@@ -418,8 +418,8 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_XCAR(c) XCONS (c)->u.s.car
 #define lisp_h_XCDR(c) XCONS (c)->u.s.u.cdr
 #define lisp_h_XCONS(a) \
-   (eassert (CONSP (a)), XUNTAG (a, Lisp_Cons, struct Lisp_Cons))
-#define lisp_h_XHASH(a) XUFIXNUM (a)
+   (eassert (CONSP (a)), (struct Lisp_Cons *) XUNTAG (a, Lisp_Cons))
+#define lisp_h_XHASH(a) XUINT (a)
 #if USE_LSB_TAG
 # define lisp_h_make_fixnum(n) \
     XIL ((EMACS_INT) (((EMACS_UINT) (n) << INTTYPEBITS) + Lisp_Int0))
@@ -1584,17 +1584,10 @@ SCHARS (Lisp_Object string)
   return nchars;
 }
 
-#ifdef GC_CHECK_STRING_BYTES
-extern ptrdiff_t string_bytes (struct Lisp_String *);
-#endif
 INLINE ptrdiff_t
 STRING_BYTES (struct Lisp_String *s)
 {
-#ifdef GC_CHECK_STRING_BYTES
-  ptrdiff_t nbytes = string_bytes (s);
-#else
   ptrdiff_t nbytes = s->u.s.size_byte < 0 ? s->u.s.size : s->u.s.size_byte;
-#endif
   eassume (0 <= nbytes);
   return nbytes;
 }
