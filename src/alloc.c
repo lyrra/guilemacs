@@ -76,20 +76,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <valgrind/memcheck.h>
 #endif
 
-/* GC_CHECK_MARKED_OBJECTS means do sanity checks on allocated objects.
-   We turn that on by default when ENABLE_CHECKING is defined;
-   define GC_CHECK_MARKED_OBJECTS to zero to disable.  */
-
-#if defined ENABLE_CHECKING && !defined GC_CHECK_MARKED_OBJECTS
-# define GC_CHECK_MARKED_OBJECTS 1
-#endif
-
 /* GC_MALLOC_CHECK defined means perform validity checks of malloc'd
-   memory.  Can do this only if using gmalloc.c and if not checking
-   marked objects.  */
+   memory.  Can do this only if using gmalloc.c */
 
 #if (defined SYSTEM_MALLOC || defined DOUG_LEA_MALLOC \
-     || defined HYBRID_MALLOC || GC_CHECK_MARKED_OBJECTS)
+     || defined HYBRID_MALLOC)
 #undef GC_MALLOC_CHECK
 #endif
 
@@ -1461,11 +1452,6 @@ struct sdata
      (STRING) is the size of the data, and DATA contains the string's
      contents.  */
   struct Lisp_String *string;
-
-#ifdef GC_CHECK_STRING_BYTES
-  ptrdiff_t nbytes;
-#endif
-
   unsigned char data[FLEXIBLE_ARRAY_MEMBER];
 };
 
@@ -1596,6 +1582,25 @@ sdata_size (ptrdiff_t n)
 
 /* Extra bytes to allocate for each string.  */
 #define GC_STRING_EXTRA GC_STRING_OVERRUN_COOKIE_SIZE
+
+/* Value is the size of an sdata structure large enough to hold NBYTES
+   bytes of string data.  The value returned includes a terminating
+   NUL byte, the size of the sdata structure, and padding.  */
+
+/* The 'max' reserves space for the nbytes union member even when NBYTES + 1 is
+   less than the size of that member.  The 'max' is not needed when
+   SDATA_DATA_OFFSET is a multiple of sizeof (ptrdiff_t), because then the
+   alignment code reserves enough space.  */
+
+/* 20190625 larv -- needed? */
+#define SDATA_SIZE(NBYTES)				      \
+     ((SDATA_DATA_OFFSET				      \
+       + (SDATA_DATA_OFFSET % sizeof (ptrdiff_t) == 0	      \
+	  ? NBYTES					      \
+	  : max (NBYTES, sizeof (ptrdiff_t) - 1))	      \
+       + 1						      \
+       + sizeof (ptrdiff_t) - 1)			      \
+      & ~(sizeof (ptrdiff_t) - 1))
 
 /* Exact bound on the number of bytes in a string, not counting the
    terminating null.  A string cannot contain more bytes than
@@ -1739,8 +1744,6 @@ allocate_string (void)
 	}
     }
 
-  check_string_free_list ();
-
   /* Pop a Lisp_String off the free-list.  */
   s = string_free_list;
   string_free_list = NEXT_FREE_LISP_STRING (s);
@@ -1748,19 +1751,6 @@ allocate_string (void)
 
   ++strings_consed;
   tally_consing (sizeof *s);
-
-#ifdef GC_CHECK_STRING_BYTES
-  if (!noninteractive)
-    {
-      if (++check_string_bytes_count == 200)
-	{
-	  check_string_bytes_count = 0;
-	  check_string_bytes (1);
-	}
-      else
-	check_string_bytes (0);
-    }
-#endif /* GC_CHECK_STRING_BYTES */
 
   return s;
 }
@@ -1797,7 +1787,7 @@ allocate_string_data (struct Lisp_String *s,
         mallopt (M_MMAP_MAX, 0);
 #endif
 
-      b = lisp_malloc (size + GC_STRING_EXTRA, clearit, MEM_TYPE_NON_LISP);
+      b = lisp_malloc (size, clearit, MEM_TYPE_NON_LISP);
 
 #ifdef DOUG_LEA_MALLOC
       if (!mmap_lisp_allowed_p ())
@@ -1847,10 +1837,6 @@ allocate_string_data (struct Lisp_String *s,
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0';
-#ifdef GC_CHECK_STRING_OVERRUN
-  memcpy ((char *) data + needed, string_overrun_cookie,
-	  GC_STRING_OVERRUN_COOKIE_SIZE);
-#endif
 
   tally_consing (needed);
 }
@@ -1953,12 +1939,7 @@ sweep_strings (void)
 		  /* Save the size of S in its sdata so that we know
 		     how large that is.  Reset the sdata's string
 		     back-pointer so that we know it's free.  */
-#ifdef GC_CHECK_STRING_BYTES
-		  if (string_bytes (s) != SDATA_NBYTES (data))
-		    emacs_abort ();
-#else
 		  data->n.nbytes = STRING_BYTES (s);
-#endif
 		  data->string = NULL;
 
 		  /* Reset the strings's `data' member so that we
@@ -1996,13 +1977,9 @@ sweep_strings (void)
 	}
     }
 
-  check_string_free_list ();
-
   string_blocks = live_blocks;
   free_large_strings ();
   compact_small_strings ();
-
-  check_string_free_list ();
 }
 
 
@@ -2060,13 +2037,6 @@ compact_small_strings (void)
 		 overwrite data we need to compute it.  */
 	      ptrdiff_t nbytes;
 	      struct Lisp_String *s = from->string;
-
-#ifdef GC_CHECK_STRING_BYTES
-	      /* Check that the string size recorded in the string is the
-		 same as the one recorded in the sdata structure.  */
-	      if (s && string_bytes (s) != SDATA_NBYTES (from))
-		emacs_abort ();
-#endif /* GC_CHECK_STRING_BYTES */
 
 	      nbytes = s ? STRING_BYTES (s) : SDATA_NBYTES (from);
 	      eassert (nbytes <= LARGE_STRING_BYTES);
@@ -6587,8 +6557,6 @@ mark_object (Lisp_Object arg)
         if (string_marked_p (ptr))
           break;
 	CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
-        set_string_marked (ptr);
-        mark_interval_tree (ptr->u.s.intervals);
 #ifdef GC_CHECK_STRING_BYTES
 	/* Check that the string size recorded in the string is the
 	   same as the one recorded in the sdata structure.  */
@@ -6696,10 +6664,7 @@ mark_object (Lisp_Object arg)
       {
 	struct Lisp_Symbol *ptr = XSYMBOL (obj);
       nextsym:
-        if (symbol_marked_p (ptr))
-          break;
         CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
-        set_symbol_marked (ptr);
 	/* Attempt to catch bogus objects.  */
 	eassert (valid_lisp_object_p (ptr->u.s.function));
 	mark_object (ptr->u.s.function);
@@ -6759,12 +6724,6 @@ mark_object (Lisp_Object arg)
 
     case Lisp_Float:
       CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
-      /* Do not mark floats stored in a dump image: these floats are
-         "cold" and do not have mark bits.  */
-      if (pdumper_object_p (XFLOAT (obj)))
-        eassert (pdumper_cold_object_p (XFLOAT (obj)));
-      else if (!XFLOAT_MARKED_P (XFLOAT (obj)))
-        XFLOAT_MARK (XFLOAT (obj));
       break;
 
     case_Lisp_Int:
@@ -6773,10 +6732,6 @@ mark_object (Lisp_Object arg)
     default:
       emacs_abort ();
     }
-
-#undef CHECK_LIVE
-#undef CHECK_ALLOCATED
-#undef CHECK_ALLOCATED_AND_LIVE
 }
 
 /* Mark the Lisp pointers in the terminal objects.
@@ -7131,14 +7086,12 @@ static void
 gc_sweep (void)
 {
   sweep_strings ();
-  check_string_bytes (!noninteractive);
   sweep_conses ();
   sweep_floats ();
   sweep_intervals ();
   sweep_symbols ();
   sweep_buffers ();
   sweep_vectors ();
-  pdumper_clear_marks ();
   check_string_bytes (!noninteractive);
 }
 
