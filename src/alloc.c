@@ -114,20 +114,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # define GC_ASAN_POISON_OBJECTS 0
 #endif
 
-/* GC_CHECK_MARKED_OBJECTS means do sanity checks on allocated objects.
-   We turn that on by default when ENABLE_CHECKING is defined;
-   define GC_CHECK_MARKED_OBJECTS to zero to disable.  */
-
-#if defined ENABLE_CHECKING && !defined GC_CHECK_MARKED_OBJECTS
-# define GC_CHECK_MARKED_OBJECTS 1
-#endif
-
 /* GC_MALLOC_CHECK defined means perform validity checks of malloc'd
-   memory.  Can do this only if using gmalloc.c and if not checking
-   marked objects.  */
+   memory.  Can do this only if using gmalloc.c */
 
 #if (defined SYSTEM_MALLOC || defined DOUG_LEA_MALLOC \
-     || defined HYBRID_MALLOC || GC_CHECK_MARKED_OBJECTS)
+     || defined HYBRID_MALLOC)
 #undef GC_MALLOC_CHECK
 #endif
 
@@ -701,26 +692,6 @@ buffer_memory_full (ptrdiff_t nbytes)
    as a constant expression in C, so do the best that we can easily do.  */
 #define COMMON_MULTIPLE(a, b) \
   ((a) % (b) == 0 ? (a) : (b) % (a) == 0 ? (b) : (a) * (b))
-
-/* Alignment needed for memory blocks that are allocated via malloc
-   and that contain Lisp objects.  */
-enum { LISP_ALIGNMENT = alignof (union { union emacs_align_type x;
-					 GCALIGNED_UNION_MEMBER }) };
-static_assert (LISP_ALIGNMENT % GCALIGNMENT == 0);
-
-/* Verify Emacs's assumption that malloc (N) returns storage suitably
-   aligned for Lisp objects whenever N is a multiple of LISP_ALIGNMENT.
-   This assumption holds for current Emacs porting targets;
-   if the assumption fails on a new platform, this check should
-   cause compilation to fail and some porting work will need to be done.
-
-   In practice the assumption holds when alignof (max_align_t) is also a
-   multiple of LISP_ALIGNMENT.  This works even for buggy platforms
-   like MinGW circa 2020, where alignof (max_align_t) is 16 even though
-   the malloc alignment is only 8, and where Emacs still works because
-   it never does anything that requires an alignment of 16.  */
-enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
-static_assert (MALLOC_IS_LISP_ALIGNED);
 
 /* Like malloc but check for no memory and block interrupt input.  */
 
@@ -1440,11 +1411,6 @@ struct sdata
      (STRING) is the size of the data, and DATA contains the string's
      contents.  */
   struct Lisp_String *string;
-
-#ifdef GC_CHECK_STRING_BYTES
-  ptrdiff_t nbytes;
-#endif
-
   unsigned char data[FLEXIBLE_ARRAY_MEMBER];
 };
 
@@ -1544,20 +1510,6 @@ static struct Lisp_String *string_free_list;
 
 #define SDATA_OF_STRING(S) ((sdata *) ((S)->u.s.data - SDATA_DATA_OFFSET))
 
-
-#ifdef GC_CHECK_STRING_OVERRUN
-
-/* Check for overrun in string data blocks by appending a small
-   "cookie" after each allocated string data block, and check for the
-   presence of this cookie during GC.  */
-# define GC_STRING_OVERRUN_COOKIE_SIZE ROUNDUP (4, alignof (sdata))
-static char const string_overrun_cookie[GC_STRING_OVERRUN_COOKIE_SIZE] =
-  { '\xde', '\xad', '\xbe', '\xef', /* Perhaps some zeros here.  */ };
-
-#else
-# define GC_STRING_OVERRUN_COOKIE_SIZE 0
-#endif
-
 /* Return the size of an sdata structure large enough to hold N bytes
    of string data.  This counts the sdata structure, the N bytes, a
    terminating NUL byte, and alignment padding.  */
@@ -1573,9 +1525,6 @@ sdata_size (ptrdiff_t n)
   return (unaligned_size + sdata_align - 1) & ~(sdata_align - 1);
 }
 
-/* Extra bytes to allocate for each string.  */
-#define GC_STRING_EXTRA GC_STRING_OVERRUN_COOKIE_SIZE
-
 /* Exact bound on the number of bytes in a string, not counting the
    terminating null.  A string cannot contain more bytes than
    STRING_BYTES_BOUND, nor can it be so long that the size_t
@@ -1584,7 +1533,6 @@ sdata_size (ptrdiff_t n)
 static ptrdiff_t const STRING_BYTES_MAX =
   min (STRING_BYTES_BOUND,
        ((SIZE_MAX
-	 - GC_STRING_EXTRA
 	 - offsetof (struct sblock, data)
 	 - SDATA_DATA_OFFSET)
 	& ~(sizeof (EMACS_INT) - 1)));
@@ -1636,96 +1584,6 @@ init_strings (void)
 # define ASAN_UNPOISON_STRING(s) ((void) 0)
 #endif
 
-#ifdef GC_CHECK_STRING_BYTES
-
-static int check_string_bytes_count;
-
-/* Like STRING_BYTES, but with debugging check.  Can be
-   called during GC, so pay attention to the mark bit.  */
-
-ptrdiff_t
-string_bytes (struct Lisp_String *s)
-{
-  ptrdiff_t nbytes =
-    (s->u.s.size_byte < 0 ? s->u.s.size & ~ARRAY_MARK_FLAG : s->u.s.size_byte);
-
-  if (!PURE_P (s) && !pdumper_object_p (s) && s->u.s.data
-      && nbytes != SDATA_NBYTES (SDATA_OF_STRING (s)))
-    emacs_abort ();
-  return nbytes;
-}
-
-/* Check validity of Lisp strings' string_bytes member in B.  */
-
-static void
-check_sblock (struct sblock *b)
-{
-  sdata *end = b->next_free;
-
-  for (sdata *from = b->data; from < end; )
-    {
-      ptrdiff_t nbytes = sdata_size (from->string
-				     ? string_bytes (from->string)
-				     : SDATA_NBYTES (from));
-      from = (sdata *) ((char *) from + nbytes + GC_STRING_EXTRA);
-    }
-}
-
-
-/* Check validity of Lisp strings' string_bytes member.  ALL_P
-   means check all strings, otherwise check only most
-   recently allocated strings.  Used for hunting a bug.  */
-
-static void
-check_string_bytes (bool all_p)
-{
-  if (all_p)
-    {
-      struct sblock *b;
-
-      for (b = large_sblocks; b; b = b->next)
-	{
-	  struct Lisp_String *s = b->data[0].string;
-	  if (s)
-	    string_bytes (s);
-	}
-
-      for (b = oldest_sblock; b; b = b->next)
-	check_sblock (b);
-    }
-  else if (current_sblock)
-    check_sblock (current_sblock);
-}
-
-#else /* not GC_CHECK_STRING_BYTES */
-
-#define check_string_bytes(all) ((void) 0)
-
-#endif /* GC_CHECK_STRING_BYTES */
-
-#ifdef GC_CHECK_STRING_FREE_LIST
-
-/* Walk through the string free list looking for bogus next pointers.
-   This may catch buffer overrun from a previous string.  */
-
-static void
-check_string_free_list (void)
-{
-  struct Lisp_String *s;
-
-  /* Pop a Lisp_String off the free-list.  */
-  s = string_free_list;
-  while (s != NULL)
-    {
-      if ((uintptr_t) s < 1024)
-	emacs_abort ();
-      s = NEXT_FREE_LISP_STRING (s);
-    }
-}
-#else
-#define check_string_free_list()
-#endif
-
 /* Return a new Lisp_String.  */
 
 static struct Lisp_String *
@@ -1754,8 +1612,6 @@ allocate_string (void)
       ASAN_POISON_STRING_BLOCK (b);
     }
 
-  check_string_free_list ();
-
   /* Pop a Lisp_String off the free-list.  */
   s = string_free_list;
   ASAN_UNPOISON_STRING (s);
@@ -1763,19 +1619,6 @@ allocate_string (void)
 
   ++strings_consed;
   tally_consing (sizeof *s);
-
-#ifdef GC_CHECK_STRING_BYTES
-  if (!noninteractive)
-    {
-      if (++check_string_bytes_count == 200)
-	{
-	  check_string_bytes_count = 0;
-	  check_string_bytes (1);
-	}
-      else
-	check_string_bytes (0);
-    }
-#endif /* GC_CHECK_STRING_BYTES */
 
   return s;
 }
@@ -1813,7 +1656,7 @@ allocate_string_data (struct Lisp_String *s,
         mallopt (M_MMAP_MAX, 0);
 #endif
 
-      b = lisp_malloc (size + GC_STRING_EXTRA, clearit, MEM_TYPE_NON_LISP);
+      b = lisp_malloc (size, clearit, MEM_TYPE_NON_LISP);
       ASAN_POISON_SBLOCK_DATA (b, size);
 
 #ifdef DOUG_LEA_MALLOC
@@ -1831,7 +1674,7 @@ allocate_string_data (struct Lisp_String *s,
       b = current_sblock;
 
       if (b == NULL
-	  || (SBLOCK_SIZE - GC_STRING_EXTRA
+	  || (SBLOCK_SIZE
 	      < (char *) b->next_free - (char *) b + needed))
 	{
 	  /* Not enough room in the current sblock.  */
@@ -1864,20 +1707,13 @@ allocate_string_data (struct Lisp_String *s,
 
   ASAN_PREPARE_LIVE_SDATA (data, nbytes);
   data->string = s;
-  b->next_free = (sdata *) ((char *) data + needed + GC_STRING_EXTRA);
+  b->next_free = (sdata *) ((char *) data + needed);
   eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
 
   s->u.s.data = SDATA_DATA (data);
-#ifdef GC_CHECK_STRING_BYTES
-  SDATA_NBYTES (data) = nbytes;
-#endif
   s->u.s.size = nchars;
   s->u.s.size_byte = nbytes;
   s->u.s.data[nbytes] = '\0';
-#ifdef GC_CHECK_STRING_OVERRUN
-  memcpy ((char *) data + needed, string_overrun_cookie,
-	  GC_STRING_OVERRUN_COOKIE_SIZE);
-#endif
 
   tally_consing (needed);
 }
@@ -1905,9 +1741,6 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
       /* No need to reallocate, as the size change falls within the
 	 alignment slop.  */
       XSTRING (string)->u.s.size_byte = new_nbytes;
-#ifdef GC_CHECK_STRING_BYTES
-      SDATA_NBYTES (old_sdata) = new_nbytes;
-#endif
       new_charaddr = data + cidx_byte;
       memmove (new_charaddr + new_clen, new_charaddr + clen,
 	       nbytes - (cidx_byte + (clen - 1)));
@@ -1984,12 +1817,7 @@ sweep_strings (void)
 		  /* Save the size of S in its sdata so that we know
 		     how large that is.  Reset the sdata's string
 		     back-pointer so that we know it's free.  */
-#ifdef GC_CHECK_STRING_BYTES
-		  if (string_bytes (s) != SDATA_NBYTES (data))
-		    emacs_abort ();
-#else
 		  data->n.nbytes = STRING_BYTES (s);
-#endif
 		  data->string = NULL;
 
 		  /* Reset the strings's `data' member so that we
@@ -2031,13 +1859,9 @@ sweep_strings (void)
 	}
     }
 
-  check_string_free_list ();
-
   string_blocks = live_blocks;
   free_large_strings ();
   compact_small_strings ();
-
-  check_string_free_list ();
 }
 
 
@@ -2096,40 +1920,26 @@ compact_small_strings (void)
 	      ptrdiff_t nbytes;
 	      struct Lisp_String *s = from->string;
 
-#ifdef GC_CHECK_STRING_BYTES
-	      /* Check that the string size recorded in the string is the
-		 same as the one recorded in the sdata structure.  */
-	      if (s && string_bytes (s) != SDATA_NBYTES (from))
-		emacs_abort ();
-#endif /* GC_CHECK_STRING_BYTES */
-
 	      nbytes = s ? STRING_BYTES (s) : SDATA_NBYTES (from);
 	      eassert (nbytes <= LARGE_STRING_BYTES);
 
 	      ptrdiff_t size = sdata_size (nbytes);
 	      sdata *from_end = (sdata *) ((char *) from
-					   + size + GC_STRING_EXTRA);
-
-#ifdef GC_CHECK_STRING_OVERRUN
-	      if (memcmp (string_overrun_cookie,
-			  (char *) from_end - GC_STRING_OVERRUN_COOKIE_SIZE,
-			  GC_STRING_OVERRUN_COOKIE_SIZE))
-		emacs_abort ();
-#endif
+					   + size);
 
 	      /* Non-NULL S means it's alive.  Copy its data.  */
 	      if (s)
 		{
 		  /* If TB is full, proceed with the next sblock.  */
 		  sdata *to_end = (sdata *) ((char *) to
-					     + size + GC_STRING_EXTRA);
+					     + size);
 		  if (to_end > tb_end)
 		    {
 		      tb->next_free = to;
 		      tb = tb->next;
 		      tb_end = (sdata *) ((char *) tb + SBLOCK_SIZE);
 		      to = tb->data;
-		      to_end = (sdata *) ((char *) to + size + GC_STRING_EXTRA);
+		      to_end = (sdata *) ((char *) to + size);
 		    }
 
 		  /* Copy, and update the string's `data' pointer.  */
@@ -2137,7 +1947,7 @@ compact_small_strings (void)
 		    {
 		      eassert (tb != b || to < from);
 		      ASAN_PREPARE_LIVE_SDATA (to, nbytes);
-		      memmove (to, from, size + GC_STRING_EXTRA);
+		      memmove (to, from, size);
 		      to->string->u.s.data = SDATA_DATA (to);
 		    }
 
@@ -6982,60 +6792,6 @@ process_mark_stack (ptrdiff_t base_sp)
       last_marked_index &= LAST_MARKED_SIZE - 1;
 #endif
 
-      /* Perform some sanity checks on the objects marked here.  Abort if
-	 we encounter an object we know is bogus.  This increases GC time
-	 by ~80%.  */
-#if GC_CHECK_MARKED_OBJECTS
-
-      /* Check that the object pointed to by PO is known to be a Lisp
-	 structure allocated from the heap.  */
-#define CHECK_ALLOCATED()			\
-      do {					\
-	if (pdumper_object_p (po))		\
-	  {					\
-	    if (!pdumper_object_p_precise (po))	\
-	      emacs_abort ();			\
-	    break;				\
-	  }					\
-	m = mem_find (po);			\
-	if (m == MEM_NIL)			\
-	  emacs_abort ();			\
-      } while (0)
-
-      /* Check that the object pointed to by PO is live, using predicate
-	 function LIVEP.  */
-#define CHECK_LIVE(LIVEP, MEM_TYPE)			\
-      do {						\
-	if (pdumper_object_p (po))			\
-	  break;					\
-	if (! (m->type == MEM_TYPE && LIVEP (m, po)))	\
-	  emacs_abort ();				\
-      } while (0)
-
-      /* Check both of the above conditions, for non-symbols.  */
-#define CHECK_ALLOCATED_AND_LIVE(LIVEP, MEM_TYPE)	\
-      do {						\
-	CHECK_ALLOCATED ();				\
-	CHECK_LIVE (LIVEP, MEM_TYPE);			\
-      } while (false)
-
-      /* Check both of the above conditions, for symbols.  */
-#define CHECK_ALLOCATED_AND_LIVE_SYMBOL()			\
-      do {							\
-	if (!c_symbol_p (ptr))					\
-	  {							\
-	    CHECK_ALLOCATED ();					\
-	    CHECK_LIVE (live_symbol_p, MEM_TYPE_SYMBOL);	\
-	  }							\
-      } while (false)
-
-#else /* not GC_CHECK_MARKED_OBJECTS */
-
-#define CHECK_ALLOCATED_AND_LIVE(LIVEP, MEM_TYPE)	((void) 0)
-#define CHECK_ALLOCATED_AND_LIVE_SYMBOL()		((void) 0)
-
-#endif /* not GC_CHECK_MARKED_OBJECTS */
-
       switch (XTYPE (obj))
 	{
 	case Lisp_String:
@@ -7043,14 +6799,8 @@ process_mark_stack (ptrdiff_t base_sp)
 	    register struct Lisp_String *ptr = XSTRING (obj);
 	    if (string_marked_p (ptr))
 	      break;
-	    CHECK_ALLOCATED_AND_LIVE (live_string_p, MEM_TYPE_STRING);
 	    set_string_marked (ptr);
 	    mark_interval_tree (ptr->u.s.intervals);
-#ifdef GC_CHECK_STRING_BYTES
-	    /* Check that the string size recorded in the string is the
-	       same as the one recorded in the sdata structure.  */
-	    string_bytes (ptr);
-#endif /* GC_CHECK_STRING_BYTES */
 	  }
 	  break;
 
@@ -7063,19 +6813,6 @@ process_mark_stack (ptrdiff_t base_sp)
 
 	    enum pvec_type pvectype
 	      = PSEUDOVECTOR_TYPE (ptr);
-
-#ifdef GC_CHECK_MARKED_OBJECTS
-	    if (!pdumper_object_p (po) && !SUBRP (obj) && !main_thread_p (po))
-	      {
-		m = mem_find (po);
-		if (m == MEM_NIL)
-		  emacs_abort ();
-		if (m->type == MEM_TYPE_VECTORLIKE)
-		  CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
-		else
-		  CHECK_LIVE (live_small_vector_p, MEM_TYPE_VECTOR_BLOCK);
-	      }
-#endif
 
 	    switch (pvectype)
 	      {
@@ -7178,7 +6915,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	  nextsym:
 	    if (symbol_marked_p (ptr))
 	      break;
-	    CHECK_ALLOCATED_AND_LIVE_SYMBOL ();
 	    set_symbol_marked (ptr);
 	    /* Attempt to catch bogus objects.  */
 	    eassert (valid_lisp_object_p (ptr->u.s.function));
@@ -7234,7 +6970,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	    struct Lisp_Cons *ptr = XCONS (obj);
 	    if (cons_marked_p (ptr))
 	      break;
-	    CHECK_ALLOCATED_AND_LIVE (live_cons_p, MEM_TYPE_CONS);
 	    set_cons_marked (ptr);
 	    /* Avoid growing the stack if the cdr is nil.
 	       In any case, make sure the car is expanded first.  */
@@ -7257,7 +6992,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	    struct Lisp_Float *f = XFLOAT (obj);
 	    if (!f)
 	      break;		/* for HASH_UNUSED_ENTRY_KEY */
-	    CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
 	    /* Do not mark floats stored in a dump image: these floats are
 	       "cold" and do not have mark bits.  */
 	    if (pdumper_object_p (f))
@@ -7274,10 +7008,6 @@ process_mark_stack (ptrdiff_t base_sp)
 	  emacs_abort ();
 	}
     }
-
-#undef CHECK_LIVE
-#undef CHECK_ALLOCATED
-#undef CHECK_ALLOCATED_AND_LIVE
 }
 
 void
@@ -7654,7 +7384,6 @@ static void
 gc_sweep (void)
 {
   sweep_strings ();
-  check_string_bytes (!noninteractive);
   sweep_conses ();
   sweep_floats ();
   sweep_intervals ();
@@ -7662,7 +7391,6 @@ gc_sweep (void)
   sweep_buffers ();
   sweep_vectors ();
   pdumper_clear_marks ();
-  check_string_bytes (!noninteractive);
 }
 
 DEFUN ("memory-info", Fmemory_info, Smemory_info, 0, 0, 0,

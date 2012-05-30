@@ -392,6 +392,10 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_XCAR(c) XCONS (c)->u.s.car
 #define lisp_h_XCDR(c) XCONS (c)->u.s.u.cdr
 #define lisp_h_XHASH(a) XUFIXNUM_RAW (a)
+#define lisp_h_XPNTR(a) \
+   (SYMBOLP (a) ? XSYMBOL (a) : (void *) ((intptr_t) (XLI (a) & VALMASK)))
+#define lisp_h_XSYMBOL(a) \
+   (eassert (SYMBOLP (a)), (struct Lisp_Symbol *) XUNTAG (a, Lisp_Symbol))
 #if USE_LSB_TAG
 # define lisp_h_make_fixnum_wrap(n) \
     XIL ((EMACS_INT) (((EMACS_UINT) (n) << INTTYPEBITS) + Lisp_Int0))
@@ -442,6 +446,8 @@ typedef EMACS_INT Lisp_Word;
 # define XCAR(c) lisp_h_XCAR (c)
 # define XCDR(c) lisp_h_XCDR (c)
 # define XHASH(a) lisp_h_XHASH (a)
+# define XPNTR(a) lisp_h_XPNTR (a)
+# define XSYMBOL(a) lisp_h_XSYMBOL (a)
 # if USE_LSB_TAG
 #  define make_fixnum(n) lisp_h_make_fixnum (n)
 #  define XFIXNUM_RAW(a) lisp_h_XFIXNUM_RAW (a)
@@ -1703,17 +1709,10 @@ SCHARS (Lisp_Object string)
   return nchars;
 }
 
-#ifdef GC_CHECK_STRING_BYTES
-extern ptrdiff_t string_bytes (struct Lisp_String *);
-#endif
 INLINE ptrdiff_t
 STRING_BYTES (struct Lisp_String *s)
 {
-#ifdef GC_CHECK_STRING_BYTES
-  ptrdiff_t nbytes = string_bytes (s);
-#else
   ptrdiff_t nbytes = s->u.s.size_byte < 0 ? s->u.s.size : s->u.s.size_byte;
-#endif
   eassume (0 <= nbytes);
   return nbytes;
 }
