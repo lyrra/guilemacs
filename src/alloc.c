@@ -712,39 +712,6 @@ verify (LISP_ALIGNMENT % GCALIGNMENT == 0);
    it never does anything that requires an alignment of 16.  */
 enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
 
-/* If compiled with XMALLOC_BLOCK_INPUT_CHECK, define a symbol
-   BLOCK_INPUT_IN_MEMORY_ALLOCATORS that is visible to the debugger.
-   If that variable is set, block input while in one of Emacs's memory
-   allocation functions.  There should be no need for this debugging
-   option, since signal handlers do not allocate memory, but Emacs
-   formerly allocated memory in signal handlers and this compile-time
-   option remains as a way to help debug the issue should it rear its
-   ugly head again.  */
-#ifdef XMALLOC_BLOCK_INPUT_CHECK
-bool block_input_in_memory_allocators EXTERNALLY_VISIBLE;
-static void
-malloc_block_input (void)
-{
-  if (block_input_in_memory_allocators)
-    block_input ();
-}
-static void
-malloc_unblock_input (void)
-{
-  if (block_input_in_memory_allocators)
-    {
-      int err = errno;
-      unblock_input ();
-      errno = err;
-    }
-}
-# define MALLOC_BLOCK_INPUT malloc_block_input ()
-# define MALLOC_UNBLOCK_INPUT malloc_unblock_input ()
-#else
-# define MALLOC_BLOCK_INPUT ((void) 0)
-# define MALLOC_UNBLOCK_INPUT ((void) 0)
-#endif
-
 #define MALLOC_PROBE(size)			\
   do {						\
     if (profiler_memory_running)		\
@@ -761,13 +728,10 @@ xmalloc (size_t size)
 {
   void *val;
 
-  MALLOC_BLOCK_INPUT;
   val = lmalloc (size, false);
-  MALLOC_UNBLOCK_INPUT;
 
   if (!val && size)
     memory_full (size);
-  MALLOC_PROBE (size);
   return val;
 }
 
@@ -778,13 +742,10 @@ xzalloc (size_t size)
 {
   void *val;
 
-  MALLOC_BLOCK_INPUT;
   val = lmalloc (size, true);
-  MALLOC_UNBLOCK_INPUT;
 
   if (!val && size)
     memory_full (size);
-  MALLOC_PROBE (size);
   return val;
 }
 
@@ -795,18 +756,15 @@ xrealloc (void *block, size_t size)
 {
   void *val;
 
-  MALLOC_BLOCK_INPUT;
   /* We must call malloc explicitly when BLOCK is 0, since some
      reallocs don't do this.  */
   if (! block)
     val = lmalloc (size, false);
   else
     val = lrealloc (block, size);
-  MALLOC_UNBLOCK_INPUT;
 
   if (!val && size)
     memory_full (size);
-  MALLOC_PROBE (size);
   return val;
 }
 
@@ -820,9 +778,8 @@ xfree (void *block)
     return;
   if (pdumper_object_p (block))
     return;
-  MALLOC_BLOCK_INPUT;
   free (block);
-  MALLOC_UNBLOCK_INPUT;
+
   /* We don't call refill_memory_reserve here
      because in practice the call in r_alloc_free seems to suffice.  */
 }
@@ -1000,8 +957,6 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
 {
   register void *val;
 
-  MALLOC_BLOCK_INPUT;
-
 #ifdef GC_MALLOC_CHECK
   allocated_mem_type = type;
 #endif
@@ -1030,10 +985,8 @@ lisp_malloc (size_t nbytes, bool clearit, enum mem_type type)
     mem_insert (val, (char *) val + nbytes, type);
 #endif
 
-  MALLOC_UNBLOCK_INPUT;
   if (!val)
     memory_full (nbytes);
-  MALLOC_PROBE (nbytes);
   return val;
 }
 
@@ -1046,12 +999,10 @@ lisp_free (void *block)
   if (pdumper_object_p (block))
     return;
 
-  MALLOC_BLOCK_INPUT;
   free (block);
 #ifndef GC_MALLOC_CHECK
   mem_delete (mem_find (block));
 #endif
-  MALLOC_UNBLOCK_INPUT;
 }
 
 /*****  Allocation of aligned blocks of memory to store Lisp data.  *****/
@@ -1179,8 +1130,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 
   eassert (nbytes <= BLOCK_BYTES);
 
-  MALLOC_BLOCK_INPUT;
-
 #ifdef GC_MALLOC_CHECK
   allocated_mem_type = type;
 #endif
@@ -1204,10 +1153,7 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 #endif
 
       if (base == 0)
-	{
-	  MALLOC_UNBLOCK_INPUT;
-	  memory_full (ABLOCKS_BYTES);
-	}
+        memory_full (ABLOCKS_BYTES);
 
       aligned = (base == abase);
       if (!aligned)
@@ -1231,7 +1177,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
 	    {
 	      lisp_malloc_loser = base;
 	      free (base);
-	      MALLOC_UNBLOCK_INPUT;
 	      memory_full (SIZE_MAX);
 	    }
 	}
@@ -1266,10 +1211,6 @@ lisp_align_malloc (size_t nbytes, enum mem_type type)
     mem_insert (val, (char *) val + nbytes, type);
 #endif
 
-  MALLOC_UNBLOCK_INPUT;
-
-  MALLOC_PROBE (nbytes);
-
   eassert (0 == ((uintptr_t) val) % BLOCK_ALIGN);
   return val;
 }
@@ -1280,10 +1221,10 @@ lisp_align_free (void *block)
   struct ablock *ablock = block;
   struct ablocks *abase = ABLOCK_ABASE (ablock);
 
-  MALLOC_BLOCK_INPUT;
 #ifndef GC_MALLOC_CHECK
   mem_delete (mem_find (block));
 #endif
+
   /* Put on free list.  */
   ablock->x.next_free = free_ablock;
   free_ablock = ablock;
@@ -1316,7 +1257,6 @@ lisp_align_free (void *block)
 #endif
       free (ABLOCKS_BASE (abase));
     }
-  MALLOC_UNBLOCK_INPUT;
 }
 
 /* True if a malloc-returned pointer P is suitably aligned for SIZE,
@@ -1427,8 +1367,6 @@ make_interval (void)
 {
   INTERVAL val;
 
-  MALLOC_BLOCK_INPUT;
-
   if (interval_free_list)
     {
       val = interval_free_list;
@@ -1447,8 +1385,6 @@ make_interval (void)
 	}
       val = &interval_block->intervals[interval_block_index++];
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   tally_consing (sizeof (struct interval));
   intervals_consed++;
@@ -1784,8 +1720,6 @@ allocate_string (void)
 {
   struct Lisp_String *s;
 
-  MALLOC_BLOCK_INPUT;
-
   /* If the free-list is empty, allocate a new string_block, and
      add all the Lisp_Strings in it to the free-list.  */
   if (string_free_list == NULL)
@@ -1812,7 +1746,6 @@ allocate_string (void)
   s = string_free_list;
   string_free_list = NEXT_FREE_LISP_STRING (s);
 
-  MALLOC_UNBLOCK_INPUT;
 
   ++strings_consed;
   tally_consing (sizeof *s);
@@ -1855,8 +1788,6 @@ allocate_string_data (struct Lisp_String *s,
   /* Determine the number of bytes needed to store NBYTES bytes
      of string data.  */
   ptrdiff_t needed = sdata_size (nbytes);
-
-  MALLOC_BLOCK_INPUT;
 
   if (nbytes > LARGE_STRING_BYTES)
     {
@@ -1909,7 +1840,6 @@ allocate_string_data (struct Lisp_String *s,
   b->next_free = (sdata *) ((char *) data + needed + GC_STRING_EXTRA);
   eassert ((uintptr_t) b->next_free % alignof (sdata) == 0);
 
-  MALLOC_UNBLOCK_INPUT;
 
   s->u.s.data = SDATA_DATA (data);
 #ifdef GC_CHECK_STRING_BYTES
@@ -2576,8 +2506,6 @@ make_float (double float_value)
 {
   register Lisp_Object val;
 
-  MALLOC_BLOCK_INPUT;
-
   if (float_free_list)
     {
       XSETFLOAT (val, float_free_list);
@@ -2597,8 +2525,6 @@ make_float (double float_value)
       XSETFLOAT (val, &float_block->floats[float_block_index]);
       float_block_index++;
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   XFLOAT_INIT (val, float_value);
   eassert (!XFLOAT_MARKED_P (XFLOAT (val)));
@@ -2683,8 +2609,6 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
 {
   register Lisp_Object val;
 
-  MALLOC_BLOCK_INPUT;
-
   if (cons_free_list)
     {
       XSETCONS (val, cons_free_list);
@@ -2704,8 +2628,6 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
       XSETCONS (val, &cons_block->conses[cons_block_index]);
       cons_block_index++;
     }
-
-  MALLOC_UNBLOCK_INPUT;
 
   XSETCAR (val, car);
   XSETCDR (val, cdr);
@@ -3292,8 +3214,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
   ptrdiff_t nbytes = header_size + len * word_size;
   struct Lisp_Vector *p;
 
-  MALLOC_BLOCK_INPUT;
-
 #ifdef DOUG_LEA_MALLOC
   if (!mmap_lisp_allowed_p ())
     mallopt (M_MMAP_MAX, 0);
@@ -3325,7 +3245,6 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
   tally_consing (nbytes);
   vector_cells_consed += len;
 
-  MALLOC_UNBLOCK_INPUT;
 
   return p;
 }
@@ -3619,8 +3538,6 @@ Its value is void, and its function definition and property list are nil.  */)
 
   CHECK_STRING (name);
 
-  MALLOC_BLOCK_INPUT;
-
   if (symbol_free_list)
     {
       XSETSYMBOL (val, symbol_free_list);
@@ -3640,7 +3557,6 @@ Its value is void, and its function definition and property list are nil.  */)
       symbol_block_index++;
     }
 
-  MALLOC_UNBLOCK_INPUT;
 
   init_symbol (val, name);
   tally_consing (sizeof (struct Lisp_Symbol));
@@ -4032,14 +3948,12 @@ memory_full (size_t nbytes)
     {
       void *p;
 
-      MALLOC_BLOCK_INPUT;
       p = malloc (SPARE_MEMORY);
       if (p)
 	{
 	  free (p);
 	  enough_free_memory = true;
 	}
-      MALLOC_UNBLOCK_INPUT;
     }
 
   if (! enough_free_memory)
