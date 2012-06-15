@@ -327,83 +327,9 @@ this option's value should be 'yes', 'no', 'alsa', 'oss', or 'bsd-ossaudio'.])
   ],
   [with_sound=$with_features])
 
-AC_ARG_WITH([pdumper],
-  AS_HELP_STRING(
-    [--with-pdumper=VALUE],
-    [enable pdumper support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-pdumper=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_pdumper=$val
-    ],
-    [with_pdumper=auto])
-
-AC_ARG_WITH([unexec],
-  AS_HELP_STRING(
-    [--with-unexec=VALUE],
-    [enable unexec support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-unexec=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_unexec=$val
-    ],
-    [with_unexec=auto])
-
-AC_ARG_WITH([dumping],[AS_HELP_STRING([--with-dumping=VALUE],
-    [kind of dumping to use for initial Emacs build
-(VALUE one of: pdumper, unexec, none; default pdumper)])],
-    [ case "${withval}" in
-        pdumper|unexec|none) val=$withval ;;
-        *) AC_MSG_ERROR(['--with-dumping=$withval is invalid;
-this option's value should be 'pdumper', 'unexec', or 'none'.])
-        ;;
-      esac
-      with_dumping=$val
-    ],
-    [with_dumping=pdumper])
-
-if test "$with_pdumper" = "auto"; then
-  if test "$with_dumping" = "pdumper"; then
-    with_pdumper=yes
-  else
-    with_pdumper=no
-  fi
-fi
-
-if test "$with_unexec" = "auto"; then
-  if test "$with_dumping" = "unexec"; then
-    with_unexec=yes
-  else
-    with_unexec=no
-  fi
-fi
-
-if test "$with_dumping" = "pdumper" && test "$with_pdumper" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=pdumper' requires pdumper support])
-fi
-
-if test "$with_dumping" = "unexec" && test "$with_unexec" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=unexec' requires unexec support])
-fi
-
-if test "$with_pdumper" = "yes"; then
-  AC_DEFINE([HAVE_PDUMPER], 1, [Define to build with portable dumper support])
-  HAVE_PDUMPER=yes
-else
-  HAVE_PDUMPER=no
-fi
-AC_SUBST([HAVE_PDUMPER])
-
-DUMPING=$with_dumping
-AC_SUBST(DUMPING)
+dnl AC_DEFINE(HAVE_PDUMPER , [disable pdumper])
+dnl AC_DEFINE(HAVE_UNEXEC , [disable unexec])
+dnl AC_DEFINE(DUMPING , [disable dumping])
 
 dnl FIXME currently it is not the last.
 dnl This should be the last --with option, because --with-x is
@@ -601,15 +527,6 @@ if test x$ac_enable_checking != x ; then
   AC_DEFINE(ENABLE_CHECKING, 1,
 [Define to 1 if expensive run-time data type and consistency checks are enabled.])
 fi
-if $CHECK_STRUCTS; then
-  AC_DEFINE([CHECK_STRUCTS], 1,
-    [Define this to check whether someone updated the portable dumper
-     code after changing the layout of a structure that it uses.
-     If you change one of these structures, check that the pdumper.c
-     code is still valid, and update the pertinent hash in pdumper.c
-     by manually copying the hash from the newly-generated dmpstruct.h.])
-fi
-AC_SUBST([CHECK_STRUCTS])
 if test x$ac_gc_check_stringbytes != x ; then
   AC_DEFINE(GC_CHECK_STRING_BYTES, 1,
 [Define this temporarily to hunt a bug.  If defined, the size of
@@ -1436,45 +1353,7 @@ AC_CACHE_CHECK([whether addresses are sanitized],
      [emacs_cv_sanitize_address=yes],
      [emacs_cv_sanitize_address=no])])
 
-if test $with_unexec = yes; then
-  AC_DEFINE([HAVE_UNEXEC], 1, [Define if Emacs supports unexec.])
-  if test "$emacs_cv_sanitize_address" = yes; then
-    AC_MSG_WARN([[Addresses are sanitized; suggest --without-unexec]])
-  fi
-fi
 
-
-UNEXEC_OBJ=
-test $with_unexec = yes &&
-case "$opsys" in
-  # MSDOS uses unexcoff.o
-  aix4-2)
-   UNEXEC_OBJ=unexaix.o
-   ;;
-  cygwin)
-   UNEXEC_OBJ=unexcw.o
-   ;;
-  darwin)
-   UNEXEC_OBJ=unexmacosx.o
-   ;;
-  hpux10-20 | hpux11)
-   UNEXEC_OBJ=unexhp9k800.o
-   ;;
-  mingw32)
-   UNEXEC_OBJ=unexw32.o
-   ;;
-  solaris)
-   # Use the Solaris dldump() function, called from unexsol.c, to dump
-   # emacs, instead of the generic ELF dump code found in unexelf.c.
-   # The resulting binary has a complete symbol table, and is better
-   # for debugging and other observability tools (debuggers, pstack, etc).
-   UNEXEC_OBJ=unexsol.o
-   ;;
-  *)
-   UNEXEC_OBJ=unexelf.o
-   ;;
-esac
-AC_SUBST(UNEXEC_OBJ)
 
 LD_SWITCH_SYSTEM=
 test "$with_unexec" = no || case "$opsys" in
@@ -2290,21 +2169,7 @@ doug_lea_malloc=$emacs_cv_var_doug_lea_malloc
 hybrid_malloc=
 system_malloc=yes
 
-dnl This must be before the test of $ac_cv_func_sbrk below.
-AC_CHECK_FUNCS_ONCE([sbrk])
-
-test $with_unexec = yes &&
-case "$opsys" in
-  ## darwin ld insists on the use of malloc routines in the System framework.
-  darwin | mingw32 | nacl | solaris) ;;
-  cygwin | qnxnto | freebsd)
-	  hybrid_malloc=yes
-          system_malloc= ;;
-  *) test "$ac_cv_func_sbrk" = yes && system_malloc=$emacs_cv_sanitize_address;;
-esac
-
-if test "${system_malloc}" != yes && test "${doug_lea_malloc}" != yes \
-   && test "${UNEXEC_OBJ}" = unexelf.o; then
+if test "${system_malloc}" != yes && test "${doug_lea_malloc}" != yes; then
   hybrid_malloc=yes
 fi
 
@@ -5916,14 +5781,12 @@ optsep=
 emacs_config_features=
 for opt in ACL CAIRO DBUS FREETYPE GCONF GIF GLIB GMP GNUTLS GPM GSETTINGS \
  HARFBUZZ IMAGEMAGICK JPEG JSON LCMS2 LIBOTF LIBSELINUX LIBSYSTEMD LIBXML2 \
- M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PDUMPER PNG RSVG SECCOMP \
+ M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PNG RSVG SECCOMP \
  SOUND THREADS TIFF \
- TOOLKIT_SCROLL_BARS UNEXEC X11 XAW3D XDBE XFT XIM XPM XWIDGETS X_TOOLKIT \
+ TOOLKIT_SCROLL_BARS X11 XAW3D XDBE XFT XIM XPM XWIDGETS X_TOOLKIT \
  ZLIB; do
 
     case $opt in
-      PDUMPER) val=${with_pdumper} ;;
-      UNEXEC) val=${with_unexec} ;;
       GLIB) val=${emacs_cv_links_glib} ;;
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
       TOOLKIT_SCROLL_BARS|X_TOOLKIT) eval val=\${USE_$opt} ;;
@@ -5990,10 +5853,6 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}
   Does Emacs support Xwidgets?                            ${HAVE_XWIDGETS}
   Does Emacs have threading support in lisp?              ${threads_enabled}
-  Does Emacs support the portable dumper?                 ${with_pdumper}
-  Does Emacs support legacy unexec dumping?               ${with_unexec}
-  Which dumping strategy does Emacs use?                  ${with_dumping}
-  Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}
 "])
 
 if test -n "${EMACSDATA}"; then
