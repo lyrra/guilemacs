@@ -2240,13 +2240,6 @@ AC_CACHE_CHECK([whether addresses are sanitized],
      [emacs_cv_sanitize_address=yes],
      [emacs_cv_sanitize_address=no])])
 
-if test $with_unexec = yes; then
-  AC_DEFINE([HAVE_UNEXEC], [1], [Define if Emacs supports unexec.])
-  if test "$emacs_cv_sanitize_address" = yes; then
-    AC_MSG_WARN([[Addresses are sanitized; suggest --without-unexec]])
-  fi
-fi
-
 
 UNEXEC_OBJ=
 test $with_unexec = yes &&
