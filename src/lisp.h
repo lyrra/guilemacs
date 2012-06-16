@@ -237,13 +237,8 @@ DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
    expression involving VAL_MAX.  */
 #define VAL_MAX (EMACS_INT_MAX >> (GCTYPEBITS - 1))
 
-/* Whether the least-significant bits of an EMACS_INT contain the tag.
-   On hosts where pointers-as-ints do not exceed VAL_MAX / 2, USE_LSB_TAG is:
-    a. unnecessary, because the top bits of an EMACS_INT are unused, and
-    b. slower, because it typically requires extra masking.
-   So, USE_LSB_TAG is true only on hosts where it might be useful.  */
 DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
-#define USE_LSB_TAG (VAL_MAX / 2 < INTPTR_MAX)
+#define USE_LSB_TAG 1
 DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
@@ -257,10 +252,6 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
 # define alignas(a)
 #endif
 
-/* Minimum alignment requirement for Lisp objects, imposed by the
-   internal representation of tagged pointers.  It is 2**GCTYPEBITS if
-   USE_LSB_TAG, 1 otherwise.  It must be a literal integer constant,
-   for older versions of GCC (through at least 4.9).  */
 #if USE_LSB_TAG
 # define GCALIGNMENT 8
 # if GCALIGNMENT != 1 << GCTYPEBITS
