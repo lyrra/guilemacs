@@ -263,7 +263,7 @@ enum Lisp_Bits
     b. slower, because it typically requires extra masking.
    So, USE_LSB_TAG is true only on hosts where it might be useful.  */
 DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
-#define USE_LSB_TAG (VAL_MAX / 2 < INTPTR_MAX)
+#define USE_LSB_TAG 1
 DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
@@ -271,10 +271,15 @@ DEFINE_GDB_SYMBOL_BEGIN (EMACS_INT, VALMASK)
 # define VALMASK (USE_LSB_TAG ? - (1 << GCTYPEBITS) : VAL_MAX)
 DEFINE_GDB_SYMBOL_END (VALMASK)
 
-#if !USE_LSB_TAG && !defined WIDE_EMACS_INT
-# error "USE_LSB_TAG not supported on this platform; please report this." \
-	"Try 'configure --with-wide-int' to work around the problem."
-error !;
+DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
+#define USE_LSB_TAG 1
+DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
+
+#ifndef alignas
+# define alignas(alignment) /* empty */
+# if USE_LSB_TAG
+#  error "USE_LSB_TAG requires alignas"
+# endif
 #endif
 
 /* Some operations are so commonly executed that they are implemented
