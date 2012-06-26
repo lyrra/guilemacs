@@ -217,14 +217,6 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 # define DEADP(x) 0
 #endif
 
-static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
-XPNTR (Lisp_Object a)
-{
-  return (SYMBOLP (a)
-	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
-	  : (char *) XLP (a) - (XLI (a) & ~VALMASK));
-}
-
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
 {
