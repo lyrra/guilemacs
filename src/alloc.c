@@ -206,20 +206,6 @@ static void refill_memory_reserve (void);
 static Lisp_Object make_empty_string (int);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 
-/* Addresses of staticpro'd variables.  Initialize it to a nonzero
-   value if we might unexec; otherwise some compilers put it into
-   BSS.  */
-
-Lisp_Object const *staticvec[NSTATICS]
-#ifdef HAVE_UNEXEC
-= {&Vpurify_flag}
-#endif
-  ;
-
-/* Index of next unused slot in staticvec.  */
-
-int staticidx;
-
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
 {
@@ -2034,19 +2020,10 @@ DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
 			  Protection from GC
  ***********************************************************************/
 
-/* Put an entry in staticvec, pointing at the variable with address
-   VARADDRESS.  */
-
 void
 staticpro (Lisp_Object const *varaddress)
 {
-  for (int i = 0; i < staticidx; i++)
-    eassert (staticvec[i] != varaddress);
-  if (staticidx >= NSTATICS)
-    fatal ("NSTATICS too small; try increasing and recompiling Emacs.");
-  staticvec[staticidx++] = varaddress;
 }
-
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
        doc: /* Reclaim storage for Lisp objects no longer needed.
