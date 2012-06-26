@@ -1573,20 +1573,6 @@ DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
 			  Protection from GC
  ***********************************************************************/
 
-/* Put an entry in staticvec, pointing at the variable with address
-   VARADDRESS.  */
-
-void
-staticpro (Lisp_Object const *varaddress)
-{
-  for (int i = 0; i < staticidx; i++)
-    eassert (staticvec[i] != varaddress);
-  if (staticidx >= NSTATICS)
-    fatal ("NSTATICS too small; try increasing and recompiling Emacs.");
-  staticvec[staticidx++] = varaddress;
-}
-
-
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
        doc: /* Reclaim storage for Lisp objects no longer needed.
 Garbage collection happens automatically if you cons more than
