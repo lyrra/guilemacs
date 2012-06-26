@@ -235,53 +235,9 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 # define DEADP(x) 0
 #endif
 
-/* Addresses of staticpro'd variables.  Initialize it to a nonzero
-   value; otherwise some compilers put it into BSS.  */
+/* Recording what needs to be marked for gc.  */
 
-enum { NSTATICS = 2048 };
-static Lisp_Object *staticvec[NSTATICS] = {&Vpurify_flag};
-
-/* Index of next unused slot in staticvec.  */
-
-static int staticidx;
-
-/*** FIX: 20190625 LAV Used ***/
-/* Extract the pointer hidden within A, if A is not a symbol.
-   If A is a symbol, extract the hidden pointer's offset from lispsym,
-   converted to void *.  */
-
-#define macro_XPNTR_OR_SYMBOL_OFFSET(a) \
-  ((void *) (intptr_t) (USE_LSB_TAG ? XLI (a) - XTYPE (a) : XLI (a) & VALMASK))
-
-/* Extract the pointer hidden within A.  */
-
-#define macro_XPNTR(a) \
-  ((void *) ((intptr_t) XPNTR_OR_SYMBOL_OFFSET (a) \
-	     + (SYMBOLP (a) ? (char *) lispsym : NULL)))
-
-/* For pointer access, define XPNTR and XPNTR_OR_SYMBOL_OFFSET as
-   functions, as functions are cleaner and can be used in debuggers.
-   Also, define them as macros if being compiled with GCC without
-   optimization, for performance in that case.  The macro_* names are
-   private to this section of code.  */
-
-static ATTRIBUTE_UNUSED void *
-XPNTR_OR_SYMBOL_OFFSET (Lisp_Object a)
-{
-  return macro_XPNTR_OR_SYMBOL_OFFSET (a);
-}
-static ATTRIBUTE_UNUSED void *
-XPNTR (Lisp_Object a)
-{
-  return macro_XPNTR (a);
-}
-
-#if DEFINE_KEY_OPS_AS_MACROS
-# define XPNTR_OR_SYMBOL_OFFSET(a) macro_XPNTR_OR_SYMBOL_OFFSET (a)
-# define XPNTR(a) macro_XPNTR (a)
-#endif
-
-/*** EOF FIX: 20190625 LAV, used? ***/
+struct gcpro *gcprolist;
 
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
@@ -2326,17 +2282,11 @@ DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
 			  Protection from GC
  ***********************************************************************/
 
-/* Put an entry in staticvec, pointing at the variable with address
-   VARADDRESS.  */
-
 void
 staticpro (Lisp_Object *varaddress)
 {
-  if (staticidx >= NSTATICS)
-    fatal ("NSTATICS too small; try increasing and recompiling Emacs.");
-  staticvec[staticidx++] = varaddress;
+  return;
 }
-
 
 DEFUN ("garbage-collect", Fgarbage_collect, Sgarbage_collect, 0, 0, "",
        doc: /* Reclaim storage for Lisp objects no longer needed.
