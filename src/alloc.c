@@ -1825,7 +1825,7 @@ memory_full (size_t nbytes)
   bool enough_free_memory = false;
   if (SPARE_MEMORY < nbytes)
     {
-      void *p = GC_MALLOC (SPARE_MEMORY);
+      void *p = xmalloc_unsafe (SPARE_MEMORY);
       if (p)
 	{
 	  xfree (p);
