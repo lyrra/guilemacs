@@ -1309,13 +1309,11 @@ x_get_window_property (Display *display, Window window, Atom property,
 
       if (total_size - offset < bytes_gotten)
 	{
-	  unsigned char *data1;
 	  ptrdiff_t remaining_lim = total_size_max - offset - bytes_gotten;
 	  if (remaining_lim < 0 || remaining_lim < bytes_remaining)
 	    goto size_overflow;
 	  total_size = offset + bytes_gotten + bytes_remaining;
-	  data1 = xrealloc (data, total_size + 1);
-	  data = data1;
+	  data = xrealloc (data, total_size + 1);
 	}
 
       if (LONG_WIDTH > 32 && *actual_format_ret == 32)
