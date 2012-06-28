@@ -70,7 +70,7 @@ ftxfont_get_gcs (struct frame *f, unsigned long foreground, unsigned long backgr
 	}
     }
 
-  new = xmalloc (sizeof *new);
+  new = xmalloc_unsafe (sizeof *new);
   new->next = this;
   if (prev)
       prev->next = new;
