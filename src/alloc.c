@@ -242,7 +242,7 @@ struct gcpro *gcprolist;
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
 {
-  XFLOAT (f)->u.data = n;
+  XFLOAT (f)->data = n;
 }
 
 #ifdef DOUG_LEA_MALLOC
