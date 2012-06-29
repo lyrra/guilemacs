@@ -2770,12 +2770,8 @@ XBUFFER_OBJFWD (lispfwd a)
 /* Lisp floating point type.  */
 struct Lisp_Float
   {
-    union
-    {
-      double data;
-      struct Lisp_Float *chain;
-    } u;
-  } GCALIGNED_STRUCT;
+    double data;
+  };
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -2793,7 +2789,7 @@ XFLOAT (Lisp_Object a)
 INLINE double
 XFLOAT_DATA (Lisp_Object f)
 {
-  return XFLOAT (f)->u.data;
+  return XFLOAT (f)->data;
 }
 
 /* Most hosts nowadays use IEEE floating point, so they use IEC 60559
