@@ -148,7 +148,7 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
 {
-  XFLOAT (f)->u.data = n;
+  XFLOAT (f)->data = n;
 }
 
 /* Account for allocation of NBYTES in the heap.  This is a separate
