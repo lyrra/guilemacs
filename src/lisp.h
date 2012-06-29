@@ -3201,14 +3201,8 @@ KBOARD_OBJFWDP (lispfwd a)
 /* Lisp floating point type.  */
 struct Lisp_Float
   {
-    union
-    {
-      double data;
-      struct Lisp_Float *chain;
-      GCALIGNED_UNION_MEMBER
-    } u;
+    double data;
   };
-static_assert (GCALIGNED (struct Lisp_Float));
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -3226,7 +3220,7 @@ XFLOAT (Lisp_Object a)
 INLINE double
 XFLOAT_DATA (Lisp_Object f)
 {
-  return XFLOAT (f)->u.data;
+  return XFLOAT (f)->data;
 }
 
 /* Most hosts nowadays use IEEE floating point, so they use IEC 60559
