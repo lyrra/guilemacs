@@ -1188,8 +1188,6 @@ maybe_load_seccomp (int argc, char **argv)
 int
 main (int argc, char **argv)
 {
-  void *stack_bottom_variable;
-
   /* First, check whether we should apply a seccomp filter.  This
      should come at the very beginning to allow the filter to protect
      the initialization phase.  */
@@ -1207,9 +1205,6 @@ main (int argc, char **argv)
 
   /* If we use --chdir, this records the original directory.  */
   char const *original_pwd = 0;
-
-  /* Record (approximately) where the stack begins.  */
-  stack_bottom = (char *) &stack_bottom_variable;
 
   const char *dump_mode = NULL;
   int skip_args = 0;
