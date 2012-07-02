@@ -677,7 +677,6 @@ close_output_streams (void)
 int
 main (int argc, char **argv)
 {
-  void *stack_bottom_variable;
   bool do_initial_setlocale;
   bool dumping;
   int skip_args = 0;
