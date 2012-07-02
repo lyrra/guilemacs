@@ -977,7 +977,6 @@ load_pdump (int argc, char **argv)
 int
 main (int argc, char **argv)
 {
-  void *stack_bottom_variable;
   bool do_initial_setlocale;
   bool no_loadup = false;
   char *junk = 0;
