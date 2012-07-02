@@ -1271,9 +1271,6 @@ int
 android_emacs_init (int argc, char **argv, char *dump_file)
 #endif
 {
-  /* Variable near the bottom of the stack, and aligned appropriately
-     for pointers.  */
-  void *stack_bottom_variable;
   int old_argc;
 #if defined HAVE_PDUMPER && !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
   char *dump_file;
