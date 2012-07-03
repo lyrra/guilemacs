@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libguile.h>
 
 #define MAIN_PROGRAM
 #include "lisp.h"
@@ -1489,6 +1490,11 @@ android_emacs_init (int argc, char **argv, char *dump_file)
      'command-line-args-left' in 'command-line-1'.  */
 
   bool only_version = false;
+
+  /* Override Guile's libgc configuration. */
+  xputenv ("GC_ALL_INTERIOR_POINTERS=1");
+  scm_init_guile ();
+
   sort_args (argc, argv);
   old_argc = argc, argc = 0;
   /* Don't allow going past argv.  */
