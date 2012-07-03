@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/file.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <libguile.h>
 
 #define MAIN_PROGRAM
 #include "lisp.h"
@@ -1371,6 +1372,10 @@ main (int argc, char **argv)
      below whose priority is below the GUI system related switches
      should be explicitly recognized, ignored, and removed from
      'command-line-args-left' in 'command-line-1'.  */
+
+  /* Override Guile's libgc configuration. */
+  xputenv ("GC_ALL_INTERIOR_POINTERS=1");
+  scm_init_guile ();
 
   sort_args (argc, argv);
   argc = 0;
