@@ -687,7 +687,7 @@ define pvecsize
     echo \n
     output (($size & PSEUDOVECTOR_REST_MASK) >> PSEUDOVECTOR_SIZE_BITS)
   else
-    output ($size & ~ARRAY_MARK_FLAG)
+    output $size
   end
   echo \n
 end
@@ -783,7 +783,7 @@ end
 define xvector
   xgetptr $
   print (struct Lisp_Vector *) $ptr
-  output ($->header.size > 50) ? 0 : ($->contents[0])@($->header.size & ~ARRAY_MARK_FLAG)
+  output ($->header.size > 50) ? 0 : ($->contents[0])@($->header.size)
 echo \n
 end
 document xvector
@@ -1071,7 +1071,7 @@ end
 
 define xprintstr
   set $data = (char *) $arg0->u.s.data
-  set $strsize = ($arg0->u.s.size_byte < 0) ? ($arg0->u.s.size & ~ARRAY_MARK_FLAG) : $arg0->u.s.size_byte
+  set $strsize = ($arg0->u.s.size_byte < 0) ?  $arg0->u.s.size : $arg0->u.s.size_byte
   # GDB doesn't like zero repetition counts
   if $strsize == 0
     output ""
@@ -1170,7 +1170,7 @@ define xbacktrace
         if ($size & PSEUDOVECTOR_FLAG)
 	  output (enum pvec_type) (($size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
 	else
-	  output $size & ~ARRAY_MARK_FLAG
+	  output $size
 	end
       else
         printf "Lisp type %d", $type
@@ -1188,7 +1188,7 @@ end
 
 define xprintbytestr
   set $data = (char *) $arg0->data
-  set $bstrsize = ($arg0->size_byte < 0) ? ($arg0->size & ~ARRAY_MARK_FLAG) : $arg0->size_byte
+  set $bstrsize = ($arg0->size_byte < 0) ? $arg0->size : $arg0->size_byte
   printf "Bytecode: "
   if $bstrsize > 0
     output/u ($arg0->size > 1000) ? 0 : ($data[0])@($bvsize)

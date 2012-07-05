@@ -857,12 +857,6 @@ INLINE void
   lisp_h_CHECK_SYMBOL (x);
 }
 
-/* In the size word of a vector, this bit means the vector has been marked.  */
-
-DEFINE_GDB_SYMBOL_BEGIN (ptrdiff_t, ARRAY_MARK_FLAG)
-# define ARRAY_MARK_FLAG PTRDIFF_MIN
-DEFINE_GDB_SYMBOL_END (ARRAY_MARK_FLAG)
-
 /* In the size word of a struct Lisp_Vector, this bit means it's really
    some other vector-like object.  */
 DEFINE_GDB_SYMBOL_BEGIN (ptrdiff_t, PSEUDOVECTOR_FLAG)
@@ -1658,7 +1652,7 @@ gc_aset (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
 {
   /* Like ASET, but also can be used in the garbage collector:
      sweep_weak_table calls set_hash_key etc. while the table is marked.  */
-  eassert (0 <= idx && idx < gc_asize (array));
+  eassert (0 <= idx && idx < (ASIZE (array))); // eassert (0 <= idx && idx < gc_asize (array));
   XVECTOR (array)->contents[idx] = val;
 }
 
