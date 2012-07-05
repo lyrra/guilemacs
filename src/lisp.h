@@ -996,12 +996,6 @@ struct Lisp_Symbol_With_Pos
   Lisp_Object pos;              /* A fixnum */
 } GCALIGNED_STRUCT;
 
-/* In the size word of a vector, this bit means the vector has been marked.  */
-
-DEFINE_GDB_SYMBOL_BEGIN (ptrdiff_t, ARRAY_MARK_FLAG)
-# define ARRAY_MARK_FLAG PTRDIFF_MIN
-DEFINE_GDB_SYMBOL_END (ARRAY_MARK_FLAG)
-
 /* In the size word of a struct Lisp_Vector, this bit means it's really
    some other vector-like object.  */
 DEFINE_GDB_SYMBOL_BEGIN (ptrdiff_t, PSEUDOVECTOR_FLAG)
@@ -1779,7 +1773,7 @@ INLINE ptrdiff_t
 gc_asize (Lisp_Object array)
 {
   /* Like ASIZE, but also can be used in the garbage collector.  */
-  return XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG;
+  return XVECTOR (array)->header.size;
 }
 
 INLINE ptrdiff_t
