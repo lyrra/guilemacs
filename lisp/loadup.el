@@ -105,10 +105,6 @@
       ;; than usual.
       (setq max-lisp-eval-depth (max max-lisp-eval-depth 3400))))
 
-(if (eq t purify-flag)
-    ;; Hash consing saved around 11% of pure space in my tests.
-    (setq purify-flag (make-hash-table :test #'equal :size 80000)))
-
 (message "Using load-path %s" load-path)
 
 (if dump-mode
