@@ -4097,14 +4097,11 @@ static Lisp_Object
 read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 {
   Lisp_Object tem = read_list (1, readcharfun);
-  ptrdiff_t size = list_length (tem);
-  Lisp_Object vector = make_nil_vector (size);
-
-  /* Avoid accessing past the end of a vector if the vector is too
-     small to be valid for bytecode.  */
-  bytecodeflag &= COMPILED_STACK_DEPTH < size;
-
+  Lisp_Object len = Flength (tem);
+  Lisp_Object vector = Fmake_vector (len, Qnil);
+  ptrdiff_t  size = ASIZE (vector);
   Lisp_Object *ptr = XVECTOR (vector)->contents;
+
   for (ptrdiff_t i = 0; i < size; i++)
     {
       Lisp_Object item = Fcar (tem);
@@ -4141,7 +4138,6 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 		  if (!CONSP (item))
 		    error ("Invalid byte code");
 
-		  struct Lisp_Cons *otem = XCONS (item);
 		  bytestr = XCAR (item);
 		  item = XCDR (item);
 		}
@@ -4160,7 +4156,6 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 	    }
 	}
       ASET (vector, i, item);
-      struct Lisp_Cons *otem = XCONS (tem);
       tem = Fcdr (tem);
     }
   return vector;
