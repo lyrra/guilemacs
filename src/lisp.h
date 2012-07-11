@@ -268,7 +268,7 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 #define lisp_h_CHECK_SYMBOL(x) CHECK_TYPE (SYMBOLP (x), Qsymbolp, x)
 #define lisp_h_CHECK_TYPE(ok, predicate, x) \
    ((ok) ? (void) 0 : (void) wrong_type_argument (predicate, x))
-#define lisp_h_CONSP(x) (SMOB_TYPEP (x, lisp_cons_tag))
+#define lisp_h_CONSP(x) (x && scm_is_pair (x))
 #define lisp_h_EQ(x, y) (scm_is_eq (x, y))
 #define lisp_h_FLOATP(x) (x && SCM_INEXACTP (x))
 #define lisp_h_INTEGERP(x) (SCM_I_INUMP (x))
@@ -285,8 +285,8 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
    (eassert ((sym)->redirect == SYMBOL_PLAINVAL), (sym)->val.value)
 #define lisp_h_SYMBOLP(x) (SMOB_TYPEP (x, lisp_symbol_tag))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
-#define lisp_h_XCAR(c) XCONS (c)->car
-#define lisp_h_XCDR(c) XCONS (c)->cdr
+#define lisp_h_XCAR(c) (scm_car (c))
+#define lisp_h_XCDR(c) (scm_cdr (c))
 #define lisp_h_XHASH(a) (SCM_UNPACK (a))
 #define lisp_h_XSYMBOL(a) \
    (eassert (SYMBOLP (a)), (struct Lisp_Symbol *) SMOB_PTR (a))
@@ -323,7 +323,6 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 # define VECTORLIKEP(x) lisp_h_VECTORLIKEP (x)
 # define XCAR(c) lisp_h_XCAR (c)
 # define XCDR(c) lisp_h_XCDR (c)
-# define XCONS(a) lisp_h_XCONS (a)
 # define XHASH(a) lisp_h_XHASH (a)
 # define XSYMBOL(a) lisp_h_XSYMBOL (a)
 #endif
@@ -352,7 +351,6 @@ scm_t_bits lisp_symbol_tag;
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
-scm_t_bits lisp_cons_tag;
 
 enum Lisp_Type
   {
@@ -898,13 +896,6 @@ XTYPE (Lisp_Object o)
 
 /* Extract a value or address from a Lisp_Object.  */
 
-INLINE struct Lisp_Cons *
-XCONS (Lisp_Object a)
-{
-  eassert (CONSP (a));
-  return SMOB_PTR (a);
-}
-
 INLINE struct Lisp_Vector *
 XVECTOR (Lisp_Object a)
 {
@@ -986,7 +977,6 @@ make_lisp_proc (struct Lisp_Process *p)
 
 #define XSETINT(a, b) ((a) = make_number (b))
 #define XSETFASTINT(a, b) ((a) = make_natnum (b))
-#define XSETCONS(a, b) ((a) = (b)->self)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->self)
@@ -1052,75 +1042,8 @@ make_pointer_integer (void *p)
 
 typedef struct interval *INTERVAL;
 
-struct Lisp_Cons
-{
-  struct
-  {
-    Lisp_Object self;
-
-    /* Car of this cons cell.  */
-    Lisp_Object car;
-    /* Cdr of this cons cell.  */
-    Lisp_Object cdr;
-  } s;
-};
-verify (alignof (struct Lisp_Cons) % GCALIGNMENT == 0);
-
-INLINE bool
-(NILP) (Lisp_Object x)
-{
-  return lisp_h_NILP (x);
-}
-
-INLINE bool
-(CONSP) (Lisp_Object x)
-{
-  return lisp_h_CONSP (x);
-}
-
-INLINE void
-CHECK_CONS (Lisp_Object x)
-{
-  CHECK_TYPE (CONSP (x), Qconsp, x);
-}
-
-INLINE struct Lisp_Cons *
-(XCONS) (Lisp_Object a)
-{
-  return lisp_h_XCONS (a);
-}
-
-/* Take the car or cdr of something known to be a cons cell.  */
-/* The _addr functions shouldn't be used outside of the minimal set
-   of code that has to know what a cons cell looks like.  Other code not
-   part of the basic lisp implementation should assume that the car and cdr
-   fields are not accessible.  (What if we want to switch to
-   a copying collector someday?  Cached cons cell field addresses may be
-   invalidated at arbitrary points.)  */
-INLINE Lisp_Object *
-xcar_addr (Lisp_Object c)
-{
-  return &XCONS (c)->u.s.car;
-}
-INLINE Lisp_Object *
-xcdr_addr (Lisp_Object c)
-{
-  return &XCONS (c)->s.cdr;
-}
-
-/* Use these from normal code.  */
-
-INLINE Lisp_Object
-(XCAR) (Lisp_Object c)
-{
-  return lisp_h_XCAR (c);
-}
-
-INLINE Lisp_Object
-(XCDR) (Lisp_Object c)
-{
-  return lisp_h_XCDR (c);
-}
+LISP_MACRO_DEFUN (XCAR, Lisp_Object, (Lisp_Object c), (c))
+LISP_MACRO_DEFUN (XCDR, Lisp_Object, (Lisp_Object c), (c))
 
 /* Use these to set the fields of a cons cell.
 
@@ -1129,12 +1052,12 @@ INLINE Lisp_Object
 INLINE void
 XSETCAR (Lisp_Object c, Lisp_Object n)
 {
-  *xcar_addr (c) = n;
+  scm_set_car_x (c, n);
 }
 INLINE void
 XSETCDR (Lisp_Object c, Lisp_Object n)
 {
-  *xcdr_addr (c) = n;
+  scm_set_cdr_x (c, n);
 }
 
 /* Take the car or cdr of something whose type is not known.  */
@@ -2862,6 +2785,7 @@ CHECK_NUMBER_CDR (Lisp_Object x)
    arguments, so we can catch errors with maxargs at compile-time.  */
 #ifdef _MSC_VER
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
+   SCM_SNARF_INIT (defsubr (&sname);)                                   \
    Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
    static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
    { { NULL,                                                            \
@@ -2872,6 +2796,7 @@ CHECK_NUMBER_CDR (Lisp_Object x)
    Lisp_Object fnname
 #else  /* not _MSC_VER */
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
+   SCM_SNARF_INIT (defsubr (&sname);)                                   \
    static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
    { { .self = NULL,                                                    \
        .size = PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },                   \
