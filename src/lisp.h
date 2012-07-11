@@ -1377,7 +1377,7 @@ INLINE struct Lisp_Cons *
 INLINE Lisp_Object *
 xcar_addr (Lisp_Object c)
 {
-  return &XCONS (c)->u.s.car;
+  return &XCONS (c)->s.car;
 }
 INLINE Lisp_Object *
 xcdr_addr (Lisp_Object c)
@@ -1801,26 +1801,10 @@ aref_addr (Lisp_Object array, ptrdiff_t idx)
   return & XVECTOR (array)->contents[idx];
 }
 
-INLINE ptrdiff_t
-gc_asize (Lisp_Object array)
-{
-  /* Like ASIZE, but also can be used in the garbage collector.  */
-  return XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG;
-}
-
 INLINE void
 ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
 {
   eassert (0 <= idx && idx < ASIZE (array));
-  XVECTOR (array)->contents[idx] = val;
-}
-
-INLINE void
-gc_aset (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
-{
-  /* Like ASET, but also can be used in the garbage collector:
-     sweep_weak_table calls set_hash_key etc. while the table is marked.  */
-  eassert (0 <= idx && idx < (ASIZE (array))); // eassert (0 <= idx && idx < gc_asize (array));
   XVECTOR (array)->contents[idx] = val;
 }
 

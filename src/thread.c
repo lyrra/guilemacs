@@ -620,63 +620,6 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
 
 
 static void
-mark_one_thread (struct thread_state *thread)
-{
-  /* Get the stack top now, in case mark_specpdl changes it.  */
-  void const *stack_top = thread->stack_top;
-
-  mark_specpdl (thread->m_specpdl, thread->m_specpdl_ptr);
-
-  mark_stack (thread->m_stack_bottom, stack_top);
-
-  for (struct handler *handler = thread->m_handlerlist;
-       handler; handler = handler->next)
-    {
-      mark_object (handler->tag_or_ch);
-      mark_object (handler->val);
-    }
-
-  if (thread->m_current_buffer)
-    {
-      Lisp_Object tem;
-      XSETBUFFER (tem, thread->m_current_buffer);
-      mark_object (tem);
-    }
-
-  /* No need to mark Lisp_Object members like m_last_thing_searched,
-     as mark_threads_callback does that by calling mark_object.  */
-}
-
-static void
-mark_threads_callback (void *ignore)
-{
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
-    {
-      Lisp_Object thread_obj;
-
-      XSETTHREAD (thread_obj, iter);
-      mark_object (thread_obj);
-      mark_one_thread (iter);
-    }
-}
-
-void
-mark_threads (void)
-{
-  flush_stack_call_func (mark_threads_callback, NULL);
-}
-
-void
-unmark_main_thread (void)
-{
-  main_thread.s.header.size &= ~ARRAY_MARK_FLAG;
-}
-
-
-
-static void
 yield_callback (void *ignore)
 {
   struct thread_state *self = current_thread;
