@@ -248,7 +248,7 @@ enum font_property_index
 
 struct font_spec
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   Lisp_Object props[FONT_SPEC_MAX];
 };
 
@@ -256,7 +256,7 @@ struct font_spec
 
 struct font_entity
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   Lisp_Object props[FONT_ENTITY_MAX];
 };
 
@@ -269,7 +269,7 @@ struct font_entity
 
 struct font
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* All Lisp_Object components must come first.
      That ensures they are all aligned normally.  */
@@ -431,13 +431,6 @@ FONT_SPEC_P (Lisp_Object x)
   return FONTP (x) && PVSIZE (x) == FONT_SPEC_MAX;
 }
 
-/* Like FONT_SPEC_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_SPEC_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_SPEC_MAX;
-}
-
 /* True iff X is font-entity.  */
 INLINE bool
 FONT_ENTITY_P (Lisp_Object x)
@@ -445,25 +438,11 @@ FONT_ENTITY_P (Lisp_Object x)
   return FONTP (x) && PVSIZE (x) == FONT_ENTITY_MAX;
 }
 
-/* Like FONT_ENTITY_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_ENTITY_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_ENTITY_MAX;
-}
-
 /* True iff X is font-object.  */
 INLINE bool
 FONT_OBJECT_P (Lisp_Object x)
 {
   return FONTP (x) && PVSIZE (x) == FONT_OBJECT_MAX;
-}
-
-/* Like FONT_OBJECT_P, but can be used in the garbage collector.  */
-INLINE bool
-GC_FONT_OBJECT_P (Lisp_Object x)
-{
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_OBJECT_MAX;
 }
 
 /* Type checking functions for various font-related objects.  */
@@ -501,13 +480,6 @@ XFONT_SPEC (Lisp_Object p)
   return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
 }
 
-INLINE struct font_spec *
-GC_XFONT_SPEC (Lisp_Object p)
-{
-  eassert (GC_FONT_SPEC_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
-}
-
 INLINE struct font_entity *
 XFONT_ENTITY (Lisp_Object p)
 {
@@ -515,24 +487,10 @@ XFONT_ENTITY (Lisp_Object p)
   return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
 }
 
-INLINE struct font_entity *
-GC_XFONT_ENTITY (Lisp_Object p)
-{
-  eassert (GC_FONT_ENTITY_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
-}
-
 INLINE struct font *
 XFONT_OBJECT (Lisp_Object p)
 {
   eassert (FONT_OBJECT_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font);
-}
-
-INLINE struct font *
-GC_XFONT_OBJECT (Lisp_Object p)
-{
-  eassert (GC_FONT_OBJECT_P (p));
   return XUNTAG (p, Lisp_Vectorlike, struct font);
 }
 

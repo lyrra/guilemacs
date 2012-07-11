@@ -4384,11 +4384,12 @@ init_obarray_once (void)
 
 
 void
-defsubr (union Aligned_Lisp_Subr *aname)
+defsubr (struct Aligned_Lisp_Subr *aname)
 {
   struct Lisp_Subr *sname = &aname->s;
   Lisp_Object sym, tem;
   sym = intern_c_string (sname->symbol_name);
+  SCM_NEWSMOB (sname->header.self, lisp_vectorlike_tag, sname);
   XSETPVECTYPE (sname, PVEC_SUBR);
   XSETSUBR (tem, sname);
   set_symbol_function (sym, tem);

@@ -2413,7 +2413,7 @@ syms_of_xmenu (void)
 #if defined (USE_GTK) || defined (USE_X_TOOLKIT)
   defsubr (&Sx_menu_bar_open_internal);
   Ffset (intern_c_string ("accelerate-menu"),
-	 intern_c_string (Sx_menu_bar_open_internal.s.symbol_name));
+	 intern_c_string (Sx_menu_bar_open_internal.symbol_name));
 #endif
 
   pdumper_do_now_and_after_load (syms_of_xmenu_for_pdumper);

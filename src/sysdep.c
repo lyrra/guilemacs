@@ -2329,9 +2329,9 @@ get_random (void)
   int i;
   for (i = 0; i < (FIXNUM_BITS + RAND_BITS - 1) / RAND_BITS; i++)
     val = (random () ^ (val << RAND_BITS)
-	   ^ (val >> (EMACS_INT_WIDTH - RAND_BITS)));
-  val ^= val >> (EMACS_INT_WIDTH - FIXNUM_BITS);
-  return val & INTMASK;
+	   ^ (val >> (SIZE_WIDTH - RAND_BITS)));
+  val ^= val >> (SIZE_WIDTH - FIXNUM_BITS);
+  return val & ((1 << SIZE_WIDTH) - 1);
 }
 
 #ifndef HAVE_SNPRINTF
