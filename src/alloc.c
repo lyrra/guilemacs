@@ -238,41 +238,6 @@ extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
 /* Recording what needs to be marked for gc.  */
 
 struct gcpro *gcprolist;
-
-static void
-XFLOAT_INIT (Lisp_Object f, double n)
-{
-  XFLOAT (f)->data = n;
-}
-
-#ifdef DOUG_LEA_MALLOC
-static bool
-pointers_fit_in_lispobj_p (void)
-{
-  return (UINTPTR_MAX <= VAL_MAX) || USE_LSB_TAG;
-}
-
-static bool
-mmap_lisp_allowed_p (void)
-{
-  /* If we can't store all memory addresses in our lisp objects, it's
-     risky to let the heap use mmap and give us addresses from all
-     over our address space.  We also can't use mmap for lisp objects
-     if we might dump: unexec doesn't preserve the contents of mmapped
-     regions.  */
-  return pointers_fit_in_lispobj_p () && !might_dump;
-}
-#endif
-
-/* Head of a circularly-linked list of extant finalizers. */
-static struct Lisp_Finalizer finalizers;
-
-/* Head of a circularly-linked list of finalizers that must be invoked
-   because we deemed them unreachable.  This list must be global, and
-   not a local inside garbage_collect_1, in case we GC again while
-   running finalizers.  */
-static struct Lisp_Finalizer doomed_finalizers;
-
 
 /************************************************************************
 				Malloc
@@ -1019,16 +984,8 @@ make_formatted_string (char *buf, const char *format, ...)
 Lisp_Object
 make_float (double float_value)
 {
-  register Lisp_Object val;
-  struct Lisp_Float *p;
-
-  p = xmalloc (sizeof *p);
-  SCM_NEWSMOB (p->self, lisp_float_tag, p);
-  XSETFLOAT (val, p);
-  XFLOAT_INIT (val, float_value);
-  return val;
+  return scm_from_double (float_value);
 }
-
 
 
 /***********************************************************************
@@ -2438,7 +2395,6 @@ init_alloc_once (void)
   lisp_string_tag = scm_make_smob_type ("elisp-string", 0);
   lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);
   lisp_cons_tag = scm_make_smob_type ("elisp-cons", 0);
-  lisp_float_tag = scm_make_smob_type ("elisp-float", 0);
 
   /* Used to do Vpurify_flag = Qt here, but Qt isn't set up yet!  */
   /* Even though Qt's contents are not set up, its address is known.  */
