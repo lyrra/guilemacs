@@ -334,7 +334,7 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_CONSP(x) SMOB_TYPEP (x, lisp_cons_tag)
 #define lisp_h_EQ(x, y) scm_is_eq (x, y)
 #define lisp_h_FIXNUMP(x) SCM_I_INUMP (x)
-#define lisp_h_FLOATP(x) SMOB_TYPEP (x, lisp_float_tag)
+#define lisp_h_FLOATP(x) x && SCM_INEXACTP (x)
 #define lisp_h_NILP(x) EQ (x, Qnil)
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
@@ -413,7 +413,6 @@ scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
 scm_t_bits lisp_cons_tag;
-scm_t_bits lisp_float_tag;
 
 /* Lisp_Object tagging scheme:
         Tag location
@@ -1230,7 +1229,6 @@ XTYPE (Lisp_Object o)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->self)
-#define XSETFLOAT(a, b) ((a) = (b)->self)
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
@@ -3043,12 +3041,6 @@ KBOARD_OBJFWDP (lispfwd a)
 }
 
 
-/* Lisp floating point type.  */
-struct Lisp_Float
-  {
-    Lisp_Object self;
-    double data;
-  };
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -3056,18 +3048,7 @@ INLINE bool
   return lisp_h_FLOATP (x);
 }
 
-INLINE struct Lisp_Float *
-XFLOAT (Lisp_Object a)
-{
-  eassert (FLOATP (a));
-  return SMOB_PTR3 (a, Lisp_Float, struct Lisp_Float);
-}
-
-INLINE double
-XFLOAT_DATA (Lisp_Object f)
-{
-  return XFLOAT (f)->data;
-}
+#define XFLOAT_DATA(f)  (scm_to_double (f))
 
 /* Most hosts nowadays use IEEE floating point, so they use IEC 60559
    representations, have infinities and NaNs, and do not trap on
