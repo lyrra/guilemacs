@@ -306,9 +306,9 @@ typedef EMACS_INT Lisp_Word;
    ((ok) ? (void) 0 : (void) wrong_type_argument (predicate, x))
 #define lisp_h_CONSP(x) (SMOB_TYPEP (x, lisp_cons_tag))
 #define lisp_h_EQ(x, y) (scm_is_eq (x, y))
+#define lisp_h_FLOATP(x) (x && SCM_INEXACTP (x))
 #define lisp_h_INTEGERP(x) (SCM_I_INUMP (x))
 //FIX-20230203-LAV: no lisp_h_FIXNUMP ?
-#define lisp_h_FLOATP(x) (SMOB_TYPEP (x, lisp_float_tag))
 #define lisp_h_NILP(x) EQ (x, Qnil)
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
@@ -398,7 +398,6 @@ scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
 scm_t_bits lisp_cons_tag;
-scm_t_bits lisp_float_tag;
 
 enum Lisp_Type
   {
@@ -981,15 +980,6 @@ INLINE bool
   return lisp_h_SYMBOLP (x);
 }
 
-INLINE struct Lisp_Symbol * ATTRIBUTE_NO_SANITIZE_UNDEFINED
-XSYMBOL (Lisp_Object a)
-{
-  eassert (SYMBOLP (a));
-  intptr_t i = (intptr_t) XUNTAG (a, Lisp_Symbol, struct Lisp_Symbol);
-  void *p = (char *) lispsym + i;
-  return p;
-}
-
 #if 0
 INLINE Lisp_Object
 make_lisp_symbol (struct Lisp_Symbol *sym)
@@ -1200,7 +1190,22 @@ make_lisp_ptr (void *ptr, enum Lisp_Type type)
 }
 */
 
-#define XSETINT(a, b) ((a) = make_fixnum (b))
+INLINE bool
+(FIXNUMP) (Lisp_Object x)
+{
+  return lisp_h_INTEGERP (x);
+}
+
+
+LISP_MACRO_DEFUN (XSYMBOL, struct Lisp_Symbol *, (Lisp_Object a), (a))
+
+INLINE bool
+(FLOATP) (Lisp_Object x)
+{
+  return lisp_h_FLOATP (x);
+}
+
+#define XSETINT(a, b) ((a) = make_number (b))
 #define XSETFASTINT(a, b) ((a) = make_natnum (b))
 #define XSETCONS(a, b) ((a) = (b)->self)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
@@ -2604,6 +2609,7 @@ XFWDTYPE (lispfwd a)
 
 
 
+//FIX-20230204-LAV: is float an unboxed type? if so these structs are not used, see scm_to_double()
 /* Lisp floating point type.  */
 struct Lisp_Float
   {
@@ -2611,11 +2617,6 @@ struct Lisp_Float
     double data;
   };
 
-INLINE bool
-(FLOATP) (Lisp_Object x)
-{
-  return lisp_h_FLOATP (x);
-}
 
 INLINE struct Lisp_Float *
 XFLOAT (Lisp_Object a)
@@ -2624,11 +2625,7 @@ XFLOAT (Lisp_Object a)
   return SMOB_PTR (a);
 }
 
-INLINE double
-XFLOAT_DATA (Lisp_Object f)
-{
-  return XFLOAT (f)->data;
-}
+#define XFLOAT_DATA(f)  (scm_to_double (f))
 
 /* Most hosts nowadays use IEEE floating point, so they use IEC 60559
    representations, have infinities and NaNs, and do not trap on
