@@ -732,7 +732,7 @@ INLINE struct buffer *
 XBUFFER (Lisp_Object a)
 {
   eassert (BUFFERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct buffer);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct buffer);
 }
 
 /* Most code should use these functions to set Lisp fields in struct

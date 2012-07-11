@@ -884,7 +884,7 @@ INLINE struct terminal *
 XTERMINAL (Lisp_Object a)
 {
   eassert (TERMINALP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct terminal);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct terminal);
 }
 
 /* Most code should use these functions to set Lisp fields in struct

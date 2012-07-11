@@ -222,7 +222,7 @@ INLINE struct Lisp_Process *
 XPROCESS (Lisp_Object a)
 {
   eassert (PROCESSP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Process);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Process);
 }
 
 /* Every field in the preceding structure except for the first two

@@ -603,7 +603,11 @@ init_strings (void)
 static struct Lisp_String *
 allocate_string (void)
 {
-  return xmalloc (sizeof (struct Lisp_String));
+  struct Lisp_String *p;
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_string_tag, p);
+  return p;
 }
 
 
@@ -1043,7 +1047,11 @@ Lisp_Object
 make_float (double float_value)
 {
   register Lisp_Object val;
-  XSETFLOAT (val, xmalloc_atomic (sizeof (struct Lisp_Float)));
+  struct Lisp_Float *p;
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_float_tag, p);
+  XSETFLOAT (val, p);
   XFLOAT_INIT (val, float_value);
   return val;
 }
@@ -1059,8 +1067,11 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
   (Lisp_Object car, Lisp_Object cdr)
 {
   register Lisp_Object val;
+  struct Lisp_Cons *p;
 
-  XSETCONS (val, xmalloc (sizeof (struct Lisp_Cons)));
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_cons_tag, p);
+  XSETCONS (val, p);
   XSETCAR (val, car);
   XSETCDR (val, cdr);
   return val;
@@ -1190,8 +1201,11 @@ Lisp_Object zero_vector;
 static void
 init_vectors (void)
 {
-  XSETVECTOR (zero_vector, xmalloc (header_size));
-  XVECTOR (zero_vector)->header.size = 0;
+  struct Lisp_Vector *p = xmalloc (header_size);
+
+  SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
+  p->header.size = 0;
+  XSETVECTOR (zero_vector, p);
 }
 
 /* Value is a pointer to a newly allocated Lisp_Vector structure
@@ -1200,10 +1214,17 @@ init_vectors (void)
 static struct Lisp_Vector *
 allocate_vectorlike (ptrdiff_t len, bool clearit)
 {
+  struct Lisp_Vector *p;
+
   if (len == 0)
-    return XVECTOR (zero_vector);  
+    p = XVECTOR (zero_vector);
   else
-    return xmalloc (header_size + len * word_size);
+    {
+      p = xmalloc (header_size + len * word_size);
+      SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
+    }
+
+  return p;
 }
 
 
@@ -1267,6 +1288,8 @@ allocate_buffer (void)
   struct buffer *b
     = ALLOCATE_PSEUDOVECTOR (struct buffer, cursor_in_non_selected_windows_,
 			     PVEC_BUFFER);
+
+  SCM_NEWSMOB (b->header.self, lisp_vectorlike_tag, b);
   BUFFER_PVEC_INIT (b);
   /* Note that the rest fields of B are not initialized.  */
   return b;
@@ -1438,13 +1461,21 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 static void
 set_symbol_name (Lisp_Object sym, Lisp_Object name)
 {
-  XBARE_SYMBOL (sym)->u.s.name = name;
+  XSYMBOL (sym)->u.s.name = name;
 }
 
 void
 init_symbol (Lisp_Object val, Lisp_Object name)
 {
-  struct Lisp_Symbol *p = XBARE_SYMBOL (val);
+  Lisp_Object val;
+  struct Lisp_Symbol *p;
+
+  CHECK_STRING (name);
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_symbol_tag, p);
+  XSETSYMBOL (val, p);
+  p = XSYMBOL (val);
   set_symbol_name (val, name);
   set_symbol_plist (val, Qnil);
   p->u.s.redirect = SYMBOL_PLAINVAL;
@@ -1482,22 +1513,7 @@ make_misc_ptr (void *a)
   return make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
-/* Return a new symbol with position with the specified SYMBOL and POSITION. */
-Lisp_Object
-build_symbol_with_pos (Lisp_Object symbol, Lisp_Object position)
-{
-  Lisp_Object val;
-  struct Lisp_Symbol_With_Pos *p
-    = (struct Lisp_Symbol_With_Pos *) allocate_vector (2);
-  XSETVECTOR (val, p);
-  XSETPVECTYPESIZE (XVECTOR (val), PVEC_SYMBOL_WITH_POS, 2, 0);
-  p->sym = symbol;
-  p->pos = position;
-
-  return val;
-}
-
-/* Return a new (deleted) overlay with PLIST.  */
+/* Return a new overlay with specified START, END and PLIST.  */
 
 Lisp_Object
 build_overlay (bool front_advance, bool rear_advance,
@@ -1958,12 +1974,12 @@ valid_pointer_p (void *p)
 int
 valid_lisp_object_p (Lisp_Object obj)
 {
-  if (FIXNUMP (obj))
+  if (SCM_IMP (obj))
     return 1;
 
-  p = (void *) XPNTR (obj);
+  p = (void *) SCM2PTR (obj);
 
-  if (BARE_SYMBOL_P (obj) && c_symbol_p (p))
+  if (SYMBOLP (obj) && c_symbol_p (p))
     return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
   if (p == &buffer_defaults || p == &buffer_local_symbols)
@@ -2161,6 +2177,13 @@ init_alloc_once (void)
   PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
   PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
 
+  lisp_symbol_tag = scm_make_smob_type ("elisp-symbol", 0);
+  lisp_misc_tag = scm_make_smob_type ("elisp-misc", 0);
+  lisp_string_tag = scm_make_smob_type ("elisp-string", 0);
+  lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);
+  lisp_cons_tag = scm_make_smob_type ("elisp-cons", 0);
+  lisp_float_tag = scm_make_smob_type ("elisp-float", 0);
+
   /* Call init_alloc_once_for_pdumper now so we run mem_init early.
      Keep in mind that when we reload from a dump, we'll run _only_
      init_alloc_once_for_pdumper and not init_alloc_once at all.  */
@@ -2321,7 +2344,6 @@ extern union enums_for_gdb
   enum CHARTAB_SIZE_BITS CHARTAB_SIZE_BITS;
   enum char_table_specials char_table_specials;
   enum char_bits char_bits;
-  enum CHECK_LISP_OBJECT_TYPE CHECK_LISP_OBJECT_TYPE;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;
   enum Lisp_Closure Lisp_Closure;
