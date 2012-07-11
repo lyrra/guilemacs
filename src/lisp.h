@@ -338,8 +338,8 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
 #define lisp_h_SYMBOLP(x) (XTYPE (x) == Lisp_Symbol)
 #define lisp_h_VECTORLIKEP(x) (XTYPE (x) == Lisp_Vectorlike)
-#define lisp_h_XCAR(c) XCONS (c)->u.s.car
-#define lisp_h_XCDR(c) XCONS (c)->u.s.u.cdr
+#define lisp_h_XCAR(c) XCONS (c)->s.car
+#define lisp_h_XCDR(c) XCONS (c)->s.cdr
 #define lisp_h_XCONS(a) \
    (eassert (CONSP (a)), (struct Lisp_Cons *) XUNTAG (a, Lisp_Cons))
 #define lisp_h_XHASH(a) XUINT (a)
@@ -1134,24 +1134,13 @@ typedef struct interval *INTERVAL;
 
 struct Lisp_Cons
 {
-  union
+  struct
   {
-    struct
-    {
-      /* Car of this cons cell.  */
-      Lisp_Object car;
-
-      union
-      {
-	/* Cdr of this cons cell.  */
-	Lisp_Object cdr;
-
-	/* Used to chain conses on a free list.  */
-	struct Lisp_Cons *chain;
-      } u;
-    } s;
-    char alignas (GCALIGNMENT) gcaligned;
-  } u;
+    /* Car of this cons cell.  */
+    Lisp_Object car;
+    /* Cdr of this cons cell.  */
+    Lisp_Object cdr;
+  } s;
 };
 verify (alignof (struct Lisp_Cons) % GCALIGNMENT == 0);
 
@@ -1194,7 +1183,7 @@ xcar_addr (Lisp_Object c)
 INLINE Lisp_Object *
 xcdr_addr (Lisp_Object c)
 {
-  return &XCONS (c)->u.s.u.cdr;
+  return &XCONS (c)->s.cdr;
 }
 
 /* Use these from normal code.  */
