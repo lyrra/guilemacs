@@ -359,7 +359,8 @@ truncate_undo_list (struct buffer *b)
 	{
 	  /* The function is responsible for making
 	     any desired changes in buffer-undo-list.  */
-	  unbind_to (count, Qnil);
+    //FIX-20230225-LAV: add dynwind_end()
+	  //unbind_to (count, Qnil);
 	  return;
 	}
     }
@@ -411,7 +412,8 @@ truncate_undo_list (struct buffer *b)
   else
     bset_undo_list (b, Qnil);
 
-  unbind_to (count, Qnil);
+  //FIX-20230225-LAV: add dynwind_end()
+  //unbind_to (count, Qnil);
 }
 
 

@@ -303,7 +303,7 @@ enum { UNKNOWN_MODTIME_NSECS = -2 };
 
 struct buffer
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* The name of this buffer.  */
   Lisp_Object name_;

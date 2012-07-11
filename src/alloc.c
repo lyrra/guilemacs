@@ -521,7 +521,11 @@ init_strings (void)
 static struct Lisp_String *
 allocate_string (void)
 {
-  return xmalloc (sizeof (struct Lisp_String));
+  struct Lisp_String *p;
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_string_tag, p);
+  return p;
 }
 
 /* Set up Lisp_String S for holding NCHARS characters, NBYTES bytes,
@@ -540,10 +544,10 @@ allocate_string_data (struct Lisp_String *s,
     string_overflow ();
 
   data = GC_MALLOC_ATOMIC (nbytes + 1);
-  s->u.s.data = data;
-  s->u.s.size = nchars;
-  s->u.s.size_byte = nbytes;
-  s->u.s.data[nbytes] = '\0';
+  s->data = data;
+  s->size = nchars;
+  s->size_byte = nbytes;
+  s->data[nbytes] = '\0';
 }
 
 void
@@ -815,7 +819,7 @@ make_uninit_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes)
     return empty_multibyte_string;
 
   s = allocate_string ();
-  s->u.s.intervals = NULL;
+  s->intervals = NULL;
   allocate_string_data (s, nchars, nbytes);
   XSETSTRING (string, s);
   return string;
@@ -847,7 +851,11 @@ Lisp_Object
 make_float (double float_value)
 {
   register Lisp_Object val;
-  XSETFLOAT (val, xmalloc_atomic (sizeof (struct Lisp_Float)));
+  struct Lisp_Float *p;
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_float_tag, p);
+  XSETFLOAT (val, p);
   XFLOAT_INIT (val, float_value);
   return val;
 }
@@ -863,8 +871,11 @@ DEFUN ("cons", Fcons, Scons, 2, 2, 0,
   (Lisp_Object car, Lisp_Object cdr)
 {
   register Lisp_Object val;
+  struct Lisp_Cons *p;
 
-  XSETCONS (val, xmalloc (sizeof (struct Lisp_Cons)));
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->self, lisp_cons_tag, p);
+  XSETCONS (val, p);
   XSETCAR (val, car);
   XSETCDR (val, cdr);
   return val;
@@ -994,8 +1005,11 @@ Lisp_Object zero_vector;
 static void
 init_vectors (void)
 {
-  zero_vector = make_vector (0, Qnil);
-  staticpro (&zero_vector);
+  struct Lisp_Vector *p = xmalloc (header_size);
+
+  SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
+  p->header.size = 0;
+  XSETVECTOR (zero_vector, p);
 }
 
 /* Value is a pointer to a newly allocated Lisp_Vector structure
@@ -1005,10 +1019,17 @@ init_vectors (void)
 static struct Lisp_Vector *
 allocate_vectorlike (ptrdiff_t len)
 {
+  struct Lisp_Vector *p;
+
   if (len == 0)
-    return XVECTOR (zero_vector);
+    p = XVECTOR (zero_vector);
   else
-    return xmalloc (header_size + len * word_size);
+    {
+      p = xmalloc (header_size + len * word_size);
+      SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
+    }
+
+  return p;
 }
 
 
@@ -1053,6 +1074,7 @@ allocate_buffer (void)
 {
   struct buffer *b = xmalloc (sizeof *b);
 
+  SCM_NEWSMOB (b->header.self, lisp_vectorlike_tag, b);
   BUFFER_PVEC_INIT (b);
   /* Put B on the chain of all buffers including killed ones.  */
   b->next = all_buffers;
@@ -1231,10 +1253,9 @@ Its value is void, and its function definition and property list are nil.  */)
   (Lisp_Object name)
 {
   Lisp_Object val;
-
   CHECK_STRING (name);
-  XSETSYMBOL (val, xmalloc (sizeof (struct Lisp_String)));
-  init_symbol (val, name);
+  val = scm_make_symbol (scm_from_utf8_stringn (SSDATA (name),
+                                                SBYTES (name)));
   return val;
 }
 
@@ -1685,6 +1706,13 @@ static void init_alloc_once_for_pdumper (void);
 void
 init_alloc_once (void)
 {
+  lisp_symbol_tag = scm_make_smob_type ("elisp-symbol", 0);
+  lisp_misc_tag = scm_make_smob_type ("elisp-misc", 0);
+  lisp_string_tag = scm_make_smob_type ("elisp-string", 0);
+  lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);
+  lisp_cons_tag = scm_make_smob_type ("elisp-cons", 0);
+  lisp_float_tag = scm_make_smob_type ("elisp-float", 0);
+
   init_strings ();
   init_vectors ();
 }
@@ -1697,8 +1725,6 @@ init_alloc_once_for_pdumper (void)
 void
 init_alloc (void)
 {
-  Vgc_elapsed = make_float (0.0);
-  gcs_done = 0;
 }
 
 void
@@ -1762,7 +1788,6 @@ union
   enum CHARTAB_SIZE_BITS CHARTAB_SIZE_BITS;
   enum char_table_specials char_table_specials;
   enum char_bits char_bits;
-  enum CHECK_LISP_OBJECT_TYPE CHECK_LISP_OBJECT_TYPE;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;
   enum Lisp_Compiled Lisp_Compiled;

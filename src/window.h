@@ -100,7 +100,7 @@ struct cursor_pos
 struct window
   {
     /* This is for Lisp; the terminal code does not refer to it.  */
-    union vectorlike_header header;
+    struct vectorlike_header header;
 
     /* The frame this window is on.  */
     Lisp_Object frame;
@@ -470,7 +470,7 @@ INLINE struct window *
 XWINDOW (Lisp_Object a)
 {
   eassert (WINDOWP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct window);
+  return SMOB_PTR (a);
 }
 
 /* Most code should use these functions to set Lisp fields in struct

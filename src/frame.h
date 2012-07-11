@@ -80,7 +80,7 @@ enum ns_appearance_type
 
 struct frame
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* All Lisp_Object components must come first.
      That ensures they are all aligned normally.  */
@@ -828,7 +828,7 @@ default_pixels_per_inch_y (void)
 #define FRAME_IMAGE_CACHE(F) ((F)->terminal->image_cache)
 
 #define XFRAME(p) \
-  (eassert (FRAMEP (p)), XUNTAG (p, Lisp_Vectorlike, struct frame))
+  (eassert (FRAMEP (p)), (struct frame *) SCM_SMOB_DATA (p))
 #define XSETFRAME(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_FRAME))
 
 /* Given a window, return its frame as a Lisp_Object.  */
