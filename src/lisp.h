@@ -304,7 +304,7 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_CHECK_SYMBOL(x) CHECK_TYPE (SYMBOLP (x), Qsymbolp, x)
 #define lisp_h_CHECK_TYPE(ok, predicate, x) \
    ((ok) ? (void) 0 : (void) wrong_type_argument (predicate, x))
-#define lisp_h_CONSP(x) (SMOB_TYPEP (x, lisp_cons_tag))
+#define lisp_h_CONSP(x) (x && scm_is_pair (x))
 #define lisp_h_EQ(x, y) (scm_is_eq (x, y))
 #define lisp_h_FLOATP(x) (x && SCM_INEXACTP (x))
 #define lisp_h_INTEGERP(x) (SCM_I_INUMP (x))
@@ -320,8 +320,8 @@ typedef EMACS_INT Lisp_Word;
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
 #define lisp_h_SYMBOLP(x) (SMOB_TYPEP (x, lisp_symbol_tag))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
-#define lisp_h_XCAR(c) XCONS (c)->car
-#define lisp_h_XCDR(c) XCONS (c)->cdr
+#define lisp_h_XCAR(c) (scm_car (c))
+#define lisp_h_XCDR(c) (scm_cdr (c))
 #define lisp_h_XCONS(c) SMOB_PTR (c)
 #define lisp_h_XHASH(a) (SCM_UNPACK (a))
 #define lisp_h_XFIXNUM (x) (SCM_I_INUMP (x))
@@ -368,7 +368,6 @@ typedef EMACS_INT Lisp_Word;
 # define VECTORLIKEP(x) lisp_h_VECTORLIKEP (x)
 # define XCAR(c) lisp_h_XCAR (c)
 # define XCDR(c) lisp_h_XCDR (c)
-# define XCONS(a) lisp_h_XCONS (a)
 # define XHASH(a) lisp_h_XHASH (a)
 //# define XSYMBOL(a) lisp_h_XSYMBOL (a)
 #endif
@@ -397,7 +396,6 @@ scm_t_bits lisp_symbol_tag;
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
-scm_t_bits lisp_cons_tag;
 
 enum Lisp_Type
   {
@@ -1196,6 +1194,8 @@ INLINE bool
   return lisp_h_INTEGERP (x);
 }
 
+/* Extract a value or address from a Lisp_Object.  */
+
 
 LISP_MACRO_DEFUN (XSYMBOL, struct Lisp_Symbol *, (Lisp_Object a), (a))
 
@@ -1207,7 +1207,6 @@ INLINE bool
 
 #define XSETINT(a, b) ((a) = make_number (b))
 #define XSETFASTINT(a, b) ((a) = make_natnum (b))
-#define XSETCONS(a, b) ((a) = (b)->self)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->u.s.self)
@@ -1293,73 +1292,10 @@ make_pointer_integer (void *p)
 
 typedef struct interval *INTERVAL;
 
-struct Lisp_Cons
-{
-  Lisp_Object self;
-
-  /* Car of this cons cell.  */
-  Lisp_Object car;
-  /* Cdr of this cons cell.  */
-  Lisp_Object cdr;
-};
-verify (GCALIGNED (struct Lisp_Cons));
-
-INLINE bool
-(NILP) (Lisp_Object x)
-{
-  return lisp_h_NILP (x);
-}
-
-INLINE bool
-(CONSP) (Lisp_Object x)
-{
-  return lisp_h_CONSP (x);
-}
-
-INLINE void
-CHECK_CONS (Lisp_Object x)
-{
-  CHECK_TYPE (CONSP (x), Qconsp, x);
-}
-
-INLINE struct Lisp_Cons *
-(XCONS) (Lisp_Object a)
-{
-  eassert (CONSP (a));
-  return SMOB_PTR (a);
-}
-
-/* Take the car or cdr of something known to be a cons cell.  */
-/* The _addr functions shouldn't be used outside of the minimal set
-   of code that has to know what a cons cell looks like.  Other code not
-   part of the basic lisp implementation should assume that the car and cdr
-   fields are not accessible.  (What if we want to switch to
-   a copying collector someday?  Cached cons cell field addresses may be
-   invalidated at arbitrary points.)  */
-INLINE Lisp_Object *
-xcar_addr (Lisp_Object c)
-{
-  return &XCONS (c)->car;
-}
-INLINE Lisp_Object *
-xcdr_addr (Lisp_Object c)
-{
-  return &XCONS (c)->cdr;
-}
-
-/* Use these from normal code.  */
-
-INLINE Lisp_Object
-(XCAR) (Lisp_Object c)
-{
-  return lisp_h_XCAR (c);
-}
-
-INLINE Lisp_Object
-(XCDR) (Lisp_Object c)
-{
-  return lisp_h_XCDR (c);
-}
+LISP_MACRO_DEFUN (NILP, bool, (Lisp_Object x), (x))
+LISP_MACRO_DEFUN (CONSP, bool, (Lisp_Object x), (x))
+LISP_MACRO_DEFUN (XCAR, Lisp_Object, (Lisp_Object c), (c))
+LISP_MACRO_DEFUN (XCDR, Lisp_Object, (Lisp_Object c), (c))
 
 /* Use these to set the fields of a cons cell.
 
@@ -1368,12 +1304,12 @@ INLINE Lisp_Object
 INLINE void
 XSETCAR (Lisp_Object c, Lisp_Object n)
 {
-  *xcar_addr (c) = n;
+  scm_set_car_x (c, n);
 }
 INLINE void
 XSETCDR (Lisp_Object c, Lisp_Object n)
 {
-  *xcdr_addr (c) = n;
+  scm_set_cdr_x (c, n);
 }
 
 /* Take the car or cdr of something whose type is not known.  */
@@ -2702,7 +2638,6 @@ RANGED_FIXNUMP (intmax_t lo, Lisp_Object x, intmax_t hi)
    && (TYPE_SIGNED (type) ? TYPE_MINIMUM (type) <= XFIXNUM (x) : 0 <= XFIXNUM (x)) \
    && XFIXNUM (x) <= TYPE_MAXIMUM (type))
 
-
 INLINE bool
 SAVE_VALUEP (Lisp_Object x)
 {
@@ -2727,8 +2662,6 @@ XBUFFER_OBJFWD (lispfwd a)
   eassert (BUFFER_OBJFWDP (a));
   return a.fwdptr;
 }
-
-
 
 /* Test for specific pseudovector types.  */
 
@@ -2910,6 +2843,7 @@ CHECK_SUBR (Lisp_Object x)
    arguments, so we can catch errors with maxargs at compile-time.  */
 #ifdef _MSC_VER
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
+   SCM_SNARF_INIT (defsubr (&sname);)                                   \
    Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
    static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
    { { NULL,                                                            \
@@ -2920,6 +2854,7 @@ CHECK_SUBR (Lisp_Object x)
    Lisp_Object fnname
 #else  /* not _MSC_VER */
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
+   SCM_SNARF_INIT (defsubr (&sname);)                                   \
    static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
    { { .self = NULL,                                                    \
        .size = PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },                   \
@@ -4822,10 +4757,9 @@ enum
 /* Auxiliary macros used for auto allocation of Lisp objects.  Please
    use these only in macros like AUTO_CONS that declare a local
    variable whose lifetime will be clear to the programmer.  */
-#define STACK_CONS(a, b) \
-  make_lisp_ptr (&((struct Lisp_Cons) {{{a, {b}}}}), Lisp_Cons)
-#define AUTO_CONS_EXPR(a, b) \
-  (USE_STACK_CONS ? STACK_CONS (a, b) : Fcons (a, b))
+//#define STACK_CONS(a, b) \
+//  make_lisp_ptr (&((struct Lisp_Cons) {{{a, {b}}}}), Lisp_Cons)
+#define AUTO_CONS_EXPR(a, b) Fcons (a, b)
 
 /* Declare NAME as an auto Lisp cons or short list if possible, a
    GC-based one otherwise.  This is in the sense of the C keyword
