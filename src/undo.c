@@ -292,8 +292,8 @@ truncate_undo_list (struct buffer *b)
   Lisp_Object list;
   Lisp_Object prev, next, last_boundary;
   intmax_t size_so_far = 0;
-
   specpdl_ref count = SPECPDL_INDEX ();
+  static const size_t sizeof_cons = sizeof (scm_t_cell);
 
   /* Make the buffer current to get its local values of variables such
      as undo_limit.  Also so that Vundo_outer_limit_function can
@@ -311,7 +311,7 @@ truncate_undo_list (struct buffer *b)
   if (CONSP (next) && NILP (XCAR (next)))
     {
       /* Add in the space occupied by this element and its chain link.  */
-      size_so_far += sizeof (struct Lisp_Cons);
+      size_so_far += sizeof_cons;
 
       /* Advance to next element.  */
       prev = next;
@@ -330,10 +330,10 @@ truncate_undo_list (struct buffer *b)
       elt = XCAR (next);
 
       /* Add in the space occupied by this element and its chain link.  */
-      size_so_far += sizeof (struct Lisp_Cons);
+      size_so_far += sizeof_cons;
       if (CONSP (elt))
 	{
-	  size_so_far += sizeof (struct Lisp_Cons);
+	  size_so_far += sizeof_cons;
 	  if (STRINGP (XCAR (elt)))
 	    size_so_far += (sizeof (struct Lisp_String) - 1
 			    + SCHARS (XCAR (elt)));
@@ -389,10 +389,10 @@ truncate_undo_list (struct buffer *b)
 	}
 
       /* Add in the space occupied by this element and its chain link.  */
-      size_so_far += sizeof (struct Lisp_Cons);
+      size_so_far += sizeof_cons;
       if (CONSP (elt))
 	{
-	  size_so_far += sizeof (struct Lisp_Cons);
+	  size_so_far += sizeof_cons;
 	  if (STRINGP (XCAR (elt)))
 	    size_so_far += (sizeof (struct Lisp_String) - 1
 			    + SCHARS (XCAR (elt)));
