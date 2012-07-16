@@ -2106,10 +2106,7 @@ DEFUN ("eql", Feql, Seql, 2, 2, 0,
 Floating-point numbers of equal value are `eql', but they may not be `eq'.  */)
   (Lisp_Object obj1, Lisp_Object obj2)
 {
-  if (FLOATP (obj1))
-    return equal_no_quit (obj1, obj2) ? Qt : Qnil;
-  else
-    return EQ (obj1, obj2) ? Qt : Qnil;
+  return scm_is_true (scm_eqv_p (obj1, obj2)) ? Qt : Qnil;
 }
 
 DEFUN ("equal", Fequal, Sequal, 2, 2, 0,
