@@ -2481,14 +2481,7 @@ This differs from numeric comparison: (eql 0.0 -0.0) returns nil and
 \(eql 0.0e+NaN 0.0e+NaN) returns t, whereas `=' does the opposite.  */)
   (Lisp_Object obj1, Lisp_Object obj2)
 {
-  if (FLOATP (obj1))
-    return FLOATP (obj2) && same_float (obj1, obj2) ? Qt : Qnil;
-  else if (BIGNUMP (obj1))
-    return ((BIGNUMP (obj2)
-	     && mpz_cmp (*xbignum_val (obj1), *xbignum_val (obj2)) == 0)
-	    ? Qt : Qnil);
-  else
-    return EQ (obj1, obj2) ? Qt : Qnil;
+  return scm_is_true (scm_eqv_p (obj1, obj2)) ? Qt : Qnil;
 }
 
 DEFUN ("equal", Fequal, Sequal, 2, 2, 0,
