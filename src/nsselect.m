@@ -481,16 +481,11 @@ nxatoms_of_nsselect (void)
 void
 syms_of_nsselect (void)
 {
+#include "nsselect.x"
   DEFSYM (QCLIPBOARD, "CLIPBOARD");
   DEFSYM (QSECONDARY, "SECONDARY");
   DEFSYM (QTEXT, "TEXT");
   DEFSYM (QFILE_NAME, "FILE_NAME");
-
-  defsubr (&Sns_disown_selection_internal);
-  defsubr (&Sns_get_selection);
-  defsubr (&Sns_own_selection_internal);
-  defsubr (&Sns_selection_exists_p);
-  defsubr (&Sns_selection_owner_p);
 
   Vselection_alist = Qnil;
   staticpro (&Vselection_alist);

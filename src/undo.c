@@ -421,6 +421,8 @@ truncate_undo_list (struct buffer *b)
 void
 syms_of_undo (void)
 {
+#include "undo.x"
+
   DEFSYM (Qinhibit_read_only, "inhibit-read-only");
   DEFSYM (Qundo_auto__last_boundary_cause, "undo-auto--last-boundary-cause");
   DEFSYM (Qexplicit, "explicit");
@@ -430,8 +432,6 @@ syms_of_undo (void)
 
   pending_boundary = Qnil;
   staticpro (&pending_boundary);
-
-  defsubr (&Sundo_boundary);
 
   DEFVAR_INT ("undo-limit", undo_limit,
 	      doc: /* Keep no more undo information once it exceeds this size.

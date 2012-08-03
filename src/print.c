@@ -2300,6 +2300,8 @@ init_print_once (void)
 void
 syms_of_print (void)
 {
+#include "print.x"
+
   DEFSYM (Qtemp_buffer_setup_hook, "temp-buffer-setup-hook");
 
   DEFVAR_LISP ("standard-output", Vstandard_output,
@@ -2424,16 +2426,6 @@ priorities.  */);
 
   /* prin1_to_string_buffer initialized in init_buffer_once in buffer.c */
   staticpro (&Vprin1_to_string_buffer);
-
-  defsubr (&Sprin1);
-  defsubr (&Sprin1_to_string);
-  defsubr (&Serror_message_string);
-  defsubr (&Sprinc);
-  defsubr (&Sprint);
-  defsubr (&Sterpri);
-  defsubr (&Swrite_char);
-  defsubr (&Sredirect_debugging_output);
-  defsubr (&Sprint_preprocess);
 
   DEFSYM (Qprint_escape_newlines, "print-escape-newlines");
   DEFSYM (Qprint_escape_multibyte, "print-escape-multibyte");

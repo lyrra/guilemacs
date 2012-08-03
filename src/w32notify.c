@@ -702,6 +702,8 @@ globals_of_w32notify (void)
 void
 syms_of_w32notify (void)
 {
+#include "w32notify.x"
+
   DEFSYM (Qfile_name, "file-name");
   DEFSYM (Qdirectory_name, "directory-name");
   DEFSYM (Qattributes, "attributes");
@@ -710,10 +712,6 @@ syms_of_w32notify (void)
   DEFSYM (Qcreation_time, "creation-time");
   DEFSYM (Qsecurity_desc, "security-desc");
   DEFSYM (Qsubtree, "subtree");
-
-  defsubr (&Sw32notify_add_watch);
-  defsubr (&Sw32notify_rm_watch);
-  defsubr (&Sw32notify_valid_p);
 
   staticpro (&watch_list);
 

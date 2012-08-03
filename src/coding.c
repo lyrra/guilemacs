@@ -10810,6 +10810,8 @@ init_coding_once (void)
 void
 syms_of_coding (void)
 {
+#include "coding.x"
+
   staticpro (&Vcoding_system_hash_table);
   Vcoding_system_hash_table = CALLN (Fmake_hash_table, QCtest, Qeq);
 
@@ -10960,39 +10962,6 @@ syms_of_coding (void)
   /* If a symbol has this property, evaluate the value to define the
      symbol as a coding system.  */
   DEFSYM (Qcoding_system_define_form, "coding-system-define-form");
-
-  defsubr (&Scoding_system_p);
-  defsubr (&Sread_coding_system);
-  defsubr (&Sread_non_nil_coding_system);
-  defsubr (&Scheck_coding_system);
-  defsubr (&Sdetect_coding_region);
-  defsubr (&Sdetect_coding_string);
-  defsubr (&Sfind_coding_systems_region_internal);
-  defsubr (&Sunencodable_char_position);
-  defsubr (&Scheck_coding_systems_region);
-  defsubr (&Sdecode_coding_region);
-  defsubr (&Sencode_coding_region);
-  defsubr (&Sdecode_coding_string);
-  defsubr (&Sencode_coding_string);
-  defsubr (&Sdecode_sjis_char);
-  defsubr (&Sencode_sjis_char);
-  defsubr (&Sdecode_big5_char);
-  defsubr (&Sencode_big5_char);
-  defsubr (&Sset_terminal_coding_system_internal);
-  defsubr (&Sset_safe_terminal_coding_system_internal);
-  defsubr (&Sterminal_coding_system);
-  defsubr (&Sset_keyboard_coding_system_internal);
-  defsubr (&Skeyboard_coding_system);
-  defsubr (&Sfind_operation_coding_system);
-  defsubr (&Sset_coding_system_priority);
-  defsubr (&Sdefine_coding_system_internal);
-  defsubr (&Sdefine_coding_system_alias);
-  defsubr (&Scoding_system_put);
-  defsubr (&Scoding_system_base);
-  defsubr (&Scoding_system_plist);
-  defsubr (&Scoding_system_aliases);
-  defsubr (&Scoding_system_eol_type);
-  defsubr (&Scoding_system_priority_list);
 
   DEFVAR_LISP ("coding-system-list", Vcoding_system_list,
 	       doc: /* List of coding systems.

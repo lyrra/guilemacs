@@ -308,10 +308,7 @@ globals_of_gfilenotify (void)
 void
 syms_of_gfilenotify (void)
 {
-  defsubr (&Sgfile_add_watch);
-  defsubr (&Sgfile_rm_watch);
-  defsubr (&Sgfile_valid_p);
-  defsubr (&Sgfile_monitor_name);
+#include "gfilenotify.x"
 
   /* Filter objects.  */
   DEFSYM (Qchange, "change");

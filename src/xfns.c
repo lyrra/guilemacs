@@ -7577,6 +7577,8 @@ frame_parm_handler x_frame_parm_handlers[] =
 void
 syms_of_xfns (void)
 {
+#include "xfns.x"
+
   DEFSYM (Qundefined_color, "undefined-color");
   DEFSYM (Qcompound_text, "compound-text");
   DEFSYM (Qcancel_timer, "cancel-timer");
@@ -7807,46 +7809,6 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
 #endif
 
   /* X window properties.  */
-  defsubr (&Sx_change_window_property);
-  defsubr (&Sx_delete_window_property);
-  defsubr (&Sx_window_property);
-  defsubr (&Sx_window_property_attributes);
-
-  defsubr (&Sxw_display_color_p);
-  defsubr (&Sx_display_grayscale_p);
-  defsubr (&Sxw_color_defined_p);
-  defsubr (&Sxw_color_values);
-  defsubr (&Sx_server_max_request_size);
-  defsubr (&Sx_server_vendor);
-  defsubr (&Sx_server_version);
-  defsubr (&Sx_display_pixel_width);
-  defsubr (&Sx_display_pixel_height);
-  defsubr (&Sx_display_mm_width);
-  defsubr (&Sx_display_mm_height);
-  defsubr (&Sx_display_screens);
-  defsubr (&Sx_display_planes);
-  defsubr (&Sx_display_color_cells);
-  defsubr (&Sx_display_visual_class);
-  defsubr (&Sx_display_backing_store);
-  defsubr (&Sx_display_save_under);
-  defsubr (&Sx_display_monitor_attributes_list);
-  defsubr (&Sx_frame_geometry);
-  defsubr (&Sx_frame_edges);
-  defsubr (&Sx_frame_list_z_order);
-  defsubr (&Sx_frame_restack);
-  defsubr (&Sx_mouse_absolute_pixel_position);
-  defsubr (&Sx_set_mouse_absolute_pixel_position);
-  defsubr (&Sx_wm_set_size_hint);
-  defsubr (&Sx_create_frame);
-  defsubr (&Sx_open_connection);
-  defsubr (&Sx_close_connection);
-  defsubr (&Sx_display_list);
-  defsubr (&Sx_synchronize);
-  defsubr (&Sx_backspace_delete_keys_p);
-
-  defsubr (&Sx_show_tip);
-  defsubr (&Sx_hide_tip);
-  defsubr (&Sx_double_buffered_p);
   tip_timer = Qnil;
   staticpro (&tip_timer);
   tip_frame = Qnil;
@@ -7855,21 +7817,4 @@ When using Gtk+ tooltips, the tooltip face is not used.  */);
   last_show_tip_args = Qnil;
   staticpro (&last_show_tip_args);
 
-  defsubr (&Sx_uses_old_gtk_dialog);
-#if defined (USE_MOTIF) || defined (USE_GTK)
-  defsubr (&Sx_file_dialog);
-#endif
-
-#if defined (USE_GTK) && defined (HAVE_FREETYPE)
-  defsubr (&Sx_select_font);
-#endif
-
-#ifdef USE_CAIRO
-  defsubr (&Sx_export_frames);
-#ifdef USE_GTK
-  defsubr (&Sx_page_setup_dialog);
-  defsubr (&Sx_get_page_setup);
-  defsubr (&Sx_print_frames_dialog);
-#endif
-#endif
 }

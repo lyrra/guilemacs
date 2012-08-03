@@ -1164,10 +1164,7 @@ representing a data format that is currently available in the clipboard.  */)
 void
 syms_of_w32select (void)
 {
-  defsubr (&Sw32_set_clipboard_data);
-  defsubr (&Sw32_get_clipboard_data);
-  defsubr (&Sw32_selection_exists_p);
-  defsubr (&Sw32_selection_targets);
+#include "w32select.x"
 
   DEFVAR_LISP ("selection-coding-system", Vselection_coding_system,
 	       doc: /* Coding system for communicating with other programs.

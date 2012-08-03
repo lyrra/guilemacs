@@ -1075,23 +1075,13 @@ syms_of_character (void)
   for (int i = 0; i <= UCHAR_MAX; i++)
     hexdigit[i] -= i != '0' && !hexdigit[i];
 #endif
+#include "character.x"
 
   DEFSYM (Qcharacterp, "characterp");
   DEFSYM (Qauto_fill_chars, "auto-fill-chars");
 
   staticpro (&Vchar_unify_table);
   Vchar_unify_table = Qnil;
-
-  defsubr (&Smax_char);
-  defsubr (&Scharacterp);
-  defsubr (&Sunibyte_char_to_multibyte);
-  defsubr (&Smultibyte_char_to_unibyte);
-  defsubr (&Schar_width);
-  defsubr (&Sstring_width);
-  defsubr (&Sstring);
-  defsubr (&Sunibyte_string);
-  defsubr (&Schar_resolve_modifiers);
-  defsubr (&Sget_byte);
 
   DEFVAR_LISP ("translation-table-vector",  Vtranslation_table_vector,
 	       doc: /*

@@ -884,6 +884,8 @@ Its numeric meaning is what you would get from `(interactive "p")'.  */)
 void
 syms_of_callint (void)
 {
+#include "callint.x"
+
   point_marker = Fmake_marker ();
   staticpro (&point_marker);
 
@@ -962,9 +964,4 @@ behave as if the mark were still active.  */);
 Its purpose is to give temporary modes such as Isearch mode
 a way to turn themselves off when a mouse command switches windows.  */);
   Vmouse_leave_buffer_hook = Qnil;
-
-  defsubr (&Sinteractive);
-  defsubr (&Scall_interactively);
-  defsubr (&Sfuncall_interactively);
-  defsubr (&Sprefix_numeric_value);
 }

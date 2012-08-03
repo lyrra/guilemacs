@@ -550,30 +550,5 @@ DEFUN ("ftruncate", Fftruncate, Sftruncate, 1, 1, 0,
 void
 syms_of_floatfns (void)
 {
-  defsubr (&Sacos);
-  defsubr (&Sasin);
-  defsubr (&Satan);
-  defsubr (&Scos);
-  defsubr (&Ssin);
-  defsubr (&Stan);
-  defsubr (&Sisnan);
-  defsubr (&Scopysign);
-  defsubr (&Sfrexp);
-  defsubr (&Sldexp);
-  defsubr (&Sfceiling);
-  defsubr (&Sffloor);
-  defsubr (&Sfround);
-  defsubr (&Sftruncate);
-  defsubr (&Sexp);
-  defsubr (&Sexpt);
-  defsubr (&Slog);
-  defsubr (&Ssqrt);
-
-  defsubr (&Sabs);
-  defsubr (&Sfloat);
-  defsubr (&Slogb);
-  defsubr (&Sceiling);
-  defsubr (&Sfloor);
-  defsubr (&Sround);
-  defsubr (&Struncate);
+#include "floatfns.x"
 }

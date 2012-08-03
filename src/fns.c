@@ -4965,6 +4965,8 @@ disregarding any coding systems.  If nil, use the current buffer.  */ )
 void
 syms_of_fns (void)
 {
+#include "fns.x"
+
   /* Hash table stuff.  */
   DEFSYM (Qhash_table_p, "hash-table-p");
   DEFSYM (Qeq, "eq");
@@ -4981,25 +4983,6 @@ syms_of_fns (void)
   DEFSYM (Qhash_table_test, "hash-table-test");
   DEFSYM (Qkey_or_value, "key-or-value");
   DEFSYM (Qkey_and_value, "key-and-value");
-
-  defsubr (&Ssxhash_eq);
-  defsubr (&Ssxhash_eql);
-  defsubr (&Ssxhash_equal);
-  defsubr (&Smake_hash_table);
-  defsubr (&Scopy_hash_table);
-  defsubr (&Shash_table_count);
-  defsubr (&Shash_table_rehash_size);
-  defsubr (&Shash_table_rehash_threshold);
-  defsubr (&Shash_table_size);
-  defsubr (&Shash_table_test);
-  defsubr (&Shash_table_weakness);
-  defsubr (&Shash_table_p);
-  defsubr (&Sclrhash);
-  defsubr (&Sgethash);
-  defsubr (&Sputhash);
-  defsubr (&Sremhash);
-  defsubr (&Smaphash);
-  defsubr (&Sdefine_hash_table_test);
 
   /* Crypto and hashing stuff.  */
   DEFSYM (Qiv_auto, "iv-auto");
@@ -5070,77 +5053,4 @@ that disables the use of a file dialog, regardless of the value of
 this variable.  */);
   use_file_dialog = 1;
 
-  defsubr (&Sidentity);
-  defsubr (&Srandom);
-  defsubr (&Slength);
-  defsubr (&Ssafe_length);
-  defsubr (&Sstring_bytes);
-  defsubr (&Sstring_equal);
-  defsubr (&Scompare_strings);
-  defsubr (&Sstring_lessp);
-  defsubr (&Sstring_version_lessp);
-  defsubr (&Sstring_collate_lessp);
-  defsubr (&Sstring_collate_equalp);
-  defsubr (&Sappend);
-  defsubr (&Sconcat);
-  defsubr (&Svconcat);
-  defsubr (&Scopy_sequence);
-  defsubr (&Sstring_make_multibyte);
-  defsubr (&Sstring_make_unibyte);
-  defsubr (&Sstring_as_multibyte);
-  defsubr (&Sstring_as_unibyte);
-  defsubr (&Sstring_to_multibyte);
-  defsubr (&Sstring_to_unibyte);
-  defsubr (&Scopy_alist);
-  defsubr (&Ssubstring);
-  defsubr (&Ssubstring_no_properties);
-  defsubr (&Snthcdr);
-  defsubr (&Snth);
-  defsubr (&Selt);
-  defsubr (&Smember);
-  defsubr (&Smemq);
-  defsubr (&Smemql);
-  defsubr (&Sassq);
-  defsubr (&Sassoc);
-  defsubr (&Srassq);
-  defsubr (&Srassoc);
-  defsubr (&Sdelq);
-  defsubr (&Sdelete);
-  defsubr (&Snreverse);
-  defsubr (&Sreverse);
-  defsubr (&Ssort);
-  defsubr (&Splist_get);
-  defsubr (&Sget);
-  defsubr (&Splist_put);
-  defsubr (&Sput);
-  defsubr (&Slax_plist_get);
-  defsubr (&Slax_plist_put);
-  defsubr (&Seql);
-  defsubr (&Sequal);
-  defsubr (&Sequal_including_properties);
-  defsubr (&Sfillarray);
-  defsubr (&Sclear_string);
-  defsubr (&Snconc);
-  defsubr (&Smapcar);
-  defsubr (&Smapc);
-  defsubr (&Smapcan);
-  defsubr (&Smapconcat);
-  defsubr (&Syes_or_no_p);
-  defsubr (&Sload_average);
-  defsubr (&Sfeaturep);
-  defsubr (&Srequire);
-  defsubr (&Sprovide);
-  defsubr (&Splist_member);
-  defsubr (&Swidget_put);
-  defsubr (&Swidget_get);
-  defsubr (&Swidget_apply);
-  defsubr (&Sbase64_encode_region);
-  defsubr (&Sbase64_decode_region);
-  defsubr (&Sbase64_encode_string);
-  defsubr (&Sbase64_decode_string);
-  defsubr (&Smd5);
-  defsubr (&Ssecure_hash_algorithms);
-  defsubr (&Ssecure_hash);
-  defsubr (&Sbuffer_hash);
-  defsubr (&Slocale_info);
 }

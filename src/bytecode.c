@@ -1480,7 +1480,7 @@ get_byte_code_arity (Lisp_Object args_template)
 void
 syms_of_bytecode (void)
 {
-  defsubr (&Sbyte_code);
+#include "bytecode.x"
 
 #ifdef BYTE_CODE_METER
 

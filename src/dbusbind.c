@@ -1677,13 +1677,15 @@ init_dbusbind (void)
 void
 syms_of_dbusbind (void)
 {
-  defsubr (&Sdbus__init_bus);
-  defsubr (&Sdbus_get_unique_name);
+#include "dbusbind.x"
 
   DEFSYM (Qdbus_message_internal, "dbus-message-internal");
-  defsubr (&Sdbus_message_internal);
 
   /* D-Bus error symbol.  */
+
+  DEFSYM (Qdbus__init_bus, "dbus--init-bus");
+  DEFSYM (Qdbus_get_unique_name, "dbus-get-unique-name");
+  DEFSYM (Qdbus_message_internal, "dbus-message-internal");
   DEFSYM (Qdbus_error, "dbus-error");
   Fput (Qdbus_error, Qerror_conditions,
 	list2 (Qdbus_error, Qerror));
@@ -1710,6 +1712,7 @@ syms_of_dbusbind (void)
   DEFSYM (QCstring, ":string");
   DEFSYM (QCobject_path, ":object-path");
   DEFSYM (QCsignature, ":signature");
+
 #ifdef DBUS_TYPE_UNIX_FD
   DEFSYM (QCunix_fd, ":unix-fd");
 #endif

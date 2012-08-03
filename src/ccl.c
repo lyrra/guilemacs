@@ -2274,6 +2274,8 @@ Return index number of the registered map.  */)
 void
 syms_of_ccl (void)
 {
+#include "ccl.x"
+
   staticpro (&Vccl_program_table);
   Vccl_program_table = Fmake_vector (make_number (32), Qnil);
 
@@ -2312,10 +2314,4 @@ Comprises pairs (SYMBOL . TABLE) where SYMBOL and TABLE were set up by calls
 to `define-translation-hash-table'.  The vector is indexed by the table id
 used by CCL.  */);
     Vtranslation_hash_table_vector = Qnil;
-
-  defsubr (&Sccl_program_p);
-  defsubr (&Sccl_execute);
-  defsubr (&Sccl_execute_on_string);
-  defsubr (&Sregister_ccl_program);
-  defsubr (&Sregister_code_conversion_map);
 }

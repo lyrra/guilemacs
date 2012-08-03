@@ -1930,6 +1930,8 @@ init_minibuf_once (void)
 void
 syms_of_minibuf (void)
 {
+#include "minibuf.x"
+
   minibuf_level = 0;
   minibuf_prompt = Qnil;
   staticpro (&minibuf_prompt);
@@ -2116,27 +2118,4 @@ This variable also overrides the default character that `read-passwd'
 uses to hide passwords.  */);
   Vread_hide_char = Qnil;
 
-  defsubr (&Sactive_minibuffer_window);
-  defsubr (&Sset_minibuffer_window);
-  defsubr (&Sread_from_minibuffer);
-  defsubr (&Sread_string);
-  defsubr (&Sread_command);
-  defsubr (&Sread_variable);
-  defsubr (&Sinternal_complete_buffer);
-  defsubr (&Sread_buffer);
-  defsubr (&Sread_no_blanks_input);
-  defsubr (&Sminibuffer_depth);
-  defsubr (&Sminibuffer_prompt);
-
-  defsubr (&Sminibufferp);
-  defsubr (&Sminibuffer_prompt_end);
-  defsubr (&Sminibuffer_contents);
-  defsubr (&Sminibuffer_contents_no_properties);
-  defsubr (&Sminibuffer_completion_contents);
-
-  defsubr (&Stry_completion);
-  defsubr (&Sall_completions);
-  defsubr (&Stest_completion);
-  defsubr (&Sassoc_string);
-  defsubr (&Scompleting_read);
 }

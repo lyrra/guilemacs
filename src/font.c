@@ -5303,6 +5303,8 @@ font_drop_xrender_surfaces (struct frame *f)
 void
 syms_of_font (void)
 {
+#include "font.x"
+
   sort_shift_bits[FONT_TYPE_INDEX] = 0;
   sort_shift_bits[FONT_SLANT_INDEX] = 2;
   sort_shift_bits[FONT_WEIGHT_INDEX] = 9;
@@ -5363,42 +5365,6 @@ syms_of_font (void)
   otf_list = Qnil;
 #endif	/* HAVE_LIBOTF */
 #endif	/* 0 */
-
-  defsubr (&Sfontp);
-  defsubr (&Sfont_spec);
-  defsubr (&Sfont_get);
-#ifdef HAVE_WINDOW_SYSTEM
-  defsubr (&Sfont_face_attributes);
-#endif
-  defsubr (&Sfont_put);
-  defsubr (&Slist_fonts);
-  defsubr (&Sfont_family_list);
-  defsubr (&Sfind_font);
-  defsubr (&Sfont_xlfd_name);
-  defsubr (&Sclear_font_cache);
-  defsubr (&Sfont_shape_gstring);
-  defsubr (&Sfont_variation_glyphs);
-  defsubr (&Sinternal_char_font);
-#if 0
-  defsubr (&Sfont_drive_otf);
-  defsubr (&Sfont_otf_alternates);
-#endif	/* 0 */
-
-#ifdef FONT_DEBUG
-  defsubr (&Sopen_font);
-  defsubr (&Sclose_font);
-  defsubr (&Squery_font);
-  defsubr (&Sfont_get_glyphs);
-  defsubr (&Sfont_match_p);
-  defsubr (&Sfont_at);
-#if 0
-  defsubr (&Sdraw_string);
-#endif
-  defsubr (&Sframe_font_cache);
-#endif	/* FONT_DEBUG */
-#ifdef HAVE_WINDOW_SYSTEM
-  defsubr (&Sfont_info);
-#endif
 
   DEFVAR_LISP ("font-encoding-alist", Vfont_encoding_alist,
 	       doc: /*

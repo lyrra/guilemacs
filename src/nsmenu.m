@@ -1881,13 +1881,13 @@ DEFUN ("menu-or-popup-active-p", Fmenu_or_popup_active_p, Smenu_or_popup_active_
 void
 syms_of_nsmenu (void)
 {
+#include "nsmenu.x"
+
 #ifndef NS_IMPL_COCOA
   /* Don't know how to keep track of this in Next/Open/GNUstep.  Always
      update menus there.  */
   trackingMenu = 1;
 #endif
-  defsubr (&Sns_reset_menu);
-  defsubr (&Smenu_or_popup_active_p);
 
   DEFSYM (Qdebug_on_next_call, "debug-on-next-call");
 }

@@ -8106,6 +8106,8 @@ init_process_emacs (int sockfd)
 void
 syms_of_process (void)
 {
+#include "process.x"
+
 #ifdef subprocesses
 
   DEFSYM (Qprocessp, "processp");
@@ -8254,66 +8256,6 @@ returns non-`nil'.  */);
 	  "internal-default-interrupt-process");
   DEFSYM (Qinterrupt_process_functions, "interrupt-process-functions");
 
-  defsubr (&Sprocessp);
-  defsubr (&Sget_process);
-  defsubr (&Sdelete_process);
-  defsubr (&Sprocess_status);
-  defsubr (&Sprocess_exit_status);
-  defsubr (&Sprocess_id);
-  defsubr (&Sprocess_name);
-  defsubr (&Sprocess_tty_name);
-  defsubr (&Sprocess_command);
-  defsubr (&Sset_process_buffer);
-  defsubr (&Sprocess_buffer);
-  defsubr (&Sprocess_mark);
-  defsubr (&Sset_process_filter);
-  defsubr (&Sprocess_filter);
-  defsubr (&Sset_process_sentinel);
-  defsubr (&Sprocess_sentinel);
-  defsubr (&Sset_process_thread);
-  defsubr (&Sprocess_thread);
-  defsubr (&Sset_process_window_size);
-  defsubr (&Sset_process_inherit_coding_system_flag);
-  defsubr (&Sset_process_query_on_exit_flag);
-  defsubr (&Sprocess_query_on_exit_flag);
-  defsubr (&Sprocess_contact);
-  defsubr (&Sprocess_plist);
-  defsubr (&Sset_process_plist);
-  defsubr (&Sprocess_list);
-  defsubr (&Smake_process);
-  defsubr (&Smake_pipe_process);
-  defsubr (&Sserial_process_configure);
-  defsubr (&Smake_serial_process);
-  defsubr (&Sset_network_process_option);
-  defsubr (&Smake_network_process);
-  defsubr (&Sformat_network_address);
-  defsubr (&Snetwork_interface_list);
-  defsubr (&Snetwork_interface_info);
-#ifdef DATAGRAM_SOCKETS
-  defsubr (&Sprocess_datagram_address);
-  defsubr (&Sset_process_datagram_address);
-#endif
-  defsubr (&Saccept_process_output);
-  defsubr (&Sprocess_send_region);
-  defsubr (&Sprocess_send_string);
-  defsubr (&Sinternal_default_interrupt_process);
-  defsubr (&Sinterrupt_process);
-  defsubr (&Skill_process);
-  defsubr (&Squit_process);
-  defsubr (&Sstop_process);
-  defsubr (&Scontinue_process);
-  defsubr (&Sprocess_running_child_p);
-  defsubr (&Sprocess_send_eof);
-  defsubr (&Ssignal_process);
-  defsubr (&Swaiting_for_user_input_p);
-  defsubr (&Sprocess_type);
-  defsubr (&Sinternal_default_process_sentinel);
-  defsubr (&Sinternal_default_process_filter);
-  defsubr (&Sset_process_coding_system);
-  defsubr (&Sprocess_coding_system);
-  defsubr (&Sset_process_filter_multibyte);
-  defsubr (&Sprocess_filter_multibyte_p);
-
  {
    Lisp_Object subfeatures = Qnil;
    const struct socket_options *sopt;
@@ -8347,9 +8289,4 @@ returns non-`nil'.  */);
  }
 
 #endif	/* subprocesses */
-
-  defsubr (&Sget_buffer_process);
-  defsubr (&Sprocess_inherit_coding_system_flag);
-  defsubr (&Slist_system_processes);
-  defsubr (&Sprocess_attributes);
 }

@@ -2626,6 +2626,8 @@ struct font_driver w32font_driver =
 void
 syms_of_w32font (void)
 {
+#include "w32font.x"
+
   DEFSYM (Qgdi, "gdi");
   DEFSYM (Quniscribe, "uniscribe");
   DEFSYM (QCformat, ":format");
@@ -2799,8 +2801,6 @@ versions of Windows) characters.  */);
   DEFSYM (Qw32_charset_vietnamese, "w32-charset-vietnamese");
   DEFSYM (Qw32_charset_thai, "w32-charset-thai");
   DEFSYM (Qw32_charset_mac, "w32-charset-mac");
-
-  defsubr (&Sx_select_font);
 
   register_font_driver (&w32font_driver, NULL);
 }

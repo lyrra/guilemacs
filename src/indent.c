@@ -2369,17 +2369,12 @@ whether or not it is currently displayed in some window.  */)
 void
 syms_of_indent (void)
 {
+#include "indent.x"
+
   DEFVAR_BOOL ("indent-tabs-mode", indent_tabs_mode,
 	       doc: /* Indentation can insert tabs if this is non-nil.  */);
   indent_tabs_mode = 1;
 
   DEFSYM (Qcolumns, "columns");
 
-  defsubr (&Scurrent_indentation);
-  defsubr (&Sindent_to);
-  defsubr (&Scurrent_column);
-  defsubr (&Smove_to_column);
-  defsubr (&Sline_number_display_width);
-  defsubr (&Svertical_motion);
-  defsubr (&Scompute_motion);
 }

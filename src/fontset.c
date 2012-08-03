@@ -2111,6 +2111,8 @@ DEFUN ("fontset-list-all", Ffontset_list_all, Sfontset_list_all, 0, 0, 0,
 void
 syms_of_fontset (void)
 {
+#include "fontset.x"
+
   DEFSYM (Qfontset, "fontset");
   Fput (Qfontset, Qchar_table_extra_slots, make_number (8));
   DEFSYM (Qfontset_info, "fontset-info");
@@ -2199,14 +2201,4 @@ at the vertical center of lines.  */);
   DEFVAR_LISP ("otf-script-alist", Votf_script_alist,
 	       doc: /* Alist of OpenType script tags vs the corresponding script names.  */);
   Votf_script_alist = Qnil;
-
-  defsubr (&Squery_fontset);
-  defsubr (&Snew_fontset);
-  defsubr (&Sset_fontset_font);
-  defsubr (&Sfontset_info);
-  defsubr (&Sfontset_font);
-  defsubr (&Sfontset_list);
-#ifdef ENABLE_CHECKING
-  defsubr (&Sfontset_list_all);
-#endif
 }

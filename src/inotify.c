@@ -512,9 +512,11 @@ DEFUN ("inotify-allocated-p", Finotify_allocated_p, Sinotify_allocated_p, 0, 0, 
 void
 syms_of_inotify (void)
 {
+#include "inotify.x"
   DEFSYM (Qaccess, "access");		/* IN_ACCESS */
   DEFSYM (Qattrib, "attrib");		/* IN_ATTRIB */
   DEFSYM (Qclose_write, "close-write");	/* IN_CLOSE_WRITE */
+
   DEFSYM (Qclose_nowrite, "close-nowrite");
 					/* IN_CLOSE_NOWRITE */
   DEFSYM (Qcreate, "create");		/* IN_CREATE */
@@ -538,14 +540,6 @@ syms_of_inotify (void)
   DEFSYM (Qq_overflow, "q-overflow");	/* IN_Q_OVERFLOW */
   DEFSYM (Qunmount, "unmount");		/* IN_UNMOUNT */
 
-  defsubr (&Sinotify_add_watch);
-  defsubr (&Sinotify_rm_watch);
-  defsubr (&Sinotify_valid_p);
-
-#ifdef INOTIFY_DEBUG
-  defsubr (&Sinotify_watch_list);
-  defsubr (&Sinotify_allocated_p);
-#endif
   staticpro (&watch_list);
 
   Fprovide (intern_c_string ("inotify"), Qnil);

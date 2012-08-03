@@ -299,8 +299,7 @@ If DISCARD-COMMENTS is non-nil, all HTML comments are discarded. */)
 void
 syms_of_xml (void)
 {
-  defsubr (&Slibxml_parse_html_region);
-  defsubr (&Slibxml_parse_xml_region);
+#include "xml.x"
 }
 
 #endif /* HAVE_LIBXML2 */

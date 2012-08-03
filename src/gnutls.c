@@ -2569,6 +2569,7 @@ Any GnuTLS extension with ID up to 100
 void
 syms_of_gnutls (void)
 {
+#include "gnutls.x"
   DEFSYM (Qlibgnutls_version, "libgnutls-version");
   Fset (Qlibgnutls_version,
 #ifdef HAVE_GNUTLS
@@ -2634,27 +2635,6 @@ syms_of_gnutls (void)
   Fput (Qgnutls_e_not_ready_for_handshake, Qgnutls_code,
 	make_number (GNUTLS_E_APPLICATION_ERROR_MIN));
 
-  defsubr (&Sgnutls_get_initstage);
-  defsubr (&Sgnutls_asynchronous_parameters);
-  defsubr (&Sgnutls_errorp);
-  defsubr (&Sgnutls_error_fatalp);
-  defsubr (&Sgnutls_error_string);
-  defsubr (&Sgnutls_boot);
-  defsubr (&Sgnutls_deinit);
-  defsubr (&Sgnutls_bye);
-  defsubr (&Sgnutls_peer_status);
-  defsubr (&Sgnutls_peer_status_warning_describe);
-
-#ifdef HAVE_GNUTLS3
-  defsubr (&Sgnutls_ciphers);
-  defsubr (&Sgnutls_macs);
-  defsubr (&Sgnutls_digests);
-  defsubr (&Sgnutls_hash_mac);
-  defsubr (&Sgnutls_hash_digest);
-  defsubr (&Sgnutls_symmetric_encrypt);
-  defsubr (&Sgnutls_symmetric_decrypt);
-#endif
-
   DEFVAR_INT ("gnutls-log-level", global_gnutls_log_level,
 	      doc: /* Logging level used by the GnuTLS functions.
 Set this larger than 0 to get debug output in the *Messages* buffer.
@@ -2664,5 +2644,4 @@ are as per the GnuTLS logging conventions.  */);
 
 #endif	/* HAVE_GNUTLS */
 
-  defsubr (&Sgnutls_available_p);
 }

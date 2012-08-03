@@ -1645,6 +1645,8 @@ set_initial_environment (void)
 void
 syms_of_callproc (void)
 {
+#include "callproc.x"
+
 #ifndef DOS_NT
   Vtemp_file_name_pattern = build_string ("emacsXXXXXX");
 #else  /* DOS_NT */
@@ -1727,8 +1729,4 @@ use.
 
 See `setenv' and `getenv'.  */);
   Vprocess_environment = Qnil;
-
-  defsubr (&Scall_process);
-  defsubr (&Sgetenv_internal);
-  defsubr (&Scall_process_region);
 }

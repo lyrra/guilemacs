@@ -3868,6 +3868,8 @@ Lisp_Object backtrace_top_function (void)
 void
 syms_of_eval (void)
 {
+#include "eval.x"
+
   DEFVAR_INT ("max-specpdl-size", max_specpdl_size,
 	      doc: /* Limit on number of Lisp variable bindings and `unwind-protect's.
 If Lisp code tries to increase the total number past this amount,
@@ -4019,51 +4021,6 @@ alist of active lexical bindings.  */);
 
   inhibit_lisp_code = Qnil;
 
-  defsubr (&Sor);
-  defsubr (&Sand);
-  defsubr (&Sif);
-  defsubr (&Scond);
-  defsubr (&Sprogn);
-  defsubr (&Sprog1);
-  defsubr (&Sprog2);
-  defsubr (&Ssetq);
-  defsubr (&Squote);
-  defsubr (&Sfunction);
-  defsubr (&Sdefault_toplevel_value);
-  defsubr (&Sset_default_toplevel_value);
-  defsubr (&Sdefvar);
-  defsubr (&Sdefvaralias);
   DEFSYM (Qdefvaralias, "defvaralias");
-  defsubr (&Sdefconst);
-  defsubr (&Smake_var_non_special);
-  defsubr (&Slet);
-  defsubr (&SletX);
-  defsubr (&Swhile);
-  defsubr (&Smacroexpand);
-  defsubr (&Scatch);
-  defsubr (&Sthrow);
-  defsubr (&Sunwind_protect);
-  defsubr (&Scondition_case);
-  defsubr (&Ssignal);
-  defsubr (&Scommandp);
-  defsubr (&Sautoload);
-  defsubr (&Sautoload_do_load);
-  defsubr (&Seval);
-  defsubr (&Sapply);
-  defsubr (&Sfuncall);
-  defsubr (&Sfunc_arity);
-  defsubr (&Srun_hooks);
-  defsubr (&Srun_hook_with_args);
-  defsubr (&Srun_hook_with_args_until_success);
-  defsubr (&Srun_hook_with_args_until_failure);
-  defsubr (&Srun_hook_wrapped);
-  defsubr (&Sfetch_bytecode);
-  defsubr (&Sbacktrace_debug);
   DEFSYM (QCdebug_on_exit, ":debug-on-exit");
-  defsubr (&Smapbacktrace);
-  defsubr (&Sbacktrace_frame_internal);
-  defsubr (&Sbacktrace_eval);
-  defsubr (&Sbacktrace__locals);
-  defsubr (&Sspecial_variable_p);
-  defsubr (&Sfunctionp);
 }
