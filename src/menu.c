@@ -1579,12 +1579,8 @@ for instance using the window manager, then this produces a quit and
 void
 syms_of_menu (void)
 {
+#include "menu.x"
   menu_items = Qnil;
-  staticpro (&menu_items);
 
   DEFSYM (Qhide, "hide");
-
-  defsubr (&Sx_popup_menu);
-  defsubr (&Sx_popup_dialog);
-  defsubr (&Smenu_bar_menu_at_x_y);
 }

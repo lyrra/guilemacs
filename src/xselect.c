@@ -2631,15 +2631,7 @@ static void syms_of_xselect_for_pdumper (void);
 void
 syms_of_xselect (void)
 {
-  defsubr (&Sx_get_selection_internal);
-  defsubr (&Sx_own_selection_internal);
-  defsubr (&Sx_disown_selection_internal);
-  defsubr (&Sx_selection_owner_p);
-  defsubr (&Sx_selection_exists_p);
-
-  defsubr (&Sx_get_atom_name);
-  defsubr (&Sx_send_client_message);
-  defsubr (&Sx_register_dnd_atom);
+#include "xselect.x"
 
   reading_selection_reply = Fcons (Qnil, Qnil);
   staticpro (&reading_selection_reply);

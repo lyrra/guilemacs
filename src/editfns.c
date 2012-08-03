@@ -4450,6 +4450,8 @@ ring.  */)
 void
 syms_of_editfns (void)
 {
+#include "editfns.x"
+
   DEFSYM (Qbuffer_access_fontify_functions, "buffer-access-fontify-functions");
   DEFSYM (Qwall, "wall");
   DEFSYM (Qpropertize, "propertize");
@@ -4513,95 +4515,14 @@ This variable is experimental; email 32252@debbugs.gnu.org if you need
 it to be non-nil.  */);
   binary_as_unsigned = false;
 
-  defsubr (&Spropertize);
-  defsubr (&Schar_equal);
-  defsubr (&Sgoto_char);
-  defsubr (&Sstring_to_char);
-  defsubr (&Schar_to_string);
-  defsubr (&Sbyte_to_string);
-  defsubr (&Sbuffer_substring);
-  defsubr (&Sbuffer_substring_no_properties);
-  defsubr (&Sbuffer_string);
-  defsubr (&Sget_pos_property);
-
-  defsubr (&Spoint_marker);
-  defsubr (&Smark_marker);
-  defsubr (&Spoint);
-  defsubr (&Sregion_beginning);
-  defsubr (&Sregion_end);
+  DEFVAR_LISP ("message-in-echo-area", Vmessage_in_echo_area,
+	       doc: /* Non-nil means overwrite the minibuffer with a message in the echo area.  */);
+  Vmessage_in_echo_area = Qnil;
+  DEFSYM (Qmessage_in_echo_area, "message-in-echo-area");
 
   /* Symbol for the text property used to mark fields.  */
   DEFSYM (Qfield, "field");
 
   /* A special value for Qfield properties.  */
   DEFSYM (Qboundary, "boundary");
-
-  defsubr (&Sfield_beginning);
-  defsubr (&Sfield_end);
-  defsubr (&Sfield_string);
-  defsubr (&Sfield_string_no_properties);
-  defsubr (&Sdelete_field);
-  defsubr (&Sconstrain_to_field);
-
-  defsubr (&Sline_beginning_position);
-  defsubr (&Sline_end_position);
-
-  defsubr (&Ssave_excursion);
-  defsubr (&Ssave_current_buffer);
-
-  defsubr (&Sbuffer_size);
-  defsubr (&Spoint_max);
-  defsubr (&Spoint_min);
-  defsubr (&Spoint_min_marker);
-  defsubr (&Spoint_max_marker);
-  defsubr (&Sgap_position);
-  defsubr (&Sgap_size);
-  defsubr (&Sposition_bytes);
-  defsubr (&Sbyte_to_position);
-
-  defsubr (&Sbobp);
-  defsubr (&Seobp);
-  defsubr (&Sbolp);
-  defsubr (&Seolp);
-  defsubr (&Sfollowing_char);
-  defsubr (&Sprevious_char);
-  defsubr (&Schar_after);
-  defsubr (&Schar_before);
-  defsubr (&Sinsert);
-  defsubr (&Sinsert_before_markers);
-  defsubr (&Sinsert_and_inherit);
-  defsubr (&Sinsert_and_inherit_before_markers);
-  defsubr (&Sinsert_char);
-  defsubr (&Sinsert_byte);
-
-  defsubr (&Sngettext);
-
-  defsubr (&Suser_login_name);
-  defsubr (&Sgroup_name);
-  defsubr (&Suser_real_login_name);
-  defsubr (&Suser_uid);
-  defsubr (&Suser_real_uid);
-  defsubr (&Sgroup_gid);
-  defsubr (&Sgroup_real_gid);
-  defsubr (&Suser_full_name);
-  defsubr (&Semacs_pid);
-  defsubr (&Ssystem_name);
-  defsubr (&Smessage);
-  defsubr (&Smessage_box);
-  defsubr (&Smessage_or_box);
-  defsubr (&Scurrent_message);
-  defsubr (&Sformat);
-  defsubr (&Sformat_message);
-
-  defsubr (&Sinsert_buffer_substring);
-  defsubr (&Scompare_buffer_substrings);
-  defsubr (&Sreplace_buffer_contents);
-  defsubr (&Ssubst_char_in_region);
-  defsubr (&Stranslate_region_internal);
-  defsubr (&Sdelete_region);
-  defsubr (&Sdelete_and_extract_region);
-  defsubr (&Swiden);
-  defsubr (&Snarrow_to_region);
-  defsubr (&Ssave_restriction);
-  defsubr (&Stranspose_regions);
 }

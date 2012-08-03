@@ -2296,6 +2296,8 @@ init_minibuf_once (void)
 static void
 init_minibuf_once_for_pdumper (void)
 {
+#include "minibuf.x"
+
   PDUMPER_IGNORE (minibuf_level);
   PDUMPER_IGNORE (minibuf_prompt_width);
 
@@ -2542,29 +2544,4 @@ the minibuffer.  However, if `minibuffer-restore-windows' is present
 in `minibuffer-exit-hook', exiting the minibuffer will remove the window
 showing the *Completions* buffer, if any.  */);
   read_minibuffer_restore_windows = true;
-
-  defsubr (&Sactive_minibuffer_window);
-  defsubr (&Sset_minibuffer_window);
-  defsubr (&Sread_from_minibuffer);
-  defsubr (&Sread_string);
-  defsubr (&Sread_command);
-  defsubr (&Sread_variable);
-  defsubr (&Sinternal_complete_buffer);
-  defsubr (&Sread_buffer);
-  defsubr (&Sminibuffer_depth);
-  defsubr (&Sminibuffer_prompt);
-
-  defsubr (&Sminibufferp);
-  defsubr (&Sinnermost_minibuffer_p);
-  defsubr (&Sminibuffer_innermost_command_loop_p);
-  defsubr (&Sabort_minibuffers);
-  defsubr (&Sminibuffer_prompt_end);
-  defsubr (&Sminibuffer_contents);
-  defsubr (&Sminibuffer_contents_no_properties);
-
-  defsubr (&Stry_completion);
-  defsubr (&Sall_completions);
-  defsubr (&Stest_completion);
-  defsubr (&Sassoc_string);
-  defsubr (&Scompleting_read);
 }

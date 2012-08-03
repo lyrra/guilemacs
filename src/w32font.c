@@ -2732,6 +2732,8 @@ static void syms_of_w32font_for_pdumper (void);
 void
 syms_of_w32font (void)
 {
+#include "w32font.x"
+
   DEFSYM (Qgdi, "gdi");
   DEFSYM (Quniscribe, "uniscribe");
   DEFSYM (Qharfbuzz, "harfbuzz");
@@ -2911,7 +2913,6 @@ versions of Windows) characters.  */);
   DEFSYM (Qw32_charset_mac, "w32-charset-mac");
   DEFSYM (Qw32_non_USB_fonts, "w32-non-USB-fonts");
 
-  defsubr (&Sx_select_font);
 
   pdumper_do_now_and_after_load (syms_of_w32font_for_pdumper);
 }

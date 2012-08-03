@@ -2824,6 +2824,7 @@ Any GnuTLS extension with ID up to 100
 void
 syms_of_gnutls (void)
 {
+#include "gnutls.x"
   DEFVAR_LISP ("libgnutls-version", Vlibgnutls_version,
                doc: /* The version of libgnutls that Emacs was compiled with.
 The version number is encoded as an integer with the major version in
@@ -2895,27 +2896,7 @@ level in the ones.  For builds without libgnutls, the value is -1.  */);
   Fput (Qgnutls_e_not_ready_for_handshake, Qgnutls_code,
 	make_fixnum (GNUTLS_E_APPLICATION_ERROR_MIN));
 
-  defsubr (&Sgnutls_get_initstage);
-  defsubr (&Sgnutls_asynchronous_parameters);
-  defsubr (&Sgnutls_errorp);
-  defsubr (&Sgnutls_error_fatalp);
-  defsubr (&Sgnutls_error_string);
-  defsubr (&Sgnutls_boot);
-  defsubr (&Sgnutls_deinit);
-  defsubr (&Sgnutls_bye);
-  defsubr (&Sgnutls_peer_status);
-  defsubr (&Sgnutls_peer_status_warning_describe);
-  defsubr (&Sgnutls_format_certificate);
-
 #ifdef HAVE_GNUTLS3
-  defsubr (&Sgnutls_ciphers);
-  defsubr (&Sgnutls_macs);
-  defsubr (&Sgnutls_digests);
-  defsubr (&Sgnutls_hash_mac);
-  defsubr (&Sgnutls_hash_digest);
-  defsubr (&Sgnutls_symmetric_encrypt);
-  defsubr (&Sgnutls_symmetric_decrypt);
-
   cipher_cache = Qnil;
   staticpro (&cipher_cache);
 #endif
@@ -2929,5 +2910,4 @@ are as per the GnuTLS logging conventions.  */);
 
 #endif	/* HAVE_GNUTLS */
 
-  defsubr (&Sgnutls_available_p);
 }

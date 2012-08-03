@@ -703,6 +703,7 @@ See variable `text-quoting-style'.  */)
 void
 syms_of_doc (void)
 {
+#include "doc.x"
   DEFSYM (Qsubstitute_command_keys, "substitute-command-keys");
   DEFSYM (Qfunction_documentation, "function-documentation");
   DEFSYM (Qgrave, "grave");
@@ -738,8 +739,4 @@ The value should be one of these symbols:
 	       doc: /* If nil, a nil `text-quoting-style' is treated as `grave'.  */);
   /* Initialized by ‘main’.  */
 
-  defsubr (&Sdocumentation);
-  defsubr (&Sdocumentation_property);
-  defsubr (&Ssnarf_documentation);
-  defsubr (&Stext_quoting_style);
 }

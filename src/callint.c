@@ -825,6 +825,8 @@ Its numeric meaning is what you would get from `(interactive "p")'.  */)
 void
 syms_of_callint (void)
 {
+#include "callint.x"
+
   point_marker = Fmake_marker ();
   staticpro (&point_marker);
 
@@ -914,9 +916,4 @@ was invoked by an input event that is not a mouse gesture: a click, a drag,
 etc.  To create the event data when the input was some other event,
 use `event-start', `event-end', and `event-click-count'.  */);
   inhibit_mouse_event_check = false;
-
-  defsubr (&Sinteractive);
-  defsubr (&Scall_interactively);
-  defsubr (&Sfuncall_interactively);
-  defsubr (&Sprefix_numeric_value);
 }

@@ -3346,6 +3346,7 @@ static void syms_of_search_for_pdumper (void);
 void
 syms_of_search (void)
 {
+#include "search.x"
   for (int i = 0; i < REGEXP_CACHE_SIZE; ++i)
     {
       staticpro (&searchbufs[i].regexp);
@@ -3399,25 +3400,6 @@ such as `looking-at', `string-match', `re-search-forward', etc.,
 do not set the match data.  The proper way to use this variable
 is to bind it with `let' around a small expression.  */);
   Vinhibit_changing_match_data = Qnil;
-
-  defsubr (&Slooking_at);
-  defsubr (&Sposix_looking_at);
-  defsubr (&Sstring_match);
-  defsubr (&Sposix_string_match);
-  defsubr (&Ssearch_forward);
-  defsubr (&Ssearch_backward);
-  defsubr (&Sre_search_forward);
-  defsubr (&Sre_search_backward);
-  defsubr (&Sposix_search_forward);
-  defsubr (&Sposix_search_backward);
-  defsubr (&Sreplace_match);
-  defsubr (&Smatch_beginning);
-  defsubr (&Smatch_end);
-  defsubr (&Smatch_data);
-  defsubr (&Sset_match_data);
-  defsubr (&Smatch_data__translate);
-  defsubr (&Sregexp_quote);
-  defsubr (&Snewline_cache_check);
 
   pdumper_do_now_and_after_load (syms_of_search_for_pdumper);
 }

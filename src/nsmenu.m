@@ -1877,8 +1877,6 @@ DEFUN ("menu-or-popup-active-p", Fmenu_or_popup_active_p, Smenu_or_popup_active_
 void
 syms_of_nsmenu (void)
 {
-  defsubr (&Sns_reset_menu);
-  defsubr (&Smenu_or_popup_active_p);
-
+#include "nsmenu.x"
   DEFSYM (Qdebug_on_next_call, "debug-on-next-call");
 }

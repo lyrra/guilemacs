@@ -2427,15 +2427,15 @@ static void syms_of_xmenu_for_pdumper (void);
 void
 syms_of_xmenu (void)
 {
+#include "xmenu.x"
+
   DEFSYM (Qdebug_on_next_call, "debug-on-next-call");
-  defsubr (&Smenu_or_popup_active_p);
 
 #ifdef USE_GTK
   DEFSYM (Qframe_monitor_workarea, "frame-monitor-workarea");
 #endif
 
 #if defined (USE_GTK) || defined (USE_X_TOOLKIT)
-  defsubr (&Sx_menu_bar_open_internal);
   Ffset (intern_c_string ("accelerate-menu"),
 	 intern_c_string (Sx_menu_bar_open_internal.symbol_name));
 #endif

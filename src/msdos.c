@@ -4301,6 +4301,8 @@ msdos_fatal_signal (int sig)
 void
 syms_of_msdos (void)
 {
+#include "msdos.x"
+
   recent_doskeys = Fmake_vector (make_fixnum (NUM_RECENT_DOSKEYS), Qnil);
   staticpro (&recent_doskeys);
 
@@ -4315,12 +4317,6 @@ This variable is used only by MS-DOS terminals.  */);
   Vdos_unsupported_char_glyph = make_fixnum ('\177');
 
 #endif
-
-  defsubr (&Srecent_doskeys);
-  defsubr (&Smsdos_long_file_names);
-  defsubr (&Smsdos_downcase_filename);
-  defsubr (&Smsdos_remember_default_colors);
-  defsubr (&Smsdos_set_mouse_buttons);
 }
 
 #endif /* MSDOS */

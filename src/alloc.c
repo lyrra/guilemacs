@@ -1712,6 +1712,43 @@ init_alloc (void)
 void
 syms_of_alloc (void)
 {
+#include "alloc.x"
+
+  DEFVAR_INT ("gc-cons-threshold", gc_cons_threshold,
+	      doc: /* Number of bytes of consing between garbage collections.
+Garbage collection can happen automatically once this many bytes have been
+allocated since the last garbage collection.  All data types count.
+
+Garbage collection happens automatically only when `eval' is called.
+
+By binding this temporarily to a large number, you can effectively
+prevent garbage collection during a part of the program.
+See also `gc-cons-percentage'.  */);
+
+  DEFVAR_LISP ("gc-cons-percentage", Vgc_cons_percentage,
+	       doc: /* Portion of the heap used for allocation.
+Garbage collection can happen automatically once this portion of the heap
+has been allocated since the last garbage collection.
+If this portion is smaller than `gc-cons-threshold', this is ignored.  */);
+  Vgc_cons_percentage = make_float (0.1);
+
+  DEFVAR_INT ("pure-bytes-used", pure_bytes_used,
+	      doc: /* Number of bytes of shareable Lisp data allocated so far.  */);
+
+  DEFVAR_LISP ("purify-flag", Vpurify_flag,
+	       doc: /* Non-nil means loading Lisp code in order to dump an executable.
+This means that certain objects should be allocated in shared (pure) space.
+It can also be set to a hash-table, in which case this table is used to
+do hash-consing of the objects allocated to pure space.  */);
+
+  DEFVAR_BOOL ("garbage-collection-messages", garbage_collection_messages,
+	       doc: /* Non-nil means display messages at start and end of garbage collection.  */);
+  garbage_collection_messages = 0;
+
+  DEFVAR_LISP ("post-gc-hook", Vpost_gc_hook,
+	       doc: /* Hook run after garbage collection has finished.  */);
+  Vpost_gc_hook = Qnil;
+  DEFSYM (Qpost_gc_hook, "post-gc-hook");
 
   DEFVAR_LISP ("memory-signal-data", Vmemory_signal_data,
 	       doc: /* Precomputed `signal' argument for memory-full error.  */);
@@ -1735,23 +1772,6 @@ syms_of_alloc (void)
 Integers with absolute values less than 2**N do not signal a range error.
 N should be nonnegative.  */);
 
-  defsubr (&Scons);
-  defsubr (&Slist);
-  defsubr (&Svector);
-  defsubr (&Srecord);
-  defsubr (&Sbool_vector);
-  defsubr (&Smake_byte_code);
-  defsubr (&Smake_closure);
-  defsubr (&Smake_list);
-  defsubr (&Smake_vector);
-  defsubr (&Smake_record);
-  defsubr (&Smake_string);
-  defsubr (&Smake_bool_vector);
-  defsubr (&Smake_symbol);
-  defsubr (&Smake_marker);
-  defsubr (&Spurecopy);
-  defsubr (&Sgarbage_collect);
-  defsubr (&Ssuspicious_object);
 }
 
 #ifdef HAVE_X_WINDOWS

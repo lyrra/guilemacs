@@ -3724,6 +3724,8 @@ init_syntax_once (void)
 void
 syms_of_syntax (void)
 {
+#include "syntax.x"
+
   DEFSYM (Qsyntax_table_p, "syntax-table-p");
   DEFSYM (Qsyntax_ppss, "syntax-ppss");
   DEFVAR_LISP ("comment-use-syntax-ppss",
@@ -3796,29 +3798,4 @@ In both cases, LIMIT bounds the search. */);
   comment_end_can_be_escaped = false;
   DEFSYM (Qcomment_end_can_be_escaped, "comment-end-can-be-escaped");
   Fmake_variable_buffer_local (Qcomment_end_can_be_escaped);
-
-  defsubr (&Ssyntax_table_p);
-  defsubr (&Ssyntax_table);
-  defsubr (&Sstandard_syntax_table);
-  defsubr (&Scopy_syntax_table);
-  defsubr (&Sset_syntax_table);
-  defsubr (&Schar_syntax);
-  defsubr (&Ssyntax_class_to_char);
-  defsubr (&Smatching_paren);
-  defsubr (&Sstring_to_syntax);
-  defsubr (&Smodify_syntax_entry);
-  defsubr (&Sinternal_describe_syntax_value);
-
-  defsubr (&Sforward_word);
-
-  defsubr (&Sskip_chars_forward);
-  defsubr (&Sskip_chars_backward);
-  defsubr (&Sskip_syntax_forward);
-  defsubr (&Sskip_syntax_backward);
-
-  defsubr (&Sforward_comment);
-  defsubr (&Sscan_lists);
-  defsubr (&Sscan_sexps);
-  defsubr (&Sbackward_prefix_chars);
-  defsubr (&Sparse_partial_sexp);
 }

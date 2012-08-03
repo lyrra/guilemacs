@@ -669,16 +669,4 @@ Called with one argument METHOD which can be:
   is called, for each contiguous sub-region, with METHOD as its
   3rd argument.  */);
   Vregion_extract_function = Qnil; /* simple.el sets this.  */
-
-  defsubr (&Supcase);
-  defsubr (&Sdowncase);
-  defsubr (&Scapitalize);
-  defsubr (&Supcase_initials);
-  defsubr (&Supcase_region);
-  defsubr (&Sdowncase_region);
-  defsubr (&Scapitalize_region);
-  defsubr (&Supcase_initials_region);
-  defsubr (&Supcase_word);
-  defsubr (&Sdowncase_word);
-  defsubr (&Scapitalize_word);
 }
