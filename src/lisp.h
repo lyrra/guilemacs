@@ -2855,6 +2855,7 @@ CHECK_SUBR (Lisp_Object x)
 #else  /* not _MSC_VER */
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
    SCM_SNARF_INIT (defsubr (&sname);)                                   \
+   Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
    static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
    { { .self = NULL,                                                    \
        .size = PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },                   \
