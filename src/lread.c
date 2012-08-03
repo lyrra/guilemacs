@@ -5810,26 +5810,7 @@ dir_warning (char const *use, Lisp_Object dirname)
 void
 syms_of_lread (void)
 {
-  defsubr (&Sread);
-  defsubr (&Sread_positioning_symbols);
-  defsubr (&Sread_from_string);
-  defsubr (&Slread__substitute_object_in_subtree);
-  defsubr (&Sintern);
-  defsubr (&Sintern_soft);
-  defsubr (&Sunintern);
-  defsubr (&Sget_load_suffixes);
-  defsubr (&Sload);
-  defsubr (&Seval_buffer);
-  defsubr (&Seval_region);
-  defsubr (&Sread_char);
-  defsubr (&Sread_char_exclusive);
-  defsubr (&Sread_event);
-  defsubr (&Smapatoms);
-  defsubr (&Slocate_file_internal);
-  defsubr (&Sinternal__obarray_buckets);
-  defsubr (&Sobarray_make);
-  defsubr (&Sobarrayp);
-  defsubr (&Sobarray_clear);
+#include "lread.x"
 
   DEFVAR_LISP ("obarray", Vobarray,
 	       doc: /* Symbol table for use by `intern' and `read'.

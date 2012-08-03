@@ -2280,6 +2280,7 @@ init_minibuf_once_for_pdumper (void)
 void
 syms_of_minibuf (void)
 {
+#include "minibuf.x"
   staticpro (&minibuf_prompt);
   staticpro (&minibuf_save_list);
   staticpro (&MB_frame);
@@ -2515,30 +2516,6 @@ in `minibuffer-exit-hook', exiting the minibuffer will remove the window
 showing the *Completions* buffer, if any.  */);
   read_minibuffer_restore_windows = true;
 
-  defsubr (&Sactive_minibuffer_window);
-  defsubr (&Sset_minibuffer_window);
-  defsubr (&Sread_from_minibuffer);
-  defsubr (&Sread_string);
-  defsubr (&Sread_command);
-  defsubr (&Sread_variable);
-  defsubr (&Sinternal_complete_buffer);
-  defsubr (&Sread_buffer);
-  defsubr (&Sminibuffer_depth);
-  defsubr (&Sminibuffer_prompt);
-
-  defsubr (&Sminibufferp);
-  defsubr (&Sinnermost_minibuffer_p);
-  defsubr (&Sminibuffer_innermost_command_loop_p);
-  defsubr (&Sabort_minibuffers);
-  defsubr (&Sminibuffer_prompt_end);
-  defsubr (&Sminibuffer_contents);
-  defsubr (&Sminibuffer_contents_no_properties);
-
-  defsubr (&Stry_completion);
-  defsubr (&Sall_completions);
-  defsubr (&Stest_completion);
-  defsubr (&Sassoc_string);
-  defsubr (&Scompleting_read);
   DEFSYM (Qminibuffer_quit_recursive_edit, "minibuffer-quit-recursive-edit");
   DEFSYM (Qinternal_complete_buffer, "internal-complete-buffer");
   DEFSYM (Qcompleting_read_function, "completing-read-function");

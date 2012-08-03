@@ -1348,22 +1348,10 @@ CHAR-TABLE must be what returned by `unicode-property-table-internal'. */)
 void
 syms_of_chartab (void)
 {
+#include "chartab.x"
+
   /* Purpose of uniprop tables. */
   DEFSYM (Qchar_code_property_table, "char-code-property-table");
-
-  defsubr (&Smake_char_table);
-  defsubr (&Schar_table_parent);
-  defsubr (&Schar_table_subtype);
-  defsubr (&Sset_char_table_parent);
-  defsubr (&Schar_table_extra_slot);
-  defsubr (&Sset_char_table_extra_slot);
-  defsubr (&Schar_table_range);
-  defsubr (&Sset_char_table_range);
-  defsubr (&Soptimize_char_table);
-  defsubr (&Smap_char_table);
-  defsubr (&Sunicode_property_table_internal);
-  defsubr (&Sget_unicode_property_internal);
-  defsubr (&Sput_unicode_property_internal);
 
   /* Each element has the form (PROP . TABLE).
      PROP is a symbol representing a character property.

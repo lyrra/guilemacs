@@ -1898,11 +1898,9 @@ syms_of_dbusbind_for_pdumper (void)
 void
 syms_of_dbusbind (void)
 {
-  defsubr (&Sdbus__init_bus);
-  defsubr (&Sdbus_get_unique_name);
+#include "dbusbind.x"
 
   DEFSYM (Qdbus_message_internal, "dbus-message-internal");
-  defsubr (&Sdbus_message_internal);
 
   /* D-Bus error symbol.  */
   DEFSYM (Qdbus_error, "dbus-error");

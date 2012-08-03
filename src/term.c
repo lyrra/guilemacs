@@ -4965,6 +4965,8 @@ See also `display-pixel-height'.  */)
 void
 syms_of_term (void)
 {
+#include "term.x"
+
   DEFVAR_BOOL ("system-uses-terminfo", system_uses_terminfo,
     doc: /* Non-nil means the system uses terminfo rather than termcap.
 This variable can be used by terminal emulator packages.  */);
@@ -5000,32 +5002,6 @@ bigger, or it may make it blink, or it may do nothing at all.  */);
 This should be set if the function in `mouse-position-function' does not
 trigger redisplay.  */);
   tty_menu_calls_mouse_position_function = 0;
-
-  defsubr (&Stty_display_color_p);
-  defsubr (&Stty_display_color_cells);
-  defsubr (&Stty_no_underline);
-  defsubr (&Stty_type);
-  defsubr (&Scontrolling_tty_p);
-  defsubr (&Stty_top_frame);
-  defsubr (&Ssuspend_tty);
-  defsubr (&Sresume_tty);
-#ifndef HAVE_ANDROID
-  defsubr (&Stty__set_output_buffer_size);
-  defsubr (&Stty__output_buffer_size);
-#endif /* !HAVE_ANDROID */
-  defsubr (&Stty_frame_at);
-#ifdef HAVE_GPM
-  defsubr (&Sgpm_mouse_start);
-  defsubr (&Sgpm_mouse_stop);
-  staticpro (&last_mouse_frame);
-#endif /* HAVE_GPM */
-
-  defsubr (&Stty_frame_geometry);
-  defsubr (&Stty_frame_edges);
-  defsubr (&Stty_frame_list_z_order);
-  defsubr (&Stty_frame_restack);
-  defsubr (&Stty_display_pixel_width);
-  defsubr (&Stty_display_pixel_height);
 
 #if !defined DOS_NT && !defined HAVE_ANDROID
   default_orig_pair = NULL;

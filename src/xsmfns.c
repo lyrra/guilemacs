@@ -542,6 +542,7 @@ Do not call this function yourself. */)
 void
 syms_of_xsmfns (void)
 {
+#include "xsmfns.x"
   DEFSYM (Qemacs_session_save, "emacs-session-save");
 
   DEFVAR_LISP ("x-session-id", Vx_session_id,
@@ -574,8 +575,6 @@ same, depending on how the session manager works.
 See also `emacs-save-session-functions', `emacs-session-save' and
 `emacs-session-restore'.  */);
   Vx_session_previous_id = Qnil;
-
-  defsubr (&Shandle_save_session);
 }
 
 #endif /* HAVE_X_SM */

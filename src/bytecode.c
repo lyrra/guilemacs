@@ -1811,10 +1811,8 @@ get_byte_code_arity (Lisp_Object args_template)
 void
 syms_of_bytecode (void)
 {
+#include "bytecode.x"
   DEFSYM (Qinteractive_p, "interactive-p");
-
-  defsubr (&Sbyte_code);
-  defsubr (&Sinternal_stack_stats);
 
 #ifdef BYTE_CODE_METER
 

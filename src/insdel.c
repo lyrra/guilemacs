@@ -2440,6 +2440,8 @@ DEFUN ("combine-after-change-execute", Fcombine_after_change_execute,
 void
 syms_of_insdel (void)
 {
+#include "insdel.x"
+
   staticpro (&combine_after_change_list);
   staticpro (&combine_after_change_buffer);
   combine_after_change_list = Qnil;
@@ -2467,6 +2469,4 @@ binding this variable.
 See also the info node `(elisp) Change Hooks'.  */);
   inhibit_modification_hooks = 0;
   DEFSYM (Qinhibit_modification_hooks, "inhibit-modification-hooks");
-
-  defsubr (&Scombine_after_change_execute);
 }

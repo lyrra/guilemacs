@@ -12929,6 +12929,7 @@ image_prune_animation_caches (bool clear)
 void
 syms_of_image (void)
 {
+#include "image.x"
   /* Must be defined now because we're going to update it below, while
      defining the supported image types.  */
   DEFVAR_LISP ("image-types", Vimage_types,
@@ -13124,28 +13125,10 @@ non-numeric, there is no explicit limit on the size of images.  */);
 # endif
 #endif
 
-  defsubr (&Sinit_image_library);
-#ifdef HAVE_IMAGEMAGICK
-  defsubr (&Simagemagick_types);
-#endif
-  defsubr (&Sclear_image_cache);
-  defsubr (&Simage_flush);
-  defsubr (&Simage_size);
-  defsubr (&Simage_mask_p);
-  defsubr (&Simage_metadata);
-  defsubr (&Simage_cache_size);
-  defsubr (&Simagep);
-
-#ifdef GLYPH_DEBUG
-  defsubr (&Slookup_image);
-#endif
-
   DEFSYM (QCanimate_buffer, ":animate-buffer");
   DEFSYM (QCanimate_tardiness, ":animate-tardiness");
   DEFSYM (QCanimate_position, ":animate-position");
   DEFSYM (QCanimate_multi_frame_data, ":animate-multi-frame-data");
-
-  defsubr (&Simage_transforms_p);
 
   DEFVAR_BOOL ("cross-disabled-images", cross_disabled_images,
     doc: /* Non-nil means always draw a cross over disabled images.

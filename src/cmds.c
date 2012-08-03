@@ -505,6 +505,7 @@ internal_self_insert (int c, EMACS_INT n)
 void
 syms_of_cmds (void)
 {
+#include "cmds.x"
   DEFSYM (Qinternal_auto_fill, "internal-auto-fill");
 
   DEFSYM (Qundo_auto_amalgamate, "undo-auto-amalgamate");
@@ -525,13 +526,4 @@ syms_of_cmds (void)
 This is run after inserting a character.
 The hook can access the inserted character via `last-command-event'.  */);
   Vpost_self_insert_hook = Qnil;
-
-  defsubr (&Sforward_char);
-  defsubr (&Sbackward_char);
-  defsubr (&Sforward_line);
-  defsubr (&Sbeginning_of_line);
-  defsubr (&Send_of_line);
-
-  defsubr (&Sdelete_char);
-  defsubr (&Sself_insert_command);
 }

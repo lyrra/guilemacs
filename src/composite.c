@@ -2179,6 +2179,8 @@ syms_of_composite (void)
 {
   int i;
 
+#include "composite.x"
+
   DEFSYM (Qcomposition, "composition");
 
   /* Make a hash table for static composition.  */
@@ -2298,11 +2300,4 @@ them anyway.
 
 This list is auto-generated, you should not need to modify it.  */);
   Vauto_composition_emoji_eligible_codepoints = Qnil;
-
-  defsubr (&Scompose_region_internal);
-  defsubr (&Scompose_string_internal);
-  defsubr (&Sfind_composition_internal);
-  defsubr (&Scomposition_get_gstring);
-  defsubr (&Sclear_composition_cache);
-  defsubr (&Scomposition_sort_rules);
 }

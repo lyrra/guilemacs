@@ -702,6 +702,7 @@ With negative argument, capitalize previous words but do not move.  */)
 void
 syms_of_casefiddle (void)
 {
+#include "casefiddle.x"
   DEFSYM (Qbounds, "bounds");
   DEFSYM (Qidentity, "identity");
   DEFSYM (Qtitlecase, "titlecase");
@@ -740,16 +741,4 @@ letter of a symbol's name is ever capitalized.*/);
   case_symbols_as_words = 0;
   DEFSYM (Qcase_symbols_as_words, "case-symbols-as-words");
   Fmake_variable_buffer_local (Qcase_symbols_as_words);
-
-  defsubr (&Supcase);
-  defsubr (&Sdowncase);
-  defsubr (&Scapitalize);
-  defsubr (&Supcase_initials);
-  defsubr (&Supcase_region);
-  defsubr (&Sdowncase_region);
-  defsubr (&Scapitalize_region);
-  defsubr (&Supcase_initials_region);
-  defsubr (&Supcase_word);
-  defsubr (&Sdowncase_word);
-  defsubr (&Scapitalize_word);
 }

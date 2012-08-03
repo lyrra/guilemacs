@@ -4211,6 +4211,7 @@ Lisp_Object backtrace_top_function (void)
 void
 syms_of_eval (void)
 {
+#include "eval.x"
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
 	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.
 
@@ -4409,58 +4410,8 @@ alist of active lexical bindings.  */);
   staticpro (&list_of_t);
   list_of_t = list1 (Qt);
 
-  defsubr (&Sor);
-  defsubr (&Sand);
-  defsubr (&Sif);
-  defsubr (&Scond);
-  defsubr (&Sprogn);
-  defsubr (&Sprog1);
-  defsubr (&Ssetq);
-  defsubr (&Squote);
-  defsubr (&Sfunction);
-  defsubr (&Smake_interpreted_closure);
-  defsubr (&Sdefault_toplevel_value);
-  defsubr (&Sset_default_toplevel_value);
-  defsubr (&Sdefvar);
-  defsubr (&Sdefvar_1);
-  defsubr (&Sdefvaralias);
   DEFSYM (Qdefvaralias, "defvaralias");
-  defsubr (&Sdefconst);
-  defsubr (&Sdefconst_1);
-  defsubr (&Sinternal__define_uninitialized_variable);
-  defsubr (&Smake_var_non_special);
-  defsubr (&Slet);
-  defsubr (&SletX);
-  defsubr (&Swhile);
-  defsubr (&Sfuncall_with_delayed_message);
-  defsubr (&Smacroexpand);
-  defsubr (&Scatch);
-  defsubr (&Sthrow);
-  defsubr (&Sunwind_protect);
-  defsubr (&Scondition_case);
-  defsubr (&Shandler_bind_1);
   DEFSYM (QCsuccess, ":success");
-  defsubr (&Ssignal);
-  defsubr (&Scommandp);
-  defsubr (&Sautoload);
-  defsubr (&Sautoload_do_load);
-  defsubr (&Seval);
-  defsubr (&Sapply);
-  defsubr (&Sfuncall);
-  defsubr (&Sfunc_arity);
-  defsubr (&Srun_hooks);
-  defsubr (&Srun_hook_with_args);
-  defsubr (&Srun_hook_with_args_until_success);
-  defsubr (&Srun_hook_with_args_until_failure);
-  defsubr (&Srun_hook_wrapped);
-  defsubr (&Sbacktrace_debug);
   DEFSYM (QCdebug_on_exit, ":debug-on-exit");
-  defsubr (&Smapbacktrace);
-  defsubr (&Sbacktrace_frame_internal);
-  defsubr (&Sbacktrace_frames_from_thread);
-  defsubr (&Sbacktrace_eval);
-  defsubr (&Sbacktrace__locals);
-  defsubr (&Sspecial_variable_p);
   DEFSYM (Qfunctionp, "functionp");
-  defsubr (&Sfunctionp);
 }

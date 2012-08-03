@@ -2196,6 +2196,8 @@ init_alloc (void)
 void
 syms_of_alloc (void)
 {
+#include "alloc.x"
+
   DEFVAR_INT ("gc-cons-threshold", gc_cons_threshold,
 	      doc: /* Number of bytes of consing between garbage collections.
 Garbage collection can happen automatically once this many bytes have been

@@ -6620,6 +6620,7 @@ from the absolute start of the buffer, disregarding the narrowing.  */)
 void
 syms_of_fns (void)
 {
+#include "fns.x"
   /* Hash table stuff.  */
   DEFSYM (Qhash_table_p, "hash-table-p");
   DEFSYM (Qeq, "eq");
@@ -6636,32 +6637,6 @@ syms_of_fns (void)
   DEFSYM (Qhash_table_test, "hash-table-test");
   DEFSYM (Qkey_or_value, "key-or-value");
   DEFSYM (Qkey_and_value, "key-and-value");
-
-  defsubr (&Ssxhash_eq);
-  defsubr (&Ssxhash_eql);
-  defsubr (&Ssxhash_equal);
-  defsubr (&Ssxhash_equal_including_properties);
-  defsubr (&Smake_hash_table);
-  defsubr (&Scopy_hash_table);
-  defsubr (&Shash_table_count);
-  defsubr (&Shash_table_rehash_size);
-  defsubr (&Shash_table_rehash_threshold);
-  defsubr (&Shash_table_size);
-  defsubr (&Shash_table_test);
-  defsubr (&Shash_table_weakness);
-  defsubr (&Shash_table_p);
-  defsubr (&Sclrhash);
-  defsubr (&Sgethash);
-  defsubr (&Sputhash);
-  defsubr (&Sremhash);
-  defsubr (&Smaphash);
-  defsubr (&Sdefine_hash_table_test);
-  defsubr (&Sinternal__hash_table_histogram);
-  defsubr (&Sinternal__hash_table_buckets);
-  defsubr (&Sinternal__hash_table_index_size);
-  defsubr (&Sstring_search);
-  defsubr (&Sobject_intervals);
-  defsubr (&Sline_number_at_pos);
 
   /* Crypto and hashing stuff.  */
   DEFSYM (Qiv_auto, "iv-auto");
@@ -6747,89 +6722,6 @@ The same variable also affects the function `read-answer'.  See also
     doc: /* String to append when `yes-or-no-p' asks a question.
 For best results this should end in a space.  */);
   Vyes_or_no_prompt = build_unibyte_string ("(yes or no) ");
-
-  defsubr (&Sidentity);
-  defsubr (&Srandom);
-  defsubr (&Slength);
-  defsubr (&Ssafe_length);
-  defsubr (&Slength_less);
-  defsubr (&Slength_greater);
-  defsubr (&Slength_equal);
-  defsubr (&Sproper_list_p);
-  defsubr (&Sstring_bytes);
-  defsubr (&Sstring_distance);
-  defsubr (&Sstring_equal);
-  defsubr (&Scompare_strings);
-  defsubr (&Sstring_lessp);
-  defsubr (&Sstring_version_lessp);
-  defsubr (&Sstring_collate_lessp);
-  defsubr (&Sstring_collate_equalp);
-  defsubr (&Sappend);
-  defsubr (&Sconcat);
-  defsubr (&Svconcat);
-  defsubr (&Scopy_sequence);
-  defsubr (&Sstring_make_multibyte);
-  defsubr (&Sstring_make_unibyte);
-  defsubr (&Sstring_as_multibyte);
-  defsubr (&Sstring_as_unibyte);
-  defsubr (&Sstring_to_multibyte);
-  defsubr (&Sstring_to_unibyte);
-  defsubr (&Scopy_alist);
-  defsubr (&Ssubstring);
-  defsubr (&Ssubstring_no_properties);
-  defsubr (&Stake);
-  defsubr (&Sntake);
-  defsubr (&Snthcdr);
-  defsubr (&Snth);
-  defsubr (&Selt);
-  defsubr (&Smember);
-  defsubr (&Smemq);
-  defsubr (&Smemql);
-  defsubr (&Sassq);
-  defsubr (&Sassoc);
-  defsubr (&Srassq);
-  defsubr (&Srassoc);
-  defsubr (&Sdelq);
-  defsubr (&Sdelete);
-  defsubr (&Snreverse);
-  defsubr (&Sreverse);
-  defsubr (&Ssort);
-  defsubr (&Splist_get);
-  defsubr (&Sget);
-  defsubr (&Splist_put);
-  defsubr (&Sput);
-  defsubr (&Seql);
-  defsubr (&Sequal);
-  defsubr (&Sequal_including_properties);
-  defsubr (&Svaluelt);
-  defsubr (&Sfillarray);
-  defsubr (&Sclear_string);
-  defsubr (&Snconc);
-  defsubr (&Smapcar);
-  defsubr (&Smapc);
-  defsubr (&Smapcan);
-  defsubr (&Smapconcat);
-  defsubr (&Syes_or_no_p);
-  defsubr (&Sload_average);
-  defsubr (&Sfeaturep);
-  defsubr (&Srequire);
-  defsubr (&Sprovide);
-  defsubr (&Splist_member);
-  defsubr (&Swidget_put);
-  defsubr (&Swidget_get);
-  defsubr (&Swidget_apply);
-  defsubr (&Sbase64_encode_region);
-  defsubr (&Sbase64_decode_region);
-  defsubr (&Sbase64_encode_string);
-  defsubr (&Sbase64_decode_string);
-  defsubr (&Sbase64url_encode_region);
-  defsubr (&Sbase64url_encode_string);
-  defsubr (&Smd5);
-  defsubr (&Ssecure_hash_algorithms);
-  defsubr (&Ssecure_hash);
-  defsubr (&Sbuffer_hash);
-  defsubr (&Slocale_info);
-  defsubr (&Sbuffer_line_statistics);
 
   DEFSYM (Qreal_this_command, "real-this-command");
   DEFSYM (Qfrom__tty_menu_p, "from--tty-menu-p");

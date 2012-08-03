@@ -674,9 +674,7 @@ frame's display, or the first available X display.  */)
 void
 syms_of_win16select (void)
 {
-  defsubr (&Sw16_set_clipboard_data);
-  defsubr (&Sw16_get_clipboard_data);
-  defsubr (&Sw16_selection_exists_p);
+#include "w16select.x"
 
   DEFVAR_LISP ("selection-coding-system", Vselection_coding_system,
 	       doc: /* SKIP: real doc in select.el.  */);

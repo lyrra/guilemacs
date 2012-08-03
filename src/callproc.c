@@ -2083,6 +2083,8 @@ set_initial_environment (void)
 void
 syms_of_callproc (void)
 {
+#include "callproc.x"
+
 #ifndef DOS_NT
   Vtemp_file_name_pattern = build_string ("emacsXXXXXX");
 #else  /* DOS_NT */
@@ -2242,10 +2244,6 @@ the system.  */);
 #else /* HAVE_ANDROID && !ANDROID_STUBIFY */
   Vrcs2log_program_name = build_pure_c_string ("librcs2log.so");
 #endif /* !HAVE_ANDROID || ANDROID_STUBIFY */
-
-  defsubr (&Scall_process);
-  defsubr (&Sgetenv_internal);
-  defsubr (&Scall_process_region);
 
   DEFSYM (Qafter_insert_file_set_buffer_file_coding_system,
 	  "after-insert-file-set-buffer-file-coding-system");

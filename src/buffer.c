@@ -5067,6 +5067,8 @@ DEFUN ("overlay-tree", Foverlay_tree, Soverlay_tree, 0, 1, 0,
 void
 syms_of_buffer (void)
 {
+#include "buffer.x"
+
   staticpro (&last_overlay_modification_hooks);
   last_overlay_modification_hooks = make_nil_vector (10);
 
@@ -6052,60 +6054,6 @@ variable to `most-positive-fixnum'.
 
 There is no reason to change that value except for debugging purposes.  */);
   large_hscroll_threshold = 10000;
-
-  defsubr (&Sbuffer_live_p);
-  defsubr (&Sbuffer_list);
-  defsubr (&Sget_buffer);
-  defsubr (&Sget_file_buffer);
-  defsubr (&Sget_truename_buffer);
-  defsubr (&Sfind_buffer);
-  defsubr (&Sget_buffer_create);
-  defsubr (&Smake_indirect_buffer);
-  defsubr (&Sgenerate_new_buffer_name);
-  defsubr (&Sbuffer_name);
-  defsubr (&Sbuffer_last_name);
-  defsubr (&Sbuffer_file_name);
-  defsubr (&Sbuffer_base_buffer);
-  defsubr (&Sbuffer_local_value);
-  defsubr (&Sbuffer_local_variables);
-  defsubr (&Sbuffer_modified_p);
-  defsubr (&Sforce_mode_line_update);
-  defsubr (&Sset_buffer_modified_p);
-  defsubr (&Sbuffer_modified_tick);
-  defsubr (&Sinternal__set_buffer_modified_tick);
-  defsubr (&Sbuffer_chars_modified_tick);
-  defsubr (&Srename_buffer);
-  defsubr (&Sother_buffer);
-  defsubr (&Sbuffer_enable_undo);
-  defsubr (&Skill_buffer);
-  defsubr (&Sbury_buffer_internal);
-  defsubr (&Sset_buffer_major_mode);
-  defsubr (&Scurrent_buffer);
-  defsubr (&Sset_buffer);
-  defsubr (&Sbarf_if_buffer_read_only);
-  defsubr (&Serase_buffer);
-  defsubr (&Sbuffer_swap_text);
-  defsubr (&Sset_buffer_multibyte);
-  defsubr (&Skill_all_local_variables);
-
-  defsubr (&Soverlayp);
-  defsubr (&Smake_overlay);
-  defsubr (&Sdelete_overlay);
-  defsubr (&Sdelete_all_overlays);
-  defsubr (&Smove_overlay);
-  defsubr (&Soverlay_start);
-  defsubr (&Soverlay_end);
-  defsubr (&Soverlay_buffer);
-  defsubr (&Soverlay_properties);
-  defsubr (&Soverlays_at);
-  defsubr (&Soverlays_in);
-  defsubr (&Snext_overlay_change);
-  defsubr (&Sprevious_overlay_change);
-  defsubr (&Soverlay_recenter);
-  defsubr (&Soverlay_lists);
-  defsubr (&Soverlay_get);
-  defsubr (&Soverlay_put);
-  defsubr (&Srestore_buffer_modified_p);
 
   DEFSYM (Qautosaved, "autosaved");
 

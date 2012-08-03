@@ -7365,6 +7365,7 @@ init_xfaces (void)
 void
 syms_of_xfaces (void)
 {
+#include "xfaces.x"
   /* The symbols `face' and `mouse-face' used as text properties.  */
   DEFSYM (Qface, "face");
 
@@ -7487,44 +7488,6 @@ syms_of_xfaces (void)
   staticpro (&Vface_alternative_font_family_alist);
   Vface_alternative_font_registry_alist = Qnil;
   staticpro (&Vface_alternative_font_registry_alist);
-
-  defsubr (&Sinternal_make_lisp_face);
-  defsubr (&Sinternal_lisp_face_p);
-  defsubr (&Sinternal_set_lisp_face_attribute);
-#ifdef HAVE_WINDOW_SYSTEM
-  defsubr (&Sinternal_set_lisp_face_attribute_from_resource);
-#endif
-  defsubr (&Scolor_gray_p);
-  defsubr (&Scolor_supported_p);
-#ifndef HAVE_X_WINDOWS
-  defsubr (&Sx_load_color_file);
-#endif
-  defsubr (&Sface_attribute_relative_p);
-  defsubr (&Smerge_face_attribute);
-  defsubr (&Sinternal_get_lisp_face_attribute);
-  defsubr (&Sinternal_lisp_face_attribute_values);
-  defsubr (&Sinternal_lisp_face_equal_p);
-  defsubr (&Sinternal_lisp_face_empty_p);
-  defsubr (&Sinternal_copy_lisp_face);
-  defsubr (&Sinternal_merge_in_global_face);
-  defsubr (&Sface_font);
-  defsubr (&Sframe_face_hash_table);
-  defsubr (&Sdisplay_supports_face_attributes_p);
-  defsubr (&Scolor_distance);
-  defsubr (&Sinternal_set_font_selection_order);
-  defsubr (&Sinternal_set_alternative_font_family_alist);
-  defsubr (&Sinternal_set_alternative_font_registry_alist);
-  defsubr (&Sface_attributes_as_vector);
-#ifdef GLYPH_DEBUG
-  defsubr (&Sdump_face);
-  defsubr (&Sshow_face_resources);
-#endif /* GLYPH_DEBUG */
-  defsubr (&Sclear_face_cache);
-  defsubr (&Stty_suppress_bold_inverse_default_colors);
-
-#if defined DEBUG_X_COLORS && defined HAVE_X_WINDOWS
-  defsubr (&Sdump_colors);
-#endif
 
   DEFVAR_BOOL ("face-filters-always-match", face_filters_always_match,
     doc: /* Non-nil means that face filters are always deemed to match.
@@ -7694,11 +7657,4 @@ This variable exists for debugging of the font-selection process,
 and we advise not to change it otherwise.  */);
   Vface_font_lax_matched_attributes = Qt;
 
-#ifdef HAVE_WINDOW_SYSTEM
-  defsubr (&Sbitmap_spec_p);
-  defsubr (&Sx_list_fonts);
-  defsubr (&Sinternal_face_x_get_resource);
-  defsubr (&Sx_family_fonts);
-#endif
-  defsubr (&Scolor_values_from_color_spec);
 }

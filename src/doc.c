@@ -697,6 +697,8 @@ function will never return nil.  */)
 void
 syms_of_doc (void)
 {
+#include "doc.x"
+
   DEFSYM (Qlisp_directory, "lisp-directory");
   DEFSYM (Qsubstitute_command_keys, "substitute-command-keys");
   DEFSYM (Qfunction_documentation, "function-documentation");
@@ -737,11 +739,5 @@ compute the correct value for the current terminal in the nil case.  */);
 	       doc: /* If nil, a nil `text-quoting-style' is treated as `grave'.  */);
   /* Initialized by ‘main’.  */
 
-  defsubr (&Sdocumentation_stringp);
-  defsubr (&Sdocumentation);
-  defsubr (&Ssubr_documentation);
-  defsubr (&Sdocumentation_property);
-  defsubr (&Ssnarf_documentation);
-  defsubr (&Stext_quoting_style);
   DEFSYM (Qcustom_delayed_init_variables, "custom-delayed-init-variables");
 }

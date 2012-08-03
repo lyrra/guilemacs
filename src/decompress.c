@@ -342,8 +342,7 @@ This function can be called only in unibyte buffers.  */)
 void
 syms_of_decompress (void)
 {
-  defsubr (&Szlib_decompress_region);
-  defsubr (&Szlib_available_p);
+#include "decompress.x"
 }
 
 #endif /* HAVE_ZLIB */

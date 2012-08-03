@@ -1609,6 +1609,7 @@ for instance using the window manager, then this produces a quit and
 void
 syms_of_menu (void)
 {
+#include "menu.x"
   menu_items = Qnil;
   staticpro (&menu_items);
 
@@ -1621,8 +1622,4 @@ It is only run before the menu is really going to be displayed.  It
 won't be run if `x-popup-menu' fails or returns for some other reason
 (such as the keymap is invalid).  */);
   Vx_pre_popup_menu_hook = Qnil;
-
-  defsubr (&Sx_popup_menu);
-  defsubr (&Sx_popup_dialog);
-  defsubr (&Smenu_bar_menu_at_x_y);
 }

@@ -3340,6 +3340,8 @@ describe_vector (Lisp_Object vector, Lisp_Object prefix, Lisp_Object args,
 void
 syms_of_keymap (void)
 {
+#include "keymap.x"
+
   DEFSYM (Qkeymap, "keymap");
   DEFSYM (Qhelp__describe_map_tree, "help--describe-map-tree");
   DEFSYM (Qmap_keymap_sorted, "map-keymap-sorted");
@@ -3453,36 +3455,6 @@ that describe key bindings.  That is why the default is nil.  */);
   staticpro (&fontify_key_properties);
   fontify_key_properties = Fcons (Qfont_lock_face,
 				  Fcons (Qhelp_key_binding, Qnil));
-
-  defsubr (&Skeymapp);
-  defsubr (&Skeymap_parent);
-  defsubr (&Skeymap_prompt);
-  defsubr (&Sset_keymap_parent);
-  defsubr (&Smake_keymap);
-  defsubr (&Smake_sparse_keymap);
-  defsubr (&Smap_keymap_internal);
-  defsubr (&Smap_keymap);
-  defsubr (&Scopy_keymap);
-  defsubr (&Scommand_remapping);
-  defsubr (&Skey_binding);
-  defsubr (&Sminor_mode_key_binding);
-  defsubr (&Sdefine_key);
-  defsubr (&Slookup_key);
-  defsubr (&Suse_global_map);
-  defsubr (&Suse_local_map);
-  defsubr (&Scurrent_local_map);
-  defsubr (&Scurrent_global_map);
-  defsubr (&Scurrent_minor_mode_maps);
-  defsubr (&Scurrent_active_maps);
-  defsubr (&Saccessible_keymaps);
-  defsubr (&Skey_description);
-  defsubr (&Skeymap__get_keyelt);
-  defsubr (&Shelp__describe_vector);
-  defsubr (&Sdescribe_vector);
-  defsubr (&Ssingle_key_description);
-  defsubr (&Stext_char_description);
-  defsubr (&Swhere_is_internal);
-  defsubr (&Sdescribe_buffer_bindings);
 
   DEFSYM (Qkey_parse, "key-parse");
   DEFSYM (Qkey_valid_p, "key-valid-p");

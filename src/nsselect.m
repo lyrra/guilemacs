@@ -787,24 +787,17 @@ FOLLOW-TOOLTIP means the same thing it does in `x-begin-drag'.  */)
 void
 syms_of_nsselect (void)
 {
+#include "nsselect.x
   DEFSYM (QCLIPBOARD, "CLIPBOARD");
   DEFSYM (QSECONDARY, "SECONDARY");
   DEFSYM (QTEXT, "TEXT");
   DEFSYM (QFILE_NAME, "FILE_NAME");
-
   DEFSYM (QTARGETS, "TARGETS");
   DEFSYM (QXdndActionCopy, "XdndActionCopy");
   DEFSYM (QXdndActionMove, "XdndActionMove");
   DEFSYM (QXdndActionLink, "XdndActionLink");
   DEFSYM (QXdndActionPrivate, "XdndActionPrivate");
   DEFSYM (Qnow, "now");
-
-  defsubr (&Sns_disown_selection_internal);
-  defsubr (&Sns_get_selection);
-  defsubr (&Sns_own_selection_internal);
-  defsubr (&Sns_selection_exists_p);
-  defsubr (&Sns_selection_owner_p);
-  defsubr (&Sns_begin_drag);
 
   Vselection_alist = Qnil;
   staticpro (&Vselection_alist);

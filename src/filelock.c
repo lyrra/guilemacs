@@ -811,6 +811,8 @@ t if it is locked by you, else a string saying which user has locked it.  */)
 void
 syms_of_filelock (void)
 {
+#include "filelock.x"
+
   DEFVAR_LISP ("temporary-file-directory", Vtemporary_file_directory,
 	       doc: /* The directory for writing temporary files.  */);
   Vtemporary_file_directory = Qnil;
@@ -827,10 +829,4 @@ Info node `(emacs)Interlocking'.  */);
   DEFSYM (Qfile_locked_p, "file-locked-p");
   DEFSYM (Qmake_lock_file_name, "make-lock-file-name");
   DEFSYM (Qstring_replace, "string-replace");
-
-  defsubr (&Slock_file);
-  defsubr (&Sunlock_file);
-  defsubr (&Slock_buffer);
-  defsubr (&Sunlock_buffer);
-  defsubr (&Sfile_locked_p);
 }

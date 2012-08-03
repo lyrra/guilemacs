@@ -1291,6 +1291,8 @@ known style.  Otherwise return image.  */)
 void
 syms_of_xsettings (void)
 {
+#include "xsettings.x"
+
   current_mono_font = NULL;
   PDUMPER_IGNORE (current_mono_font);
   current_font = NULL;
@@ -1317,9 +1319,6 @@ syms_of_xsettings (void)
   DEFSYM (Qfont_render_setting, "font-render-setting");
   DEFSYM (Qsystem_font_setting, "system-font-setting");
 
-  defsubr (&Sfont_get_system_font);
-  defsubr (&Sfont_get_system_normal_font);
-
   DEFVAR_BOOL ("font-use-system-font", use_system_font,
     doc: /* Non-nil means to apply the system defined font dynamically.
 When this is non-nil and the system defined fixed width font changes, we
@@ -1340,7 +1339,6 @@ If this variable is nil, Emacs ignores system font changes.  */);
 
   current_tool_bar_style = Qnil;
   DEFSYM (Qtool_bar_style, "tool-bar-style");
-  defsubr (&Stool_bar_get_system_style);
 
   Fprovide (Qdynamic_setting, Qnil);
 }
