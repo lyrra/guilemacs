@@ -3251,6 +3251,7 @@ CHECK_SUBR (Lisp_Object x)
    arguments, so we can catch errors with maxargs at compile-time.  */
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
    SCM_SNARF_INIT (defsubr (&sname);)                                   \
+   Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
    static union Aligned_Lisp_Subr sname =				\
    {{{ .self = NULL,                                                    \
        .size = PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },                   \
