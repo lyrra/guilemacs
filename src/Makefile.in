@@ -425,6 +425,8 @@ bootstrap_pdmp :=
 pdmp :=
 endif
 
+GUILE_SNARF=@GUILE_SNARF@
+
 # Flags that might be in WARN_CFLAGS but are not valid for Objective C.
 NON_OBJC_CFLAGS = -Wignored-attributes -Wignored-qualifiers -Wopenmp-simd \
   -Wnested-externs -Wstrict-flex-arrays -Wflex-array-member-not-at-end
@@ -456,13 +458,18 @@ ALL_OBJC_CFLAGS = $(EMACS_CFLAGS) \
 ALL_CXX_CFLAGS = $(EMACS_CFLAGS) \
   $(filter-out $(NON_CXX_CFLAGS),$(WARN_CFLAGS)) $(CXXFLAGS)
 
-.SUFFIXES: .c .m .cc
+.SUFFIXES: .c .m .cc .x
 .c.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) $(PROFILING_CFLAGS) $<
 .m.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_OBJC_CFLAGS) $(PROFILING_CFLAGS) $<
 .cc.o:
 	$(AM_V_CXX)$(CXX) -c $(CPPFLAGS) $(ALL_CXX_CFLAGS) $(PROFILING_CFLAGS) $<
+
+.c.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_CFLAGS)
+.m.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_OBJC_CFLAGS)
 
 ## lastfile must follow all files whose initialized data areas should
 ## be dumped as pure by dump-emacs.
