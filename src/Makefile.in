@@ -329,6 +329,8 @@ UNEXEC_OBJ = @UNEXEC_OBJ@
 
 CANNOT_DUMP=@CANNOT_DUMP@
 
+GUILE_SNARF=@GUILE_SNARF@
+
 # 'make' verbosity.
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 
@@ -376,11 +378,17 @@ ALL_OBJC_CFLAGS = $(EMACS_CFLAGS) \
   $(filter-out $(NON_OBJC_CFLAGS),$(WARN_CFLAGS)) $(CFLAGS) \
   $(GNU_OBJC_CFLAGS)
 
-.SUFFIXES: .m
+.SUFFIXES: .m .x
+
 .c.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) $(PROFILING_CFLAGS) $<
 .m.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_OBJC_CFLAGS) $(PROFILING_CFLAGS) $<
+
+.c.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_CFLAGS)
+.m.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_OBJC_CFLAGS)
 
 ## lastfile must follow all files whose initialized data areas should
 ## be dumped as pure by dump-emacs.
