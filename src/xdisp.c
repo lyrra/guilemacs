@@ -32789,6 +32789,8 @@ gui_intersect_rectangles (const Emacs_Rectangle *r1, const Emacs_Rectangle *r2,
 void
 syms_of_xdisp (void)
 {
+#include "xdisp.x"
+
   Vwith_echo_area_save_vector = Qnil;
   staticpro (&Vwith_echo_area_save_vector);
 
@@ -32816,27 +32818,6 @@ be let-bound around code that needs to disable messages temporarily. */);
   staticpro (&message_dolog_marker2);
   message_dolog_marker3 = Fmake_marker ();
   staticpro (&message_dolog_marker3);
-
-  defsubr (&Sset_buffer_redisplay);
-#ifdef GLYPH_DEBUG
-  defsubr (&Sdump_frame_glyph_matrix);
-  defsubr (&Sdump_glyph_matrix);
-  defsubr (&Sdump_glyph_row);
-  defsubr (&Sdump_tool_bar_row);
-  defsubr (&Strace_redisplay);
-  defsubr (&Strace_to_stderr);
-#endif
-#ifdef HAVE_WINDOW_SYSTEM
-  defsubr (&Stool_bar_height);
-  defsubr (&Slookup_image_map);
-#endif
-  defsubr (&Sline_pixel_height);
-  defsubr (&Sformat_mode_line);
-  defsubr (&Sinvisible_p);
-  defsubr (&Scurrent_bidi_paragraph_direction);
-  defsubr (&Swindow_text_pixel_size);
-  defsubr (&Smove_point_visually);
-  defsubr (&Sbidi_find_overridden_directionality);
 
   DEFSYM (Qmenu_bar_update_hook, "menu-bar-update-hook");
   DEFSYM (Qoverriding_terminal_local_map, "overriding-terminal-local-map");

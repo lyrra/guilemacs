@@ -1002,6 +1002,8 @@ Otherwise, return a new string.  */)
 void
 syms_of_doc (void)
 {
+#include "doc.x"
+
   DEFSYM (Qfunction_documentation, "function-documentation");
   DEFSYM (Qgrave, "grave");
   DEFSYM (Qstraight, "straight");
@@ -1033,8 +1035,4 @@ otherwise.  */);
 	       doc: /* If nil, a nil `text-quoting-style' is treated as `grave'.  */);
   /* Initialized by ‘main’.  */
 
-  defsubr (&Sdocumentation);
-  defsubr (&Sdocumentation_property);
-  defsubr (&Ssnarf_documentation);
-  defsubr (&Ssubstitute_command_keys);
 }

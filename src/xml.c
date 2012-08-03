@@ -330,9 +330,5 @@ DEFUN ("libxml-available-p", Flibxml_available_p, Slibxml_available_p, 0, 0, 0,
 void
 syms_of_xml (void)
 {
-#ifdef HAVE_LIBXML2
-  defsubr (&Slibxml_parse_html_region);
-  defsubr (&Slibxml_parse_xml_region);
-#endif
-  defsubr (&Slibxml_available_p);
+#include "xml.x"
 }

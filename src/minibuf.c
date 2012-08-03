@@ -1881,6 +1881,8 @@ init_minibuf_once (void)
 static void
 init_minibuf_once_for_pdumper (void)
 {
+#include "minibuf.x"
+
   PDUMPER_IGNORE (minibuf_level);
   PDUMPER_IGNORE (minibuf_prompt_width);
 
@@ -2086,26 +2088,4 @@ This variable also overrides the default character that `read-passwd'
 uses to hide passwords.  */);
   Vread_hide_char = Qnil;
 
-  defsubr (&Sactive_minibuffer_window);
-  defsubr (&Sset_minibuffer_window);
-  defsubr (&Sread_from_minibuffer);
-  defsubr (&Sread_string);
-  defsubr (&Sread_command);
-  defsubr (&Sread_variable);
-  defsubr (&Sinternal_complete_buffer);
-  defsubr (&Sread_buffer);
-  defsubr (&Sread_no_blanks_input);
-  defsubr (&Sminibuffer_depth);
-  defsubr (&Sminibuffer_prompt);
-
-  defsubr (&Sminibufferp);
-  defsubr (&Sminibuffer_prompt_end);
-  defsubr (&Sminibuffer_contents);
-  defsubr (&Sminibuffer_contents_no_properties);
-
-  defsubr (&Stry_completion);
-  defsubr (&Sall_completions);
-  defsubr (&Stest_completion);
-  defsubr (&Sassoc_string);
-  defsubr (&Scompleting_read);
 }

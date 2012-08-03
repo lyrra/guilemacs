@@ -6330,20 +6330,7 @@ static void syms_of_display_for_pdumper (void);
 void
 syms_of_display (void)
 {
-  defsubr (&Sredraw_frame);
-  defsubr (&Sredraw_display);
-  defsubr (&Sframe_or_buffer_changed_p);
-  defsubr (&Sopen_termscript);
-  defsubr (&Sding);
-  defsubr (&Sredisplay);
-  defsubr (&Ssleep_for);
-  defsubr (&Ssend_string_to_terminal);
-  defsubr (&Sinternal_show_cursor);
-  defsubr (&Sinternal_show_cursor_p);
-
-#ifdef GLYPH_DEBUG
-  defsubr (&Sdump_redisplay_history);
-#endif
+#include "dispnew.x"
 
   frame_and_buffer_state = make_vector (20, Qlambda);
   staticpro (&frame_and_buffer_state);
