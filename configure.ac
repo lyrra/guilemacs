@@ -1546,6 +1546,11 @@ AC_SUBST(BDW_GC_LIBS)
 CFLAGS="$CFLAGS $BDW_GC_CFLAGS"
 LIBS="$BDW_GC_LIBS $LIBS"
 
+AC_PATH_PROG(GUILE_SNARF, guile-snarf, no)
+if test "$GUILE_SNARF" = "no"; then
+   AC_MSG_ERROR([guile-snarf not found])
+fi
+
 HAVE_SOUND=no
 
 if test "${with_sound}" != "no"; then

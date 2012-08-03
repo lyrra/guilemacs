@@ -347,6 +347,8 @@ DUMPING=@DUMPING@
 CHECK_STRUCTS = @CHECK_STRUCTS@
 HAVE_PDUMPER = @HAVE_PDUMPER@
 
+GUILE_SNARF=@GUILE_SNARF@
+
 ## ARM Macs require that all code have a valid signature.  Since pdump
 ## invalidates the signature, we must re-sign to fix it.
 DO_CODESIGN=$(patsubst aarch64-apple-darwin%,yes,@configuration@)
@@ -385,11 +387,17 @@ ALL_OBJC_CFLAGS = $(EMACS_CFLAGS) \
   $(filter-out $(NON_OBJC_CFLAGS),$(WARN_CFLAGS)) $(CFLAGS) \
   $(GNU_OBJC_CFLAGS)
 
-.SUFFIXES: .m
+.SUFFIXES: .m .x
+
 .c.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_CFLAGS) $(PROFILING_CFLAGS) $<
 .m.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_OBJC_CFLAGS) $(PROFILING_CFLAGS) $<
+
+.c.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_CFLAGS)
+.m.x:
+	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_OBJC_CFLAGS)
 
 ## lastfile must follow all files whose initialized data areas should
 ## be dumped as pure by dump-emacs.
