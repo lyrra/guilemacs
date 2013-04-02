@@ -389,7 +389,6 @@ lost after dumping")))
       (message "Warning: Change in load-path due to site-init will be \
 lost after dumping")))
 
-(setq current-load-list nil)
 ;; Avoid storing references to build directory in the binary.
 (setq custom-current-group-alist nil)
 
