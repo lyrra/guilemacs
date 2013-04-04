@@ -44,8 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void sort_vector_copy (Lisp_Object, ptrdiff_t,
 			      Lisp_Object *restrict, Lisp_Object *restrict);
 enum equal_kind { EQUAL_NO_QUIT, EQUAL_PLAIN, EQUAL_INCLUDING_PROPERTIES };
-static bool internal_equal (Lisp_Object, Lisp_Object,
-			    enum equal_kind, int, Lisp_Object);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
        doc: /* Return the argument unchanged.  */
@@ -1382,8 +1380,6 @@ DEFUN ("memql", Fmemql, Smemql, 2, 2, 0,
 The value is actually the tail of LIST whose car is ELT.  */)
   (Lisp_Object elt, Lisp_Object list)
 {
-  if (!FLOATP (elt))
-    return Fmemq (elt, list);
 
   Lisp_Object tail = list;
   FOR_EACH_TAIL (tail)
@@ -2119,18 +2115,10 @@ Numbers are compared by value, but integers cannot equal floats.
 Symbols must match exactly.  */)
   (Lisp_Object o1, Lisp_Object o2)
 {
-  return internal_equal (o1, o2, EQUAL_PLAIN, 0, Qnil) ? Qt : Qnil;
+  return scm_is_true (scm_equal_p (o1, o2)) ? Qt : Qnil;
 }
 
-DEFUN ("equal-including-properties", Fequal_including_properties, Sequal_including_properties, 2, 2, 0,
-       doc: /* Return t if two Lisp objects have similar structure and contents.
-This is like `equal' except that it compares the text properties
-of strings.  (`equal' ignores text properties.)  */)
-  (Lisp_Object o1, Lisp_Object o2)
-{
-  return (internal_equal (o1, o2, EQUAL_INCLUDING_PROPERTIES, 0, Qnil)
-	  ? Qt : Qnil);
-}
+SCM compare_text_properties = SCM_BOOL_F;
 
 /* Return true if O1 and O2 are equal.  Do not quit or check for cycles.
    Use this only on arguments that are cycle-free and not too large and
@@ -2142,182 +2130,102 @@ equal_no_quit (Lisp_Object o1, Lisp_Object o2)
   return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
 }
 
-/* Return true if O1 and O2 are equal.  EQUAL_KIND specifies what kind
-   of equality test to use: if it is EQUAL_NO_QUIT, do not check for
-   cycles or large arguments or quits; if EQUAL_PLAIN, do ordinary
-   Lisp equality; and if EQUAL_INCLUDING_PROPERTIES, do
-   equal-including-properties.
-
-   If DEPTH is the current depth of recursion; signal an error if it
-   gets too deep.  HT is a hash table used to detect cycles; if nil,
-   it has not been allocated yet.  But ignore the last two arguments
-   if EQUAL_KIND == EQUAL_NO_QUIT.  */
-
-static bool
-internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
-		int depth, Lisp_Object ht)
+DEFUN ("equal-including-properties", Fequal_including_properties, Sequal_including_properties, 2, 2, 0,
+       doc: /* Return t if two Lisp objects have similar structure and contents.
+This is like `equal' except that it compares the text properties
+of strings.  (`equal' ignores text properties.)  */)
+  (Lisp_Object o1, Lisp_Object o2)
 {
- tail_recurse:
-  if (depth > 10)
+  Lisp_Object tem;
+
+  scm_dynwind_begin (0);
+  scm_dynwind_fluid (compare_text_properties, SCM_BOOL_T);
+  tem = Fequal (o1, o2);
+  scm_dynwind_end ();
+  return tem;
+}
+
+static SCM
+misc_equal_p (SCM o1, SCM o2)
+{
+  if (XMISCTYPE (o1) != XMISCTYPE (o2))
+    return SCM_BOOL_F;
+  if (OVERLAYP (o1))
     {
-      eassert (equal_kind != EQUAL_NO_QUIT);
-      if (depth > 200)
-	error ("Stack overflow in equal");
-      if (NILP (ht))
-	ht = CALLN (Fmake_hash_table, QCtest, Qeq);
-      switch (XTYPE (o1))
-	{
-	case Lisp_Cons: case Lisp_Misc: case Lisp_Vectorlike:
-	  {
-	    struct Lisp_Hash_Table *h = XHASH_TABLE (ht);
-	    EMACS_UINT hash;
-	    ptrdiff_t i = hash_lookup (h, o1, &hash);
-	    if (i >= 0)
-	      { /* `o1' was seen already.  */
-		Lisp_Object o2s = HASH_VALUE (h, i);
-		if (!NILP (Fmemq (o2, o2s)))
-		  return true;
-		else
-		  set_hash_value_slot (h, i, Fcons (o2, o2s));
-	      }
-	    else
-	      hash_put (h, o1, Fcons (o2, Qnil), hash);
-	  }
-	default: ;
-	}
+      if (NILP (Fequal (OVERLAY_START (o1), OVERLAY_START (o2)))
+          || NILP (Fequal (OVERLAY_END (o1), OVERLAY_END (o2))))
+        return SCM_BOOL_F;
+      return scm_equal_p (XOVERLAY (o1)->plist, XOVERLAY (o2)->plist);
     }
-
-  if (EQ (o1, o2))
-    return true;
-  if (XTYPE (o1) != XTYPE (o2))
-    return false;
-
-  switch (XTYPE (o1))
+  if (MARKERP (o1))
     {
-    case Lisp_Float:
-      {
-	double d1 = XFLOAT_DATA (o1);
-	double d2 = XFLOAT_DATA (o2);
-	/* If d is a NaN, then d != d. Two NaNs should be `equal' even
-	   though they are not =.  */
-	return d1 == d2 || (d1 != d1 && d2 != d2);
-      }
-
-    case Lisp_Cons:
-      if (equal_kind == EQUAL_NO_QUIT)
-	for (; CONSP (o1); o1 = XCDR (o1))
-	  {
-	    if (! CONSP (o2))
-	      return false;
-	    if (! equal_no_quit (XCAR (o1), XCAR (o2)))
-	      return false;
-	    o2 = XCDR (o2);
-	    if (EQ (XCDR (o1), o2))
-	      return true;
-	  }
-      else
-	FOR_EACH_TAIL (o1)
-	  {
-	    if (! CONSP (o2))
-	      return false;
-	    if (! internal_equal (XCAR (o1), XCAR (o2),
-				  equal_kind, depth + 1, ht))
-	      return false;
-	    o2 = XCDR (o2);
-	    if (EQ (XCDR (o1), o2))
-	      return true;
-	  }
-      depth++;
-      goto tail_recurse;
-
-    case Lisp_Misc:
-      if (XMISCTYPE (o1) != XMISCTYPE (o2))
-	return false;
-      if (OVERLAYP (o1))
-	{
-	  if (!internal_equal (OVERLAY_START (o1), OVERLAY_START (o2),
-			       equal_kind, depth + 1, ht)
-	      || !internal_equal (OVERLAY_END (o1), OVERLAY_END (o2),
-				  equal_kind, depth + 1, ht))
-	    return false;
-	  o1 = XOVERLAY (o1)->plist;
-	  o2 = XOVERLAY (o2)->plist;
-	  depth++;
-	  goto tail_recurse;
-	}
-      if (MARKERP (o1))
-	{
-	  return (XMARKER (o1)->buffer == XMARKER (o2)->buffer
-		  && (XMARKER (o1)->buffer == 0
-		      || XMARKER (o1)->bytepos == XMARKER (o2)->bytepos));
-	}
-      break;
-
-    case Lisp_Vectorlike:
-      {
-	register int i;
-	ptrdiff_t size = ASIZE (o1);
-	/* Pseudovectors have the type encoded in the size field, so this test
-	   actually checks that the objects have the same type as well as the
-	   same size.  */
-	if (ASIZE (o2) != size)
-	  return false;
-	/* Boolvectors are compared much like strings.  */
-	if (BOOL_VECTOR_P (o1))
-	  {
-	    EMACS_INT size = bool_vector_size (o1);
-	    if (size != bool_vector_size (o2))
-	      return false;
-	    if (memcmp (bool_vector_data (o1), bool_vector_data (o2),
-			bool_vector_bytes (size)))
-	      return false;
-	    return true;
-	  }
-	if (WINDOW_CONFIGURATIONP (o1))
-	  {
-	    eassert (equal_kind != EQUAL_NO_QUIT);
-	    return compare_window_configurations (o1, o2, false);
-	  }
-
-	/* Aside from them, only true vectors, char-tables, compiled
-	   functions, and fonts (font-spec, font-entity, font-object)
-	   are sensible to compare, so eliminate the others now.  */
-	if (size & PSEUDOVECTOR_FLAG)
-	  {
-	    if (((size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
-		< PVEC_COMPILED)
-	      return false;
-	    size &= PSEUDOVECTOR_SIZE_MASK;
-	  }
-	for (i = 0; i < size; i++)
-	  {
-	    Lisp_Object v1, v2;
-	    v1 = AREF (o1, i);
-	    v2 = AREF (o2, i);
-	    if (!internal_equal (v1, v2, equal_kind, depth + 1, ht))
-	      return false;
-	  }
-	return true;
-      }
-      break;
-
-    case Lisp_String:
-      if (SCHARS (o1) != SCHARS (o2))
-	return false;
-      if (SBYTES (o1) != SBYTES (o2))
-	return false;
-      if (memcmp (SDATA (o1), SDATA (o2), SBYTES (o1)))
-	return false;
-      if (equal_kind == EQUAL_INCLUDING_PROPERTIES
-	  && !compare_string_intervals (o1, o2))
-	return false;
-      return true;
-
-    default:
-      break;
+      struct Lisp_Marker *m1 = XMARKER (o1), *m2 = XMARKER (o2);
+      return scm_from_bool (m1->buffer == m2->buffer
+                            && (m1->buffer == 0
+                                || m1->bytepos == m2->bytepos));
     }
+  return SCM_BOOL_F;
+}
 
-  return false;
+static SCM
+vectorlike_equal_p (SCM o1, SCM o2)
+{
+  int i;
+  ptrdiff_t size = ASIZE (o1);
+  /* Pseudovectors have the type encoded in the size field, so this
+     test actually checks that the objects have the same type as well
+     as the same size.  */
+  if (ASIZE (o2) != size)
+    return SCM_BOOL_F;
+  /* Boolvectors are compared much like strings.  */
+  if (BOOL_VECTOR_P (o1))
+    {
+      if (XBOOL_VECTOR (o1)->size != XBOOL_VECTOR (o2)->size)
+        return SCM_BOOL_F;
+      if (memcmp (XBOOL_VECTOR (o1)->data, XBOOL_VECTOR (o2)->data,
+                  ((XBOOL_VECTOR (o1)->size
+                    + BOOL_VECTOR_BITS_PER_CHAR - 1)
+                   / BOOL_VECTOR_BITS_PER_CHAR)))
+        return SCM_BOOL_F;
+      return SCM_BOOL_T;
+    }
+  if (WINDOW_CONFIGURATIONP (o1))
+    return scm_from_bool (compare_window_configurations (o1, o2, 0));
+
+  /* Aside from them, only true vectors, char-tables, compiled
+     functions, and fonts (font-spec, font-entity, font-object) are
+     sensible to compare, so eliminate the others now.  */
+  if (size & PSEUDOVECTOR_FLAG)
+    {
+      if (((size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
+          < PVEC_COMPILED)
+        return SCM_BOOL_F;
+      size &= PSEUDOVECTOR_SIZE_MASK;
+    }
+  for (i = 0; i < size; i++)
+    {
+      Lisp_Object v1, v2;
+      v1 = AREF (o1, i);
+      v2 = AREF (o2, i);
+      if (scm_is_false (scm_equal_p (v1, v2)))
+        return SCM_BOOL_F;
+    }
+  return SCM_BOOL_T;
+}
+
+static SCM
+string_equal_p (SCM o1, SCM o2)
+{
+  if (SCHARS (o1) != SCHARS (o2))
+    return SCM_BOOL_F;
+  if (SBYTES (o1) != SBYTES (o2))
+    return SCM_BOOL_F;
+  if (memcmp (SDATA (o1), SDATA (o2), SBYTES (o1)))
+    return SCM_BOOL_F;
+  if (scm_is_true (scm_fluid_ref (compare_text_properties))
+      && !compare_string_intervals (o1, o2))
+    return SCM_BOOL_F;
+  return SCM_BOOL_T;
 }
 
 
@@ -4962,6 +4870,15 @@ disregarding any coding systems.  If nil, use the current buffer.  */ )
 }
 
 
+void
+init_fns_once (void)
+{
+  compare_text_properties = scm_make_fluid ();
+  scm_set_smob_equalp (lisp_misc_tag, misc_equal_p);
+  scm_set_smob_equalp (lisp_string_tag, string_equal_p);
+  scm_set_smob_equalp (lisp_vectorlike_tag, vectorlike_equal_p);
+}
+
 void
 syms_of_fns (void)
 {
