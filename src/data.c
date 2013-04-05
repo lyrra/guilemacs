@@ -201,24 +201,16 @@ rather than compare the return value of this function against
 a fixed set of types.  */)
   (Lisp_Object object)
 {
-  switch (XTYPE (object))
+  if (INTEGERP (object))
+    return Qinteger;
+  else if (SYMBOLP (object))
+    return Qsymbol;
+  else if (STRINGP (object))
+    return Qstring;
+  else if (CONSP (object))
+    return Qcons;
+  else if (PSEUDOVECTORP (object))
     {
-    case_Lisp_Int:
-      return Qfixnum;
-
-    case Lisp_Symbol:
-      return NILP (object) ? Qnull
-             : EQ (object, Qt) ? Qboolean
-             : Qsymbol;
-
-    case Lisp_String:
-      return Qstring;
-
-    case Lisp_Cons:
-      return Qcons;
-
-    case Lisp_Vectorlike:
-      /* WARNING!!  Keep 'cl--type-hierarchy' in sync with this code!!  */
       switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
         {
         case PVEC_NORMAL_VECTOR: return Qvector;
@@ -290,13 +282,11 @@ a fixed set of types.  */)
         case PVEC_FREE: ;
         }
       emacs_abort ();
-
-    case Lisp_Float:
-      return Qfloat;
-
-    default:
-      emacs_abort ();
     }
+  else if (FLOATP (object))
+    return Qfloat;
+  else
+    return Qt;
 }
 
 DEFUN ("consp", Fconsp, Sconsp, 1, 1, 0,
