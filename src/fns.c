@@ -764,6 +764,17 @@ the same empty object instead of its copy.  */)
   (Lisp_Object arg)
 {
   if (NILP (arg)) return arg;
+  /************************************
+   * FIX: guilemacs, why not use:
+  if (CONSP (arg))
+    return concat (1, &arg, Concat_cons, 0);
+  else if (STRINGP (arg))
+    return concat (1, &arg, Concat_string, 0);
+  else if (VECTORP (arg))
+    return concat (1, &arg, Concat_vector, 0);
+  else
+    wrong_type_argument (Qsequencep, arg);
+  ***************************************/
 
   if (CONSP (arg))
     {
