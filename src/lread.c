@@ -4654,10 +4654,8 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 
   /* Recurse according to subtree's type.
      Every branch must return a Lisp_Object.  */
-  switch (XTYPE (subtree))
+  if (VECTORLIKEP (subtree))
     {
-    case Lisp_Vectorlike:
-      {
 	ptrdiff_t i = 0, length = 0;
 	if (BOOL_VECTOR_P (subtree))
 	  return subtree;		/* No sub-objects anyway.  */
@@ -4679,16 +4677,17 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 	for ( ; i < length; i++)
 	  ASET (subtree, i,
 		substitute_object_recurse (subst, AREF (subtree, i)));
-	return subtree;
-      }
 
-    case Lisp_Cons:
+      return subtree;
+    }
+  else if (CONSP (subtree))
+    {
       XSETCAR (subtree, substitute_object_recurse (subst, XCAR (subtree)));
       XSETCDR (subtree, substitute_object_recurse (subst, XCDR (subtree)));
       return subtree;
-
-    case Lisp_String:
-      {
+    }
+  else if (STRINGP (subtree))
+    {
 	/* Check for text properties in each interval.
 	   substitute_in_interval contains part of the logic.  */
 
@@ -4696,12 +4695,10 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 	traverse_intervals_noorder (root_interval,
 				    substitute_in_interval, subst);
 	return subtree;
-      }
-
-      /* Other types don't recurse any further.  */
-    default:
-      return subtree;
     }
+  else
+    /* Other types don't recurse any further.  */
+    return subtree;
 }
 
 /*  Helper function for substitute_object_recurse.  */
