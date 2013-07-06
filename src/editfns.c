@@ -3116,7 +3116,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   ptrdiff_t bufsize = sizeof initial_buffer;
   ptrdiff_t max_bufsize = STRING_BYTES_BOUND + 1;
   char *p;
-  ptrdiff_t buf_save_value_index UNINIT;
   char *format, *end;
   ptrdiff_t nchars;
   /* When we make a multibyte string, we must pay attention to the
@@ -3853,6 +3852,13 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	{
 	  if (max_bufsize <= buflen_needed)
 	    string_overflow ();
+	  buf = xmalloc_atomic (bufsize);
+	  memcpy (buf, initial_buffer, used);
+	}
+      else
+	{
+	  buf = xrealloc_atomic (buf, bufsize);
+	}
 
 	  /* Either there wasn't enough room to store this conversion,
 	     or there won't be enough room to do a sprintf the next

@@ -4536,9 +4536,7 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
-#define USE_SAFE_ALLOCA			\
-  ptrdiff_t sa_avail = MAX_ALLOCA;	\
-  ptrdiff_t sa_count = SPECPDL_INDEX ()
+#define USE_SAFE_ALLOCA ((void) 0)
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 
@@ -4546,7 +4544,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
 #define SAFE_ALLOCA(size) ((size) <= sa_avail				\
 			   ? AVAIL_ALLOCA (size)			\
-			   : record_xmalloc (size))
+			   : xmalloc (size))
 
 /* SAFE_NALLOCA sets BUF to a newly allocated array of MULTIPLIER *
    NITEMS items, each of the same type as *BUF.  MULTIPLIER must
@@ -4573,42 +4571,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
 /* Free xmalloced memory and enable GC as needed.  */
 
-#define SAFE_FREE() safe_free (sa_count)
-
-INLINE void
-safe_free (ptrdiff_t sa_count)
-{
-  while (specpdl_ptr != specpdl + sa_count)
-    {
-      specpdl_ptr--;
-      if (specpdl_ptr->kind == SPECPDL_UNWIND_PTR)
-	{
-	  eassert (specpdl_ptr->unwind_ptr.func == xfree);
-	  xfree (specpdl_ptr->unwind_ptr.arg);
-	}
-      else
-	{
-	  eassert (specpdl_ptr->kind == SPECPDL_UNWIND_ARRAY);
-	  xfree (specpdl_ptr->unwind_array.array);
-	}
-    }
-}
-
-/* Pop the specpdl stack back to COUNT, and return VAL.
-   Prefer this to { SAFE_FREE (); unbind_to (COUNT, VAL); }
-   when COUNT predates USE_SAFE_ALLOCA, as it is a bit more efficient
-   and also lets callers intermix SAFE_ALLOCA calls with other calls
-   that grow the specpdl stack.  */
-
-#define SAFE_FREE_UNBIND_TO(count, val) \
-  safe_free_unbind_to (count, sa_count, val)
-
-INLINE Lisp_Object
-safe_free_unbind_to (ptrdiff_t count, ptrdiff_t sa_count, Lisp_Object val)
-{
-  eassert (count <= sa_count);
-  return unbind_to (count, val);
-}
+#define SAFE_FREE() ((void) 0)
 
 /* Set BUF to point to an allocated array of NELT Lisp_Objects,
    immediately followed by EXTRA spare bytes.  */
