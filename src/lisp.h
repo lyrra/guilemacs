@@ -4339,19 +4339,15 @@ extern void init_system_name (void);
 
 enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
-extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
-
-#define USE_SAFE_ALLOCA			\
-  ptrdiff_t sa_avail = MAX_ALLOCA;	\
-  ptrdiff_t sa_count = SPECPDL_INDEX (); bool sa_must_free = false
+#define USE_SAFE_ALLOCA ((void) 0)
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 
 /* SAFE_ALLOCA allocates a simple buffer.  */
-
-#define SAFE_ALLOCA(size) ((size) <= sa_avail				\
-			   ? AVAIL_ALLOCA (size)			\
-			   : (sa_must_free = true, record_xmalloc (size)))
+// FIX: 20190626 LAV, if sa_avail exist, revert partially this patch, keeping only xmalloc(size)
+#define SAFE_ALLOCA(size) ((size) < MAX_ALLOCA	\
+			   ? alloca (size)	\
+			   : xmalloc (size))
 
 /* SAFE_NALLOCA sets BUF to a newly allocated array of MULTIPLIER *
    NITEMS items, each of the same type as *BUF.  MULTIPLIER must
@@ -4362,12 +4358,8 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
     if ((nitems) <= sa_avail / sizeof *(buf) / (multiplier))	 \
       (buf) = AVAIL_ALLOCA (sizeof *(buf) * (multiplier) * (nitems)); \
     else							 \
-      {								 \
-	(buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier)); \
-	sa_must_free = true;					 \
-	record_unwind_protect_ptr (xfree, buf);			 \
-      }								 \
-  } while (false)
+      (buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier));   \
+  } while (0)
 
 /* SAFE_ALLOCA_STRING allocates a C copy of a Lisp string.  */
 
@@ -4379,13 +4371,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
 /* SAFE_FREE frees xmalloced memory and enables GC as needed.  */
 
-#define SAFE_FREE()			\
-  do {					\
-    if (sa_must_free) {			\
-      sa_must_free = false;		\
-      unbind_to (sa_count, Qnil);	\
-    }					\
-  } while (false)
+#define SAFE_FREE() ((void) 0)
 
 /* Set BUF to point to an allocated array of NELT Lisp_Objects,
    immediately followed by EXTRA spare bytes.  */
@@ -4401,11 +4387,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
       (buf) = AVAIL_ALLOCA (alloca_nbytes);		       \
     else						       \
       {							       \
-	Lisp_Object arg_;				       \
-	(buf) = xmalloc (alloca_nbytes);		       \
-	arg_ = make_save_memory (buf, nelt);		       \
-	sa_must_free = true;				       \
-	record_unwind_protect (free_save_value, arg_);	       \
+        buf = xmalloc ((nelt) * word_size);		       \
       }							       \
   } while (false)
 

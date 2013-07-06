@@ -4231,7 +4231,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   ptrdiff_t bufsize = sizeof initial_buffer;
   ptrdiff_t max_bufsize = STRING_BYTES_BOUND + 1;
   char *p;
-  ptrdiff_t buf_save_value_index UNINIT;
   char *format, *end;
   ptrdiff_t nchars;
   /* When we make a multibyte string, we must pay attention to the
@@ -4908,16 +4907,12 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
       if (buf == initial_buffer)
 	{
-	  buf = xmalloc (bufsize);
-	  sa_must_free = true;
-	  buf_save_value_index = SPECPDL_INDEX ();
-	  record_unwind_protect_ptr (xfree, buf);
+	  buf = xmalloc_atomic (bufsize);
 	  memcpy (buf, initial_buffer, used);
 	}
       else
 	{
-	  buf = xrealloc (buf, bufsize);
-	  set_unwind_protect_ptr (buf_save_value_index, xfree, buf);
+	  buf = xrealloc_atomic (buf, bufsize);
 	}
 
       p = buf + used;
