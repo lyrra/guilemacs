@@ -5471,20 +5471,15 @@ extern void init_system_name (void);
 
 enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
-extern void *record_xmalloc (size_t)
-  ATTRIBUTE_ALLOC_SIZE ((1)) ATTRIBUTE_RETURNS_NONNULL;
-
-#define USE_SAFE_ALLOCA			\
-  ptrdiff_t sa_avail = MAX_ALLOCA;	\
-  specpdl_ref sa_count = SPECPDL_INDEX ()
+#define USE_SAFE_ALLOCA ((void) 0)
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 
 /* SAFE_ALLOCA allocates a simple buffer.  */
 
-#define SAFE_ALLOCA(size) ((size) <= sa_avail				\
-			   ? AVAIL_ALLOCA (size)			\
-			   : record_xmalloc (size))
+#define SAFE_ALLOCA(size) ((size) <= MAX_ALLOCA	\
+			   ? alloca (size)	\
+			   : xmalloc (size))
 
 /* SAFE_NALLOCA sets BUF to a newly allocated array of MULTIPLIER *
    NITEMS items, each of the same type as *BUF.  MULTIPLIER must
@@ -5495,10 +5490,7 @@ extern void *record_xmalloc (size_t)
     if ((nitems) <= sa_avail / sizeof *(buf) / (multiplier))	 \
       (buf) = AVAIL_ALLOCA (sizeof *(buf) * (multiplier) * (nitems)); \
     else							 \
-      {								 \
-	(buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier)); \
-	record_unwind_protect_ptr (xfree, buf);			 \
-      }								 \
+      (buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier));   \
   } while (false)
 
 /* SAFE_ALLOCA_STRING allocates a C copy of a Lisp string.  */
@@ -5508,45 +5500,6 @@ extern void *record_xmalloc (size_t)
     (ptr) = SAFE_ALLOCA (SBYTES (string) + 1);		\
     memcpy (ptr, SDATA (string), SBYTES (string) + 1);	\
   } while (false)
-
-/* Free xmalloced memory and enable GC as needed.  */
-
-#define SAFE_FREE() safe_free (sa_count)
-
-INLINE void
-safe_free (specpdl_ref sa_count)
-{
-  while (specpdl_ptr != specpdl_ref_to_ptr (sa_count))
-    {
-      specpdl_ptr--;
-      if (specpdl_ptr->kind == SPECPDL_UNWIND_PTR)
-	{
-	  eassert (specpdl_ptr->unwind_ptr.func == xfree);
-	  xfree (specpdl_ptr->unwind_ptr.arg);
-	}
-      else
-	{
-	  eassert (specpdl_ptr->kind == SPECPDL_UNWIND_ARRAY);
-	  xfree (specpdl_ptr->unwind_array.array);
-	}
-    }
-}
-
-/* Pop the specpdl stack back to COUNT, and return VAL.
-   Prefer this to { SAFE_FREE (); unbind_to (COUNT, VAL); }
-   when COUNT predates USE_SAFE_ALLOCA, as it is a bit more efficient
-   and also lets callers intermix SAFE_ALLOCA calls with other calls
-   that grow the specpdl stack.  */
-
-#define SAFE_FREE_UNBIND_TO(count, val) \
-  safe_free_unbind_to (count, sa_count, val)
-
-INLINE Lisp_Object
-safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
-{
-  eassert (!specpdl_ref_lt (sa_count, count));
-  return unbind_to (count, val);
-}
 
 /* Work around GCC bug 109577
    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109577
@@ -5574,7 +5527,6 @@ safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
 	   typically EXTRA is 0 or small so just use xzalloc;  \
 	   this is simpler and often faster.  */	       \
 	(buf) = xzalloc (alloca_nbytes);		       \
-	record_unwind_protect_array (buf, nelt);	       \
       }							       \
   } while (false)
 
@@ -5582,6 +5534,7 @@ safe_free_unbind_to (specpdl_ref count, specpdl_ref sa_count, Lisp_Object val)
 
 #define SAFE_ALLOCA_LISP(buf, nelt) SAFE_ALLOCA_LISP_EXTRA (buf, nelt, 0)
 
+#define SAFE_FREE() ((void) 0)
 
 /* If USE_STACK_LISP_OBJECTS, define macros and functions that
    allocate some Lisp objects on the C stack.  As the storage is not
