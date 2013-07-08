@@ -257,10 +257,26 @@ close_file_unwind (int fd)
 }
 
 void
+close_file_ptr_unwind (void *fdp)
+{
+  int fd = *((int *) fdp);
+  if (fd >= 0)
+    emacs_close (fd);
+}
+
+void
 fclose_unwind (void *arg)
 {
   FILE *stream = arg;
   fclose (stream);
+}
+
+void
+fclose_ptr_unwind (void *arg)
+{
+  FILE *stream = *((void **) arg);
+  if (stream)
+    fclose (stream);
 }
 
 /* Restore point, having saved it as a marker.  */
@@ -2054,7 +2070,7 @@ permissions.  */)
   if (ifd < 0)
     report_file_error ("Opening input file", file);
 
-  record_unwind_protect_int (close_file_unwind, ifd);
+  record_unwind_protect_int_1 (close_file_unwind, ifd, false);
 
   if (fstat (ifd, &st) != 0)
     report_file_error ("Input file status", file);
@@ -2095,7 +2111,7 @@ permissions.  */)
   if (ofd < 0)
     report_file_error ("Opening output file", newname);
 
-  record_unwind_protect_int (close_file_unwind, ofd);
+  record_unwind_protect_int_1 (close_file_unwind, ofd, false);
 
   off_t oldsize = 0, newsize;
 
@@ -2242,8 +2258,7 @@ permissions.  */)
 #endif /* MSDOS */
 #endif /* not WINDOWSNT */
 
-  /* Discard the unwind protects.  */
-  specpdl_ptr = specpdl + count;
+  unbind_to (count, Qnil);
 
   return Qnil;
 }
@@ -3745,7 +3760,7 @@ by calling `format-decode', which see.  */)
     }
 
   fd_index = SPECPDL_INDEX ();
-  record_unwind_protect_int (close_file_unwind, fd);
+  record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
 
   /* Replacement should preserve point as it preserves markers.  */
   if (!NILP (replace))
@@ -3885,6 +3900,7 @@ by calling `format-decode', which see.  */)
 		  Lisp_Object workbuf;
 		  struct buffer *buf;
 
+                  ptrdiff_t count1 = SPECPDL_INDEX ();
 		  record_unwind_current_buffer ();
 
 		  workbuf = Fget_buffer_create (name);
@@ -3908,9 +3924,7 @@ by calling `format-decode', which see.  */)
 					 filename, make_fixnum (nread));
 		  set_buffer_internal (prev);
 
-		  /* Discard the unwind protect for recovering the
-                     current buffer.  */
-		  specpdl_ptr--;
+                  unbind_to (count1, Qnil);
 
 		  /* Rewind the file for the actual read done later.  */
 		  if (lseek (fd, 0, SEEK_SET) < 0)
@@ -4016,7 +4030,7 @@ by calling `format-decode', which see.  */)
       if (same_at_start - BEGV_BYTE == end_offset - beg_offset)
 	{
 	  emacs_close (fd);
-	  clear_unwind_protect (fd_index);
+          fd = -1;
 
 	  /* Truncate the buffer to the size of the file.  */
 	  del_range_1 (same_at_start, same_at_end, 0, 0);
@@ -4193,7 +4207,7 @@ by calling `format-decode', which see.  */)
       if (this < 0)
 	report_file_error ("Read error", orig_filename);
       emacs_close (fd);
-      clear_unwind_protect (fd_index);
+      fd = -1;
 
       if (unprocessed > 0)
 	{
@@ -4430,7 +4444,7 @@ by calling `format-decode', which see.  */)
     Fset (Qdeactivate_mark, Qt);
 
   emacs_close (fd);
-  clear_unwind_protect (fd_index);
+  fd = -1;
 
   if (how_much < 0)
     report_file_error ("Read error", orig_filename);
@@ -5081,7 +5095,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
 	}
 
       count1 = SPECPDL_INDEX ();
-      record_unwind_protect_int (close_file_unwind, desc);
+      record_unwind_protect_int_1 (close_file_unwind, desc, false);
     }
 
   if (NUMBERP (append))
@@ -5150,8 +5164,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       if (emacs_close (desc) < 0)
 	ok = 0, save_errno = errno;
 
-      /* Discard the unwind protect for close_file_unwind.  */
-      specpdl_ptr = specpdl + count1;
+      unbind_to (count1, Qnil);
     }
 
   /* Some file systems have a bug where st_mtime is not updated

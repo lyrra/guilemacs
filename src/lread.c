@@ -1254,7 +1254,8 @@ Return t if the file exists and loads successfully.  */)
   if (0 <= fd)
     {
       fd_index = SPECPDL_INDEX ();
-      record_unwind_protect_int (close_file_unwind, fd);
+      record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
+      record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }
 
 #ifdef HAVE_MODULES
@@ -1369,7 +1370,7 @@ Return t if the file exists and loads successfully.  */)
 	  if (fd >= 0)
 	    {
 	      emacs_close (fd);
-	      clear_unwind_protect (fd_index);
+              fd = -1;
 	    }
 	  val = call4 (Vload_source_file_function, found, hist_file_name,
 		       NILP (noerror) ? Qnil : Qt,
@@ -1390,7 +1391,7 @@ Return t if the file exists and loads successfully.  */)
     {
 #ifdef WINDOWSNT
       emacs_close (fd);
-      clear_unwind_protect (fd_index);
+      fd = -1;
       efound = ENCODE_FILE (found);
       stream = emacs_fopen (SSDATA (efound), fmode);
 #else
