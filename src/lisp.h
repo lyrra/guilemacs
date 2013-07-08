@@ -2961,6 +2961,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
+  SPECPDL_FRAME = 1,
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
   SPECPDL_UNWIND_ARRAY,		/* Likewise, on an array that needs freeing.
 				   Its elements are potential Lisp_Objects.  */
@@ -2987,6 +2988,10 @@ union specbinding
     ENUM_BF (specbind_tag) kind : CHAR_BIT;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+    } frame;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       void (*func) (Lisp_Object);
       Lisp_Object arg;
       EMACS_INT eval_depth;
@@ -3923,18 +3928,17 @@ extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Ob
 extern struct handler *push_handler (Lisp_Object, enum handlertype);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind (Lisp_Object, Lisp_Object);
+extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
+extern void record_unwind_protect_ptr_1 (void (*) (void *), void *, bool);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);
+extern void record_unwind_protect_int_1 (void (*) (int), int, bool);
 extern void record_unwind_protect_int (void (*) (int), int);
-extern void record_unwind_protect_intmax (void (*) (intmax_t), intmax_t);
+extern void record_unwind_protect_void_1 (void (*) (void), bool);
 extern void record_unwind_protect_void (void (*) (void));
-extern void record_unwind_protect_excursion (void);
-extern void record_unwind_protect_nothing (void);
-extern void record_unwind_protect_module (enum specbind_tag, void *);
-extern void clear_unwind_protect (ptrdiff_t);
-extern void set_unwind_protect (ptrdiff_t, void (*) (Lisp_Object), Lisp_Object);
-extern void set_unwind_protect_ptr (ptrdiff_t, void (*) (void *), void *);
+extern void dynwind_begin (void);
+extern void dynwind_end (void);
 extern Lisp_Object unbind_to (ptrdiff_t, Lisp_Object);
 extern void rebind_for_thread_switch (void);
 extern void unbind_for_thread_switch (struct thread_state *);
