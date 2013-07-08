@@ -3374,6 +3374,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
+  SPECPDL_FRAME = 1,
   SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
   SPECPDL_UNWIND_ARRAY,		/* Likewise, on an array that needs freeing.
 				   Its elements are potential Lisp_Objects.  */
@@ -3402,6 +3403,9 @@ union specbinding
     /* Aligning similar members consistently might help efficiency slightly
        (Bug#31996#25).  */
     ENUM_BF (specbind_tag) kind : CHAR_BIT;
+    struct {
+      ENUM_BF (specbind_tag) kind : CHAR_BIT;
+    } frame;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
       void (*func) (Lisp_Object);
@@ -4668,6 +4672,8 @@ extern void set_unwind_protect (specpdl_ref, void (*) (Lisp_Object),
 extern void set_unwind_protect_ptr (specpdl_ref, void (*) (void *), void *);
 extern Lisp_Object unbind_to (specpdl_ref, Lisp_Object);
 void specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only);
+extern void dynwind_begin (void);
+extern void dynwind_end (void);
 extern AVOID error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
 extern AVOID verror (const char *, va_list)
   ATTRIBUTE_FORMAT_PRINTF (1, 0);
