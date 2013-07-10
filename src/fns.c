@@ -3742,7 +3742,7 @@ FILENAME are suppressed.  */)
                    SDATA (tem3), tem2);
         }
 
-      feature = unbind_to (count, feature);
+      unbind_to (count, feature);
     }
 
   return feature;

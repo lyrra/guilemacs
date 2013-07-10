@@ -3091,7 +3091,7 @@ dsafe__call (bool inhibit_quit, Lisp_Object (f) (ptrdiff_t, Lisp_Object *),
 	 so there is no possibility of wanting to redisplay.  */
       val = internal_condition_case_n (f, nargs, args, Qt,
 				       dsafe_eval_handler);
-      val = unbind_to (count, val);
+      unbind_to (count, val);
     }
 
   return val;
