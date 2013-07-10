@@ -4206,7 +4206,7 @@ network_interface_list (void)
   void *buf = NULL;
   ptrdiff_t buf_size = 512;
   int s;
-  Lisp_Object res;
+  Lisp_Object res = Qnil;
   ptrdiff_t count;
 
   s = socket (AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
@@ -4229,7 +4229,7 @@ network_interface_list (void)
     }
   while (ifconf.ifc_len == buf_size);
 
-  res = unbind_to (count, Qnil);
+  unbind_to (count, Qnil);
   ifreq = ifconf.ifc_req;
   while ((char *) ifreq < (char *) ifconf.ifc_req + ifconf.ifc_len)
     {

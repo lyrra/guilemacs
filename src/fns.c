@@ -2734,7 +2734,7 @@ suppressed.  */)
 
       /* Once loading finishes, don't undo it.  */
       Vautoload_queue = Qt;
-      feature = unbind_to (count, feature);
+      unbind_to (count, feature);
     }
 
   return feature;
