@@ -79,12 +79,7 @@ static Lisp_Object Vtemp_file_name_pattern;
 /* If nonzero, a process-ID that has not been reaped.  */
 static pid_t synch_process_pid;
 
-/* If a string, the name of a temp file that has not been removed.  */
-#ifdef MSDOS
 static Lisp_Object synch_process_tempfile;
-#else
-# define synch_process_tempfile make_number (0)
-#endif
 
 /* Indexes of file descriptors that need closing on call_process_kill.  */
 enum
@@ -100,7 +95,7 @@ enum
     CALLPROC_FDS
   };
 
-static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int, ptrdiff_t);
+static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int *, Lisp_Object *);
 
 /* Return the current buffer's working directory, or the home
    directory if it's unreachable, as a string suitable for a system call.
@@ -161,9 +156,11 @@ record_kill_process (struct Lisp_Process *p, Lisp_Object tempfile)
 /* Clean up files, file descriptors and processes created by Fcall_process.  */
 
 static void
-delete_temp_file (Lisp_Object name)
+delete_temp_file_ptr (Lisp_Object *name_ptr)
 {
-  unlink (SSDATA (name));
+  Lisp_Object name = *name_ptr;
+  if (! NILP (name))
+    unlink (SSDATA (name));
 }
 
 static void
@@ -184,7 +181,7 @@ call_process_kill (void *ptr)
       synch_process_pid = 0;
     }
   else if (STRINGP (synch_process_tempfile))
-    delete_temp_file (synch_process_tempfile);
+    delete_temp_file_ptr (&synch_process_tempfile);
 }
 
 /* Clean up when exiting Fcall_process: restore the buffer, and
@@ -272,8 +269,8 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
   filefd = emacs_open (SSDATA (encoded_infile), O_RDONLY, 0);
   if (filefd < 0)
     report_file_error ("Opening process input file", infile);
-  record_unwind_protect_int (close_file_unwind, filefd);
-  return unbind_to (count, call_process (nargs, args, filefd, -1));
+  record_unwind_protect_int (close_file_unwind, &filefd);
+  return unbind_to (count, call_process (nargs, args, &filefd, -1));
 }
 
 /* Like Fcall_process (NARGS, ARGS), except use FILEFD as the input file.
@@ -285,8 +282,7 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
    At entry, the specpdl stack top entry must be close_file_unwind (FILEFD).  */
 
 static Lisp_Object
-call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
-	      ptrdiff_t tempfile_index)
+call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *tempfile_ptr)
 {
   Lisp_Object buffer, current_dir, path;
   bool display_p;
@@ -548,7 +544,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
     }
 
 #ifdef MSDOS /* MW, July 1993 */
-  status = child_setup (filefd, fd_output, fd_error, new_argv, 0, current_dir);
+  status = child_setup (*filefd, fd_output, fd_error, new_argv, 0, current_dir);
 
   if (status < 0)
     {
@@ -566,8 +562,8 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	emacs_close (callproc_fd[i]);
 	callproc_fd[i] = -1;
       }
-  emacs_close (filefd);
-  clear_unwind_protect (count - 1);
+  emacs_close (*filefd);
+  *filefd = -1;
 
   if (tempfile)
     {
@@ -595,7 +591,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
   block_child_signal (&oldset);
 
 #ifdef WINDOWSNT
-  pid = child_setup (filefd, fd_output, fd_error, new_argv, 0, current_dir);
+  pid = child_setup (*filefd, fd_output, fd_error, new_argv, 0, current_dir);
 #else  /* not WINDOWSNT */
 
   /* vfork, and prevent local vars from being clobbered by the vfork.  */
@@ -605,7 +601,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
     Lisp_Object volatile current_dir_volatile = current_dir;
     bool volatile display_p_volatile = display_p;
     int volatile fd_error_volatile = fd_error;
-    int volatile filefd_volatile = filefd;
+    int *volatile filefd_volatile = filefd;
     ptrdiff_t volatile count_volatile = count;
     char **volatile new_argv_volatile = new_argv;
     int volatile callproc_fd_volatile[CALLPROC_FDS];
@@ -660,7 +656,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
       signal (SIGPROF, SIG_DFL);
 #endif
 
-      child_setup (filefd, fd_output, fd_error, new_argv, 0, current_dir);
+      child_setup (*filefd, fd_output, fd_error, new_argv, 0, current_dir);
     }
 
 #endif /* not WINDOWSNT */
@@ -673,14 +669,15 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 
       if (INTEGERP (buffer))
 	{
-	  if (tempfile_index < 0)
-	    record_deleted_pid (pid, Qnil);
-	  else
-	    {
-	      eassert (1 < nargs);
-	      record_deleted_pid (pid, args[1]);
-	      clear_unwind_protect (tempfile_index);
-	    }
+          if (tempfile_ptr)
+            {
+              record_deleted_pid (pid, *tempfile_ptr);
+              *tempfile_ptr = Qnil;
+            }
+          else
+            {
+              record_deleted_pid (pid, Qnil);
+            }
 	  synch_process_pid = 0;
 	}
     }
@@ -699,8 +696,8 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
 	emacs_close (callproc_fd[i]);
 	callproc_fd[i] = -1;
       }
-  emacs_close (filefd);
-  clear_unwind_protect (count - 1);
+  emacs_close (*filefd);
+  *filefd = -1;
 
 #endif /* not MSDOS */
 
@@ -915,9 +912,9 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int filefd,
    Unwind-protect the file, so that the file descriptor will be closed
    and the file removed when the caller unwinds the specpdl stack.  */
 
-static int
+static void
 create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
-		  Lisp_Object *filename_string_ptr)
+		  Lisp_Object *filename_string_ptr, int *fdp)
 {
   int fd;
   Lisp_Object filename_string;
@@ -965,14 +962,14 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
     filename_string = Fcopy_sequence (ENCODE_FILE (pattern));
     tempfile = SSDATA (filename_string);
 
-    count = SPECPDL_INDEX ();
-    record_unwind_protect_nothing ();
     fd = mkostemp (tempfile, O_BINARY | O_CLOEXEC);
     if (fd < 0)
       report_file_error ("Failed to open temporary file using pattern",
 			 pattern);
-    set_unwind_protect (count, delete_temp_file, filename_string);
-    record_unwind_protect_int (close_file_unwind, fd);
+    *fdp = fd;
+    *filename_string_ptr = filename_string;
+    record_unwind_protect (delete_temp_file_ptr, filename_string_ptr);
+    record_unwind_protect_ptr (close_file_ptr_unwind, fdp);
   }
 
   start = args[0];
@@ -1014,8 +1011,6 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
   /* Note that Fcall_process takes care of binding
      coding-system-for-read.  */
 
-  *filename_string_ptr = filename_string;
-  return fd;
 }
 
 DEFUN ("call-process-region", Fcall_process_region, Scall_process_region,
@@ -1073,14 +1068,14 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
     }
 
   if (!empty_input)
-    fd = create_temp_file (nargs, args, &infile);
+    create_temp_file (nargs, args, &infile, &fd);
   else
     {
       infile = Qnil;
       fd = emacs_open (NULL_DEVICE, O_RDONLY, 0);
       if (fd < 0)
 	report_file_error ("Opening null device", Qnil);
-      record_unwind_protect_int (close_file_unwind, fd);
+      record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
     }
 
   if (nargs > 3 && !NILP (args[3]))
@@ -1098,7 +1093,7 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
     }
   args[1] = infile;
 
-  val = call_process (nargs, args, fd, empty_input ? -1 : count);
+  val = call_process (nargs, args, &fd, empty_input ? -1 : count);
   return unbind_to (count, val);
 }
 
@@ -1648,10 +1643,8 @@ syms_of_callproc (void)
 #endif
   staticpro (&Vtemp_file_name_pattern);
 
-#ifdef MSDOS
   synch_process_tempfile = make_number (0);
   staticpro (&synch_process_tempfile);
-#endif
 
   DEFVAR_LISP ("shell-file-name", Vshell_file_name,
 	       doc: /* File name to load inferior shells from.

@@ -4427,8 +4427,8 @@ extract_data_from_object (Lisp_Object spec,
     }
   else if (BUFFERP (object))
     {
-      struct buffer *prev = current_buffer;
       EMACS_INT b, e;
+      ptrdiff_t count = SPECPDL_INDEX ();
 
       record_unwind_current_buffer ();
 
@@ -4524,10 +4524,7 @@ extract_data_from_object (Lisp_Object spec,
 	}
 
       object = make_buffer_string (b, e, 0);
-      set_buffer_internal (prev);
-      /* Discard the unwind protect for recovering the current
-	 buffer.  */
-      specpdl_ptr--;
+      unbind_to (count, Qnil);
 
       if (STRING_MULTIBYTE (object))
 	object = code_convert_string (object, coding_system, Qnil, 1, 0, 0);

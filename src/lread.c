@@ -1129,7 +1129,7 @@ Return t if the file exists and loads successfully.  */)
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
-  FILE *stream;
+  FILE *stream = NULL;
   int fd;
   int fd_index UNINIT;
   ptrdiff_t count = SPECPDL_INDEX ();
@@ -1250,7 +1250,8 @@ Return t if the file exists and loads successfully.  */)
   if (0 <= fd)
     {
       fd_index = SPECPDL_INDEX ();
-      record_unwind_protect_int (close_file_unwind, fd);
+      record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
+      record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }
 
 #ifdef HAVE_MODULES
@@ -1370,7 +1371,7 @@ Return t if the file exists and loads successfully.  */)
 	  if (fd >= 0)
 	    {
 	      emacs_close (fd);
-	      clear_unwind_protect (fd_index);
+              fd = -1;
 	    }
 	  val = call4 (Vload_source_file_function, found, hist_file_name,
 		       NILP (noerror) ? Qnil : Qt,
@@ -1391,7 +1392,7 @@ Return t if the file exists and loads successfully.  */)
     {
 #ifdef WINDOWSNT
       emacs_close (fd);
-      clear_unwind_protect (fd_index);
+      fd = -1;
       efound = ENCODE_FILE (found);
       stream = emacs_fopen (SSDATA (efound), fmode);
 #else
@@ -1400,7 +1401,6 @@ Return t if the file exists and loads successfully.  */)
     }
   if (! stream)
     report_file_error ("Opening stdio stream", file);
-  set_unwind_protect_ptr (fd_index, close_infile_unwind, stream);
 
   if (! NILP (Vpurify_flag))
     Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
