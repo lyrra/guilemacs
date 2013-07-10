@@ -3408,6 +3408,7 @@ union specbinding
     } frame;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       void (*func) (Lisp_Object);
       Lisp_Object arg;
       EMACS_INT eval_depth;
@@ -3419,12 +3420,14 @@ union specbinding
     } unwind_array;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       void (*func) (void *);	/* Unwind function.  */
       void *arg;
       void (*mark) (void *);	/* GC mark function (if non-null).  */
     } unwind_ptr;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       void (*func) (int);
       int arg;
     } unwind_int;
@@ -3435,10 +3438,12 @@ union specbinding
     } unwind_intmax;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       Lisp_Object marker, window;
     } unwind_excursion;
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
+      bool wind_explicitly;
       void (*func) (void);
     } unwind_void;
     struct {
@@ -4655,21 +4660,16 @@ extern void pop_handler (void);
 extern void push_handler_bind (Lisp_Object, Lisp_Object, int);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind (Lisp_Object, Lisp_Object);
+extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
 extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
+extern void record_unwind_protect_ptr_1 (void (*) (void *), void *, bool);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);
-extern void record_unwind_protect_ptr_mark (void (*function) (void *),
-					    void *arg, void (*mark) (void *));
+extern void record_unwind_protect_int_1 (void (*) (int), int, bool);
 extern void record_unwind_protect_int (void (*) (int), int);
 extern void record_unwind_protect_intmax (void (*) (intmax_t), intmax_t);
+extern void record_unwind_protect_void_1 (void (*) (void), bool);
 extern void record_unwind_protect_void (void (*) (void));
-extern void record_unwind_protect_excursion (void);
-extern void record_unwind_protect_nothing (void);
-extern void record_unwind_protect_module (enum specbind_tag, void *);
-extern void clear_unwind_protect (specpdl_ref);
-extern void set_unwind_protect (specpdl_ref, void (*) (Lisp_Object),
-				Lisp_Object);
-extern void set_unwind_protect_ptr (specpdl_ref, void (*) (void *), void *);
 extern Lisp_Object unbind_to (specpdl_ref, Lisp_Object);
 void specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only);
 extern void dynwind_begin (void);
@@ -4851,7 +4851,9 @@ extern Lisp_Object write_region (Lisp_Object, Lisp_Object, Lisp_Object,
 				 Lisp_Object, Lisp_Object, Lisp_Object,
 				 Lisp_Object, int);
 extern void close_file_unwind (int);
+extern void close_file_ptr_unwind (void *);
 extern void fclose_unwind (void *);
+extern void fclose_ptr_unwind (void *);
 extern void restore_point_unwind (Lisp_Object);
 extern bool file_access_p (char const *, int);
 extern Lisp_Object get_file_errno_data (const char *, Lisp_Object, int);

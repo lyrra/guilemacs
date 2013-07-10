@@ -1319,7 +1319,7 @@ Return t if the file exists and loads successfully.  */)
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
-  file_stream stream UNINIT;
+  file_stream stream = NULL; // guilemacs cant use UNINIT, must always be zero
   lread_fd fd;
 #ifdef USE_ANDROID_ASSETS
   int rc;
@@ -1469,7 +1469,8 @@ Return t if the file exists and loads successfully.  */)
   if (0 <= fd)
     {
       fd_index = SPECPDL_INDEX ();
-      record_unwind_protect_int (close_file_unwind, fd);
+      record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
+      record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }
 #else
   if (fd.asset || fd.fd >= 0)
@@ -1610,7 +1611,7 @@ Return t if the file exists and loads successfully.  */)
 	  if (lread_fd_p)
 	    {
 	      lread_close (fd);
-	      clear_unwind_protect (fd_index);
+              fd = -1;
 	    }
 	  val = call4 (Vload_source_file_function, found, hist_file_name,
 		       NILP (noerror) ? Qnil : Qt,
@@ -1631,7 +1632,7 @@ Return t if the file exists and loads successfully.  */)
     {
 #ifdef WINDOWSNT
       emacs_close (fd);
-      clear_unwind_protect (fd_index);
+      fd = -1;
       efound = ENCODE_FILE (found);
       stream = emacs_fopen (SSDATA (efound), fmode);
 #else
@@ -1665,7 +1666,6 @@ Return t if the file exists and loads successfully.  */)
     {
       if (!file_stream_valid_p (stream))
         report_file_error ("Opening stdio stream", file);
-      set_unwind_protect_ptr (fd_index, close_infile_unwind, infile);
       input.stream = stream;
       input.lookahead = 0;
       infile = &input;

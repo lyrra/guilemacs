@@ -2556,7 +2556,7 @@ usage:  (make-pipe-process &rest ARGS)  */)
   eassert (p->decoding_carryover == 0);
   pset_encoding_buf (p, empty_unibyte_string);
 
-  specpdl_ptr = specpdl_ref_to_ptr (specpdl_count);
+  unbind_to (specpdl_count, Qnil);
 
   return proc;
 }
@@ -3189,7 +3189,7 @@ usage:  (make-serial-process &rest ARGS)  */)
   CHECK_STRING (name);
   proc = make_process (name);
   specpdl_ref specpdl_count = SPECPDL_INDEX ();
-  record_unwind_protect (remove_process, proc);
+  record_unwind_protect_1 (remove_process, proc, false);
   p = XPROCESS (proc);
 
   fd = serial_open (port);
@@ -3266,7 +3266,7 @@ usage:  (make-serial-process &rest ARGS)  */)
 
   Fserial_process_configure (nargs, args);
 
-  specpdl_ptr = specpdl_ref_to_ptr (specpdl_count);
+  unbind_to (specpdl_count, Qnil);
 
   return proc;
 }
@@ -3490,7 +3490,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #endif /* DATAGRAM_SOCKETS */
 
       /* Make us close S if quit.  */
-      record_unwind_protect_int (close_file_unwind, s);
+      record_unwind_protect_int_1 (close_file_unwind, s, false);
 
       /* Parse network options in the arg list.  We simply ignore anything
 	 which isn't a known option (including other keywords).  An error
@@ -3615,7 +3615,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #endif /* !WINDOWSNT */
 
       /* Discard the unwind protect closing S.  */
-      specpdl_ptr = specpdl_ref_to_ptr (count1);
+      unbind_to (count1, Qnil);
       emacs_close (s);
       s = -1;
       if (0 <= socket_to_use)
@@ -3708,7 +3708,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   p->outfd = outch;
 
   /* Discard the unwind protect for closing S, if any.  */
-  specpdl_ptr = specpdl_ref_to_ptr (count1);
+  unbind_to (count1, Qnil);
 
   if (p->is_server && p->socktype != SOCK_DGRAM)
     pset_status (p, Qlisten);
@@ -4971,7 +4971,7 @@ server_accept_connection (Lisp_Object server, int channel)
     }
 
   specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_int (close_file_unwind, s);
+  record_unwind_protect_int_1 (close_file_unwind, s, false);
 
   connect_counter++;
 
@@ -5088,8 +5088,7 @@ server_accept_connection (Lisp_Object server, int channel)
   eassert (NILP (p->command));
   eassert (p->pid == 0);
 
-  /* Discard the unwind protect for closing S.  */
-  specpdl_ptr = specpdl_ref_to_ptr (count);
+  unbind_to (count, Qnil);
 
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd  = s;

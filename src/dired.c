@@ -261,7 +261,6 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
 	 file in the directory, when we call file_attributes below.  */
       record_unwind_protect (directory_files_internal_w32_unwind,
 			     Vw32_get_true_file_attributes);
-      w32_save = Vw32_get_true_file_attributes;
       if (EQ (Vw32_get_true_file_attributes, Qlocal))
 	{
 	  /* w32.c:stat will notice these bindings and avoid calling
@@ -355,14 +354,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
       list = Fcons (attrs ? Fcons (finalname, fileattrs) : finalname, list);
     }
 
-  emacs_closedir (d);
-#ifdef WINDOWSNT
-  if (attrs)
-    Vw32_get_true_file_attributes = w32_save;
-#endif
-
-  /* Discard the unwind protect.  */
-  specpdl_ptr = specpdl_ref_to_ptr (count);
+  unbind_to (count, Qnil);
 
   if (NILP (nosort))
     {
