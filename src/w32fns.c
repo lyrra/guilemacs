@@ -7878,7 +7878,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 #endif	/* !NTGUI_UNICODE */
 
     {
-      int count = SPECPDL_INDEX ();
+      ptrdiff_t count = SPECPDL_INDEX ();
 
       w32_dialog_in_progress (Qt);
 
