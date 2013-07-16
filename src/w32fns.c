@@ -7993,7 +7993,7 @@ value of DIR as in previous invocations; this is standard Windows behavior.  */)
 #endif	/* !NTGUI_UNICODE */
 
     {
-      int count = SPECPDL_INDEX ();
+      ptrdiff_t count = SPECPDL_INDEX ();
 
       w32_dialog_in_progress (Qt);
 
