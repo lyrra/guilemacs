@@ -92,6 +92,7 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
    Use printchar to output one character,
    or call strout to output a block of characters.  */
 
+/* {{coccinelle:skip_start}} */
 #define PRINTPREPARE							\
    struct buffer *old = current_buffer;					\
    ptrdiff_t old_point = -1, start_point = -1;				\
@@ -189,6 +190,9 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
 		  old_point_byte + (old_point_byte >= start_point_byte	\
 				    ? PT_BYTE - start_point_byte : 0));	\
    set_buffer_internal (old);
+
+#define PRINTCHAR(ch) printchar (ch, printcharfun)
+/* {{coccinelle:skip_end}} */
 
 /* This is used to restore the saved contents of print_buffer
    when there is a recursive call to print.  */
