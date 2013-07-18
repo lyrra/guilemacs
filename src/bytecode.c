@@ -460,6 +460,7 @@ valid_sp (struct bc_thread_state *bc, Lisp_Object *sp)
    arguments in ARGS are pushed on the stack according to
    ARGS_TEMPLATE before executing FUN.  */
 
+/* {{coccinelle:skip_start}} */
 Lisp_Object
 exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 		ptrdiff_t nargs, Lisp_Object *args)
@@ -1800,6 +1801,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
   Lisp_Object result = TOP;
   return result;
 }
+/* {{coccinelle:skip_end}} */
 
 /* `args_template' has the same meaning as in exec_byte_code() above.  */
 Lisp_Object
