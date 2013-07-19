@@ -3374,15 +3374,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
-  SPECPDL_FRAME = 1,
-  SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
-  SPECPDL_UNWIND_ARRAY,		/* Likewise, on an array that needs freeing.
-				   Its elements are potential Lisp_Objects.  */
-  SPECPDL_UNWIND_PTR,		/* Likewise, on void *.  */
-  SPECPDL_UNWIND_INT,		/* Likewise, on int.  */
-  SPECPDL_UNWIND_INTMAX,	/* Likewise, on intmax_t.  */
-  SPECPDL_UNWIND_EXCURSION,	/* Likewise, on an excursion.  */
-  SPECPDL_UNWIND_VOID,		/* Likewise, with no arg.  */
   SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
   SPECPDL_NOP,			/* A filler.  */
 #ifdef HAVE_MODULES
@@ -3605,6 +3596,7 @@ record_in_backtrace (Lisp_Object function, Lisp_Object *args, ptrdiff_t nargs)
   current_thread->stack_top = specpdl_ptr->bt.args = args;
   specpdl_ptr->bt.nargs = nargs;
   grow_specpdl ();
+  scm_dynwind_unwind_handler (unbind_once, NULL, SCM_F_WIND_EXPLICITLY);
 
   return count;
 }
@@ -3674,12 +3666,14 @@ enum nonlocal_exit
 struct handler
 {
   enum handlertype type;
+  Lisp_Object ptag;
   Lisp_Object tag_or_ch;
 
   /* The next two are set by unwind_to_catch.  */
   enum nonlocal_exit nonlocal_exit;
   Lisp_Object val;
-
+  Lisp_Object var;
+  Lisp_Object body;
   struct handler *next;
   struct handler *nextfree;
 
@@ -3697,6 +3691,7 @@ struct handler
   EMACS_INT f_lisp_eval_depth;
   specpdl_ref pdlcount;
   struct bc_frame *act_rec;
+  EMACS_INT lisp_eval_depth;
   int poll_suppress_count;
   int interrupt_input_blocked;
 
@@ -4698,6 +4693,9 @@ extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
+extern _Noreturn SCM abort_to_prompt (SCM, SCM);
+extern SCM call_with_prompt (SCM, SCM, SCM);
+extern SCM make_prompt_tag (void);
 
 /* Defined in unexmacosx.c.  */
 #if defined DARWIN_OS && defined HAVE_UNEXEC
@@ -5707,5 +5705,4 @@ maybe_gc (void)
 }
 
 INLINE_HEADER_END
-
 #endif /* EMACS_LISP_H */
