@@ -2961,15 +2961,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
-  SPECPDL_FRAME = 1,
-  SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
-  SPECPDL_UNWIND_ARRAY,		/* Likewise, on an array that needs freeing.
-				   Its elements are potential Lisp_Objects.  */
-  SPECPDL_UNWIND_PTR,		/* Likewise, on void *.  */
-  SPECPDL_UNWIND_INT,		/* Likewise, on int.  */
-  SPECPDL_UNWIND_INTMAX,	/* Likewise, on intmax_t.  */
-  SPECPDL_UNWIND_EXCURSION,	/* Likewise, on an excursion.  */
-  SPECPDL_UNWIND_VOID,		/* Likewise, with no arg.  */
   SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
 #ifdef HAVE_MODULES
   SPECPDL_MODULE_RUNTIME,       /* A live module runtime.  */
@@ -3085,28 +3076,16 @@ enum nonlocal_exit
 struct handler
 {
   enum handlertype type;
+  Lisp_Object ptag;
   Lisp_Object tag_or_ch;
 
   /* The next two are set by unwind_to_catch.  */
   enum nonlocal_exit nonlocal_exit;
   Lisp_Object val;
-
+  Lisp_Object var;
+  Lisp_Object body;
   struct handler *next;
-  struct handler *nextfree;
-
-  /* The bytecode interpreter can have several handlers active at the same
-     time, so when we longjmp to one of them, it needs to know which handler
-     this was and what was the corresponding internal state.  This is stored
-     here, and when we longjmp we make sure that handlerlist points to the
-     proper handler.  */
-  Lisp_Object *bytecode_top;
-  int bytecode_dest;
-
-  /* Most global vars are reset to their value via the specpdl mechanism,
-     but a few others are handled by storing their value here.  */
-  sys_jmp_buf jmp;
   EMACS_INT f_lisp_eval_depth;
-  ptrdiff_t pdlcount;
   int poll_suppress_count;
   int interrupt_input_blocked;
 };
@@ -3963,6 +3942,9 @@ extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+extern _Noreturn SCM abort_to_prompt (SCM, SCM);
+extern SCM call_with_prompt (SCM, SCM, SCM);
+extern SCM make_prompt_tag (void);
 
 /* Defined in unexmacosx.c.  */
 #if defined DARWIN_OS && defined HAVE_UNEXEC
@@ -4848,5 +4830,4 @@ maybe_gc (void)
 }
 
 INLINE_HEADER_END
-
 #endif /* EMACS_LISP_H */
