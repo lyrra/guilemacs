@@ -2896,11 +2896,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd *, const char *, int);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
-  SPECPDL_FRAME = 1,
-  SPECPDL_UNWIND,		/* An unwind_protect function on Lisp_Object.  */
-  SPECPDL_UNWIND_PTR,		/* Likewise, on void *.  */
-  SPECPDL_UNWIND_INT,		/* Likewise, on int.  */
-  SPECPDL_UNWIND_VOID,		/* Likewise, with no arg.  */
   SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
   /* Tags greater than SPECPDL_LET must be "subkinds" of LET.  */
@@ -2992,24 +2987,13 @@ enum handlertype { CATCHER, CONDITION_CASE, CATCHER_ALL };
 struct handler
 {
   enum handlertype type;
+  Lisp_Object ptag;
   Lisp_Object tag_or_ch;
   Lisp_Object val;
+  Lisp_Object var;
+  Lisp_Object body;
   struct handler *next;
-  struct handler *nextfree;
-
-  /* The bytecode interpreter can have several handlers active at the same
-     time, so when we longjmp to one of them, it needs to know which handler
-     this was and what was the corresponding internal state.  This is stored
-     here, and when we longjmp we make sure that handlerlist points to the
-     proper handler.  */
-  Lisp_Object *bytecode_top;
-  int bytecode_dest;
-
-  /* Most global vars are reset to their value via the specpdl mechanism,
-     but a few others are handled by storing their value here.  */
-  sys_jmp_buf jmp;
   EMACS_INT f_lisp_eval_depth;
-  ptrdiff_t pdlcount;
   int poll_suppress_count;
   int interrupt_input_blocked;
 };
@@ -3722,7 +3706,6 @@ extern void record_unwind_protect_void_1 (void (*) (void), bool);
 extern void record_unwind_protect_void (void (*) (void));
 extern void dynwind_begin (void);
 extern void dynwind_end (void);
-extern Lisp_Object unbind_to (ptrdiff_t, Lisp_Object);
 extern void rebind_for_thread_switch (void);
 extern void unbind_for_thread_switch (struct thread_state *);
 extern _Noreturn void error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
@@ -3744,6 +3727,9 @@ extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+extern _Noreturn SCM abort_to_prompt (SCM, SCM);
+extern SCM call_with_prompt (SCM, SCM, SCM);
+extern SCM make_prompt_tag (void);
 
 /* Defined in unexmacosx.c.  */
 #if defined DARWIN_OS && !defined CANNOT_DUMP
@@ -4563,5 +4549,4 @@ maybe_gc (void)
 }
 
 INLINE_HEADER_END
-
 #endif /* EMACS_LISP_H */
