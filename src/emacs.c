@@ -1576,6 +1576,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
     {
       init_alloc_once ();
       init_obarray_once ();
+      init_guile ();
       init_fns_once ();
       init_eval_once ();
       init_charset_once ();
