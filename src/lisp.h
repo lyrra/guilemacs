@@ -417,6 +417,8 @@ scm_t_bits lisp_vectorlike_tag;
 
 enum Lisp_Type
   {
+    Lisp_Other,
+
     /* Integer.  XINT (obj) is the integer value.  */
     Lisp_Int,
 
@@ -2707,6 +2709,7 @@ ARRAYP (Lisp_Object x)
 {
   return VECTORP (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
 }
+
 /* Extract A's type.  */
 INLINE enum Lisp_Type
 XTYPE (Lisp_Object o)
@@ -2726,7 +2729,7 @@ XTYPE (Lisp_Object o)
   else if (FLOATP (o))
     return Lisp_Float;
   else
-    abort ();
+    return Lisp_Other;
 }
 
 INLINE void

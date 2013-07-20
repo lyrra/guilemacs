@@ -89,7 +89,7 @@ struct thread_state
 #define handlerlist (current_thread->m_handlerlist)
 
   struct handler *m_handlerlist_sentinel;
-#define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
+//#define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
 
   /* Current number of specbindings allocated in specpdl.  */
   ptrdiff_t m_specpdl_size;

@@ -2691,13 +2691,9 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       else
 	{
 	  Lisp_Object tem0;
-
-	  ptrdiff_t count = SPECPDL_INDEX ();
 	  save_getcjmp (save_jump);
-	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
 	  restore_getcjmp (local_getcjmp);
 	  tem0 = sit_for (Vecho_keystrokes, 1, 1);
-	  unbind_to (count, Qnil);
 	  if (EQ (tem0, Qt)
 	      && ! CONSP (Vunread_command_events))
 	    echo_now ();
@@ -2770,7 +2766,6 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	  timeout = delay_level * timeout / 4;
 	  ptrdiff_t count1 = SPECPDL_INDEX ();
 	  save_getcjmp (save_jump);
-	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
 	  restore_getcjmp (local_getcjmp);
 	  tem0 = sit_for (make_fixnum (timeout), 1, 1);
 	  unbind_to (count1, Qnil);

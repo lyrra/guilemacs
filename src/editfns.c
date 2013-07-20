@@ -785,7 +785,6 @@ This function does not move point.  */)
 void
 save_excursion_save (union specbinding *pdl)
 {
-  eassert (pdl->unwind_excursion.kind == SPECPDL_UNWIND_EXCURSION);
   pdl->unwind_excursion.marker = Fpoint_marker ();
   /* Selected window if current buffer is shown in it, nil otherwise.  */
   pdl->unwind_excursion.window
