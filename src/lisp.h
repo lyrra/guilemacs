@@ -425,6 +425,8 @@ scm_t_bits lisp_vectorlike_tag;
    111.......  .......111  float       pointer to struct Lisp_Float  */
 enum Lisp_Type
   {
+    Lisp_Other,
+
     /* Symbol.  XSYMBOL (object) points to a struct Lisp_Symbol.  */
     Lisp_Symbol,
 
@@ -1219,7 +1221,7 @@ XTYPE (Lisp_Object o)
   else if (FLOATP (o))
     return Lisp_Float;
   else
-    abort ();
+    return Lisp_Other;
 }
 
 #define XSETINT(a, b) ((a) = make_fixnum (b))
