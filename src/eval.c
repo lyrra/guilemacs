@@ -226,7 +226,7 @@ make_catch_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  //c->lisp_eval_depth = lisp_eval_depth;
   c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
@@ -243,7 +243,7 @@ make_condition_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  //c->lisp_eval_depth = lisp_eval_depth;
   c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
@@ -706,14 +706,6 @@ default_toplevel_binding (Lisp_Object symbol)
 	  if (EQ (specpdl_symbol (pdl), symbol))
 	    binding = pdl;
 	  break;
-
-	case SPECPDL_UNWIND:
-	case SPECPDL_UNWIND_ARRAY:
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_INTMAX:
-	case SPECPDL_UNWIND_EXCURSION:
-	case SPECPDL_UNWIND_VOID:
 	case SPECPDL_BACKTRACE:
 #ifdef HAVE_MODULES
         case SPECPDL_MODULE_RUNTIME:
@@ -1207,7 +1199,7 @@ restore_handler (void *data)
   struct handler *c = data;
   set_poll_suppress_count (c->poll_suppress_count);
   unblock_input_to (c->interrupt_input_blocked);
-  immediate_quit = 0;
+  //immediate_quit = 0;
 }
 
 struct icc_thunk_env
@@ -3664,7 +3656,7 @@ record_unwind_protect_intmax (void (*function) (intmax_t), intmax_t arg)
 void
 record_unwind_protect_excursion (void)
 {
-  specpdl_ptr->unwind_excursion.kind = SPECPDL_UNWIND_EXCURSION;
+  //specpdl_ptr->unwind_excursion.kind = SPECPDL_UNWIND_EXCURSION;
   save_excursion_save (specpdl_ptr);
   grow_specpdl ();
 }
@@ -3708,29 +3700,6 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
   eassert (unwinding || this_binding->kind >= SPECPDL_LET);
   switch (this_binding->kind)
     {
-    case SPECPDL_UNWIND:
-      lisp_eval_depth = this_binding->unwind.eval_depth;
-      this_binding->unwind.func (this_binding->unwind.arg);
-      break;
-    case SPECPDL_UNWIND_ARRAY:
-      xfree (this_binding->unwind_array.array);
-      break;
-    case SPECPDL_UNWIND_PTR:
-      this_binding->unwind_ptr.func (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_UNWIND_INT:
-      this_binding->unwind_int.func (this_binding->unwind_int.arg);
-      break;
-    case SPECPDL_UNWIND_INTMAX:
-      this_binding->unwind_intmax.func (this_binding->unwind_intmax.arg);
-      break;
-    case SPECPDL_UNWIND_VOID:
-      this_binding->unwind_void.func ();
-      break;
-    case SPECPDL_UNWIND_EXCURSION:
-      save_excursion_restore (this_binding->unwind_excursion.marker,
-			      this_binding->unwind_excursion.window);
-      break;
     case SPECPDL_BACKTRACE:
       break;
 #ifdef HAVE_MODULES
@@ -3890,7 +3859,7 @@ unbind_to_1 (ptrdiff_t count, Lisp_Object value, bool explicit)
   Vquit_flag = Qnil;
 
   while (specpdl_ptr != specpdl + count)
-    unbind_once (explicit);
+    unbind_once (count);
 
   if (NILP (Vquit_flag) && !NILP (quitf))
     Vquit_flag = quitf;
@@ -4227,13 +4196,6 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 	    }
 	    break;
 
-	  case SPECPDL_UNWIND:
-	  case SPECPDL_UNWIND_ARRAY:
-	  case SPECPDL_UNWIND_PTR:
-	  case SPECPDL_UNWIND_INT:
-	  case SPECPDL_UNWIND_INTMAX:
-	  case SPECPDL_UNWIND_EXCURSION:
-	  case SPECPDL_UNWIND_VOID:
 	  case SPECPDL_BACKTRACE:
 #ifdef HAVE_MODULES
           case SPECPDL_MODULE_RUNTIME:

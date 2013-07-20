@@ -776,24 +776,7 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 
 	CASE (Bpushcatch):	/* New in 24.4.  */
 	  type = CATCHER;
-	  goto pushhandler;
-	CASE (Bpushconditioncase): /* New in 24.4.  */
-	  type = CONDITION_CASE;
-	pushhandler:
-	  {
-	    struct handler *c = push_handler (POP, type);
-	    c->bytecode_dest = FETCH2;
-	    c->bytecode_top = top;
-
-	    if (sys_setjmp (c->jmp))
-	      {
-		struct handler *c = handlerlist;
-		top = c->bytecode_top;
-		op = c->bytecode_dest;
-		handlerlist = c->next;
-		PUSH (c->val);
-		goto op_branch;
-	      }
+	  //goto pushhandler;
 
 	CASE (Bpushconditioncase): /* New in 24.4.  */
           emacs_abort ();

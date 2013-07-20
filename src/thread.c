@@ -699,6 +699,7 @@ run_thread (void *state)
 
   acquire_global_lock (self);
 
+#if 0
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
      This is important since handlerlist->nextfree holds the freelist
      which would otherwise leak every time we unwind back to top-level.   */
@@ -723,10 +724,11 @@ run_thread (void *state)
     struct handler *c, *c_next;
     for (c = handlerlist_sentinel; c; c = c_next)
       {
-	c_next = c->nextfree;
+	//c_next = c->nextfree;
 	xfree (c);
       }
   }
+#endif
 
   xfree (self->thread_name);
 
