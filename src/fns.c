@@ -4716,6 +4716,19 @@ disregarding any coding systems.  If nil, use the current buffer.  */ )
 }
 
 
+DEFUN ("eval-scheme", Feval_scheme, Seval_scheme, 1, 1,
+       "sEval Scheme: ",
+       doc: /* Evaluate a string containing a Scheme expression.  */)
+  (Lisp_Object string)
+{
+  Lisp_Object tem;
+
+  CHECK_STRING (string);
+
+  tem = scm_c_eval_string (SSDATA (string));
+  return (INTERACTIVE ? Fprin1 (tem, Qt) : tem);
+}
+
 void
 init_fns_once (void)
 {
