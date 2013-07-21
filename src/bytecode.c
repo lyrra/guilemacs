@@ -735,6 +735,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  op -= Bvarbind;
 	varbind:
 	  /* Specbind can signal and thus GC.  */
+          dynwind_begin ();
 	  specbind (vectorp[op], POP);
 	  NEXT;
 
@@ -839,7 +840,8 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	CASE (Bunbind5):
 	  op -= Bunbind;
 	dounbind:
-	  unbind_to (specpdl_ref_add (SPECPDL_INDEX (), -op), Qnil);
+          for (int i = 0; i < op; i++)
+            dynwind_end ();
 	  NEXT;
 
 	CASE (Bgoto):
@@ -925,25 +927,28 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  NEXT;
 
 	CASE (Bsave_excursion):
+          dynwind_begin ();
 	  record_unwind_protect_excursion ();
 	  NEXT;
 
 	CASE (Bsave_current_buffer_OBSOLETE): /* Obsolete since 20.  */
 	CASE (Bsave_current_buffer):
+          dynwind_begin ();
 	  record_unwind_current_buffer ();
 	  NEXT;
 
 	CASE (Bsave_window_excursion): /* Obsolete since 24.1.  */
 	  {
-	    specpdl_ref count1 = SPECPDL_INDEX ();
+            dynwind_begin ();
 	    record_unwind_protect (restore_window_configuration,
 				   Fcurrent_window_configuration (Qnil));
 	    TOP = Fprogn (TOP);
-	    unbind_to (count1, TOP);
+            dynwind_end ();
 	    NEXT;
 	  }
 
 	CASE (Bsave_restriction):
+          dynwind_begin ();
 	  record_unwind_protect (save_restriction_restore,
 				 save_restriction_save ());
 	  NEXT;
@@ -1013,6 +1018,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	CASE (Bunwind_protect):	/* FIXME: avoid closure for lexbind.  */
 	  {
 	    Lisp_Object handler = POP;
+            dynwind_begin ();
 	    /* Support for a function here is new in 24.4.  */
 	    record_unwind_protect (FUNCTIONP (handler) ? bcall0 : prog_ignore,
 				   handler);
@@ -1028,6 +1034,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 
 	CASE (Btemp_output_buffer_setup): /* Obsolete since 24.1.  */
 	  CHECK_STRING (TOP);
+          dynwind_begin ();
 	  temp_output_buffer_setup (SSDATA (TOP));
 	  TOP = Vstandard_output;
 	  NEXT;
@@ -1038,7 +1045,7 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	    temp_output_buffer_show (TOP);
 	    TOP = v1;
 	    /* pop binding of standard-output */
-	    unbind_to (specpdl_ref_add (SPECPDL_INDEX (), -1), Qnil);
+            dynwind_end ();
 	    NEXT;
 	  }
 

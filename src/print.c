@@ -228,7 +228,7 @@ print_finish (struct print_context *pc)
 		 pc->old_point_byte
 		 + (pc->old_point_byte >= pc->start_point_byte
 		    ? PT_BYTE - pc->start_point_byte : 0));
-  unbind_to (pc->specpdl_count, Qnil);
+  dynwind_end ();
 }
 
 /* Print character CH to the stdio stream STREAM.  */
@@ -584,10 +584,10 @@ write_string (const char *data, Lisp_Object printcharfun)
 void
 temp_output_buffer_setup (const char *bufname)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
   register struct buffer *old = current_buffer;
   register Lisp_Object buf;
 
+  dynwind_begin ();
   record_unwind_current_buffer ();
 
   Fset_buffer (Fget_buffer_create (build_string (bufname), Qnil));
@@ -608,7 +608,7 @@ temp_output_buffer_setup (const char *bufname)
 
   run_hook (Qtemp_buffer_setup_hook);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   specbind (Qstandard_output, buf);
 }
@@ -798,8 +798,7 @@ See `prin1' for the meaning of OVERRIDES.
 A printed representation of an object is text which describes that object.  */)
   (Lisp_Object object, Lisp_Object noescape, Lisp_Object overrides)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
-
+  dynwind_begin ();
   specbind (Qinhibit_modification_hooks, Qt);
 
   if (!NILP (overrides))
@@ -829,7 +828,8 @@ A printed representation of an object is text which describes that object.  */)
 
   Vdeactivate_mark = save_deactivate_mark;
 
-  return unbind_to (count, object);
+  dynwind_end ();
+  return object;
 }
 
 DEFUN ("princ", Fprinc, Sprinc, 1, 2, 0,

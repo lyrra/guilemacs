@@ -173,12 +173,12 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       struct buffer *prev = current_buffer;
       Lisp_Object buffer;
-      specpdl_ref specpdl_count = SPECPDL_INDEX ();
       int previous_menu_items_used = f->menu_bar_items_used;
       Lisp_Object *previous_items
 	= alloca (previous_menu_items_used * sizeof *previous_items);
       int subitems;
 
+      dynwind_begin ();
       buffer = XWINDOW (FRAME_SELECTED_WINDOW (f))->contents;
       specbind (Qinhibit_quit, Qt);
       /* Don't let the debugger step into this code
@@ -291,7 +291,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 	     the menus in any form, since it would be a no-op.  */
 	  free_menubar_widget_value_tree (first_wv);
 	  discard_menu_items ();
-	  unbind_to (specpdl_count, Qnil);
+          dynwind_end ();
 #ifdef NS_IMPL_GNUSTEP
 	  inside--;
 #endif
@@ -303,7 +303,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
       f->menu_bar_items_used = menu_items_used;
 
       /* This undoes save_menu_items.  */
-      unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
 
       /* Now GC cannot happen during the lifetime of the widget_value,
 	 so it's safe to store data from a Lisp_String.  */
@@ -888,7 +888,6 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
   EmacsMenu *pmenu;
   NSPoint p;
   Lisp_Object tem;
-  specpdl_ref specpdl_count;
   widget_value *wv, *first_wv = 0;
   widget_value *save_wv = 0, *prev_wv = 0;
   widget_value **submenu_stack;
@@ -913,7 +912,7 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
   submenu_stack
     = SAFE_ALLOCA (menu_items_used * sizeof *submenu_stack);
 
-  specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Don't GC due to a mysterious bug.  */
   inhibit_garbage_collection ();
@@ -1078,7 +1077,7 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
   tem = [pmenu runMenuAt: p forFrame: f keymaps: keymaps];
   popup_activated_flag = 0;
   [[FRAME_NS_VIEW (SELECTED_FRAME ()) window] makeKeyWindow];
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
   unblock_input ();
 
   SAFE_FREE ();
@@ -1576,7 +1575,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   specpdl_ref specpdl_count;
 
   NSTRACE ("ns_popup_dialog");
-  specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   is_question = NILP (header);
   check_window_system (f);
@@ -1618,7 +1617,7 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   record_unwind_protect_ptr (pop_down_menu, dialog);
   popup_activated_flag = 1;
   tem = [dialog runDialogAt: p];
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* This must come *after* unuse_menu_items.  */
   discard_menu_items ();

@@ -1391,7 +1391,7 @@ command_loop_1 (void)
 	{
 	  /* Bind inhibit-quit to t so that C-g gets read in
 	     rather than quitting back to the minibuffer.  */
-	  specpdl_ref count = SPECPDL_INDEX ();
+          dynwind_begin ();
 	  specbind (Qinhibit_quit, Qt);
 
 	  sit_for (Vminibuffer_message_timeout, 0, 2);
@@ -1405,7 +1405,7 @@ command_loop_1 (void)
 	     needs more or less space than the echo area.  */
 	  resize_mini_window (XWINDOW (minibuf_window), false);
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 
 	  /* If a C-g came in before, treat it as input now.  */
 	  if (!NILP (Vquit_flag))
@@ -1519,7 +1519,7 @@ command_loop_1 (void)
 	  /* Here for a command that isn't executed directly.  */
 
 #ifdef HAVE_WINDOW_SYSTEM
-            specpdl_ref scount = SPECPDL_INDEX ();
+            dynwind_begin ();
 
             if (display_hourglass_p
                 && NILP (Vexecuting_kbd_macro))
@@ -1553,8 +1553,7 @@ command_loop_1 (void)
 	     hourglass cursor anyway.
 	     But don't cancel the hourglass within a macro
 	     just because a command in the macro finishes.  */
-	  if (NILP (Vexecuting_kbd_macro))
-            unbind_to (scount, Qnil);
+            dynwind_end ();
 #endif
           }
       /* Restore last PT position value, possibly clobbered by
@@ -3264,7 +3263,6 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       Lisp_Object keys;
       ptrdiff_t key_count;
       ptrdiff_t command_key_start;
-      specpdl_ref count = SPECPDL_INDEX ();
 
       /* Save the echo status.  */
       bool saved_immediate_echo = current_kboard->immediate_echo;
@@ -3272,6 +3270,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
       Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
 
+      dynwind_begin ();
       /* Save the this_command_keys status.  */
       key_count = this_command_key_count;
       command_key_start = this_single_command_key_start;
@@ -3301,7 +3300,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       /* Call the input method.  */
       tem = call1 (Vinput_method_function, c);
 
-      unbind_to (count, tem);
+      dynwind_end ();
 
       /* Restore the saved echoing state
 	 and this_command_keys state.  */
@@ -3390,7 +3389,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
   /* Process the help character specially if enabled.  */
   if (!NILP (Vhelp_form) && help_char_p (c))
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       help_form_saved_window_configs
 	= Fcons (Fcurrent_window_configuration (Qnil),
@@ -3409,7 +3408,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	}
       while (BUFFERP (c));
       /* Remove the help from the frame.  */
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       redisplay ();
       if (BASE_EQ (c, make_fixnum (040)))
@@ -10480,8 +10479,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		   bool fix_current_buffer, bool prevent_redisplay,
 		   bool disable_text_conversion_p)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
-
   /* How many keys there are in the current key sequence.  */
   int t;
 
@@ -10559,6 +10556,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* raw_keybuf_count = 0; */
 
   delayed_switch_frame = Qnil;
+
+  dynwind_begin ();
 
   if (INTERACTIVE)
     {
@@ -10878,7 +10877,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	     Just return -1.  */
 	  if (EQ (key, Qt))
 	    {
-	      unbind_to (count, Qnil);
+              dynwind_end ();
 	      return -1;
 	    }
 
@@ -11444,7 +11443,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     : Qnil;
 
   unread_switch_frame = delayed_switch_frame;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Don't downcase the last character if the caller says don't.
      Don't downcase it if the result is undefined, either.  */

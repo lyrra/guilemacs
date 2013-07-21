@@ -111,7 +111,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte)
 {
   char *from, *to, *name, *p, *p1;
   Lisp_Object file, pos;
-  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object dir;
   USE_SAFE_ALLOCA;
 
@@ -140,6 +139,8 @@ get_doc_string (Lisp_Object filepos, bool unibyte)
 
   /* Put the file name in NAME as a C string.
      If it is relative, combine it with Vdoc_directory.  */
+
+  dynwind_begin ();
 
   Lisp_Object tem = Ffile_name_absolute_p (file);
   file = ENCODE_FILE (file);
@@ -231,7 +232,8 @@ get_doc_string (Lisp_Object filepos, bool unibyte)
 	}
       p += nread;
     }
-  SAFE_FREE_UNBIND_TO (count, Qnil);
+  dynwind_end ();
+  SAFE_FREE ();
 
   /* Sanity checking.  */
   if (CONSP (filepos))
@@ -647,8 +649,8 @@ the same file name is found in the `doc-directory'.  */)
       filled -= end - buf;
       memmove (buf, end, filled);
     }
-
-  return SAFE_FREE_UNBIND_TO (count, Qnil);
+  SAFE_FREE ();
+  return Qnil;
 }
 
 /* Return true if text quoting style should default to quote `like this'.  */

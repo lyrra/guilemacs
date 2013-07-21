@@ -1120,6 +1120,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
   Lisp_Object x, y, window;
   int menuflags = 0;
   specpdl_ref specpdl_count = SPECPDL_INDEX ();
+  specpdl_ref count2;
 
   if (NILP (position))
     /* This is an obsolete call, which wants us to precompute the
@@ -1389,6 +1390,8 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     }
 #endif
 
+  specpdl_count2 = SPECPDL_INDEX ();
+
   record_unwind_protect_void (discard_menu_items);
 
   run_hook (Qx_pre_popup_menu_hook);
@@ -1411,7 +1414,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     selection = FRAME_TERMINAL (f)->menu_show_hook (f, xpos, ypos, menuflags,
 						    title, &error_name);
 
-  unbind_to (specpdl_count, Qnil);
+  unbind_to (specpdl_count2, Qnil);
 
 #ifdef HAVE_NTGUI     /* W32 specific because other terminals clear
 			 the grab inside their `menu_show_hook's if

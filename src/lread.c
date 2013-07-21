@@ -1468,7 +1468,6 @@ Return t if the file exists and loads successfully.  */)
 #if !defined USE_ANDROID_ASSETS
   if (0 <= fd)
     {
-      fd_index = SPECPDL_INDEX ();
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
       record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }

@@ -486,17 +486,20 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   AUTO_LIST2 (suffixes, map, txt);
   specpdl_ref count = SPECPDL_INDEX ();
   record_unwind_protect_ptr (fclose_ptr_unwind, &fp);
-  specbind (Qfile_name_handler_alist, Qnil);
-  fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false, false,
-	      NULL);
-  fp = fd < 0 ? 0 : emacs_fdopen (fd, "r");
-  if (!fp)
-    {
-      int open_errno = errno;
-      emacs_close (fd);
-      report_file_errno ("Loading charset map", mapfile, open_errno);
-    }
-  unbind_to (specpdl_ref_add (count, 1), Qnil);
+  {
+    ptrdiff_t count1 = SPECPDL_INDEX ();
+    specbind (Qfile_name_handler_alist, Qnil);
+    fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false, false,
+                NULL);
+    fp = fd < 0 ? 0 : emacs_fdopen (fd, "r");
+    if (!fp)
+      {
+        int open_errno = errno;
+        emacs_close (fd);
+        report_file_errno ("Loading charset map", mapfile, open_errno);
+      }
+    unbind_to (count1, Qnil);
+  }
 
   /* Use record, as `charset_map_entries' is large (larger than
      MAX_ALLOCA).  */
