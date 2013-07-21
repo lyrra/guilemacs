@@ -1131,7 +1131,6 @@ Return t if the file exists and loads successfully.  */)
 {
   FILE *stream = NULL;
   int fd;
-  int fd_index UNINIT;
   ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object found, efound, hist_file_name;
   /* True means we printed the ".el is newer" message.  */
@@ -1247,9 +1246,8 @@ Return t if the file exists and loads successfully.  */)
 #endif
     }
 
-  if (0 <= fd)
+  if (fd >= 0)
     {
-      fd_index = SPECPDL_INDEX ();
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
       record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }

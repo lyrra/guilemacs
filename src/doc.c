@@ -86,7 +86,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
   int offset;
   EMACS_INT position;
   Lisp_Object file, tem, pos;
-  ptrdiff_t count;
   USE_SAFE_ALLOCA;
 
   if (INTEGERP (filepos))
@@ -148,7 +147,7 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	  return concat3 (cannot_open, file, quote_nl);
 	}
     }
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_int (close_file_unwind, fd);
 
   /* Seek only to beginning of disk block.  */
@@ -204,7 +203,7 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	}
       p += nread;
     }
-  unbind_to (count, Qnil);
+  dynwind_end ();
   SAFE_FREE ();
 
   /* Sanity checking.  */
@@ -590,6 +589,7 @@ the same file name is found in the `doc-directory'.  */)
       report_file_errno ("Opening doc string file", build_string (name),
 			 open_errno);
     }
+  dynwind_begin ();
   record_unwind_protect_int (close_file_unwind, fd);
   Vdoc_file_name = filename;
   filled = 0;
@@ -670,6 +670,7 @@ the same file name is found in the `doc-directory'.  */)
     }
 
   SAFE_FREE ();
+  dynwind_end ();
   return unbind_to (count, Qnil);
 }
 

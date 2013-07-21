@@ -3873,6 +3873,8 @@ usage: (make-network-process &rest ARGS)  */)
   if (nargs == 0)
     return Qnil;
 
+  dynwind_begin ();
+
   /* Save arguments for process-contact and clone-process.  */
   contact = Flist (nargs, args);
 
@@ -4163,7 +4165,11 @@ usage: (make-network-process &rest ARGS)  */)
   tem = Fplist_get (contact, QCtls_parameters);
   CHECK_LIST (tem);
   p->gnutls_boot_parameters = tem;
-#endif
+
+  dynwind_end ();
+
+  /* Unwind bind_polling_period and request_sigio.  */
+  dynwind_end ();
 
   set_network_socket_coding_system (proc, host, service, name);
 

@@ -1240,7 +1240,6 @@ is used to further constrain the set of candidates.  */)
 	       ? list_table : function_table));
   ptrdiff_t idx = 0, obsize = 0;
   int matchcount = 0;
-  ptrdiff_t bindcount = -1;
   Lisp_Object bucket, zero, end, tem;
 
   CHECK_STRING (string);
@@ -1324,18 +1323,17 @@ is used to further constrain the set of candidates.  */)
 
 	  /* Ignore this element if it fails to match all the regexps.  */
 	  {
+            dynwind_begin ();
+            specbind (Qcase_fold_search,
+                      completion_ignore_case ? Qt : Qnil);
 	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
 		 regexps = XCDR (regexps))
 	      {
-		if (bindcount < 0) {
-		  bindcount = SPECPDL_INDEX ();
-		  specbind (Qcase_fold_search,
-			    completion_ignore_case ? Qt : Qnil);
-		}
 		tem = Fstring_match (XCAR (regexps), eltstring, zero);
 		if (NILP (tem))
 		  break;
 	      }
+            dynwind_end ();
 	    if (CONSP (regexps))
 	      continue;
 	  }
@@ -1349,11 +1347,6 @@ is used to further constrain the set of candidates.  */)
 		tem = Fcommandp (elt, Qnil);
 	      else
 		{
-		  if (bindcount >= 0)
-		    {
-		      unbind_to (bindcount, Qnil);
-		      bindcount = -1;
-		    }
 		  tem = (type == hash_table
 			 ? call2 (predicate, elt,
 				  HASH_VALUE (XHASH_TABLE (collection),
@@ -1430,11 +1423,6 @@ is used to further constrain the set of candidates.  */)
 	}
     }
 
-  if (bindcount >= 0) {
-    unbind_to (bindcount, Qnil);
-    bindcount = -1;
-  }
-
   if (NILP (bestmatch))
     return Qnil;		/* No completions found.  */
   /* If we are ignoring case, and there is no exact match,
@@ -1494,7 +1482,6 @@ with a space are ignored unless STRING itself starts with a space.  */)
     : VECTORP (collection) ? 2
     : NILP (collection) || (CONSP (collection) && !FUNCTIONP (collection));
   ptrdiff_t idx = 0, obsize = 0;
-  ptrdiff_t bindcount = -1;
   Lisp_Object bucket, tem, zero;
 
   CHECK_STRING (string);
@@ -1584,18 +1571,17 @@ with a space are ignored unless STRING itself starts with a space.  */)
 
 	  /* Ignore this element if it fails to match all the regexps.  */
 	  {
+            dynwind_begin ();
+            specbind (Qcase_fold_search,
+                      completion_ignore_case ? Qt : Qnil);
 	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
 		 regexps = XCDR (regexps))
 	      {
-		if (bindcount < 0) {
-		  bindcount = SPECPDL_INDEX ();
-		  specbind (Qcase_fold_search,
-			    completion_ignore_case ? Qt : Qnil);
-		}
 		tem = Fstring_match (XCAR (regexps), eltstring, zero);
 		if (NILP (tem))
 		  break;
 	      }
+            dynwind_end ();
 	    if (CONSP (regexps))
 	      continue;
 	  }
@@ -1609,10 +1595,6 @@ with a space are ignored unless STRING itself starts with a space.  */)
 		tem = Fcommandp (elt, Qnil);
 	      else
 		{
-		  if (bindcount >= 0) {
-		    unbind_to (bindcount, Qnil);
-		    bindcount = -1;
-		  }
 		  tem = type == 3
 		    ? call2 (predicate, elt,
 			     HASH_VALUE (XHASH_TABLE (collection), idx - 1))
@@ -1624,11 +1606,6 @@ with a space are ignored unless STRING itself starts with a space.  */)
 	  allmatches = Fcons (eltstring, allmatches);
 	}
     }
-
-  if (bindcount >= 0) {
-    unbind_to (bindcount, Qnil);
-    bindcount = -1;
-  }
 
   return Fnreverse (allmatches);
 }

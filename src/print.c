@@ -96,7 +96,7 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
    struct buffer *old = current_buffer;					\
    ptrdiff_t old_point = -1, start_point = -1;				\
    ptrdiff_t old_point_byte = -1, start_point_byte = -1;		\
-   ptrdiff_t specpdl_count = SPECPDL_INDEX ();				\
+   dynwind_begin ();                                                    \
    bool free_print_buffer = 0;						\
    bool multibyte							\
      = !NILP (BVAR (current_buffer, enable_multibyte_characters));	\
@@ -180,7 +180,7 @@ bool print_output_debug_flag EXTERNALLY_VISIBLE = 1;
        xfree (print_buffer);						\
        print_buffer = 0;						\
      }									\
-   unbind_to (specpdl_count, Qnil);					\
+   dynwind_end ();                                                      \
    if (MARKERP (original))						\
      set_marker_both (original, Qnil, PT, PT_BYTE);			\
    if (old_point >= 0)							\
@@ -534,10 +534,10 @@ write_string (const char *data, Lisp_Object printcharfun)
 void
 temp_output_buffer_setup (const char *bufname)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
   register struct buffer *old = current_buffer;
   register Lisp_Object buf;
 
+  dynwind_begin ();
   record_unwind_current_buffer ();
 
   Fset_buffer (Fget_buffer_create (build_string (bufname)));
@@ -559,7 +559,7 @@ temp_output_buffer_setup (const char *bufname)
 
   run_hook (Qtemp_buffer_setup_hook);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   specbind (Qstandard_output, buf);
 }
@@ -647,8 +647,7 @@ a list, a buffer, a window, a frame, etc.
 A printed representation of an object is text which describes that object.  */)
   (Lisp_Object object, Lisp_Object noescape)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-
+  dynwind_begin ();
   specbind (Qinhibit_modification_hooks, Qt);
 
   /* Save and restore this: we are altering a buffer
@@ -676,7 +675,8 @@ A printed representation of an object is text which describes that object.  */)
 
   Vdeactivate_mark = save_deactivate_mark;
 
-  return unbind_to (count, object);
+  dynwind_end ();
+  return object;
 }
 
 DEFUN ("princ", Fprinc, Sprinc, 1, 2, 0,

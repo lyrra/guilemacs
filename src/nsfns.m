@@ -1094,7 +1094,6 @@ This function is an internal primitive--use `make-frame' instead.  */)
   Lisp_Object name;
   int minibuffer_only = 0;
   long window_prompting = 0;
-  ptrdiff_t count = specpdl_ptr - specpdl;
   Lisp_Object display;
   struct ns_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -1167,6 +1166,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
     fset_icon_name (f, Qnil);
 
   FRAME_DISPLAY_INFO (f) = dpyinfo;
+
+  dynwind_begin ();
 
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
   record_unwind_protect (unwind_create_frame, frame);
@@ -1447,7 +1448,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 void
@@ -2866,11 +2868,11 @@ Text larger than the specified size is clipped.  */)
      (Lisp_Object string, Lisp_Object frame, Lisp_Object parms, Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
 {
   int root_x, root_y;
-  ptrdiff_t count = SPECPDL_INDEX ();
   struct frame *f;
   char *str;
   NSSize size;
 
+  dynwind_begin ();
   specbind (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
@@ -2908,7 +2910,8 @@ Text larger than the specified size is clipped.  */)
   [ns_tooltip showAtX: root_x Y: root_y for: XINT (timeout)];
   unblock_input ();
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 

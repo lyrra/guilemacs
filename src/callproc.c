@@ -290,7 +290,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   int callproc_fd[CALLPROC_FDS];
   int status;
   ptrdiff_t i;
-  ptrdiff_t count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;
 
   char **new_argv;
@@ -311,6 +310,8 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   /* Set to the return value of Ffind_operation_coding_system.  */
   Lisp_Object coding_systems;
   bool discard_output;
+
+  dynwind_begin ();
 
   if (synch_process_pid)
     error ("call-process invoked recursively");
@@ -549,7 +550,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   if (status < 0)
     {
       child_errno = errno;
-      unbind_to (count, Qnil);
+      dynwind_end ();
       synchronize_system_messages_locale ();
       return
 	code_convert_string_norecord (build_string (strerror (child_errno)),
@@ -602,7 +603,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
     bool volatile display_p_volatile = display_p;
     int volatile fd_error_volatile = fd_error;
     int *volatile filefd_volatile = filefd;
-    ptrdiff_t volatile count_volatile = count;
     char **volatile new_argv_volatile = new_argv;
     int volatile callproc_fd_volatile[CALLPROC_FDS];
     for (i = 0; i < CALLPROC_FDS; i++)
@@ -616,7 +616,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
     display_p = display_p_volatile;
     fd_error = fd_error_volatile;
     filefd = filefd_volatile;
-    count = count_volatile;
     new_argv = new_argv_volatile;
 
     for (i = 0; i < CALLPROC_FDS; i++)
@@ -702,7 +701,10 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 #endif /* not MSDOS */
 
   if (INTEGERP (buffer))
-    return unbind_to (count, Qnil);
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   if (BUFFERP (buffer))
     Fset_buffer (buffer);
@@ -797,8 +799,8 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 	  else
 	    {			/* We have to decode the input.  */
 	      Lisp_Object curbuf;
-	      ptrdiff_t count1 = SPECPDL_INDEX ();
 
+              dynwind_begin ();
 	      XSETBUFFER (curbuf, current_buffer);
 	      /* FIXME: Call signal_after_change!  */
 	      prepare_to_modify_buffer (PT, PT, NULL);
@@ -810,7 +812,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 	      specbind (Qinhibit_modification_hooks, Qt);
 	      decode_coding_c_string (&process_coding,
 				      (unsigned char *) buf, nread, curbuf);
-	      unbind_to (count1, Qnil);
+              dynwind_end ();
 	      if (display_on_the_fly
 		  && CODING_REQUIRE_DETECTION (&saved_coding)
 		  && ! CODING_REQUIRE_DETECTION (&process_coding))
@@ -882,7 +884,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   synch_process_pid = 0;
 
   SAFE_FREE ();
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (!wait_ok)
     return build_unibyte_string ("internal error");
