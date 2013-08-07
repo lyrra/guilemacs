@@ -417,7 +417,7 @@ typedef EMACS_INT Lisp_Word;
    The default is true if the compiler is GCC-like and if function
    inlining is disabled because the compiler is not optimizing or is
    optimizing for size.  Otherwise the default is false.  */
-#ifndef DEFINE_KEY_OPS_AS_MACROS
+#if 0
 # if (defined __NO_INLINE__ \
       && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__)
 #  define DEFINE_KEY_OPS_AS_MACROS true
@@ -453,6 +453,7 @@ typedef EMACS_INT Lisp_Word;
 #  define XFIXNUM_RAW(a) lisp_h_XFIXNUM_RAW (a)
 #  define XTYPE(a) lisp_h_XTYPE (a)
 # endif
+#endif
 #endif
 
 
