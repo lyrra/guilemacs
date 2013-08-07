@@ -444,6 +444,7 @@ typedef EMACS_INT Lisp_Word;
 #  define XTYPE(a) lisp_h_XTYPE (a)
 # endif
 #endif
+#endif
 
 
 /* Define the fundamental Lisp data structures.  */
