@@ -424,6 +424,7 @@ typedef EMACS_INT Lisp_Word;
 /* When compiling via gcc -O0, define the key operations as macros, as
    Emacs is too slow otherwise.  To disable this optimization, compile
    with -DINLINING=false.  */
+#if 0
 #if (defined __NO_INLINE__ \
      && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__ \
      && ! (defined INLINING && ! INLINING))
@@ -462,6 +463,7 @@ typedef EMACS_INT Lisp_Word;
 #  define XFIXNUM(a) lisp_h_XFIXNUM (a)
 #  define XTYPE(a) lisp_h_XTYPE (a)
 # endif
+#endif
 #endif
 
 
