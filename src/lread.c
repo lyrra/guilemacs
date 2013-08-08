@@ -168,6 +168,8 @@ file_get_char (file_stream stream)
 # endif
 #endif
 
+static SCM obarrays;
+
 /* The objects or placeholders read with the #n=object form.
 
    A hash table maps a number to either a placeholder (while the
@@ -4870,9 +4872,15 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
 
 static Lisp_Object initial_obarray;
 
-/* `oblookup' stores the bucket number here, for the sake of Funintern.  */
-
-static size_t oblookup_last_bucket_number;
+Lisp_Object
+obhash (Lisp_Object obarray)
+{
+  Lisp_Object tem = scm_hashq_get_handle (obarrays, obarray);
+  if (SCM_UNLIKELY (scm_is_false (tem)))
+    tem = scm_hashq_create_handle_x (obarrays, obarray,
+                                     scm_make_obarray ());
+  return scm_cdr (tem);
+}
 
 static Lisp_Object make_obarray (unsigned bits);
 
@@ -4908,13 +4916,13 @@ static void grow_obarray (struct Lisp_Obarray *o);
 
 /* FIXME: retype arguments as pure C types */
 static Lisp_Object
-intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
+intern_sym (Lisp_Object sym, Lisp_Object obarray)
 {
-  eassert (BARE_SYMBOL_P (sym) && OBARRAYP (obarray) && FIXNUMP (index));
-  struct Lisp_Symbol *s = XBARE_SYMBOL (sym);
-  s->u.s.interned = (BASE_EQ (obarray, initial_obarray)
-		     ? SYMBOL_INTERNED_IN_INITIAL_OBARRAY
-		     : SYMBOL_INTERNED);
+  Lisp_Object sym;
+  sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
+                                           SBYTES (string)),
+                    obhash (obarray));
+  init_symbol (sym, string);
 
   if (SREF (s->u.s.name, 0) == ':' && BASE_EQ (obarray, initial_obarray))
     {
@@ -4926,23 +4934,18 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
       SET_SYMBOL_VAL (s, sym);
     }
 
-  struct Lisp_Obarray *o = XOBARRAY (obarray);
-  Lisp_Object *ptr = o->buckets + XFIXNUM (index);
-  s->u.s.next = BARE_SYMBOL_P (*ptr) ? XBARE_SYMBOL (*ptr) : NULL;
-  *ptr = sym;
-  o->count++;
-  if (o->count > obarray_size (o))
-    grow_obarray (o);
-  return sym;
+  return scm_intern (scm_from_utf8_stringn (SSDATA (string),
+                                          SBYTES (string)),
+                     obhash (obarray));
 }
 
 /* Intern a symbol with name STRING in OBARRAY using bucket INDEX.  */
 
 Lisp_Object
-intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
+intern_driver (Lisp_Object string, Lisp_Object obarray)
 {
-  SET_SYMBOL_VAL (XBARE_SYMBOL (Qobarray_cache), Qnil);
-  return intern_sym (Fmake_symbol (string), obarray, index);
+  SET_SYMBOL_VAL (XSYMBOL (Qobarray_cache), Qnil);
+  return intern_sym (Fmake_symbol (string), obarray);
 }
 
 /* Intern the C string STR: return a symbol with that name,
@@ -4952,13 +4955,12 @@ Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
   Lisp_Object obarray = check_obarray (Vobarray);
-  Lisp_Object tem = oblookup (obarray, str, len, len);
 
   return (BARE_SYMBOL_P (tem) ? tem
 	  /* The above `oblookup' was done on the basis of nchars==nbytes, so
 	     the string has to be unibyte.  */
 	  : intern_driver (make_unibyte_string (str, len),
-			   obarray, tem));
+			   obarray));
 }
 
 Lisp_Object
@@ -4976,7 +4978,7 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
       else
 	string = make_pure_c_string (str, len);
 
-      tem = intern_driver (string, obarray, tem);
+      tem = intern_driver (string, obarray);
     }
   return tem;
 }
@@ -5037,12 +5039,12 @@ it defaults to the value of `obarray'.  */)
 	{
 	  tem = intern_driver (make_multibyte_string (longhand, longhand_chars,
 						      longhand_bytes),
-			       obarray, tem);
+			       obarray);
 	  xfree (longhand);
 	}
       else
 	tem = intern_driver (NILP (Vpurify_flag) ? string : Fpurecopy (string),
-			     obarray, tem);
+			     obarray);
     }
   return tem;
 }
@@ -5087,6 +5089,22 @@ it defaults to the value of `obarray'.  */)
       return BASE_EQ (sym, tem) ? name : Qnil;
     }
 }
+
+DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
+       doc: /* find-symbol */)
+     (Lisp_Object string, Lisp_Object obarray)
+{
+  Lisp_Object tem;
+
+  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
+  CHECK_STRING (string);
+
+  tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
+  if (INTEGERP (tem))
+    return scm_values (scm_list_2 (Qnil, Qnil));
+  else
+    return scm_values (scm_list_2 (tem, Qt));
+}
 
 DEFUN ("unintern", Funintern, Sunintern, 2, 2, 0,
        doc: /* Delete the symbol named NAME, if any, from OBARRAY.
@@ -5099,13 +5117,16 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   register Lisp_Object tem;
   Lisp_Object string;
 
-  if (NILP (obarray)) obarray = Vobarray;
+  if (NILP (obarray))
+    obarray = Vobarray;
   obarray = check_obarray (obarray);
 
   if (SYMBOLP (name))
     {
-      if (!BARE_SYMBOL_P (name))
-	name = XSYMBOL_WITH_POS (name)->sym;
+      if (! EQ (name,
+                scm_find_symbol (scm_symbol_to_string (name),
+                                 obhash (obarray))))
+        return Qnil;
       string = SYMBOL_NAME (name);
     }
   else
@@ -5114,54 +5135,8 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
       string = name;
     }
 
-  char *longhand = NULL;
-  ptrdiff_t longhand_chars = 0;
-  ptrdiff_t longhand_bytes = 0;
-  tem = oblookup_considering_shorthand (obarray, SSDATA (string),
-					SCHARS (string), SBYTES (string),
-					&longhand, &longhand_chars,
-					&longhand_bytes);
-  if (longhand)
-    xfree(longhand);
-
-  if (FIXNUMP (tem))
-    return Qnil;
-  /* If arg was a symbol, don't delete anything but that symbol itself.  */
-  if (BARE_SYMBOL_P (name) && !BASE_EQ (name, tem))
-    return Qnil;
-
-  /* There are plenty of other symbols which will screw up the Emacs
-     session if we unintern them, as well as even more ways to use
-     `setq' or `fset' or whatnot to make the Emacs session
-     unusable.  Let's not go down this silly road.  --Stef  */
-  /* if (NILP (tem) || EQ (tem, Qt))
-       error ("Attempt to unintern t or nil"); */
-
-  struct Lisp_Symbol *sym = XBARE_SYMBOL (tem);
-  sym->u.s.interned = SYMBOL_UNINTERNED;
-
-  ptrdiff_t idx = oblookup_last_bucket_number;
-  Lisp_Object *loc = &XOBARRAY (obarray)->buckets[idx];
-
-  eassert (BARE_SYMBOL_P (*loc));
-  struct Lisp_Symbol *prev = XBARE_SYMBOL (*loc);
-  if (sym == prev)
-    *loc = sym->u.s.next ? make_lisp_symbol (sym->u.s.next) : make_fixnum (0);
-  else
-    while (1)
-      {
-	struct Lisp_Symbol *next = prev->u.s.next;
-	if (next == sym)
-	  {
-	    prev->u.s.next = next->u.s.next;
-	    break;
-	  }
-	prev = next;
-      }
-
-  XOBARRAY (obarray)->count--;
-
-  return Qt;
+  //XSYMBOL (tem)->u.s.interned = SYMBOL_UNINTERNED;
+  return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
 }
 
 
@@ -5183,27 +5158,16 @@ obarray_index (struct Lisp_Obarray *oa, const char *str, ptrdiff_t size_byte)
 Lisp_Object
 oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff_t size_byte)
 {
-  struct Lisp_Obarray *o = XOBARRAY (obarray);
-  ptrdiff_t idx = obarray_index (o, ptr, size_byte);
-  Lisp_Object bucket = o->buckets[idx];
+  Lisp_Object sym;
+  Lisp_Object string2 = scm_from_utf8_stringn (ptr, size_byte);
 
-  oblookup_last_bucket_number = idx;
-  if (!BASE_EQ (bucket, make_fixnum (0)))
-    {
-      Lisp_Object sym = bucket;
-      while (1)
-	{
-	  struct Lisp_Symbol *s = XBARE_SYMBOL (sym);
-	  Lisp_Object name = s->u.s.name;
-	  if (SBYTES (name) == size_byte && SCHARS (name) == size
-	      && memcmp (SDATA (name), ptr, size_byte) == 0)
-	    return sym;
-	  if (s->u.s.next == NULL)
-	    break;
-	  sym = make_lisp_symbol(s->u.s.next);
-	}
-    }
-  return make_fixnum (idx);
+  obarray = check_obarray (obarray);
+  sym = scm_find_symbol (string2, obhash (obarray));
+  if (scm_is_true (sym)
+      && scm_is_true (scm_module_variable (symbol_module, sym)))
+    return sym;
+  else
+    return make_number (0);
 }
 
 /* Like 'oblookup', but considers 'Vread_symbol_shorthands',
@@ -5273,131 +5237,17 @@ oblookup_considering_shorthand (Lisp_Object obarray, const char *in,
 static struct Lisp_Obarray *
 allocate_obarray (void)
 {
-  return ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Obarray, PVEC_OBARRAY);
-}
-
-static Lisp_Object
-make_obarray (unsigned bits)
-{
-  struct Lisp_Obarray *o = allocate_obarray ();
-  o->count = 0;
-  o->size_bits = bits;
-  ptrdiff_t size = (ptrdiff_t)1 << bits;
-  o->buckets = hash_table_alloc_bytes (size * sizeof *o->buckets);
-  for (ptrdiff_t i = 0; i < size; i++)
-    o->buckets[i] = make_fixnum (0);
-  return make_lisp_obarray (o);
-}
-
-enum {
-  obarray_default_bits = 3,
-  word_size_log2 = word_size < 8 ? 5 : 6,  /* good enough */
-  obarray_max_bits = min (8 * sizeof (int),
-			  8 * sizeof (ptrdiff_t) - word_size_log2) - 1,
-};
-
-static void
-grow_obarray (struct Lisp_Obarray *o)
-{
-  ptrdiff_t old_size = obarray_size (o);
-  eassert (o->count > old_size);
-  Lisp_Object *old_buckets = o->buckets;
-
-  int new_bits = o->size_bits + 1;
-  if (new_bits > obarray_max_bits)
-    error ("Obarray too big");
-  ptrdiff_t new_size = (ptrdiff_t)1 << new_bits;
-  o->buckets = hash_table_alloc_bytes (new_size * sizeof *o->buckets);
-  for (ptrdiff_t i = 0; i < new_size; i++)
-    o->buckets[i] = make_fixnum (0);
-  o->size_bits = new_bits;
-
-  /* Rehash symbols.
-     FIXME: this is expensive since we need to recompute the hash for every
-     symbol name.  Would it be reasonable to store it in the symbol?  */
-  for (ptrdiff_t i = 0; i < old_size; i++)
-    {
-      Lisp_Object obj = old_buckets[i];
-      if (BARE_SYMBOL_P (obj))
-	{
-	  struct Lisp_Symbol *s = XBARE_SYMBOL (obj);
-	  while (1)
-	    {
-	      Lisp_Object name = s->u.s.name;
-	      ptrdiff_t idx = obarray_index (o, SSDATA (name), SBYTES (name));
-	      Lisp_Object *loc = o->buckets + idx;
-	      struct Lisp_Symbol *next = s->u.s.next;
-	      s->u.s.next = BARE_SYMBOL_P (*loc) ? XBARE_SYMBOL (*loc) : NULL;
-	      *loc = make_lisp_symbol (s);
-	      if (next == NULL)
-		break;
-	      s = next;
-	    }
-	}
-    }
-
-  hash_table_free_bytes (old_buckets, old_size * sizeof *old_buckets);
-}
-
-DEFUN ("obarray-make", Fobarray_make, Sobarray_make, 0, 1, 0,
-       doc: /* Return a new obarray of size SIZE.
-The obarray will grow to accommodate any number of symbols; the size, if
-given, is only a hint for the expected number.  */)
-  (Lisp_Object size)
-{
-  int bits;
-  if (NILP (size))
-    bits = obarray_default_bits;
-  else
-    {
-      CHECK_FIXNAT (size);
-      EMACS_UINT n = XFIXNUM (size);
-      bits = elogb (n) + 1;
-      if (bits > obarray_max_bits)
-	xsignal (Qargs_out_of_range, size);
-    }
-  return make_obarray (bits);
-}
-
-DEFUN ("obarrayp", Fobarrayp, Sobarrayp, 1, 1, 0,
-       doc: /* Return t iff OBJECT is an obarray.  */)
-  (Lisp_Object object)
-{
-  return OBARRAYP (object) ? Qt : Qnil;
-}
-
-DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
-       doc: /* Remove all symbols from OBARRAY.  */)
-  (Lisp_Object obarray)
-{
-  CHECK_OBARRAY (obarray);
-  struct Lisp_Obarray *o = XOBARRAY (obarray);
-
-  /* This function does not bother setting the status of its contained symbols
-     to uninterned.  It doesn't matter very much.  */
-  int new_bits = obarray_default_bits;
-  int new_size = (ptrdiff_t)1 << new_bits;
-  Lisp_Object *new_buckets
-    = hash_table_alloc_bytes (new_size * sizeof *new_buckets);
-  for (ptrdiff_t i = 0; i < new_size; i++)
-    new_buckets[i] = make_fixnum (0);
-
-  int old_size = obarray_size (o);
-  hash_table_free_bytes (o->buckets, old_size * sizeof *o->buckets);
-  o->buckets = new_buckets;
-  o->size_bits = new_bits;
-  o->count = 0;
-
-  return Qnil;
-}
-
-void
-map_obarray (Lisp_Object obarray,
-	     void (*fn) (Lisp_Object, Lisp_Object), Lisp_Object arg)
-{
-  CHECK_OBARRAY (obarray);
-  DOOBARRAY (XOBARRAY (obarray), it)
-    (*fn) (obarray_iter_symbol (&it), arg);
+  Lisp_Object proc (Lisp_Object sym)
+  {
+    Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), obarray);
+    if (scm_is_true (scm_c_value_ref (tem, 1))
+        && EQ (sym, scm_c_value_ref (tem, 0)))
+      fn (sym, arg);
+    return SCM_UNSPECIFIED;
+  }
+  CHECK_VECTOR (obarray);
+  scm_obarray_for_each (scm_c_make_gsubr ("proc", 1, 0, 0, proc),
+                        obhash (obarray));
 }
 
 static void
@@ -5452,8 +5302,14 @@ init_obarray_once (void)
   initial_obarray = Vobarray;
   staticpro (&initial_obarray);
 
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    define_symbol (builtin_lisp_symbol (i), defsym_name[i]);
+  obarrays = scm_make_hash_table (SCM_UNDEFINED);
+  scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
+
+  Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
+  /* Set temporary dummy values to Qnil and Vpurify_flag to satisfy the
+     NILP (Vpurify_flag) check in intern_c_string.  */
+  Qnil = make_number (-1); Vpurify_flag = make_number (1);
+  Qnil = intern_c_string ("nil");
 
   DEFSYM (Qunbound, "unbound");
 

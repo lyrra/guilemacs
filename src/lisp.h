@@ -344,51 +344,11 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert ((sym)->redirect == SYMBOL_PLAINVAL), (sym)->val.value)
-#define lisp_h_SYMBOLP(x) SMOB_TYPEP (x, lisp_symbol_tag)
+#define lisp_h_SYMBOLP(x) (x && scm_is_symbol (x))
 #define lisp_h_VECTORLIKEP(x) SMOB_TYPEP (x, lisp_vectorlike_tag)
 #define lisp_h_XCAR(c) scm_car (c)
 #define lisp_h_XCDR(c) scm_cdr (c)
 #define lisp_h_XHASH(a) (SCM_UNPACK (a))
-#define lisp_h_XSYMBOL(a) \
-   (eassert (SYMBOLP (a)), (struct Lisp_Symbol *) SMOB_PTR (a))
-
-/* When DEFINE_KEY_OPS_AS_MACROS, define key operations as macros to
-   cajole the compiler into inlining them; otherwise define them as
-   inline functions as this is cleaner and can be more efficient.
-   The default is true if the compiler is GCC-like and if function
-   inlining is disabled because the compiler is not optimizing or is
-   optimizing for size.  Otherwise the default is false.  */
-#if 0
-# if (defined __NO_INLINE__ \
-      && ! defined __OPTIMIZE__ && ! defined __OPTIMIZE_SIZE__)
-#  define DEFINE_KEY_OPS_AS_MACROS true
-# else
-#  define DEFINE_KEY_OPS_AS_MACROS false
-# endif
-#endif
-
-#if DEFINE_KEY_OPS_AS_MACROS
-# define XLI(o) lisp_h_XLI (o)
-# define XIL(i) lisp_h_XIL (i)
-# define XLP(o) lisp_h_XLP (o)
-# define CHECK_FIXNUM(x) lisp_h_CHECK_FIXNUM (x)
-# define CHECK_SYMBOL(x) lisp_h_CHECK_SYMBOL (x)
-# define CHECK_TYPE(ok, predicate, x) lisp_h_CHECK_TYPE (ok, predicate, x)
-# define CONSP(x) lisp_h_CONSP (x)
-# define FLOATP(x) lisp_h_FLOATP (x)
-# define FIXNUMP(x) lisp_h_FIXNUMP (x)
-# define NILP(x) lisp_h_NILP (x)
-# define SYMBOL_CONSTANT_P(sym) lisp_h_SYMBOL_CONSTANT_P (sym)
-# define SYMBOL_TRAPPED_WRITE_P(sym) lisp_h_SYMBOL_TRAPPED_WRITE_P (sym)
-# define TAGGEDP(a, tag) lisp_h_TAGGEDP (a, tag)
-# define VECTORLIKEP(x) lisp_h_VECTORLIKEP (x)
-# define XCAR(c) lisp_h_XCAR (c)
-# define XCDR(c) lisp_h_XCDR (c)
-# define XHASH(a) lisp_h_XHASH (a)
-# define XSYMBOL(a) lisp_h_XSYMBOL (a)
-#endif
-#endif
-
 
 /* Define the fundamental Lisp data structures.  */
 
@@ -408,7 +368,6 @@ typedef EMACS_INT Lisp_Word;
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
-scm_t_bits lisp_symbol_tag;
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
@@ -773,9 +732,6 @@ struct Lisp_Symbol
 
       /* The symbol's property list.  */
       Lisp_Object plist;
-
-      /* Next symbol in obarray bucket, if the symbol is interned.  */
-      struct Lisp_Symbol *next;
     } s;
     GCALIGNED_UNION_MEMBER
   } u;
@@ -838,9 +794,22 @@ typedef EMACS_UINT Lisp_Word_tag;
   DEFINE_GDB_SYMBOL_BEGIN (Lisp_Object, name) \
   DEFINE_GDB_SYMBOL_END (LISPSYM_INITIALLY (name))
 
-/* The index of the C-defined Lisp symbol SYM.
-   This can be used in a static initializer.  */
-#define SYMBOL_INDEX(sym) i##sym
+extern void initialize_symbol (Lisp_Object, Lisp_Object);
+INLINE Lisp_Object build_string (const char *);
+extern Lisp_Object symbol_module;
+
+INLINE struct Lisp_Symbol *
+XSYMBOL (Lisp_Object a)
+{
+  Lisp_Object tem;
+  eassert (SYMBOLP (a));
+  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
+  return scm_to_pointer (tem);
+}
+
+/* XSYMBOL_INIT (Qfoo) is like XSYMBOL (Qfoo), except it is valid in
+   static initializers, and SYM must be a C-defined symbol.  */
+#define XSYMBOL_INIT(sym) a##sym
 
 /* By default, define macros for Qt, etc., as this leads to a bit
    better performance in the core Emacs interpreter.  A plugin can
@@ -3833,12 +3802,6 @@ set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 }
 
 INLINE void
-set_symbol_next (Lisp_Object sym, struct Lisp_Symbol *next)
-{
-  XSYMBOL (sym)->u.s.next = next;
-}
-
-INLINE void
 make_symbol_constant (Lisp_Object sym)
 {
   XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
@@ -4571,6 +4534,7 @@ extern Lisp_Object intern_driver (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object intern_c_multibyte (const char *str,
 				       ptrdiff_t nchars, ptrdiff_t nbytes);
 extern void init_symbol (Lisp_Object, Lisp_Object);
+extern Lisp_Object obhash (Lisp_Object);
 extern Lisp_Object oblookup (Lisp_Object, const char *, ptrdiff_t, ptrdiff_t);
 INLINE void
 LOADHIST_ATTACH (Lisp_Object x)

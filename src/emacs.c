@@ -159,6 +159,8 @@ extern char etext;
 #include "comp.h"
 #include "thread.h"
 
+Lisp_Object symbol_module;
+
 static const char emacs_version[] = PACKAGE_VERSION;
 static const char emacs_copyright[] = COPYRIGHT;
 static const char emacs_bugreport[] = PACKAGE_BUGREPORT;
@@ -1962,6 +1964,11 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   if (!initialized)
     {
+      symbol_module = scm_call (scm_c_public_ref ("guile", "define-module*"),
+                                scm_list_1 (scm_from_utf8_symbol ("elisp-symbols")),
+                                scm_from_locale_keyword ("pure"),
+                                SCM_BOOL_T,
+                                SCM_UNDEFINED);
       init_alloc_once ();
       init_pdumper_once ();
       init_guile ();
