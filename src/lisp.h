@@ -342,19 +342,21 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
-#define lisp_h_SYMBOLP(x) (SMOB_TYPEP (x, lisp_symbol_tag))
+#define lisp_h_SYMBOLP(x) (x && scm_is_symbol (x))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
 #define lisp_h_XCAR(c) (scm_car (c))
 #define lisp_h_XCDR(c) (scm_cdr (c))
 #define lisp_h_XCONS(c) SMOB_PTR (c)
 #define lisp_h_XHASH(a) (SCM_UNPACK (a))
 
-#define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
-#define lisp_h_CHECK_LIST_CONS(x, y) CHECK_TYPE (CONSP (x), Qlistp, y)
-#define lisp_h_MARKERP(x) (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Marker)
-#define lisp_h_XSYMBOL(a) \
-   (eassert (SYMBOLP (a)), (struct Lisp_Symbol *) SMOB_PTR (a))
+//lhz
+//#define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
+//#define lisp_h_CHECK_LIST_CONS(x, y) CHECK_TYPE (CONSP (x), Qlistp, y)
+//#define lisp_h_MARKERP(x) (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Marker)
+//#define lisp_h_XSYMBOL(a) \
+//   (eassert (SYMBOLP (a)), (struct Lisp_Symbol *) SMOB_PTR (a))
 
+#if 0
 /* When compiling via gcc -O0, define the key operations as macros, as
    Emacs is too slow otherwise.  To disable this optimization, compile
    with -DINLINING=false.  */
@@ -389,7 +391,20 @@ typedef EMACS_INT Lisp_Word;
 # define XHASH(a) lisp_h_XHASH (a)
 //# define XSYMBOL(a) lisp_h_XSYMBOL (a)
 #endif
+#endif // if-0
 
+//--------- lhz new below
+/* Define NAME as a lisp.h inline function that returns TYPE and has
+   arguments declared as ARGDECLS and passed as ARGS.  ARGDECLS and
+   ARGS should be parenthesized.  Implement the function by calling
+   lisp_h_NAME ARGS.  */
+#define LISP_MACRO_DEFUN(name, type, argdecls, args) \
+  INLINE type (name) argdecls { return lisp_h_##name args; }
+
+/* like LISP_MACRO_DEFUN, except NAME returns void.  */
+#define LISP_MACRO_DEFUN_VOID(name, argdecls, args) \
+  INLINE void (name) argdecls { lisp_h_##name args; }
+//--------- lhz new above
 
 /* Define the fundamental Lisp data structures.  */
 
@@ -410,7 +425,6 @@ typedef EMACS_INT Lisp_Word;
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
-scm_t_bits lisp_symbol_tag;
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
@@ -1149,7 +1163,18 @@ INLINE bool
 /* Extract a value or address from a Lisp_Object.  */
 
 
-LISP_MACRO_DEFUN (XSYMBOL, struct Lisp_Symbol *, (Lisp_Object a), (a))
+extern void initialize_symbol (Lisp_Object, Lisp_Object);
+INLINE Lisp_Object build_string (const char *);
+extern Lisp_Object symbol_module;
+
+INLINE struct Lisp_Symbol *
+XSYMBOL (Lisp_Object a)
+{
+  Lisp_Object tem;
+  eassert (SYMBOLP (a));
+  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
+  return scm_to_pointer (tem);
+}
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -3192,11 +3217,6 @@ set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
   XSYMBOL (sym)->u.s.plist = plist;
 }
 
-INLINE void
-set_symbol_next (Lisp_Object sym, struct Lisp_Symbol *next)
-{
-  XSYMBOL (sym)->u.s.next = next;
-}
 
 INLINE void
 make_symbol_constant (Lisp_Object sym)
@@ -3811,6 +3831,7 @@ extern Lisp_Object intern_1 (const char *, ptrdiff_t);
 extern Lisp_Object intern_c_string_1 (const char *, ptrdiff_t);
 extern Lisp_Object intern_driver (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void init_symbol (Lisp_Object, Lisp_Object);
+extern Lisp_Object obhash (Lisp_Object);
 extern Lisp_Object oblookup (Lisp_Object, const char *, ptrdiff_t, ptrdiff_t);
 INLINE void
 LOADHIST_ATTACH (Lisp_Object x)
