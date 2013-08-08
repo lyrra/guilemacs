@@ -1205,30 +1205,61 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
 
 
 
+#if 0
+DEFUN ("make-record", Fmake_record, Smake_record, 3, 3, 0,
+       doc: /* Create a new record.
+TYPE is its type as returned by `type-of'; it should be either a
+symbol or a type descriptor.  SLOTS is the number of non-type slots,
+each initialized to INIT.  */)
+  (Lisp_Object type, Lisp_Object slots, Lisp_Object init)
+{
+  CHECK_NATNUM (slots);
+  EMACS_INT size = XFASTINT (slots) + 1;
+  struct Lisp_Vector *p = allocate_record (size);
+  p->contents[0] = type;
+  for (ptrdiff_t i = 1; i < size; i++)
+    p->contents[i] = init;
+  return make_lisp_ptr (p, Lisp_Vectorlike);
+}
+
+
+DEFUN ("record", Frecord, Srecord, 1, MANY, 0,
+       doc: /* Create a new record.
+TYPE is its type as returned by `type-of'; it should be either a
+symbol or a type descriptor.  SLOTS is used to initialize the record
+slots with shallow copies of the arguments.
+usage: (record TYPE &rest SLOTS) */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  struct Lisp_Vector *p = allocate_record (nargs);
+  memcpy (p->contents, args, nargs * sizeof *args);
+  return make_lisp_ptr (p, Lisp_Vectorlike);
+}
+#endif
+
 /***********************************************************************
 			   Symbol Allocation
  ***********************************************************************/
-
 static void
 set_symbol_name (Lisp_Object sym, Lisp_Object name)
 {
   XSYMBOL (sym)->u.s.name = name;
 }
 
-void
 init_symbol (Lisp_Object val, Lisp_Object name)
 {
-  struct Lisp_Symbol *p = XSYMBOL (val);
+  struct Lisp_Symbol *p = xmalloc (sizeof *p);
+
+  scm_module_define (symbol_module, val, scm_from_pointer (p, NULL));
+  p = XSYMBOL (val);
+  p->u.s.self = val;
   set_symbol_name (val, name);
   set_symbol_plist (val, Qnil);
   p->u.s.redirect = SYMBOL_PLAINVAL;
   SET_SYMBOL_VAL (p, Qunbound);
   set_symbol_function (val, Qnil);
-  set_symbol_next (val, NULL);
   p->u.s.interned = SYMBOL_UNINTERNED;
-  p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->u.s.declared_special = false;
-  p->u.s.pinned = false;
 }
 
 DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
@@ -1240,6 +1271,7 @@ Its value is void, and its function definition and property list are nil.  */)
   CHECK_STRING (name);
   val = scm_make_symbol (scm_from_utf8_stringn (SSDATA (name),
                                                 SBYTES (name)));
+  init_symbol (val, name);
   return val;
 }
 
@@ -1690,7 +1722,6 @@ static void init_alloc_once_for_pdumper (void);
 void
 init_alloc_once (void)
 {
-  lisp_symbol_tag = scm_make_smob_type ("elisp-symbol", 0);
   lisp_misc_tag = scm_make_smob_type ("elisp-misc", 0);
   lisp_string_tag = scm_make_smob_type ("elisp-string", 0);
   lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);

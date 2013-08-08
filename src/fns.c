@@ -5597,12 +5597,9 @@ DEFUN ("eval-scheme", Feval_scheme, Seval_scheme, 1, 1,
        doc: /* Evaluate a string containing a Scheme expression.  */)
   (Lisp_Object string)
 {
-  Lisp_Object tem;
-
   CHECK_STRING (string);
 
-  tem = scm_c_eval_string (SSDATA (string));
-  return (INTERACTIVE ? Fprin1 (tem, Qt) : tem);
+  return scm_c_eval_string (SSDATA (string));
 }
 
 void
