@@ -1264,6 +1264,7 @@ maybe_load_seccomp (int argc, char **argv)
 
 #endif  /* SECCOMP_USABLE */
 
+static int main2 (void *, int, char **);
 #if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
 int
 main (int argc, char **argv)
@@ -1287,6 +1288,15 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   maybe_load_seccomp (argc, argv);
 #endif
 
+  /* Override Guile's libgc configuration. */
+  xputenv ("GC_ALL_INTERIOR_POINTERS=1");
+  scm_boot_guile (argc, argv, main2, NULL);
+}
+
+/* ARGSUSED */
+static int
+main2 (void *ignore, int argc, char **argv)
+{
   bool no_loadup = false;
   char *junk = 0;
   char *dname_arg = 0;
@@ -1490,10 +1500,6 @@ android_emacs_init (int argc, char **argv, char *dump_file)
      'command-line-args-left' in 'command-line-1'.  */
 
   bool only_version = false;
-
-  /* Override Guile's libgc configuration. */
-  xputenv ("GC_ALL_INTERIOR_POINTERS=1");
-  scm_init_guile ();
 
   sort_args (argc, argv);
   old_argc = argc, argc = 0;
