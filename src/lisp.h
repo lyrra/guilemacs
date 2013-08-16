@@ -4641,6 +4641,7 @@ extern void define_error (Lisp_Object name, const char *message, Lisp_Object par
 extern bool FUNCTIONP (Lisp_Object);
 extern Lisp_Object funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *arg_vector);
 extern Lisp_Object eval_sub (Lisp_Object form);
+extern Lisp_Object Ffuncall (ptrdiff_t nargs, Lisp_Object *args);
 extern Lisp_Object apply1 (Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
 extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);
