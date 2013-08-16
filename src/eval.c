@@ -2141,8 +2141,8 @@ set_lisp_eval_depth (void *data)
 
 /* Eval a sub-expression of the current expression (i.e. in the same
    lexical scope).  */
-Lisp_Object
-eval_sub (Lisp_Object form)
+static Lisp_Object
+eval_sub_1 (Lisp_Object form)
 {
   Lisp_Object fun, val, original_fun, original_args;
   Lisp_Object funcar;
@@ -2352,6 +2352,42 @@ eval_sub (Lisp_Object form)
   scm_dynwind_end ();
 
   return val;
+}
+
+Lisp_Object
+eval_sub (Lisp_Object form)
+{
+  return scm_c_value_ref (eval_sub_1 (form), 0);
+}
+
+static Lisp_Object
+values_to_list (Lisp_Object values)
+{
+  Lisp_Object list = Qnil;
+  for (int i = scm_c_nvalues (values) - 1; i >= 0; i--)
+    list = Fcons (scm_c_value_ref (values, i), list);
+  return list;
+}
+
+DEFUN ("multiple-value-call", Fmultiple_value_call, Smultiple_value_call,
+       2, UNEVALLED, 0,
+       doc: /* Call with multiple values.
+usage: (multiple-value-call FUNCTION-FORM FORM)  */)
+  (Lisp_Object args)
+{
+  Lisp_Object function_form = eval_sub (XCAR (args));
+  Lisp_Object values = Qnil;
+  while (CONSP (args = XCDR (args)))
+    values = nconc2 (Fnreverse (values_to_list (eval_sub_1 (XCAR (args)))),
+                     values);
+  return apply1 (function_form, Fnreverse (values));
+}
+
+DEFUN ("values", Fvalues, Svalues, 0, MANY, 0,
+       doc: /* Return multiple values. */)
+  (ptrdiff_t nargs, Lisp_Object *args)
+{
+  return scm_c_values (args, nargs);
 }
 
 DEFUN ("apply", Fapply, Sapply, 1, MANY, 0,
@@ -2757,7 +2793,7 @@ FUNCTIONP (Lisp_Object object)
     return false;
 }
 
-DEFUN ("funcall", Ffuncall, Sfuncall, 1, MANY, 0,
+DEFUN ("funcall", Ffuncall1, Sfuncall, 1, MANY, 0,
        doc: /* Call first argument as a function, passing remaining arguments to it.
 Return the value that function returns.
 Thus, (funcall \\='cons \\='x \\='y) returns (x . y).
@@ -2830,6 +2866,12 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
     val = call_debugger (list2 (Qexit, val));
   scm_dynwind_end ();
   return val;
+}
+
+Lisp_Object
+Ffuncall (ptrdiff_t nargs, Lisp_Object *args)
+{
+  return scm_c_value_ref (Ffuncall1 (nargs, args), 0);
 }
 
 
