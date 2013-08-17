@@ -4099,10 +4099,6 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 {
   Lisp_Object *ptr;
 
-  XSYMBOL (sym)->u.s.interned = (EQ (obarray, initial_obarray)
-				 ? SYMBOL_INTERNED_IN_INITIAL_OBARRAY
-				 : SYMBOL_INTERNED);
-
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
       make_symbol_constant (sym);
@@ -4264,7 +4260,6 @@ usage: (unintern NAME OBARRAY)  */)
       string = name; //FIX: 20190626 LAV, string isn't used?!?
     }
 
-  //XSYMBOL (tem)->interned = SYMBOL_UNINTERNED;
   // FIX: 20190626 LAV, do we mean string, instead of name below?
   return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
 }
