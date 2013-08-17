@@ -30822,8 +30822,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       {
 	terminal->kboard = allocate_kboard (Qx);
 
-	if (!BASE_EQ (XSYMBOL (Qvendor_specific_keysyms)->u.s.function,
-		      Qunbound))
+	if (!BASE_EQ (SYMBOL_FUNCTION (Qvendor_specific_keysyms), Qunbound))
 	  {
 	    char *vendor = ServerVendor (dpy);
 

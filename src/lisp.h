@@ -727,9 +727,6 @@ struct Lisp_Symbol
 	lispfwd fwd;
       } val;
 
-      /* Function value of the symbol or Qnil if not fboundp.  */
-      Lisp_Object function;
-
       /* The symbol's property list.  */
       Lisp_Object plist;
     } s;
@@ -797,6 +794,7 @@ typedef EMACS_UINT Lisp_Word_tag;
 extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
 
 INLINE struct Lisp_Symbol *
 XSYMBOL (Lisp_Object a)
@@ -2187,6 +2185,12 @@ INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
+}
+
+INLINE Lisp_Object
+SYMBOL_FUNCTION (Lisp_Object sym)
+{
+  return scm_variable_ref (scm_module_lookup (function_module, sym));
 }
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
@@ -3792,7 +3796,7 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
-  XSYMBOL (sym)->u.s.function = function;
+  scm_variable_set_x (scm_module_lookup (function_module, sym), function);
 }
 
 INLINE void

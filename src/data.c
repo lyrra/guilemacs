@@ -744,7 +744,7 @@ DEFUN ("fboundp", Ffboundp, Sfboundp, 1, 1, 0,
   (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  return NILP (XSYMBOL (symbol)->u.s.function) ? Qnil : Qt;
+  return NILP (SYMBOL_FUNCTION (symbol)) ? Qnil : Qt;
 }
 
 DEFUN ("makunbound", Fmakunbound, Smakunbound, 1, 1, 0,
@@ -788,7 +788,7 @@ DEFUN ("symbol-function", Fsymbol_function, Ssymbol_function, 1, 1, 0,
   (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  return XSYMBOL (symbol)->u.s.function;
+  return SYMBOL_FUNCTION (symbol);
 }
 
 DEFUN ("symbol-plist", Fsymbol_plist, Ssymbol_plist, 1, 1, 0,
@@ -885,12 +885,12 @@ signal a `cyclic-function-indirection' error.  */)
 
   /* Ensure non-circularity.  */
   for (Lisp_Object s = definition; SYMBOLP (s) && !NILP (s);
-       s = XSYMBOL (s)->u.s.function)
+       s = SYMBOL_FUNCTION (s);
     if (EQ (s, symbol))
       xsignal1 (Qcyclic_function_indirection, symbol);
 
 #ifdef HAVE_NATIVE_COMP
-  register Lisp_Object function = XSYMBOL (symbol)->u.s.function;
+  register Lisp_Object function = SYMBOL_FUNCTION (symbol);
 
   if (!NILP (Vnative_comp_enable_subr_trampolines)
       && SUBRP (function)
@@ -954,7 +954,7 @@ defalias (Lisp_Object symbol, Lisp_Object definition)
   }
 
   {
-    Lisp_Object olddef = XSYMBOL (symbol)->u.s.function;
+    Lisp_Object olddef = SYMBOL_FUNCTION (symbol);
     if (!NILP (olddef))
       {
         if (!NILP (Vautoload_queue))
@@ -2498,7 +2498,7 @@ Lisp_Object
 indirect_function (Lisp_Object object)
 {
   while (SYMBOLP (object) && !NILP (object))
-    object = XSYMBOL (object)->u.s.function;
+    object = SYMBOL_FUNCTION (object);
   return object;
 }
 
