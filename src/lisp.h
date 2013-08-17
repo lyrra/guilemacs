@@ -808,14 +808,6 @@ INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
-/* Interned state of a symbol.  */
-
-enum symbol_interned
-{
-  SYMBOL_UNINTERNED = 0,
-  SYMBOL_INTERNED = 1,
-  SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
-};
 
 enum symbol_redirect
 {
@@ -901,10 +893,6 @@ struct Lisp_Symbol
          should signal an error.  If the value is 3, then the var
          can be changed, but only by `defconst'.  */
       unsigned constant : 2;
-
-      /* Interned state of the symbol.  This is an enumerator from
-         enum symbol_interned.  */
-      unsigned interned : 2;
 
       /* True means that this variable has been explicitly declared
          special (with `defvar' etc), and shouldn't be lexically bound.  */
@@ -994,7 +982,7 @@ SYMBOL_NAME (Lisp_Object sym)
 INLINE bool
 SYMBOL_INTERNED_P (Lisp_Object sym)
 {
-  return XSYMBOL (sym)->u.s.interned != SYMBOL_UNINTERNED;
+  return scm_is_true (scm_symbol_interned_p (sym));
 }
 
 /* Value is true if SYM is interned in initial_obarray.  */
@@ -1002,7 +990,8 @@ SYMBOL_INTERNED_P (Lisp_Object sym)
 INLINE bool
 SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 {
-  return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
+  //return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
 }
 
 INLINE Lisp_Object
