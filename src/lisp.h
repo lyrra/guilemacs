@@ -798,11 +798,16 @@ INLINE void
    union of the possible values (struct Lisp_Objfwd, struct
    Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
    help static checking.  */
-typedef struct { void const *fwdptr; } lispfwd;
+//typedef struct { void const *fwdptr; } lispfwd;
 
 /***********************************************************************
 			       Symbols
  ***********************************************************************/
+extern void initialize_symbol (Lisp_Object, Lisp_Object);
+INLINE Lisp_Object build_string (const char *);
+extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
 /* Interned state of a symbol.  */
 
 enum symbol_interned
@@ -908,9 +913,6 @@ struct Lisp_Symbol
       /* True if pointed to from purespace and hence can't be GC'd.  */
       bool_bf pinned : 1;
 
-      /* The symbol's name, as a Lisp string.  */
-      Lisp_Object name;
-
       /* Value of the symbol or Qunbound if unbound.  Which alternative of the
          union is used depends on the `redirect' field above.  */
       union {
@@ -984,7 +986,7 @@ SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
 INLINE Lisp_Object
 SYMBOL_NAME (Lisp_Object sym)
 {
-  return XSYMBOL (sym)->u.s.name;
+  return build_string (scm_to_locale_string (scm_symbol_to_string (sym)));
 }
 
 /* Value is true if SYM is an interned symbol.  */
@@ -1389,11 +1391,6 @@ INLINE bool
 /* Extract a value or address from a Lisp_Object.  */
 
 
-extern void initialize_symbol (Lisp_Object, Lisp_Object);
-INLINE Lisp_Object build_string (const char *);
-extern Lisp_Object symbol_module;
-extern Lisp_Object function_module;
-extern Lisp_Object plist_module;
 
 
 INLINE bool
