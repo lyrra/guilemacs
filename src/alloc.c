@@ -1438,7 +1438,6 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   p->u.s.redirect = SYMBOL_PLAINVAL;
   SET_SYMBOL_VAL (p, Qunbound);
   scm_module_define (function_module, val, Qnil);
-  p->u.s.interned = SYMBOL_UNINTERNED;
   p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->u.s.declared_special = false;
 }

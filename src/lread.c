@@ -4924,7 +4924,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray)
                     obhash (obarray));
   init_symbol (sym, string);
 
-  if (SREF (s->u.s.name, 0) == ':' && BASE_EQ (obarray, initial_obarray))
+  if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
       s->u.s.trapped_write = SYMBOL_NOWRITE;
       s->u.s.redirect = SYMBOL_PLAINVAL;
@@ -5135,7 +5135,6 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
       string = name;
     }
 
-  //XSYMBOL (tem)->u.s.interned = SYMBOL_UNINTERNED;
   return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
 }
 
