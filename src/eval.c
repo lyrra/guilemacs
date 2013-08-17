@@ -677,14 +677,14 @@ The return value is BASE-VARIABLE.  */)
 	error ("Don't know how to make a let-bound variable an alias");
   }
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-    notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
+  //if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  //  notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
 
   sym->u.s.declared_special = true;
   XSYMBOL (base_variable)->u.s.declared_special = true;
   sym->u.s.redirect = SYMBOL_VARALIAS;
   SET_SYMBOL_ALIAS (sym, XSYMBOL (base_variable));
-  sym->u.s.trapped_write = XSYMBOL (base_variable)->u.s.trapped_write;
+  //sym->u.s.trapped_write = XSYMBOL (base_variable)->u.s.trapped_write;
   LOADHIST_ATTACH (new_alias);
   /* Even if docstring is nil: remove old docstring.  */
   Fput (new_alias, Qvariable_documentation, docstring);
@@ -3391,6 +3391,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
 
  retry:
 
+#if 0 //FIX-20230206-LAV symbol-function is gone
   /* Optimize for no indirection.  */
   function = original;
   if (SYMBOLP (function) && !NILP (function))
@@ -3399,6 +3400,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
       if (SYMBOLP (function))
 	function = indirect_function (function);
     }
+#endif
 
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
@@ -3557,9 +3559,9 @@ do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
   switch (sym->u.s.redirect)
     {
     case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
-	SET_SYMBOL_VAL (sym, value);
-      else
+//      if (!sym->u.s.trapped_write)
+//	SET_SYMBOL_VAL (sym, value);
+//      else
         set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
       break;
 
@@ -3760,9 +3762,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
 	Lisp_Object sym = specpdl_symbol (this_binding);
 	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
 	  {
-	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
-	    else
+//	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
+//	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
+//	    else
 	      set_internal (sym, specpdl_old_value (this_binding),
                             Qnil, bindflag);
 	    break;

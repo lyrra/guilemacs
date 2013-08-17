@@ -1054,9 +1054,11 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
           Lisp_Object sym = local_var;
 
           /* Watchers are run *before* modifying the var.  */
+          /* FIX-20230206-LAV: need to reimplement watchers (trapped_write has gone)
           if (XSYMBOL (local_var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
             notify_variable_watchers (local_var, Qnil,
                                       Qmakunbound, Fcurrent_buffer ());
+          */
 
           eassert (XSYMBOL (sym)->u.s.redirect == SYMBOL_LOCALIZED);
           /* Need not do anything if some other buffer's binding is
@@ -1093,10 +1095,12 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
                           newlist = Fcons (elt, newlist);
                       }
                   newlist = Fnreverse (newlist);
+                  /* FIX-20230206-LAV: no support for symbol-trapped-write
                   if (XSYMBOL (local_var)->u.s.trapped_write
 		      == SYMBOL_TRAPPED_WRITE)
                     notify_variable_watchers (local_var, newlist,
                                               Qmakunbound, Fcurrent_buffer ());
+                  */
                   XSETCDR (XCAR (tmp), newlist);
                   continue; /* Don't do variable write trapping twice.  */
                 }
@@ -1250,7 +1254,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
 	result = Fassoc (variable, BVAR (buf, local_var_alist), Qnil);
 	if (!NILP (result))
 	  {
-	    if (blv->fwd.fwdptr)
+	    if (blv->fwd)
 	      { /* What binding is loaded right now?  */
 		Lisp_Object current_alist_element = blv->valcell;
 
@@ -1271,7 +1275,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
       }
     case SYMBOL_FORWARDED:
       {
-	lispfwd fwd = SYMBOL_FWD (sym);
+	union Lisp_Fwd *fwd = SYMBOL_FWD (sym);
 	if (BUFFER_OBJFWDP (fwd))
 	  result = per_buffer_value (buf, XBUFFER_OBJFWD (fwd)->offset);
 	else
@@ -2207,7 +2211,7 @@ void set_buffer_internal_2 (register struct buffer *b)
 	  Lisp_Object var = XCAR (XCAR (tail));
 	  struct Lisp_Symbol *sym = XSYMBOL (var);
 	  if (sym->u.s.redirect == SYMBOL_LOCALIZED /* Just to be sure.  */
-	      && SYMBOL_BLV (sym)->fwd.fwdptr)
+	      && SYMBOL_BLV (sym)->fwd)
 	    /* Just reference the variable
 	       to cause it to become set for this buffer.  */
 	    Fsymbol_value (var);

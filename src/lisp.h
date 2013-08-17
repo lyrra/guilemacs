@@ -313,11 +313,9 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
-#define lisp_h_SYMBOL_CONSTANT_P(sym) \
-   (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_NOWRITE)
-#define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
+#define lisp_h_SYMBOL_CONSTANT_P(sym) (XSYMBOL (sym)->u.s.constant)
 #define lisp_h_SYMBOLP(x) (x && scm_is_symbol (x))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
 #define lisp_h_XCAR(c) (scm_car (c))
@@ -328,7 +326,7 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_XFIXNAT (x) XFIXNUM (a)
 
 //lhz
-//#define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
+#define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
 //#define lisp_h_CHECK_LIST_CONS(x, y) CHECK_TYPE (CONSP (x), Qlistp, y)
 //#define lisp_h_MARKERP(x) (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Marker)
 //#define lisp_h_XSYMBOL(a) \
@@ -370,7 +368,7 @@ typedef EMACS_INT Lisp_Word;
 # define XCAR(c) lisp_h_XCAR (c)
 # define XCDR(c) lisp_h_XCDR (c)
 # define XHASH(a) lisp_h_XHASH (a)
-//# define XSYMBOL(a) lisp_h_XSYMBOL (a)
+# define XSYMBOL(a) lisp_h_XSYMBOL (a)
 #endif
 #endif // if-0
 
@@ -386,6 +384,34 @@ typedef EMACS_INT Lisp_Word;
 #define LISP_MACRO_DEFUN_VOID(name, argdecls, args) \
   INLINE void (name) argdecls { lisp_h_##name args; }
 //--------- lhz new above
+
+typedef SCM Lisp_Object;
+
+extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
+
+INLINE bool
+(SYMBOLP) (Lisp_Object x)
+{
+  return lisp_h_SYMBOLP (x);
+}
+
+INLINE struct Lisp_Symbol *
+XSYMBOL (Lisp_Object a)
+{
+  Lisp_Object tem;
+  eassert (SYMBOLP (a));
+  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
+  return scm_to_pointer (tem);
+}
+
+INLINE void
+make_symbol_constant (Lisp_Object sym)
+{
+  //FIX-20230206-LAV: no support for constant symbols
+  //XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
+}
 
 /* Define the fundamental Lisp data structures.  */
 
@@ -470,7 +496,6 @@ enum Lisp_Fwd_Type
     Lisp_Fwd_Kboard_Obj		/* Fwd to a Lisp_Object field of kboards.  */
   };
 
-typedef SCM Lisp_Object;
 
 struct Lisp_Misc_Any		/* Supertype of all Misc types.  */
 {
@@ -775,7 +800,9 @@ INLINE void
    help static checking.  */
 typedef struct { void const *fwdptr; } lispfwd;
 
-
+/***********************************************************************
+			       Symbols
+ ***********************************************************************/
 /* Interned state of a symbol.  */
 
 enum symbol_interned
@@ -793,6 +820,62 @@ enum symbol_redirect
   SYMBOL_FORWARDED = 3
 };
 
+/* Forwarding pointer to an int variable.
+   This is allowed only in the value cell of a symbol,
+   and it means that the symbol's value really lives in the
+   specified int variable.  */
+struct Lisp_Intfwd
+  {
+    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Int */
+    intmax_t *intvar;
+  };
+
+/* Boolean forwarding pointer to an int variable.
+   This is like Lisp_Intfwd except that the ostensible
+   "value" of the symbol is t if the bool variable is true,
+   nil if it is false.  */
+struct Lisp_Boolfwd
+  {
+    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Bool */
+    bool *boolvar;
+  };
+
+/* Forwarding pointer to a Lisp_Object variable.
+   This is allowed only in the value cell of a symbol,
+   and it means that the symbol's value really lives in the
+   specified variable.  */
+struct Lisp_Objfwd
+  {
+    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Obj */
+    Lisp_Object *objvar;
+  };
+
+/* Like Lisp_Objfwd except that value lives in a slot in the
+   current buffer.  Value is byte index of slot within buffer.  */
+struct Lisp_Buffer_Objfwd
+  {
+    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Buffer_Obj */
+    int offset;
+    /* One of Qnil, Qintegerp, Qsymbolp, Qstringp, Qfloatp or Qnumberp.  */
+    Lisp_Object predicate;
+  };
+
+/* Like Lisp_Objfwd except that value lives in a slot in the
+   current kboard.  */
+struct Lisp_Kboard_Objfwd
+  {
+    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Kboard_Obj */
+    int offset;
+  };
+
+union Lisp_Fwd
+  {
+    struct Lisp_Intfwd u_intfwd;
+    struct Lisp_Boolfwd u_boolfwd;
+    struct Lisp_Objfwd u_objfwd;
+    struct Lisp_Buffer_Objfwd u_buffer_objfwd;
+    struct Lisp_Kboard_Objfwd u_kboard_objfwd;
+  };
 
 struct Lisp_Symbol
 {
@@ -801,24 +884,25 @@ struct Lisp_Symbol
     struct
     {
       Lisp_Object self;
+
       /* Indicates where the value can be found:
-	 0 : it's a plain var, the value is in the `value' field.
-	 1 : it's a varalias, the value is really in the `alias' symbol.
-	 2 : it's a localized var, the value is in the `blv' object.
-	 3 : it's a forwarding variable, the value is in `forward'.  */
+         0 : it's a plain var, the value is in the `value' field.
+         1 : it's a varalias, the value is really in the `alias' symbol.
+         2 : it's a localized var, the value is in the `blv' object.
+         3 : it's a forwarding variable, the value is in `forward'.  */
       ENUM_BF (symbol_redirect) redirect : 3;
 
-      /* 0 : normal case, just set the value
-	 1 : constant, cannot set, e.g. nil, t, :keywords.
-	 2 : trap the write, call watcher functions.  */
-      ENUM_BF (symbol_trapped_write) trapped_write : 2;
+      /* Non-zero means symbol is constant, i.e. changing its value
+         should signal an error.  If the value is 3, then the var
+         can be changed, but only by `defconst'.  */
+      unsigned constant : 2;
 
       /* Interned state of the symbol.  This is an enumerator from
-	 enum symbol_interned.  */
+         enum symbol_interned.  */
       unsigned interned : 2;
 
       /* True means that this variable has been explicitly declared
-	 special (with `defvar' etc), and shouldn't be lexically bound.  */
+         special (with `defvar' etc), and shouldn't be lexically bound.  */
       bool_bf declared_special : 1;
 
       /* True if pointed to from purespace and hence can't be GC'd.  */
@@ -828,26 +912,129 @@ struct Lisp_Symbol
       Lisp_Object name;
 
       /* Value of the symbol or Qunbound if unbound.  Which alternative of the
-	 union is used depends on the `redirect' field above.  */
+         union is used depends on the `redirect' field above.  */
       union {
-	Lisp_Object value;
-	struct Lisp_Symbol *alias;
-	struct Lisp_Buffer_Local_Value *blv;
-	lispfwd fwd;
+        Lisp_Object value;
+        struct Lisp_Symbol *alias;
+        struct Lisp_Buffer_Local_Value *blv;
+        union Lisp_Fwd *fwd;
       } val;
 
       /* Function value of the symbol or Qnil if not fboundp.  */
-      Lisp_Object function;
+//      Lisp_Object function;
 
       /* The symbol's property list.  */
-      Lisp_Object plist;
-
-      /* Next symbol in obarray bucket, if the symbol is interned.  */
-      struct Lisp_Symbol *next;
+//      Lisp_Object plist;
     } s;
   } u;
 };
-verify (GCALIGNED (struct Lisp_Symbol));
+/* Value is name of symbol.  */
+
+INLINE Lisp_Object
+(SYMBOL_VAL) (struct Lisp_Symbol *sym)
+{
+  return lisp_h_SYMBOL_VAL (sym);
+}
+
+INLINE struct Lisp_Symbol *
+SYMBOL_ALIAS (struct Lisp_Symbol *sym)
+{
+  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && sym->u.s.val.alias);
+  return sym->u.s.val.alias;
+}
+INLINE struct Lisp_Buffer_Local_Value *
+SYMBOL_BLV (struct Lisp_Symbol *sym)
+{
+  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
+  return sym->u.s.val.blv;
+}
+
+INLINE union Lisp_Fwd *
+SYMBOL_FWD (struct Lisp_Symbol *sym)
+{
+  eassume (sym->u.s.redirect == SYMBOL_FORWARDED);
+  return sym->u.s.val.fwd;
+}
+
+INLINE void
+(SET_SYMBOL_VAL) (struct Lisp_Symbol *sym, Lisp_Object v)
+{
+  lisp_h_SET_SYMBOL_VAL (sym, v);
+}
+
+INLINE void
+SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
+{
+  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && v);
+  sym->u.s.val.alias = v;
+}
+INLINE void
+SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
+{
+  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && v);
+  sym->u.s.val.blv = v;
+}
+INLINE void
+SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
+{
+  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
+  sym->u.s.val.fwd = v;
+}
+
+INLINE Lisp_Object
+SYMBOL_NAME (Lisp_Object sym)
+{
+  return XSYMBOL (sym)->u.s.name;
+}
+
+/* Value is true if SYM is an interned symbol.  */
+
+INLINE bool
+SYMBOL_INTERNED_P (Lisp_Object sym)
+{
+  return XSYMBOL (sym)->u.s.interned != SYMBOL_UNINTERNED;
+}
+
+/* Value is true if SYM is interned in initial_obarray.  */
+
+INLINE bool
+SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
+{
+  return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+}
+
+INLINE Lisp_Object
+SYMBOL_FUNCTION (Lisp_Object sym)
+{
+  return scm_variable_ref (scm_module_lookup (function_module, sym));
+}
+
+/* Value is non-zero if symbol is considered a constant, i.e. its
+   value cannot be changed (there is an exception for keyword symbols,
+   whose value can be set to the keyword symbol itself).  */
+
+INLINE int
+(SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
+{
+  return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
+}
+
+/* Value is non-zero if symbol cannot be changed at all, i.e. it's a
+   constant (e.g. nil, t, :keywords).  Code that actually wants to
+   write to SYM, should also check whether there are any watching
+   functions.  */
+
+INLINE int
+(SYMBOL_CONSTANT_P) (Lisp_Object sym)
+{
+  return lisp_h_SYMBOL_CONSTANT_P (sym);
+}
+
+/* Placeholder for make-docfile to process.  The actual symbol
+   definition is done by lread.c's define_symbol.  */
+#define DEFSYM(sym, name) /* empty */
+
+
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -982,11 +1169,6 @@ struct vectorlike_header
     ptrdiff_t size;
   };
 
-INLINE bool
-(SYMBOLP) (Lisp_Object x)
-{
-  return lisp_h_SYMBOLP (x);
-}
 
 #if 0
 INLINE Lisp_Object
@@ -1211,15 +1393,8 @@ extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
 
-INLINE struct Lisp_Symbol *
-XSYMBOL (Lisp_Object a)
-{
-  Lisp_Object tem;
-  eassert (SYMBOLP (a));
-  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return scm_to_pointer (tem);
-}
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -2034,115 +2209,6 @@ typedef jmp_buf sys_jmp_buf;
 
 #include "thread.h"
 
-/***********************************************************************
-			       Symbols
- ***********************************************************************/
-
-/* Value is name of symbol.  */
-
-INLINE Lisp_Object
-(SYMBOL_VAL) (struct Lisp_Symbol *sym)
-{
-  return lisp_h_SYMBOL_VAL (sym);
-}
-
-INLINE struct Lisp_Symbol *
-SYMBOL_ALIAS (struct Lisp_Symbol *sym)
-{
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && sym->u.s.val.alias);
-  return sym->u.s.val.alias;
-}
-INLINE struct Lisp_Buffer_Local_Value *
-SYMBOL_BLV (struct Lisp_Symbol *sym)
-{
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
-  return sym->u.s.val.blv;
-}
-INLINE lispfwd
-SYMBOL_FWD (struct Lisp_Symbol *sym)
-{
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && sym->u.s.val.fwd.fwdptr);
-  return sym->u.s.val.fwd;
-}
-
-INLINE void
-(SET_SYMBOL_VAL) (struct Lisp_Symbol *sym, Lisp_Object v)
-{
-  lisp_h_SET_SYMBOL_VAL (sym, v);
-}
-
-INLINE void
-SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
-{
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && v);
-  sym->u.s.val.alias = v;
-}
-INLINE void
-SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
-{
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && v);
-  sym->u.s.val.blv = v;
-}
-INLINE void
-SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
-{
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
-  sym->u.s.val.fwd.fwdptr = v;
-}
-
-INLINE Lisp_Object
-SYMBOL_NAME (Lisp_Object sym)
-{
-  return XSYMBOL (sym)->u.s.name;
-}
-
-/* Value is true if SYM is an interned symbol.  */
-
-INLINE bool
-SYMBOL_INTERNED_P (Lisp_Object sym)
-{
-  return XSYMBOL (sym)->u.s.interned != SYMBOL_UNINTERNED;
-}
-
-/* Value is true if SYM is interned in initial_obarray.  */
-
-INLINE bool
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
-{
-  return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
-}
-
-INLINE Lisp_Object
-SYMBOL_FUNCTION (Lisp_Object sym)
-{
-  return scm_variable_ref (scm_module_lookup (function_module, sym));
-}
-
-/* Value is non-zero if symbol is considered a constant, i.e. its
-   value cannot be changed (there is an exception for keyword symbols,
-   whose value can be set to the keyword symbol itself).  */
-
-INLINE int
-(SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
-{
-  return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
-}
-
-/* Value is non-zero if symbol cannot be changed at all, i.e. it's a
-   constant (e.g. nil, t, :keywords).  Code that actually wants to
-   write to SYM, should also check whether there are any watching
-   functions.  */
-
-INLINE int
-(SYMBOL_CONSTANT_P) (Lisp_Object sym)
-{
-  return lisp_h_SYMBOL_CONSTANT_P (sym);
-}
-
-/* Placeholder for make-docfile to process.  The actual symbol
-   definition is done by lread.c's define_symbol.  */
-#define DEFSYM(sym, name) /* empty */
-
 
 /***********************************************************************
 			     Hash Tables
@@ -2473,45 +2539,6 @@ make_uint (uintmax_t n)
   (EXPR_SIGNED (expr) ? make_int (expr) : make_uint (expr))
 
 
-/* Forwarding pointer to an int variable.
-   This is allowed only in the value cell of a symbol,
-   and it means that the symbol's value really lives in the
-   specified int variable.  */
-struct Lisp_Intfwd
-  {
-    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Int */
-    intmax_t *intvar;
-  };
-
-/* Boolean forwarding pointer to an int variable.
-   This is like Lisp_Intfwd except that the ostensible
-   "value" of the symbol is t if the bool variable is true,
-   nil if it is false.  */
-struct Lisp_Boolfwd
-  {
-    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Bool */
-    bool *boolvar;
-  };
-
-/* Forwarding pointer to a Lisp_Object variable.
-   This is allowed only in the value cell of a symbol,
-   and it means that the symbol's value really lives in the
-   specified variable.  */
-struct Lisp_Objfwd
-  {
-    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Obj */
-    Lisp_Object *objvar;
-  };
-
-/* Like Lisp_Objfwd except that value lives in a slot in the
-   current buffer.  Value is byte index of slot within buffer.  */
-struct Lisp_Buffer_Objfwd
-  {
-    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Buffer_Obj */
-    int offset;
-    /* One of Qnil, Qintegerp, Qsymbolp, Qstringp, Qfloatp or Qnumberp.  */
-    Lisp_Object predicate;
-  };
 
 /* struct Lisp_Buffer_Local_Value is used in a symbol value cell when
    the symbol has buffer-local bindings.  (Exception:
@@ -2542,7 +2569,7 @@ struct Lisp_Buffer_Local_Value
        Presumably equivalent to (defcell!=valcell).  */
     bool_bf found : 1;
     /* If non-NULL, a forwarding to the C var where it should also be set.  */
-    lispfwd fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
+    union Lisp_Fwd *fwd;	/* Should never be (Buffer|Kboard)_Objfwd.  */
     /* The buffer for which the loaded binding was found.  */
     Lisp_Object where;
     /* A cons cell that holds the default value.  It has the form
@@ -2556,19 +2583,11 @@ struct Lisp_Buffer_Local_Value
     Lisp_Object valcell;
   };
 
-/* Like Lisp_Objfwd except that value lives in a slot in the
-   current kboard.  */
-struct Lisp_Kboard_Objfwd
-  {
-    enum Lisp_Fwd_Type type;	/* = Lisp_Fwd_Kboard_Obj */
-    int offset;
-  };
 
 INLINE enum Lisp_Fwd_Type
-XFWDTYPE (lispfwd a)
+XFWDTYPE (union Lisp_Fwd *a)
 {
-  enum Lisp_Fwd_Type const *p = a.fwdptr;
-  return *p;
+  return a->u_intfwd.type;
 }
 
 
@@ -2679,16 +2698,16 @@ AUTOLOADP (Lisp_Object x)
 }
 
 INLINE bool
-BUFFER_OBJFWDP (lispfwd a)
+BUFFER_OBJFWDP (union Lisp_Fwd *a)
 {
   return XFWDTYPE (a) == Lisp_Fwd_Buffer_Obj;
 }
 
 INLINE struct Lisp_Buffer_Objfwd const *
-XBUFFER_OBJFWD (lispfwd a)
+XBUFFER_OBJFWD (union Lisp_Fwd *a)
 {
   eassert (BUFFER_OBJFWDP (a));
-  return a.fwdptr;
+  return &a->u_buffer_objfwd;
 }
 
 /* Test for specific pseudovector types.  */
@@ -3214,20 +3233,13 @@ set_symbol_function (Lisp_Object sym, Lisp_Object function)
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
-  return XSYMBOL (sym)->plist;
+  return scm_variable_ref (scm_module_lookup (plist_module, sym));
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
-  XSYMBOL (sym)->u.s.plist = plist;
-}
-
-
-INLINE void
-make_symbol_constant (Lisp_Object sym)
-{
-  XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
+  scm_variable_set_x (scm_module_lookup (plist_module, sym), plist);
 }
 
 /* Buffer-local variable access functions.  */
@@ -3395,7 +3407,7 @@ extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 extern struct Lisp_Symbol *indirect_variable (struct Lisp_Symbol *);
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
-extern Lisp_Object do_symval_forwarding (lispfwd);
+extern Lisp_Object do_symval_forwarding (union Lisp_Fwd *valcontents);
 enum Set_Internal_Bind {
   SET_INTERNAL_SET,
   SET_INTERNAL_BIND,
