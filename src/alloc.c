@@ -1447,11 +1447,6 @@ usage: (record TYPE &rest SLOTS) */)
 /***********************************************************************
 			   Symbol Allocation
  ***********************************************************************/
-static void
-set_symbol_name (Lisp_Object sym, Lisp_Object name)
-{
-  XSYMBOL (sym)->u.s.name = name;
-}
 
 init_symbol (Lisp_Object val, Lisp_Object name)
 {
@@ -1460,7 +1455,6 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   scm_module_define (symbol_module, val, scm_from_pointer (p, NULL));
   p = XSYMBOL (val);
   p->u.s.self = val;
-  set_symbol_name (val, name);
   scm_module_define (plist_module, val, Qnil);
   p->u.s.redirect = SYMBOL_PLAINVAL;
   SET_SYMBOL_VAL (p, Qunbound);
