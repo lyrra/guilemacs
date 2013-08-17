@@ -4144,11 +4144,6 @@ it defaults to the value of `obarray'.  */)
                     obhash (obarray));
   initialize_symbol (sym, string);
 
-  if (EQ (obarray, initial_obarray))
-    XSYMBOL (sym)->interned = SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
-  else
-    XSYMBOL (sym)->interned = SYMBOL_INTERNED;
-
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
     {
@@ -4236,7 +4231,6 @@ usage: (unintern NAME OBARRAY)  */)
       string = name; //FIX: 20190626 LAV, string isn't used?!?
     }
 
-  //XSYMBOL (tem)->interned = SYMBOL_UNINTERNED;
   // FIX: 20190626 LAV, do we mean string, instead of name below?
   return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
 }
