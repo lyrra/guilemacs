@@ -695,7 +695,7 @@ DEFUN ("fboundp", Ffboundp, Sfboundp, 1, 1, 0,
   (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  return NILP (XSYMBOL (symbol)->u.s.function) ? Qnil : Qt;
+  return NILP (SYMBOL_FUNCTION (symbol)) ? Qnil : Qt;
 }
 
 DEFUN ("makunbound", Fmakunbound, Smakunbound, 1, 1, 0,
@@ -727,7 +727,7 @@ DEFUN ("symbol-function", Fsymbol_function, Ssymbol_function, 1, 1, 0,
   (Lisp_Object symbol)
 {
   CHECK_SYMBOL (symbol);
-  return XSYMBOL (symbol)->u.s.function;
+  return SYMBOL_FUNCTION (symbol);
 }
 
 DEFUN ("symbol-plist", Fsymbol_plist, Ssymbol_plist, 1, 1, 0,
@@ -759,7 +759,7 @@ DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
   if (NILP (symbol))
     xsignal1 (Qsetting_constant, symbol);
 
-  function = XSYMBOL (symbol)->u.s.function;
+  function = SYMBOL_FUNCTION (symbol);
 
   if (!NILP (Vautoload_queue) && !NILP (function))
     Vautoload_queue = Fcons (Fcons (symbol, function), Vautoload_queue);
@@ -802,7 +802,7 @@ The return value is undefined.  */)
       { /* Only add autoload entries after dumping, because the ones before are
 	   not useful and else we get loads of them from the loaddefs.el.  */
 
-	if (AUTOLOADP (XSYMBOL (symbol)->u.s.function))
+	if (AUTOLOADP (SYMBOL_FUNCTION (symbol)))
 	  /* Remember that the function was already an autoload.  */
 	  LOADHIST_ATTACH (Fcons (Qt, symbol));
 	LOADHIST_ATTACH (Fcons (autoload ? Qautoload : Qdefun, symbol));
@@ -2214,12 +2214,12 @@ indirect_function (register Lisp_Object object)
     {
       if (!SYMBOLP (hare) || NILP (hare))
 	break;
-      hare = XSYMBOL (hare)->u.s.function;
+      hare = SYMBOL_FUNCTION (hare);
       if (!SYMBOLP (hare) || NILP (hare))
 	break;
-      hare = XSYMBOL (hare)->u.s.function;
+      hare = SYMBOL_FUNCTION (hare);
 
-      tortoise = XSYMBOL (tortoise)->u.s.function;
+      tortoise = SYMBOL_FUNCTION (tortoise);
 
       if (EQ (hare, tortoise))
 	xsignal1 (Qcyclic_function_indirection, object);
@@ -2241,7 +2241,7 @@ function chain of symbols.  */)
   /* Optimize for no indirection.  */
   result = object;
   if (SYMBOLP (result) && !NILP (result)
-      && (result = XSYMBOL (result)->u.s.function, SYMBOLP (result)))
+      && (result = SYMBOL_FUNCTION (result), SYMBOLP (result)))
     result = indirect_function (result);
   if (!NILP (result))
     return result;
@@ -3766,8 +3766,7 @@ syms_of_data (void)
   DEFSYM (Qinteractive_form, "interactive-form");
   DEFSYM (Qdefalias_fset_function, "defalias-fset-function");
 
-  set_symbol_function (Qwholenump, XSYMBOL (Qnatnump)->function);
-  //FIX: LAV, remove, not sure if u.s.xx or just xx is correct: set_symbol_function (Qwholenump, XSYMBOL (Qnatnump)->u.s.function);
+  set_symbol_function (Qwholenump, SYMBOL_FUNCTION (Qnatnump));
 
   DEFVAR_LISP ("most-positive-fixnum", Vmost_positive_fixnum,
 	       doc: /* The largest value that is representable in a Lisp integer.

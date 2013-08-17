@@ -1041,7 +1041,7 @@ definitions to shadow the loaded ones for use in file byte-compilation.  */)
 	  tem = Fassq (sym, environment);
 	  if (NILP (tem))
 	    {
-	      def = XSYMBOL (sym)->u.s.function;
+	      def = SYMBOL_FUNCTION (sym);
 	      if (!NILP (def))
 		continue;
 	    }
@@ -1962,8 +1962,8 @@ this does nothing and returns nil.  */)
   CHECK_STRING (file);
 
   /* If function is defined and not as an autoload, don't override.  */
-  if (!NILP (XSYMBOL (function)->u.s.function)
-      && !AUTOLOADP (XSYMBOL (function)->u.s.function))
+  if (!NILP (SYMBOL_FUNCTION (function))
+      && !AUTOLOADP (SYMBOL_FUNCTION (function)))
     return Qnil;
 
   return Fdefalias (function,
@@ -2205,7 +2205,7 @@ eval_sub_1 (Lisp_Object form)
   fun = original_fun;
   if (!SYMBOLP (fun))
     fun = Ffunction (Fcons (fun, Qnil));
-  else if (!NILP (fun) && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+  else if (!NILP (fun) && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
   if (SUBRP (fun))
@@ -2420,7 +2420,9 @@ usage: (apply FUNCTION &rest ARGUMENTS)  */)
 
   /* Optimize for no indirection.  */
   if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+      && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
+    fun = indirect_function (fun);
+  if (NILP (fun))
     {
       fun = indirect_function (fun);
       if (NILP (fun))
@@ -2835,7 +2837,7 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
   /* Optimize for no indirection.  */
   fun = original_fun;
   if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+      && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
   if (SUBRP (fun))

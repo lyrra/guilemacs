@@ -467,6 +467,7 @@ INLINE void *
 }
 
 
+
 /* Interned state of a symbol.  */
 
 enum symbol_interned
@@ -484,12 +485,6 @@ enum symbol_redirect
   SYMBOL_FORWARDED = 3
 };
 
-enum symbol_trapped_write
-{
-  SYMBOL_UNTRAPPED_WRITE = 0,
-  SYMBOL_NOWRITE = 1,
-  SYMBOL_TRAPPED_WRITE = 2
-};
 
 struct Lisp_Symbol
 {
@@ -885,6 +880,7 @@ XSTRING (Lisp_Object a)
 extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
 
 INLINE struct Lisp_Symbol *
 XSYMBOL (Lisp_Object a)
@@ -1822,9 +1818,15 @@ SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
   return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
 }
 
-/* Value is non-zero if symbol cannot be changed through a simple set,
-   i.e. it's a constant (e.g. nil, t, :keywords), or it has some
-   watching functions.  */
+INLINE Lisp_Object
+SYMBOL_FUNCTION (Lisp_Object sym)
+{
+  return scm_variable_ref (scm_module_lookup (function_module, sym));
+}
+
+/* Value is non-zero if symbol is considered a constant, i.e. its
+   value cannot be changed (there is an exception for keyword symbols,
+   whose value can be set to the keyword symbol itself).  */
 
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
@@ -3040,7 +3042,7 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
-  XSYMBOL (sym)->u.s.function = function;
+  scm_variable_set_x (scm_module_lookup (function_module, sym), function);
 }
 
 INLINE void
