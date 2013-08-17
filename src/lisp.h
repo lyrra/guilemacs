@@ -468,77 +468,6 @@ INLINE void *
 
 
 
-/* Interned state of a symbol.  */
-
-enum symbol_interned
-{
-  SYMBOL_UNINTERNED = 0,
-  SYMBOL_INTERNED = 1,
-  SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
-};
-
-enum symbol_redirect
-{
-  SYMBOL_PLAINVAL  = 4,
-  SYMBOL_VARALIAS  = 1,
-  SYMBOL_LOCALIZED = 2,
-  SYMBOL_FORWARDED = 3
-};
-
-
-struct Lisp_Symbol
-{
-  union
-  {
-    struct
-    {
-      /* Indicates where the value can be found:
-	 0 : it's a plain var, the value is in the `value' field.
-	 1 : it's a varalias, the value is really in the `alias' symbol.
-	 2 : it's a localized var, the value is in the `blv' object.
-	 3 : it's a forwarding variable, the value is in `forward'.  */
-      ENUM_BF (symbol_redirect) redirect : 3;
-
-      /* 0 : normal case, just set the value
-	 1 : constant, cannot set, e.g. nil, t, :keywords.
-	 2 : trap the write, call watcher functions.  */
-      ENUM_BF (symbol_trapped_write) trapped_write : 2;
-
-      /* Interned state of the symbol.  This is an enumerator from
-	 enum symbol_interned.  */
-      unsigned interned : 2;
-
-      /* True means that this variable has been explicitly declared
-	 special (with `defvar' etc), and shouldn't be lexically bound.  */
-      bool_bf declared_special : 1;
-
-      /* True if pointed to from purespace and hence can't be GC'd.  */
-      bool_bf pinned : 1;
-
-      /* The symbol's name, as a Lisp string.  */
-      Lisp_Object name;
-
-      /* Value of the symbol or Qunbound if unbound.  Which alternative of the
-	 union is used depends on the `redirect' field above.  */
-      union {
-	Lisp_Object value;
-	struct Lisp_Symbol *alias;
-	struct Lisp_Buffer_Local_Value *blv;
-	union Lisp_Fwd *fwd;
-      } val;
-
-      /* Function value of the symbol or Qnil if not fboundp.  */
-      Lisp_Object function;
-
-      /* The symbol's property list.  */
-      Lisp_Object plist;
-
-    };
-    char alignas (GCALIGNMENT) gcaligned;
-  } u;
-};
-verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
-
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
 /* We can use the same trick as in the DEFUN macro to generate the
@@ -881,6 +810,7 @@ extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
 
 INLINE struct Lisp_Symbol *
 XSYMBOL (Lisp_Object a)
@@ -1743,6 +1673,68 @@ typedef jmp_buf sys_jmp_buf;
 /***********************************************************************
 			       Symbols
  ***********************************************************************/
+/* Interned state of a symbol.  */
+
+enum symbol_interned
+{
+  SYMBOL_UNINTERNED = 0,
+  SYMBOL_INTERNED = 1,
+  SYMBOL_INTERNED_IN_INITIAL_OBARRAY = 2
+};
+
+enum symbol_redirect
+{
+  SYMBOL_PLAINVAL  = 4,
+  SYMBOL_VARALIAS  = 1,
+  SYMBOL_LOCALIZED = 2,
+  SYMBOL_FORWARDED = 3
+};
+
+struct Lisp_Symbol
+{
+  /* Indicates where the value can be found:
+     0 : it's a plain var, the value is in the `value' field.
+     1 : it's a varalias, the value is really in the `alias' symbol.
+     2 : it's a localized var, the value is in the `blv' object.
+     3 : it's a forwarding variable, the value is in `forward'.  */
+  ENUM_BF (symbol_redirect) redirect : 3;
+
+  /* 0 : normal case, just set the value
+     1 : constant, cannot set, e.g. nil, t, :keywords.
+     2 : trap the write, call watcher functions.  */
+  ENUM_BF (symbol_trapped_write) trapped_write : 2;
+
+  /* Interned state of the symbol.  This is an enumerator from
+     enum symbol_interned.  */
+  unsigned interned : 2;
+
+  /* True means that this variable has been explicitly declared
+     special (with `defvar' etc), and shouldn't be lexically bound.  */
+  bool_bf declared_special : 1;
+
+  /* True if pointed to from purespace and hence can't be GC'd.  */
+  bool_bf pinned : 1;
+
+  /* The symbol's name, as a Lisp string.  */
+  Lisp_Object name;
+
+  /* Value of the symbol or Qunbound if unbound.  Which alternative of the
+     union is used depends on the `redirect' field above.  */
+  union {
+    Lisp_Object value;
+    struct Lisp_Symbol *alias;
+    struct Lisp_Buffer_Local_Value *blv;
+    union Lisp_Fwd *fwd;
+  } val;
+
+  /* Function value of the symbol or Qnil if not fboundp.  */
+  Lisp_Object function;
+
+  /* The symbol's property list.  */
+  Lisp_Object plist;
+  char alignas (GCALIGNMENT) gcaligned;
+};
+verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 
 /* Value is name of symbol.  */
 
@@ -3048,13 +3040,13 @@ set_symbol_function (Lisp_Object sym, Lisp_Object function)
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
-  return XSYMBOL (sym)->plist;
+  return scm_variable_ref (scm_module_lookup (plist_module, sym));
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
-  XSYMBOL (sym)->plist = plist;
+  scm_variable_set_x (scm_module_lookup (plist_module, sym), plist);
 }
 
 

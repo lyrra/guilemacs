@@ -115,6 +115,7 @@ extern void moncontrol (int mode);
 
 Lisp_Object symbol_module;
 Lisp_Object function_module;
+Lisp_Object plist_module;
 
 static const char emacs_version[] = PACKAGE_VERSION;
 static const char emacs_copyright[] = COPYRIGHT;
@@ -1229,6 +1230,12 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
                                   scm_from_locale_keyword ("pure"),
                                   SCM_BOOL_T,
                                   SCM_UNDEFINED);
+      plist_module = scm_call (scm_c_public_ref ("guile", "define-module*"),
+                                  scm_list_1 (scm_from_utf8_symbol ("elisp-plists")),
+                                  scm_from_locale_keyword ("pure"),
+                                  SCM_BOOL_T,
+                                  SCM_UNDEFINED);
+
       init_alloc_once ();
       init_threads_once ();
       init_guile ();
