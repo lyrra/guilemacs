@@ -2574,7 +2574,23 @@ eval_sub_1 (Lisp_Object form)
   else if (!NILP (fun) && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      Lisp_Object args_left = original_args;
+      Lisp_Object nargs = Flength (args_left);
+      Lisp_Object *args;
+      size_t argnum = 0;
+
+      SAFE_ALLOCA_LISP (args, XINT (nargs));
+
+      while (! NILP (args_left))
+        {
+          args[argnum++] = eval_sub (Fcar (args_left));
+          args_left = Fcdr (args_left);
+        }
+      val = scm_call_n (fun, args, argnum);
+    }
+  else if (SUBRP (fun))
     {
       Lisp_Object args_left = original_args;
       ptrdiff_t numargs = list_length (args_left);
@@ -3099,7 +3115,7 @@ FUNCTIONP (Lisp_Object object)
       return EQ (car, Qlambda);
     }
   else
-    return false;
+    return scm_is_true (scm_procedure_p (object));
 }
 
 Lisp_Object
@@ -3468,8 +3484,13 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
 
-  if (SUBRP (function))
-    result = Fsubr_arity (function);
+  if (scm_is_true (scm_procedure_p (function)))
+    {
+      val = scm_call_n (function, args + 1, numargs);
+    }
+  else if (SUBRP (function))
+    val = funcall_subr (XSUBR (function), numargs, args + 1);
+
   else if (CLOSUREP (function))
     result = lambda_arity (function);
 #ifdef HAVE_MODULES
