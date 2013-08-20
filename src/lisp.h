@@ -4514,5 +4514,10 @@ maybe_gc (void)
   return;
 }
 
+// FIX: 20190626 LAV, whereis functionp? was: INLINE bool functionp (Lisp_Object object)
+//      old was returning true/false, new is to return:
+//        return scm_is_true (scm_procedure_p (object));
+//   perhaps functionp isn't inlined anymore?
+
 INLINE_HEADER_END
 #endif /* EMACS_LISP_H */

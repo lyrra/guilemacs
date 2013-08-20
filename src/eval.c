@@ -2208,7 +2208,23 @@ eval_sub_1 (Lisp_Object form)
   else if (!NILP (fun) && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (SUBRP (fun))
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      Lisp_Object args_left = original_args;
+      Lisp_Object nargs = Flength (args_left);
+      Lisp_Object *args;
+      size_t argnum = 0;
+
+      SAFE_ALLOCA_LISP (args, XINT (nargs));
+
+      while (! NILP (args_left))
+        {
+          args[argnum++] = eval_sub (Fcar (args_left));
+          args_left = Fcdr (args_left);
+        }
+      val = scm_call_n (fun, args, argnum);
+    }
+  else if (SUBRP (fun))
     {
       Lisp_Object args_left = original_args;
       Lisp_Object numargs = Flength (args_left);
@@ -2840,8 +2856,10 @@ usage: (funcall FUNCTION &rest ARGUMENTS)  */)
       && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (SUBRP (fun))
-    val = funcall_subr (XSUBR (fun), numargs, args + 1);
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      val = scm_call_n (fun, args + 1, numargs);
+    }
   else if (COMPILEDP (fun) || MODULE_FUNCTIONP (fun))
     val = funcall_lambda (fun, numargs, args + 1);
   else
