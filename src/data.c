@@ -40,6 +40,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void swap_in_symval_forwarding (struct Lisp_Symbol *,
 				       struct Lisp_Buffer_Local_Value *);
 
+//FIX: 20190626 LAV, old had: Lisp_Object Qnil_, Qt_;
+
 static bool
 BOOLFWDP (union Lisp_Fwd *a)
 {

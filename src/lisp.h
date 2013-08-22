@@ -274,7 +274,7 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 #define lisp_h_INTEGERP(x) (SCM_I_INUMP (x))
 #define lisp_h_MARKERP(x) (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Marker)
 #define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
-#define lisp_h_NILP(x) EQ (x, Qnil)
+#define lisp_h_NILP(x) (scm_is_lisp_false (x))
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
@@ -283,7 +283,8 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert ((sym)->redirect == SYMBOL_PLAINVAL), (sym)->val.value)
-#define lisp_h_SYMBOLP(x) (x && scm_is_symbol (x))
+#define lisp_h_SYMBOLP(x) \
+  (x && (scm_is_symbol (x) || EQ (x, Qnil) || EQ (x, Qt)))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
 #define lisp_h_XCAR(c) (scm_car (c))
 #define lisp_h_XCDR(c) (scm_cdr (c))
@@ -811,11 +812,14 @@ INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
+extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 
 INLINE struct Lisp_Symbol *
 XSYMBOL (Lisp_Object a)
 {
   Lisp_Object tem;
+  if (EQ (a, Qt)) a = Qt_;
+  if (EQ (a, Qnil)) a = Qnil_;
   eassert (SYMBOLP (a));
   tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
   return scm_to_pointer (tem);
@@ -1776,6 +1780,8 @@ SET_SYMBOL_FWD (struct Lisp_Symbol *sym, union Lisp_Fwd *v)
 INLINE Lisp_Object
 SYMBOL_NAME (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return build_string (scm_to_locale_string (scm_symbol_to_string (sym)));
 }
 
@@ -1784,6 +1790,8 @@ SYMBOL_NAME (Lisp_Object sym)
 INLINE bool
 SYMBOL_INTERNED_P (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_is_true (scm_symbol_interned_p (sym));
 }
 
@@ -1799,6 +1807,8 @@ SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_variable_ref (scm_module_lookup (function_module, sym));
 }
 
@@ -3020,18 +3030,24 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   scm_variable_set_x (scm_module_lookup (function_module, sym), function);
 }
 
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_variable_ref (scm_module_lookup (plist_module, sym));
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   scm_variable_set_x (scm_module_lookup (plist_module, sym), plist);
 }
 
@@ -3115,6 +3131,7 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
+//extern Lisp_Object Qnil_, Qt_;
 extern Lisp_Object indirect_function (Lisp_Object);
 extern Lisp_Object find_symbol_value (Lisp_Object);
 enum Arith_Comparison {
