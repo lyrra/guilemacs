@@ -4131,5 +4131,5 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
 void
 syms_of_sysdep (void)
 {
-  defsubr (&Sget_internal_run_time);
+  defsubr ("get-internal-run-time", gsubr_Fget_internal_run_time, 0, 0, 0);
 }

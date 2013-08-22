@@ -767,7 +767,7 @@ write_globals (void)
   puts ("};");
   puts ("#endif");
 
-  puts ("#define Qnil builtin_lisp_symbol (0)");
+  /*
   puts ("#if DEFINE_NON_NIL_Q_SYMBOL_MACROS");
   num_symbols = 0;
   for (ptrdiff_t i = 0; i < num_globals; i++)
@@ -775,6 +775,7 @@ write_globals (void)
       printf ("# define %s builtin_lisp_symbol (%td)\n",
 	      globals[i].name, num_symbols - 1);
   puts ("#endif");
+  */
 }
 
 

@@ -1508,11 +1508,13 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 
+/*
     case PVEC_SUBR:
       print_c_string ("#<subr ", printcharfun);
       print_c_string (XSUBR (obj)->symbol_name, printcharfun);
       printchar ('>', printcharfun);
       break;
+*/
 
     case PVEC_XWIDGET: case PVEC_XWIDGET_VIEW:
       print_c_string ("#<xwidget ", printcharfun);
@@ -2225,7 +2227,8 @@ init_print_once (void)
      for the convenience of the debugger.  */
   DEFSYM (Qexternal_debugging_output, "external-debugging-output");
 
-  defsubr (&Sexternal_debugging_output);
+  //FIX: 20190626 LAV, ??? change to: defsubr (&Sexternal_debugging_output);
+  defsubr ("external-debugging-output", gsubr_Fexternal_debugging_output, 1, 1, 0);
 }
 
 void

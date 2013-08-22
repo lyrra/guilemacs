@@ -900,6 +900,8 @@ syntax.o: syntax.x
 term.o: term.x
 terminal.o: terminal.x
 textprop.o: textprop.x
+timefns.o: timefns.x
+thread.o: thread.x
 undo.o: undo.x
 w16select.o: w16select.x
 w32console.o: w32console.x
