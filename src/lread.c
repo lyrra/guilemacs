@@ -5164,7 +5164,14 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
   sym = scm_find_symbol (string2, obhash (obarray));
   if (scm_is_true (sym)
       && scm_is_true (scm_module_variable (symbol_module, sym)))
-    return sym;
+    {
+      if (EQ (sym, Qnil_))
+        return Qnil;
+      else if (EQ (sym, Qt_))
+        return Qt;
+      else
+        return sym;
+    }
   else
     return make_number (0);
 }
@@ -5304,23 +5311,21 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
+  Qnil = SCM_ELISP_NIL;
+  Qt = SCM_BOOL_T;
+
+  Qnil_ = intern_c_string ("nil");
+  SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
+  XSYMBOL (Qnil_)->constant = 1;
+  XSYMBOL (Qnil_)->declared_special = 1;
+
+  Qt_ = intern_c_string ("t");
+  SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
+  XSYMBOL (Qt_)->constant = 1;
+  XSYMBOL (Qt_)->declared_special = 1;
+
   Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
-  /* Set temporary dummy values to Qnil and Vpurify_flag to satisfy the
-     NILP (Vpurify_flag) check in intern_c_string.  */
-  Qnil = make_number (-1); Vpurify_flag = make_number (1);
-  Qnil = intern_c_string ("nil");
-
-  DEFSYM (Qunbound, "unbound");
-
-  DEFSYM (Qnil, "nil");
-  SET_SYMBOL_VAL (XBARE_SYMBOL (Qnil), Qnil);
-  make_symbol_constant (Qnil);
-  XBARE_SYMBOL (Qnil)->u.s.declared_special = true;
-
-  DEFSYM (Qt, "t");
-  SET_SYMBOL_VAL (XBARE_SYMBOL (Qt), Qt);
-  make_symbol_constant (Qt);
-  XBARE_SYMBOL (Qt)->u.s.declared_special = true;
+  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
   /* Qt is correct even if not dumping.  loadup.el will set to nil at end.  */
   Vpurify_flag = Qt;
