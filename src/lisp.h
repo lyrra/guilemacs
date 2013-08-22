@@ -49,7 +49,7 @@ INLINE_HEADER_BEGIN
    definitions or enums visible to the debugger.  It's used for symbols
    that .gdbinit needs.  */
 
-#define DECLARE_GDB_SYM(type, id) type const id EXTERNALLY_VISIBLE
+#define DECLARE_GDB_SYM(type, id) type id EXTERNALLY_VISIBLE
 #ifdef MAIN_PROGRAM
 # define DEFINE_GDB_SYMBOL_BEGIN(type, id) DECLARE_GDB_SYM (type, id)
 # define DEFINE_GDB_SYMBOL_END(id) = id;
@@ -308,15 +308,16 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_EQ(x, y) (scm_is_eq (x, y))
 #define lisp_h_FLOATP(x) (x && SCM_INEXACTP (x))
 #define lisp_h_INTEGERP(x) (SCM_I_INUMP (x))
-//FIX-20230203-LAV: no lisp_h_FIXNUMP ?
-#define lisp_h_NILP(x) EQ (x, Qnil)
+#define lisp_h_MARKERP(x) (MISCP (x) && XMISCTYPE (x) == Lisp_Misc_Marker)
+#define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
+#define lisp_h_NILP(x) (scm_is_lisp_false (x))
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
     (sym)->u.s.val.value = (v))
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
-#define lisp_h_SYMBOL_CONSTANT_P(sym) (XSYMBOL (sym)->u.s.constant)
-#define lisp_h_SYMBOLP(x) (x && scm_is_symbol (x))
+#define lisp_h_SYMBOLP(x) \
+  (x && (scm_is_symbol (x) || EQ (x, Qnil) || EQ (x, Qt)))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
 #define lisp_h_XCAR(c) (scm_car (c))
 #define lisp_h_XCDR(c) (scm_cdr (c))
@@ -387,31 +388,10 @@ typedef EMACS_INT Lisp_Word;
 
 typedef SCM Lisp_Object;
 
+extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
-
-INLINE bool
-(SYMBOLP) (Lisp_Object x)
-{
-  return lisp_h_SYMBOLP (x);
-}
-
-INLINE struct Lisp_Symbol *
-XSYMBOL (Lisp_Object a)
-{
-  Lisp_Object tem;
-  eassert (SYMBOLP (a));
-  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return scm_to_pointer (tem);
-}
-
-INLINE void
-make_symbol_constant (Lisp_Object sym)
-{
-  //FIX-20230206-LAV: no support for constant symbols
-  //XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
-}
 
 /* Define the fundamental Lisp data structures.  */
 
@@ -792,6 +772,76 @@ INLINE void
    extracted pointer's type is CTYPE *.  */
 
 #define XUNTAG(a, type, ctype) ((ctype *) SCM_SMOB_DATA (a))
+/* Yield a signed integer that contains TAG along with PTR.
+
+   Sign-extend pointers when USE_LSB_TAG (this simplifies emacs-module.c),
+   and zero-extend otherwise (that’s a bit faster here).
+   Sign extension matters only when EMACS_INT is wider than a pointer.  */
+#define TAG_PTR(tag, ptr) \
+  (USE_LSB_TAG \
+   ? (intptr_t) (ptr) + (tag) \
+   : (EMACS_INT) (((EMACS_UINT) (tag) << 0) + (uintptr_t) (ptr)))
+
+/* Yield an integer that contains a symbol tag along with OFFSET.
+   OFFSET should be the offset in bytes from 'lispsym' to the symbol.  */
+#define TAG_SYMOFFSET(offset) TAG_PTR (Lisp_Symbol, offset)
+
+
+/* XLI_BUILTIN_LISPSYM (iQwhatever) is equivalent to
+   XLI (builtin_lisp_symbol (Qwhatever)),
+   except the former expands to an integer constant expression.  */
+#define XLI_BUILTIN_LISPSYM(iname) TAG_SYMOFFSET ((iname) * sizeof *lispsym)
+
+/* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
+   designed for use as an initializer, even for a constant initializer.  */
+#define LISPSYM_INITIALLY(name) LISP_INITIALLY (XLI_BUILTIN_LISPSYM (i##name))
+
+/* Declare extern constants for Lisp symbols.  These can be helpful
+   when using a debugger like GDB, on older platforms where the debug
+   format does not represent C macros.  However, they are unbounded
+   and would just be asking for trouble if checking pointer bounds.  */
+# define DEFINE_LISP_SYMBOL(name) \
+   DEFINE_GDB_SYMBOL_BEGIN (Lisp_Object, name) \
+   DEFINE_GDB_SYMBOL_END (LISPSYM_INITIALLY (name))
+
+/* The index of the C-defined Lisp symbol SYM.
+   This can be used in a static initializer.  */
+#define SYMBOL_INDEX(sym) i##sym
+
+/* By default, define macros for Qt, etc., as this leads to a bit
+   better performance in the core Emacs interpreter.  A plugin can
+   define DEFINE_NON_NIL_Q_SYMBOL_MACROS to be false, to be portable to
+   other Emacs instances that assign different values to Qt, etc.  */
+#ifndef DEFINE_NON_NIL_Q_SYMBOL_MACROS
+# define DEFINE_NON_NIL_Q_SYMBOL_MACROS true
+#endif
+/* Placeholder for make-docfile to process.  The actual symbol
+   definition is done by lread.c's define_symbol.  */
+#define DEFSYM(sym, name) /* empty */
+
+
+
+/* Declare a Lisp-callable function.  The MAXARGS parameter has the same
+   meaning as in the DEFUN macro, and is used to construct a prototype.  */
+/* We can use the same trick as in the DEFUN macro to generate the
+   appropriate prototype.  */
+#define EXFUN(fnname, maxargs) \
+  extern Lisp_Object fnname DEFUN_ARGS_ ## maxargs
+
+
+/* True if N is a power of 2.  N should be positive.  */
+
+#define POWER_OF_2(n) (((n) & ((n) - 1)) == 0)
+
+/* Return X rounded to the next multiple of Y.  Y should be positive,
+   and Y - 1 + X should not overflow.  Arguments should not have side
+   effects, as they are evaluated more than once.  Tune for Y being a
+   power of 2.  */
+
+#define ROUNDUP(x, y) (POWER_OF_2 (y)					\
+                       ? ((y) - 1 + (x)) & ~ ((y) - 1)			\
+                       : ((y) - 1 + (x)) - ((y) - 1 + (x)) % (y))
+
 
 /* A forwarding pointer to a value.  It uses a generic pointer to
    avoid alignment bugs that could occur if it used a pointer to a
@@ -805,9 +855,6 @@ INLINE void
  ***********************************************************************/
 extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
-extern Lisp_Object symbol_module;
-extern Lisp_Object function_module;
-extern Lisp_Object plist_module;
 
 enum symbol_redirect
 {
@@ -918,7 +965,39 @@ struct Lisp_Symbol
     } s;
   } u;
 };
+/* Note that the weird token-substitution semantics of ANSI C makes
+   this work for MANY and UNEVALLED.  */
+#define DEFUN_ARGS_MANY		(ptrdiff_t, Lisp_Object *)
+#define DEFUN_ARGS_UNEVALLED	(Lisp_Object)
+#define DEFUN_ARGS_0	(void)
+#define DEFUN_ARGS_1	(Lisp_Object)
+#define DEFUN_ARGS_2	(Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_3	(Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_4	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_5	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+			 Lisp_Object)
+#define DEFUN_ARGS_6	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+			 Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_7	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+			 Lisp_Object, Lisp_Object, Lisp_Object)
+#define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
+			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+
+INLINE Lisp_Object
+builtin_lisp_symbol (int index)
+{
+  return NULL; //make_lisp_symbol (&lispsym[index]);
+}
+
+
+#include "globals.h"
+
 /* Value is name of symbol.  */
+INLINE bool
+(EQ) (Lisp_Object x, Lisp_Object y)
+{
+  return lisp_h_EQ (x, y);
+}
 
 INLINE Lisp_Object
 (SYMBOL_VAL) (struct Lisp_Symbol *sym)
@@ -974,6 +1053,8 @@ SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
 INLINE Lisp_Object
 SYMBOL_NAME (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return build_string (scm_to_locale_string (scm_symbol_to_string (sym)));
 }
 
@@ -982,6 +1063,8 @@ SYMBOL_NAME (Lisp_Object sym)
 INLINE bool
 SYMBOL_INTERNED_P (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_is_true (scm_symbol_interned_p (sym));
 }
 
@@ -992,11 +1075,18 @@ SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 {
   //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
   //return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+  // other version:
+  // /* Should be initial_obarray */
+  // Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
+  // return (! NILP (scm_c_value_ref (tem, 1))
+  //         && (EQ (sym, scm_c_value_ref (tem, 0))));
 }
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_variable_ref (scm_module_lookup (function_module, sym));
 }
 
@@ -1004,53 +1094,26 @@ SYMBOL_FUNCTION (Lisp_Object sym)
    value cannot be changed (there is an exception for keyword symbols,
    whose value can be set to the keyword symbol itself).  */
 
+/*
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
+*/
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
    constant (e.g. nil, t, :keywords).  Code that actually wants to
    write to SYM, should also check whether there are any watching
    functions.  */
 
+/*
 INLINE int
 (SYMBOL_CONSTANT_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_CONSTANT_P (sym);
 }
-
-/* Placeholder for make-docfile to process.  The actual symbol
-   definition is done by lread.c's define_symbol.  */
-#define DEFSYM(sym, name) /* empty */
-
-
-
-/* Declare a Lisp-callable function.  The MAXARGS parameter has the same
-   meaning as in the DEFUN macro, and is used to construct a prototype.  */
-/* We can use the same trick as in the DEFUN macro to generate the
-   appropriate prototype.  */
-#define EXFUN(fnname, maxargs) \
-  extern Lisp_Object fnname DEFUN_ARGS_ ## maxargs
-
-/* Note that the weird token-substitution semantics of ANSI C makes
-   this work for MANY and UNEVALLED.  */
-#define DEFUN_ARGS_MANY		(ptrdiff_t, Lisp_Object *)
-#define DEFUN_ARGS_UNEVALLED	(Lisp_Object)
-#define DEFUN_ARGS_0	(void)
-#define DEFUN_ARGS_1	(Lisp_Object)
-#define DEFUN_ARGS_2	(Lisp_Object, Lisp_Object)
-#define DEFUN_ARGS_3	(Lisp_Object, Lisp_Object, Lisp_Object)
-#define DEFUN_ARGS_4	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
-#define DEFUN_ARGS_5	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
-			 Lisp_Object)
-#define DEFUN_ARGS_6	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
-			 Lisp_Object, Lisp_Object)
-#define DEFUN_ARGS_7	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
-			 Lisp_Object, Lisp_Object, Lisp_Object)
-#define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
-			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+*/
 
 /* untagged_ptr represents a pointer before tagging, and Lisp_Word_tag
    contains a possibly-shifted tag to be added to an untagged_ptr to
@@ -1069,64 +1132,35 @@ typedef uintptr_t untagged_ptr;
 typedef EMACS_UINT Lisp_Word_tag;
 #endif
 
-/* Yield a signed integer that contains TAG along with PTR.
-
-   Sign-extend pointers when USE_LSB_TAG (this simplifies emacs-module.c),
-   and zero-extend otherwise (that’s a bit faster here).
-   Sign extension matters only when EMACS_INT is wider than a pointer.  */
-#define TAG_PTR(tag, ptr) \
-  (USE_LSB_TAG \
-   ? (intptr_t) (ptr) + (tag) \
-   : (EMACS_INT) (((EMACS_UINT) (tag) << 0) + (uintptr_t) (ptr)))
-
-/* Yield an integer that contains a symbol tag along with OFFSET.
-   OFFSET should be the offset in bytes from 'lispsym' to the symbol.  */
-#define TAG_SYMOFFSET(offset) TAG_PTR (Lisp_Symbol, offset)
 
 
-/* XLI_BUILTIN_LISPSYM (iQwhatever) is equivalent to
-   XLI (builtin_lisp_symbol (Qwhatever)),
-   except the former expands to an integer constant expression.  */
-#define XLI_BUILTIN_LISPSYM(iname) TAG_SYMOFFSET ((iname) * sizeof *lispsym)
+/* Return true if X and Y are the same object.  */
 
-/* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
-   designed for use as an initializer, even for a constant initializer.  */
-#define LISPSYM_INITIALLY(name) LISP_INITIALLY (XLI_BUILTIN_LISPSYM (i##name))
 
-/* Declare extern constants for Lisp symbols.  These can be helpful
-   when using a debugger like GDB, on older platforms where the debug
-   format does not represent C macros.  However, they are unbounded
-   and would just be asking for trouble if checking pointer bounds.  */
-#define DEFINE_LISP_SYMBOL(name) \
-  DEFINE_GDB_SYMBOL_BEGIN (Lisp_Object, name) \
-  DEFINE_GDB_SYMBOL_END (LISPSYM_INITIALLY (name))
+INLINE bool
+(SYMBOLP) (Lisp_Object x)
+{
+  return lisp_h_SYMBOLP (x);
+}
 
-/* The index of the C-defined Lisp symbol SYM.
-   This can be used in a static initializer.  */
-#define SYMBOL_INDEX(sym) i##sym
+INLINE struct Lisp_Symbol *
+XSYMBOL (Lisp_Object a)
+{
+  Lisp_Object tem;
+  if (EQ (a, Qt)) a = Qt_;
+  if (EQ (a, Qnil)) a = Qnil_;
+  eassert (SYMBOLP (a));
+  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
+  return scm_to_pointer (tem);
+}
 
-/* By default, define macros for Qt, etc., as this leads to a bit
-   better performance in the core Emacs interpreter.  A plugin can
-   define DEFINE_NON_NIL_Q_SYMBOL_MACROS to be false, to be portable to
-   other Emacs instances that assign different values to Qt, etc.  */
-#ifndef DEFINE_NON_NIL_Q_SYMBOL_MACROS
-# define DEFINE_NON_NIL_Q_SYMBOL_MACROS true
-#endif
+INLINE void
+make_symbol_constant (Lisp_Object sym)
+{
+  //FIX-20230206-LAV: no support for constant symbols
+  //XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
+}
 
-/* True if N is a power of 2.  N should be positive.  */
-
-#define POWER_OF_2(n) (((n) & ((n) - 1)) == 0)
-
-/* Return X rounded to the next multiple of Y.  Y should be positive,
-   and Y - 1 + X should not overflow.  Arguments should not have side
-   effects, as they are evaluated more than once.  Tune for Y being a
-   power of 2.  */
-
-#define ROUNDUP(x, y) (POWER_OF_2 (y)					\
-                       ? ((y) - 1 + (x)) & ~ ((y) - 1)			\
-                       : ((y) - 1 + (x)) - ((y) - 1 + (x)) % (y))
-
-#include "globals.h"
 
 /* Header of vector-like objects.  This documents the layout constraints on
    vectors and pseudovectors (objects of PVEC_xxx subtype).  It also prevents
@@ -1180,11 +1214,6 @@ INLINE void
 }
 #endif
 
-INLINE Lisp_Object
-builtin_lisp_symbol (int index)
-{
-  return NULL; //make_lisp_symbol (&lispsym[index]);
-}
 
 /* In the size word of a struct Lisp_Vector, this bit means it's really
    some other vector-like object.  */
@@ -1345,13 +1374,7 @@ make_fixed_natnum (EMACS_INT n)
   return make_fixnum (n);
 }
 
-/* Return true if X and Y are the same object.  */
 
-INLINE bool
-(EQ) (Lisp_Object x, Lisp_Object y)
-{
-  return lisp_h_EQ (x, y);
-}
 
 INLINE intmax_t
 clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
@@ -3213,18 +3236,24 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   scm_variable_set_x (scm_module_lookup (function_module, sym), function);
 }
 
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   return scm_variable_ref (scm_module_lookup (plist_module, sym));
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
+  if (EQ (sym, Qnil)) sym = Qnil_;
+  if (EQ (sym, Qt)) sym = Qt_;
   scm_variable_set_x (scm_module_lookup (plist_module, sym), plist);
 }
 
@@ -3367,6 +3396,7 @@ modiff_to_integer (modiff_count a)
 extern AVOID wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
+//extern Lisp_Object Qnil_, Qt_;
 extern Lisp_Object indirect_function (Lisp_Object);
 extern Lisp_Object find_symbol_value (Lisp_Object);
 enum Arith_Comparison {
@@ -4640,7 +4670,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
 #define USE_SAFE_ALLOCA \
   ptrdiff_t sa_avail = MAX_ALLOCA;      \
-  ptrdiff_t sa_count = SPECPDL_INDEX ()
+  ptrdiff_t sa_count = SPECPDL_INDEX ();
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 

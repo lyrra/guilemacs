@@ -2451,6 +2451,7 @@ eval_sub_1 (Lisp_Object form)
       Lisp_Object *args;
       size_t argnum = 0;
 
+      USE_SAFE_ALLOCA
       SAFE_ALLOCA_LISP (args, XINT (nargs));
 
       while (! NILP (args_left))
