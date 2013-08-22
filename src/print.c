@@ -2311,7 +2311,8 @@ init_print_once (void)
      for the convenience of the debugger.  */
   DEFSYM (Qexternal_debugging_output, "external-debugging-output");
 
-  defsubr (&Sexternal_debugging_output);
+  //FIX: 20190626 LAV, ??? change to: defsubr (&Sexternal_debugging_output);
+  defsubr ("external-debugging-output", gsubr_Fexternal_debugging_output, 1, 1, 0);
 }
 
 void

@@ -337,10 +337,17 @@ string is passed through `substitute-command-keys'.  */)
   fun = Findirect_function (function, Qnil);
   if (NILP (fun))
     xsignal1 (Qvoid_function, function);
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
+  if (CONSP (fun) && EQ (XCAR (fun), Qmacro) ||
+      EQ (XCAR (fun), Qspecial_operator))
     fun = XCDR (fun);
-  if (SUBRP (fun))
-    doc = make_number (XSUBR (fun)->doc);
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      Lisp_Object tem = scm_procedure_property (fun, intern ("emacs-documentation"));
+      if (scm_is_true (tem))
+        doc = tem;
+      else
+        return Qnil;
+    }
   else if (MODULE_FUNCTIONP (fun))
     doc = XMODULE_FUNCTION (fun)->documentation;
   else if (COMPILEDP (fun))
@@ -475,6 +482,13 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 
   /* The type determines where the docstring is stored.  */
 
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      scm_set_procedure_property_x (fun,
+                                    intern ("emacs-documentation"),
+                                    make_number (offset));
+    }
+
   /* If it's a lisp form, stick it in the form.  */
   if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
     fun = XCDR (fun);
@@ -492,10 +506,17 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 	       correctness is quite delicate.  */
 	    XSETCAR (tem, make_number (offset));
 	}
+      // FIX: 20190626 LAV, dont store it?
+      //else if (EQ (tem, Qmacro) || EQ (tem, Qspecial_operator))
+      //  store_function_docstring (XCDR (fun), offset);
     }
 
   /* Lisp_Subrs have a slot for it.  */
-  else if (SUBRP (fun))
+  //FIX: 20190626 LAV, subrp should be replaced with scm_is_true (scm_procedure_p (fun))?
+  // was else if (SUBRP (fun))
+  else if (scm_procedure_p (fun))
+    // FIX: 20190626 LAV, This call will retrieve the function-documentation, but how do we set it?
+    //scm_procedure_property (fun, intern ("emacs-documentation"))
     XSUBR (fun)->doc = offset;
 
   /* Bytecode objects sometimes have slots for it.  */
