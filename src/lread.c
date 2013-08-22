@@ -3659,6 +3659,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
       else if (VECTORP (subtree))
         length = ASIZE (subtree);
       else
+        {
         /* An unknown pseudovector may contain non-Lisp fields, so we
            can't just blindly traverse all its fields.  We used to call
            `Flength' which signaled `sequencep', so I just preserved this
@@ -3670,6 +3671,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
         for ( ; i < length; i++)
           ASET (subtree, i,
                 substitute_object_recurse (subst, AREF (subtree, i)));
+        }
       return subtree;
     }
   else if (CONSP (subtree))
@@ -4281,7 +4283,14 @@ oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff
   sym = scm_find_symbol (string2, obhash (obarray));
   if (scm_is_true (sym)
       && scm_is_true (scm_module_variable (symbol_module, sym)))
-    return sym;
+    {
+      if (EQ (sym, Qnil_))
+        return Qnil;
+      else if (EQ (sym, Qt_))
+        return Qt;
+      else
+        return sym;
+    }
   else
     return make_number (0);
 }
@@ -4335,17 +4344,31 @@ init_obarray_once (void)
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
     define_symbol (builtin_lisp_symbol (i), defsym_name[i]);
 
+  // FIX: 20190626 LAV, new interface:
   DEFSYM (Qunbound, "unbound");
+  // should do something like this:
+  //Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
+  //SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
+  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Fmake_symbol (build_pure_c_string ("unbound")));
 
   DEFSYM (Qnil, "nil");
-  SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);
-  make_symbol_constant (Qnil);
-  XSYMBOL (Qnil)->u.s.declared_special = true;
+  SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
+
+  SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
+  //XSYMBOL (Qnil_)->constant = 1;
+  //XSYMBOL (Qnil_)->declared_special = 1;
 
   DEFSYM (Qt, "t");
-  SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
-  make_symbol_constant (Qt);
-  XSYMBOL (Qt)->u.s.declared_special = true;
+  SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
+  SET_SYMBOL_VAL (XSYMBOL (Qt_), intern_c_string ("t"));
+  SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
+  //XSYMBOL (Qt_)->constant = 1;   // FIX: 20190626 LAV, is this the old interface?
+  //XSYMBOL (Qt_)->declared_special = 1;
+
+  //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
+  //make_symbol_constant (Qt);     //              and this is the new interface, refactor post-2015?
+  //XSYMBOL (Qt)->declared_special = true;  // FIX: 20190626 LAV, true or 1?!?
+
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }

@@ -41,6 +41,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void swap_in_symval_forwarding (struct Lisp_Symbol *,
 				       struct Lisp_Buffer_Local_Value *);
 
+//FIX: 20190626 LAV, old had: Lisp_Object Qnil_, Qt_;
+
 static bool
 BOOLFWDP (union Lisp_Fwd *a)
 {
@@ -352,15 +354,6 @@ DEFUN ("symbolp", Fsymbolp, Ssymbolp, 1, 1, 0,
   if (SYMBOLP (object))
     return Qt;
   return Qnil;
-}
-
-static bool
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
-{
-  /* Should be initial_obarray */
-  Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
-  return (! NILP (scm_c_value_ref (tem, 1))
-          && (EQ (sym, scm_c_value_ref (tem, 0))));
 }
 
 /* Define this in C to avoid unnecessarily consing up the symbol
