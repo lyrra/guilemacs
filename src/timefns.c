@@ -2026,6 +2026,8 @@ syms_of_timefns_for_pdumper (void)
 void
 syms_of_timefns (void)
 {
+#include "timefns.x"
+
 #ifndef timespec_hz
   timespec_hz = make_int (TIMESPEC_HZ);
   staticpro (&timespec_hz);
@@ -2037,19 +2039,6 @@ syms_of_timefns (void)
 
   DEFSYM (Qencode_time, "encode-time");
 
-  defsubr (&Scurrent_time);
-  defsubr (&Stime_convert);
-  defsubr (&Stime_add);
-  defsubr (&Stime_subtract);
-  defsubr (&Stime_less_p);
-  defsubr (&Stime_equal_p);
-  defsubr (&Sformat_time_string);
-  defsubr (&Sfloat_time);
-  defsubr (&Sdecode_time);
-  defsubr (&Sencode_time);
-  defsubr (&Scurrent_time_string);
-  defsubr (&Scurrent_time_zone);
-  defsubr (&Sset_time_zone_rule);
 
   flt_radix_power = make_nil_vector (flt_radix_power_size);
   staticpro (&flt_radix_power);

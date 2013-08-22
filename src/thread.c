@@ -1066,26 +1066,7 @@ syms_of_threads (void)
   if (0)
 #endif
     {
-      defsubr (&Sthread_yield);
-      defsubr (&Smake_thread);
-      defsubr (&Scurrent_thread);
-      defsubr (&Sthread_name);
-      defsubr (&Sthread_signal);
-      defsubr (&Sthread_live_p);
-      defsubr (&Sthread_join);
-      defsubr (&Sthread_blocker);
-      defsubr (&Sall_threads);
-      defsubr (&Smake_mutex);
-      defsubr (&Smutex_lock);
-      defsubr (&Smutex_unlock);
-      defsubr (&Smutex_name);
-      defsubr (&Smake_condition_variable);
-      defsubr (&Scondition_wait);
-      defsubr (&Scondition_notify);
-      defsubr (&Scondition_mutex);
-      defsubr (&Scondition_name);
-      defsubr (&Sthread_last_error);
-
+#include "thread.x"
       staticpro (&last_thread_error);
       last_thread_error = Qnil;
 

@@ -35088,7 +35088,6 @@ be let-bound around code that needs to disable messages temporarily. */);
 
   DEFSYM (Qright_to_left, "right-to-left");
   DEFSYM (Qleft_to_right, "left-to-right");
-  defsubr (&Sbidi_resolved_levels);
 
 #ifdef HAVE_WINDOW_SYSTEM
   DEFVAR_BOOL ("x-stretch-cursor", x_stretch_cursor_p,

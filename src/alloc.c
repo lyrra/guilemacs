@@ -1813,7 +1813,7 @@ enum defined_HAVE_X_WINDOWS { defined_HAVE_X_WINDOWS = false };
 union
 {
   enum CHARTAB_SIZE_BITS CHARTAB_SIZE_BITS;
-  enum char_table_specials char_table_specials;
+  //enum char_table_specials char_table_specials;
   enum char_bits char_bits;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;

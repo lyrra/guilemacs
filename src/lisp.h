@@ -349,6 +349,7 @@ typedef EMACS_INT Lisp_Word;
 #endif
 
 #if DEFINE_KEY_OPS_AS_MACROS
+# error "ddnot used"
 # define XLI(o) lisp_h_XLI (o)
 # define XIL(i) lisp_h_XIL (i)
 # define CHECK_FIXNUM(x) lisp_h_CHECK_FIXNUM (x)
@@ -815,18 +816,13 @@ INLINE void
 #ifndef DEFINE_NON_NIL_Q_SYMBOL_MACROS
 # define DEFINE_NON_NIL_Q_SYMBOL_MACROS true
 #endif
+// guile handles symbols, so dont define them in globals.h
+#undef DEFINE_NON_NIL_Q_SYMBOL_MACROS
 /* Placeholder for make-docfile to process.  The actual symbol
    definition is done by lread.c's define_symbol.  */
 #define DEFSYM(sym, name) /* empty */
 
 
-
-/* Declare a Lisp-callable function.  The MAXARGS parameter has the same
-   meaning as in the DEFUN macro, and is used to construct a prototype.  */
-/* We can use the same trick as in the DEFUN macro to generate the
-   appropriate prototype.  */
-#define EXFUN(fnname, maxargs) \
-  extern Lisp_Object fnname DEFUN_ARGS_ ## maxargs
 
 
 /* True if N is a power of 2.  N should be positive.  */
@@ -965,6 +961,15 @@ struct Lisp_Symbol
     } s;
   } u;
 };
+
+
+/* Declare a Lisp-callable function.  The MAXARGS parameter has the same
+   meaning as in the DEFUN macro, and is used to construct a prototype.  */
+/* We can use the same trick as in the DEFUN macro to generate the
+   appropriate prototype.  */
+#define EXFUN(fnname, maxargs) \
+  extern Lisp_Object fnname DEFUN_ARGS_ ## maxargs
+
 /* Note that the weird token-substitution semantics of ANSI C makes
    this work for MANY and UNEVALLED.  */
 #define DEFUN_ARGS_MANY		(ptrdiff_t, Lisp_Object *)
@@ -983,22 +988,35 @@ struct Lisp_Symbol
 #define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
 			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
 
+#include "globals.h"
+
+//FIX-20230210-LAV: callers must change
 INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
   return NULL; //make_lisp_symbol (&lispsym[index]);
 }
 
-
-#include "globals.h"
-
-/* Value is name of symbol.  */
+/* Return true if X and Y are the same object.  */
 INLINE bool
 (EQ) (Lisp_Object x, Lisp_Object y)
 {
   return lisp_h_EQ (x, y);
 }
 
+INLINE bool
+(SYMBOLP) (Lisp_Object x)
+{
+  return lisp_h_SYMBOLP (x);
+}
+
+INLINE void
+(CHECK_SYMBOL) (Lisp_Object x)
+{
+  lisp_h_CHECK_SYMBOL (x);
+}
+
+/* Value is name of symbol.  */
 INLINE Lisp_Object
 (SYMBOL_VAL) (struct Lisp_Symbol *sym)
 {
@@ -1133,27 +1151,6 @@ typedef EMACS_UINT Lisp_Word_tag;
 #endif
 
 
-
-/* Return true if X and Y are the same object.  */
-
-
-INLINE bool
-(SYMBOLP) (Lisp_Object x)
-{
-  return lisp_h_SYMBOLP (x);
-}
-
-INLINE struct Lisp_Symbol *
-XSYMBOL (Lisp_Object a)
-{
-  Lisp_Object tem;
-  if (EQ (a, Qt)) a = Qt_;
-  if (EQ (a, Qnil)) a = Qnil_;
-  eassert (SYMBOLP (a));
-  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return scm_to_pointer (tem);
-}
-
 INLINE void
 make_symbol_constant (Lisp_Object sym)
 {
@@ -1195,25 +1192,6 @@ struct vectorlike_header
   };
 
 
-#if 0
-INLINE Lisp_Object
-make_lisp_symbol (struct Lisp_Symbol *sym)
-{
-  /* GCC 7 x86-64 generates faster code if lispsym is
-     cast to char * rather than to intptr_t.  */
-  char *symoffset = (char *) ((char *) sym - (char *) lispsym);
-  Lisp_Object a = TAG_PTR (Lisp_Symbol, symoffset);
-  eassert (XSYMBOL (a) == sym);
-  return a;
-}
-
-INLINE void
-(CHECK_SYMBOL) (Lisp_Object x)
-{
-  lisp_h_CHECK_SYMBOL (x);
-}
-#endif
-
 
 /* In the size word of a struct Lisp_Vector, this bit means it's really
    some other vector-like object.  */
@@ -1242,7 +1220,6 @@ enum pvec_type
   PVEC_HASH_TABLE,
   PVEC_TERMINAL,
   PVEC_WINDOW_CONFIGURATION,
-  PVEC_SUBR,
   PVEC_OTHER,            /* Should never be visible to Elisp code.  */
   PVEC_XWIDGET,
   PVEC_XWIDGET_VIEW,
@@ -1400,10 +1377,76 @@ INLINE bool
   return lisp_h_INTEGERP (x);
 }
 
+INLINE bool
+(VECTORLIKEP) (Lisp_Object x)
+{
+  return lisp_h_VECTORLIKEP (x);
+}
+
 /* Extract a value or address from a Lisp_Object.  */
 
+INLINE bool
+STRINGP (Lisp_Object x)
+{
+  return SMOB_TYPEP (x, lisp_string_tag);
+}
 
 
+extern void initialize_symbol (Lisp_Object, Lisp_Object);
+extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
+extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+
+INLINE struct Lisp_Symbol *
+XSYMBOL (Lisp_Object a)
+{
+  Lisp_Object tem;
+  if (EQ (a, Qt)) a = Qt_;
+  if (EQ (a, Qnil)) a = Qnil_;
+  eassert (SYMBOLP (a));
+  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
+  return scm_to_pointer (tem);
+}
+
+/* Pseudovector types.  */
+
+/*
+INLINE struct Lisp_Process *
+XPROCESS (Lisp_Object a)
+{
+  eassert (PROCESSP (a));
+  return SMOB_PTR (a);
+}
+*/
+
+/*
+INLINE struct window *
+XWINDOW (Lisp_Object a)
+{
+  eassert (WINDOWP (a));
+  return SMOB_PTR (a);
+}
+
+INLINE struct terminal *
+XTERMINAL (Lisp_Object a)
+{
+  return SMOB_PTR (a);
+}
+INLINE struct buffer *
+XBUFFER (Lisp_Object a)
+{
+  eassert (BUFFERP (a));
+  return SMOB_PTR (a);
+}
+
+INLINE struct Lisp_Char_Table *
+XCHAR_TABLE (Lisp_Object a)
+{
+  eassert (CHAR_TABLE_P (a));
+  return SMOB_PTR (a);
+}
+*/
 
 INLINE bool
 (FLOATP) (Lisp_Object x)
@@ -1456,7 +1499,6 @@ dead_object (void)
 #define XSETPROCESS(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_PROCESS))
 #define XSETWINDOW(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_WINDOW))
 #define XSETTERMINAL(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_TERMINAL))
-#define XSETSUBR(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_SUBR))
 #define XSETBUFFER(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_BUFFER))
 #define XSETCHAR_TABLE(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_CHAR_TABLE))
 #define XSETBOOL_VECTOR(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_BOOL_VECTOR))
@@ -1562,11 +1604,6 @@ struct Lisp_String
 };
 verify (GCALIGNED (struct Lisp_String));
 
-INLINE bool
-STRINGP (Lisp_Object x)
-{
-  return SMOB_TYPEP (x, lisp_string_tag);
-}
 
 INLINE void
 CHECK_STRING (Lisp_Object x)
@@ -1701,11 +1738,6 @@ struct Lisp_Vector
     Lisp_Object contents[FLEXIBLE_ARRAY_MEMBER];
   } GCALIGNED_STRUCT;
 
-INLINE bool
-(VECTORLIKEP) (Lisp_Object x)
-{
-  return lisp_h_VECTORLIKEP (x);
-}
 
 INLINE struct Lisp_Vector *
 XVECTOR (Lisp_Object a)
@@ -2143,6 +2175,7 @@ struct Lisp_Subr
     Lisp_Object type;
 #endif
   } GCALIGNED_STRUCT;
+
 struct Aligned_Lisp_Subr
   {
     Lisp_Object self;
@@ -2154,7 +2187,8 @@ verify (GCALIGNED (struct Aligned_Lisp_Subr));
 INLINE bool
 SUBRP (Lisp_Object a)
 {
-  return PSEUDOVECTORP (a, PVEC_SUBR);
+  SCM fun = SMOB_PTR (a);
+  return scm_is_true(scm_procedure_p (fun));
 }
 
 INLINE struct Lisp_Subr *
@@ -2164,7 +2198,12 @@ XSUBR (Lisp_Object a)
   return SMOB_PTR (a);
 }
 
-enum char_table_specials
+/* This is the number of slots that every char table must have.  This
+   counts the ordinary slots and the top, defalt, parent, and purpose
+   slots.  */
+
+
+enum CHAR_TABLE_STANDARD_SLOTS
   {
     /* This is the number of slots that every char table must have.  This
        counts the ordinary slots and the top, defalt, parent, and purpose
@@ -2898,32 +2937,76 @@ CHECK_SUBR (Lisp_Object x)
 
 /* This version of DEFUN declares a function prototype with the right
    arguments, so we can catch errors with maxargs at compile-time.  */
-#ifdef _MSC_VER
 #define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
-   SCM_SNARF_INIT (defsubr (&sname);)                                   \
+  SCM_SNARF_INIT (defsubr (lname, gsubr_ ## fnname, minargs, maxargs, intspec)) \
    Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
-   static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
-   { { NULL,                                                            \
-       (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS)                            \
-       | (sizeof (struct Lisp_Subr) / sizeof (EMACS_INT)) },		\
-     { (Lisp_Object (__cdecl *)(void))fnname },                         \
-     minargs, maxargs, lname, intspec, 0};				\
+   DEFUN_GSUBR_ ## maxargs (lname, fnname, minargs, maxargs)            \
    Lisp_Object fnname
-#else  /* not _MSC_VER */
-#define DEFUN(lname, fnname, sname, minargs, maxargs, intspec, doc)	\
-   SCM_SNARF_INIT (defsubr (&sname);)                                   \
-   Lisp_Object fnname DEFUN_ARGS_ ## maxargs ;				\
-   static struct Lisp_Subr alignas (GCALIGNMENT) sname =		\
-   { { .self = NULL,                                                    \
-       .size = PVEC_SUBR << PSEUDOVECTOR_AREA_BITS },                   \
-     { .a ## maxargs = fnname },                                        \
-     minargs, maxargs, lname, intspec, 0};				\
-   Lisp_Object fnname
-#endif
+
+#define GSUBR_ARGS_1(f) f (arg1)
+#define GSUBR_ARGS_2(f) GSUBR_ARGS_1 (f), f (arg2)
+#define GSUBR_ARGS_3(f) GSUBR_ARGS_2 (f), f (arg3)
+#define GSUBR_ARGS_4(f) GSUBR_ARGS_3 (f), f (arg4)
+#define GSUBR_ARGS_5(f) GSUBR_ARGS_4 (f), f (arg5)
+#define GSUBR_ARGS_6(f) GSUBR_ARGS_5 (f), f (arg6)
+#define GSUBR_ARGS_7(f) GSUBR_ARGS_6 (f), f (arg7)
+#define GSUBR_ARGS_8(f) GSUBR_ARGS_7 (f), f (arg8)
+
+#define GSUBR_ARGS(n) GSUBR_ARGS_PASTE (GSUBR_ARGS_, n)
+#define GSUBR_ARGS_PASTE(a, b) a ## b
+
+#define DEFUN_GSUBR_N(fn, maxargs)                              \
+  Lisp_Object                                                   \
+  gsubr_ ## fn                                                  \
+  (GSUBR_ARGS (maxargs) (Lisp_Object))                          \
+  {                                                             \
+    return fn (GSUBR_ARGS (maxargs) (GSUBR_ARG));               \
+  }
+#define GSUBR_ARG(x) (SCM_UNBNDP (x) ? Qnil : x)
+
+#define DEFUN_GSUBR_0(lname, fn, minargs, maxargs)       \
+  Lisp_Object gsubr_ ## fn (void) { return fn (); }
+#define DEFUN_GSUBR_1(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_2(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_3(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_4(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_5(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_6(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_7(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+#define DEFUN_GSUBR_8(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
+
+#define DEFUN_GSUBR_UNEVALLED(lname, fn, minargs, maxargs)  \
+  Lisp_Object                                               \
+  gsubr_ ## fn (Lisp_Object rest)                           \
+  {                                                         \
+    Lisp_Object len = Flength (rest);                       \
+    if (XINT (len) < minargs)                               \
+      xsignal2 (Qwrong_number_of_arguments,                 \
+                intern (lname), len);                       \
+    return fn (rest);                                       \
+  }
+#define DEFUN_GSUBR_MANY(lname, fn, minargs, maxargs)        \
+  Lisp_Object                                               \
+  gsubr_ ## fn (Lisp_Object rest)                           \
+  {                                                         \
+    int len = scm_to_int (scm_length (rest));               \
+    Lisp_Object *args;                                      \
+    SAFE_ALLOCA_LISP (args, len);                           \
+    int i;                                                  \
+    for (i = 0;                                             \
+         i < len && scm_is_pair (rest);                     \
+         i++, rest = SCM_CDR (rest))                        \
+      args[i] = SCM_CAR (rest);                             \
+    if (i < minargs)                                        \
+      xsignal2 (Qwrong_number_of_arguments,                 \
+                intern (lname), make_number (i));           \
+    return fn (i, args);                                    \
+  }
 
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */
-extern void defsubr (struct Aligned_Lisp_Subr *);
+//FIX-20230210-LAV: usage of defsubr is used in syms_of_* functions, and can be automated from spec
+extern void defsubr (const char *, scm_t_subr, short, short, const char *);
 
 enum maxargs
   {
@@ -3397,6 +3480,7 @@ extern AVOID wrong_choice (Lisp_Object, Lisp_Object);
 extern void notify_variable_watchers (Lisp_Object, Lisp_Object,
 				      Lisp_Object, Lisp_Object);
 //extern Lisp_Object Qnil_, Qt_;
+//extern Lisp_Object Qnil_, Qt_;
 extern Lisp_Object indirect_function (Lisp_Object);
 extern Lisp_Object find_symbol_value (Lisp_Object);
 enum Arith_Comparison {
@@ -3515,7 +3599,6 @@ int double_integer_scale (double);
 extern double trunc (double);
 #endif
 extern Lisp_Object fmod_float (Lisp_Object x, Lisp_Object y);
-extern void syms_of_floatfns (void);
 
 /* Defined in fringe.c.  */
 extern void syms_of_fringe (void);
@@ -4708,7 +4791,7 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
 /* Set BUF to point to an allocated array of NELT Lisp_Objects,
    immediately followed by EXTRA spare bytes.  */
-
+extern ptrdiff_t sa_avail;
 #define SAFE_ALLOCA_LISP_EXTRA(buf, nelt, extra)	       \
   do {							       \
     ptrdiff_t alloca_nbytes;				       \
@@ -4889,10 +4972,35 @@ maybe_gc (void)
   return;
 }
 
-// FIX: 20190626 LAV, whereis functionp? was: INLINE bool functionp (Lisp_Object object)
-//      old was returning true/false, new is to return:
-//        return scm_is_true (scm_procedure_p (object));
-//   perhaps functionp isn't inlined anymore?
+INLINE bool
+functionp (Lisp_Object object)
+{
+  if (SYMBOLP (object) && !NILP (Ffboundp (object)))
+    {
+      object = Findirect_function (object, Qt);
+
+      if (CONSP (object) && EQ (XCAR (object), Qautoload))
+	{
+	  /* Autoloaded symbols are functions, except if they load
+	     macros or keymaps.  */
+	  int i;
+	  for (i = 0; i < 4 && CONSP (object); i++)
+	    object = XCDR (object);
+
+	  return ! (CONSP (object) && !NILP (XCAR (object)));
+	}
+    }
+
+  if (scm_is_true (scm_procedure_p (object)))
+    return 1;
+  else if (COMPILEDP (object))
+    return true;
+  else if (CONSP (object))
+    {
+      Lisp_Object car = XCAR (object);
+      return EQ (car, Qlambda) || EQ (car, Qclosure);
+    }
+}
 
 INLINE_HEADER_END
 #endif /* EMACS_LISP_H */

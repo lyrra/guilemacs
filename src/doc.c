@@ -325,15 +325,22 @@ string is passed through `substitute-command-keys'.  */)
   Lisp_Object fun = Findirect_function (function, Qnil);
   if (NILP (fun))
     xsignal1 (Qvoid_function, function);
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
+  if (CONSP (fun) && EQ (XCAR (fun), Qmacro) ||
+      EQ (XCAR (fun), Qspecial_operator))
     fun = XCDR (fun);
 #ifdef HAVE_NATIVE_COMP
   if (!NILP (Fsubr_native_elisp_p (fun)))
     doc = native_function_doc (fun);
   else
 #endif
-  if (SUBRP (fun))
-    doc = make_fixnum (XSUBR (fun)->doc);
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      Lisp_Object tem = scm_procedure_property (fun, intern ("emacs-documentation"));
+      if (scm_is_true (tem))
+        doc = tem;
+      else
+        return Qnil;
+    }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
     doc = module_function_documentation (XMODULE_FUNCTION (fun));
@@ -484,6 +491,13 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 
   /* The type determines where the docstring is stored.  */
 
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      scm_set_procedure_property_x (fun,
+                                    intern ("emacs-documentation"),
+                                    make_number (offset));
+    }
+
   /* If it's a lisp form, stick it in the form.  */
   if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
     fun = XCDR (fun);
@@ -499,10 +513,16 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 	       correctness is quite delicate.  */
 	    XSETCAR (tem, make_fixnum (offset));
 	}
+      // FIX: 20190626 LAV, dont store it?
+      //else if (EQ (tem, Qmacro) || EQ (tem, Qspecial_operator))
+      //  store_function_docstring (XCDR (fun), offset);
     }
   /* Lisp_Subrs have a slot for it.  */
+  //FIX: 20190626 LAV, subrp should be replaced with scm_is_true (scm_procedure_p (fun))?
   else if (SUBRP (fun) && !SUBR_NATIVE_COMPILEDP (fun))
     {
+      // FIX: 20190626 LAV, This call will retrieve the function-documentation, but how do we set it?
+      //scm_procedure_property (fun, intern ("emacs-documentation"))
       XSUBR (fun)->doc = offset;
     }
 
