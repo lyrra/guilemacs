@@ -358,7 +358,9 @@ string is passed through `substitute-command-keys'.  */)
   Lisp_Object fun = Findirect_function (function, Qnil);
   if (NILP (fun))
     xsignal1 (Qvoid_function, function);
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
+  if (CONSP (fun)
+      && (EQ (XCAR (fun), Qmacro)
+          || EQ (XCAR (fun), Qspecial_operator)))
     fun = XCDR (fun);
   doc = call1 (Qfunction_documentation, fun);
 
@@ -398,8 +400,14 @@ DEFUN ("internal-subr-documentation", Fsubr_documentation, Ssubr_documentation, 
     return native_function_doc (function);
   else
 #endif
-  if (SUBRP (function))
-    return make_fixnum (XSUBR (function)->doc);
+  if (scm_is_true (scm_procedure_p (function)))
+    {
+      Lisp_Object tem = scm_procedure_property (function, intern ("emacs-documentation"));
+      if (scm_is_true (tem))
+        return tem;
+      else
+        return Qnil;
+    }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
     return module_function_documentation (XMODULE_FUNCTION (function));
@@ -477,28 +485,15 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
   /* The type determines where the docstring is stored.  */
 
   /* If it's a lisp form, stick it in the form.  */
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
-    fun = XCDR (fun);
+  if (CONSP (fun)
+      && (EQ (XCAR (fun), Qmacro)
+          || EQ (XCAR (fun), Qspecial_operator)))
   /* Lisp_Subrs have a slot for it.  */
-  if (SUBRP (fun))
+  if (scm_is_true (scm_procedure_p (fun)))
     {
-      XSUBR (fun)->doc = offset;
-      eassert (XSUBR (fun)->doc >= 0);
-    }
-  else if (CLOSUREP (fun))
-    {
-      /* This bytecode object must have a slot for the docstring, since
-	 we've found a docstring for it.  */
-      if (PVSIZE (fun) > CLOSURE_DOC_STRING
-	  /* Don't overwrite a non-docstring value placed there, such as
-             the symbols used for Oclosures.  */
-	  && VALID_DOCSTRING_P (AREF (fun, CLOSURE_DOC_STRING)))
-	ASET (fun, CLOSURE_DOC_STRING, make_fixnum (offset));
-      else
-	{
-	  AUTO_STRING (format, "No doc string slot for compiled: %S");
-	  CALLN (Fmessage, format, obj);
-	}
+      scm_set_procedure_property_x (fun,
+                                    intern ("emacs-documentation"),
+                                    make_number (offset));
     }
   else
     {

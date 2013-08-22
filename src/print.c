@@ -1789,12 +1789,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	print_string (XPROCESS (obj)->name, printcharfun);
       return;
 
-    case PVEC_SUBR:
-      print_c_string ("#<subr ", printcharfun);
-      print_c_string (XSUBR (obj)->symbol_name, printcharfun);
-      printchar ('>', printcharfun);
-      return;
-
     case PVEC_XWIDGET:
 #ifdef HAVE_XWIDGETS
       {
@@ -2842,8 +2836,6 @@ init_print_once (void)
   /* The subroutine object for external-debugging-output is kept here
      for the convenience of the debugger.  */
   DEFSYM (Qexternal_debugging_output, "external-debugging-output");
-
-  defsubr (&Sexternal_debugging_output);
 }
 
 void
