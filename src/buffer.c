@@ -1910,8 +1910,8 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   /* Run hooks with the buffer to be killed as the current buffer.  */
   {
-    specpdl_ref count = SPECPDL_INDEX ();
     bool modified;
+    dynwind_begin ();
 
     record_unwind_protect_excursion ();
     set_buffer_internal (b);
@@ -1923,7 +1923,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 	tem = CALLN (Frun_hook_with_args_until_failure,
 		     Qkill_buffer_query_functions);
 	if (NILP (tem))
-	  return unbind_to (count, Qnil);
+          {
+            dynwind_end ();
+            return Qnil;
+          }
       }
 
     /* Is this a modified buffer that's visiting a file? */
@@ -1936,7 +1939,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 	/* Ask whether to kill the buffer, and exit if the user says
 	   "no".  */
 	if (NILP (call1 (Qkill_buffer__possibly_save, buffer)))
-	  return unbind_to (count, Qnil);
+	  {
+	    dynwind_end ();
+	    return Qnil;
+	  }
 	/* Recheck modified.  */
 	modified = BUF_MODIFF (b) > BUF_SAVE_MODIFF (b);
       }
@@ -1960,12 +1966,15 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
     /* If the hooks have killed the buffer, exit now.  */
     if (!BUFFER_LIVE_P (b))
-      return unbind_to (count, Qt);
+      {
+        dynwind_end ();
+        return Qt;
+      }
 
     /* Then run the hooks.  */
     if (!b->inhibit_buffer_hooks)
       run_hook (Qkill_buffer_hook);
-    unbind_to (count, Qnil);
+    dynwind_end ();
   }
 
   /* If the hooks have killed the buffer, exit now.  */
@@ -2271,7 +2280,7 @@ the current buffer's major mode.  */)
                           `hack-local-variables' get run. */
     return Qnil;
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* To select a nonfundamental mode,
      select the buffer temporarily and then call the mode function.  */
@@ -2281,7 +2290,8 @@ the current buffer's major mode.  */)
   Fset_buffer (buffer);
   call0 (function);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("current-buffer", Fcurrent_buffer, Scurrent_buffer, 0, 0, 0,
@@ -3658,8 +3668,9 @@ buffer.  */)
 {
   struct buffer *b, *ob = 0;
   Lisp_Object obuffer;
-  specpdl_ref count = SPECPDL_INDEX ();
   ptrdiff_t o_beg UNINIT, o_end UNINIT;
+
+  dynwind_begin ();
 
   CHECK_OVERLAY (overlay);
   if (NILP (buffer))
@@ -3742,10 +3753,12 @@ buffer.  */)
          - Most of the work done by Fdelete_overlay has already been done
            here for other reasons.  */
       drop_overlay (XOVERLAY (overlay));
-      return unbind_to (count, overlay);
+      dynwind_end ();
+      return overlay;
     }
 
-  return unbind_to (count, overlay);
+  dynwind_end ();
+  return overlay;
 }
 
 DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
@@ -3753,13 +3766,16 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
   (Lisp_Object overlay)
 {
   struct buffer *b;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   CHECK_OVERLAY (overlay);
 
   b = OVERLAY_BUFFER (overlay);
   if (! b)
-    return Qnil;
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   specbind (Qinhibit_quit, Qt);
 
@@ -3774,7 +3790,8 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
 	  || !NILP (Foverlay_get (overlay, Qafter_string))))
     b->prevent_redisplay_optimizations_p = 1;
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("delete-all-overlays", Fdelete_all_overlays, Sdelete_all_overlays, 0, 1, 0,

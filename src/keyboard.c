@@ -709,7 +709,7 @@ add_command_key (Lisp_Object key)
 Lisp_Object
 recursive_edit_1 (void)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
 
   if (command_loop_level > 0)
@@ -759,7 +759,8 @@ recursive_edit_1 (void)
   if (FUNCTIONP (val))
     call0 (val);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 /* When an auto-save happens, record the "time", and don't do again soon.  */
@@ -803,13 +804,15 @@ throwing to \\='exit:
 This function is called by the editor initialization to begin editing.  */)
   (void)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object buffer;
 
   /* If we enter while input is blocked, don't lock up here.
      This may happen through the debugger during redisplay.  */
-  if (input_blocked_p ())
+  if (input_blocked_p ()) {
+    dynwind_end ();
     return Qnil;
+  }
 
   if (command_loop_level >= 0
       && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
@@ -832,7 +835,8 @@ This function is called by the editor initialization to begin editing.  */)
     temporarily_switch_to_single_kboard (SELECTED_FRAME ());
 
   recursive_edit_1 ();
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 void
@@ -1271,7 +1275,7 @@ DEFUN ("internal--track-mouse", Finternal_track_mouse, Sinternal_track_mouse,
        doc: /* Call BODYFUN with mouse movement events enabled.  */)
   (Lisp_Object bodyfun)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
 
   record_unwind_protect (tracking_off, track_mouse);
@@ -1279,7 +1283,8 @@ DEFUN ("internal--track-mouse", Finternal_track_mouse, Sinternal_track_mouse,
   track_mouse = Qt;
 
   val = call0 (bodyfun);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* If mouse has moved on some frame and we are tracking the mouse,
@@ -1950,12 +1955,11 @@ safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
 void
 safe_run_hooks (Lisp_Object hook)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
-
+  dynwind_begin ();
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}),
                       safe_run_hook_funcall);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 static void
@@ -4848,7 +4852,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 	     nothing, we still want to play it safe here.  */
 	  if (NILP (AREF (chosen_timer, 0)))
 	    {
-	      specpdl_ref count = SPECPDL_INDEX ();
+	      dynwind_begin ();
 	      Lisp_Object old_deactivate_mark = Vdeactivate_mark;
 
 	      /* Mark the timer as triggered to prevent problems if the lisp
@@ -4860,7 +4864,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 	      call1 (Qtimer_event_handler, chosen_timer);
 	      Vdeactivate_mark = old_deactivate_mark;
 	      timers_run++;
-	      unbind_to (count, Qnil);
+	      dynwind_end ();
 
 	      /* Since we have handled the event,
 		 we don't need to tell the caller to wake up and do it.  */
@@ -8736,12 +8740,13 @@ eval_dyn (Lisp_Object form)
 Lisp_Object
 menu_item_eval_property (Lisp_Object sexpr)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
   specbind (Qinhibit_redisplay, Qt);
   val = internal_condition_case_1 (eval_dyn, sexpr, Qerror,
 				   menu_item_eval_property_1);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* This function parses a menu item and leaves the result in the
@@ -11483,7 +11488,7 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
 		      Lisp_Object cmd_loop, bool allow_string,
 		      bool disable_text_conversion)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (!NILP (prompt))
     CHECK_STRING (prompt);
@@ -11525,10 +11530,9 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
       Vquit_flag = Qt;
       maybe_quit ();
     }
-
-  return unbind_to (count,
-		    ((allow_string ? make_event_array : Fvector)
-		     (i, keybuf)));
+  Lisp_Object tem0 = ((allow_string ? make_event_array : Fvector) (i, keybuf));
+  dynwind_end ();
+  return tem0;
 }
 
 DEFUN ("read-key-sequence", Fread_key_sequence, Sread_key_sequence, 1, 6, 0,
@@ -11980,7 +11984,7 @@ On such systems, calling this function with non-nil STUFFSTRING might
 either signal an error or silently fail to stuff the characters.  */)
   (Lisp_Object stuffstring)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   int old_height, old_width;
   int width, height;
 
@@ -12002,7 +12006,7 @@ either signal an error or silently fail to stuff the characters.  */)
     sys_subshell ();
   else
     sys_suspend ();
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Check if terminal/window size has changed.
      Note that this is not useful when we are running directly

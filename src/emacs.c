@@ -480,7 +480,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 {
   int i;
   Lisp_Object name, dir, handler;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object raw_name;
   AUTO_STRING (slash_colon, "/:");
 
@@ -645,7 +645,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	  = Fcons (build_unibyte_string (argv[i]), Vcommand_line_args);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 DEFUN ("invocation-name", Finvocation_name, Sinvocation_name, 0, 0, 0,
@@ -3183,7 +3183,7 @@ You must run Emacs in batch mode in order to dump it.  */)
 {
   Lisp_Object tem;
   Lisp_Object symbol;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   check_pure_size ();
 
@@ -3274,7 +3274,8 @@ You must run Emacs in batch mode in order to dump it.  */)
 
   Vpurify_flag = tem;
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 #endif

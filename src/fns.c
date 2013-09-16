@@ -3687,7 +3687,7 @@ FILENAME are suppressed.  */)
 
   if (NILP (tem))
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       int nesting = 0;
 
       /* This is to make sure that loadup.el gives a clear picture
@@ -3726,7 +3726,10 @@ FILENAME are suppressed.  */)
 
       /* If load failed entirely, return nil.  */
       if (NILP (tem))
-	return unbind_to (count, Qnil);
+        {
+	  dynwind_end ();
+  	  return Qnil;
+	}
 
       tem = Fmemq (feature, Vfeatures);
       if (NILP (tem))
@@ -3742,7 +3745,7 @@ FILENAME are suppressed.  */)
                    SDATA (tem3), tem2);
         }
 
-      unbind_to (count, feature);
+      dynwind_end ();
     }
 
   return feature;
@@ -5822,7 +5825,7 @@ extract_data_from_object (Lisp_Object spec,
   else if (BUFFERP (object))
     {
       EMACS_INT b, e;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       record_unwind_current_buffer ();
 
@@ -5903,7 +5906,7 @@ extract_data_from_object (Lisp_Object spec,
 	}
 
       object = make_buffer_string (b, e, false);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       if (STRING_MULTIBYTE (object))
 	object = code_convert_string (object, coding_system,

@@ -2084,8 +2084,8 @@ usage: (make-process &rest ARGS)  */)
   else
     create_pty (proc);
 
-  SAFE_FREE ();
   dynwind_end ();
+  SAFE_FREE ();
   return proc;
 }
 
@@ -5091,7 +5091,7 @@ server_accept_connection (Lisp_Object server, int channel)
   eassert (NILP (p->command));
   eassert (p->pid == 0);
 
-  dynwind_end();
+  dynwind_end ();
 
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd  = s;
@@ -6262,7 +6262,8 @@ read_process_output (Lisp_Object proc, int channel)
     {
       if (nbytes < 0 || coding->mode & CODING_MODE_LAST_BLOCK)
 	{
-	  SAFE_FREE_UNBIND_TO (count, Qnil);
+	  SAFE_FREE ();
+          dynwind_end ();
 	  return nbytes;
 	}
       coding->mode |= CODING_MODE_LAST_BLOCK;
@@ -7747,8 +7748,10 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   int waiting = waiting_for_user_input_p;
   dynwind_begin ();
 
-  if (inhibit_sentinels)
+  if (inhibit_sentinels) {
+    dynwind_end ();
     return;
+  }
 
   odeactivate = Vdeactivate_mark;
 #if 0

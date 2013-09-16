@@ -2456,7 +2456,7 @@ xg_maybe_add_timer (gpointer data)
 static int
 xg_dialog_run (struct frame *f, GtkWidget *w)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct xg_dialog_data dd;
 
   xg_set_screen (w, f);
@@ -2484,7 +2484,7 @@ xg_dialog_run (struct frame *f, GtkWidget *w)
   g_main_loop_run (dd.loop);
 
   dd.w = 0;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return dd.response;
 }

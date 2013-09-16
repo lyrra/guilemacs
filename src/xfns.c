@@ -4886,7 +4886,6 @@ This function is an internal primitive--use `make-frame' instead.  */)
   bool minibuffer_only = false;
   bool undecorated = false, override_redirect = false;
   long window_prompting = 0;
-  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object display;
   struct x_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -4894,6 +4893,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
 #ifdef HAVE_GTK3
   GdkWindow *gwin;
 #endif
+
+  dynwind_begin ();
 
   parms = Fcopy_alist (parms);
 
@@ -5524,7 +5525,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
      and similar functions.  */
   Vwindow_list = Qnil;
 
- return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -8355,8 +8357,9 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   struct frame *f;
   Lisp_Object frame;
   Lisp_Object name;
-  specpdl_ref count = SPECPDL_INDEX ();
   bool face_change_before = face_change;
+
+  dynwind_begin ();
 
   if (!dpyinfo->terminal->name)
     error ("Terminal is not live, can't create new frames on it");
@@ -8704,7 +8707,8 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   face_change = face_change_before;
 
   /* Discard the unwind_protect.  */
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -8929,7 +8933,7 @@ x_hide_tip (bool delete)
     {
       Lisp_Object was_open = Qnil;
 
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_redisplay, Qt);
       specbind (Qinhibit_quit, Qt);
 
@@ -8955,7 +8959,8 @@ x_hide_tip (bool delete)
       else
 	tip_frame = Qnil;
 
-      return unbind_to (count, was_open);
+      dynwind_end ();
+      return was_open;
     }
 #endif /* USE_GTK */
 }
@@ -9002,12 +9007,14 @@ Text larger than the specified size is clipped.  */)
   struct text_pos pos;
   int width, height;
   int old_windows_or_buffers_changed = windows_or_buffers_changed;
-  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object window, size, tip_buf;
   bool displayed;
 #ifdef ENABLE_CHECKING
   struct glyph_row *row, *end;
 #endif
+
+  dynwind_begin ();
+
   AUTO_STRING (tip, " *tip*");
 
   specbind (Qinhibit_redisplay, Qt);
@@ -9163,8 +9170,11 @@ Text larger than the specified size is clipped.  */)
       /* Create a frame for the tooltip, and record it in the global
 	 variable tip_frame.  */
       if (NILP (tip_frame = x_create_tip_frame (FRAME_DISPLAY_INFO (f), parms)))
-	/* Creating the tip frame failed.  */
-	return unbind_to (count, Qnil);
+        {
+	  /* Creating the tip frame failed.  */
+          dynwind_end ();
+	  return Qnil;
+        }
     }
 
   tip_f = XFRAME (tip_frame);
@@ -9299,7 +9309,8 @@ Text larger than the specified size is clipped.  */)
   tip_timer = call3 (Qrun_at_time, timeout, Qnil,
 		     Qx_hide_tip);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -9397,7 +9408,8 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
   Arg al[10];
   int ac = 0;
   XmString dir_xmstring, pattern_xmstring;
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   check_window_system (f);
 
@@ -9585,7 +9597,8 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 
   decoded_file = DECODE_FILE (file);
 
-  return unbind_to (count, decoded_file);
+  dynwind_end ();
+  return decoded_file;
 }
 
 #endif /* USE_MOTIF */
@@ -9617,8 +9630,9 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
   char *fn;
   Lisp_Object file = Qnil;
   Lisp_Object decoded_file;
-  specpdl_ref count = SPECPDL_INDEX ();
   char *cdef_file;
+
+  dynwind_begin ();
 
   check_window_system (f);
 
@@ -9659,7 +9673,8 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
 
   decoded_file = DECODE_FILE (file);
 
-  return unbind_to (count, decoded_file);
+  dynwind_end ();
+  return decoded_file;
 }
 
 
@@ -9678,7 +9693,8 @@ nil, it defaults to the selected frame. */)
   Lisp_Object font;
   Lisp_Object font_param;
   char *default_name = NULL;
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   if (popup_activated ())
     error ("Trying to use a menu from within a menu-entry");
@@ -9710,7 +9726,8 @@ nil, it defaults to the selected frame. */)
   if (NILP (font))
     quit ();
 
-  return unbind_to (count, font);
+  dynwind_end ();
+  return font;
 }
 #endif /* HAVE_FREETYPE */
 

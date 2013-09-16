@@ -3747,7 +3747,7 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
   /* Make the menu on that window.  */
   menu = tty_menu_create ();
 
-  specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Avoid crashes if, e.g., another client will connect while we
      are in a menu.  */
@@ -3984,7 +3984,9 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
 
  tty_menu_end:
 
-  return SAFE_FREE_UNBIND_TO (specpdl_count, entry);
+  SAFE_FREE ();
+  dynwind_end ();
+  return entry;
 }
 
 #endif	/* !MSDOS && !defined HAVE_ANDROID */

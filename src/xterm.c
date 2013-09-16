@@ -26761,7 +26761,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 {
   struct x_display_info *dpyinfo;
   Lisp_Object frame, tail;
-  specpdl_ref idx = SPECPDL_INDEX ();
+  dynwind_begin ();
   Emacs_XIOErrorHandler io_error_handler;
   xm_drop_start_message dmsg;
   struct frame *f;
@@ -26990,7 +26990,7 @@ For details, see etc/PROBLEMS.\n",
 
   totally_unblock_input ();
 
-  unbind_to (idx, Qnil);
+  dynwind_end ();
   clear_waiting_for_input ();
 
   /* Here, we absolutely have to use a non-local exit (e.g. signal, throw,

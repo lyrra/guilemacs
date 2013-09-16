@@ -370,7 +370,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       /* Don't allow a quit within the converter.
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
-      count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (!may_quit)
 	specbind (Qinhibit_quit, Qt);
@@ -404,7 +404,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 		       tem);
       else
 	value = Qnil;
-      value = unbind_to (count, value);
+      dynwind_end ();
     }
 
   /* Make sure this value is of a type that we could transmit
@@ -1117,7 +1117,6 @@ x_handle_selection_request (struct selection_input_event *event)
   Atom property = SELECTION_EVENT_PROPERTY (event);
   Lisp_Object local_selection_data;
   bool success = false;
-  specpdl_ref count = SPECPDL_INDEX ();
   bool pushed, use_alternate;
   Lisp_Object alias, tem;
 
@@ -1138,6 +1137,8 @@ x_handle_selection_request (struct selection_input_event *event)
 	  break;
 	}
     }
+
+  dynwind_begin ();
 
   pushed = false;
 
@@ -1260,7 +1261,7 @@ x_handle_selection_request (struct selection_input_event *event)
   /* Used to punt when dpyinfo is NULL.  */
  REALLY_DONE:
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return;
 }
 
@@ -1517,7 +1518,7 @@ wait_for_property_change_unwind (void *loc)
 static void
 wait_for_property_change (struct prop_location *location)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Make sure to do unexpect_property_change if we quit or err.  */
   record_unwind_protect_ptr (wait_for_property_change_unwind, location);
@@ -1548,7 +1549,7 @@ wait_for_property_change (struct prop_location *location)
 	}
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Called from XTread_socket in response to a PropertyNotify event.  */

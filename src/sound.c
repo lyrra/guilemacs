@@ -1366,7 +1366,8 @@ Internal use only, use `play-sound' instead.  */)
   (Lisp_Object sound)
 {
   Lisp_Object attrs[SOUND_ATTR_SENTINEL];
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
 #ifdef WINDOWSNT
   unsigned long ui_volume = 0;
@@ -1464,7 +1465,8 @@ Internal use only, use `play-sound' instead.  */)
 
 #endif /* WINDOWSNT */
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 /***********************************************************************

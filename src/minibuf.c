@@ -576,7 +576,6 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 	      bool allow_props, bool inherit_input_method)
 {
   Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
   Lisp_Object mini_frame, ambient_dir, minibuffer, input_method;
   Lisp_Object calling_frame = selected_frame;
   Lisp_Object calling_window = selected_window;
@@ -587,6 +586,8 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   Lisp_Object histval;
 
   Lisp_Object empty_minibuf;
+
+  dynwind_begin ();
 
   specbind (Qminibuffer_default, defalt);
   specbind (Qinhibit_read_only, Qnil);
@@ -653,7 +654,8 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
       && NILP (Vexecuting_kbd_macro))
     {
       val = read_minibuf_noninteractive (prompt, expflag, defalt);
-      return unbind_to (count, val);
+      dynwind_end ();
+      return val;
     }
 
   /* Ensure now that the latest minibuffer has been created and pushed
@@ -831,7 +833,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* Erase the buffer.  */
   {
-    specpdl_ref count1 = SPECPDL_INDEX ();
+    dynwind_begin ();
     specbind (Qinhibit_read_only, Qt);
     specbind (Qinhibit_modification_hooks, Qt);
     Ferase_buffer ();
@@ -878,7 +880,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 	      }
 	  }
       }
-    unbind_to (count1, Qnil);
+    dynwind_end ();
   }
 
   minibuf_prompt_width = current_column ();
@@ -954,7 +956,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* The appropriate frame will get selected
      in set-window-configuration.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Switch the frame back to the calling frame.  */
   if (FRAMEP (calling_frame)
@@ -1003,7 +1005,7 @@ nth_minibuffer (EMACS_INT depth)
 static void
 set_minibuffer_mode (Lisp_Object buf, EMACS_INT depth)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_current_buffer ();
   Fset_buffer (buf);
@@ -1019,7 +1021,7 @@ set_minibuffer_mode (Lisp_Object buf, EMACS_INT depth)
       else
 	Fkill_all_local_variables (Qnil);
     }
-  buf = unbind_to (count, buf);
+  dynwind_end ();
 }
 
 /* Return a buffer to be used as the minibuffer at depth `depth'.
@@ -1172,14 +1174,14 @@ read_minibuf_unwind (void)
 
   /* Erase the minibuffer we were using at this level.  */
   {
-    specpdl_ref count = SPECPDL_INDEX ();
+    dynwind_begin ();
     /* Prevent error in erase-buffer.  */
     specbind (Qinhibit_read_only, Qt);
     specbind (Qinhibit_modification_hooks, Qt);
     old_deactivate_mark = Vdeactivate_mark;
     Ferase_buffer ();
     Vdeactivate_mark = old_deactivate_mark;
-    unbind_to (count, Qnil);
+    dynwind_end ();
   }
 
   /* When we get to the outmost level, make sure we resize the
@@ -1423,7 +1425,7 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
   (Lisp_Object prompt, Lisp_Object initial_input, Lisp_Object history, Lisp_Object default_value, Lisp_Object inherit_input_method)
 {
   Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Just in case we're in a recursive minibuffer, make it clear that the
      previous minibuffer's completion table does not apply to the new
@@ -1436,7 +1438,8 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
 			       inherit_input_method);
   if (STRINGP (val) && SCHARS (val) == 0 && ! NILP (default_value))
     val = CONSP (default_value) ? XCAR (default_value) : default_value;
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("read-command", Fread_command, Sread_command, 1, 2, 0,
@@ -1522,7 +1525,7 @@ function, instead of the usual behavior.  */)
   Lisp_Object result;
   char *s;
   ptrdiff_t len;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (BUFFERP (def))
     def = BVAR (XBUFFER (def), name);
@@ -1568,7 +1571,8 @@ function, instead of the usual behavior.  */)
 	      ? call3 (Vread_buffer_function, prompt, def, require_match)
 	      : call4 (Vread_buffer_function, prompt, def, require_match,
 		       predicate));
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 static bool

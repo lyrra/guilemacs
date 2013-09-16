@@ -293,7 +293,7 @@ buffer before the macro is executed.  */)
 {
   Lisp_Object final;
   Lisp_Object tem;
-  specpdl_ref pdlcount = SPECPDL_INDEX ();
+  dynwind_begin ();
   EMACS_INT repeat = 1;
   EMACS_INT success_count = 0;
 
@@ -385,7 +385,8 @@ buffer before the macro is executed.  */)
 
   Vreal_this_command = Vexecuting_kbd_macro;
 
-  return unbind_to (pdlcount, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 void

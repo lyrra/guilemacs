@@ -804,7 +804,7 @@ The property values are compared with `eq'.  */)
   else
     {
       Lisp_Object initial_value, value;
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -848,7 +848,7 @@ The property values are compared with `eq'.  */)
 	      break;
 	  }
 
-      position = unbind_to (count, position);
+      dynwind_end ();
     }
 
   return position;
@@ -891,7 +891,7 @@ first valid position in OBJECT.  */)
     }
   else
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -943,7 +943,7 @@ first valid position in OBJECT.  */)
 	    }
 	}
 
-      position = unbind_to (count, position);
+      dynwind_end ();
     }
 
   return position;

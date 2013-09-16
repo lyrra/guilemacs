@@ -2197,8 +2197,8 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
   Lisp_Object start, end;
   Lisp_Object start_marker, end_marker;
   Lisp_Object preserve_marker;
-  specpdl_ref count = SPECPDL_INDEX ();
   struct rvoe_arg rvoe_arg;
+  dynwind_begin ();
 
   start = make_fixnum (start_int);
   end = make_fixnum (end_int);
@@ -2247,7 +2247,7 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
 
   RESTORE_VALUE;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Signal a change immediately after it happens.
@@ -2260,12 +2260,14 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
 void
 signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct rvoe_arg rvoe_arg;
   Lisp_Object tmp, save_insert_behind_hooks, save_insert_in_from_hooks;
 
-  if (inhibit_modification_hooks)
+  if (inhibit_modification_hooks) {
+    dynwind_end ();
     return;
+  }
 
   /* If we are deferring calls to the after-change functions
      and there are no before-change functions,
@@ -2295,6 +2297,7 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 	= Fcons (elt, combine_after_change_list);
       combine_after_change_buffer = Fcurrent_buffer ();
 
+      dynwind_end ();
       return;
     }
 
@@ -2343,7 +2346,7 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
     report_interval_modification (make_fixnum (charpos),
 				  make_fixnum (charpos + lenins));
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 static void
@@ -2357,13 +2360,15 @@ DEFUN ("combine-after-change-execute", Fcombine_after_change_execute,
        doc: /* This function is for use internally in the function `combine-after-change-calls'.  */)
   (void)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   ptrdiff_t beg, end, change;
   ptrdiff_t begpos, endpos;
   Lisp_Object tail;
 
-  if (NILP (combine_after_change_list))
+  if (NILP (combine_after_change_list)) {
+    dynwind_end ();
     return Qnil;
+  }
 
   /* It is rare for combine_after_change_buffer to be invalid, but
      possible.  It can happen when combine-after-change-calls is
@@ -2373,6 +2378,7 @@ DEFUN ("combine-after-change-execute", Fcombine_after_change_execute,
       || !BUFFER_LIVE_P (XBUFFER (combine_after_change_buffer)))
     {
       combine_after_change_list = Qnil;
+      dynwind_end ();
       return Qnil;
     }
 
@@ -2434,7 +2440,8 @@ DEFUN ("combine-after-change-execute", Fcombine_after_change_execute,
   signal_after_change (begpos, endpos - begpos - change, endpos - begpos);
   update_compositions (begpos, endpos, CHECK_ALL);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 void

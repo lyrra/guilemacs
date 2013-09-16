@@ -1119,13 +1119,16 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
   struct frame *f;
   Lisp_Object x, y, window;
   int menuflags = 0;
-  specpdl_ref specpdl_count = SPECPDL_INDEX ();
-  specpdl_ref count2;
+  dynwind_begin ();
+  specpdl_ref specpdl_count2;
 
   if (NILP (position))
     /* This is an obsolete call, which wants us to precompute the
        keybinding equivalents, but we don't do that any more anyway.  */
-    return Qnil;
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   {
     bool get_current_pos_p = 0;
@@ -1368,7 +1371,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
       menuflags &= ~MENU_KEYMAPS;
     }
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* Hide a previous tip, if any.  */
@@ -1390,7 +1393,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     }
 #endif
 
-  specpdl_count2 = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect_void (discard_menu_items);
 
@@ -1414,7 +1417,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     selection = FRAME_TERMINAL (f)->menu_show_hook (f, xpos, ypos, menuflags,
 						    title, &error_name);
 
-  unbind_to (specpdl_count2, Qnil);
+  dynwind_end ();
 
 #ifdef HAVE_NTGUI     /* W32 specific because other terminals clear
 			 the grab inside their `menu_show_hook's if

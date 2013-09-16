@@ -278,7 +278,7 @@ Lisp_Object
 call_debugger (Lisp_Object arg)
 {
   bool debug_while_redisplaying;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
 
   /* The previous value of 40 is too small now that the debugger
@@ -324,7 +324,8 @@ call_debugger (Lisp_Object arg)
       && !EQ (Vdebugger, Qdebug_early))
     Ftop_level ();
 
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 void
@@ -996,7 +997,7 @@ usage: (let* VARLIST BODY...)  */)
   (Lisp_Object args)
 {
   Lisp_Object var, val, elt, lexenv;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   lexenv = Vinternal_interpreter_environment;
 
@@ -1040,7 +1041,8 @@ usage: (let* VARLIST BODY...)  */)
   CHECK_LIST_END (varlist, XCAR (args));
 
   val = Fprogn (XCDR (args));
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("let", Flet, Slet, 1, UNEVALLED, 0,
@@ -1054,8 +1056,8 @@ usage: (let VARLIST BODY...)  */)
 {
   Lisp_Object *temps, tem, lexenv;
   Lisp_Object elt;
-  specpdl_ref count = SPECPDL_INDEX ();
   ptrdiff_t argnum;
+  dynwind_begin ();
   USE_SAFE_ALLOCA;
 
   Lisp_Object varlist = XCAR (args);
@@ -1107,7 +1109,9 @@ usage: (let VARLIST BODY...)  */)
     specbind (Qinternal_interpreter_environment, lexenv);
 
   elt = Fprogn (XCDR (args));
-  return SAFE_FREE_UNBIND_TO (count, elt);
+  SAFE_FREE ();
+  dynwind_end ();
+  return elt;
 }
 
 DEFUN ("while", Fwhile, Swhile, 1, UNEVALLED, 0,
@@ -1386,11 +1390,12 @@ usage: (unwind-protect BODYFORM UNWINDFORMS...)  */)
   (Lisp_Object args)
 {
   Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect (prog_ignore, XCDR (args));
   val = eval_sub (XCAR (args));
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("condition-case", Fcondition_case, Scondition_case, 2, UNEVALLED, 0,
@@ -2386,11 +2391,14 @@ it defines a macro.  */)
 {
   if (!CONSP (fundef) || !EQ (Qautoload, XCAR (fundef)))
     return fundef;
+  }
 
   Lisp_Object kind = Fnth (make_fixnum (4), fundef);
   if (EQ (macro_only, Qmacro)
       && !(EQ (kind, Qt) || EQ (kind, Qmacro)))
-    return fundef;
+    {
+      return fundef;
+    }
 
   /* This is to make sure that loadup.el gives a clear picture
      of what files are preloaded and when.  */
@@ -2441,10 +2449,12 @@ LEXICAL can also represent an actual lexical environment; see the Info
 node `(elisp)Eval' for details.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qinternal_interpreter_environment,
 	    CONSP (lexical) || NILP (lexical) ? lexical : list_of_t);
-  return unbind_to (count, eval_sub (form));
+  Lisp_Object tem = eval_sub (form);
+  dynwind_end ();
+  return tem;
 }
 
 void
@@ -2644,7 +2654,7 @@ eval_sub (Lisp_Object form)
 	}
       if (EQ (funcar, Qmacro))
 	{
-	  specpdl_ref count1 = SPECPDL_INDEX ();
+	  dynwind_begin ();
 	  Lisp_Object exp;
 	  /* Bind lexical-binding during expansion of the macro, so the
 	     macro can know reliably if the code it outputs will be
@@ -2665,7 +2675,7 @@ eval_sub (Lisp_Object form)
 	    specbind (Qmacroexp__dynvars, dynvars);
 
 	  exp = apply1 (Fcdr (fun), original_args);
-	  exp = unbind_to (count1, exp);
+	  dynwind_end ();
 	  val = eval_sub (exp);
 	}
       else if (EQ (funcar, Qlambda))
@@ -3337,7 +3347,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
             : exec_byte_code (fun, 0, 0, NULL);
     }
 
-  return unbind_to (count, val);
+  return val;
 }
 
 DEFUN ("func-arity", Ffunc_arity, Sfunc_arity, 1, 1, 0,
@@ -4158,7 +4168,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
      (Lisp_Object exp, Lisp_Object nframes, Lisp_Object base)
 {
   union specbinding *pdl = get_backtrace_frame (nframes, base);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   ptrdiff_t distance = specpdl_ptr - pdl;
   eassert (distance >= 0);
 
@@ -4171,7 +4181,9 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
   /* Use eval_sub rather than Feval since the main motivation behind
      backtrace-eval is to be able to get/set the value of lexical variables
      from the debugger.  */
-  return unbind_to (count, eval_sub (exp));
+  Lisp_Object tem1 = eval_sub (exp);
+  dynwind_end ();
+  return tem1;
 }
 
 DEFUN ("backtrace--locals", Fbacktrace__locals, Sbacktrace__locals, 1, 2, NULL,

@@ -2278,7 +2278,7 @@ permissions.  */)
    Lisp_Object preserve_permissions)
 {
   Lisp_Object handler;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object encoded_file, encoded_newname;
 #if HAVE_LIBSELINUX
   char *con;
@@ -2303,10 +2303,12 @@ permissions.  */)
   /* Likewise for output file name.  */
   if (NILP (handler))
     handler = Ffind_file_name_handler (newname, Qcopy_file);
-  if (!NILP (handler))
+  if (!NILP (handler)) {
+    dynwind_end ();
     return call7 (handler, Qcopy_file, file, newname,
 		  ok_if_already_exists, keep_time, preserve_uid_gid,
 		  preserve_permissions);
+  }
 
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
@@ -2564,7 +2566,7 @@ permissions.  */)
 #endif /* MSDOS */
 #endif /* not WINDOWSNT */
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return Qnil;
 }
@@ -2849,13 +2851,14 @@ This is what happens in interactive use with M-x.  */)
   else
     report_file_errno ("Renaming", list2 (file, newname), rename_errno);
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qdelete_by_moving_to_trash, Qnil);
   if (dirp)
     call2 (Qdelete_directory, file, Qt);
   else
     call2 (Qdelete_file, file, Qnil);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
@@ -6216,7 +6219,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   int do_handled_files;
   Lisp_Object oquit;
   FILE *stream = NULL;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool orig_minibuffer_auto_raise = minibuffer_auto_raise;
   bool old_message_p = 0;
   struct auto_save_unwind auto_save_unwind;
@@ -6392,7 +6395,8 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   Vquit_flag = oquit;
 
   /* This restores the message-stack status.  */
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("set-buffer-auto-saved", Fset_buffer_auto_saved,

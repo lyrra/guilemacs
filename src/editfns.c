@@ -831,12 +831,13 @@ usage: (save-excursion &rest BODY)  */)
   (Lisp_Object args)
 {
   register Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect_excursion ();
 
   val = Fprogn (args);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("save-current-buffer", Fsave_current_buffer, Ssave_current_buffer, 0, UNEVALLED, 0,
@@ -845,10 +846,12 @@ BODY is executed just like `progn'.
 usage: (save-current-buffer &rest BODY)  */)
   (Lisp_Object args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_current_buffer ();
-  return unbind_to (count, Fprogn (args));
+  Lisp_Object tem0 = Fprogn (args);
+  dynwind_end ();
+  return tem0;
 }
 
 DEFUN ("buffer-size", Fbuffer_size, Sbuffer_size, 0, 1, 0,
@@ -2229,7 +2232,7 @@ Both characters must have the same length of multi-byte form.  */)
   ptrdiff_t changed = 0;
   unsigned char fromstr[MAX_MULTIBYTE_LENGTH], tostr[MAX_MULTIBYTE_LENGTH];
   unsigned char *p;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 #define COMBINING_NO	 0
 #define COMBINING_BEFORE 1
 #define COMBINING_AFTER  2
@@ -2398,7 +2401,8 @@ Both characters must have the same length of multi-byte form.  */)
       update_compositions (changed, last_changed, CHECK_ALL);
     }
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -3119,11 +3123,12 @@ usage: (save-restriction &rest BODY)  */)
   (Lisp_Object body)
 {
   register Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   val = Fprogn (body);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* i18n (internationalization).  */

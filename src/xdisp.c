@@ -3082,8 +3082,7 @@ dsafe__call (bool inhibit_quit, Lisp_Object (f) (ptrdiff_t, Lisp_Object *),
     val = Qnil;
   else
     {
-      specpdl_ref count = SPECPDL_INDEX ();
-
+      dynwind_begin ();
       specbind (Qinhibit_redisplay, Qt);
       if (inhibit_quit)
 	specbind (Qinhibit_quit, Qt);
@@ -3091,7 +3090,7 @@ dsafe__call (bool inhibit_quit, Lisp_Object (f) (ptrdiff_t, Lisp_Object *),
 	 so there is no possibility of wanting to redisplay.  */
       val = internal_condition_case_n (f, nargs, args, Qt,
 				       dsafe_eval_handler);
-      unbind_to (count, val);
+      dynwind_end ();
     }
 
   return val;
@@ -4577,7 +4576,7 @@ handle_fontified_prop (struct it *it)
 	     no amount of fontifying will be able to change it.  */
 	  NILP (prop) && IT_CHARPOS (*it) < Z))
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       Lisp_Object val;
       struct buffer *obuf = current_buffer;
       ptrdiff_t begv = BEGV, zv = ZV;
@@ -4643,7 +4642,7 @@ handle_fontified_prop (struct it *it)
 	}
 
       it->f->inhibit_clear_image_cache = saved_inhibit_flag;
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       /* Fontification functions routinely call `save-restriction'.
 	 Normally, this tags clip_changed, which can confuse redisplay
@@ -6015,7 +6014,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
     form = Qnil;
   if (!NILP (form) && !EQ (form, Qt))
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       /* Bind `object' to the object having the `display' property, a
 	 buffer or string.  Bind `position' to the position in the
@@ -6032,7 +6031,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
       itdata = bidi_shelve_cache ();
       form = dsafe_eval (form);
       bidi_unshelve_cache (itdata, false);
-      form = unbind_to (count, form);
+      dynwind_end ();
     }
 
   if (NILP (form))
@@ -6092,14 +6091,14 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		{
 		  /* Evaluate IT->font_height with `height' bound to the
 		     current specified height to get the new height.  */
-		  specpdl_ref count = SPECPDL_INDEX ();
+		  dynwind_begin ();
 		  struct face *face = FACE_FROM_ID (it->f, it->face_id);
 
 		  specbind (Qheight, face->lface[LFACE_HEIGHT_INDEX]);
 		  itdata = bidi_shelve_cache ();
 		  value = dsafe_eval (it->font_height);
 		  bidi_unshelve_cache (itdata, false);
-		  value = unbind_to (count, value);
+		  dynwind_end ();
 
 		  if (NUMBERP (value))
 		    new_height = XFLOATINT (value);
@@ -12679,7 +12678,7 @@ with_echo_area_buffer (struct window *w, int which,
 {
   Lisp_Object buffer;
   bool this_one, the_other, clear_buffer_p, rc;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* If buffers aren't live, make new ones.  */
   ensure_echo_area_buffers ();
@@ -12754,7 +12753,7 @@ with_echo_area_buffer (struct window *w, int which,
   eassert (BEGV >= BEG);
   eassert (ZV <= Z && ZV >= BEGV);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return rc;
 }
 
@@ -12864,11 +12863,11 @@ setup_echo_area_for_printing (bool multibyte_p)
 
       if (Z > BEG)
 	{
-	  specpdl_ref count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 	  specbind (Qinhibit_read_only, Qt);
 	  /* Note that undo recording is always disabled.  */
 	  del_range (BEG, Z);
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	}
       TEMP_SET_PT_BOTH (BEG, BEG_BYTE);
 
@@ -13861,7 +13860,7 @@ gui_consider_frame_title (Lisp_Object frame)
       char *title;
       ptrdiff_t len;
       struct it it;
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       FOR_EACH_FRAME (tail, other_frame)
 	{
@@ -13922,7 +13921,7 @@ gui_consider_frame_title (Lisp_Object frame)
       len = str_as_multibyte ((unsigned char *) title,
 			      mode_line_noprop_buf_end - title,
 			      len, &nchars);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       /* Set the title only if it's changed.  This avoids consing in
 	 the common case where it hasn't.  (If it turns out that we've
@@ -14038,7 +14037,7 @@ prepare_menu_bars (void)
   if (all_windows)
     {
       Lisp_Object tail, frame;
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       /* True means that update_menu_bar has run its hooks
 	 so any further calls to update_menu_bar shouldn't do so again.  */
       bool menu_bar_hooks_run = false;
@@ -14069,7 +14068,7 @@ prepare_menu_bars (void)
 #endif
 	}
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
   else
     {
@@ -14135,7 +14134,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  || window_buffer_changed (w))
 	{
 	  struct buffer *prev = current_buffer;
-	  specpdl_ref count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 
 	  specbind (Qinhibit_menubar_update, Qt);
 
@@ -14184,7 +14183,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  w->update_mode_line = true;
 #endif /* HAVE_EXT_MENU_BAR */
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  set_buffer_internal_1 (prev);
 	}
     }
@@ -15268,7 +15267,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
 	  || window_buffer_changed (w))
 	{
 	  struct buffer *prev = current_buffer;
-	  specpdl_ref count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 	  Lisp_Object frame, new_tool_bar;
           int new_n_tool_bar;
 
@@ -15320,7 +15319,7 @@ update_tool_bar (struct frame *f, bool save_match_data)
               unblock_input ();
             }
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  set_buffer_internal_1 (prev);
 	}
     }
@@ -16985,7 +16984,7 @@ redisplay_internal (void)
 
   /* Record a function that clears redisplaying_p
      when we leave this function.  */
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_void (unwind_redisplay);
   redisplaying_p = true;
   block_buffer_flips ();
@@ -17787,7 +17786,7 @@ redisplay_internal (void)
   if (max_redisplay_ticks > 0)
     update_redisplay_ticks (0, NULL);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   RESUME_POLLING;
 }
 
@@ -20029,7 +20028,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   bool current_matrix_up_to_date_p = false;
   bool used_current_matrix_p = false;
   bool temp_scroll_step = false;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   int rc;
   int centering_position = -1;
   bool last_line_misfit = false;
@@ -21187,7 +21186,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	TEMP_SET_PT_BOTH (CHARPOS (lpoint), CHAR_TO_BYTE (CHARPOS (lpoint)));
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 
@@ -27476,7 +27475,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
 {
   struct it it;
   struct face *face;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   init_iterator (&it, w, -1, -1, NULL, face_id);
   /* Don't extend on a previously drawn mode-line.
@@ -27564,7 +27563,7 @@ display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
     }
   pop_kboard ();
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Fill up with spaces.  */
   display_string (" ", Qnil, Qnil, 0, 0, &it, 10000, -1, -1, 0);
@@ -28255,7 +28254,7 @@ are the selected window and the WINDOW's buffer).  */)
   struct buffer *old_buffer = NULL;
   int face_id;
   bool no_props = FIXNUMP (face);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object str;
   int string_start = 0;
 
@@ -28270,8 +28269,10 @@ are the selected window and the WINDOW's buffer).  */)
 
   /* Make formatting the modeline a non-op when noninteractive, otherwise
      there will be problems later caused by a partially initialized frame.  */
-  if (NILP (format) || noninteractive)
+  if (NILP (format) || noninteractive) {
+    dynwind_end ();
     return empty_unibyte_string;
+  }
 
   if (no_props)
     face = Qnil;
@@ -28340,7 +28341,8 @@ are the selected window and the WINDOW's buffer).  */)
 			empty_unibyte_string);
     }
 
-  return unbind_to (count, str);
+  dynwind_end ();
+  return str;
 }
 
 /* Write a null-terminated, right justified decimal representation of

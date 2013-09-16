@@ -250,7 +250,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   /* Unfortunately, we can now invoke expand-file-name and
      file-attributes on filenames, both of which can throw, so we must
      do a proper unwind-protect.  */
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_ptr (directory_files_internal_unwind, d);
 
 #ifdef WINDOWSNT
@@ -354,7 +354,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
       list = Fcons (attrs ? Fcons (finalname, fileattrs) : finalname, list);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (NILP (nosort))
     {
@@ -523,7 +523,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
      anything.  */
   bool includeall = 1;
   bool check_decoded = false;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   elt = Qnil;
 
@@ -852,7 +852,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
     }
 
   /* This closes the directory.  */
-  unbind_to (count, bestmatch);
+  dynwind_end ();
 
   if (all_flag || NILP (bestmatch))
     return bestmatch;

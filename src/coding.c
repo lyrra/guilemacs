@@ -7917,7 +7917,7 @@ coding_restore_undo_list (Lisp_Object arg)
 void
 decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object attrs;
 
   eassert (GPT_BYTE == PT_BYTE);
@@ -8014,6 +8014,7 @@ decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
 	  coding->produced = bytes;
 	  coding->produced_char = chars;
 	  insert_from_gap (chars, bytes, 1, coding->insert_before_markers);
+	  dynwind_end ();
 	  return;
 	}
     }
@@ -8041,7 +8042,7 @@ decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
       coding->produced += Z_BYTE - prev_Z_BYTE;
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 
@@ -8081,7 +8082,6 @@ decode_coding_object (struct coding_system *coding,
 		      ptrdiff_t to, ptrdiff_t to_byte,
 		      Lisp_Object dst_object)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
   unsigned char *destination UNINIT;
   ptrdiff_t dst_bytes UNINIT;
   ptrdiff_t chars = to - from;
@@ -8090,6 +8090,8 @@ decode_coding_object (struct coding_system *coding,
   ptrdiff_t saved_pt = -1, saved_pt_byte UNINIT;
   bool need_marker_adjustment = 0;
   Lisp_Object old_deactivate_mark;
+
+  dynwind_begin ();
 
   old_deactivate_mark = Vdeactivate_mark;
 
@@ -8271,7 +8273,7 @@ decode_coding_object (struct coding_system *coding,
     }
 
   Vdeactivate_mark = old_deactivate_mark;
-  unbind_to (count, coding->dst_object);
+  dynwind_end ();
 }
 
 
@@ -8315,7 +8317,7 @@ encode_coding_object (struct coding_system *coding,
 		      ptrdiff_t to, ptrdiff_t to_byte,
 		      Lisp_Object dst_object)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   ptrdiff_t chars = to - from;
   ptrdiff_t bytes = to_byte - from_byte;
   Lisp_Object attrs;
@@ -8529,7 +8531,7 @@ encode_coding_object (struct coding_system *coding,
     Fkill_buffer (coding->src_object);
 
   Vdeactivate_mark = old_deactivate_mark;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 
@@ -8646,7 +8648,7 @@ are lower-case).  */)
   (Lisp_Object prompt, Lisp_Object default_coding_system)
 {
   Lisp_Object val;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (SYMBOLP (default_coding_system))
     default_coding_system = SYMBOL_NAME (default_coding_system);
@@ -8654,7 +8656,7 @@ are lower-case).  */)
   val = Fcompleting_read (prompt, Vcoding_system_alist, Qnil,
 			  Qt, Qnil, Qcoding_system_history,
 			  default_coding_system, Qnil);
-  val = unbind_to (count, val);
+  dynwind_end ();
   return (SCHARS (val) == 0 ? Qnil : Fintern (val, Qnil));
 }
 

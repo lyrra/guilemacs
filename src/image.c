@@ -4424,7 +4424,7 @@ slurp_file (image_fd fd, ptrdiff_t *size)
 
   if (fp)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_ptr (fclose_unwind, fp);
 
       if (sys_fstat (fileno (fp), &st) == 0
@@ -4443,7 +4443,7 @@ slurp_file (image_fd fd, ptrdiff_t *size)
 	    }
 	}
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 #else
   char *buf;

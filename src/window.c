@@ -3775,7 +3775,7 @@ select_frame_norecord (Lisp_Object frame)
 static void
 run_window_configuration_change_hook (struct frame *f)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object frame, global_wcch
     = Fdefault_value (Qwindow_configuration_change_hook);
   XSETFRAME (frame, f);
@@ -3783,7 +3783,10 @@ run_window_configuration_change_hook (struct frame *f)
   if (NILP (Vrun_hooks)
       || !f->can_set_window_size
       || !f->after_make_frame)
-    return;
+    {
+      dynwind_end ();
+      return;
+    }
 
   /* Use the right buffer.  Matters when running the local hooks.  */
   if (current_buffer != XBUFFER (Fwindow_buffer (Qnil)))
@@ -3808,18 +3811,18 @@ run_window_configuration_change_hook (struct frame *f)
 	if (!NILP (Flocal_variable_p (Qwindow_configuration_change_hook,
 				      buffer)))
 	  {
-	    specpdl_ref inner_count = SPECPDL_INDEX ();
+	    dynwind_begin ();
 	    record_unwind_protect (select_window_norecord, selected_window);
 	    select_window_norecord (window);
 	    run_funs (Fbuffer_local_value (Qwindow_configuration_change_hook,
 					   buffer));
-	    unbind_to (inner_count, Qnil);
+	    dynwind_end ();
 	  }
       }
   }
 
   run_funs (global_wcch);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 DEFUN ("run-window-configuration-change-hook", Frun_window_configuration_change_hook,
@@ -4301,7 +4304,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
 {
   struct window *w = XWINDOW (window);
   struct buffer *b = XBUFFER (buffer);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool samebuf = EQ (buffer, w->contents);
 
   /* It's never OK to assign WINDOW a dead buffer.  */
@@ -4389,7 +4392,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
   if (!samebuf && !MINI_WINDOW_P (w) && !WINDOW_PSEUDO_P (w))
     FRAME_WINDOW_CHANGE (XFRAME (w->frame)) = true;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 DEFUN ("set-window-buffer", Fset_window_buffer, Sset_window_buffer, 2, 3, 0,
@@ -4529,7 +4532,7 @@ temp_output_buffer_show (register Lisp_Object buf)
       /* Run temp-buffer-show-hook, with the chosen window selected
 	 and its buffer current.  */
       {
-        specpdl_ref count = SPECPDL_INDEX ();
+        dynwind_begin ();
         Lisp_Object prev_window, prev_buffer;
         prev_window = selected_window;
         XSETBUFFER (prev_buffer, old);
@@ -4543,7 +4546,7 @@ temp_output_buffer_show (register Lisp_Object buf)
         Fselect_window (window, Qt);
         Fset_buffer (w->contents);
         run_hook (Qtemp_buffer_show_hook);
-        unbind_to (count, Qnil);
+        dynwind_end ();
       }
     }
 }
@@ -5885,7 +5888,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
   struct buffer *b = XBUFFER (w->contents);
   bool long_lines_truncated =
     b->long_line_optimizations_p && !NILP (BVAR (b, truncate_lines));
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
 
@@ -5922,7 +5925,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
   else
     window_scroll_line_based (window, n, whole, noerror);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Bug#15957.  */
   XWINDOW (window)->window_end_valid = false;
@@ -6705,7 +6708,7 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
 {
   struct window *w;
   bool other_window;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (eabs (direction) == 1);
 
@@ -6749,7 +6752,7 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
       set_marker_both (w->old_pointm, Qnil, PT, PT_BYTE);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 DEFUN ("scroll-up", Fscroll_up, Sscroll_up, 0, 1, "^P",
