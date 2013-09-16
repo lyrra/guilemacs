@@ -5140,6 +5140,8 @@ realize_basic_faces (struct frame *f)
 {
   bool success_p = false;
 
+  dynwind_begin ();
+
   /* Block input here so that we won't be surprised by an X expose
      event, for instance, without having the faces set up.  */
   block_input ();
@@ -5177,6 +5179,7 @@ realize_basic_faces (struct frame *f)
       success_p = true;
     }
 
+  dynwind_end ();
   unblock_input ();
   return success_p;
 }

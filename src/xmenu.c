@@ -726,7 +726,7 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
 
       struct buffer *prev = current_buffer;
       Lisp_Object buffer;
-      ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+      dynwind_begin ();
       int previous_menu_items_used = f->menu_bar_items_used;
       Lisp_Object *previous_items
 	= alloca (previous_menu_items_used * sizeof *previous_items);
@@ -843,7 +843,7 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
 	     the menus in any form, since it would be a no-op.  */
 	  free_menubar_widget_value_tree (first_wv);
 	  discard_menu_items ();
-	  unbind_to (specpdl_count, Qnil);
+	  dynwind_end ();
 	  return;
 	}
 
@@ -852,7 +852,7 @@ set_frame_menubar (struct frame *f, bool first_time, bool deep_p)
       f->menu_bar_items_used = menu_items_used;
 
       /* This undoes save_menu_items.  */
-      unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
 
       /* Now GC cannot happen during the lifetime of the widget_value,
 	 so it's safe to store data from a Lisp_String.  */
@@ -1248,7 +1248,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   GtkWidget *menu;
   GtkMenuPositionFunc pos_func = 0;  /* Pop up at pointer.  */
   struct next_popup_x_y popup_x_y;
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool use_pos_func = ! for_click;
 
 #ifdef HAVE_GTK3
@@ -1325,7 +1325,7 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
       popup_widget_loop (true, menu);
     }
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Must reset this manually because the button release event is not passed
      to Emacs event loop. */
@@ -1435,14 +1435,13 @@ create_and_show_popup_menu (struct frame *f, widget_value *first_wv,
   x_activate_timeout_atimer ();
 
   {
-    ptrdiff_t specpdl_count = SPECPDL_INDEX ();
-
+    dynwind_begin ();
     record_unwind_protect_int (pop_down_menu, (int) menu_id);
 
     /* Process events that apply to the menu.  */
     popup_get_selection (0, FRAME_DISPLAY_INFO (f), menu_id, true);
 
-    unbind_to (specpdl_count, Qnil);
+    dynwind_end ();
   }
 }
 
@@ -1465,8 +1464,9 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   Lisp_Object *subprefix_stack
     = alloca (menu_items_used * sizeof *subprefix_stack);
   int submenu_depth = 0;
+  int first_pane;
 
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (FRAME_X_P (f));
 
@@ -1475,6 +1475,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   if (menu_items_used <= MENU_ITEMS_PANE_LENGTH)
     {
       *error_name = "Empty menu";
+      dynwind_end ();
       return Qnil;
     }
 
@@ -1648,7 +1649,7 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   create_and_show_popup_menu (f, first_wv, x, y,
 			      menuflags & MENU_FOR_CLICK);
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Find the selected item, and its pane, to return
      the proper value.  */
@@ -1745,7 +1746,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
 
   if (menu)
     {
-      ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_ptr (pop_down_menu, menu);
 
       /* Display the menu.  */
@@ -1754,7 +1755,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
       /* Process events that apply to the menu.  */
       popup_widget_loop (true, menu);
 
-      unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
     }
 }
 
@@ -1800,7 +1801,9 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
   /* Process events that apply to the dialog box.
      Also handle timers.  */
   {
-    ptrdiff_t count = SPECPDL_INDEX ();
+    dynwind_begin ();
+
+    int fact = 4 * sizeof (LWLIB_ID);
 
     /* xdialog_show_unwind is responsible for popping the dialog box down.  */
 
@@ -1808,7 +1811,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
 
     popup_get_selection (0, FRAME_DISPLAY_INFO (f), dialog_id, true);
 
-    unbind_to (count, Qnil);
+    dynwind_end ();
   }
 }
 
@@ -1832,7 +1835,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
   /* Whether we've seen the boundary between left-hand elts and right-hand.  */
   bool boundary_seen = false;
 
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (FRAME_X_P (f));
 
@@ -1841,6 +1844,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
   if (menu_items_n_panes > 1)
     {
       *error_name = "Multiple panes in dialog box";
+      dynwind_end ();
       return Qnil;
     }
 
@@ -1871,6 +1875,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
 	  {
 	    free_menubar_widget_value_tree (first_wv);
 	    *error_name = "Submenu in dialog items";
+	    dynwind_end ();
 	    return Qnil;
 	  }
 	if (EQ (item_name, Qquote))
@@ -1885,6 +1890,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
 	  {
 	    free_menubar_widget_value_tree (first_wv);
 	    *error_name = "Too many dialog items";
+	    dynwind_end ();
 	    return Qnil;
 	  }
 
@@ -1942,7 +1948,7 @@ x_dialog_show (struct frame *f, Lisp_Object title,
   /* Actually create and show the dialog.  */
   create_and_show_dialog (f, first_wv);
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Find the selected item, and its pane, to return
      the proper value.  */
@@ -2098,17 +2104,20 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   int maxwidth;
   int dummy_int;
   unsigned int dummy_uint;
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (FRAME_X_P (f) || FRAME_MSDOS_P (f));
 
   *error_name = 0;
-  if (menu_items_n_panes == 0)
+  if (menu_items_n_panes == 0) {
+    dynwind_end ();
     return Qnil;
+  }
 
   if (menu_items_used <= MENU_ITEMS_PANE_LENGTH)
     {
       *error_name = "Empty menu";
+      dynwind_end ();
       return Qnil;
     }
 
@@ -2367,7 +2376,8 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
  return_entry:
   unblock_input ();
   SAFE_FREE ();
-  return unbind_to (specpdl_count, entry);
+  dynwind_end ();
+  return entry;
 }
 
 #endif /* not USE_X_TOOLKIT */

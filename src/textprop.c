@@ -785,7 +785,7 @@ last valid position in OBJECT.  */)
   else
     {
       Lisp_Object initial_value, value;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -826,7 +826,7 @@ last valid position in OBJECT.  */)
 	      break;
 	  }
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   return position;
@@ -869,7 +869,7 @@ first valid position in OBJECT.  */)
     }
   else
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (! NILP (object))
 	CHECK_BUFFER (object);
@@ -920,7 +920,7 @@ first valid position in OBJECT.  */)
 	    }
 	}
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   return position;

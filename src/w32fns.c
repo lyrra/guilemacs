@@ -5691,7 +5691,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
   Lisp_Object name;
   bool minibuffer_only = false;
   long window_prompting = 0;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
+
   Lisp_Object display;
   struct w32_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -6083,7 +6085,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 /* FRAME is used only to get a handle on the X display.  We don't pass the
@@ -6966,7 +6969,9 @@ x_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   Lisp_Object frame;
   Lisp_Object name;
   int width, height;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
+
   struct kboard *kb;
   bool face_change_before = face_change;
   int x_width = 0, x_height = 0;
@@ -7167,7 +7172,8 @@ x_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   face_change = face_change_before;
 
   /* Discard the unwind_protect.  */
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -7348,11 +7354,11 @@ Text larger than the specified size is clipped.  */)
   struct text_pos pos;
   int width, height;
   int old_windows_or_buffers_changed = windows_or_buffers_changed;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  ptrdiff_t count_1;
   Lisp_Object window, size;
   Lisp_Object tip_buf;
   AUTO_STRING (tip, " *tip*");
+
+  dynwind_begin ();
 
   specbind (Qinhibit_redisplay, Qt);
 
@@ -7503,7 +7509,8 @@ Text larger than the specified size is clipped.  */)
 	{
 	  /* Creating the tip frame failed.  */
 	  unblock_input ();
-	  return unbind_to (count, Qnil);
+          dynwind_end ();
+	  return Qnil;
 	}
     }
 
@@ -7547,7 +7554,6 @@ Text larger than the specified size is clipped.  */)
 
   /* Insert STRING into the root window's buffer and fit the frame to
      the buffer.  */
-  count_1 = SPECPDL_INDEX ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -7603,7 +7609,6 @@ Text larger than the specified size is clipped.  */)
   w->must_be_updated_p = true;
   update_single_window (w);
   set_buffer_internal_1 (old_buffer);
-  unbind_to (count_1, Qnil);
   unblock_input ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
@@ -7612,7 +7617,8 @@ Text larger than the specified size is clipped.  */)
   tip_timer = call3 (intern ("run-at-time"), timeout, Qnil,
 		     intern ("x-hide-tip"));
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -7993,7 +7999,7 @@ value of DIR as in previous invocations; this is standard Windows behavior.  */)
 #endif	/* !NTGUI_UNICODE */
 
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       w32_dialog_in_progress (Qt);
 
@@ -8016,7 +8022,7 @@ value of DIR as in previous invocations; this is standard Windows behavior.  */)
 	}
 #endif	/* !NTGUI_UNICODE */
       unblock_input ();
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
     if (file_opened)

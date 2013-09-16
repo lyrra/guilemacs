@@ -254,7 +254,7 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
 {
   Lisp_Object infile, encoded_infile;
   int filefd;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (nargs >= 2 && ! NILP (args[1]))
     {
@@ -270,7 +270,9 @@ usage: (call-process PROGRAM &optional INFILE DESTINATION DISPLAY &rest ARGS)  *
   if (filefd < 0)
     report_file_error ("Opening process input file", infile);
   record_unwind_protect_int (close_file_unwind, &filefd);
-  return unbind_to (count, call_process (nargs, args, &filefd, -1));
+  Lisp_Object tem0 = call_process (nargs, args, &filefd, NULL);
+  dynwind_end ();
+  return tem0;
 }
 
 /* Like Fcall_process (NARGS, ARGS), except use FILEFD as the input file.
@@ -996,7 +998,7 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
   val = complement_process_encoding_system (val);
 
   {
-    ptrdiff_t count1 = SPECPDL_INDEX ();
+    dynwind_begin ();
 
     specbind (intern ("coding-system-for-write"), val);
     /* POSIX lets mk[s]temp use "."; don't invoke jka-compr if we
@@ -1004,7 +1006,7 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
     specbind (Qfile_name_handler_alist, Qnil);
     write_region (start, end, filename_string, Qnil, Qlambda, Qnil, Qnil, fd);
 
-    unbind_to (count1, Qnil);
+    dynwind_end ();
   }
 
   if (lseek (fd, 0, SEEK_SET) < 0)
@@ -1051,7 +1053,7 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   Lisp_Object infile, val;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object start = args[0];
   Lisp_Object end = args[1];
   bool empty_input;
@@ -1095,8 +1097,10 @@ usage: (call-process-region START END PROGRAM &optional DELETE BUFFER DISPLAY &r
     }
   args[1] = infile;
 
-  val = call_process (nargs, args, &fd, empty_input ? -1 : count);
-  return unbind_to (count, val);
+  // FIX: 20190626 LAV, perhaps remove last argument from call_process?
+  val = call_process (nargs, args, &fd, empty_input ? -1 : 0); // FIX: 20190626 LAV, 0 was count, but count is remnant from old-gc ref-count?
+  dynwind_end ();
+  return val;
 }
 
 static char **

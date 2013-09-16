@@ -2320,7 +2320,7 @@ slurp_file (int fd, ptrdiff_t *size)
 
   if (fp)
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_ptr (fclose_unwind, fp);
 
       if (fstat (fileno (fp), &st) == 0
@@ -2339,7 +2339,7 @@ slurp_file (int fd, ptrdiff_t *size)
 	    }
 	}
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   return buf;

@@ -2679,7 +2679,7 @@ suppressed.  */)
 
   if (NILP (tem))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       int nesting = 0;
 
       /* This is to make sure that loadup.el gives a clear picture
@@ -2715,8 +2715,10 @@ suppressed.  */)
 		   noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
 
       /* If load failed entirely, return nil.  */
-      if (NILP (tem))
-	return unbind_to (count, Qnil);
+      if (NILP (tem)){
+	  dynwind_end ();
+	  return Qnil;
+	}
 
       tem = Fmemq (feature, Vfeatures);
       if (NILP (tem))
@@ -2734,7 +2736,7 @@ suppressed.  */)
 
       /* Once loading finishes, don't undo it.  */
       Vautoload_queue = Qt;
-      unbind_to (count, feature);
+      dynwind_end ();
     }
 
   return feature;
@@ -4428,7 +4430,7 @@ extract_data_from_object (Lisp_Object spec,
   else if (BUFFERP (object))
     {
       EMACS_INT b, e;
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       record_unwind_current_buffer ();
 
@@ -4524,7 +4526,7 @@ extract_data_from_object (Lisp_Object spec,
 	}
 
       object = make_buffer_string (b, e, 0);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       if (STRING_MULTIBYTE (object))
 	object = code_convert_string (object, coding_system, Qnil, 1, 0, 0);

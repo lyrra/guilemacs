@@ -913,7 +913,7 @@ Otherwise, return a new string.  */)
 	  tem = Fbuffer_string ();
 	  Ferase_buffer ();
 	  set_buffer_internal (oldbuf);
-	  unbind_to (count, Qnil);
+	  unbind_to (count, Qnil); // FIX: 20190626 LAV, isn't count unused?
 	 }
 
 	subst_string:
@@ -1002,7 +1002,8 @@ Otherwise, return a new string.  */)
     }
   else
     tem = string;
-  return unbind_to (count, tem);
+  // FIX: 20190626 LAV, where on earth is buf released?, it was xfree(buf)
+  return tem;
 }
 
 void

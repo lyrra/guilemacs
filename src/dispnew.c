@@ -5522,6 +5522,8 @@ static void
 change_frame_size_1 (struct frame *f, int new_width, int new_height,
 		     bool pretend, bool delay, bool safe, bool pixelwise)
 {
+  dynwind_begin ();
+
   /* If we can't deal with the change now, queue it for later.  */
   if (delay || (redisplaying_p && !safe))
     {
@@ -5556,6 +5558,7 @@ change_frame_size_1 (struct frame *f, int new_width, int new_height,
       adjust_frame_size (f, new_width, new_height, 5, pretend,
 			 Qchange_frame_size);
     }
+  dynwind_end ();
 }
 
 
@@ -5587,6 +5590,7 @@ change_frame_size (struct frame *f, int new_width, int new_height,
   else
     change_frame_size_1 (f, new_width, new_height, pretend, delay, safe,
 			 pixelwise);
+  dynwind_end ();
 }
 
 /***********************************************************************
@@ -5828,11 +5832,11 @@ immediately by pending input.  */)
       || !NILP (Vexecuting_kbd_macro))
     return Qnil;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   if (!NILP (force) && !redisplay_dont_pause)
     specbind (Qredisplay_dont_pause, Qt);
   redisplay_preserve_echo_area (2);
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return Qt;
 }
 

@@ -9766,7 +9766,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
 {
   struct x_display_info *dpyinfo = x_display_info_for_display (dpy);
   Lisp_Object frame, tail;
-  ptrdiff_t idx = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   error_msg = alloca (strlen (error_message) + 1);
   strcpy (error_msg, error_message);
@@ -9856,7 +9856,7 @@ For details, see etc/PROBLEMS.\n",
 
   totally_unblock_input ();
 
-  unbind_to (idx, Qnil);
+  dynwind_end ();
   clear_waiting_for_input ();
 
   /* Here, we absolutely have to use a non-local exit (e.g. signal, throw,

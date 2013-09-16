@@ -173,11 +173,12 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   Lisp_Object list, dirfilename, encoded_directory;
   struct re_pattern_buffer *bufp = NULL;
   bool needsep = 0;
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   /* Don't let the compiler optimize away all copies of DIRECTORY,
      which would break GC; see Bug#16986.  */
   Lisp_Object volatile directory_volatile = directory;
+
+  dynwind_begin ();
 
   /* Because of file name handlers, these functions might call
      Ffuncall, and cause a GC.  */
@@ -309,7 +310,7 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
 	}
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (NILP (nosort))
     list = Fsort (Fnreverse (list),
@@ -467,7 +468,8 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
      anything.  */
   bool includeall = 1;
   bool check_decoded = false;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   elt = Qnil;
 
@@ -763,7 +765,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
     }
 
   /* This closes the directory.  */
-  unbind_to (count, bestmatch);
+  dynwind_end ();
 
   if (all_flag || NILP (bestmatch))
     return bestmatch;

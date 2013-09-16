@@ -1927,7 +1927,8 @@ permissions.  */)
    Lisp_Object preserve_permissions)
 {
   Lisp_Object handler;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
   Lisp_Object encoded_file, encoded_newname;
 #if HAVE_LIBSELINUX
   security_context_t con;
@@ -1951,10 +1952,12 @@ permissions.  */)
   /* Likewise for output file name.  */
   if (NILP (handler))
     handler = Ffind_file_name_handler (newname, Qcopy_file);
-  if (!NILP (handler))
+  if (!NILP (handler)) {
+    dynwind_end ();
     return call7 (handler, Qcopy_file, file, newname,
 		  ok_if_already_exists, keep_time, preserve_uid_gid,
 		  preserve_permissions);
+  }
 
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
@@ -2148,7 +2151,7 @@ permissions.  */)
 #endif /* MSDOS */
 #endif /* not WINDOWSNT */
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return Qnil;
 }
@@ -2421,18 +2424,19 @@ This is what happens in interactive use with M-x.  */)
 	   ? emacs_readlinkat (AT_FDCWD, SSDATA (encoded_file))
 	   : Qnil);
       if (!NILP (symlink_target))
-	Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
+	  Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
       else
 	Fcopy_file (file, newname, ok_if_already_exists, Qt, Qt, Qt);
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qdelete_by_moving_to_trash, Qnil);
   if (dirp)
     call2 (Qdelete_directory, file, Qt);
   else
     Fdelete_file (file, Qnil);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
@@ -5574,7 +5578,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   int do_handled_files;
   Lisp_Object oquit;
   FILE *stream = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool orig_minibuffer_auto_raise = minibuffer_auto_raise;
   bool old_message_p = 0;
   struct auto_save_unwind auto_save_unwind;
@@ -5748,7 +5752,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   Vquit_flag = oquit;
 
   /* This restores the message-stack status.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return Qnil;
 }
 

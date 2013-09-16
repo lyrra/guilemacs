@@ -279,8 +279,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
   Lisp_Object teml;
   Lisp_Object up_event;
   Lisp_Object enable;
-  USE_SAFE_ALLOCA;
-  ptrdiff_t speccount = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* The index of the next element of this_command_keys to examine for
      the 'e' interactive code.  */
@@ -388,7 +387,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
       Lisp_Object result
 	= unbind_to (speccount, CALLN (Fapply, Qfuncall_interactively,
 				       function, specs));
-      SAFE_FREE ();
+      dynwind_end ();
       return result;
     }
 
@@ -582,7 +581,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 
 	case 'k':		/* Key sequence.  */
 	  {
-	    ptrdiff_t speccount1 = SPECPDL_INDEX ();
+	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_number (0),
@@ -590,7 +589,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 				Qface, Qminibuffer_prompt, callint_message);
 	    args[i] = Fread_key_sequence (callint_message,
 					  Qnil, Qnil, Qnil, Qnil);
-	    unbind_to (speccount1, Qnil);
+	    dynwind_end ();
 	    teml = args[i];
 	    visargs[i] = Fkey_description (teml, Qnil);
 
@@ -614,7 +613,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 
 	case 'K':		/* Key sequence to be defined.  */
 	  {
-	    ptrdiff_t speccount1 = SPECPDL_INDEX ();
+	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_number (0),
@@ -624,7 +623,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 						 Qnil, Qt, Qnil, Qnil);
 	    teml = args[i];
 	    visargs[i] = Fkey_description (teml, Qnil);
-	    unbind_to (speccount1, Qnil);
+	    dynwind_end ();
 
 	    /* If the key sequence ends with a down-event,
 	       discard the following up-event.  */
@@ -803,7 +802,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
       if (tem) tem++;
       else tem = "";
     }
-  unbind_to (speccount, Qnil);
+  dynwind_end ();
 
   maybe_quit ();
 
@@ -852,8 +851,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
     specbind (Qcommand_debug_status, Qnil);
 
     val = Ffuncall (nargs, args);
-    val = unbind_to (speccount, val);
-    SAFE_FREE ();
+    dynwind_end ();
     return val;
   }
 }

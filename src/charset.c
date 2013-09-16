@@ -485,9 +485,10 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   AUTO_LIST2 (suffixes, map, txt);
   ptrdiff_t count = SPECPDL_INDEX ();
 
+  dynwind_begin ();
   record_unwind_protect_ptr (fclose_ptr_unwind, &fp);
   {
-    ptrdiff_t count1 = SPECPDL_INDEX ();
+    dynwind_begin ();
     specbind (Qfile_name_handler_alist, Qnil);
     fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false);
     fp = fd < 0 ? 0 : fdopen (fd, "r");
@@ -497,7 +498,7 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
         emacs_close (fd);
         report_file_errno ("Loading charset map", mapfile, open_errno);
       }
-    unbind_to (count1, Qnil);
+    dynwind_end ();
   }
 
   /* Use record, as `charset_map_entries' is large (larger than
@@ -551,7 +552,7 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   fp = NULL;
 
   load_charset_map (charset, head, n_entries, control_flag);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 static void
