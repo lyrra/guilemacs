@@ -4168,8 +4168,6 @@ usage: (make-network-process &rest ARGS)  */)
   p->gnutls_boot_parameters = tem;
 
   dynwind_end ();
-
-  /* Unwind bind_polling_period and request_sigio.  */
   dynwind_end ();
 
   set_network_socket_coding_system (proc, host, service, name);
