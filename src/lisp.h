@@ -3715,7 +3715,6 @@ struct handler
   specpdl_ref pdlcount;
   struct bc_frame *act_rec;
   EMACS_INT lisp_eval_depth;
-  int poll_suppress_count;
   int interrupt_input_blocked;
 
 #ifdef HAVE_X_WINDOWS
