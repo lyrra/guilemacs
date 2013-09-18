@@ -810,52 +810,6 @@ reset_sigio (int fd)
 #endif
 #endif
 
-void
-request_sigio (void)
-{
-#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-  sigset_t unblocked;
-
-  if (noninteractive)
-    return;
-
-  sigemptyset (&unblocked);
-# ifdef SIGWINCH
-  sigaddset (&unblocked, SIGWINCH);
-# endif
-# ifdef USABLE_SIGIO
-  sigaddset (&unblocked, SIGIO);
-# else
-  sigaddset (&unblocked, SIGPOLL);
-# endif
-  pthread_sigmask (SIG_UNBLOCK, &unblocked, 0);
-
-  interrupts_deferred = 0;
-#endif
-}
-
-void
-unrequest_sigio (void)
-{
-#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-  sigset_t blocked;
-
-  if (noninteractive)
-    return;
-
-  sigemptyset (&blocked);
-# ifdef SIGWINCH
-  sigaddset (&blocked, SIGWINCH);
-# endif
-# ifdef USABLE_SIGIO
-  sigaddset (&blocked, SIGIO);
-# else
-  sigaddset (&blocked, SIGPOLL);
-# endif
-  pthread_sigmask (SIG_BLOCK, &blocked, 0);
-  interrupts_deferred = 1;
-#endif
-}
 
 #ifndef MSDOS
 /* Block SIGCHLD.  */

@@ -17547,11 +17547,6 @@ redisplay_internal (void)
                       && FRAME_RIF (f)->clear_under_internal_border)
                     FRAME_RIF (f)->clear_under_internal_border (f);
 #endif
-		  /* Prevent various kinds of signals during display
-		     update.  stdio is not robust about handling
-		     signals, which can cause an apparent I/O error.  */
-		  if (interrupt_input)
-		    unrequest_sigio ();
 
 		  update_frame (f, false);
 		  /* On some platforms (at least MS-Windows), the
@@ -17639,12 +17634,6 @@ redisplay_internal (void)
 	 pending that reference the faces we computed and cached.  */
       inhibit_free_realized_faces = true;
 
-      /* Prevent various kinds of signals during display update.
-	 stdio is not robust about handling signals,
-	 which can cause an apparent I/O error.  */
-      if (interrupt_input)
-	unrequest_sigio ();
-
       if (FRAME_REDISPLAY_P (sf))
 	{
           if (hscroll_retries <= MAX_HSCROLL_RETRIES
@@ -17709,13 +17698,6 @@ redisplay_internal (void)
   update_mode_lines = 0;
   windows_or_buffers_changed = 0;
 
-  /* Start SIGIO interrupts coming again.  Having them off during the
-     code above makes it less likely one will discard output, but not
-     impossible, since there might be stuff in the system buffer here.
-     But it is much hairier to try to do anything about that.  */
-  if (interrupt_input)
-    request_sigio ();
-
   /* If a frame has become visible which was not before, redisplay
      again, so that we display it.  Expose events for such a frame
      (which it gets when becoming visible) don't call the parts of
@@ -17767,8 +17749,6 @@ redisplay_internal (void)
 #ifdef HAVE_NS
   ns_set_doc_edited ();
 #endif
-  if (interrupt_input && interrupts_deferred)
-    request_sigio ();
 
   /* We're done with this redisplay cycle, so reset the tick count in
      preparation for the next redisplay cycle.  */
