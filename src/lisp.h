@@ -2965,7 +2965,6 @@ struct handler
   Lisp_Object body;
   struct handler *next;
   EMACS_INT f_lisp_eval_depth;
-  int poll_suppress_count;
   int interrupt_input_blocked;
 };
 

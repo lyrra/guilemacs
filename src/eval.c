@@ -229,7 +229,6 @@ make_catch_handler (Lisp_Object tag)
   c->body = Qnil;
   c->next = handlerlist;
   c->lisp_eval_depth = lisp_eval_depth;
-  c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -246,7 +245,6 @@ make_condition_handler (Lisp_Object tag)
   c->body = Qnil;
   c->next = handlerlist;
   c->lisp_eval_depth = lisp_eval_depth;
-  c->poll_suppress_count = poll_suppress_count;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -1109,7 +1107,6 @@ static void
 restore_handler (void *data)
 {
   struct handler *c = data;
-  set_poll_suppress_count (c->poll_suppress_count);
   unblock_input_to (c->interrupt_input_blocked);
   immediate_quit = 0;
 }

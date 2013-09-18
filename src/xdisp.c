@@ -13861,15 +13861,6 @@ propagate_buffer_redisplay (void)
     }
 }
 
-#define STOP_POLLING					\
-do { if (! polling_stopped_here) stop_polling ();	\
-       polling_stopped_here = true; } while (false)
-
-#define RESUME_POLLING					\
-do { if (polling_stopped_here) start_polling ();	\
-       polling_stopped_here = false; } while (false)
-
-
 /* Perhaps in the future avoid recentering windows if it
    is not necessary; currently that causes some problems.  */
 
@@ -14463,7 +14454,6 @@ redisplay_internal (void)
 		     signals, which can cause an apparent I/O error.  */
 		  if (interrupt_input)
 		    unrequest_sigio ();
-		  STOP_POLLING;
 
 		  pending |= update_frame (f, false, false);
 		  f->cursor_type_changed = false;
@@ -14536,7 +14526,6 @@ redisplay_internal (void)
 	 which can cause an apparent I/O error.  */
       if (interrupt_input)
 	unrequest_sigio ();
-      STOP_POLLING;
 
       if (FRAME_VISIBLE_P (sf) && !FRAME_OBSCURED_P (sf))
 	{
@@ -14622,7 +14611,6 @@ redisplay_internal (void)
      But it is much hairier to try to do anything about that.  */
   if (interrupt_input)
     request_sigio ();
-  RESUME_POLLING;
 
   /* If a frame has become visible which was not before, redisplay
      again, so that we display it.  Expose events for such a frame
@@ -14681,7 +14669,6 @@ redisplay_internal (void)
     request_sigio ();
 
   dynwind_end ();
-  RESUME_POLLING;
 }
 
 static void
