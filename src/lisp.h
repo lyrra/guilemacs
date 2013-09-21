@@ -312,10 +312,12 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
 #define lisp_h_NILP(x) (scm_is_lisp_false (x))
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
-   (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
-    (sym)->u.s.val.value = (v))
+   (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
+      scm_c_vector_set_x (sym, 4, v))
+#define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_CONSTANT (XSYMBOL (sym)))
 #define lisp_h_SYMBOL_VAL(sym) \
-   (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), (sym)->u.s.val.value)
+   (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
+    scm_c_vector_ref (sym, 4))
 #define lisp_h_SYMBOLP(x) \
   (x && (scm_is_symbol (x) || EQ (x, Qnil) || EQ (x, Qt)))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
@@ -388,6 +390,8 @@ typedef EMACS_INT Lisp_Word;
 //--------- lhz new above
 
 typedef SCM Lisp_Object;
+typedef Lisp_Object sym_t;
+
 
 extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 extern Lisp_Object symbol_module;
@@ -948,19 +952,31 @@ struct Lisp_Symbol
          union is used depends on the `redirect' field above.  */
       union {
         Lisp_Object value;
-        struct Lisp_Symbol *alias;
+        sym_t alias_;
         struct Lisp_Buffer_Local_Value *blv;
         union Lisp_Fwd *fwd;
       } val;
 
       /* Function value of the symbol or Qnil if not fboundp.  */
-//      Lisp_Object function;
+      Lisp_Object function;
 
       /* The symbol's property list.  */
-//      Lisp_Object plist;
+      Lisp_Object plist;
+      char alignas (GCALIGNMENT) gcaligned;
     } s;
   } u;
 };
+verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
+
+#define SYMBOL_SELF(sym) (scm_c_vector_ref (sym, 0))
+#define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
+#define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
+#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_number (v)))
+#define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
+#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
+#define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
+
 
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
@@ -1017,55 +1033,48 @@ INLINE void
 }
 
 /* Value is name of symbol.  */
-INLINE Lisp_Object
-(SYMBOL_VAL) (struct Lisp_Symbol *sym)
-{
-  return lisp_h_SYMBOL_VAL (sym);
-}
+LISP_MACRO_DEFUN (SYMBOL_VAL, Lisp_Object, (sym_t sym), (sym))
 
-INLINE struct Lisp_Symbol *
-SYMBOL_ALIAS (struct Lisp_Symbol *sym)
+INLINE sym_t
+SYMBOL_ALIAS (sym_t sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && sym->u.s.val.alias);
-  return sym->u.s.val.alias;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS);
+  return scm_c_vector_ref (sym, 4);
 }
 INLINE struct Lisp_Buffer_Local_Value *
-SYMBOL_BLV (struct Lisp_Symbol *sym)
+SYMBOL_BLV (sym_t sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
-  return sym->u.s.val.blv;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED);
+  return scm_to_pointer (scm_c_vector_ref (sym, 4));
 }
 
 INLINE union Lisp_Fwd *
-SYMBOL_FWD (struct Lisp_Symbol *sym)
+SYMBOL_FWD (sym_t sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED);
-  return sym->u.s.val.fwd;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
+  return scm_to_pointer (scm_c_vector_ref (sym, 4));
 }
 
-INLINE void
-(SET_SYMBOL_VAL) (struct Lisp_Symbol *sym, Lisp_Object v)
-{
-  lisp_h_SET_SYMBOL_VAL (sym, v);
-}
+LISP_MACRO_DEFUN_VOID (SET_SYMBOL_VAL,
+		       (sym_t sym, Lisp_Object v), (sym, v))
 
 INLINE void
-SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
+SET_SYMBOL_ALIAS (sym_t sym, sym_t v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && v);
-  sym->u.s.val.alias = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS);
+  scm_c_vector_set_x (sym, 4, v);
 }
 INLINE void
-SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
+SET_SYMBOL_BLV (sym_t sym, struct Lisp_Buffer_Local_Value *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && v);
-  sym->u.s.val.blv = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED);
+  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
 }
 INLINE void
-SET_SYMBOL_FWD (struct Lisp_Symbol *sym, void const *v)
+SET_SYMBOL_FWD (sym_t sym, void const *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
-  sym->u.s.val.fwd = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
+  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
 }
 
 INLINE Lisp_Object
@@ -1092,7 +1101,7 @@ INLINE bool
 SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 {
   //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
-  //return XSYMBOL (sym)->u.s.interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+  return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
   // other version:
   // /* Should be initial_obarray */
   // Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
@@ -1112,26 +1121,22 @@ SYMBOL_FUNCTION (Lisp_Object sym)
    value cannot be changed (there is an exception for keyword symbols,
    whose value can be set to the keyword symbol itself).  */
 
-/*
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
-*/
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
    constant (e.g. nil, t, :keywords).  Code that actually wants to
    write to SYM, should also check whether there are any watching
    functions.  */
 
-/*
 INLINE int
 (SYMBOL_CONSTANT_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_CONSTANT_P (sym);
 }
-*/
 
 /* untagged_ptr represents a pointer before tagging, and Lisp_Word_tag
    contains a possibly-shifted tag to be added to an untagged_ptr to
@@ -1398,7 +1403,9 @@ extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
 extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 
-INLINE struct Lisp_Symbol *
+typedef Lisp_Object sym_t;
+
+INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
   Lisp_Object tem;
@@ -1406,7 +1413,7 @@ XSYMBOL (Lisp_Object a)
   if (EQ (a, Qnil)) a = Qnil_;
   eassert (SYMBOLP (a));
   tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return scm_to_pointer (tem);
+  return tem;
 }
 
 /* Pseudovector types.  */
@@ -1459,6 +1466,7 @@ INLINE bool
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->u.s.self)
+#define XSETSYMBOL(a, b) ((a) = scm_c_vector_ref (b, 0))
 #define XSETFLOAT(a, b) ((a) = (b)->self)
 //FIX-20230203-LAV: XSETMISC no longer used
 #define XSETMISC(a, b) (a) = ((union Lisp_Misc *) (b))->u_any.self
@@ -3503,7 +3511,6 @@ extern Lisp_Object arithcompare (Lisp_Object num1, Lisp_Object num2,
 extern intmax_t cons_to_signed (Lisp_Object, intmax_t, intmax_t);
 extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 
-extern struct Lisp_Symbol *indirect_variable (struct Lisp_Symbol *);
 extern AVOID args_out_of_range (Lisp_Object, Lisp_Object);
 extern AVOID circular_list (Lisp_Object);
 extern Lisp_Object do_symval_forwarding (union Lisp_Fwd *valcontents);
@@ -3519,7 +3526,7 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
                                   enum Set_Internal_Bind bindflag);
 extern Lisp_Object expt_integer (Lisp_Object, Lisp_Object);
 extern void syms_of_data (void);
-extern void swap_in_global_binding (struct Lisp_Symbol *);
+extern void swap_in_global_binding (sym_t );
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);
@@ -4083,7 +4090,7 @@ extern ptrdiff_t record_in_backtrace (Lisp_Object, Lisp_Object *, ptrdiff_t);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
-extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+extern bool let_shadows_buffer_binding_p (sym_t symbol);
 extern _Noreturn SCM abort_to_prompt (SCM, SCM);
 extern SCM call_with_prompt (SCM, SCM, SCM);
 extern SCM make_prompt_tag (void);

@@ -4367,10 +4367,10 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
       make_symbol_constant (sym);
-      XSYMBOL (sym)->u.s.redirect = SYMBOL_PLAINVAL;
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
 	 in lexically bound elisp signal an error, as documented.  */
-      XSYMBOL (sym)->u.s.declared_special = true;
+      SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
@@ -4443,32 +4443,26 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object string, Lisp_Object obarray)
 {
-  Lisp_Object tem;
-
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
+  Lisp_Object maybe_longhand = maybe_expand_longhand(obarray, string);
+  Lisp_Object tem = Ffind_symbol (maybe_longhand, obarray);
+  if (! NILP (scm_c_value_ref (tem, 1)))
+    return scm_c_value_ref (tem, 0);
 
+  Lisp_Object sym = scm_intern (scm_from_utf8_stringn (SSDATA (maybe_longhand),
+                                                       SBYTES (maybe_longhand)),
+                                obhash (obarray));
 
-  char* longhand = NULL;
-  ptrdiff_t longhand_chars = 0;
-  ptrdiff_t longhand_bytes = 0;
-  tem = oblookup_considering_shorthand (obarray, SSDATA (string),
-					SCHARS (string), SBYTES (string),
-					&longhand, &longhand_chars,
-					&longhand_bytes);
-
-  if (!SYMBOLP (tem))
+  if ((SREF (string, 0) == ':')
+      && EQ (obarray, initial_obarray))
     {
-      if (longhand)
-	{
-	  tem = intern_driver (make_specified_string (longhand, longhand_chars,
-						      longhand_bytes, true),
-			       obarray, tem);
-	}
-      else
-	tem = intern_driver (string, obarray, tem);
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym));
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
-  return tem;
+
+  return sym;
 }
 
 DEFUN ("intern-soft", Fintern_soft, Sintern_soft, 1, 2, 0,
@@ -4479,36 +4473,27 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object name, Lisp_Object obarray)
 {
-  register Lisp_Object tem, string;
-
-  if (NILP (obarray)) obarray = Vobarray;
-  obarray = check_obarray (obarray);
-
-  if (!SYMBOLP (name))
+  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
+  Lisp_Object tem, string, mv, found;
+  /* If already a symbol, we don't do shorthand-longhand translation,
+     as promised in the docstring.  */
+  if (SYMBOLP (name))
     {
-      char *longhand = NULL;
-      ptrdiff_t longhand_chars = 0;
-      ptrdiff_t longhand_bytes = 0;
-
-      CHECK_STRING (name);
-      string = name;
-      tem = oblookup_considering_shorthand (obarray, SSDATA (string),
-					    SCHARS (string), SBYTES (string),
-					    &longhand, &longhand_chars,
-					    &longhand_bytes);
-      if (longhand)
-	xfree (longhand);
-      return FIXNUMP (tem) ? Qnil : tem;
+      string = SYMBOL_NAME (name);
     }
   else
     {
-      /* If already a symbol, we don't do shorthand-longhand translation,
-	 as promised in the docstring.  */
-      string = SYMBOL_NAME (name);
-      tem
-	= oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
-      return EQ (name, tem) ? name : Qnil;
+      CHECK_STRING (name);
+      string = maybe_expand_longhand(obarray, name);
     }
+  mv = Ffind_symbol (string, obarray);
+  tem = scm_c_value_ref (mv, 0);
+  found = scm_c_value_ref (mv, 1);
+
+  if (NILP (found) || (SYMBOLP (name) && !EQ (name, tem)))
+    return Qnil;
+  else
+    return tem;
 }
 
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
@@ -4692,8 +4677,8 @@ init_obarray_once (void)
   SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
 
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  //XSYMBOL (Qnil_)->constant = 1;
-  //XSYMBOL (Qnil_)->declared_special = 1;
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
 
   DEFSYM (Qt, "t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
@@ -4747,8 +4732,8 @@ void
 defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
 }
 
@@ -4757,8 +4742,8 @@ void
 defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
@@ -4772,8 +4757,8 @@ void
 defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
 }
 
@@ -4791,8 +4776,8 @@ void
 defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
 }
 
@@ -5076,7 +5061,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.
 This variable is obsolete as of Emacs 28.1 and should not be used.  */);
-  XSYMBOL (intern ("values"))->u.s.declared_special = false;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")));
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.
