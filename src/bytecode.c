@@ -627,9 +627,8 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	varref:
 	  {
 	    Lisp_Object v1 = vectorp[op], v2;
-	    if (XBARE_SYMBOL (v1)->u.s.redirect != SYMBOL_PLAINVAL
-		|| (v2 = XBARE_SYMBOL (v1)->u.s.val.value,
-		    BASE_EQ (v2, Qunbound)))
+	    if (SYMBOL_REDIRECT (XSYMBOL (v1)) != SYMBOL_PLAINVAL
+		|| (v2 = SYMBOL_VAL (XSYMBOL (v1)), BASE_EQ (v2, Qunbound)))
 	      v2 = Fsymbol_value (v1);
 	    PUSH (v2);
 	    NEXT;
@@ -702,9 +701,9 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 
 	    /* Inline the most common case.  */
 	    if (!BASE_EQ (val, Qunbound)
-		&& XBARE_SYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL
-		&& !XBARE_SYMBOL (sym)->u.s.trapped_write)
-	      SET_SYMBOL_VAL (XBARE_SYMBOL (sym), val);
+		&& SYMBOL_REDIRECT (XSYMBOL (sym)) == SYMBOL_PLAINVAL
+		&& !SYMBOL_TRAPPED_WRITE_P (sym))
+	      SET_SYMBOL_VAL (XSYMBOL (sym), val);
 	    else
               set_internal (sym, val, Qnil, SET_INTERNAL_SET);
 	  }

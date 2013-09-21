@@ -1342,7 +1342,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
 {
   register struct buffer *buf;
   register Lisp_Object result;
-  struct Lisp_Symbol *sym;
+  sym_t sym;
 
   CHECK_SYMBOL (variable);
   CHECK_BUFFER (buffer);
@@ -1350,7 +1350,7 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
   sym = XSYMBOL (variable);
 
  start:
-  switch (sym->u.s.redirect)
+  switch (SYMBOL_REDIRECT (sym))
     {
     case SYMBOL_VARALIAS: sym = SYMBOL_ALIAS (sym); goto start;
     case SYMBOL_PLAINVAL: result = SYMBOL_VAL (sym); break;
@@ -2363,8 +2363,8 @@ void set_buffer_internal_2 (register struct buffer *b)
       for (tail = BVAR (b, local_var_alist); CONSP (tail); tail = XCDR (tail))
 	{
 	  Lisp_Object var = XCAR (XCAR (tail));
-	  struct Lisp_Symbol *sym = XSYMBOL (var);
-	  if (sym->u.s.redirect == SYMBOL_LOCALIZED /* Just to be sure.  */
+	  sym_t sym = XSYMBOL (var);
+	  if (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED /* Just to be sure.  */
 	      && SYMBOL_BLV (sym)->fwd.fwdptr)
 	    /* Just reference the variable
 	       to cause it to become set for this buffer.  */
@@ -5017,7 +5017,7 @@ static void
 defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
 		   Lisp_Object *address, Lisp_Object predicate)
 {
-  struct Lisp_Symbol *sym;
+  sym_t sym;
   int offset;
 
   sym = XSYMBOL (intern (namestring));
@@ -5026,8 +5026,8 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   bo_fwd->type = Lisp_Fwd_Buffer_Obj;
   bo_fwd->offset = offset;
   bo_fwd->predicate = predicate;
-  sym->u.s.declared_special = true;
-  sym->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (sym, 1);
+  SET_SYMBOL_REDIRECT (sym, SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (sym, bo_fwd);
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);
 

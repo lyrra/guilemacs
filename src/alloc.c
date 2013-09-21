@@ -1429,17 +1429,17 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
 void
 init_symbol (Lisp_Object val, Lisp_Object name)
 {
-  struct Lisp_Symbol *p = xmalloc (sizeof *p);
+  sym_t p;
 
-  scm_module_define (symbol_module, val, scm_from_pointer (p, NULL));
+  scm_module_define (symbol_module, val, scm_c_make_vector (5, SCM_BOOL_F));
   p = XSYMBOL (val);
-  p->self = val;
+  SET_SYMBOL_SELF (p, val);
   scm_module_define (plist_module, val, Qnil);
-  p->u.s.redirect = SYMBOL_PLAINVAL;
+  SET_SYMBOL_REDIRECT (p, SYMBOL_PLAINVAL);
   SET_SYMBOL_VAL (p, Qunbound);
   scm_module_define (function_module, val, Qnil);
-  p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
-  p->u.s.declared_special = false;
+  SET_SYMBOL_TRAPPED (p, SYMBOL_UNTRAPPED_WRITE);
+  SET_SYMBOL_DECLARED_SPECIAL (p, false);
 }
 
 DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,

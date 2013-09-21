@@ -4926,12 +4926,12 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray)
 
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
-      s->u.s.trapped_write = SYMBOL_NOWRITE;
-      s->u.s.redirect = SYMBOL_PLAINVAL;
+      make_symbol_constant (sym);
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
 	 in lexically bound elisp signal an error, as documented.  */
-      s->u.s.declared_special = true;
-      SET_SYMBOL_VAL (s, sym);
+      SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
   return scm_intern (scm_from_utf8_stringn (SSDATA (string),
@@ -5316,13 +5316,13 @@ init_obarray_once (void)
 
   Qnil_ = intern_c_string ("nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  XSYMBOL (Qnil_)->constant = 1;
-  XSYMBOL (Qnil_)->declared_special = 1;
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
 
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  XSYMBOL (Qt_)->constant = 1;
-  XSYMBOL (Qt_)->declared_special = 1;
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
@@ -5370,9 +5370,9 @@ void
 defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XBARE_SYMBOL (sym)->u.s.declared_special = true;
-  XBARE_SYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
-  SET_SYMBOL_FWD (XBARE_SYMBOL (sym), i_fwd);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
+  SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
 }
 
 /* Similar but define a variable whose value is t if 1, nil if 0.  */
@@ -5380,9 +5380,9 @@ void
 defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XBARE_SYMBOL (sym)->u.s.declared_special = true;
-  XBARE_SYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
-  SET_SYMBOL_FWD (XBARE_SYMBOL (sym), b_fwd);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
+  SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
 
@@ -5395,9 +5395,9 @@ void
 defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XBARE_SYMBOL (sym)->u.s.declared_special = true;
-  XBARE_SYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
-  SET_SYMBOL_FWD (XBARE_SYMBOL (sym), o_fwd);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
+  SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
 }
 
 void
@@ -5414,9 +5414,9 @@ void
 defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XBARE_SYMBOL (sym)->u.s.declared_special = true;
-  XBARE_SYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
-  SET_SYMBOL_FWD (XBARE_SYMBOL (sym), ko_fwd);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
+  SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
 }
 
 /* Check that the elements of lpath exist.  */
@@ -5699,7 +5699,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.
 This variable is obsolete as of Emacs 28.1 and should not be used.  */);
-  XBARE_SYMBOL (intern ("values"))->u.s.declared_special = false;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")), false);
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.
