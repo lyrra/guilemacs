@@ -276,13 +276,12 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 #define lisp_h_MISCP(x) (SMOB_TYPEP (x, lisp_misc_tag))
 #define lisp_h_NILP(x) (scm_is_lisp_false (x))
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
-   (eassert ((sym)->u.s.redirect == SYMBOL_PLAINVAL), \
-    (sym)->u.s.val.value = (v))
-#define lisp_h_SYMBOL_CONSTANT_P(sym) \
-   (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_NOWRITE)
-#define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (XSYMBOL (sym)->u.s.trapped_write)
+   (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
+      scm_c_vector_set_x (sym, 4, v))
+#define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_CONSTANT (XSYMBOL (sym)))
 #define lisp_h_SYMBOL_VAL(sym) \
-   (eassert ((sym)->redirect == SYMBOL_PLAINVAL), (sym)->val.value)
+   (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
+    scm_c_vector_ref (sym, 4))
 #define lisp_h_SYMBOLP(x) \
   (x && (scm_is_symbol (x) || EQ (x, Qnil) || EQ (x, Qt)))
 #define lisp_h_VECTORLIKEP(x) (SMOB_TYPEP (x, lisp_vectorlike_tag))
@@ -813,7 +812,9 @@ extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
 extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 
-INLINE struct Lisp_Symbol *
+typedef Lisp_Object sym_t;
+
+INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
   Lisp_Object tem;
@@ -821,7 +822,7 @@ XSYMBOL (Lisp_Object a)
   if (EQ (a, Qnil)) a = Qnil_;
   eassert (SYMBOLP (a));
   tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return scm_to_pointer (tem);
+  return tem;
 }
 
 /* Pseudovector types.  */
@@ -884,7 +885,7 @@ make_lisp_proc (struct Lisp_Process *p)
 #define XSETFASTINT(a, b) ((a) = make_natnum (b))
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
-#define XSETSYMBOL(a, b) ((a) = (b)->self)
+#define XSETSYMBOL(a, b) ((a) = scm_c_vector_ref (b, 0))
 #define XSETMISC(a, b) (a) = ((union Lisp_Misc *) (b))->u_any.self
 
 /* Pseudovector types.  */
@@ -1648,7 +1649,7 @@ struct Lisp_Symbol
      1 : it's a varalias, the value is really in the `alias' symbol.
      2 : it's a localized var, the value is in the `blv' object.
      3 : it's a forwarding variable, the value is in `forward'.  */
-  ENUM_BF (symbol_redirect) redirect : 3;
+  ENUM_BF (symbol_redirect) redirect_ : 3;
 
   /* 0 : normal case, just set the value
      1 : constant, cannot set, e.g. nil, t, :keywords.
@@ -1657,16 +1658,13 @@ struct Lisp_Symbol
 
   /* True means that this variable has been explicitly declared
      special (with `defvar' etc), and shouldn't be lexically bound.  */
-  bool_bf declared_special : 1;
-
-  /* True if pointed to from purespace and hence can't be GC'd.  */
-  bool_bf pinned : 1;
+  bool_bf declared_special_ : 1;
 
   /* Value of the symbol or Qunbound if unbound.  Which alternative of the
      union is used depends on the `redirect' field above.  */
   union {
     Lisp_Object value;
-    struct Lisp_Symbol *alias;
+    sym_t alias_;
     struct Lisp_Buffer_Local_Value *blv;
     union Lisp_Fwd *fwd;
   } val;
@@ -1680,56 +1678,54 @@ struct Lisp_Symbol
 };
 verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 
-/* Value is name of symbol.  */
+#define SYMBOL_SELF(sym) (scm_c_vector_ref (sym, 0))
+#define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
+#define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
+#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_number (v)))
+#define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
+#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
+#define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
 
-INLINE Lisp_Object
-(SYMBOL_VAL) (struct Lisp_Symbol *sym)
+INLINE sym_t
+SYMBOL_ALIAS (sym_t sym)
 {
-  return lisp_h_SYMBOL_VAL (sym);
-}
-
-INLINE struct Lisp_Symbol *
-SYMBOL_ALIAS (struct Lisp_Symbol *sym)
-{
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && sym->u.s.val.alias);
-  return sym->u.s.val.alias;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS);
+  return scm_c_vector_ref (sym, 4);
 }
 INLINE struct Lisp_Buffer_Local_Value *
-SYMBOL_BLV (struct Lisp_Symbol *sym)
+SYMBOL_BLV (sym_t sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && sym->u.s.val.blv);
-  return sym->u.s.val.blv;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED);
+  return scm_to_pointer (scm_c_vector_ref (sym, 4));
 }
 INLINE union Lisp_Fwd *
-SYMBOL_FWD (struct Lisp_Symbol *sym)
+SYMBOL_FWD (sym_t sym)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && sym->u.s.val.fwd);
-  return sym->u.s.val.fwd;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
+  return scm_to_pointer (scm_c_vector_ref (sym, 4));
 }
 
-INLINE void
-(SET_SYMBOL_VAL) (struct Lisp_Symbol *sym, Lisp_Object v)
-{
-  lisp_h_SET_SYMBOL_VAL (sym, v);
-}
+LISP_MACRO_DEFUN_VOID (SET_SYMBOL_VAL,
+		       (sym_t sym, Lisp_Object v), (sym, v))
 
 INLINE void
-SET_SYMBOL_ALIAS (struct Lisp_Symbol *sym, struct Lisp_Symbol *v)
+SET_SYMBOL_ALIAS (sym_t sym, sym_t v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_VARALIAS && v);
-  sym->u.s.val.alias = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS);
+  scm_c_vector_set_x (sym, 4, v);
 }
 INLINE void
-SET_SYMBOL_BLV (struct Lisp_Symbol *sym, struct Lisp_Buffer_Local_Value *v)
+SET_SYMBOL_BLV (sym_t sym, struct Lisp_Buffer_Local_Value *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_LOCALIZED && v);
-  sym->u.s.val.blv = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED);
+  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
 }
 INLINE void
-SET_SYMBOL_FWD (struct Lisp_Symbol *sym, union Lisp_Fwd *v)
+SET_SYMBOL_FWD (sym_t sym, union Lisp_Fwd *v)
 {
-  eassume (sym->u.s.redirect == SYMBOL_FORWARDED && v);
-  sym->u.s.val.fwd = v;
+  eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
+  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
 }
 
 INLINE Lisp_Object
@@ -1791,6 +1787,8 @@ INLINE int
 /* Placeholder for make-docfile to process.  The actual symbol
    definition is done by lread.c's define_symbol.  */
 #define DEFSYM(sym, name) /* empty */
+
+LISP_MACRO_DEFUN (SYMBOL_VAL, Lisp_Object, (sym_t sym), (sym))
 
 
 /***********************************************************************
@@ -3163,7 +3161,7 @@ extern Lisp_Object uintbig_to_lisp (uintmax_t);
 extern intmax_t cons_to_signed (Lisp_Object, intmax_t, intmax_t);
 extern uintmax_t cons_to_unsigned (Lisp_Object, uintmax_t);
 
-extern struct Lisp_Symbol *indirect_variable (struct Lisp_Symbol *);
+extern sym_t indirect_variable (sym_t );
 extern _Noreturn void args_out_of_range (Lisp_Object, Lisp_Object);
 extern _Noreturn void args_out_of_range_3 (Lisp_Object, Lisp_Object,
 					   Lisp_Object);
@@ -3181,7 +3179,7 @@ extern void set_default_internal (Lisp_Object, Lisp_Object,
                                   enum Set_Internal_Bind bindflag);
 
 extern void syms_of_data (void);
-extern void swap_in_global_binding (struct Lisp_Symbol *);
+extern void swap_in_global_binding (sym_t );
 
 /* Defined in cmds.c */
 extern void syms_of_cmds (void);
@@ -3707,7 +3705,7 @@ extern ptrdiff_t record_in_backtrace (Lisp_Object, Lisp_Object *, ptrdiff_t);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
 extern void get_backtrace (Lisp_Object array);
 Lisp_Object backtrace_top_function (void);
-extern bool let_shadows_buffer_binding_p (struct Lisp_Symbol *symbol);
+extern bool let_shadows_buffer_binding_p (sym_t symbol);
 extern _Noreturn SCM abort_to_prompt (SCM, SCM);
 extern SCM call_with_prompt (SCM, SCM, SCM);
 extern SCM make_prompt_tag (void);

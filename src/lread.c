@@ -4147,8 +4147,8 @@ it defaults to the value of `obarray'.  */)
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
     {
-      XSYMBOL (sym)->constant = 1;
-      XSYMBOL (sym)->redirect = SYMBOL_PLAINVAL;
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
@@ -4324,13 +4324,12 @@ init_obarray (void)
 
   Qnil_ = intern_c_string ("nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  XSYMBOL (Qnil_)->constant = 1;
-  XSYMBOL (Qnil_)->declared_special = 1;
-
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  XSYMBOL (Qt_)->constant = 1;   // FIX: 20190626 LAV, is this the old interface?
-  XSYMBOL (Qt_)->declared_special = 1;
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   DEFSYM (Qt, "t");
   Qt = SCM_BOOL_T;
@@ -4385,8 +4384,8 @@ defvar_int (struct Lisp_Intfwd *i_fwd,
   sym = intern_c_string (namestring);
   i_fwd->type = Lisp_Fwd_Int;
   i_fwd->intvar = address;
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), (union Lisp_Fwd *)i_fwd);
 }
 
@@ -4400,8 +4399,8 @@ defvar_bool (struct Lisp_Boolfwd *b_fwd,
   sym = intern_c_string (namestring);
   b_fwd->type = Lisp_Fwd_Bool;
   b_fwd->boolvar = address;
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), (union Lisp_Fwd *)b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
@@ -4419,8 +4418,8 @@ defvar_lisp_nopro (struct Lisp_Objfwd *o_fwd,
   sym = intern_c_string (namestring);
   o_fwd->type = Lisp_Fwd_Obj;
   o_fwd->objvar = address;
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), (union Lisp_Fwd *)o_fwd);
 }
 
@@ -4443,8 +4442,8 @@ defvar_kboard (struct Lisp_Kboard_Objfwd *ko_fwd,
   sym = intern_c_string (namestring);
   ko_fwd->type = Lisp_Fwd_Kboard_Obj;
   ko_fwd->offset = offset;
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), (union Lisp_Fwd *)ko_fwd);
 }
 
@@ -4763,7 +4762,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
   DEFVAR_LISP ("values", Vvalues,
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.  */);
-  XSYMBOL (intern ("values"))->u.s.declared_special = false;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")), 0);
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.

@@ -490,7 +490,7 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	  {
 	    Lisp_Object v1 = vectorp[op], v2;
 	    if (!SYMBOLP (v1)
-		|| XSYMBOL (v1)->u.s.redirect != SYMBOL_PLAINVAL
+		|| SYMBOL_REDIRECT (XSYMBOL (v1)) != SYMBOL_PLAINVAL
 		|| (v2 = SYMBOL_VAL (XSYMBOL (v1)), EQ (v2, Qunbound)))
 	      v2 = Fsymbol_value (v1);
 	    PUSH (v2);
@@ -559,8 +559,8 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	    /* Inline the most common case.  */
 	    if (SYMBOLP (sym)
 		&& !EQ (val, Qunbound)
-		&& !XSYMBOL (sym)->u.s.redirect
-		&& !SYMBOL_TRAPPED_WRITE_P (sym))
+		&& !SYMBOL_REDIRECT (XSYMBOL (sym))
+		&& !SYMBOL_TRAPPED_WRITE_P (sym))  // FIX: 20190626 LAV, SYMBOL_TRAPPED code isn't working with guile/scm api
 	      SET_SYMBOL_VAL (XSYMBOL (sym), val);
 	    else
               set_internal (sym, val, Qnil, SET_INTERNAL_SET);
