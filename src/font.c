@@ -282,13 +282,9 @@ font_intern_prop (const char *str, ptrdiff_t len, bool force_symbol)
   /* This code is similar to intern function from lread.c.  */
   obarray = check_obarray (Vobarray);
   parse_str_as_multibyte ((unsigned char *) str, len, &nchars, &nbytes);
-  tem = oblookup (obarray, str,
-		  (len == nchars || len != nbytes) ? len : nchars, len);
-  if (SYMBOLP (tem))
-    return tem;
   name = make_specified_string (str, nchars, len,
 				len != nchars && len == nbytes);
-  return intern_driver (name, obarray, tem);
+  return intern_driver (name, obarray);
 }
 
 /* Return a pixel size of font-spec SPEC on frame F.  */
