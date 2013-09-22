@@ -651,13 +651,15 @@ the same file name is found in the `doc-directory'.  */)
 	     docs for eg w32-specific items on X.
 	  */
 
-	  sym = oblookup (Vobarray, p + 2,
-			  multibyte_chars_in_text ((unsigned char *) p + 2,
-						   end - p - 2),
-			  end - p - 2);
+	  Lisp_Object tem = Ffind_symbol (make_specified_string (p + 2,
+                                                                 -1,
+                                                                 end - p - 2,
+                                                                 true),
+                                          Qnil);
+          sym = scm_c_value_ref (tem, 0);
           /* Ignore docs that start with SKIP.  These mark
              placeholders where the real doc is elsewhere.  */
-	  if (SYMBOLP (sym))
+	  if (! NILP (scm_c_value_ref (tem, 1)))
 	    {
 	      /* Attach a docstring to a variable?  */
 	      if (p[1] == 'V')
