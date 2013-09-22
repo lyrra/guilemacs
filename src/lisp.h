@@ -4489,7 +4489,6 @@ extern Lisp_Object intern_c_multibyte (const char *str,
 				       ptrdiff_t nchars, ptrdiff_t nbytes);
 extern void init_symbol (Lisp_Object, Lisp_Object);
 extern Lisp_Object obhash (Lisp_Object);
-extern Lisp_Object oblookup (Lisp_Object, const char *, ptrdiff_t, ptrdiff_t);
 INLINE void
 LOADHIST_ATTACH (Lisp_Object x)
 {

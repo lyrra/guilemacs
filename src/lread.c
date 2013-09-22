@@ -4918,25 +4918,7 @@ static void grow_obarray (struct Lisp_Obarray *o);
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray)
 {
-  Lisp_Object sym;
-  sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
-                                           SBYTES (string)),
-                    obhash (obarray));
-  init_symbol (sym, string);
-
-  if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
-    {
-      make_symbol_constant (sym);
-      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
-      /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
-	 in lexically bound elisp signal an error, as documented.  */
-      SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
-      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
-    }
-
-  return scm_intern (scm_from_utf8_stringn (SSDATA (string),
-                                          SBYTES (string)),
-                     obhash (obarray));
+  return Fintern (make_string (str, len), Qnil);
 }
 
 /* Intern a symbol with name STRING in OBARRAY using bucket INDEX.  */
@@ -5012,6 +4994,29 @@ define_symbol (Lisp_Object sym, char const *str)
     }
 }
 
+DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
+       doc: /* find-symbol */)
+     (Lisp_Object string, Lisp_Object obarray)
+{
+  Lisp_Object tem, sstring, found;
+
+  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
+  CHECK_STRING (string);
+
+  sstring = scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
+  tem = scm_find_symbol (sstring, obhash (obarray));
+  if (scm_is_true (tem)
+      && scm_is_true (scm_module_variable (symbol_module, tem)))
+    {
+      if (EQ (tem, Qnil_))
+        tem = Qnil;
+      else if (EQ (tem, Qt_))
+        tem = Qt;
+      return scm_values (scm_list_2 (tem, Qt));
+    }
+  else
+    return scm_values (scm_list_2 (Qnil, Qnil));
+}
 DEFUN ("intern", Fintern, Sintern, 1, 2, 0,
        doc: /* Return the canonical symbol whose name is STRING.
 If there is none, one is created by this function and returned.
@@ -5019,34 +5024,28 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object string, Lisp_Object obarray)
 {
-  Lisp_Object tem;
+  Lisp_Object tem, sym, *ptr;
 
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
+  tem = Ffind_symbol (string, obarray);
+  if (! NILP (scm_c_value_ref (tem, 1)))
+    return scm_c_value_ref (tem, 0);
 
-  char* longhand = NULL;
-  ptrdiff_t longhand_chars = 0;
-  ptrdiff_t longhand_bytes = 0;
-  tem = oblookup_considering_shorthand (obarray, SSDATA (string),
-					SCHARS (string), SBYTES (string),
-					&longhand, &longhand_chars,
-					&longhand_bytes);
+  sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
+                                           SBYTES (string)),
+                    obhash (obarray));
+  initialize_symbol (sym, string);
 
-  if (!BARE_SYMBOL_P (tem))
+  if ((SREF (string, 0) == ':') && EQ (obarray, initial_obarray))
     {
-      if (longhand)
-	{
-	  tem = intern_driver (make_multibyte_string (longhand, longhand_chars,
-						      longhand_bytes),
-			       obarray);
-	  xfree (longhand);
-	}
-      else
-	tem = intern_driver (NILP (Vpurify_flag) ? string : Fpurecopy (string),
-			     obarray);
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
-  return tem;
+
+  return sym;
 }
 
 DEFUN ("intern-soft", Fintern_soft, Sintern_soft, 1, 2, 0,
@@ -5057,53 +5056,17 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object name, Lisp_Object obarray)
 {
-  register Lisp_Object tem, string;
+  register Lisp_Object tem, string, mv, found;
 
-  if (NILP (obarray)) obarray = Vobarray;
-  obarray = check_obarray (obarray);
+  string = SYMBOLP (name) ? SYMBOL_NAME (name) : name;
+  mv = Ffind_symbol (string, obarray);
+  tem = scm_c_value_ref (mv, 0);
+  found = scm_c_value_ref (mv, 1);
 
-  if (!SYMBOLP (name))
-    {
-      char *longhand = NULL;
-      ptrdiff_t longhand_chars = 0;
-      ptrdiff_t longhand_bytes = 0;
-
-      CHECK_STRING (name);
-      string = name;
-      tem = oblookup_considering_shorthand (obarray, SSDATA (string),
-					    SCHARS (string), SBYTES (string),
-					    &longhand, &longhand_chars,
-					    &longhand_bytes);
-      if (longhand)
-	xfree (longhand);
-      return FIXNUMP (tem) ? Qnil : tem;
-    }
+  if (NILP (found) || (SYMBOLP (name) && !EQ (name, tem)))
+    return Qnil;
   else
-    {
-      /* If already a symbol, we don't do shorthand-longhand translation,
-	 as promised in the docstring.  */
-      Lisp_Object sym = maybe_remove_pos_from_symbol (name);
-      string = XSYMBOL (name)->u.s.name;
-      tem
-	= oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
-      return BASE_EQ (sym, tem) ? name : Qnil;
-    }
-}
-
-DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
-       doc: /* find-symbol */)
-     (Lisp_Object string, Lisp_Object obarray)
-{
-  Lisp_Object tem;
-
-  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
-  CHECK_STRING (string);
-
-  tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
-  if (INTEGERP (tem))
-    return scm_values (scm_list_2 (Qnil, Qnil));
-  else
-    return scm_values (scm_list_2 (tem, Qt));
+    return tem;
 }
 
 DEFUN ("unintern", Funintern, Sunintern, 2, 2, 0,
@@ -5138,110 +5101,8 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
 }
 
-
-/* Bucket index of the string STR of length SIZE_BYTE bytes in obarray OA.  */
-static ptrdiff_t
-obarray_index (struct Lisp_Obarray *oa, const char *str, ptrdiff_t size_byte)
-{
-  EMACS_UINT hash = hash_string (str, size_byte);
-  return knuth_hash (reduce_emacs_uint_to_hash_hash (hash), oa->size_bits);
-}
-
-/* Return the symbol in OBARRAY whose names matches the string
-   of SIZE characters (SIZE_BYTE bytes) at PTR.
-   If there is no such symbol, return the integer bucket number of
-   where the symbol would be if it were present.
-
-   Also store the bucket number in oblookup_last_bucket_number.  */
-
-Lisp_Object
-oblookup (Lisp_Object obarray, register const char *ptr, ptrdiff_t size, ptrdiff_t size_byte)
-{
-  Lisp_Object sym;
-  Lisp_Object string2 = scm_from_utf8_stringn (ptr, size_byte);
-
-  obarray = check_obarray (obarray);
-  sym = scm_find_symbol (string2, obhash (obarray));
-  if (scm_is_true (sym)
-      && scm_is_true (scm_module_variable (symbol_module, sym)))
-    {
-      if (EQ (sym, Qnil_))
-        return Qnil;
-      else if (EQ (sym, Qt_))
-        return Qt;
-      else
-        return sym;
-    }
-  else
-    return make_number (0);
-}
-
-/* Like 'oblookup', but considers 'Vread_symbol_shorthands',
-   potentially recognizing that IN is shorthand for some other
-   longhand name, which is then placed in OUT.  In that case,
-   memory is malloc'ed for OUT (which the caller must free) while
-   SIZE_OUT and SIZE_BYTE_OUT respectively hold the character and byte
-   sizes of the transformed symbol name.  If IN is not recognized
-   shorthand for any other symbol, OUT is set to point to NULL and
-   'oblookup' is called.  */
-
-Lisp_Object
-oblookup_considering_shorthand (Lisp_Object obarray, const char *in,
-				ptrdiff_t size, ptrdiff_t size_byte, char **out,
-				ptrdiff_t *size_out, ptrdiff_t *size_byte_out)
-{
-  Lisp_Object tail = Vread_symbol_shorthands;
-
-  /* First, assume no transformation will take place.  */
-  *out = NULL;
-  /* Then, iterate each pair in Vread_symbol_shorthands.  */
-  FOR_EACH_TAIL_SAFE (tail)
-    {
-      Lisp_Object pair = XCAR (tail);
-      /* Be lenient to 'read-symbol-shorthands': if some element isn't a
-	 cons, or some member of that cons isn't a string, just skip
-	 to the next element.  */
-      if (!CONSP (pair))
-	continue;
-      Lisp_Object sh_prefix = XCAR (pair);
-      Lisp_Object lh_prefix = XCDR (pair);
-      if (!STRINGP (sh_prefix) || !STRINGP (lh_prefix))
-	continue;
-      ptrdiff_t sh_prefix_size = SBYTES (sh_prefix);
-
-      /* Compare the prefix of the transformation pair to the symbol
-	 name.  If a match occurs, do the renaming and exit the loop.
-	 In other words, only one such transformation may take place.
-	 Calculate the amount of memory to allocate for the longhand
-	 version of the symbol name with xrealloc.  This isn't
-	 strictly needed, but it could later be used as a way for
-	 multiple transformations on a single symbol name.  */
-      if (sh_prefix_size <= size_byte
-	  && memcmp (SSDATA (sh_prefix), in, sh_prefix_size) == 0)
-	{
-	  ptrdiff_t lh_prefix_size = SBYTES (lh_prefix);
-	  ptrdiff_t suffix_size = size_byte - sh_prefix_size;
-	  *out = xrealloc (*out, lh_prefix_size + suffix_size);
-	  memcpy (*out, SSDATA(lh_prefix), lh_prefix_size);
-	  memcpy (*out + lh_prefix_size, in + sh_prefix_size, suffix_size);
-	  *size_out = SCHARS (lh_prefix) - SCHARS (sh_prefix) + size;
-	  *size_byte_out = lh_prefix_size + suffix_size;
-	  break;
-	}
-    }
-  /* Now, as promised, call oblookup with the "final" symbol name to
-     lookup.  That function remains oblivious to whether a
-     transformation happened here or not, but the caller of this
-     function can tell by inspecting the OUT parameter.  */
-  if (*out)
-    return oblookup (obarray, *out, *size_out, *size_byte_out);
-  else
-    return oblookup (obarray, in, size, size_byte);
-}
-
-
-static struct Lisp_Obarray *
-allocate_obarray (void)
+void
+map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Object arg)
 {
   Lisp_Object proc (Lisp_Object sym)
   {
