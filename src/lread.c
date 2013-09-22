@@ -4395,28 +4395,13 @@ intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
-  Lisp_Object obarray = check_obarray (Vobarray);
-  Lisp_Object tem = oblookup (obarray, str, len, len);
-
-  return (SYMBOLP (tem) ? tem
-	  /* The above `oblookup' was done on the basis of nchars==nbytes, so
-	     the string has to be unibyte.  */
-	  : intern_driver (make_unibyte_string (str, len),
-			   obarray, tem));
+  return intern_driver (make_unibyte_string (str, len), Qnil);
 }
 
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  Lisp_Object obarray = check_obarray (Vobarray);
-  Lisp_Object tem = oblookup (obarray, str, len, len);
-
-  if (!SYMBOLP (tem))
-    {
-      Lisp_Object string = make_string (str, len);
-      tem = intern_driver (string, obarray, tem);
-    }
-  return tem;
+  return intern_driver (make_string (str, len), Qnil);
 }
 
 static void
@@ -4430,12 +4415,35 @@ define_symbol (Lisp_Object sym, char const *str)
      'unbound' created by a Lisp program.  */
   if (! EQ (sym, Qunbound))
     {
-      Lisp_Object bucket = oblookup (initial_obarray, str, len, len);
-      eassert (FIXNUMP (bucket));
-      intern_sym (sym, initial_obarray, bucket);
+      intern_sym (sym);
     }
+  return intern_driver (make_pure_c_string (str, len), Qnil);
 }
 
+DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
+       doc: /* find-symbol */)
+     (Lisp_Object string, Lisp_Object obarray)
+{
+  Lisp_Object tem, sstring, found;
+
+  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
+  CHECK_STRING (string);
+
+  sstring = scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
+  tem = scm_find_symbol (sstring, obhash (obarray));
+  if (scm_is_true (tem)
+      && scm_is_true (scm_module_variable (symbol_module, tem)))
+    {
+      if (EQ (tem, Qnil_))
+        tem = Qnil;
+      else if (EQ (tem, Qt_))
+        tem = Qt;
+      return scm_values (scm_list_2 (tem, Qt));
+    }
+  else
+    return scm_values (scm_list_2 (Qnil, Qnil));
+}
+
 DEFUN ("intern", Fintern, Sintern, 1, 2, 0,
        doc: /* Return the canonical symbol whose name is STRING.
 If there is none, one is created by this function and returned.
@@ -4494,22 +4502,6 @@ it defaults to the value of `obarray'.  */)
     return Qnil;
   else
     return tem;
-}
-
-DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
-       doc: /* find-symbol */)
-     (Lisp_Object string, Lisp_Object obarray)
-{
-  Lisp_Object tem;
-
-  obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
-  CHECK_STRING (string);
-
-  tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
-  if (INTEGERP (tem))
-    return scm_values (scm_list_2 (Qnil, Qnil));
-  else
-    return scm_values (scm_list_2 (tem, Qt));
 }
 
 DEFUN ("unintern", Funintern, Sunintern, 1, 2, 0,
