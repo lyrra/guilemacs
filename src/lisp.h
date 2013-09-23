@@ -1414,7 +1414,6 @@ struct Lisp_String
   {
     struct
     {
-      Lisp_Object self;
       /* Number of characters in string; MSB is used as the mark bit.  */
       ptrdiff_t size;
       /* If nonnegative, number of bytes in the string (which is multibyte).
@@ -1428,10 +1427,8 @@ struct Lisp_String
       unsigned char *data;
     } s;
     struct Lisp_String *next;
-    GCALIGNED_UNION_MEMBER
   } u;
 };
-static_assert (GCALIGNED (struct Lisp_String));
 
 INLINE bool
 STRINGP (Lisp_Object x)
@@ -4172,6 +4169,7 @@ extern intptr_t garbage_collection_inhibited;
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
 unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
+extern void allocate_string_data (Lisp_Object, EMACS_INT, EMACS_INT, bool);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);

@@ -1053,28 +1053,6 @@ usage: (let VARLIST BODY...)  */)
   return elt;
 }
 
-DEFUN ("while", Fwhile, Swhile, 1, UNEVALLED, 0,
-       doc: /* If TEST yields non-nil, eval BODY... and repeat.
-The order of execution is thus TEST, BODY, TEST, BODY and so on
-until TEST returns nil.
-
-The value of a `while' form is always nil.
-
-usage: (while TEST BODY...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object test, body;
-
-  test = XCAR (args);
-  body = XCDR (args);
-  while (!NILP (eval_sub (test)))
-    {
-      maybe_quit ();
-      prog_ignore (body);
-    }
-
-  return Qnil;
-}
 
 static void
 with_delayed_message_display (struct atimer *timer)
@@ -2168,8 +2146,9 @@ then strings and vectors are not accepted.  */)
   if (NILP (fun))
     return Qnil;
 
-   if (scm_is_true (scm_procedure_p (fun)))
-    return (scm_is_true (scm_procedure_property (fun, Qinteractive_form))
+  if (scm_is_true (scm_procedure_p (fun)))
+    return (scm_is_pair (scm_assq (Qinteractive_form,
+                                   scm_procedure_properties (fun)))
             ? Qt : Qnil);
 
   /* Bytecode objects are interactive if they are long enough to
