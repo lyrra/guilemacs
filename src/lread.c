@@ -4116,8 +4116,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
 
   sstring = scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
   tem = scm_find_symbol (sstring, obhash (obarray));
-  if (scm_is_true (tem)
-      && scm_is_true (scm_module_variable (symbol_module, tem)))
+  if (scm_is_true (tem))
     {
       if (EQ (tem, Qnil_))
         tem = Qnil;
@@ -4150,7 +4149,6 @@ it defaults to the value of `obarray'.  */)
   sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
                                            SBYTES (string)),
                     obhash (obarray));
-  initialize_symbol (sym, string);
 
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
@@ -4280,17 +4278,21 @@ init_obarray (void)
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
+  // FIX: 20190626 LAV, 1/2 correct def of t?
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
+  // FIX: 20190626 LAV, 2/2 correct def of t?
   DEFSYM (Qt, "t");
   Qt = SCM_BOOL_T;
   SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
   make_symbol_constant (Qt);     //              and this is the new interface, refactor post-2015?
   XSYMBOL (Qt)->declared_special = true;  // FIX: 20190626 LAV, true or 1?!?
 
+  Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
+  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
   /* Qt is correct even if CANNOT_DUMP.  loadup.el will set to nil at end.  */
   Vpurify_flag = Qt;
