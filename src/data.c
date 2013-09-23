@@ -705,61 +705,10 @@ global value outside of any lexical scope.  */)
   return (EQ (valcontents, Qunbound) ? Qnil : Qt);
 }
 
-/* It has been previously suggested to make this function an alias for
-   symbol-function, but upon discussion at Bug#23957, there is a risk
-   breaking backward compatibility, as some users of fboundp may
-   expect t in particular, rather than any true value.  */
-DEFUN ("fboundp", Ffboundp, Sfboundp, 1, 1, 0,
-       doc: /* Return t if SYMBOL's function definition is not void.  */)
-  (Lisp_Object symbol)
-{
-  CHECK_SYMBOL (symbol);
-  return NILP (SYMBOL_FUNCTION (symbol)) ? Qnil : Qt;
-}
-
-DEFUN ("makunbound", Fmakunbound, Smakunbound, 1, 1, 0,
-       doc: /* Empty out the value cell of SYMBOL, making it void as a variable.
-Return SYMBOL.
-
-If a variable is void, trying to evaluate the variable signals a
-`void-variable' error, instead of returning a value.  For more
-details, see Info node `(elisp) Void Variables'.
-
-See also `fmakunbound'.  */)
-  (register Lisp_Object symbol)
-{
-  CHECK_SYMBOL (symbol);
-  if (SYMBOL_CONSTANT_P (symbol))
-    xsignal1 (Qsetting_constant, symbol);
-  Fset (symbol, Qunbound);
-  return symbol;
-}
-
-DEFUN ("fmakunbound", Ffmakunbound, Sfmakunbound, 1, 1, 0,
-       doc: /* Make SYMBOL's function definition be void.
-Return SYMBOL.
-
-If a function definition is void, trying to call a function by that
-name will cause a `void-function' error.  For more details, see Info
-node `(elisp) Function Cells'.
-
-See also `makunbound'.  */)
-  (register Lisp_Object symbol)
-{
-  CHECK_SYMBOL (symbol);
-  if (NILP (symbol) || EQ (symbol, Qt))
-    xsignal1 (Qsetting_constant, symbol);
-  set_symbol_function (symbol, Qnil);
-  return symbol;
-}
-
-DEFUN ("symbol-function", Fsymbol_function, Ssymbol_function, 1, 1, 0,
-       doc: /* Return SYMBOL's function definition, or nil if that is void.  */)
-  (Lisp_Object symbol)
-{
-  CHECK_SYMBOL (symbol);
-  return SYMBOL_FUNCTION (symbol);
-}
+WRAP1 (Ffboundp, "fboundp")
+WRAP1 (Fmakunbound, "makunbound")
+WRAP1 (Ffmakunbound, "fmakunbound")
+WRAP1 (Fsymbol_function, "symbol-function")
 
 DEFUN ("symbol-plist", Fsymbol_plist, Ssymbol_plist, 1, 1, 0,
        doc: /* Return SYMBOL's property list.  */)
@@ -780,39 +729,7 @@ DEFUN ("symbol-name", Fsymbol_name, Ssymbol_name, 1, 1, 0,
   return name;
 }
 
-DEFUN ("fset", Ffset, Sfset, 2, 2, 0,
-       doc: /* Set SYMBOL's function definition to DEFINITION, and return DEFINITION.  */)
-  (register Lisp_Object symbol, Lisp_Object definition)
-{
-  register Lisp_Object function;
-  CHECK_SYMBOL (symbol);
-  /* Perhaps not quite the right error signal, but seems good enough.  */
-  if (NILP (symbol) && !NILP (definition))
-    /* There are so many other ways to shoot oneself in the foot, I don't
-       think this one little sanity check is worth its cost, but anyway.  */
-    xsignal1 (Qsetting_constant, symbol);
-
-  function = SYMBOL_FUNCTION (symbol);
-
-  if (!NILP (Vautoload_queue) && !NILP (function))
-    Vautoload_queue = Fcons (Fcons (symbol, function), Vautoload_queue);
-
-  if (AUTOLOADP (function))
-    Fput (symbol, Qautoload, XCDR (function));
-
-  eassert (valid_lisp_object_p (definition));
-
-#ifdef HAVE_NATIVE_COMP
-  if (comp_enable_subr_trampolines
-      && SUBRP (function)
-      && !SUBR_NATIVE_COMPILEDP (function))
-    CALLN (Ffuncall, Qcomp_subr_trampoline_install, symbol);
-#endif
-
-  set_symbol_function (symbol, definition);
-
-  return definition;
-}
+WRAP2 (Ffset, "fset")
 
 DEFUN ("defalias", Fdefalias, Sdefalias, 2, 3, 0,
        doc: /* Set SYMBOL's function definition to DEFINITION.
@@ -3928,6 +3845,18 @@ A is a bool vector, B is t or nil, and I is an index into A.  */)
   return make_fixnum (count);
 }
 
+
+DEFUN ("bind-symbol", Fbind_symbol, Sbind_symbol, 3, 3, 0,
+       doc: /* Bind symbol.  */)
+  (Lisp_Object symbol, Lisp_Object value, Lisp_Object thunk)
+{
+  Lisp_Object val;
+  dynwind_begin ();
+  specbind (symbol, value);
+  val = call0 (thunk);
+  dynwind_end ();
+  return val;
+}
 
 void
 syms_of_data (void)
