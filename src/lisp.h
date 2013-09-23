@@ -795,7 +795,7 @@ XINT (Lisp_Object a)
 /***********************************************************************
 			       Symbols
  ***********************************************************************/
-extern void initialize_symbol (Lisp_Object, Lisp_Object);
+//extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 
 enum symbol_redirect
@@ -878,6 +878,11 @@ struct Lisp_Symbol
          3 : it's a forwarding variable, the value is in `forward'.  */
       ENUM_BF (symbol_redirect) redirect : 3;
 
+      /* 0 : normal case, just set the value
+         1 : constant, cannot set, e.g. nil, t, :keywords.
+         2 : trap the write, call watcher functions.  */
+      //ENUM_BF (symbol_trapped_write) trapped_write : 2;
+
       /* Non-zero means symbol is constant, i.e. changing its value
          should signal an error.  If the value is 3, then the var
          can be changed, but only by `defconst'.  */
@@ -886,9 +891,6 @@ struct Lisp_Symbol
       /* True means that this variable has been explicitly declared
          special (with `defvar' etc), and shouldn't be lexically bound.  */
       bool_bf declared_special : 1;
-
-      /* True if pointed to from purespace and hence can't be GC'd.  */
-      bool_bf pinned : 1;
 
       /* Value of the symbol or Qunbound if unbound.  Which alternative of the
          union is used depends on the `redirect' field above.  */
@@ -919,8 +921,6 @@ verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 #define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
 #define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
 
-
-
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
 /* We can use the same trick as in the DEFUN macro to generate the
@@ -945,6 +945,17 @@ verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 			 Lisp_Object, Lisp_Object, Lisp_Object)
 #define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
 			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
+
+extern void initialize_symbol (Lisp_Object, Lisp_Object);
+extern Lisp_Object symbol_module;
+extern Lisp_Object function_module;
+extern Lisp_Object plist_module;
+extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+
+typedef Lisp_Object sym_t;
+
+INLINE sym_t XSYMBOL (Lisp_Object a);
+
 
 #include "globals.h"
 
@@ -1022,9 +1033,14 @@ SET_SYMBOL_FWD (sym_t sym, void const *v)
 INLINE Lisp_Object
 SYMBOL_NAME (Lisp_Object sym)
 {
-  if (EQ (sym, Qnil)) sym = Qnil_;
-  if (EQ (sym, Qt)) sym = Qt_;
-  return build_string (scm_to_locale_string (scm_symbol_to_string (sym)));
+  return build_string (scm_to_locale_string (scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-name"), sym)));
+}
+
+INLINE sym_t
+XSYMBOL (Lisp_Object a)
+{
+  return scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-desc"),
+                     a);
 }
 
 /* Value is true if SYM is an interned symbol.  */
@@ -1037,13 +1053,14 @@ SYMBOL_INTERNED_P (Lisp_Object sym)
   return scm_is_true (scm_symbol_interned_p (sym));
 }
 
+/* Value is true if SYM is interned in initial_obarray.  */
+
+
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
 {
-  if (EQ (sym, Qnil)) sym = Qnil_;
-  if (EQ (sym, Qt)) sym = Qt_;
-  return scm_variable_ref (scm_module_lookup (function_module, sym));
+  return scm_call_1 (scm_c_public_ref ("elisp-functions", "symbol-function"), sym);
 }
 
 /* Value is non-zero if symbol is considered a constant, i.e. its
@@ -1060,6 +1077,16 @@ INLINE int
    constant (e.g. nil, t, :keywords).  Code that actually wants to
    write to SYM, should also check whether there are any watching
    functions.  */
+
+INLINE int
+(SYMBOL_CONSTANT_P) (Lisp_Object sym)
+{
+  return lisp_h_SYMBOL_CONSTANT_P (sym);
+}
+
+/* Placeholder for make-docfile to process.  The actual symbol
+   definition is done by lread.c's define_symbol.  */
+#define DEFSYM(sym, name) /* empty */
 
 
 /* untagged_ptr represents a pointer before tagging, and Lisp_Word_tag
@@ -1319,33 +1346,6 @@ STRINGP (Lisp_Object x)
   return SMOB_TYPEP (x, lisp_string_tag);
 }
 
-
-extern void initialize_symbol (Lisp_Object, Lisp_Object);
-extern Lisp_Object symbol_module;
-extern Lisp_Object function_module;
-extern Lisp_Object plist_module;
-extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
-
-typedef Lisp_Object sym_t;
-
-INLINE sym_t
-XSYMBOL (Lisp_Object a)
-{
-  Lisp_Object tem;
-  if (EQ (a, Qt)) a = Qt_;
-  if (EQ (a, Qnil)) a = Qnil_;
-  eassert (SYMBOLP (a));
-  tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
-  return tem;
-}
-INLINE int
-(SYMBOL_CONSTANT_P) (Lisp_Object sym)
-{
-  return lisp_h_SYMBOL_CONSTANT_P (sym);
-}
-
-
-
 /* Pseudovector types.  */
 
 /*
@@ -1474,6 +1474,18 @@ LISP_MACRO_DEFUN (NILP, bool, (Lisp_Object x), (x))
 LISP_MACRO_DEFUN (CONSP, bool, (Lisp_Object x), (x))
 LISP_MACRO_DEFUN (XCAR, Lisp_Object, (Lisp_Object c), (c))
 LISP_MACRO_DEFUN (XCDR, Lisp_Object, (Lisp_Object c), (c))
+
+INLINE bool
+SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
+{
+  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
+  //return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+  // other version:
+  // /* Should be initial_obarray */
+   Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
+   return (! NILP (scm_c_value_ref (tem, 1))
+           && (EQ (sym, scm_c_value_ref (tem, 0))));
+}
 
 /* Use these to set the fields of a cons cell.
 
@@ -2097,18 +2109,6 @@ XSUBR (Lisp_Object a)
   return SMOB_PTR (a);
 }
 
-/* Value is true if SYM is interned in initial_obarray.  */
-INLINE bool
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
-{
-  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
-  //return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
-  // other version:
-  // /* Should be initial_obarray */
-   Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
-   return (! NILP (scm_c_value_ref (tem, 1))
-           && (EQ (sym, scm_c_value_ref (tem, 0))));
-}
 
 /* This is the number of slots that every char table must have.  This
    counts the ordinary slots and the top, defalt, parent, and purpose
@@ -2169,7 +2169,6 @@ typedef jmp_buf sys_jmp_buf;
 
 #include "thread.h"
 
-
 /***********************************************************************
 			     Hash Tables
  ***********************************************************************/
@@ -3035,6 +3034,9 @@ CHECK_INTEGER (Lisp_Object x)
     return fn (i, args);                                    \
   }
 
+#define WRAP1(cfn, lfn) Lisp_Object cfn (Lisp_Object a) { return call1 (intern (lfn), a); }
+#define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
+
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */
 //FIX-20230210-LAV: usage of defsubr is used in syms_of_* functions, and can be automated from spec
@@ -3320,25 +3322,22 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
-  if (EQ (sym, Qnil)) sym = Qnil_;
-  if (EQ (sym, Qt)) sym = Qt_;
-  scm_variable_set_x (scm_module_lookup (function_module, sym), function);
+  scm_call_2 (scm_c_public_ref ("language elisp runtime", "set-symbol-function!"),
+              sym, function);
 }
 
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
-  if (EQ (sym, Qnil)) sym = Qnil_;
-  if (EQ (sym, Qt)) sym = Qt_;
-  return scm_variable_ref (scm_module_lookup (plist_module, sym));
+  return scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-plist"),
+                     sym);
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
-  if (EQ (sym, Qnil)) sym = Qnil_;
-  if (EQ (sym, Qt)) sym = Qt_;
-  scm_variable_set_x (scm_module_lookup (plist_module, sym), plist);
+  scm_call_2 (scm_c_public_ref ("language elisp runtime", "set-symbol-plist!"),
+              sym, plist);
 }
 
 /* Buffer-local variable access functions.  */
@@ -4890,6 +4889,7 @@ maybe_gc (void)
   return;
 }
 
+#if 0
 INLINE bool
 functionp (Lisp_Object object)
 {
@@ -4919,6 +4919,7 @@ functionp (Lisp_Object object)
       return EQ (car, Qlambda) || EQ (car, Qclosure);
     }
 }
+#endif
 
 INLINE_HEADER_END
 #endif /* EMACS_LISP_H */

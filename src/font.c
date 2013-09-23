@@ -285,7 +285,8 @@ font_intern_prop (const char *str, ptrdiff_t len, bool force_symbol)
   parse_str_as_multibyte ((unsigned char *) str, len, &nchars, &nbytes);
   name = make_specified_string (str, nchars, len,
 				len != nchars && len == nbytes);
-  return intern_driver (name, obarray);
+  tem = oblookup (obarray, str, nchars, nbytes); //FIX-20230210-LAV: really do this?
+  return intern_driver (name, obarray, tem);
 }
 
 /* Return a pixel size of font-spec SPEC on frame F.  */

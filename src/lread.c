@@ -4128,7 +4128,8 @@ intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
-  return intern_driver (make_unibyte_string (str, len), Qnil);
+  Lisp_Object obarray = check_obarray (Vobarray);
+  return intern_driver (make_unibyte_string (str, len), obarray, Qnil);
 }
 
 Lisp_Object
@@ -4137,11 +4138,12 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
   /* Creating a non-pure string from a string literal not implemented yet.
      We could just use make_string here and live with the extra copy.  */
   eassert (!NILP (Vpurify_flag));
-  return intern_driver (make_pure_c_string (str, len), Qnil);
+  Lisp_Object obarray = check_obarray (Vobarray);
+  return intern_driver (make_pure_c_string (str, len), obarray, Qnil);
 }
 
 static void
-define_symbol (Lisp_Object sym, char const *str)
+define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
 {
   ptrdiff_t len = strlen (str);
   Lisp_Object string = make_pure_c_string (str, len);
@@ -4151,9 +4153,9 @@ define_symbol (Lisp_Object sym, char const *str)
      'unbound' created by a Lisp program.  */
   if (! EQ (sym, Qunbound))
     {
-      intern_sym (sym);
+      intern_sym (sym, obarray, Qnil);
     }
-  return intern_driver (make_pure_c_string (str, len), Qnil);
+  return intern_driver (make_pure_c_string (str, len), obarray, Qnil);
 }
 
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
@@ -4167,8 +4169,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
 
   sstring = scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
   tem = scm_find_symbol (sstring, obhash (obarray));
-  if (scm_is_true (tem)
-      && scm_is_true (scm_module_variable (symbol_module, tem)))
+  if (scm_is_true (tem))
     {
       if (EQ (tem, Qnil_))
         tem = Qnil;
@@ -4196,10 +4197,9 @@ it defaults to the value of `obarray'.  */)
   if (! NILP (scm_c_value_ref (tem, 1)))
     return scm_c_value_ref (tem, 0);
 
-  sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
-                                           SBYTES (string)),
+  Lisp_Object sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
+                                                       SBYTES (string)),
                     obhash (obarray));
-  initialize_symbol (sym, string);
 
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
@@ -4314,7 +4314,7 @@ init_obarray_once (void)
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    define_symbol (builtin_lisp_symbol (i), defsym_name[i]);
+    define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
 
   // FIX: 20190626 LAV, new interface:
   DEFSYM (Qunbound, "unbound");
@@ -4329,7 +4329,13 @@ init_obarray_once (void)
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
+  // FIX: 20190626 LAV, 1/2 correct def of t?
+  Qt_ = intern_c_string ("t");
+  SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
+  // FIX: 20190626 LAV, 2/2 correct def of t?
   DEFSYM (Qt, "t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
   SET_SYMBOL_VAL (XSYMBOL (Qt_), intern_c_string ("t"));
@@ -4337,9 +4343,8 @@ init_obarray_once (void)
   //XSYMBOL (Qt_)->constant = 1;   // FIX: 20190626 LAV, is this the old interface?
   //XSYMBOL (Qt_)->declared_special = 1;
 
-  //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
-  //make_symbol_constant (Qt);     //              and this is the new interface, refactor post-2015?
-  //XSYMBOL (Qt)->declared_special = true;  // FIX: 20190626 LAV, true or 1?!?
+  Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
+  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
