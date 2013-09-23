@@ -1610,28 +1610,12 @@ CDR_SAFE (Lisp_Object c)
 /* In a string or vector, the sign bit of size is the gc mark bit.  */
 
 struct Lisp_String
-{
-  Lisp_Object self;
-  ptrdiff_t size;
-  ptrdiff_t size_byte;
-  INTERVAL intervals;	/* Text properties in this string.  */
-  unsigned char *data;
-};
-verify (GCALIGNED (struct Lisp_String));
-
-
-INLINE void
-CHECK_STRING (Lisp_Object x)
-{
-  CHECK_TYPE (STRINGP (x), Qstringp, x);
-}
-
-INLINE struct Lisp_String *
-XSTRING (Lisp_Object a)
-{
-  eassert (STRINGP (a));
-  return SMOB_PTR (a);
-}
+  {
+    ptrdiff_t size;
+    ptrdiff_t size_byte;
+    INTERVAL intervals;		/* Text properties in this string.  */
+    unsigned char *data;
+  };
 
 /* True if STR is a multibyte string.  */
 INLINE bool
