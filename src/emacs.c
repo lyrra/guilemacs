@@ -1242,10 +1242,14 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_alloc_once ();
       init_threads_once ();
-      scm_c_module_define (scm_c_resolve_module ("language elisp lexer"),
+      scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
                            "make-lisp-string",
                            scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
                                              string_from_scheme));
+      scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
+                           "lisp-string?",
+                           scm_c_make_gsubr ("stringp", 1, 0, 0, Fstringp));
+
       init_guile ();
       init_fns_once ();
       init_obarray ();

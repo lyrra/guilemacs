@@ -939,6 +939,14 @@ make_pointer_integer (void *p)
 
 typedef struct interval *INTERVAL;
 
+struct Lisp_String
+  {
+    ptrdiff_t size;
+    ptrdiff_t size_byte;
+    INTERVAL intervals;		/* Text properties in this string.  */
+    unsigned char *data;
+  };
+
 LISP_MACRO_DEFUN (XCAR, Lisp_Object, (Lisp_Object c), (c))
 LISP_MACRO_DEFUN (XCDR, Lisp_Object, (Lisp_Object c), (c))
 
@@ -990,43 +998,6 @@ CDR_SAFE (Lisp_Object c)
 }
 
 /* In a string or vector, the sign bit of u.s.size is the gc mark bit.  */
-
-struct Lisp_String
-{
-  Lisp_Object self;
-  union
-  {
-    struct
-    {
-      ptrdiff_t size;
-      ptrdiff_t size_byte;
-      INTERVAL intervals;	/* Text properties in this string.  */
-      unsigned char *data;
-    } s;
-    struct Lisp_String *next;
-    char alignas (GCALIGNMENT) gcaligned;
-  } u;
-};
-verify (alignof (struct Lisp_String) % GCALIGNMENT == 0);
-
-INLINE bool
-STRINGP (Lisp_Object x)
-{
-  return XTYPE (x) == Lisp_String;
-}
-
-INLINE void
-CHECK_STRING (Lisp_Object x)
-{
-  CHECK_TYPE (STRINGP (x), Qstringp, x);
-}
-
-INLINE struct Lisp_String *
-XSTRING (Lisp_Object a)
-{
-  eassert (STRINGP (a));
-  return XUNTAG (a, Lisp_String);
-}
 
 /* True if STR is a multibyte string.  */
 INLINE bool
@@ -3349,7 +3320,7 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
 extern void free_misc (Lisp_Object);
-extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT);
+extern void allocate_string_data (Lisp_Object, EMACS_INT, EMACS_INT);
 extern void malloc_warning (const char *);
 extern _Noreturn void memory_full (size_t);
 extern _Noreturn void buffer_memory_full (ptrdiff_t);
