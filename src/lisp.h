@@ -1537,28 +1537,12 @@ CDR_SAFE (Lisp_Object c)
 /* In a string or vector, the sign bit of size is the gc mark bit.  */
 
 struct Lisp_String
-{
-  Lisp_Object self;
-  ptrdiff_t size;
-  ptrdiff_t size_byte;
-  INTERVAL intervals;	/* Text properties in this string.  */
-  unsigned char *data;
-};
-verify (GCALIGNED (struct Lisp_String));
-
-
-INLINE void
-CHECK_STRING (Lisp_Object x)
-{
-  CHECK_TYPE (STRINGP (x), Qstringp, x);
-}
-
-INLINE struct Lisp_String *
-XSTRING (Lisp_Object a)
-{
-  eassert (STRINGP (a));
-  return SMOB_PTR (a);
-}
+  {
+    ptrdiff_t size;
+    ptrdiff_t size_byte;
+    INTERVAL intervals;		/* Text properties in this string.  */
+    unsigned char *data;
+  };
 
 /* True if STR is a multibyte string.  */
 INLINE bool
@@ -3711,7 +3695,8 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 /* Defined in alloc.c.  */
 extern void *my_heap_start (void);
 extern void check_pure_size (void);
-extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT);
+extern void free_misc (Lisp_Object);
+extern void allocate_string_data (Lisp_Object, EMACS_INT, EMACS_INT);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);
