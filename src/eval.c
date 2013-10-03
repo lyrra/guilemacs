@@ -265,6 +265,8 @@ init_eval_once_for_pdumper (void)
 
   eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
+
+  scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
 
 static struct handler *handlerlist_sentinel;
@@ -2049,71 +2051,8 @@ grow_specpdl_allocation (void)
 static Lisp_Object
 eval_sub_1 (Lisp_Object form)
 {
-  if (SYMBOLP (form))
-    {
-      /* Look up its binding in the lexical environment.
-	 We do not pay attention to the declared_special flag here, since we
-	 already did that when let-binding the variable.  */
-      Lisp_Object lex_binding
-	= Fassq (form, Vinternal_interpreter_environment);
-      return !NILP (lex_binding) ? XCDR (lex_binding) : Fsymbol_value (form);
-    }
-
-  if (!CONSP (form))
-    return form;
-
-  maybe_quit ();
-
-  maybe_gc ();
-
-  scm_dynwind_begin (0);
-  scm_dynwind_unwind_handler (set_lisp_eval_depth,
-                              (void *) lisp_eval_depth,
-                              SCM_F_WIND_EXPLICITLY);
-
-  if (++lisp_eval_depth > max_lisp_eval_depth)
-    {
-      if (max_lisp_eval_depth < 100)
-	max_lisp_eval_depth = 100;
-      if (lisp_eval_depth > max_lisp_eval_depth)
-	xsignal1 (Qexcessive_lisp_nesting, make_fixnum (lisp_eval_depth));
-    }
-
-  Lisp_Object original_fun = XCAR (form);
-  Lisp_Object original_args = XCDR (form);
-  CHECK_LIST (original_args);
-
-  /* This also protects them from gc.  */
-  specpdl_ref count
-    = record_in_backtrace (original_fun, &original_args, UNEVALLED);
-
-  if (debug_on_next_call)
-    do_debug_on_call (Qt, count);
-
-  Lisp_Object fun, val, funcar;
-  /* Declare here, as this array may be accessed by call_debugger near
-     the end of this function.  See Bug#21245.  */
-  Lisp_Object argvals[8];
-
- retry:
-
-  /* Optimize for no indirection.  */
-  fun = original_fun;
-  if (!SYMBOLP (fun))
-    fun = Ffunction (list1 (fun));
-  else if (!NILP (fun) && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
-    fun = indirect_function (fun);
-
-  if (CLOSUREP (fun))
-    val = apply_lambda (fun, original_args);
-  else
-    val = scm_call_1 (eval_fn, form);
-
-  if (backtrace_debug_on_exit (specpdl_ptr - 1))
-    val = call_debugger (list2 (Qexit, val));
-  scm_dynwind_end ();
-
-  return val;
+  QUIT;
+  return scm_call_1 (eval_fn, form);
 }
 
 Lisp_Object
@@ -2501,7 +2440,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
     }
 }
 
-Lisp_Object
+static Lisp_Object
 Ffuncall1 (ptrdiff_t nargs, Lisp_Object *args)
 {
   return scm_call_n (funcall_fn, args, nargs);
@@ -2621,11 +2560,10 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)
   for (ptrdiff_t i = 0; i < numargs; i++)
     {
       tem = Fcar (args_left), args_left = Fcdr (args_left);
-      tem = eval_sub (tem);
       arg_vector[i] = tem;
     }
 
-  set_backtrace_args (specpdl_ref_to_ptr (count), arg_vector, numargs);
+  set_backtrace_args (specpdl_ptr - 1, arg_vector);
   tem = funcall_lambda (fun, numargs, arg_vector);
 
   lisp_eval_depth--;

@@ -400,14 +400,6 @@ DEFUN ("internal-subr-documentation", Fsubr_documentation, Ssubr_documentation, 
     return native_function_doc (function);
   else
 #endif
-  if (scm_is_true (scm_procedure_p (function)))
-    {
-      Lisp_Object tem = scm_procedure_property (function, intern ("emacs-documentation"));
-      if (scm_is_true (tem))
-        return tem;
-      else
-        return Qnil;
-    }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
     return module_function_documentation (XMODULE_FUNCTION (function));
