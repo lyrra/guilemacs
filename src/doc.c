@@ -328,24 +328,7 @@ string is passed through `substitute-command-keys'.  */)
   if (CONSP (fun) && EQ (XCAR (fun), Qmacro) ||
       EQ (XCAR (fun), Qspecial_operator))
     fun = XCDR (fun);
-#ifdef HAVE_NATIVE_COMP
-  if (!NILP (Fsubr_native_elisp_p (fun)))
-    doc = native_function_doc (fun);
-  else
-#endif
-  if (scm_is_true (scm_procedure_p (fun)))
-    {
-      Lisp_Object tem = scm_procedure_property (fun, intern ("emacs-documentation"));
-      if (scm_is_true (tem))
-        doc = tem;
-      else
-        return Qnil;
-    }
-#ifdef HAVE_MODULES
-  else if (MODULE_FUNCTIONP (fun))
-    doc = module_function_documentation (XMODULE_FUNCTION (fun));
-#endif
-  else if (COMPILEDP (fun))
+  if (COMPILEDP (fun))
     {
       if (PVSIZE (fun) <= COMPILED_DOC_STRING)
 	return Qnil;
@@ -359,6 +342,14 @@ string is passed through `substitute-command-keys'.  */)
 	  else
 	    return Qnil;
 	}
+    }
+  else if (scm_is_true (scm_procedure_p (fun)))
+    {
+      Lisp_Object tem = scm_procedure_property (fun, intern ("emacs-documentation"));
+      if (scm_is_true (tem))
+        doc = tem;
+      else
+        return Qnil;
     }
   else if (STRINGP (fun) || VECTORP (fun))
     {
