@@ -3286,7 +3286,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
-  SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
   SPECPDL_NOP,			/* A filler.  */
 #ifdef HAVE_MODULES
   SPECPDL_MODULE_RUNTIME,       /* A live module runtime.  */
@@ -3494,23 +3493,6 @@ grow_specpdl (void)
   specpdl_ptr++;
   if (specpdl_ptr == specpdl_end)
     grow_specpdl_allocation ();
-}
-
-INLINE specpdl_ref
-record_in_backtrace (Lisp_Object function, Lisp_Object *args, ptrdiff_t nargs)
-{
-  specpdl_ref count = SPECPDL_INDEX ();
-
-  eassert (nargs >= UNEVALLED);
-  specpdl_ptr->bt.kind = SPECPDL_BACKTRACE;
-  specpdl_ptr->bt.debug_on_exit = false;
-  specpdl_ptr->bt.function = function;
-  current_thread->stack_top = specpdl_ptr->bt.args = args;
-  specpdl_ptr->bt.nargs = nargs;
-  grow_specpdl ();
-  scm_dynwind_unwind_handler (unbind_once, NULL, SCM_F_WIND_EXPLICITLY);
-
-  return count;
 }
 
 /* This structure helps implement the `catch/throw' and `condition-case/signal'
@@ -4602,9 +4584,7 @@ extern Lisp_Object safe_funcall (ptrdiff_t, Lisp_Object*);
 extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
-extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
-extern void get_backtrace (Lisp_Object *array, ptrdiff_t size);
-Lisp_Object backtrace_top_function (void);
+extern void mark_specpdl (void);
 extern bool let_shadows_buffer_binding_p (sym_t symbol);
 void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
