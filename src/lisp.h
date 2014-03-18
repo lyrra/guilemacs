@@ -3157,7 +3157,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
    union specbinding.  But only eval.c should access it.  */
 
 enum specbind_tag {
-  SPECPDL_BACKTRACE,		/* An element of the backtrace.  */
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
   /* Tags greater than SPECPDL_LET must be "subkinds" of LET.  */
   SPECPDL_LET_LOCAL,		/* A buffer-local let-binding.  */
@@ -4003,7 +4002,6 @@ intern_c_string (const char *str)
 extern Lisp_Object Vautoload_queue;
 extern Lisp_Object Vrun_hooks;
 extern Lisp_Object Vsignaling_function;
-extern Lisp_Object inhibit_lisp_code;
 
 /* To run a normal hook, use the appropriate function from the list below.
    The calling convention:
@@ -4083,10 +4081,7 @@ extern Lisp_Object safe_call2 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
-extern ptrdiff_t record_in_backtrace (Lisp_Object, Lisp_Object *, ptrdiff_t);
 extern void mark_specpdl (union specbinding *first, union specbinding *ptr);
-extern void get_backtrace (Lisp_Object array);
-Lisp_Object backtrace_top_function (void);
 extern bool let_shadows_buffer_binding_p (sym_t symbol);
 extern _Noreturn SCM abort_to_prompt (SCM, SCM);
 extern SCM call_with_prompt (SCM, SCM, SCM);
