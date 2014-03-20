@@ -2460,21 +2460,6 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
       else
 	xsignal1 (Qinvalid_function, fun);
     }
-  else if (CLOSUREP (fun))
-    {
-      syms_left = AREF (fun, CLOSURE_ARGLIST);
-      /* Bytecode objects using lexical binding have an integral
-	 ARGLIST slot value: pass the arguments to the byte-code
-	 engine directly.  */
-      if (FIXNUMP (syms_left))
-	return exec_byte_code (fun, XFIXNUM (syms_left), nargs, arg_vector);
-      /* Otherwise the closure either is interpreted
-	 or uses dynamic binding and the ARGLIST slot contains a standard
-	 formal argument list whose variables are bound dynamically below.  */
-      lexenv = CONSP (AREF (fun, CLOSURE_CODE))
-               ? AREF (fun, CLOSURE_CONSTANTS)
-               : Qnil;
-    }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
     return funcall_module (fun, nargs, arg_vector);
@@ -2550,25 +2535,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     /* Instantiate a new lexical environment.  */
     specbind (Qinternal_interpreter_environment, lexenv);
 
-  Lisp_Object val;
-  if (CONSP (fun))
-    val = Fprogn (XCDR (XCDR (fun)));
-  else if (NATIVE_COMP_FUNCTIONP (fun))
-    {
-      eassert (NATIVE_COMP_FUNCTION_DYNP (fun));
-      /* No need to use funcall_subr as we have zero arguments by
-	 construction.  */
-      val = XSUBR (fun)->function.a0 ();
-    }
-  else
-    {
-      eassert (CLOSUREP (fun));
-      val = CONSP (AREF (fun, CLOSURE_CODE))
-            /* Interpreted function.  */
-            ? Fprogn (AREF (fun, CLOSURE_CODE))
-            /* Dynbound bytecode.  */
-            : exec_byte_code (fun, 0, 0, NULL);
-    }
+  val = Fprogn (XCDR (XCDR (fun)));
 
   return val;
 }
