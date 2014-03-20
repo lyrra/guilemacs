@@ -2480,24 +2480,6 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
       else
 	xsignal1 (Qinvalid_function, fun);
     }
-  else if (COMPILEDP (fun))
-    {
-      syms_left = AREF (fun, COMPILED_ARGLIST);
-      if (FIXNUMP (syms_left))
-	/* A byte-code object with an integer args template means we
-	   shouldn't bind any arguments, instead just call the byte-code
-	   interpreter directly; it will push arguments as necessary.
-
-	   Byte-code objects with a nil args template (the default)
-	   have dynamically-bound arguments, and use the
-	   argument-binding code below instead (as do all interpreted
-	   functions, even lexically bound ones).  */
-	{
-          dynwind_end ();
-	  return fetch_and_exec_byte_code (fun, syms_left, nargs, arg_vector);
-	}
-      lexenv = Qnil;
-    }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
     return funcall_module (fun, nargs, arg_vector);
@@ -2570,17 +2552,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs,
     /* Instantiate a new lexical environment.  */
     specbind (Qinternal_interpreter_environment, lexenv);
 
-  if (CONSP (fun))
-    val = Fprogn (XCDR (XCDR (fun)));
-  else if (SUBR_NATIVE_COMPILEDP (fun))
-    {
-      eassert (SUBR_NATIVE_COMPILED_DYNP (fun));
-      /* No need to use funcall_subr as we have zero arguments by
-	 construction.  */
-      val = XSUBR (fun)->function.a0 ();
-    }
-  else
-    val = fetch_and_exec_byte_code (fun, Qnil, 0, NULL);
+  val = Fprogn (XCDR (XCDR (fun)));
 
   dynwind_end ();
   return val;
