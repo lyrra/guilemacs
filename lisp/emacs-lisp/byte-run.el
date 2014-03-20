@@ -281,10 +281,15 @@ The return value is undefined.
                      (list 'function
                            (cons 'lambda
                                  (cons arglist body))))))
-      (if declarations
-          (cons 'prog1 (cons def declarations))
-          def))))
-
+      (list 'prog1
+            (if declarations
+                (cons 'prog1 (cons def declarations))
+              def)
+            (list 'funcall
+                  (list '@ '(guile) 'set-procedure-property!)
+                  (list 'symbol-function (list 'quote name))
+                  (list 'quote 'name)
+                  (list 'quote name))))))
 
 ;; Redefined in byte-opt.el.
 ;; This was undocumented and unused for decades.
