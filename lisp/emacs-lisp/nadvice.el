@@ -64,21 +64,44 @@
 
 ;;;; Lightweight advice/hook
 (defvar advice--how-alist
-  (advice--make-how-alist
-   (:around (apply car cdr r))
-   (:before (apply car r) (apply cdr r))
-   (:after (prog1 (apply cdr r) (apply car r)))
-   (:override (apply car r))
-   (:after-until (or (apply cdr r) (apply car r)))
-   (:after-while (and (apply cdr r) (apply car r)))
-   (:before-until (or (apply car r) (apply cdr r)))
-   (:before-while (and (apply car r) (apply cdr r)))
-   (:filter-args (apply cdr (funcall car r)))
-   (:filter-return (funcall car (apply cdr r))))
-  "List of descriptions of how to add a function.
-Each element has the form (HOW OCL DOC) where HOW is a keyword,
-OCL is a \"prototype\" function of type `advice', and
-DOC is a string where \"FUNCTION\" and \"OLDFUN\" are expected.")
+  '((:around . (apply function main args))
+    (:before . (progn
+               (apply function args)
+               (apply main args)))
+    (:after . (prog1 (apply main args)
+              (apply function args)))
+    (:override . (apply function args))
+    (:after-until . (or (apply main args) (apply function args)))
+    (:after-while . (and (apply main args) (apply function args)))
+    (:before-until . (or (apply function args) (apply main args)))
+    (:before-while . (and (apply function args) (apply main args)))
+    (:filter-args . (apply main (apply function args)))
+    (:filter-return . (funcall function (apply main args))))
+  "List of descriptions of how to add a function.")
+
+(setq advice--how-alist
+      (mapcar #'(lambda (tem)
+                  (cons (car tem)
+                        (eval `(lambda (function main)
+                                 (lambda (&rest args)
+                                   ,(cdr tem))))))
+              advice--how-alist))
+
+(defun advice--p (object)
+  (when (funcall (@ (guile) procedure?) object)
+    (funcall (@ (guile) procedure-property) object 'advice)))
+
+(defun advice--car (f)
+  (when (funcall (@ (guile) procedure?) f)
+    (funcall (@ (guile) procedure-property) f 'advice-car)))
+
+(defun advice--cdr (f)
+  (when (funcall (@ (guile) procedure?) f)
+    (funcall (@ (guile) procedure-property) f 'advice-cdr)))
+
+(defun advice--props (f)
+  (when (funcall (@ (guile) procedure?) f)
+    (funcall (@ (guile) procedure-property) f 'advice-props)))
 
 (defun advice--cd*r (f)
   (while (advice--p f)
@@ -86,6 +109,12 @@ DOC is a string where \"FUNCTION\" and \"OLDFUN\" are expected.")
   f)
 
 (define-obsolete-function-alias 'advice--where #'advice--how "29.1")
+(defun advice--how (f)
+  (let ((bytecode (aref f 1))
+        (how nil))
+    (dolist (elem advice--how-alist)
+      (if (eq bytecode (cdr elem)) (setq how (car elem))))
+    how))
 
 (defun advice--make-single-doc (flist function macrop)
   (let ((how (advice--how flist)))
@@ -219,28 +248,26 @@ DOC is a string where \"FUNCTION\" and \"OLDFUN\" are expected.")
         `(funcall ',fspec ',(cadr ifm))
       (cadr (or iff ifm)))))
 
-
-(cl-defmethod oclosure-interactive-form ((ad advice) &optional _)
-  (let* ((car (advice--car ad))
-         (cdr (advice--cdr ad))
-         (ifa (advice--interactive-form car))
-         (ifd (advice--interactive-form cdr)))
-    (when (or ifa ifd)
-      `(interactive ,(advice--make-interactive-form ifa ifd)))))
-
-(cl-defmethod cl-print-object ((object advice) stream)
-  (cl-assert (advice--p object))
-  (princ "#f(advice " stream)
-  (cl-print-object (advice--car object) stream)
-  (princ " " stream)
-  (princ (advice--how object) stream)
-  (princ " " stream)
-  (cl-print-object (advice--cdr object) stream)
-  (let ((props (advice--props object)))
-    (when props
-      (princ " " stream)
-      (cl-print-object props stream)))
-  (princ ")" stream))
+(defun advice--make-1 (type make-wrapper function main props)
+  "Build a function value that adds FUNCTION to MAIN."
+  (let ((adv-sig (gethash main advertised-signature-table))
+        (advice
+         (funcall make-wrapper function main)))
+    (funcall (@ (guile) set-procedure-property!)
+             advice 'advice-type type)
+    (funcall (@ (guile) set-procedure-property!)
+             advice 'advice-car function)
+    (funcall (@ (guile) set-procedure-property!)
+             advice 'advice-cdr main)
+    (funcall (@ (guile) set-procedure-property!)
+             advice 'advice-props props)
+    (when (or (commandp function) (commandp main))
+      (funcall (@ (guile) set-procedure-property!)
+               advice
+               'interactive-form
+               (advice--make-interactive-form function main)))
+    (when adv-sig (puthash advice adv-sig advertised-signature-table))
+    advice))
 
 (defun advice--make (how function main props)
   "Build a function value that adds FUNCTION to MAIN at HOW.
@@ -251,11 +278,12 @@ HOW is a symbol to select an entry in `advice--how-alist'."
     (if (and md (> fd md))
         ;; `function' should go deeper.
         (let ((rest (advice--make how function (advice--cdr main) props)))
-          (advice--cons main rest))
-      (let ((proto (assq how advice--how-alist)))
-        (unless proto (error "Unknown add-function location `%S'" how))
-        (advice--copy (cadr proto)
-                      function main how props)))))
+          (advice--make-1 (aref main 1) (aref main 3)
+                          (advice--car main) rest (advice--props main)))
+      (let ((desc (assq how advice--how-alist)))
+        (unless desc (error "Unknown add-function location `%S'" how))
+        (advice--make-1 (car desc) (cdr desc)
+                        function main props)))))
 
 (defun advice--member-p (function use-name definition)
   (let ((found nil))
