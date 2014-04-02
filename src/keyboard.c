@@ -1163,20 +1163,42 @@ command_loop (void)
    returned due to end of file (or end of kbd macro).  HANDLERS is a
    list of condition names, passed to internal_condition_case.  */
 
+static Lisp_Object
+command_loop_2_body (void *ignore)
+{
+  return command_loop_1 ();
+}
+
+static Lisp_Object
+command_loop_2_handler (void *ignore, SCM key, SCM args)
+{
+  return Fsignal (Qerror,
+                  list3 (build_string ("Scheme error"), key, args));
+}
+
+static Lisp_Object
+command_loop_2_inner (void)
+{
+  return scm_c_with_throw_handler (SCM_BOOL_T,
+                                   command_loop_2_body, NULL,
+                                   command_loop_2_handler, NULL,
+                                   0);
+}
+
 Lisp_Object
-command_loop_2 (Lisp_Object handlers)
+command_loop_2 (Lisp_Object ignore)
 {
   register Lisp_Object val;
 
   do
-    val = internal_condition_case (command_loop_1, handlers, cmd_error);
+    val = internal_condition_case (command_loop_2_inner, Qerror, cmd_error);
   while (!NILP (val));
 
   return Qnil;
 }
 
 static Lisp_Object
-top_level_2 (void)
+top_level_2_body (void *ignore)
 {
   /* If we're in batch mode, print a backtrace unconditionally when
      encountering an error, to help with debugging.  */
@@ -1190,6 +1212,15 @@ top_level_2 (void)
   if (setup_handler)
     pop_handler ();
   return res;
+}
+
+static Lisp_Object
+top_level_2 (void)
+{
+  return scm_c_with_throw_handler (SCM_BOOL_T,
+                                   top_level_2_body, NULL,
+                                   command_loop_2_handler, NULL,
+                                   0);
 }
 
 static Lisp_Object
