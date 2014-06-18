@@ -2851,7 +2851,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		    }
 		  return tbl;
 		}
-	      invalid_syntax ("#^^");
+	      invalid_syntax ("#^" "^");
 	    }
 	  invalid_syntax ("#^");
 	}
