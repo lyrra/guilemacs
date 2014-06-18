@@ -2093,6 +2093,15 @@ verify_alloca (void)
 
 #endif /* ENABLE_CHECKING && USE_STACK_LISP_OBJECTS */
 
+static int
+print_lisp_string (SCM obj, SCM port, scm_print_state *pstate)
+{
+  scm_c_write (port, "#<elisp-string \"", 16);
+  scm_c_write (port, XSTRING (obj)->data, STRING_BYTES (XSTRING (obj)));
+  scm_c_write (port, "\">", 2);
+  return 0;
+}
+
 /* Initialization.  */
 
 static void init_alloc_once_for_pdumper (void);
@@ -2110,6 +2119,7 @@ init_alloc_once (void)
   lisp_misc_tag = scm_make_smob_type ("elisp-misc", 0);
   lisp_string_tag = scm_make_smob_type ("elisp-string",
                                         sizeof (struct Lisp_String));
+  scm_set_smob_print (lisp_string_tag, print_lisp_string);
   lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);
 
   /* Call init_alloc_once_for_pdumper now so we run mem_init early.
