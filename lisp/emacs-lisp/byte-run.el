@@ -352,6 +352,9 @@ This is used by `declare'.")
                       ((and (featurep 'cl)
                             (memq (car x)  ;Cf. cl--do-proclaim.
                                   '(special inline notinline optimize warn)))
+                       ;; guilemacs see commit "rm lazy macro use"
+                       ;; postpone declaration to body, but we have no body here
+                       ;;(setq body (cons (list 'declare x) body))
                        (push (list 'declare x) cl-decls)
                        nil)
                       (t
