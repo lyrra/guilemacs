@@ -4463,19 +4463,19 @@ It is dangerous if either of these conditions are met:
   "Set local variable VAR with value VAL.
 If VAR is `mode', call `VAL-mode' as a function unless it's
 already the major mode."
-  (pcase var
-    ((and 'eval (guard (member val hack-local-variables--inhibit-eval))) nil)
-    ('mode
+  (cond
+   ((and (eq var 'eval) (member val hack-local-variables--inhibit-eval)) nil)
+   ((eq var 'mode)
      (let ((mode (intern (concat (downcase (symbol-name val))
                                  "-mode"))))
        (set-auto-mode-0 mode t)))
-    ('eval
+   ((eq var 'eval)
      (pcase val
        (`(add-hook ',hook . ,_) (hack-one-local-variable--obsolete hook)))
      (let ((hack-local-variables--inhibit-eval ;; FIXME: Should be buffer-local!
             (cons val hack-local-variables--inhibit-eval)))
        (save-excursion (eval val t))))
-    (_
+   (t
      (hack-one-local-variable--obsolete var)
      ;; Make sure the string has no text properties.
      ;; Some text properties can get evaluated in various ways,
