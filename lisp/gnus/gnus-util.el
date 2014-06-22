@@ -1078,11 +1078,7 @@ ARG is passed to the first function."
 
 (defun gnus-byte-compile (form)
   "Byte-compile FORM if `gnus-use-byte-compile' is non-nil."
-  (if gnus-use-byte-compile
-      (let ((byte-compile-warnings '(unresolved callargs redefine))
-	    (lexical-binding t))
-	(byte-compile form))
-    (eval form t)))
+  form)
 
 (defun gnus-remassoc (key alist)
   "Delete by side effect any elements of LIST whose car is `equal' to KEY.
