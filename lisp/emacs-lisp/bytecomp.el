@@ -2953,47 +2953,7 @@ FUN should be an interpreted closure."
 (defun byte-compile (form)
   "If FORM is a symbol, byte-compile its function definition.
 If FORM is a lambda or a macro, byte-compile it as a function."
-  (displaying-byte-compile-warnings
-   (byte-compile-close-variables
-    (let* ((lexical-binding lexical-binding)
-           (fun (if (symbolp form)
-		    (symbol-function form)
-		  form))
-	   (macro (eq (car-safe fun) 'macro))
-           (need-a-value nil))
-      (when macro
-	(setq need-a-value t)
-	(setq fun (cdr fun)))
-      (cond
-       ;; Up until Emacs-24.1, byte-compile silently did nothing
-       ;; when asked to compile something invalid.  So let's tone
-       ;; down the complaint from an error to a simple message for
-       ;; the known case where signaling an error causes problems.
-       ((compiled-function-p fun)
-        (message "Function %s is already compiled"
-                 (if (symbolp form) form "provided"))
-        fun)
-       (t
-        (when (or (symbolp form) (interpreted-function-p fun))
-          ;; `fun' is a function *value*, so try to recover its
-          ;; corresponding source code.
-          (if (not (interpreted-function-p fun))
-              (setq lexical-binding nil)
-            (setq lexical-binding (not (null (aref fun 2))))
-            (setq fun (byte-compile--reify-function fun)))
-          (setq need-a-value t))
-        ;; Expand macros.
-        (setq fun (byte-compile-preprocess fun))
-        (setq fun (byte-compile-top-level fun nil 'eval))
-        (when need-a-value
-          ;; `byte-compile-top-level' returns an *expression* equivalent to
-          ;; the `fun' expression, so we need to evaluate it, tho normally
-          ;; this is not needed because the expression is just a constant
-          ;; byte-code object, which is self-evaluating.
-          (setq fun (eval fun lexical-binding)))
-        (if macro (push 'macro fun))
-        (if (symbolp form) (fset form fun))
-        fun))))))
+  form)
 
 (defun byte-compile-sexp (sexp)
   "Compile and return SEXP."
@@ -6087,28 +6047,6 @@ and corresponding effects."
 	      (insert (int-to-string n) "\n")))
 	(setq i (1+ i))))))
 
-;; To avoid "lisp nesting exceeds max-lisp-eval-depth" when bytecomp compiles
-;; itself, compile some of its most used recursive functions (at load time).
-;;
-(eval-when-compile
-  (or (compiled-function-p (symbol-function 'byte-compile-form))
-      (let ((byte-optimize nil)		; do it fast
-	    (byte-compile-warnings nil))
-	(mapc (lambda (x)
-                (unless (native-comp-function-p x)
-		  (or noninteractive (message "compiling %s..." x))
-		  (byte-compile x)
-		  (or noninteractive (message "compiling %s...done" x))))
-	      '(byte-compile-normal-call
-		byte-compile-form
-		byte-compile-body
-		;; Inserted some more than necessary, to speed it up.
-		byte-compile-top-level
-		byte-compile-out-toplevel
-		byte-compile-constant
-		byte-compile-variable-ref))))
-  nil)
-
 (make-obsolete-variable 'bytecomp-load-hook
                         "use `with-eval-after-load' instead." "28.1")
 (run-hooks 'bytecomp-load-hook)
