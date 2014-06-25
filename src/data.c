@@ -2015,16 +2015,6 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
     default: emacs_abort ();
     }
 }
-
-DEFUN ("set-default", Fset_default, Sset_default, 2, 2, 0,
-       doc: /* Set SYMBOL's default value to VALUE.  SYMBOL and VALUE are evaluated.
-The default value is seen in buffers that do not have their own values
-for this variable.  */)
-  (Lisp_Object symbol, Lisp_Object value)
-{
-  set_default_internal (symbol, value, SET_INTERNAL_SET, NULL);
-  return value;
-}
 
 /* Lisp functions for creating and removing buffer-local variables.  */
 

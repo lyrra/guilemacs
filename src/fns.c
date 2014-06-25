@@ -3805,7 +3805,7 @@ usage: (widget-apply WIDGET PROPERTY &rest ARGS)  */)
   Lisp_Object property = args[1];
   Lisp_Object propval = Fwidget_get (widget, property);
   Lisp_Object trailing_args = Flist (nargs - 2, args + 2);
-  Lisp_Object result = CALLN (Fapply, propval, widget, trailing_args);
+  Lisp_Object result = CALLN (intern ("apply"), propval, widget, trailing_args);
   return result;
 }
 
