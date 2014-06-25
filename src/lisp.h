@@ -2733,7 +2733,11 @@ CHECK_NUMBER_CDR (Lisp_Object x)
     return fn (i, args);                                    \
   }
 
-#define WRAP1(cfn, lfn) Lisp_Object cfn (Lisp_Object a) { return call1 (intern (lfn), a); }
+#define WRAP1(cfn, lfn) \
+  SCM_SNARF_INIT (DEFSYM (cfn ## _sym, lfn)) \
+  static Lisp_Object cfn ## _sym; \
+  Lisp_Object cfn (Lisp_Object a) \
+  { return call1 (cfn ## _sym, a); }
 #define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
 
 /* defsubr (Sname);

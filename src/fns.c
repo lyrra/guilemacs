@@ -2811,11 +2811,14 @@ ARGS are passed as extra arguments to the function.
 usage: (widget-apply WIDGET PROPERTY &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object widget = args[0];
-  Lisp_Object property = args[1];
-  Lisp_Object propval = Fwidget_get (widget, property);
-  Lisp_Object trailing_args = Flist (nargs - 2, args + 2);
-  Lisp_Object result = CALLN (Fapply, propval, widget, trailing_args);
+  /* This function can GC.  */
+  struct gcpro gcpro1, gcpro2; // FIX: 20190626 LAV, unused??
+  Lisp_Object result;
+
+  result = call3 (intern ("apply"),
+                  Fwidget_get (args[0], args[1]),
+                  args[0],
+                  Flist (nargs - 2, args + 2));
   return result;
 }
 

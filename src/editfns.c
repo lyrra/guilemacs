@@ -1030,8 +1030,8 @@ save_excursion_restore (Lisp_Object info)
   free_misc (info);
 }
 
-DEFUN ("save-excursion", Fsave_excursion, Ssave_excursion, 0, UNEVALLED, 0,
-       doc: /* Save point, and current buffer; execute BODY; restore those things.
+DEFUN ("call-with-save-excursion", Fsave_excursion, Ssave_excursion, 1, 1, 0,
+       doc: /* Save point, mark, and current buffer; execute BODY; restore those things.
 Executes BODY just like `progn'.
 The values of point and the current buffer are restored
 even in case of abnormal exit (throw or error).
@@ -1044,28 +1044,28 @@ To save the mark state as well as point and the current buffer, use
 `save-mark-and-excursion'.
 
 usage: (save-excursion &rest BODY)  */)
-  (Lisp_Object args)
+  (Lisp_Object thunk)
 {
   register Lisp_Object val;
   dynwind_begin ();
 
   record_unwind_protect (save_excursion_restore, save_excursion_save ());
 
-  val = Fprogn (args);
+  val = call0 (thunk);
   dynwind_end ();
   return val;
 }
 
-DEFUN ("save-current-buffer", Fsave_current_buffer, Ssave_current_buffer, 0, UNEVALLED, 0,
+DEFUN ("call-with-save-current-buffer", Fsave_current_buffer, Ssave_current_buffer, 1, 1, 0,
        doc: /* Record which buffer is current; execute BODY; make that buffer current.
 BODY is executed just like `progn'.
 usage: (save-current-buffer &rest BODY)  */)
-  (Lisp_Object args)
+  (Lisp_Object thunk)
 {
   dynwind_begin ();
 
   record_unwind_current_buffer ();
-  Lisp_Object tem0 = Fprogn (args);
+  Lisp_Object tem0 = call0 (thunk);
   dynwind_end ();
   return tem0;
 }
@@ -3967,7 +3967,7 @@ save_restriction_restore (Lisp_Object data)
     set_buffer_internal (cur);
 }
 
-DEFUN ("save-restriction", Fsave_restriction, Ssave_restriction, 0, UNEVALLED, 0,
+DEFUN ("call-with-save-restriction", Fsave_restriction, Ssave_restriction, 1, 1, 0,
        doc: /* Execute BODY, saving and restoring current buffer's restrictions.
 The buffer's restrictions make parts of the beginning and end invisible.
 \(They are set up with `narrow-to-region' and eliminated with `widen'.)

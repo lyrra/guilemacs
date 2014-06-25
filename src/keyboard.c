@@ -1239,9 +1239,13 @@ tracking_off (Lisp_Object old_value)
     }
 }
 
-DEFUN ("internal--track-mouse", Ftrack_mouse, Strack_mouse, 1, 1, 0,
-       doc: /* Call BODYFUN with mouse movement events enabled.  */)
-  (Lisp_Object bodyfun)
+DEFUN ("call-with-track-mouse", Ftrack_mouse, Strack_mouse, 1, 1, 0,
+       doc: /* Evaluate BODY with mouse movement events enabled.
+Within a `track-mouse' form, mouse motion generates input events that
+you can read with `read-event'.
+Normally, mouse motion is ignored.
+usage: (track-mouse BODY...)  */)
+  (Lisp_Object thunk)
 {
   dynwind_begin ();
   Lisp_Object val;
@@ -1250,7 +1254,7 @@ DEFUN ("internal--track-mouse", Ftrack_mouse, Strack_mouse, 1, 1, 0,
 
   do_mouse_tracking = Qt;
 
-  val = call0 (bodyfun);
+  val = call0 (thunk);
   dynwind_end ();
   return val;
 }

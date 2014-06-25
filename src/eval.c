@@ -250,6 +250,9 @@ make_condition_handler (Lisp_Object tag)
   return c;
 }
 
+static Lisp_Object eval_fn;
+static Lisp_Object funcall_fn;
+
 void
 init_eval_once (void)
 {
@@ -258,10 +261,13 @@ init_eval_once (void)
   specpdl_size = size;
   specpdl = specpdl_ptr = pdlvec + 1;
   /* Don't forget to update docs (lispref node "Local Variables").  */
-  max_specpdl_size = 1300; /* 1000 is not enough for CEDET's c-by.el.  */
-  max_lisp_eval_depth = 800;
+  max_specpdl_size = 10000; /* 1000 is not enough for CEDET's c-by.el.  */
+  max_lisp_eval_depth = 10000;
 
   Vrun_hooks = Qnil;
+
+  eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
+  funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
 }
 
 static struct handler *handlerlist_sentinel;
@@ -361,23 +367,6 @@ do_debug_on_call (Lisp_Object code, ptrdiff_t count)
   call_debugger (list1 (code));
 }
 
-DEFUN ("if", Fif, Sif, 2, UNEVALLED, 0,
-       doc: /* If COND yields non-nil, do THEN, else do ELSE...
-Returns the value of THEN or the value of the last of the ELSE's.
-THEN must be one expression, but ELSE... can be zero or more expressions.
-If COND yields nil, and there are no ELSE's, the value is nil.
-usage: (if COND THEN ELSE...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object cond;
-
-  cond = eval_sub (XCAR (args));
-
-  if (!NILP (cond))
-    return eval_sub (Fcar (XCDR (args)));
-  return Fprogn (Fcdr (XCDR (args)));
-}
-
 DEFUN ("progn", Fprogn, Sprogn, 0, UNEVALLED, 0,
        doc: /* Eval BODY forms sequentially and return value of last one.
 usage: (progn BODY...)  */)
@@ -403,66 +392,8 @@ prog_ignore (Lisp_Object body)
   Fprogn (body);
 }
 
-DEFUN ("setq", Fsetq, Ssetq, 0, UNEVALLED, 0,
-       doc: /* Set each SYM to the value of its VAL.
-The symbols SYM are variables; they are literal (not evaluated).
-The values VAL are expressions; they are evaluated.
-Thus, (setq x (1+ y)) sets `x' to the value of `(1+ y)'.
-The second VAL is not computed until after the first SYM is set, and so on;
-each VAL can use the new value of variables set earlier in the `setq'.
-The return value of the `setq' form is the value of the last VAL.
-usage: (setq [SYM VAL]...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object val = args, tail = args;
-
-  for (EMACS_INT nargs = 0; CONSP (tail); nargs += 2)
-    {
-      Lisp_Object sym = XCAR (tail), lex_binding;
-      tail = XCDR (tail);
-      if (!CONSP (tail))
-	xsignal2 (Qwrong_number_of_arguments, Qsetq, make_number (nargs + 1));
-      Lisp_Object arg = XCAR (tail);
-      tail = XCDR (tail);
-      val = eval_sub (arg);
-      /* Like for eval_sub, we do not check declared_special here since
-	 it's been done when let-binding.  */
-      if (!NILP (Vinternal_interpreter_environment) /* Mere optimization!  */
-	  && SYMBOLP (sym)
-	  && !NILP (lex_binding
-		    = Fassq (sym, Vinternal_interpreter_environment)))
-	XSETCDR (lex_binding, val); /* SYM is lexically bound.  */
-      else
-	Fset (sym, val);	/* SYM is dynamically bound.  */
-    }
-
-  return val;
-}
-
-DEFUN ("quote", Fquote, Squote, 1, UNEVALLED, 0,
-       doc: /* Return the argument, without evaluating it.  `(quote x)' yields `x'.
-Warning: `quote' does not construct its return value, but just returns
-the value that was pre-constructed by the Lisp reader (see info node
-`(elisp)Printed Representation').
-This means that \\='(a . b) is not identical to (cons \\='a \\='b): the former
-does not cons.  Quoting should be reserved for constants that will
-never be modified by side-effects, unless you like self-modifying code.
-See the common pitfall in info node `(elisp)Rearrangement' for an example
-of unexpected results when a quoted object is modified.
-usage: (quote ARG)  */)
-  (Lisp_Object args)
-{
-  if (!NILP (XCDR (args)))
-    xsignal2 (Qwrong_number_of_arguments, Qquote, Flength (args));
-  return XCAR (args);
-}
-
-DEFUN ("function", Ffunction, Sfunction, 1, UNEVALLED, 0,
-       doc: /* Like `quote', but preferred for objects which are functions.
-In byte compilation, `function' causes its argument to be compiled.
-`quote' cannot do that.
-usage: (function ARG)  */)
-  (Lisp_Object args)
+Lisp_Object
+Ffunction (Lisp_Object args)
 {
   Lisp_Object quoted = XCAR (args);
 
@@ -493,7 +424,6 @@ usage: (function ARG)  */)
     /* Simply quote the argument.  */
     return quoted;
 }
-
 
 DEFUN ("defvaralias", Fdefvaralias, Sdefvaralias, 2, 3, 0,
        doc: /* Make NEW-ALIAS a variable alias for symbol BASE-VARIABLE.
@@ -619,132 +549,6 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
   return Qnil;
 }
 
-DEFUN ("defvar", Fdefvar, Sdefvar, 1, UNEVALLED, 0,
-       doc: /* Define SYMBOL as a variable, and return SYMBOL.
-You are not required to define a variable in order to use it, but
-defining it lets you supply an initial value and documentation, which
-can be referred to by the Emacs help facilities and other programming
-tools.  The `defvar' form also declares the variable as \"special\",
-so that it is always dynamically bound even if `lexical-binding' is t.
-
-If SYMBOL's value is void and the optional argument INITVALUE is
-provided, INITVALUE is evaluated and the result used to set SYMBOL's
-value.  If SYMBOL is buffer-local, its default value is what is set;
-buffer-local values are not affected.  If INITVALUE is missing,
-SYMBOL's value is not set.
-
-If SYMBOL has a local binding, then this form affects the local
-binding.  This is usually not what you want.  Thus, if you need to
-load a file defining variables, with this form or with `defconst' or
-`defcustom', you should always load that file _outside_ any bindings
-for these variables.  (`defconst' and `defcustom' behave similarly in
-this respect.)
-
-The optional argument DOCSTRING is a documentation string for the
-variable.
-
-To define a user option, use `defcustom' instead of `defvar'.
-usage: (defvar SYMBOL &optional INITVALUE DOCSTRING)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object sym, tem, tail;
-
-  sym = XCAR (args);
-  tail = XCDR (args);
-
-  if (!NILP (tail))
-    {
-      if (!NILP (XCDR (tail)) && !NILP (XCDR (XCDR (tail))))
-	error ("Too many arguments");
-
-      tem = Fdefault_boundp (sym);
-
-      /* Do it before evaluating the initial value, for self-references.  */
-      SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
-
-      if (NILP (tem))
-	Fset_default (sym, eval_sub (XCAR (tail)));
-      else
-	{ /* Check if there is really a global binding rather than just a let
-	     binding that shadows the global unboundness of the var.  */
-	  union specbinding *binding = default_toplevel_binding (sym);
-	  if (binding && EQ (specpdl_old_value (binding), Qunbound))
-	    {
-	      set_specpdl_old_value (binding, eval_sub (XCAR (tail)));
-	    }
-	}
-      tail = XCDR (tail);
-      tem = Fcar (tail);
-      if (!NILP (tem))
-	{
-	  if (!NILP (Vpurify_flag))
-	    tem = Fpurecopy (tem);
-	  Fput (sym, Qvariable_documentation, tem);
-	}
-      LOADHIST_ATTACH (sym);
-    }
-  else if (!NILP (Vinternal_interpreter_environment)
-	   && ! SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym)))
-    /* A simple (defvar foo) with lexical scoping does "nothing" except
-       declare that var to be dynamically scoped *locally* (i.e. within
-       the current file or let-block).  */
-    Vinternal_interpreter_environment
-      = Fcons (sym, Vinternal_interpreter_environment);
-  else
-    {
-      /* Simple (defvar <var>) should not count as a definition at all.
-	 It could get in the way of other definitions, and unloading this
-	 package could try to make the variable unbound.  */
-    }
-
-  return sym;
-}
-
-DEFUN ("defconst", Fdefconst, Sdefconst, 2, UNEVALLED, 0,
-       doc: /* Define SYMBOL as a constant variable.
-This declares that neither programs nor users should ever change the
-value.  This constancy is not actually enforced by Emacs Lisp, but
-SYMBOL is marked as a special variable so that it is never lexically
-bound.
-
-The `defconst' form always sets the value of SYMBOL to the result of
-evalling INITVALUE.  If SYMBOL is buffer-local, its default value is
-what is set; buffer-local values are not affected.  If SYMBOL has a
-local binding, then this form sets the local binding's value.
-However, you should normally not make local bindings for variables
-defined with this form.
-
-The optional DOCSTRING specifies the variable's documentation string.
-usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
-  (Lisp_Object args)
-{
-  Lisp_Object sym, tem;
-
-  sym = XCAR (args);
-  Lisp_Object docstring = Qnil;
-  if (!NILP (XCDR (XCDR (args))))
-    {
-      if (!NILP (XCDR (XCDR (XCDR (args)))))
-	error ("Too many arguments");
-      docstring = XCAR (XCDR (XCDR (args)));
-    }
-
-  tem = eval_sub (XCAR (XCDR (args)));
-  if (!NILP (Vpurify_flag))
-    tem = Fpurecopy (tem);
-  Fset_default (sym, tem);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
-  if (!NILP (docstring))
-    {
-      if (!NILP (Vpurify_flag))
-	docstring = Fpurecopy (docstring);
-      Fput (sym, Qvariable_documentation, docstring);
-    }
-  Fput (sym, Qrisky_local_variable, Qt);
-  LOADHIST_ATTACH (sym);
-  return sym;
-}
-
 /* Make SYMBOL lexically scoped.  */
 DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
        Smake_var_non_special, 1, 1, 0,
@@ -757,139 +561,6 @@ DEFUN ("internal-make-var-non-special", Fmake_var_non_special,
 }
 
 
-DEFUN ("let*", FletX, SletX, 1, UNEVALLED, 0,
-       doc: /* Bind variables according to VARLIST then eval BODY.
-The value of the last form in BODY is returned.
-Each element of VARLIST is a symbol (which is bound to nil)
-or a list (SYMBOL VALUEFORM) (which binds SYMBOL to the value of VALUEFORM).
-Each VALUEFORM can refer to the symbols already bound by this VARLIST.
-usage: (let* VARLIST BODY...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object var, val, elt, lexenv;
-
-  dynwind_begin ();
-
-  lexenv = Vinternal_interpreter_environment;
-
-  Lisp_Object varlist = XCAR (args);
-  while (CONSP (varlist))
-    {
-      maybe_quit ();
-
-      elt = XCAR (varlist);
-      varlist = XCDR (varlist);
-      if (SYMBOLP (elt))
-	{
-	  var = elt;
-	  val = Qnil;
-	}
-      else
-	{
-	  var = Fcar (elt);
-	  if (! NILP (Fcdr (XCDR (elt))))
-	    signal_error ("`let' bindings can have only one value-form", elt);
-	  val = eval_sub (Fcar (XCDR (elt)));
-	}
-
-      if (!NILP (lexenv) && SYMBOLP (var)
-	  && ! SYMBOL_DECLARED_SPECIAL (XSYMBOL (var))
-	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR by adding it to the interpreter's binding
-	   alist.  */
-	{
-	  Lisp_Object newenv
-	    = Fcons (Fcons (var, val), Vinternal_interpreter_environment);
-	  if (EQ (Vinternal_interpreter_environment, lexenv))
-	    /* Save the old lexical environment on the specpdl stack,
-	       but only for the first lexical binding, since we'll never
-	       need to revert to one of the intermediate ones.  */
-	    specbind (Qinternal_interpreter_environment, newenv);
-	  else
-	    Vinternal_interpreter_environment = newenv;
-	}
-      else
-	specbind (var, val);
-    }
-  CHECK_LIST_END (varlist, XCAR (args));
-
-  val = Fprogn (XCDR (args));
-  dynwind_end ();
-  return val;
-}
-
-DEFUN ("let", Flet, Slet, 1, UNEVALLED, 0,
-       doc: /* Bind variables according to VARLIST then eval BODY.
-The value of the last form in BODY is returned.
-Each element of VARLIST is a symbol (which is bound to nil)
-or a list (SYMBOL VALUEFORM) (which binds SYMBOL to the value of VALUEFORM).
-All the VALUEFORMs are evalled before any symbols are bound.
-usage: (let VARLIST BODY...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object *temps, tem, lexenv;
-  Lisp_Object elt, varlist;
-
-  dynwind_begin ();
-  ptrdiff_t argnum;
-  USE_SAFE_ALLOCA;
-
-  varlist = XCAR (args);
-  CHECK_LIST (varlist);
-
-  /* Make space to hold the values to give the bound variables.  */
-  EMACS_INT varlist_len = XFASTINT (Flength (varlist));
-  SAFE_ALLOCA_LISP (temps, varlist_len);
-  ptrdiff_t nvars = varlist_len;
-
-  /* Compute the values and store them in `temps'.  */
-
-  for (argnum = 0; argnum < nvars && CONSP (varlist); argnum++)
-    {
-      maybe_quit ();
-      elt = XCAR (varlist);
-      varlist = XCDR (varlist);
-      if (SYMBOLP (elt))
-	temps[argnum] = Qnil;
-      else if (! NILP (Fcdr (Fcdr (elt))))
-	signal_error ("`let' bindings can have only one value-form", elt);
-      else
-	temps[argnum] = eval_sub (Fcar (Fcdr (elt)));
-    }
-  nvars = argnum;
-
-  lexenv = Vinternal_interpreter_environment;
-
-  varlist = XCAR (args);
-  for (argnum = 0; argnum < nvars && CONSP (varlist); argnum++)
-    {
-      Lisp_Object var;
-
-      elt = XCAR (varlist);
-      varlist = XCDR (varlist);
-      var = SYMBOLP (elt) ? elt : Fcar (elt);
-      tem = temps[argnum];
-
-      if (!NILP (lexenv) && SYMBOLP (var)
-	  && ! SYMBOL_DECLARED_SPECIAL (XSYMBOL (var))
-	  && NILP (Fmemq (var, Vinternal_interpreter_environment)))
-	/* Lexically bind VAR by adding it to the lexenv alist.  */
-	lexenv = Fcons (Fcons (var, tem), lexenv);
-      else
-	/* Dynamically bind VAR.  */
-	specbind (var, tem);
-    }
-
-  if (!EQ (lexenv, Vinternal_interpreter_environment))
-    /* Instantiate a new lexical environment.  */
-    specbind (Qinternal_interpreter_environment, lexenv);
-
-  elt = Fprogn (XCDR (args));
-  SAFE_FREE ();
-  dynwind_end ();
-  return elt;
-}
-
 DEFUN ("macroexpand", Fmacroexpand, Smacroexpand, 1, 2, 0,
        doc: /* Return result of expanding macros at top level of FORM.
 If FORM is not a macro call, it is returned unchanged.
@@ -958,7 +629,7 @@ definitions to shadow the loaded ones for use in file byte-compilation.  */)
   return form;
 }
 
-DEFUN ("catch", Fcatch, Scatch, 1, UNEVALLED, 0,
+DEFUN ("call-with-catch", Fcatch, Scatch, 2, 2, 0,
        doc: /* Eval BODY allowing nonlocal exits using `throw'.
 TAG is evalled to get the tag to use; it must not be nil.
 
@@ -967,10 +638,9 @@ Within BODY, a call to `throw' with the same TAG exits BODY and this `catch'.
 If no throw happens, `catch' returns the value of the last BODY form.
 If a throw happens, it specifies the value to return from `catch'.
 usage: (catch TAG BODY...)  */)
-  (Lisp_Object args)
+  (Lisp_Object tag, Lisp_Object thunk)
 {
-  Lisp_Object tag = eval_sub (XCAR (args));
-  return internal_catch (tag, Fprogn, XCDR (args));
+  return internal_catch (tag, call0, thunk);
 }
 
 /* Assert that E is true, but do not evaluate E.  Use this instead of
@@ -1158,26 +828,8 @@ Both TAG and VALUE are evalled.  */
       }
   xsignal2 (Qno_catch, tag, value);
 }
-
-
-DEFUN ("unwind-protect", Funwind_protect, Sunwind_protect, 1, UNEVALLED, 0,
-       doc: /* Do BODYFORM, protecting with UNWINDFORMS.
-If BODYFORM completes normally, its value is returned
-after executing the UNWINDFORMS.
-If BODYFORM exits nonlocally, the UNWINDFORMS are executed anyway.
-usage: (unwind-protect BODYFORM UNWINDFORMS...)  */)
-  (Lisp_Object args)
-{
-  Lisp_Object val;
-  dynwind_begin ();
-
-  record_unwind_protect (prog_ignore, XCDR (args));
-  val = eval_sub (XCAR (args));
-  dynwind_end ();
-  return val;
-}
 
-DEFUN ("condition-case", Fcondition_case, Scondition_case, 2, UNEVALLED, 0,
+DEFUN ("call-with-handler", Fcall_with_handler, Scall_with_handler, 4, 4, 0,
        doc: /* Regain control when an error is signaled.
 Executes BODYFORM and returns its value if no error happens.
 Each element of HANDLERS looks like (CONDITION-NAME BODY...)
@@ -1203,13 +855,14 @@ expression.
 
 See also the function `signal' for more info.
 usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
-  (Lisp_Object args)
+  (Lisp_Object var,
+   Lisp_Object conditions,
+   Lisp_Object hthunk,
+   Lisp_Object thunk)
 {
-  Lisp_Object var = XCAR (args);
-  Lisp_Object bodyform = XCAR (XCDR (args));
-  Lisp_Object handlers = XCDR (XCDR (args));
-
-  return internal_lisp_condition_case (var, bodyform, handlers);
+  return internal_lisp_condition_case (var,
+                                       list2 (intern ("funcall"), thunk),
+                                       list1 (list2 (conditions, list2 (intern ("funcall"), hthunk))));
 }
 
 static Lisp_Object
@@ -2086,63 +1739,10 @@ eval_sub_1 (Lisp_Object form)
   else if (!NILP (fun) && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (scm_is_true (scm_procedure_p (fun)))
-    {
-      Lisp_Object args_left = original_args;
-      Lisp_Object nargs = Flength (args_left);
-      Lisp_Object *args;
-      size_t argnum = 0;
-
-      SAFE_ALLOCA_LISP (args, XINT (nargs));
-
-      while (! NILP (args_left))
-        {
-          args[argnum++] = eval_sub (Fcar (args_left));
-          args_left = Fcdr (args_left);
-        }
-      set_backtrace_args (specpdl_ptr - 1, args);
-      set_backtrace_nargs (specpdl_ptr - 1, argnum);
-      val = scm_call_n (fun, args, argnum);
-    }
-  else if (CONSP (fun) && EQ (XCAR (fun), Qspecial_operator))
-    {
-      val = scm_apply_0 (XCDR (fun), original_args);
-    }
-  else if (COMPILEDP (fun) || MODULE_FUNCTIONP (fun))
-    return apply_lambda (fun, original_args, count);
+  if (COMPILEDP (fun))
+    val = apply_lambda (fun, original_args);
   else
-    {
-      if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
-      if (!CONSP (fun))
-	xsignal1 (Qinvalid_function, original_fun);
-      funcar = XCAR (fun);
-      if (!SYMBOLP (funcar))
-	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qautoload))
-	{
-	  Fautoload_do_load (fun, original_fun, Qnil);
-	  goto retry;
-	}
-      if (EQ (funcar, Qmacro))
-	{
-	  dynwind_begin ();
-	  Lisp_Object exp;
-	  /* Bind lexical-binding during expansion of the macro, so the
-	     macro can know reliably if the code it outputs will be
-	     interpreted using lexical-binding or not.  */
-	  specbind (Qlexical_binding,
-		    NILP (Vinternal_interpreter_environment) ? Qnil : Qt);
-	  exp = apply1 (Fcdr (fun), original_args);
-	  dynwind_end ();
-	  val = eval_sub (exp);
-	}
-      else if (EQ (funcar, Qlambda)
-	       || EQ (funcar, Qclosure))
-	return apply_lambda (fun, original_args, count);
-      else
-	xsignal1 (Qinvalid_function, original_fun);
-    }
+    val = scm_call_1 (eval_fn, form);
 
   if (backtrace_debug_on_exit (specpdl + count))
     val = call_debugger (list2 (Qexit, val));
@@ -2187,12 +1787,8 @@ DEFUN ("values", Fvalues, Svalues, 0, MANY, 0,
   return scm_c_values (args, nargs);
 }
 
-DEFUN ("apply", Fapply, Sapply, 1, MANY, 0,
-       doc: /* Call FUNCTION with our remaining args, using our last arg as list of args.
-Then return the value FUNCTION returns.
-Thus, (apply \\='+ 1 2 \\='(3 4)) returns 10.
-usage: (apply FUNCTION &rest ARGUMENTS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args)
 {
   ptrdiff_t i, numargs, funcall_nargs;
   register Lisp_Object *funcall_args = NULL;
@@ -2549,112 +2145,10 @@ DEFUN ("functionp", Ffunctionp, Sfunctionp, 1, 1, 0,
   return Qnil;
 }
 
-bool
-FUNCTIONP (Lisp_Object object)
+Lisp_Object
+Ffuncall1 (ptrdiff_t nargs, Lisp_Object *args)
 {
-  if (SYMBOLP (object) && !NILP (Ffboundp (object)))
-    {
-      object = Findirect_function (object, Qt);
-
-      if (CONSP (object) && EQ (XCAR (object), Qautoload))
-	{
-	  /* Autoloaded symbols are functions, except if they load
-	     macros or keymaps.  */
-	  for (int i = 0; i < 4 && CONSP (object); i++)
-	    object = XCDR (object);
-
-	  return ! (CONSP (object) && !NILP (XCAR (object)));
-	}
-    }
-
-  if (SUBRP (object))
-    return XSUBR (object)->max_args != UNEVALLED;
-  else if (COMPILEDP (object) || MODULE_FUNCTIONP (object))
-    return true;
-  else if (CONSP (object))
-    {
-      Lisp_Object car = XCAR (object);
-      return EQ (car, Qlambda) || EQ (car, Qclosure);
-    }
-  else
-    return false;
-}
-
-DEFUN ("funcall", Ffuncall1, Sfuncall, 1, MANY, 0,
-       doc: /* Call first argument as a function, passing remaining arguments to it.
-Return the value that function returns.
-Thus, (funcall \\='cons \\='x \\='y) returns (x . y).
-usage: (funcall FUNCTION &rest ARGUMENTS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  Lisp_Object fun, original_fun;
-  Lisp_Object funcar;
-  ptrdiff_t numargs = nargs - 1;
-  Lisp_Object val;
-  ptrdiff_t count;
-
-  maybe_quit ();
-
-  scm_dynwind_begin (0);
-  scm_dynwind_unwind_handler (set_lisp_eval_depth,
-                              (void *) lisp_eval_depth,
-                              SCM_F_WIND_EXPLICITLY);
-
-  if (++lisp_eval_depth > max_lisp_eval_depth)
-    {
-      if (max_lisp_eval_depth < 100)
-	max_lisp_eval_depth = 100;
-      if (lisp_eval_depth > max_lisp_eval_depth)
-	error ("Lisp nesting exceeds `max-lisp-eval-depth'");
-    }
-
-  count = record_in_backtrace (args[0], &args[1], nargs - 1);
-
-  maybe_gc ();
-
-  if (debug_on_next_call)
-    do_debug_on_call (Qlambda, count);
-
-  original_fun = args[0];
-
- retry:
-
-  /* Optimize for no indirection.  */
-  fun = original_fun;
-  if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
-    fun = indirect_function (fun);
-
-  if (scm_is_true (scm_procedure_p (fun)))
-    {
-      val = scm_call_n (fun, args + 1, numargs);
-    }
-  else if (COMPILEDP (fun) || MODULE_FUNCTIONP (fun))
-    val = funcall_lambda (fun, numargs, args + 1);
-  else
-    {
-      if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
-      if (!CONSP (fun))
-	xsignal1 (Qinvalid_function, original_fun);
-      funcar = XCAR (fun);
-      if (!SYMBOLP (funcar))
-	xsignal1 (Qinvalid_function, original_fun);
-      if (EQ (funcar, Qlambda)
-	  || EQ (funcar, Qclosure))
-	val = funcall_lambda (fun, numargs, args + 1);
-      else if (EQ (funcar, Qautoload))
-	{
-	  Fautoload_do_load (fun, original_fun, Qnil);
-	  goto retry;
-	}
-      else
-	xsignal1 (Qinvalid_function, original_fun);
-    }
-  if (backtrace_debug_on_exit (specpdl + count))
-    val = call_debugger (list2 (Qexit, val));
-  scm_dynwind_end ();
-  return val;
+  return scm_call_n (funcall_fn, args, nargs);
 }
 
 Lisp_Object
@@ -3904,7 +3398,7 @@ alist of active lexical bindings.  */);
   Vinternal_interpreter_environment = Qnil;
   /* Don't export this variable to Elisp, so no one can mess with it
      (Just imagine if someone makes it buffer-local).  */
-  Funintern (Qinternal_interpreter_environment, Qnil);
+  //Funintern (Qinternal_interpreter_environment, Qnil);
 
   Vrun_hooks = intern_c_string ("run-hooks");
   staticpro (&Vrun_hooks);
