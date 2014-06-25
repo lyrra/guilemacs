@@ -125,6 +125,10 @@
 (load "subr")
 (load "keymap")
 
+
+(load "international/mule")
+(load "international/mule-conf")
+
 ;; Do it after subr, since both after-load-functions and add-hook are
 ;; implemented in subr.el.
 (add-hook 'after-load-functions (lambda (_) (garbage-collect)))
@@ -134,8 +138,6 @@
 (load "widget")
 (load "custom")
 (load "emacs-lisp/map-ynp")
-(load "international/mule")
-(load "international/mule-conf")
 (load "env")
 (load "format")
 (load "bindings")
@@ -160,9 +162,13 @@
   (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
     (load "emacs-lisp/macroexp")))
 
+(load "emacs-lisp/gv")
+
 (load "cus-face")
 (load "faces")  ; after here, `defface' may be used.
 
+
+(load "subr2")
 
 ;; We don't want to store loaddefs.el in the repository because it is
 ;; a generated file; but it is required in order to compile the lisp files.
@@ -206,10 +212,19 @@
 
 (load "emacs-lisp/cl-preloaded")
 (load "emacs-lisp/oclosure")          ;Used by cl-generic
+(load "emacs-lisp/derived")
+(load "emacs-lisp/easy-mmode")
 (load "obarray")        ;abbrev.el is implemented in terms of obarrays.
 (load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
 
+(load "emacs-lisp/cl-lib")
+(load "emacs-lisp/cl-macs")
+
+(load "help-macro")
 (load "help")
+(load "help-fns")
+
+(load "faces2")
 
 (load "jka-cmpr-hook")
 (load "epa-hook")
@@ -224,6 +239,8 @@
     (setq redisplay--inhibit-bidi nil))
 (load "international/characters")
 (load "composite")
+
+(load "international/ccl")
 
 ;; Load language-specific files.
 (load "language/chinese")
@@ -296,6 +313,7 @@
 
 (load "replace")
 (load "emacs-lisp/tabulated-list")
+(load "kmacro")
 (load "buff-menu")
 
 (if (fboundp 'x-create-frame)

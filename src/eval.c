@@ -266,7 +266,7 @@ init_eval_once_for_pdumper (void)
   eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
 
-  scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
+  //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
 
 static struct handler *handlerlist_sentinel;
