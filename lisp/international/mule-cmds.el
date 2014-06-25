@@ -30,8 +30,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl-lib))
-
 (defvar dos-codepage)
 (autoload 'widget-value "wid-edit")
 
@@ -549,7 +547,8 @@ Emacs, but is unlikely to be what you really want now."
 				     (coding-system-charset-list cs)))
 		   (charsets charsets))
 	       (if (coding-system-get cs :ascii-compatible-p)
-		   (cl-pushnew 'ascii cs-charsets))
+                   (if (not (memql 'ascii cs-charsets))
+                       (push 'ascii cs-charsets)))
 	       (if (catch 'ok
 		     (when cs-charsets
 		       (while charsets

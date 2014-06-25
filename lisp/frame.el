@@ -25,7 +25,6 @@
 ;;; Commentary:
 
 ;;; Code:
-(eval-when-compile (require 'cl-lib))
 
 (cl-defgeneric frame-creation-function (params)
   "Method for window-system dependent functions to create a new frame.
@@ -551,10 +550,14 @@ Return nil if we don't know how to interpret DISPLAY."
 	   (null (window-system))
 	   (not (daemonp)))
       nil
-    (cl-loop for descriptor in display-format-alist
-	     for pattern = (car descriptor)
-	     for system = (cdr descriptor)
-	     when (string-match-p pattern display) return system)))
+    (labels ((loop (list)
+                   (let* ((descriptor (car list))
+                          (pattern (car descriptor))
+                          (system (cdr descriptor)))
+                     (if (string-match-p pattern display)
+                         system
+                       (loop (cdr list))))))
+      (loop display-format-alist))))
 
 (defun make-frame-on-display (display &optional parameters)
   "Make a frame on display DISPLAY.
@@ -1535,9 +1538,13 @@ physical monitors.
 See `display-monitor-attributes-list' for the list of attribute
 keys and their meanings."
   (or frame (setq frame (selected-frame)))
-  (cl-loop for attributes in (display-monitor-attributes-list frame)
-	   for frames = (cdr (assq 'frames attributes))
-	   if (memq frame frames) return attributes))
+  (labels ((loop (list)
+                 (let* ((attributes (car list))
+                        (frames (cdr (assq 'frames attributes))))
+                   (if (memq frame frames)
+                       attributes
+                     (loop (cdr list))))))
+    (loop (display-monitor-attributes-list frame))))
 
 (defun frame-monitor-attribute (attribute &optional frame x y)
   "Return the value of ATTRIBUTE on FRAME's monitor.

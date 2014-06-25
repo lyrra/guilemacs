@@ -1532,39 +1532,6 @@ return value, which may be passed as the REQUIRE-MATCH arg to
 	 'confirm)
 	(t nil)))
 
-(defmacro minibuffer-with-setup-hook (fun &rest body)
-  "Temporarily add FUN to `minibuffer-setup-hook' while executing BODY.
-
-By default, FUN is prepended to `minibuffer-setup-hook'.  But if FUN is of
-the form `(:append FUN1)', FUN1 will be appended to `minibuffer-setup-hook'
-instead of prepending it.
-
-BODY should use the minibuffer at most once.
-Recursive uses of the minibuffer are unaffected (FUN is not
-called additional times).
-
-This macro actually adds an auxiliary function that calls FUN,
-rather than FUN itself, to `minibuffer-setup-hook'."
-  (declare (indent 1) (debug t))
-  (let ((hook (make-symbol "setup-hook"))
-        (funsym (make-symbol "fun"))
-        (append nil))
-    (when (eq (car-safe fun) :append)
-      (setq append '(t) fun (cadr fun)))
-    `(let ((,funsym ,fun)
-           ,hook)
-       (setq ,hook
-             (lambda ()
-               ;; Clear out this hook so it does not interfere
-               ;; with any recursive minibuffer usage.
-               (remove-hook 'minibuffer-setup-hook ,hook)
-               (funcall ,funsym)))
-       (unwind-protect
-           (progn
-             (add-hook 'minibuffer-setup-hook ,hook ,@append)
-             ,@body)
-         (remove-hook 'minibuffer-setup-hook ,hook)))))
-
 (defun find-file-read-args (prompt mustmatch)
   (list (read-file-name prompt nil default-directory mustmatch)
 	t))
