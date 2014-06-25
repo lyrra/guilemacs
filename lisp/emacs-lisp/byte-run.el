@@ -290,14 +290,17 @@ The return value is undefined.
                   (list 'symbol-function (list 'quote name))
                   (list 'quote 'name)
                   (list 'quote name))))))
-
+
 ;; Redefined in byte-opt.el.
 ;; This was undocumented and unused for decades.
-(defalias 'inline 'progn
-  "Like `progn', but when compiled inline top-level function calls in body.
-You don't need this.  (See bytecomp.el commentary for more details.)
-
-\(fn BODY...)")
+; FIX: 20190627 LAV, which version is correct?
+;(defalias 'inline 'progn
+;  "Like `progn', but when compiled inline top-level function calls in body.
+;You don't need this.  (See bytecomp.el commentary for more details.)
+;
+;\(fn BODY...)")
+(defmacro inline (&rest body)
+  (cons 'progn body))
 
 ;;; Interface to inline functions.
 
