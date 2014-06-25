@@ -1670,7 +1670,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #endif /* WINDOWSNT */
 
       syms_of_threads ();
-      syms_of_profiler ();
 
       keys_of_casefiddle ();
       keys_of_cmds ();

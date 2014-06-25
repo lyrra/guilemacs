@@ -406,7 +406,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	region-cache.o sound.o atimer.o \
 	doprnt.o intervals.o textprop.o composite.o xml.o lcms.o $(NOTIFY_OBJ) \
 	$(XWIDGETS_OBJ) \
-	profiler.o decompress.o \
+	decompress.o \
 	thread.o systhread.o \
 	$(if $(HYBRID_MALLOC),sheap.o) \
 	guile.o \
@@ -816,7 +816,6 @@ nsmenu.o: nsmenu.x
 nsselect.o: nsselect.x
 print.o: print.x
 process.o: process.x
-profiler.o: profiler.x
 search.o: search.x
 sound.o: sound.x
 syntax.o: syntax.x
