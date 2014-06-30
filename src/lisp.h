@@ -5629,6 +5629,10 @@ extern void *xnrealloc (void *, ptrdiff_t, ptrdiff_t)
   ATTRIBUTE_ALLOC_SIZE ((2,3)) ATTRIBUTE_RETURNS_NONNULL;
 extern void *xpalloc (void *, ptrdiff_t *, ptrdiff_t, ptrdiff_t, ptrdiff_t)
   ATTRIBUTE_RETURNS_NONNULL;
+extern void *xmalloc_atomic (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
+extern void *xzalloc_atomic (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
+extern void *xmalloc_atomic_unsafe (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
+extern void *xnmalloc_atomic (ptrdiff_t, ptrdiff_t) ATTRIBUTE_MALLOC_SIZE ((1,2));
 
 extern char *xstrdup (char const *)
   ATTRIBUTE_MALLOC ATTRIBUTE_RETURNS_NONNULL;
