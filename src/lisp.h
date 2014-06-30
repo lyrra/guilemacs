@@ -2956,24 +2956,6 @@ struct Lisp_User_Ptr
   void *p;
 } GCALIGNED_STRUCT;
 
-/* A finalizer sentinel.  */
-struct Lisp_Finalizer
-  {
-    union vectorlike_header header;
-
-    /* Call FUNCTION when the finalizer becomes unreachable, even if
-       FUNCTION contains a reference to the finalizer; i.e., call
-       FUNCTION when it is reachable _only_ through finalizers.  */
-    Lisp_Object function;
-
-    /* Circular list of all active weak references.  */
-    struct Lisp_Finalizer *prev;
-    struct Lisp_Finalizer *next;
-  } GCALIGNED_STRUCT;
-
-extern struct Lisp_Finalizer finalizers;
-extern struct Lisp_Finalizer doomed_finalizers;
-
 INLINE bool
 FINALIZERP (Lisp_Object x)
 {
