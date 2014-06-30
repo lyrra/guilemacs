@@ -1327,12 +1327,6 @@ command_loop_1 (void)
       /* Make sure the current window's buffer is selected.  */
       set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
 
-      /* Display any malloc warning that just came out.  Use while because
-	 displaying one warning can cause another.  */
-
-      while (pending_malloc_warning)
-	display_malloc_warning ();
-
       Vdeactivate_mark = Qnil;
 
       /* Don't ignore mouse movements for more than a single command

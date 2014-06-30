@@ -1452,8 +1452,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 
     case PVEC_FINALIZER:
       print_c_string ("#<finalizer", printcharfun);
-      if (NILP (XFINALIZER (obj)->function))
-	print_c_string (" used", printcharfun);
       printchar ('>', printcharfun);
       break;
 
