@@ -1300,8 +1300,6 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   /* If we use --chdir, this records the original directory.  */
   char const *original_pwd = 0;
 
-  /* Record (approximately) where the stack begins.  */
-  stack_bottom = (char *) &stack_bottom_variable;
 
   const char *dump_mode = NULL;
   int skip_args = 0;

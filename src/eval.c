@@ -1848,7 +1848,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
   struct handler *h;
   int skip;
 
-  if (gc_in_progress || waiting_for_input)
+  if (waiting_for_input)
     emacs_abort ();
 
   /* This hook is used by edebug.  */
@@ -4197,77 +4197,7 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 
 
 void
-mark_specpdl (union specbinding *first, union specbinding *ptr)
-{
-  union specbinding *pdl;
-  for (pdl = first; pdl != ptr; pdl++)
-    {
-      switch (pdl->kind)
-        {
-	case SPECPDL_UNWIND:
-	  mark_object (specpdl_arg (pdl));
-	  break;
-
-	case SPECPDL_UNWIND_ARRAY:
-	  mark_objects (pdl->unwind_array.array, pdl->unwind_array.nelts);
-	  break;
-
-	case SPECPDL_UNWIND_EXCURSION:
-	  mark_object (pdl->unwind_excursion.marker);
-	  mark_object (pdl->unwind_excursion.window);
-	  break;
-
-	case SPECPDL_BACKTRACE:
-	  {
-	    ptrdiff_t nargs = backtrace_nargs (pdl);
-	    mark_object (backtrace_function (pdl));
-	    if (nargs == UNEVALLED)
-	      nargs = 1;
-	    mark_objects (backtrace_args (pdl), nargs);
-	  }
-	  break;
-
-#ifdef HAVE_MODULES
-        case SPECPDL_MODULE_RUNTIME:
-          break;
-        case SPECPDL_MODULE_ENVIRONMENT:
-          mark_module_environment (pdl->unwind_ptr.arg);
-          break;
-#endif
-
-	case SPECPDL_LET_DEFAULT:
-	case SPECPDL_LET_LOCAL:
-	  mark_object (specpdl_where (pdl));
-	  FALLTHROUGH;
-	case SPECPDL_LET:
-	  mark_object (specpdl_symbol (pdl));
-	  mark_object (specpdl_old_value (pdl));
-	  break;
-
-	case SPECPDL_UNWIND_PTR:
-	  if (pdl->unwind_ptr.mark)
-	    pdl->unwind_ptr.mark (pdl->unwind_ptr.arg);
-	  break;
-
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_INTMAX:
-        case SPECPDL_UNWIND_VOID:
-	case SPECPDL_NOP:
-	  break;
-
-	/* While other loops that scan the specpdl use "default: break;"
-	   for simplicity, here we explicitly list all cases and abort
-	   if we find an unexpected value, as a sanity check.  */
-	default:
-	  emacs_abort ();
-	}
-    }
-}
-
-/* Fill ARRAY of size SIZE with backtrace entries, most recent call first.
-   Truncate the backtrace if longer than SIZE; pad with nil if shorter.  */
-void
-get_backtrace (Lisp_Object *array, ptrdiff_t size)
+get_backtrace (Lisp_Object array)
 {
   /* Copy the backtrace contents into working memory.  */
   union specbinding *pdl = backtrace_top ();

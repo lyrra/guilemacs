@@ -3423,7 +3423,6 @@ vector_from_rev_list (Lisp_Object elems)
     {
       vec[i] = XCAR (elems);
       Lisp_Object next = XCDR (elems);
-      free_cons (XCONS (elems));
       elems = next;
     }
   return obj;

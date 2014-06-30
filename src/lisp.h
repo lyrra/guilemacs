@@ -4480,9 +4480,6 @@ unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);
-extern bool survives_gc_p (Lisp_Object);
-extern void mark_object (Lisp_Object);
-extern void mark_objects (Lisp_Object *, ptrdiff_t);
 #if defined REL_ALLOC && !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
 extern void refill_memory_reserve (void);
 #endif
@@ -4529,7 +4526,6 @@ extern void maybe_garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-extern EMACS_INT consing_until_gc;
 #ifdef HAVE_PDUMPER
 extern int number_finalizers_run;
 #endif
@@ -4712,12 +4708,9 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
 				   PSEUDOVECSIZE (type, field),	       \
 				   VECSIZE (type), tag))
 
-extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
-extern specpdl_ref inhibit_garbage_collection (void);
 extern Lisp_Object build_symbol_with_pos (Lisp_Object, Lisp_Object);
-extern void free_cons (struct Lisp_Cons *);
 extern void init_alloc_once (void);
 extern void init_alloc (void);
 extern void syms_of_alloc (void);
@@ -5965,8 +5958,7 @@ struct for_each_tail_internal
 INLINE void
 maybe_gc (void)
 {
-  if (consing_until_gc < 0)
-    maybe_garbage_collect ();
+  return;
 }
 
 INLINE_HEADER_END

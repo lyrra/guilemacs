@@ -701,6 +701,7 @@ If the log gets full, some of the least-seen call-stacks will be evicted
 to make room for new entries.  */);
   profiler_log_size = 10000;
 
+  DEFSYM (Qautomatic_gc, "Automatic GC");
   DEFSYM (QDiscarded_Samples, "Discarded Samples");
 
   defsubr (&Sfunction_equal);
