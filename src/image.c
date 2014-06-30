@@ -1947,7 +1947,7 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
     }
 
   /* Allocate image raster.  */
-  (*ximg)->data = xmalloc ((*ximg)->bytes_per_line * height);
+  (*ximg)->data = xmalloc_atomic ((*ximg)->bytes_per_line * height);
 
   /* Allocate a pixmap of the same size.  */
   *pixmap = XCreatePixmap (display, drawable, width, height, depth);
@@ -2849,7 +2849,7 @@ xbm_read_bitmap_data (struct frame *f, char *contents, char *end,
     }
   bytes_per_line = (*width + 7) / 8 + padding_p;
   nbytes = bytes_per_line * *height;
-  p = *data = xmalloc (nbytes);
+  p = *data = xmalloc_atomic (nbytes);
 
   if (v10)
     {
@@ -3802,7 +3802,8 @@ xpm_load (struct frame *f, struct image *img)
 #endif /* HAVE_NTGUI */
 
       /* Remember allocated colors.  */
-      img->colors = xnmalloc (attrs.nalloc_pixels, sizeof *img->colors);
+      img->colors = xnmalloc_atomic (attrs.nalloc_pixels,
+                                     sizeof *img->colors);
       img->ncolors = attrs.nalloc_pixels;
       for (i = 0; i < attrs.nalloc_pixels; ++i)
 	{
@@ -4578,7 +4579,7 @@ colors_in_color_table (int *n)
     }
   else
     {
-      colors = xmalloc (ct_colors_allocated * sizeof *colors);
+      colors = xmalloc_atomic (ct_colors_allocated * sizeof *colors);
       *n = ct_colors_allocated;
 
       for (i = j = 0; i < CT_SIZE; ++i)
@@ -6115,8 +6116,8 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   if (INT_MULTIPLY_WRAPV (row_bytes, sizeof *pixels, &nbytes)
       || INT_MULTIPLY_WRAPV (nbytes, height, &nbytes))
     memory_full (SIZE_MAX);
-  c->pixels = pixels = xmalloc (nbytes);
-  c->rows = rows = xmalloc (height * sizeof *rows);
+  c->pixels = pixels = xmalloc_atomic (nbytes);
+  c->rows = rows = xmalloc_atomic (height * sizeof *rows);
   for (i = 0; i < height; ++i)
     rows[i] = pixels + i * row_bytes;
 
@@ -7283,7 +7284,7 @@ tiff_load (struct frame *f, struct image *img)
       return 0;
     }
 
-  buf = xmalloc (sizeof *buf * width * height);
+  buf = xmalloc_atomic (sizeof *buf * width * height);
 
   rc = TIFFReadRGBAImage (tiff, width, height, buf, 0);
 

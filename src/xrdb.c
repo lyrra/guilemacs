@@ -106,7 +106,7 @@ magic_db (const char *string, ptrdiff_t string_len, const char *class,
   char *lang = getenv ("LANG");
 
   ptrdiff_t path_size = 100;
-  char *path = xmalloc (path_size);
+  char *path = xmalloc_atomic (path_size);
   ptrdiff_t path_len = 0;
 
   const char *p = string;
@@ -225,7 +225,7 @@ gethomedir (void)
     return xstrdup ("/");
 
   ptrdiff_t len = strlen (ptr);
-  copy = xmalloc (len + 2);
+  copy = xmalloc_atomic (len + 2);
   strcpy (copy + len, "/");
   return memcpy (copy, ptr, len);
 }
@@ -348,7 +348,7 @@ get_user_db (Display *display)
       /* Use ~/.Xdefaults.  */
       char *home = gethomedir ();
       ptrdiff_t homelen = strlen (home);
-      char *filename = xrealloc (home, homelen + sizeof xdefaults);
+      char *filename = xrealloc_atomic (home, homelen + sizeof xdefaults);
       strcpy (filename + homelen, xdefaults);
       db = XrmGetFileDatabase (filename);
       xfree (filename);

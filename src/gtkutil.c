@@ -523,7 +523,7 @@ get_utf8_string (const char *str)
 	  || INT_ADD_WRAPV (len + 1, alloc, &alloc)
 	  || SIZE_MAX < alloc)
 	memory_full (SIZE_MAX);
-      up = utf8_str = xmalloc (alloc);
+      up = utf8_str = xmalloc_atomic (alloc);
       p = (unsigned char *)str;
 
       while (! (cp = g_locale_to_utf8 ((char *)p, -1, &bytes_read,

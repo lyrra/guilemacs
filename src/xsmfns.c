@@ -231,7 +231,7 @@ smc_save_yourself_CB (SmcConn smcConn,
   props[props_idx]->vals[vp_idx].length = strlen (emacs_program);
   props[props_idx]->vals[vp_idx++].value = emacs_program;
 
-  smid_opt = xmalloc (strlen (SMID_OPT) + strlen (client_id) + 1);
+  smid_opt = xmalloc_atomic (strlen (SMID_OPT) + strlen (client_id) + 1);
   strcpy (stpcpy (smid_opt, SMID_OPT), client_id);
 
   props[props_idx]->vals[vp_idx].length = strlen (smid_opt);
@@ -242,7 +242,7 @@ smc_save_yourself_CB (SmcConn smcConn,
 
   if (cwd)
     {
-      chdir_opt = xmalloc (strlen (CHDIR_OPT) + strlen (cwd) + 1);
+      chdir_opt = xmalloc_atomic (strlen (CHDIR_OPT) + strlen (cwd) + 1);
       strcpy (stpcpy (chdir_opt, CHDIR_OPT), cwd);
 
       props[props_idx]->vals[vp_idx].length = strlen (chdir_opt);
@@ -426,7 +426,7 @@ x_session_initialize (struct x_display_info *dpyinfo)
 
   /* This malloc will not be freed, but it is only done once, and hopefully
      not very large   */
-  emacs_program = xmalloc (name_len + 1);
+  emacs_program = xmalloc_atomic (name_len + 1);
   char *z = emacs_program;
 
   if (STRINGP (Vinvocation_directory))

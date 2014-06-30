@@ -12604,7 +12604,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       && INT_ADD_WRAPV (nbytes, SBYTES (system_name) + 1, &nbytes))
     memory_full (SIZE_MAX);
   dpyinfo->x_id = ++x_display_id;
-  dpyinfo->x_id_name = xmalloc (nbytes);
+  dpyinfo->x_id_name = xmalloc_atomic (nbytes);
   char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
   if (STRINGP (system_name))
     {

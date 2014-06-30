@@ -4992,7 +4992,7 @@ alloc_buffer_text (struct buffer *b, ptrdiff_t nbytes)
 #elif defined REL_ALLOC
   p = r_alloc ((void **) &b->text->beg, nbytes);
 #else
-  p = xmalloc (nbytes);
+  p = xmalloc_atomic (nbytes);
 #endif
 
   if (p == NULL)

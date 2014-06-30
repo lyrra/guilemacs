@@ -1263,7 +1263,7 @@ x_get_window_property (Display *display, Window window, Atom property,
   if (total_size_max < bytes_remaining)
     goto size_overflow;
   total_size = bytes_remaining;
-  data = xmalloc (total_size + 1);
+  data = xmalloc_atomic (total_size + 1);
 
   /* Now read, until we've gotten it all.  */
   while (bytes_remaining)
@@ -1368,7 +1368,7 @@ receive_incremental_selection (struct x_display_info *dpyinfo,
 
   if (min (PTRDIFF_MAX, SIZE_MAX) < min_size_bytes)
     memory_full (SIZE_MAX);
-  *data_ret = xmalloc (min_size_bytes);
+  *data_ret = xmalloc_atomic (min_size_bytes);
   *size_bytes_ret = min_size_bytes;
 
   TRACE1 ("Read %u bytes incrementally", min_size_bytes);

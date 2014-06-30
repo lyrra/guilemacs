@@ -1852,7 +1852,7 @@ x_encode_text (Lisp_Object string, Lisp_Object coding_system,
   coding.mode |= (CODING_MODE_SAFE_ENCODING | CODING_MODE_LAST_BLOCK);
   /* We suppress producing escape sequences for composition.  */
   coding.common_flags &= ~CODING_ANNOTATION_MASK;
-  coding.destination = xnmalloc (SCHARS (string), 2);
+  coding.destination = xnmalloc_atomic (SCHARS (string), 2);
   coding.dst_bytes = SCHARS (string) * 2;
   encode_coding_object (&coding, string, 0, 0,
 			SCHARS (string), SBYTES (string), Qnil);
@@ -2268,7 +2268,7 @@ xic_create_fontsetname (const char *base_fontname, bool motif)
   if (xic_default_fontset == base_fontname)
     {
       /* There is no base font name, use the default.  */
-      fontsetname = xmalloc (strlen (base_fontname) + 2);
+      fontsetname = xmalloc_atomic (strlen (base_fontname) + 2);
       z = stpcpy (fontsetname, base_fontname);
     }
   else
@@ -2288,7 +2288,7 @@ xic_create_fontsetname (const char *base_fontname, bool motif)
 	  /* As the font name doesn't conform to XLFD, we can't
 	     modify it to generalize it to allcs and allfamilies.
 	     Use the specified font plus the default.  */
-	  fontsetname = xmalloc (strlen (base_fontname)
+	  fontsetname = xmalloc_atomic (strlen (base_fontname)
 				 + strlen (xic_default_fontset) + 3);
 	  z = stpcpy (fontsetname, base_fontname);
 	  z = stpcpy (z, sep);
@@ -2361,7 +2361,7 @@ xic_create_fontsetname (const char *base_fontname, bool motif)
 	  /* Build the actual font set name.  */
 	  len = strlen (base_fontname) + strlen (font_allcs)
 	    + strlen (font_allfamilies) + strlen (font_all) + 5;
-	  fontsetname = xmalloc (len);
+	  fontsetname = xmalloc_atomic (len);
 	  z = stpcpy (fontsetname, base_fontname);
 	  z = stpcpy (z, sep);
 	  z = stpcpy (z, font_allcs);
@@ -5780,7 +5780,7 @@ FRAME.  Default is to change on the edit X window.  */)
 	 This applies even if long is more than 32 bits.  The X library
 	 converts to 32 bits before sending to the X server.  */
       elsize = element_format == 32 ? sizeof (long) : element_format >> 3;
-      data = xnmalloc (nelements, elsize);
+      data = xnmalloc_atomic (nelements, elsize);
 
       x_fill_property_data (FRAME_X_DISPLAY (f), value, data, element_format);
     }

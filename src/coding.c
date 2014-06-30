@@ -8350,7 +8350,7 @@ encode_coding_object (struct coding_system *coding,
     {
       ptrdiff_t dst_bytes = max (1, coding->src_chars);
       coding->dst_object = Qnil;
-      coding->destination = xmalloc (dst_bytes);
+      coding->destination = xmalloc_atomic (dst_bytes);
       coding->dst_bytes = dst_bytes;
       coding->dst_multibyte = 0;
     }
