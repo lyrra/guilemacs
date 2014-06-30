@@ -821,7 +821,6 @@ struct Lisp_Symbol
   {
     struct
     {
-      bool_bf gcmarkbit : 1;
 
       /* Indicates where the value can be found.  */
       ENUM_BF (symbol_redirect) redirect : 2;
