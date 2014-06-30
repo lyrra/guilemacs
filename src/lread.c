@@ -3828,7 +3828,6 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
 		  otem = XCONS (item);
 		  bytestr = XCAR (item);
 		  item = XCDR (item);
-		  free_cons (otem);
 		}
 
 	      /* Now handle the bytecode slot.  */
@@ -3847,7 +3846,6 @@ read_vector (Lisp_Object readcharfun, bool bytecodeflag)
       ASET (vector, i, item);
       otem = XCONS (tem);
       tem = Fcdr (tem);
-      free_cons (otem);
     }
   return vector;
 }

@@ -1547,7 +1547,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
   Lisp_Object clause = Qnil;
   struct handler *h;
 
-  if (gc_in_progress || waiting_for_input)
+  if (waiting_for_input)
     emacs_abort ();
 
 #if 0 /* rms: I don't know why this was here,
@@ -3846,50 +3846,6 @@ NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.  
 }
 
 
-void
-mark_specpdl (union specbinding *first, union specbinding *ptr)
-{
-  union specbinding *pdl;
-  for (pdl = first; pdl != ptr; pdl++)
-    {
-      switch (pdl->kind)
-	{
-	case SPECPDL_UNWIND:
-	  mark_object (specpdl_arg (pdl));
-	  break;
-
-	case SPECPDL_BACKTRACE:
-	  {
-	    ptrdiff_t nargs = backtrace_nargs (pdl);
-	    mark_object (backtrace_function (pdl));
-	    if (nargs == UNEVALLED)
-	      nargs = 1;
-	    while (nargs--)
-	      mark_object (backtrace_args (pdl)[nargs]);
-	  }
-	  break;
-
-	case SPECPDL_LET_DEFAULT:
-	case SPECPDL_LET_LOCAL:
-	  mark_object (specpdl_where (pdl));
-	  FALLTHROUGH;
-	case SPECPDL_LET:
-	  mark_object (specpdl_symbol (pdl));
-	  mark_object (specpdl_old_value (pdl));
-	  mark_object (specpdl_saved_value (pdl));
-	  break;
-
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_VOID:
-	  break;
-
-	default:
-	  emacs_abort ();
-	}
-    }
-}
-
 void
 get_backtrace (Lisp_Object array)
 {

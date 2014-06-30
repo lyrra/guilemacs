@@ -2148,10 +2148,6 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
 				   FETCH_START, FETCH_END, Qnil);
     }
 
-  if (! NILP (start_marker))
-    detach_marker (start_marker);
-  if (! NILP (end_marker))
-    detach_marker (end_marker);
   RESTORE_VALUE;
 
   unbind_to (count, Qnil);
