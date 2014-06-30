@@ -2559,37 +2559,6 @@ struct Lisp_User_Ptr
   void *p;
 } GCALIGNED_STRUCT;
 
-/* A finalizer sentinel.  */
-struct Lisp_Finalizer
-  {
-    union vectorlike_header header;
-
-    /* Call FUNCTION when the finalizer becomes unreachable, even if
-       FUNCTION contains a reference to the finalizer; i.e., call
-       FUNCTION when it is reachable _only_ through finalizers.  */
-    Lisp_Object function;
-
-    /* Circular list of all active weak references.  */
-    struct Lisp_Finalizer *prev;
-    struct Lisp_Finalizer *next;
-  } GCALIGNED_STRUCT;
-
-extern struct Lisp_Finalizer finalizers;
-extern struct Lisp_Finalizer doomed_finalizers;
-
-INLINE bool
-FINALIZERP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_FINALIZER);
-}
-
-INLINE struct Lisp_Finalizer *
-XFINALIZER (Lisp_Object a)
-{
-  eassert (FINALIZERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Finalizer);
-}
-
 INLINE bool
 MARKERP (Lisp_Object x)
 {
@@ -3778,44 +3747,7 @@ unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);
-#if defined REL_ALLOC && !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
-extern void refill_memory_reserve (void);
-#endif
-extern void alloc_unexec_pre (void);
-extern void alloc_unexec_post (void);
-extern void mark_stack (char const *, char const *);
-extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
-
-/* Force callee-saved registers and register windows onto the stack,
-   so that conservative garbage collection can see their values.  */
-#ifndef HAVE___BUILTIN_UNWIND_INIT
-# ifdef __sparc__
-   /* This trick flushes the register windows so that all the state of
-      the process is contained in the stack.
-      FreeBSD does not have a ta 3 handler, so handle it specially.
-      FIXME: Code in the Boehm GC suggests flushing (with 'flushrs') is
-      needed on ia64 too.  See mach_dep.c, where it also says inline
-      assembler doesn't work with relevant proprietary compilers.  */
-#  if defined __sparc64__ && defined __FreeBSD__
-#   define __builtin_unwind_init() asm ("flushw")
-#  else
-#   define __builtin_unwind_init() asm ("ta 3")
-#  endif
-# else
-#  define __builtin_unwind_init() ((void) 0)
-# endif
-#endif
-INLINE void
-flush_stack_call_func (void (*func) (void *arg), void *arg)
-{
-  __builtin_unwind_init ();
-  flush_stack_call_func1 (func, arg);
-}
-
 extern void garbage_collect (void);
-extern void maybe_garbage_collect (void);
-extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
-extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
@@ -3829,21 +3761,6 @@ extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
   listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 #define pure_list(...) \
   pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
-
-enum gc_root_type
-{
-  GC_ROOT_STATICPRO,
-  GC_ROOT_BUFFER_LOCAL_DEFAULT,
-  GC_ROOT_BUFFER_LOCAL_NAME,
-  GC_ROOT_C_SYMBOL
-};
-
-struct gc_root_visitor
-{
-  void (*visit) (Lisp_Object const *, enum gc_root_type, void *);
-  void *data;
-};
-extern void visit_static_gc_roots (struct gc_root_visitor visitor);
 
 /* Build a frequently used 1/2/3/4-integer lists.  */
 
@@ -3961,7 +3878,7 @@ make_nil_vector (ptrdiff_t size)
 }
 
 extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
-                                                  enum pvec_type);
+						  enum pvec_type);
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */
 
@@ -3984,7 +3901,6 @@ extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
 				   PSEUDOVECSIZE (type, field),	       \
 				   VECSIZE (type), tag))
 
-extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
@@ -4785,8 +4701,6 @@ extern void *xmalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xzalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xrealloc (void *, size_t) ATTRIBUTE_ALLOC_SIZE ((2));
 extern void xfree (void *);
-extern void *xmalloc_uncollectable (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
-extern void *xmalloc_unsafe (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xnmalloc (ptrdiff_t, ptrdiff_t) ATTRIBUTE_MALLOC_SIZE ((1,2));
 extern void *xnrealloc (void *, ptrdiff_t, ptrdiff_t)
   ATTRIBUTE_ALLOC_SIZE ((2,3));
