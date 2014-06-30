@@ -176,33 +176,6 @@ static EMACS_INT gc_threshold;
 
 const char *pending_malloc_warning;
 
-/* Pointer sanity only on request.  FIXME: Code depending on
-   SUSPICIOUS_OBJECT_CHECKING is obsolete; remove it entirely.  */
-#ifdef ENABLE_CHECKING
-#define SUSPICIOUS_OBJECT_CHECKING 1
-#endif
-
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-struct suspicious_free_record
-{
-  void *suspicious_object;
-  void *backtrace[128];
-};
-static void *suspicious_objects[32];
-static int suspicious_object_index;
-struct suspicious_free_record suspicious_free_history[64] EXTERNALLY_VISIBLE;
-static int suspicious_free_history_index;
-/* Find the first currently-monitored suspicious pointer in range
-   [begin,end) or NULL if no such pointer exists.  */
-static void *find_suspicious_object_in_range (void *begin, void *end);
-static void detect_suspicious_free (void *ptr);
-#else
-# define find_suspicious_object_in_range(begin, end) ((void *) NULL)
-# define detect_suspicious_free(ptr) ((void) 0)
-#endif
-
-static void mark_terminals (void);
-static void gc_sweep (void);
 static Lisp_Object make_pure_vector (ptrdiff_t);
 
 #if !defined REL_ALLOC || defined SYSTEM_MALLOC || defined HYBRID_MALLOC
@@ -1588,79 +1561,6 @@ See Info node `(elisp)Garbage Collection'.  */)
 }
 
 
-
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-
-static void *
-find_suspicious_object_in_range (void *begin, void *end)
-{
-  char *begin_a = begin;
-  char *end_a = end;
-  int i;
-
-  for (i = 0; i < ARRAYELTS (suspicious_objects); ++i)
-    {
-      char *suspicious_object = suspicious_objects[i];
-      if (begin_a <= suspicious_object && suspicious_object < end_a)
-	return suspicious_object;
-    }
-
-  return NULL;
-}
-
-static void
-note_suspicious_free (void *ptr)
-{
-  struct suspicious_free_record *rec;
-
-  rec = &suspicious_free_history[suspicious_free_history_index++];
-  if (suspicious_free_history_index ==
-      ARRAYELTS (suspicious_free_history))
-    {
-      suspicious_free_history_index = 0;
-    }
-
-  memset (rec, 0, sizeof (*rec));
-  rec->suspicious_object = ptr;
-  backtrace (&rec->backtrace[0], ARRAYELTS (rec->backtrace));
-}
-
-static void
-detect_suspicious_free (void *ptr)
-{
-  int i;
-
-  eassert (ptr != NULL);
-
-  for (i = 0; i < ARRAYELTS (suspicious_objects); ++i)
-    if (suspicious_objects[i] == ptr)
-      {
-        note_suspicious_free (ptr);
-        suspicious_objects[i] = NULL;
-      }
-}
-
-#endif /* SUSPICIOUS_OBJECT_CHECKING */
-
-DEFUN ("suspicious-object", Fsuspicious_object, Ssuspicious_object, 1, 1, 0,
-       doc: /* Return OBJ, maybe marking it for extra scrutiny.
-If Emacs is compiled with suspicious object checking, capture
-a stack trace when OBJ is freed in order to help track down
-garbage collection bugs.  Otherwise, do nothing and return OBJ.   */)
-   (Lisp_Object obj)
-{
-#ifdef SUSPICIOUS_OBJECT_CHECKING
-  /* Right now, we care only about vectors.  */
-  if (VECTORLIKEP (obj))
-    {
-      suspicious_objects[suspicious_object_index++] = XVECTOR (obj);
-      if (suspicious_object_index == ARRAYELTS (suspicious_objects))
-	suspicious_object_index = 0;
-    }
-#endif
-  return obj;
-}
-
 #ifdef ENABLE_CHECKING
 
 bool suppress_checking;
@@ -1765,22 +1665,6 @@ N should be nonnegative.  */);
   defsubr (&Spurecopy);
   defsubr (&Sgarbage_collect);
   defsubr (&Ssuspicious_object);
-
-  Lisp_Object watcher;
-
-  static union Aligned_Lisp_Subr Swatch_gc_cons_threshold =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
-       { .a4 = watch_gc_cons_threshold },
-       4, 4, "watch_gc_cons_threshold", {0}, 0}};
-  XSETSUBR (watcher, &Swatch_gc_cons_threshold.s);
-  Fadd_variable_watcher (Qgc_cons_threshold, watcher);
-
-  static union Aligned_Lisp_Subr Swatch_gc_cons_percentage =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
-       { .a4 = watch_gc_cons_percentage },
-       4, 4, "watch_gc_cons_percentage", {0}, 0}};
-  XSETSUBR (watcher, &Swatch_gc_cons_percentage.s);
-  Fadd_variable_watcher (Qgc_cons_percentage, watcher);
 }
 
 #ifdef HAVE_X_WINDOWS
