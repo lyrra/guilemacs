@@ -35,7 +35,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "bignum.h"
 #include "dispextern.h"
 #include "intervals.h"
-#include "puresize.h"
 #include "sheap.h"
 #include "sysstdio.h"
 #include "systime.h"
@@ -136,44 +135,6 @@ static void *spare_memory;
 
 #define SPARE_MEMORY (1 << 15)
 
-/* Initialize it to a nonzero value to force it into data space
-   (rather than bss space).  That way unexec will remap it into text
-   space (pure), on some systems.  We have not implemented the
-   remapping on more recent systems because this is less important
-   nowadays than in the days of small memories and timesharing.  */
-
-EMACS_INT pure[(PURESIZE + sizeof (EMACS_INT) - 1) / sizeof (EMACS_INT)] = {1,};
-#define PUREBEG (char *) pure
-
-/* Pointer to the pure area, and its size.  */
-
-static char *purebeg;
-static ptrdiff_t pure_size;
-
-/* Number of bytes of pure storage used before pure storage overflowed.
-   If this is non-zero, this implies that an overflow occurred.  */
-
-static ptrdiff_t pure_bytes_used_before_overflow;
-
-/* Index in pure at which next pure Lisp object will be allocated..  */
-
-static ptrdiff_t pure_bytes_used_lisp;
-
-/* Number of bytes allocated for non-Lisp objects in pure storage.  */
-
-static ptrdiff_t pure_bytes_used_non_lisp;
-
-/* If positive, garbage collection is inhibited.  Otherwise, zero.  */
-
-static intptr_t garbage_collection_inhibited;
-
-/* The GC threshold in bytes, the last time it was calculated
-   from gc-cons-threshold and gc-cons-percentage.  */
-static EMACS_INT gc_threshold;
-
-/* If nonzero, this is a warning delivered by malloc and not yet
-   displayed.  */
-
 const char *pending_malloc_warning;
 
 static Lisp_Object make_pure_vector (ptrdiff_t);
@@ -181,30 +142,8 @@ static Lisp_Object make_pure_vector (ptrdiff_t);
 #if !defined REL_ALLOC || defined SYSTEM_MALLOC || defined HYBRID_MALLOC
 static void refill_memory_reserve (void);
 #endif
+static Lisp_Object make_empty_string (int);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
-
-/* Index of next unused slot in staticvec.  */
-
-
-static void *pure_alloc (size_t, int);
-
-/* Return PTR rounded up to the next multiple of ALIGNMENT.  */
-
-static void *
-pointer_align (void *ptr, int alignment)
-{
-  return (void *) ROUNDUP ((uintptr_t) ptr, alignment);
-}
-
-/* Extract the pointer hidden within O.  */
-
-static ATTRIBUTE_NO_SANITIZE_UNDEFINED void *
-XPNTR (Lisp_Object a)
-{
-  return (SYMBOLP (a)
-	  ? (char *) lispsym + (XLI (a) - LISP_WORD_TAG (Lisp_Symbol))
-	  : (char *) XLP (a) - (XLI (a) & ~VALMASK));
-}
 
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
@@ -527,8 +466,8 @@ make_interval (void)
 static void
 init_strings (void)
 {
-  empty_unibyte_string = make_pure_string ("", 0, 0, 0);
-  empty_multibyte_string = make_pure_string ("", 0, 0, 1);
+  empty_unibyte_string = make_empty_string (0);
+  empty_multibyte_string = make_empty_string (1);
 }
 
 /* Return a new Lisp_String.  */
@@ -565,6 +504,21 @@ void
 string_overflow (void)
 {
   error ("Maximum string size exceeded");
+}
+
+static Lisp_Object
+make_empty_string (int multibyte)
+{
+  Lisp_Object string;
+  struct Lisp_String *s;
+
+  s = allocate_string ();
+  allocate_string_data (s, 0, 0);
+  XSETSTRING (string, s);
+  if (! multibyte)
+    STRING_SET_UNIBYTE (string);
+
+  return string;
 }
 
 DEFUN ("make-string", Fmake_string, Smake_string, 2, 3, 0,
@@ -1366,8 +1320,213 @@ memory_full (size_t nbytes)
 
 
 /***********************************************************************
-		       Pure Storage Management
+                 Pure Storage Compatibility Functions
  ***********************************************************************/
+
+<<<<<<< HEAD
+/* Return a string allocated in pure space.  DATA is a buffer holding
+   NCHARS characters, and NBYTES bytes of string data.  MULTIBYTE
+   means make the result string multibyte.
+
+   Must get an error if pure storage is full, since if it cannot hold
+   a large string it may be able to hold conses that point to that
+   string; then the string is not protected from gc.  */
+||||||| parent of eacc3830799 (remove pure storage support)
+/* Allocate room for SIZE bytes from pure Lisp storage and return a
+   pointer to it.  TYPE is the Lisp type for which the memory is
+   allocated.  TYPE < 0 means it's not used for a Lisp object,
+   and that the result should have an alignment of -TYPE.  */
+
+static void *
+pure_alloc (size_t size, int type)
+{
+  void *result = xmalloc(size);
+  if (!result)
+    memory_full (size);
+  return result;
+}
+
+<<<<<<< variant A
+    case Lisp_Vectorlike:
+      {
+	register struct Lisp_Vector *ptr = XVECTOR (obj);
+
+	if (vector_marked_p (ptr))
+	  break;
+
+        enum pvec_type pvectype
+          = PSEUDOVECTOR_TYPE (ptr);
+
+#ifdef GC_CHECK_MARKED_OBJECTS
+        if (!pdumper_object_p (po) && !SUBRP (obj) && !main_thread_p (po))
+          {
+	    m = mem_find (po);
+	    if (m == MEM_NIL)
+	      emacs_abort ();
+	    if (m->type == MEM_TYPE_VECTORLIKE)
+	      CHECK_LIVE (live_large_vector_p, MEM_TYPE_VECTORLIKE);
+	    else
+	      CHECK_LIVE (live_small_vector_p, MEM_TYPE_VECTOR_BLOCK);
+          }
+#endif
+
+	switch (pvectype)
+	  {
+	  case PVEC_BUFFER:
+	    mark_buffer ((struct buffer *) ptr);
+            break;
+
+          case PVEC_COMPILED:
+            /* Although we could treat this just like a vector, mark_compiled
+               returns the COMPILED_CONSTANTS element, which is marked at the
+               next iteration of goto-loop here.  This is done to avoid a few
+               recursive calls to mark_object.  */
+            obj = mark_compiled (ptr);
+            if (!NILP (obj))
+              goto loop;
+            break;
+
+          case PVEC_FRAME:
+            mark_frame (ptr);
+            break;
+
+          case PVEC_WINDOW:
+            mark_window (ptr);
+            break;
+
+	  case PVEC_HASH_TABLE:
+            mark_hash_table (ptr);
+	    break;
+
+	  case PVEC_CHAR_TABLE:
+	  case PVEC_SUB_CHAR_TABLE:
+	    mark_char_table (ptr, (enum pvec_type) pvectype);
+	    break;
+
+          case PVEC_BOOL_VECTOR:
+            /* bool vectors in a dump are permanently "marked", since
+               they're in the old section and don't have mark bits.
+               If we're looking at a dumped bool vector, we should
+               have aborted above when we called vector_marked_p, so
+               we should never get here.  */
+            eassert (!pdumper_object_p (ptr));
+            set_vector_marked (ptr);
+            break;
+
+          case PVEC_OVERLAY:
+	    mark_overlay (XOVERLAY (obj));
+	    break;
+
+	  case PVEC_SUBR:
+	    break;
+
+	  case PVEC_FREE:
+	    emacs_abort ();
+
+	  default:
+	    /* A regular vector, or a pseudovector needing no special
+	       treatment.  */
+	    mark_vectorlike (&ptr->header);
+	  }
+      }
+      break;
+>>>>>>> variant B
+####### Ancestor
+    case Lisp_Vectorlike:
+      {
+	register struct Lisp_Vector *ptr = XVECTOR (obj);
+
+	if (vector_marked_p (ptr))
+	  break;
+
+    case Lisp_Float:
+      CHECK_ALLOCATED_AND_LIVE (live_float_p, MEM_TYPE_FLOAT);
+      break;
+
+        enum pvec_type pvectype
+          = PSEUDOVECTOR_TYPE (ptr);
+
+        if (pvectype != PVEC_SUBR &&
+            pvectype != PVEC_BUFFER &&
+            !main_thread_p (po))
+          CHECK_LIVE (live_vector_p);
+
+	switch (pvectype)
+	  {
+	  case PVEC_BUFFER:
+	    mark_buffer ((struct buffer *) ptr);
+            break;
+
+          case PVEC_COMPILED:
+            /* Although we could treat this just like a vector, mark_compiled
+               returns the COMPILED_CONSTANTS element, which is marked at the
+               next iteration of goto-loop here.  This is done to avoid a few
+               recursive calls to mark_object.  */
+            obj = mark_compiled (ptr);
+            if (!NILP (obj))
+              goto loop;
+            break;
+
+          case PVEC_FRAME:
+            mark_frame (ptr);
+            break;
+
+          case PVEC_WINDOW:
+            mark_window (ptr);
+            break;
+
+	  case PVEC_HASH_TABLE:
+            mark_hash_table (ptr);
+	    break;
+
+	  case PVEC_CHAR_TABLE:
+	  case PVEC_SUB_CHAR_TABLE:
+	    mark_char_table (ptr, (enum pvec_type) pvectype);
+	    break;
+
+          case PVEC_BOOL_VECTOR:
+            /* bool vectors in a dump are permanently "marked", since
+               they're in the old section and don't have mark bits.
+               If we're looking at a dumped bool vector, we should
+               have aborted above when we called vector_marked_p(), so
+               we should never get here.  */
+            eassert (!pdumper_object_p (ptr));
+            set_vector_marked (ptr);
+            break;
+
+          case PVEC_OVERLAY:
+	    mark_overlay (XOVERLAY (obj));
+	    break;
+
+	  case PVEC_SUBR:
+	    break;
+
+	  case PVEC_FREE:
+	    emacs_abort ();
+
+	  default:
+	    /* A regular vector, or a pseudovector needing no special
+	       treatment.  */
+	    mark_vectorlike (&ptr->header);
+	  }
+      }
+      break;
+======= end
+
+#ifdef HAVE_UNEXEC
+
+/* Print a warning if PURESIZE is too small.  */
+
+void
+check_pure_size (void)
+{
+  if (pure_bytes_used_before_overflow)
+    message (("emacs:0:Pure Lisp storage overflow (approx. %"pI"d"
+	      " bytes needed)"),
+	     pure_bytes_used + pure_bytes_used_before_overflow);
+}
+#endif
+
 
 /* Return a string allocated in pure space.  DATA is a buffer holding
    NCHARS characters, and NBYTES bytes of string data.  MULTIBYTE
@@ -1376,41 +1535,26 @@ memory_full (size_t nbytes)
    Must get an error if pure storage is full, since if it cannot hold
    a large string it may be able to hold conses that point to that
    string; then the string is not protected from gc.  */
+=======
+void
+check_pure_size (void)
+{
+  return;
+}
+>>>>>>> eacc3830799 (remove pure storage support)
 
 Lisp_Object
 make_pure_string (const char *data,
 		  ptrdiff_t nchars, ptrdiff_t nbytes, bool multibyte)
 {
-  Lisp_Object string;
-  struct Lisp_String *s = pure_alloc (sizeof *s, Lisp_String);
-  s->u.s.data = pure_alloc (nbytes + 1, -1);
-  memcpy (s->u.s.data, data, nbytes);
-  s->u.s.data[nbytes] = '\0';
-  s->u.s.size = nchars;
-  s->u.s.size_byte = multibyte ? nbytes : -1;
-  s->u.s.intervals = NULL;
-  XSETSTRING (string, s);
-  return string;
+  return make_specified_string (data, nchars, nbytes, multibyte);
 }
-
-/* Return a string allocated in pure space.  Do not
-   allocate the string data, just point to DATA.  */
 
 Lisp_Object
 make_pure_c_string (const char *data, ptrdiff_t nchars)
 {
-  Lisp_Object string;
-  struct Lisp_String *s = pure_alloc (sizeof *s, Lisp_String);
-  s->u.s.size = nchars;
-  s->u.s.size_byte = -1;
-  s->u.s.data = (unsigned char *) data;
-  s->u.s.intervals = NULL;
-  XSETSTRING (string, s);
-  return string;
+  return build_string (data);
 }
-
-/* Return a cons allocated from pure space.  Give it pure copies
-   of CAR as car and CDR as cdr.  */
 
 Lisp_Object
 pure_cons (Lisp_Object car, Lisp_Object cdr)
@@ -1418,108 +1562,12 @@ pure_cons (Lisp_Object car, Lisp_Object cdr)
   return Fcons (car, cdr);
 }
 
-
-/* Value is a float object with value NUM allocated from pure space.  */
-
-static Lisp_Object
-make_pure_float (double num)
-{
-  Lisp_Object new;
-  struct Lisp_Float *p = pure_alloc (sizeof *p, Lisp_Float);
-  XSETFLOAT (new, p);
-  XFLOAT_INIT (new, num);
-  return new;
-}
-
-/* Value is a bignum object with value VALUE allocated from pure
-   space.  */
-
-static Lisp_Object
-make_pure_bignum (struct Lisp_Bignum *value)
-{
-  size_t i, nlimbs = mpz_size (value->value);
-  size_t nbytes = nlimbs * sizeof (mp_limb_t);
-  mp_limb_t *pure_limbs;
-  mp_size_t new_size;
-
-  struct Lisp_Bignum *b = pure_alloc (sizeof *b, Lisp_Vectorlike);
-  XSETPVECTYPESIZE (b, PVEC_BIGNUM, 0, VECSIZE (struct Lisp_Bignum));
-
-  int limb_alignment = alignof (mp_limb_t);
-  pure_limbs = pure_alloc (nbytes, - limb_alignment);
-  for (i = 0; i < nlimbs; ++i)
-    pure_limbs[i] = mpz_getlimbn (value->value, i);
-
-  new_size = nlimbs;
-  if (mpz_sgn (value->value) < 0)
-    new_size = -new_size;
-
-  mpz_roinit_n (b->value, pure_limbs, new_size);
-
-  return make_lisp_ptr (b, Lisp_Vectorlike);
-}
-
-/* Return a vector with room for LEN Lisp_Objects allocated from
-   pure space.  */
-
-static Lisp_Object
-make_pure_vector (ptrdiff_t len)
-{
-  Lisp_Object new;
-  size_t size = header_size + len * word_size;
-  struct Lisp_Vector *p = pure_alloc (size, Lisp_Vectorlike);
-  XSETVECTOR (new, p);
-  XVECTOR (new)->header.size = len;
-  return new;
-}
-
-/* Copy all contents and parameters of TABLE to a new table allocated
-   from pure space, return the purified table.  */
-static struct Lisp_Hash_Table *
-purecopy_hash_table (struct Lisp_Hash_Table *table)
-{
-  eassert (NILP (table->weak));
-  eassert (table->pure);
-
-  struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, Lisp_Vectorlike);
-  struct hash_table_test pure_test = table->test;
-
-  /* Purecopy the hash table test.  */
-  pure_test.name = purecopy (table->test.name);
-  pure_test.user_hash_function = purecopy (table->test.user_hash_function);
-  pure_test.user_cmp_function = purecopy (table->test.user_cmp_function);
-
-  pure->header = table->header;
-  pure->weak = purecopy (Qnil);
-  pure->hash = purecopy (table->hash);
-  pure->next = purecopy (table->next);
-  pure->index = purecopy (table->index);
-  pure->count = table->count;
-  pure->next_free = table->next_free;
-  pure->pure = table->pure;
-  pure->rehash_threshold = table->rehash_threshold;
-  pure->rehash_size = table->rehash_size;
-  pure->key_and_value = purecopy (table->key_and_value);
-  pure->test = pure_test;
-
-  return pure;
-}
-
 DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
-       doc: /* Make a copy of object OBJ in pure storage.
-Recursively copies contents of vectors and cons cells.
-Does not copy symbols.  Copies strings without text properties.  */)
+       doc: /* Return OBJ.  */)
   (register Lisp_Object obj)
 {
   return obj;
 }
-
-static Lisp_Object
-purecopy (Lisp_Object obj)
-{
-  return obj;
-}
-
 
 /***********************************************************************
 			  Protection from GC
