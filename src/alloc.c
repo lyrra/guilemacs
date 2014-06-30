@@ -242,15 +242,6 @@ mmap_lisp_allowed_p (void)
 }
 #endif
 
-/* Head of a circularly-linked list of extant finalizers. */
-struct Lisp_Finalizer finalizers;
-
-/* Head of a circularly-linked list of finalizers that must be invoked
-   because we deemed them unreachable.  This list must be global, and
-   not a local inside garbage_collect_1, in case we GC again while
-   running finalizers.  */
-struct Lisp_Finalizer doomed_finalizers;
-
 
 /************************************************************************
 				Malloc
@@ -1445,7 +1436,6 @@ init_symbol (Lisp_Object val, Lisp_Object name)
   SET_SYMBOL_VAL (p, Qunbound);
   set_symbol_function (val, Qnil);
   set_symbol_next (val, NULL);
-  p->u.s.gcmarkbit = false;
   p->u.s.interned = SYMBOL_UNINTERNED;
   p->u.s.trapped_write = SYMBOL_UNTRAPPED_WRITE;
   p->u.s.declared_special = false;

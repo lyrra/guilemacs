@@ -822,8 +822,6 @@ struct Lisp_Symbol
   {
     struct
     {
-      bool_bf gcmarkbit : 1;
-
       /* Indicates where the value can be found:
 	 0 : it's a plain var, the value is in the `value' field.
 	 1 : it's a varalias, the value is really in the `alias' symbol.
@@ -979,8 +977,7 @@ typedef EMACS_UINT Lisp_Word_tag;
 union vectorlike_header
   {
     /* The main member contains various pieces of information:
-       - The MSB (ARRAY_MARK_FLAG) holds the gcmarkbit.
-       - The next bit (PSEUDOVECTOR_FLAG) indicates whether this is a plain
+       - The second bit (PSEUDOVECTOR_FLAG) indicates whether this is a plain
          vector (0) or a pseudovector (1).
        - If PSEUDOVECTOR_FLAG is 0, the rest holds the size (number
          of slots) of the vector.
@@ -2423,7 +2420,6 @@ SXHASH_REDUCE (EMACS_UINT x)
 struct Lisp_Marker
 {
   union vectorlike_header header;
-
   /* This is the buffer that the marker points into, or 0 if it points nowhere.
      Note: a chain of markers can contain markers pointing into different
      buffers (the chain is per buffer_text rather than per buffer, so it's
@@ -2489,7 +2485,7 @@ struct Lisp_Misc_Ptr
   {
     union vectorlike_header header;
     void *pointer;
-  } GCALIGNED_STRUCT;
+  };
 
 extern Lisp_Object make_misc_ptr (void *);
 
