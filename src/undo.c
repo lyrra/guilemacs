@@ -293,10 +293,6 @@ truncate_undo_list (struct buffer *b)
   Lisp_Object prev, next, last_boundary;
   intmax_t size_so_far = 0;
 
-  /* Make sure that calling undo-outer-limit-function
-     won't cause another GC.  */
-  ptrdiff_t count = inhibit_garbage_collection ();
-
   /* Make the buffer current to get its local values of variables such
      as undo_limit.  Also so that Vundo_outer_limit_function can
      tell which buffer to operate on.  */

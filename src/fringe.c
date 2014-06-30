@@ -1738,14 +1738,6 @@ If nil, also continue lines which are exactly as wide as the window.  */);
   Vfringe_bitmaps = Qnil;
 }
 
-/* Garbage collection hook */
-
-void
-mark_fringe_data (void)
-{
-  mark_objects (fringe_faces, max_fringe_bitmaps);
-}
-
 /* Initialize this module when Emacs starts.  */
 
 static void init_fringe_once_for_pdumper (void);

@@ -1145,10 +1145,6 @@ AC_PATH_PROG(GZIP_PROG, gzip)
 test $with_compress_install != yes && test -n "$GZIP_PROG" && \
    GZIP_PROG=" # $GZIP_PROG # (disabled by configure --without-compress-install)"
 
-if test "$with_dumping" = "unexec" && test "$opsys" = "nacl"; then
-  AC_MSG_ERROR([nacl is not compatible with --with-dumping=unexec])
-fi
-
 AC_CACHE_CHECK([for 'find' args to delete a file],
   [emacs_cv_find_delete],
   [if touch conftest.tmp && find conftest.tmp -delete 2>/dev/null &&
@@ -1159,52 +1155,6 @@ AC_CACHE_CHECK([for 'find' args to delete a file],
 FIND_DELETE=$emacs_cv_find_delete
 AC_SUBST([FIND_DELETE])
 
-PAXCTL_dumped=
-PAXCTL_notdumped=
-if test $with_unexec = yes && test $opsys = gnu-linux; then
-  if test "${SETFATTR+set}" != set; then
-    AC_CACHE_CHECK([for setfattr],
-      [emacs_cv_prog_setfattr],
-      [touch conftest.tmp
-       if (setfattr -n user.pax.flags conftest.tmp) >/dev/null 2>&1; then
-	 emacs_cv_prog_setfattr=yes
-       else
-	 emacs_cv_prog_setfattr=no
-       fi])
-    if test "$emacs_cv_prog_setfattr" = yes; then
-      PAXCTL_notdumped='$(SETFATTR) -n user.pax.flags -v er'
-      SETFATTR=setfattr
-    else
-      SETFATTR=
-    fi
-  fi
-  case $opsys,$PAXCTL_notdumped,$emacs_uname_r in
-    gnu-linux,,* | netbsd,,[0-7].*)
-      AC_PATH_PROG([PAXCTL], [paxctl], [],
-	[$PATH$PATH_SEPARATOR/sbin$PATH_SEPARATOR/usr/sbin])
-      if test -n "$PAXCTL"; then
-	if test "$opsys" = netbsd; then
-	  PAXCTL_dumped='$(PAXCTL) +a'
-	  PAXCTL_notdumped=$PAXCTL_dumped
-	else
-	  AC_MSG_CHECKING([whether binaries have a PT_PAX_FLAGS header])
-	  AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
-	    [if $PAXCTL -v conftest$EXEEXT >/dev/null 2>&1; then
-	       AC_MSG_RESULT([yes])
-	     else
-	       AC_MSG_RESULT([no])
-	       PAXCTL=
-	     fi])
-	  if test -n "$PAXCTL"; then
-	    PAXCTL_dumped='$(PAXCTL) -zex'
-	    PAXCTL_notdumped='$(PAXCTL) -r'
-	  fi
-	fi
-      fi;;
-  esac
-fi
-AC_SUBST([PAXCTL_dumped])
-AC_SUBST([PAXCTL_notdumped])
 AC_SUBST([SETFATTR])
 
 # Makeinfo on macOS is ancient, check whether there is a more recent
@@ -1284,20 +1234,8 @@ else
 fi
 
 AC_CACHE_CHECK([for -znocombreloc], [emacs_cv_znocombreloc],
-  [if test $with_unexec = no; then
-     emacs_cv_znocombreloc='not needed'
-   else
-     save_LDFLAGS=$LDFLAGS
-     LDFLAGS="$LDFLAGS $LDFLAGS_NOCOMBRELOC"
-     AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])],
-       [emacs_cv_znocombreloc=yes], [emacs_cv_znocombreloc=no])
-     LDFLAGS=$save_LDFLAGS
-   fi])
-
-case $emacs_cv_znocombreloc in
-  no*)
-    LDFLAGS_NOCOMBRELOC= ;;
-esac
+  [emacs_cv_znocombreloc='not needed'])
+LDFLAGS_NOCOMBRELOC=
 
 
 AC_CACHE_CHECK([whether addresses are sanitized],
@@ -1318,7 +1256,7 @@ AC_CACHE_CHECK([whether addresses are sanitized],
 
 
 LD_SWITCH_SYSTEM=
-test "$with_unexec" = no || case "$opsys" in
+case "$opsys" in
   freebsd|dragonfly)
    ## Let 'ld' find image libs and similar things in /usr/local/lib.
    ## The system compiler, GCC, has apparently been modified to not
@@ -1365,22 +1303,6 @@ case "$opsys" in
 esac
 
 C_SWITCH_MACHINE=
-
-test $with_unexec = yes &&
-case $canonical in
- alpha*)
-    ## With ELF, make sure that all common symbols get allocated to in the
-    ## data section.  Otherwise, the dump of temacs may miss variables in
-    ## the shared library that have been initialized.  For example, with
-    ## GNU libc, __malloc_initialized would normally be resolved to the
-    ## shared library's .bss section, which is fatal.
-    if test "x$GCC" = "xyes"; then
-      C_SWITCH_MACHINE="-fno-common"
-    else
-      AC_MSG_ERROR([Non-GCC compilers are not supported.])
-    fi
-  ;;
-esac
 AC_SUBST(C_SWITCH_MACHINE)
 
 C_SWITCH_SYSTEM=
@@ -5488,7 +5410,6 @@ AC_SUBST(RALLOC_OBJ)
 
 if test "$opsys" = "cygwin"; then
   CYGWIN_OBJ="cygw32.o"
-  ## Cygwin differs because of its unexec().
   PRE_ALLOC_OBJ=
   POST_ALLOC_OBJ=lastfile.o
 elif test "$opsys" = "mingw32"; then
@@ -5582,9 +5503,6 @@ case "$opsys" in
    ## about 14 to about 34. Setting it high gets us plenty of slop and
    ## only costs about 1.5K of wasted binary space.
    headerpad_extra=1000
-   if test "$with_unexec" = yes; then
-     LD_SWITCH_SYSTEM_TEMACS="-fno-pie $LD_SWITCH_SYSTEM_TEMACS -Xlinker -headerpad -Xlinker $headerpad_extra"
-   fi
 
    ## This is here because src/Makefile.in did some extra fiddling around
    ## with LD_SWITCH_SYSTEM.  It seems cleaner to put this in
@@ -5631,20 +5549,7 @@ esac
 AC_CACHE_CHECK(
   [for $CC option to disable position independent executables],
   [emacs_cv_prog_cc_no_pie],
-  [if test $with_unexec = no; then
-     emacs_cv_prog_cc_no_pie='not needed'
-   else
-     emacs_save_c_werror_flag=$ac_c_werror_flag
-     emacs_save_LDFLAGS=$LDFLAGS
-     ac_c_werror_flag=yes
-     for emacs_cv_prog_cc_no_pie in -no-pie -nopie no; do
-       test $emacs_cv_prog_cc_no_pie = no && break
-       LDFLAGS="$emacs_save_LDFLAGS $emacs_cv_prog_cc_no_pie"
-       AC_LINK_IFELSE([AC_LANG_PROGRAM([], [])], [break])
-     done
-     ac_c_werror_flag=$emacs_save_c_werror_flag
-     LDFLAGS=$emacs_save_LDFLAGS
-   fi])
+  [emacs_cv_prog_cc_no_pie='not needed'])
 case $emacs_cv_prog_cc_no_pie in
   -*)
     LD_SWITCH_SYSTEM_TEMACS="$LD_SWITCH_SYSTEM_TEMACS $emacs_cv_prog_cc_no_pie"

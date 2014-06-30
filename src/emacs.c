@@ -1188,8 +1188,6 @@ maybe_load_seccomp (int argc, char **argv)
 int
 main (int argc, char **argv)
 {
-  /* Variable near the bottom of the stack, and aligned appropriately
-     for pointers.  */
   void *stack_bottom_variable;
 
   /* First, check whether we should apply a seccomp filter.  This
