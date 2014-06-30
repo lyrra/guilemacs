@@ -30910,12 +30910,12 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
       ptrdiff_t nbytes = sizeof (title) + sizeof (at);
       if (ckd_add (&nbytes, nbytes, SBYTES (system_name)))
 	memory_full (SIZE_MAX);
-      dpyinfo->x_id_name = xmalloc (nbytes);
+      dpyinfo->x_id_name = xmalloc_atomic (nbytes);
       sprintf (dpyinfo->x_id_name, "%s%s%s", title, at, SDATA (system_name));
     }
   else
     {
-      dpyinfo->x_id_name = xmalloc (sizeof (title));
+      dpyinfo->x_id_name = xmalloc_atomic (sizeof (title));
       strcpy (dpyinfo->x_id_name, title);
     }
 

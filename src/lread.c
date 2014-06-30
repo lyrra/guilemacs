@@ -3658,7 +3658,7 @@ skip_lazy_string (Lisp_Object readcharfun)
       if (ss->size == 0)
 	{
 	  ss->size = nskip + extra;
-	  ss->string = xmalloc (ss->size);
+	  ss->string = xmalloc_atomic (ss->size);
 	}
       else if (nskip > ss->size)
 	{

@@ -4177,7 +4177,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
 	  if (buf == initial_buffer)
 	    {
-	      buf = xmalloc (bufsize);
+	      buf = xmalloc_atomic (bufsize);
 	      buf_save_value_index = SPECPDL_INDEX ();
 	      record_unwind_protect_ptr (xfree, buf);
 	      memcpy (buf, initial_buffer, used);

@@ -185,7 +185,7 @@ print_prepare (Lisp_Object printcharfun)
       else
 	{
 	  int new_size = 1000;
-	  print_buffer.buffer = xmalloc (new_size);
+	  print_buffer.buffer = xmalloc_atomic (new_size);
 	  print_buffer.size = new_size;
 	  record_unwind_protect_void (print_free_buffer);
 	}
