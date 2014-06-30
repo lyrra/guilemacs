@@ -162,7 +162,7 @@ image_create_pix_container (struct frame *f, unsigned int width,
 							 ? CAIRO_FORMAT_A8
 							 : CAIRO_FORMAT_RGB24),
 							width);
-  pimg->data = xmalloc (pimg->bytes_per_line * height);
+  pimg->data = xmalloc_atomic (pimg->bytes_per_line * height);
 
   return pimg;
 }
@@ -2649,7 +2649,7 @@ x_create_x_image_and_pixmap (struct frame *f, int width, int height, int depth,
     }
 
   /* Allocate image raster.  */
-  (*ximg)->data = xmalloc ((*ximg)->bytes_per_line * height);
+  (*ximg)->data = xmalloc_atomic ((*ximg)->bytes_per_line * height);
 
   /* Allocate a pixmap of the same size.  */
   *pixmap = XCreatePixmap (display, drawable, width, height, depth);
@@ -2818,7 +2818,7 @@ image_create_x_image_and_pixmap_1 (struct frame *f, int width, int height, int d
   if (depth < 16)
     palette_colors = 1 << (depth - 1);
 
-  *pimg = xmalloc (sizeof (XImage) + palette_colors * sizeof (RGBQUAD));
+  *pimg = xmalloc_atomic (sizeof (XImage) + palette_colors * sizeof (RGBQUAD));
 
   header = &(*pimg)->info.bmiHeader;
   memset (&(*pimg)->info, 0, sizeof (BITMAPINFO));
@@ -3697,7 +3697,7 @@ xbm_read_bitmap_data (struct frame *f, char *contents, char *end,
     }
   bytes_per_line = (*width + 7) / 8 + padding_p;
   nbytes = bytes_per_line * *height;
-  p = *data = xmalloc (nbytes);
+  p = *data = xmalloc_atomic (nbytes);
 
   if (v10)
     {
@@ -4159,7 +4159,7 @@ xpm_cache_color (struct frame *f, char *color_name, XColor *color, int bucket)
     bucket = xpm_color_bucket (color_name);
 
   nbytes = FLEXSIZEOF (struct xpm_cached_color, name, strlen (color_name) + 1);
-  p = xmalloc (nbytes);
+  p = xmalloc_atomic (nbytes);
   strcpy (p->name, color_name);
   p->color = *color;
   p->next = xpm_color_cache[bucket];
@@ -4609,7 +4609,8 @@ xpm_load (struct frame *f, struct image *img)
 #endif /* HAVE_NTGUI */
 
       /* Remember allocated colors.  */
-      img->colors = xnmalloc (attrs.nalloc_pixels, sizeof *img->colors);
+      img->colors = xnmalloc_atomic (attrs.nalloc_pixels,
+                                     sizeof *img->colors);
       img->ncolors = attrs.nalloc_pixels;
       for (i = 0; i < attrs.nalloc_pixels; ++i)
 	{
@@ -5397,7 +5398,7 @@ colors_in_color_table (int *n)
     }
   else
     {
-      colors = xmalloc (ct_colors_allocated * sizeof *colors);
+      colors = xmalloc_atomic (ct_colors_allocated * sizeof *colors);
       *n = ct_colors_allocated;
 
       for (i = j = 0; i < CT_SIZE; ++i)
@@ -6988,8 +6989,8 @@ png_load_body (struct frame *f, struct image *img, struct png_load_context *c)
   if (INT_MULTIPLY_WRAPV (row_bytes, sizeof *pixels, &nbytes)
       || INT_MULTIPLY_WRAPV (nbytes, height, &nbytes))
     memory_full (SIZE_MAX);
-  c->pixels = pixels = xmalloc (nbytes);
-  c->rows = rows = xmalloc (height * sizeof *rows);
+  c->pixels = pixels = xmalloc_atomic (nbytes);
+  c->rows = rows = xmalloc_atomic (height * sizeof *rows);
   for (i = 0; i < height; ++i)
     rows[i] = pixels + i * row_bytes;
 
@@ -8052,7 +8053,7 @@ tiff_load (struct frame *f, struct image *img)
       return 0;
     }
 
-  buf = xmalloc (sizeof *buf * width * height);
+  buf = xmalloc_atomic (sizeof *buf * width * height);
 
   rc = TIFFReadRGBAImage (tiff, width, height, buf, 0);
 

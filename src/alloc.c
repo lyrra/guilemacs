@@ -462,7 +462,7 @@ xstrdup (const char *s)
   ptrdiff_t size;
   eassert (s);
   size = strlen (s) + 1;
-  return memcpy (xmalloc (size), s, size);
+  return memcpy (xmalloc_atomic (size), s, size);
 }
 
 /* Like above, but duplicates Lisp string to C string.  */
@@ -471,7 +471,7 @@ char *
 xlispstrdup (Lisp_Object string)
 {
   ptrdiff_t size = SBYTES (string) + 1;
-  return memcpy (xmalloc (size), SSDATA (string), size);
+  return memcpy (xmalloc_atomic (size), SSDATA (string), size);
 }
 
 /* Assign to *PTR a copy of STRING, freeing any storage *PTR formerly
@@ -856,7 +856,7 @@ Lisp_Object
 make_float (double float_value)
 {
   register Lisp_Object val;
-  XSETFLOAT (val, xmalloc (sizeof (struct Lisp_Float)));
+  XSETFLOAT (val, xmalloc_atomic (sizeof (struct Lisp_Float)));
   XFLOAT_INIT (val, float_value);
   return val;
 }
