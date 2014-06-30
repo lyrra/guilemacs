@@ -258,26 +258,24 @@ DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
    expression involving VAL_MAX.  */
 #define VAL_MAX (EMACS_INT_MAX >> (GCTYPEBITS - 1))
 
-DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
-#define USE_LSB_TAG 1
-DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
-
 /* Whether the least-significant bits of an EMACS_INT contain the tag.
    On hosts where pointers-as-ints do not exceed VAL_MAX / 2, USE_LSB_TAG is:
     a. unnecessary, because the top bits of an EMACS_INT are unused, and
     b. slower, because it typically requires extra masking.
    So, USE_LSB_TAG is true only on hosts where it might be useful.  */
+DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
+#define USE_LSB_TAG 1
+DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
 DEFINE_GDB_SYMBOL_BEGIN (EMACS_INT, VALMASK)
 # define VALMASK (USE_LSB_TAG ? - (1 << GCTYPEBITS) : VAL_MAX)
 DEFINE_GDB_SYMBOL_END (VALMASK)
 
-#ifndef alignas
-# define alignas(alignment) /* empty */
-# if USE_LSB_TAG
-#  error "USE_LSB_TAG requires alignas"
-# endif
+#if !USE_LSB_TAG && !defined WIDE_EMACS_INT
+# error "USE_LSB_TAG not supported on this platform; please report this." \
+	"Try 'configure --with-wide-int' to work around the problem."
+error !;
 #endif
 
 /* Minimum alignment requirement for Lisp objects, imposed by the
@@ -518,24 +516,6 @@ enum Lisp_Type
 
     /* Must be last entry in Lisp_Type enumeration.  */
     Lisp_Float = 7
-  };
-
-/* This is the set of data types that share a common structure.
-   The first member of the structure is a type code from this set.
-   The enum values are arbitrary, but we'll use large numbers to make it
-   more likely that we'll spot the error if a random word in memory is
-   mistakenly interpreted as a Lisp_Misc.  */
-enum Lisp_Misc_Type
-  {
-    Lisp_Misc_Free = 0x5eab,
-    Lisp_Misc_Marker,
-    Lisp_Misc_Overlay,
-    Lisp_Misc_Save_Value,
-    /* Currently floats are not a misc type,
-       but let's define this in case we want to change that.  */
-    Lisp_Misc_Float,
-    /* This is not a type code.  It is for range checking.  */
-    Lisp_Misc_Limit
   };
 
 /* These are the types of forwarding objects used in the value slot
@@ -2557,37 +2537,6 @@ struct Lisp_User_Ptr
   void *p;
 } GCALIGNED_STRUCT;
 
-/* A finalizer sentinel.  */
-struct Lisp_Finalizer
-  {
-    union vectorlike_header header;
-
-    /* Call FUNCTION when the finalizer becomes unreachable, even if
-       FUNCTION contains a reference to the finalizer; i.e., call
-       FUNCTION when it is reachable _only_ through finalizers.  */
-    Lisp_Object function;
-
-    /* Circular list of all active weak references.  */
-    struct Lisp_Finalizer *prev;
-    struct Lisp_Finalizer *next;
-  } GCALIGNED_STRUCT;
-
-extern struct Lisp_Finalizer finalizers;
-extern struct Lisp_Finalizer doomed_finalizers;
-
-INLINE bool
-FINALIZERP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_FINALIZER);
-}
-
-INLINE struct Lisp_Finalizer *
-XFINALIZER (Lisp_Object a)
-{
-  eassert (FINALIZERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Finalizer);
-}
-
 INLINE bool
 MARKERP (Lisp_Object x)
 {
@@ -3756,16 +3705,7 @@ extern void allocate_string_data (struct Lisp_String *, EMACS_INT, EMACS_INT);
 extern void malloc_warning (const char *);
 extern AVOID memory_full (size_t);
 extern AVOID buffer_memory_full (ptrdiff_t);
-#if defined REL_ALLOC && !defined SYSTEM_MALLOC && !defined HYBRID_MALLOC
-extern void refill_memory_reserve (void);
-#endif
-extern void alloc_unexec_pre (void);
-extern void alloc_unexec_post (void);
-extern void mark_maybe_objects (Lisp_Object const *, ptrdiff_t);
-extern void mark_stack (char const *, char const *);
-extern void flush_stack_call_func (void (*func) (void *arg), void *arg);
 extern void garbage_collect (void);
-extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
@@ -3779,21 +3719,6 @@ extern Lisp_Object pure_listn (ptrdiff_t, Lisp_Object, ...);
   listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
 #define pure_list(...) \
   pure_listn (ARRAYELTS (((Lisp_Object []) {__VA_ARGS__})), __VA_ARGS__)
-
-enum gc_root_type
-{
-  GC_ROOT_STATICPRO,
-  GC_ROOT_BUFFER_LOCAL_DEFAULT,
-  GC_ROOT_BUFFER_LOCAL_NAME,
-  GC_ROOT_C_SYMBOL
-};
-
-struct gc_root_visitor
-{
-  void (*visit) (Lisp_Object const *, enum gc_root_type, void *);
-  void *data;
-};
-extern void visit_static_gc_roots (struct gc_root_visitor visitor);
 
 /* Build a frequently used 1/2/3/4-integer lists.  */
 
@@ -3909,7 +3834,8 @@ make_nil_vector (ptrdiff_t size)
   return vec;
 }
 
-//extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type);
+extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
+						  enum pvec_type);
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */
 
@@ -3932,7 +3858,6 @@ make_nil_vector (ptrdiff_t size)
 				   PSEUDOVECSIZE (type, field),	       \
 				   VECSIZE (type), tag))
 
-extern bool gc_in_progress;
 extern Lisp_Object make_float (double);
 extern void display_malloc_warning (void);
 extern Lisp_Object build_overlay (Lisp_Object, Lisp_Object, Lisp_Object);
@@ -4673,8 +4598,6 @@ extern void *xmalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xzalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xrealloc (void *, size_t) ATTRIBUTE_ALLOC_SIZE ((2));
 extern void xfree (void *);
-extern void *xmalloc_uncollectable (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
-extern void *xmalloc_unsafe (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 extern void *xnmalloc (ptrdiff_t, ptrdiff_t) ATTRIBUTE_MALLOC_SIZE ((1,2));
 extern void *xnrealloc (void *, ptrdiff_t, ptrdiff_t)
   ATTRIBUTE_ALLOC_SIZE ((2,3));
