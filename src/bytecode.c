@@ -962,59 +962,18 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 	  }
 
 	CASE (Bpushcatch):	/* New in 24.4.  */
-	  type = CATCHER;
-	  goto pushhandler;
+          emacs_abort ();
+          NEXT;
+
 	CASE (Bpushconditioncase): /* New in 24.4.  */
-	  type = CONDITION_CASE;
-	pushhandler:
-	  {
-	    struct handler *c = push_handler (POP, type);
-	    c->bytecode_dest = FETCH2;
-	    c->bytecode_top = top;
-
-	    if (sys_setjmp (c->jmp))
-	      {
-		quitcounter = saved_quitcounter;
-		struct handler *c = handlerlist;
-		handlerlist = c->next;
-		top = c->bytecode_top;
-		op = c->bytecode_dest;
-		bc = &current_thread->bc;
-		struct bc_frame *fp = bc->fp;
-
-		Lisp_Object fun = fp->fun;
-		Lisp_Object bytestr = AREF (fun, CLOSURE_CODE);
-		Lisp_Object vector = AREF (fun, CLOSURE_CONSTANTS);
-#if GCC_LINT && __GNUC__ && !__clang__
-		/* These useless assignments pacify GCC 14.2.1 x86-64
-		   <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=21161>.  */
-		bytestr_data = saved_bytestr_data;
-		vectorp = saved_vectorp;
-#endif
-		bytestr_data = SDATA (bytestr);
-		vectorp = XVECTOR (vector)->contents;
-		if (BYTE_CODE_SAFE)
-		  {
-		    /* Only required for checking, not for execution.  */
-		    const_length = ASIZE (vector);
-		    bytestr_length = SCHARS (bytestr);
-		  }
-		pc = bytestr_data;
-		PUSH (c->val);
-		goto op_branch;
-	      }
-
-	    saved_quitcounter = quitcounter;
-#if GCC_LINT && __GNUC__ && !__clang__
-	    saved_vectorp = vectorp;
-	    saved_bytestr_data = bytestr_data;
-#endif
-	    NEXT;
-	  }
+          emacs_abort ();
+          NEXT;
 
 	CASE (Bpophandler):	/* New in 24.4.  */
-	  handlerlist = handlerlist->next;
-	  NEXT;
+          {
+            emacs_abort ();
+            NEXT;
+          }
 
 	CASE (Bunwind_protect):	/* FIXME: avoid closure for lexbind.  */
 	  {
