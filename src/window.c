@@ -6402,6 +6402,8 @@ the return value is nil.  Otherwise the value is t.  */)
 	 original configuration.  */
       bool buffer_changed = false;
 
+      dynwind_begin ();
+
       /* Don't do this within the main loop below: This may call Lisp
 	 code and is thus potentially unsafe while input is blocked.  */
       for (k = 0; k < saved_windows->header.size; k++)
@@ -6647,6 +6649,7 @@ the return value is nil.  Otherwise the value is t.  */)
 
       adjust_frame_glyphs (f);
       unblock_input ();
+      dynwind_end ();
 
       /* Scan dead buffer windows.  */
       for (; CONSP (dead_windows); dead_windows = XCDR (dead_windows))

@@ -860,7 +860,8 @@ Otherwise, return a new string.  */)
 	  bool generate_summary = strp[1] == '{';
 	  /* This is for computing the SHADOWS arg for describe_map_tree.  */
 	  Lisp_Object active_maps = Fcurrent_active_maps (Qnil, Qnil);
-	  ptrdiff_t count = SPECPDL_INDEX ();
+
+          dynwind_begin ();
 
 	  start = strp + 2;
 	  length_byte = close_bracket - start;
@@ -913,7 +914,7 @@ Otherwise, return a new string.  */)
 	  tem = Fbuffer_string ();
 	  Ferase_buffer ();
 	  set_buffer_internal (oldbuf);
-	  unbind_to (count, Qnil); // FIX: 20190626 LAV, isn't count unused?
+          dynwind_end ();
 	 }
 
 	subst_string:
