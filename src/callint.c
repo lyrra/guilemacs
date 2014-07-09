@@ -251,13 +251,15 @@ return non-nil.
 usage: (funcall-interactively FUNCTION &rest ARGUMENTS)  */)
      (ptrdiff_t nargs, Lisp_Object *args)
 {
-  ptrdiff_t speccount = SPECPDL_INDEX ();
+  dynwind_begin ();
   temporarily_switch_to_single_kboard (NULL);
 
   /* Nothing special to do here, all the work is inside
      `called-interactively-p'.  Which will look for us as a marker in the
      backtrace.  */
-  return unbind_to (speccount, Ffuncall (nargs, args));
+  Lisp_Object tem = Ffuncall (nargs, args);
+  dynwind_end ();
+  return tem;
 }
 
 DEFUN ("call-interactively", Fcall_interactively, Scall_interactively, 1, 3, 0,
@@ -767,6 +769,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
       else tem = string_end;
     }
   dynwind_end ();
+  dynwind_begin ();
 
   maybe_quit ();
 
