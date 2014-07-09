@@ -795,8 +795,9 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 		goto op_branch;
 	      }
 
-	    NEXT;
-	  }
+	CASE (Bpushconditioncase): /* New in 24.4.  */
+          emacs_abort ();
+          NEXT;
 
 	CASE (Bpophandler):	/* New in 24.4.  */
 	  handlerlist = handlerlist->next;
