@@ -1757,7 +1757,6 @@ exec_byte_code (Lisp_Object fun, ptrdiff_t args_template,
 
   bc->fp = bc->fp->saved_fp;
 
-  Lisp_Object result = TOP;
   return result;
 }
 /* {{coccinelle:skip_end}} */
