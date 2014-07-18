@@ -16598,9 +16598,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   bool buffer_unchanged_p = false;
   bool temp_scroll_step = false;
   int temp_scroll_step = 0;
-
-  dynwind_begin ();
-
   int rc;
   int centering_position = -1;
   bool last_line_misfit = false;
@@ -16629,6 +16626,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   /* Make sure that both W's markers are valid.  */
   eassert (XMARKER (w->start)->buffer == buffer);
   eassert (XMARKER (w->pointm)->buffer == buffer);
+
+  dynwind_begin ();
 
   reconsider_clip_changes (w);
   frame_line_height = default_line_pixel_height (w);
