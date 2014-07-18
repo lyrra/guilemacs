@@ -786,6 +786,7 @@ extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
 extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+extern Lisp_Object Ffboundp (Lisp_Object);
 
 INLINE sym_t
 XSYMBOL (Lisp_Object a)
