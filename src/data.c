@@ -504,7 +504,7 @@ See also `primitive-function-p' and `native-comp-function-p'.  */)
   (Lisp_Object object)
 {
   if (CONSP (object) && EQ (XCAR (object), Qspecial_operator))
-    object = XCDR (object);
+    return Qt;
   if (SCM_PRIMITIVE_P (object))
     return Qt;
   return Qnil;
