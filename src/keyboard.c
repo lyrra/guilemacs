@@ -1658,7 +1658,6 @@ command_loop_1 (void)
 Lisp_Object
 read_menu_command (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
   dynwind_begin ();
 
   /* We don't want to echo the keystrokes while navigating the
