@@ -253,6 +253,7 @@ except that PLACE is evaluated only once (after NEWELT)."
       (list 'setq place
             (list 'cons newelt place))
     (require 'macroexp)
+    (require 'gv)
     (eval `(let ((newelt ',newelt)
                  (place ',place))
              (macroexp-let2 macroexp-copyable-p x newelt
@@ -273,9 +274,10 @@ change the list."
     ,(if (symbolp place)
          ;; So we can use `pop' in the bootstrap before `gv' can be used.
          (list 'prog1 place (list 'setq place (list 'cdr place)))
-       (gv-letplace (getter setter) place
-         (macroexp-let2 macroexp-copyable-p x getter
-           `(prog1 ,x ,(funcall setter `(cdr ,x))))))))
+       (require 'gv)
+       (eval `(let ((place ',place))
+                (gv-letplace (getter setter) place
+                  `(prog1 ,getter ,(funcall setter `(cdr ,getter)))))))))
 
 ;; Note: `static-if' can be copied into a package to enable it to be
 ;; used in Emacsen older than Emacs 30.1.  If the package is used in
