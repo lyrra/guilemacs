@@ -19996,7 +19996,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   bool current_matrix_up_to_date_p = false;
   bool used_current_matrix_p = false;
   bool temp_scroll_step = false;
-  dynwind_begin ();
   int rc;
   int centering_position = -1;
   bool last_line_misfit = false;
@@ -20020,6 +20019,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   eassert (XMARKER (w->start)->buffer == buffer);
   eassert (XMARKER (w->pointm)->buffer == buffer);
 
+  dynwind_begin ();
   reconsider_clip_changes (w);
   frame_line_height = default_line_pixel_height (w);
   margin = window_scroll_margin (w, MARGIN_IN_LINES);
@@ -21154,7 +21154,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	TEMP_SET_PT_BOTH (CHARPOS (lpoint), CHAR_TO_BYTE (CHARPOS (lpoint)));
     }
 
-  dynwind_end ();
 }
 
 
