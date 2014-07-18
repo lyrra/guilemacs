@@ -323,18 +323,22 @@ Assumes the caller has bound `macroexpand-all-environment'."
       (`(,(or 'function 'quote) . ,_) form)
       (`(,(and fun (or 'let 'let*)) . ,(or `(,bindings . ,body)
                                            pcase--dontcare))
-       (macroexp--cons
-        fun
-        (macroexp--cons
-         (macroexp--all-clauses bindings 1)
-         (if (null body)
-             (macroexp-unprogn
-              (macroexp-warn-and-return
-               (format "Empty %s body" fun)
-               nil nil 'compile-only))
-           (macroexp--all-forms body))
-         (cdr form))
-        form))
+       (macroexp--cons fun
+                       (macroexp--cons (macroexp--all-clauses bindings 1)
+                                       (if (null body)
+                                           (macroexp-unprogn
+                                            (macroexp-warn-and-return
+                                             (format "Empty %s body" fun)
+                                             nil t))
+                                         (macroexp--all-forms body))
+                                       (cdr form))
+                       form))
+      (`(,(and fun (or `flet `labels)) . ,(or `(,bindings . ,body) dontcare))
+       (macroexp--cons fun
+                       (macroexp--cons (macroexp--all-clauses bindings 2)
+                                       (macroexp--all-forms body)
+                                       (cdr form))
+                       form))
       (`(,(and fun `(lambda . ,_)) . ,args)
        ;; Embedded lambda in function position.
        ;; If the byte-optimizer is loaded, try to unfold this,
