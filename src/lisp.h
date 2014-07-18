@@ -4889,6 +4889,8 @@ maybe_gc (void)
   return;
 }
 
+extern Lisp_Object Ffboundp (Lisp_Object);
+
 #if 0
 INLINE bool
 functionp (Lisp_Object object)
