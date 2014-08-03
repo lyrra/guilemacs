@@ -362,28 +362,6 @@ in compilation warnings about unused variables.
              ;; FIXME: This let often leads to "unused var" warnings.
              `((let ((,var ,counter)) ,@(cddr spec)))))))
 
-(defmacro declare (&rest specs)
-  "Do not evaluate any arguments, and return nil.
-If a `declare' form appears as the first form in the body of a
-`defun' or `defmacro' form, SPECS specifies various additional
-information about the function or macro; these go into effect
-during the evaluation of the `defun' or `defmacro' form.
-
-The possible values of SPECS are specified by
-`defun-declarations-alist' and `macro-declarations-alist'.
-
-For more information, see info node `(elisp)Declare Form'."
-  ;; `declare' is handled directly by `defun/defmacro' rather than here.
-  ;; If we get here, it's because there's a `declare' somewhere not attached
-  ;; to a `defun/defmacro', i.e. a `declare' which doesn't do what it's
-  ;; intended to do.
-  (let ((form `(declare . ,specs)))  ;; FIXME: WIBNI we had &whole?
-    (macroexp-warn-and-return
-     (format-message "Stray `declare' form: %S" form)
-     ;; Make a "unique" harmless form to circumvent
-     ;; the cache in `macroexp-warn-and-return'.
-     `(progn ',form nil) nil 'compile-only)))
-
 (defmacro ignore-errors (&rest body)
   "Execute BODY; if an error occurs, return nil.
 Otherwise, return result of last form in BODY.
