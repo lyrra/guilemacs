@@ -413,9 +413,10 @@ The return value is undefined.
 	        (def (list 'defalias
 		           (list 'quote name)
 		           (list 'cons ''macro fun))))
-           (if declarations
-	       (cons 'prog1 (cons def (car declarations)))
-	     def))))))
+           (list 'eval-when '(:compile-toplevel :load-toplevel :execute)
+            (if declarations
+	        (cons 'prog1 (cons def (car declarations)))
+	      def)))))))
 
 ;; Now that we defined defmacro we can use it!
 (defmacro defun (name arglist &rest body)
