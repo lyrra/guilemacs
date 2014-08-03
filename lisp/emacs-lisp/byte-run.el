@@ -220,9 +220,10 @@ The return value is undefined.
 						',(get name 'no-font-lock-keyword))
 				 declarations))))
 	       (lisp--el-font-lock-flush-elisp-buffers))
-	   (if declarations
-	       (cons 'prog1 (cons def declarations))
-	     def))))))
+           (list 'eval-when '(:compile-toplevel :load-toplevel :execute)
+            (if declarations
+                (cons 'prog1 (cons def declarations))
+              def)))))))
 
 ;; Now that we defined defmacro we can use it!
 (defmacro defun (name arglist &optional docstring &rest body)
