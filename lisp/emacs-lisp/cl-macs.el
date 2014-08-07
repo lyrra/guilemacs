@@ -2160,7 +2160,7 @@ of `cl-symbol-macrolet' to additionally expand symbol macros."
                  (let ((place (pop args)))
                    ;; Here, we know `place' should be a symbol.
                    (while
-                       (let ((symval (assq place venv)))
+                       (let ((symval (assoc place venv)))
                          (when symval
                            (setq place (cadr symval))
                            (if (symbolp place)
