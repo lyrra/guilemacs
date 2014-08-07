@@ -2259,7 +2259,7 @@ FUNCTIONP (Lisp_Object object)
 	  return ! (CONSP (object) && !NILP (XCAR (object)));
 	}
     }
-  
+
   if (scm_is_true (scm_procedure_p (object)))
     return 1;
   else if (CLOSUREP (object) || MODULE_FUNCTIONP (object))
@@ -2269,6 +2269,8 @@ FUNCTIONP (Lisp_Object object)
       Lisp_Object car = XCAR (object);
       return EQ (car, Qlambda);
     }
+  else
+    return false;
 }
 
 Lisp_Object

@@ -786,13 +786,13 @@ extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
 extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+extern Lisp_Object xsymbol_fn;
 extern Lisp_Object Ffboundp (Lisp_Object);
 
 INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
-  return scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-desc"),
-                     a);
+  return scm_call_1 (xsymbol_fn, a);
 }
 
 /* XSYMBOL_INIT (Qfoo) is like XSYMBOL (Qfoo), except it is valid in
@@ -2173,10 +2173,16 @@ INLINE int
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
 
+extern Lisp_Object Ffboundp (Lisp_Object);
+extern Lisp_Object Fmakunbound (Lisp_Object);
+extern Lisp_Object Ffmakunbound (Lisp_Object);
+extern Lisp_Object Ffset (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fsymbol_function (Lisp_Object);
+
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
 {
-  return scm_call_1 (scm_c_public_ref ("elisp-functions", "symbol-function"), sym);
+  return Fsymbol_function (sym);
 }
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
