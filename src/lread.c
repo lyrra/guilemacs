@@ -2178,14 +2178,7 @@ readevalloop (Lisp_Object readcharfun,
   bool whole_buffer = 0;
   /* True on the first time around.  */
   bool first_sexp = 1;
-  Lisp_Object macroexpand = intern ("internal-macroexpand-for-load");
-
-  if (NILP (Ffboundp (macroexpand))
-      || (STRINGP (sourcename) && suffix_p (sourcename, ".elc")))
-    /* Don't macroexpand before the corresponding function is defined
-       and don't bother macroexpanding in .elc files, since it should have
-       been done already.  */
-    macroexpand = Qnil;
+  Lisp_Object compile_fn = 0;
 
   if (MARKERP (readcharfun))
     {
@@ -2329,11 +2322,7 @@ readevalloop (Lisp_Object readcharfun,
       /* Restore saved point and BEGV.  */
       dynwind_end ();
 
-      /* Now eval what we just read.  */
-      if (!NILP (macroexpand))
-        val = readevalloop_eager_expand_eval (val, macroexpand);
-      else
-        val = eval_sub (val);
+      val = eval_sub (val);
 
       if (printflag)
 	{
