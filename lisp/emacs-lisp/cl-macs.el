@@ -2146,7 +2146,7 @@ except that it additionally expands symbol macros."
              (let ((letf nil) (found nil) (nbs ()))
                (dolist (binding bindings)
                  (let* ((var (if (symbolp binding) binding (car binding)))
-                        (sm (assq var venv)))
+                        (sm (assoc var venv)))
                    (push (if (not (cdr sm))
                              binding
                            (let ((nexp (cadr sm)))
