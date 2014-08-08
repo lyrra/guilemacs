@@ -2209,9 +2209,45 @@ are too difficult to instrument")
 
 ;; ,@ might have some problems.
 
-(defmacro edebug-\` (exp)
-  (declare (debug (def-form)))
-  (list '\` exp))
+(defalias 'edebug-\` '\`)  ;; same macro as regular backquote.
+(def-edebug-spec edebug-\` (def-form))
+
+;; Assume immediate quote in unquotes mean backquote at next higher level.
+(def-edebug-spec \, (&or ("quote" edebug-\`) def-form))
+(def-edebug-spec \,@ (&define  ;; so (,@ form) is never wrapped.
+		     &or ("quote" edebug-\`) def-form))
+
+;; New byte compiler.
+
+(def-edebug-spec save-selected-window t)
+(def-edebug-spec save-current-buffer t)
+
+;; Guile-Emacs
+
+(def-edebug-spec progn t)
+(def-edebug-spec eval-when (sexp &rest form))
+(def-edebug-spec if t)
+(def-edebug-spec guile-ref 0)
+(def-edebug-spec guile-private-ref 0)
+(def-edebug-spec guile-primitive 0)
+(def-edebug-spec %function function)
+(def-edebug-spec %funcall t)
+(def-edebug-spec %set-lexical-binding-mode 0)
+(def-edebug-spec @ 0)
+(def-edebug-spec @@ 0)
+(def-edebug-spec  %define-compiler-macro cl-defmacro)
+(def-edebug-spec prog1 t)
+(def-edebug-spec prog2 t)
+(def-edebug-spec and t)
+(def-edebug-spec or t)
+(def-edebug-spec while t)
+(def-edebug-spec unwind-protect t)
+(def-edebug-spec catch t)
+(def-edebug-spec save-excursion t)
+(def-edebug-spec save-restriction t)
+(def-edebug-spec track-mouse t)
+
+;; Anything else?
 
 ;;; The debugger itself
 
