@@ -4974,17 +4974,11 @@ If LINE, insert the rebuilt thread starting on line LINE."
 Note that THREAD must never, ever be anything else than a variable -
 using some other form will lead to serious barfage."
   (or (symbolp thread) (signal 'wrong-type-argument '(symbolp thread)))
-  ;; (8% speedup to gnus-summary-prepare, just for fun :-)
-  (cond
-   ((and (boundp 'lexical-binding) lexical-binding)
-    ;; FIXME: This version could be a "defsubst" rather than a macro.
-    `(#[257 "\211:\203\16\0\211@;\203\15\0A@@\207"
-            [] 2]
-      ,thread))
-   (t
-    ;; Not sure how XEmacs handles these things, so let's keep the old code.
-    (list 'byte-code "\10\211:\203\17\0\211@;\203\16\0A@@\207"
-          (vector thread) 2))))
+  `(let ((thread ,thread))
+     (declare (lexical thread))
+     (cond ((atom thread) thread)
+           ((stringp (car thread)) (cl-caadr thread))
+           (t (car thread)))))
 
 (defsubst gnus-article-sort-by-number (h1 h2)
   "Sort articles by article number."
