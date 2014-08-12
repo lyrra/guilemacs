@@ -185,7 +185,9 @@ expression, in which case we want to handle forms differently."
 
      ;; Look inside `progn', and `eval-and-compile', since these
      ;; are often used in the expansion of things like `pcase-defmacro'.
-     ((and expansion (memq car '(progn prog1 eval-and-compile)))
+     ((and expansion
+           (or (memq car '(progn prog1 eval-and-compile))
+               (and (eq car 'eval-when) (setq form (cdr form)))))
       (let ((end (memq :autoload-end form)))
 	(when end             ;Cut-off anything after the :autoload-end marker.
           (setq form (copy-sequence form))
