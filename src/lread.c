@@ -5332,7 +5332,7 @@ load_path_default (void)
 
   Lisp_Object lpath = Qnil;
 
-  lpath = decode_env_path (0, PATH_LOADSEARCH, 0);
+  lpath = decode_env_path (0, PATH_DUMPLOADSEARCH, 0);
 
   if (!NILP (Vinstallation_directory))
     {
