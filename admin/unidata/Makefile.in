@@ -32,7 +32,7 @@ top_builddir = @top_builddir@
 # Prevent any settings in the user environment causing problems.
 unexport EMACSDATA EMACSDOC EMACSLOADPATH EMACSPATH
 
-EMACS = ${top_builddir}/src/emacs
+EMACS = ${top_builddir}/src/temacs
 unidir = ${top_srcdir}/lisp/international
 emacs = "${EMACS}" -batch --no-site-file --no-site-lisp
 
@@ -48,17 +48,10 @@ all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
   ${unidir}/uni-scripts.el ${unidir}/uni-confusable.el \
   ${unidir}/idna-mapping.el
 
-## Specify .elc as an order-only prereq so as to not needlessly rebuild
-## target just because the .elc is missing.
-## Same with charprop.el below.
 ${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
-  ${srcdir}/uvs.elc
 	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
 	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
 	  > $@
-
-%.elc: %.el
-	$(AM_V_ELC)${emacs} -f batch-byte-compile $<
 
 unidata.txt: ${srcdir}/UnicodeData.txt
 	$(AM_V_GEN)sed -e 's/\([^;]*\);\(.*\)/(#x\1 "\2")/' -e 's/;/" "/g' \
@@ -67,7 +60,7 @@ unidata.txt: ${srcdir}/UnicodeData.txt
 ## charprop doesn't actually depend on unifiles, but for now at least
 ## pretend that it does since other Makefiles assume that if charprop
 ## is up-to-date, the unifiles are too.
-${unidir}/charprop.el: ${unifiles} ${srcdir}/unidata-gen.el | ${srcdir}/unidata-gen.elc
+${unidir}/charprop.el: ${unifiles} ${srcdir}/unidata-gen.el
 	$(AM_V_GEN)[ ! -f $@ ] || chmod +w $@
 	$(AM_V_at)${emacs} -L ${srcdir} -l unidata-gen \
 	  -f unidata-gen-charprop $@
@@ -75,7 +68,7 @@ ${unidir}/charprop.el: ${unifiles} ${srcdir}/unidata-gen.el | ${srcdir}/unidata-
 ${unifiles}: ${srcdir}/unidata-gen.el \
   ${srcdir}/UnicodeData.txt ${srcdir}/BidiMirroring.txt \
   ${srcdir}/BidiBrackets.txt | \
-  ${srcdir}/unidata-gen.elc unidata.txt
+  unidata.txt
 	$(AM_V_GEN)[ ! -f $@ ] || chmod +w $@
 	$(AM_V_at)${emacs} -L ${srcdir} -l unidata-gen \
 	  -f unidata-gen-file $@ ${srcdir}
@@ -126,7 +119,7 @@ ${unidir}/emoji-zwj.el: ${zwj_sources}
 .PHONY: clean bootstrap-clean distclean maintainer-clean gen-clean
 
 clean:
-	rm -f ${srcdir}/*.elc unidata.txt
+	rm -f unidata.txt
 
 ## IMO this should also run gen-clean.
 bootstrap-clean: clean

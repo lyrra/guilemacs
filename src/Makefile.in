@@ -664,7 +664,7 @@ SYSTEM_TYPE = @SYSTEM_TYPE@
 ## since not all pieces are used on all platforms.  But DOC depends
 ## on all of $lisp, and emacs depends on DOC, so it is ok to use $lisp here.
 emacs$(EXEEXT): temacs$(EXEEXT) \
-                $(abs_top_builddir)/src/lisp.mk $(etc)/DOC $(lisp) \
+                $(abs_top_builddir)/src/lisp.mk $(lisp) \
                 $(lispsource)/international/charprop.el ${charsets}
 ifeq ($(SYSTEM_TYPE),cygwin)
 	find ${top_builddir} -name '*.eln' | rebase -v -O -T -
@@ -938,12 +938,6 @@ tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 ## libemacs.so for Android, however, as the Lisp files have already
 ## been compiled by the top level `src' Makefile.
 
-ifneq ($(XCONFIGURE),android)
-%.elc: %.el | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="$(bootstrap_exe)"\
-		THEFILE=$< $<c
-endif
-
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 ## The following rules are used only when building a source tarball
 ## for the first time, when the native-lisp/ directory doesn't yet
@@ -1014,8 +1008,6 @@ ifeq ($(DUMPING),unexec)
 	$(PAXCTL_dumped) emacs$(EXEEXT)
   endif
 	mv -f emacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
-	@: Compile some files earlier to speed up further compilation.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 else
 	@: In the pdumper case, make compile-first after the dump
 	cp -f temacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
