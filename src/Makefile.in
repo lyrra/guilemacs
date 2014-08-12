@@ -578,7 +578,7 @@ SYSTEM_TYPE = @SYSTEM_TYPE@
 ## since not all pieces are used on all platforms.  But DOC depends
 ## on all of $lisp, and emacs depends on DOC, so it is ok to use $lisp here.
 emacs$(EXEEXT): temacs$(EXEEXT) \
-                lisp.mk $(etc)/DOC $(lisp) \
+                lisp.mk $(lisp) \
                 $(lispsource)/international/charprop.el ${charsets}
 ifeq ($(SYSTEM_TYPE),cygwin)
 	find ${top_builddir} -name '*.eln' | rebase -v -O -T -
@@ -792,10 +792,6 @@ tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS
 ## but now that we require GNU make, we can simply specify
 ## bootstrap-emacs$(EXEEXT) as an order-only prerequisite.
 
-%.elc: %.el | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="$(bootstrap_exe)"\
-		THEFILE=$< $<c
-
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 ## The following rules are used only when building a source tarball
 ## for the first time, when the native-lisp/ directory doesn't yet
@@ -883,8 +879,6 @@ $(bootstrap_pdmp): bootstrap-emacs$(EXEEXT)
 	rm -f $@
 	$(RUN_TEMACS) --batch $(BUILD_DETAILS) -l loadup --temacs=pbootstrap \
 		--bin-dest $(BIN_DESTDIR) --eln-dest $(ELN_DESTDIR)
-	@: Compile some files earlier to speed up further compilation.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 endif
 
 ### Flymake support (for C only)
