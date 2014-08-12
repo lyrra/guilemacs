@@ -545,7 +545,7 @@ ${lispintdir}/characters.elc: ${charscript:.el=.elc}
 ## since not all pieces are used on all platforms.  But DOC depends
 ## on all of $lisp, and emacs depends on DOC, so it is ok to use $lisp here.
 emacs$(EXEEXT): temacs$(EXEEXT) \
-                lisp.mk $(etc)/DOC $(lisp) \
+                lisp.mk $(lisp) \
                 $(lispsource)/international/charprop.el ${charsets}
 ifeq ($(CANNOT_DUMP),yes)
 	ln -f temacs$(EXEEXT) $@
@@ -740,9 +740,6 @@ tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS
 ## but now that we require GNU make, we can simply specify
 ## bootstrap-emacs$(EXEEXT) as an order-only prerequisite.
 
-%.elc: %.el | bootstrap-emacs$(EXEEXT)
-	@$(MAKE) -C ../lisp EMACS="$(bootstrap_exe)" THEFILE=$< $<c
-
 ## VCSWITNESS points to the file that holds info about the current checkout.
 ## We use it as a heuristic to decide when to rebuild loaddefs.el.
 ## If empty it is ignored; the parent makefile can set it to some other value.
@@ -765,8 +762,6 @@ else
   endif
 	mv -f emacs$(EXEEXT) $@
 endif
-	@: Compile some files earlier to speed up further compilation.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 
 alloc.o: alloc.x
 buffer.o: buffer.x
