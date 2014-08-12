@@ -4450,8 +4450,6 @@ load_path_default (void)
 #endif
 
   normal = PATH_LOADSEARCH;
-  if (!NILP (Vinstallation_directory)) normal = PATH_DUMPLOADSEARCH;
-
 #ifdef HAVE_NS
   lpath = decode_env_path (0, loadpath ? loadpath : normal, 0);
 #else
