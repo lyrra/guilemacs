@@ -756,7 +756,7 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 ;; Return a name of CHAR.  VAL is the current value of (aref TABLE
 ;; CHAR).
 
-(defun unidata-get-name (char val table)
+(fset 'unidata-get-name '(lambda (char val table)
   (cond
    ((stringp val)
     (if (> (aref val 0) 0)
@@ -844,15 +844,15 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	    ((eq sym 'LOW\ SURROGATE)
 	     (format "%s-%04X" sym char))
 	    ((eq sym 'VARIATION\ SELECTOR)
-	     (format "%s-%d" sym (+ (- char #xe0100) 17))))))))
+	     (format "%s-%d" sym (+ (- char #xe0100) 17)))))))))
 
 ;; Store VAL as the name of CHAR in TABLE.
 
-(defun unidata-put-name (char val table)
+(fset 'unidata-put-name '(lambda (char val table)
   (let ((current-val (aref table char)))
     (if (and (stringp current-val) (= (aref current-val 0) 0))
 	(funcall (char-table-extra-slot table 1) char current-val table))
-    (aset table char val)))
+    (aset table char val))))
 
 (defun unidata-get-decomposition (char val table)
   (cond
@@ -1081,15 +1081,9 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 		      idx (1+ i)))))
 	(nreverse (cons (intern (substring str idx)) l))))))
 
-(defun unidata--ensure-compiled (&rest funcs)
-  (dolist (fun funcs)
-    (or (byte-code-function-p (symbol-function fun))
-	(byte-compile fun))))
-
 (defun unidata-gen-table-name (prop index &rest ignore)
   (let* ((table (unidata-gen-table-word-list prop index 'unidata-split-name))
 	 (word-tables (char-table-extra-slot table 4)))
-    (unidata--ensure-compiled 'unidata-get-name 'unidata-put-name)
     (set-char-table-extra-slot table 1 (symbol-function 'unidata-get-name))
     (set-char-table-extra-slot table 2 (symbol-function 'unidata-put-name))
 
@@ -1127,8 +1121,6 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 (defun unidata-gen-table-decomposition (prop index &rest ignore)
   (let* ((table (unidata-gen-table-word-list prop index 'unidata-split-decomposition))
 	 (word-tables (char-table-extra-slot table 4)))
-    (unidata--ensure-compiled 'unidata-get-decomposition
-			      'unidata-put-decomposition)
     (set-char-table-extra-slot table 1
 			       (symbol-function 'unidata-get-decomposition))
     (set-char-table-extra-slot table 2
@@ -1182,7 +1174,8 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
     table))
 
 
-(defun unidata-describe-general-category (val)
+(fset
+  'unidata-describe-general-category '(lambda (val)
   (cdr (assq val
 	     '((nil . "Uknown")
 	       (Lu . "Letter, Uppercase")
@@ -1214,9 +1207,9 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	       (Cf . "Other, Format")
 	       (Cs . "Other, Surrogate")
 	       (Co . "Other, Private Use")
-	       (Cn . "Other, Not Assigned")))))
+	       (Cn . "Other, Not Assigned"))))))
 
-(defun unidata-describe-canonical-combining-class (val)
+(fset 'unidata-describe-canonical-combining-class '(lambda (val)
   (cdr (assq val
 	     '((0 . "Spacing, split, enclosing, reordrant, and Tibetan subjoined")
 	       (1 . "Overlays and interior")
@@ -1243,9 +1236,9 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	       (232 . "Above right")
 	       (233 . "Double below")
 	       (234 . "Double above")
-	       (240 . "Below (iota subscript)")))))
+	       (240 . "Below (iota subscript)"))))))
 
-(defun unidata-describe-bidi-class (val)
+(fset 'unidata-describe-bidi-class '(lambda (val)
   (cdr (assq val
 	     '((L . "Left-to-Right")
 	       (LRE . "Left-to-Right Embedding")
@@ -1269,7 +1262,7 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	       (B . "Paragraph Separator")
 	       (S . "Segment Separator")
 	       (WS . "Whitespace")
-	       (ON . "Other Neutrals")))))
+	       (ON . "Other Neutrals"))))))
 
 (defun unidata-describe-decomposition (val)
   (mapconcat
@@ -1439,7 +1432,6 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
             (setq table (funcall generator prop index default-value val-list))
             (when describer
               (unless (subrp (symbol-function describer))
-                (unidata--ensure-compiled describer)
                 (setq describer (symbol-function describer)))
               (set-char-table-extra-slot table 3 describer))
             (insert (format "(define-char-code-property '%S\n  %S\n  %S)\n"
