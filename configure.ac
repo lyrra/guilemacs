@@ -2522,8 +2522,7 @@ AC_DEFUN([EMACS_CHECK_LIB],
     [AC_CHECK_DECL([$2], [$3], [$4], [$6])],
     [AC_CHECK_LIB([$1], [$2], [$3], [$4], [$5])])])
 
-PKG_CHECK_MODULES([GUILE], [guile-2.2], [],
-                  [PKG_CHECK_MODULES([GUILE], [guile-2.0])])
+PKG_CHECK_MODULES([GUILE], [guile-2.2])
 AC_SUBST(GUILE_CFLAGS)
 AC_SUBST(GUILE_LIBS)
 
