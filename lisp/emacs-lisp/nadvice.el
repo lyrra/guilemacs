@@ -326,6 +326,7 @@ HOW is a symbol to select an entry in `advice--how-alist'."
 These functions act like the t special value in buffer-local hooks.")
 
 (defun advice--set-buffer-local (var val)
+  ;(if (equal val advice--buffer-local-function-sample) ...)
   (if (advice--forward-p val)
       (kill-local-variable var)
     (set (make-local-variable var) val)))
