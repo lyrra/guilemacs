@@ -4814,6 +4814,7 @@ compilation.  */);
     doc: /* A list of symbols which are the features of the executing Emacs.
 Used by `featurep' and `require', and altered by `provide'.  */);
   Vfeatures = list1 (Qemacs);
+  Vfeatures = Fcons (intern_c_string ("guile"), Vfeatures);
   DEFSYM (Qfeatures, "features");
   /* Let people use lexically scoped vars named `features'.  */
   Fmake_var_non_special (Qfeatures);
