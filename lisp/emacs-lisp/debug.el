@@ -132,6 +132,8 @@ where CAUSE can be:
 - exit: called because of exit of a flagged function.
 - error: called because of `debug-on-error'.")
 
+(defvar debug-inner-cut)
+
 ;;;###autoload
 (setq debugger 'debug)
 ;;;###autoload
@@ -144,6 +146,13 @@ You may call with no args, or you may pass nil as the first arg and
 any other args you like.  In that case, the list of args after the
 first will be printed into the backtrace buffer."
   (interactive)
+  (let ((debug-inner-cut (funcall (@ (guile) make-prompt-tag))))
+    (funcall (@ (guile) call-with-prompt)
+             debug-inner-cut
+             (lambda () (apply #'debug-1 args))
+             (lambda (k &rest ignore) nil))))
+
+(defun debug-1 (&rest args)
   (if inhibit-redisplay
       ;; Don't really try to enter debugger within an eval from redisplay.
       debugger-value
@@ -314,6 +323,14 @@ That buffer should be current already."
   (erase-buffer)
   (set-buffer-multibyte t)		;Why was it nil ?  -stef
   (setq buffer-undo-list t)
+  ; ----X---- FIX: 20190627 LAV, raw patch using guile backtrace
+  (let ((standard-output (current-buffer))
+	(print-escape-newlines t)
+	(print-level 8)
+	(print-length 50))
+    (guile-backtrace debug-inner-cut 0 1))
+  (goto-char (point-min))
+  ; ----X----
   (insert "Debugger entered")
   (let ((frames (nthcdr
                  ;; Remove debug--implement-debug-on-entry and the
