@@ -159,6 +159,8 @@ where CAUSE can be:
   (pcase args
     (`(error ,err . ,_) (and (consp err) (eq err debugger--last-error)))))
 
+(defvar debug-inner-cut)
+
 ;;;###autoload
 (setq debugger 'debug)
 ;;;###autoload
@@ -181,6 +183,13 @@ first will be printed into the backtrace buffer.
 If `inhibit-redisplay' is non-nil when this function is called,
 the debugger will not be entered."
   (interactive)
+  (let ((debug-inner-cut (funcall (@ (guile) make-prompt-tag))))
+    (funcall (@ (guile) call-with-prompt)
+             debug-inner-cut
+             (lambda () (apply #'debug-1 args))
+             (lambda (k &rest ignore) nil))))
+
+(defun debug-1 (&rest args)
   (if (or inhibit-redisplay
           (debugger--duplicate-p args))
       ;; Don't really try to enter debugger within an eval from redisplay
@@ -188,24 +197,6 @@ the debugger will not be entered."
       ;; which can happen when we have several nested `handler-bind's that
       ;; want to invoke the debugger.
       debugger-value
-    (setq debugger--last-error nil)
-    (let ((non-interactive-frame
-           (or noninteractive           ;FIXME: Presumably redundant.
-               ;; If we're in the initial-frame (where `message' just
-               ;; outputs to stdout) so there's no tty or GUI frame to
-               ;; display the backtrace and interact with it: just dump a
-               ;; backtrace to stdout.  This happens for example while
-               ;; handling an error in code from early-init.el with
-               ;; --debug-init.
-               (and (eq t (framep (selected-frame)))
-                    (equal "initial_terminal" (terminal-name)))))
-          ;; Don't let `inhibit-message' get in our way (especially important if
-          ;; `non-interactive-frame' evaluated to a non-nil value.
-          (inhibit-message nil)
-          ;; We may be entering the debugger from a context that has
-          ;; let-bound `inhibit-read-only', which means that all
-          ;; buffers would be read/write while the debugger is running.
-          (inhibit-read-only nil))
       (unless non-interactive-frame
         (message "Entering debugger..."))
       (let (debugger-value
@@ -301,6 +292,14 @@ the debugger will not be entered."
 		  ;; Make sure we unbind buffer-read-only in the right buffer.
 		  (save-excursion
 		    (recursive-edit))))
+	  (when (and (window-live-p debugger-window)
+		     (eq (window-buffer debugger-window) debugger-buffer))
+	    ;; Record height of debugger window.
+	    (setq debugger-previous-window-height
+		  (window-total-height debugger-window)))
+	  (if debugger-will-be-back
+	      ;; Restore previous window configuration (Bug#12623).
+	      (set-window-configuration window-configuration)
 	    (when (and (window-live-p debugger-window)
 		       (eq (window-buffer debugger-window) debugger-buffer))
 	      ;; Record height of debugger window.
@@ -385,6 +384,7 @@ That buffer should be current already and in `debugger-mode'."
   "Insert the header for the debugger's Backtrace buffer.
 Include the reason for debugger entry from ARGS."
   (insert "Debugger entered")
+  (guile-backtrace debug-inner-cut 0 1)
   (pcase (car args)
     ;; lambda is for debug-on-call when a function call is next.
     ;; debug is for debug-on-entry function called.
