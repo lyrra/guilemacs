@@ -1305,8 +1305,6 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   maybe_load_seccomp (argc, argv);
 #endif
 
-  /* Override Guile's libgc configuration. */
-  xputenv ("GC_ALL_INTERIOR_POINTERS=1");
   scm_boot_guile (argc, argv, main2, NULL);
 }
 

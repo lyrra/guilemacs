@@ -46,6 +46,8 @@ Lisp_Object Vautoload_queue;
    is shutting down.  */
 Lisp_Object Vrun_hooks;
 
+union specbinding *specpdl_base;
+
 /* The function from which the last `signal' was called.  Set in
    Fsignal.  */
 /* FIXME: We should probably get rid of this!  */
@@ -152,6 +154,7 @@ init_eval_once_for_pdumper (void)
 {
   enum { size = 50 };
   union specbinding *pdlvec = malloc ((size + 1) * sizeof *specpdl);
+  specpdl_base = pdlvec;
   specpdl = specpdl_ptr = pdlvec + 1;
   specpdl_end = specpdl + size;
 
@@ -1909,6 +1912,7 @@ grow_specpdl_allocation (void)
   ptrdiff_t pdlvecsize = size + 1;
   eassert (max_size > size);
   pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
+  specpdl_base = pdlvec;
   specpdl = pdlvec + 1;
   specpdl_end = specpdl + pdlvecsize - 1;
   specpdl_ptr = specpdl_ref_to_ptr (count);
