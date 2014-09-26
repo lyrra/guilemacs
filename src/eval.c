@@ -56,6 +56,39 @@ Lisp_Object Vautoload_queue;
    is shutting down.  */
 Lisp_Object Vrun_hooks;
 
+/* The commented-out variables below are macros defined in thread.h.  */
+
+/* Current number of specbindings allocated in specpdl, not counting
+   the dummy entry specpdl[-1].  */
+
+/* ptrdiff_t specpdl_size; */
+
+/* Pointer to beginning of specpdl.  A dummy entry specpdl[-1] exists
+   only so that its address can be taken.  */
+
+/* union specbinding *specpdl; */
+
+/* Pointer to the dummy entry before the specpdl.  */
+
+union specbinding *specpdl_base;
+
+/* Pointer to first unused element in specpdl.  */
+
+/* union specbinding *specpdl_ptr; */
+
+/* Depth in Lisp evaluations and function calls.  */
+
+/* static EMACS_INT lisp_eval_depth; */
+
+/* The value of num_nonmacro_input_events as of the last time we
+   started to enter the debugger.  If we decide to enter the debugger
+   again when this is still equal to num_nonmacro_input_events, then we
+   know that the debugger itself has an error, and we should just
+   signal the error instead of entering an infinite loop of debugger
+   invocations.  */
+
+//static EMACS_INT when_entered_debugger;
+
 /* The function from which the last `signal' was called.  Set in
    Fsignal.  */
 /* FIXME: We should probably get rid of this!  */
@@ -142,6 +175,11 @@ static void init_eval_once_for_pdumper (void);
 void
 init_eval_once (void)
 {
+  enum { size = 50 };
+  union specbinding *pdlvec = xmalloc ((size + 1) * sizeof *specpdl);
+  specpdl_base = pdlvec;
+  specpdl_size = size;
+  specpdl = specpdl_ptr = pdlvec + 1;
   /* Don't forget to update docs (lispref node "Local Variables").  */
 #ifndef HAVE_NATIVE_COMP
   max_specpdl_size = 1800; /* See bug#46818.  */
@@ -1904,6 +1942,7 @@ grow_specpdl (void)
 			  Qnil);
 	}
       pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
+      specpdl_base = pdlvec;
       specpdl = pdlvec + 1;
       specpdl_size = pdlvecsize - 1;
       specpdl_ptr = specpdl + count;
