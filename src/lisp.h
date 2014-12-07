@@ -1409,6 +1409,7 @@ INLINE bool
 #define XSETFLOAT(a, b) ((a) = (b)->self)
 //FIX-20230203-LAV: XSETMISC no longer used
 #define XSETMISC(a, b) (a) = ((union Lisp_Misc *) (b))->u_any.self
+#define make_lisp_proc(p) ((p)->header.self)
 
 /* Pseudovector types.  */
 
