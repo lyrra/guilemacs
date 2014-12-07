@@ -1031,12 +1031,6 @@ make_lisp_symbol (struct Lisp_Symbol *sym)
   return scm_c_vector_ref (b, 0);
 }
 
-INLINE Lisp_Object
-builtin_lisp_symbol (int index)
-{
-  return make_lisp_symbol_internal (&lispsym[index]);
-}
-
 INLINE bool
 c_symbol_p (struct Lisp_Symbol *sym)
 {
@@ -1250,6 +1244,7 @@ XTYPE (Lisp_Object o)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->self)
+#define make_lisp_proc(p) ((p)->header.self)
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
