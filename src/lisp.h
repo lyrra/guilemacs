@@ -1474,6 +1474,7 @@ INLINE bool
 #define XSETFLOAT(a, b) ((a) = (b)->self)
 //FIX-20230203-LAV: XSETMISC no longer used
 #define XSETMISC(a, b) (a) = ((union Lisp_Misc *) (b))->u_any.self
+#define make_lisp_proc(p) ((p)->header.self)
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
