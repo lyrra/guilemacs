@@ -4992,7 +4992,7 @@ option is non-nil, it checks all suffixes and uses whichever file is
 newest.
 Note that if you customize this, obviously it will not affect files
 that are loaded before your customizations are read!  */);
-  load_prefer_newer = 0;
+  load_prefer_newer = 1;
 
   DEFVAR_BOOL ("force-new-style-backquotes", force_new_style_backquotes,
                doc: /* Non-nil means to always use the current syntax for backquotes.
