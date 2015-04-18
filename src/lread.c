@@ -5363,7 +5363,7 @@ option is non-nil, it checks all suffixes and uses whichever file is
 newest.
 Note that if you customize this, obviously it will not affect files
 that are loaded before your customizations are read!  */);
-  load_prefer_newer = 0;
+  load_prefer_newer = 1;
 
   DEFVAR_BOOL ("load-no-native", load_no_native,
                doc: /* Non-nil means not to load a .eln file when a .elc was requested.  */);
