@@ -5105,8 +5105,7 @@ This list includes suffixes for both compiled and source Emacs Lisp files.
 This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a suffix is allowed or required.  */);
-  Vload_suffixes = list2 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"));
+  Vload_suffixes = list2 (build_pure_c_string (".el"));
 #ifdef HAVE_MODULES
   Vload_suffixes = Fcons (build_pure_c_string (MODULES_SUFFIX), Vload_suffixes);
 #ifdef MODULES_SECONDARY_SUFFIX
