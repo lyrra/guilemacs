@@ -4769,12 +4769,10 @@ This list should not include the empty string.
 `load' and related functions try to append these suffixes, in order,
 to the specified file name if a suffix is allowed or required.  */);
 #ifdef HAVE_MODULES
-  Vload_suffixes = list3 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"),
+  Vload_suffixes = list2 (build_pure_c_string (".el"),
 			  build_pure_c_string (MODULES_SUFFIX));
 #else
-  Vload_suffixes = list2 (build_pure_c_string (".elc"),
-			  build_pure_c_string (".el"));
+  Vload_suffixes = list1 (build_pure_c_string (".el"));
 #endif
   DEFVAR_LISP ("module-file-suffix", Vmodule_file_suffix,
 	       doc: /* Suffix of loadable module file, or nil if modules are not supported.  */);
