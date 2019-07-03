@@ -4076,7 +4076,7 @@ intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
-  return intern_driver (make_unibyte_string (str, len), Qnil, Qnil);
+  return Fintern (make_string (str, len), Qnil);
 }
 
 Lisp_Object
@@ -4084,8 +4084,7 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
 {
   /* Creating a non-pure string from a string literal not implemented yet.
      We could just use make_string here and live with the extra copy.  */
-  eassert (!NILP (Vpurify_flag));
-  return intern_driver (make_pure_c_string (str, len), Qnil, Qnil);
+  return Fintern (make_pure_c_string (str, len), Qnil);
 }
 
 #if 0
@@ -4141,8 +4140,6 @@ it defaults to the value of `obarray'.  */)
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  if (!NILP (Vpurify_flag))
-    string = Fpurecopy (string);
   tem = Ffind_symbol (string, obarray);
   if (! NILP (scm_c_value_ref (tem, 1)))
     return scm_c_value_ref (tem, 0);
@@ -4278,37 +4275,17 @@ init_obarray (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  /* FIX: 20190629 LAV, obarray not used
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    define_symbol (builtin_lisp_symbol (i), defsym_name[i]);
-   */
-
-  // FIX: 20190626 LAV, new interface:
-  DEFSYM (Qunbound, "unbound");
-  // should do something like this:
-  Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
-  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
-
-  DEFSYM (Qnil, "nil");
   Qnil = SCM_ELISP_NIL;
+  Qt = SCM_BOOL_T;
 
   Qnil_ = intern_c_string ("nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
-  // FIX: 20190626 LAV, 1/2 correct def of t?
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
-
-  // FIX: 20190626 LAV, 2/2 correct def of t?
-  DEFSYM (Qt, "t");
-  Qt = SCM_BOOL_T;
-  SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt));
-  //XSYMBOL (Qt)->declared_special = true;  // FIX: 20190626 LAV, true or 1?!?
-  SET_SYMBOL_DECLARED_SPECIAL(Qt, true);
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);

@@ -553,13 +553,15 @@ make_interval (void)
 			  String Allocation
  ***********************************************************************/
 
+static Lisp_Object make_pure_string_empty ();
+
 /* Initialize string allocation.  Called from init_alloc_once.  */
 
 static void
 init_strings (void)
 {
-  empty_unibyte_string = make_empty_string (0);
-  empty_multibyte_string = make_empty_string (1);
+  empty_unibyte_string = make_pure_string_empty ();
+  empty_multibyte_string = make_pure_string_empty ();
 }
 
 /* Return a new Lisp_String.  */
@@ -906,6 +908,16 @@ make_specified_string (const char *contents,
   return val;
 }
 
+static Lisp_Object
+make_pure_string_empty ()
+{
+  Lisp_Object strobj = allocate_string (); /* make an string object */
+  ((struct Lisp_String *) SCM_SMOB_DATA (strobj))->intervals = NULL;
+  allocate_string_data (strobj, 0, 0); /* makes an empty null-terminated string */
+  XSTRING (strobj)->size_byte = XSTRING (strobj)->size = 0;
+
+  return strobj;
+}
 
 /* Return an unibyte Lisp_String set up to hold LENGTH characters
    occupying LENGTH bytes.  */

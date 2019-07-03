@@ -5283,7 +5283,9 @@ init_buffer_once (void)
   Vprin1_to_string_buffer = Fget_buffer_create (build_pure_c_string (" prin1"));
   Vbuffer_alist = Qnil;
 
-  Fset_buffer (Fget_buffer_create (build_pure_c_string ("*scratch*")));
+  Lisp_Object name = build_pure_c_string ("*scratch*");
+  Lisp_Object buf = Fget_buffer_create (name);
+  Fset_buffer (buf);
 
   inhibit_modification_hooks = 0;
 }
