@@ -3242,7 +3242,6 @@ To prevent this happening, set `quit-flag' to nil
 before making `inhibit-quit' nil.  */);
   Vinhibit_quit = Qnil;
 
-  DEFSYM (Qsetq, "setq");
   DEFSYM (Qinhibit_quit, "inhibit-quit");
   DEFSYM (Qautoload, "autoload");
   DEFSYM (Qinhibit_debugger, "inhibit-debugger");
