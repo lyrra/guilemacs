@@ -4383,15 +4383,15 @@ intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
-  Lisp_Object obarray = check_obarray (Vobarray);
-  return intern_driver (make_unibyte_string (str, len), obarray, Qnil);
+  //Lisp_Object obarray = check_obarray (Vobarray);
+  //return intern_driver (make_unibyte_string (str, len), obarray, Qnil);
+  return Fintern (make_string (str, len), Qnil);
 }
 
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  Lisp_Object obarray = check_obarray (Vobarray);
-  return intern_driver (make_string (str, len), obarray, Qnil);
+  return Fintern (make_string (str, len), Qnil);
 }
 
 #if 0
@@ -4675,13 +4675,17 @@ init_obarray_once (void)
   DEFSYM (Qnil, "nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
 
+  // FIX-20230212-LAV: is this ok?
+  Qnil = SCM_ELISP_NIL;
+  // FIX-20230212-LAV: is this ok?
+  Qt = SCM_BOOL_T;
+
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
-  // FIX: 20190626 LAV, 1/2 correct def of t?
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   // FIX: 20190626 LAV, 2/2 correct def of t?
@@ -4695,6 +4699,9 @@ init_obarray_once (void)
   // make_symbol_constant (Qt);  // and this is the new interface, refactor post-2015
   //XSYMBOL (Qt_)->declared_special = 1; //FIX-20230212-LAV: do this? if so, use true?
   SET_SYMBOL_DECLARED_SPECIAL(Qt, true);
+
+  // FIX-20230212-LAV: is this ok?
+  Qt = SCM_BOOL_T;
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
