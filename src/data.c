@@ -40,8 +40,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
 Lisp_Object Qnil_, Qt_;
-//FIX: 20190626 LAV, 2015 had: Lisp_Object Qnil_, Qt_;
-//                               Lisp_Object Qspecial_operator;
+//FIX: 20190626 LAV, BT-2015 had: Lisp_Object Qspecial_operator;
 
 static bool
 BOOLFWDP (union Lisp_Fwd *a)
@@ -704,6 +703,22 @@ global value outside of any lexical scope.  */)
   return (EQ (valcontents, Qunbound) ? Qnil : Qt);
 }
 
+
+/* Call function fn with 1 argument arg1.  */
+/* ARGSUSED */
+Lisp_Object
+callx (Lisp_Object fn, Lisp_Object arg1)
+{
+  return CALLN (Ffuncall, fn, arg1);
+}
+
+
+#define WRAP1(cfn, lfn) \
+  SCM_SNARF_INIT (DEFSYM (cfn ## _sym, lfn)) \
+  static Lisp_Object cfn ## _sym; \
+  Lisp_Object cfn (Lisp_Object a) \
+  { return callx (cfn ## _sym, a); }
+
 WRAP1 (Ffboundp, "fboundp")
 WRAP1 (Fmakunbound, "makunbound")
 WRAP1 (Ffmakunbound, "fmakunbound")
@@ -728,6 +743,7 @@ DEFUN ("symbol-name", Fsymbol_name, Ssymbol_name, 1, 1, 0,
   return name;
 }
 
+#define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
 WRAP2 (Ffset, "fset")
 
 DEFUN ("defalias", Fdefalias, Sdefalias, 2, 3, 0,
