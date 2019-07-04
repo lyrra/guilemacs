@@ -11589,12 +11589,12 @@ If `help-form' is nil, the help char is not recognized.  */);
 This command is used only when there is no actual binding
 for that character after that prefix key.  */);
   Vprefix_help_command = Qnil;
-
   DEFVAR_LISP ("top-level", Vtop_level,
 	       doc: /* Form to evaluate when Emacs starts up.
 Useful to set before you dump a modified Emacs.  */);
   Vtop_level = Qnil;
-  SET_SYMBOL_DECLARED_SPECIAL(Qtop_level, 0);
+  // FIX: 20190704 LAV, below is not used in 2015.
+  SET_SYMBOL_DECLARED_SPECIAL(XSYMBOL(Qtop_level), 0);
 
   DEFVAR_KBOARD ("keyboard-translate-table", Vkeyboard_translate_table,
                  doc: /* Translate table for local keyboard input, or nil.
