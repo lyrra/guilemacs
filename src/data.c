@@ -3695,6 +3695,13 @@ syms_of_data (void)
   PUT_ERROR (Qunderflow_error, Fcons (Qdomain_error, arith_tail),
 	     "Arithmetic underflow error");
 
+  //staticpro (&Qnil);
+  //staticpro (&Qt);
+  //staticpro (&Qunbound);
+  DEFSYM (Qnil, "nil");
+  DEFSYM (Qt, "t");
+  DEFSYM (Qunbound, "unbound");
+
   /* Types that type-of returns.  */
   DEFSYM (Qinteger, "integer");
   DEFSYM (Qsymbol, "symbol");

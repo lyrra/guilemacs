@@ -48,15 +48,29 @@ INLINE_HEADER_BEGIN
 
 //   extern Lisp_Object name;
 
-#define DECLARE_GDB_SYMBOL_ENUM(id) enum { id = id##_val };
-#ifdef MAIN_PROGRAM
 // FIX: LAV, don't rely on GCC specific EXTERNALLY_VISIBLE
+//#define DECLARE_GDB_SYMBOL_ENUM(id) enum { id = id##_val };
+//#define DECLARE_GDB_SYM(type, id) type id EXTERNALLY_VISIBLE
+//#ifdef MAIN_PROGRAM
+//# define DEFINE_GDB_SYMBOL_BEGIN(type, id) type id EXTERNALLY_VISIBLE
+//# define DEFINE_GDB_SYMBOL_BEGIN(type, id) DECLARE_GDB_SYM (type, id)
+//# define DEFINE_GDB_SYMBOL_END(id) = id;
+//#else
+//# define DEFINE_GDB_SYMBOL_BEGIN(type, id) extern DECLARE_GDB_SYM (type, id)
+//# define DEFINE_GDB_SYMBOL_END(val);
+//# define DEFINE_GDB_SYMBOL_BEGIN(type, id) extern type id;
+//# define DEFINE_GDB_SYMBOL_END(val)
+//#endif
+
+#define DEFINE_GDB_SYMBOL_ENUM(id) enum { id = id##_val };
+#if defined MAIN_PROGRAM
 # define DEFINE_GDB_SYMBOL_BEGIN(type, id) type id EXTERNALLY_VISIBLE
-# define DEFINE_GDB_SYMBOL_END(id) = id;
+# define DEFINE_GDB_SYMBOL_END(id) ;
 #else
-# define DEFINE_GDB_SYMBOL_BEGIN(type, id) extern type id;
-# define DEFINE_GDB_SYMBOL_END(val)
+# define DEFINE_GDB_SYMBOL_BEGIN(type, id) extern type id
+# define DEFINE_GDB_SYMBOL_END(val) ;
 #endif
+
 
 /* The ubiquitous max and min macros.  */
 #undef min
@@ -525,7 +539,7 @@ extern void char_table_set (Lisp_Object, int, Lisp_Object);
 /* Defined in data.c.  */
 extern _Noreturn void wrong_type_argument (Lisp_Object, Lisp_Object);
 //extern Lisp_Object Qintegerp;
-extern Lisp_Object Qt_, Qnil_;
+extern Lisp_Object Qt, Qt_, Qnil_, Qnil, Qunbound;
 //extern Lisp_Object Qnumberp; // 2015-old
 //extern Lisp_Object Qvector_or_char_table_p;
 //extern Lisp_Object Qarrayp; //, Qbufferp, Qbuffer_or_string_p, Qchar_table_p;
@@ -668,7 +682,7 @@ INLINE void *
    format does not represent C macros.  */
 #define DEFINE_LISP_SYMBOL(name) \
   DEFINE_GDB_SYMBOL_BEGIN (Lisp_Object, name) ;
-  //DEFINE_GDB_SYMBOL_END (LISPSYM_INITIALLY (name))
+  DEFINE_GDB_SYMBOL_END (LISPSYM_INITIALLY (name))
 
 /* The index of the C-defined Lisp symbol SYM.
    This can be used in a static initializer.  */
