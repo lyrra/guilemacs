@@ -5590,7 +5590,6 @@ change_frame_size (struct frame *f, int new_width, int new_height,
   else
     change_frame_size_1 (f, new_width, new_height, pretend, delay, safe,
 			 pixelwise);
-  dynwind_end ();
 }
 
 /***********************************************************************

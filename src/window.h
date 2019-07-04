@@ -437,7 +437,7 @@ INLINE struct window *
 XWINDOW (Lisp_Object a)
 {
   eassert (WINDOWP (a));
-  return XUNTAG (a, Lisp_Vectorlike);
+  return SMOB_PTR (a);
 }
 
 /* Most code should use these functions to set Lisp fields in struct
