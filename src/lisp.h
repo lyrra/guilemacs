@@ -59,6 +59,7 @@ INLINE_HEADER_BEGIN
 # define DEFINE_GDB_SYMBOL_END(val) ;
 #endif
 
+
 /* The ubiquitous max and min macros.  */
 #undef min
 #undef max

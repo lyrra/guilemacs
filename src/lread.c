@@ -4700,7 +4700,7 @@ init_obarray_once (void)
   //XSYMBOL (Qt_)->declared_special = 1; //FIX-20230212-LAV: do this? if so, use true?
   SET_SYMBOL_DECLARED_SPECIAL(Qt);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_));
 
   // FIX-20230212-LAV: is this ok?
   Qt = SCM_BOOL_T;
