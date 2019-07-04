@@ -3531,60 +3531,60 @@ bottom edge of FRAME's display.  */)
 
 struct frame_parm_table {
   const char *name;
-  int sym;
+  Lisp_Object *variable;
 };
 
 static const struct frame_parm_table frame_parms[] =
 {
-  {"auto-raise",		SYMBOL_INDEX (Qauto_raise)},
-  {"auto-lower",		SYMBOL_INDEX (Qauto_lower)},
-  {"background-color",		-1},
-  {"border-color",		SYMBOL_INDEX (Qborder_color)},
-  {"border-width",		SYMBOL_INDEX (Qborder_width)},
-  {"cursor-color",		SYMBOL_INDEX (Qcursor_color)},
-  {"cursor-type",		SYMBOL_INDEX (Qcursor_type)},
-  {"font",			-1},
-  {"foreground-color",		-1},
-  {"icon-name",			SYMBOL_INDEX (Qicon_name)},
-  {"icon-type",			SYMBOL_INDEX (Qicon_type)},
-  {"internal-border-width",	SYMBOL_INDEX (Qinternal_border_width)},
-  {"right-divider-width",	SYMBOL_INDEX (Qright_divider_width)},
-  {"bottom-divider-width",	SYMBOL_INDEX (Qbottom_divider_width)},
-  {"menu-bar-lines",		SYMBOL_INDEX (Qmenu_bar_lines)},
-  {"mouse-color",		SYMBOL_INDEX (Qmouse_color)},
-  {"name",			SYMBOL_INDEX (Qname)},
-  {"scroll-bar-width",		SYMBOL_INDEX (Qscroll_bar_width)},
-  {"scroll-bar-height",		SYMBOL_INDEX (Qscroll_bar_height)},
-  {"title",			SYMBOL_INDEX (Qtitle)},
-  {"unsplittable",		SYMBOL_INDEX (Qunsplittable)},
-  {"vertical-scroll-bars",	SYMBOL_INDEX (Qvertical_scroll_bars)},
-  {"horizontal-scroll-bars",	SYMBOL_INDEX (Qhorizontal_scroll_bars)},
-  {"visibility",		SYMBOL_INDEX (Qvisibility)},
-  {"tool-bar-lines",		SYMBOL_INDEX (Qtool_bar_lines)},
-  {"scroll-bar-foreground",	SYMBOL_INDEX (Qscroll_bar_foreground)},
-  {"scroll-bar-background",	SYMBOL_INDEX (Qscroll_bar_background)},
-  {"screen-gamma",		SYMBOL_INDEX (Qscreen_gamma)},
-  {"line-spacing",		SYMBOL_INDEX (Qline_spacing)},
-  {"left-fringe",		SYMBOL_INDEX (Qleft_fringe)},
-  {"right-fringe",		SYMBOL_INDEX (Qright_fringe)},
-  {"wait-for-wm",		SYMBOL_INDEX (Qwait_for_wm)},
-  {"fullscreen",                SYMBOL_INDEX (Qfullscreen)},
-  {"font-backend",		SYMBOL_INDEX (Qfont_backend)},
-  {"alpha",			SYMBOL_INDEX (Qalpha)},
-  {"sticky",			SYMBOL_INDEX (Qsticky)},
-  {"tool-bar-position",		SYMBOL_INDEX (Qtool_bar_position)},
-  {"inhibit-double-buffering",  SYMBOL_INDEX (Qinhibit_double_buffering)},
-  {"undecorated",		SYMBOL_INDEX (Qundecorated)},
-  {"parent-frame",		SYMBOL_INDEX (Qparent_frame)},
-  {"skip-taskbar",		SYMBOL_INDEX (Qskip_taskbar)},
-  {"no-focus-on-map",		SYMBOL_INDEX (Qno_focus_on_map)},
-  {"no-accept-focus",		SYMBOL_INDEX (Qno_accept_focus)},
-  {"z-group",			SYMBOL_INDEX (Qz_group)},
-  {"override-redirect",		SYMBOL_INDEX (Qoverride_redirect)},
-  {"no-special-glyphs",		SYMBOL_INDEX (Qno_special_glyphs)},
+  {"auto-raise",		&Qauto_raise},
+  {"auto-lower",		&Qauto_lower},
+  {"background-color",		0},
+  {"border-color",		&Qborder_color},
+  {"border-width",		&Qborder_width},
+  {"cursor-color",		&Qcursor_color},
+  {"cursor-type",		&Qcursor_type},
+  {"font",			0},
+  {"foreground-color",		0},
+  {"icon-name",			&Qicon_name},
+  {"icon-type",			&Qicon_type},
+  {"internal-border-width",	&Qinternal_border_width},
+  {"right-divider-width",	&Qright_divider_width},
+  {"bottom-divider-width",	&Qbottom_divider_width},
+  {"menu-bar-lines",		&Qmenu_bar_lines},
+  {"mouse-color",		&Qmouse_color},
+  {"name",			&Qname},
+  {"scroll-bar-width",		&Qscroll_bar_width},
+  {"scroll-bar-height",		&Qscroll_bar_height},
+  {"title",			&Qtitle},
+  {"unsplittable",		&Qunsplittable},
+  {"vertical-scroll-bars",	&Qvertical_scroll_bars},
+  {"horizontal-scroll-bars",	&Qhorizontal_scroll_bars},
+  {"visibility",		&Qvisibility},
+  {"tool-bar-lines",		&Qtool_bar_lines},
+  {"scroll-bar-foreground",	&Qscroll_bar_foreground},
+  {"scroll-bar-background",	&Qscroll_bar_background},
+  {"screen-gamma",		&Qscreen_gamma},
+  {"line-spacing",		&Qline_spacing},
+  {"left-fringe",		&Qleft_fringe},
+  {"right-fringe",		&Qright_fringe},
+  {"wait-for-wm",		&Qwait_for_wm},
+  {"fullscreen",                &Qfullscreen},
+  {"font-backend",		&Qfont_backend},
+  {"alpha",			&Qalpha},
+  {"sticky",			&Qsticky},
+  {"tool-bar-position",		&Qtool_bar_position},
+  {"inhibit-double-buffering",  &Qinhibit_double_buffering},
+  {"undecorated",		&Qundecorated},
+  {"parent-frame",		&Qparent_frame},
+  {"skip-taskbar",		&Qskip_taskbar},
+  {"no-focus-on-map",		&Qno_focus_on_map},
+  {"no-accept-focus",		&Qno_accept_focus},
+  {"z-group",			&Qz_group},
+  {"override-redirect",		&Qoverride_redirect},
+  {"no-special-glyphs",		&Qno_special_glyphs},
 #ifdef NS_IMPL_COCOA
-  {"ns-appearance",		SYMBOL_INDEX (Qns_appearance)},
-  {"ns-transparent-titlebar",	SYMBOL_INDEX (Qns_transparent_titlebar)},
+  {"ns-appearance",		&Qns_appearance},
+  {"ns-transparent-titlebar",	&Qns_transparent_titlebar},
 #endif
 };
 
@@ -5773,13 +5773,17 @@ syms_of_frame (void)
   DEFSYM (Qmake_invisible, "make-invisible");
 
   {
-    int i;
-
-    for (i = 0; i < ARRAYELTS (frame_parms); i++)
+    for (int i = 0; i < ARRAYELTS (frame_parms); i++)
       {
-	Lisp_Object v = (frame_parms[i].sym < 0
-			 ? intern_c_string (frame_parms[i].name)
-			 : (frame_parms[i].sym)); // FIX: lav
+	Lisp_Object v = intern_c_string (frame_parms[i].name);
+	//Lisp_Object v = (frame_parms[i].sym < 0
+	//		 ? intern_c_string (frame_parms[i].name)
+	//		 : (frame_parms[i].sym)); // FIX: lav
+	if (frame_parms[i].variable)
+	  {
+	    *frame_parms[i].variable = v;
+	    staticpro (frame_parms[i].variable);
+	  }
 	Fput (v, Qx_frame_parameter, make_number (i));
       }
   }
