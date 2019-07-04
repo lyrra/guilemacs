@@ -4315,8 +4315,8 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 #define USE_SAFE_ALLOCA ((void) 0)
 
-#define AVAIL_ALLOCA(size) size
-//(MAX_ALLOCA -= (size), alloca (size))
+#define AVAIL_ALLOCA(size) alloca (size)
+  //(MAX_ALLOCA -= (size), alloca (size))
 
 /* SAFE_ALLOCA allocates a simple buffer.  */
 // FIX: 20190626 LAV, if sa_avail exist, revert partially this patch, keeping only xmalloc(size)
