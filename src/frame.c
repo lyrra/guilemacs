@@ -3855,20 +3855,22 @@ multiplied to find the real number of pixels.  */)
 
 struct frame_parm_table {
   const char *name;
-  int sym;
+  Lisp_Object *variable;
 };
+
+#define SYMBOL_INDEX(SYM) &sym
 
 static const struct frame_parm_table frame_parms[] =
 {
   {"auto-raise",		SYMBOL_INDEX (Qauto_raise)},
   {"auto-lower",		SYMBOL_INDEX (Qauto_lower)},
-  {"background-color",		-1},
+  {"background-color",		0},
   {"border-color",		SYMBOL_INDEX (Qborder_color)},
   {"border-width",		SYMBOL_INDEX (Qborder_width)},
   {"cursor-color",		SYMBOL_INDEX (Qcursor_color)},
   {"cursor-type",		SYMBOL_INDEX (Qcursor_type)},
-  {"font",			-1},
-  {"foreground-color",		-1},
+  {"font",			0},
+  {"foreground-color",		0},
   {"icon-name",			SYMBOL_INDEX (Qicon_name)},
   {"icon-type",			SYMBOL_INDEX (Qicon_type)},
   {"child-frame-border-width",	SYMBOL_INDEX (Qchild_frame_border_width)},
@@ -3909,8 +3911,8 @@ static const struct frame_parm_table frame_parms[] =
   {"override-redirect",		SYMBOL_INDEX (Qoverride_redirect)},
   {"no-special-glyphs",		SYMBOL_INDEX (Qno_special_glyphs)},
 #ifdef NS_IMPL_COCOA
-  {"ns-appearance",		SYMBOL_INDEX (Qns_appearance)},
-  {"ns-transparent-titlebar",	SYMBOL_INDEX (Qns_transparent_titlebar)},
+  {"ns-appearance",		&Qns_appearance},
+  {"ns-transparent-titlebar",	&Qns_transparent_titlebar},
 #endif
 };
 
@@ -6150,13 +6152,17 @@ syms_of_frame (void)
   DEFSYM (Qmake_invisible, "make-invisible");
 
   {
-    int i;
-
-    for (i = 0; i < ARRAYELTS (frame_parms); i++)
+    for (int i = 0; i < ARRAYELTS (frame_parms); i++)
       {
 	Lisp_Object v = (frame_parms[i].sym < 0
 			 ? intern_c_string (frame_parms[i].name)
 			 : builtin_lisp_symbol (frame_parms[i].sym));
+        //FIX-20230212-LAV: is this needed?
+	if (frame_parms[i].variable)
+	  {
+	    *frame_parms[i].variable = v;
+	    staticpro (frame_parms[i].variable);
+	  }
 	Fput (v, Qx_frame_parameter, make_fixnum (i));
       }
   }
