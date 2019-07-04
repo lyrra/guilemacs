@@ -11260,7 +11260,8 @@ internal character representation.  */);
   Vtranslation_table_for_input = Qnil;
 
   Lisp_Object args[coding_arg_undecided_max];
-  memclear (args, sizeof args);
+  for (int i = 0; i < coding_arg_undecided_max; i++)
+    args[i] = Qnil;
 
   Lisp_Object plist[] =
     {
