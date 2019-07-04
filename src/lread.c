@@ -4280,11 +4280,11 @@ init_obarray (void)
 
   Qnil_ = intern_c_string ("nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
