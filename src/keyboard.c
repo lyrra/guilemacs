@@ -11342,10 +11342,14 @@ syms_of_keyboard (void)
     for (i = 0; i < ARRAYELTS (head_table); i++)
       {
 	const struct event_head *p = &head_table[i];
-	Lisp_Object var =  (p->var);
-	Lisp_Object kind = (p->kind);
-	Fput (var, Qevent_kind, kind);
-	Fput (var, Qevent_symbol_elements, list1 (var));
+	*p->var = intern_c_string (p->name);
+	staticpro (p->var);
+	//Lisp_Object var =  (p->var);
+	//Lisp_Object kind = (p->kind);
+	Fput (*p->var, Qevent_kind, *p->kind);
+	Fput (*p->var, Qevent_symbol_elements, list1 (*p->var));
+	//Fput (var, Qevent_kind, kind);
+	//Fput (var, Qevent_symbol_elements, list1 (var));
       }
   }
 
