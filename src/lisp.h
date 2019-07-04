@@ -1796,9 +1796,11 @@ INLINE int
   return lisp_h_SYMBOL_CONSTANT_P (sym);
 }
 
-/* Placeholder for make-docfile to process.  The actual symbol
-   definition is done by lread.c's define_symbol.  */
-#define DEFSYM(sym, name) /* empty */
+/* make-docfile snarfes out DEFSYM macros, and puts
+   the result to globals.h  Also see
+   definitions done by lread.c's define_symbol. */
+#define DEFSYM(sym, name) \
+  do { (sym) = intern_c_string ((name)); staticpro (&(sym)); } while (false)
 
 LISP_MACRO_DEFUN (SYMBOL_VAL, Lisp_Object, (sym_t sym), (sym))
 /* Types of data which may be saved in a Lisp_Save_Value.  */

@@ -219,10 +219,116 @@ static ptrdiff_t last_point_position;
    'volatile' here.  */
 Lisp_Object internal_last_event_frame;
 
+//static Lisp_Object Qx_set_selection, Qhandle_switch_frame;
+//static Lisp_Object Qhandle_select_window;
+//Lisp_Object QPRIMARY;
+
+//static Lisp_Object Qself_insert_command;
+//static Lisp_Object Qforward_char;
+//static Lisp_Object Qbackward_char;
+//Lisp_Object Qundefined;
+//static Lisp_Object Qtimer_event_handler;
+
 /* `read_key_sequence' stores here the command definition of the
    key sequence that it reads.  */
 static Lisp_Object read_key_sequence_cmd;
 static Lisp_Object read_key_sequence_remapped;
+
+//static Lisp_Object Qinput_method_function;
+
+//static Lisp_Object Qdeactivate_mark;
+
+//Lisp_Object Qrecompute_lucid_menubar, Qactivate_menubar_hook;
+
+//static Lisp_Object Qecho_area_clear_hook;
+
+/* Hooks to run before and after each command.  */
+//static Lisp_Object Qpre_command_hook;
+//static Lisp_Object Qpost_command_hook;
+
+//static Lisp_Object Qdeferred_action_function;
+
+//static Lisp_Object Qdelayed_warnings_hook;
+
+//static Lisp_Object Qinput_method_exit_on_first_char;
+//static Lisp_Object Qinput_method_use_echo_area;
+
+//static Lisp_Object Qhelp_form_show;
+
+/* Symbols to head events.  */
+//static Lisp_Object Qmouse_movement;
+//static Lisp_Object Qscroll_bar_movement;
+//Lisp_Object Qswitch_frame; // FIX, 20190703 LAV, not static
+//static Lisp_Object Qmove_frame;
+//static Lisp_Object Qfocus_in, Qfocus_out;
+//static Lisp_Object Qdelete_frame;
+//static Lisp_Object Qiconify_frame;
+//static Lisp_Object Qmake_frame_visible;
+//static Lisp_Object Qselect_window;
+//Lisp_Object Qhelp_echo; // FIX: LAV, not static
+
+//static Lisp_Object Qmouse_fixup_help_message;
+
+//static Lisp_Object Qmouse_fixup_help_message;
+
+/* Symbols to denote kinds of events.  */
+//static Lisp_Object Qfunction_key;
+//Lisp_Object Qmouse_click;
+//#ifdef HAVE_NTGUI
+//Lisp_Object Qlanguage_change;
+//#endif
+//static Lisp_Object Qdrag_n_drop;
+//static Lisp_Object Qsave_session;
+//#ifdef HAVE_DBUS
+//static Lisp_Object Qdbus_event;
+//#endif
+//#ifdef USE_FILE_NOTIFY
+//static Lisp_Object Qfile_notify;
+//#endif /* USE_FILE_NOTIFY */
+//static Lisp_Object Qconfig_changed_event;
+
+/* Lisp_Object Qmouse_movement; - also an event header */
+
+/* Properties of event headers.  */
+//Lisp_Object Qevent_kind;
+//static Lisp_Object Qevent_symbol_elements;
+
+/* Menu and tool bar item parts.  */
+//static Lisp_Object Qmenu_enable;
+//static Lisp_Object QCenable, QCvisible, QChelp, QCkeys, QCkey_sequence;
+//Lisp_Object QCfilter;
+
+/* Non-nil disable property on a command means
+   do not execute it; call disabled-command-function's value instead.  */
+//Lisp_Object QCtoggle, QCradio;
+//static Lisp_Object QCbutton, QClabel;
+
+//static Lisp_Object QCvert_only;
+
+/* An event header symbol HEAD may have a property named
+   Qevent_symbol_element_mask, which is of the form (BASE MODIFIERS);
+   BASE is the base, unmodified version of HEAD, and MODIFIERS is the
+   mask of modifiers applied to it.  If present, this is used to help
+   speed up parse_modifiers.  */
+//Lisp_Object Qevent_symbol_element_mask;
+
+/* An unmodified event header BASE may have a property named
+   Qmodifier_cache, which is an alist mapping modifier masks onto
+   modified versions of BASE.  If present, this helps speed up
+   apply_modifiers.  */
+//static Lisp_Object Qmodifier_cache;
+
+/* Symbols to use for parts of windows.  */
+//Lisp_Object Qmode_line;
+//Lisp_Object Qvertical_line;
+//Lisp_Object Qright_divider, Qbottom_divider;
+//static Lisp_Object Qvertical_scroll_bar;
+//Lisp_Object Qmenu_bar;
+
+//static Lisp_Object Qecho_keystrokes;
+
+
+/*************************************************/
 
 /* File in which we write all commands we read.  */
 static FILE *dribble;

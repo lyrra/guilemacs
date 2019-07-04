@@ -3734,6 +3734,8 @@ syms_of_data (void)
 
   DEFSYM (Qdefalias_fset_function, "defalias-fset-function");
 
+  //FIX: 2019 uses defsubr instead of DEFSYM, which sets the
+  //     symbol-function of the symbol object
   set_symbol_function (Qwholenump, SYMBOL_FUNCTION (Qnatnump));
 
   DEFVAR_LISP ("most-positive-fixnum", Vmost_positive_fixnum,
