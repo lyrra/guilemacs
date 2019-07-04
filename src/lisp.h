@@ -346,7 +346,7 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
       scm_c_vector_set_x (sym, 4, v))
 
 #define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_CONSTANT (XSYMBOL (sym)))
-#define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (GET_SYMBOL_TRAPPED (XSYMBOL (sym)))
+#define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (GET_SYMBOL_TRAPPED (sym))
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
     scm_c_vector_ref (sym, 4))
