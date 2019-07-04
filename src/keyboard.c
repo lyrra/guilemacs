@@ -86,7 +86,7 @@ char const DEV_TTY[] = "CONOUT$";
 char const DEV_TTY[] = "/dev/tty";
 #endif
 
-#include <gc.h> /* for GC_collect_a_little */
+//#include <gc.h> /* for GC_collect_a_little */
 
 /* Variables for blockinput.h:  */
 
@@ -138,18 +138,12 @@ static int raw_keybuf_count;
    that precede this key sequence.  */
 static ptrdiff_t this_single_command_key_start;
 
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
+/* For longjmp to where kbd input is being done.  */
 
-/* For longjmp to recover from C stack overflow.  */
-sigjmp_buf return_to_command_loop;
-
-/* Message displayed by Vtop_level when recovering from C stack overflow.  */
-static Lisp_Object recover_top_level_message;
-
-#endif /* HAVE_STACK_OVERFLOW_HANDLING */
 static Lisp_Object getctag;
 
 /* Message normally displayed by Vtop_level.  */
+// FIX: larv not used in 2015
 static Lisp_Object regular_top_level_message;
 
 /* True while displaying for echoing.   Delays C-g throwing.  */
@@ -286,6 +280,8 @@ bool input_pending;
    input_pending when we begin the command, then redisplay is not skipped
    which results in better feedback to the user.  */
 static bool input_was_pending;
+
+// FIX: LAV 2015 has removed input_was_pending, why?
 
 /* Circular buffer for pre-read keyboard input.  */
 
@@ -1047,21 +1043,6 @@ static Lisp_Object top_level_1 (Lisp_Object);
 Lisp_Object
 command_loop (void)
 {
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-  /* At least on GNU/Linux, saving signal mask is important here.  */
-  if (sigsetjmp (return_to_command_loop, 1) != 0)
-    {
-      /* Comes here from handle_sigsegv (see sysdep.c) and
-	 stack_overflow_handler (see w32fns.c).  */
-#ifdef WINDOWSNT
-      w32_reset_stack_overflow_guard ();
-#endif
-      init_eval ();
-      Vinternal__top_level_message = recover_top_level_message;
-    }
-  else
-    Vinternal__top_level_message = regular_top_level_message;
-#endif /* HAVE_STACK_OVERFLOW_HANDLING */
   if (command_loop_level > 0 || minibuf_level > 0)
     {
       Lisp_Object val;
@@ -4988,14 +4969,9 @@ static const char *const lispy_drag_n_drop_names[] =
 /* An array of symbol indexes of scroll bar parts, indexed by an enum
    scroll_bar_part value.  Note that Qnil corresponds to
    scroll_bar_nowhere and should not appear in Lisp events.  */
-static short const scroll_bar_parts[] = {
-  SYMBOL_INDEX (Qnil), SYMBOL_INDEX (Qabove_handle), SYMBOL_INDEX (Qhandle),
-  SYMBOL_INDEX (Qbelow_handle), SYMBOL_INDEX (Qup), SYMBOL_INDEX (Qdown),
-  SYMBOL_INDEX (Qtop), SYMBOL_INDEX (Qbottom), SYMBOL_INDEX (Qend_scroll),
-  SYMBOL_INDEX (Qratio), SYMBOL_INDEX (Qbefore_handle),
-  SYMBOL_INDEX (Qhorizontal_handle), SYMBOL_INDEX (Qafter_handle),
-  SYMBOL_INDEX (Qleft), SYMBOL_INDEX (Qright), SYMBOL_INDEX (Qleftmost),
-  SYMBOL_INDEX (Qrightmost), SYMBOL_INDEX (Qend_scroll), SYMBOL_INDEX (Qratio)
+static Lisp_Object *const scroll_bar_parts[] = {
+  &Qabove_handle, &Qhandle, &Qbelow_handle,
+  &Qup, &Qdown, &Qtop, &Qbottom, &Qend_scroll, &Qratio
 };
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -11003,30 +10979,32 @@ init_keyboard (void)
 #endif
 }
 
-/* This type's only use is in syms_of_keyboard, to put properties on the
-   event header symbols.  */
+/* This type's only use is in syms_of_keyboard, to initialize the
+   event header symbols and put properties on them.  */
 struct event_head
 {
-  short var;
-  short kind;
+  Lisp_Object *var;
+  const char *name;
+  Lisp_Object *kind;
 };
 
 static const struct event_head head_table[] = {
-  {SYMBOL_INDEX (Qmouse_movement),      SYMBOL_INDEX (Qmouse_movement)},
-  {SYMBOL_INDEX (Qscroll_bar_movement), SYMBOL_INDEX (Qmouse_movement)},
+  {&Qmouse_movement,      "mouse-movement",      &Qmouse_movement},
+  {&Qscroll_bar_movement, "scroll-bar-movement", &Qmouse_movement},
 
   /* Some of the event heads.  */
-  {SYMBOL_INDEX (Qswitch_frame),        SYMBOL_INDEX (Qswitch_frame)},
+  {&Qswitch_frame,        "switch-frame",        &Qswitch_frame},
 
-  {SYMBOL_INDEX (Qfocus_in),            SYMBOL_INDEX (Qfocus_in)},
-  {SYMBOL_INDEX (Qfocus_out),           SYMBOL_INDEX (Qfocus_out)},
-  {SYMBOL_INDEX (Qmove_frame),          SYMBOL_INDEX (Qmove_frame)},
-  {SYMBOL_INDEX (Qdelete_frame),        SYMBOL_INDEX (Qdelete_frame)},
-  {SYMBOL_INDEX (Qiconify_frame),       SYMBOL_INDEX (Qiconify_frame)},
-  {SYMBOL_INDEX (Qmake_frame_visible),  SYMBOL_INDEX (Qmake_frame_visible)},
+  {&Qfocus_in,            "focus-in",            &Qfocus_in},
+  {&Qfocus_out,           "focus-out",	         &Qfocus_out},
+  {&Qmove_frame,          "move-frame",          &Qmove_frame},
+  {&Qdelete_frame,        "delete-frame",        &Qdelete_frame},
+  {&Qiconify_frame,       "iconify-frame",       &Qiconify_frame},
+  {&Qmake_frame_visible,  "make-frame-visible",  &Qmake_frame_visible},
+
   /* `select-window' should be handled just like `switch-frame'
      in read_key_sequence.  */
-  {SYMBOL_INDEX (Qselect_window),       SYMBOL_INDEX (Qswitch_frame)}
+  {&Qselect_window,       "select-window",       &Qswitch_frame}
 };
 
 static void syms_of_keyboard_for_pdumper (void);
