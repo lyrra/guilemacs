@@ -478,21 +478,21 @@ INLINE struct font_spec *
 XFONT_SPEC (Lisp_Object p)
 {
   eassert (FONT_SPEC_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
+  return SMOB_PTR(p); // return XUNTAG (p, Lisp_Vectorlike, struct font_spec);
 }
 
 INLINE struct font_entity *
 XFONT_ENTITY (Lisp_Object p)
 {
   eassert (FONT_ENTITY_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
+  return SMOB_PTR(p); // return XUNTAG (p, Lisp_Vectorlike, struct font_entity);
 }
 
 INLINE struct font *
 XFONT_OBJECT (Lisp_Object p)
 {
   eassert (FONT_OBJECT_P (p));
-  return XUNTAG (p, Lisp_Vectorlike, struct font);
+  return SMOB_PTR(p); // return XUNTAG (p, Lisp_Vectorlike, struct font);
 }
 
 #define XSETFONT(a, b) (XSETPSEUDOVECTOR (a, b, PVEC_FONT))

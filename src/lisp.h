@@ -788,7 +788,7 @@ INLINE void
 /* Extract A's pointer value, assuming A's Lisp type is TYPE and the
    extracted pointer's type is CTYPE *.  */
 
-#define XUNTAG(a, type, ctype) ((ctype *) SCM_SMOB_DATA (a))
+#define XUNTAG(a, type, ctype) ((ctype *) SMOB_PTR (a))
 /* Yield a signed integer that contains TAG along with PTR.
 
    Sign-extend pointers when USE_LSB_TAG (this simplifies emacs-module.c),
