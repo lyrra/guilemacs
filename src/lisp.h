@@ -614,6 +614,7 @@ INLINE void
 /* Extract A's pointer value, assuming A's type is TYPE.  */
 
 //FIX larv used? it should be for immediates, and SCM for heap objects
+/*
 INLINE void *
 (XUNTAG) (Lisp_Object a, int type)
 {
@@ -624,6 +625,7 @@ INLINE void *
   return (void *) i;
 #endif
 }
+*/
 
 
 
