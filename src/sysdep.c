@@ -1816,6 +1816,7 @@ stack_overflow (siginfo_t *siginfo)
 
 /* Attempt to recover from SIGSEGV caused by C stack overflow.  */
 
+#if 0
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
@@ -1834,35 +1835,10 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
   /* Otherwise we can't do anything with this.  */
   deliver_fatal_thread_signal (sig);
 }
+#endif
 
 /* Return true if we have successfully set up SIGSEGV handler on alternate
    stack.  Otherwise we just treat SIGSEGV among the rest of fatal signals.  */
-
-static bool
-init_sigsegv (void)
-{
-  struct sigaction sa;
-  stack_t ss;
-
-  ss.ss_sp = sigsegv_stack;
-  ss.ss_size = sizeof (sigsegv_stack);
-  ss.ss_flags = 0;
-  if (sigaltstack (&ss, NULL) < 0)
-    return 0;
-
-  sigfillset (&sa.sa_mask);
-  sa.sa_sigaction = handle_sigsegv;
-  sa.sa_flags = SA_SIGINFO | SA_ONSTACK | emacs_sigaction_flags ();
-  return sigaction (SIGSEGV, &sa, NULL) < 0 ? 0 : 1;
-}
-
-#else /* not HAVE_STACK_OVERFLOW_HANDLING or WINDOWSNT */
-
-static bool
-init_sigsegv (void)
-{
-  return 0;
-}
 
 #endif /* HAVE_STACK_OVERFLOW_HANDLING && !WINDOWSNT */
 
@@ -2132,8 +2108,6 @@ init_signals (bool dumping)
 #ifdef SIGBUS
   sigaction (SIGBUS, &thread_fatal_action, 0);
 #endif
-  if (!init_sigsegv ())
-    sigaction (SIGSEGV, &thread_fatal_action, 0);
 #ifdef SIGSYS
   sigaction (SIGSYS, &thread_fatal_action, 0);
 #endif
