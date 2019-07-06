@@ -135,7 +135,7 @@ If `error-free', drop calls even if `byte-compile-delete-errors' is nil.")
      (list 'indent
            #'(lambda (f _args val)
                (list 'function-put (list 'quote f)
-                     ''lisp-indent-function (list 'quote val))))))
+                     ''lisp-indent-function (list 'quote val)))))
     "List associating function properties to their macro expansion.
 Each element of the list takes the form (PROP FUN) where FUN is
 a function.  For each (PROP . VALUES) in a function's declaration,
