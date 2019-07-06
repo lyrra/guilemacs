@@ -3816,16 +3816,8 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		     transforming according to shorthands.  */
 		  || strspn (read_buffer, "^*+-/<=>_|") >= nbytes)
 		{
-		  tem = oblookup (obarray, read_buffer, nchars, nbytes);
-		  if (SYMBOLP (tem))
-		    {
-		      result = tem;
-		    }
-		  else
-		    {
-		      result = make_specified_string (read_buffer, nchars, nbytes,
-						      multibyte);
-		    }
+		  result = make_specified_string (read_buffer, nchars, nbytes,
+						  multibyte);
 		}
 	      else
                 {
@@ -4341,40 +4333,12 @@ check_obarray (Lisp_Object obarray)
   return obarray;
 }
 
-/* Intern symbol SYM in OBARRAY using bucket INDEX.  */
-
-//FIX-20230211-LAV: isn't obarray moved to guile-side?
-static Lisp_Object
-intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
-{
-  Lisp_Object *ptr;
-  // FIX: 20190808 LAV, why REM?
-  /*
-
-  if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
-    {
-      make_symbol_constant (sym);
-      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
-      /* Mark keywords as special.  This makes (let ((:key 'foo)) ...)
-	 in lexically bound elisp signal an error, as documented.  */
-      SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
-      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
-    }
-
-  ptr = aref_addr (obarray, XFIXNUM (index));
-  //set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
-  *ptr = sym;
-  */
-  return sym;
-}
-
 /* Intern a symbol with name STRING in OBARRAY using bucket INDEX.  */
 
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 {
-  SET_SYMBOL_VAL (XSYMBOL (Qobarray_cache), Qnil);
-  return intern_sym (Fmake_symbol (string), obarray, index);
+  return Fintern (string, obarray);
 }
 
 /* Intern the C string STR: return a symbol with that name,
@@ -4394,23 +4358,6 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
   return Fintern (make_string (str, len), Qnil);
 }
 
-#if 0
-static void
-define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
-{
-  ptrdiff_t len = strlen (str);
-  Lisp_Object string = make_pure_c_string (str, len);
-  //init_symbol (sym, string); //FIX-20230211-LAV init_symbol is moved to guile
-
-  /* Qunbound is uninterned, so that it's not confused with any symbol
-     'unbound' created by a Lisp program.  */
-  if (! EQ (sym, Qunbound))
-    {
-      intern_sym (sym, obarray, Qnil);
-    }
-  return intern_driver (make_pure_c_string (str, len), obarray, Qnil);
-}
-#endif
 
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
        doc: /* find-symbol */)
