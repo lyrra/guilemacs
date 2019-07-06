@@ -226,7 +226,10 @@ The return value is undefined.
                        (cons 'progn declarations))
                  (list 'quote name)))))))
 
+
 ;; Now that we defined defmacro we can use it!
+;; FIX: aren't we replacing some kind of primordial defun (see boot.el)?
+;;      if so we might want to say so here.
 (defmacro defun (name arglist &optional docstring &rest body)
   "Define NAME as a function.
 The definition is (lambda ARGLIST [DOCSTRING] BODY...).
