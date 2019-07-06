@@ -3526,8 +3526,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		  Lisp_Object name
 		    = make_specified_string (read_buffer, nchars, nbytes,
 					     multibyte);
-                  // FIX: 20190808 LAV: remove intern_driver
-		  result = intern_driver (name, Qnil, Qnil);
+		  result = Fintern (name, Qnil);
 		}
 	    }
 
@@ -4067,6 +4066,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray, Lisp_Object index)
 {
+  abort();
   return intern_sym (Fmake_symbol (string), obarray, index);
 }
 
