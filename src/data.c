@@ -1694,7 +1694,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
     }
 }
 
-//FIX: 20190626 LAV, this should probably be removed (similar to what happened with "setq-default")
+// FIX: 20190626 LAV, this should probably be removed (similar to what happened with "setq-default")
 DEFUN ("set-default", Fset_default, Sset_default, 2, 2, 0,
        doc: /* Set SYMBOL's default value to VALUE.  SYMBOL and VALUE are evaluated.
 The default value is seen in buffers that do not have their own values
