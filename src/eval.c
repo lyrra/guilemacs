@@ -404,8 +404,9 @@ The return value is BASE-VARIABLE.  */)
 	error ("Don't know how to make a let-bound variable an alias");
   }
 
-  if (SYMBOL_CONSTANT_P(sym)) // sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  if (SYMBOL_CONSTANT(sym)) { // sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
+  }
 
   SET_SYMBOL_DECLARED_SPECIAL (sym, 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (base_variable), 1);
