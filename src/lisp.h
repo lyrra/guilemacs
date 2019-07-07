@@ -3610,7 +3610,7 @@ ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
 		    Lisp_Object);
 void hash_remove_from_table (struct Lisp_Hash_Table *, Lisp_Object);
-extern struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal;
+extern struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal; // FIX:LAV;  dont expose these
 extern void validate_subarray (Lisp_Object, Lisp_Object, Lisp_Object,
 			       ptrdiff_t, ptrdiff_t *, ptrdiff_t *);
 extern Lisp_Object substring_both (Lisp_Object, ptrdiff_t, ptrdiff_t,

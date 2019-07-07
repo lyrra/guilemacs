@@ -5736,4 +5736,22 @@ quickly, but to take their time and perhaps think about the answer.
 The same variable also affects the function `read-answer'.  */);
   use_short_answers = false;
 
+  hashtest_eq.name = Qeq;
+  hashtest_eq.user_hash_function = Qnil;
+  hashtest_eq.user_cmp_function = Qnil;
+  hashtest_eq.cmpfn = 0;
+  hashtest_eq.hashfn = hashfn_eq;
+
+  hashtest_eql.name = Qeql;
+  hashtest_eql.user_hash_function = Qnil;
+  hashtest_eql.user_cmp_function = Qnil;
+  hashtest_eql.cmpfn = cmpfn_eql;
+  hashtest_eql.hashfn = hashfn_eql;
+
+  hashtest_equal.name = Qequal;
+  hashtest_equal.user_hash_function = Qnil;
+  hashtest_equal.user_cmp_function = Qnil;
+  hashtest_equal.cmpfn = cmpfn_equal;
+  hashtest_equal.hashfn = hashfn_equal;
+
 }
