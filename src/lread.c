@@ -4403,7 +4403,7 @@ it defaults to the value of `obarray'.  */)
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
     {
-      SET_SYMBOL_CONSTANT (XSYMBOL (sym));
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym)); // FIX: 2015 SET_SYMBOL_CONSTANT takes a second arg, used for what? it is a bitfield?
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
