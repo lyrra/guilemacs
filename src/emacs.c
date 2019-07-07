@@ -1269,6 +1269,16 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
+      /* FIX: 20190707 LAV, explain why we need to override functions
+       *                    dealing with symbols.
+       *                    It seems runtime.scm sets up its own
+       *                    symbol mechanism, perhaps to work
+       *                    without emacs. But when emacs is used
+       *                    it brings its own function dealing with
+       *                    symbols?
+       *                    Besides function, it seems we need to
+       *                    make guile aware of Qunbound (used by DEFVAR, which is a total guile-side thing).
+       */
       scm_call_7 (scm_c_public_ref ("language elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),
