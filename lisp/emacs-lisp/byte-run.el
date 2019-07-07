@@ -163,8 +163,8 @@ Each element of the list takes the form (PROP FUN) where FUN is a function.
 For each (PROP . VALUES) in a macro's declaration, the FUN corresponding
 to PROP is called with the macro name, the macro's arglist, and the VALUES
 and should return the code to use to set this property.
-
 This is used by `declare'."))
+
 
 (defalias 'defmacro
   (cons
@@ -225,7 +225,6 @@ The return value is undefined.
                        def
                        (cons 'progn declarations))
                  (list 'quote name)))))))
-
 
 ;; Now that we defined defmacro we can use it!
 ;; FIX: aren't we replacing some kind of primordial defun (see boot.el)?
