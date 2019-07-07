@@ -4849,4 +4849,22 @@ that disables the use of a file dialog, regardless of the value of
 this variable.  */);
   use_file_dialog = 1;
 
+  hashtest_eq.name = Qeq;
+  hashtest_eq.user_hash_function = Qnil;
+  hashtest_eq.user_cmp_function = Qnil;
+  hashtest_eq.cmpfn = 0;
+  hashtest_eq.hashfn = hashfn_eq;
+
+  hashtest_eql.name = Qeql;
+  hashtest_eql.user_hash_function = Qnil;
+  hashtest_eql.user_cmp_function = Qnil;
+  hashtest_eql.cmpfn = cmpfn_eql;
+  hashtest_eql.hashfn = hashfn_eql;
+
+  hashtest_equal.name = Qequal;
+  hashtest_equal.user_hash_function = Qnil;
+  hashtest_equal.user_cmp_function = Qnil;
+  hashtest_equal.cmpfn = cmpfn_equal;
+  hashtest_equal.hashfn = hashfn_equal;
+
 }
