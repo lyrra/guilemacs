@@ -4197,14 +4197,16 @@ it defaults to the value of `obarray'.  */)
   if (! NILP (scm_c_value_ref (tem, 1)))
     return scm_c_value_ref (tem, 0);
 
+  //FIX-2019-LAV: replace scm_from_utf8_stringn with: scm_from_locale_symbol (SSDATA (string)) ?
+  //   or scm_string_to_symbol (SSDATA (string));
   Lisp_Object sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
                                                        SBYTES (string)),
-                    obhash (obarray));
+                                obhash (obarray));
 
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
     {
-      SET_SYMBOL_CONSTANT (XSYMBOL (sym));
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym)); // FIX: 2015 SET_SYMBOL_CONSTANT takes a second arg, used for what? it is a bitfield?
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
