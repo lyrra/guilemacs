@@ -339,6 +339,20 @@ Ffunction (Lisp_Object args)
     return quoted;
 }
 
+void emacs_gdb_breakpoint (char *desc)
+{
+  fprintf(stderr, "Welcome! Emacs gdb breakpoint is hit: %s\n", desc);
+}
+
+DEFUN ("gdb-breakpoint", Fgdb_breakpoint, Sgdb_breakpoint, 1, 1, 0,
+       doc: /* set a breakpoint on emacs_gdb_breakpoint, and call (gdb-breakpoint) from your elisp code. */)
+  (Lisp_Object desc)
+{
+  CHECK_STRING (desc);
+  emacs_gdb_breakpoint(SSDATA(desc));
+  return Qnil;
+}
+
 DEFUN ("defvaralias", Fdefvaralias, Sdefvaralias, 2, 3, 0,
        doc: /* Make NEW-ALIAS a variable alias for symbol BASE-VARIABLE.
 Aliased variables always have the same value; setting one sets the other.
