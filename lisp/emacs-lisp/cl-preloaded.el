@@ -39,6 +39,29 @@
 (eval-when-compile (require 'cl-lib))
 (eval-when-compile (require 'cl-macs))  ;For cl--struct-class.
 
+(eval-when-compile
+(fset 'cl--make-slot-desc
+      ;; To break circularity, we pre-define the slot constructor by hand.
+      ;; It's redefined a bit further down as part of the cl-defstruct of
+      ;; cl--slot-descriptor.
+      ;; BEWARE: Obviously, it's important to keep the two in sync!
+      (lambda (name &optional initform type props)
+        (record 'cl-slot-descriptor
+                name initform type props)))
+
+(fset 'cl--struct-new-class (lambda (name docstring parent-class
+                                     type named vslots index-table
+                                     children-sym tag print)))
+(fset 'cl--struct-register-child (lambda (parent-class tag)))
+
+(defun cl--plist-remove (plist member)
+  (cond
+   ((null plist) nil)
+   ((null member) plist)
+   ((eq plist member) (cddr plist))
+   (t `(,(car plist) ,(cadr plist) ,@(cl--plist-remove (cddr plist) member)))))
+); eval-when-compile
+
 ;; The `assert' macro from the cl package signals
 ;; `cl-assertion-failed' at runtime so always define it.
 (define-error 'cl-assertion-failed (purecopy "Assertion failed"))
