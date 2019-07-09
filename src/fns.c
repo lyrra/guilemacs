@@ -4325,8 +4325,11 @@ FUNCTION is called with two arguments, KEY and VALUE.
   struct Lisp_Hash_Table *h = check_hash_table (table);
 
   for (ptrdiff_t i = 0; i < HASH_TABLE_SIZE (h); ++i)
-    if (!NILP (HASH_HASH (h, i)))
-      call2 (function, HASH_KEY (h, i), HASH_VALUE (h, i));
+    {
+      Lisp_Object sx = HASH_HASH (h, i);
+      if (sx && !NILP (sx))
+        call2 (function, HASH_KEY (h, i), HASH_VALUE (h, i));
+    }
 
   return Qnil;
 }
