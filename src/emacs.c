@@ -1962,6 +1962,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 #ifdef HAVE_SOUND
       syms_of_sound ();
 #endif
+      syms_of_xdisp();
       syms_of_textprop ();
       syms_of_composite ();
 #ifdef WINDOWSNT
@@ -1971,7 +1972,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_cygw32 ();
 #endif
       syms_of_window ();
-      syms_of_xdisp ();
       syms_of_font ();
 #ifdef HAVE_WINDOW_SYSTEM
       syms_of_fringe ();
