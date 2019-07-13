@@ -1939,6 +1939,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	 Vcoding_system_hash_table.  */
       syms_of_coding ();	/* This should be after syms_of_fileio.  */
       init_frame_once ();       /* Before init_window_once.  */
+      syms_of_frame ();
       init_window_once ();	/* Init the window system.  */
 #ifdef HAVE_WINDOW_SYSTEM
       init_fringe_once ();	/* Swap bitmaps if necessary.  */
@@ -2199,7 +2200,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_search ();
       syms_of_sysdep ();
       syms_of_timefns ();
-      syms_of_frame ();
       syms_of_syntax ();
       syms_of_terminal ();
       syms_of_term ();
