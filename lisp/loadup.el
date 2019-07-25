@@ -182,6 +182,29 @@
 
 (load "subr2")
 
+(load "emacs-lisp/nadvice")
+(load "emacs-lisp/inline") ; FIX: added, but when is it loaded? required?
+
+(load "emacs-lisp/derived")
+;(load "minibuffer")            ;After loaddefs, for define-minor-mode.
+(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
+(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
+(load "simple")
+
+(load "help-macro")
+(load "help")
+(load "help-fns")
+
+(load "emacs-lisp/bytecomp") ; FIX: added
+
+(load "emacs-lisp/cl-preloaded")
+(load "emacs-lisp/cl-lib")
+; need cl-generics before loaddefs
+(let ((max-specpdl-size (max max-specpdl-size 1800)))
+  ;; A particularly demanding file to load; 1600 does not seem to be enough.
+  (load "emacs-lisp/cl-generic"))
+(load "emacs-lisp/cl-macs")
+
 ;; We don't want to store loaddefs.el in the repository because it is
 ;; a generated file; but it is required in order to compile the lisp files.
 ;; When bootstrapping, we cannot generate loaddefs.el until an
@@ -204,20 +227,15 @@
   (setq definition-prefixes new))
 
 (load "button")                  ;After loaddefs, because of define-minor-mode!
-(load "emacs-lisp/nadvice")
-(load "emacs-lisp/cl-preloaded")
-(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
-(load "emacs-lisp/derived")
+;(load "emacs-lisp/nadvice")
+;(load "emacs-lisp/cl-preloaded")
+;(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
+;(load "emacs-lisp/derived")
 (load "emacs-lisp/easy-mmode")
-(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
-(load "simple")
+;(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
+;(load "simple")
 
-(load "emacs-lisp/cl-lib")
-(load "emacs-lisp/cl-macs")
-
-(load "help-macro")
-(load "help")
-(load "help-fns")
+;(load "emacs-lisp/cl-lib")
 
 (load "faces2")
 
@@ -267,9 +285,6 @@
 (load "language/cham")
 
 (load "indent")
-(let ((max-specpdl-size (max max-specpdl-size 1800)))
-  ;; A particularly demanding file to load; 1600 does not seem to be enough.
-  (load "emacs-lisp/cl-generic"))
 (load "minibuffer") ;Needs cl-generic (and define-minor-mode).
 (load "frame")
 (load "startup")
