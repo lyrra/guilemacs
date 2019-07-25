@@ -150,6 +150,26 @@
 
 (load "subr2")
 
+(load "emacs-lisp/nadvice")
+(load "emacs-lisp/inline") ; FIX: added, but when is it loaded? required?
+
+(load "emacs-lisp/derived")
+(load "minibuffer")            ;After loaddefs, for define-minor-mode.
+(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
+(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
+(load "simple")
+
+(load "help-macro")
+(load "help")
+(load "help-fns")
+
+(load "emacs-lisp/bytecomp") ; FIX: added
+
+(load "emacs-lisp/cl-preloaded")
+(load "emacs-lisp/cl-lib")
+(load "emacs-lisp/cl-generic") ; need cl-generics before loaddefs
+(load "emacs-lisp/cl-macs")
+
 ;; We don't want to store loaddefs.el in the repository because it is
 ;; a generated file; but it is required in order to compile the lisp files.
 ;; When bootstrapping, we cannot generate loaddefs.el until an
@@ -171,21 +191,14 @@
            definition-prefixes)
   (setq definition-prefixes new))
 
-(load "emacs-lisp/nadvice")
-(load "emacs-lisp/cl-preloaded")
-(load "minibuffer")            ;After loaddefs, for define-minor-mode.
-(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
-(load "emacs-lisp/derived")
+;(load "minibuffer")            ;After loaddefs, for define-minor-mode.
+;(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
+;(load "emacs-lisp/derived")
 (load "emacs-lisp/easy-mmode")
-(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
-(load "simple")
+;(load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
+;(load "simple")
 
-(load "emacs-lisp/cl-lib")
-(load "emacs-lisp/cl-macs")
-
-(load "help-macro")
-(load "help")
-(load "help-fns")
+;(load "emacs-lisp/cl-lib")
 
 (load "faces2")
 
@@ -235,7 +248,7 @@
 (load "language/cham")
 
 (load "indent")
-(load "emacs-lisp/cl-generic")
+;(load "emacs-lisp/cl-generic")
 (load "frame")
 (load "startup")
 (load "term/tty-colors")
