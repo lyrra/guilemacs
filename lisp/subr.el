@@ -3565,7 +3565,10 @@ used is \"Error: %S\"."
                     (if format (push format body))))))
     `(condition-case-unless-debug ,err
          (progn ,@body)
-       (error (message ,format ,err) nil))))
+       (error
+         (print "--- hit error! ---")
+         (message ,format ,err)
+         nil))))
 
 (defmacro combine-after-change-calls (&rest body)
   "Execute BODY, but don't call the after-change functions till the end.

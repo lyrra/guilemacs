@@ -429,7 +429,8 @@ default_toplevel_binding (Lisp_Object symbol)
   union specbinding *pdl = specpdl_ptr;
   while (pdl > specpdl)
     {
-      switch ((--pdl)->kind)
+      int k = (--pdl)->kind;
+      switch (k)
 	{
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET:
@@ -437,16 +438,17 @@ default_toplevel_binding (Lisp_Object symbol)
 	    binding = pdl;
 	  break;
 
-        //FIX: LAV, used when?
+        //FIX: LAV, introduced in 2019-vanilla code, used when?
 	//case SPECPDL_UNWIND:
 	//case SPECPDL_UNWIND_PTR:
 	//case SPECPDL_UNWIND_INT:
 	//case SPECPDL_UNWIND_VOID:
 	//case SPECPDL_BACKTRACE:
-	//case SPECPDL_LET_LOCAL:
-	//  break;
+	case SPECPDL_LET_LOCAL:
+	  break;
 
 	default:
+          fprintf(stderr, "ERROR: default_toplevel_binding, unknown spec: %d\n", k);
 	  emacs_abort ();
 	}
     }
