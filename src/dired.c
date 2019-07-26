@@ -954,6 +954,7 @@ file_attributes (int fd, char const *name,
     err = errno;
   else
     {
+      // FIX: silly to rely on unwind to close a simple file-handle
       record_unwind_protect_int (close_file_unwind, namefd);
       if (fstat (namefd, &s) != 0)
 	{
@@ -970,6 +971,8 @@ file_attributes (int fd, char const *name,
 	  fd = namefd;
 	  name = "";
 	}
+      // FIX: silly, atleast document why a simple close here isn't correct
+      //close(namefd);
     }
 #endif
 
@@ -1003,7 +1006,9 @@ file_attributes (int fd, char const *name,
 	 is also a symlink.  */
       file_type = check_emacs_readlinkat (fd, filename, name);
       if (NILP (file_type))
-	return Qnil;
+        {
+          return Qnil;
+        }
     }
   else
     file_type = S_ISDIR (s.st_mode) ? Qt : Qnil;
@@ -1018,6 +1023,7 @@ file_attributes (int fd, char const *name,
 
   filemodestring (&s, modes);
 
+  // Such a neat little function, until this..
   return CALLN (Flist,
 		file_type,
 		make_fixnum (s.st_nlink),
