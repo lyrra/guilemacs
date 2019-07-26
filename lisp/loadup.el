@@ -210,9 +210,10 @@
 (load "case-table")
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.
-(load "international/charprop.el" t)
-(if (featurep 'charprop)
-    (setq redisplay--inhibit-bidi nil))
+; FIX: 20190726 LAV, charprop removed, since it doesn't exist!
+; (load "international/charprop.el" t)
+; (if (featurep 'charprop)
+;     (setq redisplay--inhibit-bidi nil))
 (load "international/characters")
 (load "composite")
 
@@ -361,15 +362,15 @@
 ;; you may load them with a "site-load.el" file.
 ;; But you must also cause them to be scanned when the DOC file
 ;; is generated.
-(let ((lp load-path))
-  (load "site-load" t)
-  ;; We reset load-path after dumping.
-  ;; For a permanent change in load-path, use configure's
-  ;; --enable-locallisppath option.
-  ;; See https://debbugs.gnu.org/16107 for more details.
-  (or (equal lp load-path)
-      (message "Warning: Change in load-path due to site-load will be \
-lost after dumping")))
+;(let ((lp load-path))
+;  (load "site-load" t)
+;  ;; We reset load-path after dumping.
+;  ;; For a permanent change in load-path, use configure's
+;  ;; --enable-locallisppath option.
+;  ;; See https://debbugs.gnu.org/16107 for more details.
+;  (or (equal lp load-path)
+;      (message "Warning: Change in load-path due to site-load will be \
+;lost after dumping")))
 
 ;; Make sure default-directory is unibyte when dumping.  This is
 ;; because we cannot decode and encode it correctly (since the locale
@@ -415,11 +416,11 @@ lost after dumping")))
 ;; Note: You can cause additional libraries to be preloaded
 ;; by writing a site-init.el that loads them.
 ;; See also "site-load" above
-(let ((lp load-path))
-  (load "site-init" t)
-  (or (equal lp load-path)
-      (message "Warning: Change in load-path due to site-init will be \
-lost after dumping")))
+;(let ((lp load-path))
+;  (load "site-init" t)
+;  (or (equal lp load-path)
+;      (message "Warning: Change in load-path due to site-init will be \
+;lost after dumping")))
 
 ;; Avoid storing references to build directory in the binary.
 (setq custom-current-group-alist nil)
