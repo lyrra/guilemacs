@@ -4228,6 +4228,8 @@ static Lisp_Object
 map_obarray_inner (void *data, Lisp_Object sym)
 {
   struct map_obarray_data *modata = data;
+  if(sym == Qunbound)
+    return SCM_UNSPECIFIED;
 
   Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), modata->obarray);
   if (scm_is_true (scm_c_value_ref (tem, 1))
