@@ -337,8 +337,9 @@ string is passed through `substitute-command-keys'.  */)
   fun = Findirect_function (function, Qnil);
   if (NILP (fun))
     xsignal1 (Qvoid_function, function);
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro) ||
-      EQ (XCAR (fun), Qspecial_operator))
+
+  if (CONSP (fun) && (EQ (XCAR (fun), Qmacro) ||
+      EQ (XCAR (fun), Qspecial_operator)))
     fun = XCDR (fun);
   if (COMPILEDP (fun))
     {
