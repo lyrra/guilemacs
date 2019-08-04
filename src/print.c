@@ -1501,14 +1501,16 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  size = XFASTINT (Vprint_length);
 
 	printchar ('(', printcharfun);
-	for (ptrdiff_t i = 0; i < size; i++)
-	  if (!NILP (HASH_HASH (h, i)))
+	for (ptrdiff_t i = 0; i < size; i++){
+          void* hh = HASH_HASH (h, i);
+	  if (hh && !NILP (hh))
 	    {
 	      if (i) printchar (' ', printcharfun);
 	      print_object (HASH_KEY (h, i), printcharfun, escapeflag);
 	      printchar (' ', printcharfun);
 	      print_object (HASH_VALUE (h, i), printcharfun, escapeflag);
 	    }
+        }
 
 	if (size < real_size)
 	  print_c_string (" ...", printcharfun);
