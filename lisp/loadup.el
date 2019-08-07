@@ -195,15 +195,17 @@
 (load "help")
 (load "help-fns")
 
-(load "emacs-lisp/bytecomp") ; FIX: added
 
+(load "emacs-lisp/regexp-opt")
 (load "emacs-lisp/cl-preloaded")
+(load "emacs-lisp/bytecomp") ; FIX: added
 (load "emacs-lisp/cl-lib")
-; need cl-generics before loaddefs
+; need cl-generics before loaddefs, also needs bytecomp
 (let ((max-specpdl-size (max max-specpdl-size 1800)))
   ;; A particularly demanding file to load; 1600 does not seem to be enough.
   (load "emacs-lisp/cl-generic"))
 (load "emacs-lisp/cl-macs")
+
 
 ;; We don't want to store loaddefs.el in the repository because it is
 ;; a generated file; but it is required in order to compile the lisp files.
@@ -325,7 +327,7 @@
     (progn
       (load "fringe")
       ;; Needed by `imagemagick-register-types'
-      (load "emacs-lisp/regexp-opt")
+      ;(load "emacs-lisp/regexp-opt")
       (load "image")
       (load "international/fontset")
       (load "dnd")
