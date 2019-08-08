@@ -3742,8 +3742,8 @@ make_parent_window (Lisp_Object window, bool horflag)
 
   o = XWINDOW (window);
   p = allocate_window ();
-  memcpy ((char *) p + sizeof (union vectorlike_header),
-	  (char *) o + sizeof (union vectorlike_header),
+  memcpy ((char *) p + sizeof (struct vectorlike_header),
+	  (char *) o + sizeof (struct vectorlike_header),
 	  word_size * VECSIZE (struct window));
   /* P's buffer slot may change from nil to a buffer...  */
   adjust_window_count (p, 1);
@@ -4977,7 +4977,7 @@ window_internal_height (struct window *w)
 static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
 
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
 
@@ -4993,7 +4993,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
   else
     window_scroll_line_based (window, n, whole, noerror);
 
-  unbind_to (count, Qnil);
+  dynwind_end();
 
   /* Bug#15957.  */
   XWINDOW (window)->window_end_valid = false;
@@ -6247,7 +6247,7 @@ from the top of the window.  */)
 
 struct save_window_data
   {
-    union vectorlike_header header;
+    struct vectorlike_header header;
     Lisp_Object selected_frame;
     Lisp_Object current_window;
     Lisp_Object f_current_buffer;
@@ -6275,7 +6275,7 @@ struct save_window_data
 /* This is saved as a Lisp_Vector.  */
 struct saved_window
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   Lisp_Object window, buffer, start, pointm, old_pointm;
   Lisp_Object pixel_left, pixel_top, pixel_height, pixel_width;

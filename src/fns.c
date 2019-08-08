@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <errno.h>
 
 #include "lisp.h"
+#include "commands.h"
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
@@ -2140,7 +2141,8 @@ SCM compare_text_properties = SCM_BOOL_F;
 bool
 equal_no_quit (Lisp_Object o1, Lisp_Object o2)
 {
-  return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
+  // FIX: LAV, not semantically same, was: return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
+  return scm_is_true (scm_equal_p (o1, o2)) ? true : false;
 }
 
 DEFUN ("equal-including-properties", Fequal_including_properties, Sequal_including_properties, 2, 2, 0,
@@ -2829,7 +2831,6 @@ usage: (widget-apply WIDGET PROPERTY &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   /* This function can GC.  */
-  struct gcpro gcpro1, gcpro2; // FIX: 20190626 LAV, unused??
   Lisp_Object result;
 
   result = call3 (intern ("apply"),
@@ -3402,11 +3403,11 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
 
 /* Various symbols.  */
 
-static Lisp_Object Qhash_table_p;
-static Lisp_Object Qkey, Qvalue, Qeql;
-Lisp_Object Qeq, Qequal;
-Lisp_Object QCtest, QCsize, QCrehash_size, QCrehash_threshold, QCweakness;
-static Lisp_Object Qhash_table_test, Qkey_or_value, Qkey_and_value;
+//static Lisp_Object Qhash_table_p;
+//static Lisp_Object Qkey; //, Qvalue; //, Qeql;
+//Lisp_Object Qeq, Qequal;
+// FIX: 20190629 LAV, these are found in globals.h:
+//static Lisp_Object Qhash_table_test, Qkey_or_value, Qkey_and_value;
 
 
 /***********************************************************************
@@ -3648,13 +3649,14 @@ hashfn_user_defined (struct hash_table_test *ht, Lisp_Object key)
   return hashfn_eq (ht, hash);
 }
 
-struct hash_table_test const
-  hashtest_eq = { LISPSYM_INITIALLY (Qeq), LISPSYM_INITIALLY (Qnil),
-		  LISPSYM_INITIALLY (Qnil), 0, hashfn_eq },
-  hashtest_eql = { LISPSYM_INITIALLY (Qeql), LISPSYM_INITIALLY (Qnil),
-		   LISPSYM_INITIALLY (Qnil), cmpfn_eql, hashfn_eql },
-  hashtest_equal = { LISPSYM_INITIALLY (Qequal), LISPSYM_INITIALLY (Qnil),
-		     LISPSYM_INITIALLY (Qnil), cmpfn_equal, hashfn_equal };
+//FIX: 20190629 LAV, probably we have no access to initial symbols as constants
+struct hash_table_test
+  hashtest_eq = { NULL /* Qeq */          , NULL /* Qnil */,
+		  NULL /* Qnil */         , 0, hashfn_eq },
+  hashtest_eql = { NULL /* Qeql */        , NULL /* Qnil */,
+		   NULL /* Qnil */        , cmpfn_eql, hashfn_eql },
+  hashtest_equal = { NULL /* Qequal */    , NULL /* Qnil */,
+		     NULL  /* Qnil */     , cmpfn_equal, hashfn_equal };
 
 /* Allocate basically initialized hash table.  */
 

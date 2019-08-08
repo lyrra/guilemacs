@@ -300,8 +300,9 @@ DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
 static int
 ecount_leading_zeros (EMACS_UINT x)
 {
-  return (EMACS_UINT_WIDTH == UINT_WIDTH ? count_leading_zeros (x)
-	  : EMACS_UINT_WIDTH == ULONG_WIDTH ? count_leading_zeros_l (x)
+  //FIX: 20190629 LAV, was UINT and ULONG in below versions:
+  return (EMACS_INT_WIDTH == INT_WIDTH ? count_leading_zeros (x)
+	  : EMACS_INT_WIDTH == LONG_WIDTH ? count_leading_zeros_l (x)
 	  : count_leading_zeros_ll (x));
 }
 
@@ -333,7 +334,8 @@ This is the same as the exponent of a float.  */)
       EMACS_INT i = eabs (XINT (arg));
       value = (i == 0
 	       ? MOST_NEGATIVE_FIXNUM
-	       : EMACS_UINT_WIDTH - 1 - ecount_leading_zeros (i));
+               //FIX: larv, 20190629, was EMACS_*U*INT_WIDTH, fix lisp.h
+	       : EMACS_INT_WIDTH - 1 - ecount_leading_zeros (i));
     }
 
   return make_number (value);

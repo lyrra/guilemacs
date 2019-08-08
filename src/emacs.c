@@ -717,9 +717,6 @@ main2 (void *ignore, int argc, char **argv)
   /* If we use --chdir, this records the original directory.  */
   char *original_pwd = 0;
 
-  /* Record (approximately) where the stack begins.  */
-  stack_bottom = (char *) &stack_bottom_variable;
-
 #ifndef CANNOT_DUMP
   dumping = !initialized && (strcmp (argv[argc - 1], "dump") == 0
 			     || strcmp (argv[argc - 1], "bootstrap") == 0);

@@ -149,7 +149,7 @@ make_catch_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  //c->lisp_eval_depth = lisp_eval_depth; //FIX: 20190629 LAV too deep macrology to follow
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -165,7 +165,7 @@ make_condition_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  //c->lisp_eval_depth = lisp_eval_depth;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -194,14 +194,14 @@ init_eval_once (void)
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
 
-static struct handler *handlerlist_sentinel;
+/* static struct handler *handlerlist_sentinel; */
 
 void
 init_eval (void)
 {
   specpdl_ptr = specpdl;
   handlerlist_sentinel = make_catch_handler (Qunbound);
-  handlerlist = handlerlist_sentinel;
+  //handlerlist = handlerlist_sentinel; //FIX: 20190629 LAV, macrology
   Vquit_flag = Qnil;
   debug_on_next_call = 0;
   lisp_eval_depth = 0;
@@ -398,7 +398,8 @@ The return value is BASE-VARIABLE.  */)
   SET_SYMBOL_REDIRECT (sym, SYMBOL_VARALIAS);
 
   SET_SYMBOL_ALIAS (sym, XSYMBOL (base_variable));
-  SET_SYMBOL_CONSTANT (sym, SYMBOL_CONSTANT_P (base_variable));
+  if(SYMBOL_CONSTANT_P (base_variable))
+    SET_SYMBOL_CONSTANT (sym);
   LOADHIST_ATTACH (new_alias);
   /* Even if docstring is nil: remove old docstring.  */
   Fput (new_alias, Qvariable_documentation, docstring);
@@ -421,13 +422,14 @@ default_toplevel_binding (Lisp_Object symbol)
 	    binding = pdl;
 	  break;
 
-	case SPECPDL_UNWIND:
-	case SPECPDL_UNWIND_PTR:
-	case SPECPDL_UNWIND_INT:
-	case SPECPDL_UNWIND_VOID:
-	case SPECPDL_BACKTRACE:
-	case SPECPDL_LET_LOCAL:
-	  break;
+        //FIX: LAV, used when?
+	//case SPECPDL_UNWIND:
+	//case SPECPDL_UNWIND_PTR:
+	//case SPECPDL_UNWIND_INT:
+	//case SPECPDL_UNWIND_VOID:
+	//case SPECPDL_BACKTRACE:
+	//case SPECPDL_LET_LOCAL:
+	//  break;
 
 	default:
 	  emacs_abort ();
@@ -574,7 +576,7 @@ restore_handler (void *data)
 {
   struct handler *c = data;
   unblock_input_to (c->interrupt_input_blocked);
-  immediate_quit = 0;
+  //immediate_quit = 0;
 }
 
 struct icc_thunk_env
@@ -1563,7 +1565,7 @@ set_lisp_eval_depth (void *data)
 static Lisp_Object
 eval_sub_1 (Lisp_Object form)
 {
-  QUIT; // FIX: 20190626 LAV, really needed?
+  //QUIT; // FIX: 20190629 LAV, disabled for now!
   return scm_call_1 (eval_fn, form);
 }
 
@@ -1961,6 +1963,37 @@ DEFUN ("functionp", Ffunctionp, Sfunctionp, 1, 1, 0,
   return Qnil;
 }
 
+bool
+FUNCTIONP (Lisp_Object object)
+{
+  if (SYMBOLP (object) && !NILP (Ffboundp (object)))
+    {
+      object = Findirect_function (object, Qt);
+
+      if (CONSP (object) && EQ (XCAR (object), Qautoload))
+	{
+	  /* Autoloaded symbols are functions, except if they load
+	     macros or keymaps.  */
+	  for (int i = 0; i < 4 && CONSP (object); i++)
+	    object = XCDR (object);
+
+	  return ! (CONSP (object) && !NILP (XCAR (object)));
+	}
+    }
+
+  if (scm_is_true (scm_procedure_p (object)))
+    return 1;
+  else if (COMPILEDP (object) || MODULE_FUNCTIONP (object))
+    return true;
+  else if (CONSP (object))
+    {
+      Lisp_Object car = XCAR (object);
+      return EQ (car, Qlambda) || EQ (car, Qclosure);
+    }
+  else
+    return false;
+}
+
 static Lisp_Object
 Ffuncall1 (ptrdiff_t nargs, Lisp_Object *args)
 {
@@ -1976,7 +2009,7 @@ Ffuncall (ptrdiff_t nargs, Lisp_Object *args)
 
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
-
+#if 0
 Lisp_Object
 funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
 {
@@ -2055,6 +2088,7 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
         }
     }
 }
+#endif
 
 static Lisp_Object
 apply_lambda (Lisp_Object fun, Lisp_Object args, ptrdiff_t count)
@@ -2207,7 +2241,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   function = original;
   if (SYMBOLP (function) && !NILP (function))
     {
-      function = XSYMBOL (function)->u.s.function;
+      function = SYMBOL_FUNCTION(XSYMBOL (function));
       if (SYMBOLP (function))
 	function = indirect_function (function);
     }
@@ -2215,9 +2249,9 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
 
-  if (SUBRP (function))
-    result = Fsubr_arity (function);
-  else if (COMPILEDP (function))
+  //if (SUBRP (function)) //FIX: larv, document the replacement done in 2015 for subr
+  //  result = Fsubr_arity (function);
+  if (COMPILEDP (function))
     result = lambda_arity (function);
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
@@ -2265,6 +2299,7 @@ lambda_arity (Lisp_Object fun)
       else
 	xsignal1 (Qinvalid_function, fun);
     }
+#if 0
   else if (COMPILEDP (fun))
     {
       ptrdiff_t size = PVSIZE (fun);
@@ -2274,6 +2309,7 @@ lambda_arity (Lisp_Object fun)
       if (INTEGERP (syms_left))
         return get_byte_code_arity (syms_left);
     }
+#endif
   else
     emacs_abort ();
 
@@ -2359,10 +2395,10 @@ static void
 do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
              Lisp_Object value, enum Set_Internal_Bind bindflag)
 {
-  switch (sym->u.s.redirect)
+  switch (SYMBOL_REDIRECT(sym))
     {
     case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
+      if (SYMBOL_TRAPPED_WRITE_P(sym) == SYMBOL_TRAPPED_WRITE)
 	SET_SYMBOL_VAL (sym, value);
       else
         set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
@@ -2499,6 +2535,7 @@ record_unwind_protect_ptr (void (*function) (void *), void *arg)
   record_unwind_protect_ptr_1 (function, arg, true);
 }
 
+#if 0
 void
 rebind_for_thread_switch (void)
 {
@@ -2516,71 +2553,7 @@ rebind_for_thread_switch (void)
 	}
     }
 }
-
-static void
-do_one_unbind (union specbinding *this_binding, bool unwinding,
-               enum Set_Internal_Bind bindflag)
-{
-  eassert (unwinding || this_binding->kind >= SPECPDL_LET);
-  switch (this_binding->kind)
-    {
-    case SPECPDL_UNWIND:
-      this_binding->unwind.func (this_binding->unwind.arg);
-      break;
-    case SPECPDL_UNWIND_PTR:
-      this_binding->unwind_ptr.func (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_UNWIND_INT:
-      this_binding->unwind_int.func (this_binding->unwind_int.arg);
-      break;
-    case SPECPDL_UNWIND_VOID:
-      this_binding->unwind_void.func ();
-      break;
-    case SPECPDL_BACKTRACE:
-      break;
-    case SPECPDL_LET:
-      { /* If variable has a trivial value (no forwarding), and isn't
-	   trapped, we can just set it.  */
-	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
-	  {
-	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
-	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
-	    else
-	      set_internal (sym, specpdl_old_value (this_binding),
-                            Qnil, bindflag);
-	    break;
-	  }
-      }
-      /* Come here only if make_local_foo was used for the first time
-	 on this var within this let.  */
-      FALLTHROUGH;
-    case SPECPDL_LET_DEFAULT:
-      set_default_internal (specpdl_symbol (this_binding),
-                            specpdl_old_value (this_binding),
-                            bindflag);
-      break;
-    case SPECPDL_LET_LOCAL:
-      {
-	Lisp_Object symbol = specpdl_symbol (this_binding);
-	Lisp_Object where = specpdl_where (this_binding);
-	Lisp_Object old_value = specpdl_old_value (this_binding);
-	eassert (BUFFERP (where));
-
-	/* If this was a local binding, reset the value in the appropriate
-	   buffer, but only if that buffer's binding still exists.  */
-	if (!NILP (Flocal_variable_p (symbol, where)))
-          set_internal (symbol, old_value, where, bindflag);
-      }
-      break;
-    }
-}
-
-static void
-do_nothing (void)
-{}
-
-
+#endif
 
 /* Push an unwind-protect entry that does nothing, so that
    set_unwind_protect_ptr can overwrite it later.  */

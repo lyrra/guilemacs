@@ -160,7 +160,8 @@ static bool kbd_is_on_hold;
    when exiting.  */
 bool inhibit_sentinels;
 
-#ifdef subprocesses
+// FIX: 20190808 LAV, why REM?
+//#ifdef subprocesses
 
 #ifndef SOCK_CLOEXEC
 # define SOCK_CLOEXEC 0
@@ -168,6 +169,8 @@ bool inhibit_sentinels;
 #ifndef SOCK_NONBLOCK
 # define SOCK_NONBLOCK 0
 #endif
+
+//#endif
 
 /* True if ERRNUM represents an error where the system call would
    block if a blocking variant were used.  */
@@ -404,11 +407,6 @@ pset_stderrproc (struct Lisp_Process *p, Lisp_Object val)
 }
 
 
-static Lisp_Object
-make_lisp_proc (struct Lisp_Process *p)
-{
-  return make_lisp_ptr (p, Lisp_Vectorlike);
-}
 
 enum fd_bits
 {
@@ -3344,9 +3342,11 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   s = -1;
 
   struct sockaddr *sa = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  record_unwind_protect_nothing ();
-  ptrdiff_t count1 = SPECPDL_INDEX ();
+  // FIX: 20190630 LAV
+  //ptrdiff_t count = SPECPDL_INDEX ();
+  //record_unwind_protect_nothing ();
+  //ptrdiff_t count1 = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   while (!NILP (addrinfos))
     {
@@ -3361,7 +3361,8 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       addrlen = get_lisp_to_sockaddr_size (ip_address, &family);
       sa = xrealloc (sa, addrlen);
-      set_unwind_protect_ptr (count, xfree, sa);
+      //FIX: move dynwind_begin here?
+      //set_unwind_protect_ptr (count, xfree, sa);
       conv_lisp_to_sockaddr (family, ip_address, sa, addrlen);
 
       s = socket_to_use;
@@ -3523,7 +3524,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #endif /* !WINDOWSNT */
 
       /* Discard the unwind protect closing S.  */
-      specpdl_ptr = specpdl + count1;
+      //specpdl_ptr = specpdl + count1;
       emacs_close (s);
       s = -1;
       if (0 <= socket_to_use)
@@ -3594,7 +3595,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  Lisp_Object data = get_file_errno_data (err, contact, xerrno);
 
 	  pset_status (p, list2 (Fcar (data), Fcdr (data)));
-	  unbind_to (count, Qnil);
+          dynwind_end ();
 	  return;
 	}
 
@@ -3612,9 +3613,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   p->open_fd[SUBPROCESS_STDIN] = inch;
   p->infd  = inch;
   p->outfd = outch;
-
-  /* Discard the unwind protect for closing S, if any.  */
-  specpdl_ptr = specpdl + count1;
 
   if (p->is_server && p->socktype != SOCK_DGRAM)
     pset_status (p, Qlisten);
@@ -3659,7 +3657,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       boot = Fgnutls_boot (proc, XCAR (params), XCDR (params));
       p->gnutls_boot_parameters = Qnil;
-      unbind_to (specpdl_count, Qnil);
 
       if (p->gnutls_initstage == GNUTLS_STAGE_READY)
 	/* Run sentinels, etc. */
@@ -3675,8 +3672,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	}
     }
 #endif
-
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Create a network stream/datagram client/server process.  Treated
@@ -4136,7 +4132,7 @@ usage: (make-network-process &rest ARGS)  */)
     buffer = Fget_buffer_create (buffer);
 
   /* Unwind bind_polling_period.  */
-  unbind_to (count, Qnil);
+  //unbind_to (count, Qnil); // FIX: dynwind_begin()
 
   proc = make_process (name);
   record_unwind_protect (remove_process, proc);
@@ -4167,8 +4163,8 @@ usage: (make-network-process &rest ARGS)  */)
   CHECK_LIST (tem);
   p->gnutls_boot_parameters = tem;
 
-  dynwind_end ();
-  dynwind_end ();
+  dynwind_end (); //FIX: LAV, what does each of these unprotect?
+  dynwind_end (); //FIX: LAV, dont use double unwind?
 
   set_network_socket_coding_system (proc, host, service, name);
 
@@ -6042,7 +6038,7 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
        sometimes it's simply wrong to wrap (e.g. when called from
        accept-process-output).  */
     internal_condition_case_1 (read_process_output_call,
-			       list3 (outstream, make_lisp_proc (p), text),
+			       list3 (outstream, p->header.self, text),
 			       !NILP (Vdebug_on_error) ? Qnil : Qerror,
 			       read_process_output_error_handler);
 
@@ -8146,6 +8142,7 @@ syms_of_process (void)
   DEFSYM (QCport, ":port");
   DEFSYM (QCspeed, ":speed");
   DEFSYM (QCprocess, ":process");
+  DEFSYM (QCoptions, ":options");
 
   DEFSYM (QCbytesize, ":bytesize");
   DEFSYM (QCstopbits, ":stopbits");

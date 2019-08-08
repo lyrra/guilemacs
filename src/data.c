@@ -39,6 +39,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
+Lisp_Object Qnil_, Qt_;
 //FIX: 20190626 LAV, 2015 had: Lisp_Object Qnil_, Qt_;
 //                               Lisp_Object Qspecial_operator;
 
@@ -1261,7 +1262,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 
   CHECK_SYMBOL (symbol);
   sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (GET_SYMBOL_TRAPPED(sym))
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1403,9 +1404,9 @@ static void
 set_symbol_trapped_write (Lisp_Object symbol, enum symbol_trapped_write trap)
 {
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+  if (GET_SYMBOL_TRAPPED(sym) == SYMBOL_NOWRITE)
     xsignal1 (Qtrapping_constant, symbol);
-  sym->u.s.trapped_write = trap;
+  SET_SYMBOL_TRAPPED(sym, trap);
 }
 
 static void
@@ -1420,7 +1421,7 @@ harmonize_variable_watchers (Lisp_Object alias, Lisp_Object base_variable)
   if (!EQ (base_variable, alias)
       && EQ (base_variable, Findirect_variable (alias)))
     set_symbol_trapped_write
-      (alias, XSYMBOL (base_variable)->u.s.trapped_write);
+      (alias, GET_SYMBOL_TRAPPED(XSYMBOL (base_variable)));
 }
 
 DEFUN ("add-variable-watcher", Fadd_variable_watcher, Sadd_variable_watcher,
@@ -1507,16 +1508,16 @@ notify_variable_watchers (Lisp_Object symbol,
     {
       Lisp_Object watcher = XCAR (watchers);
       /* Call subr directly to avoid gc.  */
-      if (SUBRP (watcher))
+      if (watcher) // FIX: 20190630 lav, check is not correct
         {
           Lisp_Object args[] = { symbol, newval, operation, where };
-          funcall_subr (XSUBR (watcher), ARRAYELTS (args), args);
+          //funcall_subr (XSUBR (watcher), ARRAYELTS (args), args);
+          //FIX: xsubr not implemented
         }
       else
         CALLN (Ffuncall, watcher, symbol, newval, operation, where);
     }
-
-  unbind_to (count, Qnil);
+  //FIX: larv, wrap dynwind?
 }
 
 
@@ -1604,7 +1605,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
   CHECK_SYMBOL (symbol);
   sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (GET_SYMBOL_TRAPPED(sym))
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1616,7 +1617,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
     case SYMBOL_TRAPPED_WRITE:
       /* Don't notify here if we're going to call Fset anyway.  */
-      if (sym->u.s.redirect != SYMBOL_PLAINVAL
+      if (GET_SYMBOL_TRAPPED(sym) != SYMBOL_PLAINVAL
           /* Setting due to thread switching doesn't count.  */
           && bindflag != SET_INTERNAL_THREAD_SWITCH)
         notify_variable_watchers (symbol, value, Qset_default, Qnil);
@@ -1934,7 +1935,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
     default: emacs_abort ();
     }
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  if (GET_SYMBOL_TRAPPED(sym) == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
 
   /* Get rid of this buffer's alist element, if any.  */
@@ -3723,7 +3724,7 @@ syms_of_data (void)
 	       doc: /* The largest value that is representable in a Lisp integer.
 This variable cannot be set; trying to do so will signal an error.  */);
   Vmost_positive_fixnum = make_number (MOST_POSITIVE_FIXNUM);
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("most-positive-fixnum")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("most-positive-fixnum")));
 
   DEFVAR_LISP ("most-negative-fixnum", Vmost_negative_fixnum,
 	       doc: /* The smallest value that is representable in a Lisp integer.
@@ -3735,5 +3736,5 @@ This variable cannot be set; trying to do so will signal an error.  */);
   DEFSYM (Qunlet, "unlet");
   DEFSYM (Qset, "set");
   DEFSYM (Qset_default, "set-default");
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("most-negative-fixnum")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("most-negative-fixnum")));
 }

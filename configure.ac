@@ -1724,6 +1724,10 @@ dnl AC_C_BIGENDIAN is done by gnulib.
 
 dnl check for Make feature
 
+#DEPFLAGS=
+#MKDEPDIR=":"
+#deps_frag=deps.mk
+
 AUTO_DEPEND=no
 AUTODEPEND_PARENTS='lib src'
 dnl check if we have GCC and autodepend is on.

@@ -135,10 +135,10 @@ malloc_initialize_hook (void)
 		  break;
 		}
 	}
-
-      if (malloc_set_state (malloc_state_ptr) != 0)
-	emacs_abort ();
-      alloc_unexec_post ();
+//FIX: 20190808 LAV, Not sure where this ifdef comes from
+# ifndef XMALLOC_OVERRUN_CHECK
+      //alloc_unexec_post ();
+# endif
     }
 }
 
@@ -150,7 +150,6 @@ malloc_initialize_hook (void)
 voidfuncptr __MALLOC_HOOK_VOLATILE __malloc_initialize_hook EXTERNALLY_VISIBLE
   = malloc_initialize_hook;
 
-#endif
 
 #if defined DOUG_LEA_MALLOC || !defined CANNOT_DUMP
 
@@ -1089,45 +1088,14 @@ usage: (list &rest OBJECTS)  */)
 
 DEFUN ("make-list", Fmake_list, Smake_list, 2, 2, 0,
        doc: /* Return a newly created list of length LENGTH, with each element being INIT.  */)
-  (register Lisp_Object length, Lisp_Object init)
+  (Lisp_Object length, Lisp_Object init)
 {
-  register Lisp_Object val;
-  register EMACS_INT size;
-
+  Lisp_Object val = Qnil;
   CHECK_NATNUM (length);
-  size = XFASTINT (length);
-
-  val = Qnil;
-  while (size > 0)
+  for (EMACS_INT size = XFASTINT (length); 0 < size; size--)
     {
       val = Fcons (init, val);
-      --size;
-
-  if (size > 0)
-    {
-	  val = Fcons (init, val);
-	  --size;
-
-	  if (size > 0)
-	    {
-	      val = Fcons (init, val);
-	      --size;
-
-	      if (size > 0)
-      {
-		  val = Fcons (init, val);
-		  --size;
-
-		  if (size > 0)
-		    {
-		      val = Fcons (init, val);
-		      --size;
-		    }
-		}
-	    }
-	}
-
-      QUIT;
+      rarely_quit (size);
     }
 
   return val;
@@ -1232,6 +1200,8 @@ allocate_hash_table (void)
   return ALLOCATE_PSEUDOVECTOR (struct Lisp_Hash_Table, count, PVEC_HASH_TABLE);
 }
 
+//FIX: larv, not in 2014 nor 2019
+#if 0
 struct window *
 allocate_window (void)
 {
@@ -1243,6 +1213,7 @@ allocate_window (void)
 	  sizeof (*w) - offsetof (struct window, current_matrix));
   return w;
 }
+#endif
 
 struct terminal *
 allocate_terminal (void)
@@ -1268,6 +1239,8 @@ allocate_frame (void)
   return f;
 }
 
+// FIX: 20190629 neither 2019 nor 2014 has this function
+#if 0
 struct Lisp_Process *
 allocate_process (void)
 {
@@ -1279,6 +1252,7 @@ allocate_process (void)
 	  sizeof (*p) - offsetof (struct Lisp_Process, pid));
   return p;
 }
+#endif
 
 DEFUN ("make-vector", Fmake_vector, Smake_vector, 2, 2, 0,
        doc: /* Return a newly created vector of length LENGTH, with each element being INIT.
@@ -1401,7 +1375,9 @@ each initialized to INIT.  */)
   p->contents[0] = type;
   for (ptrdiff_t i = 1; i < size; i++)
     p->contents[i] = init;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  //FIX: larv, what do we return?
+  return p->header.self;
 }
 
 
@@ -1415,7 +1391,9 @@ usage: (record TYPE &rest SLOTS) */)
 {
   struct Lisp_Vector *p = allocate_record (nargs);
   memcpy (p->contents, args, nargs * sizeof *args);
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  // FIX: larv, what do we return?
+  return p->header.self;
 }
 
 
@@ -1504,286 +1482,11 @@ make_user_ptr (void (*finalizer) (void *), void *p)
 }
 #endif
 
-static void
-init_finalizer_list (struct Lisp_Finalizer *head)
-{
-  head->prev = head->next = head;
-}
-
-/* Insert FINALIZER before ELEMENT.  */
-
-static void
-finalizer_insert (struct Lisp_Finalizer *element,
-                  struct Lisp_Finalizer *finalizer)
-{
-  eassert (finalizer->prev == NULL);
-  eassert (finalizer->next == NULL);
-  finalizer->next = element;
-  finalizer->prev = element->prev;
-  finalizer->prev->next = finalizer;
-  element->prev = finalizer;
-}
-
-static void
-unchain_finalizer (struct Lisp_Finalizer *finalizer)
-{
-  if (finalizer->prev != NULL)
-    {
-      eassert (finalizer->next != NULL);
-      finalizer->prev->next = finalizer->next;
-      finalizer->next->prev = finalizer->prev;
-      finalizer->prev = finalizer->next = NULL;
-    }
-}
-
-static void
-mark_finalizer_list (struct Lisp_Finalizer *head)
-{
-  for (struct Lisp_Finalizer *finalizer = head->next;
-       finalizer != head;
-       finalizer = finalizer->next)
-    {
-      finalizer->base.gcmarkbit = true;
-      mark_object (finalizer->function);
-    }
-}
-
-/* Move doomed finalizers to list DEST from list SRC.  A doomed
-   finalizer is one that is not GC-reachable and whose
-   finalizer->function is non-nil.  */
-
-static void
-queue_doomed_finalizers (struct Lisp_Finalizer *dest,
-                         struct Lisp_Finalizer *src)
-{
-  struct Lisp_Finalizer *finalizer = src->next;
-  while (finalizer != src)
-    {
-      struct Lisp_Finalizer *next = finalizer->next;
-      if (!finalizer->base.gcmarkbit && !NILP (finalizer->function))
-        {
-          unchain_finalizer (finalizer);
-          finalizer_insert (dest, finalizer);
-        }
-
-      finalizer = next;
-    }
-}
-
-static Lisp_Object
-run_finalizer_handler (Lisp_Object args)
-{
-  add_to_log ("finalizer failed: %S", args);
-  return Qnil;
-}
-
-static void
-run_finalizer_function (Lisp_Object function)
-{
-  ptrdiff_t count = SPECPDL_INDEX ();
-
-  specbind (Qinhibit_quit, Qt);
-  internal_condition_case_1 (call0, function, Qt, run_finalizer_handler);
-  unbind_to (count, Qnil);
-}
-
-static void
-run_finalizers (struct Lisp_Finalizer *finalizers)
-{
-  struct Lisp_Finalizer *finalizer;
-  Lisp_Object function;
-
-  while (finalizers->next != finalizers)
-    {
-      finalizer = finalizers->next;
-      eassert (finalizer->base.type == Lisp_Misc_Finalizer);
-      unchain_finalizer (finalizer);
-      function = finalizer->function;
-      if (!NILP (function))
-	{
-	  finalizer->function = Qnil;
-	  run_finalizer_function (function);
-	}
-    }
-}
-
-DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
-       doc: /* Make a finalizer that will run FUNCTION.
-FUNCTION will be called after garbage collection when the returned
-finalizer object becomes unreachable.  If the finalizer object is
-reachable only through references from finalizer objects, it does not
-count as reachable for the purpose of deciding whether to run
-FUNCTION.  FUNCTION will be run once per finalizer object.  */)
-  (Lisp_Object function)
-{
-  Lisp_Object val = allocate_misc (Lisp_Misc_Finalizer);
-  struct Lisp_Finalizer *finalizer = XFINALIZER (val);
-  finalizer->function = function;
-  finalizer->prev = finalizer->next = NULL;
-  finalizer_insert (&finalizers, finalizer);
-  return val;
-}
-
 
-/************************************************************************
-			   C Stack Marking
- ************************************************************************/
-
-/* If P is a pointer into a live Lisp cons object on the heap, return
-   the object.  Otherwise, return nil.  M is a pointer to the
-   mem_block for P.  */
-
-static Lisp_Object
-live_cons_holding (struct mem_node *m, void *p)
-{
-  if (m->type == MEM_TYPE_CONS)
-    {
-      struct cons_block *b = m->start;
-      char *cp = p;
-      ptrdiff_t offset = cp - (char *) &b->conses[0];
-
-      /* P must point into a Lisp_Cons, not be
-	 one of the unused cells in the current cons block,
-	 and not be on the free-list.  */
-      if (0 <= offset && offset < CONS_BLOCK_SIZE * sizeof b->conses[0]
-	  && (b != cons_block
-	      || offset / sizeof b->conses[0] < cons_block_index))
-	{
-	  struct Lisp_Cons *s = p = cp -= offset % sizeof b->conses[0];
-	  if (!EQ (s->u.s.car, Vdead))
-	    return make_lisp_ptr (s, Lisp_Cons);
-	}
-    }
-  return Qnil;
-}
-
-
-/* If P is a pointer into a live Lisp symbol object on the heap,
-   return the object.  Otherwise, return nil.  M is a pointer to the
-   mem_block for P.  */
-
-static Lisp_Object
-live_symbol_holding (struct mem_node *m, void *p)
-{
-  if (m->type == MEM_TYPE_SYMBOL)
-    {
-      struct symbol_block *b = m->start;
-      char *cp = p;
-      ptrdiff_t offset = cp - (char *) &b->symbols[0];
-
-      /* P must point into the Lisp_Symbol, not be
-	 one of the unused cells in the current symbol block,
-	 and not be on the free-list.  */
-      if (0 <= offset && offset < SYMBOL_BLOCK_SIZE * sizeof b->symbols[0]
-	  && (b != symbol_block
-	      || offset / sizeof b->symbols[0] < symbol_block_index))
-	{
-	  struct Lisp_Symbol *s = p = cp -= offset % sizeof b->symbols[0];
-	  if (!EQ (s->u.s.function, Vdead))
-	    return make_lisp_symbol (s);
-	}
-    }
-  return Qnil;
-}
-
-
-/* If P is a pointer to a live Lisp Misc on the heap, return the object.
-   Otherwise, return nil.  M is a pointer to the mem_block for P.  */
-
-static Lisp_Object
-live_misc_holding (struct mem_node *m, void *p)
-{
-  if (m->type == MEM_TYPE_MISC)
-    {
-      struct marker_block *b = m->start;
-      char *cp = p;
-      ptrdiff_t offset = cp - (char *) &b->markers[0];
-
-      /* P must point into a Lisp_Misc, not be
-	 one of the unused cells in the current misc block,
-	 and not be on the free-list.  */
-      if (0 <= offset && offset < MARKER_BLOCK_SIZE * sizeof b->markers[0]
-	  && (b != marker_block
-	      || offset / sizeof b->markers[0] < marker_block_index))
-	{
-	  union Lisp_Misc *s = p = cp -= offset % sizeof b->markers[0];
-	  if (s->u_any.type != Lisp_Misc_Free)
-	    return make_lisp_ptr (s, Lisp_Misc);
-	}
-    }
-  return Qnil;
-}
-
-/* If P is a pointer to a live vector-like object, return the object.
-   Otherwise, return nil.
-   M is a pointer to the mem_block for P.  */
-
-static Lisp_Object
-live_vector_holding (struct mem_node *m, void *p)
-{
-  struct Lisp_Vector *vp = p;
-
-  if (m->type == MEM_TYPE_VECTOR_BLOCK)
-    {
-      /* This memory node corresponds to a vector block.  */
-      struct vector_block *block = m->start;
-      struct Lisp_Vector *vector = (struct Lisp_Vector *) block->data;
-
-      /* P is in the block's allocation range.  Scan the block
-	 up to P and see whether P points to the start of some
-	 vector which is not on a free list.  FIXME: check whether
-	 some allocation patterns (probably a lot of short vectors)
-	 may cause a substantial overhead of this loop.  */
-      while (VECTOR_IN_BLOCK (vector, block) && vector <= vp)
-	{
-	  struct Lisp_Vector *next = ADVANCE (vector, vector_nbytes (vector));
-	  if (vp < next && !PSEUDOVECTOR_TYPEP (&vector->header, PVEC_FREE))
-	    return make_lisp_ptr (vector, Lisp_Vectorlike);
-	  vector = next;
-	}
-    }
-  else if (m->type == MEM_TYPE_VECTORLIKE)
-    {
-      /* This memory node corresponds to a large vector.  */
-      struct Lisp_Vector *vector = large_vector_vec (m->start);
-      struct Lisp_Vector *next = ADVANCE (vector, vector_nbytes (vector));
-      if (vector <= vp && vp < next)
-	return make_lisp_ptr (vector, Lisp_Vectorlike);
-    }
-  return Qnil;
-}
-
-
-/* If P is a pointer into a live buffer, return the buffer.
-   Otherwise, return nil.  M is a pointer to the mem_block for P.  */
-
-static Lisp_Object
-live_buffer_holding (struct mem_node *m, void *p)
-{
-  /* P must point into the block, and the buffer
-     must not have been killed.  */
-  if (m->type == MEM_TYPE_BUFFER)
-    {
-      struct buffer *b = m->start;
-      char *cb = m->start;
-      char *cp = p;
-      ptrdiff_t offset = cp - cb;
-      if (0 <= offset && offset < sizeof *b && !NILP (b->name_))
-	{
-	  Lisp_Object obj;
-	  XSETBUFFER (obj, b);
-	  return obj;
-	}
-    }
-  return Qnil;
-}
-
 
 #ifndef HAVE_MODULES
 enum { HAVE_MODULES = false };
 #endif
-
-
 
 /* The type of an object near the stack top, whose address can be used
    as a stack scan limit.  */
@@ -2456,7 +2159,7 @@ The time is in seconds as a floating point value.  */);
 union
 {
   enum CHARTAB_SIZE_BITS CHARTAB_SIZE_BITS;
-  enum char_table_specials char_table_specials;
+  //enum char_table_specials char_table_specials;
   enum char_bits char_bits;
   enum DEFAULT_HASH_SIZE DEFAULT_HASH_SIZE;
   enum Lisp_Bits Lisp_Bits;

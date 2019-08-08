@@ -1959,10 +1959,10 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
     }
   else
     {
+      dynwind_begin();
       struct it it;
       struct text_pos startpos;
       bool saved_restriction = false;
-      ptrdiff_t count = SPECPDL_INDEX ();
       SET_TEXT_POS_FROM_MARKER (startpos, w->start);
       void *itdata = bidi_shelve_cache ();
       /* We want to start from window's start point, but it could be
@@ -1988,8 +1988,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
       move_it_by_lines (&it, 1);
       *width = it.lnum_width;
       *pixel_width = it.lnum_pixel_width;
-      if (saved_restriction)
-	unbind_to (count, Qnil);
+      dynwind_end();
       bidi_unshelve_cache (itdata, 0);
     }
 }
@@ -2091,7 +2090,7 @@ whether or not it is currently displayed in some window.  */)
   struct window *w;
   Lisp_Object lcols;
   void *itdata = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
 
   /* Allow LINES to be of the form (HPOS . VPOS) aka (COLUMNS . LINES).  */
   bool lcols_given = CONSP (lines);
@@ -2357,8 +2356,7 @@ whether or not it is currently displayed in some window.  */)
       bidi_unshelve_cache (itdata, 0);
     }
 
-  unbind_to (count, Qnil);
-
+  dynwind_end();
   return make_number (it.vpos);
 }
 

@@ -3168,6 +3168,7 @@ Warning: this function can be slow if there's a large number of small
 differences between the two buffers.  */)
   (Lisp_Object source)
 {
+  dynwind_begin();
   struct buffer *a = current_buffer;
   Lisp_Object source_buffer = Fget_buffer (source);
   if (NILP (source_buffer))
@@ -3299,7 +3300,9 @@ differences between the two buffers.  */)
       --i;
       --j;
     }
-  unbind_to (count, Qnil);
+
+  dynwind_end();
+
   SAFE_FREE ();
   rbc_quitcounter = 0;
 
@@ -4230,6 +4233,7 @@ usage: (format-message STRING &rest OBJECTS)  */)
 
 /* Implement ‘format-message’ if MESSAGE is true, ‘format’ otherwise.  */
 
+//FIX: larv, grotesque, not sure memory handling is still clean (removed sa_avail)
 static Lisp_Object
 styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 {
@@ -4249,7 +4253,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   Lisp_Object val;
   bool arg_intervals = false;
   USE_SAFE_ALLOCA;
-  sa_avail -= sizeof initial_buffer;
 
   /* Information recorded for each format spec.  */
   struct info
@@ -4920,7 +4923,10 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	}
       else
 	{
-	  buf = xrealloc_atomic (buf, bufsize);
+          void *new = xmalloc_atomic (bufsize);
+	  memcpy (new, initial_buffer, used);
+          xfree(buf);
+          buf = new;
 	}
 
       p = buf + used;

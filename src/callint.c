@@ -310,11 +310,19 @@ invoke it.  If KEYS is omitted or nil, the return value of
       Vreal_this_command = save_real_this_command;
       kset_last_command (current_kboard, save_last_command);
 
-      Lisp_Object result
-	= unbind_to (speccount, CALLN (Fapply, Qfuncall_interactively,
-				       function, specs));
-      dynwind_end ();
-      return result;
+      //Lisp_Object result = CALLN (Fapply, Qfuncall_interactively,
+      //				       function, specs);
+      //dynwind_end ();
+      //return result;
+      {
+	Lisp_Object tem0, args[3];
+	args[0] = Qfuncall_interactively;
+	args[1] = function;
+	args[2] = specs;
+	tem0 = Fapply (3, args);
+        dynwind_end ();
+        return tem0;
+      }
     }
 
   /* SPECS is set to a string; use it as an interactive prompt.

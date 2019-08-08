@@ -3601,8 +3601,8 @@ compute_stop_pos (struct it *it)
 
       /* Get properties here.  */
       for (p = it_props; p->handler; ++p)
-	values_here[p->idx] = textget (iv->plist,
-				       builtin_lisp_symbol (p->name));
+        // FIX: LAV, replace NULL with something sensible
+	values_here[p->idx] = textget (iv->plist, NULL);
 
       /* Look for an interval following iv that has different
 	 properties.  */
@@ -3614,8 +3614,8 @@ compute_stop_pos (struct it *it)
 	{
 	  for (p = it_props; p->handler; ++p)
 	    {
-	      Lisp_Object new_value = textget (next_iv->plist,
-					       builtin_lisp_symbol (p->name));
+              // FIX: LAV, replace NULL with something sensible
+	      Lisp_Object new_value = textget (next_iv->plist, NULL);
 	      if (!EQ (values_here[p->idx], new_value))
 		break;
 	    }
@@ -14061,11 +14061,10 @@ redisplay_internal (void)
 	 that case we call the hooks here only for the selected frame.  */
       if (sf->redisplay)
 	{
-	  ptrdiff_t count1 = SPECPDL_INDEX ();
-
+          dynwind_begin();
 	  record_unwind_save_match_data ();
 	  run_window_size_change_functions (selected_frame);
-	  unbind_to (count1, Qnil);
+          dynwind_end();
 	}
 
       if (message_cleared_p)
@@ -14086,11 +14085,10 @@ redisplay_internal (void)
     {
       if (sf->redisplay)
 	{
-	  ptrdiff_t count1 = SPECPDL_INDEX ();
-
+          dynwind_begin();
 	  record_unwind_save_match_data ();
 	  run_window_size_change_functions (selected_frame);
-	  unbind_to (count1, Qnil);
+          dynwind_end();
 	}
 
       /* Resized active mini-window to fit the size of what it is
@@ -14673,7 +14671,7 @@ redisplay_preserve_echo_area (int from_where)
   TRACE ((stderr, "redisplay_preserve_echo_area (%d)\n", from_where));
 
   block_input ();
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
   record_unwind_protect_void (unwind_redisplay_preserve_echo_area);
   block_buffer_flips ();
   unblock_input ();
@@ -14690,7 +14688,7 @@ redisplay_preserve_echo_area (int from_where)
     redisplay_internal ();
 
   flush_frame (SELECTED_FRAME ());
-  unbind_to (count, Qnil);
+  dynwind_end();
 }
 
 
@@ -16597,7 +16595,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
      It indicates that the buffer contents and narrowing are unchanged.  */
   bool buffer_unchanged_p = false;
   bool temp_scroll_step = false;
-  int temp_scroll_step = 0;
   int rc;
   int centering_position = -1;
   bool last_line_misfit = false;
@@ -20930,11 +20927,11 @@ display_count_lines_logically (ptrdiff_t start_byte, ptrdiff_t limit_byte,
     return display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
 
   ptrdiff_t val;
-  ptrdiff_t pdl_count = SPECPDL_INDEX ();
+  dynwind_begin();
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   Fwiden ();
   val = display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
-  unbind_to (pdl_count, Qnil);
+  dynwind_end();
   return val;
 }
 
@@ -20956,8 +20953,7 @@ display_count_lines_visually (struct it *it)
     return it->lnum + 1;
   else
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
-
+      dynwind_begin();
       if (IT_CHARPOS (*it) <= PT)
 	{
 	  from = it->current.pos;
@@ -20980,7 +20976,7 @@ display_count_lines_visually (struct it *it)
 		  tem_it.last_visible_y
 		  + (SCROLL_LIMIT + 10) * FRAME_LINE_HEIGHT (tem_it.f),
 		  -1, MOVE_TO_POS | MOVE_TO_Y);
-      unbind_to (count, Qnil);
+      dynwind_end();
       return IT_CHARPOS (*it) <= PT ? -tem_it.vpos : tem_it.vpos;
     }
 }
@@ -24057,7 +24053,6 @@ are the selected window and the WINDOW's buffer).  */)
   struct buffer *old_buffer = NULL;
   int face_id;
   bool no_props = INTEGERP (face);
-  int no_props = INTEGERP (face);
 
   dynwind_begin ();
   Lisp_Object str;
@@ -32571,7 +32566,7 @@ be let-bound around code that needs to disable messages temporarily. */);
 
   DEFSYM (Qright_to_left, "right-to-left");
   DEFSYM (Qleft_to_right, "left-to-right");
-  defsubr (&Sbidi_resolved_levels);
+  //defsubr (&Sbidi_resolved_levels); // FIX: 20190629 larv, probably not needed, snarf will detect it
 
 #ifdef HAVE_WINDOW_SYSTEM
   DEFVAR_BOOL ("x-stretch-cursor", x_stretch_cursor_p,

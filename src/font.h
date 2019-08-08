@@ -244,7 +244,7 @@ enum font_property_index
 
 struct font_spec
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   Lisp_Object props[FONT_SPEC_MAX];
 };
 
@@ -252,7 +252,7 @@ struct font_spec
 
 struct font_entity
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   Lisp_Object props[FONT_ENTITY_MAX];
 };
 
@@ -265,7 +265,7 @@ struct font_entity
 
 struct font
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* All Lisp_Object components must come first.
      That ensures they are all aligned normally.  */
@@ -431,7 +431,8 @@ FONT_SPEC_P (Lisp_Object x)
 INLINE bool
 GC_FONT_SPEC_P (Lisp_Object x)
 {
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_SPEC_MAX;
+  return FONT_SPEC_P(x);
+  //return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_SPEC_MAX;
 }
 
 /* True iff X is font-entity.  */
@@ -445,7 +446,8 @@ FONT_ENTITY_P (Lisp_Object x)
 INLINE bool
 GC_FONT_ENTITY_P (Lisp_Object x)
 {
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_ENTITY_MAX;
+  return FONT_ENTITY_P(x);
+  //return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_ENTITY_MAX;
 }
 
 /* True iff X is font-object.  */
@@ -459,7 +461,8 @@ FONT_OBJECT_P (Lisp_Object x)
 INLINE bool
 GC_FONT_OBJECT_P (Lisp_Object x)
 {
-  return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_OBJECT_MAX;
+  return FONT_OBJECT_P(x);
+  //return FONTP (x) && (gc_asize (x) & PSEUDOVECTOR_SIZE_MASK) == FONT_OBJECT_MAX;
 }
 
 /* Type checking functions for various font-related objects.  */

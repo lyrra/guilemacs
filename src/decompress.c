@@ -215,9 +215,6 @@ void
 syms_of_decompress (void)
 {
 #include "decompress.x"
-  defsubr (&Szlib_decompress_region);
-  defsubr (&Szlib_available_p);
-
   DEFSYM (Qzlib_dll, "zlib");
 }
 

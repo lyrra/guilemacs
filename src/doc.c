@@ -488,9 +488,7 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
     }
 
   /* If it's a lisp form, stick it in the form.  */
-  if (CONSP (fun) && EQ (XCAR (fun), Qmacro))
-    fun = XCDR (fun);
-  if (CONSP (fun))
+  else if (CONSP (fun))
     {
       Lisp_Object tem;
 
@@ -504,18 +502,18 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
 	       correctness is quite delicate.  */
 	    XSETCAR (tem, make_number (offset));
 	}
-      // FIX: 20190626 LAV, dont store it?
+      // FIX: 20190626 LAV, dont store it? 2019-vanilla doesn't
       //else if (EQ (tem, Qmacro) || EQ (tem, Qspecial_operator))
       //  store_function_docstring (XCDR (fun), offset);
     }
 
   /* Lisp_Subrs have a slot for it.  */
-  //FIX: 20190626 LAV, subrp should be replaced with scm_is_true (scm_procedure_p (fun))?
+  // FIX: 20190626 LAV, subrp should be replaced with scm_is_true (scm_procedure_p (fun))?
   // was else if (SUBRP (fun))
-  else if (scm_procedure_p (fun))
+  //else if (scm_procedure_p (fun))
     // FIX: 20190626 LAV, This call will retrieve the function-documentation, but how do we set it?
     //scm_procedure_property (fun, intern ("emacs-documentation"))
-    XSUBR (fun)->doc = offset;
+  //  XSUBR (fun)->doc = offset;
 
   /* Bytecode objects sometimes have slots for it.  */
   else if (COMPILEDP (fun))
@@ -692,7 +690,7 @@ the same file name is found in the `doc-directory'.  */)
 
   SAFE_FREE ();
   dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 /* Return true if text quoting style should default to quote `like this'.  */
@@ -961,11 +959,11 @@ Otherwise, return a new string.  */)
 				STRING_BYTES_BOUND, 1);
 		if (buf == sbuf)
 		  {
-		    record_unwind_protect_ptr (xfree, abuf);
+		    //record_unwind_protect_ptr (xfree, abuf);
 		    memcpy (abuf, sbuf, offset);
 		  }
-		else
-		  set_unwind_protect_ptr (count, xfree, abuf);
+		//else
+		  //set_unwind_protect_ptr (count, xfree, abuf);
 		buf = abuf;
 		bufp = buf + offset;
 	      }

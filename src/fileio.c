@@ -3934,7 +3934,8 @@ by calling `format-decode', which see.  */)
       if (! giveup_match_end)
 	{
 	  ptrdiff_t temp;
-          ptrdiff_t this_count = SPECPDL_INDEX ();
+          // FIX: 20190808 LAV, what are we protecting?
+          dynwind_begin();
 
 	  /* We win!  We can handle REPLACE the optimized way.  */
 
@@ -3976,7 +3977,7 @@ by calling `format-decode', which see.  */)
 	  /* Insert from the file at the proper position.  */
 	  temp = BYTE_TO_CHAR (same_at_start);
 	  SET_PT_BOTH (temp, same_at_start);
-          unbind_to (this_count, Qnil);
+          dynwind_end();
 
 	  /* If display currently starts at beginning of line,
 	     keep it that way.  */

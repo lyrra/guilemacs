@@ -985,7 +985,7 @@ file_attributes (int fd, char const *name,
     }
 
   if (err != 0)
-    return unbind_to (count, Qnil);
+    return Qnil;
 
   Lisp_Object file_type;
   if (S_ISLNK (s.st_mode))
@@ -996,12 +996,10 @@ file_attributes (int fd, char const *name,
 	 is also a symlink.  */
       file_type = emacs_readlinkat (fd, name);
       if (NILP (file_type))
-	return unbind_to (count, Qnil);
+	return Qnil;
     }
   else
     file_type = S_ISDIR (s.st_mode) ? Qt : Qnil;
-
-  unbind_to (count, Qnil);
 
   if (!(NILP (id_format) || EQ (id_format, Qinteger)))
     {

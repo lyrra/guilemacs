@@ -2288,7 +2288,7 @@ get_random (void)
   for (i = 0; i < (FIXNUM_BITS + RAND_BITS - 1) / RAND_BITS; i++)
     val = (random () ^ (val << RAND_BITS)
 	   ^ (val >> (EMACS_INT_WIDTH - RAND_BITS)));
-  val ^= val >> (EMACS_INT_WIDTH - FIXNUM_BITS);
+  val ^= val >> EMACS_TAG_BITS;
   return val & INTMASK;
 }
 
@@ -3208,7 +3208,6 @@ system_process_attributes (Lisp_Object pid)
   double pcpu, pmem;
   Lisp_Object attrs = Qnil;
   Lisp_Object decoded_cmd;
-  ptrdiff_t count;
 
   CHECK_NUMBER_OR_FLOAT (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);

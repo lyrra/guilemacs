@@ -68,9 +68,10 @@ post_acquire_global_lock (struct thread_state *self)
       /* PREV_THREAD is NULL if the previously current thread
 	 exited.  In this case, there is no reason to unbind, and
 	 trying will crash.  */
-      if (prev_thread != NULL)
-	unbind_for_thread_switch (prev_thread);
-      rebind_for_thread_switch ();
+      // FIX: LAV, hopefully with guile, we dont need this, are we acquiring a lock, or moving lexical-binds?
+      //if (prev_thread != NULL)
+	//unbind_for_thread_switch (prev_thread);
+      //rebind_for_thread_switch ();
 
        /* Set the new thread's current buffer.  This needs to be done
 	  even if it is the same buffer as that of the previous thread,
@@ -301,15 +302,16 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   (Lisp_Object mutex)
 {
   struct Lisp_Mutex *lmutex;
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   CHECK_MUTEX (mutex);
   lmutex = XMUTEX (mutex);
 
   current_thread->event_object = mutex;
-  record_unwind_protect_void (do_unwind_mutex_lock);
+  dynwind_begin(); // record_unwind_protect_void (do_unwind_mutex_lock);
   flush_stack_call_func (mutex_lock_callback, lmutex);
-  return unbind_to (count, Qnil);
+  dynwind_end();
+  //do_unwind_mutex_lock(); // FIX: LAV, where do we mutex-unlock? does record_unwind_protect_void does it?
+  return Qnil;
 }
 
 static void
@@ -606,65 +608,6 @@ thread_select (select_func *func, int max_fds, fd_set *rfds,
 
 
 static void
-mark_one_thread (struct thread_state *thread)
-{
-  /* Get the stack top now, in case mark_specpdl changes it.  */
-  void *stack_top = thread->stack_top;
-
-  mark_specpdl (thread->m_specpdl, thread->m_specpdl_ptr);
-
-  mark_stack (thread->m_stack_bottom, stack_top);
-
-  for (struct handler *handler = thread->m_handlerlist;
-       handler; handler = handler->next)
-    {
-      mark_object (handler->tag_or_ch);
-      mark_object (handler->val);
-    }
-
-  if (thread->m_current_buffer)
-    {
-      Lisp_Object tem;
-      XSETBUFFER (tem, thread->m_current_buffer);
-      mark_object (tem);
-    }
-
-  mark_object (thread->m_last_thing_searched);
-
-  if (!NILP (thread->m_saved_last_thing_searched))
-    mark_object (thread->m_saved_last_thing_searched);
-}
-
-static void
-mark_threads_callback (void *ignore)
-{
-  struct thread_state *iter;
-
-  for (iter = all_threads; iter; iter = iter->next_thread)
-    {
-      Lisp_Object thread_obj;
-
-      XSETTHREAD (thread_obj, iter);
-      mark_object (thread_obj);
-      mark_one_thread (iter);
-    }
-}
-
-void
-mark_threads (void)
-{
-  flush_stack_call_func (mark_threads_callback, NULL);
-}
-
-void
-unmark_main_thread (void)
-{
-  main_thread.header.size &= ~ARRAY_MARK_FLAG;
-}
-
-
-
-static void
 yield_callback (void *ignore)
 {
   struct thread_state *self = current_thread;
@@ -685,10 +628,10 @@ DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
 static Lisp_Object
 invoke_thread_function (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-
+  dynwind_begin();
   Ffuncall (1, &current_thread->function);
-  return unbind_to (count, Qnil);
+  dynwind_end();
+  return Qnil;
 }
 
 static Lisp_Object last_thread_error;
@@ -705,12 +648,12 @@ run_thread (void *state)
 {
   /* Make sure stack_top and m_stack_bottom are properly aligned as GC
      expects.  */
-  max_align_t stack_pos;
+  //max_align_t stack_pos;
 
   struct thread_state *self = state;
   struct thread_state **iter;
 
-  self->m_stack_bottom = self->stack_top = (char *) &stack_pos;
+  //self->m_stack_bottom = self->stack_top = (char *) &stack_pos;
   self->thread_id = sys_thread_self ();
 
   acquire_global_lock (self);
@@ -719,30 +662,32 @@ run_thread (void *state)
      This is important since handlerlist->nextfree holds the freelist
      which would otherwise leak every time we unwind back to top-level.   */
   handlerlist_sentinel = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-  struct handler *c = push_handler (Qunbound, CATCHER);
-  eassert (c == handlerlist_sentinel);
-  handlerlist_sentinel->nextfree = NULL;
-  handlerlist_sentinel->next = NULL;
+  //handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
+  //struct handler *c = push_handler (Qunbound, CATCHER);
+  //eassert (c == handlerlist_sentinel);
+  //handlerlist_sentinel->nextfree = NULL; FIX: larv check the macros
+  //handlerlist_sentinel->next = NULL;
 
   /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
 
   update_processes_for_thread_death (Fcurrent_thread ());
 
-  xfree (self->m_specpdl - 1);
-  self->m_specpdl = NULL;
-  self->m_specpdl_ptr = NULL;
-  self->m_specpdl_size = 0;
+  //xfree (self->m_specpdl - 1);
+  //self->m_specpdl = NULL;
+  //self->m_specpdl_ptr = NULL;
+  //self->m_specpdl_size = 0;
 
+  #if 0
   {
     struct handler *c, *c_next;
     for (c = handlerlist_sentinel; c; c = c_next)
       {
-	c_next = c->nextfree;
+	//c_next = c->nextfree; FIX: larv, check the macros
 	xfree (c);
       }
   }
+  #endif
 
   current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
@@ -1052,26 +997,6 @@ syms_of_threads (void)
   if (0)
 #endif
     {
-      defsubr (&Sthread_yield);
-      defsubr (&Smake_thread);
-      defsubr (&Scurrent_thread);
-      defsubr (&Sthread_name);
-      defsubr (&Sthread_signal);
-      defsubr (&Sthread_live_p);
-      defsubr (&Sthread_join);
-      defsubr (&Sthread_blocker);
-      defsubr (&Sall_threads);
-      defsubr (&Smake_mutex);
-      defsubr (&Smutex_lock);
-      defsubr (&Smutex_unlock);
-      defsubr (&Smutex_name);
-      defsubr (&Smake_condition_variable);
-      defsubr (&Scondition_wait);
-      defsubr (&Scondition_notify);
-      defsubr (&Scondition_mutex);
-      defsubr (&Scondition_name);
-      defsubr (&Sthread_last_error);
-
       staticpro (&last_thread_error);
       last_thread_error = Qnil;
 

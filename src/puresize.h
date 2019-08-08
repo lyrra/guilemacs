@@ -23,6 +23,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-#define CHECK_IMPURE(obj) ((void) 0)
+#define CHECK_IMPURE(obj, scmobj) ((void) 0)
 
 #define PURE_P(obj) 0
+
+#endif // EMACS_PURESIZE_H

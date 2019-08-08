@@ -385,9 +385,11 @@ ALL_OBJC_CFLAGS = $(EMACS_CFLAGS) \
 .m.o:
 	$(AM_V_CC)$(CC) -c $(CPPFLAGS) $(ALL_OBJC_CFLAGS) $(PROFILING_CFLAGS) $<
 
-.c.x:
+.c.x: globals.h
+	echo SNARFING-1 $(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_CFLAGS)
 	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_CFLAGS)
-.m.x:
+.m.x: globals.h
+	echo SNARFING-2 $(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_OBJC_CFLAGS)
 	$(GUILE_SNARF) -o $@ $< $(CPPFLAGS) $(ALL_OBJC_CFLAGS)
 
 ## lastfile must follow all files whose initialized data areas should
@@ -841,7 +843,7 @@ xsettings.o: xsettings.x
 xsmfns.o: xsmfns.x
 
 ## Insert either autodeps.mk (if AUTO_DEPEND), else deps.mk.
-@deps_frag@
+#@deps_frag@
 
 
 ### Makefile.in ends here

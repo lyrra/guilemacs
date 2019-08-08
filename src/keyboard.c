@@ -1895,7 +1895,6 @@ safe_run_hooks (Lisp_Object hook)
 
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
-  unbind_to (count, Qnil);
 
   dynwind_end ();
 }
@@ -2322,6 +2321,7 @@ struct read_char_state
   Lisp_Object previous_echo_area_message;
   Lisp_Object also_record;
   bool reread;
+  bool recorded;
   bool polling_stopped_here;
   struct kboard *orig_kboard;
 };
@@ -2373,7 +2373,6 @@ read_char_handle_quit (void *data, Lisp_Object k)
         current_kboard = kb;
         /* This is going to exit from read_char
            so we had better get rid of this frame's stuff.  */
-        UNGCPRO;
         return make_number (-2); /* wrong_kboard_jmpbuf */
       }
   }
@@ -2413,6 +2412,15 @@ read_char (int commandflag, Lisp_Object map,
                            make_c_closure (read_char_handle_quit, state, 1, 0));
 }
 
+/* save/restore the global getctag to current tag */
+static void save_getcjmp (struct read_char_state *state) {
+  state->save_tag = getctag;
+}
+
+static void restore_getcjmp(struct Lisp_Object *tag) {
+  getctag = tag;
+}
+
 static Lisp_Object
 read_char_1 (bool jump, volatile struct read_char_state *state)
 {
@@ -2428,10 +2436,10 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define previous_echo_area_message state->previous_echo_area_message
 #define also_record state->also_record
 #define reread state->reread
+#define recorded state->recorded
 #define polling_stopped_here state->polling_stopped_here
 #define orig_kboard state->orig_kboard
-#define save_getcjmp(x) (x = getctag)
-#define restore_getcjmp(x) (getctag = x)
+
   Lisp_Object tem, save;
 
   if (jump)
@@ -2687,11 +2695,11 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	  Lisp_Object tem0;
 
 	  ptrdiff_t count = SPECPDL_INDEX ();
-	  save_getcjmp (save_jump);
-	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
-	  restore_getcjmp (local_getcjmp);
+	  save_getcjmp (state->save_tag);
+	  record_unwind_protect_ptr (restore_getcjmp, state->save_tag);
+	  restore_getcjmp (state->local_tag);
 	  tem0 = sit_for (Vecho_keystrokes, 1, 1);
-	  unbind_to (count, Qnil);
+	  //unbind_to (count, Qnil);
 	  if (EQ (tem0, Qt)
 	      && ! CONSP (Vunread_command_events))
 	    echo_now ();
@@ -2763,11 +2771,11 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	  timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
 	  timeout = delay_level * timeout / 4;
 	  ptrdiff_t count1 = SPECPDL_INDEX ();
-	  save_getcjmp (save_jump);
-	  record_unwind_protect_ptr (restore_getcjmp, save_jump);
-	  restore_getcjmp (local_getcjmp);
+	  save_getcjmp (state);
+	  record_unwind_protect_ptr (restore_getcjmp, state->save_tag);
+	  restore_getcjmp (state->local_tag);
 	  tem0 = sit_for (make_number (timeout), 1, 1);
-	  unbind_to (count1, Qnil);
+	  //unbind_to (count1, Qnil);
 
 	  if (EQ (tem0, Qt)
 	      && ! CONSP (Vunread_command_events))
@@ -3193,10 +3201,9 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #undef previous_echo_area_message
 #undef also_record
 #undef reread
+#undef recorded
 #undef polling_stopped_here
 #undef orig_kboard
-#undef save_getcjmp
-#undef restore_getcjmp
 }
 /* {{coccinelle:skip_end}} */
 
@@ -3605,7 +3612,7 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
           /* Don't read keyboard input until we have processed kbd_buffer.
              This happens when pasting text longer than KBD_BUFFER_SIZE/2.  */
           hold_keyboard_input ();
-          unrequest_sigio ();
+          //unrequest_sigio ();
         }
 #endif	/* subprocesses */
     }
@@ -3804,7 +3811,7 @@ kbd_buffer_get_event (KBOARD **kbp,
       /* Start reading input again because we have processed enough to
          be able to accept new events again.  */
       unhold_keyboard_input ();
-      request_sigio ();
+      //request_sigio ();
     }
 #endif	/* subprocesses */
 
@@ -5472,7 +5479,7 @@ make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
 {
   return list5 (ev->frame_or_window, type, Fcons (ev->x, ev->y),
 		make_number (ev->timestamp),
-		builtin_lisp_symbol (scroll_bar_parts[ev->part]));
+		(scroll_bar_parts[ev->part]));
 }
 
 /* Given a struct input_event, build the lisp event which represents
@@ -6151,7 +6158,7 @@ make_lispy_movement (struct frame *frame, Lisp_Object bar_window, enum scroll_ba
     {
       Lisp_Object part_sym;
 
-      part_sym = builtin_lisp_symbol (scroll_bar_parts[part]);
+      part_sym = (scroll_bar_parts[part]);
       return list2 (Qscroll_bar_movement,
 		    list5 (bar_window,
 			   Qvertical_scroll_bar,
@@ -11255,8 +11262,8 @@ syms_of_keyboard (void)
     for (i = 0; i < ARRAYELTS (head_table); i++)
       {
 	const struct event_head *p = &head_table[i];
-	Lisp_Object var = builtin_lisp_symbol (p->var);
-	Lisp_Object kind = builtin_lisp_symbol (p->kind);
+	Lisp_Object var =  (p->var);
+	Lisp_Object kind = (p->kind);
 	Fput (var, Qevent_kind, kind);
 	Fput (var, Qevent_symbol_elements, list1 (var));
       }
@@ -11503,7 +11510,7 @@ for that character after that prefix key.  */);
 	       doc: /* Form to evaluate when Emacs starts up.
 Useful to set before you dump a modified Emacs.  */);
   Vtop_level = Qnil;
-  XSYMBOL (Qtop_level)->u.s.declared_special = false;
+  SET_SYMBOL_DECLARED_SPECIAL(Qtop_level, 0);
 
   DEFVAR_KBOARD ("keyboard-translate-table", Vkeyboard_translate_table,
                  doc: /* Translate table for local keyboard input, or nil.

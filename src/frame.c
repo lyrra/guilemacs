@@ -5779,7 +5779,7 @@ syms_of_frame (void)
       {
 	Lisp_Object v = (frame_parms[i].sym < 0
 			 ? intern_c_string (frame_parms[i].name)
-			 : builtin_lisp_symbol (frame_parms[i].sym));
+			 : (frame_parms[i].sym)); // FIX: lav
 	Fput (v, Qx_frame_parameter, make_number (i));
       }
   }
