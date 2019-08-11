@@ -1552,6 +1552,8 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       syms_of_buffer ();
       syms_of_callint ();
+      // FIX: set Vinput_method_function (part of syms_of_keyboard), due to (maybe)circular dependency
+      Vinput_method_function = Qlist;
       syms_of_casefiddle ();
       syms_of_casetab ();
       syms_of_category ();
