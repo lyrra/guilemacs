@@ -1669,7 +1669,7 @@ returns nil, because real GC can't be done.
 See Info node `(elisp)Garbage Collection'.  */)
   (void)
 {
-  GC_gcollect ();
+  //GC_gcollect ();
   return Qt;
 }
 
