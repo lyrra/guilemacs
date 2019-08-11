@@ -9102,7 +9102,8 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
   /* List of events for which a fake prefix key has been generated.  */
   Lisp_Object fake_prefixed_keys = Qnil;
 
-  dynwind_begin ();
+  // FIX: 20190811 LAV, for some reason, dynwind doesn't work in this function see the dynstack macros in guile to figure out the memory layout and how to debug using gdb (step-instruction if needed).
+  //dynwind_begin ();
   raw_keybuf_count = 0;
 
   last_nonmenu_event = Qnil;
@@ -9340,7 +9341,7 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
 	     Just return -1.  */
 	  if (EQ (key, Qt))
 	    {
-              dynwind_end ();
+              //dynwind_end ();
 	      return -1;
 	    }
 
@@ -9908,7 +9909,7 @@ read_key_sequence (Lisp_Object *keybuf, int bufsize, Lisp_Object prompt,
     : Qnil;
 
   unread_switch_frame = delayed_switch_frame;
-  dynwind_end ();
+  //dynwind_end ();
 
   /* Don't downcase the last character if the caller says don't.
      Don't downcase it if the result is undefined, either.  */
