@@ -213,11 +213,17 @@
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.
 ; FIX: 20190726 LAV, charprop removed, since it doesn't exist!
-; (load "international/charprop.el" t)
-; (if (featurep 'charprop)
-;     (setq redisplay--inhibit-bidi nil))
+; FIX: 20190812 LAV, during startup of emacs this must exist,
+;      because it is used by chartab.c code, that doesn't check for NIL properly.
+(load "international/charprop.el" t)
+(if (featurep 'charprop)
+    (setq redisplay--inhibit-bidi nil))
 (load "international/characters")
 (load "composite")
+
+(if unicode-category-table
+  (print "---- unicode-category-table is set")
+  (print "---- WARNING unicode-category-table NOT set"))
 
 (load "international/ccl")
 
