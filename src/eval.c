@@ -339,17 +339,32 @@ Ffunction (Lisp_Object args)
     return quoted;
 }
 
-void emacs_gdb_breakpoint (char *desc)
+void
+emacs_gdb_breakpoint (char *desc)
 {
   fprintf(stderr, "Welcome! Emacs gdb breakpoint is hit: %s\n", desc);
 }
 
+void
+emacs_gdb_breakpoint_value (void *item)
+{
+  fprintf(stderr, "Welcome! Emacs gdb breakpoint is hit, item=%lx\n", item);
+}
+
 DEFUN ("gdb-breakpoint", Fgdb_breakpoint, Sgdb_breakpoint, 1, 1, 0,
-       doc: /* set a breakpoint on emacs_gdb_breakpoint, and call (gdb-breakpoint) from your elisp code. */)
+       doc: /* in gdb, set a breakpoint on emacs_gdb_breakpoint, and call (gdb-breakpoint) from your elisp code. */)
   (Lisp_Object desc)
 {
   CHECK_STRING (desc);
   emacs_gdb_breakpoint(SSDATA(desc));
+  return Qnil;
+}
+
+DEFUN ("gdb-breakpoint-value", Fgdb_breakpoint_value, Sgdb_breakpoint_value, 1, 1, 0,
+       doc: /* in gdb, set a breakpoint on emacs_gdb_breakpoint_value, and call (gdb-breakpoint-value) from your elisp code. */)
+  (Lisp_Object item)
+{
+  emacs_gdb_breakpoint_value(item);
   return Qnil;
 }
 
