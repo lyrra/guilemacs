@@ -729,7 +729,7 @@ with L, LRE, or LRO Unicode bidi character type.")
                   ;;   uc(U+0131 ı) = I
                   ;;   uc(U+017F ſ) = S
                   ;;   uc(U+212A K) = k
-                  (when (> cased 127)
+                  (when nil ;(> cased 127)
                     (let ((end (if (consp ch) (cdr ch) ch)))
                       (setq ch (max 128 (if (consp ch) (car ch) ch)))
                       (while (<= ch end)
@@ -1351,13 +1351,14 @@ Setup char-width-table appropriate for non-CJK language environment."
 (when (setq unicode-category-table
 	    (unicode-property-table-internal 'general-category))
   (map-char-table #'(lambda (key val)
+                      (if nil
 		      (if val
 			  (cond ((or (and (/= (aref (symbol-name val) 0) ?M)
 					  (/= (aref (symbol-name val) 0) ?C))
 				     (eq val 'Zs))
 				 (modify-category-entry key ?.))
 				((eq val 'Mn)
-				 (modify-category-entry key ?^)))))
+				 (modify-category-entry key ?^))))))
 		  unicode-category-table))
 
 (optimize-char-table (standard-category-table))
