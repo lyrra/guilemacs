@@ -300,7 +300,6 @@ xmalloc (size_t size)
 
   if (!val && size)
     memory_full (size);
-  MALLOC_PROBE (size);
   return val;
 }
 
