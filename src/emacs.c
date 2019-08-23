@@ -1190,6 +1190,7 @@ maybe_load_seccomp (int argc, char **argv)
 
 #endif  /* SECCOMP_USABLE */
 
+// FIX: 20190823 LAV, redundant? see src/fns.c:Fstring_from_scheme
 static Lisp_Object
 string_from_scheme (Lisp_Object scheme_string)
 {
