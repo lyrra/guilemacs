@@ -978,6 +978,7 @@ load_pdump (int argc, char **argv)
 }
 #endif /* HAVE_PDUMPER */
 
+// FIX: 20190823 LAV, redundant? see src/fns.c:Fstring_from_scheme
 static Lisp_Object
 string_from_scheme (Lisp_Object scheme_string)
 {
