@@ -331,6 +331,8 @@ CANNOT_DUMP=@CANNOT_DUMP@
 
 GUILE_SNARF=@GUILE_SNARF@
 
+INTERNAL_DEBUG_OBJ = @INTERNAL_DEBUG_OBJ@
+
 # 'make' verbosity.
 AM_DEFAULT_VERBOSITY = @AM_DEFAULT_VERBOSITY@
 
@@ -412,6 +414,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o \
 	thread.o systhread.o \
 	$(if $(HYBRID_MALLOC),sheap.o) \
 	guile.o \
+	$(INTERNAL_DEBUG_OBJ) \
 	$(MSDOS_OBJ) $(MSDOS_X_OBJ) $(NS_OBJ) $(CYGWIN_OBJ) $(FONT_OBJ) \
 	$(W32_OBJ) $(WINDOW_SYSTEM_OBJ) $(XGSELOBJ)
 obj = $(base_obj) $(NS_OBJC_OBJ)

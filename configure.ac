@@ -476,6 +476,19 @@ if test x$ac_enable_checking != x ; then
 [Define to 1 if expensive run-time data type and consistency checks are enabled.])
 fi
 
+EMACS_INTERNAL_DEBUG=no
+INTERNAL_DEBUG_OBJ=
+AC_ARG_ENABLE(internal-debug,
+[AS_HELP_STRING([--enable-internal-debug],
+                [Add extra debug support to emacs])],
+if test "${enableval}" = "yes"; then
+  EMACS_INTERNAL_DEBUG=yes
+  INTERNAL_DEBUG_OBJ=internal-debug.o
+fi)
+
+AC_SUBST(EMACS_INTERNAL_DEBUG)
+AC_SUBST(INTERNAL_DEBUG_OBJ)
+
 dnl The name of this option is unfortunate.  It predates, and has no
 dnl relation to, the "sampling-based elisp profiler" added in 24.3.
 dnl Actually, it stops it working.
