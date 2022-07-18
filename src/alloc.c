@@ -1619,6 +1619,10 @@ print_lisp_string (SCM obj, SCM port, scm_print_state *pstate)
   return 0;
 }
 
+scm_t_bits lisp_misc_tag;
+scm_t_bits lisp_string_tag;
+scm_t_bits lisp_vectorlike_tag;
+
 void
 init_alloc_once (void)
 {
