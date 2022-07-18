@@ -343,9 +343,9 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
-scm_t_bits lisp_misc_tag;
-scm_t_bits lisp_string_tag;
-scm_t_bits lisp_vectorlike_tag;
+extern scm_t_bits lisp_misc_tag;
+extern scm_t_bits lisp_string_tag;
+extern scm_t_bits lisp_vectorlike_tag;
 
 enum Lisp_Type
   {
