@@ -1102,7 +1102,7 @@ static void syms_of_xfont_for_pdumper (void);
 
 struct font_driver const xfont_driver =
   {
-  .type = LISPSYM_INITIALLY (Qx),
+  .type = NULL, // Qx
   .get_cache = xfont_get_cache,
   .list = xfont_list,
   .match = xfont_match,

@@ -3694,6 +3694,7 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
   /* We save and restore the current buffer because tty_menu_activate
      triggers redisplay, which switches buffers at will.  */
   record_unwind_protect_ptr (tty_pop_down_menu,
+			 //FIX-MAYBE: NULL // FIX20230122: was: make_save_ptr_ptr (menu, current_buffer)
 			     &((struct tty_pop_down_menu)
 			       {menu, current_buffer}));
 
