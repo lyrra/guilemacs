@@ -1281,6 +1281,7 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   pure->key_and_value = purecopy (table->key_and_value);
   pure->test = pure_test;
 
+  fprintf(stderr, "WARNING: purecopy_hash_table used\n"); //FIX20230126 why still used?
   return pure;
 }
 
