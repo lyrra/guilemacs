@@ -1122,7 +1122,6 @@ struct font_driver const xfont_driver =
 void
 syms_of_xfont (void)
 {
-  staticpro (&xfont_scripts_cache);
   xfont_scripts_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
   staticpro (&xfont_scratch_props);
   xfont_scratch_props = make_nil_vector (8);

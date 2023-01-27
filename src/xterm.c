@@ -12615,9 +12615,9 @@ bool
 x_display_ok (const char *display)
 {
   /* XOpenDisplay fails if it gets a signal.  Block SIGIO which may arrive.  */
-  //unrequest_sigio ();
+  //unrequest_sigio (); FIX20230123
   Display *dpy = XOpenDisplay (display);
-  //request_sigio ();
+  //request_sigio (); FIX20230123
   if (!dpy)
     return false;
   XCloseDisplay (dpy);

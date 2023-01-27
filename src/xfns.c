@@ -6727,7 +6727,7 @@ x_hide_tip (bool delete)
       ptrdiff_t count;
       Lisp_Object was_open = Qnil;
 
-      count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_redisplay, Qt);
       specbind (Qinhibit_quit, Qt);
 
@@ -6838,7 +6838,8 @@ x_hide_tip (bool delete)
       else
 	tip_frame = Qnil;
 
-      return unbind_to (count, was_open);
+      dynwind_end ();
+      return was_open;
     }
 #endif /* USE_GTK */
 }
@@ -7040,9 +7041,11 @@ Text larger than the specified size is clipped.  */)
 
       /* Create a frame for the tooltip, and record it in the global
 	 variable tip_frame.  */
-      if (NILP (tip_frame = x_create_tip_frame (FRAME_DISPLAY_INFO (f), parms)))
+      if (NILP (tip_frame = x_create_tip_frame (FRAME_DISPLAY_INFO (f), parms))) {
 	/* Creating the tip frame failed.  */
-	return unbind_to (count, Qnil);
+        dynwind_end ();
+	return Qnil;
+      }
     }
 
   tip_f = XFRAME (tip_frame);
