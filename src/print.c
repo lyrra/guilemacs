@@ -43,6 +43,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #if IEEE_FLOATING_POINT
 # include <ieee754.h>
 #endif
+#include <errno.h>
 
 #ifdef WINDOWSNT
 # include <sys/socket.h> /* for F_DUPFD_CLOEXEC */
@@ -2290,6 +2291,31 @@ print_interval (INTERVAL interval, Lisp_Object printcharfun)
 		printcharfun, 1);
   printchar (' ', printcharfun);
   print_object (interval->plist, printcharfun, 1);
+}
+
+static FILE *debug_fp = NULL;
+
+void emacs_debug_print(char *msg)
+{
+  if(debug_fp == NULL) {
+    debug_fp = fopen("debug.log", "w");
+    if (!debug_fp) {
+      fprintf(stderr, "#### debug-print ERROR: file debug.log cant be opened: %s\n", strerror(errno));
+      return;
+    }
+  }
+  fwrite(msg, strlen(msg), 1, debug_fp);
+  fwrite("\n", 1, 1, debug_fp);
+  fflush(debug_fp);
+}
+
+DEFUN ("debug-print", Fdebug_print, Sdebug_print, 1, 1, 0,
+       doc: /* in gdb, set a breakpoint on emacs_gdb_breakpoint_value, and call (gdb-breakpoint-value) from your elisp code. */)
+  (Lisp_Object item)
+{
+  CHECK_STRING (item);
+  emacs_debug_print(SSDATA(item));
+  return Qnil;
 }
 
 /* Initialize debug_print stuff early to have it working from the very
