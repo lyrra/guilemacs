@@ -1629,11 +1629,15 @@ static struct dim
 allocate_matrices_for_frame_redisplay (Lisp_Object window, int x, int y,
 				       bool dim_only_p, int *window_change_flags)
 {
+  struct dim dim;
+  if (NILP(window)) { //FIX20230127: change the return type of this function instead
+    memset(&dim, 0, sizeof(dim));
+    return dim;
+  }
   struct frame *f = XFRAME (WINDOW_FRAME (XWINDOW (window)));
   int x0 = x, y0 = y;
   int wmax = 0, hmax = 0;
   struct dim total;
-  struct dim dim;
   struct window *w;
   bool in_horz_combination_p;
 
@@ -1830,6 +1834,7 @@ allocate_matrices_for_window_redisplay (struct window *w)
 void
 adjust_frame_glyphs (struct frame *f)
 {
+  if (NILP(f) || f == 0x104) return; //FIX20230125: why wont NILP work?
   /* Block input so that expose events and other events that access
      glyph matrices are not processed while we are changing them.  */
   block_input ();
