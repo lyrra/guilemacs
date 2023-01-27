@@ -2527,7 +2527,7 @@ lookup_image (struct frame *f, Lisp_Object spec, int face_id)
 
 	  /* Do image transformations and compute masks, unless we
 	     don't have the image yet.  */
-	  if (!EQ (builtin_lisp_symbol (img->type->type), Qpostscript))
+	  if (!EQ (img->type->type, Qpostscript))
 	    postprocess_image (f, img);
 
           /* postprocess_image above may modify the image or the mask,
