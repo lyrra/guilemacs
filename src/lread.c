@@ -2827,6 +2827,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	      if (!NILP (params[param_count + 1]))
 		param_count += 2;
 
+              //FIX20230127: purecopy not supported? (bdw-gc)
               params[param_count] = QCpurecopy;
               params[param_count + 1] = Fplist_get (tmp, Qpurecopy);
               if (!NILP (params[param_count + 1]))
