@@ -4162,9 +4162,10 @@ usage: (make-network-process &rest ARGS)  */)
   tem = Fplist_get (contact, QCtls_parameters);
   CHECK_LIST (tem);
   p->gnutls_boot_parameters = tem;
+#endif
 
   dynwind_end (); //FIX: LAV, what does each of these unprotect?
-  dynwind_end (); //FIX: LAV, dont use double unwind?
+//  dynwind_end (); //FIX: LAV, dont use double unwind?
 
   set_network_socket_coding_system (proc, host, service, name);
 
@@ -7504,14 +7505,14 @@ keyboard_bit_set (fd_set *mask)
 }
 # endif
 
-#else  /* not subprocesses */
-
+// #else  /* not subprocesses */
+#if 0
 /* This is referenced in thread.c:run_thread (which is never actually
    called, since threads are not enabled for this configuration.  */
-void
-update_processes_for_thread_death (Lisp_Object dying_thread)
-{
-}
+//void
+//update_processes_for_thread_death (Lisp_Object dying_thread)
+//{
+//}
 
 /* Defined in msdos.c.  */
 extern int sys_select (int, fd_set *, fd_set *, fd_set *,
