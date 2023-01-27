@@ -1813,7 +1813,7 @@ lookup_image (struct frame *f, Lisp_Object spec)
 
 	  /* Do image transformations and compute masks, unless we
 	     don't have the image yet.  */
-	  if (!EQ (builtin_lisp_symbol (img->type->type), Qpostscript))
+	  if (!EQ (img->type->type, Qpostscript))
 	    postprocess_image (f, img);
 	}
 

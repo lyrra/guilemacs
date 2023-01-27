@@ -5523,7 +5523,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 	  enum internal_border_part part
 	    = frame_internal_border_part (f, xret, yret);
 
-	  posn = builtin_lisp_symbol (internal_border_parts[part]);
+	  posn = internal_border_parts[part];
 	}
     }
 #endif
