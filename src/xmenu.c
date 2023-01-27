@@ -1464,7 +1464,6 @@ x_menu_show (struct frame *f, int x, int y, int menuflags,
   Lisp_Object *subprefix_stack
     = alloca (menu_items_used * sizeof *subprefix_stack);
   int submenu_depth = 0;
-  int first_pane;
 
   dynwind_begin ();
 
