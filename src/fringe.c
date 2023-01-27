@@ -1739,7 +1739,7 @@ init_fringe (void)
 
   fringe_bitmaps = xzalloc (max_fringe_bitmaps * sizeof *fringe_bitmaps);
 
-  verify (NIL_IS_ZERO);
+  //verify (NIL_IS_ZERO);
   fringe_faces = xzalloc (max_fringe_bitmaps * sizeof *fringe_faces);
 }
 

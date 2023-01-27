@@ -348,7 +348,7 @@ get_user_db (Display *display)
       /* Use ~/.Xdefaults.  */
       char *home = gethomedir ();
       ptrdiff_t homelen = strlen (home);
-      char *filename = xrealloc_atomic (home, homelen + sizeof xdefaults);
+      char *filename = NULL; //FIX20230123: xrealloc_atomic (home, homelen + sizeof xdefaults);
       strcpy (filename + homelen, xdefaults);
       db = XrmGetFileDatabase (filename);
       xfree (filename);
