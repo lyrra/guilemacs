@@ -842,7 +842,6 @@ x_handle_selection_request (struct selection_input_event *event)
 	   selection_symbol, target_symbol, success ? Qt : Qnil);
 
   dynwind_end ();
-  UNGCPRO;
 }
 
 /* Perform the requested selection conversion, and write the data to
