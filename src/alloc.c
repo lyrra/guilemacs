@@ -324,6 +324,7 @@ xrealloc (void *block, size_t size)
   void *val = GC_REALLOC (block, size);
   if (!val && size)
     memory_full (size);
+  return val;
 }
 
 void
