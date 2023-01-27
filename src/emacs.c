@@ -1204,7 +1204,8 @@ string_from_scheme (Lisp_Object scheme_string)
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 
-static int main2 (void *, int, char **);
+static int emacs_main (void *, int, char **);
+
 int
 main (int argc, char **argv)
 {
@@ -1215,12 +1216,12 @@ main (int argc, char **argv)
   maybe_load_seccomp (argc, argv);
 #endif
 
-  scm_boot_guile (argc, argv, main2, NULL);
+  scm_boot_guile (argc, argv, emacs_main, NULL);
 }
 
 /* ARGSUSED */
 static int
-main2 (void *ignore, int argc, char **argv)
+emacs_main (void *ignore, int argc, char **argv)
 {
   bool do_initial_setlocale;
   bool no_loadup = false;
