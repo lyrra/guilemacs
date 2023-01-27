@@ -1589,6 +1589,7 @@ c_symbol_p (struct Lisp_Symbol *sym)
 static struct Lisp_Hash_Table *
 purecopy_hash_table (struct Lisp_Hash_Table *table)
 {
+#if 0
   eassert (NILP (table->weak));
   eassert (table->pure);
 
@@ -1614,6 +1615,9 @@ purecopy_hash_table (struct Lisp_Hash_Table *table)
   pure->test = pure_test;
 
   return pure;
+#endif
+  fprintf(stderr, "WARNING: purecopy_hash_table used\n"); //FIX20230126 why still used?
+  return table;
 }
 
 
