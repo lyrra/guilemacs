@@ -201,6 +201,8 @@ bool noninteractive;
 /* True means remove site-lisp directories from load-path.  */
 bool no_site_lisp;
 
+bool no_site_file; // dummy, to advance skip-args
+
 /* True means put details like time stamps into builds.  */
 bool build_details;
 
@@ -1973,6 +1975,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
   no_site_lisp
     = argmatch (argv, argc, "-nsl", "--no-site-lisp", 11, NULL, &skip_args);
+
+  no_site_file
+    = argmatch (argv, argc, "-no-site-file", "--no-site-file", 11, NULL, &skip_args);
 
   build_details = ! argmatch (argv, argc, "-no-build-details",
 			      "--no-build-details", 7, NULL, &skip_args);
