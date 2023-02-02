@@ -1290,10 +1290,8 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qlexical_binding, Qnil);
 
   /* Get the name for load-history.  */
-  hist_file_name = (! NILP (Vpurify_flag)
-                    ? concat2 (Ffile_name_directory (file),
-                               Ffile_name_nondirectory (found))
-                    : found) ;
+  hist_file_name = concat2 (Ffile_name_directory (file),
+                            Ffile_name_nondirectory (found));
 
   version = -1;
 
@@ -1417,8 +1415,8 @@ Return t if the file exists and loads successfully.  */)
       set_unwind_protect_ptr (fd_index, close_infile_unwind, stream);
     }
 
-  if (! NILP (Vpurify_flag))
-    Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
+  //if (! NILP (Vpurify_flag))
+  //  Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
 
   if (NILP (nomessage) || force_load_messages)
     {
@@ -2040,7 +2038,7 @@ readevalloop (Lisp_Object readcharfun,
 	  = make_hash_table (hashtest_eq, DEFAULT_HASH_SIZE,
 			     DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 			     Qnil, false);
-      if (!NILP (Vpurify_flag) && c == '(')
+      if (c == '(')
 	{
 	  val = read_list (0, readcharfun);
 	}
@@ -3442,7 +3440,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	/* If purifying, and string starts with \ newline,
 	   return zero instead.  This is for doc strings
 	   that we are really going to find in etc/DOC.nn.nn.  */
-	if (!NILP (Vpurify_flag) && NILP (Vdoc_file_name) && cancel)
+	if (NILP (Vdoc_file_name) && cancel)
 	  return unbind_to (count, make_fixnum (0));
 
 	if (! force_multibyte && force_singlebyte)
@@ -3554,9 +3552,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	  if (uninterned_symbol)
 	    {
 	      Lisp_Object name
-		= ((! NILP (Vpurify_flag)
-		    ? make_pure_string : make_specified_string)
-		   (read_buffer, nchars, nbytes, multibyte));
+		= make_specified_string (read_buffer, nchars, nbytes, multibyte);
 	      result = Fmake_symbol (name);
 	    }
 	  else
@@ -3934,8 +3930,7 @@ read_list (bool flag, Lisp_Object readcharfun)
 
       /* While building, if the list starts with #$, treat it specially.  */
       if (EQ (elt, Vload_file_name)
-	  && ! NILP (elt)
-	  && !NILP (Vpurify_flag))
+	  && ! NILP (elt))
 	{
 	  if (NILP (Vdoc_file_name))
 	    /* We have not yet called Snarf-documentation, so assume
@@ -4141,7 +4136,6 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
     {
       /* Creating a non-pure string from a string literal not implemented yet.
 	 We could just use make_string here and live with the extra copy.  */
-      eassert (!NILP (Vpurify_flag));
       tem = intern_driver (make_pure_c_string (str, len), obarray, tem);
     }
   return tem;
@@ -4178,8 +4172,7 @@ it defaults to the value of `obarray'.  */)
 
   tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
   if (!SYMBOLP (tem))
-    tem = intern_driver (NILP (Vpurify_flag) ? string : Fpurecopy (string),
-			 obarray, tem);
+    tem = intern_driver (string, obarray, tem);
   return tem;
 }
 
@@ -4385,9 +4378,6 @@ init_obarray_once (void)
   SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
   make_symbol_constant (Qt);
   XSYMBOL (Qt)->u.s.declared_special = true;
-
-  /* Qt is correct even if not dumping.  loadup.el will set to nil at end.  */
-  Vpurify_flag = Qt;
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }
@@ -4636,7 +4626,7 @@ load_path_default (void)
 void
 init_lread (void)
 {
-  if (NILP (Vpurify_flag) && !NILP (Ffboundp (Qfile_truename)))
+  if (!NILP (Ffboundp (Qfile_truename)))
     Vsource_directory = call1 (Qfile_truename, Vsource_directory);
 
   /* First, set Vload_path.  */

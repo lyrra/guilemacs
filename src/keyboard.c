@@ -1108,8 +1108,6 @@ top_level_1 (Lisp_Object ignore)
   /* On entry to the outer level, run the startup file.  */
   if (!NILP (Vtop_level))
     internal_condition_case (top_level_2, Qerror, cmd_error);
-  else if (!NILP (Vpurify_flag))
-    message1 ("Bare impure Emacs (standard Lisp code not loaded)");
   else
     message1 ("Bare Emacs (standard Lisp code not loaded)");
   return Qnil;

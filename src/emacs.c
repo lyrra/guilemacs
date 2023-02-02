@@ -481,7 +481,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 
   if (!NILP (Vinvocation_directory))
     {
-      if (NILP (Vpurify_flag) && !NILP (Ffboundp (Qfile_truename)))
+      if (!NILP (Ffboundp (Qfile_truename)))
         Vinvocation_directory = call1 (Qfile_truename, Vinvocation_directory);
 
       dir = Vinvocation_directory;
@@ -2593,9 +2593,6 @@ You must run Emacs in batch mode in order to dump it.  */)
 	}
     }
 
-  tem = Vpurify_flag;
-  Vpurify_flag = Qnil;
-
 # ifdef HYBRID_MALLOC
   {
     static char const fmt[] = "%d of %d static heap bytes used";
@@ -2632,8 +2629,6 @@ You must run Emacs in batch mode in order to dump it.  */)
 # ifdef WINDOWSNT
   Vlibrary_cache = Qnil;
 # endif
-
-  Vpurify_flag = tem;
 
   return unbind_to (count, Qnil);
 }
