@@ -24388,7 +24388,7 @@ store_mode_line_string (const char *string, Lisp_Object lisp_string,
     {
       field_width -= len;
       lisp_string = Fmake_string (make_fixnum (field_width), make_fixnum (' '),
-				  Qnil);
+                                  Qnil);
       if (!NILP (props))
 	Fadd_text_properties (make_fixnum (0), make_fixnum (field_width),
 			      props, lisp_string);
