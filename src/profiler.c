@@ -36,20 +36,8 @@ saturated_add (EMACS_INT a, EMACS_INT b)
 
 typedef struct Lisp_Hash_Table log_t;
 
-static bool cmpfn_profiler (
-  struct hash_table_test *, Lisp_Object, Lisp_Object);
-
-static EMACS_UINT hashfn_profiler (
-  struct hash_table_test *, Lisp_Object);
-
-static const struct hash_table_test hashtest_profiler =
-  {
-   LISPSYM_INITIALLY (Qprofiler_backtrace_equal),
-   LISPSYM_INITIALLY (Qnil) /* user_hash_function */,
-   LISPSYM_INITIALLY (Qnil) /* user_cmp_function */,
-   cmpfn_profiler,
-   hashfn_profiler,
-  };
+static Lisp_Object Qautomatic_gc;
+static struct hash_table_test hashtest_profiler;
 
 static Lisp_Object
 make_log (void)
@@ -583,6 +571,7 @@ If the log gets full, some of the least-seen call-stacks will be evicted
 to make room for new entries.  */);
   profiler_log_size = 10000;
 
+  DEFSYM (Qautomatic_gc, "Automatic GC");
   DEFSYM (Qprofiler_backtrace_equal, "profiler-backtrace-equal");
 
   defsubr (&Sfunction_equal);

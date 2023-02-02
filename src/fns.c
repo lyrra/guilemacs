@@ -3788,6 +3788,13 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
    key_and_value vector of the hash table.  This could be done
    if a `:linear-search t' argument is given to make-hash-table.  */
 
+/* Various symbols.  */
+//FIX20230202 LAV: not present in emacs-26, really need all of them?
+static Lisp_Object Qhash_table_p;
+static Lisp_Object Qkey, Qvalue, Qeql;
+Lisp_Object Qeq, Qequal;
+Lisp_Object QCtest, QCsize, QCrehash_size, QCrehash_threshold, QCweakness;
+static Lisp_Object Qhash_table_test, Qkey_or_value, Qkey_and_value;
 
 
 /***********************************************************************
@@ -4400,100 +4407,6 @@ hash_clear (struct Lisp_Hash_Table *h)
     }
 }
 
-
-
-/************************************************************************
-			   Weak Hash Tables
- ************************************************************************/
-
-/* Sweep weak hash table H.  REMOVE_ENTRIES_P means remove
-   entries from the table that don't survive the current GC.
-   !REMOVE_ENTRIES_P means mark entries that are in use.  Value is
-   true if anything was marked.  */
-
-bool
-sweep_weak_table (struct Lisp_Hash_Table *h, bool remove_entries_p)
-{
-  ptrdiff_t n = gc_asize (h->index);
-  bool marked = false;
-
-  for (ptrdiff_t bucket = 0; bucket < n; ++bucket)
-    {
-      /* Follow collision chain, removing entries that don't survive
-         this garbage collection.  It's okay if hash_rehash_needed_p
-         (h) is true, since we're operating entirely on the cached
-         hash values. */
-      ptrdiff_t prev = -1;
-      ptrdiff_t next;
-      for (ptrdiff_t i = HASH_INDEX (h, bucket); 0 <= i; i = next)
-        {
-	  bool key_known_to_survive_p = survives_gc_p (HASH_KEY (h, i));
-	  bool value_known_to_survive_p = survives_gc_p (HASH_VALUE (h, i));
-	  bool remove_p;
-
-	  if (EQ (h->weak, Qkey))
-	    remove_p = !key_known_to_survive_p;
-	  else if (EQ (h->weak, Qvalue))
-	    remove_p = !value_known_to_survive_p;
-	  else if (EQ (h->weak, Qkey_or_value))
-	    remove_p = !(key_known_to_survive_p || value_known_to_survive_p);
-	  else if (EQ (h->weak, Qkey_and_value))
-	    remove_p = !(key_known_to_survive_p && value_known_to_survive_p);
-	  else
-	    emacs_abort ();
-
-	  next = HASH_NEXT (h, i);
-
-	  if (remove_entries_p)
-	    {
-	      if (remove_p)
-		{
-		  /* Take out of collision chain.  */
-		  if (prev < 0)
-		    set_hash_index_slot (h, bucket, next);
-		  else
-		    set_hash_next_slot (h, prev, next);
-
-		  /* Add to free list.  */
-		  set_hash_next_slot (h, i, h->next_free);
-		  h->next_free = i;
-
-		  /* Clear key, value, and hash.  */
-		  set_hash_key_slot (h, i, Qnil);
-		  set_hash_value_slot (h, i, Qnil);
-                  set_hash_hash_slot (h, i, Qnil);
-
-                  eassert (h->count != 0);
-                  h->count += h->count > 0 ? -1 : 1;
-                }
-	      else
-		{
-		  prev = i;
-		}
-	    }
-	  else
-	    {
-	      if (!remove_p)
-		{
-		  /* Make sure key and value survive.  */
-		  if (!key_known_to_survive_p)
-		    {
-		      mark_object (HASH_KEY (h, i));
-                      marked = true;
-		    }
-
-		  if (!value_known_to_survive_p)
-		    {
-		      mark_object (HASH_VALUE (h, i));
-                      marked = true;
-		    }
-		}
-	    }
-	}
-    }
-
-  return marked;
-}
 
 
 /***********************************************************************

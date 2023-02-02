@@ -977,10 +977,7 @@ load_pdump (int argc, char **argv)
 int
 main (int argc, char **argv)
 {
-  /* Variable near the bottom of the stack, and aligned appropriately
-     for pointers.  */
   void *stack_bottom_variable;
-
   bool do_initial_setlocale;
   bool no_loadup = false;
   char *junk = 0;
