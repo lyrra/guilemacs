@@ -2074,7 +2074,7 @@ usage: (ccl-execute-on-string CCL-PROGRAM STATUS STRING &optional CONTINUE UNIBY
   if (INT_MULTIPLY_WRAPV (buf_magnification, outbufsize, &outbufsize)
       || INT_ADD_WRAPV (256, outbufsize, &outbufsize))
     memory_full (SIZE_MAX);
-  outp = outbuf = xmalloc (outbufsize);
+  outp = outbuf = xmalloc_atomic (outbufsize);
 
   consumed_chars = consumed_bytes = 0;
   produced_chars = 0;

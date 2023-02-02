@@ -2624,7 +2624,7 @@ since only regular expressions have distinguished subexpressions.  */)
       substed_alloc_size = (length <= (STRING_BYTES_BOUND - 100) / 2
 			    ? length * 2 + 100
 			    : STRING_BYTES_BOUND);
-      substed = xmalloc (substed_alloc_size);
+      substed = xmalloc_atomic (substed_alloc_size);
       substed_len = 0;
 
       /* Go thru NEWTEXT, producing the actual text to insert in

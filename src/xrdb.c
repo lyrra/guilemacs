@@ -106,7 +106,7 @@ magic_db (const char *string, ptrdiff_t string_len, const char *class,
   char *lang = getenv ("LANG");
 
   ptrdiff_t path_size = 100;
-  char *path = xmalloc (path_size);
+  char *path = xmalloc_atomic (path_size);
   ptrdiff_t path_len = 0;
 
   const char *p = string;

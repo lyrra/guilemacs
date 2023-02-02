@@ -8250,7 +8250,7 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
       const char *capt = STRINGP (tcapt) ? SSDATA (tcapt) : "";
       ptrdiff_t max_lbl_size =
 	2 * max (0, min (tool_bar_max_label_size, STRING_BYTES_BOUND / 2)) + 1;
-      char *buf = xmalloc (max_lbl_size);
+      char *buf = xmalloc_atomic (max_lbl_size);
       Lisp_Object new_lbl;
       ptrdiff_t caption_len = strnlen (capt, max_lbl_size);
 

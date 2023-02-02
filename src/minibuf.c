@@ -212,7 +212,7 @@ read_minibuf_noninteractive (Lisp_Object prompt, bool expflag,
   val = Qnil;
   size = 100;
   len = 0;
-  line = xmalloc (size);
+  line = xmalloc_atomic (size);
 
   while ((c = getchar_unlocked ()) != '\n' && c != '\r')
     {

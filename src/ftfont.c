@@ -596,7 +596,7 @@ ftfont_get_open_type_spec (Lisp_Object otf_spec)
       spec->features[i] =
 	(min (PTRDIFF_MAX, SIZE_MAX) / sizeof (int) < len
 	 ? 0
-	 : xmalloc_unsafe (len * sizeof *spec->features[i]));
+	 : xmalloc_atomic_unsafe (len * sizeof *spec->features[i]));
       if (! spec->features[i])
 	{
 	  if (i > 0 && spec->features[0])
