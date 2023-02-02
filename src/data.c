@@ -801,11 +801,6 @@ The return value is undefined.  */)
   (register Lisp_Object symbol, Lisp_Object definition, Lisp_Object docstring)
 {
   CHECK_SYMBOL (symbol);
-  if (!NILP (Vpurify_flag)
-      /* If `definition' is a keymap, immutable (and copying) is wrong.  */
-      && !KEYMAPP (definition))
-    definition = Fpurecopy (definition);
-
   {
     bool autoload = AUTOLOADP (definition);
     if (!will_dump_p () || !autoload)

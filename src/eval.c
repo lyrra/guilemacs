@@ -788,8 +788,6 @@ value.  */)
   XSYMBOL (symbol)->u.s.declared_special = true;
   if (!NILP (doc))
     {
-      if (!NILP (Vpurify_flag))
-	doc = Fpurecopy (doc);
       Fput (symbol, Qvariable_documentation, doc);
     }
   LOADHIST_ATTACH (symbol);
@@ -906,8 +904,6 @@ usage: (defconst SYMBOL INITVALUE [DOCSTRING])  */)
 
   Finternal__define_uninitialized_variable (sym, docstring);
   tem = eval_sub (XCAR (XCDR (args)));
-  if (!NILP (Vpurify_flag))
-    tem = Fpurecopy (tem);
   Fset_default (sym, tem);      /* FIXME: set-default-toplevel-value? */
   Fput (sym, Qrisky_local_variable, Qt); /* FIXME: Why?  */
   return sym;
@@ -2214,7 +2210,7 @@ this does nothing and returns nil.  */)
       && !AUTOLOADP (XSYMBOL (function)->u.s.function))
     return Qnil;
 
-  if (!NILP (Vpurify_flag) && EQ (docstring, make_fixnum (0)))
+  if (EQ (docstring, make_fixnum (0)))
     /* `read1' in lread.c has found the docstring starting with "\
        and assumed the docstring will be provided by Snarf-documentation, so it
        passed us 0 instead.  But that leads to accidental sharing in purecopy's
@@ -3819,33 +3815,6 @@ set_unwind_protect_ptr (ptrdiff_t count, void (*func) (void *), void *arg)
 
 /* Pop and execute entries from the unwind-protect stack until the
    depth COUNT is reached.  Return VALUE.  */
-
-Lisp_Object
-unbind_to (ptrdiff_t count, Lisp_Object value)
-{
-  Lisp_Object quitf = Vquit_flag;
-
-  Vquit_flag = Qnil;
-
-  while (specpdl_ptr != specpdl + count)
-    {
-      /* Copy the binding, and decrement specpdl_ptr, before we do
-	 the work to unbind it.  We decrement first
-	 so that an error in unbinding won't try to unbind
-	 the same entry again, and we copy the binding first
-	 in case more bindings are made during some of the code we run.  */
-
-      union specbinding this_binding;
-      this_binding = *--specpdl_ptr;
-
-      do_one_unbind (&this_binding, true, SET_INTERNAL_UNBIND);
-    }
-
-  if (NILP (Vquit_flag) && !NILP (quitf))
-    Vquit_flag = quitf;
-
-  return value;
-}
 
 void
 unbind_for_thread_switch (struct thread_state *thr)

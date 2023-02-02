@@ -2868,9 +2868,6 @@ You must run Emacs in batch mode in order to dump it.  */)
 	}
     }
 
-  tem = Vpurify_flag;
-  Vpurify_flag = Qnil;
-
 # ifdef HYBRID_MALLOC
   {
     static char const fmt[] = "%d of %d static heap bytes used";
@@ -2907,8 +2904,6 @@ You must run Emacs in batch mode in order to dump it.  */)
 # ifdef WINDOWSNT
   Vlibrary_cache = Qnil;
 # endif
-
-  Vpurify_flag = tem;
 
   return unbind_to (count, Qnil);
 }
