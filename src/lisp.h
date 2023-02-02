@@ -258,23 +258,20 @@ DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
    expression involving VAL_MAX.  */
 #define VAL_MAX (EMACS_INT_MAX >> (GCTYPEBITS - 1))
 
+DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
+#define USE_LSB_TAG 1
+DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
+
 /* Whether the least-significant bits of an EMACS_INT contain the tag.
    On hosts where pointers-as-ints do not exceed VAL_MAX / 2, USE_LSB_TAG is:
     a. unnecessary, because the top bits of an EMACS_INT are unused, and
     b. slower, because it typically requires extra masking.
    So, USE_LSB_TAG is true only on hosts where it might be useful.  */
-DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
-#define USE_LSB_TAG 1
-DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
 DEFINE_GDB_SYMBOL_BEGIN (EMACS_INT, VALMASK)
 # define VALMASK (USE_LSB_TAG ? - (1 << GCTYPEBITS) : VAL_MAX)
 DEFINE_GDB_SYMBOL_END (VALMASK)
-
-DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
-#define USE_LSB_TAG 1
-DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 #ifndef alignas
 # define alignas(alignment) /* empty */
@@ -420,8 +417,8 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_XCAR(c) XCONS (c)->u.s.car
 #define lisp_h_XCDR(c) XCONS (c)->u.s.u.cdr
 #define lisp_h_XCONS(a) \
-   (eassert (CONSP (a)), (struct Lisp_Cons *) XUNTAG (a, Lisp_Cons))
-#define lisp_h_XHASH(a) XUINT (a)
+   (eassert (CONSP (a)), (struct Lisp_Cons *) XUNTAG (a, Lisp_Cons, struct Lisp_Cons))
+#define lisp_h_XHASH(a) XFIXNUM (a)
 #if USE_LSB_TAG
 # define lisp_h_make_fixnum(n) \
     XIL ((EMACS_INT) (((EMACS_UINT) (n) << INTTYPEBITS) + Lisp_Int0))
@@ -521,6 +518,24 @@ enum Lisp_Type
 
     /* Must be last entry in Lisp_Type enumeration.  */
     Lisp_Float = 7
+  };
+
+/* This is the set of data types that share a common structure.
+   The first member of the structure is a type code from this set.
+   The enum values are arbitrary, but we'll use large numbers to make it
+   more likely that we'll spot the error if a random word in memory is
+   mistakenly interpreted as a Lisp_Misc.  */
+enum Lisp_Misc_Type
+  {
+    Lisp_Misc_Free = 0x5eab,
+    Lisp_Misc_Marker,
+    Lisp_Misc_Overlay,
+    Lisp_Misc_Save_Value,
+    /* Currently floats are not a misc type,
+       but let's define this in case we want to change that.  */
+    Lisp_Misc_Float,
+    /* This is not a type code.  It is for range checking.  */
+    Lisp_Misc_Limit
   };
 
 /* These are the types of forwarding objects used in the value slot
@@ -3304,15 +3319,7 @@ rarely_quit (unsigned short int count)
 extern Lisp_Object Vascii_downcase_table;
 extern Lisp_Object Vascii_canon_table;
 
-/* Call staticpro (&var) to protect static variable `var'.  */
 
-void staticpro (Lisp_Object const *);
-
-enum { NSTATICS = 2048 };
-extern Lisp_Object const *staticvec[NSTATICS];
-extern int staticidx;
-
-
 /* Forward declarations for prototypes.  */
 struct window;
 struct frame;
@@ -3826,13 +3833,6 @@ extern Lisp_Object make_string (const char *, ptrdiff_t);
 extern Lisp_Object make_formatted_string (char *, const char *, ...)
   ATTRIBUTE_FORMAT_PRINTF (2, 3);
 extern Lisp_Object make_unibyte_string (const char *, ptrdiff_t);
-extern ptrdiff_t vectorlike_nbytes (const union vectorlike_header *hdr);
-
-INLINE ptrdiff_t
-vector_nbytes (const struct Lisp_Vector *v)
-{
-  return vectorlike_nbytes (&v->header);
-}
 
 /* Make unibyte string from C string when the length isn't known.  */
 
@@ -3913,8 +3913,7 @@ make_nil_vector (ptrdiff_t size)
   return vec;
 }
 
-extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
-						  enum pvec_type);
+//extern struct Lisp_Vector *allocate_pseudovector (int, int, int, enum pvec_type);
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */
 
@@ -4108,7 +4107,6 @@ extern void record_unwind_protect_nothing (void);
 extern void clear_unwind_protect (ptrdiff_t);
 extern void set_unwind_protect (ptrdiff_t, void (*) (Lisp_Object), Lisp_Object);
 extern void set_unwind_protect_ptr (ptrdiff_t, void (*) (void *), void *);
-extern Lisp_Object unbind_to (ptrdiff_t, Lisp_Object);
 extern void rebind_for_thread_switch (void);
 extern void unbind_for_thread_switch (struct thread_state *);
 extern AVOID error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
