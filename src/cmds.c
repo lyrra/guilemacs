@@ -442,8 +442,7 @@ internal_self_insert (int c, EMACS_INT n)
       int mc = ((NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 && SINGLE_BYTE_CHAR_P (c))
 		? UNIBYTE_TO_CHAR (c) : c);
-      Lisp_Object string = Fmake_string (make_fixnum (n), make_fixnum (mc),
-					 Qnil);
+      Lisp_Object string = Fmake_string (make_fixnum (n), make_fixnum (mc), Qnil);
 
       if (spaces_to_insert)
 	{
