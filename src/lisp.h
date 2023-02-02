@@ -3312,15 +3312,7 @@ rarely_quit (unsigned short int count)
 extern Lisp_Object Vascii_downcase_table;
 extern Lisp_Object Vascii_canon_table;
 
-/* Call staticpro (&var) to protect static variable `var'.  */
 
-void staticpro (Lisp_Object const *);
-
-enum { NSTATICS = 2048 };
-extern Lisp_Object const *staticvec[NSTATICS];
-extern int staticidx;
-
-
 /* Forward declarations for prototypes.  */
 struct window;
 struct frame;
@@ -3892,13 +3884,6 @@ extern Lisp_Object make_string (const char *, ptrdiff_t);
 extern Lisp_Object make_formatted_string (char *, const char *, ...)
   ATTRIBUTE_FORMAT_PRINTF (2, 3);
 extern Lisp_Object make_unibyte_string (const char *, ptrdiff_t);
-extern ptrdiff_t vectorlike_nbytes (const union vectorlike_header *hdr);
-
-INLINE ptrdiff_t
-vector_nbytes (const struct Lisp_Vector *v)
-{
-  return vectorlike_nbytes (&v->header);
-}
 
 /* Make unibyte string from C string when the length isn't known.  */
 
@@ -3982,7 +3967,7 @@ make_nil_vector (ptrdiff_t size)
 }
 
 extern struct Lisp_Vector *allocate_pseudovector (int, int, int,
-						  enum pvec_type);
+                                                  enum pvec_type);
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */
 
