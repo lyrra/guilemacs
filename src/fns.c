@@ -3789,12 +3789,6 @@ base64_decode_1 (const char *from, char *to, ptrdiff_t length,
    if a `:linear-search t' argument is given to make-hash-table.  */
 
 /* Various symbols.  */
-//FIX20230202 LAV: not present in emacs-26, really need all of them?
-static Lisp_Object Qhash_table_p;
-static Lisp_Object Qkey, Qvalue, Qeql;
-Lisp_Object Qeq, Qequal;
-Lisp_Object QCtest, QCsize, QCrehash_size, QCrehash_threshold, QCweakness;
-static Lisp_Object Qhash_table_test, Qkey_or_value, Qkey_and_value;
 
 
 /***********************************************************************

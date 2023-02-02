@@ -36,7 +36,6 @@ saturated_add (EMACS_INT a, EMACS_INT b)
 
 typedef struct Lisp_Hash_Table log_t;
 
-static Lisp_Object Qautomatic_gc;
 static struct hash_table_test hashtest_profiler;
 
 static Lisp_Object
@@ -220,39 +219,6 @@ static EMACS_INT current_sampling_interval;
 
 /* Signal handler for sampling profiler.  */
 
-static void
-handle_profiler_signal (int signal)
-{
-  if (EQ (backtrace_top_function (), QAutomatic_GC))
-    /* Special case the time-count inside GC because the hash-table
-       code is not prepared to be used while the GC is running.
-       More specifically it uses ASIZE at many places where it does
-       not expect the ARRAY_MARK_FLAG to be set.  We could try and
-       harden the hash-table code, but it doesn't seem worth the
-       effort.  */
-    cpu_gc_count = saturated_add (cpu_gc_count, 1);
-  else
-    {
-      EMACS_INT count = 1;
-#if defined HAVE_ITIMERSPEC && defined HAVE_TIMER_GETOVERRUN
-      if (profiler_timer_ok)
-	{
-	  int overruns = timer_getoverrun (profiler_timer);
-	  eassert (overruns >= 0);
-	  count += overruns;
-	}
-#endif
-      eassert (HASH_TABLE_P (cpu_log));
-      record_backtrace (XHASH_TABLE (cpu_log), count);
-    }
-}
-
-static void
-deliver_profiler_signal (int signal)
-{
-  deliver_process_signal (signal, handle_profiler_signal);
-}
-
 static int
 setup_cpu_timer (Lisp_Object sampling_interval)
 {
@@ -270,7 +236,7 @@ setup_cpu_timer (Lisp_Object sampling_interval)
     = make_timespec (current_sampling_interval / billion,
 		     current_sampling_interval % billion);
   struct sigaction action;
-  emacs_sigaction_init (&action, deliver_profiler_signal);
+  //emacs_sigaction_init (&action, deliver_profiler_signal);
   sigaction (SIGPROF, &action, 0);
 
 #ifdef HAVE_ITIMERSPEC
@@ -411,9 +377,9 @@ Before returning, a new log is allocated for future samples.  */)
      more for our use afterwards since we can't rely on its special
      pre-allocated keys anymore.  So we have to allocate a new one.  */
   cpu_log = profiler_cpu_running ? make_log () : Qnil;
-  Fputhash (make_vector (1, QAutomatic_GC),
-	    make_fixnum (cpu_gc_count),
-	    result);
+//  Fputhash (make_vector (1, QAutomatic_GC),
+//	    make_fixnum (cpu_gc_count),
+//	    result);
   cpu_gc_count = 0;
   return result;
 }
