@@ -1853,7 +1853,7 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
   /* Hard GC error may lead to stack overflow caused by
      too nested calls to mark_object.  No way to survive.  */
-  bool fatal = gc_in_progress;
+  bool fatal = false;
 
 #ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
   if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
