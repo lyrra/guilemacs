@@ -142,6 +142,8 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	  return concat3 (cannot_open, file, quote_nl);
 	}
     }
+  dynwind_begin ();
+  count = SPECPDL_INDEX ();
   record_unwind_protect_int (close_file_unwind, fd);
 
   /* Seek only to beginning of disk block.  */
@@ -196,7 +198,9 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	}
       p += nread;
     }
-  SAFE_FREE_UNBIND_TO (count, Qnil);
+  dynwind_end ();
+  SAFE_FREE ();
+  unbind_to (count, Qnil);
 
   /* Sanity checking.  */
   if (CONSP (filepos))
@@ -591,6 +595,7 @@ the same file name is found in the `doc-directory'.  */)
       report_file_errno ("Opening doc string file", build_string (name),
 			 open_errno);
     }
+  dynwind_begin ();
   record_unwind_protect_int (close_file_unwind, fd);
   Vdoc_file_name = filename;
   filled = 0;
@@ -661,7 +666,9 @@ the same file name is found in the `doc-directory'.  */)
       memmove (buf, end, filled);
     }
 
-  return SAFE_FREE_UNBIND_TO (count, Qnil);
+  SAFE_FREE ();
+  dynwind_end ();
+  return unbind_to (count, Qnil);
 }
 
 /* Return true if text quoting style should default to quote `like this'.  */

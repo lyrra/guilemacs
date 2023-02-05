@@ -483,19 +483,23 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   AUTO_STRING (map, ".map");
   AUTO_STRING (txt, ".txt");
   AUTO_LIST2 (suffixes, map, txt);
-  ptrdiff_t count = SPECPDL_INDEX ();
 
+  dynwind_begin ();
   record_unwind_protect_ptr (fclose_ptr_unwind, &fp);
-  specbind (Qfile_name_handler_alist, Qnil);
-  fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false, false);
-  fp = fd < 0 ? 0 : fdopen (fd, "r");
-  if (!fp)
-    {
-      int open_errno = errno;
-      emacs_close (fd);
-      report_file_errno ("Loading charset map", mapfile, open_errno);
-    }
-  unbind_to (count + 1, Qnil);
+
+  {
+    dynwind_begin (); // scoped specbind below
+    specbind (Qfile_name_handler_alist, Qnil);
+    fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false, false);
+    fp = fd < 0 ? 0 : fdopen (fd, "r");
+    if (!fp)
+      {
+        int open_errno = errno;
+        emacs_close (fd);
+        report_file_errno ("Loading charset map", mapfile, open_errno);
+      }
+    dynwind_end ();
+  }
 
   /* Use record, as `charset_map_entries' is large (larger than
      MAX_ALLOCA).  */
@@ -548,7 +552,7 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   fp = NULL;
 
   load_charset_map (charset, head, n_entries, control_flag);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 static void

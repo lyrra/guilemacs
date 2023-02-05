@@ -1115,12 +1115,16 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
   struct frame *f = NULL;
   Lisp_Object x, y, window;
   int menuflags = 0;
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
+  ptrdiff_t specpdl_count2;
 
   if (NILP (position))
     /* This is an obsolete call, which wants us to precompute the
        keybinding equivalents, but we don't do that any more anyway.  */
-    return Qnil;
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   {
     bool get_current_pos_p = 0;
@@ -1350,7 +1354,7 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
       menuflags &= ~MENU_KEYMAPS;
     }
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
 #ifdef HAVE_WINDOW_SYSTEM
   /* Hide a previous tip, if any.  */
@@ -1372,6 +1376,8 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     }
 #endif
 
+  dynwind_begin ();
+
 #ifdef HAVE_NS			/* FIXME: ns-specific, why? --Stef  */
   record_unwind_protect_void (discard_menu_items);
 #endif
@@ -1383,11 +1389,11 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
     selection = FRAME_TERMINAL (f)->menu_show_hook (f, xpos, ypos, menuflags,
 						    title, &error_name);
 
-#ifdef HAVE_NS
-  unbind_to (specpdl_count, Qnil);
-#else
+#ifndef HAVE_NS
   discard_menu_items ();
 #endif
+
+  dynwind_end ();
 
 #ifdef HAVE_NTGUI     /* FIXME: Is it really w32-specific?  --Stef  */
   if (FRAME_W32_P (f))

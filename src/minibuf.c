@@ -570,7 +570,6 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 	      bool allow_props, bool inherit_input_method)
 {
   Lisp_Object val;
-  ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object mini_frame, ambient_dir, minibuffer, input_method;
   Lisp_Object calling_frame = selected_frame;
   Lisp_Object calling_window = selected_window;
@@ -582,6 +581,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   Lisp_Object empty_minibuf;
 
+  dynwind_begin ();
   specbind (Qminibuffer_default, defalt);
   specbind (Qinhibit_read_only, Qnil);
 
@@ -647,7 +647,8 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
       && NILP (Vexecuting_kbd_macro))
     {
       val = read_minibuf_noninteractive (prompt, expflag, defalt);
-      return unbind_to (count, val);
+      dynwind_end ();
+      return val;
     }
 
   /* Ensure now that the latest minibuffer has been created and pushed
@@ -825,7 +826,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* Erase the buffer.  */
   {
-    ptrdiff_t count1 = SPECPDL_INDEX ();
+    dynwind_begin ();
     specbind (Qinhibit_read_only, Qt);
     specbind (Qinhibit_modification_hooks, Qt);
     Ferase_buffer ();
@@ -872,7 +873,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 	      }
 	  }
       }
-    unbind_to (count1, Qnil);
+    dynwind_end ();
   }
 
   minibuf_prompt_width = current_column ();
@@ -934,7 +935,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* The appropriate frame will get selected
      in set-window-configuration.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Switch the frame back to the calling frame.  */
   if (FRAMEP (calling_frame)
@@ -1147,14 +1148,14 @@ read_minibuf_unwind (void)
 
   /* Erase the minibuffer we were using at this level.  */
   {
-    ptrdiff_t count = SPECPDL_INDEX ();
+    dynwind_begin ();
     /* Prevent error in erase-buffer.  */
     specbind (Qinhibit_read_only, Qt);
     specbind (Qinhibit_modification_hooks, Qt);
     old_deactivate_mark = Vdeactivate_mark;
     Ferase_buffer ();
     Vdeactivate_mark = old_deactivate_mark;
-    unbind_to (count, Qnil);
+    dynwind_end ();
   }
 
   /* When we get to the outmost level, make sure we resize the
@@ -1376,7 +1377,7 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
   (Lisp_Object prompt, Lisp_Object initial_input, Lisp_Object history, Lisp_Object default_value, Lisp_Object inherit_input_method)
 {
   Lisp_Object val;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Just in case we're in a recursive minibuffer, make it clear that the
      previous minibuffer's completion table does not apply to the new
@@ -1389,7 +1390,8 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
 			       inherit_input_method);
   if (STRINGP (val) && SCHARS (val) == 0 && ! NILP (default_value))
     val = CONSP (default_value) ? XCAR (default_value) : default_value;
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("read-command", Fread_command, Sread_command, 1, 2, 0,
@@ -1475,7 +1477,7 @@ function, instead of the usual behavior.  */)
   Lisp_Object result;
   char *s;
   ptrdiff_t len;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (BUFFERP (def))
     def = BVAR (XBUFFER (def), name);
@@ -1522,7 +1524,8 @@ function, instead of the usual behavior.  */)
 	      ? call3 (Vread_buffer_function, prompt, def, require_match)
 	      : call4 (Vread_buffer_function, prompt, def, require_match,
 		       predicate));
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 static Lisp_Object
@@ -1667,6 +1670,9 @@ is used to further constrain the set of candidates.  */)
 
 	  /* Ignore this element if it fails to match all the regexps.  */
 	  {
+            dynwind_begin ();
+            specbind (Qcase_fold_search,
+                      completion_ignore_case ? Qt : Qnil);
 	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
 		 regexps = XCDR (regexps))
 	      {
@@ -1680,6 +1686,7 @@ is used to further constrain the set of candidates.  */)
 		if (NILP (tem))
 		  break;
 	      }
+            dynwind_end ();
 	    if (CONSP (regexps))
 	      continue;
 	  }
@@ -1693,11 +1700,6 @@ is used to further constrain the set of candidates.  */)
 		tem = Fcommandp (elt, Qnil);
 	      else
 		{
-		  if (bindcount >= 0)
-		    {
-		      unbind_to (bindcount, Qnil);
-		      bindcount = -1;
-		    }
 		  tem = (type == hash_table
 			 ? call2 (predicate, elt,
 				  HASH_VALUE (XHASH_TABLE (collection),
@@ -1931,6 +1933,9 @@ with a space are ignored unless STRING itself starts with a space.  */)
 
 	  /* Ignore this element if it fails to match all the regexps.  */
 	  {
+            dynwind_begin ();
+            specbind (Qcase_fold_search,
+                      completion_ignore_case ? Qt : Qnil);
 	    for (regexps = Vcompletion_regexp_list; CONSP (regexps);
 		 regexps = XCDR (regexps))
 	      {
@@ -1944,6 +1949,7 @@ with a space are ignored unless STRING itself starts with a space.  */)
 		if (NILP (tem))
 		  break;
 	      }
+            dynwind_end ();
 	    if (CONSP (regexps))
 	      continue;
 	  }
@@ -2148,7 +2154,7 @@ the values STRING, PREDICATE and `lambda'.  */)
   /* Reject this element if it fails to match all the regexps.  */
   if (CONSP (Vcompletion_regexp_list))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qcase_fold_search, completion_ignore_case ? Qt : Qnil);
       for (regexps = Vcompletion_regexp_list; CONSP (regexps);
 	   regexps = XCDR (regexps))
@@ -2156,9 +2162,12 @@ the values STRING, PREDICATE and `lambda'.  */)
           /* We can test against STRING, because if we got here, then
              the element is equivalent to it.  */
           if (NILP (Fstring_match (XCAR (regexps), string, Qnil)))
-	    return unbind_to (count, Qnil);
+            {
+	      dynwind_end ();
+	      return Qnil;
+            }
 	}
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   /* Finally, check the predicate.  */

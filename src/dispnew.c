@@ -6215,10 +6215,11 @@ immediately by pending input.  */)
       || !NILP (Vexecuting_kbd_macro))
     return Qnil;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   if (!NILP (force) && !redisplay_dont_pause)
     specbind (Qredisplay_dont_pause, Qt);
   redisplay_preserve_echo_area (2);
+  dynwind_end ();
   return unbind_to (count, Qt);
 }
 

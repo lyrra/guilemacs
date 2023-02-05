@@ -1748,6 +1748,7 @@ usage: (make-process &rest ARGS)  */)
   Lisp_Object buffer, name, command, program, proc, contact, current_dir, tem;
   Lisp_Object xstderr, stderrproc;
   ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (nargs == 0)
     return Qnil;
@@ -2013,6 +2014,7 @@ usage: (make-process &rest ARGS)  */)
   else
     create_pty (proc);
 
+  dynwind_end ();
   return SAFE_FREE_UNBIND_TO (count, proc);
 }
 
@@ -3093,7 +3095,7 @@ usage:  (make-serial-process &rest ARGS)  */)
     name = port;
   CHECK_STRING (name);
   proc = make_process (name);
-  specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_1 (remove_process, proc, false);
   p = XPROCESS (proc);
 
@@ -3170,8 +3172,7 @@ usage:  (make-serial-process &rest ARGS)  */)
 
   Fserial_process_configure (nargs, args);
 
-  specpdl_ptr = specpdl + specpdl_count;
-
+  dynwind_end ();
   return proc;
 }
 
@@ -3332,9 +3333,11 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   s = -1;
 
   struct sockaddr *sa = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  record_unwind_protect_nothing ();
-  ptrdiff_t count1 = SPECPDL_INDEX ();
+  // FIX: 20190630 LAV
+  //ptrdiff_t count = SPECPDL_INDEX ();
+  //record_unwind_protect_nothing ();
+  //ptrdiff_t count1 = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   while (!NILP (addrinfos))
     {
@@ -3349,7 +3352,8 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       addrlen = get_lisp_to_sockaddr_size (ip_address, &family);
       sa = xrealloc (sa, addrlen);
-      set_unwind_protect_ptr (count, xfree, sa);
+      //FIX: move dynwind_begin here?
+      //set_unwind_protect_ptr (count, xfree, sa);
       conv_lisp_to_sockaddr (family, ip_address, sa, addrlen);
 
       s = socket_to_use;
@@ -3519,7 +3523,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 #endif /* !WINDOWSNT */
 
       /* Discard the unwind protect closing S.  */
-      specpdl_ptr = specpdl + count1;
+      //specpdl_ptr = specpdl + count1;
       emacs_close (s);
       s = -1;
       if (0 <= socket_to_use)
@@ -3591,7 +3595,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	  Lisp_Object data = get_file_errno_data (err, contact, xerrno);
 
 	  pset_status (p, list2 (Fcar (data), Fcdr (data)));
-	  unbind_to (count, Qnil);
+          dynwind_end ();
 	  return;
 	}
 
@@ -3610,9 +3614,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
   p->open_fd[SUBPROCESS_STDIN] = inch;
   p->infd  = inch;
   p->outfd = outch;
-
-  /* Discard the unwind protect for closing S, if any.  */
-  specpdl_ptr = specpdl + count1;
 
   if (p->is_server && p->socktype != SOCK_DGRAM)
     pset_status (p, Qlisten);
@@ -3672,8 +3673,7 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 	}
     }
 #endif
-
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Create a network stream/datagram client/server process.  Treated
@@ -3874,6 +3874,8 @@ usage: (make-network-process &rest ARGS)  */)
 
   if (nargs == 0)
     return Qnil;
+
+  dynwind_begin ();
 
   /* Save arguments for process-contact and clone-process.  */
   contact = Flist (nargs, args);
@@ -4142,7 +4144,7 @@ usage: (make-network-process &rest ARGS)  */)
     buffer = Fget_buffer_create (buffer, Qnil);
 
   /* Unwind bind_polling_period.  */
-  unbind_to (count, Qnil);
+  //unbind_to (count, Qnil); // FIX: dynwind_begin()
 
   proc = make_process (name);
   record_unwind_protect (remove_process, proc);
@@ -4173,6 +4175,9 @@ usage: (make-network-process &rest ARGS)  */)
   CHECK_LIST (tem);
   p->gnutls_boot_parameters = tem;
 #endif
+
+  dynwind_end (); //FIX: LAV, what does each of these unprotect?
+//  dynwind_end (); //FIX: LAV, dont use double unwind?
 
   set_network_socket_coding_system (proc, host, service, name);
 
@@ -4386,7 +4391,7 @@ network_interface_info (Lisp_Object ifname)
   s = socket (AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
   if (s < 0)
     return Qnil;
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_int (close_file_unwind, s);
 
   elt = Qnil;
@@ -4506,7 +4511,9 @@ network_interface_info (Lisp_Object ifname)
 #endif
   res = Fcons (elt, res);
 
-  return unbind_to (count, any ? res : Qnil);
+  Lisp_Object tem0 = any ? res : Qnil;
+  dynwind_end ();
+  return tem0;
 }
 #endif	/* !SIOCGIFADDR && !SIOCGIFHWADDR && !SIOCGIFFLAGS */
 #endif	/* defined (HAVE_NET_IF_H) */
@@ -4852,7 +4859,7 @@ server_accept_connection (Lisp_Object server, int channel)
       return;
     }
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_int_1 (close_file_unwind, s, false);
 
   connect_counter++;
@@ -4970,7 +4977,7 @@ server_accept_connection (Lisp_Object server, int channel)
   eassert (NILP (p->command));
   eassert (p->pid == 0);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd  = s;
@@ -5167,7 +5174,8 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 #if defined HAVE_GETADDRINFO_A || defined HAVE_GNUTLS
   bool retry_for_async;
 #endif
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   /* Close to the current time if known, an invalid timespec otherwise.  */
   struct timespec now = invalid_timespec ();
@@ -5935,7 +5943,7 @@ wait_reading_process_output (intmax_t time_limit, int nsecs, int read_kbd,
 	}			/* End for each file descriptor.  */
     }				/* End while exit conditions not met.  */
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* If calling from keyboard input, do not quit
      since we want to return C-g as an input character.
@@ -6003,10 +6011,10 @@ read_process_output (Lisp_Object proc, int channel)
   struct coding_system *coding = proc_decode_coding_system[channel];
   int carryover = p->decoding_carryover;
   ptrdiff_t readmax = clip_to_bounds (1, read_process_output_max, PTRDIFF_MAX);
-  ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object odeactivate;
   char *chars;
 
+  dynwind_begin ();
   USE_SAFE_ALLOCA;
   chars = SAFE_ALLOCA (sizeof coding->carryover + readmax);
 
@@ -6076,7 +6084,7 @@ read_process_output (Lisp_Object proc, int channel)
     {
       if (nbytes < 0 || coding->mode & CODING_MODE_LAST_BLOCK)
 	{
-	  SAFE_FREE_UNBIND_TO (count, Qnil);
+	  dynwind_end ();
 	  return nbytes;
 	}
       coding->mode |= CODING_MODE_LAST_BLOCK;
@@ -6102,7 +6110,7 @@ read_process_output (Lisp_Object proc, int channel)
   /* Handling the process output should not deactivate the mark.  */
   Vdeactivate_mark = odeactivate;
 
-  SAFE_FREE_UNBIND_TO (count, Qnil);
+  dynwind_end ();
   return nbytes;
 }
 
@@ -7412,12 +7420,14 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
 {
   Lisp_Object sentinel, odeactivate;
   struct Lisp_Process *p = XPROCESS (proc);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool outer_running_asynch_code = running_asynch_code;
   int waiting = waiting_for_user_input_p;
 
-  if (inhibit_sentinels)
+  if (inhibit_sentinels) {
+    dynwind_end ();
     return;
+  }
 
   odeactivate = Vdeactivate_mark;
 #if 0
@@ -7468,7 +7478,7 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
      when we were called, in case the filter clobbered it.  */
   waiting_for_user_input_p = waiting;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Report all recent events of a change in process status

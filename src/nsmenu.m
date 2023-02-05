@@ -154,11 +154,12 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       struct buffer *prev = current_buffer;
       Lisp_Object buffer;
-      ptrdiff_t specpdl_count = SPECPDL_INDEX ();
       int previous_menu_items_used = f->menu_bar_items_used;
       Lisp_Object *previous_items
 	= alloca (previous_menu_items_used * sizeof *previous_items);
       int subitems;
+
+      dynwind_begin ();
 
       buffer = XWINDOW (FRAME_SELECTED_WINDOW (f))->contents;
       specbind (Qinhibit_quit, Qt);
@@ -284,6 +285,7 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       /* This undoes save_menu_items.  */
       unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
 
       /* Now GC cannot happen during the lifetime of the widget_value,
 	 so it's safe to store data from a Lisp_String.  */
@@ -779,13 +781,14 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
   EmacsMenu *pmenu;
   NSPoint p;
   Lisp_Object tem;
-  ptrdiff_t specpdl_count = SPECPDL_INDEX ();
   widget_value *wv, *first_wv = 0;
   bool keymaps = (menuflags & MENU_KEYMAPS);
 
   NSTRACE ("ns_menu_show");
 
   block_input ();
+
+  dynwind_begin ();
 
   p.x = x; p.y = y;
 
@@ -962,7 +965,7 @@ ns_menu_show (struct frame *f, int x, int y, int menuflags,
                    NILP (title) ? @"" : [NSString stringWithLispString: title]];
   [pmenu fillWithWidgetValue: first_wv->contents];
   free_menubar_widget_value_tree (first_wv);
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   popup_activated_flag = 1;
   tem = [pmenu runMenuAt: p forFrame: f keymaps: keymaps];
@@ -1467,12 +1470,10 @@ ns_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
                                            isQuestion: isQ];
 
   {
-    ptrdiff_t specpdl_count = SPECPDL_INDEX ();
-
     record_unwind_protect_ptr (pop_down_menu, dialog);
     popup_activated_flag = 1;
     tem = [dialog runDialogAt: p];
-    unbind_to (specpdl_count, Qnil);  /* calls pop_down_menu */
+    dynwind_end ();
   }
 
   unblock_input ();

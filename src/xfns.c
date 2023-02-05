@@ -3663,7 +3663,9 @@ This function is an internal primitive--use `make-frame' instead.  */)
   bool minibuffer_only = false;
   bool undecorated = false, override_redirect = false;
   long window_prompting = 0;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  int width, height;
+
+  dynwind_begin ();
   Lisp_Object display;
   struct x_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -4208,7 +4210,8 @@ This function is an internal primitive--use `make-frame' instead.  */)
      and similar functions.  */
   Vwindow_list = Qnil;
 
- return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -6272,8 +6275,9 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   struct frame *f;
   Lisp_Object frame;
   Lisp_Object name;
-  ptrdiff_t count = SPECPDL_INDEX ();
   bool face_change_before = face_change;
+
+  dynwind_begin ();
 
   if (!dpyinfo->terminal->name)
     error ("Terminal is not live, can't create new frames on it");
@@ -6569,7 +6573,8 @@ x_create_tip_frame (struct x_display_info *dpyinfo, Lisp_Object parms)
   face_change = face_change_before;
 
   /* Discard the unwind_protect.  */
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -6884,6 +6889,8 @@ Text larger than the specified size is clipped.  */)
   Lisp_Object window, size, tip_buf;
   AUTO_STRING (tip, " *tip*");
 
+  dynwind_begin ();
+
   specbind (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
@@ -7080,7 +7087,6 @@ Text larger than the specified size is clipped.  */)
 
   /* Insert STRING into root window's buffer and fit the frame to the
      buffer.  */
-  count_1 = SPECPDL_INDEX ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -7118,7 +7124,6 @@ Text larger than the specified size is clipped.  */)
   update_single_window (w);
   flush_frame (tip_f);
   set_buffer_internal_1 (old_buffer);
-  unbind_to (count_1, Qnil);
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
@@ -7126,7 +7131,8 @@ Text larger than the specified size is clipped.  */)
   tip_timer = call3 (intern ("run-at-time"), timeout, Qnil,
 		     intern ("x-hide-tip"));
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -7135,6 +7141,7 @@ DEFUN ("x-hide-tip", Fx_hide_tip, Sx_hide_tip, 0, 0, 0,
 Value is t if tooltip was open, nil otherwise.  */)
   (void)
 {
+  //FIX: 20190626 larry, x_hide_tip may need dynwind wrapping
   return x_hide_tip (!tooltip_reuse_hidden_frame);
 }
 
@@ -7220,7 +7227,8 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
   Arg al[10];
   int ac = 0;
   XmString dir_xmstring, pattern_xmstring;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   check_window_system (f);
 
@@ -7355,7 +7363,8 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 
   decoded_file = DECODE_FILE (file);
 
-  return unbind_to (count, decoded_file);
+  dynwind_end ();
+  return decoded_file;
 }
 
 #endif /* USE_MOTIF */
@@ -7387,8 +7396,9 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
   char *fn;
   Lisp_Object file = Qnil;
   Lisp_Object decoded_file;
-  ptrdiff_t count = SPECPDL_INDEX ();
   char *cdef_file;
+
+  dynwind_begin ();
 
   check_window_system (f);
 
@@ -7429,7 +7439,8 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
 
   decoded_file = DECODE_FILE (file);
 
-  return unbind_to (count, decoded_file);
+  dynwind_end ();
+  return decoded_file;
 }
 
 
@@ -7448,7 +7459,8 @@ nil, it defaults to the selected frame. */)
   Lisp_Object font;
   Lisp_Object font_param;
   char *default_name = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   if (popup_activated ())
     error ("Trying to use a menu from within a menu-entry");
@@ -7480,7 +7492,8 @@ nil, it defaults to the selected frame. */)
   if (NILP (font))
     quit ();
 
-  return unbind_to (count, font);
+  dynwind_end ();
+  return font;
 }
 #endif /* HAVE_FREETYPE */
 

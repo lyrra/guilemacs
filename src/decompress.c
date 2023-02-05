@@ -240,6 +240,7 @@ This function can be called only in unibyte buffers.  */)
   int inflate_status;
   struct decompress_unwind_data unwind_data;
   ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   validate_region (&start, &end);
 
@@ -251,6 +252,7 @@ This function can be called only in unibyte buffers.  */)
     zlib_initialized = init_zlib_functions ();
   if (!zlib_initialized)
     {
+      dynwind_end ();
       message1 ("zlib library not found");
       return Qnil;
     }
@@ -274,8 +276,10 @@ This function can be called only in unibyte buffers.  */)
 
   /* The magic number 32 apparently means "autodetect both the gzip and
      zlib formats" according to zlib.h.  */
-  if (inflateInit2 (&stream, MAX_WBITS + 32) != Z_OK)
+  if (inflateInit2 (&stream, MAX_WBITS + 32) != Z_OK) {
+    dynwind_end ();
     return Qnil;
+  }
 
   unwind_data.orig = istart;
   unwind_data.start = iend;
@@ -320,7 +324,10 @@ This function can be called only in unibyte buffers.  */)
       if (!NILP (allow_partial))
         ret = make_int (iend - pos_byte);
       else
-        return unbind_to (count, Qnil);
+        {
+          dynwind_end ();
+          return unbind_to (count, Qnil);
+        }
     }
 
   unwind_data.start = 0;
@@ -332,6 +339,7 @@ This function can be called only in unibyte buffers.  */)
   signal_after_change (istart, iend - istart, unwind_data.nbytes);
   update_compositions (istart, istart, CHECK_HEAD);
 
+  dynwind_end ();
   return unbind_to (count, ret);
 }
 

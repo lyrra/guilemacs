@@ -280,6 +280,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
   (Lisp_Object function, Lisp_Object record_flag, Lisp_Object keys)
 {
   ptrdiff_t speccount = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   bool arg_from_tty = false;
   ptrdiff_t key_count;
@@ -350,8 +351,10 @@ invoke it (via an `interactive' spec that contains, for instance, an
       Vreal_this_command = save_real_this_command;
       kset_last_command (current_kboard, save_last_command);
 
-      return unbind_to (speccount, CALLN (Fapply, Qfuncall_interactively,
-					  function, specs));
+      Lisp_Object result = unbind_to (speccount, CALLN (Fapply, Qfuncall_interactively,
+                                                        function, specs));
+      dynwind_end ();
+      return result;
     }
 
   /* SPECS is set to a string; use it as an interactive prompt.
@@ -541,7 +544,8 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
 	case 'k':		/* Key sequence.  */
 	  {
-	    ptrdiff_t speccount1 = SPECPDL_INDEX ();
+            ptrdiff_t speccount1 = SPECPDL_INDEX ();
+	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_fixnum (0),
@@ -549,6 +553,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 				Qface, Qminibuffer_prompt, callint_message);
 	    args[i] = Fread_key_sequence (callint_message,
 					  Qnil, Qnil, Qnil, Qnil);
+	    dynwind_end ();
 	    unbind_to (speccount1, Qnil);
 	    visargs[i] = Fkey_description (args[i], Qnil);
 
@@ -571,7 +576,8 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
 	case 'K':		/* Key sequence to be defined.  */
 	  {
-	    ptrdiff_t speccount1 = SPECPDL_INDEX ();
+            ptrdiff_t speccount1 = SPECPDL_INDEX ();
+	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_fixnum (0),
@@ -581,6 +587,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 						 Qnil, Qt, Qnil, Qnil);
 	    visargs[i] = Fkey_description (args[i], Qnil);
 	    unbind_to (speccount1, Qnil);
+	    dynwind_end ();
 
 	    /* If the key sequence ends with a down-event,
 	       discard the following up-event.  */
@@ -759,7 +766,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
       if (tem) tem++;
       else tem = string_end;
     }
-  unbind_to (speccount, Qnil);
+  dynwind_end ();
 
   maybe_quit ();
 
@@ -796,6 +803,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
   specbind (Qcommand_debug_status, Qnil);
 
   Lisp_Object val = Ffuncall (nargs, args);
+  dynwind_end ();
   return SAFE_FREE_UNBIND_TO (speccount, val);
 }
 

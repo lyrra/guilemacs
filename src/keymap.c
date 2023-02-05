@@ -1502,6 +1502,7 @@ OLP if non-nil indicates that we should obey `overriding-local-map' and
 like in the respective argument of `key-binding'.  */)
   (Lisp_Object olp, Lisp_Object position)
 {
+  dynwind_begin ();
   ptrdiff_t count = SPECPDL_INDEX ();
 
   Lisp_Object keymaps = list1 (current_global_map);
@@ -1614,6 +1615,7 @@ like in the respective argument of `key-binding'.  */)
 	keymaps = Fcons (otlp, keymaps);
     }
 
+  dynwind_end ();
   return unbind_to (count, keymaps);
 }
 
@@ -2880,7 +2882,7 @@ This is text showing the elements of vector matched against indices.
 DESCRIBER is the output function used; nil means use `princ'.  */)
   (Lisp_Object vector, Lisp_Object describer)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   if (NILP (describer))
     describer = intern ("princ");
   specbind (Qstandard_output, Fcurrent_buffer ());
@@ -2888,7 +2890,8 @@ DESCRIBER is the output function used; nil means use `princ'.  */)
   describe_vector (vector, Qnil, describer, describe_vector_princ, 0,
 		   Qnil, Qnil, 0, 0);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 static Lisp_Object fontify_key_properties;
