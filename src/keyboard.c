@@ -2393,6 +2393,7 @@ struct read_char_state
   Lisp_Object previous_echo_area_message;
   Lisp_Object also_record;
   bool reread;
+  bool recorded;
   bool polling_stopped_here;
   struct kboard *orig_kboard;
 };
@@ -2404,6 +2405,8 @@ read_char (int commandflag, Lisp_Object map,
 	   Lisp_Object prev_event,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
+  struct read_char_state *state = xmalloc (sizeof *state);
+
   state->commandflag = commandflag;
   state->map = map;
   state->prev_event = prev_event;
@@ -2489,6 +2492,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define previous_echo_area_message state->previous_echo_area_message
 #define also_record state->also_record
 #define reread state->reread
+#define recorded state->recorded
 #define polling_stopped_here state->polling_stopped_here
 #define orig_kboard state->orig_kboard
   Lisp_Object tem, save;
@@ -3296,6 +3300,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #undef previous_echo_area_message
 #undef also_record
 #undef reread
+#undef recorded
 #undef polling_stopped_here
 #undef orig_kboard
 }
