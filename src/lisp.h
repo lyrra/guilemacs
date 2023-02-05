@@ -4548,7 +4548,9 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
 
-#define USE_SAFE_ALLOCA ((void) 0)
+#define USE_SAFE_ALLOCA \
+  ptrdiff_t sa_avail = MAX_ALLOCA;      \
+  ptrdiff_t sa_count = SPECPDL_INDEX ()
 
 #define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
 
@@ -4569,7 +4571,6 @@ extern void *record_xmalloc (size_t) ATTRIBUTE_ALLOC_SIZE ((1));
     else							 \
       {								 \
 	(buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier)); \
-	record_unwind_protect_ptr (xfree, buf);			 \
       }								 \
   } while (false)
 
@@ -4694,12 +4695,7 @@ enum
    user code.  */
 
 #define AUTO_STRING_WITH_LEN(name, str, len)				\
-  Lisp_Object name =							\
-    (USE_STACK_STRING							\
-     ? (make_lisp_ptr							\
-	((&(struct Lisp_String) {{{len, -1, 0, (unsigned char *) (str)}}}), \
-	 Lisp_String))							\
-     : make_unibyte_string (str, len))
+  Lisp_Object name = make_unibyte_string (str, len)
 
 /* The maximum length of "small" lists, as a heuristic.  These lists
    are so short that code need not check for cycles or quits while

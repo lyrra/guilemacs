@@ -68,6 +68,9 @@ static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, ptrdiff_t);
 static Lisp_Object lambda_arity (Lisp_Object);
 
+Lisp_Object
+unbind_to (ptrdiff_t count, Lisp_Object value);
+
 static Lisp_Object
 specpdl_symbol (union specbinding *pdl)
 {
@@ -3572,7 +3575,7 @@ unbind_once (bool explicit)
            just set it.  No need to check for constant symbols here,
            since that was already done by specbind.  */
         struct Lisp_Symbol *sym = XSYMBOL (specpdl_symbol (specpdl_ptr));
-        if (sym->redirect == SYMBOL_PLAINVAL)
+        if (sym->u.s.redirect == SYMBOL_PLAINVAL)
           {
             SET_SYMBOL_VAL (sym, specpdl_old_value (specpdl_ptr));
             break;
@@ -3603,18 +3606,41 @@ unbind_once (bool explicit)
     }
 }
 
-/* Pop and execute entries from the unwind-protect stack until the
-   depth COUNT is reached.  Return VALUE.  */
+void
+dynwind_begin (void)
+{
+  specpdl_ptr->kind = SPECPDL_FRAME;
+  grow_specpdl ();
+}
 
-Lisp_Object
-unbind_to (ptrdiff_t count, Lisp_Object value)
+void
+dynwind_end (void)
+{
+  enum specbind_tag last;
+  Lisp_Object quitf = Vquit_flag;
+  union specbinding *pdl = specpdl_ptr;
+
+  Vquit_flag = Qnil;
+
+  do
+    pdl--;
+  while (pdl->kind != SPECPDL_FRAME);
+
+  while (specpdl_ptr != pdl)
+    unbind_once (true);
+
+  Vquit_flag = quitf;
+}
+
+static Lisp_Object
+unbind_to_1 (ptrdiff_t count, Lisp_Object value, bool explicit)
 {
   Lisp_Object quitf = Vquit_flag;
 
   Vquit_flag = Qnil;
 
   while (specpdl_ptr != specpdl + count)
-    unbind_once ();
+    unbind_once (explicit);
 
   if (NILP (Vquit_flag) && !NILP (quitf))
     Vquit_flag = quitf;
@@ -3636,6 +3662,12 @@ unbind_for_thread_switch (struct thread_state *thr)
           do_one_unbind (bind, false, SET_INTERNAL_THREAD_SWITCH);
 	}
     }
+}
+
+Lisp_Object
+unbind_to (ptrdiff_t count, Lisp_Object value)
+{
+  return unbind_to_1 (count, value, true);
 }
 
 DEFUN ("special-variable-p", Fspecial_variable_p, Sspecial_variable_p, 1, 1, 0,

@@ -3652,17 +3652,17 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
            behavior.  */
         wrong_type_argument (Qsequencep, subtree);
 
-      for (i = 0; i < length; i++)
-        SUBSTITUTE (AREF (subtree, i),
-                    ASET (subtree, i, true_value));
+        if (SUB_CHAR_TABLE_P (subtree))
+          i = 2;
+        for ( ; i < length; i++)
+          ASET (subtree, i,
+                substitute_object_recurse (subst, AREF (subtree, i)));
       return subtree;
     }
   else if (CONSP (subtree))
     {
-      SUBSTITUTE (XCAR (subtree),
-                  XSETCAR (subtree, true_value));
-      SUBSTITUTE (XCDR (subtree),
-                  XSETCDR (subtree, true_value));
+      XSETCAR (subtree, substitute_object_recurse (subst, XCAR (subtree)));
+      XSETCDR (subtree, substitute_object_recurse (subst, XCDR (subtree)));
       return subtree;
     }
   else if (STRINGP (subtree))
@@ -3671,10 +3671,8 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
          substitute_in_interval contains part of the logic.  */
 
       INTERVAL root_interval = string_intervals (subtree);
-      Lisp_Object arg = Fcons (object, placeholder);
-
       traverse_intervals_noorder (root_interval,
-                                  &substitute_in_interval, arg);
+                                  substitute_in_interval, subst);
 
       return subtree;
     }

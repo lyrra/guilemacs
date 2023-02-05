@@ -25121,6 +25121,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 
     case '@':
       {
+        ptrdiff_t count = inhibit_garbage_collection ();
 	Lisp_Object curdir = BVAR (current_buffer, directory);
 	Lisp_Object val = Qnil;
 
