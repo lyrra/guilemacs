@@ -377,6 +377,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
       ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
 
       CHECK_SYMBOL (target_type);
@@ -388,6 +389,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 		       XCAR (XCDR (local_value)));
       else
 	value = Qnil;
+      dynwind_end ();
       value = unbind_to (count, value);
     }
 
@@ -564,7 +566,7 @@ x_reply_selection_request (struct selection_input_event *event,
   Window window = SELECTION_EVENT_REQUESTOR (event);
   ptrdiff_t bytes_remaining;
   int max_bytes = selection_quantum (display);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct selection_data *cs;
 
   reply->type = SelectionNotify;
@@ -738,7 +740,7 @@ x_reply_selection_request (struct selection_input_event *event,
      and then BLOCK again because x_uncatch_errors requires it.  */
   block_input ();
   /* This calls x_uncatch_errors.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
   unblock_input ();
 }
 
@@ -758,7 +760,8 @@ x_handle_selection_request (struct selection_input_event *event)
   Atom property = SELECTION_EVENT_PROPERTY (event);
   Lisp_Object local_selection_data;
   bool success = false;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   if (!dpyinfo) goto DONE;
 
@@ -841,7 +844,8 @@ x_handle_selection_request (struct selection_input_event *event)
     CALLN (Frun_hook_with_args, Qx_sent_selection_functions,
 	   selection_symbol, target_symbol, success ? Qt : Qnil);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
+  UNGCPRO;
 }
 
 /* Perform the requested selection conversion, and write the data to
@@ -1073,7 +1077,7 @@ wait_for_property_change_unwind (void *loc)
 static void
 wait_for_property_change (struct prop_location *location)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Make sure to do unexpect_property_change if we quit or err.  */
   record_unwind_protect_ptr (wait_for_property_change_unwind, location);
@@ -1099,7 +1103,7 @@ wait_for_property_change (struct prop_location *location)
 	}
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Called from XTread_socket in response to a PropertyNotify event.  */

@@ -2011,7 +2011,8 @@ permissions.  */)
    Lisp_Object preserve_permissions)
 {
   Lisp_Object handler;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
   Lisp_Object encoded_file, encoded_newname;
 #if HAVE_LIBSELINUX
   security_context_t con;
@@ -2035,10 +2036,12 @@ permissions.  */)
   /* Likewise for output file name.  */
   if (NILP (handler))
     handler = Ffind_file_name_handler (newname, Qcopy_file);
-  if (!NILP (handler))
+  if (!NILP (handler)) {
+    dynwind_end ();
     return call7 (handler, Qcopy_file, file, newname,
 		  ok_if_already_exists, keep_time, preserve_uid_gid,
 		  preserve_permissions);
+  }
 
   encoded_file = ENCODE_FILE (file);
   encoded_newname = ENCODE_FILE (newname);
@@ -2258,7 +2261,7 @@ permissions.  */)
 #endif /* MSDOS */
 #endif /* not WINDOWSNT */
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return Qnil;
 }
@@ -2546,18 +2549,19 @@ This is what happens in interactive use with M-x.  */)
 	   ? emacs_readlinkat (AT_FDCWD, SSDATA (encoded_file))
 	   : Qnil);
       if (!NILP (symlink_target))
-	Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
+	  Fmake_symbolic_link (symlink_target, newname, ok_if_already_exists);
       else
 	Fcopy_file (file, newname, ok_if_already_exists, Qt, Qt, Qt);
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qdelete_by_moving_to_trash, Qnil);
   if (dirp)
     call2 (Qdelete_directory, file, Qt);
   else
     Fdelete_file (file, Qnil);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 DEFUN ("add-name-to-file", Fadd_name_to_file, Sadd_name_to_file, 2, 3,
@@ -3679,7 +3683,6 @@ by calling `format-decode', which see.  */)
   ptrdiff_t how_much;
   off_t beg_offset, end_offset;
   int unprocessed;
-  ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object handler, val, insval, orig_filename, old_undo;
   Lisp_Object p;
   ptrdiff_t total = 0;
@@ -3698,7 +3701,6 @@ by calling `format-decode', which see.  */)
        && BEG == Z);
   Lisp_Object old_Vdeactivate_mark = Vdeactivate_mark;
   bool we_locked_file = false;
-  ptrdiff_t fd_index;
   Lisp_Object window_markers = Qnil;
   /* same_at_start and same_at_end count bytes, because file access counts
      bytes and BEG and END count bytes.  */
@@ -3707,6 +3709,8 @@ by calling `format-decode', which see.  */)
   /* SAME_AT_END_CHARPOS counts characters, because
      restore_window_points needs the old character count.  */
   ptrdiff_t same_at_end_charpos = ZV;
+
+  dynwind_begin ();
 
   if (current_buffer->base_buffer && ! NILP (visit))
     error ("Cannot do file visiting in an indirect buffer");
@@ -3759,7 +3763,6 @@ by calling `format-decode', which see.  */)
       goto notfound;
     }
 
-  fd_index = SPECPDL_INDEX ();
   record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
 
   /* Replacement should preserve point as it preserves markers.  */
@@ -3900,7 +3903,7 @@ by calling `format-decode', which see.  */)
 		  Lisp_Object workbuf;
 		  struct buffer *buf;
 
-                  ptrdiff_t count1 = SPECPDL_INDEX ();
+                  dynwind_begin ();
 		  record_unwind_current_buffer ();
 
 		  workbuf = Fget_buffer_create (name);
@@ -3924,7 +3927,7 @@ by calling `format-decode', which see.  */)
 					 filename, make_fixnum (nread));
 		  set_buffer_internal (prev);
 
-                  unbind_to (count1, Qnil);
+                  dynwind_end ();
 
 		  /* Rewind the file for the actual read done later.  */
 		  if (lseek (fd, 0, SEEK_SET) < 0)
@@ -4169,11 +4172,11 @@ by calling `format-decode', which see.  */)
       unsigned char *decoded;
       ptrdiff_t temp;
       ptrdiff_t this = 0;
-      ptrdiff_t this_count = SPECPDL_INDEX ();
       bool multibyte
 	= ! NILP (BVAR (current_buffer, enable_multibyte_characters));
       Lisp_Object conversion_buffer;
 
+      dynwind_begin ();
       conversion_buffer = code_conversion_save (1, multibyte);
 
       /* First read the whole file, performing code conversion into
@@ -4246,7 +4249,7 @@ by calling `format-decode', which see.  */)
 	    }
 	  inserted = 0;
 
-	  unbind_to (this_count, Qnil);
+          dynwind_end ();
 	  goto handled;
 	}
 
@@ -4322,7 +4325,7 @@ by calling `format-decode', which see.  */)
       /* Set point before the inserted characters.  */
       SET_PT_BOTH (temp, same_at_start);
 
-      unbind_to (this_count, Qnil);
+      dynwind_end ();
 
       goto handled;
     }
@@ -4482,7 +4485,7 @@ by calling `format-decode', which see.  */)
 	     care of marker adjustment.  By this way, we can run Lisp
 	     program safely before decoding the inserted text.  */
 	  Lisp_Object unwind_data;
-	  ptrdiff_t count1 = SPECPDL_INDEX ();
+          dynwind_begin ();
 
 	  unwind_data = Fcons (BVAR (current_buffer, enable_multibyte_characters),
 			       Fcons (BVAR (current_buffer, undo_list),
@@ -4507,7 +4510,7 @@ by calling `format-decode', which see.  */)
 	      if (CONSP (coding_system))
 		coding_system = XCAR (coding_system);
 	    }
-	  unbind_to (count1, Qnil);
+          dynwind_end ();
 	  inserted = Z_BYTE - BEG_BYTE;
 	}
 
@@ -4627,8 +4630,8 @@ by calling `format-decode', which see.  */)
   if (inserted > 0)
     {
       /* Don't run point motion or modification hooks when decoding.  */
-      ptrdiff_t count1 = SPECPDL_INDEX ();
       ptrdiff_t old_inserted = inserted;
+      dynwind_begin ();
       specbind (Qinhibit_point_motion_hooks, Qt);
       specbind (Qinhibit_modification_hooks, Qt);
 
@@ -4743,7 +4746,7 @@ by calling `format-decode', which see.  */)
 	   Otherwise start with an empty undo_list.  */
 	bset_undo_list (current_buffer, EQ (old_undo, Qt) ? Qt : Qnil);
 
-      unbind_to (count1, Qnil);
+      dynwind_end ();
     }
 
   if (!NILP (visit)
@@ -4772,7 +4775,8 @@ by calling `format-decode', which see.  */)
   if (NILP (val))
     val = list2 (orig_filename, make_fixnum (inserted));
 
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 static Lisp_Object build_annotations (Lisp_Object, Lisp_Object);
@@ -4961,8 +4965,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   const char *fn;
   struct stat st;
   struct timespec modtime;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  ptrdiff_t count1 UNINIT;
   Lisp_Object handler;
   Lisp_Object visit_file;
   Lisp_Object annotations;
@@ -5019,6 +5021,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       return val;
     }
 
+  dynwind_begin ();
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
 
   /* Special kludge to simplify auto-saving.  */
@@ -5094,7 +5097,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
 	  report_file_errno ("Opening output file", filename, open_errno);
 	}
 
-      count1 = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_int_1 (close_file_unwind, desc, false);
     }
 
@@ -5164,7 +5167,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       if (emacs_close (desc) < 0)
 	ok = 0, save_errno = errno;
 
-      unbind_to (count1, Qnil);
+      dynwind_end ();
     }
 
   /* Some file systems have a bug where st_mtime is not updated
@@ -5238,7 +5241,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   	= XCDR (Vwrite_region_annotation_buffers);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (file_locked)
     unlock_file (lockname);
@@ -5740,11 +5743,12 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   int do_handled_files;
   Lisp_Object oquit;
   FILE *stream = NULL;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool orig_minibuffer_auto_raise = minibuffer_auto_raise;
   bool old_message_p = 0;
   struct auto_save_unwind auto_save_unwind;
 
+  ptrdiff_t count = SPECPDL_INDEX ();
   intmax_t sum = INT_ADD_WRAPV (specpdl_size, 40, &sum) ? INTMAX_MAX : sum;
   if (max_specpdl_size < sum)
     max_specpdl_size = sum;
@@ -5920,6 +5924,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   Vquit_flag = oquit;
 
   /* This restores the message-stack status.  */
+  dynwind_end ();
   return unbind_to (count, Qnil);
 }
 

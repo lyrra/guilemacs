@@ -727,12 +727,16 @@ This function does not move point.  */)
 {
   ptrdiff_t charpos, bytepos;
 
+  dynwind_begin ();
+
   if (NILP (n))
     XSETFASTINT (n, 1);
   else
     CHECK_FIXNUM (n);
 
   scan_newline_from_point (XFIXNUM (n) - 1, &charpos, &bytepos);
+
+  dynwind_end ();
 
   /* Return END constrained to the current input field.  */
   return Fconstrain_to_field (make_fixnum (charpos), make_fixnum (PT),
@@ -835,12 +839,13 @@ usage: (save-excursion &rest BODY)  */)
   (Lisp_Object args)
 {
   register Lisp_Object val;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect_excursion ();
 
   val = Fprogn (args);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("save-current-buffer", Fsave_current_buffer, Ssave_current_buffer, 0, UNEVALLED, 0,
@@ -849,10 +854,12 @@ BODY is executed just like `progn'.
 usage: (save-current-buffer &rest BODY)  */)
   (Lisp_Object args)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_current_buffer ();
-  return unbind_to (count, Fprogn (args));
+  Lisp_Object tem0 = Fprogn (args);
+  dynwind_end ();
+  return tem0;
 }
 
 DEFUN ("buffer-size", Fbuffer_size, Sbuffer_size, 0, 1, 0,
@@ -2256,6 +2263,7 @@ Both characters must have the same length of multi-byte form.  */)
   ptrdiff_t changed = 0;
   unsigned char fromstr[MAX_MULTIBYTE_LENGTH], tostr[MAX_MULTIBYTE_LENGTH];
   unsigned char *p;
+  dynwind_begin ();
   ptrdiff_t count = SPECPDL_INDEX ();
 #define COMBINING_NO	 0
 #define COMBINING_BEFORE 1
@@ -2417,6 +2425,7 @@ Both characters must have the same length of multi-byte form.  */)
       update_compositions (changed, last_changed, CHECK_ALL);
     }
 
+  dynwind_end ();
   return unbind_to (count, Qnil);
 }
 
@@ -2826,11 +2835,12 @@ usage: (save-restriction &rest BODY)  */)
   (Lisp_Object body)
 {
   register Lisp_Object val;
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   val = Fprogn (body);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* i18n (internationalization).  */

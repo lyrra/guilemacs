@@ -5686,7 +5686,9 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
   Lisp_Object name;
   bool minibuffer_only = false;
   long window_prompting = 0;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
+
   Lisp_Object display;
   struct w32_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -6094,7 +6096,8 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 DEFUN ("xw-color-defined-p", Fxw_color_defined_p, Sxw_color_defined_p, 1, 2, 0,
@@ -6833,7 +6836,9 @@ w32_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   Lisp_Object frame;
   Lisp_Object name;
   int width, height;
-  ptrdiff_t count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
+
   struct kboard *kb;
   bool face_change_before = face_change;
   int x_width = 0, x_height = 0;
@@ -7041,7 +7046,8 @@ w32_create_tip_frame (struct w32_display_info *dpyinfo, Lisp_Object parms)
   face_change = face_change_before;
 
   /* Discard the unwind_protect.  */
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 
@@ -7215,6 +7221,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   Lisp_Object window, size, tip_buf;
   AUTO_STRING (tip, " *tip*");
 
+  dynwind_begin ();
+
   specbind (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
@@ -7364,7 +7372,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 	{
 	  /* Creating the tip frame failed.  */
 	  unblock_input ();
-	  return unbind_to (count, Qnil);
+          dynwind_end ();
+	  return Qnil;
 	}
     }
 
@@ -7408,7 +7417,6 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 
   /* Insert STRING into the root window's buffer and fit the frame to
      the buffer.  */
-  count_1 = SPECPDL_INDEX ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -7464,7 +7472,6 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   w->must_be_updated_p = true;
   update_single_window (w);
   set_buffer_internal_1 (old_buffer);
-  unbind_to (count_1, Qnil);
   unblock_input ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
@@ -7473,7 +7480,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   tip_timer = call3 (intern ("run-at-time"), timeout, Qnil,
 		     intern ("x-hide-tip"));
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -7842,7 +7850,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 #endif	/* !NTGUI_UNICODE */
 
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       w32_dialog_in_progress (Qt);
 
@@ -7865,7 +7873,7 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 	}
 #endif	/* !NTGUI_UNICODE */
       unblock_input ();
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
     if (file_opened)

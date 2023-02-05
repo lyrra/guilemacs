@@ -1050,7 +1050,6 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
   Lisp_Object name;
   int minibuffer_only = 0;
   long window_prompting = 0;
-  ptrdiff_t count = specpdl_ptr - specpdl;
   Lisp_Object display;
   struct ns_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -1127,6 +1126,8 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
     fset_icon_name (f, Qnil);
 
   FRAME_DISPLAY_INFO (f) = dpyinfo;
+
+  dynwind_begin ();
 
   /* With FRAME_DISPLAY_INFO set up, this unwind-protect is safe.  */
   record_unwind_protect (unwind_create_frame, frame);
@@ -1414,7 +1415,8 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 static BOOL
@@ -2699,13 +2701,13 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
      (Lisp_Object string, Lisp_Object frame, Lisp_Object parms, Lisp_Object timeout, Lisp_Object dx, Lisp_Object dy)
 {
   int root_x, root_y;
-  ptrdiff_t count = SPECPDL_INDEX ();
   struct frame *f;
   char *str;
   NSSize size;
   NSColor *color;
   Lisp_Object t;
 
+  dynwind_begin ();
   specbind (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
@@ -2753,7 +2755,8 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   [ns_tooltip showAtX: root_x Y: root_y for: XFIXNUM (timeout)];
   unblock_input ();
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 

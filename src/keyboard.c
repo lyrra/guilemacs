@@ -676,7 +676,7 @@ add_command_key (Lisp_Object key)
 Lisp_Object
 recursive_edit_1 (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
 
   if (command_loop_level > 0)
@@ -721,7 +721,8 @@ recursive_edit_1 (void)
   if (STRINGP (val))
     xsignal1 (Qerror, val);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 /* When an auto-save happens, record the "time", and don't do again soon.  */
@@ -757,13 +758,15 @@ one level up.
 This function is called by the editor initialization to begin editing.  */)
   (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object buffer;
 
   /* If we enter while input is blocked, don't lock up here.
      This may happen through the debugger during redisplay.  */
-  if (input_blocked_p ())
+  if (input_blocked_p ()) {
+    dynwind_end ();
     return Qnil;
+  }
 
   if (command_loop_level >= 0
       && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
@@ -786,7 +789,8 @@ This function is called by the editor initialization to begin editing.  */)
     temporarily_switch_to_single_kboard (SELECTED_FRAME ());
 
   recursive_edit_1 ();
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 void
@@ -1185,7 +1189,7 @@ DEFUN ("internal--track-mouse", Ftrack_mouse, Strack_mouse, 1, 1, 0,
        doc: /* Call BODYFUN with mouse movement events enabled.  */)
   (Lisp_Object bodyfun)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
 
   record_unwind_protect (tracking_off, do_mouse_tracking);
@@ -1193,7 +1197,8 @@ DEFUN ("internal--track-mouse", Ftrack_mouse, Strack_mouse, 1, 1, 0,
   do_mouse_tracking = Qt;
 
   val = call0 (bodyfun);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* If mouse has moved on some frame, return one of those frames.
@@ -1306,7 +1311,7 @@ command_loop_1 (void)
 	{
 	  /* Bind inhibit-quit to t so that C-g gets read in
 	     rather than quitting back to the minibuffer.  */
-	  ptrdiff_t count = SPECPDL_INDEX ();
+          dynwind_begin ();
 	  specbind (Qinhibit_quit, Qt);
 
 	  sit_for (Vminibuffer_message_timeout, 0, 2);
@@ -1315,7 +1320,7 @@ command_loop_1 (void)
 	  message1 (0);
 	  safe_run_hooks (Qecho_area_clear_hook);
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 
 	  /* If a C-g came in before, treat it as input now.  */
 	  if (!NILP (Vquit_flag))
@@ -1433,7 +1438,7 @@ command_loop_1 (void)
 	  /* Here for a command that isn't executed directly.  */
 
 #ifdef HAVE_WINDOW_SYSTEM
-            ptrdiff_t scount = SPECPDL_INDEX ();
+            dynwind_begin ();
 
             if (display_hourglass_p
                 && NILP (Vexecuting_kbd_macro))
@@ -1460,8 +1465,7 @@ command_loop_1 (void)
 	     hourglass cursor anyway.
 	     But don't cancel the hourglass within a macro
 	     just because a command in the macro finishes.  */
-	  if (NILP (Vexecuting_kbd_macro))
-            unbind_to (scount, Qnil);
+            dynwind_end ();
 #endif
           }
       kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
@@ -1825,11 +1829,13 @@ safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
 void
 safe_run_hooks (Lisp_Object hook)
 {
+  dynwind_begin ();
   ptrdiff_t count = SPECPDL_INDEX ();
-
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
   unbind_to (count, Qnil);
+
+  dynwind_end ();
 }
 
 
@@ -3031,13 +3037,14 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       Lisp_Object keys;
       ptrdiff_t key_count;
       ptrdiff_t command_key_start;
-      ptrdiff_t count = SPECPDL_INDEX ();
 
       /* Save the echo status.  */
       bool saved_immediate_echo = current_kboard->immediate_echo;
       struct kboard *saved_ok_to_echo = ok_to_echo_at_next_pause;
       Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
       Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
+
+      dynwind_begin ();
 
       /* Save the this_command_keys status.  */
       key_count = this_command_key_count;
@@ -3068,7 +3075,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       /* Call the input method.  */
       tem = call1 (Vinput_method_function, c);
 
-      unbind_to (count, tem);
+      dynwind_end ();
 
       /* Restore the saved echoing state
 	 and this_command_keys state.  */
@@ -3156,7 +3163,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
   /* Process the help character specially if enabled.  */
   if (!NILP (Vhelp_form) && help_char_p (c))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       help_form_saved_window_configs
 	= Fcons (Fcurrent_window_configuration (Qnil),
@@ -3174,7 +3181,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	}
       while (BUFFERP (c));
       /* Remove the help from the frame.  */
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       redisplay ();
       if (EQ (c, make_fixnum (040)))
@@ -4350,7 +4357,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 	{
 	  if (NILP (AREF (chosen_timer, 0)))
 	    {
-	      ptrdiff_t count = SPECPDL_INDEX ();
+	      dynwind_begin ();
 	      Lisp_Object old_deactivate_mark = Vdeactivate_mark;
 
 	      /* Mark the timer as triggered to prevent problems if the lisp
@@ -4362,7 +4369,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 	      call1 (Qtimer_event_handler, chosen_timer);
 	      Vdeactivate_mark = old_deactivate_mark;
 	      timers_run++;
-	      unbind_to (count, Qnil);
+	      dynwind_end ();
 
 	      /* Since we have handled the event,
 		 we don't need to tell the caller to wake up and do it.  */
@@ -7656,12 +7663,13 @@ eval_dyn (Lisp_Object form)
 Lisp_Object
 menu_item_eval_property (Lisp_Object sexpr)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object val;
   specbind (Qinhibit_redisplay, Qt);
   val = internal_condition_case_1 (eval_dyn, sexpr, Qerror,
 				   menu_item_eval_property_1);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* This function parses a menu item and leaves the result in the
@@ -8931,8 +8939,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		   bool dont_downcase_last, bool can_return_switch_frame,
 		   bool fix_current_buffer, bool prevent_redisplay)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-
   /* How many keys there are in the current key sequence.  */
   int t;
 
@@ -9003,7 +9009,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      read_key_sequence.  This is so that in a recursive call (for
      mouse menus) a spurious initialization doesn't erase the contents
      of raw_keybuf created by the outer call.  */
-  /* raw_keybuf_count = 0; */
+  dynwind_begin ();
+
+  last_nonmenu_event = Qnil;
 
   delayed_switch_frame = Qnil;
 
@@ -9243,7 +9251,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	     Just return -1.  */
 	  if (EQ (key, Qt))
 	    {
-	      unbind_to (count, Qnil);
+              dynwind_end ();
 	      return -1;
 	    }
 
@@ -9812,7 +9820,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     : Qnil;
 
   unread_switch_frame = delayed_switch_frame;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Don't downcase the last character if the caller says don't.
      Don't downcase it if the result is undefined, either.  */
@@ -9850,6 +9858,7 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
 		      Lisp_Object cmd_loop, bool allow_string)
 {
   ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (!NILP (prompt))
     CHECK_STRING (prompt);
@@ -9891,9 +9900,10 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
       maybe_quit ();
     }
 
-  return unbind_to (count,
-		    ((allow_string ? make_event_array : Fvector)
-		     (i, keybuf)));
+  Lisp_Object tem0 = ((allow_string ? make_event_array : Fvector)
+                      (i, keybuf));
+  dynwind_end ();
+  return tem0;
 }
 
 DEFUN ("read-key-sequence", Fread_key_sequence, Sread_key_sequence, 1, 5, 0,
@@ -10260,7 +10270,7 @@ Some operating systems cannot stop the Emacs process and resume it later.
 On such systems, Emacs starts a subshell instead of suspending.  */)
   (Lisp_Object stuffstring)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   int old_height, old_width;
   int width, height;
 
@@ -10282,7 +10292,7 @@ On such systems, Emacs starts a subshell instead of suspending.  */)
     sys_subshell ();
   else
     sys_suspend ();
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Check if terminal/window size has changed.
      Note that this is not useful when we are running directly

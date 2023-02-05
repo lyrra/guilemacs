@@ -284,7 +284,7 @@ each iteration of the macro.  Iteration stops if LOOPFUNC returns nil.  */)
 {
   Lisp_Object final;
   Lisp_Object tem;
-  ptrdiff_t pdlcount = SPECPDL_INDEX ();
+  dynwind_begin ();
   EMACS_INT repeat = 1;
   EMACS_INT success_count = 0;
 
@@ -334,7 +334,8 @@ each iteration of the macro.  Iteration stops if LOOPFUNC returns nil.  */)
 
   Vreal_this_command = Vexecuting_kbd_macro;
 
-  return unbind_to (pdlcount, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 void
