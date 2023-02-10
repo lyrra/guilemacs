@@ -4104,7 +4104,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
       make_symbol_constant (sym);
-      XSYMBOL (sym)->u.s.redirect = SYMBOL_PLAINVAL;
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
@@ -4184,8 +4184,23 @@ it defaults to the value of `obarray'.  */)
 
   tem = oblookup (obarray, SSDATA (string), SCHARS (string), SBYTES (string));
   if (!SYMBOLP (tem))
+    /* FIX-20230210-LAV: intern_driver, does is result in:
+     *                   sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
+     *                                                            SBYTES (string)),
+     *                                     obhash (obarray));
+     *                   initialize_symbol (sym, string);
+     *                   if ((SREF (string, 0) == ':')
+     *                       && EQ (obarray, initial_obarray))
+     *                     {
+     *                       SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+     *                       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+     *                       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+     *                     }
+     *                   return scm_intern (scm_from_utf8_stringn (SSDATA (string),
+     *                                                           SBYTES (string)),
+     *                                      obhash (obarray));
+     */
     tem = intern_driver (string, obarray, tem);
-  return tem;
 }
 
 DEFUN ("intern-soft", Fintern_soft, Sintern_soft, 1, 2, 0,
@@ -4355,8 +4370,8 @@ init_obarray_once (void)
   SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
 
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  //XSYMBOL (Qnil_)->constant = 1;
-  //XSYMBOL (Qnil_)->declared_special = 1;
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
 
   DEFSYM (Qt, "t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
@@ -4410,8 +4425,8 @@ void
 defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
 }
 
@@ -4420,8 +4435,8 @@ void
 defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
 }
@@ -4435,8 +4450,8 @@ void
 defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
 }
 
@@ -4454,8 +4469,8 @@ void
 defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  XSYMBOL (sym)->u.s.declared_special = true;
-  XSYMBOL (sym)->u.s.redirect = SYMBOL_FORWARDED;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
 }
 
@@ -4746,7 +4761,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
   DEFVAR_LISP ("values", Vvalues,
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.  */);
-  XSYMBOL (intern ("values"))->u.s.declared_special = false;
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")), 0);
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.
