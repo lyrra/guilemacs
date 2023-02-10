@@ -849,6 +849,12 @@ INLINE void
    Lisp_Intfwd, etc.).  The pointer is packaged inside a struct to
    help static checking.  */
 //typedef struct { void const *fwdptr; } lispfwd;
+/* Extract A's value as a signed integer.  */
+INLINE EMACS_INT
+XINT (Lisp_Object a)
+{
+  return SCM_I_INUM (a);
+}
 
 /***********************************************************************
 			       Symbols
@@ -1095,19 +1101,6 @@ SYMBOL_INTERNED_P (Lisp_Object sym)
   return scm_is_true (scm_symbol_interned_p (sym));
 }
 
-/* Value is true if SYM is interned in initial_obarray.  */
-
-INLINE bool
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
-{
-  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
-  return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
-  // other version:
-  // /* Should be initial_obarray */
-  // Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
-  // return (! NILP (scm_c_value_ref (tem, 1))
-  //         && (EQ (sym, scm_c_value_ref (tem, 0))));
-}
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
@@ -1132,11 +1125,6 @@ INLINE int
    write to SYM, should also check whether there are any watching
    functions.  */
 
-INLINE int
-(SYMBOL_CONSTANT_P) (Lisp_Object sym)
-{
-  return lisp_h_SYMBOL_CONSTANT_P (sym);
-}
 
 /* untagged_ptr represents a pointer before tagging, and Lisp_Word_tag
    contains a possibly-shifted tag to be added to an untagged_ptr to
@@ -1415,6 +1403,13 @@ XSYMBOL (Lisp_Object a)
   tem = scm_variable_ref (scm_module_lookup (symbol_module, a));
   return tem;
 }
+INLINE int
+(SYMBOL_CONSTANT_P) (Lisp_Object sym)
+{
+  return lisp_h_SYMBOL_CONSTANT_P (sym);
+}
+
+
 
 /* Pseudovector types.  */
 
@@ -2204,6 +2199,19 @@ XSUBR (Lisp_Object a)
 {
   eassert (SUBRP (a));
   return SMOB_PTR (a);
+}
+
+/* Value is true if SYM is interned in initial_obarray.  */
+INLINE bool
+SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
+{
+  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
+  //return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
+  // other version:
+  // /* Should be initial_obarray */
+   Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), Vobarray);
+   return (! NILP (scm_c_value_ref (tem, 1))
+           && (EQ (sym, scm_c_value_ref (tem, 0))));
 }
 
 /* This is the number of slots that every char table must have.  This
