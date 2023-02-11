@@ -1,4 +1,4 @@
-In essence this is a rebase attempt of Robin Templetons 2015 work
+In essence this is a rebase attempt of Robin Templeton's 2015 work
 on replacing the emacs interpreter/compiler written in C+elisp
 with an guile based version.
 
@@ -21,7 +21,7 @@ Branch information
   Based on emacs version 26.2.90.
 
 * 2015-guile-wip
-  Robin Templetons original work from 2015.
+  Original work from 2015 by Robin Templeton.
 
 * master
 
