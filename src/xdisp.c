@@ -16767,7 +16767,6 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
      It indicates that the buffer contents and narrowing are unchanged.  */
   bool buffer_unchanged_p = false;
   bool temp_scroll_step = false;
-  int temp_scroll_step = 0;
   int rc;
   int centering_position = -1;
   bool last_line_misfit = false;

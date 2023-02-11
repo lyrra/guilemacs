@@ -348,12 +348,6 @@ malloc_unblock_input (void)
 # define MALLOC_UNBLOCK_INPUT ((void) 0)
 #endif
 
-#define MALLOC_PROBE(size)			\
-  do {						\
-    if (profiler_memory_running)		\
-      malloc_probe (size);			\
-  } while (0)
-
 static void *lmalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
 static void *lrealloc (void *, size_t);
 
@@ -366,7 +360,6 @@ xmalloc (size_t size)
 
   if (!val && size)
     memory_full (size);
-  MALLOC_PROBE (size);
   return val;
 }
 

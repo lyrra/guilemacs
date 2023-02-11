@@ -411,12 +411,6 @@ typedef EMACS_INT Lisp_Word;
 typedef SCM Lisp_Object;
 typedef Lisp_Object sym_t;
 
-
-extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
-extern Lisp_Object symbol_module;
-extern Lisp_Object function_module;
-extern Lisp_Object plist_module;
-
 /* Define the fundamental Lisp data structures.  */
 
 /* This is the set of Lisp data types.  If you want to define a new
@@ -892,15 +886,10 @@ struct Lisp_Symbol
          3 : it's a forwarding variable, the value is in `forward'.  */
       ENUM_BF (symbol_redirect) redirect : 3;
 
-      /* 0 : normal case, just set the value
-         1 : constant, cannot set, e.g. nil, t, :keywords.
-         2 : trap the write, call watcher functions.  */
-      ENUM_BF (symbol_trapped_write) trapped_write : 2;
-
       /* Non-zero means symbol is constant, i.e. changing its value
          should signal an error.  If the value is 3, then the var
          can be changed, but only by `defconst'.  */
-      //unsigned constant : 2;
+      unsigned constant : 2;
 
       /* True means that this variable has been explicitly declared
          special (with `defvar' etc), and shouldn't be lexically bound.  */
@@ -964,7 +953,8 @@ extern void initialize_symbol (Lisp_Object, Lisp_Object);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
-extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+//extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
+extern Lisp_Object Qt_, Qnil_;
 
 extern Lisp_Object Ffboundp (Lisp_Object);
 extern Lisp_Object Fmakunbound (Lisp_Object);
@@ -1074,24 +1064,17 @@ SYMBOL_INTERNED_P (Lisp_Object sym)
   return scm_is_true (scm_symbol_interned_p (sym));
 }
 
-/* Value is true if SYM is interned in initial_obarray.  */
-
-INLINE bool
-SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
-{
-  //FIX: 20190626 LAV, need to use scm_symbol_interned_p(sym) probably
-  return XSYMBOL (sym)->interned == SYMBOL_INTERNED_IN_INITIAL_OBARRAY;
-}
-
 /* Value is non-zero if symbol is considered a constant, i.e. its
    value cannot be changed (there is an exception for keyword symbols,
    whose value can be set to the keyword symbol itself).  */
 
+#if 0
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
+#endif
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
    constant (e.g. nil, t, :keywords).  Code that actually wants to
@@ -1121,17 +1104,6 @@ INLINE int
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
 #endif
-
-/* Value is non-zero if symbol cannot be changed at all, i.e. it's a
-   constant (e.g. nil, t, :keywords).  Code that actually wants to
-   write to SYM, should also check whether there are any watching
-   functions.  */
-
-INLINE int
-(SYMBOL_CONSTANT_P) (Lisp_Object sym)
-{
-  return lisp_h_SYMBOL_CONSTANT_P (sym);
-}
 
 /* Placeholder for make-docfile to process.  The actual symbol
    definition is done by lread.c's define_symbol.  */
@@ -4971,6 +4943,13 @@ functionp (Lisp_Object object)
     }
   else
     return false;
+}
+
+/* True if OBJ is a Lisp function.  */
+INLINE bool
+FUNCTIONP (Lisp_Object obj)
+{
+  return functionp (obj);
 }
 
 Lisp_Object
