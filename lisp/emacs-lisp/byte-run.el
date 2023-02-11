@@ -162,6 +162,7 @@ The return value of this function is not used."
             ''command-modes (list 'quote val))))
 
 ;; Add any new entries to info node `(elisp)Declare Form'.
+(eval-and-compile
 (defvar defun-declarations-alist
   (list
    (list 'advertised-calling-convention
@@ -213,7 +214,7 @@ For each (PROP . VALUES) in a macro's declaration, the FUN corresponding
 to PROP is called with the macro name, the macro's arglist, and the VALUES
 and should return the code to use to set this property.
 
-This is used by `declare'.")
+This is used by `declare'."))
 
 (defalias 'defmacro
   (cons

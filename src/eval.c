@@ -271,7 +271,7 @@ init_eval_once (void)
   Vrun_hooks = Qnil;
   eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
-  scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
+  //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
 }
 
@@ -1957,9 +1957,9 @@ it defines a macro.  */)
 
   /* This is to make sure that loadup.el gives a clear picture
      of what files are preloaded and when.  */
-  if (will_dump_p () && !will_bootstrap_p ())
+  /* if (will_dump_p () && !will_bootstrap_p ())
     error ("Attempt to autoload %s while preparing to dump",
-	   SDATA (SYMBOL_NAME (funname)));
+    SDATA (SYMBOL_NAME (funname)));*/
 
   CHECK_SYMBOL (funname);
 

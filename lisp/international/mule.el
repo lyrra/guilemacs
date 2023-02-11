@@ -1439,6 +1439,9 @@ Windows 9X systems.  For Windows 9X, see also `w32-set-console-codepage'."
   (set-keyboard-coding-system-internal coding-system terminal)
   (setq keyboard-coding-system coding-system))
 
+(defmacro defcustom (var val &rest ignore)
+  `(defvar ,var ,val))
+
 (defcustom keyboard-coding-system nil
   "Specify coding system for keyboard input.
 If you set this on a terminal which can't distinguish Meta keys from
