@@ -5930,9 +5930,7 @@ syms_of_frame (void)
   {
     for (int i = 0; i < ARRAYELTS (frame_parms); i++)
       {
-	Lisp_Object v = (frame_parms[i].sym < 0
-			 ? intern_c_string (frame_parms[i].name)
-			 : builtin_lisp_symbol (frame_parms[i].sym));
+	Lisp_Object v = intern_c_string (frame_parms[i].name);
         //FIX-20230212-LAV: is this needed?
 	if (frame_parms[i].variable)
 	  {
