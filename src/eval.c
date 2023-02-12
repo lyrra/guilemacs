@@ -465,7 +465,8 @@ default_toplevel_binding (Lisp_Object symbol)
   union specbinding *pdl = specpdl_ptr;
   while (pdl > specpdl)
     {
-      switch ((--pdl)->kind)
+      int k = (--pdl)->kind;
+      switch (k)
 	{
 	case SPECPDL_LET_DEFAULT:
 	case SPECPDL_LET:
@@ -476,6 +477,7 @@ default_toplevel_binding (Lisp_Object symbol)
 	  break;
 
 	default:
+          fprintf(stderr, "ERROR: default_toplevel_binding, unknown spec: %d\n", k);
 	  emacs_abort ();
 	}
     }
