@@ -272,7 +272,7 @@ overlays_around (EMACS_INT pos, Lisp_Object *vec, ptrdiff_t len)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object end = OVERLAY_END (overlay);
       ptrdiff_t endpos = OVERLAY_POSITION (end);
       if (endpos < pos)
@@ -291,7 +291,7 @@ overlays_around (EMACS_INT pos, Lisp_Object *vec, ptrdiff_t len)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object start = OVERLAY_START (overlay);
       ptrdiff_t startpos = OVERLAY_POSITION (start);
       if (pos < startpos)

@@ -5967,7 +5967,7 @@ load_overlay_strings (struct it *it, ptrdiff_t charpos)
   for (struct Lisp_Overlay *ov = current_buffer->overlays_before;
        ov; ov = ov->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Misc);
       eassert (OVERLAYP (overlay));
       ptrdiff_t start = OVERLAY_POSITION (OVERLAY_START (overlay));
       ptrdiff_t end = OVERLAY_POSITION (OVERLAY_END (overlay));
@@ -6009,7 +6009,7 @@ load_overlay_strings (struct it *it, ptrdiff_t charpos)
   for (struct Lisp_Overlay *ov = current_buffer->overlays_after;
        ov; ov = ov->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Misc);
       eassert (OVERLAYP (overlay));
       ptrdiff_t start = OVERLAY_POSITION (OVERLAY_START (overlay));
       ptrdiff_t end = OVERLAY_POSITION (OVERLAY_END (overlay));

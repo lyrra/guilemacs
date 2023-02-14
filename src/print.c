@@ -1395,39 +1395,6 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	SAFE_FREE ();
       }
       break;
-
-    case PVEC_MARKER:
-      print_c_string ("#<marker ", printcharfun);
-      /* Do you think this is necessary?  */
-      if (XMARKER (obj)->insertion_type != 0)
-	print_c_string ("(moves after insertion) ", printcharfun);
-      if (! XMARKER (obj)->buffer)
-	print_c_string ("in no buffer", printcharfun);
-      else
-	{
-	  int len = sprintf (buf, "at %"pD"d in ", marker_position (obj));
-	  strout (buf, len, len, printcharfun);
-	  print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
-	}
-      printchar ('>', printcharfun);
-      break;
-
-    case PVEC_OVERLAY:
-      print_c_string ("#<overlay ", printcharfun);
-      if (! XMARKER (OVERLAY_START (obj))->buffer)
-	print_c_string ("in no buffer", printcharfun);
-      else
-	{
-	  int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
-			     marker_position (OVERLAY_START (obj)),
-			     marker_position (OVERLAY_END   (obj)));
-	  strout (buf, len, len, printcharfun);
-	  print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
-			printcharfun);
-	}
-      printchar ('>', printcharfun);
-      break;
-
     case PVEC_USER_PTR:
       {
 	print_c_string ("#<user-ptr ", printcharfun);
@@ -2166,11 +2133,46 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  printchar (')', printcharfun);
 	}
       break;
+    case Lisp_Misc:
+      switch (XMISCTYPE (obj))
+	{
+        case Lisp_Misc_Free: fprintf(stderr, "--ERROR: Lisp_Misc_Free not handled\n"); break;
+        case Lisp_Misc_Save_Value: fprintf(stderr, "--ERROR: Lisp_Misc_Save_Value not handled\n"); break;
+        case Lisp_Misc_Float: fprintf(stderr, "--ERROR: Lisp_Misc_Float not handled\n"); break;
+        case Lisp_Misc_Limit: fprintf(stderr, "--ERROR: Lisp_Misc_Limit not handled\n"); break;
+	case Lisp_Misc_Marker:
+          print_c_string ("#<marker ", printcharfun);
+          /* Do you think this is necessary?  */
+          if (XMARKER (obj)->insertion_type != 0)
+	    print_c_string ("(moves after insertion) ", printcharfun);
+          if (! XMARKER (obj)->buffer)
+	    print_c_string ("in no buffer", printcharfun);
+          else
+	    {
+	      int len = sprintf (buf, "at %"pD"d in ", marker_position (obj));
+	      strout (buf, len, len, printcharfun);
+	      print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
+	    }
+          printchar ('>', printcharfun);
+	  break;
 
-    case Lisp_Vectorlike:
-      if (print_vectorlike (obj, printcharfun, escapeflag, buf))
-	break;
-      FALLTHROUGH;
+	case Lisp_Misc_Overlay:
+          print_c_string ("#<overlay ", printcharfun);
+          if (! XMARKER (OVERLAY_START (obj))->buffer)
+	    print_c_string ("in no buffer", printcharfun);
+          else
+	    {
+	      int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
+			         marker_position (OVERLAY_START (obj)),
+			         marker_position (OVERLAY_END   (obj)));
+	      strout (buf, len, len, printcharfun);
+	      print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
+			    printcharfun);
+	    }
+          printchar ('>', printcharfun);
+	  break;
+        }
+        break;
     case Lisp_Other:
       {
         static SCM prefix;
@@ -2189,7 +2191,10 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
         scm_close_port (port);
       }
       break;
-
+    case Lisp_Vectorlike:
+      if (print_vectorlike (obj, printcharfun, escapeflag, buf))
+	break;
+      FALLTHROUGH;
     default:
       {
 	int len;

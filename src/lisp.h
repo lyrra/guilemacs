@@ -653,6 +653,8 @@ extern double extract_float (Lisp_Object);
   make_lisp_ptr_ ## type (ptr)
 #define make_lisp_ptr_Lisp_Cons(ptr) ptr
 #define make_lisp_ptr_Lisp_Vectorlike(ptr) \
+  ptr->header.self
+#define make_lisp_ptr_Lisp_Misc(ptr) \
   ((union Lisp_Misc *) (ptr))->u_any.self
 
 
@@ -2558,17 +2560,13 @@ XMISCTYPE (Lisp_Object a)
 }
 //---------------------
 
-INLINE bool
-MARKERP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_MARKER);
-}
+LISP_MACRO_DEFUN (MARKERP, bool, (Lisp_Object x), (x))
 
 INLINE struct Lisp_Marker *
 XMARKER (Lisp_Object a)
 {
   eassert (MARKERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Marker);
+  return & XMISC (a)->u_marker;
 }
 
 INLINE bool
@@ -2581,7 +2579,7 @@ INLINE struct Lisp_Overlay *
 XOVERLAY (Lisp_Object a)
 {
   eassert (OVERLAYP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Overlay);
+  return & XMISC (a)->u_overlay;
 }
 
 INLINE bool
