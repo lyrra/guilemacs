@@ -1283,34 +1283,51 @@ make_misc_ptr (void *a)
   return make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
+static Lisp_Object
+allocate_misc (enum Lisp_Misc_Type type)
+{
+  Lisp_Object val;
+  union Lisp_Misc *p;
+
+  p = xmalloc (sizeof *p);
+  SCM_NEWSMOB (p->u_any.self, lisp_misc_tag, p);
+  XSETMISC (val, p);
+  XMISCANY (val)->type = type;
+  return val;
+}
+
 /* Return a new overlay with specified START, END and PLIST.  */
 
 Lisp_Object
 build_overlay (Lisp_Object start, Lisp_Object end, Lisp_Object plist)
 {
-  struct Lisp_Overlay *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Overlay, plist,
-						  PVEC_OVERLAY);
-  Lisp_Object overlay = make_lisp_ptr (p, Lisp_Vectorlike);
+  Lisp_Object overlay = allocate_misc (Lisp_Misc_Overlay);
   OVERLAY_START (overlay) = start;
   OVERLAY_END (overlay) = end;
   set_overlay_plist (overlay, plist);
-  p->next = NULL;
+  XOVERLAY (overlay)->next = NULL;
   return overlay;
 }
 
-DEFUN ("make-marker", Fmake_marker, Smake_marker, 0, 0, 0,
-       doc: /* Return a newly allocated marker which does not point at any place.  */)
-  (void)
+struct Lisp_Marker *
+new_marker (void)
 {
-  struct Lisp_Marker *p = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Marker,
-						       PVEC_MARKER);
+  Lisp_Object val = allocate_misc (Lisp_Misc_Marker);
+  struct Lisp_Marker *p = XMARKER (val);
   p->buffer = 0;
   p->bytepos = 0;
   p->charpos = 0;
   p->next = NULL;
   p->insertion_type = 0;
   p->need_adjustment = 0;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  return val;
+}
+
+DEFUN ("make-marker", Fmake_marker, Smake_marker, 0, 0, 0,
+       doc: /* Return a newly allocated marker which does not point at any place.  */)
+  (void)
+{
+  return new_marker ();
 }
 
 /* Return a newly allocated marker which points into BUF
@@ -1325,8 +1342,7 @@ build_marker (struct buffer *buf, ptrdiff_t charpos, ptrdiff_t bytepos)
   /* Every character is at least one byte.  */
   eassert (charpos <= bytepos);
 
-  struct Lisp_Marker *m = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Marker,
-						       PVEC_MARKER);
+  struct Lisp_Marker *m = new_marker ();
   m->buffer = buf;
   m->charpos = charpos;
   m->bytepos = bytepos;
@@ -1334,7 +1350,7 @@ build_marker (struct buffer *buf, ptrdiff_t charpos, ptrdiff_t bytepos)
   m->need_adjustment = 0;
   m->next = BUF_MARKERS (buf);
   BUF_MARKERS (buf) = m;
-  return make_lisp_ptr (m, Lisp_Vectorlike);
+  return m;
 }
 
 

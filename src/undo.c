@@ -146,8 +146,7 @@ record_marker_adjustments (ptrdiff_t from, ptrdiff_t to)
 
           if (adjustment)
             {
-              //FIX-20230211-LAV: is marker is stack-allocated, and hence not actual at return? (or even at each for-iter)
-	      Lisp_Object marker = make_lisp_ptr (m, Lisp_Vectorlike);
+	      Lisp_Object marker = make_lisp_ptr (m, Lisp_Misc);
               bset_undo_list
                 (current_buffer,
                  Fcons (Fcons (marker, make_fixnum (adjustment)),

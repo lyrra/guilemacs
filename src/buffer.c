@@ -2888,7 +2888,7 @@ overlays_at (EMACS_INT pos, bool extend, Lisp_Object **vec_ptr,
   for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object start = OVERLAY_START (overlay);
       Lisp_Object end = OVERLAY_END (overlay);
       ptrdiff_t endpos = OVERLAY_POSITION (end);
@@ -2934,7 +2934,7 @@ overlays_at (EMACS_INT pos, bool extend, Lisp_Object **vec_ptr,
   for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object start = OVERLAY_START (overlay);
       Lisp_Object end = OVERLAY_END (overlay);
       ptrdiff_t startpos = OVERLAY_POSITION (start);
@@ -3017,7 +3017,7 @@ overlays_in (EMACS_INT beg, EMACS_INT end, bool extend,
   for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object ostart = OVERLAY_START (overlay);
       Lisp_Object oend = OVERLAY_END (overlay);
       ptrdiff_t endpos = OVERLAY_POSITION (oend);
@@ -3062,7 +3062,7 @@ overlays_in (EMACS_INT beg, EMACS_INT end, bool extend,
   for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       Lisp_Object ostart = OVERLAY_START (overlay);
       Lisp_Object oend = OVERLAY_END (overlay);
       ptrdiff_t startpos = OVERLAY_POSITION (ostart);
@@ -3177,7 +3177,7 @@ overlay_touches_p (ptrdiff_t pos)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       ptrdiff_t endpos = OVERLAY_POSITION (OVERLAY_END (overlay));
@@ -3190,7 +3190,7 @@ overlay_touches_p (ptrdiff_t pos)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
@@ -3416,7 +3416,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
   for (struct Lisp_Overlay *ov = current_buffer->overlays_before;
        ov; ov = ov->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
@@ -3446,7 +3446,7 @@ overlay_strings (ptrdiff_t pos, struct window *w, unsigned char **pstr)
   for (struct Lisp_Overlay *ov = current_buffer->overlays_after;
        ov; ov = ov->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (ov, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
@@ -3545,7 +3545,7 @@ recenter_overlay_lists (struct buffer *buf, ptrdiff_t pos)
        tail; prev = tail, tail = next)
     {
       next = tail->next;
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       Lisp_Object beg = OVERLAY_START (overlay);
@@ -3568,7 +3568,7 @@ recenter_overlay_lists (struct buffer *buf, ptrdiff_t pos)
 	  for (other = buf->overlays_after; other;
 	       other_prev = other, other = other->next)
 	    {
-	      Lisp_Object otheroverlay = make_lisp_ptr (other, Lisp_Vectorlike);
+	      Lisp_Object otheroverlay = make_lisp_ptr (other, Lisp_Misc);
 	      eassert (OVERLAYP (otheroverlay));
 
 	      Lisp_Object otherbeg = OVERLAY_START (otheroverlay);
@@ -3597,7 +3597,7 @@ recenter_overlay_lists (struct buffer *buf, ptrdiff_t pos)
        tail; prev = tail, tail = next)
     {
       next = tail->next;
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
       eassert (OVERLAYP (overlay));
 
       Lisp_Object beg = OVERLAY_START (overlay);
@@ -3625,7 +3625,7 @@ recenter_overlay_lists (struct buffer *buf, ptrdiff_t pos)
 	  for (other = buf->overlays_before; other;
 	       other_prev = other, other = other->next)
 	    {
-	      Lisp_Object otheroverlay = make_lisp_ptr (other, Lisp_Vectorlike);
+	      Lisp_Object otheroverlay = make_lisp_ptr (other, Lisp_Misc);
 	      eassert (OVERLAYP (otheroverlay));
 
 	      Lisp_Object otherend = OVERLAY_END (otheroverlay);
@@ -3705,7 +3705,7 @@ fix_start_end_in_overlays (register ptrdiff_t start, register ptrdiff_t end)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 
       ptrdiff_t endpos = OVERLAY_POSITION (OVERLAY_END (overlay));
       ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
@@ -3754,7 +3754,7 @@ fix_start_end_in_overlays (register ptrdiff_t start, register ptrdiff_t end)
   for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
        tail; tail = tail->next)
     {
-      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+      Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 
       ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
       ptrdiff_t endpos = OVERLAY_POSITION (OVERLAY_END (overlay));
@@ -3846,7 +3846,7 @@ fix_overlays_before (struct buffer *bp, ptrdiff_t prev, ptrdiff_t pos)
      overlay whose ending marker is after-insertion-marker if disorder
      exists).  */
   while (tail
-	 && (tem = make_lisp_ptr (tail, Lisp_Vectorlike),
+	 && (tem = make_lisp_ptr (tail, Lisp_Misc),
 	     (end = OVERLAY_POSITION (OVERLAY_END (tem))) >= pos))
     {
       parent = tail;
@@ -3873,7 +3873,7 @@ fix_overlays_before (struct buffer *bp, ptrdiff_t prev, ptrdiff_t pos)
      overlays are in correct order.  */
   while (tail)
     {
-      tem = make_lisp_ptr (tail, Lisp_Vectorlike);
+      tem = make_lisp_ptr (tail, Lisp_Misc);
       end = OVERLAY_POSITION (OVERLAY_END (tem));
 
       if (end == pos)
@@ -4414,10 +4414,10 @@ However, the overlays you get are the real objects that the buffer uses.  */)
 
   for (struct Lisp_Overlay *ol = current_buffer->overlays_before;
        ol; ol = ol->next)
-    before = Fcons (make_lisp_ptr (ol, Lisp_Vectorlike), before);
+    before = Fcons (make_lisp_ptr (ol, Lisp_Misc), before);
   for (struct Lisp_Overlay *ol = current_buffer->overlays_after;
        ol; ol = ol->next)
-    after = Fcons (make_lisp_ptr (ol, Lisp_Vectorlike), after);
+    after = Fcons (make_lisp_ptr (ol, Lisp_Misc), after);
 
   return Fcons (Fnreverse (before), Fnreverse (after));
 }
@@ -4558,7 +4558,7 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
 	  ptrdiff_t startpos, endpos;
 	  Lisp_Object ostart, oend;
 
-	  Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+	  Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 
 	  ostart = OVERLAY_START (overlay);
 	  oend = OVERLAY_END (overlay);
@@ -4596,7 +4596,7 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
 	  ptrdiff_t startpos, endpos;
 	  Lisp_Object ostart, oend;
 
-	  Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+	  Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 
 	  ostart = OVERLAY_START (overlay);
 	  oend = OVERLAY_END (overlay);
@@ -4683,7 +4683,7 @@ evaporate_overlays (ptrdiff_t pos)
     for (struct Lisp_Overlay *tail = current_buffer->overlays_before;
 	 tail; tail = tail->next)
       {
-	Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+	Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 	ptrdiff_t endpos = OVERLAY_POSITION (OVERLAY_END (overlay));
 	if (endpos < pos)
 	  break;
@@ -4695,7 +4695,7 @@ evaporate_overlays (ptrdiff_t pos)
     for (struct Lisp_Overlay *tail = current_buffer->overlays_after;
 	 tail; tail = tail->next)
       {
-	Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Vectorlike);
+	Lisp_Object overlay = make_lisp_ptr (tail, Lisp_Misc);
 	ptrdiff_t startpos = OVERLAY_POSITION (OVERLAY_START (overlay));
 	if (startpos > pos)
 	  break;
