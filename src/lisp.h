@@ -1184,10 +1184,6 @@ INLINE int
 }
 #endif
 
-/* Placeholder for make-docfile to process.  The actual symbol
-   definition is done by lread.c's define_symbol.  */
-#define DEFSYM(sym, name) /* empty */
-
 /* untagged_ptr represents a pointer before tagging, and Lisp_Word_tag
    contains a possibly-shifted tag to be added to an untagged_ptr to
    convert it to a Lisp_Word.  */
