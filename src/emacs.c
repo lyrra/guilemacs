@@ -3125,6 +3125,7 @@ component .BUILD is present.  This is now stored separately in
 
   DEFVAR_LISP ("dump-mode", Vdump_mode,
                doc: /* Non-nil when Emacs is dumping itself.  */);
+  Vdump_mode = Qnil;
 
   DEFVAR_LISP ("dynamic-library-alist", Vdynamic_library_alist,
     doc: /* Alist of dynamic libraries vs external files implementing them.
