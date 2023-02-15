@@ -1168,7 +1168,7 @@ SYMBOL_FUNCTION (Lisp_Object sym)
 {
 #if ENABLE_CHECKING
   eassert (SYMBOLP (sym));
-#ENDIF
+#endif
   return Fsymbol_function (sym);
 }
 
