@@ -837,9 +837,6 @@ INLINE void
 #endif
 // guile handles symbols, so dont define them in globals.h
 #undef DEFINE_NON_NIL_Q_SYMBOL_MACROS
-/* Placeholder for make-docfile to process.  The actual symbol
-   definition is done by lread.c's define_symbol.  */
-#define DEFSYM(sym, name) /* empty */
 
 
 
