@@ -3101,6 +3101,7 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
   do {						\
     static struct Lisp_Objfwd const o_fwd	\
       = {Lisp_Fwd_Obj, &globals.f_##vname};	\
+    globals.f_##vname = Qunbound;               \
     defvar_lisp (&o_fwd, lname);		\
   } while (false)
 #define DEFVAR_LISP_NOPRO(lname, vname, doc)	\
