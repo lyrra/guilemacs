@@ -4611,53 +4611,25 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  // FIX: 20190629 LAV, obarray not used
-  //for (int i = 0; i < ARRAYELTS (lispsym); i++)
-  //  define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
-
-  // FIX: 20190626 LAV, new interface:
-  DEFSYM (Qunbound, "unbound");
-  // should do something like this:
-  //Qunbound = Fmake_symbol (build_pure_c_string ("unbound"));
-  //SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
-  SET_SYMBOL_VAL (XSYMBOL (Qunbound), Fmake_symbol (build_pure_c_string ("unbound")));
-
-  DEFSYM (Qnil, "nil");
-  SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
-
-  // FIX-20230212-LAV: is this ok?
   Qnil = SCM_ELISP_NIL;
-  // FIX-20230212-LAV: is this ok?
   Qt = SCM_BOOL_T;
 
+  Qnil_ = intern_c_string ("nil");
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_));
+
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
   SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_));
 
-  // FIX: 20190626 LAV, 2/2 correct def of t?
-  DEFSYM (Qt, "t");
-  // Qt = SCM_BOOL_T; //FIX-20230212-LAV: correct?
-  SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
-  SET_SYMBOL_VAL (XSYMBOL (Qt_), intern_c_string ("t"));
-  // SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt); // FIX-20230212-LAV: correct?
-  // SET_SYMBOL_VAL (XSYMBOL (Qt), Qt); ???
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt)); // FIX-20190626-LAV: do this?
-  // make_symbol_constant (Qt);  // and this is the new interface, refactor post-2015
-  //XSYMBOL (Qt_)->declared_special = 1; //FIX-20230212-LAV: do this? if so, use true?
-  SET_SYMBOL_DECLARED_SPECIAL(Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_));
-
-  // FIX-20230212-LAV: is this ok?
-  Qt = SCM_BOOL_T;
-
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
+  // FIX-20230213-LAV: shouldn't we tell guile about emacs builtin symbols?
+  //for (int i = 0; i < ARRAYELTS (lispsym); i++)
+  //  define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
 
   DEFSYM (Qvariable_documentation, "variable-documentation");
 }
