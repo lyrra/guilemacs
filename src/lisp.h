@@ -1060,6 +1060,9 @@ extern Lisp_Object xsymbol_fn;
 INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
+#ifdef ENABLE_CHECKING
+  eassert (SYMBOLP (o) && xsymbol_fn);
+#endif
   return scm_call_1 (xsymbol_fn, a);
 }
 
@@ -1099,6 +1102,9 @@ INLINE int
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
 {
+#if ENABLE_CHECKING
+  eassert (SYMBOLP (sym));
+#ENDIF
   return Fsymbol_function (sym);
 }
 
