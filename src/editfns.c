@@ -3867,16 +3867,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	{
 	  if (max_bufsize <= buflen_needed)
 	    string_overflow ();
-	  buf = xmalloc_atomic (bufsize);
-	  memcpy (buf, initial_buffer, used);
-	}
-      else
-	{
-          void *new = xmalloc_atomic (bufsize);
-	  memcpy (new, initial_buffer, used);
-          xfree(buf);
-          buf = new;
-	}
 
 	  /* Either there wasn't enough room to store this conversion,
 	     or there won't be enough room to do a sprintf the next
@@ -3887,14 +3877,14 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
 	  if (buf == initial_buffer)
 	    {
-	      buf = xmalloc (bufsize);
+	      buf = xmalloc (bufsize); //FIX-20230216-LAV: can be atomic
 	      buf_save_value_index = SPECPDL_INDEX ();
 	      record_unwind_protect_ptr (xfree, buf);
 	      memcpy (buf, initial_buffer, used);
 	    }
 	  else
 	    {
-	      buf = xrealloc (buf, bufsize);
+	      buf = xrealloc (buf, bufsize); //FIX-20230216-LAV: can be atomic
 	      set_unwind_protect_ptr (buf_save_value_index, xfree, buf);
 	    }
 
@@ -3908,6 +3898,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	      ispec = ispec0;
 	    }
 	}
+    }
 
   if (bufsize < p - buf)
     emacs_abort ();
