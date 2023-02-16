@@ -1795,7 +1795,6 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 {
   CHECK_SYMBOL (symbol);
   sym_t sym = XSYMBOL (symbol);
-#if 0
   switch (GET_SYMBOL_TRAPPED(sym))
     {
     case SYMBOL_NOWRITE:
@@ -1819,7 +1818,6 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
     default: emacs_abort ();
     }
-#endif
  start:
   switch (SYMBOL_REDIRECT (sym))
     {
