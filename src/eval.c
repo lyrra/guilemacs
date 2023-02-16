@@ -171,7 +171,9 @@ make_condition_handler (Lisp_Object tag)
 
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
+#ifdef HAVE_PDUMPER
 static void init_eval_once_for_pdumper (void);
+#endif
 
 void
 init_eval_once (void)
@@ -190,9 +192,12 @@ init_eval_once (void)
   eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
+#ifdef HAVE_PDUMPER
   pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
+#endif
 }
 
+#ifdef HAVE_PDUMPER
 static void
 init_eval_once_for_pdumper (void)
 {
@@ -201,6 +206,7 @@ init_eval_once_for_pdumper (void)
   specpdl_size = size;
   specpdl = specpdl_ptr = pdlvec + 1;
 }
+#endif
 
 /* static struct handler *handlerlist_sentinel; */
 
