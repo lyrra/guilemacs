@@ -3876,7 +3876,10 @@ INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
   Lisp_Object vec = make_uninit_vector (size);
-  memclear (XVECTOR (vec)->contents, size * word_size);
+  for (ptrdiff_t i = 0; i < size; i++)
+    {
+      ASET (vec, i, Qnil);
+    }
   return vec;
 }
 
