@@ -871,6 +871,8 @@ XINT (Lisp_Object a)
 /***********************************************************************
 			       Symbols
  ***********************************************************************/
+#define GET_SYMBOL_TRAPPED(sym) (XINT (scm_c_vector_ref (sym, 2)))
+#define SET_SYMBOL_TRAPPED(sym, v) (scm_c_vector_set_x (sym, 2, make_fixnum (v)))
 //extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
 
