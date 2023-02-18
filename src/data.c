@@ -1441,7 +1441,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 
   CHECK_SYMBOL (symbol);
   struct Lisp_Symbol *sym = XSYMBOL (symbol);
-#if 0 // FIX-20230206-LAV: symbol-trapped-write not implemented
   switch (GET_SYMBOL_TRAPPED(sym))
     {
     case SYMBOL_NOWRITE:
@@ -1467,7 +1466,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 
     default: emacs_abort ();
     }
-#endif
  start:
   switch (SYMBOL_REDIRECT (sym))
     {
@@ -1586,7 +1584,6 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
   return;
 }
 
-#if 0
 static void
 set_symbol_trapped_write (Lisp_Object symbol, enum symbol_trapped_write trap)
 {
@@ -1601,16 +1598,15 @@ restore_symbol_trapped_write (Lisp_Object symbol)
 {
   set_symbol_trapped_write (symbol, SYMBOL_TRAPPED_WRITE);
 }
-#endif
 
 static void
 harmonize_variable_watchers (Lisp_Object alias, Lisp_Object base_variable)
 {
-//  if (!EQ (base_variable, alias)
-//      && EQ (base_variable, Findirect_variable (alias)))
+  if (!EQ (base_variable, alias)
+      && EQ (base_variable, Findirect_variable (alias)))
 //FIX-20230206-LAV symbol-trapped-write not implemented
-//    set_symbol_trapped_write
-//      (alias, GET_SYMBOL_TRAPPED(XSYMBOL (base_variable)));
+    set_symbol_trapped_write
+      (alias, GET_SYMBOL_TRAPPED(XSYMBOL (base_variable)));
 }
 
 DEFUN ("add-variable-watcher", Fadd_variable_watcher, Sadd_variable_watcher,
@@ -1631,7 +1627,7 @@ All writes to aliases of SYMBOL will call WATCH-FUNCTION too.  */)
 {
   symbol = Findirect_variable (symbol);
   CHECK_SYMBOL (symbol);
-  //set_symbol_trapped_write (symbol, SYMBOL_TRAPPED_WRITE); // FIX-20230206-LAV
+  set_symbol_trapped_write (symbol, SYMBOL_TRAPPED_WRITE); // FIX-20230206-LAV
   map_obarray (Vobarray, harmonize_variable_watchers, symbol);
 
   Lisp_Object watchers = Fget (symbol, Qwatchers);
@@ -1653,7 +1649,7 @@ SYMBOL (or its aliases) are set.  */)
   watchers = Fdelete (watch_function, watchers);
   if (NILP (watchers))
     {
-      // set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE); // FIX-20230206-LAV
+      set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE); // FIX-20230206-LAV
       map_obarray (Vobarray, harmonize_variable_watchers, symbol);
     }
   Fput (symbol, Qwatchers, watchers);
@@ -1665,9 +1661,9 @@ DEFUN ("get-variable-watchers", Fget_variable_watchers, Sget_variable_watchers,
        doc: /* Return a list of SYMBOL's active watchers.  */)
   (Lisp_Object symbol)
 {
-//  return (SYMBOL_TRAPPED_WRITE_P (symbol) == SYMBOL_TRAPPED_WRITE)
-//    ? Fget (Findirect_variable (symbol), Qwatchers)
-//    : Qnil;
+  return (SYMBOL_TRAPPED_WRITE_P (symbol) == SYMBOL_TRAPPED_WRITE)
+    ? Fget (Findirect_variable (symbol), Qwatchers)
+    : Qnil;
 }
 
 void
@@ -1679,9 +1675,9 @@ notify_variable_watchers (Lisp_Object symbol,
   symbol = Findirect_variable (symbol);
 
   ptrdiff_t count = SPECPDL_INDEX ();
-  //record_unwind_protect (restore_symbol_trapped_write, symbol);
+  record_unwind_protect (restore_symbol_trapped_write, symbol);
   /* Avoid recursion.  */
-  //set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
+  set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
 
   if (NILP (where)
       && !EQ (operation, Qset_default) && !EQ (operation, Qmakunbound)
