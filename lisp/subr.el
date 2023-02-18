@@ -138,26 +138,6 @@ remaining args, whose values are discarded."
   (declare (indent 2) (debug t))
   `(progn ,form1 (prog1 ,form2 ,@body)))
 
-(defmacro setq-default (&rest args)
-  "Set the default value of variable VAR to VALUE.
-VAR, the variable name, is literal (not evaluated);
-VALUE is an expression: it is evaluated and its value returned.
-The default value of a variable is seen in buffers
-that do not have their own values for the variable.
-
-More generally, you can use multiple variables and values, as in
-  (setq-default VAR VALUE VAR VALUE...)
-This sets each VAR's default value to the corresponding VALUE.
-The VALUE for the Nth VAR can refer to the new default values
-of previous VARs.
-
-\(fn [VAR VALUE]...)"
-  (declare (debug setq))
-  (let ((exps nil))
-    (while args
-      (push `(set-default ',(pop args) ,(pop args)) exps))
-    `(progn . ,(nreverse exps))))
-
 (defmacro setq-local (&rest pairs)
   "Make variables in PAIRS buffer-local and assign them the corresponding values.
 
