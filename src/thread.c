@@ -644,10 +644,10 @@ DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
 static Lisp_Object
 invoke_thread_function (void)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-
+  dynwind_begin ();
   current_thread->result = Ffuncall (1, &current_thread->function);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 static Lisp_Object last_thread_error;

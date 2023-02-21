@@ -299,7 +299,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   int callproc_fd[CALLPROC_FDS];
   int status;
   ptrdiff_t i;
-  ptrdiff_t count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;
 
   char **new_argv;
@@ -701,7 +700,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
   if (FIXNUMP (buffer))
     {
       dynwind_end ();
-      return unbind_to (count, Qnil);
+      return Qnil;
     }
 
   if (BUFFERP (buffer))
@@ -883,7 +882,6 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 
   SAFE_FREE ();
   dynwind_end ();
-  unbind_to (count, Qnil);
 
   if (!wait_ok)
     return build_unibyte_string ("internal error");

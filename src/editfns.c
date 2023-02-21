@@ -2026,7 +2026,6 @@ nil.  */)
     }
 
   dynwind_begin();
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   /* FIXME: It is not documented how to initialize the contents of the
      context structure.  This code cargo-cults from the existing
@@ -2085,7 +2084,6 @@ nil.  */)
     {
       del_range (min_a, ZV);
       Finsert_buffer_substring (source, Qnil,Qnil);
-      SAFE_FREE_UNBIND_TO (count, Qnil);
       dynwind_end();
       return Qnil;
     }
@@ -2151,9 +2149,7 @@ nil.  */)
       --j;
     }
 
-  SAFE_FREE_UNBIND_TO (count, Qnil);
-
-  dynwind_end();
+  dynwind_end ();
 
   rbc_quitcounter = 0;
 
@@ -2430,7 +2426,7 @@ Both characters must have the same length of multi-byte form.  */)
     }
 
   dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 

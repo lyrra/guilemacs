@@ -364,7 +364,6 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   Lisp_Object empty_minibuf;
   Lisp_Object dummy, frame;
 
-  ptrdiff_t count = SPECPDL_INDEX ();
   specbind (Qminibuffer_default, defalt);
   specbind (Qinhibit_read_only, Qnil);
 
@@ -430,7 +429,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
     {
       val = read_minibuf_noninteractive (prompt, expflag, defalt);
       dynwind_end ();
-      return unbind_to (count, val);
+      return val;
     }
 
   /* Choose the minibuffer window and frame, and take action on them.  */
@@ -740,7 +739,6 @@ get_minibuffer (EMACS_INT depth)
     }
   else
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
       dynwind_begin ();
       /* We have to empty both overlay lists.  Otherwise we end
 	 up with overlays that think they belong to this buffer
@@ -754,7 +752,6 @@ get_minibuffer (EMACS_INT depth)
       else
         Fkill_all_local_variables ();
       dynwind_end ();
-      buf = unbind_to (count, buf);
     }
 
   return buf;

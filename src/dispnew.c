@@ -5925,7 +5925,6 @@ Return t if redisplay was performed, nil if redisplay was preempted
 immediately by pending input.  */)
   (Lisp_Object force)
 {
-  ptrdiff_t count;
 
   swallow_events (true);
   if ((detect_input_pending_run_timers (1)
@@ -5938,7 +5937,7 @@ immediately by pending input.  */)
     specbind (Qredisplay_dont_pause, Qt);
   redisplay_preserve_echo_area (2);
   dynwind_end ();
-  return unbind_to (count, Qt);
+  return Qt;
 }
 
 

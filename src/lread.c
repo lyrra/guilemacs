@@ -1140,8 +1140,7 @@ Return t if the file exists and loads successfully.  */)
   FILE *stream UNINIT;
   int fd;
   int fd_index UNINIT;
-  ptrdiff_t count = SPECPDL_INDEX ();
-  dynwind_begin ();
+  dynwind_begin (); //FIX-20230220-LAV: hoist? unwind-protection is needed later
   Lisp_Object found, efound, hist_file_name;
   /* True means we printed the ".el is newer" message.  */
   bool newer = 0;
@@ -1261,6 +1260,7 @@ Return t if the file exists and loads successfully.  */)
 #endif
     }
 
+  //FIX-20230220-LAV: hoist dynwind_begin here
   if (fd >= 0)
     {
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
@@ -2124,7 +2124,6 @@ DO-ALLOW-PRINT, if non-nil, specifies that output functions in the
 This function preserves the position of point.  */)
   (Lisp_Object buffer, Lisp_Object printflag, Lisp_Object filename, Lisp_Object unibyte, Lisp_Object do_allow_print)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
   dynwind_begin ();
   Lisp_Object tem, buf;
 
@@ -2152,7 +2151,7 @@ This function preserves the position of point.  */)
   readevalloop (buf, 0, filename,
 		!NILP (printflag), unibyte, Qnil, Qnil, Qnil);
   dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 DEFUN ("eval-region", Feval_region, Seval_region, 2, 4, "r",
@@ -2676,7 +2675,6 @@ read_integer (Lisp_Object readcharfun, int radix,
   char *p = read_buffer;
   char *heapbuf = NULL;
   int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   int c = READCHAR;
   if (c == '-' || c == '+')
@@ -2709,7 +2707,7 @@ read_integer (Lisp_Object readcharfun, int radix,
 	  ptrdiff_t offset = p - read_buffer;
 	  read_buffer = grow_read_buffer (read_buffer, offset,
 					  &heapbuf, &read_buffer_size,
-					  count);
+					  0); // FIX: 20190808 LAV, 0 is count and not used, please change API
 	  p = read_buffer + offset;
 	}
       *p++ = c;
@@ -2722,7 +2720,7 @@ read_integer (Lisp_Object readcharfun, int radix,
     invalid_radix_integer (radix, stackbuf);
 
   *p = '\0';
-  return unbind_to (count, string_to_number (read_buffer, radix, NULL));
+  return string_to_number (read_buffer, radix, NULL);
 }
 
 

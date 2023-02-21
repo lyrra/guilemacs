@@ -3501,15 +3501,13 @@ window after it has established the size of the new window.  */)
   (Lisp_Object window)
 {
   struct window *w = decode_live_window (window);
-  ptrdiff_t count = SPECPDL_INDEX ();
-
+  dynwind_begin();
   record_unwind_current_buffer ();
   Fset_buffer (w->contents);
   if (!NILP (Vwindow_scroll_functions))
     run_hook_with_args_2 (Qwindow_scroll_functions, window,
 			  Fmarker_position (w->start));
-  unbind_to (count, Qnil);
-
+  dynwind_end();
   return Qnil;
 }
 
@@ -3741,8 +3739,8 @@ run_window_change_functions (void)
   Lisp_Object tail, frame;
   bool selected_frame_change = !EQ (selected_frame, old_selected_frame);
   bool run_window_state_change_hook = false;
-  ptrdiff_t count = SPECPDL_INDEX ();
 
+  dynwind_begin();
   window_change_record_frames = false;
   record_unwind_protect_void (window_change_record);
   specbind (Qinhibit_redisplay, Qt);
@@ -3923,7 +3921,7 @@ run_window_change_functions (void)
 
   /* Record changes for all frames (if asked for), selected window and
      frame.  */
-  unbind_to (count, Qnil);
+  dynwind_end();
 }
 
 /* Make WINDOW display BUFFER.  RUN_HOOKS_P means it's allowed
@@ -6105,7 +6103,6 @@ scroll_command (Lisp_Object window, Lisp_Object n, int direction)
 {
   struct window *w;
   bool other_window;
-  ptrdiff_t count = SPECPDL_INDEX ();
   dynwind_begin ();
 
   eassert (eabs (direction) == 1);
@@ -6235,11 +6232,8 @@ It is determined by the function `other-window-for-scrolling',
 which see.  */)
   (Lisp_Object arg)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-  dynwind_begin ();
   scroll_command (Fother_window_for_scrolling (), arg, 1);
-  dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 DEFUN ("scroll-other-window-down", Fscroll_other_window_down,
@@ -6248,11 +6242,8 @@ DEFUN ("scroll-other-window-down", Fscroll_other_window_down,
 For more details, see the documentation for `scroll-other-window'.  */)
   (Lisp_Object arg)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
-  dynwind_begin ();
   scroll_command (Fother_window_for_scrolling (), arg, -1);
-  dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 DEFUN ("scroll-left", Fscroll_left, Sscroll_left, 0, 2, "^P\np",

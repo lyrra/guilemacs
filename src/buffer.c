@@ -1709,7 +1709,6 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 
   /* Run hooks with the buffer to be killed the current buffer.  */
   {
-    ptrdiff_t count = SPECPDL_INDEX ();
     dynwind_begin ();
 
     record_unwind_protect_excursion ();
@@ -1724,7 +1723,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
 	if (NILP (tem))
           {
             dynwind_end ();
-	    return unbind_to (count, Qnil);
+	    return Qnil;
           }
       }
 
@@ -1750,7 +1749,6 @@ cleaning up all windows currently displaying the buffer to be killed. */)
     /* Then run the hooks.  */
     if (!b->inhibit_buffer_hooks)
       run_hook (Qkill_buffer_hook);
-    unbind_to (count, Qnil);
     dynwind_end ();
   }
 
@@ -4013,7 +4011,6 @@ buffer.  */)
       temp = beg; beg = end; end = temp;
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
   specbind (Qinhibit_quit, Qt);
 
   obuffer = Fmarker_buffer (OVERLAY_START (overlay));
@@ -4080,7 +4077,7 @@ buffer.  */)
            here for other reasons.  */
       drop_overlay (XBUFFER (buffer), XOVERLAY (overlay));
       dynwind_end ();
-      return unbind_to (count, overlay);
+      return overlay;
     }
 
   /* Put the overlay into the new buffer's overlay lists, first on the

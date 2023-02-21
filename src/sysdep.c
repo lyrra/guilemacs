@@ -3424,7 +3424,6 @@ system_process_attributes (Lisp_Object pid)
   gid_t gid;
   Lisp_Object attrs = Qnil;
   Lisp_Object decoded_cmd;
-  ptrdiff_t count;
 
   CHECK_NUMBER (pid);
   CONS_TO_INTEGER (pid, pid_t, proc_id);
@@ -3521,7 +3520,7 @@ system_process_attributes (Lisp_Object pid)
       attrs = Fcons (Fcons (Qargs, decoded_cmd), attrs);
     }
   dynwind_end ();
-  return unbind_to (count, attrs);
+  return attrs;
 }
 
 #elif defined __FreeBSD__
