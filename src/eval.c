@@ -2369,7 +2369,8 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, ptrdiff_t count)
   tem = funcall_lambda (fun, numargs, arg_vector);
 
   SAFE_FREE ();
-  specpdl_ptr--; //FIX: 20190627 LAV, dont think this is used?
+  fprintf(stderr, "C #### apply_lambda ####\n");
+  //specpdl_ptr--; //FIX: 20190627 LAV, dont think this is used? //20230219 leave this unREM
   return tem;
 }
 
