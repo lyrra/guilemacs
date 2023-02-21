@@ -310,7 +310,7 @@ looking_at_1 (Lisp_Object string, bool posix)
       s2 = 0;
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
   re_match_object = Qnil;
@@ -321,7 +321,7 @@ looking_at_1 (Lisp_Object string, bool posix)
 
   if (i == -2)
     {
-      unbind_to (count, Qnil);
+      dynwind_end();
       matcher_overflow ();
     }
 
@@ -340,7 +340,8 @@ looking_at_1 (Lisp_Object string, bool posix)
     XSETBUFFER (last_thing_searched, current_buffer);
   }
 
-  return unbind_to (count, val);
+  dynwind_end();
+  return val;
 }
 
 DEFUN ("looking-at", Flooking_at, Slooking_at, 1, 1, 0,
@@ -558,14 +559,14 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   struct regexp_cache *cache_entry =
     compile_pattern (regexp, 0, Qnil, 0, multibyte);
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
   re_match_object = STRINGP (string) ? string : Qnil;
   len = re_match_2 (&cache_entry->buf, (char *) p1, s1, (char *) p2, s2,
 		    pos_byte, NULL, limit_byte);
 
-  unbind_to (count, Qnil);
+  dynwind_end();
   return len;
 }
 
@@ -1188,7 +1189,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
       s2 = 0;
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
 
@@ -1204,7 +1205,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          pos_byte - BEGV_BYTE);
       if (val == -2)
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           matcher_overflow ();
         }
       if (val >= 0)
@@ -1233,7 +1234,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
         }
       else
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           return (n);
         }
       n++;
@@ -1250,7 +1251,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          lim_byte - BEGV_BYTE);
       if (val == -2)
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           matcher_overflow ();
         }
       if (val >= 0)
@@ -1277,13 +1278,13 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
         }
       else
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           return (0 - n);
         }
       n--;
       maybe_quit ();
     }
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return (pos);
 }
 

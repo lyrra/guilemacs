@@ -2993,7 +2993,6 @@ safe__call (bool inhibit_quit, ptrdiff_t nargs, Lisp_Object func, va_list ap)
   else
     {
       ptrdiff_t i;
-      ptrdiff_t count = SPECPDL_INDEX ();
       dynwind_begin ();
 
       Lisp_Object *args;
@@ -3011,7 +3010,6 @@ safe__call (bool inhibit_quit, ptrdiff_t nargs, Lisp_Object func, va_list ap)
 	 so there is no possibility of wanting to redisplay.  */
       val = internal_condition_case_n (Ffuncall, nargs, args, Qt,
 				       safe_eval_handler);
-      val = SAFE_FREE_UNBIND_TO (count, val);
       dynwind_end ();
     }
 
@@ -5380,7 +5378,6 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
     form = Qnil;
   if (!NILP (form) && !EQ (form, Qt))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
       dynwind_begin ();
 
       /* Bind `object' to the object having the `display' property, a
@@ -5398,7 +5395,6 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
       itdata = bidi_shelve_cache ();
       form = safe_eval (form);
       bidi_unshelve_cache (itdata, false);
-      form = unbind_to (count, form);
       dynwind_end ();
     }
 
@@ -5461,13 +5457,11 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		     current specified height to get the new height.  */
 		  struct face *face = FACE_FROM_ID (it->f, it->face_id);
 
-                  ptrdiff_t count = SPECPDL_INDEX ();
 		  dynwind_begin ();
 		  specbind (Qheight, face->lface[LFACE_HEIGHT_INDEX]);
 		  itdata = bidi_shelve_cache ();
 		  value = safe_eval (it->font_height);
 		  bidi_unshelve_cache (itdata, false);
-		  value = unbind_to (count, value);
 		  dynwind_end ();
 
 		  if (NUMBERP (value))
@@ -11130,7 +11124,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
              we aren't prepared to run modification hooks (we could
              end up calling modification hooks from another buffer and
              only with AFTER=t, Bug#21824).  */
-          ptrdiff_t count = SPECPDL_INDEX ();
+          dynwind_begin ();
           specbind (Qinhibit_modification_hooks, Qt);
 
 	  insert_1_both ("\n", 1, 1, true, false, false);
@@ -11180,7 +11174,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 	      del_range_both (BEG, BEG_BYTE, PT, PT_BYTE, false);
 	    }
 
-          unbind_to (count, Qnil);
+          dynwind_end ();
 	}
       BEGV = marker_position (oldbegv);
       BEGV_BYTE = marker_byte_position (oldbegv);
@@ -26405,7 +26399,7 @@ are the selected window and the WINDOW's buffer).  */)
   struct buffer *old_buffer = NULL;
   int face_id;
   bool no_props = FIXNUMP (face);
-  ptrdiff_t count = SPECPDL_INDEX ();
+
   dynwind_begin ();
   Lisp_Object str;
   int string_start = 0;
@@ -26486,7 +26480,7 @@ are the selected window and the WINDOW's buffer).  */)
     }
 
   dynwind_end ();
-  return unbind_to (count, str);
+  return str;
 }
 
 /* Write a null-terminated, right justified decimal representation of
@@ -27129,8 +27123,7 @@ decode_mode_spec (struct window *w, register int c, int field_width,
 	if (STRINGP (curdir))
 	  val = safe_call1 (intern ("file-remote-p"), curdir);
 
-  //FIX-20230225-LAV: add dynwind_end()
-	//val = unbind_to (count, val);
+        dynwind_end ();
 
 	if (NILP (val))
 	  return "-";

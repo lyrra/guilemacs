@@ -5988,7 +5988,6 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
   bool old_message_p = 0;
   struct auto_save_unwind auto_save_unwind;
 
-  ptrdiff_t count = SPECPDL_INDEX ();
   intmax_t sum = INT_ADD_WRAPV (specpdl_size, 40, &sum) ? INTMAX_MAX : sum;
   if (max_specpdl_size < sum)
     max_specpdl_size = sum;
@@ -6165,7 +6164,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 
   /* This restores the message-stack status.  */
   dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 DEFUN ("set-buffer-auto-saved", Fset_buffer_auto_saved,

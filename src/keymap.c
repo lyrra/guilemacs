@@ -1503,7 +1503,6 @@ like in the respective argument of `key-binding'.  */)
   (Lisp_Object olp, Lisp_Object position)
 {
   dynwind_begin ();
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   Lisp_Object keymaps = list1 (current_global_map);
 
@@ -1616,7 +1615,7 @@ like in the respective argument of `key-binding'.  */)
     }
 
   dynwind_end ();
-  return unbind_to (count, keymaps);
+  return keymaps;
 }
 
 /* GC is possible in this function if it autoloads a keymap.  */

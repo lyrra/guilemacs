@@ -2029,8 +2029,7 @@ nil.  */)
       return Qt;
     }
 
-  ptrdiff_t count = SPECPDL_INDEX ();
-
+  dynwind_begin();
 
   ptrdiff_t diags = size_a + size_b + 3;
   ptrdiff_t del_bytes = size_a / CHAR_BIT + 1;
@@ -2077,7 +2076,7 @@ nil.  */)
     {
       del_range (min_a, ZV);
       Finsert_buffer_substring (source, Qnil,Qnil);
-      SAFE_FREE_UNBIND_TO (count, Qnil);
+      dynwind_end();
       return Qnil;
     }
 
@@ -2417,7 +2416,7 @@ Both characters must have the same length of multi-byte form.  */)
     }
 
   dynwind_end ();
-  return unbind_to (count, Qnil);
+  return Qnil;
 }
 
 

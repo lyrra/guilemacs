@@ -281,7 +281,6 @@ invoke it (via an `interactive' spec that contains, for instance, an
 `this-command-keys-vector' is used.  */)
   (Lisp_Object function, Lisp_Object record_flag, Lisp_Object keys)
 {
-  ptrdiff_t speccount = SPECPDL_INDEX ();
   dynwind_begin ();
 
   bool arg_from_tty = false;
@@ -546,7 +545,6 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
 	case 'k':		/* Key sequence.  */
 	  {
-            ptrdiff_t speccount1 = SPECPDL_INDEX ();
 	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
@@ -556,7 +554,6 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	    args[i] = Fread_key_sequence (callint_message,
 					  Qnil, Qnil, Qnil, Qnil);
 	    dynwind_end ();
-	    unbind_to (speccount1, Qnil);
 	    visargs[i] = Fkey_description (args[i], Qnil);
 
 	    /* If the key sequence ends with a down-event,
@@ -578,7 +575,6 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
 	case 'K':		/* Key sequence to be defined.  */
 	  {
-            ptrdiff_t speccount1 = SPECPDL_INDEX ();
 	    dynwind_begin ();
 	    specbind (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
@@ -588,7 +584,6 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	    args[i] = Fread_key_sequence_vector (callint_message,
 						 Qnil, Qt, Qnil, Qnil);
 	    visargs[i] = Fkey_description (args[i], Qnil);
-	    unbind_to (speccount1, Qnil);
 	    dynwind_end ();
 
 	    /* If the key sequence ends with a down-event,
@@ -807,7 +802,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 
   Lisp_Object val = Ffuncall (nargs, args);
   dynwind_end ();
-  return SAFE_FREE_UNBIND_TO (speccount, val);
+  return val;
 }
 
 DEFUN ("prefix-numeric-value", Fprefix_numeric_value, Sprefix_numeric_value,

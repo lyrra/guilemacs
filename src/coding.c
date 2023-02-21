@@ -8586,7 +8586,6 @@ are lower-case).  */)
   (Lisp_Object prompt, Lisp_Object default_coding_system)
 {
   Lisp_Object val;
-  ptrdiff_t count = SPECPDL_INDEX ();
   dynwind_begin ();
 
   if (SYMBOLP (default_coding_system))
@@ -8596,7 +8595,6 @@ are lower-case).  */)
 			  Qt, Qnil, Qcoding_system_history,
 			  default_coding_system, Qnil);
   dynwind_end ();
-  val = unbind_to (count, val);
   return (SCHARS (val) == 0 ? Qnil : Fintern (val, Qnil));
 }
 

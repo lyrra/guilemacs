@@ -376,7 +376,6 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       /* Don't allow a quit within the converter.
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
-      ptrdiff_t count = SPECPDL_INDEX ();
       dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
 
@@ -390,7 +389,6 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       else
 	value = Qnil;
       dynwind_end ();
-      value = unbind_to (count, value);
     }
 
   /* Make sure this value is of a type that we could transmit
