@@ -43,6 +43,22 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 #include "guile.h"
 
+void c_gdbbreak ()
+{
+  fprintf(stderr, "-- c_gdb_break\n");
+}
+
+DEFUN ("gdbbreak", Fgdbbreak, Sgdbbreak, 0, 0, 0,
+       doc: /* call this, and put a break point on gdb_break
+*/)
+  ()
+{
+  fprintf(stderr, "-- gdb-break\n");
+  c_gdbbreak();
+  fprintf(stderr, "-- gdb-break done\n");
+  return Qnil;
+}
+
 static void unbind_once (void *ignore);
 
 /* Non-nil means record all fset's and provide's, to be undone
