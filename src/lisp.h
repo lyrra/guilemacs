@@ -1082,13 +1082,11 @@ SYMBOL_INTERNED_P (Lisp_Object sym)
    value cannot be changed (there is an exception for keyword symbols,
    whose value can be set to the keyword symbol itself).  */
 
-#if 0
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
-#endif
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
    constant (e.g. nil, t, :keywords).  Code that actually wants to
