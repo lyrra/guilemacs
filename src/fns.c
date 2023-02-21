@@ -4808,8 +4808,8 @@ extract_data_from_object (Lisp_Object spec,
     {
       struct buffer *prev = current_buffer;
       EMACS_INT b, e;
-      ptrdiff_t count = SPECPDL_INDEX ();
-      dynwind_begin ();
+      //ptrdiff_t count = SPECPDL_INDEX ();
+      //dynwind_begin ();
 
       record_unwind_current_buffer ();
 
@@ -4908,8 +4908,8 @@ extract_data_from_object (Lisp_Object spec,
       /* Discard the unwind protect for recovering the current
 	 buffer.  */
       specpdl_ptr--;
-      unbind_to (count, Qnil);
-      dynwind_end ();
+      //unbind_to (count, Qnil); //FIX-20230221-LAV: possible warranted use of unbind_to
+      //dynwind_end ();
 
       if (STRING_MULTIBYTE (object))
 	object = code_convert_string (object, coding_system,
