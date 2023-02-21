@@ -2949,6 +2949,7 @@ window_loop (enum window_loop type, Lisp_Object obj, bool mini,
     window = FRAME_SELECTED_WINDOW (f);
   else
     window = FRAME_SELECTED_WINDOW (SELECTED_FRAME ());
+  CHECK_WINDOW (window);
 
   windows = window_list_1 (window, mini ? Qt : Qnil, frame_arg);
   best_window = Qnil;

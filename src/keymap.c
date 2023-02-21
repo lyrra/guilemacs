@@ -561,8 +561,11 @@ map_keymap_char_table_item (Lisp_Object args, Lisp_Object key, Lisp_Object val)
 	 it in place.  */
       if (CONSP (key))
 	key = Fcons (XCAR (key), XCDR (key));
-      union map_keymap *md = XFIXNUMPTR (args);
-      map_keymap_item (md->s.fun, md->s.args, key, val, md->s.data);
+      if (!NILP (args)) //FIX-20230221-LAV: can be nil
+        {
+          union map_keymap *md = XFIXNUMPTR (args);
+          map_keymap_item (md->s.fun, md->s.args, key, val, md->s.data);
+        }
     }
 }
 
