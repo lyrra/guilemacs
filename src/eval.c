@@ -2568,9 +2568,11 @@ record_unwind_protect_ptr_1 (void (*function) (void *), void *arg,
 void
 record_unwind_protect_excursion (void)
 {
+  //FIX-20230219-LAV: re-add support for SPECPDL_UNWIND_EXCURSION
   //specpdl_ptr->unwind_excursion.kind = SPECPDL_UNWIND_EXCURSION;
-  save_excursion_save (specpdl_ptr);
-  grow_specpdl ();
+  //save_excursion_save (specpdl_ptr);
+  //fprintf(stderr, "C record_unwind_protect_excursion calling grow_specpdl\n");
+  //grow_specpdl ();
 }
 
 record_unwind_protect_ptr (void (*function) (void *), void *arg)
