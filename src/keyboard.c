@@ -2917,6 +2917,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 
 	  timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
 	  timeout = delay_level * timeout / 4;
+          emacs_abort(); //FIX-20230220-LAV: longjump not supported
 	  ptrdiff_t count1 = SPECPDL_INDEX ();
 	  save_getcjmp (save_jump);
 	  restore_getcjmp (local_getcjmp);
