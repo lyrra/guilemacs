@@ -191,7 +191,7 @@
 
 (load "emacs-lisp/regexp-opt")
 (load "emacs-lisp/cl-preloaded")
-(load "emacs-lisp/bytecomp") ; FIX: added
+;(load "emacs-lisp/bytecomp") ; FIX: added
 (load "emacs-lisp/cl-lib")
 (load "emacs-lisp/cl-generic") ; need cl-generics before loaddefs, also needs bytecomp
 (load "emacs-lisp/cl-macs")
