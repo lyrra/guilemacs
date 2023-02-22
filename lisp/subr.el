@@ -2581,7 +2581,6 @@ process."
 	 (format "Buffer %S has a running process; kill it? "
 		 (buffer-name (current-buffer)))))))
 
-(add-hook 'kill-buffer-query-functions #'process-kill-buffer-query-function)
 
 ;; process plist management
 

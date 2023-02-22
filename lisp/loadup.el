@@ -127,7 +127,7 @@
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
 (load "subr")
-
+(load "subr-hooks")
 
 (load "international/mule")
 (load "international/mule-conf")
