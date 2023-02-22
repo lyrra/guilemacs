@@ -644,8 +644,8 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
       ;; FIXME: For generic functions with a single method (or with 2 methods,
       ;; one of which always matches), using a tagcode + hash-table is
       ;; overkill: better just use a `cl-typep' test.
-      (byte-compile
-       `(lambda (generic dispatches-left methods)
+      (eval
+      `(lambda (generic dispatches-left methods)
           (let ((method-cache (make-hash-table :test #'eql)))
             (lambda (,@fixedargs &rest args)
               (let ,bindings

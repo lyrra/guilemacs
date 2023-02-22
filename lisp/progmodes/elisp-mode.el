@@ -2050,7 +2050,8 @@ directory of the buffer being compiled, and nothing else.")
                                                        (throw 'tag nil)))))))
 
 ;;;###autoload
-(defun elisp-flymake-byte-compile (report-fn &rest _args)
+;;FIX-20230222-LAV: some error about compiling cons without arguments
+'(defun elisp-flymake-byte-compile (report-fn &rest _args)
   "A Flymake backend for elisp byte compilation.
 Spawn an Emacs process that byte-compiles a file representing the
 current buffer state and calls REPORT-FN when done."

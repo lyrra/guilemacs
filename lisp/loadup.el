@@ -198,7 +198,7 @@
 
 (load "emacs-lisp/regexp-opt")
 (load "emacs-lisp/cl-preloaded")
-(load "emacs-lisp/bytecomp") ; FIX: added
+;(load "emacs-lisp/bytecomp") ; FIX: added
 (load "emacs-lisp/cl-lib")
 ; need cl-generics before loaddefs, also needs bytecomp
 (let ((max-specpdl-size (max max-specpdl-size 1800)))
