@@ -21,7 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifndef EMACS_LISP_H
 #define EMACS_LISP_H
 
-#include <alloca.h>
+// #include <alloca.h> // FIX: 20190628 LAV, used for what?
 #include <setjmp.h>
 #include <stdalign.h>
 #include <stdarg.h>
@@ -49,6 +49,7 @@ INLINE_HEADER_BEGIN
    definitions or enums visible to the debugger.  It's used for symbols
    that .gdbinit needs.  */
 
+// FIX-2019-LAV: don't rely on GCC specific EXTERNALLY_VISIBLE
 #define DECLARE_GDB_SYM(type, id) type id EXTERNALLY_VISIBLE
 #ifdef MAIN_PROGRAM
 # define DEFINE_GDB_SYMBOL_BEGIN(type, id) DECLARE_GDB_SYM (type, id)
@@ -223,6 +224,12 @@ DEFINE_GDB_SYMBOL_END (INTTYPEBITS)
 DEFINE_GDB_SYMBOL_BEGIN (bool, USE_LSB_TAG)
 #define USE_LSB_TAG 1
 DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
+
+/* The maximum value that can be stored in a EMACS_INT, assuming all
+   bits other than the type bits contribute to a nonnegative signed value.
+   This can be used in #if, e.g., '#if USE_LSB_TAG' below expands to an
+   expression involving VAL_MAX.  */
+//#define VAL_MAX SCM_FIXNUM_BITS
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
 DEFINE_GDB_SYMBOL_BEGIN (EMACS_INT, VALMASK)
@@ -658,18 +665,8 @@ LISP_MACRO_DEFUN (MISCP, bool, (Lisp_Object x), (x))
    if pointers differ in width from EMACS_INT; otherwise they are
    no-ops.  */
 
-INLINE EMACS_INT
-(XLI) (Lisp_Object o)
-{
-  return lisp_h_XLI (o);
-}
-
-INLINE Lisp_Object
-(XIL) (EMACS_INT i)
-{
-  return lisp_h_XIL (i);
-}
-
+LISP_MACRO_DEFUN (XLI, EMACS_INT, (Lisp_Object o), (o))
+LISP_MACRO_DEFUN (XIL, Lisp_Object, (EMACS_INT i), (i))
 
 /*
 INLINE void *
@@ -814,6 +811,13 @@ enum symbol_redirect
   SYMBOL_FORWARDED = 3
 };
 
+enum symbol_trapped_write
+{
+  SYMBOL_UNTRAPPED_WRITE = 0,
+  SYMBOL_NOWRITE = 1,
+  SYMBOL_TRAPPED_WRITE = 2
+};
+
 /* Forwarding pointer to an int variable.
    This is allowed only in the value cell of a symbol,
    and it means that the symbol's value really lives in the
@@ -886,10 +890,10 @@ struct Lisp_Symbol
          3 : it's a forwarding variable, the value is in `forward'.  */
       ENUM_BF (symbol_redirect) redirect : 3;
 
-      /* Non-zero means symbol is constant, i.e. changing its value
-         should signal an error.  If the value is 3, then the var
-         can be changed, but only by `defconst'.  */
-      unsigned constant : 2;
+      /* 0 : normal case, just set the value
+         1 : constant, cannot set, e.g. nil, t, :keywords.
+         2 : trap the write, call watcher functions.  */
+      ENUM_BF (symbol_trapped_write) trapped_write : 2;
 
       /* True means that this variable has been explicitly declared
          special (with `defvar' etc), and shouldn't be lexically bound.  */
@@ -920,7 +924,7 @@ verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 #define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
 #define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_fixnum (v)))
 #define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
-#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_fixnum (v)))
+#define SET_SYMBOL_CONSTANT(sym) (scm_c_vector_set_x (sym, 2, make_fixnum (1)))
 #define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
 #define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_fixnum (v)))
 
@@ -976,12 +980,9 @@ builtin_lisp_symbol (int index)
   return NULL; //make_lisp_symbol (&lispsym[index]);
 }
 
+
 /* Return true if X and Y are the same object.  */
-INLINE bool
-(EQ) (Lisp_Object x, Lisp_Object y)
-{
-  return lisp_h_EQ (x, y);
-}
+LISP_MACRO_DEFUN (EQ, bool, (Lisp_Object x, Lisp_Object y), (x, y))
 
 INLINE bool
 (SYMBOLP) (Lisp_Object x)
@@ -1479,6 +1480,7 @@ make_pointer_integer (void *p)
 /* See the macros in intervals.h.  */
 
 typedef struct interval *INTERVAL;
+
 
 LISP_MACRO_DEFUN (NILP, bool, (Lisp_Object x), (x))
 LISP_MACRO_DEFUN (CONSP, bool, (Lisp_Object x), (x))
@@ -3593,7 +3595,7 @@ ptrdiff_t hash_lookup (struct Lisp_Hash_Table *, Lisp_Object, EMACS_UINT *);
 ptrdiff_t hash_put (struct Lisp_Hash_Table *, Lisp_Object, Lisp_Object,
 		    EMACS_UINT);
 void hash_remove_from_table (struct Lisp_Hash_Table *, Lisp_Object);
-extern struct hash_table_test const hashtest_eq, hashtest_eql, hashtest_equal;
+extern struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal;
 extern void validate_subarray (Lisp_Object, Lisp_Object, Lisp_Object,
 			       ptrdiff_t, ptrdiff_t *, ptrdiff_t *);
 extern Lisp_Object substring_both (Lisp_Object, ptrdiff_t, ptrdiff_t,

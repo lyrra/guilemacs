@@ -3687,8 +3687,8 @@ compute_stop_pos (struct it *it)
 
       /* Get properties here.  */
       for (p = it_props; p->handler; ++p)
-	values_here[p->idx] = textget (iv->plist,
-				       builtin_lisp_symbol (p->name));
+        // FIX: LAV, replace NULL with something sensible
+	values_here[p->idx] = textget (iv->plist, NULL);
 
       /* Look for an interval following iv that has different
 	 properties.  */
@@ -3700,8 +3700,8 @@ compute_stop_pos (struct it *it)
 	{
 	  for (p = it_props; p->handler; ++p)
 	    {
-	      Lisp_Object new_value = textget (next_iv->plist,
-					       builtin_lisp_symbol (p->name));
+              // FIX: LAV, replace NULL with something sensible
+	      Lisp_Object new_value = textget (next_iv->plist, NULL);
 	      if (!EQ (values_here[p->idx], new_value))
 		break;
 	    }
@@ -14813,7 +14813,7 @@ redisplay_preserve_echo_area (int from_where)
   TRACE ((stderr, "redisplay_preserve_echo_area (%d)\n", from_where));
 
   block_input ();
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
   record_unwind_protect_void (unwind_redisplay_preserve_echo_area);
   block_buffer_flips ();
   unblock_input ();
@@ -14830,7 +14830,7 @@ redisplay_preserve_echo_area (int from_where)
     redisplay_internal ();
 
   flush_frame (SELECTED_FRAME ());
-  unbind_to (count, Qnil);
+  dynwind_end();
 }
 
 
@@ -21249,11 +21249,11 @@ display_count_lines_logically (ptrdiff_t start_byte, ptrdiff_t limit_byte,
     return display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
 
   ptrdiff_t val;
-  ptrdiff_t pdl_count = SPECPDL_INDEX ();
+  dynwind_begin();
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   Fwiden ();
   val = display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
-  unbind_to (pdl_count, Qnil);
+  dynwind_end();
   return val;
 }
 
@@ -21275,8 +21275,7 @@ display_count_lines_visually (struct it *it)
     return it->lnum + 1;
   else
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
-
+      dynwind_begin();
       if (IT_CHARPOS (*it) <= PT)
 	{
 	  from = it->current.pos;
@@ -21299,7 +21298,7 @@ display_count_lines_visually (struct it *it)
 		  tem_it.last_visible_y
 		  + (SCROLL_LIMIT + 10) * FRAME_LINE_HEIGHT (tem_it.f),
 		  -1, MOVE_TO_POS | MOVE_TO_Y);
-      unbind_to (count, Qnil);
+      dynwind_end();
       return IT_CHARPOS (*it) <= PT ? -tem_it.vpos : tem_it.vpos;
     }
 }
@@ -24408,6 +24407,7 @@ are the selected window and the WINDOW's buffer).  */)
   int face_id;
   bool no_props = FIXNUMP (face);
   ptrdiff_t count = SPECPDL_INDEX ();
+
   dynwind_begin ();
   Lisp_Object str;
   int string_start = 0;

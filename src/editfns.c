@@ -2025,6 +2025,7 @@ nil.  */)
       return Qt;
     }
 
+  dynwind_begin();
   ptrdiff_t count = SPECPDL_INDEX ();
 
   /* FIXME: It is not documented how to initialize the contents of the
@@ -2085,6 +2086,7 @@ nil.  */)
       del_range (min_a, ZV);
       Finsert_buffer_substring (source, Qnil,Qnil);
       SAFE_FREE_UNBIND_TO (count, Qnil);
+      dynwind_end();
       return Qnil;
     }
 
@@ -2150,6 +2152,9 @@ nil.  */)
     }
 
   SAFE_FREE_UNBIND_TO (count, Qnil);
+
+  dynwind_end();
+
   rbc_quitcounter = 0;
 
   if (modification_hooks_inhibited)
@@ -3098,6 +3103,7 @@ usage: (format-message STRING &rest OBJECTS)  */)
 
 /* Implement ‘format-message’ if MESSAGE is true, ‘format’ otherwise.  */
 
+//FIX: larv, grotesque, not sure memory handling is still clean (removed sa_avail)
 static Lisp_Object
 styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 {
@@ -3136,7 +3142,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   Lisp_Object val;
   bool arg_intervals = false;
   USE_SAFE_ALLOCA;
-  sa_avail -= sizeof initial_buffer;
 
   /* Information recorded for each format spec.  */
   struct info
@@ -3867,7 +3872,10 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	}
       else
 	{
-	  buf = xrealloc_atomic (buf, bufsize);
+          void *new = xmalloc_atomic (bufsize);
+	  memcpy (new, initial_buffer, used);
+          xfree(buf);
+          buf = new;
 	}
 
 	  /* Either there wasn't enough room to store this conversion,

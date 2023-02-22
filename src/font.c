@@ -674,7 +674,8 @@ get_font_prop_index (Lisp_Object key)
   int i;
 
   for (i = 0; i < ARRAYELTS (font_property_table); i++)
-    if (EQ (key, builtin_lisp_symbol (font_property_table[i].key)))
+    //FIX: LAV, doc how builtin_lisp_symbol (font_property_table[i].key) isn't needed
+    if (EQ (key, font_property_table[i].key))
       return i;
   return -1;
 }
@@ -691,7 +692,8 @@ font_prop_validate (int idx, Lisp_Object prop, Lisp_Object val)
   if (NILP (val))
     return val;
   if (NILP (prop))
-    prop = builtin_lisp_symbol (font_property_table[idx].key);
+    prop = font_property_table[idx].key;
+    //prop = builtin_lisp_symbol (font_property_table[idx].key);
   else
     {
       idx = get_font_prop_index (prop);
@@ -4006,6 +4008,7 @@ copy_font_spec (Lisp_Object font)
   enum { font_spec_size = VECSIZE (struct font_spec) };
   Lisp_Object new_spec, tail, *pcdr;
   struct font_spec *spec;
+  Lisp_Object prev, extra;
 
   CHECK_FONT (font);
 
@@ -4020,8 +4023,11 @@ copy_font_spec (Lisp_Object font)
   memcpy (spec->props + 1, XVECTOR (font)->contents + 1,
 	  (FONT_EXTRA_INDEX - 1) * word_size);
 
+//FIX: 20190808 LAV, why is it REM?
+#if 0
   /* Copy an alist of extra information but discard :font-entity property.  */
   pcdr = spec->props + FONT_EXTRA_INDEX;
+  //FIX: 20190630 LAV, this looks similar to a fold, replace it?
   for (tail = AREF (font, FONT_EXTRA_INDEX); CONSP (tail); tail = XCDR (tail))
     if (!EQ (XCAR (XCAR (tail)), QCfont_entity))
       {
@@ -4031,6 +4037,18 @@ copy_font_spec (Lisp_Object font)
       }
 
   XSETFONT (new_spec, spec);
+  return new_spec;
+#endif
+  for (prev = Qnil, tail = extra; CONSP (tail); prev = tail, tail = XCDR (tail))
+    if (EQ (XCAR (XCAR (tail)), QCfont_entity))
+      {
+	if (NILP (prev))
+	  extra = XCDR (extra);
+	else
+	  XSETCDR (prev, XCDR (tail));
+	break;
+      }
+  ASET (new_spec, FONT_EXTRA_INDEX, extra);
   return new_spec;
 }
 
@@ -5434,21 +5452,21 @@ Each element has the form:
 NUMERIC-VALUE is an integer, and SYMBOLIC-NAME and ALIAS-NAME are symbols.
 This variable cannot be set; trying to do so will signal an error.  */);
   Vfont_weight_table = BUILD_STYLE_TABLE (weight_table);
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-weight-table")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-weight-table")));
 
   DEFVAR_LISP_NOPRO ("font-slant-table", Vfont_slant_table,
 	       doc: /*  Vector of font slant symbols vs the corresponding numeric values.
 See `font-weight-table' for the format of the vector.
 This variable cannot be set; trying to do so will signal an error.  */);
   Vfont_slant_table = BUILD_STYLE_TABLE (slant_table);
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-slant-table")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-slant-table")));
 
   DEFVAR_LISP_NOPRO ("font-width-table", Vfont_width_table,
 	       doc: /*  Alist of font width symbols vs the corresponding numeric values.
 See `font-weight-table' for the format of the vector.
 This variable cannot be set; trying to do so will signal an error.  */);
   Vfont_width_table = BUILD_STYLE_TABLE (width_table);
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-width-table")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("font-width-table")));
 
   staticpro (&font_style_table);
   font_style_table = make_uninit_vector (3);

@@ -2333,14 +2333,17 @@ static char *
 grow_read_buffer (char *buf, ptrdiff_t offset,
 		  char **buf_addr, ptrdiff_t *buf_size, ptrdiff_t count)
 {
+  // FIX: 20190808 LAV, use guile foreign alloc which lends a piece of mem to C
   char *p = xpalloc (*buf_addr, buf_size, MAX_MULTIBYTE_LENGTH, -1, 1);
   if (!*buf_addr)
     {
       memcpy (p, buf, offset);
-      record_unwind_protect_ptr (xfree, p);
+      //FIX: LAV, flawed
+      //record_unwind_protect_ptr (xfree, p);
     }
-  else
-    set_unwind_protect_ptr (count, xfree, p);
+  //else
+    //FIX: LAV, flawed
+    //set_unwind_protect_ptr (count, xfree, p);
   *buf_addr = p;
   return p;
 }
@@ -2883,8 +2886,9 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		  depth = XFIXNUM (XCAR (tmp));
 		  if (chartab_size[depth] != size - 2)
 		    error ("Invalid size in sub char-table");
-		  cell = XCONS (tmp), tmp = XCDR (tmp), size--;
-		  free_cons (cell);
+                  //FIX: LAV
+		  //cell = XCONS (tmp), tmp = XCDR (tmp), size--;
+		  //free_cons (cell);
 
 		  if (! RANGED_FIXNUMP (0, XCAR (tmp), MAX_CHAR))
 		    error ("Invalid minimum character in sub-char-table");
@@ -2896,8 +2900,9 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		  for (i = 0; i < size; i++)
 		    {
 		      XSUB_CHAR_TABLE (tbl)->contents[i] = XCAR (tmp);
-		      cell = XCONS (tmp), tmp = XCDR (tmp);
-		      free_cons (cell);
+                      //FIX: LAV
+		      //cell = XCONS (tmp), tmp = XCDR (tmp);
+		      //free_cons (cell);
 		    }
 		  return tbl;
 		}
@@ -3343,7 +3348,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 
     case '"':
       {
-	ptrdiff_t count = SPECPDL_INDEX ();
+        dynwind_begin();
 	char *read_buffer = stackbuf;
 	ptrdiff_t read_buffer_size = sizeof stackbuf;
 	char *heapbuf = NULL;
@@ -3367,7 +3372,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		ptrdiff_t offset = p - read_buffer;
 		read_buffer = grow_read_buffer (read_buffer, offset,
 						&heapbuf, &read_buffer_size,
-						count);
+						0); // FIX: 20190808 LAV, 0 is count and not used, please change API
 		p = read_buffer + offset;
 		end = read_buffer + read_buffer_size;
 	      }
@@ -3454,7 +3459,8 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	  = make_specified_string (read_buffer, nchars, p - read_buffer,
 				   (force_multibyte
 				    || (p - read_buffer != nchars)));
-	return unbind_to (count, result);
+        dynwind_end();
+        return result;
       }
 
     case '.':
@@ -3481,7 +3487,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 
     read_symbol:
       {
-	ptrdiff_t count = SPECPDL_INDEX ();
+        dynwind_begin();
 	char *read_buffer = stackbuf;
 	ptrdiff_t read_buffer_size = sizeof stackbuf;
 	char *heapbuf = NULL;
@@ -3497,7 +3503,7 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		ptrdiff_t offset = p - read_buffer;
 		read_buffer = grow_read_buffer (read_buffer, offset,
 						&heapbuf, &read_buffer_size,
-						count);
+						0); // FIX: 20190808 LAV, change API
 		p = read_buffer + offset;
 		end = read_buffer + read_buffer_size;
 	      }
@@ -3530,7 +3536,10 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	    ptrdiff_t len;
 	    Lisp_Object result = string_to_number (read_buffer, 10, &len);
 	    if (! NILP (result) && len == nbytes)
-	      return unbind_to (count, result);
+              {
+                dynwind_end();
+	        return result;
+              }
 	  }
         if (!quoted && multibyte)
           {
@@ -3559,12 +3568,13 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		 we're going to retain it in a new symbol.
 
 		 Like intern_1 but supports multibyte names.  */
-	      Lisp_Object obarray = check_obarray (Vobarray);
-
+                // FIX: LAV, use the obarray?
+	        Lisp_Object obarray = check_obarray (Vobarray);
 		{
 		  Lisp_Object name
 		    = make_specified_string (read_buffer, nchars, nbytes,
 					     multibyte);
+                  // FIX: 20190808 LAV: remove intern_driver
 		  result = intern_driver (name, obarray, Qnil);
 		}
 	    }
@@ -3574,7 +3584,8 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 	    Vread_symbol_positions_list
 	      = Fcons (Fcons (result, make_fixnum (start_position)),
 		       Vread_symbol_positions_list);
-	  return unbind_to (count, result);
+          dynwind_end();
+          return result;
 	}
       }
     }
@@ -3598,6 +3609,7 @@ if any object might be circular.  */)
   return Qnil;
 }
 
+// FIX: LAV, probably not used
 static Lisp_Object
 substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 {
@@ -3667,7 +3679,6 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
       INTERVAL root_interval = string_intervals (subtree);
       traverse_intervals_noorder (root_interval,
                                   substitute_in_interval, subst);
-
       return subtree;
     }
   else
@@ -4080,6 +4091,8 @@ static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 {
   Lisp_Object *ptr;
+  // FIX: 20190808 LAV, why REM?
+  /*
 
   if (SREF (SYMBOL_NAME (sym), 0) == ':' && EQ (obarray, initial_obarray))
     {
@@ -4091,6 +4104,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
   ptr = aref_addr (obarray, XFIXNUM (index));
   //set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
   *ptr = sym;
+  */
   return sym;
 }
 
@@ -4122,6 +4136,7 @@ intern_c_string_1 (const char *str, ptrdiff_t len)
   return intern_driver (make_pure_c_string (str, len), obarray, Qnil);
 }
 
+#if 0
 static void
 define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
 {
@@ -4137,6 +4152,7 @@ define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
     }
   return intern_driver (make_pure_c_string (str, len), obarray, Qnil);
 }
+#endif
 
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
        doc: /* find-symbol */)
@@ -4184,7 +4200,7 @@ it defaults to the value of `obarray'.  */)
   if ((SREF (string, 0) == ':')
       && EQ (obarray, initial_obarray))
     {
-      SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym));
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
@@ -4308,8 +4324,9 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
+  // FIX: 20190629 LAV, obarray not used
+  //for (int i = 0; i < ARRAYELTS (lispsym); i++)
+  //  define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
 
   // FIX: 20190626 LAV, new interface:
   DEFSYM (Qunbound, "unbound");
@@ -4322,21 +4339,25 @@ init_obarray_once (void)
   SET_SYMBOL_VAL (XSYMBOL (Qnil), SCM_ELISP_NIL);
 
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
   // FIX: 20190626 LAV, 1/2 correct def of t?
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   // FIX: 20190626 LAV, 2/2 correct def of t?
   DEFSYM (Qt, "t");
+  // Qt = SCM_BOOL_T; //FIX-20230212-LAV: correct?
   SET_SYMBOL_VAL (XSYMBOL (Qt_), SCM_BOOL_T);
   SET_SYMBOL_VAL (XSYMBOL (Qt_), intern_c_string ("t"));
-  SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  //XSYMBOL (Qt_)->constant = 1;   // FIX: 20190626 LAV, is this the old interface?
-  //XSYMBOL (Qt_)->declared_special = 1;
+  // SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt); // FIX-20230212-LAV: correct?
+  // SET_SYMBOL_VAL (XSYMBOL (Qt), Qt); ???
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt)); // FIX-20190626-LAV: do this?
+  // make_symbol_constant (Qt);  // and this is the new interface, refactor post-2015
+  //XSYMBOL (Qt_)->declared_special = 1; //FIX-20230212-LAV: do this? if so, use true?
+  SET_SYMBOL_DECLARED_SPECIAL(Qt, true);
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);

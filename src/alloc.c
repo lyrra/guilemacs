@@ -125,10 +125,10 @@ malloc_initialize_hook (void)
 		  break;
 		}
 	}
-
-      if (malloc_set_state (malloc_state_ptr) != 0)
-	emacs_abort ();
-      alloc_unexec_post ();
+//FIX: 20190808 LAV, Not sure where this ifdef comes from
+# ifndef XMALLOC_OVERRUN_CHECK
+      //alloc_unexec_post ();
+# endif
     }
 }
 
@@ -141,7 +141,7 @@ typedef void (*voidfuncptr) (void);
 voidfuncptr __MALLOC_HOOK_VOLATILE __malloc_initialize_hook EXTERNALLY_VISIBLE
   = malloc_initialize_hook;
 
-#endif
+#endif //FIXNOW
 
 #if defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC
 
@@ -1184,6 +1184,8 @@ allocate_hash_table (void)
   return ALLOCATE_PSEUDOVECTOR (struct Lisp_Hash_Table, count, PVEC_HASH_TABLE);
 }
 
+//FIX: larv, not in 2014 nor 2019
+#if 0
 struct window *
 allocate_window (void)
 {
@@ -1195,6 +1197,7 @@ allocate_window (void)
 	  sizeof (*w) - offsetof (struct window, current_matrix));
   return w;
 }
+#endif
 
 struct terminal *
 allocate_terminal (void)
@@ -1425,7 +1428,9 @@ each initialized to INIT.  */)
   p->contents[0] = type;
   for (ptrdiff_t i = 1; i < size; i++)
     p->contents[i] = init;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  //FIX-LAV: what do we return?
+  return p->header.self;
 }
 
 
@@ -1439,7 +1444,9 @@ usage: (record TYPE &rest SLOTS) */)
 {
   struct Lisp_Vector *p = allocate_record (nargs);
   memcpy (p->contents, args, nargs * sizeof *args);
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  // FIX-LAV: what do we return?
+  return p->header.self;
 }
 #endif
 

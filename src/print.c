@@ -1508,13 +1508,14 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
       }
       break;
 
-/*
+      /* //FIX: 20190808 LAV, why REM?
     case PVEC_SUBR:
       print_c_string ("#<subr ", printcharfun);
-      print_c_string (XSUBR (obj)->symbol_name, printcharfun);
+      // FIX: 20190629 LAV, no subr print?
+      //print_c_string (XSUBR (obj)->symbol_name, printcharfun);
       printchar ('>', printcharfun);
       break;
-*/
+      */
 
     case PVEC_XWIDGET: case PVEC_XWIDGET_VIEW:
       print_c_string ("#<xwidget ", printcharfun);
@@ -2020,7 +2021,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 			  && len == size_byte);
 
 	if (! NILP (Vprint_gensym)
-            && !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj))
+            //&& !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj)
+            )
 	  print_c_string ("#:", printcharfun);
 	else if (size_byte == 0)
 	  {
