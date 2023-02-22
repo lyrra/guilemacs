@@ -5501,7 +5501,7 @@ window_internal_height (struct window *w)
 static void
 window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin();
 
   n = clip_to_bounds (INT_MIN, n, INT_MAX);
 
@@ -5517,7 +5517,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
   else
     window_scroll_line_based (window, n, whole, noerror);
 
-  unbind_to (count, Qnil);
+  dynwind_end();
 
   /* Bug#15957.  */
   XWINDOW (window)->window_end_valid = false;

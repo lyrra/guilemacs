@@ -1907,7 +1907,6 @@ safe_run_hooks (Lisp_Object hook)
   ptrdiff_t count = SPECPDL_INDEX ();
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
-  unbind_to (count, Qnil);
 
   dynwind_end ();
 }
@@ -2468,6 +2467,15 @@ read_char (int commandflag, Lisp_Object map,
                            make_c_closure (read_char_handle_quit, state, 1, 0));
 }
 
+/* save/restore the global getctag to current tag */
+static void save_getcjmp (struct read_char_state *state) {
+  state->save_tag = getctag;
+}
+
+static void restore_getcjmp(struct Lisp_Object *tag) {
+  getctag = tag;
+}
+
 static Lisp_Object
 read_char_1 (bool jump, volatile struct read_char_state *state)
 {
@@ -2486,8 +2494,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define recorded state->recorded
 #define polling_stopped_here state->polling_stopped_here
 #define orig_kboard state->orig_kboard
-#define save_getcjmp(x) (x = getctag)
-#define restore_getcjmp(x) (getctag = x)
+
   Lisp_Object tem, save;
 
   if (jump)
@@ -3288,8 +3295,6 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #undef recorded
 #undef polling_stopped_here
 #undef orig_kboard
-#undef save_getcjmp
-#undef restore_getcjmp
 }
 /* {{coccinelle:skip_end}} */
 
@@ -6218,7 +6223,7 @@ make_lispy_movement (struct frame *frame, Lisp_Object bar_window, enum scroll_ba
     {
       Lisp_Object part_sym;
 
-      part_sym = builtin_lisp_symbol (scroll_bar_parts[part]);
+      part_sym = (scroll_bar_parts[part]);
       return list2 (Qscroll_bar_movement,
 		    list5 (bar_window,
 			   Qvertical_scroll_bar,
@@ -11829,8 +11834,8 @@ syms_of_keyboard (void)
     for (i = 0; i < ARRAYELTS (head_table); i++)
       {
 	const struct event_head *p = &head_table[i];
-	Lisp_Object var = builtin_lisp_symbol (p->var);
-	Lisp_Object kind = builtin_lisp_symbol (p->kind);
+	Lisp_Object var =  (p->var);
+	Lisp_Object kind = (p->kind);
 	Fput (var, Qevent_kind, kind);
 	Fput (var, Qevent_symbol_elements, list1 (var));
       }

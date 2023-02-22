@@ -298,8 +298,9 @@ DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
 static int
 ecount_leading_zeros (EMACS_UINT x)
 {
-  return (EMACS_UINT_WIDTH == UINT_WIDTH ? count_leading_zeros (x)
-	  : EMACS_UINT_WIDTH == ULONG_WIDTH ? count_leading_zeros_l (x)
+  //FIX: 20190629 LAV, was UINT and ULONG in below versions:
+  return (EMACS_INT_WIDTH == INT_WIDTH ? count_leading_zeros (x)
+	  : EMACS_INT_WIDTH == LONG_WIDTH ? count_leading_zeros_l (x)
 	  : count_leading_zeros_ll (x));
 }
 

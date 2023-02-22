@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 #include "bignum.h"
+#include "commands.h" //FIXNOW needed?
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
@@ -2521,7 +2522,8 @@ SCM compare_text_properties = SCM_BOOL_F;
 bool
 equal_no_quit (Lisp_Object o1, Lisp_Object o2)
 {
-  return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
+  // FIX: LAV, not semantically same, was: return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
+  return scm_is_true (scm_equal_p (o1, o2)) ? true : false;
 }
 #endif
 
@@ -4184,13 +4186,14 @@ hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
   return FIXNUMP (hash) ? hash : make_ufixnum (sxhash (hash));
 }
 
-struct hash_table_test const
-  hashtest_eq = { LISPSYM_INITIALLY (Qeq), LISPSYM_INITIALLY (Qnil),
-		  LISPSYM_INITIALLY (Qnil), 0, hashfn_eq },
-  hashtest_eql = { LISPSYM_INITIALLY (Qeql), LISPSYM_INITIALLY (Qnil),
-		   LISPSYM_INITIALLY (Qnil), cmpfn_eql, hashfn_eql },
-  hashtest_equal = { LISPSYM_INITIALLY (Qequal), LISPSYM_INITIALLY (Qnil),
-		     LISPSYM_INITIALLY (Qnil), cmpfn_equal, hashfn_equal };
+//FIX: 20190629 LAV, probably we have no access to initial symbols as constants
+struct hash_table_test
+  hashtest_eq = { NULL /* Qeq */          , NULL /* Qnil */,
+		  NULL /* Qnil */         , 0, hashfn_eq },
+  hashtest_eql = { NULL /* Qeql */        , NULL /* Qnil */,
+		   NULL /* Qnil */        , cmpfn_eql, hashfn_eql },
+  hashtest_equal = { NULL /* Qequal */    , NULL /* Qnil */,
+		     NULL  /* Qnil */     , cmpfn_equal, hashfn_equal };
 
 /* Allocate basically initialized hash table.  */
 

@@ -146,7 +146,7 @@ make_catch_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  //c->lisp_eval_depth = lisp_eval_depth;
+  //c->lisp_eval_depth = lisp_eval_depth; //FIX: 20190629 LAV too deep macrology to follow
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -210,14 +210,13 @@ init_eval_once_for_pdumper (void)
   specpdl = specpdl_ptr = pdlvec + 1;
 }
 
-static struct handler *handlerlist_sentinel;
+/* static struct handler *handlerlist_sentinel; */
 
 void
 init_eval (void)
 {
   specpdl_ptr = specpdl;
-  handlerlist_sentinel = make_catch_handler (Qunbound);
-  handlerlist = handlerlist_sentinel;
+  //handlerlist = handlerlist_sentinel; //FIX: 20190629 LAV, macrology
   Vquit_flag = Qnil;
   debug_on_next_call = 0;
   lisp_eval_depth = 0;
@@ -1455,7 +1454,7 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool keyboard_quit)
     }
   else
     {
-      if (handlerlist != handlerlist_sentinel)
+      //if (handlerlist != handlerlist_sentinel)
 	/* FIXME: This will come right back here if there's no `top-level'
 	   catcher.  A better solution would be to abort here, and instead
 	   add a catch-all condition handler so we never come here.  */
@@ -2362,7 +2361,7 @@ Ffuncall (ptrdiff_t nargs, Lisp_Object *args)
 
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
-
+#if 0
 Lisp_Object
 funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
 {
@@ -2441,6 +2440,7 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
         }
     }
 }
+#endif
 
 /* Call the compiled Lisp function FUN.  If we have not yet read FUN's
    bytecode string and constants vector, fetch them from the file first.  */
@@ -2612,7 +2612,7 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   function = original;
   if (SYMBOLP (function) && !NILP (function))
     {
-      function = XSYMBOL (function)->u.s.function;
+      function = SYMBOL_FUNCTION(XSYMBOL (function));
       if (SYMBOLP (function))
 	function = indirect_function (function);
     }
@@ -2621,9 +2621,9 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
 
-  if (SUBRP (function))
-    result = Fsubr_arity (function);
-  else if (COMPILEDP (function))
+  //if (SUBRP (function)) //FIX: larv, document the replacement done in 2015 for subr
+  //  result = Fsubr_arity (function);
+  if (COMPILEDP (function))
     result = lambda_arity (function);
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
@@ -2671,6 +2671,7 @@ lambda_arity (Lisp_Object fun)
       else
 	xsignal1 (Qinvalid_function, fun);
     }
+#if 0
   else if (COMPILEDP (fun))
     {
       syms_left = AREF (fun, COMPILED_ARGLIST);
@@ -2678,6 +2679,7 @@ lambda_arity (Lisp_Object fun)
 	xsignal1 (Qinvalid_function, Qnil); //FIX-LAV can this be triggered?
         // FIX-20230211-LAV: was: return get_byte_code_arity (syms_left);
     }
+#endif
   else
     emacs_abort ();
 

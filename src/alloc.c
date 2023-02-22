@@ -1222,7 +1222,9 @@ each initialized to INIT.  */)
   p->contents[0] = type;
   for (ptrdiff_t i = 1; i < size; i++)
     p->contents[i] = init;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  //FIX-LAV: what do we return?
+  return p->header.self;
 }
 
 
@@ -1236,7 +1238,9 @@ usage: (record TYPE &rest SLOTS) */)
 {
   struct Lisp_Vector *p = allocate_record (nargs);
   memcpy (p->contents, args, nargs * sizeof *args);
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  //return make_lisp_ptr (p, Lisp_Vectorlike);
+  // FIX-LAV: what do we return?
+  return p->header.self;
 }
 #endif
 

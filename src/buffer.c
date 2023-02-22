@@ -1055,12 +1055,13 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
 
           /* Watchers are run *before* modifying the var.  */
           /* FIX-20230206-LAV: need to reimplement watchers (trapped_write has gone)
-          if (XSYMBOL (local_var)->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+          if (GET_SYMBOL_TRAPPED(XSYMBOL (local_var)) == SYMBOL_TRAPPED_WRITE)
             notify_variable_watchers (local_var, Qnil,
                                       Qmakunbound, Fcurrent_buffer ());
           */
 
           SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_LOCALIZED);
+          // FIX-20230212-LAV: old-was: eassert (SYMBOL_REDIRECT(XSYMBOL (sym)) == SYMBOL_LOCALIZED);
           /* Need not do anything if some other buffer's binding is
 	     now cached.  */
           if (EQ (SYMBOL_BLV (XSYMBOL (sym))->where, buffer))
@@ -1096,8 +1097,7 @@ reset_buffer_local_variables (struct buffer *b, bool permanent_too)
                       }
                   newlist = Fnreverse (newlist);
                   /* FIX-20230206-LAV: no support for symbol-trapped-write
-                  if (XSYMBOL (local_var)->u.s.trapped_write
-		      == SYMBOL_TRAPPED_WRITE)
+                  if (GET_SYMBOL_TRAPPED(XSYMBOL (local_var)) == SYMBOL_TRAPPED_WRITE)
                     notify_variable_watchers (local_var, newlist,
                                               Qmakunbound, Fcurrent_buffer ());
                   */
@@ -5740,7 +5740,7 @@ use the function `set-buffer-multibyte' to change a buffer's representation.
 To prevent any attempts to set it or make it buffer-local, Emacs will
 signal an error in those cases.
 See also Info node `(elisp)Text Representations'.  */);
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("enable-multibyte-characters")), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("enable-multibyte-characters")));
 
   DEFVAR_PER_BUFFER ("buffer-file-coding-system",
 		     &BVAR (current_buffer, buffer_file_coding_system), Qnil,

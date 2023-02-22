@@ -2170,7 +2170,6 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
 {
   Lisp_Object prop, lispy_position, lispy_buffer;
   ptrdiff_t old_begv, old_zv, old_begv_byte, old_zv_byte;
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   position = clip_to_bounds (BUF_BEGV (buffer), position, BUF_ZV (buffer));
 
@@ -2181,6 +2180,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
   old_begv_byte = BUF_BEGV_BYTE (buffer);
   old_zv_byte = BUF_ZV_BYTE (buffer);
 
+  dynwind_begin();
   specbind (Qinhibit_quit, Qt);
   SET_BUF_BEGV_BOTH (buffer, BUF_BEG (buffer), BUF_BEG_BYTE (buffer));
   SET_BUF_ZV_BOTH (buffer, BUF_Z (buffer), BUF_Z_BYTE (buffer));
@@ -2199,7 +2199,8 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
 
   SET_BUF_BEGV_BOTH (buffer, old_begv, old_begv_byte);
   SET_BUF_ZV_BOTH (buffer, old_zv, old_zv_byte);
-  unbind_to (count, Qnil);
+  dynwind_end();
+
 
   /* Use the local map only if it is valid.  */
   prop = get_keymap (prop, 0, 0);

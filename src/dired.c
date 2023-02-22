@@ -1003,7 +1003,7 @@ file_attributes (int fd, char const *name,
 	 is also a symlink.  */
       file_type = check_emacs_readlinkat (fd, filename, name);
       if (NILP (file_type))
-	return unbind_to (count, Qnil);
+	return Qnil;
     }
   else
     file_type = S_ISDIR (s.st_mode) ? Qt : Qnil;
