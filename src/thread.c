@@ -38,6 +38,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define release_select_lock() do { } while (0)
 #endif
 
+#define flush_stack_call_func(callback,mutex) (void)0
+
 union aligned_thread_state
 {
   struct thread_state s;
@@ -100,9 +102,10 @@ post_acquire_global_lock (struct thread_state *self)
       /* PREV_THREAD is NULL if the previously current thread
 	 exited.  In this case, there is no reason to unbind, and
 	 trying will crash.  */
-      if (prev_thread != NULL)
-	unbind_for_thread_switch (prev_thread);
-      rebind_for_thread_switch ();
+      // FIX: LAV, hopefully with guile, we dont need this, are we acquiring a lock, or moving lexical-binds?
+      //if (prev_thread != NULL)
+	//unbind_for_thread_switch (prev_thread);
+      //rebind_for_thread_switch ();
 
        /* Set the new thread's current buffer.  This needs to be done
 	  even if it is the same buffer as that of the previous thread,
@@ -329,15 +332,16 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   (Lisp_Object mutex)
 {
   struct Lisp_Mutex *lmutex;
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   CHECK_MUTEX (mutex);
   lmutex = XMUTEX (mutex);
 
   current_thread->event_object = mutex;
-  record_unwind_protect_void (do_unwind_mutex_lock);
+  dynwind_begin(); // record_unwind_protect_void (do_unwind_mutex_lock);
   flush_stack_call_func (mutex_lock_callback, lmutex);
-  return unbind_to (count, Qnil);
+  dynwind_end();
+  //do_unwind_mutex_lock(); // FIX: LAV, where do we mutex-unlock? does record_unwind_protect_void does it?
+  return Qnil;
 }
 
 static void
@@ -670,15 +674,6 @@ record_thread_error (Lisp_Object error_form)
 static void *
 run_thread (void *state)
 {
-  /* Make sure stack_top and m_stack_bottom are properly aligned as GC
-     expects.  */
-  union
-  {
-    Lisp_Object o;
-    void *p;
-    char c;
-  } stack_pos;
-
   struct thread_state *self = state;
   struct thread_state **iter;
 
@@ -691,7 +686,6 @@ run_thread (void *state)
   void *pool = ns_alloc_autorelease_pool ();
 #endif
 
-  self->m_stack_bottom = self->stack_top = &stack_pos.c;
   self->thread_id = sys_thread_self ();
 
   if (self->thread_name)
@@ -699,32 +693,32 @@ run_thread (void *state)
 
   acquire_global_lock (self);
 
-#if 0
   /* Put a dummy catcher at top-level so that handlerlist is never NULL.
      This is important since handlerlist->nextfree holds the freelist
      which would otherwise leak every time we unwind back to top-level.   */
-  handlerlist_sentinel = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-  struct handler *c = push_handler (Qunbound, CATCHER);
-  eassert (c == handlerlist_sentinel);
-  handlerlist_sentinel->nextfree = NULL;
-  handlerlist_sentinel->next = NULL;
+  //handlerlist_sentinel = xzalloc (sizeof (struct handler));
+  //handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
+  //struct handler *c = push_handler (Qunbound, CATCHER);
+  //eassert (c == handlerlist_sentinel);
+  //handlerlist_sentinel->nextfree = NULL; FIX: larv check the macros
+  //handlerlist_sentinel->next = NULL;
 
   /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
 
   update_processes_for_thread_death (Fcurrent_thread ());
 
-  xfree (self->m_specpdl - 1);
+  //xfree (self->m_specpdl - 1);
   self->m_specpdl = NULL;
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_size = 0;
 
+#if 0
   {
     struct handler *c, *c_next;
     for (c = handlerlist_sentinel; c; c = c_next)
       {
-	//c_next = c->nextfree;
+	//c_next = c->nextfree; FIX: larv, check the macros
 	xfree (c);
       }
   }
