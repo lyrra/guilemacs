@@ -1829,8 +1829,8 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
     fatal = true;
 #endif
 
-  if (!fatal && stack_overflow (siginfo))
-    siglongjmp (return_to_command_loop, 1);
+  //if (!fatal && stack_overflow (siginfo))
+  //  siglongjmp (return_to_command_loop, 1);
 
   /* Otherwise we can't do anything with this.  */
   deliver_fatal_thread_signal (sig);

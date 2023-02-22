@@ -5524,7 +5524,7 @@ defvar_per_buffer (struct Lisp_Buffer_Objfwd *bo_fwd, const char *namestring,
   bo_fwd->type = Lisp_Fwd_Buffer_Obj;
   bo_fwd->offset = offset;
   bo_fwd->predicate = predicate;
-  SET_SYMBOL_DECLARED_SPECIAL (sym, 1);
+  SET_SYMBOL_DECLARED_SPECIAL (sym);
   SET_SYMBOL_REDIRECT (sym, SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (sym, (union Lisp_Fwd *) bo_fwd);
   XSETSYMBOL (PER_BUFFER_SYMBOL (offset), sym);

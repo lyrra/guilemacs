@@ -73,6 +73,12 @@ DEFINE_GDB_SYMBOL_BEGIN (int, GCTYPEBITS)
 #define GCTYPEBITS 3
 DEFINE_GDB_SYMBOL_END (GCTYPEBITS)
 
+/* make-docfile snarfes out DEFSYM macros, and puts
+   the result to globals.h  Also see
+   definitions done by lread.c's define_symbol. */
+#define DEFSYM(sym, name) \
+  do { (sym) = intern_c_string ((name)); staticpro (&(sym)); } while (false)
+
 /* EMACS_INT - signed integer wide enough to hold an Emacs value
    EMACS_INT_WIDTH - width in bits of EMACS_INT
    EMACS_INT_MAX - maximum value of EMACS_INT; can be used in #if
@@ -990,7 +996,8 @@ verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 #define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
 #define SET_SYMBOL_CONSTANT(sym) (scm_c_vector_set_x (sym, 2, make_fixnum (1)))
 #define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
-#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_fixnum (v)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym) (scm_c_vector_set_x (sym, 3, make_fixnum (1)))
+#define CLR_SYMBOL_DECLARED_SPECIAL(sym) (scm_c_vector_set_x (sym, 3, make_fixnum (0)))
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -2017,6 +2024,7 @@ memclear (void *p, ptrdiff_t nbytes)
   /* Since Qnil is zero, memset suffices.  */
   memset (p, 0, nbytes);
 }
+
 
 /* If a struct is made to look like a vector, this macro returns the length
    of the shortest vector that would hold that struct.  */
