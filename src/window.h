@@ -24,6 +24,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
+scm_t_bits lisp_window_tag;
+
 /* Windows are allocated as if they were vectors, but then the Lisp
 data type is changed to Lisp_Window.  They are garbage collected along
 with the vectors.
@@ -446,7 +448,7 @@ struct window
 INLINE bool
 WINDOWP (Lisp_Object a)
 {
-  return PSEUDOVECTORP (a, PVEC_WINDOW);
+  return (SMOB_TYPEP (a, lisp_window_tag));
 }
 
 INLINE void
