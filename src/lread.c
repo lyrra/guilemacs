@@ -4346,12 +4346,12 @@ init_obarray_once (void)
   Qt = SCM_BOOL_T;
 
   SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_));
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_));
   Qt_ = intern_c_string ("t");
   SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
+  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_));
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_));
 
   // FIX: 20190626 LAV, 2/2 correct def of t?
   DEFSYM (Qt, "t");
@@ -4363,7 +4363,7 @@ init_obarray_once (void)
   SET_SYMBOL_CONSTANT (XSYMBOL (Qt)); // FIX-20190626-LAV: do this?
   // make_symbol_constant (Qt);  // and this is the new interface, refactor post-2015
   //XSYMBOL (Qt_)->declared_special = 1; //FIX-20230212-LAV: do this? if so, use true?
-  SET_SYMBOL_DECLARED_SPECIAL(Qt, true);
+  SET_SYMBOL_DECLARED_SPECIAL(Qt);
 
   // FIX-20230212-LAV: is this ok?
   Qt = SCM_BOOL_T;
@@ -4412,7 +4412,7 @@ void
 defvar_int (struct Lisp_Intfwd const *i_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
   SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), i_fwd);
 }
@@ -4422,7 +4422,7 @@ void
 defvar_bool (struct Lisp_Boolfwd const *b_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
   SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), b_fwd);
   Vbyte_boolean_vars = Fcons (sym, Vbyte_boolean_vars);
@@ -4437,7 +4437,7 @@ void
 defvar_lisp_nopro (struct Lisp_Objfwd const *o_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
   SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), o_fwd);
 }
@@ -4456,7 +4456,7 @@ void
 defvar_kboard (struct Lisp_Kboard_Objfwd const *ko_fwd, char const *namestring)
 {
   Lisp_Object sym = intern_c_string (namestring);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym), 1);
+  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (sym));
   SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_FORWARDED);
   SET_SYMBOL_FWD (XSYMBOL (sym), ko_fwd);
 }
@@ -4751,7 +4751,7 @@ to find all the symbols in an obarray, use `mapatoms'.  */);
   DEFVAR_LISP ("values", Vvalues,
 	       doc: /* List of values of all expressions which were read, evaluated and printed.
 Order is reverse chronological.  */);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")), 0);
+  CLR_SYMBOL_DECLARED_SPECIAL (XSYMBOL (intern ("values")));
 
   DEFVAR_LISP ("standard-input", Vstandard_input,
 	       doc: /* Stream for read to get input from.
