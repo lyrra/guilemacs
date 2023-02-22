@@ -36,7 +36,11 @@ INLINE_HEADER_BEGIN
 
 enum { PROCESS_OPEN_FDS = 6 };
 
+#ifdef MAIN_PROGRAM
 scm_t_bits lisp_process_tag;
+#else
+extern scm_t_bits lisp_process_tag;
+#endif
 
 /* This structure records information about a subprocess
    or network connection.  */

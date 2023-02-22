@@ -3579,17 +3579,12 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 
 		 Like intern_1 but supports multibyte names.  */
 	      Lisp_Object obarray = check_obarray (Vobarray);
-	      Lisp_Object tem = oblookup (obarray, read_buffer,
-					  nchars, nbytes);
 
-	      if (SYMBOLP (tem))
-		result = tem;
-	      else
 		{
 		  Lisp_Object name
 		    = make_specified_string (read_buffer, nchars, nbytes,
 					     multibyte);
-		  result = intern_driver (name, obarray, tem);
+		  result = intern_driver (name, obarray, Qnil);
 		}
 	    }
 
@@ -4099,6 +4094,7 @@ check_obarray (Lisp_Object obarray)
 
 /* Intern symbol SYM in OBARRAY using bucket INDEX.  */
 
+//FIX-20230211-LAV: isn't obarray moved to guile-side?
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 {
@@ -4112,7 +4108,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
     }
 
   ptr = aref_addr (obarray, XFIXNUM (index));
-  set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
+  //set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
   *ptr = sym;
   return sym;
 }
@@ -4150,7 +4146,7 @@ define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
 {
   ptrdiff_t len = strlen (str);
   Lisp_Object string = make_pure_c_string (str, len);
-  init_symbol (sym, string);
+  //init_symbol (sym, string); //FIX-20230211-LAV init_symbol is moved to guile
 
   /* Qunbound is uninterned, so that it's not confused with any symbol
      'unbound' created by a Lisp program.  */

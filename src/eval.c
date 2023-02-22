@@ -2295,14 +2295,14 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
       || (subr->max_args >= 0 && subr->max_args < numargs))
     {
       Lisp_Object fun;
-      XSETSUBR (fun, subr);
+      //XSETSUBR (fun, subr); //FIX-20230211-LAV XSETSUBR doesn't exist
       xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
     }
 
   else if (subr->max_args == UNEVALLED)
     {
       Lisp_Object fun;
-      XSETSUBR (fun, subr);
+      //XSETSUBR (fun, subr); //FIX-20230211-LAV XSETSUBR doesn't exist
       xsignal1 (Qinvalid_function, fun);
     }
 
@@ -2929,10 +2929,21 @@ static void
 do_nothing (void)
 {}
 
+static void
+call_void (void *data)
+{
+  ((void (*) (void)) data) ();
+}
 
+
+//FIX-20230211-LAV: these needs to use guile's dynamic-wind mechanism, see https://www.gnu.org/software/guile/manual/html_node/Dynamic-Wind.html
 
 /* Push an unwind-protect entry that does nothing, so that
    set_unwind_protect_ptr can overwrite it later.  */
+void
+record_unwind_protect_nothing (void)
+{
+}
 
 void
 record_unwind_protect_int_1 (void (*function) (int), int arg,
@@ -2947,12 +2958,6 @@ record_unwind_protect_int (void (*function) (int), int arg)
   record_unwind_protect_int_1 (function, arg, true);
 }
 
-static void
-call_void (void *data)
-{
-  ((void (*) (void)) data) ();
-}
-
 void
 record_unwind_protect_void_1 (void (*function) (void),
                               bool wind_explicitly)
@@ -2964,6 +2969,10 @@ void
 record_unwind_protect_void (void (*function) (void))
 {
   record_unwind_protect_void_1 (function, true);
+}
+
+void set_unwind_protect_ptr (ptrdiff_t count, void (*function) (void *), void *target)
+{
 }
 
 static void

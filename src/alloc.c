@@ -195,6 +195,9 @@ my_heap_start (void)
 
 #define GC_DEFAULT_THRESHOLD (100000 * word_size)
 
+/* Global variables.  */
+struct emacs_globals globals;
+
 #ifdef HAVE_PDUMPER
 /* Number of finalizers run: used to loop over GC until we stop
    generating garbage.  */
@@ -413,6 +416,16 @@ xzalloc_atomic (size_t size)
 {
   return xmalloc_atomic (size);
 }
+
+void *
+xrealloc_atomic (void *block, size_t size)
+{
+  void *val = GC_REALLOC(block, size); // FIX-20230211-LAV: GC_REALLOC_ATOMIC doesn't exist in bdw-gc?!
+  if (! val && size)
+    memory_full (size);
+  return val;
+}
+
 
 /* Allocate uncollectable memory.  */
 

@@ -601,7 +601,8 @@ map_keymap_internal (Lisp_Object map,
 	{
 	  union map_keymap mapdata = {{fun, args, data}};
 	  map_char_table (map_keymap_char_table_item, Qnil, binding,
-			  make_pointer_integer (&mapdata));
+			  Qnil // FIX-20230211-LAV: was: make_pointer_integer (&mapdata)
+                          );
 	}
     }
 
