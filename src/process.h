@@ -36,6 +36,8 @@ INLINE_HEADER_BEGIN
 
 enum { PROCESS_OPEN_FDS = 6 };
 
+scm_t_bits lisp_process_tag;
+
 /* This structure records information about a subprocess
    or network connection.  */
 
@@ -206,7 +208,7 @@ struct Lisp_Process
 INLINE bool
 PROCESSP (Lisp_Object a)
 {
-  return PSEUDOVECTORP (a, PVEC_PROCESS);
+  return (SMOB_TYPEP (a, lisp_process_tag));
 }
 
 INLINE void
@@ -219,7 +221,7 @@ INLINE struct Lisp_Process *
 XPROCESS (Lisp_Object a)
 {
   eassert (PROCESSP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Process);
+  return SMOB_PTR (a);
 }
 
 /* Every field in the preceding structure except for the first two
