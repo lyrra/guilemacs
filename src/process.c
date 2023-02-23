@@ -3094,7 +3094,7 @@ usage:  (make-serial-process &rest ARGS)  */)
   CHECK_STRING (name);
   proc = make_process (name);
   specpdl_count = SPECPDL_INDEX ();
-  record_unwind_protect (remove_process, proc);
+  record_unwind_protect_1 (remove_process, proc, false);
   p = XPROCESS (proc);
 
   fd = serial_open (port);
@@ -4853,7 +4853,7 @@ server_accept_connection (Lisp_Object server, int channel)
     }
 
   count = SPECPDL_INDEX ();
-  record_unwind_protect_int (close_file_unwind, s);
+  record_unwind_protect_int_1 (close_file_unwind, s, false);
 
   connect_counter++;
 
@@ -4970,8 +4970,7 @@ server_accept_connection (Lisp_Object server, int channel)
   eassert (NILP (p->command));
   eassert (p->pid == 0);
 
-  /* Discard the unwind protect for closing S.  */
-  specpdl_ptr = specpdl + count;
+  unbind_to (count, Qnil);
 
   p->open_fd[SUBPROCESS_STDIN] = s;
   p->infd  = s;

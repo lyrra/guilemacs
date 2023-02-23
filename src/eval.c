@@ -1204,6 +1204,8 @@ internal_catch (Lisp_Object tag,
 
    This is used for correct unwinding in Fthrow and Fsignal.  */
 
+static Lisp_Object unbind_to_1 (ptrdiff_t, Lisp_Object, bool);
+
 static AVOID
 unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
                  Lisp_Object value)
@@ -1224,7 +1226,7 @@ unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
     {
       /* Unwind the specpdl stack, and then restore the proper set of
 	 handlers.  */
-      unbind_to (handlerlist->pdlcount, Qnil);
+      unbind_to_1 (handlerlist->pdlcount, Qnil, false);
       last_time = handlerlist == catch;
       if (! last_time)
 	handlerlist = handlerlist->next;
@@ -3599,11 +3601,13 @@ specbind (Lisp_Object symbol, Lisp_Object value)
 /* Push unwind-protect entries of various types.  */
 
 void
-record_unwind_protect (void (*function) (Lisp_Object), Lisp_Object arg)
+record_unwind_protect_1 (void (*function) (Lisp_Object), Lisp_Object arg,
+                         bool wind_explicitly)
 {
   specpdl_ptr->unwind.kind = SPECPDL_UNWIND;
   specpdl_ptr->unwind.func = function;
   specpdl_ptr->unwind.arg = arg;
+  specpdl_ptr->unwind.wind_explicitly = wind_explicitly;
   specpdl_ptr->unwind.eval_depth = lisp_eval_depth;
   grow_specpdl ();
 }
@@ -3618,20 +3622,19 @@ record_unwind_protect_array (Lisp_Object *array, ptrdiff_t nelts)
 }
 
 void
-record_unwind_protect_ptr (void (*function) (void *), void *arg)
+record_unwind_protect (void (*function) (Lisp_Object), Lisp_Object arg)
+{
+  record_unwind_protect_1 (function, arg, true);
+}
+
+void
+record_unwind_protect_ptr_1 (void (*function) (void *), void *arg,
+                             bool wind_explicitly)
 {
   specpdl_ptr->unwind_ptr.kind = SPECPDL_UNWIND_PTR;
   specpdl_ptr->unwind_ptr.func = function;
   specpdl_ptr->unwind_ptr.arg = arg;
-  grow_specpdl ();
-}
-
-void
-record_unwind_protect_int (void (*function) (int), int arg)
-{
-  specpdl_ptr->unwind_int.kind = SPECPDL_UNWIND_INT;
-  specpdl_ptr->unwind_int.func = function;
-  specpdl_ptr->unwind_int.arg = arg;
+  specpdl_ptr->unwind_ptr.wind_explicitly = wind_explicitly;
   grow_specpdl ();
 }
 
@@ -3652,12 +3655,9 @@ record_unwind_protect_excursion (void)
   grow_specpdl ();
 }
 
-void
-record_unwind_protect_void (void (*function) (void))
+record_unwind_protect_ptr (void (*function) (void *), void *arg)
 {
-  specpdl_ptr->unwind_void.kind = SPECPDL_UNWIND_VOID;
-  specpdl_ptr->unwind_void.func = function;
-  grow_specpdl ();
+  record_unwind_protect_ptr_1 (function, arg, true);
 }
 
 void
