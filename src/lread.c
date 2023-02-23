@@ -3817,11 +3817,6 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 
 		 Like intern_1 but supports multibyte names.  */
 	      Lisp_Object obarray = check_obarray (Vobarray);
-
-	      char* longhand = NULL;
-	      ptrdiff_t longhand_chars = 0;
-	      ptrdiff_t longhand_bytes = 0;
-
 	      Lisp_Object tem;
 	      if (skip_shorthand
 		  /* The following ASCII characters are used in the
@@ -3830,30 +3825,25 @@ read1 (Lisp_Object readcharfun, int *pch, bool first_in_list)
 		     constituent' syntax.  We exempt them from
 		     transforming according to shorthands.  */
 		  || strspn (read_buffer, "^*+-/<=>_|") >= nbytes)
-		tem = oblookup (obarray, read_buffer, nchars, nbytes);
-	      else
-		tem = oblookup_considering_shorthand (obarray, read_buffer,
-						      nchars, nbytes, &longhand,
-						      &longhand_chars,
-						      &longhand_bytes);
-
-	      if (SYMBOLP (tem))
-		result = tem;
-	      else if (longhand)
 		{
-		  Lisp_Object name
-		    = make_specified_string (longhand, longhand_chars,
-					     longhand_bytes, multibyte);
-		  xfree (longhand);
-		  result = intern_driver (name, obarray, tem);
+		  tem = oblookup (obarray, read_buffer, nchars, nbytes);
+		  if (SYMBOLP (tem))
+		    {
+		      result = tem;
+		    }
+		  else
+		    {
+		      result = make_specified_string (read_buffer, nchars, nbytes,
+						      multibyte);
+		    }
 		}
 	      else
-		{
-		  Lisp_Object name
-		    = make_specified_string (read_buffer, nchars, nbytes,
-					     multibyte);
-		  result = intern_driver (name, obarray, tem);
-		}
+                {
+                  Lisp_Object string = make_specified_string (read_buffer, nchars, nbytes,
+                                                              multibyte);
+                  result = maybe_expand_longhand(obarray, string);
+                }
+	      result = intern_driver (result, obarray, Qnil);
 	    }
 
 	  if (EQ (Vread_with_symbol_positions, Qt)
@@ -4362,6 +4352,7 @@ check_obarray (Lisp_Object obarray)
 
 /* Intern symbol SYM in OBARRAY using bucket INDEX.  */
 
+//FIX-20230211-LAV: isn't obarray moved to guile-side?
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
 {
@@ -4378,7 +4369,7 @@ intern_sym (Lisp_Object sym, Lisp_Object obarray, Lisp_Object index)
     }
 
   ptr = aref_addr (obarray, XFIXNUM (index));
-  set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
+  //set_symbol_next (sym, SYMBOLP (*ptr) ? XSYMBOL (*ptr) : NULL);
   *ptr = sym;
   return sym;
 }
@@ -4414,7 +4405,7 @@ define_symbol (Lisp_Object sym, char const *str, Lisp_Object obarray)
 {
   ptrdiff_t len = strlen (str);
   Lisp_Object string = make_pure_c_string (str, len);
-  init_symbol (sym, string);
+  //init_symbol (sym, string); //FIX-20230211-LAV init_symbol is moved to guile
 
   /* Qunbound is uninterned, so that it's not confused with any symbol
      'unbound' created by a Lisp program.  */

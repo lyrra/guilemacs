@@ -1784,6 +1784,8 @@ TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
 Lisp_Object
 assoc_no_quit (Lisp_Object key, Lisp_Object alist)
 {
+  return Fassoc(key, list, Qnil);
+#if 0
   for (; ! NILP (alist); alist = XCDR (alist))
     {
       Lisp_Object car = XCAR (alist);
@@ -1792,6 +1794,7 @@ assoc_no_quit (Lisp_Object key, Lisp_Object alist)
 	return car;
     }
   return Qnil;
+#endif
 }
 
 DEFUN ("rassq", Frassq, Srassq, 2, 2, 0,
@@ -2497,11 +2500,13 @@ SCM compare_text_properties = SCM_BOOL_F;
    Use this only on arguments that are cycle-free and not too large and
    are not window configurations.  */
 
+#if 0
 bool
 equal_no_quit (Lisp_Object o1, Lisp_Object o2)
 {
   return internal_equal (o1, o2, EQUAL_NO_QUIT, 0, Qnil);
 }
+#endif
 
 DEFUN ("equal-including-properties", Fequal_including_properties, Sequal_including_properties, 2, 2, 0,
        doc: /* Return t if two Lisp objects have similar structure and contents.
@@ -3214,8 +3219,6 @@ ARGS are passed as extra arguments to the function.
 usage: (widget-apply WIDGET PROPERTY &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  /* This function can GC.  */
-  struct gcpro gcpro1, gcpro2; // FIX: 20190626 LAV, unused??
   Lisp_Object result;
 
   result = call3 (intern ("apply"),

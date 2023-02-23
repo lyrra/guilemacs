@@ -288,8 +288,7 @@ font_intern_prop (const char *str, ptrdiff_t len, bool force_symbol)
   parse_str_as_multibyte ((unsigned char *) str, len, &nchars, &nbytes);
   name = make_specified_string (str, nchars, len,
 				len != nchars && len == nbytes);
-  tem = oblookup (obarray, str, nchars, nbytes); //FIX-20230210-LAV: really do this?
-  return intern_driver (name, obarray, tem);
+  return intern_driver (name, obarray, Qnil);
 }
 
 /* Return a pixel size of font-spec SPEC on frame F.  */
@@ -4157,7 +4156,8 @@ copy_font_spec (Lisp_Object font)
     if (!EQ (XCAR (XCAR (tail)), QCfont_entity))
       {
         *pcdr = Fcons (Fcons (XCAR (XCAR (tail)), CDR (XCAR (tail))), Qnil);
-        pcdr = xcdr_addr (*pcdr);
+        //FIX-20230211-LAV: xcdr_addr is not supported
+        //pcdr = xcdr_addr (*pcdr);
       }
 
   XSETFONT (new_spec, spec);

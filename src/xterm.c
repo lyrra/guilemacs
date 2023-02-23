@@ -12615,9 +12615,9 @@ bool
 x_display_ok (const char *display)
 {
   /* XOpenDisplay fails if it gets a signal.  Block SIGIO which may arrive.  */
-  unrequest_sigio ();
+  //unrequest_sigio ();
   Display *dpy = XOpenDisplay (display);
-  request_sigio ();
+  //request_sigio ();
   if (!dpy)
     return false;
   XCloseDisplay (dpy);
@@ -12855,12 +12855,12 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 	argv[argc++] = xrm_option;
       }
     turn_on_atimers (false);
-    unrequest_sigio ();  /* See comment in x_display_ok.  */
+    //unrequest_sigio ();  /* See comment in x_display_ok.  */
     dpy = XtOpenDisplay (Xt_app_con, SSDATA (display_name),
 			 resource_name, EMACS_CLASS,
 			 emacs_options, XtNumber (emacs_options),
 			 &argc, argv);
-    request_sigio ();
+    //request_sigio ();
     turn_on_atimers (true);
 
 #ifdef HAVE_X11XTR6

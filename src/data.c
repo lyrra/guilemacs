@@ -43,6 +43,7 @@ sym_t indirect_variable (sym_t symbol);
 
 //FIX: 20190626 LAV, 2015 had: Lisp_Object Qnil_, Qt_;
 //                               Lisp_Object Qspecial_operator;
+Lisp_Object Qnil_, Qt_;
 
 static bool
 BOOLFWDP (union Lisp_Fwd *a)

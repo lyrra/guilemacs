@@ -2430,7 +2430,7 @@ read_char_handle_quit (void *data, Lisp_Object k)
         /* This is going to exit from read_char
            so we had better get rid of this frame's stuff.  */
         UNGCPRO;
-        return make_number (-2); /* wrong_kboard_jmpbuf */
+        return make_fixnum (-2); /* wrong_kboard_jmpbuf */
       }
   }
   return read_char_1 (true, state);
@@ -3683,7 +3683,7 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
           /* Don't read keyboard input until we have processed kbd_buffer.
              This happens when pasting text longer than KBD_BUFFER_SIZE/2.  */
           hold_keyboard_input ();
-          unrequest_sigio ();
+          //unrequest_sigio ();
         }
 #endif	/* subprocesses */
     }
@@ -3874,7 +3874,7 @@ kbd_buffer_get_event (KBOARD **kbp,
       /* Start reading input again because we have processed enough to
          be able to accept new events again.  */
       unhold_keyboard_input ();
-      request_sigio ();
+      //request_sigio ();
     }
 #endif	/* subprocesses */
 
