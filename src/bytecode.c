@@ -562,7 +562,8 @@ exec_byte_code (Lisp_Object bytestr, Lisp_Object vector, Lisp_Object maxdepth,
 	    if (SYMBOLP (sym)
 		&& !EQ (val, Qunbound)
 		&& !SYMBOL_REDIRECT (XSYMBOL (sym)) == SYMBOL_PLAINVAL
-		&& !SYMBOL_TRAPPED_WRITE_P (sym))  // FIX: 20190626 LAV, SYMBOL_TRAPPED code isn't working with guile/scm api
+		//&& !SYMBOL_TRAPPED_WRITE_P (sym)  // FIX: 20190626 LAV, SYMBOL_TRAPPED code isn't working with guile/scm api
+                )
 	      SET_SYMBOL_VAL (XSYMBOL (sym), val);
 	    else
               set_internal (sym, val, Qnil, SET_INTERNAL_SET);
