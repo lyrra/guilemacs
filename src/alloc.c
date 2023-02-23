@@ -304,6 +304,16 @@ xzalloc_atomic (size_t size)
   return xmalloc_atomic (size);
 }
 
+void *
+xrealloc_atomic (void *block, size_t size)
+{
+  void *val = GC_REALLOC(block, size); // FIX-20230211-LAV: GC_REALLOC_ATOMIC doesn't exist in bdw-gc?!
+  if (! val && size)
+    memory_full (size);
+  return val;
+}
+
+
 /* Allocate uncollectable memory.  */
 
 void *
