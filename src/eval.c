@@ -137,6 +137,7 @@ make_condition_handler (Lisp_Object tag)
 
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
+static void init_eval_once_for_pdumper (void);
 
 void
 init_eval_once (void)
@@ -428,11 +429,6 @@ default_toplevel_binding (Lisp_Object symbol)
 	  if (EQ (specpdl_symbol (pdl), symbol))
 	    binding = pdl;
 	  break;
-	case SPECPDL_BACKTRACE:
-#ifdef HAVE_MODULES
-        case SPECPDL_MODULE_RUNTIME:
-        case SPECPDL_MODULE_ENVIRONMENT:
-#endif
 	case SPECPDL_LET_LOCAL:
 	  break;
 
@@ -2640,7 +2636,8 @@ lambda_arity (Lisp_Object fun)
     {
       syms_left = AREF (fun, COMPILED_ARGLIST);
       if (FIXNUMP (syms_left))
-        return get_byte_code_arity (syms_left);
+	xsignal1 (Qinvalid_function, Qnil); //FIX-LAV can this be triggered?
+        // FIX-20230211-LAV: was: return get_byte_code_arity (syms_left);
     }
   else
     emacs_abort ();
@@ -2905,6 +2902,7 @@ record_unwind_protect_module (enum specbind_tag kind, void *ptr)
 void
 rebind_for_thread_switch (void)
 {
+#if 0
   union specbinding *bind;
 
   for (bind = specpdl; bind != specpdl_ptr; ++bind)
@@ -2918,6 +2916,7 @@ rebind_for_thread_switch (void)
                        SET_INTERNAL_THREAD_SWITCH);
 	}
     }
+#endif
 }
 
 static void
@@ -2927,16 +2926,6 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
   eassert (unwinding || this_binding->kind >= SPECPDL_LET);
   switch (this_binding->kind)
     {
-    case SPECPDL_BACKTRACE:
-      break;
-#ifdef HAVE_MODULES
-    case SPECPDL_MODULE_RUNTIME:
-      finalize_runtime_unwind (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_MODULE_ENVIRONMENT:
-      finalize_environment_unwind (this_binding->unwind_ptr.arg);
-      break;
-#endif
     case SPECPDL_LET:
       { /* If variable has a trivial value (no forwarding), and isn't
 	   trapped, we can just set it.  */
