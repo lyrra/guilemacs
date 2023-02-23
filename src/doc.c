@@ -486,7 +486,7 @@ store_function_docstring (Lisp_Object obj, EMACS_INT offset)
     {
       scm_set_procedure_property_x (fun,
                                     intern ("emacs-documentation"),
-                                    make_number (offset));
+                                    make_fixnum (offset));
     }
 
   /* If it's a lisp form, stick it in the form.  */
