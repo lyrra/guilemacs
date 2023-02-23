@@ -15,7 +15,9 @@ Branch information
   This branch is just a pointer to the most recent rebase branch.
 
 * guile-20230101
+
   Rebasing the attempt from 2019. Trying to squash many additional (cleanup) commits.
+
   Based on emacs version 27.0.50.
 
 * guile-20190824
