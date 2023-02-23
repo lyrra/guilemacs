@@ -850,15 +850,10 @@ void safe_debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
 void
 safe_debug_print (Lisp_Object arg)
 {
-  int valid = valid_lisp_object_p (arg);
-
-  if (valid > 0)
-    debug_print (arg);
-  else
     {
       EMACS_UINT n = XLI (arg);
       fprintf (stderr, "#<%s_LISP_OBJECT 0x%08"pI"x>\r\n",
-	       !valid ? "INVALID" : "SOME",
+	       "SOME",
 	       n);
     }
 }
