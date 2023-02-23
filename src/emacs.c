@@ -1865,9 +1865,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       scm_set_current_module (scm_c_resolve_module ("guile-user"));
 
       init_alloc_once ();
-      init_pdumper_once ();
-      init_obarray_once ();
-      init_threads_once ();
       scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
                            "make-lisp-string",
                            scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
@@ -1878,19 +1875,21 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_guile ();
       init_fns_once ();
+      init_obarray_once ();
       init_eval_once ();
       init_charset_once ();
       init_coding_once ();
-      init_syntax_once ();	/* Create standard syntax table.  */
-      init_category_once ();	/* Create standard category table.  */
-      init_casetab_once ();	/* Must be done before init_buffer_once.  */
-      init_buffer_once ();	/* Create buffer table and some buffers.  */
       init_minibuf_once ();	/* Create list of minibuffers.  */
 				/* Must precede init_window_once.  */
 
       /* Called before syms_of_fileio, because it sets up
          Qerror_condition.  Called before other symbol-initialization
          functions because it sets up symbols used by defsubr.  */
+      syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
+      init_syntax_once ();	/* Create standard syntax table.  */
+      init_category_once ();	/* Create standard category table.  */
+      init_casetab_once ();	/* Must be done before init_buffer_once.  */
+      init_buffer_once ();	/* Create buffer table and some buffers.  */
       syms_of_data ();
 
       scm_call_7 (scm_c_public_ref ("language elisp runtime", "emacs!"),
@@ -1916,7 +1915,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	 Emacs starts up from scratch (e.g., temacs).  */
       syms_of_keyboard ();
 
-      syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
       syms_of_fileio ();
       /* Before syms_of_coding to initialize Vgc_cons_threshold.  */
       syms_of_alloc ();
@@ -2128,6 +2126,9 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   /* Must precede init_cmdargs and init_sys_modes.  */
   init_callproc_1 ();
 
+  if (!initialized)
+    syms_of_lread ();
+
   /* Must precede init_lread.  */
   init_cmdargs (argc, argv, skip_args, original_pwd);
 
@@ -2157,7 +2158,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       /* The basic levels of Lisp must come first.  Note that
 	 syms_of_data and some others have already been called.  */
       syms_of_chartab ();
-      syms_of_lread ();
       syms_of_print ();
       syms_of_eval ();
       syms_of_floatfns ();
