@@ -9,11 +9,10 @@ Branch information
 
 * main
 
-  Contains latest effort of Guile-Emacs.
-  This branch has the most recent vanilla-emacs on which the
-  guile-emacs work has been rebased on-top off.
+  Use this branch if you want to try it out!
+  This branch has the latest effort of Guile-Emacs.
 
-  Based on emacs version 27.0.50.
+  This branch is just a pointer to the most recent rebase branch.
 
 * guile-20190824
 
@@ -25,6 +24,8 @@ Branch information
 * 2015-guile-wip
 
   Original work from 2015 by Robin Templeton.
+
+  Based on emacs version 24.4.50.
 
 * master
 
