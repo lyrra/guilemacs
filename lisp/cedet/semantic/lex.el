@@ -658,10 +658,9 @@ If universal argument ARG, then try the whole buffer."
   (let* ((start (current-time))
 	 (result (semantic-lex
 		  (if arg (point-min) (point))
-		  (point-max)))
-	 (end (current-time)))
+		  (point-max))))
     (message "Elapsed Time: %.2f seconds."
-	     (semantic-elapsed-time start end))
+	     (semantic-elapsed-time start nil))
     (pop-to-buffer "*Lexer Output*")
     (require 'pp)
     (erase-buffer)
@@ -687,9 +686,9 @@ displayed in the minibuffer.  Press SPC to move to the next lexical token."
   "Highlight the lexical TOKEN.
 TOKEN is a lexical token with a START And END position.
 Return the overlay."
-  (let ((o (semantic-make-overlay (semantic-lex-token-start token)
-				  (semantic-lex-token-end token))))
-    (semantic-overlay-put o 'face 'highlight)
+  (let ((o (make-overlay (semantic-lex-token-start token)
+			 (semantic-lex-token-end token))))
+    (overlay-put o 'face 'highlight)
     o))
 
 ;;; Lexical analyzer creation
@@ -753,11 +752,11 @@ a LOCAL option.")
 	  (progn
 	    (when token
 	      (setq o (semantic-lex-highlight-token token)))
-	    (semantic-read-event
+	    (read-event
 	     (format "%S :: Depth: %d :: SPC - continue" token semantic-lex-current-depth))
 	    )
 	(when o
-	  (semantic-overlay-delete o))))))
+	  (delete-overlay o))))))
 
 (defmacro define-lex (name doc &rest analyzers)
   "Create a new lexical analyzer with NAME.
@@ -811,7 +810,7 @@ analyzer which might mistake a number for as a symbol."
                     tmp-start (car semantic-lex-token-stream)))
 	   (setq tmp-start semantic-lex-end-point)
            (goto-char semantic-lex-end-point)
-	   ;;(when (> (semantic-elapsed-time starttime (current-time))
+	   ;;(when (> (semantic-elapsed-time starttime nil)
 	   ;;	    semantic-lex-timeout)
 	   ;;  (error "Timeout during lex at char %d" (point)))
 	   (semantic-throw-on-input 'lex)

@@ -1,4 +1,4 @@
-;;; pop3.el --- Post Office Protocol (RFC 1460) interface
+;;; pop3.el --- Post Office Protocol (RFC 1460) interface  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
 
@@ -32,7 +32,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (require 'mail-utils)
 (defvar parse-time-months)
@@ -165,12 +165,7 @@ Used for APOP authentication.")
       "How long pop3 should wait between checking for the end of output.
 Shorter values mean quicker response, but are more CPU intensive.")
     (defun pop3-accept-process-output (process)
-      (accept-process-output
-       process
-       (truncate pop3-read-timeout)
-       (truncate (* (- pop3-read-timeout
-		       (truncate pop3-read-timeout))
-		    1000))))))
+      (accept-process-output process pop3-read-timeout))))
 
 (defvar pop3-uidl)
 ;; List of UIDLs of existing messages at present in the server:
@@ -185,8 +180,8 @@ Shorter values mean quicker response, but are more CPU intensive.")
 ;;  ("SERVER_B" ("USER_B1" "UIDL1" TIMESTAMP1 "UIDL2" TIMESTAMP2...)
 ;;              ("USER_B2" "UIDL1" TIMESTAMP1 "UIDL2" TIMESTAMP2...)
 ;;              ...))
-;; Where TIMESTAMP is the most significant two digits of an Emacs time,
-;; i.e. the return value of `current-time'.
+;; Where TIMESTAMP is an Emacs time value (HI LO) representing the
+;; number of seconds (+ (ash HI 16) LO).
 
 ;;;###autoload
 (defun pop3-movemail (file)
@@ -237,8 +232,8 @@ Use streaming commands."
 	(setq start-point
 	      (pop3-wait-for-messages process pop3-stream-length
 				      total-size start-point))
-	(incf waited-for pop3-stream-length))
-      (incf i))
+	(cl-incf waited-for pop3-stream-length))
+      (cl-incf i))
     (pop3-wait-for-messages process (- count waited-for)
 			    total-size start-point)))
 
@@ -249,7 +244,7 @@ Use streaming commands."
 		    (or (not total-size)
 			(re-search-forward "^\\.\r?\n" nil t)))
 	       (re-search-forward "^-ERR " nil t))
-      (decf count)
+      (cl-decf count)
       (setq start-point (point)))
     (unless (memq (process-status process) '(open run))
       (error "pop3 process died"))
@@ -269,7 +264,6 @@ Use streaming commands."
 
 (defun pop3-write-to-file (file messages)
   (let ((pop-buffer (current-buffer))
-	(start (point-min))
 	beg end
 	temp-buffer)
     (with-temp-buffer
@@ -280,7 +274,6 @@ Use streaming commands."
 	  (forward-line 1)
 	  (setq beg (point))
 	  (when (re-search-forward "^\\.\r?\n" nil t)
-	    (setq start (point))
 	    (forward-line -1)
 	    (setq end (point)))
 	  (with-current-buffer temp-buffer
@@ -369,7 +362,7 @@ Use streaming commands."
 		(while (> i 0)
 		  (unless (member (nth (1- i) pop3-uidl) saved)
 		    (push i messages))
-		  (decf i)))
+		  (cl-decf i)))
 	      (when messages
 		(setq list (pop3-list process)
 		      size 0)
@@ -387,7 +380,9 @@ Use streaming commands."
 (defun pop3-uidl-dele (process)
   "Delete messages according to `pop3-leave-mail-on-server'.
 Return non-nil if it is necessary to update the local UIDL file."
-  (let* ((ctime (current-time))
+  (let* ((ctime (encode-time nil 'list))
+	 (age-limit (and (numberp pop3-leave-mail-on-server)
+			 (* 86400 pop3-leave-mail-on-server)))
 	 (srvr (assoc pop3-mailhost pop3-uidl-saved))
 	 (saved (assoc pop3-maildrop (cdr srvr)))
 	 i uidl mod new tstamp dele)
@@ -399,22 +394,18 @@ Return non-nil if it is necessary to update the local UIDL file."
 	     (unless (member (setq uidl (nth i pop3-uidl)) (cdr saved))
 	       (push ctime new)
 	       (push uidl new))
-	     (decf i)))
+	     (cl-decf i)))
 	  (pop3-uidl
 	   (setq new (mapcan (lambda (elt) (list elt ctime)) pop3-uidl))))
     (when new (setq mod t))
     ;; List expirable messages and delete them from the data to be saved.
-    (setq ctime (when (numberp pop3-leave-mail-on-server)
-		  (/ (+ (* (car ctime) 65536.0) (cadr ctime)) 86400))
-	  i (1- (length saved)))
+    (setq i (1- (length saved)))
     (while (> i 0)
       (if (member (setq uidl (nth (1- i) saved)) pop3-uidl)
 	  (progn
 	    (setq tstamp (nth i saved))
-	    (if (and ctime
-		     (> (- ctime (/ (+ (* (car tstamp) 65536.0) (cadr tstamp))
-				    86400))
-			pop3-leave-mail-on-server))
+	    (if (and age-limit
+		     (time-less-p age-limit (time-subtract ctime tstamp)))
 		;; Mails to delete.
 		(progn
 		  (setq mod t)
@@ -424,7 +415,7 @@ Return non-nil if it is necessary to update the local UIDL file."
 	      (push uidl new)))
 	;; Mails having been deleted in the server.
 	(setq mod t))
-      (decf i 2))
+      (cl-decf i 2))
     (cond (saved
 	   (setcdr saved new))
 	  (srvr
@@ -440,7 +431,7 @@ Return non-nil if it is necessary to update the local UIDL file."
       (while (> i 0)
 	(when (member (nth (1- i) pop3-uidl) dele)
 	  (push i uidl))
-	(decf i))
+	(cl-decf i))
       (when uidl
 	(pop3-send-streaming-command process "DELE" uidl nil)))
     mod))
@@ -594,7 +585,7 @@ Return the response string if optional second argument is non-nil."
       (goto-char pop3-read-point)
       (if (looking-at "-ERR")
 	  (error "%s" (buffer-substring (point) (- match-end 2)))
-	(if (not (looking-at "+OK"))
+	(if (not (looking-at "\\+OK"))
 	    (progn (setq pop3-read-point match-end) nil)
 	  (setq pop3-read-point match-end)
 	  (if return
@@ -620,10 +611,8 @@ Return the response string if optional second argument is non-nil."
 If NOW, use that time instead."
   (require 'parse-time)
   (let* ((now (or now (current-time)))
-	 (zone (nth 8 (decode-time now)))
-	 (sign "+"))
+	 (zone (nth 8 (decode-time now))))
     (when (< zone 0)
-      (setq sign "-")
       (setq zone (- zone)))
     (concat
      (format-time-string "%d" now)
@@ -695,14 +684,14 @@ If NOW, use that time instead."
   "Send USER information to POP3 server."
   (pop3-send-command process (format "USER %s" user))
   (let ((response (pop3-read-response process t)))
-    (if (not (and response (string-match "+OK" response)))
+    (if (not (and response (string-match "\\+OK" response)))
 	(error "USER %s not valid" user))))
 
 (defun pop3-pass (process)
   "Send authentication information to the server."
   (pop3-send-command process (format "PASS %s" pop3-password))
   (let ((response (pop3-read-response process t)))
-    (if (not (and response (string-match "+OK" response)))
+    (if (not (and response (string-match "\\+OK" response)))
 	(pop3-quit process))))
 
 (defun pop3-apop (process user)
@@ -715,7 +704,7 @@ If NOW, use that time instead."
 	(let ((hash (md5 (concat pop3-timestamp pass) nil nil 'binary)))
 	  (pop3-send-command process (format "APOP %s %s" user hash))
 	  (let ((response (pop3-read-response process t)))
-	    (if (not (and response (string-match "+OK" response)))
+	    (if (not (and response (string-match "\\+OK" response)))
 		(pop3-quit process)))))
     ))
 
@@ -785,7 +774,7 @@ Otherwise, return the size of the message-id MSG"
   (pop3-send-command process (format "DELE %s" msg))
   (pop3-read-response process))
 
-(defun pop3-noop (process msg)
+(defun pop3-noop (process _msg)
   "No-operation."
   (pop3-send-command process "NOOP")
   (pop3-read-response process))

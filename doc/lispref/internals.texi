@@ -48,24 +48,63 @@ environment.  After this step, the Emacs executable is no longer
 @dfn{bare}.
 
 @cindex dumping Emacs
+@cindex @option{--temacs} option, and dumping method
   Because it takes some time to load the standard Lisp files, the
 @file{temacs} executable usually isn't run directly by users.
-Instead, as one of the last steps of building Emacs, the command
-@samp{temacs -batch -l loadup dump} is run.  The special @samp{dump}
-argument causes @command{temacs} to dump out an executable program,
-called @file{emacs}, which has all the standard Lisp files preloaded.
-(The @samp{-batch} argument prevents @file{temacs} from trying to
-initialize any of its data on the terminal, so that the tables of
-terminal information are empty in the dumped Emacs.)
+Instead, one of the last steps of building Emacs runs the command
+@w{@samp{temacs -batch -l loadup --temacs=@var{dump-method}}}.  The
+special option @option{--temacs} tells @command{temacs} how to record
+all the standard preloaded Lisp functions and variables, so that when
+you subsequently run Emacs, it will start much faster.  The
+@option{--temacs} option requires an argument @var{dump-method}, which
+can be one of the following:
+
+@table @samp
+@item pdump
+@cindex portable dump file
+Record the preloaded Lisp data in a @dfn{portable dump} file.  This
+method produces an additional data file which Emacs will load at
+startup.  The portable dump file is usually called @file{emacs.pdmp},
+and is installed in the Emacs @code{exec-directory} (@pxref{Help
+Functions}).  This method is the most preferred one, as it does not
+require Emacs to employ any special techniques of memory allocation,
+which might get in the way of various memory-layout techniques used by
+modern systems to enhance security and privacy.
+
+@item pbootstrap
+@cindex bootstrapping Emacs
+Like @samp{pdump}, but used while @dfn{bootstrapping} Emacs, when no
+previous Emacs binary and no @file{*.elc} byte-compiled Lisp files are
+available.  The produced portable dump file is usually named
+@file{bootstrap-emacs.pdmp} in this case.
+
+@item dump
+@cindex unexec
+This method causes @command{temacs} to dump out an executable program,
+called @file{emacs}, which has all the standard Lisp files already
+preloaded into it.  (The @samp{-batch} argument prevents
+@command{temacs} from trying to initialize any of its data on the
+terminal, so that the tables of terminal information are empty in the
+dumped Emacs.)  This method is also known as @dfn{unexec}, because it
+produces a program file from a running process, and thus is in some
+sense the opposite of executing a program to start a process.
+
+@item bootstrap
+Like @samp{dump}, but used when bootstrapping Emacs with the
+@code{unexec} method.
+@end table
 
 @cindex preloaded Lisp files
 @vindex preloaded-file-list
   The dumped @file{emacs} executable (also called a @dfn{pure} Emacs)
-is the one which is installed.  The variable
-@code{preloaded-file-list} stores a list of the Lisp files preloaded
-into the dumped Emacs.  If you port Emacs to a new operating system,
-and are not able to implement dumping, then Emacs must load
-@file{loadup.el} each time it starts.
+is the one which is installed.  If the portable dumping was used to
+build Emacs, the @file{emacs} executable is actually an exact copy of
+@file{temacs}, and the corresponding @file{emacs.pdmp} file is
+installed as well.  The variable @code{preloaded-file-list} stores a
+list of the preloaded Lisp files recorded in the portable dump file or
+in the dumped Emacs executable.  If you port Emacs to a new operating
+system, and are not able to implement dumping of any kind, then Emacs
+must load @file{loadup.el} each time it starts.
 
 @cindex build details
 @cindex deterministic build
@@ -161,14 +200,41 @@ In the unlikely event that you need a more general functionality than
 @code{custom-initialize-delay} provides, you can use
 @code{before-init-hook} (@pxref{Startup Summary}).
 
+@defun dump-emacs-portable to-file &optional track-referrers
+This function dumps the current state of Emacs into a portable dump
+file @var{to-file}, using the @code{pdump} method.  Normally, the
+portable dump file is called @file{@var{emacs-name}.dmp}, where
+@var{emacs-name} is the name of the Emacs executable file.  The
+optional argument @var{track-referrers}, if non-@code{nil}, causes the
+portable dumping process keep additional information to help track
+down the provenance of object types that are not yet supported by the
+@code{pdump} method.
+
+If you want to use this function in an Emacs that was already dumped,
+you must run Emacs with the @samp{-batch} option.
+@end defun
+
 @defun dump-emacs to-file from-file
 @cindex unexec
 This function dumps the current state of Emacs into an executable file
-@var{to-file}.  It takes symbols from @var{from-file} (this is normally
-the executable file @file{temacs}).
+@var{to-file}, using the @code{unexec} method.  It takes symbols from
+@var{from-file} (this is normally the executable file @file{temacs}).
 
-If you want to use this function in an Emacs that was already dumped,
-you must run Emacs with @samp{-batch}.
+This function cannot be used in an Emacs that was already dumped.  If
+Emacs was built without @code{unexec} support, this function will not
+be available.
+@end defun
+
+@defun pdumper-stats
+If the current Emacs session restored its state from a portable dump
+file, this function returns information about the dump file and the
+time it took to restore the Emacs state.  The value is an alist
+@w{@code{((dumped-with-pdumper . t) (load-time . @var{time})
+(dump-file-name . @var{file}))}},
+where @var{file} is the name of the dump file, and @var{time} is the
+time in seconds it took to restore the state from the dump file.
+If the current session was not restored from a portable dump file, the
+value is nil.
 @end defun
 
 @node Pure Storage
@@ -247,8 +313,8 @@ of 8k bytes, and small vectors are packed into blocks of 4k bytes).
 
 @cindex vector-like objects, storage
 @cindex storage of vector-like Lisp objects
-  Beyond the basic vector, a lot of objects like window, buffer, and
-frame are managed as if they were vectors.  The corresponding C data
+  Beyond the basic vector, a lot of objects like markers, overlays and
+buffers are managed as if they were vectors.  The corresponding C data
 structures include the @code{union vectorlike_header} field whose
 @code{size} member contains the subtype enumerated by @code{enum pvec_type}
 and an information about how many @code{Lisp_Object} fields this structure
@@ -319,7 +385,6 @@ future allocations.  So an overall result is:
 @example
 ((@code{conses} @var{cons-size} @var{used-conses} @var{free-conses})
  (@code{symbols} @var{symbol-size} @var{used-symbols} @var{free-symbols})
- (@code{miscs} @var{misc-size} @var{used-miscs} @var{free-miscs})
  (@code{strings} @var{string-size} @var{used-strings} @var{free-strings})
  (@code{string-bytes} @var{byte-size} @var{used-bytes})
  (@code{vectors} @var{vector-size} @var{used-vectors})
@@ -335,7 +400,7 @@ Here is an example:
 @example
 (garbage-collect)
       @result{} ((conses 16 49126 8058) (symbols 48 14607 0)
-                 (miscs 40 34 56) (strings 32 2942 2607)
+                 (strings 32 2942 2607)
                  (string-bytes 1 78607) (vectors 16 7247)
                  (vector-slots 8 341609 29474) (floats 8 71 102)
                  (intervals 56 27 26) (buffers 944 8)
@@ -367,19 +432,6 @@ The number of symbols in use.
 The number of symbols for which space has been obtained from
 the operating system, but that are not currently being used.
 
-@item misc-size
-Internal size of a miscellaneous entity, i.e.,
-@code{sizeof (union Lisp_Misc)}, which is a size of the
-largest type enumerated in @code{enum Lisp_Misc_Type}.
-
-@item used-miscs
-The number of miscellaneous objects in use.  These include markers
-and overlays, plus certain objects not visible to users.
-
-@item free-miscs
-The number of miscellaneous objects for which space has been obtained
-from the operating system, but that are not currently being used.
-
 @item string-size
 Internal size of a string header, i.e., @code{sizeof (struct Lisp_String)}.
 
@@ -397,7 +449,7 @@ This is used for convenience and equals to @code{sizeof (char)}.
 The total size of all string data in bytes.
 
 @item vector-size
-Internal size of a vector header, i.e., @code{sizeof (struct Lisp_Vector)}.
+Size in bytes of a vector of length 1, including its header.
 
 @item used-vectors
 The number of vector headers allocated from the vector blocks.
@@ -407,6 +459,8 @@ Internal size of a vector slot, always equal to @code{sizeof (Lisp_Object)}.
 
 @item used-slots
 The number of slots in all used vectors.
+Slot counts might include some or all overhead from vector headers,
+depending on the platform.
 
 @item free-slots
 The number of free slots in all vector blocks.
@@ -508,10 +562,8 @@ function @code{memory-limit} provides information on the total amount of
 memory Emacs is currently using.
 
 @defun memory-limit
-This function returns the address of the last byte Emacs has allocated,
-divided by 1024.  We divide the value by 1024 to make sure it fits in a
-Lisp integer.
-
+This function returns an estimate of the total amount of bytes of
+virtual memory that Emacs is currently using, divided by 1024.
 You can use this to get a general idea of how your actions affect the
 memory usage.
 @end defun
@@ -596,6 +648,8 @@ in this Emacs session.
 @defvar vector-cells-consed
 The total number of vector cells that have been allocated so far
 in this Emacs session.
+This includes vector-like objects such as markers and overlays, plus
+certain objects not visible to users.
 @end defvar
 
 @defvar symbols-consed
@@ -606,12 +660,6 @@ in this Emacs session.
 @defvar string-chars-consed
 The total number of string characters that have been allocated so far
 in this session.
-@end defvar
-
-@defvar misc-objects-consed
-The total number of miscellaneous objects that have been allocated so
-far in this session.  These include markers and overlays, plus
-certain objects not visible to users.
 @end defvar
 
 @defvar intervals-consed
@@ -759,6 +807,13 @@ for documentation purposes.  This way, you can use different argument
 names in the documentation string from the ones used in the C code.
 @samp{usage:} is required if the function has an unlimited number of
 arguments.
+
+Some primitives have multiple definitions, one per platform (e.g.,
+@code{x-create-frame}).  In such cases, rather than writing the
+same documentation string in each definition, only one definition has
+the actual documentation.  The others have placeholders beginning with
+@samp{SKIP}, which are ignored by the function that parses the
+@file{DOC} file.
 
 All the usual rules for documentation strings in Lisp code
 (@pxref{Documentation Tips}) apply to C code documentation strings
@@ -1136,6 +1191,17 @@ grow with new Emacs releases.  Given the version of Emacs, the module
 can use only the parts of the module @acronym{API} that existed in
 that version, since those parts are identical in later versions.
 
+@file{emacs-module.h} defines a preprocessor macro
+@code{EMACS_MAJOR_VERSION}.  It expands to an integer literal which is
+the latest major version of Emacs supported by the header.
+@xref{Version Info}.  Note that the value of
+@code{EMACS_MAJOR_VERSION} is a compile-time constant and does not
+represent the version of Emacs that is currently running and has
+loaded your module.  If you want your module to be compatible with
+various versions of @file{emacs-module.h} as well as various versions
+of Emacs, you can use conditional compilation based on
+@code{EMACS_MAJOR_VERSION}.
+
 We recommend that modules always perform the compatibility
 verification, unless they do their job entirely in the initialization
 function, and don't access any Lisp objects or use any Emacs functions
@@ -1322,12 +1388,46 @@ can be used to obtain the type of a @code{emacs_value} object.
 This function returns the value of a Lisp integer specified by
 @var{arg}.  The C data type of the return value, @code{intmax_t}, is
 the widest integral data type supported by the C compiler, typically
-@w{@code{long long}}.
+@w{@code{long long}}.  If the value of @var{arg} doesn't fit into an
+@code{intmax_t}, the function signals an error using the error symbol
+@code{overflow-error}.
 @end deftypefn
 
 @deftypefn Function double extract_float (emacs_env *@var{env}, emacs_value @var{arg})
 This function returns the value of a Lisp float specified by
 @var{arg}, as a C @code{double} value.
+@end deftypefn
+
+@deftypefn Function struct timespec extract_time (emacs_env *@var{env}, emacs_value @var{time})
+This function, which is available since Emacs 27, interprets
+@var{time} as an Emacs Lisp time value and returns the corresponding
+@code{struct timespec}.  @xref{Time of Day}.  @code{struct timespec}
+represents a timestamp with nanosecond precision.  It has the
+following members:
+
+@table @code
+@item time_t tv_sec
+Whole number of seconds.
+@item long tv_nsec
+Fractional seconds as number of nanoseconds, always less than one
+billion.
+@end table
+
+@noindent
+@xref{Elapsed Time,,,libc}.
+
+If @var{time} has higher precision than nanoseconds, then this
+function truncates it to nanosecond precision towards negative
+infinity.  This function signals an error if @var{time} (truncated to
+nanoseconds) cannot be represented by @code{struct timespec}.  For
+example, if @code{time_t} is a 32-bit integral type, then a @var{time}
+value of ten billion seconds would signal an error, but a @var{time}
+value of 600 picoseconds would get truncated to zero.
+
+If you need to deal with time values that are not representable by
+@code{struct timespec}, or if you want higher precision, call the Lisp
+function @code{encode-time} and work with its return value.
+@xref{Time Conversion}.
 @end deftypefn
 
 @deftypefn Function bool copy_string_contents (emacs_env *@var{env}, emacs_value @var{arg}, char *@var{buf}, ptrdiff_t *@var{len})
@@ -1384,16 +1484,27 @@ objects from basic C data types.  They all return the created
 
 @deftypefn Function emacs_value make_integer (emacs_env *@var{env}, intmax_t @var{n})
 This function takes an integer argument @var{n} and returns the
-corresponding @code{emacs_value} object.  It raises the
-@code{overflow-error} error condition if the value of @var{n} cannot
-be represented as an Emacs integer, i.e.@: is not inside the limits
-set by @code{most-negative-fixnum} and @code{most-positive-fixnum}
-(@pxref{Integer Basics}).
+corresponding @code{emacs_value} object.  It returns either a fixnum
+or a bignum depending on whether the value of @var{n} is inside the
+limits set by @code{most-negative-fixnum} and
+@code{most-positive-fixnum} (@pxref{Integer Basics}).
 @end deftypefn
 
 @deftypefn Function emacs_value make_float (emacs_env *@var{env}, double @var{d})
 This function takes a @code{double} argument @var{d} and returns the
 corresponding Emacs floating-point value.
+@end deftypefn
+
+@deftypefn Function emacs_value make_time (emacs_env *@var{env}, struct timespec @var{time})
+This function, which is available since Emacs 27, takes a @code{struct
+timespec} argument @var{time} and returns the corresponding Emacs
+timestamp as a pair @code{(@var{ticks} . @var{hz})}.  @xref{Time of
+Day}.  The return value represents exactly the same timestamp as
+@var{time}: all input values are representable, and there is never a
+loss of precision.  @code{@var{time}.tv_sec} and
+@code{@var{time}.tv_nsec} can be arbitrary values.  In particular,
+there's no requirement that @var{time} be normalized.  This means that
+@code{@var{time}.tv_nsec} can be negative or larger than 999,999,999.
 @end deftypefn
 
 @deftypefn Function emacs_value make_string (emacs_env *@var{env}, const char *@var{str}, ptrdiff_t @var{strlen})
@@ -1407,6 +1518,66 @@ function raises the @code{overflow-error} error condition if
 @var{strlen} is negative or exceeds the maximum length of an Emacs
 string.
 @end deftypefn
+
+If you define the preprocessor macro @code{EMACS_MODULE_GMP} before
+including the header @file{emacs-module.h}, you can also convert
+between Emacs integers and GMP @code{mpz_t} values.  @xref{GMP
+Basics,,,gmp}.  If @code{EMACS_MODULE_GMP} is defined,
+@file{emacs-module.h} wraps @code{mpz_t} in the following structure:
+
+@deftp struct emacs_mpz value
+struct emacs_mpz @{ mpz_t value; @};
+@end deftp
+
+@noindent
+Then you can use the following additional functions:
+
+@deftypefn Function bool extract_big_integer (emacs_env *@var{env}, emacs_value @var{arg}, struct emacs_mpz *@var{result})
+This function, which is available since Emacs 27, extracts the
+integral value of @var{arg} into @var{result}.  @var{result} must not
+be @code{NULL}.  @code{@var{result}->value} must be an initialized
+@code{mpz_t} object.  @xref{Initializing Integers,,,gmp}.  If
+@var{arg} is an integer, Emacs will store its value into
+@code{@var{result}->value}.  After you have finished using
+@code{@var{result}->value}, you should free it using @code{mpz_clear}
+or similar.
+@end deftypefn
+
+@deftypefn Function emacs_value make_big_integer (emacs_env *@var{env}, const struct emacs_mpz *@var{value})
+This function, which is available since Emacs 27, takes an
+arbitrary-sized integer argument and returns a corresponding
+@code{emacs_value} object.  @var{value} must not be @code{NULL}.
+@code{@var{value}->value} must be an initialized @code{mpz_t} object.
+@xref{Initializing Integers,,,gmp}.  Emacs will return a corresponding
+integral object.  After you have finished using
+@code{@var{value}->value}, you should free it using @code{mpz_clear}
+or similar.
+@end deftypefn
+
+The following example uses GMP to calculate the next probable prime
+after a given integer:
+
+@example
+#include <assert.h>
+#include <gmp.h>
+
+#define EMACS_MODULE_GMP
+#include <emacs-module.h>
+
+static emacs_value
+next_prime (emacs_env *env, ptrdiff_t nargs, emacs_value *args,
+            void *data)
+@{
+  assert (nargs == 1);
+  emacs_mpz p;
+  mpz_init (p.value);
+  env->extract_big_integer (env, args[0], &p);
+  mpz_nextprime (p.value, p.value);
+  emacs_value result = env->make_big_integer (env, &p);
+  mpz_clear (p.value);
+  return result;
+@}
+@end example
 
 The @acronym{API} does not provide functions to manipulate Lisp data
 structures, for example, create lists with @code{cons} and @code{list}
@@ -1567,7 +1738,27 @@ purpose.
 @deftypefn Function bool should_quit (emacs_env *@var{env})
 This function returns @code{true} if the user wants to quit.  In that
 case, we recommend that your module function aborts any on-going
-processing and returns as soon as possible.
+processing and returns as soon as possible.  In most cases, use
+@code{process_input} instead.
+@end deftypefn
+
+To process input events in addition to checking whether the user wants
+to quit, use the following function, which is available since Emacs
+27.1.
+
+@anchor{process_input}
+@deftypefn Function enum emacs_process_input_result process_input (emacs_env *@var{env})
+This function processes pending input events.  It returns
+@code{emacs_process_input_quit} if the user wants to quit or an error
+occurred while processing signals.  In that case, we recommend that
+your module function aborts any on-going processing and returns as
+soon as possible.  If the module code may continue running,
+@code{process_input} returns @code{emacs_process_input_continue}.  The
+return value is @code{emacs_process_input_continue} if and only if
+there is no pending nonlocal exit in @code{env}.  If the module
+continues after calling @code{process_input}, global state such as
+variable values and buffer content may have been modified in arbitrary
+ways.
 @end deftypefn
 
 @node Module Nonlocal
@@ -1632,7 +1823,7 @@ The last @acronym{API} function exited via @code{throw}.
 @end vtable
 @end deftypefn
 
-@deftypefn Function emacs_funcall_exit non_local_exit_get (emacs_env *@var{env}, emacs_value *@var{symbol}, emacs_value *@var{data})
+@deftypefn Function enum emacs_funcall_exit non_local_exit_get (emacs_env *@var{env}, emacs_value *@var{symbol}, emacs_value *@var{data})
 This function returns the kind of nonlocal exit condition stored in
 @var{env}, like @code{non_local_exit_check} does, but it also returns
 the full information about the nonlocal exit, if any.  If the return
@@ -1698,7 +1889,7 @@ a special type to represent the pointers to all of them, which is known as
   In C, the tagged pointer is an object of type @code{Lisp_Object}.  Any
 initialized variable of such a type always holds the value of one of the
 following basic data types: integer, symbol, string, cons cell, float,
-vectorlike or miscellaneous object.  Each of these data types has the
+or vectorlike object.  Each of these data types has the
 corresponding tag value.  All tags are enumerated by @code{enum Lisp_Type}
 and placed into a 3-bit bitfield of the @code{Lisp_Object}.  The rest of the
 bits is the value itself.  Integers are immediate, i.e., directly
@@ -1730,18 +1921,13 @@ Symbol, the unique-named entity commonly used as an identifier.
 
 @item struct Lisp_Float
 Floating-point value.
-
-@item union Lisp_Misc
-Miscellaneous kinds of objects which don't fit into any of the above.
 @end table
 
   These types are the first-class citizens of an internal type system.
-Since the tag space is limited, all other types are the subtypes of either
-@code{Lisp_Vectorlike} or @code{Lisp_Misc}.  Vector subtypes are enumerated
+Since the tag space is limited, all other types are the subtypes of
+@code{Lisp_Vectorlike}.  Vector subtypes are enumerated
 by @code{enum pvec_type}, and nearly all complex objects like windows, buffers,
-frames, and processes fall into this category.  The rest of special types,
-including markers and overlays, are enumerated by @code{enum Lisp_Misc_Type}
-and form the set of subtypes of @code{Lisp_Misc}.
+frames, and processes fall into this category.
 
   Below there is a description of a few subtypes of @code{Lisp_Vectorlike}.
 Buffer object represents the text to display and edit.  Window is the part

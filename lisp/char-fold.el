@@ -24,11 +24,11 @@
 
 (eval-and-compile (put 'char-fold-table 'char-table-extra-slots 1))
 
-(defconst char-fold-table
-  (eval-when-compile
-    (let ((equiv (make-char-table 'char-fold-table))
-          (equiv-multi (make-char-table 'char-fold-table))
-          (table (unicode-property-table-internal 'decomposition)))
+(eval-and-compile
+  (defun char-fold-make-table ()
+    (let* ((equiv (make-char-table 'char-fold-table))
+           (equiv-multi (make-char-table 'char-fold-table))
+           (table (unicode-property-table-internal 'decomposition)))
       (set-char-table-extra-slot equiv 0 equiv-multi)
 
       ;; Ensure the table is populated.
@@ -107,13 +107,17 @@
 
       ;; Convert the lists of characters we compiled into regexps.
       (map-char-table
-       (lambda (char dec-list)
-         (let ((re (regexp-opt (cons (char-to-string char) dec-list))))
-           (if (consp char)
+       (lambda (char decomp-list)
+         (let ((re (regexp-opt (cons (char-to-string char) decomp-list))))
+           (if (consp char) ; FIXME: char never is consp?
                (set-char-table-range equiv char re)
              (aset equiv char re))))
        equiv)
-      equiv))
+      equiv)))
+
+(defconst char-fold-table
+  (eval-when-compile
+    (char-fold-make-table))
   "Used for folding characters of the same group during search.
 This is a char-table with the `char-fold-table' subtype.
 
@@ -170,7 +174,7 @@ from which to start."
     ;; need to keep them grouped together like this: "\\(  \\|[ ...][ ...]\\)".
     (while (< i end)
       (pcase (aref string i)
-        (`?\s (setq spaces (1+ spaces)))
+        (?\s (setq spaces (1+ spaces)))
         (c (when (> spaces 0)
              (push (char-fold--make-space-string spaces) out)
              (setq spaces 0))
@@ -214,7 +218,7 @@ from which to start."
     (when (> spaces 0)
       (push (char-fold--make-space-string spaces) out))
     (let ((regexp (apply #'concat (nreverse out))))
-      ;; Limited by `MAX_BUF_SIZE' in `regex.c'.
+      ;; Limited by `MAX_BUF_SIZE' in `regex-emacs.c'.
       (if (> (length regexp) 5000)
           (regexp-quote string)
         regexp))))

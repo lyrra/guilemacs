@@ -3,7 +3,6 @@
 ;; Copyright (C) 2004-2019 Free Software Foundation, Inc.
 
 ;; Author: David Ponce <david@dponce.com>
-;; Maintainer: David Ponce <david@dponce.com>
 ;; Created: 16 Feb 2001
 ;; Keywords: extensions
 
@@ -124,11 +123,11 @@
   :version "22.1"
   :group 'widgets)
 
-(defcustom tree-widget-image-enable (if (fboundp 'display-images-p)
-                                        (display-images-p))
+(defcustom tree-widget-image-enable t
   "Non-nil means that tree-widget will try to use images."
   :type  'boolean
-  :group 'tree-widget)
+  :group 'tree-widget
+  :version "27.1")
 
 (defvar tree-widget-themes-load-path
   '(load-path

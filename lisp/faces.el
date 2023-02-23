@@ -55,6 +55,7 @@ This means to treat a terminal of type TYPE as if it were of type ALIAS."
   :group 'terminals
   :version "25.1")
 
+(declare-function display-graphic-p "frame" (&optional display))
 (declare-function xw-defined-colors "term/common-win" (&optional frame))
 
 (defvar help-xref-stack-item)
@@ -1084,27 +1085,27 @@ of a set of discrete values.  Value is `integerp' if ATTRIBUTE expects
 an integer value."
   (let ((valid
          (pcase attribute
-           (`:family
+           (:family
             (if (window-system frame)
                 (mapcar (lambda (x) (cons x x))
                         (font-family-list))
 	      ;; Only one font on TTYs.
 	      (list (cons "default" "default"))))
-           (`:foundry
+           (:foundry
 	    (list nil))
-	   (`:width
+	   (:width
 	    (mapcar #'(lambda (x) (cons (symbol-name (aref x 1)) (aref x 1)))
 		    font-width-table))
-           (`:weight
+           (:weight
 	    (mapcar #'(lambda (x) (cons (symbol-name (aref x 1)) (aref x 1)))
 		    font-weight-table))
-	   (`:slant
+	   (:slant
 	    (mapcar #'(lambda (x) (cons (symbol-name (aref x 1)) (aref x 1)))
 		    font-slant-table))
-	   (`:inverse-video
+	   (:inverse-video
 	    (mapcar #'(lambda (x) (cons (symbol-name x) x))
 		    (internal-lisp-face-attribute-values attribute)))
-           ((or `:underline `:overline `:strike-through `:box)
+           ((or :underline :overline :strike-through :box)
             (if (window-system frame)
                 (nconc (mapcar #'(lambda (x) (cons (symbol-name x) x))
                                (internal-lisp-face-attribute-values attribute))
@@ -1112,12 +1113,12 @@ an integer value."
                                (defined-colors frame)))
 	      (mapcar #'(lambda (x) (cons (symbol-name x) x))
 		      (internal-lisp-face-attribute-values attribute))))
-           ((or `:foreground `:background)
+           ((or :foreground :background)
             (mapcar #'(lambda (c) (cons c c))
                     (defined-colors frame)))
-           (`:height
+           (:height
             'integerp)
-           (`:stipple
+           (:stipple
             (and (memq (window-system frame) '(x ns)) ; No stipple on w32
                  (mapcar #'list
                          (apply #'nconc
@@ -1126,7 +1127,7 @@ an integer value."
                                                (file-directory-p dir)
                                                (directory-files dir)))
                                         x-bitmap-file-path)))))
-           (`:inherit
+           (:inherit
             (cons '("none" . nil)
                   (mapcar #'(lambda (c) (cons (symbol-name c) c))
                           (face-list))))
@@ -1239,7 +1240,7 @@ of a global face.  Value is the new attribute value."
 	       ;; explicitly in VALID, using color approximation code
 	       ;; in tty-colors.el.
 	       (when (and (memq attribute '(:foreground :background))
-			  (not (memq (window-system frame) '(x w32 ns)))
+			  (not (display-graphic-p frame))
 			  (not (member new-value
 				       '("unspecified"
 					 "unspecified-fg" "unspecified-bg"))))
@@ -1630,7 +1631,7 @@ The argument FRAME specifies which frame to try.
 The value may be different for frames on different display types.
 If FRAME doesn't support colors, the value is nil.
 If FRAME is nil, that stands for the selected frame."
-  (if (memq (framep (or frame (selected-frame))) '(x w32 ns))
+  (if (display-graphic-p frame)
       (xw-defined-colors frame)
     (mapcar 'car (tty-color-alist frame))))
 (defalias 'x-defined-colors 'defined-colors)
@@ -1674,7 +1675,7 @@ or one of the strings \"unspecified-fg\" or \"unspecified-bg\".
 
 If FRAME is omitted or nil, use the selected frame."
   (unless (member color '(unspecified "unspecified-bg" "unspecified-fg"))
-    (if (member (framep (or frame (selected-frame))) '(x w32 ns))
+    (if (display-graphic-p frame)
 	(xw-color-defined-p color frame)
       (numberp (tty-color-translate color frame)))))
 (defalias 'x-color-defined-p 'color-defined-p)
@@ -1700,7 +1701,7 @@ return value is nil."
   (cond
    ((member color '(unspecified "unspecified-fg" "unspecified-bg"))
     nil)
-   ((memq (framep (or frame (selected-frame))) '(x w32 ns))
+   ((display-graphic-p frame)
     (xw-color-values color frame))
    (t
     (tty-color-values color frame))))
@@ -1714,7 +1715,7 @@ return value is nil."
 The optional argument DISPLAY specifies which display to ask about.
 DISPLAY should be either a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display."
-  (if (memq (framep-on-display display) '(x w32 ns))
+  (if (display-graphic-p display)
       (xw-display-color-p display)
     (tty-display-color-p display)))
 (defalias 'x-display-color-p 'display-color-p)
@@ -1725,12 +1726,9 @@ If omitted or nil, that stands for the selected frame's display."
   "Return non-nil if frames on DISPLAY can display shades of gray.
 DISPLAY should be either a frame or a display name (a string).
 If omitted or nil, that stands for the selected frame's display."
-  (let ((frame-type (framep-on-display display)))
-    (cond
-     ((memq frame-type '(x w32 ns))
-      (x-display-grayscale-p display))
-     (t
-      (> (tty-color-gray-shades display) 2)))))
+  (if (display-graphic-p display)
+      (x-display-grayscale-p display)
+    (> (tty-color-gray-shades display) 2)))
 
 (defun read-color (&optional prompt convert-to-RGB allow-empty-name msg)
   "Read a color name or RGB triplet.
@@ -2298,6 +2296,18 @@ unwanted effects."
   :version "26.1"
   :group 'basic-faces
   :group 'display-line-numbers)
+
+;; Definition stolen from display-line-numbers.
+(defface fill-column-indicator
+  '((t :inherit shadow :weight normal :slant normal
+       :underline nil :overline nil :strike-through nil
+       :box nil :inverse-video nil :stipple nil))
+  "Face for displaying fill column indicator.
+This face is used when `display-fill-column-indicator-mode' is
+non-nil."
+  :version "27.1"
+  :group 'basic-faces
+  :group 'display-fill-column-indicator)
 
 (defface escape-glyph
   '((((background dark)) :foreground "cyan")

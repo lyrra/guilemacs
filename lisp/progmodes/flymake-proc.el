@@ -2,9 +2,9 @@
 
 ;; Copyright (C) 2003-2019 Free Software Foundation, Inc.
 
-;; Author:  Pavel Kobyakov <pk_at_work@yahoo.com>
-;; Maintainer: Leo Liu <sdl.web@gmail.com>
-;; Version: 0.3
+;; Author: Pavel Kobyakov <pk_at_work@yahoo.com>
+;; Maintainer: João Távora <joaotavora@gmail.com>
+;; Version: 1.0
 ;; Keywords: c languages tools
 
 ;; This file is part of GNU Emacs.
@@ -40,6 +40,8 @@
 ;;   (from http://bugs.debian.org/337339).
 
 ;;; Code:
+
+(require 'cl-lib)
 
 (require 'flymake)
 
@@ -77,6 +79,13 @@
   :group 'flymake
   :type 'integer)
 
+(defcustom flymake-proc-ignored-file-name-regexps '()
+  "Files syntax checking is forbidden for.
+Overrides `flymake-proc-allowed-file-name-masks'."
+  :group 'flymake
+  :type '(repeat (regexp))
+  :version "27.1")
+
 (define-obsolete-variable-alias 'flymake-allowed-file-name-masks
   'flymake-proc-allowed-file-name-masks "26.1")
 
@@ -106,6 +115,7 @@
     ;; ("\\.tex\\'" 1)
     )
   "Files syntax checking is allowed for.
+Variable `flymake-proc-ignored-file-name-regexps' overrides this variable.
 This is an alist with elements of the form:
   REGEXP INIT [CLEANUP [NAME]]
 REGEXP is a regular expression that matches a file name.
@@ -148,6 +158,9 @@ Convert it to Flymake internal format."
 	  (setq converted-list (cons (list regexp file line col) converted-list)))))
     converted-list))
 
+(define-obsolete-variable-alias 'flymake-err-line-patterns
+  'flymake-proc-err-line-patterns "26.1")
+
 (defvar flymake-proc-err-line-patterns ; regexp file-idx line-idx col-idx (optional) text-idx(optional), match-end to end of string is error text
   (append
    '(
@@ -183,11 +196,10 @@ from compile.el")
   'flymake-proc-default-guess
   "Predicate matching against diagnostic text to detect its type.
 Takes a single argument, the diagnostic's text and should return
-a value suitable for indexing
-`flymake-diagnostic-types-alist' (which see).  If the returned
-value is nil, a type of `:error' is assumed.  For some backward
-compatibility, if a non-nil value is returned that doesn't
-index that alist, a type of `:warning' is assumed.
+a diagnostic symbol naming a type.  If the returned value is nil,
+a type of `:error' is assumed.  For some backward compatibility,
+if a non-nil value is returned that doesn't name a type,
+`:warning' is assumed.
 
 Instead of a function, it can also be a string, a regular
 expression.  A match indicates `:warning' type, otherwise
@@ -203,17 +215,22 @@ expression.  A match indicates `:warning' type, otherwise
          :error)))
 
 (defun flymake-proc--get-file-name-mode-and-masks (file-name)
-  "Return the corresponding entry from `flymake-proc-allowed-file-name-masks'."
+  "Return the corresponding entry from `flymake-proc-allowed-file-name-masks'.
+If the FILE-NAME matches a regexp from `flymake-proc-ignored-file-name-regexps',
+`flymake-proc-allowed-file-name-masks' is not searched."
   (unless (stringp file-name)
     (error "Invalid file-name"))
-  (let ((fnm flymake-proc-allowed-file-name-masks)
-	(mode-and-masks nil))
-    (while (and (not mode-and-masks) fnm)
-      (if (string-match (car (car fnm)) file-name)
-	  (setq mode-and-masks (cdr (car fnm))))
-      (setq fnm (cdr fnm)))
-    (flymake-log 3 "file %s, init=%s" file-name (car mode-and-masks))
-    mode-and-masks))
+  (if (cl-find file-name flymake-proc-ignored-file-name-regexps
+               :test (lambda (fn rex) (string-match rex fn)))
+      (flymake-log 3 "file %s ignored")
+    (let ((fnm flymake-proc-allowed-file-name-masks)
+          (mode-and-masks nil))
+      (while (and (not mode-and-masks) fnm)
+        (if (string-match (car (car fnm)) file-name)
+            (setq mode-and-masks (cdr (car fnm))))
+        (setq fnm (cdr fnm)))
+      (flymake-log 3 "file %s, init=%s" file-name (car mode-and-masks))
+      mode-and-masks)))
 
 (defun flymake-proc--get-init-function (file-name)
   "Return init function to be used for the file."
@@ -319,6 +336,9 @@ to the beginning of the list (File.h -> File.cpp moved to top)."
   (and (equal (file-name-sans-extension flymake-proc--included-file-name)
 	      (file-name-base file-one))
        (not (equal file-one file-two))))
+
+(define-obsolete-variable-alias 'flymake-check-file-limit
+  'flymake-proc-check-file-limit "26.1")
 
 (defvar flymake-proc-check-file-limit 8192
   "Maximum number of chars to look at when checking possible master file.
@@ -495,8 +515,8 @@ Create parent directories as needed."
                       :error))
                    ((functionp pred)
                     (let ((probe (funcall pred message)))
-                      (cond ((assoc-default probe
-                                            flymake-diagnostic-types-alist)
+                      (cond ((and (symbolp probe)
+                                  (get probe 'flymake-category))
                              probe)
                             (probe
                              :warning)
@@ -867,7 +887,7 @@ can also be executed interactively independently of
 (defun flymake-proc--delete-temp-directory (dir-name)
   "Attempt to delete temp dir created by `flymake-proc-create-temp-with-folder-structure', do not fail on error."
   (let* ((temp-dir    temporary-file-directory)
-	 (suffix      (substring dir-name (1+ (length temp-dir)))))
+	 (suffix      (substring dir-name (1+ (length (directory-file-name temp-dir))))))
 
     (while (> (length suffix) 0)
       (setq suffix (directory-file-name suffix))
@@ -1113,7 +1133,7 @@ Use CREATE-TEMP-F for creating temp copy."
   (let* ((temp-master-file-name (flymake-proc--init-create-temp-source-and-master-buffer-copy
                                  'flymake-proc-get-include-dirs-dot 'flymake-proc-create-temp-inplace
 				 '("\\.tex\\'")
-				 "[ \t]*\\in\\(?:put\\|clude\\)[ \t]*{\\(.*%s\\)}")))
+				 "[ \t]*in\\(?:put\\|clude\\)[ \t]*{\\(.*%s\\)}")))
     (when temp-master-file-name
       (flymake-proc--get-tex-args temp-master-file-name))))
 
@@ -1133,12 +1153,8 @@ Use CREATE-TEMP-F for creating temp copy."
 
 ;;;;
 
-(define-obsolete-variable-alias 'flymake-check-file-limit
-  'flymake-proc-check-file-limit "26.1")
 (define-obsolete-function-alias 'flymake-reformat-err-line-patterns-from-compile-el
   'flymake-proc-reformat-err-line-patterns-from-compile-el "26.1")
-(define-obsolete-variable-alias 'flymake-err-line-patterns
-  'flymake-proc-err-line-patterns "26.1")
 (define-obsolete-function-alias 'flymake-parse-line
   'flymake-proc-parse-line "26.1")
 (define-obsolete-function-alias 'flymake-get-include-dirs

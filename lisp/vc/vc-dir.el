@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author:   Dan Nicolaescu <dann@ics.uci.edu>
+;; Author: Dan Nicolaescu <dann@ics.uci.edu>
 ;; Keywords: vc tools
 ;; Package: vc
 
@@ -44,6 +44,8 @@
 
 ;;; Code:
 (eval-when-compile (require 'cl-lib))
+
+(declare-function fileloop-continue "fileloop")
 
 (defcustom vc-dir-mode-hook nil
   "Normal hook run by `vc-dir-mode'.
@@ -554,11 +556,15 @@ If a prefix argument is given, move by that many lines."
 
 (defun vc-dir-mark-unmark (mark-unmark-function)
   (if (use-region-p)
-      (let (;; (firstl (line-number-at-pos (region-beginning)))
+      (let ((processed-line nil)
 	    (lastl (line-number-at-pos (region-end))))
 	(save-excursion
 	  (goto-char (region-beginning))
-	  (while (<= (line-number-at-pos) lastl)
+	  (while (and (<= (line-number-at-pos) lastl)
+                      ;; We make sure to not get stuck processing the
+                      ;; same line in an infinite loop.
+		      (not (eq processed-line (line-number-at-pos))))
+	    (setq processed-line (line-number-at-pos))
 	    (condition-case nil
 		(funcall mark-unmark-function)
 	      ;; `vc-dir-mark-file' signals an error if we try marking
@@ -798,7 +804,9 @@ For marked directories, use the files displayed from those directories.
 Stops when a match is found.
 To continue searching for next match, use command \\[tags-loop-continue]."
   (interactive "sSearch marked files (regexp): ")
-  (tags-search regexp '(mapcar 'car (vc-dir-marked-only-files-and-states))))
+  (tags-search regexp
+               (lambda ()
+                 (mapcar #'car (vc-dir-marked-only-files-and-states)))))
 
 (defun vc-dir-query-replace-regexp (from to &optional delimited)
   "Do `query-replace-regexp' of FROM with TO, on all marked files.
@@ -819,8 +827,11 @@ with the command \\[tags-loop-continue]."
       (if (and buffer (with-current-buffer buffer
 			buffer-read-only))
 	  (error "File `%s' is visited read-only" file))))
-  (tags-query-replace from to delimited
-		      '(mapcar 'car (vc-dir-marked-only-files-and-states))))
+  (fileloop-initialize-replace
+   from to (mapcar 'car (vc-dir-marked-only-files-and-states))
+   (if (equal from (downcase from)) nil 'default)
+   delimited)
+  (fileloop-continue))
 
 (defun vc-dir-ignore ()
   "Ignore the current file."

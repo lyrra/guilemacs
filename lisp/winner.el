@@ -57,21 +57,22 @@
 
 (defcustom winner-dont-bind-my-keys nil
   "Non-nil means do not bind keys in Winner mode."
-  :type  'boolean
-  :group 'winner)
+  :type 'boolean)
 
 (defcustom winner-ring-size 200
   "Maximum number of stored window configurations per frame."
-  :type  'integer
-  :group 'winner)
+  :type 'integer)
 
 (defcustom winner-boring-buffers '("*Completions*")
   "List of buffer names whose windows `winner-undo' will not restore.
 You may want to include buffer names such as *Help*, *Apropos*,
 *Buffer List*, *info* and *Compile-Log*."
-  :type '(repeat string)
-  :group 'winner)
+  :type '(repeat string))
 
+(defcustom winner-boring-buffers-regexp nil
+  "`winner-undo' will not restore windows with buffers matching this regexp."
+  :type 'string
+  :version "27.1")
 
 
 ;;;; Saving old configurations (internal variables and subroutines)
@@ -273,8 +274,9 @@ You may want to include buffer names such as *Help*, *Apropos*,
 
 ;; Make sure point does not end up in the minibuffer and delete
 ;; windows displaying dead or boring buffers
-;; (c.f. `winner-boring-buffers').  Return nil if all the windows
-;; should be deleted.  Preserve correct points and marks.
+;; (c.f. `winner-boring-buffers') and `winner-boring-buffers-regexp'.
+;; Return nil if all the windows should be deleted.  Preserve correct
+;; points and marks.
 (defun winner-set (conf)
   ;; For the format of `conf', see `winner-conf'.
   (let* ((buffers nil)
@@ -291,10 +293,23 @@ You may want to include buffer names such as *Help*, *Apropos*,
       ;; Restore points
       (dolist (win (winner-sorted-window-list))
         (unless (and (pop alive)
-                     (setf (window-point win)
-                           (winner-get-point (window-buffer win) win))
-                     (not (member (buffer-name (window-buffer win))
-                                  winner-boring-buffers)))
+                     (let* ((buf   (window-buffer win))
+                            (pos   (winner-get-point (window-buffer win) win))
+                            (entry (assq buf (window-prev-buffers win))))
+                       ;; Try to restore point of buffer in the selected
+                       ;; window (Bug#23621).
+                       (let ((marker (nth 2 entry)))
+                         (when (and switch-to-buffer-preserve-window-point
+                                    marker
+                                    (not (= marker pos)))
+                           (setq pos marker))
+                         (setf (window-point win) pos)))
+		     (not (or (member (buffer-name (window-buffer win))
+				      winner-boring-buffers)
+			      (and winner-boring-buffers-regexp
+				   (string-match
+				    winner-boring-buffers-regexp
+				    (buffer-name (window-buffer win)))))))
           (push win xwins)))            ; delete this window
 
       ;; Restore marks
@@ -311,10 +326,10 @@ You may want to include buffer names such as *Help*, *Apropos*,
       ;; Return t if this is still a possible configuration.
       (or (null xwins)
 	  (progn
-            (mapc 'delete-window (cdr xwins)) ; delete all but one
-            (unless (one-window-p t)
-              (delete-window (car xwins))
-              t))))))
+	    (mapc 'delete-window (cdr xwins)) ; delete all but one
+	    (unless (one-window-p t)
+	      (delete-window (car xwins))
+	      t))))))
 
 
 
@@ -345,9 +360,6 @@ You may want to include buffer names such as *Help*, *Apropos*,
 ;;;###autoload
 (define-minor-mode winner-mode
   "Toggle Winner mode on or off.
-With a prefix argument ARG, enable Winner mode if ARG is
-positive, and disable it otherwise.  If called from Lisp, enable
-the mode if ARG is omitted or nil, and toggle it if ARG is `toggle'.
 
 Winner mode is a global minor mode that records the changes in
 the window configuration (i.e. how the frames are partitioned

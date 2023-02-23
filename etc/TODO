@@ -122,12 +122,6 @@ It can use the same icons as gud.
 ** Check what minor modes don't use define-minor-mode and convert them
 to use it.
 
-** Convert all defvars with leading '*' in the doc-strings into defcustoms
-of appropriate :type and :group.
-
-** Remove any leading '*'s from defcustom doc-strings.
-[done?] [A lot of them are in CC Mode.]
-
 ** Remove unnecessary autoload cookies from defcustoms.
 This needs a bit of care, since often people have become used to
 expecting such variables to always be defined, eg when they modify
@@ -142,15 +136,6 @@ control backend, and write a test for its status parser.  Etc.
 See the 'test' directory for examples.
 
 * Small but important fixes needed in existing features:
-
-** Flymake's customization mechanism needs to be both simpler (fewer
-levels of indirection) and better documented, so it is easier to
-understand.  I find it quite hard to figure out what compilation
-command it will use.
-
-I suggest totally rewriting that part of Flymake, using the simplest
-mechanism that suffices for the specific needs.  That will be easy
-for users to customize.
 
 ** Distribute a bar cursor of width > 1 evenly between the two glyphs
    on each side of the bar (what to do at the edges?).
@@ -191,8 +176,6 @@ for users to customize.
 ** In Emacs Info, examples of using Customize should be clickable
    and they should create Custom buffers.
 
-** The toolbar should show keyboard equivalents in its tooltips.
-
 ** Add function to redraw the tool bar.
 
 ** Redesign the load-history data structure so it can cope better
@@ -210,8 +193,6 @@ https://lists.gnu.org/r/emacs-devel/2007-04/msg00684.html
 ** Check for any included packages that define obsolete bug-reporting commands.
 Change them to use report-emacs-bug.
 *** Related functions:
-**** gnus-bug
-**** report-calc-bug
 **** org-submit-bug-report
 **** lm-report-bug
 **** tramp-bug
@@ -576,9 +557,8 @@ from the emacsclient process.
   snmp-mode [?], soundex [should be interactive?], strokes [start from
   the web page], talk, thingatpt [interactive functions?], type-break,
   vcursor, xscheme, zone-mode [?], mlconvert [?], iso-cvt,
-  feedmail [?], uce, gametree, page-ext,
-  refbib, refer, scribe, texinfo, underline,
-  cmacexp, hideif, mantemp [obsolete?], pcomplete, xml,
+  feedmail [?], uce, gametree, page-ext, refbib, refer, scribe,
+  texinfo, underline, cmacexp, hideif, pcomplete, xml,
   cvs-status (should be described in PCL-CVS manual); other progmodes,
   probably in separate manual.
 

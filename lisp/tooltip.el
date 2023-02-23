@@ -42,9 +42,6 @@
 
 (define-minor-mode tooltip-mode
   "Toggle Tooltip mode.
-With a prefix argument ARG, enable Tooltip mode if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable the mode
-if ARG is omitted or nil.
 
 When this global minor mode is enabled, Emacs displays help
 text (e.g. for buttons and menu items that you put the mouse on)
@@ -155,6 +152,18 @@ This variable is obsolete; instead of setting it to t, disable
 (make-obsolete-variable 'tooltip-use-echo-area
 			"disable Tooltip mode instead" "24.1" 'set)
 
+(defcustom tooltip-resize-echo-area nil
+  "If non-nil, using the echo area for tooltips will resize the echo area.
+By default, when the echo area is used for displaying tooltips,
+the tooltip text is truncated if it exceeds a single screen line.
+When this variable is non-nil, the text is not truncated; instead,
+the echo area is resized as needed to accommodate the full text
+of the tooltip.
+This variable has effect only on GUI frames."
+  :type 'boolean
+  :group 'tooltip
+  :version "27.1")
+
 
 ;;; Variables that are not customizable.
 
@@ -192,7 +201,8 @@ This might return nil if the event did not occur over a buffer."
 (defun tooltip-delay ()
   "Return the delay in seconds for the next tooltip."
   (if (and tooltip-hide-time
-           (< (- (float-time) tooltip-hide-time) tooltip-recent-seconds))
+	   (time-less-p (time-since tooltip-hide-time)
+			tooltip-recent-seconds))
       tooltip-short-delay
     tooltip-delay))
 
@@ -347,7 +357,8 @@ It is also called if Tooltip mode is on, for text-only displays."
 						   (current-message))))
         (setq tooltip-previous-message (current-message)))
       (setq tooltip-help-message help)
-      (let ((message-truncate-lines t)
+      (let ((message-truncate-lines
+             (or (not (display-graphic-p)) (not tooltip-resize-echo-area)))
             (message-log-max nil))
         (message "%s" help)))
      ((stringp tooltip-previous-message)

@@ -4,7 +4,6 @@
 ;; Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
-;; Maintainer: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
 ;; See: mh-e.el
 
@@ -375,8 +374,8 @@ still visible.\n")
            (cond ((not normal-exit)
                   (set-window-configuration config))
                  ,(if dont-return
-                      `(t (setq mh-previous-window-config config))
-                    `((and (get-buffer cur-buffer-name)
+                      '(t (setq mh-previous-window-config config))
+                    '((and (get-buffer cur-buffer-name)
                            (window-live-p (get-buffer-window
                                            (get-buffer cur-buffer-name))))
                       (pop-to-buffer (get-buffer cur-buffer-name) nil)))))))))
@@ -774,7 +773,7 @@ operation."
     ("^\\(Apparently-To:\\|Newsgroups:\\)\\(.*\\)"
      (1 'default)
      (2 'mh-show-cc))
-    ("^\\(In-reply-to\\|Date\\):\\(.*\\)$"
+    ("^\\(In-Reply-To\\|Date\\):\\(.*\\)$"
      (1 'default)
      (2 'mh-show-date))
     (mh-letter-header-font-lock

@@ -497,4 +497,37 @@ collection clause."
                           vconcat (vector (1+ x)))
                  [2 3 4 5 6])))
 
+(ert-deftest cl-macs-loop-for-as-equals-and ()
+  "Test for https://debbugs.gnu.org/29799 ."
+  (let ((arr (make-vector 3 0)))
+    (should (equal '((0 0) (1 1) (2 2))
+                   (cl-loop for k below 3 for x = k and z = (elt arr k)
+                            collect (list k x))))))
+
+
+(ert-deftest cl-defstruct/builtin-type ()
+  (should-error
+   (macroexpand '(cl-defstruct hash-table))
+   :type 'wrong-type-argument)
+  (should-error
+   (macroexpand '(cl-defstruct (hash-table (:predicate hash-table-p))))
+   :type 'wrong-type-argument))
+
+(ert-deftest cl-macs-test--symbol-macrolet ()
+  ;; A `setq' shouldn't be converted to a `setf' just because it occurs within
+  ;; a symbol-macrolet!
+  (should-error
+   ;; Use `eval' so the error is signaled when running the test rather than
+   ;; when macroexpanding it.
+   (eval '(let ((l (list 1))) (cl-symbol-macrolet ((x 1)) (setq (car l) 0)))))
+  ;; Make sure `gv-synthetic-place' isn't macro-expanded before `setf' gets to
+  ;; see its `gv-expander'.
+  (should (equal (let ((l '(0)))
+                   (let ((cl (car l)))
+                     (cl-symbol-macrolet
+                         ((p (gv-synthetic-place cl (lambda (v) `(setcar l ,v)))))
+                       (cl-incf p)))
+                   l)
+                 '(1))))
+
 ;;; cl-macs-tests.el ends here

@@ -105,9 +105,7 @@ encryption is used."
   (if (fboundp 'decode-coding-inserted-region)
       (save-restriction
 	(narrow-to-region (point) (point))
-	(insert (if enable-multibyte-characters
-		    (string-to-multibyte string)
-		  string))
+	(insert string)
 	(decode-coding-inserted-region
 	 (point-min) (point-max)
 	 (substring file 0 (string-match epa-file-name-regexp file))
@@ -147,7 +145,6 @@ encryption is used."
      context
      (cons #'epa-progress-callback-function
 	   (format "Decrypting %s" file)))
-    (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
     (unwind-protect
 	(progn
 	  (if replace
@@ -236,7 +233,6 @@ encryption is used."
      (cons #'epa-progress-callback-function
 	   (format "Encrypting %s" file)))
     (setf (epg-context-armor context) epa-armor)
-    (setf (epg-context-pinentry-mode context) epa-pinentry-mode)
     (condition-case error
 	(setq string
 	      (epg-encrypt-string

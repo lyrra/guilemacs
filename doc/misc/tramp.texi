@@ -2,25 +2,14 @@
 @setfilename ../../info/tramp.info
 @c %**start of header
 @include docstyle.texi
-@c In the Tramp repository, the version number is auto-frobbed from
-@c configure.ac, so you should edit that file and run
-@c "autoconf && ./configure" to change the version number.
+@c In the Tramp GIT, the version number is auto-frobbed from tramp.el,
+@c and the bug report address is auto-frobbed from configure.ac.
 @include trampver.texi
 @settitle @value{tramp} @value{trampver} User Manual
 @c %**end of header
 
 @c This is *so* much nicer :)
 @footnotestyle end
-
-@c Macro for formatting a file name according to the respective
-@c syntax.  Macro arguments should not have any leading or trailing
-@c whitespace.  Not very elegant, but I don't know it better.
-
-@macro trampfn {method, userhost, localname}
-@value{prefix}@c
-\method\@value{postfixhop}@c
-\userhost\@value{postfix}\localname\
-@end macro
 
 @copying
 Copyright @copyright{} 1999--2019 Free Software Foundation, Inc.
@@ -38,10 +27,10 @@ copy and modify this GNU manual.''
 @end quotation
 @end copying
 
-@c Entries for @command{install-info} to use
+@c Entries for @command{install-info} to use.  We cannot use @value{tramp}.
 @dircategory Emacs network features
 @direntry
-* @value{tramp}: (tramp).               Transparent Remote Access, Multiple Protocol
+* Tramp: (tramp).               Transparent Remote Access, Multiple Protocol
                                   Emacs remote file access via ssh and scp.
 @end direntry
 
@@ -62,7 +51,7 @@ editing package for Emacs.
 
 @value{tramp} stands for ``Transparent Remote (file) Access, Multiple
 Protocol''.  This package provides remote file editing, similar to
-Ange FTP.
+Ange FTP@.
 
 The difference is that Ange FTP uses FTP to transfer files between the
 local and the remote host, whereas @value{tramp} uses a combination of
@@ -83,9 +72,9 @@ Savannah Project Page}.
 @end ifhtml
 
 There is a mailing list for @value{tramp}, available at
-@email{tramp-devel@@gnu.org}, and archived at
-@uref{https://lists.gnu.org/r/tramp-devel/, the
-@value{tramp} Mail Archive}.
+@email{@value{tramp-bug-report-address}}, and archived at
+@uref{https://lists.gnu.org/r/tramp-devel/, the @value{tramp} Mail
+Archive}.
 
 @page
 @insertcopying
@@ -96,7 +85,6 @@ There is a mailing list for @value{tramp}, available at
 For the end user:
 
 * Obtaining @value{tramp}::             How to obtain @value{tramp}.
-* History::                     History of @value{tramp}.
 @ifset installchapter
 * Installation::                Installing @value{tramp} with your Emacs.
 @end ifset
@@ -122,8 +110,11 @@ For the developer:
  --- The Detailed Node Listing ---
 @c
 @ifset installchapter
+
 Installing @value{tramp} with your Emacs
 
+* System Requirements::         Prerequisites for @value{tramp} installation.
+* Basic Installation::          Installation steps.
 * Installation parameters::     Parameters in order to control installation.
 * Testing::                     A test suite for @value{tramp}.
 * Load paths::                  How to plug-in @value{tramp} into your environment.
@@ -162,6 +153,7 @@ Using @value{tramp}
 * Ad-hoc multi-hops::           Declaring multiple hops in the file name.
 * Remote processes::            Integration with other Emacs packages.
 * Cleanup remote connections::  Cleanup remote connections.
+* Archive file names::          Access to files in file archives.
 
 How file names, directories and localnames are mangled and managed
 
@@ -316,18 +308,44 @@ behind the scenes when you open a file with @value{tramp}.
 @node Obtaining @value{tramp}
 @chapter Obtaining @value{tramp}
 @cindex obtaining @value{tramp}
+@cindex GNU ELPA
+@vindex tramp-version
 
 @value{tramp} is included as part of Emacs (since Emacs 22.1).
 
 @value{tramp} is also freely packaged for download on the Internet at
-@uref{https://ftp.gnu.org/gnu/tramp/}.
+@uref{https://ftp.gnu.org/gnu/tramp/}.  The version number of
+@value{tramp} can be obtained by the variable @code{tramp-version}.
+For released @value{tramp} versions, this is a three-number string
+like ``2.4.2''.
+
+A @value{tramp} release, which is packaged with Emacs, could differ
+slightly from the corresponding standalone release.  This is because
+it isn't always possible to synchronize release dates between Emacs
+and @value{tramp}.  Such version numbers have the Emacs version number
+as suffix, like ``2.3.5.26.3''.  This means @value{tramp} 2.3.5 as
+integrated in Emacs 26.3.  A complete list of @value{tramp} versions
+packaged with Emacs can be retrieved by
+
+@vindex customize-package-emacs-version-alist
+@lisp
+(assoc 'Tramp customize-package-emacs-version-alist)
+@end lisp
+
+@value{tramp} is also available as @uref{https://elpa.gnu.org, GNU
+ELPA} package.  Besides the standalone releases, further minor version
+of @value{tramp} will appear on GNU ELPA, until the next @value{tramp}
+release appears.  These minor versions have a four-number string, like
+``2.4.2.1''.
 
 @value{tramp} development versions are available on Git servers.
-Development versions contain new and incomplete features.
+Development versions contain new and incomplete features.  The
+development version of @value{tramp} is always the version number of
+the next release, plus the suffix ``-pre'', like ``2.4.3-pre''.
 
-One way to obtain from Git server is to visit the Savannah project
-page at the following URL and then clicking on the Git link in the
-navigation bar at the top.
+One way to obtain @value{tramp} from Git server is to visit the
+Savannah project page at the following URL and then clicking on the
+Git link in the navigation bar at the top.
 
 @noindent
 @uref{https://savannah.gnu.org/projects/tramp/}
@@ -385,33 +403,8 @@ $ autoconf
 @end example
 
 
-@node History
-@chapter History of @value{tramp}
-@cindex history
-@cindex development history
-
-@value{tramp} development started at the end of November 1998 as
-@file{rssh.el}.  It provided only one method of access.  It used
-@command{ssh} for login and @command{scp} to transfer file contents.
-The name was changed to @file{rcp.el} before it got its present name
-@value{tramp}.  New methods of remote access were added, so was support
-for version control.
-
-April 2000 was the first time when multi-hop methods were added.  In
-July 2002, @value{tramp} unified file names with Ange FTP@.  In July
-2004, proxy hosts replaced multi-hop methods.  Running commands on
-remote hosts was introduced in December 2005.  Support for gateways
-since April 2007 (and removed in December 2016).  GVFS integration
-started in February 2009.  Remote commands on MS Windows hosts since
-September 2011.  Ad-hoc multi-hop methods (with a changed syntax)
-re-enabled in November 2011.  In November 2012, added Juergen
-Hoetzel's @file{tramp-adb.el}.
-
-XEmacs support was stopped in January 2016.  Since March 2017,
-@value{tramp} syntax mandates a method.
-
 @c Installation chapter is necessary only in case of standalone
-@c installation.  Text taken from trampinst.texi.
+@c installation.
 @ifset installchapter
 @include trampinst.texi
 @end ifset
@@ -463,13 +456,13 @@ this case it is written as @code{host#port}.
 
 @anchor{Quick Start Guide: @option{ssh} and @option{plink} methods}
 @section Using @option{ssh} and @option{plink}
-@cindex method ssh
-@cindex ssh method
-@cindex method plink
-@cindex plink method
+@cindex method @option{ssh}
+@cindex @option{ssh} method
+@cindex method @option{plink}
+@cindex @option{plink} method
 
 If your local host runs an SSH client, and the remote host runs an SSH
-server, the most simple remote file name is
+server, the simplest remote file name is
 @file{@trampfn{ssh,user@@host,/path/to/file}}.  The remote file name
 @file{@trampfn{ssh,,}} opens a remote connection to yourself on the
 local host, and is taken often for testing @value{tramp}.
@@ -482,12 +475,12 @@ an @command{ssh} server:
 
 @anchor{Quick Start Guide: @option{su}, @option{sudo} and @option{sg} methods}
 @section Using @option{su}, @option{sudo} and @option{sg}
-@cindex method su
-@cindex su method
-@cindex method sudo
-@cindex sudo method
-@cindex method sg
-@cindex sg method
+@cindex method @option{su}
+@cindex @option{su} method
+@cindex method @option{sudo}
+@cindex @option{sudo} method
+@cindex method @option{sg}
+@cindex @option{sg} method
 
 Sometimes, it is necessary to work on your local host under different
 permissions.  For this, you could use the @option{su} or @option{sudo}
@@ -500,12 +493,46 @@ The method @option{sg} stands for ``switch group''; the changed group
 must be used here as user name.  The default host name is the same.
 
 
+@anchor{Quick Start Guide: @option{ssh}, @option{plink}, @option{su}, @option{sudo} and @option{sg} methods}
+@section Combining @option{ssh} or @option{plink} with @option{su} or @option{sudo}
+@cindex method @option{ssh}
+@cindex @option{ssh} method
+@cindex method @option{plink}
+@cindex @option{plink} method
+@cindex method @option{su}
+@cindex @option{su} method
+@cindex method @option{sudo}
+@cindex @option{sudo} method
+
+If the @option{su} or @option{sudo} option shall be performed on
+another host, it could be comnbined with a leading @option{ssh} or
+@option{plink} option.  That means, @value{tramp} connects first to
+the other host with non-administrative credentials, and changes to
+administrative credentials on that host afterwards.  In a simple case,
+the syntax looks like
+@file{@value{prefix}ssh@value{postfixhop}user@@host|sudo@value{postfixhop}@value{postfix}/path/to/file}.
+@xref{Ad-hoc multi-hops}.
+
+
+@anchor{Quick Start Guide: @option{sudoedit} method}
+@section Using @command{sudoedit}
+@cindex method @option{sudoedit}
+@cindex @option{sudoedit} method
+
+The @option{sudoedit} method is similar to the @option{sudo} method.
+However, it is a different implementation: it does not keep an open
+session running in the background.  This is for security reasons; on
+the backside this method is less performant than the @option{sudo}
+method, it is restricted to the @samp{localhost} only, and it does not
+support external processes.
+
+
 @anchor{Quick Start Guide: @option{smb} method}
 @section Using @command{smbclient}
-@cindex method smb
-@cindex smb method
-@cindex ms windows (with smb method)
-@cindex smbclient
+@cindex method @option{smb}
+@cindex @option{smb} method
+@cindex ms windows (with @option{smb} method)
+@cindex @command{smbclient}
 
 In order to access a remote MS Windows host or Samba server, the
 @command{smbclient} client is used.  The remote file name syntax is
@@ -518,44 +545,65 @@ of the local file name is the share exported by the remote host,
 @section Using GVFS-based methods
 @cindex methods, gvfs
 @cindex gvfs based methods
-@cindex method sftp
-@cindex sftp method
-@cindex method afp
-@cindex afp method
-@cindex method dav
-@cindex method davs
-@cindex dav method
-@cindex davs method
+@cindex method @option{sftp}
+@cindex @option{sftp} method
+@cindex method @option{afp}
+@cindex @option{afp} method
+@cindex method @option{dav}
+@cindex method @option{davs}
+@cindex @option{dav} method
+@cindex @option{davs} method
 
-On systems, which have installed the virtual file system for the Gnome
-Desktop (GVFS), its offered methods could be used by @value{tramp}.
-Examples are @file{@trampfn{sftp,user@@host,/path/to/file}},
+On systems, which have installed the virtual file system for the
+@acronym{GNOME} Desktop (GVFS), its offered methods could be used by
+@value{tramp}.  Examples are
+@file{@trampfn{sftp,user@@host,/path/to/file}},
 @file{@trampfn{afp,user@@host,/path/to/file}} (accessing Apple's AFP
 file system), @file{@trampfn{dav,user@@host,/path/to/file}} and
 @file{@trampfn{davs,user@@host,/path/to/file}} (for WebDAV shares).
 
 
-@anchor{Quick Start Guide: Google Drive}
-@section Using Google Drive
-@cindex method gdrive
-@cindex gdrive method
+@anchor{Quick Start Guide: GNOME Online Accounts based methods}
+@section Using @acronym{GNOME} Online Accounts based methods
+@cindex @acronym{GNOME} Online Accounts
+@cindex method @option{gdrive}
+@cindex @option{gdrive} method
 @cindex google drive
+@cindex method @option{nextcloud}
+@cindex @option{nextcloud} method
+@cindex nextcloud
 
-Another GVFS-based method allows to access a Google Drive file system.
-The file name syntax is here always
-@file{@trampfn{gdrive,john.doe@@gmail.com,/path/to/file}}.
-@samp{john.doe@@gmail.com} stands here for your Google Drive account.
+GVFS-based methods include also @acronym{GNOME} Online Accounts, which
+support the @option{Files} service.  These are the Google Drive file
+system, and the OwnCloud/NextCloud file system.  The file name syntax
+is here always
+@file{@trampfn{gdrive,john.doe@@gmail.com,/path/to/file}}
+(@samp{john.doe@@gmail.com} stands here for your Google Drive
+account), or @file{@trampfn{nextcloud,user@@host#8081,/path/to/file}}
+(@samp{8081} stands for the port number) for OwnCloud/NextCloud files.
 
 
 @anchor{Quick Start Guide: Android}
 @section Using Android
-@cindex method adb
-@cindex adb method
+@cindex method @option{adb}
+@cindex @option{adb} method
 @cindex android
 
 An Android device, which is connected via USB to your local host, can
 be accessed via the @command{adb} command.  No user or host name is
 needed.  The file name syntax is @file{@trampfn{adb,,/path/to/file}}.
+
+
+@anchor{Quick Start Guide: @option{rclone} method}
+@section Using @command{rclone}
+@cindex method @option{rclone}
+@cindex @option{rclone} method
+
+A convenient way to access system storages is the @command{rclone}
+program.  If you have configured a storage in @command{rclone} under a
+name @samp{storage} (for example), you could access it via the remote
+file name syntax @file{@trampfn{rclone,storage,/path/to/file}}.  User
+names are not needed.
 
 
 @node Configuration
@@ -580,6 +628,13 @@ installed and loaded:
 
 @lisp
 (customize-set-variable 'tramp-verbose 6 "Enable remote command traces")
+@end lisp
+
+For functions used to configure @value{tramp}, the following clause
+might be used in your init file:
+
+@lisp
+(with-eval-after-load 'tramp (tramp-change-syntax 'simplified))
 @end lisp
 
 
@@ -654,8 +709,8 @@ Inline methods can work in situations where an external transfer
 program is unavailable.  Inline methods also work when transferring
 files between different @emph{user identities} on the same host.
 
-@cindex uuencode
-@cindex mimencode
+@cindex @command{uuencode}
+@cindex @command{mimencode}
 @cindex base-64 encoding
 
 @value{tramp} checks the remote host for the availability and
@@ -676,15 +731,15 @@ such optimization.
 
 @table @asis
 @item @option{rsh}
-@cindex method rsh
-@cindex rsh method
+@cindex method @option{rsh}
+@cindex @option{rsh} method
 
 @command{rsh} is an option for connecting to hosts within local
 networks since @command{rsh} is not as secure as other methods.
 
 @item @option{ssh}
-@cindex method ssh
-@cindex ssh method
+@cindex method @option{ssh}
+@cindex @option{ssh} method
 
 @command{ssh} is a more secure option than others to connect to a
 remote host.
@@ -695,15 +750,15 @@ host name, a hash sign, then a port number).  It is the same as passing
 @samp{-p 42} to the @command{ssh} command.
 
 @item @option{telnet}
-@cindex method telnet
-@cindex telnet method
+@cindex method @option{telnet}
+@cindex @option{telnet} method
 
 Connecting to a remote host with @command{telnet} is as insecure
 as the @option{rsh} method.
 
 @item @option{su}
-@cindex method su
-@cindex su method
+@cindex method @option{su}
+@cindex @option{su} method
 
 Instead of connecting to a remote host, @command{su} program allows
 editing as another user.  The host can be either @samp{localhost} or
@@ -711,21 +766,27 @@ the host returned by the function @command{(system-name)}.  See
 @ref{Multi-hops} for an exception to this behavior.
 
 @item @option{sudo}
-@cindex method sudo
-@cindex sudo method
+@cindex method @option{sudo}
+@cindex @option{sudo} method
 
 Similar to @option{su} method, @option{sudo} uses @command{sudo}.
 @command{sudo} must have sufficient rights to start a shell.
 
-@item @option{doas}
-@cindex method doas
-@cindex doas method
+For security reasons, a @option{sudo} connection is disabled after a
+predefined timeout (5 minutes per default).  This can be changed, see
+@ref{Predefined connection information}.
 
-This method is used on OpenBSD like the @command{sudo} command.
+@item @option{doas}
+@cindex method @option{doas}
+@cindex @option{doas} method
+
+This method is used on OpenBSD like the @command{sudo} command.  Like
+the @option{sudo} method, a @option{doas} connection is disabled after
+a predefined timeout.
 
 @item @option{sg}
-@cindex method sg
-@cindex sg method
+@cindex method @option{sg}
+@cindex @option{sg} method
 
 The @command{sg} program allows editing as different group.  The host
 can be either @samp{localhost} or the host returned by the function
@@ -734,8 +795,8 @@ denotes a group name.  See @ref{Multi-hops} for an exception to this
 behavior.
 
 @item @option{sshx}
-@cindex method sshx
-@cindex sshx method
+@cindex method @option{sshx}
+@cindex @option{sshx} method
 
 Works like @option{ssh} but without the extra authentication prompts.
 @option{sshx} uses @samp{ssh -t -t @var{host} -l @var{user} /bin/sh}
@@ -755,23 +816,23 @@ missing shell prompts that confuses @value{tramp}.
 @option{sshx} supports the @samp{-p} argument.
 
 @item @option{krlogin}
-@cindex method krlogin
-@cindex krlogin method
-@cindex kerberos (with krlogin method)
+@cindex method @option{krlogin}
+@cindex @option{krlogin} method
+@cindex kerberos (with @option{krlogin} method)
 
 This method is also similar to @option{ssh}.  It uses the
 @command{krlogin -x} command only for remote host login.
 
 @item @option{ksu}
-@cindex method ksu
-@cindex ksu method
-@cindex kerberos (with ksu method)
+@cindex method @option{ksu}
+@cindex @option{ksu} method
+@cindex kerberos (with @option{ksu} method)
 
 This is another method from the Kerberos suite.  It behaves like @option{su}.
 
 @item @option{plink}
-@cindex method plink
-@cindex plink method
+@cindex method @option{plink}
+@cindex @option{plink} method
 
 @option{plink} method is for MS Windows users with the PuTTY
 implementation of SSH@.  It uses @samp{plink -ssh} to log in to the
@@ -783,8 +844,8 @@ session.
 @option{plink} method supports the @samp{-P} argument.
 
 @item @option{plinkx}
-@cindex method plinkx
-@cindex plinkx method
+@cindex method @option{plinkx}
+@cindex @option{plinkx} method
 
 Another method using PuTTY on MS Windows with session names instead of
 host names.  @option{plinkx} calls @samp{plink -load @var{session}
@@ -814,10 +875,9 @@ methods.
 
 @table @asis
 @item @option{rcp}
-@cindex method rcp
-@cindex rcp method
-@cindex rcp (with rcp method)
-@cindex rsh (with rcp method)
+@cindex method @option{rcp}
+@cindex @option{rcp} method
+@cindex @command{rsh} (with @option{rcp} method)
 
 This method uses the @command{rsh} and @command{rcp} commands to
 connect to the remote host and transfer files.  This is the fastest
@@ -827,10 +887,9 @@ The alternative method @option{remcp} uses the @command{remsh} and
 @command{rcp} commands.
 
 @item @option{scp}
-@cindex method scp
-@cindex scp method
-@cindex scp (with scp method)
-@cindex ssh (with scp method)
+@cindex method @option{scp}
+@cindex @option{scp} method
+@cindex @command{ssh} (with @option{scp} method)
 
 Using a combination of @command{ssh} to connect and @command{scp} to
 transfer is the most secure.  While the performance is good, it is
@@ -844,10 +903,9 @@ argument list to @command{ssh}, and @samp{-P 42} in the argument list
 to @command{scp}.
 
 @item @option{rsync}
-@cindex method rsync
-@cindex rsync method
-@cindex rsync (with rsync method)
-@cindex ssh (with rsync method)
+@cindex method @option{rsync}
+@cindex @option{rsync} method
+@cindex @command{ssh} (with @option{rsync} method)
 
 @command{ssh} command to connect in combination with @command{rsync}
 command to transfer is similar to the @option{scp} method.
@@ -859,10 +917,9 @@ is lost if the file exists only on one side of the connection.
 This method supports the @samp{-p} argument.
 
 @item @option{scpx}
-@cindex method scpx
-@cindex scpx method
-@cindex scp (with scpx method)
-@cindex ssh (with scpx method)
+@cindex method @option{scpx}
+@cindex @option{scpx} method
+@cindex @command{ssh} (with @option{scpx} method)
 
 @option{scpx} is useful to avoid login shell questions.  It is similar
 in performance to @option{scp}.  @option{scpx} uses @samp{ssh -t -t
@@ -876,16 +933,14 @@ This method supports the @samp{-p} argument.
 
 @item @option{pscp}
 @item @option{psftp}
-@cindex method pscp
-@cindex pscp method
-@cindex pscp (with pscp method)
-@cindex plink (with pscp method)
-@cindex putty (with pscp method)
-@cindex method psftp
-@cindex psftp method
-@cindex pscp (with psftp method)
-@cindex plink (with psftp method)
-@cindex putty (with psftp method)
+@cindex method @option{pscp}
+@cindex @option{pscp} method
+@cindex @command{plink} (with @option{pscp} method)
+@cindex @command{putty} (with @option{pscp} method)
+@cindex method @option{psftp}
+@cindex @option{psftp} method
+@cindex @command{plink} (with @option{psftp} method)
+@cindex @command{putty} (with @option{psftp} method)
 
 These methods are similar to @option{scp} or @option{sftp}, but they
 use the @command{plink} command to connect to the remote host, and
@@ -898,10 +953,9 @@ session.
 These methods support the @samp{-P} argument.
 
 @item @option{fcp}
-@cindex method fcp
-@cindex fcp method
-@cindex fsh (with fcp method)
-@cindex fcp (with fcp method)
+@cindex method @option{fcp}
+@cindex @option{fcp} method
+@cindex @command{fsh} (with @option{fcp} method)
 
 This method is similar to @option{scp}, but uses @command{fsh} to
 connect and @command{fcp} to transfer files.  @command{fsh/fcp}, a
@@ -913,18 +967,17 @@ benefits.
 The command used for this connection is: @samp{fsh @var{host} -l
 @var{user} /bin/sh -i}
 
-@cindex method fsh
-@cindex fsh method
+@cindex method @option{fsh}
+@cindex @option{fsh} method
 
 @option{fsh} has no inline method since the multiplexing it offers is
 not useful for @value{tramp}.  @command{fsh} connects to remote host
 and @value{tramp} keeps that one connection open.
 
 @item @option{nc}
-@cindex method nc
-@cindex nc method
-@cindex nc (with nc method)
-@cindex telnet (with nc method)
+@cindex method @option{nc}
+@cindex @option{nc} method
+@cindex @command{telnet} (with @option{nc} method)
 
 Using @command{telnet} to connect and @command{nc} to transfer files
 is sometimes the only combination suitable for accessing routers or
@@ -932,19 +985,43 @@ NAS hosts.  These dumb devices have severely restricted local shells,
 such as the @command{busybox} and do not host any other encode or
 decode programs.
 
+@item @option{sudoedit}
+@cindex method @option{sudoedit}
+@cindex @option{sudoedit} method
+
+The @option{sudoedit} method allows to edit a file as a different user
+on the local host.  You could regard this as @value{tramp}'s
+implementation of the @command{sudoedit}.  Contrary to the
+@option{sudo} method, all magic file name functions are implemented by
+single @command{sudo @dots{}}  commands.  The purpose is to make
+editing such a file as secure as possible; there must be no session
+running in the Emacs background which could be attacked from inside
+Emacs.
+
+Consequently, external processes are not implemented.
+
+The host name of such remote file names must represent the local host.
+Since the default value is already proper, it is recommended not to
+use any host name in the remote file name, like
+@file{@trampfn{sudoedit,,/path/to/file}} or
+@file{@trampfn{sudoedit,user@@,/path/to/file}}.
+
+Like the @option{sudo} method, a @option{sudoedit} password expires
+after a predefined timeout.
+
 @item @option{ftp}
-@cindex method ftp
-@cindex ftp method
+@cindex method @option{ftp}
+@cindex @option{ftp} method
 
 When @value{tramp} uses @option{ftp}, it forwards requests to whatever
-ftp program is specified by Ange FTP.  This external program must be
+ftp program is specified by Ange FTP@.  This external program must be
 capable of servicing requests from @value{tramp}.
 
 @item @option{smb}
-@cindex method smb
-@cindex smb method
-@cindex ms windows (with smb method)
-@cindex smbclient
+@cindex method @option{smb}
+@cindex @option{smb} method
+@cindex ms windows (with @option{smb} method)
+@cindex @command{smbclient}
 
 This non-native @value{tramp} method connects via the Server Message
 Block (SMB) networking protocol to hosts running file servers that are
@@ -1015,9 +1092,9 @@ can.
 
 
 @item @option{adb}
-@cindex method adb
-@cindex adb method
-@cindex android (with adb method)
+@cindex method @option{adb}
+@cindex @option{adb} method
+@cindex android (with @option{adb} method)
 
 @vindex tramp-adb-program
 @vindex PATH@r{, environment variable}
@@ -1052,6 +1129,48 @@ specified using @file{device#42} host name syntax or @value{tramp} can
 use the default value as declared in @command{adb} command.  Port
 numbers are not applicable to Android devices connected through USB@.
 
+
+@item @option{rclone}
+@cindex method @option{rclone}
+@cindex @option{rclone} method
+
+@vindex tramp-rclone-program
+The program @command{rclone} allows to access different system
+storages in the cloud, see @url{https://rclone.org/} for a list of
+supported systems.  If the @command{rclone} program isn't found in
+your @env{PATH} environment variable, you can tell @value{tramp} its
+absolute path via the user option @code{tramp-rclone-program}.
+
+A system storage must be configured via the @command{rclone config}
+command, outside Emacs.  If you have configured a storage in
+@command{rclone} under a name @samp{storage} (for example), you could
+access it via the remote file name
+
+@example
+@trampfn{rclone,storage,/path/to/file}
+@end example
+
+User names are part of the @command{rclone} configuration, and not
+needed in the remote file name.  If a user name is contained in the
+remote file name, it is ignored.
+
+Internally, @value{tramp} mounts the remote system storage at location
+@file{/tmp/tramp.rclone.storage}, with @file{storage} being the name
+of the configured system storage.
+
+Optional flags to the different @option{rclone} operations could be
+passed as connection property, @xref{Predefined connection
+information}.  Supported properties are @samp{mount-args},
+@samp{copyto-args} and @samp{moveto-args}.
+
+Access via @option{rclone} is slow.  If you have an alternative method
+for accessing the system storage, you shall prefer this.  @ref{GVFS
+based methods} for example, methods @option{gdrive} and
+@option{nextcloud}.
+
+@strong{Note}: The @option{rclone} method is experimental, don't use
+it in production systems!
+
 @end table
 
 
@@ -1061,7 +1180,7 @@ numbers are not applicable to Android devices connected through USB@.
 @cindex gvfs based methods
 @cindex dbus
 
-GVFS is the virtual file system for the Gnome Desktop,
+GVFS is the virtual file system for the @acronym{GNOME} Desktop,
 @uref{https://en.wikipedia.org/wiki/GVFS}.  Remote files on GVFS are
 mounted locally through FUSE and @value{tramp} uses this locally
 mounted directory internally.
@@ -1072,8 +1191,8 @@ D-Bus, dbus}.
 
 @table @asis
 @item @option{afp}
-@cindex method afp
-@cindex afp method
+@cindex method @option{afp}
+@cindex @option{afp} method
 
 This method is for connecting to remote hosts with the Apple Filing
 Protocol for accessing files on macOS volumes.  @value{tramp} access
@@ -1082,10 +1201,10 @@ syntax requires a leading volume (share) name, for example:
 
 @item @option{dav}
 @item @option{davs}
-@cindex method dav
-@cindex method davs
-@cindex dav method
-@cindex davs method
+@cindex method @option{dav}
+@cindex method @option{davs}
+@cindex @option{dav} method
+@cindex @option{davs} method
 
 @option{dav} method provides access to WebDAV files and directories
 based on standard protocols, such as HTTP@.  @option{davs} does the same
@@ -1093,11 +1212,11 @@ but with SSL encryption.  Both methods support the port numbers.
 
 Paths being part of the WebDAV volume to be mounted by GVFS, as it is
 common for OwnCloud or NextCloud file names, are not supported by
-these methods.
+these methods.  See method @option{nextcloud} for handling them.
 
 @item @option{gdrive}
-@cindex method gdrive
-@cindex gdrive method
+@cindex method @option{gdrive}
+@cindex @option{gdrive} method
 @cindex google drive
 
 Via the @option{gdrive} method it is possible to access your Google
@@ -1111,36 +1230,36 @@ Since Google Drive uses cryptic blob file names internally,
 could produce unexpected behavior in case two files in the same
 directory have the same @code{display-name}, such a situation must be avoided.
 
-@item @option{obex}
-@cindex method obex
-@cindex obex method
+@item @option{nextcloud}
+@cindex @acronym{GNOME} Online Accounts
+@cindex method @option{nextcloud}
+@cindex @option{nextcloud} method
+@cindex nextcloud
 
-OBEX is an FTP-like access protocol for cell phones and similar simple
-devices.  @value{tramp} supports OBEX over Bluetooth.
+As the name indicates, the method @option{nextcloud} allows you to
+access OwnCloud or NextCloud hosted files and directories.  Like the
+@option{gdrive} method, your credentials must be populated in your
+@command{Online Accounts} application outside Emacs. The method
+supports port numbers.
 
 @item @option{sftp}
-@cindex method sftp
-@cindex sftp method
+@cindex method @option{sftp}
+@cindex @option{sftp} method
 
 This method uses @command{sftp} in order to securely access remote
 hosts.  @command{sftp} is a more secure option for connecting to hosts
 that for security reasons refuse @command{ssh} connections.
-
-@item @option{synce}
-@cindex method synce
-@cindex synce method
-
-@option{synce} method allows connecting to MS Windows Mobile devices.
-It uses GVFS for mounting remote files and directories via FUSE and
-requires the SYNCE-GVFS plugin.
 
 @end table
 
 @defopt tramp-gvfs-methods
 This user option is a list of external methods for GVFS@.  By default,
 this list includes @option{afp}, @option{dav}, @option{davs},
-@option{gdrive}, @option{obex}, @option{sftp} and @option{synce}.
-Other methods to include are: @option{ftp} and @option{smb}.
+@option{gdrive}, @option{nextcloud} and @option{sftp}.  Other methods
+to include are @option{ftp}, @option{http}, @option{https} and
+@option{smb}.  These methods are not intended to be used directly as
+GVFS based method.  Instead, they are added here for the benefit of
+@ref{Archive file names}.
 @end defopt
 
 
@@ -1378,7 +1497,8 @@ connect to @samp{bastion.your.domain}, then:
 @end lisp
 
 @var{proxy} can take patterns @code{%h} or @code{%u} for @var{host} or
-@var{user} respectively.
+@var{user} respectively.  Ports or domains, if they are part of
+a hop file name, are not expanded by those patterns.
 
 To login as @samp{root} on remote hosts in the domain
 @samp{your.domain}, but login as @samp{root} is disabled for non-local
@@ -1395,8 +1515,10 @@ Opening @file{@trampfn{sudo,randomhost.your.domain,}} first connects
 to @samp{randomhost.your.domain} via @code{ssh} under your account
 name, and then performs @code{sudo -u root} on that host.
 
-It is key for the sudo method in the above example to be applied on
-the host after reaching it and not on the local host.
+It is key for the @option{sudo} method in the above example to be
+applied on the host after reaching it and not on the local host.
+@value{tramp} checks therefore, that the host name for such hops
+matches the host name of the previous hop.
 
 @var{host}, @var{user} and @var{proxy} can also take Lisp forms.  These
 forms when evaluated must return either a string or @code{nil}.
@@ -1462,8 +1584,8 @@ Host host.other.domain
 @end group
 @end example
 
-@code{nc} is BSD's netcat program, which establishes HTTP tunnels. Any
-other program with such a feature could be used as well.
+@code{nc} is BSD's netcat program, which establishes HTTP tunnels.
+Any other program with such a feature could be used as well.
 
 In the example, opening @file{@trampfn{ssh,host.your.domain,}} passes
 the HTTP proxy server @samp{proxy.your.domain} on port 3128.
@@ -1491,6 +1613,74 @@ The @code{tramp-methods} variable currently has an exhaustive list of
 predefined methods.  Any part of this list can be modified with more
 suitable settings.  Refer to the Lisp documentation of that variable,
 accessible with @kbd{C-h v tramp-methods @key{RET}}.
+
+In the ELPA archives, there are several examples of such extensions.
+They can be installed with Emacs' Package Manager.  This includes
+
+@table @samp
+@c @item anything-tramp
+@c @item counsel-tramp
+@c @item helm-tramp
+@c Contact Masashí Míyaura <masasam@users.noreply.github.com>
+
+@c @item ibuffer-tramp.el
+@c Contact Svend Sorensen <svend@@ciffer.net>
+
+@item docker-tramp
+@cindex method @option{docker}
+@cindex @option{docker} method
+Integration for Docker containers.  A container is accessed via
+@file{@trampfn{docker,user@@container,/path/to/file}}, where
+@samp{user} is the (optional) user that you want to use, and
+@samp{container} is the id or name of the container.
+
+@item kubernetes-tramp
+@cindex method @option{kubectl}
+@cindex @option{kubectl} method
+Integration for Docker containers deployed in a Kubernetes cluster.
+It is derived from @samp{docker-tramp}.  A container is accessed via
+@file{@trampfn{kubectl,user@@container,/path/to/file}}, @samp{user}
+and @samp{container} have the same meaning as in @samp{docker-tramp}.
+
+@item lxc-tramp
+@cindex method @option{lxc}
+@cindex @option{lxc} method
+Integration for LXC containers.  A container is accessed via
+@file{@trampfn{lxc,container,/path/to/file}}, @samp{container} has the
+same meaning as in @samp{docker-tramp}.  A @samp{user} specification
+is ignored.
+
+@item lxd-tramp
+@cindex method @option{lxd}
+@cindex @option{lxd} method
+Integration for LXD containers.  A container is accessed via
+@file{@trampfn{lxd,user@@container,/path/to/file}}, @samp{user} and
+@samp{container} have the same meaning as in @samp{docker-tramp}.
+
+@item magit-tramp
+@cindex method @option{git}
+@cindex @option{git} method
+Browing git repositories with @code{magit}.  A versioned file is accessed via
+@file{@trampfn{git,rev@@root-dir,/path/to/file}}.  @samp{rev} is a git
+revision, and @samp{root-dir} is a virtual host name for the root
+directory, specified in @code{magit-tramp-hosts-alist}.
+
+@item tramp-hdfs
+@cindex method @option{hdfs}
+@cindex @option{hdfs} method
+Access of a hadoop/hdfs file system.  A file is accessed via
+@file{@trampfn{hdfs,user@@node,/path/to/file}}, where @samp{user} is
+the user that you want to use, and @samp{node} is the name of the
+hadoop server.
+
+@item vagrant-tramp
+@cindex method @option{vagrant}
+@cindex @option{vagrant} method
+Convenience method to access vagrant boxes.  It is often used in
+multi-hop file names like
+@file{@value{prefix}vagrant@value{postfixhop}box|sudo@value{postfixhop}box@value{postfix}/path/to/file},
+where @samp{box} is the name of the vagrant box.
+@end table
 
 
 @node Customizing Completion
@@ -1641,7 +1831,7 @@ the need.
 The package @file{auth-source.el}, originally developed for No Gnus,
 reads passwords from different sources, @xref{Help for users, ,
 auth-source, auth}.  The default authentication file is
-@file{~/.authinfo.gpg}, but this can be changed via the variable
+@file{~/.authinfo.gpg}, but this can be changed via the user option
 @code{auth-sources}.
 
 @noindent
@@ -1660,8 +1850,25 @@ file name syntax, must be appended to the machine and login items:
 machine melancholia#4711 port davs login daniel%BIZARRE password geheim
 @end example
 
+@vindex auth-source-save-behavior
+If there doesn't exist a proper entry, the password is read
+interactively.  After successful login (verification of the password),
+it is offered to save a corresponding entry for further use by
+@code{auth-source} backends which support this.  This could be changed
+by setting the user option @code{auth-source-save-behavior} to @code{nil}.
+
 @vindex auth-source-debug
 Set @code{auth-source-debug} to @code{t} to debug messages.
+
+@vindex ange-ftp-netrc-filename
+@strong{Note} that @file{auth-source.el} is not used for @option{ftp}
+connections, because @value{tramp} passes the work to Ange FTP@.  If
+you want, for example, use your @file{~/.authinfo.gpg} authentication
+file, you must customize @code{ange-ftp-netrc-filename}:
+
+@lisp
+(customize-set-variable 'ange-ftp-netrc-filename "~/.authinfo.gpg")
+@end lisp
 
 
 @anchor{Caching passwords}
@@ -1742,6 +1949,24 @@ The parameters @code{tramp-remote-shell} and
 @code{tramp-remote-shell-login} in @code{tramp-methods} now have new
 values for the remote host.
 
+A common use case is to override the session timeout of a connection,
+that is the time (in seconds) after a connection is disabled, and must
+be reestablished.  This can be set for any connection; for the
+@option{sudo} and @option{doas} methods there exist predefined values.
+A value of @code{nil} disables this feature.  For example:
+
+@lisp
+@group
+(add-to-list 'tramp-connection-properties
+             (list (regexp-quote "@trampfn{sudo,root@@system-name,}")
+                   "session-timeout" 30))
+@end group
+@end lisp
+
+@noindent
+@samp{system-name} stands here for the host returned by the function
+@command{(system-name)}.
+
 @var{property} could also be any property found in
 @code{tramp-persistency-file-name}.
 
@@ -1807,10 +2032,43 @@ preserves the path value, which can be used to update
 shell supports the login argument @samp{-l}.
 @end defopt
 
+Starting with Emacs 26, @code{tramp-remote-path} can be set per host
+via connection-local
+@ifinfo
+variables, @xref{Connection Variables, , , emacs}.
+@end ifinfo
+@ifnotinfo
+variables.
+@end ifnotinfo
+You could define your own search directories like this:
+
+@lisp
+@group
+(connection-local-set-profile-variables 'remote-path-with-bin
+   '((tramp-remote-path . ("~/bin" tramp-default-remote-path))))
+@end group
+
+@group
+(connection-local-set-profile-variables 'remote-path-with-apply-pub-bin
+   '((tramp-remote-path . ("/appli/pub/bin" tramp-default-remote-path))))
+@end group
+
+@group
+(connection-local-set-profiles
+   '(:application tramp :machine "randomhost") 'remote-path-with-bin)
+@end group
+
+@group
+(connection-local-set-profiles
+   '(:application tramp :user "anotheruser" :machine "anotherhost")
+     'remote-path-with-apply-pub-bin)
+@end group
+@end lisp
+
 When remote search paths are changed, local @value{tramp} caches must
-be recomputed.  To force @value{tramp} to recompute afresh, exit
-Emacs, remove the persistent file (@pxref{Connection caching}), and
-restart Emacs.
+be recomputed.  To force @value{tramp} to recompute afresh, call
+@kbd{M-x tramp-cleanup-this-connection @key{RET}} or friends
+(@pxref{Cleanup remote connections}).
 
 
 @node Remote shell setup
@@ -2019,10 +2277,10 @@ shell-specific config files.  For example, bash can use
 parsing.  This redefinition affects the looks of a prompt in an
 interactive remote shell through commands, such as @kbd{M-x shell
 @key{RET}}.  Such prompts, however, can be reset to something more
-readable and recognizable using these @value{tramp} variables.
+readable and recognizable using these environment variables.
 
-@value{tramp} sets the @env{INSIDE_EMACS} variable in the startup
-script file @file{~/.emacs_SHELLNAME}.
+@value{tramp} sets the @env{INSIDE_EMACS} environment variable in the
+startup script file @file{~/.emacs_SHELLNAME}.
 
 @env{SHELLNAME} is @code{bash} or equivalent shell names.  Change it by
 setting the environment variable @env{ESHELL} in the @file{.emacs} as
@@ -2048,8 +2306,8 @@ fi
 @end ifinfo
 
 @item @command{busybox} / @command{nc}
-@cindex unix command nc
-@cindex nc unix command
+@cindex unix command @command{nc}
+@cindex @command{nc} unix command
 
 @value{tramp}'s @option{nc} method uses the @command{nc} command to
 install and execute a listener as follows (see @code{tramp-methods}):
@@ -2267,8 +2525,8 @@ to direct all auto saves to that location.
 
 This section is incomplete.  Please share your solutions.
 
-@cindex method sshx with cygwin
-@cindex sshx method with cygwin
+@cindex method @option{sshx} with cygwin
+@cindex @option{sshx} method with cygwin
 
 Cygwin's @command{ssh} works only with a Cygwin version of Emacs.  To
 check for compatibility: type @kbd{M-x eshell @key{RET}}, and start
@@ -2290,8 +2548,8 @@ On @uref{https://www.emacswiki.org/emacs/SshWithNTEmacs, the Emacs
 Wiki} it is explained how to use the helper program
 @command{fakecygpty} to fix this problem.
 
-@cindex method scpx with cygwin
-@cindex scpx method with cygwin
+@cindex method @option{scpx} with cygwin
+@cindex @option{scpx} method with cygwin
 
 When using the @option{scpx} access method, Emacs may call
 @command{scp} with MS Windows file naming, such as @code{c:/foo}.  But
@@ -2347,6 +2605,7 @@ is a feature of Emacs that may cause missed prompts when using
 * Ad-hoc multi-hops::           Declaring multiple hops in the file name.
 * Remote processes::            Integration with other Emacs packages.
 * Cleanup remote connections::  Cleanup remote connections.
+* Archive file names::          Access to files in file archives.
 @end menu
 
 
@@ -2429,7 +2688,7 @@ names.  Beside the @code{default} value, @var{syntax} can be
 @item @code{simplified}
 @cindex simplified syntax
 
-The remote file name syntax is similar to the syntax used by Ange FTP.
+The remote file name syntax is similar to the syntax used by Ange FTP@.
 A remote file name has the form
 @code{@value{prefix}user@@host@value{postfix}path/to/file}.  The
 @code{user@@} part is optional, and the method is determined by
@@ -2453,11 +2712,12 @@ and @code{user@@} parts are optional.
 
 @defvar tramp-file-name-regexp
 This variable keeps a regexp which matches the selected remote file
-name syntax.  However, it is not recommended to use this variable in
-external packages, a call of @code{file-remote-p} is much more
-appropriate.
+name syntax.  Its value changes after every call of
+@code{tramp-change-syntax}.  However, it is not recommended to use
+this variable in external packages, a call of @code{file-remote-p} is
+much more appropriate.
 @ifinfo
-@pxref{Magic File Names, , , elisp}
+@pxref{Magic File Names, , , elisp}.
 @end ifinfo
 @end defvar
 @end ifset
@@ -2531,6 +2791,14 @@ names on that host.
 When the configuration (@pxref{Customizing Completion}) includes user
 names, then the completion lists will account for the user names as well.
 
+@vindex tramp-completion-use-auth-sources
+Results from @code{auth-sources} search (@pxref{Using an
+authentication file}) are added to the completion candidates.  This
+search could be annoying, for example due to a passphrase request of
+the @file{~/.authinfo.gpg} authentication file.  The user option
+@code{tramp-completion-use-auth-sources} controls, whether such a
+search is performed during completion.
+
 Remote hosts previously visited or hosts whose connections are kept
 persistently (@pxref{Connection caching}) will be included in the
 completion lists.
@@ -2553,7 +2821,7 @@ Example:
      @print{} @trampfn{ssh,melancholia,/etc}
 
 @kbd{C-x C-f @trampfn{ssh,melancholia,//etc} @key{TAB}}
-     @print{} /etc
+     @print{} @trampfn{ssh,melancholia,/etc}
 
 @kbd{C-x C-f @trampfn{ssh,melancholia,/usr/local/bin///etc} @key{TAB}}
      @print{} /etc
@@ -2579,9 +2847,9 @@ directory contents.
 @cindex multi-hop, ad-hoc
 @cindex proxy hosts, ad-hoc
 
-@value{tramp} file name syntax can accommodate ad hoc specification of
+@value{tramp} file name syntax can accommodate ad-hoc specification of
 multiple proxies without using @code{tramp-default-proxies-alist}
-configuration setup(@pxref{Multi-hops}).
+configuration setup (@pxref{Multi-hops}).
 
 Each proxy is specified using the same syntax as the remote host
 specification minus the file name part.  Each hop is separated by a
@@ -2596,13 +2864,14 @@ proxy @samp{bird@@bastion} to a remote file on @samp{you@@remotehost}:
 
 Each involved method must be an inline method (@pxref{Inline methods}).
 
-Proxies can take patterns @code{%h} or @code{%u}.
-
 @value{tramp} adds the ad-hoc definitions on the fly to
-@code{tramp-default-proxies-alist} and is available for re-use
-during that Emacs session.  Subsequent @value{tramp} connections to
-the same remote host can then use the shortcut form:
-@samp{@trampfn{ssh,you@@remotehost,/path}}.
+@code{tramp-default-proxies-alist} and is available for re-use during
+that Emacs session.  Subsequent @value{tramp} connections to the same
+remote host can then use the shortcut form:
+@samp{@trampfn{ssh,you@@remotehost,/path}}.  Ad-hoc definitions are
+removed from @code{tramp-default-proxies-alist} via the command
+@kbd{M-x tramp-cleanup-all-connections @key{RET}} (@pxref{Cleanup
+remote connections}).
 
 @defopt tramp-save-ad-hoc-proxies
 For ad-hoc definitions to be saved automatically in
@@ -2613,6 +2882,17 @@ For ad-hoc definitions to be saved automatically in
 (customize-set-variable 'tramp-save-ad-hoc-proxies t)
 @end lisp
 @end defopt
+
+Ad-hoc proxies can take patterns @code{%h} or @code{%u} like in
+@code{tramp-default-proxies-alist}.  The following file name expands
+to user @code{root} on host @code{remotehost}, starting with an
+@option{ssh} session on host @code{remotehost}:
+@samp{@value{prefix}ssh@value{postfixhop}%h|su@value{postfixhop}remotehost@value{postfix}}.
+
+On the other hand, if a trailing hop does not specifiy a host name,
+the host name of the previous hop is reused. Therefore, the following
+file name is equivalent to the previous example:
+@samp{@value{prefix}ssh@value{postfixhop}remotehost|su@value{postfixhop}@value{postfix}}.
 
 
 @node Remote processes
@@ -2776,7 +3056,7 @@ Starting with Emacs 26, you could use connection-local variables for
 setting different values of @code{explicit-shell-file-name} for
 different remote hosts.
 @ifinfo
-@pxref{Connection Local Variables, , , elisp}
+@xref{Connection Variables, , , emacs}.
 @end ifinfo
 
 @lisp
@@ -2829,6 +3109,25 @@ host.  Example:
 @kbd{M-x auto-revert-tail-mode @key{RET}} runs similarly showing
 continuous output.
 
+@vindex shell-file-name
+@vindex shell-command-switch
+@code{shell-command} uses the variables @code{shell-file-name} and
+@code{shell-command-switch} in order to determine which shell to run.
+For remote hosts, their default values are @file{/bin/sh} and
+@option{-c}, respectively (except for the @option{adb} method, which
+uses @file{/system/bin/sh}).  Like the variables in the previous
+section, these variables can be changed via connection-local
+variables.
+
+@vindex async-shell-command-width
+@vindex COLUMNS@r{, environment variable}
+If Emacs supports the variable @code{async-shell-command-width} (since
+Emacs 27.1), @value{tramp} cares about its value for asynchronous
+shell commands.  It specifies the number of display columns for
+command output.  For synchronous shell commands, a similar effect can
+be achieved by adding the environment variable @env{COLUMNS} to
+@code{tramp-remote-process-environment}.
+
 
 @subsection Running @code{eshell} on a remote host
 @cindex @code{eshell}
@@ -2877,7 +3176,7 @@ uid=0(root) gid=0(root) groups=0(root)
 
 @anchor{Running a debugger on a remote host}
 @subsection Running a debugger on a remote host
-@cindex @code{gud}
+@cindex @file{gud.el}
 @cindex @code{gdb}
 @cindex @code{perldb}
 
@@ -2972,7 +3271,8 @@ interactively, this command lists active remote connections in the
 minibuffer.  Each connection is of the format
 @file{@trampfn{method,user@@host,}}.  Flushing remote connections also
 cleans the password cache (@pxref{Password handling}), file cache,
-connection cache (@pxref{Connection caching}), and connection buffers.
+connection cache (@pxref{Connection caching}), recentf cache
+(@pxref{File Conveniences, , , emacs}), and connection buffers.
 @end deffn
 
 @deffn Command tramp-cleanup-this-connection
@@ -2982,14 +3282,255 @@ as in @code{tramp-cleanup-connection}.
 
 @deffn Command tramp-cleanup-all-connections
 Flushes all active remote connection objects, the same as in
-@code{tramp-cleanup-connection}.
+@code{tramp-cleanup-connection}.  This command removes also ad-hoc
+proxy definitions (@pxref{Ad-hoc multi-hops}).
+
 @end deffn
 
 @deffn Command tramp-cleanup-all-buffers
 Just as for @code{tramp-cleanup-all-connections}, all remote
-connections are cleaned up in addition to killing buffers related to
-that remote connection.
+connections and ad-hoc proxy definition are cleaned up in addition to
+killing buffers related to that remote connection.
 @end deffn
+
+
+@node Archive file names
+@section Archive file names
+@cindex file archives
+@cindex archive file names
+@cindex method archive
+@cindex archive method
+
+@value{tramp} offers also transparent access to files inside file
+archives.  This is possible only on machines which have installed the
+virtual file system for the @acronym{GNOME} Desktop (GVFS), @ref{GVFS
+based methods}.  Internally, file archives are mounted via the GVFS
+@option{archive} method.
+
+A file archive is a regular file of kind @file{/path/to/dir/file.EXT}.
+The extension @samp{.EXT} identifies the type of the file archive.  A
+file inside a file archive, called archive file name, has the name
+@file{/path/to/dir/file.EXT/dir/file}.
+
+Most of the @ref{Magic File Names, , magic file name operations,
+elisp}, are implemented for archive file names, exceptions are all
+operations which write into a file archive, and process related
+operations.  Therefore, functions like
+
+@lisp
+(copy-file "/path/to/dir/file.tar/dir/file" "/somewhere/else")
+@end lisp
+
+@noindent
+work out of the box.  This is also true for file name completion, and
+for libraries like @code{dired} or @code{ediff}, which accept archive
+file names as well.
+
+@vindex tramp-archive-suffixes
+File archives are identified by the file name extension @samp{.EXT}.
+Since GVFS uses internally the library @code{libarchive(3)}, all
+suffixes, which are accepted by this library, work also for archive
+file names.  Accepted suffixes are listed in the constant
+@code{tramp-archive-suffixes}.  They are
+
+@itemize
+@item @samp{.7z} ---
+7-Zip archives
+@cindex @file{7z} file archive suffix
+@cindex file archive suffix @file{7z}
+
+@item @samp{.apk} ---
+Android package kits
+@cindex @file{apk} file archive suffix
+@cindex file archive suffix @file{apk}
+
+@item @samp{.ar} ---
+UNIX archiver formats
+@cindex @file{ar} file archive suffix
+@cindex file archive suffix @file{ar}
+
+@item @samp{.cab}, @samp{.CAB} ---
+Microsoft Windows cabinets
+@cindex @file{cab} file archive suffix
+@cindex @file{CAB} file archive suffix
+@cindex file archive suffix @file{cab}
+@cindex file archive suffix @file{CAB}
+
+@item @samp{.cpio} ---
+CPIO archives
+@cindex @file{cpio} file archive suffix
+@cindex file archive suffix @file{cpio}
+
+@item @samp{.deb} ---
+Debian packages
+@cindex @file{deb} file archive suffix
+@cindex file archive suffix @file{deb}
+
+@item @samp{.depot} ---
+HP-UX SD depots
+@cindex @file{depot} file archive suffix
+@cindex file archive suffix @file{depot}
+
+@item @samp{.exe} ---
+Self extracting Microsoft Windows EXE files
+@cindex @file{exe} file archive suffix
+@cindex file archive suffix @file{exe}
+
+@item @samp{.iso} ---
+ISO 9660 images
+@cindex @file{iso} file archive suffix
+@cindex file archive suffix @file{iso}
+
+@item @samp{.jar} ---
+Java archives
+@cindex @file{jar} file archive suffix
+@cindex file archive suffix @file{jar}
+
+@item @samp{.lzh}, @samp{.LZH} ---
+Microsoft Windows compressed LHA archives
+@cindex @file{lzh} file archive suffix
+@cindex @file{LZH} file archive suffix
+@cindex file archive suffix @file{lzh}
+@cindex file archive suffix @file{LZH}
+
+@item @samp{.msu}, @samp{.MSU} ---
+Microsoft Windows Update packages
+@cindex @file{msu} file archive suffix
+@cindex @file{MSU} file archive suffix
+@cindex file archive suffix @file{msu}
+@cindex file archive suffix @file{MSU}
+
+@item @samp{.mtree} ---
+BSD mtree format
+@cindex @file{mtree} file archive suffix
+@cindex file archive suffix @file{mtree}
+
+@item @samp{.odb}, @samp{.odf}, @samp{.odg}, @samp{.odp}, @samp{.ods},
+@samp{.odt} ---
+OpenDocument formats
+@cindex @file{odb} file archive suffix
+@cindex @file{odf} file archive suffix
+@cindex @file{odg} file archive suffix
+@cindex @file{odp} file archive suffix
+@cindex @file{ods} file archive suffix
+@cindex @file{odt} file archive suffix
+@cindex file archive suffix @file{odb}
+@cindex file archive suffix @file{odf}
+@cindex file archive suffix @file{odg}
+@cindex file archive suffix @file{odp}
+@cindex file archive suffix @file{ods}
+@cindex file archive suffix @file{odt}
+
+@item @samp{.pax} ---
+Posix archives
+@cindex @file{pax} file archive suffix
+@cindex file archive suffix @file{pax}
+
+@item @samp{.rar} ---
+RAR archives
+@cindex @file{rar} file archive suffix
+@cindex file archive suffix @file{rar}
+
+@item @samp{.rpm} ---
+Red Hat packages
+@cindex @file{rpm} file archive suffix
+@cindex file archive suffix @file{rpm}
+
+@item @samp{.shar} ---
+Shell archives
+@cindex @file{shar} file archive suffix
+@cindex file archive suffix @file{shar}
+
+@item @samp{.tar}, @samp{.tbz}, @samp{.tgz}, @samp{.tlz}, @samp{.txz},
+@samp{.tzst} ---
+(Compressed) tape archives
+@cindex @file{tar} file archive suffix
+@cindex @file{tbz} file archive suffix
+@cindex @file{tgz} file archive suffix
+@cindex @file{tlz} file archive suffix
+@cindex @file{txz} file archive suffix
+@cindex @file{tzst} file archive suffix
+@cindex file archive suffix @file{tar}
+@cindex file archive suffix @file{tbz}
+@cindex file archive suffix @file{tgz}
+@cindex file archive suffix @file{tlz}
+@cindex file archive suffix @file{txz}
+@cindex file archive suffix @file{tzst}
+
+@item @samp{.warc} ---
+Web archives
+@cindex @file{warc} file archive suffix
+@cindex file archive suffix @file{warc}
+
+@item @samp{.xar} ---
+macOS XAR archives
+@cindex @file{xar} file archive suffix
+@cindex file archive suffix @file{xar}
+
+@item @samp{.xpi} ---
+XPInstall Mozilla addons
+@cindex @file{xpi} file archive suffix
+@cindex file archive suffix @file{xpi}
+
+@item @samp{.xps} ---
+Open XML Paper Specification (OpenXPS) documents
+@cindex @file{xps} file archive suffix
+@cindex file archive suffix @file{xps}
+
+@item @samp{.zip}, @samp{.ZIP} ---
+ZIP archives
+@cindex @file{zip} file archive suffix
+@cindex @file{ZIP} file archive suffix
+@cindex file archive suffix @file{zip}
+@cindex file archive suffix @file{ZIP}
+@end itemize
+
+@vindex tramp-archive-compression-suffixes
+File archives could also be compressed, identified by an additional
+compression suffix.  Valid compression suffixes are listed in the
+constant @code{tramp-archive-compression-suffixes}.  They are
+@samp{.bz2}, @samp{.gz}, @samp{.lrz}, @samp{.lz}, @samp{.lz4},
+@samp{.lzma}, @samp{.lzo}, @samp{.uu}, @samp{.xz}, @samp{.Z}, and
+@samp{.zst}.  A valid archive file name would be
+@file{/path/to/dir/file.tar.gz/dir/file}.  Even several suffixes in a
+row are possible, like @file{/path/to/dir/file.tar.gz.uu/dir/file}.
+
+@vindex tramp-archive-all-gvfs-methods
+An archive file name could be a remote file name, as in
+@file{/ftp:anonymous@@ftp.gnu.org:/gnu/tramp/tramp-2.3.2.tar.gz/INSTALL}.
+Since all file operations are mapped internally to GVFS operations,
+remote file names supported by @code{tramp-gvfs} perform better,
+because no local copy of the file archive must be downloaded first.
+For example, @samp{/sftp:user@@host:...} performs better than the
+similar @samp{/scp:user@@host:...}.  See the constant
+@code{tramp-archive-all-gvfs-methods} for a complete list of
+@code{tramp-gvfs} supported method names.
+
+If @code{url-handler-mode} is enabled, archives could be visited via
+URLs, like
+@file{https://ftp.gnu.org/gnu/tramp/tramp-2.3.2.tar.gz/INSTALL}.  This
+allows complex file operations like
+
+@lisp
+@group
+(progn
+  (url-handler-mode 1)
+  (ediff-directories
+   "https://ftp.gnu.org/gnu/tramp/tramp-2.3.1.tar.gz/tramp-2.3.1"
+   "https://ftp.gnu.org/gnu/tramp/tramp-2.3.2.tar.gz/tramp-2.3.2" ""))
+@end group
+@end lisp
+
+It is even possible to access file archives in file archives, as
+
+@lisp
+@group
+(progn
+  (url-handler-mode 1)
+  (find-file
+   "http://ftp.debian.org/debian/pool/main/c/coreutils/coreutils_8.28-1_amd64.deb/control.tar.gz/control"))
+@end group
+@end lisp
 
 
 @node Bug Reports
@@ -3007,9 +3548,9 @@ discussing, and general discussions about @value{tramp}.
 post for moderator approval.  Sometimes this approval step may take as
 long as 48 hours due to public holidays.
 
-@email{tramp-devel@@gnu.org} is the mailing list.  Messages sent to
-this address go to all the subscribers.  This is @emph{not} the
-address to send subscription requests to.
+@email{@value{tramp-bug-report-address}} is the mailing list.
+Messages sent to this address go to all the subscribers.  This is
+@emph{not} the address to send subscription requests to.
 
 To subscribe to the mailing list, visit:
 @uref{https://lists.gnu.org/mailman/listinfo/tramp-devel/, the
@@ -3043,7 +3584,9 @@ When including @value{tramp}'s messages in the bug report, increase
 the verbosity level to 6 (@pxref{Traces and Profiles, Traces}) in the
 @file{~/.emacs} file before repeating steps to the bug.  Include the
 contents of the @file{*tramp/foo*} and @file{*debug tramp/foo*}
-buffers with the bug report.
+buffers with the bug report.  Both buffers could contain
+non-@acronym{ASCII} characters which are relevant for analysis, append
+the buffers as attachments to the bug report.
 
 @strong{Note} that a verbosity level greater than 6 is not necessary
 at this stage.  Also note that a verbosity level of 6 or greater, the
@@ -3076,7 +3619,8 @@ Where is the latest @value{tramp}?
 @item
 Which systems does it work on?
 
-The package works successfully on Emacs 24, Emacs 25, and Emacs 26.
+The package works successfully on Emacs 24, Emacs 25, Emacs 26, and
+Emacs 27.
 
 While Unix and Unix-like systems are the primary remote targets,
 @value{tramp} has equal success connecting to other platforms, such as
@@ -3099,6 +3643,7 @@ Keep the file @code{tramp-persistency-file-name}, which is where
 @value{tramp} caches remote information about hosts and files.  Caching
 is enabled by default.  Don't disable it.
 
+@vindex remote-file-name-inhibit-cache
 Set @code{remote-file-name-inhibit-cache} to @code{nil} if remote
 files are not independently updated outside @value{tramp}'s control.
 That cache cleanup will be necessary if the remote directories or
@@ -3235,7 +3780,7 @@ Set @code{file-precious-flag} to @code{t} for files accessed by
 @value{tramp} so the file contents are checked using checksum by
 first saving to a temporary file.
 @ifinfo
-@pxref{Saving Buffers, , , elisp}
+@pxref{Saving Buffers, , , elisp}.
 @end ifinfo
 
 @lisp
@@ -3248,6 +3793,16 @@ first saving to a temporary file.
 @end group
 @end lisp
 @end itemize
+
+
+@item
+@value{tramp} fails in a chrooted environment
+
+@vindex tramp-local-host-regexp
+When connecting to a local host, @value{tramp} uses some internal
+optimizations.  They fail, when there is a chrooted environment.  In
+order to disable those optimizations, set user option
+@code{tramp-local-host-regexp} to @code{nil}.
 
 
 @item
@@ -3765,6 +4320,15 @@ export EDITOR=/path/to/emacsclient.sh
 
 
 @item
+How to determine whether a buffer is remote?
+
+The buffer-local variable @code{default-directory} tells this.  If the
+form @code{(file-remote-p default-directory)} returns non-@code{nil},
+the buffer is remote.  See the optional arguments of
+@code{file-remote-p} for determining details of the remote connection.
+
+
+@item
 How to disable other packages from calling @value{tramp}?
 
 There are packages that call @value{tramp} without the user ever
@@ -3806,6 +4370,7 @@ in @file{.emacs}:
 @end lisp
 
 @item
+@vindex tramp-mode
 To disable both @value{tramp} (and Ange FTP), set @code{tramp-mode} to
 @code{nil} in @file{.emacs}.  @strong{Note}, that we don't use
 @code{customize-set-variable}, in order to avoid loading @value{tramp}.
@@ -3813,6 +4378,21 @@ To disable both @value{tramp} (and Ange FTP), set @code{tramp-mode} to
 @lisp
 (setq tramp-mode nil)
 @end lisp
+
+@item
+@vindex tramp-ignored-file-name-regexp
+To deactivate @value{tramp} for some look-alike remote file names, set
+@code{tramp-ignored-file-name-regexp} to a proper regexp in
+@file{.emacs}.  @strong{Note}, that we don't use
+@code{customize-set-variable}, in order to avoid loading
+@value{tramp}.
+
+@lisp
+(setq tramp-ignored-file-name-regexp "\\`/ssh:example\\.com:")
+@end lisp
+
+This is needed, if you mount for example a virtual file system on your
+local host's root directory as @file{/ssh:example.com:}.
 
 @item
 To unload @value{tramp}, type @kbd{M-x tramp-unload-tramp @key{RET}}.
@@ -3823,7 +4403,7 @@ Unloading @value{tramp} resets Ange FTP plugins also.
 
 @c For the developer
 @node Files directories and localnames
-@chapter How file names, directories and localnames are mangled and managed.
+@chapter How file names, directories and localnames are mangled and managed
 
 @menu
 * Localname deconstruction::    Splitting a localname into its component parts.
@@ -3849,9 +4429,10 @@ handlers.
 @section Integrating with external Lisp packages
 @subsection File name completion.
 
+@vindex non-essential
 Sometimes, it is not convenient to open a new connection to a remote
 host, including entering the password and alike.  For example, this is
-nasty for packages providing file name completion. Such a package
+nasty for packages providing file name completion.  Such a package
 could signal to @value{tramp}, that they don't want it to establish a
 new connection.  Use the variable @code{non-essential} temporarily and
 bind it to non-@code{nil} value.
@@ -3906,6 +4487,7 @@ root-directory, it is most likely sufficient to make the
 
 @node Traces and Profiles
 @chapter How to Customize Traces
+@vindex tramp-verbose
 
 @value{tramp} messages are raised with verbosity levels ranging from 0
 to 10.  @value{tramp} does not display all messages; only those with a

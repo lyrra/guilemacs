@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -28,11 +28,11 @@
 
 ;;; CLASSES
 
-(eval-when-compile (require 'cl))
 (require 'eieio)
 (require 'cl-generic)
 (require 'srecode)
 (require 'srecode/table)
+(require 'srecode/fields)
 (eval-when-compile (require 'semantic))
 
 (declare-function srecode-compile-parse-inserter "srecode/compile")
@@ -42,7 +42,6 @@
 (declare-function srecode-insert-code-stream "srecode/insert")
 (declare-function data-debug-new-buffer "data-debug")
 (declare-function data-debug-insert-object-slots "eieio-datadebug")
-(declare-function srecode-field "srecode/fields")
 
 (defclass srecode-dictionary ()
   ((namehash :initarg :namehash
@@ -123,7 +122,7 @@ Makes sure that :value is compiled."
 
     (cl-call-next-method this (nreverse newfields))
     (when (not (slot-boundp this 'compiled))
-      (let ((val (oref this :value))
+      (let ((val (oref this value))
 	    (comp nil))
 	(while val
 	  (let ((nval (car val))
@@ -142,7 +141,7 @@ Makes sure that :value is compiled."
 		   (error "Don't know how to handle variable value %S" nval)))
 	    )
 	  (setq val (cdr val)))
-	(oset this :compiled (nreverse comp))))))
+	(oset this compiled (nreverse comp))))))
 
 ;;; DICTIONARY METHODS
 ;;
@@ -173,7 +172,7 @@ associated with a buffer or parent."
 	      initfrombuff t))
 
        ;; Parent is another dictionary
-       ((srecode-dictionary-child-p buffer-or-parent)
+       ((cl-typep buffer-or-parent 'srecode-dictionary)
 	(setq parent buffer-or-parent
 	      buffer (oref buffer-or-parent buffer)
 	      origin (concat (eieio-object-name buffer-or-parent) " in "
@@ -224,7 +223,7 @@ TPL is an object representing a compiled template file."
     ;; Tables are sorted with highest priority first, useful for looking
     ;; up templates, but this means we need to install the variables in
     ;; reverse order so higher priority variables override lower ones.
-    (let ((tabs (reverse (oref tpl :tables))))
+    (let ((tabs (reverse (oref tpl tables))))
       (require 'srecode/find) ; For srecode-template-table-in-project-p
       (while tabs
 	(when (srecode-template-table-in-project-p (car tabs))
@@ -357,7 +356,7 @@ values but STATE is nil."
 	(srecode-dictionary-set-value dict name value))
 
        ;; Value is a dictionary; insert as child dictionary.
-       ((srecode-dictionary-child-p value)
+       ((cl-typep value 'srecode-dictionary)
 	(srecode-dictionary-merge
 	 (srecode-dictionary-add-section-dictionary dict name)
 	 value t))
@@ -506,7 +505,6 @@ inserted with a new editable field.")
 				     function
 				     dictionary)
   "Convert this field into an insertable string."
-  (require 'srecode/fields)
   ;; If we are not in a buffer, then this is not supported.
   (when (not (bufferp standard-output))
     (error "FIELDS invoked while inserting template to non-buffer"))
@@ -519,13 +517,13 @@ inserted with a new editable field.")
     (let* ((dv (oref cp defaultvalue))
 	   (sti (oref cp firstinserter))
 	   (start (point))
-	   (name (oref sti :object-name)))
+	   (name (oref sti object-name)))
 
       (cond
        ;; No default value.
        ((not dv) (insert name))
        ;; A compound value as the default?  Recurse.
-       ((srecode-dictionary-compound-value-child-p dv)
+       ((cl-typep dv 'srecode-dictionary-compound-value)
 	(srecode-compound-toString dv function dictionary))
        ;; A string that is empty?  Use the name.
        ((and (stringp dv) (string= dv ""))
@@ -612,10 +610,9 @@ STATE is the current compiler state."
 			  (srecode-get-mode-table modesym))
 		   (error "No table found for mode %S" modesym)))
 	 (dict (srecode-create-dictionary (current-buffer)))
-	 (end (current-time))
 	 )
     (message "Creating a dictionary took %.2f seconds."
-	     (semantic-elapsed-time start end))
+	     (semantic-elapsed-time start nil))
     (data-debug-new-buffer "*SRECODE ADEBUG*")
     (data-debug-insert-object-slots dict "*")))
 
@@ -662,7 +659,7 @@ STATE is the current compiler state."
 			))
 		    (princ "\n")
 		    )
-		   ((srecode-dictionary-compound-value-child-p entry)
+		   ((cl-typep entry 'srecode-dictionary-compound-value)
 		    (srecode-dump entry indent)
 		    (princ "\n")
 		    )

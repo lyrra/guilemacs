@@ -142,6 +142,11 @@ struct window
        as well.  */
     Lisp_Object contents;
 
+    /* The old buffer of this window, set to this window's buffer by
+       run_window_change_functions every time it sees this window.
+       Unused for internal windows.  */
+    Lisp_Object old_buffer;
+
     /* A marker pointing to where in the text to start displaying.
        BIDI Note: This is the _logical-order_ start, i.e. the smallest
        buffer position visible in the window, not necessarily the
@@ -204,6 +209,12 @@ struct window
     /* An alist with parameters.  */
     Lisp_Object window_parameters;
 
+    /* The help echo text for this window.  Qnil if there's none.  */
+    Lisp_Object mode_line_help_echo;
+
+    /* No Lisp data may follow this point; mode_line_help_echo must be
+       the last Lisp member.  */
+
     /* Glyph matrices.  */
     struct glyph_matrix *current_matrix;
     struct glyph_matrix *desired_matrix;
@@ -222,6 +233,14 @@ struct window
     /* Unique number of window assigned when it was created.  */
     EMACS_INT sequence_number;
 
+    /* The change stamp of this window.  Set to 0 when the window is
+       created, it is set to its frame's change stamp every time
+       run_window_change_functions is run on that frame with this
+       window live.  It is left alone when the window exists only
+       within a window configuration.  Not useful for internal
+       windows.  */
+    int change_stamp;
+
     /* The upper left corner pixel coordinates of this window, as
        integers relative to upper left corner of frame = 0, 0.  */
     int pixel_left;
@@ -236,10 +255,13 @@ struct window
     int pixel_width;
     int pixel_height;
 
-    /* The pixel sizes of the window at the last time
-       `window-size-change-functions' was run.  */
-    int pixel_width_before_size_change;
-    int pixel_height_before_size_change;
+    /* The pixel and pixel body sizes of the window at the last time
+       run_window_change_functions was run with this window live.  Not
+       useful for internal windows.  */
+    int old_pixel_width;
+    int old_pixel_height;
+    int old_body_pixel_width;
+    int old_body_pixel_height;
 
     /* The size of the window.  */
     int total_cols;
@@ -258,11 +280,11 @@ struct window
 
     /* Displayed buffer's text modification events counter as of last time
        display completed.  */
-    EMACS_INT last_modified;
+    modiff_count last_modified;
 
     /* Displayed buffer's overlays modification events counter as of last
        complete update.  */
-    EMACS_INT last_overlay_modified;
+    modiff_count last_overlay_modified;
 
     /* Value of point at that time.  Since this is a position in a buffer,
        it should be positive.  */
@@ -419,7 +441,7 @@ struct window
     /* Z_BYTE - buffer position of the last glyph in the current matrix of W.
        Should be nonnegative, and only valid if window_end_valid is true.  */
     ptrdiff_t window_end_bytepos;
-  };
+  } GCALIGNED_STRUCT;
 
 INLINE bool
 WINDOWP (Lisp_Object a)
@@ -464,6 +486,12 @@ INLINE void
 wset_redisplay_end_trigger (struct window *w, Lisp_Object val)
 {
   w->redisplay_end_trigger = val;
+}
+
+INLINE void
+wset_mode_line_help_echo (struct window *w, Lisp_Object val)
+{
+  w->mode_line_help_echo = val;
 }
 
 INLINE void
@@ -567,7 +595,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #define WINDOW_BUFFER(W)			\
   (WINDOW_LEAF_P(W)				\
    ? (W)->contents				\
-   : Qnil)					\
+   : Qnil)
 
 /* Return the canonical column width of the frame of window W.  */
 #define WINDOW_FRAME_COLUMN_WIDTH(W) \
@@ -621,7 +649,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #define WINDOW_RIGHTMOST_P(W)					\
   (WINDOW_RIGHT_PIXEL_EDGE (W)					\
    == (WINDOW_RIGHT_PIXEL_EDGE					\
-       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))	\
+       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))
 
 /* True if window W has no other windows below it on its frame (the
    minibuffer window is not counted in this respect unless W itself is a
@@ -629,13 +657,13 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #define WINDOW_BOTTOMMOST_P(W)					\
   (WINDOW_BOTTOM_PIXEL_EDGE (W)					\
    == (WINDOW_BOTTOM_PIXEL_EDGE					\
-       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))	\
+       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))
 
 /* True if window W takes up the full width of its frame.  */
 #define WINDOW_FULL_WIDTH_P(W)					\
   (WINDOW_PIXEL_WIDTH (W)					\
    == (WINDOW_PIXEL_WIDTH					\
-       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))	\
+       (XWINDOW (FRAME_ROOT_WINDOW (WINDOW_XFRAME (W))))))
 
 /* Width of right divider of window W.  */
 #define WINDOW_RIGHT_DIVIDER_WIDTH(W)				\
@@ -710,7 +738,7 @@ wset_next_buffers (struct window *w, Lisp_Object val)
 #endif
 
 /* True if W is a tool bar window.  */
-#if defined (HAVE_WINDOW_SYSTEM) && ! defined (USE_GTK) && ! defined (HAVE_NS)
+#if defined (HAVE_WINDOW_SYSTEM) && ! defined (HAVE_EXT_TOOL_BAR)
 #define WINDOW_TOOL_BAR_P(W) \
   (WINDOWP (WINDOW_XFRAME (W)->tool_bar_window) \
    && (W) == XWINDOW (WINDOW_XFRAME (W)->tool_bar_window))
@@ -1034,11 +1062,11 @@ extern Lisp_Object window_from_coordinates (struct frame *, int, int,
 extern void resize_frame_windows (struct frame *, int, bool, bool);
 extern void restore_window_configuration (Lisp_Object);
 extern void delete_all_child_windows (Lisp_Object);
-extern void grow_mini_window (struct window *, int, bool);
-extern void shrink_mini_window (struct window *, bool);
+extern void grow_mini_window (struct window *, int);
+extern void shrink_mini_window (struct window *);
 extern int window_relative_x_coord (struct window *, enum window_part, int);
 
-void run_window_size_change_functions (Lisp_Object);
+void run_window_change_functions (void);
 
 /* Make WINDOW display BUFFER.  RUN_HOOKS_P means it's allowed
    to run hooks.  See make_frame for a case where it's not allowed.  */
@@ -1094,7 +1122,7 @@ struct glyph *get_phys_cursor_glyph (struct window *w);
 
 /* True if WINDOW is a valid window.  */
 #define WINDOW_VALID_P(WINDOW)					\
-  (WINDOWP (WINDOW) && !NILP (XWINDOW (WINDOW)->contents))	\
+  (WINDOWP (WINDOW) && !NILP (XWINDOW (WINDOW)->contents))
 
 /* A window of any sort, leaf or interior, is "valid" if its
    contents slot is non-nil.  */

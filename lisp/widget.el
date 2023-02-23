@@ -44,7 +44,8 @@
   ;; 	(list 'or (list 'boundp (list 'car 'keywords))
   ;; 	  (list 'set (list 'car 'keywords) (list 'car 'keywords)))
   ;; 	(list 'setq 'keywords (list 'cdr 'keywords)))))
-  )
+  (declare (obsolete nil "27.1"))
+  nil)
 
 ;;(define-widget-keywords :documentation-indent
 ;;  :complete-function :complete :button-overlay

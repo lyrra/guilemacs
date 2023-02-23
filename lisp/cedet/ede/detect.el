@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -195,11 +195,10 @@ Return a cons cell:
   "Run a quick test for autodetecting on BUFFER."
   (interactive)
   (let ((start (current-time))
-	(ans (ede-detect-directory-for-project default-directory))
-	(end (current-time)))
+	(ans (ede-detect-directory-for-project default-directory)))
     (if ans
 	(message "Project found in %d sec @ %s of type %s"
-		 (float-time (time-subtract end start))
+		 (encode-time (time-since start) 'integer)
 		 (car ans)
 		 (eieio-object-name-string (cdr ans)))
       (message "No Project found.") )))

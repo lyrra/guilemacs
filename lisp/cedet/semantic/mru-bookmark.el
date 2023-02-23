@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -45,7 +45,6 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
 (require 'semantic)
 (require 'eieio-base)
 (require 'ring)
@@ -166,7 +165,6 @@ We can't use the built-in ring data structure because we need
 to delete some items from the ring when we don't have the data.")
 
 (defvar semantic-mru-bookmark-ring (semantic-bookmark-ring
-				    "Ring"
 				    :ring (make-ring 20))
   "The MRU bookmark ring.
 This ring tracks the most recent active tags of interest.")
@@ -254,8 +252,7 @@ been edited, and you can re-visit them with \\[semantic-mrub-switch-tags]."
 
 ;;;###autoload
 (define-minor-mode global-semantic-mru-bookmark-mode
-  "Toggle global use of option `semantic-mru-bookmark-mode'.
-If ARG is positive or nil, enable, if it is negative, disable."
+  "Toggle global use of option `semantic-mru-bookmark-mode'."
   :global t :group 'semantic :group 'semantic-modes
   ;; Not needed because it's autoloaded instead.
   ;; :require 'semantic-util-modes
@@ -280,10 +277,9 @@ been edited, and you can re-visit them with \\[semantic-mrub-switch-tags].
 
 \\{semantic-mru-bookmark-mode-map}
 
-With prefix argument ARG, turn on if positive, otherwise off.  The
-minor mode can be turned on only if semantic feature is available and
-the current buffer was set up for parsing.  Return non-nil if the
-minor mode is enabled."
+The minor mode can be turned on only if semantic feature is
+available and the current buffer was set up for parsing.  Return
+non-nil if the minor mode is enabled."
   :keymap semantic-mru-bookmark-mode-map
   (if semantic-mru-bookmark-mode
       (if (not (and (featurep 'semantic) (semantic-active-p)))
@@ -319,7 +315,7 @@ minor mode is enabled."
 	(al nil))
     (while (< idx len)
       (let ((r (ring-ref ring idx)))
-	(setq al (cons (cons (oref r :object-name) r)
+	(setq al (cons (cons (oref r object-name) r)
 		       al)))
       (setq idx (1+ idx)))
     (nreverse al)))

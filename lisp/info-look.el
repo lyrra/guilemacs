@@ -3,8 +3,7 @@
 
 ;; Copyright (C) 1995-1999, 2001-2019 Free Software Foundation, Inc.
 
-;; Author: Ralph Schleicher <rs@nunatak.allgaeu.org>
-;;         (did not show signs of life (Nov 2001)  -stef)
+;; Author: Ralph Schleicher <rs@ralph-schleicher.de>
 ;; Keywords: help languages
 
 ;; This file is part of GNU Emacs.
@@ -619,7 +618,8 @@ Return nil if there is nothing appropriate in the buffer near point."
 	      beg end)
 	  (cond
 	   ((and (memq (get-char-property (point) 'face)
-			 '(custom-variable-tag custom-variable-tag-face))
+			 '(custom-variable-tag custom-variable-obsolete
+			   custom-variable-tag-face))
 		   (setq beg (previous-single-char-property-change
 			      (point) 'face nil (line-beginning-position)))
 		   (setq end (next-single-char-property-change

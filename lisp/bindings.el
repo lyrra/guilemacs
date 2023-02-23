@@ -124,17 +124,61 @@ corresponding to the mode line clicked."
 
 ;;; Mode line contents
 
-(defcustom mode-line-default-help-echo
-  "mouse-1: Select (drag to resize)\n\
-mouse-2: Make current window occupy the whole frame\n\
-mouse-3: Remove current window from display"
+(defun mode-line-default-help-echo (window)
+  "Return default help echo text for WINDOW's mode line."
+  (let* ((frame (window-frame window))
+         (line-1a
+          ;; Show text to select window only if the window is not
+          ;; selected.
+          (not (eq window (frame-selected-window frame))))
+         (line-1b
+          ;; Show text to drag mode line if either the window is not
+          ;; at the bottom of its frame or the minibuffer window of
+          ;; this frame can be resized.  This matches a corresponding
+          ;; check in `mouse-drag-mode-line'.
+          (or (not (window-at-side-p window 'bottom))
+              (let ((mini-window (minibuffer-window frame)))
+                (and (eq frame (window-frame mini-window))
+                     (or (minibuffer-window-active-p mini-window)
+                         (not resize-mini-windows))))))
+         (line-2
+          ;; Show text make window occupy the whole frame
+          ;; only if it doesn't already do that.
+          (not (eq window (frame-root-window frame))))
+         (line-3
+          ;; Show text to delete window only if that's possible.
+          (not (eq window (frame-root-window frame)))))
+    (when (or line-1a line-1b line-2 line-3)
+      (concat
+       (when (or line-1a line-1b)
+         (concat
+          "mouse-1: "
+          (when line-1a "Select window")
+          (when line-1b
+            (if line-1a " (drag to resize)" "Drag to resize"))
+          (when (or line-2 line-3) "\n")))
+       (when line-2
+         (concat
+          "mouse-2: Make window occupy whole frame"
+          (when line-3 "\n")))
+       (when line-3
+         "mouse-3: Remove window from frame")))))
+
+(defcustom mode-line-default-help-echo #'mode-line-default-help-echo
   "Default help text for the mode line.
 If the value is a string, it specifies the tooltip or echo area
 message to display when the mouse is moved over the mode line.
-If the text at the mouse position has a `help-echo' text
-property, that overrides this variable."
-  :type '(choice (const :tag "No help" :value nil) string)
-  :version "24.3"
+If the value is a function, call that function with one argument
+- the window whose mode line to display.  If the text at the
+mouse position has a `help-echo' text property, that overrides
+this variable."
+  :type '(choice
+          (const :tag "No help" :value nil)
+          function
+          (string :value "mouse-1: Select (drag to resize)\n\
+mouse-2: Make current window occupy the whole frame\n\
+mouse-3: Remove current window from display"))
+  :version "27.1"
   :group 'mode-line)
 
 (defvar mode-line-front-space '(:eval (if (display-graphic-p) " " "-"))
@@ -373,7 +417,7 @@ zero, otherwise they start from one."
 This option specifies both the field width and the type of offset
 displayed in `mode-line-position', a component of the default
 `mode-line-format'."
-  :type `(radio
+  :type '(radio
           (const :tag "nil:  No offset is displayed" nil)
           (const :tag "\"%o\": Proportion of \"travel\" of the window through the buffer"
                  (-3 "%o"))
@@ -680,11 +724,11 @@ okay.  See `mode-line-format'.")
       ;; FIXME: Maybe beginning-of-line, beginning-of-buffer, end-of-line,
       ;; end-of-buffer, end-of-file, buffer-read-only, and
       ;; file-supersession should all be user-errors!
-      `(beginning-of-line beginning-of-buffer end-of-line
-	end-of-buffer end-of-file buffer-read-only
-	file-supersession mark-inactive
-        user-error ;; That's the main one!
-        ))
+      '(beginning-of-line beginning-of-buffer end-of-line
+	                  end-of-buffer end-of-file buffer-read-only
+	                  file-supersession mark-inactive
+                          user-error ;; That's the main one!
+                          ))
 
 (make-variable-buffer-local 'indent-tabs-mode)
 
@@ -702,7 +746,7 @@ okay.  See `mode-line-format'.")
 	buffer-file-format buffer-auto-save-file-format
 	buffer-display-count buffer-display-time
 	enable-multibyte-characters
-	buffer-file-coding-system))
+	buffer-file-coding-system truncate-lines))
 
 ;; We have base64, md5 and sha1 functions built in now.
 (provide 'base64)
@@ -985,6 +1029,13 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key search-map "hu"   'unhighlight-regexp)
 (define-key search-map "hf"   'hi-lock-find-patterns)
 (define-key search-map "hw"   'hi-lock-write-interactive-patterns)
+(put 'highlight-regexp                   :advertised-binding [?\M-s ?h ?r])
+(put 'highlight-phrase                   :advertised-binding [?\M-s ?h ?p])
+(put 'highlight-lines-matching-regexp    :advertised-binding [?\M-s ?h ?l])
+(put 'highlight-symbol-at-point          :advertised-binding [?\M-s ?h ?.])
+(put 'unhighlight-regexp                 :advertised-binding [?\M-s ?h ?u])
+(put 'hi-lock-find-patterns              :advertised-binding [?\M-s ?h ?f])
+(put 'hi-lock-write-interactive-patterns :advertised-binding [?\M-s ?h ?w])
 
 ;;(defun function-key-error ()
 ;;  (interactive)
@@ -1178,8 +1229,8 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key ctl-x-map "\C-t" 'transpose-lines)
 
 (define-key esc-map ";" 'comment-dwim)
-(define-key esc-map "j" 'indent-new-comment-line)
-(define-key esc-map "\C-j" 'indent-new-comment-line)
+(define-key esc-map "j" 'default-indent-new-line)
+(define-key esc-map "\C-j" 'default-indent-new-line)
 (define-key ctl-x-map ";" 'comment-set-column)
 (define-key ctl-x-map [?\C-\;] 'comment-line)
 (define-key ctl-x-map "f" 'set-fill-column)

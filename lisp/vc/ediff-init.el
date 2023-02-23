@@ -1,4 +1,4 @@
-;;; ediff-init.el --- Macros, variables, and defsubsts used by Ediff
+;;; ediff-init.el --- Macros, variables, and defsubsts used by Ediff  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1994-2019 Free Software Foundation, Inc.
 
@@ -86,7 +86,7 @@ that Ediff doesn't know about.")
 ;; Plagiarized from `emerge-defvar-local' for XEmacs.
 (defmacro ediff-defvar-local (var value doc)
   "Defines VAR as a local variable."
-  (declare (indent defun))
+  (declare (indent defun) (doc-string 3))
   `(progn
      (defvar ,var ,value ,doc)
      (make-variable-buffer-local ',var)
@@ -267,17 +267,17 @@ It needs to be killed when we quit the session.")
   (and (ediff-window-display-p) ediff-multiframe))
 
 (defmacro ediff-narrow-control-frame-p ()
-  `(and (ediff-multiframe-setup-p)
-	(equal ediff-help-message ediff-brief-message-string)))
+  '(and (ediff-multiframe-setup-p)
+        (equal ediff-help-message ediff-brief-message-string)))
 
 (defmacro ediff-3way-comparison-job ()
-  `(memq
+  '(memq
     ediff-job-name
     '(ediff-files3 ediff-buffers3)))
 (ediff-defvar-local ediff-3way-comparison-job nil "")
 
 (defmacro ediff-merge-job ()
-  `(memq
+  '(memq
     ediff-job-name
     '(ediff-merge-files
       ediff-merge-buffers
@@ -288,10 +288,10 @@ It needs to be killed when we quit the session.")
 (ediff-defvar-local ediff-merge-job nil "")
 
 (defmacro ediff-patch-job ()
-  `(eq ediff-job-name 'epatch))
+  '(eq ediff-job-name 'epatch))
 
 (defmacro ediff-merge-with-ancestor-job ()
-  `(memq
+  '(memq
     ediff-job-name
     '(ediff-merge-files-with-ancestor
       ediff-merge-buffers-with-ancestor
@@ -299,26 +299,26 @@ It needs to be killed when we quit the session.")
 (ediff-defvar-local ediff-merge-with-ancestor-job nil "")
 
 (defmacro ediff-3way-job ()
-  `(or ediff-3way-comparison-job ediff-merge-job))
+  '(or ediff-3way-comparison-job ediff-merge-job))
 (ediff-defvar-local ediff-3way-job nil "")
 
 ;; A diff3 job is like a 3way job, but ediff-merge doesn't require the use
 ;; of diff3.
 (defmacro ediff-diff3-job ()
-  `(or ediff-3way-comparison-job
+  '(or ediff-3way-comparison-job
        ediff-merge-with-ancestor-job))
 (ediff-defvar-local ediff-diff3-job nil "")
 
 (defmacro ediff-windows-job ()
-  `(memq ediff-job-name '(ediff-windows-wordwise ediff-windows-linewise)))
+  '(memq ediff-job-name '(ediff-windows-wordwise ediff-windows-linewise)))
 (ediff-defvar-local ediff-windows-job nil "")
 
 (defmacro ediff-word-mode-job ()
-  `(memq ediff-job-name '(ediff-windows-wordwise ediff-regions-wordwise)))
+  '(memq ediff-job-name '(ediff-windows-wordwise ediff-regions-wordwise)))
 (ediff-defvar-local ediff-word-mode-job nil "")
 
 (defmacro ediff-narrow-job ()
-  `(memq ediff-job-name '(ediff-windows-wordwise
+  '(memq ediff-job-name '(ediff-windows-wordwise
 			  ediff-regions-wordwise
 			  ediff-windows-linewise
 			  ediff-regions-linewise)))
@@ -502,7 +502,7 @@ set local variables that determine how the display looks like."
 
 ;; Selective browsing
 
-(ediff-defvar-local ediff-skip-diff-region-function 'ediff-show-all-diffs
+(ediff-defvar-local ediff-skip-diff-region-function #'ediff-show-all-diffs
   "Function that determines the next/previous diff region to show.
 Should return t for regions to be ignored and nil otherwise.
 This function gets a region number as an argument.  The region number
@@ -739,26 +739,6 @@ to temp files in buffer jobs and when Ediff needs to find fine differences."
 
 (defalias 'ediff-delete-overlay
   (if (featurep 'xemacs) 'delete-extent 'delete-overlay))
-
-;; Assumes that emacs-major-version and emacs-minor-version are defined.
-(defun ediff-check-version (op major minor &optional type-of-emacs)
-  "Check the current version against MAJOR and MINOR version numbers.
-The comparison uses operator OP, which may be any of: =, >, >=, <, <=.
-TYPE-OF-EMACS is either `emacs' or `xemacs'."
-  (declare (obsolete version< "23.1"))
-  (and (cond ((eq type-of-emacs 'xemacs) (featurep 'xemacs))
-	     ((eq type-of-emacs 'emacs) (featurep 'emacs))
-	     (t))
-       (cond ((eq op '=) (and (= emacs-minor-version minor)
-			      (= emacs-major-version major)))
-	     ((memq op '(> >= < <=))
-	      (and (or (funcall op emacs-major-version major)
-		       (= emacs-major-version major))
-		   (if (= emacs-major-version major)
-		       (funcall op emacs-minor-version minor)
-		     t)))
-	     (t
-	      (user-error "%S: Invalid op in ediff-check-version" op)))))
 
 (defun ediff-color-display-p ()
   (condition-case nil
@@ -1508,7 +1488,7 @@ This default should work without changes."
 ;; this record is itself a vector
 (defsubst ediff-clear-fine-diff-vector (diff-record)
   (if diff-record
-      (mapc 'ediff-delete-overlay
+      (mapc #'ediff-delete-overlay
 	    (ediff-get-fine-diff-vector-from-diff-record diff-record))))
 
 (defsubst ediff-clear-fine-differences-in-one-buffer (n buf-type)
@@ -1779,7 +1759,7 @@ Unless optional argument INPLACE is non-nil, return a new string."
 
 (defsubst ediff-message-if-verbose (string &rest args)
   (if ediff-verbose-p
-      (apply 'message string args)))
+      (apply #'message string args)))
 
 (defun ediff-file-attributes (filename attr-number)
   (if (ediff-listable-file filename)
@@ -1818,13 +1798,4 @@ Unless optional argument INPLACE is non-nil, return a new string."
 
 
 (provide 'ediff-init)
-
-
-
-;; Local Variables:
-;; eval: (put 'ediff-defvar-local 'lisp-indent-hook 'defun)
-;; eval: (put 'ediff-with-current-buffer 'lisp-indent-hook 1)
-;; eval: (put 'ediff-with-current-buffer 'edebug-form-spec '(form body))
-;; End:
-
 ;;; ediff-init.el ends here

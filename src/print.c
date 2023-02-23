@@ -38,6 +38,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 #include <float.h>
 #include <ftoastr.h>
+#include <math.h>
+
+#if IEEE_FLOATING_POINT
+# include <ieee754.h>
+#endif
 #include <errno.h>
 
 #ifdef WINDOWSNT
@@ -266,7 +271,7 @@ printchar_to_stream (unsigned int ch, FILE *stream)
 	  break;
       if (! (i < n))
 	break;
-      ch = XFASTINT (AREF (dv, i));
+      ch = XFIXNAT (AREF (dv, i));
     }
 }
 
@@ -279,7 +284,7 @@ static void
 printchar (unsigned int ch, Lisp_Object fun)
 {
   if (!NILP (fun) && !EQ (fun, Qt))
-    call1 (fun, make_number (ch));
+    call1 (fun, make_fixnum (ch));
   else
     {
       unsigned char str[MAX_MULTIBYTE_LENGTH];
@@ -318,6 +323,25 @@ printchar (unsigned int ch, Lisp_Object fun)
     }
 }
 
+/* Output an octal escape for C.  If C is less than '\100' consult the
+   following character (if any) to see whether to use three octal
+   digits to avoid misinterpretation of the next character.  The next
+   character after C will be taken from DATA, starting at byte
+   location I, if I is less than SIZE.  Use PRINTCHARFUN to output
+   each character.  */
+
+static void
+octalout (unsigned char c, unsigned char *data, ptrdiff_t i, ptrdiff_t size,
+	  Lisp_Object printcharfun)
+{
+  int digits = (c > '\77' || (i < size && '0' <= data[i] && data[i] <= '7')
+		? 3
+		: c > '\7' ? 2 : 1);
+  printchar ('\\', printcharfun);
+  do
+    printchar ('0' + ((c >> (3 * --digits)) & 7), printcharfun);
+  while (digits != 0);
+}
 
 /* Output SIZE characters, SIZE_BYTE bytes from string PTR using
    method PRINTCHARFUN.  PRINTCHARFUN nil means output to
@@ -506,9 +530,9 @@ PRINTCHARFUN defaults to the value of `standard-output' (which see).  */)
 {
   if (NILP (printcharfun))
     printcharfun = Vstandard_output;
-  CHECK_NUMBER (character);
+  CHECK_FIXNUM (character);
   PRINTPREPARE;
-  printchar (XINT (character), printcharfun);
+  printchar (XFIXNUM (character), printcharfun);
   PRINTFINISH;
   return character;
 }
@@ -757,8 +781,8 @@ You can call `print' while debugging emacs, and pass it this function
 to make it write to the debugging output.  */)
   (Lisp_Object character)
 {
-  CHECK_NUMBER (character);
-  printchar_to_stream (XINT (character), stderr);
+  CHECK_FIXNUM (character);
+  printchar_to_stream (XFIXNUM (character), stderr);
   return character;
 }
 
@@ -839,6 +863,17 @@ safe_debug_print (Lisp_Object arg)
 	       !valid ? "INVALID" : "SOME",
 	       n);
     }
+}
+
+/* This function formats the given object and returns the result as a
+   string. Use this in contexts where you can inspect strings, but
+   where stderr output won't work --- e.g., while replaying rr
+   recordings.  */
+const char * debug_format (const char *, Lisp_Object) EXTERNALLY_VISIBLE;
+const char *
+debug_format (const char *fmt, Lisp_Object arg)
+{
+  return SSDATA (CALLN (Fformat, build_string (fmt), arg));
 }
 
 
@@ -976,43 +1011,22 @@ float_to_string (char *buf, double data)
   int width;
   int len;
 
-  /* Check for plus infinity in a way that won't lose
-     if there is no plus infinity.  */
-  if (data == data / 2 && data > 1.0)
-    {
-      static char const infinity_string[] = "1.0e+INF";
-      strcpy (buf, infinity_string);
-      return sizeof infinity_string - 1;
-    }
-  /* Likewise for minus infinity.  */
-  if (data == data / 2 && data < -1.0)
+  if (isinf (data))
     {
       static char const minus_infinity_string[] = "-1.0e+INF";
-      strcpy (buf, minus_infinity_string);
-      return sizeof minus_infinity_string - 1;
+      bool positive = 0 < data;
+      strcpy (buf, minus_infinity_string + positive);
+      return sizeof minus_infinity_string - 1 - positive;
     }
-  /* Check for NaN in a way that won't fail if there are no NaNs.  */
-  if (! (data * 0.0 >= 0.0))
+#if IEEE_FLOATING_POINT
+  if (isnan (data))
     {
-      /* Prepend "-" if the NaN's sign bit is negative.
-	 The sign bit of a double is the bit that is 1 in -0.0.  */
-      static char const NaN_string[] = "0.0e+NaN";
-      int i;
-      union { double d; char c[sizeof (double)]; } u_data, u_minus_zero;
-      bool negative = 0;
-      u_data.d = data;
-      u_minus_zero.d = - 0.0;
-      for (i = 0; i < sizeof (double); i++)
-	if (u_data.c[i] & u_minus_zero.c[i])
-	  {
-	    *buf = '-';
-	    negative = 1;
-	    break;
-	  }
-
-      strcpy (buf + negative, NaN_string);
-      return negative + sizeof NaN_string - 1;
+      union ieee754_double u = { .d = data };
+      uprintmax_t hi = u.ieee_nan.mantissa0;
+      return sprintf (buf, &"-%"pMu".0e+NaN"[!u.ieee_nan.negative],
+		      (hi << 31 << 1) + u.ieee_nan.mantissa1);
     }
+#endif
 
   if (NILP (Vfloat_output_format)
       || !STRINGP (Vfloat_output_format))
@@ -1199,11 +1213,11 @@ print_preprocess (Lisp_Object obj)
 		  && SYMBOLP (obj)
 		  && !SYMBOL_INTERNED_P (obj)))
 	    { /* OBJ appears more than once.	Let's remember that.  */
-	      if (!INTEGERP (num))
+	      if (!FIXNUMP (num))
 		{
 		  print_number_index++;
 		  /* Negative number indicates it hasn't been printed yet.  */
-		  Fputhash (obj, make_number (- print_number_index),
+		  Fputhash (obj, make_fixnum (- print_number_index),
 			    Vprint_number_table);
 		}
 	      print_depth--;
@@ -1303,8 +1317,7 @@ print_check_string_charset_prop (INTERVAL interval, Lisp_Object string)
 	  || CONSP (XCDR (XCDR (val))))
 	print_check_string_result |= PRINT_STRING_NON_CHARSET_FOUND;
     }
-  if (NILP (Vprint_charset_text_property)
-      || ! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
+  if (! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
       int i, c;
       ptrdiff_t charpos = interval->position;
@@ -1334,23 +1347,37 @@ print_prune_string_charset (Lisp_Object string)
   print_check_string_result = 0;
   traverse_intervals (string_intervals (string), 0,
 		      print_check_string_charset_prop, string);
-  if (! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
+  if (NILP (Vprint_charset_text_property)
+      || ! (print_check_string_result & PRINT_STRING_UNSAFE_CHARSET_FOUND))
     {
       string = Fcopy_sequence (string);
       if (print_check_string_result & PRINT_STRING_NON_CHARSET_FOUND)
 	{
 	  if (NILP (print_prune_charset_plist))
 	    print_prune_charset_plist = list1 (Qcharset);
-	  Fremove_text_properties (make_number (0),
-				   make_number (SCHARS (string)),
+	  Fremove_text_properties (make_fixnum (0),
+				   make_fixnum (SCHARS (string)),
 				   print_prune_charset_plist, string);
 	}
       else
-	Fset_text_properties (make_number (0), make_number (SCHARS (string)),
+	Fset_text_properties (make_fixnum (0), make_fixnum (SCHARS (string)),
 			      Qnil, string);
     }
   return string;
 }
+
+#ifdef HAVE_MODULES
+/* Return a data pointer equal to FUNCPTR.  */
+
+static void const *
+data_from_funcptr (void (*funcptr) (void))
+{
+  /* The module code, and the POSIX API for dynamic linking, already
+     assume that function and data pointers are represented
+     interchangeably, so it's OK to assume that here too.  */
+  return (void const *) funcptr;
+}
+#endif
 
 static bool
 print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
@@ -1358,6 +1385,41 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 {
   switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
     {
+    case PVEC_BIGNUM:
+      {
+	ptrdiff_t size = bignum_bufsize (obj, 10);
+	USE_SAFE_ALLOCA;
+	char *str = SAFE_ALLOCA (size);
+	ptrdiff_t len = bignum_to_c_string (str, size, obj, 10);
+	strout (str, len, len, printcharfun);
+	SAFE_FREE ();
+      }
+      break;
+    case PVEC_USER_PTR:
+      {
+	print_c_string ("#<user-ptr ", printcharfun);
+	int i = sprintf (buf, "ptr=%p finalizer=%p",
+			 XUSER_PTR (obj)->p,
+			 XUSER_PTR (obj)->finalizer);
+	strout (buf, i, i, printcharfun);
+	printchar ('>', printcharfun);
+      }
+      break;
+
+    case PVEC_FINALIZER:
+      print_c_string ("#<finalizer", printcharfun);
+      printchar ('>', printcharfun);
+      break;
+
+    case PVEC_MISC_PTR:
+      {
+	/* This shouldn't happen in normal usage, but let's
+	   print it anyway for the benefit of the debugger.  */
+	int i = sprintf (buf, "#<ptr %p>", xmint_pointer (obj));
+	strout (buf, i, i, printcharfun);
+      }
+      break;
+
     case PVEC_PROCESS:
       if (escapeflag)
 	{
@@ -1372,32 +1434,33 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
     case PVEC_BOOL_VECTOR:
       {
 	EMACS_INT size = bool_vector_size (obj);
-	ptrdiff_t size_in_chars = bool_vector_bytes (size);
-	ptrdiff_t real_size_in_chars = size_in_chars;
+	ptrdiff_t size_in_bytes = bool_vector_bytes (size);
+	ptrdiff_t real_size_in_bytes = size_in_bytes;
+	unsigned char *data = bool_vector_uchar_data (obj);
 
 	int len = sprintf (buf, "#&%"pI"d\"", size);
 	strout (buf, len, len, printcharfun);
 
-	/* Don't print more characters than the specified maximum.
+	/* Don't print more bytes than the specified maximum.
 	   Negative values of print-length are invalid.  Treat them
 	   like a print-length of nil.  */
-	if (NATNUMP (Vprint_length)
-	    && XFASTINT (Vprint_length) < size_in_chars)
-	  size_in_chars = XFASTINT (Vprint_length);
+	if (FIXNATP (Vprint_length)
+	    && XFIXNAT (Vprint_length) < size_in_bytes)
+	  size_in_bytes = XFIXNAT (Vprint_length);
 
-	for (ptrdiff_t i = 0; i < size_in_chars; i++)
+	for (ptrdiff_t i = 0; i < size_in_bytes; i++)
 	  {
 	    maybe_quit ();
-	    unsigned char c = bool_vector_uchar_data (obj)[i];
+	    unsigned char c = data[i];
 	    if (c == '\n' && print_escape_newlines)
 	      print_c_string ("\\n", printcharfun);
 	    else if (c == '\f' && print_escape_newlines)
 	      print_c_string ("\\f", printcharfun);
-	    else if (c > '\177')
+	    else if (c > '\177'
+		     || (print_escape_control_characters && c_iscntrl (c)))
 	      {
 		/* Use octal escapes to avoid encoding issues.  */
-		int len = sprintf (buf, "\\%o", c);
-		strout (buf, len, len, printcharfun);
+		octalout (c, data, i + 1, size_in_bytes, printcharfun);
 	      }
 	    else
 	      {
@@ -1407,7 +1470,7 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	      }
 	  }
 
-	if (size_in_chars < real_size_in_chars)
+	if (size_in_bytes < real_size_in_bytes)
 	  print_c_string (" ...", printcharfun);
 	printchar ('\"', printcharfun);
       }
@@ -1498,8 +1561,8 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	ptrdiff_t size = real_size;
 
 	/* Don't print more elements than the specified maximum.  */
-	if (NATNUMP (Vprint_length) && XFASTINT (Vprint_length) < size)
-	  size = XFASTINT (Vprint_length);
+	if (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size)
+	  size = XFIXNAT (Vprint_length);
 
 	printchar ('(', printcharfun);
 	for (ptrdiff_t i = 0; i < size; i++){
@@ -1631,8 +1694,8 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 
 	/* Don't print more elements than the specified maximum.  */
 	ptrdiff_t n
-	  = (NATNUMP (Vprint_length) && XFASTINT (Vprint_length) < size
-	     ? XFASTINT (Vprint_length) : size);
+	  = (FIXNATP (Vprint_length) && XFIXNAT (Vprint_length) < size
+	     ? XFIXNAT (Vprint_length) : size);
 
 	print_c_string ("#s(", printcharfun);
 	for (ptrdiff_t i = 0; i < n; i ++)
@@ -1692,9 +1755,9 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
 	  }
 
 	/* Don't print more elements than the specified maximum.  */
-	if (NATNUMP (Vprint_length)
-	    && XFASTINT (Vprint_length) < size)
-	  size = XFASTINT (Vprint_length);
+	if (FIXNATP (Vprint_length)
+	    && XFIXNAT (Vprint_length) < size)
+	  size = XFIXNAT (Vprint_length);
 
 	for (int i = idx; i < size; i++)
 	  {
@@ -1712,24 +1775,21 @@ print_vectorlike (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag,
     case PVEC_MODULE_FUNCTION:
       {
 	print_c_string ("#<module function ", printcharfun);
-	void *ptr = XMODULE_FUNCTION (obj)->subr;
-	const char *file = NULL;
-	const char *symbol = NULL;
+        module_funcptr ptr = module_function_address (XMODULE_FUNCTION (obj));
+	char const *file;
+	char const *symbol;
 	dynlib_addr (ptr, &file, &symbol);
 
 	if (symbol == NULL)
 	  {
-	    print_c_string ("at ", printcharfun);
-	    enum { pointer_bufsize = sizeof ptr * 16 / CHAR_BIT + 2 + 1 };
-	    char buffer[pointer_bufsize];
-	    int needed = snprintf (buffer, sizeof buffer, "%p", ptr);
-	    const char p0x[] = "0x";
-	    eassert (needed <= sizeof buffer);
-	    /* ANSI C doesn't guarantee that %p produces a string that
-	       begins with a "0x".  */
-	    if (c_strncasecmp (buffer, p0x, sizeof (p0x) - 1) != 0)
-	      print_c_string (p0x, printcharfun);
-	    print_c_string (buffer, printcharfun);
+	    uintptr_t ui = (uintptr_t) data_from_funcptr (ptr);
+
+	    /* In theory this assignment could lose info on pre-C99
+	       hosts, but in practice it doesn't.  */
+	    uprintmax_t up = ui;
+
+	    int len = sprintf (buf, "at 0x%"pMx, up);
+	    strout (buf, len, len, printcharfun);
 	  }
 	else
 	  print_c_string (symbol, printcharfun);
@@ -1757,7 +1817,9 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 {
   char buf[max (sizeof "from..to..in " + 2 * INT_STRLEN_BOUND (EMACS_INT),
 		max (sizeof " . #" + INT_STRLEN_BOUND (printmax_t),
-		     40))];
+		     max ((sizeof "at 0x"
+			   + (sizeof (uprintmax_t) * CHAR_BIT + 4 - 1) / 4),
+			  40)))];
   current_thread->stack_top = buf;
   maybe_quit ();
 
@@ -1784,16 +1846,16 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
     {
       /* With the print-circle feature.  */
       Lisp_Object num = Fgethash (obj, Vprint_number_table, Qnil);
-      if (INTEGERP (num))
+      if (FIXNUMP (num))
 	{
-	  EMACS_INT n = XINT (num);
+	  EMACS_INT n = XFIXNUM (num);
 	  if (n < 0)
 	    { /* Add a prefix #n= if OBJ has not yet been printed;
 		 that is, its status field is nil.  */
 	      int len = sprintf (buf, "#%"pI"d=", -n);
 	      strout (buf, len, len, printcharfun);
 	      /* OBJ is going to be printed.  Remember that fact.  */
-	      Fputhash (obj, make_number (- n), Vprint_number_table);
+	      Fputhash (obj, make_fixnum (- n), Vprint_number_table);
 	    }
 	  else
 	    {
@@ -1811,7 +1873,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
     {
     case_Lisp_Int:
       {
-	int len = sprintf (buf, "%"pI"d", XINT (obj));
+	int len = sprintf (buf, "%"pI"d", XFIXNUM (obj));
 	strout (buf, len, len, printcharfun);
       }
       break;
@@ -1864,9 +1926,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		     (when requested) a non-ASCII character in a unibyte buffer,
 		     print single-byte non-ASCII string chars
 		     using octal escapes.  */
-		  char outbuf[5];
-		  int len = sprintf (outbuf, "\\%03o", c + 0u);
-		  strout (outbuf, len, len, printcharfun);
+		  octalout (c, SDATA (obj), i_byte, size_byte, printcharfun);
 		  need_nonhex = false;
 		}
 	      else if (multibyte
@@ -1880,7 +1940,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		}
 	      else
 		{
-                  bool still_need_nonhex = false;
 		  /* If we just had a hex escape, and this character
 		     could be taken as part of it,
 		     output `\ ' to prevent that.  */
@@ -1894,22 +1953,16 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
                            ? (c = 'n', true)
                            : c == '\f' && print_escape_newlines
                            ? (c = 'f', true)
-                           : c == '\0' && print_escape_control_characters
-                           ? (c = '0', still_need_nonhex = true)
                            : c == '\"' || c == '\\')
                     {
                       printchar ('\\', printcharfun);
                       printchar (c, printcharfun);
                     }
                   else if (print_escape_control_characters && c_iscntrl (c))
-                    {
-                      char outbuf[1 + 3 + 1];
-                      int len = sprintf (outbuf, "\\%03o", c + 0u);
-                      strout (outbuf, len, len, printcharfun);
-                    }
+		    octalout (c, SDATA (obj), i_byte, size_byte, printcharfun);
                   else
                     printchar (c, printcharfun);
-		  need_nonhex = still_need_nonhex;
+		  need_nonhex = false;
 		}
 	    }
 	  printchar ('\"', printcharfun);
@@ -1925,39 +1978,17 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
     case Lisp_Symbol:
       {
-	bool confusing;
-	unsigned char *p = SDATA (SYMBOL_NAME (obj));
-	unsigned char *end = p + SBYTES (SYMBOL_NAME (obj));
-	int c;
-	ptrdiff_t i, i_byte;
-	ptrdiff_t size_byte;
-	Lisp_Object name;
+	Lisp_Object name = SYMBOL_NAME (obj);
+	ptrdiff_t size_byte = SBYTES (name);
 
-	name = SYMBOL_NAME (obj);
-
-	if (p != end && (*p == '-' || *p == '+')) p++;
-	if (p == end)
-	  confusing = 0;
-	/* If symbol name begins with a digit, and ends with a digit,
-	   and contains nothing but digits and `e', it could be treated
-	   as a number.  So set CONFUSING.
-
-	   Symbols that contain periods could also be taken as numbers,
-	   but periods are always escaped, so we don't have to worry
-	   about them here.  */
-	else if (*p >= '0' && *p <= '9'
-		 && end[-1] >= '0' && end[-1] <= '9')
-	  {
-	    while (p != end && ((*p >= '0' && *p <= '9')
-				/* Needed for \2e10.  */
-				|| *p == 'e' || *p == 'E'))
-	      p++;
-	    confusing = (end == p);
-	  }
-	else
-	  confusing = 0;
-
-	size_byte = SBYTES (name);
+	/* Set CONFUSING if NAME looks like a number, calling
+	   string_to_number for non-obvious cases.  */
+	char *p = SSDATA (name);
+	bool signedp = *p == '-' || *p == '+';
+	ptrdiff_t len;
+	bool confusing = ((c_isdigit (p[signedp]) || p[signedp] == '.')
+			  && !NILP (string_to_number (p, 10, &len))
+			  && len == size_byte);
 
 	if (! NILP (Vprint_gensym)
             //&& !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj)
@@ -1969,10 +2000,12 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	    break;
 	  }
 
-	for (i = 0, i_byte = 0; i_byte < size_byte;)
+	ptrdiff_t i = 0;
+	for (ptrdiff_t i_byte = 0; i_byte < size_byte; )
 	  {
 	    /* Here, we must convert each multi-byte form to the
 	       corresponding character code before handing it to PRINTCHAR.  */
+	    int c;
 	    FETCH_STRING_CHAR_ADVANCE (c, name, i, i_byte);
 	    maybe_quit ();
 
@@ -1982,7 +2015,9 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		    || c == ';' || c == '#' || c == '(' || c == ')'
 		    || c == ',' || c == '.' || c == '`'
 		    || c == '[' || c == ']' || c == '?' || c <= 040
-		    || confusing)
+		    || c == NO_BREAK_SPACE
+                    || confusing
+		    || (i == 1 && confusable_symbol_character_p (c)))
 		  {
 		    printchar ('\\', printcharfun);
 		    confusing = false;
@@ -1995,8 +2030,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
     case Lisp_Cons:
       /* If deeper than spec'd depth, print placeholder.  */
-      if (INTEGERP (Vprint_level)
-	  && print_depth > XINT (Vprint_level))
+      if (FIXNUMP (Vprint_level)
+	  && print_depth > XFIXNUM (Vprint_level))
 	print_c_string ("...", printcharfun);
       else if (print_quoted && CONSP (XCDR (obj)) && NILP (XCDR (XCDR (obj)))
 	       && EQ (XCAR (obj), Qquote))
@@ -2037,8 +2072,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
 	  /* Negative values of print-length are invalid in CL.
 	     Treat them like nil, as CMUCL does.  */
-	  printmax_t print_length = (NATNUMP (Vprint_length)
-				     ? XFASTINT (Vprint_length)
+	  printmax_t print_length = (FIXNATP (Vprint_length)
+				     ? XFIXNAT (Vprint_length)
 				     : TYPE_MAXIMUM (printmax_t));
 
 	  printmax_t i = 0;
@@ -2061,7 +2096,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 		  if (i != 0)
 		    {
 		      Lisp_Object num = Fgethash (obj, Vprint_number_table, Qnil);
-		      if (INTEGERP (num))
+		      if (FIXNUMP (num))
 			{
 			  print_c_string (" . ", printcharfun);
 			  print_object (obj, printcharfun, escapeflag);
@@ -2098,163 +2133,46 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  printchar (')', printcharfun);
 	}
       break;
-
-    case Lisp_Vectorlike:
-      if (! print_vectorlike (obj, printcharfun, escapeflag, buf))
-	goto badtype;
-      break;
-
     case Lisp_Misc:
       switch (XMISCTYPE (obj))
 	{
+        case Lisp_Misc_Free: fprintf(stderr, "--ERROR: Lisp_Misc_Free not handled\n"); break;
+        case Lisp_Misc_Save_Value: fprintf(stderr, "--ERROR: Lisp_Misc_Save_Value not handled\n"); break;
+        case Lisp_Misc_Float: fprintf(stderr, "--ERROR: Lisp_Misc_Float not handled\n"); break;
+        case Lisp_Misc_Limit: fprintf(stderr, "--ERROR: Lisp_Misc_Limit not handled\n"); break;
 	case Lisp_Misc_Marker:
-	  print_c_string ("#<marker ", printcharfun);
-	  /* Do you think this is necessary?  */
-	  if (XMARKER (obj)->insertion_type != 0)
+          print_c_string ("#<marker ", printcharfun);
+          /* Do you think this is necessary?  */
+          if (XMARKER (obj)->insertion_type != 0)
 	    print_c_string ("(moves after insertion) ", printcharfun);
-	  if (! XMARKER (obj)->buffer)
+          if (! XMARKER (obj)->buffer)
 	    print_c_string ("in no buffer", printcharfun);
-	  else
+          else
 	    {
 	      int len = sprintf (buf, "at %"pD"d in ", marker_position (obj));
 	      strout (buf, len, len, printcharfun);
 	      print_string (BVAR (XMARKER (obj)->buffer, name), printcharfun);
 	    }
-	  printchar ('>', printcharfun);
+          printchar ('>', printcharfun);
 	  break;
 
 	case Lisp_Misc_Overlay:
-	  print_c_string ("#<overlay ", printcharfun);
-	  if (! XMARKER (OVERLAY_START (obj))->buffer)
+          print_c_string ("#<overlay ", printcharfun);
+          if (! XMARKER (OVERLAY_START (obj))->buffer)
 	    print_c_string ("in no buffer", printcharfun);
-	  else
+          else
 	    {
 	      int len = sprintf (buf, "from %"pD"d to %"pD"d in ",
-				 marker_position (OVERLAY_START (obj)),
-				 marker_position (OVERLAY_END   (obj)));
+			         marker_position (OVERLAY_START (obj)),
+			         marker_position (OVERLAY_END   (obj)));
 	      strout (buf, len, len, printcharfun);
 	      print_string (BVAR (XMARKER (OVERLAY_START (obj))->buffer, name),
 			    printcharfun);
 	    }
-	  printchar ('>', printcharfun);
-          break;
-
-#ifdef HAVE_MODULES
-	case Lisp_Misc_User_Ptr:
-	  {
-	    print_c_string ("#<user-ptr ", printcharfun);
-	    int i = sprintf (buf, "ptr=%p finalizer=%p",
-			     XUSER_PTR (obj)->p,
-			     XUSER_PTR (obj)->finalizer);
-	    strout (buf, i, i, printcharfun);
-	    printchar ('>', printcharfun);
-	    break;
-	  }
-#endif
-
-        case Lisp_Misc_Finalizer:
-          print_c_string ("#<finalizer", printcharfun);
-          //FIX: 20190629 LAV, no finalizer?
-          //if (NILP (XFINALIZER (obj)->function))
-          //  print_c_string (" used", printcharfun);
-	  printchar ('>', printcharfun);
-          break;
-
-	  /* Remaining cases shouldn't happen in normal usage, but let's
-	     print them anyway for the benefit of the debugger.  */
-
-	case Lisp_Misc_Free:
-	  print_c_string ("#<misc free cell>", printcharfun);
+          printchar ('>', printcharfun);
 	  break;
-
-	case Lisp_Misc_Save_Value:
-	  {
-	    int i;
-	    struct Lisp_Save_Value *v = XSAVE_VALUE (obj);
-
-	    print_c_string ("#<save-value ", printcharfun);
-
-	    if (v->save_type == SAVE_TYPE_MEMORY)
-	      {
-		ptrdiff_t amount = v->data[1].integer;
-
-		/* valid_lisp_object_p is reliable, so try to print up
-		   to 8 saved objects.  This code is rarely used, so
-		   it's OK that valid_lisp_object_p is slow.  */
-
-		int limit = min (amount, 8);
-		Lisp_Object *area = v->data[0].pointer;
-
-		i = sprintf (buf, "with %"pD"d objects", amount);
-		strout (buf, i, i, printcharfun);
-
-		for (i = 0; i < limit; i++)
-		  {
-		    Lisp_Object maybe = area[i];
-		    int valid = valid_lisp_object_p (maybe);
-
-		    printchar (' ', printcharfun);
-		    if (0 < valid)
-		      print_object (maybe, printcharfun, escapeflag);
-		    else
-		      print_c_string (valid < 0 ? "<some>" : "<invalid>",
-				      printcharfun);
-		  }
-		if (i == limit && i < amount)
-		  print_c_string (" ...", printcharfun);
-	      }
-	    else
-	      {
-		/* Print each slot according to its type.  */
-		int index;
-		for (index = 0; index < SAVE_VALUE_SLOTS; index++)
-		  {
-		    if (index)
-		      printchar (' ', printcharfun);
-
-		    switch (save_type (v, index))
-		      {
-		      case SAVE_UNUSED:
-			i = sprintf (buf, "<unused>");
-			break;
-
-		      case SAVE_POINTER:
-			i = sprintf (buf, "<pointer %p>",
-				     v->data[index].pointer);
-			break;
-
-		      case SAVE_FUNCPOINTER:
-			i = sprintf (buf, "<funcpointer %p>",
-				     ((void *) (intptr_t)
-				      v->data[index].funcpointer));
-			break;
-
-		      case SAVE_INTEGER:
-			i = sprintf (buf, "<integer %"pD"d>",
-				     v->data[index].integer);
-			break;
-
-		      case SAVE_OBJECT:
-			print_object (v->data[index].object, printcharfun,
-				      escapeflag);
-			continue;
-
-		      default:
-			emacs_abort ();
-		      }
-
-		    strout (buf, i, i, printcharfun);
-		  }
-	      }
-	    printchar ('>', printcharfun);
-	  }
-	  break;
-
-	default:
-	  goto badtype;
-	}
-      break;
-
+        }
+        break;
     case Lisp_Other:
       {
         static SCM prefix;
@@ -2273,17 +2191,17 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
         scm_close_port (port);
       }
       break;
-
+    case Lisp_Vectorlike:
+      if (print_vectorlike (obj, printcharfun, escapeflag, buf))
+	break;
+      FALLTHROUGH;
     default:
-    badtype:
       {
 	int len;
 	/* We're in trouble if this happens!
 	   Probably should just emacs_abort ().  */
 	print_c_string ("#<EMACS BUG: INVALID DATATYPE ", printcharfun);
-	if (MISCP (obj))
-	  len = sprintf (buf, "(MISC 0x%04x)", (unsigned) XMISCTYPE (obj));
-	else if (VECTORLIKEP (obj))
+	if (VECTORLIKEP (obj))
 	  len = sprintf (buf, "(PVEC 0x%08zx)", (size_t) ASIZE (obj));
 	else
 	  len = sprintf (buf, "(0x%02x)", (unsigned) XTYPE (obj));
@@ -2307,9 +2225,9 @@ print_interval (INTERVAL interval, Lisp_Object printcharfun)
   if (NILP (interval->plist))
     return;
   printchar (' ', printcharfun);
-  print_object (make_number (interval->position), printcharfun, 1);
+  print_object (make_fixnum (interval->position), printcharfun, 1);
   printchar (' ', printcharfun);
-  print_object (make_number (interval->position + LENGTH (interval)),
+  print_object (make_fixnum (interval->position + LENGTH (interval)),
 		printcharfun, 1);
   printchar (' ', printcharfun);
   print_object (interval->plist, printcharfun, 1);
@@ -2425,7 +2343,7 @@ This affects only `prin1'.  */);
   DEFVAR_BOOL ("print-quoted", print_quoted,
 	       doc: /* Non-nil means print quoted forms with reader syntax.
 I.e., (quote foo) prints as \\='foo, (function foo) as #\\='foo.  */);
-  print_quoted = 0;
+  print_quoted = true;
 
   DEFVAR_LISP ("print-gensym", Vprint_gensym,
 	       doc: /* Non-nil means print uninterned symbols so they will read as uninterned.
@@ -2470,7 +2388,7 @@ that need to be recorded in the table.  */);
 
   DEFVAR_LISP ("print-charset-text-property", Vprint_charset_text_property,
 	       doc: /* A flag to control printing of `charset' text property on printing a string.
-The value must be nil, t, or `default'.
+The value should be nil, t, or `default'.
 
 If the value is nil, don't print the text property `charset'.
 
@@ -2478,16 +2396,15 @@ If the value is t, always print the text property `charset'.
 
 If the value is `default', print the text property `charset' only when
 the value is different from what is guessed in the current charset
-priorities.  */);
+priorities.  Values other than nil or t are also treated as
+`default'.  */);
   Vprint_charset_text_property = Qdefault;
 
   /* prin1_to_string_buffer initialized in init_buffer_once in buffer.c */
   staticpro (&Vprin1_to_string_buffer);
 
-  DEFSYM (Qprint_escape_newlines, "print-escape-newlines");
   DEFSYM (Qprint_escape_multibyte, "print-escape-multibyte");
   DEFSYM (Qprint_escape_nonascii, "print-escape-nonascii");
-  DEFSYM (Qprint_escape_control_characters, "print-escape-control-characters");
 
   print_prune_charset_plist = Qnil;
   staticpro (&print_prune_charset_plist);

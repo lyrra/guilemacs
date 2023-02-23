@@ -3,7 +3,7 @@
 ;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
 ;; Author: Carsten Dominik <dominik@astro.uva.nl>
-;; Maintainer: J.D. Smith <jdsmith@as.arizona.edu>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: processes
 ;; Package: idlwave
 
@@ -33,8 +33,6 @@
 
 
 ;;; Code:
-
-(eval-when-compile (require 'cl))
 
 (defun idlwave-toolbar-make-button (image)
   (if (featurep 'xemacs)

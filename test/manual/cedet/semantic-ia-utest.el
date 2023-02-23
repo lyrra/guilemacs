@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -434,7 +434,7 @@ tag that contains point, and return that."
       (when (interactive-p)
 	(message "Found %d occurrences of %s in %.2f seconds"
 		 Lcount (semantic-tag-name target)
-		 (semantic-elapsed-time start (current-time))))
+		 (semantic-elapsed-time start nil)))
       Lcount)))
 
 (defun semantic-src-utest-buffer-refs ()

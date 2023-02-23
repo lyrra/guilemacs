@@ -2,7 +2,7 @@
 
 ;;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Version: 1.0
 
 ;; This file is part of GNU Emacs.
@@ -196,11 +196,11 @@ Optional argument FACE specifies the face to do the highlighting."
       (pulse-reset-face face)
       (setq pulse-momentary-timer
             (run-with-timer 0 pulse-delay #'pulse-tick
-                            (time-add (current-time)
+                            (time-add nil
                                       (* pulse-delay pulse-iterations)))))))
 
 (defun pulse-tick (stop-time)
-  (if (time-less-p (current-time) stop-time)
+  (if (time-less-p nil stop-time)
       (pulse-lighten-highlight)
     (pulse-momentary-unhighlight)))
 

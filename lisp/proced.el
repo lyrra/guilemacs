@@ -1348,7 +1348,7 @@ Prefix ARG controls sort order, see `proced-sort-interactive'."
 
 (defun proced-format-time (time)
   "Format time interval TIME."
-  (let* ((ftime (float-time time))
+  (let* ((ftime (encode-time time 'integer))
          (days (truncate ftime 86400))
          (ftime (mod ftime 86400))
          (hours (truncate ftime 3600))
@@ -1744,9 +1744,10 @@ The value returned is the value of the last form in BODY."
        (save-window-excursion
          ;; Analogous to `dired-pop-to-buffer'
          ;; Don't split window horizontally.  (Bug#1806)
-         (let (split-width-threshold)
-           (pop-to-buffer (current-buffer)))
-         (fit-window-to-buffer (get-buffer-window) nil 1)
+         (display-buffer (current-buffer)
+                         '(display-buffer-in-direction
+                           (direction . bottom)
+                           (window-height . fit-window-to-buffer)))
          ,@body))))
 
 (defun proced-send-signal (&optional signal process-alist)

@@ -69,6 +69,7 @@
 (declare-function x-server-vendor "xfns.c" (&optional terminal))
 (declare-function x-server-version "xfns.c" (&optional terminal))
 (declare-function message-sort-headers "message" ())
+(declare-function w32--os-description "w32-fns" ())
 (defvar message-strip-special-text-properties)
 
 (defun report-emacs-bug-can-use-osx-open ()
@@ -115,6 +116,88 @@ This requires either the macOS \"open\" command, or the freedesktop
 			   "--body" body
 			   (concat "mailto:" to)))
 	(error "Subject, To or body not found")))))
+
+(defvar report-emacs-bug--os-description nil
+  "Cached value of operating system description.")
+
+(defun report-emacs-bug--os-description ()
+  "Return a string describing the operating system, or nil."
+  (cond ((eq system-type 'darwin)
+         (let (os)
+           (with-temp-buffer
+             (when (eq 0 (ignore-errors
+                           (call-process "sw_vers" nil '(t nil) nil)))
+               (dolist (s '("ProductName" "ProductVersion"))
+                 (goto-char (point-min))
+                 (if (re-search-forward (format "^%s\\s-*:\\s-+\\(.*\\)$" s)
+                                        nil t)
+                     (setq os (concat os " " (match-string 1)))))))
+           os))
+        ((eq system-type 'windows-nt)
+         (or report-emacs-bug--os-description
+             (setq report-emacs-bug--os-description (w32--os-description))))
+        ((eq system-type 'berkeley-unix)
+         (with-temp-buffer
+           (when
+               (or (eq 0 (ignore-errors (call-process "freebsd-version" nil
+                                                      '(t nil) nil "-u")))
+                   (progn (erase-buffer)
+                          (eq 0 (ignore-errors
+                                  (call-process "uname" nil
+                                                '(t nil) nil "-a")))))
+             (unless (zerop (buffer-size))
+               (goto-char (point-min))
+               (buffer-substring (line-beginning-position)
+                                 (line-end-position))))))
+        ;; TODO Cygwin, Solaris (usg-unix-v).
+        (t
+         (or (let ((file "/etc/os-release"))
+               (and (file-readable-p file)
+                    (with-temp-buffer
+                      (insert-file-contents file)
+                      (if (re-search-forward
+                           "^\\sw*PRETTY_NAME=\"?\\(.+?\\)\"?$" nil t)
+                          (match-string 1)
+                        (let (os)
+                          (when (re-search-forward
+                                 "^\\sw*NAME=\"?\\(.+?\\)\"?$" nil t)
+                            (setq os (match-string 1))
+                            (if (re-search-forward
+                                 "^\\sw*VERSION=\"?\\(.+?\\)\"?$" nil t)
+                                (setq os (concat os " " (match-string 1))))
+                            os))))))
+             (with-temp-buffer
+               (when (eq 0 (ignore-errors
+                             (call-process "lsb_release" nil '(t nil)
+                                           nil "-d")))
+                 (goto-char (point-min))
+                 (if (looking-at "^\\sw+:\\s-+")
+                     (goto-char (match-end 0)))
+                 (buffer-substring (point) (line-end-position))))
+             (let ((file "/etc/lsb-release"))
+               (and (file-readable-p file)
+                    (with-temp-buffer
+                      (insert-file-contents file)
+                      (if (re-search-forward
+                           "^\\sw*DISTRIB_DESCRIPTION=\"?\\(.*release.*?\\)\"?$" nil t)
+                          (match-string 1)))))
+             (catch 'found
+               (dolist (f (append (file-expand-wildcards "/etc/*-release")
+                                  '("/etc/debian_version")))
+                 (and (not (member (file-name-nondirectory f)
+                                   '("lsb-release" "os-release")))
+                      (file-readable-p f)
+                      (with-temp-buffer
+                        (insert-file-contents f)
+                        (if (not (zerop (buffer-size)))
+                            (throw 'found
+                                   (format "%s%s"
+                                           (if (equal (file-name-nondirectory f)
+                                                      "debian_version")
+                                               "Debian " "")
+                                           (buffer-substring
+                                            (line-beginning-position)
+                                            (line-end-position)))))))))))))
 
 ;; It's the default mail mode, so it seems OK to use its features.
 (autoload 'message-bogus-recipient-p "message")
@@ -225,6 +308,8 @@ usually do not have translators for other languages.\n\n")))
 
     (if (stringp emacs-repository-version)
 	(insert "Repository revision: " emacs-repository-version "\n"))
+    (if (stringp emacs-repository-branch)
+	(insert "Repository branch: " emacs-repository-branch "\n"))
     (if (fboundp 'x-server-vendor)
 	(condition-case nil
             ;; This is used not only for X11 but also W32 and others.
@@ -232,13 +317,9 @@ usually do not have translators for other languages.\n\n")))
                     "', version "
 		    (mapconcat 'number-to-string (x-server-version) ".") "\n")
 	  (error t)))
-    (let ((lsb (with-temp-buffer
-		 (if (eq 0 (ignore-errors
-			     (call-process "lsb_release" nil '(t nil)
-					   nil "-d")))
-		     (buffer-string)))))
-      (if (stringp lsb)
-	  (insert "System " lsb "\n")))
+    (let ((os (ignore-errors (report-emacs-bug--os-description))))
+      (if (stringp os)
+          (insert "System Description: " os "\n\n")))
     (let ((message-buf (get-buffer "*Messages*")))
       (if message-buf
 	  (let (beg-pos
@@ -267,11 +348,6 @@ usually do not have translators for other languages.\n\n")))
        "LC_ALL" "LC_COLLATE" "LC_CTYPE" "LC_MESSAGES"
        "LC_MONETARY" "LC_NUMERIC" "LC_TIME" "LANG" "XMODIFIERS"))
     (insert (format "  locale-coding-system: %s\n" locale-coding-system))
-    ;; Only ~ 0.2% of people from a sample of 3200 changed this from
-    ;; the default, t.
-    (or (default-value 'enable-multibyte-characters)
-	(insert (format "  default enable-multibyte-characters: %s\n"
-			(default-value 'enable-multibyte-characters))))
     (insert "\n")
     (insert (format "Major mode: %s\n"
 		    (format-mode-line

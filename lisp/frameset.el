@@ -675,7 +675,7 @@ nil while the filtering is done to restore it."
       ;; of a frameset, so we must copy parameters to avoid inadvertent
       ;; modifications.
       (pcase (cdr (assq (car current) filter-alist))
-	(`nil
+	('nil
 	 (push (if saving current (copy-tree current)) filtered))
 	(:never
 	 nil)
@@ -800,22 +800,17 @@ Internal use only."
              (cons nil
                    (and mb-frame
                         (frameset-frame-id mb-frame)))))))))
-  ;; Now store text-pixel width and height if it differs from the calculated
-  ;; width and height and the frame is not fullscreen.
+  ;; Now store text-pixel width and height if `frame-resize-pixelwise'
+  ;; is set.  (Bug#30141)
   (dolist (frame frame-list)
-    (unless (frame-parameter frame 'fullscreen)
-      (unless (eq (* (frame-parameter frame 'width)
-                     (frame-char-width frame))
-                  (frame-text-width frame))
-        (set-frame-parameter
-         frame 'frameset--text-pixel-width
-         (frame-text-width frame)))
-      (unless (eq (* (frame-parameter frame 'height)
-                     (frame-char-height frame))
-                  (frame-text-height frame))
-        (set-frame-parameter
-         frame 'frameset--text-pixel-height
-         (frame-text-height frame))))))
+    (when (and frame-resize-pixelwise
+               (not (frame-parameter frame 'fullscreen)))
+      (set-frame-parameter
+       frame 'frameset--text-pixel-width
+       (frame-text-width frame))
+      (set-frame-parameter
+       frame 'frameset--text-pixel-height
+       (frame-text-height frame)))))
 
 ;;;###autoload
 (cl-defun frameset-save (frame-list
@@ -908,7 +903,7 @@ NOTE: This only works for non-iconified frames."
 		      (< fr-right  left) (> fr-right  right)
 		      (< fr-top    top)  (> fr-top    bottom)))
 	    ;; Displaced to the left, right, above or below the screen.
-	    (`t   (or (> fr-left   right)
+	    ('t   (or (> fr-left   right)
 		      (< fr-right  left)
 		      (> fr-top    bottom)
 		      (< fr-bottom top)))
@@ -975,8 +970,7 @@ is the parameter alist of the frame being restored.  Internal use only."
 	   ;; that frame has already been loaded (which can happen after
 	   ;; M-x desktop-read).
 	   (setq frame (frameset--find-frame-if
-			(lambda (f id)
-			  (frameset-frame-id-equal-p f id))
+			#'frameset-frame-id-equal-p
 			display (frameset-cfg-id parameters)))
 	   ;; If it has not been loaded, and it is not a minibuffer-only frame,
 	   ;; let's look for an existing non-minibuffer-only frame to reuse.
@@ -1200,11 +1194,11 @@ All keyword parameters default to nil."
 	 ;; will decide which ones can be reused, and how to deal with any leftover.
 	 (frameset--reuse-list
 	  (pcase reuse-frames
-	    (`t
+	    ('t
 	     frames)
-	    (`nil
+	    ('nil
 	     nil)
-	    (`match
+	    ('match
 	     (cl-loop for (state) in (frameset-states frameset)
 		      when (frameset-frame-with-id (frameset-cfg-id state) frames)
 		      collect it))
@@ -1355,41 +1349,44 @@ All keyword parameters default to nil."
 
 ;; Register support
 
-;;;###autoload
-(defun frameset--jump-to-register (data)
-  "Restore frameset from DATA stored in register.
-Called from `jump-to-register'.  Internal use only."
+(cl-defstruct (frameset-register
+               (:constructor nil)
+               (:constructor frameset-make-register (frameset frame-id point)))
+  frameset frame-id point)
+
+(cl-defmethod register-val-jump-to ((data frameset-register) arg)
   (frameset-restore
-   (aref data 0)
+   (frameset-register-frameset data)
    :filters frameset-session-filter-alist
-   :reuse-frames (if current-prefix-arg t 'match)
-   :cleanup-frames (if current-prefix-arg
+   :reuse-frames (if arg t 'match)
+   :cleanup-frames (if arg
 		       ;; delete frames
 		       nil
 		     ;; iconify frames
 		     (lambda (frame action)
 		       (pcase action
-			 (`rejected (iconify-frame frame))
+			 ('rejected (iconify-frame frame))
 			 ;; In the unexpected case that a frame was a candidate
 			 ;; (matching frame id) and yet not restored, remove it
 			 ;; because it is in fact a duplicate.
-			 (`ignored (delete-frame frame))))))
+			 ('ignored (delete-frame frame))))))
 
   ;; Restore selected frame, buffer and point.
-  (let ((frame (frameset-frame-with-id (aref data 1)))
+  (let ((frame (frameset-frame-with-id (frameset-register-frame-id data)))
+        (marker (frameset-register-point data))
 	buffer window)
     (when frame
       (select-frame-set-input-focus frame)
-      (when (and (buffer-live-p (setq buffer (marker-buffer (aref data 2))))
+      (when (and (buffer-live-p
+                  (setq buffer (marker-buffer marker)))
 		 (window-live-p (setq window (get-buffer-window buffer frame))))
 	(set-frame-selected-window frame window)
-	(with-current-buffer buffer (goto-char (aref data 2)))))))
+	(with-current-buffer buffer (goto-char marker))))))
 
-;;;###autoload
-(defun frameset--print-register (data)
+(cl-defmethod register-val-describe ((data frameset-register) _verbose)
   "Print basic info about frameset stored in DATA.
 Called from `list-registers' and `view-register'.  Internal use only."
-  (let* ((fs (aref data 0))
+  (let* ((fs (frameset-register-frameset data))
 	 (ns (length (frameset-states fs))))
     (princ (format "a frameset (%d frame%s, saved on %s)."
 		   ns
@@ -1405,16 +1402,14 @@ Argument is a character, naming the register.
 Interactively, reads the register using `register-read-with-preview'."
   (interactive (list (register-read-with-preview "Frameset to register: ")))
   (set-register register
-		(registerv-make
-		 (vector (frameset-save nil
-					:app 'register
-					:filters frameset-session-filter-alist)
-			 ;; frameset-save does not include the value of point
-			 ;; in the current buffer, so record that separately.
-			 (frameset-frame-id nil)
-			 (point-marker))
-		 :print-func #'frameset--print-register
-		 :jump-func #'frameset--jump-to-register)))
+		(frameset-make-register
+                 (frameset-save nil
+				:app 'register
+				:filters frameset-session-filter-alist)
+		 ;; frameset-save does not include the value of point
+		 ;; in the current buffer, so record that separately.
+		 (frameset-frame-id nil)
+		 (point-marker))))
 
 (provide 'frameset)
 

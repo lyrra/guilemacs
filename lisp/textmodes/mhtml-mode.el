@@ -21,7 +21,9 @@
 
 ;;; Code:
 
-(eval-and-compile (require 'sgml-mode))
+(eval-and-compile
+  (require 'cl-lib)
+  (require 'sgml-mode))
 (require 'js)
 (require 'css-mode)
 (require 'prog-mode)
@@ -363,7 +365,6 @@ Code inside a <script> element is indented using the rules from
 `js-mode'; and code inside a <style> element is indented using
 the rules from `css-mode'."
   (setq-local indent-line-function #'mhtml-indent-line)
-  (setq-local parse-sexp-lookup-properties t)
   (setq-local syntax-propertize-function #'mhtml-syntax-propertize)
   (setq-local font-lock-fontify-region-function
               #'mhtml--submode-fontify-region)

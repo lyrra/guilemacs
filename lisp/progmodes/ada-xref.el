@@ -416,7 +416,7 @@ As a special case, ${current} is replaced with the name of the current
 file, minus extension but with directory, and ${full_current} is
 replaced by the name including the extension."
 
-  (while (string-match "\\(-[^-$IO]*[IO]\\)?${\\([^}]+\\)}" cmd-string)
+  (while (string-match "\\(-[^-$IO]*[IO]\\)?\\${\\([^}]+\\)}" cmd-string)
     (let (value
 	  (name (match-string 2 cmd-string)))
       (cond
@@ -1133,8 +1133,7 @@ If OTHER-FRAME is non-nil, display the cross-reference in another frame."
 	(ada-find-in-ali identlist other-frame)
       ;; File not found: print explicit error message
       (ada-error-file-not-found
-       (message (concat (error-message-string err)
-			(nthcdr 1 err))))
+       (message "%s%s" (error-message-string err) (nthcdr 1 err)))
 
       (error
        (let ((ali-file (ada-get-ali-file-name (ada-file-of identlist))))

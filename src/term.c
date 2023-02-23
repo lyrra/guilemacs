@@ -73,11 +73,10 @@ static void clear_tty_hooks (struct terminal *terminal);
 static void set_tty_hooks (struct terminal *terminal);
 static void dissociate_if_controlling_tty (int fd);
 static void delete_tty (struct terminal *);
-static _Noreturn void maybe_fatal (bool, struct terminal *,
-				   const char *, const char *, ...)
+static AVOID maybe_fatal (bool, struct terminal *, const char *, const char *,
+			  ...)
   ATTRIBUTE_FORMAT_PRINTF (3, 5) ATTRIBUTE_FORMAT_PRINTF (4, 5);
-static _Noreturn void vfatal (const char *str, va_list ap)
-  ATTRIBUTE_FORMAT_PRINTF (1, 0);
+static AVOID vfatal (const char *, va_list) ATTRIBUTE_FORMAT_PRINTF (1, 0);
 
 
 #define OUTPUT(tty, a)                                          \
@@ -1201,7 +1200,9 @@ calculate_costs (struct frame *frame)
       calculate_ins_del_char_costs (frame);
 
       /* Don't use TS_repeat if its padding is worse than sending the chars */
-      if (tty->TS_repeat && per_line_cost (tty->TS_repeat) * baud_rate < 9000)
+      if (tty->TS_repeat
+	  && (baud_rate <= 0
+	      || per_line_cost (tty->TS_repeat) < 9000 / baud_rate))
         tty->RPov = string_cost (tty->TS_repeat);
       else
         tty->RPov = FRAME_COLS (frame) * 2;
@@ -1350,7 +1351,8 @@ term_get_fkeys_1 (void)
   char **address = term_get_fkeys_address;
   KBOARD *kboard = term_get_fkeys_kboard;
 
-  /* This can happen if CANNOT_DUMP or with strange options.  */
+  /* This can happen if Emacs is starting up from scratch, or with
+     strange options.  */
   if (!KEYMAPP (KVAR (kboard, Vinput_decode_map)))
     kset_input_decode_map (kboard, Fmake_sparse_keymap (Qnil));
 
@@ -1359,8 +1361,7 @@ term_get_fkeys_1 (void)
       char *sequence = tgetstr (keys[i].cap, address);
       if (sequence)
 	Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence),
-		     Fmake_vector (make_number (1),
-				   intern (keys[i].name)));
+		     make_vector (1, intern (keys[i].name)));
     }
 
   /* The uses of the "k0" capability are inconsistent; sometimes it
@@ -1379,13 +1380,13 @@ term_get_fkeys_1 (void)
 	  /* Define f0 first, so that f10 takes precedence in case the
 	     key sequences happens to be the same.  */
 	  Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k0),
-		       Fmake_vector (make_number (1), intern ("f0")));
+		       make_vector (1, intern ("f0")));
 	Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k_semi),
-		     Fmake_vector (make_number (1), intern ("f10")));
+		     make_vector (1, intern ("f10")));
       }
     else if (k0)
       Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (k0),
-		   Fmake_vector (make_number (1), intern (k0_name)));
+		   make_vector (1, intern (k0_name)));
   }
 
   /* Set up cookies for numbered function keys above f10. */
@@ -1408,8 +1409,7 @@ term_get_fkeys_1 (void)
 	    {
 	      sprintf (fkey, "f%d", i);
 	      Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence),
-			   Fmake_vector (make_number (1),
-					 intern (fkey)));
+			   make_vector (1, intern (fkey)));
 	    }
 	}
       }
@@ -1425,8 +1425,7 @@ term_get_fkeys_1 (void)
 	  char *sequence = tgetstr (cap2, address);			\
 	  if (sequence)                                                 \
 	    Fdefine_key (KVAR (kboard, Vinput_decode_map), build_string (sequence), \
-			 Fmake_vector (make_number (1),                 \
-				       intern (sym)));                  \
+			 make_vector (1, intern (sym)));		\
 	}
 
       /* if there's no key_next keycap, map key_npage to `next' keysym */
@@ -2050,7 +2049,7 @@ TERMINAL does not refer to a text terminal.  */)
 {
   struct terminal *t = decode_tty_terminal (terminal);
 
-  return make_number (t ? t->display_info.tty->TN_max_colors : 0);
+  return make_fixnum (t ? t->display_info.tty->TN_max_colors : 0);
 }
 
 #ifndef DOS_NT
@@ -2137,7 +2136,7 @@ set_tty_color_mode (struct tty_display_info *tty, struct frame *f)
   tem = assq_no_quit (Qtty_color_mode, f->param_alist);
   val = CONSP (tem) ? XCDR (tem) : Qnil;
 
-  if (INTEGERP (val))
+  if (FIXNUMP (val))
     color_mode = val;
   else if (SYMBOLP (tty_color_mode_alist))
     {
@@ -2147,7 +2146,7 @@ set_tty_color_mode (struct tty_display_info *tty, struct frame *f)
   else
     color_mode = Qnil;
 
-  mode = TYPE_RANGED_INTEGERP (int, color_mode) ? XINT (color_mode) : 0;
+  mode = TYPE_RANGED_FIXNUMP (int, color_mode) ? XFIXNUM (color_mode) : 0;
 
   if (mode != tty->previous_color_mode)
     {
@@ -2437,15 +2436,14 @@ term_mouse_movement (struct frame *frame, Gpm_Event *event)
   return 0;
 }
 
-/* Return the Time that corresponds to T.  Wrap around on overflow.  */
+/* Return the current time, as a Time value.  Wrap around on overflow.  */
 static Time
-timeval_to_Time (struct timeval const *t)
+current_Time (void)
 {
-  Time s_1000, ms;
-
-  s_1000 = t->tv_sec;
+  struct timespec now = current_timespec ();
+  Time s_1000 = now.tv_sec;
   s_1000 *= 1000;
-  ms = t->tv_usec / 1000;
+  Time ms = now.tv_nsec / 1000000;
   return s_1000 + ms;
 }
 
@@ -2467,8 +2465,6 @@ term_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 		     enum scroll_bar_part *part, Lisp_Object *x,
 		     Lisp_Object *y, Time *timeptr)
 {
-  struct timeval now;
-
   *fp = SELECTED_FRAME ();
   (*fp)->mouse_moved = 0;
 
@@ -2477,8 +2473,7 @@ term_mouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
   XSETINT (*x, last_mouse_x);
   XSETINT (*y, last_mouse_y);
-  gettimeofday(&now, 0);
-  *timeptr = timeval_to_Time (&now);
+  *timeptr = current_Time ();
 }
 
 /* Prepare a mouse-event in *RESULT for placement in the input queue.
@@ -2490,7 +2485,6 @@ static Lisp_Object
 term_mouse_click (struct input_event *result, Gpm_Event *event,
 		  struct frame *f)
 {
-  struct timeval now;
   int i, j;
 
   result->kind = GPM_CLICK_EVENT;
@@ -2501,8 +2495,7 @@ term_mouse_click (struct input_event *result, Gpm_Event *event,
 	break;
       }
     }
-  gettimeofday(&now, 0);
-  result->timestamp = timeval_to_Time (&now);
+  result->timestamp = current_Time ();
 
   if (event->type & GPM_UP)
     result->modifiers = up_modifier;
@@ -2721,7 +2714,7 @@ typedef struct tty_menu_struct
 
 /* Create a brand new menu structure.  */
 
-static tty_menu *
+static tty_menu * ATTRIBUTE_MALLOC
 tty_menu_create (void)
 {
   return xzalloc (sizeof *tty_menu_create ());
@@ -2805,8 +2798,8 @@ mouse_get_xy (int *x, int *y)
 						 &time_dummy);
   if (!NILP (lmx))
     {
-      *x = XINT (lmx);
-      *y = XINT (lmy);
+      *x = XFIXNUM (lmx);
+      *y = XFIXNUM (lmy);
     }
 }
 
@@ -3132,15 +3125,15 @@ tty_menu_activate (tty_menu *menu, int *pane, int *selidx,
   SAFE_NALLOCA (state, 1, menu->panecount);
   memset (state, 0, sizeof (*state));
   faces[0]
-    = lookup_derived_face (sf, intern ("tty-menu-disabled-face"),
+    = lookup_derived_face (NULL, sf, intern ("tty-menu-disabled-face"),
 			   DEFAULT_FACE_ID, 1);
   faces[1]
-    = lookup_derived_face (sf, intern ("tty-menu-enabled-face"),
+    = lookup_derived_face (NULL, sf, intern ("tty-menu-enabled-face"),
 			   DEFAULT_FACE_ID, 1);
   selectface = intern ("tty-menu-selected-face");
-  faces[2] = lookup_derived_face (sf, selectface,
+  faces[2] = lookup_derived_face (NULL, sf, selectface,
 				  faces[0], 1);
-  faces[3] = lookup_derived_face (sf, selectface,
+  faces[3] = lookup_derived_face (NULL, sf, selectface,
 				  faces[1], 1);
 
   /* Make sure the menu title is always displayed with
@@ -3403,20 +3396,25 @@ tty_menu_help_callback (char const *help_string, int pane, int item)
     pane_name = first_item[MENU_ITEMS_ITEM_NAME];
 
   /* (menu-item MENU-NAME PANE-NUMBER)  */
-  menu_object = list3 (Qmenu_item, pane_name, make_number (pane));
+  menu_object = list3 (Qmenu_item, pane_name, make_fixnum (pane));
   show_help_echo (help_string ? build_string (help_string) : Qnil,
- 		  Qnil, menu_object, make_number (item));
+ 		  Qnil, menu_object, make_fixnum (item));
 }
 
-static void
-tty_pop_down_menu (Lisp_Object arg)
+struct tty_pop_down_menu
 {
-  tty_menu *menu = XSAVE_POINTER (arg, 0);
-  struct buffer *orig_buffer = XSAVE_POINTER (arg, 1);
+  tty_menu *menu;
+  struct buffer *buffer;
+};
+
+static void
+tty_pop_down_menu (void *arg)
+{
+  struct tty_pop_down_menu *data = arg;
 
   block_input ();
-  tty_menu_destroy (menu);
-  set_buffer_internal (orig_buffer);
+  tty_menu_destroy (data->menu);
+  set_buffer_internal (data->buffer);
   unblock_input ();
 }
 
@@ -3472,7 +3470,7 @@ tty_menu_new_item_coords (struct frame *f, int which, int *x, int *y)
 	  pos = AREF (items, i + 3);
 	  if (NILP (str))
 	    return;
-	  ix = XINT (pos);
+	  ix = XFIXNUM (pos);
 	  if (ix <= *x
 	      /* We use <= so the blank between 2 items on a TTY is
 		 considered part of the previous item.  */
@@ -3483,14 +3481,14 @@ tty_menu_new_item_coords (struct frame *f, int which, int *x, int *y)
 	      if (which == TTYM_NEXT)
 		{
 		  if (i < last_i)
-		    *x = XINT (AREF (items, i + 4 + 3));
+		    *x = XFIXNUM (AREF (items, i + 4 + 3));
 		  else
 		    *x = 0;	/* Wrap around to the first item.  */
 		}
 	      else if (prev_x < 0)
 		{
 		  /* Wrap around to the last item.  */
-		  *x = XINT (AREF (items, last_i + 3));
+		  *x = XFIXNUM (AREF (items, last_i + 3));
 		}
 	      else
 		*x = prev_x;
@@ -3695,9 +3693,10 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
 
   /* We save and restore the current buffer because tty_menu_activate
      triggers redisplay, which switches buffers at will.  */
-  record_unwind_protect (tty_pop_down_menu,
-			 NULL // FIX20230122: was: make_save_ptr_ptr (menu, current_buffer)
-                         );
+  record_unwind_protect_ptr (tty_pop_down_menu,
+			 //FIX-MAYBE: NULL // FIX20230122: was: make_save_ptr_ptr (menu, current_buffer)
+			     &((struct tty_pop_down_menu)
+			       {menu, current_buffer}));
 
   specbind (Qoverriding_terminal_local_map,
 	    Fsymbol_value (Qtty_menu_navigation_map));
@@ -3747,7 +3746,7 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
     case TTYM_NEXT:
     case TTYM_PREV:
       tty_menu_new_item_coords (f, status, &item_x, &item_y);
-      entry = Fcons (make_number (item_x), make_number (item_y));
+      entry = Fcons (make_fixnum (item_x), make_fixnum (item_y));
       break;
 
     case TTYM_FAILURE:
@@ -3769,9 +3768,8 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
 
  tty_menu_end:
 
-  SAFE_FREE ();
   dynwind_end ();
-  return entry;
+  return SAFE_FREE_UNBIND_TO (specpdl_count, entry);
 }
 
 #endif	/* !MSDOS */
@@ -3840,6 +3838,7 @@ clear_tty_hooks (struct terminal *terminal)
   terminal->update_begin_hook = 0;
   terminal->update_end_hook = 0;
   terminal->set_terminal_window_hook = 0;
+  terminal->defined_color_hook = 0;
   terminal->mouse_position_hook = 0;
   terminal->frame_rehighlight_hook = 0;
   terminal->frame_raise_lower_hook = 0;
@@ -3883,6 +3882,7 @@ set_tty_hooks (struct terminal *terminal)
   terminal->menu_show_hook = &tty_menu_show;
 #endif
   terminal->set_terminal_window_hook = &tty_set_terminal_window;
+  terminal->defined_color_hook = &tty_defined_color; /* xfaces.c */
   terminal->read_socket_hook = &tty_read_avail_input; /* keyboard.c */
   terminal->delete_frame_hook = &tty_free_frame_resources;
   terminal->delete_terminal_hook = &delete_tty;
@@ -4144,16 +4144,24 @@ use the Bourne shell command 'TERM=...; export TERM' (C-shell:\n\
       tty->TN_max_colors = tgetnum ("Co");
 
 #ifdef TERMINFO
-      /* Non-standard support for 24-bit colors. */
       {
 	const char *fg = tigetstr ("setf24");
 	const char *bg = tigetstr ("setb24");
+	/* Non-standard support for 24-bit colors. */
 	if (fg && bg
 	    && fg != (char *) (intptr_t) -1
 	    && bg != (char *) (intptr_t) -1)
 	  {
 	    tty->TS_set_foreground = fg;
 	    tty->TS_set_background = bg;
+	    tty->TN_max_colors = 16777216;
+	  }
+	/* Standard support for 24-bit colors.  */
+	else if (tigetflag ("RGB") > 0)
+	  {
+	    /* If the used Terminfo library supports only 16-bit
+	       signed values, tgetnum("Co") and tigetnum("colors")
+	       could return 32767.  */
 	    tty->TN_max_colors = 16777216;
 	  }
       }
@@ -4392,9 +4400,8 @@ vfatal (const char *str, va_list ap)
 {
   fprintf (stderr, "emacs: ");
   vfprintf (stderr, str, ap);
-  if (!(strlen (str) > 0 && str[strlen (str) - 1] == '\n'))
+  if (! (str[0] && str[strlen (str) - 1] == '\n'))
     fprintf (stderr, "\n");
-  fflush (stderr);
   exit (1);
 }
 

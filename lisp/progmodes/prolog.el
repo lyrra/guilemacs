@@ -942,21 +942,21 @@ This is really kludgy, and unneeded (i.e. obsolete) in Emacs>=24."
 
 (defun prolog-smie-rules (kind token)
   (pcase (cons kind token)
-    (`(:elem . basic) prolog-indent-width)
+    ('(:elem . basic) prolog-indent-width)
     ;; The list of arguments can never be on a separate line!
     (`(:list-intro . ,_) t)
     ;; When we don't know how to indent an empty line, assume the most
     ;; likely token will be ";".
-    (`(:elem . empty-line-token) ";")
-    (`(:after . ".") '(column . 0)) ;; To work around smie-closer-alist.
+    ('(:elem . empty-line-token) ";")
+    ('(:after . ".") '(column . 0)) ;; To work around smie-closer-alist.
     ;; Allow indentation of if-then-else as:
     ;;    (   test
     ;;    ->  thenrule
     ;;    ;   elserule
     ;;    )
-    (`(:before . ,(or `"->" `";"))
+    (`(:before . ,(or "->" ";"))
      (and (smie-rule-bolp) (smie-rule-parent-p "(") (smie-rule-parent 0)))
-    (`(:after . ,(or `"->" `"*->"))
+    (`(:after . ,(or "->" "*->"))
      ;; We distinguish
      ;;
      ;;     (a ->
@@ -977,7 +977,7 @@ This is really kludgy, and unneeded (i.e. obsolete) in Emacs>=24."
                       (smie-indent-backward-token)
                       (smie-rule-bolp))))
        prolog-indent-width))
-    (`(:after . ";")
+    ('(:after . ";")
      ;; Align with same-line comment as in:
      ;;   ;   %% Toto
      ;;       foo
@@ -989,7 +989,7 @@ This is really kludgy, and unneeded (i.e. obsolete) in Emacs>=24."
             ;; Only do it for small offsets, since the comment may actually be
             ;; an "end-of-line" comment at comment-column!
             (if (<= offset prolog-indent-width) offset))))
-    (`(:after . ",")
+    ('(:after . ",")
      ;; Special indent for:
      ;;    foopredicate(x) :- !,
      ;;        toto.
@@ -998,7 +998,7 @@ This is really kludgy, and unneeded (i.e. obsolete) in Emacs>=24."
             (smie-indent-backward-token) ;Skip !
             (equal ":-" (car (smie-indent-backward-token))))
           (smie-rule-parent prolog-indent-width)))
-    (`(:after . ":-")
+    ('(:after . ":-")
      (if (bolp)
          (save-excursion
            (smie-indent-forward-token)
@@ -1007,7 +1007,7 @@ This is really kludgy, and unneeded (i.e. obsolete) in Emacs>=24."
                prolog-indent-width
              (min prolog-indent-width (current-column))))
        prolog-indent-width))
-    (`(:after . "-->") prolog-indent-width)))
+    ('(:after . "-->") prolog-indent-width)))
 
 
 ;;-------------------------------------------------------------------
@@ -2826,7 +2826,7 @@ STRING should be given if the last search was by `string-match' on STRING."
           (progn
             (if (and (eq prolog-system 'mercury)
                      (looking-at
-                      (format ":-[ \t]*\\(pred\\|mode\\)[ \t]+\\(%s+\\)"
+                      (format ":-[ \t]*\\(pred\\|mode\\)[ \t]+\\(\\(?:%s\\)+\\)"
                               prolog-atom-regexp)))
                 ;; Skip predicate declarations
                 (progn
@@ -2950,7 +2950,7 @@ objects (relevant only if `prolog-system' is set to `sicstus')."
            (predname
             (if (looking-at prolog-atom-char-regexp)
                 (progn
-                  (skip-chars-forward "^ (\\.")
+                  (skip-chars-forward "^ (.")
                   (buffer-substring op (point)))
               ""))
            (arity 0))
@@ -3247,11 +3247,11 @@ the following comma and whitespace, if any."
 
 (defun prolog-post-self-insert ()
   (pcase last-command-event
-    (`?_ (prolog-electric--underscore))
-    (`?- (prolog-electric--dash))
-    (`?: (prolog-electric--colon))
-    ((or `?\( `?\; `?>) (prolog-electric--if-then-else))
-    (`?. (prolog-electric--dot))))
+    (?_ (prolog-electric--underscore))
+    (?- (prolog-electric--dash))
+    (?: (prolog-electric--colon))
+    ((or ?\( ?\; ?>) (prolog-electric--if-then-else))
+    (?. (prolog-electric--dot))))
 
 (defun prolog-find-term (functor arity &optional prefix)
   "Go to the position at the start of the next occurrence of a term.

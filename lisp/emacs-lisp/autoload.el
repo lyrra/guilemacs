@@ -146,7 +146,7 @@ expression, in which case we want to handle forms differently."
                            t))))
         ;; Add the usage form at the end where describe-function-1
         ;; can recover it.
-        (when (listp args) (setq doc (help-add-fundoc-usage doc args)))
+        (when (consp args) (setq doc (help-add-fundoc-usage doc args)))
         ;; (message "autoload of %S" (nth 1 form))
         `(autoload ,(nth 1 form) ,file ,doc ,interactive ,type)))
 
@@ -184,13 +184,13 @@ expression, in which case we want to handle forms differently."
       (let* ((macrop (memq car '(defmacro cl-defmacro defmacro*)))
 	     (name (nth 1 form))
 	     (args (pcase car
-                     ((or `defun `defmacro
-                          `defun* `defmacro* `cl-defun `cl-defmacro
-                          `define-overloadable-function)
+                     ((or 'defun 'defmacro
+                          'defun* 'defmacro* 'cl-defun 'cl-defmacro
+                          'define-overloadable-function)
                       (nth 2 form))
-                     (`define-skeleton '(&optional str arg))
-                     ((or `define-generic-mode `define-derived-mode
-                          `define-compilation-mode)
+                     ('define-skeleton '(&optional str arg))
+                     ((or 'define-generic-mode 'define-derived-mode
+                          'define-compilation-mode)
                       nil)
                      (_ t)))
 	     (body (nthcdr (or (function-get car 'doc-string-elt) 3) form))
@@ -326,6 +326,7 @@ put the output in."
 	    (setcdr p nil)
 	    (princ "\n(" outbuf)
 	    (let ((print-escape-newlines t)
+		  (print-escape-control-characters t)
                   (print-quoted t)
 		  (print-escape-nonascii t))
 	      (dolist (elt form)
@@ -350,6 +351,7 @@ put the output in."
 		       outbuf))
 	      (terpri outbuf)))
 	(let ((print-escape-newlines t)
+	      (print-escape-control-characters t)
               (print-quoted t)
 	      (print-escape-nonascii t))
 	  (print form outbuf)))))))
@@ -607,7 +609,8 @@ Don't try to split prefixes that are already longer than that.")
                       nil))))
               prefixes)))
         `(if (fboundp 'register-definition-prefixes)
-             (register-definition-prefixes ,file ',(delq nil strings)))))))
+             (register-definition-prefixes ,file ',(sort (delq nil strings)
+							 'string<)))))))
 
 (defun autoload--setup-output (otherbuf outbuf absfile load-name)
   (let ((outbuf
@@ -658,6 +661,21 @@ Don't try to split prefixes that are already longer than that.")
               (progn (forward-line 1) (point)))))))
 
 (defvar autoload-builtin-package-versions nil)
+
+(defvar autoload-ignored-definitions
+  '("define-obsolete-function-alias"
+    "define-obsolete-variable-alias"
+    "define-category" "define-key"
+    "defgroup" "defface" "defadvice"
+    "def-edebug-spec"
+    ;; Hmm... this is getting ugly:
+    "define-widget"
+    "define-erc-module"
+    "define-erc-response-handler"
+    "defun-rcirc-command")
+  "List of strings naming definitions to ignore for prefixes.
+More specifically those definitions will not be considered for the
+`register-definition-prefixes' call.")
 
 ;; When called from `generate-file-autoloads' we should ignore
 ;; `generated-autoload-file' altogether.  When called from
@@ -757,17 +775,8 @@ FILE's modification time."
                              (looking-at "(\\(def[^ ]+\\) ['(]*\\([^' ()\"\n]+\\)[\n \t]")
                              (not (member
                                    (match-string 1)
-                                   '("define-obsolete-function-alias"
-                                     "define-obsolete-variable-alias"
-                                     "define-category" "define-key"
-                                     "defgroup" "defface" "defadvice"
-                                     "def-edebug-spec"
-                                     ;; Hmm... this is getting ugly:
-                                     "define-widget"
-                                     "define-erc-module"
-                                     "define-erc-response-handler"
-                                     "defun-rcirc-command"))))
-                    (push (match-string 2) defs))
+                                   autoload-ignored-definitions)))
+                    (push (match-string-no-properties 2) defs))
                             (forward-sexp 1)
                             (forward-line 1)))))))
 
@@ -812,7 +821,8 @@ FILE's modification time."
                          (marker-buffer other-output-start)
                          "actual autoloads are elsewhere" load-name relfile
 			 (if autoload-timestamps
-			     (nth 5 (file-attributes absfile))
+			     (file-attribute-modification-time
+			      (file-attributes absfile))
 			   autoload--non-timestamp))
                         (insert ";;; Generated autoloads from " relfile "\n")))
                     (insert generate-autoload-section-trailer)))))))
@@ -848,7 +858,8 @@ FILE's modification time."
                                       ;; `emacs-internal' instead.
                                       nil nil 'emacs-mule-unix)
                                (if autoload-timestamps
-                                   (nth 5 (file-attributes relfile))
+                                   (file-attribute-modification-time
+				    (file-attributes relfile))
                                  autoload--non-timestamp)))
                             (insert ";;; Generated autoloads from " relfile "\n")))
                         (insert generate-autoload-section-trailer))))
@@ -861,7 +872,7 @@ FILE's modification time."
                   ;; If the entries were added to some other buffer, then the file
                   ;; doesn't add entries to OUTFILE.
                   otherbuf))
-          (nth 5 (file-attributes absfile))))
+          (file-attribute-modification-time (file-attributes absfile))))
     (error
      ;; Probably unbalanced parens in forward-sexp. In that case, the
      ;; condition is scan-error, and the signal data includes point
@@ -942,7 +953,8 @@ removes any prior now out-of-date autoload entries."
            (existing-buffer (if buffer-file-name buf))
            (output-file (autoload-generated-file))
            (output-time (if (file-exists-p output-file)
-                            (nth 5 (file-attributes output-file))))
+                            (file-attribute-modification-time
+			     (file-attributes output-file))))
            (found nil))
       (with-current-buffer (autoload-find-generated-file)
         ;; This is to make generated-autoload-file have Unix EOLs, so
@@ -964,7 +976,8 @@ removes any prior now out-of-date autoload entries."
                    ;; Check if it is up to date.
                    (let ((begin (match-beginning 0))
                          (last-time (nth 4 form))
-                         (file-time (nth 5 (file-attributes file))))
+                         (file-time (file-attribute-modification-time
+				     (file-attributes file))))
                      (if (and (or (null existing-buffer)
                                   (not (buffer-modified-p existing-buffer)))
                               (cond
@@ -1057,7 +1070,8 @@ write its autoloads into the specified file instead."
 	    generated-autoload-file))
 	 (output-time
 	  (if (file-exists-p generated-autoload-file)
-	      (nth 5 (file-attributes generated-autoload-file)))))
+	      (file-attribute-modification-time
+	       (file-attributes generated-autoload-file)))))
 
     (with-current-buffer (autoload-find-generated-file)
       (save-excursion
@@ -1078,7 +1092,8 @@ write its autoloads into the specified file instead."
 		   (if (member last-time (list t autoload--non-timestamp))
 		       (setq last-time output-time))
 		   (dolist (file file)
-		     (let ((file-time (nth 5 (file-attributes file))))
+		     (let ((file-time (file-attribute-modification-time
+				       (file-attributes file))))
 		       (when (and file-time
 				  (not (time-less-p last-time file-time)))
 			 ;; file unchanged
@@ -1097,7 +1112,8 @@ write its autoloads into the specified file instead."
 						    t autoload--non-timestamp))
 					   output-time
 					 oldtime))
-                                     (nth 5 (file-attributes file))))
+                                     (file-attribute-modification-time
+				      (file-attributes file))))
 		   ;; File hasn't changed.
 		   nil)
 		  (t
@@ -1110,8 +1126,14 @@ write its autoloads into the specified file instead."
             (push file done)
 	    (setq files (delete file files)))))
       ;; Elements remaining in FILES have no existing autoload sections yet.
-      (let ((no-autoloads-time (or last-time '(0 0 0 0))) file-time)
+      (let ((no-autoloads-time (or last-time '(0 0 0 0)))
+            (progress (make-progress-reporter
+                       (byte-compile-info-string "Scraping files for autoloads")
+                       0 (length files) nil 10))
+            (file-count 0)
+            file-time)
 	(dolist (file files)
+          (progress-reporter-update progress (setq file-count (1+ file-count)))
 	  (cond
 	   ;; Passing nil as second argument forces
 	   ;; autoload-generate-file-autoloads to look for the right
@@ -1122,6 +1144,7 @@ write its autoloads into the specified file instead."
 	    (if (time-less-p no-autoloads-time file-time)
 		(setq no-autoloads-time file-time)))
            (t (setq changed t))))
+        (progress-reporter-done progress)
 
 	(when no-autoloads
 	  ;; Sort them for better readability.
@@ -1144,9 +1167,6 @@ write its autoloads into the specified file instead."
       ;; In case autoload entries were added to other files because of
       ;; file-local autoload-generated-file settings.
       (autoload-save-buffers))))
-
-(define-obsolete-function-alias 'update-autoloads-from-directories
-    'update-directory-autoloads "22.1")
 
 ;;;###autoload
 (defun batch-update-autoloads ()

@@ -1047,12 +1047,9 @@ and meaning of input events in detail.
 This function returns non-@code{nil} if @var{object} is an input event
 or event type.
 
-Note that any symbol might be used as an event or an event type.
-@code{eventp} cannot distinguish whether a symbol is intended by Lisp
-code to be used as an event.  Instead, it distinguishes whether the
-symbol has actually been used in an event that has been read as input in
-the current Emacs session.  If a symbol has not yet been so used,
-@code{eventp} returns @code{nil}.
+Note that any non-@code{nil} symbol might be used as an event or an
+event type; @code{eventp} cannot distinguish whether a symbol is
+intended by Lisp code to be used as an event.
 @end defun
 
 @menu
@@ -2884,6 +2881,14 @@ command's key sequence (as returned by, e.g., @code{this-command-keys}),
 as the events will already have been added once as they were read for
 the first time.  An element of the form @w{@code{(t . @var{event})}}
 forces @var{event} to be added to the current command's key sequence.
+
+@cindex not recording input events
+@cindex input events, prevent recording
+Elements read from this list are normally recorded by the
+record-keeping features (@pxref{Recording Input}) and while defining a
+keyboard macro (@pxref{Keyboard Macros}).  However, an element of the
+form @w{@code{(no-record . @var{event})}} causes @var{event} to be
+processed normally without recording it.
 @end defvar
 
 @defun listify-key-sequence key

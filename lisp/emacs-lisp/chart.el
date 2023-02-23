@@ -3,7 +3,7 @@
 ;; Copyright (C) 1996, 1998-1999, 2001, 2004-2005, 2007-2019 Free
 ;; Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam  <zappo@gnu.org>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Version: 0.2
 ;; Keywords: OO, chart, graph
 
@@ -704,7 +704,7 @@ SORT-PRED if desired."
 	(cntlst nil))
     (save-excursion
       (goto-char (point-min))
-      (while (re-search-forward "\\-[A-Z][a-z][a-z] +\\(\\w+\\)@\\w+" nil t)
+      (while (re-search-forward "-[A-Z][a-z][a-z] +\\(\\w+\\)@\\w+" nil t)
 	(let* ((nam (buffer-substring (match-beginning 1) (match-end 1)))
 	       (m (member nam nmlst)))
 	  (message "Scanned username %s" nam)

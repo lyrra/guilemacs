@@ -25,13 +25,43 @@
 ;;; Code:
 
 (ert-deftest rx-char-any ()
-  "Test character alternatives with `\]' and `-' (Bug#25123)."
+  "Test character alternatives with `]' and `-' (Bug#25123)."
   (should (string-match
            (rx string-start (1+ (char (?\] . ?\{) (?< . ?\]) (?- . ?:)))
                string-end)
            (apply #'string (nconc (number-sequence ?\] ?\{)
                                   (number-sequence ?< ?\])
                                   (number-sequence ?- ?:))))))
+
+(ert-deftest rx-char-any-range-nl ()
+  "Test character alternatives with LF as a range endpoint."
+  (should (equal (rx (any "\n-\r"))
+                 "[\n-\r]"))
+  (should (equal (rx (any "\a-\n"))
+                 "[\a-\n]")))
+
+(ert-deftest rx-char-any-range-bad ()
+  (should-error (rx (any "0-9a-Z")))
+  (should-error (rx (any (?0 . ?9) (?a . ?Z)))))
+
+(ert-deftest rx-char-any-raw-byte ()
+  "Test raw bytes in character alternatives."
+  ;; Separate raw characters.
+  (should (equal (string-match-p (rx (any "\326A\333B"))
+                                 "X\326\333")
+                 1))
+  ;; Range of raw characters, unibyte.
+  (should (equal (string-match-p (rx (any "\200-\377"))
+                                 "ÿA\310B")
+                 2))
+  ;; Range of raw characters, multibyte.
+  (should (equal (string-match-p (rx (any "Å\211\326-\377\177"))
+                                 "XY\355\177\327")
+                 2))
+  ;; Split range; \177-\377ÿ should not be optimised to \177-\377.
+  (should (equal (string-match-p (rx (any "\177-\377" ?ÿ))
+                                 "ÿA\310B")
+                 0)))
 
 (ert-deftest rx-pcase ()
   (should (equal (pcase "a 1 2 3 1 1 b"
@@ -42,6 +72,93 @@
                         (backref 1))
                     (list u v)))
                  '("1" "3"))))
+
+(ert-deftest rx-kleene ()
+  "Test greedy and non-greedy repetition operators."
+  (should (equal (rx (* "a") (+ "b") (\? "c") (?\s "d")
+                     (*? "e") (+? "f") (\?? "g") (?? "h"))
+                 "a*b+c?d?e*?f+?g??h??"))
+  (should (equal (rx (zero-or-more "a") (0+ "b")
+                     (one-or-more "c") (1+ "d")
+                     (zero-or-one "e") (optional "f") (opt "g"))
+                 "a*b*c+d+e?f?g?"))
+  (should (equal (rx (minimal-match
+                      (seq (* "a") (+ "b") (\? "c") (?\s "d")
+                           (*? "e") (+? "f") (\?? "g") (?? "h"))))
+                 "a*b+c?d?e*?f+?g??h??"))
+  (should (equal (rx (minimal-match
+                      (seq (zero-or-more "a") (0+ "b")
+                           (one-or-more "c") (1+ "d")
+                           (zero-or-one "e") (optional "f") (opt "g"))))
+                 "a*?b*?c+?d+?e??f??g??"))
+  (should (equal (rx (maximal-match
+                      (seq (* "a") (+ "b") (\? "c") (?\s "d")
+                         (*? "e") (+? "f") (\?? "g") (?? "h"))))
+                 "a*b+c?d?e*?f+?g??h??")))
+
+(ert-deftest rx-or ()
+  ;; Test or-pattern reordering (Bug#34641).
+  (let ((s "abc"))
+    (should (equal (and (string-match (rx (or "abc" "ab" "a")) s)
+                        (match-string 0 s))
+                   "abc"))
+    (should (equal (and (string-match (rx (or "ab" "abc" "a")) s)
+                        (match-string 0 s))
+                   "ab"))
+    (should (equal (and (string-match (rx (or "a" "ab" "abc")) s)
+                        (match-string 0 s))
+                   "a")))
+  ;; Test zero-argument `or'.
+  (should (equal (rx (or)) regexp-unmatchable)))
+
+(ert-deftest rx-seq ()
+  ;; Test zero-argument `seq'.
+  (should (equal (rx (seq)) "")))
+
+(defmacro rx-tests--match (regexp string &optional match)
+  (macroexp-let2 nil strexp string
+    `(ert-info ((format "Matching %S to %S" ',regexp ,strexp))
+       (should (string-match ,regexp ,strexp))
+       ,@(when match
+           `((should (equal (match-string 0 ,strexp) ,match)))))))
+
+(ert-deftest rx-nonstring-expr ()
+  (let ((bee "b")
+        (vowel "[aeiou]"))
+    (rx-tests--match (rx "a" (literal bee) "c") "abc")
+    (rx-tests--match (rx "a" (regexp bee) "c") "abc")
+    (rx-tests--match (rx "a" (or (regexp bee) "xy") "c") "abc")
+    (rx-tests--match (rx "a" (or "xy" (regexp bee)) "c") "abc")
+    (should-not (string-match (rx (or (regexp bee) "xy")) ""))
+    (rx-tests--match (rx "a" (= 3 (regexp bee)) "c") "abbbc")
+    (rx-tests--match (rx "x" (= 3 (regexp vowel)) "z") "xeoez")
+    (should-not (string-match (rx "x" (= 3 (regexp vowel)) "z") "xe[]z"))
+    (rx-tests--match (rx "x" (= 3 (literal vowel)) "z")
+                     "x[aeiou][aeiou][aeiou]z")
+    (rx-tests--match (rx "x" (repeat 1 (regexp vowel)) "z") "xaz")
+    (rx-tests--match (rx "x" (repeat 1 2 (regexp vowel)) "z") "xaz")
+    (rx-tests--match (rx "x" (repeat 1 2 (regexp vowel)) "z") "xauz")
+    (rx-tests--match (rx "x" (>= 1 (regexp vowel)) "z") "xaiiz")
+    (rx-tests--match (rx "x" (** 1 2 (regexp vowel)) "z") "xaiz")
+    (rx-tests--match (rx "x" (group (regexp vowel)) "z") "xaz")
+    (rx-tests--match (rx "x" (group-n 1 (regexp vowel)) "z") "xaz")
+    (rx-tests--match (rx "x" (? (regexp vowel)) "z") "xz")))
+
+(ert-deftest rx-nonstring-expr-non-greedy ()
+  "`rx's greediness can't affect runtime regexp parts."
+  (let ((ad-min "[ad]*?")
+        (ad-max "[ad]*")
+        (ad "[ad]"))
+    (rx-tests--match (rx "c" (regexp ad-min) "a") "cdaaada" "cda")
+    (rx-tests--match (rx "c" (regexp ad-max) "a") "cdaaada" "cdaaada")
+    (rx-tests--match (rx "c" (minimal-match (regexp ad-max)) "a") "cdaaada" "cdaaada")
+    (rx-tests--match (rx "c" (maximal-match (regexp ad-min)) "a") "cdaaada" "cda")
+    (rx-tests--match (rx "c" (minimal-match (0+ (regexp ad))) "a") "cdaaada" "cda")
+    (rx-tests--match (rx "c" (maximal-match (0+ (regexp ad))) "a") "cdaaada" "cdaaada")))
+
+(ert-deftest rx-to-string-lisp-forms ()
+  (rx-tests--match (rx-to-string '(seq "a" (literal "b") "c")) "abc")
+  (rx-tests--match (rx-to-string '(seq "a" (regexp "b") "c")) "abc"))
 
 (provide 'rx-tests)
 ;; rx-tests.el ends here.

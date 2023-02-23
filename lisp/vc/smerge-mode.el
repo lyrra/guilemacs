@@ -44,7 +44,8 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
-(require 'diff-mode)                    ;For diff-auto-refine-mode.
+(require 'diff)				;For diff-check-labels.
+(require 'diff-mode)                    ;For diff-refine.
 (require 'newcomment)
 
 ;;; The real definition comes later.
@@ -104,7 +105,6 @@ Used in `smerge-diff-base-upper' and related functions."
     (((class color))
      :foreground "yellow"))
   "Face for the base code.")
-(define-obsolete-face-alias 'smerge-base-face 'smerge-base "22.1")
 (defvar smerge-base-face 'smerge-base)
 
 (defface smerge-markers
@@ -113,7 +113,6 @@ Used in `smerge-diff-base-upper' and related functions."
     (((background dark))
      (:background "grey30")))
   "Face for the conflict markers.")
-(define-obsolete-face-alias 'smerge-markers-face 'smerge-markers "22.1")
 (defvar smerge-markers-face 'smerge-markers)
 
 (defface smerge-refined-changed
@@ -266,7 +265,7 @@ Can be nil if the style is undecided, or else:
 
 ;; Define smerge-next and smerge-prev
 (easy-mmode-define-navigation smerge smerge-begin-re "conflict" nil nil
-  (if diff-auto-refine-mode
+  (if diff-refine
       (condition-case nil (smerge-refine) (error nil))))
 
 (defconst smerge-match-names ["conflict" "upper" "base" "lower"])
@@ -365,9 +364,9 @@ function should only apply safe heuristics) and with the match data set
 according to `smerge-match-conflict'.")
 
 (defvar smerge-text-properties
-  `(help-echo "merge conflict: mouse-3 shows a menu"
-    ;; mouse-face highlight
-    keymap (keymap (down-mouse-3 . smerge-popup-context-menu))))
+  '(help-echo "merge conflict: mouse-3 shows a menu"
+              ;; mouse-face highlight
+              keymap (keymap (down-mouse-3 . smerge-popup-context-menu))))
 
 (defun smerge-remove-props (beg end)
   (remove-overlays beg end 'smerge 'refine)
@@ -1077,9 +1076,10 @@ used to replace chars to try and eliminate some spurious differences."
           (if smerge-refine-weight-hack (make-hash-table :test #'equal))))
     (unless (markerp beg1) (setq beg1 (copy-marker beg1)))
     (unless (markerp beg2) (setq beg2 (copy-marker beg2)))
-    ;; Chop up regions into smaller elements and save into files.
-    (smerge--refine-chopup-region beg1 end1 file1 preproc)
-    (smerge--refine-chopup-region beg2 end2 file2 preproc)
+    (let ((write-region-inhibit-fsync t)) ; Don't fsync temp files (Bug#12747).
+      ;; Chop up regions into smaller elements and save into files.
+      (smerge--refine-chopup-region beg1 end1 file1 preproc)
+      (smerge--refine-chopup-region beg2 end2 file2 preproc))
 
     ;; Call diff on those files.
     (unwind-protect
@@ -1244,9 +1244,12 @@ spacing of the \"Lower\" chunk."
 	    (let ((status
 		   (apply 'call-process diff-command nil t nil
 			  (append smerge-diff-switches
-				  (list "-L" (concat name1 "/" file)
-					"-L" (concat name2 "/" file)
-					file1 file2)))))
+				  (and (diff-check-labels)
+				       (list "--label"
+					     (concat name1 "/" file)
+					     "--label"
+					     (concat name2 "/" file)))
+				  (list file1 file2)))))
 	      (if (eq status 0) (insert "No differences found.\n"))))
 	  (goto-char (point-min))
 	  (diff-mode)
@@ -1400,9 +1403,7 @@ with a \\[universal-argument] prefix, makes up a 3-way conflict."
 ;;;###autoload
 (define-minor-mode smerge-mode
   "Minor mode to simplify editing output from the diff3 program.
-With a prefix argument ARG, enable the mode if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable the mode
-if ARG is omitted or nil.
+
 \\{smerge-mode-map}"
   :group 'smerge :lighter " SMerge"
   (when (and (boundp 'font-lock-mode) font-lock-mode)
@@ -1434,6 +1435,40 @@ If no conflict maker is found, turn off `smerge-mode'."
       (unless (looking-at smerge-begin-re)
         (smerge-next))
     (error (smerge-auto-leave))))
+
+(defcustom smerge-change-buffer-confirm t
+  "If non-nil, request confirmation before moving to another buffer."
+  :type 'boolean)
+
+(defun smerge-vc-next-conflict ()
+  "Go to next conflict, possibly in another file.
+First tries to go to the next conflict in the current buffer, and if not
+found, uses VC to try and find the next file with conflict."
+  (interactive)
+  (let ((buffer (current-buffer)))
+    (condition-case nil
+        ;; FIXME: Try again from BOB before moving to the next file.
+        (smerge-next)
+      (error
+       (if (and (or smerge-change-buffer-confirm
+                    (and (buffer-modified-p) buffer-file-name))
+                (not (or (eq last-command this-command)
+                         (eq ?\r last-command-event)))) ;Called via M-x!?
+           ;; FIXME: Don't emit this message if `vc-find-conflicted-file' won't
+           ;; go to another file anyway (because there are no more conflicted
+           ;; files).
+           (message (if (buffer-modified-p)
+                        "No more conflicts here.  Repeat to save and go to next buffer"
+                      "No more conflicts here.  Repeat to go to next buffer"))
+         (if (and (buffer-modified-p) buffer-file-name)
+             (save-buffer))
+         (vc-find-conflicted-file)
+         (if (eq buffer (current-buffer))
+             ;; Do nothing: presumably `vc-find-conflicted-file' already
+             ;; emitted a message explaining there aren't any more conflicts.
+             nil
+           (goto-char (point-min))
+           (smerge-next)))))))
 
 (provide 'smerge-mode)
 

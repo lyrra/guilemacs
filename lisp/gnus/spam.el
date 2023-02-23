@@ -38,8 +38,6 @@
 
 ;;{{{ compilation directives and autoloads/requires
 
-(eval-when-compile (require 'cl))
-
 (require 'message)              ;for the message-fetch-field functions
 (require 'gnus-sum)
 (require 'gnus-uu)                      ; because of key prefix issues
@@ -50,6 +48,8 @@
 
 ;; for nnimap-split-download-body-default
 (eval-when-compile (require 'nnimap))
+
+(eval-when-compile (require 'cl-lib))
 
 ;; autoload query-dig
 (autoload 'query-dig "dig")
@@ -366,9 +366,6 @@ Only meaningful if you enable `spam-use-blackholes'."
     (t :inverse-video t))
   "Face for spam-marked articles."
   :group 'spam)
-;; backward-compatibility alias
-(put 'spam-face 'face-alias 'spam)
-(put 'spam-face 'obsolete-face "22.1")
 
 (defcustom spam-face 'spam
   "Face for spam-marked articles."
@@ -1167,12 +1164,12 @@ backends)."
 (defun spam-article-sort-by-spam-status (h1 h2)
   "Sort articles by score."
   (let (result)
-    (dolist (header (spam-necessary-extra-headers))
+    (cl-dolist (header (spam-necessary-extra-headers))
       (let ((s1 (spam-summary-score h1 header))
             (s2 (spam-summary-score h2 header)))
       (unless (= s1 s2)
         (setq result (< s1 s2))
-        (return))))
+        (cl-return))))
     result))
 
 (defvar spam-spamassassin-score-regexp
@@ -1208,14 +1205,14 @@ Note this has to be fast."
 With SPECIFIC-HEADER, returns only that header's score.
 Will not return a nil score."
   (let (score)
-    (dolist (header
+    (cl-dolist (header
              (if specific-header
                  (list specific-header)
                (spam-necessary-extra-headers)))
       (setq score
             (spam-extra-header-to-number header headers))
       (when score
-        (return)))
+        (cl-return)))
     (or score 0)))
 
 (defun spam-generic-score (&optional recheck)
@@ -1247,73 +1244,40 @@ Will not return a nil score."
         (setq found backend)))
     found))
 
-(defvar spam-list-of-processors
-  ;; note the nil processors are not defined in gnus.el
-  '((gnus-group-spam-exit-processor-bogofilter   spam spam-use-bogofilter)
-    (gnus-group-spam-exit-processor-bsfilter     spam spam-use-bsfilter)
-    (gnus-group-spam-exit-processor-blacklist    spam spam-use-blacklist)
-    (gnus-group-spam-exit-processor-ifile        spam spam-use-ifile)
-    (gnus-group-spam-exit-processor-stat         spam spam-use-stat)
-    (gnus-group-spam-exit-processor-spamoracle   spam spam-use-spamoracle)
-    (gnus-group-spam-exit-processor-spamassassin spam spam-use-spamassassin)
-    (gnus-group-spam-exit-processor-report-gmane spam spam-use-gmane) ;; Buggy?
-    (gnus-group-ham-exit-processor-ifile         ham spam-use-ifile)
-    (gnus-group-ham-exit-processor-bogofilter    ham spam-use-bogofilter)
-    (gnus-group-ham-exit-processor-bsfilter      ham spam-use-bsfilter)
-    (gnus-group-ham-exit-processor-stat          ham spam-use-stat)
-    (gnus-group-ham-exit-processor-whitelist     ham spam-use-whitelist)
-    (gnus-group-ham-exit-processor-BBDB          ham spam-use-BBDB)
-    (gnus-group-ham-exit-processor-copy          ham spam-use-ham-copy)
-    (gnus-group-ham-exit-processor-spamassassin  ham spam-use-spamassassin)
-    (gnus-group-ham-exit-processor-spamoracle    ham spam-use-spamoracle))
-  "The OBSOLETE `spam-list-of-processors' list.
-This list contains pairs associating the obsolete ham/spam exit
-processor variables with a classification and a spam-use-*
-variable.  When the processor variable is nil, just the
-classification and spam-use-* check variable are used.  This is
-superseded by the new spam backend code, so it's only consulted
-for backwards compatibility.")
-(make-obsolete-variable 'spam-list-of-processors nil "22.1")
-
 (defun spam-group-processor-p (group backend &optional classification)
   "Checks if GROUP has a BACKEND with CLASSIFICATION registered.
-Also accepts the obsolete processors, which can be found in
-gnus.el and in spam-list-of-processors.  In the case of mover
-backends, checks the setting of `spam-summary-exit-behavior' in
-addition to the set values for the group."
+In the case of mover backends, checks the setting of
+`spam-summary-exit-behavior' in addition to the set values for the group."
   (if (and (stringp group)
            (symbolp backend))
-      (let ((old-style (assq backend spam-list-of-processors))
-            (parameters (nth 0 (gnus-parameter-spam-process group)))
+      (let ((parameters (nth 0 (gnus-parameter-spam-process group)))
             found)
-        (if old-style  ; old-style processor
-            (spam-group-processor-p group (nth 2 old-style) (nth 1 old-style))
-          ;; now search for the parameter
-          (dolist (parameter parameters)
-            (when (and (null found)
-                       (listp parameter)
-                       (eq classification (nth 0 parameter))
-                       (eq backend (nth 1 parameter)))
-              (setq found t)))
+        ;; now search for the parameter
+        (dolist (parameter parameters)
+          (when (and (null found)
+                     (listp parameter)
+                     (eq classification (nth 0 parameter))
+                     (eq backend (nth 1 parameter)))
+            (setq found t)))
 
-          ;; now, if the parameter was not found, do the
-          ;; spam-summary-exit-behavior-logic for mover backends
-          (unless found
-            (when (spam-backend-mover-p backend)
-              (setq
-               found
-               (cond
-                ((eq spam-summary-exit-behavior 'move-all) t)
-                ((eq spam-summary-exit-behavior 'move-none) nil)
-                ((eq spam-summary-exit-behavior 'default)
-                 (or (eq classification 'spam) ;move spam out of all groups
-                     ;; move ham out of spam groups
-                     (and (eq classification 'ham)
-                          (spam-group-spam-contents-p group))))
-                (t (gnus-error 5 "Unknown spam-summary-exit-behavior: %s"
-                               spam-summary-exit-behavior))))))
+        ;; now, if the parameter was not found, do the
+        ;; spam-summary-exit-behavior-logic for mover backends
+        (unless found
+          (when (spam-backend-mover-p backend)
+            (setq
+             found
+             (cond
+              ((eq spam-summary-exit-behavior 'move-all) t)
+              ((eq spam-summary-exit-behavior 'move-none) nil)
+              ((eq spam-summary-exit-behavior 'default)
+               (or (eq classification 'spam) ;move spam out of all groups
+                   ;; move ham out of spam groups
+                   (and (eq classification 'ham)
+                        (spam-group-spam-contents-p group))))
+              (t (gnus-error 5 "Unknown spam-summary-exit-behavior: %s"
+                             spam-summary-exit-behavior))))))
 
-          found))
+        found)
     nil))
 
 ;;}}}
@@ -1556,7 +1520,7 @@ addition to the set values for the group."
 ;;       nil)))
 
 (defun spam-fetch-field-fast (article field &optional prepared-data-header)
-  "Fetch a FIELD for ARTICLE with the internal `gnus-data-list' function.
+  "Fetch a FIELD for ARTICLE with the internal `gnus-data-find' function.
 When PREPARED-DATA-HEADER is given, don't look in the Gnus data.
 When FIELD is 'number, ARTICLE can be any number (since we want
 to find it out)."
@@ -1622,7 +1586,7 @@ to find it out)."
 (defun spam-fetch-article-header (article)
   (with-current-buffer gnus-summary-buffer
     (gnus-read-header article)
-    (nth 3 (assq article gnus-newsgroup-data))))
+    (gnus-data-header (gnus-data-find article))))
 ;;}}}
 
 ;;{{{ Spam determination.
@@ -1697,10 +1661,10 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
          article-cannot-be-faked)
 
 
-    (dolist (backend methods)
+    (cl-dolist (backend methods)
       (when (spam-backend-statistical-p backend)
         (setq article-cannot-be-faked t)
-        (return)))
+        (cl-return)))
 
     (when (memq 'default methods)
       (setq article-cannot-be-faked t))
@@ -1785,7 +1749,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
           ;; eliminate duplicates
           (dolist (article (copy-sequence ulist))
             (when (memq article rlist)
-              (incf delcount)
+              (cl-incf delcount)
               (setq rlist (delq article rlist))
               (setq ulist (delq article ulist))))
 
@@ -2173,7 +2137,7 @@ See `spam-ifile-database'."
           (apply 'call-process-region
                  (point-min) (point-max) spam-ifile-program
                  nil temp-buffer-name nil "-c"
-                 (if db-param `(,db-param "-q") `("-q"))))
+                 (if db-param `(,db-param "-q") '("-q"))))
         ;; check the return now (we're back in the temp buffer)
         (goto-char (point-min))
         (if (not (eobp))
@@ -2202,7 +2166,7 @@ Uses `gnus-newsgroup-name' if category is nil (for ham registration)."
              (point-min) (point-max) spam-ifile-program
              nil nil nil
              add-or-delete-option category
-             (if db `(,db "-h") `("-h"))))))
+             (if db `(,db "-h") '("-h"))))))
 
 (defun spam-ifile-register-spam-routine (articles &optional unregister)
   (spam-ifile-register-with-ifile articles spam-ifile-spam-category unregister))
@@ -2335,10 +2299,10 @@ With a non-nil REMOVE, remove the ADDRESSES."
   (when (stringp from)
     (spam-filelist-build-cache type)
     (let (found)
-      (dolist (address (gethash type spam-caches))
+      (cl-dolist (address (gethash type spam-caches))
         (when (and address (string-match address from))
           (setq found t)
-          (return)))
+          (cl-return)))
       found)))
 
 ;;; returns t if the sender is in the whitelist, nil or
@@ -2509,7 +2473,7 @@ With a non-nil REMOVE, remove the ADDRESSES."
                      (point-min) (point-max)
                      spam-bogofilter-program
                      nil temp-buffer-name nil
-                     (if db `("-d" ,db "-v") `("-v"))))
+                     (if db `("-d" ,db "-v") '("-v"))))
             (setq return (spam-check-bogofilter-headers score))))
         return)
     (gnus-error 5 "`spam.el' doesn't support obsolete bogofilter versions")))
@@ -2537,7 +2501,7 @@ With a non-nil REMOVE, remove the ADDRESSES."
                      (point-min) (point-max)
                      spam-bogofilter-program
                      nil nil nil switch
-                     (if db `("-d" ,db "-v") `("-v")))))))
+                     (if db `("-d" ,db "-v") '("-v")))))))
     (gnus-error 5 "`spam.el' doesn't support obsolete bogofilter versions")))
 
 (defun spam-bogofilter-register-spam-routine (articles &optional unregister)

@@ -26,6 +26,24 @@
   (mapconcat (lambda (_) (string (+ 9 (random 117))))
              (make-list n nil) ""))
 
+(defun char-fold--ascii-upcase (string)
+  "Like `upcase' but acts on ASCII characters only."
+  (replace-regexp-in-string "[a-z]+" 'upcase string))
+
+(defun char-fold--ascii-downcase (string)
+  "Like `downcase' but acts on ASCII characters only."
+  (replace-regexp-in-string "[a-z]+" 'downcase string))
+
+(defun char-fold--test-match-exactly (string &rest strings-to-match)
+  (let ((re (concat "\\`" (char-fold-to-regexp string) "\\'")))
+    (dolist (it strings-to-match)
+      (should (string-match re it)))
+    ;; Case folding
+    (let ((case-fold-search t))
+      (dolist (it strings-to-match)
+        (should (string-match (char-fold--ascii-upcase re) (downcase it)))
+        (should (string-match (char-fold--ascii-downcase re) (upcase it)))))))
+
 (defun char-fold--test-search-with-contents (contents string)
   (with-temp-buffer
     (insert contents)
@@ -54,25 +72,7 @@
        (concat w1 "\s\n\s\t\f\t\n\r\t" w2)
        (concat w1 (make-string 10 ?\s) w2)))))
 
-(defun char-fold--ascii-upcase (string)
-  "Like `upcase' but acts on ASCII characters only."
-  (replace-regexp-in-string "[a-z]+" 'upcase string))
-
-(defun char-fold--ascii-downcase (string)
-  "Like `downcase' but acts on ASCII characters only."
-  (replace-regexp-in-string "[a-z]+" 'downcase string))
-
-(defun char-fold--test-match-exactly (string &rest strings-to-match)
-  (let ((re (concat "\\`" (char-fold-to-regexp string) "\\'")))
-    (dolist (it strings-to-match)
-      (should (string-match re it)))
-    ;; Case folding
-    (let ((case-fold-search t))
-      (dolist (it strings-to-match)
-        (should (string-match (char-fold--ascii-upcase re) (downcase it)))
-        (should (string-match (char-fold--ascii-downcase re) (upcase it)))))))
-
-(ert-deftest char-fold--test-some-defaults ()
+(ert-deftest char-fold--test-multi-defaults ()
   (dolist (it '(("ffl" . "ﬄ") ("ffi" . "ﬃ")
                 ("fi" . "ﬁ") ("ff" . "ﬀ")
                 ("ä" . "ä")))
@@ -109,24 +109,20 @@
 (ert-deftest char-fold--speed-test ()
   (dolist (string (append '("tty-set-up-initial-frame-face"
                             "tty-set-up-initial-frame-face-frame-faceframe-faceframe-faceframe-face")
-                          (mapcar #'char-fold--random-word '(10 50 100
-                                                                     50 100))))
-    (message "Testing %s" string)
+                          (mapcar #'char-fold--random-word '(10 50 100 50 100))))
     ;; Make sure we didn't just fallback on the trivial search.
     (should-not (string= (regexp-quote string)
                          (char-fold-to-regexp string)))
     (with-temp-buffer
       (save-excursion (insert string))
-      (let ((time (time-to-seconds (current-time))))
+      (let ((time (time-to-seconds)))
         ;; Our initial implementation of case-folding in char-folding
         ;; created a lot of redundant paths in the regexp. Because of
         ;; that, if a really long string "almost" matches, the regexp
         ;; engine took a long time to realize that it doesn't match.
         (should-not (char-fold-search-forward (concat string "c") nil 'noerror))
         ;; Ensure it took less than a second.
-        (should (< (- (time-to-seconds (current-time))
-                      time)
-                   1))))))
+        (should (< (- (time-to-seconds) time) 1))))))
 
 (provide 'char-fold-tests)
 ;;; char-fold-tests.el ends here

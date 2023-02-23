@@ -37,11 +37,6 @@
 
 ;;; Compatibility
 
-;; (eval-and-compile
-;;   (if (featurep 'xemacs)
-;;       (defalias 'eieio-overlay-lists (lambda () (list (extent-list))))
-;;     (defalias 'eieio-overlay-lists 'overlay-lists)))
-
 ;;; Code:
 (defclass eieio-widget-test-class nil
   ((a-string :initarg :a-string
@@ -317,7 +312,8 @@ Optional argument IGNORE is an extraneous parameter."
                             (car (widget-apply (car chil) :value-inline))))
               (setq chil (cdr chil))))))
     ;; Set any name updates on it.
-    (if name (eieio-object-set-name-string obj name))
+    (when name
+      (setf (slot-value obj 'object-name) name))
     ;; This is the same object we had before.
     obj))
 
@@ -466,8 +462,13 @@ Return the symbol for the group, or nil"
       ;; Make the association list
       (setq g (mapcar (lambda (g) (cons (symbol-name g) g)) g))
       (cdr (assoc
-	    (completing-read (concat (oref obj name)  " Custom Group: ")
-			     g nil t nil 'eieio-read-custom-group-history)
+	    (completing-read
+             (concat
+              (if (slot-exists-p obj 'name)
+                  (concat (slot-value obj (intern "name" obarray)) "")
+                "")
+              "Custom Group: ")
+	     g nil t nil 'eieio-read-custom-group-history)
 	    g)))))
 
 (provide 'eieio-custom)

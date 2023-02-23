@@ -5,7 +5,7 @@
 ;; Author: Alexandru Harsanyi <AlexHarsanyi@gmail.com>
 ;; Author: Thomas Fitzsimmons <fitzsim@fitzsim.org>
 ;; Created: December, 2009
-;; Version: 3.1.4
+;; Version: 3.1.5
 ;; Keywords: soap, web-services, comm, hypermedia
 ;; Package: soap-client
 ;; Homepage: https://github.com/alex-hhh/emacs-soap-client
@@ -629,7 +629,7 @@ disallows them."
              (<= time-zone-minute 59))
       (error "Invalid or unsupported time: %s" date-time-string))
     ;; Return a value in a format similar to that returned by decode-time, and
-    ;; suitable for (apply 'encode-time ...).
+    ;; suitable for (apply #'encode-time ...).
     (list second minute hour day month year second-fraction datatype
           (if has-time-zone
               (* (rng-xsd-time-to-seconds
@@ -685,14 +685,17 @@ This is a specialization of `soap-decode-type' for
         (anyType (soap-decode-any-type node))
         (Array (soap-decode-array node))))))
 
-(defun soap-type-of (element)
-  "Return the type of ELEMENT."
-  ;; Support Emacs < 26 byte-code running in Emacs >= 26 sessions
-  ;; (Bug#31742).
-  (let ((type (type-of element)))
-    (if (eq type 'vector)
-        (aref element 0) ; For Emacs 25 and earlier.
-      type)))
+(defalias 'soap-type-of
+  (if (eq 'soap-xs-basic-type (type-of (make-soap-xs-basic-type)))
+      ;; `type-of' in Emacs ≥ 26 already does what we need.
+      #'type-of
+    ;; For Emacs < 26, use our own function.
+    (lambda (element)
+      "Return the type of ELEMENT."
+      (if (vectorp element)
+          (aref element 0)            ;Assume this vector is actually a struct!
+        ;; This should never happen.
+        (type-of element)))))
 
 ;; Register methods for `soap-xs-basic-type'
 (let ((tag (soap-type-of (make-soap-xs-basic-type))))
@@ -2334,6 +2337,14 @@ traverse an element tree."
 (defun soap-parse-server-response ()
   "Error-check and parse the XML contents of the current buffer."
   (let ((mime-part (mm-dissect-buffer t t)))
+    (when (and
+           (equal (mm-handle-media-type mime-part) "multipart/related")
+           (equal (get-text-property 0 'type (mm-handle-media-type mime-part))
+                  "text/xml"))
+      (setq mime-part
+            (mm-make-handle
+             (get-text-property 0 'buffer (mm-handle-media-type mime-part))
+             `(,(get-text-property 0 'type (mm-handle-media-type mime-part))))))
     (unless mime-part
       (error "Failed to decode response from server"))
     (unless (equal (car (mm-handle-type mime-part)) "text/xml")
@@ -2880,6 +2891,8 @@ reference multiRef parts which are external to RESPONSE-NODE."
         decoded-parts))))
 
 ;;;; SOAP type encoding
+
+;; FIXME: Use `cl-defmethod' (but this requires Emacs-25).
 
 (defun soap-encode-attributes (value type)
   "Encode XML attributes for VALUE according to TYPE.

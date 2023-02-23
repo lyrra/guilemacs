@@ -3,7 +3,7 @@
 ;; Copyright (C) 1985-1986, 1988, 1990-1998, 2000-2019 Free Software
 ;; Foundation, Inc.
 
-;; Maintainer: Robert J. Chassell <bug-texinfo@gnu.org>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: maint, tex, docs
 
 ;; This file is part of GNU Emacs.
@@ -552,13 +552,7 @@ if large.  You can use `Info-split' to do this manually."
 
 (defvar texinfo-accent-commands
   (concat
-   "@^\\|"
-   "@`\\|"
-   "@'\\|"
-   "@\"\\|"
-   "@,\\|"
-   "@=\\|"
-   "@~\\|"
+   "@[\"',=^`~]\\|"
    "@OE{\\|"
    "@oe{\\|"
    "@AA{\\|"
@@ -2447,7 +2441,7 @@ Use only the FILENAME arg; for Info, ignore the other arguments to @image."
 (defun texinfo-format-option ()
   "Insert \\=` ... \\=' around arg unless inside a table; in that case, no quotes."
   ;; `looking-at-backward' not available in v. 18.57, 20.2
-  (if (not (search-backward ""    ; searched-for character is a control-H
+  (if (not (search-backward "\^H"
                     (line-beginning-position)
                     t))
       (insert "`" (texinfo-parse-arg-discard) "'")

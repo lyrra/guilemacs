@@ -4,7 +4,7 @@
 
 ;; Author: Steve Fisk <fisk@bowdoin.edu>
 ;;         Edward M. Reingold <reingold@cs.uiuc.edu>
-;; Maintainer: Glenn Morris <rgm@gnu.org>
+;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: calendar
 ;; Human-Keywords: Calendar, LaTeX
 ;; Package: calendar
@@ -245,8 +245,6 @@ This definition is the heart of the calendar!")
   "LaTeX code for right header.")
 
 (autoload 'holiday-in-range "holidays")
-
-(define-obsolete-function-alias 'cal-tex-list-holidays 'holiday-in-range "24.3")
 
 (autoload 'diary-list-entries "diary-lib")
 

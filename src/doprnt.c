@@ -35,7 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
      sequence.
 
    . It accepts a pointer to the end of the format string, so the format string
-     could include embedded null characters.
+     could include embedded NUL characters.
 
    . It signals an error if the length of the formatted string is about to
      overflow ptrdiff_t or size_t, to avoid producing strings longer than what
@@ -123,7 +123,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    to fit and return BUFSIZE - 1; if this truncates a multibyte
    sequence, store '\0' into the sequence's first byte.
    Returns the number of bytes stored into BUFFER, excluding
-   the terminating null byte.  Output is always null-terminated.
+   the terminating NUL byte.  Output is always NUL-terminated.
    String arguments are passed as C strings.
    Integers are passed as C integers.  */
 
@@ -357,8 +357,8 @@ doprnt (char *buffer, ptrdiff_t bufsize, const char *format,
 	      if (fmtcpy[1] != 's')
 		minlen = atoi (&fmtcpy[1]);
 	      string = va_arg (ap, char *);
-	      tem = strlen (string);
-	      if (STRING_BYTES_BOUND < tem)
+	      tem = strnlen (string, STRING_BYTES_BOUND + 1);
+	      if (tem == STRING_BYTES_BOUND + 1)
 		error ("String for %%s or %%S format is too long");
 	      width = strwidth (string, tem);
 	      goto doit1;
@@ -503,7 +503,7 @@ esprintf (char *buf, char const *format, ...)
   return nbytes;
 }
 
-#if HAVE_MODULES || (defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT)
+#if defined HAVE_X_WINDOWS && defined USE_X_TOOLKIT
 
 /* Format to buffer *BUF of positive size *BUFSIZE, reallocating *BUF
    and updating *BUFSIZE if the buffer is too small, and otherwise

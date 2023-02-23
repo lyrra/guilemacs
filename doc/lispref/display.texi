@@ -426,7 +426,7 @@ This function calls @code{progress-reporter-update}, so the first
 message is printed immediately.
 @end defun
 
-@defun progress-reporter-update reporter &optional value
+@defun progress-reporter-update reporter &optional value suffix
 This function does the main work of reporting progress of your
 operation.  It displays the message of @var{reporter}, followed by
 progress percentage determined by @var{value}.  If percentage is zero,
@@ -440,6 +440,11 @@ state of your operation and must be between @var{min-value} and
 @code{make-progress-reporter}.  For instance, if you scan a buffer,
 then @var{value} should be the result of a call to @code{point}.
 
+Optional argument @var{suffix} is a string to be displayed after
+@var{reporter}'s main message and progress text.  If @var{reporter} is
+a non-numerical reporter, then @var{value} should be @code{nil}, or a
+string to use instead of @var{suffix}.
+
 This function respects @var{min-change} and @var{min-time} as passed
 to @code{make-progress-reporter} and so does not output new messages
 on every invocation.  It is thus very fast and normally you should not
@@ -447,11 +452,11 @@ try to reduce the number of calls to it: resulting overhead will most
 likely negate your effort.
 @end defun
 
-@defun progress-reporter-force-update reporter &optional value new-message
+@defun progress-reporter-force-update reporter &optional value new-message suffix
 This function is similar to @code{progress-reporter-update} except
 that it prints a message in the echo area unconditionally.
 
-The first two arguments have the same meaning as for
+@var{reporter}, @var{value}, and @var{suffix} have the same meaning as for
 @code{progress-reporter-update}.  Optional @var{new-message} allows
 you to change the message of the @var{reporter}.  Since this function
 always updates the echo area, such a change will be immediately
@@ -469,19 +474,54 @@ never print it, there are many good reasons for this not to happen.
 Secondly, @samp{done} is more explicit.
 @end defun
 
-@defmac dotimes-with-progress-reporter (var count [result]) message body@dots{}
+@defmac dotimes-with-progress-reporter (var count [result]) reporter-or-message body@dots{}
 This is a convenience macro that works the same way as @code{dotimes}
 does, but also reports loop progress using the functions described
-above.  It allows you to save some typing.
+above.  It allows you to save some typing.  The argument
+@var{reporter-or-message} can be either a string or a progress
+reporter object.
 
-You can rewrite the example in the beginning of this node using
-this macro this way:
+You can rewrite the example in the beginning of this subsection using
+this macro as follows:
 
 @example
+@group
 (dotimes-with-progress-reporter
     (k 500)
     "Collecting some mana for Emacs..."
   (sit-for 0.01))
+@end group
+@end example
+
+Using a reporter object as the @var{reporter-or-message} argument is
+useful if you want to specify the optional arguments in
+@var{make-progress-reporter}.  For instance, you can write the
+previous example as follows:
+
+@example
+@group
+(dotimes-with-progress-reporter
+    (k 500)
+    (make-progress-reporter "Collecting some mana for Emacs..." 0 500 0 1 1.5)
+  (sit-for 0.01))
+@end group
+@end example
+@end defmac
+
+@defmac dolist-with-progress-reporter (var count [result]) reporter-or-message body@dots{}
+This is another convenience macro that works the same way as @code{dolist}
+does, but also reports loop progress using the functions described
+above.  As in @code{dotimes-with-progress-reporter},
+@code{reporter-or-message} can be a progress reporter or a string.
+You can rewrite the previous example with this macro as follows:
+
+@example
+@group
+(dolist-with-progress-reporter
+    (k (number-sequence 0 500))
+    "Collecting some mana for Emacs..."
+  (sit-for 0.01))
+@end group
 @end example
 @end defmac
 
@@ -733,6 +773,10 @@ each warning separately.
 @defvar warning-fill-prefix
 When this variable is non-@code{nil}, it specifies a fill prefix to
 use for filling each warning's text.
+@end defvar
+
+@defvar warning-fill-column
+The column at which to fill warnings.
 @end defvar
 
 @defvar warning-type-format
@@ -999,8 +1043,8 @@ hiding certain lines on the screen.
 @cindex explicit selective display
   The first variant, explicit selective display, was designed for use in a Lisp
 program: it controls which lines are hidden by altering the text.  This kind of
-hiding is now obsolete; instead you can get the same effect with the
-@code{invisible} property (@pxref{Invisible Text}).
+hiding is now obsolete and deprecated; instead you should use the
+@code{invisible} property (@pxref{Invisible Text}) to get the same effect.
 
   In the second variant, the choice of lines to hide is made
 automatically based on indentation.  This variant is designed to be a
@@ -1708,9 +1752,12 @@ modified, and the length of the pre-change text replaced by that range.
 length is the number of characters deleted, and the post-change
 beginning and end are equal.)
 
-If these functions modify the buffer, they should bind
-@code{inhibit-modification-hooks} to @code{t} around doing so, to
-avoid confusing the internal mechanism that calls these hooks.
+When these functions are called, @code{inhibit-modification-hooks} is
+bound to non-@code{nil}.  If the functions modify the buffer, you
+might want to bind @code{inhibit-modification-hooks} to @code{nil}, so
+as to cause the change hooks to run for these modifications.  However,
+doing this may call your own change hook recursively, so be sure to
+prepare for that.  @xref{Change Hooks}.
 
 Text properties also support the @code{modification-hooks} property,
 but the details are somewhat different (@pxref{Special Properties}).
@@ -2939,7 +2986,13 @@ the remapped face---it replaces the normal definition of @var{face},
 instead of modifying it.
 
 If @code{face-remapping-alist} is buffer-local, its local value takes
-effect only within that buffer.
+effect only within that buffer.  If @code{face-remapping-alist}
+includes faces applicable only to certain windows, by using the
+@w{@code{(:filtered (:window @var{param} @var{val}) @var{spec})}},
+that face takes effect only in windows that match the filter
+conditions (@pxref{Special Properties}).  To turn off face filtering
+temporarily, bind @code{face-filters-always-match} to a non-@code{nil}
+value, then all face filters will match any window.
 
 Note: face remapping is non-recursive.  If @var{remapping} references
 the same face name @var{face}, either directly or via the
@@ -4139,10 +4192,10 @@ Used to indicate continued lines.
 @item @code{right-triangle}, @code{left-triangle}
 The former is used by overlay arrows.  The latter is unused.
 
-@item @code{up-arrow}, @code{down-arrow}, @code{top-left-angle} @code{top-right-angle}
+@item @code{up-arrow}, @code{down-arrow}
 @itemx @code{bottom-left-angle}, @code{bottom-right-angle}
-@itemx @code{top-right-angle}, @code{top-left-angle}
-@itemx @code{left-bracket}, @code{right-bracket}, @code{top-right-angle}, @code{top-left-angle}
+@itemx @code{top-left-angle}, @code{top-right-angle}
+@itemx @code{left-bracket}, @code{right-bracket}
 Used to indicate buffer boundaries.
 
 @item @code{filled-rectangle}, @code{hollow-rectangle}
@@ -4150,7 +4203,7 @@ Used to indicate buffer boundaries.
 @itemx @code{vertical-bar}, @code{horizontal-bar}
 Used for different types of fringe cursors.
 
-@item @code{empty-line}, @code{exclamation-mark}, @code{question-mark}, @code{exclamation-mark}
+@item @code{empty-line}, @code{exclamation-mark}, @code{question-mark}
 Not used by core Emacs features.
 @end table
 
@@ -5097,6 +5150,71 @@ This adds a shadow rectangle around the image.  The value,
 @var{relief} is negative, shadows are drawn so that the image appears
 as a pressed button; otherwise, it appears as an unpressed button.
 
+@item :width @var{width}, :height @var{height}
+The @code{:width} and @code{:height} keywords are used for scaling the
+image.  If only one of them is specified, the other one will be
+calculated so as to preserve the aspect ratio.  If both are specified,
+aspect ratio may not be preserved.
+
+@item :max-width @var{max-width}, :max-height @var{max-height}
+The @code{:max-width} and @code{:max-height} keywords are used for
+scaling if the size of the image exceeds these values.  If
+@code{:width} is set, it will have precedence over @code{max-width},
+and if @code{:height} is set, it will have precedence over
+@code{max-height}, but you can otherwise mix these keywords as you
+wish.
+
+If both @code{:max-width} and @code{:height} are specified, but
+@code{:width} is not, preserving the aspect ratio might require that
+width exceeds @code{:max-width}.  If this happens, scaling will use a
+smaller value for the height so as to preserve the aspect ratio while
+not exceeding @code{:max-width}.  Similarly when both
+@code{:max-height} and @code{:width} are specified, but @code{:height}
+is not.  For example, if you have a 200x100 image and specify that
+@code{:width} should be 400 and @code{:max-height} should be 150,
+you'll end up with an image that is 300x150: Preserving the aspect
+ratio and not exceeding the ``max'' setting.  This combination of
+parameters is a useful way of saying ``display this image as large as
+possible, but no larger than the available display area''.
+
+@item :scale @var{scale}
+This should be a number, where values higher than 1 means to increase
+the size, and lower means to decrease the size, by multiplying both
+the width and height.  For instance, a value of 0.25 will make the
+image a quarter size of what it originally was.  If the scaling makes
+the image larger than specified by @code{:max-width} or
+@code{:max-height}, the resulting size will not exceed those two
+values.  If both @code{:scale} and @code{:height}/@code{:width} are
+specified, the height/width will be adjusted by the specified scaling
+factor.
+
+@item :crop @var{geometry}
+This should be a list of the form @code{(@var{width} @var{height}
+@var{x} @var{y})}.  @var{width} and @var{height} specify the width
+and height of the cropped image.  If @var{x} is a positive number it
+specifies the offset of the cropped area from the left of the original
+image, and if negative the offset from the right.  If @var{y} is a
+positive number it specifies the offset from the top of the original
+image, and if negative from the bottom.  If @var{x} or @var{y} are
+@code{nil} or unspecified the crop area will be centred on the
+original image.
+
+If the crop area is outside or overlaps the edge of the image it will
+be reduced to exclude any areas outside of the image.  This means it
+is not possible to use @code{:crop} to increase the size of the image
+by entering large @var{width} or @var{height} values.
+
+Cropping is performed after scaling but before rotation.
+
+@item :rotation @var{angle}
+Specifies a rotation angle in degrees.  Only multiples of 90 degrees
+are supported, unless the image type is @code{imagemagick}.  Positive
+values rotate clockwise, negative values counter-clockwise.  Rotation
+is performed after scaling and cropping.
+
+@item :index @var{frame}
+@xref{Multi-Frame Images}.
+
 @item :conversion @var{algorithm}
 This specifies a conversion algorithm that should be applied to the
 image before it is displayed; the value, @var{algorithm}, specifies
@@ -5236,6 +5354,17 @@ This function returns @code{t} if image @var{spec} has a mask bitmap.
 (@pxref{Input Focus}).
 @end defun
 
+@defun image-transforms-p &optional frame
+This function returns @code{t} if @var{frame} supports image scaling
+and rotation.  @var{frame} @code{nil} or omitted means to use the
+selected frame (@pxref{Input Focus}).
+
+If image transforms are not supported, @code{:rotation},
+@code{:width}, @code{:height}, @code{:scale}, @code{:max-width} and
+@code{:max-height} will only be usable through ImageMagick, if
+available (@pxref{ImageMagick Images}).
+@end defun
+
 @node XBM Images
 @subsection XBM Images
 @cindex XBM
@@ -5372,53 +5501,11 @@ color, which is used as the image's background color if the image
 supports transparency.  If the value is @code{nil}, it defaults to the
 frame's background color.
 
-@item :width @var{width}, :height @var{height}
-The @code{:width} and @code{:height} keywords are used for scaling the
-image.  If only one of them is specified, the other one will be
-calculated so as to preserve the aspect ratio.  If both are specified,
-aspect ratio may not be preserved.
-
-@item :max-width @var{max-width}, :max-height @var{max-height}
-The @code{:max-width} and @code{:max-height} keywords are used for
-scaling if the size of the image of the image exceeds these values.
-If @code{:width} is set it will have precedence over @code{max-width},
-and if @code{:height} is set it will have precedence over
-@code{max-height}, but you can otherwise mix these keywords as you
-wish.  @code{:max-width} and @code{:max-height} will always preserve
-the aspect ratio.
-
-If both @code{:width} and @code{:max-height} has been set (but
-@code{:height} has not been set), then @code{:max-height} will have
-precedence.  The same is the case for the opposite combination: The
-``max'' keyword has precedence.  That is, if you have a 200x100 image
-and specify that @code{:width} should be 400 and @code{:max-height}
-should be 150, you'll end up with an image that is 300x150: Preserving
-the aspect ratio and not exceeding the ``max'' setting.  This
-combination of parameters is a useful way of saying ``display this
-image as large as possible, but no larger than the available display
-area''.
-
-@item :scale @var{scale}
-This should be a number, where values higher than 1 means to increase
-the size, and lower means to decrease the size.  For instance, a value
-of 0.25 will make the image a quarter size of what it originally was.
-If the scaling makes the image larger than specified by
-@code{:max-width} or @code{:max-height}, the resulting size will not
-exceed those two values.  If both @code{:scale} and
-@code{:height}/@code{:width} are specified, the height/width will be
-adjusted by the specified scaling factor.
-
 @item :format @var{type}
 The value, @var{type}, should be a symbol specifying the type of the
 image data, as found in @code{image-format-suffixes}.  This is used
 when the image does not have an associated file name, to provide a
 hint to ImageMagick to help it detect the image type.
-
-@item :rotation @var{angle}
-Specifies a rotation angle in degrees.
-
-@item :index @var{frame}
-@xref{Multi-Frame Images}.
 @end table
 
 @node SVG Images

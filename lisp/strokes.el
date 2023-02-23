@@ -155,7 +155,7 @@
 ;; Euna Kim for her help in Korean, and massive thanks to the helpful
 ;; guys on the help instance on athena (zeno, jered, amu, gsstark,
 ;; ghudson, etc) Special thanks to Steve Baur, Kyle Jones, and Hrvoje
-;; Niksic for all their help.  And special thanks to Dave Gillespie
+;; Nikšić for all their help.  And special thanks to Dave Gillespie
 ;; for all the elisp help--he is responsible for helping me use the cl
 ;; macros at (near) max speed.
 
@@ -1388,9 +1388,6 @@ If STROKES-MAP is not given, `strokes-global-map' will be used instead."
 ;;;###autoload
 (define-minor-mode strokes-mode
   "Toggle Strokes mode, a global minor mode.
-With a prefix argument ARG, enable Strokes mode if ARG is
-positive, and disable it otherwise.  If called from Lisp,
-enable the mode if ARG is omitted or nil.
 
 \\<strokes-mode-map>
 Strokes are pictographic mouse gestures which invoke commands.

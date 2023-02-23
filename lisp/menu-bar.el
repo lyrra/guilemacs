@@ -277,6 +277,15 @@
 ;; The Edit->Search->Incremental Search menu
 (defvar menu-bar-i-search-menu
   (let ((menu (make-sparse-keymap "Incremental Search")))
+    (bindings--define-key menu [isearch-forward-symbol-at-point]
+      '(menu-item "Forward Symbol at Point..." isearch-forward-symbol-at-point
+        :help "Search forward for a symbol found at point"))
+    (bindings--define-key menu [isearch-forward-symbol]
+      '(menu-item "Forward Symbol..." isearch-forward-symbol
+        :help "Search forward for a symbol as you type it"))
+    (bindings--define-key menu [isearch-forward-word]
+      '(menu-item "Forward Word..." isearch-forward-word
+        :help "Search forward for a word as you type it"))
     (bindings--define-key menu [isearch-backward-regexp]
       '(menu-item "Backward Regexp..." isearch-backward-regexp
         :help "Search backwards for a regular expression as you type it"))
@@ -300,7 +309,7 @@
       menu-bar-separator)
 
     (bindings--define-key menu [tags-continue]
-      '(menu-item "Continue Tags Search" tags-loop-continue
+      '(menu-item "Continue Tags Search" fileloop-continue
                   :help "Continue last tags search operation"))
     (bindings--define-key menu [tags-srch]
       '(menu-item "Search Tagged Files..." tags-search
@@ -349,7 +358,7 @@
 (defvar menu-bar-replace-menu
   (let ((menu (make-sparse-keymap "Replace")))
     (bindings--define-key menu [tags-repl-continue]
-      '(menu-item "Continue Replace" tags-loop-continue
+      '(menu-item "Continue Replace" fileloop-continue
                   :help "Continue last tags replace operation"))
     (bindings--define-key menu [tags-repl]
       '(menu-item "Replace in Tagged Files..." tags-query-replace
@@ -423,15 +432,15 @@
   (let ((menu (make-sparse-keymap "Edit")))
 
     (bindings--define-key menu [props]
-      `(menu-item "Text Properties" facemenu-menu))
+      '(menu-item "Text Properties" facemenu-menu))
 
     ;; ns-win.el said: Add spell for platform consistency.
     (if (featurep 'ns)
         (bindings--define-key menu [spell]
-          `(menu-item "Spell" ispell-menu-map)))
+          '(menu-item "Spell" ispell-menu-map)))
 
     (bindings--define-key menu [fill]
-      `(menu-item "Fill" fill-region
+      '(menu-item "Fill" fill-region
                   :enable (and mark-active (not buffer-read-only))
                   :help
                   "Fill text in region to fit between left and right margin"))
@@ -440,7 +449,7 @@
       menu-bar-separator)
 
     (bindings--define-key menu [bookmark]
-      `(menu-item "Bookmarks" menu-bar-bookmark-map))
+      '(menu-item "Bookmarks" menu-bar-bookmark-map))
 
     (bindings--define-key menu [goto]
       `(menu-item "Go To" ,menu-bar-goto-menu))
@@ -1379,11 +1388,7 @@ mail status in mode line"))
       ;; It is better not to use backquote here,
       ;; because that makes a bootstrapping problem
       ;; if you need to recompile all the Lisp files using interpreted code.
-      `(menu-item "Multilingual Environment" ,mule-menu-keymap
-                  ;; Most of the MULE menu actually does make sense in
-                  ;; unibyte mode, e.g. language selection.
-                  ;; :visible '(default-value 'enable-multibyte-characters)
-                  ))
+      `(menu-item "Multilingual Environment" ,mule-menu-keymap))
     ;;(setq menu-bar-final-items (cons 'mule menu-bar-final-items))
     ;;(bindings--define-key menu [preferences]
     ;;  `(menu-item "Preferences" ,menu-bar-preferences-menu
@@ -1697,18 +1702,14 @@ mail status in mode line"))
 
     (bindings--define-key menu [mule-diag]
       '(menu-item "Show All of Mule Status" mule-diag
-                  :visible (default-value 'enable-multibyte-characters)
                   :help "Display multilingual environment settings"))
     (bindings--define-key menu [describe-coding-system-briefly]
       '(menu-item "Describe Coding System (Briefly)"
-                  describe-current-coding-system-briefly
-                  :visible (default-value 'enable-multibyte-characters)))
+                  describe-current-coding-system-briefly))
     (bindings--define-key menu [describe-coding-system]
-      '(menu-item "Describe Coding System..." describe-coding-system
-                  :visible (default-value 'enable-multibyte-characters)))
+      '(menu-item "Describe Coding System..." describe-coding-system))
     (bindings--define-key menu [describe-input-method]
       '(menu-item "Describe Input Method..." describe-input-method
-                  :visible (default-value 'enable-multibyte-characters)
                   :help "Keyboard layout for specific input method"))
     (bindings--define-key menu [describe-language-environment]
       `(menu-item "Describe Language Environment"
@@ -2143,9 +2144,9 @@ It must accept a buffer as its only required argument.")
 	 ;; Make the menu of buffers proper.
 	 (setq buffers-menu
                (let ((i 0)
-                     (limit (if (and (integerp buffers-menu-max-size)
-                                     (> buffers-menu-max-size 1))
-                                buffers-menu-max-size most-positive-fixnum))
+		     (limit (and (integerp buffers-menu-max-size)
+				 (> buffers-menu-max-size 1)
+				 buffers-menu-max-size))
                      alist)
 		 ;; Put into each element of buffer-list
 		 ;; the name for actual display,
@@ -2169,7 +2170,7 @@ It must accept a buffer as its only required argument.")
                              alist)
                        ;; If requested, list only the N most recently
                        ;; selected buffers.
-                       (when (= limit (setq i (1+ i)))
+                       (when (eql limit (setq i (1+ i)))
                          (setq buffers nil)))))
 		 (list (menu-bar-buffer-vector alist))))
 
@@ -2293,9 +2294,6 @@ It must accept a buffer as its only required argument.")
 
 (define-minor-mode menu-bar-mode
   "Toggle display of a menu bar on each frame (Menu Bar mode).
-With a prefix argument ARG, enable Menu Bar mode if ARG is
-positive, and disable it otherwise.  If called from Lisp, also
-enable Menu Bar mode if ARG is omitted or nil.
 
 This command applies to all frames that exist and frames to be
 created in the future."
@@ -2432,7 +2430,7 @@ form ((XOFFSET YOFFSET) WINDOW), or nil.
 If nil, the current mouse position is used, or nil if there is no mouse."
   (pcase position
     ;; nil -> mouse cursor position
-    (`nil
+    ('nil
      (let ((mp (mouse-pixel-position)))
        (list (list (cadr mp) (cddr mp)) (car mp))))
     ;; Value returned from `event-end' or `posn-at-point'.
