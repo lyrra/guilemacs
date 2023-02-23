@@ -417,9 +417,15 @@ extern Lisp_Object plist_module;
 #define ENUM_BF(TYPE) enum TYPE
 #endif
 
+#ifdef MAIN_PROGRAM
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
+#else
+extern scm_t_bits lisp_misc_tag;
+extern scm_t_bits lisp_string_tag;
+extern scm_t_bits lisp_vectorlike_tag;
+#endif
 
 enum Lisp_Type
   {
@@ -695,6 +701,14 @@ definitely_will_not_unexec_p (void)
 
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
+
+/* Construct a Lisp_Object from a value or address.  */
+
+#define make_lisp_ptr(ptr, type) \
+  make_lisp_ptr_ ## type (ptr)
+#define make_lisp_ptr_Lisp_Cons(ptr) ptr
+#define make_lisp_ptr_Lisp_Vectorlike(ptr) \
+  ((union Lisp_Misc *) (ptr))->u_any.self
 
 
 /* Low-level conversion and type checking.  */
@@ -979,11 +993,11 @@ verify (alignof (struct Lisp_Symbol) % GCALIGNMENT == 0);
 #define SYMBOL_SELF(sym) (scm_c_vector_ref (sym, 0))
 #define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
 #define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
-#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_number (v)))
+#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_fixnum (v)))
 #define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
-#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
+#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_fixnum (v)))
 #define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
-#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_fixnum (v)))
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -1131,11 +1145,13 @@ SYMBOL_FUNCTION (Lisp_Object sym)
    value cannot be changed (there is an exception for keyword symbols,
    whose value can be set to the keyword symbol itself).  */
 
+#if 0
 INLINE int
 (SYMBOL_TRAPPED_WRITE_P) (Lisp_Object sym)
 {
   return lisp_h_SYMBOL_TRAPPED_WRITE_P (sym);
 }
+#endif
 
 /* Value is non-zero if symbol cannot be changed at all, i.e. it's a
    constant (e.g. nil, t, :keywords).  Code that actually wants to
@@ -1379,17 +1395,6 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
   return num < lower ? lower : num <= upper ? num : upper;
 }
 
-/* Construct a Lisp_Object from a value or address.  */
-
-/*
-INLINE Lisp_Object
-make_lisp_ptr (void *ptr, enum Lisp_Type type)
-{
-  Lisp_Object a = TAG_PTR (type, ptr);
-  eassert (TAGGEDP (a, type) && XUNTAG (a, type, char) == ptr);
-  return a;
-}
-*/
 
 INLINE bool
 (FIXNUMP) (Lisp_Object x)
@@ -1456,7 +1461,7 @@ INLINE bool
   return lisp_h_FLOATP (x);
 }
 
-#define XSETINT(a, b) ((a) = make_number (b))
+#define XSETINT(a, b) ((a) = make_fixnum (b))
 #define XSETFASTINT(a, b) ((a) = make_natnum (b))
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
@@ -1548,6 +1553,19 @@ LISP_MACRO_DEFUN (CONSP, bool, (Lisp_Object x), (x))
 LISP_MACRO_DEFUN (XCAR, Lisp_Object, (Lisp_Object c), (c))
 LISP_MACRO_DEFUN (XCDR, Lisp_Object, (Lisp_Object c), (c))
 
+INLINE Lisp_Object
+XCONS (Lisp_Object c)
+{
+  eassert (CONSP (c));
+  return SMOB_PTR (c);
+}
+
+INLINE void
+CHECK_CONS (Lisp_Object x)
+{
+  CHECK_TYPE (CONSP (x), Qconsp, x);
+}
+
 INLINE bool
 SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 {
@@ -1617,12 +1635,27 @@ struct Lisp_String
     unsigned char *data;
   };
 
+INLINE struct Lisp_String *
+XSTRING (Lisp_Object a)
+{
+  eassert (STRINGP (a));
+  return SMOB_PTR (a);
+}
+
 /* True if STR is a multibyte string.  */
 INLINE bool
 STRING_MULTIBYTE (Lisp_Object str)
 {
   return 0 <= XSTRING (str)->size_byte;
 }
+
+INLINE void
+CHECK_STRING (Lisp_Object x)
+{
+  CHECK_TYPE (STRINGP (x), Qstringp, x);
+}
+
+
 
 /* An upper bound on the number of bytes in a Lisp string, not
    counting the terminating null.  This a tight enough bound to
@@ -2990,6 +3023,7 @@ CHECK_SUBR (Lisp_Object x)
   {                                                         \
     int len = scm_to_int (scm_length (rest));               \
     Lisp_Object *args;                                      \
+    USE_SAFE_ALLOCA                                         \
     SAFE_ALLOCA_LISP (args, len);                           \
     int i;                                                  \
     for (i = 0;                                             \
@@ -2998,7 +3032,7 @@ CHECK_SUBR (Lisp_Object x)
       args[i] = SCM_CAR (rest);                             \
     if (i < minargs)                                        \
       xsignal2 (Qwrong_number_of_arguments,                 \
-                intern (lname), make_number (i));           \
+                intern (lname), make_fixnum (i));           \
     return fn (i, args);                                    \
   }
 
@@ -3959,7 +3993,6 @@ extern Lisp_Object check_obarray (Lisp_Object);
 extern Lisp_Object intern_1 (const char *, ptrdiff_t);
 extern Lisp_Object intern_c_string_1 (const char *, ptrdiff_t);
 extern Lisp_Object intern_driver (Lisp_Object, Lisp_Object, Lisp_Object);
-extern void init_symbol (Lisp_Object, Lisp_Object);
 extern Lisp_Object obhash (Lisp_Object);
 INLINE void
 LOADHIST_ATTACH (Lisp_Object x)
@@ -4024,7 +4057,6 @@ extern AVOID xsignal2 (Lisp_Object, Lisp_Object, Lisp_Object);
 extern AVOID xsignal3 (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
 extern AVOID signal_error (const char *, Lisp_Object);
 extern AVOID overflow_error (void);
-extern bool FUNCTIONP (Lisp_Object);
 extern Lisp_Object funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *arg_vector);
 extern Lisp_Object eval_sub (Lisp_Object form);
 extern Lisp_Object Ffuncall (ptrdiff_t nargs, Lisp_Object *args);
@@ -4053,9 +4085,10 @@ extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Ob
 extern struct handler *push_handler (Lisp_Object, enum handlertype);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind (Lisp_Object, Lisp_Object);
+extern void set_unwind_protect_ptr (ptrdiff_t, void (*) (void *), void *);
 extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
-extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
+//extern void record_unwind_protect_array (Lisp_Object *, ptrdiff_t);
 extern void record_unwind_protect_ptr_1 (void (*) (void *), void *, bool);
 extern void record_unwind_protect_ptr (void (*) (void *), void *);
 extern void record_unwind_protect_int_1 (void (*) (int), int, bool);
@@ -4807,7 +4840,7 @@ extern ptrdiff_t sa_avail;
 	   typically EXTRA is 0 or small so just use xzalloc;  \
 	   this is simpler and often faster.  */	       \
 	(buf) = xzalloc (alloca_nbytes);		       \
-	record_unwind_protect_array (buf, nelt);	       \
+	/* record_unwind_protect_array (buf, nelt); */	       \
       }							       \
   } while (false)
 
@@ -4856,8 +4889,8 @@ enum
 /* Auxiliary macros used for auto allocation of Lisp objects.  Please
    use these only in macros like AUTO_CONS that declare a local
    variable whose lifetime will be clear to the programmer.  */
-//#define STACK_CONS(a, b) \
-//  make_lisp_ptr (&((struct Lisp_Cons) {{{a, {b}}}}), Lisp_Cons)
+#define STACK_CONS(a, b) \
+  make_lisp_ptr (scm_cons(a, b), Lisp_Cons)
 #define AUTO_CONS_EXPR(a, b) Fcons (a, b)
 
 /* Declare NAME as an auto Lisp cons or short list if possible, a
@@ -4974,7 +5007,6 @@ maybe_gc (void)
 
 extern Lisp_Object Ffboundp (Lisp_Object);
 
-#if 0
 INLINE bool
 functionp (Lisp_Object object)
 {
@@ -5003,8 +5035,12 @@ functionp (Lisp_Object object)
       Lisp_Object car = XCAR (object);
       return EQ (car, Qlambda) || EQ (car, Qclosure);
     }
+  else
+    return false;
 }
-#endif
+
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
 
 INLINE_HEADER_END
 #endif /* EMACS_LISP_H */
