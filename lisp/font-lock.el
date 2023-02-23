@@ -1,4 +1,4 @@
-;;; font-lock.el --- Electric font lock mode
+;;; font-lock.el --- Electric font lock mode  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1992-2019 Free Software Foundation, Inc.
 
@@ -327,6 +327,9 @@ If a number, only buffers greater than this size have fontification messages."
 (defvar font-lock-type-face		'font-lock-type-face
   "Face name to use for type and class names.")
 
+(define-obsolete-variable-alias
+  'font-lock-reference-face 'font-lock-constant-face "20.3")
+
 (defvar font-lock-constant-face		'font-lock-constant-face
   "Face name to use for constant and label names.")
 
@@ -339,9 +342,6 @@ This can be an \"!\" or the \"n\" in \"ifndef\".")
 
 (defvar font-lock-preprocessor-face	'font-lock-preprocessor-face
   "Face name to use for preprocessor directives.")
-
-(define-obsolete-variable-alias
-  'font-lock-reference-face 'font-lock-constant-face "20.3")
 
 ;; Fontification variables:
 
@@ -631,10 +631,7 @@ Major/minor modes can set this variable if they know which option applies.")
     (declare (indent 0) (debug t))
     `(let ((inhibit-point-motion-hooks t))
        (with-silent-modifications
-         ,@body)))
-  ;;
-  ;; Shut up the byte compiler.
-  (defvar font-lock-face-attributes))	; Obsolete but respected if set.
+         ,@body))))
 
 (defvar-local font-lock-set-defaults nil) ; Whether we have set up defaults.
 
@@ -659,7 +656,7 @@ be enabled."
       (cond (font-lock-fontified
 	     nil)
 	    ((or (null max-size) (> max-size (buffer-size)))
-	     (font-lock-fontify-buffer))
+             (with-no-warnings (font-lock-fontify-buffer)))
 	    (font-lock-verbose
 	     (message "Fontifying %s...buffer size greater than font-lock-maximum-size"
 		      (buffer-name)))))))
@@ -929,9 +926,9 @@ The value of this variable is used when Font Lock mode is turned on."
 
 (defun font-lock-turn-on-thing-lock ()
   (pcase (font-lock-value-in-major-mode font-lock-support-mode)
-    (`fast-lock-mode (fast-lock-mode t))
-    (`lazy-lock-mode (lazy-lock-mode t))
-    (`jit-lock-mode
+    ('fast-lock-mode (fast-lock-mode t))
+    ('lazy-lock-mode (lazy-lock-mode t))
+    ('jit-lock-mode
      ;; Prepare for jit-lock
      (remove-hook 'after-change-functions
                   #'font-lock-after-change-function t)
@@ -1096,14 +1093,10 @@ accessible portion of the current buffer."
                 (or beg (point-min)) (or end (point-max)))))
 
 (defvar font-lock-ensure-function
-  (lambda (_beg _end)
+  (lambda (beg end)
     (unless font-lock-fontified
-      (font-lock-default-fontify-buffer)
-      (unless font-lock-mode
-        ;; If font-lock is not enabled, we don't have the hooks in place to
-        ;; track modifications, so a subsequent call to font-lock-ensure can't
-        ;; assume that the fontification is still valid.
-        (setq font-lock-fontified nil))))
+      (save-excursion
+        (font-lock-fontify-region beg end))))
   "Function to make sure a region has been fontified.
 Called with two arguments BEG and END.")
 
@@ -1394,12 +1387,19 @@ delimit the region to fontify."
 ;; below and given a `font-lock-' prefix.  Those that are not used are defined
 ;; in Lisp below and commented out.  sm.
 
-(defun font-lock-prepend-text-property (start end prop value &optional object)
-  "Prepend to one property of the text from START to END.
-Arguments PROP and VALUE specify the property and value to prepend to the value
-already in place.  The resulting property values are always lists.
-Optional argument OBJECT is the string or buffer containing the text."
-  (let ((val (if (listp value) value (list value))) next prev)
+(defun font-lock--add-text-property (start end prop value object append)
+  "Add an element to a property of the text from START to END.
+Arguments PROP and VALUE specify the property and value to add to
+the value already in place.  The resulting property values are
+always lists.  Argument OBJECT is the string or buffer containing
+the text.  If argument APPEND is non-nil, VALUE will be appended,
+otherwise it will be prepended."
+  (let ((val (if (and (listp value) (not (keywordp (car value))))
+                 ;; Already a list of faces.
+                 value
+               ;; A single face (e.g. a plist of face properties).
+               (list value)))
+        next prev)
     (while (/= start end)
       (setq next (next-single-property-change start prop object end)
 	    prev (get-text-property start prop object))
@@ -1409,30 +1409,26 @@ Optional argument OBJECT is the string or buffer containing the text."
 	   (or (keywordp (car prev))
 	       (memq (car prev) '(foreground-color background-color)))
 	   (setq prev (list prev)))
-      (put-text-property start next prop
-			 (append val (if (listp prev) prev (list prev)))
-			 object)
+      (let* ((list-prev (if (listp prev) prev (list prev)))
+             (new-value (if append
+                           (append list-prev val)
+                         (append val list-prev))))
+        (put-text-property start next prop new-value object))
       (setq start next))))
+
+(defun font-lock-prepend-text-property (start end prop value &optional object)
+  "Prepend to one property of the text from START to END.
+Arguments PROP and VALUE specify the property and value to prepend to the value
+already in place.  The resulting property values are always lists.
+Optional argument OBJECT is the string or buffer containing the text."
+  (font-lock--add-text-property start end prop value object nil))
 
 (defun font-lock-append-text-property (start end prop value &optional object)
   "Append to one property of the text from START to END.
 Arguments PROP and VALUE specify the property and value to append to the value
 already in place.  The resulting property values are always lists.
 Optional argument OBJECT is the string or buffer containing the text."
-  (let ((val (if (listp value) value (list value))) next prev)
-    (while (/= start end)
-      (setq next (next-single-property-change start prop object end)
-	    prev (get-text-property start prop object))
-      ;; Canonicalize old forms of face property.
-      (and (memq prop '(face font-lock-face))
-	   (listp prev)
-	   (or (keywordp (car prev))
-	       (memq (car prev) '(foreground-color background-color)))
-	   (setq prev (list prev)))
-      (put-text-property start next prop
-			 (append (if (listp prev) prev (list prev)) val)
-			 object)
-      (setq start next))))
+  (font-lock--add-text-property start end prop value object t))
 
 (defun font-lock-fillin-text-property (start end prop value &optional object)
   "Fill in one property of the text from START to END.
@@ -1503,7 +1499,7 @@ see `font-lock-syntactic-keywords'."
       ;; Flush the syntax-cache.  I believe this is not necessary for
       ;; font-lock's use of syntax-ppss, but I'm not 100% sure and it can
       ;; still be necessary for other users of syntax-ppss anyway.
-      (syntax-ppss-after-change-function start)
+      (syntax-ppss-flush-cache start)
       (cond
        ((not override)
 	;; Cannot override existing fontification.
@@ -1787,7 +1783,7 @@ If SYNTACTIC-KEYWORDS is non-nil, it means these keywords are used for
 	  (cons t (cons keywords
 			(mapcar #'font-lock-compile-keyword keywords))))
     (if (and (not syntactic-keywords)
-	     (let ((beg-function syntax-begin-function))
+	     (let ((beg-function (with-no-warnings syntax-begin-function)))
 	       (or (eq beg-function #'beginning-of-defun)
                    (if (symbolp beg-function)
                        (get beg-function 'font-lock-syntax-paren-check))))

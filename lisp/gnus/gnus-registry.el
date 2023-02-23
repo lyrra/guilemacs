@@ -76,7 +76,8 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
+(eval-when-compile (require 'subr-x))
 
 (require 'gnus)
 (require 'gnus-int)
@@ -165,12 +166,7 @@ nnmairix groups are specifically excluded because they are ephemeral."
 
 (defvar gnus-registry-misc-menus nil)   ; ugly way to keep the menus
 
-(make-obsolete-variable 'gnus-registry-clean-empty nil "23.4")
-(make-obsolete-variable 'gnus-registry-use-long-group-names nil "23.4")
-(make-obsolete-variable 'gnus-registry-max-track-groups nil "23.4")
-(make-obsolete-variable 'gnus-registry-entry-caching nil "23.4")
-(make-obsolete-variable 'gnus-registry-trim-articles-without-groups nil "23.4")
-;; FIXME it was simply deleted.
+;; It was simply deleted.
 (make-obsolete-variable 'gnus-registry-max-pruned-entries nil "25.1")
 
 (defcustom gnus-registry-track-extra '(subject sender recipient)
@@ -311,33 +307,40 @@ This is not required after changing `gnus-registry-cache-file'."
     (gnus-message 4 "Remaking the Gnus registry")
     (setq gnus-registry-db (gnus-registry-make-db))))
 
-(defun gnus-registry-load ()
-  "Load the registry from the cache file."
+(defun gnus-registry-load (&optional force)
+  "Load the registry from the cache file.
+If the registry is already loaded, don't reload unless FORCE is
+non-nil."
   (interactive)
-  (let ((file gnus-registry-cache-file))
-    (condition-case nil
-        (gnus-registry-read file)
-      (file-error
-       ;; Fix previous mis-naming of the registry file.
-       (let ((old-file-name
-	      (concat (file-name-sans-extension
-		      gnus-registry-cache-file)
-		     ".eioio")))
-	 (if (and (file-exists-p old-file-name)
-		  (yes-or-no-p
-		   (format "Rename registry file from %s to %s? "
-			   old-file-name file)))
-	     (progn
-	       (gnus-registry-read old-file-name)
-	       (setf (oref gnus-registry-db file) file)
-	       (gnus-message 1 "Registry filename changed to %s" file))
-	   (gnus-registry-remake-db t))))
-      (error
-       (gnus-message
-        1
-        "The Gnus registry could not be loaded from %s, creating a new one"
-        file)
-       (gnus-registry-remake-db t)))))
+  (when (or force
+	    ;; The registry is loaded by both
+	    ;; `gnus-registry-initialize' and the read-newsrc hook.
+	    ;; Don't load twice.
+	    (null (eieio-object-p gnus-registry-db)))
+    (let ((file gnus-registry-cache-file))
+      (condition-case nil
+          (gnus-registry-read file)
+	(file-error
+	 ;; Fix previous mis-naming of the registry file.
+	 (let ((old-file-name
+		(concat (file-name-sans-extension
+			 gnus-registry-cache-file)
+			".eioio")))
+	   (if (and (file-exists-p old-file-name)
+		    (yes-or-no-p
+		     (format "Rename registry file from %s to %s? "
+			     old-file-name file)))
+	       (progn
+		 (gnus-registry-read old-file-name)
+		 (setf (oref gnus-registry-db file) file)
+		 (gnus-message 1 "Registry filename changed to %s" file))
+	     (gnus-registry-remake-db t))))
+	(error
+	 (gnus-message
+          1
+          "The Gnus registry could not be loaded from %s, creating a new one"
+          file)
+	 (gnus-registry-remake-db t))))))
 
 (defun gnus-registry-read (file)
   "Do the actual reading of the registry persistence file."
@@ -372,7 +375,7 @@ This is not required after changing `gnus-registry-cache-file'."
          (grouphashtb (registry-lookup-secondary db 'group))
          (old-size (registry-size db)))
     (registry-reindex db)
-    (loop for k being the hash-keys of grouphashtb
+    (cl-loop for k being the hash-keys of grouphashtb
           using (hash-values v)
           when (gnus-registry-ignore-group-p k)
           do (registry-delete db v nil))
@@ -443,14 +446,14 @@ This is not required after changing `gnus-registry-cache-file'."
                   (sender ,sender)
                   (recipient ,@recipients)
                   (subject ,subject)))
-      (when (second kv)
-        (let ((new (or (assq (first kv) entry)
-                       (list (first kv)))))
+      (when (cadr kv)
+        (let ((new (or (assq (car kv) entry)
+                       (list (car kv)))))
           (dolist (toadd (cdr kv))
             (unless (member toadd new)
               (setq new (append new (list toadd)))))
           (setq entry (cons new
-                            (assq-delete-all (first kv) entry))))))
+                            (assq-delete-all (car kv) entry))))))
     (gnus-message 10 "Gnus registry: new entry for %s is %S"
                   id
                   entry)
@@ -504,7 +507,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
      :subject subject
      :log-agent "Gnus registry fancy splitting with parent")))
 
-(defun* gnus-registry--split-fancy-with-parent-internal
+(cl-defun gnus-registry--split-fancy-with-parent-internal
     (&rest spec
            &key references refstr sender subject recipients log-agent
            &allow-other-keys)
@@ -524,7 +527,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
        log-agent refstr)
       (dolist (reference (nreverse references))
         (gnus-message 9 "%s is looking up %s" log-agent reference)
-        (loop for group in (gnus-registry-get-id-key reference 'group)
+        (cl-loop for group in (gnus-registry-get-id-key reference 'group)
               when (gnus-registry-follow-group-p group)
               do
               (progn
@@ -547,7 +550,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
                          (gnus-registry-get-id-key reference 'group))
                        (registry-lookup-secondary-value db 'subject subject)))))
          (setq found
-               (loop for group in groups
+               (cl-loop for group in groups
                      when (gnus-registry-follow-group-p group)
                      do (gnus-message
                          ;; warn more if gnus-registry-track-extra
@@ -574,7 +577,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
                          (gnus-registry-get-id-key reference 'group))
                        (registry-lookup-secondary-value db 'sender sender)))))
          (setq found
-               (loop for group in groups
+               (cl-loop for group in groups
                      when (gnus-registry-follow-group-p group)
                      do (gnus-message
                          ;; warn more if gnus-registry-track-extra
@@ -604,7 +607,7 @@ See the Info node `(gnus)Fancy Mail Splitting' for more details."
                                  (registry-lookup-secondary-value
                                   db 'recipient recp)))))
              (setq found
-                   (loop for group in groups
+                   (cl-loop for group in groups
                          when (gnus-registry-follow-group-p group)
                          do (gnus-message
                              ;; warn more if gnus-registry-track-extra
@@ -640,7 +643,7 @@ possible.  Uses `gnus-registry-split-strategy'."
         out chosen)
     ;; the strategy can be nil, in which case chosen is nil
     (setq chosen
-          (case gnus-registry-split-strategy
+          (cl-case gnus-registry-split-strategy
             ;; default, take only one-element lists into chosen
             ((nil)
              (and (= (length groups) 1)
@@ -692,7 +695,7 @@ possible.  Uses `gnus-registry-split-strategy'."
                  10
                  "%s: stripped group %s to %s"
                  log-agent group short-name))
-              (pushnew short-name out :test #'equal))
+              (cl-pushnew short-name out :test #'equal))
           ;; else...
           (gnus-message
            7
@@ -803,11 +806,9 @@ Overrides existing keywords with FORCE set non-nil."
 
 ;; message field fetchers
 (defun gnus-registry-fetch-message-id-fast (article)
-  "Fetch the Message-ID quickly, using the internal gnus-data-list function."
-  (if (and (numberp article)
-           (assoc article (gnus-data-list nil)))
-      (mail-header-id (gnus-data-header (assoc article (gnus-data-list nil))))
-    nil))
+  "Fetch the Message-ID quickly, using the internal `gnus-data-find' function."
+  (when-let* ((data (and (numberp article) (gnus-data-find article))))
+    (mail-header-id (gnus-data-header data))))
 
 (defun gnus-registry-extract-addresses (text)
   "Extract all the addresses in a normalized way from TEXT.
@@ -834,31 +835,22 @@ Addresses without a name will say \"noname\"."
     nil))
 
 (defun gnus-registry-fetch-simplified-message-subject-fast (article)
-  "Fetch the Subject quickly, using the internal gnus-data-list function."
-  (if (and (numberp article)
-           (assoc article (gnus-data-list nil)))
-      (gnus-string-remove-all-properties
-       (gnus-registry-simplify-subject
-        (mail-header-subject (gnus-data-header
-                              (assoc article (gnus-data-list nil))))))
-    nil))
+  "Fetch the Subject quickly, using the internal `gnus-data-find' function."
+  (when-let* ((data (and (numberp article) (gnus-data-find article))))
+    (gnus-string-remove-all-properties
+     (gnus-registry-simplify-subject
+      (mail-header-subject (gnus-data-header data))))))
 
 (defun gnus-registry-fetch-sender-fast (article)
-  (gnus-registry-fetch-header-fast "from" article))
+  (when-let* ((data (and (numberp article) (gnus-data-find article))))
+    (mail-header-from (gnus-data-header data))))
 
 (defun gnus-registry-fetch-recipients-fast (article)
-  (gnus-registry-sort-addresses
-   (or (ignore-errors (gnus-registry-fetch-header-fast "Cc" article)) "")
-   (or (ignore-errors (gnus-registry-fetch-header-fast "To" article)) "")))
-
-(defun gnus-registry-fetch-header-fast (article header)
-  "Fetch the HEADER quickly, using the internal gnus-data-list function."
-  (if (and (numberp article)
-           (assoc article (gnus-data-list nil)))
-      (gnus-string-remove-all-properties
-       (cdr (assq header (gnus-data-header
-                          (assoc article (gnus-data-list nil))))))
-    nil))
+  (when-let* ((data (and (numberp article) (gnus-data-find article)))
+	      (extra (mail-header-extra (gnus-data-header data))))
+    (gnus-registry-sort-addresses
+     (or (cdr (assq 'Cc extra)) "")
+     (or (cdr (assq 'To extra)) ""))))
 
 ;; registry marks glue
 (defun gnus-registry-do-marks (type function)
@@ -895,9 +887,7 @@ FUNCTION should take two parameters, a mark symbol and the cell value."
     (gnus-message 9 "Applying mark %s to %d articles"
                   mark (length articles))
     (dolist (article articles)
-      (gnus-summary-update-article
-       article
-       (assoc article (gnus-data-list nil))))))
+      (gnus-summary-update-article article (gnus-data-find article)))))
 
 ;; This is ugly code, but I don't know how to do it better.
 (defun gnus-registry-install-shortcuts ()
@@ -1089,7 +1079,7 @@ only the last one's marks are returned."
            (expected (length old))
            entry)
       (while (car-safe old)
-        (incf count)
+        (cl-incf count)
         ;; don't use progress reporters for backwards compatibility
         (when (and (< 0 expected)
                    (= 0 (mod count 100)))
@@ -1099,7 +1089,7 @@ only the last one's marks are returned."
               old (cdr-safe old))
         (let* ((id (car-safe entry))
                (rest (cdr-safe entry))
-               (groups (loop for p in rest
+               (groups (cl-loop for p in rest
                              when (stringp p)
                              collect p))
                extra-cell key val)
@@ -1118,6 +1108,12 @@ only the last one's marks are returned."
               (setq val (list val)))
             (gnus-registry-set-id-key id key val))))
       (message "Import done, collected %d entries" count))))
+
+(defun gnus-registry-clear ()
+  "Clear the registry."
+  (setq gnus-registry-db nil))
+
+(gnus-add-shutdown 'gnus-registry-clear 'gnus)
 
 ;;;###autoload
 (defun gnus-registry-initialize ()
@@ -1235,7 +1231,7 @@ from your existing entries."
   (when extra
     (let ((db gnus-registry-db))
       (registry-reindex db)
-      (loop for k being the hash-keys of (oref db data)
+      (cl-loop for k being the hash-keys of (oref db data)
 	    using (hash-value v)
 	    do (let ((newv (delq nil (mapcar #'(lambda (entry)
 						 (unless (member (car entry) extra)

@@ -86,7 +86,7 @@ instead of the filename inheritance method."
      ((and prompt (not byserv))
       (setq user (or
 		  (url-do-auth-source-search server type :user)
-		  (read-string (url-auth-user-prompt url realm)
+		  (read-string (url-auth-user-prompt href realm)
 			       (or user (user-real-login-name))))
 	    pass (or
 		  (url-do-auth-source-search server type :secret)
@@ -115,7 +115,7 @@ instead of the filename inheritance method."
 	  (progn
 	    (setq user (or
 			(url-do-auth-source-search server type :user)
-			(read-string (url-auth-user-prompt url realm)
+			(read-string (url-auth-user-prompt href realm)
 				     (user-real-login-name)))
 		  pass (or
 			(url-do-auth-source-search server type :secret)
@@ -192,9 +192,10 @@ key cache `url-digest-auth-storage'."
 (defun url-digest-auth-make-cnonce ()
   "Compute a new unique client nonce value."
   (base64-encode-string
-   (apply 'format "%016x%04x%04x%05x%05x" (random) (current-time)) t))
+   (format "%016x%016x" (random) (car (encode-time nil t)))
+   t))
 
-(defun url-digest-auth-nonce-count (nonce)
+(defun url-digest-auth-nonce-count (_nonce)
   "The number requests sent to server with the given NONCE.
 This count includes the request we're preparing here.
 
@@ -477,6 +478,8 @@ PROMPT is boolean - specifies whether to ask the user for a username/password
        if one cannot be found in the cache"
   (if (not realm)
       (setq realm (cdr-safe (assoc "realm" args))))
+  (if (equal realm "")
+      (setq realm nil))
   (if (stringp url)
       (setq url (url-generic-parse-url url)))
   (if (or (null type) (eq type 'any))

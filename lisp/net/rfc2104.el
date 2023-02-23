@@ -1,4 +1,4 @@
-;;; rfc2104.el --- RFC2104 Hashed Message Authentication Codes
+;;; rfc2104.el --- RFC2104 Hashed Message Authentication Codes  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
 
@@ -55,7 +55,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 ;; Magic character for inner HMAC round. 0x36 == 54 == '6'
 (defconst rfc2104-ipad ?\x36)
@@ -84,14 +84,6 @@
       (setq ls (cdr ls)))
     v))
 
-(eval-when-compile
-  (defmacro rfc2104-string-make-unibyte (string)
-    "Return the unibyte equivalent of STRING.
-In XEmacs return just STRING."
-    (if (featurep 'xemacs)
-	string
-      `(string-make-unibyte ,string))))
-
 (defun rfc2104-hash (hash block-length hash-length key text)
   (let* (;; if key is longer than B, reset it to HASH(key)
 	 (key (if (> (length key) block-length)
@@ -101,23 +93,22 @@ In XEmacs return just STRING."
 	 (opad (make-string (+ block-length hash-length) rfc2104-opad))
          c partial)
     ;; Prefix *pad with key, appropriately XORed.
-    (do ((i 0 (1+ i)))
+    (cl-do ((i 0 (1+ i)))
         ((= len i))
       (setq c (aref key i))
       (aset ipad i (logxor rfc2104-ipad c))
       (aset opad i (logxor rfc2104-opad c)))
     ;; Perform inner hash.
-    (setq partial (rfc2104-string-make-unibyte
-		   (funcall hash (concat ipad text))))
+    (setq partial (funcall hash (concat ipad text)))
     ;; Pack latter part of opad.
-    (do ((r 0 (+ 2 r))
-         (w block-length (1+ w)))
+    (cl-do ((r 0 (+ 2 r))
+            (w block-length (1+ w)))
         ((= (* 2 hash-length) r))
       (aset opad w
             (+ (* 16 (aref rfc2104-nybbles (aref partial     r)))
                (      aref rfc2104-nybbles (aref partial (1+ r))))))
     ;; Perform outer hash.
-    (rfc2104-string-make-unibyte (funcall hash opad))))
+    (funcall hash opad)))
 
 (provide 'rfc2104)
 

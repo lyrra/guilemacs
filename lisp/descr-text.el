@@ -413,12 +413,6 @@ The character information includes:
            (charset (if eight-bit-p 'eight-bit
                       (or (get-text-property pos 'charset)
                           (char-charset char))))
-           ;; TIS620.2533 overlaps eight-bit-control, but we want to
-           ;; show eight-bit for raw bytes, not some obscure character
-           ;; set no one heard of.
-           (charset (if (eq charset 'tis620-2533)
-                        'eight-bit
-                      charset))
            (composition (find-composition pos nil nil t))
            (component-chars nil)
            (display-table (or (window-display-table)
@@ -849,8 +843,6 @@ The character information includes:
 
           (if text-props-desc (insert text-props-desc))
           (setq buffer-read-only t))))))
-
-(define-obsolete-function-alias 'describe-char-after 'describe-char "22.1")
 
 ;;; Describe-Char-ElDoc
 

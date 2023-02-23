@@ -3,7 +3,6 @@
 ;; Copyright (C) 2002-2019 Free Software Foundation, Inc.
 ;;
 ;; Author: David Ponce <david@dponce.com>
-;; Maintainer: David Ponce <david@dponce.com>
 ;; Created: 26 Aug 2002
 ;; Keywords: syntax
 ;; This file is part of GNU Emacs.
@@ -194,7 +193,7 @@ See also the function `wisent-skip-block'."
   "Expand call to SKIP-TOKEN grammar macro.
 Return the form to skip the lookahead token.
 See also the function `wisent-skip-token'."
-  `(wisent-skip-token))
+  '(wisent-skip-token))
 
 (defun wisent-grammar-assocs ()
   "Return associativity and precedence level definitions."

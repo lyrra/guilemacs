@@ -314,7 +314,13 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 					    (other :tag "hidden by keypress" 1))
 			      "22.1")
 	     (make-pointer-invisible mouse boolean "23.2")
-	     (menu-bar-mode frames boolean nil
+             (resize-mini-frames
+              frames (choice
+                      (const :tag "Never" nil)
+                      (const :tag "Fit frame to buffer" t)
+                      (function :tag "User-defined function"))
+               "27.1")
+             (menu-bar-mode frames boolean nil
 			    ;; FIXME?
                             ;; :initialize custom-initialize-default
 			    :set custom-set-minor-mode)
@@ -345,6 +351,7 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 	     ;; keyboard.c
 	     (meta-prefix-char keyboard character)
 	     (auto-save-interval auto-save integer)
+             (auto-save-no-message auto-save boolean "27.1")
 	     (auto-save-timeout auto-save (choice (const :tag "off" nil)
 						  (integer :format "%v")))
 	     (echo-keystrokes minibuffer number)
@@ -414,6 +421,10 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 	     ;; msdos.c
 	     (dos-unsupported-char-glyph display integer)
 	     ;; nsterm.m
+             ;;
+             ;; FIXME: Why does ⌃ use nil instead of none?  Also the
+             ;; description is confusing; setting it to nil disables ⌃
+             ;; entirely.
 	     (ns-control-modifier
 	      ns
 	      (choice (const :tag "No modifier" nil)
@@ -430,13 +441,13 @@ Leaving \"Default\" unchecked is equivalent with specifying a default of
 		      (const super)) "24.1")
 	     (ns-command-modifier
 	      ns
-	      (choice (const :tag "No modifier" nil)
+	      (choice (const :tag "No modifier (work as layout switch)" none)
 		      (const control) (const meta)
 		      (const alt) (const hyper)
 		      (const super)) "23.1")
 	     (ns-right-command-modifier
 	      ns
-	      (choice (const :tag "No modifier (work as command)" none)
+	      (choice (const :tag "No modifier (work as layout switch)" none)
 		      (const :tag "Use the value of ns-command-modifier"
 			     left)
 		      (const control) (const meta)
@@ -542,7 +553,12 @@ since it could result in memory overflow and make Emacs crash."
 		      (const :tag "Respect `truncate-lines'" nil)
 		      (other :tag "Truncate if not full-width" t))
 	      "23.1")
-	     (make-cursor-line-fully-visible windows boolean)
+	     (make-cursor-line-fully-visible
+              windows
+              (choice
+               (const :tag "Make cursor always fully visible" t)
+               (const :tag "Allow cursor to be partially-visible" nil)
+               (function :tag "User-defined function")))
 	     (mode-line-in-non-selected-windows mode-line boolean "22.1")
 	     (line-number-display-limit display
 					(choice integer
@@ -632,6 +648,19 @@ since it could result in memory overflow and make Emacs crash."
                                   (const :tag "Count lines from beginning of narrowed region"
                                          :value nil))
                                  "26.1")
+
+             (display-fill-column-indicator display-fill-column-indicator
+                                 boolean "27.1")
+             (display-fill-column-indicator-column display-fill-column-indicator
+                                 (choice
+                                  (const :tag "Use fill-column variable"
+                                         :value t)
+                                  (const :tag "Fixed column number"
+                                         :value 70
+                                         :format "%v"))
+                                 integer "27.1")
+             (display-fill-column-indicator-character display-fill-column-indicator
+                                 character "27.1")
 	     ;; xfaces.c
 	     (scalable-fonts-allowed display boolean "22.1")
 	     ;; xfns.c
@@ -675,7 +704,7 @@ since it could result in memory overflow and make Emacs crash."
 		      ((string-match "selection" (symbol-name symbol))
 		       (fboundp 'x-selection-exists-p))
 		      ((string-match "fringe" (symbol-name symbol))
-		       (fboundp 'define-fringe-bitmap))
+		       (boundp 'fringe-bitmaps))
 		      ((string-match "\\`imagemagick" (symbol-name symbol))
 		       (fboundp 'imagemagick-types))
 		      ((equal "font-use-system-font" (symbol-name symbol))
@@ -708,17 +737,19 @@ since it could result in memory overflow and make Emacs crash."
 	  (put symbol 'custom-set (cadr prop)))
       ;; This is used by describe-variable.
       (if version (put symbol 'custom-version version))
-      ;; Note this is the _only_ initialize property we handle.
-      (if (eq (cadr (memq :initialize rest)) 'custom-initialize-delay)
-          ;; These vars are defined early and should hence be initialized
-          ;; early, even if this file happens to be loaded late.  so add them
-          ;; to the end of custom-delayed-init-variables.  Otherwise,
-          ;; auto-save-file-name-transforms will appear in M-x customize-rogue.
-	  (add-to-list 'custom-delayed-init-variables symbol 'append))
+      ;; Don't re-add to custom-delayed-init-variables post-startup.
+      (unless after-init-time
+	;; Note this is the _only_ initialize property we handle.
+	(if (eq (cadr (memq :initialize rest)) 'custom-initialize-delay)
+	    ;; These vars are defined early and should hence be initialized
+	    ;; early, even if this file happens to be loaded late.  so add them
+	    ;; to the end of custom-delayed-init-variables.  Otherwise,
+	    ;; auto-save-file-name-transforms will appear in customize-rogue.
+	    (add-to-list 'custom-delayed-init-variables symbol 'append)))
       ;; If this is NOT while dumping Emacs, set up the rest of the
       ;; customization info.  This is the stuff that is not needed
       ;; until someone does M-x customize etc.
-      (unless purify-flag
+      (unless dump-mode
 	;; Add it to the right group(s).
 	(if (listp group)
 	    (dolist (g group)
@@ -740,7 +771,7 @@ since it could result in memory overflow and make Emacs crash."
 ;; Record cus-start as loaded if we have set up all the info that we can.
 ;; Don't record it as loaded if we have only set up the standard values
 ;; and safe/risky properties.
-(unless purify-flag
+(unless dump-mode
   (provide 'cus-start))
 
 ;;; cus-start.el ends here

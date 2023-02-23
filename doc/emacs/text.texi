@@ -459,6 +459,13 @@ non-@code{nil}, and in programming-language strings if
 @code{nil} for @code{electric-quote-string} and @code{t} for the other
 variables.
 
+@vindex electric-quote-replace-double
+  You can also set the option @code{electric-quote-replace-double} to
+a non-@code{nil} value.  Then, typing @t{"} insert an appropriate
+curved double quote depending on context: @t{“} at the beginning of
+the buffer or after a line break, whitespace, opening parenthesis, or
+quote character, and @t{”} otherwise.
+
   Electric Quote mode is disabled by default.  To toggle it in a
 single buffer, use @kbd{M-x electric-quote-local-mode}.
 To toggle it globally, type
@@ -631,8 +638,15 @@ line.  If a function returns a non-@code{nil} value, Emacs will not
 break the line there.  Functions you can use there include:
 @code{fill-single-word-nobreak-p} (don't break after the first word of
 a sentence or before the last); @code{fill-single-char-nobreak-p}
-(don't break after a one-letter word); and @code{fill-french-nobreak-p}
-(don't break after @samp{(} or before @samp{)}, @samp{:} or @samp{?}).
+(don't break after a one-letter word preceded by a whitespace
+character); @code{fill-french-nobreak-p} (don't break after @samp{(}
+or before @samp{)}, @samp{:} or @samp{?}); and
+@code{fill-polish-nobreak-p} (don't break after a one letter word,
+even if preceded by a non-whitespace character).
+
+  Emacs can display an indicator in the @code{fill-column} position
+using the Display fill column indicator mode 
+(@pxref{Displaying Boundaries, display-fill-column-indicator}).
 
 @node Fill Prefix
 @subsection The Fill Prefix
@@ -2406,11 +2420,13 @@ to the commands above.
 @subsection Setting Other Text Properties
 
   The Special Properties submenu of Text Properties has entries for
-adding or removing three other text properties: @code{read-only},
+adding or removing four other text properties: @code{read-only},
 (which disallows alteration of the text), @code{invisible} (which
-hides text), and @code{intangible} (which disallows moving point
-within the text).  The @samp{Remove Special} menu item removes all of
-these special properties from the text in the region.
+hides text), @code{intangible} (which disallows moving point within
+the text), and @code{charset} (which is important for selecting a
+proper font to display a character).  The @samp{Remove Special} menu
+item removes all of these special properties from the text in the
+region.
 
   The @code{invisible} and @code{intangible} properties are not saved.
 
@@ -2835,11 +2851,12 @@ cell interval, and the justification of the text in each cell.
 @findex table-generate-source
   @kbd{M-x table-generate-source} generates a table formatted for a
 specific markup language.  It asks for a language (which must be one
-of @code{html}, @code{latex}, or @code{cals}), a destination buffer in
-which to put the result, and a table caption, and then inserts the
-generated table into the specified buffer.  The default destination
-buffer is @code{table.@var{lang}}, where @var{lang} is the language
-you specified.
+of @code{html}, @code{latex}, @code{cals}, @code{wiki} or
+@code{mediawiki}), a destination buffer in which to put the result,
+and a table caption, and then inserts the generated table into the
+specified buffer.  The default destination buffer is
+@code{table.@var{lang}}, where @var{lang} is the language you
+specified.
 
 @node Two-Column
 @section Two-Column Editing

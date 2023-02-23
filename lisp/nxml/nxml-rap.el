@@ -108,7 +108,6 @@ Return nil if the character at POS is not inside."
     (setq nxml-prolog-regions (xmltok-forward-prolog))
     (setq nxml-prolog-end (point))))
 
-
 ;;; Random access parsing
 
 (defun nxml-token-after ()

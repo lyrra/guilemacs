@@ -52,7 +52,7 @@
 ;; The main keymap
 
 (easy-mmode-defmap log-edit-mode-map
-  `(("\C-c\C-c" . log-edit-done)
+  '(("\C-c\C-c" . log-edit-done)
     ("\C-c\C-a" . log-edit-insert-changelog)
     ("\C-c\C-d" . log-edit-show-diff)
     ("\C-c\C-f" . log-edit-show-files)
@@ -203,10 +203,7 @@ when this variable is set to nil.")
 
 (defconst log-edit-maximum-comment-ring-size 32
   "Maximum number of saved comments in the comment ring.")
-(define-obsolete-variable-alias 'vc-comment-ring 'log-edit-comment-ring "22.1")
 (defvar log-edit-comment-ring (make-ring log-edit-maximum-comment-ring-size))
-(define-obsolete-variable-alias 'vc-comment-ring-index
-  'log-edit-comment-ring-index "22.1")
 (defvar log-edit-comment-ring-index nil)
 (defvar log-edit-last-comment-match "")
 
@@ -311,13 +308,6 @@ automatically."
     (or (eobp) (looking-at "\n\n")
 	(insert "\n"))))
 
-;; Compatibility with old names.
-(define-obsolete-function-alias 'vc-previous-comment 'log-edit-previous-comment "22.1")
-(define-obsolete-function-alias 'vc-next-comment 'log-edit-next-comment "22.1")
-(define-obsolete-function-alias 'vc-comment-search-reverse 'log-edit-comment-search-backward "22.1")
-(define-obsolete-function-alias 'vc-comment-search-forward 'log-edit-comment-search-forward "22.1")
-(define-obsolete-function-alias 'vc-comment-to-change-log 'log-edit-comment-to-change-log "22.1")
-
 ;;;
 ;;; Actual code
 ;;;
@@ -360,7 +350,7 @@ The first subexpression is the actual text of the field.")
 (defun log-edit-goto-eoh ()             ;FIXME: Almost rfc822-goto-eoh!
   (goto-char (point-min))
   (when (re-search-forward
-	 "^\\([^[:alpha:]]\\|[[:alnum:]-]+[^[:alnum:]-:]\\)" nil 'move)
+	 "^\\([^[:alpha:]]\\|[[:alnum:]-]+[^[:alnum:]-]\\)" nil 'move)
     (goto-char (match-beginning 0))))
 
 (defun log-edit--match-first-line (limit)
@@ -623,7 +613,7 @@ Also saves its contents in the comment history and hides
       (setq buffer-read-only nil)
       (erase-buffer)
       (cvs-insert-strings files)
-      (setq buffer-read-only t)
+      (special-mode)
       (goto-char (point-min))
       (save-selected-window
 	(cvs-pop-to-buffer-same-frame buf)
@@ -764,7 +754,9 @@ regardless of user name or time."
 	     (log-edit-insert-changelog-entries (log-edit-files)))))
       (log-edit-set-common-indentation)
       ;; Add an Author: field if appropriate.
-      (when author (log-edit-add-field "Author" (car author)))
+      (when author
+        (log-edit-add-field "Author" (car author))
+        (log-edit-add-field "Summary" ""))
       ;; Add a Fixes: field if applicable.
       (when (consp log-edit-rewrite-fixes)
 	(rfc822-goto-eoh)
@@ -923,8 +915,10 @@ where LOGBUFFER is the name of the ChangeLog buffer, and each
              (setq change-log-default-name nil)
              (find-change-log)))))
     (when (or (find-buffer-visiting changelog-file-name)
-              (file-exists-p changelog-file-name))
-      (with-current-buffer (find-file-noselect changelog-file-name)
+              (file-exists-p changelog-file-name)
+              add-log-dont-create-changelog-file)
+      (with-current-buffer
+          (add-log-find-changelog-buffer changelog-file-name)
         (unless (eq major-mode 'change-log-mode) (change-log-mode))
         (goto-char (point-min))
         (if (looking-at "\\s-*\n") (goto-char (match-end 0)))
@@ -1092,6 +1086,22 @@ line of MSG."
         (delete-region (match-beginning 0) (match-end 0)))
       (if summary (insert summary "\n\n"))
       (cons (buffer-string) res))))
+
+(defun log-edit--toggle-amend (last-msg-fn)
+  (when (log-edit-toggle-header "Amend" "yes")
+    (goto-char (point-max))
+    (unless (bolp) (insert "\n"))
+    (insert (funcall last-msg-fn))
+    (save-excursion
+      (rfc822-goto-eoh)
+      (forward-line 1)
+      (let ((pt (point)))
+        (and (zerop (forward-line 1))
+             (looking-at "\n\\|\\'")
+             (let ((summary (buffer-substring-no-properties pt (1- (point)))))
+               (skip-chars-forward " \n")
+               (delete-region pt (point))
+               (log-edit-set-header "Summary" summary)))))))
 
 (provide 'log-edit)
 

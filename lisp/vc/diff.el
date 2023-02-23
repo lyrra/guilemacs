@@ -121,6 +121,17 @@ Possible values are:
   nil   -- no, it does not
   check -- try to probe whether it does")
 
+(defvar diff-default-directory)
+
+(defun diff-check-labels (&optional force)
+  (if (not (or force (eq 'check diff-use-labels)))
+      diff-use-labels
+    (setq diff-use-labels
+	  (with-temp-buffer
+	    (when (ignore-errors
+		    (call-process diff-command nil t nil "--help"))
+	      (if (search-backward "--label" nil t) t))))))
+
 (defun diff-no-select (old new &optional switches no-async buf)
   ;; Noninteractive helper for creating and reverting diff buffers
   (unless (bufferp new) (setq new (expand-file-name new)))
@@ -128,11 +139,7 @@ Possible values are:
   (or switches (setq switches diff-switches)) ; If not specified, use default.
   (unless (listp switches) (setq switches (list switches)))
   (or buf (setq buf (get-buffer-create "*Diff*")))
-  (when (eq 'check diff-use-labels)
-    (setq diff-use-labels
-	  (with-temp-buffer
-	    (when (ignore-errors (call-process diff-command nil t nil "--help"))
-	      (if (search-backward "--label" nil t) t)))))
+  (diff-check-labels)
   (let* ((old-alt (diff-file-local-copy old))
 	 (new-alt (diff-file-local-copy new))
 	 (command
@@ -165,6 +172,7 @@ Possible values are:
            (lambda (_ignore-auto _noconfirm)
              (diff-no-select old new switches no-async (current-buffer))))
       (setq default-directory thisdir)
+      (setq diff-default-directory default-directory)
       (let ((inhibit-read-only t))
 	(insert command "\n"))
       (if (and (not no-async) (fboundp 'make-process))
@@ -226,8 +234,9 @@ With prefix arg, prompt for diff switches."
   "View the differences between BUFFER and its associated file.
 This requires the external program `diff' to be in your `exec-path'."
   (interactive "bBuffer: ")
-  (with-current-buffer (get-buffer (or buffer (current-buffer)))
-    (diff buffer-file-name (current-buffer) nil 'noasync)))
+  (let ((buf (get-buffer (or buffer (current-buffer)))))
+    (with-current-buffer (or (buffer-base-buffer buf) buf)
+      (diff buffer-file-name (current-buffer) nil 'noasync))))
 
 (provide 'diff)
 

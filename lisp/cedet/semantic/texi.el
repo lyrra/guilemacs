@@ -365,6 +365,8 @@ Optional argument POINT is where to look for the environment."
 (eval-when-compile
   (require 'semantic/analyze))
 
+(declare-function semantic-analyze-context "semantic/analyze")
+
 (define-mode-local-override semantic-analyze-current-context
   texinfo-mode (point)
   "Analysis context makes no sense for texinfo.  Return nil."
@@ -376,7 +378,6 @@ Optional argument POINT is where to look for the environment."
     (when prefix
       (require 'semantic/analyze)
       (semantic-analyze-context
-       "Context-for-texinfo"
        :buffer (current-buffer)
        :scope nil
        :bounds bounds
@@ -418,9 +419,9 @@ Since texinfo is not a programming language the default version is not
 useful.  Instead, look at the current symbol.  If it is a command
 do primitive texinfo built ins.  If not, use ispell to lookup words
 that start with that symbol."
-  (let ((prefix (car (oref context :prefix)))
+  (let ((prefix (car (oref context prefix)))
 	)
-    (cond ((member 'function (oref context :prefixclass))
+    (cond ((member 'function (oref context prefixclass))
 	   ;; Do completion for texinfo commands
 	   (let* ((cmd (substring prefix 1))
 		  (lst (all-completions
@@ -428,7 +429,7 @@ that start with that symbol."
 	     (mapcar (lambda (f) (semantic-tag (concat "@" f) 'function))
 		     lst))
 	   )
-	  ((member 'word (oref context :prefixclass))
+	  ((member 'word (oref context prefixclass))
 	   ;; Do completion for words via ispell.
 	   (require 'ispell)
 	   (let ((word-list (ispell-lookup-words prefix)))

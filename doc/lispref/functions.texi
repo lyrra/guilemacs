@@ -376,8 +376,8 @@ keyword @code{&rest} before one final argument.
 @example
 @group
 (@var{required-vars}@dots{}
- @r{[}&optional @var{optional-vars}@dots{}@r{]}
- @r{[}&rest @var{rest-var}@r{]})
+ @r{[}&optional @r{[}@var{optional-vars}@dots{}@r{]}@r{]}
+ @r{[}&rest @r{[}@var{rest-var}@r{]}@r{]})
 @end group
 @end example
 
@@ -1122,6 +1122,10 @@ a byte-code function object (@pxref{Byte Compilation}).
 When lexical binding is enabled, @var{function-object} is converted
 into a closure.  @xref{Closures}.
 @end itemize
+
+When @var{function-object} is a symbol and the code is byte compiled,
+the byte-compiler will warn if that function is not defined or might
+not be known at run time.
 @end defspec
 
 @cindex @samp{#'} syntax
@@ -1247,7 +1251,7 @@ This form defines a method like @code{cl-defmethod} does.
 @end table
 @end defmac
 
-@defmac cl-defmethod name [qualifier] arguments &rest [docstring] body
+@defmac cl-defmethod name [qualifier] arguments [&context (expr spec)@dots{}] &rest [docstring] body
 This macro defines a particular implementation for the generic
 function called @var{name}.  The implementation code is given by
 @var{body}.  If present, @var{docstring} is the documentation string
@@ -1274,15 +1278,20 @@ defined with @code{cl-defstruct} (@pxref{Structures,,, cl, Common Lisp
 Extensions for GNU Emacs Lisp}), or of one of its child classes.
 @end table
 
-Alternatively, the argument specializer can be of the form
-@code{&context (@var{expr} @var{spec})}, in which case the value of
-@var{expr} must be compatible with the specializer provided by
-@var{spec}; @var{spec} can be any of the forms described above.  In
-other words, this form of specializer uses the value of @var{expr}
-instead of arguments for the decision whether the method is
-applicable.  For example, @code{&context (overwrite-mode (eql t))}
-will make the method compatible only when @code{overwrite-mode} is
-turned on.
+Method definitions can make use of a new argument-list keyword,
+@code{&context}, which introduces extra specializers that test the
+environment at the time the method is run.  This keyword should appear
+after the list of required arguments, but before any @code{&rest} or
+@code{&optional} keywords.  The @code{&context} specializers look much
+like regular argument specializers---(@var{expr} @var{spec})---except
+that @var{expr} is an expression to be evaluated in the current
+context, and the @var{spec} is a value to compare against.  For
+example, @code{&context (overwrite-mode (eql t))} will make the method
+applicable only when @code{overwrite-mode} is turned on.  The
+@code{&context} keyword can be followed by any number of context
+specializers.  Because the context specializers are not part of the
+generic function's argument signature, they may be omitted in methods
+that don't require them.
 
 The type specializer, @code{(@var{arg} @var{type})}, can specify one
 of the @dfn{system types} in the following list.  When a parent type

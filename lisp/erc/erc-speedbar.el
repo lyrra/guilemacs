@@ -3,7 +3,7 @@
 ;; Copyright (C) 2001-2004, 2006-2019 Free Software Foundation, Inc.
 
 ;; Author: Mario Lang <mlang@delysid.org>
-;; Contributor: Eric M. Ludlam <eric@siege-engine.com>
+;; Contributor: Eric M. Ludlam <zappo@gnu.org>
 ;; Maintainer: emacs-devel@gnu.org
 
 ;; This file is part of GNU Emacs.
@@ -140,7 +140,7 @@ This will add a speedbar major display mode."
 	t))))
 
 (defun erc-speedbar-expand-server (text server indent)
-  (cond ((string-match "+" text)
+  (cond ((string-match "\\+" text)
 	 (speedbar-change-expand-button-char ?-)
 	 (if (speedbar-with-writable
 	       (save-excursion
@@ -185,7 +185,7 @@ This will add a speedbar major display mode."
   "For the line matching TEXT, in CHANNEL, expand or contract a line.
 INDENT is the current indentation level."
   (cond
-   ((string-match "+" text)
+   ((string-match "\\+" text)
     (speedbar-change-expand-button-char ?-)
     (speedbar-with-writable
      (save-excursion
@@ -285,7 +285,7 @@ is only done when the channel is actually expanded already."
 	(erc-speedbar-expand-channel "+" buffer 1)))))
 
 (defun erc-speedbar-expand-user (text token indent)
-  (cond ((string-match "+" text)
+  (cond ((string-match "\\+" text)
 	 (speedbar-change-expand-button-char ?-)
 	 (speedbar-with-writable
 	   (save-excursion
@@ -361,6 +361,7 @@ The INDENT level is ignored."
 ;;; erc-speedbar.el ends here
 ;;
 ;; Local Variables:
+;; generated-autoload-file: "erc-loaddefs.el"
 ;; indent-tabs-mode: t
 ;; tab-width: 8
 ;; End:

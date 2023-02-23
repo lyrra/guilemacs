@@ -42,6 +42,9 @@
 ;;   beginning-op	Function to call to skip to the beginning of a "thing".
 ;;   end-op		Function to call to skip to the end of a "thing".
 ;;
+;; For simple things, defined as sequences of specific kinds of characters,
+;; use macro define-thing-chars.
+;;
 ;; Reliance on existing operators means that many `things' can be accessed
 ;; without further code:  eg.
 ;;     (thing-at-point 'line)
@@ -58,7 +61,7 @@
   "Move forward to the end of the Nth next THING.
 THING should be a symbol specifying a type of syntactic entity.
 Possibilities include `symbol', `list', `sexp', `defun',
-`filename', `url', `email', `word', `sentence', `whitespace',
+`filename', `url', `email', `uuid', `word', `sentence', `whitespace',
 `line', and `page'."
   (let ((forward-op (or (get thing 'forward-op)
 			(intern-soft (format "forward-%s" thing)))))
@@ -73,7 +76,7 @@ Possibilities include `symbol', `list', `sexp', `defun',
   "Determine the start and end buffer locations for the THING at point.
 THING should be a symbol specifying a type of syntactic entity.
 Possibilities include `symbol', `list', `sexp', `defun',
-`filename', `url', `email', `word', `sentence', `whitespace',
+`filename', `url', `email', `uuid', `word', `sentence', `whitespace',
 `line', and `page'.
 
 See the file `thingatpt.el' for documentation on how to define a
@@ -131,7 +134,7 @@ positions of the thing found."
   "Return the THING at point.
 THING should be a symbol specifying a type of syntactic entity.
 Possibilities include `symbol', `list', `sexp', `defun',
-`filename', `url', `email', `word', `sentence', `whitespace',
+`filename', `url', `email', `uuid', `word', `sentence', `whitespace',
 `line', `number', and `page'.
 
 When the optional argument NO-PROPERTIES is non-nil,
@@ -235,21 +238,28 @@ Prefer the enclosing list with fallback on sexp at point.
 (put 'defun 'end-op       'end-of-defun)
 (put 'defun 'forward-op   'end-of-defun)
 
+;; Things defined by sets of characters
+
+(defmacro define-thing-chars (thing chars)
+  "Define THING as a sequence of CHARS.
+E.g.:
+\(define-thing-chars twitter-screen-name \"[:alnum:]_\")"
+  `(progn
+     (put ',thing 'end-op
+          (lambda ()
+            (re-search-forward (concat "\\=[" ,chars "]*") nil t)))
+     (put ',thing 'beginning-op
+          (lambda ()
+            (if (re-search-backward (concat "[^" ,chars "]") nil t)
+	        (forward-char)
+	      (goto-char (point-min)))))))
+
 ;;  Filenames
 
 (defvar thing-at-point-file-name-chars "-~/[:alnum:]_.${}#%,:"
   "Characters allowable in filenames.")
 
-(put 'filename 'end-op
-     (lambda ()
-       (re-search-forward (concat "\\=[" thing-at-point-file-name-chars "]*")
-			  nil t)))
-(put 'filename 'beginning-op
-     (lambda ()
-       (if (re-search-backward (concat "[^" thing-at-point-file-name-chars "]")
-			       nil t)
-	   (forward-char)
-	 (goto-char (point-min)))))
+(define-thing-chars filename thing-at-point-file-name-chars)
 
 ;;  URIs
 
@@ -456,11 +466,14 @@ looks like an email address, \"ftp://\" if it starts with
      (while htbs
        (setq htb (car htbs) htbs (cdr htbs))
        (ignore-errors
-	 ;; errs: htb symbol may be unbound, or not a hash-table.
-	 ;; gnus-gethash is just a macro for intern-soft.
-	 (and (symbol-value htb)
-	      (intern-soft string (symbol-value htb))
-	      (setq ret string htbs nil))
+         (setq htb (symbol-value htb))
+	 (when (cond ((obarrayp htb)
+	              (intern-soft string htb))
+                     ((listp htb)
+                      (member string htb))
+                     ((hash-table-p htb)
+                      (gethash string htb)))
+	   (setq ret string htbs nil))
 	 ;; If we made it this far, gnus is running, so ignore "heads":
 	 (setq heads nil)))
      (or ret (not heads)
@@ -552,15 +565,33 @@ with angle brackets.")
 (put 'buffer 'end-op (lambda () (goto-char (point-max))))
 (put 'buffer 'beginning-op (lambda () (goto-char (point-min))))
 
+;; UUID
+
+(defconst thing-at-point-uuid-regexp
+  (rx bow
+      (repeat 8 hex-digit) "-"
+      (repeat 4 hex-digit) "-"
+      (repeat 4 hex-digit) "-"
+      (repeat 4 hex-digit) "-"
+      (repeat 12 hex-digit)
+      eow)
+  "A regular expression matching a UUID.
+See RFC 4122 for the description of the format.")
+
+(put 'uuid 'bounds-of-thing-at-point
+     (lambda ()
+       (when (thing-at-point-looking-at thing-at-point-uuid-regexp 36)
+         (cons (match-beginning 0) (match-end 0)))))
+
 ;;  Aliases
 
-(defun word-at-point ()
+(defun word-at-point (&optional no-properties)
   "Return the word at point.  See `thing-at-point'."
-  (thing-at-point 'word))
+  (thing-at-point 'word no-properties))
 
-(defun sentence-at-point ()
+(defun sentence-at-point (&optional no-properties)
   "Return the sentence at point.  See `thing-at-point'."
-  (thing-at-point 'sentence))
+  (thing-at-point 'sentence no-properties))
 
 (defun thing-at-point--read-from-whole-string (str)
   "Read a Lisp expression from STR.

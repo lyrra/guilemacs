@@ -110,11 +110,8 @@ absolute file name and number of characters inserted."
       (let* ((ibeg (point))
 	     (iend (+ (point) (cadr rval)))
 	     (visitingp (and visit (= ibeg (point-min)) (= iend (point-max))))
-	     (data
-	      (string-make-unibyte
-	       (buffer-substring-no-properties ibeg iend)))
-	     (image
-	      (create-image data nil t))
+             (image (create-image (encode-coding-region ibeg iend 'binary t)
+                                  nil t))
 	     (props
 	      `(display ,image
 			yank-handler
@@ -180,9 +177,6 @@ Optional argument ARGS are the arguments to call FUNCTION with."
 ;;;###autoload
 (define-minor-mode auto-image-file-mode
   "Toggle visiting of image files as images (Auto Image File mode).
-With a prefix argument ARG, enable Auto Image File mode if ARG is
-positive, and disable it otherwise.  If called from Lisp, enable
-the mode if ARG is omitted or nil.
 
 An image file is one whose name has an extension in
 `image-file-name-extensions', or matches a regexp in

@@ -339,12 +339,18 @@ is called as a function to find the defun's beginning."
 
    ((or defun-prompt-regexp open-paren-in-column-0-is-defun-start)
     (and (< arg 0) (not (eobp)) (forward-char 1))
-    (and (re-search-backward (if defun-prompt-regexp
-				 (concat (if open-paren-in-column-0-is-defun-start
-					     "^\\s(\\|" "")
-					 "\\(?:" defun-prompt-regexp "\\)\\s(")
-			       "^\\s(")
-			     nil 'move arg)
+    (and (let (found)
+           (while
+               (and (setq found
+                          (re-search-backward
+                           (if defun-prompt-regexp
+			       (concat (if open-paren-in-column-0-is-defun-start
+					   "^\\s(\\|" "")
+				       "\\(?:" defun-prompt-regexp "\\)\\s(")
+			     "^\\s(")
+			                      nil 'move arg))
+                    (nth 8 (syntax-ppss))))
+           found)
 	 (progn (goto-char (1- (match-end 0)))
                 t)))
 
@@ -364,8 +370,9 @@ is called as a function to find the defun's beginning."
 	  (arg-+ve (> arg 0)))
       (save-restriction
 	(widen)
-	(let ((ppss (let (syntax-begin-function)
-		      (syntax-ppss)))
+	(let ((ppss (with-suppressed-warnings ((obsolete syntax-begin-function))
+                      (let (syntax-begin-function)
+		        (syntax-ppss))))
 	      ;; position of least enclosing paren, or nil.
 	      encl-pos)
 	  ;; Back out of any comment/string, so that encl-pos will always
@@ -639,7 +646,7 @@ Interactively, the behavior depends on `narrow-to-defun-include-comments'."
       (re-search-backward "^\n" (- (point) 1) t)
       (narrow-to-region beg end))))
 
-(defvar insert-pair-alist
+(defcustom insert-pair-alist
   '((?\( ?\)) (?\[ ?\]) (?\{ ?\}) (?\< ?\>) (?\" ?\") (?\' ?\') (?\` ?\'))
   "Alist of paired characters inserted by `insert-pair'.
 Each element looks like (OPEN-CHAR CLOSE-CHAR) or (COMMAND-CHAR
@@ -649,7 +656,16 @@ or without modifiers, are inserted by `insert-pair'.
 
 If COMMAND-CHAR is specified, it is a character that triggers the
 insertion of the open/close pair, and COMMAND-CHAR itself isn't
-inserted.")
+inserted."
+  :type '(repeat (choice (list :tag "Pair"
+                               (character :tag "Open")
+                               (character :tag "Close"))
+                         (list :tag "Triple"
+                               (character :tag "Command")
+                               (character :tag "Open")
+                               (character :tag "Close"))))
+  :group 'lisp
+  :version "27.1")
 
 (defun insert-pair (&optional arg open close)
   "Enclose following ARG sexps in a pair of OPEN and CLOSE characters.
@@ -717,11 +733,13 @@ This command assumes point is not in a string or comment."
   (interactive "P")
   (insert-pair arg ?\( ?\)))
 
-(defun delete-pair ()
-  "Delete a pair of characters enclosing the sexp that follows point."
-  (interactive)
-  (save-excursion (forward-sexp 1) (delete-char -1))
-  (delete-char 1))
+(defun delete-pair (&optional arg)
+  "Delete a pair of characters enclosing ARG sexps following point.
+A negative ARG deletes a pair of characters around preceding ARG sexps."
+  (interactive "p")
+  (unless arg (setq arg 1))
+  (save-excursion (forward-sexp arg) (delete-char (if (> arg 0) -1 1)))
+  (delete-char (if (> arg 0) 1 -1)))
 
 (defun raise-sexp (&optional arg)
   "Raise ARG sexps higher up the tree."

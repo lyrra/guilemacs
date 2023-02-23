@@ -191,7 +191,6 @@ If nil, means use the colon-separated path in the variable $INCPATH instead."
 ;;;###autoload
 (define-minor-mode partial-completion-mode
   "Toggle Partial Completion mode.
-With prefix ARG, turn Partial Completion mode on if ARG is positive.
 
 When Partial Completion mode is enabled, TAB (or M-TAB if `PC-meta-flag' is
 nil) is enhanced so that if some string is divided into words and each word is
@@ -833,9 +832,12 @@ GOTO-END is non-nil, however, it instead replaces up to END."
                           ;;
                           ;; Note that choose-completion-string-functions
                           ;; plays around with point.
-                          (setq completion-base-size (if dirname
-                                                         dirlength
-                                                       (- beg prompt-end))))))
+                          (with-suppressed-warnings ((obsolete
+                                                      completion-base-size))
+                            (setq completion-base-size
+                                  (if dirname
+                                      dirlength
+                                    (- beg prompt-end)))))))
                              (PC-temp-minibuffer-message " [Next char not unique]"))
                          ;; Expansion of filenames is not reversible,
                          ;; so just keep the prefix.

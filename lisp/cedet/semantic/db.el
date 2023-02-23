@@ -171,18 +171,6 @@ based on whichever technique used.  This method provides a hook for
 them to convert TAG into a more complete form."
   (cons obj tag))
 
-(cl-defmethod object-print ((obj semanticdb-abstract-table) &rest strings)
-  "Pretty printer extension for `semanticdb-abstract-table'.
-Adds the number of tags in this file to the object print name."
-  (if (or (not strings)
-	  (and (= (length strings) 1) (stringp (car strings))
-	       (string= (car strings) "")))
-      ;; Else, add a tags quantifier.
-      (cl-call-next-method obj (format " (%d tags)" (length (semanticdb-get-tags obj))))
-    ;; Pass through.
-    (apply #'cl-call-next-method obj strings)
-    ))
-
 ;;; Index Cache
 ;;
 (defclass semanticdb-abstract-search-index ()
@@ -321,13 +309,18 @@ If OBJ's file is not loaded, read it in first."
   (oset obj dirty t)
   )
 
-(cl-defmethod object-print ((obj semanticdb-table) &rest strings)
+(cl-defmethod semanticdb-debug-info ((obj semanticdb-table))
+  (list (format "(%d tags)%s"
+                (length (semanticdb-get-tags obj))
+                (if (oref obj dirty)
+                    ", DIRTY"
+                  ""))))
+
+(cl-defmethod cl-print-object ((obj semanticdb-table) stream)
   "Pretty printer extension for `semanticdb-table'.
 Adds the number of tags in this file to the object print name."
-  (apply #'cl-call-next-method obj
-	 (format " (%d tags)" (length (semanticdb-get-tags obj)))
-         (if (oref obj dirty) ", DIRTY" "")
-         strings))
+  (princ (eieio-object-name obj (semanticdb-debug-info obj))
+         stream))
 
 ;;; DATABASE BASE CLASS
 ;;
@@ -380,16 +373,17 @@ where it may need to resynchronize with some persistent storage."
       (setq tabs (cdr tabs)))
     dirty))
 
-(cl-defmethod object-print ((obj semanticdb-project-database) &rest strings)
+(cl-defmethod semanticdb-debug-info ((obj semanticdb-project-database))
+  (list (format "(%d tables%s)"
+                (length (semanticdb-get-database-tables obj))
+                (if (semanticdb-dirty-p obj)
+                    " DIRTY" ""))))
+
+(cl-defmethod cl-print-object ((obj semanticdb-project-database) stream)
   "Pretty printer extension for `semanticdb-project-database'.
 Adds the number of tables in this file to the object print name."
-  (apply #'cl-call-next-method obj
-	 (format " (%d tables%s)"
-                 (length (semanticdb-get-database-tables obj))
-                 (if (semanticdb-dirty-p obj)
-                     " DIRTY" "")
-                 )
-         strings))
+  (princ (eieio-object-name obj (semanticdb-debug-info obj))
+         stream))
 
 (cl-defmethod semanticdb-create-database ((dbc (subclass semanticdb-project-database)) directory)
   "Create a new semantic database of class DBC for DIRECTORY and return it.
@@ -611,8 +605,8 @@ The file associated with OBJ does not need to be in a buffer."
       ;; Buffer isn't loaded.  The only clue we have is if the file
       ;; is somehow different from our mark in the semanticdb table.
       (let* ((stats (file-attributes ff))
-	     (actualsize (nth 7 stats))
-	     (actualmod (nth 5 stats))
+	     (actualsize (file-attribute-size stats))
+	     (actualmod (file-attribute-modification-time stats))
 	     )
 
 	(or (not (slot-boundp obj 'tags))
@@ -631,8 +625,8 @@ The file associated with OBJ does not need to be in a buffer."
   (oset table tags new-tags)
   (oset table pointmax (point-max))
   (let ((fattr (file-attributes (semanticdb-full-filename table))))
-    (oset table fsize (nth 7 fattr))
-    (oset table lastmodtime (nth 5 fattr))
+    (oset table fsize (file-attribute-size fattr))
+    (oset table lastmodtime (file-attribute-modification-time fattr))
     )
   ;; Assume it is now up to date.
   (oset table unmatched-syntax semantic-unmatched-syntax-cache)

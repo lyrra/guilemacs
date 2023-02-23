@@ -700,8 +700,6 @@ It also can't undo some Viper settings."
       (and (fboundp 'add-to-ordered-list) (boundp 'emulation-mode-map-alists))
     (viper-delocalize-var 'minor-mode-map-alist))
   (viper-delocalize-var 'require-final-newline)
-  (if (featurep 'xemacs) (viper-delocalize-var 'bar-cursor))
-
 
   ;; deactivate all advices done by Viper.
   (viper--deactivate-advice-list)
@@ -787,8 +785,6 @@ It also can't undo some Viper settings."
   ;; In emacs, we have to advice handle-switch-frame
   ;; This advice is undone earlier, when all advices matching "viper-" are
   ;; deactivated.
-  (if (featurep 'xemacs)
-      (remove-hook 'mouse-leave-frame-hook #'viper-remember-current-frame))
   ) ; end viper-go-away
 
 
@@ -935,10 +931,7 @@ Two differences:
    (lambda (orig-fun &rest args)
     ;; FIXME: Use remapping?
     (if (and (eq viper-current-state 'vi-state)
-	     ;; Do not use called-interactively-p here. XEmacs does not have it
-	     ;; and interactive-p is just fine.
-	     ;; (called-interactively-p 'interactive))
-	     (interactive-p))
+             (called-interactively-p 'interactive))
 	(beep 1)
       (apply orig-fun args))))
 
@@ -1052,108 +1045,6 @@ Two differences:
       (setq global-mode-string
 	    (append '("" viper-mode-string) (cdr global-mode-string))))
 
-  (if (featurep 'xemacs)
-      ;; XEmacs
-      (defadvice describe-key (before viper-describe-key-ad protect activate)
-	"Force to read key via `viper-read-key-sequence'."
-	(interactive (list (viper-read-key-sequence "Describe key: "))))
-    ;; Emacs
-    (viper--advice-add 'describe-key :before
-     (lambda (&rest _)
-      "Force to read key via `viper-read-key-sequence'."
-      (interactive (let ((key (viper-read-key-sequence
-			       "Describe key (or click or menu item): ")))
-		     (list key
-			   (prefix-numeric-value current-prefix-arg)
-			   ;; If KEY is a down-event, read also the
-			   ;; corresponding up-event.
-			   (and (vectorp key)
-				(let ((last-idx (1- (length key))))
-				  (and (eventp (aref key last-idx))
-				       (memq 'down (event-modifiers
-						    (aref key last-idx)))))
-				(or (and (eventp (aref key 0))
-					 (memq 'down (event-modifiers
-						      (aref key 0)))
-					 ;; For the C-down-mouse-2 popup menu,
-					 ;; there is no subsequent up-event
-					 (= (length key) 1))
-				    (and (> (length key) 1)
-					 (eventp (aref key 1))
-					 (memq 'down (event-modifiers (aref key 1)))))
-				(read-event)))))
-      nil))
-
-    ) ; (if (featurep 'xemacs)
-
-  (if (featurep 'xemacs)
-      ;; XEmacs
-      (defadvice describe-key-briefly
-	(before viper-describe-key-briefly-ad protect activate)
-	"Force to read key via `viper-read-key-sequence'."
-	(interactive (list (viper-read-key-sequence "Describe key briefly: "))))
-    ;; Emacs
-    (viper--advice-add 'describe-key-briefly :before
-     (lambda (&rest _)
-      "Force to read key via `viper-read-key-sequence'."
-      (interactive (let ((key (viper-read-key-sequence
-			       "Describe key (or click or menu item): ")))
-		     ;; If KEY is a down-event, read and discard the
-		     ;; corresponding up-event.
-		     (and (vectorp key)
-			  (let ((last-idx (1- (length key))))
-			    (and (eventp (aref key last-idx))
-				 (memq 'down (event-modifiers (aref key last-idx)))))
-			  (read-event))
-		     (list key
-			   (if current-prefix-arg
-			       (prefix-numeric-value current-prefix-arg))
-			   1)))
-      nil))
-    ) ; (if (featurep 'xemacs)
-
-  ;; FIXME: The default already uses read-file-name, so it looks like this
-  ;; advice is not needed any more.
-  ;; (defadvice find-file (before viper-add-suffix-advice activate)
-  ;;   "Use `read-file-name' for reading arguments."
-  ;;   (interactive (cons (read-file-name "Find file: " nil default-directory)
-  ;;       	       ;; XEmacs: if Mule & prefix arg, ask for coding system
-  ;;       	       (cond ((and (featurep 'xemacs) (featurep 'mule))
-  ;;       		      (list
-  ;;       		       (and current-prefix-arg
-  ;;       			    (read-coding-system "Coding-system: "))))
-  ;;       		     ;; Emacs: do wildcards
-  ;;       		     ((and (featurep 'emacs) (boundp 'find-file-wildcards))
-  ;;       			   (list find-file-wildcards))))
-  ;;       	 ))
-  ;; (defadvice find-file-other-window (before viper-add-suffix-advice activate)
-  ;;   "Use `read-file-name' for reading arguments."
-  ;;   (interactive (cons (read-file-name "Find file in other window: "
-  ;;       			       nil default-directory)
-  ;;       	       ;; XEmacs: if Mule & prefix arg, ask for coding system
-  ;;       	       (cond ((and (featurep 'xemacs) (featurep 'mule))
-  ;;       		      (list
-  ;;       		       (and current-prefix-arg
-  ;;       			    (read-coding-system "Coding-system: "))))
-  ;;       		     ;; Emacs: do wildcards
-  ;;       		     ((and (featurep 'emacs) (boundp 'find-file-wildcards))
-  ;;       		      (list find-file-wildcards))))
-  ;;       	 ))
-  ;; (defadvice find-file-other-frame (before viper-add-suffix-advice activate)
-  ;;   "Use `read-file-name' for reading arguments."
-  ;;   (interactive (cons (read-file-name "Find file in other frame: "
-  ;;       			       nil default-directory)
-  ;;       	       ;; XEmacs: if Mule & prefix arg, ask for coding system
-  ;;       	       (cond ((and (featurep 'xemacs) (featurep 'mule))
-  ;;       		      (list
-  ;;       		       (and current-prefix-arg
-  ;;       			    (read-coding-system "Coding-system: "))))
-  ;;       		     ;; Emacs: do wildcards
-  ;;       		     ((and (featurep 'emacs) (boundp 'find-file-wildcards))
-  ;;       		      (list find-file-wildcards))))
-  ;;       	 ))
-
-
   (viper--advice-add 'read-file-name :around
    (lambda (orig-fun &rest args)
     "Tell `exit-minibuffer' to run `viper-file-add-suffix' as a hook."
@@ -1180,13 +1071,11 @@ This may be needed if the previous `:map' command terminated abnormally."
 
   ;; catch frame switching event
   (if (viper-window-display-p)
-      (if (featurep 'xemacs)
-	  (add-hook 'mouse-leave-frame-hook
-		    #'viper-remember-current-frame)
-	(viper--advice-add 'handle-switch-frame :before
-	 (lambda (&rest _)
-	  "Remember the selected frame before the switch-frame event."
-	  (viper-remember-current-frame (selected-frame))))))
+      (viper--advice-add
+       'handle-switch-frame :before
+       (lambda (&rest _)
+	 "Remember the selected frame before the switch-frame event."
+	 (viper-remember-current-frame (selected-frame)))))
 
   ) ; end viper-non-hook-settings
 

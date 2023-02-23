@@ -150,12 +150,12 @@ elisp byte-compiler."
   :group 'ibuffer)
 
 (defcustom ibuffer-fontification-alist
-  `((10 buffer-read-only font-lock-constant-face)
+  '((10 buffer-read-only font-lock-constant-face)
     (15 (and buffer-file-name
 	     (string-match ibuffer-compressed-file-name-regexp
 			   buffer-file-name))
 	font-lock-doc-face)
-    (20 (string-match "^*" (buffer-name)) font-lock-keyword-face)
+    (20 (string-match "^\\*" (buffer-name)) font-lock-keyword-face)
     (25 (and (string-match "^ " (buffer-name))
 	     (null buffer-file-name))
 	italic)
@@ -223,14 +223,6 @@ view of the buffers."
   :type 'boolean
   :group 'ibuffer)
 (defvar ibuffer-sorting-reversep nil)
-
-(defcustom ibuffer-elide-long-columns nil
-  "If non-nil, then elide column entries which exceed their max length."
-  :type 'boolean
-  :group 'ibuffer)
-(make-obsolete-variable 'ibuffer-elide-long-columns
-                        "use the :elide argument of `ibuffer-formats'."
-                        "22.1")
 
 (defcustom ibuffer-eliding-string "..."
   "The string to use for eliding long columns."
@@ -349,14 +341,10 @@ directory, like `default-directory'."
   :type 'regexp
   :group 'ibuffer)
 
-(define-obsolete-variable-alias 'ibuffer-hooks 'ibuffer-hook "22.1")
-
 (defcustom ibuffer-hook nil
   "Hook run when `ibuffer' is called."
   :type 'hook
   :group 'ibuffer)
-
-(define-obsolete-variable-alias 'ibuffer-mode-hooks 'ibuffer-mode-hook "22.1")
 
 (defcustom ibuffer-mode-hook nil
   "Hook run upon entry into `ibuffer-mode'."
@@ -522,6 +510,7 @@ directory, like `default-directory'."
     (define-key map (kbd "/ m") 'ibuffer-filter-by-used-mode)
     (define-key map (kbd "/ M") 'ibuffer-filter-by-derived-mode)
     (define-key map (kbd "/ n") 'ibuffer-filter-by-name)
+    (define-key map (kbd "/ E") 'ibuffer-filter-by-process)
     (define-key map (kbd "/ *") 'ibuffer-filter-by-starred-name)
     (define-key map (kbd "/ f") 'ibuffer-filter-by-filename)
     (define-key map (kbd "/ b") 'ibuffer-filter-by-basename)
@@ -956,7 +945,6 @@ directory, like `default-directory'."
 (defvar ibuffer-compiled-formats nil)
 (defvar ibuffer-cached-formats nil)
 (defvar ibuffer-cached-eliding-string nil)
-(defvar ibuffer-cached-elide-long-columns 0)
 
 (defvar ibuffer-sorting-functions-alist nil
   "An alist of functions which describe how to sort buffers.
@@ -1603,7 +1591,7 @@ If point is on a group name, this function operates on that group."
 
 (defun ibuffer-compile-make-eliding-form (strvar elide from-end-p)
   (let ((ellipsis (propertize ibuffer-eliding-string 'font-lock-face 'bold)))
-    (if (or elide (with-no-warnings ibuffer-elide-long-columns))
+    (if elide
 	`(if (> strlen 5)
 	     ,(if from-end-p
                   ;; FIXME: this should probably also be using
@@ -1625,8 +1613,8 @@ If point is on a group name, this function operates on that group."
     `(truncate-string-to-width ,strvar ,maxvar nil ?\s)))
 
 (defun ibuffer-compile-make-format-form (strvar widthform alignment)
-  (let* ((left `(make-string tmp2 ?\s))
-	 (right `(make-string (- tmp1 tmp2) ?\s)))
+  (let* ((left '(make-string tmp2 ?\s))
+	 (right '(make-string (- tmp1 tmp2) ?\s)))
     `(progn
        (setq tmp1 ,widthform
 	     tmp2 (/ tmp1 2))
@@ -1749,7 +1737,7 @@ If point is on a group name, this function operates on that group."
 		      outforms)
 		     (push `(setq str ,callform
                                   ,@(when strlen-used
-                                      `(strlen (string-width str))))
+                                      '(strlen (string-width str))))
 			   outforms)
 		     (setq outforms
 			   (append outforms
@@ -1803,9 +1791,6 @@ If point is on a group name, this function operates on that group."
 	      (not (eq ibuffer-cached-formats ibuffer-formats))
 	      (null ibuffer-cached-eliding-string)
 	      (not (equal ibuffer-cached-eliding-string ibuffer-eliding-string))
-	      (eql 0 ibuffer-cached-elide-long-columns)
-	      (not (eql ibuffer-cached-elide-long-columns
-			(with-no-warnings ibuffer-elide-long-columns)))
 	      (and ext-loaded
 		   (not (eq ibuffer-cached-filter-formats
 			    ibuffer-filter-format-alist))
@@ -1814,8 +1799,7 @@ If point is on a group name, this function operates on that group."
       (message "Formats have changed, recompiling...")
       (ibuffer-recompile-formats)
       (setq ibuffer-cached-formats ibuffer-formats
-	    ibuffer-cached-eliding-string ibuffer-eliding-string
-	    ibuffer-cached-elide-long-columns (with-no-warnings ibuffer-elide-long-columns))
+	    ibuffer-cached-eliding-string ibuffer-eliding-string)
       (when ext-loaded
 	(setq ibuffer-cached-filter-formats ibuffer-filter-format-alist))
       (message "Formats have changed, recompiling...done"))))
@@ -1825,7 +1809,7 @@ If point is on a group name, this function operates on that group."
 (defface ibuffer-locked-buffer
   '((((background dark)) (:foreground "RosyBrown"))
     (t (:foreground "brown4")))
-  "*Face used for locked buffers in Ibuffer."
+  "Face used for locked buffers in Ibuffer."
   :version "26.1"
   :group 'ibuffer
   :group 'font-lock-highlighting-faces)
@@ -2221,7 +2205,7 @@ the value of point at the beginning of the line for that buffer."
 		     strname
 		     (propertize strname 'mouse-face 'highlight 'keymap hmap)))
 		  strname)))))
-	 (add-text-properties opos (point) `(ibuffer-title-header t))
+	 (add-text-properties opos (point) '(ibuffer-title-header t))
 	 (insert "\n")
 	 ;; Add the underlines
 	 (let ((str (save-excursion
@@ -2271,7 +2255,7 @@ the value of point at the beginning of the line for that buffer."
                                                align)
                       summary))))))
 	   (point))
-	 `(ibuffer-summary t)))))
+	 '(ibuffer-summary t)))))
 
 
 (defun ibuffer-redisplay (&optional silent)
@@ -2759,7 +2743,6 @@ will be inserted before the group at point."
   (set (make-local-variable 'ibuffer-compiled-formats) nil)
   (set (make-local-variable 'ibuffer-cached-formats) nil)
   (set (make-local-variable 'ibuffer-cached-eliding-string) nil)
-  (set (make-local-variable 'ibuffer-cached-elide-long-columns) nil)
   (set (make-local-variable 'ibuffer-current-format) nil)
   (set (make-local-variable 'ibuffer-did-modification) nil)
   (set (make-local-variable 'ibuffer-tmp-hide-regexps) nil)

@@ -29,6 +29,7 @@
   "Image support."
   :group 'multimedia)
 
+(declare-function image-flush "image.c" (spec &optional frame))
 (defalias 'image-refresh 'image-flush)
 
 (defconst image-type-header-regexps
@@ -247,6 +248,7 @@ compatibility with versions of Emacs that lack the variable
 ;; Used to be in image-type-header-regexps, but now not used anywhere
 ;; (since 2009-08-28).
 (defun image-jpeg-p (data)
+  (declare (obsolete "It is unused inside Emacs and will be removed." "27.1"))
   "Value is non-nil if DATA, a string, consists of JFIF image data.
 We accept the tag Exif because that is the same format."
   (setq data (ignore-errors (string-to-unibyte data)))
@@ -259,7 +261,7 @@ We accept the tag Exif because that is the same format."
 	  (setq i (1+ i))
 	  (when (>= (+ i 2) len)
 	    (throw 'jfif nil))
-	  (let ((nbytes (+ (lsh (aref data (+ i 1)) 8)
+	  (let ((nbytes (+ (ash (aref data (+ i 1)) 8)
 			   (aref data (+ i 2))))
 		(code (aref data i)))
 	    (when (and (>= code #xe0) (<= code #xef))
@@ -313,7 +315,7 @@ be determined."
 					(buffer-substring
 					 (point-min)
 					 (min (point-max)
-					      (+ (point-min) 256))))))
+					      (+ (point-min) 8192))))))
 		     (setq image-type (cdr image-type))))
 	    (setq type image-type
 		  types nil)
@@ -337,7 +339,7 @@ be determined."
        (file-readable-p file)
        (with-temp-buffer
 	 (set-buffer-multibyte nil)
-	 (insert-file-contents-literally file nil 0 256)
+	 (insert-file-contents-literally file nil 0 8192)
 	 (image-type-from-buffer))))
 
 
@@ -802,19 +804,22 @@ If the image has a non-nil :speed property, it acts as a multiplier
 for the animation speed.  A negative value means to animate in reverse."
   (when (and (buffer-live-p (plist-get (cdr image) :animate-buffer))
              ;; Delayed more than two seconds more than expected.
-	     (or (<= (- (float-time) target-time) 2)
+	     (or (time-less-p (time-since target-time) 2)
 		 (progn
 		   (message "Stopping animation; animation possibly too big")
 		   nil)))
     (image-show-frame image n t)
     (let* ((speed (image-animate-get-speed image))
-	   (time (float-time))
+	   (time (current-time))
 	   (animation (image-multi-frame-p image))
+	   (time-to-load-image (time-since time))
+	   (stated-delay-time (/ (or (cdr animation)
+				     image-default-frame-delay)
+				 (float (abs speed))))
 	   ;; Subtract off the time we took to load the image from the
 	   ;; stated delay time.
-	   (delay (max (+ (* (or (cdr animation) image-default-frame-delay)
-			     (/ 1.0 (abs speed)))
-			  time (- (float-time)))
+	   (delay (max (float-time (time-subtract stated-delay-time
+						  time-to-load-image))
 		       image-minimum-frame-delay))
 	   done)
       (setq n (if (< speed 0)
@@ -980,17 +985,20 @@ default is 20%."
                         0.8)))
 
 (defun image--get-image ()
-  (let ((image (get-text-property (point) 'display)))
+  "Return the image at point."
+  (let ((image (get-char-property (point) 'display)))
     (unless (eq (car-safe image) 'image)
       (error "No image under point"))
     image))
 
 (defun image--get-imagemagick-and-warn ()
-  (unless (fboundp 'imagemagick-types)
-    (error "Cannot rescale images without ImageMagick support"))
+  (unless (or (fboundp 'imagemagick-types) (image-transforms-p))
+    (error "Cannot rescale images on this terminal"))
   (let ((image (image--get-image)))
     (image-flush image)
-    (plist-put (cdr image) :type 'imagemagick)
+    (when (and (fboundp 'imagemagick-types)
+               (not (image-transforms-p)))
+      (plist-put (cdr image) :type 'imagemagick))
     image))
 
 (defun image--change-size (factor)
@@ -1009,6 +1017,8 @@ default is 20%."
               (unless (memq key '(:scale :width :height :max-width :max-height))
               (setq new (nconc new (list key val))))))
           new)))
+
+(declare-function image-size "image.c" (spec &optional pixels frame))
 
 (defun image--current-scaling (image new-image)
   ;; The image may be scaled due to many reasons (:scale, :max-width,
@@ -1032,10 +1042,7 @@ default is 20%."
 (defun image-save ()
   "Save the image under point."
   (interactive)
-  (let ((image (get-text-property (point) 'display)))
-    (when (or (not (consp image))
-              (not (eq (car image) 'image)))
-      (error "No image under point"))
+  (let ((image (image--get-image)))
     (with-temp-buffer
       (let ((file (plist-get (cdr image) :file)))
         (if file

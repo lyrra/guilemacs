@@ -804,7 +804,7 @@ The 2nd and 3rd arguments BEGIN and END specify the region."
 
     ;; Special Ethiopic punctuation.
     (goto-char (point-min))
-    (while (re-search-forward "\\ce[»\\.\\?]\\|«\\ce" nil t)
+    (while (re-search-forward "\\ce[».?]\\|«\\ce" nil t)
       (cond
        ((= (setq ch (preceding-char)) ?\»)
 	(delete-char -1)
@@ -1014,7 +1014,7 @@ With ARG, insert that many delimiters."
 ;;
 
 ;;;###autoload
-(defun ethio-composition-function (pos to font-object string)
+(defun ethio-composition-function (pos to font-object string _direction)
   (setq pos (1- pos))
   (let ((pattern "\\ce\\(፟\\|����\\)"))
     (if string

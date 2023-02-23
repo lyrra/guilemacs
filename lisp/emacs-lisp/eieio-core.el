@@ -391,9 +391,9 @@ See `defclass' for more information."
 	;; Clean up the meaning of protection.
         (setq prot
               (pcase prot
-                ((or 'nil 'public ':public) nil)
-                ((or 'protected ':protected) 'protected)
-                ((or 'private ':private) 'private)
+                ((or 'nil 'public :public) nil)
+                ((or 'protected :protected) 'protected)
+                ((or 'private :private) 'private)
                 (_ (signal 'invalid-slot-type (list :protection prot)))))
 
 	;; The default type specifier is supposed to be t, meaning anything.
@@ -866,7 +866,6 @@ reverse-lookup that name, and recurse with the associated slot value."
 	(if fn
             ;; Accessing a slot via its :initarg is accepted by EIEIO
             ;; (but not CLOS) but is a bad idea (for one: it's slower).
-            ;; FIXME: We should emit a compile-time warning when this happens!
             (eieio--slot-name-index class fn)
           nil)))))
 
@@ -1085,6 +1084,11 @@ method invocation orders of the involved classes."
   "Support for (subclass CLASS) specializers.
 These match if the argument is the name of a subclass of CLASS."
   (list eieio--generic-subclass-generalizer))
+
+(defmacro eieio-declare-slots (&rest slots)
+  "Declare that SLOTS are known eieio object slot names."
+  `(eval-when-compile
+     (setq eieio--known-slot-names (append ',slots eieio--known-slot-names))))
 
 (provide 'eieio-core)
 

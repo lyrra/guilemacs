@@ -253,6 +253,13 @@ character or word at point to the search string.  This is an easy way
 to search for another occurrence of the text at point.  (The decision
 of whether to copy a character or a word is heuristic.)
 
+@kindex C-M-w @r{(Incremental search)}
+@findex isearch-yank-symbol-or-char
+  @kbd{C-M-w} (@code{isearch-yank-symbol-or-char}) appends the next
+character or symbol at point to the search string.  This is an easy way
+to search for another occurrence of the symbol at point.  (The decision
+of whether to copy a character or a symbol is heuristic.)
+
 @kindex M-s C-e @r{(Incremental search)}
 @findex isearch-yank-line
   Similarly, @kbd{M-s C-e} (@code{isearch-yank-line}) appends the rest
@@ -274,11 +281,11 @@ appended text with an earlier kill, similar to the usual @kbd{M-y}
 in the echo area appends the current X selection (@pxref{Primary
 Selection}) to the search string (@code{isearch-yank-x-selection}).
 
-@kindex C-M-w @r{(Incremental search)}
+@kindex C-M-d @r{(Incremental search)}
 @kindex C-M-y @r{(Incremental search)}
 @findex isearch-del-char
 @findex isearch-yank-char
-  @kbd{C-M-w} (@code{isearch-del-char}) deletes the last character
+  @kbd{C-M-d} (@code{isearch-del-char}) deletes the last character
 from the search string, and @kbd{C-M-y} (@code{isearch-yank-char})
 appends the character after point to the search string.  An
 alternative method to add the character after point is to enter the
@@ -308,7 +315,7 @@ string that failed to match is highlighted using the face
 
   At this point, there are several things you can do.  If your string
 was mistyped, use @key{DEL} to cancel a previous input item
-(@pxref{Basic Isearch}), @kbd{C-M-w} to erase one character at a time,
+(@pxref{Basic Isearch}), @kbd{C-M-d} to erase one character at a time,
 or @kbd{M-e} to edit it.  If you like the place you have found, you
 can type @key{RET} to remain there.  Or you can type @kbd{C-g}, which
 removes from the search string the characters that could not be found
@@ -468,7 +475,7 @@ of the keymap @code{isearch-mode-map} (@pxref{Keymaps}).
 
 This subsection describes how to control whether typing a command not
 specifically meaningful in searches exits the search before executing
-the command.  It also describes two categories of commands which you
+the command.  It also describes three categories of commands which you
 can type without exiting the current incremental search, even though
 they are not themselves part of incremental search.
 
@@ -477,7 +484,7 @@ they are not themselves part of incremental search.
 search exits the search before executing the command.  Thus, the
 command operates on the buffer from which you invoked the search.
 However, if you customize the variable @code{search-exit-option} to
-@code{nil}, the characters which you type that are not interpreted by
+@code{append}, the characters which you type that are not interpreted by
 the incremental search are simply appended to the search string.  This
 is so you could include in the search string control characters, such
 as @kbd{C-a}, that would normally exit the search and invoke the
@@ -538,6 +545,18 @@ change point, the buffer contents, the match data, the current buffer,
 or the selected window and frame.  The command must not itself attempt
 an incremental search.  This feature is disabled if
 @code{isearch-allow-scroll} is @code{nil} (which it is by default).
+
+@item Motion Commands
+@cindex motion commands, during incremental search
+When @code{isearch-yank-on-move} is customized to @code{shift},
+you can extend the search string by holding down the shift key while
+typing cursor motion commands.  It will yank text that ends at the new
+position after moving point in the current buffer.
+
+When @code{isearch-yank-on-move} is @code{t}, you can extend the
+search string without using the shift key for cursor motion commands,
+but it applies only for certain motion command that have the
+@code{isearch-move} property on their symbols.
 @end table
 
 @node Isearch Minibuffer
@@ -955,11 +974,10 @@ character class inside a character alternative.  For instance,
 elisp, The Emacs Lisp Reference Manual}, for a list of character
 classes.
 
-To include a @samp{]} in a character set, you must make it the first
-character.  For example, @samp{[]a]} matches @samp{]} or @samp{a}.  To
-include a @samp{-}, write @samp{-} as the first or last character of the
-set, or put it after a range.  Thus, @samp{[]-]} matches both @samp{]}
-and @samp{-}.
+To include a @samp{]} in a character set, you must make it the first character.
+For example, @samp{[]a]} matches @samp{]} or @samp{a}.  To include a @samp{-},
+write @samp{-} as the last character of the set, tho you can also put it first
+or after a range.  Thus, @samp{[]-]} matches both @samp{]} and @samp{-}.
 
 To include @samp{^} in a set, put it anywhere but at the beginning of
 the set.  (At the beginning, it complements the set---see below.)
@@ -1819,7 +1837,7 @@ In the @file{*Occur*} buffer, you can click on each entry, or move
 point there and type @key{RET}, to visit the corresponding position in
 the buffer that was searched.  @kbd{o} and @kbd{C-o} display the match
 in another window; @kbd{C-o} does not select it.  Alternatively, you
-can use the @kbd{C-x `} (@code{next-error}) command to visit the
+can use the @kbd{M-g M-n} (@code{next-error}) command to visit the
 occurrences one by one (@pxref{Compilation Mode}).
 
 @cindex Occur Edit mode
@@ -1855,11 +1873,13 @@ region instead.
 @findex flush-lines
 @item M-x flush-lines
 Prompt for a regexp, and delete each line that contains a match for
-it, operating on the text after point.  This command deletes the
-current line if it contains a match starting after point.  If the
-region is active, it operates on the region instead; if a line
-partially contained in the region contains a match entirely contained
-in the region, it is deleted.
+it, operating on the text after point.  When the command finishes,
+it prints the number of deleted matching lines.
+
+This command deletes the current line if it contains a match starting
+after point.  If the region is active, it operates on the region
+instead; if a line partially contained in the region contains a match
+entirely contained in the region, it is deleted.
 
 If a match is split across lines, @code{flush-lines} deletes all those
 lines.  It deletes the lines before starting to look for the next

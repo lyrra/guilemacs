@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author: David Engster <dengste@eml.cc>
+;; Author: David Engster <deng@randomsample.de>
 ;; Keywords: mail searching
 ;; Old-Version: 0.6
 
@@ -133,8 +133,6 @@
 
 
 ;;; Code:
-
-(eval-when-compile (require 'cl))       ;For (pop (cdr ogroup)).
 
 (require 'nnoo)
 (require 'gnus-group)
@@ -1421,12 +1419,12 @@ TYPE is either 'nov or 'headers."
 	     (setq cur (nnheader-parse-nov))
 	     (when corr
 	       (setq article (+ (mail-header-number cur) numc))
-	       (mail-header-set-number cur article))
+	       (setf (mail-header-number cur) article))
 	     (setq xref (mail-header-xref cur))
 	     (when (and (stringp xref)
 			(string-match (format "[ \t]%s:[0-9]+" backendgroup) xref))
 	       (setq xref (replace-match (format " %s:%d" mairixgroup article) t nil xref))
-	       (mail-header-set-xref cur xref))
+	       (setf (mail-header-xref cur) xref))
 	     (set-buffer buf)
 	     (nnheader-insert-nov cur)
 	     (set-buffer nntp-server-buffer)
@@ -1776,7 +1774,7 @@ If VERSION is a string: must be contained in mairix version output."
 	(setq versionstring
 	      (let* ((commandsplit (split-string nnmairix-mairix-command))
 		     (args (append (list (car commandsplit))
-				  `(nil t nil) (cdr commandsplit) '("-V"))))
+				   '(nil t nil) (cdr commandsplit) '("-V"))))
 	      (apply 'call-process args)
 	      (goto-char (point-min))
 	      (re-search-forward "mairix.*")

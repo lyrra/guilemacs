@@ -42,14 +42,14 @@
   "An input ring for ERC."
   :group 'erc)
 
-;;;###autoload (autoload 'erc-ring-mode "erc-ring" nil t)
+;;;###autoload(autoload 'erc-ring-mode "erc-ring" nil t)
 (define-erc-module ring nil
   "Stores input in a ring so that previous commands and messages can
 be recalled using M-p and M-n."
-  ((add-hook 'erc-send-pre-hook 'erc-add-to-input-ring)
+  ((add-hook 'erc-pre-send-functions 'erc-add-to-input-ring)
    (define-key erc-mode-map "\M-p" 'erc-previous-command)
    (define-key erc-mode-map "\M-n" 'erc-next-command))
-  ((remove-hook 'erc-send-pre-hook 'erc-add-to-input-ring)
+  ((remove-hook 'erc-pre-send-functions 'erc-add-to-input-ring)
    (define-key erc-mode-map "\M-p" 'undefined)
    (define-key erc-mode-map "\M-n" 'undefined)))
 
@@ -71,10 +71,10 @@ Call this function when setting up the mode."
     (setq erc-input-ring (make-ring comint-input-ring-size)))
   (setq erc-input-ring-index nil))
 
-(defun erc-add-to-input-ring (s)
+(defun erc-add-to-input-ring (state)
   "Add string S to the input ring and reset history position."
   (unless erc-input-ring (erc-input-ring-setup))
-  (ring-insert erc-input-ring s)
+  (ring-insert erc-input-ring (erc-input-string state))
   (setq erc-input-ring-index nil))
 
 (defun erc-clear-input-ring ()
@@ -146,5 +146,6 @@ containing a password."
 
 ;;; erc-ring.el ends here
 ;; Local Variables:
+;; generated-autoload-file: "erc-loaddefs.el"
 ;; indent-tabs-mode: nil
 ;; End:

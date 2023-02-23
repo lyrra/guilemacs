@@ -116,15 +116,10 @@ Usage example:
                               (cons (capitalize (cadr elem))
                                     (car elem)))
                             choices)))
-                  (condition-case err
+                  (condition-case nil
                       (let ((cursor-in-echo-area t))
-                        (read-char))
-                    (error (when (equal (cadr err) "Non-character input-event")
-                             ;; Use up the non-character input-event.
-                             ;; Otherwise we'll just keep reading it
-                             ;; again and again (Bug#32257).
-                             (read-event))
-                           nil))))
+                        (read-event))
+                    (error nil))))
           (setq answer (lookup-key query-replace-map (vector tchar) t))
           (setq tchar
                 (cond

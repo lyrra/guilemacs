@@ -7,7 +7,6 @@
 ;; Maintainer: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
 ;; Package: tramp
-;; Version: 2.3.5.26.3
 
 ;; This file is part of GNU Emacs.
 
@@ -26,39 +25,49 @@
 
 ;;; Code:
 
-;; In the Tramp GIT repository, the version number and the bug report
-;; address are auto-frobbed from configure.ac, so you should edit that
-;; file and run "autoconf && ./configure" to change them.  Emacs
-;; version check is defined in macro AC_EMACS_INFO of aclocal.m4;
-;; should be changed only there.
+;; In the Tramp GIT, the version number is auto-frobbed from tramp.el,
+;; and the bug report address is auto-frobbed from configure.ac.
+;; Emacs version check is defined in macro AC_EMACS_INFO of
+;; aclocal.m4; should be changed only there.
 
 ;;;###tramp-autoload
-(defconst tramp-version "2.3.5.26.3"
+(defconst tramp-version "2.4.2-pre"
   "This version of Tramp.")
 
 ;;;###tramp-autoload
 (defconst tramp-bug-report-address "tramp-devel@gnu.org"
   "Email address to send bug reports to.")
 
-(defun tramp-repository-get-version ()
-  "Try to return as a string the repository revision of the Tramp sources."
-  (let ((dir (locate-dominating-file (locate-library "tramp") ".git")))
-    (when dir
-      (with-temp-buffer
-	(let ((default-directory (file-name-as-directory dir)))
-	  (and (zerop
-		(ignore-errors
-		  (call-process "git" nil '(t nil) nil "rev-parse" "HEAD")))
-	       (not (zerop (buffer-size)))
-	       (replace-regexp-in-string "\n" "" (buffer-string))))))))
+(defconst tramp-repository-branch
+  (ignore-errors
+    ;; Suppress message from `emacs-repository-get-branch'.  We must
+    ;; also handle out-of-tree builds.
+    (let ((inhibit-message t)
+	  (dir (or (locate-dominating-file (locate-library "tramp") ".git")
+		   source-directory)))
+      ;; `emacs-repository-get-branch' has been introduced with Emacs 27.1.
+      (with-no-warnings
+	(and (stringp dir) (file-directory-p dir)
+	     (emacs-repository-get-branch dir)))))
+  "The repository branch of the Tramp sources.")
+
+(defconst tramp-repository-version
+  (ignore-errors
+    ;; Suppress message from `emacs-repository-get-version'.  We must
+    ;; also handle out-of-tree builds.
+    (let ((inhibit-message t)
+	  (dir (or (locate-dominating-file (locate-library "tramp") ".git")
+		   source-directory)))
+      (and (stringp dir) (file-directory-p dir)
+	   (emacs-repository-get-version dir))))
+  "The repository revision of the Tramp sources.")
 
 ;; Check for Emacs version.
-(let ((x (if (>= emacs-major-version 24)
-    "ok"
-  (format "Tramp 2.3.5.26.3 is not fit for %s"
-	  (when (string-match "^.*$" (emacs-version))
-	    (match-string 0 (emacs-version)))))))
-  (unless (string-match "\\`ok\\'" x) (error "%s" x)))
+(let ((x   (if (not (string-lessp emacs-version "24.1"))
+      "ok"
+    (format "Tramp 2.4.2-pre is not fit for %s"
+            (replace-regexp-in-string "\n" "" (emacs-version))))))
+  (unless (string-equal "ok" x) (error "%s" x)))
 
 ;; Tramp versions integrated into Emacs.  If a user option declares a
 ;; `:package-version' which doesn't belong to an integrated Tramp

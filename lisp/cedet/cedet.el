@@ -3,7 +3,7 @@
 ;; Copyright (C) 2002-2019 Free Software Foundation, Inc.
 
 ;; Author: David Ponce <david@dponce.com>
-;; Maintainer: Eric M. Ludlam  <zappo@gnu.org>
+;; Maintainer: Eric M. Ludlam <zappo@gnu.org>
 ;; Version: 2.0
 ;; Keywords: OO, lisp
 
@@ -29,9 +29,6 @@
 ;; This file depends on the major components of CEDET, so that you can
 ;; load them all by doing (require 'cedet).  This is mostly for
 ;; compatibility with the upstream, stand-alone CEDET distribution.
-
-(eval-when-compile
-  (require 'cl))
 
 (declare-function inversion-find-version "inversion")
 

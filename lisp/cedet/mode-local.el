@@ -3,7 +3,6 @@
 ;; Copyright (C) 2004-2005, 2007-2019 Free Software Foundation, Inc.
 ;;
 ;; Author: David Ponce <david@dponce.com>
-;; Maintainer: David Ponce <david@dponce.com>
 ;; Created: 27 Apr 2004
 ;; Keywords: syntax
 
@@ -45,8 +44,6 @@
 ;; Add macro for defining the '-default' functionality.
 
 ;;; Code:
-
-(eval-when-compile (require 'cl))
 
 (require 'find-func)
 ;; For find-function-regexp-alist. It is tempting to replace this
@@ -299,8 +296,7 @@ Elements are (SYMBOL . PREVIOUS-VALUE), describing one variable."
   ;; Hack -
   ;; do not do this if we are inside set-auto-mode as we may be in
   ;; an initialization race condition.
-  (if (or  (and (featurep 'emacs) (boundp 'keep-mode-if-same))
-	   (and (featurep 'xemacs) (boundp 'just-from-file-name)))
+  (if (boundp 'keep-mode-if-same)
       ;; We are inside set-auto-mode, as this is an argument that is
       ;; vaguely unique.
 

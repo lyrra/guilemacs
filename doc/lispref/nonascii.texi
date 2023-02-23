@@ -829,18 +829,18 @@ two functions support these conversions.
 This function decodes a character that is assigned a @var{code-point}
 in @var{charset}, to the corresponding Emacs character, and returns
 it.  If @var{charset} doesn't contain a character of that code point,
-the value is @code{nil}.  If @var{code-point} doesn't fit in a Lisp
-integer (@pxref{Integer Basics, most-positive-fixnum}), it can be
+the value is @code{nil}.
+
+For backward compatibility, if @var{code-point} doesn't fit in a Lisp
+fixnum (@pxref{Integer Basics, most-positive-fixnum}), it can be
 specified as a cons cell @code{(@var{high} . @var{low})}, where
 @var{low} are the lower 16 bits of the value and @var{high} are the
-high 16 bits.
+high 16 bits.  This usage is obsolescent.
 @end defun
 
 @defun encode-char char charset
 This function returns the code point assigned to the character
-@var{char} in @var{charset}.  If the result does not fit in a Lisp
-integer, it is returned as a cons cell @code{(@var{high} . @var{low})}
-that fits the second argument of @code{decode-char} above.  If
+@var{char} in @var{charset}.  If
 @var{charset} doesn't have a codepoint for @var{char}, the value is
 @code{nil}.
 @end defun
@@ -1379,7 +1379,7 @@ operates on the contents of @var{string} instead of bytes in the buffer.
 @end defun
 
 @cindex null bytes, and decoding text
-@defvar inhibit-null-byte-detection
+@defvar inhibit-nul-byte-detection
 If this variable has a non-@code{nil} value, null bytes are ignored
 when detecting the encoding of a region or a string.  This allows the
 encoding of text that contains null bytes to be correctly detected,
@@ -2126,9 +2126,9 @@ Return a 12-element vector of month names (locale items @code{MON_1}
 through @code{MON_12}).
 
 @item paper
-Return a list @code{(@var{width} @var{height})} for the default paper
-size measured in millimeters (locale items @code{PAPER_WIDTH} and
-@code{PAPER_HEIGHT}).
+Return a list @w{@code{(@var{width} @var{height})}} of 2 integers, for
+the default paper size measured in millimeters (locale items
+@code{_NL_PAPER_WIDTH} and @code{_NL_PAPER_HEIGHT}).
 @end table
 
 If the system can't provide the requested information, or if

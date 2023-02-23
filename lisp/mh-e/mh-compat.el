@@ -3,7 +3,6 @@
 ;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
-;; Maintainer: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
 ;; See: mh-e.el
 
@@ -65,7 +64,8 @@ Simulate NOERROR argument in XEmacs which lacks it."
 Case is ignored if CASE-FOLD is non-nil.
 This function is used by Emacs versions that lack `assoc-string',
 introduced in Emacs 22."
-  (if case-fold
+  ;; Test for fboundp is solely to silence compiler for Emacs >= 22.1.
+  (if (and case-fold (fboundp 'assoc-ignore-case))
       (assoc-ignore-case key list)
     (assoc key list)))
 
@@ -307,7 +307,8 @@ This function is used by XEmacs that lacks `replace-regexp-in-string'.
 The function `replace-in-string' is used instead.
 The arguments FIXEDCASE, SUBEXP, and START, used by
 `replace-in-string' are ignored."
-  (replace-in-string string regexp rep literal))
+  (if (featurep 'xemacs)                ; silence Emacs compiler
+      (replace-in-string string regexp rep literal)))
 
 (defun-mh mh-test-completion
   test-completion (string collection &optional predicate)

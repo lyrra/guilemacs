@@ -3,7 +3,6 @@
 ;; Copyright (C) 1993, 1995, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
-;; Maintainer: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
 ;; See: mh-e.el
 
@@ -357,6 +356,8 @@ Arguments are IGNORED (for `revert-buffer')."
              (yes-or-no-p "Undo all commands in folder? "))
          (setq mh-delete-list nil
                mh-refile-list nil
+               mh-blacklist nil
+               mh-whitelist nil
                mh-seq-list nil
                mh-next-direction 'forward)
          (with-mh-folder-updating (nil)

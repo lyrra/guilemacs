@@ -29,11 +29,7 @@
 
 (defun fileio-tests--symlink-failure ()
   (let* ((dir (make-temp-file "fileio" t))
-         (link (expand-file-name "link" dir))
-         (file-name-coding-system (if (and (eq system-type 'darwin)
-                                           (featurep 'ucs-normalize))
-                                      'utf-8-hfs-unix
-                                    file-name-coding-system)))
+         (link (expand-file-name "link" dir)))
     (unwind-protect
         (let (failure
               (char 0))
@@ -99,3 +95,15 @@ Also check that an encoding error can appear in a symlink."
   (should (equal (file-name-as-directory "d:/abc/") "d:/abc/"))
   (should (equal (file-name-as-directory "D:\\abc/") "d:/abc/"))
   (should (equal (file-name-as-directory "D:/abc//") "d:/abc//")))
+
+(ert-deftest fileio-tests--relative-HOME ()
+  "Test that expand-file-name works even when HOME is relative."
+  (let ((old-home (getenv "HOME")))
+    (setenv "HOME" "a/b/c")
+    (should (equal (expand-file-name "~/foo")
+                   (expand-file-name "a/b/c/foo")))
+    (when (memq system-type '(ms-dos windows-nt))
+      ;; Test expansion of drive-relative file names.
+      (setenv "HOME" "x:foo")
+      (should (equal (expand-file-name "~/bar") "x:/foo/bar")))
+    (setenv "HOME" old-home)))

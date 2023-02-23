@@ -552,7 +552,11 @@ value unless you are sure you know what it does."
 			 (setq prefixes nil)
 			 (delete-region (point-min) (point)))
 		     (setq prefixes (cdr prefixes))))))
-	   (subst-char-in-region (point-min) (point-max) ?- ?\s t)
+	   (goto-char (point-min))
+           ;; Translate characters commonly used as delimiters between
+           ;; words in symbols into space; e.g. foo:bar-zot/thing.
+	   (while (re-search-forward "[-:/]+" nil t)
+	     (replace-match " "))
 	   (capitalize-region (point-min) (point-max))
 	   (unless no-suffix
 	     (goto-char (point-max))
@@ -986,7 +990,7 @@ If given a prefix (or a COMMENT argument), also prompt for a comment."
 				       current-prefix-arg))
   (custom-load-symbol variable)
   (custom-push-theme 'theme-value variable 'user 'set (custom-quote value))
-  (funcall (or (get variable 'custom-set) 'set-default) variable value)
+  (funcall (or (get variable 'custom-set) #'set-default) variable value)
   (put variable 'customized-value (list (custom-quote value)))
   (cond ((string= comment "")
  	 (put variable 'variable-comment nil)
@@ -1827,20 +1831,9 @@ item in another window.\n\n"))
 			      (" `-" "bottom")))
 
 (defun custom-browse-insert-prefix (prefix)
-  "Insert PREFIX.  On XEmacs convert it to line graphics."
-  ;; Fixme: do graphics.
-  (if nil ; (featurep 'xemacs)
-      (progn
-	(insert "*")
-	(while (not (string-equal prefix ""))
-	  (let ((entry (substring prefix 0 3)))
-	    (setq prefix (substring prefix 3))
-	    (let ((overlay (make-overlay (1- (point)) (point) nil t nil))
-		  (name (nth 1 (assoc entry custom-browse-alist))))
-	      (overlay-put overlay 'end-glyph (widget-glyph-find name entry))
-	      (overlay-put overlay 'start-open t)
-	      (overlay-put overlay 'end-open t)))))
-    (insert prefix)))
+  "Insert PREFIX."
+  (declare (obsolete insert "27.1"))
+  (insert prefix))
 
 ;;; Modification of Basic Widgets.
 ;;
@@ -2431,8 +2424,20 @@ If INITIAL-STRING is non-nil, use that rather than \"Parent groups:\"."
 
 ;;; The `custom-variable' Widget.
 
+(defface custom-variable-obsolete
+  '((((class color) (background dark))
+     :foreground "light blue")
+    (((min-colors 88) (class color) (background light))
+     :foreground "blue1")
+    (((class color) (background light))
+     :foreground "blue")
+    (t :slant italic))
+  "Face used for obsolete variables."
+  :version "27.1"
+  :group 'custom-faces)
+
 (defface custom-variable-tag
-  `((((class color) (background dark))
+  '((((class color) (background dark))
      :foreground "light blue" :weight bold)
     (((min-colors 88) (class color) (background light))
      :foreground "blue1" :weight bold)
@@ -2456,8 +2461,9 @@ If INITIAL-STRING is non-nil, use that rather than \"Parent groups:\"."
 (defun custom-variable-documentation (variable)
   "Return documentation of VARIABLE for use in Custom buffer.
 Normally just return the docstring.  But if VARIABLE automatically
-becomes buffer local when set, append a message to that effect."
-  (format "%s%s" (documentation-property variable 'variable-documentation t)
+becomes buffer local when set, append a message to that effect.
+Also append any obsolescence information."
+  (format "%s%s%s" (documentation-property variable 'variable-documentation t)
 	  (if (and (local-variable-if-set-p variable)
 		   (or (not (local-variable-p variable))
 		       (with-temp-buffer
@@ -2465,7 +2471,21 @@ becomes buffer local when set, append a message to that effect."
 	      "\n
 This variable automatically becomes buffer-local when set outside Custom.
 However, setting it through Custom sets the default value."
-	    "")))
+	    "")
+	  ;; This duplicates some code from describe-variable.
+	  ;; TODO extract to separate utility function?
+	  (let* ((obsolete (get variable 'byte-obsolete-variable))
+		 (use (car obsolete)))
+	    (if obsolete
+		(concat "\n
+This variable is obsolete"
+			(if (nth 2 obsolete)
+			    (format " since %s" (nth 2 obsolete)))
+			(cond ((stringp use) (concat ";\n" use))
+			      (use (format-message ";\nuse `%s' instead."
+						   (car obsolete)))
+			      (t ".")))
+	      ""))))
 
 (define-widget 'custom-variable 'custom
   "A widget for displaying a Custom variable.
@@ -2549,11 +2569,13 @@ try matching its doc string against `custom-guess-doc-alist'."
 	 (state (or (widget-get widget :custom-state)
 		    (if (memq (custom-variable-state symbol value)
 			      (widget-get widget :hidden-states))
-			'hidden))))
+			'hidden)))
+	 (obsolete (get symbol 'byte-obsolete-variable)))
 
     ;; If we don't know the state, see if we need to edit it in lisp form.
     (unless state
-      (setq state (if (custom-show type value) 'unknown 'hidden)))
+      (with-suppressed-warnings ((obsolete custom-show))
+        (setq state (if (custom-show type value) 'unknown 'hidden))))
     (when (eq state 'unknown)
       (unless (widget-apply conv :match value)
 	(setq form 'mismatch)))
@@ -2581,7 +2603,9 @@ try matching its doc string against `custom-guess-doc-alist'."
 	   (push (widget-create-child-and-convert
 		  widget 'item
 		  :format "%{%t%} "
-		  :sample-face 'custom-variable-tag
+		  :sample-face (if obsolete
+				   'custom-variable-obsolete
+				 'custom-variable-tag)
 		  :tag tag
 		  :parent widget)
 		 buttons))
@@ -2639,7 +2663,9 @@ try matching its doc string against `custom-guess-doc-alist'."
 		    :help-echo "Change value of this option."
 		    :mouse-down-action 'custom-tag-mouse-down-action
 		    :button-face 'custom-variable-button
-		    :sample-face 'custom-variable-tag
+		    :sample-face (if obsolete
+				     'custom-variable-obsolete
+				   'custom-variable-tag)
 		    tag)
 		   buttons)
 	     (push (widget-create-child-and-convert
@@ -3322,6 +3348,23 @@ Only match frames that support the specified face attributes.")
   :group 'custom-buffer
   :version "20.3")
 
+(defun custom-face-documentation (face)
+  "Return documentation of FACE for use in Custom buffer."
+  (format "%s%s" (face-documentation face)
+          ;; This duplicates some code from describe-face.
+          ;; TODO extract to separate utility function?
+          ;; In practice this does not get used, because M-x customize-face
+          ;; follows aliases.
+          (let ((alias (get face 'face-alias))
+                (obsolete (get face 'obsolete-face)))
+            (if (and alias obsolete)
+                (format "\nThis face is obsolete%s; use `%s' instead.\n"
+                        (if (stringp obsolete)
+                            (format " since %s" obsolete)
+                          "")
+                        alias)
+              ""))))
+
 (define-widget 'custom-face 'custom
   "Widget for customizing a face.
 The following properties have special meanings for this widget:
@@ -3345,7 +3388,7 @@ The following properties have special meanings for this widget:
   of the widget, instead of the current face spec."
   :sample-face 'custom-face-tag
   :help-echo "Set or reset this face."
-  :documentation-property #'face-doc-string
+  :documentation-property #'custom-face-documentation
   :value-create 'custom-face-value-create
   :action 'custom-face-action
   :custom-category 'face
@@ -3741,10 +3784,6 @@ Optional EVENT is the location for the menu."
   (custom-save-all)
   (custom-face-state-set-and-redraw widget))
 
-;; For backward compatibility.
-(define-obsolete-function-alias 'custom-face-save-command 'custom-face-save
-  "22.1")
-
 (defun custom-face-reset-saved (widget)
   "Restore WIDGET to the face's default attributes.
 If there is a saved face, restore it; otherwise reset to the
@@ -3875,7 +3914,7 @@ restoring it to the state of a face that has never been customized."
 (defun custom-hook-convert-widget (widget)
   ;; Handle `:options'.
   (let* ((options (widget-get widget :options))
-	 (other `(editable-list :inline t
+	 (other '(editable-list :inline t
 				:entry-format "%i %d%v"
 				(function :format " %v")))
 	 (args (if options
@@ -3998,7 +4037,7 @@ If GROUPS-ONLY is non-nil, return only those members that are groups."
     (cond ((and (eq custom-buffer-style 'tree)
 		(eq state 'hidden)
 		(or members (custom-unloaded-widget-p widget)))
-	   (custom-browse-insert-prefix prefix)
+	   (insert prefix)
 	   (push (widget-create-child-and-convert
 		  widget 'custom-browse-visibility
 		  :tag "+")
@@ -4011,19 +4050,17 @@ If GROUPS-ONLY is non-nil, return only those members that are groups."
 	   (widget-put widget :buttons buttons))
 	  ((and (eq custom-buffer-style 'tree)
 		(zerop (length members)))
-	   (custom-browse-insert-prefix prefix)
-	   (insert "[ ]-- ")
+	   (insert prefix "[ ]-- ")
 	   (push (widget-create-child-and-convert
 		  widget 'custom-browse-group-tag)
 		 buttons)
 	   (insert " " tag "\n")
 	   (widget-put widget :buttons buttons))
 	  ((eq custom-buffer-style 'tree)
-	   (custom-browse-insert-prefix prefix)
+	   (insert prefix)
 	   (if (zerop (length members))
 	       (progn
-		 (custom-browse-insert-prefix prefix)
-		 (insert "[ ]-- ")
+		 (insert prefix "[ ]-- ")
 		 ;; (widget-glyph-insert nil "[ ]" "empty")
 		 ;; (widget-glyph-insert nil "-- " "horizontal")
 		 (push (widget-create-child-and-convert
@@ -4100,7 +4137,7 @@ If GROUPS-ONLY is non-nil, return only those members that are groups."
 	   ;; Update buttons.
 	   (widget-put widget :buttons buttons)
 	   ;; Insert documentation.
-	   (if (and (eq custom-buffer-style 'links) (> level 1))
+	   (when (eq custom-buffer-style 'links)
 	       (widget-put widget :documentation-indent
 			   custom-group-doc-align-col))
 	   (widget-add-documentation-string-button
@@ -4176,19 +4213,14 @@ If GROUPS-ONLY is non-nil, return only those members that are groups."
 			    custom-buffer-order-groups))
 		  (prefixes (widget-get widget :custom-prefixes))
 		  (custom-prefix-list (custom-prefix-add symbol prefixes))
-		  (len (length members))
-		  (count 0)
-		  (reporter (make-progress-reporter
-			     "Creating group entries..." 0 len))
 		  (have-subtitle (and (not (eq symbol 'emacs))
 				      (eq custom-buffer-order-groups 'last)))
 		  prev-type
 		  children)
 
-	     (dolist (entry members)
+	     (dolist-with-progress-reporter (entry members) "Creating group entries..."
 	       (unless (eq prev-type 'custom-group)
 		 (widget-insert "\n"))
-	       (progress-reporter-update reporter (setq count (1+ count)))
 	       (let ((sym (nth 0 entry))
 		     (type (nth 1 entry)))
 		 (when (and have-subtitle (eq type 'custom-group))
@@ -4210,8 +4242,7 @@ If GROUPS-ONLY is non-nil, return only those members that are groups."
 	     (setq children (nreverse children))
 	     (mapc 'custom-magic-reset children)
 	     (widget-put widget :children children)
-	     (custom-group-state-update widget)
-	     (progress-reporter-done reporter))
+	     (custom-group-state-update widget))
 	   ;; End line
 	   (let ((p (1+ (point))))
 	     (insert "\n\n")

@@ -30,6 +30,9 @@
 (require 'cl-lib)
 (eval-when-compile (require 'subr-x))
 
+(defvar file-notify-debug nil
+  "Use for debug messages.")
+
 (defconst file-notify--library
   (cond
    ((featurep 'inotify) 'inotify)
@@ -45,11 +48,11 @@ could use another implementation.")
                (:constructor nil)
                (:constructor
                 file-notify--watch-make (directory filename callback)))
-  ;; Watched directory
+  ;; Watched directory.
   directory
   ;; Watched relative filename, nil if watching the directory.
   filename
-  ;; Function to propagate events to
+  ;; Function to propagate events to, or nil if watch is being removed.
   callback)
 
 (defun file-notify--watch-absolute-filename (watch)
@@ -72,12 +75,15 @@ struct.")
 DESCRIPTOR should be an object returned by `file-notify-add-watch'.
 If it is registered in `file-notify-descriptors', a stopped event is sent."
   (when-let* ((watch (gethash descriptor file-notify-descriptors)))
-    ;; Send `stopped' event.
-    (unwind-protect
-        (funcall
-         (file-notify--watch-callback watch)
-         `(,descriptor stopped ,(file-notify--watch-absolute-filename watch)))
-      (remhash descriptor file-notify-descriptors))))
+    (let ((callback (file-notify--watch-callback watch)))
+      ;; Make sure this is the last time the callback is invoked.
+      (setf (file-notify--watch-callback watch) nil)
+      ;; Send `stopped' event.
+      (unwind-protect
+          (funcall
+           callback
+           `(,descriptor stopped ,(file-notify--watch-absolute-filename watch)))
+        (remhash descriptor file-notify-descriptors)))))
 
 ;; This function is used by `inotify', `kqueue', `gfilenotify' and
 ;; `w32notify' events.
@@ -90,7 +96,8 @@ If EVENT is a filewatch event, call its callback.  It has the format
 
 Otherwise, signal a `file-notify-error'."
   (interactive "e")
-  ;;(message "file-notify-handle-event %S" event)
+  (when file-notify-debug
+    (message "file-notify-handle-event %S" event))
   (if (and (consp event)
            (eq (car event) 'file-notify)
 	   (>= (length event) 3))
@@ -114,7 +121,7 @@ Could be different from the directory watched by the backend library."
   (when-let* ((watch (gethash (car event) file-notify-descriptors)))
     (directory-file-name
      (expand-file-name
-      (or  (and (stringp (nth 2 event)) (nth 2 event)) "")
+      (or (and (stringp (nth 2 event)) (nth 2 event)) "")
       (file-notify--watch-directory watch)))))
 
 ;; Only `gfilenotify' could return two file names.
@@ -154,12 +161,14 @@ EVENT is the cadr of the event in `file-notify-handle-event'
       (while actions
         (let ((action (pop actions)))
           ;; Send pending event, if it doesn't match.
+          ;; We only handle {renamed,moved}-{from,to} pairs when these
+          ;; arrive in order without anything else in-between.
           (when (and file-notify--pending-event
-                     ;; The cookie doesn't match.
-                     (not (equal (file-notify--event-cookie
-                                  (car file-notify--pending-event))
-                                 (file-notify--event-cookie event)))
                      (or
+                      ;; The cookie doesn't match.
+                      (not (equal (file-notify--event-cookie
+                                   (car file-notify--pending-event))
+                                  (file-notify--event-cookie event)))
                       ;; inotify.
                       (and (eq (nth 1 (car file-notify--pending-event))
                                'moved-from)
@@ -229,24 +238,32 @@ EVENT is the cadr of the event in `file-notify-handle-event'
                       (string-equal
                        (file-notify--watch-filename watch)
                        (file-name-nondirectory file))
+
                       ;; Directory matches.
-                      (string-equal
-                       (file-name-nondirectory file)
-                       (file-name-nondirectory
-                        (file-notify--watch-directory watch)))
+                      ;;  FIXME: What purpose would this condition serve?
+                      ;;  Doesn't it just slip through events for files
+                      ;;  having the same name as the last component of the
+                      ;;  directory of the file that we are really watching?
+                      ;;(string-equal
+                      ;; (file-name-nondirectory file)
+                      ;; (file-name-nondirectory
+                      ;;  (file-notify--watch-directory watch)))
+
                       ;; File1 matches.
                       (and (stringp file1)
                            (string-equal
                             (file-notify--watch-filename watch)
                             (file-name-nondirectory file1)))))
-            ;;(message
-            ;;"file-notify-callback %S %S %S %S %S"
-            ;;desc action file file1 watch)
-            (if file1
-                (funcall (file-notify--watch-callback watch)
-                         `(,desc ,action ,file ,file1))
-              (funcall (file-notify--watch-callback watch)
-                       `(,desc  ,action ,file))))
+            (when file-notify-debug
+              (message
+               "file-notify-callback %S %S %S %S %S %S %S"
+               desc action file file1 watch
+               (file-notify--event-watched-file event)
+               (file-notify--watch-directory watch)))
+            (funcall (file-notify--watch-callback watch)
+                     (if file1
+                         `(,desc ,action ,file ,file1)
+                       `(,desc ,action ,file))))
 
           ;; Send `stopped' event.
           (when (or stopped
@@ -258,9 +275,49 @@ EVENT is the cadr of the event in `file-notify-handle-event'
                           file (file-notify--event-watched-file event))))
             (file-notify-rm-watch desc)))))))
 
-;; `kqueue', `gfilenotify' and `w32notify' return a unique descriptor
-;; for every `file-notify-add-watch', while `inotify' returns a unique
-;; descriptor per inode only.
+(declare-function inotify-add-watch "inotify.c" (file flags callback))
+(declare-function kqueue-add-watch "kqueue.c" (file flags callback))
+(declare-function w32notify-add-watch "w32notify.c" (file flags callback))
+(declare-function gfile-add-watch "gfilenotify.c" (file flags callback))
+
+(defun file-notify--add-watch-inotify (_file dir flags)
+  "Add a watch for FILE in DIR with FLAGS, using inotify."
+  (inotify-add-watch dir
+                     (append
+                      (and (memq 'change flags)
+                           '(create delete delete-self modify move-self move))
+                      (and (memq 'attribute-change flags)
+                           '(attrib)))
+                     #'file-notify-callback))
+
+(defun file-notify--add-watch-kqueue (file _dir flags)
+  "Add a watch for FILE in DIR with FLAGS, using kqueue."
+  ;; kqueue does not report changes to file contents when watching
+  ;; directories, so we watch each file directly.
+  (kqueue-add-watch file
+                    (append
+                     (and (memq 'change flags)
+	                  '(create delete write extend rename))
+                     (and (memq 'attribute-change flags)
+                          '(attrib)))
+                    #'file-notify-callback))
+
+(defun file-notify--add-watch-w32notify (_file dir flags)
+  "Add a watch for FILE in DIR with FLAGS, using w32notify."
+  (w32notify-add-watch dir
+                       (append
+                        (and (memq 'change flags)
+                             '(file-name directory-name size last-write-time))
+                        (and (memq 'attribute-change flags)
+                             '(attributes)))
+                       #'file-notify-callback))
+
+(defun file-notify--add-watch-gfilenotify (_file dir flags)
+  "Add a watch for FILE in DIR with FLAGS, using gfilenotify."
+  (gfile-add-watch dir
+                   (append '(watch-mounts send-moved) flags)
+                   #'file-notify-callback))
+
 (defun file-notify-add-watch (file flags callback)
   "Add a watch for filesystem events pertaining to FILE.
 This arranges for filesystem events pertaining to FILE to be reported
@@ -307,97 +364,64 @@ FILE is the name of the file whose event is being reported."
   (unless (functionp callback)
     (signal 'wrong-type-argument `(,callback)))
 
-  (let* ((quoted (file-name-quoted-p file))
-         (file (file-name-unquote file))
-         (file-name-handler-alist (if quoted nil file-name-handler-alist))
-         (handler (find-file-name-handler file 'file-notify-add-watch))
-	 (dir (directory-file-name
-	       (if (file-directory-p file)
-		   file
-		 (file-name-directory file))))
-         desc func l-flags)
+  (let ((handler (find-file-name-handler file 'file-notify-add-watch))
+	(dir (directory-file-name
+	      (if (file-directory-p file)
+		  file
+		(file-name-directory file)))))
 
     (unless (file-directory-p dir)
       (signal 'file-notify-error `("Directory does not exist" ,dir)))
 
-    (if handler
-	;; A file name handler could exist even if there is no local
-	;; file notification support.
-	(setq desc (funcall handler 'file-notify-add-watch dir flags callback))
+    (let ((desc
+           (if handler
+               (funcall handler 'file-notify-add-watch dir flags callback)
+             (funcall
+              (pcase file-notify--library
+                ('inotify     #'file-notify--add-watch-inotify)
+                ('kqueue      #'file-notify--add-watch-kqueue)
+                ('w32notify   #'file-notify--add-watch-w32notify)
+                ('gfilenotify #'file-notify--add-watch-gfilenotify)
+                (_ (signal 'file-notify-error
+		           '("No file notification package available"))))
+              file dir flags))))
 
-      ;; Check, whether Emacs has been compiled with file notification
-      ;; support.
-      (unless file-notify--library
-	(signal 'file-notify-error
-		'("No file notification package available")))
-
-      ;; Determine low-level function to be called.
-      (setq func
-	    (cond
-	     ((eq file-notify--library 'inotify) 'inotify-add-watch)
-	     ((eq file-notify--library 'kqueue) 'kqueue-add-watch)
-	     ((eq file-notify--library 'gfilenotify) 'gfile-add-watch)
-	     ((eq file-notify--library 'w32notify) 'w32notify-add-watch)))
-
-      ;; Determine respective flags.
-      (if (eq file-notify--library 'gfilenotify)
-	  (setq l-flags (append '(watch-mounts send-moved) flags))
-	(when (memq 'change flags)
-	  (setq
-	   l-flags
-	   (cond
-	    ((eq file-notify--library 'inotify)
-	     '(create delete delete-self modify move-self move))
-	    ((eq file-notify--library 'kqueue)
-	     '(create delete write extend rename))
-	    ((eq file-notify--library 'w32notify)
-	     '(file-name directory-name size last-write-time)))))
-	(when (memq 'attribute-change flags)
-	  (push (cond
-                 ((eq file-notify--library 'inotify) 'attrib)
-                 ((eq file-notify--library 'kqueue) 'attrib)
-                 ((eq file-notify--library 'w32notify) 'attributes))
-                l-flags)))
-
-      ;; Call low-level function.
-      (setq desc (funcall
-                  ;; kqueue does not report file changes in directory
-                  ;; monitor.  So we must watch the file itself.
-                  func (if (eq file-notify--library 'kqueue) file dir)
-                  l-flags 'file-notify-callback)))
-
-    ;; Modify `file-notify-descriptors'.
-    (let ((watch (file-notify--watch-make
-                  dir
-                  (unless (file-directory-p file) (file-name-nondirectory file))
-                  callback)))
-      (puthash desc watch file-notify-descriptors))
-    ;; Return descriptor.
-    desc))
+      ;; Modify `file-notify-descriptors'.
+      (let ((watch (file-notify--watch-make
+                    ;; We do not want to enter quoted file names into the hash.
+                    (file-name-unquote dir)
+                    (unless (file-directory-p file)
+                      (file-name-nondirectory file))
+                    callback)))
+        (puthash desc watch file-notify-descriptors))
+      ;; Return descriptor.
+      desc)))
 
 (defun file-notify-rm-watch (descriptor)
   "Remove an existing watch specified by its DESCRIPTOR.
 DESCRIPTOR should be an object returned by `file-notify-add-watch'."
   (when-let* ((watch (gethash descriptor file-notify-descriptors)))
-    (let ((handler (find-file-name-handler
-                    (file-notify--watch-directory watch)
-                    'file-notify-rm-watch)))
-      (condition-case nil
-          (if handler
-              ;; A file name handler could exist even if there is no
-              ;; local file notification support.
-              (funcall handler 'file-notify-rm-watch descriptor)
+    ;; If we are called from a `stopped' event, do nothing.
+    (when (file-notify--watch-callback watch)
+      (let ((handler (find-file-name-handler
+                      (file-notify--watch-directory watch)
+                      'file-notify-rm-watch)))
+        (condition-case nil
+            (if handler
+                ;; A file name handler could exist even if there is no
+                ;; local file notification support.
+                (funcall handler 'file-notify-rm-watch descriptor)
 
-            (funcall
-             (cond
-              ((eq file-notify--library 'inotify) 'inotify-rm-watch)
-              ((eq file-notify--library 'kqueue) 'kqueue-rm-watch)
-              ((eq file-notify--library 'gfilenotify) 'gfile-rm-watch)
-              ((eq file-notify--library 'w32notify) 'w32notify-rm-watch))
-             descriptor))
-        (file-notify-error nil)))
-    ;; Modify `file-notify-descriptors'.
-    (file-notify--rm-descriptor descriptor)))
+              (funcall
+               (cond
+                ((eq file-notify--library 'inotify) 'inotify-rm-watch)
+                ((eq file-notify--library 'kqueue) 'kqueue-rm-watch)
+                ((eq file-notify--library 'gfilenotify) 'gfile-rm-watch)
+                ((eq file-notify--library 'w32notify) 'w32notify-rm-watch))
+               descriptor))
+          (file-notify-error nil)))
+      ;; Modify `file-notify-descriptors' and send a `stopped' event.
+      (file-notify--rm-descriptor descriptor))))
 
 (defun file-notify-valid-p (descriptor)
   "Check a watch specified by its DESCRIPTOR.
@@ -419,11 +443,9 @@ DESCRIPTOR should be an object returned by `file-notify-add-watch'."
               descriptor))
            t))))
 
-
 ;; TODO:
-;; * Watching a /dir/file may receive events for dir.
-;;   (This may be the desired behavior.)
-;; * Watching a file in an already watched directory
+
+;; * Watching a file in an already watched directory.
 ;;   If the file is created and *then* a watch is added to that file, the
 ;;   watch might receive events which occurred prior to it being created,
 ;;   due to the way events are propagated during idle time.  Note: This

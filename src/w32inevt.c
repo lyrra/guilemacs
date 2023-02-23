@@ -181,8 +181,8 @@ key_event (KEY_EVENT_RECORD *event, struct input_event *emacs_ev, int *isdead)
 	     Space which we will ignore.  */
 	  if ((mod_key_state & LEFT_WIN_PRESSED) == 0)
 	    {
-	      if (NUMBERP (Vw32_phantom_key_code))
-		faked_key = XUINT (Vw32_phantom_key_code) & 255;
+	      if (FIXNUMP (Vw32_phantom_key_code))
+		faked_key = XUFIXNUM (Vw32_phantom_key_code) & 255;
 	      else
 		faked_key = VK_SPACE;
 	      keybd_event (faked_key, (BYTE) MapVirtualKey (faked_key, 0), 0, 0);
@@ -198,8 +198,8 @@ key_event (KEY_EVENT_RECORD *event, struct input_event *emacs_ev, int *isdead)
 	{
 	  if ((mod_key_state & RIGHT_WIN_PRESSED) == 0)
 	    {
-	      if (NUMBERP (Vw32_phantom_key_code))
-		faked_key = XUINT (Vw32_phantom_key_code) & 255;
+	      if (FIXNUMP (Vw32_phantom_key_code))
+		faked_key = XUFIXNUM (Vw32_phantom_key_code) & 255;
 	      else
 		faked_key = VK_SPACE;
 	      keybd_event (faked_key, (BYTE) MapVirtualKey (faked_key, 0), 0, 0);
@@ -680,7 +680,7 @@ handle_file_notifications (struct input_event *hold_quit)
 		     already be defined at this point.  */
 		  Lisp_Object fname
 		    = code_convert_string_norecord (utf_16_fn, cs, 0);
-		  Lisp_Object action = lispy_file_action (fni->Action);
+		  Lisp_Object action = w32_lispy_file_action (fni->Action);
 
 		  inev.kind = FILE_NOTIFY_EVENT;
 		  inev.timestamp = GetTickCount ();

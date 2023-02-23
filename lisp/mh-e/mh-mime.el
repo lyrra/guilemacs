@@ -3,7 +3,6 @@
 ;; Copyright (C) 1993, 1995, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
-;; Maintainer: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
 ;; See: mh-e.el
 
@@ -75,7 +74,7 @@
 ;;;###mh-autoload
 (defmacro mh-buffer-data ()
   "Convenience macro to get the MIME data structures of the current buffer."
-  `(gethash (current-buffer) mh-globals-hash))
+  '(gethash (current-buffer) mh-globals-hash))
 
 ;; Structure to keep track of MIME handles on a per buffer basis.
 (mh-defstruct (mh-buffer-data (:conc-name mh-mime-)

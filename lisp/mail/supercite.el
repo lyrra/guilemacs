@@ -634,12 +634,7 @@ the list should be unique."
 		(deallocate-event event))
 	    (setq quit-flag nil)
 	    (signal 'quit '())))
-      (let ((char
-	     (if (featurep 'xemacs)
-		 (let* ((key (and (key-press-event-p event) (event-key event)))
-			(char (and key (event-to-character event))))
-		   char)
-	       event))
+      (let ((char event)
 	    elt)
 	(if char (setq char (downcase char)))
 	(cond
@@ -651,9 +646,7 @@ the list should be unique."
 	  nil)
 	 (t
 	  (message "%s%s" p (single-key-description event))
-	  (if (featurep 'xemacs)
-	      (ding nil 'y-or-n-p)
-	    (ding))
+	  (ding)
 	  (discard-input)
 	  (if (eq p prompt)
 	      (setq p (concat "Try again.  " prompt)))))))
@@ -709,7 +702,11 @@ the list should be unique."
   "Regi frame for glomming mail header information.")
 (put 'sc-mail-glom-frame 'risky-local-variable t)
 
-(defvar curline)			; dynamic bondage
+;; This variable is bound dynamically before calling the forms in the
+;; `sc-mail-glom-frame' variable, and is part of the advertised
+;; interface.
+(with-suppressed-warnings ((lexical curline))
+  (defvar curline))
 
 ;; regi functions
 
@@ -1887,8 +1884,7 @@ and `sc-post-hook' is run after the guts of this function."
   ;; grab point and mark since the region is probably not active when
   ;; this function gets automatically called. we want point to be a
   ;; mark so any deleting before point works properly
-  (let* ((zmacs-regions nil)		; for XEemacs
-	 (mark-active t)		; for Emacs
+  (let* ((mark-active t)
 	 (point (point-marker))
 	 (mark  (copy-marker (mark-marker))))
 

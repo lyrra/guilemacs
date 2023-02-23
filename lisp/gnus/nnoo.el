@@ -25,7 +25,7 @@
 ;;; Code:
 
 (require 'nnheader)
-(eval-when-compile (require 'cl))
+(eval-when-compile (require 'cl-lib))
 
 (defvar nnoo-definition-alist nil)
 (defvar nnoo-state-alist nil)
@@ -142,7 +142,7 @@
 	(if (numberp (nth i (cdr m)))
 	    (push `(nth ,i args) margs)
 	  (push (nth i (cdr m)) margs))
-	(incf i))
+	(cl-incf i))
       (eval `(deffoo ,(nnoo-symbol backend (nnoo-rest-symbol (car m)))
 		 (&rest args)
 	       (nnoo-parent-function ',backend ',(car m)
@@ -269,8 +269,7 @@
 
 (defun nnoo-server-opened (backend server)
   (and (nnoo-current-server-p backend server)
-       nntp-server-buffer
-       (buffer-name nntp-server-buffer)))
+       (buffer-live-p nntp-server-buffer)))
 
 (defmacro nnoo-define-basics (backend)
   "Define `close-server', `server-opened' and `status-message'."

@@ -40,7 +40,7 @@ PDF_CZECH = \
 PDF_FRENCH = \
 	fr-dired-ref.pdf \
 	fr-refcard.pdf \
-	fr-survival.pdf \
+	fr-survival.pdf
 
 PDF_GERMAN = de-refcard.pdf
 
@@ -311,7 +311,7 @@ viperCard.dvi: $(vipercard_deps)
 .PHONY: clean
 
 clean:
-	-rm -f *.dvi *.log *.aux
+	-rm -f ./*.dvi ./*.log ./*.aux
 
 distclean: clean
 

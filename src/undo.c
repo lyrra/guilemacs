@@ -74,7 +74,7 @@ record_point (ptrdiff_t beg)
       && point_before_last_command_or_undo != beg
       && buffer_before_last_command_or_undo == current_buffer )
     bset_undo_list (current_buffer,
-		    Fcons (make_number (point_before_last_command_or_undo),
+		    Fcons (make_fixnum (point_before_last_command_or_undo),
 			   BVAR (current_buffer, undo_list)));
 }
 
@@ -102,11 +102,11 @@ record_insert (ptrdiff_t beg, ptrdiff_t length)
       Lisp_Object elt;
       elt = XCAR (BVAR (current_buffer, undo_list));
       if (CONSP (elt)
-	  && INTEGERP (XCAR (elt))
-	  && INTEGERP (XCDR (elt))
-	  && XINT (XCDR (elt)) == beg)
+	  && FIXNUMP (XCAR (elt))
+	  && FIXNUMP (XCDR (elt))
+	  && XFIXNUM (XCDR (elt)) == beg)
 	{
-	  XSETCDR (elt, make_number (beg + length));
+	  XSETCDR (elt, make_fixnum (beg + length));
 	  return;
 	}
     }
@@ -126,15 +126,11 @@ record_insert (ptrdiff_t beg, ptrdiff_t length)
 static void
 record_marker_adjustments (ptrdiff_t from, ptrdiff_t to)
 {
-  Lisp_Object marker;
-  register struct Lisp_Marker *m;
-  register ptrdiff_t charpos, adjustment;
+  prepare_record ();
 
-  prepare_record();
-
-  for (m = BUF_MARKERS (current_buffer); m; m = m->next)
+  for (struct Lisp_Marker *m = BUF_MARKERS (current_buffer); m; m = m->next)
     {
-      charpos = m->charpos;
+      ptrdiff_t charpos = m->charpos;
       eassert (charpos <= Z);
 
       if (from <= charpos && charpos <= to)
@@ -146,14 +142,14 @@ record_marker_adjustments (ptrdiff_t from, ptrdiff_t to)
              insertion_type t markers will automatically move forward
              upon re-inserting the deleted text, so we have to arrange
              for them to move backward to the correct position.  */
-          adjustment = (m->insertion_type ? to : from) - charpos;
+	  ptrdiff_t adjustment = (m->insertion_type ? to : from) - charpos;
 
           if (adjustment)
             {
-              XSETMISC (marker, m);
+	      Lisp_Object marker = make_lisp_ptr (m, Lisp_Misc);
               bset_undo_list
                 (current_buffer,
-                 Fcons (Fcons (marker, make_number (adjustment)),
+                 Fcons (Fcons (marker, make_fixnum (adjustment)),
                         BVAR (current_buffer, undo_list)));
             }
         }
@@ -295,9 +291,13 @@ truncate_undo_list (struct buffer *b)
 {
   Lisp_Object list;
   Lisp_Object prev, next, last_boundary;
-  EMACS_INT size_so_far = 0;
+  intmax_t size_so_far = 0;
   dynwind_begin ();
   static const size_t sizeof_cons = sizeof (scm_t_cell);
+
+  /* Make sure that calling undo-outer-limit-function
+     won't cause another GC.  */
+  ptrdiff_t count = inhibit_garbage_collection ();
 
   /* Make the buffer current to get its local values of variables such
      as undo_limit.  Also so that Vundo_outer_limit_function can
@@ -350,14 +350,17 @@ truncate_undo_list (struct buffer *b)
 
   /* If by the first boundary we have already passed undo_outer_limit,
      we're heading for memory full, so offer to clear out the list.  */
-  if (INTEGERP (Vundo_outer_limit)
-      && size_so_far > XINT (Vundo_outer_limit)
+  intmax_t undo_outer_limit;
+  if ((INTEGERP (Vundo_outer_limit)
+       && (integer_to_intmax (Vundo_outer_limit, &undo_outer_limit)
+	   ? undo_outer_limit < size_so_far
+	   : NILP (Fnatnump (Vundo_outer_limit))))
       && !NILP (Vundo_outer_limit_function))
     {
       Lisp_Object tem;
 
       /* Normally the function this calls is undo-outer-limit-truncate.  */
-      tem = call1 (Vundo_outer_limit_function, make_number (size_so_far));
+      tem = call1 (Vundo_outer_limit_function, make_int (size_so_far));
       if (! NILP (tem))
 	{
 	  /* The function is responsible for making
@@ -470,7 +473,7 @@ In fact, this calls the function which is the value of
 `undo-outer-limit-function' with one argument, the size.
 The text above describes the behavior of the function
 that variable usually specifies.  */);
-  Vundo_outer_limit = make_number (12000000);
+  Vundo_outer_limit = make_fixnum (12000000);
 
   DEFVAR_LISP ("undo-outer-limit-function", Vundo_outer_limit_function,
 	       doc: /* Function to call when an undo list exceeds `undo-outer-limit'.

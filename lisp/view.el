@@ -381,9 +381,6 @@ own View-like bindings."
   ;; bindings instead of using the \\[] construction.  The reason for this
   ;; is that most commands have more than one key binding.
   "Toggle View mode, a minor mode for viewing text but not editing it.
-With a prefix argument ARG, enable View mode if ARG is positive,
-and disable it otherwise.  If called from Lisp, enable View mode
-if ARG is omitted or nil.
 
 When View mode is enabled, commands that do not change the buffer
 contents are available as usual.  Kill commands insert text in
@@ -960,7 +957,7 @@ for highlighting the match that is found."
      (t (error "No previous View-mode search")))
     (save-excursion
       (if end (goto-char (if (< times 0) (point-max) (point-min)))
-	(move-to-window-line (if (< times 0) 0 -1)))
+	(forward-line (if (< times 0) -1 1)))
       (if (if no (view-search-no-match-lines times regexp)
 	    (re-search-forward regexp nil t times))
 	  (setq where (point))))

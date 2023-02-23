@@ -272,6 +272,39 @@ to all arguments, such as variable names after a $."
   "Complete amongst a list of directories and executables."
   (pcomplete-entries regexp 'file-executable-p))
 
+(defmacro pcomplete-here (&optional form stub paring form-only)
+  "Complete against the current argument, if at the end.
+If completion is to be done here, evaluate FORM to generate the completion
+table which will be used for completion purposes.  If STUB is a
+string, use it as the completion stub instead of the default (which is
+the entire text of the current argument).
+
+For an example of when you might want to use STUB: if the current
+argument text is `long-path-name/', you don't want the completions
+list display to be cluttered by `long-path-name/' appearing at the
+beginning of every alternative.  Not only does this make things less
+intelligible, but it is also inefficient.  Yet, if the completion list
+does not begin with this string for every entry, the current argument
+won't complete correctly.
+
+The solution is to specify a relative stub.  It allows you to
+substitute a different argument from the current argument, almost
+always for the sake of efficiency.
+
+If PARING is nil, this argument will be pared against previous
+arguments using the function `file-truename' to normalize them.
+PARING may be a function, in which case that function is used for
+normalization.  If PARING is t, the argument dealt with by this
+call will not participate in argument paring.  If it is the
+integer 0, all previous arguments that have been seen will be
+cleared.
+
+If FORM-ONLY is non-nil, only the result of FORM will be used to
+generate the completions list.  This means that the hook
+`pcomplete-try-first-hook' will not be run."
+  (declare (debug t))
+  `(pcomplete--here (lambda () ,form) ,stub ,paring ,form-only))
+
 (defcustom pcomplete-command-completion-function
   (function
    (lambda ()
@@ -411,10 +444,28 @@ Same as `pcomplete' but using the standard completion UI."
            ;; table which expects strings using a prefix from the
            ;; buffer's text but internally uses the corresponding
            ;; prefix from pcomplete-stub.
+           ;;
+           (argbeg (pcomplete-begin))
+           ;; When completing an envvar within an argument in Eshell
+           ;; (e.g. "cd /home/$US TAB"), `pcomplete-stub' will just be
+           ;; "US" whereas `argbeg' will point to the first "/".
+           ;; We could rely on c-t-subvert to handle the difference,
+           ;; but we try here to guess the "real" beginning so as to
+           ;; rely less on c-t-subvert.
            (beg (max (- (point) (length pcomplete-stub))
-                     (pcomplete-begin)))
-           (buftext (pcomplete-unquote-argument
-                     (buffer-substring beg (point)))))
+                     argbeg))
+           buftext)
+      ;; Try and improve our guess of `beg' in case the difference
+      ;; between pcomplete-stub and the buffer's text is simply due to
+      ;; some chars removed by unquoting.  Again, this is not
+      ;; indispensable but reduces the reliance on c-t-subvert and
+      ;; improves corner case behaviors.
+      (while (progn (setq buftext (pcomplete-unquote-argument
+                                   (buffer-substring beg (point))))
+                    (and (> beg argbeg)
+                         (> (length pcomplete-stub) (length buftext))))
+        (setq beg (max argbeg (- beg (- (length pcomplete-stub)
+                                        (length buftext))))))
       (when completions
         (let ((table
                (completion-table-with-quoting
@@ -735,7 +786,7 @@ this is `comint-dynamic-complete-functions'."
 	(push (point) begins)
         (while
             (progn
-              (skip-chars-forward "^ \t\n\\")
+              (skip-chars-forward "^ \t\n\\\\")
               (when (eq (char-after) ?\\)
                 (forward-char 1)
                 (unless (eolp)
@@ -950,7 +1001,7 @@ Arguments NO-GANGING and ARGS-FOLLOW are currently ignored."
 		(function
 		 (lambda (opt)
 		   (concat "-" opt)))
-		(pcomplete-uniqify-list choices))))
+		(pcomplete-uniquify-list choices))))
     (let ((arg (pcomplete-arg)))
       (when (and (> (length arg) 1)
 		 (stringp arg)
@@ -1014,39 +1065,6 @@ See the documentation for `pcomplete-here'."
              ;; byte-compiled with the older code.
              (eval form)))))
 
-(defmacro pcomplete-here (&optional form stub paring form-only)
-  "Complete against the current argument, if at the end.
-If completion is to be done here, evaluate FORM to generate the completion
-table which will be used for completion purposes.  If STUB is a
-string, use it as the completion stub instead of the default (which is
-the entire text of the current argument).
-
-For an example of when you might want to use STUB: if the current
-argument text is `long-path-name/', you don't want the completions
-list display to be cluttered by `long-path-name/' appearing at the
-beginning of every alternative.  Not only does this make things less
-intelligible, but it is also inefficient.  Yet, if the completion list
-does not begin with this string for every entry, the current argument
-won't complete correctly.
-
-The solution is to specify a relative stub.  It allows you to
-substitute a different argument from the current argument, almost
-always for the sake of efficiency.
-
-If PARING is nil, this argument will be pared against previous
-arguments using the function `file-truename' to normalize them.
-PARING may be a function, in which case that function is used for
-normalization.  If PARING is t, the argument dealt with by this
-call will not participate in argument paring.  If it is the
-integer 0, all previous arguments that have been seen will be
-cleared.
-
-If FORM-ONLY is non-nil, only the result of FORM will be used to
-generate the completions list.  This means that the hook
-`pcomplete-try-first-hook' will not be run."
-  (declare (debug t))
-  `(pcomplete--here (lambda () ,form) ,stub ,paring ,form-only))
-
 
 (defmacro pcomplete-here* (&optional form stub form-only)
   "An alternate form which does not participate in argument paring."
@@ -1066,18 +1084,10 @@ generate the completions list.  This means that the hook
   (setq pcomplete-last-window-config nil
 	pcomplete-window-restore-timer nil))
 
-;; Abstractions so that the code below will work for both Emacs 20 and
-;; XEmacs 21
+(define-obsolete-function-alias 'pcomplete-event-matches-key-specifier-p
+  'eq "27.1")
 
-(defalias 'pcomplete-event-matches-key-specifier-p
-  (if (featurep 'xemacs)
-      'event-matches-key-specifier-p
-  'eq))
-
-(defun pcomplete-read-event (&optional prompt)
-  (if (fboundp 'read-event)
-      (read-event prompt)
-    (aref (read-key-sequence prompt) 0)))
+(define-obsolete-function-alias 'pcomplete-read-event 'read-event "27.1")
 
 (defun pcomplete-show-completions (completions)
   "List in help buffer sorted COMPLETIONS.
@@ -1094,15 +1104,15 @@ Typing SPC flushes the help buffer."
     (prog1
         (catch 'done
           (while (with-current-buffer (get-buffer "*Completions*")
-                   (setq event (pcomplete-read-event)))
+                   (setq event (read-event)))
             (cond
-             ((pcomplete-event-matches-key-specifier-p event ?\s)
+             ((eq event ?\s)
               (set-window-configuration pcomplete-last-window-config)
               (setq pcomplete-last-window-config nil)
               (throw 'done nil))
-             ((or (pcomplete-event-matches-key-specifier-p event 'tab)
+             ((or (eq event 'tab)
                   ;; Needed on a terminal
-                  (pcomplete-event-matches-key-specifier-p event 9))
+                  (eq event 9))
               (let ((win (or (get-buffer-window "*Completions*" 0)
                              (display-buffer "*Completions*"
                                              'not-this-window))))
@@ -1269,7 +1279,7 @@ If specific documentation can't be given, be generic."
 
 ;; general utilities
 
-(defun pcomplete-uniqify-list (l)
+(defun pcomplete-uniquify-list (l)
   "Sort and remove multiples in L."
   (setq l (sort l 'string-lessp))
   (let ((m l))
@@ -1280,6 +1290,9 @@ If specific documentation can't be given, be generic."
 	(setcdr m (cddr m)))
       (setq m (cdr m))))
   l)
+(define-obsolete-function-alias
+  'pcomplete-uniqify-list
+  'pcomplete-uniquify-list "27.1")
 
 (defun pcomplete-process-result (cmd &rest args)
   "Call CMD using `call-process' and return the simplest result."

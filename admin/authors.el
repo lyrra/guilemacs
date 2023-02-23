@@ -1,4 +1,3 @@
-
 ;;; authors.el --- utility for maintaining Emacs's AUTHORS file
 
 ;; Copyright (C) 2000-2019 Free Software Foundation, Inc.

@@ -30,4 +30,3 @@ Branch information
 * master
 
   Tracks vanilla-emacs
-

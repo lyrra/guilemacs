@@ -5,8 +5,6 @@
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
 ;;   Registration Number H14PRO021
 
-;; Maintainer:  Kenichi Handa <handa@m17n.org>
-;;		KAWABATA, Taichi <kawabata@m17n.org>
 ;; Keywords: 	multilingual, i18n, Indian
 
 ;; This file is part of GNU Emacs.

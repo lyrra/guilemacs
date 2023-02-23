@@ -177,6 +177,14 @@ before starting Emacs.  Trying to modify @code{exec-path}
 independently of @env{PATH} can lead to confusing results.
 @end defopt
 
+@defun exec-path
+This function is an extension of the variable @code{exec-path}.  If
+@code{default-directory} indicates a remote directory, this function
+returns a list of directories used for searching programs on the
+respective remote host.  In case of a local @code{default-directory},
+the function returns just the value of the variable @code{exec-path}.
+@end defun
+
 @node Shell Arguments
 @section Shell Arguments
 @cindex arguments for shell commands
@@ -415,27 +423,27 @@ be found in the definition of the @code{insert-directory} function:
 
 @defun process-file program &optional infile buffer display &rest args
 This function processes files synchronously in a separate process.  It
-is similar to @code{call-process}, but may invoke a file handler based
-on the value of the variable @code{default-directory}, which specifies
-the current working directory of the subprocess.
+is similar to @code{call-process}, but may invoke a file name handler
+based on the value of the variable @code{default-directory}, which
+specifies the current working directory of the subprocess.
 
 The arguments are handled in almost the same way as for
 @code{call-process}, with the following differences:
 
-Some file handlers may not support all combinations and forms of the
+Some file name handlers may not support all combinations and forms of the
 arguments @var{infile}, @var{buffer}, and @var{display}.  For example,
-some file handlers might behave as if @var{display} were @code{nil},
+some file name handlers might behave as if @var{display} were @code{nil},
 regardless of the value actually passed.  As another example, some
-file handlers might not support separating standard output and error
+file name handlers might not support separating standard output and error
 output by way of the @var{buffer} argument.
 
-If a file handler is invoked, it determines the program to run based
+If a file name handler is invoked, it determines the program to run based
 on the first argument @var{program}.  For instance, suppose that a
 handler for remote files is invoked.  Then the path that is used for
 searching for the program might be different from @code{exec-path}.
 
-The second argument @var{infile} may invoke a file handler.  The file
-handler could be different from the handler chosen for the
+The second argument @var{infile} may invoke a file name handler.  The file
+name handler could be different from the handler chosen for the
 @code{process-file} function itself.  (For example,
 @code{default-directory} could be on one remote host, and
 @var{infile} on a different remote host.  Or @code{default-directory}
@@ -462,7 +470,7 @@ remote files.
 
 By default, this variable is always set to @code{t}, meaning that a
 call of @code{process-file} could potentially change any file on a
-remote host.  When set to @code{nil}, a file handler could optimize
+remote host.  When set to @code{nil}, a file name handler could optimize
 its behavior with respect to remote file attribute caching.
 
 You should only ever change this variable with a let-binding; never
@@ -670,8 +678,11 @@ Initialize the process query flag to @var{query-flag}.
 @xref{Query Before Exit}.
 
 @item :stop @var{stopped}
-If @var{stopped} is non-@code{nil}, start the process in the
-stopped state.
+If provided, @var{stopped} must be @code{nil}; it is an error to use
+any non-@code{nil} value.  The @code{:stop} key is ignored otherwise
+and is retained for compatibility with other process types such as
+pipe processes.  Asynchronous subprocesses never start in the stopped
+state.
 
 @item :filter @var{filter}
 Initialize the process filter to @var{filter}.  If not specified, a
@@ -686,7 +697,28 @@ a default sentinel will be used, which can be overridden later.
 @item :stderr @var{stderr}
 Associate @var{stderr} with the standard error of the process.  A
 non-@code{nil} value should be either a buffer or a pipe process
-created with @code{make-pipe-process}, described below.
+created with @code{make-pipe-process}, described below.  If
+@var{stderr} is @code{nil}, standard error is mixed with standard
+output, and both are sent to @var{buffer} or @var{filter}.
+
+@cindex standard error process
+If @var{stderr} is a buffer, Emacs will create a pipe process, the
+@dfn{standard error process}.  This process will have the default
+filter (@pxref{Filter Functions}), sentinel (@pxref{Sentinels}), and
+coding systems (@pxref{Default Coding Systems}).  On the other hand,
+it will use @var{query-flag} as its query-on-exit flag (@pxref{Query
+Before Exit}).  It will be associated with the @var{stderr} buffer
+(@pxref{Process Buffers}) and send its output (which is the standard
+error of the main process) there.
+
+If @var{stderr} is a pipe process, Emacs will use it as standard error
+process for the new process.
+
+@item :file-handler @var{file-handler}
+If @var{file-handler} is non-@code{nil}, then look for a file name
+handler for the current buffer's @code{default-directory}, and invoke
+that file name handler to make the process.  If there is no such
+handler, proceed as if @var{file-handler} were @code{nil}.
 @end table
 
 The original argument list, modified with the actual connection
@@ -694,9 +726,22 @@ information, is available via the @code{process-contact} function.
 
 The current working directory of the subprocess is set to the current
 buffer's value of @code{default-directory} if that is local (as
-determined by `unhandled-file-name-directory'), or "~" otherwise.  If
-you want to run a process in a remote directory use
-@code{start-file-process}.
+determined by @code{unhandled-file-name-directory}), or @file{~}
+otherwise.  If you want to run a process in a remote directory, pass
+@code{:file-handler t} to @code{make-process}.  In that case, the
+current working directory is the local name component of
+@code{default-directory} (as determined by @code{file-local-name}).
+
+Depending on the implementation of the file name handler, it might not
+be possible to apply @var{filter} or @var{sentinel} to the resulting
+process object.  The @code{:stderr} argument cannot be a pipe process,
+file name handlers do not support pipe processes for this.  A buffer
+as @code{:stderr} argument is accepted, its contents is shown without
+the use of pipe processes.  @xref{Filter Functions}, @ref{Sentinels},
+and @ref{Accepting Output}.
+
+Some file name handlers may not support @code{make-process}.  In such
+cases, this function does nothing and returns @code{nil}.
 @end defun
 
 @defun make-pipe-process &rest args
@@ -812,7 +857,7 @@ subprocess running @var{program} in it, and returns its process
 object.
 
 The difference from @code{start-process} is that this function may
-invoke a file handler based on the value of @code{default-directory}.
+invoke a file name handler based on the value of @code{default-directory}.
 This handler ought to run @var{program}, perhaps on the local host,
 perhaps on a remote host that corresponds to @code{default-directory}.
 In the latter case, the local part of @code{default-directory} becomes
@@ -826,13 +871,13 @@ names relative to @code{default-directory}, or to names that identify
 the files locally on the remote host, by running them through
 @code{file-local-name}.
 
-Depending on the implementation of the file handler, it might not be
+Depending on the implementation of the file name handler, it might not be
 possible to apply @code{process-filter} or @code{process-sentinel} to
 the resulting process object.  @xref{Filter Functions}, and @ref{Sentinels}.
 
 @c FIXME  Can we find a better example (i.e., a more modern function
 @c that is actually documented).
-Some file handlers may not support @code{start-file-process} (for
+Some file name handlers may not support @code{start-file-process} (for
 example the function @code{ange-ftp-hook-function}).  In such cases,
 this function does nothing and returns @code{nil}.
 @end defun
@@ -1769,7 +1814,7 @@ system comes from @code{coding-system-for-read}, if that is
 non-@code{nil}; or else from the defaulting mechanism (@pxref{Default
 Coding Systems}).  If the text output by a process contains null
 bytes, Emacs by default uses @code{no-conversion} for it; see
-@ref{Lisp and Coding Systems, inhibit-null-byte-detection}, for how to
+@ref{Lisp and Coding Systems, inhibit-nul-byte-detection}, for how to
 control this behavior.
 
   @strong{Warning:} Coding systems such as @code{undecided}, which
@@ -1858,6 +1903,22 @@ like this:
 @example
 (while (accept-process-output process))
 @end example
+
+If you have passed a non-@code{nil} @var{stderr} to
+@code{make-process}, it will have a standard error process.
+@xref{Asynchronous Processes}.  In that case, waiting for process
+output from the main process doesn't wait for output from the standard
+error process.  To make sure you have received both all of standard
+output and all of standard error from a process, use the following
+code:
+
+@example
+(while (accept-process-output process))
+(while (accept-process-output stderr-process))
+@end example
+
+Reading pending standard error from a process running on a remote host
+is not possible this way.
 
 @node Processes and Threads
 @subsection Processes and Threads
@@ -2104,8 +2165,6 @@ attribute and @var{value} is the value of that attribute.  The various
 attribute @var{key}s that this function can return are listed below.
 Not all platforms support all of these attributes; if an attribute is
 not supported, its association will not appear in the returned alist.
-Values that are numbers can be either integer or floating point,
-depending on the magnitude of the value.
 
 @table @code
 @item euid
@@ -2189,19 +2248,17 @@ faults for all the child processes of the given process.
 
 @item utime
 Time spent by the process in the user context, for running the
-application's code.  The corresponding @var{value} is in the
-@w{@code{(@var{high} @var{low} @var{microsec} @var{picosec})}} format, the same
-format used by functions @code{current-time} (@pxref{Time of Day,
-current-time}) and @code{file-attributes} (@pxref{File Attributes}).
+application's code.  The corresponding @var{value} is a Lisp
+timestamp (@pxref{Time of Day}).
 
 @item stime
 Time spent by the process in the system (kernel) context, for
-processing system calls.  The corresponding @var{value} is in the same
-format as for @code{utime}.
+processing system calls.  The corresponding @var{value} is a Lisp
+timestamp.
 
 @item time
 The sum of @code{utime} and @code{stime}.  The corresponding
-@var{value} is in the same format as for @code{utime}.
+@var{value} is a Lisp timestamp.
 
 @item cutime
 @itemx cstime
@@ -2220,13 +2277,10 @@ nice values get scheduled more favorably.)
 The number of threads in the process.
 
 @item start
-The time when the process was started, in the same
-@code{(@var{high} @var{low} @var{microsec} @var{picosec})} format used by
-@code{file-attributes} and @code{current-time}.
+The time when the process was started, as a Lisp timestamp.
 
 @item etime
-The time elapsed since the process started, in the format @code{(@var{high}
-@var{low} @var{microsec} @var{picosec})}.
+The time elapsed since the process started, as a Lisp timestamp.
 
 @item vsize
 The virtual memory size of the process, measured in kilobytes.
@@ -2627,7 +2681,9 @@ Specify the host to connect to.  @var{host} should be a host name or
 Internet address, as a string, or the symbol @code{local} to specify
 the local host.  If you specify @var{host} for a server, it must
 specify a valid address for the local host, and only clients
-connecting to that address will be accepted.
+connecting to that address will be accepted.  When using @code{local},
+by default IPv4 will be used, specify a @var{family} of @code{ipv6} to
+override this.
 
 @item :service @var{service}
 @var{service} specifies a port number to connect to; or, for a server,
@@ -2754,8 +2810,7 @@ Initialize the process filter to @var{filter}.
 
 @item :filter-multibyte @var{multibyte}
 If @var{multibyte} is non-@code{nil}, strings given to the process
-filter are multibyte, otherwise they are unibyte.  The default is the
-default value of @code{enable-multibyte-characters}.
+filter are multibyte, otherwise they are unibyte.  The default is @code{t}.
 
 @item :sentinel @var{sentinel}
 Initialize the process sentinel to @var{sentinel}.
@@ -3158,7 +3213,6 @@ direction is also known as @dfn{serializing} or @dfn{packing}.
 @menu
 * Bindat Spec::         Describing data layout.
 * Bindat Functions::    Doing the unpacking and packing.
-* Bindat Examples::     Samples of what bindat.el can do for you!
 @end menu
 
 @node Bindat Spec
@@ -3401,132 +3455,3 @@ dotted notation.
      @result{} "127.0.0.1"
 @end example
 @end defun
-
-@node Bindat Examples
-@subsection Examples of Byte Unpacking and Packing
-@c FIXME?  This seems a very long example for something that is not used
-@c very often.  As of 25.2, gdb-mi.el is the only user of bindat.el in Emacs.
-@c Maybe one or both of these examples should just be moved to the
-@c commentary of bindat.el.
-
-  Here are two complete examples that use bindat.el.
-The first shows simple byte packing:
-
-@lisp
-(require 'bindat)
-
-(defun rfc868-payload ()
-  (bindat-pack
-   '((now-hi u16)
-     (now-lo u16))
-   ;; Emacs uses Unix epoch, while RFC868 epoch
-   ;; is 1900-01-01 00:00:00, which is 2208988800
-   ;; (or #x83aa7e80) seconds more.
-   (let ((now (time-add nil '(#x83aa #x7e80))))
-     `((now-hi . ,(car now))
-       (now-lo . ,(cadr now))))))
-
-(let ((s (rfc868-payload)))
-  (list (multibyte-string-p s)
-        (mapconcat (lambda (byte)
-                     (format "%02x" byte))
-                   s " ")
-        (current-time-string)))
-     @result{} (nil "dc 6d 17 01" "Fri Mar 10 13:13:53 2017")
-@end lisp
-
-The following is an example of defining and unpacking a complex
-structure.  Consider the following C structures:
-
-@example
-struct header @{
-    unsigned long    dest_ip;
-    unsigned long    src_ip;
-    unsigned short   dest_port;
-    unsigned short   src_port;
-@};
-
-struct data @{
-    unsigned char    type;
-    unsigned char    opcode;
-    unsigned short   length;  /* in network byte order  */
-    unsigned char    id[8];   /* null-terminated string  */
-    unsigned char    data[/* (length + 3) & ~3 */];
-@};
-
-struct packet @{
-    struct header    header;
-    unsigned long    counters[2];  /* in little endian order  */
-    unsigned char    items;
-    unsigned char    filler[3];
-    struct data      item[/* items */];
-
-@};
-@end example
-
-The corresponding data layout specification is:
-
-@lisp
-(setq header-spec
-      '((dest-ip   ip)
-        (src-ip    ip)
-        (dest-port u16)
-        (src-port  u16)))
-
-(setq data-spec
-      '((type      u8)
-        (opcode    u8)
-        (length    u16)  ; network byte order
-        (id        strz 8)
-        (data      vec (length))
-        (align     4)))
-
-(setq packet-spec
-      '((header    struct header-spec)
-        (counters  vec 2 u32r)   ; little endian order
-        (items     u8)
-        (fill      3)
-        (item      repeat (items)
-                   (struct data-spec))))
-@end lisp
-
-A binary data representation is:
-
-@lisp
-(setq binary-data
-      [ 192 168 1 100 192 168 1 101 01 28 21 32
-        160 134 1 0 5 1 0 0 2 0 0 0
-        2 3 0 5 ?A ?B ?C ?D ?E ?F 0 0 1 2 3 4 5 0 0 0
-        1 4 0 7 ?B ?C ?D ?E ?F ?G 0 0 6 7 8 9 10 11 12 0 ])
-@end lisp
-
-The corresponding decoded structure is:
-
-@lisp
-(setq decoded (bindat-unpack packet-spec binary-data))
-     @result{}
-((header
-  (dest-ip   . [192 168 1 100])
-  (src-ip    . [192 168 1 101])
-  (dest-port . 284)
-  (src-port  . 5408))
- (counters . [100000 261])
- (items . 2)
- (item ((data . [1 2 3 4 5])
-        (id . "ABCDEF")
-        (length . 5)
-        (opcode . 3)
-        (type . 2))
-       ((data . [6 7 8 9 10 11 12])
-        (id . "BCDEFG")
-        (length . 7)
-        (opcode . 4)
-        (type . 1))))
-@end lisp
-
-An example of fetching data from this structure:
-
-@lisp
-(bindat-get-field decoded 'item 1 'id)
-     @result{} "BCDEFG"
-@end lisp

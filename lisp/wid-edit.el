@@ -1,4 +1,4 @@
-;;; wid-edit.el --- Functions for creating and using widgets -*-byte-compile-dynamic: t; lexical-binding:t -*-
+;;; wid-edit.el --- Functions for creating and using widgets -*- lexical-binding:t -*-
 ;;
 ;; Copyright (C) 1996-1997, 1999-2019 Free Software Foundation, Inc.
 ;;
@@ -252,7 +252,10 @@ minibuffer."
 	   (define-key map [?\M--] 'negative-argument)
 	   (save-window-excursion
 	     (let ((buf (get-buffer " widget-choose")))
-	       (fit-window-to-buffer (display-buffer buf))
+	       (display-buffer buf
+			       '(display-buffer-in-direction
+				 (direction . bottom)
+				 (window-height . fit-window-to-buffer)))
 	       (let ((cursor-in-echo-area t)
 		     (arg 1))
                  (while (not value)
@@ -1163,8 +1166,9 @@ When not inside a field, signal an error."
 
 (defun widget-at (&optional pos)
   "The button or field at POS (default, point)."
-  (or (get-char-property (or pos (point)) 'button)
-      (widget-field-at pos)))
+  (let ((widget (or (get-char-property (or pos (point)) 'button)
+                    (widget-field-at pos))))
+    (and (widgetp widget) widget)))
 
 ;;;###autoload
 (defun widget-setup ()

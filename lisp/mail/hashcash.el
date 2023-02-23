@@ -1,4 +1,4 @@
-;;; hashcash.el --- Add hashcash payments to email
+;;; hashcash.el --- Add hashcash payments to email  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 2003-2005, 2007-2019 Free Software Foundation, Inc.
 
@@ -47,7 +47,7 @@
 
 ;;; Code:
 
-(eval-when-compile (require 'cl))	; for case
+(eval-when-compile (require 'cl-lib))
 
 (defgroup hashcash nil
   "Hashcash configuration."
@@ -133,18 +133,18 @@ For example, you may want to set this to (\"-Z2\") to reduce header length."
 
 (declare-function message-narrow-to-headers-or-head "message" ())
 (declare-function message-fetch-field "message" (header &optional not-all))
-(declare-function message-goto-eoh "message" ())
+(declare-function message-goto-eoh "message" (&optional interactive))
 (declare-function message-narrow-to-headers "message" ())
 
 (defun hashcash-token-substring ()
   (save-excursion
     (let ((token ""))
-      (loop
+      (cl-loop
 	(setq token
 	  (concat token (buffer-substring (point) (hashcash-point-at-eol))))
 	(goto-char (hashcash-point-at-eol))
 	(forward-char 1)
-	(unless (looking-at "[ \t]") (return token))
+	(unless (looking-at "[ \t]") (cl-return token))
 	(while (looking-at "[ \t]") (forward-char 1))))))
 
 (defun hashcash-payment-required (addr)
@@ -182,8 +182,7 @@ Return immediately.  Call CALLBACK with process and result when ready."
 	(setq hashcash-process-alist (cons
 				      (cons process (current-buffer))
 				      hashcash-process-alist))
-	(set-process-filter process `(lambda (process output)
-				       (funcall ,callback process output))))
+	(set-process-filter process callback))
     (funcall callback nil nil)))
 
 (defun hashcash-check-payment (token str val)
@@ -244,8 +243,9 @@ Only start calculation.  Results are inserted when ready."
     (hashcash-generate-payment-async
      (hashcash-payment-to arg)
      (hashcash-payment-required arg)
-     `(lambda (process payment)
-	(hashcash-insert-payment-async-2 ,(current-buffer) process payment)))))
+     (let ((buf (current-buffer)))
+       (lambda (process payment)
+         (hashcash-insert-payment-async-2 buf process payment))))))
 
 (defun hashcash-insert-payment-async-2 (buffer process pay)
   (when (buffer-live-p buffer)
@@ -298,7 +298,7 @@ BUFFER defaults to the current buffer."
   (let* ((split (split-string token ":"))
 	 (key (if (< (hashcash-version token) 1.2)
 		  (nth 1 split)
-		  (case (string-to-number (nth 0 split))
+		  (pcase (string-to-number (nth 0 split))
 		    (0 (nth 2 split))
 		    (1 (nth 3 split))))))
     (cond ((null resource)

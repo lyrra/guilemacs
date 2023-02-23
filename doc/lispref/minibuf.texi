@@ -634,6 +634,12 @@ A history list for arguments that are Lisp expressions to evaluate.
 A history list for arguments that are faces.
 @end defvar
 
+@findex read-variable@r{, history list}
+@defvar custom-variable-history
+A history list for variable-name arguments read by
+@code{read-variable}.
+@end defvar
+
 @c Less common: coding-system-history, input-method-history,
 @c command-history, grep-history, grep-find-history,
 @c read-envvar-name-history, setenv-history, yes-or-no-p-history.
@@ -2252,7 +2258,7 @@ function @code{read-passwd}.
 @defun read-passwd prompt &optional confirm default
 This function reads a password, prompting with @var{prompt}.  It does
 not echo the password as the user types it; instead, it echoes
-@samp{.}  for each character in the password.  If you want to apply
+@samp{*}  for each character in the password.  If you want to apply
 another character to hide the password, let-bind the variable
 @code{read-hide-char} with that character.
 
@@ -2397,6 +2403,25 @@ will not work.  If you want to prevent resizing of minibuffer windows
 when displaying long messages, bind the @code{message-truncate-lines}
 variable instead (@pxref{Echo Area Customization}).
 
+The option @code{resize-mini-windows} does not affect the behavior of
+minibuffer-only frames (@pxref{Frame Layout}).  The following option
+allows to automatically resize such frames as well.
+
+@defopt resize-mini-frames
+If this is @code{nil}, minibuffer-only frames are never resized
+automatically.
+
+If this is a function, that function is called with the
+minibuffer-only frame to be resized as sole argument.  At the time
+this function is called, the buffer of the minibuffer window of that
+frame is the buffer whose contents will be shown the next time that
+window is redisplayed.  The function is expected to fit the frame to
+the buffer in some appropriate way.
+
+Any other non-@code{nil} value means to resize minibuffer-only frames
+by calling @code{fit-frame-to-buffer} (@pxref{Resizing Windows}).
+@end defopt
+
 
 @node Minibuffer Contents
 @section Minibuffer Contents
@@ -2515,7 +2540,7 @@ locally inside the minibuffer (@pxref{Help Functions}).
 @anchor{Definition of minibuffer-scroll-window}
 If the value of this variable is non-@code{nil}, it should be a window
 object.  When the function @code{scroll-other-window} is called in the
-minibuffer, it scrolls this window.
+minibuffer, it scrolls this window (@pxref{Textual Scrolling}).
 @end defvar
 
 @defun minibuffer-selected-window

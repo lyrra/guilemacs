@@ -784,7 +784,7 @@ default.  Some examples:
 (cl-deftype null () '(satisfies null))    ; predefined
 (cl-deftype list () '(or null cons))      ; predefined
 (cl-deftype unsigned-byte (&optional bits)
-  (list 'integer 0 (if (eq bits '*) bits (1- (lsh 1 bits)))))
+  (list 'integer 0 (if (eq bits '*) bits (1- (ash 1 bits)))))
 (unsigned-byte 8)  @equiv{}  (integer 0 255)
 (unsigned-byte)  @equiv{}  (integer 0 *)
 unsigned-byte  @equiv{}  (integer 0 *)
@@ -1359,7 +1359,8 @@ Because of the nature of macros, @code{cl-macrolet} is always lexically
 scoped.  The @code{cl-macrolet} binding will
 affect only calls that appear physically within the body
 @var{forms}, possibly after expansion of other macros in the
-body.
+body.  Calls of @code{cl-macrolet} bound macros are expanded in the
+global environment.
 @end defmac
 
 @defmac cl-symbol-macrolet (bindings@dots{}) forms@dots{}
@@ -1709,9 +1710,9 @@ but surrounds the loop with an implicit @code{nil} block.
 The body is executed with @var{var} bound to the integers
 from zero (inclusive) to @var{count} (exclusive), in turn.  Then
 @c FIXME lispref does not state this part explicitly, could move this there.
-the @code{result} form is evaluated with @var{var} bound to the total
+the @var{result} form is evaluated with @var{var} bound to the total
 number of iterations that were done (i.e., @code{(max 0 @var{count})})
-to get the return value for the loop form.
+to get the return value for the loop form.  Use of @var{result} is deprecated.
 @end defmac
 
 @defmac cl-do-symbols (var [obarray [result]]) forms@dots{}
@@ -4149,7 +4150,7 @@ package, @code{cl-typep} simply looks for a function called
 only if they used the default predicate name.
 
 @item :include
-This option implements a very limited form of C++-style inheritance.
+This option implements a very limited form of C@t{++}-style inheritance.
 The argument is the name of another structure type previously
 created with @code{cl-defstruct}.  The effect is to cause the new
 structure type to inherit all of the included structure's slots
@@ -4193,6 +4194,10 @@ other way around).  Every @code{astronaut} includes all the slots
 of a @code{person}, plus extra slots that are specific to
 astronauts.  Operations that work on people (like @code{person-name})
 work on astronauts just like other people.
+
+@item :noinline
+If this option is present, this structure's functions will not be
+inlined, even functions that normally would.
 
 @item :print-function
 In full Common Lisp, this option allows you to specify a function

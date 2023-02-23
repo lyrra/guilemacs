@@ -83,8 +83,7 @@
 
 (defcustom org-id-link-to-org-use-id nil
   "Non-nil means storing a link to an Org file will use entry IDs.
-\\<org-mode-map>\
-
+\\<org-mode-map>
 The variable can have the following values:
 
 t     Create an ID if needed to make a link to the current entry.
@@ -357,7 +356,7 @@ So a typical ID could look like \"Org:4nd91V40HI\"."
   "Return string with random (version 4) UUID."
   (let ((rnd (md5 (format "%s%s%s%s%s%s%s"
 			  (random)
-			  (current-time)
+			  (encode-time nil 'list)
 			  (user-uid)
 			  (emacs-pid)
 			  (user-full-name)
@@ -416,7 +415,7 @@ The input I may be a character, or a single-letter string."
   "Encode TIME as a 10-digit string.
 This string holds the time to micro-second accuracy, and can be decoded
 using `org-id-decode'."
-  (setq time (or time (current-time)))
+  (setq time (encode-time time 'list))
   (concat (org-id-int-to-b36 (nth 0 time) 4)
 	  (org-id-int-to-b36 (nth 1 time) 4)
 	  (org-id-int-to-b36 (or (nth 2 time) 0) 4)))

@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
 
-;; Author: Eric M. Ludlam <eric@siege-engine.com>
+;; Author: Eric M. Ludlam <zappo@gnu.org>
 
 ;; This file is part of GNU Emacs.
 
@@ -46,7 +46,7 @@
 ;;; Code:
 
 (add-to-list 'ede-project-class-files
-	     (ede-project-autoload "simple-overlay"
+	     (ede-project-autoload
 	      :name "Simple" :file 'ede/simple
 	      :proj-file 'ede-simple-projectfile-for-dir
 	      :load-type 'ede-simple-load

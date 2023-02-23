@@ -1,9 +1,9 @@
-;;; smtpmail.el --- simple SMTP protocol (RFC 821) for sending mail
+;;; smtpmail.el --- simple SMTP protocol (RFC 821) for sending mail  -*- lexical-binding:t -*-
 
 ;; Copyright (C) 1995-1996, 2001-2019 Free Software Foundation, Inc.
 
 ;; Author: Tomoji Kagatani <kagatani@rbc.ncl.omron.co.jp>
-;; Maintainer: Simon Josefsson <simon@josefsson.org>
+;; Maintainer: emacs-devel@gnu.org
 ;; w32 Maintainer: Brian D. Carlstrom <bdc@ai.mit.edu>
 ;; ESMTP support: Simon Leinen <simon@switch.ch>
 ;; Hacked by Mike Taylor, 11th October 1999 to add support for
@@ -138,7 +138,7 @@ The commands enables verbose information from the SMTP server."
 (defcustom smtpmail-code-conv-from nil
   "Coding system for encoding outgoing mail.
 Used for the value of `sendmail-coding-system' when
-`select-message-coding-system' is called. "
+`select-message-coding-system' is called."
   :type 'coding-system
   :group 'smtpmail)
 
@@ -150,7 +150,8 @@ and sent with `smtpmail-send-queued-mail'."
   :group 'smtpmail)
 
 (defcustom smtpmail-queue-dir "~/Mail/queued-mail/"
-  "Directory where `smtpmail.el' stores queued mail."
+  "Directory where `smtpmail.el' stores queued mail.
+This directory should not be writable by other users."
   :type 'directory
   :group 'smtpmail)
 
@@ -179,9 +180,11 @@ This is relative to `smtpmail-queue-dir'."
 ;; Buffer-local variable.
 (defvar smtpmail-read-point)
 
-(defconst smtpmail-auth-supported '(cram-md5 plain login)
+(defvar smtpmail-auth-supported '(cram-md5 plain login)
   "List of supported SMTP AUTH mechanisms.
-The list is in preference order.")
+The list is in preference order.
+Every element should have a matching `cl-defmethod' for
+for `smtpmail-try-auth-method'.")
 
 (defvar smtpmail-mail-address nil
   "Value to use for envelope-from address for mail from ambient buffer.")
@@ -320,11 +323,11 @@ The list is in preference order.")
 	    (goto-char (1+ delimline))
 	    (if (eval mail-mailer-swallows-blank-line)
 		(newline))
-	    ;; Find and handle any FCC fields.
+	    ;; Find and handle any Fcc fields.
 	    (goto-char (point-min))
-	    (if (re-search-forward "^FCC:" delimline t)
+	    (if (re-search-forward "^Fcc:" delimline t)
 		;; Force `mail-do-fcc' to use the encoding of the mail
-		;; buffer to encode outgoing messages on FCC files.
+		;; buffer to encode outgoing messages on Fcc files.
 		(let ((coding-system-for-write
 		       ;; mbox files must have Unix EOLs.
 		       (coding-system-change-eol-conversion
@@ -359,9 +362,7 @@ The list is in preference order.")
 		     smtpmail-queue-dir))
 		   (file-data (convert-standard-filename file-data))
 		   (file-elisp (concat file-data ".el"))
-		   (buffer-data (create-file-buffer file-data))
-		   (buffer-elisp (create-file-buffer file-elisp))
-		   (buffer-scratch "*queue-mail*"))
+		   (buffer-data (create-file-buffer file-data)))
 	      (unless (file-exists-p smtpmail-queue-dir)
 		(make-directory smtpmail-queue-dir t))
 	      (with-current-buffer buffer-data
@@ -376,22 +377,16 @@ The list is in preference order.")
 		 nil t)
 		(insert-buffer-substring tembuf)
 		(write-file file-data)
-		(set-buffer buffer-elisp)
-		(erase-buffer)
-		(insert (concat
-			 "(setq smtpmail-recipient-address-list '"
+                (write-region
+                 (concat "(setq smtpmail-recipient-address-list '"
 			 (prin1-to-string smtpmail-recipient-address-list)
-			 ")\n"))
-		(write-file file-elisp)
-		(set-buffer (generate-new-buffer buffer-scratch))
-		(insert (concat file-data "\n"))
-		(append-to-file (point-min)
-				(point-max)
-                                (expand-file-name smtpmail-queue-index-file
-                                                  smtpmail-queue-dir)))
-	      (kill-buffer buffer-scratch)
-	      (kill-buffer buffer-data)
-	      (kill-buffer buffer-elisp))))
+			 ")\n")
+                 nil file-elisp nil 'silent)
+		(write-region (concat file-data "\n") nil
+                              (expand-file-name smtpmail-queue-index-file
+                                                smtpmail-queue-dir)
+                              t 'silent))
+	      (kill-buffer buffer-data))))
       (kill-buffer tembuf)
       (if (bufferp errbuf)
 	  (kill-buffer errbuf)))))
@@ -412,7 +407,20 @@ The list is in preference order.")
       (while (not (eobp))
 	(setq file-data (buffer-substring (point) (line-end-position)))
 	(setq file-elisp (concat file-data ".el"))
-	(load file-elisp)
+        ;; FIXME: Avoid `load' which can execute arbitrary code and is hence
+        ;; a source of security holes.  Better read the file and extract the
+        ;; data "by hand".
+	;;(load file-elisp)
+        (with-temp-buffer
+          (insert-file-contents file-elisp)
+          (goto-char (point-min))
+          (pcase (read (current-buffer))
+            (`(setq smtpmail-recipient-address-list ',v)
+             (skip-chars-forward " \n\t")
+             (unless (eobp) (message "Ignoring trailing text in %S"
+                                     file-elisp))
+             (setq smtpmail-recipient-address-list v))
+            (sexp (error "Unexpected code in %S: %S" file-elisp sexp))))
 	;; Insert the message literally: it is already encoded as per
 	;; the MIME headers, and code conversions might guess the
 	;; encoding wrongly.
@@ -510,8 +518,7 @@ The list is in preference order.")
          (user (plist-get auth-info :user))
          (password (plist-get auth-info :secret))
 	 (save-function (and ask-for-password
-			     (plist-get auth-info :save-function)))
-	 ret)
+			     (plist-get auth-info :save-function))))
     (when (functionp password)
       (setq password (funcall password)))
     (when (and user
@@ -532,7 +539,10 @@ The list is in preference order.")
     (when (functionp password)
       (setq password (funcall password)))
     (let ((result (catch 'done
-		    (smtpmail-try-auth-method process mech user password))))
+                    (if (and mech user password)
+		        (smtpmail-try-auth-method process mech user password)
+                      ;; No mechanism, or no credentials.
+                      mech))))
       (if (stringp result)
 	  (progn
 	    (auth-source-forget+ :host host :port port)
@@ -541,51 +551,52 @@ The list is in preference order.")
 	  (funcall save-function))
 	result))))
 
-(defun smtpmail-try-auth-method (process mech user password)
-  (let (ret)
-    (cond
-     ((or (not mech)
-	  (not user)
-	  (not password))
-      ;; No mechanism, or no credentials.
-      mech)
-     ((eq mech 'cram-md5)
-      (setq ret (smtpmail-command-or-throw process "AUTH CRAM-MD5"))
-      (when (eq (car ret) 334)
-	(let* ((challenge (substring (cadr ret) 4))
-	       (decoded (base64-decode-string challenge))
-	       (hash (rfc2104-hash 'md5 64 16 password decoded))
-	       (response (concat user " " hash))
-	       ;; Osamu Yamane <yamane@green.ocn.ne.jp>:
-	       ;; SMTP auth fails because the SMTP server identifies
-	       ;; only the first part of the string (delimited by
-	       ;; new line characters) as a response from the
-	       ;; client, and the rest as distinct commands.
+(cl-defgeneric smtpmail-try-auth-method (_process mech _user _password)
+  "Perform authentication of type MECH for USER with PASSWORD.
+MECH should be one of the values in `smtpmail-auth-supported'.
+USER and PASSWORD should be non-nil."
+  (error "Mechanism %S not implemented" mech))
 
-	       ;; In my case, the response string is 80 characters
-	       ;; long.  Without the no-line-break option for
-	       ;; `base64-encode-string', only the first 76 characters
-	       ;; are taken as a response to the server, and the
-	       ;; authentication fails.
-	       (encoded (base64-encode-string response t)))
-	  (smtpmail-command-or-throw process encoded))))
-     ((eq mech 'login)
-      (smtpmail-command-or-throw process "AUTH LOGIN")
-      (smtpmail-command-or-throw process (base64-encode-string user t))
-      (smtpmail-command-or-throw process (base64-encode-string password t)))
-     ((eq mech 'plain)
-      ;; We used to send an empty initial request, and wait for an
-      ;; empty response, and then send the password, but this
-      ;; violate a SHOULD in RFC 2222 paragraph 5.1.  Note that this
-      ;; is not sent if the server did not advertise AUTH PLAIN in
-      ;; the EHLO response.  See RFC 2554 for more info.
-      (smtpmail-command-or-throw
-       process
-       (concat "AUTH PLAIN "
-	       (base64-encode-string (concat "\0" user "\0" password) t))
-       235))
-     (t
-      (error "Mechanism %s not implemented" mech)))))
+(cl-defmethod smtpmail-try-auth-method
+  (process (_mech (eql cram-md5)) user password)
+  (let ((ret (smtpmail-command-or-throw process "AUTH CRAM-MD5")))
+    (when (eq (car ret) 334)
+      (let* ((challenge (substring (cadr ret) 4))
+	     (decoded (base64-decode-string challenge))
+	     (hash (rfc2104-hash 'md5 64 16 password decoded))
+	     (response (concat user " " hash))
+	     ;; Osamu Yamane <yamane@green.ocn.ne.jp>:
+	     ;; SMTP auth fails because the SMTP server identifies
+	     ;; only the first part of the string (delimited by
+	     ;; new line characters) as a response from the
+	     ;; client, and the rest as distinct commands.
+
+	     ;; In my case, the response string is 80 characters
+	     ;; long.  Without the no-line-break option for
+	     ;; `base64-encode-string', only the first 76 characters
+	     ;; are taken as a response to the server, and the
+	     ;; authentication fails.
+	     (encoded (base64-encode-string response t)))
+	(smtpmail-command-or-throw process encoded)))))
+
+(cl-defmethod smtpmail-try-auth-method
+  (process (_mech (eql login)) user password)
+  (smtpmail-command-or-throw process "AUTH LOGIN")
+  (smtpmail-command-or-throw process (base64-encode-string user t))
+  (smtpmail-command-or-throw process (base64-encode-string password t)))
+
+(cl-defmethod smtpmail-try-auth-method
+  (process (_mech (eql plain)) user password)
+  ;; We used to send an empty initial request, and wait for an
+  ;; empty response, and then send the password, but this
+  ;; violate a SHOULD in RFC 2222 paragraph 5.1.  Note that this
+  ;; is not sent if the server did not advertise AUTH PLAIN in
+  ;; the EHLO response.  See RFC 2554 for more info.
+  (smtpmail-command-or-throw
+   process
+   (concat "AUTH PLAIN "
+	   (base64-encode-string (concat "\0" user "\0" password) t))
+   235))
 
 (defun smtpmail-response-code (string)
   (when string
@@ -664,7 +675,6 @@ Returns an error if the server cannot be contacted."
 	       (and from
 		    (cadr (mail-extract-address-components from))))
 	     (smtpmail-user-mail-address)))
-	response-code
 	process-buffer
 	result
 	auth-mechanisms
@@ -681,7 +691,9 @@ Returns an error if the server cannot be contacted."
 	    (setq buffer-undo-list t)
 	    (erase-buffer))
 
-	  ;; open the connection to the server
+	  ;; Open the connection to the server.
+          ;; FIXME: Should we use raw-text-dos coding system to handle the r\n
+          ;; for us?
 	  (let ((coding-system-for-read 'binary)
 		(coding-system-for-write 'binary))
 	    (setq result
@@ -718,9 +730,8 @@ Returns an error if the server cannot be contacted."
 	      (throw 'done (format "Connection not allowed: %s" greeting))))
 
 	  (with-current-buffer process-buffer
-	    (set-buffer-process-coding-system 'raw-text-unix 'raw-text-unix)
-	    (make-local-variable 'smtpmail-read-point)
-	    (setq smtpmail-read-point (point-min))
+            (set-process-coding-system process 'raw-text-unix 'raw-text-unix)
+	    (setq-local smtpmail-read-point (point-min))
 
 	    (let* ((capabilities (plist-get (cdr result) :capabilities))
 		   (code (smtpmail-response-code capabilities)))
@@ -943,8 +954,7 @@ Returns an error if the server cannot be contacted."
 
   (if (and (multibyte-string-p data)
 	   smtpmail-code-conv-from)
-      (setq data (string-as-multibyte
-		  (encode-coding-string data smtpmail-code-conv-from))))
+      (setq data (encode-coding-string data smtpmail-code-conv-from)))
 
   (if smtpmail-debug-info
       (insert data "\r\n"))
@@ -990,9 +1000,9 @@ Returns an error if the server cannot be contacted."
 	  ;; RESENT-* fields should stop processing of regular fields.
 	  (save-excursion
 	    (setq addr-regexp
-		  (if (re-search-forward "^Resent-\\(to\\|cc\\|bcc\\):"
+		  (if (re-search-forward "^Resent-\\(To\\|Cc\\|Bcc\\):"
 					 header-end t)
-		      "^Resent-\\(to\\|cc\\|bcc\\):"
+		      "^Resent-\\(To\\|Cc\\|Bcc\\):"
 		    "^\\(To:\\|Cc:\\|Bcc:\\)")))
 
 	  (while (re-search-forward addr-regexp header-end t)
@@ -1025,14 +1035,14 @@ Returns an error if the server cannot be contacted."
 	    (setq smtpmail-recipient-address-list recipient-address-list))))))
 
 (defun smtpmail-do-bcc (header-end)
-  "Delete [Resent-]BCC: and their continuation lines from the header area.
-There may be multiple BCC: lines, and each may have arbitrarily
+  "Delete [Resent-]Bcc: and their continuation lines from the header area.
+There may be multiple Bcc: lines, and each may have arbitrarily
 many continuation lines."
   (let ((case-fold-search t))
     (save-excursion
       (goto-char (point-min))
-      ;; iterate over all BCC: lines
-      (while (re-search-forward "^\\(RESENT-\\)?BCC:" header-end t)
+      ;; iterate over all Bcc: lines
+      (while (re-search-forward "^\\(RESENT-\\)?Bcc:" header-end t)
 	(delete-region (match-beginning 0)
 		       (progn (forward-line 1) (point)))
 	;; get rid of any continuation lines

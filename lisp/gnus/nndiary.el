@@ -2,8 +2,7 @@
 
 ;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
 
-;; Author:        Didier Verna <didier@xemacs.org>
-;; Maintainer:    Didier Verna <didier@xemacs.org>
+;; Author:        Didier Verna <didier@didierverna.net>
 ;; Created:       Fri Jul 16 18:55:42 1999
 ;; Keywords:      calendar mail news
 
@@ -83,7 +82,6 @@
 (require 'nnoo)
 (require 'nnheader)
 (require 'nnmail)
-(eval-when-compile (require 'cl))
 
 (require 'gnus-start)
 (require 'gnus-sum)
@@ -233,7 +231,7 @@ through all nnml directories and generate nov databases for them
 all.  This may very well take some time.")
 
 (defvoo nndiary-prepare-save-mail-hook nil
-  "*Hook run narrowed to an article before saving.")
+  "Hook run narrowed to an article before saving.")
 
 (defvoo nndiary-inhibit-expiry nil
   "If non-nil, inhibit expiry.")
@@ -980,7 +978,7 @@ all.  This may very well take some time.")
   "Add a nov line for the GROUP base."
   (with-current-buffer (nndiary-open-nov group)
     (goto-char (point-max))
-    (mail-header-set-number headers article)
+    (setf (mail-header-number headers) article)
     (nnheader-insert-nov headers)))
 
 (defsubst nndiary-header-value ()
@@ -995,8 +993,8 @@ all.  This may very well take some time.")
 	 (goto-char (point-min))
 	 (if (search-forward "\n\n" nil t) (1- (point)) (point-max))))
       (let ((headers (nnheader-parse-naked-head)))
-	(mail-header-set-chars headers chars)
-	(mail-header-set-number headers number)
+	(setf (mail-header-chars  headers) chars)
+	(setf (mail-header-number headers) number)
 	headers))))
 
 (defun nndiary-open-nov (group)
@@ -1017,7 +1015,7 @@ all.  This may very well take some time.")
 (defun nndiary-save-nov ()
   (save-excursion
     (while nndiary-nov-buffer-alist
-      (when (buffer-name (cdar nndiary-nov-buffer-alist))
+      (when (buffer-live-p (cdar nndiary-nov-buffer-alist))
 	(set-buffer (cdar nndiary-nov-buffer-alist))
 	(when (buffer-modified-p)
 	  (nnmail-write-region 1 (point-max) nndiary-nov-buffer-file-name
@@ -1279,28 +1277,28 @@ all.  This may very well take some time.")
       (push
        (cond ((eq (cdr reminder) 'minute)
 	      (time-subtract
-	       (apply 'encode-time 0 (nthcdr 1 date-elts))
-	       (seconds-to-time (* (car reminder) 60.0))))
+	       (apply #'encode-time 0 (nthcdr 1 date-elts))
+	       (encode-time (* (car reminder) 60.0))))
 	     ((eq (cdr reminder) 'hour)
 	      (time-subtract
-	       (apply 'encode-time 0 0 (nthcdr 2 date-elts))
-	       (seconds-to-time (* (car reminder) 3600.0))))
+	       (apply #'encode-time 0 0 (nthcdr 2 date-elts))
+	       (encode-time (* (car reminder) 3600.0))))
 	     ((eq (cdr reminder) 'day)
 	      (time-subtract
-	       (apply 'encode-time 0 0 0 (nthcdr 3 date-elts))
-	       (seconds-to-time (* (car reminder) 86400.0))))
+	       (apply #'encode-time 0 0 0 (nthcdr 3 date-elts))
+	       (encode-time (* (car reminder) 86400.0))))
 	     ((eq (cdr reminder) 'week)
 	      (time-subtract
-	       (apply 'encode-time 0 0 0 monday (nthcdr 4 date-elts))
-	       (seconds-to-time (* (car reminder) 604800.0))))
+	       (apply #'encode-time 0 0 0 monday (nthcdr 4 date-elts))
+	       (encode-time (* (car reminder) 604800.0))))
 	     ((eq (cdr reminder) 'month)
 	      (time-subtract
-	       (apply 'encode-time 0 0 0 1 (nthcdr 4 date-elts))
-	       (seconds-to-time (* (car reminder) 18748800.0))))
+	       (apply #'encode-time 0 0 0 1 (nthcdr 4 date-elts))
+	       (encode-time (* (car reminder) 18748800.0))))
 	     ((eq (cdr reminder) 'year)
 	      (time-subtract
-	       (apply 'encode-time 0 0 0 1 1 (nthcdr 5 date-elts))
-	       (seconds-to-time (* (car reminder) 400861056.0)))))
+	       (apply #'encode-time 0 0 0 1 1 (nthcdr 5 date-elts))
+	       (encode-time (* (car reminder) 400861056.0)))))
        res))
     (sort res 'time-less-p)))
 
@@ -1532,7 +1530,7 @@ all.  This may very well take some time.")
 	  ;; past. A permanent schedule never expires.
 	  (and sched
 	       (setq sched (nndiary-last-occurrence sched))
-	       (time-less-p sched (current-time))))
+	       (time-less-p sched nil)))
       ;; else
       (nnheader-report 'nndiary "Could not read file %s" file)
       nil)

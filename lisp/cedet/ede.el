@@ -475,9 +475,6 @@ To be used in hook functions."
 
 (define-minor-mode ede-minor-mode
   "Toggle EDE (Emacs Development Environment) minor mode.
-With a prefix argument ARG, enable EDE minor mode if ARG is
-positive, and disable it otherwise.  If called from Lisp, enable
-EDE minor mode if ARG is omitted or nil.
 
 If this file is contained, or could be contained in an EDE
 controlled project, then this mode is activated automatically
@@ -563,9 +560,6 @@ Sets buffer local variables for EDE."
 ;;;###autoload
 (define-minor-mode global-ede-mode
   "Toggle global EDE (Emacs Development Environment) mode.
-With a prefix argument ARG, enable global EDE mode if ARG is
-positive, and disable it otherwise.  If called from Lisp, enable
-the mode if ARG is omitted or nil.
 
 This global minor mode enables `ede-minor-mode' in all buffers in
 an EDE controlled project."
@@ -797,7 +791,7 @@ Optional argument NAME is the name to give this project."
 		 ))
 	 (inits (oref obj initializers)))
     ;; Force the name to match for new objects.
-    (eieio-object-set-name-string nobj (oref nobj name))
+    (setf (slot-value nobj 'object-name) (oref nobj name))
     ;; Handle init args.
     (while inits
       (eieio-oset nobj (car inits) (car (cdr inits)))
@@ -1095,6 +1089,7 @@ Flush the dead projects from the project cache."
     ))
 
 (defvar ede--disable-inode)             ;Defined in ede/files.el.
+(declare-function ede--project-inode "ede/files" (proj))
 
 (defun ede-global-list-sanity-check ()
   "Perform a sanity check to make sure there are no duplicate projects."
