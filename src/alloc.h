@@ -4,6 +4,9 @@
 #define UNGCPRO
 #define staticpro(x)
 #define inhibit_garbage_collection() 0
+#define free_cons(c) ((void)0)
+#define gc_aset(a,i,v) ASET(a,i,v)
+#define SAFE_FREE_UNBIND_TO(speccount, val) val
 //#define	record_unwind_protect_ptr (xfree, ptr)
 //#define	record_unwind_protect_array (lispObj, nelt)
 //#define record_unwind_protect_ptr_1 (fun, ptr, bool)
