@@ -189,12 +189,9 @@
 ;(load "minibuffer")            ;After loaddefs, for define-minor-mode.
 (load "obarray")        ;abbrev.el is implemented in terms of obarrays.
 (load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
-(load "simple")
 
 (load "help-macro")
 (load "help")
-(load "help-fns")
-
 
 (load "emacs-lisp/regexp-opt")
 (load "emacs-lisp/cl-preloaded")
@@ -205,6 +202,10 @@
   ;; A particularly demanding file to load; 1600 does not seem to be enough.
   (load "emacs-lisp/cl-generic"))
 (load "emacs-lisp/cl-macs")
+
+(load "simple")
+
+(load "help-fns")
 
 
 ;; We don't want to store loaddefs.el in the repository because it is
