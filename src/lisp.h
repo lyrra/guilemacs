@@ -1411,11 +1411,6 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
 }
 
 
-INLINE bool
-(FIXNUMP) (Lisp_Object x)
-{
-  return lisp_h_INTEGERP (x);
-}
 
 INLINE bool
 (VECTORLIKEP) (Lisp_Object x)
