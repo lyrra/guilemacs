@@ -44,7 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 void c_gdbbreak ()
 {
-  fprintf(stderr, "-- c_gdb_break\n");
 }
 
 DEFUN ("gdbbreak", Fgdbbreak, Sgdbbreak, 0, 0, 0,
@@ -52,9 +51,7 @@ DEFUN ("gdbbreak", Fgdbbreak, Sgdbbreak, 0, 0, 0,
 */)
   ()
 {
-  fprintf(stderr, "-- gdb-break\n");
   c_gdbbreak();
-  fprintf(stderr, "-- gdb-break done\n");
   return Qnil;
 }
 
@@ -493,7 +490,6 @@ default_toplevel_binding (Lisp_Object symbol)
 	  break;
 
 	default:
-          fprintf(stderr, "ERROR: default_toplevel_binding, unknown spec: %d\n", k);
 	  emacs_abort ();
 	}
     }
@@ -2369,7 +2365,6 @@ apply_lambda (Lisp_Object fun, Lisp_Object args, ptrdiff_t count)
   tem = funcall_lambda (fun, numargs, arg_vector);
 
   SAFE_FREE ();
-  fprintf(stderr, "C #### apply_lambda ####\n");
   //specpdl_ptr--; //FIX: 20190627 LAV, dont think this is used? //20230219 leave this unREM
   return tem;
 }
