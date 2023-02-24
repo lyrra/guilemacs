@@ -1482,15 +1482,6 @@ INLINE bool
 #define XSETMISC(a, b) (a) = ((union Lisp_Misc *) (b))->u_any.self
 #define make_lisp_proc(p) ((p)->header.self)
 
-/* Return a Lisp_Object value that does not correspond to any object.
-   This can make some Lisp objects on free lists recognizable in O(1).  */
-
-INLINE Lisp_Object
-dead_object (void)
-{
-  return make_lisp_ptr (NULL, Lisp_String);
-}
-
 /* Pseudovector types.  */
 
 #define XSETPVECTYPE(v, code)						\
