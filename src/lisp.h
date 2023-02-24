@@ -1346,6 +1346,11 @@ INLINE Lisp_Object
 {
   return SCM_I_MAKINUM (n);
 }
+INLINE Lisp_Object
+(make_ufixnum) (EMACS_INT n)
+{
+  return SCM_I_MAKINUM (n);
+}
 /* Like XFIXNUM (A), but may be faster.  A must be nonnegative.
    If ! USE_LSB_TAG, this takes advantage of the fact that Lisp
    integers have zero-bits in their tags.  */
