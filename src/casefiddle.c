@@ -648,6 +648,8 @@ With negative argument, capitalize previous words but do not move.  */)
 void
 syms_of_casefiddle (void)
 {
+#include "casefiddle.x"
+
   DEFSYM (Qbounds, "bounds");
   DEFSYM (Qidentity, "identity");
   DEFSYM (Qtitlecase, "titlecase");
