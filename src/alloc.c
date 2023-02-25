@@ -151,15 +151,6 @@ XFLOAT_INIT (Lisp_Object f, double n)
   XFLOAT (f)->data = n;
 }
 
-/* Account for allocation of NBYTES in the heap.  This is a separate
-   function to avoid hassles with implementation-defined conversion
-   from unsigned to signed types.  */
-static void
-tally_consing (ptrdiff_t nbytes)
-{
-  consing_until_gc -= nbytes;
-}
-
 #ifdef DOUG_LEA_MALLOC
 static bool
 pointers_fit_in_lispobj_p (void)
