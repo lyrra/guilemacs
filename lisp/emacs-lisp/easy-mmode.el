@@ -115,7 +115,8 @@ it is disabled.")
              (filled (if (fboundp 'fill-region)
                          (with-temp-buffer
                            (insert argdoc)
-                           (fill-region (point-min) (point-max) 'left t)
+                           ;FIX-20230225-LAV: disabled: access to fill-prefix causes error
+                           ;(fill-region (point-min) (point-max) 'left t)
                            (buffer-string))
                        argdoc)))
         (replace-regexp-in-string "\\(\n\n\\|\\'\\)\\(.\\|\n\\)*\\'"
