@@ -126,6 +126,7 @@
 
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
+(load "emacs-lisp/macroexp-progn")
 (load "subr")
 (load "subr-hooks")
 
