@@ -3858,7 +3858,7 @@ struct frame_parm_table {
   Lisp_Object *variable;
 };
 
-#define SYMBOL_INDEX(SYM) &sym
+#define SYMBOL_INDEX(sym) &sym
 
 static const struct frame_parm_table frame_parms[] =
 {
