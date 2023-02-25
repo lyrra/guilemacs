@@ -4884,9 +4884,6 @@ init_lread (void)
 {
   /* First, set Vload_path.  */
 
-  if (!NILP (Ffboundp (Qfile_truename)))
-    Vsource_directory = call1 (Qfile_truename, Vsource_directory);
-
   /* Set Vsource_directory before calling load_path_default.  */
   Vsource_directory
     = Fexpand_file_name (build_string ("../"),
