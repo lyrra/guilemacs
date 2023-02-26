@@ -8070,7 +8070,7 @@ foreach_window_1 (struct window *w, bool (*fn) (struct window *, void *),
    window, combination_limit and the like.  This might have to be
    fixed.  */
 
-static bool
+bool
 compare_window_configurations (Lisp_Object configuration1,
 			       Lisp_Object configuration2)
 {
