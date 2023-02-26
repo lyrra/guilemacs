@@ -3112,7 +3112,8 @@ There is no need to explicitly add `help-char' to CHARS;
               ;; We have a string (with one character), so return the first one.
               (elt result 0)
             ;; The default value is RET.
-            (when history (push "\r" (symbol-value history)))
+            ;FIX-20230226-LAV: this expr expands to pcase which isn't available
+            nil ;(when history (push "\r" (symbol-value history)))
             ?\r)))
     ;; Display the question with the answer.
     (message "%s%s" prompt (char-to-string char))
