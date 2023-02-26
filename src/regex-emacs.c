@@ -3959,11 +3959,11 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 
   DEBUG_PRINT ("\nEntering re_match_2.\n");
 
+  dynwind_begin ();
+
   REGEX_USE_SAFE_ALLOCA;
 
   INIT_FAIL_STACK ();
-
-  ptrdiff_t count = SPECPDL_INDEX ();
 
   /* Prevent shrinking and relocation of buffer text if GC happens
      while we are inside this function.  The calls to
@@ -4206,8 +4206,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 
 	  DEBUG_PRINT ("Returning %td from re_match_2.\n", dcnt);
 
-	  unbind_to (count, Qnil);
-	  SAFE_FREE ();
+          dynwind_end ();
 	  return dcnt;
 	}
 
@@ -5056,8 +5055,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
   if (best_regs_set)
     goto restore_best_regs;
 
-  unbind_to (count, Qnil);
-  SAFE_FREE ();
+  dynwind_end ();
 
   return -1;				/* Failure to match.  */
 }
