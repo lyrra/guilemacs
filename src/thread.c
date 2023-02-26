@@ -688,8 +688,8 @@ run_thread (void *state)
 
   self->thread_id = sys_thread_self ();
 
-  if (self->thread_name)
-    sys_thread_set_name (self->thread_name);
+  //if (self->thread_name)
+  //  sys_thread_set_name (self->thread_name);
 
   acquire_global_lock (self);
 
