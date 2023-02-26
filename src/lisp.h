@@ -366,7 +366,6 @@ typedef EMACS_INT Lisp_Word;
 #endif
 
 #if DEFINE_KEY_OPS_AS_MACROS
-# error "ddnot used"
 # define XLI(o) lisp_h_XLI (o)
 # define XIL(i) lisp_h_XIL (i)
 # define CHECK_FIXNUM(x) lisp_h_CHECK_FIXNUM (x)
@@ -389,7 +388,6 @@ typedef EMACS_INT Lisp_Word;
 # define XHASH(a) lisp_h_XHASH (a)
 # define XSYMBOL(a) lisp_h_XSYMBOL (a)
 #endif
-#endif // if-0
 
 //--------- lhz new below
 /* Define NAME as a lisp.h inline function that returns TYPE and has
