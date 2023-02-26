@@ -221,23 +221,6 @@ buffer_memory_full (ptrdiff_t nbytes)
 }
 
 
-/* Alignment needed for memory blocks that are allocated via malloc
-   and that contain Lisp objects.  On typical hosts malloc already
-   aligns sufficiently, but extra work is needed on oddball hosts
-   where Emacs would crash if malloc returned a non-GCALIGNED pointer.  */
-enum { LISP_ALIGNMENT = alignof (union { union emacs_align_type x;
-					 GCALIGNED_UNION_MEMBER }) };
-verify (LISP_ALIGNMENT % GCALIGNMENT == 0);
-
-/* True if malloc (N) is known to return storage suitably aligned for
-   Lisp objects whenever N is a multiple of LISP_ALIGNMENT.  In
-   practice this is true whenever alignof (max_align_t) is also a
-   multiple of LISP_ALIGNMENT.  This works even for buggy platforms
-   like MinGW circa 2020, where alignof (max_align_t) is 16 even though
-   the malloc alignment is only 8, and where Emacs still works because
-   it never does anything that requires an alignment of 16.  */
-enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
-
 /* Like GC_MALLOC but check for no memory and block interrupt input.  */
 
 void *
