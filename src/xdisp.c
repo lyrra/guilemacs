@@ -12205,10 +12205,10 @@ set_message (Lisp_Object string)
 
   if (FUNCTIONP (Vset_message_function))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
       message = safe_call1 (Vset_message_function, string);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       if (STRINGP (message))
         {
@@ -12283,10 +12283,10 @@ clear_message (bool current_p, bool last_displayed_p)
 
       if (FUNCTIONP (Vclear_message_function))
         {
-          ptrdiff_t count = SPECPDL_INDEX ();
+          dynwind_begin ();
           specbind (Qinhibit_quit, Qt);
           safe_call (1, Vclear_message_function);
-          unbind_to (count, Qnil);
+          dynwind_end ();
         }
     }
 
