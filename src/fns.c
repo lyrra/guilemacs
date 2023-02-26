@@ -1807,7 +1807,7 @@ TESTFN is called with 2 arguments: a car of an alist element and KEY.  */)
 Lisp_Object
 assoc_no_quit (Lisp_Object key, Lisp_Object alist)
 {
-  return Fassoc(key, list, Qnil);
+  return Fassoc(key, alist, Qnil);
 #if 0
   for (; ! NILP (alist); alist = XCDR (alist))
     {
