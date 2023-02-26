@@ -1036,6 +1036,15 @@ allocate_vector (ptrdiff_t len)
 }
 
 
+struct Lisp_Vector *
+allocate_nil_vector (ptrdiff_t len)
+{
+  struct Lisp_Vector *v = allocate_vector(len);
+  for (int i = 0; i < len; ++i)
+    v->contents[i] = Qnil;
+  return v;
+}
+
 /* Allocate other vector-like structures.  */
 
 struct Lisp_Vector *
