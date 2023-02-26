@@ -1103,9 +1103,6 @@ allocate_buffer (void)
 
   SCM_NEWSMOB (b->header.self, lisp_vectorlike_tag, b);
   BUFFER_PVEC_INIT (b);
-  /* Put B on the chain of all buffers including killed ones.  */
-  b->next = all_buffers;
-  all_buffers = b;
   /* Note that the rest fields of B are not initialized.  */
   return b;
 }
