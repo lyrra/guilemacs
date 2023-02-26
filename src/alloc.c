@@ -550,6 +550,34 @@ allocate_string_data (Lisp_Object string,
   s->data[nbytes] = '\0';
 }
 
+/* Reallocate multibyte STRING data when a single character is replaced.
+   The character is at byte offset CIDX_BYTE in the string.
+   The character being replaced is CLEN bytes long,
+   and the character that will replace it is NEW_CLEN bytes long.
+   Return the address of where the caller should store the
+   the new character.  */
+
+unsigned char *
+resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
+                    int clen, int new_clen)
+{
+  eassume (STRING_MULTIBYTE (string));
+  ptrdiff_t nchars = SCHARS (string);
+  ptrdiff_t nbytes = SBYTES (string);
+  ptrdiff_t new_nbytes = nbytes + (new_clen - clen);
+  unsigned char *data = SDATA (string);
+  unsigned char *new_charaddr;
+  allocate_string_data (XSTRING (string), nchars, new_nbytes);
+  unsigned char *new_data = SDATA (string);
+  new_charaddr = new_data + cidx_byte;
+  memcpy (new_charaddr + new_clen, data + cidx_byte + clen,
+          nbytes - (cidx_byte + clen));
+  memcpy (new_data, data, cidx_byte);
+  clear_string_char_byte_cache ();
+
+  return new_charaddr;
+}
+
 void
 string_overflow (void)
 {
