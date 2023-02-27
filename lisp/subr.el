@@ -860,7 +860,9 @@ For an approximate inverse of this, see `key-description'."
   ;; the calling convention of `kbd'.
   (declare (pure t) (side-effect-free t))
   ;; A pure function is expected to preserve the match data.
-  (save-match-data (read-kbd-macro keys)))
+  ;(save-match-data (read-kbd-macro keys))
+  ;FIX-20230227-LAV: Scheme error, macro not found
+  (read-kbd-macro keys))
 
 (defun undefined ()
   "Beep to tell the user this binding is undefined."
