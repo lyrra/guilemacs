@@ -1794,13 +1794,6 @@ ASIZE (Lisp_Object array)
 }
 
 INLINE ptrdiff_t
-gc_asize (Lisp_Object array)
-{
-  /* Like ASIZE, but also can be used in the garbage collector.  */
-  return XVECTOR (array)->header.size & ~ARRAY_MARK_FLAG;
-}
-
-INLINE ptrdiff_t
 PVSIZE (Lisp_Object pv)
 {
   return ASIZE (pv) & PSEUDOVECTOR_SIZE_MASK;
