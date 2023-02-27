@@ -206,7 +206,8 @@
 
 (load "simple")
 
-(load "help-fns")
+(load "button")                  ;After loaddefs, because of define-minor-mode!
+(load "help-fns") ; after button, needs button-buffer-map
 
 
 ;; We don't want to store loaddefs.el in the repository because it is
@@ -230,7 +231,6 @@
            definition-prefixes)
   (setq definition-prefixes new))
 
-(load "button")                  ;After loaddefs, because of define-minor-mode!
 ;(load "emacs-lisp/nadvice")
 ;(load "emacs-lisp/cl-preloaded")
 ;(load "obarray")        ;abbrev.el is implemented in terms of obarrays.
