@@ -48,7 +48,8 @@
     map)
   "Keymap for Help mode.")
 
-(easy-menu-define help-mode-menu help-mode-map
+;;FIX-20230228-LAV: similar as below, use before being defined error (symbols function definition is void), not sure though what is undefined here. it used to work recently
+'(easy-menu-define help-mode-menu help-mode-map
   "Menu for Help mode."
   '("Help-Mode"
     ["Show Help for Symbol" help-follow-symbol
@@ -95,7 +96,7 @@
 
   menu)
 
-(defvar help-mode-tool-bar-map
+'(defvar help-mode-tool-bar-map
   (let ((map (make-sparse-keymap)))
     (tool-bar-local-item "close" 'quit-window 'quit map
                          :help "Quit help"
