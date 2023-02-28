@@ -119,7 +119,7 @@ enum
     CALLPROC_FDS
   };
 
-static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int, Lisp_Object *);
+static Lisp_Object call_process (ptrdiff_t, Lisp_Object *, int*, Lisp_Object *);
 
 #ifdef DOS_NT
 # define CHILD_SETUP_TYPE int
