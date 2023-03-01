@@ -5546,5 +5546,5 @@ be preloaded.  */);
   Fprovide (intern_c_string ("native-compile"), Qnil);
 #endif /* #ifdef HAVE_NATIVE_COMP */
 
-  defsubr (&Snative_comp_available_p);
+  //defsubr (&Snative_comp_available_p);
 }
