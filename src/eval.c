@@ -701,13 +701,15 @@ restore_handler (void *data)
 
 struct icc_thunk_env
 {
-  enum { ICC_0, ICC_1, ICC_2, ICC_3, ICC_N } type;
+  enum { ICC_0, ICC_1, ICC_2, ICC_3, ICC_4, ICC_5, ICC_N } type;
   union
   {
     Lisp_Object (*fun0) (void);
     Lisp_Object (*fun1) (Lisp_Object);
     Lisp_Object (*fun2) (Lisp_Object, Lisp_Object);
     Lisp_Object (*fun3) (Lisp_Object, Lisp_Object, Lisp_Object);
+    Lisp_Object (*fun4) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
+    Lisp_Object (*fun5) (Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object);
     Lisp_Object (*funn) (ptrdiff_t, Lisp_Object *);
   };
   union
@@ -717,6 +719,8 @@ struct icc_thunk_env
       Lisp_Object arg1;
       Lisp_Object arg2;
       Lisp_Object arg3;
+      Lisp_Object arg4;
+      Lisp_Object arg5;
     };
     struct
     {
@@ -993,7 +997,6 @@ internal_condition_case_1 (Lisp_Object (*bfun) (Lisp_Object), Lisp_Object arg,
 			   Lisp_Object handlers,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
-  Lisp_Object val;
   struct handler *c = make_condition_handler (handlers);
 
   struct icc_thunk_env env = { .type = ICC_1,
@@ -1036,21 +1039,16 @@ internal_condition_case_3 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
                            Lisp_Object handlers,
                            Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
+  struct handler *c = make_condition_handler (handlers);
+  struct icc_thunk_env env = { .type = ICC_3,
+                               .fun2 = bfun,
+                               .arg1 = arg1,
+                               .arg2 = arg2,
+                               .arg3 = arg3,
+                               .c = c };
+  return call_with_prompt (c->ptag,
+                           make_c_closure (icc_thunk, &env, 0, 0),
+                           make_c_closure (icc_handler, hfun, 2, 0));
 }
 
 /* Like internal_condition_case_1 but call BFUN with ARG1, ARG2, ARG3, ARG4 as
@@ -1064,21 +1062,17 @@ internal_condition_case_4 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
                            Lisp_Object handlers,
                            Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3, arg4);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
+  struct handler *c = make_condition_handler (handlers);
+  struct icc_thunk_env env = { .type = ICC_4,
+                               .fun2 = bfun,
+                               .arg1 = arg1,
+                               .arg2 = arg2,
+                               .arg3 = arg3,
+                               .arg4 = arg4,
+                               .c = c };
+  return call_with_prompt (c->ptag,
+                           make_c_closure (icc_thunk, &env, 0, 0),
+                           make_c_closure (icc_handler, hfun, 2, 0));
 }
 
 /* Like internal_condition_case_1 but call BFUN with ARG1, ARG2, ARG3,
@@ -1093,21 +1087,18 @@ internal_condition_case_5 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object,
 			   Lisp_Object arg5, Lisp_Object handlers,
                            Lisp_Object (*hfun) (Lisp_Object))
 {
-  struct handler *c = push_handler (handlers, CONDITION_CASE);
-  if (sys_setjmp (c->jmp))
-    {
-      Lisp_Object val = handlerlist->val;
-      clobbered_eassert (handlerlist == c);
-      handlerlist = handlerlist->next;
-      return hfun (val);
-    }
-  else
-    {
-      Lisp_Object val = bfun (arg1, arg2, arg3, arg4, arg5);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
+  struct handler *c = make_condition_handler (handlers);
+  struct icc_thunk_env env = { .type = ICC_5,
+                               .fun2 = bfun,
+                               .arg1 = arg1,
+                               .arg2 = arg2,
+                               .arg3 = arg3,
+                               .arg4 = arg4,
+                               .arg5 = arg5,
+                               .c = c };
+  return call_with_prompt (c->ptag,
+                           make_c_closure (icc_thunk, &env, 0, 0),
+                           make_c_closure (icc_handler, hfun, 2, 0));
 }
 
 /* Like internal_condition_case but call BFUN with NARGS as first,
