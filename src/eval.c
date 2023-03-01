@@ -950,8 +950,6 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 
   CHECK_SYMBOL (var);
 
-  Lisp_Object success_handler = Qnil;
-
   for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
     {
       Lisp_Object tem = XCAR (tail);
@@ -961,10 +959,6 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 		     || CONSP (XCAR (tem))))))
 	error ("Invalid condition handler: %s",
 	       SDATA (Fprin1_to_string (tem, Qt)));
-      if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
-	success_handler = XCDR (tem);
-      else
-	clausenb++;
     }
 
   return ilcc1 (var, bodyform, Freverse (handlers));
