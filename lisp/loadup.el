@@ -399,6 +399,8 @@
 (load "vc/vc-hooks")
 (load "vc/ediff-hook")
 (load "uniquify")
+(advice-add 'rename-buffer :around #'uniquify--rename-buffer-advice)
+(advice-add 'create-file-buffer :around #'uniquify--create-file-buffer-advice)
 (load "electric")
 (load "paren")
 

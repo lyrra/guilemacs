@@ -476,7 +476,6 @@ For use on `kill-buffer-hook'."
 ;; rename-buffer and create-file-buffer.  (Setting find-file-hook isn't
 ;; sufficient.)
 
-(advice-add 'rename-buffer :around #'uniquify--rename-buffer-advice)
 (defun uniquify--rename-buffer-advice (rb-fun newname &optional unique &rest args)
   "Uniquify buffer names with parts of directory name."
   (let ((retval (apply rb-fun newname unique args)))
@@ -493,8 +492,6 @@ For use on `kill-buffer-hook'."
         (setq retval (buffer-name (current-buffer)))))
     retval))
 
-
-(advice-add 'create-file-buffer :around #'uniquify--create-file-buffer-advice)
 (defun uniquify--create-file-buffer-advice (cfb-fun filename &rest args)
   "Uniquify buffer names with parts of directory name."
   (let ((retval (apply cfb-fun filename args)))
