@@ -815,6 +815,12 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   Lisp_Object arity;
   bool special = false;
 
+  //FIX-20230301-LAV: not sure this is correct, or if it is, should we get the arity from the scheme-gsubr?
+  if (SCM_PRIMITIVE_P (subr))
+    {
+      return Qnil; // Fcons (Qnil, Qnil);
+    }
+
   CHECK_SUBR (subr);
   if (CONSP (subr) && EQ (XCAR (subr), Qspecial_operator))
     {
