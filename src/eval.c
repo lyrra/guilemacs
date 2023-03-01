@@ -69,7 +69,7 @@ static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, ptrdiff_t);
 static Lisp_Object lambda_arity (Lisp_Object);
 
-Lisp_Object
+static Lisp_Object
 unbind_to (ptrdiff_t count, Lisp_Object value);
 
 static Lisp_Object

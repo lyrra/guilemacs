@@ -83,7 +83,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 {
   char *from, *to, *name, *p, *p1;
   Lisp_Object file, pos;
-  ptrdiff_t count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;
 
   if (FIXNUMP (filepos))
@@ -143,7 +142,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
 	}
     }
   dynwind_begin ();
-  count = SPECPDL_INDEX ();
   record_unwind_protect_int (close_file_unwind, fd);
 
   /* Seek only to beginning of disk block.  */
@@ -199,8 +197,6 @@ get_doc_string (Lisp_Object filepos, bool unibyte, bool definition)
       p += nread;
     }
   dynwind_end ();
-  SAFE_FREE ();
-  unbind_to (count, Qnil);
 
   /* Sanity checking.  */
   if (CONSP (filepos))

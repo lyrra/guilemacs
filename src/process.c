@@ -2169,7 +2169,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   if (!EQ (p->command, Qt))
     add_process_read_fd (inchannel);
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* This may signal an error.  */
   setup_process_coding_systems (process);
@@ -2197,7 +2197,7 @@ create_process (Lisp_Object process, char **new_argv, Lisp_Object current_dir)
   unblock_input ();
 
   /* Environment block no longer needed.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (pid < 0)
     report_file_errno (CHILD_SETUP_ERROR_DESC, Qnil, vfork_errno);

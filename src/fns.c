@@ -2911,7 +2911,7 @@ if `last-nonmenu-event' is nil, and `use-dialog-box' is non-nil.  */)
   AUTO_STRING (yes_or_no, "(yes or no) ");
   prompt = CALLN (Fconcat, prompt, yes_or_no);
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qenable_recursive_minibuffers, Qt);
 
   while (1)
@@ -2920,9 +2920,15 @@ if `last-nonmenu-event' is nil, and `use-dialog-box' is non-nil.  */)
 					      Qyes_or_no_p_history, Qnil,
 					      Qnil));
       if (SCHARS (ans) == 3 && !strcmp (SSDATA (ans), "yes"))
-	return unbind_to (count, Qt);
+        {
+          dynwind_end ();
+	  return Qt;
+        }
       if (SCHARS (ans) == 2 && !strcmp (SSDATA (ans), "no"))
-	return unbind_to (count, Qnil);
+        {
+          dynwind_end ();
+	  return Qnil;
+        }
 
       Fding (Qnil);
       Fdiscard_input ();
@@ -4083,10 +4089,12 @@ hash_table_user_defined_call (ptrdiff_t nargs, Lisp_Object *args,
 {
   if (!h->mutable)
     return Ffuncall (nargs, args);
-  ptrdiff_t count = inhibit_garbage_collection ();
+  dynwind_begin (); // inhibit_garbage_collection ();
   record_unwind_protect_ptr (restore_mutability, h);
   h->mutable = false;
-  return unbind_to (count, Ffuncall (nargs, args));
+  Lisp_Object res = Ffuncall (nargs, args);
+  dynwind_end ();
+  return res;
 }
 
 /* Ignore HT and compare KEY1 and KEY2 using 'eql'.

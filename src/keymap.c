@@ -2928,7 +2928,7 @@ the one in this keymap, we ignore this one.  */)
    Lisp_Object partial, Lisp_Object shadow, Lisp_Object entire_map,
    Lisp_Object mention_shadow)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qstandard_output, Fcurrent_buffer ());
   CHECK_VECTOR_OR_CHAR_TABLE (vector);
 
@@ -2937,7 +2937,8 @@ the one in this keymap, we ignore this one.  */)
 
   describe_vector (vector, prefix, describer, describe_vector_basic, b_partial,
 		   shadow, entire_map, true, b_mention_shadow);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 /* Insert in the current buffer a description of the contents of VECTOR.

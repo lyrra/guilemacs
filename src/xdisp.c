@@ -13013,7 +13013,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  || window_buffer_changed (w))
 	{
 	  struct buffer *prev = current_buffer;
-	  ptrdiff_t count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 
 	  specbind (Qinhibit_menubar_update, Qt);
 
@@ -13065,7 +13065,7 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  w->update_mode_line = true;
 #endif /* HAVE_EXT_MENU_BAR */
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  set_buffer_internal_1 (prev);
 	}
     }
@@ -13183,9 +13183,10 @@ update_tab_bar (struct frame *f, bool save_match_data)
 	  || window_buffer_changed (w))
 	{
 	  struct buffer *prev = current_buffer;
-	  ptrdiff_t count = SPECPDL_INDEX ();
 	  Lisp_Object new_tab_bar;
           int new_n_tab_bar;
+
+	  dynwind_begin ();
 
 	  /* Set current_buffer to the buffer of the selected
 	     window of the frame, so that we get the right local
@@ -13238,7 +13239,7 @@ update_tab_bar (struct frame *f, bool save_match_data)
               unblock_input ();
             }
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  set_buffer_internal_1 (prev);
 	}
     }
@@ -25543,8 +25544,9 @@ display_mode_lines (struct window *w)
 {
   Lisp_Object old_selected_window = selected_window;
   Lisp_Object new_frame = w->frame;
-  ptrdiff_t count = SPECPDL_INDEX ();
   int n = 0;
+
+  dynwind_begin ();
 
   record_unwind_protect (restore_selected_window, selected_window);
   record_unwind_protect
@@ -25615,7 +25617,7 @@ display_mode_lines (struct window *w)
       ++n;
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (n > 0)
     w->must_be_updated_p = true;

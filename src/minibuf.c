@@ -984,7 +984,7 @@ nth_minibuffer (EMACS_INT depth)
 static void
 set_minibuffer_mode (Lisp_Object buf, EMACS_INT depth)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_current_buffer ();
   Fset_buffer (buf);
@@ -1000,7 +1000,7 @@ set_minibuffer_mode (Lisp_Object buf, EMACS_INT depth)
       else
 	Fkill_all_local_variables ();
     }
-  buf = unbind_to (count, buf);
+  dynwind_end ();
 }
 
 /* Return a buffer to be used as the minibuffer at depth `depth'.
