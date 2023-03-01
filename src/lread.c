@@ -4356,13 +4356,13 @@ intern_1 (const char *str, ptrdiff_t len)
 {
   //Lisp_Object obarray = check_obarray (Vobarray);
   //return intern_driver (make_unibyte_string (str, len), obarray, Qnil);
-  return Fintern (make_string (str, len), Qnil);
+  return Fintern (make_pure_c_string (str, len), Qnil);
 }
 
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  return Fintern (make_string (str, len), Qnil);
+  return Fintern (make_pure_c_string (str, len), Qnil);
 }
 
 
