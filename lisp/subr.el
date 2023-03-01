@@ -1802,10 +1802,11 @@ performance impact when running `add-hook' and `remove-hook'."
       ;; All those `equal' tests performed between functions can end up being
       ;; costly since those functions may be large recursive and even cyclic
       ;; structures, so we index `hook--depth-alist' with `eq'.  (bug#46326)
-      (when (or (get hook 'hook--depth-alist) (not (zerop depth)))
-        ;; Note: The main purpose of the above `when' test is to avoid running
-        ;; this `setf' before `gv' is loaded during bootstrap.
-        (push (cons function depth) (get hook 'hook--depth-alist)))
+; FIX-20230301-LAV: see compiled scheme in eval-lisp runtime.scm
+;      (when (or (get hook 'hook--depth-alist) (not (zerop depth)))
+;        ;; Note: The main purpose of the above `when' test is to avoid running
+;        ;; this `setf' before `gv' is loaded during bootstrap.
+;        (push (cons function depth) (get hook 'hook--depth-alist)))
       (setq hook-value
 	    (if (< 0 depth)
 		(append hook-value (list function))
