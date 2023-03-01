@@ -1399,6 +1399,10 @@ Return t if the file exists and loads successfully.  */)
      Vload_source_file_function.  */
   specbind (Qlexical_binding, Qnil);
 
+  /* Get the name for load-history.  */
+  hist_file_name = concat2 (Ffile_name_directory (file),
+                            Ffile_name_nondirectory (found));
+
   Lisp_Object found_eff =
     is_native_elisp
     ? compute_found_effective (found)
