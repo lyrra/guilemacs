@@ -1886,6 +1886,8 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       init_eval_once ();
       init_charset_once ();
       init_coding_once ();
+      init_casetab_once ();	/* Must be done before init_buffer_once.  */
+      Vbuffer_alist = Qnil; // workaround, minibuf needs init_buffer_once, ie circular dep.
       init_minibuf_once ();	/* Create list of minibuffers.  */
 				/* Must precede init_window_once.  */
 
@@ -1895,7 +1897,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
       init_syntax_once ();	/* Create standard syntax table.  */
       init_category_once ();	/* Create standard category table.  */
-      init_casetab_once ();	/* Must be done before init_buffer_once.  */
       init_buffer_once ();	/* Create buffer table and some buffers.  */
       syms_of_data ();
 
