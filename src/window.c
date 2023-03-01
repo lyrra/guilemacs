@@ -7605,9 +7605,10 @@ static struct window *
 set_window_margins (struct window *w, Lisp_Object left_width,
 		    Lisp_Object right_width)
 {
+  //FIX-20230301-LAV: BVAR *widths are uninitialized, workaround !left/right_window
   int unit = WINDOW_FRAME_COLUMN_WIDTH (w);
-  int left = NILP (left_width) ? 0 : extract_dimension (left_width);
-  int right = NILP (right_width) ? 0 : extract_dimension (right_width);
+  int left = (!left_width) || NILP (left_width) ? 0 : extract_dimension (left_width);
+  int right = (!right_width) || NILP (right_width) ? 0 : extract_dimension (right_width);
 
   if (w->left_margin_cols != left || w->right_margin_cols != right)
     {
