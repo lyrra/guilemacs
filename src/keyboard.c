@@ -1239,7 +1239,7 @@ command_loop_2_inner (void)
                                    0);
 }
 
-static Lisp_Object
+Lisp_Object
 command_loop_2 (Lisp_Object ignore)
 {
   register Lisp_Object val;
