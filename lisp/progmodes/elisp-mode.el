@@ -37,7 +37,7 @@
 It has `lisp-mode-abbrev-table' as its parent."
   :parents (list lisp-mode-abbrev-table))
 
-(defvar emacs-lisp-mode-syntax-table
+'(defvar emacs-lisp-mode-syntax-table
   (let ((table (make-syntax-table lisp-data-mode-syntax-table)))
     ;; These are redundant, now.
     ;;(modify-syntax-entry ?\[ "(]  " table)

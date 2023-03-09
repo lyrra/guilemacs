@@ -206,6 +206,59 @@
 
 (load "simple")
 
+; from emacs-lisp/lisp-mode.el
+(defvar lisp-data-mode-syntax-table
+  (let ((table (make-syntax-table))
+        (i 0))
+    (while (< i ?0)
+      (modify-syntax-entry i "_   " table)
+      (setq i (1+ i)))
+    (setq i (1+ ?9))
+    (while (< i ?A)
+      (modify-syntax-entry i "_   " table)
+      (setq i (1+ i)))
+    (setq i (1+ ?Z))
+    (while (< i ?a)
+      (modify-syntax-entry i "_   " table)
+      (setq i (1+ i)))
+    (setq i (1+ ?z))
+    (while (< i 128)
+      (modify-syntax-entry i "_   " table)
+      (setq i (1+ i)))
+    (modify-syntax-entry ?\s "    " table)
+    ;; Non-break space acts as whitespace.
+    (modify-syntax-entry ?\xa0 "    " table)
+    (modify-syntax-entry ?\t "    " table)
+    (modify-syntax-entry ?\f "    " table)
+    (modify-syntax-entry ?\n ">   " table)
+    (modify-syntax-entry ?\; "<   " table)
+    (modify-syntax-entry ?` "'   " table)
+    (modify-syntax-entry ?' "'   " table)
+    (modify-syntax-entry ?, "'   " table)
+    (modify-syntax-entry ?@ "_ p" table)
+    ;; Used to be singlequote; changed for flonums.
+    (modify-syntax-entry ?. "_   " table)
+    (modify-syntax-entry ?# "'   " table)
+    (modify-syntax-entry ?\" "\"    " table)
+    (modify-syntax-entry ?\\ "\\   " table)
+    (modify-syntax-entry ?\( "()  " table)
+    (modify-syntax-entry ?\) ")(  " table)
+    (modify-syntax-entry ?\[ "(]" table)
+    (modify-syntax-entry ?\] ")[" table)
+    table)
+  "Parent syntax table used in Lisp modes.")
+
+; from progmodes/elisp-mode.el
+(defvar emacs-lisp-mode-syntax-table
+  (let ((table (make-syntax-table lisp-data-mode-syntax-table)))
+    ;; These are redundant, now.
+    ;;(modify-syntax-entry ?\[ "(]  " table)
+    ;;(modify-syntax-entry ?\] ")[  " table)
+    table)
+  "Syntax table used in `emacs-lisp-mode'.")
+
+
+
 (load "button")                  ;After loaddefs, because of define-minor-mode!
 (load "help-fns") ; after button, needs button-buffer-map
 

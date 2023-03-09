@@ -38,7 +38,7 @@
 (define-abbrev-table 'lisp-mode-abbrev-table ()
   "Abbrev table for Lisp mode.")
 
-(defvar lisp-data-mode-syntax-table
+'(defvar lisp-data-mode-syntax-table
   (let ((table (make-syntax-table))
         (i 0))
     (while (< i ?0)
