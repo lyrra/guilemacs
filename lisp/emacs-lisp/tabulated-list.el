@@ -207,7 +207,7 @@ If ADVANCE is non-nil, move forward by one line afterwards."
       (while (re-search-forward re nil 'noerror)
         (tabulated-list-put-tag empty)))))
 
-(defvar tabulated-list-mode-map
+'(defvar tabulated-list-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map (make-composed-keymap
                             button-buffer-map

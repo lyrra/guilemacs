@@ -170,10 +170,10 @@ static void readevalloop (Lisp_Object, struct infile *, Lisp_Object, bool,
 
 static void build_load_history (Lisp_Object, bool);
 
-static Lisp_Object considering_shorthand (Lisp_Object, const char *,
-					  ptrdiff_t, ptrdiff_t,
-					  char **, ptrdiff_t *,
-					  ptrdiff_t *);
+static void
+considering_shorthand (Lisp_Object obarray, const char *in,
+		       ptrdiff_t size, ptrdiff_t size_byte, char **out,
+		       ptrdiff_t *size_out, ptrdiff_t *size_byte_out);
 
 static Lisp_Object
 maybe_expand_longhand (const Lisp_Object, const Lisp_Object);
@@ -4489,7 +4489,7 @@ usage: (unintern NAME OBARRAY)  */)
    shorthand for any other symbol, OUT is set to point to NULL and
    'oblookup' is called.  */
 
-void
+static void
 considering_shorthand (Lisp_Object obarray, const char *in,
 		       ptrdiff_t size, ptrdiff_t size_byte, char **out,
 		       ptrdiff_t *size_out, ptrdiff_t *size_byte_out)

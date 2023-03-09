@@ -127,6 +127,7 @@
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
 (load "emacs-lisp/macroexp-progn")
+(defun read-kbd-macro (start &optional end))
 (load "subr")
 (load "subr-hooks")
 
@@ -310,7 +311,8 @@
 (load "international/charprop.el" t)
 (if (featurep 'charprop)
     (setq redisplay--inhibit-bidi nil))
-(load "international/characters")
+(load "minibuffer") ;Needs cl-generic (and define-minor-mode).
+(load "international/characters") ; needs minibuffer/try-completion
 (load "composite")
 
 (if unicode-category-table
@@ -349,7 +351,6 @@
 (load "language/cham")
 
 (load "indent")
-(load "minibuffer") ;Needs cl-generic (and define-minor-mode).
 (load "frame")
 (load "startup")
 (load "term/tty-colors")

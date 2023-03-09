@@ -116,7 +116,7 @@ as it is by default."
 This is set by the prefix argument to `buffer-menu' and related
 commands.")
 
-(defvar Buffer-menu-mode-map
+'(defvar Buffer-menu-mode-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map tabulated-list-mode-map)
     (define-key map "v" 'Buffer-menu-select)
@@ -154,7 +154,7 @@ commands.")
     map)
   "Local keymap for `Buffer-menu-mode' buffers.")
 
-(easy-menu-define Buffer-menu-mode-menu Buffer-menu-mode-map
+'(easy-menu-define Buffer-menu-mode-menu Buffer-menu-mode-map
   "Menu for `Buffer-menu-mode' buffers."
   '("Buffer-Menu"
     ["Mark" Buffer-menu-mark
