@@ -4495,13 +4495,13 @@ face_at_pos (const struct it *it, enum lface_attribute_index attr_filter)
 static enum prop_handled
 handle_face_prop (struct it *it)
 {
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
   /* Don't allow the user to quit out of face-merging code, in case
      this is called when redisplaying a non-selected window, with
      point temporarily moved to window-point.  */
   specbind (Qinhibit_quit, Qt);
   const int new_face_id = face_at_pos (it, 0);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
 
   /* Is this a start of a run of characters with box face?
@@ -5811,7 +5811,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 #ifdef HAVE_WINDOW_SYSTEM
       else
 	{
-	  ptrdiff_t count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 
 	  it->what = IT_IMAGE;
 	  /* Don't allow quitting from lookup_image, for when we are
@@ -5819,7 +5819,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	     was temporarily moved to the window-point.  */
 	  specbind (Qinhibit_quit, Qt);
 	  it->image_id = lookup_image (it->f, value, it->face_id);
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  it->position = start_pos;
 	  it->object = NILP (object) ? it->w->contents : object;
 	  it->method = GET_FROM_IMAGE;
@@ -17337,11 +17337,11 @@ run_window_scroll_functions (Lisp_Object window, struct text_pos startp)
 
   if (!NILP (Vwindow_scroll_functions))
     {
-      ptrdiff_t count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
       run_hook_with_args_2 (Qwindow_scroll_functions, window,
 			    make_fixnum (CHARPOS (startp)));
-      unbind_to (count, Qnil);
+      dynwind_end ();
       SET_TEXT_POS_FROM_MARKER (startp, w->start);
       /* In case the hook functions switch buffers.  */
       set_buffer_internal (XBUFFER (w->contents));
@@ -19355,11 +19355,10 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  || window_wants_header_line (w)
 	  || window_wants_tab_line (w)))
     {
-      ptrdiff_t count1 = SPECPDL_INDEX ();
-
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
       display_mode_lines (w);
-      unbind_to (count1, Qnil);
+      dynwind_end ();
 
       /* If mode line height has changed, arrange for a thorough
 	 immediate redisplay using the correct mode line height.  */
@@ -22175,7 +22174,7 @@ extend_face_to_end_of_line (struct it *it)
 	   || WINDOW_RIGHT_MARGIN_WIDTH (it->w) > 0))
     return;
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Don't allow the user to quit out of face-merging code, in case
      this is called when redisplaying a non-selected window, with
@@ -22185,7 +22184,7 @@ extend_face_to_end_of_line (struct it *it)
                               || it->s != NULL)
     ? DEFAULT_FACE_ID
     : face_at_pos (it, LFACE_EXTEND_INDEX);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Face extension extends the background and box of IT->extend_face_id
      to the end of the line.  If the background equals the background

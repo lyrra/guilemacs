@@ -969,7 +969,7 @@ update_window_fringes (struct window *w, bool keep_current_p)
   if (w->pseudo_window_p)
     return 0;
 
-  ptrdiff_t count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* This function could be called for redisplaying non-selected
      windows, in which case point has been temporarily moved to that
@@ -1339,7 +1339,7 @@ update_window_fringes (struct window *w, bool keep_current_p)
       row->fringe_bitmap_periodic_p = periodic_p;
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return redraw_p && !keep_current_p;
 }

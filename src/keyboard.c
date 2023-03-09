@@ -1043,10 +1043,10 @@ static Lisp_Object
 cmd_error (Lisp_Object data)
 {
   Lisp_Object old_level, old_length;
-  ptrdiff_t count = SPECPDL_INDEX ();
   Lisp_Object conditions;
   char macroerror[sizeof "After..kbd macro iterations: "
 		  + INT_STRLEN_BOUND (EMACS_INT)];
+  dynwind_begin ();
 
 #ifdef HAVE_WINDOW_SYSTEM
   if (display_hourglass_p)
@@ -1093,7 +1093,7 @@ cmd_error (Lisp_Object data)
   Vquit_flag = Qnil;
   Vinhibit_quit = Qnil;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return make_fixnum (0);
 }
 
