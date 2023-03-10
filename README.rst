@@ -14,6 +14,14 @@ Branch information
 
   This branch is just a pointer to the most recent rebase branch.
 
+  Currently this branch tracks branch e28.2
+
+* branch e28.2
+
+  Rebasing the attempt from 2019. Trying to squash many additional (cleanup) commits.
+
+  Based on emacs version 28.2
+
 * guile-20230101
 
   Rebasing the attempt from 2019. Trying to squash many additional (cleanup) commits.
