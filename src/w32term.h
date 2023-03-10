@@ -1,5 +1,5 @@
 /* Definitions and headers for communication on the Microsoft Windows API.
-   Copyright (C) 1995, 2001-2019 Free Software Foundation, Inc.
+   Copyright (C) 1995, 2001-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -75,7 +75,6 @@ struct w32_palette_entry {
 extern void w32_regenerate_palette (struct frame *f);
 extern void w32_fullscreen_rect (HWND hwnd, int fsmode, RECT normal,
                                  RECT *rect);
-
 
 /* For each display (currently only one on w32), we have a structure that
    records information about it.  */
@@ -233,6 +232,7 @@ extern void w32_real_positions (struct frame *f, int *xptr, int *yptr);
 
 extern void w32_clear_under_internal_border (struct frame *);
 
+extern void w32_change_tab_bar_height (struct frame *, int);
 extern void w32_change_tool_bar_height (struct frame *, int);
 extern void w32_implicitly_set_name (struct frame *, Lisp_Object, Lisp_Object);
 extern void w32_set_scroll_bar_default_width (struct frame *);
@@ -247,6 +247,8 @@ extern int w32_display_pixel_height (struct w32_display_info *);
 extern int w32_display_pixel_width (struct w32_display_info *);
 extern void initialize_frame_menubar (struct frame *);
 extern void w32_dialog_in_progress (Lisp_Object in_progress);
+extern void w32_query_frame_background_color (struct frame *f,
+                                              Emacs_Color *bgcolor);
 
 extern void w32_make_frame_visible (struct frame *f);
 extern void w32_make_frame_invisible (struct frame *f);
@@ -266,6 +268,10 @@ extern void w32con_show_cursor (void);
 extern const char *w32_get_string_resource (void *v_rdb,
                                             const char *name,
                                             const char *class);
+
+/* w32fns.c */
+extern void w32_default_font_parameter (struct frame* f, Lisp_Object parms);
+
 
 #define PIX_TYPE COLORREF
 
@@ -370,6 +376,10 @@ struct w32_output
   /* Non-hourglass cursor that is currently active.  */
   HCURSOR current_cursor;
 
+  /* The window style for this frame.  Set up when the frame is
+     created and updated when adding/removing decorations in
+     w32_set_undecorated.  Used by w32_set_window_size to adjust the
+     frame's window rectangle.  */
   DWORD dwStyle;
 
   /* This is the Emacs structure for the display this frame is on.  */
@@ -466,7 +476,7 @@ struct scroll_bar {
      editing large files, we establish a minimum height by always
      drawing handle bottoms VERTICAL_SCROLL_BAR_MIN_HANDLE pixels below
      where they would be normally; the bottom and top are in a
-     different co-ordinate system.  */
+     different coordinate system.  */
   int start, end;
 
   /* If the scroll bar handle is currently being dragged by the user,
@@ -661,7 +671,8 @@ do { \
 #define WM_EMACS_BRINGTOTOP            (WM_EMACS_START + 23)
 #define WM_EMACS_INPUT_READY           (WM_EMACS_START + 24)
 #define WM_EMACS_FILENOTIFY            (WM_EMACS_START + 25)
-#define WM_EMACS_END                   (WM_EMACS_START + 26)
+#define WM_EMACS_IME_STATUS            (WM_EMACS_START + 26)
+#define WM_EMACS_END                   (WM_EMACS_START + 27)
 
 #define WND_FONTWIDTH_INDEX    (0)
 #define WND_LINEHEIGHT_INDEX   (4)
@@ -743,12 +754,14 @@ extern int handle_file_notifications (struct input_event *);
 extern void w32_initialize_display_info (Lisp_Object);
 extern void initialize_w32_display (struct terminal *, int *, int *);
 
+extern bool w32_image_rotations_p (void);
+
 #ifdef WINDOWSNT
 /* Keyboard hooks.  */
 extern void setup_w32_kbdhook (void);
 extern void remove_w32_kbdhook (void);
 extern int check_w32_winkey_state (int);
-#define w32_kbdhook_active (os_subtype != OS_9X)
+#define w32_kbdhook_active (os_subtype != OS_SUBTYPE_9X)
 #else
 #define w32_kbdhook_active 0
 #endif

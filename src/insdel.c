@@ -1,5 +1,5 @@
 /* Buffer insertion/deletion and gap motion for GNU Emacs. -*- coding: utf-8 -*-
-   Copyright (C) 1985-1986, 1993-1995, 1997-2019 Free Software
+   Copyright (C) 1985-1986, 1993-1995, 1997-2022 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -115,7 +115,7 @@ gap_left (ptrdiff_t charpos, ptrdiff_t bytepos, bool newgap)
   i = GPT_BYTE;
   to = GAP_END_ADDR;
   from = GPT_ADDR;
-  new_s1 = GPT_BYTE;
+  new_s1 = GPT_BYTE; /* May point in the middle of multibyte sequences.  */
 
   /* Now copy the characters.  To move the gap down,
      copy characters up.  */
@@ -133,11 +133,17 @@ gap_left (ptrdiff_t charpos, ptrdiff_t bytepos, bool newgap)
 	 make_gap_smaller set inhibit-quit.  */
       if (QUITP)
 	{
+          /* FIXME: This can point in the middle of a multibyte character.  */
 	  bytepos = new_s1;
 	  charpos = BYTE_TO_CHAR (bytepos);
 	  break;
 	}
       /* Move at most 32000 chars before checking again for a quit.  */
+      /* FIXME: This 32KB chunk size dates back to before 1991.
+         Maybe we should bump it to reflect the >1000x increase
+         in memory size and bandwidth since that time.
+         Is it even worthwhile checking `quit` within this loop?
+         Especially since make_gap_smaller/larger binds inhibit-quit anyway!  */
       if (i > 32000)
 	i = 32000;
       new_s1 -= i;
@@ -164,7 +170,7 @@ gap_right (ptrdiff_t charpos, ptrdiff_t bytepos)
 {
   register unsigned char *to, *from;
   register ptrdiff_t i;
-  ptrdiff_t new_s1;
+  ptrdiff_t new_s1; /* May point in the middle of multibyte sequences.  */
 
   BUF_COMPUTE_UNCHANGED (current_buffer, charpos, GPT);
 
@@ -189,6 +195,7 @@ gap_right (ptrdiff_t charpos, ptrdiff_t bytepos)
 	 make_gap_smaller set inhibit-quit.  */
       if (QUITP)
 	{
+          /* FIXME: This can point in the middle of a multibyte character.  */
 	  bytepos = new_s1;
 	  charpos = BYTE_TO_CHAR (bytepos);
 	  break;
@@ -375,10 +382,10 @@ count_bytes (ptrdiff_t pos, ptrdiff_t bytepos, ptrdiff_t endpos)
 
   if (pos <= endpos)
     for ( ; pos < endpos; pos++)
-      INC_POS (bytepos);
+      bytepos += next_char_len (bytepos);
   else
     for ( ; pos > endpos; pos--)
-      DEC_POS (bytepos);
+      bytepos -= prev_char_len (bytepos);
 
   return bytepos;
 }
@@ -619,8 +626,7 @@ copy_text (const unsigned char *from_addr, unsigned char *to_addr,
 
       while (bytes_left > 0)
 	{
-	  int thislen, c;
-	  c = STRING_CHAR_AND_LENGTH (from_addr, thislen);
+	  int thislen, c = string_char_and_length (from_addr, &thislen);
 	  if (! ASCII_CHAR_P (c))
 	    c &= 0xFF;
 	  *to_addr++ = c;
@@ -708,7 +714,7 @@ insert_char (int c)
   insert ((char *) str, len);
 }
 
-/* Insert the NUL-terminated string S before point.  */
+/* Insert the null-terminated string S before point.  */
 
 void
 insert_string (const char *s)
@@ -1072,6 +1078,34 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
 /* Insert a sequence of NCHARS chars which occupy NBYTES bytes
    starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
+   GPT_ADDR (if not text_at_gap_tail).
+   Contrary to insert_from_gap, this does not invalidate any cache,
+   nor update any markers, nor record any buffer modification information
+   of any sort.  */
+void
+insert_from_gap_1 (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
+{
+  eassert (NILP (BVAR (current_buffer, enable_multibyte_characters))
+           ? nchars == nbytes : nchars <= nbytes);
+
+  GAP_SIZE -= nbytes;
+  if (! text_at_gap_tail)
+    {
+      GPT += nchars;
+      GPT_BYTE += nbytes;
+    }
+  ZV += nchars;
+  Z += nchars;
+  ZV_BYTE += nbytes;
+  Z_BYTE += nbytes;
+
+  /* Put an anchor to ensure multi-byte form ends at gap.  */
+  if (GAP_SIZE > 0) *(GPT_ADDR) = 0;
+  eassert (GPT <= GPT_BYTE);
+}
+
+/* Insert a sequence of NCHARS chars which occupy NBYTES bytes
+   starting at GAP_END_ADDR - NBYTES (if text_at_gap_tail) and at
    GPT_ADDR (if not text_at_gap_tail).  */
 
 void
@@ -1090,19 +1124,7 @@ insert_from_gap (ptrdiff_t nchars, ptrdiff_t nbytes, bool text_at_gap_tail)
   record_insert (GPT, nchars);
   modiff_incr (&MODIFF);
 
-  GAP_SIZE -= nbytes;
-  if (! text_at_gap_tail)
-    {
-      GPT += nchars;
-      GPT_BYTE += nbytes;
-    }
-  ZV += nchars;
-  Z += nchars;
-  ZV_BYTE += nbytes;
-  Z_BYTE += nbytes;
-  if (GAP_SIZE > 0) *(GPT_ADDR) = 0; /* Put an anchor.  */
-
-  eassert (GPT <= GPT_BYTE);
+  insert_from_gap_1 (nchars, nbytes, text_at_gap_tail);
 
   adjust_overlays_for_insert (ins_charpos, nchars);
   adjust_markers_for_insert (ins_charpos, ins_bytepos,
@@ -1370,7 +1392,7 @@ adjust_after_insert (ptrdiff_t from, ptrdiff_t from_byte,
 void
 replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
                bool prepare, bool inherit, bool markers,
-               bool adjust_match_data)
+               bool adjust_match_data, bool inhibit_mod_hooks)
 {
   ptrdiff_t inschars = SCHARS (new);
   ptrdiff_t insbytes = SBYTES (new);
@@ -1530,8 +1552,11 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   if (adjust_match_data)
     update_search_regs (from, to, from + SCHARS (new));
 
-  signal_after_change (from, nchars_del, GPT - from);
-  update_compositions (from, GPT, CHECK_BORDER);
+  if (!inhibit_mod_hooks)
+    {
+      signal_after_change (from, nchars_del, GPT - from);
+      update_compositions (from, GPT, CHECK_BORDER);
+    }
 }
 
 /* Replace the text from character positions FROM to TO with
@@ -1967,7 +1992,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
       /* Make binding buffer-file-name to nil effective.  */
       && !NILP (BVAR (base_buffer, filename))
       && SAVE_MODIFF >= MODIFF)
-    lock_file (BVAR (base_buffer, file_truename));
+    Flock_file (BVAR (base_buffer, file_truename));
 
   /* If `select-active-regions' is non-nil, save the region text.  */
   /* FIXME: Move this to Elisp (via before-change-functions).  */
@@ -1979,7 +2004,7 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
 	  : (!NILP (Vselect_active_regions)
 	     && !NILP (Vtransient_mark_mode))))
     Vsaved_region_selection
-      = call1 (Fsymbol_value (Qregion_extract_function), Qnil);
+      = call1 (Vregion_extract_function, Qnil);
 
   signal_before_change (start, end, preserve_ptr);
   Fset (Qdeactivate_mark, Qt);
@@ -2175,7 +2200,7 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
 {
   dynwind_begin ();
   struct rvoe_arg rvoe_arg;
-  Lisp_Object tmp;
+  Lisp_Object tmp, save_insert_behind_hooks, save_insert_in_from_hooks;
 
   if (inhibit_modification_hooks) {
     dynwind_end ();
@@ -2214,6 +2239,12 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
       return;
     }
 
+  /* Save and restore the insert-*-hooks, because other hooks like
+     after-change-functions, called below, could clobber them if they
+     manipulate text properties.  */
+  save_insert_behind_hooks = interval_insert_behind_hooks;
+  save_insert_in_from_hooks = interval_insert_in_front_hooks;
+
   if (!NILP (combine_after_change_list))
     Fcombine_after_change_execute ();
 
@@ -2235,6 +2266,9 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
       /* There was no error: unarm the reset_on_error.  */
       rvoe_arg.errorp = 0;
     }
+
+  interval_insert_behind_hooks = save_insert_behind_hooks;
+  interval_insert_in_front_hooks = save_insert_in_from_hooks;
 
   if (buffer_has_overlays ())
     report_overlay_modification (make_fixnum (charpos),
@@ -2371,7 +2405,13 @@ This affects `before-change-functions' and `after-change-functions',
 as well as hooks attached to text properties and overlays.
 Setting this variable non-nil also inhibits file locks and checks
 whether files are locked by another Emacs session, as well as
-handling of the active region per `select-active-regions'.  */);
+handling of the active region per `select-active-regions'.
+
+To delay change hooks during a series of changes, use
+`combine-change-calls' or `combine-after-change-calls' instead of
+binding this variable.
+
+See also the info node `(elisp) Change Hooks'.  */);
   inhibit_modification_hooks = 0;
   DEFSYM (Qinhibit_modification_hooks, "inhibit-modification-hooks");
 

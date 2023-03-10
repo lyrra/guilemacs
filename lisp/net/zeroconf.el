@@ -1,6 +1,6 @@
 ;;; zeroconf.el --- Service browser using Avahi.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, hardware
@@ -104,7 +104,7 @@
 (require 'dbus)
 
 (defvar zeroconf-debug nil
-  "Write messages during service discovery")
+  "Write messages during service discovery.")
 
 (defconst zeroconf-service-avahi "org.freedesktop.Avahi"
   "The D-Bus name used to talk to Avahi.")
@@ -253,23 +253,23 @@ the service.  Usually, every string is a key=value pair.  The
 supported keys depend on the service type.")
 
 (defun zeroconf-list-service-names ()
-  "Returns all discovered Avahi service names as list."
+  "Return all discovered Avahi service names as list."
   (let (result)
     (maphash
-     (lambda (_key value) (add-to-list 'result (zeroconf-service-name value)))
+     (lambda (_key value) (push (zeroconf-service-name value) result))
      zeroconf-services-hash)
-    result))
+    (delete-dups result)))
 
 (defun zeroconf-list-service-types ()
-  "Returns all discovered Avahi service types as list."
+  "Return all discovered Avahi service types as list."
   (let (result)
     (maphash
-     (lambda (_key value) (add-to-list 'result (zeroconf-service-type value)))
+     (lambda (_key value) (push (zeroconf-service-type value) result))
      zeroconf-services-hash)
-    result))
+    (delete-dups result)))
 
 (defun zeroconf-list-services (type)
-  "Returns all discovered Avahi services for a given service type TYPE.
+  "Return all discovered Avahi services for a given service type TYPE.
 The service type is one of the returned values of
 `zeroconf-list-service-types'.  The return value is a list
 \(SERVICE1 SERVICE2 ...).  See `zeroconf-services-hash' for the
@@ -278,9 +278,9 @@ format of SERVICE."
     (maphash
      (lambda (_key value)
        (when (equal type (zeroconf-service-type value))
-	 (add-to-list 'result value)))
+	 (push value result)))
      zeroconf-services-hash)
-    result))
+    (delete-dups result)))
 
 (defvar zeroconf-service-added-hooks-hash (make-hash-table :test 'equal)
   "Hash table of hooks for newly added services.
@@ -341,19 +341,19 @@ type used when registering FUNCTION."
       (remhash type table))))
 
 (defun zeroconf-get-host ()
-  "Returns the local host name as string."
+  "Return the local host name as string."
   (dbus-call-method
    :system zeroconf-service-avahi zeroconf-path-avahi
    zeroconf-interface-avahi-server "GetHostName"))
 
 (defun zeroconf-get-domain ()
-  "Returns the domain name as string."
+  "Return the domain name as string."
   (dbus-call-method
    :system zeroconf-service-avahi zeroconf-path-avahi
    zeroconf-interface-avahi-server "GetDomainName"))
 
 (defun zeroconf-get-host-domain ()
-  "Returns the local host name FQDN as string."
+  "Return the local host name FQDN as string."
   (dbus-call-method
    :system zeroconf-service-avahi zeroconf-path-avahi
    zeroconf-interface-avahi-server "GetHostNameFqdn"))
@@ -375,7 +375,7 @@ type used when registering FUNCTION."
 (defun zeroconf-get-service (name type)
   "Return the service description of service NAME as list.
 NAME must be a string.  The service must be of service type
-TYPE. The resulting list has the format
+TYPE.  The resulting list has the format
 
   (INTERFACE PROTOCOL NAME TYPE DOMAIN FLAGS)."
   ;; Due to the service browser, all known services are kept in
@@ -387,7 +387,7 @@ TYPE. The resulting list has the format
 (defun zeroconf-resolve-service (service)
   "Return all service attributes SERVICE as list.
 NAME must be a string.  The service must be of service type
-TYPE. The resulting list has the format
+TYPE.  The resulting list has the format
 
   (INTERFACE PROTOCOL NAME TYPE DOMAIN HOST APROTOCOL ADDRESS PORT TXT FLAGS)."
   (let* ((name (zeroconf-service-name service))

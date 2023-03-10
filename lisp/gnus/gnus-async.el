@@ -1,6 +1,6 @@
 ;;; gnus-async.el --- asynchronous support for Gnus  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -141,8 +141,15 @@ that was fetched."
 	      (cancel-timer 'gnus-async-timer)))
 	  (setq gnus-async-timer
 		(run-with-idle-timer
-		 0.1 nil #'gnus-async-prefetch-article
-		 group (gnus-data-number next) summary)))))))
+		 0.1 nil
+		 (lambda ()
+		   ;; When running from a timer, `C-g' is inhibited.
+		   ;; But the prefetch action may (when there's a
+		   ;; network problem or the like) hang (or take a
+		   ;; long time), so allow quitting anyway.
+		   (let ((inhibit-quit nil))
+		     (gnus-async-prefetch-article
+		      group (gnus-data-number next) summary))))))))))
 
 (defun gnus-async-prefetch-article (group article summary &optional next)
   "Possibly prefetch several articles starting with ARTICLE."
@@ -220,6 +227,7 @@ that was fetched."
 	  (narrow-to-region mark (point-max))
 	  ;; Put the articles into the agent, if they aren't already.
 	  (when (and gnus-agent
+		     gnus-agent-eagerly-store-articles
 		     (gnus-agent-group-covered-p group))
 	    (save-restriction
 	      (narrow-to-region mark (point-max))

@@ -1,6 +1,8 @@
 ;;; lisp-mode-tests.el --- Test Lisp editing commands  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2017-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2017-2022 Free Software Foundation, Inc.
+
+;; This file is part of GNU Emacs.
 
 ;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -20,6 +22,10 @@
 (require 'ert)
 (require 'cl-lib)
 (require 'lisp-mode)
+(require 'faceup)
+
+
+;;; Indentation
 
 (defconst lisp-mode-tests--correctly-indented-sexp "\
 \(a
@@ -149,7 +155,7 @@ noindent\" 3
       (should (equal (buffer-string) str)))))
 
 (ert-deftest indent-sexp-stop-before-eol-non-lisp ()
-  "`indent-sexp' shouldn't be too agressive in non-Lisp modes."
+  "`indent-sexp' shouldn't be too aggressive in non-Lisp modes."
   ;; See https://debbugs.gnu.org/35286#13.
   (with-temp-buffer
     (prolog-mode)
@@ -284,7 +290,45 @@ Expected initialization file: `%s'\"
     (lisp-indent-line)
     (should (equal (buffer-string) "prompt> foo"))))
 
+(ert-deftest lisp-indent-unfinished-string ()
+  "Don't infloop on unfinished string (Bug#37045)."
+  (with-temp-buffer
+    (insert "\"\n")
+    (lisp-indent-region (point-min) (point-max))))
 
+(ert-deftest lisp-indent-defun ()
+  (with-temp-buffer
+    (lisp-mode)
+    (let ((orig "(defun x ()
+  (print (quote ( thingy great
+		  stuff)))
+  (print (quote (thingy great
+			stuff))))"))
+      (insert orig)
+      (indent-region (point-min) (point-max))
+      (should (equal (buffer-string) orig)))))
+
+
+;;; Fontification
+
+(ert-deftest lisp-fontify-confusables ()
+  "Unescaped 'smart quotes' should be fontified in `font-lock-warning-face'."
+  (with-temp-buffer
+    (dolist (ch
+             '(#x2018 ;; LEFT SINGLE QUOTATION MARK
+               #x2019 ;; RIGHT SINGLE QUOTATION MARK
+               #x201B ;; SINGLE HIGH-REVERSED-9 QUOTATION MARK
+               #x201C ;; LEFT DOUBLE QUOTATION MARK
+               #x201D ;; RIGHT DOUBLE QUOTATION MARK
+               #x201F ;; DOUBLE HIGH-REVERSED-9 QUOTATION MARK
+               #x301E ;; DOUBLE PRIME QUOTATION MARK
+               #xFF02 ;; FULLWIDTH QUOTATION MARK
+               #xFF07 ;; FULLWIDTH APOSTROPHE
+               ))
+      (insert (format "«w:%c»foo \\%cfoo\n" ch ch)))
+    (let ((faceup (buffer-string)))
+      (faceup-clean-buffer)
+      (should (faceup-test-font-lock-buffer 'emacs-lisp-mode faceup)))))
 
 (provide 'lisp-mode-tests)
 ;;; lisp-mode-tests.el ends here

@@ -1,6 +1,6 @@
 ;;; pcmpl-gnu.el --- completions for GNU project tools -*- lexical-binding: t -*-
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
 
 ;; Package: pcomplete
 
@@ -37,8 +37,13 @@
 (defcustom pcmpl-gnu-makefile-regexps
   '("\\`GNUmakefile" "\\`[Mm]akefile" "\\.ma?k\\'")
   "A list of regexps that will match Makefile names."
-  :type '(repeat regexp)
-  :group 'pcmpl-gnu)
+  :type '(repeat regexp))
+
+(defcustom pcmpl-gnu-makefile-includes t
+  "If non-nil, `pcomplete/make' completes on targets in included files."
+  :type 'boolean
+  :version "27.1"
+  :safe 'booleanp)
 
 ;; Functions:
 
@@ -60,14 +65,14 @@
   "Find all zipped or unzipped files: the inverse of UNZIP-P."
   (pcomplete-entries
    nil
-   (function
-    (lambda (entry)
-      (when (and (file-readable-p entry)
-		 (file-regular-p entry))
-	(let ((zipped (string-match "\\.\\(t?gz\\|\\(ta\\)?Z\\)\\'"
-				    entry)))
-	  (or (and unzip-p zipped)
-	      (and (not unzip-p) (not zipped)))))))))
+   (lambda (entry)
+     (or (file-directory-p entry)
+         (when (and (file-readable-p entry)
+                    (file-regular-p entry))
+           (let ((zipped (string-match "\\.\\(t?gz\\|\\(ta\\)?Z\\)\\'"
+                                       entry)))
+             (or (and unzip-p zipped)
+                 (and (not unzip-p) (not zipped)))))))))
 
 ;;;###autoload
 (defun pcomplete/bzip2 ()
@@ -86,13 +91,12 @@
   "Find all zipped or unzipped files: the inverse of UNZIP-P."
   (pcomplete-entries
    nil
-   (function
-    (lambda (entry)
-      (when (and (file-readable-p entry)
-		 (file-regular-p entry))
-	(let ((zipped (string-match "\\.\\(t?z2\\|bz2\\)\\'" entry)))
-	  (or (and unzip-p zipped)
-	      (and (not unzip-p) (not zipped)))))))))
+   (lambda (entry)
+     (when (and (file-readable-p entry)
+                (file-regular-p entry))
+       (let ((zipped (string-match "\\.\\(t?z2\\|bz2\\)\\'" entry)))
+         (or (and unzip-p zipped)
+             (and (not unzip-p) (not zipped))))))))
 
 ;;;###autoload
 (defun pcomplete/make ()
@@ -102,14 +106,47 @@
     (while (pcomplete-here (completion-table-in-turn
                             (pcmpl-gnu-make-rule-names)
                             (pcomplete-entries))
-                           nil 'identity))))
+                           nil #'identity))))
 
 (defun pcmpl-gnu-makefile-names ()
   "Return a list of possible makefile names."
   (pcomplete-entries (mapconcat 'identity pcmpl-gnu-makefile-regexps "\\|")))
 
+(defun pcmpl-gnu-make-targets (targets)
+  "Add to TARGETS the list of makefile targets in the current buffer.
+Return the new list."
+  (goto-char (point-min))
+  (while (re-search-forward
+          "^\\([^\t\n#%.$][^:=\n]*\\)\\s-*:[^=]" nil t)
+    (setq targets (nconc (split-string (match-string-no-properties 1))
+                         targets)))
+  targets)
+
+(defun pcmpl-gnu-make-includes ()
+  "Return a list of all included file names in the current buffer."
+  (let (filenames)
+    (goto-char (point-min))
+    (while (search-forward-regexp "^include +\\(.*\\)$" nil t)
+      (push (match-string-no-properties 1) filenames))
+    filenames))
+
+(defun pcmpl-gnu-make-all-targets (makefile targets)
+  "Add to TARGETS the list of target names in MAKEFILE and files it includes.
+Return the new list."
+  (with-temp-buffer
+    (with-demoted-errors			;Could be a directory or something.
+        (insert-file-contents makefile))
+
+    (let ((filenames (when pcmpl-gnu-makefile-includes (pcmpl-gnu-make-includes))))
+      (setq targets (pcmpl-gnu-make-targets targets))
+      (dolist (file filenames)
+        (when (file-readable-p file)
+	  (setq targets (pcmpl-gnu-make-all-targets file targets))))
+      ))
+  targets)
+
 (defun pcmpl-gnu-make-rule-names ()
-  "Return a list of possible make rule names in MAKEFILE."
+  "Return a list of possible make targets in a makefile in the current directory."
   (let* ((minus-f (member "-f" pcomplete-args))
 	 (makefile (or (cadr minus-f)
 		       (cond
@@ -119,20 +156,14 @@
 	 rules)
     (if (not (file-readable-p makefile))
 	(unless minus-f (list "-f"))
-      (with-temp-buffer
-	(ignore-errors			;Could be a directory or something.
-	  (insert-file-contents makefile))
-	(while (re-search-forward
-		(concat "^\\s-*\\([^\n#%.$][^:=\n]*\\)\\s-*:[^=]") nil t)
-	  (setq rules (append (split-string (match-string 1)) rules))))
+      (setq rules (pcmpl-gnu-make-all-targets makefile rules))
       (pcomplete-uniquify-list rules))))
 
 (defcustom pcmpl-gnu-tarfile-regexp
   "\\.t\\(ar\\(\\.\\(gz\\|bz2\\|Z\\|xz\\)\\)?\\|gz\\|a[zZ]\\|z2\\)\\'"
   "A regexp which matches any tar archive."
   :version "24.3"                       ; added xz
-  :type 'regexp
-  :group 'pcmpl-gnu)
+  :type 'regexp)
 
 ;; Only used in tar-mode buffers.
 (defvar tar-parse-info)
@@ -305,7 +336,7 @@
                          (pcomplete-match-string 1 0)))))
     (unless saw-option
       (pcomplete-here
-       (mapcar 'char-to-string
+       (mapcar #'char-to-string
 	       (string-to-list
 		"01234567ABCFGIKLMNOPRSTUVWXZbcdfghiklmoprstuvwxz")))
       (if (pcomplete-match "[xt]" 'first 1)
@@ -324,7 +355,7 @@
                      (pcmpl-gnu-with-file-buffer
                       file (mapcar #'tar-header-name tar-parse-info)))))
 	      (pcomplete-entries))
-	    nil 'identity))))
+	    nil #'identity))))
 
 ;;;###autoload
 
@@ -360,7 +391,7 @@
                (string= prec "-execdir"))
            (while (pcomplete-here* (funcall pcomplete-command-completion-function)
                                    (pcomplete-arg 'last) t))))
-    (while (pcomplete-here (pcomplete-dirs) nil 'identity))))
+    (while (pcomplete-here (pcomplete-dirs) nil #'identity))))
 
 ;;;###autoload
 (defalias 'pcomplete/gdb 'pcomplete/xargs)

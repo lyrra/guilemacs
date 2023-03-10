@@ -1,5 +1,5 @@
 /* Terminal hooks for GNU Emacs on the Microsoft Windows API.
-   Copyright (C) 1992, 1999, 2001-2019 Free Software Foundation, Inc.
+   Copyright (C) 1992, 1999, 2001-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -503,7 +503,14 @@ w32con_set_terminal_modes (struct terminal *t)
 
   SetConsoleActiveScreenBuffer (cur_screen);
 
-  SetConsoleMode (keyboard_handle, ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT);
+  /* If Quick Edit is enabled for the console, it will get in the way
+     of receiving mouse events, so we disable it.  But leave the
+     Insert Mode as it was set by the user.  */
+  DWORD new_console_mode
+    = ENABLE_MOUSE_INPUT | ENABLE_WINDOW_INPUT | ENABLE_EXTENDED_FLAGS;
+  if ((prev_console_mode & ENABLE_INSERT_MODE) != 0)
+    new_console_mode |= ENABLE_INSERT_MODE;
+  SetConsoleMode (keyboard_handle, new_console_mode);
 
   /* Initialize input mode: interrupt_input off, no flow control, allow
      8 bit character input, standard quit char.  */
@@ -796,7 +803,7 @@ initialize_w32_display (struct terminal *term, int *width, int *height)
       ceol_initialized = FALSE;
     }
 
-  if (os_subtype == OS_NT)
+  if (os_subtype == OS_SUBTYPE_NT)
     w32_console_unicode_input = 1;
   else
     w32_console_unicode_input = 0;

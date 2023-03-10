@@ -1,6 +1,6 @@
 ;;; server.el --- Lisp code for GNU Emacs running as server process -*- lexical-binding: t -*-
 
-;; Copyright (C) 1986-1987, 1992, 1994-2019 Free Software Foundation,
+;; Copyright (C) 1986-1987, 1992, 1994-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: William Sommerfeld <wesommer@athena.mit.edu>
@@ -27,12 +27,12 @@
 
 ;;; Commentary:
 
-;; This Lisp code is run in Emacs when it is to operate as
-;; a server for other processes.
+;; This library allows Emacs to operate as a server for other
+;; processes.
 
-;; Load this library and do M-x server-edit to enable Emacs as a server.
+;; Load this library and do `M-x server-start' to enable Emacs as a server.
 ;; Emacs opens up a socket for communication with clients.  If there are no
-;; client buffers to edit, server-edit acts like (switch-to-buffer
+;; client buffers to edit, `server-edit' acts like (switch-to-buffer
 ;; (other-buffer))
 
 ;; When some other program runs "the editor" to edit a file,
@@ -42,10 +42,10 @@
 
 ;; Note that any number of clients may dispatch files to Emacs to be edited.
 
-;; When you finish editing a Server buffer, again call server-edit
+;; When you finish editing a Server buffer, again call `server-edit'
 ;; to mark that buffer as done for the client and switch to the next
 ;; Server buffer.  When all the buffers for a client have been edited
-;; and exited with server-edit, the client "editor" will return
+;; and exited with `server-edit', the client "editor" will return
 ;; to the program that invoked it.
 
 ;; Your editing commands and Emacs's display output go to and from
@@ -54,24 +54,27 @@
 ;; the client.  This is possible in four cases:
 
 ;; 1. On a window system, where Emacs runs in one window and the
-;; program that wants to use "the editor" runs in another.
+;;    program that wants to use "the editor" runs in another.
 
-;; 2. On a multi-terminal system, where Emacs runs on one terminal and the
-;; program that wants to use "the editor" runs on another.
+;; 2. On a multi-terminal system, where Emacs runs on one terminal and
+;;    the program that wants to use "the editor" runs on another.
 
-;; 3. When the program that wants to use "the editor" is running
-;; as a subprocess of Emacs.
+;; 3. When the program that wants to use "the editor" is running as a
+;;    subprocess of Emacs.
 
-;; 4. On a system with job control, when Emacs is suspended, the program
-;; that wants to use "the editor" will stop and display
-;; "Waiting for Emacs...".  It can then be suspended, and Emacs can be
-;; brought into the foreground for editing.  When done editing, Emacs is
-;; suspended again, and the client program is brought into the foreground.
+;; 4. On a system with job control, when Emacs is suspended, the
+;;    program that wants to use "the editor" will stop and display
+;;    "Waiting for Emacs...".  It can then be suspended, and Emacs can
+;;    be brought into the foreground for editing.  When done editing,
+;;    Emacs is suspended again, and the client program is brought into
+;;    the foreground.
 
-;; The buffer local variable "server-buffer-clients" lists
+;; The buffer local variable `server-buffer-clients' lists
 ;; the clients who are waiting for this buffer to be edited.
-;; The global variable "server-clients" lists all the waiting clients,
+;; The global variable `server-clients' lists all the waiting clients,
 ;; and which files are yet to be edited for each.
+
+;;; Code:
 
 ;; Todo:
 
@@ -79,8 +82,6 @@
 ;; - move most of the args processing and decision making from emacsclient.c
 ;;   to here.
 ;; - fix up handling of the client's environment (place it in the terminal?).
-
-;;; Code:
 
 (eval-when-compile (require 'cl-lib))
 
@@ -197,9 +198,8 @@ The created frame is selected when the hook is called."
   "List of current server clients.
 Each element is a process.")
 
-(defvar server-buffer-clients nil
+(defvar-local server-buffer-clients nil
   "List of client processes requesting editing of current buffer.")
-(make-variable-buffer-local 'server-buffer-clients)
 ;; Changing major modes should not erase this local.
 (put 'server-buffer-clients 'permanent-local t)
 
@@ -239,11 +239,10 @@ in this way."
   :type 'boolean
   :version "21.1")
 
-(defvar server-existing-buffer nil
+(defvar-local server-existing-buffer nil
   "Non-nil means the buffer existed before the server was asked to visit it.
 This means that the server should not kill the buffer when you say you
 are done with it in the server.")
-(make-variable-buffer-local 'server-existing-buffer)
 
 (defvar server--external-socket-initialized nil
   "When an external socket is passed into Emacs, we need to call
@@ -268,16 +267,23 @@ the \"-f\" switch otherwise."
   :type 'string
   :version "23.1")
 
+(defcustom server-client-instructions t
+  "If non-nil, display instructions on how to exit the client on connection.
+If nil, no instructions are displayed."
+  :version "28.1"
+  :type 'boolean)
+
 ;; We do not use `temporary-file-directory' here, because emacsclient
 ;; does not read the init file.
 (defvar server-socket-dir
   (if internal--daemon-sockname
       (file-name-directory internal--daemon-sockname)
     (and (featurep 'make-network-process '(:family local))
-	 (let ((xdg_runtime_dir (getenv "XDG_RUNTIME_DIR")))
-	   (if xdg_runtime_dir
-	       (format "%s/emacs" xdg_runtime_dir)
-	     (format "%s/emacs%d" (or (getenv "TMPDIR") "/tmp") (user-uid))))))
+	 (let ((runtime-dir (getenv "XDG_RUNTIME_DIR")))
+	   (if runtime-dir
+	       (expand-file-name "emacs" runtime-dir)
+	     (expand-file-name (format "emacs%d" (user-uid))
+                               (or (getenv "TMPDIR") "/tmp"))))))
   "The directory in which to place the server socket.
 If local sockets are not supported, this is nil.")
 
@@ -353,9 +359,11 @@ Updates `server-clients'."
 
       (setq server-clients (delq proc server-clients))
 
-      ;; Delete the client's tty, except on Windows (both GUI and console),
-      ;; where there's only one terminal and does not make sense to delete it.
-      (unless (eq system-type 'windows-nt)
+      ;; Delete the client's tty, except on Windows (both GUI and
+      ;; console), where there's only one terminal and does not make
+      ;; sense to delete it, or if we are explicitly told not.
+      (unless (or (eq system-type 'windows-nt)
+                  (process-get proc 'no-delete-terminal))
 	(let ((terminal (process-get proc 'terminal)))
 	  ;; Only delete the terminal if it is non-nil.
 	  (when (and terminal (eq (terminal-live-p terminal) t))
@@ -406,9 +414,14 @@ If CLIENT is non-nil, add a description of it to the logged message."
   ;; for possible servers before doing anything, so it *should* be ours.
   (and (process-contact proc :server)
        (eq (process-status proc) 'closed)
+       ;; If this variable is non-nil, the socket was passed in to
+       ;; Emacs, and not created by Emacs itself (for instance,
+       ;; created by systemd).  In that case, don't delete the socket.
+       (not internal--daemon-sockname)
        (ignore-errors
 	 (delete-file (process-get proc :server-file))))
-  (server-log (format "Status changed to %s: %s" (process-status proc) msg) proc)
+  (server-log (format "Status changed to %s: %s"
+                      (process-status proc) msg) proc)
   (server-delete-client proc))
 
 (defun server--on-display-p (frame display)
@@ -535,16 +548,6 @@ Creates the directory if necessary and makes sure:
       (cl-letf (((default-file-modes) ?\700)) (make-directory dir t))
       (setq attrs (file-attributes dir 'integer)))
 
-    (let ((olddir (or (getenv "TMPDIR") "/tmp")))
-      (when (and (equal dir (format "%s/emacs" (getenv "XDG_RUNTIME_DIR")))
-                 (file-writable-p olddir))
-        (let ((link (format "%s/emacs%d" olddir (user-uid))))
-          (unless (file-directory-p link)
-            ;; We're using the new location, so try and setup a symlink from
-            ;; the old location, in case we want to use an old emacsclient.
-            ;; FIXME: Check that it's safe to use!
-            (make-symbolic-link dir link t)))))
-
     ;; Check that it's safe for use.
     (let* ((uid (file-attribute-user-id attrs))
 	   (w32 (eq system-type 'windows-nt))
@@ -573,9 +576,9 @@ See variable `server-auth-dir' for details."
                      (format "it is not owned by you (owner = %s (%d))"
                              (user-full-name uid) uid))
                     (w32 nil)           ; on NTFS?
-                    ((/= 0 (logand ?\077 (file-modes dir)))
-                     (format "it is accessible by others (%03o)"
-                             (file-modes dir)))
+                    ((let ((modes (file-modes dir 'nofollow)))
+                       (unless (zerop (logand (or modes 0) #o077))
+                         (format "it is accessible by others (%03o)" modes))))
                     (t nil))))
       (when unsafe
         (error "`%s' is not a safe directory because %s"
@@ -655,7 +658,17 @@ the `server-process' variable."
            ;; Remove any leftover socket or authentication file.
            (ignore-errors
              (let (delete-by-moving-to-trash)
-               (delete-file server-file)))
+               (delete-file server-file)
+               ;; Also delete the directory that the server file was
+               ;; created in -- but only in /tmp (see bug#44644).
+               ;; There may be other servers running, too, so this may
+               ;; fail.
+               (when (equal (file-name-directory
+                             (directory-file-name
+                              (file-name-directory server-file)))
+                            "/tmp/")
+                 (ignore-errors
+                   (delete-directory (file-name-directory server-file))))))
          (setq server-mode nil) ;; already set by the minor mode code
          (display-warning
           'server
@@ -737,7 +750,8 @@ If server is running, it is first stopped.
 NAME defaults to `server-name'.  With argument, ask for NAME."
   (interactive
    (list (if current-prefix-arg
-	     (read-string "Server name: " nil nil server-name))))
+	     (read-string (format-prompt "Server name" server-name)
+                          nil nil server-name))))
   (when server-mode (with-temp-message nil (server-mode -1)))
   (let ((file (expand-file-name (or name server-name)
 				(if server-use-tcp
@@ -838,7 +852,6 @@ This handles splitting the command if it would be bigger than
     (error "Invalid terminal device"))
   (unless type
     (error "Invalid terminal type"))
-  (add-to-list 'frame-inherited-parameters 'client)
   (let ((frame
          (server-with-environment
              (process-get proc 'env)
@@ -850,39 +863,26 @@ This handles splitting the command if it would be bigger than
                "TERMINFO_DIRS" "TERMPATH"
                ;; rxvt wants these
                "COLORFGBG" "COLORTERM")
-           (make-frame `((window-system . nil)
-                         (tty . ,tty)
-                         (tty-type . ,type)
-                         ;; Ignore nowait here; we always need to
-                         ;; clean up opened ttys when the client dies.
-                         (client . ,proc)
-                         ;; This is a leftover from an earlier
-                         ;; attempt at making it possible for process
-                         ;; run in the server process to use the
-                         ;; environment of the client process.
-                         ;; It has no effect now and to make it work
-                         ;; we'd need to decide how to make
-                         ;; process-environment interact with client
-                         ;; envvars, and then to change the
-                         ;; C functions `child_setup' and
-                         ;; `getenv_internal' accordingly.
-                         (environment . ,(process-get proc 'env))
-                         ,@parameters)))))
+           (server--create-frame
+            ;; Ignore nowait here; we always need to
+            ;; clean up opened ttys when the client dies.
+            nil proc
+            `((window-system . nil)
+              (tty . ,tty)
+              (tty-type . ,type)
+              ,@parameters)))))
 
     ;; ttys don't use the `display' parameter, but callproc.c does to set
     ;; the DISPLAY environment on subprocesses.
     (set-frame-parameter frame 'display
                          (getenv-internal "DISPLAY" (process-get proc 'env)))
-    (select-frame frame)
-    (process-put proc 'frame frame)
-    (process-put proc 'terminal (frame-terminal frame))
     frame))
 
 (defun server-create-window-system-frame (display nowait proc parent-id
 						  &optional parameters)
   (let* ((display (or display
                       (frame-parameter nil 'display)
-                      (error "Please specify display.")))
+                      (error "Please specify display")))
          (w (or (cdr (assq 'window-system parameters))
                 (window-system-for-display display))))
 
@@ -901,30 +901,55 @@ This handles splitting the command if it would be bigger than
       )
 
     (cond (w
-           ;; Flag frame as client-created, but use a dummy client.
-           ;; This will prevent the frame from being deleted when
-           ;; emacsclient quits while also preventing
-           ;; `server-save-buffers-kill-terminal' from unexpectedly
-           ;; killing emacs on that frame.
-           (let* ((params `((client . ,(if nowait 'nowait proc))
-                            ;; This is a leftover, see above.
-                            (environment . ,(process-get proc 'env))
-                            ,@parameters))
-                  frame)
-             (if parent-id
-                 (push (cons 'parent-id (string-to-number parent-id)) params))
-             (add-to-list 'frame-inherited-parameters 'client)
-             (setq frame (make-frame-on-display display params))
-             (server-log (format "%s created" frame) proc)
-             (select-frame frame)
-             (process-put proc 'frame frame)
-             (process-put proc 'terminal (frame-terminal frame))
-             frame))
+           (server--create-frame
+            nowait proc
+            `((display . ,display)
+              ,@(if parent-id
+                    `((parent-id . ,(string-to-number parent-id))))
+              ,@parameters)))
 
           (t
            (server-log "Window system unsupported" proc)
            (server-send-string proc "-window-system-unsupported \n")
            nil))))
+
+(defun server-create-dumb-terminal-frame (nowait proc &optional parameters)
+  ;; If the destination is a dumb terminal, we can't really run Emacs
+  ;; in its tty.  So instead, we use whichever terminal is currently
+  ;; selected.  This situation typically occurs when `emacsclient' is
+  ;; running inside something like an Emacs shell buffer (bug#25547).
+  (let ((frame (server--create-frame nowait proc parameters)))
+    ;; The client is not the exclusive owner of this terminal, so don't
+    ;; delete the terminal when the client exits.
+    ;; FIXME: Maybe we just shouldn't set the `terminal' property instead?
+    (process-put proc 'no-delete-terminal t)
+    frame))
+
+(defun server--create-frame (nowait proc parameters)
+  (add-to-list 'frame-inherited-parameters 'client)
+  ;; When `nowait' is set, flag frame as client-created, but use
+  ;; a dummy client.  This will prevent the frame from being deleted
+  ;; when emacsclient quits while also preventing
+  ;; `server-save-buffers-kill-terminal' from unexpectedly killing
+  ;; emacs on that frame.
+  (let ((frame (make-frame `((client . ,(if nowait 'nowait proc))
+                             ;; This is a leftover from an earlier
+                             ;; attempt at making it possible for process
+                             ;; run in the server process to use the
+                             ;; environment of the client process.
+                             ;; It has no effect now and to make it work
+                             ;; we'd need to decide how to make
+                             ;; process-environment interact with client
+                             ;; envvars, and then to change the
+                             ;; C functions `child_setup' and
+                             ;; `getenv_internal' accordingly.
+                             (environment . ,(process-get proc 'env))
+                             ,@parameters))))
+    (server-log (format "%s created" frame) proc)
+    (select-frame frame)
+    (process-put proc 'frame frame)
+    (process-put proc 'terminal (frame-terminal frame))
+    frame))
 
 (defun server-goto-toplevel (proc)
   (condition-case nil
@@ -936,12 +961,11 @@ This handles splitting the command if it would be bigger than
             (isearch-cancel))))
     ;; Signaled by isearch-cancel.
     (quit (message nil)))
-  (when (> (recursion-depth) 0)
+  (when (> (minibuffer-depth) 0)
     ;; We're inside a minibuffer already, so if the emacs-client is trying
     ;; to open a frame on a new display, we might end up with an unusable
     ;; frame because input from that display will be blocked (until exiting
     ;; the minibuffer).  Better exit this minibuffer right away.
-    ;; Similarly with recursive-edits such as the splash screen.
     (run-with-timer 0 nil (lambda () (server-execute-continuation proc)))
     (top-level)))
 
@@ -999,7 +1023,7 @@ The following commands are accepted by the server:
 `-display DISPLAY'
   Set the display name to open X frames on.
 
-`-position LINE[:COLUMN]'
+`-position +LINE[:COLUMN]'
   Go to the given line and column number
   in the next file opened.
 
@@ -1055,7 +1079,7 @@ The following commands are accepted by the client:
 
 `-suspend'
   Suspend this terminal, i.e., stop the client process.
-  Sent when the user presses C-z."
+  Sent when the user presses \\[suspend-frame]."
   (server-log (concat "Received " string) proc)
   ;; First things first: let's check the authentication
   (unless (process-get proc :authenticated)
@@ -1109,8 +1133,7 @@ The following commands are accepted by the client:
 		tty-type   ; string.
 		files
 		filepos
-		args-left
-                create-frame-func)
+		args-left)
 	    ;; Remove this line from STRING.
 	    (setq string (substring string (match-end 0)))
 	    (setq args-left
@@ -1196,7 +1219,7 @@ The following commands are accepted by the client:
                                 (eq window-system 'w32)))
                    (push "-window-system" args-left)))
 
-                ;; -position LINE[:COLUMN]:  Set point to the given
+                ;; -position +LINE[:COLUMN]:  Set point to the given
                 ;;  position in the next file.
                 ("-position"
                  (if (not (string-match "\\+\\([0-9]+\\)\\(?::\\([0-9]+\\)\\)?"
@@ -1262,29 +1285,41 @@ The following commands are accepted by the client:
 		 (or files commands)
 		 (setq use-current-frame t))
 
-	    (setq create-frame-func
-                  (lambda ()
-		    (cond
-		     ((and use-current-frame
-			   (or (eq use-current-frame 'always)
-			       ;; We can't use the Emacs daemon's
-			       ;; terminal frame.
-			       (not (and (daemonp)
-				         (null (cdr (frame-list)))
-				         (eq (selected-frame)
-					     terminal-frame)))))
-		      (setq tty-name nil tty-type nil)
-		      (if display (server-select-display display)))
-		     ((or (and (eq system-type 'windows-nt)
-			       (daemonp)
-			       (setq display "w32"))
-		          (eq tty-name 'window-system))
-		      (server-create-window-system-frame display nowait proc
-						    parent-id
-						    frame-parameters))
-		     ;; When resuming on a tty, tty-name is nil.
-		     (tty-name
-		      (server-create-tty-frame tty-name tty-type proc)))))
+	    (setq frame
+		  (cond
+		   ((and use-current-frame
+			 (or (eq use-current-frame 'always)
+			     ;; We can't use the Emacs daemon's
+			     ;; terminal frame.
+			     (not (and (daemonp)
+				       (null (cdr (frame-list)))
+				       (eq (selected-frame)
+					   terminal-frame)))))
+		    (setq tty-name nil tty-type nil)
+		    (if display (server-select-display display)))
+                   ((equal tty-type "dumb")
+                    (server-create-dumb-terminal-frame nowait proc
+                                                       frame-parameters))
+		   ((or (and (eq system-type 'windows-nt)
+			     (daemonp)
+			     (setq display "w32"))
+		        (eq tty-name 'window-system))
+		    (server-create-window-system-frame display nowait proc
+						       parent-id
+						       frame-parameters))
+		   ;; When resuming on a tty, tty-name is nil.
+		   (tty-name
+		    (server-create-tty-frame tty-name tty-type proc))
+
+                   ;; If there won't be a current frame to use, fall
+                   ;; back to trying to create a new one.
+		   ((and use-current-frame
+			 (daemonp)
+			 (null (cdr (frame-list)))
+			 (eq (selected-frame) terminal-frame)
+			 display)
+		    (setq tty-name nil tty-type nil)
+		    (server-select-display display))))
 
             (process-put
              proc 'continuation
@@ -1296,7 +1331,7 @@ The following commands are accepted by the client:
                          (if (and dir (file-directory-p dir))
                              dir default-directory)))
                    (server-execute proc files nowait commands
-                                   dontkill create-frame-func tty-name)))))
+                                   dontkill frame tty-name)))))
 
             (when (or frame files)
               (server-goto-toplevel proc))
@@ -1305,7 +1340,7 @@ The following commands are accepted by the client:
     ;; condition-case
     (t (server-return-error proc err))))
 
-(defun server-execute (proc files nowait commands dontkill create-frame-func tty-name)
+(defun server-execute (proc files nowait commands dontkill frame tty-name)
   ;; This is run from timers and process-filters, i.e. "asynchronously".
   ;; But w.r.t the user, this is not really asynchronous since the timer
   ;; is run after 0s and the process-filter is run in response to the
@@ -1315,29 +1350,20 @@ The following commands are accepted by the client:
   ;; including code that needs to wait.
   (with-local-quit
     (condition-case err
-        (let* ((buffers (server-visit-files files proc nowait))
-               ;; If we were told only to open a new client, obey
-               ;; `initial-buffer-choice' if it specifies a file
-               ;; or a function.
-               (initial-buffer (unless (or files commands)
-                                 (let ((buf
-                                        (cond ((stringp initial-buffer-choice)
-                                               (find-file-noselect initial-buffer-choice))
-                                              ((functionp initial-buffer-choice)
-                                               (funcall initial-buffer-choice)))))
-                                   (if (buffer-live-p buf) buf (startup--get-buffer-create-scratch)))))
-               ;; Set current buffer so that newly created tty frames
-               ;; show the correct buffer initially.
-               (frame (with-current-buffer (or (car buffers)
-                                               initial-buffer
-                                               (current-buffer))
-                        (prog1
-                            (funcall create-frame-func)
-                          ;; Switch to initial buffer in case the frame was reused.
-                          (when initial-buffer
-                            (switch-to-buffer initial-buffer 'norecord))))))
-
-          (mapc #'funcall (nreverse commands))
+        (let ((buffers (server-visit-files files proc nowait)))
+          (mapc 'funcall (nreverse commands))
+	  ;; If we were told only to open a new client, obey
+	  ;; `initial-buffer-choice' if it specifies a file
+          ;; or a function.
+          (unless (or files commands)
+            (let ((buf
+                   (cond ((stringp initial-buffer-choice)
+			  (find-file-noselect initial-buffer-choice))
+			 ((functionp initial-buffer-choice)
+			  (funcall initial-buffer-choice)))))
+	      (switch-to-buffer
+	       (if (buffer-live-p buf) buf (get-buffer-create "*scratch*"))
+	       'norecord)))
 
           ;; Delete the client if necessary.
           (cond
@@ -1354,15 +1380,25 @@ The following commands are accepted by the client:
             nil)
            ((and frame (null buffers))
             (run-hooks 'server-after-make-frame-hook)
-            (message "%s" (substitute-command-keys
-                           "When done with this frame, type \\[delete-frame]")))
+            (when server-client-instructions
+              (message "%s"
+                       (substitute-command-keys
+                        "When done with this frame, type \\[delete-frame]"))))
            ((not (null buffers))
             (run-hooks 'server-after-make-frame-hook)
-            (server-switch-buffer (car buffers) nil (cdr (car files)))
+            (server-switch-buffer
+             (car buffers) nil (cdr (car files))
+             ;; When triggered from "emacsclient -c", we popped up a
+             ;; new frame.  Ensure that we switch to the requested
+             ;; buffer in that frame, and not in some other frame
+             ;; where it may be displayed.
+             (plist-get (process-plist proc) 'frame))
             (run-hooks 'server-switch-hook)
-            (unless nowait
-              (message "%s" (substitute-command-keys
-                             "When done with a buffer, type \\[server-edit]")))))
+            (when (and (not nowait)
+                       server-client-instructions)
+              (message "%s"
+                       (substitute-command-keys
+                        "When done with a buffer, type \\[server-edit]")))))
           (when (and frame (null tty-name))
             (server-unselect-display frame)))
       ((quit error)
@@ -1578,7 +1614,9 @@ prevent a backup for it.)  The variable `server-temp-file-regexp' controls
 which filenames are considered temporary.
 
 If invoked with a prefix argument, or if there is no server process running,
-starts server process and that is all.  Invoked by \\[server-edit]."
+starts server process and that is all.  Invoked by \\[server-edit].
+
+To abort an edit instead of saying \"Done\", use \\[server-edit-abort]."
   (interactive "P")
   (cond
    ((or arg
@@ -1588,7 +1626,19 @@ starts server process and that is all.  Invoked by \\[server-edit]."
    (server-clients (apply #'server-switch-buffer (server-done)))
    (t (message "No server editing buffers exist"))))
 
-(defun server-switch-buffer (&optional next-buffer killed-one filepos)
+(defun server-edit-abort ()
+  "Abort editing the current client buffer."
+  (interactive)
+  (if server-clients
+      (mapc (lambda (proc)
+              (server-send-string
+               proc (concat "-error "
+                            (server-quote-arg "Aborted by the user"))))
+            server-clients)
+    (message "This buffer has no clients")))
+
+(defun server-switch-buffer (&optional next-buffer killed-one filepos
+                                       this-frame-only)
   "Switch to another buffer, preferably one that has a client.
 Arg NEXT-BUFFER is a suggestion; if it is a live buffer, use it.
 
@@ -1622,7 +1672,8 @@ be a cons cell (LINENUMBER . COLUMNNUMBER)."
       ;; OK, we know next-buffer is live, let's display and select it.
       (if (functionp server-window)
 	  (funcall server-window next-buffer)
-	(let ((win (get-buffer-window next-buffer 0)))
+	(let ((win (get-buffer-window next-buffer
+                                      (if this-frame-only nil 0))))
 	  (if (and win (not server-window))
 	      ;; The buffer is already displayed: just reuse the
 	      ;; window.  If FILEPOS is non-nil, use it to replace the
@@ -1640,7 +1691,8 @@ be a cons cell (LINENUMBER . COLUMNNUMBER)."
 		     (setq server-window (make-frame)))
 		   (select-window (frame-selected-window server-window))))
 	    (when (window-minibuffer-p)
-	      (select-window (next-window nil 'nomini 0)))
+	      (select-window (next-window nil 'nomini
+                                          (if this-frame-only nil 0))))
 	    ;; Move to a non-dedicated window, if we have one.
 	    (when (window-dedicated-p)
 	      (select-window

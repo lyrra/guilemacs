@@ -1,6 +1,6 @@
-;;; srecode/dictionary.el --- Dictionary code for the semantic recoder.
+;;; srecode/dictionary.el --- Dictionary code for the semantic recoder.  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -147,7 +147,7 @@ Makes sure that :value is compiled."
 ;;
 
 (defun srecode-create-dictionary (&optional buffer-or-parent)
-  "Create a dictionary for BUFFER.
+  "Create a dictionary for BUFFER-OR-PARENT.
 If BUFFER-OR-PARENT is not specified, assume a buffer, and
 use the current buffer.
 If BUFFER-OR-PARENT is another dictionary, then remember the
@@ -326,8 +326,8 @@ inserted dictionaries."
 					   entries &optional state)
   "Add ENTRIES to DICT.
 
-ENTRIES is a list of even length of dictionary entries to
-add. ENTRIES looks like this:
+ENTRIES is a list of even length of dictionary entries to add.
+ENTRIES looks like this:
 
   (NAME_1 VALUE_1 NAME_2 VALUE_2 ...)
 
@@ -340,7 +340,7 @@ and for values
  * Otherwise, a compound variable is created for VALUE_N.
 
 The optional argument STATE has to non-nil when compound values
-are inserted. An error is signaled if ENTRIES contains compound
+are inserted.  An error is signaled if ENTRIES contains compound
 values but STATE is nil."
   (while entries
     (let ((name  (nth 0 entries))
@@ -364,7 +364,7 @@ values but STATE is nil."
        ;; Value is some other object; create a compound value.
        (t
 	(unless state
-	  (error "Cannot insert compound values without state."))
+          (error "Cannot insert compound values without state"))
 
 	(srecode-dictionary-set-value
 	 dict name
@@ -409,8 +409,8 @@ OTHERDICT."
 					   name &optional non-recursive)
   "Return information about DICT's value for NAME.
 DICT is a dictionary, and NAME is a string that is treated as the
-name of an entry in the dictionary. If such an entry exists, its
-value is returned. Otherwise, nil is returned. Normally, the
+name of an entry in the dictionary.  If such an entry exists, its
+value is returned.  Otherwise, nil is returned.  Normally, the
 lookup is recursive in the sense that the parent of DICT is
 searched for NAME if it is not found in DICT.  This recursive
 lookup can be disabled by the optional argument NON-RECURSIVE.
@@ -443,8 +443,8 @@ The root dictionary is usually for a current or active insertion."
 ;; for use in converting the compound value into something insertable.
 
 (cl-defmethod srecode-compound-toString ((cp srecode-dictionary-compound-value)
-				      function
-				      dictionary)
+				         _function
+				         _dictionary)
   "Convert the compound dictionary value CP to a string.
 If FUNCTION is non-nil, then FUNCTION is somehow applied to an aspect
 of the compound value.  The FUNCTION could be a fraction
@@ -457,14 +457,15 @@ standard out is a buffer, and using `insert'."
   (eieio-object-name cp))
 
 (cl-defmethod srecode-dump ((cp srecode-dictionary-compound-value)
-			 &optional indent)
+			    &optional _indent)
   "Display information about this compound value."
   (princ (eieio-object-name cp))
   )
 
-(cl-defmethod srecode-compound-toString ((cp srecode-dictionary-compound-variable)
-				      function
-				      dictionary)
+(cl-defmethod srecode-compound-toString
+    ((cp srecode-dictionary-compound-variable)
+     _function
+     dictionary)
   "Convert the compound dictionary variable value CP into a string.
 FUNCTION and DICTIONARY are as for the baseclass."
   (require 'srecode/insert)
@@ -552,7 +553,7 @@ inserted with a new editable field.")
   "Create a dictionary with entries according to TAGS.
 
 TAGS should be in the format produced by the template file
-grammar. That is
+grammar.  That is
 
 TAGS = (ENTRY_1 ENTRY_2 ...)
 
@@ -560,9 +561,9 @@ where
 
 ENTRY_N = (NAME ENTRY_N_1 ENTRY_N_2 ...) | TAG
 
-where TAG is a semantic tag of class 'variable. The (NAME ... )
+where TAG is a semantic tag of class `variable'.  The (NAME ... )
 form creates a child dictionary which is stored under the name
-NAME. The TAG form creates a value entry or section dictionary
+NAME.  The TAG form creates a value entry or section dictionary
 entry whose name is the name of the tag.
 
 STATE is the current compiler state."
@@ -606,9 +607,9 @@ STATE is the current compiler state."
   (require 'srecode/find)
   (let* ((modesym major-mode)
 	 (start (current-time))
-	 (junk (or (progn (srecode-load-tables-for-mode modesym)
-			  (srecode-get-mode-table modesym))
-		   (error "No table found for mode %S" modesym)))
+	 (_ (or (progn (srecode-load-tables-for-mode modesym)
+		       (srecode-get-mode-table modesym))
+		(error "No table found for mode %S" modesym)))
 	 (dict (srecode-create-dictionary (current-buffer)))
 	 )
     (message "Creating a dictionary took %.2f seconds."

@@ -1,6 +1,6 @@
 ;;; url-file-tests.el --- Test suite for url-file. -*- lexical-binding: t -*-
 
-;; Copyright (C) 2018-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -23,21 +23,15 @@
 
 (require 'url-file)
 (require 'ert)
-
-(defconst url-file-tests-data-directory
-  (expand-file-name "lisp/url/url-file-resources"
-                    (or (getenv "EMACS_TEST_DIRECTORY")
-                        (expand-file-name "../../.."
-                                          (or load-file-name
-                                              buffer-file-name))))
-  "Directory for url-file test files.")
+(require 'ert-x)
 
 (ert-deftest url-file ()
   "Test reading file via file:/// URL."
-  (let ((file (expand-file-name "file.txt" url-file-tests-data-directory)))
+  (let* ((file (ert-resource-file "file.txt"))
+         (uri-prefix (if (eq (aref file 0) ?/) "file://" "file:///")))
     (should (equal
              (with-current-buffer
-                 (url-file (url-generic-parse-url (concat "file:///" file))
+                 (url-file (url-generic-parse-url (concat uri-prefix file))
                            #'ignore nil)
                (prog1 (buffer-substring (point) (point-max))
                  (kill-buffer)))

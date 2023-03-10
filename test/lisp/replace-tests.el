@@ -1,6 +1,6 @@
-;;; replace-tests.el --- tests for replace.el.
+;;; replace-tests.el --- tests for replace.el.  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2022 Free Software Foundation, Inc.
 
 ;; Author: Nicolas Richard <youngfrog@members.fsf.org>
 ;; Author: Juri Linkov <juri@jurta.org>
@@ -411,6 +411,9 @@ Each element has the format:
 (defvar replace-tests-bind-read-string nil
   "A string to bind `read-string' and avoid the prompt.")
 
+(defvar replace-tests-perform-replace-regexp-flag t
+  "Value for regexp-flag argument passed to `perform-replace' in undo tests.")
+
 (defmacro replace-tests-with-undo (input from to char-nums def-chr &rest body)
   "Helper to test `query-replace' undo feature.
 INPUT is a string to insert in a temporary buffer.
@@ -441,7 +444,7 @@ Return the last evalled form in BODY."
          ;; If `replace-tests-bind-read-string' is non-nil, then
          ;; bind `read-string' as well.
          (cl-letf (((symbol-function 'read-event)
-                    (lambda (&rest args)
+                    (lambda (&rest _args)
                       (cl-incf ,count)
                       (pcase ,count ; Build the clauses from CHAR-NUMS
                         ,@(append
@@ -456,9 +459,19 @@ Return the last evalled form in BODY."
                            `((_ ,def-chr))))))
                    ((symbol-function 'read-string)
                     (if replace-tests-bind-read-string
-                        (lambda (&rest args) replace-tests-bind-read-string)
-                      (symbol-function 'read-string))))
-           (perform-replace ,from ,to t t nil))
+                        (lambda (&rest _args) replace-tests-bind-read-string)
+                      (symbol-function 'read-string)))
+                   ;; Emulate replace-highlight clobbering match-data via
+                   ;; isearch-lazy-highlight-new-loop and sit-for (bug#36328)
+                   ((symbol-function 'replace-highlight)
+                    (lambda (&rest _args)
+                      (string-match "[A-Z ]" "ForestGreen")))
+                   ;; Override `sit-for' and `ding' so that we don't have
+                   ;; to wait and listen to bells when running the test.
+                   ((symbol-function 'sit-for)
+                    (lambda (&rest _args) (redisplay)))
+                   ((symbol-function 'ding) 'ignore))
+           (perform-replace ,from ,to t replace-tests-perform-replace-regexp-flag nil))
          ,@body))))
 
 (defun replace-tests--query-replace-undo (&optional comma)
@@ -499,5 +512,109 @@ Return the last evalled form in BODY."
      (replace-tests-with-undo
       input "a" "B" ((?\s . (1 2 3)) (?E . (4)) (?U . (5))) ?q
       (string= input (buffer-string))))))
+
+(ert-deftest query-replace-undo-bug37073 ()
+  "Test for https://debbugs.gnu.org/37073 ."
+  (let ((input "theorem 1\ntheorem 2\ntheorem 3"))
+    (should
+     (replace-tests-with-undo
+         input "theorem \\([0-9]+\\)"
+         '(replace-eval-replacement
+           replace-quote
+           (format "theorem \\\\ref{theo_%d}" (1+ (string-to-number (match-string 1)))))
+         ((?\s . (1 2)) (?U . (3)))
+         ?q
+       (string= input (buffer-string)))))
+  ;; Now run a test with regexp-flag arg in `perform-replace' set to nil
+  (let ((input " ^theorem$ 1\n ^theorem$ 2\n ^theorem$ 3")
+        (replace-tests-perform-replace-regexp-flag nil)
+        (expected " theo 1\n ^theorem$ 2\n ^theorem$ 3"))
+    (should
+     (replace-tests-with-undo
+         input "^theorem$"
+         "theo"
+         ((?\s . (1 2 4)) (?U . (3)))
+         ?q
+       (string= expected (buffer-string))))))
+
+(ert-deftest query-replace-undo-bug37287 ()
+  "Test for https://debbugs.gnu.org/37287 ."
+  (let ((input "foo-1\nfoo-2\nfoo-3")
+        (expected "foo-2\nfoo-2\nfoo-3"))
+    (should
+     (replace-tests-with-undo
+      input "\\([0-9]\\)"
+      '(replace-eval-replacement
+        replace-quote
+        (format "%d" (1+ (string-to-number (match-string 1)))))
+      ((?\s . (1 2 4)) (?U . (3)))
+      ?q
+      (string= expected (buffer-string))))))
+
+(defmacro replace-tests-with-highlighted-occurrence (highlight-locus &rest body)
+  "Helper macro to test the highlight of matches when navigating occur buffer.
+
+Eval BODY with `next-error-highlight' and `next-error-highlight-no-select'
+bound to HIGHLIGHT-LOCUS."
+  (declare (indent 1) (debug (form body)))
+  `(let ((regexp "foo")
+         (next-error-highlight ,highlight-locus)
+         (next-error-highlight-no-select ,highlight-locus)
+         (buffer (generate-new-buffer "test"))
+         (inhibit-message t))
+     (unwind-protect
+         ;; Local bind to disable the deletion of `occur-highlight-overlay'
+         (cl-letf (((symbol-function 'occur-goto-locus-delete-o) (lambda ())))
+           (with-current-buffer buffer (dotimes (_ 3) (insert regexp ?\n)))
+           (pop-to-buffer buffer)
+           (occur regexp)
+           (pop-to-buffer "*Occur*")
+           (occur-next)
+           ,@body)
+       (kill-buffer buffer)
+       (kill-buffer "*Occur*"))))
+
+(ert-deftest occur-highlight-occurrence ()
+  "Test for https://debbugs.gnu.org/39121 ."
+  (let ((alist '((nil . nil) (0.5 . t) (t . t) (fringe-arrow . nil)))
+        (check-overlays
+         (lambda (has-ov)
+           (eq has-ov (not (null (overlays-in (point-min) (point-max))))))))
+    (pcase-dolist (`(,highlight-locus . ,has-overlay) alist)
+      ;; Visiting occurrences
+      (replace-tests-with-highlighted-occurrence highlight-locus
+        (occur-mode-goto-occurrence)
+        (should (funcall check-overlays has-overlay)))
+      ;; Displaying occurrences
+      (replace-tests-with-highlighted-occurrence highlight-locus
+        (occur-mode-display-occurrence)
+        (with-current-buffer (marker-buffer
+                              (caar (get-text-property (point) 'occur-target)))
+          (should (funcall check-overlays has-overlay)))))))
+
+(ert-deftest replace-regexp-bug45973 ()
+  "Test for https://debbugs.gnu.org/45973 ."
+  (let ((before "1RB 1LC 1RC 1RB 1RD 0LE 1LA 1LD 1RH 0LA")
+        (after  "1LB 1RC 1LC 1LB 1LD 0RE 1RA 1RD 1LH 0RA"))
+    (with-temp-buffer
+      (insert before)
+      (goto-char (point-min))
+      (replace-regexp
+       "\\(\\(L\\)\\|\\(R\\)\\)"
+       '(replace-eval-replacement
+         replace-quote
+         (if (match-string 2) "R" "L")))
+      (should (equal (buffer-string) after)))))
+
+(ert-deftest test-count-matches ()
+  (with-temp-buffer
+    (insert "oooooooooo")
+    (goto-char (point-min))
+    (should (= (count-matches "oo") 5))
+    (should (= (count-matches "o+") 1)))
+  (with-temp-buffer
+    (insert "o\n\n\n\no\n\n")
+    (goto-char (point-min))
+    (should (= (count-matches "^$") 4))))
 
 ;;; replace-tests.el ends here

@@ -1,6 +1,6 @@
-;;; mh-identity.el --- multiple identify support for MH-E
+;;; mh-identity.el --- multiple identify support for MH-E  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2002-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2002-2022 Free Software Foundation, Inc.
 
 ;; Author: Peter S. Galbraith <psg@debian.org>
 ;; Maintainer: Bill Wohler <wohler@newt.com>
@@ -33,8 +33,6 @@
 ;; in MH-Letter mode. The command `mh-insert-identity' can be used
 ;; to manually insert an identity.
 
-;;; Change Log:
-
 ;;; Code:
 
 (require 'mh-e)
@@ -50,7 +48,7 @@ This is normally set as part of an Identity in
 (defvar mh-identity-menu nil
   "The Identity menu.")
 
-(defalias 'mh-identity-make-menu-no-autoload 'mh-identity-make-menu)
+(defalias 'mh-identity-make-menu-no-autoload #'mh-identity-make-menu)
 
 ;;;###mh-autoload
 (defun mh-identity-make-menu ()
@@ -71,11 +69,10 @@ See `mh-identity-add-menu'."
         (mh-insert-auto-fields) mh-auto-fields-list]
        "--")
 
-     (mapcar (function
-              (lambda (arg)
-                `[,arg  (mh-insert-identity ,arg) :style radio
-                        :selected (equal mh-identity-local ,arg)]))
-             (mapcar 'car mh-identity-list))
+     (mapcar (lambda (arg)
+               `[,arg  (mh-insert-identity ,arg) :style radio
+                       :selected (equal mh-identity-local ,arg)])
+             (mapcar #'car mh-identity-list))
      '(["None"
         (mh-insert-identity "None") :style radio
         :selected (not mh-identity-local)]
@@ -92,7 +89,7 @@ See `mh-identity-add-menu'."
   "Add the current Identity menu.
 See `mh-identity-make-menu'."
   (if mh-identity-menu
-      (easy-menu-add mh-identity-menu)))
+      (mh-do-in-xemacs (easy-menu-add mh-identity-menu))))
 
 (defvar mh-identity-local nil
   "Buffer-local variable that holds the identity currently in use.")
@@ -143,7 +140,7 @@ See `mh-identity-list'."
           (completing-read
            "Identity: "
            (cons '("None")
-                 (mapcar 'list (mapcar 'car mh-identity-list)))
+                 (mapcar #'list (mapcar #'car mh-identity-list)))
            nil t default nil default))
     (if (eq identity "None")
         nil
@@ -172,8 +169,8 @@ See `mh-identity-list'."
           "Identity: "
           (if mh-identity-local
               (cons '("None")
-                    (mapcar 'list (mapcar 'car mh-identity-list)))
-            (mapcar 'list (mapcar 'car mh-identity-list)))
+                    (mapcar #'list (mapcar #'car mh-identity-list)))
+            (mapcar #'list (mapcar #'car mh-identity-list)))
           nil t)
          nil))
 
@@ -205,7 +202,7 @@ See `mh-identity-list'."
       (setq mh-identity-local identity))))
 
 ;;;###mh-autoload
-(defun mh-identity-handler-gpg-identity (field action &optional value)
+(defun mh-identity-handler-gpg-identity (_field action &optional value)
   "Process header FIELD \":pgg-default-user-id\".
 The ACTION is one of `remove' or `add'. If `add', the VALUE is added.
 The buffer-local variable `mh-identity-pgg-default-user-id' is set to
@@ -219,7 +216,7 @@ VALUE when action `add' is selected."
     (setq mh-identity-pgg-default-user-id value))))
 
 ;;;###mh-autoload
-(defun mh-identity-handler-signature (field action &optional value)
+(defun mh-identity-handler-signature (_field action &optional value)
   "Process header FIELD \":signature\".
 The ACTION is one of `remove' or `add'. If `add', the VALUE is
 added."
@@ -250,7 +247,7 @@ added."
   "Marker for the end of the attribution verb.")
 
 ;;;###mh-autoload
-(defun mh-identity-handler-attribution-verb (field action &optional value)
+(defun mh-identity-handler-attribution-verb (_field action &optional value)
   "Process header FIELD \":attribution-verb\".
 The ACTION is one of `remove' or `add'.  If `add', the VALUE is
 added."
@@ -282,9 +279,9 @@ If VALUE is nil, use `mh-extract-from-attribution-verb'."
 
 (defun mh-identity-handler-default (field action top &optional value)
   "Process header FIELD.
-The ACTION is one of 'remove or 'add. If TOP is non-nil, add the
+The ACTION is one of `remove' or `add'. If TOP is non-nil, add the
 field and its VALUE at the top of the header, else add it at the
-bottom of the header. If action is 'add, the VALUE is added."
+bottom of the header. If action is `add', the VALUE is added."
   (let ((field-colon (if (string-match "^.*:$" field)
                          field
                        (concat field ":"))))

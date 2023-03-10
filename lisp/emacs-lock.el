@@ -1,6 +1,6 @@
 ;;; emacs-lock.el --- protect buffers against killing or exiting -*- lexical-binding: t -*-
 
-;; Copyright (C) 2011-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2022 Free Software Foundation, Inc.
 
 ;; Author: Juanma Barranquero <lekktu@gmail.com>
 ;; Inspired by emacs-lock.el by Tom Wurgler <twurgler@goodyear.com>
@@ -115,7 +115,7 @@ Internal use only.")
 
 (defun emacs-lock-live-process-p (buffer-or-name)
   "Return t if BUFFER-OR-NAME is associated with a live process."
-  (process-live-p (get-buffer-process buffer-or-name)))
+  (and (process-live-p (get-buffer-process buffer-or-name)) t))
 
 (defun emacs-lock--can-auto-unlock (action)
   "Return t if the current buffer can auto-unlock for ACTION.
@@ -176,11 +176,12 @@ Return a value appropriate for `kill-buffer-query-functions' (which see)."
                arg)
               ((and (eq arg current-prefix-arg) (consp current-prefix-arg))
                ;; called with C-u M-x emacs-lock-mode, so ask the user
-               (intern (completing-read "Locking mode: "
-                                        '("all" "exit" "kill")
-                                        nil t nil nil
-                                        (symbol-name
-                                         emacs-lock-default-locking-mode))))
+               (intern (completing-read
+                        (format-prompt "Locking mode"
+                                       emacs-lock-default-locking-mode)
+                        '("all" "exit" "kill")
+                        nil t nil nil
+                        (symbol-name emacs-lock-default-locking-mode))))
               ((eq mode t)
                ;; turn on, so use previous setting, or customized default
                (or emacs-lock--old-mode emacs-lock-default-locking-mode))

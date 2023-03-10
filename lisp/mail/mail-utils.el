@@ -1,6 +1,6 @@
-;;; mail-utils.el --- utility functions used both by rmail and rnews
+;;; mail-utils.el --- utility functions used both by rmail and rnews  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 2001-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: mail, news
@@ -46,6 +46,7 @@ also the To field, unless this would leave an empty To field."
   :type '(choice regexp (const :tag "Your Name" nil))
   :group 'mail)
 
+(defvar epa-inhibit)
 ;; Returns t if file FILE is an Rmail file.
 ;;;###autoload
 (defun mail-file-babyl-p (file)
@@ -56,8 +57,9 @@ also the To field, unless this would leave an empty To field."
       (looking-at "BABYL OPTIONS:"))))
 
 (defun mail-string-delete (string start end)
-  "Returns a string containing all of STRING except the part
+  "Return a string containing all of STRING except the part
 from START (inclusive) to END (exclusive)."
+  ;; FIXME: This is not used anywhere.  Make obsolete?
   (if (null end) (substring string 0 start)
     (concat (substring string 0 start)
 	    (substring string end nil))))
@@ -132,7 +134,7 @@ we expect to find and remove the wrapper characters =?ISO-8859-1?Q?....?=."
 				       (aref string (1+ (match-beginning 1))))))
 		      strings)))
 	(setq i (match-end 0)))
-      (apply 'concat (nreverse (cons (substring string i) strings))))))
+      (apply #'concat (nreverse (cons (substring string i) strings))))))
 
 ;; FIXME Gnus for some reason has `quoted-printable-decode-region' in qp.el.
 ;;;###autoload
@@ -192,7 +194,7 @@ Also delete leading/trailing whitespace and replace FOO <BAR> with just BAR.
 Return a modified address list."
   (when address
     (if mail-use-rfc822
-	(mapconcat 'identity (rfc822-addresses address) ", ")
+	(mapconcat #'identity (rfc822-addresses address) ", ")
       (let (pos)
 
         ;; Strip comments.
@@ -250,7 +252,7 @@ comma-separated list, and return the pruned list."
       (setq cur-pos (string-match "[,\"]" destinations cur-pos))
       (if (and cur-pos (equal (match-string 0 destinations) "\""))
 	  ;; Search for matching quote.
-	  (let ((next-pos (string-match "\"" destinations (1+ cur-pos))))
+	  (let ((next-pos (string-search "\"" destinations (1+ cur-pos))))
 	    (if next-pos
 		(setq cur-pos (1+ next-pos))
 	      ;; If the open-quote has no close-quote,
@@ -280,15 +282,17 @@ comma-separated list, and return the pruned list."
     destinations))
 
 ;; Legacy name
-(define-obsolete-function-alias 'rmail-dont-reply-to 'mail-dont-reply-to "24.1")
+(define-obsolete-function-alias 'rmail-dont-reply-to #'mail-dont-reply-to "24.1")
 
 
 ;;;###autoload
-(defun mail-fetch-field (field-name &optional last all list)
+(defun mail-fetch-field (field-name &optional last all list delete)
   "Return the value of the header field whose type is FIELD-NAME.
 If second arg LAST is non-nil, use the last field of type FIELD-NAME.
 If third arg ALL is non-nil, concatenate all such fields with commas between.
 If 4th arg LIST is non-nil, return a list of all such fields.
+If 5th arg DELETE is non-nil, delete all header lines that are
+included in the result.
 The buffer should be narrowed to just the header, else false
 matches may be returned from the message body."
   (save-excursion
@@ -311,7 +315,9 @@ matches may be returned from the message body."
 		  (setq value (concat value
 				      (if (string= value "") "" ", ")
 				      (buffer-substring-no-properties
-				       opoint (point)))))))
+				       opoint (point)))))
+                (if delete
+                    (delete-region (point-at-bol) (point)))))
 	    (if list
 		value
 	      (and (not (string= value "")) value)))
@@ -324,7 +330,10 @@ matches may be returned from the message body."
 		;; Back up over newline, then trailing spaces or tabs
 		(forward-char -1)
 		(skip-chars-backward " \t" opoint)
-		(buffer-substring-no-properties opoint (point)))))))))
+                (prog1
+                    (buffer-substring-no-properties opoint (point))
+                  (if delete
+                      (delete-region (point-at-bol) (1+ (point))))))))))))
 
 ;; Parse a list of tokens separated by commas.
 ;; It runs from point to the end of the visible part of the buffer.

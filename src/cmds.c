@@ -1,6 +1,6 @@
 /* Simple built-in editing commands.
 
-Copyright (C) 1985, 1993-1998, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1985, 1993-1998, 2001-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -31,15 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 static int internal_self_insert (int, EMACS_INT);
 
-DEFUN ("forward-point", Fforward_point, Sforward_point, 1, 1, 0,
-       doc: /* Return buffer position N characters after (before if N negative) point.  */)
-  (Lisp_Object n)
-{
-  CHECK_FIXNUM (n);
-
-  return make_fixnum (PT + XFIXNUM (n));
-}
-
 /* Add N to point; or subtract N if FORWARD is false.  N defaults to 1.
    Validate the new location.  Return nil.  */
 static Lisp_Object
@@ -108,6 +99,7 @@ DEFUN ("forward-line", Fforward_line, Sforward_line, 0, 1, "^p",
 Precisely, if point is on line I, move to the start of line I + N
 \("start of line" in the logical order).
 If there isn't room, go as far as possible (no error).
+Interactively, N is the numeric prefix argument and defaults to 1.
 
 Returns the count of lines left to move.  If moving forward,
 that is N minus number of lines moved; if backward, N plus number
@@ -159,7 +151,7 @@ With argument N not nil or 1, move forward N - 1 lines first.
 If point reaches the beginning or end of buffer, it stops there.
 
 This function constrains point to the current field unless this moves
-point to a different line than the original, unconstrained result.
+point to a different line from the original, unconstrained result.
 If N is nil or 1, and a front-sticky field starts at point, the point
 does not move.  To ignore field boundaries bind
 `inhibit-field-text-motion' to t, or use the `forward-line' function
@@ -184,7 +176,7 @@ If point reaches the beginning or end of buffer, it stops there.
 To ignore intangibility, bind `inhibit-point-motion-hooks' to t.
 
 This function constrains point to the current field unless this moves
-point to a different line than the original, unconstrained result.  If
+point to a different line from the original, unconstrained result.  If
 N is nil or 1, and a rear-sticky field ends at point, the point does
 not move.  To ignore field boundaries bind `inhibit-field-text-motion'
 to t.  */)
@@ -203,7 +195,7 @@ to t.  */)
       SET_PT (newpos);
 
       if (PT > newpos
-	  && FETCH_CHAR (PT - 1) == '\n')
+	  && FETCH_BYTE (PT_BYTE - 1) == '\n')
 	{
 	  /* If we skipped over a newline that follows
 	     an invisible intangible run,
@@ -214,7 +206,7 @@ to t.  */)
 	  break;
 	}
       else if (PT > newpos && PT < ZV
-	       && FETCH_CHAR (PT) != '\n')
+	       && FETCH_BYTE (PT_BYTE) != '\n')
 	/* If we skipped something intangible
 	   and now we're not really at eol,
 	   keep going.  */
@@ -398,8 +390,8 @@ internal_self_insert (int c, EMACS_INT n)
 		  /* We will delete too many columns.  Let's fill columns
 		     by spaces so that the remaining text won't move.  */
 		  ptrdiff_t actual = PT_BYTE;
-		  DEC_POS (actual);
-		  if (FETCH_CHAR (actual) == '\t')
+		  actual -= prev_char_len (actual);
+		  if (FETCH_BYTE (actual) == '\t')
 		    /* Rather than add spaces, let's just keep the tab. */
 		    chars_to_delete--;
 		  else
@@ -459,7 +451,10 @@ internal_self_insert (int c, EMACS_INT n)
 	  string = concat2 (string, tem);
 	}
 
-      replace_range (PT, PT + chars_to_delete, string, 1, 1, 1, 0);
+      ptrdiff_t to;
+      if (INT_ADD_WRAPV (PT, chars_to_delete, &to))
+	to = PTRDIFF_MAX;
+      replace_range (PT, to, string, 1, 1, 1, 0, false);
       Fforward_char (make_fixnum (n));
     }
   else if (n > 1)
@@ -527,25 +522,4 @@ syms_of_cmds (void)
 	       doc: /* Hook run at the end of `self-insert-command'.
 This is run after inserting the character.  */);
   Vpost_self_insert_hook = Qnil;
-}
-
-void
-keys_of_cmds (void)
-{
-  int n;
-
-  initial_define_key (global_map, Ctl ('I'), "self-insert-command");
-  for (n = 040; n < 0177; n++)
-    initial_define_key (global_map, n, "self-insert-command");
-#ifdef MSDOS
-  for (n = 0200; n < 0240; n++)
-    initial_define_key (global_map, n, "self-insert-command");
-#endif
-  for (n = 0240; n < 0400; n++)
-    initial_define_key (global_map, n, "self-insert-command");
-
-  initial_define_key (global_map, Ctl ('A'), "beginning-of-line");
-  initial_define_key (global_map, Ctl ('B'), "backward-char");
-  initial_define_key (global_map, Ctl ('E'), "end-of-line");
-  initial_define_key (global_map, Ctl ('F'), "forward-char");
 }

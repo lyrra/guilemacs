@@ -1,5 +1,5 @@
 /* undo handling for GNU Emacs.
-   Copyright (C) 1990, 1993-1994, 2000-2019 Free Software Foundation,
+   Copyright (C) 1990, 1993-1994, 2000-2022 Free Software Foundation,
    Inc.
 
 This file is part of GNU Emacs.
@@ -444,7 +444,7 @@ value, the earlier commands that came before it are forgotten.
 
 The size is counted as the number of bytes occupied,
 which includes both saved text and other data.  */);
-  undo_limit = 80000;
+  undo_limit = 160000;
 
   DEFVAR_INT ("undo-strong-limit", undo_strong_limit,
 	      doc: /* Don't keep more than this much size of undo information.
@@ -456,7 +456,7 @@ is never discarded for this reason.
 
 The size is counted as the number of bytes occupied,
 which includes both saved text and other data.  */);
-  undo_strong_limit = 120000;
+  undo_strong_limit = 240000;
 
   DEFVAR_LISP ("undo-outer-limit", Vundo_outer_limit,
 	      doc: /* Outer limit on size of undo information for one command.
@@ -473,7 +473,7 @@ In fact, this calls the function which is the value of
 `undo-outer-limit-function' with one argument, the size.
 The text above describes the behavior of the function
 that variable usually specifies.  */);
-  Vundo_outer_limit = make_fixnum (12000000);
+  Vundo_outer_limit = make_fixnum (24000000);
 
   DEFVAR_LISP ("undo-outer-limit-function", Vundo_outer_limit_function,
 	       doc: /* Function to call when an undo list exceeds `undo-outer-limit'.

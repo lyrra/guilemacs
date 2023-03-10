@@ -1,6 +1,6 @@
-;;; electric.el --- window maker and Command loop for `electric' modes
+;;; electric.el --- window maker and Command loop for `electric' modes  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1985-1986, 1995, 2001-2019 Free Software Foundation,
+;; Copyright (C) 1985-1986, 1995, 2001-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: K. Shane Hartman
@@ -245,10 +245,7 @@ or comment."
                              'electric-indent-functions
                              last-command-event)
                             (memq last-command-event electric-indent-chars))))
-               (not
-                (or (memq act '(nil no-indent))
-                    ;; In a string or comment.
-                    (unless (eq act 'do-indent) (nth 8 (syntax-ppss))))))))
+               (not (memq act '(nil no-indent))))))
       ;; If we error during indent, silently give up since this is an
       ;; automatic action that the user didn't explicitly request.
       ;; But we don't want to suppress errors from elsewhere in *this*
@@ -270,10 +267,13 @@ or comment."
                   (goto-char before)
                   (condition-case-unless-debug ()
                       (indent-according-to-mode)
-                    (error (throw 'indent-error nil)))
-                  ;; The goal here will be to remove the trailing
-                  ;; whitespace after reindentation of the previous line
-                  ;; because that may have (re)introduced it.
+                    (error (throw 'indent-error nil))))
+                (unless (eq electric-indent-inhibit 'electric-layout-mode)
+                  ;; Unless we're operating under
+                  ;; `electric-layout-mode' (Bug#35254), the goal here
+                  ;; will be to remove the trailing whitespace after
+                  ;; reindentation of the previous line because that
+                  ;; may have (re)introduced it.
                   (goto-char before)
                   ;; We were at EOL in marker `before' before the call
                   ;; to `indent-according-to-mode' but after we may
@@ -310,10 +310,16 @@ column specified by the function `current-left-margin'."
 
 ;;;###autoload
 (define-minor-mode electric-indent-mode
-  "Toggle on-the-fly reindentation (Electric Indent mode).
+  "Toggle on-the-fly reindentation of text lines (Electric Indent mode).
 
 When enabled, this reindents whenever the hook `electric-indent-functions'
-returns non-nil, or if you insert a character from `electric-indent-chars'.
+returns non-nil, or if you insert one of the \"electric characters\".
+The electric characters normally include the newline, but can
+also include other characters as needed by the major mode; see
+`electric-indent-chars' for the actual list.
+
+By \"reindent\" we mean remove any existing indentation, and then
+indent the line according to context and rules of the major mode.
 
 This is a global minor mode.  To toggle the mode in a single buffer,
 use `electric-indent-local-mode'."
@@ -382,6 +388,8 @@ If multiple rules match, only first one is executed.")
   (when electric-layout-mode
     (electric-layout-post-self-insert-function-1)))
 
+(defvar electric-pair-open-newline-between-pairs)
+
 ;; for edebug's sake, a separate function
 (defun electric-layout-post-self-insert-function-1 ()
   (let* ((pos (electric--after-char-pos))
@@ -420,10 +428,10 @@ If multiple rules match, only first one is executed.")
                   ;; newlines, re-indentation is prevented.
                   ;;
                   ;; FIXME: when `newline'ing, we exceptionally
-                  ;; prevent a specific behaviour of
-                  ;; `eletric-pair-mode', that of opening an extra
+                  ;; prevent a specific behavior of
+                  ;; `electric-pair-mode', that of opening an extra
                   ;; newline between newly inserted matching paris.
-                  ;; In theory that behaviour should be provided by
+                  ;; In theory that behavior should be provided by
                   ;; `electric-layout-mode' instead, which should be
                   ;; possible given the current API.
                   ;;
@@ -451,7 +459,7 @@ If multiple rules match, only first one is executed.")
                       ;; really wants to reindent, then
                       ;; `last-command-event' should be in
                       ;; `electric-indent-chars'.
-                      (let ((electric-indent-inhibit t))
+                      (let ((electric-indent-inhibit 'electric-layout-mode))
                         (funcall nl-after)))))))
             (pcase sym
               ('before (funcall nl-before))

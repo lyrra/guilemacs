@@ -1,6 +1,6 @@
 /* Calculate what line insertion or deletion to do, and do it
 
-Copyright (C) 1985-1986, 1990, 1993-1994, 2001-2019 Free Software
+Copyright (C) 1985-1986, 1990, 1993-1994, 2001-2022 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -20,7 +20,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
-#include <stdio.h>
 
 #include "lisp.h"
 #include "termchar.h"

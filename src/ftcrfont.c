@@ -1,5 +1,5 @@
 /* ftcrfont.c -- FreeType font driver on cairo.
-   Copyright (C) 2015-2019 Free Software Foundation, Inc.
+   Copyright (C) 2015-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -18,7 +18,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
 #include <config.h>
-#include <stdio.h>
 #include <math.h>
 #include <cairo-ft.h>
 
@@ -85,7 +84,12 @@ ftcrfont_glyph_extents (struct font *font,
       cache->lbearing = floor (extents.x_bearing);
       cache->rbearing = ceil (extents.width + extents.x_bearing);
       cache->width = lround (extents.x_advance);
-      cache->ascent = ceil (- extents.y_bearing);
+      /* The subtraction of a small number is to avoid rounding up due
+	 to floating-point inaccuracies with some fonts, which then
+	 could cause unpleasant effects while scrolling (see bug
+	 #44284), since we then think that a glyph row's ascent is too
+	 small to accommodate a glyph with a higher phys_ascent.  */
+      cache->ascent = ceil (- extents.y_bearing - 1.0 / 256);
       cache->descent = ceil (extents.height + extents.y_bearing);
     }
 
@@ -140,7 +144,8 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 
   FcPatternDestroy (pat);
   font_face = cairo_ft_font_face_create_for_pattern (match);
-  if (!font_face)
+  if (!font_face
+      || cairo_font_face_status (font_face) != CAIRO_STATUS_SUCCESS)
     {
       unblock_input ();
       FcPatternDestroy (match);
@@ -155,6 +160,18 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   cairo_font_face_destroy (font_face);
   cairo_font_options_destroy (options);
   unblock_input ();
+  if (!scaled_font
+      || cairo_scaled_font_status (scaled_font) != CAIRO_STATUS_SUCCESS)
+    {
+      FcPatternDestroy (match);
+      return Qnil;
+    }
+  ft_face = cairo_ft_scaled_font_lock_face (scaled_font);
+  if (!ft_face)
+    {
+      FcPatternDestroy (match);
+      return Qnil;
+    }
 
   font_object = font_build_object (VECSIZE (struct font_info),
 				   AREF (entity, FONT_TYPE_INDEX),
@@ -188,7 +205,8 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 
   block_input ();
   cairo_glyph_t stack_glyph;
-  font->min_width = font->average_width = font->space_width = 0;
+  font->min_width = font->max_width = 0;
+  font->average_width = font->space_width = 0;
   for (char c = 32; c < 127; c++)
     {
       cairo_glyph_t *glyphs = &stack_glyph;
@@ -212,6 +230,8 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 	  && (! font->min_width
 	      || font->min_width > this_width))
 	font->min_width = this_width;
+      if (this_width > font->max_width)
+	font->max_width = this_width;
       if (c == 32)
 	font->space_width = this_width;
       font->average_width += this_width;
@@ -232,7 +252,6 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
       font->descent = font->height - font->ascent;
     }
 
-  ft_face = cairo_ft_scaled_font_lock_face (scaled_font);
   if (XFIXNUM (AREF (entity, FONT_SIZE_INDEX)) == 0)
     {
       int upEM = ft_face->units_per_EM;
@@ -267,6 +286,7 @@ ftcrfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
   font->relative_compose = 0;
   font->default_ascent = 0;
   font->vertical_centering = false;
+  eassert (font->max_width < 512 * 1024 * 1024);
 
   return font_object;
 }
@@ -329,14 +349,13 @@ ftcrfont_encode_char (struct font *font, int c)
   struct font_info *ftcrfont_info = (struct font_info *) font;
   unsigned code = FONT_INVALID_CODE;
   unsigned char utf8[MAX_MULTIBYTE_LENGTH];
-  unsigned char *p = utf8;
+  int utf8len = CHAR_STRING (c, utf8);
   cairo_glyph_t stack_glyph;
   cairo_glyph_t *glyphs = &stack_glyph;
   int num_glyphs = 1;
 
-  CHAR_STRING_ADVANCE (c, p);
   if (cairo_scaled_font_text_to_glyphs (ftcrfont_info->cr_scaled_font, 0, 0,
-					(char *) utf8, p - utf8,
+					(char *) utf8, utf8len,
 					&glyphs, &num_glyphs,
 					NULL, NULL, NULL)
       == CAIRO_STATUS_SUCCESS)
@@ -549,7 +568,11 @@ ftcrhbfont_begin_hb_font (struct font *font, double *position_unit)
 
   ftcrfont_info->ft_size = ft_face->size;
   hb_font_t *hb_font = fthbfont_begin_hb_font (font, position_unit);
-  if (ftcrfont_info->bitmap_position_unit)
+  /* HarfBuzz 5 correctly scales bitmap-only fonts without position
+     unit adjustment.
+     (https://github.com/harfbuzz/harfbuzz/issues/489) */
+  if (!hb_version_atleast (5, 0, 0)
+      && ftcrfont_info->bitmap_position_unit)
     *position_unit = ftcrfont_info->bitmap_position_unit;
 
   return hb_font;
@@ -577,8 +600,8 @@ struct font_driver const ftcrfont_driver =
   .list = ftcrfont_list,
   .match = ftcrfont_match,
   .list_family = ftfont_list_family,
-  .open = ftcrfont_open,
-  .close = ftcrfont_close,
+  .open_font = ftcrfont_open,
+  .close_font = ftcrfont_close,
   .has_char = ftcrfont_has_char,
   .encode_char = ftcrfont_encode_char,
   .text_extents = ftcrfont_text_extents,
@@ -621,6 +644,7 @@ syms_of_ftcrfont_for_pdumper (void)
   ftcrhbfont_driver.type = Qftcrhb;
   ftcrhbfont_driver.list = ftcrhbfont_list;
   ftcrhbfont_driver.match = ftcrhbfont_match;
+  ftcrhbfont_driver.otf_capability = hbfont_otf_capability;
   ftcrhbfont_driver.shape = hbfont_shape;
   ftcrhbfont_driver.combining_capability = hbfont_combining_capability;
   ftcrhbfont_driver.begin_hb_font = ftcrhbfont_begin_hb_font;

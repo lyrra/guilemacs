@@ -1,6 +1,6 @@
-;;; semantic/scope.el --- Analyzer Scope Calculations
+;;; semantic/scope.el --- Analyzer Scope Calculations  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -115,7 +115,7 @@ Saves scoping information between runs of the analyzer.")
   )
 
 (cl-defmethod semanticdb-synchronize ((cache semantic-scope-cache)
-				   new-tags)
+				      _new-tags)
   "Synchronize a CACHE with some NEW-TAGS."
   (semantic-reset cache))
 
@@ -262,7 +262,7 @@ are from nesting data types."
 	(semantic-go-to-tag pparent)
 	(setq stack (semantic-find-tag-by-overlay (point)))
 	;; Step one, find the merged version of stack in the typecache.
-	(let* ((stacknames (reverse (mapcar 'semantic-tag-name stack)))
+	(let* ((stacknames (reverse (mapcar #'semantic-tag-name stack)))
 	       (tc nil)
 	       )
 	  ;; @todo - can we use the typecache ability to
@@ -317,7 +317,7 @@ are from nesting data types."
 	      ;; returnlist is empty.
 	      (while snlist
 		(setq fullsearchname
-		      (append (mapcar 'semantic-tag-name returnlist)
+		      (append (mapcar #'semantic-tag-name returnlist)
 			      (list (car snlist)))) ;; Next one
 		(setq ptag
 		      (semanticdb-typecache-find fullsearchname))
@@ -325,8 +325,8 @@ are from nesting data types."
 		(when (or (not ptag)
 			  (not (semantic-tag-of-class-p ptag 'type)))
 		  (let ((rawscope
-			 (apply 'append
-				(mapcar 'semantic-tag-type-members
+			 (apply #'append
+				(mapcar #'semantic-tag-type-members
 					(cons (car returnlist) scopetypes)
 					)))
 			)
@@ -461,8 +461,8 @@ implicit \"object\"."
 (define-overloadable-function  semantic-analyze-scope-calculate-access (type scope)
   "Calculate the access class for TYPE as defined by the current SCOPE.
 Access is related to the :parents in SCOPE.  If type is a member of SCOPE
-then access would be 'private.  If TYPE is inherited by a member of SCOPE,
-the access would be 'protected.  Otherwise, access is 'public")
+then access would be `private'.  If TYPE is inherited by a member of SCOPE,
+the access would be `protected'.  Otherwise, access is `public'.")
 
 (defun semantic-analyze-scope-calculate-access-default (type scope)
   "Calculate the access class for TYPE as defined by the current SCOPE."
@@ -541,11 +541,12 @@ tag is not something you can complete from within TYPE."
 	  (setq leftover (cons S leftover)))))
     (nreverse leftover)))
 
-(defun semantic-analyze-scoped-type-parts (type &optional scope noinherit protection)
+(defun semantic-analyze-scoped-type-parts (type &optional scope noinherit _protection)
   "Return all parts of TYPE, a tag representing a TYPE declaration.
 SCOPE is the scope object.
 NOINHERIT turns off searching of inherited tags.
-PROTECTION specifies the type of access requested, such as 'public or 'private."
+PROTECTION specifies the type of access requested,
+such as `public' or `private'."
   (if (not type)
       nil
     (let* ((access (semantic-analyze-scope-calculate-access type scope))
@@ -561,7 +562,7 @@ PROTECTION specifies the type of access requested, such as 'public or 'private."
 	   ;; @TODO - is this line needed??  Try w/out for a while
 	   ;; @note - I think C++ says no.  elisp might, but methods
 	   ;;         look like defuns, so it makes no difference.
-	   (extmeth nil) ; (semantic-tag-external-member-children type t))
+	   ;;(extmeth nil) ; (semantic-tag-external-member-children type t))
 
 	   ;; INHERITED are tags found in classes that our TYPE tag
 	   ;; inherits from.  Do not do this if it was not requested.
@@ -583,7 +584,7 @@ PROTECTION specifies the type of access requested, such as 'public or 'private."
 	  (setq slots (nreverse copyslots))
 	  ))
       ;; Flatten the database output.
-      (append slots extmeth inherited)
+      (append slots nil inherited) ;; extmeth
       )))
 
 (defun semantic-analyze-scoped-inherited-tags (type scope access)
@@ -593,8 +594,8 @@ whose tags can be searched when needed, OR it may be a scope object.
 ACCESS is the level of access we filter on child supplied tags.
 For languages with protection on specific methods or slots,
 it should strip out those not accessible by methods of TYPE.
-An ACCESS of 'public means not in a method of a subclass of type.
-A value of 'private means we can access private parts of the originating
+An ACCESS of `public' means not in a method of a subclass of type.
+A value of `private' means we can access private parts of the originating
 type."
   (let ((ret nil))
     (semantic-analyze-scoped-inherited-tag-map

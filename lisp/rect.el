@@ -1,6 +1,6 @@
 ;;; rect.el --- rectangle functions for GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1985, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1985, 1999-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: Didier Verna <didier@didierverna.net>
 ;; Keywords: internal
@@ -133,10 +133,14 @@ Point is at the end of the segment of this line within the rectangle."
 (defun rectangle--crutches ()
   (cons rectangle--mark-crutches
         (window-parameter nil 'rectangle--point-crutches)))
-(defun rectangle--reset-crutches ()
-  (kill-local-variable 'rectangle--mark-crutches)
+
+(defun rectangle--reset-point-crutches ()
   (if (window-parameter nil 'rectangle--point-crutches)
       (setf (window-parameter nil 'rectangle--point-crutches) nil)))
+
+(defun rectangle--reset-crutches ()
+  (kill-local-variable 'rectangle--mark-crutches)
+  (rectangle--reset-point-crutches))
 
 ;;; Rectangle operations.
 
@@ -198,8 +202,8 @@ rectangles, as conses of the form (WIDTH . HEIGHT)."
              (<= (+ y2 h2) y1)))))
 
 (defun rectangle-dimensions (start end)
-  "Return the dimensions of the rectangle with corners at START
-and END. The returned value has the form of (WIDTH . HEIGHT)."
+  "Return the dimensions of the rectangle with corners at START and END.
+The returned value has the form of (WIDTH . HEIGHT)."
   (save-excursion
     (let* ((height (1+ (abs (- (line-number-at-pos end)
                                (line-number-at-pos start)))))
@@ -517,10 +521,12 @@ Called from a program, takes three args; START, END and STRING."
                              #'rectangle--string-erase-preview nil t)
                    (add-hook 'post-command-hook
                              #'rectangle--string-preview nil t))
-               (read-string (format "String rectangle (default %s): "
-                                    (or (car string-rectangle-history) ""))
+               (read-string (format-prompt
+                             "String rectangle"
+                             (or (car string-rectangle-history) ""))
                             nil 'string-rectangle-history
-                            (car string-rectangle-history)))))))
+                            (car string-rectangle-history)
+                            'inherit-input-method))))))
   ;; If we undo this change, we want to have the point back where we
   ;; are now, and not after the first line in the rectangle (which is
   ;; the first line to be changed by the following command).
@@ -544,8 +550,8 @@ This command does not delete or overwrite any existing text."
 	  (list
 	   (region-beginning)
 	   (region-end)
-	   (read-string (format "String insert rectangle (default %s): "
-				(or (car string-rectangle-history) ""))
+	   (read-string (format-prompt "String insert rectangle"
+				       (or (car string-rectangle-history) ""))
 			nil 'string-rectangle-history
 			(car string-rectangle-history)))))
   (apply-on-rectangle 'string-rectangle-line start end string nil))
@@ -613,7 +619,7 @@ with a prefix argument, prompt for START-AT and FORMAT."
     (apply-on-rectangle 'rectangle-number-line-callback
 			start end format)))
 
-;;; New rectangle integration with kill-ring.
+;;; Rectangle integration with kill-ring.
 
 ;; FIXME: known problems with the new rectangle support:
 ;; - lots of commands handle the region without paying attention to its
@@ -645,8 +651,9 @@ with a prefix argument, prompt for START-AT and FORMAT."
 (define-minor-mode rectangle-mark-mode
   "Toggle the region as rectangular.
 
-Activates the region if needed.  Only lasts until the region is deactivated."
-  nil nil nil
+Activates the region if it's inactive and Transient Mark mode is
+on.  Only lasts until the region is next deactivated."
+  :lighter nil
   (rectangle--reset-crutches)
   (when rectangle-mark-mode
     (add-hook 'deactivate-mark-hook

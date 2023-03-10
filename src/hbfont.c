@@ -1,5 +1,5 @@
 /* hbfont.c -- Platform-independent support for HarfBuzz font driver.
-   Copyright (C) 2019 Free Software Foundation, Inc.
+   Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -19,12 +19,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 #include <math.h>
 #include <hb.h>
+#include <hb-ot.h>
 
 #include "lisp.h"
 #include "frame.h"
 #include "composite.h"
 #include "font.h"
 #include "dispextern.h"
+#include "buffer.h"
 
 #ifdef HAVE_NTGUI
 
@@ -69,6 +71,18 @@ DEF_DLL_FN (hb_glyph_info_t *, hb_buffer_get_glyph_infos,
 	    (hb_buffer_t *, unsigned int *));
 DEF_DLL_FN (hb_glyph_position_t *, hb_buffer_get_glyph_positions,
 	    (hb_buffer_t *, unsigned int *));
+DEF_DLL_FN (void, hb_tag_to_string, (hb_tag_t, char *));
+DEF_DLL_FN (hb_face_t *, hb_font_get_face, (hb_font_t *font));
+DEF_DLL_FN (unsigned int, hb_ot_layout_table_get_script_tags,
+	    (hb_face_t *, hb_tag_t, unsigned int, unsigned int *, hb_tag_t *));
+DEF_DLL_FN (unsigned int, hb_ot_layout_table_get_feature_tags,
+	    (hb_face_t *, hb_tag_t, unsigned int, unsigned int *, hb_tag_t *));
+DEF_DLL_FN (unsigned int, hb_ot_layout_script_get_language_tags,
+	    (hb_face_t *, hb_tag_t, unsigned int, unsigned int, unsigned int *,
+	     hb_tag_t *));
+DEF_DLL_FN (unsigned int, hb_ot_layout_language_get_feature_tags,
+	    (hb_face_t *, hb_tag_t, unsigned int, unsigned int, unsigned int,
+	     unsigned int *, hb_tag_t *));
 
 #define hb_unicode_funcs_create fn_hb_unicode_funcs_create
 #define hb_unicode_funcs_get_default fn_hb_unicode_funcs_get_default
@@ -92,6 +106,12 @@ DEF_DLL_FN (hb_glyph_position_t *, hb_buffer_get_glyph_positions,
 #define hb_buffer_reverse_clusters fn_hb_buffer_reverse_clusters
 #define hb_buffer_get_glyph_infos fn_hb_buffer_get_glyph_infos
 #define hb_buffer_get_glyph_positions fn_hb_buffer_get_glyph_positions
+#define hb_tag_to_string fn_hb_tag_to_string
+#define hb_font_get_face fn_hb_font_get_face
+#define hb_ot_layout_table_get_script_tags fn_hb_ot_layout_table_get_script_tags
+#define hb_ot_layout_table_get_feature_tags fn_hb_ot_layout_table_get_feature_tags
+#define hb_ot_layout_script_get_language_tags fn_hb_ot_layout_script_get_language_tags
+#define hb_ot_layout_language_get_feature_tags fn_hb_ot_layout_language_get_feature_tags
 
 /* This function is called from syms_of_w32uniscribe_for_pdumper to
    initialize the above function pointers.  */
@@ -120,9 +140,102 @@ hbfont_init_w32_funcs (HMODULE library)
   LOAD_DLL_FN (library, hb_buffer_reverse_clusters);
   LOAD_DLL_FN (library, hb_buffer_get_glyph_infos);
   LOAD_DLL_FN (library, hb_buffer_get_glyph_positions);
+  LOAD_DLL_FN (library, hb_tag_to_string);
+  LOAD_DLL_FN (library, hb_font_get_face);
+  LOAD_DLL_FN (library, hb_ot_layout_table_get_script_tags);
+  LOAD_DLL_FN (library, hb_ot_layout_table_get_feature_tags);
+  LOAD_DLL_FN (library, hb_ot_layout_script_get_language_tags);
+  LOAD_DLL_FN (library, hb_ot_layout_language_get_feature_tags);
   return true;
 }
 #endif	/* HAVE_NTGUI */
+
+static Lisp_Object
+hbfont_otf_features (hb_face_t *face, hb_tag_t table_tag)
+{
+  hb_tag_t *language_tags = NULL, *feature_tags = NULL;
+  char buf[4];
+  unsigned int script_count
+    = hb_ot_layout_table_get_script_tags (face, table_tag, 0, NULL, NULL);
+  hb_tag_t *script_tags = xnmalloc (script_count, sizeof *script_tags);
+  hb_ot_layout_table_get_script_tags (face, table_tag, 0, &script_count,
+				      script_tags);
+  Lisp_Object scripts = Qnil;
+  for (int i = script_count - 1; i >= 0; i--)
+    {
+      unsigned int language_count
+	= hb_ot_layout_script_get_language_tags (face, table_tag, i, 0,
+						 NULL, NULL);
+      language_tags = xnrealloc (language_tags, language_count,
+				 sizeof *language_tags);
+      hb_ot_layout_script_get_language_tags (face, table_tag, i, 0,
+					     &language_count, language_tags);
+      Lisp_Object langsyses = Qnil;
+      for (int j = language_count - 1; j >= -1; j--)
+	{
+	  unsigned int language_index
+	    = j >= 0 ? j : HB_OT_LAYOUT_DEFAULT_LANGUAGE_INDEX;
+	  unsigned int feature_count
+	    = hb_ot_layout_language_get_feature_tags (face, table_tag,
+						      i, language_index, 0,
+						      NULL, NULL);
+	  if (feature_count == 0)
+	    continue;
+	  feature_tags = xnrealloc (feature_tags, feature_count,
+				    sizeof *feature_tags);
+	  hb_ot_layout_language_get_feature_tags (face, table_tag,
+						  i, language_index, 0,
+						  &feature_count, feature_tags);
+	  Lisp_Object features = Qnil;
+	  for (int k = feature_count - 1; k >= 0; k--)
+	    {
+	      hb_tag_to_string (feature_tags[k], buf);
+	      features = Fcons (font_intern_prop (buf, 4, 1), features);
+	    }
+
+	  Lisp_Object sym = Qnil;
+	  if (j >= 0)
+	    {
+	      hb_tag_to_string (language_tags[j], buf);
+	      sym = font_intern_prop (buf, 4, 1);
+	    }
+	  langsyses = Fcons (Fcons (sym, features), langsyses);
+	}
+
+      hb_tag_to_string (script_tags[i], buf);
+      scripts = Fcons (Fcons (font_intern_prop (buf, 4, 1), langsyses),
+		       scripts);
+    }
+  xfree (feature_tags);
+  xfree (language_tags);
+  xfree (script_tags);
+
+  return scripts;
+}
+
+Lisp_Object
+hbfont_otf_capability (struct font *font)
+{
+  double position_unit;
+  hb_font_t *hb_font
+    = font->driver->begin_hb_font
+    ? font->driver->begin_hb_font (font, &position_unit)
+    : NULL;
+  if (!hb_font)
+    return Qnil;
+
+  Lisp_Object gsub_gpos = Fcons (Qnil, Qnil);
+  hb_face_t *face = hb_font_get_face (hb_font);
+  if (hb_ot_layout_table_get_feature_tags (face, HB_OT_TAG_GSUB, 0, NULL, NULL))
+    XSETCAR (gsub_gpos, hbfont_otf_features (face, HB_OT_TAG_GSUB));
+  if (hb_ot_layout_table_get_feature_tags (face, HB_OT_TAG_GPOS, 0, NULL, NULL))
+    XSETCDR (gsub_gpos, hbfont_otf_features (face, HB_OT_TAG_GPOS));
+
+  if (font->driver->end_hb_font)
+    font->driver->end_hb_font (font, hb_font);
+
+  return gsub_gpos;
+}
 
 /* Support functions for HarfBuzz shaper.  */
 
@@ -246,8 +359,8 @@ get_hb_unicode_funcs (void)
   hb_unicode_funcs_set_general_category_func (funcs, uni_general, NULL, NULL);
   hb_unicode_funcs_set_mirroring_func (funcs, uni_mirroring, NULL, NULL);
 
-  /* Use default implmentation for Unicode composition/decomposition, we might
-   * want to revisit this later.
+  /* Use default implementation for Unicode composition/decomposition.
+     We might want to revisit this later.
   hb_unicode_funcs_set_compose_func (funcs, uni_compose, NULL, NULL);
   hb_unicode_funcs_set_decompose_func (funcs, uni_decompose, NULL, NULL);
   */
@@ -267,7 +380,7 @@ get_hb_unicode_funcs (void)
    (N+1)th element of LGSTRING is nil, input of shaping is from the
    1st to (N)th elements.  In each input glyph, FROM, TO, CHAR, and
    CODE are already set, but FROM and TO need adjustments according
-   to the glyphs produced by the shaping fuinction.
+   to the glyphs produced by the shaping function.
    DIRECTION is either L2R or R2L, or nil if unknown.  During
    redisplay, this comes from applying the UBA, is passed from
    composition_reseat_it, and is used by the HarfBuzz shaper.
@@ -326,7 +439,11 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
 
   /* If the caller didn't provide a meaningful DIRECTION, let HarfBuzz
      guess it. */
-  if (!NILP (direction))
+  if (!NILP (direction)
+      /* If they bind bidi-display-reordering to nil, the DIRECTION
+	 they provide is meaningless, and we should let HarfBuzz guess
+	 the real direction.  */
+      && !NILP (BVAR (current_buffer, bidi_display_reordering)))
     {
       hb_direction_t dir = HB_DIRECTION_LTR;
       if (EQ (direction, QL2R))
@@ -400,9 +517,11 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
       Lisp_Object lglyph = LGSTRING_GLYPH (lgstring, i);
       struct font_metrics metrics = {.width = 0};
       int xoff, yoff, wadjust;
+      bool new_lglyph = false;
 
       if (NILP (lglyph))
 	{
+	  new_lglyph = true;
 	  lglyph = LGLYPH_NEW ();
 	  LGSTRING_SET_GLYPH (lgstring, i, lglyph);
 	}
@@ -427,7 +546,7 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
 
 	     Implementation note: the character codepoint recorded in
 	     each glyph is not really used, except when we display the
-	     glyphs in descr-text.el.  So this is just an aeasthetic
+	     glyphs in descr-text.el.  So this is just an aesthetic
 	     issue.  */
 	  if (buf_reversed)
 	    cluster_offset = to - from;
@@ -444,7 +563,9 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
 	 in the original sequence were processed by the composition.
 	 If we don't do this, some of the composed characters will be
 	 displayed again as separate glyphs.  */
-      if (!(to == text_len - 1 && LGLYPH_TO (lglyph) > to))
+      if (!(!new_lglyph
+	    && to == text_len - 1
+	    && LGLYPH_TO (lglyph) > to))
 	LGLYPH_SET_TO (lglyph, to);
 
       /* Not every glyph in a cluster maps directly to a single
@@ -473,13 +594,10 @@ hbfont_shape (Lisp_Object lgstring, Lisp_Object direction)
       yoff = - lround (pos[i].y_offset * position_unit);
       wadjust = lround (pos[i].x_advance * position_unit);
       if (xoff || yoff || wadjust != metrics.width)
-	{
-	  Lisp_Object vec = make_uninit_vector (3);
-	  ASET (vec, 0, make_fixnum (xoff));
-	  ASET (vec, 1, make_fixnum (yoff));
-	  ASET (vec, 2, make_fixnum (wadjust));
-	  LGLYPH_SET_ADJUSTMENT (lglyph, vec);
-	}
+	LGLYPH_SET_ADJUSTMENT (lglyph, CALLN (Fvector,
+					      make_fixnum (xoff),
+					      make_fixnum (yoff),
+					      make_fixnum (wadjust)));
     }
 
   return make_fixnum (glyph_len);

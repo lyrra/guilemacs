@@ -1,6 +1,6 @@
 ;;; url-file.el --- File retrieval code  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-1999, 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2004-2022 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes
 
@@ -37,8 +37,8 @@
   "Find the exact file referenced by `fname'.
 This tries the common compression extensions, because things like
 ange-ftp and efs are not quite smart enough to realize when a server
-can do automatic decompression for them, and won't find 'foo' if
-'foo.gz' exists, even though the FTP server would happily serve it up
+can do automatic decompression for them, and won't find `foo' if
+`foo.gz' exists, even though the FTP server would happily serve it up
 to them."
   (let ((scratch nil)
 	(compressed-extensions '("" ".gz" ".z" ".Z" ".bz2" ".xz"))
@@ -120,9 +120,6 @@ to them."
 	 (cond
 	  ((featurep 'ange-ftp)
 	   (ange-ftp-set-passwd host user pass))
-	  ((when (featurep 'xemacs)
-             (or (featurep 'efs) (featurep 'efs-auto)
-                 (efs-set-passwd host user pass))))
 	  (t
 	   nil)))
 
@@ -157,7 +154,7 @@ to them."
     ;; not the compressed one.
     ;; FIXME should this regexp not include more extensions; basically
     ;; everything that url-file-find-possibly-compressed-file does?
-    (setq uncompressed-filename (if (string-match "\\.\\(gz\\|Z\\|z\\)$" filename)
+    (setq uncompressed-filename (if (string-match "\\.\\(gz\\|Z\\|z\\)\\'" filename)
 				    (substring filename 0 (match-beginning 0))
 				  filename))
     (setq content-type (mailcap-extension-to-mime
@@ -202,16 +199,7 @@ to them."
 					     (list #'url-file-asynch-callback
 						   new (current-buffer)
 						   callback cbargs)
-					     t)
-              (when (featurep 'xemacs)
-                (autoload 'efs-copy-file-internal "efs")
-                (efs-copy-file-internal filename (efs-ftp-path filename)
-                                        new (efs-ftp-path new)
-                                        t nil 0
-                                        (list #'url-file-asynch-callback
-                                              new (current-buffer)
-                                              callback cbargs)
-                                        0 nil)))))))
+					     t))))))
     buffer))
 
 (defmacro url-file-create-wrapper (method args)

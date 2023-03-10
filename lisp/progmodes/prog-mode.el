@@ -1,6 +1,6 @@
 ;;; prog-mode.el --- Generic major mode for programming  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -39,9 +39,60 @@
 (defcustom prog-mode-hook nil
   "Normal hook run when entering programming modes."
   :type 'hook
-  :options '(flyspell-prog-mode abbrev-mode flymake-mode linum-mode
-                                prettify-symbols-mode)
-  :group 'prog-mode)
+  :options '(flyspell-prog-mode abbrev-mode flymake-mode
+                                display-line-numbers-mode
+                                prettify-symbols-mode))
+
+(defun prog-context-menu (menu click)
+  "Populate MENU with xref commands at CLICK."
+  (require 'xref)
+  (define-key-after menu [prog-separator] menu-bar-separator
+    'middle-separator)
+
+  (unless (xref-marker-stack-empty-p)
+    (define-key-after menu [xref-pop]
+      '(menu-item "Go Back" xref-pop-marker-stack
+                  :help "Back to the position of the last search")
+      'prog-separator))
+
+  (let ((identifier (save-excursion
+                      (mouse-set-point click)
+                      (xref-backend-identifier-at-point
+                       (xref-find-backend)))))
+    (when identifier
+      (define-key-after menu [xref-find-ref]
+        `(menu-item "Find References" xref-find-references-at-mouse
+                    :help ,(format "Find references to `%s'" identifier))
+        'prog-separator)
+      (define-key-after menu [xref-find-def]
+        `(menu-item "Find Definition" xref-find-definitions-at-mouse
+                    :help ,(format "Find definition of `%s'" identifier))
+        'prog-separator)))
+
+  (when (thing-at-mouse click 'symbol)
+    (define-key-after menu [select-region mark-symbol]
+      `(menu-item "Symbol"
+                  ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'symbol))
+                  :help "Mark the symbol at click for a subsequent cut/copy")
+      'mark-whole-buffer))
+  (define-key-after menu [select-region mark-list]
+    `(menu-item "List"
+                ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'list))
+                :help "Mark the list at click for a subsequent cut/copy")
+    'mark-whole-buffer)
+  (define-key-after menu [select-region mark-defun]
+    `(menu-item "Defun"
+                ,(lambda (e) (interactive "e") (mark-thing-at-mouse e 'defun))
+                :help "Mark the defun at click for a subsequent cut/copy")
+    'mark-whole-buffer)
+
+  ;; Include text-mode select menu only in strings and comments.
+  (when (nth 8 (save-excursion
+                 (with-current-buffer (window-buffer (posn-window (event-end click)))
+                   (syntax-ppss (posn-point (event-end click))))))
+    (text-mode-context-menu menu click))
+
+  menu)
 
 (defvar prog-mode-map
   (let ((map (make-sparse-keymap)))
@@ -100,7 +151,7 @@ which case it will be used to compose the new symbol as per the
 third argument of `compose-region'.")
 
 (defun prettify-symbols-default-compose-p (start end _match)
-  "Return true iff the symbol MATCH should be composed.
+  "Return non-nil iff the symbol MATCH should be composed.
 The symbol starts at position START and ends at position END.
 This is the default for `prettify-symbols-compose-predicate'
 which is suitable for most programming languages such as C or Lisp."
@@ -118,7 +169,7 @@ which is suitable for most programming languages such as C or Lisp."
   "A predicate for deciding if the currently matched symbol is to be composed.
 The matched symbol is the car of one entry in `prettify-symbols-alist'.
 The predicate receives the match's start and end positions as well
-as the match-string as arguments.")
+as the `match-string' as arguments.")
 
 (defun prettify-symbols--compose-symbol (alist)
   "Compose a sequence of characters into a symbol.
@@ -138,9 +189,10 @@ Regexp match data 0 specifies the characters to be composed."
       ;; No composition for you.  Let's actually remove any
       ;; composition we may have added earlier and which is now
       ;; incorrect.
-      (remove-text-properties start end '(composition
-                                          prettify-symbols-start
-                                          prettify-symbols-end))))
+      (remove-list-of-text-properties start end
+                                      '(composition
+                                        prettify-symbols-start
+                                        prettify-symbols-end))))
   ;; Return nil because we're not adding any face property.
   nil)
 
@@ -164,8 +216,7 @@ on the symbol."
   :version "25.1"
   :type '(choice (const :tag "Never unprettify" nil)
                  (const :tag "Unprettify when point is inside" t)
-                 (const :tag "Unprettify when point is inside or at right edge" right-edge))
-  :group 'prog-mode)
+                 (const :tag "Unprettify when point is inside or at right edge" right-edge)))
 
 (defun prettify-symbols--post-command-hook ()
   (cl-labels ((get-prop-as-list
@@ -191,7 +242,7 @@ on the symbol."
 	        (e (apply #'max e)))
       (with-silent-modifications
 	(setq prettify-symbols--current-symbol-bounds (list s e))
-	(remove-text-properties s e '(composition))))))
+        (remove-text-properties s e '(composition nil))))))
 
 ;;;###autoload
 (define-minor-mode prettify-symbols-mode
@@ -211,6 +262,9 @@ You can enable this mode locally in desired buffers, or use
 `global-prettify-symbols-mode' to enable it for all modes that
 support it."
   :init-value nil
+  (when prettify-symbols--keywords
+    (font-lock-remove-keywords nil prettify-symbols--keywords)
+    (setq prettify-symbols--keywords nil))
   (if prettify-symbols-mode
       ;; Turn on
       (when (setq prettify-symbols--keywords (prettify-symbols--make-keywords))
@@ -226,9 +280,6 @@ support it."
         (font-lock-flush))
     ;; Turn off
     (remove-hook 'post-command-hook #'prettify-symbols--post-command-hook t)
-    (when prettify-symbols--keywords
-      (font-lock-remove-keywords nil prettify-symbols--keywords)
-      (setq prettify-symbols--keywords nil))
     (when (memq 'composition font-lock-extra-managed-props)
       (setq font-lock-extra-managed-props (delq 'composition
                                                 font-lock-extra-managed-props))
@@ -249,6 +300,7 @@ support it."
   "Major mode for editing programming language source code."
   (setq-local require-final-newline mode-require-final-newline)
   (setq-local parse-sexp-ignore-comments t)
+  (add-hook 'context-menu-functions 'prog-context-menu 10 t)
   ;; Any programming language is always written left to right.
   (setq bidi-paragraph-direction 'left-to-right))
 

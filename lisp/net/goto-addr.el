@@ -1,11 +1,11 @@
-;;; goto-addr.el --- click to browse URL or to send to e-mail address
+;;; goto-addr.el --- click to browse URL or to send to e-mail address  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1995, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1995, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric Ding <ericding@alum.mit.edu>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Created: 15 Aug 1995
-;; Keywords: mh-e, www, mouse, mail
+;; Keywords: www, mouse, mail
 
 ;; This file is part of GNU Emacs.
 
@@ -32,10 +32,10 @@
 
 ;; INSTALLATION
 ;;
-;; To use goto-address in a particular mode (for example, while
-;; reading mail in mh-e), add this to your init file:
+;; To use goto-address in a particular mode (this example uses
+;; the fictional rich-text-mode), add this to your init file:
 ;;
-;; (add-hook 'mh-show-mode-hook 'goto-address)
+;; (add-hook 'rich-text-mode-hook 'goto-address)
 ;;
 ;; The mouse click method is bound to [mouse-2] on highlighted URLs or
 ;; e-mail addresses only; it functions normally everywhere else.  To bind
@@ -63,16 +63,6 @@
 (require 'thingatpt)
 (autoload 'browse-url-url-at-point "browse-url")
 
-;; XEmacs needs the following definitions.
-(unless (fboundp 'overlays-in)
-  (require 'overlay))
-(unless (fboundp 'line-beginning-position)
-  (defalias 'line-beginning-position 'point-at-bol))
-(unless (fboundp 'line-end-position)
-  (defalias 'line-end-position 'point-at-eol))
-(unless (fboundp 'match-string-no-properties)
-  (defalias 'match-string-no-properties 'match-string))
-
 (defgroup goto-address nil
   "Click to browse URL or to send to e-mail address."
   :group 'mouse
@@ -83,19 +73,16 @@
 (defcustom goto-address-fontify-p t
   "Non-nil means URLs and e-mail addresses in buffer are fontified.
 But only if `goto-address-highlight-p' is also non-nil."
-  :type 'boolean
-  :group 'goto-address)
+  :type 'boolean)
 
 (defcustom goto-address-highlight-p t
   "Non-nil means URLs and e-mail addresses in buffer are highlighted."
-  :type 'boolean
-  :group 'goto-address)
+  :type 'boolean)
 
 (defcustom goto-address-fontify-maximum-size 30000
   "Maximum size of file in which to fontify and/or highlight URLs.
 A value of t means there is no limit--fontify regardless of the size."
-  :type '(choice (integer :tag "Maximum size") (const :tag "No limit" t))
-  :group 'goto-address)
+  :type '(choice (integer :tag "Maximum size") (const :tag "No limit" t)))
 
 (defvar goto-address-mail-regexp
   ;; Actually pretty much any char could appear in the username part.  -stef
@@ -110,7 +97,7 @@ A value of t means there is no limit--fontify regardless of the size."
   '("mailto:" "data:")
   "List of URI schemes to exclude from `goto-address-uri-schemes'.
 
-Customisations to this variable made after goto-addr is loaded
+Customizations to this variable made after goto-addr is loaded
 will have no effect.")
 
 (defvar goto-address-uri-schemes
@@ -121,7 +108,7 @@ will have no effect.")
               (copy-sequence thing-at-point-uri-schemes))
   "List of URI schemes matched by `goto-address-url-regexp'.
 
-Customisations to this variable made after goto-addr is loaded
+Customizations to this variable made after goto-addr is loaded
 will have no effect.")
 
 (defvar goto-address-url-regexp
@@ -132,30 +119,35 @@ will have no effect.")
 
 (defvar goto-address-highlight-keymap
   (let ((m (make-sparse-keymap)))
-    (define-key m (kbd "<mouse-2>") 'goto-address-at-point)
-    (define-key m (kbd "C-c RET") 'goto-address-at-point)
+    (define-key m (kbd "<mouse-2>") #'goto-address-at-point)
+    (define-key m (kbd "C-c RET") #'goto-address-at-point)
     m)
   "Keymap to hold goto-addr's mouse key defs under highlighted URLs.")
 
+(defun goto-address-context-menu (menu click)
+  "Populate MENU with `goto-address' commands at CLICK."
+  (when (mouse-posn-property (event-start click) 'goto-address)
+    (define-key menu [goto-address-separator] menu-bar-separator)
+    (define-key menu [goto-address-at-mouse]
+      '(menu-item "Follow Link" goto-address-at-mouse
+                  :help "Follow a link where you click")))
+  menu)
+
 (defcustom goto-address-url-face 'link
   "Face to use for URLs."
-  :type 'face
-  :group 'goto-address)
+  :type 'face)
 
 (defcustom goto-address-url-mouse-face 'highlight
   "Face to use for URLs when the mouse is on them."
-  :type 'face
-  :group 'goto-address)
+  :type 'face)
 
 (defcustom goto-address-mail-face 'italic
   "Face to use for e-mail addresses."
-  :type 'face
-  :group 'goto-address)
+  :type 'face)
 
 (defcustom goto-address-mail-mouse-face 'secondary-selection
   "Face to use for e-mail addresses when the mouse is on them."
-  :type 'face
-  :group 'goto-address)
+  :type 'face)
 
 (defun goto-address-unfontify (start end)
   "Remove `goto-address' fontification from the given region."
@@ -262,6 +254,11 @@ address.  If no e-mail address found, return nil."
 	       (goto-char (match-beginning 0))))
       (match-string-no-properties 0)))
 
+(defun goto-address-at-mouse (click)
+  "Send to the e-mail address or load the URL at mouse click."
+  (interactive "e")
+  (goto-address-at-point click))
+
 ;;;###autoload
 (defun goto-address ()
   "Sets up goto-address functionality in the current buffer.
@@ -280,22 +277,31 @@ Also fontifies the buffer appropriately (see `goto-address-fontify-p' and
 ;;;###autoload
 (define-minor-mode goto-address-mode
   "Minor mode to buttonize URLs and e-mail addresses in the current buffer."
-  nil
-  ""
-  nil
-  (if goto-address-mode
-      (jit-lock-register #'goto-address-fontify-region)
+  :lighter ""
+  (cond
+   (goto-address-mode
+    (jit-lock-register #'goto-address-fontify-region)
+    (add-hook 'context-menu-functions 'goto-address-context-menu 10 t))
+   (t
     (jit-lock-unregister #'goto-address-fontify-region)
     (save-restriction
       (widen)
-      (goto-address-unfontify (point-min) (point-max)))))
+      (goto-address-unfontify (point-min) (point-max)))
+    (remove-hook 'context-menu-functions 'goto-address-context-menu t))))
+
+(defun goto-addr-mode--turn-on ()
+  (when (not goto-address-mode)
+    (goto-address-mode 1)))
+
+;;;###autoload
+(define-globalized-minor-mode global-goto-address-mode
+  goto-address-mode goto-addr-mode--turn-on
+  :version "28.1")
 
 ;;;###autoload
 (define-minor-mode goto-address-prog-mode
   "Like `goto-address-mode', but only for comments and strings."
-  nil
-  ""
-  nil
+  :lighter ""
   (if goto-address-prog-mode
       (jit-lock-register #'goto-address-fontify-region)
     (jit-lock-unregister #'goto-address-fontify-region)

@@ -1,6 +1,6 @@
 ;;; trace.el --- tracing facility for Emacs Lisp functions  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993, 1998, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1998, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Hans Chalupsky <hans@cs.buffalo.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -161,7 +161,7 @@
   "Helper function to get internal values.
 You can call this function to add internal values in the trace buffer."
   (unless inhibit-trace
-    (with-current-buffer trace-buffer
+    (with-current-buffer (get-buffer-create trace-buffer)
       (goto-char (point-max))
       (insert
        (trace-entry-message
@@ -174,7 +174,7 @@ and CONTEXT is a string describing the dynamic context (e.g. values of
 some global variables)."
   (let ((print-circle t))
     (format "%s%s%d -> %S%s\n"
-            (mapconcat 'char-to-string (make-string (1- level) ?|) " ")
+            (mapconcat 'char-to-string (make-string (max 0 (1- level)) ?|) " ")
             (if (> level 1) " " "")
             level
             ;; FIXME: Make it so we can click the function name to jump to its
@@ -225,7 +225,7 @@ be printed along with the arguments in the trace."
           (ctx (funcall context)))
       (unless inhibit-trace
         (with-current-buffer trace-buffer
-          (set (make-local-variable 'window-point-insertion-type) t)
+          (setq-local window-point-insertion-type t)
           (unless background (trace--display-buffer trace-buffer))
           (goto-char (point-max))
           ;; Insert a separator from previous trace output:
@@ -265,20 +265,13 @@ be printed along with the arguments in the trace."
 If `current-prefix-arg' is non-nil, also read a buffer and a \"context\"
 \(Lisp expression).  Return (FUNCTION BUFFER FUNCTION-CONTEXT)."
   (cons
-   (let ((default (function-called-at-point))
-         (beg (string-match ":[ \t]*\\'" prompt)))
-     (intern (completing-read (if default
-                                  (format
-                                   "%s (default %s)%s"
-                                   (substring prompt 0 beg)
-                                   default
-                                   (if beg (substring prompt beg) ": "))
-                                prompt)
+   (let ((default (function-called-at-point)))
+     (intern (completing-read (format-prompt prompt default)
                               obarray 'fboundp t nil nil
                               (if default (symbol-name default)))))
    (when current-prefix-arg
      (list
-      (read-buffer "Output to buffer: " trace-buffer)
+      (read-buffer (format-prompt "Output to buffer" trace-buffer))
       (let ((exp
              (let ((minibuffer-completing-symbol t))
                (read-from-minibuffer "Context expression: "
@@ -292,7 +285,9 @@ If `current-prefix-arg' is non-nil, also read a buffer and a \"context\"
 (defun trace-function-foreground (function &optional buffer context)
   "Trace calls to function FUNCTION.
 With a prefix argument, also prompt for the trace buffer (default
-`trace-buffer'), and a Lisp expression CONTEXT.
+`trace-buffer'), and a Lisp expression CONTEXT.  When called from
+Lisp, CONTEXT should be a function of no arguments which returns
+a value to insert into BUFFER during the trace.
 
 Tracing a function causes every call to that function to insert
 into BUFFER Lisp-style trace messages that display the function's
@@ -306,7 +301,7 @@ functions that switch buffers, or do any other display-oriented
 stuff - use `trace-function-background' instead.
 
 To stop tracing a function, use `untrace-function' or `untrace-all'."
-  (interactive (trace--read-args "Trace function: "))
+  (interactive (trace--read-args "Trace function"))
   (trace-function-internal function buffer nil context))
 
 ;;;###autoload
@@ -314,7 +309,7 @@ To stop tracing a function, use `untrace-function' or `untrace-all'."
   "Trace calls to function FUNCTION, quietly.
 This is like `trace-function-foreground', but without popping up
 the output buffer or changing the window configuration."
-  (interactive (trace--read-args "Trace function in background: "))
+  (interactive (trace--read-args "Trace function in background"))
   (trace-function-internal function buffer t context))
 
 ;;;###autoload

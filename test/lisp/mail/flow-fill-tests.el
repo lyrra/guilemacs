@@ -1,6 +1,6 @@
 ;;; flow-fill-tests.el --- Tests for flow-fill.el  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2019 Free Software Foundation, Inc.
+;; Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -24,7 +24,7 @@
 (require 'ert)
 (require 'flow-fill)
 
-(ert-deftest fill-flow-tests-fill-flowed-encode ()
+(ert-deftest fill-flow-tests-fill-flowed-decode ()
   (let ((input
          (concat
           "> Thou villainous ill-breeding spongy dizzy-eyed \n"
@@ -35,7 +35,8 @@
           ">>> unmuzzled ratsbane!\n"
           ">>>> Henceforth, the coding style is to be strictly \n"
           ">>>> enforced, including the use of only upper case.\n"
-          ">>>>> I've noticed a lack of adherence to the coding \n"
+          ">>>>> I've noticed a lack of adherence to \n"
+          ">>>>> the coding \n"
           ">>>>> styles, of late.\n"
           ">>>>>> Any complaints?\n"))
         (output
@@ -53,6 +54,7 @@
     (with-temp-buffer
       (insert input)
       (fill-flowed)
+      (message "foo")
       (should (equal (buffer-string) output)))))
 
 (ert-deftest fill-flow-tests-fill-flowed-encode ()
@@ -86,6 +88,19 @@
     (with-temp-buffer
       (insert input)
       (fill-flowed-encode)
+      (should (equal (buffer-string) output)))))
+
+(ert-deftest fill-flow-tests-fill-flowed-stuffed ()
+  (let ((input
+         (concat
+          " > From space-stuffed with a \n"
+          "continuation.\n"))
+        (output
+         "> From space-stuffed with a continuation.\n")
+        (fill-flowed-display-column 69))
+    (with-temp-buffer
+      (insert input)
+      (fill-flowed)
       (should (equal (buffer-string) output)))))
 
 (provide 'flow-fill-tests)

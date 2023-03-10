@@ -1,6 +1,6 @@
 /* Generate doc-string file for GNU Emacs from source files.
 
-Copyright (C) 1985-1986, 1992-1994, 1997, 1999-2019 Free Software
+Copyright (C) 1985-1986, 1992-1994, 1997, 1999-2022 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -641,13 +641,24 @@ compare_globals (const void *a, const void *b)
     return ga->type - gb->type;
 
   /* Consider "nil" to be the least, so that iQnil is zero.  That
-     way, Qnil's internal representation is zero, which is a bit faster.  */
+     way, Qnil's internal representation is zero, which is a bit faster.
+     Similarly, consider "t" to be the second-least, and so forth.  */
   if (ga->type == SYMBOL)
     {
-      bool a_nil = strcmp (ga->name, "Qnil") == 0;
-      bool b_nil = strcmp (gb->name, "Qnil") == 0;
-      if (a_nil | b_nil)
-	return b_nil - a_nil;
+      /* Common symbols in decreasing popularity order.  */
+      static char const commonsym[][8]
+	= { "nil", "t", "unbound", "error", "lambda" };
+      int ncommonsym = sizeof commonsym / sizeof *commonsym;
+      int ai = ncommonsym, bi = ncommonsym;
+      for (int i = 0; i < ncommonsym; i++)
+	{
+	  if (ga->name[0] == 'Q' && strcmp (ga->name + 1, commonsym[i]) == 0)
+	    ai = i;
+	  if (gb->name[0] == 'Q' && strcmp (gb->name + 1, commonsym[i]) == 0)
+	    bi = i;
+	}
+      if (! (ai == ncommonsym && bi == ncommonsym))
+	return ai - bi;
     }
 
   return strcmp (ga->name, gb->name);

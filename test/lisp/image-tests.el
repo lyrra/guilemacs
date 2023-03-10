@@ -1,6 +1,6 @@
 ;;; image-tests.el --- tests for image.el -*- lexical-binding: t -*-
 
-;; Copyright (C) 2019 Free Software Foundation, Inc.
+;; Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -21,9 +21,11 @@
 
 (require 'ert)
 (require 'image)
+(eval-when-compile
+  (require 'cl-lib))
 
 (defconst image-tests--emacs-images-directory
-  (expand-file-name "../etc/images" (getenv "EMACS_TEST_DIRECTORY"))
+  (expand-file-name "images" data-directory)
   "Directory containing Emacs images.")
 
 (ert-deftest image--set-property ()
@@ -46,11 +48,46 @@
     (setf (image-property image :width) nil)
     (should (equal image '(image)))))
 
+(ert-deftest image-find-image ()
+  (find-image '((:type xpm :file "undo.xpm")))
+  (find-image '((:type png :file "newsticker/rss-feed.png" :ascent center))))
+
+(ert-deftest image-type-from-file-name ()
+  (should (eq (image-type-from-file-name "foo.jpg") 'jpeg))
+  (should (eq (image-type-from-file-name "foo.png") 'png)))
+
+(ert-deftest image-type/from-filename ()
+  ;; On emba, `image-types' and `image-load-path' do not exist.
+  (skip-unless (and (bound-and-true-p image-types)
+                    (bound-and-true-p image-load-path)))
+  (should (eq (image-type "foo.jpg") 'jpeg)))
+
 (ert-deftest image-type-from-file-header-test ()
   "Test image-type-from-file-header."
-  (should (eq 'svg
+  (should (eq (if (image-type-available-p 'svg) 'svg)
 	      (image-type-from-file-header
 	       (expand-file-name "splash.svg"
 				 image-tests--emacs-images-directory)))))
+
+(ert-deftest image-rotate ()
+  "Test `image-rotate'."
+  (cl-letf* ((image (list 'image))
+             ((symbol-function 'image--get-imagemagick-and-warn)
+              (lambda () image)))
+    (let ((current-prefix-arg '(4)))
+      (call-interactively #'image-rotate))
+    (should (equal image '(image :rotation 270.0)))
+    (call-interactively #'image-rotate)
+    (should (equal image '(image :rotation 0.0)))
+    (image-rotate)
+    (should (equal image '(image :rotation 90.0)))
+    (image-rotate 0)
+    (should (equal image '(image :rotation 90.0)))
+    (image-rotate 1)
+    (should (equal image '(image :rotation 91.0)))
+    (image-rotate 1234.5)
+    (should (equal image '(image :rotation 245.5)))
+    (image-rotate -154.5)
+    (should (equal image '(image :rotation 91.0)))))
 
 ;;; image-tests.el ends here

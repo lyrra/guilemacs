@@ -1,5 +1,5 @@
 /* font.h -- Interface definition for font handling.
-   Copyright (C) 2006-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006-2022 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -58,7 +58,7 @@ INLINE_HEADER_BEGIN
 	Lisp object encapsulating "struct font".  This corresponds to
 	an opened font.
 
-	Note: Only the method `open' of a font-driver can create this
+	Note: Only the method `open_font' of a font-driver can create this
 	object, and it should never be modified by Lisp.  */
 
 
@@ -70,8 +70,9 @@ INLINE_HEADER_BEGIN
 enum font_property_index
   {
     /* FONT-TYPE is a symbol indicating a font backend; currently `x',
-       `xft', and `ftx' are available on X, `uniscribe' and `gdi' on
-       Windows, and `ns' under Cocoa / GNUstep.  */
+       `xft', `xfthb', `ftrc', and `ftcrhb' are available on X;
+       `harfbuzz', `uniscribe', and `gdi' on Windows, and `ns' under
+       Cocoa / GNUstep.  */
     FONT_TYPE_INDEX,
 
     /* FONT-FOUNDRY is a foundry name (symbol).  */
@@ -552,9 +553,9 @@ struct font_driver
      :weight, :slant, :width, :size, :dpi, :spacing, :avgwidth.  If
      the font is scalable, :size and :avgwidth must be 0.
 
-     The `open' method of the same font-backend is called with one of
+     The `open_font' method of the same font-backend is called with one of
      the returned font-entities.  If the backend needs additional
-     information to be used in `open' method, this method can add any
+     information to be used in `open_font' method, this method can add any
      Lispy value using the property :font-entity to the entities.
 
      This and the following `match' are the only APIs that allocate
@@ -581,11 +582,11 @@ struct font_driver
 
   /* Open a font specified by FONT_ENTITY on frame F.  If the font is
      scalable, open it with PIXEL_SIZE.  */
-  Lisp_Object (*open) (struct frame *f, Lisp_Object font_entity,
-                       int pixel_size);
+  Lisp_Object (*open_font) (struct frame *f, Lisp_Object font_entity,
+                            int pixel_size);
 
   /* Close FONT.  NOTE: this can be called by GC.  */
-  void (*close) (struct font *font);
+  void (*close_font) (struct font *font);
 
   /* Prepare FACE for displaying characters by FONT on frame F by
      storing some data in FACE->extra.  */
@@ -794,6 +795,7 @@ extern Lisp_Object font_style_symbolic (Lisp_Object font,
                                         bool for_face);
 
 extern bool font_match_p (Lisp_Object spec, Lisp_Object font);
+extern bool font_is_ignored (const char *name, ptrdiff_t namelen);
 extern Lisp_Object font_list_entities (struct frame *, Lisp_Object);
 
 extern Lisp_Object font_get_name (Lisp_Object font_object);
@@ -842,13 +844,14 @@ valid_font_driver (struct font_driver const *d)
 extern Lisp_Object font_update_drivers (struct frame *f, Lisp_Object list);
 extern Lisp_Object font_range (ptrdiff_t, ptrdiff_t, ptrdiff_t *,
 			       struct window *, struct face *,
-			       Lisp_Object);
-extern void font_fill_lglyph_metrics (Lisp_Object, Lisp_Object);
+			       Lisp_Object, int);
+extern void font_fill_lglyph_metrics (Lisp_Object, struct font *, unsigned int);
 
 extern Lisp_Object font_put_extra (Lisp_Object font, Lisp_Object prop,
                                    Lisp_Object val);
 
 #ifdef HAVE_HARFBUZZ
+extern Lisp_Object hbfont_otf_capability (struct font *);
 extern Lisp_Object hbfont_shape (Lisp_Object, Lisp_Object);
 extern Lisp_Object hbfont_combining_capability (struct font *);
 #endif
@@ -894,7 +897,6 @@ extern void syms_of_ftfont (void);
 extern struct font_driver const xfont_driver;
 extern Lisp_Object xfont_get_cache (struct frame *);
 extern void syms_of_xfont (void);
-extern void syms_of_ftxfont (void);
 #ifdef HAVE_XFT
 extern struct font_driver const xftfont_driver;
 #ifdef HAVE_HARFBUZZ
@@ -902,7 +904,6 @@ extern struct font_driver xfthbfont_driver;
 #endif	/* HAVE_HARFBUZZ */
 #endif
 #if defined HAVE_FREETYPE || defined HAVE_XFT
-extern struct font_driver const ftxfont_driver;
 extern void syms_of_xftfont (void);
 #endif
 #ifdef HAVE_BDFFONT

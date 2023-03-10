@@ -1,6 +1,6 @@
 ;;; elec-pair.el --- Automatic parenthesis pairing  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; Author: João Távora <joaotavora@gmail.com>
 
@@ -51,7 +51,7 @@ See also the variable `electric-pair-text-pairs'."
 
 Pairs of delimiters in this list are a fallback in case they have
 no syntax relevant to `electric-pair-mode' in the syntax table
-defined in `electric-pair-text-syntax-table'"
+defined in `electric-pair-text-syntax-table'."
   :version "24.4"
   :group 'electricity
   :type '(repeat (cons character character)))
@@ -63,7 +63,7 @@ When inserting a closing paren character right before the same character,
 just skip that character instead, so that hitting ( followed by ) results
 in \"()\" rather than \"())\".
 
-This can be convenient for people who find it easier to hit ) than C-f.
+This can be convenient for people who find it easier to hit ) than \\[forward-char].
 
 Can also be a function of one argument (the closer char just
 inserted), in which case that function's return value is
@@ -159,7 +159,7 @@ return value is considered instead."
   #'electric-pair--skip-whitespace
   "Function to use to skip whitespace forward.
 Before attempting a skip, if `electric-pair-skip-whitespace' is
-non-nil, this function is called. It move point to a new buffer
+non-nil, this function is called.  It move point to a new buffer
 position, presumably skipping only whitespace in between.")
 
 (defun electric-pair--skip-whitespace ()
@@ -230,7 +230,7 @@ inside a comment or string."
 	(electric-pair-mode nil)
         ;; When adding the "closer" delimiter, a job his function is
         ;; frequently used for, we don't want to munch any extra
-        ;; newlines above us.  That would be the default behaviour of
+        ;; newlines above us.  That would be the default behavior of
         ;; `electric-layout-mode', which potentially kicked in before
         ;; us to add these newlines, and is probably about to kick in
         ;; again after we add the closer.
@@ -238,9 +238,9 @@ inside a comment or string."
     (self-insert-command 1)))
 
 (cl-defmacro electric-pair--with-uncached-syntax ((table &optional start) &rest body)
-  "Like `with-syntax-table', but flush the syntax-ppss cache afterwards.
+  "Like `with-syntax-table', but flush the `syntax-ppss' cache afterwards.
 Use this instead of (with-syntax-table TABLE BODY) when BODY
-contains code which may update the syntax-ppss cache.  This
+contains code which may update the `syntax-ppss' cache.  This
 includes calling `parse-partial-sexp' and any sexp-based movement
 functions when `parse-sexp-lookup-properties' is non-nil.  The
 cache is flushed from position START, defaulting to point."
@@ -380,7 +380,7 @@ If point is not enclosed by any lists, return ((t) . (t))."
 (defvar electric-pair-string-bound-function 'point-max
   "Next buffer position where strings are syntactically unexpected.
 Value is a function called with no arguments and returning a
-buffer position. Major modes should set this variable
+buffer position.  Major modes should set this variable
 buffer-locally if they experience slowness with
 `electric-pair-mode' when pairing quotes.")
 
@@ -485,6 +485,27 @@ happened."
     (electric-pair-conservative-inhibit char)))
 
 (defun electric-pair-post-self-insert-function ()
+  "Member of `post-self-insert-hook'.  Do main work for `electric-pair-mode'.
+If the newly inserted character C has delimiter syntax, this
+function may decide to insert additional paired delimiters, or
+skip the insertion of the new character altogether by jumping
+over an existing identical character, or do nothing.
+
+The decision is taken by order of preference:
+
+* According to `use-region-p'.  If this returns non-nil this
+  function will unconditionally \"wrap\" the region in the
+  corresponding delimiter for C;
+
+* According to C alone, by looking C up in the tables
+  `electric-pair-pairs' or `electric-pair-text-pairs' (which
+  see);
+
+* According to C's syntax and the syntactic state of the buffer
+  (both as defined by the major mode's syntax table).  This is
+  done by looking up up the variables
+  `electric-pair-inhibit-predicate', `electric-pair-skip-self'
+  and `electric-pair-skip-whitespace' (which see)."
   (let* ((pos (and electric-pair-mode (electric--after-char-pos)))
          (skip-whitespace-info))
     (pcase (electric-pair-syntax-info last-command-event)
@@ -551,18 +572,21 @@ happened."
                          (goto-char pos)
                          (funcall electric-pair-inhibit-predicate
                                   last-command-event)))))
-         (save-excursion (electric-pair--insert pair)))))
-      (_
-       (when (and (if (functionp electric-pair-open-newline-between-pairs)
-                      (funcall electric-pair-open-newline-between-pairs)
-                    electric-pair-open-newline-between-pairs)
-                  (eq last-command-event ?\n)
-                  (< (1+ (point-min)) (point) (point-max))
-                  (eq (save-excursion
-                        (skip-chars-backward "\t\s")
-                        (char-before (1- (point))))
-                      (matching-paren (char-after))))
-         (save-excursion (newline 1 t)))))))
+         (save-excursion (electric-pair--insert pair))))))))
+
+(defun electric-pair-open-newline-between-pairs-psif ()
+  "Honor `electric-pair-open-newline-between-pairs'.
+Member of `post-self-insert-hook' if `electric-pair-mode' is on."
+  (when (and (if (functionp electric-pair-open-newline-between-pairs)
+                 (funcall electric-pair-open-newline-between-pairs)
+               electric-pair-open-newline-between-pairs)
+             (eq last-command-event ?\n)
+             (< (1+ (point-min)) (point) (point-max))
+             (eq (save-excursion
+                   (skip-chars-backward "\t\s")
+                   (char-before (1- (point))))
+                 (matching-paren (char-after))))
+    (save-excursion (newline 1 t))))
 
 (defun electric-pair-will-use-region ()
   (and (use-region-p)
@@ -623,10 +647,15 @@ To toggle the mode in a single buffer, use `electric-pair-local-mode'."
                   ;; `electric-indent-mode' are used together.
                   ;; Use `vc-region-history' on these lines for more info.
                   50)
+        (add-hook 'post-self-insert-hook
+		  #'electric-pair-open-newline-between-pairs-psif
+                  50)
 	(add-hook 'self-insert-uses-region-functions
 		  #'electric-pair-will-use-region))
     (remove-hook 'post-self-insert-hook
                  #'electric-pair-post-self-insert-function)
+    (remove-hook 'post-self-insert-hook
+                 #'electric-pair-open-newline-between-pairs-psif)
     (remove-hook 'self-insert-uses-region-functions
                  #'electric-pair-will-use-region)))
 

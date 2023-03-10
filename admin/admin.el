@@ -1,6 +1,6 @@
-;;; admin.el --- utilities for Emacs administration
+;;; admin.el --- utilities for Emacs administration  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2001-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -147,7 +147,11 @@ Root must be the root of an Emacs source tree."
     (unless (> (length newversion) 2)   ; pretest or release candidate?
       (with-temp-buffer
         (insert-file-contents newsfile)
-        (if (re-search-forward "^\\(\\+\\+\\+ *\\|--- *\\)$" nil t)
+        (when (re-search-forward "^\\* [^\n]*\n+" nil t)
+          (display-warning 'admin
+                           "NEWS file contains empty sections - remove them?"))
+        (goto-char (point-min))
+        (if (re-search-forward "^\\(\\+\\+\\+? *$\\|---? *$\\|Temporary note:\\)" nil t)
             (display-warning 'admin
                              "NEWS file still contains temporary markup.
 Documentation changes might not have been completed!"))))
@@ -250,7 +254,7 @@ ROOT should be the root of an Emacs source tree."
     (search-forward "INFO_COMMON = ")
     (let ((start (point)))
       (end-of-line)
-      (while (and (looking-back "\\\\")
+      (while (and (looking-back "\\\\" (- (point) 2))
 		  (zerop (forward-line 1)))
 	(end-of-line))
       (append (split-string (replace-regexp-in-string
@@ -333,14 +337,16 @@ Optional argument TYPE is type of output (nil means all)."
 
 (defconst manual-doctype-string
   "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.01 Transitional//EN\"
-\"http://www.w3.org/TR/html4/loose.dtd\">\n\n")
+\"https://www.w3.org/TR/html4/loose.dtd\">\n\n")
 
 (defconst manual-meta-string
-  "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">
-<link rev=\"made\" href=\"mailto:bug-gnu-emacs@gnu.org\">
+  "<meta http-equiv=\"content-type\" content=\"text/html; charset=utf-8\">\n")
+
+(defconst manual-links-string
+  "<link rev=\"made\" href=\"mailto:bug-gnu-emacs@gnu.org\">
 <link rel=\"icon\" type=\"image/png\" href=\"/graphics/gnu-head-mini.png\">
 <meta name=\"ICBM\" content=\"42.256233,-71.006581\">
-<meta name=\"DC.title\" content=\"gnu.org\">\n\n")
+<meta name=\"DC.title\" content=\"gnu.org\">\n")
 
 (defconst manual-style-string "<style type=\"text/css\">
 @import url('/software/emacs/manual.css');\n</style>\n")
@@ -471,6 +477,13 @@ the @import directive."
       (delete-region opoint (point))
       (search-forward "<meta http-equiv=\"Content-Style")
       (setq opoint (match-beginning 0)))
+    (search-forward "<title>")
+    (delete-region opoint (match-beginning 0))
+    (search-forward "</title>\n")
+    (when (search-forward "<link href=" nil t)
+      (goto-char (match-beginning 0)))
+    (insert manual-links-string)
+    (setq opoint (point))
     (search-forward "</head>")
     (goto-char (match-beginning 0))
     (delete-region opoint (point))
@@ -541,7 +554,7 @@ Leave point after the table."
 	(forward-line 1)
 	(while (not done)
 	  (cond ((re-search-forward "<tr><td.*&bull; \\(<a.*</a>\\)\
-:</td><td>&nbsp;&nbsp;</td><td[^>]*>\\(.*\\)" (line-end-position) t)
+:?</td><td>&nbsp;&nbsp;</td><td[^>]*>\\(.*\\)" (line-end-position) t)
 		 (replace-match (format "<tr><td%s>\\1</td>\n<td>\\2"
 					(if table-workaround
 					    " bgcolor=\"white\"" "")))
@@ -587,80 +600,87 @@ style=\"text-align:left\">")
 		 (forward-line 1)
 		 (setq done t)))))
     (let (done open-td tag desc)
-      ;; Convert the list that Makeinfo made into a table.
-      (or (search-forward "<ul class=\"menu\">" nil t)
-	  ;; FIXME?  The following search seems dangerously lax.
-	  (search-forward "<ul>"))
-      (replace-match "<table style=\"float:left\" width=\"100%\">")
-      (forward-line 1)
-      (while (not done)
-	(cond
-	 ((or (looking-at "<li>\\(<a.+</a>\\):[ \t]+\\(.*\\)$")
-	      (looking-at "<li>\\(<a.+</a>\\)$"))
-	  (setq tag (match-string 1))
-	  (setq desc (match-string 2))
-	  (replace-match "" t t)
-	  (when open-td
-	    (save-excursion
-	      (forward-char -1)
-	      (skip-chars-backward " ")
-	      (delete-region (point) (line-end-position))
-	      (insert "</td>\n  </tr>")))
-	  (insert "  <tr>\n    ")
-	  (if table-workaround
-	      ;; This works around a Firefox bug in the mono file.
-	      (insert "<td bgcolor=\"white\">")
-	    (insert "<td>"))
-	  (insert tag "</td>\n    <td>" (or desc ""))
-	  (setq open-td t))
-	 ((eq (char-after) ?\n)
-	  (delete-char 1)
-	  ;; Negate the following `forward-line'.
-	  (forward-line -1))
-	 ((looking-at "<!-- ")
-	  (search-forward "-->"))
-	 ((looking-at "<p>[- ]*The Detailed Node Listing[- \n]*")
-	  (replace-match "  </td></tr></table>\n
+      ;; Texinfo 6.8 and later doesn't produce <ul class="menu"> lists
+      ;; for the TOC menu, and the "description" part of each menu
+      ;; item is not there anymore.  So for HTML manuals produced by
+      ;; those newer versions of Texinfo we punt and leave the menu in
+      ;; its original form.
+      (when (or (search-forward "<ul class=\"menu\">" nil t)
+	        ;; FIXME?  The following search seems dangerously lax.
+	        (search-forward "<ul>" nil t))
+        ;; Convert the list that Makeinfo made into a table.
+        (replace-match "<table style=\"float:left\" width=\"100%\">")
+        (forward-line 1)
+        (while (not done)
+	  (cond
+	   ((or (looking-at "<li>\\(<a.+</a>\\):[ \t]+\\(.*\\)$")
+	        (looking-at "<li>\\(<a.+</a>\\)$"))
+	    (setq tag (match-string 1))
+	    (setq desc (match-string 2))
+	    (replace-match "" t t)
+	    (when open-td
+	      (save-excursion
+	        (forward-char -1)
+	        (skip-chars-backward " ")
+	        (delete-region (point) (line-end-position))
+	        (insert "</td>\n  </tr>")))
+	    (insert "  <tr>\n    ")
+	    (if table-workaround
+	        ;; This works around a Firefox bug in the mono file.
+	        (insert "<td bgcolor=\"white\">")
+	      (insert "<td>"))
+	    (insert tag "</td>\n    <td>" (or desc ""))
+	    (setq open-td t))
+	   ((eq (char-after) ?\n)
+	    (delete-char 1)
+	    ;; Negate the following `forward-line'.
+	    (forward-line -1))
+	   ((looking-at "<!-- ")
+	    (search-forward "-->"))
+	   ((looking-at "<p>[- ]*The Detailed Node Listing[- \n]*")
+	    (replace-match "  </td></tr></table>\n
 <h3>Detailed Node Listing</h3>\n\n" t t)
-	  (search-forward "<p>")
-	  ;; FIXME Fragile!
-	  ;; The Emacs and Elisp manual have some text at the
-	  ;; start of the detailed menu that is not part of the menu.
-	  ;; Other manuals do not.
-	  (if (looking-at "Here are some other nodes")
-	      (search-forward "<p>"))
-	  (goto-char (match-beginning 0))
-	  (skip-chars-backward "\n ")
-	  (setq open-td nil)
-	  (insert "</p>\n\n<table  style=\"float:left\" width=\"100%\">"))
-	 ((looking-at "</li></ul>")
-	  (replace-match "" t t))
-	 ((looking-at "<p>")
-	  (replace-match "" t t)
-	  (when open-td
-	    (insert "  </td></tr>")
-	    (setq open-td nil))
-	  (insert "  <tr>
+	    (search-forward "<p>")
+	    ;; FIXME Fragile!
+	    ;; The Emacs and Elisp manual have some text at the
+	    ;; start of the detailed menu that is not part of the menu.
+	    ;; Other manuals do not.
+	    (if (looking-at "Here are some other nodes")
+	        (search-forward "<p>"))
+	    (goto-char (match-beginning 0))
+	    (skip-chars-backward "\n ")
+	    (setq open-td nil)
+	    (insert "</p>\n\n<table  style=\"float:left\" width=\"100%\">"))
+	   ((looking-at "</li></ul>")
+	    (replace-match "" t t))
+	   ((looking-at "<p>")
+	    (replace-match "" t t)
+	    (when open-td
+	      (insert "  </td></tr>")
+	      (setq open-td nil))
+	    (insert "  <tr>
     <th colspan=\"2\" align=\"left\" style=\"text-align:left\">")
-	  (if (re-search-forward "</p>[ \t\n]*<ul class=\"menu\">" nil t)
-	      (replace-match "  </th></tr>")))
-	 ((looking-at "[ \t]*</ul>[ \t]*$")
-	  (replace-match
-	   (if open-td
-	       "  </td></tr>\n</table>"
-	     "</table>") t t)
-	  (setq done t))
-	 (t
-	  (if (eobp)
-	      (error "Parse error in %s"
-		     (file-name-nondirectory buffer-file-name)))
-	  (unless open-td
-	    (setq done t))))
-	(forward-line 1)))))
+	    (if (re-search-forward "</p>[ \t\n]*<ul class=\"menu\">" nil t)
+	        (replace-match "  </th></tr>")))
+	   ((looking-at "[ \t]*</ul>[ \t]*$")
+	    (replace-match
+	     (if open-td
+	         "  </td></tr>\n</table>"
+	       "</table>") t t)
+	    (setq done t))
+	   (t
+	    (if (eobp)
+	        (error "Parse error in %s"
+		       (file-name-nondirectory buffer-file-name)))
+	    (unless open-td
+	      (setq done t))))
+	  (forward-line 1))))))
 
 
 (defconst make-manuals-dist-output-variables
   '(("@\\(top_\\)?srcdir@" . ".")	; top_srcdir is wrong, but not used
+    ("@\\(abs_\\)?top_builddir@" . ".") ; wrong but unused
+    ("^\\(EMACS *=\\).*" . "\\1 emacs")
     ("^\\(\\(?:texinfo\\|buildinfo\\|emacs\\)dir *=\\).*" . "\\1 .")
     ("^\\(clean:.*\\)" . "\\1 infoclean")
     ("@MAKEINFO@" . "makeinfo")
@@ -678,9 +698,7 @@ style=\"text-align:left\">")
     ("@INSTALL@" . "install -c")
     ("@INSTALL_DATA@" . "${INSTALL} -m 644")
     ("@configure_input@" . "")
-    ("@AM_DEFAULT_VERBOSITY@" . "0")
-    ("@AM_V@" . "${V}")
-    ("@AM_DEFAULT_V@" . "${AM_DEFAULT_VERBOSITY}"))
+    ("@AM_DEFAULT_VERBOSITY@" . "0"))
   "Alist of (REGEXP . REPLACEMENT) pairs for `make-manuals-dist'.")
 
 (defun make-manuals-dist--1 (root type)
@@ -710,7 +728,8 @@ style=\"text-align:left\">")
 		   (string-match-p "\\.\\(eps\\|pdf\\)\\'" file)))
 	  (copy-file file stem)))
     (with-temp-buffer
-      (let ((outvars make-manuals-dist-output-variables))
+      (let ((outvars make-manuals-dist-output-variables)
+            (case-fold-search nil))
 	(push `("@version@" . ,version) outvars)
 	(insert-file-contents (format "../doc/%s/Makefile.in" type))
 	(dolist (cons outvars)
@@ -916,6 +935,60 @@ changes (in a non-trivial way).  This function does not check for that."
 			      'var var
 			      'help-echo "Mouse-2: visit this definition"
 			      :type 'cusver-xref)))))))
+
+
+;; Reminder message for open release-blocking bugs.  This requires the
+;; GNU ELPA package `debbugs'.
+
+(defun reminder-for-release-blocking-bugs (version)
+  "Submit a reminder message for release-blocking bugs of Emacs VERSION."
+  (interactive
+   (list (progn
+           (require 'debbugs-gnu)
+           (defvar debbugs-gnu-emacs-blocking-reports)
+           (defvar debbugs-gnu-emacs-current-release)
+           (completing-read
+	    "Emacs release: "
+	    (mapcar #'identity debbugs-gnu-emacs-blocking-reports)
+	    nil t debbugs-gnu-emacs-current-release))))
+
+  (require 'debbugs-gnu)
+  (declare-function debbugs-get-status "debbugs" (&rest bug-numbers))
+  (declare-function debbugs-get-attribute "debbugs" (bug-or-message attribute))
+  (require 'reporter)
+  (declare-function mail-position-on-field "sendmail" (field &optional soft))
+  (declare-function mail-text "sendmail" ())
+
+  (when-let ((id (alist-get version debbugs-gnu-emacs-blocking-reports
+                            nil nil #'string-equal))
+             (status-id (debbugs-get-status id))
+             (blockedby-ids (debbugs-get-attribute (car status-id) 'blockedby))
+             (blockedby-status
+              (apply #'debbugs-get-status (sort blockedby-ids #'<))))
+
+    (reporter-submit-bug-report
+     "<emacs-devel@gnu.org>" ; to-address
+     nil nil nil
+     (lambda () ; posthook
+       (goto-char (point-min))
+       (mail-position-on-field "subject")
+       (insert (format "Reminder: release-blocking bugs for Emacs %s (%s)"
+                       version (format-time-string "%F" nil "UTC0")))
+       (mail-text)
+       (delete-region (point) (point-max))
+       (insert "
+The following bugs are regarded as release-blocking for Emacs " version ".
+People are encouraged to work on them with priority.\n\n")
+       (dolist (i blockedby-status)
+         (unless (equal (debbugs-get-attribute i 'pending) "done")
+           (insert (format "bug#%d %s\n"
+                           (debbugs-get-attribute i 'id)
+                           (debbugs-get-attribute i 'subject)))))
+       (insert "
+If you use the debbugs package from GNU ELPA, you can apply the
+following form to see all bugs which block a given release:
+
+  (debbugs-gnu-emacs-release-blocking-reports \"" version "\")\n")))))
 
 (provide 'admin)
 

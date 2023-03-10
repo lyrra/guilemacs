@@ -1,5 +1,5 @@
 /* Filesystem notifications support with glib API.
-   Copyright (C) 2013-2019 Free Software Foundation, Inc.
+   Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -18,7 +18,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#include <stdio.h>
 #include <gio/gio.h>
 #include "lisp.h"
 #include "coding.h"

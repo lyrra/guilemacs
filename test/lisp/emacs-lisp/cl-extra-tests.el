@@ -1,21 +1,21 @@
 ;;; cl-extra-tests.el --- tests for emacs-lisp/cl-extra.el  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software: you can redistribute it and/or
-;; modify it under the terms of the GNU General Public License as
-;; published by the Free Software Foundation, either version 3 of the
-;; License, or (at your option) any later version.
-;;
-;; This program is distributed in the hope that it will be useful, but
-;; WITHOUT ANY WARRANTY; without even the implied warranty of
-;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
-;; General Public License for more details.
-;;
+;; GNU Emacs is free software: you can redistribute it and/or modify
+;; it under the terms of the GNU General Public License as published by
+;; the Free Software Foundation, either version 3 of the License, or
+;; (at your option) any later version.
+
+;; GNU Emacs is distributed in the hope that it will be useful,
+;; but WITHOUT ANY WARRANTY; without even the implied warranty of
+;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+;; GNU General Public License for more details.
+
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `https://www.gnu.org/licenses/'.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -98,5 +98,13 @@
   (let ((s (cl-make-random-state)))
     ;; Test for Bug#33731.
     (should-not (eq s (cl-make-random-state s)))))
+
+(ert-deftest cl-concatenate ()
+  (should (equal (cl-concatenate 'list '(1 2 3) '(4 5 6))
+                 '(1 2 3 4 5 6)))
+  (should (equal (cl-concatenate 'vector [1 2 3] [4 5 6])
+                 [1 2 3 4 5 6]))
+  (should (equal (cl-concatenate 'string "123" "456")
+                 "123456")))
 
 ;;; cl-extra-tests.el ends here

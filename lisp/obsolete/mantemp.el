@@ -1,6 +1,6 @@
-;;; mantemp.el --- create manual template instantiations from g++ 2.7.2 output
+;;; mantemp.el --- create manual template instantiations from g++ 2.7.2 output  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1996, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Tom Houlder <thoulder@icor.fr>
 ;; Created: 10 Dec 1996
@@ -148,7 +148,7 @@ the lines."
     ;; subsequently remove 'class' for functions so we don't need to
     ;; both scan for classes and functions.
     (goto-char (point-min))
-    (message "Inserting 'template class' for classes")
+    (message "Inserting `template class' for classes")
     (while (re-search-forward "^.+" nil t)
       (progn
 	(beginning-of-line)
@@ -156,7 +156,7 @@ the lines."
 	    (insert "template ")
 	  (insert "template class "))))
     (goto-char (point-min))
-    (message "Inserting 'template' for functions")
+    (message "Inserting `template' for functions")
     (while (re-search-forward
 	    "^template class [a-zA-Z :&*<>~=,0-9+!]*(" nil t nil)
       (progn

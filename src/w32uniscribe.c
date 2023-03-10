@@ -1,6 +1,6 @@
 /* Font backend for the Microsoft W32 Uniscribe API.
    Windows-specific parts of the HarfBuzz font backend.
-   Copyright (C) 2008-2019 Free Software Foundation, Inc.
+   Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <usp10.h>
 #ifdef HAVE_HARFBUZZ
 # include <hb.h>
+# include <hb-ot.h>	/* for hb_ot_font_set_funcs */
 # if GNUC_PREREQ (4, 3, 0)
 #  define bswap_32(v)  __builtin_bswap32(v)
 # else
@@ -87,6 +88,7 @@ DEF_DLL_FN (hb_bool_t, hb_font_get_nominal_glyph,
 	    (hb_font_t *, hb_codepoint_t, hb_codepoint_t *));
 DEF_DLL_FN (hb_bool_t, hb_font_get_variation_glyph,
 	    (hb_font_t *, hb_codepoint_t, hb_codepoint_t, hb_codepoint_t *));
+DEF_DLL_FN (void, hb_ot_font_set_funcs, (hb_font_t *));
 
 #define hb_blob_create fn_hb_blob_create
 #define hb_face_create_for_tables fn_hb_face_create_for_tables
@@ -97,6 +99,7 @@ DEF_DLL_FN (hb_bool_t, hb_font_get_variation_glyph,
 #define hb_face_get_upem fn_hb_face_get_upem
 #define hb_font_get_nominal_glyph fn_hb_font_get_nominal_glyph
 #define hb_font_get_variation_glyph fn_hb_font_get_variation_glyph
+#define hb_ot_font_set_funcs fn_hb_ot_font_set_funcs
 #endif
 
 /* Used by uniscribe_otf_capability.  */
@@ -1305,7 +1308,12 @@ w32hb_get_font (struct font *font, double *scale)
   hb_face_t *hb_face =
     hb_face_create_for_tables (w32hb_get_font_table, font_handle, NULL);
   if (hb_face_get_glyph_count (hb_face) > 0)
-    hb_font = hb_font_create (hb_face);
+    {
+      hb_font = hb_font_create (hb_face);
+      /* This is needed for HarfBuzz before 2.0.0; it is the default
+	 in later versions.  */
+      hb_ot_font_set_funcs (hb_font);
+    }
 
   struct uniscribe_font_info *uniscribe_font =
     (struct uniscribe_font_info *) font;
@@ -1486,6 +1494,7 @@ load_harfbuzz_funcs (HMODULE library)
   LOAD_DLL_FN (library, hb_face_destroy);
   LOAD_DLL_FN (library, hb_font_get_nominal_glyph);
   LOAD_DLL_FN (library, hb_font_get_variation_glyph);
+  LOAD_DLL_FN (library, hb_ot_font_set_funcs);
   return hbfont_init_w32_funcs (library);
 }
 #endif	/* HAVE_HARFBUZZ */
@@ -1540,6 +1549,7 @@ syms_of_w32uniscribe_for_pdumper (void)
   harfbuzz_font_driver.list = w32hb_list;
   harfbuzz_font_driver.match = w32hb_match;
   harfbuzz_font_driver.encode_char = w32hb_encode_char;
+  harfbuzz_font_driver.otf_capability = hbfont_otf_capability;
   harfbuzz_font_driver.shape = hbfont_shape;
   harfbuzz_font_driver.get_variation_glyphs = w32hb_get_variation_glyphs;
   harfbuzz_font_driver.combining_capability = hbfont_combining_capability;

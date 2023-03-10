@@ -1,6 +1,6 @@
-;;; mh-compat.el --- make MH-E compatible with various versions of Emacs
+;;; mh-compat.el --- make MH-E compatible with various versions of Emacs  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
@@ -23,8 +23,6 @@
 
 ;;; Commentary:
 
-;;; Change Log:
-
 ;;; Code:
 
 ;; This is a good place to gather code that is used for compatibility
@@ -42,7 +40,7 @@
 (eval-when-compile (require 'mh-acros))
 
 (mh-do-in-gnu-emacs
-  (defalias 'mh-require 'require))
+  (defalias 'mh-require #'require))
 
 (mh-do-in-xemacs
   (defun mh-require (feature &optional filename noerror)
@@ -83,6 +81,7 @@ This is an analogue of a dynamically scoped `let' that operates on
 the function cell of FUNCs rather than their value cell.
 
 \(fn ((FUNC ARGLIST BODY...) ...) FORM...)"
+  (declare (indent 1) (debug ((&rest (sexp sexp &rest form)) &rest form)))
   (if (fboundp 'cl-letf)
       `(cl-letf ,(mapcar (lambda (binding)
                            `((symbol-function ',(car binding))
@@ -90,9 +89,6 @@ the function cell of FUNCs rather than their value cell.
                          bindings)
          ,@body)
     `(flet ,bindings ,@body)))
-(put 'mh-flet 'lisp-indent-function 1)
-(put 'mh-flet 'edebug-form-spec
-     '((&rest (sexp sexp &rest form)) &rest form))
 
 (defun mh-display-color-cells (&optional display)
   "Return the number of color cells supported by DISPLAY.
@@ -134,7 +130,7 @@ introduced in Emacs 22."
 
 (defmacro mh-face-background (face &optional frame inherit)
   "Return the background color name of face, or nil if unspecified.
-See documentation for `back-foreground' for a description of the
+See documentation for `face-background' for a description of the
 arguments FACE, FRAME, and INHERIT.
 This macro is used by Emacs versions that lack an INHERIT argument,
 introduced in Emacs 22."
@@ -143,7 +139,7 @@ introduced in Emacs 22."
     `(face-background ,face ,frame ,inherit)))
 
 (defun-mh mh-font-lock-add-keywords font-lock-add-keywords
-  (mode keywords &optional how)
+  (_mode _keywords &optional _how)
   "XEmacs does not have `font-lock-add-keywords'.
 This function returns nil on that system.")
 
@@ -243,7 +239,7 @@ compatibility with versions of Emacs that lack the variable
            (delete image-directory (copy-sequence (or path load-path))))))
 
 (defun-mh mh-image-search-load-path
-  image-search-load-path (file &optional path)
+  image-search-load-path (_file &optional _path)
   "Emacs 21 and XEmacs don't have `image-search-load-path'.
 This function returns nil on those systems."
   nil)
@@ -292,7 +288,7 @@ introduced in Emacs 24."
       `(make-obsolete-variable ,obsolete-name ,current-name ,when ,access-type))))
 
 (defun-mh mh-match-string-no-properties
-  match-string-no-properties (num &optional string)
+  match-string-no-properties (num &optional _string)
   "Return string of text matched by last search, without text properties.
 This function is used by XEmacs that lacks `match-string-no-properties'.
 The function `buffer-substring-no-properties' is used instead.
@@ -301,7 +297,7 @@ The argument STRING is ignored."
    (match-beginning num) (match-end num)))
 
 (defun-mh mh-replace-regexp-in-string replace-regexp-in-string
-  (regexp rep string &optional fixedcase literal subexp start)
+  (regexp rep string &optional _fixedcase literal _subexp _start)
   "Replace REGEXP with REP everywhere in STRING and return result.
 This function is used by XEmacs that lacks `replace-regexp-in-string'.
 The function `replace-in-string' is used instead.
@@ -311,7 +307,7 @@ The arguments FIXEDCASE, SUBEXP, and START, used by
       (replace-in-string string regexp rep literal)))
 
 (defun-mh mh-test-completion
-  test-completion (string collection &optional predicate)
+  test-completion (_string _collection &optional _predicate)
   "Return non-nil if STRING is a valid completion.
 XEmacs does not have `test-completion'. This function returns nil
 on that system." nil)
@@ -352,7 +348,7 @@ The arguments RETURN-TO and EXIT-ACTION are ignored."
   (view-mode 1))
 
 (defun-mh mh-window-full-height-p
-  window-full-height-p (&optional WINDOW)
+  window-full-height-p (&optional _window)
   "Return non-nil if WINDOW is not the result of a vertical split.
 This function is defined in XEmacs as it lacks
 `window-full-height-p'. The values of the functions

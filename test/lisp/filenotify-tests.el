@@ -1,21 +1,23 @@
 ;;; filenotify-tests.el --- Tests of file notifications  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 
-;; This program is free software: you can redistribute it and/or
+;; This file is part of GNU Emacs.
+;;
+;; GNU Emacs is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
 ;; published by the Free Software Foundation, either version 3 of the
 ;; License, or (at your option) any later version.
 ;;
-;; This program is distributed in the hope that it will be useful, but
+;; GNU Emacs is distributed in the hope that it will be useful, but
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;; General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `https://www.gnu.org/licenses/'.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -93,6 +95,7 @@
 (defvar file-notify--test-desc2 nil)
 (defvar file-notify--test-results nil)
 (defvar file-notify--test-event nil)
+(defvar file-notify--test-file nil)
 (defvar file-notify--test-events nil)
 (defvar file-notify--test-monitors nil)
 
@@ -104,25 +107,23 @@ There are different timeouts for local and remote file notification libraries."
    (cond
     ;; gio/gpollfilemonitor.c declares POLL_TIME_SECS 5.  So we must
     ;; wait at least this time in the GPollFileMonitor case.  A
-    ;; similar timeout seems to be needed in the GFamFileMonitor case,
-    ;; at least on Cygwin.
-    ((and (string-equal (file-notify--test-library) "gfilenotify")
-          (memq (file-notify--test-monitor)
-                '(GFamFileMonitor GPollFileMonitor)))
-     7)
-    ((string-equal (file-notify--test-library) "gvfs-monitor-dir.exe") 1)
+    ;; similar timeout seems to be needed in the
+    ;; GFam{File,Directory}Monitor case.  So we use a large timeout
+    ;; for any monitor.
+    ((file-notify--test-monitor) 7)
     ((file-remote-p temporary-file-directory) 0.1)
     (t 0.01))))
 
 (defun file-notify--test-timeout ()
   "Timeout to wait for arriving a bunch of events, in seconds."
   (cond
-   ((file-remote-p temporary-file-directory) 6)
+   ((file-remote-p temporary-file-directory) 20)
+   ((eq system-type 'cygwin) 10)
+   ((getenv "EMACS_EMBA_CI") 10)
    ((string-equal (file-notify--test-library) "w32notify") 4)
-   ((eq system-type 'cygwin) 6)
    (t 3)))
 
-(defmacro file-notify--wait-for-events (timeout until)
+(defmacro file-notify--test-wait-for-events (timeout until)
   "Wait for and return file notification events until form UNTIL is true.
 TIMEOUT is the maximum time to wait for, in seconds."
   `(with-timeout (,timeout (ignore))
@@ -133,7 +134,7 @@ TIMEOUT is the maximum time to wait for, in seconds."
   "Check that `file-notify-descriptors' is an empty hash table.
 Return nil when any other file notification watch is still active."
   ;; Give read events a last chance.
-  (file-notify--wait-for-events
+  (file-notify--test-wait-for-events
    (file-notify--test-timeout)
    (zerop (hash-table-count file-notify-descriptors)))
   ;; Now check.
@@ -192,17 +193,26 @@ Return nil when any other file notification watch is still active."
         file-notify--test-desc1 nil
         file-notify--test-desc2 nil
         file-notify--test-results nil
+        file-notify--test-event nil
+        file-notify--test-file nil
         file-notify--test-events nil
         file-notify--test-monitors nil))
 
 (setq file-notify-debug nil
       password-cache-expiry nil
       tramp-verbose 0
-      tramp-message-show-message nil)
+      ;; When the remote user id is 0, Tramp refuses unsafe temporary files.
+      tramp-allow-unsafe-temporary-files
+      (or tramp-allow-unsafe-temporary-files noninteractive))
 
 ;; This should happen on hydra only.
 (when (getenv "EMACS_HYDRA_CI")
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+
+(defun file-notify--test-add-watch (file flags callback)
+  "Like `file-notify-add-watch', but also passing FILE to CALLBACK."
+  (file-notify-add-watch file flags
+                         (lambda (event) (funcall callback event file))))
 
 ;; We do not want to try and fail `file-notify-add-watch'.
 (defun file-notify--test-local-enabled ()
@@ -212,7 +222,8 @@ remote case we return always t."
   (or file-notify--library
       (file-remote-p temporary-file-directory)))
 
-(defvar file-notify--test-remote-enabled-checked nil
+(defvar file-notify--test-remote-enabled-checked
+  (if (getenv "EMACS_HYDRA_CI") '(t . nil))
   "Cached result of `file-notify--test-remote-enabled'.
 If the function did run, the value is a cons cell, the `cdr'
 being the result.")
@@ -249,18 +260,37 @@ remote host, or nil."
 
 (defun file-notify--test-monitor ()
   "The used monitor for the test, as a symbol.
-This returns only for the local case and gfilenotify; otherwise it is nil.
-`file-notify--test-desc' must be a valid watch descriptor."
+This returns only for (local) gfilenotify or (remote) gio library;
+otherwise it is nil.  `file-notify--test-desc' must be a valid
+watch descriptor."
   ;; We cache the result, because after `file-notify-rm-watch',
   ;; `gfile-monitor-name' does not return a proper result anymore.
-  ;; But we still need this information.
-  (unless (file-remote-p temporary-file-directory)
-    (or (cdr (assq file-notify--test-desc file-notify--test-monitors))
-        (when (functionp 'gfile-monitor-name)
-          (add-to-list 'file-notify--test-monitors
-                       (cons file-notify--test-desc
-                             (gfile-monitor-name file-notify--test-desc)))
-          (cdr (assq file-notify--test-desc file-notify--test-monitors))))))
+  ;; But we still need this information.  So far, we know the monitors
+  ;; GFamFileMonitor (gfilenotify on cygwin), GFamDirectoryMonitor
+  ;; (gfilenotify on Solaris), GInotifyFileMonitor (gfilenotify and
+  ;; gio on GNU/Linux), GKqueueFileMonitor (gfilenotify and gio on
+  ;; FreeBSD) and GPollFileMonitor (gio on cygwin).
+  (when file-notify--test-desc
+    (or (alist-get file-notify--test-desc file-notify--test-monitors)
+        (when (member (file-notify--test-library) '("gfilenotify" "gio"))
+	  (add-to-list
+	   'file-notify--test-monitors
+	   (cons file-notify--test-desc
+	         (if (file-remote-p temporary-file-directory)
+                     ;; `file-notify--test-desc' is the connection process.
+                     (progn
+                       (while (not (tramp-connection-property-p
+		                    file-notify--test-desc "gio-file-monitor"))
+                         (accept-process-output file-notify--test-desc 0))
+		       (tramp-get-connection-property
+		        file-notify--test-desc "gio-file-monitor" nil))
+		   (and (functionp 'gfile-monitor-name)
+		        (gfile-monitor-name file-notify--test-desc)))))
+          ;; If we don't know the monitor, there are good chances the
+          ;; test will fail.  We let it fail already here, in order to
+          ;; know the real reason.
+          (should (alist-get file-notify--test-desc file-notify--test-monitors)))
+	(alist-get file-notify--test-desc file-notify--test-monitors))))
 
 (defmacro file-notify--deftest-remote (test docstring &optional unstable)
   "Define ert `TEST-remote' for remote files.
@@ -447,15 +477,17 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 
   (unwind-protect
       ;; Check, that removing watch descriptors out of order do not
-      ;; harm.  This fails on Cygwin because of timing issues unless a
+      ;; harm.  This fails on cygwin because of timing issues unless a
       ;; long `sit-for' is added before the call to
       ;; `file-notify--test-read-event'.
       (unless (eq system-type 'cygwin)
         (let (results)
           (cl-flet ((first-callback (event)
-                     (when (eq (nth 1 event) 'deleted) (push 1 results)))
+                     (when (eq (file-notify--test-event-action event) 'deleted)
+                       (push 1 results)))
                     (second-callback (event)
-                     (when (eq (nth 1 event) 'deleted) (push 2 results))))
+                     (when (eq (file-notify--test-event-action event) 'deleted)
+                       (push 2 results))))
             (setq file-notify--test-tmpfile (file-notify--test-make-temp-name))
             (write-region
              "any text" nil file-notify--test-tmpfile nil 'no-message)
@@ -469,12 +501,15 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
                    (file-notify-add-watch
                     file-notify--test-tmpfile
                     '(change) #'second-callback)))
+            ;; `file-notify-rm-watch' confuses `file-notify--test-monitor'.
+            ;; Initialize it in time.
+            (file-notify--test-monitor)
             ;; Remove first watch.
             (file-notify-rm-watch file-notify--test-desc)
             ;; Only the second callback shall run.
 	    (file-notify--test-read-event)
             (delete-file file-notify--test-tmpfile)
-            (file-notify--wait-for-events
+            (file-notify--test-wait-for-events
              (file-notify--test-timeout) results)
             (should (equal results (list 2)))
 
@@ -487,35 +522,43 @@ If UNSTABLE is non-nil, the test is tagged as `:unstable'."
 (file-notify--deftest-remote file-notify-test02-rm-watch
   "Check `file-notify-rm-watch' for remote files.")
 
+;; Accessors for the callback argument.
+(defun file-notify--test-event-desc (event) (car event))
+(defun file-notify--test-event-action (event) (nth 1 event))
+(defun file-notify--test-event-file (event) (nth 2 event))
+(defun file-notify--test-event-file1 (event) (nth 3 event))
+
 (defun file-notify--test-event-test ()
   "Ert test function to be called by `file-notify--test-event-handler'.
 We cannot pass arguments, so we assume that `file-notify--test-event'
-is bound somewhere."
+and `file-notify--test-file' are bound somewhere."
   ;; Check the descriptor.
-  (should (equal (car file-notify--test-event) file-notify--test-desc))
+  (should (equal (file-notify--test-event-desc file-notify--test-event)
+                 file-notify--test-desc))
   ;; Check the file name.
   (should
    (string-prefix-p
-    (file-notify--event-watched-file file-notify--test-event)
-    (file-notify--event-file-name file-notify--test-event)))
+    file-notify--test-file
+    (file-notify--test-event-file file-notify--test-event)))
   ;; Check the second file name if exists.
-  (when (eq (nth 1 file-notify--test-event) 'renamed)
+  (when (eq (file-notify--test-event-action file-notify--test-event) 'renamed)
     (should
      (string-prefix-p
-      (file-notify--event-watched-file file-notify--test-event)
-      (file-notify--event-file1-name file-notify--test-event)))))
+      file-notify--test-file
+      (file-notify--test-event-file1 file-notify--test-event)))))
 
-(defun file-notify--test-event-handler (event)
+(defun file-notify--test-event-handler (event file)
   "Run a test over FILE-NOTIFY--TEST-EVENT.
 For later analysis, append the test result to `file-notify--test-results'
 and the event to `file-notify--test-events'."
   (let* ((file-notify--test-event event)
+         (file-notify--test-file file)
          (result
           (ert-run-test (make-ert-test :body 'file-notify--test-event-test))))
     ;; Do not add lock files, this would confuse the checks.
     (unless (string-match
 	     (regexp-quote ".#")
-	     (file-notify--event-file-name file-notify--test-event))
+	     (file-notify--test-event-file file-notify--test-event))
       (when file-notify-debug
         (message "file-notify--test-event-handler result: %s event: %S"
                  (null (ert-test-failed-p result)) file-notify--test-event))
@@ -524,71 +567,86 @@ and the event to `file-notify--test-events'."
 	    file-notify--test-results
 	    (append file-notify--test-results `(,result))))))
 
-(defun file-notify--test-with-events-check (events)
-  "Check whether received events match one of the EVENTS alternatives."
+(defun file-notify--test-event-actions ()
+  "Helper function to return retrieved actions, as list."
+  (mapcar #'file-notify--test-event-action file-notify--test-events))
+
+(defun file-notify--test-with-actions-check (actions)
+  "Check whether received actions match one of the ACTIONS alternatives."
   (let (result)
-    (dolist (elt events result)
+    (dolist (elt actions result)
       (setq result
             (or result
                 (if (eq (car elt) :random)
                     (equal (sort (cdr elt) 'string-lessp)
-                           (sort (mapcar #'cadr file-notify--test-events)
+                           (sort (file-notify--test-event-actions)
                                  'string-lessp))
-                  (equal elt (mapcar #'cadr file-notify--test-events))))))))
+                  (equal elt (file-notify--test-event-actions))))))
+    ;; Do not report result in case we debug.  Write messages instead.
+    (if file-notify-debug
+        (prog1 t
+          (if result
+              (message "Success\n%s" (file-notify--test-event-actions))
+            (message (file-notify--test-with-actions-explainer actions))))
+      result)))
 
-(defun file-notify--test-with-events-explainer (events)
-  "Explain why `file-notify--test-with-events-check' fails."
-  (if (null (cdr events))
-      (format "Received events do not match expected events\n%s\n%s"
-              (mapcar #'cadr file-notify--test-events) (car events))
+(defun file-notify--test-with-actions-explainer (actions)
+  "Explain why `file-notify--test-with-actions-check' fails."
+  (if (null (cdr actions))
+      (format "Received actions do not match expected actions\n%s\n%s"
+              (file-notify--test-event-actions) (car actions))
     (format
-     "Received events do not match any sequence of expected events\n%s\n%s"
-     (mapcar #'cadr file-notify--test-events) events)))
+     "Received actions do not match any sequence of expected actions\n%s\n%s"
+     (file-notify--test-event-actions) actions)))
 
-(put 'file-notify--test-with-events-check 'ert-explainer
-     'file-notify--test-with-events-explainer)
+(put 'file-notify--test-with-actions-check 'ert-explainer
+     'file-notify--test-with-actions-explainer)
 
-(defmacro file-notify--test-with-events (events &rest body)
-  "Run BODY collecting events and then compare with EVENTS.
-EVENTS is either a simple list of events, or a list of lists of
-events, which represent different possible results.  The first
+(defmacro file-notify--test-with-actions (actions &rest body)
+  "Run BODY collecting actions and then compare with ACTIONS.
+ACTIONS is either a simple list of actions, or a list of lists of
+actions, which represent different possible results.  The first
 event of a list could be the pseudo event `:random', which is
 just an indicator for comparison.
 
-Don't wait longer than timeout seconds for the events to be
+Don't wait longer than timeout seconds for the actions to be
 delivered."
-  (declare (indent 1))
-  `(let* ((events (if (consp (car ,events)) ,events (list ,events)))
+  (declare (indent 1) (debug (form body)))
+  `(let* ((actions (if (consp (car ,actions)) ,actions (list ,actions)))
           (max-length
            (apply
             'max
             (mapcar
              (lambda (x) (length (if (eq (car x) :random) (cdr x) x)))
-             events)))
+             actions)))
+          ;; Don't stop while debugging.
+          (while-no-input-ignore-events
+           (cons 'file-notify while-no-input-ignore-events))
           create-lockfiles)
-     ;; Flush pending events.
+     ;; Flush pending actions.
      (file-notify--test-read-event)
-     (file-notify--wait-for-events
+     (file-notify--test-wait-for-events
       (file-notify--test-timeout)
       (not (input-pending-p)))
      (setq file-notify--test-events nil
            file-notify--test-results nil)
      ,@body
-     (file-notify--wait-for-events
-      ;; More events need more time.  Use some fudge factor.
+     (file-notify--test-wait-for-events
+      ;; More actions need more time.  Use some fudge factor.
       (* (ceiling max-length 100) (file-notify--test-timeout))
       (= max-length (length file-notify--test-events)))
-     ;; Check the result sequence just to make sure that all events
+     ;; Check the result sequence just to make sure that all actions
      ;; are as expected.
      (dolist (result file-notify--test-results)
        (when (ert-test-failed-p result)
          (ert-fail
           (cadr (ert-test-result-with-condition-condition result)))))
      ;; One of the possible event sequences shall match.
-     (should (file-notify--test-with-events-check events))))
+     (should (file-notify--test-with-actions-check actions))))
 
 (ert-deftest file-notify-test03-events ()
   "Check file creation/change/removal notifications."
+  :tags '(:expensive-test)
   (skip-unless (file-notify--test-local-enabled))
 
   (unwind-protect
@@ -599,20 +657,17 @@ delivered."
         (setq file-notify--test-tmpfile (file-notify--test-make-temp-name))
         (should
          (setq file-notify--test-desc
-               (file-notify-add-watch
+               (file-notify--test-add-watch
                 file-notify--test-tmpfile
                 '(change) #'file-notify--test-event-handler)))
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
             (cond
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `created' event reliably.
-	     ((string-equal
-	       (file-notify--test-library) "gvfs-monitor-dir.exe")
-	      '((deleted stopped)
-	        (created deleted stopped)))
-             ;; cygwin does not raise a `changed' event.
-             ((eq system-type 'cygwin)
-              '(created deleted stopped))
+	     ;; GFam{File,Directory}Monitor, GKqueueFileMonitor and
+	     ;; GPollFileMonitor do not report the `changed' event.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor
+                      GKqueueFileMonitor GPollFileMonitor))
+	      '(created deleted stopped))
              (t '(created changed deleted stopped)))
           (write-region
            "another text" nil file-notify--test-tmpfile nil 'no-message)
@@ -633,16 +688,20 @@ delivered."
         (write-region "any text" nil file-notify--test-tmpfile nil 'no-message)
 	(should
 	 (setq file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpfile
 		'(change) #'file-notify--test-event-handler)))
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
 	    (cond
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `changed' event reliably.
-	     ((string-equal (file-notify--test-library) "gvfs-monitor-dir.exe")
+	     ;; GFam{File,Directory}Monitor and GPollFileMonitor do
+             ;; not detect the `changed' event reliably.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	      '((deleted stopped)
 		(changed deleted stopped)))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(deleted stopped))
 	     ;; There could be one or two `changed' events.
 	     (t '((changed deleted stopped)
 		  (changed changed deleted stopped))))
@@ -667,32 +726,32 @@ delivered."
 	(should
 	 (setq file-notify--test-tmpfile (file-notify--test-make-temp-name)
 	       file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpdir
 		'(change) #'file-notify--test-event-handler)))
-	(file-notify--test-with-events
+	(file-notify--test-with-actions
 	    (cond
 	     ;; w32notify does not raise `deleted' and `stopped'
 	     ;; events for the watched directory.
 	     ((string-equal (file-notify--test-library) "w32notify")
 	      '(created changed deleted))
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `created' event reliably.
-	     ((string-equal
-	       (file-notify--test-library) "gvfs-monitor-dir.exe")
-	      '((deleted stopped)
-		(created deleted stopped)))
              ;; On emba, `deleted' and `stopped' events of the
              ;; directory are not detected.
              ((getenv "EMACS_EMBA_CI")
               '(created changed deleted))
 	     ;; There are two `deleted' events, for the file and for
-	     ;; the directory.  Except for cygwin and kqueue.  And
-	     ;; cygwin does not raise a `changed' event.
-	     ((eq system-type 'cygwin)
+	     ;; the directory.  Except for
+	     ;; GFam{File,Directory}Monitor, GPollFileMonitor and
+	     ;; kqueue.  And GFam{File,Directory}Monitor and
+	     ;; GPollFileMonitor do not raise a `changed' event.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	      '(created deleted stopped))
 	     ((string-equal (file-notify--test-library) "kqueue")
 	      '(created changed deleted stopped))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(created deleted deleted stopped))
 	     (t '(created changed deleted deleted stopped)))
 	  (write-region
 	   "any text" nil file-notify--test-tmpfile nil 'no-message)
@@ -714,10 +773,10 @@ delivered."
 	 (setq file-notify--test-tmpfile (file-notify--test-make-temp-name)
 	       file-notify--test-tmpfile1 (file-notify--test-make-temp-name)
 	       file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpdir
 		'(change) #'file-notify--test-event-handler)))
-	(file-notify--test-with-events
+	(file-notify--test-with-actions
 	    (cond
 	     ;; w32notify does not distinguish between `changed' and
 	     ;; `attribute-changed'.  It does not raise `deleted' and
@@ -726,15 +785,12 @@ delivered."
 	      '(created changed created changed
 		changed changed changed
 		deleted deleted))
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `created' event reliably.
-	     ((string-equal
-	       (file-notify--test-library) "gvfs-monitor-dir.exe")
-	      '((deleted stopped)
-		(created created deleted stopped)))
 	     ;; There are three `deleted' events, for two files and
-	     ;; for the directory.  Except for cygwin and kqueue.
-	     ((eq system-type 'cygwin)
+	     ;; for the directory.  Except for
+	     ;; GFam{File,Directory}Monitor, GPollFileMonitor and
+	     ;; kqueue.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	      '(created created changed changed deleted stopped))
 	     ((string-equal (file-notify--test-library) "kqueue")
 	      '(created changed created changed deleted stopped))
@@ -742,6 +798,9 @@ delivered."
              ;; directory are not detected.
              ((getenv "EMACS_EMBA_CI")
               '(created changed created changed deleted deleted))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(created created deleted deleted deleted stopped))
 	     (t '(created changed created changed
 		  deleted deleted deleted stopped)))
 	  (write-region
@@ -750,9 +809,9 @@ delivered."
 	  (copy-file file-notify--test-tmpfile file-notify--test-tmpfile1)
 	  ;; The next two events shall not be visible.
 	  (file-notify--test-read-event)
-	  (set-file-modes file-notify--test-tmpfile 000)
+	  (set-file-modes file-notify--test-tmpfile 000 'nofollow)
 	  (file-notify--test-read-event)
-	  (set-file-times file-notify--test-tmpfile '(0 0))
+	  (set-file-times file-notify--test-tmpfile '(0 0) 'nofollow)
 	  (file-notify--test-read-event)
           (delete-directory file-notify--test-tmpdir 'recursive))
         (file-notify-rm-watch file-notify--test-desc)
@@ -771,33 +830,33 @@ delivered."
 	 (setq file-notify--test-tmpfile (file-notify--test-make-temp-name)
 	       file-notify--test-tmpfile1 (file-notify--test-make-temp-name)
 	       file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpdir
 		'(change) #'file-notify--test-event-handler)))
-	(file-notify--test-with-events
+	(file-notify--test-with-actions
 	    (cond
 	     ;; w32notify does not raise `deleted' and `stopped'
 	     ;; events for the watched directory.
 	     ((string-equal (file-notify--test-library) "w32notify")
 	      '(created changed renamed deleted))
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `created' event reliably.
-	     ((string-equal
-	       (file-notify--test-library) "gvfs-monitor-dir.exe")
-	      '((deleted stopped)
-		(created deleted stopped)))
              ;; On emba, `deleted' and `stopped' events of the
              ;; directory are not detected.
              ((getenv "EMACS_EMBA_CI")
               '(created changed renamed deleted))
 	     ;; There are two `deleted' events, for the file and for
-	     ;; the directory.  Except for cygwin and kqueue.  And
-	     ;; cygwin raises `created' and `deleted' events instead
-	     ;; of a `renamed' event.
-	     ((eq system-type 'cygwin)
+	     ;; the directory.  Except for
+	     ;; GFam{File,Directory}Monitor, GPollfileMonitor and
+	     ;; kqueue.  And GFam{File,Directory}Monitor and
+	     ;; GPollFileMonitor raise `created' and `deleted' events
+	     ;; instead of a `renamed' event.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	      '(created created deleted deleted stopped))
 	     ((string-equal (file-notify--test-library) "kqueue")
 	      '(created changed renamed deleted stopped))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(created renamed deleted deleted stopped))
 	     (t '(created changed renamed deleted deleted stopped)))
 	  (write-region
 	   "any text" nil file-notify--test-tmpfile nil 'no-message)
@@ -815,17 +874,17 @@ delivered."
     (file-notify--test-cleanup))
 
   (unwind-protect
-      ;; Check attribute change.  Does not work for cygwin.
-      (unless (eq system-type 'cygwin)
+      ;; Check attribute change.
+      (progn
 	(setq file-notify--test-tmpfile (file-notify--test-make-temp-name))
 	(write-region
 	 "any text" nil file-notify--test-tmpfile nil 'no-message)
 	(should
 	 (setq file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpfile
 		'(attribute-change) #'file-notify--test-event-handler)))
-	(file-notify--test-with-events
+	(file-notify--test-with-actions
 	    (cond
 	     ;; w32notify does not distinguish between `changed' and
 	     ;; `attribute-changed'.  Under MS Windows 7, we get four
@@ -834,18 +893,29 @@ delivered."
 	     ((string-equal (file-notify--test-library) "w32notify")
 	      '((changed changed)
 		(changed changed changed changed)))
-	     ;; For kqueue and in the remote case, `write-region'
-	     ;; raises also an `attribute-changed' event.
-	     ((or (string-equal (file-notify--test-library) "kqueue")
-		  (file-remote-p temporary-file-directory))
+	     ;; GFam{File,Directory}Monitor, GKqueueFileMonitor and
+	     ;; GPollFileMonitor do not report the `attribute-changed'
+	     ;; event.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor
+                      GKqueueFileMonitor GPollFileMonitor))
+              '())
+	     ;; For GInotifyFileMonitor,`write-region' raises
+	     ;; also an `attribute-changed' event on gio.
+	     ((and (string-equal (file-notify--test-library) "gio")
+                   (eq (file-notify--test-monitor) 'GInotifyFileMonitor))
+	      '(attribute-changed attribute-changed attribute-changed))
+	     ;; For kqueue, `write-region' raises also an
+	     ;; `attribute-changed' event.
+             ((string-equal (file-notify--test-library) "kqueue")
 	      '(attribute-changed attribute-changed attribute-changed))
 	     (t '(attribute-changed attribute-changed)))
 	  (write-region
 	   "any text" nil file-notify--test-tmpfile nil 'no-message)
 	  (file-notify--test-read-event)
-	  (set-file-modes file-notify--test-tmpfile 000)
+	  (set-file-modes file-notify--test-tmpfile 000 'nofollow)
 	  (file-notify--test-read-event)
-	  (set-file-times file-notify--test-tmpfile '(0 0))
+	  (set-file-times file-notify--test-tmpfile '(0 0) 'nofollow)
 	  (file-notify--test-read-event)
 	  (delete-file file-notify--test-tmpfile))
         (file-notify-rm-watch file-notify--test-desc)
@@ -857,7 +927,7 @@ delivered."
     (file-notify--test-cleanup)))
 
 (file-notify--deftest-remote file-notify-test03-events
-  "Check file creation/change/removal notifications for remote files.")
+  "Check file creation/change/removal notifications for remote files." t)
 
 (require 'autorevert)
 (setq auto-revert-notify-exclude-dir-regexp "nothing-to-be-excluded"
@@ -866,6 +936,7 @@ delivered."
 
 (ert-deftest file-notify-test04-autorevert ()
   "Check autorevert via file notification."
+  :tags '(:expensive-test)
   (skip-unless (file-notify--test-local-enabled))
 
   ;; `auto-revert-buffers' runs every 5".  And we must wait, until the
@@ -899,6 +970,10 @@ delivered."
             ;; timeouts.
             (setq file-notify--test-desc auto-revert-notify-watch-descriptor)
 
+	    ;; GKqueueFileMonitor does not report the `changed' event.
+	    (skip-unless
+             (not (eq (file-notify--test-monitor) 'GKqueueFileMonitor)))
+
 	    ;; Check, that file notification has been used.
 	    (should auto-revert-mode)
 	    (should auto-revert-use-notify)
@@ -907,40 +982,43 @@ delivered."
 	    ;; Modify file.  We wait for a second, in order to have
             ;; another timestamp.
             (ert-with-message-capture captured-messages
-              (sleep-for 1)
-              (write-region
-               "another text" nil file-notify--test-tmpfile nil 'no-message)
+              (let ((inhibit-message t))
+                (sleep-for 1)
+                (write-region
+                 "another text" nil file-notify--test-tmpfile nil 'no-message)
 
-              ;; Check, that the buffer has been reverted.
-              (file-notify--wait-for-events
-               timeout
-               (string-match
-                (format-message "Reverting buffer `%s'." (buffer-name buf))
-                captured-messages))
-              (should (string-match "another text" (buffer-string))))
+                ;; Check, that the buffer has been reverted.
+                (file-notify--test-wait-for-events
+                 timeout
+                 (string-match
+                  (format-message "Reverting buffer `%s'." (buffer-name buf))
+                  captured-messages))
+                (should (string-match "another text" (buffer-string)))))
 
             ;; Stop file notification.  Autorevert shall still work via polling.
 	    (file-notify-rm-watch auto-revert-notify-watch-descriptor)
-	    (file-notify--wait-for-events
+	    (file-notify--test-wait-for-events
 	     timeout (null auto-revert-notify-watch-descriptor))
 	    (should auto-revert-use-notify)
-	    (should-not auto-revert-notify-watch-descriptor)
+	    (should-not
+             (file-notify-valid-p auto-revert-notify-watch-descriptor))
 
 	    ;; Modify file.  We wait for two seconds, in order to
 	    ;; have another timestamp.  One second seems to be too
-            ;; short.  And Cygwin sporadically requires more than two.
+            ;; short.  And cygwin sporadically requires more than two.
             (ert-with-message-capture captured-messages
-              (sleep-for (if (eq system-type 'cygwin) 3 2))
-              (write-region
-               "foo bla" nil file-notify--test-tmpfile nil 'no-message)
+              (let ((inhibit-message t))
+                (sleep-for (if (eq system-type 'cygwin) 3 2))
+                (write-region
+                 "foo bla" nil file-notify--test-tmpfile nil 'no-message)
 
-              ;; Check, that the buffer has been reverted.
-              (file-notify--wait-for-events
-               timeout
-               (string-match
-                (format-message "Reverting buffer `%s'." (buffer-name buf))
-                captured-messages))
-              (should (string-match "foo bla" (buffer-string))))
+                ;; Check, that the buffer has been reverted.
+                (file-notify--test-wait-for-events
+                 timeout
+                 (string-match
+                  (format-message "Reverting buffer `%s'." (buffer-name buf))
+                  captured-messages))
+                (should (string-match "foo bla" (buffer-string)))))
 
             ;; Stop autorevert, in order to cleanup descriptor.
             (auto-revert-mode -1))
@@ -958,6 +1036,7 @@ delivered."
 
 (ert-deftest file-notify-test05-file-validity ()
   "Check `file-notify-valid-p' for files."
+  :tags '(:expensive-test)
   (skip-unless (file-notify--test-local-enabled))
 
   (unwind-protect
@@ -987,17 +1066,21 @@ delivered."
 	(write-region "any text" nil file-notify--test-tmpfile nil 'no-message)
 	(should
 	 (setq file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpfile
 		'(change) #'file-notify--test-event-handler)))
 	(should (file-notify-valid-p file-notify--test-desc))
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
 	    (cond
-             ;; gvfs-monitor-dir on cygwin does not detect the
-             ;; `changed' event reliably.
-	     ((string-equal (file-notify--test-library) "gvfs-monitor-dir.exe")
+	     ;; GFam{File,Directory}Monitor do not
+             ;; detect the `changed' event reliably.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor))
 	      '((deleted stopped)
 		(changed deleted stopped)))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(deleted stopped))
 	     ;; There could be one or two `changed' events.
 	     (t '((changed deleted stopped)
 		  (changed changed deleted stopped))))
@@ -1024,29 +1107,29 @@ delivered."
 	  (should
 	   (setq file-notify--test-tmpfile (file-notify--test-make-temp-name)
 	         file-notify--test-desc
-	         (file-notify-add-watch
+	         (file-notify--test-add-watch
 		  file-notify--test-tmpdir
 		  '(change) #'file-notify--test-event-handler)))
 	  (should (file-notify-valid-p file-notify--test-desc))
-	  (file-notify--test-with-events
+	  (file-notify--test-with-actions
 	      (cond
 	       ;; w32notify does not raise `deleted' and `stopped'
 	       ;; events for the watched directory.
 	       ((string-equal (file-notify--test-library) "w32notify")
 	        '(created changed deleted))
-               ;; gvfs-monitor-dir on cygwin does not detect the
-               ;; `created' event reliably.
-	       ((string-equal
-                 (file-notify--test-library) "gvfs-monitor-dir.exe")
-	        '((deleted stopped)
-	          (created deleted stopped)))
 	       ;; There are two `deleted' events, for the file and for
-	       ;; the directory.  Except for cygwin and kqueue.  And
-	       ;; cygwin does not raise a `changed' event.
-	       ((eq system-type 'cygwin)
+	       ;; the directory.  Except for
+	       ;; GFam{File,Directory}Monitor, GPollFileMonitor and
+	       ;; kqueue.  And GFam{File,Directory}Monitor and
+	       ;; GPollfileMonitor do not raise a `changed' event.
+	       ((memq (file-notify--test-monitor)
+                      '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	        '(created deleted stopped))
 	       ((string-equal (file-notify--test-library) "kqueue")
 	        '(created changed deleted stopped))
+	       ;; GKqueueFileMonitor does not report the `changed' event.
+	       ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+		'(created deleted deleted stopped))
 	       (t '(created changed deleted deleted stopped)))
 	    (write-region
 	     "any text" nil file-notify--test-tmpfile nil 'no-message)
@@ -1089,7 +1172,7 @@ delivered."
         ;; After removing the watch, the descriptor must not be valid
         ;; anymore.
         (file-notify-rm-watch file-notify--test-desc)
-        (file-notify--wait-for-events
+        (file-notify--test-wait-for-events
          (file-notify--test-timeout)
 	 (not (file-notify-valid-p file-notify--test-desc)))
         (should-not (file-notify-valid-p file-notify--test-desc))
@@ -1116,7 +1199,7 @@ delivered."
         ;; After deleting the directory, the descriptor must not be
         ;; valid anymore.
         (delete-directory file-notify--test-tmpfile 'recursive)
-        (file-notify--wait-for-events
+        (file-notify--test-wait-for-events
 	 (file-notify--test-timeout)
 	 (not (file-notify-valid-p file-notify--test-desc)))
         (should-not (file-notify-valid-p file-notify--test-desc))
@@ -1142,11 +1225,11 @@ delivered."
 	 (make-temp-file "file-notify-test-parent" t)))
   (should
    (setq file-notify--test-desc
-	 (file-notify-add-watch
+	 (file-notify--test-add-watch
 	  file-notify--test-tmpfile
 	  '(change) #'file-notify--test-event-handler)))
   (unwind-protect
-      (let ((n 1000)
+      (let ((n 10);00)
             source-file-list target-file-list
             (default-directory file-notify--test-tmpfile))
         (dotimes (i n)
@@ -1159,7 +1242,7 @@ delivered."
 		(push (expand-file-name (format "y%d" i)) target-file-list))
 	    (push (expand-file-name (format "y%d" i)) source-file-list)
 	    (push (expand-file-name (format "x%d" i)) target-file-list)))
-        (file-notify--test-with-events (make-list (+ n n) 'created)
+        (file-notify--test-with-actions (make-list (+ n n) 'created)
           (let ((source-file-list source-file-list)
                 (target-file-list target-file-list))
             (while (and source-file-list target-file-list)
@@ -1167,7 +1250,7 @@ delivered."
               (write-region "" nil (pop source-file-list) nil 'no-message)
               (file-notify--test-read-event)
               (write-region "" nil (pop target-file-list) nil 'no-message))))
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
 	    (cond
 	     ;; w32notify fires both `deleted' and `renamed' events.
 	     ((string-equal (file-notify--test-library) "w32notify")
@@ -1175,9 +1258,11 @@ delivered."
 		(dotimes (_i n)
 		  (setq r (append '(deleted renamed) r)))
 		r))
-	     ;; cygwin fires `changed' and `deleted' events, sometimes
-	     ;; in random order.
-	     ((eq system-type 'cygwin)
+	     ;; GFam{File,Directory}Monitor and GPollFileMonitor fire
+	     ;; `changed' and `deleted' events, sometimes in random
+	     ;; order.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
 	      (let (r)
 		(dotimes (_i n)
 		  (setq r (append '(changed deleted) r)))
@@ -1188,7 +1273,7 @@ delivered."
             (while (and source-file-list target-file-list)
               (file-notify--test-read-event)
               (rename-file (pop source-file-list) (pop target-file-list) t))))
-        (file-notify--test-with-events (make-list n 'deleted)
+        (file-notify--test-with-actions (make-list n 'deleted)
           (dolist (file target-file-list)
             (file-notify--test-read-event)
             (delete-file file)))
@@ -1206,10 +1291,11 @@ delivered."
 ;; Unpredictable failures, eg https://hydra.nixos.org/build/86016286
 (file-notify--deftest-remote file-notify-test07-many-events
   "Check that events are not dropped for remote directories."
-  (getenv "EMACS_HYDRA_CI"))
+  (or (getenv "EMACS_HYDRA_CI") (getenv "EMACS_EMBA_CI")))
 
 (ert-deftest file-notify-test08-backup ()
   "Check that backup keeps file notification."
+  :tags '(:expensive-test)
   (skip-unless (file-notify--test-local-enabled))
 
   (unwind-protect
@@ -1218,14 +1304,17 @@ delivered."
 	(write-region "any text" nil file-notify--test-tmpfile nil 'no-message)
 	(should
 	 (setq file-notify--test-desc
-	       (file-notify-add-watch
+	       (file-notify--test-add-watch
 		file-notify--test-tmpfile
 		'(change) #'file-notify--test-event-handler)))
         (should (file-notify-valid-p file-notify--test-desc))
-        (file-notify--test-with-events
-            ;; There could be one or two `changed' events.
-            '((changed)
-              (changed changed))
+        (file-notify--test-with-actions
+	    (cond
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor) '())
+             ;; There could be one or two `changed' events.
+	     (t '((changed)
+		  (changed changed))))
           ;; There shouldn't be any problem, because the file is kept.
           (with-temp-buffer
             (let ((buffer-file-name file-notify--test-tmpfile)
@@ -1254,15 +1343,20 @@ delivered."
          "any text" nil file-notify--test-tmpfile nil 'no-message)
         (should
          (setq file-notify--test-desc
-               (file-notify-add-watch
+               (file-notify--test-add-watch
                 file-notify--test-tmpfile
                 '(change) #'file-notify--test-event-handler)))
         (should (file-notify-valid-p file-notify--test-desc))
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
             (cond
-             ;; On cygwin we only get the `changed' event.
-             ((eq system-type 'cygwin)
-              '(changed))
+	     ;; GFam{File,Directory}Monitor and GPollFileMonitor
+	     ;; report only the `changed' event.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
+	      '(changed))
+	     ;; GKqueueFileMonitor does not report the `changed' event.
+	     ((eq (file-notify--test-monitor) 'GKqueueFileMonitor)
+	      '(renamed created))
              (t '(renamed created changed)))
           ;; The file is renamed when creating a backup.  It shall
           ;; still be watched.
@@ -1310,31 +1404,31 @@ the file watch."
   (write-region "any text" nil file-notify--test-tmpfile1 nil 'no-message)
   (unwind-protect
       (cl-flet (;; Directory monitor.
-                (dir-callback (event)
+                (dir-callback (event file)
                  (let ((file-notify--test-desc file-notify--test-desc1))
-                   (file-notify--test-event-handler event)))
+                   (file-notify--test-event-handler event file)))
                 ;; File monitor.
-                (file-callback (event)
+                (file-callback (event file)
                  (let ((file-notify--test-desc file-notify--test-desc2))
-                   (file-notify--test-event-handler event))))
+                   (file-notify--test-event-handler event file))))
         (should
          (setq file-notify--test-desc1
-               (file-notify-add-watch
+               (file-notify--test-add-watch
                 file-notify--test-tmpfile
                 '(change) #'dir-callback)
                ;; This is needed for `file-notify--test-monitor'.
                file-notify--test-desc file-notify--test-desc1))
         (should
          (setq file-notify--test-desc2
-               (file-notify-add-watch
+               (file-notify--test-add-watch
                 file-notify--test-tmpfile1
                 '(change) #'file-callback)))
         (should (file-notify-valid-p file-notify--test-desc1))
         (should (file-notify-valid-p file-notify--test-desc2))
         (should-not (equal file-notify--test-desc1 file-notify--test-desc2))
-        (let ((n 100))
+        (let ((n 10));0))
           ;; Run the test.
-          (file-notify--test-with-events
+          (file-notify--test-with-actions
               ;; There could be one or two `changed' events.
               (list
 	       ;; cygwin.
@@ -1360,7 +1454,12 @@ the file watch."
                 (make-list (/ n 2) 'changed)
                 ;; Just the directory monitor.
                 (make-list (/ n 2) 'created)
-                (make-list (/ n 2) 'changed)))
+                (make-list (/ n 2) 'changed))
+	       (append
+                '(:random)
+		;; Just the directory monitor.  GKqueueFileMonitor
+		;; does not report the `changed' event.
+                (make-list (/ n 2) 'created)))
             (dotimes (i n)
               (file-notify--test-read-event)
               (if (zerop (mod i 2))
@@ -1375,19 +1474,22 @@ the file watch."
         ;; active.  We receive the `deleted' event from both the
         ;; directory and the file monitor.  The `stopped' event is
         ;; from the file monitor.  It's undecided in which order the
-        ;; the directory and the file monitor are triggered.
-        (file-notify--test-with-events '(:random deleted deleted stopped)
+        ;; directory and the file monitor are triggered.
+        (file-notify--test-with-actions '(:random deleted deleted stopped)
           (delete-file file-notify--test-tmpfile1))
         (should (file-notify-valid-p file-notify--test-desc1))
         (should-not (file-notify-valid-p file-notify--test-desc2))
 
         ;; Now we delete the directory.
-        (file-notify--test-with-events
+        (file-notify--test-with-actions
             (cond
-             ;; In kqueue and for cygwin, just one `deleted' event for
-             ;; the directory is received.
-             ((or (eq system-type 'cygwin)
-		  (string-equal (file-notify--test-library) "kqueue"))
+             ;; GFam{File,Directory}Monitor, GPollFileMonitor and
+             ;; kqueue raise just one `deleted' event for the
+             ;; directory.
+	     ((memq (file-notify--test-monitor)
+                    '(GFamFileMonitor GFamDirectoryMonitor GPollFileMonitor))
+              '(deleted stopped))
+	     ((string-equal (file-notify--test-library) "kqueue")
               '(deleted stopped))
              (t (append
                  ;; The directory monitor raises a `deleted' event for

@@ -1,6 +1,6 @@
 ;;; url-util.el --- Miscellaneous helper routines for URL library -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2019 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Bill Perry <wmperry@gnu.org>
@@ -74,60 +74,49 @@ If a list, it is a list of the types of messages to be logged."
 (defun url-parse-args (str &optional nodowncase)
   ;; Return an assoc list of attribute/value pairs from a string
   ;; that uses RFC 822 (or later) format.
-  (let (
-	name				; From name=
+  (let (name				; From name=
 	value				; its value
 	results				; Assoc list of results
 	name-pos			; Start of XXXX= position
-	val-pos				; Start of value position
-	st
-	nd
-	)
-    (save-excursion
-      (save-restriction
-	(set-buffer (get-buffer-create " *urlparse-temp*"))
-	(set-syntax-table url-parse-args-syntax-table)
-	(erase-buffer)
-	(insert str)
-	(setq st (point-min)
-	      nd (point-max))
-	(set-syntax-table url-parse-args-syntax-table)
-	(narrow-to-region st nd)
-	(goto-char (point-min))
-	(while (not (eobp))
-	  (skip-chars-forward "; \n\t")
-	  (setq name-pos (point))
-	  (skip-chars-forward "^ \n\t=;")
-	  (if (not nodowncase)
-	      (downcase-region name-pos (point)))
-	  (setq name (buffer-substring name-pos (point)))
-	  (skip-chars-forward " \t\n")
-	  (if (/= (or (char-after (point)) 0)  ?=) ; There is no value
-	      (setq value nil)
-	    (skip-chars-forward " \t\n=")
-	    (setq val-pos (point)
-		  value
-		  (cond
-		   ((or (= (or (char-after val-pos) 0) ?\")
-			(= (or (char-after val-pos) 0) ?'))
-		    (buffer-substring (1+ val-pos)
-				      (condition-case ()
-					  (prog2
-					      (forward-sexp 1)
-					      (1- (point))
-					    (skip-chars-forward "\""))
-					(error
-					 (skip-chars-forward "^ \t\n")
-					 (point)))))
-		   (t
-		    (buffer-substring val-pos
-				      (progn
-					(skip-chars-forward "^;")
-					(skip-chars-backward " \t")
-					(point)))))))
-	  (setq results (cons (cons name value) results))
-	  (skip-chars-forward "; \n\t"))
-	results))))
+	val-pos)                        ; Start of value position
+    (with-temp-buffer
+      (insert str)
+      (set-syntax-table url-parse-args-syntax-table)
+      (goto-char (point-min))
+      (while (not (eobp))
+	(skip-chars-forward "; \n\t")
+	(setq name-pos (point))
+	(skip-chars-forward "^ \n\t=;")
+	(unless nodowncase
+	  (downcase-region name-pos (point)))
+	(setq name (buffer-substring name-pos (point)))
+	(skip-chars-forward " \t\n")
+	(if (/= (or (char-after (point)) 0)  ?=) ; There is no value
+	    (setq value nil)
+	  (skip-chars-forward " \t\n=")
+	  (setq val-pos (point)
+		value
+		(cond
+		 ((or (= (or (char-after val-pos) 0) ?\")
+		      (= (or (char-after val-pos) 0) ?'))
+		  (buffer-substring (1+ val-pos)
+				    (condition-case ()
+					(prog2
+					    (forward-sexp 1)
+					    (1- (point))
+					  (skip-chars-forward "\""))
+				      (error
+				       (skip-chars-forward "^ \t\n")
+				       (point)))))
+		 (t
+		  (buffer-substring val-pos
+				    (progn
+				      (skip-chars-forward "^;")
+				      (skip-chars-backward " \t")
+				      (point)))))))
+	(setq results (cons (cons name value) results))
+	(skip-chars-forward "; \n\t"))
+      results)))
 
 ;;;###autoload
 (defun url-insert-entities-in-string (string)
@@ -181,7 +170,7 @@ Will not do anything if `url-show-status' is nil."
 	  (null url-show-status)
 	  (active-minibuffer-window)
 	  (= url-lazy-message-time
-	     (setq url-lazy-message-time (encode-time nil 'integer))))
+	     (setq url-lazy-message-time (time-convert nil 'integer))))
       nil
     (apply 'message args)))
 
@@ -263,7 +252,7 @@ Will not do anything if `url-show-status' is nil."
     (while pairs
       (setq cur (car pairs)
 	    pairs (cdr pairs))
-      (unless (string-match "=" cur)
+      (unless (string-search "=" cur)
         (setq cur (concat cur "=")))
 
       (when (string-match "=" cur)
@@ -293,7 +282,7 @@ Given a QUERY in the form:
 \(This is the same format as produced by `url-parse-query-string')
 
 This will return a string
-\"key1=val1&key2=val2&key3=val1&key3=val2&key4&key5\". Keys may
+\"key1=val1&key2=val2&key3=val1&key3=val2&key4&key5\".  Keys may
 be strings or symbols; if they are symbols, the symbol name will
 be used.
 
@@ -346,10 +335,13 @@ instead of just \"key\" as in the example above."
 
 ;;;###autoload
 (defun url-unhex-string (str &optional allow-newlines)
-  "Remove %XX embedded spaces, etc in a URL.
+  "Decode %XX sequences in a percent-encoded URL.
 If optional second argument ALLOW-NEWLINES is non-nil, then allow the
 decoding of carriage returns and line feeds in the string, which is normally
-forbidden in URL encoding."
+forbidden in URL encoding.
+
+The resulting string in general requires decoding using an
+appropriate coding-system; see `decode-coding-string'."
   (setq str (or str ""))
   (let ((tmp "")
 	(case-fold-search t))
@@ -406,9 +398,12 @@ string: \"%\" followed by two upper-case hex digits.
 
 The allowed characters are specified by ALLOWED-CHARS.  If this
 argument is nil, the list `url-unreserved-chars' determines the
-allowed characters.  Otherwise, ALLOWED-CHARS should be a vector
-whose Nth element is non-nil if character N is allowed."
-  (unless allowed-chars
+allowed characters.  Otherwise, ALLOWED-CHARS should be either a
+list of allowed chars, or a vector whose Nth element is non-nil
+if character N is allowed."
+  (if allowed-chars
+      (unless (vectorp allowed-chars)
+        (setq allowed-chars (url--allowed-chars allowed-chars)))
     (setq allowed-chars (url--allowed-chars url-unreserved-chars)))
   (mapconcat (lambda (byte)
 	       (if (aref allowed-chars byte)
@@ -577,38 +572,13 @@ Has a preference for looking backward when not directly on a symbol."
 	  (setq url nil))
       url)))
 
-(defun url-generate-unique-filename (&optional fmt)
-  "Generate a unique filename in `url-temporary-directory'."
-  (declare (obsolete make-temp-file "23.1"))
-  ;; This variable is obsolete, but so is this function.
-  (let ((tempdir (with-no-warnings url-temporary-directory)))
-    (if (not fmt)
-	(let ((base (format "url-tmp.%d" (user-real-uid)))
-	      (fname "")
-	      (x 0))
-	  (setq fname (format "%s%d" base x))
-	  (while (file-exists-p
-		  (expand-file-name fname tempdir))
-	    (setq x (1+ x)
-		  fname (concat base (int-to-string x))))
-	  (expand-file-name fname tempdir))
-      (let ((base (concat "url" (int-to-string (user-real-uid))))
-	    (fname "")
-	    (x 0))
-	(setq fname (format fmt (concat base (int-to-string x))))
-	(while (file-exists-p
-		(expand-file-name fname tempdir))
-	  (setq x (1+ x)
-		fname (format fmt (concat base (int-to-string x)))))
-	(expand-file-name fname tempdir)))))
-
 (defun url-extract-mime-headers ()
   "Set `url-current-mime-headers' in current buffer."
   (save-excursion
     (goto-char (point-min))
     (unless url-current-mime-headers
-      (set (make-local-variable 'url-current-mime-headers)
-	   (mail-header-extract)))))
+      (setq-local url-current-mime-headers
+                  (mail-header-extract)))))
 
 (defun url-make-private-file (file)
   "Make FILE only readable and writable by the current user.
@@ -623,9 +593,7 @@ Creates FILE and its parent directories if they do not exist."
         (with-temp-buffer
           (write-region (point-min) (point-max) file nil 'silent nil 'excl)))
     (file-already-exists
-     (if (file-symlink-p file)
-         (error "Danger: `%s' is a symbolic link" file))
-     (set-file-modes file #o0600))))
+     (set-file-modes file #o0600 'nofollow))))
 
 (autoload 'puny-encode-domain "puny")
 (autoload 'url-domsuf-cookie-allowed-p "url-domsuf")

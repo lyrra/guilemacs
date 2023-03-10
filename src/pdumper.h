@@ -1,6 +1,6 @@
 /* Header file for the portable dumper.
 
-Copyright (C) 2016, 2018-2019 Free Software Foundation, Inc.
+Copyright (C) 2016, 2018-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -15,7 +15,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #ifndef EMACS_PDUMPER_H
 #define EMACS_PDUMPER_H
@@ -24,7 +24,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 INLINE_HEADER_BEGIN
 
-#define PDUMPER_NO_OBJECT ((enum Lisp_Type) -1)
+enum { PDUMPER_NO_OBJECT = -1 };
 
 /* Indicate in source code that we're deliberately relying on pdumper
    not preserving the given value.  Compiles to nothing --- for humans
@@ -35,7 +35,7 @@ INLINE_HEADER_BEGIN
    variables to which the Lisp heap points.  It doesn't know anything
    about other C variables.  The functions below allow code from other
    parts of Emacs to tell the portable dumper about other bits of
-   information to preserve in dumped images.
+   information to preserve in dump files.
 
    These memory-records are themselves preserved in the dump, so call
    the functions below only on the !initialized init path, just
@@ -44,7 +44,7 @@ INLINE_HEADER_BEGIN
    There are no special functions to preserve a global Lisp_Object.
    You should just staticpro these.  */
 
-/* Remember the value of THING in dumped images.  THING must not
+/* Remember the value of THING in dump files.  THING must not
    contain any pointers or Lisp_Object variables: these values are not
    valid across dump and load.  */
 #define PDUMPER_REMEMBER_SCALAR(thing)                  \
@@ -81,12 +81,25 @@ pdumper_remember_lv_ptr_raw (void *ptr, enum Lisp_Type type)
 
 typedef void (*pdumper_hook)(void);
 extern void pdumper_do_now_and_after_load_impl (pdumper_hook hook);
+extern void pdumper_do_now_and_after_late_load_impl (pdumper_hook hook);
 
 INLINE void
 pdumper_do_now_and_after_load (pdumper_hook hook)
 {
 #ifdef HAVE_PDUMPER
   pdumper_do_now_and_after_load_impl (hook);
+#else
+  hook ();
+#endif
+}
+
+/* Same as 'pdumper_do_now_and_after_load' but for hooks running code
+   that can call into Lisp.  */
+INLINE void
+pdumper_do_now_and_after_late_load (pdumper_hook hook)
+{
+#ifdef HAVE_PDUMPER
+  pdumper_do_now_and_after_late_load_impl (hook);
 #else
   hook ();
 #endif
@@ -124,10 +137,10 @@ enum pdumper_load_result
     PDUMPER_LOAD_FAILED_DUMP,
     PDUMPER_LOAD_OOM,
     PDUMPER_LOAD_VERSION_MISMATCH,
-    PDUMPER_LOAD_ERROR,
+    PDUMPER_LOAD_ERROR /* Must be last, as errno may be added.  */
   };
 
-enum pdumper_load_result pdumper_load (const char *dump_filename);
+int pdumper_load (const char *dump_filename, char *argv0);
 
 struct pdumper_loaded_dump
 {
@@ -170,12 +183,12 @@ pdumper_cold_object_p (const void *obj)
 }
 
 
-extern enum Lisp_Type pdumper_find_object_type_impl (const void *obj);
+extern int pdumper_find_object_type_impl (const void *obj);
 
 /* Return the type of the dumped object that starts at OBJ.  It is a
    programming error to call this routine for an OBJ for which
    pdumper_object_p would return false.  */
-INLINE _GL_ATTRIBUTE_CONST enum Lisp_Type
+INLINE _GL_ATTRIBUTE_CONST int
 pdumper_find_object_type (const void *obj)
 {
 #ifdef HAVE_PDUMPER
@@ -186,6 +199,14 @@ pdumper_find_object_type (const void *obj)
 #endif
 }
 
+/* Return true if TYPE is that of a Lisp object.
+   PDUMPER_NO_OBJECT is invalid.  */
+INLINE bool
+pdumper_valid_object_type_p (int type)
+{
+  return 0 <= type;
+}
+
 /* Return whether OBJ points exactly to the start of some object in
    the loaded dump image.  It is a programming error to call this
    routine for an OBJ for which pdumper_object_p would return
@@ -194,7 +215,7 @@ INLINE _GL_ATTRIBUTE_CONST bool
 pdumper_object_p_precise (const void *obj)
 {
 #ifdef HAVE_PDUMPER
-  return pdumper_find_object_type (obj) != PDUMPER_NO_OBJECT;
+  return pdumper_valid_object_type_p (pdumper_find_object_type (obj));
 #else
   (void) obj;
   emacs_abort ();
@@ -248,6 +269,7 @@ pdumper_clear_marks (void)
    file was loaded.  */
 extern void pdumper_record_wd (const char *);
 
+void init_pdumper_once (void);
 void syms_of_pdumper (void);
 
 INLINE_HEADER_END

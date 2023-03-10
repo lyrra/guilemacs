@@ -1,6 +1,6 @@
 ;;; desktop.el --- save partial status of Emacs when killed -*- lexical-binding: t -*-
 
-;; Copyright (C) 1993-1995, 1997, 2000-2019 Free Software Foundation,
+;; Copyright (C) 1993-1995, 1997, 2000-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Morten Welinder <terra@diku.dk>
@@ -44,10 +44,11 @@
 ;; (info "(emacs)Saving Emacs Sessions") in the GNU Emacs Manual.
 
 ;; When the desktop module is loaded, the function `desktop-kill' is
-;; added to the `kill-emacs-hook'.  This function is responsible for
-;; saving the desktop when Emacs is killed.  Furthermore an anonymous
-;; function is added to the `after-init-hook'.  This function is
-;; responsible for loading the desktop when Emacs is started.
+;; added to the `kill-emacs-query-functions'.  This function is
+;; responsible for saving the desktop and deleting the desktop lock
+;; file when Emacs is killed.  In addition, an anonymous function is
+;; added to the `after-init-hook'.  This function is responsible for
+;; loading the desktop when Emacs is started.
 
 ;; Special handling.
 ;; -----------------
@@ -344,7 +345,7 @@ to the value obtained by evaluating FORM."
 Each element is a regular expression.  Buffers with a name matched by any of
 these won't be deleted."
   :version "23.3"                       ; added Warnings - bug#6336
-  :type '(repeat string)
+  :type '(repeat regexp)
   :group 'desktop)
 
 ;;;###autoload
@@ -534,7 +535,7 @@ can guess how to load the mode's definition.")
   '((defining-kbd-macro nil)
     (isearch-mode nil)
     (vc-mode nil)
-    (vc-dired-mode nil)
+    (vc-dir-mode nil)
     (erc-track-minor-mode nil)
     (savehist-mode nil))
   "Table mapping minor mode variables to minor mode functions.
@@ -706,8 +707,9 @@ if different)."
                                  "\\)\\'")))
     (dolist (buffer (buffer-list))
       (let ((bufname (buffer-name buffer)))
-	(unless (or (eq (aref bufname 0) ?\s) ;; Don't kill internal buffers
-		    (string-match-p preserve-regexp bufname))
+       (unless (or (null bufname)
+                   (eq (aref bufname 0) ?\s) ;; Don't kill internal buffers
+		   (string-match-p preserve-regexp bufname))
 	  (kill-buffer buffer)))))
   (delete-other-windows)
   (when (and desktop-restore-frames
@@ -731,7 +733,10 @@ if different)."
 
 ;; ----------------------------------------------------------------------------
 (unless noninteractive
-  (add-hook 'kill-emacs-hook #'desktop-kill))
+  (add-hook 'kill-emacs-query-functions #'desktop-kill)
+  ;; Certain things should be done even if
+  ;; `kill-emacs-query-functions' are not called.
+  (add-hook 'kill-emacs-hook #'desktop--on-kill))
 
 (defun desktop-kill ()
   "If `desktop-save-mode' is non-nil, do what `desktop-save' says to do.
@@ -758,8 +763,15 @@ is nil, ask the user where to save the desktop."
       (file-error
        (unless (yes-or-no-p "Error while saving the desktop.  Ignore? ")
 	 (signal (car err) (cdr err))))))
+  (desktop--on-kill)
+  t)
+
+(defun desktop--on-kill ()
   ;; If we own it, we don't anymore.
-  (when (eq (emacs-pid) (desktop-owner)) (desktop-release-lock)))
+  (when (eq (emacs-pid) (desktop-owner))
+    ;; Allow exiting Emacs even if we can't delete the desktop file.
+    (ignore-error 'file-error
+      (desktop-release-lock))))
 
 ;; ----------------------------------------------------------------------------
 (defun desktop-list* (&rest args)
@@ -946,7 +958,14 @@ which means to truncate VAR's value to at most MAX-SIZE elements
 	      ")\n"))))
 
 ;; ----------------------------------------------------------------------------
-(defun desktop-save-buffer-p (filename bufname mode &rest _dummy)
+(defvar desktop-buffers-not-to-save-function nil
+  "Function identifying buffers that are to be excluded from saving.
+Like `desktop-buffers-not-to-save' it can be used to check whether
+a given buffer should not be saved.  It takes the same arguments as
+`desktop-save-buffer-p' and should return nil if buffer should not
+have its state saved in the desktop file.")
+
+(defun desktop-save-buffer-p (filename bufname mode &rest rest)
   "Return t if buffer should have its state saved in the desktop file.
 FILENAME is the visited file name, BUFNAME is the buffer name, and
 MODE is the major mode.
@@ -970,6 +989,9 @@ MODE is the major mode.
 	     (and (null filename)
 		  (null dired-skip)  ; bug#5755
 		  (with-current-buffer bufname desktop-save-buffer)))
+	 (or (null desktop-buffers-not-to-save-function)
+	     (funcall desktop-buffers-not-to-save-function
+		      filename bufname mode rest))
 	 t)))
 
 ;; ----------------------------------------------------------------------------
@@ -1007,13 +1029,16 @@ Frames with a non-nil `desktop-dont-save' parameter are not saved."
 
 ;;;###autoload
 (defun desktop-save (dirname &optional release only-if-changed version)
-  "Save the desktop in a desktop file.
-Parameter DIRNAME specifies where to save the desktop file.
-Optional parameter RELEASE says whether we're done with this
-desktop.  If ONLY-IF-CHANGED is non-nil, compare the current
-desktop information to that in the desktop file, and if the
-desktop information has not changed since it was last saved then
-do not rewrite the file.
+  "Save the state of Emacs in a desktop file in directory DIRNAME.
+Optional argument RELEASE non-nil says we're done with this
+desktop, in which case this function releases the lock of the
+desktop file in DIRNAME.
+If ONLY-IF-CHANGED is non-nil, compare the current desktop
+information to that in the desktop file, and if the desktop
+information has not changed since it was last saved, then do
+not rewrite the file.
+
+To restore the desktop, use `desktop-read'.
 
 This function can save the desktop in either format version
 208 (which only Emacs 25.1 and later can read) or version
@@ -1023,14 +1048,20 @@ it was last saved, or version 208 when writing a fresh desktop
 file.
 
 To upgrade a version 206 file to version 208, call this command
-explicitly with a bare prefix argument: C-u M-x desktop-save.
-You are recommended to do this once you have firmly upgraded to
-Emacs 25.1 (or later).  To downgrade a version 208 file to version
-206, use a double command prefix: C-u C-u M-x desktop-save.
-Confirmation will be requested in either case.  In a non-interactive
-call, VERSION can be given as an integer, either 206 or 208, which
-will be accepted as the format version in which to save the file
-without further confirmation."
+explicitly with a prefix argument: \\[universal-argument] \\[desktop-save].
+If you are upgrading from Emacs 24 or older, we recommend to do
+this once you decide you no longer need compatibility with versions
+of Emacs before 25.1.
+
+To downgrade a version 208 file to version 206, use a double prefix
+argument: \\[universal-argument] \\[universal-argument] \\[desktop-save].
+
+Emacs will ask for confirmation when you upgrade or downgrade your
+desktop file.
+
+In a non-interactive call, VERSION can be given as an integer, either
+206 or 208, to specify the format version in which to save the file,
+no questions asked."
   (interactive (list
                 ;; Or should we just use (car desktop-path)?
                 (let ((default (if (member "." desktop-path)
@@ -1191,24 +1222,33 @@ being set (usually, by reading it from the desktop)."
 (defvar desktop-buffer-ok-count)
 (defvar desktop-buffer-fail-count)
 
-;; FIXME Interactively, this should have the option to prompt for dirname.
 ;;;###autoload
-(defun desktop-read (&optional dirname)
+(defun desktop-read (&optional dirname ask)
   "Read and process the desktop file in directory DIRNAME.
 Look for a desktop file in DIRNAME, or if DIRNAME is omitted, look in
 directories listed in `desktop-path'.  If a desktop file is found, it
 is processed and `desktop-after-read-hook' is run.  If no desktop file
 is found, clear the desktop and run `desktop-no-desktop-file-hook'.
+Interactively, with prefix arg \\[universal-argument], ask for DIRNAME.
 This function is a no-op when Emacs is running in batch mode.
-It returns t if a desktop file was loaded, nil otherwise."
-  (interactive)
-  (unless noninteractive
+It returns t if a desktop file was loaded, nil otherwise.
+\n(fn DIRNAME)"
+  (interactive "i\nP")
+  (if (or noninteractive
+          (and (desktop-owner)
+               (= (desktop-owner) (emacs-pid))))
+      (message "Not reloading the desktop%s"
+               (if noninteractive
+                   ""
+                 "; already loaded"))
     (setq desktop-dirname
           (file-name-as-directory
            (expand-file-name
             (or
              ;; If DIRNAME is specified, use it.
              (and (< 0 (length dirname)) dirname)
+             ;; Else, with a prefix arg, ask for a directory name.
+             (and ask (read-directory-name "Directory for desktop file: " nil nil t))
              ;; Otherwise search desktop file in desktop-path.
              (let ((dirs desktop-path))
                (while (and dirs
@@ -1233,8 +1273,10 @@ It returns t if a desktop file was loaded, nil otherwise."
 		   (memq desktop-load-locked-desktop '(nil ask))
 		   (or (null desktop-load-locked-desktop)
 		       (daemonp)
-		       (not (y-or-n-p (format "Warning: desktop file appears to be in use by PID %s.\n\
-Using it may cause conflicts.  Use it anyway? " owner)))))
+		       (not (y-or-n-p (format "
+Warning: desktop file appears to be in use by process with PID %s.\n\
+Using it may cause conflicts if that process still runs.\n\
+Use desktop file anyway? " owner)))))
 	      (let ((default-directory desktop-dirname))
 		(setq desktop-dirname nil)
 		(run-hooks 'desktop-not-loaded-hook)

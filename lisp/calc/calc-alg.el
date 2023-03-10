@@ -1,6 +1,6 @@
 ;;; calc-alg.el --- algebraic functions for Calc  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1993, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1993, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: David Gillespie <daveg@synaptics.com>
 
@@ -30,6 +30,8 @@
 
 ;;; Algebra commands.
 
+(defvar math-simplify-only)
+
 (defun calc-alg-evaluate (arg)
   (interactive "p")
   (calc-slow-wrapper
@@ -37,6 +39,8 @@
     (let ((math-simplify-only nil))
       (calc-modify-simplify-mode arg)
       (calc-enter-result 1 "dsmp" (calc-top 1))))))
+
+(defvar calc-simplify-mode)
 
 (defun calc-modify-simplify-mode (arg)
   (if (= (math-abs arg) 2)
@@ -66,6 +70,8 @@
   (calc-slow-wrapper
    (calc-with-default-simplification
     (calc-enter-result 1 "esmp" (math-simplify-extended (calc-top-n 1))))))
+
+(defvar math-expand-formulas)
 
 (defun calc-expand-formula (arg)
   (interactive "p")
@@ -159,6 +165,8 @@
   (calc-slow-wrapper
    (calc-binary-op "pgcd" 'calcFunc-pgcd arg)))
 
+
+(defvar calc-poly-div-remainder)
 
 (defun calc-poly-div (arg)
   (interactive "P")
@@ -303,6 +311,7 @@
 		  (math-beforep (car a) (car b)))))
 	(t (string-lessp (car a) (car b)))))
 
+(defvar math-living-dangerously)
 
 (defsubst math-simplify-extended (a)
   (let ((math-living-dangerously t))
@@ -363,6 +372,9 @@
 
 ;; math-normalize-error is declared in calc.el.
 (defvar math-normalize-error)
+(defvar math-simplifying)
+(defvar calc-angle-mode)
+
 (defun math-simplify (top-expr)
   (let ((math-simplifying t)
         (calc-angle-mode (if (calc-input-angle-units top-expr)
@@ -432,12 +444,12 @@ Code can refer to the expression to simplify via lexical variable `expr'
 and should return the simplified expression to use (or nil)."
   (declare (indent 1) (debug (sexp body)))
   (cons 'progn
-        (mapcar #'(lambda (func)
-                    `(put ',func 'math-simplify
-                          (nconc
-                           (get ',func 'math-simplify)
-                           (list
-                            #'(lambda (expr) ,@code)))))
+        (mapcar (lambda (func)
+                  `(put ',func 'math-simplify
+                        (nconc
+                         (get ',func 'math-simplify)
+                         (list
+                          (lambda (expr) ,@code)))))
                 (if (symbolp funcs) (list funcs) funcs))))
 
 (math-defsimplify (+ -)
@@ -677,6 +689,8 @@ and should return the simplified expression to use (or nil)."
 	(math-make-frac (math-gcd (nth 1 a) (nth 1 b))
 			(math-gcd (nth 2 a) (nth 2 b)))))))
 
+(defvar calc-prefer-frac)
+
 (math-defsimplify %
   (and (Math-realp (nth 2 expr))
        (Math-posp (nth 2 expr))
@@ -842,11 +856,13 @@ and should return the simplified expression to use (or nil)."
       (and (eq calc-angle-mode 'rad)
 	   (let ((n (math-linear-in (nth 1 expr) '(var pi var-pi))))
 	     (and n
-		  (math-div 1 (math-known-sin (car n) (nth 1 n) 120 300)))))
+                  (let ((s (math-known-sin (car n) (nth 1 n) 120 300)))
+                    (and s (math-div 1 s))))))
       (and (eq calc-angle-mode 'deg)
 	   (let ((n (math-integer-plus (nth 1 expr))))
 	     (and n
-                  (math-div 1 (math-known-sin (car n) (nth 1 n) '(frac 2 3) 300)))))
+                  (let ((s (math-known-sin (car n) (nth 1 n) '(frac 2 3) 300)))
+                    (and s (math-div 1 s))))))
       (and (eq (car-safe (nth 1 expr)) 'calcFunc-arcsin)
            (math-div
             1
@@ -867,11 +883,13 @@ and should return the simplified expression to use (or nil)."
       (and (eq calc-angle-mode 'rad)
 	   (let ((n (math-linear-in (nth 1 expr) '(var pi var-pi))))
 	     (and n
-                  (math-div 1 (math-known-sin (car n) (nth 1 n) 120 0)))))
+                  (let ((s (math-known-sin (car n) (nth 1 n) 120 0)))
+                    (and s (math-div 1 s))))))
       (and (eq calc-angle-mode 'deg)
 	   (let ((n (math-integer-plus (nth 1 expr))))
 	     (and n
-                  (math-div 1 (math-known-sin (car n) (nth 1 n) '(frac 2 3) 0)))))
+                  (let ((s (math-known-sin (car n) (nth 1 n) '(frac 2 3) 0)))
+                    (and s (math-div 1 s))))))
       (and (eq (car-safe (nth 1 expr)) 'calcFunc-arcsin)
 	   (math-div 1 (nth 1 (nth 1 expr))))
       (and (eq (car-safe (nth 1 expr)) 'calcFunc-arccos)
@@ -972,11 +990,13 @@ and should return the simplified expression to use (or nil)."
       (and (eq calc-angle-mode 'rad)
 	   (let ((n (math-linear-in (nth 1 expr) '(var pi var-pi))))
 	     (and n
-                  (math-div 1 (math-known-tan (car n) (nth 1 n) 120)))))
+                  (let ((tn (math-known-tan (car n) (nth 1 n) 120)))
+                    (and tn (math-div 1 tn))))))
       (and (eq calc-angle-mode 'deg)
 	   (let ((n (math-integer-plus (nth 1 expr))))
 	     (and n
-                  (math-div 1 (math-known-tan (car n) (nth 1 n) '(frac 2 3))))))
+                  (let ((tn (math-known-tan (car n) (nth 1 n) '(frac 2 3))))
+                    (and tn (math-div 1 tn))))))
       (and (eq (car-safe (nth 1 expr)) 'calcFunc-arcsin)
 	   (math-div (list 'calcFunc-sqrt
 			   (math-sub 1 (math-sqr (nth 1 (nth 1 expr)))))
@@ -1665,6 +1685,7 @@ and should return the simplified expression to use (or nil)."
 (defvar math-is-poly-degree)
 (defvar math-is-poly-loose)
 (defvar math-var)
+(defvar math-poly-base-variable)
 
 (defun math-is-polynomial (expr var &optional degree loose)
   (let* ((math-poly-base-variable (if loose
@@ -1764,7 +1785,7 @@ and should return the simplified expression to use (or nil)."
 				  (cons (nth 2 expr) math-poly-neg-powers))))
 		   (not (Math-zerop (nth 2 expr)))
 		   (let ((p1 (math-is-poly-rec (nth 1 expr) negpow)))
-		     (mapcar (function (lambda (x) (math-div x (nth 2 expr))))
+                     (mapcar (lambda (x) (math-div x (nth 2 expr)))
 			     p1))))
 	     ((and (eq (car expr) 'calcFunc-exp)
 		   (equal math-var '(var e var-e)))
@@ -1817,8 +1838,9 @@ and should return the simplified expression to use (or nil)."
 (defun math-polynomial-base (top-expr &optional pred)
   "Find the variable (or sub-expression) which is the base of polynomial expr."
   (let ((math-poly-base-pred
-         (or pred (function (lambda (base) (math-polynomial-p
-				       top-expr base))))))
+         (or pred (lambda (base)
+                    (math-polynomial-p
+                     top-expr base)))))
   (or (let ((math-poly-base-const-ok nil))
 	(math-polynomial-base-rec top-expr))
       (let ((math-poly-base-const-ok t))

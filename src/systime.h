@@ -1,5 +1,5 @@
 /* systime.h - System-dependent definitions for time manipulations.
-   Copyright (C) 1993-1994, 2002-2019 Free Software Foundation, Inc.
+   Copyright (C) 1993-1994, 2002-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -41,6 +41,8 @@ typedef unsigned long Time;
 #endif
 
 #include <sys/time.h>	/* for 'struct timeval' */
+
+#undef hz /* AIX <sys/param.h> #defines this.  */
 
 /* Emacs uses struct timespec to represent nonnegative temporal intervals.
 
@@ -64,9 +66,6 @@ timespec_valid_p (struct timespec t)
 {
   return t.tv_nsec >= 0;
 }
-
-/* defined in sysdep.c */
-extern int set_file_times (int, const char *, struct timespec, struct timespec);
 
 /* defined in keyboard.c */
 extern void set_waiting_for_input (struct timespec *);

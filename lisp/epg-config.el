@@ -1,6 +1,6 @@
-;;; epg-config.el --- configuration of the EasyPG Library
+;;; epg-config.el --- configuration of the EasyPG Library  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
 
 ;; Author: Daiki Ueno <ueno@unixuser.org>
 ;; Keywords: PGP, GnuPG
@@ -21,7 +21,10 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
+;;; Commentary:
+
 ;;; Code:
+;;; Prelude
 
 (eval-when-compile (require 'cl-lib))
 
@@ -34,6 +37,8 @@
 (define-obsolete-variable-alias 'epg-bug-report-address
   'report-emacs-bug-address "27.1")
 
+;;; Options
+
 (defgroup epg ()
   "Interface to the GNU Privacy Guard (GnuPG)."
   :tag "EasyPG"
@@ -44,9 +49,18 @@
 (defcustom epg-gpg-program (if (executable-find "gpg2")
                                "gpg2"
                              "gpg")
-  "The `gpg' executable.
-Setting this variable directly does not take effect;
-instead use \\[customize] (see the info node `Easy Customization')."
+  "Say what gpg program to prefer (if it satisfies minimum requirements).
+
+If this variable is \"gpg2\", but the version of gpg2 installed
+is less than `epg-gpg2-minimum-version', then version 1 of
+GnuPG (i.e., \"gpg\") will be used instead.  If the version of
+version 1 is less than `epg-gpg-minimum-version', then that won't
+be used either.
+
+If you want to explicitly specify what gpg program to use, you
+have to use \\[customize] instead (see the info node `Easy
+Customization').  Setting this variable without \\[customize] has
+no effect."
   :version "25.1"
   :type 'string)
 
@@ -97,6 +111,8 @@ through the minibuffer, instead of external Pinentry program."
 Note that the buffer name starts with a space."
   :type 'boolean)
 
+;;; Constants
+
 (defconst epg-gpg-minimum-version "1.4.3")
 (defconst epg-gpg2-minimum-version "2.1.6")
 
@@ -124,6 +140,8 @@ The first element of each entry is protocol symbol, which is
 either `OpenPGP' or `CMS'.  The second element is a function
 which constructs a configuration object (actually a plist).")
 
+;;; "Configuration"
+
 (defvar epg--configurations nil)
 
 ;;;###autoload
@@ -141,7 +159,7 @@ version requirement is met."
     (setq program-alist epg-config--program-alist))
   (let ((entry (assq protocol program-alist)))
     (unless entry
-      (error "Unknown protocol %S" protocol))
+      (error "Unknown protocol `%S'" protocol))
     (cl-destructuring-bind (symbol . alist)
         (cdr entry)
       (let ((constructor
@@ -174,10 +192,18 @@ version requirement is met."
 (defun epg-config--make-gpg-configuration (program)
   (let (config groups type args)
     (with-temp-buffer
-      (apply #'call-process program nil (list t nil) nil
-	     (append (if epg-gpg-home-directory
-			 (list "--homedir" epg-gpg-home-directory))
-		     '("--with-colons" "--list-config")))
+      ;; The caller might have bound coding-system-for-* to something
+      ;; like 'no-conversion, but the below needs to call PROGRAM
+      ;; expecting human-readable text in both directions (since we
+      ;; are going to parse the output as text), so let Emacs guess
+      ;; the encoding of that text by its usual encoding-detection
+      ;; machinery.
+      (let ((coding-system-for-read 'undecided)
+            (coding-system-for-write 'undecided))
+        (apply #'call-process program nil (list t nil) nil
+	       (append (if epg-gpg-home-directory
+			   (list "--homedir" epg-gpg-home-directory))
+		       '("--with-colons" "--list-config"))))
       (goto-char (point-min))
       (while (re-search-forward "^cfg:\\([^:]+\\):\\(.*\\)" nil t)
 	(setq type (intern (match-string 1))
@@ -185,13 +211,13 @@ version requirement is met."
 	(cond
 	 ((eq type 'group)
 	  (if (string-match "\\`\\([^:]+\\):" args)
-		  (setq groups
-			(cons (cons (downcase (match-string 1 args))
-				    (delete "" (split-string
-						(substring args
-							   (match-end 0))
-						";")))
-			      groups))
+	      (setq groups
+		    (cons (cons (downcase (match-string 1 args))
+				(delete "" (split-string
+					    (substring args
+						       (match-end 0))
+					    ";")))
+			  groups))
 	    (if epg-debug
 		(message "Invalid group configuration: %S" args))))
 	 ((memq type '(pubkey cipher digest compress))
@@ -252,6 +278,15 @@ a single minimum version string."
                        (version< version max)))
           (throw 'version-ok t)))
       (error "Unsupported version: %s" version))))
+
+(defun epg-required-version-p (protocol required-version)
+  "Verify a sufficient version of GnuPG for specific protocol.
+PROTOCOL is symbol, either `OpenPGP' or `CMS'.  REQUIRED-VERSION
+is a string containing the required version number.  Return
+non-nil if that version or higher is installed."
+  (let ((version (cdr (assq 'version (epg-find-configuration protocol)))))
+    (and (stringp version)
+         (version<= required-version version))))
 
 ;;;###autoload
 (defun epg-expand-group (config group)

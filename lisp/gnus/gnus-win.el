@@ -1,6 +1,6 @@
-;;; gnus-win.el --- window configuration functions for Gnus
+;;; gnus-win.el --- window configuration functions for Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: news
@@ -36,22 +36,23 @@
 
 (defcustom gnus-use-full-window t
   "If non-nil, use the entire Emacs screen."
-  :group 'gnus-windows
   :type 'boolean)
+
+(defcustom gnus-use-atomic-windows nil
+  "If non-nil, Gnus' window compositions will be atomic."
+  :type 'boolean
+  :version "27.1")
 
 (defcustom gnus-window-min-width 2
   "Minimum width of Gnus buffers."
-  :group 'gnus-windows
   :type 'integer)
 
 (defcustom gnus-window-min-height 1
   "Minimum height of Gnus buffers."
-  :group 'gnus-windows
   :type 'integer)
 
 (defcustom gnus-always-force-window-configuration nil
   "If non-nil, always force the Gnus window configurations."
-  :group 'gnus-windows
   :type 'boolean)
 
 (defcustom gnus-use-frames-on-any-display nil
@@ -59,11 +60,10 @@
 When nil, only frames on the same display as the selected frame will be
 used to display Gnus windows."
   :version "22.1"
-  :group 'gnus-windows
   :type 'boolean)
 
 (defvar gnus-buffer-configuration
-  '((group
+  `((group
      (vertical 1.0
 	       (group 1.0 point)))
     (summary
@@ -137,10 +137,9 @@ used to display Gnus windows."
     (pipe
      (vertical 1.0
 	       (summary 0.25 point)
-	       ("*Shell Command Output*" 1.0)))
+               (,shell-command-buffer-name 1.0)))
     (bug
      (vertical 1.0
-	       (if gnus-bug-create-help-buffer '("*Gnus Help Bug*" 0.5))
 	       ("*Gnus Bug*" 1.0 point)))
     (score-trace
      (vertical 1.0
@@ -198,7 +197,6 @@ See the Gnus manual for an explanation of the syntax used.")
 (defcustom gnus-configure-windows-hook nil
   "A hook called when configuring windows."
   :version "22.1"
-  :group 'gnus-windows
   :type 'hook)
 
 ;;; Internal variables.
@@ -248,7 +246,7 @@ See the Gnus manual for an explanation of the syntax used.")
     ;; return a new SPLIT.
     (while (and (not (assq (car split) gnus-window-to-buffer))
 		(symbolp (car split)) (fboundp (car split)))
-      (setq split (eval split)))
+      (setq split (eval split t)))
     (let* ((type (car split))
 	   (subs (cddr split))
 	   (len (if (eq type 'horizontal) (window-width) (window-height)))
@@ -325,7 +323,7 @@ See the Gnus manual for an explanation of the syntax used.")
 	    (setq sub (append (pop subs) nil))
 	    (while (and (not (assq (car sub) gnus-window-to-buffer))
 			(symbolp (car sub)) (fboundp (car sub)))
-	      (setq sub (eval sub)))
+	      (setq sub (eval sub t)))
 	    (when sub
 	      (push sub comp-subs)
 	      (setq size (cadar comp-subs))
@@ -362,11 +360,14 @@ See the Gnus manual for an explanation of the syntax used.")
 	    (setq result (or (gnus-configure-frame
 			      (car comp-subs) window)
 			     result))
-	    (select-window new-win)
-	    (setq window new-win)
+            (if (not (window-live-p new-win))
+                ;; pop-to-buffer might have deleted the original window
+                (setq window (selected-window))
+              (select-window new-win)
+	      (setq window new-win))
 	    (setq comp-subs (cdr comp-subs))))
 	;; Return the proper window, if any.
-	(when result
+	(when (window-live-p result)
 	  (select-window result)))))))
 
 (defvar gnus-frame-split-p nil)
@@ -402,6 +403,15 @@ See the Gnus manual for an explanation of the syntax used.")
         (unless (gnus-buffer-live-p nntp-server-buffer)
           (nnheader-init-server-buffer))
 
+	;; Remove all 'window-atom parameters, as we're going to blast
+	;; and recreate the window layout.
+	(when (window-parameter nil 'window-atom)
+	  (let ((root (window-atom-root)))
+	    (walk-window-subtree
+	     (lambda (win)
+	       (set-window-parameter win 'window-atom nil))
+	     root t)))
+
         ;; Either remove all windows or just remove all Gnus windows.
         (let ((frame (selected-frame)))
           (unwind-protect
@@ -423,6 +433,13 @@ See the Gnus manual for an explanation of the syntax used.")
           (set-buffer nntp-server-buffer)
           (gnus-configure-frame split)
           (run-hooks 'gnus-configure-windows-hook)
+
+	  ;; If we're using atomic windows, and the current frame has
+	  ;; multiple windows, make them atomic.
+	  (when (and gnus-use-atomic-windows
+		     (window-parent (selected-window)))
+	    (window-make-atom (window-parent (selected-window))))
+
           (when gnus-window-frame-focus
             (select-frame-set-input-focus
              (window-frame gnus-window-frame-focus)))))))))
@@ -454,7 +471,7 @@ should have point."
       ;; return a new SPLIT.
       (while (and (not (assq (car split) gnus-window-to-buffer))
 		  (symbolp (car split)) (fboundp (car split)))
-	(setq split (eval split)))
+	(setq split (eval split t)))
 
       (setq type (elt split 0))
       (cond

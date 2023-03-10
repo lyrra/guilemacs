@@ -1,6 +1,6 @@
-;;; nnml.el --- mail spool access for Gnus
+;;; nnml.el --- mail spool access for Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1995-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1995-2022 Free Software Foundation, Inc.
 
 ;; Authors: Didier Verna <didier@didierverna.net> (adding compaction)
 ;;	Simon Josefsson <simon@josefsson.org>
@@ -111,36 +111,9 @@ non-nil.")
 
 (nnoo-define-basics nnml)
 
-(eval-when-compile
-  (defsubst nnml-group-name-charset (group server-or-method)
-    (gnus-group-name-charset
-     (if (stringp server-or-method)
-	 (gnus-server-to-method
-	  (if (string-match "\\+" server-or-method)
-	      (concat (substring server-or-method 0 (match-beginning 0))
-		      ":" (substring server-or-method (match-end 0)))
-	    (concat "nnml:" server-or-method)))
-       (or server-or-method gnus-command-method '(nnml "")))
-     group)))
-
-(defun nnml-decoded-group-name (group &optional server-or-method)
-  "Return a decoded group name of GROUP on SERVER-OR-METHOD."
-  (if nnmail-group-names-not-encoded-p
-      group
-    (decode-coding-string
-     group
-     (nnml-group-name-charset group server-or-method))))
-
-(defun nnml-encoded-group-name (group &optional server-or-method)
-  "Return an encoded group name of GROUP on SERVER-OR-METHOD."
-  (encode-coding-string
-   group
-   (nnml-group-name-charset group server-or-method)))
-
-(defun nnml-group-pathname (group &optional file server)
+(defun nnml-group-pathname (group &optional file _server)
   "Return an absolute file name of FILE for GROUP on SERVER."
-  (nnmail-group-pathname (inline (nnml-decoded-group-name group server))
-			 nnml-directory file))
+  (nnmail-group-pathname group nnml-directory file))
 
 (deffoo nnml-retrieve-headers (sequence &optional group server fetch-old)
   (when (nnml-possibly-change-directory group server)
@@ -242,9 +215,8 @@ non-nil.")
       (cons (if group-num (car group-num) group)
 	    (string-to-number (file-name-nondirectory path)))))))
 
-(deffoo nnml-request-group (group &optional server dont-check info)
-  (let ((file-name-coding-system nnmail-pathname-coding-system)
-	(decoded (nnml-decoded-group-name group server)))
+(deffoo nnml-request-group (group &optional server dont-check _info)
+  (let ((file-name-coding-system nnmail-pathname-coding-system))
     (cond
      ((not (nnml-possibly-change-directory group server))
       (nnheader-report 'nnml "Invalid group (no such directory)"))
@@ -254,15 +226,15 @@ non-nil.")
      ((not (file-directory-p nnml-current-directory))
       (nnheader-report 'nnml "%s is not a directory" nnml-current-directory))
      (dont-check
-      (nnheader-report 'nnml "Group %s selected" decoded)
+      (nnheader-report 'nnml "Group %s selected" group)
       t)
      (t
       (nnheader-re-read-dir nnml-current-directory)
       (nnmail-activate 'nnml)
       (let ((active (nth 1 (assoc-string group nnml-group-alist))))
 	(if (not active)
-	    (nnheader-report 'nnml "No such group: %s" decoded)
-	  (nnheader-report 'nnml "Selected group %s" decoded)
+	    (nnheader-report 'nnml "No such group: %s" group)
+	  (nnheader-report 'nnml "Selected group %s" group)
 	  (nnheader-insert "211 %d %d %d %s\n"
 			   (max (1+ (- (cdr active) (car active))) 0)
 			   (car active) (cdr active) group)))))))
@@ -280,11 +252,11 @@ non-nil.")
    (t
     (nnmail-get-new-mail 'nnml 'nnml-save-incremental-nov nnml-directory nil))))
 
-(deffoo nnml-close-group (group &optional server)
+(deffoo nnml-close-group (_group &optional _server)
   (setq nnml-article-file-alist nil)
   t)
 
-(deffoo nnml-request-create-group (group &optional server args)
+(deffoo nnml-request-create-group (group &optional server _args)
   (nnml-possibly-change-directory nil server)
   (nnmail-activate 'nnml)
   (cond
@@ -306,12 +278,12 @@ non-nil.")
       (let* ((file-name-coding-system nnmail-pathname-coding-system)
 	     (articles (nnml-directory-articles nnml-current-directory)))
 	(when articles
-	  (setcar active (apply 'min articles))
-	  (setcdr active (apply 'max articles))))
+	  (setcar active (apply #'min articles))
+	  (setcdr active (apply #'max articles))))
       (nnmail-save-active nnml-group-alist nnml-active-file)
       t))))
 
-(deffoo nnml-request-list (&optional server)
+(deffoo nnml-request-list (&optional _server)
   (save-excursion
     (let ((nnmail-file-coding-system nnmail-active-file-coding-system)
 	  (file-name-coding-system nnmail-pathname-coding-system))
@@ -319,10 +291,10 @@ non-nil.")
     (setq nnml-group-alist (nnmail-get-active))
     t))
 
-(deffoo nnml-request-newgroups (date &optional server)
+(deffoo nnml-request-newgroups (_date &optional server)
   (nnml-request-list server))
 
-(deffoo nnml-request-list-newsgroups (&optional server)
+(deffoo nnml-request-list-newsgroups (&optional _server)
   (save-excursion
     (nnmail-find-file nnml-newsgroups-file)))
 
@@ -332,11 +304,10 @@ non-nil.")
 	 (active-articles
 	  (nnml-directory-articles nnml-current-directory))
 	 (is-old t)
-	 (decoded (nnml-decoded-group-name group server))
 	 article rest mod-time number target)
     (nnmail-activate 'nnml)
 
-    (setq active-articles (sort active-articles '<))
+    (setq active-articles (sort active-articles #'<))
     ;; Articles not listed in active-articles are already gone,
     ;; so don't try to expire them.
     (setq articles (gnus-sorted-intersection articles active-articles))
@@ -370,7 +341,7 @@ non-nil.")
 	    (if target
 		(progn
 		  (nnheader-message 5 "Deleting article %s in %s"
-				    number decoded)
+				    number group)
 		  (condition-case ()
 		      (funcall nnmail-delete-file-function article)
 		    (file-error
@@ -382,15 +353,15 @@ non-nil.")
     (let ((active (nth 1 (assoc-string group nnml-group-alist))))
       (when active
 	(setcar active (or (and active-articles
-				(apply 'min active-articles))
+				(apply #'min active-articles))
 			   (1+ (cdr active)))))
       (nnmail-save-active nnml-group-alist nnml-active-file))
     (nnml-save-nov)
     (nconc rest articles)))
 
 (deffoo nnml-request-move-article
-    (article group server accept-form &optional last move-is-internal)
-  (let ((buf (get-buffer-create " *nnml move*"))
+    (article group server accept-form &optional last _move-is-internal)
+  (let ((buf (gnus-get-buffer-create " *nnml move*"))
 	(file-name-coding-system nnmail-pathname-coding-system)
 	result)
     (nnml-possibly-change-directory group server)
@@ -403,7 +374,7 @@ non-nil.")
 	   nnml-article-file-alist)
        (with-current-buffer buf
 	 (insert-buffer-substring nntp-server-buffer)
-	 (setq result (eval accept-form))
+	 (setq result (eval accept-form t))
 	 (kill-buffer (current-buffer))
 	 result))
      (progn
@@ -440,8 +411,8 @@ non-nil.")
       (and
        (nnmail-activate 'nnml)
        (if (and (not (setq result (nnmail-article-group
-				   `(lambda (group)
-				      (nnml-active-number group ,server)))))
+				   (lambda (group)
+				     (nnml-active-number group server)))))
 		(yes-or-no-p "Moved to `junk' group; delete article? "))
 	   (setq result 'junk)
 	 (setq result (car (nnml-save-mail result server t))))
@@ -506,13 +477,12 @@ non-nil.")
 			nnml-current-directory t
 			(concat
 			 nnheader-numerical-short-files
-			 "\\|" (regexp-quote nnml-nov-file-name) "$")))
-		      (decoded (nnml-decoded-group-name group server)))
+			 "\\|" (regexp-quote nnml-nov-file-name) "$"))))
 		  (dolist (article articles)
 		    (when (file-writable-p article)
 		      (nnheader-message 5 "Deleting article %s in %s..."
 					(file-name-nondirectory article)
-					decoded)
+					group)
 		      (funcall nnmail-delete-file-function article))))
 		;; Try to delete the directory itself.
 		(ignore-errors (delete-directory nnml-current-directory))))
@@ -602,7 +572,7 @@ non-nil.")
 
 ;; Find an article number in the current group given the Message-ID.
 (defun nnml-find-group-number (id server)
-  (with-current-buffer (get-buffer-create " *nnml id*")
+  (with-current-buffer (gnus-get-buffer-create " *nnml id*")
     (let ((alist nnml-group-alist)
 	  number)
       ;; We want to look through all .overview files, but we want to
@@ -687,15 +657,7 @@ article number.  This function is called narrowed to an article."
 			 (if (stringp nnml-use-compressed-files)
 			     nnml-use-compressed-files
 			   ".gz")))
-	 decoded dec file first headers)
-    (when nnmail-group-names-not-encoded-p
-      (dolist (ga (prog1 group-art (setq group-art nil)))
-	(setq group-art (nconc group-art
-			       (list (cons (nnml-encoded-group-name (car ga)
-								    server)
-					   (cdr ga))))
-	      decoded (nconc decoded (list (car ga)))))
-      (setq dec decoded))
+	 file first headers)
     (nnmail-insert-xref group-art)
     (run-hooks 'nnmail-prepare-save-mail-hook)
     (run-hooks 'nnml-prepare-save-mail-hook)
@@ -705,16 +667,10 @@ article number.  This function is called narrowed to an article."
       (forward-line 1))
     ;; We save the article in all the groups it belongs in.
     (dolist (ga group-art)
-      (if nnmail-group-names-not-encoded-p
-	  (progn
-	    (nnml-possibly-create-directory (car decoded) server)
-	    (setq file (nnmail-group-pathname
-			(pop decoded) nnml-directory
-			(concat (number-to-string (cdr ga)) extension))))
-	(nnml-possibly-create-directory (car ga) server)
-	(setq file (nnml-group-pathname
-		    (car ga) (concat (number-to-string (cdr ga)) extension)
-		    server)))
+      (nnml-possibly-create-directory (car ga) server)
+      (setq file (nnml-group-pathname
+		  (car ga) (concat (number-to-string (cdr ga)) extension)
+		  server))
       (if first
 	  ;; It was already saved, so we just make a hard link.
 	  (let ((file-name-coding-system nnmail-pathname-coding-system))
@@ -731,18 +687,13 @@ article number.  This function is called narrowed to an article."
     (let ((func (if full-nov
 		    'nnml-add-nov
 		  'nnml-add-incremental-nov)))
-      (if nnmail-group-names-not-encoded-p
-	  (dolist (ga group-art)
-	    (funcall func (pop dec) (cdr ga) headers))
-	(dolist (ga group-art)
-	  (funcall func (car ga) (cdr ga) headers)))))
+      (dolist (ga group-art)
+	(funcall func (car ga) (cdr ga) headers))))
   group-art)
 
 (defun nnml-active-number (group &optional server)
   "Compute the next article number in GROUP on SERVER."
-  (let* ((encoded (if nnmail-group-names-not-encoded-p
-		      (nnml-encoded-group-name group server)))
-	 (active (cadr (assoc-string (or encoded group) nnml-group-alist))))
+  (let ((active (cadr (assoc-string group nnml-group-alist))))
     ;; The group wasn't known to nnml, so we just create an active
     ;; entry for it.
     (unless active
@@ -754,13 +705,13 @@ article number.  This function is called narrowed to an article."
 	(setq nnml-article-file-alist
 	      (sort
 	       (nnml-current-group-article-to-file-alist)
-	       'car-less-than-car)))
+	       #'car-less-than-car)))
       (setq active
 	    (if nnml-article-file-alist
 		(cons (caar nnml-article-file-alist)
 		      (caar (last nnml-article-file-alist)))
 	      (cons 1 0)))
-      (push (list (or encoded group) active) nnml-group-alist))
+      (push (list group active) nnml-group-alist))
     (setcdr active (1+ (cdr active)))
     (while (file-exists-p
 	    (nnml-group-pathname group (int-to-string (cdr active)) server))
@@ -815,22 +766,36 @@ article number.  This function is called narrowed to an article."
 	 (if (re-search-forward "\n\r?\n" nil t)
 	     (1- (point))
 	   (point-max))))
-      (let ((headers (nnheader-parse-naked-head)))
+      (let ((headers (nnheader-parse-head t)))
 	(setf (mail-header-chars  headers) chars)
 	(setf (mail-header-number headers) number)
+	;; If there's non-ASCII raw characters in the data,
+	;; RFC2047-encode them to avoid having arbitrary data in the
+	;; .overview file.
+	(nnml--encode-headers headers)
 	headers))))
 
+(defun nnml--encode-headers (headers)
+  (let ((subject (mail-header-subject headers))
+	(rfc2047-encoding-type 'mime))
+    (unless (string-match "\\`[[:ascii:]]*\\'" subject)
+      (setf (mail-header-subject headers)
+	    (mail-encode-encoded-word-string subject t))))
+  (let ((from (mail-header-from headers))
+	(rfc2047-encoding-type 'address-mime))
+    (unless (string-match "\\`[[:ascii:]]*\\'" from)
+      (setf (mail-header-from headers)
+	    (rfc2047-encode-string from t)))))
+
 (defun nnml-get-nov-buffer (group &optional incrementalp)
-  (let* ((decoded (nnml-decoded-group-name group))
-	 (buffer (get-buffer-create (format " *nnml %soverview %s*"
-					    (if incrementalp
-						"incremental "
-					      "")
-					    decoded)))
+  (let ((buffer (gnus-get-buffer-create
+                 (format " *nnml %soverview %s*"
+			 (if incrementalp "incremental " "")
+			 group)))
 	 (file-name-coding-system nnmail-pathname-coding-system))
     (with-current-buffer buffer
-      (set (make-local-variable 'nnml-nov-buffer-file-name)
-	   (nnmail-group-pathname decoded nnml-directory nnml-nov-file-name))
+      (setq-local nnml-nov-buffer-file-name
+                  (nnmail-group-pathname group nnml-directory nnml-nov-file-name))
       (erase-buffer)
       (when (and (not incrementalp)
 		 (file-exists-p nnml-nov-buffer-file-name))
@@ -891,7 +856,7 @@ Unless no-active is non-nil, update the active file too."
 	  (nnml-generate-nov-databases-directory dir seen)))
       ;; Do this directory.
       (let ((nnml-files (sort (nnheader-article-to-file-alist dir)
-			 'car-less-than-car)))
+			      #'car-less-than-car)))
 	(if (not nnml-files)
 	    (let* ((group (nnheader-file-to-group
 			   (directory-file-name dir) nnml-directory))
@@ -908,7 +873,7 @@ Unless no-active is non-nil, update the active file too."
   ;; Update the active info for this group.
   (let ((group (directory-file-name dir))
 	entry last)
-    (setq group (nnheader-file-to-group (nnml-encoded-group-name group)
+    (setq group (nnheader-file-to-group group
 					nnml-directory)
 	  entry (assoc group nnml-group-alist)
 	  last (or (caadr entry) 0)
@@ -923,8 +888,8 @@ Unless no-active is non-nil, update the active file too."
 (defun nnml-generate-nov-file (dir files)
   (let* ((dir (file-name-as-directory dir))
 	 (nov (concat dir nnml-nov-file-name))
-	 (nov-buffer (get-buffer-create " *nov*"))
-	 chars file headers)
+	 (nov-buffer (gnus-get-buffer-create " *nov*"))
+	 chars headers) ;; file
     (with-current-buffer nov-buffer
       ;; Init the nov buffer.
       (buffer-disable-undo)
@@ -952,7 +917,7 @@ Unless no-active is non-nil, update the active file too."
 		(nnheader-insert-nov headers)))
 	    (widen))))
       (with-current-buffer nov-buffer
-	(nnmail-write-region (point-min) (point-max) nov nil 'nomesg)
+	(nnmail-write-region (point-min) (point-max) nov nil 'nomesg nil 'excl)
 	(kill-buffer (current-buffer))))))
 
 (defun nnml-nov-delete-article (group article)
@@ -1045,7 +1010,7 @@ Use the nov database for the current group if available."
   (unless nnml-article-file-alist
     (setq nnml-article-file-alist
 	  (sort (nnml-current-group-article-to-file-alist)
-		'car-less-than-car)))
+		#'car-less-than-car)))
   (if (not nnml-article-file-alist)
       ;; The group is empty: do nothing but return t
       t
@@ -1117,7 +1082,7 @@ Use the nov database for the current group if available."
 		  (when (gnus-member-of-range old-number read)
 		    (setq read (gnus-remove-from-range read (list old-number)))
 		    (setq read (gnus-add-to-range read (list new-number))))
-		  (gnus-info-set-read info read))
+		  (setf (gnus-info-read info) read))
 		;; 2 b/ marked articles:
 		(let ((oldmarks (gnus-info-marks info))
 		      mark newmarks)
@@ -1130,7 +1095,7 @@ Use the nov database for the current group if available."
 		      (setcdr mark (gnus-add-to-range (cdr mark)
 						      (list new-number))))
 		    (push mark newmarks))
-		  (gnus-info-set-marks info newmarks))
+		  (setf (gnus-info-marks info) newmarks))
 		;; 3/ Update the NOV entry for this article:
 		(unless nnml-nov-is-evil
 		  (with-current-buffer (nnml-open-nov group)

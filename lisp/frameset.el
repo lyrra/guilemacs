@@ -1,6 +1,6 @@
 ;;; frameset.el --- save and restore frame and window setup -*- lexical-binding: t -*-
 
-;; Copyright (C) 2013-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2013-2022 Free Software Foundation, Inc.
 
 ;; Author: Juanma Barranquero <lekktu@gmail.com>
 ;; Keywords: convenience
@@ -396,17 +396,17 @@ Properties can be set with
 ;; or, if you're only changing a few items,
 ;;
 ;;   (defvar my-filter-alist
-;;     (nconc '((my-param1 . :never)
-;;              (my-param2 . my-filtering-function))
-;;            frameset-filter-alist)
+;;     (append '((my-param1 . :never)
+;;		 (my-param2 . my-filtering-function))
+;;	       frameset-filter-alist)
 ;;     "My brief customized parameter filter alist.")
 ;;
 ;; and pass it to the FILTER arg of the save/restore functions,
 ;; ALWAYS taking care of not modifying the original lists; if you're
 ;; going to do any modifying of my-filter-alist, please use
 ;;
-;;   (nconc '((my-param1 . :never) ...)
-;;          (copy-sequence frameset-filter-alist))
+;;   (append '((my-param1 . :never) ...)
+;;	     (copy-sequence frameset-filter-alist))
 ;;
 ;; One thing you shouldn't forget is that they are alists, so searching
 ;; in them is sequential.  If you just want to change the default of
@@ -445,7 +445,7 @@ DO NOT MODIFY.  See `frameset-filter-alist' for a full description.")
 
 ;;;###autoload
 (defvar frameset-persistent-filter-alist
-  (nconc
+  (append
    '((background-color            . frameset-filter-sanitize-color)
      (buffer-list                 . :never)
      (buffer-predicate            . :never)
@@ -456,6 +456,9 @@ DO NOT MODIFY.  See `frameset-filter-alist' for a full description.")
      (client                      . :never)
      (delete-before               . :never)
      (font                        . frameset-filter-font-param)
+     ;; Don't save font-backend because we cannot guarantee the new
+     ;; session will support the saved backend anyway.  (Bug#38442)
+     (font-backend                . :never)
      (foreground-color            . frameset-filter-sanitize-color)
      (frameset--text-pixel-height . :save)
      (frameset--text-pixel-width  . :save)
@@ -633,7 +636,7 @@ see `frameset-filter-alist'."
       (not (frameset-switch-to-gui-p parameters))
       (let* ((prefix:p (symbol-name (car current)))
 	     (p (intern (substring prefix:p
-				   (1+ (string-match-p ":" prefix:p)))))
+				   (1+ (string-search ":" prefix:p)))))
 	     (val (cdr current))
 	     (found (assq p filtered)))
 	(if (not found)
@@ -879,7 +882,7 @@ For the description of FORCE-ONSCREEN, see `frameset-restore'.
 When forced onscreen, frames wider than the monitor's workarea are converted
 to fullwidth, and frames taller than the workarea are converted to fullheight.
 NOTE: This only works for non-iconified frames."
-  (pcase-let* ((`(,left ,top ,width ,height) (cl-cdadr (frame-monitor-attributes frame)))
+  (pcase-let* ((`(,left ,top ,width ,height) (cdadr (frame-monitor-attributes frame)))
 	       (right (+ left width -1))
 	       (bottom (+ top height -1))
 	       (fr-left (frameset-compute-pos (frame-parameter frame 'left) left right))
@@ -1102,11 +1105,20 @@ Internal use only."
   "Predicate to sort frame states in an order suitable for creating frames.
 It sorts minibuffer-owning frames before minibufferless ones.
 Internal use only."
-  (pcase-let ((`(,hasmini1 ,id-def1) (assq 'frameset--mini (car state1)))
-	      (`(,hasmini2 ,id-def2) (assq 'frameset--mini (car state2))))
-    (cond ((eq id-def1 t) t)
+  (pcase-let ((`(,hasmini1 . ,id-def1) (cdr (assq 'frameset--mini (car state1))))
+	      (`(,hasmini2 . ,id-def2) (cdr (assq 'frameset--mini (car state2)))))
+    ;; hasmini1 is t when 1st frame has its own minibuffer
+    ;; hasmini2 is t when 2nd frame has its own minibuffer
+    ;; id-def1 is t when 1st minibuffer-owning frame is the default-minibuffer-frame
+    ;;         or frame-id of 1st frame if it's minibufferless
+    ;; id-def2 is t when 2nd minibuffer-owning frame is the default-minibuffer-frame
+    ;;         or frame-id of 2nd frame if it's minibufferless
+    (cond ;; Sort the minibuffer-owning default-minibuffer-frame first
+	  ((eq id-def1 t) t)
 	  ((eq id-def2 t) nil)
-	  ((not (eq hasmini1 hasmini2)) (eq hasmini1 t))
+	  ;; Sort non-default minibuffer-owning frames before minibufferless
+	  ((not (eq hasmini1 hasmini2)) (eq hasmini1 t)) ;; boolean xor
+	  ;; Sort minibufferless frames with frame-id before some remaining
 	  ((eq hasmini1 nil) (or id-def1 id-def2))
 	  (t t))))
 
@@ -1166,7 +1178,8 @@ FORCE-ONSCREEN can be:
 	   - a list (LEFT TOP WIDTH HEIGHT), describing the workarea.
 	   It must return non-nil to force the frame onscreen, nil otherwise.
 
-CLEANUP-FRAMES allows \"cleaning up\" the frame list after restoring a frameset:
+CLEANUP-FRAMES allows \"cleaning up\" the frame list after
+restoring a frameset:
   t        Delete all frames that were not created or restored upon.
   nil      Keep all frames.
   FUNC     A function called with two arguments:
@@ -1336,6 +1349,16 @@ All keyword parameters default to nil."
 	      (funcall cleanup frame (gethash frame frameset--action-map))
 	    (error
 	     (delay-warning 'frameset (error-message-string err) :warning))))))
+
+    ;; Make sure the frame with last-focus-update has focus.
+    (let ((last-focus-frame
+           (catch 'last-focus
+             (maphash (lambda (frame _)
+                        (when (frame-parameter frame 'last-focus-update)
+                          (throw 'last-focus frame)))
+                      frameset--action-map))))
+      (when last-focus-frame
+        (select-frame-set-input-focus last-focus-frame)))
 
     ;; Make sure there's at least one visible frame.
     (unless (or (daemonp)

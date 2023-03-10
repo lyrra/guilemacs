@@ -1,11 +1,11 @@
 ;;; ebnf2ps.el --- translate an EBNF to a syntactic chart on PostScript  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2022 Free Software Foundation, Inc.
 
 ;; Author: Vinicius Jose Latorre <viniciusjl.gnu@gmail.com>
 ;; Keywords: wp, ebnf, PostScript
 ;; Version: 4.4
-;; X-URL: http://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
+;; URL: https://www.emacswiki.org/cgi-bin/wiki/ViniciusJoseLatorre
 
 ;; This file is part of GNU Emacs.
 
@@ -45,20 +45,12 @@ Please send all bug fixes and enhancements to
 ;;
 ;;        (require 'ebnf2ps)
 ;;
-;; ebnf2ps uses ps-print package (version 5.2.3 or later), so see ps-print to
+;; ebnf2ps uses ps-print package (bundled with Emacs), so see ps-print to
 ;; know how to set options like landscape printing, page headings, margins,
 ;; etc.
 ;;
-;; NOTE: ps-print zebra stripes and line number options doesn't have effect on
-;;       ebnf2ps, they behave as it's turned off.
-;;
-;; For good performance, be sure to byte-compile ebnf2ps.el, e.g.
-;;
-;;    M-x byte-compile-file <give the path to ebnf2ps.el when prompted>
-;;
-;; This will generate ebnf2ps.elc, which will be loaded instead of ebnf2ps.el.
-;;
-;; ebnf2ps was tested with GNU Emacs 20.4.1.
+;; NOTE: ps-print zebra stripes and line number options don't have an
+;;       effect on ebnf2ps, they behave as if it's turned off.
 ;;
 ;;
 ;; Using ebnf2ps
@@ -326,11 +318,11 @@ Please send all bug fixes and enhancements to
 ;;			`ebnf-lex-comment-char' and `ebnf-lex-eop-char'.
 ;;
 ;;    `abnf'		ebnf2ps recognizes the syntax described in the URL:
-;;			`http://www.ietf.org/rfc/rfc2234.txt'
+;;			`https://www.ietf.org/rfc/rfc2234.txt'
 ;;			("Augmented BNF for Syntax Specifications: ABNF").
 ;;
 ;;    `iso-ebnf'	ebnf2ps recognizes the syntax described in the URL:
-;;			`http://www.cl.cam.ac.uk/~mgk25/iso-ebnf.html'
+;;			`https://www.cl.cam.ac.uk/~mgk25/iso-ebnf.html'
 ;;			("International Standard of the ISO EBNF Notation").
 ;;			The following variables *ONLY* have effect with this
 ;;			setting:
@@ -342,11 +334,11 @@ Please send all bug fixes and enhancements to
 ;;			`ebnf-yac-ignore-error-recovery'.
 ;;
 ;;    `ebnfx'		ebnf2ps recognizes the syntax described in the URL:
-;;		     `http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
+;;		     `https://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
 ;;		     ("Extensible Markup Language (XML) 1.0 (Third Edition)")
 ;;
 ;;    `dtd'		ebnf2ps recognizes the syntax described in the URL:
-;;			`http://www.w3.org/TR/2004/REC-xml-20040204/'
+;;			`https://www.w3.org/TR/2004/REC-xml-20040204/'
 ;;		     ("Extensible Markup Language (XML) 1.0 (Third Edition)")
 ;;
 ;; Any other value is treated as `ebnf'.
@@ -1157,21 +1149,6 @@ Please send all bug fixes and enhancements to
 (and (string< ps-print-version "5.2.3")
      (error "`ebnf2ps' requires `ps-print' package version 5.2.3 or later"))
 
-
-;; to avoid gripes with Emacs 20
-(or (fboundp 'assq-delete-all)
-    (defun assq-delete-all (key alist)
-      "Delete from ALIST all elements whose car is KEY.
-Return the modified alist.
-Elements of ALIST that are not conses are ignored."
-      (let ((tail alist))
-	(while tail
-	  (if (and (consp (car tail))
-		   (eq (car (car tail)) key))
-	      (setq alist (delq (car tail) alist)))
-	  (setq tail (cdr tail)))
-	alist)))
-
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; User Variables:
@@ -1180,7 +1157,7 @@ Elements of ALIST that are not conses are ignored."
 ;;; Interface to the command system
 
 (defgroup postscript nil
-  "Printing with PostScript"
+  "Printing with PostScript."
   :tag "PostScript"
   :version "20"
   :group 'environment)
@@ -1794,11 +1771,11 @@ Valid values are:
 		`ebnf-lex-comment-char' and `ebnf-lex-eop-char'.
 
    `abnf'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.ietf.org/rfc/rfc2234.txt'
+                `https://www.ietf.org/rfc/rfc2234.txt'
 		(\"Augmented BNF for Syntax Specifications: ABNF\").
 
    `iso-ebnf'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.cl.cam.ac.uk/~mgk25/iso-ebnf.html'
+                `https://www.cl.cam.ac.uk/~mgk25/iso-ebnf.html'
 		(\"International Standard of the ISO EBNF Notation\").
 		The following variables *ONLY* have effect with this
 		setting:
@@ -1810,11 +1787,11 @@ Valid values are:
 		`ebnf-yac-ignore-error-recovery'.
 
    `ebnfx'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
+                `https://www.w3.org/TR/2004/REC-xml-20040204/#sec-notation'
 		(\"Extensible Markup Language (XML) 1.0 (Third Edition)\")
 
    `dtd'	ebnf2ps recognizes the syntax described in the URL:
-		`http://www.w3.org/TR/2004/REC-xml-20040204/'
+                `https://www.w3.org/TR/2004/REC-xml-20040204/'
 		(\"Extensible Markup Language (XML) 1.0 (Third Edition)\")
 
 Any other value is treated as `ebnf'."
@@ -1898,7 +1875,7 @@ It's only used when `ebnf-syntax' is `iso-ebnf'."
   :group 'ebnf-syntactic)
 
 
-(defcustom ebnf-file-suffix-regexp "\\.[Bb][Nn][Ff]$"
+(defcustom ebnf-file-suffix-regexp "\\.[Bb][Nn][Ff]\\'"
   "Specify file name suffix that contains EBNF.
 
 See `ebnf-eps-directory' command."
@@ -2053,8 +2030,7 @@ It must be a float between 0.0 (top) and 1.0 (bottom)."
 
 
 ;; Printing color requires x-color-values.
-(defcustom ebnf-color-p (or (fboundp 'x-color-values) ; Emacs
-			    (fboundp 'color-instance-rgb-components)) ; XEmacs
+(defcustom ebnf-color-p t
   "Non-nil means use color."
   :type 'boolean
   :version "20"
@@ -2260,8 +2236,12 @@ the PostScript image in a file with that name.  If FILENAME is a
 number, prompt the user for the name of the file to save in."
   (interactive (list (ps-print-preprint current-prefix-arg)))
   (ebnf-log-header "(ebnf-print-buffer %S)" filename)
-  (ebnf-print-region (point-min) (point-max) filename))
-
+  (cl-letf (((symbol-function 'ps-output-string)
+             ;; Make non-ASCII work (sort of).
+             (lambda (string)
+               (ps-output t (and string
+                                 (encode-coding-string string 'iso-8859-1))))))
+    (ebnf-print-region (point-min) (point-max) filename)))
 
 ;;;###autoload
 (defun ebnf-print-region (from to &optional filename)
@@ -2731,15 +2711,14 @@ Used in functions `ebnf-reset-style', `ebnf-push-style' and
       (ebnf-syntax                      . 'ebnf)
       (ebnf-iso-alternative-p           . nil)
       (ebnf-iso-normalize-p             . nil)
-      (ebnf-file-suffix-regexp          . "\\.[Bb][Nn][Ff]$")
+      (ebnf-file-suffix-regexp          . "\\.[Bb][Nn][Ff]\\'")
       (ebnf-eps-prefix                  . "ebnf--")
       (ebnf-eps-header-font             . '(11 Helvetica "Black" "White" bold))
       (ebnf-eps-header                  . nil)
       (ebnf-eps-footer-font             . '(7 Helvetica "Black" "White" bold))
       (ebnf-eps-footer                  . nil)
       (ebnf-entry-percentage            . 0.5)
-      (ebnf-color-p   . (or (fboundp 'x-color-values) ; Emacs
-			    (fboundp 'color-instance-rgb-components))) ; XEmacs
+      (ebnf-color-p                     . t)
       (ebnf-line-width                  . 1.0)
       (ebnf-line-color                  . "Black")
       (ebnf-debug-ps                    . nil)
@@ -2937,7 +2916,7 @@ See `ebnf-style-database' documentation."
 	value
       (and (car value) (ebnf-apply-style1 (car value)))
       (while (setq value (cdr value))
-	(set (caar value) (eval (cdar value)))))))
+	(set (caar value) (eval (cdar value) t))))))
 
 
 (defun ebnf-check-style-values (values)
@@ -2958,16 +2937,11 @@ See `ebnf-style-database' documentation."
 (defvar ebnf-eps-executing      nil)
 (defvar ebnf-eps-header-comment nil)
 (defvar ebnf-eps-footer-comment nil)
-(defvar ebnf-eps-upper-x        0.0)
-(make-variable-buffer-local 'ebnf-eps-upper-x)
-(defvar ebnf-eps-upper-y        0.0)
-(make-variable-buffer-local 'ebnf-eps-upper-y)
-(defvar ebnf-eps-prod-width     0.0)
-(make-variable-buffer-local 'ebnf-eps-prod-width)
-(defvar ebnf-eps-max-height     0.0)
-(make-variable-buffer-local 'ebnf-eps-max-height)
-(defvar ebnf-eps-max-width      0.0)
-(make-variable-buffer-local 'ebnf-eps-max-width)
+(defvar-local ebnf-eps-upper-x        0.0)
+(defvar-local ebnf-eps-upper-y        0.0)
+(defvar-local ebnf-eps-prod-width     0.0)
+(defvar-local ebnf-eps-max-height     0.0)
+(defvar-local ebnf-eps-max-width      0.0)
 
 
 (defvar ebnf-eps-context nil
@@ -4359,7 +4333,7 @@ end
   (let ((len   (1- (length str)))
 	(index 0)
 	new start fmt)
-    (while (setq start (string-match "%" str index))
+    (while (setq start (string-search "%" str index))
       (setq fmt   (if (< start len) (aref str (1+ start)) ?\?)
 	    new   (concat new
 			  (substring str index start)
@@ -4420,8 +4394,8 @@ end
 
 (defun ebnf-format-float (&rest floats)
   (mapconcat
-   #'(lambda (float)
-       (format ebnf-format-float float))
+   (lambda (float)
+     (format ebnf-format-float float))
    floats
    " "))
 
@@ -4544,7 +4518,7 @@ end
   (let* ((ebnf-tree tree)
          (ps-color-p           (and ebnf-color-p (ps-color-device)))
 	 (ps-print-color-scale (if ps-color-p
-				   (float (car (ps-color-values "white")))
+				   (float (car (color-values "white")))
 				 1.0))
 	 (ebnf-total           (length ebnf-tree))
 	 (ebnf-nprod           0)
@@ -4646,7 +4620,7 @@ end
   (let* ((ebnf-tree tree)
          (ps-color-p           (and ebnf-color-p (ps-color-device)))
 	 (ps-print-color-scale (if ps-color-p
-				   (float (car (ps-color-values "white")))
+				   (float (car (color-values "white")))
 				 1.0))
 	 ps-zebra-stripes ps-line-number ps-razzle-dazzle
 	 ps-print-hook
@@ -4979,22 +4953,10 @@ killed after process termination."
       (kill-buffer (current-buffer))))
 
 
-;; function `ebnf-range-regexp' is used to avoid a bug of `skip-chars-forward'
-;; on version 20.4.1, that is, it doesn't accept ranges like "\240-\377" (or
-;; "\177-\237"), but it accepts the character sequence from \240 to \377 (or
-;; from \177 to \237).  It seems that version 20.7 has the same problem.
-(defun ebnf-range-regexp (prefix from to)
-  (let (str)
-    (while (<= from to)
-      (setq str  (concat str (char-to-string from))
-	    from (1+ from)))
-    (concat prefix str)))
-
-
 (defvar ebnf-map-name
   (let ((map (make-vector 256 ?\_)))
-    (mapc #'(lambda (char)
-	      (aset map char char))
+    (mapc (lambda (char)
+            (aset map char char))
 	  (concat "#$%&+-.0123456789=?@~"
 		  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 		  "abcdefghijklmnopqrstuvwxyz"))
@@ -5004,8 +4966,6 @@ killed after process termination."
 (defun ebnf-eps-filename (str)
   (let* ((len  (length str))
 	 (stri 0)
-	 ;; to keep compatibility with Emacs 20 & 21:
-	 ;; DO NOT REPLACE `?\ ' BY `?\s'
 	 (new  (make-string len ?\ )))
     (while (< stri len)
       (aset new stri (aref ebnf-map-name (aref str stri)))
@@ -5523,7 +5483,7 @@ killed after process termination."
 		      (ebnf-shape-value ebnf-chart-shape
 					ebnf-terminal-shape-alist))
 	      (format "/UserArrow{%s}def\n"
-		      (let ((arrow (eval ebnf-user-arrow)))
+		      (let ((arrow (eval ebnf-user-arrow t)))
 			(if (stringp arrow)
 			    arrow
 			  "")))
@@ -5987,8 +5947,7 @@ killed after process termination."
      (point))))
 
 
-;; replace the range "\240-\377" (see `ebnf-range-regexp').
-(defconst ebnf-8-bit-chars (ebnf-range-regexp "" ?\240 ?\377))
+(defconst ebnf-8-bit-chars "\u00a0-\u00ff")
 
 
 (defun ebnf-string (chars eos-char kind)
@@ -6023,8 +5982,6 @@ killed after process termination."
 (defun ebnf-trim-right (str)
   (let* ((len   (1- (length str)))
 	 (index len))
-    ;; to keep compatibility with Emacs 20 & 21:
-    ;; DO NOT REPLACE `?\ ' BY `?\s'
     (while (and (> index 0) (= (aref str index) ?\ ))
       (setq index (1- index)))
     (if (= index len)
@@ -6329,7 +6286,7 @@ killed after process termination."
 (defun ebnf-log-header (format-str &rest args)
   (when ebnf-log
     (apply
-     'ebnf-log
+     #'ebnf-log
      (concat
       "\n\n===============================================================\n\n"
       format-str)

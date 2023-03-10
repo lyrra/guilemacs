@@ -1,6 +1,6 @@
-;;; mule-diag.el --- show diagnosis of multilingual environment (Mule)
+;;; mule-diag.el --- show diagnosis of multilingual environment (Mule)  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1997-1998, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2000-2022 Free Software Foundation, Inc.
 ;; Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
 ;;   2005, 2006, 2007, 2008, 2009, 2010, 2011
 ;;   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -45,8 +45,8 @@
 (define-button-type 'sort-listed-character-sets
   'help-echo (purecopy "mouse-2, RET: sort on this column")
   'face 'bold
-  'action #'(lambda (button)
-	      (sort-listed-character-sets (button-get button 'sort-key))))
+  'action (lambda (button)
+            (sort-listed-character-sets (button-get button 'sort-key))))
 
 (define-button-type 'list-charset-chars
   :supertype 'help-xref
@@ -86,8 +86,7 @@ but still shows the full information."
 	(indent-to 48)
 	(insert "| +--CHARS\n")
 	(let ((columns '(("CHARSET-NAME" . name) "\t\t\t\t\t"
-			 ("D CH  FINAL-BYTE" . iso-spec)))
-	      pos)
+			 ("D CH  FINAL-BYTE" . iso-spec))))
 	  (while columns
 	    (if (stringp (car columns))
 		(insert (car columns))
@@ -117,8 +116,8 @@ but still shows the full information."
 SORT-KEY should be `name' or `iso-spec' (default `name')."
   (or sort-key
       (setq sort-key 'name))
-  (let ((tail charset-list)
-	charset-info-list supplementary-list charset sort-func)
+  (let (;; (tail charset-list)
+	charset-info-list supplementary-list sort-func)
     (dolist (charset charset-list)
       ;; Generate a list that contains all information to display.
       (let ((elt (list charset
@@ -136,13 +135,12 @@ SORT-KEY should be `name' or `iso-spec' (default `name')."
 
 		((eq sort-key 'iso-spec)
 		 ;; Sort by DIMENSION CHARS FINAL-CHAR
-		 (function
-		  (lambda (x y)
-		    (or (< (nth 1 x) (nth 1 y))
-			(and (= (nth 1 x) (nth 1 y))
-			     (or (< (nth 2 x) (nth 2 y))
-				 (and (= (nth 2 x) (nth 2 y))
-				      (< (nth 3 x) (nth 3 y)))))))))
+                 (lambda (x y)
+                   (or (< (nth 1 x) (nth 1 y))
+                       (and (= (nth 1 x) (nth 1 y))
+                            (or (< (nth 2 x) (nth 2 y))
+                                (and (= (nth 2 x) (nth 2 y))
+                                     (< (nth 3 x) (nth 3 y))))))))
 		(t
 		 (error "Invalid charset sort key: %s" sort-key))))
 
@@ -199,10 +197,6 @@ Character sets for defining other charsets, or for backward compatibility
 		   (charset-iso-final-char charset)
 ;;;		   (charset-iso-graphic-plane charset)
 		   (charset-description charset)))))
-
-(defvar non-iso-charset-alist nil
-  "Obsolete.")
-(make-obsolete-variable 'non-iso-charset-alist "no longer relevant." "23.1")
 
 ;; A variable to hold charset input history.
 (defvar charset-history nil)
@@ -278,9 +272,9 @@ meanings of these arguments."
       (setq tab-width 4)
       (set-buffer-multibyte t)
       (let ((dim (charset-dimension charset))
-	    (chars (charset-chars charset))
-	    ;; 	(plane (charset-iso-graphic-plane charset))
-	    (plane 1)
+	    ;; (chars (charset-chars charset))
+	    ;; (plane (charset-iso-graphic-plane charset))
+	    ;; (plane 1)
 	    (range (plist-get (charset-plist charset) :code-space))
 	    min max min2 max2)
 	(if (> dim 2)
@@ -420,7 +414,8 @@ or provided just for backward compatibility." nil)))
       (print-coding-system-briefly coding-system 'doc-string)
       (let ((type (coding-system-type coding-system))
 	    ;; Fixme: use this
-	    (extra-spec (coding-system-plist coding-system)))
+	    ;; (extra-spec (coding-system-plist coding-system))
+	    )
 	(princ "Type: ")
 	(princ type)
 	(cond ((eq type 'undecided)
@@ -677,7 +672,8 @@ Priority order for recognizing coding systems when reading files:\n")
 			(princ (cdr (car alist)))
 			(princ "\n")
 			(setq alist (cdr alist)))))))
-	(funcall func "File I/O" file-coding-system-alist)
+	(funcall func "File I/O" (append auto-coding-alist
+                                         file-coding-system-alist))
 	(funcall func "Process I/O" process-coding-system-alist)
 	(funcall func "Network I/O" network-coding-system-alist))
       (help-mode))))
@@ -834,9 +830,18 @@ The IGNORED argument is ignored."
 
 ;;;###autoload
 (defun describe-font (fontname)
-  "Display information about a font whose name is FONTNAME.
-The font must be already used by Emacs."
-  (interactive "sFont name (default current choice for ASCII chars): ")
+  "Display information about a font whose name is FONTNAME."
+  (interactive
+   (list (completing-read
+          "Font name (default current choice for ASCII chars): "
+          (and window-system
+               ;; Implied by `window-system'.
+               (fboundp 'x-list-fonts)
+               (fboundp 'fontset-list)
+               ;; The final element in `fontset-list' is a default
+               ;; (generic) one, so don't include that.
+               (nconc (butlast (fontset-list))
+                      (x-list-fonts "*"))))))
   (or (and window-system (fboundp 'fontset-list))
       (error "No fonts being used"))
   (let ((xref-item (list #'describe-font fontname))
@@ -846,9 +851,8 @@ The font must be already used by Emacs."
     (setq font-info (font-info fontname))
     (if (null font-info)
 	(if (fontp fontname 'font-object)
-	    ;; The font should be surely used.  So, there's some
-	    ;; problem about getting information about it.  It is
-	    ;; better to print the fontname to show which font has
+	    ;; If there's some problem with getting information about
+	    ;; the font, print the font name to show which font has
 	    ;; this problem.
 	    (message "No information about \"%s\"" (font-xlfd-name fontname))
 	  (message "No matching font found"))
@@ -856,15 +860,30 @@ The font must be already used by Emacs."
       (with-output-to-temp-buffer "*Help*"
 	(describe-font-internal font-info)))))
 
+(defvar mule--print-opened)
+
+(defun mule--kbd-at (point)
+  (save-excursion
+    (goto-char point)
+    (elt
+     (kbd (buffer-substring
+           (point)
+           (progn
+             ;; Might be a space, in which case we want it.
+             (if (zerop (skip-chars-forward "^ "))
+                 (1+ (point))
+               (point)))))
+     0)))
+
 (defun print-fontset-element (val)
   ;; VAL has this format:
   ;;  ((REQUESTED-FONT-NAME OPENED-FONT-NAME ...) ...)
   ;; CHAR RANGE is already inserted.  Get character codes from
   ;; the current line.
   (beginning-of-line)
-  (let ((from (following-char))
-	(to (if (looking-at "[^.]*[.]* ")
-		(char-after (match-end 0)))))
+  (let ((from (mule--kbd-at (point)))
+	(to (if (looking-at "[^.]+[.][.] ")
+		(mule--kbd-at (match-end 0)))))
     (if (re-search-forward "[ \t]*$" nil t)
 	(delete-region (match-beginning 0) (match-end 0)))
 
@@ -899,13 +918,13 @@ The font must be already used by Emacs."
 		  (setq family "*-*")
 		(if (symbolp family)
 		    (setq family (symbol-name family)))
-		(or (string-match "-" family)
+		(or (string-search "-" family)
 		    (setq family (concat "*-" family))))
 	      (if (not registry)
 		  (setq registry "*-*")
 		(if (symbolp registry)
 		    (setq registry (symbol-name registry)))
-		(or (string-match "-" registry)
+		(or (string-search "-" registry)
 		    (= (aref registry (1- (length registry))) ?*)
 		    (setq registry (concat registry "*"))))
 	      (insert (format"\n    -%s-%s-%s-%s-%s-*-*-*-*-*-*-%s"
@@ -913,7 +932,7 @@ The font must be already used by Emacs."
 			     (or adstyle "*") registry)))))
 
 	;; Insert opened font names (if any).
-	(if (and (boundp 'print-opened) (symbol-value 'print-opened))
+	(if (bound-and-true-p mule--print-opened)
 	    (dolist (opened (cdr elt))
 	      (insert "\n\t[" opened "]")))))))
 
@@ -941,8 +960,9 @@ the current buffer."
 	  " and [" (propertize "OPENED" 'face 'underline) "])")
   (let* ((info (fontset-info fontset))
 	 (default-info (char-table-extra-slot info 0))
+	 (mule--print-opened print-opened)
 	 start1 end1 start2 end2)
-    (describe-vector info 'print-fontset-element)
+    (describe-vector info #'print-fontset-element)
     (when (char-table-range info nil)
       ;; The default of FONTSET is described.
       (setq start1 (re-search-backward "^default"))
@@ -954,7 +974,7 @@ the current buffer."
     (when default-info
       (insert "\n  ---<fallback to the default fontset>---")
       (put-text-property (line-beginning-position) (point) 'face 'highlight)
-      (describe-vector default-info 'print-fontset-element)
+      (describe-vector default-info #'print-fontset-element)
       (when (char-table-range default-info nil)
 	;; The default of the default fontset is described.
 	(setq end2 (re-search-backward "^default"))
@@ -1165,12 +1185,12 @@ The default is 20.  If LIMIT is negative, do not limit the listing."
 	(if (or (vectorp elt) (listp elt))
 	    (let ((i 0))
 	      (catch 'tag
-		(mapc #'(lambda (x)
-			  (setq i (1+ i))
-			  (when (= i limit)
-			    (insert "  ...\n")
-			    (throw 'tag nil))
-			  (insert (format "  %s\n" x)))
+                (mapc (lambda (x)
+                        (setq i (1+ i))
+                        (when (= i limit)
+                          (insert "  ...\n")
+                          (throw 'tag nil))
+                        (insert (format "  %s\n" x)))
 		      elt)))
 	  (insert (format "  %s\n" elt)))))))
 

@@ -1,6 +1,6 @@
 /* sound.c -- sound support.
 
-Copyright (C) 1998-1999, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1998-1999, 2001-2022 Free Software Foundation, Inc.
 
 Author: Gerd Moellmann <gerd@gnu.org>
 
@@ -72,12 +72,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <soundcard.h>
 #endif
 #ifdef HAVE_ALSA
-#ifdef ALSA_SUBDIR_INCLUDE
 #include <alsa/asoundlib.h>
-#else
-#include <asoundlib.h>
-#endif /* ALSA_SUBDIR_INCLUDE */
-#endif /* HAVE_ALSA */
+#endif
 
 /* END: Non Windows Includes */
 
@@ -1119,7 +1115,7 @@ alsa_write (struct sound_device *sd, const char *buffer, ptrdiff_t nbytes)
 {
   struct alsa_params *p = (struct alsa_params *) sd->data;
 
-  /* The the third parameter to snd_pcm_writei is frames, not bytes. */
+  /* The third parameter to snd_pcm_writei is frames, not bytes. */
   int fact = snd_pcm_format_size (sd->format, 1) * sd->channels;
   ptrdiff_t nwritten = 0;
   int err;
@@ -1374,8 +1370,9 @@ Internal use only, use `play-sound' instead.  */)
   if (STRINGP (attrs[SOUND_FILE]))
     {
       /* Open the sound file.  */
-      current_sound->fd = openp (list1 (Vdata_directory),
-				 attrs[SOUND_FILE], Qnil, &file, Qnil, false);
+      current_sound->fd =
+	openp (list1 (Vdata_directory), attrs[SOUND_FILE], Qnil, &file, Qnil,
+	       false, false);
       if (current_sound->fd < 0)
 	sound_perror ("Could not open sound file");
 

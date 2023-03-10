@@ -1,6 +1,6 @@
-;;; ede/linux.el --- Special project for Linux
+;;; ede/linux.el --- Special project for Linux  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -47,26 +47,22 @@
 (defcustom project-linux-build-directory-default 'ask
   "Build directory."
   :version "24.4"
-  :group 'project-linux
   :type '(choice (const :tag "Same as source directory" same)
                  (const :tag "Ask the user" ask)))
 
 (defcustom project-linux-architecture-default 'ask
   "Target architecture to assume when not auto-detected."
   :version "24.4"
-  :group 'project-linux
   :type '(choice (string :tag "Architecture name")
                  (const :tag "Ask the user" ask)))
 
 
 (defcustom project-linux-compile-target-command (concat ede-make-command " -k -C %s SUBDIRS=%s")
   "Default command used to compile a target."
-  :group 'project-linux
   :type 'string)
 
 (defcustom project-linux-compile-project-command (concat ede-make-command " -k -C %s")
   "Default command used to compile a project."
-  :group 'project-linux
   :type 'string)
 
 (defun ede-linux-version (dir)
@@ -118,7 +114,7 @@ If DIR has not been used as a build directory, fall back to
 
 
 (defun ede-linux--get-archs (dir)
-  "Returns a list of architecture names found in DIR."
+  "Return a list of architecture names found in DIR."
   (let ((archs-dir (expand-file-name "arch" dir))
         archs)
     (when (file-directory-p archs-dir)
@@ -136,7 +132,7 @@ If DIR has not been used as a build directory, fall back to
 
 (defun ede-linux--detect-architecture (dir)
   "Try to auto-detect the architecture as configured in DIR.
-DIR is Linux' build directory. If it cannot be auto-detected,
+DIR is Linux' build directory.  If it cannot be auto-detected,
 returns `project-linux-architecture-default'."
   (let ((archs-dir (expand-file-name "arch" dir))
         (archs (ede-linux--get-archs dir))
@@ -157,9 +153,9 @@ returns `project-linux-architecture-default'."
 
 (defun ede-linux--get-architecture (dir bdir)
   "Try to auto-detect the architecture as configured in BDIR.
-Uses `ede-linux--detect-architecture' for the auto-detection. If
-the result is `ask', let the user choose from architectures found
-in DIR."
+Uses `ede-linux--detect-architecture' for the auto-detection.
+If the result is `ask', let the user choose from architectures
+found in DIR."
   (let ((arch (ede-linux--detect-architecture bdir)))
     (cl-case arch
       (ask
@@ -169,7 +165,7 @@ in DIR."
 
 
 (defun ede-linux--include-path (dir bdir arch)
-  "Returns a list with include directories.
+  "Return a list with include directories.
 Returned directories might not exist, since they are not created
 until Linux is built for the first time."
   (cl-map 'list
@@ -186,7 +182,7 @@ until Linux is built for the first time."
 
 ;;;###autoload
 (defun ede-linux-load (dir &optional _rootproj)
-  "Return an Linux Project object if there is a match.
+  "Return a Linux Project object if there is a match.
 Return nil if there isn't one.
 Argument DIR is the directory it is created for.
 ROOTPROJ is nil, since there is only one project."

@@ -1,6 +1,6 @@
 ;;; js.el --- Major mode for editing JavaScript  -*- lexical-binding: t -*-
 
-;; Copyright (C) 2008-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: Karl Landstrom <karl.landstrom@brgeight.se>
 ;;         Daniel Colascione <dancol@dancol.org>
@@ -24,9 +24,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
-;;; Commentary
+;;; Commentary:
 
-;; This is based on Karl Landstrom's barebones javascript-mode. This
+;; This is based on Karl Landstrom's barebones javascript-mode.  This
 ;; is much more robust and works with cc-mode's comment filling
 ;; (mostly).
 ;;
@@ -46,6 +46,9 @@
 ;;; Code:
 
 (require 'cc-mode)
+(eval-when-compile
+  (require 'cc-langs)
+  (require 'cc-fonts))
 (require 'newcomment)
 (require 'imenu)
 (require 'moz nil t)
@@ -65,7 +68,7 @@
 
 ;;; Constants
 
-(defconst js--name-start-re (concat "[[:alpha:]_$]")
+(defconst js--name-start-re "[[:alpha:]_$]"
   "Regexp matching the start of a JavaScript identifier, without grouping.")
 
 (defconst js--stmt-delim-chars "^;{}?:")
@@ -234,8 +237,7 @@ will create multiple top-level entries.  Don't use :prototype
 unnecessarily: it has an associated cost in performance.
 
 If :strip-prototype is present and non-nil, then if the class
-name as matched contains
-")
+name as matched contains.")
 
 (defconst js--available-frameworks
   (cl-loop for style in js--class-styles
@@ -279,7 +281,7 @@ Match group 1 is the name of the macro.")
      "continue" "debugger" "default" "delete" "do" "else"
      "enum" "export" "extends" "final" "finally" "for"
      "function" "goto" "if" "implements" "import" "in"
-     "instanceof" "interface" "native" "new" "package"
+     "instanceof" "interface" "native" "new" "of" "package"
      "private" "protected" "public" "return" "static"
      "super" "switch" "synchronized" "throw"
      "throws" "transient" "try" "typeof" "var" "void" "let"
@@ -424,22 +426,19 @@ Match group 1 is the name of the macro.")
 (defcustom js-indent-level 4
   "Number of spaces for each indentation step in `js-mode'."
   :type 'integer
-  :safe 'integerp
-  :group 'js)
+  :safe 'integerp)
 
 (defcustom js-expr-indent-offset 0
   "Number of additional spaces for indenting continued expressions.
 The value must be no less than minus `js-indent-level'."
   :type 'integer
-  :safe 'integerp
-  :group 'js)
+  :safe 'integerp)
 
 (defcustom js-paren-indent-offset 0
   "Number of additional spaces for indenting expressions in parentheses.
 The value must be no less than minus `js-indent-level'."
   :type 'integer
   :safe 'integerp
-  :group 'js
   :version "24.1")
 
 (defcustom js-square-indent-offset 0
@@ -447,7 +446,6 @@ The value must be no less than minus `js-indent-level'."
 The value must be no less than minus `js-indent-level'."
   :type 'integer
   :safe 'integerp
-  :group 'js
   :version "24.1")
 
 (defcustom js-curly-indent-offset 0
@@ -455,7 +453,6 @@ The value must be no less than minus `js-indent-level'."
 The value must be no less than minus `js-indent-level'."
   :type 'integer
   :safe 'integerp
-  :group 'js
   :version "24.1")
 
 (defcustom js-switch-indent-offset 0
@@ -463,26 +460,22 @@ The value must be no less than minus `js-indent-level'."
 The value must not be negative."
   :type 'integer
   :safe 'integerp
-  :group 'js
   :version "24.4")
 
 (defcustom js-flat-functions nil
   "Treat nested functions as top-level functions in `js-mode'.
 This applies to function movement, marking, and so on."
-  :type 'boolean
-  :group 'js)
+  :type 'boolean)
 
 (defcustom js-indent-align-list-continuation t
   "Align continuation of non-empty ([{ lines in `js-mode'."
   :version "26.1"
   :type 'boolean
-  :safe 'booleanp
-  :group 'js)
+  :safe 'booleanp)
 
 (defcustom js-comment-lineup-func #'c-lineup-C-comments
   "Lineup function for `cc-mode-style', for C comments in `js-mode'."
-  :type 'function
-  :group 'js)
+  :type 'function)
 
 (defcustom js-enabled-frameworks js--available-frameworks
   "Frameworks recognized by `js-mode'.
@@ -490,30 +483,27 @@ To improve performance, you may turn off some frameworks you
 seldom use, either globally or on a per-buffer basis."
   :type (cons 'set (mapcar (lambda (x)
                              (list 'const x))
-                           js--available-frameworks))
-  :group 'js)
+                           js--available-frameworks)))
 
 (defcustom js-js-switch-tabs
   (and (memq system-type '(darwin)) t)
   "Whether `js-mode' should display tabs while selecting them.
 This is useful only if the windowing system has a good mechanism
 for preventing Firefox from stealing the keyboard focus."
-  :type 'boolean
-  :group 'js)
+  :type 'boolean)
 
 (defcustom js-js-tmpdir
-  "~/.emacs.d/js/js"
+  (locate-user-emacs-file "js/js")
   "Temporary directory used by `js-mode' to communicate with Mozilla.
 This directory must be readable and writable by both Mozilla and Emacs."
   :type 'directory
-  :group 'js)
+  :version "28.1")
 
 (defcustom js-js-timeout 5
   "Reply timeout for executing commands in Mozilla via `js-mode'.
 The value is given in seconds.  Increase this value if you are
 getting timeout messages."
-  :type 'integer
-  :group 'js)
+  :type 'integer)
 
 (defcustom js-indent-first-init nil
   "Non-nil means specially indent the first variable declaration's initializer.
@@ -554,8 +544,7 @@ don't indent the first one's initializer; otherwise, indent it.
       bar = 2;"
   :version "25.1"
   :type '(choice (const nil) (const t) (const dynamic))
-  :safe 'symbolp
-  :group 'js)
+  :safe 'symbolp)
 
 (defcustom js-chain-indent nil
   "Use \"chained\" indentation.
@@ -564,12 +553,10 @@ If the previous expression also contains a \".\" at the same level,
 then the \".\"s will be lined up:
 
   let x = svg.mumble()
-             .chained;
-"
+             .chained;"
   :version "26.1"
   :type 'boolean
-  :safe 'booleanp
-  :group 'js)
+  :safe 'booleanp)
 
 (defcustom js-jsx-detect-syntax t
   "When non-nil, automatically detect whether JavaScript uses JSX.
@@ -578,16 +565,15 @@ t.  The detection strategy can be customized by adding elements
 to `js-jsx-regexps', which see."
   :version "27.1"
   :type 'boolean
-  :safe 'booleanp
-  :group 'js)
+  :safe 'booleanp)
 
 (defcustom js-jsx-syntax nil
   "When non-nil, parse JavaScript with consideration for JSX syntax.
 
 This enables proper font-locking and indentation of code using
 Facebook’s “JSX” syntax extension for JavaScript, for use with
-Facebook’s “React” library.  Font-locking is like sgml-mode.
-Indentation is also like sgml-mode, although some indentation
+Facebook’s “React” library.  Font-locking is like `sgml-mode'.
+Indentation is also like `sgml-mode', although some indentation
 behavior may differ slightly to align more closely with the
 conventions of the React developer community.
 
@@ -597,8 +583,7 @@ When `js-mode' is already enabled, you should call
 It is set to be buffer-local (and t) when in `js-jsx-mode'."
   :version "27.1"
   :type 'boolean
-  :safe 'booleanp
-  :group 'js)
+  :safe 'booleanp)
 
 (defcustom js-jsx-align->-with-< t
   "When non-nil, “>” will be indented to the opening “<” in JSX.
@@ -622,8 +607,7 @@ When this is disabled, JSX indentation looks like this:
     />"
   :version "27.1"
   :type 'boolean
-  :safe 'booleanp
-  :group 'js)
+  :safe 'booleanp)
 
 (defcustom js-jsx-indent-level nil
   "When non-nil, indent JSX by this value, instead of like JS.
@@ -650,9 +634,9 @@ indentation looks like this (different):
       </element>
   )"
   :version "27.1"
-  :type 'integer
-  :safe (lambda (x) (or (null x) (integerp x)))
-  :group 'js)
+  :type '(choice integer
+                 (const :tag "Not Set" nil))
+  :safe (lambda (x) (or (null x) (integerp x))))
 ;; This is how indentation behaved out-of-the-box until Emacs 27.  JSX
 ;; indentation was controlled with `sgml-basic-offset', which defaults
 ;; to 2, whereas `js-indent-level' defaults to 4.  Users who had the
@@ -681,8 +665,7 @@ indentation looks like this:
 This variable is like `sgml-attribute-offset'."
   :version "27.1"
   :type 'integer
-  :safe 'integerp
-  :group 'js)
+  :safe 'integerp)
 
 ;;; KeyMap
 
@@ -713,26 +696,20 @@ This variable is like `sgml-attribute-offset'."
     table)
   "Syntax table for `js-mode'.")
 
-(defvar js--quick-match-re nil
+(defvar-local js--quick-match-re nil
   "Autogenerated regexp used by `js-mode' to match buffer constructs.")
 
-(defvar js--quick-match-re-func nil
+(defvar-local js--quick-match-re-func nil
   "Autogenerated regexp used by `js-mode' to match constructs and functions.")
 
-(make-variable-buffer-local 'js--quick-match-re)
-(make-variable-buffer-local 'js--quick-match-re-func)
-
-(defvar js--cache-end 1
+(defvar-local js--cache-end 1
   "Last valid buffer position for the `js-mode' function cache.")
-(make-variable-buffer-local 'js--cache-end)
 
-(defvar js--last-parse-pos nil
+(defvar-local js--last-parse-pos nil
   "Latest parse position reached by `js--ensure-cache'.")
-(make-variable-buffer-local 'js--last-parse-pos)
 
-(defvar js--state-at-last-parse-pos nil
+(defvar-local js--state-at-last-parse-pos nil
   "Parse state at `js--last-parse-pos'.")
-(make-variable-buffer-local 'js--state-at-last-parse-pos)
 
 (defun js--maybe-join (prefix separator suffix &rest list)
   "Helper function for `js--update-quick-match-re'.
@@ -1081,7 +1058,7 @@ Return the pitem of the function we went to the beginning of."
             (t
              (js--beginning-of-defun-nested))))))
 
-(defun js--flush-caches (&optional beg ignored)
+(defun js--flush-caches (&optional beg _ignored)
   "Flush the `js-mode' syntax cache after position BEG.
 BEG defaults to `point-min', meaning to flush the entire cache."
   (interactive)
@@ -1361,7 +1338,6 @@ LIMIT defaults to point."
 
 (defun js--end-of-defun-nested ()
   "Helper function for `js-end-of-defun'."
-  (message "test")
   (let* (pitem
          (this-end (save-excursion
                      (and (setq pitem (js--beginning-of-defun-nested))
@@ -1495,14 +1471,12 @@ LIMIT defaults to point."
   "Helper function for building `js--font-lock-keywords'.
 Create a byte-compiled function for matching a concatenation of
 REGEXPS, but only if FRAMEWORK is in `js-enabled-frameworks'."
-  (setq regexps (apply #'concat regexps))
-  (byte-compile
-   `(lambda (limit)
-      (when (memq (quote ,framework) js-enabled-frameworks)
-        (re-search-forward ,regexps limit t)))))
+  (let ((regexp (apply #'concat regexps)))
+    (lambda (limit)
+      (when (memq framework js-enabled-frameworks)
+        (re-search-forward regexp limit t)))))
 
-(defvar js--tmp-location nil)
-(make-variable-buffer-local 'js--tmp-location)
+(defvar-local js--tmp-location nil)
 
 (defun js--forward-destructuring-spec (&optional func)
   "Move forward over a JavaScript destructuring spec.
@@ -2007,7 +1981,7 @@ For use by `syntax-propertize-extend-region-functions'."
 ;; When applying syntax properties, since `js-syntax-propertize' uses
 ;; `syntax-propertize-rules' to parse JSXBoundaryElements iteratively
 ;; and statelessly, whenever we exit such an element, we need to
-;; determine the JSX depth.  If >0, then we know we to apply syntax
+;; determine the JSX depth.  If >0, then we know to apply syntax
 ;; properties to JSXText up until the next JSXBoundaryElement occurs.
 ;; But if the JSX depth is 0, then—importantly—we know to NOT parse
 ;; the following code as JSXText, rather propertize it as regular JS
@@ -2055,24 +2029,26 @@ the match.  Return nil if a match can’t be found."
   (let ((tag-stack 1) tag-pos type last-pos pos)
     (catch 'stop
       (while (and (re-search-forward "<\\s-*" nil t) (not (eobp)))
-        (when (setq tag-pos (match-beginning 0)
-                    type (js-jsx--matched-tag-type))
-          (when last-pos
-            (setq pos (point))
-            (goto-char last-pos)
-            (while (re-search-forward js-jsx--self-closing-re pos 'move)
-              (setq tag-stack (1- tag-stack))))
-          (if (eq type 'close)
-              (progn
-                (setq tag-stack (1- tag-stack))
-                (when (= tag-stack 0)
-                  (throw 'stop tag-pos)))
-            ;; JSXOpeningElements that we know are self-closing aren’t
-            ;; added to the stack at all (because point is already
-            ;; past that syntax).
-            (unless (eq type 'self-closing)
-              (setq tag-stack (1+ tag-stack))))
-          (setq last-pos (point)))))))
+        ;; Not inside a comment or string.
+        (unless (nth 8 (save-excursion (syntax-ppss (match-beginning 0))))
+          (when (setq tag-pos (match-beginning 0)
+                      type (js-jsx--matched-tag-type))
+            (when last-pos
+              (setq pos (point))
+              (goto-char last-pos)
+              (while (re-search-forward js-jsx--self-closing-re pos 'move)
+                (setq tag-stack (1- tag-stack))))
+            (if (eq type 'close)
+                (progn
+                  (setq tag-stack (1- tag-stack))
+                  (when (= tag-stack 0)
+                    (throw 'stop tag-pos)))
+              ;; JSXOpeningElements that we know are self-closing
+              ;; aren’t added to the stack at all (because point is
+              ;; already past that syntax).
+              (unless (eq type 'self-closing)
+                (setq tag-stack (1+ tag-stack))))
+            (setq last-pos (point))))))))
 
 (defun js-jsx--enclosing-tag-pos ()
   "Return beginning and end of a JSXElement about point.
@@ -2358,7 +2334,11 @@ testing for syntax only valid as JSX."
                               'syntax-table (string-to-syntax "\"/"))
            (js-syntax-propertize-regexp end)))))
     ("\\`\\(#\\)!" (1 "< b"))
-    ("<" (0 (ignore (if js-jsx-syntax (js-jsx--syntax-propertize-tag end))))))
+    ("<" (0 (ignore
+             (when js-jsx-syntax
+               ;; Not inside a comment or string.
+               (unless (nth 8 (save-excursion (syntax-ppss (match-beginning 0))))
+                 (js-jsx--syntax-propertize-tag end)))))))
    (point) end))
 
 (defconst js--prettify-symbols-alist
@@ -2698,7 +2678,7 @@ Whitespace and comments around the arrow are ignored.")
 
 (defun js--broken-arrow-terminates-line-p ()
   "Helper function for `js--proper-indentation'.
-Return t if the last non-comment, non-whitespace token of the
+Return non-nil if the last non-comment, non-whitespace token of the
 current line is the \"=>\" token (of an arrow function)."
   (let ((from (point)))
     (end-of-line)
@@ -2878,7 +2858,11 @@ return nil."
           ((nth 3 parse-status) 0) ; inside string
           ((when (and js-jsx-syntax (not js-jsx--indent-col))
              (save-excursion (js-jsx--indentation parse-status))))
-          ((eq (char-after) ?#) 0)
+          ((and (eq (char-after) ?#)
+                (save-excursion
+                  (forward-char 1)
+                  (looking-at-p cpp-font-lock-keywords-source-directives)))
+           0)
           ((save-excursion (js--beginning-of-macro)) 4)
           ;; Indent array comprehension continuation lines specially.
           ((let ((bracket (nth 1 parse-status))
@@ -3281,7 +3265,7 @@ the broken-down class name of the item to insert."
 
 (defun js--get-all-known-symbols ()
   "Return a hash table of all JavaScript symbols.
-This searches all existing `js-mode' buffers. Each key is the
+This searches all existing `js-mode' buffers.  Each key is the
 name of a symbol (possibly disambiguated with <N>, where N > 1),
 and each value is a marker giving the location of that symbol."
   (cl-loop with symbols = (make-hash-table :test 'equal)
@@ -3716,8 +3700,7 @@ Otherwise, use the current value of `process-mark'."
 Strings and numbers are JSON-encoded.  Lists (including nil) are
 made into JavaScript array literals and their contents encoded
 with `js--js-encode-value'."
-  (cond ((stringp x) (json-encode-string x))
-        ((numberp x) (json-encode-number x))
+  (cond ((or (stringp x) (numberp x)) (json-encode x))
         ((symbolp x) (format "{objid:%S}" (symbol-name x)))
         ((js--js-handle-p x)
 
@@ -4195,8 +4178,9 @@ browser, respectively."
                        "style" "")
                      cmds)))
 
-             (eval (list 'with-js
-                         (cons 'js-list (nreverse cmds))))))
+             (eval `(with-js
+                        (js-list ,@(nreverse cmds)))
+                   t)))
 
           (command-hook
            ()
@@ -4407,7 +4391,8 @@ If one hasn't been set, or if it's stale, prompt for a new one."
             (with-temp-buffer
               (insert js--js-inserter)
               (insert "(")
-              (insert (json-encode-list defun-info))
+              (let ((standard-output (current-buffer)))
+                (json--print-list defun-info))
               (insert ",\n")
               (insert defun-body)
               (insert "\n)")
@@ -4484,7 +4469,7 @@ their `mode-name' updates to show enabled syntax extensions."
 
 (defvar js-jsx-regexps
   (list "\\_<\\(?:var\\|let\\|const\\|import\\)\\_>.*?React")
-  "Regexps for detecting JSX in JavaScript buffers.
+  "Case-sensitive regexps for detecting JSX in JavaScript buffers.
 When `js-jsx-detect-syntax' is non-nil and any of these regexps
 match text near the beginning of a JavaScript buffer,
 `js-jsx-syntax' (which see) will be made buffer-local and set to
@@ -4504,7 +4489,9 @@ is non-nil.  Return t after enabling, nil otherwise."
                    (catch 'match
                      (mapc
                       (lambda (regexp)
-                        (if (re-search-forward regexp 4000 t) (throw 'match t)))
+                        (when (let (case-fold-search)
+                                (re-search-forward regexp 4000 t))
+                          (throw 'match t)))
                       js-jsx-regexps)
                      nil))))
     (js-jsx-enable)
@@ -4522,12 +4509,22 @@ This function is intended for use in `after-change-functions'."
         (when (js-jsx--detect-and-enable 'arbitrarily)
           (remove-hook 'after-change-functions #'js-jsx--detect-after-change t))))))
 
+;; Ensure all CC Mode "lang variables" are set to valid values.
+;; js-mode, however, currently uses only those needed for filling.
+(eval-and-compile
+  (c-add-language 'js-mode 'java-mode))
+
+(c-lang-defconst c-paragraph-start
+  js-mode "\\(@[[:alpha:]]+\\>\\|$\\)")
+
 ;;; Main Function
 
 ;;;###autoload
 (define-derived-mode js-mode prog-mode "JavaScript"
   "Major mode for editing JavaScript."
   :group 'js
+  ;; Ensure all CC Mode "lang variables" are set to valid values.
+  (c-init-language-vars js-mode)
   (setq-local indent-line-function #'js-indent-line)
   (setq-local beginning-of-defun-function #'js-beginning-of-defun)
   (setq-local end-of-defun-function #'js-end-of-defun)
@@ -4548,7 +4545,7 @@ This function is intended for use in `after-change-functions'."
 
   ;; Comments
   (setq-local comment-start "// ")
-  (setq-local comment-start-skip "\\(//+\\|/\\*+\\)\\s *")
+  (setq-local comment-start-skip "\\(?://+\\|/\\*+\\)\\s *")
   (setq-local comment-end "")
   (setq-local fill-paragraph-function #'js-fill-paragraph)
   (setq-local normal-auto-fill-function #'js-do-auto-fill)
@@ -4569,16 +4566,10 @@ This function is intended for use in `after-change-functions'."
   (setq imenu-create-index-function #'js--imenu-create-index)
 
   ;; for filling, pretend we're cc-mode
-  (setq c-comment-prefix-regexp "//+\\|\\**"
-        c-paragraph-start "\\(@[[:alpha:]]+\\>\\|$\\)"
-        c-paragraph-separate "$"
-        c-block-comment-prefix "* "
-        c-line-comment-starter "//"
-        c-comment-start-regexp "/[*/]\\|\\s!")
+  (c-foreign-init-lit-pos-cache)
+  (add-hook 'before-change-functions #'c-foreign-truncate-lit-pos-cache nil t)
   (setq-local comment-line-break-function #'c-indent-new-comment-line)
-  (setq-local c-block-comment-start-regexp "/\\*")
   (setq-local comment-multi-line t)
-
   (setq-local electric-indent-chars
 	      (append "{}():;," electric-indent-chars)) ;FIXME: js2-mode adds "[]*".
   (setq-local electric-layout-rules
@@ -4592,6 +4583,13 @@ This function is intended for use in `after-change-functions'."
     (make-local-variable 'paragraph-ignore-fill-prefix)
     (make-local-variable 'adaptive-fill-mode)
     (make-local-variable 'adaptive-fill-regexp)
+    ;; While the full CC Mode style system is not yet in use, set the
+    ;; pertinent style variables manually.
+    (c-initialize-builtin-style)
+    (let ((style (cc-choose-style-for-mode 'js-mode c-default-style)))
+      (c-set-style style))
+    (setq c-block-comment-prefix "* "
+          c-comment-prefix-regexp "//+\\|\\**")
     (c-setup-paragraph-variables))
 
   ;; Important to fontify the whole buffer syntactically! If we don't,
@@ -4633,7 +4631,18 @@ could set `js-jsx-syntax' to t in your init file, or in a
 one of the aforementioned options instead of using this mode."
   :group 'js
   (js-jsx-enable)
+  (setq-local comment-region-function #'js-jsx--comment-region)
   (js-use-syntactic-mode-name))
+
+(defun js-jsx--comment-region (beg end &optional arg)
+  (if (or (js-jsx--context)
+          (save-excursion
+            (skip-chars-forward " \t")
+            (js-jsx--looking-at-start-tag-p)))
+      (let ((comment-start "{/* ")
+            (comment-end " */}"))
+        (comment-region-default beg end arg))
+    (comment-region-default beg end arg)))
 
 ;;;###autoload (defalias 'javascript-mode 'js-mode)
 
@@ -4647,4 +4656,4 @@ one of the aforementioned options instead of using this mode."
 
 (provide 'js)
 
-;; js.el ends here
+;;; js.el ends here

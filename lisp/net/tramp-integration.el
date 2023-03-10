@@ -1,6 +1,6 @@
 ;;; tramp-integration.el --- Tramp integration into other packages  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2019 Free Software Foundation, Inc.
+;; Copyright (C) 2019-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Albinus <michael.albinus@gmx.de>
 ;; Keywords: comm, processes
@@ -31,14 +31,27 @@
 
 ;; Pacify byte-compiler.
 (require 'cl-lib)
+(declare-function info-lookup->cache "info-look")
+(declare-function info-lookup->mode-cache "info-look")
+(declare-function info-lookup->mode-value "info-look")
+(declare-function info-lookup->other-modes "info-look")
+(declare-function info-lookup->topic-cache "info-look")
+(declare-function info-lookup->topic-value "info-look")
+(declare-function info-lookup-maybe-add-help "info-look")
 (declare-function recentf-cleanup "recentf")
 (declare-function tramp-dissect-file-name "tramp")
 (declare-function tramp-file-name-equal-p "tramp")
 (declare-function tramp-tramp-file-p "tramp")
+(declare-function tramp-rename-files "tramp-cmds")
+(declare-function tramp-rename-these-files "tramp-cmds")
 (defvar eshell-path-env)
+(defvar ido-read-file-name-non-ido)
+(defvar info-lookup-alist)
+(defvar ivy-completing-read-handlers-alist)
 (defvar recentf-exclude)
 (defvar tramp-current-connection)
 (defvar tramp-postfix-host-format)
+(defvar tramp-use-ssh-controlmaster-options)
 
 ;;; Fontification of `read-file-name':
 
@@ -69,6 +82,7 @@ special handling of `substitute-in-file-name'."
 			 #'tramp-rfn-eshadow-setup-minibuffer)))
 
 (defun tramp-rfn-eshadow-update-overlay-regexp ()
+  "An overlay covering the shadowed part of the filename."
   (format "[^%s/~]*\\(/\\|~\\)" tramp-postfix-host-format))
 
 ;; Package rfn-eshadow is preloaded in Emacs, but for some reason,
@@ -123,18 +137,17 @@ been set up by `rfn-eshadow-setup-minibuffer'."
 	(mapconcat
 	 #'identity (butlast (tramp-compat-exec-path)) path-separator)))
 
-(eval-after-load "esh-util"
-  '(progn
-     (add-hook 'eshell-mode-hook
-	       #'tramp-eshell-directory-change)
-     (add-hook 'eshell-directory-change-hook
-	       #'tramp-eshell-directory-change)
-     (add-hook 'tramp-integration-unload-hook
-	       (lambda ()
-		 (remove-hook 'eshell-mode-hook
-			      #'tramp-eshell-directory-change)
-		 (remove-hook 'eshell-directory-change-hook
-			      #'tramp-eshell-directory-change)))))
+(with-eval-after-load 'esh-util
+  (add-hook 'eshell-mode-hook
+	    #'tramp-eshell-directory-change)
+  (add-hook 'eshell-directory-change-hook
+	    #'tramp-eshell-directory-change)
+  (add-hook 'tramp-integration-unload-hook
+	    (lambda ()
+	      (remove-hook 'eshell-mode-hook
+			   #'tramp-eshell-directory-change)
+	      (remove-hook 'eshell-directory-change-hook
+			   #'tramp-eshell-directory-change))))
 
 ;;; Integration of recentf.el:
 
@@ -158,38 +171,150 @@ NAME must be equal to `tramp-current-connection'."
     (let ((recentf-exclude '(file-remote-p)))
       (recentf-cleanup))))
 
-(eval-after-load "recentf"
-  '(progn
-     (add-hook 'tramp-cleanup-connection-hook
-	       #'tramp-recentf-cleanup)
-     (add-hook 'tramp-cleanup-all-connections-hook
-	       #'tramp-recentf-cleanup-all)
-     (add-hook 'tramp-integration-unload-hook
-	       (lambda ()
-		 (remove-hook 'tramp-cleanup-connection-hook
-			      #'tramp-recentf-cleanup)
-		 (remove-hook 'tramp-cleanup-all-connections-hook
-			      #'tramp-recentf-cleanup-all)))))
+(with-eval-after-load 'recentf
+  (add-hook 'tramp-cleanup-connection-hook
+	    #'tramp-recentf-cleanup)
+  (add-hook 'tramp-cleanup-all-connections-hook
+	    #'tramp-recentf-cleanup-all)
+  (add-hook 'tramp-integration-unload-hook
+	    (lambda ()
+	      (remove-hook 'tramp-cleanup-connection-hook
+			   #'tramp-recentf-cleanup)
+	      (remove-hook 'tramp-cleanup-all-connections-hook
+			   #'tramp-recentf-cleanup-all))))
+
+;;; Integration of ido.el:
+
+(with-eval-after-load 'ido
+  (add-to-list 'ido-read-file-name-non-ido #'tramp-rename-files)
+  (add-to-list 'ido-read-file-name-non-ido #'tramp-rename-these-files)
+  (add-hook 'tramp-integration-unload-hook
+	    (lambda ()
+	      (setq ido-read-file-name-non-ido
+		    (delq #'tramp-rename-these-files ido-read-file-name-non-ido)
+		    ido-read-file-name-non-ido
+		    (delq #'tramp-rename-files ido-read-file-name-non-ido)))))
+
+;;; Integration of ivy.el:
+
+(with-eval-after-load 'ivy
+  (add-to-list 'ivy-completing-read-handlers-alist
+	       '(tramp-rename-files . completing-read-default))
+  (add-to-list 'ivy-completing-read-handlers-alist
+	       '(tramp-rename-these-files . completing-read-default))
+  (add-hook
+   'tramp-integration-unload-hook
+   (lambda ()
+     (setq ivy-completing-read-handlers-alist
+	   (delete
+	    (assq #'tramp-rename-these-files ivy-completing-read-handlers-alist)
+	    ivy-completing-read-handlers-alist)
+	   ivy-completing-read-handlers-alist
+	   (delete
+	    (assq #'tramp-rename-files ivy-completing-read-handlers-alist)
+	    ivy-completing-read-handlers-alist)))))
+
+;;; Integration of info-look.el:
+
+(with-eval-after-load 'info-look
+  ;; Create a pseudo mode `tramp-info-lookup-mode' for Tramp symbol lookup.
+  (info-lookup-maybe-add-help
+   :mode 'tramp-info-lookup-mode :topic 'symbol
+   :regexp "[^][()`'‘’,\" \t\n]+"
+   :doc-spec '(("(tramp)Function Index" nil "^ -+ .*: " "\\( \\|$\\)")
+	       ("(tramp)Variable Index" nil "^ -+ .*: " "\\( \\|$\\)")))
+
+  (add-hook
+   'tramp-integration-unload-hook
+   (lambda ()
+     (setcdr (assq 'symbol info-lookup-alist)
+	     (delete (info-lookup->mode-value 'symbol 'tramp-info-lookup-mode)
+		     (info-lookup->topic-value 'symbol)))
+     (setcdr (info-lookup->cache 'symbol)
+	     (delete (info-lookup->mode-cache 'symbol 'tramp-info-lookup-mode)
+		     (info-lookup->topic-cache 'symbol)))))
+
+  (dolist (mode (mapcar #'car (info-lookup->topic-value 'symbol)))
+    ;; Add `tramp-info-lookup-mode' to `other-modes' for either
+    ;; `emacs-lisp-mode' itself, or to modes which use
+    ;; `emacs-lisp-mode' as `other-modes'.  Reset `info-lookup-cache'.
+    (when (and (or (equal mode 'emacs-lisp-mode)
+		   (memq
+		    'emacs-lisp-mode (info-lookup->other-modes 'symbol mode)))
+	       (not (memq 'tramp-info-lookup-mode
+			  (info-lookup->other-modes 'symbol mode))))
+      (setcdr (info-lookup->mode-value 'symbol mode)
+	      (append (butlast (cdr (info-lookup->mode-value 'symbol mode)))
+		      `((tramp-info-lookup-mode
+			 . ,(info-lookup->other-modes 'symbol mode)))))
+      (setcdr (info-lookup->cache 'symbol)
+	      (delete (info-lookup->mode-cache 'symbol mode)
+		      (info-lookup->topic-cache 'symbol)))
+
+      (add-hook
+       'tramp-integration-unload-hook
+       `(lambda ()
+	  (setcdr (info-lookup->mode-value 'symbol ',mode)
+		  (append (butlast
+			   (cdr (info-lookup->mode-value 'symbol ',mode)))
+			  (list
+			   (delq 'tramp-info-lookup-mode
+				 (info-lookup->other-modes 'symbol ',mode)))))
+	  (setcdr (info-lookup->cache 'symbol)
+		  (delete (info-lookup->mode-cache 'symbol ',mode)
+			  (info-lookup->topic-cache 'symbol))))))))
+
+;;; Integration of compile.el:
+
+;; Compilation processes use `accept-process-output' such a way that
+;; Tramp's parallel `accept-process-output' blocks.  See last part of
+;; Bug#45518.  So we don't use ssh ControlMaster options.
+(defun tramp-compile-disable-ssh-controlmaster-options ()
+  "Don't allow ssh ControlMaster while compiling."
+  (setq-local tramp-use-ssh-controlmaster-options nil))
+
+(with-eval-after-load 'compile
+  (add-hook 'compilation-mode-hook
+	    #'tramp-compile-disable-ssh-controlmaster-options)
+  (add-hook 'tramp-integration-unload-hook
+	    (lambda ()
+	      (remove-hook 'compilation-start-hook
+			   #'tramp-compile-disable-ssh-controlmaster-options))))
 
 ;;; Default connection-local variables for Tramp:
-
-(defconst tramp-connection-local-default-profile
-  '((shell-file-name . "/bin/sh")
-    (shell-command-switch . "-c"))
-  "Default connection-local variables for remote connections.")
-
 ;; `connection-local-set-profile-variables' and
 ;; `connection-local-set-profiles' exists since Emacs 26.1.
-(eval-after-load "shell"
-  '(progn
-     (tramp-compat-funcall
-      'connection-local-set-profile-variables
-      'tramp-connection-local-default-profile
-      tramp-connection-local-default-profile)
-     (tramp-compat-funcall
-      'connection-local-set-profiles
-      `(:application tramp)
-      'tramp-connection-local-default-profile)))
+
+(defconst tramp-connection-local-default-system-variables
+  '((path-separator . ":")
+    (null-device . "/dev/null"))
+  "Default connection-local system variables for remote connections.")
+
+(tramp-compat-funcall
+ 'connection-local-set-profile-variables
+ 'tramp-connection-local-default-system-profile
+ tramp-connection-local-default-system-variables)
+
+(tramp-compat-funcall
+ 'connection-local-set-profiles
+ '(:application tramp)
+ 'tramp-connection-local-default-system-profile)
+
+(defconst tramp-connection-local-default-shell-variables
+  '((shell-file-name . "/bin/sh")
+    (shell-command-switch . "-c"))
+  "Default connection-local shell variables for remote connections.")
+
+(tramp-compat-funcall
+ 'connection-local-set-profile-variables
+ 'tramp-connection-local-default-shell-profile
+ tramp-connection-local-default-shell-variables)
+
+(with-eval-after-load 'shell
+  (tramp-compat-funcall
+   'connection-local-set-profiles
+   '(:application tramp)
+   'tramp-connection-local-default-shell-profile))
 
 (add-hook 'tramp-unload-hook
 	  (lambda () (unload-feature 'tramp-integration 'force)))

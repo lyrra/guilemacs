@@ -1,6 +1,6 @@
-;;; semantic/find.el --- Search routines for Semantic
+;;; semantic/find.el --- Search routines for Semantic  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1999-2005, 2008-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1999-2005, 2008-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 ;; Keywords: syntax
@@ -307,7 +307,7 @@ attempting to do completions."
 (defmacro semantic-find-tags-by-class (class &optional table)
   "Find all tags of class CLASS in TABLE.
 CLASS is a symbol representing the class of the token, such as
-'variable, of 'function..
+`variable' or `function'.
 TABLE is a tag table.  See `semantic-something-to-tag-table'."
   `(semantic--find-tags-by-macro
     (eq ,class (semantic-tag-class (car tags)))
@@ -316,7 +316,7 @@ TABLE is a tag table.  See `semantic-something-to-tag-table'."
 (defmacro semantic-filter-tags-by-class (class &optional table)
   "Find all tags of class not in the list CLASS in TABLE.
 CLASS is a list of symbols representing the class of the token,
-such as 'variable, of 'function..
+such as `variable' or `function'.
 TABLE is a tag table.  See `semantic-something-to-tag-table'."
   `(semantic--find-tags-by-macro
     (not (memq (semantic-tag-class (car tags)) ,class))
@@ -583,7 +583,7 @@ Optional argument SEARCH-PARTS and SEARCH-INCLUDES are passed to
   )
 
 (defun semantic-brute-find-tag-by-function
-  (function streamorbuffer &optional search-parts search-includes)
+  (function streamorbuffer &optional search-parts _search-includes)
   "Find all tags for which FUNCTION's value is non-nil within STREAMORBUFFER.
 FUNCTION must return non-nil if an element of STREAM will be included
 in the new list.
@@ -620,7 +620,7 @@ This parameter hasn't be active for a while and is obsolete."
     nl))
 
 (defun semantic-brute-find-first-tag-by-function
-  (function streamorbuffer &optional search-parts search-includes)
+  (function streamorbuffer &optional _search-parts _search-includes)
   "Find the first tag which FUNCTION match within STREAMORBUFFER.
 FUNCTION must return non-nil if an element of STREAM will be included
 in the new list.

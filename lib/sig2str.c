@@ -1,6 +1,7 @@
 /* sig2str.c -- convert between signal names and numbers
 
-   Copyright (C) 2002, 2004, 2006, 2009-2019 Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004, 2006, 2009-2022 Free Software Foundation,
+   Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -189,6 +190,11 @@ static struct numname { int num; char const name[8]; } numname_table[] =
     NUMNAME (STKFLT),
 #endif
 
+    /* AIX 7.  */
+#ifdef SIGCPUFAIL
+    NUMNAME (CPUFAIL),
+#endif
+
     /* AIX 5L.  */
 #ifdef SIGDANGER
     NUMNAME (DANGER),
@@ -229,7 +235,12 @@ static struct numname { int num; char const name[8]; } numname_table[] =
     NUMNAME (WINDOW),   /* Older name for SIGWINCH.  */
 #endif
 
-    /* BeOS */
+    /* OpenBSD.  */
+#ifdef SIGTHR
+    NUMNAME (THR),
+#endif
+
+    /* BeOS, Haiku */
 #ifdef SIGKILLTHR
     NUMNAME (KILLTHR),
 #endif
@@ -237,6 +248,11 @@ static struct numname { int num; char const name[8]; } numname_table[] =
     /* Older HP-UX versions.  */
 #ifdef SIGDIL
     NUMNAME (DIL),
+#endif
+
+    /* native Windows */
+#ifdef SIGBREAK
+    NUMNAME (BREAK),
 #endif
 
     /* Korn shell and Bash, of uncertain vintage.  */

@@ -1,6 +1,6 @@
-;;; cus-face.el --- customization support for faces
+;;; cus-face.el --- customization support for faces  -*- lexical-binding: t; -*-
 ;;
-;; Copyright (C) 1996-1997, 1999-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1997, 1999-2022 Free Software Foundation, Inc.
 ;;
 ;; Author: Per Abrahamsen <abraham@dina.kvl.dk>
 ;; Keywords: help, faces
@@ -26,8 +26,6 @@
 ;; See `custom.el'.
 
 ;;; Code:
-
-(defalias 'custom-facep 'facep)
 
 ;;; Declaring a face.
 
@@ -84,22 +82,22 @@
      (choice :tag "Weight"
 	     :help-echo "Font weight."
 	     :value normal		; default
-	     (const :tag "black" ultra-bold)
-	     (const :tag "bold" bold)
-	     (const :tag "book" semi-light)
-	     (const :tag "demibold" semi-bold)
+	     (const :tag "ultralight" ultra-light)
 	     (const :tag "extralight" extra-light)
-	     (const :tag "extrabold" extra-bold)
-	     (const :tag "heavy" extra-bold)
 	     (const :tag "light" light)
-	     (const :tag "medium" normal)
+	     (const :tag "thin" thin)
+	     (const :tag "semilight" semi-light)
+	     (const :tag "book" semi-light)
 	     (const :tag "normal" normal)
 	     (const :tag "regular" normal)
+	     (const :tag "medium" normal)
 	     (const :tag "semibold" semi-bold)
-	     (const :tag "semilight" semi-light)
-	     (const :tag "ultralight" ultra-light)
+	     (const :tag "demibold" semi-bold)
+	     (const :tag "bold" bold)
+	     (const :tag "extrabold" extra-bold)
+	     (const :tag "heavy" extra-bold)
 	     (const :tag "ultrabold" ultra-bold)
-	     (const :tag "thin" thin)))
+	     (const :tag "black" ultra-bold)))
 
     (:slant
      (choice :tag "Slant"
@@ -166,30 +164,37 @@
 	     :help-echo "Control box around text."
 	     (const :tag "Off" nil)
 	     (list :tag "Box"
-		   :value (:line-width 2 :color "grey75" :style released-button)
-		   (const :format "" :value :line-width)
-		   (integer :tag "Width")
+                   :value (:line-width (2 . 2) :color "grey75" :style released-button)
+                   (const :format "" :value :line-width)
+                   (cons :tag "Width" :extra-offset 2
+                         (integer :tag "Vertical")
+                         (integer :tag "Horizontal"))
 		   (const :format "" :value :color)
 		   (choice :tag "Color" (const :tag "*" nil) color)
 		   (const :format "" :value :style)
 		   (choice :tag "Style"
 			   (const :tag "Raised" released-button)
 			   (const :tag "Sunken" pressed-button)
+			   (const :tag "Flat"   flat-button)
 			   (const :tag "None" nil))))
      ;; filter to make value suitable for customize
      (lambda (real-value)
        (and real-value
 	    (let ((lwidth
 		   (or (and (consp real-value)
-			    (plist-get real-value :line-width))
+                            (if (listp (cdr real-value))
+                                (plist-get real-value :line-width)
+                              real-value))
 		       (and (integerp real-value) real-value)
-		       1))
+                       '(1 . 1)))
 		  (color
 		   (or (and (consp real-value) (plist-get real-value :color))
 		       (and (stringp real-value) real-value)
 		       nil))
 		  (style
 		   (and (consp real-value) (plist-get real-value :style))))
+              (if (integerp lwidth)
+                  (setq lwidth (cons (abs lwidth) lwidth)))
 	      (list :line-width lwidth :color color :style style))))
      ;; filter to make customized-value suitable for storing
      (lambda (cus-value)
@@ -233,7 +238,11 @@
 	     (file :tag "File"
 		   :help-echo "Name of bitmap file."
 		   :must-match t)))
-
+    (:extend
+     (choice :tag "Extend"
+	     :help-echo "Control whether attributes should be extended after EOL."
+	     (const :tag "Off" nil)
+	     (const :tag "On" t)))
     (:inherit
      (repeat :tag "Inherit"
 	     :help-echo "List of faces to inherit attributes from."
@@ -384,7 +393,7 @@ Each of the arguments ARGS has this form:
 This means reset FACE to its value in FROM-THEME."
   (apply 'custom-theme-reset-faces 'user args))
 
-;;; The End.
+(define-obsolete-function-alias 'custom-facep #'facep "28.1")
 
 (provide 'cus-face)
 

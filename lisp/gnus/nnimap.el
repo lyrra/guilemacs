@@ -1,6 +1,6 @@
-;;; nnimap.el --- IMAP interface for Gnus
+;;; nnimap.el --- IMAP interface for Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2010-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2010-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;         Simon Josefsson <simon@josefsson.org>
@@ -36,7 +36,6 @@
 (require 'nnoo)
 (require 'netrc)
 (require 'utf7)
-(require 'parse-time)
 (require 'nnmail)
 
 (autoload 'auth-source-forget+ "auth-source")
@@ -96,17 +95,28 @@ Uses the same syntax as `nnmail-split-methods'.")
   "Articles with the flags in the list will not be considered when splitting.")
 
 (make-obsolete-variable 'nnimap-split-rule "see `nnimap-split-methods'."
-			"Emacs 24.1")
+                        "24.1")
 
 (defvoo nnimap-authenticator nil
   "How nnimap authenticate itself to the server.
 Possible choices are nil (use default methods), `anonymous',
 `login', `plain' and `cram-md5'.")
 
-(defvoo nnimap-expunge t
-  "If non-nil, expunge articles after deleting them.
-This is always done if the server supports UID EXPUNGE, but it's
-not done by default on servers that doesn't support that command.")
+(defvoo nnimap-expunge 'on-exit
+  "When to expunge deleted messages.
+If `never', deleted articles are marked with the IMAP \\Delete
+flag but not automatically expunged. If `immediately', deleted
+articles are immediately expunged (this requires the server to
+support the UID EXPUNGE command). If `on-exit', deleted articles
+are flagged, and all flagged articles are expunged when the group
+is closed.
+
+For backwards compatibility, this variable may also be set to t
+or nil. If the server supports UID EXPUNGE, both t and nil are
+equivalent to `immediately'. If the server does not support UID
+EXPUNGE nil is equivalent to `never', while t will immediately
+expunge ALL articles that are currently flagged as deleted
+(i.e., potentially not only the article that was just deleted).")
 
 (defvoo nnimap-streaming t
   "If non-nil, try to use streaming commands with IMAP servers.
@@ -119,18 +129,22 @@ some servers.")
 
 (defvoo nnimap-namespace nil)
 
-(defun nnimap-decode-gnus-group (group)
-  (decode-coding-string group 'utf-8))
-
-(defun nnimap-encode-gnus-group (group)
-  (encode-coding-string group 'utf-8))
-
 (defvoo nnimap-fetch-partial-articles nil
   "If non-nil, Gnus will fetch partial articles.
 If t, Gnus will fetch only the first part.  If a string, it
 will fetch all parts that have types that match that string.  A
 likely value would be \"text/\" to automatically fetch all
 textual parts.")
+
+(defvoo nnimap-keepalive-intervals (cons (* 60 15)
+                                         (* 60 5))
+  "Configuration for the nnimap keepalive timer.
+The value is a cons of two integers (each representing a number
+of seconds): the first is how often to run the keepalive
+function, the second is the seconds of inactivity required to
+send the actual keepalive command.
+
+Set to nil to disable keepalive commands altogether.")
 
 (defgroup nnimap nil
   "IMAP for Gnus."
@@ -139,15 +153,25 @@ textual parts.")
 (defcustom nnimap-request-articles-find-limit nil
   "Limit the number of articles to look for after moving an article."
   :type '(choice (const nil) integer)
-  :version "24.4"
-  :group 'nnimap)
+  :version "24.4")
+
+(define-obsolete-variable-alias
+  'nnimap-split-download-body-default 'nnimap-split-download-body
+  "28.1")
+
+(defcustom nnimap-split-download-body nil
+  "If non-nil, make message bodies available for consideration during splitting.
+This requires downloading the full message from the IMAP server
+during splitting, which may be slow."
+  :version "28.1"
+  :type 'boolean)
+
+(defvar nnimap--split-download-body nil
+  "Like `nnimap-split-download-body', but for internal use.")
 
 (defvar nnimap-process nil)
 
 (defvar nnimap-status-string "")
-
-(defvar nnimap-split-download-body-default nil
-  "Internal variable with default value for `nnimap-split-download-body'.")
 
 (defvar nnimap-keepalive-timer nil)
 (defvar nnimap-process-buffers nil)
@@ -209,8 +233,6 @@ textual parts.")
     (format "%s" (nreverse params))))
 
 (deffoo nnimap-retrieve-headers (articles &optional group server _fetch-old)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
   (with-current-buffer nntp-server-buffer
     (erase-buffer)
     (when (nnimap-change-group group server)
@@ -231,8 +253,9 @@ textual parts.")
     'headers))
 
 (defun nnimap-transform-headers ()
+  "Transform server's FETCH response into parsable headers."
   (goto-char (point-min))
-  (let (article lines size string labels)
+  (let (seen-articles article lines size string labels)
     (cl-block nil
       (while (not (eobp))
 	(while (not (looking-at "\\* [0-9]+ FETCH"))
@@ -261,45 +284,57 @@ textual parts.")
 	      (and (re-search-forward "UID \\([0-9]+\\)" (line-end-position)
 				      t)
 		   (match-string 1)))
-	(setq lines nil)
-	(beginning-of-line)
-	(setq size
-	      (and (re-search-forward "RFC822.SIZE \\([0-9]+\\)"
-				      (line-end-position)
-				      t)
-		   (match-string 1)))
-	(beginning-of-line)
-	(when (search-forward "X-GM-LABELS" (line-end-position) t)
-	  (setq labels (ignore-errors (read (current-buffer)))))
-	(beginning-of-line)
-	(when (search-forward "BODYSTRUCTURE" (line-end-position) t)
-	  (let ((structure (ignore-errors
-			     (read (current-buffer)))))
-	    (while (and (consp structure)
-			(not (atom (car structure))))
-	      (setq structure (car structure)))
-	    (setq lines (if (and
-			     (stringp (car structure))
-			     (equal (upcase (nth 0 structure)) "MESSAGE")
-			     (equal (upcase (nth 1 structure)) "RFC822"))
-			    (nth 9 structure)
-			  (nth 7 structure)))))
-	(delete-region (line-beginning-position) (line-end-position))
-	(insert (format "211 %s Article retrieved." article))
-	(forward-line 1)
-	(when size
-	  (insert (format "Chars: %s\n" size)))
-	(when lines
-	  (insert (format "Lines: %s\n" lines)))
-	(when labels
-	  (insert (format "X-GM-LABELS: %s\n" labels)))
-	;; Most servers have a blank line after the headers, but
-	;; Davmail doesn't.
-	(unless (re-search-forward "^\r$\\|^)\r?$" nil t)
-	  (goto-char (point-max)))
-	(delete-region (line-beginning-position) (line-end-position))
-	(insert ".")
-	(forward-line 1)))))
+	;; If we've already got headers for this article, or this
+	;; FETCH line doesn't provide headers for the article, skip
+	;; it.  See bug#35433.
+	(if (or (member article seen-articles)
+		(save-excursion
+		  (forward-line)
+		  (null (looking-at-p
+			 ;; We're expecting a mail-ish header.
+			 "^[!-9;-~]+:[[:space:]]?"))))
+	    (delete-region (line-beginning-position)
+			   (1+ (line-end-position)))
+	  (setq lines nil)
+	  (beginning-of-line)
+	  (setq size
+		(and (re-search-forward "RFC822.SIZE \\([0-9]+\\)"
+					(line-end-position)
+					t)
+		     (match-string 1)))
+	  (beginning-of-line)
+	  (when (search-forward "X-GM-LABELS" (line-end-position) t)
+	    (setq labels (ignore-errors (read (current-buffer)))))
+	  (beginning-of-line)
+	  (when (search-forward "BODYSTRUCTURE" (line-end-position) t)
+	    (let ((structure (ignore-errors
+			       (read (current-buffer)))))
+	      (while (and (consp structure)
+			  (not (atom (car structure))))
+		(setq structure (car structure)))
+	      (setq lines (if (and
+			       (stringp (car structure))
+			       (equal (upcase (nth 0 structure)) "MESSAGE")
+			       (equal (upcase (nth 1 structure)) "RFC822"))
+			      (nth 9 structure)
+			    (nth 7 structure)))))
+	  (delete-region (line-beginning-position) (line-end-position))
+	  (insert (format "211 %s Article retrieved." article))
+	  (forward-line 1)
+	  (when size
+	    (insert (format "Chars: %s\n" size)))
+	  (when lines
+	    (insert (format "Lines: %s\n" lines)))
+	  (when labels
+	    (insert (format "X-GM-LABELS: %s\n" labels)))
+	  ;; Most servers have a blank line after the headers, but
+	  ;; Davmail doesn't.
+	  (unless (re-search-forward "^\r$\\|^)\r?$" nil t)
+	    (goto-char (point-max)))
+	  (delete-region (line-beginning-position) (line-end-position))
+	  (insert ".")
+	  (forward-line 1)
+	  (push article seen-articles))))))
 
 (defun nnimap-unfold-quoted-lines ()
   ;; Unfold quoted {number} strings.
@@ -350,10 +385,10 @@ textual parts.")
     (mm-disable-multibyte)
     (buffer-disable-undo)
     (gnus-add-buffer)
-    (set (make-local-variable 'after-change-functions) nil)
-    (set (make-local-variable 'nnimap-object)
-	 (make-nnimap :server (nnoo-current-server 'nnimap)
-		      :initial-resync 0))
+    (setq-local after-change-functions nil) ;FIXME: Why?
+    (setq-local nnimap-object
+                (make-nnimap :server (nnoo-current-server 'nnimap)
+                             :initial-resync 0))
     (push (list buffer (current-buffer)) nnimap-connection-alist)
     (push (current-buffer) nnimap-process-buffers)
     (current-buffer)))
@@ -380,20 +415,22 @@ textual parts.")
       nil)))
 
 (defun nnimap-keepalive ()
-  (let ((now (current-time)))
+  (let ((now (current-time))
+        ;; Set this so we don't wait for a response.
+        (nnimap-streaming t))
     (dolist (buffer nnimap-process-buffers)
       (when (buffer-live-p buffer)
 	(with-current-buffer buffer
 	  (when (and nnimap-object
 		     (nnimap-last-command-time nnimap-object)
 		     (time-less-p
-		      ;; More than five minutes since the last command.
-		      (* 5 60)
+		      (cdr nnimap-keepalive-intervals)
 		      (time-subtract
 		       now
 		       (nnimap-last-command-time nnimap-object))))
-            (ignore-errors              ;E.g. "buffer foo has no process".
-              (nnimap-send-command "NOOP"))))))))
+            (with-local-quit
+              (ignore-errors          ;E.g. "buffer foo has no process".
+                (nnimap-send-command "NOOP")))))))))
 
 (defun nnimap-open-connection (buffer)
   ;; Be backwards-compatible -- the earlier value of nnimap-stream was
@@ -415,6 +452,7 @@ textual parts.")
 
 ;; This is only needed for Windows XP or earlier
 (defun nnimap-map-port (port)
+  (declare-function x-server-version "xfns.c" (&optional terminal))
   (if (and (eq system-type 'windows-nt)
            (<= (car (x-server-version)) 5)
            (equal port "imaps"))
@@ -422,9 +460,12 @@ textual parts.")
     port))
 
 (defun nnimap-open-connection-1 (buffer)
-  (unless nnimap-keepalive-timer
-    (setq nnimap-keepalive-timer (run-at-time (* 60 15) (* 60 15)
-					      #'nnimap-keepalive)))
+  (unless (or nnimap-keepalive-timer
+              (null nnimap-keepalive-intervals))
+    (setq nnimap-keepalive-timer (run-at-time
+                                  (car nnimap-keepalive-intervals)
+                                  (car nnimap-keepalive-intervals)
+				  #'nnimap-keepalive)))
   (with-current-buffer (nnimap-make-process-buffer buffer)
     (let* ((coding-system-for-read 'binary)
 	   (coding-system-for-write 'binary)
@@ -558,6 +599,13 @@ textual parts.")
              (eq nnimap-authenticator 'anonymous)
 	     (eq nnimap-authenticator 'login)))
     (nnimap-command "LOGIN %S %S" user password))
+   ((and (nnimap-capability "AUTH=XOAUTH2")
+         (eq nnimap-authenticator 'xoauth2))
+    (nnimap-command  "AUTHENTICATE XOAUTH2 %s"
+                     (base64-encode-string
+                      (format "user=%s\001auth=Bearer %s\001\001"
+                              (nnimap-quote-specials user)
+                              (nnimap-quote-specials password)))))
    ((and (nnimap-capability "AUTH=CRAM-MD5")
 	 (or (null nnimap-authenticator)
 	     (eq nnimap-authenticator 'cram-md5)))
@@ -570,7 +618,8 @@ textual parts.")
 	(base64-encode-string
 	 (concat user " "
 		 (rfc2104-hash 'md5 64 16 password
-			       (base64-decode-string challenge))))
+			       (base64-decode-string challenge)))
+	 t)
 	"\r\n"))
       (nnimap-wait-for-response sequence)))
    ((and (not (nnimap-capability "LOGINDISABLED"))
@@ -586,7 +635,8 @@ textual parts.")
      (base64-encode-string
       (format "\000%s\000%s"
 	      (nnimap-quote-specials user)
-	      (nnimap-quote-specials password)))))))
+	      (nnimap-quote-specials password))
+      t)))))
 
 (defun nnimap-quote-specials (string)
   (with-temp-buffer
@@ -610,8 +660,8 @@ textual parts.")
 	(setq result (cdr (cadr elem))))))
     result))
 
-(deffoo nnimap-close-server (&optional server)
-  (when (nnoo-change-server 'nnimap server nil)
+(deffoo nnimap-close-server (&optional server defs)
+  (when (nnoo-change-server 'nnimap server defs)
     (ignore-errors
       (delete-process (get-buffer-process (nnimap-buffer))))
     (nnoo-close-server 'nnimap server)
@@ -630,8 +680,6 @@ textual parts.")
   nnimap-status-string)
 
 (deffoo nnimap-request-article (article &optional group server to-buffer)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
   (with-current-buffer nntp-server-buffer
     (let ((result (nnimap-change-group group server))
 	  parts structure)
@@ -663,8 +711,6 @@ textual parts.")
 	    (cons group article)))))))
 
 (deffoo nnimap-request-head (article &optional group server to-buffer)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
   (when (nnimap-change-group group server)
     (with-current-buffer (nnimap-buffer)
       (when (stringp article)
@@ -682,8 +728,6 @@ textual parts.")
 	    (cons group article)))))))
 
 (deffoo nnimap-request-articles (articles &optional group server)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
   (with-current-buffer nntp-server-buffer
     (let ((result (nnimap-change-group group server)))
       (when result
@@ -833,7 +877,6 @@ textual parts.")
     (nreverse parts)))
 
 (deffoo nnimap-request-group (group &optional server dont-check info)
-  (setq group (nnimap-decode-gnus-group group))
   (let ((result (nnimap-change-group
 		 ;; Don't SELECT the group if we're going to select it
 		 ;; later, anyway.
@@ -860,11 +903,10 @@ textual parts.")
 			(- (cdr active) (car active))
 			(car active)
 			(cdr active)
-			(nnimap-encode-gnus-group group)))
+			group))
 	t))))
 
 (deffoo nnimap-request-group-scan (group &optional server info)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group nil server)
     (let (marks high low)
       (with-current-buffer (nnimap-buffer)
@@ -896,23 +938,20 @@ textual parts.")
 	(insert
 	 (format
 	  "211 %d %d %d %S\n" (1+ (- high low)) low high
-	  (nnimap-encode-gnus-group group)))
+	  group))
 	t))))
 
 (deffoo nnimap-request-create-group (group &optional server _args)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group nil server)
     (with-current-buffer (nnimap-buffer)
       (car (nnimap-command "CREATE %S" (nnimap-group-to-imap group))))))
 
 (deffoo nnimap-request-delete-group (group &optional _force server)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group nil server)
     (with-current-buffer (nnimap-buffer)
       (car (nnimap-command "DELETE %S" (nnimap-group-to-imap group))))))
 
 (deffoo nnimap-request-rename-group (group new-name &optional server)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group nil server)
     (with-current-buffer (nnimap-buffer)
       (nnimap-unselect-group)
@@ -927,7 +966,6 @@ textual parts.")
   (nnimap-command "EXAMINE DOES.NOT.EXIST"))
 
 (deffoo nnimap-request-expunge-group (group &optional server)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group group server)
     (with-current-buffer (nnimap-buffer)
       (car (nnimap-command "EXPUNGE")))))
@@ -950,15 +988,15 @@ textual parts.")
 	      articles)))
     (nreverse articles)))
 
-(deffoo nnimap-close-group (_group &optional _server)
-  t)
+(deffoo nnimap-close-group (_group &optional server)
+  (when (eq nnimap-expunge 'on-exit)
+    (nnoo-change-server 'nnimap server nil)
+    (with-current-buffer (nnimap-buffer)
+      (nnimap-command "EXPUNGE"))))
 
 (deffoo nnimap-request-move-article (article group server accept-form
 					     &optional _last
 					     internal-move-group)
-  (setq group (nnimap-decode-gnus-group group))
-  (when internal-move-group
-    (setq internal-move-group (nnimap-decode-gnus-group internal-move-group)))
   (with-temp-buffer
     (mm-disable-multibyte)
     (when (funcall (if internal-move-group
@@ -981,18 +1019,20 @@ textual parts.")
                 (when (and (car result) (not can-move))
                   (nnimap-delete-article article))
                 (cons internal-move-group
-                      (or (nnimap-find-uid-response "COPYUID" (caddr result))
+                      (or (nnimap-find-uid-response
+			   "COPYUID"
+			   ;; Server gives different responses for MOVE and COPY.
+			   (if can-move (caddr result) (cadr result)))
                           (nnimap-find-article-by-message-id
                            internal-move-group server message-id
                            nnimap-request-articles-find-limit)))))
 	  ;; Move the article to a different method.
-	  (when-let* ((result (eval accept-form)))
+	  (when-let* ((result (eval accept-form t)))
 	    (nnimap-change-group group server)
 	    (nnimap-delete-article article)
 	    result))))))
 
 (deffoo nnimap-request-expire-articles (articles group &optional server force)
-  (setq group (nnimap-decode-gnus-group group))
   (cond
    ((null articles)
     nil)
@@ -1000,8 +1040,7 @@ textual parts.")
     articles)
    ((and force
 	 (eq nnmail-expiry-target 'delete))
-    (unless (nnimap-delete-article (gnus-compress-sequence articles))
-      (nnheader-message 7 "Article marked for deletion, but not expunged."))
+    (nnimap-delete-article (gnus-compress-sequence articles))
     nil)
    (t
     (let ((deletable-articles
@@ -1045,7 +1084,9 @@ textual parts.")
                   "UID COPY %s %S")
                 (nnimap-article-ranges (gnus-compress-sequence articles))
                 (nnimap-group-to-imap (gnus-group-real-name nnmail-expiry-target)))
-               (set (if can-move 'deleted-articles 'articles-to-delete) articles))))
+               (if can-move
+                   (setq deleted-articles articles)
+                 (setq articles-to-delete articles)))))
       t)
      (t
       (dolist (article articles)
@@ -1082,12 +1123,8 @@ textual parts.")
 	(let ((result
 	       (nnimap-command
 		"UID SEARCH SENTBEFORE %s"
-		(format-time-string
-		 (format "%%d-%s-%%Y"
-			 (upcase
-			  (car (rassoc (nth 4 (decode-time cutoff))
-				       parse-time-months))))
-		 cutoff))))
+		(let ((system-time-locale "C"))
+		  (upcase (format-time-string "%d-%b-%Y" cutoff))))))
 	  (and (car result)
 	       (delete 0 (mapcar #'string-to-number
 				 (cdr (assoc "SEARCH" (cdr result)))))))))))
@@ -1125,24 +1162,35 @@ If LIMIT, first try to limit the search to the N last articles."
               (nnimap-find-article-by-message-id group server message-id))))))))
 
 (defun nnimap-delete-article (articles)
+  "Delete ARTICLES."
   (with-current-buffer (nnimap-buffer)
     (nnimap-command "UID STORE %s +FLAGS.SILENT (\\Deleted)"
 		    (nnimap-article-ranges articles))
     (cond
+     ((eq nnimap-expunge 'immediately)
+      (if (nnimap-capability "UIDPLUS")
+	  (nnimap-command "UID EXPUNGE %s"
+			  (nnimap-article-ranges articles))
+	(nnheader-message
+	 3 (concat "nnimap-expunge set to `immediately', but "
+		   "server doesn't support UIDPLUS"))
+	nil))
+
+     ((memq nnimap-expunge '(on-exit never)) nil)
+
      ((nnimap-capability "UIDPLUS")
       (nnimap-command "UID EXPUNGE %s"
-		      (nnimap-article-ranges articles))
-      t)
-     (nnimap-expunge
-      (nnimap-command "EXPUNGE")
-      t)
-     (t (gnus-message 7 (concat "nnimap: nnimap-expunge is not set and the "
-                                "server doesn't support UIDPLUS, so we won't "
-                                "delete this article now"))))))
+		      (nnimap-article-ranges articles)))
 
-(deffoo nnimap-request-scan (&optional group server)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
+     (nnimap-expunge
+      (nnimap-command "EXPUNGE"))
+
+     (t
+      (nnheader-message
+       7 "Article marked for deletion, but not expunged.")
+      nil))))
+
+(deffoo nnimap-request-scan (&optional _group server)
   (when (and (nnimap-change-group nil server)
 	     nnimap-inbox
 	     nnimap-split-methods)
@@ -1161,7 +1209,6 @@ If LIMIT, first try to limit the search to the N last articles."
     flags))
 
 (deffoo nnimap-request-update-group-status (group status &optional server)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group nil server)
     (let ((command (assoc
 		    status
@@ -1172,7 +1219,6 @@ If LIMIT, first try to limit the search to the N last articles."
 	  (nnimap-command "%s %S" (cadr command) (nnimap-group-to-imap group)))))))
 
 (deffoo nnimap-request-set-mark (group actions &optional server)
-  (setq group (nnimap-decode-gnus-group group))
   (when (nnimap-change-group group server)
     (let (sequence)
       (with-current-buffer (nnimap-buffer)
@@ -1181,6 +1227,12 @@ If LIMIT, first try to limit the search to the N last articles."
 	;; response.  If they're successful, they're successful.
 	(dolist (action actions)
 	  (cl-destructuring-bind (range action marks) action
+	    ;; If we add a tick mark, then also mark the message as
+	    ;; read.  Other IMAP clients can have marked messages
+	    ;; without having them read, but Gnus can't.
+	    (when (and (memq 'tick marks)
+		       (eq action 'add))
+	      (push 'read marks))
 	    (let ((flags (nnimap-marks-to-flags marks)))
 	      (when flags
 		(setq sequence (nnimap-send-command
@@ -1207,8 +1259,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	    ;; that's determined by the IMAP server later.  So just
 	    ;; return the group name.
 	    (lambda (group)
-              (list (list group)))))))
-  (setq group (nnimap-decode-gnus-group group))
+	       (list (list group)))))))
   (when (nnimap-change-group nil server)
     (nnmail-check-syntax)
     (let ((message-id (message-field-value "message-id"))
@@ -1248,7 +1299,7 @@ If LIMIT, first try to limit the search to the N last articles."
   (when (and (nnimap-greeting nnimap-object)
 	     (string-match greeting-match (nnimap-greeting nnimap-object))
 	     (eq type 'append)
-	     (string-match "\000" data))
+	     (string-search "\000" data))
     (let ((choice (gnus-multiple-choice
 		   "Message contains NUL characters.  Delete, continue, abort? "
 		   '((?d "Delete NUL characters")
@@ -1286,7 +1337,6 @@ If LIMIT, first try to limit the search to the N last articles."
     result))
 
 (deffoo nnimap-request-replace-article (article group buffer)
-  (setq group (nnimap-decode-gnus-group group))
   (let (group-art)
     (when (and (nnimap-change-group group)
 	       ;; Put the article into the group.
@@ -1325,7 +1375,7 @@ If LIMIT, first try to limit the search to the N last articles."
 		    (progn (end-of-line)
 			   (skip-chars-backward " \r\"")
 			   (point)))))
-	(unless (member '%NoSelect flags)
+	(unless (member '%Noselect flags)
           (let* ((group (utf7-decode (if (stringp group) group
                                        (format "%s" group)) t))
                  (group (cond ((or (not prefix)
@@ -1370,8 +1420,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	  (dolist (response responses)
 	    (let* ((sequence (car response))
 		   (response (cadr response))
-		   (group (cadr (assoc sequence sequences)))
-		   (egroup (nnimap-encode-gnus-group group)))
+		   (group (cadr (assoc sequence sequences))))
 	      (when (and group
 			 (equal (caar response) "OK"))
 		(let ((uidnext (nnimap-find-parameter "UIDNEXT" response))
@@ -1383,14 +1432,14 @@ If LIMIT, first try to limit the search to the N last articles."
 		    (setq highest (1- (string-to-number (car uidnext)))))
 		  (cond
 		   ((null highest)
-		    (insert (format "%S 0 1 y\n" egroup)))
+		    (insert (format "%S 0 1 y\n" group)))
 		   ((zerop exists)
 		    ;; Empty group.
-		    (insert (format "%S %d %d y\n" egroup
+		    (insert (format "%S %d %d y\n" group
 				    highest (1+ highest))))
 		   (t
 		    ;; Return the widest possible range.
-		    (insert (format "%S %d 1 y\n" egroup
+		    (insert (format "%S %d 1 y\n" group
 				    (or highest exists)))))))))
 	  t)))))
 
@@ -1402,7 +1451,7 @@ If LIMIT, first try to limit the search to the N last articles."
 		       (nnimap-get-groups)))
 	(unless (assoc group nnimap-current-infos)
 	  ;; Insert dummy numbers here -- they don't matter.
-	  (insert (format "%S 0 1 y\n" (nnimap-encode-gnus-group group)))))
+	  (insert (format "%S 0 1 y\n" group))))
       t)))
 
 (deffoo nnimap-retrieve-group-data-early (server infos)
@@ -1419,8 +1468,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	;; what and how to request the data.
 	(dolist (info infos)
 	  (setq params (gnus-info-params info)
-		group (nnimap-decode-gnus-group
-		       (gnus-group-real-name (gnus-info-group info)))
+		group (gnus-group-real-name (gnus-info-group info))
 		active (cdr (assq 'active params))
 		unexist (assq 'unexist (gnus-info-marks info))
 		uidvalidity (cdr (assq 'uidvalidity params))
@@ -1501,24 +1549,22 @@ If LIMIT, first try to limit the search to the N last articles."
 		     (active (gnus-active group)))
 		(when active
 		  (insert (format "%S %d %d y\n"
-				  (nnimap-encode-gnus-group
-				   (nnimap-decode-gnus-group
-				    (gnus-group-real-name group)))
+				  (gnus-group-real-name group)
 				  (cdr active)
 				  (car active))))))))))))
 
 (defun nnimap-update-infos (flags infos)
   (dolist (info infos)
-    (let* ((group (nnimap-decode-gnus-group
-		   (gnus-group-real-name (gnus-info-group info))))
+    (let* ((group (gnus-group-real-name (gnus-info-group info)))
 	   (marks (cdr (assoc group flags))))
       (when marks
 	(nnimap-update-info info marks)))))
 
 (defun nnimap-update-info (info marks)
   (cl-destructuring-bind (existing flags high low uidnext start-article
-				permanent-flags uidvalidity
-				vanished highestmodseq) marks
+				   permanent-flags uidvalidity
+				   vanished highestmodseq)
+      marks
     (cond
      ;; Ignore groups with no UIDNEXT/marks.  This happens for
      ;; completely empty groups.
@@ -1612,7 +1658,7 @@ If LIMIT, first try to limit the search to the N last articles."
 		       read)))
 	      (when (or (not (listp permanent-flags))
 			(memq '%Seen permanent-flags))
-		(gnus-info-set-read info read))
+		(setf (gnus-info-read info) read))
 	      ;; Update the marks.
 	      (setq marks (gnus-info-marks info))
 	      (dolist (type (cdr nnimap-mark-alist))
@@ -1662,8 +1708,7 @@ If LIMIT, first try to limit the search to the N last articles."
 	  (when (and active
 		     recent
 		     (> (car (last recent)) (cdr active)))
-	    (push (list (cons (gnus-group-real-name group) 0))
-		  nnmail-split-history)))
+	    (push (list (cons group 0)) nnmail-split-history)))
 	;; Note the active level for the next run-through.
 	(gnus-group-set-parameter info 'active (gnus-active group))
 	(gnus-group-set-parameter info 'uidvalidity uidvalidity)
@@ -1672,14 +1717,13 @@ If LIMIT, first try to limit the search to the N last articles."
 
 (defun nnimap-update-qresync-info (info existing vanished flags)
   ;; Add all the vanished articles to the list of read articles.
-  (gnus-info-set-read
-   info
-   (gnus-add-to-range
-    (gnus-add-to-range
-     (gnus-range-add (gnus-info-read info)
-		     vanished)
-     (cdr (assq '%Flagged flags)))
-    (cdr (assq '%Seen flags))))
+  (setf (gnus-info-read info)
+        (gnus-add-to-range
+         (gnus-add-to-range
+          (gnus-range-add (gnus-info-read info)
+			  vanished)
+	  (cdr (assq '%Flagged flags)))
+	 (cdr (assq '%Seen flags))))
   (let ((marks (gnus-info-marks info)))
     (dolist (type (cdr nnimap-mark-alist))
       (let ((ticks (assoc (car type) marks))
@@ -1687,18 +1731,19 @@ If LIMIT, first try to limit the search to the N last articles."
 	     (cdr (or (assoc (caddr type) flags) ; %Flagged
 		      (assoc (intern (cadr type) obarray) flags)
 		      (assoc (cadr type) flags))))) ; "\Flagged"
-	(setq marks (delq ticks marks))
-	(pop ticks)
-	;; Add the new marks we got.
-	(setq ticks (gnus-add-to-range ticks new-marks))
-	;; Remove the marks from messages that don't have them.
-	(setq ticks (gnus-remove-from-range
-		     ticks
-		     (gnus-compress-sequence
-		      (gnus-sorted-complement existing new-marks))))
-	(when ticks
-	  (push (cons (car type) ticks) marks)))
-      (gnus-info-set-marks info marks t))
+	(when new-marks
+	  (setq marks (delq ticks marks))
+	  (pop ticks)
+	  ;; Add the new marks we got.
+	  (setq ticks (gnus-add-to-range ticks new-marks))
+	  ;; Remove the marks from messages that don't have them.
+	  (setq ticks (gnus-remove-from-range
+		       ticks
+		       (gnus-compress-sequence
+			(gnus-sorted-complement existing new-marks))))
+	  (when ticks
+	    (push (cons (car type) ticks) marks))
+	  (gnus-info-set-marks info marks t))))
     ;; Add vanished to the list of unexisting articles.
     (when vanished
       (let* ((old-unexists (assq 'unexist marks))
@@ -1714,7 +1759,7 @@ If LIMIT, first try to limit the search to the N last articles."
     (let ((result nil))
       (dolist (elem (split-string irange ","))
 	(push
-	 (if (string-match ":" elem)
+	 (if (string-search ":" elem)
 	     (let ((numbers (split-string elem ":")))
 	       (cons (string-to-number (car numbers))
 		     (string-to-number (cadr numbers))))
@@ -1723,8 +1768,7 @@ If LIMIT, first try to limit the search to the N last articles."
       (nreverse result))))
 
 (defun nnimap-store-info (info active)
-  (let* ((group (nnimap-decode-gnus-group
-		 (gnus-group-real-name (gnus-info-group info))))
+  (let* ((group (gnus-group-real-name (gnus-info-group info)))
 	 (entry (assoc group nnimap-current-infos)))
     (if entry
 	(setcdr entry (list info active))
@@ -1763,11 +1807,6 @@ If LIMIT, first try to limit the search to the N last articles."
   ;; read it.
   (subst-char-in-region (point-min) (point-max)
 			?\\ ?% t)
-  ;; Remove any MODSEQ entries in the buffer, because they may contain
-  ;; numbers that are too large for 32-bit Emacsen.
-  (while (re-search-forward " MODSEQ ([0-9]+)" nil t)
-    (replace-match "" t t))
-  (goto-char (point-min))
   (let (start end articles groups uidnext elems permanent-flags
 	      uidvalidity vanished highestmodseq)
     (dolist (elem sequences)
@@ -1783,32 +1822,31 @@ If LIMIT, first try to limit the search to the N last articles."
 		 (goto-char start)
 		 (setq permanent-flags
 		       (if (equal command "SELECT")
-			   (and (search-forward "PERMANENTFLAGS "
-						(or end (point-min)) t)
+			   (and (search-forward "PERMANENTFLAGS " end t)
 				(read (current-buffer)))
 			 'not-scanned))
 		 (goto-char start)
 		 (setq uidnext
-		       (and (search-forward "UIDNEXT "
-					    (or end (point-min)) t)
+		       (and (search-forward "UIDNEXT " end t)
 			    (read (current-buffer))))
 		 (goto-char start)
 		 (setq uidvalidity
 		       (and (re-search-forward "UIDVALIDITY \\([0-9]+\\)"
-					       (or end (point-min)) t)
-			    ;; Store UIDVALIDITY as a string, as it's
-			    ;; too big for 32-bit Emacsen, usually.
+					       end t)
+			    ;; Store UIDVALIDITY as a string; before bignums,
+			    ;; it was usually too big for 32-bit Emacsen,
+			    ;; and we don't want to change the format now.
 			    (match-string 1)))
 		 (goto-char start)
 		 (setq vanished
 		       (and (eq flag-sequence 'qresync)
 			    (re-search-forward "^\\* VANISHED .*? \\([0-9:,]+\\)"
-					       (or end (point-min)) t)
+					       end t)
 			    (match-string 1)))
 		 (goto-char start)
 		 (setq highestmodseq
 		       (and (re-search-forward "HIGHESTMODSEQ \\([0-9]+\\)"
-					    (or end (point-min)) t)
+					       end t)
 			    (match-string 1)))
 		 (goto-char end)
 		 (forward-line -1))
@@ -1844,17 +1882,15 @@ If LIMIT, first try to limit the search to the N last articles."
   (setq nnimap-status-string "Read-only server")
   nil)
 
-(defvar gnus-refer-thread-use-nnir) ;; gnus-sum.el
+(defvar gnus-refer-thread-use-search) ;; gnus-sum.el
 (declare-function gnus-fetch-headers "gnus-sum"
 		  (articles &optional limit force-new dependencies))
 
-(autoload 'nnir-search-thread "nnir")
+(autoload 'nnselect-search-thread "nnselect")
 
 (deffoo nnimap-request-thread (header &optional group server)
-  (when group
-    (setq group (nnimap-decode-gnus-group group)))
-  (if gnus-refer-thread-use-nnir
-      (nnir-search-thread header)
+  (if gnus-refer-thread-use-search
+      (nnselect-search-thread header)
     (when (nnimap-change-group group server)
       (let* ((cmd (nnimap-make-thread-query header))
              (result (with-current-buffer (nnimap-buffer)
@@ -1934,7 +1970,7 @@ Return the server's response to the SELECT or EXAMINE command."
 (defun nnimap-log-buffer ()
   (let ((name "*imap log*"))
     (or (get-buffer name)
-        (with-current-buffer (get-buffer-create name)
+        (with-current-buffer (gnus-get-buffer-create name)
 	  (setq-local window-point-insertion-type t)
           (current-buffer)))))
 
@@ -2099,7 +2135,8 @@ Return the server's response to the SELECT or EXAMINE command."
 		 "BODY.PEEK"
 	       "RFC822.PEEK"))
 	    (cond
-	     (nnimap-split-download-body-default
+             ((or nnimap-split-download-body
+                  nnimap--split-download-body)
 	      "[]")
 	     ((nnimap-ver4-p)
 	      "[HEADER]")
@@ -2170,28 +2207,16 @@ Return the server's response to the SELECT or EXAMINE command."
 	    (when (and (not can-move) sequences)
 	      (nnimap-wait-for-response (caar sequences))
 	      ;; And then mark the successful copy actions as deleted,
-	      ;; and possibly expunge them.
-	      (nnimap-mark-and-expunge-incoming
-	       (nnimap-parse-copied-articles sequences)))
-            (nnimap-mark-and-expunge-incoming junk-articles)))))))
-
-(defun nnimap-mark-and-expunge-incoming (range)
-  (when range
-    (setq range (nnimap-article-ranges range))
-    (erase-buffer)
-    (let ((sequence
-	   (nnimap-send-command
-	    "UID STORE %s +FLAGS.SILENT (\\Deleted)" range)))
-      (cond
-       ;; If the server supports it, we now delete the message we have
-       ;; just copied over.
-       ((nnimap-capability "UIDPLUS")
-	(setq sequence (nnimap-send-command "UID EXPUNGE %s" range)))
-       ;; If it doesn't support UID EXPUNGE, then we only expunge if the
-       ;; user has configured it.
-       (nnimap-expunge
-	(setq sequence (nnimap-send-command "EXPUNGE"))))
-      (nnimap-wait-for-response sequence))))
+	      ;; and possibly expunge them.  Almost any non-nil
+	      ;; setting of nnimap-expunge should lead to expunging
+	      ;; here.
+	      (let ((nnimap-expunge (and nnimap-expunge
+					 (not (equal nnimap-expunge 'never))
+					 'immediate)))
+		(nnimap-delete-article
+		 (nnimap-parse-copied-articles sequences))))
+	    (when junk-articles
+              (nnimap-delete-article junk-articles))))))))
 
 (defun nnimap-parse-copied-articles (sequences)
   (let (sequence copied range)
@@ -2262,7 +2287,7 @@ Return the server's response to the SELECT or EXAMINE command."
 	  nnimap-incoming-split-list)))
 
 (defun nnimap-make-thread-query (header)
-  (let* ((id  (mail-header-id header))
+  (let* ((id (substring-no-properties (mail-header-id header)))
 	 (refs (split-string
 		(or (mail-header-references header)
 		    "")))

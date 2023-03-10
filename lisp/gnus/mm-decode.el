@@ -1,6 +1,6 @@
 ;;; mm-decode.el --- Functions for decoding MIME things  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;;	MORIOKA Tomohiko <morioka@jaist.ac.jp>
@@ -40,8 +40,8 @@
 
 (defvar gnus-current-window-configuration)
 
-(add-hook 'gnus-exit-gnus-hook 'mm-destroy-postponed-undisplay-list)
-(add-hook 'gnus-exit-gnus-hook 'mm-temp-files-delete)
+(add-hook 'gnus-exit-gnus-hook #'mm-destroy-postponed-undisplay-list)
+(add-hook 'gnus-exit-gnus-hook #'mm-temp-files-delete)
 
 (defgroup mime-display ()
   "Display of MIME in mail and news articles."
@@ -381,9 +381,11 @@ enables you to choose manually one of two types those mails include."
   :type 'directory
   :group 'mime-display)
 
-(defcustom mm-inline-large-images nil
-  "If t, then all images fit in the buffer.
-If `resize', try to resize the images so they fit."
+(defcustom mm-inline-large-images 'resize
+  "If nil, images larger than the window aren't displayed in the buffer.
+If `resize', try to resize the images so they fit in the buffer.
+If t, show the images as they are without resizing."
+  :version "27.1"
   :type '(radio
           (const :tag "Inline large images as they are." t)
           (const :tag "Resize large images." resize)
@@ -600,11 +602,10 @@ files left at the next time."
 	(push temp fails)))
     (if fails
 	;; Schedule the deletion of the files left at the next time.
-	(progn
-	  (write-region (concat (mapconcat 'identity (nreverse fails) "\n")
+	(with-file-modes #o600
+	  (write-region (concat (mapconcat #'identity (nreverse fails) "\n")
 				"\n")
-			nil cache-file nil 'silent)
-	  (set-file-modes cache-file #o600))
+			nil cache-file nil 'silent))
       (when (file-exists-p cache-file)
 	(ignore-errors (delete-file cache-file))))
     (setq mm-temp-files-to-be-deleted nil)))
@@ -648,7 +649,7 @@ MIME-Version header before proceeding."
 	      (setq description (mail-decode-encoded-word-string
 				 description)))))
       (if (or (not ctl)
-	      (not (string-match "/" (car ctl))))
+	      (not (string-search "/" (car ctl))))
 	  (mm-dissect-singlepart
 	   (list mm-dissect-default-type)
 	   (and cte (intern (downcase (mail-header-strip-cte cte))))
@@ -896,11 +897,11 @@ external if displayed external."
                                    (buffer-live-p gnus-summary-buffer))
 			  (when attachment-filename
 			    (with-current-buffer mm
-			      (rename-buffer (format "*mm* %s" attachment-filename) t)))
+			      (rename-buffer
+			       (format "*mm* %s" attachment-filename) t)))
 			  ;; So that we pop back to the right place, sort of.
 			  (switch-to-buffer gnus-summary-buffer)
 			  (switch-to-buffer mm))
-			(delete-other-windows)
 			(funcall method))
 		    (mm-save-part handle))
 		(when (and (not non-viewer)
@@ -909,8 +910,10 @@ external if displayed external."
 	;; The function is a string to be executed.
 	(mm-insert-part handle)
 	(mm-add-meta-html-tag handle)
-	(let* ((dir (make-temp-file
-		     (expand-file-name "emm." mm-tmp-directory) 'dir))
+	;; We create a private sub-directory where we store our files.
+	(let* ((dir (with-file-modes #o700
+		      (make-temp-file
+		       (expand-file-name "emm." mm-tmp-directory) 'dir)))
 	       (filename (or
 			  (mail-content-type-get
 			   (mm-handle-disposition handle) 'filename)
@@ -922,8 +925,6 @@ external if displayed external."
 			      (assoc "needsterminal" mime-info)))
 	       (copiousoutput (assoc "copiousoutput" mime-info))
 	       file buffer)
-	  ;; We create a private sub-directory where we store our files.
-	  (set-file-modes dir #o700)
 	  (if filename
 	      (setq file (expand-file-name
 			  (gnus-map-function mm-file-name-rewrite-functions
@@ -939,14 +940,15 @@ external if displayed external."
 		;; `mailcap-mime-extensions'.
 		(setq suffix (car (rassoc (mm-handle-media-type handle)
 					  mailcap-mime-extensions))))
-	      (setq file (make-temp-file (expand-file-name "mm." dir)
-					 nil suffix))))
+	      (setq file (with-file-modes #o600
+			   (make-temp-file (expand-file-name "mm." dir)
+					   nil suffix)))))
 	  (let ((coding-system-for-write mm-binary-coding-system))
 	    (write-region (point-min) (point-max) file nil 'nomesg))
 	  ;; The file is deleted after the viewer exists.  If the users edits
 	  ;; the file, changes will be lost.  Set file to read-only to make it
 	  ;; clear.
-	  (set-file-modes file #o400)
+	  (set-file-modes file #o400 'nofollow)
 	  (message "Viewing with %s" method)
 	  (cond
 	   (needsterm
@@ -1079,7 +1081,8 @@ external if displayed external."
 	    (string= total "\"%s\""))
 	(setq uses-stdin nil)
 	(push (shell-quote-argument
-	       (gnus-map-function mm-path-name-rewrite-functions file)) out))
+	       (gnus-map-function mm-path-name-rewrite-functions file))
+	      out))
        ((string= total "%t")
 	(push (shell-quote-argument (car type-list)) out))
        (t
@@ -1090,7 +1093,7 @@ external if displayed external."
       (push (shell-quote-argument
 	     (gnus-map-function mm-path-name-rewrite-functions file))
 	    out))
-    (mapconcat 'identity (nreverse out) "")))
+    (mapconcat #'identity (nreverse out) "")))
 
 (defun mm-remove-parts (handles)
   "Remove the displayed MIME parts represented by HANDLES."
@@ -1253,6 +1256,7 @@ in HANDLE."
 
 (defmacro mm-with-part (handle &rest forms)
   "Run FORMS in the temp buffer containing the contents of HANDLE."
+  (declare (indent 1) (debug t))
   ;; The handle-buffer's content is a sequence of bytes, not a sequence of
   ;; chars, so the buffer should be unibyte.  It may happen that the
   ;; handle-buffer is multibyte for some reason, in which case now is a good
@@ -1268,8 +1272,6 @@ in HANDLE."
 	  (mm-handle-encoding handle)
 	  (mm-handle-media-type handle))
 	 ,@forms))))
-(put 'mm-with-part 'lisp-indent-function 1)
-(put 'mm-with-part 'edebug-form-spec '(body))
 
 (defun mm-get-part (handle &optional no-cache)
   "Return the contents of HANDLE as a string.
@@ -1362,10 +1364,7 @@ PROMPT overrides the default one used to ask user for a file name."
 	  (setq file
 		(read-file-name
 		 (or prompt
-		     (format "Save MIME part to%s: "
-			     (if filename
-				 (format " (default %s)" filename)
-			       "")))
+		     (format-prompt "Save MIME part to" filename))
 		 (or directory mm-default-directory default-directory)
 		 (expand-file-name
 		  (or filename "")
@@ -1644,13 +1643,21 @@ If RECURSIVE, search recursively."
 	    (setq result (buffer-string))))))
     result))
 
-(defvar mm-security-handle nil)
-
 (defsubst mm-set-handle-multipart-parameter (handle parameter value)
   ;; HANDLE could be a CTL.
   (when handle
     (put-text-property 0 (length (car handle)) parameter value
 		       (car handle))))
+
+;; Interface functions and variables for the decryption/verification
+;; functions.
+(defvar mm-security-handle nil)
+(defun mm-sec-status (&rest keys)
+  (cl-loop for (key val) on keys by #'cddr
+	   do (mm-set-handle-multipart-parameter mm-security-handle key val)))
+
+(defun mm-sec-error (&rest keys)
+  (apply #'mm-sec-status (append '(sec-error t) keys)))
 
 (autoload 'mm-view-pkcs7 "mm-view")
 
@@ -1658,19 +1665,48 @@ If RECURSIVE, search recursively."
   (let ((type (car ctl))
 	(subtype (cadr (split-string (car ctl) "/")))
 	(mm-security-handle ctl) ;; (car CTL) is the type.
+	(smime-type (cdr (assq 'smime-type (mm-handle-type parts))))
 	protocol func functest)
     (cond
      ((or (equal type "application/x-pkcs7-mime")
 	  (equal type "application/pkcs7-mime"))
       (with-temp-buffer
 	(when (and (cond
+		    ((equal smime-type "signed-data") t)
 		    ((eq mm-decrypt-option 'never) nil)
 		    ((eq mm-decrypt-option 'always) t)
 		    ((eq mm-decrypt-option 'known) t)
-		    (t (y-or-n-p
-			(format "Decrypt (S/MIME) part? "))))
+		    (t (y-or-n-p "Decrypt (S/MIME) part? ")))
 		   (mm-view-pkcs7 parts from))
-	  (setq parts (mm-dissect-buffer t)))))
+	  (goto-char (point-min))
+	  ;; The encrypted document is a MIME part, and may use either
+	  ;; CRLF (Outlook and the like) or newlines for end-of-line
+	  ;; markers.  Translate from CRLF.
+	  (while (search-forward "\r\n" nil t)
+	    (replace-match "\n"))
+	  ;; Normally there will be a Content-type header here, but
+	  ;; some mailers don't add that to the encrypted part, which
+	  ;; makes the subsequent re-dissection fail here.
+	  (save-restriction
+	    (mail-narrow-to-head)
+	    (unless (mail-fetch-field "content-type")
+	      (goto-char (point-max))
+	      (insert "Content-type: text/plain\n\n")))
+	  (setq parts
+		(if (equal smime-type "signed-data")
+		    (list (propertize
+			   "multipart/signed"
+			   'protocol "application/pkcs7-signature"
+			   'gnus-info
+			   (format
+			    "%s:%s"
+			    (get-text-property 0 'gnus-info
+					       (car mm-security-handle))
+			    (get-text-property 0 'gnus-details
+					       (car mm-security-handle))))
+			  (mm-dissect-buffer t)
+			  parts)
+		  (mm-dissect-buffer t))))))
      ((equal subtype "signed")
       (unless (and (setq protocol
 			 (mm-handle-multipart-ctl-parameter ctl 'protocol))
@@ -1702,9 +1738,8 @@ If RECURSIVE, search recursively."
 	(save-excursion
 	  (if func
 	      (setq parts (funcall func parts ctl))
-	    (mm-set-handle-multipart-parameter
-	     mm-security-handle 'gnus-details
-	     (format "Unknown sign protocol (%s)" protocol))))))
+	    (mm-sec-error 'gnus-details
+			  (format "Unknown sign protocol (%s)" protocol))))))
      ((equal subtype "encrypted")
       (unless (setq protocol
 		    (mm-handle-multipart-ctl-parameter ctl 'protocol))
@@ -1734,11 +1769,28 @@ If RECURSIVE, search recursively."
 	(save-excursion
 	  (if func
 	      (setq parts (funcall func parts ctl))
-	    (mm-set-handle-multipart-parameter
-	     mm-security-handle 'gnus-details
-	     (format "Unknown encrypt protocol (%s)" protocol))))))
-     (t nil))
-    parts))
+	    (mm-sec-error
+	     'gnus-details
+	     (format "Unknown encrypt protocol (%s)" protocol)))))))
+    ;; Check the results (which are now in `parts').
+    (let ((err (get-text-property 0 'sec-error (car mm-security-handle))))
+      (if (or (not err)
+	      (not (equal subtype "encrypted")))
+	  parts
+	;; We had an error during decryption.  Report what it is.
+	(list
+	 (mm-make-handle
+	  (with-current-buffer (generate-new-buffer " *mm*")
+	    (insert "Error!  Result from decryption:\n\n"
+		    (or (get-text-property 0 'gnus-details
+					   (car mm-security-handle))
+			"")
+		    "\n\n"
+		    (or (get-text-property 0 'gnus-details
+					   (car mm-security-handle))
+			""))
+	    (current-buffer))
+	  '("text/plain")))))))
 
 (defun mm-multiple-handles (handles)
   (and (listp handles)
@@ -1829,7 +1881,6 @@ text/html;\\s-*charset=\\([^\t\n\r \"'>]+\\)[^>]*>" nil t)
       (shr-insert-document document)
       (unless (bobp)
 	(insert "\n"))
-      (mm-convert-shr-links)
       (mm-handle-set-undisplayer
        handle
        (let ((min (point-min-marker))
@@ -1837,40 +1888,6 @@ text/html;\\s-*charset=\\([^\t\n\r \"'>]+\\)[^>]*>" nil t)
          (lambda ()
 	   (let ((inhibit-read-only t))
 	     (delete-region min max))))))))
-
-(defvar shr-image-map)
-(defvar shr-map)
-(autoload 'widget-convert-button "wid-edit")
-(defvar widget-keymap)
-
-(defun mm-convert-shr-links ()
-  (let ((start (point-min))
-	end keymap)
-    (while (and start
-		(< start (point-max)))
-      (when (setq start (text-property-not-all start (point-max) 'shr-url nil))
-	(setq end (next-single-property-change start 'shr-url nil (point-max)))
-	(widget-convert-button
-	 'url-link start end
-	 :help-echo (get-text-property start 'help-echo)
-	 :keymap (setq keymap (copy-keymap
-			       (if (mm-images-in-region-p start end)
-				   shr-image-map
-				 shr-map)))
-	 (get-text-property start 'shr-url))
-	;; Mask keys that launch `widget-button-click'.
-	;; Those bindings are provided by `widget-keymap'
-	;; that is a parent of `gnus-article-mode-map'.
-	(dolist (key (where-is-internal 'widget-button-click widget-keymap))
-	  (unless (lookup-key keymap key)
-	    (define-key keymap key #'ignore)))
-	;; Avoid `shr-next-link' and `shr-previous-link' in `keymap' so
-	;; TAB and M-TAB run `widget-forward' and `widget-backward' instead.
-	(substitute-key-definition 'shr-next-link nil keymap)
-	(substitute-key-definition 'shr-previous-link nil keymap)
-	(dolist (overlay (overlays-at start))
-	  (overlay-put overlay 'face nil))
-	(setq start end)))))
 
 (defun mm-handle-filename (handle)
   "Return filename of HANDLE if any."

@@ -1,21 +1,23 @@
-;;; undo-tests.el --- Tests of primitive-undo
+;;; undo-tests.el --- Tests of primitive-undo -*- lexical-binding: t -*-
 
-;; Copyright (C) 2012-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2012-2022 Free Software Foundation, Inc.
 
 ;; Author: Aaron S. Hawley <aaron.s.hawley@gmail.com>
 
-;; This program is free software: you can redistribute it and/or
+;; This file is part of GNU Emacs.
+;;
+;; GNU Emacs is free software: you can redistribute it and/or
 ;; modify it under the terms of the GNU General Public License as
 ;; published by the Free Software Foundation, either version 3 of the
 ;; License, or (at your option) any later version.
 ;;
-;; This program is distributed in the hope that it will be useful, but
+;; GNU Emacs is distributed in the hope that it will be useful, but
 ;; WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
 ;; General Public License for more details.
 ;;
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see `https://www.gnu.org/licenses/'.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -44,6 +46,7 @@
 ;;; Code:
 
 (require 'ert)
+(require 'facemenu)
 
 (ert-deftest undo-test0 ()
   "Test basics of \\[undo]."
@@ -72,7 +75,7 @@
     (undo-boundary)
     (put-text-property (point-min) (point-max) 'face 'bold)
     (undo-boundary)
-    (remove-text-properties (point-min) (point-max) '(face default))
+    (remove-list-of-text-properties (point-min) (point-max) '(face))
     (undo-boundary)
     (set-buffer-multibyte (not enable-multibyte-characters))
     (undo-boundary)
@@ -85,6 +88,7 @@
 
 (ert-deftest undo-test1 ()
   "Test undo of \\[undo] command (redo)."
+  (require 'facemenu)
   (with-temp-buffer
     (buffer-enable-undo)
     (undo-boundary)
@@ -255,7 +259,7 @@
     (insert "12345")
     (search-backward "4")
     (undo-boundary)
-    (delete-forward-char 1)
+    (funcall-interactively 'delete-forward-char 1)
     (search-backward "1")
     (undo-boundary)
     (insert "xxxx")
@@ -299,7 +303,7 @@ undo-make-selective-list."
     (insert "ddd")
     (search-backward "ad")
     (undo-boundary)
-    (delete-forward-char 2)
+    (funcall-interactively 'delete-forward-char 2)
     (undo-boundary)
     ;; Select "dd"
     (push-mark (point) t t)
@@ -348,7 +352,7 @@ undo-make-selective-list."
     (let ((m (make-marker)))
       (set-marker m 2 (current-buffer))
       (goto-char (point-min))
-      (delete-forward-char 3)
+      (funcall-interactively 'delete-forward-char 3)
       (undo-boundary)
       (should (= (point-min) (marker-position m)))
       (undo)
@@ -369,7 +373,7 @@ undo-make-selective-list."
       (push-mark (point) t t)
       (setq mark-active t)
       (goto-char (point-min))
-      (delete-forward-char 1) ;; delete region covering "ab"
+      (funcall-interactively 'delete-forward-char 1) ; delete region covering "ab"
       (undo-boundary)
       (should (= (point-min) (marker-position m)))
       ;; Resurrect "ab". m's insertion type means the reinsertion
@@ -389,7 +393,7 @@ Demonstrates bug 16818."
     (let ((m (make-marker)))
       (set-marker m 2 (current-buffer)) ; m at b
       (goto-char (point-min))
-      (delete-forward-char 3) ; m at d
+      (funcall-interactively 'delete-forward-char 3) ; m at d
       (undo-boundary)
       (set-marker m 4) ; m at g
       (undo)
@@ -422,7 +426,7 @@ Demonstrates bug 16818."
     (push-mark (point) t t)
     (setq mark-active t)
     (goto-char (- (point) 3))
-    (delete-forward-char 1)
+    (funcall-interactively 'delete-forward-char 1)
     (undo-boundary)
 
     (insert "bbb")
@@ -452,7 +456,7 @@ Demonstrates bug 25599."
     (insert ";; aaaaaaaaa
 ;; bbbbbbbb")
     (let ((overlay-modified
-           (lambda (ov after-p _beg _end &optional length)
+           (lambda (ov after-p _beg _end &optional _length)
              (unless after-p
                (when (overlay-buffer ov)
                  (delete-overlay ov))))))

@@ -1,6 +1,6 @@
 ;;; flymake-tests.el --- Test suite for flymake -*- lexical-binding: t -*-
 
-;; Copyright (C) 2011-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2011-2022 Free Software Foundation, Inc.
 
 ;; Author: Eduard Wiebe <usenet@pusto.de>
 
@@ -52,7 +52,7 @@
                                             (flymake-reporting-backends))
            while notdone
            unless noninteractive do (read-event "" nil 0.1)
-           do (sleep-for (+ 0.5 flymake-no-changes-timeout))
+           do (sleep-for (+ 0.5 (or flymake-no-changes-timeout 0)))
            finally (when notdone (ert-skip
                                   (format "Some backends not reporting yet %s"
                                           notdone)))))
@@ -60,7 +60,7 @@
 (cl-defun flymake-tests--call-with-fixture (fn file
                                                &key (severity-predicate
                                                      nil sev-pred-supplied-p))
-  "Call FN after flymake setup in FILE, using `flymake-proc`.
+  "Call FN after flymake setup in FILE, using `flymake-proc'.
 SEVERITY-PREDICATE is used to setup
 `flymake-proc-diagnostic-type-pred'"
   (let* ((file (expand-file-name file flymake-tests-data-directory))
@@ -109,9 +109,8 @@ SEVERITY-PREDICATE is used to setup
                 (face-at-point)))))
 
 (ert-deftest perl-backend ()
-  "Test the perl backend"
+  "Test the perl backend."
   (skip-unless (executable-find "perl"))
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
   (flymake-tests--with-flymake ("test.pl")
     (flymake-goto-next-error)
     (should (eq 'flymake-warning (face-at-point)))
@@ -121,9 +120,8 @@ SEVERITY-PREDICATE is used to setup
 
 (defvar ruby-mode-hook)
 (ert-deftest ruby-backend ()
-  "Test the ruby backend"
+  "Test the ruby backend."
   (skip-unless (executable-find "ruby"))
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
   ;; Some versions of ruby fail if HOME doesn't exist (bug#29187).
   (let* ((tempdir (make-temp-file "flymake-tests-ruby" t))
          (process-environment (cons (format "HOME=%s" tempdir)
@@ -142,12 +140,15 @@ SEVERITY-PREDICATE is used to setup
             (should (eq 'flymake-error (face-at-point)))))
       (delete-directory tempdir t))))
 
+(defun flymake-tests--gcc-is-clang ()
+  "Whether the `gcc' command actually runs the Clang compiler."
+  (string-match "[Cc]lang version "
+                (shell-command-to-string "gcc --version")))
+
 (ert-deftest different-diagnostic-types ()
   "Test GCC warning via function predicate."
-  ;; http://lists.gnu.org/archive/html/emacs-devel/2019-03/msg01043.html
-  :expected-result (if (or (getenv "EMACS_HYDRA_CI") (getenv "EMACS_EMBA_CI"))
-                       :failed :passed)
   (skip-unless (and (executable-find "gcc")
+                    (not (flymake-tests--gcc-is-clang))
                     (version<=
                      "5" (string-trim
                           (shell-command-to-string "gcc -dumpversion")))
@@ -171,8 +172,9 @@ SEVERITY-PREDICATE is used to setup
 
 (ert-deftest included-c-header-files ()
   "Test inclusion of .h header files."
-  (skip-unless (and (executable-find "gcc") (executable-find "make")))
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  (skip-unless (and (executable-find "gcc")
+                    (not (flymake-tests--gcc-is-clang))
+                    (executable-find "make")))
   (let ((flymake-wrap-around nil))
     (flymake-tests--with-flymake
         ("some-problems.h")
@@ -199,7 +201,7 @@ SEVERITY-PREDICATE is used to setup
 
 (defun flymake-tests--diagnose-words
     (report-fn type words)
-  "Helper. Call REPORT-FN with diagnostics for WORDS in buffer."
+  "Helper.  Call REPORT-FN with diagnostics for WORDS in buffer."
   (funcall report-fn
            (cl-loop
             for word in words
@@ -240,7 +242,7 @@ SEVERITY-PREDICATE is used to setup
           (lambda (_report-fn)
             ;; HACK: Shoosh log during tests
             (setq-local warning-minimum-log-level :emergency)
-            (error "crashed"))))
+            (error "Crashed"))))
       (insert "Lorem ipsum dolor sit amet, consectetur adipiscing
     elit, sed do eiusmod tempor incididunt ut labore et dolore
     manha aliqua. Ut enim ad minim veniam, quis nostrud
@@ -297,8 +299,7 @@ SEVERITY-PREDICATE is used to setup
         (should-error (flymake-goto-next-error nil nil t))))))
 
 (ert-deftest recurrent-backend ()
-  "Test a backend that calls REPORT-FN multiple times"
-  (skip-unless (not (getenv "EMACS_HYDRA_CI")))
+  "Test a backend that calls REPORT-FN multiple times."
   (with-temp-buffer
     (let (tick)
       (cl-letf
@@ -381,4 +382,4 @@ SEVERITY-PREDICATE is used to setup
 
 (provide 'flymake-tests)
 
-;;; flymake.el ends here
+;;; flymake-tests.el ends here

@@ -1,6 +1,6 @@
 /* Functions for handling font and other changes dynamically.
 
-Copyright (C) 2009-2019 Free Software Foundation, Inc.
+Copyright (C) 2009-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -343,8 +343,8 @@ get_prop_window (struct x_display_info *dpyinfo)
 #define PAD(nr)    (((nr) + 3) & ~3)
 
 /* Parse xsettings and extract those that deal with Xft.
-   See http://freedesktop.org/wiki/Specifications/XSettingsRegistry
-   and http://standards.freedesktop.org/xsettings-spec/xsettings-spec-0.5.html.
+   See https://freedesktop.org/wiki/Specifications/XSettingsRegistry/
+   and https://specifications.freedesktop.org/xsettings-spec/xsettings-spec-0.5.html.
 
    Layout of prop.  First is a header:
 

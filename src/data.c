@@ -1,5 +1,5 @@
 /* Primitive operations on Lisp data types for GNU Emacs Lisp interpreter.
-   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2019 Free Software
+   Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -92,12 +92,6 @@ XOBJFWD (union Lisp_Fwd *a)
 }
 
 static void
-CHECK_SUBR (Lisp_Object x)
-{
-  CHECK_TYPE (! NILP (Fsubrp (x)), Qsubrp, x);
-}
-
-static void
 set_blv_found (struct Lisp_Buffer_Local_Value *blv, int found)
 {
   eassert (found == !EQ (blv->defcell, blv->valcell));
@@ -147,15 +141,9 @@ wrong_length_argument (Lisp_Object a1, Lisp_Object a2, Lisp_Object a3)
 }
 
 AVOID
-wrong_type_argument (register Lisp_Object predicate, register Lisp_Object value)
+wrong_type_argument (Lisp_Object predicate, Lisp_Object value)
 {
-  /* If VALUE is not even a valid Lisp object, we'd want to abort here
-     where we can get a backtrace showing where it came from.  We used
-     to try and do that by checking the tagbits, but nowadays all
-     tagbits are potentially valid.  */
-  /* if ((unsigned int) XTYPE (value) >= Lisp_Type_Limit)
-   *   emacs_abort (); */
-
+  //eassert (!TAGGEDP (value, Lisp_Type_Unused0));
   xsignal2 (Qwrong_type_argument, predicate, value);
 }
 
@@ -289,6 +277,8 @@ for example, (type-of 1) returns `integer'.  */)
           }
         case PVEC_MODULE_FUNCTION:
           return Qmodule_function;
+	case PVEC_NATIVE_COMP_UNIT:
+          return Qnative_comp_unit;
         case PVEC_XWIDGET:
           return Qxwidget;
         case PVEC_XWIDGET_VIEW:
@@ -553,7 +543,7 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
   (Lisp_Object object)
 {
   return ((FIXNUMP (object) ? 0 <= XFIXNUM (object)
-	   : BIGNUMP (object) && 0 <= mpz_sgn (XBIGNUM (object)->value))
+	   : BIGNUMP (object) && 0 <= mpz_sgn (*xbignum_val (object)))
 	  ? Qt : Qnil);
 }
 
@@ -619,8 +609,8 @@ DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
 /* Extract and set components of lists.  */
 
 DEFUN ("car", Fcar, Scar, 1, 1, 0,
-       doc: /* Return the car of LIST.  If arg is nil, return nil.
-Error if arg is not nil and not a cons cell.  See also `car-safe'.
+       doc: /* Return the car of LIST.  If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell.  See also `car-safe'.
 
 See Info node `(elisp)Cons Cells' for a discussion of related basic
 Lisp concepts such as car, cdr, cons cell and list.  */)
@@ -637,8 +627,8 @@ DEFUN ("car-safe", Fcar_safe, Scar_safe, 1, 1, 0,
 }
 
 DEFUN ("cdr", Fcdr, Scdr, 1, 1, 0,
-       doc: /* Return the cdr of LIST.  If arg is nil, return nil.
-Error if arg is not nil and not a cons cell.  See also `cdr-safe'.
+       doc: /* Return the cdr of LIST.  If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell.  See also `cdr-safe'.
 
 See Info node `(elisp)Cons Cells' for a discussion of related basic
 Lisp concepts such as cdr, car, cons cell and list.  */)
@@ -794,6 +784,8 @@ The return value is undefined.  */)
       Ffset (symbol, definition);
   }
 
+  maybe_defer_native_compilation (symbol, definition);
+
   if (!NILP (docstring))
     Fput (symbol, Qfunction_documentation, docstring);
   /* We used to return `definition', but now that `defun' and `defmacro' expand
@@ -822,6 +814,12 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   Lisp_Object min, max;
   Lisp_Object arity;
   bool special = false;
+
+  //FIX-20230301-LAV: not sure this is correct, or if it is, should we get the arity from the scheme-gsubr?
+  if (SCM_PRIMITIVE_P (subr))
+    {
+      return Qnil; // Fcons (Qnil, Qnil);
+    }
 
   CHECK_SUBR (subr);
   if (CONSP (subr) && EQ (XCAR (subr), Qspecial_operator))
@@ -852,6 +850,74 @@ SUBR must be a built-in function.  */)
     subr = XCDR (subr);
   return Fsymbol_name (SCM_SUBR_NAME (subr));
 }
+
+DEFUN ("subr-native-elisp-p", Fsubr_native_elisp_p, Ssubr_native_elisp_p, 1, 1,
+       0, doc: /* Return t if the object is native compiled lisp
+function, nil otherwise.  */)
+  (Lisp_Object object)
+{
+  return SUBR_NATIVE_COMPILEDP (object) ? Qt : Qnil;
+}
+
+DEFUN ("subr-native-lambda-list", Fsubr_native_lambda_list,
+       Ssubr_native_lambda_list, 1, 1, 0,
+       doc: /* Return the lambda list for a native compiled lisp/d
+function or t otherwise.  */)
+  (Lisp_Object subr)
+{
+  CHECK_SUBR (subr);
+
+#ifdef HAVE_NATIVE_COMP
+  if (SUBR_NATIVE_COMPILED_DYNP (subr))
+    return XSUBR (subr)->lambda_list;
+#endif
+  return Qt;
+}
+
+DEFUN ("subr-type", Fsubr_type,
+       Ssubr_type, 1, 1, 0,
+       doc: /* Return the type of SUBR.  */)
+  (Lisp_Object subr)
+{
+  CHECK_SUBR (subr);
+#ifdef HAVE_NATIVE_COMP
+  return SUBR_TYPE (subr);
+#else
+  return Qnil;
+#endif
+}
+
+#ifdef HAVE_NATIVE_COMP
+
+DEFUN ("subr-native-comp-unit", Fsubr_native_comp_unit,
+       Ssubr_native_comp_unit, 1, 1, 0,
+       doc: /* Return the native compilation unit.  */)
+  (Lisp_Object subr)
+{
+  CHECK_SUBR (subr);
+  return XSUBR (subr)->native_comp_u;
+}
+
+DEFUN ("native-comp-unit-file", Fnative_comp_unit_file,
+       Snative_comp_unit_file, 1, 1, 0,
+       doc: /* Return the file of the native compilation unit.  */)
+  (Lisp_Object comp_unit)
+{
+  CHECK_TYPE (NATIVE_COMP_UNITP (comp_unit), Qnative_comp_unit, comp_unit);
+  return XNATIVE_COMP_UNIT (comp_unit)->file;
+}
+
+DEFUN ("native-comp-unit-set-file", Fnative_comp_unit_set_file,
+       Snative_comp_unit_set_file, 2, 2, 0,
+       doc: /* Return the file of the native compilation unit.  */)
+  (Lisp_Object comp_unit, Lisp_Object new_file)
+{
+  CHECK_TYPE (NATIVE_COMP_UNITP (comp_unit), Qnative_comp_unit, comp_unit);
+  XNATIVE_COMP_UNIT (comp_unit)->file = new_file;
+  return comp_unit;
+}
+
+#endif
 
 DEFUN ("interactive-form", Finteractive_form, Sinteractive_form, 1, 1, 0,
        doc: /* Return the interactive form of CMD or nil if none.
@@ -888,15 +954,102 @@ Value, if non-nil, is a list (interactive SPEC).  */)
       if (scm_is_pair (tem))
         return list2 (Qinteractive, scm_cdr (tem));
     }
+#ifdef HAVE_MODULES
+  else if (MODULE_FUNCTIONP (fun))
+    {
+      Lisp_Object form
+        = module_function_interactive_form (XMODULE_FUNCTION (fun));
+      if (! NILP (form))
+        return form;
+    }
+#endif
   else if (AUTOLOADP (fun))
     return Finteractive_form (Fautoload_do_load (fun, cmd, Qnil));
   else if (CONSP (fun))
     {
       Lisp_Object funcar = XCAR (fun);
-      if (EQ (funcar, Qclosure))
-	return Fassq (Qinteractive, Fcdr (Fcdr (XCDR (fun))));
-      else if (EQ (funcar, Qlambda))
-	return Fassq (Qinteractive, Fcdr (XCDR (fun)));
+      if (EQ (funcar, Qclosure)
+	  || EQ (funcar, Qlambda))
+	{
+	  Lisp_Object form = Fcdr (XCDR (fun));
+	  if (EQ (funcar, Qclosure))
+	    form = Fcdr (form);
+	  Lisp_Object spec = Fassq (Qinteractive, form);
+	  if (NILP (Fcdr (Fcdr (spec))))
+	    return spec;
+	  else
+	    return list2 (Qinteractive, Fcar (Fcdr (spec)));
+	}
+    }
+  return Qnil;
+}
+
+/* Note that this doesn't work for native-compiled functions in Emacs
+   28.1, but it's fixed in later Emacs versions. */
+
+DEFUN ("command-modes", Fcommand_modes, Scommand_modes, 1, 1, 0,
+       doc: /* Return the modes COMMAND is defined for.
+If COMMAND is not a command, the return value is nil.
+The value, if non-nil, is a list of mode name symbols.  */)
+  (Lisp_Object command)
+{
+  Lisp_Object fun = indirect_function (command); /* Check cycles.  */
+
+  if (NILP (fun))
+    return Qnil;
+
+  /* Use a `command-modes' property if present, analogous to the
+     function-documentation property.  */
+  fun = command;
+  while (SYMBOLP (fun))
+    {
+      Lisp_Object modes = Fget (fun, Qcommand_modes);
+      if (!NILP (modes))
+	return modes;
+      else
+	fun = Fsymbol_function (fun);
+    }
+
+  if (COMPILEDP (fun))
+    {
+      if (PVSIZE (fun) <= COMPILED_INTERACTIVE)
+	return Qnil;
+      Lisp_Object form = AREF (fun, COMPILED_INTERACTIVE);
+      if (VECTORP (form))
+	/* New form -- the second element is the command modes. */
+	return AREF (form, 1);
+      else
+	/* Old .elc file -- no command modes. */
+	return Qnil;
+    }
+#ifdef HAVE_MODULES
+  else if (MODULE_FUNCTIONP (fun))
+    {
+      Lisp_Object form
+        = module_function_command_modes (XMODULE_FUNCTION (fun));
+      if (! NILP (form))
+        return form;
+    }
+#endif
+  else if (AUTOLOADP (fun))
+    {
+      Lisp_Object modes = Fnth (make_int (3), fun);
+      if (CONSP (modes))
+	return modes;
+      else
+	return Qnil;
+    }
+  else if (CONSP (fun))
+    {
+      Lisp_Object funcar = XCAR (fun);
+      if (EQ (funcar, Qclosure)
+	  || EQ (funcar, Qlambda))
+	{
+	  Lisp_Object form = Fcdr (XCDR (fun));
+	  if (EQ (funcar, Qclosure))
+	    form = Fcdr (form);
+	  return Fcdr (Fcdr (Fassq (Qinteractive, form)));
+	}
     }
   return Qnil;
 }
@@ -1412,10 +1565,14 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 	  {
 	    int offset = XBUFFER_OBJFWD (innercontents)->offset;
 	    int idx = PER_BUFFER_IDX (offset);
-	    if (idx > 0
-                && bindflag == SET_INTERNAL_SET
-		&& !let_shadows_buffer_binding_p (sym))
-	      SET_PER_BUFFER_VALUE_P (buf, idx, 1);
+	    if (idx > 0 && bindflag == SET_INTERNAL_SET
+	        && !PER_BUFFER_VALUE_P (buf, idx))
+	      {
+		if (let_shadows_buffer_binding_p (sym))
+		  set_default_internal (symbol, newval, bindflag);
+		else
+		  SET_PER_BUFFER_VALUE_P (buf, idx, 1);
+	      }
 	  }
 
 	if (voide)
@@ -1460,11 +1617,12 @@ harmonize_variable_watchers (Lisp_Object alias, Lisp_Object base_variable)
 
 DEFUN ("add-variable-watcher", Fadd_variable_watcher, Sadd_variable_watcher,
        2, 2, 0,
-       doc: /* Cause WATCH-FUNCTION to be called when SYMBOL is set.
+       doc: /* Cause WATCH-FUNCTION to be called when SYMBOL is about to be set.
 
 It will be called with 4 arguments: (SYMBOL NEWVAL OPERATION WHERE).
 SYMBOL is the variable being changed.
-NEWVAL is the value it will be changed to.
+NEWVAL is the value it will be changed to.  (The variable still has
+the old value when WATCH-FUNCTION is called.)
 OPERATION is a symbol representing the kind of change, one of: `set',
 `let', `unlet', `makunbound', and `defvaralias'.
 WHERE is a buffer if the buffer-local value of the variable is being
@@ -1474,6 +1632,7 @@ All writes to aliases of SYMBOL will call WATCH-FUNCTION too.  */)
   (Lisp_Object symbol, Lisp_Object watch_function)
 {
   symbol = Findirect_variable (symbol);
+  CHECK_SYMBOL (symbol);
   set_symbol_trapped_write (symbol, SYMBOL_TRAPPED_WRITE); // FIX-20230206-LAV
   map_obarray (Vobarray, harmonize_variable_watchers, symbol);
 
@@ -1560,7 +1719,7 @@ notify_variable_watchers (Lisp_Object symbol,
 /* Return the default value of SYMBOL, but don't check for voidness.
    Return Qunbound if it is void.  */
 
-static Lisp_Object
+Lisp_Object
 default_value (Lisp_Object symbol)
 {
   sym_t sym;
@@ -1607,8 +1766,9 @@ default_value (Lisp_Object symbol)
 
 DEFUN ("default-boundp", Fdefault_boundp, Sdefault_boundp, 1, 1, 0,
        doc: /* Return t if SYMBOL has a non-void default value.
-This is the value that is seen in buffers that do not have their own values
-for this variable.  */)
+A variable may have a buffer-local or a `let'-bound local value.  This
+function says whether the variable has a non-void value outside of the
+current context.  Also see `default-value'.  */)
   (Lisp_Object symbol)
 {
   register Lisp_Object value;
@@ -1766,6 +1926,7 @@ make_blv (sym_t sym, bool forwarded,
   set_blv_defcell (blv, tem);
   set_blv_valcell (blv, tem);
   set_blv_found (blv, false);
+  __lsan_ignore_object (blv);
   return blv;
 }
 
@@ -1786,7 +1947,9 @@ a variable local to the current buffer for one particular use, use
 while setting up a new major mode, unless they have a `permanent-local'
 property.
 
-The function `default-value' gets the default value and `set-default' sets it.  */)
+The function `default-value' gets the default value and `set-default' sets it.
+
+See also `defvar-local'.  */)
   (register Lisp_Object variable)
 {
   sym_t sym;
@@ -2007,7 +2170,9 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
 DEFUN ("local-variable-p", Flocal_variable_p, Slocal_variable_p,
        1, 2, 0,
        doc: /* Non-nil if VARIABLE has a local binding in buffer BUFFER.
-BUFFER defaults to the current buffer.  */)
+BUFFER defaults to the current buffer.
+
+Also see `buffer-local-boundp'.*/)
   (Lisp_Object variable, Lisp_Object buffer)
 {
   struct buffer *buf = decode_buffer (buffer);
@@ -2281,141 +2446,69 @@ bool-vector.  IDX starts at 0.  */)
     }
   else /* STRINGP */
     {
-      int c;
-
       CHECK_IMPURE (array, XSTRING (array));
       if (idxval < 0 || idxval >= SCHARS (array))
 	args_out_of_range (array, idx);
       CHECK_CHARACTER (newelt);
-      c = XFIXNAT (newelt);
+      int c = XFIXNAT (newelt);
+      ptrdiff_t idxval_byte;
+      int prev_bytes;
+      unsigned char workbuf[MAX_MULTIBYTE_LENGTH], *p0 = workbuf, *p1;
 
       if (STRING_MULTIBYTE (array))
 	{
-	  ptrdiff_t idxval_byte, nbytes;
-	  int prev_bytes, new_bytes;
-	  unsigned char workbuf[MAX_MULTIBYTE_LENGTH], *p0 = workbuf, *p1;
-
-	  nbytes = SBYTES (array);
 	  idxval_byte = string_char_to_byte (array, idxval);
 	  p1 = SDATA (array) + idxval_byte;
 	  prev_bytes = BYTES_BY_CHAR_HEAD (*p1);
-	  new_bytes = CHAR_STRING (c, p0);
-	  if (prev_bytes != new_bytes)
-	    {
-	      /* We must relocate the string data.  */
-	      ptrdiff_t nchars = SCHARS (array);
-	      USE_SAFE_ALLOCA;
-	      unsigned char *str = SAFE_ALLOCA (nbytes);
-
-	      memcpy (str, SDATA (array), nbytes);
-	      allocate_string_data (array, nchars,
-				    nbytes + new_bytes - prev_bytes);
-	      memcpy (SDATA (array), str, idxval_byte);
-	      p1 = SDATA (array) + idxval_byte;
-	      memcpy (p1 + new_bytes, str + idxval_byte + prev_bytes,
-		      nbytes - (idxval_byte + prev_bytes));
-	      SAFE_FREE ();
-	      clear_string_char_byte_cache ();
-	    }
-	  while (new_bytes--)
-	    *p1++ = *p0++;
+	}
+      else if (SINGLE_BYTE_CHAR_P (c))
+	{
+	  SSET (array, idxval, c);
+	  return newelt;
 	}
       else
 	{
-	  if (! SINGLE_BYTE_CHAR_P (c))
-	    {
-	      ptrdiff_t i;
-
-	      for (i = SBYTES (array) - 1; i >= 0; i--)
-		if (SREF (array, i) >= 0x80)
-		  args_out_of_range (array, newelt);
-	      /* ARRAY is an ASCII string.  Convert it to a multibyte
-		 string, and try `aset' again.  */
-	      STRING_SET_MULTIBYTE (array);
-	      return Faset (array, idx, newelt);
-	    }
-	  SSET (array, idxval, c);
+	  for (ptrdiff_t i = SBYTES (array) - 1; i >= 0; i--)
+	    if (!ASCII_CHAR_P (SREF (array, i)))
+	      args_out_of_range (array, newelt);
+	  /* ARRAY is an ASCII string.  Convert it to a multibyte string.  */
+	  STRING_SET_MULTIBYTE (array);
+	  idxval_byte = idxval;
+	  p1 = SDATA (array) + idxval_byte;
+	  prev_bytes = 1;
 	}
+
+      int new_bytes = CHAR_STRING (c, p0);
+      if (prev_bytes != new_bytes)
+	p1 = resize_string_data (array, idxval_byte, prev_bytes, new_bytes);
+
+      do
+	*p1++ = *p0++;
+      while (--new_bytes != 0);
     }
 
   return newelt;
 }
 
-/* GMP tests for this value and aborts (!) if it is exceeded.
-   This is as of GMP 6.1.2 (2016); perhaps future versions will differ.  */
-enum { GMP_NLIMBS_MAX = min (INT_MAX, ULONG_MAX / GMP_NUMB_BITS) };
-
-/* An upper bound on limb counts, needed to prevent libgmp and/or
-   Emacs from aborting or otherwise misbehaving.  This bound applies
-   to estimates of mpz_t sizes before the mpz_t objects are created,
-   as opposed to integer-width which operates on mpz_t values after
-   creation and before conversion to Lisp bignums.  */
-enum
-  {
-   NLIMBS_LIMIT = min (min (/* libgmp needs to store limb counts.  */
-			    GMP_NLIMBS_MAX,
-
-			    /* Size calculations need to work.  */
-			    min (PTRDIFF_MAX, SIZE_MAX) / sizeof (mp_limb_t)),
-
-		       /* Emacs puts bit counts into fixnums.  */
-		       MOST_POSITIVE_FIXNUM / GMP_NUMB_BITS)
-  };
-
-/* Like mpz_size, but tell the compiler the result is a nonnegative int.  */
-
-static int
-emacs_mpz_size (mpz_t const op)
-{
-  mp_size_t size = mpz_size (op);
-  eassume (0 <= size && size <= INT_MAX);
-  return size;
-}
-
-/* Wrappers to work around GMP limitations.  As of GMP 6.1.2 (2016),
-   the library code aborts when a number is too large.  These wrappers
-   avoid the problem for functions that can return numbers much larger
-   than their arguments.  For slowly-growing numbers, the integer
-   width checks in bignum.c should suffice.  */
-
-static void
-emacs_mpz_mul (mpz_t rop, mpz_t const op1, mpz_t const op2)
-{
-  if (NLIMBS_LIMIT - emacs_mpz_size (op1) < emacs_mpz_size (op2))
-    overflow_error ();
-  mpz_mul (rop, op1, op2);
-}
-
-static void
-emacs_mpz_mul_2exp (mpz_t rop, mpz_t const op1, EMACS_INT op2)
-{
-  /* Fudge factor derived from GMP 6.1.2, to avoid an abort in
-     mpz_mul_2exp (look for the '+ 1' in its source code).  */
-  enum { mul_2exp_extra_limbs = 1 };
-  enum { lim = min (NLIMBS_LIMIT, GMP_NLIMBS_MAX - mul_2exp_extra_limbs) };
-
-  EMACS_INT op2limbs = op2 / GMP_NUMB_BITS;
-  if (lim - emacs_mpz_size (op1) < op2limbs)
-    overflow_error ();
-  mpz_mul_2exp (rop, op1, op2);
-}
-
-static void
-emacs_mpz_pow_ui (mpz_t rop, mpz_t const base, unsigned long exp)
-{
-  /* This fudge factor is derived from GMP 6.1.2, to avoid an abort in
-     mpz_n_pow_ui (look for the '5' in its source code).  */
-  enum { pow_ui_extra_limbs = 5 };
-  enum { lim = min (NLIMBS_LIMIT, GMP_NLIMBS_MAX - pow_ui_extra_limbs) };
-
-  int nbase = emacs_mpz_size (base), n;
-  if (INT_MULTIPLY_WRAPV (nbase, exp, &n) || lim < n)
-    overflow_error ();
-  mpz_pow_ui (rop, base, exp);
-}
-
-
 /* Arithmetic functions */
+
+static Lisp_Object
+check_integer_coerce_marker (Lisp_Object x)
+{
+  if (MARKERP (x))
+    return make_fixnum (marker_position (x));
+  CHECK_TYPE (INTEGERP (x), Qinteger_or_marker_p, x);
+  return x;
+}
+
+static Lisp_Object
+check_number_coerce_marker (Lisp_Object x)
+{
+  if (MARKERP (x))
+    return make_fixnum (marker_position (x));
+  CHECK_TYPE (NUMBERP (x), Qnumber_or_marker_p, x);
+  return x;
+}
 
 Lisp_Object
 arithcompare (Lisp_Object num1, Lisp_Object num2,
@@ -2425,8 +2518,8 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
   bool lt, eq = true, gt;
   bool test;
 
-  CHECK_NUMBER_COERCE_MARKER (num1);
-  CHECK_NUMBER_COERCE_MARKER (num2);
+  num1 = check_number_coerce_marker (num1);
+  num2 = check_number_coerce_marker (num2);
 
   /* If the comparison is mostly done by comparing two doubles,
      set LT, EQ, and GT to the <, ==, > results of that comparison,
@@ -2467,7 +2560,7 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
       else if (isnan (f1))
 	lt = eq = gt = false;
       else
-	i2 = mpz_cmp_d (XBIGNUM (num2)->value, f1);
+	i2 = mpz_cmp_d (*xbignum_val (num2), f1);
     }
   else if (FIXNUMP (num1))
     {
@@ -2488,7 +2581,7 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
 	  i2 = XFIXNUM (num2);
 	}
       else
-	i2 = mpz_sgn (XBIGNUM (num2)->value);
+	i2 = mpz_sgn (*xbignum_val (num2));
     }
   else if (FLOATP (num2))
     {
@@ -2496,12 +2589,12 @@ arithcompare (Lisp_Object num1, Lisp_Object num2,
       if (isnan (f2))
 	lt = eq = gt = false;
       else
-	i1 = mpz_cmp_d (XBIGNUM (num1)->value, f2);
+	i1 = mpz_cmp_d (*xbignum_val (num1), f2);
     }
   else if (FIXNUMP (num2))
-    i1 = mpz_sgn (XBIGNUM (num1)->value);
+    i1 = mpz_sgn (*xbignum_val (num1));
   else
-    i1 = mpz_cmp (XBIGNUM (num1)->value, XBIGNUM (num2)->value);
+    i1 = mpz_cmp (*xbignum_val (num1), *xbignum_val (num2));
 
   if (eq)
     {
@@ -2828,9 +2921,7 @@ floatop_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
       argnum++;
       if (argnum == nargs)
 	return make_float (accum);
-      Lisp_Object val = args[argnum];
-      CHECK_NUMBER_COERCE_MARKER (val);
-      next = XFLOATINT (val);
+      next = XFLOATINT (check_number_coerce_marker (args[argnum]));
     }
 }
 
@@ -2857,7 +2948,7 @@ static Lisp_Object
 bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 		     ptrdiff_t argnum, intmax_t iaccum, Lisp_Object val)
 {
-  mpz_t *accum;
+  mpz_t const *accum;
   if (argnum == 0)
     {
       accum = bignum_integer (&mpz[0], val);
@@ -2868,7 +2959,7 @@ bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 
   while (true)
     {
-      mpz_t *next = bignum_integer (&mpz[1], val);
+      mpz_t const *next = bignum_integer (&mpz[1], val);
 
       switch (code)
 	{
@@ -2892,8 +2983,7 @@ bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
       argnum++;
       if (argnum == nargs)
 	return make_integer_mpz ();
-      val = args[argnum];
-      CHECK_NUMBER_COERCE_MARKER (val);
+      val = check_number_coerce_marker (args[argnum]);
       if (FLOATP (val))
 	return float_arith_driver (code, nargs, args, argnum,
 				   mpz_get_d_rounded (*accum), val);
@@ -2914,7 +3004,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
   ptrdiff_t argnum = 0;
   /* Set ACCUM to VAL's value if it is a fixnum, otherwise to some
      ignored value to avoid using an uninitialized variable later.  */
-  intmax_t accum = XFIXNUM (val);
+  intmax_t accum = XFIXNUM_RAW (val);
 
   if (FIXNUMP (val))
     while (true)
@@ -2922,8 +3012,7 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	argnum++;
 	if (argnum == nargs)
 	  return make_int (accum);
-	val = args[argnum];
-	CHECK_NUMBER_COERCE_MARKER (val);
+	val = check_number_coerce_marker (args[argnum]);
 
 	/* Set NEXT to the next value if it fits, else exit the loop.  */
 	intmax_t next;
@@ -2932,8 +3021,8 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 
 	/* Set ACCUM to the next operation's result if it fits,
 	   else exit the loop.  */
-	bool overflow = false;
-	intmax_t a UNINIT;
+	bool overflow;
+	intmax_t a;
 	switch (code)
 	  {
 	  case Aadd : overflow = INT_ADD_WRAPV (accum, next, &a); break;
@@ -2942,10 +3031,11 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	  case Adiv:
 	    if (next == 0)
 	      xsignal0 (Qarith_error);
-	    overflow = INT_DIVIDE_OVERFLOW (accum, next);
-	    if (!overflow)
-	      a = accum / next;
-	    break;
+	    /* This cannot overflow, as integer overflow can
+	       occur only if the dividend is INTMAX_MIN, but
+	       INTMAX_MIN < MOST_NEGATIVE_FIXNUM <= accum.  */
+	    accum /= next;
+	    continue;
 	  case Alogand: accum &= next; continue;
 	  case Alogior: accum |= next; continue;
 	  case Alogxor: accum ^= next; continue;
@@ -2969,8 +3059,7 @@ usage: (+ &rest NUMBERS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (0);
-  Lisp_Object a = args[0];
-  CHECK_NUMBER_COERCE_MARKER (a);
+  Lisp_Object a = check_number_coerce_marker (args[0]);
   return nargs == 1 ? a : arith_driver (Aadd, nargs, args, a);
 }
 
@@ -2983,15 +3072,14 @@ usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (0);
-  Lisp_Object a = args[0];
-  CHECK_NUMBER_COERCE_MARKER (a);
+  Lisp_Object a = check_number_coerce_marker (args[0]);
   if (nargs == 1)
     {
       if (FIXNUMP (a))
 	return make_int (-XFIXNUM (a));
       if (FLOATP (a))
 	return make_float (-XFLOAT_DATA (a));
-      mpz_neg (mpz[0], XBIGNUM (a)->value);
+      mpz_neg (mpz[0], *xbignum_val (a));
       return make_integer_mpz ();
     }
   return arith_driver (Asub, nargs, args, a);
@@ -3004,8 +3092,7 @@ usage: (* &rest NUMBERS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (1);
-  Lisp_Object a = args[0];
-  CHECK_NUMBER_COERCE_MARKER (a);
+  Lisp_Object a = check_number_coerce_marker (args[0]);
   return nargs == 1 ? a : arith_driver (Amult, nargs, args, a);
 }
 
@@ -3017,8 +3104,7 @@ The arguments must be numbers or markers.
 usage: (/ NUMBER &rest DIVISORS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object a = args[0];
-  CHECK_NUMBER_COERCE_MARKER (a);
+  Lisp_Object a = check_number_coerce_marker (args[0]);
   if (nargs == 1)
     {
       if (FIXNUMP (a))
@@ -3044,86 +3130,90 @@ usage: (/ NUMBER &rest DIVISORS)  */)
   return arith_driver (Adiv, nargs, args, a);
 }
 
+/* Return NUM % DEN (or NUM mod DEN, if MODULO).  NUM and DEN must be
+   integers.  */
+static Lisp_Object
+integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
+{
+  if (FIXNUMP (den))
+    {
+      EMACS_INT d = XFIXNUM (den);
+      if (d == 0)
+	xsignal0 (Qarith_error);
+
+      EMACS_INT r;
+      bool have_r = false;
+      if (FIXNUMP (num))
+	{
+	  r = XFIXNUM (num) % d;
+	  have_r = true;
+	}
+      else if (eabs (d) <= ULONG_MAX)
+	{
+	  mpz_t const *n = xbignum_val (num);
+	  bool neg_n = mpz_sgn (*n) < 0;
+	  r = mpz_tdiv_ui (*n, eabs (d));
+	  if (neg_n)
+	    r = -r;
+	  have_r = true;
+	}
+
+      if (have_r)
+	{
+	  /* If MODULO and the remainder has the wrong sign, fix it.  */
+	  if (modulo && (d < 0 ? r > 0 : r < 0))
+	    r += d;
+
+	  return make_fixnum (r);
+	}
+    }
+
+  mpz_t const *d = bignum_integer (&mpz[1], den);
+  mpz_t *r = &mpz[0];
+  mpz_tdiv_r (*r, *bignum_integer (&mpz[0], num), *d);
+
+  if (modulo)
+    {
+      /* If the remainder has the wrong sign, fix it.  */
+      int sgn_r = mpz_sgn (*r);
+      if (mpz_sgn (*d) < 0 ? sgn_r > 0 : sgn_r < 0)
+	mpz_add (*r, *r, *d);
+    }
+
+  return make_integer_mpz ();
+}
+
 DEFUN ("%", Frem, Srem, 2, 2, 0,
        doc: /* Return remainder of X divided by Y.
 Both must be integers or markers.  */)
-  (register Lisp_Object x, Lisp_Object y)
+  (Lisp_Object x, Lisp_Object y)
 {
-  CHECK_INTEGER_COERCE_MARKER (x);
-  CHECK_INTEGER_COERCE_MARKER (y);
-
-  /* A bignum can never be 0, so don't check that case.  */
-  if (FIXNUMP (y) && XFIXNUM (y) == 0)
-    xsignal0 (Qarith_error);
-
-  if (FIXNUMP (x) && FIXNUMP (y))
-    return make_fixnum (XFIXNUM (x) % XFIXNUM (y));
-  else
-    {
-      mpz_tdiv_r (mpz[0],
-		  *bignum_integer (&mpz[0], x),
-		  *bignum_integer (&mpz[1], y));
-      return make_integer_mpz ();
-    }
+  x = check_integer_coerce_marker (x);
+  y = check_integer_coerce_marker (y);
+  return integer_remainder (x, y, false);
 }
 
 DEFUN ("mod", Fmod, Smod, 2, 2, 0,
        doc: /* Return X modulo Y.
 The result falls between zero (inclusive) and Y (exclusive).
 Both X and Y must be numbers or markers.  */)
-  (register Lisp_Object x, Lisp_Object y)
+  (Lisp_Object x, Lisp_Object y)
 {
-  CHECK_NUMBER_COERCE_MARKER (x);
-  CHECK_NUMBER_COERCE_MARKER (y);
-
-  /* Note that a bignum can never be 0, so we don't need to check that
-     case.  */
-  if (FIXNUMP (y) && XFIXNUM (y) == 0)
-    xsignal0 (Qarith_error);
-
+  x = check_number_coerce_marker (x);
+  y = check_number_coerce_marker (y);
   if (FLOATP (x) || FLOATP (y))
     return fmod_float (x, y);
-
-  if (FIXNUMP (x) && FIXNUMP (y))
-    {
-      EMACS_INT i1 = XFIXNUM (x), i2 = XFIXNUM (y);
-
-      if (i2 == 0)
-	xsignal0 (Qarith_error);
-
-      i1 %= i2;
-
-      /* If the "remainder" comes out with the wrong sign, fix it.  */
-      if (i2 < 0 ? i1 > 0 : i1 < 0)
-	i1 += i2;
-
-      return make_fixnum (i1);
-    }
-  else
-    {
-      mpz_t *ym = bignum_integer (&mpz[1], y);
-      bool neg_y = mpz_sgn (*ym) < 0;
-      mpz_mod (mpz[0], *bignum_integer (&mpz[0], x), *ym);
-
-      /* Fix the sign if needed.  */
-      int sgn_r = mpz_sgn (mpz[0]);
-      if (neg_y ? sgn_r > 0 : sgn_r < 0)
-	mpz_add (mpz[0], mpz[0], *ym);
-
-      return make_integer_mpz ();
-    }
+  return integer_remainder (x, y, true);
 }
 
 static Lisp_Object
 minmax_driver (ptrdiff_t nargs, Lisp_Object *args,
 	       enum Arith_Comparison comparison)
 {
-  Lisp_Object accum = args[0];
-  CHECK_NUMBER_COERCE_MARKER (accum);
+  Lisp_Object accum = check_number_coerce_marker (args[0]);
   for (ptrdiff_t argnum = 1; argnum < nargs; argnum++)
     {
-      Lisp_Object val = args[argnum];
-      CHECK_NUMBER_COERCE_MARKER (val);
+      Lisp_Object val = check_number_coerce_marker (args[argnum]);
       if (!NILP (arithcompare (val, accum, comparison)))
 	accum = val;
       else if (FLOATP (val) && isnan (XFLOAT_DATA (val)))
@@ -3158,8 +3248,7 @@ usage: (logand &rest INTS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (-1);
-  Lisp_Object a = args[0];
-  CHECK_INTEGER_COERCE_MARKER (a);
+  Lisp_Object a = check_integer_coerce_marker (args[0]);
   return nargs == 1 ? a : arith_driver (Alogand, nargs, args, a);
 }
 
@@ -3171,8 +3260,7 @@ usage: (logior &rest INTS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (0);
-  Lisp_Object a = args[0];
-  CHECK_INTEGER_COERCE_MARKER (a);
+  Lisp_Object a = check_integer_coerce_marker (args[0]);
   return nargs == 1 ? a : arith_driver (Alogior, nargs, args, a);
 }
 
@@ -3184,8 +3272,7 @@ usage: (logxor &rest INTS-OR-MARKERS)  */)
 {
   if (nargs == 0)
     return make_fixnum (0);
-  Lisp_Object a = args[0];
-  CHECK_INTEGER_COERCE_MARKER (a);
+  Lisp_Object a = check_integer_coerce_marker (args[0]);
   return nargs == 1 ? a : arith_driver (Alogxor, nargs, args, a);
 }
 
@@ -3200,7 +3287,7 @@ representation.  */)
 
   if (BIGNUMP (value))
     {
-      mpz_t *nonneg = &XBIGNUM (value)->value;
+      mpz_t const *nonneg = xbignum_val (value);
       if (mpz_sgn (*nonneg) < 0)
 	{
 	  mpz_com (mpz[0], *nonneg);
@@ -3231,10 +3318,10 @@ In this case, the sign bit is duplicated.  */)
     {
       if (EQ (value, make_fixnum (0)))
 	return value;
-      if (mpz_sgn (XBIGNUM (count)->value) < 0)
+      if (mpz_sgn (*xbignum_val (count)) < 0)
 	{
 	  EMACS_INT v = (FIXNUMP (value) ? XFIXNUM (value)
-			 : mpz_sgn (XBIGNUM (value)->value));
+			 : mpz_sgn (*xbignum_val (value)));
 	  return make_fixnum (v < 0 ? -1 : 0);
 	}
       overflow_error ();
@@ -3255,7 +3342,7 @@ In this case, the sign bit is duplicated.  */)
 	}
     }
 
-  mpz_t *zval = bignum_integer (&mpz[0], value);
+  mpz_t const *zval = bignum_integer (&mpz[0], value);
   if (XFIXNUM (count) < 0)
     {
       if (TYPE_MAXIMUM (mp_bitcnt_t) < - XFIXNUM (count))
@@ -3273,14 +3360,29 @@ In this case, the sign bit is duplicated.  */)
 Lisp_Object
 expt_integer (Lisp_Object x, Lisp_Object y)
 {
+  /* Special cases for -1 <= x <= 1, which never overflow.  */
+  if (EQ (x, make_fixnum (1)))
+    return x;
+  if (EQ (x, make_fixnum (0)))
+    return EQ (x, y) ? make_fixnum (1) : x;
+  if (EQ (x, make_fixnum (-1)))
+    return ((FIXNUMP (y) ? XFIXNUM (y) & 1 : mpz_odd_p (*xbignum_val (y)))
+	    ? x : make_fixnum (1));
+
   unsigned long exp;
-  if (TYPE_RANGED_FIXNUMP (unsigned long, y))
-    exp = XFIXNUM (y);
-  else if (MOST_POSITIVE_FIXNUM < ULONG_MAX && BIGNUMP (y)
-	   && mpz_fits_ulong_p (XBIGNUM (y)->value))
-    exp = mpz_get_ui (XBIGNUM (y)->value);
+  if (FIXNUMP (y))
+    {
+      if (ULONG_MAX < XFIXNUM (y))
+	overflow_error ();
+      exp = XFIXNUM (y);
+    }
   else
-    overflow_error ();
+    {
+      if (ULONG_MAX <= MOST_POSITIVE_FIXNUM
+	  || !mpz_fits_ulong_p (*xbignum_val (y)))
+	overflow_error ();
+      exp = mpz_get_ui (*xbignum_val (y));
+    }
 
   emacs_mpz_pow_ui (mpz[0], *bignum_integer (&mpz[0], x), exp);
   return make_integer_mpz ();
@@ -3289,30 +3391,30 @@ expt_integer (Lisp_Object x, Lisp_Object y)
 DEFUN ("1+", Fadd1, Sadd1, 1, 1, 0,
        doc: /* Return NUMBER plus one.  NUMBER may be a number or a marker.
 Markers are converted to integers.  */)
-  (register Lisp_Object number)
+  (Lisp_Object number)
 {
-  CHECK_NUMBER_COERCE_MARKER (number);
+  number = check_number_coerce_marker (number);
 
   if (FIXNUMP (number))
     return make_int (XFIXNUM (number) + 1);
   if (FLOATP (number))
     return (make_float (1.0 + XFLOAT_DATA (number)));
-  mpz_add_ui (mpz[0], XBIGNUM (number)->value, 1);
+  mpz_add_ui (mpz[0], *xbignum_val (number), 1);
   return make_integer_mpz ();
 }
 
 DEFUN ("1-", Fsub1, Ssub1, 1, 1, 0,
        doc: /* Return NUMBER minus one.  NUMBER may be a number or a marker.
 Markers are converted to integers.  */)
-  (register Lisp_Object number)
+  (Lisp_Object number)
 {
-  CHECK_NUMBER_COERCE_MARKER (number);
+  number = check_number_coerce_marker (number);
 
   if (FIXNUMP (number))
     return make_int (XFIXNUM (number) - 1);
   if (FLOATP (number))
     return (make_float (-1.0 + XFLOAT_DATA (number)));
-  mpz_sub_ui (mpz[0], XBIGNUM (number)->value, 1);
+  mpz_sub_ui (mpz[0], *xbignum_val (number), 1);
   return make_integer_mpz ();
 }
 
@@ -3323,7 +3425,7 @@ DEFUN ("lognot", Flognot, Slognot, 1, 1, 0,
   CHECK_INTEGER (number);
   if (FIXNUMP (number))
     return make_fixnum (~XFIXNUM (number));
-  mpz_com (mpz[0], XBIGNUM (number)->value);
+  mpz_com (mpz[0], *xbignum_val (number));
   return make_integer_mpz ();
 }
 
@@ -3350,27 +3452,14 @@ bool_vector_spare_mask (EMACS_INT nr_bits)
   return (((bits_word) 1) << (nr_bits % BITS_PER_BITS_WORD)) - 1;
 }
 
-/* Info about unsigned long long, falling back on unsigned long
-   if unsigned long long is not available.  */
-
-#if HAVE_UNSIGNED_LONG_LONG_INT && defined ULLONG_WIDTH
-enum { ULL_WIDTH = ULLONG_WIDTH };
-# define ULL_MAX ULLONG_MAX
-#else
-enum { ULL_WIDTH = ULONG_WIDTH };
-# define ULL_MAX ULONG_MAX
-# define count_one_bits_ll count_one_bits_l
-# define count_trailing_zeros_ll count_trailing_zeros_l
-#endif
-
 /* Shift VAL right by the width of an unsigned long long.
-   ULL_WIDTH must be less than BITS_PER_BITS_WORD.  */
+   ULLONG_WIDTH must be less than BITS_PER_BITS_WORD.  */
 
 static bits_word
 shift_right_ull (bits_word w)
 {
   /* Pacify bogus GCC warning about shift count exceeding type width.  */
-  int shift = ULL_WIDTH - BITS_PER_BITS_WORD < 0 ? ULL_WIDTH : 0;
+  int shift = ULLONG_WIDTH - BITS_PER_BITS_WORD < 0 ? ULLONG_WIDTH : 0;
   return w >> shift;
 }
 
@@ -3387,7 +3476,7 @@ count_one_bits_word (bits_word w)
     {
       int i = 0, count = 0;
       while (count += count_one_bits_ll (w),
-	     (i += ULL_WIDTH) < BITS_PER_BITS_WORD)
+	     (i += ULLONG_WIDTH) < BITS_PER_BITS_WORD)
 	w = shift_right_ull (w);
       return count;
     }
@@ -3518,7 +3607,7 @@ count_trailing_zero_bits (bits_word val)
     return count_trailing_zeros (val);
   if (BITS_WORD_MAX == ULONG_MAX)
     return count_trailing_zeros_l (val);
-  if (BITS_WORD_MAX == ULL_MAX)
+  if (BITS_WORD_MAX == ULLONG_MAX)
     return count_trailing_zeros_ll (val);
 
   /* The rest of this code is for the unlikely platform where bits_word differs
@@ -3532,18 +3621,18 @@ count_trailing_zero_bits (bits_word val)
     {
       int count;
       for (count = 0;
-	   count < BITS_PER_BITS_WORD - ULL_WIDTH;
-	   count += ULL_WIDTH)
+	   count < BITS_PER_BITS_WORD - ULLONG_WIDTH;
+	   count += ULLONG_WIDTH)
 	{
-	  if (val & ULL_MAX)
+	  if (val & ULLONG_MAX)
 	    return count + count_trailing_zeros_ll (val);
 	  val = shift_right_ull (val);
 	}
 
-      if (BITS_PER_BITS_WORD % ULL_WIDTH != 0
+      if (BITS_PER_BITS_WORD % ULLONG_WIDTH != 0
 	  && BITS_WORD_MAX == (bits_word) -1)
 	val |= (bits_word) 1 << pre_value (ULONG_MAX < BITS_WORD_MAX,
-					   BITS_PER_BITS_WORD % ULL_WIDTH);
+					   BITS_PER_BITS_WORD % ULLONG_WIDTH);
       return count + count_trailing_zeros_ll (val);
     }
 }
@@ -3556,10 +3645,8 @@ bits_word_to_host_endian (bits_word val)
 #else
   if (BITS_WORD_MAX >> 31 == 1)
     return bswap_32 (val);
-# if HAVE_UNSIGNED_LONG_LONG
   if (BITS_WORD_MAX >> 31 >> 31 >> 1 == 1)
     return bswap_64 (val);
-# endif
   {
     int i;
     bits_word r = 0;
@@ -3802,6 +3889,7 @@ syms_of_data (void)
   DEFSYM (Qerror, "error");
   DEFSYM (Quser_error, "user-error");
   DEFSYM (Qquit, "quit");
+  DEFSYM (Qminibuffer_quit, "minibuffer-quit");
   DEFSYM (Qwrong_length_argument, "wrong-length-argument");
   DEFSYM (Qwrong_type_argument, "wrong-type-argument");
   DEFSYM (Qargs_out_of_range, "args-out-of-range");
@@ -3823,6 +3911,7 @@ syms_of_data (void)
   DEFSYM (Qbuffer_read_only, "buffer-read-only");
   DEFSYM (Qtext_read_only, "text-read-only");
   DEFSYM (Qmark_inactive, "mark-inactive");
+  DEFSYM (Qinhibited_interaction, "inhibited-interaction");
 
   DEFSYM (Qlistp, "listp");
   DEFSYM (Qconsp, "consp");
@@ -3873,6 +3962,7 @@ syms_of_data (void)
   Fput (sym, Qerror_message, build_pure_c_string (msg))
 
   PUT_ERROR (Qquit, Qnil, "Quit");
+  PUT_ERROR (Qminibuffer_quit, pure_cons (Qquit, Qnil), "Quit");
 
   PUT_ERROR (Quser_error, error_tail, "");
   PUT_ERROR (Qwrong_length_argument, error_tail, "Wrong length argument");
@@ -3907,6 +3997,8 @@ syms_of_data (void)
   PUT_ERROR (Qbuffer_read_only, error_tail, "Buffer is read-only");
   PUT_ERROR (Qtext_read_only, pure_cons (Qbuffer_read_only, error_tail),
 	     "Text is read-only");
+  PUT_ERROR (Qinhibited_interaction, error_tail,
+	     "User interaction while inhibited");
 
   DEFSYM (Qrange_error, "range-error");
   DEFSYM (Qdomain_error, "domain-error");
@@ -3921,9 +4013,9 @@ syms_of_data (void)
   PUT_ERROR (Qsingularity_error, Fcons (Qdomain_error, arith_tail),
 	     "Arithmetic singularity error");
 
-  PUT_ERROR (Qoverflow_error, Fcons (Qdomain_error, arith_tail),
+  PUT_ERROR (Qoverflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic overflow error");
-  PUT_ERROR (Qunderflow_error, Fcons (Qdomain_error, arith_tail),
+  PUT_ERROR (Qunderflow_error, Fcons (Qrange_error, arith_tail),
 	     "Arithmetic underflow error");
 
   //staticpro (&Qnil);
@@ -3942,6 +4034,7 @@ syms_of_data (void)
   DEFSYM (Qoverlay, "overlay");
   DEFSYM (Qfinalizer, "finalizer");
   DEFSYM (Qmodule_function, "module-function");
+  DEFSYM (Qnative_comp_unit, "native-comp-unit");
   DEFSYM (Quser_ptr, "user-ptr");
   DEFSYM (Qfloat, "float");
   DEFSYM (Qwindow_configuration, "window-configuration");
@@ -3970,8 +4063,8 @@ syms_of_data (void)
 
   DEFSYM (Qdefalias_fset_function, "defalias-fset-function");
 
-  //FIX: 2019 uses defsubr instead of DEFSYM, which sets the
-  //     symbol-function of the symbol object
+  DEFSYM (Qbyte_code_function_p, "byte-code-function-p");
+
   set_symbol_function (Qwholenump, SYMBOL_FUNCTION (Qnatnump));
 
   DEFVAR_LISP ("most-positive-fixnum", Vmost_positive_fixnum,
@@ -3992,5 +4085,6 @@ This variable cannot be set; trying to do so will signal an error.  */);
   DEFSYM (Qunlet, "unlet");
   DEFSYM (Qset, "set");
   DEFSYM (Qset_default, "set-default");
+  DEFSYM (Qcommand_modes, "command-modes");
   SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("most-negative-fixnum")));
 }

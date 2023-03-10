@@ -1,6 +1,6 @@
-;;; mh-seq.el --- MH-E sequences support
+;;; mh-seq.el --- MH-E sequences support  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1993, 1995, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1995, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
@@ -26,12 +26,9 @@
 ;; Sequences are stored in the alist `mh-seq-list' in the form:
 ;;     ((seq-name msgs ...) (seq-name msgs ...) ...)
 
-;;; Change Log:
-
 ;;; Code:
 
 (require 'mh-e)
-(mh-require-cl)
 (require 'mh-scan)
 
 (require 'font-lock)
@@ -157,7 +154,7 @@ The list appears in a buffer named \"*MH-E Sequences*\"."
           (let ((name (mh-seq-name (car seq-list)))
                 (sorted-seq-msgs
                  (mh-coalesce-msg-list
-                  (sort (copy-sequence (mh-seq-msgs (car seq-list))) '<)))
+                  (sort (copy-sequence (mh-seq-msgs (car seq-list))) #'<)))
                 name-spec)
             (insert (setq name-spec (format (format "%%%ss:" max-len) name)))
             (while sorted-seq-msgs
@@ -183,16 +180,16 @@ MESSAGE appears."
   (interactive "P")
   (if (not message)
       (setq message (mh-get-msg-num t)))
-  (let* ((dest-folder (loop for seq in mh-refile-list
-                            when (member message (cdr seq)) return (car seq)
-                            finally return nil))
+  (let* ((dest-folder (cl-loop for seq in mh-refile-list
+                               when (member message (cdr seq)) return (car seq)
+                               finally return nil))
          (deleted-flag (unless dest-folder (member message mh-delete-list))))
     (message "Message %d%s is in sequences: %s"
              message
              (cond (dest-folder (format " (to be refiled to %s)" dest-folder))
-                   (deleted-flag (format " (to be deleted)"))
+                   (deleted-flag " (to be deleted)")
                    (t ""))
-             (mapconcat 'concat
+             (mapconcat #'concat
                         (mh-list-to-string (mh-seq-containing-msg message t))
                         " "))))
 
@@ -391,10 +388,7 @@ Prompt with PROMPT, raise an error if the sequence is empty and
 the NOT-EMPTY flag is non-nil, and supply an optional DEFAULT
 sequence. A reply of `%' defaults to the first sequence
 containing the current message."
-  (let* ((input (completing-read (format "%s sequence%s: " prompt
-                                         (if default
-                                             (format " (default %s)" default)
-                                           ""))
+  (let* ((input (completing-read (format-prompt "%s sequence" default prompt)
                                  (mh-seq-names mh-seq-list)
                                  nil nil nil 'mh-sequence-history))
          (seq (cond ((equal input "%")
@@ -495,13 +489,13 @@ folder buffer are not updated."
   ;; Add to a SEQUENCE each message the list of MSGS.
   (if (and (mh-valid-seq-p seq) (not (mh-folder-name-p seq)))
       (if msgs
-          (apply 'mh-exec-cmd "mark" mh-current-folder "-add"
+          (apply #'mh-exec-cmd "mark" mh-current-folder "-add"
                  "-sequence" (symbol-name seq)
                  (mh-coalesce-msg-list msgs)))))
 
 (defun mh-canonicalize-sequence (msgs)
   "Sort MSGS in decreasing order and remove duplicates."
-  (let* ((sorted-msgs (sort (copy-sequence msgs) '>))
+  (let* ((sorted-msgs (sort (copy-sequence msgs) #'>))
          (head sorted-msgs))
     (while (cdr head)
       (if (= (car head) (cadr head))
@@ -566,7 +560,7 @@ OP is one of `widen' and `unthread'."
 (defvar mh-range-seq-names)
 (defvar mh-range-history ())
 (defvar mh-range-completion-map (copy-keymap minibuffer-local-completion-map))
-(define-key mh-range-completion-map " " 'self-insert-command)
+(define-key mh-range-completion-map " " #'self-insert-command)
 
 ;;;###mh-autoload
 (defun mh-interactive-range (range-prompt &optional default)
@@ -647,13 +641,10 @@ should be replaced with:
                         ((stringp default) default)
                         ((symbolp default) (symbol-name default))))
          (prompt (cond ((and guess large default)
-                        (format "%s (folder has %s messages, default %s)"
-                                prompt (car counts) default))
-                       ((and guess large)
-                        (format "%s (folder has %s messages)"
-                                prompt (car counts)))
+                        (format-prompt "%s (folder has %s messages)"
+                                default prompt (car counts)))
                        (default
-                         (format "%s (default %s)" prompt default))))
+                         (format-prompt prompt default))))
          (minibuffer-local-completion-map mh-range-completion-map)
          (seq-list (if (eq folder mh-current-folder)
                        mh-seq-list
@@ -663,7 +654,7 @@ should be replaced with:
                   (mh-seq-names seq-list)))
          (input (cond ((and (not ask-flag) unseen) (symbol-name mh-unseen-seq))
                       ((and (not ask-flag) (not large)) "all")
-                      (t (completing-read (format "%s: " prompt)
+                      (t (completing-read prompt
                                           'mh-range-completion-function nil nil
                                           nil 'mh-range-history default))))
          msg-list)
@@ -721,9 +712,9 @@ completion is over."
           ((eq flag t)
            (all-completions last-word candidates predicate))
           ((eq flag 'lambda)
-           (loop for x in candidates
-                 when (equal x last-word) return t
-                 finally return nil)))))
+           (cl-loop for x in candidates
+                    when (equal x last-word) return t
+                    finally return nil)))))
 
 (defun mh-seq-names (seq-list)
   "Return an alist containing the names of the SEQ-LIST."
@@ -742,8 +733,8 @@ completion is over."
     (call-process (expand-file-name "flist" mh-progs) nil t nil "-showzero"
                   "-norecurse" folder "-sequence" (symbol-name mh-unseen-seq))
     (goto-char (point-min))
-    (multiple-value-bind (folder unseen total)
-        (values-list
+    (cl-multiple-value-bind (folder unseen total)
+        (cl-values-list
          (mh-parse-flist-output-line
           (buffer-substring (point) (mh-line-end-position))))
       (list total unseen folder))))
@@ -795,9 +786,9 @@ If SAVE-REFILES is non-nil, then keep the sequences
 that note messages to be refiled."
   (let ((seqs ()))
     (cond (save-refiles
-           (mh-mapc (function (lambda (seq) ; Save the refiling sequences
-                                (if (mh-folder-name-p (mh-seq-name seq))
-                                    (setq seqs (cons seq seqs)))))
+           (mh-mapc (lambda (seq) ; Save the refiling sequences
+                      (if (mh-folder-name-p (mh-seq-name seq))
+                          (setq seqs (cons seq seqs))))
                     mh-seq-list)))
     (save-excursion
       (if (eq 0 (mh-exec-cmd-quiet nil "mark" folder "-list"))
@@ -934,8 +925,8 @@ notated."
       (dolist (msg (mh-seq-msgs seq))
         (push (car seq) (gethash msg msg-hash))))
     (mh-iterate-on-range msg range
-      (loop for seq in (gethash msg msg-hash)
-            do (mh-add-sequence-notation msg (mh-internal-seq seq))))))
+      (cl-loop for seq in (gethash msg msg-hash)
+               do (mh-add-sequence-notation msg (mh-internal-seq seq))))))
 
 (defun mh-add-sequence-notation (msg internal-seq-flag)
   "Add sequence notation to the MSG on the current line.

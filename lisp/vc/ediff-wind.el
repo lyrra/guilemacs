@@ -1,6 +1,6 @@
 ;;; ediff-wind.el --- window manipulation utilities  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-1997, 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1994-1997, 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Michael Kifer <kifer@cs.stonybrook.edu>
 ;; Package: ediff
@@ -41,13 +41,6 @@
 (require 'ediff-init)
 (require 'ediff-help)
 ;; end pacifier
-
-
-;; be careful with ediff-tbar
-(eval-and-compile
-  (if (featurep 'xemacs)
-      (require 'ediff-tbar)
-    (defun ediff-compute-toolbar-width () 0)))
 
 (defgroup ediff-window nil
   "Ediff window manipulation."
@@ -96,25 +89,25 @@ provided functions are written."
 		 (function :tag "Other function"))
   :version "24.3")
 
-;; indicates if we are in a multiframe setup
-(ediff-defvar-local ediff-multiframe nil "")
+(ediff-defvar-local ediff-multiframe nil
+  "Indicates if we are in a multiframe setup.")
 
-;; Share of the frame occupied by the merge window (buffer C)
-(ediff-defvar-local ediff-merge-window-share 0.45 "")
+(ediff-defvar-local ediff-merge-window-share 0.45
+  "Share of the frame occupied by the merge window (buffer C).")
 
-;; The control window.
-(ediff-defvar-local ediff-control-window nil "")
-;; Official window for buffer A
-(ediff-defvar-local ediff-window-A nil "")
-;; Official window for buffer B
-(ediff-defvar-local ediff-window-B nil "")
-;; Official window for buffer C
-(ediff-defvar-local ediff-window-C nil "")
-;; Official window for buffer Ancestor
-(ediff-defvar-local ediff-window-Ancestor nil "")
-;; Ediff's window configuration.
-;; Used to minimize the need to rearrange windows.
-(ediff-defvar-local ediff-window-config-saved "" "")
+(ediff-defvar-local ediff-control-window nil
+  "The control window.")
+(ediff-defvar-local ediff-window-A nil
+  "Official window for buffer A.")
+(ediff-defvar-local ediff-window-B nil
+  "Official window for buffer B.")
+(ediff-defvar-local ediff-window-C nil
+  "Official window for buffer C.")
+(ediff-defvar-local ediff-window-Ancestor nil
+  "Official window for buffer Ancestor.")
+(ediff-defvar-local ediff-window-config-saved ""
+  "Ediff's window configuration.
+Used to minimize the need to rearrange windows.")
 
 ;; Association between buff-type and ediff-window-*
 (defconst ediff-window-alist
@@ -151,21 +144,15 @@ In this case, Ediff will use those frames to display these buffers."
 	  (const :tag "Split horizontally" split-window-horizontally)
 	  function))
 
-;; Definitions hidden from the compiler by compat wrappers.
-(declare-function ediff-display-pixel-width "ediff-init")
-(declare-function ediff-display-pixel-height "ediff-init")
-
 (defconst ediff-control-frame-parameters
   (list
    '(name . "Ediff")
    ;;'(unsplittable . t)
    '(minibuffer . nil)
-   '(user-position . t)	      ; Emacs only
-   '(vertical-scroll-bars . nil)  ; Emacs only
-   '(scrollbar-width . 0)         ; XEmacs only
-   '(scrollbar-height . 0)        ; XEmacs only
-   '(menu-bar-lines . 0)          ; Emacs only
-   '(tool-bar-lines . 0)          ; Emacs 21+ only
+   '(user-position . t)
+   '(vertical-scroll-bars . nil)
+   '(menu-bar-lines . 0)
+   '(tool-bar-lines . 0)
    '(left-fringe    . 0)
    '(right-fringe   . 0)
    ;; don't lower but auto-raise
@@ -179,23 +166,23 @@ In this case, Ediff will use those frames to display these buffers."
    ;; this blocks queries from  window manager as to where to put
    ;; ediff's control frame. we put the frame outside the display,
    ;; so the initial frame won't jump all over the screen
-   (cons 'top  (if (fboundp 'ediff-display-pixel-height)
-		   (1+ (ediff-display-pixel-height))
+   (cons 'top  (if (fboundp 'display-pixel-height)
+		   (1+ (display-pixel-height))
 		 3000))
-   (cons 'left (if (fboundp 'ediff-display-pixel-width)
-		   (1+ (ediff-display-pixel-width))
+   (cons 'left (if (fboundp 'display-pixel-width)
+		   (1+ (display-pixel-width))
 		 3000))
    )
   "Frame parameters for displaying Ediff Control Panel.
 Used internally---not a user option.")
 
-;; position of the mouse; used to decide whether to warp the mouse into ctl
-;; frame
-(ediff-defvar-local ediff-mouse-pixel-position nil "")
+(ediff-defvar-local ediff-mouse-pixel-position nil
+  "Position of the mouse.
+Used to decide whether to warp the mouse into control frame.")
 
 ;; not used for now
 (defvar ediff-mouse-pixel-threshold 30
-  "If the user moves mouse more than this many pixels, Ediff won't warp mouse into control window.")
+  "If mouse moved more than this many pixels, don't warp mouse into control window.")
 
 (defcustom ediff-grab-mouse t
   "If t, Ediff will always grab the mouse and put it in the control frame.
@@ -219,7 +206,7 @@ This is used by the default control frame positioning function,
 customization of the default control frame positioning."
   :type 'integer)
 
-(defcustom ediff-narrow-control-frame-leftward-shift (if (featurep 'xemacs) 7 3)
+(defcustom ediff-narrow-control-frame-leftward-shift 3
   "The leftward shift of control frame from the right edge of buf A's frame.
 Measured in characters.
 This is used by the default control frame positioning function,
@@ -240,12 +227,10 @@ customization of the default."
 
 ;; Wide frame display
 
-;; t means Ediff is using wide display
-(ediff-defvar-local ediff-wide-display-p nil "")
-;; keeps frame config for toggling wide display
+(ediff-defvar-local ediff-wide-display-p nil
+  "If t, Ediff is using wide display.")
 (ediff-defvar-local ediff-wide-display-orig-parameters nil
-  "Frame parameters to be restored when the user wants to toggle the wide
-display off.")
+  "Frame parameters to restore when toggling the wide display off.")
 (ediff-defvar-local ediff-wide-display-frame nil
   "Frame to be used for wide display.")
 (ediff-defvar-local ediff-make-wide-display-function #'ediff-make-wide-display
@@ -256,18 +241,17 @@ frame parameters in `ediff-wide-display-orig-parameters'.
 The variable `ediff-wide-display-frame' should be set to contain
 the frame used for the wide display.")
 
-;; Frame used for the control panel in a windowing system.
-(ediff-defvar-local ediff-control-frame nil "")
+(ediff-defvar-local ediff-control-frame nil
+  "Frame used for the control panel in a windowing system.")
 
 (defcustom ediff-prefer-iconified-control-frame nil
   "If t, keep control panel iconified when help message is off.
 This has effect only on a windowing system.
 If t, hitting `?' to toggle control panel off iconifies it.
 
-This is only useful in Emacs and only for certain kinds of window managers,
-such as TWM and its derivatives, since the window manager must permit
-keyboard input to go into icons.  XEmacs completely ignores keyboard input
-into icons, regardless of the window manager."
+This is only useful for certain kinds of window managers, such as
+TWM and its derivatives, since the window manager must permit
+keyboard input to go into icons."
   :type 'boolean)
 
 ;;; Functions
@@ -276,36 +260,33 @@ into icons, regardless of the window manager."
   (let (event)
     (message
      "Select windows by clicking.  Please click on Window %d " wind-number)
-    (while (not (ediff-mouse-event-p (setq event (ediff-read-event))))
+    (while (not (ediff-mouse-event-p (setq event
+                                           (read--potential-mouse-event))))
       (if (sit-for 1) ; if sequence of events, wait till the final word
 	  (beep 1))
       (message "Please click on Window %d " wind-number))
-    (ediff-read-event) ; discard event
-    (if (featurep 'xemacs)
-        (event-window event)
-      (posn-window (event-start event)))))
+    (read--potential-mouse-event) ; discard event
+    (posn-window (event-start event))))
 
 
 ;; Select the lowest window on the frame.
 (defun ediff-select-lowest-window ()
-  (if (featurep 'xemacs)
-      (select-window (frame-lowest-window))
-    (let* ((lowest-window (selected-window))
-	   (bottom-edge (car (cdr (cdr (cdr (window-edges))))))
-	   (last-window (save-excursion
-			  (other-window -1) (selected-window)))
-	   (window-search t))
-      (while window-search
-	(let* ((this-window (next-window))
-	       (next-bottom-edge
-		(car (cdr (cdr (cdr (window-edges this-window)))))))
-	  (if (< bottom-edge next-bottom-edge)
-	      (setq bottom-edge next-bottom-edge
-		    lowest-window this-window))
-	  (select-window this-window)
-	  (when (eq last-window this-window)
-	    (select-window lowest-window)
-	    (setq window-search nil)))))))
+  (let* ((lowest-window (selected-window))
+	 (bottom-edge (car (cdr (cdr (cdr (window-edges))))))
+	 (last-window (save-excursion
+			(other-window -1) (selected-window)))
+	 (window-search t))
+    (while window-search
+      (let* ((this-window (next-window))
+	     (next-bottom-edge
+	      (car (cdr (cdr (cdr (window-edges this-window)))))))
+	(if (< bottom-edge next-bottom-edge)
+	    (setq bottom-edge next-bottom-edge
+		  lowest-window this-window))
+	(select-window this-window)
+	(when (eq last-window this-window)
+	  (select-window lowest-window)
+	  (setq window-search nil))))))
 
 
 ;;; Common window setup routines
@@ -379,11 +360,6 @@ into icons, regardless of the window manager."
     (switch-to-buffer buf-A)
     (setq wind-A (selected-window))
 
-    ;; XEmacs used to have a lot of trouble with display
-    ;; It did't set things right unless we tell it to sit still
-    ;; 19.12 seems ok.
-    ;;(if (featurep 'xemacs) (sit-for 0))
-
     (split-window-vertically (max 2 (- (window-height) merge-window-lines)))
     (if (eq (selected-window) wind-A)
 	(other-window 1))
@@ -422,7 +398,8 @@ into icons, regardless of the window manager."
   ;; skip dedicated and unsplittable frames
   (ediff-destroy-control-frame control-buffer)
   (let ((window-min-height 1)
-	split-window-function wind-width-or-height
+        (window-combination-resize t)
+	split-window-function
 	three-way-comparison
 	wind-A-start wind-B-start wind-A wind-B wind-C)
     (with-current-buffer control-buffer
@@ -441,27 +418,12 @@ into icons, regardless of the window manager."
 	(select-window (next-window nil 'ignore-minibuf)))
     (delete-other-windows)
     (set-window-dedicated-p (selected-window) nil)
-    (split-window-vertically)
-    (ediff-select-lowest-window)
-    (ediff-setup-control-buffer control-buffer)
 
     ;; go to the upper window and split it betw A, B, and possibly C
     (other-window 1)
     (switch-to-buffer buf-A)
     (setq wind-A (selected-window))
-    (if three-way-comparison
-	(setq wind-width-or-height
-	      (/ (if (eq split-window-function #'split-window-vertically)
-		     (window-height wind-A)
-		   (window-width wind-A))
-		 3)))
-
-    ;; XEmacs used to have a lot of trouble with display
-    ;; It did't set things right unless we told it to sit still
-    ;; 19.12 seems ok.
-    ;;(if (featurep 'xemacs) (sit-for 0))
-
-    (funcall split-window-function wind-width-or-height)
+    (funcall split-window-function)
 
     (if (eq (selected-window) wind-A)
 	(other-window 1))
@@ -470,7 +432,7 @@ into icons, regardless of the window manager."
 
     (if three-way-comparison
 	(progn
-	  (funcall split-window-function) ; equally
+	  (funcall split-window-function)
 	  (if (eq (selected-window) wind-B)
 	      (other-window 1))
 	  (switch-to-buffer buf-C)
@@ -488,7 +450,9 @@ into icons, regardless of the window manager."
 	  (set-window-start wind-A wind-A-start)
 	  (set-window-start wind-B wind-B-start)))
 
-    (ediff-select-lowest-window)
+    (select-window (display-buffer-in-direction
+                    control-buffer
+                    '((direction . bottom))))
     (ediff-setup-control-buffer control-buffer)
     ))
 
@@ -773,6 +737,7 @@ into icons, regardless of the window manager."
 			     (and (not (frame-live-p frame-A))
 				  (or ctl-frame-exists-p
 				      (eq frame-B (selected-frame))))))
+         (window-combination-resize t)
 	 wind-A-start wind-B-start
 	 designated-minibuffer-frame)
 
@@ -785,7 +750,7 @@ into icons, regardless of the window manager."
 			   'B ediff-narrow-bounds))))
 
     (if use-same-frame
-	(let (wind-width-or-height) ; this affects 3way setups only
+        (progn
 	  (if (and (eq frame-A frame-B) (frame-live-p frame-A))
 	      (select-frame frame-A)
 	    ;; avoid dedicated and non-splittable windows
@@ -794,15 +759,7 @@ into icons, regardless of the window manager."
 	  (switch-to-buffer buf-A)
 	  (setq wind-A (selected-window))
 
-	  (if three-way-comparison
-	      (setq wind-width-or-height
-		    (/
-		     (if (eq split-window-function #'split-window-vertically)
-			 (window-height wind-A)
-		       (window-width wind-A))
-		     3)))
-
-	  (funcall split-window-function wind-width-or-height)
+          (funcall split-window-function)
 	  (if (eq (selected-window) wind-A)
 	      (other-window 1))
 	  (switch-to-buffer buf-B)
@@ -885,7 +842,7 @@ into icons, regardless of the window manager."
 
 (defun ediff-skip-unsuitable-frames (&optional ok-unsplittable)
   "Skip unsplittable frames and frames that have dedicated windows.
-create a new splittable frame if none is found."
+Create a new splittable frame if none is found."
   (if (ediff-window-display-p)
       (let ((wind-frame (window-frame))
 	     seen-windows)
@@ -935,8 +892,6 @@ create a new splittable frame if none is found."
     (not (ediff-frame-has-dedicated-windows (window-frame wind)))
     )))
 
-(declare-function ediff-make-bottom-toolbar "ediff-util" (&optional frame))
-
 ;; Prepare or refresh control frame
 (defun ediff-setup-control-frame (ctl-buffer designated-minibuffer-frame)
   (let ((window-min-height 1)
@@ -946,8 +901,6 @@ create a new splittable frame if none is found."
 	fheight fwidth adjusted-parameters)
 
     (with-current-buffer ctl-buffer
-      (if (and (featurep 'xemacs) (featurep 'menubar))
-	  (set-buffer-menubar nil))
       ;;(setq user-grabbed-mouse (ediff-user-grabbed-mouse))
       (run-hooks 'ediff-before-setup-control-frame-hook))
 
@@ -959,7 +912,7 @@ create a new splittable frame if none is found."
 	    ediff-control-frame ctl-frame)
       ;; protect against undefined face-attribute
       (condition-case nil
-	  (if (and (featurep 'emacs) (face-attribute 'mode-line :box))
+	  (if (face-attribute 'mode-line :box)
 	      (set-face-attribute 'mode-line ctl-frame :box nil))
 	(error)))
 
@@ -974,8 +927,7 @@ create a new splittable frame if none is found."
     ;; just a precaution--we should be in ctl-buffer already
     (with-current-buffer ctl-buffer
       (make-local-variable 'frame-title-format)
-      (make-local-variable 'frame-icon-title-format)	; XEmacs
-      (make-local-variable 'icon-title-format))  	; Emacs
+      (make-local-variable 'icon-title-format))
 
     (ediff-setup-control-buffer ctl-buffer)
     (setq dont-iconify-ctl-frame
@@ -987,8 +939,7 @@ create a new splittable frame if none is found."
     ;; 1 more line for the mode line
     (setq lines (1+ (count-lines (point-min) (point-max)))
 	  fheight lines
-	  fwidth (max (+ (ediff-help-message-line-length) 2)
-		      (ediff-compute-toolbar-width))
+          fwidth (max (+ (ediff-help-message-line-length) 2) 0)
 	  adjusted-parameters
 	  (list
 	   ;; possibly change surrogate minibuffer
@@ -1007,27 +958,12 @@ create a new splittable frame if none is found."
 		  '(auto-raise . t))
 		adjusted-parameters))
 
-    ;; In XEmacs, buffer menubar needs to be killed before frame parameters
-    ;; are changed.
-    (if (ediff-has-toolbar-support-p)
-	(when (featurep 'xemacs)
-	  (if (ediff-has-gutter-support-p)
-	      (set-specifier top-gutter (list ctl-frame nil)))
-	  (sit-for 0)
-	  (set-specifier top-toolbar-height (list ctl-frame 0))
-	  ;;(set-specifier bottom-toolbar-height (list ctl-frame 0))
-	  (set-specifier left-toolbar-width (list ctl-frame 0))
-	  (set-specifier right-toolbar-width (list ctl-frame 0))))
-
     ;; As a precaution, we call modify frame parameters twice, in
     ;; order to make sure that at least once we do it for
     ;; a non-iconified frame.  (It appears that in the Windows port of
     ;; Emacs, one can't modify frame parameters of iconified frames.)
     (if (eq system-type 'windows-nt)
 	(modify-frame-parameters ctl-frame adjusted-parameters))
-
-    ;; make or zap toolbar (if not requested)
-    (ediff-make-bottom-toolbar ctl-frame)
 
     (goto-char (point-min))
 
@@ -1070,12 +1006,6 @@ create a new splittable frame if none is found."
 			   (or (eq this-command 'ediff-quit)
 			       (not (eq ediff-grab-mouse t)))))
 
-    (when (featurep 'xemacs)
-      (with-current-buffer ctl-buffer
-	(make-local-hook 'select-frame-hook)
-	(add-hook 'select-frame-hook
-		  #'ediff-xemacs-select-frame-hook nil 'local)))
-
     (with-current-buffer ctl-buffer
       (run-hooks 'ediff-after-setup-control-frame-hook))))
 
@@ -1084,8 +1014,6 @@ create a new splittable frame if none is found."
   (ediff-with-current-buffer ctl-buffer
     (if (and (ediff-window-display-p) (frame-live-p ediff-control-frame))
 	(let ((ctl-frame ediff-control-frame))
-	  (if (and (featurep 'xemacs) (featurep 'menubar))
-	      (set-buffer-menubar default-menubar))
 	  (setq ediff-control-frame nil)
 	  (delete-frame ctl-frame))))
   (if ediff-multiframe
@@ -1099,8 +1027,8 @@ create a new splittable frame if none is found."
   (with-current-buffer ctl-buffer
     (let* ((frame-A (window-frame ediff-window-A))
 	   (frame-A-parameters (frame-parameters frame-A))
-	   (frame-A-top (eval (cdr (assoc 'top frame-A-parameters))))
-	   (frame-A-left (eval (cdr (assoc 'left frame-A-parameters))))
+	   (frame-A-top (eval (cdr (assoc 'top frame-A-parameters)) t))
+	   (frame-A-left (eval (cdr (assoc 'left frame-A-parameters)) t))
 	   (frame-A-width (frame-width frame-A))
 	   (ctl-frame ediff-control-frame)
 	   horizontal-adjustment upward-adjustment
@@ -1117,23 +1045,23 @@ create a new splittable frame if none is found."
 	    ctl-frame-left
 	    (+ frame-A-left
 	       (if ediff-use-long-help-message
-		   (* (ediff-frame-char-width ctl-frame)
+		   (* (frame-char-width ctl-frame)
 		      (+ ediff-wide-control-frame-rightward-shift
 			 horizontal-adjustment))
-		 (- (* frame-A-width (ediff-frame-char-width frame-A))
-		    (* (ediff-frame-char-width ctl-frame)
+		 (- (* frame-A-width (frame-char-width frame-A))
+		    (* (frame-char-width ctl-frame)
 		       (+ ctl-frame-width
 			  ediff-narrow-control-frame-leftward-shift
 			  horizontal-adjustment))))))
       (setq ctl-frame-top
 	    (min ctl-frame-top
-		 (- (ediff-display-pixel-height)
+		 (- (display-pixel-height)
 		    (* 2 ctl-frame-height
-		       (ediff-frame-char-height ctl-frame))))
+		       (frame-char-height ctl-frame))))
 	    ctl-frame-left
 	    (min ctl-frame-left
-		 (- (ediff-display-pixel-width)
-		    (* ctl-frame-width (ediff-frame-char-width ctl-frame)))))
+		 (- (display-pixel-width)
+		    (* ctl-frame-width (frame-char-width ctl-frame)))))
       ;; keep ctl frame within the visible bounds
       (setq ctl-frame-top (max ctl-frame-top 1)
 	    ctl-frame-left (max ctl-frame-left 1))
@@ -1143,6 +1071,7 @@ create a new splittable frame if none is found."
       )))
 
 (defun ediff-xemacs-select-frame-hook ()
+  (declare (obsolete nil "28.1"))
   (if (and (equal (selected-frame) ediff-control-frame)
 	   (not ediff-use-long-help-message))
       (raise-frame ediff-control-frame)))
@@ -1153,14 +1082,14 @@ Saves the old frame parameters in `ediff-wide-display-orig-parameters'.
 The frame to be resized is kept in `ediff-wide-display-frame'.
 This function modifies only the left margin and the width of the display.
 It assumes that it is called from within the control buffer."
-  (if (not (fboundp 'ediff-display-pixel-width))
+  (if (not (fboundp 'display-pixel-width))
       (user-error "Can't determine display width"))
   (let* ((frame-A (window-frame ediff-window-A))
 	 (frame-A-params (frame-parameters frame-A))
-	 (cw (ediff-frame-char-width frame-A))
-	 (wd (- (/ (ediff-display-pixel-width) cw) 5)))
+	 (cw (frame-char-width frame-A))
+	 (wd (- (/ (display-pixel-width) cw) 5)))
     (setq ediff-wide-display-orig-parameters
-	  (list (cons 'left (max 0 (eval (cdr (assoc 'left frame-A-params)))))
+	  (list (cons 'left (max 0 (eval (cdr (assoc 'left frame-A-params)) t)))
 		(cons 'width (cdr (assoc 'width frame-A-params))))
 	  ediff-wide-display-frame frame-A)
     (modify-frame-parameters
@@ -1257,18 +1186,11 @@ It assumes that it is called from within the control buffer."
 
 
 (defun ediff-refresh-control-frame ()
-  (if (featurep 'emacs)
-      ;; set frame/icon titles for Emacs
-      (modify-frame-parameters
-       ediff-control-frame
-       (list (cons 'title (ediff-make-base-title))
-	     (cons 'icon-name (ediff-make-narrow-control-buffer-id))
-	     ))
-    ;; set frame/icon titles for XEmacs
-    (setq frame-title-format (ediff-make-base-title)
-	  frame-icon-title-format (ediff-make-narrow-control-buffer-id))
-    ;; force an update of the frame title
-    (modify-frame-parameters ediff-control-frame '(()))))
+  ;; Set frame/icon titles.
+  (modify-frame-parameters
+   ediff-control-frame
+   (list (cons 'title (ediff-make-base-title))
+	 (cons 'icon-name (ediff-make-narrow-control-buffer-id)))))
 
 
 (defun ediff-make-narrow-control-buffer-id (&optional skip-name)
@@ -1307,9 +1229,7 @@ It assumes that it is called from within the control buffer."
 ;; If buff is not live, return nil
 (defun ediff-get-visible-buffer-window (buff)
   (if (ediff-buffer-live-p buff)
-      (if (featurep 'xemacs)
-	  (get-buffer-window buff t)
-	(get-buffer-window buff 'visible))))
+      (get-buffer-window buff 'visible)))
 
 
 ;;; Functions to decide when to redraw windows
@@ -1348,6 +1268,9 @@ It assumes that it is called from within the control buffer."
 			     (ediff-multiframe-setup-p)
 			     ediff-wide-display-p)))))))
 
+(defun ediff-compute-toolbar-width ()
+  (declare (obsolete nil "28.1"))
+  0)
 
 (provide 'ediff-wind)
 ;;; ediff-wind.el ends here

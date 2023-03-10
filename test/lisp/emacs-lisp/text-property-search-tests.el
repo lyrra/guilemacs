@@ -1,22 +1,24 @@
-;;; text-property-search-tests.el --- Testing text-property-search
+;;; text-property-search-tests.el --- Testing text-property-search  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2018-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2018-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Ingebrigtsen <larsi@gnus.org>
 ;; Keywords:
 
-;; This program is free software; you can redistribute it and/or modify
+;; This file is part of GNU Emacs.
+
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -107,6 +109,67 @@
   (with-test (text-property-search-backward 'face 'bold t t)
              '("bold1")
              35))
+
+(defmacro with-match-test (form beginning end value &optional point)
+  `(with-temp-buffer
+     (text-property-setup)
+     (when ,point
+       (goto-char ,point))
+     (should (equal ,form
+                    (make-prop-match :beginning ,beginning
+                                     :end ,end
+                                     :value ,value)))))
+
+(ert-deftest text-property-search-forward-prop-match-match-face-nil-nil ()
+  (with-match-test
+   (text-property-search-forward 'face nil nil)
+   9 14 'bold))
+
+(ert-deftest text-property-search-forward-prop-match-match-face-bold-t ()
+  (with-match-test
+   (text-property-search-forward 'face 'bold t)
+   9 14 'bold))
+
+(ert-deftest text-property-search-forward-prop-match-match-face-bold-nil ()
+  (with-match-test
+   (text-property-search-forward 'face 'bold nil)
+   1 9 nil))
+
+(ert-deftest text-property-search-backward-prop-match-match-face-nil-nil ()
+  (with-match-test
+   (text-property-search-backward 'face nil nil)
+   39 46 'italic
+   (point-max)))
+
+(ert-deftest text-property-search-backward-prop-match-match-face-italic-t ()
+  (with-match-test
+   (text-property-search-backward 'face 'italic t)
+   39 46 'italic
+   (point-max)))
+
+(ert-deftest text-property-search-backward-prop-match-match-face-italic-nil ()
+  (with-match-test
+   (text-property-search-backward 'face 'italic nil)
+   46 57 nil
+   (point-max)))
+
+
+;;;; Position after search.
+
+(defun text-property-search--pos-test (fun pos &optional reverse)
+  (with-temp-buffer
+    (insert (concat "foo "
+                  (propertize "bar" 'x t)
+                  " baz"))
+    (goto-char (if reverse (point-max) (point-min)))
+    (funcall fun 'x t)
+    (should (= (point) pos))))
+
+(ert-deftest text-property-search-forward-point-at-beginning ()
+  (text-property-search--pos-test #'text-property-search-forward 5))
+
+(ert-deftest text-property-search-backward-point-at-end ()
+  (text-property-search--pos-test #'text-property-search-backward 8 t))
 
 (provide 'text-property-search-tests)
 

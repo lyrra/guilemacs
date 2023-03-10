@@ -1,6 +1,6 @@
-;;; winner.el --- Restore old window configurations
+;;; winner.el --- Restore old window configurations  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1997-1998, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1997-1998, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Ivar Rummelhoff <ivarru@math.uio.no>
 ;; Created: 27 Feb 1997
@@ -33,23 +33,12 @@
 ;;; Code:
 
 (eval-when-compile (require 'cl-lib))
+(require 'ring)
 
 (defun winner-active-region ()
   (declare (gv-setter (lambda (store)
-                        (if (featurep 'xemacs)
-                            `(if ,store (zmacs-activate-region)
-                               (zmacs-deactivate-region))
-                          `(if ,store (activate-mark) (deactivate-mark))))))
+                        `(if ,store (activate-mark) (deactivate-mark)))))
   (region-active-p))
-
-(defalias 'winner-edges
-  (if (featurep 'xemacs) 'window-pixel-edges 'window-edges))
-(defalias 'winner-window-list
-  (if (featurep 'xemacs)
-      (lambda () (delq (minibuffer-window) (window-list nil 0)))
-    (lambda () (window-list nil 0))))
-
-(require 'ring)
 
 (defgroup winner nil
   "Restoring window configurations."
@@ -71,7 +60,8 @@ You may want to include buffer names such as *Help*, *Apropos*,
 
 (defcustom winner-boring-buffers-regexp nil
   "`winner-undo' will not restore windows with buffers matching this regexp."
-  :type 'string
+  :type '(choice (regexp :tag "Regexp")
+                 (const :tag "Not Set" nil))
   :version "27.1")
 
 
@@ -82,17 +72,17 @@ You may want to include buffer names such as *Help*, *Apropos*,
 
 ;; List the windows according to their edges.
 (defun winner-sorted-window-list ()
-  (sort (winner-window-list)
+  (sort (window-list nil 0)
         (lambda (x y)
-          (cl-loop for a in (winner-edges x)
-                   for b in (winner-edges y)
+          (cl-loop for a in (window-edges x)
+                   for b in (window-edges y)
                    while (= a b)
                    finally return (< a b)))))
 
 (defun winner-win-data ()
   ;; Essential properties of the windows in the selected frame.
   (cl-loop for win in (winner-sorted-window-list)
-           collect (cons (winner-edges win) (window-buffer win))))
+           collect (cons (window-edges win) (window-buffer win))))
 
 ;; This variable is updated with the current window configuration
 ;; every time it changes.
@@ -141,8 +131,7 @@ You may want to include buffer names such as *Help*, *Apropos*,
 
 
 (defsubst winner-equal (a b)
-  "Check whether two Winner configurations (as produced by
-`winner-conf') are equal."
+  "Return t if two Winner configurations (as produced by `winner-conf') are equal."
   (equal (cdr a) (cdr b)))
 
 
@@ -242,7 +231,7 @@ You may want to include buffer names such as *Help*, *Apropos*,
 (defun winner-make-point-alist ()
   (save-current-buffer
     (cl-loop with alist
-             for win in (winner-window-list)
+             for win in (window-list nil 0)
              for entry =
              (or (assq (window-buffer win) alist)
                  (car (push (list (set-buffer (window-buffer win))
@@ -282,7 +271,7 @@ You may want to include buffer names such as *Help*, *Apropos*,
   (let* ((buffers nil)
 	 (alive
           ;; Possibly update `winner-point-alist'
-	  (cl-loop for buf in (mapcar 'cdr (cdr conf))
+          (cl-loop for buf in (mapcar #'cdr (cdr conf))
                    for pos = (winner-get-point buf nil)
                    if (and pos (not (memq buf buffers)))
                    do (push buf buffers)
@@ -293,17 +282,8 @@ You may want to include buffer names such as *Help*, *Apropos*,
       ;; Restore points
       (dolist (win (winner-sorted-window-list))
         (unless (and (pop alive)
-                     (let* ((buf   (window-buffer win))
-                            (pos   (winner-get-point (window-buffer win) win))
-                            (entry (assq buf (window-prev-buffers win))))
-                       ;; Try to restore point of buffer in the selected
-                       ;; window (Bug#23621).
-                       (let ((marker (nth 2 entry)))
-                         (when (and switch-to-buffer-preserve-window-point
-                                    marker
-                                    (not (= marker pos)))
-                           (setq pos marker))
-                         (setf (window-point win) pos)))
+                     (setf (window-point win)
+                           (winner-get-point (window-buffer win) win))
 		     (not (or (member (buffer-name (window-buffer win))
 				      winner-boring-buffers)
 			      (and winner-boring-buffers-regexp
@@ -326,7 +306,7 @@ You may want to include buffer names such as *Help*, *Apropos*,
       ;; Return t if this is still a possible configuration.
       (or (null xwins)
 	  (progn
-	    (mapc 'delete-window (cdr xwins)) ; delete all but one
+            (mapc #'delete-window (cdr xwins)) ; delete all but one
 	    (unless (one-window-p t)
 	      (delete-window (car xwins))
 	      t))))))
@@ -337,22 +317,20 @@ You may want to include buffer names such as *Help*, *Apropos*,
 
 (defcustom winner-mode-hook nil
   "Functions to run whenever Winner mode is turned on or off."
-  :type 'hook
-  :group 'winner)
+  :type 'hook)
 
 (define-obsolete-variable-alias 'winner-mode-leave-hook
   'winner-mode-off-hook "24.3")
 
 (defcustom winner-mode-off-hook nil
   "Functions to run whenever Winner mode is turned off."
-  :type 'hook
-  :group 'winner)
+  :type 'hook)
 
 (defvar winner-mode-map
   (let ((map (make-sparse-keymap)))
     (unless winner-dont-bind-my-keys
-      (define-key map [(control c) left] 'winner-undo)
-      (define-key map [(control c) right] 'winner-redo))
+      (define-key map [(control c) left] #'winner-undo)
+      (define-key map [(control c) right] #'winner-redo))
     map)
   "Keymap for Winner mode.")
 

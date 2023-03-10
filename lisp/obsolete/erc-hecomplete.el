@@ -1,10 +1,10 @@
-;;; erc-hecomplete.el --- Provides Nick name completion for ERC
+;;; erc-hecomplete.el --- Provides Nick name completion for ERC  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2001-2002, 2004, 2006-2019 Free Software Foundation,
+;; Copyright (C) 2001-2002, 2004, 2006-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Author: Alex Schroeder <alex@gnu.org>
-;; URL: http://www.emacswiki.org/cgi-bin/wiki.pl?ErcCompletion
+;; URL: https://www.emacswiki.org/cgi-bin/wiki.pl?ErcCompletion
 ;; Obsolete-since: 24.1
 
 ;; This file is part of GNU Emacs.
@@ -39,8 +39,8 @@
 ;;;###autoload (autoload 'erc-hecomplete-mode "erc-hecomplete" nil t)
 (define-erc-module hecomplete nil
   "Complete nick at point."
-  ((add-hook 'erc-complete-functions 'erc-hecomplete))
-  ((remove-hook 'erc-complete-functions 'erc-hecomplete)))
+  ((add-hook 'erc-complete-functions #'erc-hecomplete))
+  ((remove-hook 'erc-complete-functions #'erc-hecomplete)))
 
 (defun erc-hecomplete ()
   "Complete nick at point.
@@ -51,7 +51,7 @@ This function is obsolete, use `erc-pcomplete' instead."
     (hippie-expand nil)))
 
 (defgroup erc-hecomplete nil
-  "Nick completion.  It is recommended to use erc-pcomplete instead."
+  "Nick completion.  It is recommended to use `erc-pcomplete' instead."
   :group 'erc)
 
 (defcustom erc-nick-completion 'all
@@ -70,15 +70,13 @@ or you may use an arbitrary lisp expression."
 			erc-nick-completion-exclude-myself)
 		 (repeat :tag "List" (string :tag "Nick"))
 		 function
-		 sexp)
-  :group 'erc-hecomplete)
+		 sexp))
 
 (defcustom erc-nick-completion-ignore-case t
   "Non-nil means don't consider case significant in nick completion.
 Case will be automatically corrected when non-nil.
 For instance if you type \"dely TAB\" the word completes and changes to
 \"delYsid\"."
-  :group 'erc-hecomplete
   :type 'boolean)
 
 (defun erc-nick-completion-exclude-myself ()
@@ -95,11 +93,10 @@ typing \"f o TAB\" will directly give you foobar.  Use this with
 (defcustom erc-nick-completion-postfix ": "
   "When `erc-complete' is used in the first word after the prompt,
 add this string when a unique expansion was found."
-  :group 'erc-hecomplete
   :type 'string)
 
 (defun erc-command-list ()
-  "Returns a list of strings of the defined user commands."
+  "Return a list of strings of the defined user commands."
   (let ((case-fold-search nil))
     (mapcar (lambda (x)
 	      (concat "/" (downcase (substring (symbol-name x) 8))))
@@ -208,7 +205,7 @@ Window configurations are stored in
     (equal point (point))))
 
 (defun erc-complete-at-prompt ()
-  "Returns t if point is directly after `erc-prompt' when doing completion."
+  "Return t if point is directly after `erc-prompt' when doing completion."
   (erc-at-beginning-of-line-p (he-dabbrev-beg)))
 
 (provide 'erc-hecomplete)

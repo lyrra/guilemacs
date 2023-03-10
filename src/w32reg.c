@@ -1,6 +1,6 @@
 /* Emulate the X Resource Manager through the registry.
 
-Copyright (C) 1990, 1993-1994, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1990, 1993-1994, 2001-2022 Free Software Foundation, Inc.
 
 Author: Kevin Gallo
 
@@ -36,6 +36,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
   "emacs.tooltip.attributeBackground:SystemInfoWindow\0"  \
   "emacs.tool-bar.attributeForeground:SystemButtonText\0" \
   "emacs.tool-bar.attributeBackground:SystemButtonFace\0" \
+  "emacs.tab-bar.attributeForeground:SystemButtonText\0" \
+  "emacs.tab-bar.attributeBackground:SystemButtonFace\0" \
   "emacs.menu.attributeForeground:SystemMenuText\0"       \
   "emacs.menu.attributeBackground:SystemMenu\0"           \
   "emacs.scroll-bar.attributeForeground:SystemScrollbar\0"

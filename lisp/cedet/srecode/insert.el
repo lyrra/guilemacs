@@ -1,6 +1,6 @@
 ;;; srecode/insert.el --- Insert srecode templates to an output stream  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2005, 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2005, 2007-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -44,9 +44,7 @@ Dictionary value references that ask begin with the ? character.
 Possible values are:
   `ask'   - Prompt in the minibuffer as the value is inserted.
   `field' - Use the dictionary macro name as the inserted value,
-            and place a field there.  Matched fields change together.
-
-NOTE: The field feature does not yet work with XEmacs."
+            and place a field there.  Matched fields change together."
   :group 'srecode
   :type '(choice (const :tag "Ask" ask)
 		 (const :tag "Field" field)))
@@ -90,6 +88,8 @@ DICT-ENTRIES are additional dictionary values to add."
     ;; Don't put code here.  We need to return the end-mark
     ;; for this insertion step.
     ))
+
+(eieio-declare-slots (point :allocation :class))
 
 (defun srecode-insert-fcn (template dictionary &optional stream skipresolver)
   "Insert TEMPLATE using DICTIONARY into STREAM.
@@ -136,13 +136,13 @@ has set everything up already."
 	  )
       (srecode-insert-method template dictionary))
     ;; Handle specialization of the POINT inserter.
-    (when (and (bufferp standard-output)
-	       (slot-boundp 'srecode-template-inserter-point 'point)
-	       )
-      (set-buffer standard-output)
-      (setq end-mark (point-marker))
-      (goto-char  (oref-default 'srecode-template-inserter-point point)))
-    (oset-default 'srecode-template-inserter-point point eieio-unbound)
+    (when (bufferp standard-output)
+      (let ((point (oref-default 'srecode-template-inserter-point point)))
+        (when point
+          (set-buffer standard-output)
+          (setq end-mark (point-marker))
+          (goto-char point))))
+    (oset-default 'srecode-template-inserter-point point nil)
 
     ;; Return the end-mark.
     (or end-mark (point)))
@@ -375,8 +375,8 @@ Can't be blank, or it might be used by regular variable insertion.")
 	   :initarg :where
 	   :documentation
 	   "This should be `begin' or `end', indicating where to insert a CR.
-When `begin', insert a CR if not at 'bol'.
-When `end', insert a CR if not at 'eol'.")
+When `begin', insert a CR if not at `bol'.
+When `end', insert a CR if not at `eol'.")
     ;; @TODO - Add slot and control for the number of blank
     ;;         lines before and after point.
    )
@@ -735,6 +735,7 @@ DEPTH.")
 	"The character code used to identify inserters of this style.")
    (point :type (or null marker)
 	  :allocation :class
+	  :initform nil
 	  :documentation
 	  "Record the value of (point) in this class slot.
 It is the responsibility of the inserter algorithm to clear this

@@ -1,6 +1,6 @@
-;;; cal-persia.el --- calendar functions for the Persian calendar
+;;; cal-persia.el --- calendar functions for the Persian calendar  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1996-1997, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1997, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Edward M. Reingold <reingold@cs.uiuc.edu>
 ;; Maintainer: emacs-devel@gnu.org
@@ -100,13 +100,7 @@ Gregorian date Sunday, December 31, 1 BC."
          (d2                         ; prior days not in n2820 or n768
           (mod d1 280506))
          (n1        ; years not in n2820 or n768
-          ;; Want:
-          ;; (floor (+ (* 2820 d2) (* 2820 366)) 1029983))
-          ;; but that causes overflow, so use the following.
-          ;; Use 366 as the divisor because (2820*366 mod 1029983) is small.
-          (let ((a (floor d2 366))
-                (b (mod d2 366)))
-            (+ 1 a (floor (+ (* 2137 a) (* 2820 b) 2137) 1029983))))
+	  (floor (* 2820 (+ d2 366)) 1029983))
          (year (+ (* 2820 n2820)        ; complete 2820 year cycles
                   (* 768 n768)          ; complete 768 year cycles
                   ;; Remaining years.
@@ -145,13 +139,14 @@ Gregorian date Sunday, December 31, 1 BC."
                         (calendar-absolute-from-gregorian
                          (or date (calendar-current-date)))))
          (y (calendar-extract-year persian-date))
-         (m (calendar-extract-month persian-date))
-         (monthname (aref calendar-persian-month-name-array (1- m)))
+         (m (calendar-extract-month persian-date)))
+    (calendar-dlet
+        ((monthname (aref calendar-persian-month-name-array (1- m)))
          (day (number-to-string (calendar-extract-day persian-date)))
          (year (number-to-string y))
          (month (number-to-string m))
          dayname)
-    (mapconcat 'eval calendar-date-display-form "")))
+      (mapconcat #'eval calendar-date-display-form ""))))
 
 ;;;###cal-autoload
 (defun calendar-persian-print-date ()
@@ -163,14 +158,13 @@ Gregorian date Sunday, December 31, 1 BC."
 (defun calendar-persian-read-date ()
   "Interactively read the arguments for a Persian date command.
 Reads a year, month, and day."
-  (let* ((year (calendar-read
-                "Persian calendar year (not 0): "
+  (let* ((year (calendar-read-sexp
+                "Persian calendar year (not 0)"
                 (lambda (x) (not (zerop x)))
-                (number-to-string
-                 (calendar-extract-year
-                  (calendar-persian-from-absolute
-                   (calendar-absolute-from-gregorian
-                    (calendar-current-date)))))))
+                (calendar-extract-year
+                 (calendar-persian-from-absolute
+                  (calendar-absolute-from-gregorian
+                   (calendar-current-date))))))
          (completion-ignore-case t)
          (month (cdr (assoc
                       (completing-read
@@ -181,9 +175,11 @@ Reads a year, month, and day."
                       (calendar-make-alist calendar-persian-month-name-array
                                            1))))
          (last (calendar-persian-last-day-of-month month year))
-         (day (calendar-read
-               (format "Persian calendar day (1-%d): " last)
-               (lambda (x) (and (< 0 x) (<= x last))))))
+         (day (calendar-read-sexp
+               "Persian calendar day (1-%d)"
+               (lambda (x) (and (< 0 x) (<= x last)))
+               nil
+               last)))
     (list (list month day year))))
 
 ;;;###cal-autoload

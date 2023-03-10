@@ -1,6 +1,6 @@
 ;;; hashcash.el --- Add hashcash payments to email  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2003-2005, 2007-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2003-2005, 2007-2022 Free Software Foundation, Inc.
 
 ;; Written by: Paul Foley <mycroft@actrix.gen.nz> (1997-2002)
 ;; Maintainer: emacs-devel@gnu.org
@@ -116,15 +116,6 @@ For example, you may want to set this to (\"-Z2\") to reduce header length."
 
 (require 'mail-utils)
 
-(eval-and-compile
-  (if (fboundp 'point-at-bol)
-      (defalias 'hashcash-point-at-bol 'point-at-bol)
-    (defalias 'hashcash-point-at-bol 'line-beginning-position))
-
-  (if (fboundp 'point-at-eol)
-      (defalias 'hashcash-point-at-eol 'point-at-eol)
-    (defalias 'hashcash-point-at-eol 'line-end-position)))
-
 (defun hashcash-strip-quoted-names (addr)
   (setq addr (mail-strip-quoted-names addr))
   (if (and addr (string-match "\\`\\([^+@]+\\)\\+[^@]*\\(@.+\\)" addr))
@@ -141,8 +132,8 @@ For example, you may want to set this to (\"-Z2\") to reduce header length."
     (let ((token ""))
       (cl-loop
 	(setq token
-	  (concat token (buffer-substring (point) (hashcash-point-at-eol))))
-	(goto-char (hashcash-point-at-eol))
+          (concat token (buffer-substring (point) (line-end-position))))
+        (goto-char (line-end-position))
 	(forward-char 1)
 	(unless (looking-at "[ \t]") (cl-return token))
 	(while (looking-at "[ \t]") (forward-char 1))))))
@@ -158,7 +149,7 @@ For example, you may want to set this to (\"-Z2\") to reduce header length."
     (or (nth 1 val) (nth 0 val) addr)))
 
 (defun hashcash-generate-payment (str val)
-  "Generate a hashcash payment by finding a VAL-bit collison on STR."
+  "Generate a hashcash payment by finding a VAL-bit collision on STR."
   (if (and (> val 0)
 	   hashcash-program)
       (with-current-buffer (get-buffer-create " *hashcash*")
@@ -171,7 +162,7 @@ For example, you may want to set this to (\"-Z2\") to reduce header length."
     (error "No `hashcash' binary found")))
 
 (defun hashcash-generate-payment-async (str val callback)
-  "Generate a hashcash payment by finding a VAL-bit collison on STR.
+  "Generate a hashcash payment by finding a VAL-bit collision on STR.
 Return immediately.  Call CALLBACK with process and result when ready."
   (if (and (> val 0)
 	   hashcash-program)
@@ -226,7 +217,7 @@ Return immediately.  Call CALLBACK with process and result when ready."
 
 ;;;###autoload
 (defun hashcash-insert-payment (arg)
-  "Insert X-Payment and X-Hashcash headers with a payment for ARG"
+  "Insert X-Payment and X-Hashcash headers with a payment for ARG."
   (interactive "sPay to: ")
   (unless (hashcash-already-paid-p arg)
     (let ((pay (hashcash-generate-payment (hashcash-payment-to arg)
@@ -294,7 +285,7 @@ BUFFER defaults to the current buffer."
 
 ;;;###autoload
 (defun hashcash-verify-payment (token &optional resource amount)
-  "Verify a hashcash payment"
+  "Verify a hashcash payment."
   (let* ((split (split-string token ":"))
 	 (key (if (< (hashcash-version token) 1.2)
 		  (nth 1 split)
@@ -373,6 +364,9 @@ Prefix arg sets default accept amount temporarily."
 	(when ok
 	  (message "Payment valid"))
 	ok))))
+
+(define-obsolete-function-alias 'hashcash-point-at-bol #'line-beginning-position "28.1")
+(define-obsolete-function-alias 'hashcash-point-at-eol #'line-end-position "28.1")
 
 (provide 'hashcash)
 

@@ -1,6 +1,6 @@
 ;;; appt.el --- appointment notification functions  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1989-1990, 1994, 1998, 2001-2019 Free Software
+;; Copyright (C) 1989-1990, 1994, 1998, 2001-2022 Free Software
 ;; Foundation, Inc.
 
 ;; Author: Neil Mager <neilm@juliet.ll.mit.edu>
@@ -325,7 +325,7 @@ displayed in a window:
          (prev-appt-display-count appt-display-count)
          ;; Convert current time to minutes after midnight (12.01am = 1).
          (now (decode-time))
-         (now-mins (+ (* 60 (nth 2 now)) (nth 1 now)))
+         (now-mins (+ (* 60 (decoded-time-hour now)) (decoded-time-minute now)))
          appt-mins appt-warn-time min-to-app min-list string-list)
     (save-excursion                   ; FIXME ?
       ;; At first check in any day, update appointments to today's list.
@@ -402,11 +402,12 @@ displayed in a window:
              (appt-display-message string-list min-list))
         (when appt-display-mode-line
           (setq appt-mode-string
-                (concat " " (propertize
-                             (appt-mode-line (mapcar #'number-to-string
-                                                     min-list)
-                                             t)
-                             'face 'mode-line-emphasis))))
+                (concat (propertize
+                         (appt-mode-line (mapcar #'number-to-string
+                                                 min-list)
+                                         t)
+                         'face 'mode-line-emphasis)
+                        " ")))
         ;; Reset count to 0 in case we display another appt on the next cycle.
         (setq appt-display-count (if (eq '(0) min-list) 0
                                    (1+ prev-appt-display-count))))
@@ -647,7 +648,8 @@ Any appointments made with `appt-add' are not affected by this function."
         ;; Convert current time to minutes after midnight (12:01am = 1),
         ;; and remove elements in the list that are in the past.
         (let* ((now (decode-time))
-               (now-mins (+ (* 60 (nth 2 now)) (nth 1 now))))
+               (now-mins (+ (* 60 (decoded-time-hour now))
+                            (decoded-time-minute now))))
           (while (and appt-time-msg-list
                       (< (caar (car appt-time-msg-list)) now-mins))
             (setq appt-time-msg-list (cdr appt-time-msg-list)))))))

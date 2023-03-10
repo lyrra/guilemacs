@@ -1,6 +1,6 @@
 ;;; regex-emacs-tests.el --- tests for regex-emacs.c -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -161,7 +161,7 @@ what failed, if anything; valid values are 'search-failed,
 'compilation-failed and nil.  I compare the beginning/end of each
 group with their expected values.  This is done with either
 BOUNDS-REF or SUBSTRING-REF; one of those should be non-nil.
-BOUNDS-REF is a sequence \[start-ref0 end-ref0 start-ref1
+BOUNDS-REF is a sequence [start-ref0 end-ref0 start-ref1
 end-ref1 ....] while SUBSTRING-REF is the expected substring
 obtained by indexing the input string by start/end-ref.
 
@@ -279,11 +279,11 @@ on success"
 
 (defconst regex-tests-re-even-escapes
   "\\(?:^\\|[^\\]\\)\\(?:\\\\\\\\\\)*"
-  "Regex that matches an even number of \\ characters")
+  "Regex that matches an even number of \\ characters.")
 
 (defconst regex-tests-re-odd-escapes
   (concat regex-tests-re-even-escapes "\\\\")
-  "Regex that matches an odd number of \\ characters")
+  "Regex that matches an odd number of \\ characters.")
 
 
 (defun regex-tests-unextend (pattern)
@@ -327,7 +327,7 @@ emacs requires an extra symbol character"
 (defun regex-tests-BOOST-frob-escapes (s ispattern)
   "Mangle \\ the way it is done in frob_escapes() in
 regex-tests-BOOST.c in glibc: \\t, \\n, \\r are interpreted;
-\\\\, \\^, \{, \\|, \} are unescaped for the string (not
+\\\\, \\^, \\{, \\|, \\} are unescaped for the string (not
 pattern)"
 
   ;; this is all similar to (regex-tests-unextend)
@@ -396,9 +396,9 @@ pattern)"
    ;; emacs matches non-greedy regex ab.*? non-greedily
    639 677 712
    ]
-  "Line numbers in the boost test that should be skipped.  These
-are false-positive test failures that represent known/benign
-differences in behavior.")
+  "Line numbers in the boost test that should be skipped.
+These are false-positive test failures that represent
+known/benign differences in behavior.")
 
 ;; - Format
 ;;   - Comments are lines starting with ;
@@ -480,9 +480,9 @@ differences in behavior.")
    ;; ambiguous groupings are ambiguous
    610 611 1154 1157 1160 1168 1171 1176 1179 1182 1185 1188 1193 1196 1203
   ]
-  "Line numbers in the PCRE test that should be skipped.  These
-are false-positive test failures that represent known/benign
-differences in behavior.")
+  "Line numbers in the PCRE test that should be skipped.
+These are false-positive test failures that represent
+known/benign differences in behavior.")
 
 ;; - Format
 ;;
@@ -505,7 +505,7 @@ differences in behavior.")
      (cond
 
       ;; pattern
-      ((save-excursion (re-search-forward "^/\\(.*\\)/\\(.*i?\\)$" nil t))
+      ((save-excursion (re-search-forward "^/\\(.*\\)/\\(.*\\)$" nil t))
        (setq icase (string= "i" (match-string 2))
              pattern (regex-tests-unextend (match-string 1))))
 
@@ -562,9 +562,9 @@ differences in behavior.")
    ;; fails to match
    168
   ]
-  "Line numbers in the PTESTS test that should be skipped.  These
-are false-positive test failures that represent known/benign
-differences in behavior.")
+  "Line numbers in the PTESTS test that should be skipped.
+These are false-positive test failures that represent
+known/benign differences in behavior.")
 
 ;; - Format
 ;;   - fields separated by ¦ (note: this is not a |)
@@ -621,9 +621,9 @@ differences in behavior.")
    ;; emacs is more stringent with regexes involving unbalanced )
    67
   ]
-  "Line numbers in the TESTS test that should be skipped.  These
-are false-positive test failures that represent known/benign
-differences in behavior.")
+  "Line numbers in the TESTS test that should be skipped.
+These are false-positive test failures that represent
+known/benign differences in behavior.")
 
 ;; - Format
 ;;   - fields separated by :. Watch for [\[:xxx:]]
@@ -682,5 +682,189 @@ This evaluates the TESTS test cases from glibc."
   (should (string-match "\\`x\\{65535\\}" (make-string 65535 ?x)))
   (should-not (string-match "\\`x\\{65535\\}" (make-string 65534 ?x)))
   (should-error (string-match "\\`x\\{65536\\}" "X") :type 'invalid-regexp))
+
+(ert-deftest regexp-unibyte-unibyte ()
+  "Test matching a unibyte regexp against a unibyte string."
+  ;; Sanity check
+  (should-not (multibyte-string-p "ab"))
+  (should-not (multibyte-string-p "\xff"))
+  ;; ASCII
+  (should (string-match "a[b]" "ab"))
+  ;; Raw
+  (should (string-match "\xf1" "\xf1"))
+  (should-not (string-match "\xf1" "\xc1\xb1"))
+  ;; Raw, char alt
+  (should (string-match "[\xf1]" "\xf1"))
+  (should-not (string-match "[\xf1]" "\xc1\xb1"))
+  ;; Raw range
+  (should (string-match "[\x82-\xd3]" "\xbb"))
+  (should-not (string-match "[\x82-\xd3]" "a"))
+  (should-not (string-match "[\x82-\xd3]" "\x81"))
+  (should-not (string-match "[\x82-\xd3]" "\xd4"))
+  ;; ASCII-raw range
+  (should (string-match "[f-\xd3]" "q"))
+  (should (string-match "[f-\xd3]" "\xbb"))
+  (should-not (string-match "[f-\xd3]" "e"))
+  (should-not (string-match "[f-\xd3]" "\xd4")))
+
+(ert-deftest regexp-multibyte-multibyte ()
+  "Test matching a multibyte regexp against a multibyte string."
+  ;; Sanity check
+  (should (multibyte-string-p "åü"))
+  ;; ASCII
+  (should (string-match (string-to-multibyte "a[b]")
+                        (string-to-multibyte "ab")))
+  ;; Unicode
+  (should (string-match "å[ü]z" "åüz"))
+  (should-not (string-match "ü" (string-to-multibyte "\xc3\xbc")))
+  ;; Raw
+  (should (string-match (string-to-multibyte "\xf1")
+                        (string-to-multibyte "\xf1")))
+  (should-not (string-match (string-to-multibyte "\xf1")
+                            (string-to-multibyte "\xc1\xb1")))
+  (should-not (string-match (string-to-multibyte "\xc1\xb1")
+                            (string-to-multibyte "\xf1")))
+  ;; Raw, char alt
+  (should (string-match (string-to-multibyte "[\xf1]")
+                        (string-to-multibyte "\xf1")))
+  ;; Raw range
+  (should (string-match (string-to-multibyte "[\x82-\xd3]")
+                        (string-to-multibyte "\xbb")))
+  (should-not (string-match (string-to-multibyte "[\x82-\xd3]") "a"))
+  (should-not (string-match (string-to-multibyte "[\x82-\xd3]") "Å"))
+  (should-not (string-match (string-to-multibyte "[\x82-\xd3]") "ü"))
+  (should-not (string-match (string-to-multibyte "[\x82-\xd3]") "\x81"))
+  (should-not (string-match (string-to-multibyte "[\x82-\xd3]") "\xd4"))
+  ;; ASCII-raw range: should exclude U+0100..U+10FFFF
+  (should (string-match (string-to-multibyte "[f-\xd3]")
+                        (string-to-multibyte "q")))
+  (should (string-match (string-to-multibyte "[f-\xd3]")
+                        (string-to-multibyte "\xbb")))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "e"))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "Å"))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "ü"))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "\xd4"))
+  ;; Unicode-raw range: should be empty
+  (should-not (string-match "[å-\xd3]" "å"))
+  (should-not (string-match "[å-\xd3]" (string-to-multibyte "\xd3")))
+  (should-not (string-match "[å-\xd3]" (string-to-multibyte "\xbb")))
+  (should-not (string-match "[å-\xd3]" "ü"))
+  ;; No equivalence between raw bytes and latin-1
+  (should-not (string-match "å" (string-to-multibyte "\xe5")))
+  (should-not (string-match "[å]" (string-to-multibyte "\xe5")))
+  (should-not (string-match "\xe5" "å"))
+  (should-not (string-match "[\xe5]" "å")))
+
+(ert-deftest regexp-unibyte-multibyte ()
+  "Test matching a unibyte regexp against a multibyte string."
+  ;; ASCII
+  (should (string-match "a[b]" (string-to-multibyte "ab")))
+  ;; Unicode
+  (should (string-match "a.[^b]c" (string-to-multibyte "aåüc")))
+  ;; Raw
+  (should (string-match "\xf1" (string-to-multibyte "\xf1")))
+  (should-not (string-match "\xc1\xb1" (string-to-multibyte "\xf1")))
+  ;; Raw, char alt
+  (should (string-match "[\xf1]" (string-to-multibyte "\xf1")))
+  (should-not (string-match "[\xc1][\xb1]" (string-to-multibyte "\xf1")))
+  ;; ASCII-raw range: should exclude U+0100..U+10FFFF
+  (should (string-match "[f-\xd3]" (string-to-multibyte "q")))
+  (should (string-match "[f-\xd3]" (string-to-multibyte "\xbb")))
+  (should-not (string-match "[f-\xd3]" "e"))
+  (should-not (string-match "[f-\xd3]" "Å"))
+  (should-not (string-match "[f-\xd3]" "ü"))
+  (should-not (string-match "[f-\xd3]" "\xd4"))
+  ;; No equivalence between raw bytes and latin-1
+  (should-not (string-match "\xe5" "å"))
+  (should-not (string-match "[\xe5]" "å")))
+
+(ert-deftest regexp-multibyte-unibyte ()
+  "Test matching a multibyte regexp against a unibyte string."
+  ;; ASCII
+  (should (string-match (string-to-multibyte "a[b]") "ab"))
+  ;; Unicode
+  (should (string-match "a[^ü]c" "abc"))
+  (should-not (string-match "ü" "\xc3\xbc"))
+  ;; Raw
+  (should (string-match (string-to-multibyte "\xf1") "\xf1"))
+  (should-not (string-match (string-to-multibyte "\xf1") "\xc1\xb1"))
+  ;; Raw, char alt
+  (should (string-match (string-to-multibyte "[\xf1]") "\xf1"))
+  (should-not (string-match (string-to-multibyte "[\xf1]") "\xc1\xb1"))
+  ;; ASCII-raw range: should exclude U+0100..U+10FFFF
+  (should (string-match (string-to-multibyte "[f-\xd3]") "q"))
+  (should (string-match (string-to-multibyte "[f-\xd3]") "\xbb"))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "e"))
+  (should-not (string-match (string-to-multibyte "[f-\xd3]") "\xd4"))
+  ;; Unicode-raw range: should be empty
+  (should-not (string-match "[å-\xd3]" "\xd3"))
+  (should-not (string-match "[å-\xd3]" "\xbb"))
+  ;; No equivalence between raw bytes and latin-1
+  (should-not (string-match "å" "\xe5"))
+  (should-not (string-match "[å]" "\xe5")))
+
+(ert-deftest regexp-case-fold ()
+  "Test case-sensitive and case-insensitive matching."
+  (let ((case-fold-search nil))
+    (should (equal (string-match "aB" "ABaB") 2))
+    (should (equal (string-match "åÄ" "ÅäåäÅÄåÄ") 6))
+    (should (equal (string-match "λΛ" "lΛλλΛ") 3))
+    (should (equal (string-match "шШ" "zШшшШ") 3))
+    (should (equal (string-match "[[:alpha:]]+" ".3aBåÄßλΛшШ中﷽") 2))
+    (should (equal (match-end 0) 12))
+    (should (equal (string-match "[[:alnum:]]+" ".3aBåÄßλΛшШ中﷽") 1))
+    (should (equal (match-end 0) 12))
+    (should (equal (string-match "[[:upper:]]+" ".3aåλшBÄΛШ中﷽") 6))
+    (should (equal (match-end 0) 10))
+    (should (equal (string-match "[[:lower:]]+" ".3BÄΛШaåλш中﷽") 6))
+    (should (equal (match-end 0) 10)))
+  (let ((case-fold-search t))
+    (should (equal (string-match "aB" "ABaB") 0))
+    (should (equal (string-match "åÄ" "ÅäåäÅÄåÄ") 0))
+    (should (equal (string-match "λΛ" "lΛλλΛ") 1))
+    (should (equal (string-match "шШ" "zШшшШ") 1))
+    (should (equal (string-match "[[:alpha:]]+" ".3aBåÄßλΛшШ中﷽") 2))
+    (should (equal (match-end 0) 12))
+    (should (equal (string-match "[[:alnum:]]+" ".3aBåÄßλΛшШ中﷽") 1))
+    (should (equal (match-end 0) 12))
+    (should (equal (string-match "[[:upper:]]+" ".3aåλшBÄΛШ中﷽") 2))
+    (should (equal (match-end 0) 10))
+    (should (equal (string-match "[[:lower:]]+" ".3BÄΛШaåλш中﷽") 2))
+    (should (equal (match-end 0) 10))))
+
+(ert-deftest regexp-eszett ()
+  "Test matching of ß and ẞ."
+  ;; Sanity checks.
+  (should (equal (upcase "ß") "SS"))
+  (should (equal (downcase "ß") "ß"))
+  (should (equal (capitalize "ß") "Ss"))  ; undeutsch...
+  (should (equal (upcase "ẞ") "ẞ"))
+  (should (equal (downcase "ẞ") "ß"))
+  (should (equal (capitalize "ẞ") "ẞ"))
+  ;; ß is a lower-case letter (Ll); ẞ is an upper-case letter (Lu).
+  (let ((case-fold-search nil))
+    (should (equal (string-match "ß" "ß") 0))
+    (should (equal (string-match "ß" "ẞ") nil))
+    (should (equal (string-match "ẞ" "ß") nil))
+    (should (equal (string-match "ẞ" "ẞ") 0))
+    (should (equal (string-match "[[:alpha:]]" "ß") 0))
+    ;; bug#11309
+    (should (equal (string-match "[[:lower:]]" "ß") 0))
+    (should (equal (string-match "[[:upper:]]" "ß") nil))
+    (should (equal (string-match "[[:alpha:]]" "ẞ") 0))
+    (should (equal (string-match "[[:lower:]]" "ẞ") nil))
+    (should (equal (string-match "[[:upper:]]" "ẞ") 0)))
+  (let ((case-fold-search t))
+    (should (equal (string-match "ß" "ß") 0))
+    (should (equal (string-match "ß" "ẞ") 0))
+    (should (equal (string-match "ẞ" "ß") 0))
+    (should (equal (string-match "ẞ" "ẞ") 0))
+    (should (equal (string-match "[[:alpha:]]" "ß") 0))
+    ;; bug#11309
+    (should (equal (string-match "[[:lower:]]" "ß") 0))
+    (should (equal (string-match "[[:upper:]]" "ß") 0))
+    (should (equal (string-match "[[:alpha:]]" "ẞ") 0))
+    (should (equal (string-match "[[:lower:]]" "ẞ") 0))
+    (should (equal (string-match "[[:upper:]]" "ẞ") 0))))
 
 ;;; regex-emacs-tests.el ends here

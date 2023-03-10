@@ -1,6 +1,6 @@
 ;;; smime.el --- S/MIME support library  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <simon@josefsson.org>
 ;; Keywords: SMIME X.509 PEM OpenSSL
@@ -42,7 +42,7 @@
 ;; reflect this.
 ;;
 ;; The home of this file is in Gnus, but also available from
-;; http://josefsson.org/smime.html.
+;; https://josefsson.org/smime.html.
 
 ;;; Quick introduction:
 
@@ -130,13 +130,12 @@
 
 (defcustom smime-keys nil
   "Map mail addresses to a file containing Certificate (and private key).
-The file is assumed to be in PEM format. You can also associate additional
+The file is assumed to be in PEM format.  You can also associate additional
 certificates to be sent with every message to each address."
   :type '(repeat (list (string :tag "Mail address")
 		       (file :tag "File name")
 		       (repeat :tag "Additional certificate files"
-			       (file :tag "File name"))))
-  :group 'smime)
+			       (file :tag "File name")))))
 
 (defcustom smime-CA-directory nil
   "Directory containing certificates for CAs you trust.
@@ -148,16 +147,14 @@ $ ln -s ca.pem \\=`openssl x509 -noout -hash -in ca.pem\\=`.0
 where `ca.pem' is the file containing a PEM encoded X.509 CA
 certificate."
   :type '(choice (const :tag "none" nil)
-		 directory)
-  :group 'smime)
+		 directory))
 
 (defcustom smime-CA-file nil
   "Files containing certificates for CAs you trust.
 File should contain certificates in PEM format."
   :version "22.1"
   :type '(choice (const :tag "none" nil)
-		 file)
-  :group 'smime)
+		 file))
 
 (defcustom smime-certificate-directory "~/Mail/certs/"
   "Directory containing other people's certificates.
@@ -166,17 +163,16 @@ and the files themselves should be in PEM format."
 ;The S/MIME library provide simple functionality for fetching
 ;certificates into this directory, so there is no need to populate it
 ;manually.
-  :type 'directory
-  :group 'smime)
+  :type 'directory)
 
 (defcustom smime-openssl-program
   (and (condition-case ()
 	   (eq 0 (call-process "openssl" nil nil nil "version"))
 	 (error nil))
        "openssl")
-  "Name of OpenSSL binary."
-  :type 'string
-  :group 'smime)
+  "Name of OpenSSL binary or nil if none."
+  :type '(choice string
+                 (const :tag "none" nil)))
 
 ;; OpenSSL option to select the encryption cipher
 
@@ -185,10 +181,12 @@ and the files themselves should be in PEM format."
   :version "22.1"
   :type '(choice (const :tag "Triple DES" "-des3")
 		 (const :tag "DES"  "-des")
+		 (const :tag "AES 256 bits" "-aes256")
+		 (const :tag "AES 192 bits" "-aes192")
+		 (const :tag "AES 128 bits" "-aes128")
 		 (const :tag "RC2 40 bits" "-rc2-40")
 		 (const :tag "RC2 64 bits" "-rc2-64")
-		 (const :tag "RC2 128 bits" "-rc2-128"))
-  :group 'smime)
+		 (const :tag "RC2 128 bits" "-rc2-128")))
 
 (defcustom smime-crl-check nil
   "Check revocation status of signers certificate using CRLs.
@@ -197,7 +195,7 @@ against a certificate revocation list (CRL).
 
 For this to work the CRL must be up-to-date and since they are
 normally updated quite often (i.e., several times a day) you
-probably need some tool to keep them up-to-date. Unfortunately
+probably need some tool to keep them up-to-date.  Unfortunately
 Gnus cannot do this for you.
 
 The CRL should either be appended (in PEM format) to your
@@ -208,24 +206,21 @@ certificate with .r0 as file name extension.
 At least OpenSSL version 0.9.7 is required for this to work."
   :type '(choice (const :tag "No check" nil)
 		 (const :tag "Check certificate" "-crl_check")
-		 (const :tag "Check certificate chain" "-crl_check_all"))
-  :group 'smime)
+		 (const :tag "Check certificate chain" "-crl_check_all")))
 
 (defcustom smime-dns-server nil
   "DNS server to query certificates from.
 If nil, use system defaults."
   :version "22.1"
   :type '(choice (const :tag "System defaults")
-		 string)
-  :group 'smime)
+		 string))
 
 (defcustom smime-ldap-host-list nil
   "A list of LDAP hosts with S/MIME user certificates.
 If needed search base, binddn, passwd, etc. for the LDAP host
 must be set in `ldap-host-parameters-alist'."
   :type '(repeat (string :tag "Host name"))
-  :version "23.1" ;; No Gnus
-  :group 'smime)
+  :version "23.1") ;; No Gnus
 
 (defvar smime-details-buffer "*OpenSSL output*")
 
@@ -278,7 +273,7 @@ key and certificate itself."
 	(setenv "GNUS_SMIME_PASSPHRASE" passphrase))
     (prog1
 	(when (prog1
-		  (apply 'smime-call-openssl-region b e (list buffer tmpfile)
+		  (apply #'smime-call-openssl-region b e (list buffer tmpfile)
 			 "smime" "-sign" "-signer" (expand-file-name keyfile)
 			 (append
 			  (smime-make-certfiles certfiles)
@@ -310,9 +305,9 @@ is expected to contain of a PEM encoded certificate."
 	(tmpfile (make-temp-file "smime")))
     (prog1
 	(when (prog1
-		  (apply 'smime-call-openssl-region b e (list buffer tmpfile)
+		  (apply #'smime-call-openssl-region b e (list buffer tmpfile)
 			 "smime" "-encrypt" smime-encrypt-cipher
-			 (mapcar 'expand-file-name certfiles))
+			 (mapcar #'expand-file-name certfiles))
 		(with-current-buffer smime-details-buffer
 		  (insert-file-contents tmpfile)
 		  (delete-file tmpfile)))
@@ -371,16 +366,21 @@ Any details (stdout and stderr) are left in the buffer specified by
 			       (expand-file-name smime-CA-file)))
 		     (if smime-CA-directory
 			 (list "-CApath"
-			       (expand-file-name smime-CA-directory))))))
+			       (expand-file-name smime-CA-directory)))))
+	(input-buffer (current-buffer)))
     (unless CAs
       (error "No CA configured"))
     (if smime-crl-check
 	(cl-pushnew smime-crl-check CAs :test #'equal))
-    (if (apply 'smime-call-openssl-region b e (list smime-details-buffer t)
-	       "smime" "-verify" "-out" "/dev/null" CAs)
-	t
-      (insert-buffer-substring smime-details-buffer)
-      nil)))
+    (with-temp-buffer
+      (let ((result-buffer (current-buffer)))
+	(with-current-buffer input-buffer
+	  (if (apply #'smime-call-openssl-region b e (list result-buffer
+							  smime-details-buffer)
+		     "smime" "-verify" "-out" "-" CAs)
+	      (with-current-buffer result-buffer
+		(buffer-string))
+	    nil))))))
 
 (defun smime-noverify-region (b e)
   "Verify integrity of S/MIME message in region between B and E.
@@ -388,8 +388,8 @@ Returns non-nil on success.
 Any details (stdout and stderr) are left in the buffer specified by
 `smime-details-buffer'."
   (smime-new-details-buffer)
-  (if (apply 'smime-call-openssl-region b e (list smime-details-buffer t)
-	     "smime" "-verify" "-noverify" "-out" '("/dev/null"))
+  (if (apply #'smime-call-openssl-region b e (list smime-details-buffer t)
+	     "smime" "-verify" "-noverify" "-out" `(,null-device))
       t
     (insert-buffer-substring smime-details-buffer)
     nil))
@@ -407,7 +407,7 @@ in the buffer specified by `smime-details-buffer'."
     (if passphrase
 	(setenv "GNUS_SMIME_PASSPHRASE" passphrase))
     (if (prog1
-	    (apply 'smime-call-openssl-region b e
+	    (apply #'smime-call-openssl-region b e
 		   (list buffer tmpfile)
 		   "smime" "-decrypt" "-recip" (expand-file-name keyfile)
 		   (if passphrase
@@ -435,7 +435,7 @@ in the buffer specified by `smime-details-buffer'."
 
 (defun smime-verify-buffer (&optional buffer)
   "Verify integrity of S/MIME message in BUFFER.
-Uses current buffer if BUFFER is nil. Returns non-nil on success.
+Uses current buffer if BUFFER is nil.  Returns non-nil on success.
 Any details (stdout and stderr) are left in the buffer specified by
 `smime-details-buffer'."
   (interactive)
@@ -445,7 +445,7 @@ Any details (stdout and stderr) are left in the buffer specified by
 (defun smime-noverify-buffer (&optional buffer)
   "Verify integrity of S/MIME message in BUFFER.
 Does NOT verify validity of certificate (only message integrity).
-Uses current buffer if BUFFER is nil. Returns non-nil on success.
+Uses current buffer if BUFFER is nil.  Returns non-nil on success.
 Any details (stdout and stderr) are left in the buffer specified by
 `smime-details-buffer'."
   (interactive)
@@ -672,7 +672,7 @@ The following commands are available:
 
 (defun smime-exit ()
   "Quit the S/MIME buffer."
-  (interactive)
+  (interactive nil smime-mode)
   (kill-buffer (current-buffer)))
 
 ;; Other functions

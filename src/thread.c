@@ -1,5 +1,5 @@
 /* Threading code.
-Copyright (C) 2012-2019 Free Software Foundation, Inc.
+Copyright (C) 2012-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -27,6 +27,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "syssignal.h"
 #include "pdumper.h"
 #include "keyboard.h"
+
+#ifdef HAVE_NS
+#include "nsterm.h"
+#endif
+
+#if defined HAVE_GLIB && ! defined (HAVE_NS)
+#include <xgselect.h>
+#else
+#define release_select_lock() do { } while (0)
+#endif
 
 #define flush_stack_call_func(callback,mutex) (void)0
 
@@ -590,6 +600,8 @@ really_call_select (void *arg)
   sa->result = (sa->func) (sa->max_fds, sa->rfds, sa->wfds, sa->efds,
 			   sa->timeout, sa->sigmask);
 
+  release_select_lock ();
+
   block_interrupt_signal (&oldset);
   /* If we were interrupted by C-g while inside sa->func above, the
      signal handler could have called maybe_reacquire_global_lock, in
@@ -662,15 +674,22 @@ record_thread_error (Lisp_Object error_form)
 static void *
 run_thread (void *state)
 {
-  /* Make sure stack_top and m_stack_bottom are properly aligned as GC
-     expects.  */
-  //max_align_t stack_pos;
-
   struct thread_state *self = state;
   struct thread_state **iter;
 
-  //self->m_stack_bottom = self->stack_top = (char *) &stack_pos;
+#ifdef HAVE_NS
+  /* Allocate an autorelease pool in case this thread calls any
+     Objective C code.
+
+     FIXME: In long running threads we may want to drain the pool
+     regularly instead of just at the end.  */
+  void *pool = ns_alloc_autorelease_pool ();
+#endif
+
   self->thread_id = sys_thread_self ();
+
+  //if (self->thread_name)
+  //  sys_thread_set_name (self->thread_name);
 
   acquire_global_lock (self);
 
@@ -705,8 +724,14 @@ run_thread (void *state)
   }
 #endif
 
+  xfree (self->thread_name);
+
   current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
+
+#ifdef HAVE_NS
+  ns_release_autorelease_pool (pool);
+#endif
 
   /* Unlink this thread from the list of all threads.  Note that we
      have to do this very late, after broadcasting our death.
@@ -773,9 +798,13 @@ If NAME is given, it must be a string; it names the new thread.  */)
   new_thread->next_thread = all_threads;
   all_threads = new_thread;
 
-  char const *c_name = !NILP (name) ? SSDATA (ENCODE_UTF_8 (name)) : NULL;
+  char const *c_name = !NILP (name) ? SSDATA (ENCODE_SYSTEM (name)) : NULL;
+  if (c_name)
+    new_thread->thread_name = xstrdup (c_name);
+  else
+    new_thread->thread_name = NULL;
   sys_thread_t thr;
-  if (! sys_thread_create (&thr, c_name, run_thread, new_thread))
+  if (! sys_thread_create (&thr, run_thread, new_thread))
     {
       /* Restore the previous situation.  */
       all_threads = all_threads->next_thread;
@@ -1034,9 +1063,6 @@ syms_of_threads (void)
 #include "thread.x"
       staticpro (&last_thread_error);
       last_thread_error = Qnil;
-
-      Fdefalias (intern_c_string ("thread-alive-p"),
-		 intern_c_string ("thread-live-p"), Qnil);
 
       Fprovide (intern_c_string ("threads"), Qnil);
     }

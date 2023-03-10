@@ -1,6 +1,6 @@
 ;;; tar-mode.el --- simple editing of tar files from GNU Emacs  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1990-1991, 1993-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1990-1991, 1993-2022 Free Software Foundation, Inc.
 
 ;; Author: Jamie Zawinski <jwz@lucid.com>
 ;; Maintainer: emacs-devel@gnu.org
@@ -37,13 +37,6 @@
 
 ;; This code now understands the extra fields that GNU tar adds to tar files.
 
-;; This interacts correctly with "uncompress.el" in the Emacs library,
-;; which you get with
-;;
-;;  (autoload 'uncompress-while-visiting "uncompress")
-;;  (setq auto-mode-alist (cons '("\\.Z$" . uncompress-while-visiting)
-;;			   auto-mode-alist))
-;;
 ;; Do not attempt to use tar-mode.el with crypt.el, you will lose.
 
 ;;    ***************   TO DO   ***************
@@ -127,6 +120,11 @@ the file never exists on disk."
 This information is useful, but it takes screen space away from file names."
   :type 'boolean)
 
+(defcustom tar-copy-preserve-time nil
+  "Non-nil means that Tar mode preserves the timestamp when copying files."
+  :type 'boolean
+  :version "27.1")
+
 (defvar tar-parse-info nil)
 (defvar tar-superior-buffer nil
   "Buffer containing the tar archive from which a member was extracted.")
@@ -151,12 +149,11 @@ This information is useful, but it takes screen space away from file names."
 ;; So instead, we now keep the two pieces of data in separate buffers, and
 ;; use the new buffer-swap-text primitive when we need to change which data
 ;; is associated with "the" buffer.
-(defvar tar-data-buffer nil "Buffer that holds the actual raw tar bytes.")
-(make-variable-buffer-local 'tar-data-buffer)
+(defvar-local tar-data-buffer nil
+  "Buffer that holds the actual raw tar bytes.")
 
-(defvar tar-data-swapped nil
+(defvar-local tar-data-swapped nil
   "If non-nil, `tar-data-buffer' indeed holds raw tar bytes.")
-(make-variable-buffer-local 'tar-data-swapped)
 
 (defun tar-data-swapped-p ()
   "Return non-nil if the tar-data is in `tar-data-buffer'."
@@ -218,10 +215,14 @@ Preserve the modified states of the buffers and set `buffer-swapped-with'."
   "Round S up to the next multiple of 512."
   (ash (ash (+ s 511) -9) 9))
 
-(defun tar-header-block-tokenize (pos coding)
+(defun tar-header-block-tokenize (pos coding &optional disable-slash)
   "Return a `tar-header' structure.
 This is a list of name, mode, uid, gid, size,
-write-date, checksum, link-type, and link-name."
+write-date, checksum, link-type, and link-name.
+CODING is our best guess for decoding non-ASCII file names.
+DISABLE-SLASH, if non-nil, means don't decide an entry is a directory
+based on the trailing slash, only based on the \"link-type\" field
+of the file header.  This is used for \"old GNU\" Tar format."
   (if (> (+ pos 512) (point-max)) (error "Malformed Tar header"))
   (cl-assert (zerop (mod (- pos (point-min)) 512)))
   (cl-assert (not enable-multibyte-characters))
@@ -267,7 +268,7 @@ write-date, checksum, link-type, and link-name."
               (decode-coding-string name coding)
               linkname
               (decode-coding-string linkname coding))
-        (if (and (null link-p) (string-match "/\\'" name))
+        (if (and (null link-p) (null disable-slash) (string-match "/\\'" name))
             (setq link-p 5))            ; directory
 
         (if (and (equal name "././@LongLink")
@@ -278,12 +279,23 @@ write-date, checksum, link-type, and link-name."
             ;; This is a GNU Tar long-file-name header.
             (let* ((size (tar-parse-octal-integer
                           string tar-size-offset tar-time-offset))
-                   ;; -1 so as to strip the terminating 0 byte.
+                   ;; The long name is in the next 512-byte block.
+                   ;; We've already moved POS there, when we computed
+                   ;; STRING above.
 		   (name (decode-coding-string
+                          ;; -1 so as to strip the terminating 0 byte.
 			  (buffer-substring pos (+ pos size -1)) coding))
+                   ;; Tokenize the header of the _real_ file entry,
+                   ;; which is further 512 bytes into the archive.
                    (descriptor (tar-header-block-tokenize
-                                (+ pos (tar-roundup-512 size))
-				coding)))
+                                (+ pos (tar-roundup-512 size)) coding
+                                ;; Don't intuit directories from
+                                ;; the trailing slash, because the
+                                ;; truncated name might by chance end
+                                ;; in a slash.
+				'ignore-trailing-slash)))
+              ;; Fix the descriptor of the real file entry by using
+              ;; the information from the long name entry.
               (cond
                ((eq link-p (- ?L ?0))      ;GNUTYPE_LONGNAME.
                 (setf (tar-header-name descriptor) name))
@@ -291,6 +303,10 @@ write-date, checksum, link-type, and link-name."
                 (setf (tar-header-link-name descriptor) name))
                (t
                 (message "Unrecognized GNU Tar @LongLink format")))
+              ;; Fix the "link-type" attribute, based on the long name.
+              (if (and (null (tar-header-link-type descriptor))
+                       (string-match "/\\'" name))
+                  (setf (tar-header-link-type descriptor) 5)) ; directory
               (setf (tar-header-header-start descriptor)
                     (copy-marker (- pos 512) t))
               descriptor)
@@ -344,7 +360,7 @@ write-date, checksum, link-type, and link-name."
   #'tar-parse-octal-integer "27.1")
 
 (defun tar-parse-octal-integer-safe (string)
-  (if (zerop (length string)) (error "empty string"))
+  (if (zerop (length string)) (error "Empty string"))
   (mapc (lambda (c)
 	  (if (or (< c ?0) (> c ?7))
 	      (error "`%c' is not an octal digit" c)))
@@ -356,7 +372,7 @@ write-date, checksum, link-type, and link-name."
 The header will lack a proper checksum; use `tar-header-block-checksum'
 to compute one, or request `tar-header-serialize' to do that.
 
-Other tar-mode facilities may also require the data-start header
+Other `tar-mode' facilities may also require the data-start header
 field to be set to a valid value.
 
 If SIZE is not given or nil, it defaults to 0.
@@ -450,28 +466,16 @@ checksum before doing the check."
       (progn (beep) (message "Invalid checksum for file %s!" file-name))))
 
 (defun tar-clip-time-string (time)
+  (declare (obsolete format-time-string "27.1"))
   (let ((str (current-time-string time)))
     (concat " " (substring str 4 16) (format-time-string " %Y" time))))
 
 (defun tar-grind-file-mode (mode)
   "Construct a `rw-r--r--' string indicating MODE.
-MODE should be an integer which is a file mode value."
-  (string
-   (if (zerop (logand 256 mode)) ?- ?r)
-   (if (zerop (logand 128 mode)) ?- ?w)
-   (if (zerop (logand 2048 mode))
-       (if (zerop (logand  64 mode)) ?- ?x)
-     (if (zerop (logand  64 mode)) ?S ?s))
-   (if (zerop (logand  32 mode)) ?- ?r)
-   (if (zerop (logand  16 mode)) ?- ?w)
-   (if (zerop (logand 1024 mode))
-       (if (zerop (logand   8 mode)) ?- ?x)
-     (if (zerop (logand   8 mode)) ?S ?s))
-   (if (zerop (logand   4 mode)) ?- ?r)
-   (if (zerop (logand   2 mode)) ?- ?w)
-   (if (zerop (logand 512 mode))
-       (if (zerop (logand   1 mode)) ?- ?x)
-     (if (zerop (logand   1 mode)) ?T ?t))))
+MODE should be an integer which is a file mode value.
+For instance, if mode is #o700, then it produces `rwx------'."
+  (declare (obsolete file-modes-number-to-symbolic "28.1"))
+  (substring (file-modes-number-to-symbolic mode) 1))
 
 (defun tar-header-block-summarize (tar-hblock &optional mod-p)
   "Return a line similar to the output of `tar -vtf'."
@@ -486,29 +490,32 @@ MODE should be an integer which is a file mode value."
 	;; (ck (tar-header-checksum tar-hblock))
 	(type (tar-header-link-type tar-hblock))
 	(link-name (tar-header-link-name tar-hblock)))
-    (format "%c%c%s %7s/%-7s %7s%s %s%s"
+    (format "%c%s %7s/%-7s %7s%s %s%s"
 	    (if mod-p ?* ? )
-	    (cond ((or (eq type nil) (eq type 0)) ?-)
-		  ((eq type 1) ?h)	; link
-		  ((eq type 2) ?l)	; symlink
-		  ((eq type 3) ?c)	; char special
-		  ((eq type 4) ?b)	; block special
-		  ((eq type 5) ?d)	; directory
-		  ((eq type 6) ?p)	; FIFO/pipe
-		  ((eq type 20) ?*)	; directory listing
-		  ((eq type 28) ?L)	; next has longname
-		  ((eq type 29) ?M)	; multivolume continuation
-		  ((eq type 35) ?S)	; sparse
-		  ((eq type 38) ?V)	; volume header
-		  ((eq type 55) ?H)	; pax global extended header
-		  ((eq type 72) ?X)	; pax extended header
-		  (t ?\s)
-		  )
-	    (tar-grind-file-mode mode)
+	    (file-modes-number-to-symbolic
+	     mode
+	     (cond ((or (eq type nil) (eq type 0)) ?-)
+		   ((eq type 1) ?h)	; link
+		   ((eq type 2) ?l)	; symlink
+		   ((eq type 3) ?c)	; char special
+		   ((eq type 4) ?b)	; block special
+		   ((eq type 5) ?d)	; directory
+		   ((eq type 6) ?p)	; FIFO/pipe
+		   ((eq type 20) ?*)	; directory listing
+		   ((eq type 28) ?L)	; next has longname
+		   ((eq type 29) ?M)	; multivolume continuation
+		   ((eq type 35) ?S)	; sparse
+		   ((eq type 38) ?V)	; volume header
+		   ((eq type 55) ?H)	; pax global extended header
+		   ((eq type 72) ?X)	; pax extended header
+		   (t ?\s)
+		   ))
 	    (if (= 0 (length uname)) uid uname)
 	    (if (= 0 (length gname)) gid gname)
 	    size
-	    (if tar-mode-show-date (tar-clip-time-string time) "")
+	    (if tar-mode-show-date
+                (format-time-string " %Y-%m-%d %H:%M" time)
+              "")
 	    (propertize name
 			'mouse-face 'highlight
 			'help-echo "mouse-2: extract this file into a buffer")
@@ -582,7 +589,7 @@ MODE should be an integer which is a file mode value."
         (setq pos (tar-header-data-end descriptor))
         (progress-reporter-update progress-reporter pos)))
 
-    (set (make-local-variable 'tar-parse-info) (nreverse result))
+    (setq-local tar-parse-info (nreverse result))
     ;; A tar file should end with a block or two of nulls,
     ;; but let's not get a fatal error if it doesn't.
     (if (null descriptor)
@@ -630,53 +637,37 @@ MODE should be an integer which is a file mode value."
     ;; Let mouse-1 follow the link.
     (define-key map [follow-link] 'mouse-face)
 
-    ;; Make menu bar items.
-
     ;; Get rid of the Edit menu bar item to save space.
     (define-key map [menu-bar edit] 'undefined)
 
-    (define-key map [menu-bar immediate]
-      (cons "Immediate" (make-sparse-keymap "Immediate")))
-
-    (define-key map [menu-bar immediate woman]
-      '("Read Man Page (WoMan)" . woman-tar-extract-file))
-    (define-key map [menu-bar immediate view]
-      '("View This File" . tar-view))
-    (define-key map [menu-bar immediate display]
-      '("Display in Other Window" . tar-display-other-window))
-    (define-key map [menu-bar immediate find-file-other-window]
-      '("Find in Other Window" . tar-extract-other-window))
-    (define-key map [menu-bar immediate find-file]
-      '("Find This File" . tar-extract))
-
-    (define-key map [menu-bar mark]
-      (cons "Mark" (make-sparse-keymap "Mark")))
-
-    (define-key map [menu-bar mark unmark-all]
-      '("Unmark All" . tar-clear-modification-flags))
-    (define-key map [menu-bar mark deletion]
-      '("Flag" . tar-flag-deleted))
-    (define-key map [menu-bar mark unmark]
-      '("Unflag" . tar-unflag))
-
-    (define-key map [menu-bar operate]
-      (cons "Operate" (make-sparse-keymap "Operate")))
-
-    (define-key map [menu-bar operate chown]
-      '("Change Owner..." . tar-chown-entry))
-    (define-key map [menu-bar operate chgrp]
-      '("Change Group..." . tar-chgrp-entry))
-    (define-key map [menu-bar operate chmod]
-      '("Change Mode..." . tar-chmod-entry))
-    (define-key map [menu-bar operate rename]
-      '("Rename to..." . tar-rename-entry))
-    (define-key map [menu-bar operate copy]
-      '("Copy to..." . tar-copy))
-    (define-key map [menu-bar operate expunge]
-      '("Expunge Marked Files" . tar-expunge))
-    
     map)
   "Local keymap for Tar mode listings.")
+
+(easy-menu-define tar-mode-immediate-menu tar-mode-map
+  "Immediate menu for Tar mode."
+  '("Immediate"
+    ["Find This File" tar-extract]
+    ["Find in Other Window" tar-extract-other-window]
+    ["Display in Other Window" tar-display-other-window]
+    ["View This File" tar-view]
+    ["Read Man Page (WoMan)" woman-tar-extract-file]))
+
+(easy-menu-define tar-mode-mark-menu tar-mode-map
+  "Mark menu for Tar mode."
+  '("Mark"
+    ["Unflag" tar-unflag]
+    ["Flag" tar-flag-deleted]
+    ["Unmark All" tar-clear-modification-flags]))
+
+(easy-menu-define tar-mode-operate-menu tar-mode-map
+  "Operate menu for Tar mode."
+  '("Operate"
+    ["Expunge Marked Files" tar-expunge]
+    ["Copy to..." tar-copy]
+    ["Rename to..." tar-rename-entry]
+    ["Change Mode..." tar-chmod-entry]
+    ["Change Group..." tar-chgrp-entry]
+    ["Change Owner..." tar-chown-entry]))
 
 
 ;; tar mode is suitable only for specially formatted data.
@@ -696,12 +687,12 @@ MODE should be an integer which is a file mode value."
 (define-derived-mode tar-mode special-mode "Tar"
   "Major mode for viewing a tar file as a dired-like listing of its contents.
 You can move around using the usual cursor motion commands.
-Letters no longer insert themselves.
-Type `e' to pull a file out of the tar file and into its own buffer;
+Letters no longer insert themselves.\\<tar-mode-map>
+Type \\[tar-extract] to pull a file out of the tar file and into its own buffer;
 or click mouse-2 on the file's line in the Tar mode buffer.
-Type `c' to copy an entry from the tar file into another file on disk.
+Type \\[tar-copy] to copy an entry from the tar file into another file on disk.
 
-If you edit a sub-file of this archive (as with the `e' command) and
+If you edit a sub-file of this archive (as with the \\[tar-extract] command) and
 save it with \\[save-buffer], the contents of that buffer will be
 saved back into the tar-file buffer; in this way you can edit a file
 inside of a tar archive without extracting it and re-archiving it.
@@ -712,21 +703,21 @@ See also: variables `tar-update-datestamp' and `tar-anal-blocksize'.
        (file-writable-p buffer-file-name)
        (setq buffer-read-only nil))    ; undo what `special-mode' did
   (make-local-variable 'tar-parse-info)
-  (set (make-local-variable 'require-final-newline) nil) ; binary data, dude...
-  (set (make-local-variable 'local-enable-local-variables) nil)
-  (set (make-local-variable 'next-line-add-newlines) nil)
-  (set (make-local-variable 'tar-file-name-coding-system)
-       (or file-name-coding-system
-	   default-file-name-coding-system
-	   locale-coding-system))
+  (setq-local require-final-newline nil) ; binary data, dude...
+  (setq-local local-enable-local-variables nil)
+  (setq-local next-line-add-newlines nil)
+  (setq-local tar-file-name-coding-system
+              (or file-name-coding-system
+	          default-file-name-coding-system
+	          locale-coding-system))
   ;; Prevent loss of data when saving the file.
-  (set (make-local-variable 'file-precious-flag) t)
+  (setq-local file-precious-flag t)
   (buffer-disable-undo)
   (widen)
   ;; Now move the Tar data into an auxiliary buffer, so we can use the main
   ;; buffer for the summary.
   (cl-assert (not (tar-data-swapped-p)))
-  (set (make-local-variable 'revert-buffer-function) #'tar-mode-revert)
+  (setq-local revert-buffer-function #'tar-mode-revert)
   ;; We started using write-contents-functions, but this hook is not
   ;; used during auto-save, so we now use
   ;; write-region-annotate-functions which hooks at a lower-level.
@@ -735,10 +726,10 @@ See also: variables `tar-update-datestamp' and `tar-anal-blocksize'.
   (add-hook 'change-major-mode-hook #'tar-change-major-mode-hook nil t)
   ;; Tar data is made of bytes, not chars.
   (set-buffer-multibyte nil)            ;Hopefully a no-op.
-  (set (make-local-variable 'tar-data-buffer)
-       (generate-new-buffer (format " *tar-data %s*"
-                                    (file-name-nondirectory
-                                     (or buffer-file-name (buffer-name))))))
+  (setq-local tar-data-buffer (generate-new-buffer
+                               (format " *tar-data %s*"
+                                       (file-name-nondirectory
+                                        (or buffer-file-name (buffer-name))))))
   (condition-case err
       (progn
         (tar-swap-data)
@@ -762,7 +753,7 @@ into the tar-file buffer that it came from.  The changes will
 actually appear on disk when you save the tar-file's buffer."
   ;; Don't do this, because it is redundant and wastes mode line space.
   ;; :lighter " TarFile"
-  nil nil nil
+  :lighter nil
   (or (and (boundp 'tar-superior-buffer) tar-superior-buffer)
       (error "This buffer is not an element of a tar file"))
   (cond (tar-subfile-mode
@@ -909,6 +900,56 @@ actually appear on disk when you save the tar-file's buffer."
           (setq buffer-undo-list nil))))
     buffer))
 
+(defun tar-goto-file (file)
+  "Go to FILE in the current buffer.
+FILE should be a relative file name.  If FILE can't be found,
+return nil.  Otherwise point is returned."
+  (let ((start (point))
+        found)
+    (goto-char (point-min))
+    (while (and (not found)
+                (not (eobp)))
+      (forward-line 1)
+      (when-let ((descriptor (ignore-errors (tar-get-descriptor))))
+        (when (equal (tar-header-name descriptor) file)
+          (setq found t))))
+    (if (not found)
+        (progn
+          (goto-char start)
+          nil)
+      (point))))
+
+(defun tar-next-file-displayer (file regexp n)
+  "Return a closure to display the next file after FILE that matches REGEXP."
+  (let ((short (replace-regexp-in-string "\\`.*!" "" file))
+        next)
+    ;; The tar buffer chops off leading "./", so do the same
+    ;; here.
+    (setq short (replace-regexp-in-string "\\`\\./" "" file))
+    (tar-goto-file short)
+    (while (and (not next)
+                ;; Stop if we reach the end/start of the buffer.
+                (if (> n 0)
+                    (not (eobp))
+                  (not (save-excursion
+                         (beginning-of-line)
+                         (bobp)))))
+      (tar-next-line n)
+      (when-let ((descriptor (ignore-errors (tar-get-descriptor))))
+        (let ((candidate (tar-header-name descriptor))
+              (buffer (current-buffer)))
+          (when (and candidate
+                     (string-match-p regexp candidate))
+            (setq next (lambda ()
+                         (kill-buffer (current-buffer))
+                         (switch-to-buffer buffer)
+                         (tar-extract)))))))
+    (unless next
+      ;; If we didn't find a next/prev file, then restore
+      ;; point.
+      (tar-goto-file short))
+    next))
+
 (defun tar-extract (&optional other-window-p)
   "In Tar mode, extract this entry of the tar file into its own buffer."
   (interactive)
@@ -921,7 +962,7 @@ actually appear on disk when you save the tar-file's buffer."
          (new-buffer-file-name (expand-file-name
                                 ;; `:' is not allowed on Windows
                                 (concat tarname "!"
-                                        (if (string-match "/" name)
+                                        (if (string-search "/" name)
                                             name
                                           ;; Make sure `name' contains a /
                                           ;; so set-auto-mode doesn't try
@@ -948,8 +989,8 @@ actually appear on disk when you save the tar-file's buffer."
                 default-directory))
         (set-buffer-modified-p nil)
         (normal-mode)                   ; pick a mode.
-        (set (make-local-variable 'tar-superior-buffer) tar-buffer)
-        (set (make-local-variable 'tar-superior-descriptor) descriptor)
+        (setq-local tar-superior-buffer tar-buffer)
+        (setq-local tar-superior-descriptor descriptor)
         (setq buffer-read-only read-only-p)
         (tar-subfile-mode 1)))
     (cond
@@ -998,11 +1039,16 @@ actually appear on disk when you save the tar-file's buffer."
 (defun tar-copy (&optional to-file)
   "In Tar mode, extract this entry of the tar file into a file on disk.
 If TO-FILE is not supplied, it is prompted for, defaulting to the name of
-the current tar-entry."
+the current tar-entry.
+
+If `tar-copy-preserve-time' is non-nil, the original
+timestamp (if present in the tar file) will be used on the
+extracted file."
   (interactive (list (tar-read-file-name)))
   (let* ((descriptor (tar-get-descriptor))
 	 (name (tar-header-name descriptor))
 	 (size (tar-header-size descriptor))
+	 (date (tar-header-date descriptor))
 	 (start (tar-header-data-start descriptor))
 	 (end (+ start size))
 	 (inhibit-file-name-handlers inhibit-file-name-handlers)
@@ -1021,7 +1067,10 @@ the current tar-entry."
 			   inhibit-file-name-handlers))
 		inhibit-file-name-operation 'write-region))
       (let ((coding-system-for-write 'no-conversion))
-	(write-region start end to-file nil nil nil t)))
+	(write-region start end to-file nil nil nil t))
+      (when (and tar-copy-preserve-time
+                 date)
+	(set-file-times to-file date 'nofollow)))
     (message "Copied tar entry %s to %s" name to-file)))
 
 (defun tar-new-entry (filename &optional index)
@@ -1192,7 +1241,7 @@ for this to be permanent."
   (interactive
     (list (read-string "New name: "
 	    (tar-header-name (tar-current-descriptor)))))
-  (if (string= "" new-name) (error "zero length name"))
+  (if (string= "" new-name) (error "Zero length name"))
   (let ((encoded-new-name (encode-coding-string new-name
 						tar-file-name-coding-system))
         (descriptor (tar-current-descriptor))
@@ -1210,7 +1259,7 @@ for this to be permanent."
       (setq prefix (substring encoded-new-name 0 (match-beginning 0)))
       (setq encoded-new-name (substring encoded-new-name (match-end 0))))
 
-    (if (> (length encoded-new-name) 98) (error "name too long"))
+    (if (> (length encoded-new-name) 98) (error "Name too long"))
     (setf (tar-header-name descriptor) new-name)
     (tar-alter-one-field 0
      (substring (concat encoded-new-name (make-string 99 0)) 0 99))
@@ -1271,7 +1320,7 @@ for this to be permanent."
 
 (defun tar-octal-time (timeval)
   ;; Format a timestamp as 11 octal digits.
-  (format "%011o" (encode-time timeval 'integer)))
+  (format "%011o" (time-convert timeval 'integer)))
 
 (defun tar-subfile-save-buffer ()
   "In tar subfile mode, save this buffer into its parent tar-file buffer.

@@ -1,5 +1,5 @@
 /* ftfont.c -- FreeType font driver.
-   Copyright (C) 2006-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006-2022 Free Software Foundation, Inc.
    Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
      National Institute of Advanced Industrial Science and Technology (AIST)
      Registration Number H13PRO009
@@ -20,7 +20,6 @@ You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
-#include <stdio.h>
 #include <fontconfig/fontconfig.h>
 #include <fontconfig/fcfreetype.h>
 
@@ -103,7 +102,7 @@ static struct
     { "iso8859-15", { 0x00A0, 0x00A1, 0x00D0, 0x0152 }},
     { "iso8859-16", { 0x00A0, 0x0218}},
     { "gb2312.1980-0", { 0x4E13 }, "zh-cn"},
-    { "big5-0", { 0xF6B1 }, "zh-tw" },
+    { "big5-0", { 0x9C21 }, "zh-tw" },
     { "jisx0208.1983-0", { 0x4E55 }, "ja"},
     { "ksc5601.1985-0", { 0xAC00 }, "ko"},
     { "cns11643.1992-1", { 0xFE32 }, "zh-tw"},
@@ -120,7 +119,7 @@ static struct
     { "jisx0213.2004-1", { 0x20B9F }},
     { "viscii1.1-1", { 0x1EA0, 0x1EAE, 0x1ED2 }, "vi"},
     { "tis620.2529-1", { 0x0E01 }, "th"},
-    { "windows-1251", { 0x0401, 0x0490 }, "ru"},
+    { "microsoft-cp1251", { 0x0401, 0x0490 }, "ru"},
     { "koi8-r", { 0x0401, 0x2219 }, "ru"},
     { "mulelao-1", { 0x0E81 }, "lo"},
     { "unicode-sip", { 0x20000 }},
@@ -347,18 +346,15 @@ struct ftfont_cache_data
 static Lisp_Object
 ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
 {
-  Lisp_Object cache, val, entity;
+  Lisp_Object cache, val;
   struct ftfont_cache_data *cache_data;
 
   if (FONT_ENTITY_P (key))
     {
-      entity = key;
-      val = assq_no_quit (QCfont_entity, AREF (entity, FONT_EXTRA_INDEX));
+      val = assq_no_quit (QCfont_entity, AREF (key, FONT_EXTRA_INDEX));
       eassert (CONSP (val));
       key = XCDR (val);
     }
-  else
-    entity = Qnil;
 
   if (NILP (ft_face_cache))
     cache = Qnil;
@@ -434,7 +430,7 @@ ftfont_lookup_cache (Lisp_Object key, enum ftfont_cache_for cache_for)
   return cache;
 }
 
-FcCharSet *
+static FcCharSet *
 ftfont_get_fc_charset (Lisp_Object entity)
 {
   Lisp_Object val, cache;
@@ -552,7 +548,19 @@ struct OpenTypeSpec
     OTF_TAG_STR (TAG, str);			\
     (SYM) = font_intern_prop (str, 4, 1);	\
   } while (0)
-#endif
+#elif defined HAVE_HARFBUZZ
+/* Libotf emulations on HarfBuzz for the functions called from
+   ftfont_list.  They are a bit slower than the original ones, so used
+   as fallbacks when libotf is not available.  */
+typedef hb_face_t OTF;
+typedef unsigned int OTF_tag;
+static OTF *hbotf_open (const char *);
+static int hbotf_check_features (OTF *, int, OTF_tag, OTF_tag,
+				 const OTF_tag *, int);
+#define OTF_open hbotf_open
+#define OTF_close hb_face_destroy
+#define OTF_check_features hbotf_check_features
+#endif	/* !HAVE_LIBOTF && HAVE_HARFBUZZ */
 
 
 static struct OpenTypeSpec *
@@ -613,7 +621,7 @@ ftfont_get_open_type_spec (Lisp_Object otf_spec)
 	      unsigned int tag;
 
 	      OTF_SYM_TAG (XCAR (val), tag);
-	      spec->features[i][j++] = negative ? tag & 0x80000000 : tag;
+	      spec->features[i][j++] = negative ? tag | 0x80000000 : tag;
 	    }
 	}
       spec->nfeatures[i] = j;
@@ -760,7 +768,7 @@ ftfont_spec_pattern (Lisp_Object spec, char *otlayout, struct OpenTypeSpec **ots
 #if defined HAVE_XFT && defined FC_COLOR
   /* We really don't like color fonts, they cause Xft crashes.  See
      Bug#30874.  */
-  if (Vxft_ignore_color_fonts
+  if (xft_ignore_color_fonts
       && ! FcPatternAddBool (pattern, FC_COLOR, FcFalse))
     goto err;
 #endif
@@ -854,6 +862,9 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 #ifdef FC_FONTFORMAT
 			     FC_FONTFORMAT,
 #endif
+#if defined HAVE_XFT && defined FC_COLOR
+                             FC_COLOR,
+#endif
 			     NULL);
   if (! objset)
     goto err;
@@ -893,7 +904,19 @@ ftfont_list (struct frame *f, Lisp_Object spec)
   for (i = 0; i < fontset->nfont; i++)
     {
       Lisp_Object entity;
-
+#if defined HAVE_XFT && defined FC_COLOR
+      {
+        /* Some fonts, notably NotoColorEmoji, have an FC_COLOR value
+           that's neither FcTrue nor FcFalse, which means FcFontList
+           returns them even when it shouldn't really do so, so we
+           need to manually skip them here (Bug#37786).  */
+        FcBool b;
+        if (xft_ignore_color_fonts
+            && FcPatternGetBool (fontset->fonts[i], FC_COLOR, 0, &b)
+            == FcResultMatch && b != FcFalse)
+            continue;
+      }
+#endif
       if (spacing >= 0)
 	{
 	  int this;
@@ -915,7 +938,7 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 	    continue;
 	}
 #endif	/* FC_CAPABILITY */
-#ifdef HAVE_LIBOTF
+#if defined HAVE_LIBOTF || defined HAVE_HARFBUZZ
       if (otspec)
 	{
 	  FcChar8 *file;
@@ -940,7 +963,7 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 	  if (!passed)
 	    continue;
 	}
-#endif	/* HAVE_LIBOTF */
+#endif	/* HAVE_LIBOTF || HAVE_HARFBUZZ */
       if (VECTORP (chars))
 	{
 	  ptrdiff_t j;
@@ -1253,6 +1276,8 @@ ftfont_entity_pattern (Lisp_Object entity, int pixel_size)
   return pat;
 }
 
+#ifndef USE_CAIRO
+
 Lisp_Object
 ftfont_open (struct frame *f, Lisp_Object entity, int pixel_size)
 {
@@ -1448,6 +1473,8 @@ ftfont_close (struct font *font)
     FT_Done_Size (ftfont_info->ft_size);
 }
 
+#endif /* !USE_CAIRO */
+
 int
 ftfont_has_char (Lisp_Object font, int c)
 {
@@ -1477,6 +1504,8 @@ ftfont_has_char (Lisp_Object font, int c)
 	      != 0);
     }
 }
+
+#ifndef USE_CAIRO
 
 unsigned
 ftfont_encode_char (struct font *font, int c)
@@ -1548,6 +1577,8 @@ ftfont_text_extents (struct font *font, const unsigned int *code,
     }
   metrics->width = width;
 }
+
+#endif /* !USE_CAIRO */
 
 int
 ftfont_get_bitmap (struct font *font, unsigned int code, struct font_bitmap *bitmap, int bits_per_pixel)
@@ -2767,10 +2798,31 @@ ftfont_shape_by_flt (Lisp_Object lgstring, struct font *font,
 
   if (gstring.used > LGSTRING_GLYPH_LEN (lgstring))
     return Qnil;
+
+  /* mflt_run may fail to set g->g.to (which must be a valid index
+     into lgstring) correctly if the font has an OTF table that is
+     different from what the m17n library expects. */
   for (i = 0; i < gstring.used; i++)
     {
       MFLTGlyphFT *g = (MFLTGlyphFT *) (gstring.glyphs) + i;
+      if (g->g.to >= len)
+	{
+	  /* Invalid g->g.to. */
+	  g->g.to = len - 1;
+	  int from = g->g.from;
+	  /* Fix remaining glyphs. */
+	  for (++i; i < gstring.used; i++)
+	    {
+	      g = (MFLTGlyphFT *) (gstring.glyphs) + i;
+	      g->g.from = from;
+	      g->g.to = len - 1;
+	    }
+	}
+    }
 
+  for (i = 0; i < gstring.used; i++)
+    {
+      MFLTGlyphFT *g = (MFLTGlyphFT *) (gstring.glyphs) + i;
       g->g.from = LGLYPH_FROM (LGSTRING_GLYPH (lgstring, g->g.from));
       g->g.to = LGLYPH_TO (LGSTRING_GLYPH (lgstring, g->g.to));
     }
@@ -2795,14 +2847,10 @@ ftfont_shape_by_flt (Lisp_Object lgstring, struct font *font,
       LGLYPH_SET_ASCENT (lglyph, g->g.ascent >> 6);
       LGLYPH_SET_DESCENT (lglyph, g->g.descent >> 6);
       if (g->g.adjusted)
-	{
-	  Lisp_Object vec = make_uninit_vector (3);
-
-	  ASET (vec, 0, make_fixnum (g->g.xoff >> 6));
-	  ASET (vec, 1, make_fixnum (g->g.yoff >> 6));
-	  ASET (vec, 2, make_fixnum (g->g.xadv >> 6));
-	  LGLYPH_SET_ADJUSTMENT (lglyph, vec);
-	}
+	LGLYPH_SET_ADJUSTMENT (lglyph, CALLN (Fvector,
+					      make_fixnum (g->g.xoff >> 6),
+					      make_fixnum (g->g.yoff >> 6),
+					      make_fixnum (g->g.xadv >> 6)));
     }
   return make_fixnum (i);
 }
@@ -2870,6 +2918,91 @@ fthbfont_begin_hb_font (struct font *font, double *position_unit)
   return ftfont_info->hb_font;
 }
 
+#ifndef HAVE_LIBOTF
+#include <hb-ot.h>
+
+static OTF *
+hbotf_open (const char *name)
+{
+  FT_Face ft_face;
+
+  if (! ft_library
+      && FT_Init_FreeType (&ft_library) != 0)
+    return NULL;
+  if (FT_New_Face (ft_library, name, 0, &ft_face)
+      != 0)
+    return NULL;
+
+  hb_face_t *face = hb_ft_face_create_referenced (ft_face);
+  FT_Done_Face (ft_face);
+
+  return face;
+}
+
+static int
+hbotf_check_features (OTF *otf, int gsubp,
+		      OTF_tag script, OTF_tag language,
+		      const OTF_tag *features, int n_features)
+{
+  hb_face_t *face = otf;
+  hb_tag_t table_tag = gsubp ? HB_OT_TAG_GSUB : HB_OT_TAG_GPOS;
+  hb_tag_t script_tag = script, language_tag = language;
+
+  unsigned int script_count
+    = hb_ot_layout_table_get_script_tags (face, table_tag, 0, NULL, NULL);
+  hb_tag_t *script_tags = xnmalloc (script_count, sizeof *script_tags);
+  hb_ot_layout_table_get_script_tags (face, table_tag, 0, &script_count,
+				      script_tags);
+  unsigned int script_index;
+  for (script_index = 0; script_index < script_count; script_index++)
+    if (script_tags[script_index] == script_tag)
+      break;
+  xfree (script_tags);
+  if (script_index == script_count)
+    return 0;
+
+  unsigned int language_index;
+  if (language_tag == 0)
+    language_index = HB_OT_LAYOUT_DEFAULT_LANGUAGE_INDEX;
+  else
+    {
+      unsigned int language_count
+	= hb_ot_layout_script_get_language_tags (face, table_tag, script_index,
+						 0, NULL, NULL);
+      hb_tag_t *language_tags = xnmalloc (language_count,
+					  sizeof *language_tags);
+      hb_ot_layout_script_get_language_tags (face, table_tag, script_index, 0,
+					     &language_count, language_tags);
+      for (language_index = 0; language_index < script_count; language_index++)
+	if (language_tags[language_index] == language_tag)
+	  break;
+      xfree (language_tags);
+      if (language_index == language_count)
+	return 0;
+    }
+
+  for (int j = 0; j < n_features; j++)
+    {
+      hb_tag_t feature_tag = features[j];
+      hb_bool_t negate = 0;
+
+      if (feature_tag == 0)
+	continue;
+      if (feature_tag & 0x80000000)
+	{
+	  feature_tag &= 0x7FFFFFFF;
+	  negate = 1;
+	}
+
+      unsigned int feature_index;
+      if (hb_ot_layout_language_find_feature (face, table_tag, script_index,
+					      language_index, feature_tag,
+					      &feature_index) == negate)
+	return 0;
+    }
+  return 1;
+}
+#endif	/* !HAVE_LIBOTF */
 #endif /* HAVE_HARFBUZZ */
 
 static const char *const ftfont_booleans [] = {
@@ -2935,6 +3068,8 @@ ftfont_combining_capability (struct font *font)
 
 static void syms_of_ftfont_for_pdumper (void);
 
+#ifndef USE_CAIRO
+
 static struct font_driver const ftfont_driver =
   {
   /* We can't draw a text without device dependent functions.  */
@@ -2943,8 +3078,8 @@ static struct font_driver const ftfont_driver =
   .list = ftfont_list,
   .match = ftfont_match,
   .list_family = ftfont_list_family,
-  .open = ftfont_open,
-  .close = ftfont_close,
+  .open_font = ftfont_open,
+  .close_font = ftfont_close,
   .has_char = ftfont_has_char,
   .encode_char = ftfont_encode_char,
   .text_extents = ftfont_text_extents,
@@ -2962,6 +3097,8 @@ static struct font_driver const ftfont_driver =
   .filter_properties = ftfont_filter_properties,
   .combining_capability = ftfont_combining_capability,
   };
+
+#endif /* !USE_CAIRO */
 
 void
 syms_of_ftfont (void)
@@ -3012,6 +3149,7 @@ syms_of_ftfont_for_pdumper (void)
 #ifdef HAVE_HARFBUZZ
   fthbfont_driver = ftfont_driver;
   fthbfont_driver.type = Qfreetypehb;
+  fthbfont_driver.otf_capability = hbfont_otf_capability;
   fthbfont_driver.shape = hbfont_shape;
   fthbfont_driver.combining_capability = hbfont_combining_capability;
   fthbfont_driver.begin_hb_font = fthbfont_begin_hb_font;

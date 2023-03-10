@@ -1,5 +1,5 @@
 /* Font driver on macOS Core text.
-   Copyright (C) 2009-2019 Free Software Foundation, Inc.
+   Copyright (C) 2009-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -664,7 +664,7 @@ static struct
     { "iso8859-15", { 0x00A0, 0x00A1, 0x00D0, 0x0152 }},
     { "iso8859-16", { 0x00A0, 0x0218}},
     { "gb2312.1980-0", { 0x4E13 }, CFSTR ("zh-Hans")},
-    { "big5-0", { /* 0xF6B1 in ftfont.c */ 0x4EDC }, CFSTR ("zh-Hant") },
+    { "big5-0", { /* 0x9C21 in ftfont.c */ 0x4EDC }, CFSTR ("zh-Hant") },
     { "jisx0208.1983-0", { 0x4E55 }, CFSTR ("ja")},
     { "ksc5601.1987-0", { 0xAC00 }, CFSTR ("ko")},
     { "cns11643.1992-1", { 0xFE32 }, CFSTR ("zh-Hant")},
@@ -986,8 +986,7 @@ macfont_set_family_cache (Lisp_Object symbol, CFStringRef string)
 {
   struct Lisp_Hash_Table *h;
   ptrdiff_t i;
-  EMACS_UINT hash;
-  Lisp_Object value;
+  Lisp_Object hash, value;
 
   if (!HASH_TABLE_P (macfont_family_cache))
     macfont_family_cache = CALLN (Fmake_hash_table, QCtest, Qeq);
@@ -1121,13 +1120,17 @@ struct macfont_metrics
      glyph width.  The `width_int' member is an integer that is
      closest to the width.  The `width_frac' member is the fractional
      adjustment representing a value in [-.5, .5], multiplied by
-     WIDTH_FRAC_SCALE.  For synthetic monospace fonts, they represent
+     WIDTH_FRAC_SCALE.  For monospace fonts, non-zero `width_frac'
+     means `width_int' is further adjusted to a multiple of the
+     (rounded) font width, and `width_frac' represents adjustment per
+     unit character.  For synthetic monospace fonts, they represent
      the advance delta for centering instead of the glyph width.  */
   signed width_frac : WIDTH_FRAC_BITS, width_int : 16 - WIDTH_FRAC_BITS;
 };
 
 #define METRICS_VALUE(metrics, member)                          \
-  (((metrics)->member##_high << 8) | (metrics)->member##_low)
+  ((int) (((unsigned int) (metrics)->member##_high << 8)        \
+          | (metrics)->member##_low))
 #define METRICS_SET_VALUE(metrics, member, value)                   \
   do {short tmp = (value); (metrics)->member##_low = tmp & 0xff;    \
     (metrics)->member##_high = tmp >> 8;} while (0)
@@ -1147,6 +1150,27 @@ enum metrics_status
 #define METRICS_NCOLS_PER_ROW	(128)
 #define LCD_FONT_SMOOTHING_LEFT_MARGIN	(0.396f)
 #define LCD_FONT_SMOOTHING_RIGHT_MARGIN	(0.396f)
+
+/* If FONT is monospace and WIDTH can be regarded as a multiple of its
+   width where the multiplier is greater than 1, then return the
+   multiplier.  Otherwise return 0.  */
+static int
+macfont_monospace_width_multiplier (struct font *font, CGFloat width)
+{
+  struct macfont_info *macfont_info = (struct macfont_info *) font;
+  int multiplier = 0;
+
+  if (macfont_info->spacing == MACFONT_SPACING_MONO
+      && font->space_width != 0)
+    {
+      multiplier = lround (width / font->space_width);
+      if (multiplier == 1
+	  || lround (width / multiplier) != font->space_width)
+	multiplier = 0;
+    }
+
+  return multiplier;
+}
 
 static int
 macfont_glyph_extents (struct font *font, CGGlyph glyph,
@@ -1192,13 +1216,38 @@ macfont_glyph_extents (struct font *font, CGGlyph glyph,
       else
         fwidth = mac_font_get_advance_width_for_glyph (macfont, glyph);
 
-      /* For synthetic mono fonts, cache->width_{int,frac} holds the
-         advance delta value.  */
-      if (macfont_info->spacing == MACFONT_SPACING_SYNTHETIC_MONO)
-        fwidth = (font->pixel_size - fwidth) / 2;
-      cache->width_int = lround (fwidth);
-      cache->width_frac = lround ((fwidth - cache->width_int)
-                                  * WIDTH_FRAC_SCALE);
+      if (macfont_info->spacing == MACFONT_SPACING_MONO)
+	{
+	  /* Some monospace fonts for programming languages contain
+	     wider ligature glyphs consisting of multiple characters.
+	     For such glyphs, simply rounding the combined fractional
+	     width to an integer can result in a value that is not a
+	     multiple of the (rounded) font width.  */
+	  int multiplier = macfont_monospace_width_multiplier (font, fwidth);
+
+	  if (multiplier)
+	    {
+	      cache->width_int = font->space_width * multiplier;
+	      cache->width_frac = lround ((fwidth / multiplier
+					   - font->space_width)
+					  * WIDTH_FRAC_SCALE);
+	    }
+	  else
+	    {
+	      cache->width_int = lround (fwidth);
+	      cache->width_frac = 0;
+	    }
+	}
+      else
+	{
+	  /* For synthetic mono fonts, cache->width_{int,frac} holds
+	     the advance delta value.  */
+	  if (macfont_info->spacing == MACFONT_SPACING_SYNTHETIC_MONO)
+	    fwidth = (font->pixel_size - fwidth) / 2;
+	  cache->width_int = lround (fwidth);
+	  cache->width_frac = lround ((fwidth - cache->width_int)
+				      * WIDTH_FRAC_SCALE);
+	}
       METRICS_SET_STATUS (cache, METRICS_WIDTH_VALID);
     }
   if (macfont_info->spacing == MACFONT_SPACING_SYNTHETIC_MONO)
@@ -1235,6 +1284,10 @@ macfont_glyph_extents (struct font *font, CGGlyph glyph,
                                     / (CGFloat) (WIDTH_FRAC_SCALE * 2));
               break;
             case MACFONT_SPACING_MONO:
+	      if (cache->width_frac)
+		bounds.origin.x += - ((cache->width_frac
+				       / (CGFloat) (WIDTH_FRAC_SCALE * 2))
+				      * (cache->width_int / font->space_width));
               break;
             case MACFONT_SPACING_SYNTHETIC_MONO:
               bounds.origin.x += (cache->width_int
@@ -1271,7 +1324,16 @@ macfont_glyph_extents (struct font *font, CGGlyph glyph,
                                  / (CGFloat) (WIDTH_FRAC_SCALE * 2)));
           break;
         case MACFONT_SPACING_MONO:
-          *advance_delta = 0;
+	  if (cache->width_frac)
+	    *advance_delta = 0;
+	  else
+	    {
+	      CGFloat delta = - ((cache->width_frac
+				  / (CGFloat) (WIDTH_FRAC_SCALE * 2))
+				 * (cache->width_int / font->space_width));
+
+	      *advance_delta = (force_integral_p ? round (delta) : delta);
+	    }
           break;
         case MACFONT_SPACING_SYNTHETIC_MONO:
           *advance_delta = (force_integral_p ? cache->width_int
@@ -1663,8 +1725,8 @@ static struct font_driver macfont_driver =
   .match = macfont_match,
   .list_family = macfont_list_family,
   .free_entity = macfont_free_entity,
-  .open = macfont_open,
-  .close = macfont_close,
+  .open_font = macfont_open,
+  .close_font = macfont_close,
   .has_char = macfont_has_char,
   .encode_char = macfont_encode_char,
   .text_extents = macfont_text_extents,
@@ -1824,7 +1886,7 @@ macfont_get_open_type_spec (Lisp_Object otf_spec)
               unsigned int tag;
 
               OTF_SYM_TAG (XCAR (val), tag);
-              spec->features[i][j++] = negative ? tag & 0x80000000 : tag;
+              spec->features[i][j++] = negative ? tag | 0x80000000 : tag;
             }
         }
       spec->nfeatures[i] = j;
@@ -2076,7 +2138,7 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
               ptrdiff_t j;
 
               for (j = 0; j < ASIZE (chars); j++)
-                if (TYPE_RANGED_FIXNUMP (UTF32Char, AREF (chars, j))
+                if (RANGED_FIXNUMP (0, AREF (chars, j), MAX_UNICODE_CHAR)
                     && CFCharacterSetIsLongCharacterMember (desc_charset,
                                                             XFIXNAT (AREF (chars, j))))
                   break;
@@ -2353,8 +2415,12 @@ macfont_list (struct frame *f, Lisp_Object spec)
             continue;
 
           /* Don't use a color bitmap font unless its family is
-             explicitly specified.  */
-          if ((sym_traits & kCTFontTraitColorGlyphs) && NILP (family))
+             explicitly specified or we're looking for a font for
+             emoji.  */
+          if ((sym_traits & kCTFontTraitColorGlyphs)
+              && NILP (family)
+              && !EQ (CDR_SAFE (assq_no_quit (QCscript, AREF (spec, FONT_EXTRA_INDEX))),
+                      Qemoji))
             continue;
 
           if (j > 0
@@ -2562,6 +2628,9 @@ macfont_open (struct frame * f, Lisp_Object entity, int pixel_size)
   font->pixel_size = size;
   font->driver = &macfont_driver;
   font->encoding_charset = font->repertory_charset = -1;
+  /* Clear font->space_width so macfont_monospace_width_multiplier may
+     not be confused by an uninitialized value.  */
+  font->space_width = 0;
 
   block_input ();
 
@@ -2709,6 +2778,9 @@ macfont_has_char (Lisp_Object font, int c)
 {
   int result;
   CFCharacterSetRef charset;
+
+  if (c < 0 || c > MAX_UNICODE_CHAR)
+    return false;
 
   block_input ();
   if (FONT_ENTITY_P (font))
@@ -3012,7 +3084,7 @@ macfont_shape (Lisp_Object lgstring, Lisp_Object direction)
       struct mac_glyph_layout *gl = glyph_layouts + i;
       EMACS_INT from, to;
       struct font_metrics metrics;
-      int xoff, yoff, wadjust;
+      int xoff, yoff, wadjust, multiplier;
 
       if (NILP (lglyph))
         {
@@ -3065,13 +3137,15 @@ macfont_shape (Lisp_Object lgstring, Lisp_Object direction)
 
       xoff = lround (gl->advance_delta);
       yoff = lround (- gl->baseline_delta);
-      wadjust = lround (gl->advance);
+      multiplier = macfont_monospace_width_multiplier (font, gl->advance);
+      if (multiplier)
+	wadjust = font->space_width * multiplier;
+      else
+	wadjust = lround (gl->advance);
       if (xoff != 0 || yoff != 0 || wadjust != metrics.width)
         {
-          Lisp_Object vec = make_uninit_vector (3);
-          ASET (vec, 0, make_fixnum (xoff));
-          ASET (vec, 1, make_fixnum (yoff));
-          ASET (vec, 2, make_fixnum (wadjust));
+          Lisp_Object vec = CALLN (Fvector, make_fixnum (xoff),
+				   make_fixnum (yoff), make_fixnum (wadjust));
           LGLYPH_SET_ADJUSTMENT (lglyph, vec);
         }
     }

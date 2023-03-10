@@ -1,6 +1,6 @@
-;;; url-vars.el --- Variables for Uniform Resource Locator tool
+;;; url-vars.el --- Variables for Uniform Resource Locator tool  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-1999, 2001, 2004-2019 Free Software Foundation,
+;; Copyright (C) 1996-1999, 2001, 2004-2022 Free Software Foundation,
 ;; Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
@@ -20,10 +20,9 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
-;;; Code:
+;;; Commentary:
 
-(defconst url-version "Emacs"
-  "Version number of URL package.")
+;;; Code:
 
 (defgroup url nil
   "Uniform Resource Locator tool."
@@ -54,25 +53,18 @@
   :group 'url)
 
 
-(defvar url-current-object nil
+(defvar-local url-current-object nil
   "A parsed representation of the current URL.")
 
-(defvar url-current-mime-headers nil
+(defvar-local url-current-mime-headers nil
   "A parsed representation of the MIME headers for the current URL.")
 
-(defvar url-current-lastloc nil
+(defvar-local url-current-lastloc nil
   "A parsed representation of the URL to be considered as the last location.
 Use of this value on outbound connections is subject to
 `url-privacy-level' and `url-lastloc-privacy-level'.  This is never set
 by the url library, applications are expected to set this
 variable in buffers representing a displayed location.")
-
-(mapc 'make-variable-buffer-local
-      '(
-	url-current-object
-	url-current-mime-headers
-        url-current-lastloc
-	))
 
 (defcustom url-honor-refresh-requests t
   "Whether to do automatic page reloads.
@@ -168,8 +160,7 @@ none          -- Always send last location.
 domain-match  -- Send last location if the new location is within the
                  same domain
 host-match    -- Send last location if the new location is on the
-                 same host
-"
+                 same host"
   :version "27.1"
   :type '(radio (const :tag "Always send" none)
                 (const :tag "Domains match" domain-match)
@@ -249,26 +240,22 @@ Should be an assoc list of headers/contents.")
   "String to send in the Accept-encoding: field in HTTP requests.")
 
 (defvar mm-mime-mule-charset-alist)
-(declare-function mm-coding-system-p "mm-util" (cs))
 
 ;; Perhaps the first few should actually be given decreasing `q's and
 ;; the list should be trimmed significantly.
-;; Fixme: do something sane if we don't have `sort-coding-systems'
-;; (Emacs 20, XEmacs).
 (defun url-mime-charset-string ()
   "Generate a list of preferred MIME charsets for HTTP requests.
 Generated according to current coding system priorities."
   (require 'mm-util)
-  (if (fboundp 'sort-coding-systems)
-      (let ((ordered (sort-coding-systems
-		      (let (accum)
-			(dolist (elt mm-mime-mule-charset-alist)
-			  (if (mm-coding-system-p (car elt))
-			      (push (car elt) accum)))
-			(nreverse accum)))))
-	(concat (format "%s;q=1, " (pop ordered))
-		(mapconcat 'symbol-name ordered ";q=0.5, ")
-		";q=0.5"))))
+  (let ((ordered (sort-coding-systems
+		  (let (accum)
+		    (dolist (elt mm-mime-mule-charset-alist)
+		      (if (coding-system-p (car elt))
+			  (push (car elt) accum)))
+		    (nreverse accum)))))
+    (concat (format "%s;q=1, " (pop ordered))
+	    (mapconcat 'symbol-name ordered ";q=0.5, ")
+	    ";q=0.5")))
 
 (defvar url-mime-charset-string nil
   "String to send in the Accept-charset: field in HTTP requests.
@@ -276,9 +263,8 @@ The MIME charset corresponding to the most preferred coding system is
 given priority 1 and the rest are given priority 0.5.")
 
 (defun url-set-mime-charset-string ()
+  (declare (obsolete nil "27.1"))
   (setq url-mime-charset-string (url-mime-charset-string)))
-;; Regenerate if the language environment changes.
-(add-hook 'set-language-environment-hook 'url-set-mime-charset-string)
 
 ;; Fixme: set from the locale.
 (defcustom url-mime-language-string nil
@@ -316,13 +302,6 @@ Applies when a protected document is denied by the server."
   :type 'integer
   :group 'url)
 
-(defcustom url-temporary-directory (or (getenv "TMPDIR") "/tmp")
-  "Where temporary files go."
-  :type 'directory
-  :group 'url-file)
-(make-obsolete-variable 'url-temporary-directory
-			'temporary-file-directory "23.1")
-
 (defcustom url-show-status t
   "Whether to show a running total of bytes transferred.
 Can cause a large hit if using a remote X display over a slow link, or
@@ -332,7 +311,7 @@ a terminal with a slow modem."
 
 (defvar url-using-proxy nil
   "Either nil or the fully qualified proxy URL in use, e.g.
-http://www.example.com/")
+https://www.example.com/")
 
 (defcustom url-news-server nil
   "The default news server from which to get newsgroups/articles.
@@ -435,6 +414,8 @@ Should be one of:
   "Hook run after initializing the URL library."
   :group 'url
   :type 'hook)
+(make-obsolete-variable 'url-load-hook
+                        "use `with-eval-after-load' instead." "28.1")
 
 (defconst url-working-buffer " *url-work")
 
@@ -442,6 +423,11 @@ Should be one of:
   "Non-nil means don't open new network connections.
 This should be set, e.g. by mail user agents rendering HTML to avoid
 `bugs' which call home.")
+
+;; Obsolete
+
+(defconst url-version "Emacs" "Version number of URL package.")
+(make-obsolete-variable 'url-version 'emacs-version "28.1")
 
 (provide 'url-vars)
 

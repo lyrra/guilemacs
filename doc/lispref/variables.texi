@@ -1,6 +1,6 @@
 @c -*-texinfo-*-
 @c This is part of the GNU Emacs Lisp Reference Manual.
-@c Copyright (C) 1990-1995, 1998-2019 Free Software Foundation, Inc.
+@c Copyright (C) 1990--1995, 1998--2022 Free Software Foundation, Inc.
 @c See the file elisp.texi for copying conditions.
 @node Variables
 @chapter Variables
@@ -194,7 +194,7 @@ default scoping rule in Emacs Lisp is called @dfn{dynamic scoping},
 which simply states that the current binding at any given point in the
 execution of a program is the most recently-created binding for that
 variable that still exists.  For details about dynamic scoping, and an
-alternative scoping rule called @dfn{lexical scoping}, @xref{Variable
+alternative scoping rule called @dfn{lexical scoping}, @pxref{Variable
 Scoping}.
 
   The special forms @code{let} and @code{let*} exist to create local
@@ -267,6 +267,76 @@ Compare the following example with the example above for @code{let}.
 @end example
 @end defspec
 
+@defspec letrec (bindings@dots{}) forms@dots{}
+This special form is like @code{let*}, but all the variables are bound
+before any of the local values are computed.  The values are then
+assigned to the locally bound variables.  This is only useful when
+lexical binding is in effect, and you want to create closures that
+refer to bindings that would otherwise not yet be in effect when using
+@code{let*}.
+
+For instance, here's a closure that removes itself from a hook after
+being run once:
+
+@lisp
+(letrec ((hookfun (lambda ()
+                    (message "Run once")
+                    (remove-hook 'post-command-hook hookfun))))
+  (add-hook 'post-command-hook hookfun))
+@end lisp
+@end defspec
+
+@cindex dynamic binding, temporarily
+@cindex dynamic let-binding
+@defspec dlet (bindings@dots{}) forms@dots{}
+This special form is like @code{let}, but it binds all variables
+dynamically.  This is rarely useful---you usually want to bind normal
+variables lexically, and special variables (i.e., variables that are
+defined with @code{defvar}) dynamically, and this is what @code{let}
+does.
+
+@code{dlet} can be useful when interfacing with old code that assumes
+that certain variables are dynamically bound (@pxref{Dynamic
+Binding}), but it's impractical to @code{defvar} these variables.
+@code{dlet} will temporarily make the bound variables special, execute
+the forms, and then make the variables non-special again.
+@end defspec
+
+@defspec named-let name bindings &rest body
+This special form is a looping construct inspired from the
+Scheme language.  It is similar to @code{let}: It binds the variables in
+@var{bindings}, and then evaluates @var{body}.  However,
+@code{named-let} also binds @var{name} to a
+local function whose formal arguments are the variables in @var{bindings}
+and whose body is @var{body}.  This allows @var{body} to call itself
+recursively by calling
+@var{name}, where the arguments passed to @var{name} are used as the
+new values of the bound variables in the recursive invocation.
+
+Example of a loop summing a list of numbers:
+
+@lisp
+(named-let sum ((numbers '(1 2 3 4))
+                (running-sum 0))
+  (if numbers
+      (sum (cdr numbers) (+ running-sum (car numbers)))
+    running-sum))
+@result{} 10
+@end lisp
+
+@anchor{Tail recursion}
+Recursive calls to @var{name} that occur in @emph{tail
+positions} in @var{body} are guaranteed to be optimized as @emph{tail
+calls}, which means that they will not consume any additional stack
+space no matter how deeply the recursion runs.  Such recursive calls
+will effectively jump to the top of the loop with new values for the
+variables.
+
+A function call is in the tail position if it's the very last thing
+done so that the value returned by the call is the value of @var{body}
+itself, as is the case in the recursive call to @code{sum} above.
+@end defspec
+
   Here is a complete list of the other facilities that create local
 bindings:
 
@@ -303,7 +373,7 @@ that Lisp avoids infinite recursion on an ill-defined function.
 @code{max-lisp-eval-depth} provides another limit on depth of nesting.
 @xref{Definition of max-lisp-eval-depth,, Eval}.
 
-The default value is 1500.  Entry to the Lisp debugger increases the
+The default value is 1600.  Entry to the Lisp debugger increases the
 value, if there is little room left, to make sure the debugger itself
 has room to execute.
 @end defopt
@@ -462,10 +532,12 @@ form occurs in a @code{let} form with lexical binding enabled), then
 effect until its binding construct exits.  @xref{Variable Scoping}.
 
 @cindex @code{eval-defun}, and @code{defvar} forms
-When you evaluate a top-level @code{defvar} form with @kbd{C-M-x} in
-Emacs Lisp mode (@code{eval-defun}), a special feature of
-@code{eval-defun} arranges to set the variable unconditionally, without
-testing whether its value is void.
+@cindex @code{eval-last-sexp}, and @code{defvar} forms
+When you evaluate a top-level @code{defvar} form with @kbd{C-M-x}
+(@code{eval-defun}) or with @kbd{C-x C-e} (@code{eval-last-sexp}) in
+Emacs Lisp mode, a special feature of these two commands arranges to
+set the variable unconditionally, without testing whether its value is
+void.
 
 If the @var{doc-string} argument is supplied, it specifies the
 documentation string for the variable (stored in the symbol's
@@ -813,10 +885,10 @@ error is signaled.
 @cindex watchpoints for Lisp variables
 
 It is sometimes useful to take some action when a variable changes its
-value.  The watchpoint facility provides the means to do so.  Some
-possible uses for this feature include keeping display in sync with
-variable settings, and invoking the debugger to track down unexpected
-changes to variables (@pxref{Variable Debugging}).
+value.  The @dfn{variable watchpoint} facility provides the means to
+do so.  Some possible uses for this feature include keeping display in
+sync with variable settings, and invoking the debugger to track down
+unexpected changes to variables (@pxref{Variable Debugging}).
 
 The following functions may be used to manipulate and query the watch
 functions for a variable.
@@ -826,18 +898,20 @@ This function arranges for @var{watch-function} to be called whenever
 @var{symbol} is modified.  Modifications through aliases
 (@pxref{Variable Aliases}) will have the same effect.
 
-@var{watch-function} will be called with 4 arguments: (@var{symbol}
-@var{newval} @var{operation} @var{where}).
-
-@var{symbol} is the variable being changed.
-@var{newval} is the value it will be changed to.
-@var{operation} is a symbol representing the kind of change, one of:
-`set', `let', `unlet', `makunbound', and `defvaralias'.
-@var{where} is a buffer if the buffer-local value of the variable is
-being changed, @code{nil} otherwise.
+@var{watch-function} will be called, just before changing the value of
+@var{symbol}, with 4 arguments: @var{symbol}, @var{newval},
+@var{operation}, and @var{where}.
+@var{symbol} is the variable being changed.  @var{newval} is the value
+it will be changed to.  (The old value is available to
+@var{watch-function} as the value of @var{symbol}, since it was not
+yet changed to @var{newval}.)  @var{operation} is a symbol
+representing the kind of change, one of: @code{set}, @code{let},
+@code{unlet}, @code{makunbound}, or @code{defvaralias}.  @var{where}
+is a buffer if the buffer-local value of the variable is being
+changed, @code{nil} otherwise.
 @end defun
 
-@defun remove-variable-watch symbol watch-function
+@defun remove-variable-watcher symbol watch-function
 This function removes @var{watch-function} from @var{symbol}'s list of
 watchers.
 @end defun
@@ -913,6 +987,7 @@ Lisp programs.
 * Dynamic Binding Tips::    Avoiding problems with dynamic binding.
 * Lexical Binding::         A different type of local variable binding.
 * Using Lexical Binding::   How to enable lexical binding.
+* Converting to Lexical Binding:: Convert existing code to lexical binding.
 @end menu
 
 @node Dynamic Binding
@@ -985,6 +1060,9 @@ a dynamic local binding, Emacs records the contents of the value cell
 (or absence thereof) in a stack, and stores the new local value in the
 value cell.  When the binding construct finishes executing, Emacs pops
 the old value off the stack, and puts it in the value cell.
+
+  Note that when code using Dynamic Binding is native compiled the
+native compiler will not perform any Lisp specific optimization.
 
 @node Dynamic Binding Tips
 @subsection Proper Use of Dynamic Binding
@@ -1166,6 +1244,15 @@ When evaluating Emacs Lisp code directly using an @code{eval} call,
 lexical binding is enabled if the @var{lexical} argument to
 @code{eval} is non-@code{nil}.  @xref{Eval}.
 
+@findex eval-expression@r{, and }lexical-binding
+Lexical binding is also enabled in Lisp Interaction and IELM mode,
+used in the @file{*scratch*} and @file{*ielm*} buffers, and also when
+evaluating expressions via @kbd{M-:} (@code{eval-expression}) and when
+processing the @option{--eval} command-line options of Emacs
+(@pxref{Action Arguments,,, emacs, The GNU Emacs Manual}) and
+@command{emacsclient} (@pxref{emacsclient Options,,, emacs, The GNU
+Emacs Manual}).
+
 @cindex special variables
   Even when lexical binding is enabled, certain variables will
 continue to be dynamically bound.  These are called @dfn{special
@@ -1205,12 +1292,17 @@ This function returns non-@code{nil} if @var{symbol} is a special
 variable (i.e., it has a @code{defvar}, @code{defcustom}, or
 @code{defconst} variable definition).  Otherwise, the return value is
 @code{nil}.
+
+Note that since this is a function, it can only return
+non-@code{nil} for variables which are permanently special, but not
+for those that are only special in the current lexical scope.
 @end defun
 
   The use of a special variable as a formal argument in a function is
-discouraged.  Doing so gives rise to unspecified behavior when lexical
-binding mode is enabled (it may use lexical binding sometimes, and
-dynamic binding other times).
+not supported.
+
+@node Converting to Lexical Binding
+@subsection Converting to Lexical Binding
 
   Converting an Emacs Lisp program to lexical binding is easy.  First,
 add a file-local variable setting of @code{lexical-binding} to
@@ -1230,10 +1322,61 @@ variable.  If a non-special variable is bound but not used within a
 variable.  The byte-compiler will also issue a warning if you use a
 special variable as a function argument.
 
-  (To silence byte-compiler warnings about unused variables, just use
-a variable name that starts with an underscore.  The byte-compiler
-interprets this as an indication that this is a variable known not to
+  A warning about a reference or an assignment to a free variable is
+usually a clear sign that that variable should be marked as
+dynamically scoped, so you need to add an appropriate @code{defvar}
+before the first use of that variable.
+
+  A warning about an unused variable may be a good hint that the
+variable was intended to be dynamically scoped (because it is actually
+used, but in another function), but it may also be an indication that
+the variable is simply really not used and could simply be removed.
+So you need to find out which case it is, and based on that, either
+add a @code{defvar} or remove the variable altogether.  If removal is
+not possible or not desirable (typically because it is a formal
+argument and that we cannot or don't want to change all the callers),
+you can also add a leading underscore to the variable's name to
+indicate to the compiler that this is a variable known not to
 be used.)
+
+@subsubheading Cross-file variable checking
+
+@strong{Caution:} This is an experimental feature that may change or
+disappear without prior notice.
+
+The byte-compiler can also warn about lexical variables that are
+special in other Emacs Lisp files, often indicating a missing
+@code{defvar} declaration.  This useful but somewhat specialized check
+requires three steps:
+
+@enumerate
+@item
+Byte-compile all files whose special variable declarations may be of
+interest, with the environment variable @env{EMACS_GENERATE_DYNVARS}
+set to a nonempty string.  These are typically all the files in the
+same package or related packages or Emacs subsystems.  The process
+will generate a file whose name ends in @file{.dynvars} for each
+compiled Emacs Lisp file.
+
+@item
+Concatenate the @file{.dynvars} files into a single file.
+
+@item
+Byte-compile the files that need to be checked, this time with
+the environment variable @env{EMACS_DYNVARS_FILE} set to the name
+of the aggregated file created in step 2.
+@end enumerate
+
+Here is an example illustrating how this could be done, assuming that
+a Unix shell and @command{make} are used for byte-compilation:
+
+@example
+$ rm *.elc                                # force recompilation
+$ EMACS_GENERATE_DYNVARS=1 make           # generate .dynvars
+$ cat *.dynvars > ~/my-dynvars            # combine .dynvars
+$ rm *.elc                                # force recompilation
+$ EMACS_DYNVARS_FILE=~/my-dynvars make    # perform checks
+@end example
 
 @node Buffer-Local Variables
 @section Buffer-Local Variables
@@ -1411,11 +1554,17 @@ needed if you use the @var{local} argument to @code{add-hook} or
 @code{remove-hook}.
 @end deffn
 
-@defmac setq-local variable value
-This macro creates a buffer-local binding in the current buffer for
-@var{variable}, and gives it the buffer-local value @var{value}.  It
-is equivalent to calling @code{make-local-variable} followed by
-@code{setq}.  @var{variable} should be an unquoted symbol.
+@defmac setq-local &rest pairs
+@var{pairs} is a list of variable and value pairs.  This macro creates
+a buffer-local binding in the current buffer for each of the
+variables, and gives them a buffer-local value.  It is equivalent to
+calling @code{make-local-variable} followed by @code{setq} for each of
+the variables.  The variables should be unquoted symbols.
+
+@lisp
+(setq-local var1 "value1"
+            var2 "value2")
+@end lisp
 @end defmac
 
 @deffn Command make-variable-buffer-local variable
@@ -1482,6 +1631,12 @@ This function returns the buffer-local binding of @var{variable} (a
 symbol) in buffer @var{buffer}.  If @var{variable} does not have a
 buffer-local binding in buffer @var{buffer}, it returns the default
 value (@pxref{Default Value}) of @var{variable} instead.
+@end defun
+
+@defun buffer-local-boundp variable buffer
+This returns non-@code{nil} if there's either a buffer-local binding
+of @var{variable} (a symbol) in buffer @var{buffer}, or @var{variable}
+has a global binding.
 @end defun
 
 @defun buffer-local-variables &optional buffer
@@ -1601,7 +1756,6 @@ buffer has a buffer-local binding.  For example, you could use
 you are in a C or Lisp mode buffer that has a buffer-local value for
 this variable.
 
-@c Emacs 19 feature
   The special forms @code{defvar} and @code{defconst} also set the
 default value (if they set the variable at all), rather than any
 buffer-local value.
@@ -1613,7 +1767,6 @@ this variable.  If @var{symbol} is not buffer-local, this is equivalent
 to @code{symbol-value} (@pxref{Accessing Variables}).
 @end defun
 
-@c Emacs 19 feature
 @defun default-boundp symbol
 The function @code{default-boundp} tells you whether @var{symbol}'s
 default value is nonvoid.  If @code{(default-boundp 'foo)} returns
@@ -1789,6 +1942,14 @@ any form of file-local variable.  For examples of why you might want
 to use this, @pxref{Auto Major Mode}.
 @end defvar
 
+@defvar permanently-enabled-local-variables
+Some local variable settings will, by default, be heeded even if
+@code{enable-local-variables} is @code{nil}.  By default, this is only
+the case for the @code{lexical-binding} local variable setting, but
+this can be controlled by using this variable, which is a list of
+symbols.
+@end defvar
+
 @defun hack-local-variables &optional handle-mode
 This function parses, and binds or evaluates as appropriate, any local
 variables specified by the contents of the current buffer.  The variable
@@ -1885,6 +2046,20 @@ Doing so adds those variable/value pairs to
 file.
 @end defopt
 
+@defopt ignored-local-variable-values
+If there are some values of particular local variables that you always
+want to ignore completely, you can use this variable.  Its value has
+the same form as @code{safe-local-variable-values}; a file-local
+variable setting to the value that appears in the list will always be
+ignored when processing the local variables specified by the file.  As
+with that variable, when Emacs queries the user about whether to obey
+file-local variables, the user can choose to ignore their particular
+values permanently, and that will alter this variable and save it to
+the user's custom file.  Variable-value pairs that appear in this
+variable take precedence over the same pairs in
+@code{safe-local-variable-values}.
+@end defopt
+
 @defun safe-local-variable-p sym val
 This function returns non-@code{nil} if it is safe to give @var{sym}
 the value @var{val}, based on the above criteria.
@@ -1978,7 +2153,7 @@ files, Emacs uses the settings from the deepest file it finds starting
 from the file's directory and moving up the directory tree.  This
 constant is also used to derive the name of a second dir-locals file
 @file{.dir-locals-2.el}.  If this second dir-locals file is present,
-then that is loaded instead of @file{.dir-locals.el}.  This is useful
+then that is loaded in addition to @file{.dir-locals.el}.  This is useful
 when @file{.dir-locals.el} is under version control in a shared
 repository and cannot be used for personal customizations.  The file
 specifies local variables as a specially formatted list; see
@@ -2292,6 +2467,14 @@ equivalent to the following:
 (defvaralias @var{obsolete-name} @var{current-name} @var{docstring})
 (make-obsolete-variable @var{obsolete-name} @var{current-name} @var{when})
 @end example
+
+This macro evaluates all its parameters, and both @var{obsolete-name}
+and @var{current-name} should be symbols, so a typical usage would
+look like:
+
+@lisp
+(define-obsolete-variable-alias 'foo-thing 'bar-thing "27.1")
+@end lisp
 @end defmac
 
 @defun indirect-variable variable
@@ -2533,14 +2716,46 @@ set.  An example of using this macro is:
 @end example
 @end defmac
 
-@findex gv-define-expander
-@findex gv-letplace
-@c FIXME?  Not sure what or how much to say about these.
-@c See cl.texi for an example of using gv-letplace.
-For more control over the expansion, see the macro @code{gv-define-expander}.
+@defmac gv-define-expander name handler
+For more control over the expansion, the @code{gv-define-expander}
+macro can be used.  For instance, a settable @code{substring} could be
+implemented this way:
+
+@example
+(gv-define-expander substring
+  (lambda (do place from &optional to)
+    (gv-letplace (getter setter) place
+      (macroexp-let2* nil ((start from) (end to))
+        (funcall do `(substring ,getter ,start ,end)
+                 (lambda (v)
+                   (macroexp-let2 nil v v
+                     `(progn
+                        ,(funcall setter `(cl--set-substring
+                                           ,getter ,start ,end ,v))
+                        ,v))))))))
+@end example
+@end defmac
+
+@defmac gv-letplace (getter setter) place &rest body
 The macro @code{gv-letplace} can be useful in defining macros that
 perform similarly to @code{setf}; for example, the @code{incf} macro
-of Common Lisp.  Consult the source file @file{gv.el} for more details.
+of Common Lisp could be implemented this way:
+
+@example
+(defmacro incf (place &optional n)
+  (gv-letplace (getter setter) place
+    (macroexp-let2 nil v (or n 1)
+      (funcall setter `(+ ,v ,getter)))))
+@end example
+
+@var{getter} will be bound to a copyable expression that returns the
+value of @var{place}.  @var{setter} will be bound to a function that
+takes an expression @var{v} and returns a new expression that sets
+@var{place} to @var{v}.  @var{body} should return a Emacs Lisp
+expression manipulating @var{place} via @var{getter} and @var{setter}.
+@end defmac
+
+Consult the source file @file{gv.el} for more details.
 
 @cindex CL note---no @code{setf} functions
 @quotation

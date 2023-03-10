@@ -1,6 +1,6 @@
 ;;; pop3.el --- Post Office Protocol (RFC 1460) interface  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1996-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-2022 Free Software Foundation, Inc.
 
 ;; Author: Richard L. Pieri <ratinox@peorth.gweep.net>
 ;; Maintainer: emacs-devel@gnu.org
@@ -35,7 +35,6 @@
 (eval-when-compile (require 'cl-lib))
 
 (require 'mail-utils)
-(defvar parse-time-months)
 
 (defgroup pop3 nil
   "Post Office Protocol."
@@ -380,7 +379,7 @@ Use streaming commands."
 (defun pop3-uidl-dele (process)
   "Delete messages according to `pop3-leave-mail-on-server'.
 Return non-nil if it is necessary to update the local UIDL file."
-  (let* ((ctime (encode-time nil 'list))
+  (let* ((ctime (time-convert nil 'list))
 	 (age-limit (and (numberp pop3-leave-mail-on-server)
 			 (* 86400 pop3-leave-mail-on-server)))
 	 (srvr (assoc pop3-mailhost pop3-uidl-saved))
@@ -464,7 +463,7 @@ Return non-nil if it is necessary to update the local UIDL file."
 		(when (cdr elt)
 		  (insert "(\"" (pop elt) "\"\n   ")
 		  (while elt
-		    (insert (format "\"%s\" %s\n   " (pop elt) (pop elt))))
+		    (insert (format "%S %s\n   " (pop elt) (pop elt))))
 		  (delete-char -4)
 		  (insert ")\n  ")))
 	      (delete-char -3)
@@ -552,8 +551,8 @@ Returns the process associated with the connection."
       (when result
 	(let ((response (plist-get (cdr result) :greeting)))
 	  (setq pop3-timestamp
-		(substring response (or (string-match "<" response) 0)
-			   (+ 1 (or (string-match ">" response) -1)))))
+		(substring response (or (string-search "<" response) 0)
+			   (+ 1 (or (string-search ">" response) -1)))))
 	(set-process-query-on-exit-flag (car result) nil)
 	(erase-buffer)
 	(car result)))))
@@ -609,18 +608,9 @@ Return the response string if optional second argument is non-nil."
 (defun pop3-make-date (&optional now)
   "Make a valid date header.
 If NOW, use that time instead."
-  (require 'parse-time)
-  (let* ((now (or now (current-time)))
-	 (zone (nth 8 (decode-time now))))
-    (when (< zone 0)
-      (setq zone (- zone)))
-    (concat
-     (format-time-string "%d" now)
-     ;; The month name of the %b spec is locale-specific.  Pfff.
-     (format " %s "
-	     (capitalize (car (rassoc (nth 4 (decode-time now))
-				      parse-time-months))))
-     (format-time-string "%Y %H:%M:%S %z" now))))
+  ;; The month name of the %b spec is locale-specific.  Pfff.
+  (let ((system-time-locale "C"))
+    (format-time-string "%d %b %Y %T %z" now)))
 
 (defun pop3-munge-message-separator (start end)
   "Check to see if a message separator exists.  If not, generate one."
@@ -720,7 +710,7 @@ If NOW, use that time instead."
 
 (defun pop3-list (process &optional msg)
   "If MSG is nil, return an alist of (MESSAGE-ID . SIZE) pairs.
-Otherwise, return the size of the message-id MSG"
+Otherwise, return the size of the message-id MSG."
   (pop3-send-command process (if msg
 				 (format "LIST %d" msg)
 			       "LIST"))
@@ -735,9 +725,9 @@ Otherwise, return the size of the message-id MSG"
 	  (setq pop3-read-point (point-marker))
 	  (goto-char (match-beginning 0))
 	  (setq end (point-marker))
-	  (mapcar #'(lambda (s) (let ((split (split-string s " ")))
-				  (cons (string-to-number (nth 0 split))
-					(string-to-number (nth 1 split)))))
+          (mapcar (lambda (s) (let ((split (split-string s " ")))
+                           (cons (string-to-number (nth 0 split))
+                                 (string-to-number (nth 1 split)))))
 		  (split-string (buffer-substring start end) "\r\n" t)))))))
 
 (defun pop3-retr (process msg crashbuf)

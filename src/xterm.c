@@ -1,6 +1,6 @@
 /* X Communication module for terminals which understand the X protocol.
 
-Copyright (C) 1989, 1993-2019 Free Software Foundation, Inc.
+Copyright (C) 1989, 1993-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -21,12 +21,12 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 /* Xt features made by Fred Pierresteguy.  */
 
 #include <config.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 
 #include "lisp.h"
 #include "blockinput.h"
+#include "sysstdio.h"
 
 /* This may include sys/types.h, and that somehow loses
    if this is not done before the other system files.  */
@@ -1291,15 +1291,15 @@ x_clear_under_internal_border (struct frame *f)
       int border = FRAME_INTERNAL_BORDER_WIDTH (f);
       int width = FRAME_PIXEL_WIDTH (f);
       int height = FRAME_PIXEL_HEIGHT (f);
-#ifdef USE_GTK
-      int margin = 0;
-#else
       int margin = FRAME_TOP_MARGIN_HEIGHT (f);
-#endif
       int face_id =
-	!NILP (Vface_remapping_alist)
-	? lookup_basic_face (NULL, f, INTERNAL_BORDER_FACE_ID)
-	: INTERNAL_BORDER_FACE_ID;
+	(FRAME_PARENT_FRAME (f)
+	 ? (!NILP (Vface_remapping_alist)
+	    ? lookup_basic_face (NULL, f, CHILD_FRAME_BORDER_FACE_ID)
+	    : CHILD_FRAME_BORDER_FACE_ID)
+	 : (!NILP (Vface_remapping_alist)
+	    ? lookup_basic_face (NULL, f, INTERNAL_BORDER_FACE_ID)
+	    : INTERNAL_BORDER_FACE_ID));
       struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
       block_input ();
@@ -1364,9 +1364,13 @@ x_after_update_window_line (struct window *w, struct glyph_row *desired_row)
       {
 	int y = WINDOW_TO_FRAME_PIXEL_Y (w, max (0, desired_row->y));
 	int face_id =
-	  !NILP (Vface_remapping_alist)
-	  ? lookup_basic_face (NULL, f, INTERNAL_BORDER_FACE_ID)
-	  : INTERNAL_BORDER_FACE_ID;
+	  (FRAME_PARENT_FRAME (f)
+	   ? (!NILP (Vface_remapping_alist)
+	      ? lookup_basic_face (NULL, f, CHILD_FRAME_BORDER_FACE_ID)
+	      : CHILD_FRAME_BORDER_FACE_ID)
+	   : (!NILP (Vface_remapping_alist)
+	      ? lookup_basic_face (NULL, f, INTERNAL_BORDER_FACE_ID)
+	      : INTERNAL_BORDER_FACE_ID));
 	struct face *face = FACE_FROM_ID_OR_NULL (f, face_id);
 
 	block_input ();
@@ -1422,7 +1426,9 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
     }
 
 #ifdef USE_CAIRO
-  if (p->which && p->which < max_fringe_bmp)
+  if (p->which
+      && p->which < max_fringe_bmp
+      && p->which < max_used_fringe_bitmap)
     {
       XGCValues gcv;
 
@@ -1432,6 +1438,16 @@ x_draw_fringe_bitmap (struct window *w, struct glyph_row *row, struct draw_fring
 				       : f->output_data.x->cursor_pixel)
 				    : face->foreground));
       XSetBackground (display, gc, face->background);
+      if (!fringe_bmp[p->which])
+	{
+	  /* This fringe bitmap is known to fringe.c, but lacks the
+	     cairo_pattern_t pattern which shadows that bitmap.  This
+	     is typical to define-fringe-bitmap being called when the
+	     selected frame was not a GUI frame, for example, when
+	     packages that define fringe bitmaps are loaded by a
+	     daemon Emacs.  Create the missing pattern now.  */
+	  gui_define_fringe_bitmap (f, p->which);
+	}
       x_cr_draw_image (f, gc, fringe_bmp[p->which], 0, p->dh,
 		       p->wd, p->h, p->x, p->y, p->overlay_p);
       XSetForeground (display, gc, gcv.foreground);
@@ -1754,7 +1770,7 @@ x_draw_glyph_string_background (struct glyph_string *s, bool force_p)
      shouldn't be drawn in the first place.  */
   if (!s->background_filled_p)
     {
-      int box_line_width = max (s->face->box_line_width, 0);
+      int box_line_width = max (s->face->box_horizontal_line_width, 0);
 
       if (s->stippled_p)
 	{
@@ -1799,7 +1815,7 @@ x_draw_glyph_string_foreground (struct glyph_string *s)
      of S to the right of that box line.  */
   if (s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p)
-    x = s->x + eabs (s->face->box_line_width);
+    x = s->x + max (s->face->box_vertical_line_width, 0);
   else
     x = s->x;
 
@@ -1849,7 +1865,7 @@ x_draw_glyph_string_foreground (struct glyph_string *s)
 	  if (!(s->for_overlaps
 		|| (s->background_filled_p && s->hl != DRAW_CURSOR)))
 	    {
-	      int box_line_width = max (s->face->box_line_width, 0);
+	      int box_line_width = max (s->face->box_horizontal_line_width, 0);
 
 	      if (s->stippled_p)
 		{
@@ -1893,7 +1909,7 @@ x_draw_composite_glyph_string_foreground (struct glyph_string *s)
      of S to the right of that box line.  */
   if (s->face && s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p)
-    x = s->x + eabs (s->face->box_line_width);
+    x = s->x + max (s->face->box_vertical_line_width, 0);
   else
     x = s->x;
 
@@ -2004,7 +2020,7 @@ x_draw_glyphless_glyph_string_foreground (struct glyph_string *s)
      of S to the right of that box line.  */
   if (s->face && s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p)
-    x = s->x + eabs (s->face->box_line_width);
+    x = s->x + max (s->face->box_vertical_line_width, 0);
   else
     x = s->x;
 
@@ -2099,7 +2115,6 @@ x_frame_of_widget (Widget widget)
     {
       f = XFRAME (frame);
       if (FRAME_X_P (f)
-	  && f->output_data.nothing != 1
 	  && FRAME_DISPLAY_INFO (f) == dpyinfo
 	  && f->output_data.x->widget == widget)
 	return f;
@@ -2392,17 +2407,23 @@ x_query_frame_background_color (struct frame *f, XColor *bgcolor)
 Status x_parse_color (struct frame *f, const char *color_name,
 		      XColor *color)
 {
+  /* Don't pass #RGB strings directly to XParseColor, because that
+     follows the X convention of zero-extending each channel
+     value: #f00 means #f00000.  We want the convention of scaling
+     channel values, so #f00 means #ff0000, just as it does for
+     HTML, SVG, and CSS.  */
+  unsigned short r, g, b;
+  if (parse_color_spec (color_name, &r, &g, &b))
+    {
+      color->red = r;
+      color->green = g;
+      color->blue = b;
+      return 1;
+    }
+
   Display *dpy = FRAME_X_DISPLAY (f);
   Colormap cmap = FRAME_X_COLORMAP (f);
   struct color_name_cache_entry *cache_entry;
-
-  if (color_name[0] == '#')
-    {
-      /* The hex form is parsed directly by XParseColor without
-	 talking to the X server.  No need for caching.  */
-      return XParseColor (dpy, cmap, color_name, color);
-    }
-
   for (cache_entry = FRAME_DISPLAY_INFO (f)->color_names; cache_entry;
        cache_entry = cache_entry->next)
     {
@@ -2741,7 +2762,7 @@ x_setup_relief_colors (struct glyph_string *s)
 static void
 x_draw_relief_rect (struct frame *f,
 		    int left_x, int top_y, int right_x, int bottom_y,
-		    int width, bool raised_p, bool top_p, bool bot_p,
+		    int hwidth, int vwidth, bool raised_p, bool top_p, bool bot_p,
 		    bool left_p, bool right_p,
 		    XRectangle *clip_rect)
 {
@@ -2766,7 +2787,7 @@ x_draw_relief_rect (struct frame *f,
   if (left_p)
     {
       x_fill_rectangle (f, top_left_gc, left_x, top_y,
-			width, bottom_y + 1 - top_y);
+			vwidth, bottom_y + 1 - top_y);
       if (top_p)
 	corners |= 1 << CORNER_TOP_LEFT;
       if (bot_p)
@@ -2774,8 +2795,8 @@ x_draw_relief_rect (struct frame *f,
     }
   if (right_p)
     {
-      x_fill_rectangle (f, bottom_right_gc, right_x + 1 - width, top_y,
-			width, bottom_y + 1 - top_y);
+      x_fill_rectangle (f, bottom_right_gc, right_x + 1 - vwidth, top_y,
+			vwidth, bottom_y + 1 - top_y);
       if (top_p)
 	corners |= 1 << CORNER_TOP_RIGHT;
       if (bot_p)
@@ -2785,25 +2806,25 @@ x_draw_relief_rect (struct frame *f,
     {
       if (!right_p)
 	x_fill_rectangle (f, top_left_gc, left_x, top_y,
-			  right_x + 1 - left_x, width);
+			  right_x + 1 - left_x, hwidth);
       else
 	x_fill_trapezoid_for_relief (f, top_left_gc, left_x, top_y,
-				     right_x + 1 - left_x, width, 1);
+				     right_x + 1 - left_x, hwidth, 1);
     }
   if (bot_p)
     {
       if (!left_p)
-	x_fill_rectangle (f, bottom_right_gc, left_x, bottom_y + 1 - width,
-			  right_x + 1 - left_x, width);
+	x_fill_rectangle (f, bottom_right_gc, left_x, bottom_y + 1 - hwidth,
+			  right_x + 1 - left_x, hwidth);
       else
 	x_fill_trapezoid_for_relief (f, bottom_right_gc,
-				     left_x, bottom_y + 1 - width,
-				     right_x + 1 - left_x, width, 0);
+				     left_x, bottom_y + 1 - hwidth,
+				     right_x + 1 - left_x, hwidth, 0);
     }
-  if (left_p && width != 1)
+  if (left_p && vwidth > 1)
     x_fill_rectangle (f, bottom_right_gc, left_x, top_y,
 		      1, bottom_y + 1 - top_y);
-  if (top_p && width != 1)
+  if (top_p && hwidth > 1)
     x_fill_rectangle (f, bottom_right_gc, left_x, top_y,
 		      right_x + 1 - left_x, 1);
   if (corners)
@@ -2837,12 +2858,12 @@ x_draw_relief_rect (struct frame *f,
   /* Top.  */
   if (top_p)
     {
-      if (width == 1)
+      if (hwidth == 1)
         XDrawLine (dpy, drawable, gc,
 		   left_x + left_p, top_y,
 		   right_x + !right_p, top_y);
 
-      for (i = 1; i < width; ++i)
+      for (i = 1; i < hwidth; ++i)
         XDrawLine (dpy, drawable, gc,
 		   left_x  + i * left_p, top_y + i,
 		   right_x + 1 - i * right_p, top_y + i);
@@ -2851,13 +2872,10 @@ x_draw_relief_rect (struct frame *f,
   /* Left.  */
   if (left_p)
     {
-      if (width == 1)
+      if (vwidth == 1)
         XDrawLine (dpy, drawable, gc, left_x, top_y + 1, left_x, bottom_y);
 
-      x_clear_area(f, left_x, top_y, 1, 1);
-      x_clear_area(f, left_x, bottom_y, 1, 1);
-
-      for (i = (width > 1 ? 1 : 0); i < width; ++i)
+      for (i = 1; i < vwidth; ++i)
         XDrawLine (dpy, drawable, gc,
 		   left_x + i, top_y + (i + 1) * top_p,
 		   left_x + i, bottom_y + 1 - (i + 1) * bot_p);
@@ -2870,26 +2888,25 @@ x_draw_relief_rect (struct frame *f,
     gc = f->output_data.x->white_relief.gc;
   XSetClipRectangles (dpy, gc, 0, 0, clip_rect, 1, Unsorted);
 
-  if (width > 1)
-    {
-      /* Outermost top line.  */
-      if (top_p)
-        XDrawLine (dpy, drawable, gc,
-		   left_x  + left_p, top_y,
-		   right_x + !right_p, top_y);
+  /* Outermost top line.  */
+  if (top_p && hwidth > 1)
+    XDrawLine (dpy, drawable, gc,
+	       left_x  + left_p, top_y,
+	       right_x + !right_p, top_y);
 
-      /* Outermost left line.  */
-      if (left_p)
-        XDrawLine (dpy, drawable, gc, left_x, top_y + 1, left_x, bottom_y);
-    }
+  /* Outermost left line.  */
+  if (left_p && vwidth > 1)
+    XDrawLine (dpy, drawable, gc, left_x, top_y + 1, left_x, bottom_y);
 
   /* Bottom.  */
   if (bot_p)
     {
-      XDrawLine (dpy, drawable, gc,
-		 left_x + left_p, bottom_y,
-		 right_x + !right_p, bottom_y);
-      for (i = 1; i < width; ++i)
+      if (hwidth >= 1)
+        XDrawLine (dpy, drawable, gc,
+		   left_x + left_p, bottom_y,
+		   right_x + !right_p, bottom_y);
+
+      for (i = 1; i < hwidth; ++i)
         XDrawLine (dpy, drawable, gc,
 		   left_x  + i * left_p, bottom_y - i,
 		   right_x + 1 - i * right_p, bottom_y - i);
@@ -2898,9 +2915,7 @@ x_draw_relief_rect (struct frame *f,
   /* Right.  */
   if (right_p)
     {
-      x_clear_area(f, right_x, top_y, 1, 1);
-      x_clear_area(f, right_x, bottom_y, 1, 1);
-      for (i = 0; i < width; ++i)
+      for (i = 0; i < vwidth; ++i)
         XDrawLine (dpy, drawable, gc,
 		   right_x - i, top_y + (i + 1) * top_p,
 		   right_x - i, bottom_y + 1 - (i + 1) * bot_p);
@@ -2921,8 +2936,8 @@ x_draw_relief_rect (struct frame *f,
 
 static void
 x_draw_box_rect (struct glyph_string *s,
-		 int left_x, int top_y, int right_x, int bottom_y, int width,
-		 bool left_p, bool right_p, XRectangle *clip_rect)
+		 int left_x, int top_y, int right_x, int bottom_y, int hwidth,
+		 int vwidth, bool left_p, bool right_p, XRectangle *clip_rect)
 {
   Display *display = FRAME_X_DISPLAY (s->f);
   XGCValues xgcv;
@@ -2933,21 +2948,21 @@ x_draw_box_rect (struct glyph_string *s,
 
   /* Top.  */
   x_fill_rectangle (s->f, s->gc,
-		  left_x, top_y, right_x - left_x + 1, width);
+		  left_x, top_y, right_x - left_x + 1, hwidth);
 
   /* Left.  */
   if (left_p)
     x_fill_rectangle (s->f, s->gc,
-		    left_x, top_y, width, bottom_y - top_y + 1);
+		    left_x, top_y, vwidth, bottom_y - top_y + 1);
 
   /* Bottom.  */
   x_fill_rectangle (s->f, s->gc,
-		  left_x, bottom_y - width + 1, right_x - left_x + 1, width);
+		  left_x, bottom_y - hwidth + 1, right_x - left_x + 1, hwidth);
 
   /* Right.  */
   if (right_p)
     x_fill_rectangle (s->f, s->gc,
-		    right_x - width + 1, top_y, width, bottom_y - top_y + 1);
+		    right_x - vwidth + 1, top_y, vwidth, bottom_y - top_y + 1);
 
   XSetForeground (display, s->gc, xgcv.foreground);
   x_reset_clip_rectangles (s->f, s->gc);
@@ -2959,7 +2974,7 @@ x_draw_box_rect (struct glyph_string *s,
 static void
 x_draw_glyph_string_box (struct glyph_string *s)
 {
-  int width, left_x, right_x, top_y, bottom_y, last_x;
+  int hwidth, vwidth, left_x, right_x, top_y, bottom_y, last_x;
   bool raised_p, left_p, right_p;
   struct glyph *last_glyph;
   XRectangle clip_rect;
@@ -2968,12 +2983,29 @@ x_draw_glyph_string_box (struct glyph_string *s)
 	    ? WINDOW_RIGHT_EDGE_X (s->w)
 	    : window_box_right (s->w, s->area));
 
-  /* The glyph that may have a right box line.  */
-  last_glyph = (s->cmp || s->img
-		? s->first_glyph
-		: s->first_glyph + s->nchars - 1);
+  /* The glyph that may have a right box line.  For static
+     compositions and images, the right-box flag is on the first glyph
+     of the glyph string; for other types it's on the last glyph.  */
+  if (s->cmp || s->img)
+    last_glyph = s->first_glyph;
+  else if (s->first_glyph->type == COMPOSITE_GLYPH
+	   && s->first_glyph->u.cmp.automatic)
+    {
+      /* For automatic compositions, we need to look up the last glyph
+	 in the composition.  */
+        struct glyph *end = s->row->glyphs[s->area] + s->row->used[s->area];
+	struct glyph *g = s->first_glyph;
+	for (last_glyph = g++;
+	     g < end && g->u.cmp.automatic && g->u.cmp.id == s->cmp_id
+	       && g->slice.cmp.to < s->cmp_to;
+	     last_glyph = g++)
+	  ;
+    }
+  else
+    last_glyph = s->first_glyph + s->nchars - 1;
 
-  width = eabs (s->face->box_line_width);
+  vwidth = eabs (s->face->box_vertical_line_width);
+  hwidth = eabs (s->face->box_horizontal_line_width);
   raised_p = s->face->box == FACE_RAISED_BOX;
   left_x = s->x;
   right_x = (s->row->full_width_p && s->extends_to_end_of_line_p
@@ -2994,13 +3026,13 @@ x_draw_glyph_string_box (struct glyph_string *s)
   get_glyph_string_clip_rect (s, &clip_rect);
 
   if (s->face->box == FACE_SIMPLE_BOX)
-    x_draw_box_rect (s, left_x, top_y, right_x, bottom_y, width,
-		     left_p, right_p, &clip_rect);
+    x_draw_box_rect (s, left_x, top_y, right_x, bottom_y, hwidth,
+		     vwidth, left_p, right_p, &clip_rect);
   else
     {
       x_setup_relief_colors (s);
-      x_draw_relief_rect (s->f, left_x, top_y, right_x, bottom_y,
-			  width, raised_p, true, true, left_p, right_p,
+      x_draw_relief_rect (s->f, left_x, top_y, right_x, bottom_y, hwidth,
+			  vwidth, raised_p, true, true, left_p, right_p,
 			  &clip_rect);
     }
 }
@@ -3020,14 +3052,12 @@ x_composite_image (struct glyph_string *s, Pixmap dest,
       XRenderPictFormat *default_format;
       XRenderPictureAttributes attr;
 
-      /* FIXME: Should we do this each time or would it make sense to
-         store destination in the frame struct?  */
       default_format = XRenderFindVisualFormat (display,
                                                 DefaultVisual (display, 0));
       destination = XRenderCreatePicture (display, dest,
                                           default_format, 0, &attr);
 
-      XRenderComposite (display, PictOpSrc,
+      XRenderComposite (display, s->img->mask_picture ? PictOpOver : PictOpSrc,
                         s->img->picture, s->img->mask_picture, destination,
                         srcX, srcY,
                         srcX, srcY,
@@ -3060,7 +3090,7 @@ x_draw_image_foreground (struct glyph_string *s)
   if (s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p
       && s->slice.x == 0)
-    x += eabs (s->face->box_line_width);
+    x += max (s->face->box_vertical_line_width, 0);
 
   /* If there is a margin around the image, adjust x- and y-position
      by that margin.  */
@@ -3179,7 +3209,7 @@ x_draw_image_relief (struct glyph_string *s)
   if (s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p
       && s->slice.x == 0)
-    x += eabs (s->face->box_line_width);
+    x += max (s->face->box_vertical_line_width, 0);
 
   /* If there is a margin around the image, adjust x- and y-position
      by that margin.  */
@@ -3191,9 +3221,14 @@ x_draw_image_relief (struct glyph_string *s)
   if (s->hl == DRAW_IMAGE_SUNKEN
       || s->hl == DRAW_IMAGE_RAISED)
     {
-      thick = (tool_bar_button_relief < 0
-	       ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
-	       : min (tool_bar_button_relief, 1000000));
+      if (s->face->id == TAB_BAR_FACE_ID)
+	thick = (tab_bar_button_relief < 0
+		 ? DEFAULT_TAB_BAR_BUTTON_RELIEF
+		 : min (tab_bar_button_relief, 1000000));
+      else
+	thick = (tool_bar_button_relief < 0
+		 ? DEFAULT_TOOL_BAR_BUTTON_RELIEF
+		 : min (tool_bar_button_relief, 1000000));
       raised_p = s->hl == DRAW_IMAGE_RAISED;
     }
   else
@@ -3206,6 +3241,19 @@ x_draw_image_relief (struct glyph_string *s)
   y1 = y + s->slice.height - 1;
 
   extra_x = extra_y = 0;
+  if (s->face->id == TAB_BAR_FACE_ID)
+    {
+      if (CONSP (Vtab_bar_button_margin)
+	  && FIXNUMP (XCAR (Vtab_bar_button_margin))
+	  && FIXNUMP (XCDR (Vtab_bar_button_margin)))
+	{
+	  extra_x = XFIXNUM (XCAR (Vtab_bar_button_margin)) - thick;
+	  extra_y = XFIXNUM (XCDR (Vtab_bar_button_margin)) - thick;
+	}
+      else if (FIXNUMP (Vtab_bar_button_margin))
+	extra_x = extra_y = XFIXNUM (Vtab_bar_button_margin) - thick;
+    }
+
   if (s->face->id == TOOL_BAR_FACE_ID)
     {
       if (CONSP (Vtool_bar_button_margin)
@@ -3232,7 +3280,7 @@ x_draw_image_relief (struct glyph_string *s)
 
   x_setup_relief_colors (s);
   get_glyph_string_clip_rect (s, &r);
-  x_draw_relief_rect (s->f, x, y, x1, y1, thick, raised_p,
+  x_draw_relief_rect (s->f, x, y, x1, y1, thick, thick, raised_p,
 		      top_p, bot_p, left_p, right_p, &r);
 }
 
@@ -3251,7 +3299,7 @@ x_draw_image_foreground_1 (struct glyph_string *s, Pixmap pixmap)
   if (s->face->box != FACE_NO_BOX
       && s->first_glyph->left_box_line_p
       && s->slice.x == 0)
-    x += eabs (s->face->box_line_width);
+    x += max (s->face->box_vertical_line_width, 0);
 
   /* If there is a margin around the image, adjust x- and y-position
      by that margin.  */
@@ -3271,6 +3319,7 @@ x_draw_image_foreground_1 (struct glyph_string *s, Pixmap pixmap)
 	     trust on the shape extension to be available
 	     (XShapeCombineRegion).  So, compute the rectangle to draw
 	     manually.  */
+          /* FIXME: Do we need to do this when using XRender compositing?  */
 	  unsigned long mask = (GCClipMask | GCClipXOrigin | GCClipYOrigin
 				| GCFunction);
 	  XGCValues xgcv;
@@ -3281,9 +3330,9 @@ x_draw_image_foreground_1 (struct glyph_string *s, Pixmap pixmap)
 	  xgcv.function = GXcopy;
 	  XChangeGC (display, s->gc, mask, &xgcv);
 
-	  XCopyArea (display, s->img->pixmap, pixmap, s->gc,
-		     s->slice.x, s->slice.y,
-		     s->slice.width, s->slice.height, x, y);
+	  x_composite_image (s, pixmap,
+                             s->slice.x, s->slice.y,
+                             x, y, s->slice.width, s->slice.height);
 	  XSetClipMask (display, s->gc, None);
 	}
       else
@@ -3352,8 +3401,8 @@ x_draw_glyph_string_bg_rect (struct glyph_string *s, int x, int y, int w, int h)
 static void
 x_draw_image_glyph_string (struct glyph_string *s)
 {
-  int box_line_hwidth = eabs (s->face->box_line_width);
-  int box_line_vwidth = max (s->face->box_line_width, 0);
+  int box_line_hwidth = max (s->face->box_vertical_line_width, 0);
+  int box_line_vwidth = max (s->face->box_horizontal_line_width, 0);
   int height;
 #ifndef USE_CAIRO
   Display *display = FRAME_X_DISPLAY (s->f);
@@ -3551,14 +3600,15 @@ x_draw_stretch_glyph_string (struct glyph_string *s)
   else if (!s->background_filled_p)
     {
       int background_width = s->background_width;
-      int x = s->x, left_x = window_box_left_offset (s->w, TEXT_AREA);
+      int x = s->x, text_left_x = window_box_left (s->w, TEXT_AREA);
 
-      /* Don't draw into left margin, fringe or scrollbar area
-         except for header line and mode line.  */
-      if (x < left_x && !s->row->mode_line_p)
+      /* Don't draw into left fringe or scrollbar area except for
+         header line and mode line.  */
+      if (s->area == TEXT_AREA
+	  && x < text_left_x && !s->row->mode_line_p)
 	{
-	  background_width -= left_x - x;
-	  x = left_x;
+	  background_width -= text_left_x - x;
+	  x = text_left_x;
 	}
       if (background_width > 0)
 	x_draw_glyph_string_bg_rect (s, x, s->y, background_width, s->height);
@@ -3769,9 +3819,9 @@ x_draw_glyph_string (struct glyph_string *s)
   if (!s->for_overlaps)
     {
       /* Draw underline.  */
-      if (s->face->underline_p)
+      if (s->face->underline)
         {
-          if (s->face->underline_type == FACE_UNDER_WAVE)
+          if (s->face->underline == FACE_UNDER_WAVE)
             {
               if (s->face->underline_defaulted_p)
                 x_draw_underwave (s);
@@ -3785,13 +3835,13 @@ x_draw_glyph_string (struct glyph_string *s)
                   XSetForeground (display, s->gc, xgcv.foreground);
                 }
             }
-          else if (s->face->underline_type == FACE_UNDER_LINE)
+          else if (s->face->underline == FACE_UNDER_LINE)
             {
               unsigned long thickness, position;
               int y;
 
-              if (s->prev && s->prev->face->underline_p
-		  && s->prev->face->underline_type == FACE_UNDER_LINE)
+              if (s->prev &&
+	          s->prev->face->underline == FACE_UNDER_LINE)
                 {
                   /* We use the same underline style as the previous one.  */
                   thickness = s->prev->underline_thickness;
@@ -3803,20 +3853,21 @@ x_draw_glyph_string (struct glyph_string *s)
 		  unsigned long minimum_offset;
 		  bool underline_at_descent_line;
 		  bool use_underline_position_properties;
-		  Lisp_Object val
-		    = buffer_local_value (Qunderline_minimum_offset,
-					  s->w->contents);
+		  Lisp_Object val = (WINDOW_BUFFER_LOCAL_VALUE
+				     (Qunderline_minimum_offset, s->w));
+
 		  if (FIXNUMP (val))
-		    minimum_offset = XFIXNAT (val);
+		    minimum_offset = max (0, XFIXNUM (val));
 		  else
 		    minimum_offset = 1;
-		  val = buffer_local_value (Qx_underline_at_descent_line,
-					    s->w->contents);
+
+		  val = (WINDOW_BUFFER_LOCAL_VALUE
+			 (Qx_underline_at_descent_line, s->w));
 		  underline_at_descent_line
 		    = !(NILP (val) || EQ (val, Qunbound));
-		  val
-		    = buffer_local_value (Qx_use_underline_position_properties,
-					  s->w->contents);
+
+		  val = (WINDOW_BUFFER_LOCAL_VALUE
+			 (Qx_use_underline_position_properties, s->w));
 		  use_underline_position_properties
 		    = !(NILP (val) || EQ (val, Qunbound));
 
@@ -4010,7 +4061,7 @@ x_delete_glyphs (struct frame *f, int n)
 /* Like XClearArea, but check that WIDTH and HEIGHT are reasonable.
    If they are <= 0, this is probably an error.  */
 
-static ATTRIBUTE_UNUSED void
+MAYBE_UNUSED static void
 x_clear_area1 (Display *dpy, Window window,
                int x, int y, int width, int height, int exposures)
 {
@@ -4747,6 +4798,16 @@ x_detect_focus_change (struct x_display_info *dpyinfo, struct frame *frame,
 
     case FocusIn:
     case FocusOut:
+      /* Ignore transient focus events from hotkeys, window manager
+         gadgets, and other odd sources.  Some buggy window managers
+         (e.g., Muffin 4.2.4) send FocusIn events of this type without
+         corresponding FocusOut events even when some other window
+         really has focus, and these kinds of focus event don't
+         correspond to real user input changes.  GTK+ uses the same
+         filtering. */
+      if (event->xfocus.mode == NotifyGrab ||
+          event->xfocus.mode == NotifyUngrab)
+        return;
       x_focus_changed (event->type,
 		       (event->xfocus.detail == NotifyPointer ?
 			FOCUS_IMPLICIT : FOCUS_EXPLICIT),
@@ -5167,20 +5228,15 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
       /* Figure out which root window we're on.  */
       XQueryPointer (FRAME_X_DISPLAY (*fp),
 		     DefaultRootWindow (FRAME_X_DISPLAY (*fp)),
-
 		     /* The root window which contains the pointer.  */
 		     &root,
-
 		     /* Trash which we can't trust if the pointer is on
 			a different screen.  */
 		     &dummy_window,
-
 		     /* The position on that root window.  */
 		     &root_x, &root_y,
-
 		     /* More trash we can't trust.  */
 		     &dummy, &dummy,
-
 		     /* Modifier keys and pointer buttons, about which
 			we don't care.  */
 		     (unsigned int *) &dummy);
@@ -5203,21 +5259,17 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 
 	x_catch_errors (FRAME_X_DISPLAY (*fp));
 
-	if (gui_mouse_grabbed (dpyinfo))
+	if (gui_mouse_grabbed (dpyinfo) && !EQ (track_mouse, Qdropping))
 	  {
 	    /* If mouse was grabbed on a frame, give coords for that frame
 	       even if the mouse is now outside it.  */
 	    XTranslateCoordinates (FRAME_X_DISPLAY (*fp),
-
 				   /* From-window.  */
 				   root,
-
 				   /* To-window.  */
 				   FRAME_X_WINDOW (dpyinfo->last_mouse_frame),
-
 				   /* From-position, to-position.  */
 				   root_x, root_y, &win_x, &win_y,
-
 				   /* Child of win.  */
 				   &child);
 	    f1 = dpyinfo->last_mouse_frame;
@@ -5227,16 +5279,12 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	    while (true)
 	      {
 		XTranslateCoordinates (FRAME_X_DISPLAY (*fp),
-
 				       /* From-window, to-window.  */
 				       root, win,
-
 				       /* From-position, to-position.  */
 				       root_x, root_y, &win_x, &win_y,
-
 				       /* Child of win.  */
 				       &child);
-
 		if (child == None || child == win)
 		  {
 #ifdef USE_GTK
@@ -5299,13 +5347,35 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 #endif /* USE_X_TOOLKIT */
 	  }
 
+	if ((!f1 || FRAME_TOOLTIP_P (f1))
+	    && EQ (track_mouse, Qdropping)
+	    && gui_mouse_grabbed (dpyinfo))
+	  {
+	    /* When dropping then if we didn't get a frame or only a
+	       tooltip frame and the mouse was grabbed on a frame,
+	       give coords for that frame even if the mouse is now
+	       outside it.  */
+	    XTranslateCoordinates (FRAME_X_DISPLAY (*fp),
+				   /* From-window.  */
+				   root,
+				   /* To-window.  */
+				   FRAME_X_WINDOW (dpyinfo->last_mouse_frame),
+				   /* From-position, to-position.  */
+				   root_x, root_y, &win_x, &win_y,
+				   /* Child of win.  */
+				   &child);
+	    f1 = dpyinfo->last_mouse_frame;
+	  }
+	else if (f1 && FRAME_TOOLTIP_P (f1))
+	  f1 = NULL;
+
 	if (x_had_errors_p (FRAME_X_DISPLAY (*fp)))
-	  f1 = 0;
+	  f1 = NULL;
 
 	x_uncatch_errors_after_check ();
 
 	/* If not, is it one of our scroll bars?  */
-	if (! f1)
+	if (!f1)
 	  {
 	    struct scroll_bar *bar;
 
@@ -5319,7 +5389,7 @@ XTmouse_position (struct frame **fp, int insist, Lisp_Object *bar_window,
 	      }
 	  }
 
-	if (f1 == 0 && insist > 0)
+	if (!f1 && insist > 0)
 	  f1 = SELECTED_FRAME ();
 
 	if (f1)
@@ -6049,17 +6119,19 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   XtSetArg (av[ac], XmNincrement, 1); ++ac;
   XtSetArg (av[ac], XmNpageIncrement, 1); ++ac;
 
+  /* Note: "background" is the thumb color, and "trough" is the color behind
+     everything. */
   pixel = f->output_data.x->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
-      XtSetArg (av[ac], XmNforeground, pixel);
+      XtSetArg (av[ac], XmNbackground, pixel);
       ++ac;
     }
 
   pixel = f->output_data.x->scroll_bar_background_pixel;
   if (pixel != -1)
     {
-      XtSetArg (av[ac], XmNbackground, pixel);
+      XtSetArg (av[ac], XmNtroughColor, pixel);
       ++ac;
     }
 
@@ -6152,7 +6224,7 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
     /* But only if we have a small colormap.  Xaw3d can allocate nice
        colors itself.  */
     {
-      XtSetArg (av[ac], XtNbeNiceToColormap,
+      XtSetArg (av[ac], (String) XtNbeNiceToColormap,
                 DefaultDepthOfScreen (FRAME_X_SCREEN (f)) < 16);
       ++ac;
     }
@@ -6163,20 +6235,20 @@ x_create_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
     {
       /* This tells Xaw3d to use real colors instead of dithering for
 	 the shadows.  */
-      XtSetArg (av[ac], XtNbeNiceToColormap, False);
+      XtSetArg (av[ac], (String) XtNbeNiceToColormap, False);
       ++ac;
 
       /* Specify the colors.  */
       pixel = f->output_data.x->scroll_bar_top_shadow_pixel;
       if (pixel != -1)
 	{
-	  XtSetArg (av[ac], XtNtopShadowPixel, pixel);
+	  XtSetArg (av[ac], (String) XtNtopShadowPixel, pixel);
 	  ++ac;
 	}
       pixel = f->output_data.x->scroll_bar_bottom_shadow_pixel;
       if (pixel != -1)
 	{
-	  XtSetArg (av[ac], XtNbottomShadowPixel, pixel);
+	  XtSetArg (av[ac], (String) XtNbottomShadowPixel, pixel);
 	  ++ac;
 	}
     }
@@ -6248,17 +6320,19 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
   XtSetArg (av[ac], XmNincrement, 1); ++ac;
   XtSetArg (av[ac], XmNpageIncrement, 1); ++ac;
 
+  /* Note: "background" is the thumb color, and "trough" is the color behind
+     everything. */
   pixel = f->output_data.x->scroll_bar_foreground_pixel;
   if (pixel != -1)
     {
-      XtSetArg (av[ac], XmNforeground, pixel);
+      XtSetArg (av[ac], XmNbackground, pixel);
       ++ac;
     }
 
   pixel = f->output_data.x->scroll_bar_background_pixel;
   if (pixel != -1)
     {
-      XtSetArg (av[ac], XmNbackground, pixel);
+      XtSetArg (av[ac], XmNtroughColor, pixel);
       ++ac;
     }
 
@@ -6351,7 +6425,7 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
     /* But only if we have a small colormap.  Xaw3d can allocate nice
        colors itself.  */
     {
-      XtSetArg (av[ac], XtNbeNiceToColormap,
+      XtSetArg (av[ac], (String) XtNbeNiceToColormap,
                 DefaultDepthOfScreen (FRAME_X_SCREEN (f)) < 16);
       ++ac;
     }
@@ -6362,20 +6436,20 @@ x_create_horizontal_toolkit_scroll_bar (struct frame *f, struct scroll_bar *bar)
     {
       /* This tells Xaw3d to use real colors instead of dithering for
 	 the shadows.  */
-      XtSetArg (av[ac], XtNbeNiceToColormap, False);
+      XtSetArg (av[ac], (String) XtNbeNiceToColormap, False);
       ++ac;
 
       /* Specify the colors.  */
       pixel = f->output_data.x->scroll_bar_top_shadow_pixel;
       if (pixel != -1)
 	{
-	  XtSetArg (av[ac], XtNtopShadowPixel, pixel);
+	  XtSetArg (av[ac], (String) XtNtopShadowPixel, pixel);
 	  ++ac;
 	}
       pixel = f->output_data.x->scroll_bar_bottom_shadow_pixel;
       if (pixel != -1)
 	{
-	  XtSetArg (av[ac], XtNbottomShadowPixel, pixel);
+	  XtSetArg (av[ac], (String) XtNbottomShadowPixel, pixel);
 	  ++ac;
 	}
     }
@@ -7760,10 +7834,6 @@ x_net_wm_state (struct frame *f, Window window)
       break;
     }
 
-  frame_size_history_add
-    (f, Qx_net_wm_state, 0, 0,
-     list2 (get_frame_param (f, Qfullscreen), lval));
-
   store_frame_param (f, Qfullscreen, lval);
 /**   store_frame_param (f, Qsticky, sticky ? Qt : Qnil); **/
 }
@@ -7786,6 +7856,37 @@ flush_dirty_back_buffers (void)
         show_back_buffer (f);
     }
   unblock_input ();
+}
+
+/**
+  mouse_or_wdesc_frame: When not dropping and the mouse was grabbed
+  for DPYINFO, return the frame where the mouse was seen last.  If
+  there's no such frame, return the frame according to WDESC.  When
+  dropping, return the frame according to WDESC.  If there's no such
+  frame and the mouse was grabbed for DPYINFO, return the frame where
+  the mouse was seen last.  In either case, never return a tooltip
+  frame.  */
+static struct frame *
+mouse_or_wdesc_frame (struct x_display_info *dpyinfo, int wdesc)
+{
+  struct frame *lm_f = (gui_mouse_grabbed (dpyinfo)
+			? dpyinfo->last_mouse_frame
+			: NULL);
+
+  if (lm_f && !EQ (track_mouse, Qdropping))
+    return lm_f;
+  else
+    {
+      struct frame *w_f = x_window_to_frame (dpyinfo, wdesc);
+
+      /* Do not return a tooltip frame.  */
+      if (!w_f || FRAME_TOOLTIP_P (w_f))
+	return EQ (track_mouse, Qdropping) ? lm_f : NULL;
+      else
+	/* When dropping it would be probably nice to raise w_f
+	   here.  */
+	return w_f;
+    }
 }
 
 /* Handles the XEvent EVENT on display DPYINFO.
@@ -8063,19 +8164,39 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (f && event->xproperty.atom == dpyinfo->Xatom_net_wm_state)
 	{
           bool not_hidden = x_handle_net_wm_state (f, &event->xproperty);
+
 	  if (not_hidden && FRAME_ICONIFIED_P (f))
 	    {
+	      if (CONSP (frame_size_history))
+		frame_size_history_plain
+		  (f, build_string ("PropertyNotify, not hidden & iconified"));
+
 	      /* Gnome shell does not iconify us when C-z is pressed.
 		 It hides the frame.  So if our state says we aren't
 		 hidden anymore, treat it as deiconified.  */
 	      SET_FRAME_VISIBLE (f, 1);
 	      SET_FRAME_ICONIFIED (f, false);
+
 	      f->output_data.x->has_been_visible = true;
 	      inev.ie.kind = DEICONIFY_EVENT;
+#if defined USE_GTK && defined HAVE_GTK3
+	      /* If GTK3 wants to impose some old size here (Bug#24526),
+		 tell it that the current size is what we want.  */
+	      if (f->was_invisible)
+		{
+		  xg_frame_set_char_size
+		    (f, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
+		  f->was_invisible = false;
+		}
+#endif
 	      XSETFRAME (inev.ie.frame_or_window, f);
 	    }
-	  else if (! not_hidden && ! FRAME_ICONIFIED_P (f))
+	  else if (!not_hidden && !FRAME_ICONIFIED_P (f))
 	    {
+	      if (CONSP (frame_size_history))
+		frame_size_history_plain
+		  (f, build_string ("PropertyNotify, hidden & not iconified"));
+
 	      SET_FRAME_VISIBLE (f, 0);
 	      SET_FRAME_ICONIFIED (f, true);
 	      inev.ie.kind = ICONIFY_EVENT;
@@ -8122,33 +8243,41 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           if (!FRAME_VISIBLE_P (f))
             {
               block_input ();
-              SET_FRAME_VISIBLE (f, 1);
-              SET_FRAME_ICONIFIED (f, false);
-              if (FRAME_X_DOUBLE_BUFFERED_P (f))
+	      /* By default, do not set the frame's visibility here, see
+		 https://lists.gnu.org/archive/html/emacs-devel/2017-02/msg00133.html.
+		 The default behavior can be overridden by setting
+		 'x-set-frame-visibility-more-laxly' (Bug#49955,
+		 Bug#53298).  */
+	      if (EQ (x_set_frame_visibility_more_laxly, Qexpose)
+		  || EQ (x_set_frame_visibility_more_laxly, Qt))
+		{
+		  SET_FRAME_VISIBLE (f, 1);
+		  SET_FRAME_ICONIFIED (f, false);
+		}
+
+	      if (FRAME_X_DOUBLE_BUFFERED_P (f))
                 font_drop_xrender_surfaces (f);
               f->output_data.x->has_been_visible = true;
               SET_FRAME_GARBAGED (f);
               unblock_input ();
             }
           else if (FRAME_GARBAGED_P (f))
-            {
+	    {
 #ifdef USE_GTK
-              /* Go around the back buffer and manually clear the
-                 window the first time we show it.  This way, we avoid
-                 showing users the sanity-defying horror of whatever
-                 GtkWindow is rendering beneath us.  We've garbaged
-                 the frame, so we'll redraw the whole thing on next
-                 redisplay anyway.  Yuck.  */
-              x_clear_area1 (
-                FRAME_X_DISPLAY (f),
-                FRAME_X_WINDOW (f),
-                event->xexpose.x, event->xexpose.y,
-                event->xexpose.width, event->xexpose.height,
-                0);
+	      /* Go around the back buffer and manually clear the
+		 window the first time we show it.  This way, we avoid
+		 showing users the sanity-defying horror of whatever
+		 GtkWindow is rendering beneath us.  We've garbaged
+		 the frame, so we'll redraw the whole thing on next
+		 redisplay anyway.  Yuck.  */
+	      x_clear_area1 (FRAME_X_DISPLAY (f),
+			     FRAME_X_WINDOW (f),
+			     event->xexpose.x, event->xexpose.y,
+			     event->xexpose.width, event->xexpose.height,
+			     0);
 	      x_clear_under_internal_border (f);
 #endif
-            }
-
+	    }
 
           if (!FRAME_GARBAGED_P (f))
             {
@@ -8241,7 +8370,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                            the frame was deleted.  */
         {
 	  bool visible = FRAME_VISIBLE_P (f);
-          /* While a frame is unmapped, display generation is
+
+	  /* While a frame is unmapped, display generation is
              disabled; you don't want to spend time updating a
              display that won't ever be seen.  */
           SET_FRAME_VISIBLE (f, 0);
@@ -8253,10 +8383,17 @@ handle_one_xevent (struct x_display_info *dpyinfo,
              and that way, we know the window is not iconified now.  */
           if (visible || FRAME_ICONIFIED_P (f))
             {
+	      if (CONSP (frame_size_history))
+		frame_size_history_plain
+		  (f, build_string ("UnmapNotify, visible | iconified"));
+
               SET_FRAME_ICONIFIED (f, true);
-              inev.ie.kind = ICONIFY_EVENT;
+	      inev.ie.kind = ICONIFY_EVENT;
               XSETFRAME (inev.ie.frame_or_window, f);
             }
+	  else if (CONSP (frame_size_history))
+	    frame_size_history_plain
+	      (f, build_string ("UnmapNotify, not visible & not iconified"));
         }
       goto OTHER;
 
@@ -8268,8 +8405,24 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (f)
         {
 	  bool iconified = FRAME_ICONIFIED_P (f);
+	  int value;
+	  bool sticky;
+          bool not_hidden = x_get_current_wm_state (f, event->xmap.window, &value, &sticky);
 
-          /* Check if fullscreen was specified before we where mapped the
+	  if (CONSP (frame_size_history))
+	    frame_size_history_extra
+	      (f,
+	       iconified
+	       ? (not_hidden
+		  ? build_string ("MapNotify, not hidden & iconified")
+		  : build_string ("MapNotify, hidden & iconified"))
+	       : (not_hidden
+		  ? build_string ("MapNotify, not hidden & not iconified")
+		  : build_string ("MapNotify, hidden & not iconified")),
+	       FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f),
+	       -1, -1, f->new_width, f->new_height);
+
+	  /* Check if fullscreen was specified before we where mapped the
              first time, i.e. from the command line.  */
           if (!f->output_data.x->has_been_visible)
 	    {
@@ -8293,19 +8446,28 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		x_set_z_group (f, Qbelow, Qnil);
 	    }
 
-          SET_FRAME_VISIBLE (f, 1);
-          SET_FRAME_ICONIFIED (f, false);
-          f->output_data.x->has_been_visible = true;
+	  if (not_hidden)
+	    {
+	      SET_FRAME_VISIBLE (f, 1);
+	      SET_FRAME_ICONIFIED (f, false);
+#if defined USE_GTK && defined HAVE_GTK3
+	      /* If GTK3 wants to impose some old size here (Bug#24526),
+		 tell it that the current size is what we want.  */
+	      if (f->was_invisible)
+		{
+		  xg_frame_set_char_size
+		    (f, FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f));
+		  f->was_invisible = false;
+		}
+#endif
+	      f->output_data.x->has_been_visible = true;
+	    }
 
-          if (iconified)
+          if (not_hidden && iconified)
             {
               inev.ie.kind = DEICONIFY_EVENT;
               XSETFRAME (inev.ie.frame_or_window, f);
             }
-          else if (! NILP (Vframe_list) && ! NILP (XCDR (Vframe_list)))
-            /* Force a redisplay sooner or later to update the
-	       frame titles in case this is the second frame.  */
-            record_asynch_buffer_change ();
         }
       goto OTHER;
 
@@ -8325,10 +8487,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       /* If mouse-highlight is an integer, input clears out
 	 mouse highlighting.  */
       if (!hlinfo->mouse_face_hidden && FIXNUMP (Vmouse_highlight)
-#if ! defined (USE_GTK)
 	  && (f == 0
-	      || !EQ (f->tool_bar_window, hlinfo->mouse_face_window))
+#if ! defined (USE_GTK)
+	      || !EQ (f->tool_bar_window, hlinfo->mouse_face_window)
 #endif
+	      || !EQ (f->tab_bar_window, hlinfo->mouse_face_window))
 	  )
         {
           clear_mouse_face (hlinfo);
@@ -8588,6 +8751,15 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      {
 		/* Decode the input data.  */
 
+#ifdef HAVE_GLIB
+		/* If this isn't done in a build with GLib (usually
+		   with GTK), then the resulting signal in
+		   `setup_coding_system' will cause Emacs to
+		   crash.  */
+		if (NILP (Fcoding_system_p (coding_system)))
+		  coding_system = Qraw_text;
+#endif
+
 		/* The input should be decoded with `coding_system'
 		   which depends on which X*LookupString function
 		   we used just above and the locale.  */
@@ -8617,7 +8789,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		if (nchars == nbytes)
 		  ch = copy_bufptr[i], len = 1;
 		else
-		  ch = STRING_CHAR_AND_LENGTH (copy_bufptr + i, len);
+		  ch = string_char_and_length (copy_bufptr + i, &len);
 		inev.ie.kind = (SINGLE_BYTE_CHAR_P (ch)
 				? ASCII_KEYSTROKE_EVENT
 				: MULTIBYTE_CHAR_KEYSTROKE_EVENT);
@@ -8678,6 +8850,34 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case FocusIn:
+#ifdef USE_GTK
+      /* Some WMs (e.g. Mutter in Gnome Shell), don't unmap
+         minimized/iconified windows; thus, for those WMs we won't get
+         a MapNotify when unminimizing/deiconifying.  Check here if we
+         are deiconizing a window (Bug42655).
+
+	 But don't do that by default on GTK since it may cause a plain
+	 invisible frame get reported as iconified, compare
+	 https://lists.gnu.org/archive/html/emacs-devel/2017-02/msg00133.html.
+	 That is fixed above but bites us here again.
+
+	 The option x_set_frame_visibility_more_laxly allows to override
+	 the default behavior (Bug#49955, Bug#53298).  */
+      if (EQ (x_set_frame_visibility_more_laxly, Qfocus_in)
+	  || EQ (x_set_frame_visibility_more_laxly, Qt))
+#endif /* USE_GTK */
+	{
+	  f = any;
+	  if (f && FRAME_ICONIFIED_P (f))
+	    {
+	      SET_FRAME_VISIBLE (f, 1);
+	      SET_FRAME_ICONIFIED (f, false);
+	      f->output_data.x->has_been_visible = true;
+	      inev.ie.kind = DEICONIFY_EVENT;
+	      XSETFRAME (inev.ie.frame_or_window, f);
+	    }
+	}
+
       x_detect_focus_change (dpyinfo, any, event, &inev.ie);
       goto OTHER;
 
@@ -8720,14 +8920,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
         previous_help_echo_string = help_echo_string;
         help_echo_string = Qnil;
 
-	f = (gui_mouse_grabbed (dpyinfo) ? dpyinfo->last_mouse_frame
-	     : x_window_to_frame (dpyinfo, event->xmotion.window));
-
-        if (hlinfo->mouse_face_hidden)
+	if (hlinfo->mouse_face_hidden)
           {
             hlinfo->mouse_face_hidden = false;
             clear_mouse_face (hlinfo);
           }
+
+	f = mouse_or_wdesc_frame (dpyinfo, event->xmotion.window);
 
 #ifdef USE_GTK
         if (f && xg_event_is_for_scrollbar (f, event))
@@ -8753,7 +8952,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 	      {
 		static Lisp_Object last_mouse_window;
 		Lisp_Object window = window_from_coordinates
-		  (f, event->xmotion.x, event->xmotion.y, 0, false);
+		  (f, event->xmotion.x, event->xmotion.y, 0, false, false);
 
 		/* A window will be autoselected only when it is not
 		   selected now and the last mouse movement event was
@@ -8847,13 +9046,29 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       if (f)
 	x_cr_update_surface_desired_size (f, configureEvent.xconfigure.width,
 					  configureEvent.xconfigure.height);
+      else if (any && configureEvent.xconfigure.window == FRAME_X_WINDOW (any))
+	x_cr_update_surface_desired_size (any,
+					  configureEvent.xconfigure.width,
+					  configureEvent.xconfigure.height);
 #endif
 #ifdef USE_GTK
       if (!f
-          && (f = any)
-          && configureEvent.xconfigure.window == FRAME_X_WINDOW (f))
+	  && (f = any)
+	  && configureEvent.xconfigure.window == FRAME_X_WINDOW (f)
+	  && (FRAME_VISIBLE_P(f)
+	      || !(configureEvent.xconfigure.width <= 1
+		   && configureEvent.xconfigure.height <= 1)))
         {
-          block_input ();
+
+	  if (CONSP (frame_size_history))
+	    frame_size_history_extra
+	      (f, build_string ("ConfigureNotify"),
+	       FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f),
+	       configureEvent.xconfigure.width,
+	       configureEvent.xconfigure.height,
+	       f->new_width, f->new_height);
+
+	  block_input ();
           if (FRAME_X_DOUBLE_BUFFERED_P (f))
             font_drop_xrender_surfaces (f);
           unblock_input ();
@@ -8864,10 +9079,13 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 					    configureEvent.xconfigure.height);
 #endif
           f = 0;
-        }
+	}
 #endif
-      if (f)
-        {
+      if (f
+	  && (FRAME_VISIBLE_P(f)
+	      || !(configureEvent.xconfigure.width <= 1
+		   && configureEvent.xconfigure.height <= 1)))
+	{
 #ifdef USE_GTK
 	  /* For GTK+ don't call x_net_wm_state for the scroll bar
 	     window.  (Bug#24963, Bug#25887) */
@@ -8891,24 +9109,29 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 
 #ifndef USE_X_TOOLKIT
 #ifndef USE_GTK
-          int width =
-	    FRAME_PIXEL_TO_TEXT_WIDTH (f, configureEvent.xconfigure.width);
-          int height =
-	    FRAME_PIXEL_TO_TEXT_HEIGHT (f, configureEvent.xconfigure.height);
+          int width = configureEvent.xconfigure.width;
+          int height = configureEvent.xconfigure.height;
 
-          /* In the toolkit version, change_frame_size
+	  if (CONSP (frame_size_history))
+	    frame_size_history_extra
+	      (f, build_string ("ConfigureNotify"),
+	       FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f),
+	       width, height, f->new_width, f->new_height);
+
+	  /* In the toolkit version, change_frame_size
              is called by the code that handles resizing
              of the EmacsFrame widget.  */
 
           /* Even if the number of character rows and columns has
              not changed, the font size may have changed, so we need
              to check the pixel dimensions as well.  */
-          if (width != FRAME_TEXT_WIDTH (f)
-              || height != FRAME_TEXT_HEIGHT (f)
-              || configureEvent.xconfigure.width != FRAME_PIXEL_WIDTH (f)
-              || configureEvent.xconfigure.height != FRAME_PIXEL_HEIGHT (f))
+          if (width != FRAME_PIXEL_WIDTH (f)
+              || height != FRAME_PIXEL_HEIGHT (f)
+	      || (f->new_size_p
+		  && ((f->new_width >= 0 && width != f->new_width)
+		      || (f->new_height >= 0 && height != f->new_height))))
             {
-              change_frame_size (f, width, height, false, true, false, true);
+              change_frame_size (f, width, height, false, true, false);
               x_clear_under_internal_border (f);
               SET_FRAME_GARBAGED (f);
               cancel_mouse_face (f);
@@ -8943,7 +9166,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 		  unblock_input ();
 		}
 
-	      if (old_left != f->left_pos || old_top != f->top_pos)
+	      if (!FRAME_TOOLTIP_P (f)
+		  && (old_left != f->left_pos || old_top != f->top_pos))
 		{
 		  inev.ie.kind = MOVE_FRAME_EVENT;
 		  XSETFRAME (inev.ie.frame_or_window, f);
@@ -8956,7 +9180,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
             xic_set_statusarea (f);
 #endif
 
-        }
+	}
       goto OTHER;
 
     case ButtonRelease:
@@ -8964,39 +9188,35 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       {
         /* If we decide we want to generate an event to be seen
            by the rest of Emacs, we put it here.  */
+        Lisp_Object tab_bar_arg = Qnil;
+        bool tab_bar_p = false;
         bool tool_bar_p = false;
 
 	memset (&compose_status, 0, sizeof (compose_status));
 	dpyinfo->last_mouse_glyph_frame = NULL;
 	x_display_set_last_user_time (dpyinfo, event->xbutton.time);
 
-	if (gui_mouse_grabbed (dpyinfo))
-	  f = dpyinfo->last_mouse_frame;
-	else
+	f = mouse_or_wdesc_frame (dpyinfo, event->xmotion.window);
+	if (f && event->xbutton.type == ButtonPress
+	    && !popup_activated ()
+	    && !x_window_to_scroll_bar (event->xbutton.display,
+					event->xbutton.window, 2)
+	    && !FRAME_NO_ACCEPT_FOCUS (f))
 	  {
-	    f = x_window_to_frame (dpyinfo, event->xbutton.window);
+	    /* When clicking into a child frame or when clicking
+	       into a parent frame with the child frame selected and
+	       `no-accept-focus' is not set, select the clicked
+	       frame.  */
+	    struct frame *hf = dpyinfo->highlight_frame;
 
-	    if (f && event->xbutton.type == ButtonPress
-		&& !popup_activated ()
-		&& !x_window_to_scroll_bar (event->xbutton.display,
-					    event->xbutton.window, 2)
-		&& !FRAME_NO_ACCEPT_FOCUS (f))
+	    if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
 	      {
-		/* When clicking into a child frame or when clicking
-		   into a parent frame with the child frame selected and
-		   `no-accept-focus' is not set, select the clicked
-		   frame.  */
-		struct frame *hf = dpyinfo->highlight_frame;
-
-		if (FRAME_PARENT_FRAME (f) || (hf && frame_ancestor_p (f, hf)))
-		  {
-		    block_input ();
-		    XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-				    RevertToParent, CurrentTime);
-		    if (FRAME_PARENT_FRAME (f))
-		      XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
-		    unblock_input ();
-		  }
+		block_input ();
+		XSetInputFocus (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+				RevertToParent, CurrentTime);
+		if (FRAME_PARENT_FRAME (f))
+		  XRaiseWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f));
+		unblock_input ();
 	      }
 	  }
 
@@ -9006,6 +9226,23 @@ handle_one_xevent (struct x_display_info *dpyinfo,
 #endif
         if (f)
           {
+            /* Is this in the tab-bar?  */
+            if (WINDOWP (f->tab_bar_window)
+                && WINDOW_TOTAL_LINES (XWINDOW (f->tab_bar_window)))
+              {
+                Lisp_Object window;
+                int x = event->xbutton.x;
+                int y = event->xbutton.y;
+
+                window = window_from_coordinates (f, x, y, 0, true, true);
+                tab_bar_p = EQ (window, f->tab_bar_window);
+
+                if (tab_bar_p)
+		  tab_bar_arg = handle_tab_bar_click
+		    (f, x, y, event->xbutton.type == ButtonPress,
+		     x_x_to_emacs_modifiers (dpyinfo, event->xbutton.state));
+              }
+
 #if ! defined (USE_GTK)
             /* Is this in the tool-bar?  */
             if (WINDOWP (f->tool_bar_window)
@@ -9015,7 +9252,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                 int x = event->xbutton.x;
                 int y = event->xbutton.y;
 
-                window = window_from_coordinates (f, x, y, 0, true);
+                window = window_from_coordinates (f, x, y, 0, true, true);
                 tool_bar_p = EQ (window, f->tool_bar_window);
 
                 if (tool_bar_p && event->xbutton.button < 4)
@@ -9025,7 +9262,7 @@ handle_one_xevent (struct x_display_info *dpyinfo,
               }
 #endif /* !USE_GTK */
 
-            if (!tool_bar_p)
+            if (!(tab_bar_p && NILP (tab_bar_arg)) && !tool_bar_p)
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
               if (! popup_activated ())
 #endif
@@ -9043,6 +9280,9 @@ handle_one_xevent (struct x_display_info *dpyinfo,
                     }
                   else
                     x_construct_mouse_click (&inev.ie, &event->xbutton, f);
+
+		  if (!NILP (tab_bar_arg))
+		    inev.ie.arg = tab_bar_arg;
                 }
             if (FRAME_X_EMBEDDED_P (f))
               xembed_send_message (f, event->xbutton.time,
@@ -9072,6 +9312,8 @@ handle_one_xevent (struct x_display_info *dpyinfo,
           {
             dpyinfo->grabbed |= (1 << event->xbutton.button);
             dpyinfo->last_mouse_frame = f;
+            if (f && !tab_bar_p)
+              f->last_tab_bar_item = -1;
 #if ! defined (USE_GTK)
             if (f && !tool_bar_p)
               f->last_tool_bar_item = -1;
@@ -9127,6 +9369,11 @@ handle_one_xevent (struct x_display_info *dpyinfo,
       goto OTHER;
 
     case VisibilityNotify:
+      f = x_top_window_to_frame (dpyinfo, event->xvisibility.window);
+      if (f && (event->xvisibility.state == VisibilityUnobscured
+		|| event->xvisibility.state == VisibilityPartiallyObscured))
+	SET_FRAME_VISIBLE (f, 1);
+
       goto OTHER;
 
     case MappingNotify:
@@ -9383,11 +9630,12 @@ x_draw_hollow_cursor (struct window *w, struct glyph_row *row)
   /* The foreground of cursor_gc is typically the same as the normal
      background color, which can cause the cursor box to be invisible.  */
   xgcv.foreground = f->output_data.x->cursor_pixel;
+  xgcv.line_width = 1;
   if (dpyinfo->scratch_cursor_gc)
-    XChangeGC (dpy, dpyinfo->scratch_cursor_gc, GCForeground, &xgcv);
+    XChangeGC (dpy, dpyinfo->scratch_cursor_gc, GCForeground | GCLineWidth, &xgcv);
   else
     dpyinfo->scratch_cursor_gc = XCreateGC (dpy, FRAME_X_DRAWABLE (f),
-					    GCForeground, &xgcv);
+					    GCForeground | GCLineWidth, &xgcv);
   gc = dpyinfo->scratch_cursor_gc;
 
   /* When on R2L character, show cursor at the right edge of the
@@ -9590,7 +9838,7 @@ x_draw_window_cursor (struct window *w, struct glyph_row *glyph_row, int x,
 
 #ifdef HAVE_X_I18N
       if (w == XWINDOW (f->selected_window))
-	if (FRAME_XIC (f) && (FRAME_XIC_STYLE (f) & XIMPreeditPosition))
+	if (FRAME_XIC (f))
 	  xic_set_preeditarea (w, x, y);
 #endif
     }
@@ -9807,6 +10055,13 @@ x_uncatch_errors (void)
 {
   struct x_error_message_stack *tmp;
 
+  /* In rare situations when running Emacs run in daemon mode,
+     shutting down an emacsclient via delete-frame can cause
+     x_uncatch_errors to be called when x_error_message is set to
+     NULL.  */
+  if (x_error_message == NULL)
+    return;
+
   block_input ();
 
   /* The display may have been closed before this function is called.
@@ -9911,8 +10166,9 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
          frame on it. */
       dpyinfo->reference_count++;
       dpyinfo->terminal->reference_count++;
+      if (ioerror)
+	dpyinfo->display = 0;
     }
-  if (ioerror) dpyinfo->display = 0;
 
   /* First delete frames whose mini-buffers are on frames
      that are on the dead display.  */
@@ -9982,7 +10238,6 @@ For details, see etc/PROBLEMS.\n",
     {
       fprintf (stderr, "%s\n", error_msg);
       Fkill_emacs (make_fixnum (70));
-      /* NOTREACHED */
     }
 
   totally_unblock_input ();
@@ -9996,8 +10251,6 @@ For details, see etc/PROBLEMS.\n",
   error ("%s", error_msg);
 }
 
-/* We specifically use it before defining it, so that gcc doesn't inline it,
-   otherwise gdb doesn't know how to properly put a breakpoint on it.  */
 static void x_error_quitter (Display *, XErrorEvent *);
 
 /* This is the first-level handler for X protocol errors.
@@ -10026,9 +10279,6 @@ x_error_handler (Display *display, XErrorEvent *event)
    If that was the only one, it prints an error message and kills Emacs.  */
 
 /* .gdbinit puts a breakpoint here, so make sure it is not inlined.  */
-
-/* On older GCC versions, just putting x_error_quitter
-   after x_error_handler prevents inlining into the former.  */
 
 static void NO_INLINE
 x_error_quitter (Display *display, XErrorEvent *event)
@@ -10077,10 +10327,6 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 {
   struct font *font = XFONT_OBJECT (font_object);
   int unit, font_ascent, font_descent;
-#ifndef USE_X_TOOLKIT
-  int old_menu_bar_height = FRAME_MENU_BAR_HEIGHT (f);
-  Lisp_Object fullscreen;
-#endif
 
   if (fontset < 0)
     fontset = fontset_from_font (font_object);
@@ -10099,6 +10345,8 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
 #ifndef USE_X_TOOLKIT
   FRAME_MENU_BAR_HEIGHT (f) = FRAME_MENU_BAR_LINES (f) * FRAME_LINE_HEIGHT (f);
 #endif
+  /* We could use a more elaborate calculation here.  */
+  FRAME_TAB_BAR_HEIGHT (f) = FRAME_TAB_BAR_LINES (f) * FRAME_LINE_HEIGHT (f);
 
   /* Compute character columns occupied by scrollbar.
 
@@ -10111,32 +10359,14 @@ x_new_font (struct frame *f, Lisp_Object font_object, int fontset)
   else
     FRAME_CONFIG_SCROLL_BAR_COLS (f) = (14 + unit - 1) / unit;
 
-  if (FRAME_X_WINDOW (f) != 0)
-    {
-      /* Don't change the size of a tip frame; there's no point in
-	 doing it because it's done in Fx_show_tip, and it leads to
-	 problems because the tip frame has no widget.  */
-      if (!FRAME_TOOLTIP_P (f))
-	{
-	  adjust_frame_size (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
-			     FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3,
-			     false, Qfont);
-#ifndef USE_X_TOOLKIT
-	  if (FRAME_MENU_BAR_HEIGHT (f) != old_menu_bar_height
-	      && !f->after_make_frame
-	      && (EQ (frame_inhibit_implied_resize, Qt)
-		  || (CONSP (frame_inhibit_implied_resize)
-		      && NILP (Fmemq (Qfont, frame_inhibit_implied_resize))))
-	      && (NILP (fullscreen = get_frame_param (f, Qfullscreen))
-		  || EQ (fullscreen, Qfullwidth)))
-	    /* If the menu bar height changes, try to keep text height
-	       constant.  */
-	    adjust_frame_size
-	      (f, -1, FRAME_TEXT_HEIGHT (f) + FRAME_MENU_BAR_HEIGHT (f)
-	       - old_menu_bar_height, 1, false, Qfont);
-#endif /* USE_X_TOOLKIT  */
-	}
-    }
+
+  /* Don't change the size of a tip frame; there's no point in doing it
+     because it's done in Fx_show_tip, and it leads to problems because
+     the tip frame has no widget.  */
+  if (FRAME_X_WINDOW (f) != 0 && !FRAME_TOOLTIP_P (f))
+    adjust_frame_size
+      (f, FRAME_COLS (f) * FRAME_COLUMN_WIDTH (f),
+       FRAME_LINES (f) * FRAME_LINE_HEIGHT (f), 3, false, Qfont);
 
 #ifdef HAVE_X_I18N
   if (FRAME_XIC (f)
@@ -10268,11 +10498,8 @@ xim_instantiate_callback (Display *display, XPointer client_data, XPointer call_
 		create_frame_xic (f);
 		if (FRAME_XIC_STYLE (f) & XIMStatusArea)
 		  xic_set_statusarea (f);
-		if (FRAME_XIC_STYLE (f) & XIMPreeditPosition)
-		  {
-		    struct window *w = XWINDOW (f->selected_window);
-		    xic_set_preeditarea (w, w->cursor.x, w->cursor.y);
-		  }
+		struct window *w = XWINDOW (f->selected_window);
+		xic_set_preeditarea (w, w->cursor.x, w->cursor.y);
 	      }
 	}
 
@@ -10508,26 +10735,29 @@ x_set_offset (struct frame *f, register int xoff, register int yoff, int change_
 	       modified_left, modified_top);
 #endif
 
-  x_sync_with_move (f, f->left_pos, f->top_pos,
-                    FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
+  /* 'x_sync_with_move' is too costly for dragging child frames.  */
+  if (!FRAME_PARENT_FRAME (f))
+    {
+      x_sync_with_move (f, f->left_pos, f->top_pos,
+			FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN);
 
-  /* change_gravity is non-zero when this function is called from Lisp to
-     programmatically move a frame.  In that case, we call
-     x_check_expected_move to discover if we have a "Type A" or "Type B"
-     window manager, and, for a "Type A" window manager, adjust the position
-     of the frame.
+      /* change_gravity is non-zero when this function is called from Lisp to
+	 programmatically move a frame.  In that case, we call
+	 x_check_expected_move to discover if we have a "Type A" or "Type B"
+	 window manager, and, for a "Type A" window manager, adjust the position
+	 of the frame.
 
-     We call x_check_expected_move if a programmatic move occurred, and
-     either the window manager type (A/B) is unknown or it is Type A but we
-     need to compute the top/left offset adjustment for this frame.  */
+	 We call x_check_expected_move if a programmatic move occurred, and
+	 either the window manager type (A/B) is unknown or it is Type A but we
+	 need to compute the top/left offset adjustment for this frame.  */
 
-  if (change_gravity != 0
-      && !FRAME_PARENT_FRAME (f)
-      && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
-	  || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
-	      && (FRAME_X_OUTPUT (f)->move_offset_left == 0
-		  && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
-    x_check_expected_move (f, modified_left, modified_top);
+      if (change_gravity != 0
+	  && (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_UNKNOWN
+	      || (FRAME_DISPLAY_INFO (f)->wm_type == X_WMTYPE_A
+		  && (FRAME_X_OUTPUT (f)->move_offset_left == 0
+		      && FRAME_X_OUTPUT (f)->move_offset_top == 0))))
+	x_check_expected_move (f, modified_left, modified_top);
+    }
 
   unblock_input ();
 }
@@ -10536,7 +10766,7 @@ x_set_offset (struct frame *f, register int xoff, register int yoff, int change_
    on the root window for frame F contains ATOMNAME.
    This is how a WM check shall be done according to the Window Manager
    Specification/Extended Window Manager Hints at
-   http://freedesktop.org/wiki/Specifications/wm-spec.  */
+   https://freedesktop.org/wiki/Specifications/wm-spec/.  */
 
 bool
 x_wm_supports (struct frame *f, Atom want_atom)
@@ -11020,10 +11250,6 @@ x_handle_net_wm_state (struct frame *f, const XPropertyEvent *event)
       break;
     }
 
-  frame_size_history_add
-    (f, Qx_handle_net_wm_state, 0, 0,
-     list2 (get_frame_param (f, Qfullscreen), lval));
-
   store_frame_param (f, Qfullscreen, lval);
   store_frame_param (f, Qsticky, sticky ? Qt : Qnil);
 
@@ -11078,9 +11304,6 @@ x_check_fullscreen (struct frame *f)
 	  emacs_abort ();
         }
 
-      frame_size_history_add
-	(f, Qx_check_fullscreen, width, height, Qnil);
-
       x_wm_set_size_hint (f, 0, false);
 
       XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
@@ -11090,8 +11313,7 @@ x_check_fullscreen (struct frame *f)
 	x_wait_for_event (f, ConfigureNotify);
       else
 	{
-	  change_frame_size (f, width, height - FRAME_MENUBAR_HEIGHT (f),
-			     false, true, false, true);
+	  change_frame_size (f, width, height, false, true, false);
 	  x_sync (f);
 	}
     }
@@ -11245,57 +11467,12 @@ static void
 x_set_window_size_1 (struct frame *f, bool change_gravity,
 		     int width, int height)
 {
-  int pixelwidth = FRAME_TEXT_TO_PIXEL_WIDTH (f, width);
-  int pixelheight = FRAME_TEXT_TO_PIXEL_HEIGHT (f, height);
-  int old_width = FRAME_PIXEL_WIDTH (f);
-  int old_height = FRAME_PIXEL_HEIGHT (f);
-  Lisp_Object fullscreen = get_frame_param (f, Qfullscreen);
-
   if (change_gravity)
     f->win_gravity = NorthWestGravity;
   x_wm_set_size_hint (f, 0, false);
 
-  /* When the frame is fullheight and we only want to change the width
-     or it is fullwidth and we only want to change the height we should
-     be able to preserve the fullscreen property.  However, due to the
-     fact that we have to send a resize request anyway, the window
-     manager will abolish it.  At least the respective size should
-     remain unchanged but giving the frame back its normal size will
-     be broken ... */
-  if (EQ (fullscreen, Qfullwidth) && width == FRAME_TEXT_WIDTH (f))
-    {
-      frame_size_history_add
-	(f, Qx_set_window_size_1, width, height,
-	 list2i (old_height, pixelheight + FRAME_MENUBAR_HEIGHT (f)));
-
-      XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-		     old_width, pixelheight + FRAME_MENUBAR_HEIGHT (f));
-    }
-  else if (EQ (fullscreen, Qfullheight) && height == FRAME_TEXT_HEIGHT (f))
-    {
-      frame_size_history_add
-	(f, Qx_set_window_size_2, width, height,
-	 list2i (old_width, pixelwidth));
-
-      XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-		     pixelwidth, old_height);
-    }
-
-  else
-    {
-      frame_size_history_add
-	(f, Qx_set_window_size_3, width, height,
-	 list3i (pixelwidth + FRAME_TOOLBAR_WIDTH (f),
-		 (pixelheight + FRAME_TOOLBAR_HEIGHT (f)
-		  + FRAME_MENUBAR_HEIGHT (f)),
-		 FRAME_MENUBAR_HEIGHT (f)));
-
-      XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
-		     pixelwidth, pixelheight + FRAME_MENUBAR_HEIGHT (f));
-      fullscreen = Qnil;
-    }
-
-
+  XResizeWindow (FRAME_X_DISPLAY (f), FRAME_OUTER_WINDOW (f),
+		 width, height + FRAME_MENUBAR_HEIGHT (f));
 
   /* We've set {FRAME,PIXEL}_{WIDTH,HEIGHT} to the values we hope to
      receive in the ConfigureNotify event; if we get what we asked
@@ -11324,65 +11501,41 @@ x_set_window_size_1 (struct frame *f, bool change_gravity,
     {
       x_wait_for_event (f, ConfigureNotify);
 
-      if (!NILP (fullscreen))
-	/* Try to restore fullscreen state.  */
-	{
-	  store_frame_param (f, Qfullscreen, fullscreen);
-	  gui_set_fullscreen (f, fullscreen, fullscreen);
-	}
+      if (CONSP (frame_size_history))
+	frame_size_history_extra
+	  (f, build_string ("x_set_window_size_1, visible"),
+	   FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f), width, height,
+	   f->new_width, f->new_height);
     }
   else
     {
-      change_frame_size (f, width, height, false, true, false, true);
+      if (CONSP (frame_size_history))
+	frame_size_history_extra
+	  (f, build_string ("x_set_window_size_1, invisible"),
+	   FRAME_PIXEL_WIDTH (f), FRAME_PIXEL_HEIGHT (f), width, height,
+	   f->new_width, f->new_height);
+
+      /* Call adjust_frame_size right away as with GTK.  It might be
+	 tempting to clear out f->new_width and f->new_height here.  */
+      adjust_frame_size (f, FRAME_PIXEL_TO_TEXT_WIDTH (f, width),
+			 FRAME_PIXEL_TO_TEXT_HEIGHT (f, height),
+			 5, 0, Qx_set_window_size_1);
+
       x_sync (f);
     }
 }
 
 
-/* Call this to change the size of frame F's x-window.
-   If CHANGE_GRAVITY, change to top-left-corner window gravity
-   for this size change and subsequent size changes.
-   Otherwise we leave the window gravity unchanged.  */
+/* Change the size of frame F's X window to WIDTH and HEIGHT pixels.  If
+   CHANGE_GRAVITY, change to top-left-corner window gravity for this
+   size change and subsequent size changes.  Otherwise we leave the
+   window gravity unchanged.  */
 
 void
 x_set_window_size (struct frame *f, bool change_gravity,
-		   int width, int height, bool pixelwise)
+		   int width, int height)
 {
   block_input ();
-
-  /* The following breaks our calculations.  If it's really needed,
-     think of something else.  */
-#if false
-  if (!FRAME_TOOLTIP_P (f))
-    {
-      int text_width, text_height;
-
-      /* When the frame is maximized/fullscreen or running under for
-         example Xmonad, x_set_window_size_1 will be a no-op.
-         In that case, the right thing to do is extend rows/width to
-         the current frame size.  We do that first if x_set_window_size_1
-         turns out to not be a no-op (there is no way to know).
-         The size will be adjusted again if the frame gets a
-         ConfigureNotify event as a result of x_set_window_size.  */
-      int pixelh = FRAME_PIXEL_HEIGHT (f);
-#ifdef USE_X_TOOLKIT
-      /* The menu bar is not part of text lines.  The tool bar
-         is however.  */
-      pixelh -= FRAME_MENUBAR_HEIGHT (f);
-#endif
-      text_width = FRAME_PIXEL_TO_TEXT_WIDTH (f, FRAME_PIXEL_WIDTH (f));
-      text_height = FRAME_PIXEL_TO_TEXT_HEIGHT (f, pixelh);
-
-      change_frame_size (f, text_width, text_height, false, true, false, true);
-    }
-#endif
-
-  /* Pixelize width and height, if necessary.  */
-  if (! pixelwise)
-    {
-      width = width * FRAME_COLUMN_WIDTH (f);
-      height = height * FRAME_LINE_HEIGHT (f);
-    }
 
 #ifdef USE_GTK
   if (FRAME_GTK_WIDGET (f))
@@ -11461,7 +11614,7 @@ static void
 xembed_request_focus (struct frame *f)
 {
   /* See XEmbed Protocol Specification at
-     http://freedesktop.org/wiki/Specifications/xembed-spec  */
+     https://freedesktop.org/wiki/Specifications/xembed-spec/  */
   if (FRAME_VISIBLE_P (f))
     xembed_send_message (f, CurrentTime,
 			 XEMBED_REQUEST_FOCUS, 0, 0, 0);
@@ -11473,7 +11626,7 @@ static void
 x_ewmh_activate_frame (struct frame *f)
 {
   /* See Window Manager Specification/Extended Window Manager Hints at
-     http://freedesktop.org/wiki/Specifications/wm-spec  */
+     https://freedesktop.org/wiki/Specifications/wm-spec/  */
 
   struct x_display_info *dpyinfo = FRAME_DISPLAY_INFO (f);
 
@@ -11484,7 +11637,8 @@ x_ewmh_activate_frame (struct frame *f)
       x_send_client_event (frame, make_fixnum (0), frame,
 			   dpyinfo->Xatom_net_active_window,
 			   make_fixnum (32),
-			   list2i (1, dpyinfo->last_user_time));
+			   list2 (make_fixnum (1),
+				  INT_TO_INTEGER (dpyinfo->last_user_time)));
     }
 }
 
@@ -11523,7 +11677,7 @@ x_focus_frame (struct frame *f, bool noactivate)
     {
       /* For Xembedded frames, normally the embedder forwards key
 	 events.  See XEmbed Protocol Specification at
-	 http://freedesktop.org/wiki/Specifications/xembed-spec  */
+	 https://freedesktop.org/wiki/Specifications/xembed-spec/  */
       xembed_request_focus (f);
     }
   else
@@ -11735,8 +11889,15 @@ x_make_frame_visible (struct frame *f)
     poll_for_input_1 ();
     poll_suppress_count = old_poll_suppress_count;
 #endif
-    if (! FRAME_VISIBLE_P (f))
-      x_wait_for_event (f, MapNotify);
+
+    if (!FRAME_VISIBLE_P (f))
+      {
+	if (CONSP (frame_size_history))
+	  frame_size_history_plain
+	    (f, build_string ("x_make_frame_visible"));
+
+	x_wait_for_event (f, MapNotify);
+      }
   }
 }
 
@@ -11791,6 +11952,10 @@ x_make_frame_invisible (struct frame *f)
      and synchronize with the server to make sure we agree.  */
   SET_FRAME_VISIBLE (f, 0);
   SET_FRAME_ICONIFIED (f, false);
+
+  if (CONSP (frame_size_history))
+    frame_size_history_plain
+      (f, build_string ("x_make_frame_invisible"));
 
   unblock_input ();
 }
@@ -12804,19 +12969,23 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 #endif
 
   Lisp_Object system_name = Fsystem_name ();
-
-  ptrdiff_t nbytes = SBYTES (Vinvocation_name) + 1;
-  if (STRINGP (system_name)
-      && INT_ADD_WRAPV (nbytes, SBYTES (system_name) + 1, &nbytes))
-    memory_full (SIZE_MAX);
-  dpyinfo->x_id = ++x_display_id;
-  dpyinfo->x_id_name = xmalloc_atomic (nbytes);
-  char *nametail = lispstpcpy (dpyinfo->x_id_name, Vinvocation_name);
+  static char const title[] = "GNU Emacs";
   if (STRINGP (system_name))
     {
-      *nametail++ = '@';
-      lispstpcpy (nametail, system_name);
+      static char const at[] = " at ";
+      ptrdiff_t nbytes = sizeof (title) + sizeof (at);
+      if (INT_ADD_WRAPV (nbytes, SBYTES (system_name), &nbytes))
+	memory_full (SIZE_MAX);
+      dpyinfo->x_id_name = xmalloc (nbytes);
+      sprintf (dpyinfo->x_id_name, "%s%s%s", title, at, SDATA (system_name));
     }
+  else
+    {
+      dpyinfo->x_id_name = xmalloc (sizeof (title));
+      strcpy (dpyinfo->x_id_name, title);
+    }
+
+  dpyinfo->x_id = ++x_display_id;
 
   /* Figure out which modifier bits mean what.  */
   x_find_modifier_meanings (dpyinfo);
@@ -12909,13 +13078,13 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
        or larger than other for other applications, even if it is the same
        font name (monospace-10 for example).  */
 
+# ifdef HAVE_XRENDER
     int event_base, error_base;
-    char *v;
-    double d;
-
     XRenderQueryExtension (dpyinfo->display, &event_base, &error_base);
+# endif
 
-    v = XGetDefault (dpyinfo->display, "Xft", "dpi");
+    char *v = XGetDefault (dpyinfo->display, "Xft", "dpi");
+    double d;
     if (v != NULL && sscanf (v, "%lf", &d) == 1)
       dpyinfo->resy = dpyinfo->resx = d;
   }
@@ -13269,7 +13438,8 @@ static struct redisplay_interface x_redisplay_interface =
     x_draw_window_divider,
     x_shift_glyphs_for_insert, /* Never called; see comment in function.  */
     x_show_hourglass,
-    x_hide_hourglass
+    x_hide_hourglass,
+    x_default_font_parameter
   };
 
 
@@ -13403,6 +13573,7 @@ x_create_terminal (struct x_display_info *dpyinfo)
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
   terminal->popup_dialog_hook = xw_popup_dialog;
 #endif
+  terminal->change_tab_bar_height_hook = x_change_tab_bar_height;
 #ifndef HAVE_EXT_TOOL_BAR
   terminal->change_tool_bar_height_hook = x_change_tool_bar_height;
 #endif
@@ -13441,8 +13612,8 @@ x_initialize (void)
 #if THREADS_ENABLED
   /* This must be called before any other Xlib routines.  */
   if (XInitThreads () == 0)
-    fprintf (stderr,
-	     "Warning: An error occurred initializing X11 thread support!\n");
+    fputs ("Warning: An error occurred initializing X11 thread support!\n",
+	   stderr);
 #endif
 
 #ifdef USE_X_TOOLKIT
@@ -13469,7 +13640,7 @@ x_initialize (void)
 #endif
 
 #ifdef USE_CAIRO
-  x_cr_init_fringe (&x_redisplay_interface);
+  gui_init_fringe (&x_redisplay_interface);
 #endif
 
   /* Note that there is no real way portable across R3/R4 to get the
@@ -13529,7 +13700,7 @@ baseline level.  The default value is nil.  */);
   DEFVAR_BOOL ("x-mouse-click-focus-ignore-position",
 	       x_mouse_click_focus_ignore_position,
     doc: /* Non-nil means that a mouse click to focus a frame does not move point.
-This variable is only used when the window manager requires that you
+This variable is used only when the window manager requires that you
 click on a frame to select it (give it focus).  In that case, a value
 of nil, means that the selected window and cursor position changes to
 reflect the mouse click position, while a non-nil value means that the
@@ -13641,4 +13812,21 @@ gtk_window_move to set or store frame positions and disables some time
 consuming frame position adjustments.  In newer versions of GTK, Emacs
 always uses gtk_window_move and ignores the value of this variable.  */);
   x_gtk_use_window_move = true;
+
+  DEFSYM (Qexpose, "expose");
+
+  DEFVAR_LISP ("x-set-frame-visibility-more-laxly",
+	       x_set_frame_visibility_more_laxly,
+    doc: /* Non-nil means set frame visibility more laxly.
+If this is nil, Emacs is more strict when marking a frame as visible.
+Since this may cause problems on some window managers, this variable can
+be also set as follows: The value `focus-in' means to mark a frame as
+visible also when a FocusIn event is received for it on GTK builds.  The
+value `expose' means to mark a frame as visible also when an Expose
+event is received for it on any X build.  The value `t' means to mark a
+frame as visible in either of these two cases.
+
+Note that any non-nil setting may cause invisible frames get erroneously
+reported as iconified.  */);
+  x_set_frame_visibility_more_laxly = Qnil;
 }

@@ -1,6 +1,6 @@
 ;;; midnight.el --- run something every midnight, e.g., kill old buffers  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Sam Steingold <sds@gnu.org>
 ;; Created: 1998-05-18
@@ -26,7 +26,7 @@
 ;; To use the file, put (require 'midnight) into your .emacs.  Then, at
 ;; midnight, Emacs will run the normal hook `midnight-hook'.  You can
 ;; put whatever you like there, say, `calendar'; by default there is
-;; only one function there - `clean-buffer-list'. It will kill the
+;; only one function there - `clean-buffer-list'.  It will kill the
 ;; buffers matching `clean-buffer-list-kill-buffer-names' and
 ;; `clean-buffer-list-kill-regexps' and the buffers which where last
 ;; displayed more than `clean-buffer-list-delay-general' days ago,
@@ -193,8 +193,8 @@ The default value is `clean-buffer-list'."
   :type 'hook)
 
 (defun midnight-next ()
-  "Return the number of seconds till the next midnight."
-  (pcase-let ((`(,sec ,min ,hrs) (decode-time)))
+  "Return the number of whole or partial seconds till the next midnight."
+  (pcase-let ((`(,sec ,min ,hrs) (decode-time nil nil 'integer)))
     (- (* 24 60 60) (* 60 60 hrs) (* 60 min) sec)))
 
 ;;;###autoload

@@ -1,6 +1,6 @@
 ;;; hideshow.el --- minor mode cmds to selectively display code/comment blocks  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1994-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1994-2022 Free Software Foundation, Inc.
 
 ;; Author: Thien-Thi Nguyen <ttn@gnu.org>
 ;;      Dan Nicolaescu <dann@ics.uci.edu>
@@ -62,7 +62,7 @@
 ;; activated or deactivated, `hs-minor-mode-hook' is run w/ `run-hooks'.
 ;;
 ;; Additionally, Joseph Eydelnant writes:
-;;   I enjoy your package hideshow.el Ver. 5.24 2001/02/13
+;;   I enjoy your package hideshow.el Version 5.24 2001/02/13
 ;;   a lot and I've been looking for the following functionality:
 ;;   toggle hide/show all with a single key.
 ;;   Here are a few lines of code that lets me do just that.
@@ -97,7 +97,8 @@
 ;; nested level in addition to the top-level:
 ;;
 ;;   (defun ttn-hs-hide-level-1 ()
-;;     (hs-hide-level 1)
+;;     (when (hs-looking-at-block-start-p)
+;;       (hs-hide-level 1))
 ;;     (forward-sexp 1))
 ;;   (setq hs-hide-all-non-comment-function 'ttn-hs-hide-level-1)
 ;;
@@ -151,18 +152,11 @@
 
 ;; * Bugs
 ;;
-;; (1) Hideshow does not work w/ emacs 18 because emacs 18 lacks the
-;;     function `forward-comment' (among other things).  If someone
-;;     writes this, please send me a copy.
-;;
-;; (2) Sometimes `hs-headline' can become out of sync.  To reset, type
+;; (1) Sometimes `hs-headline' can become out of sync.  To reset, type
 ;;     `M-x hs-minor-mode' twice (that is, deactivate then re-activate
 ;;     hideshow).
 ;;
-;; (3) Hideshow 5.x is developed and tested on GNU Emacs 20.7.
-;;     XEmacs compatibility may have bitrotted since 4.29.
-;;
-;; (4) Some buffers can't be `byte-compile-file'd properly.  This is because
+;; (2) Some buffers can't be `byte-compile-file'd properly.  This is because
 ;;     `byte-compile-file' inserts the file to be compiled in a temporary
 ;;     buffer and switches `normal-mode' on.  In the case where you have
 ;;     `hs-hide-initial-comment-block' in `hs-minor-mode-hook', the hiding of
@@ -177,7 +171,7 @@
 ;;       (let ((hs-minor-mode-hook nil))
 ;;         ad-do-it))
 ;;
-;; (5) Hideshow interacts badly with Ediff and `vc-diff'.  At the moment, the
+;; (3) Hideshow interacts badly with Ediff and `vc-diff'.  At the moment, the
 ;;     suggested workaround is to turn off hideshow entirely, for example:
 ;;
 ;;     (add-hook 'ediff-prepare-buffer-hook #'turn-off-hideshow)
@@ -238,13 +232,11 @@
 
 (defcustom hs-hide-comments-when-hiding-all t
   "Hide the comments too when you do an `hs-hide-all'."
-  :type 'boolean
-  :group 'hideshow)
+  :type 'boolean)
 
 (defcustom hs-minor-mode-hook nil
   "Hook called when hideshow minor mode is activated or deactivated."
   :type 'hook
-  :group 'hideshow
   :version "21.1")
 
 (defcustom hs-isearch-open 'code
@@ -260,8 +252,7 @@ This has effect only if `search-invisible' is set to `open'."
   :type '(choice (const :tag "open only code blocks" code)
                  (const :tag "open only comment blocks" comment)
                  (const :tag "open both code and comment blocks" t)
-                 (const :tag "don't open any of them" nil))
-  :group 'hideshow)
+                 (const :tag "don't open any of them" nil)))
 
 ;;;###autoload
 (defvar hs-special-modes-alist
@@ -270,7 +261,10 @@ This has effect only if `search-invisible' is set to `open'."
     (c++-mode "{" "}" "/[*/]" nil nil)
     (bibtex-mode ("@\\S(*\\(\\s(\\)" 1))
     (java-mode "{" "}" "/[*/]" nil nil)
-    (js-mode "{" "}" "/[*/]" nil)))
+    (js-mode "{" "}" "/[*/]" nil)
+    (mhtml-mode "{\\|<[^/>]*?" "}\\|</[^/>]*[^/]>" "<!--" mhtml-forward nil)
+    ;; Add more support here.
+    ))
   "Alist for initializing the hideshow variables for different modes.
 Each element has the form
   (MODE START END COMMENT-START FORWARD-SEXP-FUNC ADJUST-BEG-FUNC).
@@ -316,7 +310,7 @@ a block), `hs-hide-all', `hs-hide-block' and `hs-hide-level'.")
 These commands include the toggling commands (when the result is to show
 a block), `hs-show-all' and `hs-show-block'.")
 
-(defvar hs-set-up-overlay #'ignore
+(defcustom hs-set-up-overlay #'ignore
   "Function called with one arg, OV, a newly initialized overlay.
 Hideshow puts a unique overlay on each range of text to be hidden
 in the buffer.  Here is a simple example of how to use this variable:
@@ -332,7 +326,9 @@ in the buffer.  Here is a simple example of how to use this variable:
 
 This example shows how to get information from the overlay as well
 as how to set its `display' property.  See `hs-make-overlay' and
-info node `(elisp)Overlays'.")
+info node `(elisp)Overlays'."
+  :type 'function
+  :version "28.1")
 
 ;;---------------------------------------------------------------------------
 ;; internal variables
@@ -550,11 +546,13 @@ Original match data is restored upon return."
 (defun hs-hide-comment-region (beg end &optional repos-end)
   "Hide a region from BEG to END, marking it as a comment.
 Optional arg REPOS-END means reposition at end."
-  (let ((beg-eol (progn (goto-char beg) (line-end-position)))
+  (let ((goal-col (current-column))
+        (beg-bol (progn (goto-char beg) (line-beginning-position)))
+        (beg-eol (line-end-position))
         (end-eol (progn (goto-char end) (line-end-position))))
     (hs-discard-overlays beg-eol end-eol)
-    (hs-make-overlay beg-eol end-eol 'comment beg end))
-  (goto-char (if repos-end end beg)))
+    (hs-make-overlay beg-eol end-eol 'comment beg end)
+    (goto-char (if repos-end end (min end (+ beg-bol goal-col))))))
 
 (defun hs-hide-block-at-point (&optional end comment-reg)
   "Hide block if on block beginning.
@@ -614,7 +612,7 @@ as cdr."
         (forward-comment (- (buffer-size)))
         (skip-chars-forward " \t\n\f")
         (let ((p (point))
-              (hidable t))
+              (hideable t))
           (beginning-of-line)
           (unless (looking-at (concat "[ \t]*" hs-c-start-regexp))
             ;; we are in this situation: (example)
@@ -640,13 +638,13 @@ as cdr."
             (when (or (not (looking-at hs-c-start-regexp))
                       (> (point) q))
               ;; we cannot hide this comment block
-              (setq hidable nil)))
+              (setq hideable nil)))
           ;; goto the end of the comment
           (forward-comment (buffer-size))
           (skip-chars-backward " \t\n\f")
           (end-of-line)
           (when (>= (point) q)
-            (list (and hidable p) (point))))))))
+            (list (and hideable p) (point))))))))
 
 (defun hs-grok-mode-type ()
   "Set up hideshow variables for new buffers.
@@ -745,7 +743,7 @@ and `case-fold-search' are both t."
   (save-excursion
     (let ((c-reg (hs-inside-comment-p)))
       (if (and c-reg (nth 0 c-reg))
-          ;; point is inside a comment, and that comment is hidable
+          ;; point is inside a comment, and that comment is hideable
           (goto-char (nth 0 c-reg))
         (end-of-line)
         (when (and (not c-reg)
@@ -805,7 +803,8 @@ If `hs-hide-comments-when-hiding-all' is non-nil, also hide the comments."
 			 (hs-hide-block-at-point t))
 		 ;; Go to end of matched data to prevent from getting stuck
 		 ;; with an endless loop.
-		 (goto-char (match-end 0))))
+                 (when (looking-at hs-block-start-regexp)
+		   (goto-char (match-end 0)))))
            ;; found a comment, probably
            (let ((c-reg (hs-inside-comment-p)))
              (when (and c-reg (car c-reg))
@@ -948,8 +947,7 @@ Key bindings:
         (add-hook 'change-major-mode-hook
                   #'turn-off-hideshow
                   nil t)
-        (easy-menu-add hs-minor-mode-menu)
-        (set (make-local-variable 'line-move-ignore-invisible) t)
+        (setq-local line-move-ignore-invisible t)
         (add-to-invisibility-spec '(hs . t)))
     (remove-from-invisibility-spec '(hs . t))
     ;; hs-show-all does nothing unless h-m-m is non-nil.

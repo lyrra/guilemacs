@@ -1,6 +1,6 @@
-;;; ede/detect.el --- EDE project detection and file associations
+;;; ede/detect.el --- EDE project detection and file associations  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2014-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2014-2022 Free Software Foundation, Inc.
 
 ;; Author: Eric M. Ludlam <zappo@gnu.org>
 
@@ -25,7 +25,7 @@
 ;;
 ;; Detection comes in multiple forms:
 ;;
-;; `ede-detect-scan-directory-for-project' -
+;; `ede--detect-scan-directory-for-project' -
 ;;        Scan for a project via the file system.
 ;; `ede-detect-directory-for-project' -
 ;;        Check our file cache for a project.  If that fails, use
@@ -34,16 +34,6 @@
 ;;; Code:
 
 (require 'ede/auto) ;; Autoload settings.
-
-(when (or (<= emacs-major-version 23)
-	  ;; predicate as name added in Emacs 24.2
-	  (and (= emacs-major-version 24)
-	       (< emacs-minor-version 2)))
-  (message "Loading CEDET fallback autoload library.")
-  (require 'cedet/dominate
-	   (expand-file-name "../../../etc/fallback-libraries/dominate.el"
-			     (file-name-directory load-file-name))))
-
 
 ;;; BASIC PROJECT SCAN
 ;;
@@ -135,6 +125,8 @@ Return a cons cell:
 
 (defun ede--detect-ldf-root-predicate (dir)
   "Non-nil if DIR no longer match `ede--detect-nomatch-auto'."
+  ;; `dir' may be "~/".
+  (setq dir (expand-file-name dir))
   (or (ede--detect-stop-scan-p dir)
       ;; To know if DIR is at the top, we need to look just above
       ;; to see if there is a match.
@@ -198,7 +190,7 @@ Return a cons cell:
 	(ans (ede-detect-directory-for-project default-directory)))
     (if ans
 	(message "Project found in %d sec @ %s of type %s"
-		 (encode-time (time-since start) 'integer)
+		 (time-convert (time-since start) 'integer)
 		 (car ans)
 		 (eieio-object-name-string (cdr ans)))
       (message "No Project found.") )))

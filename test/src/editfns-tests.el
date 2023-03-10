@@ -1,21 +1,21 @@
-;;; editfns-tests.el -- tests for editfns.c
+;;; editfns-tests.el --- tests for editfns.c  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2016-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2016-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
-;; This program is free software; you can redistribute it and/or modify
+;; GNU Emacs is free software: you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
-;; This program is distributed in the hope that it will be useful,
+;; GNU Emacs is distributed in the hope that it will be useful,
 ;; but WITHOUT ANY WARRANTY; without even the implied warranty of
 ;; MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 ;; GNU General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
+;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
 
@@ -90,6 +90,10 @@
                                    (propertize "45" 'face 'italic)))
            #("012345    "
              0 2 (face bold) 2 4 (face underline) 4 10 (face italic))))
+  ;; Bug #38191
+  (should (ert-equal-including-properties
+           (format (propertize "‘foo’ %s bar" 'face 'bold) "xxx")
+           #("‘foo’ xxx bar" 0 13 (face bold))))
   ;; Bug #32404
   (should (ert-equal-including-properties
            (format (concat (propertize "%s" 'face 'bold)
@@ -102,7 +106,31 @@
            #("foobar" 3 6 (face error))))
   (should (ert-equal-including-properties
            (format (concat "%s " (propertize "%s" 'face 'error)) "foo" "bar")
-           #("foo bar" 4 7 (face error)))))
+           #("foo bar" 4 7 (face error))))
+  ;; Bug #46317
+  (let ((s (propertize "X" 'prop "val")))
+    (should (ert-equal-including-properties
+             (format (concat "%3s/" s) 12)
+             #(" 12/X" 4 5 (prop "val"))))
+    (should (ert-equal-including-properties
+             (format (concat "%3S/" s) 12)
+             #(" 12/X" 4 5 (prop "val"))))
+    (should (ert-equal-including-properties
+             (format (concat "%3d/" s) 12)
+             #(" 12/X" 4 5 (prop "val"))))
+    (should (ert-equal-including-properties
+             (format (concat "%-3s/" s) 12)
+             #("12 /X" 4 5 (prop "val"))))
+    (should (ert-equal-including-properties
+             (format (concat "%-3S/" s) 12)
+             #("12 /X" 4 5 (prop "val"))))
+    (should (ert-equal-including-properties
+             (format (concat "%-3d/" s) 12)
+             #("12 /X" 4 5 (prop "val"))))))
+
+(ert-deftest propertize/error-even-number-of-args ()
+  "Number of args for `propertize' must be odd."
+  (should-error (propertize "foo" 'bar) :type 'wrong-number-of-arguments))
 
 ;; Tests for bug#5131.
 (defun transpose-test-reverse-word (start end)
@@ -120,8 +148,8 @@
   "Validate character position to byte position translation."
   (let ((bytes '()))
     (dotimes (pos len)
-      (setq bytes (add-to-list 'bytes (position-bytes (1+ pos)) t)))
-    bytes))
+      (push (position-bytes (1+ pos)) bytes))
+    (nreverse bytes)))
 
 (ert-deftest transpose-ascii-regions-test ()
   (with-temp-buffer
@@ -165,13 +193,9 @@
   (should (string-equal (format "%d" -18446744073709551616.0)
                         "-18446744073709551616")))
 
-;;; Perhaps Emacs will be improved someday to return the correct
-;;; answer for positive numbers instead of overflowing; in
-;;; that case these tests will need to be changed.  In the meantime make
-;;; sure Emacs is reporting the overflow correctly.
 (ert-deftest format-%x-large-float ()
-  (should-error (format "%x" 18446744073709551616.0)
-                :type 'overflow-error))
+  (should (string-equal (format "%x" 18446744073709551616.0)
+                        "10000000000000000")))
 (ert-deftest read-large-integer ()
   (should (eq (type-of (read (format "%d0" most-negative-fixnum))) 'integer))
   (should (eq (type-of (read (format "%+d" (* -8.0 most-negative-fixnum))))
@@ -188,11 +212,16 @@
     (dolist (val (list most-negative-fixnum (1+ most-negative-fixnum)
 		       -1 0 1
 		       (1- most-positive-fixnum) most-positive-fixnum))
-      (should (eq val (read (format fmt val)))))))
+      (should (eq val (read (format fmt val)))))
+    (dolist (val (list (1+ most-positive-fixnum)
+		       (* 2 (1+ most-positive-fixnum))
+		       (* 4 (1+ most-positive-fixnum))
+		       (* 8 (1+ most-positive-fixnum))
+		       18446744073709551616.0))
+      (should (= val (read (format fmt val)))))))
 
-(ert-deftest format-%o-invalid-float ()
-  (should-error (format "%o" -1e-37)
-                :type 'overflow-error))
+(ert-deftest format-%o-negative-float ()
+  (should (string-equal (format "%o" -1e-37) "0")))
 
 ;; Bug#31938
 (ert-deftest format-%d-float ()
@@ -351,10 +380,10 @@
                    "-0x000000003ffffffffffffffe000000000000000        "))))
 
 (ert-deftest test-group-name ()
-  ;; FIXME: Actually my GID in one of my systems has no associated entry
-  ;; in /etc/group so there's no name for it and `group-name' correctly
-  ;; returns nil!
-  (should (stringp (group-name (group-gid))))
+  (let ((group-name (group-name (group-gid))))
+    ;; If the GID has no associated entry in /etc/group there's no
+    ;; name for it and `group-name' should return nil!
+    (should (or (null group-name) (stringp group-name))))
   (should-error (group-name 'foo))
   (cond
    ((memq system-type '(windows-nt ms-dos))

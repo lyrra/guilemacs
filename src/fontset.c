@@ -1,6 +1,6 @@
 /* Fontset handler.
 
-Copyright (C) 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 2001-2022 Free Software Foundation, Inc.
 Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
   2005, 2006, 2007, 2008, 2009, 2010, 2011
   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -252,14 +252,13 @@ set_fontset_fallback (Lisp_Object fontset, Lisp_Object fallback)
 
 #define BASE_FONTSET_P(fontset) (NILP (FONTSET_BASE (fontset)))
 
-/* Macros for FONT-DEF and RFONT-DEF of fontset.  */
-#define FONT_DEF_NEW(font_def, font_spec, encoding, repertory)	\
-  do {								\
-    (font_def) = make_uninit_vector (3);			\
-    ASET ((font_def), 0, font_spec);				\
-    ASET ((font_def), 1, encoding);				\
-    ASET ((font_def), 2, repertory);				\
-  } while (0)
+/* Definitions for FONT-DEF and RFONT-DEF of fontset.  */
+static Lisp_Object
+font_def_new (Lisp_Object font_spec, Lisp_Object encoding,
+	      Lisp_Object repertory)
+{
+  return CALLN (Fvector, font_spec, encoding, repertory);
+}
 
 #define FONT_DEF_SPEC(font_def) AREF (font_def, 0)
 #define FONT_DEF_ENCODING(font_def) AREF (font_def, 1)
@@ -353,7 +352,7 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 			      (NILP (args[idx]) ? args[1 - idx]
 			       : CALLMANY (Fvconcat, args)));
 	from = to1 + 1;
-      } while (from < to);
+      } while (from <= to);
     }
   else
     {
@@ -367,8 +366,14 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 static int
 fontset_compare_rfontdef (const void *val1, const void *val2)
 {
-  return (RFONT_DEF_SCORE (*(Lisp_Object *) val1)
-	  - RFONT_DEF_SCORE (*(Lisp_Object *) val2));
+  Lisp_Object v1 = *(Lisp_Object *) val1, v2 = *(Lisp_Object *) val2;
+  if (NILP (v1) && NILP (v2))
+    return 0;
+  else if (NILP (v1))
+    return INT_MIN;
+  else if (NILP (v2))
+    return INT_MAX;
+  return (RFONT_DEF_SCORE (v1) - RFONT_DEF_SCORE (v2));
 }
 
 /* Update a cons cell which has this form:
@@ -400,6 +405,8 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
   for (i = 0; i < size; i++)
     {
       Lisp_Object rfont_def = AREF (vec, i);
+      if (NILP (rfont_def))
+	continue;
       Lisp_Object font_def = RFONT_DEF_FONT_DEF (rfont_def);
       Lisp_Object font_spec = FONT_DEF_SPEC (font_def);
       int score = RFONT_DEF_SCORE (rfont_def) & 0xFF;
@@ -564,23 +571,25 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
 	   or the charset priorities were changed.  */
 	reorder_font_vector (font_group, face->ascii_face->font);
       if (charset_id >= 0)
-	/* Find a spec matching with CHARSET_ID to try it at
-	   first.  */
-	for (i = 0; i < ASIZE (vec); i++)
-	  {
-	    Lisp_Object repertory;
+	{
+	  Lisp_Object lcsetid = make_fixnum (charset_id);
+	  /* Find a spec matching with CHARSET_ID to try it at first.  */
+	  for (i = 0; i < ASIZE (vec); i++)
+	    {
+	      Lisp_Object repertory;
 
-	    rfont_def = AREF (vec, i);
-	    if (NILP (rfont_def))
-	      break;
-	    repertory = FONT_DEF_REPERTORY (RFONT_DEF_FONT_DEF (rfont_def));
-
-	    if (XFIXNUM (repertory) == charset_id)
-	      {
-		charset_matched = i;
+	      rfont_def = AREF (vec, i);
+	      if (NILP (rfont_def))
 		break;
-	      }
-	  }
+	      repertory = FONT_DEF_REPERTORY (RFONT_DEF_FONT_DEF (rfont_def));
+
+	      if (EQ (repertory, lcsetid))
+		{
+		  charset_matched = i;
+		  break;
+		}
+	    }
+	}
     }
 
   /* Find the first available font in the vector of RFONT-DEF.  If
@@ -1352,7 +1361,11 @@ check_fontset_name (Lisp_Object name, Lisp_Object *frame)
   if (EQ (name, Qt))
     return Vdefault_fontset;
   if (NILP (name))
-    id = FRAME_FONTSET (f);
+    {
+      if (!FRAME_WINDOW_P (f))
+	error ("Can't use fontsets in non-GUI frames");
+      id = FRAME_FONTSET (f);
+    }
   else
     {
       CHECK_STRING (name);
@@ -1437,28 +1450,30 @@ static void update_auto_fontset_alist (Lisp_Object, Lisp_Object);
 
 DEFUN ("set-fontset-font", Fset_fontset_font, Sset_fontset_font, 3, 5, 0,
        doc: /*
-Modify fontset NAME to use FONT-SPEC for TARGET characters.
+Modify FONTSET to use font specification in FONT-SPEC for displaying CHARACTERS.
 
-NAME is a fontset name (a string), nil for the fontset of FRAME,
-or t for the default fontset.
+FONTSET should be a fontset name (a string); or nil, meaning the
+fontset of FRAME; or t, meaning the default fontset.
 
-TARGET may be a single character to use FONT-SPEC for.
+CHARACTERS may be a single character to use FONT-SPEC for.
 
-TARGET may be a cons (FROM . TO), where FROM and TO are characters.
+CHARACTERS may be a cons (FROM . TO), where FROM and TO are characters.
 In that case, use FONT-SPEC for all the characters in the range
 between FROM and TO (inclusive).
 
-TARGET may be a script symbol.  In that case, use FONT-SPEC for
+CHARACTERS may be a script symbol.  In that case, use FONT-SPEC for
 all the characters that belong to the script.  See the variable
-`script-representative-chars' for the list of known scripts.
+`script-representative-chars' for the list of known scripts, and
+see the variable `char-script-table' for the script of any specific
+character.
 
-TARGET may be a charset.  In that case, use FONT-SPEC for all
-the characters in the charset.  See `list-character-sets' and
+CHARACTERS may be a charset symbol.  In that case, use FONT-SPEC for
+all the characters in the charset.  See `list-character-sets' and
 `list-charset-chars' for the list of character sets and their
 characters.
 
-TARGET may be nil.  In that case, use FONT-SPEC for any character for
-which no font-spec is specified.
+CHARACTERS may be nil.  In that case, use FONT-SPEC for any
+character for which no font-spec is specified in FONTSET.
 
 FONT-SPEC may one of these:
  * A font-spec object made by the function `font-spec' (which see).
@@ -1466,25 +1481,28 @@ FONT-SPEC may one of these:
    REGISTRY is a font registry name.  FAMILY may contain foundry
    name, and REGISTRY may contain encoding name.
  * A font name string.
- * nil, which explicitly specifies that there's no font for TARGET.
+ * nil, which explicitly specifies that there's no font for CHARACTERS.
 
-Optional 4th argument FRAME is a frame, or nil for the selected frame,
-to be considered in the case that NAME is nil.
+Optional 4th argument FRAME is a frame whose fontset should be modified;
+it is used if FONTSET is nil.  If FONTSET is nil and FRAME is omitted
+or nil, that stands for the fontset of the selected frame.
 
 Optional 5th argument ADD, if non-nil, specifies how to add FONT-SPEC
-to the previously set font specifications for TARGET.  If it is
-`prepend', FONT-SPEC is prepended.  If it is `append', FONT-SPEC is
-appended.  By default, FONT-SPEC overrides the previous settings.  */)
-  (Lisp_Object name, Lisp_Object target, Lisp_Object font_spec, Lisp_Object frame, Lisp_Object add)
+to the previously set font specifications for CHARACTERS.  If it is
+`prepend', FONT-SPEC is prepended to the existing font specifications.
+If it is `append', FONT-SPEC is appended.  By default, FONT-SPEC
+overwrites the previous settings.  */)
+  (Lisp_Object fontset, Lisp_Object characters, Lisp_Object font_spec,
+   Lisp_Object frame, Lisp_Object add)
 {
-  Lisp_Object fontset;
+  Lisp_Object fontset_obj;
   Lisp_Object font_def, registry, family;
   Lisp_Object range_list;
   struct charset *charset = NULL;
   Lisp_Object fontname;
   bool ascii_changed = 0;
 
-  fontset = check_fontset_name (name, &frame);
+  fontset_obj = check_fontset_name (fontset, &frame);
 
   fontname = Qnil;
   if (CONSP (font_spec))
@@ -1537,23 +1555,23 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
 	      repertory = CHARSET_SYMBOL_ID (repertory);
 	    }
 	}
-      FONT_DEF_NEW (font_def, font_spec, encoding, repertory);
+      font_def = font_def_new (font_spec, encoding, repertory);
     }
   else
     font_def = Qnil;
 
-  if (CHARACTERP (target))
+  if (CHARACTERP (characters))
     {
-      if (XFIXNAT (target) < 0x80)
+      if (XFIXNAT (characters) < 0x80)
 	error ("Can't set a font for partial ASCII range");
-      range_list = list1 (Fcons (target, target));
+      range_list = list1 (Fcons (characters, characters));
     }
-  else if (CONSP (target))
+  else if (CONSP (characters))
     {
       Lisp_Object from, to;
 
-      from = Fcar (target);
-      to = Fcdr (target);
+      from = Fcar (characters);
+      to = Fcdr (characters);
       CHECK_CHARACTER (from);
       CHECK_CHARACTER (to);
       if (XFIXNAT (from) < 0x80)
@@ -1562,38 +1580,38 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
 	    error ("Can't set a font for partial ASCII range");
 	  ascii_changed = 1;
 	}
-      range_list = list1 (target);
+      range_list = list1 (characters);
     }
-  else if (SYMBOLP (target) && !NILP (target))
+  else if (SYMBOLP (characters) && !NILP (characters))
     {
       Lisp_Object script_list;
       Lisp_Object val;
 
       range_list = Qnil;
       script_list = XCHAR_TABLE (Vchar_script_table)->extras[0];
-      if (! NILP (Fmemq (target, script_list)))
+      if (! NILP (Fmemq (characters, script_list)))
 	{
-	  if (EQ (target, Qlatin))
+	  if (EQ (characters, Qlatin))
 	    ascii_changed = 1;
-	  val = list1 (target);
+	  val = list1 (characters);
 	  map_char_table (accumulate_script_ranges, Qnil, Vchar_script_table,
 			  val);
 	  range_list = Fnreverse (XCDR (val));
 	}
-      if (CHARSETP (target))
+      if (CHARSETP (characters))
 	{
-	  CHECK_CHARSET_GET_CHARSET (target, charset);
+	  CHECK_CHARSET_GET_CHARSET (characters, charset);
 	  if (charset->ascii_compatible_p)
 	    ascii_changed = 1;
 	}
       else if (NILP (range_list))
 	error ("Invalid script or charset name: %s",
-	       SDATA (SYMBOL_NAME (target)));
+	       SDATA (SYMBOL_NAME (characters)));
     }
-  else if (NILP (target))
+  else if (NILP (characters))
     range_list = list1 (Qnil);
   else
-    error ("Invalid target for setting a font");
+    error ("Invalid second argument for setting a font in a fontset");
 
   if (ascii_changed)
     {
@@ -1601,7 +1619,7 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
 
       if (NILP (font_spec))
 	error ("Can't set ASCII font to nil");
-      val = CHAR_TABLE_REF (fontset, 0);
+      val = CHAR_TABLE_REF (fontset_obj, 0);
       if (! NILP (val) && EQ (add, Qappend))
 	/* We are going to change just an additional font for ASCII.  */
 	ascii_changed = 0;
@@ -1609,14 +1627,8 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
 
   if (charset)
     {
-      Lisp_Object arg;
-
-      arg = make_uninit_vector (5);
-      ASET (arg, 0, fontset);
-      ASET (arg, 1, font_def);
-      ASET (arg, 2, add);
-      ASET (arg, 3, ascii_changed ? Qt : Qnil);
-      ASET (arg, 4, range_list);
+      Lisp_Object arg = CALLN (Fvector, fontset_obj, font_def, add,
+			       ascii_changed ? Qt : Qnil, range_list);
 
       map_charset_chars (set_fontset_font, Qnil, arg, charset,
 			 CHARSET_MIN_CODE (charset),
@@ -1624,15 +1636,15 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
       range_list = AREF (arg, 4);
     }
   for (; CONSP (range_list); range_list = XCDR (range_list))
-    FONTSET_ADD (fontset, XCAR (range_list), font_def, add);
+    FONTSET_ADD (fontset_obj, XCAR (range_list), font_def, add);
 
   if (ascii_changed)
     {
       Lisp_Object tail, fr;
-      int fontset_id = XFIXNUM (FONTSET_ID (fontset));
+      int fontset_id = XFIXNUM (FONTSET_ID (fontset_obj));
 
-      set_fontset_ascii (fontset, fontname);
-      name = FONTSET_NAME (fontset);
+      set_fontset_ascii (fontset_obj, fontname);
+      fontset = FONTSET_NAME (fontset_obj);
       FOR_EACH_FRAME (tail, fr)
 	{
 	  struct frame *f = XFRAME (fr);
@@ -1650,17 +1662,17 @@ appended.  By default, FONT-SPEC overrides the previous settings.  */)
 	    font_object = font_open_by_spec (f, font_spec);
 	  if (! NILP (font_object))
 	    {
-	      update_auto_fontset_alist (font_object, fontset);
-	      AUTO_FRAME_ARG (arg, Qfont, Fcons (name, font_object));
+	      update_auto_fontset_alist (font_object, fontset_obj);
+	      AUTO_FRAME_ARG (arg, Qfont, Fcons (fontset, font_object));
 	      Fmodify_frame_parameters (fr, arg);
 	    }
 	}
     }
 
-  /* Free all realized fontsets whose base is FONTSET.  This way, the
+  /* Free all realized fontsets whose base is FONTSET_OBJ.  This way, the
      specified character(s) are surely redisplayed by a correct
      font.  */
-  free_realized_fontsets (fontset);
+  free_realized_fontsets (fontset_obj);
 
   return Qnil;
 }

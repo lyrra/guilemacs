@@ -1,6 +1,6 @@
-;;; gnus-ml.el --- Mailing list minor mode for Gnus
+;;; gnus-ml.el --- Mailing list minor mode for Gnus  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2000-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2000-2022 Free Software Foundation, Inc.
 
 ;; Author: Julien Gilles <jgilles@free.fr>
 ;; Keywords: news, mail
@@ -58,7 +58,9 @@
 
 ;;;###autoload
 (defun turn-on-gnus-mailing-list-mode ()
-  (when (gnus-group-find-parameter gnus-newsgroup-name 'to-list)
+  (when (or (gnus-group-find-parameter gnus-newsgroup-name 'to-list)
+            (and gnus-mailing-list-groups
+                 (string-match gnus-mailing-list-groups gnus-newsgroup-name)))
     (gnus-mailing-list-mode 1)))
 
 ;;;###autoload
@@ -125,7 +127,7 @@ If FORCE is non-nil, replace the old ones."
 	  (t (gnus-message 1 "no list-unsubscribe in this group")))))
 
 (defun gnus-mailing-list-post ()
-  "Post message (really useful ?)"
+  "Post message (really useful ?)."
   (interactive)
   (let ((list-post
 	 (with-current-buffer gnus-original-article-buffer
@@ -150,7 +152,7 @@ If FORCE is non-nil, replace the old ones."
 	 (with-current-buffer gnus-original-article-buffer
 	   (gnus-fetch-field "list-archive"))))
     (cond (list-archive
-	   (if (string-match "<\\(http:[^>]*\\)>" list-archive)
+	   (if (string-match "<\\(https?:[^>]*\\)>" list-archive)
 	       (browse-url (match-string 1 list-archive))
 	     (browse-url list-archive)))
 	  (t (gnus-message 1 "no list-archive in this group")))))

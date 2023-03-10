@@ -1,6 +1,6 @@
 ;;; generator.el --- generators  -*- lexical-binding: t -*-
 
-;;; Copyright (C) 2015-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2022 Free Software Foundation, Inc.
 
 ;; Author: Daniel Colascione <dancol@dancol.org>
 ;; Keywords: extensions, elisp
@@ -59,7 +59,7 @@
 ;; This raw form of iteration is general, but a bit awkward to use, so
 ;; this library also provides some convenience functions:
 ;;
-;; `iter-do' is like `cl-do', except that instead of walking a list,
+;; `iter-do' is like `dolist', except that instead of walking a list,
 ;; it walks an iterator.  `cl-loop' is also extended with a new
 ;; keyword, `iter-by', that iterates over an iterator.
 ;;
@@ -67,7 +67,7 @@
 ;;; Implementation:
 
 ;;
-;; The internal cps transformation code uses the cps- namespace.
+;; The internal CPS transformation code uses the cps- namespace.
 ;; Iteration functions use the `iter-' namespace.  Generator functions
 ;; are somewhat less efficient than conventional elisp routines,
 ;; although we try to avoid CPS transformation on forms that do not
@@ -89,13 +89,13 @@
   `(gensym (format ,fmt ,@args)))
 
 (defvar cps--dynamic-wrappers '(identity)
-  "List of transformer functions to apply to atomic forms we
-evaluate in CPS context.")
+  "List of functions to apply to atomic forms.
+These are transformer functions applied to atomic forms evaluated
+in CPS context.")
 
 (defconst cps-standard-special-forms
   '(setq setq-default throw interactive)
-  "List of special forms that we treat just like ordinary
-  function applications." )
+  "List of special forms treated just like ordinary function applications." )
 
 (defun cps--trace-funcall (func &rest args)
   (message "%S: args=%S" func args)
@@ -118,17 +118,15 @@ evaluate in CPS context.")
        (error "%s not supported in generators" ,function)))
 
 (defmacro cps--with-value-wrapper (wrapper &rest body)
-  "Continue generating CPS code with an atomic-form wrapper
-to the current stack of such wrappers.  WRAPPER is a function that
-takes a form and returns a wrapped form.
+  "Evaluate BODY with WRAPPER added to the stack of atomic-form wrappers.
+WRAPPER is a function that takes an atomic form and returns a wrapped form.
 
 Whenever we generate an atomic form (i.e., a form that can't
-iter-yield), we first (before actually inserting that form in our
+`iter-yield'), we first (before actually inserting that form in our
 generated code) pass that form through all the transformer
 functions.  We use this facility to wrap forms that can transfer
 control flow non-locally in goo that diverts this control flow to
-the CPS state machinery.
-"
+the CPS state machinery."
   (declare (indent 1))
   `(let ((cps--dynamic-wrappers
           (cons
@@ -153,9 +151,9 @@ DYNAMIC-VAR bound to STATIC-VAR."
      ,@body))
 
 (defun cps--add-state (kind body)
-  "Create a new CPS state with body BODY and return the state's name."
+  "Create a new CPS state of KIND with BODY and return the state's name."
   (declare (indent 1))
-  (let* ((state (cps--gensym "cps-state-%s-" kind)))
+  (let ((state (cps--gensym "cps-state-%s-" kind)))
     (push (list state body cps--cleanup-function) cps--states)
     (push state cps--bindings)
     state))
@@ -170,14 +168,12 @@ DYNAMIC-VAR bound to STATIC-VAR."
     (and (fboundp handler) handler)))
 
 (defvar cps-inhibit-atomic-optimization nil
-  "When t, always rewrite forms into cps even when they
-don't yield.")
+  "When non-nil, always rewrite forms into CPS even when they don't yield.")
 
 (defvar cps--yield-seen)
 
 (defun cps--atomic-p (form)
-  "Return whether the given form never yields."
-
+  "Return nil if FORM can yield, non-nil otherwise."
   (and (not cps-inhibit-atomic-optimization)
        (let* ((cps--yield-seen))
          (ignore (macroexpand-all
@@ -471,7 +467,7 @@ don't yield.")
           (guard (cps--special-form-p name))
           (guard (not (memq name cps-standard-special-forms))))
      name                               ; Shut up byte compiler
-     (error "special form %S incorrect or not supported" form))
+     (error "Special form %S incorrect or not supported" form))
 
     ;; Process regular function applications with nontrivial
     ;; parameters, converting them to applications of trivial
@@ -541,7 +537,7 @@ don't yield.")
 
 (defun cps--replace-variable-references (var new-var form)
   "Replace all non-shadowed references to VAR with NEW-VAR in FORM.
-This routine does not modify FORM. Instead, it returns a
+This routine does not modify FORM.  Instead, it returns a
 modified copy."
   (macroexpand-all
    `(cl-symbol-macrolet ((,var ,new-var)) ,form)
@@ -637,7 +633,7 @@ modified copy."
                          ;; If we're exiting non-locally (error, quit,
                          ;; etc.)  close the iterator.
                          ,(cps--make-close-iterator-form terminal-state)))))
-                  (t (error "unknown iterator operation %S" op))))))
+                  (t (error "Unknown iterator operation %S" op))))))
          ,(when finalizer-symbol
             '(funcall iterator
                       :stash-finalizer
@@ -649,8 +645,8 @@ modified copy."
 (defun iter-yield (value)
   "When used inside a generator, yield control to caller.
 The caller of `iter-next' receives VALUE, and the next call to
-`iter-next' resumes execution at the previous
-`iter-yield' point."
+`iter-next' resumes execution with the form immediately following this
+`iter-yield' call."
   (identity value)
   (error "`iter-yield' used outside a generator"))
 
@@ -672,12 +668,12 @@ sub-iterator function returns via `iter-end-of-sequence'."
          (iter-close ,valsym)))))
 
 (defmacro iter-defun (name arglist &rest body)
-  "Creates a generator NAME.
+  "Create a generator NAME that accepts ARGLIST as its arguments.
 When called as a function, NAME returns an iterator value that
 encapsulates the state of a computation that produces a sequence
 of values.  Callers can retrieve each value using `iter-next'."
   (declare (indent defun)
-           (debug (&define name lambda-list lambda-doc def-body))
+           (debug (&define name lambda-list lambda-doc &rest sexp))
            (doc-string 3))
   (cl-assert lexical-binding)
   (let* ((parsed-body (macroexp-parse-body body))
@@ -691,14 +687,14 @@ of values.  Callers can retrieve each value using `iter-next'."
   "Return a lambda generator.
 `iter-lambda' is to `iter-defun' as `lambda' is to `defun'."
   (declare (indent defun)
-           (debug (&define lambda-list lambda-doc def-body)))
+           (debug (&define lambda-list lambda-doc &rest sexp)))
   (cl-assert lexical-binding)
   `(lambda ,arglist
      ,(cps-generate-evaluator body)))
 
 (defmacro iter-make (&rest body)
   "Return a new iterator."
-  (declare (debug t))
+  (declare (debug (&rest sexp)))
   (cps-generate-evaluator body))
 
 (defconst iter-empty (lambda (_op _val) (signal 'iter-end-of-sequence nil))
@@ -715,7 +711,7 @@ iterator cannot supply more values."
 
 (defun iter-close (iterator)
   "Terminate an iterator early.
-Run any unwind-protect handlers in scope at the point  ITERATOR
+Run any `unwind-protect' handlers in scope at the point ITERATOR
 is blocked."
   (funcall iterator :close nil))
 
@@ -724,22 +720,25 @@ is blocked."
 Evaluate BODY with VAR bound to each value from ITERATOR.
 Return the value with which ITERATOR finished iteration."
   (declare (indent 1)
-           (debug ((symbolp form) body)))
+           (debug ((symbolp form) &rest sexp)))
   (let ((done-symbol (cps--gensym "iter-do-iterator-done"))
         (condition-symbol (cps--gensym "iter-do-condition"))
         (it-symbol (cps--gensym "iter-do-iterator"))
         (result-symbol (cps--gensym "iter-do-result")))
-    `(let (,var
-           ,result-symbol
+    `(let (,result-symbol
            (,done-symbol nil)
            (,it-symbol ,iterator))
-       (while (not ,done-symbol)
-         (condition-case ,condition-symbol
-             (setf ,var (iter-next ,it-symbol))
-           (iter-end-of-sequence
-            (setf ,result-symbol (cdr ,condition-symbol))
-            (setf ,done-symbol t)))
-         (unless ,done-symbol ,@body))
+       (while
+           (let ((,var
+                  (condition-case ,condition-symbol
+                      (iter-next ,it-symbol)
+                    (iter-end-of-sequence
+                     (setf ,result-symbol (cdr ,condition-symbol))
+                     (setf ,done-symbol t)))))
+             (unless ,done-symbol
+               ,@body
+               ;; Loop until done-symbol is set.
+               t)))
        ,result-symbol)))
 
 (defvar cl--loop-args)
@@ -760,7 +759,7 @@ Return the value with which ITERATOR finished iteration."
        (cps--advance-for ,cs))))
 
 (defun cps--handle-loop-for (var)
-  "Support `iter-by' in `loop'.  "
+  "Support `iter-by' in `loop'."
   ;; N.B. While the cl-loop-for-handler is a documented interface,
   ;; there's no documented way for cl-loop-for-handler callbacks to do
   ;; anything useful!  Additionally, cl-loop currently lexbinds useful

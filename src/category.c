@@ -1,6 +1,6 @@
 /* GNU Emacs routines to deal with category tables.
 
-Copyright (C) 1998, 2001-2019 Free Software Foundation, Inc.
+Copyright (C) 1998, 2001-2022 Free Software Foundation, Inc.
 Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
   2005, 2006, 2007, 2008, 2009, 2010, 2011
   National Institute of Advanced Industrial Science and Technology (AIST)
@@ -48,18 +48,15 @@ bset_category_table (struct buffer *b, Lisp_Object val)
 static Lisp_Object
 hash_get_category_set (Lisp_Object table, Lisp_Object category_set)
 {
-  struct Lisp_Hash_Table *h;
-  ptrdiff_t i;
-  EMACS_UINT hash;
-
   if (NILP (XCHAR_TABLE (table)->extras[1]))
     set_char_table_extras
       (table, 1,
        make_hash_table (hashtest_equal, DEFAULT_HASH_SIZE,
 			DEFAULT_REHASH_SIZE, DEFAULT_REHASH_THRESHOLD,
 			Qnil, false));
-  h = XHASH_TABLE (XCHAR_TABLE (table)->extras[1]);
-  i = hash_lookup (h, category_set, &hash);
+  struct Lisp_Hash_Table *h = XHASH_TABLE (XCHAR_TABLE (table)->extras[1]);
+  Lisp_Object hash;
+  ptrdiff_t i = hash_lookup (h, category_set, &hash);
   if (i >= 0)
     return HASH_KEY (h, i);
   hash_put (h, category_set, Qnil, hash);

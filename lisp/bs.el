@@ -1,9 +1,11 @@
 ;;; bs.el --- menu for selecting and displaying buffers -*- lexical-binding: t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 ;; Author: Olaf Sylvester <Olaf.Sylvester@netsurf.de>
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: convenience
+;; Old-Version: 1.17
+;; URL: http://www.geekware.de/software/emacs
 
 ;; This file is part of GNU Emacs.
 
@@ -22,9 +24,6 @@
 
 ;;; Commentary:
 
-;; Version: 1.17
-;; X-URL: http://www.geekware.de/software/emacs
-;;
 ;; The bs-package contains a main function bs-show for popping up a
 ;; buffer in a way similar to `list-buffers' and `electric-buffer-list':
 ;; The new buffer offers a Buffer Selection Menu for manipulating
@@ -120,8 +119,6 @@
 ;; can cycle through all file buffers and *scratch* although your current
 ;; configuration perhaps is "files" which ignores buffer *scratch*.
 
-;;; History:
-
 ;;; Code:
 
 ;; ----------------------------------------------------------------------
@@ -173,7 +170,12 @@ return a string representing the column's value."
 
 (defun bs--make-header-match-string ()
   "Return a regexp matching the first line of a Buffer Selection Menu buffer."
-  (concat "^\\(" (mapconcat #'car bs-attributes-list " *") " *$\\)"))
+  (concat "^\\("
+          (apply #'concat (mapcan (lambda (e)
+                                    (and (not (equal (car e) ""))
+                                         (list " *" (car e))))
+                                  bs-attributes-list))
+          " *$\\)"))
 
 ;; Font-Lock-Settings
 (defvar bs-mode-font-lock-keywords
@@ -612,29 +614,43 @@ manipulating the buffer list and buffers.
 For faster navigation each digit key is a digit argument.
 
 \\[bs-select] or SPACE -- select current line's buffer and other marked buffers.
-\\[bs-toggle-show-all]  -- toggle between all buffers and a special subset.
+\\[bs-select-in-one-window] -- select current's line buffer in one \
+window, and delete other
+     windows in the same frame.
 \\[bs-select-other-window] -- select current line's buffer in other window.
-\\[bs-tmp-select-other-window] -- make another window display that buffer and
-    remain in Buffer Selection Menu.
+\\[bs-tmp-select-other-window] -- display current line's buffer in \
+other window, and remain in
+     Buffer Selection Menu.
+\\[bs-select-other-frame] -- select current's line buffer in a new frame.
+\\[bs-view] -- view current's line buffer in View mode.
+\\[bs-visit-tags-table] -- call `visit-tags-table' on current line's buffer.
 \\[bs-mouse-select] -- select current line's buffer and other marked buffers.
-\\[bs-save] -- save current line's buffer immediately.
-\\[bs-delete] -- kill current line's buffer immediately.
-\\[bs-toggle-readonly] -- toggle read-only status of current line's buffer.
-\\[bs-clear-modified] -- clear modified-flag on that buffer.
+\\[bs-mouse-select-other-frame] -- select current's line buffer in a new frame.
+
 \\[bs-mark-current] -- mark current line's buffer to be displayed.
 \\[bs-unmark-current] -- unmark current line's buffer to be displayed.
-\\[bs-unmark-all] -- unmark all buffer lines.
 \\[bs-unmark-previous] -- unmark previous line's buffer to be displayed.
-\\[bs-show-sorted] -- display buffer list sorted by next sort aspect.
-\\[bs-set-configuration-and-refresh] -- ask user for a configuration and \
-apply selected configuration.
-\\[bs-select-next-configuration] -- select and apply next \
-available Buffer Selection Menu configuration.
-\\[bs-kill] -- leave Buffer Selection Menu without a selection.
-\\[bs-toggle-current-to-show] -- toggle status of appearance.
+\\[bs-unmark-all] -- unmark all buffer lines.
+
+\\[bs-bury-buffer] -- bury current's line buffer.
+\\[bs-save] -- save current line's buffer immediately.
+\\[bs-delete] -- kill current line's buffer immediately.
+\\[bs-delete-backward] -- like \\[bs-delete], but then move to previous line.
+\\[bs-clear-modified] -- clear modified-flag on that buffer.
+\\[bs-toggle-readonly] -- toggle read-only status of current line's buffer.
 \\[bs-set-current-buffer-to-show-always] -- mark current line's buffer \
 to show always.
-\\[bs-visit-tags-table] -- call `visit-tags-table' on current line's buffer.
+\\[bs-toggle-current-to-show] -- toggle status of appearance.
+
+\\[bs-toggle-show-all] -- toggle between all buffers and a special subset.
+\\[bs-select-next-configuration] -- select and apply next available \
+configuration.
+\\[bs-set-configuration-and-refresh] -- ask user for a configuration and \
+apply it.
+\\[bs-show-sorted] -- display buffer list sorted by next sort aspect.
+
+\\[bs-kill] -- leave Buffer Selection Menu without a selection.
+\\[bs-refresh] -- refresh Buffer Selection Menu.
 \\[bs-help] -- display this help text."
   (buffer-disable-undo)
   (setq buffer-read-only t
@@ -1487,7 +1503,6 @@ name of buffer configuration."
   ;; continue standard unloading
   nil)
 
-;; Now provide feature bs
 (provide 'bs)
 
 ;;; bs.el ends here

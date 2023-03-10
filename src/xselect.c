@@ -1,5 +1,5 @@
 /* X Selection processing for Emacs.
-   Copyright (C) 1993-1997, 2000-2019 Free Software Foundation, Inc.
+   Copyright (C) 1993-1997, 2000-2022 Free Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -21,7 +21,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include <limits.h>
-#include <stdio.h>      /* termhooks.h needs this */
 
 #ifdef HAVE_SYS_TYPES_H
 #include <sys/types.h>
@@ -33,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "xterm.h"	/* for all of the X includes */
 #include "frame.h"	/* Need this to get the X window of selected_frame */
 #include "blockinput.h"
+#include "sysstdio.h"	/* TRACE_SELECTION needs this.  */
 #include "termhooks.h"
 #include "keyboard.h"
 #include "pdumper.h"
@@ -63,13 +63,13 @@ static void lisp_data_to_selection_data (struct x_display_info *, Lisp_Object,
 
 #ifdef TRACE_SELECTION
 #define TRACE0(fmt) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid ())
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid ())
 #define TRACE1(fmt, a0) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0)
 #define TRACE2(fmt, a0, a1) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0, a1)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0, a1)
 #define TRACE3(fmt, a0, a1, a2) \
-  fprintf (stderr, "%"pMd": " fmt "\n", (printmax_t) getpid (), a0, a1, a2)
+  fprintf (stderr, "%"PRIdMAX": " fmt "\n", (intmax_t) getpid (), a0, a1, a2)
 #else
 #define TRACE0(fmt)		(void) 0
 #define TRACE1(fmt, a0)		(void) 0
@@ -1481,14 +1481,21 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 	= XGetSelectionOwner (display, selection_atom) != 0;
       unblock_input ();
       if (there_is_a_selection_owner)
-	signal_error ("Selection owner couldn't convert",
-		      actual_type
-		      ? list2 (target_type,
-			       x_atom_to_symbol (dpyinfo, actual_type))
-		      : target_type);
+	{
+	  AUTO_STRING (format, "Selection owner couldn't convert: %s");
+	  CALLN (Fmessage, format,
+		 actual_type
+		 ? list2 (target_type,
+			  x_atom_to_symbol (dpyinfo, actual_type))
+		 : target_type);
+	  return Qnil;
+	}
       else
-	signal_error ("No selection",
-		      x_atom_to_symbol (dpyinfo, selection_atom));
+	{
+	  AUTO_STRING (format, "No selection: %s");
+	  CALLN (Fmessage, format, x_atom_to_symbol (dpyinfo, selection_atom));
+	  return Qnil;
+	}
     }
 
   if (actual_type == dpyinfo->Xatom_INCR)
@@ -1593,7 +1600,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
 	return x_atom_to_symbol (dpyinfo, (Atom) idata[0]);
       else
 	{
-	  Lisp_Object v = make_uninit_vector (size / sizeof (int));
+	  Lisp_Object v = make_nil_vector (size / sizeof (int));
 
 	  for (i = 0; i < size / sizeof (int); i++)
 	    ASET (v, i, x_atom_to_symbol (dpyinfo, (Atom) idata[i]));
@@ -1652,7 +1659,7 @@ selection_data_to_lisp_data (struct x_display_info *dpyinfo,
   else
     {
       ptrdiff_t i;
-      Lisp_Object v = make_uninit_vector (size / X_LONG_SIZE);
+      Lisp_Object v = make_nil_vector (size / X_LONG_SIZE);
 
       if (type == XA_INTEGER)
         {
@@ -1859,7 +1866,7 @@ clean_local_selection_data (Lisp_Object obj)
       Lisp_Object copy;
       if (size == 1)
 	return clean_local_selection_data (AREF (obj, 0));
-      copy = make_uninit_vector (size);
+      copy = make_nil_vector (size);
       for (i = 0; i < size; i++)
 	ASET (copy, i, clean_local_selection_data (AREF (obj, i)));
       return copy;
@@ -2136,7 +2143,7 @@ On Nextstep, TERMINAL is unused.  */)
 
 
 /* Send clipboard manager a SAVE_TARGETS request with a UTF8_STRING
-   property (http://www.freedesktop.org/wiki/ClipboardManager).  */
+   property (https://www.freedesktop.org/wiki/ClipboardManager/).  */
 
 static Lisp_Object
 x_clipboard_manager_save (Lisp_Object frame)
@@ -2171,9 +2178,10 @@ If the problem persists, set `%s' to nil.");
 static Lisp_Object
 x_clipboard_manager_error_2 (Lisp_Object err)
 {
-  fprintf (stderr, "Error saving to X clipboard manager.\n\
-If the problem persists, set '%s' \
-to nil.\n", "x-select-enable-clipboard-manager");
+  fputs (("Error saving to X clipboard manager.\n"
+	  "If the problem persists,"
+	  " set 'x-select-enable-clipboard-manager' to nil.\n"),
+	 stderr);
   return Qnil;
 }
 
@@ -2274,23 +2282,28 @@ x_check_property_data (Lisp_Object data)
 
    DPY is the display use to look up X atoms.
    DATA is a Lisp list of values to be converted.
-   RET is the C array that contains the converted values.  It is assumed
-   it is big enough to hold all values.
+   RET is the C array that contains the converted values.
+   NELEMENTS_MAX is the number of values that will fit in RET.
+   Any excess values in DATA are ignored.
    FORMAT is 8, 16 or 32 and denotes char/short/long for each C value to
    be stored in RET.  Note that long is used for 32 even if long is more
    than 32 bits (see man pages for XChangeProperty, XGetWindowProperty and
    XClientMessageEvent).  */
 
 void
-x_fill_property_data (Display *dpy, Lisp_Object data, void *ret, int format)
+x_fill_property_data (Display *dpy, Lisp_Object data, void *ret,
+		      int nelements_max, int format)
 {
   unsigned long val;
   unsigned long  *d32 = (unsigned long  *) ret;
   unsigned short *d16 = (unsigned short *) ret;
   unsigned char  *d08 = (unsigned char  *) ret;
+  int nelements;
   Lisp_Object iter;
 
-  for (iter = data; CONSP (iter); iter = XCDR (iter))
+  for (iter = data, nelements = 0;
+       CONSP (iter) && nelements < nelements_max;
+       iter = XCDR (iter), nelements++)
     {
       Lisp_Object o = XCAR (iter);
 
@@ -2591,7 +2604,9 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
   event.xclient.window = to_root ? FRAME_OUTER_WINDOW (f) : wdest;
 
   memset (event.xclient.data.l, 0, sizeof (event.xclient.data.l));
+  /* event.xclient.data can hold 20 chars, 10 shorts, or 5 longs.  */
   x_fill_property_data (dpyinfo->display, values, event.xclient.data.b,
+                        5 * 32 / event.xclient.format,
                         event.xclient.format);
 
   /* If event mask is 0 the event is sent to the client that created

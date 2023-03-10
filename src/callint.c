@@ -1,5 +1,5 @@
 /* Call a Lisp function interactively.
-   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2019 Free Software
+   Copyright (C) 1985-1986, 1993-1995, 1997, 2000-2022 Free Software
    Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -21,7 +21,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "ptr-bounds.h"
 #include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
@@ -192,8 +191,9 @@ means unconditionally put this command in the variable `command-history'.
 Otherwise, this is done only if an arg is read using the minibuffer.
 
 Optional third arg KEYS, if given, specifies the sequence of events to
-supply, as a vector, if the command inquires which events were used to
-invoke it.  If KEYS is omitted or nil, the return value of
+supply, as a vector, if FUNCTION inquires which events were used to
+invoke it (via an `interactive' spec that contains, for instance, an
+\"e\" code letter).  If KEYS is omitted or nil, the return value of
 `this-command-keys-vector' is used.  */)
   (Lisp_Object function, Lisp_Object record_flag, Lisp_Object keys)
 {
@@ -207,6 +207,11 @@ invoke it.  If KEYS is omitted or nil, the return value of
   Lisp_Object save_this_original_command = Vthis_original_command;
   Lisp_Object save_real_this_command = Vreal_this_command;
   Lisp_Object save_last_command = KVAR (current_kboard, Vlast_command);
+
+  /* Bound recursively so that code can check the current command from
+     code running from minibuffer hooks (and the like), without being
+     overwritten by subsequent minibuffer calls.  */
+  specbind (Qcurrent_minibuffer_command, Vthis_command);
 
   if (NILP (keys))
     keys = this_command_keys, key_count = this_command_key_count;
@@ -289,11 +294,14 @@ invoke it.  If KEYS is omitted or nil, the return value of
 
   /* The index of the next element of this_command_keys to examine for
      the 'e' interactive code.  Initialize it to point to the first
-     event with parameters.  */
-  ptrdiff_t next_event;
-  for (next_event = 0; next_event < key_count; next_event++)
-    if (EVENT_HAS_PARAMETERS (AREF (keys, next_event)))
-      break;
+     event with parameters.  When `inhibit_mouse_event_check' is non-nil,
+     the command can accept an event without parameters,
+     so don't search for the event with parameters in this case.  */
+  ptrdiff_t next_event = 0;
+  if (!inhibit_mouse_event_check)
+    for (; next_event < key_count; next_event++)
+      if (EVENT_HAS_PARAMETERS (AREF (keys, next_event)))
+	break;
 
   /* Handle special starting chars `*' and `@'.  Also `-'.  */
   /* Note that `+' is reserved for user extensions.  */
@@ -376,9 +384,6 @@ invoke it.  If KEYS is omitted or nil, the return value of
   signed char *varies = (signed char *) (visargs + nargs);
 
   memclear (args, nargs * (2 * word_size + 1));
-  args = ptr_bounds_clip (args, nargs * sizeof *args);
-  visargs = ptr_bounds_clip (visargs, nargs * sizeof *visargs);
-  varies = ptr_bounds_clip (varies, nargs * sizeof *varies);
 
   if (!NILP (enable))
     specbind (Qenable_recursive_minibuffers, Qt);
@@ -542,11 +547,15 @@ invoke it.  If KEYS is omitted or nil, the return value of
 	  args[i] = AREF (keys, next_event);
 	  varies[i] = -1;
 
-	  /* Find the next parameterized event.  */
-	  do
+	  /* `inhibit_mouse_event_check' allows non-parameterized events.  */
+	  if (inhibit_mouse_event_check)
 	    next_event++;
-	  while (next_event < key_count
-		 && ! EVENT_HAS_PARAMETERS (AREF (keys, next_event)));
+	  else
+	    /* Find the next parameterized event.  */
+	    do
+	      next_event++;
+	    while (next_event < key_count
+		   && ! EVENT_HAS_PARAMETERS (AREF (keys, next_event)));
 
 	  break;
 
@@ -652,7 +661,7 @@ invoke it.  If KEYS is omitted or nil, the return value of
 	default:
 	  {
 	    /* How many bytes are left unprocessed in the specs string?
-	       (Note that this excludes the trailing NUL byte.)  */
+	       (Note that this excludes the trailing null byte.)  */
 	    ptrdiff_t bytes_left = string_len - (tem - string);
 	    unsigned letter;
 
@@ -736,7 +745,7 @@ Its numeric meaning is what you would get from `(interactive "p")'.  */)
   else if (EQ (raw, Qminus))
     XSETINT (val, -1);
   else if (CONSP (raw) && FIXNUMP (XCAR (raw)))
-    XSETINT (val, XFIXNUM (XCAR (raw)));
+    val = XCAR (raw);
   else if (FIXNUMP (raw))
     val = raw;
   else
@@ -824,8 +833,19 @@ behave as if the mark were still active.  */);
   Vmark_even_if_inactive = Qt;
 
   DEFVAR_LISP ("mouse-leave-buffer-hook", Vmouse_leave_buffer_hook,
-	       doc: /* Hook to run when about to switch windows with a mouse command.
+	       doc: /* Hook run when the user mouse-clicks in a window.
+It can be run both before and after switching windows, or even when
+not actually switching windows.
+
 Its purpose is to give temporary modes such as Isearch mode
 a way to turn themselves off when a mouse command switches windows.  */);
   Vmouse_leave_buffer_hook = Qnil;
+
+  DEFVAR_BOOL ("inhibit-mouse-event-check", inhibit_mouse_event_check,
+    doc: /* Whether the interactive spec "e" requires a mouse gesture event.
+If non-nil, `(interactive "e")' doesn't signal an error when the command
+was invoked by an input event that is not a mouse gesture: a click, a drag,
+etc.  To create the event data when the input was some other event,
+use `event-start', `event-end', and `event-click-count'.  */);
+  inhibit_mouse_event_check = false;
 }

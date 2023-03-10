@@ -1,6 +1,6 @@
 /* Storage allocation and gc for GNU Emacs Lisp interpreter.
 
-Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2019 Free Software
+Copyright (C) 1985-1986, 1988, 1993-1995, 1997-2022 Free Software
 Foundation, Inc.
 
 This file is part of GNU Emacs.
@@ -22,7 +22,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <errno.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>		/* For SIGABRT, SIGDANGER.  */
 
@@ -36,8 +35,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "bignum.h"
 #include "dispextern.h"
 #include "intervals.h"
-#include "ptr-bounds.h"
 #include "sheap.h"
+#include "sysstdio.h"
 #include "systime.h"
 #include "character.h"
 #include "buffer.h"
@@ -65,7 +64,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <malloc.h>
 #endif
 
-#if defined HAVE_VALGRIND_VALGRIND_H && !defined USE_VALGRIND
+#if (defined ENABLE_CHECKING \
+     && defined HAVE_VALGRIND_VALGRIND_H && !defined USE_VALGRIND)
 # define USE_VALGRIND 1
 #endif
 
@@ -84,64 +84,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32.h"
 #include "w32heap.h"	/* for sbrk */
 #endif
-
-#if 0
-
-/* A pointer to the memory allocated that copies that static data
-   inside glibc's malloc.  */
-static void *malloc_state_ptr;
-
-/* Restore the dumped malloc state.  Because malloc can be invoked
-   even before main (e.g. by the dynamic linker), the dumped malloc
-   state must be restored as early as possible using this special hook.  */
-static void
-malloc_initialize_hook (void)
-{
-  static bool malloc_using_checking;
-
-  if (! initialized)
-    {
-# ifdef GNU_LINUX
-      my_heap_start ();
-# endif
-      malloc_using_checking = getenv ("MALLOC_CHECK_") != NULL;
-    }
-  else
-    {
-      if (!malloc_using_checking)
-	{
-	  /* Work around a bug in glibc's malloc.  MALLOC_CHECK_ must be
-	     ignored if the heap to be restored was constructed without
-	     malloc checking.  Can't use unsetenv, since that calls malloc.  */
-	  char **p = environ;
-	  if (p)
-	    for (; *p; p++)
-	      if (strncmp (*p, "MALLOC_CHECK_=", 14) == 0)
-		{
-		  do
-		    *p = p[1];
-		  while (*++p);
-
-		  break;
-		}
-	}
-//FIX: 20190808 LAV, Not sure where this ifdef comes from
-# ifndef XMALLOC_OVERRUN_CHECK
-      //alloc_unexec_post ();
-# endif
-    }
-}
-
-/* Declare the malloc initialization hook, which runs before 'main' starts.
-   EXTERNALLY_VISIBLE works around Bug#22522.  */
-typedef void (*voidfuncptr) (void);
-# ifndef __MALLOC_HOOK_VOLATILE
-#  define __MALLOC_HOOK_VOLATILE
-# endif
-voidfuncptr __MALLOC_HOOK_VOLATILE __malloc_initialize_hook EXTERNALLY_VISIBLE
-  = malloc_initialize_hook;
-
-#endif //FIXNOW
 
 #if defined DOUG_LEA_MALLOC || defined HAVE_UNEXEC
 
@@ -180,29 +122,16 @@ my_heap_start (void)
 
 #endif
 
-/* Mark, unmark, query mark bit of a Lisp string.  S must be a pointer
-   to a struct Lisp_String.  */
-
-#define XMARK_STRING(S)		((S)->u.s.size |= ARRAY_MARK_FLAG)
-#define XUNMARK_STRING(S)	((S)->u.s.size &= ~ARRAY_MARK_FLAG)
-#define XSTRING_MARKED_P(S)	(((S)->u.s.size & ARRAY_MARK_FLAG) != 0)
-
-#define XMARK_VECTOR(V)		((V)->header.size |= ARRAY_MARK_FLAG)
-#define XUNMARK_VECTOR(V)	((V)->header.size &= ~ARRAY_MARK_FLAG)
-#define XVECTOR_MARKED_P(V)	(((V)->header.size & ARRAY_MARK_FLAG) != 0)
-
-/* Default value of gc_cons_threshold (see below).  */
-
-#define GC_DEFAULT_THRESHOLD (100000 * word_size)
-
 /* Global variables.  */
 struct emacs_globals globals;
 
-#ifdef HAVE_PDUMPER
-/* Number of finalizers run: used to loop over GC until we stop
-   generating garbage.  */
-int number_finalizers_run;
-#endif
+/* Points to memory space allocated as "spare", to be freed if we run
+   out of memory. */
+
+static void *spare_memory;
+
+/* Amount of spare memory to keep in large reserve block, or to see
+   whether this much is available when malloc fails on a larger request.  */
 
 #define SPARE_MEMORY (1 << 15)
 
@@ -215,10 +144,6 @@ static void refill_memory_reserve (void);
 #endif
 static Lisp_Object make_empty_string (int);
 extern Lisp_Object which_symbols (Lisp_Object, EMACS_INT) EXTERNALLY_VISIBLE;
-
-#ifndef DEADP
-# define DEADP(x) 0
-#endif
 
 static void
 XFLOAT_INIT (Lisp_Object f, double n)
@@ -270,7 +195,7 @@ display_malloc_warning (void)
   call3 (intern ("display-warning"),
 	 intern ("alloc"),
 	 build_string (pending_malloc_warning),
-	 intern ("emergency"));
+	 intern (":emergency"));
   pending_malloc_warning = 0;
 }
 
@@ -296,61 +221,6 @@ buffer_memory_full (ptrdiff_t nbytes)
 }
 
 
-/* LISP_ALIGNMENT is the alignment of Lisp objects.  It must be at
-   least GCALIGNMENT so that pointers can be tagged.  It also must be
-   at least as strict as the alignment of all the C types used to
-   implement Lisp objects; since pseudovectors can contain any C type,
-   this is max_align_t.  On recent GNU/Linux x86 and x86-64 this can
-   often waste up to 8 bytes, since alignof (max_align_t) is 16 but
-   typical vectors need only an alignment of 8.  Although shrinking
-   the alignment to 8 would save memory, it cost a 20% hit to Emacs
-   CPU performance on Fedora 28 x86-64 when compiled with gcc -m32.  */
-enum { LISP_ALIGNMENT = alignof (union { max_align_t x;
-					 GCALIGNED_UNION_MEMBER }) };
-verify (LISP_ALIGNMENT % GCALIGNMENT == 0);
-
-/* True if malloc (N) is known to return storage suitably aligned for
-   Lisp objects whenever N is a multiple of LISP_ALIGNMENT.  In
-   practice this is true whenever alignof (max_align_t) is also a
-   multiple of LISP_ALIGNMENT.  This works even for x86, where some
-   platform combinations (e.g., GCC 7 and later, glibc 2.25 and
-   earlier) have bugs where alignof (max_align_t) is 16 even though
-   the malloc alignment is only 8, and where Emacs still works because
-   it never does anything that requires an alignment of 16.  */
-enum { MALLOC_IS_LISP_ALIGNED = alignof (max_align_t) % LISP_ALIGNMENT == 0 };
-
-/* If compiled with XMALLOC_BLOCK_INPUT_CHECK, define a symbol
-   BLOCK_INPUT_IN_MEMORY_ALLOCATORS that is visible to the debugger.
-   If that variable is set, block input while in one of Emacs's memory
-   allocation functions.  There should be no need for this debugging
-   option, since signal handlers do not allocate memory, but Emacs
-   formerly allocated memory in signal handlers and this compile-time
-   option remains as a way to help debug the issue should it rear its
-   ugly head again.  */
-#ifdef XMALLOC_BLOCK_INPUT_CHECK
-bool block_input_in_memory_allocators EXTERNALLY_VISIBLE;
-static void
-malloc_block_input (void)
-{
-  if (block_input_in_memory_allocators)
-    block_input ();
-}
-static void
-malloc_unblock_input (void)
-{
-  if (block_input_in_memory_allocators)
-    unblock_input ();
-}
-# define MALLOC_BLOCK_INPUT malloc_block_input ()
-# define MALLOC_UNBLOCK_INPUT malloc_unblock_input ()
-#else
-# define MALLOC_BLOCK_INPUT ((void) 0)
-# define MALLOC_UNBLOCK_INPUT ((void) 0)
-#endif
-
-static void *lmalloc (size_t) ATTRIBUTE_MALLOC_SIZE ((1));
-static void *lrealloc (void *, size_t);
-
 /* Like GC_MALLOC but check for no memory and block interrupt input.  */
 
 void *
@@ -372,7 +242,6 @@ xzalloc (size_t size)
 
   if (!val && size)
     memory_full (size);
-  memset (val, 0, size);
   return val;
 }
 
@@ -390,7 +259,6 @@ xrealloc (void *block, size_t size)
 void
 xfree (void *block)
 {
-  return;
 }
 
 /* Allocate pointerless memory.  */
@@ -665,6 +533,34 @@ allocate_string_data (Lisp_Object string,
   s->data[nbytes] = '\0';
 }
 
+/* Reallocate multibyte STRING data when a single character is replaced.
+   The character is at byte offset CIDX_BYTE in the string.
+   The character being replaced is CLEN bytes long,
+   and the character that will replace it is NEW_CLEN bytes long.
+   Return the address of where the caller should store the
+   the new character.  */
+
+unsigned char *
+resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
+                    int clen, int new_clen)
+{
+  eassume (STRING_MULTIBYTE (string));
+  ptrdiff_t nchars = SCHARS (string);
+  ptrdiff_t nbytes = SBYTES (string);
+  ptrdiff_t new_nbytes = nbytes + (new_clen - clen);
+  unsigned char *data = SDATA (string);
+  unsigned char *new_charaddr;
+  allocate_string_data (XSTRING (string), nchars, new_nbytes);
+  unsigned char *new_data = SDATA (string);
+  new_charaddr = new_data + cidx_byte;
+  memcpy (new_charaddr + new_clen, data + cidx_byte + clen,
+          nbytes - (cidx_byte + clen));
+  memcpy (new_data, data, cidx_byte);
+  clear_string_char_byte_cache ();
+
+  return new_charaddr;
+}
+
 void
 string_overflow (void)
 {
@@ -696,18 +592,18 @@ a multibyte string even if INIT is an ASCII character.  */)
   int c;
   EMACS_INT nbytes;
 
-  CHECK_FIXNUM (length);
+  CHECK_FIXNAT (length);
   CHECK_CHARACTER (init);
 
-  c = XFIXNUM (init);
+  c = XFIXNAT (init);
   if (ASCII_CHAR_P (c) && NILP (multibyte))
     {
       nbytes = XFIXNUM (length);
       val = make_uninit_string (nbytes);
       if (nbytes)
 	{
-	  memset (SDATA (val), c, nbytes);
-	  SDATA (val)[nbytes] = 0;
+          memset (SDATA (val), c, nbytes);
+          SDATA (val)[nbytes] = 0;
 	}
     }
   else
@@ -759,8 +655,6 @@ bool_vector_fill (Lisp_Object a, Lisp_Object init)
   return a;
 }
 
-
-
 /* Return a newly allocated, uninitialized bool vector of size NBITS.  */
 
 Lisp_Object
@@ -792,8 +686,8 @@ LENGTH must be a number.  INIT matters only in whether it is t or nil.  */)
 {
   Lisp_Object val;
 
-  CHECK_FIXNUM (length);
-  val = make_uninit_bool_vector (XFIXNUM (length));
+  CHECK_FIXNAT (length);
+  val = make_uninit_bool_vector (XFIXNAT (length));
   return bool_vector_fill (val, init);
 }
 
@@ -1153,11 +1047,20 @@ allocate_vector (ptrdiff_t len)
 }
 
 
+struct Lisp_Vector *
+allocate_nil_vector (ptrdiff_t len)
+{
+  struct Lisp_Vector *v = allocate_vector(len);
+  for (int i = 0; i < len; ++i)
+    v->contents[i] = Qnil;
+  return v;
+}
+
 /* Allocate other vector-like structures.  */
 
 struct Lisp_Vector *
 allocate_pseudovector (int memlen, int lisplen,
-		       int zerolen, enum pvec_type tag)
+                       int zerolen, enum pvec_type tag)
 {
   /* Catch bogus values.  */
   enum { size_max = (1 << PSEUDOVECTOR_SIZE_BITS) - 1 };
@@ -1168,10 +1071,10 @@ allocate_pseudovector (int memlen, int lisplen,
   eassert (memlen <= size_max + rest_max);
 
   struct Lisp_Vector *v = allocate_vectorlike (memlen);
-  /* Only the first lisplen slots will be traced normally by the GC.  */
-  //memclear (v->contents, zerolen * word_size);
+  /* Only the first LISPLEN slots will be traced normally by the GC.  */
   for (int i = 0; i < lisplen; ++i)
     v->contents[i] = Qnil;
+
   XSETPVECTYPESIZE (v, tag, lisplen, memlen - lisplen);
   return v;
 }
@@ -1183,109 +1086,10 @@ allocate_buffer (void)
 
   SCM_NEWSMOB (b->header.self, lisp_vectorlike_tag, b);
   BUFFER_PVEC_INIT (b);
-  /* Put B on the chain of all buffers including killed ones.  */
-  b->next = all_buffers;
-  all_buffers = b;
   /* Note that the rest fields of B are not initialized.  */
   return b;
 }
 
-struct Lisp_Hash_Table *
-allocate_hash_table (void)
-{
-  return ALLOCATE_PSEUDOVECTOR (struct Lisp_Hash_Table, count, PVEC_HASH_TABLE);
-}
-
-//FIX: larv, not in 2014 nor 2019
-#if 0
-struct window *
-allocate_window (void)
-{
-  struct window *w;
-
-  w = ALLOCATE_PSEUDOVECTOR (struct window, current_matrix, PVEC_WINDOW);
-  /* Users assumes that non-Lisp data is zeroed.  */
-  memset (&w->current_matrix, 0,
-	  sizeof (*w) - offsetof (struct window, current_matrix));
-  return w;
-}
-#endif
-
-struct terminal *
-allocate_terminal (void)
-{
-  struct terminal *t;
-
-  t = ALLOCATE_PSEUDOVECTOR (struct terminal, next_terminal, PVEC_TERMINAL);
-  /* Users assumes that non-Lisp data is zeroed.  */
-  memset (&t->next_terminal, 0,
-	  sizeof (*t) - offsetof (struct terminal, next_terminal));
-  return t;
-}
-
-struct frame *
-allocate_frame (void)
-{
-  struct frame *f;
-
-  f = ALLOCATE_PSEUDOVECTOR (struct frame, face_cache, PVEC_FRAME);
-  /* Users assumes that non-Lisp data is zeroed.  */
-  memset (&f->face_cache, 0,
-	  sizeof (*f) - offsetof (struct frame, face_cache));
-  return f;
-}
-
-
-
-#ifndef HAVE_MODULES
-enum { HAVE_MODULES = false };
-#endif
-
-static bool
-c_symbol_p (struct Lisp_Symbol *sym)
-{
-  char *lispsym_ptr = (char *) lispsym;
-  char *sym_ptr = (char *) sym;
-  ptrdiff_t lispsym_offset = sym_ptr - lispsym_ptr;
-  return 0 <= lispsym_offset && lispsym_offset < sizeof lispsym;
-}
-
-
-
-/* Copy all contents and parameters of TABLE to a new table allocated
-   from pure space, return the purified table.  */
-static struct Lisp_Hash_Table *
-purecopy_hash_table (struct Lisp_Hash_Table *table)
-{
-  eassert (NILP (table->weak));
-  eassert (table->pure);
-
-  struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, Lisp_Vectorlike);
-  struct hash_table_test pure_test = table->test;
-
-  /* Purecopy the hash table test.  */
-  pure_test.name = purecopy (table->test.name);
-  pure_test.user_hash_function = purecopy (table->test.user_hash_function);
-  pure_test.user_cmp_function = purecopy (table->test.user_cmp_function);
-
-  pure->header = table->header;
-  pure->weak = purecopy (Qnil);
-  pure->hash = purecopy (table->hash);
-  pure->next = purecopy (table->next);
-  pure->index = purecopy (table->index);
-  pure->count = table->count;
-  pure->next_free = table->next_free;
-  pure->pure = table->pure;
-  pure->rehash_threshold = table->rehash_threshold;
-  pure->rehash_size = table->rehash_size;
-  pure->key_and_value = purecopy (table->key_and_value);
-  pure->test = pure_test;
-
-  fprintf(stderr, "WARNING: purecopy_hash_table used\n"); //FIX20230126 why still used?
-  return pure;
-}
-
-
 
 /* Allocate a record with COUNT slots.  COUNT must be positive, and
    includes the type slot.  */
@@ -1317,6 +1121,9 @@ each initialized to INIT.  */)
     p->contents[i] = init;
   return make_lisp_ptr (p, Lisp_Vectorlike);
 }
+
+static Lisp_Object make_clear_string (EMACS_INT, bool);
+static Lisp_Object make_clear_multibyte_string (EMACS_INT, EMACS_INT, bool);
 
 DEFUN ("record", Frecord, Srecord, 1, MANY, 0,
        doc: /* Create a new record.
@@ -1351,10 +1158,6 @@ make_vector (ptrdiff_t length, Lisp_Object init)
   for (ptrdiff_t i = 0; i < length; i++)
     p->contents[i] = init;
   return make_lisp_ptr (p, Lisp_Vectorlike);
-  //struct Lisp_Vector *p;
-  //Lisp_Object vector;
-  //XSETVECTOR (vector, p);
-  //return vector;
 }
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
@@ -1365,7 +1168,6 @@ usage: (vector &rest OBJECTS)  */)
 {
   Lisp_Object val = make_uninit_vector (nargs);
   struct Lisp_Vector *p = XVECTOR (val);
-  //memcpy (p->contents, args, nargs * sizeof *args);
   for (ptrdiff_t i = 0; i < nargs; i++)
     p->contents[i] = args[i];
   return val;
@@ -1417,7 +1219,6 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
      just wasteful and other times plainly wrong (e.g. those free vars may want
      to be setcar'd).  */
 
-  //memcpy (p->contents, args, nargs * sizeof *args);
   for (int i = 0; i < nargs; i++)
     p->contents[i] = args[i];
   make_byte_code (p);
@@ -1559,6 +1360,7 @@ build_marker (struct buffer *buf, ptrdiff_t charpos, ptrdiff_t bytepos)
   BUF_MARKERS (buf) = m;
   return m;
 }
+
 
 /* Return a newly created vector or string with specified arguments as
    elements.  If all the arguments are characters that can fit
@@ -1620,54 +1422,6 @@ memory_full (size_t nbytes)
 }
 
 
-/* Determine whether it is safe to access memory at address P.  */
-static int
-valid_pointer_p (void *p)
-{
-#ifdef WINDOWSNT
-  return w32_valid_pointer_p (p, 16);
-#else
-  int fd[2];
-  static int under_rr_state;
-
-  if (!under_rr_state)
-    under_rr_state = getenv ("RUNNING_UNDER_RR") ? -1 : 1;
-  if (under_rr_state < 0)
-    return under_rr_state;
-
-  /* Obviously, we cannot just access it (we would SEGV trying), so we
-     trick the o/s to tell us whether p is a valid pointer.
-     Unfortunately, we cannot use NULL_DEVICE here, as emacs_write may
-     not validate p in that case.  */
-
-  if (emacs_pipe (fd) == 0)
-    {
-      bool valid = emacs_write (fd[1], p, 16) == 16;
-      emacs_close (fd[1]);
-      emacs_close (fd[0]);
-      return valid;
-    }
-
-    return -1;
-#endif
-}
-
-/* Return 2 if OBJ is a killed or special buffer object, 1 if OBJ is a
-   valid lisp object, 0 if OBJ is NOT a valid lisp object, or -1 if we
-   cannot validate OBJ.  This function can be quite slow, and is used
-   only in debugging.  */
-
-int
-valid_lisp_object_p (Lisp_Object obj)
-{
-  if (SCM_IMP (obj))
-    return 1;
-
-  void *p = (void *) SCM2PTR (obj);
-
-  return valid_pointer_p (p);
-}
-
 /***********************************************************************
                  Pure Storage Compatibility Functions
  ***********************************************************************/
@@ -1725,9 +1479,10 @@ returns nil, because real GC can't be done.
 See Info node `(elisp)Garbage Collection'.  */)
   (void)
 {
-  //GC_gcollect ();
+  GC_gcollect ();
   return Qt;
 }
+
 
 #ifdef ENABLE_CHECKING
 
@@ -1791,6 +1546,11 @@ init_alloc_once (void)
 
   init_strings ();
   init_vectors ();
+}
+
+static void
+init_alloc_once_for_pdumper (void)
+{
 }
 
 void
@@ -1861,11 +1621,6 @@ do hash-consing of the objects allocated to pure space.  */);
 Integers with absolute values less than 2**N do not signal a range error.
 N should be nonnegative.  */);
 
-  DEFVAR_LISP ("gc-elapsed", Vgc_elapsed,
-	       doc: /* Accumulated time elapsed in garbage collections.
-The time is in seconds as a floating point value.  */);
-  DEFVAR_INT ("gcs-done", gcs_done,
-	      doc: /* Accumulated number of garbage collections done.  */);
 }
 
 #ifdef HAVE_X_WINDOWS
@@ -1894,3 +1649,4 @@ union
   enum defined_HAVE_X_WINDOWS defined_HAVE_X_WINDOWS;
 } const EXTERNALLY_VISIBLE gdb_make_enums_visible = {0};
 #endif	/* __GNUC__ */
+

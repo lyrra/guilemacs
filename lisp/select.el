@@ -1,6 +1,6 @@
 ;;; select.el --- lisp portion of standard selection support  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1993-1994, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993-1994, 2001-2022 Free Software Foundation, Inc.
 
 ;; Maintainer: emacs-devel@gnu.org
 ;; Keywords: internal
@@ -160,12 +160,11 @@ The value nil is the same as the list (UTF8_STRING COMPOUND_TEXT STRING)."
 		      (const TEXT)))
   :group 'killing)
 
-;; Get a selection value of type TYPE by calling gui-get-selection with
-;; an appropriate DATA-TYPE argument decided by `x-select-request-type'.
-;; The return value is already decoded.  If gui-get-selection causes an
-;; error, this function return nil.
-
 (defun gui--selection-value-internal (type)
+  "Get a selection value of type TYPE.
+Call `gui-get-selection' with an appropriate DATA-TYPE argument
+decided by `x-select-request-type'.  The return value is already
+decoded.  If `gui-get-selection' signals an error, return nil."
   (let ((request-type (if (eq window-system 'x)
                           (or x-select-request-type
                               '(UTF8_STRING COMPOUND_TEXT STRING))
@@ -185,11 +184,17 @@ The value nil is the same as the list (UTF8_STRING COMPOUND_TEXT STRING)."
   (let ((clip-text
          (when select-enable-clipboard
            (let ((text (gui--selection-value-internal 'CLIPBOARD)))
-             (if (string= text "") (setq text nil))
-
-             ;; Check the CLIPBOARD selection for 'newness', is it different
-             ;; from what we remembered them to be last time we did a
-             ;; cut/paste operation.
+             (when (string= text "")
+               (setq text nil))
+             ;; When `select-enable-clipboard' is non-nil,
+             ;; killing/copying text (with, say, `C-w') will push the
+             ;; text to the clipboard (and store it in
+             ;; `gui--last-selected-text-clipboard').  We check
+             ;; whether the text on the clipboard is identical to this
+             ;; text, and if so, we report that the clipboard is
+             ;; empty.  See (bug#27442) for further discussion about
+             ;; this DWIM action, and possible ways to make this check
+             ;; less fragile, if so desired.
              (prog1
                  (unless (equal text gui--last-selected-text-clipboard)
                    text)
@@ -491,7 +496,7 @@ two markers or an overlay.  Otherwise, it is nil."
 	    (error "Unknown selection type: %S" type)))))
 
       ;; Most programs are unable to handle NUL bytes in strings.
-      (setq str (replace-regexp-in-string "\0" "\\0" str t t))
+      (setq str (string-replace "\0" "\\0" str))
 
       (setq next-selection-coding-system nil)
       (cons type str))))

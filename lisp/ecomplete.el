@@ -1,6 +1,6 @@
 ;;; ecomplete.el --- electric completion of addresses and the like  -*- lexical-binding:t -*-
 
-;; Copyright (C) 2006-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2006-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; Keywords: mail
@@ -96,7 +96,7 @@ string that was matched."
 (defun ecomplete-add-item (type key text)
   "Add item TEXT of TYPE to the database, using KEY as the identifier."
   (let ((elems (assq type ecomplete-database))
-	(now (encode-time nil 'integer))
+	(now (time-convert nil 'integer))
 	entry)
     (unless elems
       (push (setq elems (list type)) ecomplete-database))

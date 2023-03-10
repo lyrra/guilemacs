@@ -1,6 +1,6 @@
-;;; mh-mime.el --- MH-E MIME support
+;;; mh-mime.el --- MH-E MIME support  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1993, 1995, 2001-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1993, 1995, 2001-2022 Free Software Foundation, Inc.
 
 ;; Author: Bill Wohler <wohler@newt.com>
 ;; Keywords: mail
@@ -36,8 +36,6 @@
 ;;   MIME option to mh-forward command to move to content-description
 ;;   insertion point.
 
-;;; Change Log:
-
 ;;; Code:
 
 (require 'mh-e)
@@ -53,6 +51,7 @@
 (autoload 'article-emphasize "gnus-art")
 (autoload 'gnus-eval-format "gnus-spec")
 (autoload 'mail-content-type-get "mail-parse")
+(autoload 'mail-decode-encoded-word-region "mail-parse")
 (autoload 'mail-decode-encoded-word-string "mail-parse")
 (autoload 'mail-header-parse-content-type "mail-parse")
 (autoload 'mail-header-strip-cte "mail-parse")
@@ -63,7 +62,6 @@
 (autoload 'mm-decode-body "mm-bodies")
 (autoload 'mm-uu-dissect "mm-uu")
 (autoload 'mml-unsecure-message "mml-sec")
-(autoload 'rfc2047-decode-region "rfc2047")
 (autoload 'widget-convert-button "wid-edit")
 
 
@@ -77,7 +75,7 @@
   '(gethash (current-buffer) mh-globals-hash))
 
 ;; Structure to keep track of MIME handles on a per buffer basis.
-(mh-defstruct (mh-buffer-data (:conc-name mh-mime-)
+(cl-defstruct (mh-buffer-data (:conc-name mh-mime-)
                               (:constructor mh-make-buffer-data))
   (handles ())                          ; List of MIME handles
   (handles-cache (make-hash-table))     ; Cache to avoid multiple decodes of
@@ -190,9 +188,9 @@ Set from last use.")
       ;; XEmacs doesn't care.
       (set-keymap-parent map mh-show-mode-map))
     (mh-do-in-gnu-emacs
-     (define-key map [mouse-2] 'mh-push-button))
+     (define-key map [mouse-2] #'mh-push-button))
     (mh-do-in-xemacs
-     (define-key map '(button2) 'mh-push-button))
+     (define-key map '(button2) #'mh-push-button))
     (dolist (c mh-mime-button-commands)
       (define-key map (cadr c) (car c)))
     map))
@@ -214,11 +212,11 @@ Set from last use.")
   (let ((map (make-sparse-keymap)))
     (unless (>= (string-to-number emacs-version) 21)
       (set-keymap-parent map mh-show-mode-map))
-    (define-key map "\r" 'mh-press-button)
+    (define-key map "\r" #'mh-press-button)
     (mh-do-in-gnu-emacs
-     (define-key map [mouse-2] 'mh-push-button))
+     (define-key map [mouse-2] #'mh-push-button))
     (mh-do-in-xemacs
-     (define-key map '(button2) 'mh-push-button))
+     (define-key map '(button2) #'mh-push-button))
     map))
 
 
@@ -259,9 +257,7 @@ usually reads the file \"/etc/mailcap\"."
               (methods (mapcar (lambda (x) (list (cdr (assoc 'viewer x))))
                                (mailcap-mime-info type 'all)))
               (def (caar methods))
-              (prompt (format "Viewer%s: " (if def
-                                               (format " (default %s)" def)
-                                             "")))
+              (prompt (format-prompt "Viewer" def))
               (method (completing-read prompt methods nil nil nil nil def))
               (folder mh-show-folder-buffer)
               (buffer-read-only nil))
@@ -395,9 +391,9 @@ do the work."
           ((and (or prompt
                     (equal t mh-mime-save-parts-default-directory))
                 mh-mime-save-parts-directory)
-           (read-directory-name (format
-                            "Store in directory (default %s): "
-                            mh-mime-save-parts-directory)
+           (read-directory-name (format-prompt
+                                 "Store in directory"
+                                 mh-mime-save-parts-directory)
                            "" mh-mime-save-parts-directory t ""))
           ((stringp mh-mime-save-parts-default-directory)
            mh-mime-save-parts-default-directory)
@@ -413,7 +409,7 @@ do the work."
         (cd directory)
         (setq mh-mime-save-parts-directory directory)
         (let ((initial-size (mh-truncate-log-buffer)))
-          (apply 'call-process
+          (apply #'call-process
                  (expand-file-name command mh-progs) nil t nil
                  (mh-list-to-string (list folder msg "-auto"
                                           (if (not (mh-variant-p 'nmh))
@@ -452,7 +448,7 @@ decoding the same message multiple times."
   (let ((b (point))
         (clean-message-header mh-clean-message-header-flag)
         (invisible-headers mh-invisible-header-fields-compiled)
-        (visible-headers nil))
+        ) ;; (visible-headers nil)
     (save-excursion
       (save-restriction
         (narrow-to-region b b)
@@ -474,7 +470,7 @@ decoding the same message multiple times."
         (cond (clean-message-header
                (mh-clean-msg-header (point-min)
                                     invisible-headers
-                                    visible-headers)
+                                    nil) ;; visible-headers
                (goto-char (point-min)))
               (t
                (mh-start-of-uncleaned-message)))
@@ -489,22 +485,18 @@ decoding the same message multiple times."
         (mh-display-emphasis)
         (mm-handle-set-undisplayer
          handle
-         `(lambda ()
-            (let (buffer-read-only)
-              (if (fboundp 'remove-specifier)
-                  ;; This is only valid on XEmacs.
-                  (mapcar (lambda (prop)
-                            (remove-specifier
-                             (face-property 'default prop) (current-buffer)))
-                          '(background background-pixmap foreground)))
-              (delete-region ,(point-min-marker) ,(point-max-marker)))))))))
+         (let ((beg (point-min-marker))
+               (end (point-max-marker)))
+           (lambda ()
+             (let ((inhibit-read-only t))
+               (delete-region beg end)))))))))
 
 ;;;###mh-autoload
 (defun mh-decode-message-header ()
   "Decode RFC2047 encoded message header fields."
   (when mh-decode-mime-flag
     (let ((buffer-read-only nil))
-      (rfc2047-decode-region (point-min) (mh-mail-header-end)))))
+      (mail-decode-encoded-word-region (point-min) (mh-mail-header-end)))))
 
 ;;;###mh-autoload
 (defun mh-decode-message-subject ()
@@ -512,8 +504,9 @@ decoding the same message multiple times."
   (when mh-decode-mime-flag
     (save-excursion
       (let ((buffer-read-only nil))
-        (rfc2047-decode-region (progn (mh-goto-header-field "Subject:") (point))
-                               (progn (mh-header-field-end) (point)))))))
+        (mail-decode-encoded-word-region
+         (progn (mh-goto-header-field "Subject:") (point))
+         (progn (mh-header-field-end) (point)))))))
 
 ;;;###mh-autoload
 (defun mh-mime-display (&optional pre-dissected-handles)
@@ -611,7 +604,7 @@ If message has been encoded for transfer take that into account."
   "Choose among the alternatives, HANDLES the part that will be displayed.
 If no part is preferred then all the parts are displayed."
   (let* ((preferred (mm-preferred-alternative handles))
-         (others (loop for x in handles unless (eq x preferred) collect x)))
+         (others (cl-loop for x in handles unless (eq x preferred) collect x)))
     (cond ((and preferred
                 (stringp (car preferred)))
            (mh-mime-display-part preferred)
@@ -770,7 +763,7 @@ buttons need to be displayed multiple times (for instance when
 nested messages are opened)."
   (or (gethash handle (mh-mime-part-index-hash (mh-buffer-data)))
       (setf (gethash handle (mh-mime-part-index-hash (mh-buffer-data)))
-            (incf (mh-mime-parts-count (mh-buffer-data))))))
+            (cl-incf (mh-mime-parts-count (mh-buffer-data))))))
 
 (defun mh-small-image-p (handle)
   "Decide whether HANDLE is a \"small\" image that can be displayed inline.
@@ -783,7 +776,7 @@ This is only useful if a Content-Disposition header is not present."
          (funcall media-test handle) ; Since mm-inline-large-images is T,
                                         ; this only tells us if the image is
                                         ; something that emacs can display
-         (let* ((image (mm-get-image handle)))
+         (let ((image (mm-get-image handle)))
            (or (mh-do-in-xemacs
                  (and (mh-funcall-if-exists glyphp image)
                       (< (glyph-width image)
@@ -792,7 +785,7 @@ This is only useful if a Content-Disposition header is not present."
                          (or mh-max-inline-image-height
                              (window-pixel-height)))))
                (mh-do-in-gnu-emacs
-                 (let ((size (mh-funcall-if-exists image-size image)))
+                 (let ((size (and (fboundp 'image-size) (image-size image))))
                    (and size
                         (< (cdr size) (or mh-max-inline-image-height
                                           (1- (window-height))))
@@ -839,9 +832,7 @@ being used to highlight the signature in a MIME part."
 
 ;; Shush compiler.
 (mh-do-in-xemacs
-  (defvar dots)
-  (defvar type)
-  (defvar ov))
+ (defvar ov))
 
 (defun mh-insert-mime-button (handle index displayed)
   "Insert MIME button for HANDLE.
@@ -857,23 +848,27 @@ by commands like \"K v\" which operate on individual MIME parts."
                   (mail-content-type-get (mm-handle-type handle) 'url)
                   ""))
         (type (mm-handle-media-type handle))
-        (description (mail-decode-encoded-word-string
-                      (or (mm-handle-description handle) "")))
-        (dots (if (or displayed (mm-handle-displayed-p handle)) "   " "..."))
-        long-type begin end)
+        begin end)
     (if (string-match ".*/" name) (setq name (substring name (match-end 0))))
-    (setq long-type (concat type (and (not (equal name ""))
-                                      (concat "; " name))))
-    (unless (equal description "")
-      (setq long-type (concat " --- " long-type)))
-    (unless (bolp) (insert "\n"))
-    (setq begin (point))
-    (gnus-eval-format
-     mh-mime-button-line-format mh-mime-button-line-format-alist
-     `(,@(mh-gnus-local-map-property mh-mime-button-map)
+    ;; These vars are passed by dynamic-scoping to
+    ;; mh-mime-button-line-format-alist via gnus-eval-format.
+    (mh-dlet* ((index index)
+               (description (mail-decode-encoded-word-string
+                             (or (mm-handle-description handle) "")))
+               (dots (if (or displayed (mm-handle-displayed-p handle))
+                         "   " "..."))
+               (long-type (concat type (and (not (equal name ""))
+                                            (concat "; " name)))))
+      (unless (equal description "")
+        (setq long-type (concat " --- " long-type)))
+      (unless (bolp) (insert "\n"))
+      (setq begin (point))
+      (gnus-eval-format
+       mh-mime-button-line-format mh-mime-button-line-format-alist
+       `(,@(mh-gnus-local-map-property mh-mime-button-map)
          mh-callback mh-mm-display-part
          mh-part ,index
-         mh-data ,handle))
+         mh-data ,handle)))
     (setq end (point))
     (widget-convert-button
      'link begin end
@@ -888,8 +883,6 @@ by commands like \"K v\" which operate on individual MIME parts."
 ;; Shush compiler.
 (defvar mm-verify-function-alist)       ; < Emacs 22
 (defvar mm-decrypt-function-alist)      ; < Emacs 22
-(mh-do-in-xemacs
-  (defvar pressed-details))
 
 (defun mh-insert-mime-security-button (handle)
   "Display buttons for PGP message, HANDLE."
@@ -897,42 +890,47 @@ by commands like \"K v\" which operate on individual MIME parts."
          (crypto-type (or (nth 2 (assoc protocol mm-verify-function-alist))
                           (nth 2 (assoc protocol mm-decrypt-function-alist))
                           "Unknown"))
-         (type (concat crypto-type
-                       (if (equal (car handle) "multipart/signed")
-                           " Signed" " Encrypted")
-                       " Part"))
-         (info (or (mh-mm-handle-multipart-ctl-parameter handle 'gnus-info)
-                   "Undecided"))
-         (details (mh-mm-handle-multipart-ctl-parameter handle 'gnus-details))
-         pressed-details begin end face)
-    (setq details (if details (concat "\n" details) ""))
-    (setq pressed-details (if mh-mime-security-button-pressed details ""))
-    (setq face (mh-mime-security-button-face info))
-    (unless (bolp) (insert "\n"))
-    (setq begin (point))
-    (gnus-eval-format
-     mh-mime-security-button-line-format
-     mh-mime-security-button-line-format-alist
-     `(,@(mh-gnus-local-map-property mh-mime-security-button-map)
+         begin end face)
+    ;; These vars are passed by dynamic-scoping to
+    ;; mh-mime-security-button-line-format-alist via gnus-eval-format.
+    (mh-dlet* ((type (concat crypto-type
+                             (if (equal (car handle) "multipart/signed")
+                                 " Signed" " Encrypted")
+                             " Part"))
+               (info (or (mh-mm-handle-multipart-ctl-parameter
+                          handle 'gnus-info)
+                         "Undecided"))
+               (details (mh-mm-handle-multipart-ctl-parameter
+                         handle 'gnus-details))
+               pressed-details)
+      (setq details (if details (concat "\n" details) ""))
+      (setq pressed-details (if mh-mime-security-button-pressed details ""))
+      (setq face (mh-mime-security-button-face info))
+      (unless (bolp) (insert "\n"))
+      (setq begin (point))
+      (gnus-eval-format
+       mh-mime-security-button-line-format
+       mh-mime-security-button-line-format-alist
+       `(,@(mh-gnus-local-map-property mh-mime-security-button-map)
          mh-button-pressed ,mh-mime-security-button-pressed
          mh-callback mh-mime-security-press-button
          mh-line-format ,mh-mime-security-button-line-format
          mh-data ,handle))
-    (setq end (point))
-    (widget-convert-button 'link begin end
-                           :mime-handle handle
-                           :action 'mh-widget-press-button
-                           :button-keymap mh-mime-security-button-map
-                           :button-face face
-                           :help-echo "Mouse-2 click or press RET (in show buffer) to see security details.")
-    (dolist (ov (mh-funcall-if-exists overlays-in begin end))
-      (mh-funcall-if-exists overlay-put ov 'evaporate t))
-    (when (equal info "Failed")
-      (let* ((type (if (equal (car handle) "multipart/signed")
-                       "verification" "decryption"))
-             (warning (if (equal type "decryption")
-                          "(passphrase may be incorrect)" "")))
-        (message "%s %s failed %s" crypto-type type warning)))))
+      (setq end (point))
+      (widget-convert-button 'link begin end
+                             :mime-handle handle
+                             :action 'mh-widget-press-button
+                             :button-keymap mh-mime-security-button-map
+                             :button-face face
+                             :help-echo "Mouse-2 click or press RET (in show buffer) to see security details.")
+      (dolist (ov (mh-funcall-if-exists overlays-in begin end))
+        (mh-funcall-if-exists overlay-put ov 'evaporate t))
+      (when (equal info "Failed")
+        (let* ((type (if (equal (car handle) "multipart/signed")
+                         "verification" "decryption"))
+               (warning (if (equal type "decryption")
+                            "(passphrase may be incorrect)" "")))
+          (message "%s %s failed %s" crypto-type type warning))))))
 
 (defun mh-mime-security-button-face (info)
   "Return the button face to use for encrypted/signed mail based on INFO."
@@ -995,7 +993,7 @@ If CRITERION is a function or a symbol which has a function binding
 then that function must return non-nil at the button we stop."
   (unless (or (and (symbolp criterion) (fboundp criterion))
               (functionp criterion))
-    (setq criterion (lambda (x) t)))
+    (setq criterion (lambda (_) t)))
   ;; Move to the next button in the buffer satisfying criterion
   (goto-char (or (save-excursion
                    (beginning-of-line)
@@ -1015,7 +1013,7 @@ then that function must return non-nil at the button we stop."
                                  (not (if backward-flag (bobp) (eobp))))
                        (forward-line (if backward-flag -1 1)))
                      ;; Stop at next MIME button if any exists.
-                     (block loop
+                     (cl-block loop
                        (while (/= (progn
                                     (unless (= (forward-line
                                                 (if backward-flag -1 1))
@@ -1028,11 +1026,11 @@ then that function must return non-nil at the button we stop."
                                   point-before-current-button)
                          (when (and (get-text-property (point) 'mh-data)
                                     (funcall criterion (point)))
-                           (return-from loop (point))))
+                           (cl-return-from loop (point))))
                        nil)))
                  (point))))
 
-(defun mh-widget-press-button (widget el)
+(defun mh-widget-press-button (widget _el)
   "Callback for widget, WIDGET.
 Parameter EL is unused."
   (goto-char (widget-get widget :from))
@@ -1220,7 +1218,7 @@ The option `mh-compose-insertion' controls what type of tags are inserted."
                               t)
                           t t)))
      (list description folder range)))
-  (let ((messages (mapconcat 'identity (mh-list-to-string range) " ")))
+  (let ((messages (mapconcat #'identity (mh-list-to-string range) " ")))
     (dolist (message (mh-translate-range folder messages))
       (if (equal mh-compose-insertion 'mml)
           (mh-mml-forward-message description folder (format "%s" message))
@@ -1253,11 +1251,7 @@ See also \\[mh-mh-to-mime]."
   (interactive (list
                 (mml-minibuffer-read-description)
                 (mh-prompt-for-folder "Message from" mh-sent-from-folder nil)
-                (read-string (concat "Messages"
-                                     (if (numberp mh-sent-from-msg)
-                                         (format " (default %d): "
-                                                 mh-sent-from-msg)
-                                       ": ")))))
+                (read-string (format-prompt "Messages" mh-sent-from-msg))))
   (beginning-of-line)
   (insert "#forw [")
   (and description
@@ -1591,12 +1585,12 @@ the possible security methods (see `mh-mml-method-default')."
   (if current-prefix-arg
       (let ((def (or (car mh-mml-cryptographic-method-history)
                      mh-mml-method-default)))
-        (completing-read (format "Method (default %s): " def)
+        (completing-read (format-prompt "Method" def)
                          '(("pgp") ("pgpmime") ("smime"))
                          nil t nil 'mh-mml-cryptographic-method-history def))
     mh-mml-method-default))
 
-(defun mh-secure-message (method mode &optional identity)
+(defun mh-secure-message (method mode &optional _identity)
   "Add tag to encrypt or sign message.
 
 METHOD should be one of: \"pgpmime\", \"pgp\", \"smime\".
@@ -1697,19 +1691,19 @@ buffer, while END defaults to the end of the buffer."
   (unless begin (setq begin (point-min)))
   (unless end (setq end (point-max)))
   (save-excursion
-    (block search-for-mh-directive
+    (cl-block search-for-mh-directive
       (goto-char begin)
       (while (re-search-forward "^#" end t)
         (let ((s (buffer-substring-no-properties
                   (point) (mh-line-end-position))))
           (cond ((equal s ""))
                 ((string-match "^forw[ \t\n]+" s)
-                 (return-from search-for-mh-directive t))
+                 (cl-return-from search-for-mh-directive t))
                 (t (let ((first-token (car (split-string s "[ \t;@]"))))
                      (when (and first-token
                                 (string-match mh-media-type-regexp
                                               first-token))
-                       (return-from search-for-mh-directive t)))))))
+                       (cl-return-from search-for-mh-directive t)))))))
       nil)))
 
 (defun mh-minibuffer-read-type (filename &optional default)
@@ -1720,14 +1714,14 @@ a type (see `mailcap-mime-types').
 Optional argument DEFAULT is returned if a type isn't entered."
   (mailcap-parse-mimetypes)
   (let* ((default (or default
-                      (mm-default-file-encoding filename)
+                      (mm-default-file-type filename)
                       "application/octet-stream"))
          (probed-type (mh-file-mime-type filename))
          (type (or (and (not (equal probed-type "application/octet-stream"))
                         probed-type)
                    (completing-read
-                    (format "Content type (default %s): " default)
-                    (mapcar 'list (mailcap-mime-types))))))
+                    (format-prompt "Content type" default)
+                    (mapcar #'list (mailcap-mime-types))))))
     (if (not (equal type ""))
         type
       default)))

@@ -1,6 +1,6 @@
 ;;; dabbrev.el --- dynamic abbreviation package  -*- lexical-binding: t -*-
 
-;; Copyright (C) 1985-1986, 1992, 1994, 1996-1997, 2000-2019 Free
+;; Copyright (C) 1985-1986, 1992, 1994, 1996-1997, 2000-2022 Free
 ;; Software Foundation, Inc.
 
 ;; Author: Don Morrison
@@ -45,7 +45,7 @@
 ;; dabbrev-case-replace		nil		t
 ;;
 ;; Set the variables you want special for your mode like this:
-;; (set (make-local-variable 'dabbrev-case-replace) nil)
+;; (setq-local dabbrev-case-replace nil)
 ;; Then you don't interfere with other modes.
 ;;
 ;; If your mode handles buffers that refers to other buffers
@@ -59,10 +59,10 @@
 
 ;; Example for GNUS (when we write a reply, we want dabbrev to look in
 ;; the article for expansion):
-;; (set (make-local-variable 'dabbrev-friend-buffer-function)
-;;      (lambda (buffer)
-;;         (with-current-buffer buffer
-;;           (memq major-mode '(news-reply-mode gnus-article-mode)))))
+;; (setq-local dabbrev-friend-buffer-function
+;;             (lambda (buffer)
+;;                (with-current-buffer buffer
+;;                  (memq major-mode '(news-reply-mode gnus-article-mode)))))
 
 
 ;; Known bugs and limitations.
@@ -323,6 +323,9 @@ this list."
 ;; Same as dabbrev-check-other-buffers, but is set for every expand.
 (defvar dabbrev--check-other-buffers dabbrev-check-other-buffers)
 
+;; Same as dabbrev-check-all-buffers, but is set for every expand.
+(defvar dabbrev--check-all-buffers dabbrev-check-all-buffers)
+
 ;; The regexp for recognizing a character in an abbreviation.
 (defvar dabbrev--abbrev-char-regexp nil)
 
@@ -380,10 +383,7 @@ If the prefix argument is 16 (which comes from \\[universal-argument] \\[univers
 then it searches *all* buffers."
   (interactive "*P")
   (dabbrev--reset-global-variables)
-  (let* ((dabbrev-check-other-buffers (and arg t))
-	 (dabbrev-check-all-buffers
-	  (and arg (= (prefix-numeric-value arg) 16)))
-	 (abbrev (dabbrev--abbrev-at-point))
+  (let* ((abbrev (dabbrev--abbrev-at-point))
          (beg (progn (search-backward abbrev) (point)))
          (end (progn (search-forward abbrev) (point)))
 	 (ignore-case-p (dabbrev--ignore-case-p abbrev))
@@ -420,6 +420,9 @@ then it searches *all* buffers."
                            (t
                             (mapcar #'downcase completion-list)))))))
               (complete-with-action a list s p)))))
+    (setq dabbrev--check-other-buffers (and arg t))
+    (setq dabbrev--check-all-buffers
+          (and arg (= (prefix-numeric-value arg) 16)))
     (completion-in-region beg end table)))
 
 ;;;###autoload
@@ -565,8 +568,7 @@ See also `dabbrev-abbrev-char-regexp' and \\[dabbrev-completion]."
 	major-mode)))
 
 (defun dabbrev--goto-start-of-abbrev ()
-  "Back over all abbrev type characters and then moves forward over
-all skip characters."
+  "Back over all abbrev type characters then move forward over all skip characters."
   ;; Move backwards over abbrev chars
   (save-match-data
     (when (> (point) (minibuffer-prompt-end))
@@ -623,7 +625,8 @@ all skip characters."
 	dabbrev--last-buffer-found nil
 	dabbrev--abbrev-char-regexp (or dabbrev-abbrev-char-regexp
 					"\\sw\\|\\s_")
-	dabbrev--check-other-buffers dabbrev-check-other-buffers))
+	dabbrev--check-other-buffers dabbrev-check-other-buffers
+        dabbrev--check-all-buffers dabbrev-check-all-buffers))
 
 (defun dabbrev--select-buffers ()
   "Return a list of other buffers to search for a possible abbrev.
@@ -772,7 +775,7 @@ of the start of the occurrence."
       ;; If dabbrev-check-all-buffers, tack on all the other
       ;; buffers at the end of the list, except those which are
       ;; specifically to be ignored.
-      (if dabbrev-check-all-buffers
+      (if dabbrev--check-all-buffers
 	  (setq list
 		(append list
 			(dabbrev-filter-elements

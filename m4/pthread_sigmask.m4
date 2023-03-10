@@ -1,5 +1,5 @@
-# pthread_sigmask.m4 serial 17
-dnl Copyright (C) 2011-2019 Free Software Foundation, Inc.
+# pthread_sigmask.m4 serial 21
+dnl Copyright (C) 2011-2022 Free Software Foundation, Inc.
 dnl This file is free software; the Free Software Foundation
 dnl gives unlimited permission to copy and/or distribute it,
 dnl with or without modifications, as long as this notice is preserved.
@@ -75,10 +75,6 @@ AC_DEFUN([gl_FUNC_PTHREAD_SIGMASK],
       else
         dnl pthread_sigmask may exist but does not interoperate with the chosen
         dnl multithreading facility.
-        dnl If "$gl_threads_api" = pth, we could use the function pth_sigmask,
-        dnl but it is equivalent to sigprocmask, so we choose to emulate
-        dnl pthread_sigmask with sigprocmask also in this case. This yields
-        dnl fewer link dependencies.
         if test $ac_cv_func_pthread_sigmask = yes; then
           REPLACE_PTHREAD_SIGMASK=1
         else
@@ -115,9 +111,9 @@ AC_DEFUN([gl_FUNC_PTHREAD_SIGMASK],
     AC_REQUIRE([AC_PROG_CC])
     AC_REQUIRE([AC_CANONICAL_HOST]) dnl for cross-compiles
 
-    dnl On FreeBSD 6.4, HP-UX 11.31, Solaris 9, in programs that are not linked
-    dnl with -lpthread, the pthread_sigmask() function always returns 0 and has
-    dnl no effect.
+    dnl On FreeBSD 13.0, MidnightBSD 1.1, HP-UX 11.31, Solaris 9, in programs
+    dnl that are not linked with -lpthread, the pthread_sigmask() function
+    dnl always returns 0 and has no effect.
     if test -z "$LIB_PTHREAD_SIGMASK"; then
       case " $LIBS " in
         *' -pthread '*) ;;
@@ -142,7 +138,7 @@ AC_DEFUN([gl_FUNC_PTHREAD_SIGMASK],
                 [
                  changequote(,)dnl
                  case "$host_os" in
-                   freebsd* | hpux* | solaris | solaris2.[2-9]*)
+                   freebsd* | midnightbsd* | hpux* | solaris | solaris2.[2-9]*)
                      gl_cv_func_pthread_sigmask_in_libc_works="guessing no";;
                    *)
                      gl_cv_func_pthread_sigmask_in_libc_works="guessing yes";;
@@ -224,6 +220,7 @@ int main ()
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+]GL_MDA_DEFINES[
 static volatile int sigint_occurred;
 static void
 sigint_handler (int sig)

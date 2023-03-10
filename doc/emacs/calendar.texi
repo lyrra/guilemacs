@@ -1,5 +1,5 @@
 @c This is part of the Emacs manual.  -*- coding: utf-8 -*-
-@c Copyright (C) 1985-1987, 1993-1995, 1997, 2000-2019 Free Software
+@c Copyright (C) 1985--1987, 1993--1995, 1997, 2000--2022 Free Software
 @c Foundation, Inc.
 @c See file emacs.texi for copying conditions.
 @node Calendar/Diary
@@ -532,8 +532,8 @@ holidays centered around a different month, use @kbd{C-u M-x
 holidays}, which prompts for the month and year.
 
   The holidays known to Emacs include United States holidays and the
-major Bahá'í, Chinese, Christian, Islamic, and Jewish holidays; also the
-solstices and equinoxes.
+major Bahá'í, Chinese, Christian, Islamic, and Jewish
+holidays; also the solstices and equinoxes.
 
 @findex list-holidays
    The command @kbd{M-x holiday-list} displays the list of holidays for
@@ -625,6 +625,10 @@ your time zone.  Emacs displays the times of sunrise and sunset
 @emph{corrected for daylight saving time}.  @xref{Daylight Saving},
 for how daylight saving time is determined.
 
+@vindex calendar-time-zone-style
+  If you want to display numerical time zones (like @samp{"+0100"})
+instead of symbolic ones (like @samp{"CET"}), set this to @code{numeric}.
+
   As a user, you might find it convenient to set the calendar location
 variables for your usual physical location in your @file{.emacs} file.
 If you are a system administrator, you may want to set these variables
@@ -706,7 +710,7 @@ century.
 @cindex Julian day numbers
 @cindex astronomical day numbers
   Astronomers use a simple counting of days elapsed since noon, Monday,
-January 1, 4713 B.C. on the Julian calendar.  The number of days elapsed
+January 1, 4713 BC on the Julian calendar.  The number of days elapsed
 is called the @dfn{Julian day number} or the @dfn{Astronomical day number}.
 
 @cindex Hebrew calendar
@@ -1359,6 +1363,20 @@ the 11 above to @samp{'(1 2 3)} and have the entry apply to the last
 Thursday of January, February, and March.  If the month is @code{t}, the
 entry applies to all months of the year.
 
+@findex diary-offset
+@example
+%%(diary-offset '(diary-float t 3 4) 2) Monthly committee meeting
+@end example
+
+@noindent
+This entry applies to the Saturday after the third Thursday of each
+month.  The 2 specifies number of days after when the sexp
+@w{@code{'(diary-float t 3 4)}} would evaluate to @code{t}.  This is
+useful when for example your organization has a committee meeting two
+days after every monthly meeting which takes place on the third
+Thursday, or if you would like to attend a virtual meeting scheduled
+in a different timezone causing a difference in the date.
+
   Each of the standard sexp diary entries takes an optional parameter
 specifying the name of a face or a single-character string to use when
 marking the entry in the calendar.  Most generally, sexp diary entries
@@ -1599,7 +1617,7 @@ variables' values are 120.
   The timeclock package adds up time intervals, so you can (for
 instance) keep track of how much time you spend working on particular
 projects.  (A more advanced alternative is to use the Org Mode's
-facilities for clocking time, @pxref{Clocking work time,,,org, The Org
+facilities for clocking time, @pxref{Clocking Work Time,,,org, The Org
 Manual}).
 
 @findex timeclock-in
@@ -1618,12 +1636,12 @@ timeclock-change}.
 work today (assuming a typical average of 8 hours a day), and @kbd{M-x
 timeclock-when-to-leave} which will calculate when you're done.
 
-@vindex timeclock-modeline-display
-@findex timeclock-modeline-display
+@vindex timeclock-mode-line-display
+@findex timeclock-mode-line-display
   If you want Emacs to display the amount of time left of your
 workday in the mode line, either customize the
-@code{timeclock-modeline-display} variable and set its value to
-@code{t}, or invoke the @kbd{M-x timeclock-modeline-display} command.
+@code{timeclock-mode-line-display} variable and set its value to
+@code{t}, or invoke the @kbd{M-x timeclock-mode-line-display} command.
 
 @vindex timeclock-ask-before-exiting
   Terminating the current Emacs session might or might not mean that

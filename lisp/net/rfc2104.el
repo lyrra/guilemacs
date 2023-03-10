@@ -1,6 +1,6 @@
 ;;; rfc2104.el --- RFC2104 Hashed Message Authentication Codes  -*- lexical-binding:t -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Simon Josefsson <jas@pdc.kth.se>
 ;; Keywords: mail
@@ -26,18 +26,14 @@
 ;;
 ;; Example:
 ;;
-;; (require 'md5)
 ;; (rfc2104-hash 'md5 64 16 "Jefe" "what do ya want for nothing?")
 ;; "750c783e6ab0b503eaa86e310a5db738"
 ;;
-;; (require 'sha1)
 ;; (rfc2104-hash 'sha1 64 20 "Jefe" "what do ya want for nothing?")
 ;; "effcdf6ae5eb2fa2d27416d5f184df9c259a7c79"
 ;;
 ;; 64 is block length of hash function (64 for MD5 and SHA), 16 is
 ;; resulting hash length (16 for MD5, 20 for SHA).
-;;
-;; Tested with Emacs 20.2 and XEmacs 20.3.
 ;;
 ;; Test case reference: RFC 2202.
 

@@ -1,6 +1,6 @@
 ;;; casefiddle-tests.el --- tests for casefiddle.c functions -*- lexical-binding: t -*-
 
-;; Copyright (C) 2015-2016, 2018-2019 Free Software Foundation, Inc.
+;; Copyright (C) 2015-2016, 2018-2022 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -196,7 +196,7 @@
         ("ﬁsh" "FISH" "ﬁsh" "Fish" "Fish")
         ("Straße" "STRASSE" "straße" "Straße" "Straße")
 
-        ;; The word repeated twice to test behaviour at the end of a word
+        ;; The word repeated twice to test behavior at the end of a word
         ;; inside of an input string as well as at the end of the string.
         ("ΌΣΟΣ ΌΣΟΣ" "ΌΣΟΣ ΌΣΟΣ" "όσος όσος" "Όσος Όσος" "ΌΣΟΣ ΌΣΟΣ")
         ;; What should be done with sole sigma?  It is ‘final’ but on the
@@ -247,7 +247,8 @@
   ;;             input upcase downcase [titlecase]
   (dolist (test '((?a ?A ?a) (?A ?A ?a)
                   (?ł ?Ł ?ł) (?Ł ?Ł ?ł)
-                  (?ß ?ß ?ß) (?ẞ ?ẞ ?ß)
+                  ;; We char-upcase ß to ẞ; see bug #11309.
+                  (?ß ?ẞ ?ß) (?ẞ ?ẞ ?ß)
                   (?ⅷ ?Ⅷ ?ⅷ) (?Ⅷ ?Ⅷ ?ⅷ)
                   (?Ǆ ?Ǆ ?ǆ ?ǅ) (?ǅ ?Ǆ ?ǆ ?ǅ) (?ǆ ?Ǆ ?ǆ ?ǅ)))
     (let ((ch (car test))
@@ -259,5 +260,22 @@
       (should (eq tc (capitalize ch)))
       (should (eq tc (upcase-initials ch))))))
 
+(defvar casefiddle-oldfunc region-extract-function)
+
+(defun casefiddle-loopfunc (method)
+  (if (eq method 'bounds)
+      (let ((looping (list '(1 . 1))))
+        (setcdr looping looping))
+    (funcall casefiddle-oldfunc method)))
+
+(defun casefiddle-badfunc (method)
+  (if (eq method 'bounds)
+      '(())
+    (funcall casefiddle-oldfunc method)))
+
+(ert-deftest casefiddle-invalid-region-extract-function ()
+  (dolist (region-extract-function '(casefiddle-badfunc casefiddle-loopfunc))
+    (with-temp-buffer
+      (should-error (upcase-region nil nil t)))))
 
 ;;; casefiddle-tests.el ends here

@@ -1,6 +1,6 @@
-;;; mml.el --- A package for parsing and validating MML documents
+;;; mml.el --- A package for parsing and validating MML documents  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 1998-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1998-2022 Free Software Foundation, Inc.
 
 ;; Author: Lars Magne Ingebrigtsen <larsi@gnus.org>
 ;; This file is part of GNU Emacs.
@@ -206,8 +206,8 @@ part.  This is for the internal use, you should never modify the value.")
 
 (defun mml-destroy-buffers ()
   (let (kill-buffer-hook)
-    (mapc 'kill-buffer mml-buffer-list)
-    (setq mml-buffer-list nil)))
+    (mapc #'kill-buffer (prog1 mml-buffer-list
+                          (setq mml-buffer-list nil)))))
 
 (defun mml-parse ()
   "Parse the current buffer as an MML document."
@@ -241,34 +241,37 @@ part.  This is for the internal use, you should never modify the value.")
 	       (method (cdr (assq 'method taginfo)))
 	       tags)
 	  (save-excursion
-	    (if (re-search-forward
-		 "<#/?\\(multipart\\|part\\|external\\|mml\\)." nil t)
-		(setq secure-mode "multipart")
-	      (setq secure-mode "part")))
+	    (setq secure-mode
+		  (if (re-search-forward
+		       "<#/?\\(multipart\\|part\\|external\\|mml\\)."
+		       nil t)
+		      "multipart"
+		    "part")))
 	  (save-excursion
 	    (goto-char location)
 	    (re-search-forward "<#secure[^\n]*>\n"))
 	  (delete-region (match-beginning 0) (match-end 0))
-	  (cond ((string= mode "sign")
-		 (setq tags (list "sign" method)))
-		((string= mode "encrypt")
-		 (setq tags (list "encrypt" method)))
-		((string= mode "signencrypt")
-		 (setq tags (list "sign" method "encrypt" method)))
-		(t
-		 (error "Unknown secure mode %s" mode)))
-	  (eval `(mml-insert-tag ,secure-mode
-				 ,@tags
-				 ,(if keyfile "keyfile")
-				 ,keyfile
-				 ,@(apply #'append
-					  (mapcar (lambda (certfile)
-						    (list "certfile" certfile))
-						  certfiles))
-				 ,(if recipients "recipients")
-				 ,recipients
-				 ,(if sender "sender")
-				 ,sender))
+	  (setq tags (cond ((string= mode "sign")
+		            (list "sign" method))
+		           ((string= mode "encrypt")
+		            (list "encrypt" method))
+		           ((string= mode "signencrypt")
+		            (list "sign" method "encrypt" method))
+		           (t
+		            (error "Unknown secure mode %s" mode))))
+	  (apply #'mml-insert-tag
+		 secure-mode
+		 `(,@tags
+		   ,(if keyfile "keyfile")
+		   ,keyfile
+		   ,@(apply #'append
+			    (mapcar (lambda (certfile)
+				      (list "certfile" certfile))
+				    certfiles))
+		   ,(if recipients "recipients")
+		   ,recipients
+		   ,(if sender "sender")
+		   ,sender))
 	  ;; restart the parse
 	  (goto-char location)))
        ((looking-at "<#multipart")
@@ -281,7 +284,7 @@ part.  This is for the internal use, you should never modify the value.")
 	    (setq tag (mml-read-tag)
 		  no-markup-p nil
 		  warn nil)
-	  (setq tag (list 'part '(type . "text/plain"))
+	  (setq tag (list 'part (cons 'type "text/plain"))
 		no-markup-p t
 		warn t))
 	(setq raw (cdr (assq 'raw tag))
@@ -295,6 +298,17 @@ part.  This is for the internal use, you should never modify the value.")
 			(t
 			 (mm-find-mime-charset-region point (point)
 						      mm-hack-charsets))))
+	;; We have a part that already has a transfer encoding.  Undo
+	;; that so that we don't double-encode later.
+	(when (and raw
+		   (cdr (assq 'data-encoding tag)))
+	  (with-temp-buffer
+	    (set-buffer-multibyte nil)
+	    (insert contents)
+	    (mm-decode-content-transfer-encoding
+	     (intern (cdr (assq 'data-encoding tag)))
+	     (cdr (assq 'type tag)))
+	    (setq contents (buffer-string))))
 	(when (and (not raw) (memq nil charsets))
 	  (if (or (memq 'unknown-encoding mml-confirmation-set)
 		  (message-options-get 'unknown-encoding)
@@ -313,8 +327,8 @@ Message contains characters with unknown encoding.  Really send? ")
 		(eq 'mml (car tag))
 		(< (length charsets) 2))
 	    (if (or (not no-markup-p)
+		    ;; Don't create blank parts.
 		    (string-match "[^ \t\r\n]" contents))
-		;; Don't create blank parts.
 		(push (nconc tag (list (cons 'contents contents)))
 		      struct))
 	  (let ((nstruct (mml-parse-singlepart-with-multiple-charsets
@@ -471,10 +485,13 @@ If MML is non-nil, return the buffer up till the correspondent mml tag."
 (declare-function libxml-parse-html-region "xml.c"
 		  (start end &optional base-url discard-comments))
 
-(defun mml-generate-mime (&optional multipart-type)
+(defun mml-generate-mime (&optional multipart-type content-type)
   "Generate a MIME message based on the current MML document.
 MULTIPART-TYPE defaults to \"mixed\", but can also
-be \"related\" or \"alternate\"."
+be \"related\" or \"alternate\".
+
+If CONTENT-TYPE (and there's only one part), override the content
+type detected."
   (let ((cont (mml-parse))
 	(mml-multipart-number mml-multipart-number)
 	(options message-options))
@@ -482,9 +499,10 @@ be \"related\" or \"alternate\"."
 	nil
       (when (and (consp (car cont))
 		 (= (length cont) 1)
-		 (fboundp 'libxml-parse-html-region)
-		 (equal (cdr (assq 'type (car cont))) "text/html"))
-	(setq cont (mml-expand-html-into-multipart-related (car cont))))
+		 content-type)
+	(setcdr (assq 'type (cdr (car cont))) content-type))
+      (when (fboundp 'libxml-parse-html-region)
+	(setq cont (mapcar #'mml-expand-all-html-into-multipart-related cont)))
       (prog1
 	  (with-temp-buffer
 	    (set-buffer-multibyte nil)
@@ -503,6 +521,18 @@ be \"related\" or \"alternate\"."
 	    (buffer-string))
 	(setq message-options options)))))
 
+(defun mml-expand-all-html-into-multipart-related (cont)
+  (cond ((and (eq (car cont) 'part)
+	      (equal (cdr (assq 'type cont)) "text/html"))
+	 (mml-expand-html-into-multipart-related cont))
+	((eq (car cont) 'multipart)
+	 (let ((cur (cdr cont)))
+	   (while (consp cur)
+	     (setcar cur (mml-expand-all-html-into-multipart-related (car cur)))
+	     (setf cur (cdr cur))))
+	 cont)
+	(t cont)))
+
 (defun mml-expand-html-into-multipart-related (cont)
   (let ((new-parts nil)
 	(cid 1))
@@ -520,7 +550,7 @@ be \"related\" or \"alternate\"."
 		 (end (point))
 		 (parsed (url-generic-parse-url (cdr (assq 'src (cadr img))))))
 	    (when (and (null (url-type parsed))
-		       (url-filename parsed)
+                       (not (zerop (length (url-filename parsed))))
 		       (file-exists-p (url-filename parsed)))
 	      (goto-char start)
 	      (when (search-forward (url-filename parsed) end t)
@@ -531,8 +561,7 @@ be \"related\" or \"alternate\"."
 			new-parts))
 		(setq cid (1+ cid)))))))
       ;; We have local images that we want to include.
-      (if (not new-parts)
-	  (list cont)
+      (when new-parts
 	(setcdr (assq 'contents cont) (buffer-string))
 	(setq cont
 	      (nconc (list 'multipart (cons 'type "related"))
@@ -545,8 +574,8 @@ be \"related\" or \"alternate\"."
 				       (nth 1 new-part)
 				       (nth 2 new-part))
 				    (id . ,(concat "<" (nth 0 new-part)
-						   ">")))))))
-	cont))))
+						   ">"))))))))
+      cont)))
 
 (autoload 'image-property "image")
 
@@ -591,7 +620,7 @@ be \"related\" or \"alternate\"."
 	       (filename (cdr (assq 'filename cont)))
 	       (type (or (cdr (assq 'type cont))
 			 (if filename
-			     (or (mm-default-file-encoding filename)
+			     (or (mm-default-file-type filename)
 				 "application/octet-stream")
 			   "text/plain")))
 	       (charset (cdr (assq 'charset cont)))
@@ -749,7 +778,7 @@ be \"related\" or \"alternate\"."
 	  (insert "Content-Type: "
 		  (or (cdr (assq 'type cont))
 		      (if name
-			  (or (mm-default-file-encoding name)
+			  (or (mm-default-file-type name)
 			      "application/octet-stream")
 			"text/plain"))
 		  "\n")
@@ -836,7 +865,7 @@ be \"related\" or \"alternate\"."
 				    (cl-incf mml-multipart-number)))
 	(throw 'not-unique nil))))
    ((eq (car cont) 'multipart)
-    (mapc 'mml-compute-boundary-1 (cddr cont))))
+    (mapc #'mml-compute-boundary-1 (cddr cont))))
   t)
 
 (defun mml-make-boundary (number)
@@ -916,11 +945,13 @@ be \"related\" or \"alternate\"."
     (unless (eq encoding '7bit)
       (insert (format "Content-Transfer-Encoding: %s\n" encoding)))
     (when (setq description (cdr (assq 'description cont)))
-      (insert "Content-Description: ")
-      (setq description (prog1
-			    (point)
-			  (insert description "\n")))
-      (mail-encode-encoded-word-region description (point)))))
+      (insert "Content-Description: "
+	      ;; The current buffer is unibyte, so do the description
+	      ;; encoding in a temporary buffer.
+	      (with-temp-buffer
+		(insert description "\n")
+		(mail-encode-encoded-word-region (point-min) (point-max))
+		(buffer-string))))))
 
 (defun mml-parameter-string (cont types)
   (let ((string "")
@@ -1049,7 +1080,7 @@ If HANDLES is non-nil, use it instead reparsing the buffer."
       (goto-char (point-max))
       (insert "<#/mml>\n"))
      ((stringp (car handle))
-      (mapc 'mml-insert-mime (cdr handle))
+      (mapc #'mml-insert-mime (cdr handle))
       (insert "<#/multipart>\n"))
      (textp
       (let ((charset (mail-content-type-get
@@ -1238,8 +1269,8 @@ See Info node `(emacs-mime)Composing'.
   :lighter " MML" :keymap mml-mode-map
   (when mml-mode
     (when (boundp 'dnd-protocol-alist)
-      (set (make-local-variable 'dnd-protocol-alist)
-	   (append mml-dnd-protocol-alist dnd-protocol-alist)))))
+      (setq-local dnd-protocol-alist
+                  (append mml-dnd-protocol-alist dnd-protocol-alist)))))
 
 ;;;
 ;;; Helper functions for reading MIME stuff from the minibuffer and
@@ -1276,7 +1307,7 @@ If not set, `default-directory' will be used."
   (require 'mailcap)
   (mailcap-parse-mimetypes)
   (let* ((default (or default
-		      (mm-default-file-encoding name)
+		      (mm-default-file-type name)
 		      ;; Perhaps here we should check what the file
 		      ;; looks like, and offer text/plain if it looks
 		      ;; like text/plain.
@@ -1308,7 +1339,7 @@ If not set, `default-directory' will be used."
 
 (defun mml-quote-region (beg end)
   "Quote the MML tags in the region."
-  (interactive "r")
+  (interactive "r" mml-mode)
   (save-excursion
     (save-restriction
       ;; Temporarily narrow the region to defend from changes
@@ -1332,7 +1363,7 @@ If not set, `default-directory' will be used."
 	  (value (pop plist)))
       (when value
 	;; Quote VALUE if it contains suspicious characters.
-	(when (string-match "[\"'\\~/*;() \t\n]" value)
+	(when (string-match "[][\"'\\~/*;()<>= \t\n[:multibyte:]]" value)
 	  (setq value (with-output-to-string
 			(let (print-escape-nonascii)
 			  (prin1 value)))))
@@ -1398,7 +1429,7 @@ will be computed and used."
   (interactive
    (let* ((file (mml-minibuffer-read-file "Attach file: "))
 	  (type (if current-prefix-arg
-		    (or (mm-default-file-encoding file)
+		    (or (mm-default-file-type file)
 			"application/octet-stream")
 		  (mml-minibuffer-read-type file)))
 	  (description (if current-prefix-arg
@@ -1428,7 +1459,7 @@ will be computed and used."
 		 (file-name-nondirectory file)))
       (goto-char head))))
 
-(defun mml-dnd-attach-file (uri action)
+(defun mml-dnd-attach-file (uri _action)
   "Attach a drag and drop file.
 
 Ask for type, description or disposition according to
@@ -1559,6 +1590,16 @@ Should be adopted if code in `message-send-mail' is changed."
 (declare-function message-generate-headers      "message" (headers))
 (declare-function message-sort-headers          "message" ())
 
+(defvar gnus-newsgroup-name)
+(defvar gnus-displaying-mime)
+(defvar gnus-newsgroup-name)
+(defvar gnus-article-prepare-hook)
+(defvar gnus-newsgroup-charset)
+(defvar gnus-original-article-buffer)
+(defvar gnus-message-buffer)
+(defvar message-this-is-news)
+(defvar message-this-is-mail)
+
 (defun mml-preview (&optional raw)
   "Display current buffer with Gnus, in a new buffer.
 If RAW, display a raw encoded MIME message.
@@ -1570,7 +1611,8 @@ or the `pop-to-buffer' function."
   (interactive "P")
   (setq mml-preview-buffer (generate-new-buffer
 			    (concat (if raw "*Raw MIME preview of "
-				      "*MIME preview of ") (buffer-name))))
+				      "*MIME preview of ")
+				    (buffer-name))))
   (require 'gnus-msg)		      ; for gnus-setup-posting-charset
   (save-excursion
     (let* ((buf (current-buffer))
@@ -1627,7 +1669,8 @@ or the `pop-to-buffer' function."
       (use-local-map nil)
       (add-hook 'kill-buffer-hook
 		(lambda ()
-		  (mm-destroy-parts gnus-article-mime-handles)) nil t)
+		  (mm-destroy-parts gnus-article-mime-handles))
+		nil t)
       (setq buffer-read-only t)
       (local-set-key "q" (lambda () (interactive) (kill-buffer nil)))
       (local-set-key "=" (lambda () (interactive) (delete-other-windows)))
@@ -1676,7 +1719,7 @@ or the `pop-to-buffer' function."
       cont)
     (let ((alist mml-tweak-sexp-alist))
       (while alist
-	(if (eval (caar alist))
+	(if (eval (caar alist) t)
 	    (funcall (cdar alist) cont))
 	(setq alist (cdr alist)))))
   cont)

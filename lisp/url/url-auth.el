@@ -1,6 +1,6 @@
 ;;; url-auth.el --- Uniform Resource Locator authorization modules -*- lexical-binding: t -*-
 
-;; Copyright (C) 1996-1999, 2004-2019 Free Software Foundation, Inc.
+;; Copyright (C) 1996-1999, 2004-2022 Free Software Foundation, Inc.
 
 ;; Keywords: comm, data, processes, hypermedia
 
@@ -19,11 +19,12 @@
 ;; You should have received a copy of the GNU General Public License
 ;; along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
+;;; Commentary:
+
 ;;; Code:
 
 (require 'url-vars)
 (require 'url-parse)
-(autoload 'url-warn "url")
 (autoload 'auth-source-search "auth-source")
 
 (defsubst url-auth-user-prompt (url realm)
@@ -39,7 +40,7 @@
 ;;; ------------------------
 ;;; This implements the BASIC authorization type.  See the online
 ;;; documentation at
-;;; http://www.w3.org/hypertext/WWW/AccessAuthorization/Basic.html
+;;; https://www.w3.org/hypertext/WWW/AccessAuthorization/Basic.html
 ;;; for the complete documentation on this type.
 ;;;
 ;;; This is very insecure, but it works as a proof-of-concept
@@ -82,7 +83,7 @@ instead of the filename inheritance method."
     (cond
      ((and user pass)
       ;; Explicit http://user:pass@foo/ URL.  Just return the credentials.
-      (setq retval (base64-encode-string (format "%s:%s" user pass))))
+      (setq retval (base64-encode-string (format "%s:%s" user pass) t)))
      ((and prompt (not byserv))
       (setq user (or
 		  (url-do-auth-source-search server type :user)
@@ -97,15 +98,16 @@ instead of the filename inheritance method."
 			     (setq retval
 				   (base64-encode-string
 				    (format "%s:%s" user
-					    (encode-coding-string pass 'utf-8))))))
+					    (encode-coding-string pass 'utf-8))
+                                    t))))
 		 (symbol-value url-basic-auth-storage))))
      (byserv
       (setq retval (cdr-safe (assoc file byserv)))
       (if (and (not retval)
-	       (string-match "/" file))
+	       (string-search "/" file))
  	  (while (and byserv (not retval))
 	    (setq data (car (car byserv)))
-	    (if (or (not (string-match "/" data)) ; It's a realm - take it!
+	    (if (or (not (string-search "/" data)) ; It's a realm - take it!
 		    (and
 		     (>= (length file) (length data))
 		     (string= data (substring file 0 (length data)))))
@@ -120,7 +122,7 @@ instead of the filename inheritance method."
 		  pass (or
 			(url-do-auth-source-search server type :secret)
 			(read-passwd "Password: "))
-		  retval (base64-encode-string (format "%s:%s" user pass))
+		  retval (base64-encode-string (format "%s:%s" user pass) t)
 		  byserv (assoc server (symbol-value url-basic-auth-storage)))
 	    (setcdr byserv
 		    (cons (cons file retval) (cdr byserv))))))
@@ -192,7 +194,7 @@ key cache `url-digest-auth-storage'."
 (defun url-digest-auth-make-cnonce ()
   "Compute a new unique client nonce value."
   (base64-encode-string
-   (format "%016x%016x" (random) (car (encode-time nil t)))
+   (format "%016x%016x" (random) (car (time-convert nil t)))
    t))
 
 (defun url-digest-auth-nonce-count (_nonce)
@@ -251,12 +253,12 @@ a match."
    (assoc dirkey keylist)
    ;; No exact match found.  Continue to look for partial match if
    ;; dirkey is not a realm.
-   (and (string-match "/" dirkey)
+   (and (string-search "/" dirkey)
         (let (match)
           (while (and (null match) keylist)
             (if (or
                  ;; Any realm candidate matches.  Why?
-                 (not (string-match "/" (caar keylist)))
+                 (not (string-search "/" (caar keylist)))
                  ;; Parent directory matches.
                  (string-prefix-p (caar keylist) dirkey))
                 (setq match (car keylist))
@@ -458,8 +460,7 @@ information associated with them.")
 
 ;;;###autoload
 (defun url-get-authentication (url realm type prompt &optional args)
-  "Return an authorization string suitable for use in the WWW-Authenticate
-header in an HTTP/1.0 request.
+  "Return authorization string for the WWW-Authenticate header in HTTP/1.0 request.
 
 URL    is the url you are requesting authorization to.  This can be either a
        string representing the URL, or the parsed representation returned by
@@ -493,21 +494,19 @@ PROMPT is boolean - specifies whether to ask the user for a username/password
        (car-safe
 	(sort
 	 (mapcar
-	  (function
-	   (lambda (scheme)
-	     (if (fboundp (car (cdr scheme)))
-		 (cons (cdr (cdr scheme))
-		       (funcall (car (cdr scheme)) url nil nil realm))
-	       (cons 0 nil))))
+          (lambda (scheme)
+            (if (fboundp (car (cdr scheme)))
+                (cons (cdr (cdr scheme))
+                      (funcall (car (cdr scheme)) url nil nil realm))
+              (cons 0 nil)))
 	  url-registered-auth-schemes)
-	 (function
-	  (lambda (x y)
-	    (cond
-	     ((null (cdr x)) nil)
-	     ((and (cdr x) (null (cdr y))) t)
-	     ((and (cdr x) (cdr y))
-	      (>= (car x) (car y)))
-	     (t nil)))))))
+         (lambda (x y)
+           (cond
+            ((null (cdr x)) nil)
+            ((and (cdr x) (null (cdr y))) t)
+            ((and (cdr x) (cdr y))
+             (>= (car x) (car y)))
+            (t nil))))))
     (if (symbolp type) (setq type (symbol-name type)))
     (let* ((scheme (car-safe
 		    (cdr-safe (assoc (downcase type)
@@ -541,7 +540,7 @@ RATING   a rating between 1 and 10 of the strength of the authentication.
 		  (t rating)))
 	 (node (assoc type url-registered-auth-schemes)))
     (if (not (fboundp function))
-	(url-warn
+        (display-warning
 	 'security
 	 (format-message
 	  "Tried to register `%s' as an auth scheme, but it is not a function!"

@@ -1,6 +1,6 @@
 /* Work around an fstatat bug on Solaris 9.
 
-   Copyright (C) 2006, 2009-2019 Free Software Foundation, Inc.
+   Copyright (C) 2006, 2009-2022 Free Software Foundation, Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -49,6 +49,7 @@ orig_fstatat (int fd, char const *filename, struct stat *buf, int flags)
 
 #include <errno.h>
 #include <fcntl.h>
+#include <stdlib.h>
 #include <string.h>
 
 #if HAVE_FSTATAT && HAVE_WORKING_FSTATAT_ZERO_FLAG

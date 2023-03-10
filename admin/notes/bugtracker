@@ -11,6 +11,10 @@ Use M-x report-emacs-bug, or send mail to bug-gnu-emacs@gnu.org.
 If you want to Cc someone, use an "X-Debbugs-Cc" header (or
 pseudo-header, see below) instead.
 
+** How do I read a bug?
+Visit https://debbugs.gnu.org/123 in your web browser or try this in
+Emacs: M-x gnus-read-ephemeral-emacs-bug-group.
+
 ** How do I comment on a bug?
 Reply to a mail on the bug-gnu-emacs list in the normal way.
 Or send a mail to 123@debbugs.gnu.org.
@@ -29,7 +33,7 @@ By mailing commands to control@debbugs.gnu.org.  Place commands at the
 start of the message body, one per line.
 
 severity 123 serious|important|normal|minor|wishlist
-tags 123 moreinfo|unreproducible|wontfix|patch
+tags 123 moreinfo|unreproducible|wontfix|patch|notabug
 
 * More detailed information
 
@@ -72,7 +76,7 @@ cc everyone on replies.)
 
 (Many people think the submitter SHOULD be automatically subscribed
 to subsequent discussion, but this does not seem to be implemented.
-See http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=37078
+See https://bugs.debian.org/37078
 See also https://debbugs.gnu.org/5439 )
 
 Do NOT send a separate copy to the bug list address, since this may
@@ -80,7 +84,7 @@ generate a new report.  The only time to send mail to the bug list
 address is to create a new report.
 
 Gnus users can add the following to message-dont-reply-to-names;
-similarly with Rmail and rmail-dont-reply-to-names:
+similarly with Rmail and mail-dont-reply-to-names:
 
 "\\(emacs-pretest-bug\\|bug-gnu-emacs\\|bug-\\(e\\|gnu\\)macs\\)@gnu\\.org\\|\
 \\(submit\\|control\\|owner\\)@debbugs\\.gnu\\.org"
@@ -151,7 +155,7 @@ Package: emacs
 Version: 23.0.60
 Severity: minor
 
-Remember to fix FOO, as discussed on emacs-devel at http://... .
+Remember to fix FOO, as discussed on emacs-devel at https://... .
 
 ** Not interested in tracker control messages (tags being set, etc)?
 Discard mails matching:
@@ -181,7 +185,7 @@ Basically, reply only to the numbered bug address (and any individual
 people's addresses). Do not send mail direct to bug-gnu-emacs or
 emacs-pretest-bug unless you are reporting a new bug.
 
-** To close bug #123 (for example), send mail
+** To close bug#123 (for example), send mail
 
 To: 123-done@debbugs.gnu.org
 
@@ -256,7 +260,7 @@ reopen 123
 
 *** Bugs can be tagged in various ways (eg wontfix, patch, etc).
 The available tags are:
-patch wontfix moreinfo unreproducible fixed notabug security confirmed
+patch wontfix moreinfo unreproducible fixed notabug help security confirmed easy
 See https://debbugs.gnu.org/Developer#tags
 The list of tags can be prefixed with +, - or =, meaning to add (the
 default), remove, or reset the tags. E.g.:
@@ -276,7 +280,7 @@ tag:tag                # all bugs with given tag
 
 *** Usertags
 
-See <http://wiki.debian.org/bugs.debian.org/usertags>
+See <https://wiki.debian.org/bugs.debian.org/usertags>
 
 "Usertags" are very similar to tags: a set of labels that can be added
 to a bug.  There are two differences between normal tags and user tags:
@@ -286,10 +290,9 @@ limited, predefined set of normal tags are available (see above).
 
 2) A usertag is associated with a specific user.  This is normally
 an email address (with an "@" sign and least 4 characters after the "@"),
-but on debbugs.gnu.org, the definition is less strict - anything with
-5 or more alphanumeric characters will work.  For personal tags,
+but on debbugs.gnu.org, it can also be a package name.  For personal tags,
 using an email address is still recommended.  Please only use the
-"emacs" user, or other short users, for "official" tags.
+"emacs" user for "official" tags.
 
 You set usertags in the same way as tags, by talking to the control server.
 One difference is that you can also specify the associated user.
@@ -303,7 +306,7 @@ a) In a control message:
 user emacs      # or email@example.com
 usertags 1234 any-tag-you-like
 
-This will add a usertag "any-tag-you-like" to bug 1234.  The tag will
+This will add a usertag "any-tag-you-like" to bug#1234.  The tag will
 be associated with the user "emacs".  If you omit the first line,
 the tag will be associated with your email address.
 
@@ -381,7 +384,7 @@ will be assigned proper numbers).
 NB you cannot clone a merged bug.  You'd think that trying to do so
 would just give you an unmerged copy of the specified bug number, but no:
 
-http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=474742
+https://bugs.debian.org/474742
 
 You must unmerge, clone, then re-merge.
 

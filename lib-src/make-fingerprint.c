@@ -1,7 +1,7 @@
 /* Hash inputs and generate C file with the digest.
 
-Copyright (C) 1985-1986, 1992-1994, 1997, 1999-2016, 2018-2019
-Free Software Foundation, Inc.
+Copyright (C) 1985-1986, 1992-1994, 1997, 1999-2016, 2018-2022 Free
+Software Foundation, Inc.
 
 This file is part of GNU Emacs.
 
@@ -16,12 +16,15 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
+along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 
-/* The arguments given to this program are all the object files that
- go into building GNU Emacs.  There is no special search logic to find
- the files.  */
+/* The argument given to this program is the initial version of the
+ temacs executable file used when building GNU Emacs.  This program computes
+ a digest fingerprint for the executable, and modifies the binary in
+ place, replacing all instances of the existing fingerprint (normally
+ the default fingerprint from libgnu's lib/fingerprint.c) with the
+ new value.  With option -r, it just prints the digest.   */
 
 #include <config.h>
 
@@ -144,7 +147,8 @@ main (int argc, char **argv)
 
       for (char *finger = buf;
 	   (finger = memmem (finger, buf + chunksz - finger,
-			     fingerprint, sizeof fingerprint));
+			     (unsigned char *) fingerprint,
+			     sizeof fingerprint));
 	   finger++)
 	{
 	  if (! (fseeko (f, finger - buf, SEEK_SET) == 0
