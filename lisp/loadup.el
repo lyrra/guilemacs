@@ -146,13 +146,6 @@
 (load "env")
 (load "format")
 (load "bindings")
-(load "window")  ; Needed here for `replace-buffer-in-windows'.
-;; We are now capable of resizing the mini-windows, so give the
-;; variable its advertised default value (it starts as nil, see
-;; xdisp.c).
-(setq resize-mini-windows 'grow-only)
-(setq load-source-file-function #'load-with-code-conversion)
-(load "files")
 
 ;; Load-time macro-expansion can only take effect after setting
 ;; load-source-file-function because of where it is called in lread.c.
@@ -174,7 +167,7 @@
 ;; variable its advertised default value (it starts as nil, see
 ;; xdisp.c).
 (setq resize-mini-windows 'grow-only)
-(setq load-source-file-function #'load-with-shorthands-and-code-conversion)
+(setq load-source-file-function #'load-with-code-conversion)
 (load "files")
 
 
