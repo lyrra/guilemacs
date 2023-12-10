@@ -36,11 +36,11 @@ jobs:
         ../ci/build/ci/linux/setup.sh
     - name: Build
       run: |
-        cd main
+        cd m
         ../ci/build/ci/linux/build.sh
     - name: Package
       run: |
-        cd main
+        cd m
         ../ci/build/ci/linux/package.sh
     - name: Artifact
       uses: actions/upload-artifact@v3
