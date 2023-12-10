@@ -18,25 +18,30 @@ jobs:
       uses: styfle/cancel-workflow-action@0.11.0
       with:
         access_token: ${{ github.token }}
-    - name: Clone repo main
+    - name: Clone repo ci
       uses: actions/checkout@v4
       with:
         ref: ci
         path: ci
+    - name: Clone repo main
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        path: m
     - name: Setup
       run: |
         ls -ltr
-        cd ci
+        cd m
         ls -ltr
-        ./build/ci/linux/setup.sh
+        ../ci/build/ci/linux/setup.sh
     - name: Build
       run: |
-        cd ci
-        ./build/ci/linux/build.sh
+        cd main
+        ../ci/build/ci/linux/build.sh
     - name: Package
       run: |
-        cd ci
-        ./build/ci/linux/package.sh
+        cd main
+        ../ci/build/ci/linux/package.sh
     - name: Artifact
       uses: actions/upload-artifact@v3
       with:
