@@ -1,0 +1,84 @@
+name: build_Linux
+
+on:
+  schedule:
+    - cron: '0 4 */7 * *'
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: 'Build mode: devel_build, stable_build'
+        required: true
+        default: 'devel_build'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Cancel Previous Runs
+      uses: styfle/cancel-workflow-action@0.11.0
+      with:
+        access_token: ${{ github.token }}
+    - name: Clone repo main
+      uses: actions/checkout@v4
+      with:
+        ref: ci
+        path: ci
+    - name: Setup
+      run: |
+        ls -ltr
+        cd ci
+        ls -ltr
+        ./build/ci/linux/setup.sh
+    - name: Build
+      run: |
+        cd ci
+        ./build/ci/linux/build.sh
+    - name: Package
+      run: |
+        cd ci
+        ./build/ci/linux/package.sh
+    - name: Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: linux-guilemacs
+        path: ci/guilemacs.tar.xz
+    - name: version
+      run: echo "::set-output name=version::$(date +%Y%m%d)"
+      id: version
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: release-linux-${{ steps.version.outputs.version }}
+        release_name: linux-${{ steps.version.outputs.version }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Asset
+      id: upload-release-asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }} # This pulls from the CREATE RELEASE step above, referencing it's ID to get its outputs object, which include a `upload_url`. See this blog post for more info: https://jasonet.co/posts/new-features-of-github-actions/#passing-data-to-future-steps
+        asset_path: ./ci/guilemacs.tar.xz
+        asset_name: guilemacs.tar.xz
+        asset_content_type: application/zip
+  upload-weekly:
+    permissions:
+      contents: write
+    needs:
+      - build
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: linux-guilemacs
+      - name: Upload guilemacs release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          gh release upload weekly-linux guilemacs* --clobber -R ${{ github.repository }}
