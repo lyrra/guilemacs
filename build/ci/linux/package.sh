@@ -2,8 +2,7 @@
 
 set -e
 
-cd ..
-pwd
+ls -ltr 
 
 I=/usr/local
 

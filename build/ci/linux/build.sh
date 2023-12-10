@@ -2,8 +2,6 @@
 
 set -e
 
-cd ..
-pwd
 ls -ltr
 
 #export GUILE_SYSTEM_COMPILED_PATH=/usr/lib/x86_64-linux-gnu/guile/3.0/ccache
