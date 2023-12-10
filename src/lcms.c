@@ -589,15 +589,6 @@ DEFUN ("lcms2-available-p", Flcms2_available_p, Slcms2_available_p, 0, 0, 0,
 void
 syms_of_lcms2 (void)
 {
-  defsubr (&Slcms_cie_de2000);
-  defsubr (&Slcms_xyz_to_jch);
-  defsubr (&Slcms_jch_to_xyz);
-  defsubr (&Slcms_jch_to_jab);
-  defsubr (&Slcms_jab_to_jch);
-  defsubr (&Slcms_cam02_ucs);
-  defsubr (&Slcms2_available_p);
-  defsubr (&Slcms_temp_to_white_point);
-
   Fprovide (intern_c_string ("lcms2"), Qnil);
 }
 
