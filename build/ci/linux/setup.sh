@@ -22,6 +22,8 @@ apt_packages_standard=(
   libgl1-mesa-dev
   libnss3-dev
   libzmq3-dev
+  libgnutls28-dev
+  libgif-dev
   guile-3.0
   guile-3.0-dev
   guile-3.0-libs
