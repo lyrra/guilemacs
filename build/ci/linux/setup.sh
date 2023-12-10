@@ -31,6 +31,7 @@ apt_packages_standard=(
   make
   gcc
   wget
+  xaw3dg-dev
   )
 
 apt_packages_runtime=(
@@ -69,7 +70,6 @@ echo "-------- GUILE_SYSTEM_COMPILED_PATH=$GUILE_SYSTEM_COMPILED_PATH ----------
 
 apt-get clean autoclean
 apt-get autoremove --purge -y
-rm -rf /tmp/* /var/{cache,log,backups}/* /var/lib/apt/*
 
 df -h .
 echo "Setup script done"
