@@ -3,6 +3,7 @@
 set -e
 
 cd ..
+pwd
 
 I=/usr/local
 
