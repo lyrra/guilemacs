@@ -10,7 +10,8 @@ echo "Build Linux Guilemacs"
 
 ./autogen.sh
 
-./configure --prefix=$instdir --enable-internal-debug --without-modules --without-thread s --without-xft --with-gif=no --with-tiff=no --with-jpeg=no --with-gnutls=no --with-jpeg=no --without-lcms2 --without-cairo
+./configure --prefix=$instdir --enable-internal-debug --without-modules --without-threads
+#--without-xft --with-gif=no --with-tiff=no --with-jpeg=no --with-gnutls=no --with-jpeg=no --without-lcms2 --without-cairo
 
 make V=1
 
