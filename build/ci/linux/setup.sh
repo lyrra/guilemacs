@@ -24,17 +24,18 @@ apt_packages_standard=(
   libzmq3-dev
   libgnutls28-dev
   libgif-dev
-  guile-3.0
-  guile-3.0-dev
-  guile-3.0-libs
-  guile-bytestructures
-  guile-json
-  guile-sqlite3
   make
   gcc
   wget
   xaw3dg-dev
   )
+# Cant use distributions guile, since it isn't adapted for elisp
+#  guile-3.0
+#  guile-3.0-dev
+#  guile-3.0-libs
+#  guile-bytestructures
+#  guile-json
+#  guile-sqlite3
 
 apt_packages_runtime=(
   # Alphabetical order please!
@@ -59,16 +60,23 @@ sudo apt-get install -y --no-install-recommends \
   "${apt_packages_standard[@]}" \
   "${apt_packages_runtime[@]}"
 
+# install guile-elisp
+
+# FIX: get latest release using API: https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#list-releases
+
+wget https://github.com/lyrra/guile/releases/download/release-elisp-20240101-1658/linux-x86_64-guile3-elisp.tar.xz
+
+tar xvf linux-x86_64-guile3-elisp.tar.xz
+
+ls -ltr
+
+export PATH=`pwd`/libguile/.libs:$PATH
+
 echo "---------- whereis guile 3.0 ------------"
-ls -ltr /usr/bin/guile || true
-ls -ltr /usr/bin/guile-3.0 || true
 command -v guile || true
-echo "------------ dir /usr/lib/x86_64-linux-gnu/guile  ---------------------"
-find /usr/lib/x86_64-linux-gnu/guile || true
 echo "-------- %library-dir / SCM_LIBRARY_DIR ------------------------------"
 guile -c '(begin (display (%library-dir)) (newline))'
 echo "------------------------------------------------------"
-echo "-------- GUILE_SYSTEM_COMPILED_PATH=$GUILE_SYSTEM_COMPILED_PATH ------------------------------"
 
 apt-get clean autoclean
 apt-get autoremove --purge -y
