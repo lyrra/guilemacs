@@ -35,7 +35,6 @@
 @ifclear x
 \one\@w{}\two\@c
 @end ifclear
-@clear x\one\
 @end macro
 
 @macro trampfn {method, user, host, localname}
