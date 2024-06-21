@@ -201,6 +201,9 @@ usage: (funcall-interactively FUNCTION &rest ARGUMENTS)  */)
   return tem;
 }
 
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 DEFUN ("call-interactively", Fcall_interactively, Scall_interactively, 1, 3, 0,
        doc: /* Call FUNCTION, providing args according to its interactive calling specs.
 Return the value FUNCTION returns.
