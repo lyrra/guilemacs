@@ -41,6 +41,9 @@ Branch information
 
   Based on emacs version 24.4.50.
 
+  - Added later patches from Robin.
+  - Added patches to work against the rebased work of guile-elisp to guile3
+
 * master
 
   Tracks vanilla-emacs
