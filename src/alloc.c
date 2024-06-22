@@ -60,18 +60,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <verify.h>
 #include <execinfo.h>           /* For backtrace.  */
 
-#ifdef HAVE_LINUX_SYSINFO
-#include <sys/sysinfo.h>
-#endif
-
-#ifdef MSDOS
-#include "dosfns.h"		/* For dos_memory_info.  */
-#endif
-
-#ifdef HAVE_MALLOC_H
-# include <malloc.h>
-#endif
-
 #if (defined ENABLE_CHECKING \
      && defined HAVE_VALGRIND_VALGRIND_H && !defined USE_VALGRIND)
 # define USE_VALGRIND 1
