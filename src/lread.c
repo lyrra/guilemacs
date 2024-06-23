@@ -4899,18 +4899,14 @@ check_obarray_slow (Lisp_Object obarray)
   wrong_type_argument (Qobarrayp, obarray);
 }
 
-static void grow_obarray (struct Lisp_Obarray *o);
-
-/* Intern symbol SYM in OBARRAY using bucket INDEX.  */
+/* Intern a symbol with name STRING in OBARRAY.  */
 
 /* FIXME: retype arguments as pure C types */
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray)
 {
-  return Fintern (make_string (str, len), Qnil);
+  return Fintern (sym, Qnil);
 }
-
-/* Intern a symbol with name STRING in OBARRAY using bucket INDEX.  */
 
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray)
@@ -4926,32 +4922,21 @@ Lisp_Object
 intern_1 (const char *str, ptrdiff_t len)
 {
   Lisp_Object obarray = check_obarray (Vobarray);
+	/* The above `oblookup' was done on the basis of nchars==nbytes, so
+	   the string has to be unibyte.  */
 
-  return (BARE_SYMBOL_P (tem) ? tem
-	  /* The above `oblookup' was done on the basis of nchars==nbytes, so
-	     the string has to be unibyte.  */
-	  : intern_driver (make_unibyte_string (str, len),
-			   obarray));
+  return intern_driver (make_unibyte_string (str, len), obarray);
 }
 
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
   Lisp_Object obarray = check_obarray (Vobarray);
-  Lisp_Object tem = oblookup (obarray, str, len, len);
 
-  if (!BARE_SYMBOL_P (tem))
-    {
-      Lisp_Object string;
-
-      if (NILP (Vpurify_flag))
-	string = make_string (str, len);
-      else
-	string = make_pure_c_string (str, len);
-
-      tem = intern_driver (string, obarray);
-    }
-  return tem;
+  /* Creating a non-pure string from a string literal not implemented yet.
+     We could just use make_string here and live with the extra copy.  */
+  eassert (!NILP (Vpurify_flag));
+  return intern_driver (make_pure_c_string (str, len), obarray);
 }
 
 /* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
