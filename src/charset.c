@@ -478,7 +478,6 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   unsigned max_code = CHARSET_MAX_CODE (charset);
   int fd;
   FILE *fp = NULL;
-  Lisp_Object suffixes;
   struct charset_map_entries *head, *entries;
   int n_entries;
   AUTO_STRING (map, ".map");
