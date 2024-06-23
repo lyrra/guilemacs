@@ -5449,33 +5449,6 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
    While debugging you may want to disable allocation on the C stack.
    Build with CPPFLAGS='-DUSE_STACK_LISP_OBJECTS=0' to disable it.  */
 
-#if (!defined USE_STACK_LISP_OBJECTS \
-     && defined __GNUC__ && !defined __clang__ && ! GNUC_PREREQ (4, 3, 2))
-  /* Work around GCC bugs 36584 and 35271, which were fixed in GCC 4.3.2.  */
-# define USE_STACK_LISP_OBJECTS false
-#endif
-#ifndef USE_STACK_LISP_OBJECTS
-# define USE_STACK_LISP_OBJECTS true
-#endif
-
-#ifdef GC_CHECK_STRING_BYTES
-enum { defined_GC_CHECK_STRING_BYTES = true };
-#else
-enum { defined_GC_CHECK_STRING_BYTES = false };
-#endif
-
-/* True for stack-based cons and string implementations, respectively.
-   Use stack-based strings only if stack-based cons also works.
-   Otherwise, STACK_CONS would create heap-based cons cells that
-   could point to stack-based strings, which is a no-no.  */
-
-enum
-  {
-    USE_STACK_CONS = USE_STACK_LISP_OBJECTS,
-    USE_STACK_STRING = (USE_STACK_CONS
-			&& !defined_GC_CHECK_STRING_BYTES)
-  };
-
 /* Auxiliary macros used for auto allocation of Lisp objects.  Please
    use these only in macros like AUTO_CONS that declare a local
    variable whose lifetime will be clear to the programmer.  */
@@ -5491,21 +5464,20 @@ enum
 
 #define AUTO_CONS(name, a, b) Lisp_Object name = AUTO_CONS_EXPR (a, b)
 #define AUTO_LIST1(name, a)						\
-  Lisp_Object name = (USE_STACK_CONS ? STACK_CONS (a, Qnil) : list1 (a))
+  Lisp_Object name = list1 (a)
 #define AUTO_LIST2(name, a, b)						\
-  Lisp_Object name = (USE_STACK_CONS					\
-		      ? STACK_CONS (a, STACK_CONS (b, Qnil))		\
-		      : list2 (a, b))
+  Lisp_Object name = list2 (a, b)
 #define AUTO_LIST3(name, a, b, c)					\
-  Lisp_Object name = (USE_STACK_CONS					\
-		      ? STACK_CONS (a, STACK_CONS (b, STACK_CONS (c, Qnil))) \
-		      : list3 (a, b, c))
+  Lisp_Object name = list3 (a, b, c)
 #define AUTO_LIST4(name, a, b, c, d)					\
     Lisp_Object name							\
-      = (USE_STACK_CONS							\
-	 ? STACK_CONS (a, STACK_CONS (b, STACK_CONS (c,			\
-						     STACK_CONS (d, Qnil)))) \
-	 : list4 (a, b, c, d))
+      = list4 (a, b, c, d)
+
+#define scoped_cons(a, b) Fcons (a, b)
+#define scoped_list1(a) list1 (a)
+#define scoped_list2(a, b) list2 (a,b)
+#define scoped_list3(a, b, c) list3 (a, b, c)
+#define scoped_list4(a, b, c, d) list4 (a, b, c, d)
 
 /* Declare NAME as an auto Lisp string if possible, a GC-based one if not.
    Take its unibyte value from the null-terminated string STR,
