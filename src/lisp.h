@@ -5438,9 +5438,9 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
    use these only in macros like AUTO_CONS that declare a local
    variable whose lifetime will be clear to the programmer.  */
 #define STACK_CONS(a, b) \
-  make_lisp_ptr (&((struct Lisp_Cons) {{{a, {b}}}}), Lisp_Cons)
+  Fcons(a, b)
 #define AUTO_CONS_EXPR(a, b) \
-  (USE_STACK_CONS ? STACK_CONS (a, b) : Fcons (a, b))
+  Fcons (a, b)
 
 /* Declare NAME as an auto Lisp cons or short list if possible, a
    GC-based one otherwise.  This is in the sense of the C keyword
