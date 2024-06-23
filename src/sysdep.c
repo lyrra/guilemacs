@@ -1808,19 +1808,6 @@ init_sigbus (void)
 
 #if defined HAVE_STACK_OVERFLOW_HANDLING && !defined WINDOWSNT
 
-/* Alternate stack used by SIGSEGV handler below.  */
-
-/* Storage for the alternate signal stack.
-   64 KiB is not too large for Emacs, and is large enough
-   for all known platforms.  Smaller sizes may run into trouble.
-   For example, libsigsegv 2.6 through 2.8 have a bug where some
-   architectures use more than the Linux default of an 8 KiB alternate
-   stack when deciding if a fault was caused by stack overflow.  */
-static max_align_t sigsegv_stack[(64 * 1024
-				  + sizeof (max_align_t) - 1)
-				 / sizeof (max_align_t)];
-
-
 /* Return true if SIGINFO indicates a stack overflow.  */
 
 static bool
@@ -1878,9 +1865,7 @@ static struct sigaction old_sigsegv_handler;
 static void
 handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
 {
-  /* Hard GC error may lead to stack overflow caused by
-     too nested calls to mark_object.  No way to survive.  */
-  bool fatal = gc_in_progress;
+  bool fatal = false;
 
 #ifdef FORWARD_SIGNAL_TO_MAIN_THREAD
   if (!fatal && !pthread_equal (pthread_self (), main_thread_id))
@@ -1912,8 +1897,8 @@ init_sigsegv (void)
   struct sigaction sa;
   stack_t ss;
 
-  ss.ss_sp = sigsegv_stack;
-  ss.ss_size = sizeof (sigsegv_stack);
+  //ss.ss_sp = sigsegv_stack;
+  //ss.ss_size = sizeof (sigsegv_stack);
   ss.ss_flags = 0;
   if (sigaltstack (&ss, NULL) < 0)
     return 0;
