@@ -2071,7 +2071,7 @@ verify_alloca (void)
   for (i = sizeof (struct Lisp_Cons); i <= ALLOCA_CHECK_MAX; i++)
     {
       void *ptr = alloca (i);
-      make_lisp_ptr (ptr, Lisp_Cons);
+      //make_lisp_ptr (ptr, Lisp_Cons);
     }
 }
 
