@@ -12974,8 +12974,6 @@ syms_of_keyboard (void)
   DEFSYM (Qbefore_handle, "before-handle");
   DEFSYM (Qhorizontal_handle, "horizontal-handle");
   DEFSYM (Qafter_handle, "after-handle");
-  DEFSYM (Qleft, "left");
-  DEFSYM (Qright, "right");
   DEFSYM (Qleftmost, "leftmost");
   DEFSYM (Qrightmost, "rightmost");
 
