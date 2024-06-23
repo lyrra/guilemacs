@@ -5376,7 +5376,7 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 #define USE_SAFE_ALLOCA ((void) 0)
 
-#define AVAIL_ALLOCA(size) (sa_avail -= (size), alloca (size))
+#define AVAIL_ALLOCA(size) alloca (size)
 
 /* SAFE_ALLOCA allocates a simple buffer.  */
 
@@ -5390,7 +5390,7 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 #define SAFE_NALLOCA(buf, multiplier, nitems)			 \
   do {								 \
-    if ((nitems) <= sa_avail / sizeof *(buf) / (multiplier))	 \
+    if ((nitems) <= MAX_ALLOCA / sizeof *(buf) / (multiplier))	 \
       (buf) = AVAIL_ALLOCA (sizeof *(buf) * (multiplier) * (nitems)); \
     else							 \
       (buf) = xnmalloc (nitems, sizeof *(buf) * (multiplier));   \
@@ -5416,22 +5416,7 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
    immediately followed by EXTRA spare bytes.  */
 
 #define SAFE_ALLOCA_LISP_EXTRA(buf, nelt, extra)	       \
-  do {							       \
-    ptrdiff_t alloca_nbytes;				       \
-    if (ckd_mul (&alloca_nbytes, nelt, word_size)	       \
-	|| ckd_add (&alloca_nbytes, alloca_nbytes, extra)      \
-	|| SIZE_MAX < alloca_nbytes)			       \
-      memory_full (SIZE_MAX);				       \
-    else if (alloca_nbytes <= sa_avail)			       \
-      (buf) = AVAIL_ALLOCA (alloca_nbytes);		       \
-    else						       \
-      {							       \
-	/* Although only the first nelt words need clearing,   \
-	   typically EXTRA is 0 or small so just use xzalloc;  \
-	   this is simpler and often faster.  */	       \
-	(buf) = xzalloc (alloca_nbytes);		       \
-      }							       \
-  } while (false)
+  buf = xzalloc ((nelt) * word_size + extra);
 
 /* Set BUF to point to an allocated array of NELT Lisp_Objects.  */
 
