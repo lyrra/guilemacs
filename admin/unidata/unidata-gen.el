@@ -349,7 +349,7 @@ a closing paired bracket."
       unidata-gen-bracket-type-list unidata-gen-table-symbol
       "Unicode bidi paired-bracket type.
 Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
-      unidata-describe-bidi-bracket-type
+      nil ; FIX guilemacs: unidata-describe-bidi-bracket-type
       n
       ;; The order of elements must be in sync with bidi_bracket_type_t
       ;; in src/dispextern.h.
