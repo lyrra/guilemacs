@@ -36,10 +36,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 
 #define WRAP1(cfn, lfn) \
-  SCM_SNARF_INIT (DEFSYM (cfn ## _sym, lfn)) \
-  static Lisp_Object cfn ## _sym; \
   Lisp_Object cfn (Lisp_Object a) \
   { return call1 (cfn ## _sym, a); }
+
 #define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
 
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
@@ -750,19 +749,7 @@ global value outside of any lexical scope.  */)
   return (BASE_EQ (valcontents, Qunbound) ? Qnil : Qt);
 }
 
-DEFUN ("symbol-function", Fsymbol_function, Ssymbol_function, 1, 1, 0,
-       doc: /* */)
-  (Lisp_Object a)
-{
-  return call1 (Qsymbol_function, a);
-}
-
-#define WRAP1(cfn, lfn) \
-  SCM_SNARF_INIT (DEFSYM (cfn ## _sym, lfn)) \
-  static Lisp_Object cfn ## _sym; \
-  Lisp_Object cfn (Lisp_Object a) \
-  { return call1 (cfn ## _sym, a); }
-
+WRAP1 (Fsymbol_function, "symbol-function")
 /* It has been previously suggested to make this function an alias for
    symbol-function, but upon discussion at Bug#23957, there is a risk
    breaking backward compatibility, as some users of fboundp may
@@ -3921,19 +3908,22 @@ DEFUN ("bind-symbol", Fbind_symbol, Sbind_symbol, 3, 3, 0,
 }
 
 
-void foobar() {
-}
-
 void
 syms_of_data (void)
 {
   Lisp_Object error_tail, arith_tail, recursion_tail;
 
+  /* wrapper functions that uses the guile version */
+  DEFSYM(Fsymbol_function_sym, "symbol-function");
+  DEFSYM(Ffboundp_sym, "fboundp")
+  DEFSYM(Fmakunbound_sym, "makunbound")
+  DEFSYM(Ffmakunbound_sym, "fmakunbound")
+  DEFSYM(Ffset_sym, "fset")
+
   /* Used by defsubr.  */
   DEFSYM (Qspecial_operator, "special-operator");
   DEFSYM (Qinteractive_form, "interactive-form");
 
-  DEFSYM(Qsymbol_function, "symbol-function");
 #include "data.x"
 
   DEFSYM (Qquote, "quote");
