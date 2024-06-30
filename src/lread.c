@@ -4865,13 +4865,12 @@ static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray)
 {
   return Fintern (sym, obarray);
-  //return sym;
 }
 
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray)
 {
-  return intern_sym (Fmake_symbol (string), obarray);
+  return Fintern (string, obarray);
 }
 
 #if 0
