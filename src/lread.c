@@ -5005,7 +5005,6 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
         tem = Qnil;
       else if (EQ (tem, Qt_))
         tem = Qt;
-      printf("found previous value: %lx true/false: %lx %lx  (%lx, %lx)\n", tem, Qt, Qnil, Qt_, Qnil_);
       return scm_values (scm_list_2 (tem, Qt));
     }
   else
@@ -5027,9 +5026,6 @@ it defaults to the value of `obarray'.  */)
 
   tem = Ffind_symbol (string, obarray);
   if (! NILP (scm_c_value_ref (tem, 1))) {
-    printf("note: found previous symbol: %lx => %lx\n",
-           scm_c_value_ref (tem, 1),
-           scm_c_value_ref (tem, 0));
     return scm_c_value_ref (tem, 0);
   }
 
