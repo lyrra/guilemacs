@@ -1293,22 +1293,19 @@ dead_object (void)
 INLINE void *
 XFIXNUMPTR (Lisp_Object a)
 {
-  return XUNTAG (a, Lisp_Int0, char);
+  return XINT (a);
 }
 
 INLINE Lisp_Object
 make_pointer_integer_unsafe (void *p)
 {
-  Lisp_Object a = TAG_PTR_INITIALLY (Lisp_Int0, p);
-  return a;
+  return make_fixnum (p);
 }
 
 INLINE Lisp_Object
 make_pointer_integer (void *p)
 {
-  Lisp_Object a = make_pointer_integer_unsafe (p);
-  eassert (FIXNUMP (a) && XFIXNUMPTR (a) == p);
-  return a;
+  return make_fixnum (p);
 }
 
 /* See the macros in intervals.h.  */
