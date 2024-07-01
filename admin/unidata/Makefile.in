@@ -48,10 +48,10 @@ all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
   ${unidir}/uni-scripts.el ${unidir}/uni-confusable.el \
   ${unidir}/idna-mapping.el
 
-${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
-	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
-	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
-	  > $@
+#${top_srcdir}/src/macuvs.h: ${srcdir}/uvs.el ${srcdir}/IVD_Sequences.txt | \
+#	$(AM_V_GEN)${emacs} -L ${srcdir} -l uvs \
+#	  --eval '(uvs-print-table-ivd (unmsys--file-name "${srcdir}/IVD_Sequences.txt") "Adobe-Japan1")' \
+#	  > $@
 
 unidata.txt: ${srcdir}/UnicodeData.txt
 	$(AM_V_GEN)sed -e 's/\([^;]*\);\(.*\)/(#x\1 "\2")/' -e 's/;/" "/g' \
