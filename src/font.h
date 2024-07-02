@@ -1031,4 +1031,6 @@ font_data_structures_may_be_ill_formed (void)
 
 INLINE_HEADER_END
 
+Lisp_Object Fcopy_alist (Lisp_Object);
+
 #endif	/* not EMACS_FONT_H */

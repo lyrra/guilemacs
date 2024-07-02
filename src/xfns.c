@@ -160,6 +160,7 @@ typedef struct {
 #endif /* NOT USE_GTK */
 #endif /* NOT USE_MOTIF */
 
+Lisp_Object Fcopy_alist (Lisp_Object); // FIX: cltq-inst bugfix (default int vs 64bit)
 static struct x_display_info *x_display_info_for_name (Lisp_Object);
 static void set_up_x_back_buffer (struct frame *f);
 
