@@ -48,13 +48,11 @@ grammar_bovine = ${bovinedir}/grammar.el
 grammar_wisent = ${wisentdir}/grammar.el
 
 BOVINE = \
-	${bovinedir}/c-by.el \
 	${bovinedir}/make-by.el \
 	${bovinedir}/scm-by.el
 
 WISENT = 				   \
 	${cedetdir}/semantic/grammar-wy.el \
-	${wisentdir}/javat-wy.el 	   \
 	${wisentdir}/js-wy.el 		   \
 	${wisentdir}/python-wy.el 	   \
 	${cedetdir}/srecode/srt-wy.el
@@ -85,10 +83,6 @@ ${cedetdir}/semantic/%-wy.el: ${srcdir}/%.wy ${grammar_wisent}
 
 ## js-wy.el, python-wy.el
 ${wisentdir}/%-wy.el: ${srcdir}/%.wy ${grammar_wisent}
-	$(AM_V_GEN)[ ! -f "$@" ] || chmod +w "$@"
-	$(AM_V_at)${make_wisent} -o "$@" $<
-
-${wisentdir}/javat-wy.el: ${srcdir}/java-tags.wy ${grammar_wisent}
 	$(AM_V_GEN)[ ! -f "$@" ] || chmod +w "$@"
 	$(AM_V_at)${make_wisent} -o "$@" $<
 
