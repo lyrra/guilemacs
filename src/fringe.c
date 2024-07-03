@@ -1798,9 +1798,12 @@ init_fringe_once_for_pdumper (void)
 void
 init_fringe (void)
 {
+  int i;
+
   max_fringe_bitmaps = MAX_STANDARD_FRINGE_BITMAPS + 20;
 
   fringe_bitmaps = xzalloc (max_fringe_bitmaps * sizeof *fringe_bitmaps);
+  fringe_faces = xmalloc (max_fringe_bitmaps * sizeof *fringe_faces);
 
   static_assert (NIL_IS_ZERO);
   fringe_faces = xzalloc (max_fringe_bitmaps * sizeof *fringe_faces);

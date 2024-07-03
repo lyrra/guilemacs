@@ -3413,7 +3413,7 @@ Return (nil nil nil nil) if the file is nonexistent,
 or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
   (Lisp_Object filename)
 {
-  Lisp_Object user = Qnil, role = Qnil, type = Qnil, range = Qnil;
+  Lisp_Object values[4];
   Lisp_Object absname = expand_and_dir_to_file (filename);
 #ifdef HAVE_LIBSELINUX
   const char *file;
@@ -3426,6 +3426,11 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
   if (!NILP (handler))
     return call2 (handler, Qfile_selinux_context, absname);
 
+  values[0] = Qnil;
+  values[1] = Qnil;
+  values[2] = Qnil;
+  values[3] = Qnil;
+
 #ifdef HAVE_LIBSELINUX
   file = SSDATA (ENCODE_FILE (absname));
 
@@ -3437,13 +3442,13 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
 	{
 	  context_t context = context_new (con);
 	  if (context_user_get (context))
-	    user = build_string (context_user_get (context));
+	    values[0] = build_string (context_user_get (context));
 	  if (context_role_get (context))
-	    role = build_string (context_role_get (context));
+	    values[1] = build_string (context_role_get (context));
 	  if (context_type_get (context))
-	    type = build_string (context_type_get (context));
+	    values[2] = build_string (context_type_get (context));
 	  if (context_range_get (context))
-	    range = build_string (context_range_get (context));
+	    values[3] = build_string (context_range_get (context));
 	  context_free (context);
 	  freecon (con);
 	}
@@ -3453,7 +3458,7 @@ or if SELinux is disabled, or if Emacs lacks SELinux support.  */)
     }
 #endif /* HAVE_LIBSELINUX */
 
-  return list4 (user, role, type, range);
+  return Flist (ARRAYELTS (values), values);
 }
 
 DEFUN ("set-file-selinux-context", Fset_file_selinux_context,

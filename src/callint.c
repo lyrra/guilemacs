@@ -621,7 +621,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 				   argument if no prefix.  */
 	  if (NILP (prefix_arg))
 	    {
-	      /* args[i] = Qnil; */
+	      args[i] = Qnil;
 	      varies[i] = -1;
 	    }
 	  else

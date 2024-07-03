@@ -1049,14 +1049,15 @@ font_expand_wildcards (Lisp_Object *field, int n)
 	  if (i == 0 || ! NILP (tmp[i - 1]))
 	    /* None of TMP[X] corresponds to Jth field.  */
 	    return -1;
-	  memclear (field + j, (range[i].from - j) * word_size);
-	  j = range[i].from;
+	  for (; j < range[i].from; j++)
+	    field[j] = Qnil;
 	}
       field[j++] = tmp[i];
     }
   if (! NILP (tmp[n - 1]) && j < XLFD_REGISTRY_INDEX)
     return -1;
-  memclear (field + j, (XLFD_LAST_INDEX - j) * word_size);
+  for (; j < XLFD_LAST_INDEX; j++)
+    field[j] = Qnil;
   if (FIXNUMP (field[XLFD_ENCODING_INDEX]))
     field[XLFD_ENCODING_INDEX]
       = Fintern (Fnumber_to_string (field[XLFD_ENCODING_INDEX]), Qnil);
