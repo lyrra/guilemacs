@@ -3184,7 +3184,7 @@ To see the documentation for a defined struct type, use
                ;; predicates to be defined as they are registered in
                ;; cl-deftype-satisfies.
                (,defsym ,predicate (cl-x)
-               (declare (side-effect-free error-free) (pure t))
+               ;(declare (side-effect-free error-free) (pure t))
                ,(if (eq (car pred-form) 'and)
                     (append pred-form '(t))
                   `(and ,pred-form t)))
@@ -3244,7 +3244,7 @@ To see the documentation for a defined struct type, use
                                  "Struct CL-X is a `%s'." name))
                              (internal--format-docstring-line long-docstring))
                            (if doc (concat "\n" doc) "")))
-                       (declare (side-effect-free t))
+                       ;(declare (side-effect-free t))
                        ,access-body)
                     forms)
               (when (cl-oddp (length desc))
@@ -3329,8 +3329,8 @@ To see the documentation for a defined struct type, use
                     ;; warnings.
                     (internal--format-docstring-line
                      "Constructor for objects of type `%s'." name))
-                 ,@(if (cl--safe-expr-p `(progn ,@(mapcar #'cl-second descs)))
-                       '((declare (side-effect-free t))))
+                 ;,@(if (cl--safe-expr-p `(progn ,@(mapcar #'cl-second descs)))
+                 ;      '((declare (side-effect-free t))))
                  (,con-fun ,@make))
               forms)))
     (if print-auto (nconc print-func (list '(princ ")" cl-s) t)))
