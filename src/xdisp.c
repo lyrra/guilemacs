@@ -21162,6 +21162,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	TEMP_SET_PT_BOTH (CHARPOS (lpoint), CHAR_TO_BYTE (CHARPOS (lpoint)));
     }
 
+  dynwind_end();
 }
 
 
