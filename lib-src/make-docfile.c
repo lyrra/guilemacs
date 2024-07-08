@@ -672,8 +672,8 @@ write_globals (void)
 {
   ptrdiff_t i, j;
   bool seen_defun = false;
-  ptrdiff_t symnum = 0;
-  ptrdiff_t num_symbols = 0;
+  ptrdiff_t symnum = 1;
+  ptrdiff_t num_symbols = 1;
   qsort (globals, num_globals, sizeof (struct global), compare_globals);
 
   j = 0;
@@ -693,6 +693,7 @@ write_globals (void)
       globals[j++] = globals[i];
     }
   num_globals = j;
+
 
   for (i = 0; i < num_globals; ++i)
     {
@@ -729,9 +730,10 @@ write_globals (void)
 		  globals[i].name, globals[i].name);
 	}
       else if (globals[i].type == SYMBOL)
-	printf (("#define i%s %td\n"
-		 "DEFINE_LISP_SYMBOL (%s)\n"),
-		globals[i].name, symnum++, globals[i].name);
+       printf (("#define i%s %td\n"
+                "#define %s builtin_lisp_symbol (i%s)\n"),
+                  globals[i].name, symnum++,
+                  globals[i].name, globals[i].name);
       else
 	{
 	  if (globals[i].flags & DEFUN_noreturn)
@@ -760,8 +762,12 @@ write_globals (void)
   if (!seen_defun)
     close_emacs_globals (num_symbols);
 
+  printf (("#define iQnil 0\n"
+           "DEFINE_LISP_SYMBOL (Qnil)\n"));
+
   puts ("#ifdef DEFINE_SYMBOLS");
   puts ("static char const *const defsym_name[] = {");
+  printf ("\t\"nil\",\n");
   for (ptrdiff_t i = 0; i < num_globals; i++)
     if (globals[i].type == SYMBOL)
       printf ("\t\"%s\",\n", globals[i].v.svalue);
@@ -774,7 +780,7 @@ write_globals (void)
   for (ptrdiff_t i = 0; i < num_globals; i++)
     if (globals[i].type == SYMBOL && num_symbols++ != 0)
       printf ("# define %s builtin_lisp_symbol (%td)\n",
-	      globals[i].name, num_symbols - 1);
+             globals[i].name, num_symbols - 1);
   puts ("#endif");
 }
 
