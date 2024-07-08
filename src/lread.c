@@ -5189,7 +5189,6 @@ init_obarray_once (void)
     lispsym[i].self_ = intern_initial_c_string (defsym_name[i], strlen(defsym_name[i]));
 
   DEFSYM (Qunbound, "unbound");
-  DEFSYM (Qnil, "nil");
   //SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);
   //make_symbol_constant (Qnil);
   DEFSYM (Qt, "t");

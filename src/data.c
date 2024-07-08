@@ -4093,10 +4093,6 @@ syms_of_data (void)
   PUT_ERROR (Qexcessive_variable_binding, recursion_tail,
 	     "Variable binding depth exceeds max-specpdl-size");
 
-  DEFSYM (Qnil, "nil");
-  DEFSYM (Qt, "t");
-  DEFSYM (Qunbound, "unbound");
-
   /* Types that type-of returns.  */
   DEFSYM (Qboolean, "boolean");
   DEFSYM (Qinteger, "integer");
