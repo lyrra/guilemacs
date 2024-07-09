@@ -54,7 +54,7 @@ INLINE_HEADER_BEGIN
    definitions or enums visible to the debugger.  It's used for symbols
    that .gdbinit needs.  */
 
-#define DECLARE_GDB_SYM(type, id) type const id EXTERNALLY_VISIBLE
+#define DECLARE_GDB_SYM(type, id) type id EXTERNALLY_VISIBLE
 #ifdef MAIN_PROGRAM
 # define DEFINE_GDB_SYMBOL_BEGIN(type, id) \
    extern DECLARE_GDB_SYM (type, id); DECLARE_GDB_SYM (type, id)
@@ -467,6 +467,7 @@ enum Lisp_Fwd_Type
 
 /* A Lisp_Object is a Guile opaque word that has an boxed or immediate value */
 typedef SCM Lisp_Object;
+typedef Lisp_Object sym_t;
 
 
 
@@ -749,13 +750,9 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 #define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
 			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
 
-/* Lisp_Word_tag is big enough for a possibly-shifted tag, to be
-   added to a pointer value for conversion to a Lisp_Word.  */
-#if LISP_WORDS_ARE_POINTERS
-typedef uintptr_t Lisp_Word_tag;
-#else
-typedef EMACS_UINT Lisp_Word_tag;
-#endif
+#define VALBITS 0
+
+/* Yield a signed integer that contains TAG along with PTR.
 
 /* A integer value tagged with TAG, and otherwise all zero.  */
 #define LISP_WORD_TAG(tag) \
@@ -785,7 +782,6 @@ INLINE Lisp_Object build_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
-extern Lisp_Object Qt, Qnil, Qt_, Qnil_;
 extern Lisp_Object xsymbol_fn;
 extern Lisp_Object Ffboundp (Lisp_Object);
 
@@ -795,14 +791,16 @@ XSYMBOL (Lisp_Object a)
   return scm_call_1 (xsymbol_fn, a);
 }
 
-/* XSYMBOL_INIT (Qfoo) is like XSYMBOL (Qfoo), except it is valid in
-   static initializers, and SYM must be a C-defined symbol.  */
-#define XSYMBOL_INIT(sym) a##sym
+/* The index of the C-defined Lisp symbol SYM.
+   This can be used in a static initializer.  */
+#define SYMBOL_INDEX(sym) i##sym
 
 /* By default, define macros for Qt, etc., as this leads to a bit
    better performance in the core Emacs interpreter.  A plugin can
    define DEFINE_NON_NIL_Q_SYMBOL_MACROS to be false, to be portable to
    other Emacs instances that assign different values to Qt, etc.  */
+// Guilemacs requires Qnil to be non-nil
+# define DEFINE_NON_NIL_Q_SYMBOL_MACROS false
 #ifndef DEFINE_NON_NIL_Q_SYMBOL_MACROS
 # define DEFINE_NON_NIL_Q_SYMBOL_MACROS true
 #endif
@@ -819,6 +817,8 @@ XSYMBOL (Lisp_Object a)
 #define ROUNDUP(x, y) (POWER_OF_2 (y)					\
                        ? ((y) - 1 + (x)) & ~ ((y) - 1)			\
                        : ((y) - 1 + (x)) - ((y) - 1 + (x)) % (y))
+
+extern Lisp_Object intern_c_string_2 (const char *, ptrdiff_t);
 
 #include <globals.h>
 
@@ -944,6 +944,13 @@ enum More_Lisp_Bits
     PVEC_TYPE_MASK = 0x3f << PSEUDOVECTOR_AREA_BITS
   };
 
+#define LISP_MACRO_DEFUN(name, type, argdecls, args) \
+  INLINE type (name) argdecls { return lisp_h_##name args; }
+
+/* like LISP_MACRO_DEFUN, except NAME returns void.  */
+#define LISP_MACRO_DEFUN_VOID(name, argdecls, args) \
+  INLINE void (name) argdecls { lisp_h_##name args; }
+
 /* Extract the pointer hidden within A.  */
 LISP_MACRO_DEFUN (XPNTR, void *, (Lisp_Object a), (a))
 
@@ -1012,23 +1019,17 @@ XSYMBOL (Lisp_Object a)
   return XBARE_SYMBOL (a);
 }
 
-/* Internal use only.  */
-INLINE Lisp_Object
-make_lisp_symbol_internal (struct Lisp_Symbol *sym)
-{
-  /* GCC 7 x86-64 generates faster code if lispsym is
-     cast to char * rather than to intptr_t.
-     Do not use eassert here, so that builtin symbols like Qnil compile to
-     constants; this is needed for some circa-2024 GCCs even with -O2.  */
-  char *symoffset = (char *) ((char *) sym - (char *) lispsym);
-  Lisp_Object a = TAG_PTR_INITIALLY (Lisp_Symbol, symoffset);
-  return a;
-}
-
 INLINE Lisp_Object
 make_lisp_symbol (struct Lisp_Symbol *sym)
 {
   return scm_c_vector_ref (b, 0);
+}
+
+INLINE Lisp_Object
+builtin_lisp_symbol (int index)
+{
+  struct Lisp_Symbol *sym = lispsym + index;
+  return sym->self_;
 }
 
 INLINE bool
@@ -1184,13 +1185,8 @@ extern Lisp_Object char_table_ref (Lisp_Object, int);
 extern void char_table_set (Lisp_Object, int, Lisp_Object);
 
 /* Defined in data.c.  */
-extern Lisp_Object Qarrayp, Qbufferp, Qbuffer_or_string_p, Qchar_table_p;
-extern Lisp_Object Qconsp, Qfloatp, Qintegerp, Qlambda, Qlistp, Qmarkerp, Qnil;
-extern Lisp_Object Qspecial_operator;
-extern Lisp_Object Qnumberp, Qstringp, Qsymbolp, Qt, Qvectorp;
-extern Lisp_Object Qbool_vector_p;
-extern Lisp_Object Qvector_or_char_table_p, Qwholenump;
-extern Lisp_Object Qwindow;
+//extern Lisp_Object Qnil;
+//extern Lisp_Object Qt;
 extern _Noreturn Lisp_Object wrong_type_argument (Lisp_Object, Lisp_Object);
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 
@@ -1201,21 +1197,18 @@ extern bool might_dump;
 extern bool initialized;
 
 /* Defined in eval.c.  */
-extern Lisp_Object Qautoload;
+//extern Lisp_Object Qautoload;
 
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
 
 /* Defined in process.c.  */
-extern Lisp_Object Qprocessp;
+//extern Lisp_Object Qprocessp;
 
 /* Defined in window.c.  */
-extern Lisp_Object Qwindowp;
+//extern Lisp_Object Qwindowp;
 
 /* Defined in xdisp.c.  */
-extern Lisp_Object Qimage;
-extern Lisp_Object Qfontification_functions;
-
 
 /* Extract A's type.  */
 INLINE enum Lisp_Type
@@ -1859,9 +1852,18 @@ INLINE void
 memclear (void *p, ptrdiff_t nbytes)
 {
   eassert (0 <= nbytes);
-  static_assert (NIL_IS_ZERO);
+  // static_assert (NIL_IS_ZERO);
+  emacs_abort(); // do you mean to use memsetnil instead?
   /* Since Qnil is zero, memset suffices.  */
   memset (p, 0, nbytes);
+}
+
+INLINE void
+memsetnil (Lisp_Object *p, ptrdiff_t n)
+{
+  eassert (0 <= n);
+  for (ptrdiff_t i = 0; i < n; i++)
+    p[i] = Qnil;
 }
 
 /* If a struct is made to look like a vector, this macro returns the length
@@ -2089,8 +2091,6 @@ typedef jmp_buf sys_jmp_buf;
 			       Symbols
  ***********************************************************************/
 
-typedef Lisp_Object sym_t;
-
 /* Value is name of symbol.  */
 INLINE void
 SET_SYMBOL_VAL (sym_t sym, Lisp_Object v)
@@ -2118,7 +2118,7 @@ SYMBOL_FWD (sym_t sym)
 }
 
 INLINE void
-SET_SYMBOL_VAL (struct Lisp_Symbol *sym, Lisp_Object v)
+SET_SYMBOL_VAL (sym_t sym, Lisp_Object v)
 {
   lisp_h_SET_SYMBOL_VAL (sym, v);
 }
@@ -2911,11 +2911,9 @@ FIXNATP (Lisp_Object x)
 INLINE EMACS_INT
 XFIXNAT (Lisp_Object a)
 {
-  eassert (FIXNUMP (a));
-  EMACS_INT int0 = Lisp_Int0;
-  EMACS_INT result = USE_LSB_TAG ? XFIXNUM (a) : XLI (a) - (int0 << VALBITS);
-  eassume (0 <= result);
-  return result;
+  EMACS_INT n = XFIXNUM (a);
+  eassert (0 <= n);
+  return n;
 }
 
 INLINE bool
