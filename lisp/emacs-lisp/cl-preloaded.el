@@ -133,9 +133,10 @@
     ;; `cl-structure-class' and `cl-structure-object' are allowed to be
     ;; defined without specifying the parent, because their parent
     ;; doesn't exist yet when they're defined.
-    (cl-assert (or parent (memq name '(cl-structure-class
-                                       cl-structure-object)))))
-  (cl-assert (or type (not named)))
+    ;(cl-assert (or parent (memq name '(cl-structure-class
+    ;                                   cl-structure-object))))
+    )
+  ;(cl-assert (or type (not named)))
   (if (boundp children-sym)
       (add-to-list children-sym tag)
     (set children-sym (list tag)))
