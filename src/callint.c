@@ -363,7 +363,8 @@ invoke it (via an `interactive' spec that contains, for instance, an
      recorded as a call to the function named callint_argfuns[varies[I]].  */
   signed char *varies = (signed char *) (visargs + nargs);
 
-  memclear (args, nargs * (2 * word_size + 1));
+  memset (args, 0, nargs * (2 * word_size + 1));
+  memsetnil (args, nargs * 2);
 
   if (!NILP (enable))
     specbind (Qenable_recursive_minibuffers, Qt);

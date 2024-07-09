@@ -1805,8 +1805,8 @@ init_fringe (void)
   fringe_bitmaps = xzalloc (max_fringe_bitmaps * sizeof *fringe_bitmaps);
   fringe_faces = xmalloc (max_fringe_bitmaps * sizeof *fringe_faces);
 
-  static_assert (NIL_IS_ZERO);
   fringe_faces = xzalloc (max_fringe_bitmaps * sizeof *fringe_faces);
+  memsetnil (fringe_faces, max_fringe_bitmaps);
 }
 
 void

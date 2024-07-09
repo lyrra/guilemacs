@@ -1220,8 +1220,11 @@ allocate_pseudovector (int memlen, int lisplen,
   eassert (memlen <= size_max + rest_max);
 
   struct Lisp_Vector *v = allocate_vectorlike (memlen, false);
-  /* Only the first LISPLEN slots will be traced normally by the GC.  */
-  memclear (v->contents, zerolen * word_size);
+  /* Only the first LISPLEN slots will be traced normally by the GC.
+     If Qnil is nonzero, clear the non-Lisp data separately.  */
+  memsetnil (v->contents, zerolen);
+  memset (v->contents + lisplen, 0, (zerolen - lisplen) * word_size);
+
   XSETPVECTYPESIZE (v, tag, lisplen, memlen - lisplen);
   return v;
 }
