@@ -4965,7 +4965,7 @@ intern_c_multibyte (const char *str, ptrdiff_t nchars, ptrdiff_t nbytes)
 
 
 Lisp_Object
-intern_c_string_2 (const char *str, ptrdiff_t len)
+intern_initial_c_string (const char *str, ptrdiff_t len)
 {
   Lisp_Object string = make_pure_c_string (str, len);
 
@@ -5185,7 +5185,8 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  INIT_EMACS_GLOBAL_SYMBOLS
+  for (int i = 0; i < ARRAYELTS (lispsym); i++)
+    lispsym[i].self_ = intern_initial_c_string (defsym_name[i], strlen(defsym_name[i]));
 
   DEFSYM (Qunbound, "unbound");
   DEFSYM (Qnil, "nil");
@@ -5197,8 +5198,8 @@ init_obarray_once (void)
   //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
   //make_symbol_constant (Qt);
 
-  Qnil = SCM_ELISP_NIL;
-  Qt = SCM_BOOL_T;
+  lispsym[iQnil].self_ = SCM_ELISP_NIL;
+  lispsym[iQt].self_ = SCM_BOOL_T;
 
   //Qnil_ = intern_c_string ("nil");
   //define_symbol (Qnil_, "nil");
@@ -5212,7 +5213,7 @@ init_obarray_once (void)
   //SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   //SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
-  Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
+  lispsym[iQunbound].self_ = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
   //for (int i = 0; i <  ARRAYELTS (lispsym); i++)

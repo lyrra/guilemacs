@@ -4345,7 +4345,7 @@ multiplied to find the real number of pixels.  */)
 
 struct frame_parm_table {
   const char *name;
-  sym_t *sym;
+  int sym;
 };
 
 static const struct frame_parm_table frame_parms[] =
