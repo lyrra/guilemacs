@@ -1281,11 +1281,6 @@ string_from_scheme (Lisp_Object scheme_string)
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 
-void init_emacs_syms ()
-{
-  ALL_EMACS_SYMBOLS
-}
-
 static int main2 (void *, int, char **);
 #if !defined HAVE_ANDROID || defined ANDROID_STUBIFY
 int
@@ -2008,7 +2003,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_guile ();
       init_fns_once ();
-      init_emacs_syms ();
       init_obarray ();
       init_eval_once ();
       init_charset_once ();

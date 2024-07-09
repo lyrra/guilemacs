@@ -4946,7 +4946,10 @@ intern_1 (const char *str, ptrdiff_t len)
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  return Fintern (make_pure_c_string (str, len), initial_obarray);
+  Lisp_Object s = make_pure_c_string (str, len);
+  if (!s) printf("WARNING, zero string\n");
+  return Fintern (s, initial_obarray);
+  //return Fintern (make_pure_c_string (str, len), initial_obarray);
 }
 
 /* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
@@ -4961,6 +4964,31 @@ intern_c_multibyte (const char *str, ptrdiff_t nchars, ptrdiff_t nbytes)
 			obarray, sym);
 }
 
+
+Lisp_Object
+intern_c_string_2 (const char *str, ptrdiff_t len)
+{
+  Lisp_Object string = make_pure_c_string (str, len);
+
+  CHECK_STRING (string);
+
+  Lisp_Object sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
+                                           SBYTES (string)),
+                    obhash (initial_obarray));
+
+  if (SREF (string, 0) == ':')
+    {
+      SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+    }
+
+  if (!sym) {
+    printf("ouch! sym is zero\n");
+  }
+  return sym;
+}
+
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
        doc: /* find-symbol */)
      (Lisp_Object string, Lisp_Object obarray)
@@ -4978,6 +5006,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
         tem = Qnil;
       else if (EQ (tem, Qt_))
         tem = Qt;
+      printf("found previous value: %lx true/false: %lx %lx  (%lx, %lx)\n", tem, Qt, Qnil, Qt_, Qnil_);
       return scm_values (scm_list_2 (tem, Qt));
     }
   else
@@ -4998,8 +5027,12 @@ it defaults to the value of `obarray'.  */)
   CHECK_STRING (string);
 
   tem = Ffind_symbol (string, obarray);
-  if (! NILP (scm_c_value_ref (tem, 1)))
+  if (! NILP (scm_c_value_ref (tem, 1))) {
+    printf("note: found previous symbol: %lx => %lx\n",
+           scm_c_value_ref (tem, 1),
+           scm_c_value_ref (tem, 0));
     return scm_c_value_ref (tem, 0);
+  }
 
   sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
                                            SBYTES (string)),
@@ -5012,6 +5045,9 @@ it defaults to the value of `obarray'.  */)
       SET_SYMBOL_VAL (XSYMBOL (sym), sym);
     }
 
+  if (!sym) {
+    printf("ouch! sym is zero\n");
+  }
   return sym;
 }
 
@@ -5154,8 +5190,10 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    intern_c_string_1 (defsym_name[i], strlen(defsym_name[i]));
+  for (int i = 0; i < ARRAYELTS (emacs_global_syms); i++) {
+    emacs_global_syms[i] = intern_c_string_2 (defsym_name[i], strlen(defsym_name[i]));
+    printf("init emacs global symbol %s at %d to %lx\n", defsym_name[i], i, emacs_global_syms[i]);
+  }
 
   DEFSYM (Qunbound, "unbound");
   DEFSYM (Qnil, "nil");
@@ -5167,8 +5205,8 @@ init_obarray_once (void)
   //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
   //make_symbol_constant (Qt);
 
-  // Qnil = SCM_ELISP_NIL;
-  // Qt = SCM_BOOL_T;
+  Qnil = SCM_ELISP_NIL;
+  Qt = SCM_BOOL_T;
 
   //Qnil_ = intern_c_string ("nil");
   //define_symbol (Qnil_, "nil");
