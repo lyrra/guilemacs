@@ -1237,7 +1237,6 @@ XTYPE (Lisp_Object o)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->self)
-#define make_lisp_proc(p) ((p)->header.self)
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
