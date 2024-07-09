@@ -645,6 +645,8 @@ fill_column_indicator_column (struct it *it, int char_width)
   return -1;
 }
 
+extern sym_t Qunbound;
+
 /* True means print newline to stdout before next mini-buffer message.  */
 
 bool noninteractive_need_newline;

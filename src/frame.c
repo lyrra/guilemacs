@@ -54,6 +54,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 #include "pdumper.h"
 
+extern Lisp_Object Qunbound;
+
 /* The currently selected frame.  */
 Lisp_Object selected_frame;
 
@@ -4345,7 +4347,7 @@ multiplied to find the real number of pixels.  */)
 
 struct frame_parm_table {
   const char *name;
-  int sym;
+  sym_t *sym;
 };
 
 static const struct frame_parm_table frame_parms[] =

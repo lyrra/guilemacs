@@ -32,6 +32,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <sys/ioctl.h>
 #endif
 
+extern Lisp_Object Qunbound;
+
 /* Chain of all terminals currently in use.  */
 struct terminal *terminal_list;
 

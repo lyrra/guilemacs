@@ -182,11 +182,7 @@ static void *spare_memory;
 
 const char *pending_malloc_warning;
 
-/* Maximum amount of C stack to save when a GC happens.  */
-
 /* Hook run after GC has finished.  */
-
-static Lisp_Object Qpost_gc_hook;
 
 #if !defined REL_ALLOC || defined SYSTEM_MALLOC || defined HYBRID_MALLOC
 static void refill_memory_reserve (void);
@@ -1896,9 +1892,6 @@ valid_lisp_object_p (Lisp_Object obj)
     return 1;
 
   p = (void *) SCM2PTR (obj);
-
-  if (SYMBOLP (obj) && c_symbol_p (p))
-    return ((char *) p - (char *) lispsym) % sizeof lispsym[0] == 0;
 
   if (p == &buffer_defaults || p == &buffer_local_symbols)
     return 2;

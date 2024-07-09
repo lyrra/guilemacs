@@ -4905,13 +4905,14 @@ check_obarray_slow (Lisp_Object obarray)
 static Lisp_Object
 intern_sym (Lisp_Object sym, Lisp_Object obarray)
 {
-  return Fintern (sym, Qnil);
+  //return Fintern (sym, Qnil);
+  return sym;
 }
 
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray)
 {
-  SET_SYMBOL_VAL (XSYMBOL (Qobarray_cache), Qnil);
+  abort();
   return intern_sym (Fmake_symbol (string), obarray);
 }
 
@@ -4931,12 +4932,13 @@ intern_1 (const char *str, ptrdiff_t len)
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  Lisp_Object obarray = check_obarray (Vobarray);
+  return Fintern (make_pure_c_string (str, len), Qnil);
+  //Lisp_Object obarray = check_obarray (Vobarray);
 
   /* Creating a non-pure string from a string literal not implemented yet.
      We could just use make_string here and live with the extra copy.  */
-  eassert (!NILP (Vpurify_flag));
-  return intern_driver (make_pure_c_string (str, len), obarray);
+  //eassert (!NILP (Vpurify_flag));
+  //return intern_driver (make_pure_c_string (str, len), obarray);
 }
 
 /* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
@@ -4956,15 +4958,12 @@ define_symbol (Lisp_Object sym, char const *str)
 {
   ptrdiff_t len = strlen (str);
   Lisp_Object string = make_pure_c_string (str, len);
-  init_symbol (sym, string);
 
   /* Qunbound is uninterned, so that it's not confused with any symbol
      'unbound' created by a Lisp program.  */
   if (! BASE_EQ (sym, Qunbound))
     {
-      Lisp_Object bucket = oblookup (initial_obarray, str, len, len);
-      eassert (FIXNUMP (bucket));
-      intern_sym (sym, initial_obarray, bucket);
+      intern_sym (sym, initial_obarray);
     }
 }
 
