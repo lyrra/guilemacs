@@ -37,9 +37,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
-Lisp_Object Qnil, Qt, Qunbound;
-Lisp_Object Qnil_, Qt_;
-
 static bool
 BOOLFWDP (lispfwd a)
 {
@@ -4082,6 +4079,10 @@ syms_of_data (void)
   /* Error obsolete (from 29.1), kept for compatibility.  */
   PUT_ERROR (Qexcessive_variable_binding, recursion_tail,
 	     "Variable binding depth exceeds max-specpdl-size");
+
+  DEFSYM (Qnil, "nil");
+  DEFSYM (Qt, "t");
+  DEFSYM (Qunbound, "unbound");
 
   /* Types that type-of returns.  */
   DEFSYM (Qboolean, "boolean");

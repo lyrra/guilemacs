@@ -815,8 +815,6 @@ typedef int (*Emacs_XIOErrorHandler) (Display *);
 struct input_event xg_pending_quit_event = { .kind = NO_EVENT };
 #endif
 
-extern Lisp_Object Qunbound;
-
 /* Non-zero means that a HELP_EVENT has been generated since Emacs
    start.  */
 

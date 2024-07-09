@@ -54,8 +54,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 #include "pdumper.h"
 
-extern Lisp_Object Qunbound;
-
 /* The currently selected frame.  */
 Lisp_Object selected_frame;
 

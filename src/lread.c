@@ -169,6 +169,7 @@ file_get_char (file_stream stream)
 # endif
 #endif
 
+Lisp_Object Qnil_, Qt_;
 static SCM obarrays;
 
 /* The objects or placeholders read with the #n=object form.
@@ -5173,6 +5174,9 @@ init_obarray_once (void)
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
+
+  //for (int i = 0; i <  ARRAYELTS (lispsym); i++)
+  //  define_symbol (builtin_lisp_symbol (i), defsym_name[i], Vobarray);
 
   /* Qt is correct even if not dumping.  loadup.el will set to nil at end.  */
   Vpurify_flag = Qt;
