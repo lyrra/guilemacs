@@ -169,7 +169,6 @@ file_get_char (file_stream stream)
 # endif
 #endif
 
-Lisp_Object Qnil_, Qt_;
 static SCM obarrays;
 
 /* The objects or placeholders read with the #n=object form.
@@ -4860,6 +4859,37 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
 }
 
 
+/* Intern a symbol with name STRING in OBARRAY.  */
+
+static Lisp_Object
+intern_sym (Lisp_Object sym, Lisp_Object obarray)
+{
+  return Fintern (sym, obarray);
+  //return sym;
+}
+
+Lisp_Object
+intern_driver (Lisp_Object string, Lisp_Object obarray)
+{
+  return intern_sym (Fmake_symbol (string), obarray);
+}
+
+#if 0
+static void
+define_symbol (Lisp_Object sym, char const *str)
+{
+  ptrdiff_t len = strlen (str);
+  Lisp_Object string = make_pure_c_string (str, len);
+
+  /* Qunbound is uninterned, so that it's not confused with any symbol
+     'unbound' created by a Lisp program.  */
+  if (! EQ (sym, Qunbound))
+    {
+      intern_sym (sym, initial_obarray);
+    }
+}
+#endif
+
 static Lisp_Object initial_obarray;
 
 Lisp_Object
@@ -4900,23 +4930,6 @@ check_obarray_slow (Lisp_Object obarray)
   wrong_type_argument (Qobarrayp, obarray);
 }
 
-/* Intern a symbol with name STRING in OBARRAY.  */
-
-/* FIXME: retype arguments as pure C types */
-static Lisp_Object
-intern_sym (Lisp_Object sym, Lisp_Object obarray)
-{
-  //return Fintern (sym, Qnil);
-  return sym;
-}
-
-Lisp_Object
-intern_driver (Lisp_Object string, Lisp_Object obarray)
-{
-  abort();
-  return intern_sym (Fmake_symbol (string), obarray);
-}
-
 /* Intern the C string STR: return a symbol with that name,
    interned in the current obarray.  */
 
@@ -4933,13 +4946,7 @@ intern_1 (const char *str, ptrdiff_t len)
 Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
-  return Fintern (make_pure_c_string (str, len), Qnil);
-  //Lisp_Object obarray = check_obarray (Vobarray);
-
-  /* Creating a non-pure string from a string literal not implemented yet.
-     We could just use make_string here and live with the extra copy.  */
-  //eassert (!NILP (Vpurify_flag));
-  //return intern_driver (make_pure_c_string (str, len), obarray);
+  return Fintern (make_pure_c_string (str, len), initial_obarray);
 }
 
 /* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
@@ -4952,20 +4959,6 @@ intern_c_multibyte (const char *str, ptrdiff_t nchars, ptrdiff_t nbytes)
     return sym;
   return intern_driver (make_multibyte_string (str, nchars, nbytes),
 			obarray, sym);
-}
-
-static void
-define_symbol (Lisp_Object sym, char const *str)
-{
-  ptrdiff_t len = strlen (str);
-  Lisp_Object string = make_pure_c_string (str, len);
-
-  /* Qunbound is uninterned, so that it's not confused with any symbol
-     'unbound' created by a Lisp program.  */
-  if (! BASE_EQ (sym, Qunbound))
-    {
-      intern_sym (sym, initial_obarray);
-    }
 }
 
 DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
@@ -4990,6 +4983,8 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
   else
     return scm_values (scm_list_2 (Qnil, Qnil));
 }
+
+
 DEFUN ("intern", Fintern, Sintern, 1, 2, 0,
        doc: /* Return the canonical symbol whose name is STRING.
 If there is none, one is created by this function and returned.
@@ -5159,18 +5154,33 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  Qnil = SCM_ELISP_NIL;
-  Qt = SCM_BOOL_T;
+  for (int i = 0; i < ARRAYELTS (lispsym); i++)
+    intern_c_string_1 (defsym_name[i], strlen(defsym_name[i]));
 
-  Qnil_ = intern_c_string ("nil");
-  SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
+  DEFSYM (Qunbound, "unbound");
+  DEFSYM (Qnil, "nil");
+  //SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);
+  //make_symbol_constant (Qnil);
+  DEFSYM (Qt, "t");
+  DEFSYM (Qnil_, "nil");
+  DEFSYM (Qt_, "t");
+  //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
+  //make_symbol_constant (Qt);
 
-  Qt_ = intern_c_string ("t");
-  SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
-  SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
-  SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
+  // Qnil = SCM_ELISP_NIL;
+  // Qt = SCM_BOOL_T;
+
+  //Qnil_ = intern_c_string ("nil");
+  //define_symbol (Qnil_, "nil");
+  //SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);
+  //SET_SYMBOL_CONSTANT (XSYMBOL (Qnil_), 1);
+  //SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qnil_), 1);
+
+  //Qt_ = intern_c_string ("t");
+  //define_symbol (Qt_, "t");
+  //SET_SYMBOL_VAL (XSYMBOL (Qt_), Qt);
+  //SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
+  //SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
   Qunbound = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
