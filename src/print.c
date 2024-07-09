@@ -1764,8 +1764,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 
     case PVEC_FINALIZER:
       print_c_string ("#<finalizer", printcharfun);
-      if (NILP (XFINALIZER (obj)->function))
-	print_c_string (" used", printcharfun);
       printchar ('>', printcharfun);
       return;
 

@@ -1524,125 +1524,6 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
   }
 }
 
-#ifdef HAVE_MODULES
-/* Create a new module user ptr object.  */
-Lisp_Object
-make_user_ptr (void (*finalizer) (void *), void *p)
-{
-  struct Lisp_User_Ptr *uptr
-    = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_User_Ptr, PVEC_USER_PTR);
-  uptr->finalizer = finalizer;
-  uptr->p = p;
-  return make_lisp_ptr (uptr, Lisp_Vectorlike);
-}
-#endif
-
-static void
-init_finalizer_list (struct Lisp_Finalizer *head)
-{
-  head->prev = head->next = head;
-}
-
-/* Insert FINALIZER before ELEMENT.  */
-
-static void
-finalizer_insert (struct Lisp_Finalizer *element,
-                  struct Lisp_Finalizer *finalizer)
-{
-  eassert (finalizer->prev == NULL);
-  eassert (finalizer->next == NULL);
-  finalizer->next = element;
-  finalizer->prev = element->prev;
-  finalizer->prev->next = finalizer;
-  element->prev = finalizer;
-}
-
-static void
-unchain_finalizer (struct Lisp_Finalizer *finalizer)
-{
-  if (finalizer->prev != NULL)
-    {
-      eassert (finalizer->next != NULL);
-      finalizer->prev->next = finalizer->next;
-      finalizer->next->prev = finalizer->prev;
-      finalizer->prev = finalizer->next = NULL;
-    }
-}
-
-static void
-mark_finalizer_list (struct Lisp_Finalizer *head)
-{
-  for (struct Lisp_Finalizer *finalizer = head->next;
-       finalizer != head;
-       finalizer = finalizer->next)
-    {
-      set_vectorlike_marked (&finalizer->header);
-      mark_object (finalizer->function);
-    }
-}
-
-/* Move doomed finalizers to list DEST from list SRC.  A doomed
-   finalizer is one that is not GC-reachable and whose
-   finalizer->function is non-nil.  */
-
-static void
-queue_doomed_finalizers (struct Lisp_Finalizer *dest,
-                         struct Lisp_Finalizer *src)
-{
-  struct Lisp_Finalizer *finalizer = src->next;
-  while (finalizer != src)
-    {
-      struct Lisp_Finalizer *next = finalizer->next;
-      if (!vectorlike_marked_p (&finalizer->header)
-          && !NILP (finalizer->function))
-        {
-          unchain_finalizer (finalizer);
-          finalizer_insert (dest, finalizer);
-        }
-
-      finalizer = next;
-    }
-}
-
-static Lisp_Object
-run_finalizer_handler (Lisp_Object args)
-{
-  add_to_log ("finalizer failed: %S", args);
-  return Qnil;
-}
-
-static void
-run_finalizer_function (Lisp_Object function)
-{
-  specpdl_ref count = SPECPDL_INDEX ();
-#ifdef HAVE_PDUMPER
-  ++number_finalizers_run;
-#endif
-
-  specbind (Qinhibit_quit, Qt);
-  internal_condition_case_1 (call0, function, Qt, run_finalizer_handler);
-  unbind_to (count, Qnil);
-}
-
-static void
-run_finalizers (struct Lisp_Finalizer *finalizers)
-{
-  struct Lisp_Finalizer *finalizer;
-  Lisp_Object function;
-
-  while (finalizers->next != finalizers)
-    {
-      finalizer = finalizers->next;
-      unchain_finalizer (finalizer);
-      function = finalizer->function;
-      if (!NILP (function))
-	{
-	  finalizer->function = Qnil;
-	  run_finalizer_function (function);
-	}
-    }
-}
-
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
        doc: /* Make a finalizer that will run FUNCTION.
 FUNCTION will be called after garbage collection when the returned
@@ -1652,13 +1533,7 @@ count as reachable for the purpose of deciding whether to run
 FUNCTION.  FUNCTION will be run once per finalizer object.  */)
   (Lisp_Object function)
 {
-  CHECK_TYPE (FUNCTIONP (function), Qfunctionp, function);
-  struct Lisp_Finalizer *finalizer
-    = ALLOCATE_PSEUDOVECTOR (struct Lisp_Finalizer, function, PVEC_FINALIZER);
-  finalizer->function = function;
-  finalizer->prev = finalizer->next = NULL;
-  finalizer_insert (&finalizers, finalizer);
-  return make_lisp_ptr (finalizer, Lisp_Vectorlike);
+  return Qnil;
 }
 
 
@@ -2131,8 +2006,6 @@ init_alloc_once_for_pdumper (void)
   mallopt (M_MMAP_MAX, MMAP_MAX_AREAS);   /* Max. number of mmap'ed areas.  */
 #endif
 
-  init_finalizer_list (&finalizers);
-  init_finalizer_list (&doomed_finalizers);
   refill_memory_reserve ();
 }
 
