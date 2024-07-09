@@ -5189,10 +5189,7 @@ init_obarray_once (void)
   obarrays = scm_make_hash_table (SCM_UNDEFINED);
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
-  for (int i = 0; i < ARRAYELTS (emacs_global_syms); i++) {
-    emacs_global_syms[i] = intern_c_string_2 (defsym_name[i], strlen(defsym_name[i]));
-    printf("init emacs global symbol %s at %d to %lx\n", defsym_name[i], i, emacs_global_syms[i]);
-  }
+  INIT_EMACS_GLOBAL_SYMBOLS
 
   DEFSYM (Qunbound, "unbound");
   DEFSYM (Qnil, "nil");

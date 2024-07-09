@@ -1308,6 +1308,8 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   scm_boot_guile (argc, argv, main2, NULL);
 }
 
+void foobar() {
+}
 /* ARGSUSED */
 static int
 main2 (void *ignore, int argc, char **argv)
@@ -2019,6 +2021,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
+      foobar();
       scm_call_7 (scm_c_public_ref ("language elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),
