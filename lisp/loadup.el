@@ -137,6 +137,13 @@
 
 (load "widget")
 (load "custom")
+
+(defcustom search-slow-speed 1200
+  "Highest terminal speed at which to use \"slow\" style incremental search.
+This is the style where a one-line window is created to show the line
+that the search has reached."
+  :type 'integer)
+
 (load "emacs-lisp/map-ynp")
 (load "env")
 (load "format")

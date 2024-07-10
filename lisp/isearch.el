@@ -88,11 +88,12 @@ Negative means put the slow search window at the top (normally it's at bottom)
 and the value is minus the number of lines."
   :type 'integer)
 
-(defcustom search-slow-speed 1200
-  "Highest terminal speed at which to use \"slow\" style incremental search.
-This is the style where a one-line window is created to show the line
-that the search has reached."
-  :type 'integer)
+; guilemacs: moved to loadup.el
+;(defcustom search-slow-speed 1200
+;  "Highest terminal speed at which to use \"slow\" style incremental search.
+;This is the style where a one-line window is created to show the line
+;that the search has reached."
+;  :type 'integer)
 
 (defcustom search-upper-case 'not-yanks
   "If non-nil, upper case chars disable case fold searching.
