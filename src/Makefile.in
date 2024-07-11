@@ -591,12 +591,12 @@ shortlisp =
 $(abs_top_builddir)/src/lisp.mk: $(lispsource)/loadup.el
 	${AM_V_GEN}( printf 'shortlisp = \\\n'; \
 	sed -n 's/^[ \t]*(load "\([^"]*\)".*/\1/p' $< | \
-	  sed -e 's/$$/.elc \\/' -e 's/\.el\.elc/.el/'; \
+	  sed -e 's/$$/.el \\/' -e 's/\.el\.el/.el/'; \
 	echo "" ) > $@.tmp
 	$(AM_V_at)mv -f $@.tmp $@
 
 -include $(abs_top_builddir)/src/lisp.mk
-shortlisp_filter = leim/leim-list.el site-load.elc site-init.elc
+shortlisp_filter = leim/leim-list.el site-load.el site-init.el
 shortlisp := $(filter-out ${shortlisp_filter},${shortlisp})
 ## Place loaddefs.el first, so it gets generated first, since it is on
 ## the critical path (relevant in parallel compilations).
