@@ -388,20 +388,20 @@ This will generate compile-time constants from BINDINGS."
               "with-open-stream" "with-package-iterator"
               "with-simple-restart" "with-slots" "with-standard-io-syntax"))
      (cl-errs '("abort" "cerror")))
-  (let ((vdefs (eval-when-compile
+  (let ((vdefs (progn; eval-when-compile
                  (append lisp-vdefs el-vdefs cl-vdefs)))
-        (tdefs (eval-when-compile
+        (tdefs (progn; eval-when-compile
                  (append el-tdefs eieio-tdefs cl-tdefs cl-lib-tdefs
                          (mapcar (lambda (s) (concat "cl-" s)) cl-lib-tdefs))))
         ;; Elisp and Common Lisp definers.
-        (el-defs-re (eval-when-compile
+        (el-defs-re (progn; eval-when-compile
                       (regexp-opt (append lisp-fdefs lisp-vdefs
                                           el-fdefs el-vdefs el-tdefs
                                           (mapcar (lambda (s) (concat "cl-" s))
                                                   (append cl-lib-fdefs cl-lib-tdefs))
                                           eieio-fdefs eieio-tdefs)
                                   t)))
-        (cl-defs-re (eval-when-compile
+        (cl-defs-re (progn; eval-when-compile
                       (regexp-opt (append lisp-fdefs lisp-vdefs
                                           cl-lib-fdefs cl-lib-tdefs
                                           eieio-fdefs eieio-tdefs
@@ -411,12 +411,12 @@ This will generate compile-time constants from BINDINGS."
         (cl-kws-re (eval-when-compile
                      (regexp-opt (append lisp-kw cl-kw) t)))
         ;; Elisp and Common Lisp "errors".
-        (el-errs-re (eval-when-compile
+        (el-errs-re (progn; eval-when-compile
                       (regexp-opt (append (mapcar (lambda (s) (concat "cl-" s))
                                                   cl-lib-errs)
                                           lisp-errs el-errs)
                                   t)))
-        (cl-errs-re (eval-when-compile
+        (cl-errs-re (progn; eval-when-compile
                       (regexp-opt (append lisp-errs cl-lib-errs cl-errs) t))))
     (dolist (v vdefs)
       (put (intern v) 'lisp-define-type 'var))
