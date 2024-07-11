@@ -197,7 +197,7 @@ It should normally be a symbol with position and it defaults to FORM."
     (unless compile-only
       (message "%sWarning: %s"
                (if (stringp load-file-name)
-                   (concat (file-relative-name load-file-name) ": ")
+                   (concat load-file-name ": ")
                  "")
                msg))
     form)))
