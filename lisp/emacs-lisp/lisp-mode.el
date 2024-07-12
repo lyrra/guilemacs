@@ -338,7 +338,7 @@ This will generate compile-time constants from BINDINGS."
                            '(?\s ?\n ?\t))))
         (throw 'found t)))))
 
-(let-when-compile
+(let; -when-compile
     ((lisp-fdefs '("defmacro" "defun"))
      (lisp-vdefs '("defvar"))
      (lisp-kw '("cond" "if" "while" "let" "let*" "progn" "prog1"
@@ -408,7 +408,7 @@ This will generate compile-time constants from BINDINGS."
                                           cl-fdefs cl-vdefs cl-tdefs)
                                   t)))
         ;; Common Lisp keywords (Elisp keywords are handled dynamically).
-        (cl-kws-re (eval-when-compile
+        (cl-kws-re (progn; eval-when-compile
                      (regexp-opt (append lisp-kw cl-kw) t)))
         ;; Elisp and Common Lisp "errors".
         (el-errs-re (progn; eval-when-compile
