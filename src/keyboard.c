@@ -2509,6 +2509,7 @@ struct read_char_state
   Lisp_Object save_tag;
   Lisp_Object previous_echo_area_message;
   Lisp_Object also_record;
+  bool recorded;
   bool reread;
   bool polling_stopped_here;
   struct kboard *orig_kboard;
@@ -2561,7 +2562,6 @@ read_char_handle_quit (void *data, Lisp_Object k)
         current_kboard = kb;
         /* This is going to exit from read_char
            so we had better get rid of this frame's stuff.  */
-        UNGCPRO;
         return make_number (-2); /* wrong_kboard_jmpbuf */
       }
   }
@@ -2617,13 +2617,13 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define save_jump state->save_tag
 #define previous_echo_area_message state->previous_echo_area_message
 #define also_record state->also_record
+#define recorded state->recorded
 #define reread state->reread
 #define polling_stopped_here state->polling_stopped_here
 #define orig_kboard state->orig_kboard
 #define save_getcjmp(x) (x = getctag)
 #define restore_getcjmp(x) (getctag = x)
   Lisp_Object tem, save;
-  volatile bool reread;
 
   if (jump)
     goto non_reread;
@@ -3426,6 +3426,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #undef save_jump
 #undef previous_echo_area_message
 #undef also_record
+#undef recorded
 #undef reread
 #undef polling_stopped_here
 #undef orig_kboard
