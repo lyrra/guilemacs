@@ -33,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
+#include "commands.h"
 #include "buffer.h"
 #include "intervals.h"
 #include "window.h"

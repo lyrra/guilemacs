@@ -1769,7 +1769,7 @@ valid_lisp_object_p (Lisp_Object obj)
   if (SCM_IMP (obj))
     return 1;
 
-  p = (void *) SCM2PTR (obj);
+  void* p = (void *) SCM2PTR (obj);
 
   if (p == &buffer_defaults || p == &buffer_local_symbols)
     return 2;

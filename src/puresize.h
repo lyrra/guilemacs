@@ -24,7 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 INLINE_HEADER_BEGIN
 
 /* Define PURESIZE, the number of bytes of pure Lisp code to leave space for. */
-#define CHECK_IMPURE(obj) ((void) 0)
+#define CHECK_IMPURE(obj,x) ((void) 0)
 
 #define PURE_P(obj) 0
 
