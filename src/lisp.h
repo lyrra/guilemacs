@@ -1190,8 +1190,6 @@ extern void char_table_set (Lisp_Object, int, Lisp_Object);
 extern _Noreturn Lisp_Object wrong_type_argument (Lisp_Object, Lisp_Object);
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 
-/* Defined in emacs.c.  */
-extern bool might_dump;
 /* True means Emacs has already been initialized.
    Used during startup to detect startup of dumped Emacs.  */
 extern bool initialized;
