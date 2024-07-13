@@ -667,8 +667,7 @@ make_empty_string (int multibyte)
   string = allocate_string ();
   allocate_string_data (string, 0, 0);
   if (! multibyte)
-    STRING_SET_UNIBYTE (string);
-
+    XSTRING (string)->size_byte = -1;			\
   return string;
 }
 
