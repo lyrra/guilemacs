@@ -1304,12 +1304,12 @@ See also the function `vector'.  */)
 Lisp_Object
 make_vector (ptrdiff_t length, Lisp_Object init)
 {
-  bool clearit = NIL_IS_ZERO && NILP (init);
-  struct Lisp_Vector *p = allocate_clear_vector (length, clearit);
-  if (!clearit)
-    for (ptrdiff_t i = 0; i < length; i++)
-      p->contents[i] = init;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  Lisp_Object vector;
+  struct Lisp_Vector *p = allocate_vector (length);
+  for (ptrdiff_t i = 0; i < length; i++)
+    p->contents[i] = init;
+  XSETVECTOR (vector, p);
+  return vector; // make_lisp_ptr (p, Lisp_Vectorlike);
 }
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
