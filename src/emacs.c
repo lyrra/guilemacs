@@ -201,11 +201,6 @@ bool running_asynch_code;
 bool display_arg;
 #endif
 
-#if defined GNU_LINUX && defined HAVE_UNEXEC
-/* The gap between BSS end and heap start as far as we can tell.  */
-static uintmax_t heap_bss_diff;
-#endif
-
 /* To run as a background daemon under Cocoa or Windows,
    we must do a fork+exec, not a simple fork.
 
@@ -1460,14 +1455,6 @@ main2 (void *ignore, int argc, char **argv)
 #endif
 
   argc = maybe_disable_address_randomization (argc, argv);
-
-#if defined GNU_LINUX && defined HAVE_UNEXEC
-  if (!initialized)
-    {
-      char *heap_start = my_heap_start ();
-      heap_bss_diff = heap_start - max (my_endbss, my_endbss_static);
-    }
-#endif
 
 #ifdef RUN_TIME_REMAP
   if (initialized)
@@ -3251,23 +3238,6 @@ You must run Emacs in batch mode in order to dump it.  */)
 
   if (definitely_will_not_unexec_p ())
     error ("This Emacs instance was not started in temacs mode");
-
-# if defined GNU_LINUX && defined HAVE_UNEXEC
-
-  /* Warn if the gap between BSS end and heap start is larger than this.  */
-#  define MAX_HEAP_BSS_DIFF (1024 * 1024)
-
-  if (heap_bss_diff > MAX_HEAP_BSS_DIFF)
-    fprintf (stderr,
-	     ("**************************************************\n"
-	      "Warning: Your system has a gap between BSS and the\n"
-	      "heap (%"PRIuMAX" bytes). This usually means that exec-shield\n"
-	      "or something similar is in effect.  The dump may\n"
-	      "fail because of this.  See the section about\n"
-	      "exec-shield in etc/PROBLEMS for more information.\n"
-	      "**************************************************\n"),
-	     heap_bss_diff);
-# endif
 
   /* Bind `command-line-processed' to nil before dumping,
      so that the dumped Emacs will process its command line

@@ -4140,7 +4140,6 @@ extern void parse_str_as_multibyte (const unsigned char *, ptrdiff_t,
 
 /* Defined in alloc.c.  */
 extern intptr_t garbage_collection_inhibited;
-extern void *my_heap_start (void);
 extern void check_pure_size (void);
 unsigned char *resize_string_data (Lisp_Object, ptrdiff_t, int, int);
 extern void allocate_string_data (Lisp_Object, EMACS_INT, EMACS_INT, bool);
