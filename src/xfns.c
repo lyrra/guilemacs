@@ -9220,7 +9220,7 @@ Text larger than the specified size is clipped.  */)
 
   /* Insert STRING into root window's buffer and fit the frame to the
      buffer.  */
-  specpdl_ref count_1 = SPECPDL_INDEX ();
+  dynwind_begin ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -9302,7 +9302,7 @@ Text larger than the specified size is clipped.  */)
   unblock_input ();
 
   set_buffer_internal_1 (old_buffer);
-  unbind_to (count_1, Qnil);
+  dynwind_end ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
