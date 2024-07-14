@@ -2622,8 +2622,8 @@ lambda_arity (Lisp_Object fun)
   else if (CLOSUREP (fun))
     {
       syms_left = AREF (fun, CLOSURE_ARGLIST);
-      if (FIXNUMP (syms_left))
-        return get_byte_code_arity (syms_left);
+      //if (FIXNUMP (syms_left))
+      //  return get_byte_code_arity (syms_left);
     }
   else
     emacs_abort ();
