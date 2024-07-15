@@ -4753,13 +4753,7 @@ hashfn_user_defined (Lisp_Object key, struct Lisp_Hash_Table *h)
 					 ? XUFIXNUM(hash) : sxhash (hash));
 }
 
-struct hash_table_test const
-  hashtest_eq = { .name = LISPSYM_INITIALLY (Qeq),
-		  .cmpfn = 0, .hashfn = hashfn_eq },
-  hashtest_eql = { .name = LISPSYM_INITIALLY (Qeql),
-		   .cmpfn = cmpfn_eql, .hashfn = hashfn_eql },
-  hashtest_equal = { .name = LISPSYM_INITIALLY (Qequal),
-		     .cmpfn = cmpfn_equal, .hashfn = hashfn_equal };
+struct hash_table_test hashtest_eq, hashtest_eql, hashtest_equal;
 
 /* Allocate basically initialized hash table.  */
 
@@ -6527,4 +6521,22 @@ For best results this should end in a space.  */);
   DEFSYM (QCin_place, ":in-place");
   DEFSYM (QCreverse, ":reverse");
   DEFSYM (Qvaluelt, "value<");
+
+  hashtest_eq.name = Qeq;
+  hashtest_eq.user_hash_function = Qnil;
+  hashtest_eq.user_cmp_function = Qnil;
+  hashtest_eq.cmpfn = 0;
+  hashtest_eq.hashfn = hashfn_eq;
+
+  hashtest_eql.name = Qeql;
+  hashtest_eql.user_hash_function = Qnil;
+  hashtest_eql.user_cmp_function = Qnil;
+  hashtest_eql.cmpfn = cmpfn_eql;
+  hashtest_eql.hashfn = hashfn_eql;
+
+  hashtest_equal.name = Qequal;
+  hashtest_equal.user_hash_function = Qnil;
+  hashtest_equal.user_cmp_function = Qnil;
+  hashtest_equal.cmpfn = cmpfn_equal;
+  hashtest_equal.hashfn = hashfn_equal;
 }
