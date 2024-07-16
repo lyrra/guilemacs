@@ -8031,6 +8031,8 @@ decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
       Lisp_Object val;
       Lisp_Object undo_list = BVAR (current_buffer, undo_list);
 
+      dynwind_begin ();
+
       record_unwind_protect (coding_restore_undo_list,
 			     Fcons (undo_list, Fcurrent_buffer ()));
       bset_undo_list (current_buffer, Qt);
@@ -8040,6 +8042,8 @@ decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
       CHECK_FIXNAT (val);
       coding->produced_char += Z - prev_Z;
       coding->produced += Z_BYTE - prev_Z_BYTE;
+
+      dynwind_end ();
     }
 
   dynwind_end ();
@@ -8197,8 +8201,8 @@ decode_coding_object (struct coding_system *coding,
       ptrdiff_t prev_Z = Z, prev_Z_BYTE = Z_BYTE;
       Lisp_Object val;
       Lisp_Object undo_list = BVAR (current_buffer, undo_list);
-      specpdl_ref count1 = SPECPDL_INDEX ();
 
+      dynwind_begin ();
       record_unwind_protect (coding_restore_undo_list,
 			     Fcons (undo_list, Fcurrent_buffer ()));
       bset_undo_list (current_buffer, Qt);
@@ -8208,7 +8212,8 @@ decode_coding_object (struct coding_system *coding,
       CHECK_FIXNAT (val);
       coding->produced_char += Z - prev_Z;
       coding->produced += Z_BYTE - prev_Z_BYTE;
-      unbind_to (count1, Qnil);
+
+      dynwind_end ();
     }
 
   if (EQ (dst_object, Qt))
