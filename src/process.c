@@ -4291,7 +4291,6 @@ usage: (make-network-process &rest ARGS)  */)
   if (! postpone_connection)
     connect_network_socket (proc, addrinfos, use_external_socket_p);
 
-  specpdl_ptr = specpdl_ref_to_ptr (count);
   return proc;
 }
 
