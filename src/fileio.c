@@ -4576,7 +4576,7 @@ by calling `format-decode', which see.  */)
 	  /* Insert from the file at the proper position.  */
 	  temp = BYTE_TO_CHAR (same_at_start);
 	  SET_PT_BOTH (temp, same_at_start);
-          unbind_to (this_count, Qnil);
+          dynwind_end ();
 
 	  /* If display currently starts at beginning of line,
 	     keep it that way.  */
