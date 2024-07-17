@@ -1803,13 +1803,6 @@ hash_table_free_bytes (void *p, ptrdiff_t nbytes)
                  Pure Storage Compatibility Functions
  ***********************************************************************/
 
-void
-check_pure_size (void)
-{
-  return;
-}
-#endif
-
 Lisp_Object
 make_pure_string (const char *data,
 		  ptrdiff_t nchars, ptrdiff_t nbytes, bool multibyte)
