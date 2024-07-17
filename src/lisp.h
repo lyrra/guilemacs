@@ -87,6 +87,7 @@ DEFINE_GDB_SYMBOL_END (GCTYPEBITS)
 typedef scm_t_signed_bits EMACS_INT;
 typedef scm_t_bits EMACS_UINT;
 #define EMACS_INT_MAX SCM_T_SIGNED_BITS_MAX
+#define EMACS_INT_WIDTH INT_WIDTH
 
 #if INTPTR_MAX == INT_MAX
 #define pI ""
@@ -2466,7 +2467,7 @@ sxhash_combine (EMACS_UINT x, EMACS_UINT y)
 INLINE EMACS_UINT
 SXHASH_REDUCE (EMACS_UINT x)
 {
-  return (x ^ x >> (BITS_PER_EMACS_INT - FIXNUM_BITS + 1)) & INTMASK;
+  return (x ^ x >> (EMACS_INT_WIDTH - FIXNUM_BITS + 1)) & INTMASK;
 }
 
 /* Reduce an EMACS_UINT hash value to hash_hash_t.  */
