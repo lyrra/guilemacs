@@ -1798,7 +1798,7 @@ notify_variable_watchers (Lisp_Object symbol,
 {
   symbol = Findirect_variable (symbol);
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_symbol_trapped_write, symbol);
   /* Avoid recursion.  */
   set_symbol_trapped_write (symbol, SYMBOL_UNTRAPPED_WRITE);
@@ -1828,7 +1828,7 @@ notify_variable_watchers (Lisp_Object symbol,
         calln (watcher, symbol, newval, operation, where);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 
