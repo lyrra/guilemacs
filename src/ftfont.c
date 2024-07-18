@@ -3231,6 +3231,7 @@ static void
 syms_of_ftfont_for_pdumper (void)
 {
   PDUMPER_RESET_LV (ft_face_cache, Qnil);
+  ftfont_driver.type = Qfreetype;
   register_font_driver (&ftfont_driver, NULL);
 #ifdef HAVE_HARFBUZZ
   fthbfont_driver = ftfont_driver;

@@ -1761,5 +1761,6 @@ syms_of_nsfont (void)
 static void
 syms_of_nsfont_for_pdumper (void)
 {
+  nsfont_driver.type = Qns;
   register_font_driver (&nsfont_driver, NULL);
 }

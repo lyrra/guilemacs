@@ -1162,5 +1162,6 @@ syms_of_xfont (void)
 static void
 syms_of_xfont_for_pdumper (void)
 {
+  xfont_driver.type = Qx;
   register_font_driver (&xfont_driver, NULL);
 }

@@ -3057,6 +3057,7 @@ versions of Windows) characters.  */);
 static void
 syms_of_w32font_for_pdumper (void)
 {
+  w32font_driver.type = Qgdi;
   register_font_driver (&w32font_driver, NULL);
 }
 

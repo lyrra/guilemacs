@@ -1569,6 +1569,7 @@ syms_of_w32uniscribe_for_pdumper (void)
   pfnScriptGetCMap = &ScriptGetCMap;
 #endif /* Cygwin */
 
+  uniscribe_font_driver.type = Quniscribe;
   uniscribe_available = 1;
 
   register_font_driver (&uniscribe_font_driver, NULL);
