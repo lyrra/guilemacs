@@ -46,7 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "ftfont.h"
 #include "pdumper.h"
 
-static struct font_driver const ftfont_driver;
+static struct font_driver ftfont_driver;
 #ifdef HAVE_HARFBUZZ
 static struct font_driver fthbfont_driver;
 #endif	/* HAVE_HARFBUZZ */
@@ -3152,10 +3152,10 @@ static void syms_of_ftfont_for_pdumper (void);
 
 #ifndef USE_CAIRO
 
-static struct font_driver const ftfont_driver =
+static struct font_driver ftfont_driver =
   {
   /* We can't draw a text without device dependent functions.  */
-  .type = LISPSYM_INITIALLY (Qfreetype),
+  .type = 0,
   .get_cache = ftfont_get_cache,
   .list = ftfont_list,
   .match = ftfont_match,

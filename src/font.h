@@ -957,7 +957,7 @@ extern hb_font_t *fthbfont_begin_hb_font (struct font *, double *);
 extern void syms_of_ftfont (void);
 #endif	/* HAVE_FREETYPE */
 #ifdef HAVE_X_WINDOWS
-extern struct font_driver const xfont_driver;
+extern struct font_driver xfont_driver;
 extern Lisp_Object xfont_get_cache (struct frame *);
 extern void syms_of_xfont (void);
 #ifdef HAVE_XFT

@@ -1128,7 +1128,7 @@ xfont_check (struct frame *f, struct font *font)
 
 static void syms_of_xfont_for_pdumper (void);
 
-struct font_driver const xfont_driver =
+struct font_driver xfont_driver =
   {
     .type = LISPSYM_INITIALLY (Qx),
     .get_cache = xfont_get_cache,
