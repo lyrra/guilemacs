@@ -400,7 +400,7 @@ signal a `cyclic-variable-indirection' error.  */)
 
   sym = XSYMBOL (new_alias);
 
-  if (SYMBOL_CONSTANT_P (sym))
+  if (SYMBOL_CONSTANT_P (new_alias))
     /* Making it an alias effectively changes its value.  */
     error ("Cannot make a constant an alias: %s",
 	   SDATA (SYMBOL_NAME (new_alias)));
@@ -465,14 +465,15 @@ signal a `cyclic-variable-indirection' error.  */)
 	       SDATA (SYMBOL_NAME (new_alias)));
   }
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
-    notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
+  // fix guilemacs, no Qdefvaralias, rebase error?
+  //if (SYMBOL_TRAPPED (sym) == SYMBOL_TRAPPED_WRITE)
+  //  notify_variable_watchers (new_alias, base_variable, Qdefvaralias, Qnil);
 
   SET_SYMBOL_DECLARED_SPECIAL (sym, 1);
   SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (base_variable), 1);
   SET_SYMBOL_REDIRECT (sym, SYMBOL_VARALIAS);
   SET_SYMBOL_ALIAS (sym, XSYMBOL (base_variable));
-  SET_SYMBOL_TRAPPED_WRITE (sym, SYMBOL_TRAPPED_WRITE (base_variable));
+  SET_SYMBOL_TRAPPED (sym, SYMBOL_TRAPPED (XSYMBOL (base_variable)));
   LOADHIST_ATTACH (new_alias);
   /* Even if docstring is nil: remove old docstring.  */
   Fput (new_alias, Qvariable_documentation, docstring);
@@ -2356,6 +2357,7 @@ safe_eval (Lisp_Object sexp)
   return safe_calln (Qeval, sexp, Qt);
 }
 
+#if 0
 /* Apply a C subroutine SUBR to the NUMARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.  */
 
@@ -2419,6 +2421,7 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
   else
     xsignal2 (Qwrong_number_of_arguments, fun, make_fixnum (numargs));
 }
+#endif
 
 static Lisp_Object
 apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)

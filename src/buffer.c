@@ -1194,8 +1194,7 @@ reset_buffer_local_variables (struct buffer *b, int permanent_too)
                           newlist = Fcons (elt, newlist);
                       }
                   newlist = Fnreverse (newlist);
-                  if (XSYMBOL (local_var)->u.s.trapped_write
-		      == SYMBOL_TRAPPED_WRITE)
+                  if (SYMBOL_TRAPPED (XSYMBOL (local_var)) == SYMBOL_TRAPPED_WRITE)
                     notify_variable_watchers (local_var, newlist,
                                               Qmakunbound, Fcurrent_buffer ());
                   XSETCDR (XCAR (tmp), newlist);

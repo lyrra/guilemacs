@@ -340,7 +340,7 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
       scm_c_vector_set_x (sym, 4, v))
-#define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_CONSTANT (XSYMBOL (sym)))
+#define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)) == SYMBOL_NOWRITE)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)))
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
@@ -721,8 +721,8 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 #define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
 #define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
 #define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_number (v)))
-#define SYMBOL_CONSTANT(sym) (XINT (scm_c_vector_ref (sym, 2)))
-#define SET_SYMBOL_CONSTANT(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
+#define SYMBOL_TRAPPED(sym) (XINT (scm_c_vector_ref (sym, 2)))
+#define SET_SYMBOL_TRAPPED(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
 #define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
 #define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
 
@@ -3722,7 +3722,7 @@ set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 INLINE void
 make_symbol_constant (Lisp_Object sym)
 {
-  XSYMBOL (sym)->u.s.trapped_write = SYMBOL_NOWRITE;
+  SET_SYMBOL_TRAPPED(XSYMBOL (sym), SYMBOL_NOWRITE);
 }
 
 /* Buffer-local variable access functions.  */

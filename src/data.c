@@ -1565,7 +1565,7 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 
   CHECK_SYMBOL (symbol);
   sym_t sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (SYMBOL_TRAPPED (sym))
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1712,10 +1712,10 @@ set_internal (Lisp_Object symbol, Lisp_Object newval, Lisp_Object where,
 static void
 set_symbol_trapped_write (Lisp_Object symbol, enum symbol_trapped_write trap)
 {
-  struct Lisp_Symbol *sym = XSYMBOL (symbol);
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+  sym_t sym = XSYMBOL (symbol);
+  if (SYMBOL_TRAPPED (sym) == SYMBOL_NOWRITE)
     xsignal1 (Qtrapping_constant, symbol);
-  sym->u.s.trapped_write = trap;
+  SET_SYMBOL_TRAPPED (sym, trap);
 }
 
 static void
@@ -1730,7 +1730,7 @@ harmonize_variable_watchers (Lisp_Object alias, Lisp_Object base_variable)
   if (!EQ (base_variable, alias)
       && EQ (base_variable, Findirect_variable (alias)))
     set_symbol_trapped_write
-      (alias, XSYMBOL (base_variable)->u.s.trapped_write);
+      (alias, SYMBOL_TRAPPED(XSYMBOL (base_variable)));
 }
 
 DEFUN ("add-variable-watcher", Fadd_variable_watcher, Sadd_variable_watcher,
@@ -1818,6 +1818,7 @@ notify_variable_watchers (Lisp_Object symbol,
        watchers = XCDR (watchers))
     {
       Lisp_Object watcher = XCAR (watchers);
+#if 0 // guilemacs, no SUBRP
       /* Call subr directly to avoid gc.  */
       if (SUBRP (watcher))
         {
@@ -1826,6 +1827,7 @@ notify_variable_watchers (Lisp_Object symbol,
         }
       else
         calln (watcher, symbol, newval, operation, where);
+#endif
     }
 
   dynwind_end ();
@@ -1915,7 +1917,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 {
   CHECK_SYMBOL (symbol);
   sym_t sym = XSYMBOL (symbol);
-  switch (sym->u.s.trapped_write)
+  switch (SYMBOL_TRAPPED (sym))
     {
     case SYMBOL_NOWRITE:
       if (NILP (Fkeywordp (symbol))
@@ -1927,7 +1929,7 @@ set_default_internal (Lisp_Object symbol, Lisp_Object value,
 
     case SYMBOL_TRAPPED_WRITE:
       /* Don't notify here if we're going to call Fset anyway.  */
-      if (sym->u.s.redirect != SYMBOL_PLAINVAL
+      if (SYMBOL_REDIRECT (sym) != SYMBOL_PLAINVAL
           /* Setting due to thread switching doesn't count.  */
           && bindflag != SET_INTERNAL_THREAD_SWITCH)
         notify_variable_watchers (symbol, value, Qset_default, Qnil);
@@ -2160,7 +2162,7 @@ Instead, use `add-hook' and specify t for the LOCAL argument.  */)
     default: emacs_abort ();
     }
 
-  if (sym->u.s.trapped_write == SYMBOL_NOWRITE)
+  if (SYMBOL_TRAPPED (sym) == SYMBOL_NOWRITE)
     xsignal1 (Qsetting_constant, variable);
 
   if (!blv)
@@ -2257,7 +2259,7 @@ From now on the default value will apply in this buffer.  Return VARIABLE.  */)
     default: emacs_abort ();
     }
 
-  if (sym->u.s.trapped_write == SYMBOL_TRAPPED_WRITE)
+  if (SYMBOL_TRAPPED (sym) == SYMBOL_TRAPPED_WRITE)
     notify_variable_watchers (variable, Qnil, Qmakunbound, Fcurrent_buffer ());
 
   /* Get rid of this buffer's alist element, if any.  */
