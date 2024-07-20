@@ -812,6 +812,7 @@ ftcrfont_get_default_font_options (struct x_display_info *dpyinfo,
 static void
 syms_of_ftcrfont_for_pdumper (void)
 {
+  ftcrfont_driver.type = Qftcr;
   register_font_driver (&ftcrfont_driver, NULL);
 #ifdef HAVE_HARFBUZZ
   ftcrhbfont_driver = ftcrfont_driver;

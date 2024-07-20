@@ -749,10 +749,10 @@ xfthbfont_end_hb_font (struct font *font, hb_font_t *hb_font)
 
 static void syms_of_xftfont_for_pdumper (void);
 
-struct font_driver const xftfont_driver =
+struct font_driver xftfont_driver =
   {
     /* We can't draw a text without device dependent functions.  */
-    .type = LISPSYM_INITIALLY (Qxft),
+    .type = NULL,
     .get_cache = xfont_get_cache,
     .list = xftfont_list,
     .match = xftfont_match,
@@ -818,6 +818,7 @@ The font families in this list will not be ignored when
 static void
 syms_of_xftfont_for_pdumper (void)
 {
+  xftfont_driver.type = Qxft;
   register_font_driver (&xftfont_driver, NULL);
 #ifdef HAVE_HARFBUZZ
   xfthbfont_driver = xftfont_driver;

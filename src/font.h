@@ -961,7 +961,7 @@ extern struct font_driver xfont_driver;
 extern Lisp_Object xfont_get_cache (struct frame *);
 extern void syms_of_xfont (void);
 #ifdef HAVE_XFT
-extern struct font_driver const xftfont_driver;
+extern struct font_driver xftfont_driver;
 #ifdef HAVE_HARFBUZZ
 extern struct font_driver xfthbfont_driver;
 #endif	/* HAVE_HARFBUZZ */
