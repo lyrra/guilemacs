@@ -1188,7 +1188,6 @@ extern void char_table_set (Lisp_Object, int, Lisp_Object);
 /* Defined in data.c.  */
 //extern Lisp_Object Qnil;
 //extern Lisp_Object Qt;
-extern _Noreturn Lisp_Object wrong_type_argument (Lisp_Object, Lisp_Object);
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 
 /* True means Emacs has already been initialized.
