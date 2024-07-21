@@ -612,13 +612,13 @@ invalid_syntax_lisp (Lisp_Object s, Lisp_Object readcharfun)
 
       /* Get the line/column in the readcharfun buffer.  */
       {
-	specpdl_ref count = SPECPDL_INDEX ();
+	dynwind_begin ();
 
 	record_unwind_protect_excursion ();
 	set_buffer_internal (XBUFFER (readcharfun));
 	line = count_lines (BEGV_BYTE, PT_BYTE) + 1;
 	column = current_column ();
-	unbind_to (count, Qnil);
+	dynwind_end ();
       }
 
       xsignal (Qinvalid_read_syntax,
@@ -1781,10 +1781,11 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 		      Lisp_Object nomessage, Lisp_Object nosuffix,
 		      Lisp_Object must_suffix)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_save_match_data ();
   Lisp_Object result = Fload (file, noerror, nomessage, nosuffix, must_suffix);
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 static bool
@@ -2783,16 +2784,13 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end,
 
 static char *
 grow_read_buffer (char *buf, ptrdiff_t offset,
-		  char **buf_addr, ptrdiff_t *buf_size, specpdl_ref count)
+		  char **buf_addr, ptrdiff_t *buf_size)
 {
   char *p = xpalloc (*buf_addr, buf_size, MAX_MULTIBYTE_LENGTH, -1, 1);
   if (!*buf_addr)
     {
       memcpy (p, buf, offset);
-      record_unwind_protect_ptr (xfree, p);
     }
-  else
-    set_unwind_protect_ptr (count, xfree, p);
   *buf_addr = p;
   return p;
 }
@@ -3129,7 +3127,8 @@ read_integer (Lisp_Object readcharfun, int radix)
   char *p = read_buffer;
   char *heapbuf = NULL;
   int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin();
 
   int c = READCHAR;
   if (c == '-' || c == '+')
@@ -3175,7 +3174,9 @@ read_integer (Lisp_Object readcharfun, int radix)
     invalid_radix_integer (radix, readcharfun);
 
   *p = '\0';
-  return unbind_to (count, string_to_number (read_buffer, radix, NULL));
+  Lisp_Object tem = string_to_number (read_buffer, radix, NULL);
+  dynwind_end();
+  return tem;
 }
 
 
@@ -3231,7 +3232,6 @@ read_string_literal (Lisp_Object readcharfun)
   char stackbuf[1024];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
-  specpdl_ref count = SPECPDL_INDEX ();
   char *heapbuf = NULL;
   char *p = read_buffer;
   char *end = read_buffer + read_buffer_size;
@@ -3242,6 +3242,8 @@ read_string_literal (Lisp_Object readcharfun)
      a single-byte character.  */
   bool force_singlebyte = false;
   ptrdiff_t nchars = 0;
+
+  dynwind_begin ();
 
   int ch;
   while ((ch = READCHAR) >= 0 && ch != '\"')
@@ -3345,7 +3347,8 @@ read_string_literal (Lisp_Object readcharfun)
   Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer,
 					   (force_multibyte
 					    || (p - read_buffer != nchars)));
-  return unbind_to (count, obj);
+  dynwind_end ();
+  return obj;
 }
 
 /* Make a hash table from the constructor plist.  */
@@ -3949,6 +3952,8 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
   bool uninterned_symbol;
   bool skip_shorthand;
 
+  dynwind_begin ();
+
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
@@ -4376,8 +4381,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	      {
 		ptrdiff_t offset = p - read_buffer;
 		read_buffer = grow_read_buffer (read_buffer, offset,
-						&heapbuf, &read_buffer_size,
-						count);
+						&heapbuf, &read_buffer_size);
 		p = read_buffer + offset;
 		end = read_buffer + read_buffer_size;
 	      }
@@ -4602,7 +4606,8 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	}
     }
 
-  return unbind_to (base_pdl, obj);
+  dynwind_end ();
+  return obj;
 }
 
 
