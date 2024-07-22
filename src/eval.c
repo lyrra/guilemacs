@@ -109,7 +109,7 @@ make_catch_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  c->_lisp_eval_depth = lisp_eval_depth;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -125,7 +125,7 @@ make_condition_handler (Lisp_Object tag)
   c->var = Qnil;
   c->body = Qnil;
   c->next = handlerlist;
-  c->lisp_eval_depth = lisp_eval_depth;
+  c->_lisp_eval_depth = lisp_eval_depth;
   c->interrupt_input_blocked = interrupt_input_blocked;
   c->ptag = make_prompt_tag ();
   return c;
@@ -164,7 +164,7 @@ init_eval_once_for_pdumper (void)
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
 
-static struct handler *handlerlist_sentinel;
+/*static struct handler *handlerlist_sentinel;*/
 
 void
 init_eval (void)

@@ -3571,7 +3571,7 @@ struct handler
   EMACS_INT f_lisp_eval_depth;
   specpdl_ref pdlcount;
   struct bc_frame *act_rec;
-  EMACS_INT lisp_eval_depth;
+  EMACS_INT _lisp_eval_depth;
   int interrupt_input_blocked;
 
 #ifdef HAVE_X_WINDOWS

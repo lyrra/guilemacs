@@ -801,36 +801,18 @@ run_thread (void *state)
 
   acquire_global_lock (self);
 
-  /* Put a dummy catcher at top-level so that handlerlist is never NULL.
-     This is important since handlerlist->nextfree holds the freelist
-     which would otherwise leak every time we unwind back to top-level.   */
-  handlerlist_sentinel = xzalloc (sizeof (struct handler));
-  handlerlist = handlerlist_sentinel->nextfree = handlerlist_sentinel;
-  struct handler *c = push_handler (Qunbound, CATCHER);
-  eassert (c == handlerlist_sentinel);
-  handlerlist_sentinel->nextfree = NULL;
-  handlerlist_sentinel->next = NULL;
+  // RBTT "use libguile dynamic wind + c pseudo-closures"
+  handlerlist_sentinel = make_catch_handler (Qunbound);
+  handlerlist = handlerlist_sentinel;
 
   /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
 
   update_processes_for_thread_death (Fcurrent_thread ());
 
-  xfree (self->m_specpdl - 1);
   self->m_specpdl = NULL;
   self->m_specpdl_ptr = NULL;
   self->m_specpdl_end = NULL;
-
-  {
-    struct handler *c, *c_next;
-    for (c = handlerlist_sentinel; c; c = c_next)
-      {
-	c_next = c->nextfree;
-	xfree (c);
-      }
-  }
-
-  xfree (self->thread_name);
 
   current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
