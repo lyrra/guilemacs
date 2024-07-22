@@ -2897,40 +2897,6 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
   eassert (unwinding || this_binding->kind >= SPECPDL_LET);
   switch (this_binding->kind)
     {
-    case SPECPDL_UNWIND:
-      lisp_eval_depth = this_binding->unwind.eval_depth;
-      this_binding->unwind.func (this_binding->unwind.arg);
-      break;
-    case SPECPDL_UNWIND_ARRAY:
-      xfree (this_binding->unwind_array.array);
-      break;
-    case SPECPDL_UNWIND_PTR:
-      this_binding->unwind_ptr.func (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_UNWIND_INT:
-      this_binding->unwind_int.func (this_binding->unwind_int.arg);
-      break;
-    case SPECPDL_UNWIND_INTMAX:
-      this_binding->unwind_intmax.func (this_binding->unwind_intmax.arg);
-      break;
-    case SPECPDL_UNWIND_VOID:
-      this_binding->unwind_void.func ();
-      break;
-    case SPECPDL_UNWIND_EXCURSION:
-      save_excursion_restore (this_binding->unwind_excursion.marker,
-			      this_binding->unwind_excursion.window);
-      break;
-    case SPECPDL_BACKTRACE:
-    case SPECPDL_NOP:
-      break;
-#ifdef HAVE_MODULES
-    case SPECPDL_MODULE_RUNTIME:
-      finalize_runtime_unwind (this_binding->unwind_ptr.arg);
-      break;
-    case SPECPDL_MODULE_ENVIRONMENT:
-      finalize_environment_unwind (this_binding->unwind_ptr.arg);
-      break;
-#endif
     case SPECPDL_LET:
       { /* If variable has a trivial value (no forwarding), and isn't
 	   trapped, we can just set it.  */

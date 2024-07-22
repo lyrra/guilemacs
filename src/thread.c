@@ -665,7 +665,7 @@ mark_one_thread (struct thread_state *thread)
   /* Get the stack top now, in case mark_specpdl changes it.  */
   void const *stack_top = thread->stack_top;
 
-  mark_specpdl (thread->m_specpdl, thread->m_specpdl_ptr);
+  mark_specpdl (); // thread->m_specpdl, thread->m_specpdl_ptr);
 
   mark_c_stack (thread->m_stack_bottom, stack_top);
 
