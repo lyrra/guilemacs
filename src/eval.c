@@ -2685,10 +2685,10 @@ static void
 do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
              Lisp_Object value, enum Set_Internal_Bind bindflag)
 {
-  switch (sym->u.s.redirect)
+  switch (SYMBOL_REDIRECT (sym))
     {
     case SYMBOL_PLAINVAL:
-      if (!sym->u.s.trapped_write)
+      if (!SYMBOL_TRAPPED (sym))
 	SET_SYMBOL_VAL (sym, value);
       else
         set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
@@ -2935,9 +2935,9 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
       { /* If variable has a trivial value (no forwarding), and isn't
 	   trapped, we can just set it.  */
 	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (SYMBOLP (sym) && XSYMBOL (sym)->u.s.redirect == SYMBOL_PLAINVAL)
+	if (SYMBOLP (sym) && SYMBOL_REDIRECT (XSYMBOL (sym)) == SYMBOL_PLAINVAL)
 	  {
-	    if (XSYMBOL (sym)->u.s.trapped_write == SYMBOL_UNTRAPPED_WRITE)
+	    if (SYMBOL_TRAPPED_WRITE_P (sym) == SYMBOL_UNTRAPPED_WRITE)
 	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
 	    else
 	      set_internal (sym, specpdl_old_value (this_binding),
