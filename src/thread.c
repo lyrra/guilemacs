@@ -363,7 +363,7 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   (Lisp_Object mutex)
 {
   struct Lisp_Mutex *lmutex;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   CHECK_MUTEX (mutex);
   lmutex = XMUTEX (mutex);
@@ -371,7 +371,8 @@ Note that calls to `mutex-lock' and `mutex-unlock' must be paired.  */)
   current_thread->event_object = mutex;
   record_unwind_protect_void (do_unwind_mutex_lock);
   flush_stack_call_func (mutex_lock_callback, lmutex);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 static void
@@ -686,10 +687,11 @@ DEFUN ("thread-yield", Fthread_yield, Sthread_yield, 0, 0, 0,
 static Lisp_Object
 invoke_thread_function (void)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   current_thread->result = calln (current_thread->function);
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 static Lisp_Object last_thread_error;
