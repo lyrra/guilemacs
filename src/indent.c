@@ -2194,7 +2194,8 @@ buffer, whether or not it is currently displayed in some window.  */)
   struct window *w;
   Lisp_Object lcols = Qnil;
   void *itdata = NULL;
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   /* Allow LINES to be of the form (HPOS . VPOS) aka (COLUMNS . LINES).  */
   if (CONSP (lines))
@@ -2473,7 +2474,9 @@ buffer, whether or not it is currently displayed in some window.  */)
       bidi_unshelve_cache (itdata, 0);
     }
 
-  return unbind_to (count, make_fixnum (it.vpos));
+  dynwind_end ();
+
+  return make_fixnum (it.vpos);
 }
 
 
