@@ -1822,44 +1822,6 @@ pure_cons (Lisp_Object car, Lisp_Object cdr)
   return Fcons (car, cdr);
 }
 
-/* Copy all contents and parameters of TABLE to a new table allocated
-   from pure space, return the purified table.  */
-static struct Lisp_Hash_Table *
-purecopy_hash_table (struct Lisp_Hash_Table *table)
-{
-  eassert (table->weakness == Weak_None);
-  eassert (table->purecopy);
-
-  struct Lisp_Hash_Table *pure = pure_alloc (sizeof *pure, Lisp_Vectorlike);
-  *pure = *table;
-  pure->mutable = false;
-
-  if (table->table_size > 0)
-    {
-      ptrdiff_t hash_bytes = table->table_size * sizeof *table->hash;
-      pure->hash = pure_alloc (hash_bytes, -(int)sizeof *table->hash);
-      memcpy (pure->hash, table->hash, hash_bytes);
-
-      ptrdiff_t next_bytes = table->table_size * sizeof *table->next;
-      pure->next = pure_alloc (next_bytes, -(int)sizeof *table->next);
-      memcpy (pure->next, table->next, next_bytes);
-
-      ptrdiff_t nvalues = table->table_size * 2;
-      ptrdiff_t kv_bytes = nvalues * sizeof *table->key_and_value;
-      pure->key_and_value = pure_alloc (kv_bytes,
-					-(int)sizeof *table->key_and_value);
-      for (ptrdiff_t i = 0; i < nvalues; i++)
-	pure->key_and_value[i] = purecopy (table->key_and_value[i]);
-
-      ptrdiff_t index_bytes = hash_table_index_size (table)
-	                      * sizeof *table->index;
-      pure->index = pure_alloc (index_bytes, -(int)sizeof *table->index);
-      memcpy (pure->index, table->index, index_bytes);
-    }
-
-  return pure;
-}
-
 DEFUN ("purecopy", Fpurecopy, Spurecopy, 1, 1, 0,
        doc: /* Return OBJ.  */)
   (register Lisp_Object obj)
