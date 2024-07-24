@@ -225,7 +225,7 @@ DEFINE_GDB_SYMBOL_END (USE_LSB_TAG)
 
 /* Mask for the value (as opposed to the type bits) of a Lisp object.  */
 DEFINE_GDB_SYMBOL_BEGIN (EMACS_INT, VALMASK)
-# define VALMASK (USE_LSB_TAG ? - (1 << GCTYPEBITS) : VAL_MAX)
+# define VALMASK (USE_LSB_TAG ? - (1 << GCTYPEBITS) : 0)
 DEFINE_GDB_SYMBOL_END (VALMASK)
 
 /* Ignore 'alignas' on compilers lacking it.  */
@@ -325,8 +325,11 @@ typedef EMACS_INT Lisp_Word;
 # define lisp_h_XIL(i) (SCM_PACK (i))
 #endif
 
+/* Extract a's pointer value, assuming a's Lisp type is TYPE and the
+   extracted pointer's type is CTYPE *.  */
+
 #define SMOB_PTR(a) ((void *) SCM_SMOB_DATA (a))
-#define SMOB_PTR3(a, b, c) ((c *) SCM_SMOB_DATA (a))
+#define SMOB_PTR3(a, type, ctype) ((ctype *) SCM_SMOB_DATA (a))
 #define SMOB_TYPEP(x, tag) (x && SCM_SMOB_PREDICATE (tag, x))
 #define lisp_h_CHECK_FIXNUM(x) CHECK_TYPE (FIXNUMP (x), Qfixnump, x)
 #define lisp_h_CHECK_SYMBOL(x) CHECK_TYPE (SYMBOLP (x), Qsymbolp, x)
@@ -623,46 +626,11 @@ INLINE Lisp_Object
   return lisp_h_XIL (i);
 }
 
-INLINE void *
-(XLP) (Lisp_Object o)
-{
-  return lisp_h_XLP (o);
-}
-
-/* Extract A's type.  */
-
-INLINE enum Lisp_Type
-(XTYPE) (Lisp_Object a)
-{
-#if USE_LSB_TAG
-  return lisp_h_XTYPE (a);
-#else
-  EMACS_UINT i = XLI (a);
-  return USE_LSB_TAG ? i & ~VALMASK : i >> VALBITS;
-#endif
-}
-
-/* True if A has type tag TAG.
-   Equivalent to XTYPE (a) == TAG, but often faster.  */
-
-INLINE bool
-(TAGGEDP) (Lisp_Object a, enum Lisp_Type tag)
-{
-  return lisp_h_TAGGEDP (a, tag);
-}
-
 INLINE void
 (CHECK_TYPE) (int ok, Lisp_Object predicate, Lisp_Object x)
 {
   lisp_h_CHECK_TYPE (ok, predicate, x);
 }
-
-/* Extract A's pointer value, assuming A's Lisp type is TYPE and the
-   extracted pointer's type is CTYPE *.  When !USE_LSB_TAG this simply
-   extracts A's low-order bits, as (uintptr_t) LISP_WORD_TAG (type) is
-   always zero then.  */
-#define XUNTAG(a, type, ctype) \
-  ((ctype *) ((uintptr_t) XLP (a) - (uintptr_t) LISP_WORD_TAG (type)))
 
 /* A forwarding pointer to a value.  It uses a generic pointer to
    avoid alignment bugs that could occur if it used a pointer to a
@@ -821,8 +789,6 @@ XSYMBOL (Lisp_Object a)
 
 extern Lisp_Object intern_c_string_2 (const char *, ptrdiff_t);
 
-#include <globals.h>
-
 /* Header of vector-like objects.  This documents the layout constraints on
    vectors and pseudovectors (objects of PVEC_xxx subtype).  It also prevents
    compilers from being fooled by Emacs's type punning: XSETPSEUDOVECTOR
@@ -873,6 +839,12 @@ struct Lisp_Symbol_With_Pos
   Lisp_Object sym;              /* A symbol */
   Lisp_Object pos;              /* A fixnum */
 } GCALIGNED_STRUCT;
+
+INLINE Lisp_Object builtin_lisp_symbol (int index);
+
+#include <globals.h>
+
+INLINE bool (EQ) (Lisp_Object x, Lisp_Object y);
 
 /* In the size word of a struct Lisp_Vector, this bit means it's really
    some other vector-like object.  */
@@ -2639,7 +2611,7 @@ INLINE struct Lisp_Marker *
 XMARKER (Lisp_Object a)
 {
   eassert (MARKERP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Marker);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Marker);
 }
 
 INLINE bool
@@ -2652,7 +2624,7 @@ INLINE struct Lisp_Overlay *
 XOVERLAY (Lisp_Object a)
 {
   eassert (OVERLAYP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Overlay);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Overlay);
 }
 
 INLINE bool
@@ -2665,7 +2637,7 @@ INLINE struct Lisp_User_Ptr *
 XUSER_PTR (Lisp_Object a)
 {
   eassert (USER_PTRP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_User_Ptr);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_User_Ptr);
 }
 
 INLINE bool
