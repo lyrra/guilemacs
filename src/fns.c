@@ -4624,7 +4624,6 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
   return vec;
 }
 
-
 /***********************************************************************
 			 Low-level Functions
  ***********************************************************************/
