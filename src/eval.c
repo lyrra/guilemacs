@@ -744,7 +744,6 @@ restore_handler (void *data)
 {
   struct handler *c = data;
   unblock_input_to (c->interrupt_input_blocked);
-  immediate_quit = 0;
 }
 
 struct icc_thunk_env
@@ -1924,7 +1923,7 @@ grow_specpdl_allocation (void)
 static Lisp_Object
 eval_sub_1 (Lisp_Object form)
 {
-  QUIT;
+  maybe_quit ();
   return scm_call_1 (eval_fn, form);
 }
 
