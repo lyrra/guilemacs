@@ -4619,7 +4619,7 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
   new_size = old_size + incr;
   v = allocate_vector (new_size);
   memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
-  memsetnil(v->contents + old_size, (new_size - old_size));
+  memsetnil(v->contents + old_size, new_size - old_size);
   XSETVECTOR (vec, v);
   return vec;
 }
