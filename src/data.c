@@ -214,7 +214,7 @@ a fixed set of types.  */)
     return Qstring;
   else if (CONSP (object))
     return Qcons;
-  else if (PSEUDOVECTORP (object))
+  else if (VECTORLIKEP (object))
     {
       switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
         {
@@ -281,6 +281,8 @@ a fixed set of types.  */)
 	case PVEC_MISC_PTR:
         case PVEC_OTHER:
         case PVEC_FREE: ;
+        default:
+          return Qvector;
         }
       emacs_abort ();
     }
