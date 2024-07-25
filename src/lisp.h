@@ -88,6 +88,7 @@ typedef scm_t_signed_bits EMACS_INT;
 typedef scm_t_bits EMACS_UINT;
 #define EMACS_INT_MAX SCM_T_SIGNED_BITS_MAX
 #define EMACS_INT_WIDTH INT_WIDTH
+#define EMACS_UINT_WIDTH UINT_WIDTH
 
 #if INTPTR_MAX == INT_MAX
 #define pI ""
