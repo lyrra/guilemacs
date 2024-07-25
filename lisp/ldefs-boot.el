@@ -1616,9 +1616,6 @@ You can edit the buffer and turn this mode off and on again as
 you please.  But make sure the background process has stopped
 writing before you save the file!
 
-When a buffer is reverted, a message is generated.  This can be
-suppressed by setting `auto-revert-verbose' to nil.
-
 Use `auto-revert-mode' for changes other than appends!
 
 This is a minor mode.  If called interactively, toggle the
@@ -1661,9 +1658,6 @@ may also revert some non-file buffers, as described in the
 documentation of that variable.  It ignores buffers with modes
 matching `global-auto-revert-ignore-modes', and buffers with a
 non-nil value of `global-auto-revert-ignore-buffer'.
-
-When a buffer is reverted, a message is generated.  This can be
-suppressed by setting `auto-revert-verbose' to nil.
 
 This function calls the hook `global-auto-revert-mode-hook'.
 It displays the text that `global-auto-revert-mode-text'
@@ -3432,6 +3426,7 @@ diary entries can also be marked on the calendar (see
 
 Runs the following hooks:
 
+`calendar-load-hook' - after loading calendar.el
 `calendar-today-visible-hook', `calendar-today-invisible-hook' - after
    generating a calendar, if today's date is visible or not, respectively
 `calendar-initial-window-hook' - after first creating a calendar
@@ -6373,7 +6368,7 @@ option itself, into the file you specify, overwriting any
 `custom-set-variables' and `custom-set-faces' forms already
 present in that file.  It will not delete any customizations from
 the old custom file.  You should do that manually if that is what you
-want.  You also have to put something like (load \"CUSTOM-FILE\")
+want.  You also have to put something like `(load \"CUSTOM-FILE\")
 in your init file, where CUSTOM-FILE is the actual name of the
 file.  Otherwise, Emacs will not load the file when it starts up,
 and hence will not set `custom-file' to that file either.")
@@ -11077,9 +11072,8 @@ corresponding to a successful execution.
 
 (defvar tags-file-name nil "\
 File name of tags table.
-To switch to a new tags table, do not set this variable; instead,
-invoke `visit-tags-table', which is the only reliable way of
-setting the value of this variable, whether buffer-local or global.
+To switch to a new tags table, setting this variable is sufficient.
+If you set this variable, do not also set `tags-table-list'.
 Use the `etags' program to make a tags table file.")
  (put 'tags-file-name 'variable-interactive (purecopy "fVisit tags table: "))
  (put 'tags-file-name 'safe-local-variable 'stringp)
@@ -11127,8 +11121,7 @@ FILE should be the name of a file created with the `etags' program.
 A directory name is ok too; it means file TAGS in that directory.
 
 Normally \\[visit-tags-table] sets the global value of `tags-file-name'.
-With a prefix arg, set the buffer-local value instead.  When called
-from Lisp, if the optional arg LOCAL is non-nil, set the local value.
+With a prefix arg, set the buffer-local value instead.
 When you find a tag with \\[find-tag], the buffer it finds the tag
 in is given a local value of this variable which is the name of the tags
 file the tag was in.
@@ -11136,15 +11129,12 @@ file the tag was in.
 (fn FILE &optional LOCAL)" t)
 (autoload 'visit-tags-table-buffer "etags" "\
 Select the buffer containing the current tags table.
-Optional arg CONT specifies which tags table to visit.
-If CONT is a string, visit that file as a tags table.
-If CONT is t, visit the next table in `tags-table-list'.
-If CONT is the atom `same', don't look for a new table;
+If optional arg is a string, visit that file as a tags table.
+If optional arg is t, visit the next table in `tags-table-list'.
+If optional arg is the atom `same', don't look for a new table;
  just select the buffer visiting `tags-file-name'.
-If CONT is nil or absent, choose a first buffer from information in
+If arg is nil or absent, choose a first buffer from information in
  `tags-file-name', `tags-table-list', `tags-table-list-pointer'.
-Optional second arg CBUF, if non-nil, specifies the initial buffer,
-which is important if that buffer has a local value of `tags-file-name'.
 Returns t if it visits a tags table, or nil if there are no more in the list.
 
 (fn &optional CONT CBUF)")
@@ -12602,17 +12592,16 @@ using this connection, see `connection-local-criteria-alist'.
 PROFILES are the names of connection profiles (a symbol).
 
 When a connection to a remote server is opened and CRITERIA
-matches to that server, the connection-local variables from
-PROFILES are applied to the corresponding process buffer.  The
-variables for a connection profile are defined using
-`connection-local-set-profile-variables'.
+matches to that server, the connection-local variables from CLASSES
+are applied to the corresponding process buffer.  The variables
+for a class are defined using `connection-local-set-class-variables'.
 
 (fn CRITERIA &rest PROFILES)")
 (autoload 'connection-local-set-profile-variables "files-x" "\
 Map the symbol PROFILE to a list of variable settings.
 VARIABLES is a list that declares connection-local variables for
-the connection profile.  An element in VARIABLES is an alist
-whose elements are of the form (VAR . VALUE).
+the class.  An element in VARIABLES is an alist whose elements
+are of the form (VAR . VALUE).
 
 When a connection to a remote server is opened, the server's
 connection profiles are found.  A server may be assigned a
@@ -12642,7 +12631,7 @@ This does nothing if `enable-connection-local-variables' is nil.
 
 (fn CRITERIA)")
 (autoload 'hack-connection-local-variables-apply "files-x" "\
-Apply connection-local variables identified by CRITERIA.
+Apply connection-local variables identified by `default-directory'.
 Other local variables, like file-local and dir-local variables,
 will not be changed.
 
@@ -16999,8 +16988,6 @@ operation is complete, in the form:
 ACTIVE-OPSTRING is a string which will be displayed to the user in a
 confirmation message, in the form:
  \"Really ACTIVE-OPSTRING x buffers?\"
-BEFORE is a form to evaluate before start the operation.
-AFTER is a form to evaluate once the operation is complete.
 COMPLEX means this function is special; if COMPLEX is nil BODY
 evaluates once for each marked buffer, MBUF, with MBUF current
 and saving the point.  If COMPLEX is non-nil, BODY evaluates
@@ -21784,6 +21771,12 @@ The default is 20.  If LIMIT is negative, do not limit the listing.
 
 
 ;;; Generated autoloads from international/mule-util.el
+
+(defsubst string-to-list (string) "\
+Return a list of characters in STRING." (append string nil))
+
+(defsubst string-to-vector (string) "\
+Return a vector of characters in STRING." (vconcat string))
 
 (autoload 'store-substring "mule-util" "\
 Embed OBJ (string or character) at index IDX of STRING.
@@ -29651,10 +29644,6 @@ The optional third argument STR, if specified, is the value for the
 variable `str' within the skeleton.  When this is non-nil, the
 interactor gets ignored, and this should be a valid skeleton element.
 
-When done with skeleton, but before going back to `_'-point, add
-a newline (unless `skeleton-end-newline' is nil) and run the hook
-`skeleton-end-hook'.
-
 SKELETON is made up as (INTERACTOR ELEMENT ...).  INTERACTOR may be nil if
 not needed, a prompt-string or an expression for complex read functions.
 
@@ -35907,7 +35896,7 @@ AUTO expansion functions are, in part:
 
 Some other functions are:
 
-    \\[completion-at-point]    Complete word with appropriate possibilities.
+    \\[verilog-complete-word]    Complete word with appropriate possibilities.
     \\[verilog-mark-defun]  Mark function.
     \\[verilog-beg-of-defun]  Move to beginning of current function.
     \\[verilog-end-of-defun]  Move to end of current function.
