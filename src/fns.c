@@ -2051,7 +2051,7 @@ assoc_no_quit (Lisp_Object key, Lisp_Object alist)
     {
       Lisp_Object car = XCAR (alist);
       if (CONSP (car)
-	  && (EQ (XCAR (car), key) || equal_no_quit (XCAR (car), key)))
+	  && (EQ (XCAR (car), key) || Fequal (XCAR (car), key))) // equal_no_quit
 	return car;
     }
   return Qnil;
@@ -2814,19 +2814,8 @@ of strings.  (`equal' ignores text properties.)  */)
   return tem;
 }
 
-/* Return true if O1 and O2 are equal.  Do not quit or check for cycles.
-   Use this only on arguments that are cycle-free and not too large and
-   are not window configurations.  */
-
-bool
-equal_no_quit (Lisp_Object o1, Lisp_Object o2)
-{
-  return misc_equal_p (o1, o2)
-}
-
 static ptrdiff_t hash_lookup_with_hash (struct Lisp_Hash_Table *h,
 					Lisp_Object key, hash_hash_t hash);
-
 
 /* Return true if O1 and O2 are equal.  EQUAL_KIND specifies what kind
    of equality test to use: if it is EQUAL_NO_QUIT, do not check for

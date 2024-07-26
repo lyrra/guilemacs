@@ -256,7 +256,7 @@ find_descriptor (Lisp_Object descriptor)
 {
   Lisp_Object tail, prevtail = Qt;
   for (tail = watch_list; !NILP (tail); prevtail = tail, tail = XCDR (tail))
-    if (equal_no_quit (XCAR (XCAR (tail)), descriptor))
+    if (Fequal (XCAR (XCAR (tail)), descriptor)) // equal_no_quit
       return prevtail;
   return Qnil;
 }
