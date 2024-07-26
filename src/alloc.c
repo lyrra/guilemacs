@@ -1265,13 +1265,15 @@ symbol or a type descriptor.  SLOTS is the number of non-type slots,
 each initialized to INIT.  */)
   (Lisp_Object type, Lisp_Object slots, Lisp_Object init)
 {
+  Lisp_Object record;
   CHECK_FIXNAT (slots);
   EMACS_INT size = XFIXNAT (slots) + 1;
   struct Lisp_Vector *p = allocate_record (size);
   p->contents[0] = type;
   for (ptrdiff_t i = 1; i < size; i++)
     p->contents[i] = init;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  XSETRECORD (record, p);
+  return record;
 }
 
 
@@ -1283,9 +1285,10 @@ slots with shallow copies of the arguments.
 usage: (record TYPE &rest SLOTS) */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  struct Lisp_Vector *p = allocate_record (nargs);
+  Lisp_Object val = make_uninit_vector (nargs);
+  struct Lisp_Vector *p = XVECTOR (val);
   memcpy (p->contents, args, nargs * sizeof *args);
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  return val;
 }
 
 

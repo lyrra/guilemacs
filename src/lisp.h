@@ -1206,6 +1206,7 @@ XTYPE (Lisp_Object o)
 #define XSETINT(a, b) ((a) = make_fixnum (b))
 #define XSETFASTINT(a, b) ((a) = make_fixed_natnum (b))
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
+#define XSETRECORD(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
 #define XSETSYMBOL(a, b) ((a) = (b)->self)
 
