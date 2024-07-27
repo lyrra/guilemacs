@@ -1285,10 +1285,11 @@ slots with shallow copies of the arguments.
 usage: (record TYPE &rest SLOTS) */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object val = make_uninit_vector (nargs);
-  struct Lisp_Vector *p = XVECTOR (val);
+  struct Lisp_Vector *p = allocate_record (nargs);
   memcpy (p->contents, args, nargs * sizeof *args);
-  return val;
+  Lisp_Object record;
+  XSETRECORD (record, p);
+  return record;
 }
 
 
