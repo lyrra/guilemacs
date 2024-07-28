@@ -4608,7 +4608,7 @@ INLINE struct Lisp_Module_Function *
 XMODULE_FUNCTION (Lisp_Object o)
 {
   eassert (MODULE_FUNCTIONP (o));
-  return XUNTAG (o, Lisp_Vectorlike, struct Lisp_Module_Function);
+  return SMOB_PTR3 (o, Lisp_Vectorlike, struct Lisp_Module_Function);
 }
 
 #ifdef HAVE_MODULES
