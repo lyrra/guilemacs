@@ -2007,7 +2007,7 @@ nil.  */)
       return Qt;
     }
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
 
   ptrdiff_t diags = size_a + size_b + 3;
@@ -2115,7 +2115,8 @@ nil.  */)
       --j;
     }
 
-  SAFE_FREE_UNBIND_TO (count, Qnil);
+  dynwind_end ();
+  SAFE_FREE ();
 
   if (modification_hooks_inhibited)
     {
