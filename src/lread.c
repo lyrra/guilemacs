@@ -4445,48 +4445,18 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	    /* Don't create the string object for the name unless
 	       we're going to retain it in a new symbol.
 
-	       Like intern_1 but supports multibyte names.  */
-	    Lisp_Object obarray = check_obarray (Vobarray);
-
-	    char *longhand = NULL;
-	    ptrdiff_t longhand_chars = 0;
-	    ptrdiff_t longhand_bytes = 0;
-
-	    Lisp_Object found;
-	    if (skip_shorthand
-		/* We exempt characters used in the "core" Emacs Lisp
-		   symbols that are comprised entirely of characters
-		   that have the 'symbol constituent' syntax from
-		   transforming according to shorthands.  */
-		|| symbol_char_span (read_buffer) >= nbytes)
-	      found = oblookup (obarray, read_buffer, nchars, nbytes);
-	    else
-	      found = oblookup_considering_shorthand (obarray, read_buffer,
-						      nchars, nbytes, &longhand,
-						      &longhand_chars,
-						      &longhand_bytes);
-
-	    if (BARE_SYMBOL_P (found))
-	      result = found;
-	    else if (longhand)
-	      {
-		Lisp_Object name = make_specified_string (longhand,
-							  longhand_chars,
-							  longhand_bytes,
-							  multibyte);
-		xfree (longhand);
-		result = intern_driver (name, obarray, found);
-	      }
-	    else
-	      {
-		Lisp_Object name = make_specified_string (read_buffer, nchars,
-							  nbytes, multibyte);
-		result = intern_driver (name, obarray, found);
-	      }
-	  }
-	if (locate_syms && !NILP (result))
-	  result = build_symbol_with_pos (result,
-					  make_fixnum (start_position));
+		 Like intern_1 but supports multibyte names.  */
+	      Lisp_Object obarray = check_obarray (Vobarray);
+		{
+		  Lisp_Object name
+		    = make_specified_string (read_buffer, nchars, nbytes,
+					     multibyte);
+		  result = intern_driver (name, obarray);
+		}
+	    }
+	  if (locate_syms && !NILP (result))
+	    result = build_symbol_with_pos (result,
+					    make_fixnum (start_position));
 
 	obj = result;
 	break;
