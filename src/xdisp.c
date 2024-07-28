@@ -24792,12 +24792,12 @@ display_count_lines_logically (ptrdiff_t start_byte, ptrdiff_t limit_byte,
     return display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
 
   ptrdiff_t val;
-  specpdl_ref pdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (save_restriction_restore, save_restriction_save ());
   labeled_restrictions_remove_in_current_buffer ();
   Fwiden ();
   val = display_count_lines (start_byte, limit_byte, count, byte_pos_ptr);
-  unbind_to (pdl_count, Qnil);
+  dynwind_end ();
   return val;
 }
 
@@ -24819,7 +24819,7 @@ display_count_lines_visually (struct it *it)
     return it->lnum + 1;
   else
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       if (IT_CHARPOS (*it) <= PT)
 	{
@@ -24844,7 +24844,7 @@ display_count_lines_visually (struct it *it)
 		  tem_it.last_visible_y
 		  + (SCROLL_LIMIT + 10) * FRAME_LINE_HEIGHT (tem_it.f),
 		  -1, MOVE_TO_POS | MOVE_TO_Y);
-      unbind_to (count, Qnil);
+      dynwind_end ();
       return IT_CHARPOS (*it) <= PT ? -tem_it.vpos : tem_it.vpos;
     }
 }

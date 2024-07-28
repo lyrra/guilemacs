@@ -2045,7 +2045,6 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
       struct text_pos startpos;
       bool saved_restriction = false;
       struct buffer *old_buf = current_buffer;
-      specpdl_ref count = SPECPDL_INDEX ();
       SET_TEXT_POS_FROM_MARKER (startpos, w->start);
       void *itdata = bidi_shelve_cache ();
 
@@ -2063,6 +2062,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
 	SET_TEXT_POS (startpos, PT, PT_BYTE);
       if (startpos.charpos < BEGV || startpos.charpos > ZV)
 	{
+          dynwind_begin ();
 	  record_unwind_protect (save_restriction_restore,
 				 save_restriction_save ());
 	  labeled_restrictions_remove_in_current_buffer ();
@@ -2079,7 +2079,7 @@ line_number_display_width (struct window *w, int *width, int *pixel_width)
       *width = it.lnum_width;
       *pixel_width = it.lnum_pixel_width;
       if (saved_restriction)
-	unbind_to (count, Qnil);
+        dynwind_end ();
       set_buffer_internal_1 (old_buf);
       bidi_unshelve_cache (itdata, 0);
     }
