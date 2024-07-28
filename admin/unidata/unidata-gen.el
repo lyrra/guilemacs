@@ -1435,7 +1435,6 @@ same directory."))
             (setq table (funcall generator prop index default-value val-list))
             (when describer
               (unless (subrp (symbol-function describer))
-                (unidata--ensure-compiled describer)
                 (setq describer (symbol-function describer)))
               (set-char-table-extra-slot table 3 describer))
             (insert (format "(define-char-code-property '%S\n  %S\n  %S)\n"
