@@ -2642,11 +2642,12 @@ This is the last value stored with `(put SYMBOL PROPNAME VALUE)'.  */)
   (Lisp_Object symbol, Lisp_Object propname)
 {
   CHECK_SYMBOL (symbol);
-  Lisp_Object propval = plist_get (CDR (Fassq (symbol,
-					       Voverriding_plist_environment)),
-				   propname);
-  if (!NILP (propval))
-    return propval;
+  // guilemacs, no compile-time (yet)
+  //Lisp_Object propval = plist_get (CDR (Fassq (symbol,
+	//				       Voverriding_plist_environment)),
+	//			   propname);
+  //if (!NILP (propval))
+  //  return propval;
   return plist_get (symbol_plist (symbol), propname);
 }
 
