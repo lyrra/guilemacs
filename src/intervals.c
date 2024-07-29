@@ -2179,7 +2179,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
 {
   Lisp_Object prop, lispy_position, lispy_buffer;
   ptrdiff_t old_begv, old_zv, old_begv_byte, old_zv_byte;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   position = clip_to_bounds (BUF_BEGV (buffer), position, BUF_ZV (buffer));
 
@@ -2208,7 +2208,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
 
   SET_BUF_BEGV_BOTH (buffer, old_begv, old_begv_byte);
   SET_BUF_ZV_BOTH (buffer, old_zv, old_zv_byte);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Use the local map only if it is valid.  */
   prop = get_keymap (prop, 0, 0);
