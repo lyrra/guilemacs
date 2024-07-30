@@ -1005,7 +1005,7 @@ INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
   struct Lisp_Symbol *sym = lispsym + index;
-  return sym->self_;
+  return sym->u.s.self_;
 }
 
 INLINE bool

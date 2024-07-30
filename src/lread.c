@@ -5161,7 +5161,7 @@ init_obarray_once (void)
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    lispsym[i].self_ = intern_initial_c_string (defsym_name[i], strlen(defsym_name[i]));
+    lispsym[i].u.s.self_ = intern_initial_c_string (defsym_name[i], strlen(defsym_name[i]));
 
   DEFSYM (Qunbound, "unbound");
   //SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);
@@ -5172,8 +5172,8 @@ init_obarray_once (void)
   //SET_SYMBOL_VAL (XSYMBOL (Qt), Qt);
   //make_symbol_constant (Qt);
 
-  lispsym[iQnil].self_ = SCM_ELISP_NIL;
-  lispsym[iQt].self_ = SCM_BOOL_T;
+  lispsym[iQnil].u.s.self_ = SCM_ELISP_NIL;
+  lispsym[iQt].u.s.self_ = SCM_BOOL_T;
 
   //Qnil_ = intern_c_string ("nil");
   //define_symbol (Qnil_, "nil");
@@ -5187,7 +5187,7 @@ init_obarray_once (void)
   //SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   //SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
-  lispsym[iQunbound].self_ = scm_c_public_ref ("language elisp runtime", "unbound");
+  lispsym[iQunbound].u.s.self_ = scm_c_public_ref ("language elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
   //for (int i = 0; i <  ARRAYELTS (lispsym); i++)

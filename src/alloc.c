@@ -667,7 +667,7 @@ make_empty_string (int multibyte)
   string = allocate_string ();
   allocate_string_data (string, 0, 0);
   if (! multibyte)
-    XSTRING (string)->size_byte = -1;			\
+    XSTRING (string)->u.s.size_byte = -1;			\
   return string;
 }
 
@@ -1914,7 +1914,7 @@ static int
 print_lisp_string (SCM obj, SCM port, scm_print_state *pstate)
 {
   scm_c_write (port, "#<elisp-string \"", 16);
-  scm_c_write (port, XSTRING (obj)->data, STRING_BYTES (XSTRING (obj)));
+  scm_c_write (port, XSTRING (obj)->u.s.data, STRING_BYTES (XSTRING (obj)));
   scm_c_write (port, "\">", 2);
   return 0;
 }
