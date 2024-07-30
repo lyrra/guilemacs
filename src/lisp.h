@@ -798,8 +798,10 @@ extern Lisp_Object intern_c_string_2 (const char *, ptrdiff_t);
    incorrectly reorder loads and stores to their size fields.  See
    Bug#8546.  This union formerly contained more members, and there's
    no compelling reason to change it to a struct merely because the
-   number of members has been reduced to one.  */
-union vectorlike_header
+   number of members has been reduced to one.
+   In guilemacs we have more than one member, so use struct.
+  */
+struct vectorlike_header
   {
     Lisp_Object self;
     /* The `size' header word, W bits wide, has one of two forms
@@ -1233,7 +1235,7 @@ dead_object (void)
 #define XSETPSEUDOVECTOR(a, b, code) \
   XSETTYPED_PSEUDOVECTOR (a, b,					\
 			  (SMOB_PTR3 (a, Lisp_Vectorlike,	\
-				      union vectorlike_header)	\
+				      struct vectorlike_header)	\
 			   ->size),				\
 			  code)
 #define XSETTYPED_PSEUDOVECTOR(a, b, size, code)			\
@@ -1528,7 +1530,7 @@ string_immovable_p (Lisp_Object str)
 
 struct Lisp_Vector
   {
-    union vectorlike_header header;
+    struct vectorlike_header header;
     Lisp_Object contents[FLEXIBLE_ARRAY_MEMBER];
   } GCALIGNED_STRUCT;
 
@@ -1592,7 +1594,7 @@ PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
 
 /* Can't be used with PVEC_NORMAL_VECTOR.  */
 INLINE bool
-PSEUDOVECTOR_TYPEP (const union vectorlike_header *a, enum pvec_type code)
+PSEUDOVECTOR_TYPEP (const struct vectorlike_header *a, enum pvec_type code)
 {
   /* We don't use PSEUDOVECTOR_TYPE here so as to avoid a shift
    * operation when `code' is known.  */
@@ -1621,7 +1623,7 @@ struct Lisp_Bool_Vector
   {
     /* HEADER.SIZE is the vector's size field.  It doesn't have the real size,
        just the subtype information.  */
-    union vectorlike_header header;
+    struct vectorlike_header header;
     /* The size in bits; at most BOOL_VECTOR_LENGTH_MAX.  */
     EMACS_INT size;
     /* The actual bits, packed into bytes.
@@ -1881,7 +1883,7 @@ struct Lisp_Char_Table
        pseudovector type information.  It holds the size, too.
        The size counts the defalt, parent, purpose, ascii,
        contents, and extras slots.  */
-    union vectorlike_header header;
+    struct vectorlike_header header;
 
     /* This holds the default value, which is used whenever the value
        for a specific character is nil.  */
@@ -1923,7 +1925,7 @@ struct Lisp_Sub_Char_Table
   {
     /* HEADER.SIZE is the vector's size field, which also holds the
        pseudovector type information.  It holds the size, too.  */
-    union vectorlike_header header;
+    struct vectorlike_header header;
 
     /* Depth of this sub char-table.  It should be 1, 2, or 3.  A sub
        char-table of depth 1 contains 16 elements, and each element
@@ -2218,7 +2220,7 @@ typedef int32_t hash_idx_t;
 
 struct Lisp_Hash_Table
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* Hash table internal structure:
 
@@ -2471,7 +2473,7 @@ knuth_hash (hash_hash_t hash, unsigned bits)
 
 struct Lisp_Marker
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   /* This is the buffer that the marker points into, or 0 if it points nowhere.
      Note: a chain of markers can contain markers pointing into different
@@ -2521,7 +2523,7 @@ struct Lisp_Overlay
    - end buffer position (field of the itree node)
    - insertion types of both ends (fields of the itree node).  */
   {
-    union vectorlike_header header;
+    struct vectorlike_header header;
     Lisp_Object plist;
     struct buffer *buffer;        /* eassert (live buffer || NULL). */
     struct itree_node *interval;
@@ -2529,7 +2531,7 @@ struct Lisp_Overlay
 
 struct Lisp_Misc_Ptr
   {
-    union vectorlike_header header;
+    struct vectorlike_header header;
     void *pointer;
   } GCALIGNED_STRUCT;
 
@@ -2585,7 +2587,7 @@ struct Lisp_Sqlite
 
 struct Lisp_User_Ptr
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   void (*finalizer) (void *);
   void *p;
 } GCALIGNED_STRUCT;
@@ -4229,7 +4231,7 @@ extern Lisp_Object make_string (const char *, ptrdiff_t);
 extern Lisp_Object make_formatted_string (char *, const char *, ...)
   ATTRIBUTE_FORMAT_PRINTF (2, 3);
 extern Lisp_Object make_unibyte_string (const char *, ptrdiff_t);
-extern ptrdiff_t vectorlike_nbytes (const union vectorlike_header *hdr);
+extern ptrdiff_t vectorlike_nbytes (const struct vectorlike_header *hdr);
 
 INLINE ptrdiff_t
 vector_nbytes (const struct Lisp_Vector *v)

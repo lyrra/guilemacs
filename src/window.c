@@ -7316,7 +7316,7 @@ from the top of the window.  */)
 
 struct save_window_data
   {
-    union vectorlike_header header;
+    struct vectorlike_header header;
     Lisp_Object selected_frame;
     Lisp_Object current_window;
     Lisp_Object f_current_buffer;
@@ -7345,7 +7345,7 @@ struct save_window_data
 /* This is saved as a Lisp_Vector.  */
 struct saved_window
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
 
   Lisp_Object window, buffer, start, pointm, old_pointm;
   Lisp_Object pixel_left, pixel_top, pixel_height, pixel_width;
