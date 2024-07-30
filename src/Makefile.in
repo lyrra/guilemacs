@@ -1075,6 +1075,7 @@ insdel.o: insdel.x
 keyboard.o: keyboard.x
 keymap.o: keymap.x
 lread.o: lread.x
+lcms.o: lcms.x
 macros.o: macros.x
 marker.o: marker.x
 menu.o: menu.x
