@@ -1666,7 +1666,7 @@ Return t if the file exists and loads successfully.  */)
       if (lread_fd_p)
         {
           lread_close (fd);
-          clear_unwind_protect (fd_index);
+          fd = -1;
         }
     }
   else
