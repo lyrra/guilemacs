@@ -2555,7 +2555,7 @@ extern Lisp_Object make_misc_ptr (void *);
 INLINE Lisp_Object
 make_mint_ptr (void *a)
 {
-  Lisp_Object val = TAG_PTR_INITIALLY (Lisp_Int0, a);
+  Lisp_Object val = TAG_PTR (Lisp_Int, a);
   return FIXNUMP (val) && XFIXNUMPTR (val) == a ? val : make_misc_ptr (a);
 }
 
