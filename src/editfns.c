@@ -774,22 +774,27 @@ This function does not move point.  */)
 
 /* Save current buffer state for save-excursion special form.  */
 
-void
-save_excursion_save (union specbinding *pdl)
+Lisp_Object
+save_excursion_save (void)
 {
-  eassert (pdl->unwind_excursion.kind == SPECPDL_UNWIND_EXCURSION);
-  pdl->unwind_excursion.marker = Fpoint_marker ();
-  /* Selected window if current buffer is shown in it, nil otherwise.  */
-  pdl->unwind_excursion.window
-    = (BASE_EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
-       ? selected_window : Qnil);
+  return make_save_obj_obj_obj_obj
+    (Fpoint_marker (),
+     Qnil,
+     /* Selected window if current buffer is shown in it, nil otherwise.  */
+     (BASE_EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
+      ? selected_window : Qnil),
+     Qnil);
 }
 
 /* Restore saved buffer before leaving `save-excursion' special form.  */
 
 void
-save_excursion_restore (Lisp_Object marker, Lisp_Object window)
+save_excursion_restore (Lisp_Object info)
 {
+  Lisp_Object marker = XSAVE_OBJECT (info, 0);
+  Lisp_Object window = XSAVE_OBJECT (info, 2);
+  free_misc (info);
+
   Lisp_Object buffer = Fmarker_buffer (marker);
   /* If we're unwinding to top level, saved buffer may be deleted.  This
      means that all of its markers are unchained and so BUFFER is nil.  */

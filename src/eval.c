@@ -2866,9 +2866,7 @@ record_unwind_protect_intmax (void (*function) (intmax_t), intmax_t arg)
 void
 record_unwind_protect_excursion (void)
 {
-  specpdl_ptr->unwind_excursion.kind = SPECPDL_UNWIND_EXCURSION;
-  save_excursion_save (specpdl_ptr);
-  grow_specpdl ();
+  record_unwind_protect (save_excursion_restore, save_excursion_save ());
 }
 
 void

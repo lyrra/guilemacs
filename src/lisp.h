@@ -3303,11 +3303,6 @@ union specbinding
     struct {
       ENUM_BF (specbind_tag) kind : CHAR_BIT;
       bool wind_explicitly;
-      Lisp_Object marker, window;
-    } unwind_excursion;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool wind_explicitly;
       void (*func) (void);
     } unwind_void;
     struct {
@@ -4650,9 +4645,9 @@ extern void unmark_main_thread (void);
 extern void insert1 (Lisp_Object);
 extern void find_field (Lisp_Object, Lisp_Object, Lisp_Object,
 			ptrdiff_t *, Lisp_Object, ptrdiff_t *);
-extern void save_excursion_save (union specbinding *);
-extern void save_excursion_restore (Lisp_Object, Lisp_Object);
+extern Lisp_Object save_excursion_save (void);
 extern Lisp_Object save_restriction_save (void);
+extern void save_excursion_restore (Lisp_Object);
 extern void save_restriction_restore (Lisp_Object);
 extern Lisp_Object make_buffer_string (ptrdiff_t, ptrdiff_t, bool);
 extern Lisp_Object make_buffer_string_both (ptrdiff_t, ptrdiff_t, ptrdiff_t,
