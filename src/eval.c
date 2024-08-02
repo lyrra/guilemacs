@@ -2814,15 +2814,6 @@ record_unwind_protect_ptr_1 (void (*function) (void *), void *arg,
 }
 
 void
-record_unwind_protect_array (Lisp_Object *array, ptrdiff_t nelts)
-{
-  specpdl_ptr->unwind_array.kind = SPECPDL_UNWIND_ARRAY;
-  specpdl_ptr->unwind_array.array = array;
-  specpdl_ptr->unwind_array.nelts = nelts;
-  grow_specpdl ();
-}
-
-void
 record_unwind_protect_ptr (void (*function) (void *), void *arg)
 {
   record_unwind_protect_ptr_1 (function, arg, true);
