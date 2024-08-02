@@ -2571,7 +2571,7 @@ xmint_pointer (Lisp_Object a)
   eassert (mint_ptrp (a));
   if (FIXNUMP (a))
     return XFIXNUMPTR (a);
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Misc_Ptr)->pointer;
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Misc_Ptr)->pointer;
 }
 
 struct Lisp_Sqlite

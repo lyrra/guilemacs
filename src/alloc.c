@@ -1430,7 +1430,7 @@ make_misc_ptr (void *a)
   struct Lisp_Misc_Ptr *p = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Misc_Ptr,
 							 PVEC_MISC_PTR);
   p->pointer = a;
-  return make_lisp_ptr (p, Lisp_Vectorlike);
+  return p->header.self;
 }
 
 /* Return a new overlay with specified START, END and PLIST.  */
