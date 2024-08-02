@@ -174,6 +174,7 @@ get_doc_string (Lisp_Object filepos, bool unibyte)
 	  return concat3 (cannot_open, file, quote_nl);
 	}
     }
+  dynwind_begin ();
 #ifndef USE_ANDROID_ASSETS
   record_unwind_protect_int (close_file_unwind, fd);
 #else /* USE_ANDROID_ASSETS */
