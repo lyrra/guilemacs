@@ -1433,6 +1433,16 @@ make_misc_ptr (void *a)
   return p->header.self;
 }
 
+Lisp_Object
+make_misc_excursion (Lisp_Object marker, Lisp_Object window)
+{
+  struct Lisp_Misc_Ptr *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Misc_Ptr, pointer,
+						   PVEC_MISC_EXCURSION);
+  p->marker = marker;
+  p->window = window;
+  return p->header.self;
+}
+
 /* Return a new overlay with specified START, END and PLIST.  */
 
 Lisp_Object

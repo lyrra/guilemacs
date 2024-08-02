@@ -777,23 +777,21 @@ This function does not move point.  */)
 Lisp_Object
 save_excursion_save (void)
 {
-  return make_save_obj_obj_obj_obj
+  return make_misc_excursion
     (Fpoint_marker (),
-     Qnil,
      /* Selected window if current buffer is shown in it, nil otherwise.  */
      (BASE_EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
-      ? selected_window : Qnil),
-     Qnil);
+      ? selected_window : Qnil));
 }
 
 /* Restore saved buffer before leaving `save-excursion' special form.  */
 
 void
-save_excursion_restore (Lisp_Object info)
+save_excursion_restore (Lisp_Object excr)
 {
-  Lisp_Object marker = XSAVE_OBJECT (info, 0);
-  Lisp_Object window = XSAVE_OBJECT (info, 2);
-  free_misc (info);
+  struct Lisp_Misc_Excursion * ex = XMISC_EXCURSION (excr);
+  Lisp_Object marker = ex->marker;
+  Lisp_Object window = ex->window;
 
   Lisp_Object buffer = Fmarker_buffer (marker);
   /* If we're unwinding to top level, saved buffer may be deleted.  This

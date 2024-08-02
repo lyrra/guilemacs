@@ -2535,7 +2535,22 @@ struct Lisp_Misc_Ptr
     void *pointer;
   } GCALIGNED_STRUCT;
 
+struct Lisp_Excursion
+  {
+    struct vectorlike_header header;
+    Lisp_Object marker;
+    Lisp_Object window;
+  };
+
 extern Lisp_Object make_misc_ptr (void *);
+extern Lisp_Object make_misc_excursion (Lisp_Object marker, Lisp_Object window);
+
+INLINE struct Lisp_Excursion *
+XEXCURSION (Lisp_Object a)
+{
+  eassert (MISCP (a));
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Excursion);
+}
 
 /* A mint_ptr object OBJ represents a C-language pointer P efficiently.
    Preferably (and typically), OBJ is a fixnum I such that
