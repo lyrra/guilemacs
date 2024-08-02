@@ -1268,7 +1268,7 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
   emacs_env pub;
   struct emacs_env_private priv;
   emacs_env *env = initialize_environment (&pub, &priv);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_module (SPECPDL_MODULE_ENVIRONMENT, env);
 
   USE_SAFE_ALLOCA;
@@ -1302,7 +1302,9 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
   maybe_quit ();
 
   module_signal_or_throw (&priv);
-  return SAFE_FREE_UNBIND_TO (count, value_to_lisp (ret));
+  dynwind_end ();
+  SAFE_FREE ();
+  return value_to_lisp (ret);
 }
 
 Lisp_Object
