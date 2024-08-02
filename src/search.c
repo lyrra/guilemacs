@@ -311,7 +311,7 @@ looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
       s2 = 0;
     }
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
   re_match_object = Qnil;
@@ -341,7 +341,8 @@ looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
     XSETBUFFER (last_thing_searched, current_buffer);
   }
 
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 DEFUN ("looking-at", Flooking_at, Slooking_at, 1, 2, 0,
@@ -580,14 +581,14 @@ fast_looking_at (Lisp_Object regexp, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   struct regexp_cache *cache_entry =
     compile_pattern (regexp, 0, Qnil, 0, multibyte);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
   re_match_object = STRINGP (string) ? string : Qnil;
   len = re_match_2 (&cache_entry->buf, (char *) p1, s1, (char *) p2, s2,
 		    pos_byte, NULL, limit_byte);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return len;
 }
 
@@ -1195,7 +1196,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
       s2 = 0;
     }
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   freeze_buffer_relocation ();
   freeze_pattern (cache_entry);
 
@@ -1240,7 +1241,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
         }
       else
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           return (n);
         }
       n++;
@@ -1284,13 +1285,13 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
         }
       else
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           return (0 - n);
         }
       n--;
       maybe_quit ();
     }
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return (pos);
 }
 
