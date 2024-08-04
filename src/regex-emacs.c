@@ -168,7 +168,7 @@
 ptrdiff_t emacs_re_safe_alloca = MAX_ALLOCA;
 /* Like USE_SAFE_ALLOCA, but use emacs_re_safe_alloca.  */
 #define REGEX_USE_SAFE_ALLOCA					       \
-  USE_SAFE_ALLOCA; sa_avail = emacs_re_safe_alloca
+  USE_SAFE_ALLOCA;
 
 /* Assumes a 'char *destination' variable.  */
 #define REGEX_REALLOCATE(source, osize, nsize)				\
