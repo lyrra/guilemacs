@@ -1126,6 +1126,16 @@ clip_to_bounds (intmax_t lower, intmax_t num, intmax_t upper)
 {
   return num < lower ? lower : num <= upper ? num : upper;
 }
+
+/* Construct a Lisp_Object from a value or address.  */
+
+INLINE Lisp_Object
+make_lisp_ptr (void *ptr, enum Lisp_Type type)
+{
+  struct vectorlike_header *h = ptr; // do aliasing since no padding
+  return h->self;
+}
+
 
 /* Forward declarations.  */
 
