@@ -793,7 +793,7 @@ extern Lisp_Object intern_c_string_2 (const char *, ptrdiff_t);
 /* Header of vector-like objects.  This documents the layout constraints on
    vectors and pseudovectors (objects of PVEC_xxx subtype).  It also prevents
    compilers from being fooled by Emacs's type punning: XSETPSEUDOVECTOR
-   and PSEUDOVECTORP cast their pointers to union vectorlike_header *,
+   and PSEUDOVECTORP cast their pointers to struct vectorlike_header *,
    because when two such pointers potentially alias, a compiler won't
    incorrectly reorder loads and stores to their size fields.  See
    Bug#8546.  This union formerly contained more members, and there's
@@ -1240,7 +1240,7 @@ dead_object (void)
 #define XSETPVECTYPESIZE(v, code, lispsize, restsize)		\
   ((v)->header.size = PVECHEADERSIZE (code, lispsize, restsize))
 
-/* The cast to union vectorlike_header * avoids aliasing issues.  */
+/* The cast to struct vectorlike_header * avoids aliasing issues.  */
 #define XSETPSEUDOVECTOR(a, b, code) \
   XSETTYPED_PSEUDOVECTOR (a, b,					\
 			  (SMOB_PTR3 (a, Lisp_Vectorlike,	\
@@ -1619,7 +1619,7 @@ PSEUDOVECTORP (Lisp_Object a, int code)
     return false;
   else
     {
-      /* Converting to union vectorlike_header * avoids aliasing issues.  */
+      /* Converting to struct vectorlike_header * avoids aliasing issues.  */
       return PSEUDOVECTOR_TYPEP (SMOB_PTR3 (a, Lisp_Vectorlike,
 					    struct vectorlike_header),
 				 code);
