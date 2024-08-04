@@ -688,12 +688,12 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 
 #define SYMBOL_SELF(sym) (scm_c_vector_ref (sym, 0))
 #define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
-#define SYMBOL_REDIRECT(sym) (XINT (scm_c_vector_ref (sym, 1)))
-#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_number (v)))
-#define SYMBOL_TRAPPED(sym) (XINT (scm_c_vector_ref (sym, 2)))
-#define SET_SYMBOL_TRAPPED(sym, v) (scm_c_vector_set_x (sym, 2, make_number (v)))
-#define SYMBOL_DECLARED_SPECIAL(sym) (XINT (scm_c_vector_ref (sym, 3)))
-#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_number (v)))
+#define SYMBOL_REDIRECT(sym) (XFIXNUM (scm_c_vector_ref (sym, 1)))
+#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_fixnum (v)))
+#define SYMBOL_TRAPPED(sym) (XFIXNUM (scm_c_vector_ref (sym, 2)))
+#define SET_SYMBOL_TRAPPED(sym, v) (scm_c_vector_set_x (sym, 2, make_fixnum (v)))
+#define SYMBOL_DECLARED_SPECIAL(sym) (XFIXNUM (scm_c_vector_ref (sym, 3)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_fixnum (v)))
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -1266,7 +1266,7 @@ dead_object (void)
 INLINE void *
 XFIXNUMPTR (Lisp_Object a)
 {
-  return XINT (a);
+  return XFIXNUM (a);
 }
 
 INLINE Lisp_Object
@@ -3125,12 +3125,12 @@ CHECK_SUBR (Lisp_Object x)
   gsubr_ ## fn (Lisp_Object rest)                           \
   {                                                         \
     Lisp_Object len = Flength (rest);                       \
-    if (XINT (len) < minargs)                               \
+    if (XFIXNUM (len) < minargs)                            \
       xsignal2 (Qwrong_number_of_arguments,                 \
                 intern (lname), len);                       \
     return fn (rest);                                       \
   }
-#define DEFUN_GSUBR_MANY(lname, fn, minargs, maxargs)        \
+#define DEFUN_GSUBR_MANY(lname, fn, minargs, maxargs)       \
   Lisp_Object                                               \
   gsubr_ ## fn (Lisp_Object rest)                           \
   {                                                         \
