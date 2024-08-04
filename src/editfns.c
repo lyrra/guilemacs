@@ -777,7 +777,7 @@ This function does not move point.  */)
 Lisp_Object
 save_excursion_save (void)
 {
-  return make_misc_excursion
+  return make_excursion
     (Fpoint_marker (),
      /* Selected window if current buffer is shown in it, nil otherwise.  */
      (BASE_EQ (XWINDOW (selected_window)->contents, Fcurrent_buffer ())
@@ -789,7 +789,7 @@ save_excursion_save (void)
 void
 save_excursion_restore (Lisp_Object excr)
 {
-  struct Lisp_Misc_Excursion * ex = XMISC_EXCURSION (excr);
+  struct Lisp_Excursion * ex = XEXCURSION (excr);
   Lisp_Object marker = ex->marker;
   Lisp_Object window = ex->window;
 

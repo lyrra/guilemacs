@@ -895,6 +895,7 @@ enum pvec_type
   PVEC_CHAR_TABLE,
   PVEC_SUB_CHAR_TABLE,
   PVEC_RECORD,
+  PVEC_EXCURSION,
   PVEC_FONT,
   PVEC_TAG_MAX = PVEC_FONT  /* Keep this equal to the highest member.  */
 };
@@ -1201,8 +1202,6 @@ XTYPE (Lisp_Object o)
     return Lisp_Int;
   else if (SYMBOLP (o))
     return Lisp_Symbol;
-  else if (MISCP (o))
-    return Lisp_Misc;
   else if (STRINGP (o))
     return Lisp_String;
   else if (VECTORLIKEP (o))
@@ -2553,12 +2552,18 @@ struct Lisp_Excursion
   };
 
 extern Lisp_Object make_misc_ptr (void *);
-extern Lisp_Object make_misc_excursion (Lisp_Object marker, Lisp_Object window);
+extern Lisp_Object make_excursion (Lisp_Object marker, Lisp_Object window);
+
+INLINE bool
+EXCURSIONP (Lisp_Object x)
+{
+  return PSEUDOVECTORP (x, PVEC_EXCURSION);
+}
 
 INLINE struct Lisp_Excursion *
 XEXCURSION (Lisp_Object a)
 {
-  eassert (MISCP (a));
+  eassert (EXCURSIONP (a));
   return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Excursion);
 }
 

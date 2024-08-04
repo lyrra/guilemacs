@@ -2832,8 +2832,7 @@ static ptrdiff_t hash_lookup_with_hash (struct Lisp_Hash_Table *h,
 static SCM
 misc_equal_p (SCM o1, SCM o2)
 {
- tail_recurse:
-  if (XMISCTYPE (o1) != XMISCTYPE (o2))
+  if (PSEUDOVECTOR_TYPE (o1) != PSEUDOVECTOR_TYPE (o2))
     return SCM_BOOL_F;
   if (OVERLAYP (o1))
     {

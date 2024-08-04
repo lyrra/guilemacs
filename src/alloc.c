@@ -1434,10 +1434,10 @@ make_misc_ptr (void *a)
 }
 
 Lisp_Object
-make_misc_excursion (Lisp_Object marker, Lisp_Object window)
+make_excursion (Lisp_Object marker, Lisp_Object window)
 {
-  struct Lisp_Misc_Ptr *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Misc_Ptr, pointer,
-						   PVEC_MISC_EXCURSION);
+  struct Lisp_Excursion *p = ALLOCATE_PSEUDOVECTOR (struct Lisp_Excursion, marker,
+						    PVEC_EXCURSION);
   p->marker = marker;
   p->window = window;
   return p->header.self;
