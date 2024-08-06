@@ -12231,7 +12231,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
              we aren't prepared to run modification hooks (we could
              end up calling modification hooks from another buffer and
              only with AFTER=t, Bug#21824).  */
-          specpdl_ref count = SPECPDL_INDEX ();
+          dynwind_begin ();
           specbind (Qinhibit_modification_hooks, Qt);
 
 	  insert_1_both ("\n", 1, 1, true, false, false);
@@ -12281,7 +12281,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 	      del_range_both (BEG, BEG_BYTE, PT, PT_BYTE, false);
 	    }
 
-          unbind_to (count, Qnil);
+          dynwind_end ();
 	}
       BEGV = marker_position (oldbegv);
       BEGV_BYTE = marker_byte_position (oldbegv);
