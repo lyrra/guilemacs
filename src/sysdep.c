@@ -4687,5 +4687,5 @@ str_collate (Lisp_Object s1, Lisp_Object s2,
 void
 syms_of_sysdep (void)
 {
-  defsubr (&Sget_internal_run_time);
+#include "sysdep.x"
 }
