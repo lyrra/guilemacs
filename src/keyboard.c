@@ -2562,7 +2562,7 @@ read_char_handle_quit (void *data, Lisp_Object k)
         current_kboard = kb;
         /* This is going to exit from read_char
            so we had better get rid of this frame's stuff.  */
-        return make_number (-2); /* wrong_kboard_jmpbuf */
+        return make_fixnum (-2); /* wrong_kboard_jmpbuf */
       }
   }
   return read_char_1 (true, state);

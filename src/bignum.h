@@ -65,7 +65,7 @@ INLINE struct Lisp_Bignum *
 XBIGNUM (Lisp_Object a)
 {
   eassert (BIGNUMP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Bignum);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Bignum);
 }
 
 INLINE void ARG_NONNULL ((1))

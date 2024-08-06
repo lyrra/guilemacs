@@ -3159,7 +3159,7 @@ CHECK_SUBR (Lisp_Object x)
       args[i] = SCM_CAR (rest);                             \
     if (i < minargs)                                        \
       xsignal2 (Qwrong_number_of_arguments,                 \
-                intern (lname), make_number (i));           \
+                intern (lname), make_fixnum (i));           \
     return fn (i, args);                                    \
   }
 
