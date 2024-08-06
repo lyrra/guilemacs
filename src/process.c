@@ -3430,7 +3430,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
   dynwind_begin ();
   struct sockaddr *sa = NULL;
-  record_unwind_protect_nothing ();
 
   while (!NILP (addrinfos))
     {
@@ -3445,7 +3444,6 @@ connect_network_socket (Lisp_Object proc, Lisp_Object addrinfos,
 
       addrlen = get_lisp_to_sockaddr_size (ip_address, &family);
       sa = xrealloc (sa, addrlen);
-      set_unwind_protect_ptr (count, xfree, sa);
       conv_lisp_to_sockaddr (family, ip_address, sa, addrlen);
 
       s = socket_to_use;
