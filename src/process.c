@@ -135,6 +135,9 @@ static struct rlimit nofile_limit;
 #endif
 #endif
 
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 #if defined HAVE_GETADDRINFO_A || defined HAVE_GNUTLS
 /* This is 0.1s in nanoseconds. */
 #define ASYNC_RETRY_NSEC 100000000
