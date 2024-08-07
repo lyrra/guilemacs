@@ -4345,7 +4345,9 @@ make_uninit_sub_char_table (int depth, int min_char)
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
-  return make_lisp_ptr (allocate_nil_vector (size), Lisp_Vectorlike);
+  Lisp_Object vec = make_uninit_vector (size);
+  memsetnil (XVECTOR (vec)->contents, size);
+  return vec;
 }
 
 extern struct Lisp_Vector *allocate_pseudovector (int, int, int,

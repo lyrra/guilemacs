@@ -1179,8 +1179,6 @@ allocate_clear_vector (ptrdiff_t len, bool clearit)
 {
   if (len == 0)
     return XVECTOR (zero_vector);
-  if (VECTOR_ELTS_MAX < len)
-    memory_full (SIZE_MAX);
   struct Lisp_Vector *v = allocate_vectorlike (len, clearit);
   v->header.size = len;
   return v;
@@ -1212,7 +1210,6 @@ allocate_pseudovector (int memlen, int lisplen,
   /* Catch bogus values.  */
   enum { size_max = (1 << PSEUDOVECTOR_SIZE_BITS) - 1 };
   enum { rest_max = (1 << PSEUDOVECTOR_REST_BITS) - 1 };
-  static_assert (size_max + rest_max <= VECTOR_ELTS_MAX);
   eassert (0 <= tag && tag <= PVEC_TAG_MAX);
   eassert (0 <= lisplen && lisplen <= zerolen && zerolen <= memlen);
   eassert (lisplen <= size_max);
