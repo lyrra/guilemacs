@@ -4130,6 +4130,8 @@ run_window_change_functions (void)
 	   we ran window change functions on it.  */
 	continue;
 
+      dynwind_begin ();
+
       /* Analyze windows and run buffer locals hooks in pre-order.  */
       windows = Fnreverse (window_sub_list (root, Qnil));
       number_of_windows = 0;
