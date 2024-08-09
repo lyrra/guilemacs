@@ -1151,6 +1151,11 @@ init_vectors (void)
   XSETVECTOR (zero_vector, p);
 }
 
+ptrdiff_t vectorlike_nbytes (const struct vectorlike_header *hdr)
+{
+  return NULL;
+}
+
 /* Value is a pointer to a newly allocated Lisp_Vector structure
    with room for LEN Lisp_Objects.  */
 
