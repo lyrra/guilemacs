@@ -1992,7 +1992,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_guile ();
       init_fns_once ();
-      init_obarray ();
+      init_obarray_once ();
       init_eval_once ();
       init_charset_once ();
       init_coding_once ();
