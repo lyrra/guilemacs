@@ -134,6 +134,10 @@ make_condition_handler (Lisp_Object tag)
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
 
+// gcc complains, no prototype before use
+static void
+init_eval_once_for_pdumper (void);
+
 void
 init_eval_once (void)
 {
