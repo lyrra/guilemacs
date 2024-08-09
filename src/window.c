@@ -3848,14 +3848,14 @@ has established the size of the new window.  */)
   (Lisp_Object window)
 {
   struct window *w = decode_live_window (window);
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   record_unwind_current_buffer ();
   Fset_buffer (w->contents);
   if (!NILP (Vwindow_scroll_functions))
     run_hook_with_args_2 (Qwindow_scroll_functions, window,
 			  Fmarker_position (w->start));
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return Qnil;
 }
@@ -4093,7 +4093,7 @@ run_window_change_functions (void)
   Lisp_Object tail, frame;
   bool selected_frame_change = !EQ (selected_frame, old_selected_frame);
   bool run_window_state_change_hook = false;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   window_change_record_frames = false;
   record_unwind_protect_void (window_change_record);
@@ -4289,7 +4289,7 @@ run_window_change_functions (void)
 
   /* Record changes for all frames (if asked for), selected window and
      frame.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Make WINDOW display BUFFER.  RUN_HOOKS_P means it's allowed
