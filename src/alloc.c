@@ -1848,8 +1848,6 @@ init_alloc_once (void)
 static void
 init_alloc_once_for_pdumper (void)
 {
-  mem_init ();
-
 #ifdef DOUG_LEA_MALLOC
   mallopt (M_TRIM_THRESHOLD, 128 * 1024); /* Trim threshold.  */
   mallopt (M_MMAP_THRESHOLD, 64 * 1024);  /* Mmap threshold.  */
