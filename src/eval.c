@@ -157,7 +157,7 @@ static void
 init_eval_once_for_pdumper (void)
 {
   enum { size = 50 };
-  union specbinding *pdlvec = malloc ((size + 1) * sizeof *specpdl);
+  union specbinding *pdlvec = xmalloc ((size + 1) * sizeof *specpdl);
   specpdl_base = pdlvec;
   specpdl = specpdl_ptr = pdlvec + 1;
   specpdl_end = specpdl + size;
