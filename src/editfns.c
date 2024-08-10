@@ -2058,7 +2058,8 @@ nil.  */)
     {
       del_range (min_a, ZV);
       Finsert_buffer_substring (source, Qnil,Qnil);
-      SAFE_FREE_UNBIND_TO (count, Qnil);
+      SAFE_FREE ();
+      dynwind_end ();
       return Qnil;
     }
 
