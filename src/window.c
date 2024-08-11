@@ -3775,7 +3775,6 @@ select_frame_norecord (Lisp_Object frame)
 static void
 run_window_configuration_change_hook (struct frame *f)
 {
-  dynwind_begin ();
   Lisp_Object frame, global_wcch
     = Fdefault_value (Qwindow_configuration_change_hook);
   XSETFRAME (frame, f);
@@ -3783,10 +3782,9 @@ run_window_configuration_change_hook (struct frame *f)
   if (NILP (Vrun_hooks)
       || !f->can_set_window_size
       || !f->after_make_frame)
-    {
-      dynwind_end ();
-      return;
-    }
+    return;
+
+  dynwind_begin ();
 
   /* Use the right buffer.  Matters when running the local hooks.  */
   if (current_buffer != XBUFFER (Fwindow_buffer (Qnil)))
