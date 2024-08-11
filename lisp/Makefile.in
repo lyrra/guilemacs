@@ -407,9 +407,7 @@ compile-clean:
 ## with ../src.  See comments above for loaddefs.
 gen-lisp: leim semantic
 
-# (re)compile titdic-cnv before recursing into `leim` since its used to
-# generate some of the Quail source files from tables.
-leim: $(lisp)/international/titdic-cnv.elc
+leim:
 	$(MAKE) -C ../leim all EMACS="$(EMACS)"
 
 semantic:
