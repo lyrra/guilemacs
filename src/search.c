@@ -322,7 +322,7 @@ looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
 
   if (i == -2)
     {
-      unbind_to (count, Qnil);
+      dynwind_end ();
       matcher_overflow ();
     }
 
@@ -1212,7 +1212,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          pos_byte - BEGV_BYTE);
       if (val == -2)
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           matcher_overflow ();
         }
       if (val >= 0)
@@ -1258,7 +1258,7 @@ search_buffer_re (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
                          lim_byte - BEGV_BYTE);
       if (val == -2)
         {
-          unbind_to (count, Qnil);
+          dynwind_end ();
           matcher_overflow ();
         }
       if (val >= 0)
