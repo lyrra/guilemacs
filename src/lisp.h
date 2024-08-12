@@ -1141,7 +1141,7 @@ make_lisp_ptr (void *ptr, enum Lisp_Type type)
 /* Defined in this file.  */
 union Lisp_Fwd;
 INLINE bool BOOL_VECTOR_P (Lisp_Object);
-INLINE bool BUFFER_OBJFWDP (union Lisp_Fwd *);
+INLINE bool BUFFER_OBJFWDP (lispfwd);
 INLINE bool BUFFERP (Lisp_Object);
 INLINE bool CHAR_TABLE_P (Lisp_Object);
 INLINE Lisp_Object CHAR_TABLE_REF_ASCII (Lisp_Object, ptrdiff_t);
@@ -2091,7 +2091,9 @@ INLINE lispfwd
 SYMBOL_FWD (sym_t sym)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
-  return scm_to_pointer (scm_c_vector_ref (sym, 4));
+  lispfwd res;
+  res.fwdptr = scm_to_pointer (scm_c_vector_ref (sym, 4));
+  return res;
 }
 
 INLINE void
