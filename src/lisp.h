@@ -722,8 +722,6 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 
 #define VALBITS 0
 
-/* Yield a signed integer that contains TAG along with PTR.
-
 /* A integer value tagged with TAG, and otherwise all zero.  */
 #define LISP_WORD_TAG(tag) \
   ((Lisp_Word_tag) (tag) << (USE_LSB_TAG ? 0 : VALBITS))
