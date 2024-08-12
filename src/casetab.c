@@ -180,7 +180,11 @@ set_canon (Lisp_Object case_table, Lisp_Object range, Lisp_Object elt)
   Lisp_Object canon = XCHAR_TABLE (case_table)->extras[1];
 
   if (FIXNATP (elt))
-    Fset_char_table_range (canon, range, Faref (case_table, Faref (up, elt)));
+    {
+      Lisp_Object idx = Faref (up, elt);
+      if (FIXNATP (idx))
+        Fset_char_table_range (canon, range, Faref (case_table, idx));
+    }
 }
 
 /* Set elements of char-table TABLE for C to C itself.  C may be a
