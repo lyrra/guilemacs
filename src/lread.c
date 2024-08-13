@@ -3160,8 +3160,7 @@ read_integer (Lisp_Object readcharfun, int radix)
 	{
 	  ptrdiff_t offset = p - read_buffer;
 	  read_buffer = grow_read_buffer (read_buffer, offset,
-					  &heapbuf, &read_buffer_size,
-					  count);
+					  &heapbuf, &read_buffer_size);
 	  p = read_buffer + offset;
 	}
       *p++ = c;
