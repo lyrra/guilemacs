@@ -118,23 +118,6 @@ fill_xft_data (struct widget_xft_data *data, Widget widget, XftFont *font)
   data->p_width = data->p_height = 0;
 }
 
-static void
-destroy_xft_data (Widget widget, XtPointer closure, XtPointer call_data)
-{
-  struct widget_xft_data *xft_data = closure;
-
-  for (int i = 0; xft_data[i].widget; ++i)
-    {
-      if (xft_data[i].xft_draw)
-	XftDrawDestroy (xft_data[i].xft_draw);
-      if (xft_data[i].p != None)
-	XFreePixmap (XtDisplay (widget), xft_data[i].p);
-    }
-  if (xft_data[0].xft_font)
-    XftFontClose (XtDisplay (widget), xft_data[0].xft_font);
-  xfree (xft_data);
-}
-
 static XftFont*
 openFont (Widget widget, char *name)
 {
@@ -255,7 +238,7 @@ find_xft_data (Widget widget)
     }
   if (!inst || !inst->xft_data || !inst->xft_data[0].xft_font) return 0;
 
-  for (nr = 0; data == NULL && inst->xft_data[nr].widget; ++nr)
+  for (nr = 0; data == NULL && nr < inst->nr_xft_data; ++nr)
     {
       if (inst->xft_data[nr].widget == widget)
         data = &inst->xft_data[nr];
@@ -352,10 +335,10 @@ xaw_update_one_widget (widget_instance *instance,
         {
           int th;
           int nr;
-          for (nr = 0; instance->xft_data[nr].widget; ++nr)
+          for (nr = 0; nr < instance->nr_xft_data; ++nr)
             if (instance->xft_data[nr].widget == widget)
               break;
-          if (instance->xft_data[nr].widget)
+          if (nr < instance->nr_xft_data)
             {
               set_text (&instance->xft_data[nr], instance->parent,
                         val->value, 6);
@@ -386,6 +369,28 @@ xaw_update_one_value (widget_instance *instance,
 void
 xaw_destroy_instance (widget_instance *instance)
 {
+#ifdef HAVE_XFT
+  if (instance->xft_data)
+    {
+      int i;
+      for (i = 0; i < instance->nr_xft_data; ++i)
+        {
+          if (instance->xft_data[i].xft_draw)
+            XftDrawDestroy (instance->xft_data[i].xft_draw);
+          if (instance->xft_data[i].p != None)
+            {
+              XtVaSetValues (instance->xft_data[i].widget, XtNbitmap, None,
+                             NULL);
+              XFreePixmap (XtDisplay (instance->widget),
+                           instance->xft_data[i].p);
+            }
+        }
+      if (instance->xft_data[0].xft_font)
+        XftFontClose (XtDisplay (instance->widget),
+                      instance->xft_data[0].xft_font);
+      xfree (instance->xft_data);
+    }
+#endif
   if (XtIsSubclass (instance->widget, dialogWidgetClass))
     /* Need to destroy the Shell too. */
     XtDestroyWidget (XtParent (instance->widget));
@@ -572,6 +577,7 @@ make_dialog (char* name,
           }
       }
     instance->xft_data = 0;
+    instance->nr_xft_data = 0;
     if (w)
       {
         XtResource rec[] =
@@ -591,15 +597,13 @@ make_dialog (char* name,
 
         if (xft_font)
           {
-            int nr_xft_data = left_buttons + right_buttons + 1;
-            instance->xft_data = calloc (nr_xft_data + 1,
+            instance->nr_xft_data = left_buttons + right_buttons + 1;
+            instance->xft_data = calloc (instance->nr_xft_data,
                                          sizeof(*instance->xft_data));
 	    if (!instance->xft_data)
 	      memory_full ((nr_xft_data + 1) * sizeof *instance->xft_data);
 
             fill_xft_data (&instance->xft_data[0], w, xft_font);
-	    XtAddCallback (dialog, XtNdestroyCallback, destroy_xft_data,
-			   instance->xft_data);
           }
       }
 

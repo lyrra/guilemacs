@@ -32,6 +32,7 @@ typedef struct _widget_instance
   Boolean		pop_up_p;
 #if defined USE_CAIRO || defined HAVE_XFT
   struct widget_xft_data *xft_data;
+  int                   nr_xft_data;
 #endif
   struct _widget_info*		info;
   struct _widget_instance*	next;
