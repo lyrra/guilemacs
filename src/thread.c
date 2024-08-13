@@ -1129,4 +1129,13 @@ syms_of_threads (void)
 #else
   Vmain_thread = Qnil;
 #endif
+
+  main_thread.s.m_last_thing_searched = (Qnil);
+  main_thread.s.m_saved_last_thing_searched = (Qnil);
+  main_thread.s.name = (Qnil);
+  main_thread.s.function = (Qnil);
+  main_thread.s.result = (Qnil);
+  main_thread.s.error_symbol = (Qnil);
+  main_thread.s.error_data = (Qnil);
+  main_thread.s.event_object = (Qnil);
 }
