@@ -2841,10 +2841,7 @@ record_unwind_protect_void_1 (void (*function) (void),
 void
 record_unwind_protect_intmax (void (*function) (intmax_t), intmax_t arg)
 {
-  specpdl_ptr->unwind_intmax.kind = SPECPDL_UNWIND_INTMAX;
-  specpdl_ptr->unwind_intmax.func = function;
-  specpdl_ptr->unwind_intmax.arg = arg;
-  grow_specpdl ();
+  record_unwind_protect_ptr_1 (function, arg, true);
 }
 
 void
