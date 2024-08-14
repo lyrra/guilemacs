@@ -4657,10 +4657,12 @@ hash_table_user_defined_call (ptrdiff_t nargs, Lisp_Object *args,
 {
   if (!h->mutable)
     return Ffuncall (nargs, args);
-  specpdl_ref count = inhibit_garbage_collection ();
+  dynwind_begin ();
   record_unwind_protect_ptr (restore_mutability, h);
   h->mutable = false;
-  return unbind_to (count, Ffuncall (nargs, args));
+  Lisp_Object tem = Ffuncall (nargs, args);
+  dynwind_end ();
+  return tem;
 }
 
 /* Ignore H and compare KEY1 and KEY2 using 'eql'.
