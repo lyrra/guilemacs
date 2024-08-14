@@ -9706,7 +9706,7 @@ More precisely, a char with closeparen syntax is self-inserted.")
           ;; likes to be run after others since it does
           ;; `sit-for'. That's also the reason it get a `priority' prop
           ;; of 100.
-          'append)
+          0)
 
 ;; This executes C-g typed while Emacs is waiting for a command.
 ;; Quitting out of a program does not go through here;

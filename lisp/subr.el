@@ -2088,11 +2088,13 @@ performance impact when running `add-hook' and `remove-hook'."
             (set depth-sym nil)
             (setf (get hook 'hook--depth-alist) depth-sym))
           (if local (make-local-variable depth-sym))
-          (setf (alist-get function
-                           (if local (symbol-value depth-sym)
-                             (default-value depth-sym))
-                           0)
-                depth))
+          ; guilemacs
+          ;(setf (alist-get function
+          ;                (if local (symbol-value depth-sym)
+          ;                  (default-value depth-sym))
+          ;                0)
+          ;     depth)
+          )
         (setq hook-value
 	      (if (< 0 depth)
 		  (append hook-value (list function))
