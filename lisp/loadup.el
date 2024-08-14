@@ -419,7 +419,7 @@ that the search has reached."
 
 (load "emacs-lisp/shorthands")
 
-(load "emacs-lisp/eldoc")
+;(load "emacs-lisp/eldoc")
 (load "emacs-lisp/cconv")
 (when (and (compiled-function-p (symbol-function 'cconv-fv))
            (compiled-function-p (symbol-function 'macroexpand-all)))
