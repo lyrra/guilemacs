@@ -1176,12 +1176,14 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
-      return unbind_to (count, add_text_properties_1 (start, end, properties,
+      Lisp_Object tem = add_text_properties_1 (start, end, properties,
 						      object, set_type,
-						      destructive));
+						      destructive);
+      dynwind_end ();
+      return tem;
     }
 
   INTERVAL i, unchanged;
@@ -1391,12 +1393,13 @@ set_text_properties (Lisp_Object start, Lisp_Object end, Lisp_Object properties,
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
-      return unbind_to (count,
-			set_text_properties (start, end, properties,
-					     object, coherent_change_p));
+      Lisp_Object tem = set_text_properties (start, end, properties,
+					     object, coherent_change_p);
+      dynwind_end ();
+      return tem;
     }
 
   INTERVAL i;
@@ -1474,12 +1477,12 @@ set_text_properties_1 (Lisp_Object start, Lisp_Object end,
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
 
       set_text_properties_1 (start, end, properties, object, i);
-      unbind_to (count, Qnil);
+      dynwind_end ();
       return;
     }
 
@@ -1570,12 +1573,13 @@ Use `set-text-properties' if you want to remove all text properties.  */)
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
-      return unbind_to (count,
-			Fremove_text_properties (start, end, properties,
-						 object));
+      Lisp_Object tem = Fremove_text_properties (start, end, properties,
+						 object);
+      dynwind_end ();
+      return tem;
     }
 
   INTERVAL i, unchanged;
@@ -1695,13 +1699,14 @@ Return t if any property was actually removed, nil otherwise.  */)
      buffers is slow and often unnecessary.  */
   if (BUFFERP (object) && XBUFFER (object) != current_buffer)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_current_buffer ();
       set_buffer_internal (XBUFFER (object));
-      return unbind_to (count,
-			Fremove_list_of_text_properties (start, end,
+      Lisp_Object tem = Fremove_list_of_text_properties (start, end,
 							 list_of_properties,
-							 object));
+							 object);
+      dynwind_end ();
+      return tem;
     }
 
   INTERVAL i, unchanged;
