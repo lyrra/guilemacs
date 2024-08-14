@@ -926,9 +926,6 @@ enum More_Lisp_Bits
 #define LISP_MACRO_DEFUN_VOID(name, argdecls, args) \
   INLINE void (name) argdecls { lisp_h_##name args; }
 
-/* Extract the pointer hidden within A.  */
-LISP_MACRO_DEFUN (XPNTR, void *, (Lisp_Object a), (a))
-
 /* These functions extract various sorts of values from a Lisp_Object.
    For example, if tem is a Lisp_Object whose type is Lisp_Cons,
    XCONS (tem) is the struct Lisp_Cons * pointing to the memory for
@@ -1058,8 +1055,6 @@ make_ufixnum (EMACS_INT n)
     n += int0 << VALBITS;
   return XIL (n);
 }
-
-#endif /* ! USE_LSB_TAG */
 
 INLINE bool
 (FIXNUMP) (Lisp_Object x)
