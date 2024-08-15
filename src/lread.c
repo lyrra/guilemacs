@@ -2467,6 +2467,7 @@ readevalloop (Lisp_Object readcharfun,
       if (b && first_sexp)
 	whole_buffer = (BUF_PT (b) == BUF_BEG (b) && BUF_ZV (b) == BUF_Z (b));
 
+      infile = infile0;
       eassert (!infile0 || infile == infile0);
     read_next:
       c = READCHAR;
