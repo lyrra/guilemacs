@@ -21,11 +21,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include <setjmp.h>
-#include <lisp.h>
 #include <c-strcase.h>
-
 #include <sys/types.h>
 #include <stdio.h>
+
+#include "lisp.h"
 #include "lwlib-int.h"
 #include "lwlib-utils.h"
 #include <X11/StringDefs.h>

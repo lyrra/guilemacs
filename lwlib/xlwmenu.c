@@ -23,7 +23,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include <setjmp.h>
-#include <lisp.h>
 
 #include <stdio.h>
 
@@ -34,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <X11/StringDefs.h>
 #include <X11/cursorfont.h>
 #include <X11/Shell.h>
+#include "lisp.h"
 #include "xlwmenuP.h"
 
 #ifdef emacs
