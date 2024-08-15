@@ -14309,9 +14309,10 @@ update_tab_bar (struct frame *f, bool save_match_data)
 	  || window_buffer_changed (w))
 	{
 	  struct buffer *prev = current_buffer;
-	  specpdl_ref count = SPECPDL_INDEX ();
 	  Lisp_Object new_tab_bar;
           int new_n_tab_bar;
+
+          dynwind_begin ();
 
 	  /* Set current_buffer to the buffer of the selected
 	     window of the frame, so that we get the right local
@@ -14364,7 +14365,7 @@ update_tab_bar (struct frame *f, bool save_match_data)
               unblock_input ();
             }
 
-	  unbind_to (count, Qnil);
+          dynwind_end ();
 	  set_buffer_internal_1 (prev);
 	}
     }
