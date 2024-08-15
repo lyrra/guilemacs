@@ -1941,22 +1941,6 @@ The time is in seconds as a floating point value.  */);
 	      doc: /* Maximum number N of bits in safely-calculated integers.
 Integers with absolute values less than 2**N do not signal a range error.
 N should be nonnegative.  */);
-
-  Lisp_Object watcher;
-
-  static union Aligned_Lisp_Subr Swatch_gc_cons_threshold =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
-       { .a4 = watch_gc_cons_threshold },
-       4, 4, "watch_gc_cons_threshold", {0}, lisp_h_Qnil}};
-  XSETSUBR (watcher, &Swatch_gc_cons_threshold.s);
-  Fadd_variable_watcher (Qgc_cons_threshold, watcher);
-
-  static union Aligned_Lisp_Subr Swatch_gc_cons_percentage =
-     {{{ PSEUDOVECTOR_FLAG | (PVEC_SUBR << PSEUDOVECTOR_AREA_BITS) },
-       { .a4 = watch_gc_cons_percentage },
-       4, 4, "watch_gc_cons_percentage", {0}, lisp_h_Qnil}};
-  XSETSUBR (watcher, &Swatch_gc_cons_percentage.s);
-  Fadd_variable_watcher (Qgc_cons_percentage, watcher);
   DEFSYM (Qalloc, "alloc");
   DEFSYM (QCemergency, ":emergency");
 }
