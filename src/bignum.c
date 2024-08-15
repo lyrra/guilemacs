@@ -173,8 +173,7 @@ make_integer_mpz (void)
       if (mpz_sgn (mpz[0]) < 0)
 	v = -v;
 
-      if (!FIXNUM_OVERFLOW_P (v))
-	return make_fixnum (v);
+      return make_fixnum (v);
     }
 
   return make_bignum_bits (bits);

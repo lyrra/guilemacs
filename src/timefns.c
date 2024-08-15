@@ -73,20 +73,20 @@ enum { TM_YEAR_BASE = 1900 };
 enum { CURRENT_TIME_LIST = true };
 #endif
 
-#if FASTER_TIMEFNS && !FIXNUM_OVERFLOW_P (1000000000)
+#if FASTER_TIMEFNS // && !FIXNUM_OVERFLOW_P (1000000000) // guilemacs no FIXNUM_OVERFLOW_P
 # define timespec_hz make_fixnum (TIMESPEC_HZ)
 #else
 static Lisp_Object timespec_hz;
 #endif
 
 #define TRILLION 1000000000000
-#if FASTER_TIMEFNS && !FIXNUM_OVERFLOW_P (TRILLION)
+#if FASTER_TIMEFNS // && !FIXNUM_OVERFLOW_P (TRILLION)
 # define trillion make_fixnum (TRILLION)
 #else
 static Lisp_Object trillion;
 #endif
 #if ! (FASTER_TIMEFNS && TRILLION <= ULONG_MAX)
-# if FIXNUM_OVERFLOW_P (TRILLION)
+# if 1 // FIXNUM_OVERFLOW_P (TRILLION)
 #  define ztrillion (*xbignum_val (trillion))
 # else
 static mpz_t ztrillion;

@@ -1043,17 +1043,7 @@ XFIXNUM_RAW (Lisp_Object a)
 INLINE Lisp_Object
 make_ufixnum (EMACS_INT n)
 {
-  eassert (0 <= n && n <= INTMASK);
-  EMACS_INT int0 = Lisp_Int0;
-  if (USE_LSB_TAG)
-    {
-      EMACS_UINT u = n;
-      n = u << INTTYPEBITS;
-      n += int0;
-    }
-  else
-    n += int0 << VALBITS;
-  return XIL (n);
+  return SCM_I_MAKINUM (n);
 }
 
 INLINE bool
@@ -2710,12 +2700,12 @@ INTEGERP (Lisp_Object x)
 INLINE Lisp_Object
 make_int (intmax_t n)
 {
-  return FIXNUM_OVERFLOW_P (n) ? make_bigint (n) : make_fixnum (n);
+  return make_fixnum (n);
 }
 INLINE Lisp_Object
 make_uint (uintmax_t n)
 {
-  return FIXNUM_OVERFLOW_P (n) ? make_biguint (n) : make_fixnum (n);
+  return make_fixnum (n);
 }
 
 /* Return a Lisp integer equal to the value of the C integer EXPR.  */
