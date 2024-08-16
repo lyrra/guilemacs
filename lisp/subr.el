@@ -132,6 +132,14 @@ BODY should be a list of Lisp expressions.
   ;; depend on backquote.el.
   (list 'function (cons 'lambda cdr)))
 
+; FIX: from macroexp
+(defun macroexp-progn (exps)
+  "Return EXPS (a list of expressions) with `progn' prepended.
+If EXPS is a list with a single expression, `progn' is not
+prepended, but that expression is returned instead."
+  (if (cdr exps) `(progn ,@exps) (car exps)))
+
+
 (defmacro setq-local (&rest pairs)
   "Make each VARIABLE buffer-local and assign to it the corresponding VALUE.
 
