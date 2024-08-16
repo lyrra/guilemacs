@@ -7443,4 +7443,5 @@ static void
 syms_of_display_for_pdumper (void)
 {
   Vinitial_window_system = Qnil;
+  Vtab_bar_position = Qnil;
 }
