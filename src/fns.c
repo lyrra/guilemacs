@@ -3529,7 +3529,7 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
 		  prompt_ends_in_nonspace ? space_string : empty_unibyte_string,
 		  Vyes_or_no_prompt);
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   specbind (Qenable_recursive_minibuffers, Qt);
   /* Preserve the actual command that eventually called `yes-or-no-p'
      (otherwise `repeat' will be repeating `exit-minibuffer').  */
@@ -3541,15 +3541,22 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
 					      Qyes_or_no_p_history, Qnil,
 					      Qnil));
       if (SCHARS (ans) == 3 && !strcmp (SSDATA (ans), "yes"))
-	return unbind_to (count, Qt);
+        {
+          dynwind_end ();
+          return Qt;
+        }
       if (SCHARS (ans) == 2 && !strcmp (SSDATA (ans), "no"))
-	return unbind_to (count, Qnil);
+        {
+          dynwind_end ();
+          return Qnil;
+        }
 
       Fding (Qnil);
       Fdiscard_input ();
       message1 ("Please answer yes or no.");
       Fsleep_for (make_fixnum (2), Qnil);
     }
+  // not reached, no need to dynwind_end here
 }
 
 DEFUN ("load-average", Fload_average, Sload_average, 0, 1, 0,

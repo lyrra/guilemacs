@@ -63,6 +63,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "treesit.h"
 #endif
 
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 static void update_buffer_properties (ptrdiff_t, ptrdiff_t);
 static Lisp_Object styled_format (ptrdiff_t, Lisp_Object *, bool);
 
