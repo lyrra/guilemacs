@@ -285,10 +285,10 @@ that the search has reached."
 
 (load "indent")
 (load "emacs-lisp/cl-generic")
+(load "minibuffer") ; Needs cl-generic, seq (and define-minor-mode).
 (load "simple")
 (load "emacs-lisp/seq")
 (load "emacs-lisp/nadvice")
-(load "minibuffer") ; Needs cl-generic, seq (and define-minor-mode).
 (load "frame")
 (load "startup")
 (load "term/tty-colors")
