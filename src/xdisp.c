@@ -13315,10 +13315,10 @@ set_message (Lisp_Object string)
          called from `probably_quit`.  */
       && !garbage_collection_inhibited)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
       message = dsafe_call1 (Vset_message_function, string);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       if (STRINGP (message))
         {
@@ -13394,10 +13394,10 @@ clear_message (bool current_p, bool last_displayed_p)
           /* FIXME: (bug#63253) Same as for `set-message-function` above.  */
           && !garbage_collection_inhibited)
         {
-          specpdl_ref count = SPECPDL_INDEX ();
+          dynwind_begin ();
           specbind (Qinhibit_quit, Qt);
           preserve = dsafe_calln (false, Vclear_message_function);
-          unbind_to (count, Qnil);
+          dynwind_end ();
         }
 
       if (!EQ (preserve, Qdont_clear_message))
