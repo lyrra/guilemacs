@@ -665,7 +665,7 @@ make_empty_string (int multibyte)
   Lisp_Object string;
 
   string = allocate_string ();
-  allocate_string_data (string, 0, 0);
+  allocate_string_data (string, 0, 0, false);
   if (! multibyte)
     XSTRING (string)->u.s.size_byte = -1;			\
   return string;
