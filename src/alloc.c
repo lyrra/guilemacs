@@ -641,6 +641,7 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
       memcpy (new_data, data, cidx_byte);
     }
 
+  clear_string_char_byte_cache ();
   return new_charaddr;
 }
 
