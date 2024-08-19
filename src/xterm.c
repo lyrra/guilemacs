@@ -815,6 +815,9 @@ typedef int (*Emacs_XIOErrorHandler) (Display *);
 struct input_event xg_pending_quit_event = { .kind = NO_EVENT };
 #endif
 
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 /* Non-zero means that a HELP_EVENT has been generated since Emacs
    start.  */
 
@@ -6367,7 +6370,8 @@ x_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
   int width, height;
   void (*surface_set_size_func) (cairo_surface_t *, double, double) = NULL;
   Lisp_Object acc = Qnil;
-  specpdl_ref count = SPECPDL_INDEX ();
+
+  dynwind_begin ();
 
   redisplay_preserve_echo_area (31);
 
@@ -6445,7 +6449,7 @@ x_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
 #endif
   unblock_input ();
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return CALLN (Fapply, Qconcat, Fnreverse (acc));
 }

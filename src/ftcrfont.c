@@ -728,7 +728,7 @@ ftcrhbfont_end_hb_font (struct font *font, hb_font_t *hb_font)
 
 static void syms_of_ftcrfont_for_pdumper (void);
 
-struct font_driver const ftcrfont_driver =
+struct font_driver ftcrfont_driver =
   {
   .type = LISPSYM_INITIALLY (Qftcr),
   .get_cache = ftfont_get_cache,
