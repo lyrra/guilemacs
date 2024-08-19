@@ -612,24 +612,24 @@ allocate_string_data (Lisp_Object string,
 
 unsigned char *
 resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
-		    int clen, int new_clen)
+                    int clen, int new_clen)
 {
   eassume (STRING_MULTIBYTE (string));
-  sdata *old_sdata = SDATA_OF_STRING (XSTRING (string));
+  struct Lisp_String *lstr = XSTRING(string);
   ptrdiff_t nchars = SCHARS (string);
   ptrdiff_t nbytes = SBYTES (string);
   ptrdiff_t new_nbytes = nbytes + (new_clen - clen);
   unsigned char *data = SDATA (string);
   unsigned char *new_charaddr;
 
-  if (sdata_size (nbytes) == sdata_size (new_nbytes))
+  if (nbytes == new_nbytes)
     {
       /* No need to reallocate, as the size change falls within the
 	 alignment slop.  */
       XSTRING (string)->u.s.size_byte = new_nbytes;
       new_charaddr = data + cidx_byte;
       memmove (new_charaddr + new_clen, new_charaddr + clen,
-	       nbytes - (cidx_byte + (clen - 1)));
+               nbytes - (cidx_byte + (clen - 1)));
     }
   else
     {
@@ -637,20 +637,12 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
       unsigned char *new_data = SDATA (string);
       new_charaddr = new_data + cidx_byte;
       memcpy (new_charaddr + new_clen, data + cidx_byte + clen,
-	      nbytes - (cidx_byte + clen));
+              nbytes - (cidx_byte + clen));
       memcpy (new_data, data, cidx_byte);
-
-      /* Mark old string data as free by setting its string back-pointer
-	 to null, and record the size of the data in it.  */
-      SDATA_NBYTES (old_sdata) = nbytes;
-      old_sdata->string = NULL;
     }
-
-  clear_string_char_byte_cache ();
 
   return new_charaddr;
 }
-
 
 void
 string_overflow (void)
