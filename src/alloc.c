@@ -262,7 +262,9 @@ xmalloc (size_t size)
 void *
 xzalloc (size_t size)
 {
-  return xmalloc (size);
+  void *val = xmalloc (size);
+  memset (val, 0, size);
+  return val;
 }
 
 /* Like GC_REALLOC but check for no memory.  */
@@ -1169,6 +1171,8 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
   else
     {
       p = xmalloc (header_size + len * word_size);
+      if (clearit)
+        memset (p, 0, header_size + len * word_size);
       SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
     }
 
