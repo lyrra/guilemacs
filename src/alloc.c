@@ -585,7 +585,7 @@ allocate_string (void)
 
    If CLEARIT, also clear the other bytes of S->u.s.data.  */
 
-static void
+void
 allocate_string_data (Lisp_Object string,
 		      EMACS_INT nchars, EMACS_INT nbytes, bool clearit)
 {
