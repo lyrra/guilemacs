@@ -976,6 +976,26 @@ side-effects, and the argument LIST is not modified."
       (delq elt (copy-sequence list))
     list))
 
+;; guilemacs define save-match-data before usage
+
+(defmacro save-match-data (&rest body)
+  "Execute the BODY forms, restoring the global value of the match data.
+The value returned is the value of the last form in BODY.
+NOTE: The convention in Elisp is that any function, except for a few
+exceptions like car/assoc/+/goto-char, can clobber the match data,
+so `save-match-data' should normally be used to save *your* match data
+rather than your caller's match data."
+  ;; It is better not to use backquote here,
+  ;; because that makes a bootstrapping problem
+  ;; if you need to recompile all the Lisp files using interpreted code.
+  (declare (indent 0) (debug t))
+  (let ((saved-match-data (make-symbol "saved-match-data")))
+    (list 'let
+	  (list (list saved-match-data '(match-data)))
+	  (list 'unwind-protect
+	        (cons 'progn body)
+	        (list 'set-match-data saved-match-data t)))))
+
 ;;;; Keymap support.
 
 (defun kbd (keys)
@@ -5407,23 +5427,7 @@ If `default-directory' is already an existing directory, it's not changed."
 
 ;;; Matching and match data.
 
-(defmacro save-match-data (&rest body)
-  "Execute the BODY forms, restoring the global value of the match data.
-The value returned is the value of the last form in BODY.
-NOTE: The convention in Elisp is that any function, except for a few
-exceptions like car/assoc/+/goto-char, can clobber the match data,
-so `save-match-data' should normally be used to save *your* match data
-rather than your caller's match data."
-  ;; It is better not to use backquote here,
-  ;; because that makes a bootstrapping problem
-  ;; if you need to recompile all the Lisp files using interpreted code.
-  (declare (indent 0) (debug t))
-  (let ((saved-match-data (make-symbol "saved-match-data")))
-    (list 'let
-	  (list (list saved-match-data '(match-data)))
-	  (list 'unwind-protect
-	        (cons 'progn body)
-	        (list 'set-match-data saved-match-data t)))))
+;; guilemacs: save-match-data hoisted before usage
 
 (defun match-string (num &optional string)
   "Return the string of text matched by the previous search or regexp operation.
