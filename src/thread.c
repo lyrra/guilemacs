@@ -71,7 +71,7 @@ extern volatile int interrupt_input_blocked;
 
 
 
-void
+static void
 flush_stack_call_func (void (*func) (void *arg), void *arg)
 {
   (*func) (arg);

@@ -4135,41 +4135,6 @@ extern void refill_memory_reserve (void);
 #endif
 extern void alloc_unexec_pre (void);
 extern void alloc_unexec_post (void);
-extern void mark_c_stack (char const *, char const *);
-extern void flush_stack_call_func1 (void (*func) (void *arg), void *arg);
-extern void mark_memory (void const *start, void const *end);
-
-/* Force callee-saved registers and register windows onto the stack,
-   so that conservative garbage collection can see their values.  */
-#ifndef HAVE___BUILTIN_UNWIND_INIT
-# ifdef __sparc__
-   /* This trick flushes the register windows so that all the state of
-      the process is contained in the stack.
-      FreeBSD does not have a ta 3 handler, so handle it specially.
-      FIXME: Code in the Boehm GC suggests flushing (with 'flushrs') is
-      needed on ia64 too.  See mach_dep.c, where it also says inline
-      assembler doesn't work with relevant proprietary compilers.  */
-#  if defined __sparc64__ && defined __FreeBSD__
-#   define __builtin_unwind_init() asm ("flushw")
-#  else
-#   define __builtin_unwind_init() asm ("ta 3")
-#  endif
-# else
-#  define __builtin_unwind_init() ((void) 0)
-# endif
-#endif
-INLINE void
-flush_stack_call_func (void (*func) (void *arg), void *arg)
-{
-  __builtin_unwind_init ();
-  flush_stack_call_func1 (func, arg);
-  /* Work around GCC sibling call optimization making
-     '__builtin_unwind_init' ineffective (bug#65727).
-     See <https://gcc.gnu.org/bugzilla/show_bug.cgi?id=115132>.  */
-#if defined __GNUC__ && !defined __clang__ && !defined __OBJC__
-  asm ("");
-#endif
-}
 
 extern void garbage_collect (void);
 extern void maybe_garbage_collect (void);
