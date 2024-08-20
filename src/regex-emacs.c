@@ -4170,7 +4170,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
 
   INIT_FAIL_STACK ();
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Prevent shrinking and relocation of buffer text if GC happens
      while we are inside this function.  The calls to
@@ -5279,7 +5279,7 @@ re_match_2_internal (struct re_pattern_buffer *bufp,
     goto restore_best_regs;
 
 endof_re_match:
-  unbind_to (count, Qnil);
+  dynwind_end ();
   SAFE_FREE ();
 
   /* The factor of 50 below is a heuristic that needs to be tuned.
