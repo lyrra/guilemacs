@@ -984,7 +984,7 @@ typedef struct
 while (REMAINING_AVAIL_SLOTS <= space) {				\
   if (!GROW_FAIL_STACK (fail_stack))					\
     {									\
-      unbind_to (count, Qnil);						\
+      dynwind_end ();							\
       SAFE_FREE ();							\
       return -2;							\
     }									\
