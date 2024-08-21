@@ -626,7 +626,7 @@ If FUNCTION takes less time to execute than TIMEOUT seconds, MESSAGE
 is not displayed.  */)
   (Lisp_Object timeout, Lisp_Object message, Lisp_Object function)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   CHECK_NUMBER (timeout);
   CHECK_STRING (message);
@@ -640,7 +640,8 @@ is not displayed.  */)
 
   Lisp_Object result = calln (function);
 
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 DEFUN ("macroexpand", Fmacroexpand, Smacroexpand, 1, 2, 0,
@@ -1256,7 +1257,7 @@ probably_quit (void)
     process_quit_flag ();
   else if (pending_signals)
     process_pending_signals ();
-  unbind_to (gc_count, Qnil);
+  //unbind_to (gc_count, Qnil);
 }
 
 DEFUN ("signal", Fsignal, Ssignal, 2, 2, 0,
@@ -1325,13 +1326,13 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
   if (! NILP (Vsignal_hook_function)
       && !oom)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       max_ensure_room (20);
       /* FIXME: 'handler-bind' makes `signal-hook-function' obsolete?  */
       /* FIXME: Here we still "split" the error object
          into its error-symbol and its error-data?  */
       call2 (Vsignal_hook_function, error_symbol, data);
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   conditions = Fget (real_error_symbol, Qerror_conditions);
@@ -1352,12 +1353,12 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
 	  {
 	    if (!NILP (find_handler_clause (h->tag_or_ch, conditions)))
 	      {
-	        specpdl_ref count = SPECPDL_INDEX ();
+		dynwind_begin ();
 	        max_ensure_room (20);
 	        push_handler (make_fixnum (skip + h->bytecode_dest),
 	                      SKIP_CONDITIONS);
 	        call1 (h->val, error);
-	        unbind_to (count, Qnil);
+		dynwind_end ();
 	        pop_handler ();
 	      }
 	    continue;
@@ -1803,7 +1804,7 @@ load_with_autoload_queue
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* If autoloading gets an error (which includes the error of failing
      to define the function being called), we use Vautoload_queue
@@ -1820,7 +1821,7 @@ load_with_autoload_queue
 
   /* Once loading finishes, don't undo it.  */
   Vautoload_queue = Qt;
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return tem;
 }
 
@@ -2331,7 +2332,7 @@ safe_eval_handler (Lisp_Object arg, ptrdiff_t nargs, Lisp_Object *args)
 Lisp_Object
 safe_funcall (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   /* FIXME: This function started its life in 'xdisp.c' for use internally
      by the redisplay.  So it was important to inhibit redisplay.
      Not clear if we still need this 'specbind' now that 'xdisp.c' has its
@@ -2340,7 +2341,8 @@ safe_funcall (ptrdiff_t nargs, Lisp_Object *args)
   /* Use Qt to ensure debugger does not run.  */
   Lisp_Object val = internal_condition_case_n (Ffuncall, nargs, args, Qt,
 				               safe_eval_handler);
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 Lisp_Object
