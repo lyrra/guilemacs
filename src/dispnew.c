@@ -6719,10 +6719,8 @@ when TERMINAL is nil.  */)
     }
   /* STRING might be very long, in which case fwrite could be
      interrupted by SIGIO.  So we temporarily block SIGIO.  */
-  unrequest_sigio ();
   fwrite (SDATA (string), 1, SBYTES (string), out);
   fflush (out);
-  request_sigio ();
   unblock_input ();
   return Qnil;
 }
