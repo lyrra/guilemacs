@@ -27359,8 +27359,9 @@ display_mode_lines (struct window *w)
 {
   Lisp_Object old_selected_window = selected_window;
   Lisp_Object new_frame = w->frame;
-  specpdl_ref count = SPECPDL_INDEX ();
   int n = 0;
+
+  dynwind_begin ();
 
   record_unwind_protect (restore_selected_window, selected_window);
   record_unwind_protect
@@ -27432,7 +27433,7 @@ display_mode_lines (struct window *w)
       ++n;
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   if (n > 0)
     w->must_be_updated_p = true;
