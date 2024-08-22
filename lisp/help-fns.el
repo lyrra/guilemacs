@@ -34,6 +34,7 @@
 
 (require 'cl-lib)
 (require 'seq)
+(require 'easymenu)
 (require 'help-mode)
 (require 'radix-tree)
 (eval-when-compile (require 'subr-x))   ;For when-let.
