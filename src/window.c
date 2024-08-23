@@ -2698,7 +2698,7 @@ window_list (void)
   if (!CONSP (Vwindow_list))
     {
       Lisp_Object tail, frame;
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       Vwindow_list = Qnil;
       /*  Don't allow quitting in Fnconc.  Otherwise we might end up
@@ -2717,7 +2717,7 @@ window_list (void)
 	  Vwindow_list = nconc2 (Vwindow_list, arglist);
 	}
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   return Vwindow_list;
@@ -2856,7 +2856,7 @@ static Lisp_Object
 next_window (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames,
 	     bool next_p)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   decode_next_window_args (&window, &minibuf, &all_frames);
 
@@ -2918,7 +2918,7 @@ next_window (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames,
 	window = candidate;
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return window;
 }
@@ -3010,7 +3010,7 @@ static Lisp_Object
 window_list_1 (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames)
 {
   Lisp_Object tail, list, rest;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   decode_next_window_args (&window, &minibuf, &all_frames);
   list = Qnil;
@@ -3033,7 +3033,7 @@ window_list_1 (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames)
       list = nconc2 (rest, list);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return list;
 }
