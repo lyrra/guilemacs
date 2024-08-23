@@ -1754,9 +1754,8 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
     case PVEC_USER_PTR:
       {
 	print_c_string ("#<user-ptr ", printcharfun);
-	int i = sprintf (buf, "ptr=%p finalizer=%p",
-			 XUSER_PTR (obj)->p,
-			 (void *) XUSER_PTR (obj)->finalizer);
+	int i = sprintf (buf, "ptr=%p",
+			 XUSER_PTR (obj)->p);
 	strout (buf, i, i, printcharfun);
 	printchar ('>', printcharfun);
       }

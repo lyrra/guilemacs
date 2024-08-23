@@ -1005,10 +1005,6 @@ function or t otherwise.  */)
 {
   CHECK_SUBR (subr);
 
-#ifdef HAVE_NATIVE_COMP
-  if (NATIVE_COMP_FUNCTION_DYNP (subr))
-    return XSUBR (subr)->lambda_list;
-#endif
   return Qt;
 }
 

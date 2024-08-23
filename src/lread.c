@@ -1239,8 +1239,7 @@ static Lisp_Object
 compute_found_effective (Lisp_Object found)
 {
   /* Reconstruct the .elc filename.  */
-  Lisp_Object src_name =
-    Fgethash (Ffile_name_nondirectory (found), Vcomp_eln_to_el_h, Qnil);
+  Lisp_Object src_name = Qnil;
 
   if (NILP (src_name))
     /* Manual eln load.  */

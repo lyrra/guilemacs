@@ -2067,9 +2067,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
   init_random ();
   init_xfaces ();
 
-  if (!initialized)
-    syms_of_comp ();
-
   /* Do less garbage collection in batch mode (since these tend to be
      more short-lived, and the memory is returned to the OS on exit
      anyway).  */

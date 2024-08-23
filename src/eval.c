@@ -769,6 +769,8 @@ struct icc_thunk_env
       Lisp_Object arg1;
       Lisp_Object arg2;
       Lisp_Object arg3;
+      Lisp_Object arg4;
+      Lisp_Object arg5;
     };
     struct
     {
@@ -2464,13 +2466,6 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
     return funcall_module (fun, nargs, arg_vector);
-#endif
-#ifdef HAVE_NATIVE_COMP
-  else if (NATIVE_COMP_FUNCTION_DYNP (fun))
-    {
-      syms_left = XSUBR (fun)->lambda_list;
-      lexenv = Qnil;
-    }
 #endif
   else
     emacs_abort ();

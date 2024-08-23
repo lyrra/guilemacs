@@ -2603,22 +2603,8 @@ struct Lisp_Sqlite
 struct Lisp_User_Ptr
 {
   struct vectorlike_header header;
-  void (*finalizer) (void *);
   void *p;
-} GCALIGNED_STRUCT;
-
-INLINE bool
-FINALIZERP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_FINALIZER);
-}
-
-INLINE struct Lisp_Finalizer *
-XFINALIZER (Lisp_Object a)
-{
-  eassert (FINALIZERP (a));
-  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Finalizer);
-}
+};
 
 INLINE bool
 MARKERP (Lisp_Object x)
