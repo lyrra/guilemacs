@@ -47,15 +47,11 @@ wisentdir = ${cedetdir}/semantic/wisent
 grammar_bovine = ${bovinedir}/grammar.el
 grammar_wisent = ${wisentdir}/grammar.el
 
-BOVINE = \
-	${bovinedir}/make-by.el \
-	${bovinedir}/scm-by.el
+#BOVINE = \
+#	${bovinedir}/scm-by.el
 
-WISENT = 				   \
-	${cedetdir}/semantic/grammar-wy.el \
-	${wisentdir}/js-wy.el 		   \
-	${wisentdir}/python-wy.el 	   \
-	${cedetdir}/srecode/srt-wy.el
+#WISENT = 				   \
+#	${cedetdir}/srecode/srt-wy.el
 
 ALL = ${BOVINE} ${WISENT}
 
@@ -63,7 +59,7 @@ ALL = ${BOVINE} ${WISENT}
 
 all: ${ALL}
 
-bovine: ${BOVINE}
+bovine: #${BOVINE}
 
 wisent: ${WISENT}
 
