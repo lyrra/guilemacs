@@ -662,7 +662,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
      onto Vminibuffer_list before incrementing minibuf_level, in case
      a hook called during the minibuffer creation calls
      Factive_minibuffer_window.  */
-  minibuffer = get_minibuffer (minibuf_level + 1);
+  //minibuffer = get_minibuffer (minibuf_level + 1);
   minibuf_level++;		/* Before calling choose_minibuf_frame.  */
 
   /* Choose the minibuffer window and frame, and take action on them.  */
@@ -780,6 +780,7 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   /* Switch to the minibuffer.  */
 
+  minibuffer = get_minibuffer (minibuf_level);
   set_minibuffer_mode (minibuffer, minibuf_level);
   Fset_buffer (minibuffer);
 
