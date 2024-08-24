@@ -2018,10 +2018,14 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
                   SYMBOL_FUNCTION (intern ("default-boundp")),
                   SYMBOL_FUNCTION (intern ("bind-symbol")));
 
+      syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
+
       /* Call syms_of_xfaces before init_window_once because that
 	 function creates Vterminal_frame.  Termcap frames now use
 	 faces, and the face implementation uses some symbols as
-	 face names.  */
+	 face names.
+	 After syms_of_fns, because we use hashtest_eq* friends.
+       */
       syms_of_xfaces ();
       /* XXX syms_of_keyboard uses some symbols in keymap.c.  It would
          be better to arrange things not to have this dependency.  */
@@ -2032,7 +2036,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	 Emacs starts up from scratch (e.g., temacs).  */
       syms_of_keyboard ();
 
-      syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
       syms_of_fileio ();
       /* Before syms_of_coding to initialize Vgc_cons_threshold.  */
       syms_of_alloc ();
