@@ -137,17 +137,6 @@ The format is (FUNCTION ARGS...).")
 (setq-default help-xref-stack nil help-xref-stack-item nil)
 (setq-default help-xref-forward-stack nil help-xref-forward-stack-item nil)
 
-(defvar help-mode-syntax-table
-  (let ((table (make-syntax-table emacs-lisp-mode-syntax-table)))
-    ;; Treat single quotes as parens so that forward-sexp does not
-    ;; break when a quoted string contains punctuation.
-    (modify-syntax-entry ?‘ "(’  " table)
-    (modify-syntax-entry ?’ ")‘  " table)
-    ;; `;' doesn't start a comment.
-    (modify-syntax-entry ?\; "." table)
-    table)
-  "Syntax table used in `help-mode'.")
-
 (defcustom help-mode-hook nil
   "Hook run by `help-mode'."
   :type 'hook
