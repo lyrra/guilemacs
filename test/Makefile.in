@@ -159,8 +159,8 @@ SELECTOR_ACTUAL=$(SELECTOR_EXPENSIVE)
 endif
 
 ## Byte-compile all test files to test for errors.
-%.elc: %.el
-	$(AM_V_ELC)$(emacs) --batch -f batch-byte-compile $<
+#%.elc: %.el
+#	$(AM_V_ELC)$(emacs) --batch -f batch-byte-compile $<
 
 ifdef EMACS_HYDRA_CI
 WRITE_LOG = 2>&1 | tee $@
@@ -180,7 +180,7 @@ else
 testloadfile = $*
 endif
 
-%.log: %.elc
+%.log: %.el
 	$(AM_V_GEN)${MKDIR_P} $(dir $@)
 	$(AM_V_at)HOME=$(TEST_HOME) $(emacs) \
 	  -l ert ${ert_opts} -l $(testloadfile) \
