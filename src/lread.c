@@ -169,6 +169,9 @@ file_get_char (file_stream stream)
 # endif
 #endif
 
+Lisp_Object
+intern_driver (Lisp_Object string, Lisp_Object obarray);
+
 static SCM obarrays;
 
 /* The objects or placeholders read with the #n=object form.
