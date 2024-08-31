@@ -626,8 +626,6 @@ If FUNCTION takes less time to execute than TIMEOUT seconds, MESSAGE
 is not displayed.  */)
   (Lisp_Object timeout, Lisp_Object message, Lisp_Object function)
 {
-  dynwind_begin ();
-
   CHECK_NUMBER (timeout);
   CHECK_STRING (message);
 
@@ -636,6 +634,7 @@ is not displayed.  */)
   struct atimer *timer = start_atimer (ATIMER_RELATIVE, interval,
 				       with_delayed_message_display,
 				       xstrdup (SSDATA (message)));
+  dynwind_begin ();
   record_unwind_protect_ptr (with_delayed_message_cancel, timer);
 
   Lisp_Object result = calln (function);
