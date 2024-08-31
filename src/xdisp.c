@@ -1543,6 +1543,7 @@ Value is the height in pixels of the line at point.  */)
   struct window *w = XWINDOW (selected_window);
   struct buffer *old_buffer = NULL;
   Lisp_Object result;
+  it.min_width_property = Qnil;
 
   if (XBUFFER (w->contents) != current_buffer)
     {
@@ -1688,6 +1689,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
   bool visible_p = false;
   struct buffer *old_buffer = NULL;
   bool r2l = false;
+  it.min_width_property = Qnil;
 
   if (FRAME_INITIAL_P (XFRAME (WINDOW_FRAME (w))))
     return visible_p;
@@ -1776,6 +1778,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	{
 	  struct it it2;
 	  void *it2data = NULL;
+          it2.min_width_property = Qnil;
 
 	  SAVE_IT (it2, it, it2data);
 	  move_it_by_lines (&it, 1);
@@ -1806,6 +1809,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
       int bottom_y;
       struct it save_it;
       void *save_it_data = NULL;
+      save_it.min_width_property = Qnil;
 
       /* Calling line_bottom_y may change it.method, it.position, etc.  */
       SAVE_IT (save_it, it, save_it_data);
@@ -1855,6 +1859,8 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		     the previous buffer position is also displayed
 		     from a display vector, we need to consume all of
 		     the glyphs from that display vector.  */
+                  it2.min_width_property = Qnil;
+                  it2_prev.min_width_property = Qnil;
 		  start_display (&it2, w, top);
 		  it2.glyph_row = NULL;
 		  move_it_to (&it2, charpos - 1, -1, -1, -1, MOVE_TO_POS);
@@ -1923,6 +1929,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 		  Lisp_Object startpos, endpos;
 		  EMACS_INT start, end;
 		  struct it it3;
+                  it3.min_width_property = Qnil;
 
 		  /* Find the first and the last buffer positions
 		     covered by the display string.  */
@@ -2068,6 +2075,7 @@ pos_visible_p (struct window *w, ptrdiff_t charpos, int *x, int *y,
 	 window.  */
       struct it it2;
       void *it2data = NULL;
+      it2.min_width_property = Qnil;
 
       SAVE_IT (it2, it, it2data);
       if (IT_CHARPOS (it) < ZV && FETCH_BYTE (IT_BYTEPOS (it)) != '\n')
@@ -4878,6 +4886,7 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
   ptrdiff_t next_check_charpos;
   struct it it_copy;
   void *it_copy_data = NULL;
+  it_copy.min_width_property = Qnil;
 
   eassert (it->s == NULL);
 
@@ -5692,7 +5701,8 @@ display_min_width (struct it *it, ptrdiff_t charpos,
 	      struct face *face = FACE_FROM_ID (it->f, it->face_id);
 	      font = face->font ? face->font : FRAME_FONT (it->f);
 	      calc_pixel_width_or_height (&width, it,
-					  XCAR (it->min_width_property),
+					  it->min_width_property ?
+					    XCAR (it->min_width_property) : Qnil,
 					  font, true, NULL);
 	      width -= it->current_x - it->min_width_start;
 	      /* It makes no sense to try to obey min-width which yields
@@ -7705,6 +7715,7 @@ back_to_previous_visible_line_start (struct it *it)
 	ptrdiff_t pos;
 	ptrdiff_t beg, end;
 	Lisp_Object val, overlay;
+        it2.min_width_property = Qnil;
 
 	SAVE_IT (it2, *it, it2data);
 
@@ -9967,6 +9978,10 @@ move_it_in_display_line_to (struct it *it,
   enum move_it_result result = MOVE_UNDEFINED;
   struct glyph_row *saved_glyph_row;
   struct it wrap_it, atpos_it, atx_it, ppos_it;
+  wrap_it.min_width_property = Qnil;
+  atpos_it.min_width_property = Qnil;
+  atx_it.min_width_property = Qnil;
+  ppos_it.min_width_property = Qnil;
   void *wrap_data = NULL, *atpos_data = NULL, *atx_data = NULL;
   void *ppos_data = NULL;
   bool may_wrap = false;
@@ -10329,6 +10344,7 @@ move_it_in_display_line_to (struct it *it,
 				  && IT_OVERFLOW_NEWLINE_INTO_FRINGE (it))
 				{
 				  struct it tem_it;
+                                  tem_it.min_width_property = Qnil;
 				  void *tem_data = NULL;
 
 				  SAVE_IT (tem_it, *it, tem_data);
@@ -10711,6 +10727,7 @@ move_it_in_display_line (struct it *it,
       && (op & MOVE_TO_X))
     {
       struct it save_it;
+      save_it.min_width_property = Qnil;
       void *save_data = NULL;
       int skip;
 
@@ -10806,6 +10823,7 @@ move_it_to (struct it *it, ptrdiff_t to_charpos, int to_x, int to_y, int to_vpos
       else if (op & MOVE_TO_Y)
 	{
 	  struct it it_backup;
+          it_backup.min_width_property = Qnil;
 
 	  if (it->line_wrap == WORD_WRAP)
 	    SAVE_IT (it_backup, *it, backup_data);
@@ -11099,6 +11117,8 @@ move_it_vertically_backward (struct it *it, int dy)
 {
   int nlines, h;
   struct it it2, it3;
+  it2.min_width_property = Qnil;
+  it3.min_width_property = Qnil;
   void *it2data = NULL, *it3data = NULL;
   ptrdiff_t start_pos;
   int nchars_per_row
@@ -11364,6 +11384,7 @@ move_it_by_lines (struct it *it, ptrdiff_t dvpos)
   else
     {
       struct it it2;
+      it2.min_width_property = Qnil;
       void *it2data = NULL;
       ptrdiff_t start_charpos, orig_charpos, i;
       int nchars_per_row
@@ -11475,6 +11496,7 @@ partial_line_height (struct it *it_origin)
   int partial_height;
   void *it_data = NULL;
   struct it it;
+  it.min_width_property = Qnil;
   SAVE_IT (it, *it_origin, it_data);
   move_it_to (&it, ZV, -1, it.last_visible_y, -1,
               MOVE_TO_POS | MOVE_TO_Y);
@@ -11561,6 +11583,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 {
   struct window *w = decode_live_window (window);
   struct it it;
+  it.min_width_property = Qnil;
   ptrdiff_t start, end, bpos;
   struct text_pos startp;
   void *itdata = NULL;
@@ -11763,6 +11786,7 @@ window_text_pixel_size (Lisp_Object window, Lisp_Object from, Lisp_Object to,
 
   void *it2data = NULL;
   struct it it2;
+  it2.min_width_property = Qnil;
   SAVE_IT (it2, it, it2data);
 
   x = move_it_to (&it, end, to_x, max_y, -1, move_op);
@@ -11988,10 +12012,10 @@ WINDOW.  */)
 		      ? current_buffer
 		      : XBUFFER (Fget_buffer (buffer_or_name)));
   Lisp_Object buffer, value;
-  specpdl_ref count = SPECPDL_INDEX ();
 
   XSETBUFFER (buffer, b);
 
+  dynwind_begin ();
   /* The unwind form of with_echo_area_buffer is what we need here to
      make WINDOW temporarily show our buffer.  */
   /* FIXME: Can we move this into the `if (!EQ (buffer, w->contents))`?  */
@@ -12012,7 +12036,7 @@ WINDOW.  */)
   value = window_text_pixel_size (window, Qnil, Qnil, x_limit, y_limit, Qnil,
 				  Qnil);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Restore original values.  This is important if this function is
      called from some ':eval' form in the middle of redisplay.  */
@@ -12038,6 +12062,7 @@ DEFUN ("display--line-is-continued-p", Fdisplay__line_is_continued_p,
     {
       struct text_pos startpos;
       struct it it;
+      it.min_width_property = Qnil;
       void *itdata;
       /* Use a marker, since vertical-motion enters redisplay, which can
 	 trigger fontifications, which in turn could modify buffer text.  */
@@ -13077,6 +13102,7 @@ resize_mini_window (struct window *w, bool exact_p)
   else
     {
       struct it it;
+      it.min_width_property = Qnil;
       int unit = FRAME_LINE_HEIGHT (f);
       int height, max_height;
       struct text_pos start;
@@ -13868,6 +13894,7 @@ gui_consider_frame_title (Lisp_Object frame)
       char *title;
       ptrdiff_t len;
       struct it it;
+      it.min_width_property = Qnil;
       dynwind_begin ();
 
       FOR_EACH_FRAME (tail, other_frame)
@@ -14386,6 +14413,7 @@ display_tab_bar (struct window *w)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct it it;
+  it.min_width_property = Qnil;
   Lisp_Object items;
   int i;
 
@@ -14551,6 +14579,7 @@ display_tab_bar_line (struct it *it, int height)
     {
       int x, n_glyphs_before, i, nglyphs;
       struct it it_before;
+      it_before.min_width_property = Qnil;
 
       /* Get the next display element.  */
       if (!get_next_display_element (it))
@@ -14661,6 +14690,7 @@ tab_bar_height (struct frame *f, int *n_rows, bool pixelwise)
 {
   struct window *w = XWINDOW (f->tab_bar_window);
   struct it it;
+  it.min_width_property = Qnil;
   /* tab_bar_height is called from redisplay_tab_bar after building
      the desired matrix, so use (unused) mode-line row as temporary row to
      avoid destroying the first tab-bar row.  */
@@ -14727,6 +14757,7 @@ redisplay_tab_bar (struct frame *f)
 {
   struct window *w;
   struct it it;
+  it.min_width_property = Qnil;
   struct glyph_row *row;
 
   f->tab_bar_redisplayed = true;
@@ -15563,6 +15594,7 @@ display_tool_bar_line (struct it *it, int height)
     {
       int x, n_glyphs_before, i, nglyphs;
       struct it it_before;
+      it_before.min_width_property = Qnil;
 
       /* Get the next display element.  */
       if (!get_next_display_element (it))
@@ -15684,6 +15716,7 @@ tool_bar_height (struct frame *f, int *n_rows, bool pixelwise)
 {
   struct window *w = XWINDOW (f->tool_bar_window);
   struct it it;
+  it.min_width_property = Qnil;
   /* tool_bar_height is called from redisplay_tool_bar after building
      the desired matrix, so use (unused) mode-line row as temporary row to
      avoid destroying the first tool-bar row.  */
@@ -15755,6 +15788,7 @@ redisplay_tool_bar (struct frame *f)
 {
   struct window *w;
   struct it it;
+  it.min_width_property = Qnil;
   struct glyph_row *row;
   bool change_height_p;
 
@@ -16376,6 +16410,7 @@ hscroll_window_tree (Lisp_Object window)
 		      && !cursor_row->truncated_on_left_p)))
 	    {
 	      struct it it;
+              it.min_width_property = Qnil;
 	      ptrdiff_t hscroll;
 	      struct buffer *saved_current_buffer;
 	      ptrdiff_t pt;
@@ -17233,6 +17268,7 @@ redisplay_internal (void)
 	     optimization.  */
 
 	  struct it it;
+          it.min_width_property = Qnil;
 	  int line_height_before = this_line_pixel_height;
 
 	  /* Note that start_display will handle the case that the
@@ -17359,6 +17395,7 @@ redisplay_internal (void)
 	       && !composition_break_at_point)
 	{
 	  struct it it;
+          it.min_width_property = Qnil;
 	  struct glyph_row *row;
 
 	  /* Skip from tlbufpos to PT and see where it is.  Note that
@@ -18939,6 +18976,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
   struct window *w = XWINDOW (window);
   struct text_pos pos, startp;
   struct it it;
+  it.min_width_property = Qnil;
   int this_scroll_margin, scroll_max, rc, height;
   int dy = 0, amount_to_scroll = 0;
   bool scroll_down_p = false;
@@ -19108,6 +19146,7 @@ try_scrolling (Lisp_Object window, bool just_this_one_p,
 	     point.  This matters when lines at window top and lines
 	     below window bottom have different height.  */
 	  struct it it1;
+          it1.min_width_property = Qnil;
 	  void *it1data = NULL;
 	  /* We use a temporary it1 because line_bottom_y can modify
 	     its argument, if it moves one line down; see there.  */
@@ -19282,6 +19321,7 @@ compute_window_start_on_continuation_line (struct window *w)
       && FETCH_BYTE (BYTEPOS (start_pos) - 1) != '\n')
     {
       struct it it;
+      it.min_width_property = Qnil;
       struct glyph_row *row;
 
       /* Handle the case that the window start is out of range.  */
@@ -19850,6 +19890,7 @@ set_horizontal_scroll_bar (struct window *w)
       struct buffer *b = XBUFFER (w->contents);
       struct buffer *old_buffer = NULL;
       struct it it;
+      it.min_width_property = Qnil;
       struct text_pos startp;
 
       if (b != current_buffer)
@@ -20001,6 +20042,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   bool update_mode_line;
   int tem;
   struct it it;
+  it.min_width_property = Qnil;
   /* Record it now because it's overwritten.  */
   bool current_matrix_up_to_date_p = false;
   bool used_current_matrix_p = false;
@@ -20693,6 +20735,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
 	  && BEGV <= CHARPOS (startp) && CHARPOS (startp) <= ZV)
 	{
 	  struct it it1;
+          it1.min_width_property = Qnil;
 	  void *it1data = NULL;
 
 	  SAVE_IT (it1, it, it1data);
@@ -21190,6 +21233,7 @@ try_window (Lisp_Object window, struct text_pos pos, int flags)
 {
   struct window *w = XWINDOW (window);
   struct it it;
+  it.min_width_property = Qnil;
   struct glyph_row *last_text_row = NULL;
   struct frame *f = XFRAME (w->frame);
   int cursor_vpos = w->cursor.vpos;
@@ -21300,6 +21344,7 @@ try_window_reusing_current_matrix (struct window *w)
   struct frame *f = XFRAME (w->frame);
   struct glyph_row *bottom_row;
   struct it it;
+  it.min_width_property = Qnil;
   struct run run;
   struct text_pos start, new_start;
   int nrows_scrolled, i;
@@ -22093,6 +22138,7 @@ try_window_id (struct window *w)
   struct glyph_row *bottom_row;
   int bottom_vpos;
   struct it it;
+  it.min_width_property = Qnil;
   ptrdiff_t delta = 0, delta_bytes = 0, stop_pos;
   int dvpos, dy;
   struct text_pos start_pos;
@@ -23304,6 +23350,7 @@ get_overlay_arrow_glyph_row (struct window *w, Lisp_Object overlay_arrow_string)
   const unsigned char *arrow_end = arrow_string + arrow_len;
   const unsigned char *p;
   struct it it;
+  it.min_width_property = Qnil;
   bool multibyte_p;
   int n_glyphs_before;
 
@@ -23361,6 +23408,7 @@ static void
 insert_left_trunc_glyphs (struct it *it)
 {
   struct it truncate_it;
+  truncate_it.min_width_property = Qnil;
   struct glyph *from, *end, *to, *toend;
 
   eassert (!FRAME_WINDOW_P (it->f)
@@ -24808,6 +24856,7 @@ static ptrdiff_t
 display_count_lines_visually (struct it *it)
 {
   struct it tem_it;
+  tem_it.min_width_property = Qnil;
   ptrdiff_t to;
   struct text_pos from;
 
@@ -24938,6 +24987,7 @@ maybe_produce_line_number (struct it *it)
 
   /* Produce the glyphs for the line number.  */
   struct it tem_it;
+  tem_it.min_width_property = Qnil;
   char lnum_buf[INT_STRLEN_BOUND (ptrdiff_t) + 1];
   bool beyond_zv = IT_BYTEPOS (*it) >= ZV_BYTE;
   ptrdiff_t lnum_offset = -1; /* to produce 1-based line numbers */
@@ -25213,6 +25263,7 @@ display_line (struct it *it, int cursor_vpos)
   struct glyph_row *row = it->glyph_row;
   Lisp_Object overlay_arrow_string;
   struct it wrap_it;
+  wrap_it.min_width_property = Qnil;
   void *wrap_data = NULL;
   bool may_wrap = false;
   int wrap_x UNINIT;
@@ -26662,6 +26713,7 @@ Value is the new character position of point.  */)
     {
       struct text_pos pt;
       struct it it;
+      it.min_width_property = Qnil;
       int pt_x, pt_wrap_prefix_x, target_x, pixel_width, pt_vpos;
       bool at_eol_p;
       bool overshoot_expected = false;
@@ -26800,6 +26852,7 @@ Value is the new character position of point.  */)
 		{
 		  void *it_data = NULL;
 		  struct it it2;
+                  it2.min_width_property = Qnil;
 
 		  SAVE_IT (it2, it, it_data);
 		  move_it_in_display_line_to (&it, ZV, target_x,
@@ -27035,6 +27088,7 @@ display_menu_bar (struct window *w)
 {
   struct frame *f = XFRAME (WINDOW_FRAME (w));
   struct it it;
+  it.min_width_property = Qnil;
   Lisp_Object items;
   int i;
 
@@ -27269,6 +27323,7 @@ display_tty_menu_item (const char *item_text, int width, int face_id,
 		       int x, int y, bool submenu)
 {
   struct it it;
+  it.min_width_property = Qnil;
   struct frame *f = SELECTED_FRAME ();
   struct window *w = XWINDOW (f->selected_window);
   struct glyph_row *row;
@@ -27452,6 +27507,7 @@ static int
 display_mode_line (struct window *w, enum face_id face_id, Lisp_Object format)
 {
   struct it it;
+  it.min_width_property = Qnil;
   struct face *face;
   dynwind_begin ();
 
@@ -28227,6 +28283,7 @@ are the selected window and the WINDOW's buffer).  */)
       Lisp_Object window, Lisp_Object buffer)
 {
   struct it it;
+  it.min_width_property = Qnil;
   int len;
   struct window *w;
   struct buffer *old_buffer = NULL;
@@ -32030,6 +32087,7 @@ produce_stretch_glyph (struct it *it)
 	 Compute the width of the characters having this `display'
 	 property.  */
       struct it it2;
+      it2.min_width_property = Qnil;
       Lisp_Object object =
 	it->sp > 0 ? it->stack[it->sp - 1].string : it->string;
       unsigned char *p = (STRINGP (object)
@@ -32206,6 +32264,7 @@ static void
 produce_special_glyphs (struct it *it, enum display_element_type what)
 {
   struct it temp_it;
+  temp_it.min_width_property = Qnil;
   Lisp_Object gc;
   GLYPH glyph;
   /* Take face-remapping into consideration.  */
