@@ -2230,7 +2230,8 @@ if you want to permanently change your home directory after having
 started Emacs, set `abbreviated-home-dir' to nil so it will be recalculated)."
   ;; Get rid of the prefixes added by the automounter.
   (save-match-data                      ;FIXME: Why?
-    (if-let* ((handler (find-file-name-handler filename 'abbreviate-file-name)))
+    (let ((handler (find-file-name-handler filename 'abbreviate-file-name)))
+    (if handler
         (funcall handler 'abbreviate-file-name filename)
       ;; Avoid treating /home/foo as /home/Foo during `~' substitution.
       (let ((case-fold-search (file-name-case-insensitive-p filename)))
@@ -2272,7 +2273,7 @@ started Emacs, set `abbreviated-home-dir' to nil so it will be recalculated)."
               (setq filename
                     (concat "~"
                             (substring filename mb1))))
-          filename)))))
+          filename))))))
 
 (defun find-buffer-visiting (filename &optional predicate)
   "Return the buffer visiting file FILENAME (a string).
