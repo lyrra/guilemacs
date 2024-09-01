@@ -873,29 +873,11 @@ DEFUN ("sqlite-available-p", Fsqlite_available_p, Ssqlite_available_p, 0, 0, 0,
 void
 syms_of_sqlite (void)
 {
+//#include "sqlite.x"
 #ifdef HAVE_SQLITE3
-  defsubr (&Ssqlite_open);
-  defsubr (&Ssqlite_close);
-  defsubr (&Ssqlite_execute);
-  defsubr (&Ssqlite_select);
-  defsubr (&Ssqlite_execute_batch);
-  defsubr (&Ssqlite_transaction);
-  defsubr (&Ssqlite_commit);
-  defsubr (&Ssqlite_rollback);
-  defsubr (&Ssqlite_pragma);
-#if HAVE_LOAD_EXTENSION
-  defsubr (&Ssqlite_load_extension);
-#endif
-  defsubr (&Ssqlite_next);
-  defsubr (&Ssqlite_columns);
-  defsubr (&Ssqlite_more_p);
-  defsubr (&Ssqlite_finalize);
-  defsubr (&Ssqlite_version);
   DEFSYM (Qset, "set");
   DEFSYM (Qfull, "full");
 #endif
-  defsubr (&Ssqlitep);
-  defsubr (&Ssqlite_available_p);
 
   DEFSYM (Qsqlite_error, "sqlite-error");
   Fput (Qsqlite_error, Qerror_conditions,

@@ -2591,14 +2591,14 @@ xmint_pointer (Lisp_Object a)
 
 struct Lisp_Sqlite
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   void *db;
   void *stmt;
   char *name;
   void (*finalizer) (void *);
   bool eof;
   bool is_statement;
-} GCALIGNED_STRUCT;
+};
 
 struct Lisp_User_Ptr
 {
@@ -2667,7 +2667,7 @@ INLINE struct Lisp_Sqlite *
 XSQLITE (Lisp_Object a)
 {
   eassert (SQLITEP (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Sqlite);
+  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Sqlite);
 }
 
 INLINE bool
