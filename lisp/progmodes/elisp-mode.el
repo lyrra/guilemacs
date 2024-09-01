@@ -320,8 +320,10 @@ happens in interactive invocations."
       (setq-local lexical-binding t)
       (add-file-local-variable-prop-line 'lexical-binding t interactive))))
 
-(defvar-keymap elisp--dynlex-modeline-map
-  "<mode-line> <mouse-1>" #'elisp-enable-lexical-binding)
+(defvar elisp--dynlex-modeline-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] 'elisp-enable-lexical-binding)
+    map))
 
 ;;;###autoload
 (define-derived-mode emacs-lisp-mode lisp-data-mode
