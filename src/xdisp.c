@@ -6316,11 +6316,11 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	      /* Don't allow quitting from lookup_derived_face, for when
 		 we are displaying a non-selected window, and the buffer's
 		 point was temporarily moved to the window-point.  */
-	      specpdl_ref count1 = SPECPDL_INDEX ();
+	      dynwind_begin ();
 	      specbind (Qinhibit_quit, Qt);
 	      face_id2 = lookup_derived_face (it->w, it->f, face_name,
 					      FRINGE_FACE_ID, false);
-	      unbind_to (count1, Qnil);
+	      dynwind_end ();
 	      if (face_id2 >= 0)
 		face_id = face_id2;
 	    }
