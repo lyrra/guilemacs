@@ -1664,7 +1664,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
   if (!NILP (Vprint_unreadable_function)
       && FUNCTIONP (Vprint_unreadable_function))
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       /* Bind `print-unreadable-function' to nil to avoid accidental
 	 infinite recursion in the function called.  */
       Lisp_Object func = Vprint_unreadable_function;
@@ -1681,7 +1681,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 	  set_buffer_internal (XBUFFER (Vprint__unreadable_callback_buffer));
 	}
       Lisp_Object result = calln (func, obj, escapeflag? Qt: Qnil);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       if (!NILP (result))
 	{
