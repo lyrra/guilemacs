@@ -29,6 +29,7 @@
 
 ;;; Code:
 
+(require 'elisp-mode)
 (require 'tabulated-list)
 
 (defgroup Buffer-menu nil
