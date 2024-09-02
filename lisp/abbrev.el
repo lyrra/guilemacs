@@ -67,11 +67,13 @@ be replaced by its expansion."
 
 (define-obsolete-variable-alias 'edit-abbrevs-map
   'edit-abbrevs-mode-map "24.4")
-(defvar-keymap edit-abbrevs-mode-map
-  :doc "Keymap used in `edit-abbrevs'."
-  "C-x C-s" #'abbrev-edit-save-buffer
-  "C-x C-w" #'abbrev-edit-save-to-file
-  "C-c C-c" #'edit-abbrevs-redefine)
+(defvar edit-abbrevs-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map "\C-x\C-s" 'abbrev-edit-save-buffer)
+    (define-key map "\C-x\C-w" 'abbrev-edit-save-to-file)
+    (define-key map "\C-c\C-c" 'edit-abbrevs-redefine)
+    map)
+  "Keymap used in `edit-abbrevs'.")
 
 (defun kill-all-abbrevs ()
   "Undefine all defined abbrevs."

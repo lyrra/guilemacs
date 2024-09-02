@@ -132,9 +132,9 @@ to confuse some users sometimes."
 
 (declare-function cvs-mode-toggle-mark "pcvs" (e))
 
-(defvar-keymap cvs-status-map
-  :doc "Local keymap for text properties of status."
-  "<mouse-2>" #'cvs-mode-toggle-mark)
+(easy-mmode-defmap cvs-status-map
+  '(([(mouse-2)] . cvs-mode-toggle-mark))
+  "Local keymap for text properties of status.")
 
 ;; Constructor:
 

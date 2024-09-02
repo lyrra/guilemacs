@@ -752,10 +752,10 @@ The option \"--fullname\" must be included in this value."
 
     output))
 
-(defvar-keymap gud-minibuffer-local-map
-  :doc "Keymap for minibuffer prompting of gud startup command."
-  :parent minibuffer-local-map
-  "C-i" #'comint-dynamic-complete-filename)
+(easy-mmode-defmap gud-minibuffer-local-map
+  '(("\C-i" . comint-dynamic-complete-filename))
+  "Keymap for minibuffer prompting of gud startup command."
+  :inherit minibuffer-local-map)
 
 (defun gud-query-cmdline (minor-mode &optional init)
   (let* ((hist-sym (gud-symbol 'history nil minor-mode))
