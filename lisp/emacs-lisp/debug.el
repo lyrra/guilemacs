@@ -197,7 +197,7 @@ the debugger will not be entered."
       ;; which can happen when we have several nested `handler-bind's that
       ;; want to invoke the debugger.
       debugger-value
-      (unless non-interactive-frame
+      (unless noninteractive
         (message "Entering debugger..."))
       (let (debugger-value
 	    (debugger-previous-state
@@ -248,7 +248,7 @@ the debugger will not be entered."
                   (unless (derived-mode-p 'debugger-mode)
 	            (debugger-mode))
 	          (debugger-setup-buffer debugger-args)
-	          (when non-interactive-frame
+	          (when noninteractive
 		    ;; If the backtrace is long, save the beginning
 		    ;; and the end, but discard the middle.
                     (let ((inhibit-read-only t))
@@ -358,16 +358,8 @@ Make functions into cross-reference buttons if DO-XREFS is non-nil."
 (defun debugger-setup-buffer (args)
   "Initialize the `*Backtrace*' buffer for entry to the debugger.
 That buffer should be current already and in `debugger-mode'."
-  (setq backtrace-frames
-        ;; The `base' frame is the one that gets index 0 and it is the entry to
-        ;; the debugger, so drop it with `cdr'.
-        (cdr (backtrace-get-frames (debugger--backtrace-base))))
   (when (eq (car-safe args) 'exit)
-    (setq debugger-value (nth 1 args))
-    (setf (cl-getf (backtrace-frame-flags (car backtrace-frames))
-                   :debug-on-exit)
-          nil))
-
+    (setq debugger-value (nth 1 args)))
   (setq backtrace-view (plist-put backtrace-view :show-flags t)
         backtrace-insert-header-function (lambda ()
                                            (debugger--insert-header args))
