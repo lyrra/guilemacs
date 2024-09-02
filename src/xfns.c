@@ -9310,7 +9310,6 @@ Text larger than the specified size is clipped.  */)
   tip_timer = call3 (Qrun_at_time, timeout, Qnil,
 		     Qx_hide_tip);
 
-  dynwind_end ();
   return Qnil;
 }
 

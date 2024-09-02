@@ -5272,7 +5272,7 @@ x_gc_get_ext_data (struct frame *f, GC gc, int create_if_not_found_p)
 
   object.gc = gc;
   head = XEHeadOfExtensionList (object);
-  ext_data = XFindOnExtensionList (head, dpyinfo->ext_codes->extension);
+  ext_data = NULL; // XFindOnExtensionList (head, dpyinfo->ext_codes->extension);
   if (ext_data == NULL)
     {
       if (!create_if_not_found_p)

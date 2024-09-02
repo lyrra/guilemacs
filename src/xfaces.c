@@ -540,7 +540,7 @@ x_free_gc (struct frame *f, GC gc)
 {
   eassert (input_blocked_p ());
   IF_DEBUG ((--ngcs, eassert (ngcs >= 0)));
-  XFreeGC (FRAME_X_DISPLAY (f), gc);
+  // XFreeGC (FRAME_X_DISPLAY (f), gc);
 }
 
 #endif /* HAVE_X_WINDOWS */
