@@ -221,7 +221,6 @@ a fixed set of types.  */)
         case PVEC_NORMAL_VECTOR: return Qvector;
 	case PVEC_BIGNUM: return Qbignum;
 	case PVEC_MARKER: return Qmarker;
-	case PVEC_SYMBOL_WITH_POS: return Qsymbol_with_pos;
 	case PVEC_OVERLAY: return Qoverlay;
 	case PVEC_FINALIZER: return Qfinalizer;
 	case PVEC_USER_PTR: return Quser_ptr;
@@ -340,8 +339,6 @@ DEFUN ("bare-symbol-p", Fbare_symbol_p, Sbare_symbol_p, 1, 1, 0,
        attributes: const)
   (Lisp_Object object)
 {
-  if (BARE_SYMBOL_P (object))
-    return Qt;
   return Qnil;
 }
 
@@ -351,8 +348,6 @@ Ignore `symbols-with-pos-enabled'.  */
        attributes: const)
   (Lisp_Object object)
 {
-  if (SYMBOL_WITH_POS_P (object))
-    return Qt;
   return Qnil;
 }
 
@@ -790,11 +785,7 @@ SYM is either a symbol or a symbol with position.
 Ignore `symbols-with-pos-enabled'.  */)
   (register Lisp_Object sym)
 {
-  if (BARE_SYMBOL_P (sym))
-    return sym;
-  if (SYMBOL_WITH_POS_P (sym))
-    return XSYMBOL_WITH_POS_SYM (sym);
-  xsignal2 (Qwrong_type_argument, list2 (Qsymbolp, Qsymbol_with_pos_p), sym);
+  return sym;
 }
 
 DEFUN ("symbol-with-pos-pos", Fsymbol_with_pos_pos, Ssymbol_with_pos_pos, 1, 1, 0,
@@ -802,8 +793,7 @@ DEFUN ("symbol-with-pos-pos", Fsymbol_with_pos_pos, Ssymbol_with_pos_pos, 1, 1, 
 Ignore `symbols-with-pos-enabled'.  */)
   (register Lisp_Object sympos)
 {
-  CHECK_TYPE (SYMBOL_WITH_POS_P (sympos), Qsymbol_with_pos_p, sympos);
-  return XSYMBOL_WITH_POS_POS (sympos);
+  return Qnil;
 }
 
 DEFUN ("remove-pos-from-symbol", Fremove_pos_from_symbol,
@@ -813,8 +803,6 @@ Otherwise, return ARG unchanged.  Ignore `symbols-with-pos-enabled'.
 Compare with `bare-symbol'.  */)
   (register Lisp_Object arg)
 {
-  if (SYMBOL_WITH_POS_P (arg))
-    return XSYMBOL_WITH_POS_SYM (arg);
   return arg;
 }
 
@@ -826,17 +814,7 @@ or a symbol with position from which the position will be taken.
 Ignore `symbols-with-pos-enabled'.  */)
      (register Lisp_Object sym, register Lisp_Object pos)
 {
-  Lisp_Object bare = Fbare_symbol (sym);
-  Lisp_Object position;
-
-  if (FIXNUMP (pos))
-    position = pos;
-  else if (SYMBOL_WITH_POS_P (pos))
-    position = XSYMBOL_WITH_POS_POS (pos);
-  else
-    wrong_type_argument (Qfixnum_or_symbol_with_pos_p, pos);
-
-  return build_symbol_with_pos (bare, position);
+  return sym;
 }
 
 static void

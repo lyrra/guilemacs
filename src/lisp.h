@@ -753,12 +753,6 @@ extern Lisp_Object plist_module;
 extern Lisp_Object xsymbol_fn;
 extern Lisp_Object Ffboundp (Lisp_Object);
 
-INLINE sym_t
-XSYMBOL (Lisp_Object a)
-{
-  return scm_call_1 (xsymbol_fn, a);
-}
-
 /* The index of the C-defined Lisp symbol SYM.
    This can be used in a static initializer.  */
 #define SYMBOL_INDEX(sym) i##sym
@@ -836,7 +830,7 @@ struct vectorlike_header
 
 struct Lisp_Symbol_With_Pos
 {
-  union vectorlike_header header;
+  struct vectorlike_header header;
   Lisp_Object sym;              /* A symbol */
   Lisp_Object pos;              /* A fixnum */
 } GCALIGNED_STRUCT;
@@ -943,52 +937,10 @@ INLINE bool
 	  || (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (x)));
 }
 
-INLINE struct Lisp_Symbol_With_Pos *
-XSYMBOL_WITH_POS (Lisp_Object a)
-{
-  eassert (SYMBOL_WITH_POS_P (a));
-  return XUNTAG (a, Lisp_Vectorlike, struct Lisp_Symbol_With_Pos);
-}
-
-INLINE Lisp_Object
-XSYMBOL_WITH_POS_SYM (Lisp_Object a)
-{
-  Lisp_Object sym = XSYMBOL_WITH_POS (a)->sym;
-  eassume (BARE_SYMBOL_P (sym));
-  return sym;
-}
-
-INLINE Lisp_Object
-XSYMBOL_WITH_POS_POS (Lisp_Object a)
-{
-  return XSYMBOL_WITH_POS (a)->pos;
-}
-
-INLINE Lisp_Object
-maybe_remove_pos_from_symbol (Lisp_Object x)
-{
-  return (symbols_with_pos_enabled && SYMBOL_WITH_POS_P (x)
-	  ? XSYMBOL_WITH_POS_SYM (x) : x);
-}
-
-INLINE struct Lisp_Symbol * ATTRIBUTE_NO_SANITIZE_UNDEFINED
-XBARE_SYMBOL (Lisp_Object a)
-{
-  eassert (BARE_SYMBOL_P (a));
-  intptr_t i = (intptr_t) XUNTAG (a, Lisp_Symbol, struct Lisp_Symbol);
-  void *p = (char *) lispsym + i;
-  return p;
-}
-
-INLINE struct Lisp_Symbol * ATTRIBUTE_NO_SANITIZE_UNDEFINED
+INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
-  if (!BARE_SYMBOL_P (a))
-    {
-      eassume (symbols_with_pos_enabled);
-      a = XSYMBOL_WITH_POS_SYM (a);
-    }
-  return XBARE_SYMBOL (a);
+  return scm_call_1 (xsymbol_fn, a);
 }
 
 INLINE Lisp_Object

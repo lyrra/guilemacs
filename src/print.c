@@ -1711,30 +1711,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
       printchar ('>', printcharfun);
       return;
 
-    case PVEC_SYMBOL_WITH_POS:
-      {
-        struct Lisp_Symbol_With_Pos *sp = XSYMBOL_WITH_POS (obj);
-        if (print_symbols_bare)
-          print_object (sp->sym, printcharfun, escapeflag);
-        else
-          {
-            print_c_string ("#<symbol ", printcharfun);
-            if (BARE_SYMBOL_P (sp->sym))
-              print_object (sp->sym, printcharfun, escapeflag);
-            else
-              print_c_string ("NOT A SYMBOL!!", printcharfun);
-            if (FIXNUMP (sp->pos))
-              {
-                print_c_string (" at ", printcharfun);
-                print_object (sp->pos, printcharfun, escapeflag);
-              }
-            else
-              print_c_string (" NOT A POSITION!!", printcharfun);
-            printchar ('>', printcharfun);
-          }
-      }
-      return;
-
     case PVEC_OVERLAY:
       print_c_string ("#<overlay ", printcharfun);
       if (! OVERLAY_BUFFER (obj))

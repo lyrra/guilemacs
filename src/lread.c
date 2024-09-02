@@ -4456,9 +4456,9 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		  result = intern_driver (name, obarray);
 		}
 	    }
-	  if (locate_syms && !NILP (result))
-	    result = build_symbol_with_pos (result,
-					    make_fixnum (start_position));
+	  //if (locate_syms && !NILP (result))
+	  //  result = build_symbol_with_pos (result,
+		//			    make_fixnum (start_position));
 
 	obj = result;
 	break;
