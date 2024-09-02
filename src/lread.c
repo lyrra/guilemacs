@@ -3495,7 +3495,7 @@ bytecode_from_rev_list (Lisp_Object elems, Lisp_Object readcharfun)
         vec[CLOSURE_CODE] = Fstring_as_unibyte (vec[CLOSURE_CODE]);
 
       /* Bytecode must be immovable.  */
-      pin_string (vec[CLOSURE_CODE]);
+      //pin_string (vec[CLOSURE_CODE]);
     }
 
   XSETPVECTYPE (XVECTOR (obj), PVEC_CLOSURE);

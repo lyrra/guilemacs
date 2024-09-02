@@ -633,7 +633,7 @@ resize_string_data (Lisp_Object string, ptrdiff_t cidx_byte,
     }
   else
     {
-      allocate_string_data (XSTRING (string), nchars, new_nbytes, false, false);
+      allocate_string_data (XSTRING (string), nchars, new_nbytes, false);
       unsigned char *new_data = SDATA (string);
       new_charaddr = new_data + cidx_byte;
       memcpy (new_charaddr + new_clen, data + cidx_byte + clen,
@@ -965,31 +965,6 @@ make_formatted_string (char *buf, const char *format, ...)
   va_end (ap);
   return make_string (buf, length);
 }
-
-/* Pin a unibyte string in place so that it won't move during GC.  */
-void
-pin_string (Lisp_Object string)
-{
-  eassert (STRINGP (string) && !STRING_MULTIBYTE (string));
-  struct Lisp_String *s = XSTRING (string);
-  ptrdiff_t size = STRING_BYTES (s);
-  unsigned char *data = s->u.s.data;
-
-  if (!(size > LARGE_STRING_BYTES
-	|| PURE_P (data) || pdumper_object_p (data)
-	|| s->u.s.size_byte == -3))
-    {
-      eassert (s->u.s.size_byte == -1);
-      sdata *old_sdata = SDATA_OF_STRING (s);
-      allocate_string_data (s, size, size, false, true);
-      memcpy (s->u.s.data, data, size);
-      old_sdata->string = NULL;
-      SDATA_NBYTES (old_sdata) = size;
-      ASAN_PREPARE_DEAD_SDATA (old_sdata, size);
-    }
-  s->u.s.size_byte = -3;
-}
-
 
 /***********************************************************************
 			   Float Allocation
@@ -1355,7 +1330,7 @@ usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INT
     error ("Invalid byte-code object");
 
   /* Bytecode must be immovable.  */
-  pin_string (args[CLOSURE_CODE]);
+  //pin_string (args[CLOSURE_CODE]);
 
   /* We used to purecopy everything here, if purify-flag was set.  This worked
      OK for Emacs-23, but with Emacs-24's lexical binding code, it can be

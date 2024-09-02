@@ -2278,11 +2278,14 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
   Lisp_Object original_fun = fun;
  retry:
   if (SYMBOLP (fun) && !NILP (fun)
-      && (fun = XSYMBOL (fun)->u.s.function, SYMBOLP (fun)))
+      && (fun = SYMBOL_FUNCTION (fun), SYMBOLP (fun)))
     fun = indirect_function (fun);
 
-  if (SUBRP (fun) && !NATIVE_COMP_FUNCTION_DYNP (fun))
-    return funcall_subr (XSUBR (fun), numargs, args);
+  if (scm_is_true (scm_procedure_p (fun)))
+    {
+      return scm_call_n (fun, args + 1, numargs);
+    }
+
   else if (CLOSUREP (fun)
 	   || NATIVE_COMP_FUNCTION_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
@@ -2562,11 +2565,6 @@ function with `&rest' args, or `unevalled' for a special form.  */)
 
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
-
-  if (scm_is_true (scm_procedure_p (function)))
-    {
-      val = scm_call_n (function, args + 1, numargs);
-    }
 
   else if (CLOSUREP (function))
     result = lambda_arity (function);

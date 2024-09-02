@@ -3379,13 +3379,6 @@ SPECPDL_INDEX (void)
   return wrap_specpdl_ref ((char *)specpdl_ptr - (char *)specpdl);
 }
 
-INLINE bool
-backtrace_debug_on_exit (union specbinding *pdl)
-{
-  eassert (pdl->kind == SPECPDL_BACKTRACE);
-  return pdl->bt.debug_on_exit;
-}
-
 void grow_specpdl_allocation (void);
 
 /* Grow the specpdl stack by one entry.
