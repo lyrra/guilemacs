@@ -1840,7 +1840,6 @@ it defines a macro.  */)
 {
   if (!CONSP (fundef) || !EQ (Qautoload, XCAR (fundef)))
     return fundef;
-  }
 
   Lisp_Object kind = Fnth (make_fixnum (4), fundef);
   if (EQ (macro_only, Qmacro)
