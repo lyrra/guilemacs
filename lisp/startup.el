@@ -598,7 +598,7 @@ It is the default value of the variable `top-level'."
 	  (startup--xdg-or-homedot startup--xdg-config-home-emacs nil))
 
     (when (featurep 'native-compile)
-      (unless (native-comp-available-p)
+      (unless nil; (native-comp-available-p)
         ;; Disable deferred async compilation and trampoline synthesis
         ;; in this session.  This is necessary if libgccjit is not
         ;; available on MS-Windows, but Emacs was built with
