@@ -94,14 +94,14 @@ rebind_for_thread_switch (void)
 {
   ptrdiff_t distance
     = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
-  specpdl_unrewind (specpdl_ptr, -distance, true);
+  // specpdl_unrewind (specpdl_ptr, -distance, true);
 }
 
 static void
 unbind_for_thread_switch (struct thread_state *thr)
 {
   ptrdiff_t distance = thr->m_specpdl_ptr - thr->m_specpdl;
-  specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
+  // specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
 }
 
 
