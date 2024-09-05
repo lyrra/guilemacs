@@ -807,7 +807,7 @@ finalize_one_thread (struct thread_state *state)
   free_search_regs (&state->m_search_regs);
   free_search_regs (&state->m_saved_search_regs);
   sys_cond_destroy (&state->thread_condvar);
-  free_bc_thread (&state->bc);
+  //free_bc_thread (&state->bc);
 }
 
 DEFUN ("make-thread", Fmake_thread, Smake_thread, 1, 2, 0,
@@ -837,7 +837,7 @@ If NAME is given, it must be a string; it names the new thread.  */)
   new_thread->m_specpdl_end = new_thread->m_specpdl + size;
   new_thread->m_specpdl_ptr = new_thread->m_specpdl;
 
-  init_bc_thread (&new_thread->bc);
+  //init_bc_thread (&new_thread->bc);
 
   sys_cond_init (&new_thread->thread_condvar);
 
@@ -1102,7 +1102,7 @@ init_threads (void)
 #endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
   main_thread.s.thread_id = sys_thread_self ();
-  init_bc_thread (&main_thread.s.bc);
+  //init_bc_thread (&main_thread.s.bc);
 }
 
 void
