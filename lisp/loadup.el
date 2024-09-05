@@ -284,11 +284,12 @@ that the search has reached."
 (load "language/indonesian")
 
 (load "indent")
+(load "simple")
 (load "emacs-lisp/cl-generic")
 (load "minibuffer") ; Needs cl-generic, seq (and define-minor-mode).
-(load "simple")
 (load "emacs-lisp/seq")
 (load "emacs-lisp/nadvice")
+(load "minibuffer") ;Needs cl-generic (and define-minor-mode).
 (load "frame")
 (load "startup")
 (load "term/tty-colors")

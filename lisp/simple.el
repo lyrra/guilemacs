@@ -10947,6 +10947,10 @@ call `normal-erase-is-backspace-mode' (which see) instead."
 
 (declare-function display-symbol-keys-p "frame" (&optional display))
 
+; dummy for bootstrap
+(defun display-symbol-keys-p ()
+  nil)
+
 (define-minor-mode normal-erase-is-backspace-mode
   "Toggle the Erase and Delete mode of the Backspace and Delete keys.
 
