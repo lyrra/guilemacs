@@ -447,13 +447,9 @@ ARG defaults to zero if it is nil."
 
 ;;; Keyboard macro ring
 
-(oclosure-define kmacro
-  "Keyboard macro."
-  keys (counter :mutable t) format)
-
 (defvar kmacro-ring nil
   "The keyboard macro ring.
-Each element is a `kmacro'.  Actually, the head of
+Each element is a list (MACRO COUNTER FORMAT).  Actually, the head of
 the macro ring (when defining or executing) is not stored in the ring;
 instead it is available in the variables `last-kbd-macro', `kmacro-counter',
 and `kmacro-counter-format'.")
@@ -478,24 +474,21 @@ and `kmacro-counter-format'.")
 (defun kmacro-ring-head ()
   "Return pseudo head element in macro ring."
   (and last-kbd-macro
-       (kmacro (kmacro--to-vector last-kbd-macro)
+       (list   (kmacro--to-vector last-kbd-macro)
                kmacro-counter kmacro-counter-format-start)))
 
 
 (defun kmacro-push-ring (&optional elt)
   "Push ELT or current macro onto `kmacro-ring'."
   (when (setq elt (or elt (kmacro-ring-head)))
-    (when (consp elt)
-      (message "Converting obsolete list form of kmacro: %S" elt)
-      (setq elt (apply #'kmacro elt)))
     (let ((history-delete-duplicates nil))
       (add-to-history 'kmacro-ring elt kmacro-ring-max))))
 
 
 (defun kmacro-split-ring-element (elt)
-  (setq last-kbd-macro (kmacro--keys elt)
-	kmacro-counter (kmacro--counter elt)
-	kmacro-counter-format-start (kmacro--format elt)))
+  (setq last-kbd-macro (car elt)
+	kmacro-counter (nth 1 elt)
+	kmacro-counter-format-start (nth 2 elt)))
 
 
 (defun kmacro-pop-ring1 (&optional raw)
@@ -585,9 +578,14 @@ Optional arg EMPTY is message to print if no macros are defined."
 
 
 ;;;###autoload
-(define-obsolete-function-alias 'kmacro-exec-ring-item #'funcall "29.1"
+(defun kmacro-exec-ring-item (item arg)
   "Execute item ITEM from the macro ring.
-ARG is the number of times to execute the item.")
+ARG is the number of times to execute the item."
+  ;; Use counter and format specific to the macro on the ring!
+  (let ((kmacro-counter (nth 1 item))
+	(kmacro-counter-format-start (nth 2 item)))
+    (execute-kbd-macro (car item) arg #'kmacro-loop-setup-function)
+    (setcar (cdr item) kmacro-counter)))
 
 
 (defun kmacro-call-ring-2nd (arg)
@@ -595,7 +593,7 @@ ARG is the number of times to execute the item.")
 With numeric argument ARG, execute the macro that many times."
   (interactive "p")
   (unless (kmacro-ring-empty-p)
-    (funcall (car kmacro-ring) arg)))
+    (kmacro-exec-ring-item (car kmacro-ring) arg)))
 
 
 (defun kmacro-call-ring-2nd-repeat (arg)
@@ -615,7 +613,7 @@ without repeating the prefix."
   "Display the second macro in the keyboard macro ring."
   (interactive)
   (unless (kmacro-ring-empty-p)
-    (kmacro-display (kmacro--keys (car kmacro-ring)) nil "2nd macro")))
+    (kmacro-display (car (car kmacro-ring)) nil "2nd macro")))
 
 
 (defun kmacro-cycle-ring-next (&optional _arg)
@@ -711,7 +709,8 @@ Use \\[kmacro-bind-to-key] to bind it to a key sequence."
     (let ((append (and arg (listp arg))))
       (unless append
 	(if last-kbd-macro
-	    (kmacro-push-ring))
+	    (kmacro-push-ring
+	     (list last-kbd-macro kmacro-counter kmacro-counter-format-start)))
 	(setq kmacro-counter (or (if arg (prefix-numeric-value arg))
 				 kmacro-initial-counter-value
 				 0)
@@ -847,9 +846,9 @@ With \\[universal-argument], call second macro in macro ring."
      (if kmacro-call-repeat-key
 	 (kmacro-call-macro arg no-repeat t)
        (kmacro-end-macro arg)))
-   ((and (eq this-command #'kmacro-view-macro)  ;; We are in repeat mode!
+   ((and (eq this-command 'kmacro-view-macro)  ;; We are in repeat mode!
 	 kmacro-view-last-item)
-    (funcall (car kmacro-view-last-item) arg))
+    (kmacro-exec-ring-item (car kmacro-view-last-item) arg))
    ((and arg (listp arg))
     (kmacro-call-ring-2nd 1))
    (t
@@ -911,7 +910,7 @@ If kbd macro currently being defined end it before activating it."
 ;; executing the macro later on (but that's controversial...)
 
 ;;;###autoload
-(defun kmacro (keys &optional counter format)
+'(defun kmacro (keys &optional counter format)
   "Create a `kmacro' for macro bound to symbol or key.
 KEYS should be a vector or a string that obeys `key-valid-p'."
   (oclosure-lambda (kmacro (keys (if (stringp keys) (key-parse keys) keys))
@@ -924,10 +923,11 @@ KEYS should be a vector or a string that obeys `key-valid-p'."
       (execute-kbd-macro keys arg #'kmacro-loop-setup-function)
       (setq counter kmacro-counter))))
 
-(cl-defmethod oclosure-interactive-form ((_ kmacro)) '(interactive "p"))
+'(cl-defmethod oclosure-interactive-form ((_ kmacro)) '(interactive "p"))
 
 ;;;###autoload
 (defun kmacro-lambda-form (mac &optional counter format)
+  "Create lambda form for macro bound to symbol or key."
   ;; Apparently, there are two different ways this is called:
   ;; either `counter' and `format' are both provided and `mac' is a vector,
   ;; or only `mac' is provided, as a list (MAC COUNTER FORMAT).
@@ -944,11 +944,18 @@ KEYS should be a vector or a string that obeys `key-valid-p'."
 
 (defun kmacro-extract-lambda (mac)
   "Extract kmacro from a kmacro lambda form."
-  (declare (obsolete nil "29.1"))
-  (when (kmacro-p mac)
-    (list (kmacro--keys mac)
-          (kmacro--counter mac)
-          (kmacro--format mac))))
+  (let ((mac (cond
+              ((eq (car-safe mac) 'lambda)
+               (let ((e (assoc 'kmacro-exec-ring-item mac)))
+                 (car-safe (cdr-safe (car-safe (cdr-safe e))))))
+              ((and (functionp mac)
+                    (equal (interactive-form mac) '(interactive "pkmacro")))
+               (let ((r (funcall mac 'kmacro--extract-lambda)))
+                 (and (eq (car-safe r) 'kmacro--extract-lambda) (cdr r)))))))
+    (and (consp mac)
+         (= (length mac) 3)
+         (arrayp (car mac))
+         mac)))
 
 (defun kmacro-p (x)
   "Return non-nil if MAC is a kmacro keyboard macro."
@@ -1003,15 +1010,16 @@ The ARG parameter is unused."
 		     (yes-or-no-p (format "%s runs command %S.  Bind anyway? "
 					  (format-kbd-macro key-seq)
 					  cmd))))
-	(define-key global-map key-seq (kmacro-ring-head))
+	(define-key global-map key-seq
+	  (kmacro-lambda-form (kmacro-ring-head)))
 	(message "Keyboard macro bound to %s" (format-kbd-macro key-seq))))))
 
 (defun kmacro-keyboard-macro-p (symbol)
   "Return non-nil if SYMBOL is the name of some sort of keyboard macro."
   (let ((f (symbol-function symbol)))
     (when f
-      (or (stringp f)                   ;FIXME: Really deprecated.
-	  (vectorp f)                   ;FIXME: Deprecated.
+      (or (stringp f)
+	  (vectorp f)
 	  (kmacro-p f)))))
 
 ;;;###autoload
@@ -1029,7 +1037,9 @@ Such a \"function\" cannot be called from Lisp, but it is a valid editor command
 	      symbol))
   (if (string-equal symbol "")
       (error "No command name given"))
-  (fset symbol (kmacro-ring-head))
+  ;; FIXME: Use plain old `last-kbd-macro' for kmacros where it doesn't
+  ;; make a difference?
+  (fset symbol (kmacro-lambda-form (kmacro-ring-head)))
   ;; This used to be used to detect when a symbol corresponds to a kmacro.
   ;; Nowadays it's unused because we used `kmacro-p' instead to see if the
   ;; symbol's function definition matches that of a kmacro, which is more
@@ -1065,7 +1075,7 @@ The ARG parameter is unused."
   (interactive)
   (cond
    ((or (kmacro-ring-empty-p)
-	(not (eq last-command #'kmacro-view-macro)))
+	(not (eq last-command 'kmacro-view-macro)))
     (setq kmacro-view-last-item nil))
    ((null kmacro-view-last-item)
     (setq kmacro-view-last-item kmacro-ring
@@ -1075,10 +1085,10 @@ The ARG parameter is unused."
 	  kmacro-view-item-no (1+ kmacro-view-item-no)))
    (t
     (setq kmacro-view-last-item nil)))
-  (setq this-command #'kmacro-view-macro
+  (setq this-command 'kmacro-view-macro
 	last-command this-command) ;; in case we repeat
   (kmacro-display (if kmacro-view-last-item
-		      (kmacro--keys (car kmacro-view-last-item))
+		      (car (car kmacro-view-last-item))
 		    last-kbd-macro)
 		  nil
 		  (if kmacro-view-last-item
@@ -1176,27 +1186,21 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
 	     (concat
 	      (format "Macro: %s%s%s%s%s\n"
 		      (format-kbd-macro kmacro-step-edit-new-macro 1)
-		      (if (and kmacro-step-edit-new-macro
-		               (> (length kmacro-step-edit-new-macro) 0))
-		          " " "")
+		      (if (and kmacro-step-edit-new-macro (> (length kmacro-step-edit-new-macro) 0)) " " "")
 		      (propertize (if keys (format-kbd-macro keys)
-				    (if kmacro-step-edit-appending
-				        "<APPEND>" "<INSERT>"))
-				  'face 'region)
+				    (if kmacro-step-edit-appending "<APPEND>" "<INSERT>")) 'face 'region)
 		      (if future " " "")
 		      (if future (format-kbd-macro future) ""))
 	      (cond
 	       ((minibufferp)
 		(format "%s\n%s\n"
 			  (propertize "\
-                         minibuffer                             "
-			              'face 'header-line)
+                         minibuffer                             " 'face 'header-line)
 			  (buffer-substring (point-min) (point-max))))
 	       (curmsg
 		(format "%s\n%s\n"
 			(propertize "\
-                         echo area                              "
-                                    'face 'header-line)
+                         echo area                              " 'face 'header-line)
 			curmsg))
 	       (t ""))
 	      (if keys
@@ -1227,7 +1231,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
 
     ;; Handle commands which reads additional input using read-char.
     (cond
-     ((and (eq this-command #'quoted-insert)
+     ((and (eq this-command 'quoted-insert)
 	   (not (eq kmacro-step-edit-action t)))
       ;; Find the actual end of this key sequence.
       ;; Must be able to backtrack in case we actually execute it.
@@ -1247,7 +1251,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
       (cond
        ((eq kmacro-step-edit-action t)  ;; Reentry for actual command @ end of prefix arg.
 	(cond
-	 ((eq this-command #'quoted-insert)
+	 ((eq this-command 'quoted-insert)
 	  (clear-this-command-keys) ;; recent-keys actually
 	  (let (unread-command-events)
 	    (quoted-insert (prefix-numeric-value current-prefix-arg))
@@ -1294,7 +1298,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
        ((eq act 'skip)
 	nil)
        ((eq act 'skip-keep)
-	(setq this-command #'ignore)
+	(setq this-command 'ignore)
 	t)
        ((eq act 'skip-rest)
 	(setq kmacro-step-edit-active 'ignore)
@@ -1347,7 +1351,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
       (if restore-index
 	  (setq executing-kbd-macro-index restore-index)))
      (t
-      (setq this-command #'ignore)))
+      (setq this-command 'ignore)))
     (setq kmacro-step-edit-key-index next-index)))
 
 (defun kmacro-step-edit-insert ()
@@ -1391,7 +1395,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
 	  (setq next-index kmacro-step-edit-key-index)
 	  t)
 	 (t nil))
-	(setq this-command #'ignore)
+	(setq this-command 'ignore)
       (setq this-command cmd)
       (if (memq this-command '(self-insert-command digit-argument))
 	  (setq last-command-event (aref keys (1- (length keys)))))
@@ -1404,7 +1408,7 @@ following additional answers: `insert', `insert-1', `replace', `replace-1',
   (when kmacro-step-edit-active
     (cond
      ((eq kmacro-step-edit-active 'ignore)
-      (setq this-command #'ignore))
+      (setq this-command 'ignore))
      ((eq kmacro-step-edit-active 'append-end)
       (if (= executing-kbd-macro-index (length executing-kbd-macro))
 	  (setq executing-kbd-macro (vconcat executing-kbd-macro
