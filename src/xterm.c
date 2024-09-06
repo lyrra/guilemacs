@@ -32324,13 +32324,13 @@ mark_xterm (void)
   if (x_dnd_return_frame_object)
     {
       XSETFRAME (val, x_dnd_return_frame_object);
-      mark_object (val);
+      //mark_object (val);
     }
 
   if (x_dnd_movement_frame)
     {
       XSETFRAME (val, x_dnd_movement_frame);
-      mark_object (val);
+      //mark_object (val);
     }
 
   if (x_dnd_wheel_frame)
