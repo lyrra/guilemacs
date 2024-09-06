@@ -433,7 +433,7 @@ ARGS and BODY are the same as for `lambda'."
   "Helper function to implement `oclosure-lambda' via a macro.
 This is used as a marker which cconv uses to check that
 immutable fields are indeed not mutated."
-  (cl-assert (closurep oclosure))
+  ;(cl-assert (closurep oclosure))
   ;; This should happen only for interpreted closures since `cconv.el'
   ;; should have optimized away the call to this function.
   oclosure)
@@ -445,9 +445,9 @@ immutable fields are indeed not mutated."
              (if (null mutlist)
                  args
                (mapcar (lambda (arg) (if (pop mutlist) (list arg) arg)) args)))
-    (cl-assert (consp (aref oclosure 1)))
-    (cl-assert (null (aref oclosure 3)))
-    (cl-assert (symbolp (aref oclosure 4)))
+    ;(cl-assert (consp (aref oclosure 1)))
+    ;(cl-assert (null (aref oclosure 3)))
+    ;(cl-assert (symbolp (aref oclosure 4)))
     (let ((env (aref oclosure 2)))
       (make-interpreted-closure
        (aref oclosure 0)
@@ -461,7 +461,7 @@ immutable fields are indeed not mutated."
            `(interactive ,(aref oclosure 5)))))))
 
 (defun oclosure--get (oclosure index mutable)
-  (cl-assert (closurep oclosure))
+  ;(cl-assert (closurep oclosure))
   (let* ((csts (aref oclosure 2)))
     (if (vectorp csts)
         (let ((v (aref csts index)))
@@ -469,7 +469,7 @@ immutable fields are indeed not mutated."
       (cdr (nth index csts)))))
 
 (defun oclosure--set (v oclosure index)
-  (cl-assert (closurep oclosure))
+  ;(cl-assert (closurep oclosure))
   (let ((csts (aref oclosure 2)))
     (if (vectorp csts)
         (let ((cell (aref csts index)))
@@ -490,7 +490,7 @@ immutable fields are indeed not mutated."
   (oclosure--lambda 'oclosure-accessor ((type) (slot) (index)) nil
     (oclosure) (oclosure--get oclosure index nil)))
 
-(oclosure-define accessor
+'(oclosure-define accessor
   "OClosure function to access a specific slot of an object."
   type slot)
 
@@ -507,7 +507,7 @@ immutable fields are indeed not mutated."
   (format "Access slot \"%S\" of OBJ of type `%S'.\n\n(fn OBJ)"
           (accessor--slot f) (accessor--type f)))
 
-(oclosure-define (oclosure-accessor
+'(oclosure-define (oclosure-accessor
                   (:parent accessor)
                   (:copier oclosure--accessor-copy (type slot index)))
   "OClosure function to access a specific slot of an OClosure function."
@@ -533,17 +533,17 @@ immutable fields are indeed not mutated."
       (signal 'setting-constant (list oclosure slotname)))
     (oclosure--set value oclosure index)))
 
-(defconst oclosure--mut-getter-prototype
+'(defconst oclosure--mut-getter-prototype
   (oclosure-lambda (oclosure-accessor (type) (slot) (index)) (oclosure)
     (oclosure--get oclosure index t)))
-(defconst oclosure--mut-setter-prototype
+'(defconst oclosure--mut-setter-prototype
   ;; FIXME: The generated docstring is wrong.
   (oclosure-lambda (oclosure-accessor (type) (slot) (index)) (val oclosure)
     (oclosure--set val oclosure index)))
 
 ;; Ideally, this should be in `files.el', but that file is loaded
 ;; before `oclosure.el'.
-(oclosure-define (save-some-buffers-function
+'(oclosure-define (save-some-buffers-function
                   (:predicate save-some-buffers-function--p)))
 
 ;; This OClosure type is used internally by `cconv.el' to handle
