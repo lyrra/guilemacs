@@ -162,6 +162,7 @@ that the search has reached."
   (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
     (load "emacs-lisp/macroexp")))
 
+(load "buffer-match")
 (load "window")  ; Needed here for `replace-buffer-in-windows'.
 ;; We are now capable of resizing the mini-windows, so give the
 ;; variable its advertised default value (it starts as nil, see
