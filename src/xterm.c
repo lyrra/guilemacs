@@ -32336,28 +32336,28 @@ mark_xterm (void)
   if (x_dnd_wheel_frame)
     {
       XSETFRAME (val, x_dnd_wheel_frame);
-      mark_object (val);
+      //mark_object (val);
     }
 
 #if defined HAVE_XINPUT2 || defined USE_TOOLKIT_SCROLL_BARS \
   || defined HAVE_XRANDR || defined USE_GTK || defined HAVE_X_I18N
-  for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
-    {
+  //for (dpyinfo = x_display_list; dpyinfo; dpyinfo = dpyinfo->next)
+    //{
 #ifdef HAVE_XINPUT2
-      for (i = 0; i < dpyinfo->num_devices; ++i)
-	mark_object (dpyinfo->devices[i].name);
+      //for (i = 0; i < dpyinfo->num_devices; ++i)
+	//mark_object (dpyinfo->devices[i].name);
 #endif
 #ifdef USE_TOOLKIT_SCROLL_BARS
-      for (i = 0; i < dpyinfo->n_protected_windows; ++i)
-	mark_object (dpyinfo->protected_windows[i]);
+      //for (i = 0; i < dpyinfo->n_protected_windows; ++i)
+	//mark_object (dpyinfo->protected_windows[i]);
 #endif
 #if defined HAVE_XRANDR || defined USE_GTK
-      mark_object (dpyinfo->last_monitor_attributes_list);
+      //mark_object (dpyinfo->last_monitor_attributes_list);
 #endif
 #if defined HAVE_X_I18N
-      mark_object (dpyinfo->xim_coding);
+      //mark_object (dpyinfo->xim_coding);
 #endif
-    }
+    //}
 #endif
 }
 
