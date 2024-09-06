@@ -2997,8 +2997,6 @@ be printed.  */);
   /* Don't export this variable to Elisp.  */
   Funintern (Qprint__unreadable_callback_buffer, Qnil);
 
-  defsubr (&Sflush_standard_output);
-
   /* Initialized in print_create_variable_mapping.  */
   staticpro (&Vprint_variable_mapping);
 }
