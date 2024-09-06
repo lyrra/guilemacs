@@ -2766,7 +2766,7 @@ maps."
                    (funcall (get symbol 'completion-predicate)
                             symbol buffer)))))))
 
-(cl-defgeneric function-documentation (function)
+'(cl-defgeneric function-documentation (function)
   "Extract the raw docstring info from FUNCTION.
 FUNCTION is expected to be a function value rather than, say, a mere symbol.
 This is intended to be specialized via `cl-defmethod' but not called directly:
@@ -2800,7 +2800,7 @@ function as needed."
              (signal 'invalid-function (list function))
            doc))))))
 
-(cl-defmethod function-documentation ((function accessor))
+'(cl-defmethod function-documentation ((function accessor))
   (oclosure--accessor-docstring function)) ;; FIXME: η-reduce!
 
 (cl-defmethod function-documentation ((f cconv--interactive-helper))
