@@ -2993,7 +2993,7 @@ x_dnd_free_toplevels (bool display_alive)
       return;
     }
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_ptr (xfree, destroy_windows);
   record_unwind_protect_ptr (xfree, prev_masks);
 
@@ -3014,7 +3014,7 @@ x_dnd_free_toplevels (bool display_alive)
       x_stop_ignoring_errors (dpyinfo);
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
   unblock_input ();
 }
 
@@ -12540,12 +12540,12 @@ x_handle_pending_selection_requests_1 (struct x_selection_request_event *tem)
   specpdl_ref count;
   struct selection_input_event se;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   se = tem->se;
 
   record_unwind_protect_ptr (xfree, tem);
   x_handle_selection_event (&se);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Handle all pending selection request events from modal event
@@ -12710,7 +12710,6 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   struct input_event hold_quit;
   char *atom_name, *ask_actions;
   Lisp_Object action, ltimestamp, val;
-  specpdl_ref ref, count, base;
   ptrdiff_t i, end, fill;
   XTextProperty prop;
   Lisp_Object frame_object, x, y, frame, local_value;
@@ -12733,7 +12732,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
     error ("Drag-and-drop is not possible when the client is"
 	   " not trusted by the X server.");
 
-  base = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Bind this here to avoid juggling bindings and SAFE_FREE in
      Fx_begin_drag.  */
@@ -12801,7 +12800,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
       ask_actions = NULL;
       end = 0;
-      count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       for (i = 0; i < n_ask_actions; ++i)
 	{
@@ -12841,7 +12840,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       x_uncatch_errors_after_check ();
       unblock_input ();
 
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
 
   record_unwind_protect_void (x_clear_dnd_variables);
@@ -13097,12 +13096,12 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 		  x_dnd_old_window_attrs = root_window_attrs;
 		  x_dnd_unwind_flag = true;
 
-		  ref = SPECPDL_INDEX ();
+	          dynwind_begin ();
 		  record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
 		  call2 (Vx_dnd_movement_function, frame_object,
 			 Fposn_at_x_y (x, y, frame_object, Qnil));
 		  x_dnd_unwind_flag = false;
-		  unbind_to (ref, Qnil);
+		  dynwind_end ();
 
 		  /* Redisplay this way to preserve the echo area.
 		     Otherwise, the contents will abruptly disappear
@@ -13131,7 +13130,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 		  x_dnd_old_window_attrs = root_window_attrs;
 		  x_dnd_unwind_flag = true;
 
-		  ref = SPECPDL_INDEX ();
+		  dynwind_begin ();
 		  record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
 		  call4 (Vx_dnd_wheel_function,
 			 Fposn_at_x_y (x, y, frame_object, Qnil),
@@ -13139,7 +13138,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 			 make_uint (x_dnd_wheel_state),
 			 make_uint (x_dnd_wheel_time));
 		  x_dnd_unwind_flag = false;
-		  unbind_to (ref, Qnil);
+		  dynwind_end ();
 
 		  /* Redisplay this way to preserve the echo area.
 		     Otherwise, the contents will abruptly disappear
@@ -13171,11 +13170,11 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      x_dnd_old_window_attrs = root_window_attrs;
 	      x_dnd_unwind_flag = true;
 
-	      ref = SPECPDL_INDEX ();
+	      dynwind_begin ();
 	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
 	      x_handle_pending_selection_requests ();
 	      x_dnd_unwind_flag = false;
-	      unbind_to (ref, Qnil);
+	      dynwind_end ();
 	    }
 
 	  /* Sometimes C-g can be pressed inside a selection
@@ -13198,7 +13197,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	      x_dnd_waiting_for_finish = false;
 	      x_dnd_unwind_flag = true;
 
-	      ref = SPECPDL_INDEX ();
+	      dynwind_begin ();
 	      record_unwind_protect_ptr (x_dnd_cleanup_drag_and_drop, f);
 
 	      if (!NILP (Vx_dnd_unsupported_drop_function))
@@ -13227,7 +13226,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 		x_dnd_action_symbol = val;
 
 	      x_dnd_unwind_flag = false;
-	      unbind_to (ref, Qnil);
+	      dynwind_end ();
 
 	      /* Break out of the loop now, since DND has
 		 completed.  */
@@ -13283,14 +13282,18 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
       XSETFRAME (action, x_dnd_return_frame_object);
       x_dnd_return_frame_object = NULL;
 
-      return unbind_to (base, action);
+      dynwind_end ();
+      return action;
     }
 
   x_dnd_return_frame_object = NULL;
   FRAME_DISPLAY_INFO (f)->grabbed = 0;
 
   if (!NILP (x_dnd_action_symbol))
-    return unbind_to (base, x_dnd_action_symbol);
+    {
+      dynwind_end ();
+      return x_dnd_action_symbol;
+    }
 
   if (x_dnd_action != None)
     {
@@ -13315,10 +13318,12 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 	action = Qnil;
       unblock_input ();
 
-      return unbind_to (base, action);
+      dynwind_end ();
+      return action;
     }
 
-  return unbind_to (base, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 #ifdef HAVE_XINPUT2
