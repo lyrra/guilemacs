@@ -3532,9 +3532,9 @@ The completion method is determined by `completion-at-point-functions'."
     (define-key map [prior] 'switch-to-completions)
     (define-key map "\M-v"  'switch-to-completions)
     (define-key map "\M-g\M-c"  'switch-to-completions)
-    (define-key-map "\M-<up>"    'minibuffer-choose-previous-completion)
-    (define-key-map "\M-<down>"  'minibuffer-choose-next-completion)
-    (define-key-map "\M-RET"      'minibuffer-choose-completion)
+    (define-key map "\M-<up>"    'minibuffer-choose-previous-completion)
+    (define-key map "\M-<down>"  'minibuffer-choose-next-completion)
+    (define-key map "\M-RET"      'minibuffer-choose-completion)
     map)
   "Local keymap for minibuffer input with completion.")
 
