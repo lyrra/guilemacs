@@ -2075,9 +2075,7 @@ xm_get_drag_window_1 (struct x_display_info *dpyinfo)
 	  return None;
 	}
 
-      unrequest_sigio ();
       temp_display = XOpenDisplay (XDisplayString (dpyinfo->display));
-      request_sigio ();
 
       if (!temp_display)
 	{
