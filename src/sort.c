@@ -540,7 +540,7 @@ merge_markmem (void *arg)
       Lisp_Object *src = (ms->reloc.src->values
 			  ? ms->reloc.src->values : ms->reloc.src->keys);
       eassume (src != NULL);
-      mark_objects (src, *ms->reloc.size);
+      //mark_objects (src, *ms->reloc.size);
     }
 }
 
@@ -591,7 +591,7 @@ static void
 merge_register_cleanup (merge_state *ms)
 {
   specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_ptr_mark (cleanup_mem, ms, merge_markmem);
+  //record_unwind_protect_ptr_mark (cleanup_mem, ms, merge_markmem);
   ms->count = count;
 }
 
@@ -1064,7 +1064,7 @@ resolve_fun (Lisp_Object fun)
     {
       /* Attempt to resolve the function as far as possible ahead of time,
 	 to avoid having to do it for each call.  */
-      Lisp_Object f = XSYMBOL (fun)->u.s.function;
+      Lisp_Object f = SYMBOL_FUNCTION (fun);
       if (SYMBOLP (f))
 	/* Function was an alias; use slow-path resolution.  */
 	f = indirect_function (f);
@@ -1173,6 +1173,6 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
   if (reverse)
     reverse_slice (seq, seq + length);
 
-  if (ms.a.keys != ms.temparray || allocated_keys != NULL)
-    unbind_to (ms.count, Qnil);
+  //if (ms.a.keys != ms.temparray || allocated_keys != NULL)
+  //  unbind_to (ms.count, Qnil);
 }
