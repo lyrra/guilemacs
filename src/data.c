@@ -1122,9 +1122,9 @@ The value, if non-nil, is a list of mode name symbols.  */)
 	fun = Fsymbol_function (fun);
     }
 
-  if (SUBRP (fun))
+  if (scm_is_true (scm_procedure_p (fun)))
     {
-      return XSUBR (fun)->command_modes;
+      return Qnil;
     }
   else if (CLOSUREP (fun))
     {
