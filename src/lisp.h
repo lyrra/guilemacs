@@ -3116,6 +3116,8 @@ enum maxargs
 #define call6 calln
 #define call7 calln
 #define call8 calln
+Lisp_Object
+Ffuncall (ptrdiff_t nargs, Lisp_Object *args);
 
 /* Define 'call0' as a function rather than a CPP macro because we
    sometimes want to pass it as a first class function.  */
