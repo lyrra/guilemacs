@@ -38,13 +38,13 @@
 
 ;;; Code:
 
-(oclosure-define (advice
+'(oclosure-define (advice
                   (:predicate advice--p)
                   (:copier advice--cons (cdr))
                   (:copier advice--copy (car cdr how props)))
   car cdr how props)
 
-(eval-when-compile
+'(eval-when-compile
   (defmacro advice--make-how-alist (&rest args)
     `(list
       ,@(mapcar
