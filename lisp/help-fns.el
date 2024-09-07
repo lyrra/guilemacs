@@ -33,9 +33,9 @@
 ;;; Code:
 
 (require 'cl-lib)
+(eval-when-compile (require 'minibuffer)) ; needed by cl-generic
 (eval-when-compile (require 'simple))   ;For special-mode-map
 (eval-when-compile (require 'easymenu)) ; needed by cl-generic
-(eval-when-compile (require 'minibuffer)) ; needed by cl-generic
 (eval-when-compile (require 'cl-generic))   ;For when-let.
 (require 'seq)
 (require 'help-mode)
