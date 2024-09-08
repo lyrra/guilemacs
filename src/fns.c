@@ -6389,7 +6389,7 @@ DEFUN ("eval-scheme", Feval_scheme, Seval_scheme, 1, 1,
   CHECK_STRING (string);
 
   tem = scm_c_eval_string (SSDATA (string));
-  return (INTERACTIVE ? Fprin1 (tem, Qt) : tem);
+  return (INTERACTIVE ? Fprin1 (tem, Qt, Qnil) : tem);
 }
 
 void
