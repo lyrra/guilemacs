@@ -1079,12 +1079,12 @@ static EMACS_INT minibuf_c_loop_level (EMACS_INT depth)
 static void
 run_exit_minibuf_hook (Lisp_Object minibuf)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_current_buffer ();
   if (BUFFER_LIVE_P (XBUFFER (minibuf)))
     Fset_buffer (minibuf);
   safe_run_hooks (Qminibuffer_exit_hook);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* This variable records the expired minibuffer's frame between the

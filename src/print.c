@@ -766,7 +766,7 @@ As a special case, OVERRIDES can also simply be the symbol t, which
 means "use default values for all the print-related settings".  */)
   (Lisp_Object object, Lisp_Object printcharfun, Lisp_Object overrides)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (NILP (printcharfun))
     printcharfun = Vstandard_output;
@@ -777,7 +777,8 @@ means "use default values for all the print-related settings".  */)
   print (object, pc.printcharfun, 1);
   print_finish (&pc);
 
-  return unbind_to (count, object);
+  dynwind_end ();
+  return object;
 }
 
 /* A buffer which is used to hold output being built by prin1-to-string.  */
