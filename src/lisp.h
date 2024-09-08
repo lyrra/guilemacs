@@ -1043,7 +1043,7 @@ make_fixed_natnum (EMACS_INT n)
 INLINE bool
 (BASE_EQ) (Lisp_Object x, Lisp_Object y)
 {
-  return lisp_h_BASE_EQ (x, y);
+  return lisp_h_EQ (x, y);
 }
 
 /* Return true if X and Y are the same object, reckoning a symbol with
