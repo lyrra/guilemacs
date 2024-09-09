@@ -3254,8 +3254,7 @@ read_string_literal (Lisp_Object readcharfun)
 	{
 	  ptrdiff_t offset = p - read_buffer;
 	  read_buffer = grow_read_buffer (read_buffer, offset,
-					  &heapbuf, &read_buffer_size,
-					  count);
+					  &heapbuf, &read_buffer_size);
 	  p = read_buffer + offset;
 	  end = read_buffer + read_buffer_size;
 	}
