@@ -2111,9 +2111,7 @@ xm_get_drag_window_1 (struct x_display_info *dpyinfo)
 
       /* FIXME: why does XCloseDisplay hang if SIGIO arrives and there
 	 are multiple displays? */
-      unrequest_sigio ();
       XCloseDisplay (temp_display);
-      request_sigio ();
 
       XSetErrorHandler (old_handler);
       XSetIOErrorHandler (old_io_handler);
