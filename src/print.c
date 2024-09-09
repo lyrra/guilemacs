@@ -2816,6 +2816,7 @@ init_print_once (void)
   /* The subroutine object for external-debugging-output is kept here
      for the convenience of the debugger.  */
   DEFSYM (Qexternal_debugging_output, "external-debugging-output");
+  Vprint_variable_mapping = Qnil;
 }
 
 void
