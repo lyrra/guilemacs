@@ -3834,36 +3834,6 @@ static struct read_stack rdstack = {NULL, 0, 0};
 void
 mark_lread (void)
 {
-  /* Mark the read stack, which may contain data not otherwise traced */
-  for (ptrdiff_t i = 0; i < rdstack.sp; i++)
-    {
-      struct read_stack_entry *e = &rdstack.stack[i];
-      switch (e->type)
-	{
-	case RE_list_start:
-	  break;
-	case RE_list:
-	case RE_list_dot:
-	  mark_object (e->u.list.head);
-	  mark_object (e->u.list.tail);
-	  break;
-	case RE_vector:
-	case RE_record:
-	case RE_char_table:
-	case RE_sub_char_table:
-	case RE_byte_code:
-	case RE_string_props:
-	  mark_object (e->u.vector.elems);
-	  break;
-	case RE_special:
-	  mark_object (e->u.special.symbol);
-	  break;
-	case RE_numbered:
-	  mark_object (e->u.numbered.number);
-	  mark_object (e->u.numbered.placeholder);
-	  break;
-	}
-    }
 }
 
 static inline struct read_stack_entry *
