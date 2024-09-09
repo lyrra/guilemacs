@@ -201,7 +201,7 @@ org-manuals: main-first
 # generated, too.
 autoloads: $(lisp)/emacs-lisp/loaddefs-gen.elc gen-lisp
 	$(AM_V_GEN)$(emacs) \
-            -l $(lisp)/emacs-lisp/loaddefs-gen.elc \
+            -l $(lisp)/emacs-lisp/loaddefs-gen.el \
 	    -f loaddefs-generate--emacs-batch ${SUBDIRS_ALMOST}
 
 # autoloads always runs, but only updates when there's something new.
