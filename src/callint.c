@@ -107,6 +107,7 @@ fix_command (Lisp_Object function, Lisp_Object values)
 	}
     }
 
+#if 0
   /* If the list contains a bunch of trailing nil values, and they are
      optional, remove them from the list.  This makes navigating the
      history less confusing, since it doesn't contain a lot of
@@ -134,6 +135,7 @@ fix_command (Lisp_Object function, Lisp_Object values)
       if (final_i > 0 && final_i >= XFIXNUM (XCAR (arity)) - 1)
 	XSETCDR (final,  Qnil);
     }
+#endif
 }
 
 /* Helper function to call `read-file-name' from C.  */
