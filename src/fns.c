@@ -3704,17 +3704,6 @@ FILENAME are suppressed.  */)
       dynwind_begin ();
       int nesting = 0;
 
-      /* This is to make sure that loadup.el gives a clear picture
-	 of what files are preloaded and when.  */
-      if (will_dump_p () && !will_bootstrap_p ())
-	{
-	  /* Avoid landing here recursively while outputting the
-	     backtrace from the error.  */
-	  gflags.will_dump_ = false;
-	  error ("(require %s) while preparing to dump",
-		 SDATA (SYMBOL_NAME (feature)));
-	}
-
       /* A certain amount of recursive `require' is legitimate,
 	 but if we require the same feature recursively 3 times,
 	 signal an error.  */
