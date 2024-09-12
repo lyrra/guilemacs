@@ -347,7 +347,6 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   Lisp_Object tem;
   Lisp_Object handler_fn, value, check;
   bool may_quit;
-  specpdl_ref count;
 
   may_quit = false;
 
@@ -1655,15 +1654,14 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 		    : symbol_to_x_atom (dpyinfo, target_type));
   struct atimer *delayed_message;
   struct timespec message_interval;
-  specpdl_ref count;
-
-  count = SPECPDL_INDEX ();
 
   if (!FRAME_LIVE_P (f))
-    return unbind_to (count, Qnil);
+    return Qnil;
 
   if (! NILP (time_stamp))
     CONS_TO_INTEGER (time_stamp, Time, requestor_time);
+
+  dynwind_begin ();
 
   block_input ();
   TRACE2 ("Get selection %s, type %s",
@@ -1729,16 +1727,20 @@ x_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
   if (NILP (XCAR (reading_selection_reply)))
     error ("Timed out waiting for reply from selection owner");
   if (EQ (XCAR (reading_selection_reply), Qlambda))
-    return unbind_to (count, Qnil);
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   /* Otherwise, the selection is waiting for us on the requested property.  */
-  return unbind_to (count,
-		    x_get_window_property_as_lisp_data (dpyinfo,
+  Lisp_Object tem = x_get_window_property_as_lisp_data (dpyinfo,
 							requestor_window,
 							target_property,
 							target_type,
 							selection_atom,
-							false));
+							false);
+  dynwind_end ();
+  return tem;
 }
 
 /* Subroutines of x_get_window_property_as_lisp_data */
@@ -2025,7 +2027,6 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
   ptrdiff_t bytes = 0, array_bytes;
   Lisp_Object val;
   Display *display = dpyinfo->display;
-  specpdl_ref count;
 
   /* array_bytes is only used as an argument to xpalloc.  The actual
      size of the data inside the buffer is inside bytes.  */
@@ -2065,7 +2066,7 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
      quits. Use xfree, not XFree, because x_get_window_property calls
      xmalloc itself.  */
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_ptr (x_free_selection_data, &data);
 
   if (!for_multiple && actual_type == dpyinfo->Xatom_INCR)
@@ -2107,7 +2108,8 @@ x_get_window_property_as_lisp_data (struct x_display_info *dpyinfo,
 				     actual_type, actual_format);
 
   /* This will also free `data'.  */
-  return unbind_to (count, val);
+  dynwind_end ();
+  return val;
 }
 
 /* These functions convert from the selection data read from the server into

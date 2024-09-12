@@ -2000,7 +2000,7 @@ safe_run_hooks (Lisp_Object hook)
 static void
 safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   specbind (Qinhibit_quit, Qt);
 
@@ -2014,20 +2014,19 @@ safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
 				  Qlong_line_optimizations_in_command_hooks);
     }
 
-  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}),
-                      safe_run_hook_funcall);
-  unbind_to (count, Qnil);
+  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
+  dynwind_end ();
 }
 
 void
 safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1, Lisp_Object arg2)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   specbind (Qinhibit_quit, Qt);
   run_hook_with_args (4, ((Lisp_Object []) {hook, hook, arg1, arg2}),
 		      safe_run_hook_funcall);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 
@@ -10284,9 +10283,10 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
 
       /* Bind `current-key-remap-sequence' to the key sequence being
 	 remapped.  */
-      count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qcurrent_key_remap_sequence, remap);
-      next = unbind_to (count, call1 (next, prompt));
+      next = call1 (next, prompt);
+      dynwind_end ();
 
       /* If the function returned something invalid,
 	 barf--don't ignore it.  */

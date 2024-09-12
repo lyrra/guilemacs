@@ -3753,11 +3753,11 @@ unwind_narrowed_begv (Lisp_Object point_min)
   do {									\
     if (IT->medium_narrowing_begv)					\
       {									\
-	specpdl_ref count = SPECPDL_INDEX ();				\
+	dynwind_begin ();                      				\
 	record_unwind_protect (unwind_narrowed_begv, Fpoint_min ());	\
 	SET_BUF_BEGV (current_buffer, BV);				\
 	DST = EXPR;							\
-	unbind_to (count, Qnil);					\
+	dynwind_end ();         					\
       }									\
     else								\
       DST = EXPR;							\

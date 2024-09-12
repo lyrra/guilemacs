@@ -4285,7 +4285,7 @@ Default face attributes override any local face attributes.  */)
 	  /* In some cases, realize_face below can call Lisp, which could
              trigger redisplay.  But we are in the process of realizing
              the default face, and therefore are not ready to do display.  */
-	  specpdl_ref count = SPECPDL_INDEX ();
+	  dynwind_begin ();
 	  specbind (Qinhibit_redisplay, Qt);
 
 	  /* Ensure that the face vector is fully specified by merging
@@ -4334,7 +4334,7 @@ Default face attributes override any local face attributes.  */)
 	      Fmodify_frame_parameters (frame, arg);
 	    }
 
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	}
     }
 
@@ -6005,10 +6005,11 @@ realize_default_face (struct frame *f)
   /* In some cases, realize_face below can call Lisp, which could
      trigger redisplay.  But we are in the process of realizing
      the default face, and therefore are not ready to do display.  */
+  dynwind_begin ();
   specpdl_ref count = SPECPDL_INDEX ();
   specbind (Qinhibit_redisplay, Qt);
   struct face *face = realize_face (c, attrs, DEFAULT_FACE_ID);
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
 #ifndef HAVE_WINDOW_SYSTEM
   (void) face;

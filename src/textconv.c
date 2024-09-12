@@ -187,7 +187,6 @@ int
 textconv_query (struct frame *f, struct textconv_callback_struct *query,
 		int flags)
 {
-  specpdl_ref count;
   ptrdiff_t pos, pos_byte, end, end_byte, start;
   ptrdiff_t temp, temp1, mark;
   char *buffer;
@@ -195,7 +194,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query,
 
   /* Save the excursion, as there will be extensive changes to the
      selected window.  */
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_excursion ();
   record_unwind_protect (restore_selected_window, selected_window);
 
@@ -397,7 +396,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query,
       break;
 
     default:
-      unbind_to (count, Qnil);
+      dynwind_end ();
       return 1;
     }
 
@@ -429,7 +428,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query,
       if (safe_del_range (pos, end))
 	{
 	  /* Undo any changes to the excursion.  */
-	  unbind_to (count, Qnil);
+	  dynwind_end ();
 	  return 1;
 	}
 
@@ -438,7 +437,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query,
     }
 
   /* Undo any changes to the excursion.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return 0;
 }
 
@@ -611,7 +610,6 @@ static void
 really_commit_text (struct frame *f, EMACS_INT position,
 		    Lisp_Object text)
 {
-  specpdl_ref count;
   ptrdiff_t wanted, start, end, mark;
   struct window *w;
 
@@ -620,7 +618,7 @@ really_commit_text (struct frame *f, EMACS_INT position,
   if (!WINDOW_LIVE_P (f->old_selected_window))
     return;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -780,7 +778,7 @@ really_commit_text (struct frame *f, EMACS_INT position,
   /* Update the ephemeral last point.  */
   w = XWINDOW (selected_window);
   w->ephemeral_last_point = PT;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Remove the composition region on the frame F, while leaving its
@@ -820,7 +818,6 @@ static void
 really_set_composing_text (struct frame *f, ptrdiff_t position,
 			   Lisp_Object text)
 {
-  specpdl_ref count;
   ptrdiff_t start, wanted, end;
   struct window *w;
 
@@ -829,7 +826,7 @@ really_set_composing_text (struct frame *f, ptrdiff_t position,
   if (!WINDOW_LIVE_P (f->old_selected_window))
     return;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -963,7 +960,7 @@ really_set_composing_text (struct frame *f, ptrdiff_t position,
   else
     TEXTCONV_DEBUG ("conversion region removed; PT is now: %td", PT);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Set the composing region of frame F to START by END.  Make it if
@@ -973,7 +970,6 @@ static void
 really_set_composing_region (struct frame *f, ptrdiff_t start,
 			     ptrdiff_t end)
 {
-  specpdl_ref count;
   struct window *w;
 
   /* If F's old selected window is no longer live, fail.  */
@@ -990,7 +986,7 @@ really_set_composing_region (struct frame *f, ptrdiff_t start,
       return;
     }
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -1021,7 +1017,7 @@ really_set_composing_region (struct frame *f, ptrdiff_t start,
   w = XWINDOW (selected_window);
   w->ephemeral_last_point = PT;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Delete LEFT and RIGHT chars around point or the active mark,
@@ -1032,7 +1028,6 @@ static void
 really_delete_surrounding_text (struct frame *f, ptrdiff_t left,
 				ptrdiff_t right)
 {
-  specpdl_ref count;
   ptrdiff_t start, end, a, b, a1, b1, lstart, rstart;
   struct window *w;
   Lisp_Object text;
@@ -1042,7 +1037,7 @@ really_delete_surrounding_text (struct frame *f, ptrdiff_t left,
   if (!WINDOW_LIVE_P (f->old_selected_window))
     return;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -1122,7 +1117,7 @@ really_delete_surrounding_text (struct frame *f, ptrdiff_t left,
   w = XWINDOW (selected_window);
   w->ephemeral_last_point = PT;
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Save the confines of the field surrounding point in w into F's text
@@ -1138,7 +1133,7 @@ locate_and_save_position_in_field (struct frame *f, struct window *w,
   ptrdiff_t beg, end, cstart, cend, newstart, newend;
 
   /* Set the current buffer to W's.  */
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* The current buffer must be saved, not merely the selected
      window.  */
@@ -1235,7 +1230,7 @@ locate_and_save_position_in_field (struct frame *f, struct window *w,
     }
 
  exit:
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Update the interface with frame F's new point and mark.  If a batch
@@ -1273,7 +1268,6 @@ static void
 really_set_point_and_mark (struct frame *f, ptrdiff_t point,
 			   ptrdiff_t mark)
 {
-  specpdl_ref count;
   struct window *w;
 
   /* If F's old selected window is no longer live, fail.  */
@@ -1281,7 +1275,7 @@ really_set_point_and_mark (struct frame *f, ptrdiff_t point,
   if (!WINDOW_LIVE_P (f->old_selected_window))
     return;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -1317,7 +1311,7 @@ really_set_point_and_mark (struct frame *f, ptrdiff_t point,
   TEXTCONV_DEBUG ("set point and mark: %td %td",
 		  PT, get_mark ());
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Remove the composing region.  Replace the text between START and
@@ -1337,7 +1331,7 @@ really_replace_text (struct frame *f, ptrdiff_t start, ptrdiff_t end,
   if (!WINDOW_LIVE_P (f->old_selected_window))
     return;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect (restore_selected_window,
 			 selected_window);
 
@@ -1444,7 +1438,7 @@ really_replace_text (struct frame *f, ptrdiff_t start, ptrdiff_t end,
   /* Update the ephemeral last point.  */
   w = XWINDOW (selected_window);
   w->ephemeral_last_point = PT;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Complete the edit specified by the counter value inside *TOKEN.  */
@@ -1518,7 +1512,6 @@ handle_pending_conversion_events_1 (struct frame *f,
   enum text_conversion_operation operation;
   struct buffer *buffer UNINIT;
   struct window *w;
-  specpdl_ref count;
   unsigned long token;
   struct complete_edit_check_context context;
 
@@ -1541,7 +1534,7 @@ handle_pending_conversion_events_1 (struct frame *f,
   context.check = false;
 
   /* Make sure completion is signaled.  */
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_ptr (complete_edit, &token);
   w = NULL;
 
@@ -1635,7 +1628,7 @@ handle_pending_conversion_events_1 (struct frame *f,
 
   /* Signal success.  */
   context.check = true;
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return w;
 }
@@ -1662,7 +1655,6 @@ handle_pending_conversion_events (void)
   struct text_conversion_action *action, *next;
   bool handled;
   static int inside;
-  specpdl_ref count;
   ptrdiff_t last_point;
   struct window *w;
 
@@ -1676,7 +1668,7 @@ handle_pending_conversion_events (void)
 
   inside++;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_ptr (decrement_inside, &inside);
 
   FOR_EACH_FRAME (tail, frame)
@@ -1736,7 +1728,7 @@ handle_pending_conversion_events (void)
 	}
     }
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Return the confines of the field to which editing operations on frame
@@ -2090,7 +2082,6 @@ get_extracted_text (struct frame *f, ptrdiff_t n,
 		    ptrdiff_t *end_offset, ptrdiff_t *length,
 		    ptrdiff_t *bytes, bool *mark_active)
 {
-  specpdl_ref count;
   ptrdiff_t start, end, start_byte, end_byte, mark;
   char *buffer;
   ptrdiff_t field_start, field_end;
@@ -2100,7 +2091,7 @@ get_extracted_text (struct frame *f, ptrdiff_t n,
 
   /* Save the excursion, as there will be extensive changes to the
      selected window.  */
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_excursion ();
   record_unwind_protect (restore_selected_window, selected_window);
 
@@ -2192,7 +2183,7 @@ get_extracted_text (struct frame *f, ptrdiff_t n,
 		  PT, mark, start);
 
  finish:
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return buffer;
 }
 
@@ -2213,7 +2204,6 @@ get_surrounding_text (struct frame *f, ptrdiff_t left,
 		      ptrdiff_t *start_return,
 		      ptrdiff_t *end_return)
 {
-  specpdl_ref count;
   ptrdiff_t start, end, start_byte, end_byte, mark, temp;
   ptrdiff_t field_start, field_end;
   char *buffer;
@@ -2223,7 +2213,7 @@ get_surrounding_text (struct frame *f, ptrdiff_t left,
 
   /* Save the excursion, as there will be extensive changes to the
      selected window.  */
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_excursion ();
   record_unwind_protect (restore_selected_window, selected_window);
 
@@ -2304,7 +2294,7 @@ get_surrounding_text (struct frame *f, ptrdiff_t left,
   *bytes = end_byte - start_byte;
 
  finish:
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return buffer;
 }
 

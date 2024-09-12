@@ -6921,13 +6921,13 @@ displayed_window_lines (struct window *w)
 
   itdata = bidi_shelve_cache ();
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   record_unwind_protect_void (unwind_display_working_on_window);
   display_working_on_window_p = true;
   start_display (&it, w, start);
   move_it_vertically (&it, height);
   bottom_y = line_bottom_y (&it);
-  unbind_to (count, Qnil);
+  dynwind_end ();
   bidi_unshelve_cache (itdata, false);
 
   /* Add in empty lines at the bottom of the window.  */
@@ -7024,7 +7024,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
   if (!FRAME_INITIAL_P (XFRAME (w->frame))
       && !current_buffer->long_line_optimizations_p)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       record_unwind_protect_void (unwind_display_working_on_window);
       display_working_on_window_p = true;
@@ -7090,7 +7090,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 	  if (h <= 0)
 	    {
 	      bidi_unshelve_cache (itdata, false);
-	      unbind_to (count, Qnil);
+	      dynwind_end ();
 	      return Qnil;
 	    }
 
@@ -7145,7 +7145,7 @@ and redisplay normally--don't erase and redraw the frame.  */)
 
 	  bidi_unshelve_cache (itdata, false);
 	}
-      unbind_to (count, Qnil);
+      dynwind_end ();
     }
   else
     {

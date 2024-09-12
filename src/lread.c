@@ -755,9 +755,6 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 {
   Lisp_Object val, delayed_switch_frame;
   struct timespec end_time;
-#ifdef HAVE_TEXT_CONVERSION
-  specpdl_ref count;
-#endif
 
 #ifdef HAVE_WINDOW_SYSTEM
   if (display_hourglass_p)
@@ -765,7 +762,7 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 #endif
 
 #ifdef HAVE_TEXT_CONVERSION
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Don't use text conversion when trying to just read a
      character.  */
@@ -853,7 +850,7 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 #endif
 
 #ifdef HAVE_TEXT_CONVERSION
-  return unbind_to (count, val);
+  dynwind_end ();
 #else
   return val;
 #endif
@@ -3914,16 +3911,12 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
   ptrdiff_t offset;
   char *heapbuf = NULL;
 
-  specpdl_ref base_pdl = SPECPDL_INDEX ();
+  dynwind_begin ();
   ptrdiff_t base_sp = rdstack.sp;
   record_unwind_protect_intmax (read_stack_reset, base_sp);
 
-  specpdl_ref count = SPECPDL_INDEX ();
-
   bool uninterned_symbol;
   bool skip_shorthand;
-
-  dynwind_begin ();
 
   /* Read an object into `obj'.  */
  read_obj: ;

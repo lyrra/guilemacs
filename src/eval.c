@@ -2471,11 +2471,11 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
   else
     emacs_abort ();
 
-  specpdl_ref count = SPECPDL_INDEX ();
   ptrdiff_t i = 0;
   bool optional = false;
   bool rest = false;
   bool previous_rest = false;
+  dynwind_begin ();
   for (; CONSP (syms_left); syms_left = XCDR (syms_left))
     {
       maybe_quit ();
@@ -2532,8 +2532,8 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     /* Instantiate a new lexical environment.  */
     specbind (Qinternal_interpreter_environment, lexenv);
 
-  val = Fprogn (XCDR (XCDR (fun)));
-
+  Lisp_Object val = Fprogn (XCDR (XCDR (fun)));
+  dynwind_end ();
   return val;
 }
 

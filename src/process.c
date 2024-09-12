@@ -6433,7 +6433,7 @@ read_and_insert_process_output (struct Lisp_Process *p, char *buf,
   else
     {			/* We have to decode the input.  */
       Lisp_Object curbuf;
-      specpdl_ref count1 = SPECPDL_INDEX ();
+      dynwind_begin ();
 
       XSETBUFFER (curbuf, current_buffer);
       /* See the comment above about inserting before markers.  */
@@ -6446,7 +6446,7 @@ read_and_insert_process_output (struct Lisp_Process *p, char *buf,
       specbind (Qinhibit_modification_hooks, Qt);
       decode_coding_c_string (process_coding,
 			      (unsigned char *) buf, nread, curbuf);
-      unbind_to (count1, Qnil);
+      dynwind_end ();
 
       read_process_output_set_last_coding_system (p, process_coding);
 

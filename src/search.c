@@ -402,7 +402,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
   set_char_table_extras (BVAR (current_buffer, case_canon_table), 2,
 			 BVAR (current_buffer, case_eqv_table));
 
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct regexp_cache *cache_entry
     = compile_pattern (regexp,
 		       modify_match_data ? &search_regs : NULL,
@@ -417,7 +417,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 		   SBYTES (string), pos_byte,
 		   SBYTES (string) - pos_byte,
 		   (modify_match_data ? &search_regs : NULL));
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   /* Set last_thing_searched only when match data is changed.  */
   if (modify_match_data)
@@ -487,14 +487,14 @@ fast_string_match_internal (Lisp_Object regexp, Lisp_Object string,
 			    Lisp_Object table)
 {
   re_match_object = string;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct regexp_cache *cache_entry
     = compile_pattern (regexp, 0, table, 0, STRING_MULTIBYTE (string));
   freeze_pattern (cache_entry);
   ptrdiff_t val = re_search (&cache_entry->buf, SSDATA (string),
 			     SBYTES (string), 0,
 			     SBYTES (string), 0);
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return val;
 }
 
@@ -516,13 +516,13 @@ fast_c_string_match_internal (Lisp_Object regexp,
   regexp = string_make_unibyte (regexp);
   /* Record specpdl index because freeze_pattern pushes an
      unwind-protect on the specpdl.  */
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   struct regexp_cache *cache_entry
     = compile_pattern (regexp, 0, table, 0, 0);
   freeze_pattern (cache_entry);
   re_match_object = Qt;
   ptrdiff_t val = re_search (&cache_entry->buf, string, len, 0, len, 0);
-  unbind_to (count, Qnil);
+  dynwind_end ();
   return val;
 }
 
