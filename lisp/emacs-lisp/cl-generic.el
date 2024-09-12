@@ -672,14 +672,15 @@ The set of acceptable TYPEs (also called \"specializers\") is defined
   ;; compiled.  Otherwise the byte-compiler and all the code on
   ;; which it depends needs to be usable before cl-generic is loaded,
   ;; which imposes a significant burden on the bootstrap.
-  (if (not (compiled-function-p (lambda (x) (+ x 1))))
-      (lambda (exp) (eval exp t))
+  (lambda (exp) (eval exp t)))
+  ;(if (not (compiled-function-p (lambda (x) (+ x 1))))
+  ;    (lambda (exp) (eval exp t))
     ;; But do byte-compile the dispatchers once bootstrap is passed:
     ;; the performance difference is substantial (like a 5x speedup on
     ;; the `eieio' elisp-benchmark)).
     ;; To avoid loading the byte-compiler during the final preload,
     ;; see `cl--generic-prefill-dispatchers'.
-    #'byte-compile))
+;    #'byte-compile))
 
 (defun cl--generic-get-dispatcher (dispatch)
   (with-memoization
@@ -744,6 +745,9 @@ You might need to add: %S"
       (funcall
        cl--generic-compiler
        `(lambda (generic dispatches-left methods)
+          ;; FIXME: We should find a way to expand `with-memoize' once
+          ;; and forall so we don't need `subr-x' when we get here.
+          (eval-when-compile (require 'subr-x))
           (let ((method-cache (make-hash-table :test #'eql)))
             (lambda (,@fixedargs &rest args)
               (let ,bindings
