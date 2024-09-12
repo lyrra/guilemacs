@@ -164,49 +164,43 @@ macro to be executed before appending to it."
 
 ;; Keymap
 
-(defvar-keymap kmacro-keymap
-  :doc "Keymap for keyboard macro commands."
-  ;; Start, end, execute macros
-  "s"    #'kmacro-start-macro
-  "C-s"  #'kmacro-start-macro
-  "C-k"  #'kmacro-end-or-call-macro-repeat
-  "r"    #'apply-macro-to-region-lines
-  "q"    #'kbd-macro-query  ;; Like C-x q
-  "d"    #'kmacro-redisplay
+(defvar kmacro-keymap
+  (let ((map (make-sparse-keymap)))
+    ;; Start, end, execute macros
+    (define-key map "s"    #'kmacro-start-macro)
+    (define-key map "\C-s" #'kmacro-start-macro)
+    (define-key map "\C-k" #'kmacro-end-or-call-macro-repeat)
+    (define-key map "r"    #'apply-macro-to-region-lines)
+    (define-key map "q"    #'kbd-macro-query)  ;; Like C-x q
+    (define-key map "d"    #'kmacro-redisplay)
 
-  ;; macro ring
-  "C-n"  #'kmacro-cycle-ring-next
-  "C-p"  #'kmacro-cycle-ring-previous
-  "C-v"  #'kmacro-view-macro-repeat
-  "C-d"  #'kmacro-delete-ring-head
-  "C-t"  #'kmacro-swap-ring
-  "C-l"  #'kmacro-call-ring-2nd-repeat
+    ;; macro ring
+    (define-key map "\C-n" #'kmacro-cycle-ring-next)
+    (define-key map "\C-p" #'kmacro-cycle-ring-previous)
+    (define-key map "\C-v" #'kmacro-view-macro-repeat)
+    (define-key map "\C-d" #'kmacro-delete-ring-head)
+    (define-key map "\C-t" #'kmacro-swap-ring)
+    (define-key map "\C-l" #'kmacro-call-ring-2nd-repeat)
 
-  ;; macro counter
-  "C-f"  #'kmacro-set-format
-  "C-c"  #'kmacro-set-counter
-  "C-i"  #'kmacro-insert-counter
-  "C-a"  #'kmacro-add-counter
-  "C-r l"   #'kmacro-reg-load-counter
-  "C-r s"   #'kmacro-reg-save-counter
-  "C-r a =" #'kmacro-reg-add-counter-equal
-  "C-r a <" #'kmacro-reg-add-counter-less
-  "C-r a >" #'kmacro-reg-add-counter-greater
-  "C-q ="   #'kmacro-quit-counter-equal
-  "C-q <"   #'kmacro-quit-counter-less
-  "C-q >"   #'kmacro-quit-counter-greater
+    ;; macro counter
+    (define-key map "\C-f" #'kmacro-set-format)
+    (define-key map "\C-c" #'kmacro-set-counter)
+    (define-key map "\C-i" #'kmacro-insert-counter)
+    (define-key map "\C-a" #'kmacro-add-counter)
 
-  ;; macro editing
-  "C-e"  #'kmacro-edit-macro-repeat
-  "RET"  #'kmacro-edit-macro
-  "e"    #'edit-kbd-macro
-  "l"    #'kmacro-edit-lossage
-  "SPC"  #'kmacro-step-edit-macro
+    ;; macro editing
+    (define-key map "\C-e" #'kmacro-edit-macro-repeat)
+    (define-key map "\r"   #'kmacro-edit-macro)
+    (define-key map "e"    #'edit-kbd-macro)
+    (define-key map "l"    #'kmacro-edit-lossage)
+    (define-key map " "    #'kmacro-step-edit-macro)
 
-  ;; naming and binding
-  "b"    #'kmacro-bind-to-key
-  "n"    #'kmacro-name-last-macro
-  "x"    #'kmacro-to-register)
+    ;; naming and binding
+    (define-key map "b"    #'kmacro-bind-to-key)
+    (define-key map "n"    #'kmacro-name-last-macro)
+    (define-key map "x"    #'kmacro-to-register)
+    map)
+  "Keymap for keyboard macro commands.")
 (defalias 'kmacro-keymap kmacro-keymap)
 
 ;;; Provide some binding for startup:
@@ -1147,30 +1141,34 @@ without repeating the prefix."
 (defvar kmacro-step-edit-help)     	 ;; kmacro step edit help enabled
 (defvar kmacro-step-edit-num-input-keys) ;; to ignore duplicate pre-command hook
 
-(defvar-keymap kmacro-step-edit-map
-  :doc "Keymap that defines the responses to questions in `kmacro-step-edit-macro'.
+(defvar kmacro-step-edit-map
+  (let ((map (make-sparse-keymap)))
+    ;; query-replace-map answers include: `act', `skip', `act-and-show',
+    ;; `exit', `act-and-exit', `edit', `delete-and-edit', `recenter',
+    ;; `automatic', `backup', `exit-prefix', and `help'.")
+    ;; Also: `quit', `edit-replacement'
+
+    (set-keymap-parent map query-replace-map)
+
+    (define-key map "\t" 'act-repeat)
+    (define-key map [tab] 'act-repeat)
+    (define-key map "\C-k" 'skip-rest)
+    (define-key map "c" 'automatic)
+    (define-key map "f" 'skip-keep)
+    (define-key map "q" 'quit)
+    (define-key map "d" 'skip)
+    (define-key map "\C-d" 'skip)
+    (define-key map "i" 'insert)
+    (define-key map "I" 'insert-1)
+    (define-key map "r" 'replace)
+    (define-key map "R" 'replace-1)
+    (define-key map "a" 'append)
+    (define-key map "A" 'append-end)
+    map)
+  "Keymap that defines the responses to questions in `kmacro-step-edit-macro'.
 This keymap is an extension to the `query-replace-map', allowing the
 following additional answers: `insert', `insert-1', `replace', `replace-1',
-`append', `append-end', `act-repeat', `skip-end', `skip-keep'."
-  ;; query-replace-map answers include: `act', `skip', `act-and-show',
-  ;; `exit', `act-and-exit', `edit', `delete-and-edit', `recenter',
-  ;; `automatic', `backup', `exit-prefix', and `help'.")
-  ;; Also: `quit', `edit-replacement'
-  :parent query-replace-map
-  "TAB"   'act-repeat
-  "<tab>" 'act-repeat
-  "C-k"   'skip-rest
-  "c"     'automatic
-  "f"     'skip-keep
-  "q"     'quit
-  "d"     'skip
-  "C-d"   'skip
-  "i"     'insert
-  "I"     'insert-1
-  "r"     'replace
-  "R"     'replace-1
-  "a"     'append
-  "A"     'append-end)
+`append', `append-end', `act-repeat', `skip-end', `skip-keep'.")
 
 (defun kmacro-step-edit-prompt (macro index)
   ;; Show step-edit prompt
