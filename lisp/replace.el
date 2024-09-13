@@ -829,7 +829,7 @@ by this function to the end of values available via
    (regexp-quote (or (car search-ring) ""))
    (car (symbol-value query-replace-from-history-variable))))
 
-(defvar-keymap read-regexp-map
+'(defvar-keymap read-regexp-map
   :parent minibuffer-local-map
   "M-s c" #'read-regexp-toggle-case-fold)
 
