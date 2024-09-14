@@ -42,12 +42,12 @@
   (make-sparse-keymap "Ediff Miscellanea"))
 (fset 'menu-bar-ediff-misc-menu
       menu-bar-ediff-misc-menu)
-(defvar-keymap menu-bar-epatch-menu :name "Apply Patch")
+(defvar menu-bar-epatch-menu (make-sparse-keymap "Apply Patch"))
 (fset 'menu-bar-epatch-menu menu-bar-epatch-menu)
-(defvar-keymap menu-bar-ediff-merge-menu :name "Merge")
+(defvar menu-bar-ediff-merge-menu (make-sparse-keymap "Merge"))
 (fset 'menu-bar-ediff-merge-menu
       menu-bar-ediff-merge-menu)
-(defvar-keymap menu-bar-ediff-menu :name "Compare")
+(defvar menu-bar-ediff-menu (make-sparse-keymap "Compare"))
 (fset 'menu-bar-ediff-menu menu-bar-ediff-menu)
 
 ;; define ediff compare menu
