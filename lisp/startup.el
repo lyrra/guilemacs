@@ -398,7 +398,8 @@ user@host, using `user-login-name' and `mail-host-address' (or `system-name')."
   :type 'string
   :group 'mail)
 
-(defcustom auto-save-list-file-prefix
+(defvar auto-save-list-file-prefix nil)
+'(defcustom auto-save-list-file-prefix
   (cond ((eq system-type 'ms-dos)
 	 ;; MS-DOS cannot have initial dot, and allows only 8.3 names
 	 (concat user-emacs-directory "auto-save.list/_s"))

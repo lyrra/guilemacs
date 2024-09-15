@@ -3108,9 +3108,9 @@ terminals, cursor blinking is controlled by the terminal."
   (remove-hook 'after-delete-frame-functions #'blink-cursor--rescan-frames)
   (remove-function after-focus-change-function #'blink-cursor--rescan-frames)
   (when blink-cursor-mode
-    (add-function :after after-focus-change-function
+    '(add-function :after after-focus-change-function
                   #'blink-cursor--rescan-frames)
-    (add-hook 'after-delete-frame-functions #'blink-cursor--rescan-frames)
+    '(add-hook 'after-delete-frame-functions #'blink-cursor--rescan-frames)
     (blink-cursor-check)))
 
 
