@@ -4709,7 +4709,7 @@ sxhash_eql (Lisp_Object key)
 static hash_hash_t
 hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return scm_ihashq (key, MOST_POSITIVE_FIXNUM);
+  return make_fixnum (scm_ihashq (key, MOST_POSITIVE_FIXNUM));
 }
 
 /* Ignore H and return a hash code for KEY which uses 'equal' to
