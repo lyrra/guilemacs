@@ -601,7 +601,7 @@ make_dialog (char* name,
             instance->xft_data = calloc (instance->nr_xft_data,
                                          sizeof(*instance->xft_data));
 	    if (!instance->xft_data)
-	      memory_full ((nr_xft_data + 1) * sizeof *instance->xft_data);
+	      memory_full ((instance->nr_xft_data + 1) * sizeof *instance->xft_data);
 
             fill_xft_data (&instance->xft_data[0], w, xft_font);
           }
