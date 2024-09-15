@@ -125,7 +125,6 @@ struct print_context
   Lisp_Object old_printcharfun;
   ptrdiff_t old_point, start_point;
   ptrdiff_t old_point_byte, start_point_byte;
-  specpdl_ref specpdl_count;
 };
 
 static inline struct print_context
@@ -137,8 +136,8 @@ print_prepare (Lisp_Object printcharfun)
     .start_point = -1,
     .old_point_byte = -1,
     .start_point_byte = -1,
-    .specpdl_count = SPECPDL_INDEX (),
   };
+  dynwind_begin ();
   bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   record_unwind_current_buffer ();
   specbind(Qprint__unreadable_callback_buffer, Fcurrent_buffer ());
