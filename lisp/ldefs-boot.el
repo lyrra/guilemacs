@@ -4182,8 +4182,8 @@ from which to start.
 (fn STRING &optional LAX FROM)")
 (autoload 'describe-char-fold-equivalences "char-fold" "\
 Display characters equivalent to CHAR under character-folding.
-Prompt for CHAR (using `read-char-by-name', which see for how to
-specify the character).  With no input, i.e. when CHAR is nil,
+Prompt for CHAR (using `read-char-by-name', which see for how can
+you specify the character).  With no input, i.e. when CHAR is nil,
 describe all available character equivalences of `char-fold-to-regexp'.
 Optional argument LAX (interactively, the prefix argument), if
 non-nil, means also include partially matching ligatures and
@@ -4591,6 +4591,8 @@ instead.
 ;;; Generated autoloads from emacs-lisp/cl-lib.el
 
 (push (purecopy '(cl-lib 1 0)) package--builtin-versions)
+(define-obsolete-variable-alias 'custom-print-functions 'cl-custom-print-functions "\
+24.3")
 (defvar cl-custom-print-functions nil "\
 This is a list of functions that format user objects for printing.
 Each function is called in turn with three arguments: the object, the
@@ -7642,13 +7644,6 @@ The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
 (fn &optional ARG)" t)
-(defvar diff-add-log-use-relative-names nil "\
-Use relative file names when generating ChangeLog skeletons.
-The files will be relative to the root directory of the VC
-repository.  This option affects the behavior of
-`diff-add-log-current-defuns'.")
-(custom-autoload 'diff-add-log-use-relative-names "diff-mode" t)
-(put 'diff-add-log-use-relative-names 'safe-local-variable #'booleanp)
 (autoload 'diff-vc-deduce-fileset "diff-mode")
 (register-definition-prefixes "diff-mode" '("diff-"))
 
@@ -7980,34 +7975,6 @@ This provides increased compatibility for users who call this function
 in `.emacs'.
 
 (fn ARG)")
-(autoload 'standard-display-by-replacement-char "disp-table" "\
-Produce code to display characters between FROM and TO using REPL.
-This function produces a buffer with code to set up `standard-display-table'
-such that characters that cannot be displayed by the terminal, and
-don't already have their display set up in `standard-display-table', will
-be represented by a replacement character.  You can evaluate the produced
-code to use the setup for the current Emacs session, or copy the code
-into your init file, to make Emacs use it for subsequent sessions.
-
-Interactively, the produced code arranges for any character in
-the range [#x100..#x10FFFF] that the terminal cannot display to
-be represented by the #xFFFD Unicode replacement character.
-
-When called from Lisp, FROM and TO define the range of characters for
-which to produce the setup code for `standard-display-table'.  If they
-are omitted, they default to #x100 and #x10FFFF respectively, covering
-the entire non-ASCII range of Unicode characters.
-REPL is the replacement character to use.  If it's omitted, it defaults
-to #xFFFD, the Unicode replacement character, usually displayed as a
-black diamond with a question mark inside.
-The produced code sets up `standard-display-table' to show REPL with
-the `homoglyph' face, making the replacements stand out on display.
-
-This command is most useful with text-mode terminals, such as the
-Linux console, for which Emacs has a reliable way of determining
-which characters can be displayed and which cannot.
-
-(fn &optional REPL FROM TO)" t)
 (register-definition-prefixes "disp-table" '("display-table-print-array"))
 
 
@@ -8540,7 +8507,6 @@ Valid keywords and arguments are:
              `nodigits' to suppress digits as prefix arguments.
 
 (fn BS &optional NAME M ARGS)")
-(make-obsolete 'easy-mmode-define-keymap 'define-keymap "29.1")
 (autoload 'easy-mmode-defmap "easy-mmode" "\
 Define a constant M whose value is the result of `easy-mmode-define-keymap'.
 The M, BS, and ARGS arguments are as per that function.  DOC is
@@ -8551,7 +8517,6 @@ This macro is deprecated; use `defvar-keymap' instead.
 (fn M BS DOC &rest ARGS)" nil t)
 (function-put 'easy-mmode-defmap 'doc-string-elt 3)
 (function-put 'easy-mmode-defmap 'lisp-indent-function 1)
-(make-obsolete 'easy-mmode-defmap 'defvar-keymap "29.1")
 (autoload 'easy-mmode-defsyntax "easy-mmode" "\
 Define variable ST as a syntax-table.
 CSS contains a list of syntax specifications of the form (CHAR . SYNTAX).
@@ -13075,16 +13040,11 @@ Turn on `find-function-mode', which see.")
 ;;; Generated autoloads from find-lisp.el
 
 (autoload 'find-lisp-find-dired "find-lisp" "\
-Find the files within DIR whose names match REGEXP.
-A Dired buffer with the results will be opened.
+Find files in DIR, matching REGEXP.
 
 (fn DIR REGEXP)" t)
 (autoload 'find-lisp-find-dired-subdirectories "find-lisp" "\
 Find all subdirectories of DIR.
-
-(fn DIR)" t)
-(autoload 'find-lisp-find-dired-subdirs-other-window "find-lisp" "\
-Same as `find-lisp-find-dired-subdirectories', but use another window.
 
 (fn DIR)" t)
 (autoload 'find-lisp-find-dired-filter "find-lisp" "\
@@ -17887,7 +17847,7 @@ used or not.  If non-nil, use `display-buffer' instead of
 `image-dired-previous-line-and-display' where we do not want the
 thumbnail buffer to be selected.
 
-(fn &optional ARG APPEND DO-NOT-POP)" '(nil dired-mode))
+(fn &optional ARG APPEND DO-NOT-POP)" t)
 (autoload 'image-dired-show-all-from-dir "image-dired" "\
 Make a thumbnail buffer for all images in DIR and display it.
 Any file matching `image-dired--file-name-regexp' is considered an
@@ -17900,13 +17860,13 @@ never ask for confirmation.
 
 (fn DIR)" t)
 (defalias 'image-dired 'image-dired-show-all-from-dir)
-(autoload 'image-dired-bookmark-jump "image-dired" "\
-Default bookmark handler for Image-Dired buffers.
+(autoload 'image-dired-tag-files "image-dired" "\
+Tag marked file(s) in Dired.  With prefix ARG, tag file at point.
 
-(fn BOOKMARK)")
-(define-obsolete-function-alias 'tumme #'image-dired "24.4")
-(define-obsolete-function-alias 'image-dired-setup-dired-keybindings #'image-dired-minor-mode "26.1")
-(register-definition-prefixes "image-dired" '("image-dired-"))
+(fn ARG)" t)
+(autoload 'image-dired-delete-tag "image-dired" "\
+Remove tag for selected file(s).
+With prefix argument ARG, remove tag from file at point.
 
 
 ;;; Generated autoloads from image/image-dired-dired.el
@@ -17973,6 +17933,7 @@ The viewer is specified by the value of `image-dired-external-viewer'." '(dired-
 (autoload 'image-dired-dired-display-image "image-dired-dired" "\
 Display current image file.
 See documentation for `image-dired-display-image' for more information.
+With prefix argument ARG, display image in its original size.
 
 (fn &optional _)" '(dired-mode))
 (set-advertised-calling-convention 'image-dired-dired-display-image 'nil '"29.1")
@@ -18010,13 +17971,14 @@ Add comment to current or marked files in Dired." '(dired-mode))
 (autoload 'image-dired-dired-edit-comment-and-tags "image-dired-tags" "\
 Edit comment and tags of current or marked image files.
 Edit comment and tags for all marked image files in an
-easy-to-use form." '(dired-mode))
-(register-definition-prefixes "image-dired-tags" '("image-dired-"))
+easy-to-use form." t)
+(autoload 'image-dired-bookmark-jump "image-dired" "\
+Default bookmark handler for Image-Dired buffers.
 
-
-;;; Generated autoloads from image/image-dired-util.el
-
-(register-definition-prefixes "image-dired-util" '("image-dired-"))
+(fn BOOKMARK)")
+(define-obsolete-function-alias 'tumme #'image-dired "24.4")
+(define-obsolete-function-alias 'image-dired-setup-dired-keybindings #'image-dired-minor-mode "26.1")
+(register-definition-prefixes "image-dired" '("image-dired-"))
 
 
 ;;; Generated autoloads from image-file.el
@@ -19553,7 +19515,7 @@ This option also treats some characters in the `mule-unicode-...'
 charsets if you don't have a Unicode font with which to display them.
 
 Setting this variable directly does not take effect;
-use either \\[customize] or the command `latin1-display'.")
+use either \\[customize] or the function `latin1-display'.")
 (custom-autoload 'latin1-display "latin1-disp" nil)
 (autoload 'latin1-display "latin1-disp" "\
 Set up Latin-1/ASCII display for the arguments character SETS.
@@ -19569,7 +19531,7 @@ This uses the transliterations of the Lynx browser.  The display isn't
 changed if the display can render Unicode characters.
 
 Setting this variable directly does not take effect;
-use either \\[customize] or the command `latin1-display-ucs-per-lynx'.")
+use either \\[customize] or the function `latin1-display'.")
 (custom-autoload 'latin1-display-ucs-per-lynx "latin1-disp" nil)
 (autoload 'latin1-display-ucs-per-lynx "latin1-disp" "\
 Set up Latin-1/ASCII display for Unicode characters.
@@ -26409,8 +26371,8 @@ Run an inferior Python process.
 Argument CMD defaults to `python-shell-calculate-command' return
 value.  When called interactively with `prefix-arg', it allows
 the user to edit such value and choose whether the interpreter
-should be DEDICATED to the current buffer or project.  When
-numeric prefix arg is other than 0 or 4 do not SHOW.
+should be DEDICATED for the current buffer.  When numeric prefix
+arg is other than 0 or 4 do not SHOW.
 
 For a given buffer and same values of DEDICATED, if a process is
 already running for it, it will do nothing.  This means that if
@@ -34498,14 +34460,14 @@ Fetch a GNU Info URL.
 
 
 (fn URL)")
-(define-obsolete-function-alias 'url-rlogin #'url-generic-emulator-loader "29.1")
+(defalias 'url-rlogin 'url-generic-emulator-loader)
 (defalias 'url-telnet 'url-generic-emulator-loader)
 (defalias 'url-tn3270 'url-generic-emulator-loader)
 (autoload 'url-data "url-misc" "\
 Fetch a data URL (RFC 2397).
 
 (fn URL)")
-(register-definition-prefixes "url-misc" '("url-"))
+(register-definition-prefixes "url-misc" '("url-do-terminal-emulator"))
 
 
 ;;; Generated autoloads from url/url-news.el
