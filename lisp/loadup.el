@@ -123,6 +123,20 @@
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
 (load "subr")
+
+;; Load-time macro-expansion can only take effect after setting
+;; load-source-file-function because of where it is called in lread.c.
+(load "emacs-lisp/macroexp")
+(if (compiled-function-p (symbol-function 'macroexpand-all))
+    nil
+  ;; Since loaddefs is not yet loaded, macroexp's uses of pcase will simply
+  ;; fail until pcase is explicitly loaded.  This also means that we have to
+  ;; disable eager macro-expansion while loading pcase.
+  (let ((macroexp--pending-eager-loads '(skip))) (load "emacs-lisp/pcase"))
+  ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
+  (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
+    (load "emacs-lisp/macroexp")))
+
 (load "keymap")
 
 
@@ -148,19 +162,6 @@ that the search has reached."
 (load "env")
 (load "format")
 (load "bindings")
-
-;; Load-time macro-expansion can only take effect after setting
-;; load-source-file-function because of where it is called in lread.c.
-(load "emacs-lisp/macroexp")
-(if (compiled-function-p (symbol-function 'macroexpand-all))
-    nil
-  ;; Since loaddefs is not yet loaded, macroexp's uses of pcase will simply
-  ;; fail until pcase is explicitly loaded.  This also means that we have to
-  ;; disable eager macro-expansion while loading pcase.
-  (let ((macroexp--pending-eager-loads '(skip))) (load "emacs-lisp/pcase"))
-  ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
-  (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
-    (load "emacs-lisp/macroexp")))
 
 (load "buffer-match")
 (load "window")  ; Needed here for `replace-buffer-in-windows'.
