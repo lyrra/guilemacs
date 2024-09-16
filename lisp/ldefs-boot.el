@@ -17867,6 +17867,7 @@ Tag marked file(s) in Dired.  With prefix ARG, tag file at point.
 (autoload 'image-dired-delete-tag "image-dired" "\
 Remove tag for selected file(s).
 With prefix argument ARG, remove tag from file at point.
+") ;; FIX: guilemacs, butched patch
 
 
 ;;; Generated autoloads from image/image-dired-dired.el
