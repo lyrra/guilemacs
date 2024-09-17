@@ -1094,6 +1094,7 @@ term.o: term.x
 terminal.o: terminal.x
 timefns.o: timefns.x
 textprop.o: textprop.x
+treesit.o: treesit.x
 undo.o: undo.x
 w16select.o: w16select.x
 w32console.o: w32console.x

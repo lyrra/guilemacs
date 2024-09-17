@@ -4314,6 +4314,7 @@ DEFUN ("treesit-available-p", Ftreesit_available_p,
 void
 syms_of_treesit (void)
 {
+#include "treesit.x"
 #if HAVE_TREE_SITTER
   DEFSYM (Qtreesit_parser_p, "treesit-parser-p");
   DEFSYM (Qtreesit_node_p, "treesit-node-p");
@@ -4508,64 +4509,7 @@ applies to LANGUAGE-A will be redirected to LANGUAGE-B instead.  */);
   staticpro (&Vtreesit_str_pred);
   Vtreesit_str_pred = build_pure_c_string ("pred");
 
-  defsubr (&Streesit_language_available_p);
-  defsubr (&Streesit_library_abi_version);
-  defsubr (&Streesit_language_abi_version);
-  defsubr (&Streesit_grammar_location);
-
-  defsubr (&Streesit_parser_p);
-  defsubr (&Streesit_node_p);
-  defsubr (&Streesit_compiled_query_p);
-  defsubr (&Streesit_query_p);
-  defsubr (&Streesit_query_language);
-
-  defsubr (&Streesit_node_parser);
-
-  defsubr (&Streesit_parser_create);
-  defsubr (&Streesit_parser_delete);
-  defsubr (&Streesit_parser_list);
-  defsubr (&Streesit_parser_buffer);
-  defsubr (&Streesit_parser_language);
-  defsubr (&Streesit_parser_tag);
-
-  defsubr (&Streesit_parser_root_node);
-  defsubr (&Streesit_parse_string);
-
-  defsubr (&Streesit_parser_set_included_ranges);
-  defsubr (&Streesit_parser_included_ranges);
-
-  defsubr (&Streesit_parser_notifiers);
-  defsubr (&Streesit_parser_add_notifier);
-  defsubr (&Streesit_parser_remove_notifier);
-
-  defsubr (&Streesit_node_type);
-  defsubr (&Streesit_node_start);
-  defsubr (&Streesit_node_end);
-  defsubr (&Streesit_node_string);
-  defsubr (&Streesit_node_parent);
-  defsubr (&Streesit_node_child);
-  defsubr (&Streesit_node_check);
-  defsubr (&Streesit_node_field_name_for_child);
-  defsubr (&Streesit_node_child_count);
-  defsubr (&Streesit_node_child_by_field_name);
-  defsubr (&Streesit_node_next_sibling);
-  defsubr (&Streesit_node_prev_sibling);
-  defsubr (&Streesit_node_first_child_for_pos);
-  defsubr (&Streesit_node_descendant_for_range);
-  defsubr (&Streesit_node_eq);
-
-  defsubr (&Streesit_pattern_expand);
-  defsubr (&Streesit_query_expand);
-  defsubr (&Streesit_query_compile);
-  defsubr (&Streesit_query_capture);
-
-  defsubr (&Streesit_search_subtree);
-  defsubr (&Streesit_search_forward);
-  defsubr (&Streesit_induce_sparse_tree);
-  defsubr (&Streesit_node_match_p);
-  defsubr (&Streesit_subtree_stat);
 #endif /* HAVE_TREE_SITTER */
-  defsubr (&Streesit_available_p);
 #ifdef WINDOWSNT
   DEFSYM (Qtree_sitter__library_abi, "tree-sitter--library-abi");
   Fset (Qtree_sitter__library_abi,
