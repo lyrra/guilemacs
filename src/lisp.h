@@ -1936,8 +1936,6 @@ CHAR_TABLE_SET (Lisp_Object ct, int idx, Lisp_Object val)
     char_table_set (ct, idx, val);
 }
 
-#include "comp.h"
-
 /* Return whether a value might be a valid docstring.
    Used to distinguish the presence of non-docstring in the docstring slot,
    as in the case of OClosures.  */

@@ -156,7 +156,6 @@ extern char etext;
 #include "epaths.h"
 
 /* Include these only because of INLINE.  */
-#include "comp.h"
 #include "thread.h"
 
 Lisp_Object symbol_module;
