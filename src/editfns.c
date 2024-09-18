@@ -4780,6 +4780,7 @@ syms_of_editfns (void)
   DEFSYM (Qpropertize, "propertize");
 
   staticpro (&labeled_restrictions);
+  labeled_restrictions = Qnil; // nil_is_zero is false for guilemacs
 
   DEFVAR_LISP ("inhibit-field-text-motion", Vinhibit_field_text_motion,
 	       doc: /* Non-nil means text motion commands don't notice fields.  */);
