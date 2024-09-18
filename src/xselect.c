@@ -3479,34 +3479,3 @@ syms_of_xselect_for_pdumper (void)
   prop_location_identifier = 0;
   property_change_reply = Fcons (Qnil, Qnil);
 }
-
-void
-mark_xselect (void)
-{
-  struct transfer *next;
-  struct x_selection_request *frame;
-  struct selection_data *cs;
-
-  /* Mark all the strings being used as selection data.  A string that
-     is still reachable is always reachable via either the selection
-     request stack or the list of outstanding transfers.  */
-
-  next = outstanding_transfers.next;
-
-  if (!next)
-    /* syms_of_xselect has not yet been called.  */
-    return;
-
-  while (next != &outstanding_transfers)
-    {
-      mark_object (next->data.string);
-      next = next->next;
-    }
-
-  frame = selection_request_stack;
-  for (; frame; frame = frame->last)
-    {
-      for (cs = frame->converted_selections; cs; cs = cs->next)
-	mark_object (cs->string);
-    }
-}
