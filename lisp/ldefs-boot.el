@@ -1029,8 +1029,7 @@ Like (documentation-property SYMBOL PROPERTY RAW) but handle errors.
 (autoload 'apropos "apropos" "\
 Show all meaningful Lisp symbols whose names match PATTERN.
 Symbols are shown if they are defined as functions, variables, or
-faces, or if they have nonempty property lists, or if they are
-known keywords.
+faces, or if they have nonempty property lists.
 
 PATTERN can be a word, a list of words (separated by spaces),
 or a regexp (using some regexp special characters).  If it is a word,
@@ -2398,7 +2397,7 @@ This is used by the `browse-url-at-point', `browse-url-at-mouse', and
 Also see `browse-url-secondary-browser-function' and
 `browse-url-handlers'.")
 (custom-autoload 'browse-url-browser-function "browse-url" t)
-(defvar browse-url-default-handlers '(("\\`mailto:" . browse-url--mailto) ("\\`man:" . browse-url--man) ("\\`irc6?s?://" . browse-url--irc) (browse-url--non-html-file-url-p . browse-url-emacs)) "\
+(defvar browse-url-default-handlers '(("\\`mailto:" . browse-url--mailto) ("\\`man:" . browse-url--man) (browse-url--non-html-file-url-p . browse-url-emacs)) "\
 Like `browse-url-handlers' but populated by Emacs and packages.
 
 Emacs and external packages capable of browsing certain URLs
@@ -2648,11 +2647,6 @@ When called non-interactively, optional second argument NEW-WINDOW is
 used instead of `browse-url-new-window-flag'.
 
 (fn URL &optional NEW-BUFFER)" t)
-(autoload 'browse-url-irc "browse-url" "\
-Call `url-irc' directly after parsing URL.
-This function is a fit for options like `gnus-button-alist'.
-
-(fn URL &rest _)")
 (autoload 'browse-url-mail "browse-url" "\
 Open a new mail message buffer within Emacs for the RFC 2368 URL.
 Default to using the mailto: URL around or before point as the
@@ -5895,30 +5889,6 @@ Major mode for editing C# code.
 
 ;;; Generated autoloads from textmodes/css-mode.el
 
-(autoload 'css-ts-mode "css-mode" "\
-Major mode to edit Cascading Style Sheets (CSS).
-\\<css-ts-mode-map>
-
-This mode provides syntax highlighting, indentation, completion,
-and documentation lookup for CSS, based on the tree-sitter
-library.
-
-Use `\\[completion-at-point]' to complete CSS properties,
-property values, pseudo-elements, pseudo-classes, at-rules,
-bang-rules, and HTML tags, classes and IDs.  Completion
-candidates for HTML class names and IDs are found by looking
-through open HTML mode buffers.
-
-Use `\\[info-lookup-symbol]' to look up documentation of CSS
-properties, at-rules, pseudo-classes, and pseudo-elements on the
-Mozilla Developer Network (MDN).
-
-Use `\\[fill-paragraph]' to reformat CSS declaration blocks.  It
-can also be used to fill comments.
-
-\\{css-mode-map}
-
-(fn)" t)
 (autoload 'css-mode "css-mode" "\
 Major mode to edit Cascading Style Sheets (CSS).
 \\<css-mode-map>
@@ -10599,14 +10569,11 @@ parameters, like ID.
 
 (fn &key SERVER PORT NICK USER PASSWORD FULL-NAME CLIENT-CERTIFICATE ID)" '((let ((erc-default-port erc-default-port-tls) (erc--display-context `((erc-interactive-display . erc-tls) ,@erc--display-context))) (erc-select-read-args))))
 (autoload 'erc-handle-irc-url "erc" "\
-Use ERC to IRC on HOST:PORT in CHANNEL.
+Use ERC to IRC on HOST:PORT in CHANNEL as USER with PASSWORD.
 If ERC is already connected to HOST:PORT, simply /join CHANNEL.
-Otherwise, connect to HOST:PORT as NICK and /join CHANNEL.
+Otherwise, connect to HOST:PORT as USER and /join CHANNEL.
 
-Beginning with ERC 5.5, new connections require human intervention.
-Customize `erc-url-connect-function' to override this.
-
-(fn HOST PORT CHANNEL NICK PASSWORD &optional SCHEME)")
+(fn HOST PORT CHANNEL USER PASSWORD)")
 (register-definition-prefixes "erc" '("erc-"))
 
 
@@ -10755,11 +10722,6 @@ server name and search for a match in `erc-networks-alist'.")
 (register-definition-prefixes "erc-ring" '("erc-"))
 
 
-;;; Generated autoloads from erc/erc-sasl.el
-
-(register-definition-prefixes "erc-sasl" '("erc-sasl-"))
-
-
 ;;; Generated autoloads from erc/erc-services.el
 
 (register-definition-prefixes "erc-services" '("erc-"))
@@ -10827,7 +10789,7 @@ is run.  If a macro (possibly with side effects) is to be tested,
 it has to be wrapped in `(eval (quote ...))'.
 
 If NAME is already defined as a test and Emacs is running
-in batch mode, an error is signaled.
+in batch mode, an error is signalled.
 
 (fn NAME () [DOCSTRING] [:expected-result RESULT-TYPE] [:tags \\='(TAG...)] BODY...)" nil 'macro)
 (autoload 'ert-run-tests-batch "ert" "\
@@ -11348,8 +11310,6 @@ disabled.
 (autoload 'ethio-sera-to-fidel-buffer "ethio-util" "\
 Convert the current buffer from SERA to FIDEL.
 
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
 The variable `ethio-primary-language' specifies the primary
 language and `ethio-secondary-language' specifies the secondary.
 
@@ -11367,8 +11327,6 @@ See also the descriptions of the variables
 (autoload 'ethio-sera-to-fidel-region "ethio-util" "\
 Convert the characters in region from SERA to FIDEL.
 
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
 The variable `ethio-primary-language' specifies the primary
 language and `ethio-secondary-language' specifies the secondary.
 
@@ -11384,17 +11342,13 @@ See also the descriptions of the variables
 
 (fn BEGIN END &optional SECONDARY FORCE)" t)
 (autoload 'ethio-sera-to-fidel-marker "ethio-util" "\
-Convert regions surrounded by \"<sera>\" and \"</sera>\" from SERA to FIDEL.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
+Convert the regions surrounded by \"<sera>\" and \"</sera>\" from SERA to FIDEL.
 Assume that each region begins with `ethio-primary-language'.
 The markers \"<sera>\" and \"</sera>\" themselves are not deleted.
 
 (fn &optional FORCE)" t)
 (autoload 'ethio-fidel-to-sera-buffer "ethio-util" "\
-Convert all the FIDEL characters in the current buffer to the SERA format.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
+Replace all the FIDEL characters in the current buffer to the SERA format.
 The variable `ethio-primary-language' specifies the primary
 language and `ethio-secondary-language' specifies the secondary.
 
@@ -11411,10 +11365,8 @@ See also the descriptions of the variables
 
 (fn &optional SECONDARY FORCE)" t)
 (autoload 'ethio-fidel-to-sera-region "ethio-util" "\
-Convert all the FIDEL characters in the region to the SERA format.
+Replace all the FIDEL characters in the region to the SERA format.
 
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
 The variable `ethio-primary-language' specifies the primary
 language and `ethio-secondary-language' specifies the secondary.
 
@@ -11432,14 +11384,11 @@ See also the descriptions of the variables
 (fn BEGIN END &optional SECONDARY FORCE)" t)
 (autoload 'ethio-fidel-to-sera-marker "ethio-util" "\
 Convert the regions surrounded by \"<sera>\" and \"</sera>\" from FIDEL to SERA.
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.
 The markers \"<sera>\" and \"</sera>\" themselves are not deleted.
 
 (fn &optional FORCE)" t)
 (autoload 'ethio-modify-vowel "ethio-util" "\
-Modify the vowel of the FIDEL that is under the cursor.
-FIDEL is the Amharic/Ethiopic alphabet." t)
+Modify the vowel of the FIDEL that is under the cursor." t)
 (autoload 'ethio-replace-space "ethio-util" "\
 Replace ASCII spaces with Ethiopic word separators in the region.
 
@@ -11459,13 +11408,11 @@ This function is deprecated.
 
 (fn ARG)" t)
 (autoload 'ethio-fidel-to-tex-buffer "ethio-util" "\
-Convert each FIDEL characters in the current buffer into a fidel-tex command.
-FIDEL is the Amharic/Ethiopic alphabet." t)
+Convert each fidel characters in the current buffer into a fidel-tex command." t)
 (autoload 'ethio-tex-to-fidel-buffer "ethio-util" "\
-Convert fidel-tex commands in the current buffer into FIDEL chars.
-FIDEL is the Amharic/Ethiopic alphabet." t)
+Convert fidel-tex commands in the current buffer into fidel chars." t)
 (autoload 'ethio-fidel-to-java-buffer "ethio-util" "\
-Convert Ethiopic characters in the buffer into the Java escape sequences.
+Convert Ethiopic characters into the Java escape sequences.
 
 Each escape sequence is of the form \\uXXXX, where XXXX is the
 character's codepoint (in hex) in Unicode.
@@ -11473,31 +11420,11 @@ character's codepoint (in hex) in Unicode.
 If `ethio-java-save-lowercase' is non-nil, use [0-9a-f].
 Otherwise, [0-9A-F].")
 (autoload 'ethio-java-to-fidel-buffer "ethio-util" "\
-Convert the Java escape sequences in the buffer into Ethiopic characters.")
+Convert the Java escape sequences into corresponding Ethiopic characters.")
 (autoload 'ethio-find-file "ethio-util" "\
-Transliterate file content into Ethiopic depending on filename suffix.
-If the file-name extension is \".sera\", convert from SERA to FIDEL.
-If the file-name extension is \".html\", convert regions enclosed
-by \"<sera>..</sera>\" from SERA to FIDEL.
-If the file-name extension is \".tex\", convert fidel-tex commands
-to FIDEL characters.
-If the file-name extension is \".java\", convert Java escape sequences
-to FIDEL characters.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.")
+Transliterate file content into Ethiopic depending on filename suffix.")
 (autoload 'ethio-write-file "ethio-util" "\
-Transliterate Ethiopic characters to ASCII depending on the file extension.
-If the file-name extension is \".sera\", convert from FIDEL to SERA.
-If the file-name extension is \".html\", convert FIDEL characters to
-SERA regions enclosed by \"<sera>..</sera>\".
-If the file-name extension is \".tex\", convert FIDEL characters
-to fidel-tex commands.
-If the file-name extension is \".java\", convert FIDEL characters to
-Java escape sequences.
-
-FIDEL is the Amharic alphabet; SERA (System for Ethiopic Representation
-in ASCII) is the Latin representation of Ethiopic script.")
+Transliterate Ethiopic characters in ASCII depending on the file extension.")
 (autoload 'ethio-insert-ethio-space "ethio-util" "\
 Insert the Ethiopic word delimiter (the colon-like character).
 With ARG, insert that many delimiters.
@@ -12136,10 +12063,7 @@ The variable `global-text-scale-adjust-resizes-frames' controls
 whether the frames are resized to keep the same number of lines
 and characters per line when the font size is adjusted.
 
-See also the related command `text-scale-adjust'.  Unlike that
-command, which scales the font size with a factor,
-`global-text-scale-adjust' scales the font size with an
-increment.
+See also the related command `text-scale-adjust'.
 
 (fn INCREMENT)" t)
 (autoload 'buffer-face-mode "face-remap" "\
@@ -14983,14 +14907,10 @@ Use \\[describe-mode] for more info.
 ;;; Generated autoloads from net/goto-addr.el
 
 (autoload 'goto-address-at-point "goto-addr" "\
-Compose a new message to the e-mail address or open URL at point.
-
-Compose message to address at point.  See documentation for
-`goto-address-find-address-at-point'.
-
-If no e-mail address is found at point, open the URL at or before
-point using `browse-url'.  With a prefix argument, open the URL
-using `browse-url-secondary-browser-function' instead.
+Send to the e-mail address or load the URL at point.
+Send mail to address at point.  See documentation for
+`goto-address-find-address-at-point'.  If no address is found
+there, then load the URL at or before point.
 
 (fn &optional EVENT)" t)
 (autoload 'goto-address "goto-addr" "\
@@ -16424,7 +16344,7 @@ START, END and COMMENT-START are regular expressions.  A block is
 defined as text surrounded by START and END.
 
 As a special case, START may be a list of the form (COMPLEX-START
-MDATA-SELECTOR), where COMPLEX-START is a regexp with multiple parts and
+MDATA-SELECTOR), where COMPLEX-START is a regexp w/ multiple parts and
 MDATA-SELECTOR an integer that specifies which sub-match is the proper
 place to adjust point, before calling `hs-forward-sexp-func'.  Point
 is adjusted to the beginning of the specified match.  For example,
@@ -19117,15 +19037,6 @@ If non-nil, second arg INITIAL-INPUT is a string to insert before reading.
 (register-definition-prefixes "semantic/wisent/java-tags" '("semantic-" "wisent-java-parse-error"))
 
 
-;;; Generated autoloads from progmodes/java-ts-mode.el
-
-(autoload 'java-ts-mode "java-ts-mode" "\
-Major mode for editing Java, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "java-ts-mode" '("java-ts-mode-"))
-
-
 ;;; Generated autoloads from cedet/semantic/wisent/javascript.el
 
 (register-definition-prefixes "semantic/wisent/javascript" '("semantic-" "wisent-javascript-jv-expand-tag"))
@@ -19152,21 +19063,8 @@ by `jka-compr-install'.")
 ;;; Generated autoloads from progmodes/js.el
 
 (push (purecopy '(js 9)) package--builtin-versions)
-(autoload 'js-base-mode "js" "\
-Generic major mode for editing JavaScript.
-
-This mode is intended to be inherited by concrete major modes.
-Currently there are `js-mode' and `js-ts-mode'.
-
-(fn)" t)
 (autoload 'js-mode "js" "\
 Major mode for editing JavaScript.
-
-(fn)" t)
-(autoload 'js-ts-mode "js" "\
-Major mode for editing JavaScript.
-
-\\<js-ts-mode-map>
 
 (fn)" t)
 (autoload 'js-json-mode "js" "\
@@ -19196,15 +19094,6 @@ one of the aforementioned options instead of using this mode.
 
 (push (purecopy '(json 1 5)) package--builtin-versions)
 (register-definition-prefixes "json" '("json-"))
-
-
-;;; Generated autoloads from progmodes/json-ts-mode.el
-
-(autoload 'json-ts-mode "json-ts-mode" "\
-Major mode for editing JSON, powered by tree-sitter.
-
-(fn)" t)
-(register-definition-prefixes "json-ts-mode" '("json-ts-"))
 
 
 ;;; Generated autoloads from jsonrpc.el
@@ -22788,11 +22677,6 @@ ARG is the prefix argument received when calling interactively the function.
 (register-definition-prefixes "oc-biblatex" '("org-cite-biblatex-"))
 
 
-;;; Generated autoloads from org/oc-bibtex.el
-
-(register-definition-prefixes "oc-bibtex" '("org-cite-bibtex-export-"))
-
-
 ;;; Generated autoloads from org/oc-csl.el
 
 (register-definition-prefixes "oc-csl" '("org-cite-csl-"))
@@ -22998,6 +22882,63 @@ The following commands are available:
 \\{org-mode-map}
 
 (fn)" t)
+(autoload 'org-cycle "org" "\
+TAB-action and visibility cycling for Org mode.
+
+This is the command invoked in Org mode by the `TAB' key.  Its main
+purpose is outline visibility cycling, but it also invokes other actions
+in special contexts.
+
+When this function is called with a `\\[universal-argument]' prefix, rotate the entire
+buffer through 3 states (global cycling)
+  1. OVERVIEW: Show only top-level headlines.
+  2. CONTENTS: Show all headlines of all levels, but no body text.
+  3. SHOW ALL: Show everything.
+
+With a `\\[universal-argument] \\[universal-argument]' prefix argument, switch to the startup visibility,
+determined by the variable `org-startup-folded', and by any VISIBILITY
+properties in the buffer.
+
+With a `\\[universal-argument] \\[universal-argument] \\[universal-argument]' prefix argument, show the entire buffer, including
+any drawers.
+
+When inside a table, re-align the table and move to the next field.
+
+When point is at the beginning of a headline, rotate the subtree started
+by this line through 3 different states (local cycling)
+  1. FOLDED:   Only the main headline is shown.
+  2. CHILDREN: The main headline and the direct children are shown.
+               From this state, you can move to one of the children
+               and zoom in further.
+  3. SUBTREE:  Show the entire subtree, including body text.
+If there is no subtree, switch directly from CHILDREN to FOLDED.
+
+When point is at the beginning of an empty headline and the variable
+`org-cycle-level-after-item/entry-creation' is set, cycle the level
+of the headline by demoting and promoting it to likely levels.  This
+speeds up creation document structure by pressing `TAB' once or several
+times right after creating a new headline.
+
+When there is a numeric prefix, go up to a heading with level ARG, do
+a `show-subtree' and return to the previous cursor position.  If ARG
+is negative, go up that many levels.
+
+When point is not at the beginning of a headline, execute the global
+binding for `TAB', which is re-indenting the line.  See the option
+`org-cycle-emulate-tab' for details.
+
+As a special case, if point is at the very beginning of the buffer, if
+there is no headline there, and if the variable `org-cycle-global-at-bob'
+is non-nil, this function acts as if called with prefix argument (`\\[universal-argument] TAB',
+same as `S-TAB') also when called without prefix argument.
+
+(fn &optional ARG)" t)
+(autoload 'org-global-cycle "org" "\
+Cycle the global visibility.  For details see `org-cycle'.
+With `\\[universal-argument]' prefix ARG, switch to startup visibility.
+With a numeric prefix, show all headlines up to that level.
+
+(fn &optional ARG)" t)
 (autoload 'org-run-like-in-org-mode "org" "\
 Run a command, pretending that the current buffer is in Org mode.
 This will temporarily bind local variables that are typically bound in
@@ -23286,7 +23227,7 @@ Set restriction lock for agenda to current subtree or file.
 When in a restricted subtree, remove it.
 
 The restriction will span over the entire file if TYPE is `file',
-or if TYPE is (4), or if the cursor is before the first headline
+or if type is \\='(4), or if the cursor is before the first headline
 in the file.  Otherwise, only apply the restriction to the current
 subtree.
 
@@ -23312,7 +23253,7 @@ argument: an entry from `org-agenda-get-day-entries'.
 FILTER can also be an alist with the car of each cell being
 either `headline' or `category'.  For example:
 
-   ((headline \"IMPORTANT\")
+  \\='((headline \"IMPORTANT\")
     (category \"Work\"))
 
 will only add headlines containing IMPORTANT or headlines
@@ -23399,7 +23340,7 @@ Set `org-capture-templates' to be similar to `org-remember-templates'." t)
 
 ;;; Generated autoloads from org/org-compat.el
 
-(register-definition-prefixes "org-compat" '("org-" "outline-"))
+(register-definition-prefixes "org-compat" '("org-"))
 
 
 ;;; Generated autoloads from org/org-crypt.el
@@ -23519,16 +23460,6 @@ With a numeric prefix, show all headlines up to that level.
 (register-definition-prefixes "org-feed" '("org-feed-"))
 
 
-;;; Generated autoloads from org/org-fold.el
-
-(register-definition-prefixes "org-fold" '("org-fold-"))
-
-
-;;; Generated autoloads from org/org-fold-core.el
-
-(register-definition-prefixes "org-fold-core" '("org-fold-core-"))
-
-
 ;;; Generated autoloads from org/org-footnote.el
 
 (register-definition-prefixes "org-footnote" '("org-footnote-"))
@@ -23591,7 +23522,7 @@ With a numeric prefix, show all headlines up to that level.
 
 ;;; Generated autoloads from org/org-mouse.el
 
-(register-definition-prefixes "org-mouse" '("org-"))
+(register-definition-prefixes "org-mouse" '("org-mouse-"))
 
 
 ;;; Generated autoloads from org/org-num.el
@@ -23604,11 +23535,6 @@ With a numeric prefix, show all headlines up to that level.
 (register-definition-prefixes "org-pcomplete" '("org-" "pcomplete/org-mode/"))
 
 
-;;; Generated autoloads from org/org-persist.el
-
-(register-definition-prefixes "org-persist" '("org-persist-"))
-
-
 ;;; Generated autoloads from org/org-plot.el
 
 (register-definition-prefixes "org-plot" '("org-"))
@@ -23616,7 +23542,7 @@ With a numeric prefix, show all headlines up to that level.
 
 ;;; Generated autoloads from org/org-protocol.el
 
-(register-definition-prefixes "org-protocol" '("org-"))
+(register-definition-prefixes "org-protocol" '("org-protocol-"))
 
 
 ;;; Generated autoloads from org/org-refile.el
@@ -23703,19 +23629,12 @@ The mode's hook is called both when the mode is enabled and when it is
 disabled.
 
 (fn &optional ARG)" t)
-(autoload 'outline-search-level "outline" "\
-Search for the next text property `outline-level'.
-The arguments are the same as in `outline-search-text-property',
-except the hard-coded property name `outline-level'.
-This function is intended to be used in `outline-search-function'.
-
-(fn &optional BOUND MOVE BACKWARD LOOKING-AT)")
 (register-definition-prefixes "outline" '("outline-"))
 
 
 ;;; Generated autoloads from org/ox.el
 
-(register-definition-prefixes "ox" '("org-"))
+(register-definition-prefixes "ox" '("org-export-"))
 
 
 ;;; Generated autoloads from org/ox-ascii.el
@@ -23837,7 +23756,7 @@ Return PDF file's name.
 
 ;;; Generated autoloads from org/ox-latex.el
 
-(register-definition-prefixes "ox-latex" '("org-"))
+(register-definition-prefixes "ox-latex" '("org-latex-"))
 
 
 ;;; Generated autoloads from org/ox-man.el
@@ -26366,7 +26285,7 @@ Optional argument FACE specifies the face to do the highlighting.
 (defconst python--auto-mode-alist-regexp "\\(?:\\.\\(?:p\\(?:th\\|y[iw]?\\)\\)\\|/\\(?:SCons\\(?:\\(?:crip\\|truc\\)t\\)\\)\\)\\'")
 (add-to-list 'auto-mode-alist (cons python--auto-mode-alist-regexp 'python-mode))
 (add-to-list 'interpreter-mode-alist (cons (purecopy "python[0-9.]*") 'python-mode))
-(autoload 'run-python "python" "\
+'(autoload 'run-python "python" "\
 Run an inferior Python process.
 
 Argument CMD defaults to `python-shell-calculate-command' return
@@ -26385,7 +26304,7 @@ Runs the hook `inferior-python-mode-hook' after
 process buffer for a list of commands.)
 
 (fn &optional CMD DEDICATED SHOW)" t)
-(autoload 'python-add-import "python" "\
+'(autoload 'python-add-import "python" "\
 Add an import statement to the current buffer.
 
 Interactively, ask for an import statement using all imports
@@ -26398,7 +26317,7 @@ When calling from Lisp, use a non-nil NAME to restrict the
 suggestions to imports defining NAME.
 
 (fn NAME)" t)
-(autoload 'python-import-symbol-at-point "python" "\
+'(autoload 'python-import-symbol-at-point "python" "\
 Add an import statement for the symbol at point to the current buffer.
 This works like `python-add-import', but with the opposite
 behavior regarding the prefix argument." t)
@@ -26416,14 +26335,6 @@ asking.
 Sort Python imports in the current buffer." t)
 (autoload 'python-fix-imports "python" "\
 Add missing imports and remove unused ones from the current buffer." t)
-(autoload 'python-base-mode "python" "\
-Generic major mode for editing Python files.
-
-This is a generic major mode intended to be inherited by
-concrete implementations.  Currently there are two concrete
-implementations: `python-mode' and `python-ts-mode'.
-
-(fn)" t)
 (autoload 'python-mode "python" "\
 Major mode for editing Python files.
 
@@ -27816,13 +27727,6 @@ If prefix argument REVERSE is non-nil, sorts in reverse order.
 
 (autoload 'rmail-summary "rmailsum" "\
 Display a summary of all messages, one line per message." t)
-(autoload 'rmail-summary-by-thread "rmailsum" "\
-Display a summary of messages in the same discussion thread as MSGNUM.
-Interactively, prompt for MSGNUM, defaulting to the current message.
-Threads are based on the \"Subject\", \"References\" and \"In-reply-to\"
-headers of the messages.
-
-(fn &optional MSGNUM)" t)
 (autoload 'rmail-summary-by-labels "rmailsum" "\
 Display a summary of all messages with one or more LABELS.
 LABELS should be a string containing the desired labels, separated by commas.
@@ -29169,14 +29073,6 @@ To work around that, do:
 ;;; Generated autoloads from progmodes/sh-script.el
 
 (put 'sh-shell 'safe-local-variable 'symbolp)
-(autoload 'sh-base-mode "sh-script" "\
-Generic major mode for editing shell scripts.
-
-This is a generic major mode intended to be inherited by concrete
-implementations.  Currently there are two: `sh-mode' and
-`bash-ts-mode'.
-
-(fn)" t)
 (autoload 'sh-mode "sh-script" "\
 Major mode for editing shell scripts.
 This mode works for many shells, since they all have roughly the same syntax,
@@ -29231,12 +29127,6 @@ with your script for an edit-interpret-debug cycle.
 
 (fn)" t)
 (defalias 'shell-script-mode 'sh-mode)
-(autoload 'bash-ts-mode "sh-script" "\
-Major mode for editing Bash shell scripts.
-This mode automatically falls back to `sh-mode' if the buffer is
-not written in Bash or sh.
-
-(fn)" t)
 (register-definition-prefixes "sh-script" '("sh-"))
 
 
@@ -33596,13 +33486,13 @@ It must be supported by libarchive(3).")
 List of suffixes which indicate a compressed file.
 It must be supported by libarchive(3).")
 (defmacro tramp-archive-autoload-file-name-regexp nil "\
-Regular expression matching archive file names." `(rx bos (group (+ nonl) "." (| ,@tramp-archive-suffixes) (32 "." (| ,@tramp-archive-compression-suffixes))) (group "/" (* nonl)) eos))
+Regular expression matching archive file names." '(rx bos (group (+ nonl) "." (| ,@tramp-archive-suffixes) (32 "." (| ,@tramp-archive-compression-suffixes))) (group "/" (* nonl)) eos))
 (defun tramp-archive-autoload-file-name-handler (operation &rest args) "\
 Load Tramp archive file name handler, and perform OPERATION." (defvar tramp-archive-autoload) (let ((default-directory temporary-file-directory) (tramp-archive-autoload tramp-archive-enabled)) (apply #'tramp-autoload-file-name-handler operation args)))
-(defun tramp-register-archive-autoload-file-name-handler nil "\
-Add archive file name handler to `file-name-handler-alist'." (when (and tramp-archive-enabled (not (rassq 'tramp-archive-file-name-handler file-name-handler-alist))) (add-to-list 'file-name-handler-alist (cons (tramp-archive-autoload-file-name-regexp) #'tramp-archive-autoload-file-name-handler)) (put #'tramp-archive-autoload-file-name-handler 'safe-magic t)))
-(add-hook 'after-init-hook #'tramp-register-archive-autoload-file-name-handler)
-(add-hook 'tramp-archive-unload-hook (lambda nil (remove-hook 'after-init-hook #'tramp-register-archive-autoload-file-name-handler)))
+(defun tramp-register-archive-file-name-handler nil "\
+Add archive file name handler to `file-name-handler-alist'." (when (and tramp-archive-enabled (not (rassq #'tramp-archive-file-name-handler file-name-handler-alist))) (add-to-list 'file-name-handler-alist (cons (tramp-archive-autoload-file-name-regexp) #'tramp-archive-autoload-file-name-handler)) (put #'tramp-archive-autoload-file-name-handler 'safe-magic t)))
+(add-hook 'after-init-hook #'tramp-register-archive-file-name-handler)
+(add-hook 'tramp-archive-unload-hook (lambda nil (remove-hook 'after-init-hook #'tramp-register-archive-file-name-handler)))
 (register-definition-prefixes "tramp-archive" '("tramp-" "with-parsed-tramp-archive-file-name"))
 
 
@@ -34414,9 +34304,6 @@ Insert the data retrieved from URL literally in the current buffer.
 
 
 (fn URL)")
-(defconst url-ircs-default-port 6697 "\
-Default port for IRCS connections.")
-(defalias 'url-ircs 'url-irc)
 (register-definition-prefixes "url-irc" '("url-irc-"))
 
 
