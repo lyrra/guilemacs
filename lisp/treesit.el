@@ -999,7 +999,7 @@ fontification is enabled."
           (treesit-font-lock-fontify-region
            (point-min) (point-max)))))))
 
-(defcustom treesit-font-lock-level 3
+'(defcustom treesit-font-lock-level 3
   "Decoration level to be used by tree-sitter fontifications.
 
 Major modes categorize their fontification features into levels,
