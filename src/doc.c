@@ -405,8 +405,7 @@ DEFUN ("internal-subr-documentation", Fsubr_documentation, Ssubr_documentation, 
   else if (MODULE_FUNCTIONP (function))
     return module_function_documentation (XMODULE_FUNCTION (function));
 #endif
-  else
-    return Qt;
+  return Qt;
 }
 
 DEFUN ("documentation-property", Fdocumentation_property,
