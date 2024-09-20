@@ -33486,7 +33486,7 @@ It must be supported by libarchive(3).")
 List of suffixes which indicate a compressed file.
 It must be supported by libarchive(3).")
 (defmacro tramp-archive-autoload-file-name-regexp nil "\
-Regular expression matching archive file names." '(rx bos (group (+ nonl) "." (| ,@tramp-archive-suffixes) (32 "." (| ,@tramp-archive-compression-suffixes))) (group "/" (* nonl)) eos))
+Regular expression matching archive file names." '())
 (defun tramp-archive-autoload-file-name-handler (operation &rest args) "\
 Load Tramp archive file name handler, and perform OPERATION." (defvar tramp-archive-autoload) (let ((default-directory temporary-file-directory) (tramp-archive-autoload tramp-archive-enabled)) (apply #'tramp-autoload-file-name-handler operation args)))
 (defun tramp-register-archive-file-name-handler nil "\
