@@ -453,23 +453,11 @@ and `kmacro-counter-format'.")
 (defvar kmacro-view-last-item nil)
 (defvar kmacro-view-item-no 0)
 
-(defun kmacro--to-vector (object)
-  "Normalize an old-style key sequence to the vector form."
-  (if (not (stringp object))
-      object
-    (let ((vec (string-to-vector object)))
-      (unless (multibyte-string-p object)
-	(dotimes (i (length vec))
-	  (let ((k (aref vec i)))
-	    (when (> k 127)
-	      (setf (aref vec i) (+ k ?\M-\C-@ -128))))))
-      vec)))
 
 (defun kmacro-ring-head ()
   "Return pseudo head element in macro ring."
   (and last-kbd-macro
-       (list   (kmacro--to-vector last-kbd-macro)
-               kmacro-counter kmacro-counter-format-start)))
+       (list last-kbd-macro kmacro-counter kmacro-counter-format-start)))
 
 
 (defun kmacro-push-ring (&optional elt)
@@ -934,7 +922,7 @@ KEYS should be a vector or a string that obeys `key-valid-p'."
       (setq counter (nth 1 mac))
       (setq mac     (nth 0 mac)))
     ;; `kmacro' interprets a string according to `key-parse'.
-    (kmacro (kmacro--to-vector mac) counter format)))
+    '(kmacro (kmacro--to-vector mac) counter format)))
 
 (defun kmacro-extract-lambda (mac)
   "Extract kmacro from a kmacro lambda form."
@@ -951,22 +939,8 @@ KEYS should be a vector or a string that obeys `key-valid-p'."
          (arrayp (car mac))
          mac)))
 
-(defun kmacro-p (x)
-  "Return non-nil if MAC is a kmacro keyboard macro."
-  (cl-typep x 'kmacro))
-
-(cl-defmethod cl-print-object ((object kmacro) stream)
-  (princ "#f(kmacro " stream)
-  (let ((vecdef  (kmacro--keys     object))
-        (counter (kmacro--counter object))
-        (format  (kmacro--format  object)))
-    (prin1 (key-description vecdef) stream)
-    (unless (and (equal counter 0) (equal format "%d"))
-      (princ " " stream)
-      (prin1 counter stream)
-      (princ " " stream)
-      (prin1 format stream))
-    (princ ")" stream)))
+(defalias 'kmacro-p #'kmacro-extract-lambda
+  "Return non-nil if MAC is a kmacro keyboard macro.")
 
 (defun kmacro-bind-to-key (_arg)
   "When not defining or executing a macro, offer to bind last macro to a key.
@@ -1041,15 +1015,20 @@ Such a \"function\" cannot be called from Lisp, but it is a valid editor command
   (put symbol 'kmacro t))
 
 
-(cl-defmethod register-val-jump-to ((km kmacro) arg)
-  (funcall km arg))                     ;FIXME: η-reduce?
+(cl-defstruct (kmacro-register
+               (:constructor nil)
+               (:constructor kmacro-make-register (macro)))
+  macro)
 
-(cl-defmethod register-val-describe ((km kmacro) _verbose)
-  (princ (format "a keyboard macro:\n    %s"
-                 (key-description (kmacro--keys km)))))
+(cl-defmethod register-val-jump-to ((data kmacro-register) _arg)
+  (kmacro-call-macro current-prefix-arg nil nil (kmacro-register-macro data)))
 
-(cl-defmethod register-val-insert ((km kmacro))
-  (insert (key-description (kmacro--keys km))))
+(cl-defmethod register-val-describe ((data kmacro-register) _verbose)
+  (princ (format "a keyboard macro:\n   %s"
+		 (key-description (kmacro-register-macro data)))))
+
+(cl-defmethod register-val-insert ((data kmacro-register))
+  (insert (format-kbd-macro (kmacro-register-macro data))))
 
 (defun kmacro-to-register (r)
   "Store the last keyboard macro in register R.
@@ -1059,7 +1038,7 @@ Interactively, reads the register using `register-read-with-preview'."
    (progn
      (or last-kbd-macro (error "No keyboard macro defined"))
      (list (register-read-with-preview "Save to register: "))))
-  (set-register r (kmacro-ring-head)))
+  (set-register r (kmacro-make-register last-kbd-macro)))
 
 
 (defun kmacro-view-macro (&optional _arg)
