@@ -402,8 +402,6 @@ signal a `cyclic-variable-indirection' error.  */)
   CHECK_SYMBOL (new_alias);
   CHECK_SYMBOL (base_variable);
 
-  sym = XSYMBOL (new_alias);
-
   if (SYMBOL_CONSTANT_P (new_alias))
     /* Making it an alias effectively changes its value.  */
     error ("Cannot make a constant an alias: %s",
