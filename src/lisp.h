@@ -642,10 +642,10 @@ typedef struct { void const *fwdptr; } lispfwd;
 
 enum symbol_redirect
 {
-  SYMBOL_PLAINVAL,   /* plain var, value is in the `value' field */
-  SYMBOL_VARALIAS,   /* var alias, value is really in the `alias' symbol */
-  SYMBOL_LOCALIZED,  /* localized var, value is in the `blv' object */
-  SYMBOL_FORWARDED   /* forwarding var, value is in `forward' */
+  SYMBOL_PLAINVAL = 4,   /* plain var, value is in the `value' field */
+  SYMBOL_VARALIAS = 1,   /* var alias, value is really in the `alias' symbol */
+  SYMBOL_LOCALIZED = 2,  /* localized var, value is in the `blv' object */
+  SYMBOL_FORWARDED = 3   /* forwarding var, value is in `forward' */
 };
 
 enum symbol_trapped_write
