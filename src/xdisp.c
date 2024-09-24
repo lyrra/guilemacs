@@ -13339,7 +13339,8 @@ set_message (Lisp_Object string)
       /* FIXME: (bug#63253) We should really make the regexp engine re-entrant,
          but in the mean time, let's ignore `set-message-function` when
          called from `probably_quit`.  */
-      && !garbage_collection_inhibited)
+      //&& !garbage_collection_inhibited // guilemacs
+      )
     {
       dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
@@ -13418,7 +13419,8 @@ clear_message (bool current_p, bool last_displayed_p)
     {
       if (FUNCTIONP (Vclear_message_function)
           /* FIXME: (bug#63253) Same as for `set-message-function` above.  */
-          && !garbage_collection_inhibited)
+          //&& !garbage_collection_inhibited // guilemacs
+          )
         {
           dynwind_begin ();
           specbind (Qinhibit_quit, Qt);
