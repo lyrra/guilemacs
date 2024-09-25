@@ -1284,14 +1284,6 @@ int
 android_emacs_init (int argc, char **argv, char *dump_file)
 #endif
 {
-  int old_argc;
-#if defined HAVE_PDUMPER && !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
-  char *dump_file;
-
-  /* This is just a dummy argument used to avoid extra defines.  */
-  dump_file = NULL;
-#endif
-
   /* First, check whether we should apply a seccomp filter.  This
      should come at the very beginning to allow the filter to protect
      the initialization phase.  */
@@ -1308,6 +1300,14 @@ void foobar() {
 static int
 main2 (void *ignore, int argc, char **argv)
 {
+  int old_argc;
+#if defined HAVE_PDUMPER && !(defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
+  char *dump_file;
+
+  /* This is just a dummy argument used to avoid extra defines.  */
+  dump_file = NULL;
+#endif
+
   bool no_loadup = false;
   char *junk = 0;
   char *dname_arg = 0;
