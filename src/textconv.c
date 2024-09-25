@@ -2620,8 +2620,6 @@ preference to any buffer-local value of `text-conversion-style'.  */);
 The value nil means to display no indication of a temporary edit.  */);
   Vtext_conversion_face = Qunderline;
 
-  defsubr (&Sset_text_conversion_style);
-
   postponed_buffers = Qnil;
   staticpro (&postponed_buffers);
 }
