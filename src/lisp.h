@@ -730,7 +730,7 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
    P can be a pointer or an integer.  The result is usable in a static
    initializer if TAG and P are both integer constant expressions.  */
 #define TAG_PTR_INITIALLY(tag, p) \
-  LISP_INITIALLY ((Lisp_Word) ((uintptr_t) (p) + LISP_WORD_TAG (tag)))
+  ((Lisp_Word) ((uintptr_t) (p) + LISP_WORD_TAG (tag)))
 
 /* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
    designed for use as a (possibly static) initializer.  */
@@ -2520,7 +2520,7 @@ XEXCURSION (Lisp_Object a)
 INLINE Lisp_Object
 make_mint_ptr (void *a)
 {
-  Lisp_Object val = TAG_PTR (Lisp_Int, a);
+  Lisp_Object val = TAG_PTR_INITIALLY (Lisp_Int, a);
   return FIXNUMP (val) && XFIXNUMPTR (val) == a ? val : make_misc_ptr (a);
 }
 
