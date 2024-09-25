@@ -1976,7 +1976,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       scm_set_current_module (scm_c_resolve_module ("guile-user"));
 
       init_alloc_once ();
-      init_pdumper_once ();
+      //init_pdumper_once ();
 
       scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
                            "make-lisp-string",
@@ -2534,7 +2534,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       syms_of_xwidget ();
       syms_of_threads ();
-      syms_of_pdumper ();
       syms_of_json ();
 
       keys_of_keyboard ();
