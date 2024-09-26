@@ -163,10 +163,6 @@ static struct gcstat
   byte_ct total_hash_table_bytes;
 } gcstat;
 
-/* Total size of ancillary arrays of all allocated hash-table and obarray
-   objects, both dead and alive.  This number is always kept up-to-date.  */
-static ptrdiff_t hash_table_allocated_bytes = 0;
-
 /* Points to memory space allocated as "spare", to be freed if we run
    out of memory. */
 
@@ -1651,8 +1647,6 @@ hash_table_alloc_bytes (ptrdiff_t nbytes)
 {
   if (nbytes == 0)
     return NULL;
-  tally_consing (nbytes);
-  hash_table_allocated_bytes += nbytes;
   return xmalloc (nbytes);
 }
 
@@ -1660,8 +1654,6 @@ hash_table_alloc_bytes (ptrdiff_t nbytes)
 void
 hash_table_free_bytes (void *p, ptrdiff_t nbytes)
 {
-  tally_consing (-nbytes);
-  hash_table_allocated_bytes -= nbytes;
   xfree (p);
 }
 
