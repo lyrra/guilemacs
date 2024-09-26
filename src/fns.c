@@ -4694,8 +4694,7 @@ cmpfn_user_defined (Lisp_Object key1, Lisp_Object key2,
 static EMACS_INT
 sxhash_eq (Lisp_Object key)
 {
-  Lisp_Object k = maybe_remove_pos_from_symbol (key);
-  return XHASH (k) ^ XTYPE (k);
+  return XHASH (key) ^ XTYPE (key);
 }
 
 static EMACS_INT
