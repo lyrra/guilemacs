@@ -459,7 +459,7 @@ lost after dumping")))
 ;; - advices in Emacs's core are generally considered bad style;
 ;; - `Snarf-documentation' looses docstrings of primitives advised
 ;;   during preload (bug#66032#20).
-(mapatoms
+'(mapatoms
  (lambda (f)
    (and (advice--p (symbol-function f))
         ;; Don't make it an error because it's not serious enough and
