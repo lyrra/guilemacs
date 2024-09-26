@@ -1081,7 +1081,7 @@ run_exit_minibuf_hook (Lisp_Object minibuf)
 {
   dynwind_begin ();
   record_unwind_current_buffer ();
-  if (BUFFER_LIVE_P (XBUFFER (minibuf)))
+  if (minibuf && BUFFER_LIVE_P (XBUFFER (minibuf)))
     Fset_buffer (minibuf);
   safe_run_hooks (Qminibuffer_exit_hook);
   dynwind_end ();
