@@ -966,9 +966,9 @@ push_handler_bind (Lisp_Object conditions, Lisp_Object handler, int skip)
 {
   if (!CONSP (conditions))
     conditions = Fcons (conditions, Qnil);
-  struct handler *c = push_handler (conditions, HANDLER_BIND);
-  c->val = handler;
-  c->bytecode_dest = skip;
+  //struct handler *c = push_handler (conditions, HANDLER_BIND);
+  //c->val = handler;
+  //c->bytecode_dest = skip;
 }
 
 DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
@@ -1352,8 +1352,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
 	      {
 		dynwind_begin ();
 	        max_ensure_room (20);
-	        push_handler (make_fixnum (skip + h->bytecode_dest),
-	                      SKIP_CONDITIONS);
+	        //push_handler (make_fixnum (skip + h->bytecode_dest),
+	        //              SKIP_CONDITIONS);
 	        call1 (h->val, error);
 		dynwind_end ();
 	        pop_handler ();
