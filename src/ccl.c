@@ -1373,7 +1373,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 				: -1));
 		h = GET_HASH_TABLE (eop);
 
-		eop = hash_lookup (h, make_fixnum (reg[RRR]), NULL);
+		eop = hash_lookup (h, make_fixnum (reg[RRR]));
 		if (eop >= 0)
 		  {
 		    Lisp_Object opl;
@@ -1400,7 +1400,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		i = CCL_DECODE_CHAR (reg[RRR], reg[rrr]);
 		h = GET_HASH_TABLE (eop);
 
-		eop = hash_lookup (h, make_fixnum (i), NULL);
+		eop = hash_lookup (h, make_fixnum (i));
 		if (eop >= 0)
 		  {
 		    Lisp_Object opl;
