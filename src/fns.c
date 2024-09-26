@@ -5335,13 +5335,6 @@ static struct hash_table_user_test *hash_table_user_tests = NULL;
 void
 mark_fns (void)
 {
-  for (struct hash_table_user_test *ut = hash_table_user_tests;
-       ut; ut = ut->next)
-    {
-      mark_object (ut->test.name);
-      mark_object (ut->test.user_cmp_function);
-      mark_object (ut->test.user_hash_function);
-    }
 }
 
 /* Find the hash_table_test object corresponding to the (bare) symbol TEST,
