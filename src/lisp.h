@@ -720,17 +720,11 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 #define DEFUN_ARGS_8	(Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object, \
 			 Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object)
 
-#define VALBITS 0
-
-/* A integer value tagged with TAG, and otherwise all zero.  */
-#define LISP_WORD_TAG(tag) \
-  ((Lisp_Word_tag) (tag) << (USE_LSB_TAG ? 0 : VALBITS))
-
 /* An initializer for a Lisp_Object that contains TAG along with P.
    P can be a pointer or an integer.  The result is usable in a static
    initializer if TAG and P are both integer constant expressions.  */
 #define TAG_PTR_INITIALLY(tag, p) \
-  ((Lisp_Word) ((uintptr_t) (p) + LISP_WORD_TAG (tag)))
+  ((Lisp_Word) ((uintptr_t) (p) + (uintptr_t) (tag)))
 
 /* LISPSYM_INITIALLY (Qfoo) is equivalent to Qfoo except it is
    designed for use as a (possibly static) initializer.  */
@@ -2255,7 +2249,7 @@ struct Lisp_Hash_Table
 /* A specific Lisp_Object that is not a valid Lisp value.
    We need to be careful not to leak this value into machinery
    where it may be treated as one; we'd get a segfault if lucky.  */
-#define INVALID_LISP_VALUE make_lisp_ptr (NULL, Lisp_Float)
+#define INVALID_LISP_VALUE 0 // make_lisp_ptr (NULL, Lisp_Float)
 
 /* Key value that marks an unused hash table entry.  */
 #define HASH_UNUSED_ENTRY_KEY INVALID_LISP_VALUE
