@@ -2282,8 +2282,6 @@ See also `charset-priority-list' and `set-charset-priority'.  */)
 void
 mark_charset (void)
 {
-  for (int i = 0; i < charset_table_used; i++)
-    mark_object (charset_table[i].attributes);
 }
 
 

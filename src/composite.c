@@ -2179,8 +2179,6 @@ of the way buffer text is examined for matching one of the rules.  */)
 void
 mark_composite (void)
 {
-  for (int i = 0; i < n_compositions; i++)
-    mark_object (composition_table[i]->key);
 }
 
 
