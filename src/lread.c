@@ -5092,26 +5092,8 @@ DEFUN ("internal--obarray-buckets",
        doc: /* Symbols in each bucket of OBARRAY.  Internal use only.  */)
     (Lisp_Object obarray)
 {
-  obarray = check_obarray (obarray);
-  ptrdiff_t size = obarray_size (XOBARRAY (obarray));
-
-  Lisp_Object ret = Qnil;
-  for (ptrdiff_t i = 0; i < size; i++)
-    {
-      Lisp_Object bucket = Qnil;
-      Lisp_Object sym = XOBARRAY (obarray)->buckets[i];
-      if (BARE_SYMBOL_P (sym))
-	while (1)
-	  {
-	    bucket = Fcons (sym, bucket);
-	    struct Lisp_Symbol *s = XBARE_SYMBOL (sym)->u.s.next;
-	    if (!s)
-	      break;
-	    sym = make_lisp_symbol (s);
-	  }
-      ret = Fcons (Fnreverse (bucket), ret);
-    }
-  return Fnreverse (ret);
+  emacs_abort ();
+  return Qnil;
 }
 
 void
