@@ -436,7 +436,7 @@ regardless if `funcall' would accept to call them."
 (cl--define-built-in-type marker (integer-or-marker))
 (cl--define-built-in-type bignum (integer)
   "Type of those integers too large to fit in a `fixnum'.")
-(cl--define-built-in-type fixnum (integer)
+'(cl--define-built-in-type fixnum (integer)
   (format "Type of small (fixed-size) integers.
 The size depends on the Emacs version and compilation options.
 For this build of Emacs it's %dbit."
