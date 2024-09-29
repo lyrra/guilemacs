@@ -1639,8 +1639,7 @@ valid_lisp_object_p (Lisp_Object obj)
   return valid_pointer_p (p);
 }
 
-/* Like xmalloc, but makes allocation count toward the total consing
-   and hash table or obarray usage.
+/* Like xmalloc, but makes allocation count toward the total consing.
    Return NULL for a zero-sized allocation.  */
 void *
 hash_table_alloc_bytes (ptrdiff_t nbytes)

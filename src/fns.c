@@ -44,6 +44,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "treesit.h"
 #endif
 static EMACS_UINT sxhash_obj (Lisp_Object, int);
+ptrdiff_t
+knuth_hash (hash_hash_t hash, unsigned bits);
 
 DEFUN ("identity", Fidentity, Sidentity, 1, 1, 0,
        doc: /* Return the ARGUMENT unchanged.  */

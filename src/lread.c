@@ -4796,8 +4796,28 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
   SAFE_FREE ();
   return result;
 }
-
 
+/* Reduce an EMACS_UINT hash value to hash_hash_t.  */
+hash_hash_t
+reduce_emacs_uint_to_hash_hash (EMACS_UINT x)
+{
+  verify (sizeof x <= 2 * sizeof (hash_hash_t));
+  return (sizeof x == sizeof (hash_hash_t)
+	  ? x
+	  : x ^ (x >> (8 * (sizeof x - sizeof (hash_hash_t)))));
+}
+
+/* Reduce HASH to a value BITS wide.  */
+ptrdiff_t
+knuth_hash (hash_hash_t hash, unsigned bits)
+{
+  /* Knuth multiplicative hashing, tailored for 32-bit indices
+     (avoiding a 64-bit multiply).  */
+  uint32_t alpha = 2654435769;	/* 2**32/phi */
+  /* Note the cast to uint64_t, to make it work for bits=0.  */
+  return (uint64_t)((uint32_t)hash * alpha) >> (32 - bits);
+}
+
 /* Intern a symbol with name STRING in OBARRAY.  */
 
 static Lisp_Object
@@ -4842,7 +4862,9 @@ obhash (Lisp_Object obarray)
 
 static Lisp_Object make_obarray (unsigned bits);
 
-/* Slow path obarray check: return the obarray to use or signal an error.  */
+/* Get an error if OBARRAY is not an obarray.
+   If it is one, return it.  */
+
 Lisp_Object
 check_obarray_slow (Lisp_Object obarray)
 {
@@ -4850,6 +4872,8 @@ check_obarray_slow (Lisp_Object obarray)
      and store an obarray object there.  */
   if (VECTORP (obarray) && ASIZE (obarray) > 0)
     {
+      //FIX: obsolete old-style obarrays
+      return obarray;
       Lisp_Object obj = AREF (obarray, 0);
       if (OBARRAYP (obj))
 	return obj;
@@ -4862,6 +4886,9 @@ check_obarray_slow (Lisp_Object obarray)
 	  return obj;
 	}
     }
+  // we really dont care about obarray, because it is only used as a hash-key
+  // to the real obarray that lies in guile
+  return obarray;
   /* Reset Vobarray to the standard obarray for nicer error handling. */
   if (BASE_EQ (Vobarray, obarray)) Vobarray = initial_obarray;
 
@@ -5014,8 +5041,7 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted.
 OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   (Lisp_Object name, Lisp_Object obarray)
 {
-  register Lisp_Object tem;
-  Lisp_Object string;
+  Lisp_Object tem, string;
 
   if (NILP (obarray))
     obarray = Vobarray;
@@ -5057,6 +5083,12 @@ map_obarray_inner (void *data, Lisp_Object sym)
   return SCM_UNSPECIFIED;
 }
 
+static struct Lisp_Obarray *
+allocate_obarray (void)
+{
+  return ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Obarray, PVEC_OBARRAY);
+}
+
 void
 map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Object arg)
 {
@@ -5064,9 +5096,22 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
                                    .fn = fn,
                                    .arg = arg };
 
-  CHECK_VECTOR (obarray);
+  CHECK_OBARRAY (obarray);
   scm_obarray_for_each (make_c_closure (map_obarray_inner, &data, 1, 0),
                         obhash (obarray));
+}
+
+static Lisp_Object
+make_obarray (unsigned bits)
+{
+  struct Lisp_Obarray *o = allocate_obarray ();
+  o->count = 0;
+  o->size_bits = bits;
+  ptrdiff_t size = (ptrdiff_t)1 << bits;
+  o->buckets = hash_table_alloc_bytes (size * sizeof *o->buckets);
+  for (ptrdiff_t i = 0; i < size; i++)
+    o->buckets[i] = make_fixnum (0);
+  return make_lisp_obarray (o);
 }
 
 static void
@@ -5086,6 +5131,45 @@ OBARRAY defaults to the value of `obarray'.  */)
   map_obarray (obarray, mapatoms_1, function);
   return Qnil;
 }
+
+DEFUN ("obarray-make", Fobarray_make, Sobarray_make, 0, 1, 0,
+       doc: /* Return a new obarray of size SIZE.
+The obarray will grow to accommodate any number of symbols; the size, if
+given, is only a hint for the expected number.  */)
+  (Lisp_Object size)
+{
+  return make_obarray (128); // FIX: obarray_default_bits;
+}
+
+DEFUN ("obarrayp", Fobarrayp, Sobarrayp, 1, 1, 0,
+       doc: /* Return t iff OBJECT is an obarray.  */)
+  (Lisp_Object object)
+{
+  return OBARRAYP (object) ? Qt : Qnil;
+}
+
+DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
+       doc: /* Remove all symbols from OBARRAY.  */)
+  (Lisp_Object obarray)
+{
+  //CHECK_OBARRAY (obarray);
+  //struct Lisp_Obarray *o = XOBARRAY (obarray);
+  // obarray = obhash(obarray)
+  // FIX: just call scm clear hash
+
+  return Qnil;
+}
+
+/*
+void
+map_obarray (Lisp_Object obarray,
+	     void (*fn) (Lisp_Object, Lisp_Object), Lisp_Object arg)
+{
+  CHECK_OBARRAY (obarray);
+  DOOBARRAY (XOBARRAY (obarray), it)
+    (*fn) (obarray_iter_symbol (&it), arg);
+}
+*/
 
 DEFUN ("internal--obarray-buckets",
        Finternal__obarray_buckets, Sinternal__obarray_buckets, 1, 1, 0,
