@@ -138,7 +138,7 @@ is used to further constrain the set of candidates."
          (matchsize 0)
          (type (cond
                 ((hash-table-p collection) 'hash-table)
-                ((vectorp collection) 'obarray)
+                ((obarrayp collection) 'obarray)
                 ((or (null collection)
                      (and (consp collection)
                           (not (functionp collection))))
@@ -303,7 +303,7 @@ with a space are ignored unless STRING itself starts with a space."
    (let (eltstring
          allmatches
          (type (cond ((hash-table-p collection) 'hash-table)
-                     ((vectorp collection) 'obarray)
+                     ((obarrayp collection) 'obarray)
                      ((or (null collection)
                           (and (consp collection)
                                (not (functionp collection))))
@@ -377,7 +377,7 @@ the values STRING, PREDICATE and `lambda'."
        (setq tem (assoc-string string collection completion-ignore-case))
        (unless tem
          (throw 'return nil)))
-      ((vectorp collection)
+      ((obarrayp collection)
        (setq tem (intern-soft string collection)) ; XXX nil
        (unless tem
          (let ((string (if (multibyte-string-p string)
