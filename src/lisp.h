@@ -939,7 +939,7 @@ XSYMBOL (Lisp_Object a)
 INLINE Lisp_Object
 make_lisp_symbol (struct Lisp_Symbol *sym)
 {
-  return scm_c_vector_ref (b, 0);
+  return scm_c_vector_ref (sym, 0);
 }
 
 INLINE Lisp_Object
@@ -1144,7 +1144,7 @@ XTYPE (Lisp_Object o)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETRECORD(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
-#define XSETSYMBOL(a, b) ((a) = (b)->self)
+#define XSETSYMBOL(a, b) ((a) = scm_c_vector_ref (b, 0))
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
