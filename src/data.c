@@ -192,7 +192,6 @@ compatibility with the return value of previous Emacs versions.  */)
 {
   return SYMBOLP (object)    ? Qsymbol
          : INTEGERP (object) ? Qinteger
-         : SUBRP (object)    ? Qsubr
          : Fcl_type_of (object);
 }
 
