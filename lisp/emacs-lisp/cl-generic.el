@@ -1334,8 +1334,6 @@ These match if the argument is `eql' to VAL."
 (cl--generic-prefill-dispatchers (terminal-parameter nil 'xterm--set-selection)
                                  (eql nil))
 
-;;; Dispatch on "normal types".
-
 (defun cl--generic-type-specializers (tag &rest _)
   (and (symbolp tag)
        (let ((class (cl--find-class tag)))
@@ -1343,7 +1341,8 @@ These match if the argument is `eql' to VAL."
            (cl--class-allparents class)))))
 
 (cl-generic-define-generalizer cl--generic-typeof-generalizer
-  10 (lambda (name &rest _) `(cl-type-of ,name))
+  ;; FIXME: We could also change `type-of' to return `null' for nil.
+  10 (lambda (name &rest _) `(if ,name (type-of ,name) 'null))
   #'cl--generic-type-specializers)
 
 (cl-defmethod cl-generic-generalizers :extra "typeof" (type)

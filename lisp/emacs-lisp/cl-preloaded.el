@@ -368,6 +368,8 @@ The `slots' (and hence `index-table') are currently unused."
                                           ',parents))))))
 
 ;; FIXME: Our type DAG has various quirks:
+;; - `subr' says it's a `compiled-function' but that's not true
+;;   for those subrs that are special forms!
 ;; - Some `keyword's are also `symbol-with-pos' but that's not reflected
 ;;   in the DAG.
 ;; - An OClosure can be an interpreted function or a `byte-code-function',
@@ -405,7 +407,6 @@ regardless if `funcall' would accept to call them."
 (cl--define-built-in-type buffer atom)
 (cl--define-built-in-type window atom)
 (cl--define-built-in-type process atom)
-(cl--define-built-in-type finalizer atom)
 (cl--define-built-in-type window-configuration atom)
 (cl--define-built-in-type overlay atom)
 (cl--define-built-in-type number-or-marker atom
@@ -481,12 +482,13 @@ The fields are used as follows:
   5 [iform]      The interactive form (if present)")
 (cl--define-built-in-type byte-code-function (compiled-function closure)
   "Type of functions that have been byte-compiled.")
-(cl--define-built-in-type subr (atom)
+(cl--define-built-in-type subr (compiled-function)
   "Abstract type of functions compiled to machine code.")
 (cl--define-built-in-type module-function (function)
   "Type of functions provided via the module API.")
 (cl--define-built-in-type interpreted-function (closure)
   "Type of functions that have not been compiled.")
+;--- guilemacs begin remove?
 (cl--define-built-in-type special-form (subr)
   "Type of the core syntactic elements of the Emacs Lisp language.")
 (define-obsolete-function-alias 'subr-native-elisp-p #'native-comp-function-p "30.1")
@@ -494,6 +496,7 @@ The fields are used as follows:
   "Type of functions that have been compiled by the native compiler.")
 (cl--define-built-in-type primitive-function (subr compiled-function)
   "Type of functions hand written in C.")
+;--- guilemacs end
 
 (unless (cl--class-parents (cl--find-class 'cl-structure-object))
   ;; When `cl-structure-object' is created, built-in classes didn't exist
