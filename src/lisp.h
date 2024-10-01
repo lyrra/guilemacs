@@ -930,11 +930,15 @@ INLINE bool
   return lisp_h_SYMBOLP(x);
 }
 
+#define BARE_SYMBOL_P(x) SYMBOLP(x)
+
 INLINE sym_t
 XSYMBOL (Lisp_Object a)
 {
   return scm_call_1 (xsymbol_fn, a);
 }
+
+#define XBARE_SYMBOL(a) XSYMBOL(a)
 
 INLINE Lisp_Object
 make_lisp_symbol (struct Lisp_Symbol *sym)
