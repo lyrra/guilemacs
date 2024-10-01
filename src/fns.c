@@ -3007,13 +3007,13 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 
     case Lisp_Symbol:
       if (BARE_SYMBOL_P (b))
-	return string_cmp (XBARE_SYMBOL (a)->u.s.name,
-			   XBARE_SYMBOL (b)->u.s.name);
+	return string_cmp (SYMBOL_NAME (XBARE_SYMBOL (a)),
+			   SYMBOL_NAME (XBARE_SYMBOL (b)));
       if (CONSP (b) && NILP (a))
 	return -1;
       if (SYMBOLP (b))
 	/* Slow-path branch when B is a symbol-with-pos.  */
-	return string_cmp (XBARE_SYMBOL (a)->u.s.name, XSYMBOL (b)->u.s.name);
+	return string_cmp (SYMBOL_NAME (XBARE_SYMBOL (a)), SYMBOL_NAME (XSYMBOL (b)));
       goto type_mismatch;
 
     case Lisp_String:
@@ -3113,12 +3113,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	      case PVEC_BIGNUM:
 		return mpz_cmp (*xbignum_val (a), *xbignum_val (b));
 
-	      case PVEC_SYMBOL_WITH_POS:
-		/* Compare by name, enabled or not.  */
-		a = XSYMBOL_WITH_POS_SYM (a);
-		b = XSYMBOL_WITH_POS_SYM (b);
-		goto tail_recurse;
-
 	      default:
 		/* Treat other types as unordered.  */
 		return 0;
@@ -3126,11 +3120,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	}
       else if (BIGNUMP (a))
 	return -value_cmp (b, a, maxdepth);
-      else if (SYMBOL_WITH_POS_P (a) && symbols_with_pos_enabled)
-	{
-	  a = XSYMBOL_WITH_POS_SYM (a);
-	  goto tail_recurse;
-	}
 
       goto type_mismatch;
 
