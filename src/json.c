@@ -443,7 +443,6 @@ json_out_object_cons (json_out_t *jo, Lisp_Object obj)
 	  CHECK_CONS (tail);
 	  value = XCAR (tail);
 	}
-      key = maybe_remove_pos_from_symbol (key);
       CHECK_TYPE (BARE_SYMBOL_P (key), Qsymbolp, key);
 
       if (symset_add (jo, &ss, key))
@@ -616,10 +615,11 @@ any JSON false values.
 usage: (json-serialize OBJECT &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   json_out_t jo;
   json_serialize (&jo, args[0], nargs - 1, args + 1);
-  return unbind_to (count, make_unibyte_string (jo.buf, jo.size));
+  Lisp_Object tem = make_unibyte_string (jo.buf, jo.size);
+  return tem;
 }
 
 DEFUN ("json-insert", Fjson_insert, Sjson_insert, 1, MANY,
@@ -633,7 +633,7 @@ See the function `json-serialize' for allowed values of OBJECT and ARGS.
 usage: (json-insert OBJECT &rest ARGS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   json_out_t jo;
   json_serialize (&jo, args[0], nargs - 1, args + 1);
 
@@ -644,7 +644,7 @@ usage: (json-insert OBJECT &rest ARGS)  */)
   memcpy ((char *) BEG_ADDR + PT_BYTE - BEG_BYTE, jo.buf, jo.size);
 
   /* No need to keep allocation beyond this point.  */
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   bool ub_buffer = NILP (BVAR (current_buffer, enable_multibyte_characters));
   ptrdiff_t inserted_bytes = jo.size;
@@ -1423,7 +1423,7 @@ json_parse_array (struct json_parser *parser)
 	      {
 		Lisp_Object nc = Fcons (element, Qnil);
 		*cdr = nc;
-		cdr = xcdr_addr (nc);
+		// cdr = xcdr_addr (nc); // FIX: guilemacs
 		break;
 	      }
 	    default:
@@ -1524,7 +1524,7 @@ json_parse_object (struct json_parser *parser)
 		Lisp_Object value = json_parse_object_member_value (parser);
 		Lisp_Object nc = Fcons (Fcons (key, value), Qnil);
 		*cdr = nc;
-		cdr = xcdr_addr (nc);
+		//FIX: cdr = xcdr_addr (nc); // FIX: guilemacs
 		break;
 	      }
 	    case json_object_plist:
@@ -1533,11 +1533,11 @@ json_parse_object (struct json_parser *parser)
 		Lisp_Object value = json_parse_object_member_value (parser);
 		Lisp_Object nc = Fcons (key, Qnil);
 		*cdr = nc;
-		cdr = xcdr_addr (nc);
+		// cdr = xcdr_addr (nc); // FIX: guilemacs
 
 		nc = Fcons (value, Qnil);
 		*cdr = nc;
-		cdr = xcdr_addr (nc);
+		// cdr = xcdr_addr (nc); // FIX: guilemacs
 		break;
 	      }
 	    default:
@@ -1693,7 +1693,7 @@ The arguments ARGS are a list of keyword/argument pairs:
 usage: (json-parse-string STRING &rest ARGS) */)
 (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   Lisp_Object string = args[0];
   CHECK_STRING (string);
@@ -1710,7 +1710,8 @@ usage: (json-parse-string STRING &rest ARGS) */)
   if (json_skip_whitespace_if_possible (&p) >= 0)
     json_signal_error (&p, Qjson_trailing_content);
 
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 DEFUN ("json-parse-buffer", Fjson_parse_buffer, Sjson_parse_buffer,
@@ -1746,7 +1747,7 @@ The arguments ARGS are a list of keyword/argument pairs:
 usage: (json-parse-buffer &rest args) */)
 (ptrdiff_t nargs, Lisp_Object *args)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   struct json_configuration conf
     = { json_object_hashtable, json_array_array, QCnull, QCfalse };
@@ -1778,7 +1779,8 @@ usage: (json-parse-buffer &rest args) */)
 			: PT + p.point_of_current_line + p.current_column);
   SET_PT_BOTH (position, byte);
 
-  return unbind_to (count, result);
+  dynwind_end ();
+  return result;
 }
 
 void
@@ -1825,9 +1827,4 @@ syms_of_json (void)
   DEFSYM (Qalist, "alist");
   DEFSYM (Qplist, "plist");
   DEFSYM (Qarray, "array");
-
-  defsubr (&Sjson_serialize);
-  defsubr (&Sjson_insert);
-  defsubr (&Sjson_parse_string);
-  defsubr (&Sjson_parse_buffer);
 }
