@@ -532,8 +532,8 @@ merge_markmem (void *arg)
   merge_state *ms = arg;
   eassume (ms != NULL);
 
-  if (ms->allocated_keys != NULL)
-    mark_objects (ms->allocated_keys, ms->listlen);
+  //if (ms->allocated_keys != NULL)
+  //  mark_objects (ms->allocated_keys, ms->listlen);
 
   if (ms->reloc.size != NULL && *ms->reloc.size > 0)
     {
@@ -1113,8 +1113,9 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
 	{
 	  /* Fill with valid Lisp values in case a GC occurs before all
 	     keys have been computed.  */
-	  static_assert (NIL_IS_ZERO);
+	  // static_assert (NIL_IS_ZERO); // FIX: for guilemacs this is not true
 	  keys = allocated_keys = xzalloc (length * word_size);
+	  memsetnil (keys, length);
 	}
 
       lo.keys = keys;
