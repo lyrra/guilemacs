@@ -668,7 +668,8 @@ recording whether the var has been referenced by earlier parts of the match."
       ;; Extra predicates that don't have matching types.
       (dolist (pred-types '((functionp cl-functionp consp symbolp)
                             (keywordp symbolp)
-                            (characterp fixnump)
+                            ;;FIX: guilemacs: ablated due to errors in cl-predicate / cl-generics
+                            ;;(characterp fixnump)
                             (natnump integerp)
                             (facep symbolp stringp)
                             (plistp listp)
