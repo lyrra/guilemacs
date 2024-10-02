@@ -3888,8 +3888,7 @@ read_stack_reset (intmax_t sp)
   if (end - p < MAX_MULTIBYTE_LENGTH + 1)	\
     {						\
        offset = p - read_buffer;		\
-       read_buffer = grow_read_buffer (read_buffer, offset, \
-				       &heapbuf, &read_buffer_size, count); \
+       emacs_abort ();          		\
        p = read_buffer + offset;					\
        end = read_buffer + read_buffer_size;				\
     }
