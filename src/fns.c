@@ -2888,7 +2888,7 @@ vectorlike_equal_p (SCM o1, SCM o2)
   if (size & PSEUDOVECTOR_FLAG)
     {
       if (((size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
-          < PVEC_COMPILED)
+          < PVEC_CLOSURE)
         return SCM_BOOL_F;
       size &= PSEUDOVECTOR_SIZE_MASK;
     }

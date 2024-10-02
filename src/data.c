@@ -1052,10 +1052,10 @@ Value, if non-nil, is a list (interactive SPEC).  */)
 	fun = Fsymbol_function (fun);
     }
 
-  if (COMPILEDP (fun))
+  if (CLOSUREP (fun))
     {
-      if ((ASIZE (fun) & PSEUDOVECTOR_SIZE_MASK) > COMPILED_INTERACTIVE)
-	return list2 (Qinteractive, AREF (fun, COMPILED_INTERACTIVE));
+      if ((ASIZE (fun) & PSEUDOVECTOR_SIZE_MASK) > CLOSURE_INTERACTIVE)
+	return list2 (Qinteractive, AREF (fun, CLOSURE_INTERACTIVE));
     }
   else if (scm_is_true (scm_procedure_p (fun)))
     {
