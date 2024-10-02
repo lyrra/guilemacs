@@ -1042,7 +1042,6 @@ internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
 {
   struct handler *volatile oldhandlerlist = handlerlist;
 
-  var = maybe_remove_pos_from_symbol (var);
   CHECK_TYPE (BARE_SYMBOL_P (var), Qsymbolp, var);
 
   Lisp_Object success_handler = Qnil;
