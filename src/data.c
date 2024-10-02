@@ -1987,7 +1987,7 @@ The default value is seen in buffers that do not have their own values
 for this variable.  */)
   (Lisp_Object symbol, Lisp_Object value)
 {
-  set_default_internal (symbol, value, SET_INTERNAL_SET);
+  set_default_internal (symbol, value, SET_INTERNAL_SET, NULL);
   return value;
 }
 
