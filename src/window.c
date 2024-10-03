@@ -3348,7 +3348,7 @@ window_pixel_to_total (Lisp_Object frame, Lisp_Object horizontal)
 static Lisp_Object
 window_discard_buffer_from_alist (Lisp_Object buffer, Lisp_Object alist)
 {
-  Lisp_Object tail, *prev = &alist;
+  Lisp_Object tail, prev = alist;
 
   for (tail = alist; CONSP (tail); tail = XCDR (tail))
     {
@@ -3357,9 +3357,9 @@ window_discard_buffer_from_alist (Lisp_Object buffer, Lisp_Object alist)
       tem = XCAR (tem);
 
       if (EQ (tem, buffer))
-	*prev = XCDR (tail);
+	XSETCDR (prev, XCDR (tail)); // FIX: guilemacs, might be wrong, skip this cons
       else
-	prev = xcdr_addr (tail);
+	prev = tail;
     }
 
   return alist;
@@ -3370,13 +3370,13 @@ window_discard_buffer_from_alist (Lisp_Object buffer, Lisp_Object alist)
 static Lisp_Object
 window_discard_buffer_from_list (Lisp_Object buffer, Lisp_Object list)
 {
-  Lisp_Object tail, *prev = &list;
+  Lisp_Object tail, prev = list;
 
   for (tail = list; CONSP (tail); tail = XCDR (tail))
     if (EQ (XCAR (tail), buffer))
-      *prev = XCDR (tail);
+      XSETCDR (prev, XCDR (tail)); // FIX: guilemacs, might be wrong, skip this cons
     else
-      prev = xcdr_addr (tail);
+      prev = tail;
 
   return list;
 }
