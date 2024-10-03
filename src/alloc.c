@@ -112,6 +112,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "w32heap.h"	/* for sbrk */
 #endif
 
+static struct Lisp_Vector *
+allocate_clear_vector (ptrdiff_t len, bool clearit);
+
 /* Default value of gc_cons_threshold (see below).  */
 
 #define GC_DEFAULT_THRESHOLD (100000 * word_size)
