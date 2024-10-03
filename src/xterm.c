@@ -5828,8 +5828,9 @@ xi_link_touch_point (struct xi_device_t *device,
      CARD32s easily overflow 32-bit systems, as they are not specific to
      X clients (e.g. Emacs) but grow uniformly across all of them.  */
 
-  if (FIXNUM_OVERFLOW_P (local_detail))
-    local_detail = 0;
+  //FIX: guilemacs, no FIXNUM_OVERFLOW_P
+  //if (FIXNUM_OVERFLOW_P (local_detail))
+  //  local_detail = 0;
 
   touchpoint = xmalloc (sizeof *touchpoint);
   touchpoint->next = device->touchpoints;

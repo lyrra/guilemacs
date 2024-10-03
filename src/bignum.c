@@ -148,15 +148,16 @@ make_integer_mpz (void)
   if (FASTER_BIGNUM && mpz_fits_slong_p (mpz[0]))
     {
       long int v = mpz_get_si (mpz[0]);
-      if (!FIXNUM_OVERFLOW_P (v))
+      //if (!FIXNUM_OVERFLOW_P (v)) //FIX: guilemacs, no FIXNUM_OVERFLOW_P
 	return make_fixnum (v);
     }
 
   size_t bits = mpz_sizeinbase (mpz[0], 2);
 
   if (! (FASTER_BIGNUM
-	 && FIXNUM_OVERFLOW_P (LONG_MIN)
-	 && FIXNUM_OVERFLOW_P (LONG_MAX))
+	 //&& FIXNUM_OVERFLOW_P (LONG_MIN)  //FIX: guilemacs, no FIXNUM_OVERFLOW_P
+	 //&& FIXNUM_OVERFLOW_P (LONG_MAX)) //FIX: guilemacs, no FIXNUM_OVERFLOW_P
+	 )
       && bits <= FIXNUM_BITS)
     {
       EMACS_INT v = 0;
