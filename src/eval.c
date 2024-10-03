@@ -2475,7 +2475,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
     {
       maybe_quit ();
 
-      Lisp_Object next = maybe_remove_pos_from_symbol (XCAR (syms_left));
+      Lisp_Object next = XCAR (syms_left);
       if (!BARE_SYMBOL_P (next))
 	xsignal1 (Qinvalid_function, fun);
 
