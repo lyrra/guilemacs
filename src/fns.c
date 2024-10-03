@@ -5400,8 +5400,8 @@ usage: (make-hash-table &rest KEYWORD-ARGS)  */)
     error ("Odd number of arguments");
   while (nargs >= 2)
     {
-      Lisp_Object arg = maybe_remove_pos_from_symbol (args[--nargs]);
-      Lisp_Object kw = maybe_remove_pos_from_symbol (args[--nargs]);
+      Lisp_Object arg = args[--nargs];
+      Lisp_Object kw = args[--nargs];
       if (BASE_EQ (kw, QCtest))
 	test_arg = arg;
       else if (BASE_EQ (kw, QCweakness))
