@@ -1048,7 +1048,8 @@ get_minibuffer (EMACS_INT depth)
     {
       static char const name_fmt[] = " *Minibuf-%"pI"d*";
       char name[sizeof name_fmt + INT_STRLEN_BOUND (EMACS_INT)];
-      AUTO_STRING_WITH_LEN (lname, name, sprintf (name, name_fmt, depth));
+      sprintf (name, name_fmt, depth);
+      AUTO_STRING_WITH_LEN (lname, name, 0);
       buf = Fget_buffer_create (lname, Qnil);
       /* Do this before set_minibuffer_mode.  */
       XSETCAR (tail, buf);
