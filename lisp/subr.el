@@ -3081,27 +3081,33 @@ instead."
 						  (symbol-function symbol))))
       (let ((elc-file
 	     (catch 'found
-	       (pcase-dolist (`(,file . ,elems) load-history)
-		 (when (if type
-			   (if (eq type 'defvar)
-			       ;; Variables are present just as their
-			       ;; names.
-			       (member symbol elems)
-			     ;; Many other types are represented as
-			     ;; (TYPE . NAME).
-			     (or (member (cons type symbol) elems)
-				 (memq
-				  symbol
-				  (alist-get type
-					     (alist-get 'define-symbol-props
-							elems)))))
-			 ;; We accept all types, so look for variable def
-			 ;; and then for any other kind.
-			 (or (member symbol elems)
-			     (let ((match (rassq symbol elems)))
-			       (and match
-				    (not (eq 'require (car match)))))))
-		   (throw 'found file))))))
+               (let ((files load-history)
+                     file match)
+                 (while files
+                   (let* ((elm (car files))
+                          (file (car elm))
+                          (elems (cdr elm)))
+		     (when (if type
+			       (if (eq type 'defvar)
+			           ;; Variables are present just as their
+			           ;; names.
+			           (member symbol elems)
+			         ;; Many other types are represented as
+			         ;; (TYPE . NAME).
+			         (or (member (cons type symbol) elems)
+				     (memq
+				      symbol
+				      (alist-get type
+					         (alist-get 'define-symbol-props
+							    elems)))))
+			     ;; We accept all types, so look for variable def
+			     ;; and then for any other kind.
+			     (or (member symbol elems)
+			         (let ((match (rassq symbol elems)))
+			           (and match
+				        (not (eq 'require (car match)))))))
+		       (throw 'found file))
+                     (setq files (cdr files))))))))
 	;; If they asked for the .eln file, try to find it.
 	(or (and elc-file
 		 native-p
