@@ -1338,7 +1338,7 @@ please check its value")
             ;; Initialize them in the same order they were loaded, in
             ;; case there are dependencies between them.
             (reverse custom-delayed-init-variables))))
-  (setq custom-delayed-init-variables t)
+  (setq custom-delayed-init-variables nil) ; FIX guilemacs, reverts partial 2fb271ca
 
   ;; Warn for invalid user name.
   (when init-file-user
