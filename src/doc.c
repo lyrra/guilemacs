@@ -399,7 +399,6 @@ DEFUN ("internal-subr-documentation", Fsubr_documentation, Ssubr_documentation, 
 #ifdef HAVE_NATIVE_COMP
   if (!NILP (Fnative_comp_function_p (function)))
     return native_function_doc (function);
-  else
 #endif
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
