@@ -2868,7 +2868,7 @@ vectorlike_equal_p (SCM o1, SCM o2)
     {
 #ifdef HAVE_TREE_SITTER
 	if (TS_NODEP (o1))
-	  return treesit_node_eq (o1, o2);
+	  return treesit_node_eq (o1, o2) ? SCM_BOOL_T : SCM_BOOL_F;
 #endif
       if (XBOOL_VECTOR (o1)->size != XBOOL_VECTOR (o2)->size)
         return SCM_BOOL_F;

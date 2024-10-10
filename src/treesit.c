@@ -409,6 +409,10 @@ init_treesit_functions (void)
    is different from the current one.  */
 
 
+
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 /*** Initialization  */
 
 static Lisp_Object Vtreesit_str_libtree_sitter;
