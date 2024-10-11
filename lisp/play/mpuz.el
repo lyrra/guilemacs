@@ -84,7 +84,6 @@ The value t means never ding, and `error' means only ding on wrong input."
   (keymap-set mpuz-mode-map ch #'mpuz-try-letter))
 
 (define-derived-mode mpuz-mode fundamental-mode "Mult Puzzle"
-  :interactive nil
   "Multiplication puzzle mode.
 
 You have to guess which letters stand for which digits in the
@@ -363,7 +362,7 @@ You may abort a game by typing \\<mpuz-mode-map>\\[mpuz-offer-abort]."
 
 (defun mpuz-offer-abort ()
   "Ask if user wants to abort current puzzle."
-  (interactive nil mpuz-mode)
+  (interactive)
   (if (y-or-n-p "Abort game? ")
       (let ((buf (mpuz-get-buffer)))
 	(message "Mult Puzzle aborted.")
@@ -385,7 +384,7 @@ You may abort a game by typing \\<mpuz-mode-map>\\[mpuz-offer-abort]."
 
 (defun mpuz-try-letter ()
   "Propose a digit for a letter in puzzle."
-  (interactive nil mpuz-mode)
+  (interactive)
   (if mpuz-in-progress
       (let (letter-char digit digit-char)
 	(setq letter-char (upcase last-command-event)
@@ -470,7 +469,7 @@ You may abort a game by typing \\<mpuz-mode-map>\\[mpuz-offer-abort]."
 
 (defun mpuz-show-solution (row)
   "Display solution for debugging purposes."
-  (interactive "P" mpuz-mode)
+  (interactive "P")
   (mpuz-switch-to-window)
   (mpuz-solve (if row (* 2 (prefix-numeric-value row))))
   (mpuz-paint-board)

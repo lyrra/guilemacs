@@ -1144,7 +1144,7 @@ treasures for points?" "4" "four")
 
 (defun dun-parse (_arg)
   "Function called when return is pressed in interactive mode to parse line."
-  (interactive "*p" dun-mode)
+  (interactive "*p")
   (beginning-of-line)
   (let ((beg (1+ (point)))
         line)
@@ -2235,7 +2235,7 @@ Call the proper verb with the rest of the line passed in as a list."
 (defun dun-fix-screen ()
   "In window mode, keep screen from jumping by keeping last line at
 the bottom of the screen."
-  (interactive nil dun-mode)
+  (interactive)
   (forward-line (- 0 (- (window-height) 2 )))
   (set-window-start (selected-window) (point))
   (goto-char (point-max)))
@@ -2342,7 +2342,7 @@ Also prints current score to let user know he has scored."
 ;;;;
 
 (defun dun-unix-parse (_args)
-  (interactive "*p" dun-mode)
+  (interactive "*p")
   (beginning-of-line)
   (let (beg esign)
     (setq beg (+ (point) 2))
@@ -2831,7 +2831,7 @@ drwxr-xr-x  3 root     staff          2048 Jan 1 1970 ..")
 ;;;;
 
 (defun dun-dos-parse (_args)
-  (interactive "*p" dun-mode)
+  (interactive "*p")
   (beginning-of-line)
   (let (beg)
     (setq beg (+ (point) 3))
@@ -3125,7 +3125,7 @@ File not found")))
 
 (defun dungeon-nil (_arg)
   "noop"
-  (interactive "*p" dun-mode)
+  (interactive "*p")
   nil)
 
 (defun dun-batch-dungeon ()

@@ -852,14 +852,14 @@ reads the sentence before point, and prints the Doctor's answer."
 (defun doctor-ret-or-read (arg)
   "Insert a newline if preceding character is not a newline.
 Otherwise call the Doctor to parse preceding sentence."
-  (interactive "*p" doctor-mode)
+  (interactive "*p")
   (if (= (preceding-char) ?\n)
       (doctor-read-print)
     (newline arg)))
 
 (defun doctor-read-print ()
   "Top level loop."
-  (interactive nil doctor-mode)
+  (interactive)
   (setq doctor-sent (doctor-readin))
   (insert "\n")
   (setq doctor--lincount (1+ doctor--lincount))
