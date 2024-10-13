@@ -4707,14 +4707,14 @@ hashfn_eq (Lisp_Object key, struct Lisp_Hash_Table *h)
 static hash_hash_t
 hashfn_equal (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return scm_ihash (key, MOST_POSITIVE_FIXNUM);
+  return make_fixnum (scm_ihash (key, MOST_POSITIVE_FIXNUM));
 }
 
 /* Ignore H and return a hash code for KEY which uses 'eql' to compare keys.  */
 static hash_hash_t
 hashfn_eql (Lisp_Object key, struct Lisp_Hash_Table *h)
 {
-  return scm_ihashv (key, MOST_POSITIVE_FIXNUM);
+  return make_fixnum (scm_ihashv (key, MOST_POSITIVE_FIXNUM));
 }
 
 /* Given H, return a hash code for KEY which uses a user-defined
