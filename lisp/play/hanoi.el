@@ -375,7 +375,7 @@ BITS must be of length nrings.  Start at START-TIME."
 		       ticks-per-pole-step))))))))
     (if hanoi-move-period
 	(cl-loop for elapsed = (float-time (time-subtract nil start-time))
-		 while (time-less-p elapsed hanoi-move-period)
+		 while (< elapsed hanoi-move-period)
 		 with tick-period = (/ (float-time hanoi-move-period)
 				       total-ticks)
 		 for tick = (ceiling elapsed tick-period) do
