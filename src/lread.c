@@ -852,8 +852,8 @@ read_filtered_event (bool no_switch_frame, bool ascii_required,
 #ifdef HAVE_TEXT_CONVERSION
   dynwind_end ();
 #else
-  return val;
 #endif
+  return val;
 }
 
 DEFUN ("read-char", Fread_char, Sread_char, 0, 3, 0,
