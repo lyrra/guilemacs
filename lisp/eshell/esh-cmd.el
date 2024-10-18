@@ -435,9 +435,8 @@ command hooks should be run before and after the command."
     (if toplevel
 	`(eshell-commands (progn
                             (run-hooks 'eshell-pre-command-hook)
-                            (unwind-protect
-                                (progn ,@commands)
-                              (run-hooks 'eshell-post-command-hook))))
+                            (catch 'top-level (progn ,@commands))
+                            (run-hooks 'eshell-post-command-hook)))
       (macroexp-progn commands))))
 
 (defun eshell-debug-show-parsed-args (terms)
