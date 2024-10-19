@@ -1322,7 +1322,6 @@ static void
 really_replace_text (struct frame *f, ptrdiff_t start, ptrdiff_t end,
 		     Lisp_Object text, ptrdiff_t position)
 {
-  specpdl_ref count;
   ptrdiff_t new_start, new_end, wanted;
   struct window *w;
 
