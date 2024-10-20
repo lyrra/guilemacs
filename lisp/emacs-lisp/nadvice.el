@@ -320,14 +320,14 @@ HOW is a symbol to select an entry in `advice--how-alist'."
                               (equal function (cdr (assq 'name props))))
                           (list (advice--remove-function rest function)))))))
 
-(oclosure-define (advice--forward
-                  (:predicate advice--forward-p))
-  "Redirect to the global value of a var.
-These functions act like the t special value in buffer-local hooks.")
+(defvar advice--buffer-local-function-sample nil
+  "Keeps an example of the special \"run the default value\" functions.
+These functions play the same role as t in buffer-local hooks, and to recognize
+them, we keep a sample here against which to compare.  Each instance is
+different, but `function-equal' will hopefully ignore those differences.")
 
 (defun advice--set-buffer-local (var val)
-  ;(if (equal val advice--buffer-local-function-sample) ...)
-  (if (advice--forward-p val)
+  (if (equal val advice--buffer-local-function-sample)
       (kill-local-variable var)
     (set (make-local-variable var) val)))
 
@@ -336,10 +336,11 @@ These functions act like the t special value in buffer-local hooks.")
   "Buffer-local value of VAR, presumed to contain a function."
   (declare (gv-setter advice--set-buffer-local))
   (if (local-variable-p var) (symbol-value var)
-    ;; FIXME: Provide an `advice-bottom' function that's like
-    ;; `advice--cd*r' but also follows through this proxy.
-    (oclosure-lambda (advice--forward) (&rest args)
-      (apply (default-value var) args))))
+    (setq advice--buffer-local-function-sample
+          ;; This function acts like the t special value in buffer-local hooks.
+          ;; FIXME: Provide an `advice-bottom' function that's like
+          ;; `advice-cd*r' but also follows through this proxy.
+          (lambda (&rest args) (apply (default-value var) args)))))
 
 (eval-and-compile
   (defun advice--normalize-place (place)
