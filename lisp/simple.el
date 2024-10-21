@@ -2801,11 +2801,11 @@ function as needed."
 '(cl-defmethod function-documentation ((function accessor))
   (oclosure--accessor-docstring function)) ;; FIXME: η-reduce!
 
-'(cl-defmethod function-documentation ((f cconv--interactive-helper))
+(cl-defmethod function-documentation ((f cconv--interactive-helper))
   (function-documentation (cconv--interactive-helper--fun f)))
 
 ;; This should be in `oclosure.el' but that file is loaded before `cl-generic'.
-'(cl-defgeneric oclosure-interactive-form (_function)
+(cl-defgeneric oclosure-interactive-form (_function)
   "Return the interactive form of FUNCTION or nil if none.
 This is called by `interactive-form' when invoked on OClosures.
 It should return either nil or a two-element list of the form (interactive FORM)
@@ -2815,7 +2815,7 @@ instead."
   ;; (interactive-form function)
   nil)
 
-'(cl-defmethod oclosure-interactive-form ((f cconv--interactive-helper))
+(cl-defmethod oclosure-interactive-form ((f cconv--interactive-helper))
   (let ((if (cconv--interactive-helper--if f)))
     `(interactive ,(if (functionp if) `(funcall ',if) if))))
 
