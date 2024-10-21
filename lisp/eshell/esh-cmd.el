@@ -802,9 +802,9 @@ After evaluating BODY, automatically release the handles, allowing them
 to close."
   (declare (indent 1))
   `(let ((eshell-current-handles (eshell-create-handles ,@handle-args)))
-     (unwind-protect
-         ,(if (length= body 1) (car body) `(progn ,@body))
-       (eshell-close-handles))))
+     (catch 'top-level
+       ,(if (length= body 1) (car body) `(progn ,@body)))
+     (eshell-close-handles)))
 
 (defmacro eshell-with-copied-handles (&rest body)
   "Copy the current I/O handles and evaluate BODY.
@@ -813,9 +813,9 @@ to close."
   (declare (indent 0))
   `(let ((eshell-current-handles
           (eshell-duplicate-handles eshell-current-handles)))
-     (unwind-protect
-         ,(if (length= body 1) (car body) `(progn ,@body))
-       (eshell-close-handles))))
+     (catch 'top-level
+       ,(if (length= body 1) (car body) `(progn ,@body)))
+     (eshell-close-handles)))
 
 (defmacro eshell-do-subjob (object)
   "Evaluate a command OBJECT as a subjob.
