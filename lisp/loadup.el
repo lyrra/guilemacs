@@ -234,6 +234,8 @@ that the search has reached."
 
 (load "help-macro")
 (load "help")
+(load "emacs-lisp/cl-generic")
+(load "simple")
 (load "help-fns")
 
 (load "faces2")
@@ -286,8 +288,6 @@ that the search has reached."
 (load "language/indonesian")
 
 (load "indent")
-(load "simple")
-(load "emacs-lisp/cl-generic")
 (load "minibuffer") ; Needs cl-generic, seq (and define-minor-mode).
 (load "emacs-lisp/seq")
 (load "emacs-lisp/nadvice")
