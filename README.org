@@ -21,7 +21,7 @@ export CFLAGS="-Og -ggdb3"
 rm -f configure
 sh autogen.sh
 ./configure --prefix=/t/ge/e2015 \
-            --disable-silent-rules --enable-internal-debug \
+            --disable-silent-rules \
             --with-native-compilation=no --without-modules \
             --without-threads --with-jpeg=no --without-cairo \
             --without-tree-sitter \
