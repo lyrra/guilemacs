@@ -1900,21 +1900,6 @@ union double_and_words
   EMACS_UINT word[WORDS_PER_DOUBLE];
 };
 
-/* Return true if the floats X and Y have the same value.
-   This looks at X's and Y's representation, since (unlike '==')
-   it returns true if X and Y are the same NaN.  */
-static bool
-same_float (Lisp_Object x, Lisp_Object y)
-{
-  union double_and_words
-    xu = { .val = XFLOAT_DATA (x) },
-    yu = { .val = XFLOAT_DATA (y) };
-  EMACS_UINT neql = 0;
-  for (int i = 0; i < WORDS_PER_DOUBLE; i++)
-    neql |= xu.word[i] ^ yu.word[i];
-  return !neql;
-}
-
 /* True if X can be compared using `eq'.
    This predicate is approximative, for maximum speed.  */
 static bool
@@ -2916,13 +2901,6 @@ string_equal_p (SCM o1, SCM o2)
       && !compare_string_intervals (o1, o2))
     return SCM_BOOL_F;
   return SCM_BOOL_T;
-}
-
-static bool
-internal_equal (Lisp_Object o1, Lisp_Object o2, enum equal_kind equal_kind,
-		int depth, Lisp_Object ht)
-{
-  return internal_equal_1 (o1, o2, equal_kind, depth, &ht);
 }
 
 /* Return -1/0/1 for the </=/> lexicographic relation between bool-vectors.  */
