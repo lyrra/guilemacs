@@ -662,16 +662,6 @@ struct Lisp_Symbol
     struct
     {
       Lisp_Object self_;
-
-      /* Indicates where the value can be found.  */
-      ENUM_BF (symbol_redirect) redirect_ : 2;
-
-      ENUM_BF (symbol_trapped_write) trapped_write_ : 2;
-
-      /* True means that this variable has been explicitly declared
-	 special (with `defvar' etc), and shouldn't be lexically bound.  */
-      bool_bf declared_special_ : 1;
-
       /* Value of the symbol or Qunbound if unbound.  Which alternative of the
 	 union is used depends on the `redirect' field above.  */
       union {
@@ -745,7 +735,6 @@ extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
 extern Lisp_Object xsymbol_fn;
-extern Lisp_Object Ffboundp (Lisp_Object);
 
 /* The index of the C-defined Lisp symbol SYM.
    This can be used in a static initializer.  */
@@ -941,12 +930,6 @@ XSYMBOL (Lisp_Object a)
 #define XBARE_SYMBOL(a) XSYMBOL(a)
 
 INLINE Lisp_Object
-make_lisp_symbol (struct Lisp_Symbol *sym)
-{
-  return scm_c_vector_ref (sym, 0);
-}
-
-INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
   struct Lisp_Symbol *sym = lispsym + index;
@@ -1073,28 +1056,21 @@ make_lisp_ptr (void *ptr, enum Lisp_Type type)
 union Lisp_Fwd;
 INLINE bool BOOL_VECTOR_P (Lisp_Object);
 INLINE bool BUFFER_OBJFWDP (lispfwd);
-INLINE bool BUFFERP (Lisp_Object);
 INLINE bool CHAR_TABLE_P (Lisp_Object);
 INLINE Lisp_Object CHAR_TABLE_REF_ASCII (Lisp_Object, ptrdiff_t);
 INLINE bool (CONSP) (Lisp_Object);
 INLINE bool (FLOATP) (Lisp_Object);
-INLINE bool functionp (Lisp_Object);
 INLINE bool (INTEGERP) (Lisp_Object);
 INLINE bool (MARKERP) (Lisp_Object);
-INLINE bool (MISCP) (Lisp_Object);
 INLINE bool (NILP) (Lisp_Object);
 INLINE bool OVERLAYP (Lisp_Object);
-INLINE bool PROCESSP (Lisp_Object);
 INLINE bool PSEUDOVECTORP (Lisp_Object, int);
-INLINE bool SAVE_VALUEP (Lisp_Object);
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 					      Lisp_Object);
 INLINE bool STRINGP (Lisp_Object);
 INLINE bool SUB_CHAR_TABLE_P (Lisp_Object);
 INLINE bool (SYMBOLP) (Lisp_Object);
 INLINE bool (VECTORLIKEP) (Lisp_Object);
-INLINE bool WINDOWP (Lisp_Object);
-INLINE struct Lisp_Save_Value *XSAVE_VALUE (Lisp_Object);
 
 /* Defined in chartab.c.  */
 extern Lisp_Object char_table_ref (Lisp_Object, int);
@@ -1105,15 +1081,8 @@ extern void char_table_set (Lisp_Object, int, Lisp_Object);
 //extern Lisp_Object Qt;
 extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 
-/* True means Emacs has already been initialized.
-   Used during startup to detect startup of dumped Emacs.  */
-extern bool initialized;
-
 /* Defined in eval.c.  */
 //extern Lisp_Object Qautoload;
-
-/* Defined in floatfns.c.  */
-extern double extract_float (Lisp_Object);
 
 /* Defined in process.c.  */
 //extern Lisp_Object Qprocessp;
@@ -2160,7 +2129,7 @@ check_obarray (Lisp_Object obarray)
 typedef struct {
   struct Lisp_Obarray *o;
   ptrdiff_t idx;		/* Current bucket index.  */
-  struct Lisp_Symbol *symbol;	/* Current symbol, or NULL if at end
+  sym_t symbol;	/* Current symbol, or NULL if at end
 				   of current bucket.  */
 } obarray_iter_t;
 
@@ -2189,30 +2158,6 @@ obarray_iter_at_end (obarray_iter_t *it)
     }
   return true;
 }
-
-/* Advance IT to the next symbol if any.  */
-INLINE void
-obarray_iter_step (obarray_iter_t *it)
-{
-  emacs_abort ();
-  //it->symbol = it->symbol->u.s.next;
-}
-
-/* The Lisp symbol at IT, if obarray_iter_at_end returned false.  */
-INLINE Lisp_Object
-obarray_iter_symbol (obarray_iter_t *it)
-{
-  emacs_abort ();
-  //return make_lisp_symbol (it->symbol);
-}
-
-/* Iterate IT over the symbols of the obarray OA.
-   The body shouldn't add or remove symbols in OA, but disobeying that rule
-   only risks symbols to be iterated more than once or not at all,
-   not crashes or data corruption.  */
-#define DOOBARRAY(oa, it)					\
-  for (obarray_iter_t it = make_obarray_iter (oa);		\
-       !obarray_iter_at_end (&it); obarray_iter_step (&it))
 
 /***********************************************************************
 			     Hash Tables
@@ -4482,7 +4427,6 @@ extern void define_error (Lisp_Object name, const char *message, Lisp_Object par
 extern bool FUNCTIONP (Lisp_Object);
 extern Lisp_Object funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *arg_vector);
 extern Lisp_Object eval_sub (Lisp_Object form);
-extern Lisp_Object Ffuncall (ptrdiff_t nargs, Lisp_Object *args);
 extern Lisp_Object apply1 (Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
 extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);

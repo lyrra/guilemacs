@@ -5156,17 +5156,6 @@ DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
   return Qnil;
 }
 
-/*
-void
-map_obarray (Lisp_Object obarray,
-	     void (*fn) (Lisp_Object, Lisp_Object), Lisp_Object arg)
-{
-  CHECK_OBARRAY (obarray);
-  DOOBARRAY (XOBARRAY (obarray), it)
-    (*fn) (obarray_iter_symbol (&it), arg);
-}
-*/
-
 DEFUN ("internal--obarray-buckets",
        Finternal__obarray_buckets, Sinternal__obarray_buckets, 1, 1, 0,
        doc: /* Symbols in each bucket of OBARRAY.  Internal use only.  */)
