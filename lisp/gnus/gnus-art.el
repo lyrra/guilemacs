@@ -42,6 +42,7 @@
 (require 'mouse)
 (require 'seq)
 (require 'range)
+(require 'browse-url)
 
 (autoload 'gnus-msg-mail "gnus-msg" nil t)
 (autoload 'gnus-button-mailto "gnus-msg")
