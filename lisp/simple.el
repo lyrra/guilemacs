@@ -2801,7 +2801,7 @@ function as needed."
 '(cl-defmethod function-documentation ((function accessor))
   (oclosure--accessor-docstring function)) ;; FIXME: η-reduce!
 
-(cl-defmethod function-documentation ((f cconv--interactive-helper))
+'(cl-defmethod function-documentation ((f cconv--interactive-helper))
   (function-documentation (cconv--interactive-helper--fun f)))
 
 ;; This should be in `oclosure.el' but that file is loaded before `cl-generic'.
