@@ -8921,7 +8921,8 @@ x_hide_tip (bool delete)
       else
 	tip_frame = Qnil;
 
-      return unbind_to (count, was_open);
+      dynwind_end ();
+      return was_open;
     }
 #else /* not USE_GTK */
   if (NILP (tip_frame)
