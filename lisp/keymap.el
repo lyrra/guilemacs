@@ -627,14 +627,14 @@ should be a MENU form as accepted by `easy-menu-define'.
         (unless definitions
           (error "Missing keyword value for %s" keyword))
         (let ((value (pop definitions)))
-          (pcase keyword
-            (:full (setq full value))
-            (:keymap (setq keymap value))
-            (:parent (setq parent value))
-            (:suppress (setq suppress value))
-            (:name (setq name value))
-            (:prefix (setq prefix value))
-            (_ (error "Invalid keyword: %s" keyword))))))
+          (cond
+            ((eq keyword :full) (setq full value))
+            ((eq keyword :keymap) (setq keymap value))
+            ((eq keyword :parent) (setq parent value))
+            ((eq keyword :suppress) (setq suppress value))
+            ((eq keyword :name) (setq name value))
+            ((eq keyword :prefix) (setq prefix value))
+            (t (error "Invalid keyword: %s" keyword))))))
 
     (when (and prefix
                (or full parent suppress keymap))
