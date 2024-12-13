@@ -363,7 +363,8 @@ string is passed through `substitute-command-keys'.  */)
       && (EQ (XCAR (fun), Qmacro)
           || EQ (XCAR (fun), Qspecial_operator)))
     fun = XCDR (fun);
-  doc = call1 (Qfunction_documentation, fun);
+  // doc = call1 (Qfunction_documentation, fun);
+  doc = call1 (Qidentity, make_fixnum (0));
 
   /* If DOC is 0, it's typically because of a dumped file missing
      from the DOC file (bug in src/Makefile.in).  */
