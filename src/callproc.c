@@ -32,23 +32,6 @@ extern char **environ;
 #include <sys/file.h>
 #include <fcntl.h>
 
-/* In order to be able to use `posix_spawn', it needs to support some
-   variant of `chdir' as well as `setsid'.  */
-#if defined HAVE_SPAWN_H && defined HAVE_POSIX_SPAWN        \
-  && defined HAVE_POSIX_SPAWNATTR_SETFLAGS                  \
-  && (defined HAVE_POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR        \
-      || defined HAVE_POSIX_SPAWN_FILE_ACTIONS_ADDCHDIR_NP) \
-  && defined HAVE_DECL_POSIX_SPAWN_SETSID                   \
-  && HAVE_DECL_POSIX_SPAWN_SETSID == 1			    \
-  /* posix_spawnattr_setflags rejects POSIX_SPAWN_SETSID on \
-     Haiku */						    \
-  && !defined HAIKU
-# include <spawn.h>
-# define USABLE_POSIX_SPAWN 1
-#else
-# define USABLE_POSIX_SPAWN 0
-#endif
-
 #include "lisp.h"
 
 #ifdef SETUP_SLAVE_PTY
@@ -1461,61 +1444,9 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
     return 1;
 #endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
-
-#if USABLE_POSIX_SPAWN
-  /* Prefer the simpler `posix_spawn' if available.  `posix_spawn'
-     doesn't yet support setting up pseudoterminals, so we fall back
-     to `vfork' if we're supposed to use a pseudoterminal.  */
-
-  bool use_posix_spawn = pty_name == NULL;
-
-  posix_spawn_file_actions_t actions;
-  posix_spawnattr_t attributes;
-
-  if (use_posix_spawn)
-    {
-      /* Initialize optional attributes before blocking. */
-      int error = emacs_posix_spawn_init_actions (&actions, std_in,
-                                              std_out, std_err, cwd);
-      if (error != 0)
-	return error;
-
-      error = emacs_posix_spawn_init_attributes (&attributes, oldset);
-      if (error != 0)
-	return error;
-    }
-#endif
-
   int pid;
-  int vfork_error;
 
   eassert (input_blocked_p ());
-
-#if USABLE_POSIX_SPAWN
-  if (use_posix_spawn)
-    {
-      vfork_error = posix_spawn (&pid, argv[0], &actions, &attributes,
-                                 argv, envp);
-      if (vfork_error != 0)
-	pid = -1;
-
-      int error = posix_spawn_file_actions_destroy (&actions);
-      if (error != 0)
-	{
-	  errno = error;
-	  emacs_perror ("posix_spawn_file_actions_destroy");
-	}
-
-      error = posix_spawnattr_destroy (&attributes);
-      if (error != 0)
-	{
-	  errno = error;
-	  emacs_perror ("posix_spawnattr_destroy");
-	}
-
-      goto fork_done;
-    }
-#endif
 
 #ifndef WINDOWSNT
   /* vfork, and prevent local vars from being clobbered by the vfork.  */
@@ -1668,7 +1599,7 @@ emacs_spawn (pid_t *newpid, int std_in, int std_out, int std_err,
 
   /* Back in the parent process.  */
 
-  vfork_error = pid < 0 ? errno : 0;
+  int vfork_error = pid < 0 ? errno : 0;
 
 #if USABLE_POSIX_SPAWN
  fork_done:
