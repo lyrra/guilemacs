@@ -24,9 +24,8 @@
   #:use-module (ice-9 match)
   #:use-module (git)
   ;#:use-module (git object)
-  )
-
-(libgit2-init!)
+  #:use-module (srfi srfi-171)
+  #:use-module (rnrs io ports))
 
 (define (print-commit commit line-mode sexp)
   (let ((id (substring (oid->string (commit-id commit)) 0 8)))
@@ -45,16 +44,33 @@
       (format #t "~%~a~%" (commit-message commit))
       (format #t "~%")))))
 
-(define (fold-git-log commits stopnum)
-  ;(format #t "stopn ~a   ~s~%" stopnum commits)
-  (if (and stopnum (<= stopnum 0))
-      commits
-      ; cheating a bit: assumes single parent, and parent exists (ie not reaching root)
-      (let ((parent (car (commit-parents (car commits)))))
-        (if parent
-            (fold-git-log (cons parent commits)
-                          (if stopnum (1- stopnum) #f))
-            commits))))
+; expressing the generator as a fold would be cleaner,
+; but we need to yield, so can't use standard srfi-1 fold,
+; but would need a DSL that expresses fold as a generator
+; that's why this looks so imperative,
+; it's the result of that compilation
+(define (commit-generator commit stopnum)
+  (let ((current-commit commit))
+    (lambda ()
+      (if (and stopnum (<= stopnum 0))
+          (eof-object)
+          ; cheating a bit: assumes single parent, and parent exists (ie not reaching root)
+          (let ((parent (car (commit-parents current-commit))))
+            (if parent
+                (begin
+                  (if stopnum
+                      (set! stopnum (1- stopnum)))
+                  (let ((ret-commit current-commit))
+                    (set! current-commit parent)
+                    ret-commit))
+                (eof-object)))))))
+
+(define (print-commit-transducer line-mode sexp)
+  (lambda (reducer)
+    (lambda (result . commits)
+      (if (null? commits)
+          result
+          (print-commit (car commits) line-mode sexp)))))
 
 (define (run-git-log repository line-mode sexp stopnum ref)
   (let* ((oid (if ref
@@ -63,27 +79,34 @@
                                                    (string-length ref)))
                   (reference-target (repository-head repository))))
          (commit (commit-lookup repository oid)))
-    (for-each (lambda (commit)
-                (print-commit commit line-mode sexp))
-              (reverse (fold-git-log (list commit) stopnum)))))
+    (generator-transduce
+     ; do side-effect during run of transducer
+     (print-commit-transducer line-mode sexp)
+     ; we dont collect anything, so dont build any result
+     (lambda (x y) #f)
+     #f
+     (commit-generator commit stopnum))))
 
-(let* ((directory "./")
-       (repository (repository-open directory)))
-  (let ((line-mode #f)
-        (stopnum #f)
-        (sexp #f)
-        (ref #f))
-    (for-each (lambda (arg)
-                (cond
-                 ((string=? "-l" arg) (set! line-mode arg))
-                 ((string=? "-s" arg) (set! sexp arg))
-                 ((char=? #\- (string-ref arg 0))
-                  (if (char=? #\- (string-ref arg 0))
-                      (set! stopnum (or stopnum
-                                        (string->number (substring arg 1))))))
-                 (else
-                  (set! ref arg))))
-              (cdr (command-line)))
-    (run-git-log repository line-mode sexp stopnum ref)))
+(define (run-git args)
+  (libgit2-init!)
+  (let* ((directory "./")
+         (repository (repository-open directory)))
+    (let ((line-mode #f)
+          (stopnum #f)
+          (sexp #f)
+          (ref #f))
+      (for-each (lambda (arg)
+                  (cond
+                   ((string=? "-l" arg) (set! line-mode arg))
+                   ((string=? "-s" arg) (set! sexp arg))
+                   ((char=? #\- (string-ref arg 0))
+                    (if (char=? #\- (string-ref arg 0))
+                        (set! stopnum (or stopnum
+                                          (string->number (substring arg 1))))))
+                   (else
+                    (set! ref arg))))
+                (cdr args))
+      (run-git-log repository line-mode sexp stopnum ref)))
+  (libgit2-shutdown!))
 
-(libgit2-shutdown!)
+(run-git (command-line))
