@@ -45,15 +45,16 @@
       (format #t "~%~a~%" (commit-message commit))
       (format #t "~%")))))
 
-(define (loop-git-log commit stopn pfun)
-  (when (or (not stopn) (> stopn 0))
-    (pfun commit)
-    ; cheating a bit: assumes single parent, and parent exists (ie not reaching root)
-    (let ((parent (car (commit-parents commit))))
-      (if parent
-          (loop-git-log parent
-                        (if stopn (1- stopn) #f)
-                        pfun)))))
+(define (fold-git-log commits stopnum)
+  ;(format #t "stopn ~a   ~s~%" stopnum commits)
+  (if (and stopnum (<= stopnum 0))
+      commits
+      ; cheating a bit: assumes single parent, and parent exists (ie not reaching root)
+      (let ((parent (car (commit-parents (car commits)))))
+        (if parent
+            (fold-git-log (cons parent commits)
+                          (if stopnum (1- stopnum) #f))
+            commits))))
 
 (define (run-git-log repository line-mode sexp stopnum ref)
   (let* ((oid (if ref
@@ -62,9 +63,9 @@
                                                    (string-length ref)))
                   (reference-target (repository-head repository))))
          (commit (commit-lookup repository oid)))
-    (loop-git-log commit stopnum
-                  (lambda (commit)
-                    (print-commit commit line-mode sexp)))))
+    (for-each (lambda (commit)
+                (print-commit commit line-mode sexp))
+              (reverse (fold-git-log (list commit) stopnum)))))
 
 (let* ((directory "./")
        (repository (repository-open directory)))
