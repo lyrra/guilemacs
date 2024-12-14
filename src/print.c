@@ -2531,9 +2531,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
         else
           scm_write (obj, port);
         scm_display (SCM_MAKE_CHAR ('>'), port);
-        //guilemacs: this looks wrong (size_byte = -1)
-        //strout (scm_to_locale_string (scm_get_output_string (port)),
-        //        -1, -1, printcharfun);
+        char* str = scm_to_locale_string (scm_get_output_string (port));
+        strout (str, strlen(str), strlen(str), printcharfun);
         scm_close_port (port);
       }
       break;
