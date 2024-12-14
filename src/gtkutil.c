@@ -241,13 +241,13 @@ xg_display_open (char *display_name, GdkDisplay **dpy)
 {
   GdkDisplay *gdpy;
 
-  unrequest_sigio ();  /* See comment in x_display_ok, xterm.c.  */
+  // unrequest_sigio ();  /* See comment in x_display_ok, xterm.c.  */
 #ifndef HAVE_PGTK
   gdpy = gdk_display_open (display_name);
 #else
   gdpy = gdk_display_open (strlen (display_name) == 0 ? NULL : display_name);
 #endif
-  request_sigio ();
+  // request_sigio ();
   if (!gdpy_def && gdpy)
     {
       gdpy_def = gdpy;

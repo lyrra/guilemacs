@@ -1281,7 +1281,7 @@ in the font selection dialog.  */)
     }
 
   popup_activated_p++;
-  unrequest_sigio ();
+  // unrequest_sigio ();
   rc = be_select_font (process_pending_signals,
 		       haikufont_should_quit_popup,
 		       &family, &style, &size,
@@ -1289,7 +1289,7 @@ in the font selection dialog.  */)
 		       initial_family, initial_style,
 		       initial_size, initial_antialias,
 		       &disable_antialiasing);
-  request_sigio ();
+  // request_sigio ();
   popup_activated_p--;
 
   if (!rc)

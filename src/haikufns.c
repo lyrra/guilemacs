@@ -2907,7 +2907,7 @@ Optional arg SAVE_TEXT, if non-nil, specifies some text to show in the entry fie
   f = decode_window_system_frame (frame);
 
   ++popup_activated_p;
-  unrequest_sigio ();
+  // unrequest_sigio ();
   file_name = be_popup_file_dialog (!NILP (mustmatch) || !NILP (dir_only_p),
 				    !NILP (dir) ? SSDATA (dir) : NULL,
 				    !NILP (mustmatch), !NILP (dir_only_p),
@@ -2916,7 +2916,7 @@ Optional arg SAVE_TEXT, if non-nil, specifies some text to show in the entry fie
 				     ? SSDATA (ENCODE_UTF_8 (save_text)) : NULL),
 				    SSDATA (ENCODE_UTF_8 (prompt)),
 				    process_pending_signals);
-  request_sigio ();
+  // request_sigio ();
   --popup_activated_p;
 
   if (!file_name)
@@ -3071,10 +3071,10 @@ call this function yourself.  */)
   reply.quit_reply = !NILP (quit_reply);
 
   block_input ();
-  unrequest_sigio ();
+  // unrequest_sigio ();
   write_port (port_emacs_to_session_manager, 0, &reply,
 	      sizeof reply);
-  request_sigio ();
+  // request_sigio ();
   unblock_input ();
 
   return Qnil;

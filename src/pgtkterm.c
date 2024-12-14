@@ -7071,9 +7071,9 @@ pgtk_term_init (Lisp_Object display_name, char *resource_name)
 
 	/* gtk_init does set_locale.  Fix locale before and after.  */
 	fixup_locale ();
-	unrequest_sigio ();	/* See comment in x_display_ok.  */
+	// unrequest_sigio ();	/* See comment in x_display_ok.  */
 	gtk_init (&argc, &argv2);
-	request_sigio ();
+	// request_sigio ();
 	fixup_locale ();
 
 
