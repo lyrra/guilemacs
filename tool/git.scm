@@ -72,11 +72,19 @@
           result
           (print-commit (car commits) line-mode sexp)))))
 
-(define (run-git-log repository line-mode sexp stopnum ref)
-  (let* ((oid (if ref
-                  (object-id (object-lookup-prefix repository
-                                                   (string->oid ref)
-                                                   (string-length ref)))
+(define (get-commit-from-ref-or-name repo ref-or-name)
+  (let ((iter (reference-iterator-glob-new repo (string-concatenate (list "refs/tags/" ref-or-name "*"))))
+        (tag #f))
+    (let ((ref (false-if-exception (reference-next iter))))
+      (if ref
+          (reference-name->oid repo
+                               (reference-name ref))
+          (object-id (object-lookup-prefix repo (string->oid ref-or-name)
+                                           (string-length ref-or-name)))))))
+
+(define (run-git-log repository line-mode sexp stopnum ref-or-name)
+  (let* ((oid (if ref-or-name
+                  (get-commit-from-ref-or-name repository ref-or-name)
                   (reference-target (repository-head repository))))
          (commit (commit-lookup repository oid)))
     (generator-transduce
@@ -94,7 +102,7 @@
     (let ((line-mode #f)
           (stopnum #f)
           (sexp #f)
-          (ref #f))
+          (ref-or-name #f))
       (for-each (lambda (arg)
                   (cond
                    ((string=? "-l" arg) (set! line-mode arg))
@@ -104,9 +112,9 @@
                         (set! stopnum (or stopnum
                                           (string->number (substring arg 1))))))
                    (else
-                    (set! ref arg))))
+                    (set! ref-or-name arg))))
                 (cdr args))
-      (run-git-log repository line-mode sexp stopnum ref)))
+      (run-git-log repository line-mode sexp stopnum ref-or-name)))
   (libgit2-shutdown!))
 
 (run-git (command-line))
