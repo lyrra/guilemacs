@@ -240,10 +240,15 @@
       `(interactive (advice-eval-interactive-spec
                      (cadr (advice--interactive-form-1 ',function)))))))
 
-(defun advice--make-interactive-form (iff ifm)
-  (let* ((fspec (cadr iff)))
+(defun advice--make-interactive-form (function main)
+  ;; TODO: make it so that interactive spec can be a constant which
+  ;; dynamically checks the advice--car/cdr to do its job.
+  ;; For that, advice-eval-interactive-spec needs to be more faithful.
+  (let* ((iff (advice--interactive-form function))
+         (ifm (advice--interactive-form main))
+         (fspec (cadr iff)))
     (when (memq (car-safe fspec) '(function quote)) ;; Macroexpanded lambda?
-      (setq fspec (eval fspec t)))
+      (setq fspec (nth 1 fspec)))
     (if (functionp fspec)
         `(funcall ',fspec ',(cadr ifm))
       (cadr (or iff ifm)))))
