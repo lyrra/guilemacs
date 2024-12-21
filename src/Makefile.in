@@ -704,13 +704,13 @@ endif
 ## for the first time, this prevents any variation between configurations
 ## in the contents of the DOC file.
 ##
-$(etc)/DOC: $(libsrc)/make-docfile$(EXEEXT) $(doc_obj)
+$(etc)/DOC: $(doc_obj)
 	$(AM_V_GEN)$(MKDIR_P) $(etc)
 	$(AM_V_at)rm -f $(etc)/DOC
-	$(AM_V_at)$(libsrc)/make-docfile -d $(srcdir) \
+	guile --no-auto-compile -l $(libsrc)/make-docfile.scm -e main -- -d $(srcdir) \
 	  $(SOME_MACHINE_OBJECTS) $(doc_obj) > $(etc)/DOC
 
-$(libsrc)/make-docfile$(EXEEXT) $(libsrc)/make-fingerprint$(EXEEXT): \
+$(libsrc)/make-fingerprint$(EXEEXT): \
   $(hostlib)/libgnu.a
 	$(MAKE) -C $(dir $@) $(notdir $@)
 
@@ -723,8 +723,8 @@ buildobj.h: Makefile
 
 GLOBAL_SOURCES = $(base_obj:.o=.c) $(NS_OBJC_OBJ:.o=.m)
 
-gl-stamp: $(libsrc)/make-docfile$(EXEEXT) $(GLOBAL_SOURCES)
-	$(AM_V_GLOBALS)$(libsrc)/make-docfile -d $(srcdir) -g $(doc_obj) > globals.tmp
+gl-stamp: $(libsrc)/make-docfile.scm $(GLOBAL_SOURCES)
+	$(AM_V_GLOBALS)guile --no-auto-compile -l $(libsrc)/make-docfile.scm -e main -- -d $(srcdir) -g $(doc_obj) > globals.tmp
 	$(AM_V_at)$(top_srcdir)/build-aux/move-if-change globals.tmp globals.h
 	$(AM_V_at)echo timestamp > $@
 
