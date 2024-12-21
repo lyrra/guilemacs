@@ -1,5 +1,8 @@
 Guilemacs
 
+You're most probably looking for https://codeberg.org/guile-emacs/guile-emacs/.
+This repository is an experimental and exploratory branch of guile-emacs.
+
 Work in progress. Dont try this yet! This will not produce a functioning Emacs.
 
 * run
@@ -471,6 +474,17 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
   | #include <gc.h>
 
 * todo
+** 20241215 c-x not working
+  Stopped working somewhere around r360.
+  - symptoms:
+    - issuing C-x is not working
+      - desc: leads to error message
+      - error-message: "C-s-x is undefined"
+** 20241215 hovering link org-mode crash :bug:
+  In an org-mode file, hover the mouse-pointer on a web-link,
+  after a few seconds emacs will crash.
+  Seen in tag:larry-r370-3652170d-20220131-29.0.50-TSHEDO
+
 ** 20241009 fix interactive with multiple args
   Currently we are reverting vanilla changes such as the expression (interactive nil snake-mode)
   into their former form (interactive).
