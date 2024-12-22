@@ -1345,23 +1345,6 @@ Return t if the file exists and loads successfully.  */)
     return
       call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
 
-  /* The presence of this call is the result of a historical accident:
-     it used to be in every file-operation and when it got removed
-     everywhere, it accidentally stayed here.  Since then, enough people
-     supposedly have things like (load "$PROJECT/foo.el") in their .emacs
-     that it seemed risky to remove.  */
-  if (! NILP (noerror))
-    {
-      file = internal_condition_case_1 (Fsubstitute_in_file_name, file,
-					Qt, load_error_handler);
-      if (NILP (file)) {
-        dynwind_end ();
-        return Qnil;
-      }
-    }
-  else
-    file = Fsubstitute_in_file_name (file);
-
   bool no_native = suffix_p (file, ".elc");
 
   /* Avoid weird lossage with null string as arg,
