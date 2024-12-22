@@ -1171,14 +1171,6 @@ record_load_unwind (Lisp_Object old)
   Vloads_in_progress = old;
 }
 
-/* This handler function is used via internal_condition_case_1.  */
-
-static Lisp_Object
-load_error_handler (Lisp_Object data)
-{
-  return Qnil;
-}
-
 static void
 load_warn_unescaped_character_literals (Lisp_Object file)
 {
