@@ -1323,10 +1323,6 @@ Return t if the file exists and loads successfully.  */)
 {
   file_stream stream = NULL; // guilemacs cant use UNINIT, must always be zero
   lread_fd fd;
-#ifdef USE_ANDROID_ASSETS
-  int rc;
-  void *asset;
-#endif
   dynwind_begin ();
   Lisp_Object found, efound, hist_file_name;
   /* True means we printed the ".el is newer" message.  */
@@ -1345,18 +1341,11 @@ Return t if the file exists and loads successfully.  */)
     return
       call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
 
-  bool no_native = suffix_p (file, ".elc");
-
   /* Avoid weird lossage with null string as arg,
      since it would try to load a directory as a Lisp file.  */
   if (SCHARS (file) == 0)
     {
-#if !defined USE_ANDROID_ASSETS
       fd = -1;
-#else
-      fd.asset = NULL;
-      fd.fd = -1;
-#endif
       errno = ENOENT;
     }
   else
@@ -1368,15 +1357,11 @@ Return t if the file exists and loads successfully.  */)
 	{
 	  /* Don't insist on adding a suffix if FILE already ends with one.  */
 	  if (suffix_p (file, ".el")
-	      || suffix_p (file, ".elc")
 #ifdef HAVE_MODULES
 	      || suffix_p (file, MODULES_SUFFIX)
 #ifdef MODULES_SECONDARY_SUFFIX
               || suffix_p (file, MODULES_SECONDARY_SUFFIX)
 #endif
-#endif
-#ifdef HAVE_NATIVE_COMP
-              || suffix_p (file, NATIVE_ELISP_SUFFIX)
 #endif
 	      )
 	    must_suffix = Qnil;
@@ -1395,19 +1380,8 @@ Return t if the file exists and loads successfully.  */)
 	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
 	}
 
-#if !defined USE_ANDROID_ASSETS
       fd = openp (Vload_path, file, suffixes, &found, Qnil,
-		  load_prefer_newer, no_native, NULL);
-#else
-      asset = NULL;
-      rc = openp (Vload_path, file, suffixes, &found, Qnil,
-		  load_prefer_newer, no_native, &asset);
-      fd.fd = rc;
-      fd.asset = asset;
-
-      /* fd.asset will be non-NULL if this is actually an asset
-	 file.  */
-#endif
+		  load_prefer_newer, false, NULL);
     }
 
   if (lread_fd_cmp (-1))
@@ -1436,39 +1410,13 @@ Return t if the file exists and loads successfully.  */)
         dynwind_end ();
         return call5 (handler, Qload, found, noerror, nomessage, Qt);
       }
-#ifdef DOS_NT
-      /* Tramp has to deal with semi-broken packages that prepend
-	 drive letters to remote files.  For that reason, Tramp
-	 catches file operations that test for file existence, which
-	 makes openp think X:/foo.elc files are remote.  However,
-	 Tramp does not catch `load' operations for such files, so we
-	 end up with a nil as the `load' handler above.  If we would
-	 continue with fd = -2, we will behave wrongly, and in
-	 particular try reading a .elc file in the "rt" mode instead
-	 of "rb".  See bug #9311 for the results.  To work around
-	 this, we try to open the file locally, and go with that if it
-	 succeeds.  */
-      fd = emacs_open (SSDATA (ENCODE_FILE (found)), O_RDONLY, 0);
-      if (fd == -1)
-	fd = -2;
-#endif
     }
 
-#if !defined USE_ANDROID_ASSETS
   if (0 <= fd)
     {
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
       record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }
-#else
-  if (fd.asset || fd.fd >= 0)
-    {
-      /* Use a different kind of unwind_protect here.  */
-      fd_index = SPECPDL_INDEX ();
-      record_unwind_protect_ptr (close_file_unwind_android_fd,
-				 &fd);
-    }
-#endif
 
 #ifdef HAVE_MODULES
   bool is_module =
@@ -1481,11 +1429,7 @@ Return t if the file exists and loads successfully.  */)
   bool is_module = false;
 #endif
 
-#ifdef HAVE_NATIVE_COMP
-  bool is_native_elisp = suffix_p (found, NATIVE_ELISP_SUFFIX);
-#else
   bool is_native_elisp = false;
-#endif
 
   /* Check if we're stuck in a recursive load cycle.
 
@@ -1530,66 +1474,7 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qlread_unescaped_character_literals, Qnil);
   record_unwind_protect (load_warn_unescaped_character_literals, file);
 
-  bool is_elc = suffix_p (found, ".elc");
-  if (is_elc
-      /* version = 1 means the file is empty, in which case we can
-	 treat it as not byte-compiled.  */
-      || (lread_fd_p
-	  && (version = safe_to_load_version (file, fd)) > 1))
-    /* Load .elc files directly, but not when they are
-       remote and have no handler!  */
-    {
-      if (!lread_fd_cmp (-2))
-	{
-	  struct stat s1, s2;
-	  int result;
-
-	  struct timespec epoch_timespec = {(time_t)0, 0}; /* 1970-01-01T00:00 UTC */
-	  if (version < 0 && !(version = safe_to_load_version (file, fd)))
-	    error ("File `%s' was not compiled in Emacs", SDATA (found));
-
-	  compiled = 1;
-
-	  efound = ENCODE_FILE (found);
-	  fmode = "r" FOPEN_BINARY;
-
-          /* openp already checked for newness, no point doing it again.
-             FIXME would be nice to get a message when openp
-             ignores suffix order due to load_prefer_newer.  */
-          if (!load_prefer_newer && is_elc)
-            {
-	      result = emacs_fstatat (AT_FDCWD, SSDATA (efound), &s1, 0);
-              if (result == 0)
-                {
-                  SSET (efound, SBYTES (efound) - 1, 0);
-		  result = emacs_fstatat (AT_FDCWD, SSDATA (efound), &s2, 0);
-                  SSET (efound, SBYTES (efound) - 1, 'c');
-                }
-
-              if (result == 0
-                  && timespec_cmp (get_stat_mtime (&s1), get_stat_mtime (&s2)) < 0)
-                {
-                  /* Make the progress messages mention that source is newer.  */
-                  newer = 1;
-
-                  /* If we won't print another message, mention this anyway.  */
-                  if (!NILP (nomessage) && !force_load_messages
-		      /* We don't want this message during
-			 bootstrapping for the "compile-first" .elc
-			 files, which have had their timestamps set to
-			 the epoch.  See bug #58224.  */
-		      && timespec_cmp (get_stat_mtime (&s1), epoch_timespec))
-                    {
-                      Lisp_Object msg_file;
-                      msg_file = Fsubstring (found, make_fixnum (0), make_fixnum (-1));
-                      message_with_string ("Source file `%s' newer than byte-compiled file; using older file",
-                                           msg_file, 1);
-                    }
-                }
-            } /* !load_prefer_newer */
-	}
-    }
-  else if (!is_module && !is_native_elisp)
+  if (!is_module)
     {
       /* We are loading a source file (*.el).  */
       if (!NILP (Vload_source_file_function))
@@ -1625,15 +1510,7 @@ Return t if the file exists and loads successfully.  */)
       efound = ENCODE_FILE (found);
       stream = emacs_fopen (SSDATA (efound), fmode);
 #else
-#if !defined USE_ANDROID_ASSETS
       stream = emacs_fdopen (fd, fmode);
-#else
-      /* Android systems use special file descriptors which can point
-	 into compressed data and double as file streams.  FMODE is
-	 unused.  */
-      ((void) fmode);
-      stream = fd;
-#endif
 #endif
     }
 
@@ -1695,34 +1572,13 @@ Return t if the file exists and loads successfully.  */)
       emacs_abort ();
 #endif
     }
-  else if (is_native_elisp)
-    {
-#ifdef HAVE_NATIVE_COMP
-      loadhist_initialize (hist_file_name);
-      Fnative_elisp_load (found, Qnil);
-      build_load_history (hist_file_name, true);
-#else
-      /* This cannot happen.  */
-      emacs_abort ();
-#endif
-
-    }
   else
     {
       if (lisp_file_lexical_cookie (Qget_file_char) == Cookie_Lex)
         Fset (Qlexical_binding, Qt);
 
-      if (! version || version >= 22)
-        readevalloop (Qget_file_char, &input, hist_file_name,
-                      0, Qnil, Qnil, Qnil, Qnil);
-      else
-        {
-          /* We can't handle a file which was compiled with
-             byte-compile-dynamic by older version of Emacs.  */
-          specbind (Qload_force_doc_strings, Qt);
-          readevalloop (Qget_emacs_mule_file_char, &input, hist_file_name,
-                        0, Qnil, Qnil, Qnil, Qnil);
-        }
+      readevalloop (Qget_file_char, &input, hist_file_name,
+                    0, Qnil, Qnil, Qnil, Qnil);
     }
   dynwind_end ();
 
