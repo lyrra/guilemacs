@@ -4553,8 +4553,8 @@ fread0 ()
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
-  bool multibyte;
-  int c = READCHAR_REPORT_MULTIBYTE (&multibyte);
+  bool multibyte = false;
+  int c = freadchar ();
   if (c < 0)
     end_of_file_error ();
 
@@ -4697,7 +4697,7 @@ fread0 ()
 		  }
 		else
 		  {
-		    UNREAD (ch);
+		    funreadchar (ch);
 		    INVALID_SYNTAX_WITH_BUFFER ();
 		  }
 	      }
@@ -4713,7 +4713,7 @@ fread0 ()
 	      }
 	    else
 	      {
-		UNREAD (ch);
+		funreadchar (ch);
 		INVALID_SYNTAX_WITH_BUFFER ();
 	      }
 
@@ -4784,14 +4784,14 @@ fread0 ()
 
 	  case ':':
 	    /* #:X -- uninterned symbol */
-	    c = READCHAR;
+	    c = freadchar ();
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
 		|| c == '`' || c == ',')
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
-		UNREAD (c);
+		funreadchar (c);
 		obj = Fmake_symbol (empty_unibyte_string);
 		break;
 	      }
@@ -4801,14 +4801,14 @@ fread0 ()
 
 	  case '_':
 	    /* #_X -- symbol without shorthand */
-	    c = READCHAR;
+	    c = freadchar ();
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
 		|| c == '`' || c == ',')
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
-		UNREAD (c);
+		funreadchar (c);
 		obj = Fintern (empty_unibyte_string, Qnil);
 		break;
 	      }
@@ -4910,14 +4910,14 @@ fread0 ()
 
     case ',':
       {
-	int ch = READCHAR;
+	int ch = freadchar ();
 	Lisp_Object sym;
 	if (ch == '@')
 	  sym = Qcomma_at;
 	else
 	  {
 	    if (ch >= 0)
-	      UNREAD (ch);
+	      funreadchar (ch);
 	    sym = Qcomma;
 	  }
 	read_stack_push ((struct read_stack_entry) {
