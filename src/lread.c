@@ -441,6 +441,53 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   return STRING_CHAR (buf);
 }
 
+static int
+readchar_load ()
+{
+  Lisp_Object readcharfun = Qget_file_char;
+  bool *multibyte = NULL;
+  register int c;
+  int (*readbyte) (int, Lisp_Object) = readbyte_from_file;
+  unsigned char buf[MAX_MULTIBYTE_LENGTH];
+  int i, len;
+  bool emacs_mule_encoding = 0;
+
+  readchar_offset++;
+
+  eassert (infile);
+  readbyte = readbyte_from_file;
+
+ read_multibyte:
+  if (unread_char >= 0)
+    {
+      c = unread_char;
+      unread_char = -1;
+      return c;
+    }
+  c = (*readbyte) (-1, readcharfun);
+  if (c < 0)
+    return c;
+  if (multibyte)
+    *multibyte = 1;
+  if (ASCII_CHAR_P (c))
+    return c;
+  i = 0;
+  buf[i++] = c;
+  len = BYTES_BY_CHAR_HEAD (c);
+  while (i < len)
+    {
+      buf[i++] = c = (*readbyte) (-1, readcharfun);
+      if (c < 0 || ! TRAILING_CODE_P (c))
+	{
+	  for (i -= c < 0; 0 < --i; )
+	    (*readbyte) (buf[i], readcharfun);
+	  return BYTE8_TO_CHAR (buf[0]);
+	}
+    }
+
+  return STRING_CHAR (buf);
+}
+
 #define FROM_FILE_P(readcharfun)			\
   (EQ (readcharfun, Qget_file_char)			\
    || EQ (readcharfun, Qget_emacs_mule_file_char))
@@ -2396,7 +2443,7 @@ readevalloop (Lisp_Object readcharfun,
 static int
 freadchar ()
 {
-  return readchar (Qget_file_char, NULL);
+  return readchar_load ();
 }
 void
 funreadchar (char c)
