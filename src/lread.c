@@ -442,7 +442,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 }
 
 static int
-readbyte_from_stdio2 (void)
+readbyte_from_stdio2 (struct infile *infile)
 {
   if (infile->lookahead)
     return infile->buf[--infile->lookahead];
@@ -450,18 +450,7 @@ readbyte_from_stdio2 (void)
   int c;
   file_stream instream = infile->stream;
 
-  block_input ();
-
-  /* Interrupted reads have been observed while reading over the network.  */
-  while ((c = getc (instream)) == EOF && errno == EINTR && ferror (instream))
-    {
-      unblock_input ();
-      maybe_quit ();
-      block_input ();
-      clearerr (instream);
-    }
-
-  unblock_input ();
+  c = getc (instream);
 
   return (c == EOF ? -1 : c);
 }
@@ -474,7 +463,6 @@ readchar_load ()
   register int c;
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i, len;
-  bool emacs_mule_encoding = 0;
 
   readchar_offset++;
 
@@ -486,7 +474,7 @@ readchar_load ()
       unread_char = -1;
       return c;
     }
-  c = readbyte_from_stdio2 ();
+  c = readbyte_from_stdio2 (infile);
 
   if (c < 0)
     return c;
@@ -497,9 +485,8 @@ readchar_load ()
   len = BYTES_BY_CHAR_HEAD (c);
   while (i < len)
     {
-      buf[i++] = c = readbyte_from_stdio2 ();
+      buf[i++] = c = readbyte_from_stdio2 (infile);
     }
-
   return STRING_CHAR (buf);
 }
 
