@@ -2393,7 +2393,7 @@ readevalloop (Lisp_Object readcharfun,
    START, END specify region to read in current buffer (from eval-region).
    If the input is not from a buffer, they must be nil.  */
 
-static char
+static int
 freadchar ()
 {
   return readchar (Qget_file_char, NULL);
@@ -4684,7 +4684,7 @@ fread0 ()
 	    READ_AND_BUFFER (ch);
 	    if (ch == '^')
 	      {
-		ch = READCHAR;
+		ch = freadchar ();
 		if (ch == '[')
 		  {
 		    read_stack_push ((struct read_stack_entry) {
@@ -4748,31 +4748,31 @@ fread0 ()
 	    {
 	      int c;
 	      do
-		c = READCHAR;
+		c = freadchar ();
 	      while (c >= 0 && c != '\n');
 	      goto read_obj;
 	    }
 
 	  case 'x':
 	  case 'X':
-	    obj = read_integer (readcharfun, 16);
+	    obj = read_integer (Qget_file_char, 16);
 	    break;
 
 	  case 'o':
 	  case 'O':
-	    obj = read_integer (readcharfun, 8);
+	    obj = read_integer (Qget_file_char, 8);
 	    break;
 
 	  case 'b':
 	  case 'B':
-	    obj = read_integer (readcharfun, 2);
+	    obj = read_integer (Qget_file_char, 2);
 	    break;
 
 	  case '@':
 	    /* #@NUMBER is used to skip NUMBER following bytes.
 	       That's used in .elc files to skip over doc strings
 	       and function definitions that can be loaded lazily.  */
-	    if (skip_lazy_string (readcharfun))
+	    if (skip_lazy_string (Qget_file_char))
 	      goto read_obj;
 	    obj = Qnil;	      /* #@00 skips to EOB/EOF and yields nil.  */
 	    break;
@@ -4835,8 +4835,8 @@ fread0 ()
 		  {
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
-		      invalid_radix_integer (n, readcharfun);
-		    obj = read_integer (readcharfun, n);
+		      invalid_radix_integer (n, Qget_file_char);
+		    obj = read_integer (Qget_file_char, n);
 		    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
@@ -4887,11 +4887,11 @@ fread0 ()
       }
 
     case '?':
-      obj = read_char_literal (readcharfun);
+      obj = read_char_literal (Qget_file_char);
       break;
 
     case '"':
-      obj = read_string_literal (readcharfun);
+      obj = read_string_literal (Qget_file_char);
       break;
 
     case '\'':
@@ -4931,15 +4931,15 @@ fread0 ()
       {
 	int c;
 	do
-	  c = READCHAR;
+	  c = freadchar ();
 	while (c >= 0 && c != '\n');
 	goto read_obj;
       }
 
     case '.':
       {
-	int nch = READCHAR;
-	UNREAD (nch);
+	int nch = freadchar ();
+	funreadchar (nch);
 	if (nch <= 32 || nch == NO_BREAK_SPACE
 	    || nch == '"' || nch == '\'' || nch == ';'
 	    || nch == '(' || nch == '[' || nch == '#'
@@ -4984,7 +4984,7 @@ fread0 ()
 
 	    if (c == '\\')
 	      {
-		c = READCHAR;
+		c = freadchar ();
 		if (c < 0)
 		  end_of_file_error ();
 		quoted = true;
@@ -4994,7 +4994,7 @@ fread0 ()
 	      p += CHAR_STRING (c, (unsigned char *) p);
 	    else
 	      *p++ = c;
-	    c = READCHAR;
+	    c = freadchar ();
 	  }
 	while (c > 32
 	       && c != NO_BREAK_SPACE
@@ -5005,7 +5005,7 @@ fread0 ()
 
 	*p = 0;
 	ptrdiff_t nbytes = p - read_buffer;
-	UNREAD (c);
+	funreadchar (c);
 
 	/* Only attempt to parse the token as a number if it starts as one.  */
 	char c0 = read_buffer[0];
@@ -5082,7 +5082,7 @@ fread0 ()
 	case RE_list_dot:
 	  {
 	    skip_space_and_comments (readcharfun);
-	    int ch = READCHAR;
+	    int ch = freadchar ();
 	    if (ch != ')')
 	      invalid_syntax ("expected )", readcharfun);
 	    XSETCDR (e->u.list.tail, obj);
