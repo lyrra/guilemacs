@@ -442,12 +442,36 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 }
 
 static int
+readbyte_from_stdio2 (void)
+{
+  if (infile->lookahead)
+    return infile->buf[--infile->lookahead];
+
+  int c;
+  file_stream instream = infile->stream;
+
+  block_input ();
+
+  /* Interrupted reads have been observed while reading over the network.  */
+  while ((c = getc (instream)) == EOF && errno == EINTR && ferror (instream))
+    {
+      unblock_input ();
+      maybe_quit ();
+      block_input ();
+      clearerr (instream);
+    }
+
+  unblock_input ();
+
+  return (c == EOF ? -1 : c);
+}
+
+
+static int
 readchar_load ()
 {
   Lisp_Object readcharfun = Qget_file_char;
-  bool *multibyte = NULL;
   register int c;
-  int (*readbyte) (int, Lisp_Object) = readbyte_from_file;
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i, len;
   bool emacs_mule_encoding = 0;
@@ -455,20 +479,17 @@ readchar_load ()
   readchar_offset++;
 
   eassert (infile);
-  readbyte = readbyte_from_file;
 
- read_multibyte:
   if (unread_char >= 0)
     {
       c = unread_char;
       unread_char = -1;
       return c;
     }
-  c = (*readbyte) (-1, readcharfun);
+  c = readbyte_from_stdio2 ();
+
   if (c < 0)
     return c;
-  if (multibyte)
-    *multibyte = 1;
   if (ASCII_CHAR_P (c))
     return c;
   i = 0;
@@ -476,13 +497,7 @@ readchar_load ()
   len = BYTES_BY_CHAR_HEAD (c);
   while (i < len)
     {
-      buf[i++] = c = (*readbyte) (-1, readcharfun);
-      if (c < 0 || ! TRAILING_CODE_P (c))
-	{
-	  for (i -= c < 0; 0 < --i; )
-	    (*readbyte) (buf[i], readcharfun);
-	  return BYTE8_TO_CHAR (buf[0]);
-	}
+      buf[i++] = c = readbyte_from_stdio2 ();
     }
 
   return STRING_CHAR (buf);
