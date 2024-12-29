@@ -779,6 +779,15 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   the git rebase "pick-list", is still named same.
 *** in magit-revision collapse all files
 
+* guile
+** known problems
+*** guile-emacs build fails with Unbound variable: make-srfi-4-vector
+  - error:
+      ice-9/boot-9.scm:408:31: In procedure make-u32vector: Unbound variable: make-srfi-4-vector
+  - remedy:
+    remove the files installed by guile's build system (make install), eg, rm -rf /t/ge/g3, where /t/ge/g3 is the
+    path you've used for the "configure --prefix=<PATH>" step in configuring guile.
+
 * ramblings
 
   Much of "where are we at 2024" :)
