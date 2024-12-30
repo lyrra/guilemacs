@@ -1,4 +1,5 @@
 ;; Generate source code files for GNU Emacs from source files.
+;; This file is derived from GNU Emacs "lib-src/make-docfile.c".
 
 ;; Copyright (C) 1985-1986, 1992-1994, 1997, 1999-2024 Free Software
 ;; Foundation, Inc.
@@ -56,7 +57,20 @@
 ;; ------------------------------------------------
 ;; similar to (ice-9 streams)
 
+(define %charstack #f)
+
+(define (getc s)
+  (if (null? %charstack)
+      (get-char s)
+      (let ((c (car %charstack)))
+        (set! %charstack (cdr %charstack))
+        c)))
+
+(define (ungetc c s)
+  (set! %charstack (cons c %charstack)))
+
 (define (make-fstream filename)
+  (set! %charstack '())
   (open-input-file filename))
 
 (define (fstream-eof? s)
@@ -66,7 +80,7 @@
 (define (fstream-read-integer-acc s acc)
   (if (eof-object? s)
     acc
-    (let ((c (get-char s)))
+    (let ((c (getc s)))
       (cond
        ((char-numeric? c)
         (let ((n (- (char->integer c) 48)))
@@ -75,17 +89,11 @@
                                         (+ (* acc 10) n)
                                         n))))
        (else
-        (unget-char s c)
+        (ungetc c s)
         acc)))))
 
 (define (fstream-read-integer s)
   (fstream-read-integer-acc s #f))
-
-(define (getc s)
-  (get-char s))
-
-(define (ungetc c s)
-  (unget-char s c))
 
 (define (c-isspace c)
   (memq c
