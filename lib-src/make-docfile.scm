@@ -1044,42 +1044,71 @@
 
 ;;;; -------------------------------------------------------------------
 
-(define (main args)
-  (let ((numargs (length args))
-        (i 1))
+(define (handle-command-line-args args acc)
+  (let ((setarg (lambda (key val)
+                  (assq-set! acc key val)))
+        (pusharg (lambda (key val)
+                   (if (assq key acc)
+                       (assq-set! acc key
+                                  (cons val
+                                        (cdr (assq key acc))))
+                       (assq-set! acc key
+                                  (list val))))))
+    (if (null? args)
+        acc
+        (let ((arg (car args))
+              (more (not (null? (cdr args)))))
+          (cond
+           ;; handle one-term arguments (eg -g)
+           ;; rest arguments are treated as input files
+           ((string=? "-g" arg)
+            (handle-command-line-args (cdr args)
+                                      (setarg #:generate-globals #t)))
+           ;; handle two-term arguments (eg -o file)
+           ((and more (string=? "-o" arg))
+            (handle-command-line-args (cddr args)
+                                      (setarg #:out-file (cadr args))))
+           ((and more (string=? "-a" arg))
+            (handle-command-line-args (cddr args)
+                                      (setarg #:append-file (cadr args))))
+           ((and more (string=? "-d" arg))
+            (handle-command-line-args (cddr args)
+                                      (setarg #:directory (cadr args))))
+           (else
+            (handle-command-line-args (cdr args)
+                                      (pusharg #:files arg))))))))
 
+(define (main args)
+  ;; handle command-line arguments
+  (let ((options (reverse (handle-command-line-args (cdr args) '()))))
     ;; If first two args are -o FILE, output to FILE.
-    (when (and (> numargs (1+ i)) (string=? (list-ref args i) "-o"))
-      (when (not (freopen (list-ref args (1+ i)) "w" stdout))
-        (print-error "~a" (list-ref args (1+ i)))
-        (exit EXIT_FAILURE))
-      (set! i (+ i 2)))
-    (when (and (> numargs (1+ i)) (string=? (list-ref args i) "-a"))
-      (when (not (freopen (list-ref args (1+ i)) "a" stdout))
-        (print-error "~a" (list-ref args (1+ i)))
-        (exit EXIT_FAILURE))
-      (set! i (+ i 2)))
-    (when (and (> numargs (1+ i)) (string=? (list-ref args i) "-d"))
-      (chdir (list-ref args (1+ i)))
-      (set! i (+ i 2)))
-    (when (and (> numargs i) (string=? (list-ref args i) "-g"))
-      (set! %generate-globals #t)
-      (set! i (1+ i)))
+    (if (assq #:out-file options)
+        (let ((file (assq-ref options #:out-file)))
+          (when (not (freopen file "w" stdout))
+            (print-error "~a" file)
+            (exit EXIT_FAILURE))))
+    (if (assq #:append-file options)
+        (let ((file (assq-ref options #:append-file)))
+          (when (not (freopen file "a" stdout))
+            (print-error "~a" file)
+            (exit EXIT_FAILURE))))
+    (if (assq #:directory options)
+        (chdir (assq-ref options #:directory)))
+    (set! %generate-globals (assq #:generate-globals options))
 
     ;(set-binary-mode (fileno stdout) O_BINARY)
 
     (if %generate-globals
-      (start-globals))
+        (start-globals))
 
-    (while #t
-      (format (current-error-port) "-- scan-file ~s~%" (list-ref args i))
-      (scan-file (list-ref args i))
-      (set! i (1+ i))
-      (if (>= i numargs) (break)))
+    (for-each (lambda (file)
+                (format (current-error-port) "-- scan-file ~s~%" file)
+                (scan-file file))
+              (cdr (assq #:files options)))
 
     (format (current-error-port) "~%-- number of globals: ~s~%"
             (length %globals))
     (if %generate-globals
-      (write-globals))
+        (write-globals))
 
     (exit EXIT_SUCCESS)))
