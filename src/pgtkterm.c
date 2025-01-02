@@ -70,6 +70,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define FRAME_CR_ACTIVE_CONTEXT(f)	((f)->output_data.pgtk->cr_active)
 #define FRAME_CR_SURFACE(f)		(cairo_get_target (FRAME_CR_CONTEXT (f)))
 
+Lisp_Object
+Fapply (ptrdiff_t nargs, Lisp_Object *args);
+
 /* Non-zero means that a HELP_EVENT has been generated since Emacs
    start.  */
 
@@ -339,6 +342,7 @@ evq_flush (struct input_event *hold_quit)
 void
 mark_pgtkterm (void)
 {
+#if 0 // guileemacs does not have mark_object
   struct pgtk_display_info *dpyinfo;
   struct pgtk_device_t *device;
   struct event_queue_t *evq = &event_q;
@@ -368,6 +372,7 @@ mark_pgtkterm (void)
 	   device = device->next)
 	mark_object (device->name);
     }
+#endif
 }
 
 char *
@@ -6529,8 +6534,9 @@ pgtk_link_touch_point (struct pgtk_display_info *dpyinfo,
      CARD32s easily overflow 32-bit systems, as they are not specific to
      X clients (e.g. Emacs) but grow uniformly across all of them.  */
 
-  if (FIXNUM_OVERFLOW_P (local_detail))
-    local_detail = 0;
+  //FIX: guilemacs, no FIXNUM_OVERFLOW_P
+  //if (FIXNUM_OVERFLOW_P (local_detail))
+  //  local_detail = 0;
 
   touchpoint = xmalloc (sizeof *touchpoint);
   touchpoint->next = dpyinfo->touchpoints;
@@ -7630,7 +7636,7 @@ pgtk_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
   int width, height;
   void (*surface_set_size_func) (cairo_surface_t *, double, double) = NULL;
   Lisp_Object acc = Qnil;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   redisplay_preserve_echo_area (31);
 
@@ -7708,7 +7714,7 @@ pgtk_cr_export_frames (Lisp_Object frames, cairo_surface_type_t surface_type)
 #endif
   unblock_input ();
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 
   return CALLN (Fapply, Qconcat, Fnreverse (acc));
 }

@@ -1194,7 +1194,7 @@ This function is an internal primitive--use `make-frame' instead.  */ )
   bool minibuffer_only = false;
   bool undecorated = false, override_redirect = false;
   long window_prompting = 0;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object display;
   struct pgtk_display_info *dpyinfo = NULL;
   Lisp_Object parent, parent_frame;
@@ -1733,7 +1733,8 @@ This function is an internal primitive--use `make-frame' instead.  */ )
      and similar functions.  */
   Vwindow_list = Qnil;
 
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 /* Restack frame F1 below frame F2, above if ABOVE_FLAG is non-nil.
@@ -2652,7 +2653,7 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
   struct frame *f;
   Lisp_Object frame;
   Lisp_Object name;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   bool face_change_before = face_change;
 
   if (!dpyinfo->terminal->name)
@@ -2881,7 +2882,8 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
   face_change = face_change_before;
 
   /* Discard the unwind_protect.  */
-  return unbind_to (count, frame);
+  dynwind_end ();
+  return frame;
 }
 
 /* Compute where to display tip frame F.  PARMS is the list of frame
@@ -3019,7 +3021,7 @@ pgtk_hide_tip (bool delete)
     {
       Lisp_Object was_open = Qnil;
 
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_redisplay, Qt);
       specbind (Qinhibit_quit, Qt);
 
@@ -3067,7 +3069,9 @@ pgtk_hide_tip (bool delete)
       else
 	tip_frame = Qnil;
 
-      return unbind_to (count, was_open);
+      dynwind_end ();
+
+      return was_open;
     }
 }
 
@@ -3112,7 +3116,7 @@ Text larger than the specified size is clipped.  */)
   struct text_pos pos;
   int width, height;
   int old_windows_or_buffers_changed = windows_or_buffers_changed;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   Lisp_Object window, size, tip_buf;
   bool displayed;
 #ifdef ENABLE_CHECKING
@@ -3131,7 +3135,10 @@ Text larger than the specified size is clipped.  */)
   f = decode_window_system_frame (frame);
 
   if (!FRAME_GTK_OUTER_WIDGET (f))
-    return unbind_to (count, Qnil);
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   if (NILP (timeout))
     timeout = Vx_show_tooltip_timeout;
@@ -3266,8 +3273,11 @@ Text larger than the specified size is clipped.  */)
       /* Create a frame for the tooltip, and record it in the global
 	 variable tip_frame.  */
       if (NILP (tip_frame = x_create_tip_frame (FRAME_DISPLAY_INFO (f), parms, f)))
-	/* Creating the tip frame failed.  */
-	return unbind_to (count, Qnil);
+	{
+	  /* Creating the tip frame failed.  */
+	  dynwind_end ();
+	  return Qnil;
+	}
     }
 
   tip_f = XFRAME (tip_frame);
@@ -3310,7 +3320,7 @@ Text larger than the specified size is clipped.  */)
 
   /* Insert STRING into root window's buffer and fit the frame to the
      buffer.  */
-  specpdl_ref count_1 = SPECPDL_INDEX ();
+  dynwind_begin ();
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
@@ -3371,14 +3381,15 @@ Text larger than the specified size is clipped.  */)
   update_single_window (w);
   flush_frame (tip_f);
   set_buffer_internal_1 (old_buffer);
-  unbind_to (count_1, Qnil);
+  dynwind_end ();
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
   /* Let the tip disappear after timeout seconds.  */
   tip_timer = call3 (Qrun_at_time, timeout, Qnil, Qx_hide_tip);
 
-  return unbind_to (count, Qnil);
+  dynwind_end ();
+  return Qnil;
 }
 
 
@@ -3703,7 +3714,7 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
   char *fn;
   Lisp_Object file = Qnil;
   Lisp_Object decoded_file;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
   char *cdef_file;
 
   check_window_system (f);
@@ -3744,7 +3755,8 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
 
   decoded_file = DECODE_FILE (file);
 
-  return unbind_to (count, decoded_file);
+  dynwind_end ();
+  return decoded_file;
 }
 
 DEFUN ("pgtk-backend-display-class", Fpgtk_backend_display_class, Spgtk_backend_display_class, 0, 1, "",
@@ -3771,7 +3783,7 @@ nil, it defaults to the selected frame. */)
   Lisp_Object font;
   Lisp_Object font_param;
   char *default_name = NULL;
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (popup_activated ())
     error ("Trying to use a menu from within a menu-entry");
@@ -3803,7 +3815,8 @@ nil, it defaults to the selected frame. */)
   if (NILP (font))
     quit ();
 
-  return unbind_to (count, font);
+  dynwind_end ();
+  return font;
 }
 
 DEFUN ("x-gtk-debug", Fx_gtk_debug, Sx_gtk_debug, 1, 1, 0,
@@ -3900,49 +3913,7 @@ syms_of_pgtkfns (void)
     g_free (ver);
   }
 
-  defsubr (&Spgtk_set_resource);
-  defsubr (&Sxw_display_color_p);	/* this and next called directly by C code */
-  defsubr (&Sx_display_grayscale_p);
-  defsubr (&Spgtk_font_name);
-  defsubr (&Sxw_color_defined_p);
-  defsubr (&Sxw_color_values);
-  defsubr (&Sx_server_max_request_size);
-  defsubr (&Sx_display_pixel_width);
-  defsubr (&Sx_display_pixel_height);
-  defsubr (&Spgtk_display_monitor_attributes_list);
-  defsubr (&Spgtk_frame_geometry);
-  defsubr (&Spgtk_frame_edges);
-  defsubr (&Spgtk_frame_restack);
-  defsubr (&Spgtk_set_mouse_absolute_pixel_position);
-  defsubr (&Spgtk_mouse_absolute_pixel_position);
-  defsubr (&Sx_display_mm_width);
-  defsubr (&Sx_display_mm_height);
-  defsubr (&Sx_display_screens);
-  defsubr (&Sx_display_planes);
-  defsubr (&Sx_display_color_cells);
-  defsubr (&Sx_display_visual_class);
-  defsubr (&Sx_display_backing_store);
-  defsubr (&Sx_display_save_under);
-  defsubr (&Sx_create_frame);
-  defsubr (&Sx_open_connection);
-  defsubr (&Sx_close_connection);
-  defsubr (&Sx_display_list);
-  defsubr (&Sx_gtk_debug);
-  defsubr (&Sx_gtk_launch_uri);
-
-  defsubr (&Sx_show_tip);
-  defsubr (&Sx_hide_tip);
-
-  defsubr (&Sx_export_frames);
-  defsubr (&Spgtk_page_setup_dialog);
-  defsubr (&Spgtk_get_page_setup);
-  defsubr (&Spgtk_print_frames_dialog);
-  defsubr (&Spgtk_backend_display_class);
-
-  defsubr (&Spgtk_set_monitor_scale_factor);
-
-  defsubr (&Sx_file_dialog);
-  defsubr (&Sx_select_font);
+#include "pgtkfns.x"
 
   monitor_scale_factor_alist = Qnil;
   staticpro (&monitor_scale_factor_alist);

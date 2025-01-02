@@ -245,7 +245,7 @@ pgtk_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       /* Don't allow a quit within the converter.
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qinhibit_quit, Qt);
 
       CHECK_SYMBOL (target_type);
@@ -273,7 +273,9 @@ pgtk_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 		       tem);
       else
 	value = Qnil;
-      value = unbind_to (count, value);
+
+      dynwind_end ();
+      value = value;
     }
 
   /* Make sure this value is of a type that we could transmit
@@ -543,9 +545,9 @@ pgtk_handle_selection_request (struct selection_input_event *event)
   GdkAtom property = SELECTION_EVENT_PROPERTY (event);
   Lisp_Object local_selection_data;
   bool success = false;
-  specpdl_ref count = SPECPDL_INDEX ();
   bool pushed;
   Lisp_Object alias, tem;
+  dynwind_begin ();
 
   alias = Vpgtk_selection_alias_alist;
 
@@ -660,7 +662,7 @@ pgtk_handle_selection_request (struct selection_input_event *event)
     CALLN (Frun_hook_with_args, Qpgtk_sent_selection_functions,
 	   selection_symbol, target_symbol, success ? Qt : Qnil);
 
-  unbind_to (count, Qnil);
+  dynwind_end ();
 }
 
 /* Perform the requested selection conversion, and write the data to
@@ -922,7 +924,7 @@ wait_for_property_change_unwind (void *loc)
 static void
 wait_for_property_change (struct prop_location *location)
 {
-  specpdl_ref count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   /* Make sure to do unexpect_property_change if we quit or err.  */
   record_unwind_protect_ptr (wait_for_property_change_unwind, location);
@@ -945,7 +947,7 @@ wait_for_property_change (struct prop_location *location)
 	error ("Timed out waiting for property-notify event");
     }
 
-  unbind_to (count, Qnil);
+    dynwind_end ();
 }
 
 /* Called from the big filter in response to a PropertyNotify
@@ -1018,12 +1020,14 @@ pgtk_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_typ
 		       : symbol_to_gdk_atom (target_type));
   struct atimer *delayed_message;
   struct timespec message_interval;
-  specpdl_ref count;
 
-  count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   if (!FRAME_LIVE_P (f))
-    return unbind_to (count, Qnil);
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   if (!NILP (time_stamp))
     CONS_TO_INTEGER (time_stamp, guint32, requestor_time);
@@ -1060,16 +1064,19 @@ pgtk_get_foreign_selection (Lisp_Object selection_symbol, Lisp_Object target_typ
   if (NILP (XCAR (reading_selection_reply)))
     error ("Timed out waiting for reply from selection owner");
   if (EQ (XCAR (reading_selection_reply), Qlambda))
-    return unbind_to (count, Qnil);
+    {
+      dynwind_end ();
+      return Qnil;
+    }
 
   /* Otherwise, the selection is waiting for us on the requested property.  */
-  return unbind_to (count,
-		    pgtk_get_window_property_as_lisp_data (dpyinfo,
-							   requestor_window,
-							   GDK_NONE,
-							   target_type,
-							   selection_atom,
-							   false));
+  dynwind_end ();
+  return pgtk_get_window_property_as_lisp_data (dpyinfo,
+						requestor_window,
+						GDK_NONE,
+						target_type,
+						selection_atom,
+						false);
 }
 
 /* Subroutines of pgtk_get_window_property_as_lisp_data */
@@ -1901,14 +1908,7 @@ syms_of_pgtkselect (void)
   DEFSYM (Qpgtk_sent_selection_functions, "pgtk-sent-selection-functions");
   DEFSYM (Qpgtk_lost_selection_functions, "pgtk-lost-selection-functions");
 
-  defsubr (&Spgtk_disown_selection_internal);
-  defsubr (&Spgtk_get_selection_internal);
-  defsubr (&Spgtk_own_selection_internal);
-  defsubr (&Spgtk_selection_exists_p);
-  defsubr (&Spgtk_selection_owner_p);
-  defsubr (&Spgtk_register_dnd_targets);
-  defsubr (&Spgtk_update_drop_status);
-  defsubr (&Spgtk_drop_finish);
+#include "pgtkselect.x"
 
   DEFVAR_LISP ("selection-converter-alist", Vselection_converter_alist,
 	       doc: /* SKIP: real doc in xselect.c.  */);

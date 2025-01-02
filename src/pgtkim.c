@@ -298,7 +298,7 @@ DEFUN ("pgtk-use-im-context", Fpgtk_use_im_context, Spgtk_use_im_context, 1, 2, 
 void
 syms_of_pgtkim (void)
 {
-  defsubr (&Spgtk_use_im_context);
+#include "pgtkim.x"
 
   DEFSYM (Qpgtk_refresh_preedit, "pgtk-refresh-preedit");
   DEFSYM (Qul, "ul");

@@ -258,11 +258,12 @@ set_frame_menubar (struct frame *f, bool deep_p)
     {
       struct buffer *prev = current_buffer;
       Lisp_Object buffer;
-      specpdl_ref specpdl_count = SPECPDL_INDEX ();
       int previous_menu_items_used = f->menu_bar_items_used;
       Lisp_Object *previous_items
 	= alloca (previous_menu_items_used * sizeof *previous_items);
       int subitems;
+
+      dynwind_begin ();
 
       /* If we are making a new widget, its contents are empty,
          do always reinitialize them.  */
@@ -373,7 +374,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 	     the menus in any form, since it would be a no-op.  */
 	  free_menubar_widget_value_tree (first_wv);
 	  discard_menu_items ();
-	  unbind_to (specpdl_count, Qnil);
+	  dynwind_end ();
 	  return;
 	}
 
@@ -382,7 +383,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
       f->menu_bar_items_used = menu_items_used;
 
       /* This undoes save_menu_items.  */
-      unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
 
       /* Now GC cannot happen during the lifetime of the widget_value,
          so it's safe to store data from a Lisp_String.  */
@@ -535,7 +536,7 @@ create_and_show_popup_menu (struct frame *f, widget_value * first_wv,
 			    int x, int y, bool for_click)
 {
   GtkWidget *menu;
-  specpdl_ref specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (FRAME_PGTK_P (f));
 
@@ -577,7 +578,7 @@ create_and_show_popup_menu (struct frame *f, widget_value * first_wv,
       popup_widget_loop (true, menu);
     }
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Must reset this manually because the button release event is not passed
      to Emacs event loop. */
@@ -602,7 +603,7 @@ pgtk_menu_show (struct frame *f, int x, int y, int menuflags,
     = alloca (menu_items_used * sizeof *subprefix_stack);
   int submenu_depth = 0;
 
-  specpdl_ref specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   eassert (FRAME_PGTK_P (f));
 
@@ -781,7 +782,7 @@ pgtk_menu_show (struct frame *f, int x, int y, int menuflags,
   /* Actually create and show the menu until popped down.  */
   create_and_show_popup_menu (f, first_wv, x, y, menuflags & MENU_FOR_CLICK);
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Find the selected item, and its pane, to return
      the proper value.  */
@@ -874,7 +875,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
 
   if (menu)
     {
-      specpdl_ref specpdl_count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_ptr (pop_down_menu, menu);
 
       /* Display the menu.  */
@@ -883,7 +884,7 @@ create_and_show_dialog (struct frame *f, widget_value *first_wv)
       /* Process events that apply to the menu.  */
       popup_widget_loop (true, menu);
 
-      unbind_to (specpdl_count, Qnil);
+      dynwind_end ();
     }
 }
 
@@ -1013,7 +1014,7 @@ pgtk_dialog_show (struct frame *f, Lisp_Object title,
   /* Actually create and show the dialog.  */
   create_and_show_dialog (f, first_wv);
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
 
   /* Find the selected item, and its pane, to return
      the proper value.  */
@@ -1054,7 +1055,7 @@ pgtk_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   Lisp_Object title;
   const char *error_name;
   Lisp_Object selection;
-  specpdl_ref specpdl_count = SPECPDL_INDEX ();
+  dynwind_begin ();
 
   check_window_system (f);
 
@@ -1076,7 +1077,7 @@ pgtk_popup_dialog (struct frame *f, Lisp_Object header, Lisp_Object contents)
   selection = pgtk_dialog_show (f, title, header, &error_name);
   unblock_input ();
 
-  unbind_to (specpdl_count, Qnil);
+  dynwind_end ();
   discard_menu_items ();
 
   if (error_name)
@@ -1109,13 +1110,13 @@ void
 syms_of_pgtkmenu (void)
 {
   DEFSYM (Qdebug_on_next_call, "debug-on-next-call");
-  defsubr (&Smenu_or_popup_active_p);
-
   DEFSYM (Qframe_monitor_workarea, "frame-monitor-workarea");
 
-  defsubr (&Sx_menu_bar_open_internal);
-  Ffset (intern_c_string ("accelerate-menu"),
-	 intern_c_string (Sx_menu_bar_open_internal.s.symbol_name));
+#include "pgtkmenu.x"
+
+  // fixme!
+  //Ffset (intern_c_string ("accelerate-menu"),
+  // intern_c_string (Sx_menu_bar_open_internal.s.symbol_name));
 
   pdumper_do_now_and_after_load (syms_of_pgtkmenu_for_pdumper);
 }

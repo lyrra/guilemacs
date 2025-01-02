@@ -1084,6 +1084,10 @@ msdos.o: msdos.x
 nsfns.o: nsfns.x
 nsmenu.o: nsmenu.x
 nsselect.o: nsselect.x
+pgtkfns.o: pgtkfns.x
+pgtkim.o: pgtkim.x
+pgtkmenu.o: pgtkmenu.x
+pgtkselect.o: pgtkselect.x
 print.o: print.x
 process.o: process.x
 search.o: search.x
