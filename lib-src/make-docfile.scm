@@ -104,6 +104,16 @@
               ; f
               #\Return)))
 
+(define (c-isalpha c)
+  (char-alphabetic? c))
+
+(define (c-isalnum c)
+  (or (char-alphabetic? c)
+      (char-numeric? c)))
+
+(define (c-toupper c)
+  (char-upcase c))
+
 (define (putchar c)
   (put-char (current-output-port) c))
 
@@ -114,26 +124,10 @@
 (define (fputs str s)
   (display str))
 
-(define stdout #f) ; dummy
+(define stdout 'stdout) ; dummy
 (define %input-buffer #f)
 
 ;; ------------------------------------------------
-
-; #include <config.h>
-
-;#include <attribute.h>
-;#include <binary-io.h>
-;#include <c-ctype.h>
-;#include <intprops.h>
-;#include <min-max.h>
-;#include <unlocked-io.h>
-
-
-; void scan_file (char *filename);
-; void scan_c_file (char *filename, const char *mode);
-; void scan_c_stream (FILE *infile);
-; void start_globals (void);
-; void write_globals (void);
 
 ;; True if this invocation is generating globals.h.
 (define %generate-globals #f)
@@ -144,8 +138,8 @@
 ;; Print error message.  Args are like vprintf.
 
 (define (verror m args)
-  (apply format (append (list #t m) args))
-  (format #t "~%"))
+  (apply format (append (list (current-error-port) m) args))
+  (format (current-error-port) "~%"))
 
 ;; Print error message.  Args are like printf.
 
@@ -173,7 +167,7 @@
 
 (define (scan-file filename)
   (when (not %generate-globals)
-    (put-filename  filename))
+    (put-filename filename))
   (scan-c-file filename "r"))
 
 (define (start-globals)
@@ -260,9 +254,9 @@
         (else
          (set! out-ch ch)))
       (if (rcsoc-out-file state)
-          (put-char (rcsoc-out-file state) out-ch))
+          (putchar out-ch))
       (if (rcsoc-buf-ptr state)
-        (rcsoc-buf-ptr-put state out-ch))
+          (rcsoc-buf-ptr-put state out-ch))
       (if (char=? out-ch ch) (set! done #t)))))
 
 ;; If in the middle of scanning a keyword, continue scanning with
@@ -273,36 +267,40 @@
 
 (define (scan-keyword-or-put-char ch state)
   (cond
-   ((or (and (rcsoc-keyword state)
-             (char=? (string-ref (rcsoc-keyword state) (rcsoc-cur-keyword-ptr state)) ch)
-             (> (rcsoc-cur-keyword-ptr state) 0))
-        (> (rcsoc-pending-newlines state) 0))
+   ((let ((keyword (rcsoc-keyword state))
+          (cur-keyword-ptr (rcsoc-cur-keyword-ptr state)))
+      (and keyword
+           (char=? (string-ref keyword cur-keyword-ptr) ch)
+           (or (> cur-keyword-ptr (string-length keyword))
+               (> (rcsoc-pending-newlines state) 0))))
     ;; We might be looking at STATE->keyword at some point.
     ;; Keep looking until we know for sure.
-    (when (= *++state->cur_keyword_ptr #\0)
+    (set-rcsoc-cur-keyword-ptr state
+                               (1+ (rcsoc-cur-keyword-ptr state)))
+    (when (>= (rcsoc-cur-keyword-ptr state) (string-length (rcsoc-keyword state)))
       ;; Saw the whole keyword.  Set SAW_KEYWORD flag to true.
-      (set! state->saw_keyword true)
+      (set-rcsoc-saw-keyword state #t)
 
       ;; Reset the scanning pointer.
-      (set! state->cur_keyword_ptr state->keyword)
+      (set-rcsoc-cur-keyword-ptr state 0)
 
       ;; Canonicalize whitespace preceding a usage string.
-      (set! state->pending_newlines 2)
-      (set! state->pending_spaces 0)
+      (set-rcsoc-pending-newlines state 2)
+      (set-rcsoc-pending-spaces state 0)
 
       ;; Skip any spaces and newlines between the keyword and the
       ;; usage string.
       (let ((done #f)
             (c #f))
         (while (not done)
-          (set! c (getc (state->in_file)))
-          (if (not (or (char=? c \#Space) (char=? c #\Newline)))
+          (set! c (getc (rcsoc-in-file state)))
+          (if (not (or (char=? c #\Space) (char=? c #\Newline)))
               (set! done #t))))
 
       ;; Output the open-paren we just read.
-      (if (not (char=? c #\())
+      (if (not (char=? ch #\())
           (fatal "Missing '(' after keyword"))
-      (rcsoc-put-char c state)
+      (rcsoc-put-char ch state)
 
       ;; Skip the function name and replace it with `fn'.
       (let ((done #f))
@@ -320,7 +318,7 @@
       (ungetc c state->in_file)))
    (else
     (when (and (rcsoc-keyword state)
-               (> (rcsoc-cur-keyword-ptr state) 0))
+               (> (rcsoc-cur-keyword-ptr state) (string-length (rcsoc-keyword state))))
       ;; We scanned the beginning of a potential usage
       ;; keyword, but it was a false alarm.  Output the
       ;; part we scanned.
@@ -351,7 +349,6 @@
     (set-rcsoc-keyword state (if saw-usage "usage:" #f))
     (set-rcsoc-cur-keyword-ptr state 0)
     (set-rcsoc-saw-keyword state #f)
-
     (set! c (getc infile))
     (if comment
       (while (c-isspace c)
@@ -370,13 +367,13 @@
 
         (cond
          ((char=? c #\Space)
-           (inc-rcsoc-pending-spaces state 1))
+          (inc-rcsoc-pending-spaces state 1))
          ((char=? c #\Newline)
-           (inc-pending-newlines state 1)
-           (set-pending-spaces state 0))
+          (inc-rcsoc-pending-newlines state 1)
+          (set-rcsoc-pending-spaces state 0))
          (else
-           (set! %input-buffer input-buffer)
-           (scan-keyword-or-put-char c state)))
+          (set! %input-buffer input-buffer)
+          (scan-keyword-or-put-char c state)))
 
         (set! c (getc infile)))
 
@@ -410,15 +407,18 @@
   (let ((in-ident #f)
         (ident-start #f)
         (ident-length 0)
-        (bufi (stream-idx buf)))
+        (bufi 0))
     (fputs "(fn" stdout)
 
-    (if (= buf #\()
+    (if (char=? #\( (string-ref buf 0))
       (incf bufi))
 
     (do ((p bufi (1+ p)))
-        ((= 0 (stream-ref buf p)))
-      (let ((c (stream-ref buf p)))
+        ((>= p (string-length buf)))
+      (catch 'continue
+        (lambda ()
+      (let ((continue (lambda () (throw 'continue)))
+            (c (string-ref buf p)))
         ;; Notice when a new identifier starts.
         (when (not (eq? (or (c-isalnum c) (char=? c #\_)) in-ident))
           (cond
@@ -434,7 +434,7 @@
           (when (= 0 ident-length)
             (print-error "empty arg list for '~s' should be (void), not ()" func)
             (continue))
-          (if (= 0 (strncmp ident-start "void" ident-length))
+          (if (string=? "void" (substring buf ident-start (+ ident-start ident-length)))
             (continue))
 
           (putchar #\Space)
@@ -448,18 +448,20 @@
           ;; In C code, `default' is a reserved word, so we spell it
           ;; `defalt'; demangle that here.
           (cond
-           ((and (= 6 ident-length) (= 0 (memcmp ident-start "defalt" 6)))
+           ((and (= 6 ident-length) (string=? "defalt" (substring buf ident-start (+ ident-start 6))))
             (fputs "DEFAULT" stdout))
            (else
             (while (let ((il ident-length))
                      (decf ident-length)
                      (> il 0))
-              (set! c (c_toupper ident-start))
+              (set! c (c-toupper (string-ref buf ident-start)))
               (incf ident-start)
               (if (char=? c #\_)
                 ;; Print underscore as hyphen.
                 (set! c #\-))
               (putchar c)))))))
+        (lambda (kind . args)
+          #f)))
     (putchar #\))))
 
 ;; The types of globals.  These are sorted roughly in decreasing alignment
@@ -706,9 +708,8 @@
     (if (not (file-exists? rfile))
         (set! rfile (string-concatenate (list (substring rfile 0 (1- flen)) "m"))))
 
-    (when (not (file-exists? rfile))
-      (print-error "missing file: ~s" filename)
-      (exit EXIT_FAILURE))
+    (if (not (file-exists? rfile))
+        (error "missing file: ~s" filename))
     (scan-c-stream (make-fstream rfile))))
 
 ;; Return 1 if next input from INFILE is equal to P, -1 if EOF,
@@ -967,7 +968,7 @@
         (if (char=? c #\")
             (set! c (car (read-c-string-or-comment infile 0 #f #f input-buffer))))
 
-        (while (and (not (char=? c EOF)) (not (char=? c #\,)) (not (char=? c #\/)))
+        (while (and (not (eof-object? c)) (not (char=? c #\,)) (not (char=? c #\/)))
           (set! c (getc infile)))
         (when (char=? c #\,)
           (while #t
@@ -989,16 +990,17 @@
                      (char=? c #\*)))
            (let ((comment (not (char=? c #\")))
                  (saw_usage #f))
-             (format #t "~c~c~s\n"
+             (format #t "~c~c~a\n"
                         (integer->char 31)
                         (if defvarflag #\V #\F) (car input-buffer))
 
              (if comment
                (getc infile))   ;; Skip past `*'.
              (match (read-c-string-or-comment infile 1 comment #t input-buffer)
-               ((new-c new-saw-usage)
+               ((new-c . new-saw-usage)
                 (set! c new-c)
                 (set! saw_usage new-saw-usage)))
+             (set! input-buffer (cons "" 0)) ; FIX: bad state for input-buffer
 
              ;; If this is a defun, find the arguments and print them.  If
              ;; this function takes MANY or UNEVALLED args, then the C source
@@ -1012,32 +1014,29 @@
 
              (cond
               ((and defunflag (not (= maxargs -1)) (not saw_usage))
-               (let* ((argbuf (make-vector 1024))
-                      (p argbuf)) ; stream
-
+               (let* ((p '()))
                  (if (or (not comment) doc_keyword)
                      (while (not (char=? c #\)))
-                       (if (< c 0) (throw 'eof))
+                       (if (eof-object? c) (throw 'eof))
                        (set! c (getc infile))))
                  ;; Skip into arguments.
                  (while (not (char=? c #\())
-                   (if (< c 0) (throw 'eof))
+                   (if (eof-object? c) (throw 'eof))
                    (set! c (getc infile)))
                  ;; Copy arguments into ARGBUF.
-                 (stream-store p c) ;(set-stream-buf p c) ;(set-stream-idx p (1+ (stream-idx p)))
+                 (set! p (cons c p)) ;(set-stream-buf p c) ;(set-stream-idx p (1+ (stream-idx p)))
                  (while #t
                    (set! c (getc infile))
-                   (if (< c 0) (throw 'eof))
-                   (stream-store p c)
+                   (if (eof-object? c) (throw 'eof))
+                   (set! p (cons c p))
                    (if (char=? c #\)) (break)))
 
-                 (stream-store p 0)
                  ;; Output them.
                  (fputs (format #f "~%~%") stdout)
-                 (write-c-args (car input-buffer) argbuf minargs maxargs)))
+                 (write-c-args (car input-buffer) (list->string (reverse p)) minargs maxargs)))
               ((and defunflag (= maxargs -1) (not saw_usage))
                ;; The DOC should provide the usage form.
-               (format *error-output* "Missing 'usage' for function '~a'.~%"
+               (format (current-error-port) "Missing 'usage' for function '~a'.~%"
                        input-buffer)))))))))
   (lambda (kind . args)
     #f)))
@@ -1080,7 +1079,7 @@
 
 (define (main args)
   ;; handle command-line arguments
-  (let ((options (reverse (handle-command-line-args (cdr args) '()))))
+  (let ((options (handle-command-line-args (cdr args) '())))
     ;; If first two args are -o FILE, output to FILE.
     (if (assq #:out-file options)
         (let ((file (assq-ref options #:out-file)))
@@ -1104,7 +1103,7 @@
     (for-each (lambda (file)
                 (format (current-error-port) "-- scan-file ~s~%" file)
                 (scan-file file))
-              (cdr (assq #:files options)))
+              (reverse (cdr (assq #:files options))))
 
     (format (current-error-port) "~%-- number of globals: ~s~%"
             (length %globals))
