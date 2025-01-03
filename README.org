@@ -779,6 +779,11 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   the git rebase "pick-list", is still named same.
 *** in magit-revision collapse all files
 
+* bugs
+** 20250103 hovering link org-mode crash
+  if opening a org-mode file, and hovering mouse pointer
+  over a org-mode link, after around 2 seconds, emacs craches
+
 * guile
 ** known problems
 *** guile-emacs build fails with Unbound variable: make-srfi-4-vector
