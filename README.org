@@ -77,7 +77,7 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
  - https://lists.gnu.org/archive/html/emacs-devel/2015-10/msg01538.html
 
   Canonical test cases (tetris, org-mode, dunnet, mixed elisp/guile-scheme evalutation):
-
+  - https://news.slashdot.org/story/12/04/02/197221/guile-scheme-emacs-lisp-compatibility-matures
   - http://dustycloud.org/tmp/guile-emacs-20150513.png
   - http://dustycloud.org/tmp/guilemacs.png
 
@@ -248,7 +248,8 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
 ** But I want to do other stuff than tetris, like word processing!
   Guilemacs can also play snake and dunnet.
 
-* guilemacs
+* guilemacs design
+
 ** where are we at 2024
 
   The long-term vision of using Guile as an Elisp engine has eroded
@@ -303,7 +304,7 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
   - "remove unused `defalias' function"
     patch contents already upstream
 
-*** hallmarks of an overstretched design
+** hallmarks of an overstretched design
   - "Now that EQ has become expensive.." (89bb5a5f)
   - cl-generic requires cl-generic (itself!)
   - overextended use of Make
@@ -324,7 +325,7 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
     of basic operators.
   - alot of circular development due to brownian-motion like design. Eg, see d468cf91
 
-***  Emacs features that needs to be removed:
+**  Emacs features that needs to be removed:
 
    - Emacs intentionally restricts user freedom by not having a proper FFI,
      users are redirected to use C "modules".
@@ -366,8 +367,10 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
      a layer in scheme could provide building blocks to compose composite operators
      such as macroexp-let2, et al.
 
-** design
-*** comparing guilemacs to vanilla
+* guilemacs internals
+ This section describes the inner workings of guilemacs.
+
+** comparing guilemacs to vanilla
   | vanilla     | guilemacs  | really      |
   |-------------+------------+-------------|
   | XFASTINT(a) | XFIXNAT(a) | XFIXNUM (a) |
@@ -379,7 +382,17 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
   | sym->u.s.val.fwd        | scm_to_pointer (scm_c_vector_ref (sym, 4))          |
   | sym->u.s.val.fwd.fwdptr | scm_to_pointer (scm_c_vector_ref (sym, 4))->fwdptr) |
 
-*** bignum
+** strings
+  guile will bootstrap the elisp string constructor and predicate functions.
+  guile-elisp 'lisp-string?' predicate is bootstrapped to vanilla guile 'string?', and
+  when emacs binary is started (which is linked to libguile),
+  emacs binary will redefine the symbol-value of 'lisp-string?' (see emacs.c),
+  to an emacs FFI-like function (Fstringp).
+  The 'lisp-string?' predicate is found in guile (module/language/elisp/runtime.scm),
+  and used by 'module/language/elisp/compile-tree-il.scm'.
+  Similarly is setup for make-lisp-string.
+
+** bignum
   Delegating bignum type to libgmp should theoretically decrease the amount of
   code in emacs dealing with bignum, instead it increased it:
 
@@ -388,10 +401,10 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
 
   Moving bignum to guile should decrease the amount of code.
 
-**** bignum cleanups 
+*** bignum cleanups
   If guile drives bignum.
   - 5463b7e77ab4 migth not be needed.
- 
+
 * Commit notes
 ** guile-elisp bootstrap (C)
   rebasing after 219c3f80, in function Fcommandp,
@@ -473,8 +486,56 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
   | #define GC_DEBUG 1
   | #include <gc.h>
 
+** using gdb
+   Let 'A' be a literal address like 0x12345, or a variable
+   | call scm_display(A, scm_current_output_port())
+*** helpers
+  see 7f129f2ecfbdded5c31e9d9fc8bf11ce0e017000
+  how to inspect lisp variables from gdb
+
+** backtrace
+
+   Given some backtrace, we can peek at symbols and objects.
+   Especially the symbol-name is of interest.
+
+#+BEGIN_EXAMPLE
+Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
+0x00007ffff7f4656a in scm_is_values (x=<optimized out>) at /t/ge/guile/libguile/values.h:30
+30	  return SCM_HAS_TYP7 (x, scm_tc7_values);
+(gdb) ba
+#0  0x00007ffff7f4656a in scm_is_values (x=<optimized out>) at /t/ge/guile/libguile/values.h:30
+#1  vm_debug_engine (thread=0x7ffff21d1d80) at /t/ge/guile/libguile/vm-engine.c:974
+#2  0x00007ffff7f4d60d in scm_call_n (proc=<optimized out>, argv=argv@entry=0x7fffffffcd48, nargs=nargs@entry=1) at vm.c:1608
+#3  0x00005555556d541f in Ffuncall1 (args=0x7fffffffcd48, nargs=1) at eval.c:1971
+#4  Ffuncall (args=0x7fffffffcd48, nargs=1) at eval.c:1977
+#5  call0 (fn=<optimized out>, fn@entry=0x7fffd9054100) at eval.c:1830
+#6  0x00005555556bab9d in Fbind_symbol (thunk=0x7fffd9054100, value=0x104, symbol=0x7fffea620ea0) at data.c:3315
+#7  gsubr_Fbind_symbol (arg1=<optimized out>, arg2=<optimized out>, arg3=<optimized out>) at data.c:3308
+#+END_EXAMPLE
+
+  - find the address to the symbol or lisp-object:
+    in Fbind_symbol find what symbol symbol=0x7fffea620ea0
+    and in Funcall, find what Lisp_object: args=0x7fffffffcd48
+  - print the symbol
+    (gdb) call debug_print(0x7fffea620ea0)
+    prefix-arg
+
+** testing
+  see 922ad238
+** bytecode optimizer
+  see 7feb5b2d
+
+* bugs
+
+** 20241231-guile-touch
+ - [[gedoc/20241231-guile-touch.org][20241231 guile-touch]]
+
+** 20250103 hovering link org-mode crash
+  if opening a org-mode file, and hovering mouse pointer
+  over a org-mode link, after around 2 seconds, emacs craches
+
 * todo
-** 20241215 c-x not working
+** 20241215 c-x not working :bug:
   Stopped working somewhere around r360.
   - symptoms:
     - issuing C-x is not working
@@ -614,6 +675,15 @@ Thread 1 "bootstrap-emacs" received signal SIGSEGV, Segmentation fault.
 ** 20240801 move obarray to guile ?
   see obarray global in lread.c
 
+* guile
+** known problems
+*** guile-emacs build fails with Unbound variable: make-srfi-4-vector
+  - error:
+      ice-9/boot-9.scm:408:31: In procedure make-u32vector: Unbound variable: make-srfi-4-vector
+  - remedy:
+    remove the files installed by guile's build system (make install), eg, rm -rf /t/ge/g3, where /t/ge/g3 is the
+    path you've used for the "configure --prefix=<PATH>" step in configuring guile.
+
 * misc notes:
 
 ** include c header quote
@@ -695,63 +765,21 @@ this could be hoisted to startup
   - https://aartaka.me/guile-optimization
   - https://mail.gnu.org/archive/html/guile-devel/2009-08/msg00206.html
   - fibers https://www.youtube.com/watch?app=desktop&v=7IcI6sl5oBc
-
-* debugging emacs
-** gdb
-   A can be a literal address like 0x12345, or a variable
-   | call scm_display(A, scm_current_output_port())
-*** helpers
-  see 7f129f2ecfbdded5c31e9d9fc8bf11ce0e017000
-  how to inspect lisp variables from gdb
- 
-** backtrace
-
-   Given some backtrace, we can peek at symbols and objects.
-   Especially the symbol-name is of interest.
-
-#+BEGIN_EXAMPLE
-Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
-0x00007ffff7f4656a in scm_is_values (x=<optimized out>) at /t/ge/guile/libguile/values.h:30
-30	  return SCM_HAS_TYP7 (x, scm_tc7_values);
-(gdb) ba
-#0  0x00007ffff7f4656a in scm_is_values (x=<optimized out>) at /t/ge/guile/libguile/values.h:30
-#1  vm_debug_engine (thread=0x7ffff21d1d80) at /t/ge/guile/libguile/vm-engine.c:974
-#2  0x00007ffff7f4d60d in scm_call_n (proc=<optimized out>, argv=argv@entry=0x7fffffffcd48, nargs=nargs@entry=1) at vm.c:1608
-#3  0x00005555556d541f in Ffuncall1 (args=0x7fffffffcd48, nargs=1) at eval.c:1971
-#4  Ffuncall (args=0x7fffffffcd48, nargs=1) at eval.c:1977
-#5  call0 (fn=<optimized out>, fn@entry=0x7fffd9054100) at eval.c:1830
-#6  0x00005555556bab9d in Fbind_symbol (thunk=0x7fffd9054100, value=0x104, symbol=0x7fffea620ea0) at data.c:3315
-#7  gsubr_Fbind_symbol (arg1=<optimized out>, arg2=<optimized out>, arg3=<optimized out>) at data.c:3308
-#+END_EXAMPLE
-
-  - find the address to the symbol or lisp-object:
-    in Fbind_symbol find what symbol symbol=0x7fffea620ea0
-    and in Funcall, find what Lisp_object: args=0x7fffffffcd48
-  - print the symbol
-    (gdb) call debug_print(0x7fffea620ea0)
-    prefix-arg
-
-** testing
-  see 922ad238
-** bytecode optimizer
-  see 7feb5b2d
- 
 * work flow
-** wanted
 ** magit workflow suggestions
 
   Here are some suggestions for an improved workflow using magit.
 
-*** 20240805 unbind q in magit-status
-  c-x k is sufficient since pressing q by mistake happens, and has no confirmation
-*** 20240805 quit should unwind to magit-status
+  - 20240805 unbind q in magit-status
+    c-x k is sufficient since pressing q by mistake happens, and has no confirmation
+  - 20240805 quit should unwind to magit-status
   in every magit buffer (eg showing a diff), pressing q should bring us
   to the magit-status (because/or often that is where we came from).
-*** 20240730 magit-status, unmerged file flags
+  - 20240730 magit-status, unmerged file flags
   for each unmerged file there could be a character that tells whether it contains conflicts
-*** 20240730 refuse to stage hunks that has conflicts
-*** no confirmation required when discarding a hunk
-*** outline/collapse a merge conflict
+  - 20240730 refuse to stage hunks that has conflicts
+  - no confirmation required when discarding a hunk
+  - outline/collapse a merge conflict
     show some context and elide the rest
     example:
     <<<
@@ -764,36 +792,21 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
 
     In cases where an conflict needs no edit,
     the context is often enough to decide which participant to keep.
-*** when halting during rebase, cursor is at conflicting commit, goto first conflict-hunk
+  - when halting during rebase, cursor is at conflicting commit, goto first conflict-hunk
     a single keypress should move to the "unstaged changes", and open the first
     file and put cursor at first merge-conflict-hunk.
-*** move down down/up between hunks in magit-status
+  - move down down/up between hunks in magit-status
     using some down and up commands to move and center to next/previous merge-conflict-hunk.
-*** Smerge-mode should wrap around on next-merge
-  as it is, searching for "<<<" is a safer than using Smerge-mode next-merge
-*** if halting on rebase-conflict center on first file, first conflict
-  as is, the conflict line in the pick-list is seen in the lower part,
-  needing to scroll down to the unmerged diffs.
-*** selecting modified same conflict rename from same
-  during conflict resolve, if modifying the upper part (same), and then taking it,
-  the git rebase "pick-list", is still named same.
-*** in magit-revision collapse all files
-
-* bugs
-** 20250103 hovering link org-mode crash
-  if opening a org-mode file, and hovering mouse pointer
-  over a org-mode link, after around 2 seconds, emacs craches
-
-* guile
-** known problems
-*** guile-emacs build fails with Unbound variable: make-srfi-4-vector
-  - error:
-      ice-9/boot-9.scm:408:31: In procedure make-u32vector: Unbound variable: make-srfi-4-vector
-  - remedy:
-    remove the files installed by guile's build system (make install), eg, rm -rf /t/ge/g3, where /t/ge/g3 is the
-    path you've used for the "configure --prefix=<PATH>" step in configuring guile.
+  - Smerge-mode should wrap around on next-merge
+    as it is, searching for "<<<" is a safer than using Smerge-mode next-merge
+  - if halting on rebase-conflict center on first file, first conflict
+    as is, the conflict line in the pick-list is seen in the lower part,
+    needing to scroll down to the unmerged diffs.
+  - selecting modified same conflict rename from same
+    during conflict resolve, if modifying the upper part (same), and then taking it,
+    the git rebase "pick-list", is still named same.
+  - in magit-revision collapse all files
 
 * ramblings
 
   Much of "where are we at 2024" :)
-

@@ -1,0 +1,25 @@
+* 20241231-guile-touch :bug:
+
+Background:
+When guile compiles elisp code, the compiler
+uses the elisp code in guile 'module/language/elisp/compile-tree-il.scm'.
+Now that code is installed by 'make install', both the compiled version '.go',
+along with its source '.scm' file.
+
+guile-elisp 'lisp-string?' predicate is bootstrapped to vanilla guile 'string?', but
+When emacs binary is started (which is linked to libguile),
+emacs binary will redefine the symbol-value of 'lisp-string?',
+to an emacs FFI-like function (Fstringp).
+
+After rebasing guile-elisp branch beyond '9b9149a5' 'Rework bootstrap to be reproducible',
+the compiled use of 'lisp-string?' has changed. This causes
+elisp-string type not to be recognized by the compiler, which causes
+doc-strings, declare forms and interactive forms to be passed on instead of
+thrown away as they should.
+
+By doing a unix-file-touch on either the installed file scm  a go file,
+the problem will go away.
+
+  Repos containing more debug information about the problem:
+  - https://codeberg.org/lyrra/guilemacs/src/branch/bug-20241231-guile-touch
+  - https://codeberg.org/lyrra/guile/src/branch/bug-20241231-guile-touch
