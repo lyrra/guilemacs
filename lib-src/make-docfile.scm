@@ -122,7 +122,7 @@
   (newline))
 
 (define (fputs str s)
-  (display str))
+  (display str (current-output-port)))
 
 (define stdout 'stdout) ; dummy
 (define %input-buffer #f)
@@ -295,38 +295,38 @@
         (while (not done)
           (set! c (getc (rcsoc-in-file state)))
           (if (not (or (char=? c #\Space) (char=? c #\Newline)))
-              (set! done #t))))
+              (set! done #t)))
 
-      ;; Output the open-paren we just read.
-      (if (not (char=? ch #\())
-          (fatal "Missing '(' after keyword"))
-      (rcsoc-put-char ch state)
+        ;; Output the open-paren we just read.
+        (if (not (char=? c #\())
+            (fatal "Missing '(' after keyword"))
+        (rcsoc-put-char c state))
 
       ;; Skip the function name and replace it with `fn'.
-      (let ((done #f))
+      (let ((done #f)
+            (c #f))
         (while (not done)
-          (set! c (getc (state->in_file)))
-          (if (char=? c EOF)
+          (set! c (getc (rcsoc-in-file state)))
+          (if (eof-object? c)
               (fatal "Unexpected EOF after keyword"))
-          (if (not (and (not (char=? c #\Space)) (not (char=? c #\)))))
-              (set! done #t))))
+          (if (or (char=? c #\Space) (char=? c #\)))
+              (set! done #t)))
 
-      (rcsoc-put-char #\f state)
-      (rcsoc-put-char #\n state)
+        (rcsoc-put-char #\f state)
+        (rcsoc-put-char #\n state)
 
-      ;; Put back the last character.
-      (ungetc c state->in_file)))
+        ;; Put back the last character.
+        (ungetc c (rcsoc-in-file state)))))
    (else
     (when (and (rcsoc-keyword state)
-               (> (rcsoc-cur-keyword-ptr state) (string-length (rcsoc-keyword state))))
+               (> (rcsoc-cur-keyword-ptr state) 0))
       ;; We scanned the beginning of a potential usage
       ;; keyword, but it was a false alarm.  Output the
       ;; part we scanned.
-      (error "not-here 1")
-      (do ((p state->keyword (1+ p)))
-          ((< p state->cur_keyword_ptr))
-        (rcsoc-put-char *p state))
-      (set! state->cur_keyword_ptr state->keyword))
+      (do ((p 0 (1+ p)))
+          ((>= p (rcsoc-cur-keyword-ptr state)))
+        (rcsoc-put-char (string-ref (rcsoc-keyword state) p) state))
+      (set-rcsoc-cur-keyword-ptr state 0))
     (rcsoc-put-char ch state))))
 
 ;; Skip a C string or C-style comment from INFILE, and return the
@@ -360,10 +360,11 @@
           (set! c (getc infile))
           (case c
             ((#\Newline #\Return)
-              (set! c (getc infile))
-              (continue))
-            ((#\n) (set! c #\Newline) (break))
-            ((#\t) (set! c #\Tab) (break))))
+             (set! c (getc infile))
+             (continue))
+            ((#\n)
+             (set! c #\Newline))
+            ((#\t) (set! c #\Tab))))
 
         (cond
          ((char=? c #\Space)
@@ -737,6 +738,7 @@
             (defvarflag #f)
             (type 'INVALID)
             (name #f))
+        (set! input-buffer (cons "" 0)) ; FIX: bad state for input-buffer
         (when (and (not (char=? #\Newline c)) (not (char=? #\Return c)))
           (set! c (getc infile))
           (continue))
@@ -983,11 +985,12 @@
                 (set! c (getc infile))
                 (if (not (c-isspace c)) (break)))))
 
-        (when (and (or (char=? c #\") (char=? c #\/))
-                   (begin ; peek-char
-                     (set! c (getc infile))
-                     (ungetc c infile)
-                     (char=? c #\*)))
+        (when (or (char=? c #\")
+                  (and (char=? c #\/)
+                       (begin ; peek-char
+                         (set! c (getc infile))
+                         (ungetc c infile)
+                         (char=? c #\*))))
            (let ((comment (not (char=? c #\")))
                  (saw_usage #f))
              (format #t "~c~c~a\n"
