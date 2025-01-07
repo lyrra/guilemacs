@@ -68,13 +68,6 @@ init_bignum (void)
     mpz_init (mpz[i]);
 }
 
-/* Return the value of the Lisp bignum N, as a double.  */
-double
-bignum_to_double (Lisp_Object n)
-{
-  return mpz_get_d_rounded (*xbignum_val (n));
-}
-
 /* Return D, converted to a Lisp integer.  Discard any fraction.
    Signal an error if D cannot be converted.  */
 Lisp_Object

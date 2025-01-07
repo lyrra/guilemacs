@@ -3864,7 +3864,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			  if (FIXNUMP (arg))
 			    darg = XFIXNUM (arg);
 			  else
-			    format_bignum_as_double = true;
+			    emacs_abort (); // format_bignum_as_double = true;
 			}
 		      else
 			{
@@ -3877,7 +3877,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			      else if (integer_to_uintmax (arg, &uarg))
 				ldarg = uarg;
 			      else
-				format_bignum_as_double = true;
+				emacs_abort (); //format_bignum_as_double = true;
 			    }
 			  if (!format_bignum_as_double)
 			    {
@@ -3886,7 +3886,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			    }
 			}
 		      if (format_bignum_as_double)
-			darg = bignum_to_double (arg);
+			emacs_abort(); //darg = bignum_to_double (arg);
 		    }
 
 		  if (format_as_long_double)

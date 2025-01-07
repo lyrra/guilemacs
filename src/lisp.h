@@ -484,7 +484,6 @@ INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 /* Defined in bignum.c.  */
 extern int check_int_nonnegative (Lisp_Object);
 extern intmax_t check_integer_range (Lisp_Object, intmax_t, intmax_t);
-extern double bignum_to_double (Lisp_Object) ATTRIBUTE_CONST;
 extern Lisp_Object make_bigint (intmax_t);
 extern Lisp_Object make_biguint (uintmax_t);
 extern uintmax_t check_uinteger_max (Lisp_Object, uintmax_t);
@@ -2980,7 +2979,7 @@ XFLOATINT (Lisp_Object n)
 {
   return (FIXNUMP (n) ? XFIXNUM (n)
 	  : FLOATP (n) ? XFLOAT_DATA (n)
-	  : bignum_to_double (n));
+	  : emacs_abort()); // bignum_to_double (n));
 }
 
 INLINE void
