@@ -3977,8 +3977,9 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 			}
 		      else
 			{
-			  arg = double_to_integer (d);
-			  goto bignum_arg;
+                          emacs_abort ();
+			  //arg = double_to_integer (d);
+			  //goto bignum_arg;
 			}
 		    }
 		  p[0] = negative ? '-' : plus_flag ? '+' : ' ';

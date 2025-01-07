@@ -73,10 +73,7 @@ init_bignum (void)
 Lisp_Object
 double_to_integer (double d)
 {
-  if (!isfinite (d))
-    overflow_error ();
-  mpz_set_d (mpz[0], d);
-  return make_integer_mpz ();
+  return scm_inexact_to_exact (scm_round_number (scm_from_double (d)));
 }
 
 /* Return a Lisp integer equal to mpz[0], which has BITS bits and which

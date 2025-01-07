@@ -409,7 +409,7 @@ rounding_driver (Lisp_Object n, Lisp_Object d,
   CHECK_NUMBER (n);
 
   if (NILP (d))
-    return FLOATP (n) ? double_to_integer (double_round (XFLOAT_DATA (n))) : n;
+    return FLOATP (n) ? scm_inexact_to_exact (scm_round_number (n)) : n;
 
   CHECK_NUMBER (d);
 
