@@ -170,47 +170,6 @@ make_integer_mpz (void)
   return make_bignum_bits (bits);
 }
 
-/* Set RESULT to V.  This code is for when intmax_t is wider than long.  */
-void
-mpz_set_intmax_slow (mpz_t result, intmax_t v)
-{
-  int maxlimbs = (INTMAX_WIDTH + GMP_NUMB_BITS - 1) / GMP_NUMB_BITS;
-  mp_limb_t *limb = mpz_limbs_write (result, maxlimbs);
-  int n = 0;
-  uintmax_t u = v;
-  bool negative = v < 0;
-  if (negative)
-    {
-      uintmax_t two = 2;
-      u = -u & ((two << (UINTMAX_WIDTH - 1)) - 1);
-    }
-
-  do
-    {
-      limb[n++] = u;
-      u = GMP_NUMB_BITS < UINTMAX_WIDTH ? u >> GMP_NUMB_BITS : 0;
-    }
-  while (u != 0);
-
-  mpz_limbs_finish (result, negative ? -n : n);
-}
-void
-mpz_set_uintmax_slow (mpz_t result, uintmax_t v)
-{
-  int maxlimbs = (UINTMAX_WIDTH + GMP_NUMB_BITS - 1) / GMP_NUMB_BITS;
-  mp_limb_t *limb = mpz_limbs_write (result, maxlimbs);
-  int n = 0;
-
-  do
-    {
-      limb[n++] = v;
-      v = GMP_NUMB_BITS < INTMAX_WIDTH ? v >> GMP_NUMB_BITS : 0;
-    }
-  while (v != 0);
-
-  mpz_limbs_finish (result, n);
-}
-
 /* If Z fits into *PI, store its value there and return true.
    Return false otherwise.  */
 bool

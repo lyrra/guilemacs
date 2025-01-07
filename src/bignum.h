@@ -48,8 +48,6 @@ extern void init_bignum (void);
 extern Lisp_Object make_integer_mpz (void);
 extern bool mpz_to_intmax (mpz_t const, intmax_t *) ARG_NONNULL ((1, 2));
 extern bool mpz_to_uintmax (mpz_t const, uintmax_t *) ARG_NONNULL ((1, 2));
-extern void mpz_set_intmax_slow (mpz_t, intmax_t) ARG_NONNULL ((1));
-extern void mpz_set_uintmax_slow (mpz_t, uintmax_t) ARG_NONNULL ((1));
 extern void emacs_mpz_mul (mpz_t, mpz_t const, mpz_t const)
   ARG_NONNULL ((1, 2, 3));
 extern void emacs_mpz_mul_2exp (mpz_t, mpz_t const, EMACS_INT)
@@ -78,7 +76,7 @@ mpz_set_intmax (mpz_t result, intmax_t v)
   if (FASTER_BIGNUM && !ckd_add (&i, v, 0))
     mpz_set_si (result, i);
   else
-    mpz_set_intmax_slow (result, v);
+    emacs_abort ();
 }
 INLINE void ARG_NONNULL ((1))
 mpz_set_uintmax (mpz_t result, uintmax_t v)
@@ -87,7 +85,7 @@ mpz_set_uintmax (mpz_t result, uintmax_t v)
   if (FASTER_BIGNUM && !ckd_add (&i, v, 0))
     mpz_set_ui (result, i);
   else
-    mpz_set_uintmax_slow (result, v);
+    emacs_abort ();
 }
 
 /* Return a pointer to the mpz_t value represented by the bignum I.
