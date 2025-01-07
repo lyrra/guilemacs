@@ -3736,8 +3736,6 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
 
 /* Defined in bignum.c.  This part of bignum.c's API does not require
    the caller to access bignum internals; see bignum.h for that.  */
-extern intmax_t bignum_to_intmax (Lisp_Object) ATTRIBUTE_CONST;
-extern uintmax_t bignum_to_uintmax (Lisp_Object) ATTRIBUTE_CONST;
 extern ptrdiff_t bignum_bufsize (Lisp_Object, int) ATTRIBUTE_CONST;
 extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
 extern Lisp_Object bignum_to_string (Lisp_Object, int);
@@ -3757,9 +3755,9 @@ integer_to_intmax (Lisp_Object num, intmax_t *n)
     }
   else
     {
-      intmax_t i = bignum_to_intmax (num);
-      *n = i;
-      return i != 0;
+      emacs_abort(); // intmax_t i = bignum_to_intmax (num);
+      //*n = i;
+      //return i != 0;
     }
 }
 INLINE bool
@@ -3772,9 +3770,9 @@ integer_to_uintmax (Lisp_Object num, uintmax_t *n)
     }
   else
     {
-      uintmax_t i = bignum_to_uintmax (num);
-      *n = i;
-      return i != 0;
+      emacs_abort (); // uintmax_t i = bignum_to_uintmax (num);
+      //*n = i;
+      //return i != 0;
     }
 }
 

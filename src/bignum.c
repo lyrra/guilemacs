@@ -292,22 +292,6 @@ mpz_to_uintmax (mpz_t const z, uintmax_t *pi)
   return true;
 }
 
-/* Return the value of the bignum X if it fits, 0 otherwise.
-   A bignum cannot be zero, so 0 indicates failure reliably.  */
-intmax_t
-bignum_to_intmax (Lisp_Object x)
-{
-  intmax_t i;
-  return mpz_to_intmax (*xbignum_val (x), &i) ? i : 0;
-}
-uintmax_t
-bignum_to_uintmax (Lisp_Object x)
-{
-  uintmax_t i;
-  return mpz_to_uintmax (*xbignum_val (x), &i) ? i : 0;
-}
-
-
 /* Multiply and exponentiate mpz_t values without aborting due to size
    limits.  */
 

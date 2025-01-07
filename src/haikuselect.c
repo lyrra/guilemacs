@@ -416,7 +416,7 @@ static int32
 lisp_to_type_code (Lisp_Object obj)
 {
   if (BIGNUMP (obj))
-    return (int32) bignum_to_intmax (obj);
+    emacs_abort ();
 
   if (FIXNUMP (obj))
     return XFIXNUM (obj);
@@ -487,14 +487,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 
 	  if (BIGNUMP (t2))
 	    {
-	      t5 = bignum_to_uintmax (t2);
-
-	      if (!t5 || t5 > TYPE_MAXIMUM (uint32))
-		signal_error ("Value too large", t2);
-
-	      block_input ();
-	      be_set_message_type (message, t5);
-	      unblock_input ();
+        emacs_abort ();
 	    }
 	  else
 	    {
@@ -614,14 +607,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'LONG':
 	      if (BIGNUMP (data))
 		{
-		  t4 = bignum_to_intmax (data);
-
-		  /* We know that int32 is signed.  */
-		  if (!t4 || t4 > TYPE_MINIMUM (int32)
-		      || t4 < TYPE_MAXIMUM (int32))
-		    signal_error ("Value too large", data);
-
-		  long_data = (int32) t4;
+      emacs_abort ();
 		}
 	      else
 		{
@@ -644,13 +630,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'LLNG':
 	      if (BIGNUMP (data))
 		{
-		  t4 = bignum_to_intmax (data);
-
-		  if (!t4 || t4 > TYPE_MINIMUM (int64)
-		      || t4 < TYPE_MAXIMUM (int64))
-		    signal_error ("Value too large", data);
-
-		  llong_data = (int64) t4;
+      emacs_abort ();
 		}
 	      else
 		{
@@ -673,12 +653,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'SIZT':
 	      if (BIGNUMP (data))
 		{
-		  t4 = bignum_to_intmax (data);
-
-		  if (!t4 || t4 > TYPE_MAXIMUM (size_t))
-		    signal_error ("Value too large", data);
-
-		  sizet_data = (size_t) t4;
+      emacs_abort ();
 		}
 	      else
 		{
@@ -701,13 +676,7 @@ haiku_lisp_to_message (Lisp_Object obj, void *message)
 	    case 'SSZT':
 	      if (BIGNUMP (data))
 		{
-		  t4 = bignum_to_intmax (data);
-
-		  if (!t4 || t4 > TYPE_MINIMUM (ssize_t)
-		      || t4 < TYPE_MAXIMUM (ssize_t))
-		    signal_error ("Value too large", data);
-
-		  ssizet_data = (ssize_t) t4;
+      emacs_abort ();
 		}
 	      else
 		{
