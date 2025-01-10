@@ -1092,10 +1092,18 @@ extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 
 /* Defined in xdisp.c.  */
 
+INLINE bool
+BIGNUMP (Lisp_Object x)
+{
+  return PSEUDOVECTORP (x, PVEC_BIGNUM);
+}
+
 /* Extract A's type.  */
 INLINE enum Lisp_Type
 XTYPE (Lisp_Object o)
 {
+  if (BIGNUMP (o))
+    return Lisp_Vectorlike;
   if (INTEGERP (o))
     return Lisp_Int;
   else if (SYMBOLP (o))
@@ -2641,12 +2649,6 @@ XSQLITE (Lisp_Object a)
 {
   eassert (SQLITEP (a));
   return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Sqlite);
-}
-
-INLINE bool
-BIGNUMP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_BIGNUM);
 }
 
 INLINE bool
