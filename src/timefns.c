@@ -655,8 +655,7 @@ decode_float_time (double t, enum cform cform)
       hz = AREF (flt_radix_power, scale);
       if (NILP (hz))
 	{
-	  mpz_ui_pow_ui (mpz[0], FLT_RADIX, scale);
-	  hz = make_integer_mpz ();
+          hz = scm_expt (make_fixnum (FLT_RADIX), make_fixnum(scale));
 	  ASET (flt_radix_power, scale, hz);
 	}
     }
