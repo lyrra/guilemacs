@@ -796,7 +796,8 @@ This mainly sets up debugger-related bindings."
             (handler-bind (((error quit) debugfun))
               (funcall (ert-test-body (ert--test-execution-info-test
                                        test-execution-info))))))))
-    (ert-pass))
+    ;(ert-pass)
+    )
   (setf (ert--test-execution-info-result test-execution-info)
         (make-ert-test-passed))
   nil)
