@@ -571,7 +571,7 @@ The environment used is the one when entering the activation frame at point."
   'backtrace-toggle-locals "28.1")
 
 
-(defvar-keymap debugger-mode-map
+'(DISABLED-guilemacs defvar-keymap debugger-mode-map
   :full t
   :parent backtrace-mode-map
   "b" #'debugger-frame

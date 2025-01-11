@@ -188,7 +188,7 @@ functions returns non-nil.  When adding a function to this hook,
 you should also set the :source-available flag for the backtrace
 frames where the source code location is known.")
 
-(defvar-keymap backtrace-mode-map
+'(DISABLED-guilemacs defvar-keymap backtrace-mode-map
   :doc "Local keymap for `backtrace-mode' buffers."
   :parent (make-composed-keymap special-mode-map
                                 button-buffer-map)
