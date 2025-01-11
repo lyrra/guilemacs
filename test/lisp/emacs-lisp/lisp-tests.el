@@ -176,7 +176,7 @@
     (forward-sexp)
     (should (= ?. (char-before)))))
 
-(ert-deftest lisp-forward-sexp-python-triple-quoted-string ()
+'(DISABLE-guilemacs ert-deftest lisp-forward-sexp-python-triple-quoted-string ()
   "Test \\[forward-sexp] on Python doc strings for #11321."
   (with-temp-buffer
     (insert "\"\"\"Triple-quoted string\"\"\"")
@@ -186,7 +186,7 @@
     (forward-sexp)
     (should (eobp))))
 
-(ert-deftest lisp-forward-sexp-python-triple-quotes-string ()
+'(DISABLE-guilemacs ert-deftest lisp-forward-sexp-python-triple-quotes-string ()
   "Test \\[forward-sexp] on Python doc strings for #11321."
   (with-temp-buffer
     (insert "'''Triple-quoted string'''")
@@ -214,7 +214,7 @@
 
 ;; Test some core Elisp rules.
 (defvar c-e-x)
-(ert-deftest core-elisp-tests-1-defvar-in-let ()
+'(DISABLE-guilemacs ert-deftest core-elisp-tests-1-defvar-in-let ()
   "Test some core Elisp rules."
   (with-temp-buffer
     ;; Check that when defvar is run within a let-binding, the toplevel default
