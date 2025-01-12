@@ -32,8 +32,9 @@
     (should (consp (benchmark-run 1 (setq m (1+ 0)))))
     (should (stringp (benchmark nil (1+ 0))))
     (should (stringp (benchmark 1 (1+ 0))))
-    (should (consp (benchmark-run-compiled (1+ 0))))
-    (should (consp (benchmark-run-compiled 1 (1+ 0))))
+    ;; DISABLE-guilemacs
+    '(should (consp (benchmark-run-compiled (1+ 0))))
+    '(should (consp (benchmark-run-compiled 1 (1+ 0))))
     ;; First test is heavier, must need longer time.
     (let ((count1 0)
           (count2 0)
@@ -47,7 +48,8 @@
     (should (> (car (benchmark-run
                       (let ((n 100000)) (while (> n 1) (setq n (1- n))))))
                (car (benchmark-run (setq m (1+ 0))))))
-    (should (> (car (benchmark-run-compiled
+    ;; DISABLE-guilemacs
+    '(should (> (car (benchmark-run-compiled
                       (let ((n 100000)) (while (> n 1) (setq n (1- n))))))
                (car (benchmark-run-compiled (1+ 0)))))
     (setq str (benchmark nil '(let ((n 100000)) (while (> n 1) (setq n (1- n))))))

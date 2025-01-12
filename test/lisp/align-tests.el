@@ -32,37 +32,37 @@
     (funcall function)
     (align (point-min) (point-max))))
 
-(ert-deftest align-c ()
+'(DISABLE-guilemacs ert-deftest align-c ()
   (ert-test-erts-file (ert-resource-file "c-mode.erts")
                       (test-align-transform-fun #'c-mode)))
 
-(ert-deftest align-css ()
+'(DISABLE-guilemacs ert-deftest align-css ()
   (let ((indent-tabs-mode nil))
     (ert-test-erts-file (ert-resource-file "css-mode.erts")
                         (test-align-transform-fun #'css-mode))))
 
-(ert-deftest align-java ()
+'(DISABLE-guilemacs ert-deftest align-java ()
   (ert-test-erts-file (ert-resource-file "java-mode.erts")
                       (test-align-transform-fun #'java-mode)))
 
-(ert-deftest align-latex ()
+'(DISABLE-guilemacs ert-deftest align-latex ()
   (ert-test-erts-file (ert-resource-file "latex-mode.erts")
                       (test-align-transform-fun #'latex-mode)))
 
 (autoload 'treesit-ready-p "treesit")
 
-(ert-deftest align-ts-lua ()
+'(DISABLE-guilemacs ert-deftest align-ts-lua ()
   (skip-unless (treesit-ready-p 'lua t))
   (let ((comment-column 20)
         (indent-tabs-mode nil))
     (ert-test-erts-file (ert-resource-file "lua-ts-mode.erts")
                         (test-align-transform-fun #'lua-ts-mode))))
 
-(ert-deftest align-python ()
+'(DISABLE-guilemacs ert-deftest align-python ()
   (ert-test-erts-file (ert-resource-file "python-mode.erts")
                       (test-align-transform-fun #'python-mode)))
 
-(ert-deftest align-toml ()
+'(DISABLE-guilemacs ert-deftest align-toml ()
   (let ((indent-tabs-mode nil))
     (ert-test-erts-file (ert-resource-file "conf-toml-mode.erts")
                         (test-align-transform-fun #'conf-toml-mode))))

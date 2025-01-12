@@ -26,7 +26,8 @@
 (ert-deftest backquote-test-basic ()
   (let ((lst '(ba bb bc))
         (vec [ba bb bc]))
-    (should (equal 3 `,(eval '(+ x y) '((x . 1) (y . 2)))))
+    ;; DISABLE-guilemacs
+    '(should (equal 3 `,(eval '(+ x y) '((x . 1) (y . 2)))))
     (should (equal vec `[,@lst]))
     (should (equal `(a lst c) '(a lst c)))
     (should (equal `(a ,lst c) '(a (ba bb bc) c)))

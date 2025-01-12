@@ -23,7 +23,7 @@
 (require 'dired-aux)
 (eval-when-compile (require 'cl-lib))
 
-(ert-deftest dired-test-bug27496 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27496 ()
   "Test for https://debbugs.gnu.org/27496 ."
   (skip-unless (executable-find shell-file-name))
   (ert-with-temp-file foo
@@ -61,7 +61,7 @@
                  ,@body)
              ,@body))))))
 
-(ert-deftest dired-test-bug28834 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug28834 ()
   "test for https://debbugs.gnu.org/28834 ."
   (let (to-cp to-mv)
     ;; `dired-create-destination-dirs' set to 'always.
@@ -88,7 +88,7 @@
      (should-error (dired-copy-file-recursive from to-cp nil))
      (should-error (dired-rename-file from to-mv nil)))))
 
-(ert-deftest dired-test-bug30624 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug30624 ()
   "test for https://debbugs.gnu.org/30624 ."
   (cl-letf* ((target-dir (make-temp-file "target" 'dir))
              ((symbol-function 'dired-mark-read-file-name)

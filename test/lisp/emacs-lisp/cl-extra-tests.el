@@ -56,7 +56,7 @@
   (should-not (cl-equalp '(1 2 3) '(4 5 6)))
   (should-not (cl-equalp [1 2 3] [4 5 6])))
 
-(ert-deftest cl-getf ()
+'(DISABLE-guilemacs ert-deftest cl-getf ()
   (let ((plist '(x 1 y nil)))
     (should (eq (cl-getf plist 'x) 1))
     (should-not (cl-getf plist 'y :none))

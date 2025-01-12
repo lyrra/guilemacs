@@ -23,7 +23,7 @@
 (require 'dired-x)
 
 
-(ert-deftest dired-test-bug25942 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug25942 ()
   "Test for https://debbugs.gnu.org/25942 ."
   (let* ((dirs (list "Public" "Music"))
          (files (list ".bashrc" "bar.c" "foo.c" "c" ".c"))

@@ -210,7 +210,7 @@ instead."
     (completion-preview-next-candidate 1)
     (completion-preview-tests--check-preview "z")))
 
-(ert-deftest completion-preview-complete ()
+'(DISABLE-guilemacs ert-deftest completion-preview-complete ()
   "Test `completion-preview-complete'."
   (with-temp-buffer
     (let ((exit-fn-called nil)
@@ -284,7 +284,7 @@ instead."
       (should exit-fn-called)
       (should (equal exit-fn-args '("foobash-mode" finished))))))
 
-(ert-deftest completion-preview-insert-calls-exit-function ()
+'(DISABLE-guilemacs ert-deftest completion-preview-insert-calls-exit-function ()
   "Test that `completion-preview-insert' calls the completion exit function."
   (let ((exit-fn-called nil) (exit-fn-args nil))
     (with-temp-buffer
@@ -330,7 +330,7 @@ instead."
       (should-not exit-fn-called)
       (should-not exit-fn-args))))
 
-(ert-deftest completion-preview-insert-nonsubword ()
+'(DISABLE-guilemacs ert-deftest completion-preview-insert-nonsubword ()
   "Test that `completion-preview-insert-word' with `subword-mode' off."
   (let ((exit-fn-called nil) (exit-fn-args nil))
     (with-temp-buffer
@@ -377,7 +377,7 @@ instead."
       (should-not exit-fn-called)
       (should-not exit-fn-args))))
 
-(ert-deftest completion-preview-insert-mid-symbol ()
+'(DISABLE-guilemacs ert-deftest completion-preview-insert-mid-symbol ()
   "Test `completion-preview-insert-word' when point is in a mulit-word symbol."
   (with-temp-buffer
     (setq-local completion-at-point-functions

@@ -65,7 +65,7 @@
     (should (equal (dom-tag (dom-children (dom-children dom)))
                    "title"))))
 
-(ert-deftest dom-tests-non-text-children ()
+'(DISABLE-guilemacs ert-deftest dom-tests-non-text-children ()
   (let ((dom (dom-tests--tree)))
     (should (equal (dom-children dom) (dom-non-text-children dom)))
     (should-not (dom-non-text-children

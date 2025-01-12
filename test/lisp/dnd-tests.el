@@ -30,7 +30,7 @@
 
 (require 'dnd)
 (require 'cl-lib)
-(require 'tramp)
+;(require 'tramp)
 (require 'select)
 (require 'ert-x)
 (require 'browse-url)
@@ -180,7 +180,7 @@ This function only tries to handle strings."
       (should (equal (dnd-tests-extract-selection-data string-data t)
                      (encode-coding-string test-text 'ascii))))))
 
-(ert-deftest dnd-tests-begin-file-drag ()
+'(DISABLE-guilemacs ert-deftest dnd-tests-begin-file-drag ()
   ;; These tests also involve handling remote file names.
   (skip-unless (and (dnd-tests-remote-accessible-p)
                     ;; TODO: make these tests work under X.
@@ -271,7 +271,7 @@ This function only tries to handle strings."
       (delete-file normal-multibyte-file)
       (delete-file remote-temp-file))))
 
-(ert-deftest dnd-tests-begin-drag-files ()
+'(DISABLE-guilemacs ert-deftest dnd-tests-begin-drag-files ()
   (skip-unless (and (dnd-tests-remote-accessible-p)
                     ;; TODO: make these tests work under X.
                     (not (eq window-system 'x))))

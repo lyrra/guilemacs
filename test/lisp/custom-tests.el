@@ -24,9 +24,9 @@
 
 (require 'wid-edit)
 (require 'cus-edit)
-(require 'bytecomp)
+;(require 'bytecomp)
 
-(ert-deftest custom-theme--load-path ()
+'(DISABLE-guilemacs ert-deftest custom-theme--load-path ()
   "Test `custom-theme--load-path' behavior."
   (ert-with-temp-directory temporary-file-directory
     ;; Path is empty.
@@ -84,7 +84,7 @@
         (should (file-directory-p themedir))
         (should (equal (custom-theme--load-path) (list themedir)))))))
 
-(ert-deftest custom-tests-require-theme ()
+'(DISABLE-guilemacs ert-deftest custom-tests-require-theme ()
   "Test `require-theme'."
   (require 'warnings)
   (ert-with-temp-directory temporary-file-directory

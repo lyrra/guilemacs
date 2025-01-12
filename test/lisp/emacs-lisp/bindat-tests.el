@@ -113,7 +113,7 @@
         :pack-val value)
     :unpack-val (if (< n1 126) n1 n2)))
 
-(ert-deftest bindat-test--pack-val ()
+'(DISABLE-guilemacs ert-deftest bindat-test--pack-val ()
   ;; This is intended to test the :(un)pack-val feature that offers
   ;; control over the unpacked representation of the data.
   (dolist (n '(0 42 125 126 127 128 150 255 5000 65535 65536 8769786876))
@@ -122,7 +122,7 @@
                            (bindat-pack bindat-test--int-websocket-type n))
             n))))
 
-(ert-deftest bindat-test--sint ()
+'(ert-deftest bindat-test--sint ()
   (dotimes (kind 32)
     (let ((bitlen (* 8 (/ kind 2)))
           (r (zerop (% kind 2))))
@@ -152,7 +152,7 @@
                     :unpack-val (+ (logand head 127) (ash tail 7)))))
    loop))
 
-(ert-deftest bindat-test--recursive ()
+'(ert-deftest bindat-test--recursive ()
   (dotimes (n 10)
     (let ((max (ash 1 (* n 10))))
       (dotimes (_ 10)

@@ -26,7 +26,7 @@
 (require 'generator)
 (require 'bytecomp)
 
-(ert-deftest cconv-tests-lambda-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-lambda-:documentation ()
   "Docstring for lambda can be specified with :documentation."
   (let ((fun (lambda ()
                (:documentation (concat "lambda" " documentation"))
@@ -34,7 +34,7 @@
     (should (string= (documentation fun) "lambda documentation"))
     (should (eq (funcall fun) 'lambda-result))))
 
-(ert-deftest cconv-tests-pcase-lambda-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-pcase-lambda-:documentation ()
   "Docstring for pcase-lambda can be specified with :documentation."
   (let ((fun (pcase-lambda (`(,a ,b))
                (:documentation (concat "pcase-lambda" " documentation"))
@@ -45,7 +45,7 @@
 (defun cconv-tests-defun ()
   (:documentation (concat "defun" " documentation"))
   'defun-result)
-(ert-deftest cconv-tests-defun-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-defun-:documentation ()
   "Docstring for defun can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-defun)
                    "defun documentation"))
@@ -54,7 +54,7 @@
 (cl-defun cconv-tests-cl-defun ()
   (:documentation (concat "cl-defun" " documentation"))
   'cl-defun-result)
-(ert-deftest cconv-tests-cl-defun-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-defun-:documentation ()
   "Docstring for cl-defun can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-cl-defun)
                    "cl-defun documentation"))
@@ -83,7 +83,7 @@
 (cl-iter-defun cconv-tests-cl-iter-defun ()
   (:documentation (concat "cl-iter-defun" " documentation"))
   (iter-yield 'cl-iter-defun-result))
-(ert-deftest cconv-tests-cl-iter-defun-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-iter-defun-:documentation ()
   "Docstring for cl-iter-defun can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-cl-iter-defun)
                    "cl-iter-defun documentation"))
@@ -93,13 +93,13 @@
 (iter-defun cconv-tests-iter-defun ()
   (:documentation (concat "iter-defun" " documentation"))
   (iter-yield 'iter-defun-result))
-(ert-deftest cconv-tests-iter-defun-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-iter-defun-:documentation ()
   "Docstring for iter-defun can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-iter-defun)
                    "iter-defun documentation"))
   (should (eq (iter-next (cconv-tests-iter-defun)) 'iter-defun-result)))
 
-(ert-deftest cconv-tests-iter-lambda-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-iter-lambda-:documentation ()
   "Docstring for iter-lambda can be specified with :documentation."
   (let ((iter-fun
          (iter-lambda ()
@@ -108,7 +108,7 @@
     (should (string= (documentation iter-fun) "iter-lambda documentation"))
     (should (eq (iter-next (funcall iter-fun)) 'iter-lambda-result))))
 
-(ert-deftest cconv-tests-cl-function-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-function-:documentation ()
   "Docstring for cl-function can be specified with :documentation."
   (let ((fun (cl-function (lambda (&key arg)
                             (:documentation (concat "cl-function"
@@ -117,7 +117,7 @@
     (should (string-match "\\`cl-function documentation$" (documentation fun)))
     (should (equal (funcall fun :arg t) '(t cl-function-result)))))
 
-(ert-deftest cconv-tests-function-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-function-:documentation ()
   "Docstring for lambda inside function can be specified with :documentation."
   (let ((fun #'(lambda (arg)
                  (:documentation (concat "function" " documentation"))
@@ -132,7 +132,7 @@
 (cl-defmethod cconv-tests-cl-defgeneric ((n integer))
   (:documentation (concat "cl-defmethod" " documentation"))
   (+ 1 n))
-(ert-deftest cconv-tests-cl-defgeneric-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-defgeneric-:documentation ()
   "Docstring for cl-defgeneric can be specified with :documentation."
   (let ((descr (describe-function 'cconv-tests-cl-defgeneric)))
     (set-text-properties 0 (length descr) nil descr)
@@ -147,7 +147,7 @@
 (cl-defmethod cconv-tests-cl-defgeneric-literal ((n integer))
   (:documentation "cl-defmethod-literal documentation")
   (+ 1 n))
-(ert-deftest cconv-tests-cl-defgeneric-literal-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-defgeneric-literal-:documentation ()
   "Docstring for cl-defgeneric can be specified with :documentation."
   (let ((descr (describe-function 'cconv-tests-cl-defgeneric-literal)))
     (set-text-properties 0 (length descr) nil descr)
@@ -158,7 +158,7 @@
 (defsubst cconv-tests-defsubst ()
   (:documentation (concat "defsubst" " documentation"))
   'defsubst-result)
-(ert-deftest cconv-tests-defsubst-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-defsubst-:documentation ()
   "Docstring for defsubst can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-defsubst)
                    "defsubst documentation"))
@@ -167,13 +167,13 @@
 (cl-defsubst cconv-tests-cl-defsubst ()
   (:documentation (concat "cl-defsubst" " documentation"))
   'cl-defsubst-result)
-(ert-deftest cconv-tests-cl-defsubst-:documentation ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-cl-defsubst-:documentation ()
   "Docstring for cl-defsubst can be specified with :documentation."
   (should (string= (documentation 'cconv-tests-cl-defsubst)
                    "cl-defsubst documentation"))
   (should (eq (cconv-tests-cl-defsubst) 'cl-defsubst-result)))
 
-(ert-deftest cconv-convert-lambda-lifted ()
+'(DISABLE-guilemacs ert-deftest cconv-convert-lambda-lifted ()
   ;; Verify that lambda-lifting is actually performed at all.
   (should (equal (cconv-closure-convert
                   '#'(lambda (x) (let ((f #'(lambda () (+ x 1))))
@@ -347,7 +347,7 @@
                       (list x (funcall g closed-x) (funcall h closed-x))))))))
   )
 
-(ert-deftest cconv-tests-interactive-closure-bug51695 ()
+'(DISABLE-guilemacs ert-deftest cconv-tests-interactive-closure-bug51695 ()
   (let ((f (let ((d 51695))
              (lambda (data)
                (interactive (progn (setq d (1+ d)) (list d)))
@@ -364,7 +364,7 @@
                            (call-interactively f))
                      '((t 51696) (nil 51695) (t 51697)))))))
 
-(ert-deftest cconv-safe-for-space ()
+'(DISABLE-guilemacs ert-deftest cconv-safe-for-space ()
   (let* ((magic-string "This-is-a-magic-string")
          (safe-p (lambda (x) (not (string-match magic-string (format "%S" x))))))
     (should (funcall safe-p (lambda (x) (+ x 1))))

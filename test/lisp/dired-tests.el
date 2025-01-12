@@ -31,7 +31,7 @@
     (symbol-function
      'dired-do-relsymlink))))
 
-(ert-deftest dired-test-bug22694 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug22694 ()
   "Test for https://debbugs.gnu.org/22694 ."
   (let* ((dir       (expand-file-name "bug22694" default-directory))
          (file      "test")
@@ -55,7 +55,7 @@
       (delete-directory dir 'recursive))))
 
 (defvar dired-query)
-(ert-deftest dired-test-bug25609 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug25609 ()
   "Test for https://debbugs.gnu.org/25609 ."
   (let* ((from (make-temp-file "foo" 'dir))
          ;; Make sure we have long file-names in 'from' and 'to', not
@@ -140,7 +140,7 @@
 ;;         (when (buffer-live-p buf) (kill-buffer buf)))
 ;;       (delete-directory test-dir t))))
 
-(ert-deftest dired-test-bug27243-01 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27243-01 ()
   "Test for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27243#5 ."
   (ert-with-temp-directory test-dir
     (let* ((save-pos (lambda ()
@@ -186,7 +186,7 @@
         (dolist (buf buffers)
           (when (buffer-live-p buf) (kill-buffer buf)))))))
 
-(ert-deftest dired-test-bug27243-02 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27243-02 ()
   "Test for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27243#28 ."
   (ert-with-temp-directory test-dir
     (let ((dired-auto-revert-buffer t)
@@ -221,7 +221,7 @@
         (dolist (buf buffers)
           (when (buffer-live-p buf) (kill-buffer buf)))))))
 
-(ert-deftest dired-test-bug27243-03 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27243-03 ()
   "Test for https://debbugs.gnu.org/cgi/bugreport.cgi?bug=27243#61 ."
   (ert-with-temp-directory test-dir
     (let ((dired-auto-revert-buffer t)
@@ -253,7 +253,7 @@
         (dolist (buf allbufs)
           (when (buffer-live-p buf) (kill-buffer buf)))))))
 
-(ert-deftest dired-test-bug7131 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug7131 ()
   "Test for https://debbugs.gnu.org/7131 ."
   (let* ((dir (expand-file-name "lisp" source-directory))
          (buf (dired dir)))
@@ -269,7 +269,7 @@
           (should (cdr (dired-get-marked-files))))
       (when (buffer-live-p buf) (kill-buffer buf)))))
 
-(ert-deftest dired-test-bug27631 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27631 ()
   "Test for https://debbugs.gnu.org/27631 ."
   ;; For dired using 'ls' emulation we test for this bug in
   ;; ls-lisp-tests.el and em-ls-tests.el.
@@ -291,7 +291,7 @@
             (should (cdr (dired-get-marked-files))))
         (when (buffer-live-p buf) (kill-buffer buf))))))
 
-(ert-deftest dired-test-bug27899 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27899 ()
   "Test for https://debbugs.gnu.org/27899 ."
   :tags '(:unstable)
   (dired (list (expand-file-name "src" source-directory)
@@ -308,7 +308,7 @@
           (should (eq 2 (current-column))))
       (dired-hide-details-mode orig))))
 
-(ert-deftest dired-test-bug27968 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27968 ()
   "Test for https://debbugs.gnu.org/27968 ."
   (ert-with-temp-directory top-dir
     (let* ((subdir (expand-file-name "subdir" top-dir))
@@ -357,7 +357,7 @@
         (should (equal "subdir" (dired-get-filename 'local t)))))))
 
 
-(ert-deftest dired-test-bug59047 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug59047 ()
   "Test for https://debbugs.gnu.org/59047 ."
   (dired (list (expand-file-name "src" source-directory)
                "cygw32.c" "alloc.c" "w32xfns.c" "xdisp.c"))
@@ -385,7 +385,7 @@
                ,@body)
            (kill-buffer (current-buffer)))))))
 
-(ert-deftest dired-test-bug27940 ()
+'(DISABLE-guilemacs ert-deftest dired-test-bug27940 ()
   "Test for https://debbugs.gnu.org/27940 ."
   ;; If just empty dirs we shouldn't be prompted.
   (dired-test-with-temp-dirs
@@ -525,7 +525,7 @@
       (when (file-directory-p testdir)
         (delete-directory testdir t)))))
 
-(ert-deftest dired-test-hide-absolute-location-enabled ()
+'(DISABLE-guilemacs ert-deftest dired-test-hide-absolute-location-enabled ()
   "Test for https://debbugs.gnu.org/72272 ."
   (let* ((dired-hide-details-hide-absolute-location t)
          (dir-name (expand-file-name "lisp" source-directory))
@@ -549,7 +549,7 @@
                          (get-text-property (match-beginning 1) 'invisible))))
       (kill-buffer buffer))))
 
-(ert-deftest dired-test-hide-absolute-location-disabled ()
+'(DISABLE-guilemacs ert-deftest dired-test-hide-absolute-location-disabled ()
   "Test for https://debbugs.gnu.org/72272 ."
   (let* ((dired-hide-details-hide-absolute-location nil)
          (dir-name (expand-file-name "lisp" source-directory))

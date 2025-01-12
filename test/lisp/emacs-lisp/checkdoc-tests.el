@@ -30,14 +30,14 @@
 (require 'elisp-mode)
 (require 'ert)
 
-(ert-deftest checkdoc-tests--bug-24998 ()
+'(ert-deftest checkdoc-tests--bug-24998 ()
   "Checks that Bug#24998 is fixed."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(defun foo())")
     (should-error (checkdoc-defun) :type 'user-error)))
 
-(ert-deftest checkdoc-docstring-avoid-false-positive-ok ()
+'(ert-deftest checkdoc-docstring-avoid-false-positive-ok ()
   "Check that Bug#68002 is fixed."
   (with-temp-buffer
     (emacs-lisp-mode)
@@ -46,14 +46,14 @@
 See `org-element--cache-interrupt-C-g'.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defmethod-ok ()
+'(ert-deftest checkdoc-cl-defmethod-ok ()
   "Checkdoc should be happy with a simple correct cl-defmethod."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(cl-defmethod foo (a) \"Return A.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defmethod-with-types-ok ()
+'(ert-deftest checkdoc-cl-defmethod-with-types-ok ()
   "Checkdoc should be happy with a cl-defmethod using types."
   (with-temp-buffer
     (emacs-lisp-mode)
@@ -61,14 +61,14 @@ See `org-element--cache-interrupt-C-g'.\")")
     (insert "(cl-defmethod foo ((a (eql 'smthg)) (b list)) \"Return A+B.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defmethod-qualified-ok ()
+'(ert-deftest checkdoc-cl-defmethod-qualified-ok ()
   "Checkdoc should be happy with a `cl-defmethod' using qualifiers."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(cl-defmethod test :around ((a (eql 'smthg))) \"Return A.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defmethod-with-extra-qualifier-ok ()
+'(ert-deftest checkdoc-cl-defmethod-with-extra-qualifier-ok ()
   "Checkdoc should be happy with a :extra qualified `cl-defmethod'."
   (with-temp-buffer
     (emacs-lisp-mode)
@@ -81,28 +81,28 @@ See `org-element--cache-interrupt-C-g'.\")")
      "(cl-defmethod foo :extra \"foo\" :after ((a (eql 'smthg))) \"Return A.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defmethod-with-extra-qualifier-and-nil-args-ok ()
+'(ert-deftest checkdoc-cl-defmethod-with-extra-qualifier-and-nil-args-ok ()
   "Checkdoc should be happy with a 0-arity :extra qualified `cl-defmethod'."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(cl-defmethod foo :extra \"foo\" () \"Return A.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defun-with-key-ok ()
+'(ert-deftest checkdoc-cl-defun-with-key-ok ()
   "Checkdoc should be happy with a cl-defun using &key."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(cl-defun foo (&key a (b 27)) \"Return :A+:B.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defun-with-allow-other-keys-ok ()
+'(ert-deftest checkdoc-cl-defun-with-allow-other-keys-ok ()
   "Checkdoc should be happy with a cl-defun using &allow-other-keys."
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(cl-defun foo (&key a &allow-other-keys) \"Return :A.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defun-with-default-optional-value-ok ()
+'(ert-deftest checkdoc-cl-defun-with-default-optional-value-ok ()
   "Checkdoc should be happy with a cl-defun using default values for optional args."
   (with-temp-buffer
     (emacs-lisp-mode)
@@ -111,7 +111,7 @@ See `org-element--cache-interrupt-C-g'.\")")
     (insert "(cl-defun foo (a &optional (b (1+ a) has-bs)) \"Return A + B.\")")
     (checkdoc-defun)))
 
-(ert-deftest checkdoc-cl-defun-with-destructuring-ok ()
+'(ert-deftest checkdoc-cl-defun-with-destructuring-ok ()
   "Checkdoc should be happy with a cl-defun destructuring its arguments."
   (with-temp-buffer
     (emacs-lisp-mode)

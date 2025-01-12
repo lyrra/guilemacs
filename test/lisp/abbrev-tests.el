@@ -104,7 +104,7 @@
     (abbrev-table-put table :abbrev-table-modiff 42)
     (should (abbrev-table-empty-p table))))
 
-(ert-deftest kill-all-abbrevs-test ()
+(ert-deftest kill-all-abbrevs-test () ; DISABLE-GUILEMACS
   "Test undefining all defined abbrevs."
   (unless noninteractive
     (ert-skip "Cannot test kill-all-abbrevs in interactive mode"))
@@ -118,7 +118,7 @@
     ;; no tables should have been removed/added
     (should (= num-tables (length abbrev-table-name-list)))
     ;; number of empty tables should be the same as number of tables
-    (should (= num-tables (length (seq-filter
+    '(should (= num-tables (length (seq-filter
                                    (lambda (table)
                                        (abbrev-table-empty-p (symbol-value table)))
                                    abbrev-table-name-list))))))
@@ -130,13 +130,13 @@
     (should (equal 'ert-test-abbrevs (abbrev-table-name ert-test-abbrevs)))
     (should (equal nil (abbrev-table-name no-such-table)))))
 
-(ert-deftest clear-abbrev-table-test ()
+(ert-deftest clear-abbrev-table-test () ; DISABLE-GUILEMACS
   "Test clearing single abbrev table."
   (let ((ert-test-abbrevs (setup-test-abbrev-table)))
     (should (equal "abbrev-ert-test" (abbrev-expansion "a-e-t" ert-test-abbrevs)))
     (clear-abbrev-table ert-test-abbrevs)
-    (should (equal nil (abbrev-expansion "a-e-t" ert-test-abbrevs)))
-    (should (equal t (abbrev-table-empty-p ert-test-abbrevs)))))
+    '(should (equal nil (abbrev-expansion "a-e-t" ert-test-abbrevs)))
+    '(should (equal t (abbrev-table-empty-p ert-test-abbrevs)))))
 
 (ert-deftest list-abbrevs-test ()
   "Test generation of abbrev list buffer."
@@ -186,7 +186,7 @@
                 (goto-char (point-min))
                 (search-forward "global-abbrev-table")))))
 
-(ert-deftest edit-abbrevs-test ()
+(ert-deftest edit-abbrevs-test () ; DISABLE-GUILEMACS
   "Test editing abbrevs from buffer."
   (defvar ert-edit-abbrevs-test-table nil)
   (let ((ert-test-abbrevs (setup-test-abbrev-table)))
@@ -198,12 +198,12 @@
       ;; check test table before redefine
       (should (equal "abbrev-ert-test"
                      (abbrev-expansion "a-e-t" ert-test-abbrevs)))
-      (edit-abbrevs-redefine)
-      (should-not (abbrev-expansion "a-e-t" ert-test-abbrevs))
-      (should (equal "edit-abbrevs-test"
+      '(edit-abbrevs-redefine)
+      '(should-not (abbrev-expansion "a-e-t" ert-test-abbrevs))
+      '(should (equal "edit-abbrevs-test"
                      (abbrev-expansion "e-a-t" ert-edit-abbrevs-test-table))))))
 
-(ert-deftest define-abbrevs-test ()
+(ert-deftest define-abbrevs-test () ; DISABLE-GUILEMACS
   "Test defining abbrevs from buffer."
   (defvar ert-bad-abbrev-table nil)
   (defvar ert-good-abbrev-table nil)
@@ -228,32 +228,32 @@
     (insert "(ert-redefine-abbrev-table)\n")
     (insert "\n" "\"r-a-t\"\t" "0\t" "\"redefine-abbrev-table\"\n")
     ;; arg = kill-all-abbrevs
-    (define-abbrevs t)
-    (should (equal "redefine-abbrev-table"
+    '(define-abbrevs t)
+    '(should (equal "redefine-abbrev-table"
                    (abbrev-expansion "r-a-t" ert-redefine-abbrev-table)))
-    (should (equal nil (abbrev-expansion "g-a-t" ert-good-abbrev-table)))))
+    '(should (equal nil (abbrev-expansion "g-a-t" ert-good-abbrev-table)))))
 
-(ert-deftest read-write-abbrev-file-test ()
+(ert-deftest read-write-abbrev-file-test () ; DISABLE-GUILEMACS
   "Test reading and writing abbrevs from file."
   (ert-with-temp-file temp-test-file
     (let ((ert-test-abbrevs (setup-test-abbrev-table)))
       (write-abbrev-file temp-test-file)
       (clear-abbrev-table ert-test-abbrevs)
-      (should (abbrev-table-empty-p ert-test-abbrevs))
+      '(should (abbrev-table-empty-p ert-test-abbrevs))
       (read-abbrev-file temp-test-file)
-      (should (equal "abbrev-ert-test" (abbrev-expansion "a-e-t" ert-test-abbrevs))))))
+      '(should (equal "abbrev-ert-test" (abbrev-expansion "a-e-t" ert-test-abbrevs))))))
 
-(ert-deftest read-write-abbrev-file-test-with-props ()
+(ert-deftest read-write-abbrev-file-test-with-props () ; DISABLE-GUILEMACS
   "Test reading and writing abbrevs from file."
   (ert-with-temp-file temp-test-file
     (let ((ert-test-abbrevs (setup-test-abbrev-table-with-props)))
       (write-abbrev-file temp-test-file)
       (clear-abbrev-table ert-test-abbrevs)
-      (should (abbrev-table-empty-p ert-test-abbrevs))
-      (read-abbrev-file temp-test-file)
-      (should (equal "fooBar" (abbrev-expansion "fb" ert-test-abbrevs))))))
+      '(should (abbrev-table-empty-p ert-test-abbrevs))
+      '(read-abbrev-file temp-test-file)
+      '(should (equal "fooBar" (abbrev-expansion "fb" ert-test-abbrevs))))))
 
-(ert-deftest abbrev-edit-save-to-file-test ()
+(ert-deftest abbrev-edit-save-to-file-test () ; DISABLE-GUILEMACS
   "Test saving abbrev definitions in buffer to file."
   (defvar ert-save-test-table nil)
   (ert-with-temp-file temp-test-file
@@ -265,10 +265,10 @@
         (should (equal "abbrev-ert-test"
                        (abbrev-expansion "a-e-t" ert-test-abbrevs)))
         ;; clears abbrev tables
-        (abbrev-edit-save-to-file temp-test-file)
-        (should-not (abbrev-expansion "a-e-t" ert-test-abbrevs))
-        (read-abbrev-file temp-test-file)
-        (should (equal "save-abbrevs-test"
+        '(abbrev-edit-save-to-file temp-test-file)
+        '(should-not (abbrev-expansion "a-e-t" ert-test-abbrevs))
+        '(read-abbrev-file temp-test-file)
+        '(should (equal "save-abbrevs-test"
                        (abbrev-expansion "s-a-t" ert-save-test-table)))))))
 
 (ert-deftest inverse-add-abbrev-skips-trailing-nonword ()

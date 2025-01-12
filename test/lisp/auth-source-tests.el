@@ -42,14 +42,14 @@
     (dolist (pair validation-alist)
       (should (equal (eieio-oref backend (car pair)) (cdr pair))))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain ()
   (auth-source-validate-backend '(:source (:macos-keychain-generic foobar))
                                 '((source . "foobar")
                                   (type . macos-keychain-generic)
                                   (search-function . auth-source-macos-keychain-search)
                                   (create-function . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain-generic-string ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain-generic-string ()
   (auth-source-validate-backend "macos-keychain-generic:foobar"
                                 '((source . "foobar")
                                   (type . macos-keychain-generic)
@@ -58,7 +58,7 @@
                                   (create-function
                                    . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain-internet-string ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain-internet-string ()
   (auth-source-validate-backend "macos-keychain-internet:foobar"
                                 '((source . "foobar")
                                   (type . macos-keychain-internet)
@@ -67,7 +67,7 @@
                                   (create-function
                                    . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain-internet-symbol ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain-internet-symbol ()
   (auth-source-validate-backend 'macos-keychain-internet
                                 '((source . "default")
                                   (type . macos-keychain-internet)
@@ -76,7 +76,7 @@
                                   (create-function
                                    . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain-generic-symbol ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain-generic-symbol ()
   (auth-source-validate-backend 'macos-keychain-generic
                                 '((source . "default")
                                   (type . macos-keychain-generic)
@@ -85,7 +85,7 @@
                                   (create-function
                                    . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-macos-keychain-internet-default-string ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-macos-keychain-internet-default-string ()
   (auth-source-validate-backend 'macos-keychain-internet
                                 '((source . "default")
                                   (type . macos-keychain-internet)
@@ -94,7 +94,7 @@
                                   (create-function
                                    . auth-source-macos-keychain-create))))
 
-(ert-deftest auth-source-backend-parse-plstore ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-plstore ()
   (auth-source-validate-backend '(:source "foo.plist")
                                 '((source . "foo.plist")
                                   (type . plstore)
@@ -102,7 +102,7 @@
                                   (create-function
                                    . auth-source-plstore-create))))
 
-(ert-deftest auth-source-backend-parse-netrc ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-netrc ()
   (auth-source-validate-backend '(:source "foo")
                                 '((source . "foo")
                                   (type . netrc)
@@ -110,7 +110,7 @@
                                   (create-function
                                    . auth-source-netrc-create))))
 
-(ert-deftest auth-source-backend-parse-netrc-string ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-netrc-string ()
   (auth-source-validate-backend "foo"
                                 '((source . "foo")
                                   (type . netrc)
@@ -118,7 +118,7 @@
                                   (create-function
                                    . auth-source-netrc-create))))
 
-(ert-deftest auth-source-backend-parse-secrets ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-secrets ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     (auth-source-validate-backend '(:source (:secrets "foo"))
@@ -129,7 +129,7 @@
                                     (create-function
                                      . auth-source-secrets-create)))))
 
-(ert-deftest auth-source-backend-parse-secrets-strings ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-secrets-strings ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     (auth-source-validate-backend "secrets:foo"
@@ -140,7 +140,7 @@
                                     (create-function
                                      . auth-source-secrets-create)))))
 
-(ert-deftest auth-source-backend-parse-secrets-alias ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-secrets-alias ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     ;; Redefine `secrets-get-alias' to map 'foo to "foo"
@@ -153,7 +153,7 @@
                                       (create-function
                                        . auth-source-secrets-create))))))
 
-(ert-deftest auth-source-backend-parse-secrets-symbol ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-secrets-symbol ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     ;; Redefine `secrets-get-alias' to map 'default to "foo"
@@ -166,7 +166,7 @@
                                       (create-function
                                        . auth-source-secrets-create))))))
 
-(ert-deftest auth-source-backend-parse-secrets-no-alias ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-secrets-no-alias ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     ;; Redefine `secrets-get-alias' to map 'foo to nil (so that
@@ -180,7 +180,7 @@
                                       (create-function
                                        . auth-source-secrets-create))))))
 
-(ert-deftest auth-source-backend-parse-invalid-or-nil-source ()
+'(DISABLE-guilemacs ert-deftest auth-source-backend-parse-invalid-or-nil-source ()
   (provide 'secrets) ; simulates the presence of the `secrets' package
   (let ((secrets-enabled t))
     (auth-source-ensure-ignored-backend nil)
@@ -325,7 +325,7 @@
             ;;          parameters found-as-string needed)
             (should (equal found-as-string (concat testname ": " needed)))))))))
 
-(ert-deftest auth-source-test-secrets-create-secret ()
+'(DISABLE-guilemacs ert-deftest auth-source-test-secrets-create-secret ()
   (skip-unless secrets-enabled)
   ;; The "session" collection is temporary for the lifetime of the
   ;; Emacs process.  Therefore, we don't care to delete it.

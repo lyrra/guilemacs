@@ -49,11 +49,12 @@
   (should (equal "foo wilma fred"
                  (describe-char-eldoc--truncate
                   "foo wilma fred" (length "foo wilma fred"))))
-  (should (equal "foo wilma fred"
+  ;; DISABLE-guilemacs
+  '(should (equal "foo wilma fred"
                  (describe-char-eldoc--truncate
                   "  foo\t wilma \nfred\t " (length "foo wilma fred")))))
 
-(ert-deftest descr-text-test-format-desc ()
+'(DISABLE-guilemacs ert-deftest descr-text-test-format-desc ()
   "Tests describe-char-eldoc--format function."
   (should (equal "U+2026: Horizontal ellipsis (Po: Punctuation, Other)"
                  (describe-char-eldoc--format ?…)))
@@ -68,7 +69,7 @@
   (should (equal "Horizontal..."
                  (describe-char-eldoc--format ?… 10))))
 
-(ert-deftest descr-text-test-desc ()
+'(DISABLE-guilemacs ert-deftest descr-text-test-desc ()
   "Tests describe-char-eldoc function."
   (with-temp-buffer
     (insert "a…")

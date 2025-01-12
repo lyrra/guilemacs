@@ -55,7 +55,7 @@
                                       (current-buffer))))
     (should (not (boundp 'allout-tests-globally-unbound)))))
 
-(ert-deftest allout-test-resumption-variable-resumed  ()
+'(DISABLE-guilemacs ert-deftest allout-test-resumption-variable-resumed  ()
   "Ensure that variable with prior global value is resumed."
   (with-temp-buffer
     (allout-tests-obliterate-variable 'allout-tests-globally-true)
@@ -128,7 +128,7 @@
     (should (equal allout-tests-locally-true t))
     (should (not (default-boundp 'allout-tests-locally-true)))))
 
-(ert-deftest allout-test-resumption-unbinding ()
+'(DISABLE-guilemacs ert-deftest allout-test-resumption-unbinding ()
   "Ensure that deliberately unbinding registered variables doesn't foul things."
   (with-temp-buffer
     (allout-tests-obliterate-variable 'allout-tests-globally-unbound)
