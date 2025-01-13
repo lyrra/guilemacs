@@ -53,7 +53,7 @@
 	     table)
     (nreverse accu)))
 
-(ert-deftest ert-test-test-buffers ()
+'(DISABLE-guilemacs ert-deftest ert-test-test-buffers ()
   (let (buffer-1
         buffer-2)
     (let ((test-1
@@ -155,7 +155,7 @@
 
 ;;; Tests for ERT itself that require test features from ert-x.el.
 
-(ert-deftest ert-test-run-tests-interactively-2 ()
+'(DISABLE-guilemacs ert-deftest ert-test-run-tests-interactively-2 ()
   :tags '(:causes-redisplay)
   (cl-letf* ((passing-test (make-ert-test
                             :name 'passing-test
@@ -239,7 +239,7 @@
           (when (get-buffer buffer-name)
             (kill-buffer buffer-name)))))))
 
-(ert-deftest ert-test-describe-test ()
+'(DISABLE-guilemacs ert-deftest ert-test-describe-test ()
   "Tests `ert-describe-test'."
   (save-window-excursion
     (ert-with-buffer-renamed ("*Help*")

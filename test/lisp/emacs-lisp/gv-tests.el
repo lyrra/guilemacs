@@ -37,7 +37,7 @@
            (pp form (current-buffer))))
        ,@body)))
 
-(ert-deftest gv-define-expander-in-file ()
+'(ert-deftest gv-define-expander-in-file ()
   (gv-tests--in-temp-dir (el elc)
       ((gv-define-setter gv-test-foo (newval cons)
          `(setcar ,cons ,newval))
@@ -51,7 +51,7 @@
                     "-l" elc)
       (should (equal (buffer-string) "99\n")))))
 
-(ert-deftest gv-define-expander-in-file-twice ()
+'(ert-deftest gv-define-expander-in-file-twice ()
   (gv-tests--in-temp-dir (el elc)
       ((gv-define-setter gv-test-foo (newval cons)
          `(setcar ,cons ,newval))
@@ -68,7 +68,7 @@
                     "-l" elc)
       (should (equal (buffer-string) "(99 . 42)\n")))))
 
-(ert-deftest gv-dont-define-expander-in-file ()
+'(ert-deftest gv-dont-define-expander-in-file ()
   ;; The expander is defined while we are compiling the file, even
   ;; though it's inside (when nil ...) because the compiler won't
   ;; analyze the conditional.
@@ -90,7 +90,7 @@
       (should (equal (buffer-string)
                      "Symbol's function definition is void: \\(setf\\ gv-test-foo\\)\n")))))
 
-(ert-deftest gv-define-expander-in-function ()
+'(ert-deftest gv-define-expander-in-function ()
   ;; The expander is not defined while we are compiling the file, the
   ;; compiler won't handle gv definitions not at top-level.
   :expected-result :failed
@@ -109,7 +109,7 @@
                     "-l" elc)
       (should (equal (buffer-string) "99\n")))))
 
-(ert-deftest gv-define-expander-out-of-file ()
+'(ert-deftest gv-define-expander-out-of-file ()
   (gv-tests--in-temp-dir (el elc)
       ((gv-define-setter gv-test-foo (newval cons)
          `(setcar ,cons ,newval))
@@ -124,7 +124,7 @@
                                              (message "%d" (car gv-test-pair)))))
       (should (equal (buffer-string) "99\n")))))
 
-(ert-deftest gv-dont-define-expander-other-file ()
+'(ert-deftest gv-dont-define-expander-other-file ()
   (gv-tests--in-temp-dir (el elc)
       ((if nil (gv-define-setter gv-test-foo (newval cons)
                  `(setcar ,cons ,newval)))

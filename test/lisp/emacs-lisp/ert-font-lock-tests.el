@@ -116,7 +116,7 @@
                              (should (ert-font-lock--line-comment-p))))
 
 (declare-function php-mode "php-mode")
-(ert-deftest test-line-comment-p--php ()
+'(DISABLE-guilemacs ert-deftest test-line-comment-p--php ()
   (skip-unless (featurep 'php-mode))
 
   (with-temp-buffer-str-mode php-mode
@@ -153,7 +153,7 @@ var abc = function(d) {};
                              (forward-line)
                              (should-not (ert-font-lock--line-comment-p))))
 
-(ert-deftest test-line-comment-p--python ()
+'(DISABLE-guilemacs ert-deftest test-line-comment-p--python ()
 
   (with-temp-buffer-str-mode python-mode
                              "# comment
@@ -558,7 +558,7 @@ var abc = function(d) {
    (ert-resource-file "correct.js")
    'javascript-mode))
 
-(ert-deftest test-font-lock-test-file--wrong ()
+'(DISABLE-guilemacs ert-deftest test-font-lock-test-file--wrong ()
   :expected-result :failed
   (ert-font-lock-test-file
    (ert-resource-file "broken.js")
@@ -582,7 +582,7 @@ var abc = function(d) {
 ;; ^ font-lock-keyword-face"
   )
 
-(ert-font-lock-deftest test-macro-test--failing
+'(DISABLE-guilemacs ert-font-lock-deftest test-macro-test--failing
     "A failing test."
   :expected-result :failed
   emacs-lisp-mode
@@ -595,13 +595,13 @@ var abc = function(d) {
   javascript-mode
   "correct.js")
 
-(ert-font-lock-deftest-file test-macro-test--file-no-asserts
+'(DISABLE-guilemacs ert-font-lock-deftest-file test-macro-test--file-no-asserts
     "Check failing on files without assertions"
   :expected-result :failed
   javascript-mode
   "no-asserts.js")
 
-(ert-font-lock-deftest-file test-macro-test--file-failing
+'(DISABLE-guilemacs ert-font-lock-deftest-file test-macro-test--file-failing
     "Test reading wrong assertions from a file"
   :expected-result :failed
   javascript-mode

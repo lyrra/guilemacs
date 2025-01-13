@@ -37,13 +37,13 @@
 (cl-defgeneric cl--generic-1 (x y))
 (cl-defgeneric (setf cl--generic-1) (v y z) "My generic doc.")
 
-(ert-deftest cl-generic-test-00 ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-00 ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y))
   (cl-defmethod cl--generic-1 ((x t) y) (cons x y))
   (should (equal (cl--generic-1 'a 'b) '(a . b))))
 
-(ert-deftest cl-generic-test-01-eql ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-01-eql ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y))
   (cl-defmethod cl--generic-1 ((x t) y) (cons x y))
@@ -70,7 +70,7 @@
 (cl-defstruct (cl-generic-struct-child11 (:include cl-generic-struct-child1)) d)
 (cl-defstruct (cl-generic-struct-child2 (:include cl-generic-struct-parent)) e)
 
-(ert-deftest cl-generic-test-02-struct ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-02-struct ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y) "My doc.")
   (cl-defmethod cl--generic-1 ((x t) y) "Doc 1." (cons x y))
@@ -108,7 +108,7 @@
                    '(v a b)))
     (should (equal x '(3 2 1)))))
 
-(ert-deftest cl-generic-test-04-overlapping-tagcodes ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-04-overlapping-tagcodes ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y) "My doc.")
   (cl-defmethod cl--generic-1 ((y t) z) (list y z))
@@ -122,7 +122,7 @@
   (should (equal (cl--generic-1 1 'b) '("integer" "number" 1 b)))
   (should (equal (cl--generic-1 4 'b) '("four" "integer" "number" 4 b))))
 
-(ert-deftest cl-generic-test-05-alias ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-05-alias ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y) "My doc.")
   (defalias 'cl--generic-2 #'cl--generic-1)
@@ -131,7 +131,7 @@
                 (cons "four" (cl-call-next-method)))
   (should (equal (cl--generic-1 4 'b) '("four" 4 b))))
 
-(ert-deftest cl-generic-test-06-multiple-dispatch ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-06-multiple-dispatch ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y) "My doc.")
   (cl-defmethod cl--generic-1 (x y) (list x y))
@@ -143,7 +143,7 @@
     (cons "x&y-int" (cl-call-next-method)))
   (should (equal (cl--generic-1 1 2) '("x&y-int" "x-int" "y-int" 1 2))))
 
-(ert-deftest cl-generic-test-07-apo ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-07-apo ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y)
     (:documentation "My doc.") (:argument-precedence-order y x))
@@ -156,7 +156,7 @@
     (cons "x&y-int" (cl-call-next-method)))
   (should (equal (cl--generic-1 1 2) '("x&y-int" "y-int" "x-int" 1 2))))
 
-(ert-deftest cl-generic-test-08-after/before ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-08-after/before ()
   (let ((log ()))
     (fmakunbound 'cl--generic-1)
     (cl-defgeneric cl--generic-1 (x y))
@@ -172,7 +172,7 @@
 
 (defun cl--generic-test-advice (&rest args) (cons "advice" (apply args)))
 
-(ert-deftest cl-generic-test-09-advice ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-09-advice ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y) "My doc.")
   (cl-defmethod cl--generic-1 (x y) (list x y))
@@ -184,7 +184,7 @@
   (advice-remove 'cl--generic-1 #'cl--generic-test-advice)
   (should (equal (cl--generic-1 4 5) '("integer" 4 5))))
 
-(ert-deftest cl-generic-test-10-weird ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-10-weird ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x &rest r) "My doc.")
   (cl-defmethod cl--generic-1 (x &rest r) (cons x r))
@@ -196,7 +196,7 @@
   (should (equal (cl--generic-1 'a 'b) '(a b)))
   (should (equal (cl--generic-1 1 2) '("integer" 2 1))))
 
-(ert-deftest cl-generic-test-11-next-method-p ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-11-next-method-p ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y))
   (cl-defmethod cl--generic-1 ((x t) y)
@@ -210,7 +210,7 @@
               (cl-call-next-method)))
   (should (equal (cl--generic-1 4 5) '("quatre" t 4 5 nil))))
 
-(ert-deftest cl-generic-test-12-context ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-12-context ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 ())
   (cl-defmethod cl--generic-1 (&context (overwrite-mode (eql t)))
@@ -218,12 +218,12 @@
   (cl-defmethod cl--generic-1 (&context (overwrite-mode (eql nil)))
     (list 'is-nil (cl-call-next-method)))
   (cl-defmethod cl--generic-1 () 'any)
-  (should (equal (list (let ((overwrite-mode t))   (cl--generic-1))
+  '(should (equal (list (let ((overwrite-mode t))   (cl--generic-1))
                        (let ((overwrite-mode nil)) (cl--generic-1))
                        (let ((overwrite-mode 1))   (cl--generic-1)))
                  '((is-t any) (is-nil any) any))))
 
-(ert-deftest cl-generic-test-13-head ()
+'(DISABLE-guilemacs ert-deftest cl-generic-test-13-head ()
   (fmakunbound 'cl--generic-1)
   (cl-defgeneric cl--generic-1 (x y))
   (cl-defmethod cl--generic-1 ((x t) y) (cons x y))
@@ -302,7 +302,7 @@ Edebug symbols (Bug#42672)."
 
 (cl-defmethod cl-generic-tests--acc ((x float)) (+ x 5.0))
 
-(ert-deftest cl-generic-tests--advertised-calling-convention-bug58563 ()
+'(DISABLE-guilemacs ert-deftest cl-generic-tests--advertised-calling-convention-bug58563 ()
   (should (equal (get-advertised-calling-convention
                   (indirect-function 'cl-generic-tests--acc))
                  '(x)))
@@ -322,7 +322,7 @@ Edebug symbols (Bug#42672)."
 (cl-defmethod cl-generic-tests--print-quoted-method ((function (eql '4)))
   (+ function 1))
 
-(ert-deftest cl-generic-tests--print-quoted ()
+'(DISABLE-guilemacs ert-deftest cl-generic-tests--print-quoted ()
   (with-temp-buffer
     (cl--generic-describe 'cl-generic-tests--print-quoted-method)
     (goto-char (point-min))

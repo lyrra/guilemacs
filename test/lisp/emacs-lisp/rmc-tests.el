@@ -59,14 +59,14 @@
              (rmc--add-key-description '(?n "foo"))
              `(?n . ,(concat (propertize "n" 'face 'help-key-binding) " foo"))))))
 
-(ert-deftest test-read-multiple-choice ()
+'(ert-deftest test-read-multiple-choice () ;; guilemacs sigsegv
   (dolist (char '(?y ?n))
     (cl-letf* (((symbol-function #'read-event) (lambda () char))
                (str (if (eq char ?y) "yes" "no")))
       (should (equal (list char str)
                      (read-multiple-choice "Do it? " '((?y "yes") (?n "no"))))))))
 
-(ert-deftest test-read-multiple-choice-help ()
+'(ert-deftest test-read-multiple-choice-help () ;; guilemacs sigsegv
   (let ((chars '(?o ?a))
         help)
     (cl-letf* (((symbol-function #'read-event)

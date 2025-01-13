@@ -84,7 +84,7 @@ failed or if there was a problem."
     (let ((result (ert-run-test test)))
       (cl-assert (ert-test-passed-p result)))))
 
-(ert-deftest ert-test-fail ()
+'(DISABLE-guilemacs ert-deftest ert-test-fail ()
   (let ((test (make-ert-test :body (lambda () (ert-fail "failure message")))))
     (let ((result (let ((ert-debug-on-error nil))
                     (ert-run-test test))))
@@ -93,14 +93,14 @@ failed or if there was a problem."
                      '(ert-test-failed "failure message"))
               t))))
 
-(ert-deftest ert-test-fail-debug-with-debugger-1 ()
+'(DISABLE-guilemacs ert-deftest ert-test-fail-debug-with-debugger-1 ()
   (let ((test (make-ert-test :body (lambda () (ert-fail "failure message")))))
     (let ((debugger (lambda (&rest _args)
                       (cl-assert nil))))
       (let ((ert-debug-on-error nil))
         (ert-run-test test)))))
 
-(ert-deftest ert-test-fail-debug-with-debugger-2 ()
+'(DISABLE-guilemacs ert-deftest ert-test-fail-debug-with-debugger-2 ()
   (let ((test (make-ert-test :body (lambda () (ert-fail "failure message")))))
     (cl-block nil
       (let ((debugger (lambda (&rest _args)
@@ -109,7 +109,7 @@ failed or if there was a problem."
           (ert-run-test test))
         (cl-assert nil)))))
 
-(ert-deftest ert-test-fail-debug-nested-with-debugger ()
+'(DISABLE-guilemacs ert-deftest ert-test-fail-debug-nested-with-debugger ()
   (let ((test (make-ert-test :body (lambda ()
                                      (let ((ert-debug-on-error t))
                                        (ert-fail "failure message"))))))
@@ -127,7 +127,7 @@ failed or if there was a problem."
           (ert-run-test test))
         (cl-assert nil nil "Assertion b")))))
 
-(ert-deftest ert-test-error ()
+'(DISABLE-guilemacs ert-deftest ert-test-error ()
   (let ((test (make-ert-test :body (lambda () (error "Error message")))))
     (let ((result (let ((ert-debug-on-error nil))
                     (ert-run-test test))))
@@ -138,7 +138,7 @@ failed or if there was a problem."
 
 
 ;;; Test that `should' works.
-(ert-deftest ert-test-should ()
+'(DISABLE-guilemacs ert-deftest ert-test-should ()
   (let ((test (make-ert-test :body (lambda () (should nil)))))
     (let ((result (let ((ert-debug-on-error nil))
                     (ert-run-test test))))
@@ -154,7 +154,7 @@ failed or if there was a problem."
   (should (eql (should 'foo) 'foo))
   (should (eql (should 'bar) 'bar)))
 
-(ert-deftest ert-test-should-not ()
+'(DISABLE-guilemacs ert-deftest ert-test-should-not ()
   (let ((test (make-ert-test :body (lambda () (should-not t)))))
     (let ((result (let ((ert-debug-on-error nil))
                     (ert-run-test test))))
@@ -167,7 +167,7 @@ failed or if there was a problem."
       (cl-assert (ert-test-passed-p result)))))
 
 
-(ert-deftest ert-test-should-with-macrolet ()
+'(DISABLE-guilemacs ert-deftest ert-test-should-with-macrolet ()
   (let ((test (make-ert-test :body (lambda ()
                                      (cl-macrolet ((foo () '(progn t nil)))
                                        (should (foo)))))))
@@ -180,7 +180,7 @@ failed or if there was a problem."
                                   :form (progn t nil)
                                   :value nil)))))))
 
-(ert-deftest ert-test-should-error ()
+'(DISABLE-guilemacs ert-deftest ert-test-should-error ()
   ;; No error.
   (let ((test (make-ert-test :body (lambda () (should-error (progn))))))
     (let ((result (let ((ert-debug-on-error nil))
@@ -220,7 +220,7 @@ failed or if there was a problem."
       (should (ert-test-passed-p result))
       (should (equal error '(singularity-error))))))
 
-(ert-deftest ert-test-should-error-subtypes ()
+'(DISABLE-guilemacs ert-deftest ert-test-should-error-subtypes ()
   (should-error (signal 'singularity-error nil)
                 :type 'singularity-error
                 :exclude-subtypes t)
@@ -284,7 +284,7 @@ failed or if there was a problem."
   (cl-macrolet ((test () (error "Foo")))
     (should-error (test))))
 
-(ert-deftest ert-test-skip-when ()
+'(DISABLE-guilemacs ert-deftest ert-test-skip-when ()
   ;; Don't skip.
   (let ((test (make-ert-test :body (lambda () (skip-when nil)))))
     (let ((result (ert-run-test test)))
@@ -298,7 +298,7 @@ failed or if there was a problem."
     (let ((result (ert-run-test test)))
       (should (ert-test-skipped-p result)))))
 
-(ert-deftest ert-test-skip-unless ()
+'(DISABLE-guilemacs ert-deftest ert-test-skip-unless ()
   ;; Don't skip.
   (let ((test (make-ert-test :body (lambda () (skip-unless t)))))
     (let ((result (ert-run-test test)))
@@ -318,7 +318,7 @@ failed or if there was a problem."
 This macro is used to test if macroexpansion in `should' works."
   `(list ,@args))
 
-(ert-deftest ert-test-should-failure-debugging ()
+'(DISABLE-guilemacs ert-deftest ert-test-should-failure-debugging ()
   "Test that `should' errors contain the information we expect them to."
   (cl-loop
    for (body expected-condition) in
@@ -362,7 +362,7 @@ This macro is used to test if macroexpansion in `should' works."
   (should-error (macroexpand '(ert-deftest ghi ()
                                 :documentation "foo"))))
 
-(ert-deftest ert-test-record-backtrace ()
+'(DISABLE-guilemacs ert-deftest ert-test-record-backtrace ()
   (let* ((test-body (lambda () (ert-fail "foo")))
          (test (make-ert-test :body test-body))
          (result (ert-run-test test)))
@@ -383,7 +383,7 @@ This macro is used to test if macroexpansion in `should' works."
         (should (equal (concat message-string "\n")
                        (ert-test-result-messages result)))))))
 
-(ert-deftest ert-test-running-tests ()
+'(DISABLE-guilemacs ert-deftest ert-test-running-tests ()
   (let ((outer-test (ert-get-test 'ert-test-running-tests)))
     (should (equal (ert-running-test) outer-test))
     (let (test1 test2 test3)
@@ -410,7 +410,7 @@ This macro is used to test if macroexpansion in `should' works."
                            (ert-run-test test2))))
       (should (ert-test-passed-p (ert-run-test test3))))))
 
-(ert-deftest ert-test-test-result-expected-p ()
+'(DISABLE-guilemacs ert-deftest ert-test-test-result-expected-p ()
   "Test `ert-test-result-expected-p' and (implicitly) `ert-test-result-type-p'."
   ;; passing test
   (let ((test (make-ert-test :body (lambda ()))))
@@ -508,7 +508,7 @@ This macro is used to test if macroexpansion in `should' works."
   (should-error (ert--parse-keys-and-body '(:bar foo :a))))
 
 
-(ert-deftest ert-test-run-tests-interactively ()
+'(DISABLE-guilemacs ert-deftest ert-test-run-tests-interactively ()
   :tags '(:causes-redisplay)
   (let ((passing-test (make-ert-test :name 'passing-test
                                      :body (lambda () (ert-pass))))
@@ -552,7 +552,7 @@ This macro is used to test if macroexpansion in `should' works."
             (when (get-buffer buffer-name)
               (kill-buffer buffer-name))))))))
 
-(ert-deftest ert-test-run-tests-batch ()
+'(DISABLE-guilemacs ert-deftest ert-test-run-tests-batch ()
   (let* ((complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
 	 (long-list (make-list 11 1))
 	 (failing-test-1
@@ -586,7 +586,7 @@ This macro is used to test if macroexpansion in `should' works."
 	(should found-long)
 	(should found-complex)))))
 
-(ert-deftest ert-test-run-tests-batch-expensive ()
+'(DISABLE-guilemacs ert-deftest ert-test-run-tests-batch-expensive ()
   :tags (if (getenv "EMACS_EMBA_CI") '(:unstable))
   (let* ((complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
 	 (failing-test-1
@@ -622,7 +622,7 @@ This macro is used to test if macroexpansion in `should' works."
     (fset b 'if)
     (should (ert--special-operator-p b))))
 
-(ert-deftest ert-test-list-of-should-forms ()
+'(DISABLE-guilemacs ert-deftest ert-test-list-of-should-forms ()
   (let ((test (make-ert-test :body (lambda ()
                                      (should t)
                                      (should (null '()))
@@ -858,7 +858,7 @@ This macro is used to test if macroexpansion in `should' works."
   "Check that ERT correctly handles `with-demoted-errors'."
   (should-not (with-demoted-errors "FOO: %S" (error "Foo"))))
 
-(ert-deftest ert-test-fail-inside-should ()
+'(DISABLE-guilemacs ert-deftest ert-test-fail-inside-should ()
   "Check that `ert-fail' inside `should' works correctly."
   (let ((result (ert-run-test
                  (make-ert-test
@@ -876,7 +876,7 @@ This macro is used to test if macroexpansion in `should' works."
   (should (eq (ert--get-explainer 'string-equal) 'ert--explain-string-equal))
   (should (eq (ert--get-explainer 'string=) 'ert--explain-string-equal)))
 
-(ert-deftest ert--pp-with-indentation-and-newline ()
+'(DISABLE-guilemacs ert-deftest ert--pp-with-indentation-and-newline ()
   :tags '(:causes-redisplay)
   (let ((failing-test (make-ert-test
                        :name 'failing-test

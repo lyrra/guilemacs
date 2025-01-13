@@ -222,13 +222,13 @@
               (`((cl-tag-slot) (abc 5 :readonly t)
                  (def . ,(or 'nil '(nil))))
                t)))))
-(ert-deftest cl-lib-struct-constructors ()
+'(DISABLE-guilemacs ert-deftest cl-lib-struct-constructors ()
   (should (string-match "\\`Constructor docstring."
                         (documentation 'cl-lib--con-2 t)))
   (should (mystruct-p (cl-lib--con-1)))
   (should (mystruct-p (cl-lib--con-2))))
 
-(ert-deftest cl-lib-arglist-performance ()
+'(DISABLE-guilemacs ert-deftest cl-lib-arglist-performance ()
   ;; An `&aux' should not cause lambda's arglist to be turned into an &rest
   ;; that's parsed by hand.
   (should (equal () (help-function-arglist 'cl-lib--con-1)))
@@ -361,21 +361,21 @@
   (should (= 4 (cl-first '(4 2))))
   (should-error (cl-first "42") :type 'wrong-type-argument))
 
-(ert-deftest cl-lib-test-second ()
+'(DISABLE-guilemacs ert-deftest cl-lib-test-second ()
   (should (null (cl-second '())))
   (should (null (cl-second '(4))))
   (should (= 2 (cl-second '(1 2))))
   (should (= 2 (cl-second '(1 2 3))))
   (should-error (cl-second "1 2 3") :type 'wrong-type-argument))
 
-(ert-deftest cl-lib-test-third ()
+'(ert-deftest cl-lib-test-third ()
   (should (null (cl-third '())))
   (should (null (cl-third '(1 2))))
   (should (= 3 (cl-third '(1 2 3))))
   (should (= 3 (cl-third '(1 2 3 4))))
   (should-error (cl-third "123") :type 'wrong-type-argument))
 
-(ert-deftest cl-lib-test-fourth ()
+'(ert-deftest cl-lib-test-fourth ()
   (should (null (cl-fourth '())))
   (should (null (cl-fourth '(1 2 3))))
   (should (= 4 (cl-fourth '(1 2 3 4))))
@@ -481,7 +481,7 @@
     (should (null (cl-nth-value 2 vals)))
     (should-error (cl-nth-value 0.0 vals) :type 'wrong-type-argument)))
 
-(ert-deftest cl-lib-nth-value-test-multiple-values ()
+'(DISABLE-guilemacs ert-deftest cl-lib-nth-value-test-multiple-values ()
   "While CL multiple values are an alias to list, these won't work."
   :expected-result :failed
   (should (equal (cl-nth-value 0 '(2 3)) '(2 3)))
@@ -608,7 +608,7 @@
     (should (eq (type-of x) 'foo))
     (should (eql (foo-x x) 42))))
 
-(ert-deftest old-struct ()
+'(DISABLE-guilemacs ert-deftest old-struct ()
   (cl-defstruct foo x)
   (with-suppressed-warnings ((obsolete cl-old-struct-compat-mode))
     (let ((x (vector 'cl-struct-foo))

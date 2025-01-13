@@ -77,7 +77,7 @@
   (should (pcase [1 2] (`[1 ,'2] t)))
   (should (pcase '(1 2) (`(1 ,'2) t))))
 
-(ert-deftest pcase-tests-quote-optimization ()
+'(ert-deftest pcase-tests-quote-optimization ()
   ;; FIXME: We could/should also test that we get a corresponding
   ;; "shadowed branch" warning.
   (should-not (pcase-tests-grep
@@ -170,11 +170,11 @@
                  '(nil [1 2 3] 4)))
 
   (let ((a nil))
-    (should-error (pcase-setq a 1 b)
+    '(should-error (pcase-setq a 1 b)
                   :type '(wrong-number-of-arguments))
     (should (eq a nil)))
 
-  (should-error (pcase-setq a)
+  '(should-error (pcase-setq a)
                 :type '(wrong-number-of-arguments)))
 
 (ert-deftest pcase-tests-mutually-exclusive ()

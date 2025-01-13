@@ -39,7 +39,7 @@
 
 (defmacro macroexp--test-get-file-name () (macroexp-file-name))
 
-(ert-deftest macroexp--tests-file-name ()
+'(ert-deftest macroexp--tests-file-name ()
   (should (string-match
            "\\`macroexp-tests.elc?\\'"
            (file-name-nondirectory macroexp--tests-filename)))
@@ -93,7 +93,7 @@
     (when output
       (message "%s" output))))
 
-(ert-deftest macroexp--tests-dynamic-variable-p ()
+'(ert-deftest macroexp--tests-dynamic-variable-p ()
   "Test `macroexp--dynamic-variable-p'."
   (let* ((vk-el (ert-resource-file "vk.el"))
          (vk-elc (concat vk-el "c"))

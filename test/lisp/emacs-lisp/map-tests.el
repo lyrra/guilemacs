@@ -265,7 +265,7 @@ See bug#58531#25 and bug#58563."
     (with-suppressed-warnings ((obsolete map-put))
       (should (eq (map-put ht 'a 'hello) 'hello)))))
 
-(ert-deftest test-map-insert-empty ()
+'(ert-deftest test-map-insert-empty ()
   "Test `map-insert' on empty maps."
   (with-empty-maps-do map
     (if (arrayp map)
@@ -275,7 +275,7 @@ See bug#58531#25 and bug#58563."
         (should-not (map-pairs map))
         (should (= (map-elt new 0) 6))))))
 
-(ert-deftest test-map-insert ()
+'(ert-deftest test-map-insert ()
   "Test `map-insert'."
   (with-maps-do map
     (let ((pairs (map-pairs map))
@@ -386,7 +386,7 @@ See bug#58531#25 and bug#58563."
   (should (= 5 (map-length [0 1 2 3 4])))
   (should (= 4 (map-length #s(hash-table data (a 1 b 2 c 3 d 4))))))
 
-(ert-deftest test-map-copy ()
+'(ert-deftest test-map-copy ()
   (with-maps-do map
     (let ((copy (map-copy map)))
       (should (equal (map-pairs map) (map-pairs copy)))

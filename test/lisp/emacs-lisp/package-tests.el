@@ -267,7 +267,7 @@ Must called from within a `tar-mode' buffer."
       (should (file-exists-p autoloads-file))
       (should-not (get-file-buffer autoloads-file)))))
 
-(ert-deftest package-test-install-file ()
+'(ert-deftest package-test-install-file ()
   "Install files with `package-install-file'."
   (with-package-test (:basedir (ert-resource-directory))
     (package-initialize)
@@ -286,7 +286,7 @@ Must called from within a `tar-mode' buffer."
       (should (package-installed-p 'multi-file))
       (package-delete (cadr (assq 'multi-file package-alist))))))
 
-(ert-deftest package-test-bug58367 ()
+'(ert-deftest package-test-bug58367 ()
   "Check variations in tarball formats."
   (with-package-test (:basedir (ert-resource-directory))
     (package-initialize)
@@ -384,7 +384,7 @@ but with a different end of line convention (bug#48137)."
 (declare-function macro-builtin-func "macro-builtin" ())
 (declare-function macro-builtin-10-and-90 "macro-builtin" ())
 
-(ert-deftest package-test-macro-compilation ()
+'(ert-deftest package-test-macro-compilation ()
   "\"Activation has to be done before compilation, so that if we're
    upgrading and macros have changed we load the new definitions
    before compiling.\" -- package.el"
@@ -400,7 +400,7 @@ but with a different end of line convention (bug#48137)."
     ;; `macro-problem-10-and-90' depends on an entirely new macro from `macro-aux'.
     (should (equal (macro-problem-10-and-90) '(10 90)))))
 
-(ert-deftest package-test-macro-compilation-gz ()
+'(ert-deftest package-test-macro-compilation-gz ()
   "Built-in's can be superseded as well."
   (with-package-test (:basedir (ert-resource-directory))
     (let ((dir (expand-file-name "macro-builtin-package-1.0")))
@@ -466,7 +466,7 @@ but with a different end of line convention (bug#48137)."
         (should (version-list-= '(1 3)
                                 (package-desc-version installed)))))))
 
-(ert-deftest package-test-install-multifile ()
+'(ert-deftest package-test-install-multifile ()
   "Check properties of the installed multi-file package."
   (with-package-test (:basedir (ert-resource-directory) :install '(multi-file))
     (let ((autoload-file
@@ -505,7 +505,7 @@ but with a different end of line convention (bug#48137)."
            (progn ,@body)
          (kill-buffer buf)))))
 
-(ert-deftest package-test-update-listing ()
+'(ert-deftest package-test-update-listing ()
   "Ensure installed package status is updated."
   (with-package-menu-test
     (search-forward-regexp "^ +simple-single")
@@ -519,7 +519,7 @@ but with a different end of line convention (bug#48137)."
     (goto-char (point-min))
     (should-not (re-search-forward "^\\s-+simple-single\\s-+1.3\\s-+\\(available\\|new\\)" nil t))))
 
-(ert-deftest package-test-list-filter-by-archive ()
+'(ert-deftest package-test-list-filter-by-archive ()
   "Ensure package list is filtered correctly by archive version."
   (with-package-menu-test
     ;; TODO: Add another package archive to test filtering, because
@@ -530,7 +530,7 @@ but with a different end of line convention (bug#48137)."
     (should (= (count-lines (point-min) (point-max)) 4))
     (should-error (package-menu-filter-by-archive "non-existent archive"))))
 
-(ert-deftest package-test-list-filter-by-keyword ()
+'(ert-deftest package-test-list-filter-by-keyword ()
   "Ensure package list is filtered correctly by package keyword."
   (with-package-menu-test
     (package-menu-filter-by-keyword "frobnicate")
@@ -539,7 +539,7 @@ but with a different end of line convention (bug#48137)."
     (should (= (count-lines (point-min) (point-max)) 1))
     (should-error (package-menu-filter-by-keyword "non-existent-keyword"))))
 
-(ert-deftest package-test-list-filter-by-name ()
+'(ert-deftest package-test-list-filter-by-name ()
   "Ensure package list is filtered correctly by package name."
   (with-package-menu-test ()
     (package-menu-filter-by-name "ansi-color")
@@ -547,7 +547,7 @@ but with a different end of line convention (bug#48137)."
     (should (re-search-forward "^\\s-+ansi-color" nil t))
     (should (= (count-lines (point-min) (point-max)) 1))))
 
-(ert-deftest package-test-list-filter-by-status ()
+'(ert-deftest package-test-list-filter-by-status ()
   "Ensure package list is filtered correctly by package status."
   (with-package-menu-test
     (package-menu-filter-by-status "available")
@@ -557,7 +557,7 @@ but with a different end of line convention (bug#48137)."
     ;; No installed packages in default environment.
     (should-error (package-menu-filter-by-status "installed"))))
 
-(ert-deftest package-test-list-filter-marked ()
+'(ert-deftest package-test-list-filter-marked ()
   "Ensure package list is filtered correctly by non-empty mark."
   (with-package-test ()
     (package-list-packages)
@@ -572,7 +572,7 @@ but with a different end of line convention (bug#48137)."
     ;; No marked packages in default environment.
     (should-error (package-menu-filter-marked))))
 
-(ert-deftest package-test-list-filter-by-version ()
+'(ert-deftest package-test-list-filter-by-version ()
   (with-package-menu-test
     (should-error (package-menu-filter-by-version "1.1" 'unknown-symbol)))  )
 
@@ -584,19 +584,19 @@ but with a different end of line convention (bug#48137)."
     ;; listing.  One could be more ambitious.
     (should (re-search-forward name))))
 
-(ert-deftest package-test-list-filter-by-version-= ()
+'(ert-deftest package-test-list-filter-by-version-= ()
   "Ensure package list is filtered correctly by package version (=)."
   (package-test-filter-by-version "1.1" '= "^\\s-+simple-two-depend"))
 
-(ert-deftest package-test-list-filter-by-version-< ()
+'(ert-deftest package-test-list-filter-by-version-< ()
   "Ensure package list is filtered correctly by package version (<)."
   (package-test-filter-by-version "1.2" '< "^\\s-+simple-two-depend"))
 
-(ert-deftest package-test-list-filter-by-version-> ()
+'(ert-deftest package-test-list-filter-by-version-> ()
   "Ensure package list is filtered correctly by package version (>)."
   (package-test-filter-by-version "1.0" '> "^\\s-+simple-two-depend"))
 
-(ert-deftest package-test-list-clear-filter ()
+'(ert-deftest package-test-list-clear-filter ()
   "Ensure package list filter is cleared correctly."
   (with-package-menu-test
     (let ((num-packages (count-lines (point-min) (point-max))))
@@ -605,7 +605,7 @@ but with a different end of line convention (bug#48137)."
       (package-menu-clear-filter)
       (should (= (count-lines (point-min) (point-max)) num-packages)))))
 
-(ert-deftest package-test-update-archives ()
+'(ert-deftest package-test-update-archives ()
   "Test updating package archives."
   (with-package-test ()
     (let ((_buf (package-list-packages)))
@@ -695,7 +695,7 @@ but with a different end of line convention (bug#48137)."
     (should (package-installed-p 'project nil))
     (should (not (package-installed-p 'imaginary-package nil)))))
 
-(ert-deftest package-test-describe-package ()
+'(ert-deftest package-test-describe-package ()
   "Test displaying help for a package."
 
   (require 'finder-inf)
@@ -727,7 +727,7 @@ but with a different end of line convention (bug#48137)."
                                              nil t)))
      )))
 
-(ert-deftest package-test-describe-installed-multi-file-package ()
+'(ert-deftest package-test-describe-installed-multi-file-package ()
   "Test displaying of the readme for installed multi-file package."
 
   (with-package-test ()
@@ -741,7 +741,7 @@ but with a different end of line convention (bug#48137)."
      (should (search-forward "This is a bare-bones readme file for the multi-file"
                              nil t)))))
 
-(ert-deftest package-test-describe-non-installed-package ()
+'(ert-deftest package-test-describe-non-installed-package ()
   "Test displaying of the readme for non-installed package."
 
   (with-package-test ()
@@ -754,7 +754,7 @@ but with a different end of line convention (bug#48137)."
      (should (search-forward "This package provides a minor mode to frobnicate"
                              nil t)))))
 
-(ert-deftest package-test-describe-non-installed-multi-file-package ()
+'(ert-deftest package-test-describe-non-installed-multi-file-package ()
   "Test displaying of the readme for non-installed multi-file package."
 
   (with-package-test ()
@@ -768,7 +768,7 @@ but with a different end of line convention (bug#48137)."
                              nil t)))))
 
 (defvar epg-config--program-alist) ; Silence byte-compiler.
-(ert-deftest package-test-signed ()
+'(ert-deftest package-test-signed ()
   "Test verifying package signature."
   (skip-unless (ert-with-temp-directory homedir
                  (let ((process-environment

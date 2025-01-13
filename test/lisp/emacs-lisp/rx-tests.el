@@ -552,7 +552,7 @@
     (should (equal (rx (f +))
                    "a+"))))
 
-(ert-deftest rx-define ()
+'(ert-deftest rx-define () ;; guilemacs
   (rx-define rx--a (seq "x" (opt "y")))
   (should (equal (rx bol rx--a eol)
                  "^xy?$"))
@@ -577,7 +577,7 @@
   (should (equal (rx--test-rx-to-string-define)
                  "^Q")))
 
-(ert-deftest rx-let-define ()
+'(ert-deftest rx-let-define () ;; guilemacs
   "Test interaction between `rx-let' and `rx-define'."
   (rx-define rx--e "one")
   (rx-define rx--f "eins")

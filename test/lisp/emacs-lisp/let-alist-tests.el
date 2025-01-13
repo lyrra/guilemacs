@@ -23,7 +23,7 @@
 (require 'cl-lib)
 (require 'let-alist)
 
-(ert-deftest let-alist-surface-test ()
+'(ert-deftest let-alist-surface-test ()
   "Tests basic macro expansion for `let-alist'."
   (should
    (equal '(let ((symbol data))

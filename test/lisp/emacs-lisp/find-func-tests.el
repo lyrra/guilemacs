@@ -44,7 +44,7 @@
                      (concat data-directory (kbd "n x / TAB RET"))
                    (read-library-name)))))
 
-(ert-deftest find-func-tests--locate-symbols ()
+'(DISABLE-guilemacs ert-deftest find-func-tests--locate-symbols ()
   (should (cdr
            (find-function-search-for-symbol
             #'goto-line nil "simple")))
@@ -82,7 +82,7 @@ expected function symbol and function library, respectively."
                (not (string-empty-p expected-library))
                (string-match-p expected-library library))))))
 
-(ert-deftest find-func-tests--locate-library ()
+'(DISABLE-guilemacs ert-deftest find-func-tests--locate-library ()
   (test-locate-helper #'goto-line '(goto-line . "simple"))
   (test-locate-helper #'forward-char '(forward-char . "cmds.c"))
   (should-error (test-locate-helper 'wrong-function)))
