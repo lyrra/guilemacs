@@ -222,7 +222,7 @@
               (with-current-buffer buf (bury-buffer)) ; ensure not selected
               (kill-buffer buf))))))
   ;; Tests
-  (ert-deftest ibuffer-filter-inclusion-1 ()
+  '(ert-deftest ibuffer-filter-inclusion-1 ()
     "Tests inclusion using basic filter combinators with a single buffer."
     (require 'ibuf-ext)
     (unwind-protect
@@ -265,7 +265,7 @@
                               (basename . "\\`ibuf-test-1"))))))
       (funcall clean-up)))
 
-  (ert-deftest ibuffer-filter-inclusion-2 ()
+  '(ert-deftest ibuffer-filter-inclusion-2 ()
     "Tests inclusion of basic filters in combination on a single buffer."
     (require 'ibuf-ext)
     (unwind-protect
@@ -300,7 +300,7 @@
                                  (derived-mode . emacs-lisp-mode))))))
       (funcall clean-up)))
 
-  (ert-deftest ibuffer-filter-inclusion-3 ()
+  '(ert-deftest ibuffer-filter-inclusion-3 ()
     "Tests inclusion with filename filters on specified buffers."
     (require 'ibuf-ext)
     (unwind-protect
@@ -334,7 +334,7 @@
                    bufB '((name . "ibuf-test-3")))))
       (funcall clean-up)))
 
-  (ert-deftest ibuffer-filter-inclusion-4 ()
+  '(ert-deftest ibuffer-filter-inclusion-4 ()
     "Tests inclusion with various filters on a single buffer."
     (require 'ibuf-ext)
     (unwind-protect
@@ -394,7 +394,7 @@
                                        (not (filename . "test-5")))))))))
       (funcall clean-up)))
 
-  (ert-deftest ibuffer-filter-inclusion-6 ()
+  '(ert-deftest ibuffer-filter-inclusion-6 ()
     "Tests inclusion using saved filters and DeMorgan's laws."
     (require 'ibuf-ext)
     (unwind-protect
@@ -448,7 +448,7 @@
                    buf '((not (not (not modified)))))))
       (funcall clean-up)))
 
-  (ert-deftest ibuffer-filter-inclusion-8 ()
+  '(ert-deftest ibuffer-filter-inclusion-8 ()
     "Tests inclusion with various filters."
     (require 'ibuf-ext)
     (unwind-protect

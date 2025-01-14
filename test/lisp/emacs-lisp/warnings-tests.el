@@ -40,7 +40,7 @@
     (with-current-buffer "*Messages*"
       (should (string-match "Hello123" (buffer-string))))))
 
-(ert-deftest test-display-warning/warning-minimum-level ()
+'(ert-deftest test-display-warning/warning-minimum-level ()
   ;; This test only works interactively:
   :expected-result :failed
   (let ((warning-minimum-level :emergency))

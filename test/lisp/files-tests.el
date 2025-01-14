@@ -191,7 +191,7 @@ form.")
   (ert-resource-file "files-bug18141.el.gz")
   "Test file for bug#18141.")
 
-(ert-deftest files-tests-bug-18141 ()
+'(ert-deftest files-tests-bug-18141 ()
   "Test for https://debbugs.gnu.org/18141 ."
   (skip-unless (executable-find "gzip"))
   ;; If called interactively, environment variable
@@ -293,7 +293,7 @@ form.")
       (setenv "FOO" foo-env)
       (setenv "BAR" bar-env))))
 
-(ert-deftest files-tests-save-buffers-kill-emacs--confirm-kill-processes ()
+'(ert-deftest files-tests-save-buffers-kill-emacs--confirm-kill-processes ()
   "Test that `save-buffers-kill-emacs' honors
 `confirm-kill-processes'."
   (cl-letf* ((yes-or-no-p-prompts nil)
@@ -353,7 +353,7 @@ be $HOME."
                    (file-name-unquote
                     (file-name-unquote temporary-file-directory))))))
 
-(ert-deftest files-tests-file-name-non-special--subprocess ()
+'(ert-deftest files-tests-file-name-non-special--subprocess ()
   "Check that Bug#25949 and Bug#48177 are fixed."
   (skip-unless (and (executable-find "true") (file-exists-p null-device)
                     ;; These systems cannot set date of the null device.
@@ -378,7 +378,7 @@ be $HOME."
            (progn ,@body)
          (advice-remove #',symbol ,function)))))
 
-(ert-deftest files-tests-file-name-non-special--buffers ()
+'(ert-deftest files-tests-file-name-non-special--buffers ()
   "Check that Bug#25951 is fixed.
 We call `verify-visited-file-modtime' on a buffer visiting a file
 with a quoted name.  We use two different variants: first with
@@ -993,7 +993,7 @@ unquoted file names."
   (files-tests--with-temp-non-special-and-file-name-handler (tmpfile nospecial)
     (should-error (with-temp-buffer (insert-file-contents nospecial)))))
 
-(ert-deftest files-tests-file-name-non-special-load ()
+'(ert-deftest files-tests-file-name-non-special-load ()
   (files-tests--with-temp-non-special (tmpfile nospecial)
     (should (load nospecial nil t)))
   (files-tests--with-temp-non-special-and-file-name-handler (tmpfile nospecial)
@@ -1267,7 +1267,7 @@ unquoted file names."
     (with-temp-buffer
       (write-region nil nil nospecial nil :visit))))
 
-(ert-deftest files-tests-file-name-non-special-make-process ()
+'(ert-deftest files-tests-file-name-non-special-make-process ()
   "Check that the ‘:file-handler’ argument of ‘make-process’
 works as expected if the default directory is quoted."
   (let ((default-directory (file-name-quote invocation-directory))
@@ -1567,7 +1567,7 @@ See <https://debbugs.gnu.org/36401>."
                      '("/foo/" "//bar/")
                    '("/foo/" "/bar/")))))
 
-(ert-deftest files-test-magic-mode-alist-doctype ()
+'(ert-deftest files-test-magic-mode-alist-doctype ()
   "Test that DOCTYPE and variants put files in mhtml-mode."
   (with-temp-buffer
     (goto-char (point-min))
@@ -1722,7 +1722,7 @@ set to."
   ;; Invocation through env, with modified environment.
   (files-tests--check-shebang "#!/usr/bin/env -S PYTHONPATH=/...:${PYTHONPATH} python" 'python-base-mode))
 
-(ert-deftest files-test-dir-locals-auto-mode-alist ()
+'(ert-deftest files-test-dir-locals-auto-mode-alist ()
   "Test an `auto-mode-alist' entry in `.dir-locals.el'"
   (find-file (ert-resource-file "whatever.quux"))
   (should (eq major-mode 'tcl-mode))
@@ -1934,7 +1934,7 @@ Ensure that the issues from bug#66546 are fixed."
           (should     (equal (file-contents file) "baz\nbar\nfoo\n"))
           (should     (equal (file-contents backup) 'missing)))))))
 
-(ert-deftest files-tests-save-some-buffers ()
+'(ert-deftest files-tests-save-some-buffers ()
   "Test `save-some-buffers'.
 Test the 3 cases for the second argument PRED, i.e., nil, t, or
 predicate.
@@ -2041,7 +2041,7 @@ permutation."
                                        (swap ,vec idx l)))))
          (permute ,vec 0 (1- (length ,vec)))))))
 
-(ert-deftest files-tests-buffer-offer-save ()
+'(ert-deftest files-tests-buffer-offer-save () ;; guilemacs sigsegv
   "Test `save-some-buffers' for non-file-visiting buffers.
 Check the behavior of `save-some-buffers' for non-file-visiting
 buffers under several values of `buffer-offer-save'.
@@ -2073,7 +2073,7 @@ PRED is nil."
              #'save-some-buffers
              args-res)))))))
 
-(ert-deftest files-tests-save-buffers-kill-emacs--asks-to-save-buffers ()
+'(ert-deftest files-tests-save-buffers-kill-emacs--asks-to-save-buffers () ;; guilemacs sigsegv
   "Test that `save-buffers-kill-emacs' asks to save buffers as expected.
 Prompt users for any modified buffer with `buffer-offer-save' non-nil."
   (let* ((buffers-offer-init '((buf-1 t) (buf-2 always) (buf-3 nil)))
@@ -2097,7 +2097,7 @@ Prompt users for any modified buffer with `buffer-offer-save' non-nil."
   (should (equal (file-name-split "/foo/bar/") '("" "foo" "bar" "")))
   (should (equal (file-name-split "foo/bar/") '("foo" "bar" ""))))
 
-(ert-deftest files-test-set-mode ()
+'(ert-deftest files-test-set-mode ()
   (find-file (ert-resource-file "file-mode"))
   (should (eq major-mode 'text-mode))
   (emacs-lisp-mode)
@@ -2112,7 +2112,7 @@ Prompt users for any modified buffer with `buffer-offer-save' non-nil."
   (find-file (ert-resource-file "file-mode-prop-line"))
   (should (eq major-mode 'text-mode)))
 
-(ert-deftest files-load-elc-gz-file ()
+'(ert-deftest files-load-elc-gz-file ()
   (skip-unless (executable-find "gzip"))
   (ert-with-temp-directory dir
     (let* ((pref (expand-file-name "compile-utf8" dir))

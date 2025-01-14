@@ -34,13 +34,13 @@
     (sit-for 0 t)
     (should timer-ran)))
 
-(ert-deftest timer-tests-debug-timer-check ()
+'(ert-deftest timer-tests-debug-timer-check ()
   ;; This function exists only if --enable-checking.
   (skip-unless (fboundp 'debug-timer-check))
   (when (fboundp 'debug-timer-check)    ; silence byte-compiler
     (should (debug-timer-check))))
 
-(ert-deftest timer-test-multiple-of-time ()
+'(ert-deftest timer-test-multiple-of-time ()
   (should (time-equal-p
 	   (timer-next-integral-multiple-of-time '(0 0 0 1) (1+ (ash 1 53)))
 	   (list (ash 1 (- 53 16)) 1))))

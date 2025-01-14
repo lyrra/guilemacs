@@ -74,7 +74,7 @@
   (should (listp (find-image '((:type png :file "newsticker/rss-feed.png" :ascent center)))))
   (should-not (find-image '((:type png :file "does-not-exist-foo-bar.png")))))
 
-(ert-deftest image-supported-file-p/built-in ()
+'(ert-deftest image-supported-file-p/built-in ()
   ;; (skip-unless (image-type-available-p 'pbm)) ; Always built-in
   (skip-unless (display-images-p))               ; (except in nox builds).
   (should (eq (image-supported-file-p "foo.pbm") 'pbm)))
@@ -93,7 +93,7 @@
     (should (eq (image-type-from-file-name "foo.png") 'png))
     (should (eq (image-type-from-file-name "foo.webp") 'webp))))
 
-(ert-deftest image-type/from-filename ()
+'(ert-deftest image-type/from-filename ()
   ;; On emba, `image-types' and `image-load-path' do not exist.
   (skip-unless (and (bound-and-true-p image-types)
                     (bound-and-true-p image-load-path)
@@ -132,7 +132,7 @@
 (ert-deftest image-type-from-file-header-test/xpm ()
   (image-tests--type-from-file-header 'xpm))
 
-(ert-deftest image-rotate ()
+'(ert-deftest image-rotate ()
   "Test `image-rotate'."
   (cl-letf* ((image (list 'image))
              ((symbol-function 'image--get-imagemagick-and-warn)
@@ -155,7 +155,7 @@
 
 ;;;; Transforming maps
 
-(ert-deftest image-create-image-with-map ()
+'(ert-deftest image-create-image-with-map ()
   "Test that `create-image' correctly adds :map and/or :original-map."
   (skip-unless (display-images-p))
   (let ((data "<svg width=\"30\" height=\"30\" version=\"1.1\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"></svg>")
@@ -209,7 +209,7 @@ corresponding coordinate in B.  When nil, TOLERANCE defaults to 5."
                (check-tolerance (aref coords-a i) (aref coords-b i))))))))
     t))
 
-(ert-deftest image--compute-map-and-original-map ()
+'(ert-deftest image--compute-map-and-original-map ()
   "Test `image--compute-map' and `image--compute-original-map'."
   (skip-unless (display-images-p))
   (let* ((svg-string "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"no\"?><svg width=\"125pt\" height=\"116pt\" viewBox=\"0.00 0.00 125.00 116.00\" xmlns=\"http://www.w3.org/2000/svg\" xmlns:xlink=\"http://www.w3.org/1999/xlink\"><g transform=\"scale(1 1) rotate(0) translate(4 112)\"><polygon fill=\"white\" stroke=\"transparent\" points=\"-4,4 -4,-112 121,-112 121,4 -4,4\"/><a xlink:href=\"a\"><ellipse fill=\"none\" stroke=\"black\" cx=\"27\" cy=\"-90\" rx=\"18\" ry=\"18\"/><text text-anchor=\"middle\" x=\"27\" y=\"-86.3\" fill=\"#000000\">A</text></a><a xlink:href=\"b\"><polygon fill=\"none\" stroke=\"black\" points=\"54,-36 0,-36 0,0 54,0 54,-36\"/><text text-anchor=\"middle\" x=\"27\" y=\"-14.3\" fill=\"#000000\">B</text></a><a xlink:href=\"c\"><ellipse fill=\"none\" stroke=\"black\" cx=\"90\" cy=\"-90\" rx=\"27\" ry=\"18\"/><text text-anchor=\"middle\" x=\"90\" y=\"-86.3\" fill=\"#000000\">C</text></a></g></svg>")

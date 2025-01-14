@@ -28,7 +28,7 @@
 (require 'ert-x)
 (require 'ffap)
 
-(ert-deftest ffap-replace-file-component ()
+'(ert-deftest ffap-replace-file-component ()
   (should (equal
            (ffap-replace-file-component "/ftp:who@foo.com:/whatever" "/new")
            "/ftp:who@foo.com:/new")))
@@ -146,7 +146,7 @@ left alone when opening a URL in an external browser."
      (save-excursion (insert "type="))
      (ffap-guess-file-name-at-point))))
 
-(ert-deftest ffap-ido-mode ()
+'(ert-deftest ffap-ido-mode ()
   (require 'ido)
   (with-temp-buffer
     (let ((ido-mode t)

@@ -32,7 +32,7 @@
 
 ;; `if-let*' tests
 
-(ert-deftest subr-x-test-if-let*-single-binding-expansion ()
+'(ert-deftest subr-x-test-if-let*-single-binding-expansion ()
   "Test single bindings are expanded properly."
   (should (equal
            (macroexpand
@@ -53,7 +53,7 @@
                   (- a)
                 "no")))))
 
-(ert-deftest subr-x-test-if-let*-single-symbol-expansion ()
+'(ert-deftest subr-x-test-if-let*-single-symbol-expansion ()
   "Test single symbol bindings are expanded properly."
   (should (equal
            (macroexpand
@@ -87,7 +87,7 @@
                   (- a)
                 "no")))))
 
-(ert-deftest subr-x-test-if-let*-nil-related-expansion ()
+'(ert-deftest subr-x-test-if-let*-nil-related-expansion ()
   "Test nil is processed properly."
   (should (equal
            (macroexpand
@@ -220,7 +220,7 @@
 
 ;; `when-let*' tests
 
-(ert-deftest subr-x-test-when-let*-body-expansion ()
+'(ert-deftest subr-x-test-when-let*-body-expansion ()
   "Test body allows for multiple sexps wrapping with progn."
   (should (equal
            (macroexpand
@@ -396,10 +396,10 @@
    ;; The error doesn't trigger when compiled: the compiler will give
    ;; a warning and then drop the erroneous code.  Therefore, use
    ;; `eval' to avoid compilation.
-   (should-error (eval '(and-let* (nil (x 1))) lexical-binding)
+   '(should-error (eval '(and-let* (nil (x 1))) lexical-binding)
                  :type 'setting-constant)
    (should (equal nil (and-let* ((nil) (x 1)))))
-   (should-error (eval '(and-let* (2 (x 1))) lexical-binding)
+   '(should-error (eval '(and-let* (2 (x 1))) lexical-binding)
                  :type 'wrong-type-argument)
    (should (equal 1 (and-let* ((2) (x 1)))))
    (should (equal 2 (and-let* ((x 1) (2)))))

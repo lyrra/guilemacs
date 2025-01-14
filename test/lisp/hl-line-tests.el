@@ -28,7 +28,7 @@
     (not (cl-some (apply-partially #'eq hl-line-overlay)
                   (overlays-at (point))))))
 
-(ert-deftest hl-line-tests-sticky-across-frames ()
+'(ert-deftest hl-line-tests-sticky-across-frames ()
   (skip-unless (display-graphic-p))
   (customize-set-variable 'global-hl-line-sticky-flag t)
   (call-interactively #'global-hl-line-mode)

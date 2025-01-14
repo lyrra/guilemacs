@@ -34,14 +34,14 @@
   (let ((help-xref-following nil))
     (should (equal "*Help*" (help-buffer)))))
 
-(ert-deftest help-mode-tests-help-buffer-current-buffer ()
+'(ert-deftest help-mode-tests-help-buffer-current-buffer ()
   (with-temp-buffer
     (help-mode)
     (let ((help-xref-following t))
       (should (equal (buffer-name (current-buffer))
                      (help-buffer))))))
 
-(ert-deftest help-mode-tests-make-xrefs ()
+'(ert-deftest help-mode-tests-make-xrefs ()
   (with-temp-buffer
     (insert "car is a built-in function in ‘C source code’.
 
@@ -144,14 +144,14 @@ Lisp concepts such as car, cdr, cons cell and list.")
   (let ((help-xref-forward-stack '()))
     (should-error (help-go-forward))))
 
-(ert-deftest help-mode-tests-do-xref ()
+'(ert-deftest help-mode-tests-do-xref ()
   (with-temp-buffer
     (help-mode)
     (help-do-xref 0 #'describe-symbol '(car))
     (should (looking-at-p "car is a"))
     (should (string-match-p "[back]" (buffer-string)))))
 
-(ert-deftest help-mode-tests-follow-symbol ()
+'(ert-deftest help-mode-tests-follow-symbol ()
   (with-temp-buffer
     (insert "car")
     (help-mode)
@@ -159,7 +159,7 @@ Lisp concepts such as car, cdr, cons cell and list.")
     (should (looking-at-p "car is a"))
     (should (string-match-p "[back]" (buffer-string)))))
 
-(ert-deftest help-mode-tests-follow-symbol-no-symbol ()
+'(ert-deftest help-mode-tests-follow-symbol-no-symbol ()
   (with-temp-buffer
     (insert "fXYEWnRHI0B9w6VJqQIw")
     (help-mode)

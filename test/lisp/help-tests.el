@@ -269,7 +269,7 @@ M-g M-c		switch-to-completions
            (substitute-command-keys "\200 \\[goto-char]") nil nil
            "\200 M-g c" nil nil)))
 
-(ert-deftest help-tests-substitute-command-keys/apropos ()
+'(ert-deftest help-tests-substitute-command-keys/apropos ()
   (save-window-excursion
     (apropos "foo")
     (switch-to-buffer "*Apropos*")

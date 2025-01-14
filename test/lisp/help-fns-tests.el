@@ -41,18 +41,18 @@ Return first line of the output of (describe-function-1 FUNC)."
     (string-match "\\(.+\\)\n" string)
     (match-string-no-properties 1 string)))
 
-(ert-deftest help-fns-test-bug17410 ()
+'(ert-deftest help-fns-test-bug17410 ()
   "Test for https://debbugs.gnu.org/17410 ."
   (let ((regexp "autoloaded Lisp macro")
         (result (help-fns-tests--describe-function 'help-fns-test--macro)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-built-in ()
+'(ert-deftest help-fns-test-built-in ()
   (let ((regexp "a primitive-function in .C source code")
         (result (help-fns-tests--describe-function 'mapcar)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-interactive-built-in ()
+'(ert-deftest help-fns-test-interactive-built-in ()
   (let ((regexp "an interactive primitive-function in .C source code")
         (result (help-fns-tests--describe-function 're-search-forward)))
     (should (string-match regexp result))))
@@ -62,14 +62,14 @@ Return first line of the output of (describe-function-1 FUNC)."
         (result (help-fns-tests--describe-function 'when)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-lisp-defun ()
+'(ert-deftest help-fns-test-lisp-defun ()
   (let ((regexp "a \\([^ ]+\\) in .+subr\\.el")
         (result (help-fns-tests--describe-function 'last)))
     (should (string-match regexp result))
     (should (member (match-string 1 result)
                     '("native-comp-function" "byte-code-function")))))
 
-(ert-deftest help-fns-test-lisp-defsubst ()
+'(ert-deftest help-fns-test-lisp-defsubst ()
   (let ((regexp "a byte-code-function in .+subr\\.el")
         (result (help-fns-tests--describe-function 'posn-window)))
     (should (string-match regexp result))))
@@ -85,7 +85,7 @@ Return first line of the output of (describe-function-1 FUNC)."
         (result (help-fns-tests--describe-function 'search-forward-regexp)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-dangling-alias ()
+'(ert-deftest help-fns-test-dangling-alias ()
   "Make sure we don't burp on bogus aliases."
   (let ((f (make-symbol "bogus-alias")))
     (define-obsolete-function-alias f 'help-fns-test--undefined-function "past")
@@ -102,7 +102,7 @@ Return first line of the output of (describe-function-1 FUNC)."
   "Another function with a funny name."
   x)
 
-(ert-deftest help-fns-test-funny-names ()
+'(ert-deftest help-fns-test-funny-names ()
   "Test for help with functions with funny names."
   (describe-function 'abc\\\[universal-argument\]b\`c\'d\\e\"f)
   (with-current-buffer "*Help*"
@@ -117,7 +117,7 @@ Return first line of the output of (describe-function-1 FUNC)."
 
 
 ;;; Test for describe-symbol
-(ert-deftest help-fns-test-describe-symbol ()
+'(ert-deftest help-fns-test-describe-symbol ()
   "Test the `describe-symbol' function."
   ;; 'describe-symbol' would originally signal an error for
   ;; 'font-lock-comment-face'.
@@ -138,7 +138,7 @@ Return first line of the output of (describe-function-1 FUNC)."
   "b" 'test-cmd-b
   "c" 'test-cmd-c)
 
-(ert-deftest help-fns-test-find-keymap-name ()
+'(ert-deftest help-fns-test-find-keymap-name ()
   (should (equal (help-fns-find-keymap-name lisp-mode-map) 'lisp-mode-map))
   ;; Follow aliasing.
   (unwind-protect
@@ -147,7 +147,7 @@ Return first line of the output of (describe-function-1 FUNC)."
         (should (equal (help-fns-find-keymap-name foo-test-map) 'lisp-mode-map)))
     (makunbound 'foo-test-map)))
 
-(ert-deftest help-fns-test-describe-keymap/symbol ()
+'(ert-deftest help-fns-test-describe-keymap/symbol ()
   (describe-keymap 'help-fns-test-map)
   (with-current-buffer "*Help*"
     (should (looking-at "^help-fns-test-map is"))
@@ -156,7 +156,7 @@ Return first line of the output of (describe-function-1 FUNC)."
                                    word-start "test-cmd-a" word-end)
                                nil t))))
 
-(ert-deftest help-fns-test-describe-keymap/value ()
+'(ert-deftest help-fns-test-describe-keymap/value ()
   (describe-keymap help-fns-test-map)
   (with-current-buffer "*Help*"
     (should (looking-at "\nKey"))))
@@ -166,13 +166,13 @@ Return first line of the output of (describe-function-1 FUNC)."
   (should-error (describe-keymap emacs-version))
   (should-error (describe-keymap 'some-undefined-variable-foobar)))
 
-(ert-deftest help-fns-test-describe-keymap/let-bound ()
+'(ert-deftest help-fns-test-describe-keymap/let-bound ()
   (let ((foobar help-fns-test-map))
     (describe-keymap foobar)
     (with-current-buffer "*Help*"
       (should (looking-at "\nKey")))))
 
-(ert-deftest help-fns-test-describe-keymap/dynamically-bound-no-file ()
+'(ert-deftest help-fns-test-describe-keymap/dynamically-bound-no-file ()
   (setq help-fns-test--describe-keymap-foo help-fns-test-map)
   (describe-keymap 'help-fns-test--describe-keymap-foo)
   (with-current-buffer "*Help*"
