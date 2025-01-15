@@ -97,7 +97,7 @@ tests, so you can use it to document the test cases if you wish."
 
 ;;; Indentation tests
 
-(ert-deftest cperl-test-indent-exp ()
+'(ert-deftest cperl-test-indent-exp ()
   "Run various tests for `cperl-indent-exp' edge cases.
 These exercise some standard blocks and also the special
 treatment for Perl expressions where a closing paren isn't the
@@ -107,7 +107,7 @@ end of the statement."
    (ert-resource-file "cperl-indent-exp.pl")
    (cperl-indent-exp))) ; here we go!
 
-(ert-deftest cperl-test-indent-styles ()
+'(ert-deftest cperl-test-indent-styles ()
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (cperl--run-test-cases
    (ert-resource-file "cperl-indent-styles.pl")
@@ -116,7 +116,7 @@ end of the statement."
 
 ;;; Fontification tests
 
-(ert-deftest cperl-test-fontify-punct-vars ()
+'(ert-deftest cperl-test-fontify-punct-vars ()
   "Test fontification of Perl's punctuation variables.
 Perl has variable names containing unbalanced quotes for the list
 separator $\" and pre- and postmatch $` and $'.  A reference to
@@ -157,7 +157,7 @@ point in the distant past, and is still broken in perl-mode. "
     (should (equal (get-text-property (match-beginning 0) 'face)
                    'font-lock-keyword-face))))
 
-(ert-deftest cperl-test-fontify-attrs-and-signatures ()
+'(ert-deftest cperl-test-fontify-attrs-and-signatures ()
   "Test fontification of the various combinations of subroutine
 attributes, prototypes and signatures."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -216,7 +216,7 @@ attributes, prototypes and signatures."
                            'font-lock-variable-name-face)))
           (goto-char end-of-sub))))))
 
-(ert-deftest cperl-test-fontify-builtin-constants ()
+'(ert-deftest cperl-test-fontify-builtin-constants ()
   "Test fontificiation of the floating point constants \"nan\" and \"inf\"."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((constants '("my $min=-builtin::inf;"
@@ -249,7 +249,7 @@ attributes, prototypes and signatures."
                          face)))))))
 
 
-(ert-deftest cperl-test-fontify-class ()
+'(ert-deftest cperl-test-fontify-class ()
   "Test fontification of the various elements in a Perl class."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((file (ert-resource-file "perl-class.pl")))
@@ -294,7 +294,7 @@ attributes, prototypes and signatures."
                      'font-lock-constant-face))
 )))
 
-(ert-deftest cperl-test-fontify-special-variables ()
+'(ert-deftest cperl-test-fontify-special-variables ()
   "Test fontification of variables like $^T or ${^ENCODING}.
 These can occur as \"local\" aliases."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -402,7 +402,7 @@ comments and POD they should be fontified as POD."
           (should-not (nth 8 ppss)))
         ))))
 
-(ert-deftest cperl-test-here-doc-missing-end ()
+'(ert-deftest cperl-test-here-doc-missing-end ()
   "Verify that a missing here-document terminator gives a message.
 This message prints the terminator which wasn't found and is only
 issued by CPerl mode."
@@ -485,7 +485,7 @@ the whole string."
        (and (string-match regexp string)
 	    (string= (match-string 0 string) string))))))
 
-(ert-deftest cperl-test-ws-rx ()
+'(ert-deftest cperl-test-ws-rx ()
   "Tests capture of very simple regular expressions (yawn)."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -495,7 +495,7 @@ the whole string."
     (cperl-test--validate-regexp (rx (eval cperl--ws-rx))
 				 valid invalid)))
 
-(ert-deftest cperl-test-ws+-rx ()
+'(ert-deftest cperl-test-ws+-rx ()
   "Tests sequences of whitespace and comment lines."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -506,7 +506,7 @@ the whole string."
     (cperl-test--validate-regexp (rx (eval cperl--ws+-rx))
 				 valid invalid)))
 
-(ert-deftest cperl-test-version-regexp ()
+'(ert-deftest cperl-test-version-regexp ()
   "Tests the regexp for recommended syntax of versions in Perl."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -521,7 +521,7 @@ the whole string."
     (cperl-test--validate-regexp cperl--version-regexp
 				 valid invalid)))
 
-(ert-deftest cperl-test-package-regexp ()
+'(ert-deftest cperl-test-package-regexp ()
   "Tests the regular expression of Perl package and class names with versions.
 Also includes valid cases with whitespace in strange places."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -540,7 +540,7 @@ Also includes valid cases with whitespace in strange places."
     (cperl-test--validate-regexp (rx (eval cperl--package-rx))
 				 valid invalid)))
 
-(ert-deftest cperl-test-identifier-rx ()
+'(ert-deftest cperl-test-identifier-rx ()
   "Test valid and invalid identifiers (no sigils)."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -553,7 +553,7 @@ Also includes valid cases with whitespace in strange places."
     (cperl-test--validate-regexp (rx (eval cperl--basic-identifier-rx))
                                  valid invalid)))
 
-(ert-deftest cperl-test-attribute-rx ()
+'(ert-deftest cperl-test-attribute-rx ()
   "Test attributes and attribute lists"
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -566,7 +566,7 @@ Also includes valid cases with whitespace in strange places."
     (cperl-test--validate-regexp (rx (eval cperl--single-attribute-rx))
                                  valid invalid)))
 
-(ert-deftest cperl-test-attribute-list-rx ()
+'(ert-deftest cperl-test-attribute-list-rx ()
   "Test attributes and attribute lists."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -584,7 +584,7 @@ Also includes valid cases with whitespace in strange places."
     (cperl-test--validate-regexp (rx (eval cperl--attribute-list-rx))
                                  valid invalid)))
 
-(ert-deftest cperl-test-field-declaration-rx ()
+'(ert-deftest cperl-test-field-declaration-rx ()
   "Test field declarations with and without attributes."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -603,7 +603,7 @@ Also includes valid cases with whitespace in strange places."
 
 
 
-         (ert-deftest cperl-test-prototype-rx ()
+'(ert-deftest cperl-test-prototype-rx ()
   "Test subroutine prototypes"
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((valid
@@ -618,7 +618,7 @@ Also includes valid cases with whitespace in strange places."
     (cperl-test--validate-regexp (rx (eval cperl--prototype-rx))
                                  valid invalid)))
 
-(ert-deftest cperl-test-signature-rx ()
+'(ert-deftest cperl-test-signature-rx ()
    "Test subroutine signatures."
    (skip-unless (eq cperl-test-mode #'cperl-mode))
    (let ((valid
@@ -764,7 +764,7 @@ point after the first occurrence of STRING (no regexp!)."
       (should (equal (get-text-property (1- (match-end 0)) 'face)
                      'font-lock-variable-name-face)))))
 
-(ert-deftest cperl-test-unicode-arrays ()
+'(ert-deftest cperl-test-unicode-arrays ()
   "Test fontification of array access."
   ;; Perl mode just looks at the sigil, for element access
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -795,7 +795,7 @@ point after the first occurrence of STRING (no regexp!)."
     (should (equal (get-text-property (1+ (point)) 'face)
                    'font-lock-variable-name-face))))
 
-(ert-deftest cperl-test-unicode-hashes ()
+'(ert-deftest cperl-test-unicode-hashes ()
   "Test fontification of hash access."
   ;; Perl mode just looks at the sigil, for element access
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -826,7 +826,7 @@ point after the first occurrence of STRING (no regexp!)."
     (should (equal (get-text-property (1+ (point)) 'face)
                    'font-lock-variable-name-face))))
 
-(ert-deftest cperl-test-unicode-hashref ()
+'(ert-deftest cperl-test-unicode-hashref ()
   "Verify that a hashref access disambiguates {s}.
 CPerl mode takes the token \"s\" as a substitution unless
 detected otherwise.  Not for perl-mode: it doesn't stringify
@@ -840,7 +840,7 @@ bareword hash keys and doesn't recognize a substitution
     (should (equal (get-text-property (1+ (point)) 'face)
             nil))))
 
-(ert-deftest cperl-test-unicode-proto ()
+'(ert-deftest cperl-test-unicode-proto ()
   ;; perl-mode doesn't fontify prototypes at all
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (with-temp-buffer
@@ -874,7 +874,7 @@ bareword hash keys and doesn't recognize a substitution
             (should (equal (get-text-property (point) 'face)
                      bareword-face)))))
 
-(ert-deftest cperl-test-unicode-hashkeys ()
+'(ert-deftest cperl-test-unicode-hashkeys ()
   "Test stringification of bareword hash keys.  Not in perl-mode.
 perl-mode generally does not stringify bareword hash keys."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
@@ -897,7 +897,7 @@ perl-mode generally does not stringify bareword hash keys."
     (should (equal (get-text-property (point) 'face)
                    'font-lock-string-face))))
 
-(ert-deftest cperl-test-word-at-point ()
+'(ert-deftest cperl-test-word-at-point ()
   "Test whether the function captures non-ASCII words."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((words '("rôle" "café" "ångström"
@@ -911,7 +911,7 @@ perl-mode generally does not stringify bareword hash keys."
         (insert word)
         (should (string= word (cperl-word-at-point-hard)))))))
 
-(ert-deftest cperl-test-extra-delimiters ()
+'(ert-deftest cperl-test-extra-delimiters ()
   "Test whether cperl-mode can process unicode delimiters.
 The minor mode `cperl-extra-paired-delimiters-mode' controls whether we
 have extra paired delimiters."
@@ -948,7 +948,7 @@ have extra paired delimiters."
 
 ;;; Function test: Building an index for imenu
 
-(ert-deftest cperl-test-imenu-index ()
+'(ert-deftest cperl-test-imenu-index ()
   "Test index creation for imenu.
 This test relies on the specific layout of the index alist as
 created by CPerl mode, so skip it for Perl mode."
@@ -1046,7 +1046,7 @@ under timeout control."
       (should (string-match
                "poop ('foo', \n      'bar')" (buffer-string))))))
 
-(ert-deftest cperl-test-bug-11733 ()
+'(ert-deftest cperl-test-bug-11733 ()
   "Verify indentation of braces after newline and non-labels."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (cperl--run-test-cases
@@ -1153,7 +1153,7 @@ does not break fontification."
     (should (equal (get-text-property (point) 'face)
                    cperl--tests-heredoc-face))))
 
-(ert-deftest cperl-test-bug-16368 ()
+'(ert-deftest cperl-test-bug-16368 ()
   "Verify that `cperl-forward-group-in-re' doesn't hide errors."
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((code "/(\\d{4})(?{2}/;")     ; the regex from the bug report
@@ -1371,7 +1371,7 @@ as that quote like operator."
                          'font-lock-constant-face
                        'font-lock-string-face))))))
 
-(ert-deftest cperl-test-hyperactive-electric-else ()
+'(ert-deftest cperl-test-hyperactive-electric-else ()
   "Demonstrate cperl-electric-else behavior.
 If `cperl-electric-keywords' is true, keywords like \"else\" and
 \"continue\" are expanded by a following empty block, with the
@@ -1427,7 +1427,7 @@ as a regex."
     (funcall cperl-test-mode)
     (should-not (nth 3 (syntax-ppss 3)))))
 
-(ert-deftest cperl-test-bug-64190 ()
+'(ert-deftest cperl-test-bug-64190 ()
   "Verify correct fontification of multiline declarations"
   (skip-unless (eq cperl-test-mode #'cperl-mode))
   (let ((file (ert-resource-file "cperl-bug-64190.pl")))

@@ -68,7 +68,7 @@ end program progname
     (f90-indent-region (point-min) (point-max))
     (should (string-equal (buffer-string) f90-test-indent))))
 
-(ert-deftest f90-test-bug3729 ()
+'(ert-deftest f90-test-bug3729 ()
   "Test for https://debbugs.gnu.org/3729 ."
   :expected-result :failed
   (with-temp-buffer

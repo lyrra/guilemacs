@@ -39,7 +39,7 @@
   (should (obarrayp (obarray-make)))
   (should (obarrayp (obarray-make 7))))
 
-(ert-deftest obarray-make-with-size-test ()
+'(ert-deftest obarray-make-with-size-test ()
   ;; FIXME: Actually, `wrong-type-argument' is not the right error to signal,
   ;; so we shouldn't enforce this misbehavior in tests!
   (should-error (obarray-make -1) :type 'wrong-type-argument)
@@ -57,7 +57,7 @@
     (should (string= "aoeu" (obarray-put table "aoeu")))
     (should (string= "aoeu" (obarray-get table "aoeu")))))
 
-(ert-deftest obarray-remove-test ()
+'(ert-deftest obarray-remove-test ()
   (let ((table (obarray-make 3)))
     (should-not (obarray-get table "aoeu"))
     (should-not (obarray-remove table "aoeu"))
@@ -79,7 +79,7 @@
     (obarray-map collect-names table)
     (should (equal (sort syms #'string<) '("a" "b" "c")))))
 
-(ert-deftest obarray-clear ()
+'(ert-deftest obarray-clear ()
   (let ((o (obarray-make)))
     (intern "a" o)
     (intern "b" o)

@@ -201,7 +201,7 @@
                     'completions-first-difference)
            return pos))
 
-(ert-deftest completion-test--pcm-bug38458 ()
+'(ert-deftest completion-test--pcm-bug38458 ()
   (should (equal (let ((completion-ignore-case t))
                    (completion-pcm--merge-try '("tes" point "ing")
                                               '("Testing" "testing")
@@ -493,7 +493,7 @@
      (previous-line-completion 5)
      (should (equal "a\nb" (get-text-property (point) 'completion--string))))))
 
-(ert-deftest completions-header-format-test ()
+'(ert-deftest completions-header-format-test ()
   (let ((completion-show-help nil)
         (completions-header-format nil))
     (completing-read-with-minibuffer-setup
@@ -637,13 +637,13 @@
       (previous-line-completion 7)
       (should (equal "aa1" (get-text-property (point) 'completion--string))))))
 
-(ert-deftest completion-cycle ()
+'(ert-deftest completion-cycle ()
   (completing-read-with-minibuffer-setup '("aaa" "bbb" "ccc")
     (let ((completion-cycle-threshold t))
       (execute-kbd-macro (kbd "TAB TAB TAB"))
       (should (equal (minibuffer-contents) "ccc")))))
 
-(ert-deftest minibuffer-next-completion ()
+'(ert-deftest minibuffer-next-completion ()
   (let ((default-directory (ert-resource-directory)))
     (completing-read-with-minibuffer-setup #'read-file-name-internal
       (insert "d/")

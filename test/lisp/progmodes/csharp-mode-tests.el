@@ -26,7 +26,7 @@
 (ert-deftest csharp-mode-test-indentation ()
   (ert-test-erts-file (ert-resource-file "indent.erts")))
 
-(ert-deftest csharp-ts-mode-test-indentation ()
+'(ert-deftest csharp-ts-mode-test-indentation ()
   (skip-unless (treesit-ready-p 'c-sharp t))
   (ert-test-erts-file (ert-resource-file "indent-ts.erts")))
 

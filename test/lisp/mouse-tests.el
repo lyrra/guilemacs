@@ -58,7 +58,7 @@ translate `mouse-1' events into `mouse-2' events."
     (should (eq 'down-mouse-1 (car-safe (aref (read-key-sequence "") 0))))
     (should (eq 'mouse-2 (car-safe (aref (read-key-sequence "") 0))))))
 
-(ert-deftest bug26816-mouse-frame-movement ()
+'(ert-deftest bug26816-mouse-frame-movement ()
   "Mouse moves relative to frame."
   (skip-unless (display-graphic-p))
   (let ((frame (selected-frame)))

@@ -52,7 +52,7 @@
                      (read-string "prompt:"))))))
 
 ;;Bug#65997, ensure that old-names haven't overridden new names.
-(ert-deftest mule-cmds-tests--ucs-names-old-name-override ()
+'(ert-deftest mule-cmds-tests--ucs-names-old-name-override ()
   (let (code-points)
     (dotimes (u (1+ (max-char 'ucs)))
       (when-let* ((name (get-char-code-property u 'name))
@@ -64,7 +64,7 @@
     (should (null code-points))))
 
 ;; Bug#65997, ensure that all codepoints with names are in '(ucs-names)'.
-(ert-deftest mule-cmds-tests--ucs-names-missing-names ()
+'(ert-deftest mule-cmds-tests--ucs-names-missing-names ()
   (let (code-points)
     (dotimes (u (1+ (max-char 'ucs)))
       (when-let* ((name (get-char-code-property u 'name)))

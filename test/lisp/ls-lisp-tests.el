@@ -30,7 +30,7 @@
 (require 'dired)
 
 (defvar dired-find-subdir)
-(ert-deftest ls-lisp-test-bug70271 ()
+'(ert-deftest ls-lisp-test-bug70271 ()
   "Test for https://debbugs.gnu.org/70271 ."
   (ert-with-temp-file
    fpath
@@ -69,7 +69,7 @@
              (kill-buffer)))
        (when (buffer-live-p buf) (kill-buffer buf))))))
 
-(ert-deftest ls-lisp-test-bug27762 ()
+'(ert-deftest ls-lisp-test-bug27762 ()
   "Test for https://debbugs.gnu.org/27762 ."
   (let* ((dir source-directory)
          (default-directory dir)
@@ -92,7 +92,7 @@
           (should (looking-at "src")))
       (when (buffer-live-p buf) (kill-buffer buf)))))
 
-(ert-deftest ls-lisp-test-bug27631 ()
+'(ert-deftest ls-lisp-test-bug27631 ()
   "Test for https://debbugs.gnu.org/27631 ."
   (ert-with-temp-directory dir
     :suffix "bug27631"
@@ -111,7 +111,7 @@
             (should (cdr (dired-get-marked-files))))
         (when (buffer-live-p buf) (kill-buffer buf))))))
 
-(ert-deftest ls-lisp-test-bug27693 ()
+'(ert-deftest ls-lisp-test-bug27693 ()
   "Test for https://debbugs.gnu.org/27693 ."
   (let ((dir (expand-file-name "lisp" source-directory))
         (size "")

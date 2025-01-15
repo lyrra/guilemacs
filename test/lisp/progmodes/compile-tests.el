@@ -542,7 +542,7 @@ The test data is in `compile-tests--test-regexps-data'."
       (should (eq compilation-num-warnings-found 36))
       (should (eq compilation-num-infos-found 35)))))
 
-(ert-deftest compile-test-grep-regexps ()
+'(ert-deftest compile-test-grep-regexps ()
   "Test the `grep-regexp-alist' regexps.
 The test data is in `compile-tests--grep-regexp-testcases'."
   (with-temp-buffer

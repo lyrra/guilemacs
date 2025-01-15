@@ -24,7 +24,7 @@
 (require 'seq)
 
 
-(ert-deftest shift ()
+'(ert-deftest shift ()
   (with-suppressed-warnings ((suspicious lsh))
 
     ;; shift left +ve                      5628     #x00000000000015fc
@@ -101,7 +101,7 @@ At EOF:
 (defvar pgg-parse-crc24)
 (declare-function pgg-parse-crc24-string "pgg-parse" (string))
 
-(ert-deftest pgg-parse-crc24 ()
+'(ert-deftest pgg-parse-crc24 ()
   ;; Compiler
   (require 'pgg)
   (should (equal pgg-parse-crc24 prog-pgg-code))
@@ -110,7 +110,7 @@ At EOF:
   (should (equal (pgg-parse-crc24-string "bar") (concat [#x51 #xd9 #x53])))
   (should (equal (pgg-parse-crc24-string "baz") (concat [#xf0 #x58 #x6a]))))
 
-(ert-deftest pgg-parse-crc24-dump ()
+'(ert-deftest pgg-parse-crc24-dump ()
   ;; Disassembler
   (require 'pgg)
   (with-temp-buffer

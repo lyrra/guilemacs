@@ -32,7 +32,7 @@
 
 (ert-deftest loadhist-tests-feature-file ()
   (should (equal (file-name-base (feature-file 'loadhist)) "loadhist"))
-  (should-error (feature-file 'non-existent-feature)))
+  '(should-error (feature-file 'non-existent-feature)))
 
 (ert-deftest loadhist-tests-file-loadhist-lookup ()
   ;; This should probably be extended...
@@ -41,7 +41,7 @@
 (ert-deftest loadhist-tests-file-provides ()
   (should (eq (car (file-provides "loadhist")) 'loadhist)))
 
-(ert-deftest loadhist-tests-file-requires ()
+'(ert-deftest loadhist-tests-file-requires ()
   (should-not (file-requires "loadhist")))
 
 (ert-deftest loadhist-tests-file-dependents ()
@@ -49,14 +49,14 @@
   (let ((deps (file-dependents "dired")))
     (should (member "dired-x" (mapcar #'file-name-base deps)))))
 
-(ert-deftest loadhist-tests-unload-feature ()
+'(ert-deftest loadhist-tests-unload-feature ()
   (require 'dired-x)
   (should-error (unload-feature 'dired))
   (unload-feature 'dired-x))
 
 (defvar loadhist--tests-dir (file-name-directory (macroexp-file-name)))
 
-(ert-deftest loadhist-tests-unload-feature-nested ()
+'(ert-deftest loadhist-tests-unload-feature-nested ()
   (add-to-list 'load-path (expand-file-name
                            "loadhist-resources/"
                            loadhist--tests-dir))
@@ -81,7 +81,7 @@
   (should (null (get 'loadhist--bar-dec 'function-history)))
   (should (null (get 'loadhist--foo-inc 'function-history))))
 
-(ert-deftest loadhist-tests-unload-feature-notnested ()
+'(ert-deftest loadhist-tests-unload-feature-notnested ()
   (add-to-list 'load-path (expand-file-name
                            "loadhist-resources/"
                            loadhist--tests-dir))

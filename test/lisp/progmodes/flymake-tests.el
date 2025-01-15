@@ -90,7 +90,7 @@ SEVERITY-PREDICATE is used to setup
            (debug (sexp &rest form)))
   `(flymake-tests--call-with-fixture (lambda () ,@body) ,file ,@args))
 
-(ert-deftest warning-predicate-rx-gcc ()
+'(ert-deftest warning-predicate-rx-gcc ()
   "Test GCC warning via regexp predicate."
   (skip-unless (and (executable-find "gcc") (executable-find "make")))
   (flymake-tests--with-flymake
@@ -99,7 +99,7 @@ SEVERITY-PREDICATE is used to setup
     (should (eq 'flymake-warning
                 (face-at-point)))))
 
-(ert-deftest warning-predicate-function-gcc ()
+'(ert-deftest warning-predicate-function-gcc ()
   "Test GCC warning via function predicate."
   (skip-unless (and (executable-find "gcc") (executable-find "make")))
   (flymake-tests--with-flymake
@@ -120,7 +120,7 @@ SEVERITY-PREDICATE is used to setup
     (should (eq 'flymake-error (face-at-point)))))
 
 (defvar ruby-mode-hook)
-(ert-deftest ruby-backend ()
+'(ert-deftest ruby-backend ()
   "Test the ruby backend."
   (skip-unless (executable-find "ruby"))
   ;; Some versions of ruby fail if HOME doesn't exist (bug#29187).
@@ -140,7 +140,7 @@ SEVERITY-PREDICATE is used to setup
         (flymake-goto-next-error)
         (should (eq 'flymake-error (face-at-point)))))))
 
-(ert-deftest different-diagnostic-types ()
+'(ert-deftest different-diagnostic-types ()
   "Test GCC warning via function predicate."
   (skip-unless (and (executable-find "gcc")
                     (not (ert-gcc-is-clang-p))
@@ -165,7 +165,7 @@ SEVERITY-PREDICATE is used to setup
       (should (eq 'flymake-warning (face-at-point)))
       (should-error (flymake-goto-next-error nil nil t)))))
 
-(ert-deftest included-c-header-files ()
+'(ert-deftest included-c-header-files ()
   "Test inclusion of .h header files."
   (skip-unless (and (executable-find "gcc")
                     (not (ert-gcc-is-clang-p))

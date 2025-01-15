@@ -439,7 +439,7 @@ Each element has the format:
     ("a a a " "C-M-% \\ba SPC RET c RET !" "ccc") ; not "ca c"
     ))
 
-(defun query-replace--run-tests (tests)
+'(defun query-replace--run-tests (tests)
   (with-temp-buffer
     (save-window-excursion
       ;; `execute-kbd-macro' is applied to window only
@@ -453,10 +453,10 @@ Each element has the format:
         (execute-kbd-macro (kbd (nth 1 case)))
         (should (equal (buffer-string) (nth 2 case)))))))
 
-(ert-deftest query-replace-tests ()
+'(ert-deftest query-replace-tests ()
   (query-replace--run-tests query-replace-tests))
 
-(ert-deftest query-replace-search-function-tests ()
+'(ert-deftest query-replace-search-function-tests ()
   (let* ((replace-re-search-function #'re-search-forward))
     (query-replace--run-tests query-replace-tests))
 
@@ -489,7 +489,7 @@ Each element has the format:
     ;; ("a a a " "\\ba " "c" nil t nil nil nil 1 4 nil nil "ca a ")
     ))
 
-(defun perform-replace--run-tests (tests)
+'(defun perform-replace--run-tests (tests)
   (with-temp-buffer
     (dolist (case tests)
       (delete-region (point-min) (point-max))
@@ -498,7 +498,7 @@ Each element has the format:
       (apply 'perform-replace (butlast case))
       (should (equal (buffer-string) (car (last case)))))))
 
-(ert-deftest perform-replace-tests ()
+'(ert-deftest perform-replace-tests ()
   (perform-replace--run-tests perform-replace-tests))
 
 
@@ -580,11 +580,11 @@ Return the last evalled form in BODY."
        (replace-tests-with-undo
         input "1" "2" ((?\s . (2)) (?u . (3)) (?q . (4))) ?\s (buffer-string))))))
 
-(ert-deftest query-replace--undo ()
+'(ert-deftest query-replace--undo ()
   (should (string= "211" (replace-tests--query-replace-undo)))
   (should (string= "211" (replace-tests--query-replace-undo 'comma))))
 
-(ert-deftest query-replace-undo-bug31073 ()
+'(ert-deftest query-replace-undo-bug31073 ()
   "Test for https://debbugs.gnu.org/31073 ."
   (let ((input "aaa aaa"))
     (should
@@ -592,7 +592,7 @@ Return the last evalled form in BODY."
       input "a" "B" ((?\s . (1 2 3)) (?U . (4))) ?q
       (string= input (buffer-string))))))
 
-(ert-deftest query-replace-undo-bug31492 ()
+'(ert-deftest query-replace-undo-bug31492 ()
   "Test for https://debbugs.gnu.org/31492 ."
   (let ((input "a\nb\nc\n"))
     (should
@@ -600,7 +600,7 @@ Return the last evalled form in BODY."
       input "^\\|\b\\|$" "foo" ((?\s . (1 2)) (?U . (3))) ?q
       (string= input (buffer-string))))))
 
-(ert-deftest query-replace-undo-bug31538 ()
+'(ert-deftest query-replace-undo-bug31538 ()
   "Test for https://debbugs.gnu.org/31538 ."
   (let ((input "aaa aaa")
         (replace-tests-bind-read-string "Bfoo"))
@@ -609,7 +609,7 @@ Return the last evalled form in BODY."
       input "a" "B" ((?\s . (1 2 3)) (?E . (4)) (?U . (5))) ?q
       (string= input (buffer-string))))))
 
-(ert-deftest query-replace-undo-bug37073 ()
+'(ert-deftest query-replace-undo-bug37073 ()
   "Test for https://debbugs.gnu.org/37073 ."
   (let ((input "theorem 1\ntheorem 2\ntheorem 3"))
     (should
@@ -633,7 +633,7 @@ Return the last evalled form in BODY."
          ?q
        (string= expected (buffer-string))))))
 
-(ert-deftest query-replace-undo-bug37287 ()
+'(ert-deftest query-replace-undo-bug37287 ()
   "Test for https://debbugs.gnu.org/37287 ."
   (let ((input "foo-1\nfoo-2\nfoo-3")
         (expected "foo-2\nfoo-2\nfoo-3"))
@@ -688,7 +688,7 @@ bound to HIGHLIGHT-LOCUS."
                               (caar (get-text-property (point) 'occur-target)))
           (should (funcall check-overlays has-overlay)))))))
 
-(ert-deftest replace-regexp-bug45973 ()
+'(SIGSEGV-guilemacs ert-deftest replace-regexp-bug45973 ()
   "Test for https://debbugs.gnu.org/45973 ."
   (let ((before "1RB 1LC 1RC 1RB 1RD 0LE 1LA 1LD 1RH 0LA")
         (after  "1LB 1RC 1LC 1LB 1LD 0RE 1RA 1RD 1LH 0RA"))

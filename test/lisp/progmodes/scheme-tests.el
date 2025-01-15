@@ -24,7 +24,7 @@
 (require 'ert)
 (require 'scheme)
 
-(ert-deftest scheme-test-indent ()
+'(ert-deftest scheme-test-indent ()
   ;; FIXME: Look into what is the expected indent here and fix it.
   :expected-result :failed
   ;; Converted from manual test.

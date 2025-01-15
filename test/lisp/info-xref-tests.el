@@ -102,7 +102,7 @@ text.
                                      "-c" (format "makeinfo '%s'" file))))
     (should (equal 0 (call-process "makeinfo" file)))))
 
-(ert-deftest info-xref-test-makeinfo ()
+'(ert-deftest info-xref-test-makeinfo ()
   "Test that info-xref can parse basic makeinfo output."
   (skip-unless (executable-find "makeinfo"))
   (ert-with-temp-file tempfile

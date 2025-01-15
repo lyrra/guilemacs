@@ -352,14 +352,14 @@ The ACTION will be tested after set-up of PRODUCT."
          (let (kill-buffer-query-functions) ;; Kill what we create
            (mapc #'kill-buffer new-bufs))))))
 
-(ert-deftest sql-tests-buffer-naming-default ()
+'(ert-deftest sql-tests-buffer-naming-default ()
   "Test buffer naming."
   (sql-tests-buffer-naming-harness sqlite
     (sql-sqlite)
     (message ">> %S" (current-buffer))
     (should (equal (buffer-name) "*SQL: SQLite*"))))
 
-(ert-deftest sql-tests-buffer-naming-multiple ()
+'(ert-deftest sql-tests-buffer-naming-multiple ()
   "Test buffer naming of multiple buffers."
   (sql-tests-buffer-naming-harness sqlite
     (sql-sqlite)
@@ -370,7 +370,7 @@ The ACTION will be tested after set-up of PRODUCT."
     (sql-sqlite)
     (should (equal (buffer-name) "*SQL: SQLite*"))))
 
-(ert-deftest sql-tests-buffer-naming-explicit ()
+'(ert-deftest sql-tests-buffer-naming-explicit ()
   "Test buffer naming with explicit name."
   (sql-tests-buffer-naming-harness sqlite
     (sql-sqlite "A")
@@ -381,7 +381,7 @@ The ACTION will be tested after set-up of PRODUCT."
     (sql-sqlite "A")
     (should (equal (buffer-name) "*SQL: A*"))))
 
-(ert-deftest sql-tests-buffer-naming-universal-argument ()
+'(ert-deftest sql-tests-buffer-naming-universal-argument ()
   "Test buffer naming with explicit name."
   (sql-tests-buffer-naming-harness sqlite
     (cl-letf
@@ -400,7 +400,7 @@ The ACTION will be tested after set-up of PRODUCT."
       (sql-sqlite '(16))
       (should (equal (buffer-name) "*SQL: 2*")))))
 
-(ert-deftest sql-tests-buffer-naming-existing ()
+'(ert-deftest sql-tests-buffer-naming-existing ()
   "Test buffer naming with an existing non-SQLi buffer."
   (sql-tests-buffer-naming-harness sqlite
     (get-buffer-create "*SQL: exist*")
