@@ -1599,7 +1599,7 @@ It must not be mistaken for \"$)\"."
      (cperl-indent-command)
      (forward-line 1))))
 
-(ert-deftest test-indentation ()
+(ert-deftest cperl-mode-test-indentation ()
   (ert-test-erts-file (ert-resource-file "cperl-indents.erts")))
 
 ;;; cperl-mode-tests.el ends here

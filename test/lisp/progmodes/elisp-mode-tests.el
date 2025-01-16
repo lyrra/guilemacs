@@ -1134,7 +1134,7 @@ evaluation of BODY."
                              (buffer-string)))))))
     (should (equal observed expected-longhand-form))))
 
-(ert-deftest test-indentation ()
+(ert-deftest elisp-mode-test-indentation ()
   (ert-test-erts-file (ert-resource-file "elisp-indents.erts"))
   (ert-test-erts-file (ert-resource-file "flet.erts")
                       (lambda ()

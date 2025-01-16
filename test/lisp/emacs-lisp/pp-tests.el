@@ -33,7 +33,7 @@
   (should (string= (pp-to-string '(quotefoo)) "(quotefoo)\n"))
   (should (string= (pp-to-string '(a b)) "(a b)\n")))
 
-(ert-deftest test-indentation ()
+(ert-deftest pp-test-indentation ()
   (ert-test-erts-file (ert-resource-file "code-formats.erts")))
 
 (defun pp-tests--dimensions ()

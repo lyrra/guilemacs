@@ -51,7 +51,7 @@
 }
 "))))
 
-(ert-deftest test-indentation ()
+(ert-deftest sh-script-test-indentation ()
   (ert-test-erts-file (ert-resource-file "sh-indents.erts")))
 
 (ert-deftest test-indent-after-continuation ()
