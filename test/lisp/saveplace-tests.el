@@ -27,7 +27,7 @@
 (require 'ert-x)
 (require 'saveplace)
 
-(ert-deftest saveplace-test-save-place-to-alist/dir ()
+'(ert-deftest saveplace-test-save-place-to-alist/dir ()
   (save-place-mode)
   (let* ((save-place-alist nil)
          (save-place-loaded t)

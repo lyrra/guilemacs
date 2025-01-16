@@ -30,7 +30,7 @@
   "Test problem found by Filipp Gunbin in emacs-devel."
   (should (equal (car (shell--unquote&requote-argument "te'st" 2)) "test")))
 
-(ert-deftest shell-tests-completion-before-semi ()
+'(ert-deftest shell-tests-completion-before-semi ()
   (with-temp-buffer
     (shell-mode)
     (insert "cd ba;")
@@ -38,14 +38,14 @@
     (should (equal (shell--parse-pcomplete-arguments)
                    '(("cd" "ba") 1 4)))))
 
-(ert-deftest shell-tests-completion-after-semi ()
+'(ert-deftest shell-tests-completion-after-semi ()
   (with-temp-buffer
     (shell-mode)
     (insert "cd ba;")
     (should (equal (shell--parse-pcomplete-arguments)
                    '(("cd" "ba" "") 1 4 7)))))
 
-(ert-deftest shell-tests-split-string ()
+'(ert-deftest shell-tests-split-string ()
   (should (equal (split-string-shell-command "ls /tmp")
                  '("ls" "/tmp")))
   (should (equal (split-string-shell-command "ls '/tmp/foo bar'")
@@ -64,7 +64,7 @@
     (should (equal (split-string-shell-command "ls /tmp/foo\\ bar")
                    '("ls" "/tmp/foo bar")))))
 
-(ert-deftest shell-dirtrack-on-by-default ()
+'(ert-deftest shell-dirtrack-on-by-default ()
   (with-temp-buffer
     (shell-mode)
     (should shell-dirtrack-mode)))
@@ -73,7 +73,7 @@
   (with-temp-buffer
     (should (not shell-dirtrack-mode))))
 
-(ert-deftest shell-dirtrack-sets-list-buffers-directory ()
+'(ert-deftest shell-dirtrack-sets-list-buffers-directory ()
   (let ((start-dir default-directory))
     (with-temp-buffer
       (should-not list-buffers-directory)
@@ -83,7 +83,7 @@
       (should (not (equal start-dir list-buffers-directory)))
       (should (string-prefix-p list-buffers-directory start-dir)))))
 
-(ert-deftest shell-directory-tracker-cd ()
+'(ert-deftest shell-directory-tracker-cd ()
   (let ((start-dir default-directory))
     (with-temp-buffer
       (should-not list-buffers-directory)

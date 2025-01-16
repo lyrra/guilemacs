@@ -119,7 +119,7 @@ mark there."
 
 ;;; `execute-extended-command'
 
-(ert-deftest simple-execute-extended-command--shorter ()
+'(ert-deftest simple-execute-extended-command--shorter ()
   ;; This test can be flaky with completion frameworks other than the
   ;; default, so just skip it in interactive sessions.
   (skip-unless noninteractive)
@@ -460,7 +460,7 @@ See bug#35036."
 
 
 ;;; `delete-trailing-whitespace'
-(ert-deftest simple-delete-trailing-whitespace--bug-21766 ()
+'(ert-deftest simple-delete-trailing-whitespace--bug-21766 ()
   "Test bug#21766: delete-whitespace sometimes deletes non-whitespace."
   (defvar python-indent-guess-indent-offset)  ; to avoid a warning
   (let ((python (featurep 'python))
@@ -835,7 +835,7 @@ See Bug#21722."
         (call-interactively #'eval-expression)
         (should (equal (buffer-string) "t"))))))
 
-(ert-deftest eval-expression-print-format-sym-echo ()
+'(ert-deftest eval-expression-print-format-sym-echo ()
   ;; We can only check the echo area when running interactive.
   (skip-when noninteractive)
   (with-temp-buffer
@@ -857,7 +857,7 @@ See Bug#21722."
         (call-interactively #'eval-expression)
         (should (equal (buffer-string) "65 (#o101, #x41, ?A)"))))))
 
-(ert-deftest eval-expression-print-format-small-int-echo ()
+'(ert-deftest eval-expression-print-format-small-int-echo ()
   (skip-when noninteractive)
   (with-temp-buffer
     (cl-letf (((symbol-function 'read--expression) (lambda (&rest _) ?A)))
@@ -883,7 +883,7 @@ See Bug#21722."
         (call-interactively #'eval-expression)
         (should (equal (buffer-string) "66 (#o102, #x42, ?B)"))))))
 
-(ert-deftest eval-expression-print-format-large-int-echo ()
+'(ert-deftest eval-expression-print-format-large-int-echo ()
   (skip-when noninteractive)
   (with-temp-buffer
     (cl-letf (((symbol-function 'read--expression) (lambda (&rest _) ?B))
@@ -973,7 +973,7 @@ See Bug#21722."
 
 ;;; Shell command.
 
-(ert-deftest simple-tests-async-shell-command-30280 ()
+'(ert-deftest simple-tests-async-shell-command-30280 ()
   "Test for https://debbugs.gnu.org/30280 ."
   (let* ((async-shell-command-buffer 'new-buffer)
          (async-shell-command-display-buffer nil)
@@ -1050,7 +1050,7 @@ See Bug#21722."
          (when (buffer-live-p ,output-buf)
            (kill-buffer ,output-buf))))))
 
-(ert-deftest simple-tests-shell-command-39067 ()
+'(ert-deftest simple-tests-shell-command-39067 ()
   "The output buffer is erased or not according to `shell-command-dont-erase-buffer'."
   (let ((str "foo\\n"))
     (dolist (output-current '(t nil))
@@ -1062,7 +1062,7 @@ See Bug#21722."
                               (t (concat str str)))))
           (should (string= expected (buffer-string))))))))
 
-(ert-deftest simple-tests-shell-command-dont-erase-buffer ()
+'(ert-deftest simple-tests-shell-command-dont-erase-buffer ()
   "The point is set at the expected position after execution of the command."
   (let* ((str "foo\\n")
          (expected-point `((beg-last-out . ,(1+ (length str)))
