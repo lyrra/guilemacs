@@ -66,6 +66,19 @@ export LD_LIBRARY_PATH=/t/ge/g3/lib
 /t/ge/e2015/bin/emacs -Q $*
 #+END_SRC
 
+** run tests
+
+After building emacs, the test suite can be runned.
+
+#+BEGIN_SRC
+echo GUILE=/t/ge/g3/lib > env.sh
+
+./tool/run-tests.sh
+#+END_SRC
+
+The test suite will utilize the ERT suite. While many tests in the ERT suite will
+not work with guilemacs, ie fail, only those that are known to pass are runned.
+
 * original work
 
  - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
