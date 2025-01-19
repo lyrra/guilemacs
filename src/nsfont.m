@@ -36,7 +36,6 @@ Author: Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "character.h"
 #include "font.h"
 #include "termchar.h"
-#include "pdumper.h"
 
 #import <Foundation/NSException.h>
 #import <AppKit/NSFontDescriptor.h>
@@ -1721,8 +1720,6 @@ ns_dump_glyphstring (struct glyph_string *s)
   putc ('\n', stderr);
 }
 
-static void syms_of_nsfont_for_pdumper (void);
-
 struct font_driver const nsfont_driver =
   {
   .type = LISPSYM_INITIALLY (Qns),
@@ -1750,17 +1747,11 @@ syms_of_nsfont (void)
     doc: /* Internal map of font registry to Unicode script.  */);
   Vns_reg_to_script = Qnil;
 
-  pdumper_do_now_and_after_load (syms_of_nsfont_for_pdumper);
+  nsfont_driver.type = Qns;
+  register_font_driver (&nsfont_driver, NULL);
 
   /* Font slant styles.  */
   DEFSYM (Qreverse_italic, "reverse-italic");
   DEFSYM (Qreverse_oblique, "reverse-oblique");
   DEFSYM (Qexpanded, "expanded");
-}
-
-static void
-syms_of_nsfont_for_pdumper (void)
-{
-  nsfont_driver.type = Qns;
-  register_font_driver (&nsfont_driver, NULL);
 }

@@ -45,7 +45,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "coding.h"
 #include "sysselect.h"
-#include "pdumper.h"
 
 #ifdef MSDOS
 #include "msdos.h"
@@ -2908,8 +2907,6 @@ DEFUN ("menu-or-popup-active-p", Fmenu_or_popup_active_p, Smenu_or_popup_active_
 }
 
 
-static void syms_of_xmenu_for_pdumper (void);
-
 void
 syms_of_xmenu (void)
 {
@@ -2925,12 +2922,6 @@ syms_of_xmenu (void)
          intern_c_string ("x-menu-bar-open-internal"));
 #endif
 
-  pdumper_do_now_and_after_load (syms_of_xmenu_for_pdumper);
-}
-
-static void
-syms_of_xmenu_for_pdumper (void)
-{
 #ifdef USE_X_TOOLKIT
   enum { WIDGET_ID_TICK_START = 1 << 16 };
   widget_id_tick = WIDGET_ID_TICK_START;

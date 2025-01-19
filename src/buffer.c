@@ -42,7 +42,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "xwidget.h"
 #include "itree.h"
-#include "pdumper.h"
 
 #ifdef WINDOWSNT
 #include "w32heap.h"		/* for mmap_* */
@@ -4605,10 +4604,7 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
     BUF_Z_BYTE (b) - BUF_BEG_BYTE (b) + BUF_GAP_SIZE (b) + 1;
   ptrdiff_t new_nbytes = old_nbytes + delta;
 
-  if (pdumper_object_p (old_beg))
-    b->text->beg = NULL;
-  else
-    old_beg = NULL;
+  old_beg = NULL;
 
 #if defined USE_MMAP_FOR_BUFFERS
   p = mmap_realloc ((void **) &b->text->beg, new_nbytes);
@@ -4642,16 +4638,13 @@ free_buffer_text (struct buffer *b)
 {
   block_input ();
 
-  if (!pdumper_object_p (b->text->beg))
-    {
 #if defined USE_MMAP_FOR_BUFFERS
-      mmap_free ((void **) &b->text->beg);
+  mmap_free ((void **) &b->text->beg);
 #elif defined REL_ALLOC
-      r_alloc_free ((void **) &b->text->beg);
+  r_alloc_free ((void **) &b->text->beg);
 #else
-      xfree (b->text->beg);
+  xfree (b->text->beg);
 #endif
-    }
 
   BUF_BEG_ADDR (b) = NULL;
   unblock_input ();
@@ -4680,7 +4673,6 @@ init_buffer_once (void)
 
   /* Items flagged permanent get an explicit permanent-local property
      added in bindings.el, for clarity.  */
-  PDUMPER_REMEMBER_SCALAR (buffer_permanent_local_flags);
   memset (buffer_permanent_local_flags, 0, sizeof buffer_permanent_local_flags);
 
   /* 0 means not a lisp var, -1 means always local, else mask.  */
@@ -4774,15 +4766,10 @@ init_buffer_once (void)
   XSETFASTINT (BVAR (&buffer_local_flags, text_conversion_style), idx); ++idx;
   XSETFASTINT (BVAR (&buffer_local_flags, cursor_in_non_selected_windows), idx); ++idx;
 
-  /* buffer_local_flags contains no pointers, so it's safe to treat it
-     as a blob for pdumper.  */
-  PDUMPER_REMEMBER_SCALAR (buffer_local_flags);
-
   /* Need more room? */
   if (idx >= MAX_PER_BUFFER_VARS)
     emacs_abort ();
   last_per_buffer_idx = idx;
-  PDUMPER_REMEMBER_SCALAR (last_per_buffer_idx);
 
   /* Make sure all markable slots in buffer_defaults
      are initialized reasonably, so mark_buffer won't choke.  */
@@ -4879,7 +4866,6 @@ init_buffer_once (void)
 
   Vbuffer_alist = Qnil;
   current_buffer = 0;
-  pdumper_remember_lv_ptr_raw (&current_buffer, Lisp_Vectorlike);
 
   QSFundamental = build_pure_c_string ("Fundamental");
 

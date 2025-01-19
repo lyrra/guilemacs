@@ -39,7 +39,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 #include "font.h"
-#include "pdumper.h"
 
 /* FONTSET
 
@@ -2179,7 +2178,6 @@ syms_of_fontset (void)
      build_pure_c_string ("-*-*-*-*-*-*-*-*-*-*-*-*-fontset-default"));
   ASET (Vfontset_table, 0, Vdefault_fontset);
   next_fontset_id = 1;
-  PDUMPER_REMEMBER_SCALAR (next_fontset_id);
 
   auto_fontset_alist = Qnil;
   staticpro (&auto_fontset_alist);

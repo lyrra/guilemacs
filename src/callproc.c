@@ -1964,12 +1964,9 @@ init_callproc (void)
 	}
     }
 
-  if (!will_dump_p ())
-    {
-      tempdir = Fdirectory_file_name (Vexec_directory);
-      if (! file_accessible_directory_p (tempdir))
-	dir_warning ("arch-dependent data dir", Vexec_directory);
-    }
+  tempdir = Fdirectory_file_name (Vexec_directory);
+  if (! file_accessible_directory_p (tempdir))
+    dir_warning ("arch-dependent data dir", Vexec_directory);
 
   tempdir = Fdirectory_file_name (Vdata_directory);
   if (! file_accessible_directory_p (tempdir))

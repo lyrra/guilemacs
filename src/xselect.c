@@ -40,7 +40,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"	/* TRACE_SELECTION needs this.  */
 #include "termhooks.h"
 #include "keyboard.h"
-#include "pdumper.h"
 #include "atimer.h"
 
 #include <X11/Xproto.h>
@@ -3342,8 +3341,6 @@ x_timestamp_for_selection (struct x_display_info *dpyinfo,
   return value;
 }
 
-static void syms_of_xselect_for_pdumper (void);
-
 void
 syms_of_xselect (void)
 {
@@ -3464,12 +3461,6 @@ Note that this does not affect setting or owning selections.  */);
   DEFSYM (QXmTRANSFER_SUCCESS, "XmTRANSFER_SUCCESS");
   DEFSYM (QXmTRANSFER_FAILURE, "XmTRANSFER_FAILURE");
 
-  pdumper_do_now_and_after_load (syms_of_xselect_for_pdumper);
-}
-
-static void
-syms_of_xselect_for_pdumper (void)
-{
   outstanding_transfers.next = &outstanding_transfers;
   outstanding_transfers.last = &outstanding_transfers;
 
@@ -3478,4 +3469,5 @@ syms_of_xselect_for_pdumper (void)
   property_change_wait_list = 0;
   prop_location_identifier = 0;
   property_change_reply = Fcons (Qnil, Qnil);
+
 }

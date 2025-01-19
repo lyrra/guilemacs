@@ -32,7 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 #include "sysstdio.h"
 #include "systty.h"
-#include "pdumper.h"
 
 #ifdef HAVE_NTGUI
 #include "w32term.h"
@@ -1716,33 +1715,21 @@ set_initial_minibuffer_mode (void)
   set_minibuffer_mode (minibuf, 0);
 }
 
-static void init_minibuf_once_for_pdumper (void);
-
 void
 init_minibuf_once (void)
 {
   staticpro (&Vminibuffer_list);
   staticpro (&Vcommand_loop_level_list);
-  pdumper_do_now_and_after_load (init_minibuf_once_for_pdumper);
-  /* Ensure our inactive minibuffer exists.  */
-  get_minibuffer (0);
-}
 
-static void
-init_minibuf_once_for_pdumper (void)
-{
-  PDUMPER_IGNORE (minibuf_level);
-  PDUMPER_IGNORE (minibuf_prompt_width);
-
-  /* We run this function on first initialization and whenever we
-     restore from a dump file.  pdumper doesn't try to preserve
-     frames, windows, and so on, so reset everything related here.  */
   Vminibuffer_list = Qnil;
   Vcommand_loop_level_list = Qnil;
   minibuf_level = 0;
   minibuf_prompt = Qnil;
   minibuf_save_list = Qnil;
   last_minibuf_string = Qnil;
+
+  /* Ensure our inactive minibuffer exists.  */
+  get_minibuffer (0);
 }
 
 void

@@ -30,7 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "charset.h"
 #include "font.h"
-#include "pdumper.h"
 
 
 /* X core font driver.  */
@@ -1126,8 +1125,6 @@ xfont_check (struct frame *f, struct font *font)
 }
 
 
-static void syms_of_xfont_for_pdumper (void);
-
 struct font_driver xfont_driver =
   {
     .type = LISPSYM_INITIALLY (Qx),
@@ -1152,16 +1149,11 @@ syms_of_xfont (void)
   xfont_scripts_cache = CALLN (Fmake_hash_table, QCtest, Qequal);
   staticpro (&xfont_scratch_props);
   xfont_scratch_props = make_nil_vector (8);
-  pdumper_do_now_and_after_load (syms_of_xfont_for_pdumper);
+
+  xfont_driver.type = Qx;
+  register_font_driver (&xfont_driver, NULL);
 
   DEFSYM (Qkana, "kana");
   DEFSYM (Qhan, "han");
   DEFSYM (Qhangul, "hangul");
-}
-
-static void
-syms_of_xfont_for_pdumper (void)
-{
-  xfont_driver.type = Qx;
-  register_font_driver (&xfont_driver, NULL);
 }

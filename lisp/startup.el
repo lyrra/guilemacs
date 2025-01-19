@@ -2527,18 +2527,11 @@ A fancy display is used on graphic displays, normal otherwise."
 (defalias 'about-emacs #'display-about-screen)
 (defalias 'display-splash-screen #'display-startup-screen)
 
-;; This avoids byte-compiler warning in the unexec build.
-(declare-function pdumper-stats "pdumper.c" ())
-
 (defun command-line-1 (args-left)
   "A subroutine of `command-line'."
   (display-startup-echo-area-message)
   (when (and pure-space-overflow
-	     (not noninteractive)
-             ;; If we were dumped with pdumper, we don't care about
-             ;; pure-space overflow.
-             (or (not (fboundp 'pdumper-stats))
-                 (null (pdumper-stats))))
+	     (not noninteractive))
     (display-warning
      'initialization
      "Building Emacs overflowed pure space.\

@@ -297,7 +297,6 @@ encode_coding_XXX (struct coding_system *coding)
 #include "composite.h"
 #include "coding.h"
 #include "termhooks.h"
-#include "pdumper.h"
 
 Lisp_Object Vcoding_system_hash_table;
 
@@ -11719,9 +11718,6 @@ init_coding_once (void)
       coding_priorities[i] = i;
     }
 
-  PDUMPER_REMEMBER_SCALAR (coding_categories);
-  PDUMPER_REMEMBER_SCALAR (coding_priorities);
-
   /* ISO2022 specific initialize routine.  */
   for (i = 0; i < 0x20; i++)
     iso_code_class[i] = ISO_control_0;
@@ -11741,8 +11737,6 @@ init_coding_once (void)
   iso_code_class[ISO_CODE_SS3] = ISO_single_shift_3;
   iso_code_class[ISO_CODE_CSI] = ISO_control_sequence_introducer;
 
-  PDUMPER_REMEMBER_SCALAR (iso_code_class);
-
   for (i = 0; i < 256; i++)
     {
       emacs_mule_bytes[i] = 1;
@@ -11751,11 +11745,7 @@ init_coding_once (void)
   emacs_mule_bytes[EMACS_MULE_LEADING_CODE_PRIVATE_12] = 3;
   emacs_mule_bytes[EMACS_MULE_LEADING_CODE_PRIVATE_21] = 4;
   emacs_mule_bytes[EMACS_MULE_LEADING_CODE_PRIVATE_22] = 4;
-
-  PDUMPER_REMEMBER_SCALAR (emacs_mule_bytes);
 }
-
-static void reset_coding_after_pdumper_load (void);
 
 void
 syms_of_coding (void)
@@ -11778,7 +11768,6 @@ syms_of_coding (void)
   Vcode_conversion_workbuf_name = build_pure_c_string (" *code-conversion-work*");
 
   reused_workbuf_in_use = false;
-  PDUMPER_REMEMBER_SCALAR (reused_workbuf_in_use);
 
   DEFSYM (Qcharset, "charset");
   DEFSYM (Qtarget_idx, "target-idx");
@@ -12266,34 +12255,6 @@ internal character representation.  */);
   for (int i = 0; i < coding_category_max; i++)
     Fset (AREF (Vcoding_category_table, i), Qno_conversion);
 
-  pdumper_do_now_and_after_load (reset_coding_after_pdumper_load);
-
   DEFSYM (QUnknown_error, "Unknown error");
   DEFSYM (Qdefine_coding_system_internal, "define-coding-system-internal");
-}
-
-static void
-reset_coding_after_pdumper_load (void)
-{
-  if (!dumped_with_pdumper_p ())
-    return;
-  for (struct coding_system *this = &coding_categories[0];
-       this < &coding_categories[coding_category_max];
-       ++this)
-    {
-      int id = this->id;
-      if (id >= 0)
-        {
-          /* Need to rebuild the coding system object because we
-             persisted it as a scalar and it's full of gunk that's now
-             invalid.  */
-          memset (this, 0, sizeof (*this));
-          setup_coding_system (CODING_ID_NAME (id), this);
-        }
-    }
-  /* In temacs the below is done by mule-conf.el, because we need to
-     define us-ascii first.  But in dumped Emacs us-ascii is restored
-     by the above loop, and mule-conf.el will not be loaded, so we set
-     it up now; otherwise safe_terminal_coding will remain zeroed.  */
-  Fset_safe_terminal_coding_system_internal (Qus_ascii);
 }

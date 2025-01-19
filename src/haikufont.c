@@ -32,7 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "font.h"
 #include "termchar.h"
-#include "pdumper.h"
 #include "haiku_support.h"
 
 #include <math.h>
@@ -1412,12 +1411,6 @@ haiku_handle_font_change_event (struct haiku_font_change_event *event,
 	     ? Qmonospace_font_name : Qfont_name);
 }
 
-static void
-syms_of_haikufont_for_pdumper (void)
-{
-  register_font_driver (&haikufont_driver, NULL);
-}
-
 void
 syms_of_haikufont (void)
 {
@@ -1456,7 +1449,7 @@ syms_of_haikufont (void)
 #ifdef USE_BE_CAIRO
   Fput (Qhaiku, Qfont_driver_superseded_by, Qftcr);
 #endif
-  pdumper_do_now_and_after_load (syms_of_haikufont_for_pdumper);
+  register_font_driver (&haikufont_driver, NULL);
 
   font_cache = list (Qnil);
   staticpro (&font_cache);

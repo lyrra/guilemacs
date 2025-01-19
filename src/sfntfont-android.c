@@ -32,7 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "androidterm.h"
 #include "sfntfont.h"
-#include "pdumper.h"
 #include "blockinput.h"
 #include "android.h"
 
@@ -738,15 +737,6 @@ loaded before character sets are made available.  */)
 }
 
 
-
-static void
-syms_of_sfntfont_android_for_pdumper (void)
-{
-  init_sfntfont_vendor (Qsfnt_android, &android_sfntfont_driver,
-			sfntfont_android_put_glyphs);
-  register_font_driver (&android_sfntfont_driver, NULL);
-}
-
 void
 init_sfntfont_android (void)
 {
@@ -817,5 +807,7 @@ syms_of_sfntfont_android (void)
 
   defsubr (&Sandroid_enumerate_fonts);
 
-  pdumper_do_now_and_after_load (syms_of_sfntfont_android_for_pdumper);
+  init_sfntfont_vendor (Qsfnt_android, &android_sfntfont_driver,
+			sfntfont_android_put_glyphs);
+  register_font_driver (&android_sfntfont_driver, NULL);
 }

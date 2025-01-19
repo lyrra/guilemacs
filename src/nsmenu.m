@@ -37,7 +37,6 @@ Carbon version by Yamamoto Mitsuharu. */
 #include "termhooks.h"
 #include "keyboard.h"
 #include "menu.h"
-#include "pdumper.h"
 
 #define NSMENUPROFILE 0
 

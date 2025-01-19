@@ -31,7 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "font.h"
 #include "ftfont.h"
-#include "pdumper.h"
 
 #ifdef HAVE_XRENDER
 #include <X11/extensions/Xrender.h>
@@ -747,8 +746,6 @@ xfthbfont_end_hb_font (struct font *font, hb_font_t *hb_font)
 
 #endif	/* HAVE_HARFBUZZ */
 
-static void syms_of_xftfont_for_pdumper (void);
-
 struct font_driver xftfont_driver =
   {
     /* We can't draw a text without device dependent functions.  */
@@ -812,12 +809,6 @@ The font families in this list will not be ignored when
 `xft-ignore-color-fonts' is non-nil.  */);
   Vxft_color_font_whitelist = list1 (build_pure_c_string ("Source Code Pro"));
 
-  pdumper_do_now_and_after_load (syms_of_xftfont_for_pdumper);
-}
-
-static void
-syms_of_xftfont_for_pdumper (void)
-{
   xftfont_driver.type = Qxft;
   register_font_driver (&xftfont_driver, NULL);
 #ifdef HAVE_HARFBUZZ

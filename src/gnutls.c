@@ -25,7 +25,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "gnutls.h"
 #include "coding.h"
 #include "buffer.h"
-#include "pdumper.h"
 
 #ifdef HAVE_GNUTLS
 
@@ -3013,7 +3012,6 @@ level in the ones.  For builds without libgnutls, the value is -1.  */);
 #include "gnutls.x"
 
   gnutls_global_initialized = 0;
-  PDUMPER_IGNORE (gnutls_global_initialized);
 
   DEFSYM (Qgnutls_code, "gnutls-code");
   DEFSYM (Qgnutls_anon, "gnutls-anon");

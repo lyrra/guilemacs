@@ -41,7 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "font.h"
 #include "w32font.h"
-#include "pdumper.h"
 #include "w32common.h"
 
 int uniscribe_available = 0;
@@ -1499,34 +1498,8 @@ struct font_driver uniscribe_font_driver =
    as it needs to test for the existence of the Uniscribe library.  */
 void syms_of_w32uniscribe (void);
 
-static void syms_of_w32uniscribe_for_pdumper (void);
-
 void
 syms_of_w32uniscribe (void)
-{
-  pdumper_do_now_and_after_load (syms_of_w32uniscribe_for_pdumper);
-}
-
-#ifdef HAVE_HARFBUZZ
-static bool
-load_harfbuzz_funcs (HMODULE library)
-{
-  LOAD_DLL_FN (library, hb_blob_create);
-  LOAD_DLL_FN (library, hb_face_create_for_tables);
-  LOAD_DLL_FN (library, hb_face_get_glyph_count);
-  LOAD_DLL_FN (library, hb_font_create);
-  LOAD_DLL_FN (library, hb_font_destroy);
-  LOAD_DLL_FN (library, hb_face_get_upem);
-  LOAD_DLL_FN (library, hb_face_destroy);
-  LOAD_DLL_FN (library, hb_font_get_nominal_glyph);
-  LOAD_DLL_FN (library, hb_font_get_variation_glyph);
-  LOAD_DLL_FN (library, hb_ot_font_set_funcs);
-  return hbfont_init_w32_funcs (library);
-}
-#endif	/* HAVE_HARFBUZZ */
-
-static void
-syms_of_w32uniscribe_for_pdumper (void)
 {
   /* Don't init Uniscribe and HarfBuzz when dumping */
   if (!initialized)
@@ -1624,3 +1597,21 @@ syms_of_w32uniscribe_for_pdumper (void)
 
 #endif	/* HAVE_HARFBUZZ */
 }
+
+#ifdef HAVE_HARFBUZZ
+static bool
+load_harfbuzz_funcs (HMODULE library)
+{
+  LOAD_DLL_FN (library, hb_blob_create);
+  LOAD_DLL_FN (library, hb_face_create_for_tables);
+  LOAD_DLL_FN (library, hb_face_get_glyph_count);
+  LOAD_DLL_FN (library, hb_font_create);
+  LOAD_DLL_FN (library, hb_font_destroy);
+  LOAD_DLL_FN (library, hb_face_get_upem);
+  LOAD_DLL_FN (library, hb_face_destroy);
+  LOAD_DLL_FN (library, hb_font_get_nominal_glyph);
+  LOAD_DLL_FN (library, hb_font_get_variation_glyph);
+  LOAD_DLL_FN (library, hb_ot_font_set_funcs);
+  return hbfont_init_w32_funcs (library);
+}
+#endif	/* HAVE_HARFBUZZ */

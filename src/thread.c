@@ -25,7 +25,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "process.h"
 #include "coding.h"
 #include "syssignal.h"
-#include "pdumper.h"
 #include "keyboard.h"
 
 #ifdef HAVE_NS

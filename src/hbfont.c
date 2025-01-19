@@ -113,8 +113,7 @@ DEF_DLL_FN (unsigned int, hb_ot_layout_language_get_feature_tags,
 #define hb_ot_layout_script_get_language_tags fn_hb_ot_layout_script_get_language_tags
 #define hb_ot_layout_language_get_feature_tags fn_hb_ot_layout_language_get_feature_tags
 
-/* This function is called from syms_of_w32uniscribe_for_pdumper to
-   initialize the above function pointers.  */
+/* initialize the above function pointers.  */
 bool
 hbfont_init_w32_funcs (HMODULE library)
 {

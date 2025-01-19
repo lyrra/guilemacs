@@ -507,102 +507,6 @@ extern char *fixnum_to_string (EMACS_INT number, char *buffer, char *end);
    subsequent starts.  */
 extern bool initialized;
 
-extern struct gflags
-{
-  /* True means this Emacs instance was born to dump.  */
-  bool will_dump_ : 1;
-  bool will_bootstrap_ : 1;
-#ifdef HAVE_PDUMPER
-  /* Set in an Emacs process that will likely dump with pdumper; all
-     Emacs processes may dump with pdumper, however.  */
-  bool will_dump_with_pdumper_ : 1;
-  /* Set in an Emacs process that has been restored from a portable
-     dump.  */
-  bool dumped_with_pdumper_ : 1;
-#endif
-#ifdef HAVE_UNEXEC
-  bool will_dump_with_unexec_ : 1;
-  /* Set in an Emacs process that has been restored from an unexec
-     dump.  */
-  bool dumped_with_unexec_ : 1;
-  /* We promise not to unexec: useful for hybrid malloc.  */
-  bool will_not_unexec_ : 1;
-#endif
-} gflags;
-
-INLINE bool
-will_dump_p (void)
-{
-#if HAVE_PDUMPER || defined HAVE_UNEXEC
-  return gflags.will_dump_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-will_bootstrap_p (void)
-{
-#if HAVE_PDUMPER || defined HAVE_UNEXEC
-  return gflags.will_bootstrap_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-will_dump_with_pdumper_p (void)
-{
-#if HAVE_PDUMPER
-  return gflags.will_dump_with_pdumper_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-dumped_with_pdumper_p (void)
-{
-#if HAVE_PDUMPER
-  return gflags.dumped_with_pdumper_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-will_dump_with_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.will_dump_with_unexec_;
-#else
-  return false;
-#endif
-}
-
-INLINE bool
-dumped_with_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.dumped_with_unexec_;
-#else
-  return false;
-#endif
-}
-
-/* This function is the opposite of will_dump_with_unexec_p(), except
-   that it returns false before main runs.  It's important to use
-   gmalloc for any pre-main allocations if we're going to unexec.  */
-INLINE bool
-definitely_will_not_unexec_p (void)
-{
-#ifdef HAVE_UNEXEC
-  return gflags.will_not_unexec_;
-#else
-  return true;
-#endif
-}
-
 /* Defined in floatfns.c.  */
 extern double extract_float (Lisp_Object);
 
@@ -3001,19 +2905,6 @@ CHECK_SUBR (Lisp_Object x)
 }
 
 
-/* If we're not dumping using the legacy dumper and we might be using
-   the portable dumper, try to bunch all the subr structures together
-   for more efficient dump loading.  */
-#ifndef HAVE_UNEXEC
-# ifdef DARWIN_OS
-#  define SUBR_SECTION_ATTRIBUTE ATTRIBUTE_SECTION ("__DATA,subrs")
-# else
-#  define SUBR_SECTION_ATTRIBUTE ATTRIBUTE_SECTION (".subrs")
-# endif
-#else
-# define SUBR_SECTION_ATTRIBUTE
-#endif
-
 /* Define a built-in function for calling from Lisp.
  `lname' should be the name to give the function in Lisp,
     as a null-terminated C string.
@@ -4094,9 +3985,6 @@ extern void maybe_garbage_collect (void);
 extern bool maybe_garbage_collect_eagerly (EMACS_INT factor);
 extern const char *pending_malloc_warning;
 extern Lisp_Object zero_vector;
-#ifdef HAVE_PDUMPER
-extern int number_finalizers_run;
-#endif
 extern Lisp_Object list1 (Lisp_Object);
 extern Lisp_Object list2 (Lisp_Object, Lisp_Object);
 extern Lisp_Object list3 (Lisp_Object, Lisp_Object, Lisp_Object);
@@ -4480,26 +4368,6 @@ Lisp_Object funcall_general (Lisp_Object fun,
 extern _Noreturn SCM abort_to_prompt (SCM, SCM);
 extern SCM call_with_prompt (SCM, SCM, SCM);
 extern SCM make_prompt_tag (void);
-
-/* Defined in unexmacosx.c.  */
-#if defined DARWIN_OS && defined HAVE_UNEXEC
-/* Redirect calls to malloc, realloc and free to a macOS zone memory allocator.
-   FIXME: Either also redirect unexec_aligned_alloc and unexec_calloc,
-   or fix this comment to explain why those two redirections are not needed.  */
-extern void unexec_init_emacs_zone (void);
-extern void *unexec_malloc (size_t);
-extern void *unexec_realloc (void *, size_t);
-extern void unexec_free (void *);
-# ifndef UNEXMACOSX_C
-#  include <stdlib.h>
-#  undef malloc
-#  undef realloc
-#  undef free
-#  define malloc unexec_malloc
-#  define realloc unexec_realloc
-#  define free unexec_free
-# endif
-#endif
 
 /* Defined in gmalloc.c.  */
 #ifdef HYBRID_MALLOC

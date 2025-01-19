@@ -32,7 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "region-cache.h"
 #include "blockinput.h"
 #include "intervals.h"
-#include "pdumper.h"
 #include "composite.h"
 
 #include "regex-emacs.h"
@@ -3431,9 +3430,6 @@ If RAW is non-nil, just return the actual bytecode.  */)
     }
 }
 
-
-static void syms_of_search_for_pdumper (void);
-
 void
 syms_of_search (void)
 {
@@ -3492,12 +3488,6 @@ do not set the match data.  The proper way to use this variable
 is to bind it with `let' around a small expression.  */);
   Vinhibit_changing_match_data = Qnil;
 
-  pdumper_do_now_and_after_load (syms_of_search_for_pdumper);
-}
-
-static void
-syms_of_search_for_pdumper (void)
-{
   for (int i = 0; i < REGEXP_CACHE_SIZE; ++i)
     {
       searchbufs[i].buf.allocated = 100;

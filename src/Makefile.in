@@ -390,8 +390,6 @@ RUN_TEMACS = ./temacs
 # Whether builds should contain details. '--no-build-details' or empty.
 BUILD_DETAILS = @BUILD_DETAILS@
 
-UNEXEC_OBJ = @UNEXEC_OBJ@
-
 HAIKU_OBJ = @HAIKU_OBJ@
 HAIKU_CXX_OBJ = @HAIKU_CXX_OBJ@
 HAIKU_LIBS = @HAIKU_LIBS@
@@ -406,7 +404,6 @@ LIBGMP_CFLAGS = @LIBGMP_CFLAGS@
 
 DUMPING=@DUMPING@
 CHECK_STRUCTS = @CHECK_STRUCTS@
-HAVE_PDUMPER = @HAVE_PDUMPER@
 
 HAVE_BE_APP = @HAVE_BE_APP@
 
@@ -417,13 +414,6 @@ DO_CODESIGN=$(patsubst aarch64-apple-darwin%,yes,@configuration@)
 -include ${top_builddir}/src/verbose.mk
 
 bootstrap_exe = ../src/bootstrap-emacs$(EXEEXT)
-ifeq ($(DUMPING),pdumper)
-bootstrap_pdmp := bootstrap-emacs.pdmp # Keep in sync with loadup.el
-pdmp := emacs.pdmp
-else
-bootstrap_pdmp :=
-pdmp :=
-endif
 
 GUILE_SNARF=@GUILE_SNARF@
 
@@ -482,7 +472,7 @@ base_obj = dispnew.o frame.o scroll.o xdisp.o menu.o $(XMENU_OBJ) window.o     \
 	cmds.o casetab.o casefiddle.o indent.o search.o regex-emacs.o undo.o   \
 	alloc.o data.o doc.o editfns.o callint.o 		       \
 	eval.o floatfns.o fns.o sort.o font.o print.o lread.o $(MODULES_OBJ)   \
-	syntax.o $(UNEXEC_OBJ) $(DYNLIB_OBJ) 				       \
+	syntax.o $(DYNLIB_OBJ) 				       \
 	process.o gnutls.o callproc.o 					       \
 	region-cache.o sound.o timefns.o atimer.o 			       \
 	doprnt.o intervals.o textprop.o composite.o xml.o lcms.o $(NOTIFY_OBJ) \
@@ -547,16 +537,6 @@ ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 all: ../native-lisp
 endif
 .PHONY: all
-
-dmpstruct_headers=$(srcdir)/lisp.h $(srcdir)/buffer.h $(srcdir)/itree.h \
-	$(srcdir)/intervals.h $(srcdir)/charset.h $(srcdir)/bignum.h
-ifeq ($(CHECK_STRUCTS),true)
-pdumper.o: dmpstruct.h
-endif
-dmpstruct.h: $(srcdir)/dmpstruct.awk
-dmpstruct.h: $(libsrc)/make-fingerprint$(EXEEXT) $(dmpstruct_headers)
-	$(AM_V_GEN)POSIXLY_CORRECT=1 $(AWK) -f $(srcdir)/dmpstruct.awk \
-		$(dmpstruct_headers) > $@
 
 AUTO_DEPEND = @AUTO_DEPEND@
 DEPDIR = deps
@@ -691,13 +671,6 @@ Emacs.pdmp: $(pdmp)
 	$(AM_V_GEN) cp -f $(pdmp) $@
 endif
 
-ifeq ($(DUMPING),pdumper)
-$(pdmp): emacs$(EXEEXT) $(lispsource)/loaddefs.el $(lispsource)/loaddefs.elc
-	LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) -l loadup --temacs=pdump \
-		--bin-dest '$(BIN_DESTDIR)' --eln-dest '$(ELN_DESTDIR)'
-	cp -f $@ $(bootstrap_pdmp)
-endif
-
 ## $(SOME_MACHINE_OBJECTS) comes before $(obj) because some files may
 ## or may not be included in $(obj), but they are always included in
 ## $(SOME_MACHINE_OBJECTS).  Since a file is processed when it is mentioned
@@ -738,18 +711,12 @@ LIBEGNU_ARCHIVE = $(lib)/lib$(if $(HYBRID_MALLOC),e)gnu.a
 $(LIBEGNU_ARCHIVE): $(config_h)
 	$(MAKE) -C $(dir $@) all
 
-ifeq ($(HAVE_PDUMPER),yes)
-MAKE_PDUMPER_FINGERPRINT = $(libsrc)/make-fingerprint$(EXEEXT)
-else
-MAKE_PDUMPER_FINGERPRINT =
-endif
-
 ## We have to create $(etc) here because init_cmdargs tests its
 ## existence when setting Vinstallation_directory (FIXME?).
 ## This goes on to affect various things, and the emacs binary fails
 ## to start if Vinstallation_directory has the wrong value.
 temacs$(EXEEXT): $(LIBXMENU) $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(EMACSRES) \
-  $(charsets) $(charscript) ${emoji-zwj} $(MAKE_PDUMPER_FINGERPRINT)
+  $(charsets) $(charscript) ${emoji-zwj}
 ifeq ($(HAVE_BE_APP),yes)
 	$(AM_V_CXXLD)$(CXX) -o $@.tmp \
 	  $(ALL_CFLAGS) $(TEMACS_LDFLAGS) $(LDFLAGS) \
@@ -759,19 +726,8 @@ else
 	  $(ALL_CFLAGS) $(CXXFLAGS) $(TEMACS_LDFLAGS) $(LDFLAGS) \
 	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(LIBES)
 endif
-ifeq ($(HAVE_PDUMPER),yes)
-	$(AM_V_at)$(MAKE_PDUMPER_FINGERPRINT) $@.tmp
-ifeq ($(DO_CODESIGN),yes)
-	codesign -s - -f $@.tmp
-endif
-endif
 	$(AM_V_at)mv $@.tmp $@
 	$(MKDIR_P) $(etc)
-ifeq ($(DUMPING),unexec)
-  ifneq ($(PAXCTL_notdumped),)
-	$(PAXCTL_notdumped) $@
-  endif
-endif
 
 ifeq ($(XCONFIGURE),android)
 ## The Android package internally links to a shared library named
@@ -797,12 +753,11 @@ build-counter.c: $(abs_top_builddir)/src/lisp.mk $(lisp)
 	$(AM_V_GEN) $(top_srcdir)/build-aux/makecounter.sh $@
 
 libemacs.so: $(ALLOBJS) $(BUILD_COUNTER_OBJ) $(LIBEGNU_ARCHIVE) \
-	     $(EMACSRES) $(MAKE_PDUMPER_FINGERPRINT) \
+	     $(EMACSRES) \
 	     $(NDK_BUILD_SHARED) $(NDK_BUILD_STATIC) $(etc)/DOC
 	$(AM_V_CCLD)$(CC) -o $@ $(ALL_CFLAGS) $(TEMACS_LDFLAGS) \
 	  $(ANDROID_LDFLAGS) $(LDFLAGS) -shared $(ALLOBJS) \
 	  $(BUILD_COUNTER_OBJ) $(LIBEGNU_ARCHIVE) $(LIBES)
-	$(AM_V_at)$(MAKE_PDUMPER_FINGERPRINT) $@
 
 # There is also a binary named `android-emacs' which simply calls
 # emacs.so.  It need not link against libemacs because app_process
@@ -1002,30 +957,9 @@ endif
 
 bootstrap-emacs$(EXEEXT): temacs$(EXEEXT)
 	$(MAKE) -C ../lisp update-subdirs
-ifeq ($(DUMPING),unexec)
-	$(RUN_TEMACS) --batch $(BUILD_DETAILS) -l loadup --temacs=bootstrap
-  ifneq ($(PAXCTL_dumped),)
-	$(PAXCTL_dumped) emacs$(EXEEXT)
-  endif
-	mv -f emacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
-else
-	@: In the pdumper case, make compile-first after the dump
 	cp -f temacs$(EXEEXT) bootstrap-emacs$(EXEEXT)
 ifeq ($(DO_CODESIGN),yes)
 	codesign -s - -f bootstrap-emacs$(EXEEXT)
-endif
-endif
-
-ifeq ($(DUMPING),pdumper)
-$(bootstrap_pdmp): bootstrap-emacs$(EXEEXT)
-	rm -f $@
-	$(RUN_TEMACS) --batch $(BUILD_DETAILS) -l loadup --temacs=pbootstrap \
-		--bin-dest '$(BIN_DESTDIR)' --eln-dest '$(ELN_DESTDIR)'
-	@: Compile some files earlier to speed up further compilation.
-	@: First, byte compile these files, ....
-	ANCIENT=yes $(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
-	@: .... then use their .elcs in native compiling these and other files.
-	$(MAKE) -C ../lisp compile-first EMACS="$(bootstrap_exe)"
 endif
 
 ### Flymake support (for C only)

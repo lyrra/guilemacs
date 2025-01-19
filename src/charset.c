@@ -39,7 +39,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "buffer.h"
 #include "sysstdio.h"
-#include "pdumper.h"
 
 /*** GENERAL NOTES on CODED CHARACTER SETS (CHARSETS) ***
 
@@ -2323,24 +2322,13 @@ init_charset_once (void)
       for (k = 0; k < ISO_MAX_FINAL; k++)
         iso_charset_table[i][j][k] = -1;
 
-  PDUMPER_REMEMBER_SCALAR (iso_charset_table);
-
   for (i = 0; i < 256; i++)
     emacs_mule_charset[i] = -1;
 
-  PDUMPER_REMEMBER_SCALAR (emacs_mule_charset);
-
   charset_jisx0201_roman = -1;
-  PDUMPER_REMEMBER_SCALAR (charset_jisx0201_roman);
-
   charset_jisx0208_1978 = -1;
-  PDUMPER_REMEMBER_SCALAR (charset_jisx0208_1978);
-
   charset_jisx0208 = -1;
-  PDUMPER_REMEMBER_SCALAR (charset_jisx0208);
-
   charset_ksc5601 = -1;
-  PDUMPER_REMEMBER_SCALAR (charset_ksc5601);
 }
 
 /* Allocate an initial charset table that is large enough to handle
@@ -2384,9 +2372,7 @@ syms_of_charset (void)
 
   charset_table = charset_table_init;
   charset_table_size = ARRAYELTS (charset_table_init);
-  PDUMPER_REMEMBER_SCALAR (charset_table_size);
   charset_table_used = 0;
-  PDUMPER_REMEMBER_SCALAR (charset_table_used);
 
   DEFVAR_LISP ("charset-map-path", Vcharset_map_path,
 	       doc: /* List of directories to search for charset map files.  */);
@@ -2409,29 +2395,23 @@ the value may be a list of mnemonics.  */);
   charset_ascii
     = define_charset_internal (Qascii, 1, "\x00\x7F\0\0\0\0\0",
                                0, 127, 'B', -1, 0, 1, 0, 0);
-  PDUMPER_REMEMBER_SCALAR (charset_ascii);
 
   charset_iso_8859_1
     = define_charset_internal (Qiso_8859_1, 1, "\x00\xFF\0\0\0\0\0",
                                0, 255, -1, -1, -1, 1, 0, 0);
-  PDUMPER_REMEMBER_SCALAR (charset_iso_8859_1);
 
   charset_unicode
     = define_charset_internal (Qunicode, 3, "\x00\xFF\x00\xFF\x00\x10\0",
                                0, MAX_UNICODE_CHAR, -1, 0, -1, 1, 0, 0);
-  PDUMPER_REMEMBER_SCALAR (charset_unicode);
 
   charset_emacs
     = define_charset_internal (Qemacs, 3, "\x00\xFF\x00\xFF\x00\x3F\0",
                                0, MAX_5_BYTE_CHAR, -1, 0, -1, 1, 1, 0);
-  PDUMPER_REMEMBER_SCALAR (charset_emacs);
 
   charset_eight_bit
     = define_charset_internal (Qeight_bit, 1, "\x80\xFF\0\0\0\0\0",
 			       128, 255, -1, 0, -1, 0, 1,
                                MAX_5_BYTE_CHAR + 1);
-  PDUMPER_REMEMBER_SCALAR (charset_eight_bit);
 
   charset_unibyte = charset_iso_8859_1;
-  PDUMPER_REMEMBER_SCALAR (charset_unibyte);
 }

@@ -32,7 +32,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "textconv.h"
 #include "coding.h"
-#include "pdumper.h"
 #include "keymap.h"
 
 /* This is a chain of structures for all the X displays currently in
@@ -6902,7 +6901,7 @@ for instance, `early-init.el', or they will be of no effect.  */);
   Vx_toolkit_scroll_bars = Qnil;
 
   /* Avoid dumping Vandroid_build_fingerprint.  */
-  pdumper_do_now_and_after_load (android_set_build_fingerprint);
+  android_set_build_fingerprint ();
 
   DEFSYM (Qx_underline_at_descent_line, "x-underline-at-descent-line");
 

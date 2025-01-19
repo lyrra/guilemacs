@@ -631,12 +631,6 @@ ifeq (${ns_self_contained},no)
 ifeq (${HAVE_BE_APP},yes)
 	${INSTALL_PROGRAM} $(INSTALL_STRIP) src/Emacs "$(DESTDIR)${prefix}/apps/Emacs"
 endif
-ifeq (${DUMPING},pdumper)
-ifeq (${HAVE_BE_APP},yes)
-	${INSTALL_DATA} src/Emacs.pdmp "$(DESTDIR)${libexecdir}/emacs/${version}/${configuration}"/Emacs.pdmp
-endif
-	${INSTALL_DATA} src/emacs.pdmp "$(DESTDIR)${libexecdir}/emacs/${version}/${configuration}"/emacs-${EMACS_PDMP}
-endif
 	-chmod 755 "$(DESTDIR)${bindir}/$(EMACSFULL)"
 ifndef NO_BIN_LINK
 	rm -f "$(DESTDIR)${bindir}/$(EMACS)"

@@ -38,7 +38,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "fontset.h"
 #include "font.h"
 #include "termhooks.h"
-#include "pdumper.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -3553,8 +3552,7 @@ font_open_by_name (struct frame *f, Lisp_Object name)
 
    The second is with frame F NULL.  In this case, DRIVER is globally
    registered in the variable `font_driver_list'.  All font-driver
-   implementations must call this function in its
-   syms_of_XXXX_for_pdumper (e.g. syms_of_xfont_for_pdumper).  */
+   implementations must call this function during init.  */
 
 void
 register_font_driver (struct font_driver const *driver, struct frame *f)
@@ -5830,7 +5828,6 @@ syms_of_font (void)
   sort_shift_bits[FONT_SIZE_INDEX] = 16;
   sort_shift_bits[FONT_WIDTH_INDEX] = 23;
   /* Note that the other elements in sort_shift_bits are not used.  */
-  PDUMPER_REMEMBER_SCALAR (sort_shift_bits);
 
   font_charset_alist = Qnil;
   staticpro (&font_charset_alist);

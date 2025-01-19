@@ -41,7 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 #include "keyboard.h"
 #include "frame.h"
-#include "pdumper.h"
 #include "termhooks.h"		/* For struct terminal.  */
 #include "itree.h"
 #ifdef HAVE_WINDOW_SYSTEM
@@ -125,12 +124,6 @@ struct emacs_globals globals;
 /* maybe_gc collects garbage if this goes negative.  */
 
 EMACS_INT consing_until_gc;
-
-#ifdef HAVE_PDUMPER
-/* Number of finalizers run: used to loop over GC until we stop
-   generating garbage.  */
-int number_finalizers_run;
-#endif
 
 /* True during GC.  */
 
@@ -1778,8 +1771,6 @@ print_lisp_string (SCM obj, SCM port, scm_print_state *pstate)
 
 /* Initialization.  */
 
-static void init_alloc_once_for_pdumper (void);
-
 scm_t_bits lisp_misc_tag;
 scm_t_bits lisp_string_tag;
 scm_t_bits lisp_vectorlike_tag;
@@ -1791,28 +1782,12 @@ init_alloc_once (void)
   /* Even though Qt's contents are not set up, its address is known.  */
   Vpurify_flag = Qt;
 
-  PDUMPER_REMEMBER_SCALAR (buffer_defaults.header);
-  PDUMPER_REMEMBER_SCALAR (buffer_local_symbols.header);
-
   lisp_misc_tag = scm_make_smob_type ("elisp-misc", 0);
   lisp_string_tag = scm_make_smob_type ("elisp-string",
                                         sizeof (struct Lisp_String));
   scm_set_smob_print (lisp_string_tag, print_lisp_string);
   lisp_vectorlike_tag = scm_make_smob_type ("elisp-vectorlike", 0);
 
-  /* Call init_alloc_once_for_pdumper now so we run mem_init early.
-     Keep in mind that when we reload from a dump, we'll run _only_
-     init_alloc_once_for_pdumper and not init_alloc_once at all.  */
-  pdumper_do_now_and_after_load (init_alloc_once_for_pdumper);
-
-  verify_alloca ();
-  init_strings ();
-  init_vectors ();
-}
-
-static void
-init_alloc_once_for_pdumper (void)
-{
 #ifdef DOUG_LEA_MALLOC
   mallopt (M_TRIM_THRESHOLD, 128 * 1024); /* Trim threshold.  */
   mallopt (M_MMAP_THRESHOLD, 64 * 1024);  /* Mmap threshold.  */
@@ -1820,6 +1795,10 @@ init_alloc_once_for_pdumper (void)
 #endif
 
   refill_memory_reserve ();
+
+  verify_alloca ();
+  init_strings ();
+  init_vectors ();
 }
 
 void

@@ -43,7 +43,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "termhooks.h"
 #include "blockinput.h"
-#include "pdumper.h"
 #include <c-ctype.h>
 #include <vla.h>
 #include "guile.h"
@@ -2304,8 +2303,7 @@ readevalloop (Lisp_Object readcharfun,
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
-  if (!will_dump_p ()
-      && !NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
+  if (!NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
     sourcename = Fexpand_file_name (sourcename, Qnil);
 
   loadhist_initialize (sourcename);
@@ -6012,7 +6010,6 @@ load_path_check (Lisp_Object lpath)
    are running uninstalled.
 
    Uses the following logic:
-   If !will_dump: Use PATH_LOADSEARCH.
    The remainder is what happens when dumping is about to happen:
    If dumping, just use PATH_DUMPLOADSEARCH.
    Otherwise use PATH_LOADSEARCH.
@@ -6037,14 +6034,6 @@ load_path_check (Lisp_Object lpath)
 static Lisp_Object
 load_path_default (void)
 {
-  if (will_dump_p ())
-    /* PATH_DUMPLOADSEARCH is the lisp dir in the source directory.
-       We used to add ../lisp (ie the lisp dir in the build
-       directory) at the front here, but that should not be
-       necessary, since in out of tree builds lisp/ is empty, save
-       for Makefile.  */
-    return decode_env_path (0, PATH_DUMPLOADSEARCH, 0);
-
   Lisp_Object lpath = Qnil;
   bool initialized_or_cannot_dump = false;
 
@@ -6149,8 +6138,7 @@ init_lread (void)
 
   /* First, set Vload_path.  */
 
-  /* Ignore EMACSLOADPATH when dumping.  */
-  bool use_loadpath = !will_dump_p ();
+  bool use_loadpath = true;
 
   if (use_loadpath && egetenv ("EMACSLOADPATH"))
     {
@@ -6201,7 +6189,7 @@ init_lread (void)
       load_path_check (Vload_path);
 
       /* Add the site-lisp directories at the front.  */
-      if (!will_dump_p () && !no_site_lisp && PATH_SITELOADSEARCH[0] != '\0')
+      if (!no_site_lisp && PATH_SITELOADSEARCH[0] != '\0')
         {
           Lisp_Object sitelisp;
           sitelisp = decode_env_path (0, PATH_SITELOADSEARCH, 0);

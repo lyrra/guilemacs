@@ -52,7 +52,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef USE_X_TOOLKIT
 #include "widget.h"
 #endif
-#include "pdumper.h"
 
 /* The currently selected frame.  */
 Lisp_Object selected_frame;
@@ -6632,24 +6631,13 @@ make_monitor_attribute_list (struct MonitorInfo *monitors,
 				Initialization
  ***********************************************************************/
 
-static void init_frame_once_for_pdumper (void);
-
 void
 init_frame_once (void)
 {
   staticpro (&Vframe_list);
   staticpro (&selected_frame);
-  PDUMPER_IGNORE (last_nonminibuf_frame);
   Vframe_list = Qnil;
   selected_frame = Qnil;
-  pdumper_do_now_and_after_load (init_frame_once_for_pdumper);
-}
-
-static void
-init_frame_once_for_pdumper (void)
-{
-  PDUMPER_RESET_LV (Vframe_list, Qnil);
-  PDUMPER_RESET_LV (selected_frame, Qnil);
 }
 
 void

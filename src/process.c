@@ -8635,16 +8635,6 @@ init_process_emacs (int sockfd)
 
   inhibit_sentinels = 0;
 
-#ifdef HAVE_UNEXEC
-  /* Clear child_signal_read_fd and child_signal_write_fd after dumping,
-     lest wait_reading_process_output should select on nonexistent file
-     descriptors which existed in the build process.  */
-  child_signal_read_fd = -1;
-  child_signal_write_fd = -1;
-#endif /* HAVE_UNEXEC */
-
-  if (!will_dump_with_unexec_p ())
-    {
 #if defined HAVE_GLIB && !defined WINDOWSNT
       /* Tickle Glib's child-handling code.  Ask Glib to install a
 	 watch source for Emacs itself which will initialize glib's
@@ -8678,7 +8668,6 @@ init_process_emacs (int sockfd)
 #else
       catch_child_signal ();
 #endif
-    }
 
 #ifdef HAVE_SETRLIMIT
   /* Don't allocate more than FD_SETSIZE file descriptors for Emacs itself.  */

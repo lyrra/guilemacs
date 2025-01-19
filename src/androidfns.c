@@ -28,7 +28,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "buffer.h"
 #include "androidgui.h"
-#include "pdumper.h"
 
 #ifndef ANDROID_STUBIFY
 
@@ -3352,7 +3351,7 @@ users.  */)
 #ifndef ANDROID_STUBIFY
 
 static void
-syms_of_androidfns_for_pdumper (void)
+syms_of_androidfns_more (void)
 {
   jclass locale;
   jmethodID method;
@@ -3783,6 +3782,6 @@ language to be US English if LANGUAGE is empty.  */);
   tip_dy = Qnil;
   staticpro (&tip_dy);
 
-  pdumper_do_now_and_after_load (syms_of_androidfns_for_pdumper);
+  syms_of_androidfns_more ();
 #endif /* !ANDROID_STUBIFY */
 }

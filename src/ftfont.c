@@ -44,7 +44,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "font.h"
 #include "ftfont.h"
-#include "pdumper.h"
 
 static struct font_driver ftfont_driver;
 #ifdef HAVE_HARFBUZZ
@@ -3148,8 +3147,6 @@ ftfont_combining_capability (struct font *font)
 #endif
 }
 
-static void syms_of_ftfont_for_pdumper (void);
-
 #ifndef USE_CAIRO
 
 static struct font_driver ftfont_driver =
@@ -3224,13 +3221,6 @@ syms_of_ftfont (void)
   staticpro (&ft_face_cache);
   ft_face_cache = Qnil;
 
-  pdumper_do_now_and_after_load (syms_of_ftfont_for_pdumper);
-}
-
-static void
-syms_of_ftfont_for_pdumper (void)
-{
-  PDUMPER_RESET_LV (ft_face_cache, Qnil);
   ftfont_driver.type = Qfreetype;
   register_font_driver (&ftfont_driver, NULL);
 #ifdef HAVE_HARFBUZZ

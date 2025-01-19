@@ -30,7 +30,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "bignum.h"
 #include "coding.h"
 #include "lisp.h"
-#include "pdumper.h"
 
 #include <strftime.h>
 
@@ -317,36 +316,7 @@ tzlookup (Lisp_Object zone, bool settz)
 void
 init_timefns (void)
 {
-#ifdef HAVE_UNEXEC
-  /* A valid but unlikely setting for the TZ environment variable.
-     It is OK (though a bit slower) if the user chooses this value.  */
-  static char dump_tz_string[] = "TZ=UtC0";
-
-  /* When just dumping out, set the time zone to a known unlikely value
-     and skip the rest of this function.  */
-  if (will_dump_with_unexec_p ())
-    {
-      xputenv (dump_tz_string);
-      tzset ();
-      return;
-    }
-#endif
-
   char *tz = getenv ("TZ");
-
-#ifdef HAVE_UNEXEC
-  /* If the execution TZ happens to be the same as the dump TZ,
-     change it to some other value and then change it back,
-     to force the underlying implementation to reload the TZ info.
-     This is needed on implementations that load TZ info from files,
-     since the TZ file contents may differ between dump and execution.  */
-  if (tz && strcmp (tz, &dump_tz_string[tzeqlen]) == 0)
-    {
-      ++*tz;
-      tzset ();
-      --*tz;
-    }
-#endif
 
   /* Set the time zone rule now, so that the call to putenv is done
      before multiple threads are active.  */
@@ -1987,15 +1957,6 @@ emacs_setenv_TZ (const char *tzstring)
   return 0;
 }
 
-#ifdef NEED_ZTRILLION_INIT
-static void
-syms_of_timefns_for_pdumper (void)
-{
-  mpz_init_set_ui (ztrillion, 1000000);
-  mpz_mul_ui (ztrillion, ztrillion, 1000000);
-}
-#endif
-
 void
 syms_of_timefns (void)
 {
@@ -2028,6 +1989,7 @@ version after that.  */);
   staticpro (&flt_radix_power);
 
 #ifdef NEED_ZTRILLION_INIT
-  pdumper_do_now_and_after_load (syms_of_timefns_for_pdumper);
+  mpz_init_set_ui (ztrillion, 1000000);
+  mpz_mul_ui (ztrillion, ztrillion, 1000000);
 #endif
 }

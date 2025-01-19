@@ -29,7 +29,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "window.h"
 #include "region-cache.h"
-#include "pdumper.h"
 
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
@@ -2015,14 +2014,6 @@ prepare_to_modify_buffer_1 (ptrdiff_t start, ptrdiff_t end,
   XSETFASTINT (temp, start);
   if (!NILP (BVAR (current_buffer, read_only)))
     Fbarf_if_buffer_read_only (temp);
-
-  /* If we're about to modify a buffer the contents of which come from
-     a dump file, copy the contents to private storage first so we
-     don't take a COW fault on the buffer text and keep it around
-     forever.  */
-  if (pdumper_object_p (BEG_ADDR))
-    enlarge_buffer_text (current_buffer, 0);
-  eassert (!pdumper_object_p (BEG_ADDR));
 
   run_undoable_change();
 

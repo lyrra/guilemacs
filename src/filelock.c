@@ -114,11 +114,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 static time_t
 get_boot_sec (void)
 {
-  /* get_boot_time maintains static state.  Don't touch that state
-     if we are going to dump, since it might not survive dumping.  */
-  if (will_dump_p ())
-    return 0;
-
   struct timespec boot_time;
   boot_time.tv_sec = 0;
   get_boot_time (&boot_time);
@@ -582,12 +577,6 @@ static Lisp_Object
 lock_file (Lisp_Object fn)
 {
   lock_info_type lock_info;
-
-  /* Don't do locking while dumping Emacs.
-     Uncompressing wtmp files uses call-process, which does not work
-     in an uninitialized Emacs.  */
-  if (will_dump_p ())
-    return Qnil;
 
   Lisp_Object lfname = Qnil;
   if (create_lockfiles)

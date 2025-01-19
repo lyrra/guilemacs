@@ -28,7 +28,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "dispextern.h"
 #include "buffer.h"
-#include "pdumper.h"
 #include "atimer.h"
 #include "guile.h"
 
@@ -134,10 +133,6 @@ make_condition_handler (Lisp_Object tag)
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
 
-// gcc complains, no prototype before use
-static void
-init_eval_once_for_pdumper (void);
-
 void
 init_eval_once (void)
 {
@@ -150,12 +145,7 @@ init_eval_once (void)
    */
   max_lisp_eval_depth = 10000;
   Vrun_hooks = Qnil;
-  pdumper_do_now_and_after_load (init_eval_once_for_pdumper);
-}
 
-static void
-init_eval_once_for_pdumper (void)
-{
   enum { size = 50 };
   union specbinding *pdlvec = xmalloc ((size + 1) * sizeof *specpdl);
   specpdl_base = pdlvec;

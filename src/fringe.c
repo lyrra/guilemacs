@@ -28,7 +28,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "blockinput.h"
 #include "termhooks.h"
-#include "pdumper.h"
 
 #ifdef HAVE_PGTK
 # include "pgtkterm.h"
@@ -1780,16 +1779,8 @@ If nil, also continue lines which are exactly as wide as the window.  */);
 
 /* Initialize this module when Emacs starts.  */
 
-static void init_fringe_once_for_pdumper (void);
-
 void
 init_fringe_once (void)
-{
-  pdumper_do_now_and_after_load (init_fringe_once_for_pdumper);
-}
-
-static void
-init_fringe_once_for_pdumper (void)
 {
   for (int bt = NO_FRINGE_BITMAP + 1; bt < MAX_STANDARD_FRINGE_BITMAPS; bt++)
     init_fringe_bitmap (bt, &standard_bitmaps[bt], 1);

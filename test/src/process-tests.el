@@ -957,12 +957,7 @@ COMMAND must be a list returned by
 (defun process-tests--emacs-command ()
   "Return a command to reinvoke the current Emacs instance.
 Return nil if that doesn't appear to be possible."
-  (when-let* ((binary (process-tests--emacs-binary))
-              (dump (process-tests--dump-file)))
-    (cons binary
-          (unless (eq dump :not-needed)
-            (list (concat "--dump-file="
-                          (file-name-unquote dump)))))))
+  (cons (process-tests--emacs-binary) nil))
 
 (defun process-tests--emacs-binary ()
   "Return the filename of the currently running Emacs binary.
@@ -977,16 +972,6 @@ Return nil if that can't be determined."
                           (expand-file-name invocation-name
                                             invocation-directory))))
          (and (file-executable-p file) file))))
-
-(defun process-tests--dump-file ()
-  "Return the filename of the dump file used to start Emacs.
-Return nil if that can't be determined.  Return `:not-needed' if
-Emacs wasn't started with a dump file."
-  (if-let* ((stats (and (fboundp 'pdumper-stats) (pdumper-stats))))
-      (when-let* ((file (process-tests--usable-file-for-reinvoke
-                         (cdr (assq 'dump-file-name stats)))))
-        (and (file-readable-p file) file))
-    :not-needed))
 
 (defun process-tests--usable-file-for-reinvoke (filename)
   "Return a version of FILENAME that can be used to reinvoke Emacs.

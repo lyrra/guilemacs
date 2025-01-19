@@ -71,8 +71,6 @@ typedef enum _WTS_VIRTUAL_CLASS {
 #include "w32.h"
 #endif
 
-#include "pdumper.h"
-
 #include <basetyps.h>
 #include <unknwn.h>
 #include <commctrl.h>
@@ -11027,7 +11025,6 @@ syms_of_w32fns (void)
   track_mouse_window = NULL;
 
   w32_visible_system_caret_hwnd = NULL;
-  PDUMPER_IGNORE (w32_visible_system_caret_hwnd);
 
   DEFSYM (Qundefined_color, "undefined-color");
   DEFSYM (Qcancel_timer, "cancel-timer");

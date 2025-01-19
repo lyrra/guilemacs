@@ -429,90 +429,6 @@ this option's value should be 'yes', 'no', 'alsa', 'oss', or 'bsd-ossaudio'.])
   ],
   [with_sound=$with_features])
 
-AC_ARG_WITH([pdumper],
-  AS_HELP_STRING(
-    [--with-pdumper=VALUE],
-    [enable pdumper support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-pdumper=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_pdumper=$val
-    ],
-    [with_pdumper=auto])
-
-AC_ARG_WITH([unexec],
-  AS_HELP_STRING(
-    [--with-unexec=VALUE],
-    [enable unexec support unconditionally
-      ('yes', 'no', or 'auto': default 'auto')]),
-    [ case "${withval}" in
-        yes|no|auto) val=$withval ;;
-        *) AC_MSG_ERROR(
-           ['--with-unexec=$withval' is invalid;
-this option's value should be 'yes' or 'no'.]) ;;
-      esac
-      with_unexec=$val
-    ],
-    [with_unexec=auto])
-
-AC_ARG_WITH([dumping],[AS_HELP_STRING([--with-dumping=VALUE],
-    [kind of dumping to use for initial Emacs build
-(VALUE one of: pdumper, unexec, none; default pdumper)])],
-    [ case "${withval}" in
-        pdumper|unexec|none) val=$withval ;;
-        *) AC_MSG_ERROR(['--with-dumping=$withval is invalid;
-this option's value should be 'pdumper', 'unexec', or 'none'.])
-        ;;
-      esac
-      with_dumping=$val
-    ],
-    [with_dumping=pdumper])
-
-if test "$with_pdumper" = "auto"; then
-  if test "$with_dumping" = "pdumper"; then
-    with_pdumper=yes
-  else
-    with_pdumper=no
-  fi
-fi
-
-if test "$with_unexec" = "auto"; then
-  if test "$with_dumping" = "unexec"; then
-    with_unexec=yes
-  else
-    with_unexec=no
-  fi
-fi
-
-if test "$with_dumping" = "pdumper" && test "$with_pdumper" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=pdumper' requires pdumper support])
-fi
-
-if test "$with_dumping" = "unexec" && test "$with_unexec" = "no"; then
-  AC_MSG_ERROR(['--with-dumping=unexec' requires unexec support])
-fi
-
-with_dumping=
-with_pdumper=no
-with_unexec=no
-
-if test "$with_pdumper" = "yes"; then
-  AC_DEFINE([HAVE_PDUMPER], [1],
-    [Define to build with portable dumper support])
-  HAVE_PDUMPER=yes
-else
-  HAVE_PDUMPER=no
-fi
-AC_SUBST([HAVE_PDUMPER])
-
-
-DUMPING=$with_dumping
-AC_SUBST([DUMPING])
-
 dnl FIXME currently it is not the last.
 dnl This should be the last --with option, because --with-x is
 dnl added later on when we find the file name of X, and it's best to
@@ -2197,39 +2113,6 @@ AC_CACHE_CHECK([whether addresses are sanitized],
      [emacs_cv_sanitize_address=yes],
      [emacs_cv_sanitize_address=no])])
 
-
-UNEXEC_OBJ=
-test $with_unexec = yes &&
-case "$opsys" in
-  # MSDOS uses unexcoff.o
-  aix4-2)
-   UNEXEC_OBJ=unexaix.o
-   ;;
-  cygwin)
-   UNEXEC_OBJ=unexcw.o
-   ;;
-  darwin)
-   UNEXEC_OBJ=unexmacosx.o
-   ;;
-  hpux10-20 | hpux11)
-   UNEXEC_OBJ=unexhp9k800.o
-   ;;
-  mingw32)
-   UNEXEC_OBJ=unexw32.o
-   ;;
-  solaris)
-   # Use the Solaris dldump() function, called from unexsol.c, to dump
-   # emacs, instead of the generic ELF dump code found in unexelf.c.
-   # The resulting binary has a complete symbol table, and is better
-   # for debugging and other observability tools (debuggers, pstack, etc).
-   UNEXEC_OBJ=unexsol.o
-   ;;
-  *)
-   UNEXEC_OBJ=unexelf.o
-   ;;
-esac
-AC_SUBST([UNEXEC_OBJ])
-
 LD_SWITCH_SYSTEM=
 test "$with_unexec" = no || case "$opsys" in
   freebsd|dragonfly)
@@ -3347,8 +3230,7 @@ case "$opsys" in
   *) test "$ac_cv_func_sbrk" = yes && system_malloc=$emacs_cv_sanitize_address;;
 esac
 
-if test "${system_malloc}" != yes && test "${doug_lea_malloc}" != yes \
-   && test "${UNEXEC_OBJ}" = unexelf.o; then
+if test "${system_malloc}" != yes && test "${doug_lea_malloc}" != yes ; then
   hybrid_malloc=yes
 fi
 
@@ -7683,14 +7565,12 @@ optsep=
 emacs_config_features=
 for opt in ACL BE_APP CAIRO DBUS FREETYPE GCONF GIF GLIB GMP GNUTLS GPM GSETTINGS \
  HARFBUZZ IMAGEMAGICK JPEG LCMS2 LIBOTF LIBSELINUX LIBSYSTEMD LIBXML2 \
- M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PDUMPER PGTK PNG RSVG SECCOMP \
+ M17N_FLT MODULES NATIVE_COMP NOTIFY NS OLDXMENU PGTK PNG RSVG SECCOMP \
  SOUND SQLITE3 THREADS TIFF TOOLKIT_SCROLL_BARS TREE_SITTER \
- UNEXEC WEBP X11 XAW3D XDBE XFT XIM XINPUT2 XPM XWIDGETS X_TOOLKIT \
+ WEBP X11 XAW3D XDBE XFT XIM XINPUT2 XPM XWIDGETS X_TOOLKIT \
  ZLIB; do
 
     case $opt in
-      PDUMPER) val=${with_pdumper} ;;
-      UNEXEC) val=${with_unexec} ;;
       GLIB) val=${emacs_cv_links_glib} ;;
       NOTIFY|ACL) eval val=\${${opt}_SUMMARY} ;;
       TOOLKIT_SCROLL_BARS|X_TOOLKIT) eval val=\${USE_$opt} ;;
@@ -7765,9 +7645,6 @@ AS_ECHO(["  Does Emacs use -lXaw3d?                                 ${HAVE_XAW3D
   Does Emacs use toolkit scroll bars?                     ${USE_TOOLKIT_SCROLL_BARS}
   Does Emacs support Xwidgets?                            ${HAVE_XWIDGETS}
   Does Emacs have threading support in lisp?              ${threads_enabled}
-  Does Emacs support the portable dumper?                 ${with_pdumper}
-  Does Emacs support legacy unexec dumping?               ${with_unexec}
-  Which dumping strategy does Emacs use?                  ${with_dumping}
   Does Emacs have native lisp compiler?                   ${HAVE_NATIVE_COMP}
   Does Emacs use version 2 of the X Input Extension?      ${HAVE_XINPUT2}
   Does Emacs generate a smaller-size Japanese dictionary? ${with_small_ja_dic}

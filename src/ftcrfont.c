@@ -36,7 +36,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "font.h"
 #include "ftfont.h"
-#include "pdumper.h"
 #ifdef HAVE_PGTK
 #include "xsettings.h"
 #endif
@@ -726,8 +725,6 @@ ftcrhbfont_end_hb_font (struct font *font, hb_font_t *hb_font)
 #endif	/* HAVE_HARFBUZZ */
 
 
-static void syms_of_ftcrfont_for_pdumper (void);
-
 struct font_driver ftcrfont_driver =
   {
   .type = LISPSYM_INITIALLY (Qftcr),
@@ -770,7 +767,21 @@ syms_of_ftcrfont (void)
   DEFSYM (Qftcrhb, "ftcrhb");
   Fput (Qftcr, Qfont_driver_superseded_by, Qftcrhb);
 #endif	/* HAVE_HARFBUZZ */
-  pdumper_do_now_and_after_load (syms_of_ftcrfont_for_pdumper);
+
+  ftcrfont_driver.type = Qftcr;
+  register_font_driver (&ftcrfont_driver, NULL);
+#ifdef HAVE_HARFBUZZ
+  ftcrhbfont_driver = ftcrfont_driver;
+  ftcrhbfont_driver.type = Qftcrhb;
+  ftcrhbfont_driver.list = ftcrhbfont_list;
+  ftcrhbfont_driver.match = ftcrhbfont_match;
+  ftcrhbfont_driver.otf_capability = hbfont_otf_capability;
+  ftcrhbfont_driver.shape = hbfont_shape;
+  ftcrhbfont_driver.combining_capability = hbfont_combining_capability;
+  ftcrhbfont_driver.begin_hb_font = ftcrhbfont_begin_hb_font;
+  ftcrhbfont_driver.end_hb_font = ftcrhbfont_end_hb_font;
+  register_font_driver (&ftcrhbfont_driver, NULL);
+#endif	/* HAVE_HARFBUZZ */
 }
 
 #ifdef HAVE_X_WINDOWS
@@ -808,22 +819,3 @@ ftcrfont_get_default_font_options (struct x_display_info *dpyinfo,
 }
 
 #endif
-
-static void
-syms_of_ftcrfont_for_pdumper (void)
-{
-  ftcrfont_driver.type = Qftcr;
-  register_font_driver (&ftcrfont_driver, NULL);
-#ifdef HAVE_HARFBUZZ
-  ftcrhbfont_driver = ftcrfont_driver;
-  ftcrhbfont_driver.type = Qftcrhb;
-  ftcrhbfont_driver.list = ftcrhbfont_list;
-  ftcrhbfont_driver.match = ftcrhbfont_match;
-  ftcrhbfont_driver.otf_capability = hbfont_otf_capability;
-  ftcrhbfont_driver.shape = hbfont_shape;
-  ftcrhbfont_driver.combining_capability = hbfont_combining_capability;
-  ftcrhbfont_driver.begin_hb_font = ftcrhbfont_begin_hb_font;
-  ftcrhbfont_driver.end_hb_font = ftcrhbfont_end_hb_font;
-  register_font_driver (&ftcrhbfont_driver, NULL);
-#endif	/* HAVE_HARFBUZZ */
-}

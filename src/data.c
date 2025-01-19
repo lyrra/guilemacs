@@ -858,7 +858,7 @@ defalias (Lisp_Object symbol, Lisp_Object definition)
 {
   {
     bool autoload = AUTOLOADP (definition);
-    if (!will_dump_p () || !autoload)
+    if (!autoload)
       { /* Only add autoload entries after dumping, because the ones before are
 	   not useful and else we get loads of them from the loaddefs.el.
 	   That saves us about 110KB in the pdmp file (Jan 2022).  */

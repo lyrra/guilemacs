@@ -35,7 +35,6 @@ Original author: YAMAMOTO Mitsuharu
 #include "nsterm.h"
 #include "macfont.h"
 #include "macuvs.h"
-#include "pdumper.h"
 
 #include <libkern/OSByteOrder.h>
 
@@ -4219,8 +4218,6 @@ mac_register_font_driver (struct frame *f)
 
 
 
-static void syms_of_macfont_for_pdumper (void);
-
 void
 syms_of_macfont (void)
 {
@@ -4241,16 +4238,7 @@ syms_of_macfont (void)
   macfont_family_cache = Qnil;
   staticpro (&macfont_family_cache);
 
-  pdumper_do_now_and_after_load (syms_of_macfont_for_pdumper);
-}
-
-static void
-syms_of_macfont_for_pdumper (void)
-{
-  if (dumped_with_pdumper_p ())
-    macfont_family_cache = Qnil;
-  else
-    eassert (NILP (macfont_family_cache));
+  eassert (NILP (macfont_family_cache));
 
   macfont_driver.type = Qmac_ct;
   register_font_driver (&macfont_driver, NULL);

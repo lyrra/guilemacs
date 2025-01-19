@@ -45,7 +45,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef MSDOS
 #include "msdos.h"
 #endif
-#include "pdumper.h"
 
 static ptrdiff_t count_windows (struct window *);
 static ptrdiff_t get_leaf_windows (struct window *, struct window **,
@@ -8763,8 +8762,6 @@ scrolling positions.  */)
 }
 
 
-static void init_window_once_for_pdumper (void);
-
 void
 init_window_once (void)
 {
@@ -8782,41 +8779,12 @@ init_window_once (void)
   old_selected_window = Qnil;
   staticpro (&old_selected_window);
 
-  pdumper_do_now_and_after_late_load (init_window_once_for_pdumper);
-}
-
-static void init_window_once_for_pdumper (void)
-{
   window_scroll_pixel_based_preserve_x = -1;
   window_scroll_pixel_based_preserve_y = -1;
   window_scroll_preserve_hpos = -1;
   window_scroll_preserve_vpos = -1;
-  PDUMPER_IGNORE (sequence_number);
 
-  PDUMPER_RESET_LV (minibuf_window, Qnil);
-  PDUMPER_RESET_LV (selected_window, Qnil);
-  PDUMPER_RESET_LV (Vwindow_list, Qnil);
-  PDUMPER_RESET_LV (minibuf_selected_window, Qnil);
-
-  /* Hack: if mode_line_in_non_selected_windows is true (which it may
-     be, if we're restoring from a dump) the guts of
-     make_initial_frame will try to access selected_window, which is
-     invalid at this point, and lose.  For the purposes of creating
-     the initial frame and window, this variable must be false.  */
-  bool old_mode_line_in_non_selected_windows;
-
-  /* Snapshot dumped_with_pdumper to suppress compiler warning.  */
-  bool saved_dumped_with_pdumper = dumped_with_pdumper_p ();
-  if (saved_dumped_with_pdumper)
-    {
-      old_mode_line_in_non_selected_windows
-        = mode_line_in_non_selected_windows;
-      mode_line_in_non_selected_windows = false;
-    }
   struct frame *f = make_initial_frame ();
-  if (saved_dumped_with_pdumper)
-    mode_line_in_non_selected_windows =
-      old_mode_line_in_non_selected_windows;
   XSETFRAME (selected_frame, f);
   old_selected_frame = Vterminal_frame = selected_frame;
   minibuf_window = f->minibuffer_window;

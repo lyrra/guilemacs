@@ -36,7 +36,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "font.h"
 #include "termchar.h"
-#include "pdumper.h"
 #include "android.h"
 
 #ifndef ANDROID_STUBIFY
@@ -1051,18 +1050,12 @@ struct font_driver androidfont_driver =
     .list_family = androidfont_list_family,
   };
 
-static void
-syms_of_androidfont_for_pdumper (void)
-{
-  register_font_driver (&androidfont_driver, NULL);
-}
-
 void
 syms_of_androidfont (void)
 {
   DEFSYM (Qfontsize, "fontsize");
 
-  pdumper_do_now_and_after_load (syms_of_androidfont_for_pdumper);
+  register_font_driver (&androidfont_driver, NULL);
 
   font_cache = list (Qnil);
   staticpro (&font_cache);

@@ -41,7 +41,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "tparam.h"
 #include "xwidget.h"
-#include "pdumper.h"
 #include "disptab.h"
 #include "cm.h"
 
@@ -7085,12 +7084,9 @@ init_display_interactive (void)
      with.  Otherwise newly opened tty frames will not resize
      automatically. */
 #ifdef SIGWINCH
-  if (!will_dump_p ())
-    {
       struct sigaction action;
       emacs_sigaction_init (&action, deliver_window_change_signal);
       sigaction (SIGWINCH, &action, 0);
-    }
 #endif /* SIGWINCH */
 
   /* If running as a daemon, no need to initialize any frames/terminal,
@@ -7104,8 +7100,6 @@ init_display_interactive (void)
 	 init_faces_initial will realize these faces now.  (Non-daemon
 	 Emacs does this either near the end of this function or when
 	 the GUI frame is created.)  */
-      if (dumped_with_pdumper_p ())
-        init_faces_initial ();
 #ifndef WINDOWSNT
       return;
 #endif
@@ -7166,7 +7160,7 @@ init_display_interactive (void)
 #endif /* HAVE_NTGUI */
 
 #ifdef HAVE_NS
-  if (!inhibit_window_system && !will_dump_p ())
+  if (!inhibit_window_system)
     {
       Vinitial_window_system = Qns;
       return;
@@ -7174,7 +7168,7 @@ init_display_interactive (void)
 #endif
 
 #ifdef HAVE_PGTK
-  if (!inhibit_window_system && !will_dump_p ())
+  if (!inhibit_window_system)
     {
       Vinitial_window_system = Qpgtk;
       return;
@@ -7182,7 +7176,7 @@ init_display_interactive (void)
 #endif
 
 #ifdef HAVE_HAIKU
-  if (!inhibit_window_system && !will_dump_p ())
+  if (!inhibit_window_system)
     {
       Vinitial_window_system = Qhaiku;
       return;
@@ -7286,12 +7280,7 @@ init_display_interactive (void)
 void
 init_display (void)
 {
-  if (noninteractive)
-    {
-      if (dumped_with_pdumper_p ())
-        init_faces_initial ();
-    }
-  else
+  if (!noninteractive)
     init_display_interactive ();
 }
 
@@ -7328,8 +7317,6 @@ WINDOW nil or omitted means report on the selected window.  */)
 /***********************************************************************
 			    Initialization
  ***********************************************************************/
-
-static void syms_of_display_for_pdumper (void);
 
 void
 syms_of_display (void)
@@ -7432,14 +7419,8 @@ See `buffer-display-table' for more information.  */);
 Possible values are t (below the tool bar), nil (above the tool bar).
 This option affects only builds where the tool bar is not external.  */);
 
-  pdumper_do_now_and_after_load (syms_of_display_for_pdumper);
-
-  Fprovide (intern_c_string ("tty-child-frames"), Qnil);
-}
-
-static void
-syms_of_display_for_pdumper (void)
-{
   Vinitial_window_system = Qnil;
   Vtab_bar_position = Qnil;
+
+  Fprovide (intern_c_string ("tty-child-frames"), Qnil);
 }

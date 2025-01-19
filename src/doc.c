@@ -147,22 +147,12 @@ get_doc_string (Lisp_Object filepos, bool unibyte)
   Lisp_Object docdir
     = NILP (tem) ? ENCODE_FILE (dir) : empty_unibyte_string;
   ptrdiff_t docdir_sizemax = SBYTES (docdir) + 1;
-  if (will_dump_p ())
-    docdir_sizemax = max (docdir_sizemax, sizeof sibling_etc);
   name = SAFE_ALLOCA (docdir_sizemax + SBYTES (file));
   lispstpcpy (lispstpcpy (name, docdir), file);
 
   doc_fd fd = doc_open (name, O_RDONLY, 0);
   if (!doc_fd_p (fd))
     {
-      if (will_dump_p ())
-	{
-	  /* Preparing to dump; DOC file is probably not installed.
-	     So check in ../etc.  */
-	  lispstpcpy (stpcpy (name, sibling_etc), file);
-
-	  fd = doc_open (name, O_RDONLY, 0);
-	}
       if (!doc_fd_p (fd))
 	{
 	  if (errno != ENOENT && errno != ENOTDIR)
@@ -524,17 +514,9 @@ the same file name is found in the `doc-directory'.  */)
 
   CHECK_STRING (filename);
 
-  if (will_dump_p ())
-    {
-      dirname = sibling_etc;
-      dirlen = sizeof sibling_etc - 1;
-    }
-  else
-    {
-      CHECK_STRING (Vdoc_directory);
-      dirname = SSDATA (Vdoc_directory);
-      dirlen = SBYTES (Vdoc_directory);
-    }
+  CHECK_STRING (Vdoc_directory);
+  dirname = SSDATA (Vdoc_directory);
+  dirlen = SBYTES (Vdoc_directory);
 
   specpdl_ref count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;

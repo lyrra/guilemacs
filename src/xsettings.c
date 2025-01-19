@@ -36,7 +36,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keyboard.h"
 #include "blockinput.h"
 #include "termhooks.h"
-#include "pdumper.h"
 
 #ifndef HAVE_PGTK
 #include <X11/Xproto.h>
@@ -1294,22 +1293,16 @@ syms_of_xsettings (void)
 #include "xsettings.x"
 
   current_mono_font = NULL;
-  PDUMPER_IGNORE (current_mono_font);
   current_font = NULL;
-  PDUMPER_IGNORE (current_font);
   first_dpyinfo = NULL;
-  PDUMPER_IGNORE (first_dpyinfo);
 #ifdef HAVE_GSETTINGS
   gsettings_client = NULL;
-  PDUMPER_IGNORE (gsettings_client);
 #endif
 #ifdef HAVE_GCONF
   gconf_client = NULL;
-  PDUMPER_IGNORE (gconf_client);
 #endif
 #ifdef HAVE_PGTK
   font_options = NULL;
-  PDUMPER_IGNORE (font_options);
 #endif
 
   DEFSYM (Qmonospace_font_name, "monospace-font-name");

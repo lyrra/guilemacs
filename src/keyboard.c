@@ -83,8 +83,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <ignore-value.h>
 
-#include "pdumper.h"
-
 #include <gc.h> /* for GC_collect_a_little */
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -12825,8 +12823,6 @@ is_ignored_event (union buffered_input_event *event)
   return !NILP (Fmemq (ignore_event, Vwhile_no_input_ignore_events));
 }
 
-static void syms_of_keyboard_for_pdumper (void);
-
 void
 syms_of_keyboard (void)
 {
@@ -13855,7 +13851,9 @@ function is called to remap that sequence.  */);
   Vcurrent_key_remap_sequence = Qnil;
   DEFSYM (Qcurrent_key_remap_sequence, "current-key-remap-sequence");
 
-  pdumper_do_now_and_after_load (syms_of_keyboard_for_pdumper);
+  /* Create the initial keyboard.  Qt means 'unset'.  */
+  eassert (initial_kboard == NULL);
+  initial_kboard = allocate_kboard (Qt);
 
   DEFSYM (Qactivate_mark_hook, "activate-mark-hook");
   DEFSYM (Qns_unput_working_text, "ns-unput-working-text");
@@ -13865,37 +13863,6 @@ function is called to remap that sequence.  */);
   DEFSYM (Qsuspend_resume_hook, "suspend-resume-hook");
   DEFSYM (Qcommand_error_default_function, "command-error-default-function");
   DEFSYM (Qsigusr2, "sigusr2");
-}
-
-static void
-syms_of_keyboard_for_pdumper (void)
-{
-  /* Make sure input state is pristine when restoring from a dump.
-     init_keyboard() also resets some of these, but the duplication
-     doesn't hurt and makes sure that allocate_kboard and subsequent
-     early init functions see the environment they expect.  */
-
-  PDUMPER_RESET_LV (pending_funcalls, Qnil);
-  PDUMPER_RESET_LV (unread_switch_frame, Qnil);
-  PDUMPER_RESET_LV (internal_last_event_frame, Qnil);
-  PDUMPER_RESET_LV (last_command_event, Qnil);
-  PDUMPER_RESET_LV (last_nonmenu_event, Qnil);
-  PDUMPER_RESET_LV (last_input_event, Qnil);
-  PDUMPER_RESET_LV (Vunread_command_events, Qnil);
-  PDUMPER_RESET_LV (Vunread_post_input_method_events, Qnil);
-  PDUMPER_RESET_LV (Vunread_input_method_events, Qnil);
-  PDUMPER_RESET_LV (Vthis_command, Qnil);
-  PDUMPER_RESET_LV (Vreal_this_command, Qnil);
-  PDUMPER_RESET_LV (Vthis_command_keys_shift_translated, Qnil);
-  PDUMPER_RESET_LV (Vthis_original_command, Qnil);
-  PDUMPER_RESET (num_input_keys, 0);
-  PDUMPER_RESET (num_nonmacro_input_events, 0);
-  PDUMPER_RESET_LV (Vlast_event_frame, Qnil);
-  PDUMPER_RESET_LV (Vdelayed_warnings_list, Qnil);
-
-  /* Create the initial keyboard.  Qt means 'unset'.  */
-  eassert (initial_kboard == NULL);
-  initial_kboard = allocate_kboard (Qt);
 }
 
 void
