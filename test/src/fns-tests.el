@@ -29,7 +29,7 @@
   (let ((str "foo")) (should (eq (identity str) str)))
   (let ((lst '(11))) (should (eq (identity lst) lst))))
 
-(ert-deftest fns-tests-random ()
+'(ert-deftest fns-tests-random ()
   (unwind-protect
       (progn
         (should-error (random -1) :type 'args-out-of-range)
@@ -98,7 +98,7 @@
   (should-not (equal-including-properties #("a" 0 1 (k "v"))
                                           #("b" 0 1 (k "v")))))
 
-(ert-deftest fns-tests-equal-symbols-with-position ()
+'(ert-deftest fns-tests-equal-symbols-with-position ()
   "Test `eq' and `equal' on symbols with position."
   (let ((foo1 (position-symbol 'foo 42))
         (foo2 (position-symbol 'foo 666))
@@ -497,7 +497,7 @@
   (should (string-version-lessp "2" "1245"))
   (should (not (string-version-lessp "1245" "2"))))
 
-(ert-deftest fns-tests-func-arity ()
+'(ert-deftest fns-tests-func-arity ()
   (should (equal (func-arity 'car) '(1 . 1)))
   (should (equal (func-arity 'caar) '(1 . 1)))
   (should (equal (func-arity 'format) '(1 . many)))
@@ -766,19 +766,19 @@
     (nconc ls2 'tail)
     ls1))
 
-(ert-deftest test-cycle-length ()
+'(ert-deftest test-cycle-length ()
   (should-error (length (cyc1 1)) :type 'circular-list)
   (should-error (length (cyc2 1 2)) :type 'circular-list)
   (should-error (length (dot1 1)) :type 'wrong-type-argument)
   (should-error (length (dot2 1 2)) :type 'wrong-type-argument))
 
-(ert-deftest test-cycle-safe-length ()
+'(ert-deftest test-cycle-safe-length ()
   (should (<= 10 (safe-length (cyc1 1))))
   (should (<= 1010 (safe-length (cyc2 1 2))))
   (should (= 10 (safe-length (dot1 1))))
   (should (= 20 (safe-length (dot2 1 2)))))
 
-(ert-deftest test-cycle-member ()
+'(ert-deftest test-cycle-member ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -796,7 +796,7 @@
     (should-error (member 3 d1) :type 'wrong-type-argument)
     (should-error (member 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-memq ()
+'(ert-deftest test-cycle-memq ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -814,7 +814,7 @@
     (should-error (memq 3 d1) :type 'wrong-type-argument)
     (should-error (memq 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-memql ()
+'(ert-deftest test-cycle-memql ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -832,7 +832,7 @@
     (should-error (memql 3 d1) :type 'wrong-type-argument)
     (should-error (memql 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-assq ()
+'(ert-deftest test-cycle-assq ()
   (let ((c1 (cyc1 '(1)))
         (c2 (cyc2 '(1) '(2)))
         (d1 (dot1 '(1)))
@@ -850,7 +850,7 @@
     (should-error (assq 3 d1) :type 'wrong-type-argument)
     (should-error (assq 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-assoc ()
+'(ert-deftest test-cycle-assoc ()
   (let ((c1 (cyc1 '(1)))
         (c2 (cyc2 '(1) '(2)))
         (d1 (dot1 '(1)))
@@ -874,7 +874,7 @@
     (should (eq (assoc "b" alist #'string-equal) (cadr alist)))
     (should-not (assoc "b" alist #'eq))))
 
-(ert-deftest test-cycle-rassq ()
+'(ert-deftest test-cycle-rassq ()
   (let ((c1 (cyc1 '(0 . 1)))
         (c2 (cyc2 '(0 . 1) '(0 . 2)))
         (d1 (dot1 '(0 . 1)))
@@ -892,7 +892,7 @@
     (should-error (rassq 3 d1) :type 'wrong-type-argument)
     (should-error (rassq 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-rassoc ()
+'(ert-deftest test-cycle-rassoc ()
   (let ((c1 (cyc1 '(0 . 1)))
         (c2 (cyc2 '(0 . 1) '(0 . 2)))
         (d1 (dot1 '(0 . 1)))
@@ -910,7 +910,7 @@
     (should-error (rassoc 3 d1) :type 'wrong-type-argument)
     (should-error (rassoc 3 d2) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-delq ()
+'(ert-deftest test-cycle-delq ()
   (should-error (delq 1 (cyc1 1)) :type 'circular-list)
   (should-error (delq 1 (cyc2 1 2)) :type 'circular-list)
   (should-error (delq 1 (dot1 1)) :type 'wrong-type-argument)
@@ -924,7 +924,7 @@
   (should-error (delq 3 (dot1 1)) :type 'wrong-type-argument)
   (should-error (delq 3 (dot2 1 2)) :type 'wrong-type-argument))
 
-(ert-deftest test-cycle-delete ()
+'(ert-deftest test-cycle-delete ()
   (should-error (delete 1 (cyc1 1)) :type 'circular-list)
   (should-error (delete 1 (cyc2 1 2)) :type 'circular-list)
   (should-error (delete 1 (dot1 1)) :type 'wrong-type-argument)
@@ -938,21 +938,21 @@
   (should-error (delete 3 (dot1 1)) :type 'wrong-type-argument)
   (should-error (delete 3 (dot2 1 2)) :type 'wrong-type-argument))
 
-(ert-deftest test-cycle-reverse ()
+'(ert-deftest test-cycle-reverse ()
   (should-error (reverse (cyc1 1)) :type 'circular-list)
   (should-error (reverse (cyc2 1 2)) :type 'circular-list)
   (should-error (reverse (dot1 1)) :type 'wrong-type-argument)
   (should-error (reverse (dot2 1 2)) :type 'wrong-type-argument))
 
-(ert-deftest test-cycle-equal ()
+'(ert-deftest test-cycle-equal ()
   (should-error (equal (cyc1 1) (cyc1 1)))
   (should-error (equal (cyc2 1 2) (cyc2 1 2))))
 
-(ert-deftest test-cycle-nconc ()
+'(ert-deftest test-cycle-nconc ()
   (should-error (nconc (cyc1 1) 'tail) :type 'circular-list)
   (should-error (nconc (cyc2 1 2) 'tail) :type 'circular-list))
 
-(ert-deftest test-cycle-plist-get ()
+'(ert-deftest test-cycle-plist-get ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -970,7 +970,7 @@
     (should-not (plist-get d1 3))
     (should-not (plist-get d2 3))))
 
-(ert-deftest test-cycle-plist-member ()
+'(ert-deftest test-cycle-plist-member ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -988,7 +988,7 @@
     (should-error (plist-member d1 3) :type 'wrong-type-argument)
     (should-error (plist-member d2 3) :type 'wrong-type-argument)))
 
-(ert-deftest test-cycle-plist-put ()
+'(ert-deftest test-cycle-plist-put ()
   (let ((c1 (cyc1 1))
         (c2 (cyc2 1 2))
         (d1 (dot1 1))
@@ -1500,7 +1500,7 @@
         (loop (1- m) (cdr tail) (cons (car tail) ac))
       (nreverse ac))))
 
-(ert-deftest fns--take-ntake ()
+'(ert-deftest fns--take-ntake ()
   "Test `take' and `ntake'."
   ;; Check errors and edge cases.
   (should-error (take 'x '(a)))
@@ -1577,7 +1577,7 @@
   (should-error (copy-alist "abc")
                 :type 'wrong-type-argument))
 
-(ert-deftest fns-value<-ordered ()
+'(ert-deftest fns-value<-ordered ()
   ;; values (X . Y) where X<Y
   (let* ((big (* 10 most-positive-fixnum))
          (buf1 (get-buffer-create " *one*"))
@@ -1683,7 +1683,7 @@
       (kill-buffer buf2)
       (kill-buffer buf1))))
 
-(ert-deftest fns-value<-unordered ()
+'(ert-deftest fns-value<-unordered ()
   ;; values (X . Y) where neither X<Y nor Y<X
 
   (let ((buf1 (get-buffer-create " *one*"))
@@ -1732,7 +1732,7 @@
             (should-error (value< y x) :type 'type-mismatch)))
         (setq tail (cdr tail))))))
 
-(ert-deftest fns-value<-symbol-with-pos ()
+'(ert-deftest fns-value<-symbol-with-pos ()
   ;; values (X . Y) where X<Y
   (let* ((a-sp-1 (position-symbol 'a 1))
          (a-sp-2 (position-symbol 'a 2))

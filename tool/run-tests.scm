@@ -16,6 +16,11 @@
 
 ; these doesn't want to play with others
 (define %tests '(
+(group
+; "test/src/timefns-tests.el"
+  "test/src/fns-tests.el"
+  "test/src/floatfns-tests.el"
+  )
 ;; in the following group, all of the test files works with guilemacs
 (group
   "test/lisp/allout-widgets-tests.el"
@@ -228,8 +233,6 @@
          (else
           (format #t "~a >>> ~a~%" (+ tot %total-passed-tests) line)
           (cond
-           ((string-contains line "results as expected")
-            #f)
            ((string-contains line " passed ")
             (let ((f (list-matches re line)))
               (unless (null? f)

@@ -55,10 +55,10 @@
 (ert-deftest floatfns-tests-logb ()
   (should (= (logb 10000) 13)))
 
-(ert-deftest floatfns-tests-ceiling ()
+'(ert-deftest floatfns-tests-ceiling ()
   (should (= (ceiling 0.5) 1)))
 
-(ert-deftest floatfns-tests-floor ()
+'(ert-deftest floatfns-tests-floor ()
   (should (= (floor 1.5) 1)))
 
 (ert-deftest floatfns-tests-round ()
@@ -98,7 +98,7 @@
   (should-error (ftruncate 0) :type 'wrong-type-argument)
   (should-error (fround 0) :type 'wrong-type-argument))
 
-(ert-deftest bignum-to-float ()
+'(ert-deftest bignum-to-float ()
   ;; 122 because we want to go as big as possible to provoke a rounding error,
   ;; but not too big: 2**122 < 10**37 < 2**123, and the C standard says
   ;; 10**37 <= DBL_MAX so 2**122 cannot overflow as a double.
@@ -112,7 +112,7 @@
   (should (= most-positive-fixnum
              (- (abs most-negative-fixnum) 1))))
 
-(ert-deftest bignum-expt ()
+'(ert-deftest bignum-expt ()
   (dolist (n (list most-positive-fixnum (1+ most-positive-fixnum)
                    most-negative-fixnum (1- most-negative-fixnum)
                    (* 5 most-negative-fixnum)
@@ -133,7 +133,7 @@
 (ert-deftest bignum-mod ()
   (should (= 0 (mod (1+ most-positive-fixnum) 2.0))))
 
-(ert-deftest bignum-round ()
+'(ert-deftest bignum-round ()
   (let ((ns (list (* most-positive-fixnum most-negative-fixnum)
                   (1- most-negative-fixnum) most-negative-fixnum
                   (1+ most-negative-fixnum) -2 1 1 2
