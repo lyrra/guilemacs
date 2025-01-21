@@ -2935,23 +2935,18 @@ bool_vector_cmp (Lisp_Object a, Lisp_Object b)
   return (d & aw) ? 1 : -1;
 }
 
-/* Return -1 if a<b, 1 if a>b, 0 if a=b or if b is NaN (a must be a fixnum).  */
 static inline int
-fixnum_float_cmp (EMACS_INT a, double b)
+value_cmp_scm (Lisp_Object a, Lisp_Object b)
 {
-  double fa = (double)a;
-  if (fa == b)
+  if (scm_less_p (a, b) == SCM_BOOL_T)
     {
-      /* This doesn't mean that a=b because the conversion may have rounded.
-	 However, b must be an integer that fits in an EMACS_INT,
-	 because |b| ≤ 2|a| and EMACS_INT has at least one bit more than
-	 needed to represent any fixnum.
-	 Thus we can compare in the integer domain instead.  */
-      EMACS_INT ib = b;		/* lossless conversion */
-      return a < ib ? -1 : a > ib;
+      return -1;
     }
-  else
-    return fa < b ? -1 : fa > b;   /* return 0 if b is NaN */
+  if (scm_gr_p (a, b) == SCM_BOOL_T)
+    {
+      return 1;
+    }
+  return 0;
 }
 
 /* Return -1, 0 or 1 to indicate whether a<b, a=b or a>b in the sense of value<.
@@ -2974,10 +2969,8 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
     case_Lisp_Int:
       {
 	EMACS_INT ia = XFIXNUM (a);
-	if (FIXNUMP (b))
-	  return ia < XFIXNUM (b) ? -1 : 1;   /* we know that a != b */
-	if (FLOATP (b))
-	  return fixnum_float_cmp (ia, XFLOAT_DATA (b));
+	if (FIXNUMP (b) || FLOATP (b))
+          return value_cmp_scm (a, b);
 	if (BIGNUMP (b))
 	  return -mpz_sgn (*xbignum_val (b));
       }
@@ -3103,11 +3096,9 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 
     case Lisp_Float:
       {
+	if (FIXNUMP (b) || FLOATP (b))
+          return value_cmp_scm (a, b);
 	double fa = XFLOAT_DATA (a);
-	if (FLOATP (b))
-	  return fa < XFLOAT_DATA (b) ? -1 : fa > XFLOAT_DATA (b);
-	if (FIXNUMP (b))
-	  return -fixnum_float_cmp (XFIXNUM (b), fa);
 	if (BIGNUMP (b))
 	  {
 	    if (isnan (fa))
