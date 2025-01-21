@@ -14,8 +14,9 @@
 ; try to sort the test from most primordial elisp functionallity
 ; towards more complex elisp applications
 
-; these doesn't want to play with others
 (define %tests '(
+(group (prelude)
+  "test/pre/value-cmp.el")
 (group
 ; "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
@@ -125,6 +126,7 @@
 ;; false positives. So if you count total passed tests,
 ;; they need to be subtracted.
 (group
+  ;; these doesn't want to play with others
   "test/lisp/emacs-lisp/find-func-tests.el" ; doesn't like test/lisp/emacs-lisp/checkdoc-tests.el
   "test/lisp/help-mode-tests.el"
   "test/lisp/help-fns-tests.el"
@@ -210,7 +212,63 @@
 
 (define %total-passed-tests 0)
 
-(define (run-tests files)
+(define (run-tests-bare-emacs files keys)
+  (let* ((files (map (lambda (file)
+                       (let ((s (substring file 5)))
+                         (substring s 0 (- (string-length s) 3))))
+                     files))
+         (files (randomize-list files))
+         (args (append
+                '("../src/emacs" "-nl" "-Q" "--batch")
+                (list
+                 (apply string-concatenate
+                        (map (lambda (file)
+                               (list "--prelude " (getcwd) "/" file))
+                             files)))
+                '(" 2>&1"))))
+    (format #t "Running prelude test files: ~a~%" files)
+    (format #t "running ===> ~a~%" args)
+    (let* ((port (open-input-pipe (string-join args " ")))
+           (tot 0)
+           (curname #f)
+           (expected #f)
+           (curstr ""))
+      (let loop ((line (get-line port)))
+        (cond
+         ((eof-object? line) #f)
+         (else
+          (cond
+           ((string-contains line "-- test begin: ") =>
+            (lambda (idx)
+              (let ((name (substring line (+ idx (string-length "-- test begin: ")))))
+                (set! curname name)
+                (format #t "TEST-BEGIN: name [~s]~%" name))))
+           ((string-contains line "-- test end: ") =>
+            (lambda (idx)
+              (let ((name (substring line (+ idx (string-length "-- test end: ")))))
+                (format #t "TEST-END: name [~s]~%" name)
+                (format #t "  RESULT:~%")
+                (format #t "    EXP: ~s~%" expected)
+                (format #t "    GOT: ~s~%" curstr)
+                (format #t "    PASS: ~s~%" (equal? expected curstr)))
+              (if (equal? expected curstr)
+                  (set! tot (1+ tot)))
+              (set! expected #f)
+              (set! curstr "")))
+           ((string-contains line "-- test expect: ") =>
+            (lambda (idx)
+              (let ((name (substring line (+ idx (string-length "-- test expect: ")))))
+                (set! expected name)
+                (format #t "  TEST-EXPECT: name [~s]~%" name))))
+           (else
+            (if curname
+                (set! curstr (string-concatenate (list curstr line))))
+            (format #t "~a [~a] >>> ~a~%" (+ tot %total-passed-tests) curname line)))
+          (loop (get-line port)))))
+      (set! %total-passed-tests (+ %total-passed-tests tot))
+      (format #t "number of passed tests in files: ~a, of total: ~a~%" tot %total-passed-tests))))
+
+(define (run-tests-loadup-emacs files keys)
   (let* ((files (map (lambda (file)
                        (let ((s (substring file 5)))
                          (substring s 0 (- (string-length s) 3))))
@@ -244,27 +302,52 @@
       (set! %total-passed-tests (+ %total-passed-tests tot))
       (format #t "number of passed tests in files: ~a, of total: ~a~%" tot %total-passed-tests))))
 
+(define (run-tests files keys)
+  ((if (memq 'prelude keys)
+       run-tests-bare-emacs
+      run-tests-loadup-emacs)
+   files keys))
+
+(define (match-keys keys fils)
+  ;; check prelude
+  (let ((pass #t))
+    (if (memq 'prelude fils)
+        (if (not (memq 'prelude keys))
+            (set! pass #f)))
+    pass))
+
 (define (main args)
-  (set! *random-state* (random-state-from-platform))
-  (let ((files '())
-        (done #f))
-    (for-each (lambda (line)
-                (when (and (not done)
-                           (not (equal? "" line)))
-                  (cond
-                   ((eq? 'done line) (set! done #t))
-                   ((and (pair? line)
-                         (eq? 'group (car line)))
-                    ; run any currently collected files
-                    (unless (null? files)
-                      (run-tests files))
-                    ; run the files in the group
-                    (run-tests (cdr line))
-                    (set! files '()))
-                   (else
-                    (set! files (cons line files))))))
-              %tests)
-    (unless (null? files)
-      (run-tests files))
-    (format #t "~%total number of passed tests: ~a~%" %total-passed-tests)
-    (exit)))
+  (let ((test-filter '()))
+    (for-each (lambda (arg)
+                (if (string=? "--prelude" arg)
+                    (set! test-filter (cons 'prelude test-filter))))
+              args)
+    (set! *random-state* (random-state-from-platform))
+    (let ((files '())
+          (done #f))
+      (for-each (lambda (line)
+                  (when (and (not done)
+                             (not (equal? "" line)))
+                    (cond
+                     ((eq? 'done line) (set! done #t))
+                     ((and (pair? line)
+                           (eq? 'group (car line)))
+                      (let ((keys (if (and (pair? (cdr line)) (pair? (cadr line)))
+                                      (cadr line)
+                                      '())))
+                        (if (not (null? keys)) ; skip the keys
+                            (set! line (cdr line)))
+                        ;; run any currently collected files
+                        (unless (null? files)
+                          (run-tests files '()))
+                        ;; run the files in the group
+                        (if (match-keys keys test-filter)
+                            (run-tests (cdr line) keys))
+                        (set! files '())))
+                     (else
+                      (set! files (cons line files))))))
+                %tests)
+      (unless (null? files)
+        (run-tests files '()))
+      (format #t "~%total number of passed tests: ~a~%" %total-passed-tests)
+      (exit))))
