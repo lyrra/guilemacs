@@ -290,6 +290,7 @@ Initialization options:\n\
 --no-build-details          do not add build details such as time stamps\n\
 --no-desktop                do not load a saved desktop\n\
 --no-init-file, -q          load neither ~/.emacs nor default.el\n\
+--prelude, -prelude         load file instead of loadup.el into bare Emacs\n\
 --no-loadup, -nl            do not load loadup.el into bare Emacs\n\
 --no-site-file              do not load site-start.el\n\
 --no-x-resources            do not load X resources\n\
@@ -1038,6 +1039,7 @@ main2 (void *ignore, int argc, char **argv)
 {
   int old_argc;
   bool no_loadup = false;
+  char *prelude = NULL;
   char *junk = 0;
   char *dname_arg = 0;
 #ifdef DAEMON_MUST_EXEC
@@ -2267,7 +2269,21 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	}
       /* Unless next switch is -nl, load "loadup.el" first thing.  */
       if (! no_loadup)
-	Vtop_level = list2 (Qload, build_string ("loadup.el"));
+        {
+	  Vtop_level = list2 (Qload, build_string ("loadup.el"));
+        } else {
+          while (skip_args < argc)
+            {
+              argmatch (argv, argc, "-prelude", "--prelude", 7, &prelude, &skip_args);
+
+              if (prelude)
+                {
+                  Vtop_level = list2 (Qload, build_unibyte_string (prelude));
+                  break;
+                }
+              skip_args++;
+            }
+        }
 
 #ifdef HAVE_NATIVE_COMP
       /* If we are going to load stuff in a non-initialized Emacs,
