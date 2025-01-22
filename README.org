@@ -96,6 +96,28 @@ echo GUILE=/t/ge/g3/lib > env.sh
 
 The prelude tests are found in test/pre directory.
 
+**** debug tests c-prelude
+
+The following script show how to manually run a bare emacs
+with the proper args, under gdb.
+Note that you would first need to run "run-tools.sh --prelude",
+to generate the test file "test/pre/value-cmp.el".
+
+#+BEGIN_SRC
+. ./env.sh
+
+export PATH="$GUILE/bin:$PATH"
+export LD_LIBRARY_PATH="$GUILE/lib"
+
+export HOME=/nonexistent
+export LANG=C
+export EMACS_TEST_DIRECTORY="`pwd`/test"
+
+cd test
+
+gdb --args ../src/emacs -nl -Q --batch -L . --prelude `pwd`/pre/value-cmp.el
+#+END_SRC
+
 * original work
 
  - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
