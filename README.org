@@ -1,17 +1,38 @@
-Guilemacs
+* Guilemacs - Beyond Emacs
 
-You're most probably looking for https://codeberg.org/guile-emacs/guile-emacs/.
-This repository is an experimental and exploratory branch of guile-emacs.
+If you're looking for guile-emacs, check out the repository at
+ https://codeberg.org/guile-emacs/guile-emacs/.
+This is an experimental and exploratory branch of guile-emacs.
 
-Work in progress. Dont try this yet! This will not produce a functioning Emacs.
+*Work in progress.* Dont try this yet! This will not produce a functioning Emacs.
+ Please note that this project still has alot of lose ends to tie, ie alpha stage,
+ and will therefore not produce a fully functional Emacs at this stage.
 
-* run
+ Proceed with caution and only if you're comfortable with experimental software.
 
-First install guile with special elisp fixes from:
-https://git.savannah.gnu.org/gitweb/?p=guile.git;a=shortlog;h=refs/heads/wip-elisp-rebased
+ This branch of guile-emacs tries to explore a few of the vast plethora of features
+ that are possible when the underlying elisp engine is driven by guile.
 
-Then configure, make and make install guilemacs:
-The example assumes you have special guile installed in /t/ge/g3
+* Getting Started
+
+Since guilemacs is using libguile, guile
+ needs to be configured, compiled and installed. And since guilemacs is using
+some extended features of guile, a special flavor of guile is needed.
+
+The example assumes you have installed this special flavor of guile in "/t/ge/g3",
+or that you point out the guile-install-directory in the GUILE enviornment variable.
+
+After guile has been installed, guilemacs can be
+ configured and built. It is not necessery to install guilemacs, it's possible
+to run it directly from the source directory (convenient for development).
+
+** Install special flavor of Guile
+
+First, install a version of guile that includes specific Elisp fixes:
+  - Repository: https://codeberg.org/lyrra/guile
+  - Original upstream: https://git.savannah.gnu.org/gitweb/?p=guile.git;a=shortlog;h=refs/heads/wip-elisp-rebased
+
+After that, please proceed with configuring and building Guilemacs:
 
 ** configure
 
@@ -59,6 +80,8 @@ make install
 
 ** run
 
+Use the following script to launch Guilemacs:
+
 #+BEGIN_SRC
 #!/bin/sh
 export LD_LIBRARY_PATH=/t/ge/g3/lib
@@ -76,17 +99,16 @@ echo GUILE=/t/ge/g3/lib > env.sh
 ./tool/run-tests.sh
 #+END_SRC
 
-The test suite will utilize the ERT suite. While many tests in the ERT suite will
-not work with guilemacs, ie fail, only those that are known to pass are runned.
+The test suite uses the Emacs ERT suite. Note that many tests will fail since Guilemacs is
+still under development. Only tests known to pass will be executed.
 
-*** run tests for C defined elisp
+*** run tests for C defined elisp functions
 
-Alot of emacs functionallity and also primordial so are written in C.
-To test these rudimentary functions, that just require guile-elisp and
-nothing else. Ie, no elisp code loaded by loadup.el is needed.
+Many fundamental Emacs functions, including some primitive operations, are implemented
+in C. These functions can be tested using Guile-Elisp (libguile) together with the bare emacs binary.
+Without loading additional Elisp code from "loadup.el".
 
-These functions called c-prelude can be tested by giving the --prelude
-flag to the run-tests script:
+Run the tests for these basic functions using the --prelude flag:
 
 #+BEGIN_SRC
 echo GUILE=/t/ge/g3/lib > env.sh
@@ -94,14 +116,16 @@ echo GUILE=/t/ge/g3/lib > env.sh
 ./tool/run-tests.sh --prelude
 #+END_SRC
 
-The prelude tests are found in test/pre directory.
+The prelude tests are located in the "test/pre" directory.
 
 **** debug tests c-prelude
 
-The following script show how to manually run a bare emacs
-with the proper args, under gdb.
-Note that you would first need to run "run-tools.sh --prelude",
-to generate the test file "test/pre/value-cmp.el".
+To manually debug a bare Emacs session under gdb,
+you can follow these steps. First, ensure you generate the necessary test files:
+ "run-tools.sh --prelude".
+Which will generate the test file "test/pre/value-cmp.el".
+
+Then, run the following script to start a debugging session:
 
 #+BEGIN_SRC
 . ./env.sh
@@ -117,6 +141,10 @@ cd test
 
 gdb --args ../src/emacs -nl -Q --batch -L . --prelude `pwd`/pre/value-cmp.el
 #+END_SRC
+
+This will allow you to step through and debug the C-prelude tests.
+Since the prelude tests are designed to exercise a minimum of emacs, it should
+be easier to pin-point test faults, sigsegvs and so on.
 
 * original work
 
