@@ -16,7 +16,7 @@
 
 (define %tests '(
 (group (prelude)
-  "test/pre/value-cmp.el")
+  "test/pre/value-cmp.scm")
 (group
 ; "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
@@ -210,14 +210,49 @@
   )
  ))
 
+(define %total-runned-tests 0)
+(define %total-failed-tests 0)
 (define %total-passed-tests 0)
 
+(define-syntax el-expr
+  (syntax-rules ()
+    ((_ expr)
+     (begin
+       (format (current-output-port) "~s~%" expr)))))
+
+(define-syntax deftest
+  (lambda (x)
+    (syntax-case x ()
+      ((_ name (expect) . body)
+       #'(begin
+           (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" 'name)
+           (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" 'expect)
+           (begin . body)
+           (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" 'name))))))
+
+;; take a test-specification in scheme and generate an elisp test file
+(define (testcompile-file file)
+  (let ((elfile (substring (substring file 0 (- (string-length file) 4)) 5)))
+    (with-output-to-file (string-concatenate (list elfile ".el"))
+      (lambda ()
+        (primitive-load (substring file 5))))
+    elfile))
+
+(define (testcompile-files files)
+  (map (lambda (file)
+         (cond
+          ;; scheme file, first compile it
+          ((= (- (string-length file) 4) (or (string-contains file ".scm") 0))
+           (testcompile-file file))
+          ;; raw elisp file, feed it to test target (emacs)
+          (else
+           ;; remove "/test" prefix and ".el" suffix
+           (let ((s (substring file 5)))
+             (substring s 0 (- (string-length s) 3))))))
+       files))
+
 (define (run-tests-bare-emacs files keys)
-  (let* ((files (map (lambda (file)
-                       (let ((s (substring file 5)))
-                         (substring s 0 (- (string-length s) 3))))
-                     files))
-         (files (randomize-list files))
+  (let* ((files (randomize-list (testcompile-files files)))
          (args (append
                 '("../src/emacs" "-nl" "-Q" "--batch")
                 (list
@@ -229,7 +264,7 @@
     (format #t "Running prelude test files: ~a~%" files)
     (format #t "running ===> ~a~%" args)
     (let* ((port (open-input-pipe (string-join args " ")))
-           (tot 0)
+           (tot 0) (pass 0) (fail 0)
            (curname #f)
            (expected #f)
            (curstr ""))
@@ -242,6 +277,8 @@
             (lambda (idx)
               (let ((name (substring line (+ idx (string-length "-- test begin: ")))))
                 (set! curname name)
+                (set! tot (1+ tot))
+                (set! %total-runned-tests (+ 1 %total-runned-tests))
                 (format #t "TEST-BEGIN: name [~s]~%" name))))
            ((string-contains line "-- test end: ") =>
             (lambda (idx)
@@ -251,8 +288,13 @@
                 (format #t "    EXP: ~s~%" expected)
                 (format #t "    GOT: ~s~%" curstr)
                 (format #t "    PASS: ~s~%" (equal? expected curstr)))
-              (if (equal? expected curstr)
-                  (set! tot (1+ tot)))
+              (cond
+               ((equal? expected curstr)
+                (set! pass (1+ pass))
+                (set! %total-passed-tests (+ 1 %total-passed-tests)))
+               (else
+                (set! fail (1+ fail))
+                (set! %total-failed-tests (+ 1 %total-failed-tests))))
               (set! expected #f)
               (set! curstr "")))
            ((string-contains line "-- test expect: ") =>
@@ -263,17 +305,14 @@
            (else
             (if curname
                 (set! curstr (string-concatenate (list curstr line))))
-            (format #t "~a [~a] >>> ~a~%" (+ tot %total-passed-tests) curname line)))
+            (format #t "~a/~a/~a [~a] >>> ~a~%"
+                    %total-runned-tests %total-passed-tests %total-failed-tests
+                    curname line)))
           (loop (get-line port)))))
-      (set! %total-passed-tests (+ %total-passed-tests tot))
-      (format #t "number of passed tests in files: ~a, of total: ~a~%" tot %total-passed-tests))))
+      (format #t "tests result over files: ~a runned, ~a passed, ~a failed~%" tot pass fail))))
 
 (define (run-tests-loadup-emacs files keys)
-  (let* ((files (map (lambda (file)
-                       (let ((s (substring file 5)))
-                         (substring s 0 (- (string-length s) 3))))
-                     files))
-         (files (randomize-list files))
+  (let* ((files (randomize-list (testcompile-files files)))
          (args (append
                 '("../src/emacs" "--no-init-file" "--no-site-file" "--no-site-lisp" "-L" ":." "-l" "ert")
                 (apply append (map (lambda (file)
@@ -349,5 +388,7 @@
                 %tests)
       (unless (null? files)
         (run-tests files '()))
-      (format #t "~%total number of passed tests: ~a~%" %total-passed-tests)
+      (format #t "~%total number of runned tests: ~a~%" %total-runned-tests)
+      (format #t "total number of passed tests: ~a~%" %total-passed-tests)
+      (format #t "total number of failed tests: ~a~%" %total-failed-tests)
       (exit))))
