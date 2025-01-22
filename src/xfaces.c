@@ -5857,7 +5857,7 @@ realize_basic_faces (struct frame *f)
          since otherwise face-remapping might affect the basic faces in the
          face cache, if this function happens to be invoked with current
 	 buffer set to a buffer with a non-nil face-remapping-alist.  */
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind (Qface_remapping_alist, Qnil);
       realize_named_face (f, Qmode_line_active, MODE_LINE_ACTIVE_FACE_ID);
       realize_named_face (f, Qmode_line_inactive, MODE_LINE_INACTIVE_FACE_ID);
@@ -5880,7 +5880,7 @@ realize_basic_faces (struct frame *f)
       realize_named_face (f, Qchild_frame_border, CHILD_FRAME_BORDER_FACE_ID);
       realize_named_face (f, Qtab_bar, TAB_BAR_FACE_ID);
       realize_named_face (f, Qtab_line, TAB_LINE_FACE_ID);
-      unbind_to (count, Qnil);
+      dynwind_end ();
 
       /* Reflect changes in the `menu' face in menu bars.  */
       if (FRAME_FACE_CACHE (f)->menu_face_changed_p)
