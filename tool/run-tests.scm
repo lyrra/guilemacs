@@ -1,4 +1,6 @@
-(use-modules (ice-9 popen)
+(use-modules (ice-9 match)
+             (ice-9 format)
+             (ice-9 popen)
              (ice-9 regex)
              (rnrs io ports)
              (utils))
@@ -283,16 +285,14 @@
            ((string-contains line "-- test end: ") =>
             (lambda (idx)
               (let ((name (substring line (+ idx (string-length "-- test end: ")))))
-                (format #t "TEST-END: name [~s]~%" name)
-                (format #t "  RESULT:~%")
-                (format #t "    EXP: ~s~%" expected)
-                (format #t "    GOT: ~s~%" curstr)
-                (format #t "    PASS: ~s~%" (equal? expected curstr)))
+                (format #t "TEST-END: name [~s]~%" name))
               (cond
                ((equal? expected curstr)
+                (format #t "    Ok.~%")
                 (set! pass (1+ pass))
                 (set! %total-passed-tests (+ 1 %total-passed-tests)))
                (else
+                (format #t "    FAIL!~%")
                 (set! fail (1+ fail))
                 (set! %total-failed-tests (+ 1 %total-failed-tests))))
               (set! expected #f)
@@ -309,7 +309,7 @@
                     %total-runned-tests %total-passed-tests %total-failed-tests
                     curname line)))
           (loop (get-line port)))))
-      (format #t "tests result over files: ~a runned, ~a passed, ~a failed~%" tot pass fail))))
+      (list tot pass fail))))
 
 (define (run-tests-loadup-emacs files keys)
   (let* ((files (randomize-list (testcompile-files files)))
@@ -338,14 +338,18 @@
                     (set! tot (string->number str))))))
             (loop (get-line port)))
            (else (loop (get-line port)))))))
-      (set! %total-passed-tests (+ %total-passed-tests tot))
-      (format #t "number of passed tests in files: ~a, of total: ~a~%" tot %total-passed-tests))))
+      (list tot tot 0))))
 
 (define (run-tests files keys)
-  ((if (memq 'prelude keys)
-       run-tests-bare-emacs
-      run-tests-loadup-emacs)
-   files keys))
+  (match ((if (memq 'prelude keys)
+              run-tests-bare-emacs
+              run-tests-loadup-emacs)
+          files keys)
+    ((tot pass fail)
+     (set! %total-runned-tests (+ %total-runned-tests tot))
+     (set! %total-passed-tests (+ %total-passed-tests pass))
+     (set! %total-failed-tests (+ %total-failed-tests fail))
+     (format #t "tests result over files: ~a runned, ~a passed, ~a failed~%" tot pass fail))))
 
 (define (match-keys keys fils)
   ;; check prelude
