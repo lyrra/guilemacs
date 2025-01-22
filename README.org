@@ -554,6 +554,54 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   see 922ad238
 ** bytecode optimizer
   see 7feb5b2d
+** coverage of the C-core
+   Coverage can be used to see wheter the testes exercise the C-code.
+
+   An example is given below of how to use GCOV to get
+   coverage details for the c-function / elisp function Fvaluelt (value<).
+
+   Find what c-file your function is stated in. In the example the elisp
+   function (value<), is defined in src/fns.c as Fvaluelt.
+
+   Run make with V=1 flag to get the full command line used to compile src/fns.c:
+
+#+BEGIN_SRC
+  make V=1
+
+  ...
+
+  Run the outputted command again, but add the --coverage flag:
+
+  cd src
+  gcc -g -c  -Demacs ... --coverage fns.c
+#+END_SRC
+
+  After recompiling fns.c with the --coverage flag, relink emacs
+  and again give the --coverage flag to gcc.
+  The link command can be found by running make V=1, which during build
+  will compile a temacs.tmp binary.
+
+#+BEGIN_SRC
+  cd src
+  gcc -g -o emacs --coverage ...
+#+END_SRC
+
+  Write some c-prelude tests and run the guilemacs regression suite:
+
+#+BEGIN_SRC
+  sh tool/run-tests.sh --prelude
+#+END_SRC
+
+  Run the gcov command to make reports from the coverage statistics:
+
+#+BEGIN_SRC
+  (cd src; gcov -m fns.c)
+
+  less src/fns.c.gcov
+#+END_SRC
+
+  The coverage statistics is found in the file src/fns.c.gcov
+  and will tell you what c-lines are runned.
 
 * bugs
 
