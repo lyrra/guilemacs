@@ -2973,6 +2973,8 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
           return value_cmp_scm (a, b);
 	if (BIGNUMP (b))
 	  return -mpz_sgn (*xbignum_val (b));
+        if (GUILEBIGNUMP (b))
+          return value_cmp_scm (a, b);
       }
       goto type_mismatch;
 
@@ -3104,6 +3106,19 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	    if (isnan (fa))
 	      return 0;
 	    return -mpz_cmp_d (*xbignum_val (b), fa);
+	  }
+        if (XTYPE (b) == Lisp_GuileBignum)
+          return value_cmp_scm (a, b);
+      }
+
+    case Lisp_GuileBignum:
+      {
+	if (FIXNUMP (b) || FLOATP (b) || GUILEBIGNUMP (b))
+          return value_cmp_scm (a, b);
+	if (BIGNUMP (b))
+	  {
+            Lisp_Object x = bignum_to_guile_bignum (b);
+            return value_cmp_scm (a, b);
 	  }
       }
       goto type_mismatch;
