@@ -2632,6 +2632,15 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  break;
 	}
 	break;
+    case Lisp_GuileBignum:
+      {
+        SCM port = scm_open_output_string ();
+        scm_write (obj, port);
+        char* str = scm_to_locale_string (scm_get_output_string (port));
+        strout (str, strlen(str), strlen(str), printcharfun);
+        scm_close_port (port);
+      }
+      break;
 
     default:
       emacs_abort ();

@@ -407,6 +407,7 @@ enum Lisp_Type
        the size and contents.  The size field also contains the type
        information, if it's not a real vector object.  */
     Lisp_Vectorlike,
+    Lisp_GuileBignum,
 
     /* Cons.  XCONS (object) points to a struct Lisp_Cons.  */
     Lisp_Cons,
@@ -1001,13 +1002,21 @@ BIGNUMP (Lisp_Object x)
   return PSEUDOVECTORP (x, PVEC_BIGNUM);
 }
 
+INLINE bool
+GUILEBIGNUMP (Lisp_Object x)
+{
+  return SCM_BIGP (x);
+}
+
 /* Extract A's type.  */
 INLINE enum Lisp_Type
 XTYPE (Lisp_Object o)
 {
   if (BIGNUMP (o))
     return Lisp_Vectorlike;
-  if (INTEGERP (o))
+  else if (GUILEBIGNUMP (o))
+    return Lisp_GuileBignum;
+  else if (INTEGERP (o))
     return Lisp_Int;
   else if (SYMBOLP (o))
     return Lisp_Symbol;
