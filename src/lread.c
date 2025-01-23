@@ -35,6 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "dispextern.h"
 #include "intervals.h"
 #include "character.h"
+#include "bignum.h"
 #include "buffer.h"
 #include "charset.h"
 #include <epaths.h>
@@ -5456,7 +5457,7 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
       if (!negative)
 	return make_uint (n);
       if (-MOST_NEGATIVE_FIXNUM < n)
-	return make_neg_biguint (n);
+	return bignum_to_guile_bignum (make_neg_biguint (n));
       EMACS_INT signed_n = n;
       return make_fixnum (-signed_n);
     }
@@ -5464,13 +5465,13 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
   /* Trim any leading "+" and trailing nondigits, then return a bignum.  */
   string += positive;
   if (!*after_digits)
-    return make_bignum_str (string, base);
+    return bignum_to_guile_bignum (make_bignum_str (string, base));
   ptrdiff_t trimmed_len = after_digits - string;
   USE_SAFE_ALLOCA;
   char *trimmed = SAFE_ALLOCA (trimmed_len + 1);
   memcpy (trimmed, string, trimmed_len);
   trimmed[trimmed_len] = '\0';
-  Lisp_Object result = make_bignum_str (trimmed, base);
+  Lisp_Object result = bignum_to_guile_bignum (make_bignum_str (trimmed, base));
   SAFE_FREE ();
   return result;
 }
