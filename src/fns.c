@@ -2935,7 +2935,7 @@ bool_vector_cmp (Lisp_Object a, Lisp_Object b)
   return (d & aw) ? 1 : -1;
 }
 
-static inline int
+int
 value_cmp_scm (Lisp_Object a, Lisp_Object b)
 {
   if (scm_less_p (a, b) == SCM_BOOL_T)

@@ -35,6 +35,9 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "keymap.h"
 
+int
+value_cmp_scm (Lisp_Object a, Lisp_Object b);
+
 #define WRAP1(cfn, lfn) \
   Lisp_Object cfn (Lisp_Object a) \
   { return call1 (cfn ## _sym, a); }
@@ -2593,134 +2596,41 @@ arithcompare (Lisp_Object num1, Lisp_Object num2)
   num1 = coerce_marker (num1);
   num2 = coerce_marker (num2);
 
+  if (BIGNUMP (num1))
+    {
+      num1 = bignum_to_guile_bignum (num1);
+    }
+
+  if (BIGNUMP (num2))
+    {
+      num2 = bignum_to_guile_bignum (num2);
+    }
+
   bool lt, eq, gt;
-  if (FLOATP (num1))
+
+  if ((FLOATP (num1) && scm_nan_p (num1) == SCM_BOOL_T) ||
+      (FLOATP (num2) && scm_nan_p (num2) == SCM_BOOL_T))
     {
-      double f1 = XFLOAT_DATA (num1);
-      if (FLOATP (num2))
-	{
-	  double f2 = XFLOAT_DATA (num2);
-	  lt = f1 < f2;
-	  eq = f1 == f2;
-	  gt = f1 > f2;
-	}
-      else if (FIXNUMP (num2))
-	{
-	  /* Compare a float NUM1 to an integer NUM2 by converting the
-	     integer I2 (i.e., NUM2) to the double F2 (a conversion that
-	     can round on some platforms, if I2 is large enough), and then
-	     converting F2 back to the integer I1 (a conversion that is
-	     always exact), so that I1 exactly equals ((double) NUM2).  If
-	     floating-point comparison reports a tie, NUM1 = F1 = F2 = I1
-	     (exactly) so I1 - I2 = NUM1 - NUM2 (exactly), so comparing I1
-	     to I2 will break the tie correctly.  */
-	  double f2 = XFIXNUM (num2);
-	  if (f1 == f2)
-	    {
-	      EMACS_INT i1 = f2;
-	      EMACS_INT i2 = XFIXNUM (num2);
-	      eq = i1 == i2;
-	      lt = i1 < i2;
-	      gt = i1 > i2;
-	    }
-	  else
-	    {
-	      eq = false;
-	      lt = f1 < f2;
-	      gt = f1 > f2;
-	    }
-	}
-      else if (BIGNUMP (num2))
-	{
-	  if (isnan (f1))
-	    lt = eq = gt = false;
-	  else
-	    {
-	      int cmp = mpz_cmp_d (*xbignum_val (num2), f1);
-	      eq = cmp == 0;
-	      lt = cmp > 0;
-	      gt = cmp < 0;
-	    }
-	}
-      else
-	not_number_or_marker (num2);
+      eq = false;
+      lt = false;
+      gt = false;
     }
-  else if (FIXNUMP (num1))
+  else if ((INTEGERP (num1) || FLOATP (num1)) &&
+           (INTEGERP (num2) || FLOATP (num2)))
     {
-      if (FLOATP (num2))
-	{
-	  /* Compare an integer NUM1 to a float NUM2.  This is the
-	     converse of comparing float to integer (see above).  */
-	  double f1 = XFIXNUM (num1), f2 = XFLOAT_DATA (num2);
-	  if (f1 == f2)
-	    {
-	      EMACS_INT i1 = XFIXNUM (num1);
-	      EMACS_INT i2 = f1;
-	      eq = i1 == i2;
-	      lt = i1 < i2;
-	      gt = i1 > i2;
-	    }
-	  else
-	    {
-	      eq = false;
-	      lt = f1 < f2;
-	      gt = f1 > f2;
-	    }
-	}
-      else if (FIXNUMP (num2))
-	{
-	  EMACS_INT i1 = XFIXNUM (num1);
-	  EMACS_INT i2 = XFIXNUM (num2);
-	  eq = i1 == i2;
-	  lt = i1 < i2;
-	  gt = i1 > i2;
-	}
-      else if (BIGNUMP (num2))
-	{
-	  int sgn = mpz_sgn (*xbignum_val (num2));
-	  eassume (sgn != 0);
-	  eq = false;
-	  lt = sgn > 0;
-	  gt = sgn < 0;
-	}
-      else
-	not_number_or_marker (num2);
-    }
-  else if (BIGNUMP (num1))
-    {
-      if (FLOATP (num2))
-	{
-	  double f2 = XFLOAT_DATA (num2);
-	  if (isnan (f2))
-	    lt = eq = gt = false;
-	  else
-	    {
-	      int cmp = mpz_cmp_d (*xbignum_val (num1), f2);
-	      eq = cmp == 0;
-	      lt = cmp < 0;
-	      gt = cmp > 0;
-	    }
-	}
-      else if (FIXNUMP (num2))
-	{
-	  int sgn = mpz_sgn (*xbignum_val (num1));
-	  eassume (sgn != 0);
-	  eq = false;
-	  lt = sgn < 0;
-	  gt = sgn > 0;
-	}
-      else if (BIGNUMP (num2))
-	{
-	  int cmp = mpz_cmp (*xbignum_val (num1), *xbignum_val (num2));
-	  eq = cmp == 0;
-	  lt = cmp < 0;
-	  gt = cmp > 0;
-	}
-      else
-	not_number_or_marker (num2);
+      int cmp = value_cmp_scm (num1, num2);
+      eq = cmp == 0;
+      lt = cmp < 0;
+      gt = cmp > 0;
     }
   else
-    not_number_or_marker (num1);
+    {
+      if (!(INTEGERP (num1) || FLOATP (num1)))
+        {
+          not_number_or_marker (num1);
+        }
+      not_number_or_marker (num2);
+    }
 
   return lt << Cmp_Bit_LT | gt << Cmp_Bit_GT | eq << Cmp_Bit_EQ;
 }
