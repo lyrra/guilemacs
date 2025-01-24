@@ -228,12 +228,20 @@
   (lambda (x)
     (syntax-case x ()
       ((_ name (expect) . body)
-       #'(begin
-           (set! %total-defined-tests (1+ %total-defined-tests))
-           (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" 'name)
-           (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" 'expect)
-           (begin . body)
-           (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" 'name))))))
+       #'(emit-test 'name 'expect (lambda () . body))))))
+
+(define-syntax deftestf
+  (lambda (x)
+    (syntax-case x ()
+      ((_ name (expect) . body)
+       #'(emit-test name expect (lambda () . body))))))
+
+(define (emit-test name expect thunk)
+  (set! %total-defined-tests (1+ %total-defined-tests))
+  (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" name)
+  (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" expect)
+  (thunk)
+  (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" name))
 
 ;; take a test-specification in scheme and generate an elisp test file
 (define (testcompile-file file)
