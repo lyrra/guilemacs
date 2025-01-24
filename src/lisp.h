@@ -2569,7 +2569,7 @@ XSQLITE (Lisp_Object a)
 INLINE bool
 INTEGERP (Lisp_Object x)
 {
-  return FIXNUMP (x) || BIGNUMP (x);
+  return FIXNUMP (x) || BIGNUMP (x) || GUILEBIGNUMP (x);
 }
 
 /* Return a Lisp integer with value taken from N.  */
