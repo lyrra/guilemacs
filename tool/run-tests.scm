@@ -18,7 +18,8 @@
 
 (define %tests '(
 (group (prelude)
-  "test/pre/value-cmp.scm")
+  "test/pre/value-cmp.scm"
+  "test/pre/bignum.scm")
 (group
 ; "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
@@ -212,8 +213,9 @@
   )
  ))
 
+(define %total-defined-tests 0)
 (define %total-runned-tests 0)
-(define %total-failed-tests 0)
+(define %total-failed-tests '())
 (define %total-passed-tests 0)
 
 (define-syntax el-expr
@@ -227,6 +229,7 @@
     (syntax-case x ()
       ((_ name (expect) . body)
        #'(begin
+           (set! %total-defined-tests (1+ %total-defined-tests))
            (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" 'name)
            (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" 'expect)
            (begin . body)
@@ -258,16 +261,17 @@
          (args (append
                 '("../src/emacs" "-nl" "-Q" "--batch")
                 (list
-                 (apply string-concatenate
-                        (map (lambda (file)
-                               (list "--prelude " (getcwd) "/" file))
-                             files)))
+                 (string-concatenate
+                  (apply append (map (lambda (file)
+                                       (list "--prelude " (getcwd) "/" file " "))
+                                     files))))
                 '(" 2>&1"))))
     (format #t "Running prelude test files: ~a~%" files)
     (format #t "running ===> ~a~%" args)
     (let* ((port (open-input-pipe (string-join args " ")))
-           (tot 0) (pass 0) (fail 0)
+           (tot 0) (pass 0) (fail '())
            (curname #f)
+           (prevres #f)
            (expected #f)
            (curstr ""))
       (let loop ((line (get-line port)))
@@ -277,10 +281,13 @@
           (cond
            ((string-contains line "-- test begin: ") =>
             (lambda (idx)
+              ;; catch if a test-protocol didn't report TEST-END
+              (if (and curname (not prevres))
+                (set! fail (cons curname fail)))
               (let ((name (substring line (+ idx (string-length "-- test begin: ")))))
+                (set! prevres #f)
                 (set! curname name)
                 (set! tot (1+ tot))
-                (set! %total-runned-tests (+ 1 %total-runned-tests))
                 (format #t "TEST-BEGIN: name [~s]~%" name))))
            ((string-contains line "-- test end: ") =>
             (lambda (idx)
@@ -290,25 +297,28 @@
                ((equal? expected curstr)
                 (format #t "    Ok.~%")
                 (set! pass (1+ pass))
-                (set! %total-passed-tests (+ 1 %total-passed-tests)))
+                (set! prevres #t))
                (else
                 (format #t "    FAIL!~%")
-                (set! fail (1+ fail))
-                (set! %total-failed-tests (+ 1 %total-failed-tests))))
+                (set! prevres #t) ;; avoid reporting failure again after loop-end
+                (set! fail (cons curname fail))))
               (set! expected #f)
               (set! curstr "")))
            ((string-contains line "-- test expect: ") =>
             (lambda (idx)
-              (let ((name (substring line (+ idx (string-length "-- test expect: ")))))
-                (set! expected name)
-                (format #t "  TEST-EXPECT: name [~s]~%" name))))
+              (let ((val (substring line (+ idx (string-length "-- test expect: ")))))
+                (set! expected val)
+                (format #t "  TEST-EXPECT: val [~s]~%" val))))
            (else
             (if curname
                 (set! curstr (string-concatenate (list curstr line))))
             (format #t "~a/~a/~a [~a] >>> ~a~%"
-                    %total-runned-tests %total-passed-tests %total-failed-tests
+                    %total-runned-tests (+ pass %total-passed-tests)
+                    (+ (length fail) (length %total-failed-tests))
                     curname line)))
           (loop (get-line port)))))
+      (if (and curname (not prevres))
+          (set! fail (cons curname fail)))
       (list tot pass fail))))
 
 (define (run-tests-loadup-emacs files keys)
@@ -338,7 +348,7 @@
                     (set! tot (string->number str))))))
             (loop (get-line port)))
            (else (loop (get-line port)))))))
-      (list tot tot 0))))
+      (list tot tot '()))))
 
 (define (run-tests files keys)
   (match ((if (memq 'prelude keys)
@@ -348,8 +358,10 @@
     ((tot pass fail)
      (set! %total-runned-tests (+ %total-runned-tests tot))
      (set! %total-passed-tests (+ %total-passed-tests pass))
-     (set! %total-failed-tests (+ %total-failed-tests fail))
-     (format #t "tests result over files: ~a runned, ~a passed, ~a failed~%" tot pass fail))))
+     (set! %total-failed-tests (append %total-failed-tests fail))
+     (format #t "tests result over files: ~a runned, ~a passed, ~a failed~%" tot pass (length fail))
+     (if (not (null? fail))
+         (format #t "  failed tests: ~s~%" fail)))))
 
 (define (match-keys keys fils)
   ;; check prelude
@@ -392,7 +404,10 @@
                 %tests)
       (unless (null? files)
         (run-tests files '()))
-      (format #t "~%total number of runned tests: ~a~%" %total-runned-tests)
+      (if (not (null? %total-failed-tests))
+          (format #t "~%~%failed tests ~s~%" %total-failed-tests))
+      (format #t "total number of defined tests: ~a~%" %total-defined-tests)
+      (format #t "total number of runned tests: ~a~%" %total-runned-tests)
       (format #t "total number of passed tests: ~a~%" %total-passed-tests)
-      (format #t "total number of failed tests: ~a~%" %total-failed-tests)
+      (format #t "total number of failed tests: ~a~%" (length %total-failed-tests))
       (exit))))
