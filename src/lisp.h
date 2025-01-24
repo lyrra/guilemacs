@@ -860,6 +860,9 @@ INLINE void
   lisp_h_CHECK_SYMBOL (x);
 }
 
+#define FIXNUM_OVERFLOW_P(i) \
+  (! ((0 <= (i) || MOST_NEGATIVE_FIXNUM <= (i)) && (i) <= MOST_POSITIVE_FIXNUM))
+
 /* Make a fixnum representing the value of the low order bits of N.  */
 INLINE Lisp_Object
 make_fixnum (EMACS_INT n)
@@ -2573,12 +2576,12 @@ INTEGERP (Lisp_Object x)
 INLINE Lisp_Object
 make_int (intmax_t n)
 {
-  return make_fixnum (n);
+  return FIXNUM_OVERFLOW_P (n) ? scm_from_uintmax (n) : make_fixnum (n);
 }
 INLINE Lisp_Object
 make_uint (uintmax_t n)
 {
-  return make_fixnum (n);
+  return FIXNUM_OVERFLOW_P (n) ? scm_from_uintmax (n) : make_fixnum (n);
 }
 
 /* Return a Lisp integer equal to the value of the C integer EXPR.  */
