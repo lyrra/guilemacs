@@ -533,7 +533,14 @@ This rounds the value towards -inf.
 With optional DIVISOR, return the largest integer no greater than ARG/DIVISOR.  */)
   (Lisp_Object arg, Lisp_Object divisor)
 {
-  return rounding_driver (arg, divisor, floor, mpz_fdiv_q, floor2);
+  eassert (!BIGNUMP (arg));
+  if (NILP (divisor))
+    {
+      return scm_inexact_to_exact (scm_floor (arg));
+    } else {
+      eassert (!BIGNUMP (divisor));
+      return scm_inexact_to_exact (scm_floor_quotient (arg, divisor));
+    }
 }
 
 DEFUN ("round", Fround, Sround, 1, 2, 0,
