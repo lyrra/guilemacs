@@ -20,7 +20,8 @@
 (group (prelude)
   "test/pre/value-cmp.scm"
   "test/pre/bignum.scm"
-  "test/pre/fixnum.scm")
+  "test/pre/fixnum.scm"
+  "test/pre/float.scm")
 (group
 ; "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
