@@ -19,7 +19,8 @@
 (define %tests '(
 (group (prelude)
   "test/pre/value-cmp.scm"
-  "test/pre/bignum.scm")
+  "test/pre/bignum.scm"
+  "test/pre/fixnum.scm")
 (group
 ; "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
@@ -241,7 +242,8 @@
   (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" name)
   (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" expect)
   (thunk)
-  (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" name))
+  (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" name)
+  (format (current-output-port) "(flush-standard-output)~%"))
 
 ;; take a test-specification in scheme and generate an elisp test file
 (define (testcompile-file file)
@@ -287,6 +289,10 @@
          ((eof-object? line) #f)
          (else
           (cond
+           ((string-contains line "Symbol's function definition is void") #f)
+           ((and (string-contains line "Loading ")
+                 (string-contains line "(source)"))
+            #f)
            ((string-contains line "-- test begin: ") =>
             (lambda (idx)
               ;; catch if a test-protocol didn't report TEST-END
@@ -308,6 +314,8 @@
                 (set! prevres #t))
                (else
                 (format #t "    FAIL!~%")
+                (format #t "    EXPECTED: ~s~%" expected)
+                (format #t "    GOT: ~s~%" curstr)
                 (set! prevres #t) ;; avoid reporting failure again after loop-end
                 (set! fail (cons curname fail))))
               (set! expected #f)
