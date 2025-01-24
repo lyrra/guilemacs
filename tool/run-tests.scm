@@ -220,11 +220,11 @@
 (define %total-failed-tests '())
 (define %total-passed-tests 0)
 
-(define-syntax el-expr
-  (syntax-rules ()
-    ((_ expr)
-     (begin
-       (format (current-output-port) "~s~%" expr)))))
+(define (el-expr str)
+  (format (current-output-port) "~a" str))
+
+(define (el-str str)
+  (format #f "~a" str))
 
 (define-syntax deftest
   (lambda (x)
