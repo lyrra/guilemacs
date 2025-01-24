@@ -40,18 +40,8 @@ Lisp_Object
 bignum_to_guile_bignum (Lisp_Object num)
 {
   if (BIGNUMP (num)) {
-    // reconstruct the elisp-bignum as a Guile bignum
-    // q1 <- (quotient x)
-    // r1 <- (remainder x)
-    // q2 <- (quotient q1)
-    // r2 <- (remainder q1)
-    // num == (+ (* (+ (* q2 m) r2) m) r1)
     mpz_t const *z = bignum_integer (&mpz[0], num);
-    Lisp_Object r1 = make_fixnum (mpz_fdiv_q_ui (mpz[0], *z, 1000000000000));
-    Lisp_Object r2 = make_fixnum (mpz_fdiv_q_ui (mpz[0], mpz[0], 1000000000000));
-    Lisp_Object q2 = make_fixnum (mpz_get_si (mpz[0]));
-    Lisp_Object m = make_fixnum (1000000000000);
-    return scm_sum (scm_product (scm_sum (scm_product (q2, m), r2), m), r1);
+    return scm_from_mpz (*z);
   } else {
     return num;
   }
