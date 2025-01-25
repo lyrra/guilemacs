@@ -68,3 +68,10 @@
     (make-arith-test '> b f 't)
     (make-arith-test '> f b 'nil)
     (make-arith-test '< b f 'nil)))
+
+(for-each (lambda (num)
+            (let ((name (string->symbol (format #f "minus-a0-~x" num))))
+              (deftestf name ((- num))
+                (el-expr `(print (- ,num))))))
+          (append %interesting-bignums
+                  '(0 -1 1)))

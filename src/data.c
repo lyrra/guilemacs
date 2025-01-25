@@ -3114,6 +3114,8 @@ usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
 	return make_int (-XFIXNUM (a));
       if (FLOATP (a))
 	return make_float (-XFLOAT_DATA (a));
+      if (GUILEBIGNUMP (a))
+	return scm_difference (2, a); // 2 == make_fixnum (0)
       mpz_neg (mpz[0], *xbignum_val (a));
       return make_integer_mpz ();
     }
