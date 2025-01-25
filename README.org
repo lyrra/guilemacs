@@ -140,6 +140,9 @@ export EMACS_TEST_DIRECTORY="`pwd`/test"
 cd test
 
 gdb --args ../src/emacs -nl -Q --batch -L . --prelude `pwd`/pre/value-cmp.el
+
+(gdb) break xsignal2
+(gdb) break emacs_abort
 #+END_SRC
 
 This will allow you to step through and debug the C-prelude tests.
