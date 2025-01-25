@@ -2895,6 +2895,7 @@ XFLOATINT (Lisp_Object n)
 {
   return (FIXNUMP (n) ? XFIXNUM (n)
 	  : FLOATP (n) ? XFLOAT_DATA (n)
+	  : GUILEBIGNUMP (n) ? scm_to_double (n)
 	  : emacs_abort()); // bignum_to_double (n));
 }
 

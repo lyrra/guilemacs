@@ -1810,6 +1810,12 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
 	  return tail;
 	}
     }
+  else if (GUILEBIGNUMP (n))
+    {
+      if (scm_negative_p (n) == SCM_BOOL_T)
+	return tail;
+      num = large_num;
+    }
   else
     {
       if (mpz_sgn (*xbignum_val (n)) < 0)
@@ -1843,7 +1849,14 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
   /* TAIL is part of a cycle.  Reduce NUM modulo the cycle length to
      avoid going around this cycle repeatedly.  */
   intptr_t cycle_length = tortoise_num - num;
-  if (! FIXNUMP (n))
+  if (GUILEBIGNUMP (n))
+    {
+      emacs_abort ();
+      // just error, too complex to keep in C
+      // but a pure guile version might differ too much?
+      // also see test test-nthcdr-circular
+     }
+  else if (! FIXNUMP (n))
     {
       /* Undo any error introduced when LARGE_NUM was substituted for
 	 N, by adding N - LARGE_NUM to NUM, using arithmetic modulo

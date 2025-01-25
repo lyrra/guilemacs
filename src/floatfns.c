@@ -310,27 +310,13 @@ This is the same as the exponent of a float.  */)
   EMACS_INT value;
   CHECK_NUMBER (arg);
 
-  if (FLOATP (arg))
+  if (FLOATP (arg) || FIXNUMP (arg) || GUILEBIGNUMP (arg))
     {
-      double f = XFLOAT_DATA (arg);
-      if (f == 0)
-	return make_float (-HUGE_VAL);
-      if (!isfinite (f))
-	return f < 0 ? make_float (-f) : arg;
-      int ivalue;
-      frexp (f, &ivalue);
-      value = ivalue - 1;
-    }
-  else if (!FIXNUMP (arg))
-    value = mpz_sizeinbase (*xbignum_val (arg), 2) - 1;
-  else
-    {
-      EMACS_INT i = XFIXNUM (arg);
-      if (i == 0)
-	return make_float (-HUGE_VAL);
-      value = elogb (eabs (i));
+      Lisp_Object x = scm_divide (scm_log (arg), scm_log (10)); // 10 = make_fixnum (2)
+      return scm_inexact_to_exact (scm_round_number (x));
     }
 
+  value = mpz_sizeinbase (*xbignum_val (arg), 2) - 1;
   return make_fixnum (value);
 }
 

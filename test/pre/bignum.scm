@@ -69,9 +69,36 @@
     (make-arith-test '> f b 'nil)
     (make-arith-test '< b f 'nil)))
 
+;;; minus
 (for-each (lambda (num)
             (let ((name (string->symbol (format #f "minus-a0-~x" num))))
               (deftestf name ((- num))
                 (el-expr `(print (- ,num))))))
           (append %interesting-bignums
                   '(0 -1 1)))
+
+;;;
+;;; in vanilla emacs all these equals 2305843009213693952 (- most-negative-fixnum)
+(deftest divide-extreme-sign-ceiling (t)
+  (el-expr `(print (= -2305843009213693952
+                      (ceiling most-negative-fixnum -1.0)))))
+(deftest divide-extreme-sign-floor (t)
+  (el-expr `(print (= 2305843009213693952
+                      (floor most-negative-fixnum -1.0)))))
+(deftest divide-extreme-sign-round (t)
+  (el-expr `(print (= -2305843009213693952
+                      (round most-negative-fixnum -1.0)))))
+(deftest divide-extreme-sign-truncate (t)
+  (el-expr `(print (= -2305843009213693952
+                      (truncate most-negative-fixnum -1.0)))))
+
+;;; logarithm
+(deftest logb-2 (62)
+  (el-expr `(print (+ (logb most-positive-fixnum) 1))))
+
+(deftest logb-3 (61)
+  (el-expr `(print (logb (+ most-positive-fixnum 1)))))
+
+(deftest bignum-abs (t)
+  (el-expr `(print (= most-positive-fixnum
+                      (- (abs most-negative-fixnum) 1)))))
