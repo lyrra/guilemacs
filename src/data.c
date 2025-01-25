@@ -2980,6 +2980,50 @@ float_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
    converted to integer.  */
 
 static Lisp_Object
+guilebignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
+                          ptrdiff_t argnum, intmax_t iaccum, Lisp_Object val)
+{
+  Lisp_Object accum;
+  if (argnum == 0)
+    {
+      accum = val;
+      goto next_arg;
+    }
+  accum = scm_from_intmax (iaccum);
+
+  while (true)
+    {
+      Lisp_Object next = val;
+
+      switch (code)
+	{
+	case Aadd   :       accum = scm_sum (accum, next); break;
+	case Asub   :       accum = scm_difference (accum, next); break;
+	case Amult  :       accum = scm_product (accum, next); break;
+	case Alogand:       accum = scm_logand (accum, next); break;
+	case Alogior:       accum = scm_logior (accum, next); break;
+	case Alogxor:       accum = scm_logxor (accum, next); break;
+	case Adiv:
+	  if (scm_zero_p (next) == SCM_BOOL_T)
+	    xsignal0 (Qarith_error);
+	  accum = scm_divide (accum, next);
+	  break;
+	default:
+	  eassume (false);
+	}
+
+    next_arg:
+      argnum++;
+      if (argnum == nargs)
+	return accum;
+      val = check_number_coerce_marker (args[argnum]);
+      if (FLOATP (val))
+	return float_arith_driver (code, nargs, args, argnum, scm_to_double (accum), val);
+    }
+}
+
+
+static Lisp_Object
 bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 		     ptrdiff_t argnum, intmax_t iaccum, Lisp_Object val)
 {
@@ -3081,9 +3125,18 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	accum = a;
       }
 
-  return (FLOATP (val)
-	  ? float_arith_driver (code, nargs, args, argnum, accum, val)
-	  : bignum_arith_driver (code, nargs, args, argnum, accum, val));
+  if (FLOATP (val))
+    {
+      return float_arith_driver (code, nargs, args, argnum, accum, val);
+    }
+  else if (GUILEBIGNUMP (val))
+    {
+      return guilebignum_arith_driver (code, nargs, args, argnum, accum, val);
+    }
+  else
+    {
+      return bignum_arith_driver (code, nargs, args, argnum, accum, val);
+    }
 }
 
 
@@ -3110,11 +3163,7 @@ usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
   Lisp_Object a = check_number_coerce_marker (args[0]);
   if (nargs == 1)
     {
-      if (FIXNUMP (a))
-	return make_int (-XFIXNUM (a));
-      if (FLOATP (a))
-	return make_float (-XFLOAT_DATA (a));
-      if (GUILEBIGNUMP (a))
+      if (FIXNUMP (a) || FLOATP (a) || GUILEBIGNUMP (a))
 	return scm_difference (2, a); // 2 == make_fixnum (0)
       mpz_neg (mpz[0], *xbignum_val (a));
       return make_integer_mpz ();
