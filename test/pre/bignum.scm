@@ -151,3 +151,12 @@
             (logcount 1 ,(lambda (a) (logcount a)))
             (ash 2 ,(lambda (a b) (ash a b)))
             (lognot 1 ,(lambda (a) (lognot a)))))
+
+;;; format
+
+;; disabled for now, see guilemacs FIX in editfns.c styled_format
+;(for-each (lambda (num)
+;           (deftestf (string->symbol (format #f "format-~x" num))
+;                     ((format #f "~a" num))
+;             (el-expr `(print (format "\"%i\"" ,num)))))
+;         %interesting-bignums)

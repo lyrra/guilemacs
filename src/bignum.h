@@ -56,7 +56,6 @@ extern void emacs_mpz_mul_2exp (mpz_t, mpz_t const, EMACS_INT)
   ARG_NONNULL ((1, 2));
 extern void emacs_mpz_pow_ui (mpz_t, mpz_t const, unsigned long)
   ARG_NONNULL ((1, 2));
-extern double mpz_get_d_rounded (mpz_t const) ATTRIBUTE_CONST;
 extern Lisp_Object get_random_bignum (struct Lisp_Bignum const *);
 
 INLINE_HEADER_BEGIN
@@ -116,18 +115,6 @@ bignum_integer (mpz_t *tmp, Lisp_Object i)
       return (mpz_t const *) tmp;
     }
   return xbignum_val (i);
-}
-
-/* Set RESULT to the value stored in the Lisp integer I.  If I is a
-   big integer, copy it to RESULT.  RESULT must already be
-   initialized.  */
-INLINE void
-mpz_set_integer (mpz_t result, Lisp_Object i)
-{
-  if (FIXNUMP (i))
-    mpz_set_intmax (result, XFIXNUM (i));
-  else
-    mpz_set (result, *xbignum_val (i));
 }
 
 INLINE_HEADER_END

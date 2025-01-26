@@ -522,10 +522,11 @@ json_out_float (json_out_t *jo, Lisp_Object f)
 static void
 json_out_bignum (json_out_t *jo, Lisp_Object x)
 {
+  emacs_abort ();  // FIX: guilemacs, not implemented
   int base = 10;
-  ptrdiff_t size = bignum_bufsize (x, base);
+  ptrdiff_t size = 0; // size of bignum printed as a string
   json_make_room (jo, size);
-  int n = bignum_to_c_string (jo->buf + jo->size, size, x, base);
+  int n = 0; //convert bignum (x, base) into jo->buf+jo->size, return length of bignum as string
   jo->size += n;
 }
 

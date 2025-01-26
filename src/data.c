@@ -3041,53 +3041,6 @@ guilebignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
     }
 }
 
-
-static Lisp_Object
-bignum_arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
-		     ptrdiff_t argnum, intmax_t iaccum, Lisp_Object val)
-{
-  mpz_t const *accum;
-  if (argnum == 0)
-    {
-      accum = bignum_integer (&mpz[0], val);
-      goto next_arg;
-    }
-  mpz_set_intmax (mpz[0], iaccum);
-  accum = &mpz[0];
-
-  while (true)
-    {
-      mpz_t const *next = bignum_integer (&mpz[1], val);
-
-      switch (code)
-	{
-	case Aadd   :       mpz_add (mpz[0], *accum, *next); break;
-	case Asub   :       mpz_sub (mpz[0], *accum, *next); break;
-	case Amult  : emacs_mpz_mul (mpz[0], *accum, *next); break;
-	case Alogand:       mpz_and (mpz[0], *accum, *next); break;
-	case Alogior:       mpz_ior (mpz[0], *accum, *next); break;
-	case Alogxor:       mpz_xor (mpz[0], *accum, *next); break;
-	case Adiv:
-	  if (mpz_sgn (*next) == 0)
-	    xsignal0 (Qarith_error);
-	  mpz_tdiv_q (mpz[0], *accum, *next);
-	  break;
-	default:
-	  eassume (false);
-	}
-      accum = &mpz[0];
-
-    next_arg:
-      argnum++;
-      if (argnum == nargs)
-	return make_integer_mpz ();
-      val = check_number_coerce_marker (args[argnum]);
-      if (FLOATP (val))
-	return float_arith_driver (code, nargs, args, argnum,
-				   mpz_get_d_rounded (*accum), val);
-    }
-}
-
 /* Return the result of applying the arithmetic operation CODE to the
    NARGS arguments starting at ARGS, with the first argument being the
    number VAL.  2 <= NARGS.  Check that the remaining arguments are
@@ -3144,17 +3097,16 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	accum = a;
       }
 
+  if (BIGNUMP (val))
+    emacs_abort ();
+
   if (FLOATP (val))
     {
       return float_arith_driver (code, nargs, args, argnum, accum, val);
     }
-  else if (GUILEBIGNUMP (val))
-    {
-      return guilebignum_arith_driver (code, nargs, args, argnum, accum, val);
-    }
   else
     {
-      return bignum_arith_driver (code, nargs, args, argnum, accum, val);
+      return guilebignum_arith_driver (code, nargs, args, argnum, accum, val);
     }
 }
 

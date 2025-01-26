@@ -319,57 +319,6 @@ emacs_mpz_pow_ui (mpz_t rop, mpz_t const base, unsigned long exp)
   mpz_pow_ui (rop, base, exp);
 }
 
-
-/* Yield an upper bound on the buffer size needed to contain a C
-   string representing the NUM in base BASE.  This includes any
-   preceding '-' and the terminating null.  */
-static ptrdiff_t
-mpz_bufsize (mpz_t const num, int base)
-{
-  return mpz_sizeinbase (num, base) + 2;
-}
-ptrdiff_t
-bignum_bufsize (Lisp_Object num, int base)
-{
-  return mpz_bufsize (*xbignum_val (num), base);
-}
-
-/* Convert NUM to a nearest double, as opposed to mpz_get_d which
-   truncates toward zero.  */
-double
-mpz_get_d_rounded (mpz_t const num)
-{
-  ptrdiff_t size = mpz_bufsize (num, 10);
-
-  /* Use mpz_get_d as a shortcut for a bignum so small that rounding
-     errors cannot occur, which is possible if EMACS_INT (not counting
-     sign) has fewer bits than a double significand.  */
-  if (! ((FLT_RADIX == 2 && DBL_MANT_DIG <= FIXNUM_BITS - 1)
-	 || (FLT_RADIX == 16 && DBL_MANT_DIG * 4 <= FIXNUM_BITS - 1))
-      && size <= DBL_DIG + 2)
-    return mpz_get_d (num);
-
-  USE_SAFE_ALLOCA;
-  char *buf = SAFE_ALLOCA (size);
-  mpz_get_str (buf, 10, num);
-  double result = strtod (buf, NULL);
-  SAFE_FREE ();
-  return result;
-}
-
-/* Store into BUF (of size SIZE) the value of NUM as a base-BASE string.
-   If BASE is negative, use upper-case digits in base -BASE.
-   Return the string's length.
-   SIZE must equal bignum_bufsize (NUM, abs (BASE)).  */
-ptrdiff_t
-bignum_to_c_string (char *buf, ptrdiff_t size, Lisp_Object num, int base)
-{
-  eassert (bignum_bufsize (num, abs (base)) == size);
-  mpz_get_str (buf, base, *xbignum_val (num));
-  ptrdiff_t n = size - 2;
-  return !buf[n - 1] ? n - 1 : n + !!buf[n];
-}
-
 /* Check that X is a Lisp integer in the range LO..HI.
    Return X's value as an intmax_t.  */
 

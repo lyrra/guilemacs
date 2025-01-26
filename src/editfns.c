@@ -3785,7 +3785,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		                 : "Invalid format operation char #o%03o",
 		       *p);
 	    }
-	  else if (! (FIXNUMP (arg) || ((BIGNUMP (arg) || FLOATP (arg))
+	  else if (! (FIXNUMP (arg) || ((GUILEBIGNUMP (arg) || FLOATP (arg))
 					&& conversion != 'c')))
 	    error ("Format specifier doesn't match argument type");
 	  else
@@ -3907,24 +3907,17 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  sprintf_bytes = prec != 0;
 		}
 	      else if (BIGNUMP (arg))
+                {
+                  emacs_abort ();
+                }
+	      else if (GUILEBIGNUMP (arg))
 	      bignum_arg:
 		{
+                  // FIX: guilemacs, not working
 		  int base = ((conversion == 'd' || conversion == 'i') ? 10
 			      : conversion == 'o' ? 8 : 16);
-		  sprintf_bytes = bignum_bufsize (arg, base);
-		  if (sprintf_bytes <= buf + bufsize - p)
-		    {
-		      int signedbase = conversion == 'X' ? -base : base;
-		      sprintf_bytes = bignum_to_c_string (p, sprintf_bytes,
-							  arg, signedbase);
-		      bool negative = p[0] == '-';
-		      prec = min (precision, sprintf_bytes - prefixlen);
-		      prefix[prefixlen] = plus_flag ? '+' : ' ';
-		      prefixlen += (plus_flag | space_flag) & !negative;
-		      prefix[prefixlen] = '0';
-		      prefix[prefixlen + 1] = conversion;
-		      prefixlen += sharp_flag && base == 16 ? 2 : 0;
-		    }
+                  char *c_string = scm_to_utf8_string (scm_number_to_string (arg, make_fixnum (base)));
+                  sprintf_bytes = c_string;
 		}
 	      else if (conversion == 'd' || conversion == 'i')
 		{
