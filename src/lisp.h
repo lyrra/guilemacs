@@ -485,8 +485,6 @@ INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 /* Defined in bignum.c.  */
 extern int check_int_nonnegative (Lisp_Object);
 extern intmax_t check_integer_range (Lisp_Object, intmax_t, intmax_t);
-extern Lisp_Object make_bigint (intmax_t);
-extern Lisp_Object make_biguint (uintmax_t);
 extern uintmax_t check_uinteger_max (Lisp_Object, uintmax_t);
 
 /* Defined in chartab.c.  */
@@ -3643,7 +3641,6 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
 extern ptrdiff_t bignum_bufsize (Lisp_Object, int) ATTRIBUTE_CONST;
 extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
 extern Lisp_Object bignum_to_string (Lisp_Object, int);
-extern Lisp_Object make_bignum_str (char const *, int);
 extern Lisp_Object make_neg_biguint (uintmax_t);
 extern Lisp_Object double_to_integer (double);
 

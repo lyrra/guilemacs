@@ -115,22 +115,6 @@ make_bignum (void)
   return make_bignum_bits (mpz_sizeinbase (mpz[0], 2));
 }
 
-/* Return a Lisp integer equal to N, which must not be in fixnum range.  */
-Lisp_Object
-make_bigint (intmax_t n)
-{
-  eassert (FIXNUM_OVERFLOW_P (n));
-  mpz_set_intmax (mpz[0], n);
-  return make_bignum ();
-}
-Lisp_Object
-make_biguint (uintmax_t n)
-{
-  eassert (FIXNUM_OVERFLOW_P (n));
-  mpz_set_uintmax (mpz[0], n);
-  return make_bignum ();
-}
-
 /* Return a Lisp integer equal to -N, which must not be in fixnum range.  */
 Lisp_Object
 make_neg_biguint (uintmax_t n)
@@ -399,22 +383,6 @@ bignum_to_string (Lisp_Object num, int base)
   Lisp_Object result = make_unibyte_string (str, len);
   SAFE_FREE ();
   return result;
-}
-
-/* Create a bignum by scanning NUM, with digits in BASE.
-   NUM must consist of an optional '-', a nonempty sequence
-   of base-BASE digits, and a terminating null byte, and
-   the represented number must not be in fixnum range.  */
-
-Lisp_Object
-make_bignum_str (char const *num, int base)
-{
-  struct Lisp_Bignum *b = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Bignum,
-						       PVEC_BIGNUM);
-  mpz_init (b->value);
-  int check = mpz_set_str (b->value, num, base);
-  eassert (check == 0);
-  return make_lisp_ptr (b, Lisp_Vectorlike);
 }
 
 /* Check that X is a Lisp integer in the range LO..HI.
