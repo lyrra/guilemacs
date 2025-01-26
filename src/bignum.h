@@ -54,8 +54,6 @@ extern void emacs_mpz_mul (mpz_t, mpz_t const, mpz_t const)
   ARG_NONNULL ((1, 2, 3));
 extern void emacs_mpz_mul_2exp (mpz_t, mpz_t const, EMACS_INT)
   ARG_NONNULL ((1, 2));
-extern void emacs_mpz_pow_ui (mpz_t, mpz_t const, unsigned long)
-  ARG_NONNULL ((1, 2));
 
 INLINE_HEADER_BEGIN
 

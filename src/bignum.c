@@ -305,20 +305,6 @@ emacs_mpz_mul_2exp (mpz_t rop, mpz_t const op1, EMACS_INT op2)
   mpz_mul_2exp (rop, op1, op2);
 }
 
-void
-emacs_mpz_pow_ui (mpz_t rop, mpz_t const base, unsigned long exp)
-{
-  /* This fudge factor is derived from GMP 6.1.2, to avoid an abort in
-     mpz_n_pow_ui (look for the '5' in its source code).  */
-  enum { pow_ui_extra_limbs = 5 };
-  enum { lim = min (NLIMBS_LIMIT, GMP_NLIMBS_MAX - pow_ui_extra_limbs) };
-
-  int nbase = emacs_mpz_size (base), n;
-  if (ckd_mul (&n, nbase, exp) || lim < n)
-    overflow_error ();
-  mpz_pow_ui (rop, base, exp);
-}
-
 /* Check that X is a Lisp integer in the range LO..HI.
    Return X's value as an intmax_t.  */
 

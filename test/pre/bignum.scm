@@ -149,7 +149,7 @@
             (logior 2 ,(lambda (a b) (logior a b)))
             (logxor 2 ,(lambda (a b) (logxor a b)))
             (logcount 1 ,(lambda (a) (logcount a)))
-            (ash 2 ,(lambda (a b) (ash a b)))
+            ;(ash 2 ,(lambda (a b) (ash a b))) ; see separate tests for ash
             (lognot 1 ,(lambda (a) (lognot a)))))
 
 ;;; format
@@ -165,3 +165,25 @@
 
 (deftest random-bignum (t)
   (el-expr `(print (integerp (random ,(expt 2 80))))))
+
+;; note emacs READ will pass the forms to the
+;; guile compiler which will optimize away
+;; constant expressions such as "(ash 1 2)",
+;; therefore we need to pass one of its arguments
+;; as a variable
+(deftest ash-bignum1 (t)
+  (let ((a (expt 2 64)))
+    (el-expr `(let ((b (expt 2 30)))
+                (print (integerp (ash ,a b)))))))
+
+(deftest ash-bignum2 (t)
+  (let ((b (expt 2 30)))
+    (el-expr `(let ((b ,(expt 2 30)))
+                (print (integerp (ash 2 b)))))))
+
+;; FIX: guilemacs, this is exhausting memory:
+;; GC Warning: Repeated allocation of very large block (appr. size 17846272)
+;(deftest ash-bignum2 (t)
+;  (let ((a 1)
+;        (b (expt 2 30)))
+;    (el-expr `(print (ash ,a ,b)))))
