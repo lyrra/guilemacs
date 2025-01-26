@@ -1456,7 +1456,7 @@
     (should-error (vconcat [1] loop)
                   :type 'circular-list)))
 
-(ert-deftest fns-append ()
+'(ert-deftest fns-append ()
   (should (equal (append) nil))
   (should (equal (append 'tail) 'tail))
   (should (equal (append [1 2 3] nil '(4 5) "AB" "å"
@@ -1571,11 +1571,11 @@
           (setq orig (cdr orig))
           (setq copy (cdr copy))))))
 
-  (should-error (copy-alist 'a)
+  '(should-error (copy-alist 'a)
                 :type 'wrong-type-argument)
-  (should-error (copy-alist [(a . 1) (b . 2) (a . 3)])
+  '(should-error (copy-alist [(a . 1) (b . 2) (a . 3)])
                 :type 'wrong-type-argument)
-  (should-error (copy-alist "abc")
+  '(should-error (copy-alist "abc")
                 :type 'wrong-type-argument))
 
 '(ert-deftest fns-value<-ordered ()
