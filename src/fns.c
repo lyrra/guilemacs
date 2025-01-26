@@ -90,19 +90,13 @@ See Info node `(elisp)Random Numbers' for more details.  */)
     init_random ();
   else if (STRINGP (limit))
     seed_random (SSDATA (limit), SBYTES (limit));
-  else if (FIXNUMP (limit))
+  else if (FIXNUMP (limit) || GUILEBIGNUMP (limit))
     {
-      EMACS_INT lim = XFIXNUM (limit);
-      if (lim <= 0)
-        xsignal1 (Qargs_out_of_range, limit);
-      return get_random_fixnum (lim);
+      return scm_random (limit, SCM_UNDEFINED);
     }
   else if (BIGNUMP (limit))
     {
-      struct Lisp_Bignum *lim = XBIGNUM (limit);
-      if (mpz_sgn (*bignum_val (lim)) <= 0)
-        xsignal1 (Qargs_out_of_range, limit);
-      return get_random_bignum (lim);
+      emacs_abort ();
     }
 
   return make_ufixnum (get_random ());

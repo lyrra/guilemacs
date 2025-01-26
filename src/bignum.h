@@ -56,7 +56,6 @@ extern void emacs_mpz_mul_2exp (mpz_t, mpz_t const, EMACS_INT)
   ARG_NONNULL ((1, 2));
 extern void emacs_mpz_pow_ui (mpz_t, mpz_t const, unsigned long)
   ARG_NONNULL ((1, 2));
-extern Lisp_Object get_random_bignum (struct Lisp_Bignum const *);
 
 INLINE_HEADER_BEGIN
 

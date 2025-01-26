@@ -160,3 +160,8 @@
 ;                     ((format #f "~a" num))
 ;             (el-expr `(print (format "\"%i\"" ,num)))))
 ;         %interesting-bignums)
+
+;;; random
+
+(deftest random-bignum (t)
+  (el-expr `(print (integerp (random ,(expt 2 80))))))
