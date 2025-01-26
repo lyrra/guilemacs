@@ -370,21 +370,6 @@ bignum_to_c_string (char *buf, ptrdiff_t size, Lisp_Object num, int base)
   return !buf[n - 1] ? n - 1 : n + !!buf[n];
 }
 
-/* Convert NUM to a base-BASE Lisp string.
-   If BASE is negative, use upper-case digits in base -BASE.  */
-
-Lisp_Object
-bignum_to_string (Lisp_Object num, int base)
-{
-  ptrdiff_t size = bignum_bufsize (num, abs (base));
-  USE_SAFE_ALLOCA;
-  char *str = SAFE_ALLOCA (size);
-  ptrdiff_t len = bignum_to_c_string (str, size, num, base);
-  Lisp_Object result = make_unibyte_string (str, len);
-  SAFE_FREE ();
-  return result;
-}
-
 /* Check that X is a Lisp integer in the range LO..HI.
    Return X's value as an intmax_t.  */
 

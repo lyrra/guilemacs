@@ -999,16 +999,6 @@ maybe_load_seccomp (int argc, char **argv)
 
 #endif  /* SECCOMP_USABLE */
 
-static Lisp_Object
-string_from_scheme (Lisp_Object scheme_string)
-{
-  size_t nbytes;
-  char *c_string = scm_to_utf8_stringn (scheme_string, &nbytes);
-  return make_string_from_bytes (c_string,
-                                 scm_c_string_length (scheme_string),
-                                 nbytes);
-}
-
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 

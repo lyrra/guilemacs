@@ -1192,6 +1192,9 @@ CDR_SAFE (Lisp_Object c)
   return CONSP (c) ? XCDR (c) : Qnil;
 }
 
+Lisp_Object string_from_scheme (Lisp_Object scheme_string);
+Lisp_Object string_to_scheme (Lisp_Object string);
+
 /* In a string or vector, the sign bit of u.s.size is the gc mark bit.  */
 
 struct Lisp_String
@@ -3640,7 +3643,6 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
    the caller to access bignum internals; see bignum.h for that.  */
 extern ptrdiff_t bignum_bufsize (Lisp_Object, int) ATTRIBUTE_CONST;
 extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
-extern Lisp_Object bignum_to_string (Lisp_Object, int);
 extern Lisp_Object make_neg_biguint (uintmax_t);
 extern Lisp_Object double_to_integer (double);
 

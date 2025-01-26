@@ -24,6 +24,16 @@
                 (el-expr `(print ,num)))))
           %interesting-bignums)
 
+(for-each (lambda (num)
+              (deftestf (string->symbol (format #f "number-to-string-~x" num))
+                        ((format #f "~a" num))
+                (el-expr `(print (number-to-string ,num))))
+
+              (deftestf (string->symbol (format #f "string-to-number-~x" num))
+                        (num)
+                (el-expr `(print (string-to-number ,(format #f "\"~a\"" num))))))
+          %interesting-bignums)
+
 (let ((mpfx (- (expt 2 61) 1)) ; most-positive-fixnum
       (lnfx (- (expt 2 62) 1))) ; least-negative-fixnum
 

@@ -240,10 +240,13 @@
 
 (define (emit-test name expect thunk)
   (set! %total-defined-tests (1+ %total-defined-tests))
-  (format (current-output-port) "(princ \"\\n-- test begin: ~s\\n\")~%" name)
-  (format (current-output-port) "(princ \"\\n-- test expect: ~s\\n\")~%" expect)
+  (format (current-output-port) "(princ \"\\n-- test begin: ~a\\n\")~%" name)
+  (format (current-output-port) "(princ \"\\n-- test expect: ~a\\n\")~%"
+          (if (string? expect)
+              (format #f "\\\"~a\\\"" expect)
+              expect))
   (thunk)
-  (format (current-output-port) "(princ \"\\n-- test end: ~s\\n\")~%" name)
+  (format (current-output-port) "(princ \"\\n-- test end: ~a\\n\")~%" name)
   (format (current-output-port) "(flush-standard-output)~%"))
 
 ;; take a test-specification in scheme and generate an elisp test file

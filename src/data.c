@@ -2862,8 +2862,13 @@ NUMBER may be an integer or a floating point number.  */)
       return make_unibyte_string (p, end - p);
     }
 
+  if (GUILEBIGNUMP (number))
+    {
+      // guilemacs, missing ancient feature: If BASE is negative, use upper-case digits in base -BASE.
+      return string_from_scheme (scm_number_to_string (number, make_fixnum (10)));
+    }
   if (BIGNUMP (number))
-    return bignum_to_string (number, 10);
+    emacs_abort ();
 
   if (FLOATP (number))
     return make_unibyte_string (buffer,
@@ -2903,6 +2908,20 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
   Lisp_Object val = string_to_number (p, b, 0);
   return ((IEEE_FLOATING_POINT ? NILP (val) : !NUMBERP (val))
 	  ? make_fixnum (0) : val);
+}
+Lisp_Object
+string_from_scheme (Lisp_Object scheme_string)
+{
+  size_t nbytes;
+  char *c_string = scm_to_utf8_stringn (scheme_string, &nbytes);
+  return make_string_from_bytes (c_string,
+                                 scm_c_string_length (scheme_string),
+                                 nbytes);
+}
+Lisp_Object
+string_to_scheme (Lisp_Object string)
+{
+  return scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
 }
 
 enum arithop
