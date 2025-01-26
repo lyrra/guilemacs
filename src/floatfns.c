@@ -222,13 +222,7 @@ DEFUN ("expt", Fexpt, Sexpt, 2, 2, 0,
 {
   CHECK_NUMBER (arg1);
   CHECK_NUMBER (arg2);
-
-  /* Common Lisp spec: don't promote if both are integers, and if the
-     result is not fractional.  */
-  if (INTEGERP (arg1) && !NILP (Fnatnump (arg2)))
-    return expt_integer (arg1, arg2);
-
-  return make_float (pow (XFLOATINT (arg1), XFLOATINT (arg2)));
+  return scm_expt (arg1, arg2);
 }
 
 DEFUN ("log", Flog, Slog, 1, 2, 0,

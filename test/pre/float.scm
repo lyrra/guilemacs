@@ -19,3 +19,6 @@
 
 (deftest floor-2 (123)
   (el-expr `(print (floor 123.999))))
+
+(deftest expt (33.1776)
+  (el-expr `(print (expt 2.4 4.0))))
