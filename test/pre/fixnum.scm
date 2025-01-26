@@ -18,3 +18,9 @@
 (let ((bs (- (expt 2 62) 2)))
   (deftestf 'print-penultimate-least-negative-fixnum (bs)
     (el-expr `(print ,bs))))
+
+;
+(let ((b most-positive-fixnum)
+      (s most-negative-fixnum))
+  (deftestf 'max-1 (b) (el-expr `(let ((b ,b) (s ,s)) (print (max b s)))))
+  (deftestf 'min-1 (s) (el-expr `(let ((b ,s) (s ,s)) (print (min b s))))))
