@@ -50,10 +50,6 @@ extern void init_bignum (void);
 extern Lisp_Object make_integer_mpz (void);
 extern bool mpz_to_intmax (mpz_t const, intmax_t *) ARG_NONNULL ((1, 2));
 extern bool mpz_to_uintmax (mpz_t const, uintmax_t *) ARG_NONNULL ((1, 2));
-extern void emacs_mpz_mul (mpz_t, mpz_t const, mpz_t const)
-  ARG_NONNULL ((1, 2, 3));
-extern void emacs_mpz_mul_2exp (mpz_t, mpz_t const, EMACS_INT)
-  ARG_NONNULL ((1, 2));
 
 INLINE_HEADER_BEGIN
 

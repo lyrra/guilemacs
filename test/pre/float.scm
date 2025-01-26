@@ -22,3 +22,9 @@
 
 (deftest expt (33.1776)
   (el-expr `(print (expt 2.4 4.0))))
+
+(for-each (lambda (num)
+            (deftestf (string->symbol (format #f "round_~a" num))
+                      ((inexact->exact (round num)))
+              (el-expr `(let ((a ,num)) (print (round a))))))
+          '(4.3 1.2 5.7))

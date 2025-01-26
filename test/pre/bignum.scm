@@ -88,19 +88,19 @@
                   '(0 -1 1)))
 
 ;;;
-;;; in vanilla emacs all these equals 2305843009213693952 (- most-negative-fixnum)
-(deftest divide-extreme-sign-ceiling (t)
-  (el-expr `(print (= -2305843009213693952
-                      (ceiling most-negative-fixnum -1.0)))))
-(deftest divide-extreme-sign-floor (t)
-  (el-expr `(print (= 2305843009213693952
-                      (floor most-negative-fixnum -1.0)))))
-(deftest divide-extreme-sign-round (t)
-  (el-expr `(print (= -2305843009213693952
-                      (round most-negative-fixnum -1.0)))))
-(deftest divide-extreme-sign-truncate (t)
-  (el-expr `(print (= -2305843009213693952
-                      (truncate most-negative-fixnum -1.0)))))
+(let ((m 2305843009213693952)) ; (- most-negative-fixnum)
+  (deftest divide-extreme-sign-ceiling (t)
+    (el-expr `(print (= ,m
+                        (ceiling most-negative-fixnum -1.0)))))
+  (deftest divide-extreme-sign-floor (t)
+    (el-expr `(print (= ,m
+                        (floor most-negative-fixnum -1.0)))))
+  (deftest divide-extreme-sign-round (t)
+    (el-expr `(print (= ,m
+                        (round most-negative-fixnum -1.0)))))
+  (deftest divide-extreme-sign-truncate (t)
+    (el-expr `(print (= ,m
+                        (truncate most-negative-fixnum -1.0))))))
 
 ;;; logarithm
 (deftest logb-2 (62)
