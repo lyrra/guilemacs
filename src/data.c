@@ -3221,6 +3221,12 @@ usage: (/ NUMBER &rest DIVISORS)  */)
 static Lisp_Object
 integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
 {
+  if ((FIXNUMP (num) || GUILEBIGNUMP (num)) &&
+      (FIXNUMP (den) || GUILEBIGNUMP (den)))
+    {
+      return scm_remainder (num, den);
+    }
+
   if (FIXNUMP (den))
     {
       EMACS_INT d = XFIXNUM (den);
@@ -3370,7 +3376,11 @@ representation.  */)
 {
   CHECK_INTEGER (value);
 
-  if (BIGNUMP (value))
+  if (GUILEBIGNUMP (value))
+    {
+      return scm_logcount (value);
+    }
+  else if (BIGNUMP (value))
     {
       mpz_t const *nonneg = xbignum_val (value);
       if (mpz_sgn (*nonneg) < 0)
