@@ -24,7 +24,7 @@
   "test/pre/float.scm"
   "test/pre/random.scm")
 (group
-; "test/src/timefns-tests.el"
+  "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
   "test/src/floatfns-tests.el"
   )
