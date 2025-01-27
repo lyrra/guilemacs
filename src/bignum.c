@@ -115,16 +115,6 @@ make_bignum (void)
   return make_bignum_bits (mpz_sizeinbase (mpz[0], 2));
 }
 
-/* Return a Lisp integer equal to -N, which must not be in fixnum range.  */
-Lisp_Object
-make_neg_biguint (uintmax_t n)
-{
-  eassert (-MOST_NEGATIVE_FIXNUM < n);
-  mpz_set_uintmax (mpz[0], n);
-  mpz_neg (mpz[0], mpz[0]);
-  return make_bignum ();
-}
-
 /* Return a Lisp integer with value taken from mpz[0].
    Set mpz[0] to a junk value.  */
 Lisp_Object
@@ -207,40 +197,6 @@ mpz_to_intmax (mpz_t const z, intmax_t *pi)
       return true;
     }
   return false;
-}
-bool
-mpz_to_uintmax (mpz_t const z, uintmax_t *pi)
-{
-  if (FASTER_BIGNUM)
-    {
-      if (mpz_fits_ulong_p (z))
-	{
-	  *pi = mpz_get_ui (z);
-	  return true;
-	}
-      if (UINTMAX_MAX <= ULONG_MAX)
-	return false;
-    }
-
-  if (mpz_sgn (z) < 0)
-    return false;
-  ptrdiff_t bits = mpz_sizeinbase (z, 2);
-  if (UINTMAX_WIDTH < bits)
-    return false;
-
-  uintmax_t v = 0;
-  int i = 0, shift = 0;
-
-  do
-    {
-      uintmax_t limb = mpz_getlimbn (z, i++);
-      v += limb << shift;
-      shift += GMP_NUMB_BITS;
-    }
-  while (shift < bits);
-
-  *pi = v;
-  return true;
 }
 
 /* Check that X is a Lisp integer in the range LO..HI.

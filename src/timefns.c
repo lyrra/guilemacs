@@ -592,41 +592,12 @@ ticks_hz_list4 (Lisp_Object ticks, Lisp_Object hz)
 		make_fixnum (us), make_fixnum (ps));
 }
 
-/* Set ROP to T.  */
-static void
-mpz_set_time (mpz_t rop, time_t t)
-{
-  if (EXPR_SIGNED (t))
-    mpz_set_intmax (rop, t);
-  else
-    mpz_set_uintmax (rop, t);
-}
-
-/* Store into mpz[0] a clock tick count for T, assuming a
-   TIMESPEC_HZ-frequency clock.  Use mpz[1] as a temp.  */
-static void
-timespec_mpz (struct timespec t)
-{
-  /* mpz[0] = sec * TIMESPEC_HZ + nsec.  */
-  mpz_set_ui (mpz[0], t.tv_nsec);
-  mpz_set_time (mpz[1], t.tv_sec);
-  mpz_addmul_ui (mpz[0], mpz[1], TIMESPEC_HZ);
-}
-
 /* Convert T to a Lisp integer counting TIMESPEC_HZ ticks.  */
 static Lisp_Object
 timespec_ticks (struct timespec t)
 {
-  /* For speed, use intmax_t arithmetic if it will do.  */
-  intmax_t accum;
-  if (FASTER_TIMEFNS
-      && !ckd_mul (&accum, t.tv_sec, TIMESPEC_HZ)
-      && !ckd_add (&accum, accum, t.tv_nsec))
-    return make_int (accum);
-
-  /* Fall back on bignum arithmetic.  */
-  timespec_mpz (t);
-  return make_integer_mpz ();
+  return scm_sum (scm_product (make_fixnum (t.tv_sec), make_fixnum (TIMESPEC_HZ)),
+                  make_fixnum (t.tv_nsec));
 }
 
 /* Return greatest common divisor of positive A and B.  */

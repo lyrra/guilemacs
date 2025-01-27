@@ -5457,7 +5457,9 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
       if (!negative)
 	return make_uint (n);
       if (-MOST_NEGATIVE_FIXNUM < n)
-	return bignum_to_guile_bignum (make_neg_biguint (n));
+        {
+	  return scm_product(scm_from_int (-1), scm_from_uintmax (n));
+        }
       EMACS_INT signed_n = n;
       return make_fixnum (-signed_n);
     }

@@ -72,15 +72,6 @@ mpz_set_intmax (mpz_t result, intmax_t v)
   else
     emacs_abort ();
 }
-INLINE void ARG_NONNULL ((1))
-mpz_set_uintmax (mpz_t result, uintmax_t v)
-{
-  unsigned long int i;
-  if (FASTER_BIGNUM && !ckd_add (&i, v, 0))
-    mpz_set_ui (result, i);
-  else
-    emacs_abort ();
-}
 
 /* Return a pointer to the mpz_t value represented by the bignum I.
    It is const because the value should not change.  */
