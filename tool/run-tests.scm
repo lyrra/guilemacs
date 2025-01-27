@@ -22,7 +22,8 @@
   "test/pre/bignum.scm"
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
-  "test/pre/random.scm")
+  "test/pre/random.scm"
+  "test/pre/time.scm")
 (group
   "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
@@ -232,21 +233,24 @@
   (lambda (x)
     (syntax-case x ()
       ((_ name (expect) . body)
-       #'(emit-test 'name 'expect (lambda () . body))))))
+       #'(emit-test 'name #f 'expect (lambda () . body))))))
 
 (define-syntax deftestf
   (lambda (x)
     (syntax-case x ()
       ((_ name (expect) . body)
-       #'(emit-test name expect (lambda () . body))))))
+       #'(emit-test name #f expect (lambda () . body)))
+      ((_ name (type expect) . body)
+       #'(emit-test name 'type expect (lambda () . body))))))
 
-(define (emit-test name expect thunk)
+(define (emit-test name type expect thunk)
   (set! %total-defined-tests (1+ %total-defined-tests))
   (format (current-output-port) "(princ \"\\n-- test begin: ~a\\n\")~%" name)
   (format (current-output-port) "(princ \"\\n-- test expect: ~a\\n\")~%"
-          (if (string? expect)
-              (format #f "\\\"~a\\\"" expect)
-              expect))
+          (cond
+           ((eq? type 'text) (format #f "~a" expect))
+           ((string? expect) (format #f "\\\"~a\\\"" expect))
+           (else expect)))
   (thunk)
   (format (current-output-port) "(princ \"\\n-- test end: ~a\\n\")~%" name)
   (format (current-output-port) "(flush-standard-output)~%"))
@@ -403,10 +407,12 @@
     (let ((files '())
           (done #f))
       (for-each (lambda (line)
-                  (when (and (not done)
-                             (not (equal? "" line)))
+                  (when (not done)
                     (cond
                      ((eq? 'done line) (set! done #t))
+                     ((and (pair? line)
+                           (eq? 'quote (car line)))
+                      #f)
                      ((and (pair? line)
                            (eq? 'group (car line)))
                       (let ((keys (if (and (pair? (cdr line)) (pair? (cadr line)))

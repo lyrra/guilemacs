@@ -384,22 +384,6 @@ frac_to_double (Lisp_Object numerator, Lisp_Object denominator)
   return scm_to_double (scm_divide (numerator, denominator));
 }
 
-/* Convert Z to time_t, returning true if it fits.  */
-static bool
-mpz_time (mpz_t const z, time_t *t)
-{
-  if (TYPE_SIGNED (time_t))
-    {
-      intmax_t i;
-      return mpz_to_intmax (z, &i) && !ckd_add (t, i, 0);
-    }
-  else
-    {
-      uintmax_t i;
-      return mpz_to_uintmax (z, &i) && !ckd_add (t, i, 0);
-    }
-}
-
 /* Return a valid timespec (S, N) if S is in time_t range,
    an invalid timespec otherwise.  */
 static struct timespec
@@ -427,8 +411,7 @@ static struct timespec
 ticks_hz_to_timespec (Lisp_Object ticks, Lisp_Object hz)
 {
   int ns;
-  mpz_t *q = &mpz[0];
-  mpz_t const *qt = q;
+  Lisp_Object q, q2;
 
   /* Floor-divide (TICKS * TIMESPEC_HZ) by HZ,
      yielding quotient Q (tv_sec) and remainder NS (tv_nsec).
@@ -444,26 +427,42 @@ ticks_hz_to_timespec (Lisp_Object ticks, Lisp_Object hz)
 	    s--, ns += TIMESPEC_HZ;
 	  return s_ns_to_timespec (s, ns);
 	}
-      ns = mpz_fdiv_q_ui (*q, *xbignum_val (ticks), TIMESPEC_HZ);
+      scm_round_divide (ticks, make_fixnum (TIMESPEC_HZ), &q, &ns);
     }
   else if (FASTER_TIMEFNS && BASE_EQ (hz, make_fixnum (1)))
     {
       ns = 0;
       if (FIXNUMP (ticks))
-	return s_ns_to_timespec (XFIXNUM (ticks), ns);
-      qt = xbignum_val (ticks);
+        {
+	  return s_ns_to_timespec (XFIXNUM (ticks), ns);
+        }
+      q = ticks;
     }
   else
     {
-      mpz_mul_ui (*q, *bignum_integer (q, ticks), TIMESPEC_HZ);
-      mpz_fdiv_q (*q, *q, *bignum_integer (&mpz[1], hz));
-      ns = mpz_fdiv_q_ui (*q, *q, TIMESPEC_HZ);
+      Lisp_Object thz = scm_from_unsigned_integer (TIMESPEC_HZ);
+      q = scm_product (ticks, thz);
+      q = scm_floor_quotient (q, hz);
+      Lisp_Object r;
+      scm_floor_divide (q, thz, &q2, &r);
+      ns = scm_to_signed_integer (r, MOST_NEGATIVE_FIXNUM, MOST_POSITIVE_FIXNUM);
     }
 
   /* Check that Q fits in time_t, not merely in RESULT.tv_sec.  With some MinGW
      versions, tv_sec is a 64-bit type, whereas time_t is a 32-bit type.  */
   time_t sec;
-  return mpz_time (*qt, &sec) ? make_timespec (sec, ns) : invalid_timespec ();
+
+  // FIX: guilemacs, this causes a general guile error, we should call invalid_timespec ();
+  if (TYPE_SIGNED (time_t))
+    {
+      sec = scm_to_signed_integer (q2, INT_MIN, INT_MAX);
+    }
+  else
+    {
+      sec = scm_to_unsigned_integer (q2, 0, UINT_MAX);
+    }
+
+  return make_timespec (sec, ns);
 }
 
 /* C timestamp forms.  This enum is passed to conversion functions to

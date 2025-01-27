@@ -155,50 +155,6 @@ make_integer_mpz (void)
   return make_bignum_bits (bits);
 }
 
-/* If Z fits into *PI, store its value there and return true.
-   Return false otherwise.  */
-bool
-mpz_to_intmax (mpz_t const z, intmax_t *pi)
-{
-  if (FASTER_BIGNUM)
-    {
-      if (mpz_fits_slong_p (z))
-	{
-	  *pi = mpz_get_si (z);
-	  return true;
-	}
-      if (LONG_MIN <= INTMAX_MIN && INTMAX_MAX <= LONG_MAX)
-	return false;
-    }
-
-  ptrdiff_t bits = mpz_sizeinbase (z, 2);
-  bool negative = mpz_sgn (z) < 0;
-
-  if (bits < INTMAX_WIDTH)
-    {
-      intmax_t v = 0;
-      int i = 0, shift = 0;
-
-      do
-	{
-	  intmax_t limb = mpz_getlimbn (z, i++);
-	  v += limb << shift;
-	  shift += GMP_NUMB_BITS;
-	}
-      while (shift < bits);
-
-      *pi = negative ? -v : v;
-      return true;
-    }
-  if (bits == INTMAX_WIDTH && INTMAX_MIN < -INTMAX_MAX && negative
-      && mpz_scan1 (z, 0) == INTMAX_WIDTH - 1)
-    {
-      *pi = INTMAX_MIN;
-      return true;
-    }
-  return false;
-}
-
 /* Check that X is a Lisp integer in the range LO..HI.
    Return X's value as an intmax_t.  */
 

@@ -377,11 +377,11 @@ With optional DIVISOR, return the smallest integer no less than ARG/DIVISOR.  */
 {
   if (NILP (divisor))
       {
-        return scm_ceiling (arg);
+        return scm_inexact_to_exact(scm_ceiling (arg));
       }
     else
       {
-        return scm_ceiling (scm_divide (arg, divisor));
+        return scm_inexact_to_exact (scm_ceiling (scm_divide (arg, divisor)));
       }
 }
 

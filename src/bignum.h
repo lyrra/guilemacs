@@ -48,8 +48,6 @@ extern Lisp_Object bignum_to_guile_bignum (Lisp_Object num);
 
 extern void init_bignum (void);
 extern Lisp_Object make_integer_mpz (void);
-extern bool mpz_to_intmax (mpz_t const, intmax_t *) ARG_NONNULL ((1, 2));
-extern bool mpz_to_uintmax (mpz_t const, uintmax_t *) ARG_NONNULL ((1, 2));
 
 INLINE_HEADER_BEGIN
 
