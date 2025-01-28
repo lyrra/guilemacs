@@ -305,15 +305,6 @@ be easier to pin-point test faults, sigsegvs and so on.
   in git diff 5761a2ecb..da4a31b1b1a
   search-slow-speed has been moved
 
-** faults
-
-  not working:
-  ... 8209e03844  -- 20240717
-
-** guilemacs differences
-*** old-style obarray removed
-  (see vanilla check_obarray_slow)
-
 * FAQ
 ** How can I help?
   - testing what currently works:
@@ -488,6 +479,10 @@ be easier to pin-point test faults, sigsegvs and so on.
   If guile drives bignum.
   - 5463b7e77ab4 migth not be needed.
 
+** guilemacs differences
+*** old-style obarray removed
+  (see vanilla check_obarray_slow)
+
 * Commit notes
 ** guile-elisp bootstrap (C)
   rebasing after 219c3f80, in function Fcommandp,
@@ -548,6 +543,40 @@ be easier to pin-point test faults, sigsegvs and so on.
   alist = Fcopy_sequence (alist);
 
 * debugging
+** finding regressions in history and git bisecting
+  Since guilemacs is built ontop of emacs, and by staying fresh, all commits
+  belonging to guilemacs is rebased ontop of the latest emacs master branch.
+
+  When a rebase is done, manual testing and regression tests are run to see
+  wheter the rebase was successful.
+
+  Every now and then and also at crucial emacs development points in time,
+  a git tag is created that records that rebase attempt.
+
+  The tag name has the format:
+
+#+BEGIN_SRC
+  larry-r616-dcfc31da-20250118-31.0.50-TSHREDO
+  ^     ^    ^        ^        ^       ^
+  |     |    |        |        |       |
+  |     |    |        |        |       >    Tests
+  |     |    |        |        > Emacs preliminary version
+  |     |    |        > Rebase emacs git commit date
+  |     |    > Rebase emacs git commit hash
+  |     > Tag sequence number
+  > guile-emacs contributors prefix
+
+  - By having a contributor prefix, all can contribute and push their tags upstream.
+  - Tests: each character represents a test procedure:
+    - T -- tetris is possible to launch and play
+    - S -- snake is possible to launch and play
+    - H -- hanoi is possible to launch and completes
+    - R -- prelude + ERT  regression tests
+    - E -- eshell launches and can list files
+    - D -- dunnet launches, try to take the shovel and go east
+
+#+END_SRC
+
 ** possible causes of errors
 *** unbound-variable "(:full)"
   Full error:
@@ -657,6 +686,10 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   and will tell you what c-lines are runned.
 
 * bugs
+** faults
+
+  not working:
+  ... 8209e03844  -- 20240717
 
 ** 20241231-guile-touch
  - [[gedoc/20241231-guile-touch.org][20241231 guile-touch]]
