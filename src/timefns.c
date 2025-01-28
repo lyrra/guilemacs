@@ -559,36 +559,31 @@ decode_float_time (double t, enum cform cform)
 static Lisp_Object
 ticks_hz_list4 (Lisp_Object ticks, Lisp_Object hz)
 {
-  /* mpz[0] = floor ((ticks * trillion) / hz).  */
-  mpz_t const *zticks = bignum_integer (&mpz[0], ticks);
-#if FASTER_TIMEFNS && TRILLION <= ULONG_MAX
-  mpz_mul_ui (mpz[0], *zticks, TRILLION);
-#else
-  mpz_mul (mpz[0], *zticks, ztrillion);
-#endif
-  mpz_fdiv_q (mpz[0], mpz[0], *bignum_integer (&mpz[1], hz));
+  Lisp_Object zt = BIGNUMP (ticks) ? bignum_to_guile_bignum (ticks) : ticks;
+  Lisp_Object zh = BIGNUMP (hz) ? bignum_to_guile_bignum (hz) : hz;
+
+  Lisp_Object z, q, q2, r;
+  /* floor ((ticks * trillion) / hz).  */
+  z = scm_product (zt, scm_from_uintmax (TRILLION));
+  q2 = scm_floor_quotient (z, zh);
+
+  scm_floor_divide (q2, scm_from_uintmax (TRILLION), &q, &r);
+  unsigned long int fullps = scm_to_uintmax (r);
+  int us = fullps / 1000000;
+  int ps = fullps % 1000000;
 
   /* mpz[0] = floor (mpz[0] / trillion), with US = the high six digits of the
      12-digit remainder, and PS = the low six digits.  */
-#if FASTER_TIMEFNS && TRILLION <= ULONG_MAX
-  unsigned long int fullps = mpz_fdiv_q_ui (mpz[0], mpz[0], TRILLION);
-  int us = fullps / 1000000;
-  int ps = fullps % 1000000;
-#else
-  mpz_fdiv_qr (mpz[0], mpz[1], mpz[0], ztrillion);
-  int ps = mpz_fdiv_q_ui (mpz[1], mpz[1], 1000000);
-  int us = mpz_get_ui (mpz[1]);
-#endif
 
   /* mpz[0] = floor (mpz[0] / (1 << LO_TIME_BITS)), with LO = remainder.  */
-  unsigned long ulo = mpz_get_ui (mpz[0]);
-  if (mpz_sgn (mpz[0]) < 0)
-    ulo = -ulo;
-  int lo = ulo & ((1 << LO_TIME_BITS) - 1);
-  mpz_fdiv_q_2exp (mpz[0], mpz[0], LO_TIME_BITS);
+  unsigned long ulo = scm_to_uintmax (q);
 
-  return list4 (make_integer_mpz (), make_fixnum (lo),
-		make_fixnum (us), make_fixnum (ps));
+  if (scm_negative_p (q) == SCM_BOOL_T)
+    ulo = -ulo;
+
+  int lo = ulo & ((1 << LO_TIME_BITS) - 1);
+  q = scm_floor_quotient (q, scm_expt (make_fixnum (2), make_fixnum (LO_TIME_BITS)));
+  return list4 (q, make_fixnum (lo), make_fixnum (us), make_fixnum (ps));
 }
 
 /* Convert T to a Lisp integer counting TIMESPEC_HZ ticks.  */

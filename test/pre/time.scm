@@ -5,6 +5,18 @@
 (deftest time-convert-hanoi (t)
   (el-expr `(print (integerp (time-convert nil 'integer)))))
 
+; trigger call to ticks_hz_list4
+(deftest time-convert-0125 ((0 0 0 0))
+  (el-expr `(print (time-convert 0.125 'list))))
+
+; trigger call to ticks_hz_list4
+(deftest time-convert-ticks_hz_list4 ((0 123 0 123))
+  (el-expr `(print (time-convert 123 'list))))
+; trigger call to ticks_hz_list4
+(deftest time-convert-ticks_hz_list4-2 ((1876831054 45057 123000000 1))
+  (el-expr `(print (time-convert 123000000000000.9999 'list))))
+
+
 (deftestf 'decode-time ('(0 0 1 1 1 1970 4 nil 3600))
   (el-expr `(print (decode-time 0))))
 
