@@ -641,20 +641,19 @@ ticks_hz_hz_ticks (struct ticks_hz t, Lisp_Object hz)
 	  hz = make_fixnum (ihz);
 	}
     }
+  else if (! (GUILEBIGNUMP (hz) && (scm_negative_p (hz) == SCM_BOOL_T)))
+    invalid_hz (hz);
   else if (! (BIGNUMP (hz) && 0 < mpz_sgn (*xbignum_val (hz))))
     invalid_hz (hz);
 
+  Lisp_Object z, z2;
+  Lisp_Object zt = BIGNUMP (hz) ? bignum_to_guile_bignum (t.ticks) : t.ticks;
+  Lisp_Object zh = BIGNUMP (hz) ? bignum_to_guile_bignum (hz) : hz;
+  Lisp_Object zh2 = BIGNUMP (t.hz) ? bignum_to_guile_bignum (t.hz) : t.hz;
   /* Fall back on bignum arithmetic.  */
-  mpz_t const *zticks = bignum_integer (&mpz[0], t.ticks);
-  if (FASTER_TIMEFNS && FIXNUMP (hz) && XFIXNUM (hz) <= ULONG_MAX)
-    mpz_mul_ui (mpz[0], *zticks, XFIXNUM (hz));
-  else
-    mpz_mul (mpz[0], *zticks, *bignum_integer (&mpz[1], hz));
-  if (FASTER_TIMEFNS && FIXNUMP (t.hz) && XFIXNUM (t.hz) <= ULONG_MAX)
-    mpz_fdiv_q_ui (mpz[0], mpz[0], XFIXNUM (t.hz));
-  else
-    mpz_fdiv_q (mpz[0], mpz[0], *bignum_integer (&mpz[1], t.hz));
-  return make_integer_mpz ();
+  z = scm_product (zt, zh);
+  z2 = scm_floor_quotient (z, zh2);
+  return z2;
 }
 
 /* Convert T to a Lisp integer counting seconds, taking the floor.  */

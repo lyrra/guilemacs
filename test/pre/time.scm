@@ -16,6 +16,11 @@
 (deftest time-convert-ticks_hz_list4-2 ((1876831054 45057 123000000 1))
   (el-expr `(print (time-convert 123000000000000.9999 'list))))
 
+;(deftest time-convert-ticks_hz_hz_ticks ((12300000000000100 . 100))
+;  (el-expr `(print (time-convert 123000000000000.9999 100))))
+
+(deftest time-convert-ticks_hz_hz_ticks ((12300000000000100000000000 . 100000000000))
+  (el-expr `(print (time-convert 123000000000000.9999 100000000000))))
 
 (deftestf 'decode-time ('(0 0 1 1 1 1970 4 nil 3600))
   (el-expr `(print (decode-time 0))))
