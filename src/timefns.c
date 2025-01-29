@@ -671,10 +671,7 @@ ticks_hz_seconds (struct ticks_hz t)
 			- (XFIXNUM (t.ticks) % XFIXNUM (t.hz) < 0));
 
   /* For speed, inline what ticks_hz_hz_ticks would do.  */
-  mpz_fdiv_q (mpz[0],
-	      *bignum_integer (&mpz[0], t.ticks),
-	      *bignum_integer (&mpz[1], t.hz));
-  return make_integer_mpz ();
+  return scm_floor_quotient (t.ticks, t.hz);
 }
 
 /* Convert T to a Lisp timestamp.  */
@@ -1131,19 +1128,24 @@ time_cmp (Lisp_Object a, Lisp_Object b)
      ATICKS * BHZ to BTICKS * AHZ.  */
   struct ticks_hz ta = decode_lisp_time (a, CFORM_TICKS_HZ).th;
   struct ticks_hz tb = decode_lisp_time (b, CFORM_TICKS_HZ).th;
-  mpz_t const *za = bignum_integer (&mpz[0], ta.ticks);
-  mpz_t const *zb = bignum_integer (&mpz[1], tb.ticks);
+  if (BIGNUMP (ta.ticks) || BIGNUMP (tb.ticks))
+    emacs_abort ();
+  Lisp_Object za = ta.ticks;
+  Lisp_Object zb = tb.ticks;
   if (! (FASTER_TIMEFNS && BASE_EQ (ta.hz, tb.hz)))
     {
-      /* This could be sped up by looking at the signs, sizes, and
-	 number of bits of the two sides; see how GMP does mpq_cmp.
-	 It may not be worth the trouble here, though.  */
-      mpz_mul (mpz[0], *za, *bignum_integer (&mpz[2], tb.hz));
-      mpz_mul (mpz[1], *zb, *bignum_integer (&mpz[2], ta.hz));
-      za = &mpz[0];
-      zb = &mpz[1];
+      za = scm_product (za, tb.hz);
+      zb = scm_product (zb, ta.hz);
     }
-  return mpz_cmp (*za, *zb);
+  if (scm_less_p (za, zb) == SCM_BOOL_T)
+    {
+      return -1;
+    }
+  if (scm_less_p (zb, za) == SCM_BOOL_T)
+    {
+      return 1;
+    }
+  return 0;
 }
 
 DEFUN ("time-less-p", Ftime_less_p, Stime_less_p, 2, 2, 0,
@@ -1471,12 +1473,10 @@ usage: (decode-time &optional TIME ZONE FORM)  */)
 	ticks = make_int (n);
       else
 	{
-	  mpz_fdiv_r (mpz[0],
-		      *bignum_integer (&mpz[0], th.ticks),
-		      *bignum_integer (&mpz[1], hz));
-	  mpz_addmul_ui (mpz[0], *bignum_integer (&mpz[1], hz),
-			 local_tm.tm_sec);
-	  ticks = make_integer_mpz ();
+          Lisp_Object z = scm_floor_remainder (th.ticks, hz);
+          z = scm_floor_remainder (th.ticks, hz);
+          z = scm_sum (z, scm_product (hz, scm_from_unsigned_integer (local_tm.tm_sec)));
+	  ticks = z;
 	}
       sec = Fcons (ticks, hz);
     }
