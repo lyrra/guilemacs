@@ -1,7 +1,17 @@
 (define-module (utils)
   #:use-module (srfi srfi-1)
-  #:export (randomize-list
+  #:export (push! push-append! randomize-list
             string-remove-substr))
+
+(define-syntax push!
+  (syntax-rules ()
+    ((_ lst item)
+     (set! lst (cons item lst)))))
+
+(define-syntax push-append!
+  (syntax-rules ()
+    ((_ lst lst2)
+     (set! lst (append lst lst2)))))
 
 (define (%randomize-list lst acc)
   (if (null? lst)

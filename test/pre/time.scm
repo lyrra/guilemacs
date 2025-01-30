@@ -62,7 +62,7 @@
 
 (for-each (lambda (trip)
             (let ((emit-test (lambda (a b r)
-                   (deftestf (string->symbol (format #f "time-equal-p_~a_~a_~a" a b r))
+                   (deftestf (format #f "time-equal-p_~a_~a_~a" a b r)
                      (r)
                      (el-expr `(print (time-equal-p ,a ,b)))))))
               (match trip
@@ -77,7 +77,7 @@
 ;; based on ERT test decode-then-encode-time
 (for-each
  (lambda (a)
-   (deftestf (string->symbol (format #f "decode-then-encode-time_~a" a))
+   (deftestf (format #f "decode-then-encode-time_~a" a)
              ('t)
      (el-expr `(let* ((a ',a)
                       (d (decode-time a t t))
@@ -86,7 +86,7 @@
  %interesting-time-numbers)
 (for-each
  (lambda (a)
-   (deftestf (string->symbol (format #f "decode-then-encode-time_int_~a" a))
+   (deftestf (format #f "decode-then-encode-time_int_~a" a)
              ('t)
      (el-expr `(let* ((a ',a)
                       (d-integer (decode-time a t 'integer))
