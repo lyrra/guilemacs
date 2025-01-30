@@ -94,3 +94,6 @@
                  (print (time-equal-p (time-convert a 'integer)
                                       e-integer))))))
  %interesting-time-numbers2)
+
+(deftestf 'time-less-p ('t)
+  (el-expr `(print (time-less-p 0 '(26510 8973 916267 104000)))))

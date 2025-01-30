@@ -1128,8 +1128,16 @@ time_cmp (Lisp_Object a, Lisp_Object b)
      ATICKS * BHZ to BTICKS * AHZ.  */
   struct ticks_hz ta = decode_lisp_time (a, CFORM_TICKS_HZ).th;
   struct ticks_hz tb = decode_lisp_time (b, CFORM_TICKS_HZ).th;
-  if (BIGNUMP (ta.ticks) || BIGNUMP (tb.ticks))
-    emacs_abort ();
+
+  if (BIGNUMP (ta.ticks))
+    ta.ticks = bignum_to_guile_bignum (ta.ticks);
+  if (BIGNUMP (tb.ticks))
+    tb.ticks = bignum_to_guile_bignum (tb.ticks);
+  if (BIGNUMP (ta.hz))
+    ta.hz = bignum_to_guile_bignum (ta.hz);
+  if (BIGNUMP (tb.hz))
+    tb.hz = bignum_to_guile_bignum (tb.hz);
+
   Lisp_Object za = ta.ticks;
   Lisp_Object zb = tb.ticks;
   if (! (FASTER_TIMEFNS && BASE_EQ (ta.hz, tb.hz)))
