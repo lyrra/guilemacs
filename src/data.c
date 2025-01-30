@@ -584,9 +584,20 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
        attributes: const)
   (Lisp_Object object)
 {
-  return ((FIXNUMP (object) ? 0 <= XFIXNUM (object)
-	   : BIGNUMP (object) && 0 <= mpz_sgn (*xbignum_val (object)))
-	  ? Qt : Qnil);
+  if (FIXNUMP (object))
+    {
+      return 0 <= XFIXNUM (object) ? Qt : Qnil;
+    }
+  else if (GUILEBIGNUMP (object))
+    {
+      return scm_positive_p (object) ? Qt : Qnil;
+    }
+  else if (BIGNUMP (object))
+    {
+      return 0 <= mpz_sgn (*xbignum_val (object)) ? Qt : Qnil;
+    }
+  else
+    return Qnil;
 }
 
 DEFUN ("numberp", Fnumberp, Snumberp, 1, 1, 0,

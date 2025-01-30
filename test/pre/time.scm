@@ -97,3 +97,12 @@
 
 (deftestf 'time-less-p ('t)
   (el-expr `(print (time-less-p 0 '(26510 8973 916267 104000)))))
+
+(deftestf 'float-time-precision-1 ('(t t t t))
+  (el-expr `(print (list (= (float-time '(0 1 0 4025)) 1.000000004025)
+                         (= (float-time '(1000000004025 . 1000000000000)) 1.000000004025)
+                         (< 0 (float-time '(1 . 10000000000)))
+                         (< (float-time '(-1 . 10000000000)) 0)))))
+
+(deftestf 'float-time-1 (-0.002375)
+  (el-expr `(print (float-time '(-5476377146882523 . 2305843009213693952)))))
