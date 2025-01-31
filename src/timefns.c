@@ -846,6 +846,10 @@ decode_lisp_time (Lisp_Object specified_time, enum cform cform)
     {
       Lisp_Object high = XCAR (specified_time);
       Lisp_Object low = XCDR (specified_time);
+      if (BIGNUMP (high))
+        emacs_abort ();
+      if (BIGNUMP (low))
+        emacs_abort ();
       Lisp_Object usec = make_fixnum (0);
       Lisp_Object psec = make_fixnum (0);
       if (CONSP (low))
@@ -976,6 +980,15 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
     tb = decode_lisp_time (b, CFORM_TICKS_HZ).th;
   Lisp_Object ticks, hz;
 
+  if (BIGNUMP (ta.hz))
+    emacs_abort ();
+  if (BIGNUMP (tb.hz))
+    emacs_abort ();
+  if (BIGNUMP (ta.ticks))
+    emacs_abort ();
+  if (BIGNUMP (tb.ticks))
+    emacs_abort ();
+
   if (FASTER_TIMEFNS && BASE_EQ (ta.hz, tb.hz))
     {
       hz = ta.hz;
@@ -987,41 +1000,49 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 	 Start by computing da and db, their minimum (which will be
 	 needed later) and the iticks temporary that will become
 	 available once only their minimum is needed.  */
-      mpz_t const *da = bignum_integer (&mpz[1], ta.hz);
-      mpz_t const *db = bignum_integer (&mpz[2], tb.hz);
-      bool da_lt_db = mpz_cmp (*da, *db) < 0;
-      mpz_t const *hzmin = da_lt_db ? da : db;
-      mpz_t *iticks = &mpz[da_lt_db + 1];
+      Lisp_Object da = ta.hz;
+      Lisp_Object db = tb.hz;
+
+      bool da_lt_db = scm_less_p (da, db) == SCM_BOOL_T;
+      Lisp_Object hzmin = da_lt_db ? da : db;
+      Lisp_Object iticks; // = &mpz[da_lt_db + 1];
 
       /* The plan is to compute (na * (db/g) + nb * (da/g)) / lcm (da, db)
 	 where g = gcd (da, db).  Start by computing g.  */
-      mpz_t *g = &mpz[3];
-      mpz_gcd (*g, *da, *db);
+      Lisp_Object g = scm_gcd (da, db);
 
       /* fa = da/g, fb = db/g.  */
-      mpz_t *fa = &mpz[4], *fb = &mpz[3];
-      mpz_divexact (*fa, *da, *g);
-      mpz_divexact (*fb, *db, *g);
+      Lisp_Object fa, fb;
+      fa = scm_quotient (da, g);
+      fb = scm_quotient (db, g);
 
       /* ihz = fa * db.  This is equal to lcm (da, db).  */
-      mpz_t *ihz = &mpz[0];
-      mpz_mul (*ihz, *fa, *db);
+      Lisp_Object ihz = scm_product (fa, db);
+      Lisp_Object ihz2 = scm_lcm (da, db);
+      eassert (scm_num_eq_p (ihz, ihz2) == SCM_BOOL_T);
 
       /* iticks = (fb * na) OP (fa * nb), where OP is + or -.  */
-      mpz_t const *na = bignum_integer (iticks, ta.ticks);
-      mpz_mul (*iticks, *fb, *na);
-      mpz_t const *nb = bignum_integer (&mpz[3], tb.ticks);
-      (subtract ? mpz_submul : mpz_addmul) (*iticks, *fa, *nb);
+
+      Lisp_Object na = scm_product (fb, ta.ticks);
+      Lisp_Object nb = scm_product (fa, tb.ticks);
+
+      if (subtract)
+        {
+          iticks = scm_difference (na, nb);
+        }
+      else
+        {
+          iticks = scm_sum (na, nb);
+        }
 
       /* Normalize iticks/ihz by dividing both numerator and
 	 denominator by ig = gcd (iticks, ihz).  For speed, though,
 	 skip this division if ihz = 1.  */
-      mpz_t *ig = &mpz[3];
-      mpz_gcd (*ig, *iticks, *ihz);
-      if (!FASTER_TIMEFNS || mpz_cmp_ui (*ig, 1) > 0)
+      Lisp_Object ig = scm_gcd (iticks, ihz);
+      if (!FASTER_TIMEFNS || scm_gr_p (ig, make_fixnum(1)) == SCM_BOOL_T)
 	{
-	  mpz_divexact (*iticks, *iticks, *ig);
-	  mpz_divexact (*ihz, *ihz, *ig);
+          iticks = scm_quotient (iticks, ig);
+          ihz = scm_quotient (ihz, ig);
 
 	  /* However, if dividing the denominator by ig would cause the
 	     denominator to become less than hzmin, rescale the denominator
@@ -1029,24 +1050,20 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 	     so that the resulting denominator becomes at least hzmin.
 	     This rescaling avoids returning a timestamp that is less precise
 	     than both a and b.  */
-	  if (!FASTER_TIMEFNS || mpz_cmp (*ihz, *hzmin) < 0)
+	  if (!FASTER_TIMEFNS || scm_less_p (ihz, hzmin) == SCM_BOOL_T)
 	    {
 	      /* Rescale straightforwardly.  Although this might not
 		 yield the minimal denominator that preserves numeric
 		 value and is at least hzmin, calculating such a
 		 denominator would be too expensive because it would
 		 require testing multisets of factors of lcm (da, db).  */
-	      mpz_t *rescale = &mpz[3];
-	      mpz_cdiv_q (*rescale, *hzmin, *ihz);
-	      mpz_mul (*iticks, *iticks, *rescale);
-	      mpz_mul (*ihz, *ihz, *rescale);
+              Lisp_Object rescale = scm_ceiling_quotient (hzmin, ihz);
+              iticks = scm_product (iticks, rescale);
+              ihz    = scm_product (ihz   , rescale);
 	    }
 	}
-
-      /* mpz[0] and iticks now correspond to the (HZ . TICKS) pair.  */
-      hz = make_integer_mpz ();
-      mpz_swap (mpz[0], *iticks);
-      ticks = make_integer_mpz ();
+      ticks = iticks;
+      hz = ihz;
     }
 
   /* Return an integer if the timestamp resolution is 1,
@@ -1604,12 +1621,7 @@ usage: (encode-time TIME &rest OBSOLESCENT-ARGUMENTS)  */)
     }
   else
     {
-      mpz_fdiv_qr (mpz[0], mpz[1],
-		   *bignum_integer (&mpz[0], th.ticks),
-		   *bignum_integer (&mpz[1], hz));
-      sec = make_integer_mpz ();
-      mpz_swap (mpz[0], mpz[1]);
-      subsecticks = make_integer_mpz ();
+      scm_floor_divide (th.ticks, hz, &sec, &subsecticks);
     }
   tm.tm_sec  = check_tm_member (sec, 0);
   tm.tm_min  = check_tm_member (minarg, 0);
