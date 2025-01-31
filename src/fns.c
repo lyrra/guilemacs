@@ -3112,6 +3112,7 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	  {
 	    if (isnan (fa))
 	      return 0;
+            emacs_abort ();
 	    return -mpz_cmp_d (*xbignum_val (b), fa);
 	  }
         if (XTYPE (b) == Lisp_GuileBignum)
