@@ -670,6 +670,10 @@ ticks_hz_seconds (struct ticks_hz t)
     return make_fixnum (XFIXNUM (t.ticks) / XFIXNUM (t.hz)
 			- (XFIXNUM (t.ticks) % XFIXNUM (t.hz) < 0));
 
+  if (BIGNUMP (t.ticks))
+    t.ticks = bignum_to_guile_bignum (t.ticks);
+  if (BIGNUMP (t.hz))
+    t.hz = bignum_to_guile_bignum (t.hz);
   /* For speed, inline what ticks_hz_hz_ticks would do.  */
   return scm_floor_quotient (t.ticks, t.hz);
 }

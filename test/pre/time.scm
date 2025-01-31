@@ -21,6 +21,10 @@
 (deftestf 'time-convert  ('(7881299347898368 . 2251799813685248))
   (el-expr `(print (time-convert 3.5 t))))
 
+(deftest time-convert (78796799)
+  (el-expr `(print
+             (time-convert '(1202 22527 999999 999999) 'integer))))
+
 (deftest time-convert-hanoi (t)
   (el-expr `(print (integerp (time-convert nil 'integer)))))
 
