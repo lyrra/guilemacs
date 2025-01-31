@@ -190,3 +190,30 @@ check_int_nonnegative (Lisp_Object x)
   CHECK_INTEGER (x);
   return NILP (Fnatnump (x)) ? 0 : check_integer_range (x, 0, INT_MAX);
 }
+
+/* Yield an upper bound on the buffer size needed to contain a C
+   string representing the NUM in base BASE.  This includes any
+   preceding '-' and the terminating null.  */
+static ptrdiff_t
+mpz_bufsize (mpz_t const num, int base)
+{
+  return mpz_sizeinbase (num, base) + 2;
+}
+ptrdiff_t
+bignum_bufsize (Lisp_Object num, int base)
+{
+  return mpz_bufsize (*xbignum_val (num), base);
+}
+
+/* Store into BUF (of size SIZE) the value of NUM as a base-BASE string.
+   If BASE is negative, use upper-case digits in base -BASE.
+   Return the string's length.
+   SIZE must equal bignum_bufsize (NUM, abs (BASE)).  */
+ptrdiff_t
+bignum_to_c_string (char *buf, ptrdiff_t size, Lisp_Object num, int base)
+{
+  eassert (bignum_bufsize (num, abs (base)) == size);
+  mpz_get_str (buf, base, *xbignum_val (num));
+  ptrdiff_t n = size - 2;
+  return !buf[n - 1] ? n - 1 : n + !!buf[n];
+}
