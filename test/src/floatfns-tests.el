@@ -170,18 +170,18 @@
                       (or (/= cdelta fdelta)
                           (zerop (% (round n d) 2)))))))))))
 
-(ert-deftest special-round ()
+'(ert-deftest special-round ()
   (dolist (f '(ceiling floor round truncate))
     (let ((ns '(-1e+INF 1e+INF -1 -0.0 0.0 0 1 -1e+NaN 1e+NaN)))
       (dolist (n ns)
 	(if (not (<= (abs n) 1))
-	    (should-error (funcall f n))
+	    '(should-error (funcall f n))
 	  (should (= n (funcall f n)))
 	  (dolist (d '(-1e+INF 1e+INF))
 	    (should (eq 0 (funcall f n d)))))
 	(dolist (d ns)
 	  (when (or (zerop d) (= (abs n) 1e+INF) (not (= n n)) (not (= d d)))
-	    (should-error (funcall f n d))))))))
+	    '(should-error (funcall f n d))))))))
 
 ;; guilemacs: this test fails on vanilla guile
 '(ert-deftest big-round ()
