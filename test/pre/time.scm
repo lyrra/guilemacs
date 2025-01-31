@@ -45,6 +45,31 @@
 (deftest time-convert-ticks_hz_hz_ticks ((12300000000000100000000000 . 100000000000))
   (el-expr `(print (time-convert 123000000000000.9999 100000000000))))
 
+(deftest time-subtract ((999999999999 . 1000000000000))
+  (el-expr `(print (time-subtract '(78796799999999999999 . 1000000000000)
+                                  '(78796799000000000000 . 1000000000000)))))
+
+(deftest time-subtract ((78796799000000000000 . 1000000000000))
+  (el-expr `(print
+             (let* ((look '(1202 22527 999999 999999))
+                    (look-ticks-hz (time-convert look t))
+                    (hz (cdr look-ticks-hz))
+                    (look-integer (time-convert look 'integer))
+                    (sec ;(time-subtract look-ticks-hz
+                         (time-convert look-integer hz)))
+             sec))))
+
+(deftest time-subtract ((59000078796799 . 1000000000000))
+  (el-expr `(print
+             (let* ((look '(1202 22527 999999 999999))
+                    (look-ticks-hz (time-convert look t))
+	            (hz (cdr look-ticks-hz))
+	            (look-integer (time-convert look 'integer))
+	            (sec (time-add (time-convert 59 hz)
+			           (time-subtract look-ticks-hz
+					          (time-convert look-integer hz)))))
+               sec))))
+
 (deftestf 'decode-time ('(0 0 1 1 1 1970 4 nil 3600))
   (el-expr `(print (decode-time 0))))
 

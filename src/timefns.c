@@ -768,33 +768,32 @@ decode_time_components (Lisp_Object high, Lisp_Object low,
   if (! (INTEGERP (high) && INTEGERP (low)))
     return (struct err_time) { .err = EINVAL };
 
-  mpz_t *s = &mpz[1];
-  mpz_set_intmax (*s, s_from_us_ps);
-  mpz_add (*s, *s, *bignum_integer (&mpz[0], low));
-  mpz_addmul_ui (*s, *bignum_integer (&mpz[0], high), 1 << LO_TIME_BITS);
+  Lisp_Object s = scm_from_intmax (s_from_us_ps);
+  s = scm_sum (s, low);
+  s = scm_sum (s, scm_product (high, scm_from_intmax (1 << LO_TIME_BITS)));
+  Lisp_Object z;
 
   if (BASE_EQ (hz, trillion))
     {
       #if FASTER_TIMEFNS && TRILLION <= ULONG_MAX
 	unsigned long i = us;
-	mpz_set_ui (mpz[0], i * 1000000 + ps);
-	mpz_addmul_ui (mpz[0], *s, TRILLION);
+        z = scm_from_uintmax (i * 1000000 + ps);
+        z = scm_sum (z, scm_product (s, scm_from_uintmax (TRILLION)));
       #else
 	intmax_t i = us;
-	mpz_set_intmax (mpz[0], i * 1000000 + ps);
-	mpz_addmul (mpz[0], *s, ztrillion);
+        z = scm_from_intmax (i * 1000000 + ps);
+        z = scm_sum (z, scm_product (s, scm_from_uintmax (TRILLION)));
       #endif
     }
   else if (BASE_EQ (hz, make_fixnum (1000000)))
     {
-      mpz_set_ui (mpz[0], us);
-      mpz_addmul_ui (mpz[0], *s, 1000000);
+      z = scm_from_uintmax (us);
+      z = scm_sum (z, scm_product (s, scm_from_uintmax (1000000)));
     }
   else
-    mpz_swap (mpz[0], *s);
+    z = s;
 
-  Lisp_Object ticks = make_integer_mpz ();
-  return (struct err_time) { .time = decode_ticks_hz (ticks, hz, cform) };
+  return (struct err_time) { .time = decode_ticks_hz (z, hz, cform) };
 }
 
 /* Current time (seconds since epoch) in form CFORM.  */
@@ -954,32 +953,17 @@ lispint_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 {
   bool mpz_done = false;
 
-  if (FASTER_TIMEFNS && FIXNUMP (b))
+  if (BIGNUMP (a) || BIGNUMP (b))
+    emacs_abort ();
+
+  if (subtract)
     {
-      if (BASE_EQ (b, make_fixnum (0)))
-	return a;
-
-      /* For speed, use EMACS_INT arithmetic if it will do.  */
-      if (FIXNUMP (a))
-	return make_int (subtract
-			 ? XFIXNUM (a) - XFIXNUM (b)
-			 : XFIXNUM (a) + XFIXNUM (b));
-
-      /* For speed, use mpz_add_ui/mpz_sub_ui if it will do.  */
-      if (eabs (XFIXNUM (b)) <= ULONG_MAX)
-	{
-	  ((XFIXNUM (b) < 0) == subtract ? mpz_add_ui : mpz_sub_ui)
-	    (mpz[0], *xbignum_val (a), eabs (XFIXNUM (b)));
-	  mpz_done = true;
-	}
+      return scm_difference (a, b);
     }
-
-  /* Fall back on bignum arithmetic if necessary.  */
-  if (!mpz_done)
-    (subtract ? mpz_sub : mpz_add) (mpz[0],
-				    *bignum_integer (&mpz[0], a),
-				    *bignum_integer (&mpz[1], b));
-  return make_integer_mpz ();
+  else
+    {
+      return scm_sum (a, b);
+    }
 }
 
 /* Given Lisp operands A and B, add their values, and return the
