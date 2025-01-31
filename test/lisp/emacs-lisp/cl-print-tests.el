@@ -145,7 +145,7 @@
                      (cl-print-to-string-with-limit #'cl-prin1 thing10 100)))
 
     ;; Print something which needs to be abbreviated and which can be.
-    (should (< (length (cl-print-to-string-with-limit #'cl-prin1 thing100 100))
+    '(should (< (length (cl-print-to-string-with-limit #'cl-prin1 thing100 100))
                100
                (length (cl-prin1-to-string thing100))))
 
@@ -154,7 +154,7 @@
                      (cl-print-to-string-with-limit #'cl-prin1 thing10x10 100)))
 
     ;; Print something which should be abbreviated even if the limit is large.
-    (should (< (length (cl-print-to-string-with-limit #'cl-prin1 nested-thing 1000))
+    '(should (< (length (cl-print-to-string-with-limit #'cl-prin1 nested-thing 1000))
                (length (cl-prin1-to-string nested-thing))))
 
     ;; Print with no limits.

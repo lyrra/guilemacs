@@ -166,7 +166,7 @@ a fixed place on the right and are padded on the left."
     (should (equal (format-time-string "%6N" ref-time t) "123000"))))
 
 
-'(ert-deftest time-equal-p-nil-nil ()
+(ert-deftest time-equal-p-nil-nil ()
   (should (time-equal-p nil nil)))
 
 (ert-deftest time-arith-tests ()
@@ -212,7 +212,7 @@ a fixed place on the right and are padded on the left."
 		      (< 0.99 (/ (- (float-time a)) (float-time b))
 			 1.01))))))))
 
-'(ert-deftest time-rounding-tests ()
+(ert-deftest time-rounding-tests ()
   (should (time-equal-p 1e-13 (time-add 0 1e-13))))
 
 (ert-deftest encode-time-dst-numeric-zone ()

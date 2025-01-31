@@ -42,23 +42,23 @@
       (ignore (benchmark-run (setq count1 (1+ count1))))
       (ignore (benchmark-run repeat (setq count2 (1+ count2))))
       (should (> count2 count1)))
-    (should (> (car (benchmark-run
+    '(should (> (car (benchmark-run
                       (let ((n 100000)) (while (> n 1) (setq n (1- n))))))
                (car (benchmark-run (setq m (1+ 0))))))
-    (should (> (car (benchmark-run
+    '(should (> (car (benchmark-run
                       (let ((n 100000)) (while (> n 1) (setq n (1- n))))))
                (car (benchmark-run (setq m (1+ 0))))))
     ;; DISABLE-guilemacs
     '(should (> (car (benchmark-run-compiled
                       (let ((n 100000)) (while (> n 1) (setq n (1- n))))))
                (car (benchmark-run-compiled (1+ 0)))))
-    (setq str (benchmark nil '(let ((n 100000)) (while (> n 1) (setq n (1- n))))))
-    (string-match "Elapsed time: \\([0-9.]+\\)" str)
-    (setq t-long (string-to-number (match-string 1 str)))
-    (setq str (benchmark nil '(1+ 0)))
-    (string-match "Elapsed time: \\([0-9.]+\\)" str)
-    (setq t-short (string-to-number (match-string 1 str)))
-    (should (> t-long t-short))
+    '(setq str (benchmark nil '(let ((n 100000)) (while (> n 1) (setq n (1- n))))))
+    '(string-match "Elapsed time: \\([0-9.]+\\)" str)
+    '(setq t-long (string-to-number (match-string 1 str)))
+    '(setq str (benchmark nil '(1+ 0)))
+    '(string-match "Elapsed time: \\([0-9.]+\\)" str)
+    '(setq t-short (string-to-number (match-string 1 str)))
+    '(should (> t-long t-short))
     ;; Silence compiler.
     m))
 

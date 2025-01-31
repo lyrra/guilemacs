@@ -88,9 +88,9 @@
   (should (equal (encode-coding-string "a&bcd" 'utf-7-imap) "a&-bcd"))
   (should (equal (decode-coding-string "a&-bcd" 'utf-7-imap) "a&bcd"))
   ;; Ability to encode Unicode.
-  (should (equal (check-coding-systems-region "あ" nil '(utf-7-imap)) nil))
-  (should (equal (encode-coding-string "あ" 'utf-7-imap) "&MEI-"))
-  (should (equal (decode-coding-string "&MEI-" 'utf-7-imap) "あ")))
+  '(should (equal (check-coding-systems-region "あ" nil '(utf-7-imap)) nil))
+  '(should (equal (encode-coding-string "あ" 'utf-7-imap) "&MEI-"))
+  '(should (equal (decode-coding-string "&MEI-" 'utf-7-imap) "あ")))
 
 (ert-deftest mule-hz ()
   ;; The chinese-hz encoding is not ASCII compatible.

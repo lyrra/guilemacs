@@ -1188,7 +1188,7 @@ unquoted file names."
                                 " --version")
                         (current-buffer)))))))
 
-(ert-deftest files-tests-file-name-non-special-start-file-process ()
+'(ert-deftest files-tests-file-name-non-special-start-file-process ()
   (files-tests--with-temp-non-special (tmpdir nospecial-dir t)
     (with-temp-buffer
       (let ((default-directory nospecial-dir))

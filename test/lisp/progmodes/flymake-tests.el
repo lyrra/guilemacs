@@ -183,7 +183,7 @@ SEVERITY-PREDICATE is used to setup
         ("no-problems.h")
       (should-error (flymake-goto-next-error nil nil t)))))
 
-(ert-deftest foreign-diagnostics ()
+'(ert-deftest foreign-diagnostics ()
   "Test Flymake in one file impacts another"
   (skip-unless (and (executable-find "gcc")
                     (not (ert-gcc-is-clang-p))

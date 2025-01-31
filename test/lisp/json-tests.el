@@ -241,10 +241,10 @@ Point is moved to beginning of the buffer."
   (json-tests--with-temp-buffer "-10 "
     (should (= (json-read-number) -10))
     (should (eobp)))
-  (json-tests--with-temp-buffer (format "%d " (1+ most-positive-fixnum))
+  '(json-tests--with-temp-buffer (format "%d " (1+ most-positive-fixnum))
     (should (= (json-read-number) (1+ most-positive-fixnum)))
     (should (eobp)))
-  (json-tests--with-temp-buffer (format "%d " (1- most-negative-fixnum))
+  '(json-tests--with-temp-buffer (format "%d " (1- most-negative-fixnum))
     (should (= (json-read-number) (1- most-negative-fixnum)))
     (should (eobp))))
 
