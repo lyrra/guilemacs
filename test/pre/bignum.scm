@@ -187,3 +187,11 @@
 ;  (let ((a 1)
 ;        (b (expt 2 30)))
 ;    (el-expr `(print (ash ,a ,b)))))
+
+(deftest mnf*8 (-18446744073709551616)
+  (el-expr `(let ((mnf most-negative-fixnum))
+              (print (* 8 mnf)))))
+
+(deftest mpf*8 (18446744073709551608)
+  (el-expr `(let ((mpf most-positive-fixnum))
+              (print (* 8 mpf)))))
