@@ -1,7 +1,8 @@
 (define-module (utils)
   #:use-module (srfi srfi-1)
   #:export (push! push-append! randomize-list
-            string-remove-substr))
+            string-remove-substr
+            print-report-table))
 
 (define-syntax push!
   (syntax-rules ()
@@ -34,3 +35,32 @@
         (string-concatenate (list (substring str 0 n)
                                   (substring str (+ (string-length sub) 1))))
         #f)))
+
+(define (leftpad str len)
+  (string-concatenate
+   (list (make-string len #\Space)
+         str)))
+
+(define (print-report-table tab)
+  (let* ((tab (map (lambda (row)
+                     (map (lambda (col)
+                            (if col
+                                (format #f "~a" col)
+                                ""))
+                          row))
+                   tab))
+         (numcols (length (car tab)))
+         (collen (apply map (lambda cols
+                              (apply max (map string-length cols)))
+                        tab)))
+    (let ((print-row (lambda (row . plus)
+                       (for-each (lambda (col len)
+                                   (format #t "~a~a" (leftpad col
+                                                              (- len (string-length col)))
+                                           (if (null? plus) " | " "-+-")))
+                                 row collen)
+                       (format #t "~%"))))
+      (print-row (car tab))
+      (print-row (map (lambda (len) (make-string len #\-)) collen) #f)
+      (for-each print-row
+                (cdr tab)))))

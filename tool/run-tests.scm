@@ -1,3 +1,7 @@
+;; todo:
+;; - unique names for generated tests
+;; - --filter flag
+
 (use-modules (ice-9 match)
              (ice-9 format)
              (ice-9 popen)
@@ -218,6 +222,10 @@
   )
  ))
 
+;; keep track manually of which tests are expensive or unstable
+(define %skipped-tests '(
+ "cperl-test-bug-10483" "info-xref-test-emacs-manuals" "package-test-update-archives-async" "password-cache-tests-add/expires-key" "test-htmlfontify-load-rgb-file" "cl-seq-test-bug24264" "srecode-field-utest-impl" "semantic-test-c-preprocessor-simulation"))
+
 (define %read-failures 0)
 (define %total-passed-tests 0)
 (define %total-failed-tests 0)
@@ -264,11 +272,12 @@
 
 ;; use the scheme-parser to read through the elisp-file
 ;; and search for deftest forms.
-(define (count-tests filename)
+(define (scan-testfile filename)
   (let ((r (lambda (port)
              (with-exception-handler
                  (lambda (exn)
                    (apply (lambda args
+                            (format (current-error-port) "SCAN ERROR: filename: ~s, error: ~s~%" filename args)
                             (set! %read-failures (1+ %read-failures))
                             #f)
                           (exception-kind exn)
@@ -303,7 +312,7 @@
           (else
            ;; remove "/test" prefix and ".el" suffix
            (let ((s (substring file 5)))
-             (count-tests s)
+             (scan-testfile s)
              (substring s 0 (- (string-length s) 3))))))
        files))
 
@@ -416,6 +425,7 @@
       (list pass pass '()))))
 
 (define (run-tests files keys)
+  (flush-all-ports)
   (match (cond
           ((memq 'prelude keys)
            (match (run-tests-bare-emacs files keys)
@@ -432,6 +442,7 @@
               (push-append! %total-failed-ert-tests fail)
               (list found pass fail)))))
     ((found pass fail)
+     (set! %total-failed-tests (+ (length fail) %total-failed-tests))
      (format #t "tests result in group: ~a found tests (atleast), ~a passed, ~a failed~%"
                 (length found) (length pass) (length fail))
      (if (not (null? fail))
@@ -481,46 +492,74 @@
                 %tests)
       (unless (null? files)
         (run-tests files '())))
+    (flush-all-ports)
     ;; report
-    (format #t "~%# ERT test -- a test that comes from the Emacs Regression Test framework. These test files are scanned and counted before being run (because running the target may abort and not report totals).~%")
-    (format #t "# generated test -- a simple test protocol, where Scheme is used to generated test cases in elisp-files, these are counted during emit.~%")
-    (format #t "# found -- a test that is either emitted during test generation, or found when search the ERT suite~%")
-    (format #t "# passed -- a test that explicitly reports success~%")
-    (format #t "# failed -- a test that explicitly reports a failure mode~%")
-    (format #t "# missing-- a test that was found during search, but has not reported its result, the test has either aborted during run, or hasn't been runned, both cases are counted as a failed test (ie, not a controlled skip).~%")
-    (let ((num-total-gen-tests (length %total-gen-tests))
-          (num-total-ert-tests (length %total-ert-tests))
-          (num-total-found-gen-tests (length %total-found-gen-tests))
-          (num-total-found-ert-tests (length %total-found-ert-tests))
-          (num-total-passed-gen-tests (length %total-passed-gen-tests))
-          (num-total-passed-ert-tests (length %total-passed-ert-tests))
-          (num-total-failed-ert-tests (length %total-failed-ert-tests))
-          (failed-gen (filter (lambda (x)
-                                (not (member x %total-passed-gen-tests)))
-                              %total-gen-tests))
-          (failed-ert (filter (lambda (x)
-                                (not (member x %total-passed-ert-tests)))
-                              %total-ert-tests)))
+    (format #t "~%#################################################################~%")
+    (format #t "# * ERT test -- a test that comes from the Emacs Regression Test framework.~%")
+    (format #t "#   These test files are scanned and counted before being run~%")
+    (format #t "#   (because running the target may abort and not report totals).~%")
+    (format #t "# * gen test -- a simple test protocol, where Scheme is used to generated test cases in elisp-files, these are counted during emit.~%")
+    (format #t "# * found -- a test that is either emitted during test generation, or found when search the ERT suite~%")
+    (format #t "# * passed -- a test that explicitly reports success~%")
+    (format #t "# * failed -- a test that explicitly reports a failure mode~%")
+    (format #t "# * missing -- a test that was found during search, but has not reported its result, the test has either aborted during run,~%")
+    (format #t "#   or hasn't been runned, both cases are counted as a failed test (ie, not a controlled skip).~%")
+    (format #t "# * found: known tests found during emit or search~%")
+    (let* ((num-total-gen-tests (length %total-gen-tests))
+           (num-total-ert-tests (length %total-ert-tests))
+           (num-total-found-gen-tests (length %total-found-gen-tests))
+           (num-total-found-ert-tests (length %total-found-ert-tests))
+           (num-total-passed-gen-tests (length %total-passed-gen-tests))
+           (num-total-passed-ert-tests (length %total-passed-ert-tests))
+           ;(num-total-failed-gen-tests (length %total-failed-gen-tests))
+           (num-total-missing-ert-tests ; (length %total-failed-ert-tests)
+                    (- num-total-ert-tests num-total-passed-ert-tests))
+           (failed-gen (filter (lambda (x)
+                                 (not (member x %total-passed-gen-tests)))
+                               %total-gen-tests))
+           (failed-ert (filter (lambda (x)
+                                 (and (not (member x %total-passed-ert-tests))
+                                      (not (member x %skipped-tests))))
+                               %total-ert-tests))
+           (num-total-failed-gen-tests (length failed-gen))
+           (num-total-failed-ert-tests (length failed-ert)))
       (format #t "~%")
-      (format #t "read failures when reading ERT test files: ~s~%" %read-failures)
       (if (not (null? %total-failed-gen-tests))
-          (format #t "~%~%failed generated tests ~s~%" %total-failed-gen-tests))
+          (format #t "~%~%* failed generated tests ~s~%" %total-failed-gen-tests))
       (if (not (null? %total-failed-ert-tests))
-          (format #t "failed ERT tests ~s~%" %total-failed-ert-tests))
+          (format #t "* failed ERT tests ~s~%" %total-failed-ert-tests))
       (if (not (null? failed-gen))
           (format #t "~%failed gen tests: ~s~%~%" failed-gen))
       (if (not (null? failed-ert))
           (format #t "failed ERT tests: ~s~%~%" failed-ert))
-      (format #t "passed tests: ~s~%" num-total-passed-gen-tests)
-      (format #t "total number of tests: ~a~%" (+ num-total-gen-tests num-total-ert-tests))
-      (format #t "  - generated tests: ~a~%" num-total-gen-tests)
-      (format #t "  - ERT tests: ~a~%" num-total-ert-tests)
-      (format #t "total number of found tests: ~a     ;; known tests found during emit or search~%"
-              (+ num-total-found-gen-tests num-total-found-ert-tests))
-      (format #t "total number of passed tests: ~a    ;; known to pass~%"
-              (+ num-total-passed-gen-tests num-total-passed-ert-tests))
-      (format #t "total number of missing tests: ~a   ;; found minus pass, ie most probably failed~%"
+      (format #t "Read failures when reading ERT test files: ~s~%" %read-failures)
+      (format #t "Total number of missing tests: ~a   ;; found during emit/scan, but never runned, ie most probably failed~%"
               (+ (length failed-gen) (length failed-ert)))
-      (format #t "total number of failed tests: ~a     ;; known to fail~%"
-              (+ num-total-failed-ert-tests num-total-failed-ert-tests))
+      (format #t "--------------------------------------------~%")
+      (print-report-table
+       (list '("" "gen" "ERT" "total" "")
+             (list "found"
+                   num-total-gen-tests
+                   num-total-ert-tests
+                   (+ num-total-gen-tests num-total-ert-tests)
+                   ; #f
+                   )
+             (list "runned"
+                   num-total-found-gen-tests
+                   num-total-found-ert-tests
+                   (+ num-total-found-gen-tests num-total-found-ert-tests)
+                   ; #f
+                   )
+             (list "pass"
+                   num-total-passed-gen-tests
+                   num-total-passed-ert-tests
+                   (+ num-total-passed-gen-tests num-total-passed-ert-tests)
+                   ; %total-passed-tests
+                   )
+             (list "fail"
+                   num-total-failed-gen-tests
+                   num-total-failed-ert-tests
+                   (+ num-total-failed-gen-tests num-total-failed-ert-tests)
+                   ; %total-failed-tests
+                   )))
       (exit))))
