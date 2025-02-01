@@ -101,54 +101,6 @@ echo GUILE=/t/ge/g3/lib > env.sh
 
 The test suite uses the Emacs ERT suite. Note that many tests will fail since Guilemacs is
 still under development. Only tests known to pass will be executed.
-
-*** run tests for C defined elisp functions
-
-Many fundamental Emacs functions, including some primitive operations, are implemented
-in C. These functions can be tested using Guile-Elisp (libguile) together with the bare emacs binary.
-Without loading additional Elisp code from "loadup.el".
-
-Run the tests for these basic functions using the --prelude flag:
-
-#+BEGIN_SRC
-echo GUILE=/t/ge/g3/lib > env.sh
-
-./tool/run-tests.sh --prelude
-#+END_SRC
-
-The prelude tests are located in the "test/pre" directory.
-
-**** debug tests c-prelude
-
-To manually debug a bare Emacs session under gdb,
-you can follow these steps. First, ensure you generate the necessary test files:
- "run-tools.sh --prelude".
-Which will generate the test file "test/pre/value-cmp.el".
-
-Then, run the following script to start a debugging session:
-
-#+BEGIN_SRC
-. ./env.sh
-
-export PATH="$GUILE/bin:$PATH"
-export LD_LIBRARY_PATH="$GUILE/lib"
-
-export HOME=/nonexistent
-export LANG=C
-export EMACS_TEST_DIRECTORY="`pwd`/test"
-
-cd test
-
-gdb --args ../src/emacs -nl -Q --batch -L . --prelude `pwd`/pre/value-cmp.el
-
-(gdb) break xsignal2
-(gdb) break emacs_abort
-#+END_SRC
-
-This will allow you to step through and debug the C-prelude tests.
-Since the prelude tests are designed to exercise a minimum of emacs, it should
-be easier to pin-point test faults, sigsegvs and so on.
-
 * original work
 
  - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
@@ -164,7 +116,13 @@ be easier to pin-point test faults, sigsegvs and so on.
   - http://dustycloud.org/tmp/guile-emacs-20150513.png
   - http://dustycloud.org/tmp/guilemacs.png
 
-* news
+* Latest News
+** 20250201 Regression tests
+  A regression test program has been written
+  that can both run primordial guile-elisp + emacs-core tests.
+  And also run the full ERT framework suite.
+  This is good news since it makes us more confident in
+  doing more aggressive refactoring.
 ** 20240906 load-order: try-completion
   alot of load-order problems is caused by
   missing try-completion, that in emacs
@@ -174,136 +132,6 @@ be easier to pin-point test faults, sigsegvs and so on.
 
 ** 20240903 use Fcopy_sequence
   see commit note for [[use an enum to select concat target type]]
-
-** 20240824
-  Freshly built guilemacs with a jit-enabled guile:
-  tag r291-d0fa569b (6bce86b5),
-  has been built from scratch and tested with
-  jit-enabled guile (wip-elisp-rebased 4b9b8277).
- 
-** 20240823
-  - make doesn't exit on failure
-#+BEGIN_SRC
-  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
-  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
-  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
-  Fatal error 11: Segmentation fault
-  Backtrace:
-  ...
-  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
-  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
-  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
-  make[1]: Leaving directory '/t/ge/emacs/src'
-  make: *** [Makefile:409: src] Error 2
-#+END_SRC
-    
-** 20240822
-  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
-  - mapbacktrace is missing, it is used by (seemingly redundant functions)
-  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
-  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
-  it will cause an error that prints backtraces (thought backtraces was broken)!
-  This is seen around 1d43c1854.
-  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
-  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!) 
-
-** 20240810
-  emacs-devel partially has:
-  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
-  at commit 10527fca66e39d7067986904161fa33741abcd26
-
-** 27.0.50-20191008-20240809
-  rebased beyond introduction of new pdumper
-  went almost smoothly, only:
-  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
-  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
-
-** 20240807
-  merge gone wrong!
-  During a merge conflict resolve, what was merged without conflict made no sense.
-  The function allocate_vectorlike looks butched.
-  - File: alloc.c
-  - head: 3de046c9
-  - old base commit: 7e9f62c0
-  - new base commit: c8431a06
-
-** 20240725
-  "ldefs-boot, revert be538ba778"
-  causes guile error (it receives a SCM 0 object)
-  probably only partial is needed, ablate testing needed
- 
-  Test if this is still needed in later rebases
-
-** 20240724
-  dunnet alive and kicking: 16efea3a883ebf633946ee9b9d0681eb55437878 and earlier commits
-
-** 20240722
-  rebase over threading patches
-  see "use libguile dynamic wind + c pseudo-closures"
-  - probably specpdl_saved_value should not be used
-  - unbind_to_1: remove?:
-      byte_stack_list = catch->byte_stack;
-
-  hmm, the patchset removes handlerlist_sentinel struct from eval.c,
-  whereas GM only changes it into a pointer,
-  still needed? NO, this has moved to thread.h where it is an #define
-
-** 20240718
-  rebase trapped write
-
-  replace:
-  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("enable-multibyte-characters")), 1);
-  with:
-  make_symbol_constant (intern_c_string ("enable-multibyte-characters"));
-
-  #predicate:
-  #sym->trapped_write == SYMBOL_NOWRITE
-  #is replaced with:
-  #if (SYMBOL_TRAPPED_NOWRITE_P (sym))   -- guilemacs
-  #similar as:
-  #if (sym->trapped_write == SYMBOL_TRAPPED_WRITE)
-
-  predicate:
-  if (sym->constant)
-  is replaced with:
-  if (SYMBOL_TRAPPED_WRITE_P (sym))
-
-  in eval.c:
-  sym->trapped_write = XSYMBOL (base_variable)->trapped_write;
-  is now:
-  SET_SYMBOL_TRAPPED_WRITE (sym, SYMBOL_TRAPPED_WRITE (base_variable));
-
-  make_symbol_constant (sym);
-  should do what this did:
-  SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
-
-  new:
-  #define lisp_h_SYMBOL_CONSTANT_P(sym) (XSYMBOL (sym)->trapped_write == SYMBOL_NOWRITE)
-  is:
-
-  new:
-  #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) ((XSYMBOL (sym)->trapped_write)
-  is:
-  #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)))
-
-** 20240713
-
-   - remove ? src/sheap.h
-   - remove hybrid malloc? dd951c00
-
-   rebase over 60d1b18 resulting in ea302f67, was non-trivial
-   and it might have lead to unbalanced or missing dynwind
-
-   during rebase,
-   commit "* src/data.c (Ftype_of): Return `Qt' by default."
-   might have been butched, around Lisp_Vectorlike / VECTORLIKEP.
-
-   "store lisp structures in SCM objects" butched? compare to 3e12ebf33
-   definition of XCONS looks duplicated
-
-** 20240710
-  in git diff 5761a2ecb..da4a31b1b1a
-  search-slow-speed has been moved
 
 * FAQ
 ** How can I help?
@@ -440,6 +268,88 @@ be easier to pin-point test faults, sigsegvs and so on.
    - increased orthogonality
      a layer in scheme could provide building blocks to compose composite operators
      such as macroexp-let2, et al.
+
+* testing
+
+Running the tool/run-tests.sh script will run through both guilemacs tests,
+and also the emacs ERT suite.
+At the end, the script will output a test report summarizing what tests
+succeded and what failed.
+
+#+BEGIN_SRC
+...
+Read failures when reading ERT test files: 349
+Total number of missing tests: 0   ;; found during emit/scan, but never runned, ie most probably failed
+--------------------------------------------
+       | gen |  ERT | total |
+-------+-----+------+-------+-
+ found | 180 | 1741 |  1921 |
+runned | 180 | 2085 |  2265 |
+  pass | 180 | 2085 |  2265 |
+  fail |   0 |    0 |     0 |
+#+END_SRC
+
+During testing, tests generated from Scheme are counted from Scheme. This means every test
+produced from Scheme code -- which are translated into a Emacs Lisp file, and then
+the target emacs is started and loads the test elisp file.
+
+In contrast, ERT tests are simply Elisp files that the target binary (emacs) loads.
+If target Emacs crashes during testing, any test that havn't run wont report any result.
+
+To ensure that all intended tests are accounted for, the Scheme test program will read
+each elisp test file, and counts every instance of 'ert-deftest' declaration.
+
+The problem with this is that elisp isn't compatible with scheme, and so the
+scheme reader will error.
+
+The final test result report will reflect any of these issues.
+
+** run tests for C defined elisp functions
+
+Many fundamental Emacs functions, including some primitive operations, are implemented
+in C. These functions can be tested using Guile-Elisp (libguile) together with the bare emacs binary.
+Without loading additional Elisp code from "loadup.el".
+
+Run the tests for these basic functions using the --prelude flag:
+
+#+BEGIN_SRC
+echo GUILE=/t/ge/g3/lib > env.sh
+
+./tool/run-tests.sh --prelude
+#+END_SRC
+
+The prelude tests are located in the "test/pre" directory.
+
+*** debug tests c-prelude
+
+To manually debug a bare Emacs session under gdb,
+you can follow these steps. First, ensure you generate the necessary test files:
+ "run-tools.sh --prelude".
+Which will generate the test file "test/pre/value-cmp.el".
+
+Then, run the following script to start a debugging session:
+
+#+BEGIN_SRC
+. ./env.sh
+
+export PATH="$GUILE/bin:$PATH"
+export LD_LIBRARY_PATH="$GUILE/lib"
+
+export HOME=/nonexistent
+export LANG=C
+export EMACS_TEST_DIRECTORY="`pwd`/test"
+
+cd test
+
+gdb --args ../src/emacs -nl -Q --batch -L . --prelude `pwd`/pre/value-cmp.el
+
+(gdb) break xsignal2
+(gdb) break emacs_abort
+#+END_SRC
+
+This will allow you to step through and debug the C-prelude tests.
+Since the prelude tests are designed to exercise a minimum of emacs, it should
+be easier to pin-point test faults, sigsegvs and so on.
 
 * guilemacs internals
  This section describes the inner workings of guilemacs.
@@ -974,3 +884,133 @@ this could be hoisted to startup
 * ramblings
 
   Much of "where are we at 2024" :)
+* Changelog
+** 20240824
+  Freshly built guilemacs with a jit-enabled guile:
+  tag r291-d0fa569b (6bce86b5),
+  has been built from scratch and tested with
+  jit-enabled guile (wip-elisp-rebased 4b9b8277).
+
+** 20240823
+  - make doesn't exit on failure
+#+BEGIN_SRC
+  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
+  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
+  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
+  Fatal error 11: Segmentation fault
+  Backtrace:
+  ...
+  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
+  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
+  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
+  make[1]: Leaving directory '/t/ge/emacs/src'
+  make: *** [Makefile:409: src] Error 2
+#+END_SRC
+
+** 20240822
+  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
+  - mapbacktrace is missing, it is used by (seemingly redundant functions)
+  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
+  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
+  it will cause an error that prints backtraces (thought backtraces was broken)!
+  This is seen around 1d43c1854.
+  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
+  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!)
+
+** 20240810
+  emacs-devel partially has:
+  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
+  at commit 10527fca66e39d7067986904161fa33741abcd26
+
+** 27.0.50-20191008-20240809
+  rebased beyond introduction of new pdumper
+  went almost smoothly, only:
+  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
+  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
+
+** 20240807
+  merge gone wrong!
+  During a merge conflict resolve, what was merged without conflict made no sense.
+  The function allocate_vectorlike looks butched.
+  - File: alloc.c
+  - head: 3de046c9
+  - old base commit: 7e9f62c0
+  - new base commit: c8431a06
+
+** 20240725
+  "ldefs-boot, revert be538ba778"
+  causes guile error (it receives a SCM 0 object)
+  probably only partial is needed, ablate testing needed
+
+  Test if this is still needed in later rebases
+
+** 20240724
+  dunnet alive and kicking: 16efea3a883ebf633946ee9b9d0681eb55437878 and earlier commits
+
+** 20240722
+  rebase over threading patches
+  see "use libguile dynamic wind + c pseudo-closures"
+  - probably specpdl_saved_value should not be used
+  - unbind_to_1: remove?:
+      byte_stack_list = catch->byte_stack;
+
+  hmm, the patchset removes handlerlist_sentinel struct from eval.c,
+  whereas GM only changes it into a pointer,
+  still needed? NO, this has moved to thread.h where it is an #define
+
+** 20240718
+  rebase trapped write
+
+  replace:
+  SET_SYMBOL_CONSTANT (XSYMBOL (intern_c_string ("enable-multibyte-characters")), 1);
+  with:
+  make_symbol_constant (intern_c_string ("enable-multibyte-characters"));
+
+  #predicate:
+  #sym->trapped_write == SYMBOL_NOWRITE
+  #is replaced with:
+  #if (SYMBOL_TRAPPED_NOWRITE_P (sym))   -- guilemacs
+  #similar as:
+  #if (sym->trapped_write == SYMBOL_TRAPPED_WRITE)
+
+  predicate:
+  if (sym->constant)
+  is replaced with:
+  if (SYMBOL_TRAPPED_WRITE_P (sym))
+
+  in eval.c:
+  sym->trapped_write = XSYMBOL (base_variable)->trapped_write;
+  is now:
+  SET_SYMBOL_TRAPPED_WRITE (sym, SYMBOL_TRAPPED_WRITE (base_variable));
+
+  make_symbol_constant (sym);
+  should do what this did:
+  SET_SYMBOL_CONSTANT (XSYMBOL (sym), 1);
+
+  new:
+  #define lisp_h_SYMBOL_CONSTANT_P(sym) (XSYMBOL (sym)->trapped_write == SYMBOL_NOWRITE)
+  is:
+
+  new:
+  #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) ((XSYMBOL (sym)->trapped_write)
+  is:
+  #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)))
+
+** 20240713
+
+   - remove ? src/sheap.h
+   - remove hybrid malloc? dd951c00
+
+   rebase over 60d1b18 resulting in ea302f67, was non-trivial
+   and it might have lead to unbalanced or missing dynwind
+
+   during rebase,
+   commit "* src/data.c (Ftype_of): Return `Qt' by default."
+   might have been butched, around Lisp_Vectorlike / VECTORLIKEP.
+
+   "store lisp structures in SCM objects" butched? compare to 3e12ebf33
+   definition of XCONS looks duplicated
+
+** 20240710
+  in git diff 5761a2ecb..da4a31b1b1a
+  search-slow-speed has been moved
