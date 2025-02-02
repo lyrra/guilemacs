@@ -265,6 +265,9 @@ DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
 {
   CHECK_NUMBER (arg);
 
+  if (BIGNUMP (arg))
+    emacs_abort ();
+
   if (FIXNUMP (arg))
     {
       if (XFIXNUM (arg) < 0)
@@ -275,14 +278,11 @@ DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
       if (signbit (XFLOAT_DATA (arg)))
 	arg = make_float (- XFLOAT_DATA (arg));
     }
-  else if (BIGNUMP (arg))
-    emacs_abort ();
   else
     {
-      if (mpz_sgn (*xbignum_val (arg)) < 0)
+      if (scm_negative_p (arg) == SCM_BOOL_T)
 	{
-	  mpz_neg (mpz[0], *xbignum_val (arg));
-	  arg = make_integer_mpz ();
+          return scm_abs (arg);
 	}
     }
 

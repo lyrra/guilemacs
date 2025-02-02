@@ -2,6 +2,8 @@
 ;;;; especially the corner-cases
 ;;;; for some preliminary fixnum tests at limit see pre/fixnum.scm
 
+(use-modules (rnrs arithmetic fixnums))
+
 ;; we're past maxsize of a guile fixnum, ie we're in bignum territory
 
 ;; try some numbers around the fixnum/bignum boundary
@@ -195,3 +197,7 @@
 (deftest mpf*8 (18446744073709551608)
   (el-expr `(let ((mpf most-positive-fixnum))
               (print (* 8 mpf)))))
+
+(deftestf 'abs ((abs (* 8 (least-fixnum))))
+  (el-expr `(let ((num (* 8 most-negative-fixnum)))
+              (print (abs num)))))
