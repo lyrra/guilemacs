@@ -275,6 +275,8 @@ DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
       if (signbit (XFLOAT_DATA (arg)))
 	arg = make_float (- XFLOAT_DATA (arg));
     }
+  else if (BIGNUMP (arg))
+    emacs_abort ();
   else
     {
       if (mpz_sgn (*xbignum_val (arg)) < 0)
@@ -309,7 +311,7 @@ This is the same as the exponent of a float.  */)
       Lisp_Object x = scm_divide (scm_log (arg), scm_log (10)); // 10 = make_fixnum (2)
       return scm_inexact_to_exact (scm_round_number (x));
     }
-
+  emacs_abort ();
   value = mpz_sizeinbase (*xbignum_val (arg), 2) - 1;
   return make_fixnum (value);
 }
