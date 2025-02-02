@@ -1460,7 +1460,6 @@ usage: (decode-time &optional TIME ZONE FORM)  */)
     }
   else
     {
-      fprintf(stderr, "###################### decode-time REACHED ! #####################\n");
       emacs_abort ();
       mpz_set_si (mpz[0], local_tm.tm_year);
       mpz_add_ui (mpz[0], mpz[0], TM_YEAR_BASE);
@@ -1526,7 +1525,7 @@ check_tm_member (Lisp_Object obj, int offset)
     }
   else
     {
-      fprintf(stderr, "###################### check_tm_member REACHED ! #####################\n");
+      emacs_abort ();
       CHECK_INTEGER (obj);
       mpz_sub_ui (mpz[0], *bignum_integer (&mpz[0], obj), offset);
       if (!mpz_fits_sint_p (mpz[0]))

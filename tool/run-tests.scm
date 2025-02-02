@@ -511,7 +511,7 @@
            (num-total-found-ert-tests (length %total-found-ert-tests))
            (num-total-passed-gen-tests (length %total-passed-gen-tests))
            (num-total-passed-ert-tests (length %total-passed-ert-tests))
-           ;(num-total-failed-gen-tests (length %total-failed-gen-tests))
+           (num-total-failed-gen-tests (length %total-failed-gen-tests))
            (num-total-missing-ert-tests ; (length %total-failed-ert-tests)
                     (- num-total-ert-tests num-total-passed-ert-tests))
            (failed-gen (filter (lambda (x)
@@ -521,7 +521,6 @@
                                  (and (not (member x %total-passed-ert-tests))
                                       (not (member x %skipped-tests))))
                                %total-ert-tests))
-           (num-total-failed-gen-tests (length failed-gen))
            (num-total-failed-ert-tests (length failed-ert)))
       (format #t "~%")
       (if (not (null? %total-failed-gen-tests))
@@ -534,7 +533,7 @@
           (format #t "failed ERT tests: ~s~%~%" failed-ert))
       (format #t "Read failures when reading ERT test files: ~s~%" %read-failures)
       (format #t "Total number of missing tests: ~a   ;; found during emit/scan, but never runned, ie most probably failed~%"
-              (+ (length failed-gen) (length failed-ert)))
+              (length failed-ert))
       (format #t "--------------------------------------------~%")
       (print-report-table
        (list '("" "gen" "ERT" "total" "")

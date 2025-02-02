@@ -29,14 +29,14 @@
   (el-expr `(print (integerp (time-convert nil 'integer)))))
 
 ; trigger call to ticks_hz_list4
-(deftest time-convert-0125 ((0 0 0 0))
+(deftest time-convert-0125 ((0 0 125000 0))
   (el-expr `(print (time-convert 0.125 'list))))
 
 ; trigger call to ticks_hz_list4
-(deftest time-convert-ticks_hz_list4 ((0 123 0 123))
+(deftest time-convert-ticks_hz_list4 ((0 123 0 0))
   (el-expr `(print (time-convert 123 'list))))
 ; trigger call to ticks_hz_list4
-(deftest time-convert-ticks_hz_list4-2 ((1876831054 45057 123000000 1))
+(deftest time-convert-ticks_hz_list4-2 ((1876831054 45057 0 0))
   (el-expr `(print (time-convert 123000000000000.9999 'list))))
 
 ;(deftest time-convert-ticks_hz_hz_ticks ((12300000000000100 . 100))
@@ -59,7 +59,7 @@
                          (time-convert look-integer hz)))
              sec))))
 
-(deftest time-subtract ((59000078796799 . 1000000000000))
+(deftest time-subtract ((59999999999999 . 1000000000000))
   (el-expr `(print
              (let* ((look '(1202 22527 999999 999999))
                     (look-ticks-hz (time-convert look t))

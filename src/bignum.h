@@ -96,6 +96,8 @@ bignum_integer (mpz_t *tmp, Lisp_Object i)
       /* The unnecessary cast pacifies a buggy GCC 4.8.5.  */
       return (mpz_t const *) tmp;
     }
+  else if (GUILEBIGNUMP (i))
+    emacs_abort ();
   return xbignum_val (i);
 }
 
