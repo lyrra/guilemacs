@@ -6,6 +6,7 @@
              (ice-9 format)
              (ice-9 popen)
              (ice-9 regex)
+             (srfi srfi-1)
              (rnrs io ports)
              (utils))
 ; accumulate all testfiles and run them in a single guile-emacs program
@@ -448,24 +449,38 @@
      (if (not (null? fail))
          (format #t "  failed tests: ~s~%" fail)))))
 
-(define (match-keys keys fils)
-  ;; check prelude
-  (let ((pass #t))
-    (if (memq 'prelude fils)
-        (if (not (memq 'prelude keys))
-            (set! pass #f)))
-    pass))
+(define (maybe-run-tests files keys test-filter)
+  (when (or (null? (memq 'prelude keys))
+            ;; check prelude
+            (if (memq 'prelude test-filter)
+                (memq 'prelude keys)
+                #t))
+    ;; check filter
+    (let ((filters (filter string? test-filter)))
+      (if (not (null? filters))
+          (set! files
+                (filter (lambda (file)
+                          (fold (lambda (a m)
+                                  (or m
+                                      (string-contains file a)))
+                                #f
+                                filters))
+                        files)))
+      (if (not (null? files))
+          (run-tests files keys)))))
 
 (define (main args)
   (let ((test-filter '()))
     (for-each (lambda (arg)
                 (if (string=? "--prelude" arg)
-                    (push! test-filter 'prelude)))
+                    (push! test-filter 'prelude))
+                (if (string-contains arg "--filter=")
+                    (push! test-filter (substring arg 9))))
               args)
     (set! *random-state* (random-state-from-platform))
     ;; test
-    (let ((files '())
-          (done #f))
+    (let* ((files '())
+           (done #f))
       (for-each (lambda (line)
                   (when (not done)
                     (cond
@@ -482,16 +497,15 @@
                             (set! line (cdr line)))
                         ;; run any currently collected files
                         (unless (null? files)
-                          (run-tests files '()))
+                          (maybe-run-tests files '() test-filter))
                         ;; run the files in the group
-                        (if (match-keys keys test-filter)
-                            (run-tests (cdr line) keys))
+                        (maybe-run-tests (cdr line) keys test-filter)
                         (set! files '())))
                      (else
                       (push! files line)))))
                 %tests)
       (unless (null? files)
-        (run-tests files '())))
+        (maybe-run-tests files '() test-filter)))
     (flush-all-ports)
     ;; report
     (format #t "~%#################################################################~%")
