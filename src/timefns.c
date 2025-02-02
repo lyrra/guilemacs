@@ -564,10 +564,10 @@ ticks_hz_list4 (Lisp_Object ticks, Lisp_Object hz)
   int us = fullps / 1000000;
   int ps = fullps % 1000000;
 
-  /* mpz[0] = floor (mpz[0] / trillion), with US = the high six digits of the
+  /* floor (_ / trillion), with US = the high six digits of the
      12-digit remainder, and PS = the low six digits.  */
 
-  /* mpz[0] = floor (mpz[0] / (1 << LO_TIME_BITS)), with LO = remainder.  */
+  /* floor (_ / (1 << LO_TIME_BITS)), with LO = remainder.  */
   unsigned long ulo = scm_to_uintmax (q);
 
   if (scm_negative_p (q) == SCM_BOOL_T)
@@ -1460,10 +1460,8 @@ usage: (decode-time &optional TIME ZONE FORM)  */)
     }
   else
     {
-      emacs_abort ();
-      mpz_set_si (mpz[0], local_tm.tm_year);
-      mpz_add_ui (mpz[0], mpz[0], TM_YEAR_BASE);
-      year = make_integer_mpz ();
+      year = scm_from_intmax (local_tm.tm_year);
+      year = scm_sum (year, scm_from_intmax (TM_YEAR_BASE));
     }
 
   /* Compute SEC from LOCAL_TM.tm_sec and HZ.  */
@@ -1527,10 +1525,12 @@ check_tm_member (Lisp_Object obj, int offset)
     {
       emacs_abort ();
       CHECK_INTEGER (obj);
-      mpz_sub_ui (mpz[0], *bignum_integer (&mpz[0], obj), offset);
-      if (!mpz_fits_sint_p (mpz[0]))
+      Lisp_Object z = scm_difference (obj, scm_from_intmax (offset));
+      // FIX: should check if fits really an signed-int, whereas fixnum is smaller
+      if (scm_gr_p (z, scm_from_intmax (MOST_POSITIVE_FIXNUM)) ||
+          scm_less_p (z, scm_from_intmax (MOST_NEGATIVE_FIXNUM)))
 	time_overflow ();
-      return mpz_get_si (mpz[0]);
+      return scm_to_intmax (z);
     }
 }
 
