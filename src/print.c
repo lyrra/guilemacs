@@ -1599,17 +1599,6 @@ print_pointer (Lisp_Object printcharfun, char *buf, const char *prefix,
 #endif
 
 static void
-print_bignum (Lisp_Object obj, Lisp_Object printcharfun)
-{
-  ptrdiff_t size = bignum_bufsize (obj, 10);
-  USE_SAFE_ALLOCA;
-  char *str = SAFE_ALLOCA (size);
-  ptrdiff_t len = bignum_to_c_string (str, size, obj, 10);
-  strout (str, len, len, printcharfun);
-  SAFE_FREE ();
-}
-
-static void
 print_bool_vector (Lisp_Object obj, Lisp_Object printcharfun)
 {
   EMACS_INT size = bool_vector_size (obj);
@@ -2620,7 +2609,8 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  }
 
 	case PVEC_BIGNUM:
-          print_bignum (obj, printcharfun);
+          Lisp_Object z = bignum_to_guile_bignum (obj);
+          print_object (z, printcharfun, escapeflag);
 	  break;
 
 	case PVEC_BOOL_VECTOR:

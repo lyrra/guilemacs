@@ -1708,9 +1708,9 @@ If N is greater or equal to the length of LIST, return LIST (or a copy).  */)
       if (m <= 0)
 	return Qnil;
     }
-  else if (BIGNUMP (n))
+  else if (GUILEBIGNUMP (n))
     {
-      if (mpz_sgn (*xbignum_val (n)) < 0)
+      if (scm_negative_p (n) == SCM_BOOL_T || scm_zero_p (n) == SCM_BOOL_T)
 	return Qnil;
       m = MOST_POSITIVE_FIXNUM;
     }
@@ -1750,9 +1750,9 @@ Otherwise, return LIST after truncating it.  */)
       if (m <= 0)
 	return Qnil;
     }
-  else if (BIGNUMP (n))
+  else if (GUILEBIGNUMP (n))
     {
-      if (mpz_sgn (*xbignum_val (n)) < 0)
+      if (scm_negative_p (n) == SCM_BOOL_T || scm_zero_p (n) == SCM_BOOL_T)
 	return Qnil;
       m = MOST_POSITIVE_FIXNUM;
     }
@@ -1812,9 +1812,7 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
     }
   else
     {
-      if (mpz_sgn (*xbignum_val (n)) < 0)
-	return tail;
-      num = large_num;
+      emacs_abort ();
     }
 
   EMACS_INT tortoise_num = num;
@@ -1840,34 +1838,14 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
       return Qnil;
     }
 
+  if (! FIXNUMP (n))
+    {
+      emacs_abort ();
+    }
+
   /* TAIL is part of a cycle.  Reduce NUM modulo the cycle length to
      avoid going around this cycle repeatedly.  */
   intptr_t cycle_length = tortoise_num - num;
-  if (GUILEBIGNUMP (n))
-    {
-      emacs_abort ();
-      // just error, too complex to keep in C
-      // but a pure guile version might differ too much?
-      // also see test test-nthcdr-circular
-     }
-  else if (! FIXNUMP (n))
-    {
-      /* Undo any error introduced when LARGE_NUM was substituted for
-	 N, by adding N - LARGE_NUM to NUM, using arithmetic modulo
-	 CYCLE_LENGTH.  */
-      /* Add N mod CYCLE_LENGTH to NUM.  */
-      if (cycle_length <= ULONG_MAX)
-	num += mpz_tdiv_ui (*xbignum_val (n), cycle_length);
-      else
-	{
-	  mpz_set_intmax (mpz[0], cycle_length);
-	  mpz_tdiv_r (mpz[0], *xbignum_val (n), mpz[0]);
-	  intptr_t iz;
-	  mpz_export (&iz, NULL, -1, sizeof iz, 0, 0, mpz[0]);
-	  num += iz;
-	}
-      num += cycle_length - large_num % cycle_length;
-    }
   num %= cycle_length;
 
   /* One last time through the cycle.  */
@@ -2979,7 +2957,7 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	if (FIXNUMP (b) || FLOATP (b))
           return value_cmp_scm (a, b);
 	if (BIGNUMP (b))
-	  return -mpz_sgn (*xbignum_val (b));
+          emacs_abort ();
         if (GUILEBIGNUMP (b))
           return value_cmp_scm (a, b);
       }
@@ -3091,7 +3069,7 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 		}
 
 	      case PVEC_BIGNUM:
-		return mpz_cmp (*xbignum_val (a), *xbignum_val (b));
+                emacs_abort ();
 
 	      default:
 		/* Treat other types as unordered.  */
@@ -3110,10 +3088,7 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	double fa = XFLOAT_DATA (a);
 	if (BIGNUMP (b))
 	  {
-	    if (isnan (fa))
-	      return 0;
             emacs_abort ();
-	    return -mpz_cmp_d (*xbignum_val (b), fa);
 	  }
         if (XTYPE (b) == Lisp_GuileBignum)
           return value_cmp_scm (a, b);

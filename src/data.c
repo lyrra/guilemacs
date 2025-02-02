@@ -594,7 +594,7 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
     }
   else if (BIGNUMP (object))
     {
-      return 0 <= mpz_sgn (*xbignum_val (object)) ? Qt : Qnil;
+      emacs_abort ();
     }
   else
     return Qnil;
@@ -3147,8 +3147,7 @@ usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
     {
       if (FIXNUMP (a) || FLOATP (a) || GUILEBIGNUMP (a))
 	return scm_difference (2, a); // 2 == make_fixnum (0)
-      mpz_neg (mpz[0], *xbignum_val (a));
-      return make_integer_mpz ();
+      emacs_abort ();
     }
   return arith_driver (Asub, nargs, args, a);
 }
@@ -3231,6 +3230,7 @@ integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
 	}
       else if (eabs (d) <= ULONG_MAX)
 	{
+          emacs_abort ();
 	  mpz_t const *n = xbignum_val (num);
 	  bool neg_n = mpz_sgn (*n) < 0;
 	  r = mpz_tdiv_ui (*n, eabs (d));
@@ -3249,12 +3249,14 @@ integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
 	}
     }
 
+  emacs_abort ();
   mpz_t const *d = bignum_integer (&mpz[1], den);
   mpz_t *r = &mpz[0];
   mpz_tdiv_r (*r, *bignum_integer (&mpz[0], num), *d);
 
   if (modulo)
     {
+      emacs_abort ();
       /* If the remainder has the wrong sign, fix it.  */
       int sgn_r = mpz_sgn (*r);
       if (mpz_sgn (*d) < 0 ? sgn_r > 0 : sgn_r < 0)
@@ -3371,6 +3373,7 @@ representation.  */)
     }
   else if (BIGNUMP (value))
     {
+      emacs_abort ();
       mpz_t const *nonneg = xbignum_val (value);
       if (mpz_sgn (*nonneg) < 0)
 	{
