@@ -198,6 +198,35 @@
   (el-expr `(let ((mpf most-positive-fixnum))
               (print (* 8 mpf)))))
 
+;; note that using the variable most-positive-fixnum or mpf
+;; instead of the literal number avoids
+;; guile constant folding optimization getting in the way
+(for-each (lambda (p)
+            (match p
+              ((f e)
+               (deftestf 'mpf (e)
+                 (el-expr `(let ((mpf most-positive-fixnum)
+                                 (mnf most-negative-fixnum))
+                             (print ,f)))))))
+          (let ((mpf (greatest-fixnum))
+                (mnf (least-fixnum)))
+            `((,mpf ,mpf) ; printing the literal greatest-fixnum expects that number
+              (mpf ,mpf) ; ditto but print the emacs version of it
+              (,mnf ,mnf)
+              (mnf ,mnf)
+              ((* 1 mpf) ,(* 1 mpf))
+              ((* 2 mpf) ,(* 2 mpf))
+              ((* 2 mpf 4) ,(* 8 mpf))
+              ((* 2 mnf 4) ,(* 8 mnf))
+              ((+ mpf mnf) ,(+ mpf mnf))
+              ((+ (* 8 mpf)) ,(+ (* 8 mpf)))
+              ((+ (* 8 mnf)) ,(+ (* 8 mnf)))
+              ((- (* 8 mpf)) ,(- (* 8 mpf)))
+              ((- (* 8 mnf)) ,(- (* 8 mnf)))
+              ((- mpf mnf) ,(- mpf mnf))
+              ((- mnf mpf) ,(- mnf mpf)) ; test make_int
+              )))
+
 (deftestf 'abs ((abs (* 8 (least-fixnum))))
   (el-expr `(let ((num (* 8 most-negative-fixnum)))
               (print (abs num)))))

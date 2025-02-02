@@ -2577,7 +2577,7 @@ INTEGERP (Lisp_Object x)
 INLINE Lisp_Object
 make_int (intmax_t n)
 {
-  return FIXNUM_OVERFLOW_P (n) ? scm_from_uintmax (n) : make_fixnum (n);
+  return FIXNUM_OVERFLOW_P (n) ? scm_from_intmax (n) : make_fixnum (n);
 }
 INLINE Lisp_Object
 make_uint (uintmax_t n)
