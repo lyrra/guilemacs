@@ -3206,7 +3206,14 @@ integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
   if ((FIXNUMP (num) || GUILEBIGNUMP (num)) &&
       (FIXNUMP (den) || GUILEBIGNUMP (den)))
     {
-      return scm_remainder (num, den);
+      if (modulo)
+        {
+          return scm_modulo (num, den);
+        }
+      else
+        {
+          return scm_remainder (num, den);
+        }
     }
 
   if (FIXNUMP (den))
@@ -3403,13 +3410,7 @@ Markers are converted to integers.  */)
   (Lisp_Object number)
 {
   number = check_number_coerce_marker (number);
-
-  if (FIXNUMP (number))
-    return make_int (XFIXNUM (number) + 1);
-  if (FLOATP (number))
-    return (make_float (1.0 + XFLOAT_DATA (number)));
-  mpz_add_ui (mpz[0], *xbignum_val (number), 1);
-  return make_integer_mpz ();
+  return scm_sum (number, make_fixnum(1));
 }
 
 DEFUN ("1-", Fsub1, Ssub1, 1, 1, 0,
@@ -3418,13 +3419,7 @@ Markers are converted to integers.  */)
   (Lisp_Object number)
 {
   number = check_number_coerce_marker (number);
-
-  if (FIXNUMP (number))
-    return make_int (XFIXNUM (number) - 1);
-  if (FLOATP (number))
-    return (make_float (-1.0 + XFLOAT_DATA (number)));
-  mpz_sub_ui (mpz[0], *xbignum_val (number), 1);
-  return make_integer_mpz ();
+  return scm_difference (number, make_fixnum(1));
 }
 
 DEFUN ("lognot", Flognot, Slognot, 1, 1, 0,
@@ -3434,8 +3429,7 @@ DEFUN ("lognot", Flognot, Slognot, 1, 1, 0,
   CHECK_INTEGER (number);
   if (FIXNUMP (number))
     return make_fixnum (~XFIXNUM (number));
-  mpz_com (mpz[0], *xbignum_val (number));
-  return make_integer_mpz ();
+  return scm_lognot (number);
 }
 
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,
