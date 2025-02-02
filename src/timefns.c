@@ -84,14 +84,6 @@ static Lisp_Object timespec_hz;
 #else
 static Lisp_Object trillion;
 #endif
-#if ! (FASTER_TIMEFNS && TRILLION <= ULONG_MAX)
-# if 1 // FIXNUM_OVERFLOW_P (TRILLION)
-#  define ztrillion (*xbignum_val (trillion))
-# else
-static mpz_t ztrillion;
-#  define NEED_ZTRILLION_INIT
-# endif
-#endif
 
 /* True if the nonzero Lisp integer HZ divides evenly into a trillion.  */
 static bool
@@ -608,6 +600,8 @@ emacs_gcd (EMACS_INT a, EMACS_INT b)
 static Lisp_Object
 ticks_hz_hz_ticks (struct ticks_hz t, Lisp_Object hz)
 {
+  if (BIGNUMP (hz))
+    emacs_abort ();
   /* The idea is to return the floor of ((T.ticks * HZ) / T.hz).  */
 
   /* For speed, just return T.ticks if T.hz == HZ.  */
@@ -643,11 +637,16 @@ ticks_hz_hz_ticks (struct ticks_hz t, Lisp_Object hz)
     }
   else if (! (GUILEBIGNUMP (hz) && (scm_negative_p (hz) == SCM_BOOL_T)))
     invalid_hz (hz);
-  else if (! (BIGNUMP (hz) && 0 < mpz_sgn (*xbignum_val (hz))))
-    invalid_hz (hz);
+
+  if (BIGNUMP (t.ticks))
+    emacs_abort ();
+  if (BIGNUMP (t.hz))
+    emacs_abort ();
+  if (BIGNUMP (hz))
+    emacs_abort ();
 
   Lisp_Object z, z2;
-  Lisp_Object zt = BIGNUMP (hz) ? bignum_to_guile_bignum (t.ticks) : t.ticks;
+  Lisp_Object zt = BIGNUMP (t.ticks) ? bignum_to_guile_bignum (t.ticks) : t.ticks;
   Lisp_Object zh = BIGNUMP (hz) ? bignum_to_guile_bignum (hz) : hz;
   Lisp_Object zh2 = BIGNUMP (t.hz) ? bignum_to_guile_bignum (t.hz) : t.hz;
   /* Fall back on bignum arithmetic.  */
@@ -955,8 +954,6 @@ lisp_seconds_argument (Lisp_Object specified_time)
 static Lisp_Object
 lispint_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 {
-  bool mpz_done = false;
-
   if (BIGNUMP (a) || BIGNUMP (b))
     emacs_abort ();
 
@@ -1005,7 +1002,7 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 
       bool da_lt_db = scm_less_p (da, db) == SCM_BOOL_T;
       Lisp_Object hzmin = da_lt_db ? da : db;
-      Lisp_Object iticks; // = &mpz[da_lt_db + 1];
+      Lisp_Object iticks;
 
       /* The plan is to compute (na * (db/g) + nb * (da/g)) / lcm (da, db)
 	 where g = gcd (da, db).  Start by computing g.  */
@@ -1463,6 +1460,8 @@ usage: (decode-time &optional TIME ZONE FORM)  */)
     }
   else
     {
+      fprintf(stderr, "###################### decode-time REACHED ! #####################\n");
+      emacs_abort ();
       mpz_set_si (mpz[0], local_tm.tm_year);
       mpz_add_ui (mpz[0], mpz[0], TM_YEAR_BASE);
       year = make_integer_mpz ();
@@ -1527,6 +1526,7 @@ check_tm_member (Lisp_Object obj, int offset)
     }
   else
     {
+      fprintf(stderr, "###################### check_tm_member REACHED ! #####################\n");
       CHECK_INTEGER (obj);
       mpz_sub_ui (mpz[0], *bignum_integer (&mpz[0], obj), offset);
       if (!mpz_fits_sint_p (mpz[0]))
@@ -1960,8 +1960,4 @@ version after that.  */);
   flt_radix_power = make_nil_vector (flt_radix_power_size);
   staticpro (&flt_radix_power);
 
-#ifdef NEED_ZTRILLION_INIT
-  mpz_init_set_ui (ztrillion, 1000000);
-  mpz_mul_ui (ztrillion, ztrillion, 1000000);
-#endif
 }
