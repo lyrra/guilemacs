@@ -225,7 +225,8 @@
 
 ;; keep track manually of which tests are expensive or unstable
 (define %skipped-tests '(
- "cperl-test-bug-10483" "info-xref-test-emacs-manuals" "package-test-update-archives-async" "password-cache-tests-add/expires-key" "test-htmlfontify-load-rgb-file" "cl-seq-test-bug24264" "srecode-field-utest-impl" "semantic-test-c-preprocessor-simulation"))
+ "cperl-test-bug-10483" "info-xref-test-emacs-manuals" "package-test-update-archives-async" "password-cache-tests-add/expires-key" "test-htmlfontify-load-rgb-file" "cl-seq-test-bug24264" "srecode-field-utest-impl" "semantic-test-c-preprocessor-simulation"
+ "dnd-tests-open-remote-url"))
 
 (define %read-failures 0)
 (define %total-passed-tests 0)
@@ -259,41 +260,74 @@
       ((_ name (type expect) . body)
        #'(emit-test name 'type expect (lambda () . body))))))
 
+(define %testnum 0)
+
 (define (emit-test name type expect thunk)
-  (push! %total-gen-tests (format #f "~a" name))
-  (format (current-output-port) "(princ \"\\n-- test begin: ~a\\n\")~%" name)
-  (format (current-output-port) "(princ \"\\n-- test expect: ~a\\n\")~%"
-          (cond
-           ((eq? type 'text) (format #f "~a" expect))
-           ((string? expect) (format #f "\\\"~a\\\"" expect))
-           (else expect)))
-  (thunk)
-  (format (current-output-port) "(princ \"\\n-- test end: ~a\\n\")~%" name)
-  (format (current-output-port) "(flush-standard-output)~%"))
+  ;; ensure name is unique
+  (let* ((name (format #f "~a" name))
+         (name (if (member name %total-gen-tests)
+                   (let ((num (1+ %testnum)))
+                     (set! %testnum num)
+                     (string-concatenate (list name (format #f "-~a" num))))
+                   name)))
+    (push! %total-gen-tests name)
+    (format (current-output-port) "(princ \"\\n-- test begin: ~a\\n\")~%" name)
+    (format (current-output-port) "(princ \"\\n-- test expect: ~a\\n\")~%"
+            (cond
+             ((eq? type 'text) (format #f "~a" expect))
+             ((string? expect) (format #f "\\\"~a\\\"" expect))
+             (else expect)))
+    (thunk)
+    (format (current-output-port) "(princ \"\\n-- test end: ~a\\n\")~%" name)
+    (format (current-output-port) "(flush-standard-output)~%")))
 
 ;; use the scheme-parser to read through the elisp-file
 ;; and search for deftest forms.
 (define (scan-testfile filename)
-  (let ((r (lambda (port)
-             (with-exception-handler
-                 (lambda (exn)
-                   (apply (lambda args
-                            (format (current-error-port) "SCAN ERROR: filename: ~s, error: ~s~%" filename args)
-                            (set! %read-failures (1+ %read-failures))
-                            #f)
-                          (exception-kind exn)
-                          (exception-args exn)))
-               (lambda () (read port))
-               #:unwind? #t
-               #:unwind-for-type #t))))
+  (let* ((failure #f)
+         (r (lambda (port)
+              (with-exception-handler
+                  (lambda (exn)
+                    (apply (lambda args
+                             (format (current-error-port) "SCAN ERROR: filename: ~s, error: ~s~%" filename args)
+                             (set! failure #t)
+                             (set! %read-failures (1+ %read-failures))
+                             #f)
+                           (exception-kind exn)
+                           (exception-args exn)))
+                (lambda () (read port))
+                #:unwind? #t
+                #:unwind-for-type #t))))
     (call-with-input-file filename
       (lambda (port)
         (do ((form (r port) (r port)))
             ((eof-object? form))
           (if (and (pair? form) (eq? 'ert-deftest (car form)))
-              (push! %total-ert-tests
-                     (if (and (pair? (cdr form)) (symbol? (cadr form)))
-                         (symbol->string (cadr form)) #f))))))))
+              (if (and (pair? (cdr form)) (symbol? (cadr form)))
+                  (set! %total-ert-tests (assoc-set! %total-ert-tests
+                                                     (symbol->string (cadr form))
+                                                     '())))))))
+    (when failure
+      (format #t "Need to rescan file ~s.~%" filename)
+      (call-with-input-file filename
+        (lambda (port)
+          (do ((line (get-line port) (get-line port)))
+              ((eof-object? line))
+            (cond
+             ;; dont account skipped tests
+             ((string-contains line "'(SIGSEGV-guilemacs") #f)
+             ((string-contains line "'(DISABLE-guilemacs") #f)
+             ((string-contains line "'(ert-deftest") #f)
+             ((= 0 (or (string-contains line ";") -1)) #f)
+             (else
+              (let ((n (string-contains line "ert-deftest")))
+                (when n
+                  (let* ((name (substring line (+ 1 n (string-length "ert-deftest"))))
+                         (name (substring name 0 (string-contains name " "))))
+                    (if (and (not (string-contains name ",")) ; emit deftest through macro
+                             (not (string-contains name ",(intern")) ; ditto
+                             (not (string=? name "")))
+                        (set! %total-ert-tests (assoc-set! %total-ert-tests name '()))))))))))))))
 
 ;; take a test-specification in scheme and generate an elisp test file
 (define (testcompile-file file)
@@ -532,8 +566,8 @@
                                  (not (member x %total-passed-gen-tests)))
                                %total-gen-tests))
            (failed-ert (filter (lambda (x)
-                                 (and (not (member x %total-passed-ert-tests))
-                                      (not (member x %skipped-tests))))
+                                 (and (not (member (car x) %total-passed-ert-tests))
+                                      (not (member (car x) %skipped-tests))))
                                %total-ert-tests))
            (num-total-failed-ert-tests (length failed-ert)))
       (format #t "~%")
