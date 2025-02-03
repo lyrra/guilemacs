@@ -31,7 +31,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <gc.h>
 
 #include "lisp.h"
-#include "bignum.h"
 #include "dispextern.h"
 #include "intervals.h"
 #include "sysstdio.h"

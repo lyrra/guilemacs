@@ -35,7 +35,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "dispextern.h"
 #include "intervals.h"
 #include "character.h"
-#include "bignum.h"
 #include "buffer.h"
 #include "charset.h"
 #include <epaths.h>

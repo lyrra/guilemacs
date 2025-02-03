@@ -553,7 +553,7 @@ json_out_something (json_out_t *jo, Lisp_Object obj)
     json_out_object_hash (jo, obj);
   else if (VECTORP (obj))
     json_out_array (jo, obj);
-  else if (BIGNUMP (obj))
+  else if (GUILEBIGNUMP (obj))
     json_out_bignum (jo, obj);
   else
     wrong_type_argument (Qjson_value_p, obj);

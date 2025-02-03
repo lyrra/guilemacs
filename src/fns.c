@@ -29,7 +29,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 
 #include "lisp.h"
-#include "bignum.h"
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
@@ -93,10 +92,6 @@ See Info node `(elisp)Random Numbers' for more details.  */)
   else if (FIXNUMP (limit) || GUILEBIGNUMP (limit))
     {
       return scm_random (limit, SCM_UNDEFINED);
-    }
-  else if (BIGNUMP (limit))
-    {
-      emacs_abort ();
     }
 
   return make_ufixnum (get_random ());
@@ -2956,8 +2951,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	EMACS_INT ia = XFIXNUM (a);
 	if (FIXNUMP (b) || FLOATP (b))
           return value_cmp_scm (a, b);
-	if (BIGNUMP (b))
-          emacs_abort ();
         if (GUILEBIGNUMP (b))
           return value_cmp_scm (a, b);
       }
@@ -3068,16 +3061,11 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 		  goto tail_recurse;
 		}
 
-	      case PVEC_BIGNUM:
-                emacs_abort ();
-
 	      default:
 		/* Treat other types as unordered.  */
 		return 0;
 	      }
 	}
-      else if (BIGNUMP (a))
-	return -value_cmp (b, a, maxdepth);
 
       goto type_mismatch;
 
@@ -3086,10 +3074,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	if (FIXNUMP (b) || FLOATP (b))
           return value_cmp_scm (a, b);
 	double fa = XFLOAT_DATA (a);
-	if (BIGNUMP (b))
-	  {
-            emacs_abort ();
-	  }
         if (XTYPE (b) == Lisp_GuileBignum)
           return value_cmp_scm (a, b);
       }
@@ -3098,11 +3082,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
       {
 	if (FIXNUMP (b) || FLOATP (b) || GUILEBIGNUMP (b))
           return value_cmp_scm (a, b);
-	if (BIGNUMP (b))
-	  {
-            Lisp_Object x = bignum_to_guile_bignum (b);
-            return value_cmp_scm (a, b);
-	  }
       }
       goto type_mismatch;
 
@@ -4658,7 +4637,7 @@ sxhash_eq (Lisp_Object key)
 static EMACS_INT
 sxhash_eql (Lisp_Object key)
 {
-  return FLOATP (key) || BIGNUMP (key) ? sxhash (key) : sxhash_eq (key);
+  return FLOATP (key) || GUILEBIGNUMP (key) ? sxhash (key) : sxhash_eq (key);
 }
 
 /* Ignore H and return a hash code for KEY which uses 'eq' to compare keys.  */

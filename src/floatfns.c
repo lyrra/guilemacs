@@ -51,7 +51,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
-#include "bignum.h"
 
 #include <math.h>
 
@@ -265,9 +264,6 @@ DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
 {
   CHECK_NUMBER (arg);
 
-  if (BIGNUMP (arg))
-    emacs_abort ();
-
   if (FIXNUMP (arg))
     {
       if (XFIXNUM (arg) < 0)
@@ -391,12 +387,10 @@ This rounds the value towards -inf.
 With optional DIVISOR, return the largest integer no greater than ARG/DIVISOR.  */)
   (Lisp_Object arg, Lisp_Object divisor)
 {
-  eassert (!BIGNUMP (arg));
   if (NILP (divisor))
     {
       return scm_inexact_to_exact (scm_floor (arg));
     } else {
-      eassert (!BIGNUMP (divisor));
       return scm_inexact_to_exact (scm_floor_quotient (arg, divisor));
     }
 }

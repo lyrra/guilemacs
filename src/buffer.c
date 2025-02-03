@@ -145,7 +145,7 @@ fix_position (Lisp_Object pos)
     return XFIXNUM (pos);
   if (MARKERP (pos))
     return marker_position (pos);
-  CHECK_TYPE (BIGNUMP (pos), Qinteger_or_marker_p, pos);
+  CHECK_TYPE (GUILEBIGNUMP (pos), Qinteger_or_marker_p, pos);
   return !NILP (Fnatnump (pos)) ? MOST_POSITIVE_FIXNUM : MOST_NEGATIVE_FIXNUM;
 }
 

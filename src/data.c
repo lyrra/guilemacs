@@ -26,7 +26,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <intprops.h>
 
 #include "lisp.h"
-#include "bignum.h"
 #include "puresize.h"
 #include "character.h"
 #include "buffer.h"
@@ -216,12 +215,13 @@ a fixed set of types.  */)
     return Qstring;
   else if (CONSP (object))
     return Qcons;
+  else if (GUILEBIGNUMP (object))
+    return Qbignum;
   else if (VECTORLIKEP (object))
     {
       switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
         {
         case PVEC_NORMAL_VECTOR: return Qvector;
-	case PVEC_BIGNUM: return Qbignum;
 	case PVEC_MARKER: return Qmarker;
 	case PVEC_OVERLAY: return Qoverlay;
 	case PVEC_FINALIZER: return Qfinalizer;
@@ -591,10 +591,6 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
   else if (GUILEBIGNUMP (object))
     {
       return scm_positive_p (object) ? Qt : Qnil;
-    }
-  else if (BIGNUMP (object))
-    {
-      emacs_abort ();
     }
   else
     return Qnil;
@@ -2607,16 +2603,6 @@ arithcompare (Lisp_Object num1, Lisp_Object num2)
   num1 = coerce_marker (num1);
   num2 = coerce_marker (num2);
 
-  if (BIGNUMP (num1))
-    {
-      num1 = bignum_to_guile_bignum (num1);
-    }
-
-  if (BIGNUMP (num2))
-    {
-      num2 = bignum_to_guile_bignum (num2);
-    }
-
   bool lt, eq, gt;
 
   if ((FLOATP (num1) && scm_nan_p (num1) == SCM_BOOL_T) ||
@@ -2878,8 +2864,6 @@ NUMBER may be an integer or a floating point number.  */)
       // guilemacs, missing ancient feature: If BASE is negative, use upper-case digits in base -BASE.
       return string_from_scheme (scm_number_to_string (number, make_fixnum (10)));
     }
-  if (BIGNUMP (number))
-    emacs_abort ();
 
   if (FLOATP (number))
     return make_unibyte_string (buffer,
@@ -3107,9 +3091,6 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
 	  break;
 	accum = a;
       }
-
-  if (BIGNUMP (val))
-    emacs_abort ();
 
   if (FLOATP (val))
     {
@@ -3350,10 +3331,6 @@ representation.  */)
   if (GUILEBIGNUMP (value))
     {
       return scm_logcount (value);
-    }
-  else if (BIGNUMP (value))
-    {
-      emacs_abort ();
     }
 
   eassume (FIXNUMP (value));

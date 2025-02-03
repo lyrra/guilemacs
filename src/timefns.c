@@ -27,7 +27,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 
 #include "blockinput.h"
-#include "bignum.h"
 #include "coding.h"
 #include "lisp.h"
 
@@ -551,13 +550,11 @@ decode_float_time (double t, enum cform cform)
 static Lisp_Object
 ticks_hz_list4 (Lisp_Object ticks, Lisp_Object hz)
 {
-  Lisp_Object zt = BIGNUMP (ticks) ? bignum_to_guile_bignum (ticks) : ticks;
-  Lisp_Object zh = BIGNUMP (hz) ? bignum_to_guile_bignum (hz) : hz;
 
   Lisp_Object z, q, q2, r;
   /* floor ((ticks * trillion) / hz).  */
-  z = scm_product (zt, scm_from_uintmax (TRILLION));
-  q2 = scm_floor_quotient (z, zh);
+  z = scm_product (ticks, scm_from_uintmax (TRILLION));
+  q2 = scm_floor_quotient (z, hz);
 
   scm_floor_divide (q2, scm_from_uintmax (TRILLION), &q, &r);
   unsigned long int fullps = scm_to_uintmax (r);
@@ -600,8 +597,6 @@ emacs_gcd (EMACS_INT a, EMACS_INT b)
 static Lisp_Object
 ticks_hz_hz_ticks (struct ticks_hz t, Lisp_Object hz)
 {
-  if (BIGNUMP (hz))
-    emacs_abort ();
   /* The idea is to return the floor of ((T.ticks * HZ) / T.hz).  */
 
   /* For speed, just return T.ticks if T.hz == HZ.  */
@@ -638,21 +633,9 @@ ticks_hz_hz_ticks (struct ticks_hz t, Lisp_Object hz)
   else if (! (GUILEBIGNUMP (hz) && (scm_negative_p (hz) == SCM_BOOL_T)))
     invalid_hz (hz);
 
-  if (BIGNUMP (t.ticks))
-    emacs_abort ();
-  if (BIGNUMP (t.hz))
-    emacs_abort ();
-  if (BIGNUMP (hz))
-    emacs_abort ();
-
-  Lisp_Object z, z2;
-  Lisp_Object zt = BIGNUMP (t.ticks) ? bignum_to_guile_bignum (t.ticks) : t.ticks;
-  Lisp_Object zh = BIGNUMP (hz) ? bignum_to_guile_bignum (hz) : hz;
-  Lisp_Object zh2 = BIGNUMP (t.hz) ? bignum_to_guile_bignum (t.hz) : t.hz;
   /* Fall back on bignum arithmetic.  */
-  z = scm_product (zt, zh);
-  z2 = scm_floor_quotient (z, zh2);
-  return z2;
+  Lisp_Object z = scm_product (t.ticks, hz);
+  return scm_floor_quotient (z, t.hz);
 }
 
 /* Convert T to a Lisp integer counting seconds, taking the floor.  */
@@ -669,10 +652,6 @@ ticks_hz_seconds (struct ticks_hz t)
     return make_fixnum (XFIXNUM (t.ticks) / XFIXNUM (t.hz)
 			- (XFIXNUM (t.ticks) % XFIXNUM (t.hz) < 0));
 
-  if (BIGNUMP (t.ticks))
-    t.ticks = bignum_to_guile_bignum (t.ticks);
-  if (BIGNUMP (t.hz))
-    t.hz = bignum_to_guile_bignum (t.hz);
   /* For speed, inline what ticks_hz_hz_ticks would do.  */
   return scm_floor_quotient (t.ticks, t.hz);
 }
@@ -845,10 +824,6 @@ decode_lisp_time (Lisp_Object specified_time, enum cform cform)
     {
       Lisp_Object high = XCAR (specified_time);
       Lisp_Object low = XCDR (specified_time);
-      if (BIGNUMP (high))
-        emacs_abort ();
-      if (BIGNUMP (low))
-        emacs_abort ();
       Lisp_Object usec = make_fixnum (0);
       Lisp_Object psec = make_fixnum (0);
       if (CONSP (low))
@@ -954,9 +929,6 @@ lisp_seconds_argument (Lisp_Object specified_time)
 static Lisp_Object
 lispint_arith (Lisp_Object a, Lisp_Object b, bool subtract)
 {
-  if (BIGNUMP (a) || BIGNUMP (b))
-    emacs_abort ();
-
   if (subtract)
     {
       return scm_difference (a, b);
@@ -976,15 +948,6 @@ time_arith (Lisp_Object a, Lisp_Object b, bool subtract)
     ta = decode_lisp_time (a, CFORM_TICKS_HZ).th,
     tb = decode_lisp_time (b, CFORM_TICKS_HZ).th;
   Lisp_Object ticks, hz;
-
-  if (BIGNUMP (ta.hz))
-    emacs_abort ();
-  if (BIGNUMP (tb.hz))
-    emacs_abort ();
-  if (BIGNUMP (ta.ticks))
-    emacs_abort ();
-  if (BIGNUMP (tb.ticks))
-    emacs_abort ();
 
   if (FASTER_TIMEFNS && BASE_EQ (ta.hz, tb.hz))
     {
@@ -1130,15 +1093,6 @@ time_cmp (Lisp_Object a, Lisp_Object b)
      ATICKS * BHZ to BTICKS * AHZ.  */
   struct ticks_hz ta = decode_lisp_time (a, CFORM_TICKS_HZ).th;
   struct ticks_hz tb = decode_lisp_time (b, CFORM_TICKS_HZ).th;
-
-  if (BIGNUMP (ta.ticks))
-    ta.ticks = bignum_to_guile_bignum (ta.ticks);
-  if (BIGNUMP (tb.ticks))
-    tb.ticks = bignum_to_guile_bignum (tb.ticks);
-  if (BIGNUMP (ta.hz))
-    ta.hz = bignum_to_guile_bignum (ta.hz);
-  if (BIGNUMP (tb.hz))
-    tb.hz = bignum_to_guile_bignum (tb.hz);
 
   Lisp_Object za = ta.ticks;
   Lisp_Object zb = tb.ticks;

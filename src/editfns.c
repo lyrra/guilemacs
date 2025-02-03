@@ -3906,10 +3906,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  p[1] = '\0';
 		  sprintf_bytes = prec != 0;
 		}
-	      else if (BIGNUMP (arg))
-                {
-                  emacs_abort ();
-                }
 	      else if (GUILEBIGNUMP (arg))
 	      bignum_arg:
 		{

@@ -2056,7 +2056,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
     case PVEC_CHAR_TABLE:
     case PVEC_SUB_CHAR_TABLE:
     case PVEC_HASH_TABLE:
-    case PVEC_BIGNUM:
     case PVEC_BOOL_VECTOR:
     /* Impossible cases.  */
     case PVEC_FREE:
@@ -2607,11 +2606,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	      }
 	    goto next_obj;
 	  }
-
-	case PVEC_BIGNUM:
-          Lisp_Object z = bignum_to_guile_bignum (obj);
-          print_object (z, printcharfun, escapeflag);
-	  break;
 
 	case PVEC_BOOL_VECTOR:
 	  print_bool_vector (obj, printcharfun);

@@ -91,7 +91,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#include "bignum.h"
 #include "itree.h"
 #include "intervals.h"
 #include "character.h"

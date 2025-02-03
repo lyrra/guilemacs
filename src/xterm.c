@@ -12764,7 +12764,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
   if (NILP (ltimestamp))
     error ("No local value for XdndSelection");
 
-  if (BIGNUMP (ltimestamp))
+  if (GUILEBIGNUMP (ltimestamp))
     emacs_abort (); //x_dnd_selection_timestamp = bignum_to_intmax (ltimestamp);
   else
     x_dnd_selection_timestamp = XFIXNUM (ltimestamp);

@@ -19,22 +19,11 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
-#include "bignum.h"
-
 #include "lisp.h"
 
 #include <math.h>
 #include <stdlib.h>
 
-Lisp_Object
-bignum_to_guile_bignum (Lisp_Object num)
-{
-  if (BIGNUMP (num)) {
-    emacs_abort ();
-  } else {
-    return num;
-  }
-}
 
 /* Return D, converted to a Lisp integer.  Discard any fraction.
    Signal an error if D cannot be converted.  */

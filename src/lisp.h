@@ -739,7 +739,6 @@ enum pvec_type
 {
   PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
   PVEC_FREE,
-  PVEC_BIGNUM,
   PVEC_MARKER,
   PVEC_OVERLAY,
   PVEC_FINALIZER,
@@ -998,12 +997,6 @@ extern _Noreturn void wrong_choice (Lisp_Object, Lisp_Object);
 /* Defined in xdisp.c.  */
 
 INLINE bool
-BIGNUMP (Lisp_Object x)
-{
-  return PSEUDOVECTORP (x, PVEC_BIGNUM);
-}
-
-INLINE bool
 GUILEBIGNUMP (Lisp_Object x)
 {
   return SCM_BIGP (x);
@@ -1013,9 +1006,7 @@ GUILEBIGNUMP (Lisp_Object x)
 INLINE enum Lisp_Type
 XTYPE (Lisp_Object o)
 {
-  if (BIGNUMP (o))
-    return Lisp_Vectorlike;
-  else if (GUILEBIGNUMP (o))
+  if (GUILEBIGNUMP (o))
     return Lisp_GuileBignum;
   else if (INTEGERP (o))
     return Lisp_Int;
@@ -2570,7 +2561,7 @@ XSQLITE (Lisp_Object a)
 INLINE bool
 INTEGERP (Lisp_Object x)
 {
-  return FIXNUMP (x) || BIGNUMP (x) || GUILEBIGNUMP (x);
+  return FIXNUMP (x) || GUILEBIGNUMP (x);
 }
 
 /* Return a Lisp integer with value taken from N.  */
