@@ -998,6 +998,36 @@ maybe_load_seccomp (int argc, char **argv)
 
 #endif  /* SECCOMP_USABLE */
 
+bool try_load_guile_prelude (const char *filename)
+{
+  int fd = emacs_open (filename, O_RDONLY, 0);
+  if (fd > 0)
+    {
+      fprintf(stderr, "found prelude, trying to load %s\n", filename);
+      emacs_close (fd);
+      scm_c_define ("%prelude-filename", scm_from_utf8_string (filename));
+      scm_c_primitive_load (filename);
+      return true;
+    }
+   else
+    return false;
+}
+
+void load_guile_prelude ()
+{
+  // FIX: first look at some env variable
+  if (try_load_guile_prelude ("prelude/load.scm"))
+    return;
+  if (try_load_guile_prelude ("../prelude/load.scm"))
+    return;
+  if (try_load_guile_prelude ("../../prelude/load.scm"))
+    return;
+  if (try_load_guile_prelude ("../../../prelude/load.scm"))
+    return;
+  if (try_load_guile_prelude ("../../../../prelude/load.scm"))
+    return;
+}
+
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 
@@ -1026,6 +1056,7 @@ void foobar() {
 static int
 main2 (void *ignore, int argc, char **argv)
 {
+  load_guile_prelude ();
   int old_argc;
   bool no_loadup = false;
   char *prelude = NULL;
