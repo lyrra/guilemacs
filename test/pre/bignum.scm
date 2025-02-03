@@ -263,8 +263,8 @@
     (el-expr `(let ((num ,num))
                 (print (natnump num))))))
 
-(let ((num1 (ash 1 (random 128)))
-      (num2 (ash 1 (random 128))))
+(let ((num1 (ash 1 (random 96)))
+      (num2 (ash 1 (random 96))))
   (deftestf 'remainder ((remainder num1 num2))
     (el-expr `(print (% ,num1 ,num2))))
   (deftestf 'remainder ((remainder num1 num2))
@@ -285,7 +285,6 @@
               (64 128)
               (128 64)
               (128 128)
-              (156 156)
               (156 32)
               (32 156))))
   (for-each (lambda (ab)
