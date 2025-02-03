@@ -3641,8 +3641,6 @@ set_sub_char_table_contents (Lisp_Object table, ptrdiff_t idx, Lisp_Object val)
 
 /* Defined in bignum.c.  This part of bignum.c's API does not require
    the caller to access bignum internals; see bignum.h for that.  */
-extern ptrdiff_t bignum_bufsize (Lisp_Object, int) ATTRIBUTE_CONST;
-extern ptrdiff_t bignum_to_c_string (char *, ptrdiff_t, Lisp_Object, int);
 extern Lisp_Object make_neg_biguint (uintmax_t);
 extern Lisp_Object double_to_integer (double);
 

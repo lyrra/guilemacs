@@ -312,8 +312,6 @@ This is the same as the exponent of a float.  */)
       return scm_inexact_to_exact (scm_round_number (x));
     }
   emacs_abort ();
-  value = mpz_sizeinbase (*xbignum_val (arg), 2) - 1;
-  return make_fixnum (value);
 }
 
 /* Return the integer exponent E such that D * FLT_RADIX**E (i.e.,

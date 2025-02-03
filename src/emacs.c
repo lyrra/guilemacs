@@ -1689,7 +1689,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 	 bignums.  Without the following call to init_bignums, crashes
 	 happen on Windows 9X after dumping when GC tries to free a
 	 pointer allocated on the system heap.  */
-      init_bignum ();
       init_window_once ();	/* Init the window system.  */
 #ifdef HAVE_WINDOW_SYSTEM
       init_fringe_once ();	/* Swap bitmaps if necessary.  */
@@ -1700,7 +1699,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
     }
 
   init_alloc ();
-  init_bignum ();
   init_threads ();
   init_eval ();
   running_asynch_code = 0;

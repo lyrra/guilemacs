@@ -42,65 +42,6 @@ struct Lisp_Bignum
   mpz_t value;
 } GCALIGNED_STRUCT;
 
-extern mpz_t mpz[5];
-
 extern Lisp_Object bignum_to_guile_bignum (Lisp_Object num);
-
-extern void init_bignum (void);
-extern Lisp_Object make_integer_mpz (void);
-
-INLINE_HEADER_BEGIN
-
-INLINE struct Lisp_Bignum *
-XBIGNUM (Lisp_Object a)
-{
-  eassert (BIGNUMP (a));
-  return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Bignum);
-}
-
-INLINE void ARG_NONNULL ((1))
-mpz_set_intmax (mpz_t result, intmax_t v)
-{
-  /* mpz_set_si works in terms of long, but Emacs may use a wider
-     integer type, and so sometimes will have to construct the mpz_t
-     by hand.  */
-  long int i;
-  if (FASTER_BIGNUM && !ckd_add (&i, v, 0))
-    mpz_set_si (result, i);
-  else
-    emacs_abort ();
-}
-
-/* Return a pointer to the mpz_t value represented by the bignum I.
-   It is const because the value should not change.  */
-INLINE mpz_t const *
-bignum_val (struct Lisp_Bignum const *i)
-{
-  return &i->value;
-}
-INLINE mpz_t const *
-xbignum_val (Lisp_Object i)
-{
-  return bignum_val (XBIGNUM (i));
-}
-
-/* Return a pointer to an mpz_t that is equal to the Lisp integer I.
-   If I is a bignum this returns a pointer to I's representation;
-   otherwise this sets *TMP to I's value and returns TMP.  */
-INLINE mpz_t const *
-bignum_integer (mpz_t *tmp, Lisp_Object i)
-{
-  if (FIXNUMP (i))
-    {
-      mpz_set_intmax (*tmp, XFIXNUM (i));
-      /* The unnecessary cast pacifies a buggy GCC 4.8.5.  */
-      return (mpz_t const *) tmp;
-    }
-  else if (GUILEBIGNUMP (i))
-    emacs_abort ();
-  return xbignum_val (i);
-}
-
-INLINE_HEADER_END
 
 #endif /* BIGNUM_H */

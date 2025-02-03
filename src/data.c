@@ -3231,12 +3231,6 @@ integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
       else if (eabs (d) <= ULONG_MAX)
 	{
           emacs_abort ();
-	  mpz_t const *n = xbignum_val (num);
-	  bool neg_n = mpz_sgn (*n) < 0;
-	  r = mpz_tdiv_ui (*n, eabs (d));
-	  if (neg_n)
-	    r = -r;
-	  have_r = true;
 	}
 
       if (have_r)
@@ -3250,20 +3244,6 @@ integer_remainder (Lisp_Object num, Lisp_Object den, bool modulo)
     }
 
   emacs_abort ();
-  mpz_t const *d = bignum_integer (&mpz[1], den);
-  mpz_t *r = &mpz[0];
-  mpz_tdiv_r (*r, *bignum_integer (&mpz[0], num), *d);
-
-  if (modulo)
-    {
-      emacs_abort ();
-      /* If the remainder has the wrong sign, fix it.  */
-      int sgn_r = mpz_sgn (*r);
-      if (mpz_sgn (*d) < 0 ? sgn_r > 0 : sgn_r < 0)
-	mpz_add (*r, *r, *d);
-    }
-
-  return make_integer_mpz ();
 }
 
 DEFUN ("%", Frem, Srem, 2, 2, 0,
@@ -3374,13 +3354,6 @@ representation.  */)
   else if (BIGNUMP (value))
     {
       emacs_abort ();
-      mpz_t const *nonneg = xbignum_val (value);
-      if (mpz_sgn (*nonneg) < 0)
-	{
-	  mpz_com (mpz[0], *nonneg);
-	  nonneg = &mpz[0];
-	}
-      return make_fixnum (mpz_popcount (*nonneg));
     }
 
   eassume (FIXNUMP (value));

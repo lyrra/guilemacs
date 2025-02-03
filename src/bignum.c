@@ -26,57 +26,14 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 #include <stdlib.h>
 
-/* mpz global temporaries.  Making them global saves the trouble of
-   properly using mpz_init and mpz_clear on temporaries even when
-   storage is exhausted.  Admittedly this is not ideal.  An mpz value
-   in a temporary is made permanent by mpz_swapping it with a bignum's
-   value.  Although typically at most two temporaries are needed,
-   rounddiv_q and rounding_driver both need four and time_arith needs
-   five.  */
-
-mpz_t mpz[5];
-
 Lisp_Object
 bignum_to_guile_bignum (Lisp_Object num)
 {
   if (BIGNUMP (num)) {
-    mpz_t const *z = bignum_integer (&mpz[0], num);
-    return scm_from_mpz (*z);
+    emacs_abort ();
   } else {
     return num;
   }
-}
-
-static void *
-xrealloc_for_gmp (void *ptr, size_t ignore, size_t size)
-{
-  return xrealloc (ptr, size);
-}
-
-static void
-xfree_for_gmp (void *ptr, size_t ignore)
-{
-  xfree (ptr);
-}
-
-void
-init_bignum (void)
-{
-  eassert (mp_bits_per_limb == GMP_NUMB_BITS);
-  integer_width = 1 << 16;
-
-  /* FIXME: The Info node `(gmp) Custom Allocation' states: "No error
-     return is allowed from any of these functions, if they return
-     then they must have performed the specified operation. [...]
-     There's currently no defined way for the allocation functions to
-     recover from an error such as out of memory, they must terminate
-     program execution.  A 'longjmp' or throwing a C++ exception will
-     have undefined results."  But xmalloc and xrealloc do call
-     'longjmp'.  */
-  mp_set_memory_functions (xmalloc, xrealloc_for_gmp, xfree_for_gmp);
-
-  for (int i = 0; i < ARRAYELTS (mpz); i++)
-    mpz_init (mpz[i]);
 }
 
 /* Return D, converted to a Lisp integer.  Discard any fraction.
@@ -86,77 +43,6 @@ double_to_integer (double d)
 {
   return scm_inexact_to_exact (scm_round_number (scm_from_double (d)));
 }
-
-/* Return a Lisp integer equal to mpz[0], which has BITS bits and which
-   must not be in fixnum range.  Set mpz[0] to a junk value.  */
-static Lisp_Object
-make_bignum_bits (size_t bits)
-{
-  /* The documentation says integer-width should be nonnegative, so
-     comparing it to BITS works even though BITS is unsigned.  Treat
-     integer-width as if it were at least twice the machine integer width,
-     so that timefns.c can safely use bignums for double-precision
-     timestamps.  */
-  if (integer_width < bits && 2 * max (INTMAX_WIDTH, UINTMAX_WIDTH) < bits)
-    overflow_error ();
-
-  struct Lisp_Bignum *b = ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Bignum,
-						       PVEC_BIGNUM);
-  mpz_init (b->value);
-  mpz_swap (b->value, mpz[0]);
-  return make_lisp_ptr (b, Lisp_Vectorlike);
-}
-
-/* Return a Lisp integer equal to mpz[0], which must not be in fixnum range.
-   Set mpz[0] to a junk value.  */
-static Lisp_Object
-make_bignum (void)
-{
-  return make_bignum_bits (mpz_sizeinbase (mpz[0], 2));
-}
-
-/* Return a Lisp integer with value taken from mpz[0].
-   Set mpz[0] to a junk value.  */
-Lisp_Object
-make_integer_mpz (void)
-{
-  if (FASTER_BIGNUM && mpz_fits_slong_p (mpz[0]))
-    {
-      long int v = mpz_get_si (mpz[0]);
-      //if (!FIXNUM_OVERFLOW_P (v)) //FIX: guilemacs, no FIXNUM_OVERFLOW_P
-	return make_fixnum (v);
-    }
-
-  size_t bits = mpz_sizeinbase (mpz[0], 2);
-
-  if (! (FASTER_BIGNUM
-	 //&& FIXNUM_OVERFLOW_P (LONG_MIN)  //FIX: guilemacs, no FIXNUM_OVERFLOW_P
-	 //&& FIXNUM_OVERFLOW_P (LONG_MAX)) //FIX: guilemacs, no FIXNUM_OVERFLOW_P
-	 )
-      && bits <= FIXNUM_BITS)
-    {
-      EMACS_INT v = 0;
-      int i = 0, shift = 0;
-
-      do
-	{
-	  EMACS_INT limb = mpz_getlimbn (mpz[0], i++);
-	  v += limb << shift;
-	  shift += GMP_NUMB_BITS;
-	}
-      while (shift < bits);
-
-      if (mpz_sgn (mpz[0]) < 0)
-	v = -v;
-
-      return make_fixnum (v);
-    }
-
-  return make_bignum_bits (bits);
-}
-
-/* Check that X is a Lisp integer in the range LO..HI.
-   Return X's value as an intmax_t.  */
 
 intmax_t
 check_integer_range (Lisp_Object x, intmax_t lo, intmax_t hi)
@@ -189,31 +75,4 @@ check_int_nonnegative (Lisp_Object x)
 {
   CHECK_INTEGER (x);
   return NILP (Fnatnump (x)) ? 0 : check_integer_range (x, 0, INT_MAX);
-}
-
-/* Yield an upper bound on the buffer size needed to contain a C
-   string representing the NUM in base BASE.  This includes any
-   preceding '-' and the terminating null.  */
-static ptrdiff_t
-mpz_bufsize (mpz_t const num, int base)
-{
-  return mpz_sizeinbase (num, base) + 2;
-}
-ptrdiff_t
-bignum_bufsize (Lisp_Object num, int base)
-{
-  return mpz_bufsize (*xbignum_val (num), base);
-}
-
-/* Store into BUF (of size SIZE) the value of NUM as a base-BASE string.
-   If BASE is negative, use upper-case digits in base -BASE.
-   Return the string's length.
-   SIZE must equal bignum_bufsize (NUM, abs (BASE)).  */
-ptrdiff_t
-bignum_to_c_string (char *buf, ptrdiff_t size, Lisp_Object num, int base)
-{
-  eassert (bignum_bufsize (num, abs (base)) == size);
-  mpz_get_str (buf, base, *xbignum_val (num));
-  ptrdiff_t n = size - 2;
-  return !buf[n - 1] ? n - 1 : n + !!buf[n];
 }
