@@ -41,3 +41,29 @@
             ,(- (random 64))
             ,(+ (random 128) 64)
             ,(- (- (random 128)) 64)))
+
+(for-each (lambda (n)
+            (let ((c (logxor n)))
+              (deftestf 'logxor (c)
+                (el-expr `(let ((n ,n))
+                            (print (logxor n)))))))
+          `(0
+            1
+            -1
+            ,(random 64)
+            ,(- (random 64))
+            ,(+ (random 128) 64)
+            ,(- (- (random 128)) 64)))
+
+(for-each (lambda (n)
+            (let ((c (logior n)))
+              (deftestf 'logior (c)
+                (el-expr `(let ((n ,n))
+                            (print (logior n)))))))
+          `(0
+            1
+            -1
+            ,(random 64)
+            ,(- (random 64))
+            ,(+ (random 128) 64)
+            ,(- (- (random 128)) 64)))

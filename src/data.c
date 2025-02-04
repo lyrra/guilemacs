@@ -3295,30 +3295,6 @@ usage: (logand &rest INTS-OR-MARKERS)  */)
   return nargs == 1 ? a : arith_driver (Alogand, nargs, args, a);
 }
 
-DEFUN ("logior", Flogior, Slogior, 0, MANY, 0,
-       doc: /* Return bitwise-or of all the arguments.
-Arguments may be integers, or markers converted to integers.
-usage: (logior &rest INTS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (0);
-  Lisp_Object a = check_integer_coerce_marker (args[0]);
-  return nargs == 1 ? a : arith_driver (Alogior, nargs, args, a);
-}
-
-DEFUN ("logxor", Flogxor, Slogxor, 0, MANY, 0,
-       doc: /* Return bitwise-exclusive-or of all the arguments.
-Arguments may be integers, or markers converted to integers.
-usage: (logxor &rest INTS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (0);
-  Lisp_Object a = check_integer_coerce_marker (args[0]);
-  return nargs == 1 ? a : arith_driver (Alogxor, nargs, args, a);
-}
-
 DEFUN ("1+", Fadd1, Sadd1, 1, 1, 0,
        doc: /* Return NUMBER plus one.  NUMBER may be a number or a marker.
 Markers are converted to integers.  */)
