@@ -3319,44 +3319,6 @@ usage: (logxor &rest INTS-OR-MARKERS)  */)
   return nargs == 1 ? a : arith_driver (Alogxor, nargs, args, a);
 }
 
-DEFUN ("logcount", Flogcount, Slogcount, 1, 1, 0,
-       doc: /* Return population count of VALUE.
-This is the number of one bits in the two's complement representation
-of VALUE.  If VALUE is negative, return the number of zero bits in the
-representation.  */)
-  (Lisp_Object value)
-{
-  CHECK_INTEGER (value);
-
-  if (GUILEBIGNUMP (value))
-    {
-      return scm_logcount (value);
-    }
-
-  eassume (FIXNUMP (value));
-  EMACS_UINT v = XFIXNUM (value) < 0 ? -1 - XFIXNUM (value) : XFIXNUM (value);
-  return make_fixnum (stdc_count_ones (v));
-}
-
-DEFUN ("ash", Fash, Sash, 2, 2, 0,
-       doc: /* Return integer VALUE with its bits shifted left by COUNT bit positions.
-If COUNT is negative, shift VALUE to the right instead.
-VALUE and COUNT must be integers.
-Mathematically, the return value is VALUE multiplied by 2 to the
-power of COUNT, rounded down.  If the result is non-zero, its sign
-is the same as that of VALUE.
-In terms of bits, when COUNT is positive, the function moves
-the bits of VALUE to the left, adding zero bits on the right; when
-COUNT is negative, it moves the bits of VALUE to the right,
-discarding bits.  */)
-  (Lisp_Object value, Lisp_Object count)
-{
-  CHECK_INTEGER (value);
-  CHECK_INTEGER (count);
-
-  return scm_ash (value, count);
-}
-
 DEFUN ("1+", Fadd1, Sadd1, 1, 1, 0,
        doc: /* Return NUMBER plus one.  NUMBER may be a number or a marker.
 Markers are converted to integers.  */)
@@ -3373,16 +3335,6 @@ Markers are converted to integers.  */)
 {
   number = check_number_coerce_marker (number);
   return scm_difference (number, make_fixnum(1));
-}
-
-DEFUN ("lognot", Flognot, Slognot, 1, 1, 0,
-       doc: /* Return the bitwise complement of NUMBER.  NUMBER must be an integer.  */)
-  (register Lisp_Object number)
-{
-  CHECK_INTEGER (number);
-  if (FIXNUMP (number))
-    return make_fixnum (~XFIXNUM (number));
-  return scm_lognot (number);
 }
 
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,

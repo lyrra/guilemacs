@@ -4,3 +4,6 @@
 ; (format #t "-- prelude path: ~s~%" %prelude-filename)
 
 (set-symbol-function! '/ /)
+(set-symbol-function! 'logcount logcount)
+(set-symbol-function! 'lognot lognot)
+(set-symbol-function! 'ash ash)

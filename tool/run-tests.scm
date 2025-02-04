@@ -25,6 +25,7 @@
 (group (prelude)
   "test/pre/value-cmp.scm"
   "test/pre/bignum.scm"
+  "test/pre/bitwise.scm"
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
   "test/pre/random.scm"
