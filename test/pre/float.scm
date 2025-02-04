@@ -44,3 +44,38 @@
             (sin ,(sin 0.1))
             (cos  ,(cos 0.1))
             (tan ,(tan 0.1))))
+
+(deftest exp (4.953032424395115)
+  (el-expr `(let ((x 1.6))
+              (print (exp x)))))
+
+; emacs prints (exp 90) as: 1.2204032943178408e+39
+; whereas guile: 1.2204032943178408e39
+; so use = and expect t
+(deftest exp (t)
+  (el-expr `(let ((x 90))
+              (print (= "1.2204032943178408e+39" (exp x))))))
+
+(deftest expt (76177348045866392339289727720615561750424801402395196724001565744957137343033038019601000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000)
+  (el-expr `(let ((x 90))
+              (print (expt x 90)))))
+
+(deftest log90 (90.0)
+  (el-expr `(let ((x 90))
+              (print (log (expt x x) x)))))
+
+(deftest log10 (10.0)
+  (el-expr `(let ((x 10))
+              (print (log (expt x x) x)))))
+
+(deftest log (404.9828703297239)
+  (el-expr `(let ((x 90))
+              (print (log (expt x x))))))
+
+(deftest sqrt10 (10)
+  (el-expr `(let ((x 100))
+              (print (sqrt x)))))
+
+(deftest abs (10)
+  (el-expr `(let ((x -10))
+              (print (abs x)))))

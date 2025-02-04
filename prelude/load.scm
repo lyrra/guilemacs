@@ -16,3 +16,16 @@
 (set-symbol-function! 'acos acos)
 (set-symbol-function! 'atan atan)
 (set-symbol-function! 'asin asin)
+
+(set-symbol-function! 'abs abs)
+(set-symbol-function! 'sqrt sqrt)
+(set-symbol-function! 'exp exp)
+(set-symbol-function! 'expt expt)
+
+(set-symbol-function! 'log
+  (lambda* (num #:optional base)
+    (if (not base)
+        (log num)
+        (if (= base 10.0)
+            (log10 num)
+            (/ (log num) (log base))))))

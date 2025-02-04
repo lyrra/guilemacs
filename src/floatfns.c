@@ -141,85 +141,6 @@ EXPONENT must be an integer.   */)
   return make_float (ldexp (extract_float (sgnfcand), e));
 }
 
-DEFUN ("exp", Fexp, Sexp, 1, 1, 0,
-       doc: /* Return the exponential base e of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = exp (d);
-  return make_float (d);
-}
-
-DEFUN ("expt", Fexpt, Sexpt, 2, 2, 0,
-       doc: /* Return the exponential ARG1 ** ARG2.  */)
-  (Lisp_Object arg1, Lisp_Object arg2)
-{
-  CHECK_NUMBER (arg1);
-  CHECK_NUMBER (arg2);
-  return scm_expt (arg1, arg2);
-}
-
-DEFUN ("log", Flog, Slog, 1, 2, 0,
-       doc: /* Return the natural logarithm of ARG.
-If the optional argument BASE is given, return log ARG using that base.  */)
-  (Lisp_Object arg, Lisp_Object base)
-{
-  double d = extract_float (arg);
-
-  if (NILP (base))
-    d = log (d);
-  else
-    {
-      double b = extract_float (base);
-
-      if (b == 10.0)
-	d = log10 (d);
-#if HAVE_LOG2
-      else if (b == 2.0)
-	d = log2 (d);
-#endif
-      else
-	d = log (d) / log (b);
-    }
-  return make_float (d);
-}
-
-DEFUN ("sqrt", Fsqrt, Ssqrt, 1, 1, 0,
-       doc: /* Return the square root of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = sqrt (d);
-  return make_float (d);
-}
-
-DEFUN ("abs", Fabs, Sabs, 1, 1, 0,
-       doc: /* Return the absolute value of ARG.  */)
-  (Lisp_Object arg)
-{
-  CHECK_NUMBER (arg);
-
-  if (FIXNUMP (arg))
-    {
-      if (XFIXNUM (arg) < 0)
-	arg = make_int (-XFIXNUM (arg));
-    }
-  else if (FLOATP (arg))
-    {
-      if (signbit (XFLOAT_DATA (arg)))
-	arg = make_float (- XFLOAT_DATA (arg));
-    }
-  else
-    {
-      if (scm_negative_p (arg) == SCM_BOOL_T)
-	{
-          return scm_abs (arg);
-	}
-    }
-
-  return arg;
-}
-
 DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
        doc: /* Return the floating point number equal to ARG.  */)
   (register Lisp_Object arg)
