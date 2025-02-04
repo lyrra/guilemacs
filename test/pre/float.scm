@@ -31,3 +31,16 @@
                       ((inexact->exact (round num)))
               (el-expr `(let ((a ,num)) (print (round a))))))
           '(4.3 1.2 5.7))
+
+(for-each (lambda (tri)
+            (match tri
+              ((sym ex)
+               (deftestf sym (ex)
+                 (el-expr `(let ((x 0.1))
+                             (print (,sym x))))))))
+          `((acos ,(acos 0.1))
+            (asin ,(asin 0.1))
+            (atan ,(atan 0.1))
+            (sin ,(sin 0.1))
+            (cos  ,(cos 0.1))
+            (tan ,(tan 0.1))))

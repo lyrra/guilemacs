@@ -81,71 +81,6 @@ extract_float (Lisp_Object num)
 
 /* Trig functions.  */
 
-DEFUN ("acos", Facos, Sacos, 1, 1, 0,
-       doc: /* Return the inverse cosine of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = acos (d);
-  return make_float (d);
-}
-
-DEFUN ("asin", Fasin, Sasin, 1, 1, 0,
-       doc: /* Return the inverse sine of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = asin (d);
-  return make_float (d);
-}
-
-DEFUN ("atan", Fatan, Satan, 1, 2, 0,
-       doc: /* Return the inverse tangent of the arguments.
-If only one argument Y is given, return the inverse tangent of Y.
-If two arguments Y and X are given, return the inverse tangent of Y
-divided by X, i.e. the angle in radians between the vector (X, Y)
-and the x-axis.  */)
-  (Lisp_Object y, Lisp_Object x)
-{
-  double d = extract_float (y);
-
-  if (NILP (x))
-    d = atan (d);
-  else
-    {
-      double d2 = extract_float (x);
-      d = atan2 (d, d2);
-    }
-  return make_float (d);
-}
-
-DEFUN ("cos", Fcos, Scos, 1, 1, 0,
-       doc: /* Return the cosine of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = cos (d);
-  return make_float (d);
-}
-
-DEFUN ("sin", Fsin, Ssin, 1, 1, 0,
-       doc: /* Return the sine of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = sin (d);
-  return make_float (d);
-}
-
-DEFUN ("tan", Ftan, Stan, 1, 1, 0,
-       doc: /* Return the tangent of ARG.  */)
-  (Lisp_Object arg)
-{
-  double d = extract_float (arg);
-  d = tan (d);
-  return make_float (d);
-}
-
 DEFUN ("isnan", Fisnan, Sisnan, 1, 1, 0,
        doc: /* Return non-nil if argument X is a NaN.  */)
   (Lisp_Object x)
