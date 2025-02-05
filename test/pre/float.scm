@@ -1,3 +1,7 @@
+(deftest isnan (t)
+  (el-expr `(let ((nan "0.0e+NaN"))
+              (print (isnan nan)))))
+
 ;;; numbers used in tests in floatfns are too large:
 ;;;   1.7976931348623157e+308
 ;;;   5e-324

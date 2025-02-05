@@ -56,3 +56,9 @@
   (frob fceiling ceiling)
   (frob ffloor floor)
   (frob fround round))
+
+(set-symbol-function! 'isnan
+                      (lambda (num)
+                        (unless (and (real? num) (not (exact? num)))
+                          ((symbol-function 'signal) 'wrong-type-argument num))
+                        (nan? num)))

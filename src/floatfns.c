@@ -79,16 +79,6 @@ extract_float (Lisp_Object num)
   return XFLOATINT (num);
 }
 
-/* Trig functions.  */
-
-DEFUN ("isnan", Fisnan, Sisnan, 1, 1, 0,
-       doc: /* Return non-nil if argument X is a NaN.  */)
-  (Lisp_Object x)
-{
-  CHECK_FLOAT (x);
-  return isnan (XFLOAT_DATA (x)) ? Qt : Qnil;
-}
-
 /* Although the substitute does not work on NaNs, it is good enough
    for platforms lacking the signbit macro.  */
 #ifndef signbit
