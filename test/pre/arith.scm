@@ -58,3 +58,15 @@
             (9.0001 3 3)
             (-11.9999 3 -3)
             (10 -3.3334 -2)))
+
+(for-each (lambda (tri)
+            (match tri
+              ((fun x e)
+               (deftestf fun (e)
+                 (el-expr `(let ((x ,x))
+                             (print (,fun x))))))))
+          `((ftruncate 10.5 10.0)
+            (fceiling  10.5 11.0)
+            (ffloor    10.5 10.0)
+            (fround     10.0 10.0)
+            (fround    10.5 10.0)))

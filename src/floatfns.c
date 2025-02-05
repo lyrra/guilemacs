@@ -199,20 +199,6 @@ double_integer_scale (double d)
 	     + (isnan (d) ? 2 : exponent == INT_MAX)));
 }
 
-/* The code uses emacs_rint, so that it works to undefine HAVE_RINT
-   if `rint' exists but does not work right.  */
-#ifdef HAVE_RINT
-#define emacs_rint rint
-#else
-static double
-emacs_rint (double d)
-{
-  double d1 = d + 0.5;
-  double r = floor (d1);
-  return r - (r == d1 && fmod (r, 2) != 0);
-}
-#endif
-
 #ifndef HAVE_TRUNC
 double
 trunc (double d)
@@ -234,49 +220,6 @@ fmod_float (Lisp_Object x, Lisp_Object y)
     f1 += f2;
 
   return make_float (f1);
-}
-
-DEFUN ("fceiling", Ffceiling, Sfceiling, 1, 1, 0,
-       doc: /* Return the smallest integer no less than ARG, as a float.
-\(Round toward +inf.)  */)
-  (Lisp_Object arg)
-{
-  CHECK_FLOAT (arg);
-  double d = XFLOAT_DATA (arg);
-  d = ceil (d);
-  return make_float (d);
-}
-
-DEFUN ("ffloor", Fffloor, Sffloor, 1, 1, 0,
-       doc: /* Return the largest integer no greater than ARG, as a float.
-\(Round toward -inf.)  */)
-  (Lisp_Object arg)
-{
-  CHECK_FLOAT (arg);
-  double d = XFLOAT_DATA (arg);
-  d = floor (d);
-  return make_float (d);
-}
-
-DEFUN ("fround", Ffround, Sfround, 1, 1, 0,
-       doc: /* Return the nearest integer to ARG, as a float.  */)
-  (Lisp_Object arg)
-{
-  CHECK_FLOAT (arg);
-  double d = XFLOAT_DATA (arg);
-  d = emacs_rint (d);
-  return make_float (d);
-}
-
-DEFUN ("ftruncate", Fftruncate, Sftruncate, 1, 1, 0,
-       doc: /* Truncate a floating point number to an integral float value.
-\(Round toward zero.)  */)
-  (Lisp_Object arg)
-{
-  CHECK_FLOAT (arg);
-  double d = XFLOAT_DATA (arg);
-  d = trunc (d);
-  return make_float (d);
 }
 
 void

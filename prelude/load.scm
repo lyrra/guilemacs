@@ -30,30 +30,29 @@
             (log10 num)
             (/ (log num) (log base))))))
 
-(set-symbol-function! 'ceiling
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (ceiling num)
-         (ceiling-quotient num div)))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ el-name scm-op-arity1 scm-op-arity2)
+              (set-symbol-function! 'el-name
+                                    (lambda* (num #:optional div)
+                                      (inexact->exact
+                                       (if (not div)
+                                           (scm-op-arity1 num)
+                                           (scm-op-arity2 num div)))))))))
+  (frob truncate truncate truncate-quotient)
+  (frob ceiling  ceiling  ceiling-quotient)
+  (frob floor    floor    floor-quotient)
+  (frob round    round    round-quotient))
 
-(set-symbol-function! 'floor
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (floor num)
-         (floor-quotient num div)))))
-
-(set-symbol-function! 'round
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (round num)
-         (round-quotient num div)))))
-
-(set-symbol-function! 'truncate
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (truncate num)
-         (truncate-quotient num div)))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ el-name scm-op)
+              (set-symbol-function! 'el-name
+                                    (lambda (num)
+                                      (unless (and (real? num) (not (exact? num)))
+                                        ((symbol-function 'signal) 'wrong-type-argument num))
+                                      (exact->inexact (scm-op num))))))))
+  (frob ftruncate truncate)
+  (frob fceiling ceiling)
+  (frob ffloor floor)
+  (frob fround round))
