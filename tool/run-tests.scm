@@ -23,6 +23,7 @@
 
 (define %tests '(
 (group (prelude)
+  "test/pre/arith.scm"
   "test/pre/value-cmp.scm"
   "test/pre/bignum.scm"
   "test/pre/bitwise.scm"

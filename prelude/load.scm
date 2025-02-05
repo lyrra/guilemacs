@@ -29,3 +29,31 @@
         (if (= base 10.0)
             (log10 num)
             (/ (log num) (log base))))))
+
+(set-symbol-function! 'ceiling
+  (lambda* (num #:optional div)
+    (inexact->exact
+     (if (not div)
+         (ceiling num)
+         (ceiling-quotient num div)))))
+
+(set-symbol-function! 'floor
+  (lambda* (num #:optional div)
+    (inexact->exact
+     (if (not div)
+         (floor num)
+         (floor-quotient num div)))))
+
+(set-symbol-function! 'round
+  (lambda* (num #:optional div)
+    (inexact->exact
+     (if (not div)
+         (round num)
+         (round-quotient num div)))))
+
+(set-symbol-function! 'truncate
+  (lambda* (num #:optional div)
+    (inexact->exact
+     (if (not div)
+         (truncate num)
+         (truncate-quotient num div)))))
