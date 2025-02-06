@@ -1,4 +1,18 @@
 
+(deftestf 'plus (0)
+  (el-expr `(print (+))))
+
+(deftestf 'plus (1)
+  (el-expr `(let ((a 1))
+              (print (+ a)))))
+
+(deftestf 'plus (text "1.8446744073709552e+19")
+  (el-expr `(let ((a 0)
+                  (b 1)
+                  (c 0.0000000001)
+                  (d (ash 1 64)))
+              (print (+ a b c d)))))
+
 (for-each (lambda (tri)
             (match tri
               ((x y e)

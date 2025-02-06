@@ -1,7 +1,18 @@
-(use-modules (language elisp runtime))
+;; (force-output (current-error-port))
+;; (format (current-error-port) "-- loading guile elisp prelude~%")
+;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
+;; (force-output (current-error-port))
+(set-current-module (resolve-module '(language elisp runtime)))
+;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
+;; (force-output (current-error-port))
 
-; (format #t "-- loading guile elisp prelude~%")
-; (format #t "-- prelude path: ~s~%" %prelude-filename)
+(use-modules (language elisp emacs))
+(use-modules (system foreign-library))
+
+(define elisp-+ (lambda args
+                  (apply + (map check-number-coerce-marker args))))
+
+(set-symbol-function! '+ elisp-+)
 
 (set-symbol-function! '/ /)
 (set-symbol-function! 'logcount logcount)
@@ -62,3 +73,6 @@
                         (unless (and (real? num) (not (exact? num)))
                           ((symbol-function 'signal) 'wrong-type-argument num))
                         (nan? num)))
+
+;; (format (current-error-port) "-- done loading guile elisp prelude~%")
+;; (force-output (current-error-port))

@@ -156,6 +156,9 @@ extern char etext;
 /* Include these only because of INLINE.  */
 #include "thread.h"
 
+Lisp_Object
+check_number_coerce_marker (Lisp_Object x);
+
 Lisp_Object symbol_module;
 Lisp_Object function_module;
 Lisp_Object plist_module;
@@ -1050,13 +1053,20 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   scm_boot_guile (argc, argv, main2, NULL);
 }
 
-void foobar() {
+static void
+guilemacs_init (void *_)
+{
+  scm_c_define_gsubr ("check-number-coerce-marker", 1, 0, 0, check_number_coerce_marker);
+  scm_c_export ("check-number-coerce-marker", NULL);
 }
+
 /* ARGSUSED */
 static int
 main2 (void *ignore, int argc, char **argv)
 {
+  scm_c_define_module ("language elisp emacs", guilemacs_init, NULL);
   load_guile_prelude ();
+
   int old_argc;
   bool no_loadup = false;
   char *prelude = NULL;
@@ -1675,7 +1685,6 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
-      foobar();
       scm_call_7 (scm_c_public_ref ("language elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),

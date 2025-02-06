@@ -2576,7 +2576,7 @@ check_integer_coerce_marker (Lisp_Object x)
   return x;
 }
 
-static Lisp_Object
+Lisp_Object
 check_number_coerce_marker (Lisp_Object x)
 {
   if (MARKERP (x))
@@ -3100,18 +3100,6 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
     {
       return guilebignum_arith_driver (code, nargs, args, argnum, accum, val);
     }
-}
-
-
-DEFUN ("+", Fplus, Splus, 0, MANY, 0,
-       doc: /* Return sum of any number of arguments, which are numbers or markers.
-usage: (+ &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (0);
-  Lisp_Object a = check_number_coerce_marker (args[0]);
-  return nargs == 1 ? a : arith_driver (Aadd, nargs, args, a);
 }
 
 DEFUN ("-", Fminus, Sminus, 0, MANY, 0,

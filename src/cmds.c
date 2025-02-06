@@ -29,6 +29,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "keymap.h"
 #include "frame.h"
 
+static Lisp_Object plus_fn;
+
 static int internal_self_insert (int, EMACS_INT);
 
 /* Add N to point; or subtract N if FORWARD is false.  N defaults to 1.
@@ -141,7 +143,7 @@ go to its beginning.  */)
 		  : (BEGV < ZV && PT != opoint
 		     && FETCH_BYTE (PT_BYTE - 1) != '\n'));
   return (excessive
-	  ? CALLN (Fplus, make_fixnum (shortage - count), n)
+	  ? scm_call_2 (plus_fn, make_fixnum (shortage - count), n)
 	  : make_fixnum (shortage));
 }
 
@@ -526,4 +528,6 @@ syms_of_cmds (void)
 This is run after inserting a character.
 The hook can access the inserted character via `last-command-event'.  */);
   Vpost_self_insert_hook = Qnil;
+
+  plus_fn = scm_c_private_lookup ("language elisp runtime", "elisp-+");
 }

@@ -143,6 +143,8 @@ int _cdecl _spawnlp (int, const char *, const char *, ...);
 /* Declare here, including term.h is problematic on some systems.  */
 extern void tputs (const char *, int, int (*)(int));
 
+static Lisp_Object plus_fn;
+
 static const int baud_convert[] =
   {
     0, 50, 75, 110, 135, 150, 200, 300, 600, 1200,
@@ -3365,7 +3367,7 @@ make_lisp_s_us (time_t s, long us)
   Lisp_Object sec = make_int (s);
   Lisp_Object usec = make_fixnum (us);
   Lisp_Object hz = make_fixnum (1000000);
-  Lisp_Object ticks = CALLN (Fplus, CALLN (Ftimes, sec, hz), usec);
+  Lisp_Object ticks = scm_call_2 (plus_fn, CALLN (Ftimes, sec, hz), usec);
   return Ftime_convert (Fcons (ticks, hz), Qnil);
 }
 
@@ -4682,4 +4684,6 @@ void
 syms_of_sysdep (void)
 {
 #include "sysdep.x"
+
+  plus_fn = scm_c_private_lookup ("language elisp runtime", "elisp-+");
 }
