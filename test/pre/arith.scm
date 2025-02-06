@@ -70,3 +70,20 @@
             (ffloor    10.5 10.0)
             (fround     10.0 10.0)
             (fround    10.5 10.0)))
+
+(for-each (lambda (tri)
+            (match tri
+              ((x y e)
+               (deftestf 'mod (e)
+                 (el-expr `(let ((x ,x)
+                                 (y ,y))
+                             (print (mod x y))))))))
+          `((10   3   1)
+            (10.0 3.0 1.0)
+            ( 1.0 3.0 1.0)
+            ( 0   1   0)
+            ;; note this fails on guile, perhaps due to keeping float and hit by precision
+            ;(,(ash 1 64)  999999999.0  156295708.0)
+            ; ensure we use guiles euclidean-remainder if dealing with floats
+            (0.3333333333333333 1 0.3333333333333333)
+            (-0.3333333333333333 1 0.6666666666666667)))

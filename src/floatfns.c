@@ -197,20 +197,6 @@ trunc (double d)
 }
 #endif
 
-Lisp_Object
-fmod_float (Lisp_Object x, Lisp_Object y)
-{
-  double f1 = XFLOATINT (x);
-  double f2 = XFLOATINT (y);
-
-  f1 = fmod (f1, f2);
-
-  /* If the "remainder" comes out with the wrong sign, fix it.  */
-  if (f2 < 0 ? f1 > 0 : f1 < 0)
-    f1 += f2;
-
-  return make_float (f1);
-}
 
 void
 syms_of_floatfns (void)

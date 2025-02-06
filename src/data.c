@@ -3246,7 +3246,7 @@ Both X and Y must be numbers or markers.  */)
   x = check_number_coerce_marker (x);
   y = check_number_coerce_marker (y);
   if (FLOATP (x) || FLOATP (y))
-    return fmod_float (x, y);
+    return scm_euclidean_remainder (x, y);
   return integer_remainder (x, y, true);
 }
 
