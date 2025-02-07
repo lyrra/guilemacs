@@ -3211,7 +3211,7 @@ Both must be integers or markers.  */)
 {
   x = check_integer_coerce_marker (x);
   y = check_integer_coerce_marker (y);
-  return integer_remainder (x, y, false);
+  return scm_remainder (x, y);
 }
 
 DEFUN ("mod", Fmod, Smod, 2, 2, 0,
