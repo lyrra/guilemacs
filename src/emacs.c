@@ -1019,6 +1019,16 @@ bool try_load_guile_prelude (const char *filename)
 void load_guile_prelude ()
 {
   // FIX: first look at some env variable
+  const char* ge = getenv ("GUILEMACS");
+  if (ge)
+    {
+      char str[1024];
+      str[0] = 0;
+      strcat (str, ge);
+      strcat (str, "/prelude/load.scm");
+      try_load_guile_prelude (str);
+      return;
+    }
   if (try_load_guile_prelude ("prelude/load.scm"))
     return;
   if (try_load_guile_prelude ("../prelude/load.scm"))
@@ -1029,6 +1039,8 @@ void load_guile_prelude ()
     return;
   if (try_load_guile_prelude ("../../../../prelude/load.scm"))
     return;
+  fprintf(stderr, "ERROR: cant find prelude/load.scm\n");
+  emacs_abort ();
 }
 
 Lisp_Object xsymbol_fn;
