@@ -13,6 +13,20 @@
                   (d (ash 1 64)))
               (print (+ a b c d)))))
 
+(deftestf 'times (1)
+  (el-expr `(print (*))))
+
+(deftestf 'times (2)
+  (el-expr `(let ((a 2))
+              (print (* a)))))
+
+(deftestf 'times (text "3689348814.7419105")
+  (el-expr `(let ((a 1)
+                  (b 2)
+                  (c 0.0000000001)
+                  (d (ash 1 64)))
+              (print (* a b c d)))))
+
 (for-each (lambda (tri)
             (match tri
               ((x y e)

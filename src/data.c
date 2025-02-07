@@ -3121,17 +3121,6 @@ usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
   return arith_driver (Asub, nargs, args, a);
 }
 
-DEFUN ("*", Ftimes, Stimes, 0, MANY, 0,
-       doc: /* Return product of any number of arguments, which are numbers or markers.
-usage: (* &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (1);
-  Lisp_Object a = check_number_coerce_marker (args[0]);
-  return nargs == 1 ? a : arith_driver (Amult, nargs, args, a);
-}
-
 DEFUN ("/", Fquo, Squo, 1, MANY, 0,
        doc: /* Divide number by divisors and return the result.
 With two or more arguments, return first argument divided by the rest.

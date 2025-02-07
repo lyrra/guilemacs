@@ -144,6 +144,7 @@ int _cdecl _spawnlp (int, const char *, const char *, ...);
 extern void tputs (const char *, int, int (*)(int));
 
 static Lisp_Object plus_fn;
+static Lisp_Object times_fn;
 
 static const int baud_convert[] =
   {
@@ -3367,7 +3368,7 @@ make_lisp_s_us (time_t s, long us)
   Lisp_Object sec = make_int (s);
   Lisp_Object usec = make_fixnum (us);
   Lisp_Object hz = make_fixnum (1000000);
-  Lisp_Object ticks = scm_call_2 (plus_fn, CALLN (Ftimes, sec, hz), usec);
+  Lisp_Object ticks = scm_call_2 (plus_fn, scm_call_2 (times_fn, sec, hz), usec);
   return Ftime_convert (Fcons (ticks, hz), Qnil);
 }
 
@@ -4686,4 +4687,5 @@ syms_of_sysdep (void)
 #include "sysdep.x"
 
   plus_fn = scm_c_private_lookup ("language elisp runtime", "elisp-+");
+  times_fn = scm_c_private_lookup ("language elisp runtime", "elisp-*");
 }
