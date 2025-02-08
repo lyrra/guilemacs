@@ -77,5 +77,20 @@
                           ((symbol-function 'signal) 'wrong-type-argument num))
                         (nan? num)))
 
+(define elisp-% (lambda (a b)
+                  (remainder (check-number-coerce-marker a)
+                             (check-number-coerce-marker b))))
+
+(set-symbol-function! '% elisp-%)
+
+(define elisp-mod (lambda (a b)
+                    ((if (or (inexact? a) (inexact? b))
+                         euclidean-remainder
+                         modulo)
+                     (check-number-coerce-marker a)
+                     (check-number-coerce-marker b))))
+
+(set-symbol-function! 'mod elisp-mod)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

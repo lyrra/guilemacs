@@ -228,6 +228,8 @@ static HBITMAP w32_create_pixmap_from_bitmap_data (int, int, char *);
 static void anim_prune_animation_cache (Lisp_Object);
 #endif
 
+static Lisp_Object mod_fn;
+
 #ifdef USE_CAIRO
 
 static Emacs_Pix_Container
@@ -2908,7 +2910,7 @@ compute_image_rotation (struct image *img, double *rotation)
       return;
     }
 
-  Lisp_Object reduced_angle = Fmod (value, make_fixnum (360));
+  Lisp_Object reduced_angle = scm_call_2 (mod_fn, value, make_fixnum (360));
   if (FLOATP (reduced_angle))
     *rotation = XFLOAT_DATA (reduced_angle);
   else
@@ -13175,4 +13177,6 @@ The options are:
   DEFSYM (Qimage_format_suffixes, "image-format-suffixes");
   DEFSYM (QCformat, ":format");
 #endif /* HAVE_IMAGEMAGICK */
+
+  mod_fn = scm_c_private_lookup ("language elisp runtime", "elisp-mod");
 }

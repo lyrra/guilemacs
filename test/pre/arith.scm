@@ -115,3 +115,7 @@
             ; ensure we use guiles euclidean-remainder if dealing with floats
             (0.3333333333333333 1 0.3333333333333333)
             (-0.3333333333333333 1 0.6666666666666667)))
+
+(deftestf 'remainder (-1)
+  (el-expr `(let ((a -1))
+              (print (% a 2)))))
