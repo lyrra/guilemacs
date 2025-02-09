@@ -36,9 +36,21 @@ After that, please proceed with configuring and building Guilemacs:
 
 ** configure
 
+Notice where you installed the special flavor of guile.
+Also, since guilemacs loads scheme files during boot, it needs to know where those are.
+By default it will search current and parents directory and also check the GUILEMACS
+ environment variable.
+
 #+BEGIN_SRC
 GUILE=/t/ge/g3
+GUILEMACS=`pwd`
 
+#+END_SRC
+
+Use the above script and "source" it before running any other scripts
+in the following build instructions.
+
+#+BEGIN_SRC
 export PATH=$GUILE/bin:$PATH
 export PKG_CONFIG_PATH=$GUILE/lib/pkgconfig
 export CFLAGS="-Og -ggdb3"
@@ -55,8 +67,6 @@ sh autogen.sh
 ** make
 
 #+BEGIN_SRC
-GUILE=/t/ge/g3
-
 export PATH=$GUILE/bin:$PATH
 export PKG_CONFIG_PATH=$GUILE/lib/pkgconfig
 export LD_LIBRARY_PATH=$GUILE/lib
@@ -69,8 +79,6 @@ make V=1
 ** make install
 
 #+BEGIN_SRC
-GUILE=/t/ge/g3
-
 export PATH=$GUILE/bin:$PATH
 export PKG_CONFIG_PATH=$GUILE/lib/pkgconfig
 export LD_LIBRARY_PATH=$GUILE/lib
@@ -84,7 +92,7 @@ Use the following script to launch Guilemacs:
 
 #+BEGIN_SRC
 #!/bin/sh
-export LD_LIBRARY_PATH=/t/ge/g3/lib
+export LD_LIBRARY_PATH=$GUILE/lib
 
 /t/ge/e2015/bin/emacs -Q $*
 #+END_SRC
