@@ -26,11 +26,19 @@
 (set-symbol-function! '1+ elisp-1+)
 (set-symbol-function! '1- elisp-1-)
 
+(define elisp-logand (lambda args
+                       (map (lambda (num)
+                              (unless (and (integer? num) (exact? num))
+                                ((symbol-function 'signal) 'wrong-type-argument num)))
+                            args)
+                       (apply logand (map check-number-coerce-marker args))))
+
 (set-symbol-function! '/ /)
 (set-symbol-function! 'logcount logcount)
 (set-symbol-function! 'lognot lognot)
 (set-symbol-function! 'logior logior)
 (set-symbol-function! 'logxor logxor)
+(set-symbol-function! 'logand elisp-logand)
 (set-symbol-function! 'ash ash)
 
 (set-symbol-function! 'cos cos)

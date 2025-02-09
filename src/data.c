@@ -3169,18 +3169,6 @@ usage: (min NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
   return minmax_driver (nargs, args, Cmp_LT);
 }
 
-DEFUN ("logand", Flogand, Slogand, 0, MANY, 0,
-       doc: /* Return bitwise-and of all the arguments.
-Arguments may be integers, or markers converted to integers.
-usage: (logand &rest INTS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (-1);
-  Lisp_Object a = check_integer_coerce_marker (args[0]);
-  return nargs == 1 ? a : arith_driver (Alogand, nargs, args, a);
-}
-
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,
        doc: /* Return the byteorder for the machine.
 Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
