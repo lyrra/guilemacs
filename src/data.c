@@ -3102,25 +3102,6 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
     }
 }
 
-DEFUN ("-", Fminus, Sminus, 0, MANY, 0,
-       doc: /* Negate number or subtract numbers or markers and return the result.
-With one arg, negates it.  With more than one arg,
-subtracts all but the first from the first.
-usage: (- &optional NUMBER-OR-MARKER &rest MORE-NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 0)
-    return make_fixnum (0);
-  Lisp_Object a = check_number_coerce_marker (args[0]);
-  if (nargs == 1)
-    {
-      if (FIXNUMP (a) || FLOATP (a) || GUILEBIGNUMP (a))
-	return scm_difference (2, a); // 2 == make_fixnum (0)
-      emacs_abort ();
-    }
-  return arith_driver (Asub, nargs, args, a);
-}
-
 DEFUN ("/", Fquo, Squo, 1, MANY, 0,
        doc: /* Divide number by divisors and return the result.
 With two or more arguments, return first argument divided by the rest.

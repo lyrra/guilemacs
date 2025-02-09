@@ -150,6 +150,7 @@ typedef struct android_fd_or_asset emacs_fd;
 #endif /* !defined HAVE_ANDROID || defined ANDROID_STUBIFY */
 
 static Lisp_Object times_fn;
+static Lisp_Object minus_fn;
 
 /* True during writing of auto-save files.  */
 static bool auto_saving;
@@ -6521,7 +6522,7 @@ blocks_to_bytes (uintmax_t blocksize, uintmax_t blocks, bool negate)
     return make_int (negate ? -n : n);
   Lisp_Object bs = make_uint (blocksize);
   if (negate)
-    bs = CALLN (Fminus, bs);
+    bs = scm_call_1 (minus_fn, bs);
   return scm_call_2 (times_fn, bs, make_uint (blocks));
 }
 
@@ -6890,5 +6891,6 @@ This includes interactive calls to `delete-file' and
   DEFSYM (QCerror, ":error");
   DEFSYM (Qauto_save_hook, "auto-save-hook");
 
-  times_fn = scm_c_private_lookup ("language elisp runtime", "elisp-*");
+  times_fn = scm_c_private_ref ("language elisp runtime", "elisp-*");
+  minus_fn = scm_c_private_ref ("language elisp runtime", "-");
 }
