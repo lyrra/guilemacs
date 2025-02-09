@@ -3102,40 +3102,6 @@ arith_driver (enum arithop code, ptrdiff_t nargs, Lisp_Object *args,
     }
 }
 
-DEFUN ("/", Fquo, Squo, 1, MANY, 0,
-       doc: /* Divide number by divisors and return the result.
-With two or more arguments, return first argument divided by the rest.
-With one argument, return 1 divided by the argument.
-The arguments must be numbers or markers.
-usage: (/ NUMBER &rest DIVISORS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  Lisp_Object a = check_number_coerce_marker (args[0]);
-  if (nargs == 1)
-    {
-      if (FIXNUMP (a))
-	{
-	  if (XFIXNUM (a) == 0)
-	    xsignal0 (Qarith_error);
-	  return make_fixnum (1 / XFIXNUM (a));
-	}
-      if (FLOATP (a))
-	{
-	  if (! IEEE_FLOATING_POINT && XFLOAT_DATA (a) == 0)
-	    xsignal0 (Qarith_error);
-	  return make_float (1 / XFLOAT_DATA (a));
-	}
-      /* Dividing 1 by any bignum yields 0.  */
-      return make_fixnum (0);
-    }
-
-  /* Do all computation in floating-point if any arg is a float.  */
-  for (ptrdiff_t argnum = 2; argnum < nargs; argnum++)
-    if (FLOATP (args[argnum]))
-      return floatop_arith_driver (Adiv, nargs, args, 0, 0, XFLOATINT (a));
-  return arith_driver (Adiv, nargs, args, a);
-}
-
 static Lisp_Object
 minmax_driver (ptrdiff_t nargs, Lisp_Object *args, cmp_bits_t cmpmask)
 {

@@ -15,6 +15,25 @@
                   (apply - (map check-number-coerce-marker args))))
 (define elisp-* (lambda args
                   (apply * (map check-number-coerce-marker args))))
+(define (elisp-/-fold a lst seen-inexact)
+  (if (null? lst)
+      (cons a seen-inexact)
+      (let ((b (car lst)))
+        (elisp-/-fold (/ a b) (cdr lst) (or seen-inexact (inexact? b))))))
+
+(define elisp-/ (lambda args
+                  (if (null? args)
+                      ((symbol-function 'signal) 'wrong-type-argument num)
+                      (let ((a (car args)))
+                        (if (null? (cdr args))
+                            (if (exact? a)
+                                (inexact->exact (truncate (car (elisp-/-fold 1.0 (list a) #f))))
+                                (car (elisp-/-fold 1.0 (list a) #f)))
+                            (let ((p (elisp-/-fold a (cdr args) (inexact? a))))
+                              (if (cdr p) ; a float was seen among the operands
+                                  (car p)
+                                  (inexact->exact (truncate (car p))))))))))
+
 (define elisp-1+ (lambda (a)
                    (1+ (check-number-coerce-marker a))))
 (define elisp-1- (lambda (a)
@@ -23,6 +42,7 @@
 (set-symbol-function! '+ elisp-+)
 (set-symbol-function! '- elisp--)
 (set-symbol-function! '* elisp-*)
+(set-symbol-function! '/ elisp-/)
 (set-symbol-function! '1+ elisp-1+)
 (set-symbol-function! '1- elisp-1-)
 
@@ -33,7 +53,6 @@
                             args)
                        (apply logand (map check-number-coerce-marker args))))
 
-(set-symbol-function! '/ /)
 (set-symbol-function! 'logcount logcount)
 (set-symbol-function! 'lognot lognot)
 (set-symbol-function! 'logior logior)

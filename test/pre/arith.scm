@@ -1,4 +1,37 @@
 
+;; note, if not doing indirect by passing through a variable
+;; and instead doing direct like (/ ,n 3) , guile compiler
+;; will optimize that away into a rational (fractional), and
+;; that type isn't supported by guilemacs
+
+;; next, emacs divide is like c, if you pass it exact integers
+;; it will truncate, as demonstrated in this test:
+(deftestf 'divide (0)
+  (el-expr `(let ((n 1))
+    (print (/ n 3)))))
+
+(for-each (lambda (p)
+            (match p
+              ((n e)
+               (deftestf 'divide (e)
+                 (el-expr `(let ((n ,n))
+                             (print (list (-     (/ n 3))
+                                          (- n 1 (/ n 3))))))))))
+  '((0 (0 -1))
+    (1 (0 0))
+    (2 (0 1))
+    (3 (-1 1))
+    (10 (-3 6))
+    (100 (-33 66))
+    (1000 (-333 666))
+    (10.1 (-3.3666666666666667 5.7333333333333325))))
+
+;; test covers completion--flex-score-1
+(deftestf 'divide-promote-float (0.3333333333333333)
+  (el-expr `(let ((a 1)
+                  (b 3))
+              (print (/ a b 1.0)))))
+
 (deftestf 'plus (0)
   (el-expr `(print (+))))
 
