@@ -15,10 +15,16 @@
                   (apply - (map check-number-coerce-marker args))))
 (define elisp-* (lambda args
                   (apply * (map check-number-coerce-marker args))))
+(define elisp-1+ (lambda (a)
+                   (1+ (check-number-coerce-marker a))))
+(define elisp-1- (lambda (a)
+                   (1- (check-number-coerce-marker a))))
 
 (set-symbol-function! '+ elisp-+)
 (set-symbol-function! '- elisp--)
 (set-symbol-function! '* elisp-*)
+(set-symbol-function! '1+ elisp-1+)
+(set-symbol-function! '1- elisp-1-)
 
 (set-symbol-function! '/ /)
 (set-symbol-function! 'logcount logcount)

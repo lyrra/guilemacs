@@ -3181,24 +3181,6 @@ usage: (logand &rest INTS-OR-MARKERS)  */)
   return nargs == 1 ? a : arith_driver (Alogand, nargs, args, a);
 }
 
-DEFUN ("1+", Fadd1, Sadd1, 1, 1, 0,
-       doc: /* Return NUMBER plus one.  NUMBER may be a number or a marker.
-Markers are converted to integers.  */)
-  (Lisp_Object number)
-{
-  number = check_number_coerce_marker (number);
-  return scm_sum (number, make_fixnum(1));
-}
-
-DEFUN ("1-", Fsub1, Ssub1, 1, 1, 0,
-       doc: /* Return NUMBER minus one.  NUMBER may be a number or a marker.
-Markers are converted to integers.  */)
-  (Lisp_Object number)
-{
-  number = check_number_coerce_marker (number);
-  return scm_difference (number, make_fixnum(1));
-}
-
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,
        doc: /* Return the byteorder for the machine.
 Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII

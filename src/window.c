@@ -4317,7 +4317,7 @@ set_window_buffer (Lisp_Object window, Lisp_Object buffer,
 
   /* Update time stamps of buffer display.  */
   if (INTEGERP (BVAR (b, display_count)))
-    bset_display_count (b, Fadd1 (BVAR (b, display_count)));
+    bset_display_count (b, scm_sum (make_fixnum (1), BVAR (b, display_count)));
   bset_display_time (b, Fcurrent_time ());
 
   w->window_end_pos = 0;
