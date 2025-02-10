@@ -1373,7 +1373,8 @@ store_symval_forwarding (lispfwd valcontents, Lisp_Object newval,
 		  {
 		    Lisp_Object min = XCAR (rangeprop), max = XCDR (rangeprop);
 		    if (! NUMBERP (newval)
-			|| NILP (CALLN (Fleq, min, newval, max)))
+			|| (scm_leq_p (min, newval) == SCM_BOOL_F)
+                        || (scm_leq_p (newval, max) == SCM_BOOL_F))
 		      wrong_range (min, max, newval);
 		  }
 		else if (FUNCTIONP (predicate))
@@ -2639,58 +2640,6 @@ arithcompare_driver (ptrdiff_t nargs, Lisp_Object *args, cmp_bits_t cmpmask)
     if (!(arithcompare (args[i - 1], args[i]) & cmpmask))
       return Qnil;
   return Qt;
-}
-
-DEFUN ("=", Feqlsign, Seqlsign, 1, MANY, 0,
-       doc: /* Return t if args, all numbers or markers, are equal.
-usage: (= NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  return arithcompare_driver (nargs, args, Cmp_EQ);
-}
-
-DEFUN ("<", Flss, Slss, 1, MANY, 0,
-       doc: /* Return t if each arg (a number or marker), is less than the next arg.
-usage: (< NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 2 && FIXNUMP (args[0]) && FIXNUMP (args[1]))
-    return XFIXNUM (args[0]) < XFIXNUM (args[1]) ? Qt : Qnil;
-
-  return arithcompare_driver (nargs, args, Cmp_LT);
-}
-
-DEFUN (">", Fgtr, Sgtr, 1, MANY, 0,
-       doc: /* Return t if each arg (a number or marker) is greater than the next arg.
-usage: (> NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 2 && FIXNUMP (args[0]) && FIXNUMP (args[1]))
-    return XFIXNUM (args[0]) > XFIXNUM (args[1]) ? Qt : Qnil;
-
-  return arithcompare_driver (nargs, args, Cmp_GT);
-}
-
-DEFUN ("<=", Fleq, Sleq, 1, MANY, 0,
-       doc: /* Return t if each arg (a number or marker) is less than or equal to the next.
-usage: (<= NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 2 && FIXNUMP (args[0]) && FIXNUMP (args[1]))
-    return XFIXNUM (args[0]) <= XFIXNUM (args[1]) ? Qt : Qnil;
-
-  return arithcompare_driver (nargs, args, Cmp_LT | Cmp_EQ);
-}
-
-DEFUN (">=", Fgeq, Sgeq, 1, MANY, 0,
-       doc: /* Return t if each arg (a number or marker) is greater than or equal to the next.
-usage: (>= NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  if (nargs == 2 && FIXNUMP (args[0]) && FIXNUMP (args[1]))
-    return XFIXNUM (args[0]) >= XFIXNUM (args[1]) ? Qt : Qnil;
-
-  return arithcompare_driver (nargs, args, Cmp_GT | Cmp_EQ);
 }
 
 DEFUN ("/=", Fneq, Sneq, 2, 2, 0,

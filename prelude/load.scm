@@ -46,6 +46,20 @@
 (set-symbol-function! '1+ elisp-1+)
 (set-symbol-function! '1- elisp-1-)
 
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ lisp-name fun-name)
+              (begin
+                (define fun-name (lambda args
+                                  (if (apply lisp-name (map check-number-coerce-marker args))
+                                      #t #nil)))
+                (set-symbol-function! 'lisp-name fun-name))))))
+  (frob = elisp-=)
+  (frob < elisp-<)
+  (frob > elisp->)
+  (frob <= elisp-<=)
+  (frob >= elisp->=))
+
 (define elisp-logand (lambda args
                        (map (lambda (num)
                               (unless (and (integer? num) (exact? num))
