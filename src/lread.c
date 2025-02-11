@@ -204,8 +204,7 @@ static Lisp_Object read_objects_map;
    (to reduce allocations), or nil.  */
 static Lisp_Object read_objects_completed;
 
-/* File and lookahead for get-file-char and get-emacs-mule-file-char
-   to read from.  Used by Fload.  */
+/* File and lookahead for get-file-char to read from.  Used by Fload.  */
 static struct infile
 {
   /* The input stream.  */
@@ -242,9 +241,6 @@ static struct saved_string saved_strings[2];
 
 static Lisp_Object Vloads_in_progress;
 
-static int read_emacs_mule_char (int, int (*) (int, Lisp_Object),
-                                 Lisp_Object);
-
 static void readevalloop (Lisp_Object, struct infile *, Lisp_Object, bool,
                           Lisp_Object, Lisp_Object,
                           Lisp_Object, Lisp_Object);
@@ -278,7 +274,7 @@ static int readbyte_from_file (int, Lisp_Object);
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
 
-/* When READCHARFUN is Qget_file_char or Qget_emacs_mule_file_char,
+/* When READCHARFUN is Qget_file_char,
    we use this to keep an unread character because
    a file stream can't handle multibyte-char unreading.  The value -1
    means that there's no unread character.  */
@@ -292,7 +288,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   int (*readbyte) (int, Lisp_Object);
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i, len;
-  bool emacs_mule_encoding = 0;
 
   if (multibyte)
     *multibyte = 0;
@@ -394,14 +389,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       return c;
     }
 
-  if (EQ (readcharfun, Qget_emacs_mule_file_char))
-    {
-      readbyte = readbyte_from_file;
-      eassert (infile);
-      emacs_mule_encoding = 1;
-      goto read_multibyte;
-    }
-
   tem = call0 (readcharfun);
 
   if (NILP (tem))
@@ -422,8 +409,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
     *multibyte = 1;
   if (ASCII_CHAR_P (c))
     return c;
-  if (emacs_mule_encoding)
-    return read_emacs_mule_char (c, readbyte, readcharfun);
   i = 0;
   buf[i++] = c;
   len = BYTES_BY_CHAR_HEAD (c);
@@ -490,8 +475,7 @@ readchar_load ()
 }
 
 #define FROM_FILE_P(readcharfun)			\
-  (EQ (readcharfun, Qget_file_char)			\
-   || EQ (readcharfun, Qget_emacs_mule_file_char))
+  (EQ (readcharfun, Qget_file_char))
 
 static void
 skip_dyn_bytes (Lisp_Object readcharfun, ptrdiff_t n)
@@ -685,69 +669,6 @@ invalid_syntax (const char *s, Lisp_Object readcharfun)
 {
   invalid_syntax_lisp (build_string (s), readcharfun);
 }
-
-
-/* Read one non-ASCII character from INFILE.  The character is
-   encoded in `emacs-mule' and the first byte is already read in
-   C.  */
-
-static int
-read_emacs_mule_char (int c, int (*readbyte) (int, Lisp_Object), Lisp_Object readcharfun)
-{
-  /* Emacs-mule coding uses at most 4-byte for one character.  */
-  unsigned char buf[4];
-  int len = emacs_mule_bytes[c];
-  struct charset *charset;
-  int i;
-  unsigned code;
-
-  if (len == 1)
-    /* C is not a valid leading-code of `emacs-mule'.  */
-    return BYTE8_TO_CHAR (c);
-
-  i = 0;
-  buf[i++] = c;
-  while (i < len)
-    {
-      buf[i++] = c = (*readbyte) (-1, readcharfun);
-      if (c < 0xA0)
-	{
-	  for (i -= c < 0; 0 < --i; )
-	    (*readbyte) (buf[i], readcharfun);
-	  return BYTE8_TO_CHAR (buf[0]);
-	}
-    }
-
-  if (len == 2)
-    {
-      charset = CHARSET_FROM_ID (emacs_mule_charset[buf[0]]);
-      code = buf[1] & 0x7F;
-    }
-  else if (len == 3)
-    {
-      if (buf[0] == EMACS_MULE_LEADING_CODE_PRIVATE_11
-	  || buf[0] == EMACS_MULE_LEADING_CODE_PRIVATE_12)
-	{
-	  charset = CHARSET_FROM_ID (emacs_mule_charset[buf[1]]);
-	  code = buf[2] & 0x7F;
-	}
-      else
-	{
-	  charset = CHARSET_FROM_ID (emacs_mule_charset[buf[0]]);
-	  code = ((buf[1] << 8) | buf[2]) & 0x7F7F;
-	}
-    }
-  else
-    {
-      charset = CHARSET_FROM_ID (emacs_mule_charset[buf[1]]);
-      code = ((buf[2] << 8) | buf[3]) & 0x7F7F;
-    }
-  c = DECODE_CHAR (charset, code);
-  if (c < 0)
-    invalid_syntax ("invalid multibyte form", readcharfun);
-  return c;
-}
-
 
 /* An in-progress substitution of OBJECT for PLACEHOLDER.  */
 struct subst
@@ -3488,11 +3409,7 @@ bytecode_from_rev_list (Lisp_Object elems, Lisp_Object readcharfun)
           Lisp_Object enc = vec[CLOSURE_CODE];
 	  eassert (!STRING_MULTIBYTE (enc));
 	  /* The string (always unibyte) must be decoded to be parsed.  */
-	  enc = Fdecode_coding_string (enc,
-				       EQ (readcharfun,
-					   Qget_emacs_mule_file_char)
-				       ? Qemacs_mule : Qutf_8_emacs,
-				       Qt, Qnil);
+	  enc = Fdecode_coding_string (enc, Qutf_8_emacs, Qt, Qnil);
 	  Lisp_Object pair = Fread (enc);
           if (!CONSP (pair))
 	    invalid_syntax ("Invalid byte-code object", readcharfun);
@@ -6515,10 +6432,6 @@ through `require'.  */);
   DEFSYM (Qstandard_input, "standard-input");
   DEFSYM (Qread_char, "read-char");
   DEFSYM (Qget_file_char, "get-file-char");
-
-  /* Used instead of Qget_file_char while loading *.elc files compiled
-     by Emacs 21 or older.  */
-  DEFSYM (Qget_emacs_mule_file_char, "get-emacs-mule-file-char");
 
   DEFSYM (Qload_force_doc_strings, "load-force-doc-strings");
 
