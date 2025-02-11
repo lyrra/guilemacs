@@ -60,6 +60,13 @@
   (frob <= elisp-<=)
   (frob >= elisp->=))
 
+(define elisp-/= (lambda args
+                   (if (apply = (map check-number-coerce-marker args))
+                       #nil #t)))
+
+(set-symbol-function! '/= elisp-/=)
+
+
 (define elisp-logand (lambda args
                        (map (lambda (num)
                               (unless (and (integer? num) (exact? num))

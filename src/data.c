@@ -2641,13 +2641,6 @@ arithcompare_driver (ptrdiff_t nargs, Lisp_Object *args, cmp_bits_t cmpmask)
       return Qnil;
   return Qt;
 }
-
-DEFUN ("/=", Fneq, Sneq, 2, 2, 0,
-       doc: /* Return t if first arg is not equal to second arg.  Both must be numbers or markers.  */)
-  (register Lisp_Object num1, Lisp_Object num2)
-{
-  return arithcompare (num1, num2) & Cmp_EQ ? Qnil : Qt;
-}
 
 /* Convert the cons-of-integers, integer, or float value C to an
    unsigned value with maximum value MAX, where MAX is one less than a
