@@ -9,12 +9,19 @@
 (use-modules (language elisp emacs))
 (use-modules (system foreign-library))
 
-(define elisp-+ (lambda args
-                  (apply + (map check-number-coerce-marker args))))
-(define elisp-- (lambda args
-                  (apply - (map check-number-coerce-marker args))))
-(define elisp-* (lambda args
-                  (apply * (map check-number-coerce-marker args))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ lisp-name fun-name)
+              (begin
+                (define fun-name (lambda args
+                                   (apply lisp-name (map check-number-coerce-marker args))))
+                (set-symbol-function! 'lisp-name fun-name))))))
+  (frob min elisp-min)
+  (frob max elisp-max)
+  (frob + elisp-+)
+  (frob - elisp--)
+  (frob * elisp-*))
+
 (define (elisp-/-fold a lst seen-inexact)
   (if (null? lst)
       (cons a seen-inexact)
@@ -39,9 +46,6 @@
 (define elisp-1- (lambda (a)
                    (1- (check-number-coerce-marker a))))
 
-(set-symbol-function! '+ elisp-+)
-(set-symbol-function! '- elisp--)
-(set-symbol-function! '* elisp-*)
 (set-symbol-function! '/ elisp-/)
 (set-symbol-function! '1+ elisp-1+)
 (set-symbol-function! '1- elisp-1-)
@@ -65,7 +69,6 @@
                        #nil #t)))
 
 (set-symbol-function! '/= elisp-/=)
-
 
 (define elisp-logand (lambda args
                        (map (lambda (num)

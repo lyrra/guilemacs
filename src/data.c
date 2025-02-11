@@ -2853,39 +2853,6 @@ string_to_scheme (Lisp_Object string)
   return scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
 }
 
-static Lisp_Object
-minmax_driver (ptrdiff_t nargs, Lisp_Object *args, cmp_bits_t cmpmask)
-{
-  Lisp_Object accum = check_number_coerce_marker (args[0]);
-  for (ptrdiff_t argnum = 1; argnum < nargs; argnum++)
-    {
-      Lisp_Object val = check_number_coerce_marker (args[argnum]);
-      if (arithcompare (val, accum) & cmpmask)
-	accum = val;
-      else if (FLOATP (val) && isnan (XFLOAT_DATA (val)))
-	return val;
-    }
-  return accum;
-}
-
-DEFUN ("max", Fmax, Smax, 1, MANY, 0,
-       doc: /* Return largest of all the arguments (which must be numbers or markers).
-The value is always a number; markers are converted to numbers.
-usage: (max NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  return minmax_driver (nargs, args, Cmp_GT);
-}
-
-DEFUN ("min", Fmin, Smin, 1, MANY, 0,
-       doc: /* Return smallest of all the arguments (which must be numbers or markers).
-The value is always a number; markers are converted to numbers.
-usage: (min NUMBER-OR-MARKER &rest NUMBERS-OR-MARKERS)  */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  return minmax_driver (nargs, args, Cmp_LT);
-}
-
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,
        doc: /* Return the byteorder for the machine.
 Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
