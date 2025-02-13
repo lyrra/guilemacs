@@ -838,6 +838,47 @@ Thread 1 "bootstrap-emacs" received signal SIGSEGV, Segmentation fault.
   see obarray global in lread.c
 
 * guile
+** guile-elisp internals
+
+Following flow chart describes how string type is handled
+by guile-elisp.
+
+  - emacs binary is runned
+    the binary will launch guile (libguile)
+  - the emacs side elisp engine (lread.c, eval.c, etc) will
+    start to load loadup.el
+  - a "(eload ...)" expression in loadup.el will
+    be evaluated, that during evaluation calls
+    to guile's boot.el and runtime.scm where eload is defined
+  - the eload function calls guile's elisp support "(compile-and-load ... #:from 'elisp)"
+  - that elisp support system guile has, has several components,
+    reader, lexer, parser, compiler etc..
+    and the lexer (language/elisp/lexer.scm) will export the lexer as a
+    function "lex", that when called by the guile elisp system will
+    read and parse/lex stuff from a guile-port.
+    If it happens to be a literal string, it will be constructed by
+    "%make-lisp-string".
+
+  - "%make-lisp-string" is defined in language/elisp/runtime.scm,
+    and it is a function that does a dynamic call into the same
+    module (language elisp runtime), but function "make-lisp-string".
+
+    and that function ("make-lisp-string"), is just the identity function.
+
+  - ..thats strange.. why would guile elisp go through hops and loops for
+    just reading a string, that would end up as a guile-string (when the
+    identity function gets a guile-string, and just returns it) ?
+
+    The answer is that, in "guile elisp" (or call it "modern elisp" or "standard elisp",
+    or why not "common elisp"), the string will be just a guile-string.
+
+    But when emacs binary is loaded, it will replace the function found in the
+    variable "%make-lisp-string" with it's own string construction function.
+    And that function is a FFI call to C's "string_from_scheme" (found in data.c).
+
+  - So the final string returned by the lexer is one constructed by the c-function
+    "string_from_scheme" if guile-elisp is runned within the emacs binary.
+
 ** known problems
 *** guile-emacs build fails with Unbound variable: make-srfi-4-vector
   - error:
