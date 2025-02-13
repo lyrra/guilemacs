@@ -1043,6 +1043,17 @@ void load_guile_prelude ()
   emacs_abort ();
 }
 
+void
+install_emacs_strings ()
+{
+    SCM module = scm_c_resolve_module ("language elisp runtime");
+    scm_c_module_define (module, "make-lisp-string",
+                         scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
+                                           string_from_scheme));
+    scm_c_module_define (module, "lisp-string?",
+                         scm_c_make_gsubr ("stringp", 1, 0, 0, Fstringp));
+}
+
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 
@@ -1668,13 +1679,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_alloc_once ();
 
-      scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
-                           "make-lisp-string",
-                           scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
-                                             string_from_scheme));
-      scm_c_module_define (scm_c_resolve_module ("language elisp runtime"),
-                           "lisp-string?",
-                           scm_c_make_gsubr ("stringp", 1, 0, 0, Fstringp));
+      install_emacs_strings ();
 
       xsymbol_fn = scm_c_public_ref ("language elisp runtime", "symbol-desc");
       symbol_function_fn = scm_c_public_ref ("language elisp runtime", "symbol-function");
