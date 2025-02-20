@@ -523,6 +523,10 @@ be easier to pin-point test faults, sigsegvs and so on.
   see 7f129f2ecfbdded5c31e9d9fc8bf11ce0e017000
   how to inspect lisp variables from gdb
 
+*** breakpoints
+  If guile gets an error it will be reported as "Scheme error:" (see src/keyboard.c).
+  A useful breakpoint then are "command_loop_2_handler".
+
 ** backtrace
 
    Given some backtrace, we can peek at symbols and objects.
