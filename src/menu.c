@@ -864,7 +864,7 @@ update_submenu_strings (widget_value *first_wv)
             }
         }
 
-      if (STRINGP (wv->lkey))
+      if (wv->lkey && STRINGP (wv->lkey))
         wv->key = SSDATA (wv->lkey);
 
       if (wv->contents)
