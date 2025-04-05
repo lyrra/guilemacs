@@ -1239,8 +1239,8 @@ format_time_string (char const *format, ptrdiff_t formatlen,
 
   xtzfree (tz);
   AUTO_STRING_WITH_LEN (bufstring, buf, len);
-  Lisp_Object result = code_convert_string_norecord (bufstring,
-						     Vlocale_coding_system, 0);
+  Lisp_Object result = bufstring; //code_convert_string_norecord (bufstring,
+				//	     Vlocale_coding_system, 0);
   SAFE_FREE ();
   return result;
 }
@@ -1327,8 +1327,8 @@ usage: (format-time-string FORMAT-STRING &optional TIME ZONE)  */)
   struct tm tm;
 
   CHECK_STRING (format_string);
-  format_string = code_convert_string_norecord (format_string,
-						Vlocale_coding_system, 1);
+  //format_string = code_convert_string_norecord (format_string,
+//						Vlocale_coding_system, 1);
   return format_time_string (SSDATA (format_string), SBYTES (format_string),
 			     t, zone, &tm);
 }

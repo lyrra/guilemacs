@@ -27815,6 +27815,7 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 	/* Handle the non-literal case.  */
 
 	while ((precision <= 0 || n < precision)
+               && (scm_c_string_length (elt) > 0)
 	       && SREF (elt, offset) != 0
 	       && (mode_line_target != MODE_LINE_DISPLAY
 		   || it->current_x < it->last_visible_x))
@@ -27822,8 +27823,15 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 	    ptrdiff_t last_offset = offset;
 
 	    /* Advance to end of string or next format specifier.  */
-	    while ((c = SREF (elt, offset++)) != '\0' && c != '%')
-	      ;
+            {
+              int len = scm_c_string_length (elt);
+              for (int i = offset; i < len; i++)
+                {
+                  int c = SREF (elt, offset++);
+                  if (c == '%')
+                    break;
+                }
+            }
 
 	    if (offset - 1 != last_offset)
 	      {
@@ -27880,8 +27888,16 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		/* Get the specified minimum width.  Zero means
 		   don't pad.  */
 		field = 0;
-		while ((c = SREF (elt, offset++)) >= '0' && c <= '9')
-		  field = field * 10 + c - '0';
+                {
+                  int len = scm_c_string_length (elt);
+                  for (int i = offset; i < len; i++)
+                    {
+                      int c = SREF (elt, offset++);
+		      if (!(c >= '0' && c <= '9'))
+                        break;
+                      field = field * 10 + c - '0';
+                    }
+                }
 
 		/* Don't pad beyond the total padding allowed.  */
 		if (field_width - n > 0 && field > field_width - n)

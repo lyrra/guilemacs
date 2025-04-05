@@ -128,7 +128,13 @@ compile_pattern_1 (struct regexp_cache *cp, Lisp_Object pattern,
   cp->syntax_table = cp->buf.used_syntax ? BVAR (current_buffer, syntax_table) : Qt;
 
   if (val)
-    xsignal1 (Qinvalid_regexp, build_string (val));
+    {
+      xsignal2 (Qinvalid_regexp,
+                build_string (val),
+                Qnil);
+      xsignal1 (Qinvalid_regexp, build_string (val));
+  }
+
 
   cp->regexp = Fcopy_sequence (pattern);
 }
@@ -372,7 +378,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 {
   ptrdiff_t val;
   EMACS_INT pos;
-  ptrdiff_t pos_byte, i;
+  ptrdiff_t i;
   bool modify_match_data = NILP (Vinhibit_changing_match_data) && modify_data;
 
   if (running_asynch_code)
@@ -382,7 +388,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
   CHECK_STRING (string);
 
   if (NILP (start))
-    pos = 0, pos_byte = 0;
+    pos = 0;
   else
     {
       ptrdiff_t len = SCHARS (string);
@@ -393,7 +399,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 	pos = len + pos;
       else if (0 > pos || pos > len)
 	args_out_of_range (string, start);
-      pos_byte = string_char_to_byte (string, pos);
+      pos = string_char_to_byte (string, pos);
     }
 
   /* This is so set_image_of_range_1 in regex-emacs.c can find the EQV
@@ -512,7 +518,7 @@ fast_c_string_match_internal (Lisp_Object regexp,
   /* FIXME: This is expensive and not obviously correct when it makes
      a difference. I.e., no longer "fast", and may hide bugs.
      Something should be done about this.  */
-  regexp = string_make_unibyte (regexp);
+  //regexp = string_make_unibyte (regexp);
   /* Record specpdl index because freeze_pattern pushes an
      unwind-protect on the specpdl.  */
   dynwind_begin ();
@@ -1081,7 +1087,7 @@ search_command (Lisp_Object string, Lisp_Object bound, Lisp_Object noerror,
   if (np <= 0)
     {
       if (NILP (noerror))
-	xsignal1 (Qsearch_failed, string);
+	xsignal2 (Qsearch_failed, string, Qnil);
 
       if (!EQ (noerror, Qt))
 	{
@@ -1335,13 +1341,16 @@ search_buffer_non_re (Lisp_Object string, ptrdiff_t pos,
     }
   else
     {
+*/
       /* Converting multibyte to single-byte.  */
+/*
       raw_pattern_size = SCHARS (string);
       raw_pattern_size_byte = SCHARS (string);
       raw_pattern = SAFE_ALLOCA (raw_pattern_size + 1);
       copy_text (SDATA (string), raw_pattern,
                  SBYTES (string), 1, 0);
     }
+*/
 
   /* Copy and optionally translate the pattern.  */
   ptrdiff_t len = raw_pattern_size;
@@ -2664,15 +2673,14 @@ since only regular expressions have distinguished subexpressions.  */)
 
 	  if (str_multibyte)
 	    {
-	      c = fetch_string_char_advance_no_check (newtext,
-						      &pos, &pos_byte);
+	      c = fetch_string_char_advance_no_check (newtext, &pos);
 	      if (!buf_multibyte)
 		c = CHAR_TO_BYTE8 (c);
 	    }
 	  else
 	    {
 	      /* Note that we don't have to increment POS.  */
-	      c = SREF (newtext, pos_byte++);
+	      c = SREF (newtext, pos++);
 	      if (buf_multibyte)
 		c = make_char_multibyte (c);
 	    }
@@ -2687,14 +2695,13 @@ since only regular expressions have distinguished subexpressions.  */)
 
 	      if (str_multibyte)
 		{
-		  c = fetch_string_char_advance_no_check (newtext,
-							  &pos, &pos_byte);
+		  c = fetch_string_char_advance_no_check (newtext, &pos);
 		  if (!buf_multibyte && !ASCII_CHAR_P (c))
 		    c = CHAR_TO_BYTE8 (c);
 		}
 	      else
 		{
-		  c = SREF (newtext, pos_byte++);
+		  c = SREF (newtext, pos++);
 		  if (buf_multibyte)
 		    c = make_char_multibyte (c);
 		}

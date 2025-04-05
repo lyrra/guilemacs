@@ -2367,7 +2367,9 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	      /* Here, we must convert each multi-byte form to the
 		 corresponding character code before handing it to
 		 printchar.  */
-	      int c = fetch_string_char_advance (obj, &i, &i_byte);
+	      int c = SREF (obj, i);
+              i++;
+              i_byte++;
 
 	      maybe_quit ();
 
@@ -2442,18 +2444,25 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	ptrdiff_t size_byte = SBYTES (name);
 
 	char *p = SSDATA (name);
-	bool signedp = *p == '-' || *p == '+';
+        char p0 = size_byte ? SREF (name, 0) : 0;
+	bool signedp = p0 == '-' || p0 == '+';
 	ptrdiff_t len;
+        char p1 = size_byte > 1 ? SREF (name, 1) : 0;
+        bool digit_notsigned = c_isdigit (p0);
+        bool digit_signed = p1 ? c_isdigit (p1) : 0;
+        bool dot_notsigned = p0 == '.';
+        bool dot_signed = p1 ? p1 == '.' : 0;
+        // FIX: guilemacs, how can this work in vanilla if symbol is just '-' or '+', read beyond end?
 	bool confusing =
 	  /* Set CONFUSING if NAME looks like a number, calling
 	     string_to_number for non-obvious cases.  */
-	  ((c_isdigit (p[signedp]) || p[signedp] == '.')
-	   && !NILP (string_to_number (p, 10, &len))
+	  ((digit_notsigned || digit_signed || dot_notsigned || dot_signed)
+	   && !NILP (string_to_number_Ls (name, 10, &len))
 	   && len == size_byte)
 	  /* We don't escape "." or "?" (unless they're the first
 	     character in the symbol name).  */
-	  || *p == '?'
-	  || *p == '.';
+	  || p0 == '?'
+	  || p0 == '.';
 
 	if (! NILP (Vprint_gensym)
 	    && !SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (obj))
@@ -2464,12 +2473,12 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	    break;
 	  }
 
-	ptrdiff_t i = 0;
 	for (ptrdiff_t i_byte = 0; i_byte < size_byte; )
 	  {
 	    /* Here, we must convert each multi-byte form to the
 	       corresponding character code before handing it to PRINTCHAR.  */
-	    int c = fetch_string_char_advance (name, &i, &i_byte);
+	    int c = SREF (name, i_byte);
+            i_byte++;
 	    maybe_quit ();
 
 	    if (escapeflag)

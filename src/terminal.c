@@ -301,8 +301,8 @@ create_terminal (enum output_method type, struct redisplay_interface *rif)
       || NILP (Fcoding_system_p (terminal_coding)))
     terminal_coding = Qundecided;
 
-  setup_coding_system (keyboard_coding, terminal->keyboard_coding);
-  setup_coding_system (terminal_coding, terminal->terminal_coding);
+  // setup_coding_system (keyboard_coding, terminal->keyboard_coding);
+  // setup_coding_system (terminal_coding, terminal->terminal_coding);
 
   return terminal;
 }
