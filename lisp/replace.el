@@ -73,7 +73,7 @@ See `query-replace-from-history-variable' and
 This is a list of cons cells (FROM-STRING . TO-STRING), or nil
 if there are no default values.")
 
-(defcustom query-replace-from-to-separator " → "
+(defcustom query-replace-from-to-separator " -> "
   "String that separates FROM and TO in the history of replacement pairs.
 When nil, the pair will not be added to the history (same behavior
 as in Emacs 24.5)."
@@ -1310,8 +1310,8 @@ a previously found match."
     (define-key map "n" 'next-error-no-select)
     (define-key map "p" 'previous-error-no-select)
     (define-key map "l" 'recenter-current-error)
-    (define-key map "\M-n" 'occur-next)
-    (define-key map "\M-p" 'occur-prev)
+    ;(define-key map "\M-n" 'occur-next)
+    ;(define-key map "\M-p" 'occur-prev)
     (define-key map "r" 'occur-rename-buffer)
     (define-key map "c" 'clone-buffer)
     (define-key map "\C-c\C-f" 'next-error-follow-minor-mode)
@@ -2494,7 +2494,7 @@ in the current buffer."
     (define-key map "\C-g" 'quit)
     (define-key map "\C-]" 'quit)
     (define-key map "\C-v" 'scroll-up)
-    (define-key map "\M-v" 'scroll-down)
+    ;(define-key map "\M-v" 'scroll-down)
     (define-key map [next] 'scroll-up)
     (define-key map [prior] 'scroll-down)
     (define-key map [?\C-\M-v] 'scroll-other-window)

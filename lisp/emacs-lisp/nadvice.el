@@ -365,9 +365,9 @@ different, but `function-equal' will hopefully ignore those differences.")
                              (format (format " %%-%ds %%s" col1width)
                                      (car x) (nth 2 x)))
                            advice--how-alist "\n"))
-         (table (if global-prettify-symbols-mode
-                    (replace-regexp-in-string "(lambda\\>" "(λ" table t t)
-                  table))
+         ;(table (if global-prettify-symbols-mode
+         ;           (replace-regexp-in-string "(lambda\\>" "(λ" table t t)
+         ;         table))
          (combined-doc
           (if (not (string-match "<<>>" doc))
               doc

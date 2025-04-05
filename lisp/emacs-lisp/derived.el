@@ -348,12 +348,13 @@ which more-or-less shadow%s %s's corresponding table%s."
                          "This mode "
                        (concat
                         "In addition to any hooks its parent mode "
-                        (if (string-match (format "[`‘]%s['’]"
+                        (progn
+                        (if (string-match (format "[`']%s['']"
                                                   (regexp-quote
                                                    (symbol-name parent)))
                                           docstring)
                             nil
-                          (format "`%s' " parent))
+                          (format "`%s' " parent)))
                         "might have run, this mode "))
                      (format "runs the hook `%s'" hook)
                      ", as the final or penultimate step during initialization."))))

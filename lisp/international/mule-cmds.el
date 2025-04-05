@@ -348,17 +348,10 @@ This also sets the following values:
       if CODING-SYSTEM is ASCII-compatible"
   (check-coding-system coding-system)
   (setq-default buffer-file-coding-system coding-system)
-  (if (or (eq system-type 'darwin)
-          (eq system-type 'android))
-      ;; The file-name coding system on Darwin and Android systems is
-      ;; always UTF-8.
-      (setq default-file-name-coding-system 'utf-8-unix)
-    (if (and (or (not coding-system)
-		 (coding-system-get coding-system 'ascii-compatible-p)))
-	(setq default-file-name-coding-system
-	      (coding-system-change-eol-conversion coding-system 'unix))))
+  (setq default-file-name-coding-system 'utf-8-unix)
   (setq default-terminal-coding-system coding-system)
   ;; Prevent default-terminal-coding-system from converting ^M to ^J.
+  ;; FIX-guilemacs: strings, disable?
   (setq default-keyboard-coding-system
 	(coding-system-change-eol-conversion coding-system 'unix))
   ;; Preserve eol-type from existing default-process-coding-systems.
@@ -366,6 +359,7 @@ This also sets the following values:
   ;; carefully by the user, or by the startup code, to deal with the
   ;; users shell appropriately, so should not be altered by changing
   ;; language environment.
+  ;; FIX-guilemacs: strings, disable?
   (let ((output-coding
 	 (coding-system-change-text-conversion
 	  (car default-process-coding-system) coding-system))
@@ -1866,37 +1860,20 @@ The default status is as follows:
 
   (set-default-coding-systems nil)
   (setq default-sendmail-coding-system 'utf-8)
-  (setq default-file-name-coding-system (if (memq system-type
-                                                  '(windows-nt ms-dos))
-                                            'iso-latin-1-unix
-                                          'utf-8-unix))
+  (setq default-file-name-coding-system 'utf-8-unix)
   ;; Preserve eol-type from existing default-process-coding-systems.
   ;; On non-unix-like systems in particular, these may have been set
   ;; carefully by the user, or by the startup code, to deal with the
   ;; users shell appropriately, so should not be altered by changing
   ;; language environment.
-  (let ((output-coding
-	 ;; When bootstrapping, coding-systems are not defined yet, so
-	 ;; we need to catch the error from check-coding-system.
-	 (condition-case nil
-	     (coding-system-change-text-conversion
-	      (car default-process-coding-system) 'undecided)
-	   (coding-system-error 'undecided)))
-	(input-coding
-	 (condition-case nil
-	     (coding-system-change-text-conversion
-	      (cdr default-process-coding-system)
-	      (if (memq system-type '(windows-nt ms-dos)) 'iso-latin-1 'utf-8))
-	   (coding-system-error
-	    (if (memq system-type '(windows-nt ms-dos)) 'iso-latin-1 'utf-8)))))
-    (setq default-process-coding-system
-	  (cons output-coding input-coding)))
+  (setq default-process-coding-system
+	(cons 'utf-8 'utf-8))
 
   ;; Put the highest priority to the charset iso-8859-1 to prefer the
   ;; registry iso8859-1 over iso8859-2 in font selection.  It also
   ;; makes unibyte-display-via-language-environment to use iso-8859-1
   ;; as the unibyte charset.
-  (set-charset-priority 'iso-8859-1)
+  ;(set-charset-priority 'iso-8859-1)
 
   ;; Don't alter the terminal and keyboard coding systems here.
   ;; The terminal still supports the same coding system

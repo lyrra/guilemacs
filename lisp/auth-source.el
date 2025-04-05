@@ -2445,13 +2445,13 @@ point is moved into the passwords (see `authinfo-hide-elements').
                    (propertize "****" 'face 'font-lock-doc-face))
     (overlay-put overlay 'display nil)))
 
-;; It would be preferable to use "👁" ("\N{EYE}").  However, there is
+;; It would be preferable to use "_" ("\N{EYE}").  However, there is
 ;; no corresponding Unicode char with a slash.  So we use symbols as
-;; fallback only, with "⦵" ("\N{CIRCLE WITH HORIZONTAL BAR}") for
+;; fallback only, with "_" ("\N{CIRCLE WITH HORIZONTAL BAR}") for
 ;; hiding the password.
 (define-icon read-passwd--show-password-icon nil
   '((image "reveal.svg" "reveal.pbm" :height (0.8 . em))
-    (symbol "👁")
+    (symbol "_")
     (text "<o>"))
   "Mode line icon to show a hidden password."
   :group mode-line-faces
@@ -2460,7 +2460,7 @@ point is moved into the passwords (see `authinfo-hide-elements').
 
 (define-icon read-passwd--hide-password-icon nil
   '((image "conceal.svg" "conceal.pbm" :height (0.8 . em))
-    (symbol "⦵")
+    (symbol "_")
     (text "<\\>"))
   "Mode line icon to hide a visible password."
   :group mode-line-faces

@@ -141,7 +141,7 @@ and also to avoid outputting the warning during normal execution."
 
 (defun macroexp-compiling-p ()
   "Return non-nil if we're macroexpanding for the compiler."
-  ;; FIXME: ¡¡Major Ugly Hack!! To determine whether the output of this
+  ;; FIXME: !!Major Ugly Hack!! To determine whether the output of this
   ;; macro-expansion will be processed by the byte-compiler, we check
   ;; circumstantial evidence.
   (member '(declare-function . byte-compile-macroexpand-declare-function)
@@ -309,7 +309,7 @@ It should normally be a symbol with position and it defaults to FORM."
         ;; the same way (let obey special-variable-p, but functions
         ;; don't).  So if one of the vars is declared as dynamically scoped, we
         ;; can't just convert the call to `let'.
-        ;; FIXME: We should α-rename the affected args and then use `let'.
+        ;; FIXME: We should alpha-rename the affected args and then use `let'.
         (dynboundarg form)
         (bindings `(let ,(nreverse bindings) . ,body))
         (t (macroexp-progn body)))))
@@ -844,7 +844,7 @@ test of free variables in the following ways:
        (error "Eager macro-expansion failure: %S" err)
        form)))))
 
-;; ¡¡¡ Big Ugly Hack !!!
+;; !!! Big Ugly Hack !!!
 ;; src/bootstrap-emacs is mostly used to compile .el files, so it needs
 ;; macroexp, bytecomp, cconv, and byte-opt to be fast.  Generally this is done
 ;; by compiling those files first, but this only makes a difference if those

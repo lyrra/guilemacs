@@ -1115,11 +1115,11 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key ctl-x-map "=" 'what-cursor-position)
 (define-key esc-map ":" 'eval-expression)
 ;; Define ESC ESC : like ESC : for people who type ESC ESC out of habit.
-(define-key esc-map "\M-:" 'eval-expression)
+;(define-key esc-map "\M-:" 'eval-expression)
 ;; Changed from C-x ESC so that function keys work following C-x.
 (define-key ctl-x-map "\e\e" 'repeat-complex-command)
 ;; New binding analogous to M-:.
-(define-key ctl-x-map "\M-:" 'repeat-complex-command)
+;(define-key ctl-x-map "\M-:" 'repeat-complex-command)
 (define-key ctl-x-map "u" 'undo)
 (put 'undo :advertised-binding [?\C-x ?u])
 ;; Many people are used to typing C-/ on GUI frames and getting C-_.

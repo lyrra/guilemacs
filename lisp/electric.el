@@ -691,8 +691,8 @@ This requotes when a quoting key is typed."
 (define-minor-mode electric-quote-mode
   "Toggle on-the-fly requoting (Electric Quote mode).
 
-When enabled, as you type this replaces \\=` with \\=‘, \\=' with \\=’,
-\\=`\\=` with “, and \\='\\=' with ”.  This occurs only in comments, strings,
+When enabled, as you type this replaces \\=` with \\=', \\=' with \\=',
+\\=`\\=` with \", and \\='\\=' with \".  This occurs only in comments, strings,
 and text paragraphs, and these are selectively controlled with
 `electric-quote-comment', `electric-quote-string', and
 `electric-quote-paragraph'.

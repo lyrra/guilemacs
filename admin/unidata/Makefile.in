@@ -44,7 +44,7 @@ unifiles = $(addprefix ${unidir}/,$(sort $(shell sed -n 's/^[ \t][ \t]*${lparen}
 .PHONY: all
 
 all: ${top_srcdir}/src/macuvs.h ${unifiles} ${unidir}/charscript.el \
-  ${unidir}/charprop.el ${unidir}/emoji-zwj.el ${unidir}/emoji-labels.el \
+  ${unidir}/charprop.el \
   ${unidir}/uni-scripts.el ${unidir}/uni-confusable.el \
   ${unidir}/idna-mapping.el
 
@@ -73,9 +73,9 @@ ${unifiles}: ${srcdir}/unidata-gen.el \
 	$(AM_V_at)${emacs} -L ${srcdir} -l unidata-gen \
 	  -f unidata-gen-file $@ ${srcdir}
 
-${unidir}/emoji-labels.el: ${unidir}/../international/emoji.el \
-	  ${srcdir}/emoji-test.txt
-	$(AM_V_GEN)${emacs} -l emoji.el -f emoji--generate-file $@
+#${unidir}/emoji-labels.el: ${unidir}/../international/emoji.el \
+#	  ${srcdir}/emoji-test.txt
+#	$(AM_V_GEN)${emacs} -l emoji.el -f emoji--generate-file $@
 
 ${unidir}/uni-scripts.el: ${srcdir}/unidata-gen.el \
 	  ${srcdir}/Scripts.txt \

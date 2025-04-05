@@ -355,8 +355,8 @@ the name is not known."
   (with-temp-buffer
     (insert-file-contents (expand-file-name "../admin/unidata/emoji-test.txt"
                                             data-directory))
-    (unless (re-search-forward "^# +group:" nil t)
-      (error "Can't find start of data"))
+    ;(unless (re-search-forward "^# +group:" nil t)
+    ;  (error "Can't find start of data"))
     (beginning-of-line)
     (setq emoji--names (make-hash-table :test #'equal))
     (let ((derivations (make-hash-table :test #'equal))

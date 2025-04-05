@@ -175,11 +175,12 @@ This variable must not be changed globally."))
       'tramp-compat-password-colon-equivalents
       'password-colon-equivalents)
   (defvar tramp-compat-password-colon-equivalents
-    '(?\N{COLON}
-      ?\N{FULLWIDTH COLON}
-      ?\N{SMALL COLON}
-      ?\N{PRESENTATION FORM FOR VERTICAL COLON}
-      ?\N{KHMER SIGN CAMNUC PII KUUH})
+    '(;?\N{COLON}
+      ;?\N{FULLWIDTH COLON}
+      ;?\N{SMALL COLON}
+      ;?\N{PRESENTATION FORM FOR VERTICAL COLON}
+      ;?\N{KHMER SIGN CAMNUC PII KUUH}
+      )
     "List of characters equivalent to trailing colon in \"password\" prompts."))
 
 ;; Macros `connection-local-p' and `connection-local-value' are new in

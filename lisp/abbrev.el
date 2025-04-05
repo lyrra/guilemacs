@@ -1259,12 +1259,12 @@ SORTFUN is passed to `sort' to change the default ordering."
   "Face used for displaying the abbrev table name in `edit-abbrevs-mode'."
   :version "29.1")
 
-(defvar edit-abbrevs-mode-font-lock-keywords
-  `((,(rx bol "("
-          ;; lisp-mode-symbol-regexp
-          (regexp "\\(?:\\sw\\|\\s_\\|\\\\.\\)+")
-          ")" eol)
-     0 'abbrev-table-name)))
+;(defvar edit-abbrevs-mode-font-lock-keywords
+;  `((,(rx bol "("
+;          ;; lisp-mode-symbol-regexp
+;          (regexp "\\(?:\\sw\\|\\s_\\|\\\\.\\)+")
+;          ")" eol)
+;     0 'abbrev-table-name)))
 
 ;; Keep it after define-abbrev-table, since define-derived-mode uses
 ;; define-abbrev-table.

@@ -418,8 +418,8 @@ trailing slash after a completion:
     (string-match
      ;; \x3FFF7F is just an arbitrary char among the ones Emacs accepts
      ;; that hopefully will never appear in normal text.
-     "\\(?:.\\|\n\\)*?\\(\\(?:.\\|\n\\)*\\)\x3FFF7F\\(?:.\\|\n\\)*\\1\\'"
-     (concat s1 "\x3FFF7F" s2))
+     "\\(?:.\\|\n\\)*?\\(\\(?:.\\|\n\\)*\\)\\x3FFF7F\\(?:.\\|\n\\)*\\1\\'"
+     (concat s1 "\\x3FFF7F" s2))
     (- (match-end 1) (match-beginning 1))))
 
 (defun pcomplete-completions-at-point ()

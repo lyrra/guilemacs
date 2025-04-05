@@ -1528,10 +1528,11 @@ keymap.")
     (define-key map "\C-x\C-z" #'suspend-emacs) ;FIXME: Re-bound later!
 
     (define-key map "\C-v"    #'scroll-up-command)
-    (define-key map "\M-v"    #'scroll-down-command)
-    (define-key map "\M-\C-v" #'scroll-other-window)
+; FIX-guilemacs: input locale conversion error #<scheme #vu8(246)>
+;    (define-key map "\M-v"    #'scroll-down-command)
+;    (define-key map "\M-\C-v" #'scroll-other-window)
 
-    (define-key map "\M-\C-c" #'exit-recursive-edit)
+;    (define-key map "\M-\C-c" #'exit-recursive-edit)
     (define-key map "\C-]"    #'abort-recursive-edit)
     map)
   "Default global keymap mapping Emacs keyboard input into commands.
@@ -2520,6 +2521,49 @@ These forms come from `define-derived-mode'.")
 
 (defvar after-change-major-mode-hook nil
   "Normal hook run at the very end of major mode functions.")
+
+(defmacro condition-case-unless-debug (var bodyform &rest handlers)
+  "Like `condition-case' except that it does not prevent debugging.
+More specifically if `debug-on-error' is set then the debugger will be invoked
+even if this catches the signal."
+  (declare (debug condition-case) (indent 2))
+  `(condition-case ,var
+       ,bodyform
+     ,@(mapcar (lambda (handler)
+                 (let ((condition (car handler)))
+                   (if (eq condition :success)
+                       handler
+                     `((debug ,@(if (listp condition) condition
+                                  (list condition)))
+                       ,@(cdr handler)))))
+               handlers)))
+
+(defmacro with-demoted-errors (format &rest body)
+  "Run BODY and demote any errors to simple messages.
+FORMAT is a string passed to `message' to format any error message.
+It should contain a single %-sequence; e.g., \"Error: %S\".
+
+If `debug-on-error' is non-nil, run BODY without catching its errors.
+This is to be used around code that is not expected to signal an error
+but that should be robust in the unexpected case that an error is signaled."
+  (declare (debug t) (indent 1))
+  (let* ((err (make-symbol "err"))
+         (orig-body body)
+         (orig-format format)
+         (format (if (and (stringp format) body) format
+                   (prog1 "Error: %S"
+                     (if format (push format body)))))
+         (exp
+          `(condition-case-unless-debug ,err
+               (progn ,@body)
+             (error (message ,format ,err) nil))))
+    (if (eq orig-body body) exp
+      ;; The use without `format' is obsolete, let's warn when we bump
+      ;; into any such remaining uses.
+      (macroexp-warn-and-return
+       (format-message "Missing format argument in `with-demoted-errors'")
+       exp nil nil
+       orig-format))))
 
 (defun run-mode-hooks (&rest hooks)
   "Run mode hooks `delayed-mode-hooks' and HOOKS, or delay HOOKS.
@@ -3951,7 +3995,7 @@ like) while `y-or-n-p' is running)."
       (setq prompt (funcall padded prompt t)
 	    answer (x-popup-dialog t `(,prompt ("Yes" . act) ("No" . skip)))))
      (y-or-n-p-use-read-key
-      ;; ¡Beware! when I tried to edebug this code, Emacs got into a weird state
+      ;; !Beware! when I tried to edebug this code, Emacs got into a weird state
       ;; where all the keys were unbound (i.e. it somehow got triggered
       ;; within read-key, apparently).  I had to kill it.
       (setq prompt (funcall padded prompt))
@@ -5188,49 +5232,6 @@ If BODY finishes, `while-no-input' returns whatever value BODY produced."
             (quit-flag
              nil)
             (t val)))))))
-
-(defmacro condition-case-unless-debug (var bodyform &rest handlers)
-  "Like `condition-case' except that it does not prevent debugging.
-More specifically if `debug-on-error' is set then the debugger will be invoked
-even if this catches the signal."
-  (declare (debug condition-case) (indent 2))
-  `(condition-case ,var
-       ,bodyform
-     ,@(mapcar (lambda (handler)
-                 (let ((condition (car handler)))
-                   (if (eq condition :success)
-                       handler
-                     `((debug ,@(if (listp condition) condition
-                                  (list condition)))
-                       ,@(cdr handler)))))
-               handlers)))
-
-(defmacro with-demoted-errors (format &rest body)
-  "Run BODY and demote any errors to simple messages.
-FORMAT is a string passed to `message' to format any error message.
-It should contain a single %-sequence; e.g., \"Error: %S\".
-
-If `debug-on-error' is non-nil, run BODY without catching its errors.
-This is to be used around code that is not expected to signal an error
-but that should be robust in the unexpected case that an error is signaled."
-  (declare (debug t) (indent 1))
-  (let* ((err (make-symbol "err"))
-         (orig-body body)
-         (orig-format format)
-         (format (if (and (stringp format) body) format
-                   (prog1 "Error: %S"
-                     (if format (push format body)))))
-         (exp
-          `(condition-case-unless-debug ,err
-               (progn ,@body)
-             (error (message ,format ,err) nil))))
-    (if (eq orig-body body) exp
-      ;; The use without `format' is obsolete, let's warn when we bump
-      ;; into any such remaining uses.
-      (macroexp-warn-and-return
-       (format-message "Missing format argument in `with-demoted-errors'")
-       exp nil nil
-       orig-format))))
 
 (defmacro combine-after-change-calls (&rest body)
   "Execute BODY, but don't call the after-change functions till the end.

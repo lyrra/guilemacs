@@ -679,7 +679,7 @@ functions are annotated with \"<f>\" via the
 	   (beg (condition-case nil
 		    (save-excursion
 		      (backward-sexp 1)
-		      (skip-chars-forward "`',‘#")
+		      (skip-chars-forward "`',#")
 		      (min (point) pos))
 		  (scan-error pos)))
 	   (end
@@ -691,7 +691,7 @@ functions are annotated with \"<f>\" via the
 		  (save-excursion
 		    (goto-char beg)
 		    (forward-sexp 1)
-                    (skip-chars-backward "'’")
+                    (skip-chars-backward "'")
 		    (when (>= (point) pos)
 		      (point)))
 		(scan-error pos)))
@@ -1387,9 +1387,10 @@ Semicolons start comments.
             (goto-char end)))))))
 
 (defun elisp-byte-code-syntax-propertize (start end)
-  (goto-char start)
-  (elisp--byte-code-comment end (point))
-  (funcall
+  ; FIX-guilemacs, why disabled?
+  '(goto-char start)
+  '(elisp--byte-code-comment end (point))
+  '(funcall
    (syntax-propertize-rules
     (emacs-lisp-byte-code-comment-re
      (1 (prog1 "< b" (elisp--byte-code-comment end (point))))))

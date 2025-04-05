@@ -1571,14 +1571,8 @@ Each element must be one of the names listed in the variable
 `ctext-non-standard-encodings-alist' (which see).")
 
 (defvar ctext-non-standard-encodings-regexp
-  (purecopy
-  (string-to-multibyte
-   (concat
-    ;; For non-standard encodings.
-    "\\(\e%/[0-4][\200-\377][\200-\377]\\([^\002]+\\)\002\\)"
-    "\\|"
-    ;; For UTF-8 encoding.
-    "\\(\e%G[^\e]*\e%@\\)"))))
+  nil
+  )
 
 ;; Functions to support "Non-Standard Character Set Encodings" defined
 ;; by the COMPOUND-TEXT spec.  They also support "The UTF-8 encoding"
@@ -1746,6 +1740,7 @@ in-place."
 ;;; FILE I/O
 
 ;; TODO many elements of this list are also in inhibit-local-variables-regexps.
+; FIX-guilemacs: this was disabled/remarked
 (defcustom auto-coding-alist
   ;; .exe and .EXE are added to support archive-mode looking at DOS
   ;; self-extracting exe archives.
@@ -1774,12 +1769,14 @@ and the contents of `file-coding-system-alist'."
 		       (symbol :tag "Coding system"))))
 
 (defcustom auto-coding-regexp-alist
-  (mapcar (lambda (arg) (cons (purecopy (car arg)) (cdr arg)))
-  '(("\\`BABYL OPTIONS:[ \t]*-\\*-[ \t]*rmail[ \t]*-\\*-" . no-conversion)
-    ("\\`\xFE\xFF" . utf-16be-with-signature)
-    ("\\`\xFF\xFE" . utf-16le-with-signature)
-    ("\\`\xEF\xBB\xBF" . utf-8-with-signature)
-    ("\\`;ELC\024\0\0\0" . emacs-mule)))	; Emacs 20-compiled
+;  (mapcar (lambda (arg) (cons (purecopy (car arg)) (cdr arg)))
+;  '(("\\`BABYL OPTIONS:[ \t]*-\\*-[ \t]*rmail[ \t]*-\\*-" . no-conversion)
+;    ("\\`\xFE\xFF" . utf-16be-with-signature)
+;    ("\\`\xFF\xFE" . utf-16le-with-signature)
+;    ("\\`\xEF\xBB\xBF" . utf-8-with-signature)
+;    ("\\`;ELC\024\0\0\0" . emacs-mule)
+;    ))	; Emacs 20-compiled
+  nil
   "Alist of patterns vs corresponding coding systems.
 Each element looks like (REGEXP . CODING-SYSTEM).
 A file whose first bytes match REGEXP is decoded by CODING-SYSTEM on reading.

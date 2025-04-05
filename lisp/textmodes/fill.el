@@ -103,7 +103,7 @@ reinserts the fill prefix in each resulting line."
   ;; Added `%' for TeX comments.
   ;; RMS: deleted the code to match `1.' and `(1)'.
   ;; Update mail-mode's paragraph-separate if you change this.
-  (purecopy "[-–!|#%;>*·•‣⁃◦ \t]*")
+  "[-!|#%;>*. ]*"
   "Regexp to match text at start of line that constitutes indentation.
 If Adaptive Fill mode is enabled, a prefix matching this pattern
 on the first and second lines of a paragraph is used as the
@@ -335,12 +335,12 @@ after an opening paren or just before a closing paren or a punctuation
 mark such as `?' or `:'.  It is common in French writing to put a space
 at such places, which would normally allow breaking the line at those
 places."
-  (or (looking-at "[ \t]*[])}»?!;:-]")
+  (or (looking-at "[ \t]*[])}?!;:-]")
       (save-excursion
 	(skip-chars-backward " \t")
 	(unless (bolp)
 	  (backward-char 1)
-	  (or (looking-at "[([{«]")
+	  (or (looking-at "[([{]")
 	      ;; Don't cut right after a single-letter word.
 	      (and (memq (preceding-char) '(?\t ?\s))
 		   (eq (char-syntax (following-char)) ?w)))))))

@@ -207,7 +207,7 @@ options through Custom does this automatically."
      "compressing"    "compress"     ("-c")
      ;; gzip is more common than uncompress. It can only read, not write.
      "uncompressing"  "gzip"   ("-c" "-q" "-d")
-     nil t "\037\235"
+     nil t "\\037\\235"
      zlib-decompress-region]
      ;; Formerly, these had an additional arg "-c", but that fails with
      ;; "Version 0.1pl2, 29-Aug-97." (RedHat 5.1 GNU/Linux) and
@@ -223,12 +223,12 @@ options through Custom does this automatically."
     ["\\.\\(?:tgz\\|svgz\\|sifz\\)\\'"
      "compressing"        "gzip"         ("-c" "-q")
      "uncompressing"      "gzip"         ("-c" "-q" "-d")
-     t nil "\037\213"
+     t nil "\\037\\213"
      zlib-decompress-region]
     ["\\.g?z\\'"
      "compressing"        "gzip"         ("-c" "-q")
      "uncompressing"      "gzip"         ("-c" "-q" "-d")
-     t t "\037\213"
+     t t "\\037\\213"
      zlib-decompress-region]
     ["\\.lz\\'"
      "Lzip compressing"   "lzip"         ("-c" "-q")
@@ -242,26 +242,26 @@ options through Custom does this automatically."
      ;; On MacOS, gzip can uncompress xz files.
      "XZ compressing" ,(if (featurep 'ns) "gzip" "xz") ("-c" "-q")
      "XZ uncompressing"   "xz"           ("-c" "-q" "-d")
-     t t "\3757zXZ\0"]
+     t t "\\3757zXZ\\0"]
     ["\\.txz\\'"
      "XZ compressing"     "xz"           ("-c" "-q")
      "XZ uncompressing"   "xz"           ("-c" "-q" "-d")
-     t nil "\3757zXZ\0"]
+     t nil "\\3757zXZ\\0"]
     ;; dzip is gzip with random access.  Its compression program can't
     ;; read/write stdin/out, so .dz files can only be viewed without
     ;; saving, having their contents decompressed with gzip.
     ["\\.dz\\'"
      nil              nil            nil
      "uncompressing"      "gzip"         ("-c" "-q" "-d")
-     nil t "\037\213"]
+     nil t "\\037\\213"]
     ["\\.zst\\'"
      "zstd compressing"   "zstd"         ("-c" "-q")
      "zstd uncompressing" "zstd"         ("-c" "-q" "-d")
-     t t "\050\265\057\375"]
+     t t "\\050\\265\\057\\375"]
     ["\\.tzst\\'"
      "zstd compressing"   "zstd"         ("-c" "-q")
      "zstd uncompressing" "zstd"         ("-c" "-q" "-d")
-     t nil "\050\265\057\375"]))
+     t nil "\\050\\265\\057\\375"]))
 
   "List of vectors that describe available compression techniques.
 Each element, which describes a compression technique, is a vector of

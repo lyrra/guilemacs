@@ -4162,7 +4162,7 @@ Any character in STRING that has an entry in
 regexp) and other characters are `regexp-quote'd.
 
 When LAX is non-nil, then the final character also matches ligatures
-partially, for instance, the search string \"f\" will match \"ﬁ\",
+partially, for instance, the search string \"f\" will match \"fi\",
 so when typing the search string in isearch while the cursor is on
 a ligature, the search won't try to immediately advance to the next
 complete match, but will stay on the partially matched ligature.
@@ -10086,15 +10086,15 @@ Emerge two RCS revisions of a file, with another revision as ancestor.
 
 ;;; Generated autoloads from international/emoji.el
 
- (autoload 'emoji-insert "emoji" nil t)
- (autoload 'emoji-recent "emoji" nil t)
- (autoload 'emoji-search "emoji" nil t)
-(autoload 'emoji-list "emoji" "\
+; (autoload 'emoji-insert "emoji" nil t)
+; (autoload 'emoji-recent "emoji" nil t)
+; (autoload 'emoji-search "emoji" nil t)
+'(autoload 'emoji-list "emoji" "\
 List emojis and allow selecting and inserting one of them.
 Select the emoji by typing \\<emoji-list-mode-map>\\[emoji-list-select] on its picture.
 The glyph will be inserted into the buffer that was current
 when the command was invoked." t)
-(autoload 'emoji-describe "emoji" "\
+'(autoload 'emoji-describe "emoji" "\
 Display the name of the grapheme cluster composed from GLYPH.
 GLYPH should be a string of one or more characters which together
 produce an emoji.  Interactively, GLYPH is the emoji at point (it
@@ -10104,21 +10104,21 @@ If called from Lisp, return the name as a string; return nil if
 the name is not known.
 
 (fn GLYPH &optional INTERACTIVE)" t)
- (autoload 'emoji-list-select "emoji" nil t)
-(autoload 'emoji--init "emoji" "\
+'(autoload 'emoji-list-select "emoji" nil t)
+'(autoload 'emoji--init "emoji" "\
 
 
 (fn &optional FORCE INHIBIT-ADJUST)")
-(autoload 'emoji-zoom-increase "emoji" "\
+'(autoload 'emoji-zoom-increase "emoji" "\
 Increase the size of the character under point.
 FACTOR is the multiplication factor for the size.
 
 (fn &optional FACTOR)" t)
-(autoload 'emoji-zoom-decrease "emoji" "\
+'(autoload 'emoji-zoom-decrease "emoji" "\
 Decrease the size of the character under point." t)
-(autoload 'emoji-zoom-reset "emoji" "\
+'(autoload 'emoji-zoom-reset "emoji" "\
 Reset the size of the character under point." t)
-(register-definition-prefixes "emoji" '("emoji-"))
+'(register-definition-prefixes "emoji" '("emoji-"))
 
 
 ;;; Generated autoloads from textmodes/enriched.el
@@ -16696,8 +16696,8 @@ Islamic holidays.
 See the documentation for `calendar-holidays' for details.")
 (custom-autoload 'holiday-islamic-holidays "holidays" t)
 (put 'holiday-islamic-holidays 'risky-local-variable t)
-(defvar holiday-bahai-holidays (mapcar 'purecopy '((holiday-bahai-new-year) (holiday-bahai-ridvan) (holiday-fixed 5 23 "Declaration of the Báb") (holiday-fixed 5 29 "Ascension of Bahá’u’lláh") (holiday-fixed 7 9 "Martyrdom of the Báb") (holiday-fixed 10 20 "Birth of the Báb") (holiday-fixed 11 12 "Birth of Bahá’u’lláh") (if calendar-bahai-all-holidays-flag (append (holiday-fixed 11 26 "Day of the Covenant") (holiday-fixed 11 28 "Ascension of `Abdu’l-Bahá"))))) "\
-Bahá’í holidays.
+(defvar holiday-bahai-holidays (mapcar 'purecopy '((holiday-bahai-new-year) (holiday-bahai-ridvan) (holiday-fixed 5 23 "Declaration of the Bab") (holiday-fixed 5 29 "Ascension of Baha'u'llah") (holiday-fixed 7 9 "Martyrdom of the Bab") (holiday-fixed 10 20 "Birth of the Bab") (holiday-fixed 11 12 "Birth of Baha'u'llah") (if calendar-bahai-all-holidays-flag (append (holiday-fixed 11 26 "Day of the Covenant") (holiday-fixed 11 28 "Ascension of `Abdu'l-Baha"))))) "\
+Baha'i holidays.
 See the documentation for `calendar-holidays' for details.")
 (custom-autoload 'holiday-bahai-holidays "holidays" t)
 (put 'holiday-bahai-holidays 'risky-local-variable t)
@@ -16770,7 +16770,7 @@ entities, so you should even be able to do HTML-within-HTML
 fontified display.
 
 You should, however, note that random control or non-ASCII
-characters such as ^L (U+000C FORM FEED (FF)) or ¤ (U+00A4
+characters such as ^L (U+000C FORM FEED (FF)) or (U+00A4
 CURRENCY SIGN) won't get mapped yet.
 
 If the SRCDIR and FILE arguments are set, lookup etags derived
@@ -33063,22 +33063,23 @@ List all timers in a buffer.
 
 ;;; Generated autoloads from international/titdic-cnv.el
 
-(autoload 'titdic-convert "titdic-cnv" "\
-
-
-(fn FILENAME &optional DIRNAME)")
-(make-obsolete 'titdic-convert 'tit-dic-convert "30.1")
-(autoload 'batch-titdic-convert "titdic-cnv" "\
-
-
-(fn &optional FORCE)")
-(make-obsolete 'batch-titdic-convert 'batch-tit-dic-convert "30.1")
-(register-definition-prefixes "titdic-cnv" '("batch-tit-" "tit-"))
+;(autoload 'titdic-convert "titdic-cnv" "\
+;
+;
+;(fn FILENAME &optional DIRNAME)")
+;(make-obsolete 'titdic-convert 'tit-dic-convert "30.1")
+;(autoload 'batch-titdic-convert "titdic-cnv" "\
+;
+;
+;(fn &optional FORCE)")
+;(make-obsolete 'batch-titdic-convert 'batch-tit-dic-convert "30.1")
+;(register-definition-prefixes "titdic-cnv" '("batch-tit-" "tit-"))
 
 
 ;;; Generated autoloads from tmm.el
 
- (define-key global-map "\M-`" 'tmm-menubar)
+; FIX-guilemacs: \M not a valid char in guile strings
+;(define-key global-map "\M-`" 'tmm-menubar)
 (autoload 'tmm-menubar "tmm" "\
 Text-mode emulation of looking and choosing from a menubar.
 See the documentation for `tmm-prompt'.

@@ -653,24 +653,6 @@ It is the default value of the variable `top-level'."
       (setq eol-mnemonic-dos  "(DOS)"
 	    eol-mnemonic-mac  "(Mac)")))
 
-    (if (and (featurep 'android)
-             (eq system-type 'android)
-             (fboundp 'android-locale-for-system-language)
-             initial-window-system)
-        ;; If Android windowing is enabled, derive a proper locale
-        ;; from the system's language preferences.  On Android, LANG
-        ;; and LC_* must be set to one of the two locales the C
-        ;; library supports, but, by contrast with other systems, the
-        ;; C library locale does not reflect the configured system
-        ;; language.
-        ;;
-        ;; For this reason, the locale from which Emacs derives a
-        ;; default language environment is computed from such
-        ;; preferences, rather than environment variables that the C
-        ;; library refers to.
-        (set-locale-environment
-         (funcall 'android-locale-for-system-language))
-      (set-locale-environment nil))
     ;; Decode all default-directory's (probably, only *scratch* exists
     ;; at this point).  default-directory of *scratch* is the basis
     ;; for many other file-name variables and directory lists, so it
@@ -719,18 +701,6 @@ It is the default value of the variable `top-level'."
 		(set pathsym (mapcar (lambda (dir)
 				       (decode-coding-string dir coding t))
 				     path)))))
-        (when (featurep 'native-compile)
-          (let ((npath (symbol-value 'native-comp-eln-load-path)))
-            (set 'native-comp-eln-load-path
-                 (mapcar (lambda (dir)
-                           ;; Call expand-file-name to remove all the
-                           ;; pesky ".." from the directory names in
-                           ;; native-comp-eln-load-path.
-                           (expand-file-name
-                            (decode-coding-string dir coding t)))
-                         npath)))
-          (setq startup--original-eln-load-path
-                (copy-sequence native-comp-eln-load-path)))
 	(dolist (filesym '(data-directory doc-directory exec-directory
 					  installation-directory
 					  invocation-directory invocation-name
@@ -1032,7 +1002,7 @@ If STYLE is nil, display appropriately for the terminal."
             (aset repls i2 lr)
             (aset repls (1+ i2) rr)))))
     (dotimes (i 4)
-      (let ((char (aref "‘’“”" i))
+      (let ((char (aref "''''" i))
             (repl (aref repls i)))
         (if repl
             (aset (or standard-display-table
@@ -2367,7 +2337,7 @@ To quit a partially entered command, type Control-g.\n")
   (insert-button "Activate menubar"
 		 'action (lambda (_button) (tmm-menubar))
 		 'follow-link t)
-  (if (and (eq (key-binding "\M-`") 'tmm-menubar)
+  (if (and (eq (key-binding "\\M-`") 'tmm-menubar)
 	   (eq (key-binding [f10]) 'tmm-menubar))
       (insert "   F10  or  ESC `  or   M-`")
     (insert (substitute-command-keys "   \\[tmm-menubar]")))

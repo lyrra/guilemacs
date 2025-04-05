@@ -235,8 +235,8 @@ present if the icon is represented by an image."
 
 (define-icon button nil
   '((image :face icon-button)
-    (emoji "🔵" :face icon)
-    (symbol "●" :face icon-button)
+    (emoji "_" :face icon)
+    (symbol "_" :face icon-button)
     (text "button" :face icon-button))
   "Base icon for buttons."
   :version "29.1")

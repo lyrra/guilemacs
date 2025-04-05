@@ -225,7 +225,7 @@ NAME must be equal to `tramp-current-connection'."
   ;; Create a pseudo mode `tramp-info-lookup-mode' for Tramp symbol lookup.
   (info-lookup-maybe-add-help
    :mode 'tramp-info-lookup-mode :topic 'symbol
-   :regexp (rx (+ (not (any "\t\n \"'(),[]`‘’"))))
+   :regexp (rx (+ (not (any "\t\n \"'(),[]`"))))
    :doc-spec `(("(tramp)Function Index" nil
 		,(rx bol blank (+ "-") blank (* nonl) ":" blank)
 		,(rx (| blank eol)))

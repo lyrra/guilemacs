@@ -506,7 +506,7 @@ This will generate compile-time constants from BINDINGS."
          ("\\(\\\\\\)\\([^\"\\]\\)"
           (1 (elisp--font-lock-backslash) prepend))
          ;; Words inside ‘’, '' and `' tend to be symbol names.
-         (,(concat "[`‘']\\(" (rx lisp-mode-symbol) "\\)['’]")
+         (,(concat "[`'']\\(" (rx lisp-mode-symbol) "\\)['']")
           (1 font-lock-constant-face prepend))
          ;; \\= tends to be an escape in doc strings.
          (,(rx "\\\\=")
@@ -559,7 +559,7 @@ This will generate compile-time constants from BINDINGS."
          (,(concat "(" cl-errs-re "\\_>")
            (1 font-lock-warning-face))
          ;; Words inside ‘’ and `' tend to be symbol names.
-         (,(concat "[`‘]\\(" (rx lisp-mode-symbol) "\\)['’]")
+         (,(concat "[`']\\(" (rx lisp-mode-symbol) "\\)['']")
           (1 font-lock-constant-face prepend))
          ;; Uninterned symbols, e.g., (defpackage #:my-package ...)
          ;; must come before keywords below to have effect

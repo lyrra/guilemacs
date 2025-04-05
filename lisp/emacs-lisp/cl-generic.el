@@ -419,7 +419,8 @@ the specializer used will be the one returned by BODY."
                 ;; FIXME: Also, optimize the case where call-next-method is
                 ;; only called with explicit arguments.
                 (uses-cnm (macroexp--fgrep `((,cnm) (,nmp)) nbody))
-                (λ-lift (mapcar #'car uses-cnm)))
+                ; FIX-guilemacs: why isn't utf-8 char λ permissible?
+                (lambda-lift (mapcar #'car uses-cnm)))
            (cond
             ((not uses-cnm)
              (cons nil
@@ -461,8 +462,8 @@ the specializer used will be the one returned by BODY."
                               ;; `arglist' according to `args'.
                               ;; A destructuring-bind would do the trick
                               ;; as well when/if it's more efficient.
-                              (apply (lambda (,@λ-lift ,@args) ,nbody)
-                                     ,@λ-lift ,arglist)))))))
+                              (apply (lambda (,@lambda-lift ,@args) ,nbody)
+                                     ,@lambda-lift ,arglist)))))))
             (t
              (cons t
                  `#'(lambda (,cnm ,@args)

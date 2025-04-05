@@ -1671,59 +1671,59 @@ for decoding and encoding files, process I/O, etc."
 		      (cons 128 (max-char))
 		      'self-insert-command)
 
-(aset latin-extra-code-table ?\221 t)
-(aset latin-extra-code-table ?\222 t)
-(aset latin-extra-code-table ?\223 t)
-(aset latin-extra-code-table ?\224 t)
-(aset latin-extra-code-table ?\225 t)
-(aset latin-extra-code-table ?\226 t)
+;(aset latin-extra-code-table ?\221 t)
+;(aset latin-extra-code-table ?\222 t)
+;(aset latin-extra-code-table ?\223 t)
+;(aset latin-extra-code-table ?\224 t)
+;(aset latin-extra-code-table ?\225 t)
+;(aset latin-extra-code-table ?\226 t)
 
 (defcustom password-word-equivalents
   '("password" "passcode" "passphrase" "pass phrase" "pin"
     "decryption key" "encryption key" ; From ccrypt.
     ; These are sorted according to the GNU en_US locale.
-    "암호"		; ko
-    "パスワード"	; ja
-    "ପ୍ରବେଶ ସଙ୍କେତ"	; or
-    "ពាក្យសម្ងាត់"		; km
-    "adgangskode"	; da
-    "contraseña"	; es
-    "contrasenya"	; ca
-    "geslo"		; sl
-    "hasło"		; pl
-    "heslo"		; cs, sk
-    "iphasiwedi"	; zu
-    "jelszó"		; hu
-    "lösenord"		; sv
-    "lozinka"		; hr, sr
-    "mật khẩu"		; vi
-    "mot de passe"	; fr
-    "parola"		; tr
-    "pasahitza"		; eu
-    "passord"		; nb
-    "passwort"		; de
-    "pasvorto"		; eo
-    "salasana"		; fi
-    "senha"		; pt
-    "slaptažodis"	; lt
-    "wachtwoord"	; nl
-    "كلمة السر"		; ar
-    "ססמה"		; he
-    "лозинка"		; sr
-    "пароль"		; kk, ru, uk
-    "गुप्तशब्द"		; mr
-    "शब्दकूट"		; hi
-    "પાસવર્ડ"		; gu
-    "సంకేతపదము"		; te
-    "ਪਾਸਵਰਡ"		; pa
-    "ಗುಪ್ತಪದ"		; kn
-    "கடவுச்சொல்"		; ta
-    "അടയാളവാക്ക്"		; ml
-    "গুপ্তশব্দ"		; as
-    "পাসওয়ার্ড"		; bn_IN
-    "රහස්පදය"		; si
-    "密码"		; zh_CN
-    "密碼"		; zh_TW
+;   "암호"		; ko
+;   "パスワード"	; ja
+;   "ପ୍ରବେଶ ସଙ୍କେତ"	; or
+;   "ពាក្យសម្ងាត់"		; km
+;   "adgangskode"	; da
+;   "contraseña"	; es
+;   "contrasenya"	; ca
+;   "geslo"		; sl
+;   "hasło"		; pl
+;   "heslo"		; cs, sk
+;   "iphasiwedi"	; zu
+;   "jelszó"		; hu
+;   "lösenord"		; sv
+;   "lozinka"		; hr, sr
+;   "mật khẩu"		; vi
+;   "mot de passe"	; fr
+;   "parola"		; tr
+;   "pasahitza"		; eu
+;   "passord"		; nb
+;   "passwort"		; de
+;   "pasvorto"		; eo
+;   "salasana"		; fi
+;   "senha"		; pt
+;   "slaptažodis"	; lt
+;   "wachtwoord"	; nl
+;   "كلمة السر"		; ar
+;   "ססמה"		; he
+;   "лозинка"		; sr
+;   "пароль"		; kk, ru, uk
+;   "गुप्तशब्द"		; mr
+;   "शब्दकूट"		; hi
+;   "પાસવર્ડ"		; gu
+;   "సంకేతపదము"		; te
+;   "ਪਾਸਵਰਡ"		; pa
+;   "ಗುಪ್ತಪದ"		; kn
+;   "கடவுச்சொல்"		; ta
+;   "അടയാളവാക്ക്"		; ml
+;   "গুপ্তশব্দ"		; as
+;   "পাসওয়ার্ড"		; bn_IN
+;   "රහස්පදය"		; si
+;    "密码"		; zh_CN
+;    "密碼"		; zh_TW
     )
   "List of words equivalent to \"password\".
 This is used by Shell mode and other parts of Emacs to recognize
@@ -1737,11 +1737,11 @@ included; callers should bind `case-fold-search' to t."
 ;; (describe-char-fold-equivalences ?:)
 ;; The last entry is taken from history.
 (defcustom password-colon-equivalents
-  '(?\u003a ; ?\N{COLON}
-    ?\uff1a ; ?\N{FULLWIDTH COLON}
-    ?\ufe55 ; ?\N{SMALL COLON}
-    ?\ufe13 ; ?\N{PRESENTATION FORM FOR VERTICAL COLON}
-    ?\u17d6 ; ?\N{KHMER SIGN CAMNUC PII KUUH}
+  '(;?\u003a ; ?\N{COLON}
+    ;?\uff1a ; ?\N{FULLWIDTH COLON}
+    ;?\ufe55 ; ?\N{SMALL COLON}
+    ;?\ufe13 ; ?\N{PRESENTATION FORM FOR VERTICAL COLON}
+    ;?\u17d6 ; ?\N{KHMER SIGN CAMNUC PII KUUH}
     )
   "List of characters equivalent to trailing colon in \"password\" prompts."
   :type '(repeat character)

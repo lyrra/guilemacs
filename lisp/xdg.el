@@ -98,7 +98,7 @@ According to the XDG Base Directory Specification version
   * actions history (logs, history, recently used files, …)
 
   * current state of the application that can be reused on a
-    restart (view, layout, open files, undo history, …)\""
+    restart (view, layout, open files, undo history, ...)\""
   (xdg--dir-home "XDG_STATE_HOME" "~/.local/state"))
 
 (defun xdg-runtime-dir ()

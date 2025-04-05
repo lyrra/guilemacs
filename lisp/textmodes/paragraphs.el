@@ -161,7 +161,7 @@ regexp describing the end of a sentence, when the value of the variable
   :group 'fill)
 
 (defcustom sentence-end-without-space
-  "。．？！"
+  "" ; "。．？！"
   "String of characters that end sentence without following spaces.
 
 This value is used by the function `sentence-end' to construct the
@@ -181,7 +181,7 @@ to obtain the value of this variable."
   :type '(choice regexp (const :tag "Use default value" nil))
   :safe #'string-or-null-p)
 
-(defcustom sentence-end-base "[.?!…‽][]\"'”’)}»›]*"
+(defcustom sentence-end-base "[.][]\"')}.]*"
   "Regexp matching the basic end of a sentence, not including following space."
   :type 'regexp
   :safe #'stringp
@@ -201,16 +201,10 @@ must be followed by two spaces, with perhaps some closing delimiters
 in between.  See Info node `(elisp)Standard Regexps'."
   (or sentence-end
       ;; We accept non-break space along with space.
-      (concat (if sentence-end-without-period "\\w[ \u00a0][ \u00a0]\\|")
-	      "\\("
-	      sentence-end-base
-              (if sentence-end-double-space
-                  "\\($\\|[ \u00a0]$\\|\t\\|[ \u00a0][ \u00a0]\\)" "\\($\\|[\t \u00a0]\\)")
-              "\\|[" sentence-end-without-space "]+"
-	      "\\)"
-              "[ \u00a0\t\n]*")))
+      "."
+      ))
 
-(defcustom page-delimiter "^\014"
+(defcustom page-delimiter "^\\014"
   "Regexp describing line-beginnings that separate pages."
   :type 'regexp
   :safe #'stringp)

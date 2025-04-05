@@ -198,7 +198,7 @@ For easier selection of tabs by their numbers, consider customizing
                :margin ,tab-bar-button-margin
                :ascent center)
         ;; (emoji "🍔")
-        (symbol "☰")
+        (symbol "=")
         (text "Menu" :face tab-bar-tab-inactive))
       "Icon for the menu bar."
       :version "29.1"

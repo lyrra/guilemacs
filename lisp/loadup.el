@@ -142,6 +142,30 @@
 
 (load "international/mule")
 (load "international/mule-conf")
+; Following is moved out from mule-conf:
+(defcustom password-word-equivalents
+  '("password" "passcode" "passphrase" "pass phrase" "pin"
+    "decryption key" "encryption key" ; From ccrypt.
+    )
+  "List of words equivalent to \"password\".
+This is used by Shell mode and other parts of Emacs to recognize
+password prompts, including prompts in languages other than
+English.  Different case choices should not be assumed to be
+included; callers should bind `case-fold-search' to t."
+  :type '(repeat string)
+  :version "27.1"
+  :group 'processes)
+(defcustom password-colon-equivalents
+  '(?\u003a ; ?\N{COLON}
+    ?\uff1a ; ?\N{FULLWIDTH COLON}
+    ?\ufe55 ; ?\N{SMALL COLON}
+    ?\ufe13 ; ?\N{PRESENTATION FORM FOR VERTICAL COLON}
+    ?\u17d6 ; ?\N{KHMER SIGN CAMNUC PII KUUH}
+    )
+  "List of characters equivalent to trailing colon in \"password\" prompts."
+  :type '(repeat character)
+  :version "30.1"
+  :group 'processes)
 
 ;; Do it after subr, since both after-load-functions and add-hook are
 ;; implemented in subr.el.
@@ -169,7 +193,8 @@ that the search has reached."
 ;; variable its advertised default value (it starts as nil, see
 ;; xdisp.c).
 (setq resize-mini-windows 'grow-only)
-(setq load-source-file-function #'load-with-code-conversion)
+; FIX-guilemacs: disabled, why?
+;(setq load-source-file-function #'load-with-code-conversion)
 (load "files")
 
 (load "emacs-lisp/gv")
@@ -256,36 +281,37 @@ that the search has reached."
 
 (load "international/ccl")
 
+;; FIX-guilemacs: not sure why disabled
 ;; Load language-specific files.
-(load "language/chinese")
-(load "language/cyrillic")
-(load "language/indian")
-(load "language/sinhala")
+;(load "language/chinese")
+;(load "language/cyrillic")
+;(load "language/indian")
+;(load "language/sinhala")
 (load "language/english")
-(load "language/ethiopic")
-(load "language/european")
-(load "language/czech")
-(load "language/slovak")
-(load "language/romanian")
-(load "language/greek")
-(load "language/hebrew")
-(load "international/cp51932")
-(load "international/eucjp-ms")
-(load "language/japanese")
-(load "language/korean")
-(load "language/lao")
-(load "language/tai-viet")
-(load "language/thai")
-(load "language/tibetan")
-(load "language/vietnamese")
+;(load "language/ethiopic")
+;(load "language/european")
+;(load "language/czech")
+;(load "language/slovak")
+;(load "language/romanian")
+;(load "language/greek")
+;(load "language/hebrew")
+;(load "international/cp51932")
+;(load "international/eucjp-ms")
+;(load "language/japanese")
+;(load "language/korean")
+;(load "language/lao")
+;(load "language/tai-viet")
+;(load "language/thai")
+;(load "language/tibetan")
+;(load "language/vietnamese")
 (load "language/misc-lang")
 (load "language/utf-8-lang")
-(load "language/georgian")
-(load "language/khmer")
-(load "language/burmese")
-(load "language/cham")
-(load "language/philippine")
-(load "language/indonesian")
+;(load "language/georgian")
+;(load "language/khmer")
+;(load "language/burmese")
+;(load "language/cham")
+;(load "language/philippine")
+;(load "language/indonesian")
 
 (load "indent")
 (load "minibuffer") ; Needs cl-generic, seq (and define-minor-mode).
@@ -438,7 +464,7 @@ that the search has reached."
 
 ;; This file doesn't exist when building a development version of Emacs
 ;; from the repository.  It is generated just after temacs is built.
-(load "leim/leim-list.el" t)
+;(load "leim/leim-list.el" t)
 
 ;; If you want additional libraries to be preloaded and their
 ;; doc strings kept in the DOC file rather than in core,

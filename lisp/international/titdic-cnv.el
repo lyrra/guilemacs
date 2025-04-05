@@ -92,130 +92,8 @@
 
 (define-obsolete-variable-alias 'quail-cxterm-package-ext-info 'tit-quail-cxterm-package-ext-info "30.1")
 (defvar tit-quail-cxterm-package-ext-info
-  '(("chinese-4corner" "四角")
-    ("chinese-array30" "３０")
-    ("chinese-ccdospy" "缩拼"
-     "Pinyin base input method for Chinese charset GB2312 (`chinese-gb2312').
-
-Pinyin is the standard Roman transliteration method for Chinese.
-For the detail of Pinyin system, see the documentation of the input
-method `chinese-py'.
-
-This input method works almost the same way as `chinese-py'.  The
-difference is that you type a single key for these Pinyin spelling.
-    Pinyin:  zh  en  eng ang ch  an  ao  ai  ong sh  ing  yu(ü)
-    keyseq:   a   f   g   h   i   j   k   l   s   u   y   v
-For example:
-    Chinese:  啊    果    中    文    光    玉    全
-    Pinyin:   a    guo   zhong  wen  guang  yu   quan
-    Keyseq:   a1   guo4   as1   wf4  guh1  yu..6 qvj6
-
-\\<quail-translation-docstring>
-
-For double-width GB2312 characters corresponding to ASCII, use the
-input method `chinese-qj'.")
-
-    ("chinese-ecdict" "英漢"
-"In this input method, you enter a Chinese (Big5) character or word
-by typing the corresponding English word.  For example, if you type
-\"computer\", \"電腦\" is input.
-
-\\<quail-translation-docstring>")
-
-    ("chinese-etzy" "倚注"
-"Zhuyin base input method for Chinese Big5 characters (`chinese-big5-1',
-`chinese-big5-2').
-
-Zhuyin is a kind of phonetic symbol.  One to three Zhuyin symbols
-compose one Chinese character.
-
-In this input method, you enter a Chinese character by first typing
-keys corresponding to Zhuyin symbols (see the above table) followed by
-SPC, 1, 2, 3, or 4 specifying a tone (SPC:陰平, 1:輕聲, 2:陽平, 3: 上聲,
-4:去聲).
-
-\\<quail-translation-docstring>")
-
-    ("chinese-punct-b5" "標B"
-     "Input method for Chinese punctuation and symbols of Big5
-\(`chinese-big5-1' and `chinese-big5-2').")
-
-    ("chinese-punct" "标G"
-     "Input method for Chinese punctuation and symbols of GB2312
-\(`chinese-gb2312').")
-
-    ("chinese-py-b5" "拼B"
-     "Pinyin base input method for Chinese Big5 characters
-\(`chinese-big5-1', `chinese-big5-2').
-
-This input method works almost the same way as `chinese-py' (which
-see).
-
-This input method supports only Han characters.  The more convenient
-method is `chinese-py-punct-b5', which is the combination of this
-method and `chinese-punct-b5' and which supports both Han characters
-and punctuation/symbols.
-
-For double-width Big5 characters corresponding to ASCII, use the input
-method `chinese-qj-b5'.
-
-The input method `chinese-py' and `chinese-tonepy' are also Pinyin
-based, but for the character set GB2312 (`chinese-gb2312').")
-
-    ("chinese-qj-b5" "全B")
-
-    ("chinese-qj" "全G")
-
-    ("chinese-sw" "首尾"
-"Radical base input method for Chinese charset GB2312 (`chinese-gb2312').
-
-In this input method, you enter a Chinese character by typing two
-keys.  The first key corresponds to the first (首) radical, the second
-key corresponds to the last (尾) radical.  The correspondence of keys
-and radicals is as below:
-
- first radical:
- a  b  c  d  e  f  g  h  i  j  k  l  m  n  o  p  q  r  s  t  u  v  w  x  y  z
- 心 冖 尸 丶 火 口 扌 氵 讠 艹 亻 木 礻 饣 月 纟 石 王 八 丿 日 辶 犭 竹 一 人
- last radical:
- a  b  c  d  e  f  g  h  i  j  k  l  m  n  o  p  q  r  s  t  u  v  w  x  y  z
- 又 山 土 刀 阝 口 衣 疋 大 丁 厶 灬 十 歹 冂 门 今 丨 女 乙 囗 小 厂 虫 弋 卜
-
-\\<quail-translation-docstring>")
-
-    ("chinese-tonepy" "调拼"
-     "Pinyin base input method for Chinese charset GB2312 (`chinese-gb2312').
-
-Pinyin is the standard roman transliteration method for Chinese.
-For the details of Pinyin system, see the documentation of the input
-method `chinese-py'.
-
-This input method works almost the same way as `chinese-py'.  The
-difference is that you must type 1..5 after each Pinyin spelling to
-specify a tone (1:阴平, 2:阳平, 3:上声, 4下声, 5:轻声).
-
-\\<quail-translation-docstring>
-
-For instance, to input 你, you type \"n i 3 3\", the first \"n i\" is
-a Pinyin, the next \"3\" specifies tone, and the last \"3\" selects
-the third character from the candidate list.
-
-For double-width GB2312 characters corresponding to ASCII, use the
-input method `chinese-qj'.")
-
-    ("chinese-zozy" "零注"
-"Zhuyin base input method for Chinese Big5 characters (`chinese-big5-1',
-`chinese-big5-2').
-
-Zhuyin is a kind of a phonetic symbol.  One to three Zhuyin symbols
-compose a Chinese character.
-
-In this input method, you enter a Chinese character by first typing
-keys corresponding to Zhuyin symbols (see the above table) followed by
-SPC, 6, 3, 4, or 7 specifying a tone (SPC:陰平, 6:陽平, 3:上聲, 4:去聲,
-7:輕聲).
-
-\\<quail-translation-docstring>")))
+  '(("chinese-4corner" "....")
+    ("chinese-array30" "....")))
 
 ;; Return a value of the key in the current line.
 (defsubst tit-read-key-value ()
@@ -592,7 +470,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 
 (define-obsolete-variable-alias 'quail-misc-package-ext-info 'tit-quail-misc-package-ext-info "30.1")
 (defvar tit-quail-misc-package-ext-info
-  '(("chinese-b5-tsangchi" "倉B"
+  '(("chinese-b5-tsangchi" "..B"
      "cangjie-table.b5" big5 "tsang-b5.el"
      tit--tsang-b5-converter
      "\
@@ -602,7 +480,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; # unmodified versions is granted without royalty provided
 ;; # this notice is preserved.")
 
-    ("chinese-b5-quick" "簡B"
+    ("chinese-b5-quick" "..B"
      "cangjie-table.b5" big5 "quick-b5.el"
      tit--quick-b5-converter
      "\
@@ -612,7 +490,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; # unmodified versions is granted without royalty provided
 ;; # this notice is preserved.")
 
-    ("chinese-cns-tsangchi" "倉C"
+    ("chinese-cns-tsangchi" "..C"
      "cangjie-table.cns" iso-2022-cn-ext "tsang-cns.el"
      tit--tsang-cns-converter
      "\
@@ -622,7 +500,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; # unmodified versions is granted without royalty provided
 ;; # this notice is preserved.")
 
-    ("chinese-cns-quick" "簡C"
+    ("chinese-cns-quick" "..C"
      "cangjie-table.cns" iso-2022-cn-ext "quick-cns.el"
      tit--quick-cns-converter
      "\
@@ -632,7 +510,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; # unmodified versions is granted without royalty provided
 ;; # this notice is preserved.")
 
-    ("chinese-py" "拼G"
+    ("chinese-py" "..G"
      "pinyin.map" cn-gb-2312 "PY.el"
      tit--py-converter
      "\
@@ -660,7 +538,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; You should have received a copy of the GNU General Public License along with
 ;; CCE.  If not, see <https://www.gnu.org/licenses/>.")
 
-    ("chinese-ziranma" "自然"
+    ("chinese-ziranma" "...."
      "ziranma.cin" cn-gb-2312 "ZIRANMA.el"
      tit--ziranma-converter
      "\
@@ -688,7 +566,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; You should have received a copy of the GNU General Public License along with
 ;; CCE.  If not, see <https://www.gnu.org/licenses/>.")
 
-    ("chinese-ctlau" "刘粤"
+    ("chinese-ctlau" "...."
      "CTLau.html" cn-gb-2312 "CTLau.el"
      tit--ctlau-gb-converter
      "\
@@ -713,7 +591,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 ;; # You should have received a copy of the GNU General Public License
 ;; # along with this program.  If not, see <https://www.gnu.org/licenses/>.")
 
-    ("chinese-ctlaub" "劉粵"
+    ("chinese-ctlaub" "...."
      "CTLau-b5.html" big5 "CTLau-b5.el"
      tit--ctlau-b5-converter
      "\
@@ -750,18 +628,10 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 
 (define-obsolete-function-alias 'tsang-quick-converter #'tit--tsang-quick-converter "30.1")
 (defun tit--tsang-quick-converter (dicbuf tsang-p big5-p)
-  (let ((fulltitle (if tsang-p "倉頡" "簡易"))
+  (let ((fulltitle (if tsang-p "...." "...."))
 	dic)
     (goto-char (point-max))
-    (insert (format "\"中文輸入【%s】%s
-
-	漢語%s輸入鍵盤
-
-   [Q 手] [W 田] [E 水] [R 口] [T 廿] [Y 卜] [U 山] [I 戈] [O 人] [P 心]
-
-    [A 日] [S 尸] [D 木] [F 火] [G 土] [H 竹] [J 十] [K 大] [L 中]
-
-      [Z  ] [X 難] [C 金] [V 女] [B 月] [N 弓] [M 一]
+    (insert (format "\"
 
 \\\\<quail-translation-docstring>\"\n"
 		    fulltitle (if big5-p "BIG5" "CNS") fulltitle))
@@ -797,35 +667,8 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
     (setq dic (sort dic (lambda (x y) (string< (car x ) (car y)))))
     (dolist (elt dic)
       (insert (format "(%S\t%S)\n" (car elt) (cdr elt))))
-    (let ((punctuation '((";" "；﹔，、﹐﹑" "；﹔，、﹐﹑")
-			 (":" "：︰﹕．。‧﹒·" "：︰﹕．。・﹒·")
-			 ("'" "’‘" "’‘")
-			 ("\"" "”“〝〞〃" "”“〝〞〃")
-			 ("\\" "＼﹨╲" "＼﹨╲")
-			 ("|" "｜︱︳∣" "︱︲����｜")
-			 ("/" "／∕╱" "／∕╱")
-			 ("?" "？﹖" "？﹖")
-			 ("<" "〈＜﹤︿∠" "〈＜﹤︿∠")
-			 (">" "〉＞﹥﹀" "〉＞﹦﹀")
-			 ("[" "〔【﹝︹︻「『﹁﹃" "〔【﹝︹︻「『﹁﹃")
-			 ("]" "〕】﹞︺︼」』﹂﹄" "〕】﹞︺︼」』﹂﹄")
-			 ("{" "｛﹛︷ " "｛﹛︷ ")
-			 ("}" "｝﹜︸" "｝﹜︸")
-			 ("`" "‵′" "′‵")
-			 ("~" "～﹋﹌︴﹏" "∼﹋﹌��������")
-			 ("!" "！﹗" "！﹗")
-			 ("@" "＠﹫" "＠﹫")
-			 ("#" "＃﹟" "＃﹟")
-			 ("$" "＄﹩" "＄﹩")
-			 ("%" "％﹪" "％﹪")
-			 ("&" "＆﹠" "＆﹠")
-			 ("*" "＊﹡※☆★" "＊﹡※☆★")
-			 ("(" "（﹙︵" "（﹙︵")
-			 (")" "）﹚︶" "）﹚︶")
-			 ("-" "–—¯￣－﹣" "—–‾����－﹣")
-			 ("_" "＿ˍ" "＿����")
-			 ("=" "＝﹦" "＝﹥")
-			 ("+" "＋﹢" "＋﹢"))))
+    (let ((punctuation '((";" "...........................")
+			 ("+" "...." "...."))))
     (dolist (elt punctuation)
       (insert (format "(%S %S)\n" (concat "z" (car elt))
 		      (if big5-p (nth 1 elt) (nth 2 elt))))))
@@ -854,11 +697,7 @@ To get complete usage, invoke \"emacs -batch -f batch-tit-dic-convert -h\"."
 (define-obsolete-function-alias 'py-converter #'tit--py-converter "30.1")
 (defun tit--py-converter (dicbuf)
   (goto-char (point-max))
-  (insert (format "%S\n" "汉字输入∷拼音∷
-
-	拼音方案
-
- 小写英文字母代表「拼音」符号， \"u(yu) 则用 u: 表示∶
+  (insert (format "%S\n" "
 
 Pinyin base input method for Chinese charset GB2312 (`chinese-gb2312').
 
@@ -879,7 +718,7 @@ entering its pinyin spelling.
 
 \\<quail-translation-docstring>
 
-For instance, to input 你, you type \"n i C-n 3\".  The first \"n i\"
+For instance, to input .., you type \"n i C-n 3\".  The first \"n i\"
 is a Pinyin, \"C-n\" selects the next group of candidates (each group
 contains at most 10 characters), \"3\" select the third character in
 that group.
@@ -963,23 +802,7 @@ method `chinese-tonepy' with which you must specify tones by digits
 		 table)))
     (setq dic (sort dic (lambda (x y) (string< (car x) (car y)))))
     (goto-char (point-max))
-    (insert (format "%S\n" "汉字输入∷【自然】∷
-
-                            键盘对照表:
- ┏━━┳━━┳━━┳━━┳━━┳━━┳━━┳━━┳━━┳━━┓
- ┃Ｑ  ┃Ｗ  ┃Ｅ  ┃Ｒ  ┃Ｔ  ┃Ｙ  ┃Ｕsh┃Ｉch┃Ｏ  ┃Ｐ  ┃
- ┃  iu┃  ua┃   e┃ uan┃  ue┃ uai┃   u┃   i┃   o┃  un┃
- ┃    ┃  ia┃    ┃ van┃  ve┃ ing┃    ┃    ┃  uo┃  vn┃
- ┗┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┛
-   ┃Ａ  ┃Ｓ  ┃Ｄ  ┃Ｆ  ┃Ｇ  ┃Ｈ  ┃Ｊ  ┃Ｋ  ┃Ｌ  ┃
-   ┃   a┃iong┃uang┃  en┃ eng┃ ang┃  an┃  ao┃  ai┃
-   ┃    ┃ ong┃iang┃    ┃  ng┃    ┃    ┃    ┃    ┃
-   ┗┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━┻┳━━┓
-     ┃Ｚ  ┃Ｘ  ┃Ｃ  ┃Ｖzh┃Ｂ  ┃Ｎ  ┃Ｍ  ┃，  ┃．  ┃ ／ ┃
-     ┃  ei┃  ie┃ iao┃  ui┃  ou┃  in┃ ian┃前页┃后页┃符号┃
-     ┃    ┃    ┃    ┃   v┃    ┃    ┃    ┃    ┃    ┃    ┃
-     ┗━━┻━━┻━━┻━━┻━━┻━━┻━━┻━━┻━━┻━━┛
-
+    (insert (format "%S\n" "
 
 Pinyin base input method for Chinese GB2312 characters (`chinese-gb2312').
 
@@ -990,34 +813,23 @@ method `chinese-py'.
 Unlike the standard spelling of Pinyin, in this input method all
 initials and finals are assigned to single keys (see the above table).
 For instance, the initial \"ch\" is assigned to the key `i', the final
-\"iu\" is assigned to the key `q', and tones 1, 2, 3, 4, and 轻声 are
 assigned to the keys `q', `w', `e', `r', `t' respectively.
 
 \\<quail-translation-docstring>
 
 To input one-letter words, you type 4 keys, the first two for the
 Pinyin of the letter, next one for tone, and the last one is always a
-quote (').  For instance, \"vsq'\" input 中.  Exceptions are these
 letters.  You can input them just by typing a single key.
 
-	Character: 按 不 次 的 二 发 个 和 出 及 可 了 没
-	Key:	   a  b  c  d  e  f  g  h  i  j  k  l  m
-	Character: 你 欧 片 七 人 三 他 是 着 我 小 一 在
-	Key:	   n  o  p  q  r  s  t  u  v  w  x  y  z
 
 To input two-letter words, you have two ways.  One way is to type 4
 keys, two for the first Pinyin, two for the second Pinyin.  For
-instance, \"vsgo\" inputs 中国.  Another way is to type 3 keys: 2
 initials of two letters, and quote (').  For instance, \"vg'\" also
-inputs 中国.
 
 To input three-letter words, you type 4 keys: initials of three
-letters, and the last is quote (').  For instance, \"bjy'2\" inputs 北
-京鸭 (the last `2' is to select one of the candidates).
 
 To input words of more than three letters, you type 4 keys, initials
 of the first three letters and the last letter.  For instance,
-\"bjdt\" inputs 北京电视台.
 
 To input symbols and punctuation, type `/' followed by one of `a' to
 `z', then select one of the candidates."))
@@ -1090,32 +902,27 @@ To input symbols and punctuation, type `/' followed by one of `a' to
 (define-obsolete-function-alias 'ctlau-gb-converter #'tit--ctlau-gb-converter "30.1")
 (defun tit--ctlau-gb-converter (dicbuf)
   (tit--ctlau-converter dicbuf
-"汉字输入∷刘锡祥式粤音∷
-
- 刘锡祥式粤语注音方案
+"
  Sidney Lau's Cantonese transcription scheme as described in his book
  \"Elementary Cantonese\", The Government Printer, Hong Kong, 1972.
- This file was prepared by Fung Fung Lee (李枫峰).
  Originally converted from CTCPS3.tit
  Last modified: June 2, 1993.
 
  Some infrequent GB characters are accessed by typing \\, followed by
- the Cantonese romanization of the respective radical (部首)."))
+ the Cantonese romanization of the respective radical ()."))
 
 (define-obsolete-function-alias 'ctlau-b5-converter #'tit--ctlau-b5-converter "30.1")
 (defun tit--ctlau-b5-converter (dicbuf)
   (tit--ctlau-converter dicbuf
-"漢字輸入：劉錫祥式粵音：
+"
 
- 劉錫祥式粵語注音方案
  Sidney Lau's Cantonese transcription scheme as described in his book
  \"Elementary Cantonese\", The Government Printer, Hong Kong, 1972.
- This file was prepared by Fung Fung Lee (李楓峰).
  Originally converted from CTCPS3.tit
  Last modified: June 2, 1993.
 
  Some infrequent characters are accessed by typing \\, followed by
- the Cantonese romanization of the respective radical (部首)."))
+ the Cantonese romanization of the respective radical ()."))
 
 (declare-function dos-8+3-filename "dos-fns.el" (filename))
 
@@ -1226,7 +1033,8 @@ The library is named pinyin.el, and contains the constant
       (let ((pos (point)))
         (insert-file-contents src-file)
         (goto-char pos)
-        (re-search-forward "^[a-z]")
+        ; FIX-GUILEMACS: why disabled
+        ;(re-search-forward "^[a-z]")
         (beginning-of-line)
         (delete-region pos (point))
         (while (not (eobp))

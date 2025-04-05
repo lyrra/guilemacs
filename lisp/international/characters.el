@@ -285,9 +285,15 @@ with L, LRE, or LRO Unicode bidi character type.")
 (map-charset-chars #'modify-category-entry 'korean-ksc5601 ?Y #x2C21 #x2C7E)
 
 ;; These are in more than one charset.
-(let ((parens (concat "〈〉《》「」『』【】〔〕〖〗〘〙〚〛"
-		      "︵︶︷︸︹︺︻︼︽︾︿﹀﹁﹂﹃﹄"
-		      "（）［］｛｝"))
+(let ((parens (concat ;"〈〉《》「」『』【】〔〕〖〗〘〙〚〛"
+		      ;"︵︶︷︸︹︺︻︼︽︾︿﹀﹁﹂﹃﹄"
+		      ;"（）［］｛｝"
+		      ;"｛｝"
+                      ; FIX: why do scm_from_utf8_stringn get decode-error, this is utf-8 (?!)
+                      ; it works if either of these are passed to concat, but not both
+		      "｝"
+		      ;"｛"
+                      ))
       open close)
   (dotimes (i (/ (length parens) 2))
     (setq open (aref parens (* i 2))

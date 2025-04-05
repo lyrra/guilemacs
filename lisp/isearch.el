@@ -598,9 +598,9 @@ This is like `describe-bindings', but displays only Isearch keys."
     ;; Define M-C-s and M-C-r like C-s and C-r so that the same key
     ;; combinations can be used to repeat regexp isearches that can
     ;; be used to start these searches.
-    (define-key map "\M-\C-s" 'isearch-repeat-forward)
-    (define-key map "\M-\C-r" 'isearch-repeat-backward)
-    (define-key map "\177" 'isearch-delete-char)
+;    (define-key map "\M-\C-s" 'isearch-repeat-forward)
+;    (define-key map "\M-\C-r" 'isearch-repeat-backward)
+;    (define-key map "\177" 'isearch-delete-char)
     (define-key map [backspace] 'undefined) ;bug#20466.
     (define-key map "\C-g" 'isearch-abort)
 
@@ -618,25 +618,25 @@ This is like `describe-bindings', but displays only Isearch keys."
     (define-key map [?\S-\ ] 'isearch-printing-char)
 
     (define-key map    "\C-w" 'isearch-yank-word-or-char)
-    (define-key map "\M-\C-w" 'isearch-yank-symbol-or-char)
-    (define-key map "\M-\C-d" 'isearch-del-char)
-    (define-key map "\M-\C-y" 'isearch-yank-char)
+;    (define-key map "\M-\C-w" 'isearch-yank-symbol-or-char)
+;    (define-key map "\M-\C-d" 'isearch-del-char)
+;    (define-key map "\M-\C-y" 'isearch-yank-char)
     (define-key map    "\C-y" 'isearch-yank-kill)
-    (define-key map "\M-\C-z" 'isearch-yank-until-char)
-    (define-key map "\M-s\C-e" 'isearch-yank-line)
+;    (define-key map "\M-\C-z" 'isearch-yank-until-char)
+;    (define-key map "\M-s\C-e" 'isearch-yank-line)
 
-    (define-key map "\M-s\M-<" 'isearch-beginning-of-buffer)
-    (define-key map "\M-s\M->" 'isearch-end-of-buffer)
+;    (define-key map "\M-s\M-<" 'isearch-beginning-of-buffer)
+;    (define-key map "\M-s\M->" 'isearch-end-of-buffer)
 
     (define-key map (char-to-string help-char) isearch-help-map)
     (define-key map [help] isearch-help-map)
     (define-key map [f1] isearch-help-map)
 
-    (define-key map "\M-n" 'isearch-ring-advance)
-    (define-key map "\M-p" 'isearch-ring-retreat)
-    (define-key map "\M-y" 'isearch-yank-pop-only)
+;    (define-key map "\M-n" 'isearch-ring-advance)
+;    (define-key map "\M-p" 'isearch-ring-retreat)
+;    (define-key map "\M-y" 'isearch-yank-pop-only)
 
-    (define-key map "\M-\t" 'isearch-complete)
+;    (define-key map "\M-\t" 'isearch-complete)
 
     ;; Frame events should exit the search, because such frame events
     ;; as `switch-frame’ and `delete-frame’ change the current buffer.
@@ -660,22 +660,22 @@ This is like `describe-bindings', but displays only Isearch keys."
 
     ;; Some bindings you may want to put in your isearch-mode-hook.
     ;; Suggest some alternates...
-    (define-key map "\M-c" 'isearch-toggle-case-fold)
-    (define-key map "\M-r" 'isearch-toggle-regexp)
-    (define-key map "\M-e" 'isearch-edit-string)
+;    (define-key map "\M-c" 'isearch-toggle-case-fold)
+;    (define-key map "\M-r" 'isearch-toggle-regexp)
+;    (define-key map "\M-e" 'isearch-edit-string)
 
-    (put 'isearch-toggle-case-fold :advertised-binding "\M-sc")
-    (put 'isearch-toggle-regexp    :advertised-binding "\M-sr")
-    (put 'isearch-edit-string      :advertised-binding "\M-se")
+;    (put 'isearch-toggle-case-fold :advertised-binding "\M-sc")
+;    (put 'isearch-toggle-regexp    :advertised-binding "\M-sr")
+;    (put 'isearch-edit-string      :advertised-binding "\M-se")
 
-    (define-key map "\M-se" 'isearch-edit-string)
+;    (define-key map "\M-se" 'isearch-edit-string)
     ;; More toggles defined by `isearch-define-mode-toggle'.
 
-    (define-key map [?\M-%] 'isearch-query-replace)
-    (define-key map [?\C-\M-%] 'isearch-query-replace-regexp)
-    (define-key map "\M-so" 'isearch-occur)
-    (define-key map "\M-shr" 'isearch-highlight-regexp)
-    (define-key map "\M-shl" 'isearch-highlight-lines-matching-regexp)
+;    (define-key map [?\M-%] 'isearch-query-replace)
+;    (define-key map [?\C-\M-%] 'isearch-query-replace-regexp)
+;    (define-key map "\M-so" 'isearch-occur)
+;    (define-key map "\M-shr" 'isearch-highlight-regexp)
+;    (define-key map "\M-shl" 'isearch-highlight-lines-matching-regexp)
 
     ;; The key translations defined in the C-x 8 prefix should add
     ;; characters to the search string.  See iso-transl.el.
@@ -1000,7 +1000,7 @@ Each element is an `isearch--state' struct where the slots are
 (define-key search-map    "w" 'isearch-forward-word)
 (define-key search-map    "_" 'isearch-forward-symbol)
 (define-key search-map    "." 'isearch-forward-symbol-at-point)
-(define-key search-map "\M-." 'isearch-forward-thing-at-point)
+;(define-key search-map "\M-." 'isearch-forward-thing-at-point)
 
 ;; Entry points to isearch-mode.
 
@@ -2100,7 +2100,8 @@ If FUNCTION is a symbol, this command first toggles the value of
 The command then executes BODY and updates the isearch prompt."
   (declare (indent defun))
   (let ((command-name (intern (format "isearch-toggle-%s" mode)))
-        (key (concat "\M-s" key)))
+        ;(key (concat "\M-s" key))
+        )
     `(progn
        (defun ,command-name ()
          ,(format "Toggle %s searching on or off.%s" mode
@@ -4700,9 +4701,9 @@ CASE-FOLD non-nil means the search was case-insensitive."
                    (lambda (string &optional _lax)
                      (thread-last
                        (regexp-quote string)
-                       (replace-regexp-in-string "`" "[`‘]")
-                       (replace-regexp-in-string "'" "['’]")
-                       (replace-regexp-in-string "\"" "[\"“”]")))))
+                       (replace-regexp-in-string "`" "[`']")
+                       (replace-regexp-in-string "'" "['']")
+                       (replace-regexp-in-string "\"" "[\"'']")))))
     (buffer-local-restore-state isearch-fold-quotes-mode--state)))
 
 (define-obsolete-function-alias 'isearch-mode-help #'isearch-describe-mode "29.1")

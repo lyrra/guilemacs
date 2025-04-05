@@ -218,15 +218,14 @@ the keywords can also be preceded by the obsolete triplet
 INIT-VALUE LIGHTER KEYMAP.
 
 \(fn MODE DOC [KEYWORD VAL ... &rest BODY])"
-  (declare (doc-string 2)
-           (indent defun)
-           (debug (&define name string-or-null-p
-			   [&optional [&not keywordp] sexp
-			    &optional [&not keywordp] sexp
-			    &optional [&not keywordp] sexp]
-			   [&rest [keywordp sexp]]
-			   def-body)))
-
+;  (declare (doc-string 2)
+;           (indent defun)
+;           (debug (&define name string-or-null-p
+;			   [&optional [&not keywordp] sexp
+;			    &optional [&not keywordp] sexp
+;			    &optional [&not keywordp] sexp]
+;			   [&rest [keywordp sexp]]
+;			   def-body)))
   (let* ((last-message (make-symbol "last-message"))
          (mode-name (symbol-name mode))
          (init-value nil)

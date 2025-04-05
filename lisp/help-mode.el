@@ -711,11 +711,11 @@ variable `help-clean-buttons' is non-nil."
                  (> beg (point-min))
                  (save-excursion
                    (goto-char (1- beg))
-                   (looking-at "['`‘]"))
+                   (looking-at "['`']"))
                  (< end (point-max))
                  (save-excursion
                    (goto-char end)
-                   (looking-at "['’]")))
+                   (looking-at "['']")))
         (delete-region end (1+ end))
         (delete-region (1- beg) beg)))))
 

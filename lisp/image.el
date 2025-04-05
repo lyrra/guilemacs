@@ -36,30 +36,31 @@
                   (&optional filter animation-cache))
 
 (defconst image-type-header-regexps
-  `(("\\`/[\t\n\r ]*\\*.*XPM.\\*/" . xpm)
-    ("\\`P[1-6]\\(?:\
-\\(?:\\(?:#[^\r\n]*[\r\n]\\)*[ \t\r\n]\\)+\
-\\(?:\\(?:#[^\r\n]*[\r\n]\\)*[0-9]\\)+\
-\\)\\{2\\}" . pbm)
-    ("\\`GIF8[79]a" . gif)
-    ("\\`\x89PNG\r\n\x1a\n" . png)
-    ("\\`[\t\n\r ]*#define \\([a-z0-9_]+\\)_width [0-9]+\n\
-#define \\1_height [0-9]+\n\\(\
-#define \\1_x_hot [0-9]+\n\
-#define \\1_y_hot [0-9]+\n\\)?\
-static \\(unsigned \\)?char \\1_bits" . xbm)
-    ("\\`\\(?:MM\0\\*\\|II\\*\0\\)" . tiff)
-    ("\\`[\t\n\r ]*%!PS" . postscript)
-    ("\\`\xff\xd8" . jpeg)    ; used to be (image-jpeg-p . jpeg)
-    ("\\`RIFF[^z-a][^z-a][^z-a][^z-a]WEBPVP8" . webp)
-    (,(let* ((incomment-re "\\(?:[^-]\\|-[^-]\\)")
-	     (comment-re (concat "\\(?:!--" incomment-re "*-->[ \t\r\n]*<\\)")))
-	(concat "\\(?:<\\?xml[ \t\r\n]+[^>]*>\\)?[ \t\r\n]*<"
-		comment-re "*"
-		"\\(?:!DOCTYPE[ \t\r\n]+[^>]*>[ \t\r\n]*<[ \t\r\n]*" comment-re "*\\)?"
-		"[Ss][Vv][Gg]"))
-     . svg)
-    ("\\`....ftyp\\(heic\\|heix\\|hevc\\|heim\\|heis\\|hevm\\|hevs\\|mif1\\|msf1\\)" . heic))
+  `(;("\\`/[\t\n\r ]*\\*.*XPM.\\*/" . xpm)
+    ;("\\`P[1-6]\\(?:\
+;\\(?:\\(?:#[^\r\n]*[\r\n]\\)*[ \t\r\n]\\)+\
+;\\(?:\\(?:#[^\r\n]*[\r\n]\\)*[0-9]\\)+\
+;\\)\\{2\\}" . pbm)
+;    ("\\`GIF8[79]a" . gif)
+;    ("\\`\x89PNG\r\n\x1a\n" . png)
+;    ("\\`[\t\n\r ]*#define \\([a-z0-9_]+\\)_width [0-9]+\n\
+;#define \\1_height [0-9]+\n\\(\
+;#define \\1_x_hot [0-9]+\n\
+;#define \\1_y_hot [0-9]+\n\\)?\
+;static \\(unsigned \\)?char \\1_bits" . xbm)
+;    ("\\`\\(?:MM\0\\*\\|II\\*\0\\)" . tiff)
+;    ("\\`[\t\n\r ]*%!PS" . postscript)
+;    ("\\`\xff\xd8" . jpeg)    ; used to be (image-jpeg-p . jpeg)
+;    ("\\`RIFF[^z-a][^z-a][^z-a][^z-a]WEBPVP8" . webp)
+;    (,(let* ((incomment-re "\\(?:[^-]\\|-[^-]\\)")
+;	     (comment-re (concat "\\(?:!--" incomment-re "*-->[ \t\r\n]*<\\)")))
+;	(concat "\\(?:<\\?xml[ \t\r\n]+[^>]*>\\)?[ \t\r\n]*<"
+;		comment-re "*"
+;		"\\(?:!DOCTYPE[ \t\r\n]+[^>]*>[ \t\r\n]*<[ \t\r\n]*" comment-re "*\\)?"
+;		"[Ss][Vv][Gg]"))
+;     . svg)
+;    ("\\`....ftyp\\(heic\\|heix\\|hevc\\|heim\\|heis\\|hevm\\|hevs\\|mif1\\|msf1\\)" . heic)
+)
   "Alist of (REGEXP . IMAGE-TYPE) pairs used to auto-detect image types.
 When the first bytes of an image file match REGEXP, it is assumed to
 be of image type IMAGE-TYPE if IMAGE-TYPE is a symbol.  If not a symbol,
@@ -311,7 +312,7 @@ compatibility with versions of Emacs that lack the variable
 We accept the tag Exif because that is the same format."
   (declare (obsolete "It is unused inside Emacs and will be removed." "27.1"))
   (setq data (ignore-errors (string-to-unibyte data)))
-  (when (and data (string-match-p "\\`\xff\xd8" data))
+  (when (and data (string-match-p "\\`\\xff\\xd8" data))
     (catch 'jfif
       (let ((len (length data)) (i 2))
 	(while (< i len)

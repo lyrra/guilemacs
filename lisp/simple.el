@@ -1056,10 +1056,10 @@ any other non-digit terminates the character code and is then used as input."))
 	    ((not (integerp translated))
 	     (setq unread-command-events (list char)
 		   done t))
-	    ((/= (logand translated ?\M-\^@) 0)
-	     ;; Turn a meta-character into a character with the 0200 bit set.
-	     (setq code (logior (logand translated (lognot ?\M-\^@)) 128)
-		   done t))
+	    ;((/= (logand translated ?\M-\^@) 0)
+	    ; ;; Turn a meta-character into a character with the 0200 bit set.
+	    ; (setq code (logior (logand translated (lognot ?\M-\^@)) 128)
+		;   done t))
 	    ((and (<= ?0 translated)
                   (< translated (+ ?0 (min 10 read-quoted-char-radix))))
 	     (setq code (+ (* code read-quoted-char-radix) (- translated ?0)))
@@ -2004,13 +2004,13 @@ in *Help* buffer.  See also the command `describe-char'."
 ;; Initialize read-expression-map.  It is defined at C level.
 (defvar read-expression-map
   (let ((m (make-sparse-keymap)))
-    (define-key m "\M-\t" 'completion-at-point)
+    (define-key m "\\M-\t" 'completion-at-point)
     ;; Might as well bind TAB to completion, since inserting a TAB char is
     ;; much too rarely useful.
     (define-key m "\t" 'completion-at-point)
     (define-key m "\r" 'read--expression-try-read)
     (define-key m "\n" 'read--expression-try-read)
-    (define-key m "\M-g\M-c" 'read-expression-switch-to-completions)
+    (define-key m "\\M-g\\M-c" 'read-expression-switch-to-completions)
     (set-keymap-parent m minibuffer-local-map)
     m))
 
@@ -2668,7 +2668,8 @@ customizing `read-extended-command-predicate'."
       (setq binding nil))
     ;; Some features, such as novice.el, rely on this-command-keys
     ;; including M-x COMMAND-NAME RET.
-    (set--this-command-keys (concat "\M-x" (symbol-name function) "\r"))
+    ; FIX-guilemacs: \\M
+    (set--this-command-keys (concat "\\M-x" (symbol-name function) "\\r"))
     (setq this-command function)
     ;; Normally `real-this-command' should never be changed, but here we really
     ;; want to pretend that M-x <cmd> RET is nothing more than a "key
@@ -4378,7 +4379,7 @@ after the default value."
     (define-key map "\t"       #'completion-at-point)
     (define-key map [M-up]     #'minibuffer-previous-completion)
     (define-key map [M-down]   #'minibuffer-next-completion)
-    (define-key map [?\M-\r]   #'minibuffer-choose-completion)
+    ;(define-key map [?\M-\r]   #'minibuffer-choose-completion)
     map)
   "Keymap used for completing shell commands in minibuffer.")
 
@@ -6140,10 +6141,10 @@ The argument is used for internal purposes; do not supply one."
 	(message "If the next command is a kill, it will append"))
     (setq last-command 'kill-region)))
 
-(defvar bidi-directional-controls-chars "\x202a-\x202e\x2066-\x2069"
+(defvar bidi-directional-controls-chars "\\x202a-\\x202e\\x2066-\\x2069"
   "Character set that matches bidirectional formatting control characters.")
 
-(defvar bidi-directional-non-controls-chars "^\x202a-\x202e\x2066-\x2069"
+(defvar bidi-directional-non-controls-chars "^\\x202a-\\x202e\\x2066-\\x2069"
   "Character set that matches any character except bidirectional controls.")
 
 (defun squeeze-bidi-context-1 (from to category replacement)
@@ -6193,13 +6194,13 @@ bidirectional display before and after the region."
     (if (null (marker-position end))
 	(setq end (point-max-marker)))
     ;; Replace each run of non-RTL characters with a single LRM.
-    (squeeze-bidi-context-1 start end "\\CR+" "\x200e")
+    (squeeze-bidi-context-1 start end "\\CR+" "\\x200e")
     ;; Replace each run of non-LTR characters with a single RLM.  Note
     ;; that the \cR category includes both the Arabic Letter (AL) and
     ;; R characters; here we ignore the distinction between them,
     ;; because that distinction affects only Arabic Number (AN)
     ;; characters, which are weak and don't affect the reordering.
-    (squeeze-bidi-context-1 start end "\\CL+" "\x200f")))
+    (squeeze-bidi-context-1 start end "\\CL+" "\\x200f")))
 
 (defun line-substring-with-bidi-context (start end &optional no-properties)
   "Return buffer text between START and END with its bidi context.
@@ -6243,8 +6244,8 @@ visual order of that text when it is inserted at some other place."
       ;; affecting the visual order of the surrounding text at
       ;; destination if there are characters of different
       ;; directionality there.
-      (concat (if (eq para-dir 'left-to-right) "\x2066" "\x2067")
-	      substr "\x2069"))))
+      (concat (if (eq para-dir 'left-to-right) "\\x2066" "\\x2067")
+	      substr "\\x2069"))))
 
 (defun buffer-substring-with-bidi-context (start end &optional no-properties)
   "Return portion of current buffer between START and END with bidi context.
@@ -6540,7 +6541,7 @@ PROMPT is a string to prompt with."
          (history-pos (when yank-from-kill-ring-rotate
                         (- (length kill-ring)
                            (length kill-ring-yank-pointer))))
-         (ellipsis (if (char-displayable-p ?…) "…" "..."))
+         (ellipsis (if (char-displayable-p ?…) "..." "..."))
          ;; Remove keymaps from text properties of copied string,
          ;; because typing RET in the minibuffer might call
          ;; an irrelevant command from the map of copied string.
@@ -10046,11 +10047,11 @@ makes it easier to edit it."
     (define-key map [backtab] 'previous-completion)
     (define-key map [M-up] 'minibuffer-previous-completion)
     (define-key map [M-down] 'minibuffer-next-completion)
-    (define-key map "\M-\r" 'minibuffer-choose-completion)
+    (define-key map "\\M-\r" 'minibuffer-choose-completion)
     (define-key map "z" 'kill-current-buffer)
     (define-key map "n" 'next-completion)
     (define-key map "p" 'previous-completion)
-    (define-key map "\M-g\M-c" 'switch-to-minibuffer)
+    (define-key map "\\M-g\\M-c" 'switch-to-minibuffer)
     map)
   "Local map for completion list buffers.")
 
@@ -10638,8 +10639,8 @@ PREFIX is the string that represents this modifier in an event type symbol."
 		   (logior (- (upcase base-event) 64)
                            ;; ... and any additional modifiers
                            ;; specified in the original event...
-                           (logand event (logior ?\M-\0 ?\C-\0 ?\S-\0
-					         ?\H-\0 ?\s-\0 ?\A-\0))
+                          ;(logand event (logior ?\M-\0 ?\C-\0 ?\S-\0
+			;		         ?\H-\0 ?\s-\0 ?\A-\0))
                            ;; ... including any shift modifier that
                            ;; `event-basic-type' may have removed.
                            (if (<= ?A event ?Z) ?\S-\0 0))
@@ -10652,8 +10653,9 @@ PREFIX is the string that represents this modifier in an event type symbol."
 		   (logior (upcase base-event)
                            ;; ... and any additional modifiers
                            ;; specified in the original event.
-                           (logand event (logior ?\M-\0 ?\C-\0 ?\S-\0
-					         ?\H-\0 ?\s-\0 ?\A-\0)))
+                           ;(logand event (logior ?\M-\0 ?\C-\0 ?\S-\0
+				;	         ?\H-\0 ?\s-\0 ?\A-\0))
+                           )
 	         (logior (ash 1 lshiftby) event)))
 	      (t
 	       (logior (ash 1 lshiftby) event))))

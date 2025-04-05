@@ -1570,9 +1570,9 @@ Otherwise, return a new string."
              ;; 2. Handle quotes.
              ((and (eq (text-quoting-style) 'curve)
                    (or (and (= (following-char) ?\`)
-                            (prog1 t (insert "‘")))
+                            (prog1 t (insert "'")))
                        (and (= (following-char) ?')
-                            (prog1 t (insert "’")))))
+                            (prog1 t (insert "'")))))
               (delete-char 1))
              ((and (eq (text-quoting-style) 'straight)
                    (= (following-char) ?\`))
@@ -1589,8 +1589,8 @@ apostrophe \\=' is replaced by right quote.  Which left and right
 quote characters to use is determined by the variable
 `text-quoting-style'."
   (cond ((eq (text-quoting-style) 'curve)
-         (string-replace "`" "‘"
-                         (string-replace "'" "’" string)))
+         (string-replace "`" "'"
+                         (string-replace "'" "'" string)))
         ((eq (text-quoting-style) 'straight)
          (string-replace "`" "'" string))
         (t string)))
@@ -2217,7 +2217,7 @@ Return VALUE."
 (defun help--docstring-quote (string)
   "Return a doc string that represents STRING.
 The result, when formatted by `substitute-command-keys', should equal STRING."
-  (replace-regexp-in-string "['\\`‘’]" "\\\\=\\&" string))
+  (replace-regexp-in-string "['\\`'']" "\\\\=\\&" string)) ; FIX-guilemacs: multibyte, probably mismatches in length of string
 
 ;; The following functions used to be in help-fns.el, which is not preloaded.
 ;; But for various reasons, they are more widely needed, so they were
@@ -2379,7 +2379,8 @@ the suggested string to use instead.  See
 `help-uni-confusable-suggestions'.")
 
 (defconst help-uni-confusables-regexp
-  (concat "[" (mapcar #'car help-uni-confusables) "]")
+  (concat "[" () ;(mapcar #'car help-uni-confusables)
+          "]")
   "Regexp matching any character listed in `help-uni-confusables'.")
 
 (defun help-uni-confusable-suggestions (string)
