@@ -111,7 +111,9 @@ CHAR_BYTE8_P (int c)
 INLINE int
 BYTE8_TO_CHAR (int byte)
 {
-  return byte + 0x3FFF00;
+  if (byte < 0 || byte > 0xff)
+    emacs_abort ();
+  return byte + 0x1F700; // borrow the alchemy table
 }
 
 INLINE int
