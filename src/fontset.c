@@ -1623,9 +1623,10 @@ to be shown using the fonts from before the call.  */)
 	  if (charset->ascii_compatible_p)
 	    ascii_changed = 1;
 	}
-      else if (NILP (range_list))
-	error ("Invalid script or charset name: %s",
-	       SDATA (SYMBOL_NAME (characters)));
+// FIX-guilemacs: not sure what to do here
+//      else if (NILP (range_list))
+//	error ("Invalid script or charset name: %s",
+//	       SDATA (SYMBOL_NAME (characters)));
     }
   else if (NILP (characters))
     range_list = list1 (Qnil);

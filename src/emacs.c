@@ -487,12 +487,12 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
     char argv0[MAX_UTF8_PATH];
 
     if (filename_from_ansi (argv[0], argv0) == 0)
-      raw_name = build_unibyte_string (argv0);
+      raw_name = build_string (argv0);
     else
-      raw_name = build_unibyte_string (argv[0]);
+      raw_name = build_string (argv[0]);
   }
 #else
-  raw_name = build_unibyte_string (argv[0]);
+  raw_name = build_string (argv[0]);
 #endif
 
   /* Add /: to the front of the name
@@ -635,7 +635,7 @@ init_cmdargs (int argc, char **argv, int skip_args, char const *original_pwd)
 	   They are decoded in the function command-line after we know
 	   locale-coding-system.  */
 	Vcommand_line_args
-	  = Fcons (build_unibyte_string (argv[i]), Vcommand_line_args);
+	  = Fcons (build_string (argv[i]), Vcommand_line_args);
     }
 
   dynwind_end ();
@@ -1679,7 +1679,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
 
       init_alloc_once ();
 
-      install_emacs_strings ();
+      //install_emacs_strings ();
 
       xsymbol_fn = scm_c_public_ref ("language elisp runtime", "symbol-desc");
       symbol_function_fn = scm_c_public_ref ("language elisp runtime", "symbol-function");
@@ -1951,7 +1951,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
       Lisp_Object old_log_max;
       old_log_max = Vmessage_log_max;
       XSETFASTINT (Vmessage_log_max, 0);
-      message_dolog ("", 0, 1, 0);
+      message_dolog ("", 0, 1);
       Vmessage_log_max = old_log_max;
     }
 
@@ -2321,7 +2321,7 @@ Using an Emacs configured with --with-x-toolkit=lucid does not have this problem
             {
               if (!(strcmp(argv[i], "--prelude")))
                 {
-                  loads = Fcons (list2 (Qload, build_unibyte_string (argv[i + 1])), loads);
+                  loads = Fcons (list2 (Qload, build_string (argv[i + 1])), loads);
                 }
             }
           if (!NILP (loads))
@@ -3062,7 +3062,7 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
       p = strchr (path, SEPCHAR);
       if (!p)
 	p = path + strlen (path);
-      element = ((p - path) ? make_unibyte_string (path, p - path)
+      element = ((p - path) ? build_string (path)
 		 : empty_element);
       if (! NILP (element))
         {
@@ -3070,7 +3070,7 @@ decode_env_path (const char *evarname, const char *defalt, bool empty)
           /* Relative file names in the default path are interpreted as
              being relative to $emacs_dir.  */
           if (edir && defaulted
-              && strncmp (path, emacs_dir_env, emacs_dir_len) == 0)
+              && strncmp (path, emacs_dir_env, emacs_dir_len) == 0 && emacs_abort ())
             element = Fexpand_file_name (Fsubstring
                                          (element,
                                           make_fixnum (emacs_dir_len),

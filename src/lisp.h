@@ -633,6 +633,7 @@ static_assert (GCALIGNED (struct Lisp_Symbol));
 
 extern void initialize_symbol (Lisp_Object, Lisp_Object);
 INLINE Lisp_Object build_string (const char *);
+INLINE Lisp_Object build_lisp_string (const char *);
 extern Lisp_Object symbol_module;
 extern Lisp_Object function_module;
 extern Lisp_Object plist_module;
@@ -1213,7 +1214,8 @@ struct Lisp_String
 INLINE bool
 STRINGP (Lisp_Object x)
 {
-  return SMOB_TYPEP (x, lisp_string_tag);
+  return scm_string_p (x) == SCM_BOOL_T;
+  //return SMOB_TYPEP (x, lisp_string_tag);
 }
 
 INLINE void
@@ -1225,6 +1227,7 @@ CHECK_STRING (Lisp_Object x)
 INLINE struct Lisp_String *
 XSTRING (Lisp_Object a)
 {
+  emacs_abort ();
   eassert (STRINGP (a));
   return SMOB_PTR3 (a, Lisp_String, struct Lisp_String);
 }
@@ -1233,6 +1236,7 @@ XSTRING (Lisp_Object a)
 INLINE bool
 STRING_MULTIBYTE (Lisp_Object str)
 {
+  emacs_abort ();
   return 0 <= XSTRING (str)->u.s.size_byte;
 }
 
@@ -1255,6 +1259,7 @@ STRING_MULTIBYTE (Lisp_Object str)
 /* Mark STR as a unibyte string.  */
 #define STRING_SET_UNIBYTE(STR)				\
   do {							\
+    emacs_abort ();                                     \
     if (XSTRING (STR)->u.s.size == 0)			\
       (STR) = empty_unibyte_string;			\
     else						\
@@ -1266,6 +1271,7 @@ STRING_MULTIBYTE (Lisp_Object str)
 INLINE void
 STRING_SET_MULTIBYTE (Lisp_Object str)
 {
+  emacs_abort ();
   /* The 0-length strings are unique&shared so we can't modify them.  */
   eassert (XSTRING (str)->u.s.size > 0);
   XSTRING (str)->u.s.size_byte = XSTRING (str)->u.s.size;
@@ -1273,39 +1279,32 @@ STRING_SET_MULTIBYTE (Lisp_Object str)
 
 /* Convenience functions for dealing with Lisp strings.  */
 
-/* WARNING: Use the 'char *' pointers to string data with care in code
-   that could GC: GC can relocate string data, invalidating such
-   pointers.  It is best to use string character or byte index
-   instead, delaying the access through SDATA/SSDATA pointers to the
-   latest possible moment.  If you must use the 'char *' pointers
-   (e.g., for speed), be sure to adjust them after any call that could
-   potentially GC.  */
-
 INLINE unsigned char *
 SDATA (Lisp_Object string)
 {
-  return XSTRING (string)->u.s.data;
+  return scm_to_locale_string (string);
 }
 INLINE char *
 SSDATA (Lisp_Object string)
 {
-  /* Avoid "differ in sign" warnings.  */
-  return (char *) SDATA (string);
+  return scm_to_locale_string (string);
 }
-INLINE unsigned char
+INLINE scm_t_wchar
 SREF (Lisp_Object string, ptrdiff_t index)
 {
-  return SDATA (string)[index];
+  return SCM_CHAR (scm_c_string_ref (string, index));
+  //return SDATA (string)[index];
 }
 INLINE void
 SSET (Lisp_Object string, ptrdiff_t index, unsigned char new)
 {
+  emacs_abort ();
   SDATA (string)[index] = new;
 }
 INLINE ptrdiff_t
 SCHARS (Lisp_Object string)
 {
-  ptrdiff_t nchars = XSTRING (string)->u.s.size;
+  ptrdiff_t nchars = scm_c_string_length (string);
   eassume (0 <= nchars);
   return nchars;
 }
@@ -1313,6 +1312,7 @@ SCHARS (Lisp_Object string)
 INLINE ptrdiff_t
 STRING_BYTES (struct Lisp_String *s)
 {
+  emacs_abort ();
   ptrdiff_t nbytes = s->u.s.size_byte < 0 ? s->u.s.size : s->u.s.size_byte;
   eassume (0 <= nbytes);
   return nbytes;
@@ -1321,11 +1321,14 @@ STRING_BYTES (struct Lisp_String *s)
 INLINE ptrdiff_t
 SBYTES (Lisp_Object string)
 {
+  return scm_c_string_length (string);
+  emacs_abort ();
   return STRING_BYTES (XSTRING (string));
 }
 INLINE void
 STRING_SET_CHARS (Lisp_Object string, ptrdiff_t newsize)
 {
+  emacs_abort ();
   /* This function cannot change the size of data allocated for the
      string when it was created.  */
   eassert (STRING_MULTIBYTE (string)
@@ -1337,6 +1340,7 @@ STRING_SET_CHARS (Lisp_Object string, ptrdiff_t newsize)
 INLINE void
 CHECK_STRING_NULL_BYTES (Lisp_Object string)
 {
+  emacs_abort ();
   CHECK_TYPE (memchr (SSDATA (string), '\0', SBYTES (string)) == NULL,
 	      Qfilenamep, string);
 }
@@ -1345,8 +1349,18 @@ CHECK_STRING_NULL_BYTES (Lisp_Object string)
 INLINE bool
 string_immovable_p (Lisp_Object str)
 {
+  emacs_abort ();
   return XSTRING (str)->u.s.size_byte == -3;
 }
+
+INLINE bool
+LISP_STRCMP_C_L (char* ac, Lisp_Object bl)
+{
+  return scm_string_equal_p (scm_from_utf8_string (ac), bl);
+}
+
+#define MaybeLsToC(ls) \
+  (STRINGP (ls) ? SDATA (ls) : "")
 
 /* A regular vector is just a header plus an array of Lisp_Objects.  */
 
@@ -3583,7 +3597,8 @@ set_overlay_plist (Lisp_Object overlay, Lisp_Object plist)
 INLINE INTERVAL
 string_intervals (Lisp_Object s)
 {
-  return XSTRING (s)->u.s.intervals;
+  //return XSTRING (s)->u.s.intervals;
+  return NULL;
 }
 
 /* Set text properties of S to I.  */
@@ -3591,6 +3606,7 @@ string_intervals (Lisp_Object s)
 INLINE void
 set_string_intervals (Lisp_Object s, INTERVAL i)
 {
+  emacs_abort ();
   XSTRING (s)->u.s.intervals = i;
 }
 
@@ -3939,7 +3955,8 @@ extern void message1 (const char *);
 extern void message1_nolog (const char *);
 extern void message3 (Lisp_Object);
 extern void message3_nolog (Lisp_Object);
-extern void message_dolog (const char *, ptrdiff_t, bool, bool);
+extern void message_dolog (const char *, ptrdiff_t, bool);
+extern void message_dolog_Ls (Lisp_Object ls, bool);
 extern void message_with_string (const char *, Lisp_Object, bool);
 extern void message_log_maybe_newline (void);
 extern void update_echo_area (void);
@@ -4091,6 +4108,12 @@ build_string (const char *str)
 {
   return make_string (str, strlen (str));
 }
+INLINE Lisp_Object
+build_lisp_string (const char *str)
+{
+  return make_string (str, strlen (str));
+}
+
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
@@ -4215,7 +4238,9 @@ extern void syms_of_chartab (void);
 
 /* Defined in print.c.  */
 extern Lisp_Object Vprin1_to_string_buffer;
+extern bool g_debug_print;
 extern void debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
+extern void maybe_debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
 extern void temp_output_buffer_setup (const char *);
 extern int print_level;
 extern void print_error_message (Lisp_Object, Lisp_Object, const char *,
@@ -4260,6 +4285,7 @@ extern int openp (Lisp_Object, Lisp_Object, Lisp_Object,
 		  void **);
 enum { S2N_IGNORE_TRAILING = 1 };
 extern Lisp_Object string_to_number (char const *, int, ptrdiff_t *);
+extern Lisp_Object string_to_number_Ls (Lisp_Object, int, ptrdiff_t *);
 extern void map_obarray (Lisp_Object, void (*) (Lisp_Object, Lisp_Object),
                          Lisp_Object);
 extern void dir_warning (const char *, Lisp_Object);
@@ -5154,11 +5180,8 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 /* SAFE_ALLOCA_STRING allocates a C copy of a Lisp string.  */
 
-#define SAFE_ALLOCA_STRING(ptr, string)			\
-  do {							\
-    (ptr) = SAFE_ALLOCA (SBYTES (string) + 1);		\
-    memcpy (ptr, SDATA (string), SBYTES (string) + 1);	\
-  } while (false)
+#define SAFE_ALLOCA_STRING(ptr, string)	\
+  ptr = scm_to_locale_string (string)
 
 /* Work around GCC bug 109577
    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=109577

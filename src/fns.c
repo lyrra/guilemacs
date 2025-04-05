@@ -340,11 +340,7 @@ See also `string-equal-ignore-case'.  */)
   CHECK_STRING (s1);
   CHECK_STRING (s2);
 
-  if (SCHARS (s1) != SCHARS (s2)
-      || SBYTES (s1) != SBYTES (s2)
-      || memcmp (SDATA (s1), SDATA (s2), SBYTES (s1)))
-    return Qnil;
-  return Qt;
+  return scm_string_equal_p (s1, s2) == SCM_BOOL_T ? Qt : Qnil;
 }
 
 DEFUN ("compare-strings", Fcompare_strings, Scompare_strings, 6, 7, 0,
@@ -392,29 +388,45 @@ If string STR1 is greater, the value is a positive number N;
   i1_byte = string_char_to_byte (str1, i1);
   i2_byte = string_char_to_byte (str2, i2);
 
+  // guilemacs: FIX: this shouldn't happen
+  int len1 = scm_c_string_length (str1);
+  int len2 = scm_c_string_length (str2);
+
   while (i1 < to1 && i2 < to2)
     {
       /* When we find a mismatch, we must compare the
 	 characters, not just the bytes.  */
-      int c1 = fetch_string_char_as_multibyte_advance (str1, &i1, &i1_byte);
-      int c2 = fetch_string_char_as_multibyte_advance (str2, &i2, &i2_byte);
+      int c1 = i1 < len1 ? SREF (str1, i1) : 0;
+      int c2 = i2 < len2 ? SREF (str2, i2) : 0;
+      i1++;
+      i2++;
 
       if (c1 == c2)
 	continue;
+
+      bool lt = false;
 
       if (! NILP (ignore_case))
 	{
-	  c1 = XFIXNUM (Fupcase (make_fixnum (c1)));
-	  c2 = XFIXNUM (Fupcase (make_fixnum (c2)));
+          Lisp_Object l1 = i1 < len1 ? scm_c_string_ref (str1, i1) : Qnil;
+          Lisp_Object l2 = i2 < len2 ? scm_c_string_ref (str2, i2) : Qnil;
+          if (NILP (l1) || NILP (l2))
+            break;
+          if (scm_char_ci_eq_p (l1, l2) == SCM_BOOL_T)
+            continue;
+          if (scm_char_ci_less_p (l1, l2) == SCM_BOOL_T)
+            lt = true;
 	}
-
-      if (c1 == c2)
-	continue;
+      else
+	{
+          if (c1 < c2)
+            lt = true;
+	}
 
       /* Note that I1 has already been incremented
 	 past the character that we are comparing;
 	 hence we don't add or subtract 1 here.  */
-      if (c1 < c2)
+      if (lt)
 	return make_fixnum (- i1 + from1);
       else
 	return make_fixnum (i1 - from1);
@@ -459,6 +471,12 @@ load_unaligned_size_t (const void *p)
 static int
 string_cmp (Lisp_Object string1, Lisp_Object string2)
 {
+  if (scm_string_equal_p (string1, string2) == SCM_BOOL_T)
+    return 0;
+  if (scm_string_gt (string1, string2, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED) == SCM_BOOL_T)
+    return 1;
+  return -1;
+#if 0
   ptrdiff_t n = min (SCHARS (string1), SCHARS (string2));
 
   if ((!STRING_MULTIBYTE (string1) || SCHARS (string1) == SBYTES (string1))
@@ -513,8 +531,8 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
       /* Compare the differing characters.  */
       ptrdiff_t i1 = 0, i2 = 0;
       ptrdiff_t i1_byte = b, i2_byte = b;
-      int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
-      int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
+      int c1 = fetch_string_char_advance_no_check (string1, &i1);
+      int c2 = fetch_string_char_advance_no_check (string2, &i2);
       return c1 < c2 ? -1 : c1 > c2;
     }
   else if (STRING_MULTIBYTE (string1))
@@ -523,7 +541,7 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
       ptrdiff_t i1 = 0, i1_byte = 0, i2 = 0;
       while (i1 < n)
 	{
-	  int c1 = fetch_string_char_advance_no_check (string1, &i1, &i1_byte);
+	  int c1 = fetch_string_char_advance_no_check (string1, &i1);
 	  int c2 = SREF (string2, i2++);
 	  if (c1 != c2)
 	    return c1 < c2 ? -1 : 1;
@@ -537,12 +555,13 @@ string_cmp (Lisp_Object string1, Lisp_Object string2)
       while (i1 < n)
 	{
 	  int c1 = SREF (string1, i1++);
-	  int c2 = fetch_string_char_advance_no_check (string2, &i2, &i2_byte);
+	  int c2 = fetch_string_char_advance_no_check (string2, &i2);
 	  if (c1 != c2)
 	    return c1 < c2 ? -1 : 1;
 	}
       return i1 < SCHARS (string2) ? -1 : i1 < SCHARS (string1);
     }
+#endif
 }
 
 DEFUN ("string-lessp", Fstring_lessp, Sstring_lessp, 2, 2, 0,
@@ -785,12 +804,8 @@ the same empty object instead of its copy.  */)
 
   if (STRINGP (arg))
     {
-      ptrdiff_t bytes = SBYTES (arg);
-      ptrdiff_t chars = SCHARS (arg);
-      Lisp_Object val = STRING_MULTIBYTE (arg)
-	? make_uninit_multibyte_string (chars, bytes)
-	: make_uninit_string (bytes);
-      memcpy (SDATA (val), SDATA (arg), bytes);
+      return scm_string_append (list1 (arg));
+      /*
       INTERVAL ivs = string_intervals (arg);
       if (ivs)
 	{
@@ -799,6 +814,7 @@ the same empty object instead of its copy.  */)
 	  set_string_intervals (val, copy);
 	}
       return val;
+      */
     }
 
   if (VECTORP (arg))
@@ -854,12 +870,12 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	{
 	  ptrdiff_t arg_len_byte = SBYTES (arg);
 	  len = SCHARS (arg);
-	  if (STRING_MULTIBYTE (arg))
-	    dest_multibyte = true;
-	  else
-	    some_unibyte = true;
-	  if (STRING_BYTES_BOUND - result_len_byte < arg_len_byte)
-	    string_overflow ();
+	  //if (STRING_MULTIBYTE (arg)) ;<---------------------
+	  //  dest_multibyte = true;
+	  //else
+	  //  some_unibyte = true;
+	  //if (STRING_BYTES_BOUND - result_len_byte < arg_len_byte)
+	  //  string_overflow ();
 	  result_len_byte += arg_len_byte;
 	}
       else if (VECTORP (arg))
@@ -927,13 +943,10 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	}
     }
 
-  if (!dest_multibyte)
-    result_len_byte = result_len;
-
   /* Create the output object.  */
-  Lisp_Object result = dest_multibyte
-    ? make_uninit_multibyte_string (result_len, result_len_byte)
-    : make_uninit_string (result_len);
+  Lisp_Object result = scm_c_make_string (result_len, SCM_UNDEFINED);
+    //?; make_uninit_multibyte_string (result_len, result_len_byte)
+    //:; make_uninit_string (result_len);
 
   /* Copy the contents of the args into the result.  */
   ptrdiff_t toindex = 0;
@@ -961,6 +974,12 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	      num_textprops++;
 	    }
 	  ptrdiff_t nchars = SCHARS (arg);
+          for (ptrdiff_t j = 0; j < nchars; j++)
+            {
+              scm_c_string_set_x (result, toindex, scm_c_string_ref (arg, j));
+              toindex++;
+            }
+#if 0
 	  if (STRING_MULTIBYTE (arg) == dest_multibyte)
 	    {
 	      /* Between strings of the same kind, copy fast.  */
@@ -974,7 +993,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	      toindex_byte += str_to_multibyte (SDATA (result) + toindex_byte,
 						SDATA (arg), nchars);
 	    }
-	  toindex += nchars;
+#endif
 	}
       else if (VECTORP (arg))
 	{
@@ -996,7 +1015,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    if (dest_multibyte)
 	      toindex_byte += CHAR_STRING (c, SDATA (result) + toindex_byte);
 	    else
-	      SSET (result, toindex_byte++, c);
+              scm_c_string_set_x (result, toindex, scm_c_make_char (c));
 	    toindex++;
 	  }
     }
@@ -1071,15 +1090,7 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
 	      Lisp_Object elt;
 	      if (STRINGP (arg))
 		{
-		  int c;
-		  if (STRING_MULTIBYTE (arg))
-		    {
-		      ptrdiff_t char_idx = argindex;
-		      c = fetch_string_char_advance_no_check (arg, &char_idx,
-							      &argindex_byte);
-		    }
-		  else
-		    c = SREF (arg, argindex);
+		  int c = SREF (arg, argindex);
 		  elt = make_fixed_natnum (c);
 		}
 	      else if (BOOL_VECTOR_P (arg))
@@ -1153,16 +1164,18 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
       else if (STRINGP (arg))
 	{
 	  ptrdiff_t size = SCHARS (arg);
+          /*
 	  if (STRING_MULTIBYTE (arg))
 	    {
 	      ptrdiff_t byte = 0;
 	      for (ptrdiff_t i = 0; i < size;)
 		{
-		  int c = fetch_string_char_advance_no_check (arg, &i, &byte);
+		  int c = fetch_string_char_advance_no_check (arg, &i);
 		  *dst++ = make_fixnum (c);
 		}
 	    }
 	  else
+          */
 	    for (ptrdiff_t i = 0; i < size; i++)
 	      *dst++ = make_fixnum (SREF (arg, i));
 	}
@@ -2315,11 +2328,12 @@ See also the function `nreverse', which is used more often.  */)
 
 	  new = make_uninit_string (size);
 	  for (i = 0; i < size; i++)
-	    SSET (new, i, SREF (seq, size - i - 1));
+            scm_c_string_set_x (new, i, scm_c_make_char (SREF (seq, size - i - 1)));
 	}
       else
 	{
 	  unsigned char *p, *q;
+          emacs_abort ();
 
 	  new = make_uninit_multibyte_string (size, bytes);
 	  p = SDATA (seq), q = SDATA (new) + bytes;
@@ -2762,7 +2776,8 @@ Numbers are compared via `eql', so integers do not equal floats.
 Symbols must match exactly.  */)
   (Lisp_Object o1, Lisp_Object o2)
 {
-  return scm_is_true (scm_equal_p (o1, o2)) ? Qt : Qnil;
+  Lisp_Object x = scm_equal_p (o1, o2);
+  return scm_is_true (x) ? Qt : Qnil;
 }
 
 SCM compare_text_properties = SCM_BOOL_F;
@@ -6146,13 +6161,24 @@ It must be between zero and the length of HAYSTACK, inclusive.
 Case is always significant and text properties are ignored. */)
   (register Lisp_Object needle, Lisp_Object haystack, Lisp_Object start_pos)
 {
-  ptrdiff_t start_byte = 0, haybytes;
-  char *res, *haystart;
-  EMACS_INT start = 0;
+  //ptrdiff_t start_byte = 0, haybytes;
+  //char *res, *haystart;
+  //EMACS_INT start = 0;
 
   CHECK_STRING (needle);
   CHECK_STRING (haystack);
 
+  Lisp_Object res;
+  if (NILP (start_pos))
+    res = scm_string_contains (haystack, needle, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
+  else
+    res = scm_string_contains (haystack, needle, start_pos , SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
+
+  if (res == SCM_BOOL_F)
+    return Qnil;
+
+  return res;
+#if 0
   if (!NILP (start_pos))
     {
       CHECK_FIXNUM (start_pos);
@@ -6170,29 +6196,6 @@ Case is always significant and text properties are ignored. */)
   haystart = SSDATA (haystack) + start_byte;
   haybytes = SBYTES (haystack) - start_byte;
 
-  /* We can do a direct byte-string search if both strings have the
-     same multibyteness, or if the needle consists of ASCII characters only.  */
-  if (STRING_MULTIBYTE (haystack)
-      ? (STRING_MULTIBYTE (needle)
-         || SCHARS (haystack) == SBYTES (haystack) || string_ascii_p (needle))
-      : (!STRING_MULTIBYTE (needle)
-         || SCHARS (needle) == SBYTES (needle)))
-    {
-      if (STRING_MULTIBYTE (haystack) && STRING_MULTIBYTE (needle)
-          && SCHARS (haystack) == SBYTES (haystack)
-          && SCHARS (needle) != SBYTES (needle))
-        /* Multibyte non-ASCII needle, multibyte ASCII haystack: impossible.  */
-        return Qnil;
-      else
-        res = memmem (haystart, haybytes,
-                      SSDATA (needle), SBYTES (needle));
-    }
-  else if (STRING_MULTIBYTE (haystack))  /* unibyte non-ASCII needle */
-    {
-      Lisp_Object multi_needle = string_to_multibyte (needle);
-      res = memmem (haystart, haybytes,
-		    SSDATA (multi_needle), SBYTES (multi_needle));
-    }
   else              /* unibyte haystack, multibyte non-ASCII needle */
     {
       /* The only possible way we can find the multibyte needle in the
@@ -6219,6 +6222,7 @@ Case is always significant and text properties are ignored. */)
     return Qnil;
 
   return make_int (string_byte_to_char (haystack, res - SSDATA (haystack)));
+#endif
 }
 
 DEFUN ("object-intervals", Fobject_intervals, Sobject_intervals, 1, 1, 0,
@@ -6424,7 +6428,7 @@ The same variable also affects the function `read-answer'.  See also
   DEFVAR_LISP ("yes-or-no-prompt", Vyes_or_no_prompt,
     doc: /* String to append when `yes-or-no-p' asks a question.
 For best results this should end in a space.  */);
-  Vyes_or_no_prompt = build_unibyte_string ("(yes or no) ");
+  Vyes_or_no_prompt = build_lisp_string ("(yes or no) ");
 
   DEFSYM (Qreal_this_command, "real-this-command");
   DEFSYM (Qfrom__tty_menu_p, "from--tty-menu-p");

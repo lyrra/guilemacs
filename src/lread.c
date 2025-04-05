@@ -220,7 +220,6 @@ static struct infile
 
 /* For use within read-from-string (this reader is non-reentrant!!)  */
 static ptrdiff_t read_from_string_index;
-static ptrdiff_t read_from_string_index_byte;
 static ptrdiff_t read_from_string_limit;
 
 /* Position in object from which characters are being read by `readchar'.  */
@@ -461,7 +460,7 @@ readchar_load ()
     {
       buf[i++] = c = readbyte_from_stdio2 (infile);
     }
-  return STRING_CHAR (buf);
+  return SREF (scm_from_utf8_stringn (buf, i), 0);
 }
 
 #define FROM_FILE_P(readcharfun)			\
@@ -545,8 +544,6 @@ unreadchar (Lisp_Object readcharfun, int c)
   else if (STRINGP (readcharfun))
     {
       read_from_string_index--;
-      read_from_string_index_byte
-	= string_char_to_byte (readcharfun, read_from_string_index);
     }
   else if (FROM_FILE_P (readcharfun))
     {
@@ -647,11 +644,12 @@ invalid_syntax_lisp (Lisp_Object s, Lisp_Object readcharfun)
 	dynwind_end ();
       }
 
-      xsignal (Qinvalid_read_syntax,
-	       list3 (s, make_fixnum (line), make_fixnum (column)));
+      xsignal2 (Qinvalid_read_syntax,
+	       list3 (s, make_fixnum (line), make_fixnum (column)),
+                Qnil);
     }
   else
-    xsignal1 (Qinvalid_read_syntax, s);
+    xsignal2 (Qinvalid_read_syntax, s, Qnil);
 }
 
 static AVOID
@@ -2303,7 +2301,9 @@ readevalloop (Lisp_Object readcharfun,
 	  else if (! NILP (Vload_read_function))
 	    val = call1 (Vload_read_function, readcharfun);
 	  else
-	    val = read_internal_start (readcharfun, Qnil, Qnil, false);
+            {
+	      val = read_internal_start (readcharfun, Qnil, Qnil, false);
+            }
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
@@ -2703,7 +2703,6 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end,
 			 &startval, &endval);
 
       read_from_string_index = startval;
-      read_from_string_index_byte = string_char_to_byte (string, startval);
       read_from_string_limit = endval;
     }
 
@@ -2750,7 +2749,7 @@ character_name_to_code (char const *name, ptrdiff_t name_len,
   Lisp_Object code
     = (name[0] == 'U' && name[1] == '+'
        ? string_to_number (name + 1, 16, &len)
-       : call2 (Qchar_from_name, make_unibyte_string (name, name_len), Qt));
+       : call2 (Qchar_from_name, scm_from_utf8_stringn (name, name_len), Qt));
 
   if (! RANGED_FIXNUMP (0, code, MAX_UNICODE_CHAR)
       || len != name_len - 1
@@ -3260,7 +3259,9 @@ read_string_literal (Lisp_Object readcharfun)
 	  /* Any modifiers remaining are invalid.  */
 	  if (modifiers)
 	    invalid_syntax ("Invalid modifier in string", readcharfun);
-	  p += CHAR_STRING (ch, (unsigned char *) p);
+
+	  int i = CHAR_STRING (ch, (unsigned char *) p);
+	  p += i;
 	}
       else
 	{
@@ -5382,6 +5383,15 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
   SAFE_FREE ();
   return result;
 }
+
+Lisp_Object
+string_to_number_Ls (Lisp_Object ls, int base, ptrdiff_t *plen)
+{
+  char str = scm_to_locale_string (ls);
+  Lisp_Object ret = string_to_number (str, base, plen);
+  free (str);
+  return ret;
+}
 
 /* Reduce an EMACS_UINT hash value to hash_hash_t.  */
 hash_hash_t
@@ -5491,7 +5501,7 @@ intern_1 (const char *str, ptrdiff_t len)
 	/* The above `oblookup' was done on the basis of nchars==nbytes, so
 	   the string has to be unibyte.  */
 
-  return intern_driver (make_unibyte_string (str, len), obarray);
+  return intern_driver (scm_from_utf8_stringn (str, len), obarray);
 }
 
 Lisp_Object
@@ -5513,18 +5523,12 @@ intern_c_multibyte (const char *str, ptrdiff_t nchars, ptrdiff_t nbytes)
 }
 
 
-Lisp_Object
-intern_initial_c_string (const char *str, ptrdiff_t len)
+static Lisp_Object
+intern_initial_c_string (const char *cstr)
 {
-  Lisp_Object string = make_pure_c_string (str, len);
-
-  CHECK_STRING (string);
-
-  Lisp_Object sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
-                                           SBYTES (string)),
-                    obhash (initial_obarray));
-
-  if (SREF (string, 0) == ':')
+  Lisp_Object string = scm_from_utf8_string (cstr);
+  Lisp_Object sym = scm_intern (string, obhash (initial_obarray));
+  if (scm_char_eq_p(scm_string_ref (string, 2), scm_c_make_char (':')) == SCM_BOOL_T)
     {
       SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
@@ -5546,8 +5550,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  sstring = scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
-  tem = scm_find_symbol (sstring, obhash (obarray));
+  tem = scm_find_symbol (string, obhash (obarray));
   if (scm_is_true (tem))
     {
       if (EQ (tem, Qnil_))
@@ -5578,11 +5581,10 @@ it defaults to the value of `obarray'.  */)
     return scm_c_value_ref (tem, 0);
   }
 
-  sym = scm_intern (scm_from_utf8_stringn (SSDATA (string),
-                                           SBYTES (string)),
-                    obhash (obarray));
+  sym = scm_intern (string, obhash (obarray));
 
-  if ((SREF (string, 0) == ':') && EQ (obarray, initial_obarray))
+  if (scm_c_string_length (string)
+      && (SREF (string, 0) == ':') && EQ (obarray, initial_obarray))
     {
       SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
@@ -5763,7 +5765,7 @@ init_obarray_once (void)
   scm_hashq_set_x (obarrays, Vobarray, SCM_UNDEFINED);
 
   for (int i = 0; i < ARRAYELTS (lispsym); i++)
-    lispsym[i].u.s.self_ = intern_initial_c_string (defsym_name[i], strlen(defsym_name[i]));
+    lispsym[i].u.s.self_ = intern_initial_c_string (defsym_name[i]);
 
   DEFSYM (Qunbound, "unbound");
   //SET_SYMBOL_VAL (XSYMBOL (Qnil), Qnil);

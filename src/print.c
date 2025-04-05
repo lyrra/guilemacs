@@ -262,28 +262,11 @@ printchar_to_stream (unsigned int ch, FILE *stream)
       if (ASCII_CHAR_P (ch))
 	{
 	  putc (ch, stream);
-#ifdef WINDOWSNT
-	  /* Send the output to a debugger (nothing happens if there
-	     isn't one).  */
-	  if (print_output_debug_flag && stream == stderr)
-	    OutputDebugString ((char []) {ch, '\0'});
-#endif
 	}
       else
 	{
-	  unsigned char mbstr[MAX_MULTIBYTE_LENGTH];
-	  int len = CHAR_STRING (ch, mbstr);
-	  Lisp_Object encoded_ch =
-	    make_multibyte_string ((char *) mbstr, 1, len);
-
-	  if (encode_p)
-	    encoded_ch = code_convert_string_norecord (encoded_ch,
-						       coding_system, true);
-	  fwrite (SSDATA (encoded_ch), 1, SBYTES (encoded_ch), stream);
-#ifdef WINDOWSNT
-	  if (print_output_debug_flag && stream == stderr)
-	    OutputDebugString (SSDATA (encoded_ch));
-#endif
+          Lisp_Object str = scm_c_make_string (1, scm_c_make_char (ch));
+	  fwrite (SSDATA (str), 1, SBYTES (str), stream);
 	}
 
       i++;
@@ -819,8 +802,6 @@ A printed representation of an object is text which describes that object.  */)
   struct buffer *previous = current_buffer;
   set_buffer_internal (XBUFFER (Vprin1_to_string_buffer));
   object = Fbuffer_string ();
-  if (SBYTES (object) == SCHARS (object))
-    STRING_SET_UNIBYTE (object);
 
   /* Note that this won't make prepare_to_modify_buffer call
      ask-user-about-supersession-threat because this buffer

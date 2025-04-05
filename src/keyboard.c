@@ -7343,13 +7343,8 @@ apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_
   }
 
   {
-    Lisp_Object new_name;
-
-    new_name = make_uninit_multibyte_string (mod_len + base_len,
-					     mod_len + base_len_byte);
-    memcpy (SDATA (new_name), new_mods, mod_len);
-    memcpy (SDATA (new_name) + mod_len, base, base_len_byte);
-
+    Lisp_Object new_name = scm_string_append (list2 (build_string (new_mods),
+                                                     build_string (base)));
     return Fintern (new_name, Qnil);
   }
 }

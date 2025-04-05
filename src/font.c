@@ -1362,7 +1362,7 @@ font_dynamic_unparse_xlfd (Lisp_Object font, int pixel_size)
 	  alloc = SBYTES (val) + 1;
 	  f[j] = p = SAFE_ALLOCA (alloc);
 	  /* Copy the name while excluding '-', '?', ',', and '"'.  */
-	  for (k = l = 0; k < alloc; k++)
+	  for (k = l = 0; k < alloc - 1; k++)
 	    {
 	      c = SREF (val, k);
 	      if (c != '-' && c != '?' && c != ',' && c != '"')
@@ -1524,7 +1524,7 @@ font_unparse_xlfd (Lisp_Object font, int pixel_size, char *name, int nbytes)
 	    return -1;
 	  f[j] = p = alloca (alloc);
 	  /* Copy the name while excluding '-', '?', ',', and '"'.  */
-	  for (k = l = 0; k < alloc; k++)
+	  for (k = l = 0; k < alloc - 1; k++)
 	    {
 	      c = SREF (val, k);
 	      if (c != '-' && c != '?' && c != ',' && c != '"')
@@ -3964,7 +3964,7 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
     {
       c = (NILP (string)
 	   ? fetch_char_advance_no_check (&pos, &pos_byte)
-	   : fetch_string_char_advance_no_check (string, &pos, &pos_byte));
+	   : fetch_string_char_advance_no_check (string, &pos));
       Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
       if (FIXNUMP (category)
 	  && (XFIXNUM (category) == UNICODE_CATEGORY_Cf
