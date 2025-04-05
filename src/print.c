@@ -51,6 +51,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "treesit.h"
 #endif
 
+bool g_debug_print;
+
 struct terminal;
 
 /* Avoid actual stack overflow in print.  */
@@ -988,6 +990,13 @@ debug_print (Lisp_Object arg)
   fputs ("\r\n", stderr);
 }
 
+void
+maybe_debug_print (Lisp_Object arg)
+{
+  if (g_debug_print) debug_print (arg);
+}
+
+
 void safe_debug_print (Lisp_Object) EXTERNALLY_VISIBLE;
 void
 safe_debug_print (Lisp_Object arg)
@@ -1016,6 +1025,67 @@ debug_format (const char *fmt, Lisp_Object arg)
   return SSDATA (CALLN (Fformat, build_string (fmt), arg));
 }
 
+DEFUN ("debug-print", Fdebug_print, Sdebug_print,
+       1, 1, 0,
+       doc: /* prints argument to STDERR */)
+  (Lisp_Object arg)
+{
+  debug_print (arg);
+  return Qnil;
+}
+
+DEFUN ("maybe-debug-print", Fmaybe_debug_print, Smaybe_debug_print,
+       1, 1, 0,
+       doc: /* prints argument to STDERR */)
+  (Lisp_Object arg)
+{
+  maybe_debug_print (arg);
+  return Qnil;
+}
+
+DEFUN ("set-gdb-debug-flag", Fset_gdb_debug_flag, Sset_gdb_debug_flag,
+       1, 1, 0,
+       doc: /* sets debug flag */)
+  (Lisp_Object arg)
+{
+  if (!NILP (arg))
+    {
+      g_debug_print = 1;
+    }
+  else
+    {
+      g_debug_print = 0;
+    }
+  return Qnil;
+}
+
+DEFUN ("debug-flag", Fdebug_flag, Sdebug_flag,
+       0, 0, 0,
+       doc: /* gets debug flag */)
+  ()
+{
+  if (g_debug_print)
+    return Qt;
+  return Qnil;
+}
+
+
+DEFUN ("debug-gdb-break", Fdebug_gdb_break, Sdebug_gdb_break,
+       1, 1, 0,
+       doc: /* used for putting breakpoints in gdb, arg is unused */)
+  (Lisp_Object arg)
+{
+  return Qnil;
+}
+DEFUN ("debug-backtrace", Fdebug_backtrace, Sdebug_backtrace,
+       0, 0, 0,
+       doc: /* enter debugger */)
+  ()
+{
+  Lisp_Object* as = { SYMBOL_FUNCTION (intern ("mapbacktrace")) };
+  Ffuncall (1, as);
+  return Qnil;
+}
 
 DEFUN ("error-message-string", Ferror_message_string, Serror_message_string,
        1, 1, 0,
