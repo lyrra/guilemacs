@@ -3528,6 +3528,7 @@ read_bool_vector (Lisp_Object readcharfun)
 
   ptrdiff_t size_in_chars = bool_vector_bytes (length);
   Lisp_Object str = read_string_literal (readcharfun);
+#if 0
   if (STRING_MULTIBYTE (str)
       || !(size_in_chars == SCHARS (str)
 	   /* We used to print 1 char too many when the number of bits
@@ -3535,6 +3536,7 @@ read_bool_vector (Lisp_Object readcharfun)
 	      from an old version.  */
 	   || length == (SCHARS (str) - 1) * BOOL_VECTOR_BITS_PER_CHAR))
     invalid_syntax ("#&...", readcharfun);
+#endif
 
   Lisp_Object obj = make_uninit_bool_vector (length);
   unsigned char *data = bool_vector_uchar_data (obj);
@@ -6145,7 +6147,7 @@ dir_warning (char const *use, Lisp_Object dirname)
 				  + strlen (use) + SBYTES (dirname) + diaglen);
       ptrdiff_t message_len = esprintf (buffer, format, use, SSDATA (dirname),
 					diagnostic);
-      message_dolog (buffer, message_len, 0, STRING_MULTIBYTE (dirname));
+      message_dolog (buffer, message_len, 0);
       SAFE_FREE ();
     }
 }

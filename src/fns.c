@@ -1640,7 +1640,7 @@ With one argument, just copy STRING (with properties, if any).  */)
 	= ito == size ? SBYTES (string) : string_char_to_byte (string, ito);
       res = make_specified_string (SSDATA (string) + from_byte,
 				   ito - ifrom, to_byte - from_byte,
-				   STRING_MULTIBYTE (string));
+				   false);
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
@@ -1673,7 +1673,7 @@ With one argument, just copy STRING without its properties.  */)
     to_char == size ? SBYTES (string) : string_char_to_byte (string, to_char);
   return make_specified_string (SSDATA (string) + from_byte,
 				to_char - from_char, to_byte - from_byte,
-				STRING_MULTIBYTE (string));
+				false);
 }
 
 /* Extract a substring of STRING, giving start and end positions
@@ -1693,7 +1693,7 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
     {
       res = make_specified_string (SSDATA (string) + from_byte,
 				   to - from, to_byte - from_byte,
-				   STRING_MULTIBYTE (string));
+				   false);
       copy_text_properties (make_fixnum (from), make_fixnum (to),
 			    string, make_fixnum (0), res, Qnil);
     }

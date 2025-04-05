@@ -12336,6 +12336,14 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag)
     }
 }
 
+void
+message_dolog_Ls (Lisp_Object ls, bool nlflag)
+{
+  char *str = scm_to_locale_string (ls);
+  message_dolog (str, strlen(str), nlflag);
+  free (str);
+}
+
 
 /* We are at the end of the buffer after just having inserted a newline.
    (Note: We depend on the fact we won't be crossing the gap.)
@@ -12390,13 +12398,7 @@ message3 (Lisp_Object m)
   message_log_maybe_newline ();
   if (STRINGP (m))
     {
-      ptrdiff_t nbytes = SBYTES (m);
-      bool multibyte = STRING_MULTIBYTE (m);
-      char *buffer;
-      USE_SAFE_ALLOCA;
-      SAFE_ALLOCA_STRING (buffer, m);
-      message_dolog (buffer, nbytes, true, multibyte);
-      SAFE_FREE ();
+      message_dolog (m, SBYTES (m), true);
     }
   if (! inhibit_message)
     message3_nolog (m);

@@ -325,7 +325,7 @@ printchar (unsigned int ch, Lisp_Object fun)
 
 	  setup_echo_area_for_printing (multibyte_p);
 	  insert_char (ch);
-	  message_dolog ((char *) str, len, 0, multibyte_p);
+	  message_dolog ((char *) str, len, 0);
 	}
     }
 }
@@ -401,7 +401,7 @@ strout (const char *ptr, ptrdiff_t size, ptrdiff_t size_byte,
 	= !NILP (BVAR (current_buffer, enable_multibyte_characters));
 
       setup_echo_area_for_printing (multibyte_p);
-      message_dolog (ptr, size_byte, 0, multibyte_p);
+      message_dolog (ptr, size_byte, 0);
 
       if (size == size_byte)
 	{
@@ -462,6 +462,8 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
       if (print_escape_nonascii)
 	string = string_escape_byte8 (string);
 
+      chars = SBYTES (string);
+#if 0
       if (STRING_MULTIBYTE (string))
 	chars = SCHARS (string);
       else if (! print_escape_nonascii
@@ -486,6 +488,7 @@ print_string (Lisp_Object string, Lisp_Object printcharfun)
 	}
       else
 	chars = SBYTES (string);
+#endif
 
       if (EQ (printcharfun, Qt))
 	{
@@ -1121,8 +1124,8 @@ print_error_message (Lisp_Object data, Lisp_Object stream, const char *context,
       USE_SAFE_ALLOCA;
       char *name = SAFE_ALLOCA (cnamelen);
       memcpy (name, SDATA (cname), cnamelen);
-      message_dolog (name, cnamelen, 0, STRING_MULTIBYTE (cname));
-      message_dolog (": ", 2, 0, 0);
+      message_dolog (name, cnamelen, 0);
+      message_dolog (": ", 2, 0);
       SAFE_FREE ();
     }
 
@@ -2348,7 +2351,7 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  /* True means we must ensure that the next character we output
 	     cannot be taken as part of a hex character escape.	 */
 	  bool need_nonhex = false;
-	  bool multibyte = STRING_MULTIBYTE (obj);
+	  bool multibyte = false;
 
 	  if (! EQ (Vprint_charset_text_property, Qt))
 	    obj = print_prune_string_charset (obj);
