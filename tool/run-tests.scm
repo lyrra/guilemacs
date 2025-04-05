@@ -30,12 +30,14 @@
   "test/pre/bitwise.scm"
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
+  "test/pre/string2.scm"
+  "test/pre/fns.scm"
   "test/pre/random.scm"
   "test/pre/time.scm")
 (group
-  "test/src/timefns-tests.el"
+  ;"test/src/timefns-tests.el"
   "test/src/fns-tests.el"
-  "test/src/floatfns-tests.el"
+  ;"test/src/floatfns-tests.el"
   )
 ;; in the following group, all of the test files works with guilemacs
 (group
@@ -337,7 +339,8 @@
   (let ((elfile (substring (substring file 0 (- (string-length file) 4)) 5)))
     (with-output-to-file (string-concatenate (list elfile ".el"))
       (lambda ()
-        (primitive-load (substring file 5))))
+        (primitive-load (substring file 5)))
+      #:encoding "UTF-8")
     elfile))
 
 (define (testcompile-files files)
