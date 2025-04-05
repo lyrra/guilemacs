@@ -742,7 +742,7 @@ str_as_unibyte (unsigned char *str, ptrdiff_t bytes)
 static ptrdiff_t
 string_count_byte8 (Lisp_Object string)
 {
-  bool multibyte = STRING_MULTIBYTE (string);
+  bool multibyte = false;
   ptrdiff_t nbytes = SBYTES (string);
   unsigned char *p = SDATA (string);
   unsigned char *pend = p + nbytes;
@@ -774,7 +774,7 @@ string_escape_byte8 (Lisp_Object string)
 {
   ptrdiff_t nchars = SCHARS (string);
   ptrdiff_t nbytes = SBYTES (string);
-  bool multibyte = STRING_MULTIBYTE (string);
+  bool multibyte = false;
   ptrdiff_t byte8_count;
   ptrdiff_t thrice_byte8_count, uninit_nchars, uninit_nbytes;
   const unsigned char *src, *src_end;
@@ -846,21 +846,11 @@ Concatenate all the argument characters and make the result a string.
 usage: (string &rest CHARACTERS)  */)
   (ptrdiff_t n, Lisp_Object *args)
 {
-  ptrdiff_t nbytes = 0;
+  Lisp_Object str =  scm_c_make_string (n, scm_c_make_char (32));
   for (ptrdiff_t i = 0; i < n; i++)
     {
       CHECK_CHARACTER (args[i]);
-      nbytes += CHAR_BYTES (XFIXNUM (args[i]));
-    }
-  if (nbytes == n)
-    return Funibyte_string (n, args);
-  Lisp_Object str = make_uninit_multibyte_string (n, nbytes);
-  unsigned char *p = SDATA (str);
-  for (ptrdiff_t i = 0; i < n; i++)
-    {
-      eassume (CHARACTERP (args[i]));
-      int c = XFIXNUM (args[i]);
-      p += CHAR_STRING (c, p);
+      scm_c_string_set_x (str, i, scm_c_make_char (args[i]));
     }
   return str;
 }
@@ -870,11 +860,7 @@ DEFUN ("unibyte-string", Funibyte_string, Sunibyte_string, 0, MANY, 0,
 usage: (unibyte-string &rest BYTES)  */)
   (ptrdiff_t n, Lisp_Object *args)
 {
-  Lisp_Object str = make_uninit_string (n);
-  unsigned char *p = SDATA (str);
-  for (ptrdiff_t i = 0; i < n; i++)
-    *p++ = check_integer_range (args[i], 0, 255);
-  return str;
+  return Fstring (n, args);
 }
 
 DEFUN ("char-resolve-modifiers", Fchar_resolve_modifiers,

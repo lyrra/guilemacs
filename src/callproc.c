@@ -400,9 +400,9 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 	for (i = 4; i < nargs; i++)
 	  CHECK_STRING (args[i]);
 
-	for (i = 4; i < nargs; i++)
-	  if (STRING_MULTIBYTE (args[i]))
-	    must_encode = 1;
+	//for (i = 4; i < nargs; i++)
+	  //if (STRING_MULTIBYTE (args[i]))
+	    //must_encode = 1;
 
 	if (!NILP (Vcoding_system_for_write))
 	  val = Vcoding_system_for_write;

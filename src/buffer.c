@@ -647,7 +647,7 @@ even if it is dead.  The return value is never nil.  */)
   bset_zv_marker (b, Qnil);
 
   name = Fcopy_sequence (buffer_or_name);
-  set_string_intervals (name, NULL);
+  // set_string_intervals (name, NULL); FIX: guilemacs, interval support for strings
   bset_name (b, name);
   bset_last_name (b, name);
 
@@ -4958,9 +4958,11 @@ init_buffer (void)
       /* At this moment, we still don't know how to decode the directory
          name.  So, we keep the bytes in unibyte form so that file I/O
          routines correctly get the original bytes.  */
-      Lisp_Object dirname = make_unibyte_string (pwd, len + add_slash);
-      if (add_slash)
-	SSET (dirname, len, DIRECTORY_SEP);
+      Lisp_Object dirname = build_string (pwd); // len + add_slash);
+      if (add_slash) {
+	//SSET (dirname, len, DIRECTORY_SEP);
+	dirname = scm_string_append (list2 (dirname, scm_make_string (make_fixnum (1), scm_c_make_char (DIRECTORY_SEP))));
+      }
       bset_directory (current_buffer, dirname);
 
       /* Add /: to the front of the name
@@ -4971,7 +4973,7 @@ init_buffer (void)
              because of the ange-ftp completion handler.
              However, it is not necessary to turn / into /:/.
              So avoid doing that.  */
-          && strcmp ("/", SSDATA (BVAR (current_buffer, directory))))
+          && LISP_STRCMP_C_L ("/", BVAR (current_buffer, directory)))
         {
           AUTO_STRING (slash_colon, "/:");
           bset_directory (current_buffer,

@@ -244,126 +244,6 @@ make_char_unibyte (int c)
   return ASCII_CHAR_P (c) ? c : CHAR_TO_BYTE8 (c);
 }
 
-static Lisp_Object
-do_casify_natnum (struct casing_context *ctx, Lisp_Object obj)
-{
-  int flagbits = (CHAR_ALT | CHAR_SUPER | CHAR_HYPER
-		  | CHAR_SHIFT | CHAR_CTL | CHAR_META);
-  int ch = XFIXNAT (obj);
-
-  /* If the character has higher bits set above the flags, return it unchanged.
-     It is not a real character.  */
-  if (! (0 <= ch && ch <= flagbits))
-    return obj;
-
-  int flags = ch & flagbits;
-  ch = ch & ~flagbits;
-
-  /* FIXME: Even if enable-multibyte-characters is nil, we may manipulate
-     multibyte chars.  This means we have a bug for latin-1 chars since when we
-     receive an int 128-255 we can't tell whether it's an eight-bit byte or
-     a latin-1 char.  */
-  bool multibyte = (ch >= 256
-		    || !NILP (BVAR (current_buffer,
-				    enable_multibyte_characters)));
-  if (! multibyte)
-    ch = make_char_multibyte (ch);
-  int cased = case_single_character (ctx, ch);
-  if (cased == ch)
-    return obj;
-
-  if (! multibyte)
-    cased = make_char_unibyte (cased);
-  return make_fixed_natnum (cased | flags);
-}
-
-static Lisp_Object
-do_casify_multibyte_string (struct casing_context *ctx, Lisp_Object obj)
-{
-  /* Verify that ‘data’ is the first member of struct casing_str_buf
-     so that when casting char * to struct casing_str_buf *, the
-     representation of the character is at the beginning of the
-     buffer.  This is why we don’t need a separate struct
-     casing_str_buf object, and can write directly to the destination.  */
-  static_assert (offsetof (struct casing_str_buf, data) == 0);
-
-  ptrdiff_t size = SCHARS (obj), n;
-  USE_SAFE_ALLOCA;
-  if (ckd_mul (&n, size, MAX_MULTIBYTE_LENGTH)
-      || ckd_add (&n, n, sizeof (struct casing_str_buf)))
-    n = PTRDIFF_MAX;
-  unsigned char *dst = SAFE_ALLOCA (n);
-  unsigned char *dst_end = dst + n;
-  unsigned char *o = dst;
-
-  const unsigned char *src = SDATA (obj);
-
-  for (n = 0; size; --size)
-    {
-      if (dst_end - o < sizeof (struct casing_str_buf))
-	string_overflow ();
-      int ch = string_char_advance (&src);
-      case_character ((struct casing_str_buf *) o, ctx, ch,
-		      size > 1 ? src : NULL);
-      n += ((struct casing_str_buf *) o)->len_chars;
-      o += ((struct casing_str_buf *) o)->len_bytes;
-    }
-  eassert (o <= dst_end);
-  obj = make_multibyte_string ((char *) dst, n, o - dst);
-  SAFE_FREE ();
-  return obj;
-}
-
-static int
-ascii_casify_character (bool downcase, int c)
-{
-  Lisp_Object cased = CHAR_TABLE_REF (downcase?
-				      uniprop_table (Qlowercase) :
-				      uniprop_table (Quppercase),
-				      c);
-  return FIXNATP (cased) ? XFIXNAT (cased) : c;
-}
-
-static Lisp_Object
-do_casify_unibyte_string (struct casing_context *ctx, Lisp_Object obj)
-{
-  ptrdiff_t i, size = SCHARS (obj);
-  int ch, cased;
-
-  obj = Fcopy_sequence (obj);
-  for (i = 0; i < size; i++)
-    {
-      ch = make_char_multibyte (SREF (obj, i));
-      cased = case_single_character (ctx, ch);
-      if (ch == cased)
-	continue;
-      /* If down/upcasing changed an ASCII character into a non-ASCII
-	 character (this can happen in some locales, like the Turkish
-	 "I"), downcase using the ASCII char table.  */
-      if (ASCII_CHAR_P (ch) && !SINGLE_BYTE_CHAR_P (cased))
-	cased = ascii_casify_character (ctx->downcase_last, ch);
-      SSET (obj, i, make_char_unibyte (cased));
-    }
-  return obj;
-}
-
-static Lisp_Object
-casify_object (enum case_action flag, Lisp_Object obj)
-{
-  struct casing_context ctx;
-  prepare_casing_context (&ctx, flag, false);
-
-  if (FIXNATP (obj))
-    return do_casify_natnum (&ctx, obj);
-  else if (!STRINGP (obj))
-    wrong_type_argument (Qchar_or_string_p, obj);
-  else if (!SCHARS (obj))
-    return obj;
-  else if (STRING_MULTIBYTE (obj))
-    return do_casify_multibyte_string (&ctx, obj);
-  else
-    return do_casify_unibyte_string (&ctx, obj);
-}
 
 DEFUN ("upcase", Fupcase, Supcase, 1, 1, 0,
        doc: /* Convert argument to upper case and return that.
@@ -377,7 +257,7 @@ cased, e.g. ﬁ, are returned unchanged.
 See also `capitalize', `downcase' and `upcase-initials'.  */)
   (Lisp_Object obj)
 {
-  return casify_object (CASE_UP, obj);
+  return scm_string_locale_upcase (obj, SCM_UNDEFINED);
 }
 
 DEFUN ("downcase", Fdowncase, Sdowncase, 1, 1, 0,
@@ -394,7 +274,7 @@ locale, the string must be converted into multibyte first.
 The argument object is not altered--the value is a copy.  */)
   (Lisp_Object obj)
 {
-  return casify_object (CASE_DOWN, obj);
+  return scm_string_locale_downcase (obj, SCM_UNDEFINED);
 }
 
 DEFUN ("capitalize", Fcapitalize, Scapitalize, 1, 1, 0,
@@ -410,7 +290,7 @@ is a character, characters which map to multiple code points when
 cased, e.g. ﬁ, are returned unchanged.  */)
   (Lisp_Object obj)
 {
-  return casify_object (CASE_CAPITALIZE, obj);
+  return scm_string_locale_titlecase (obj, SCM_UNDEFINED);
 }
 
 /* Like Fcapitalize but change only the initials.  */
@@ -428,7 +308,7 @@ is a character, characters which map to multiple code points when
 cased, e.g. ﬁ, are returned unchanged.  */)
   (Lisp_Object obj)
 {
-  return casify_object (CASE_CAPITALIZE_UP, obj);
+  return scm_string_locale_titlecase (obj, SCM_UNDEFINED);
 }
 
 /* Based on CTX, case region in a unibyte buffer from *STARTP to *ENDP.
