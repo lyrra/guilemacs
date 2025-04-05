@@ -371,21 +371,11 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
     {
       if (read_from_string_index >= read_from_string_limit)
 	c = -1;
-      else if (STRING_MULTIBYTE (readcharfun))
-	{
-	  if (multibyte)
-	    *multibyte = 1;
-	  c = (fetch_string_char_advance_no_check
-	       (readcharfun,
-		&read_from_string_index,
-		&read_from_string_index_byte));
-	}
       else
-	{
-	  c = SREF (readcharfun, read_from_string_index_byte);
-	  read_from_string_index++;
-	  read_from_string_index_byte++;
-	}
+        {
+          c = SREF (readcharfun, read_from_string_index);
+          read_from_string_index++;
+        }
       return c;
     }
 
@@ -1874,10 +1864,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	   several times during loadup.  We therefore don't want to
 	   encode the file before passing it to file I/O library
 	   functions.  */
-	if (!STRING_MULTIBYTE (filename) && !STRING_MULTIBYTE (suffix))
-	  string = make_unibyte_string (fn, fnlen);
-	else
-	  string = make_string (fn, fnlen);
+        string = build_string (fn);
 	handler = Ffind_file_name_handler (string, Qfile_exists_p);
 	if ((!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
 	    && !FIXNATP (predicate))

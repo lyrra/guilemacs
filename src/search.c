@@ -110,7 +110,7 @@ compile_pattern_1 (struct regexp_cache *cp, Lisp_Object pattern,
   cp->regexp = Qnil;
   cp->buf.translate = translate;
   cp->posix = posix;
-  cp->buf.multibyte = STRING_MULTIBYTE (pattern);
+  cp->buf.multibyte = false;
   cp->buf.charset_unibyte = charset_unibyte;
   if (STRINGP (Vsearch_spaces_regexp))
     cp->f_whitespace_regexp = Vsearch_spaces_regexp;
@@ -214,7 +214,7 @@ compile_pattern (Lisp_Object pattern, struct re_registers *regp,
 	goto compile_it;
       if (SCHARS (cp->regexp) == SCHARS (pattern)
           && !cp->busy
-	  && STRING_MULTIBYTE (cp->regexp) == STRING_MULTIBYTE (pattern)
+	  //&& STRING_MULTIBYTE (cp->regexp) == STRING_MULTIBYTE (pattern)
 	  && !NILP (Fstring_equal (cp->regexp, pattern))
 	  && BASE_EQ (cp->buf.translate, translate)
 	  && cp->posix == posix
@@ -409,12 +409,12 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 			? BVAR (current_buffer, case_canon_table)
 			: Qnil),
 		       posix,
-		       STRING_MULTIBYTE (string));
+		       false);
   freeze_pattern (cache_entry);
   re_match_object = string;
   val = re_search (&cache_entry->buf, SSDATA (string),
-		   SBYTES (string), pos_byte,
-		   SBYTES (string) - pos_byte,
+		   SBYTES (string), pos,
+		   SBYTES (string) - pos,
 		   (modify_match_data ? &search_regs : NULL));
   dynwind_end ();
 

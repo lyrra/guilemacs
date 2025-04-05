@@ -693,11 +693,11 @@ digest_single_submenu (int start, int end, bool top_level_items)
 		  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
 		}
 #elif !defined (HAVE_MULTILINGUAL_MENU)
-	      if (STRINGP (pane_name) && STRING_MULTIBYTE (pane_name))
-		{
-		  pane_name = ENCODE_MENU_STRING (pane_name);
-		  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
-		}
+	      //if (STRINGP (pane_name) && STRING_MULTIBYTE (pane_name))
+	//	{
+	//	  pane_name = ENCODE_MENU_STRING (pane_name);
+	//	  ASET (menu_items, i + MENU_ITEMS_PANE_NAME, pane_name);
+	//	}
 #endif
 	    }
 
@@ -780,17 +780,17 @@ digest_single_submenu (int start, int end, bool top_level_items)
 		  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
 		}
 #elif !defined (HAVE_MULTILINGUAL_MENU)
-	      if (STRING_MULTIBYTE (item_name))
-		{
-		  item_name = ENCODE_MENU_STRING (item_name);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_NAME, item_name);
-		}
+	      //if (STRING_MULTIBYTE (item_name))
+		//{
+		//  item_name = ENCODE_MENU_STRING (item_name);
+		//  ASET (menu_items, i + MENU_ITEMS_ITEM_NAME, item_name);
+		//}
 
-	      if (STRINGP (descrip) && STRING_MULTIBYTE (descrip))
-		{
-		  descrip = ENCODE_MENU_STRING (descrip);
-		  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
-		}
+	      //if (STRINGP (descrip) && STRING_MULTIBYTE (descrip))
+		//{
+		//  descrip = ENCODE_MENU_STRING (descrip);
+		//  ASET (menu_items, i + MENU_ITEMS_ITEM_EQUIV_KEY, descrip);
+		//}
 #endif
 	    }
 

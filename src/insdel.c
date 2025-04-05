@@ -1011,10 +1011,10 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     outgoing_nbytes = nchars;
-  else if (! STRING_MULTIBYTE (string))
-    outgoing_nbytes
-      = count_size_as_multibyte (SDATA (string) + pos_byte,
-				 nbytes);
+//  else if (! STRING_MULTIBYTE (string))
+//    outgoing_nbytes
+//      = count_size_as_multibyte (SDATA (string) + pos_byte,
+//				 nbytes);
 
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
@@ -1029,7 +1029,7 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   /* Copy the string text into the buffer, perhaps converting
      between single-byte and multibyte.  */
   copy_text (SDATA (string) + pos_byte, GPT_ADDR, nbytes,
-	     STRING_MULTIBYTE (string),
+	     false,
 	     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG

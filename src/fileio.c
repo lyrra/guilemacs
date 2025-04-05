@@ -270,8 +270,7 @@ get_file_errno_data (char const *string, Lisp_Object name, int errorno)
   Lisp_Object data = CONSP (name) || NILP (name) ? name : list1 (name);
   char *str = emacs_strerror (errorno);
   AUTO_STRING (unibyte_str, str);
-  Lisp_Object errstring
-    = code_convert_string_norecord (unibyte_str, Vlocale_coding_system, 0);
+  Lisp_Object errstring = unibyte_str;
   Lisp_Object errdata = Fcons (errstring, data);
 
   if (errorno == EEXIST)
@@ -547,7 +546,7 @@ file_name_directory (Lisp_Object filename)
   SAFE_FREE ();
   return tem_fn;
 #else  /* DOS_NT */
-  return make_specified_string (beg, -1, p - beg, STRING_MULTIBYTE (filename));
+  return make_specified_string (beg, -1, p - beg, false);
 #endif	/* DOS_NT */
 }
 
@@ -589,7 +588,7 @@ or the entire name if it contains no slash.  */)
 	 )
     p--;
 
-  return make_specified_string (p, -1, end - p, STRING_MULTIBYTE (filename));
+  return make_specified_string (p, -1, end - p, false);
 }
 
 DEFUN ("unhandled-file-name-directory", Funhandled_file_name_directory,
@@ -686,9 +685,9 @@ is already present.  */)
     file = Fdowncase (file);
 #endif
   buf = SAFE_ALLOCA (SBYTES (file) + file_name_as_directory_slop + 1);
-  length = file_name_as_directory (buf, SSDATA (file), SBYTES (file),
-				   STRING_MULTIBYTE (file));
-  val = make_specified_string (buf, -1, length, STRING_MULTIBYTE (file));
+  const char *str = scm_to_locale_string (file);
+  length = file_name_as_directory (buf, str, strlen (str), false);
+  val = make_specified_string (buf, -1, length, false);
   SAFE_FREE ();
   return val;
 }
@@ -777,9 +776,8 @@ In Unix-syntax, this function just removes the final slash.  */)
     directory = Fdowncase (directory);
 #endif
   buf = SAFE_ALLOCA (SBYTES (directory) + 1);
-  length = directory_file_name (buf, SSDATA (directory), SBYTES (directory),
-				STRING_MULTIBYTE (directory));
-  val = make_specified_string (buf, -1, length, STRING_MULTIBYTE (directory));
+  length = directory_file_name (buf, SSDATA (directory), SBYTES (directory), false);
+  val = make_specified_string (buf, -1, length, false);
   SAFE_FREE ();
   return val;
 }
@@ -885,9 +883,6 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
       if (SCHARS (arg) == 0)
 	continue;
       eargs++;
-      /* Multibyte and non-ASCII. */
-      if (STRING_MULTIBYTE (arg) && SCHARS (arg) != SBYTES (arg))
-	multibytes++;
       /* We're not adding a slash to the final part. */
       if (i == nargs - 1
 	  || IS_DIRECTORY_SEP (*(SSDATA (arg) + SBYTES (arg) - 1)))
@@ -1059,7 +1054,7 @@ the root directory.  */)
   USE_SAFE_ALLOCA;
 
   CHECK_STRING (name);
-  CHECK_STRING_NULL_BYTES (name);
+  //CHECK_STRING_NULL_BYTES (name);
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
@@ -1191,8 +1186,8 @@ the root directory.  */)
 	  }
       }
   }
-  multibyte = STRING_MULTIBYTE (name);
-  bool defdir_multibyte = STRING_MULTIBYTE (default_directory);
+  multibyte = false;
+  bool defdir_multibyte = false;
   if (multibyte != defdir_multibyte)
     {
       /* We want to make both NAME and DEFAULT_DIRECTORY have the same

@@ -436,67 +436,43 @@ string_char_advance (unsigned char const **pp)
    *BYTEIDX, character position *CHARIDX.  Update *BYTEIDX and
    *CHARIDX past the character fetched.  */
 
+// FIX-guilemacs: remove
 INLINE int
 fetch_string_char_advance (Lisp_Object string,
 			   ptrdiff_t *charidx, ptrdiff_t *byteidx)
 {
-  int output;
-  ptrdiff_t b = *byteidx;
-  unsigned char *chp = SDATA (string) + b;
-  if (STRING_MULTIBYTE (string))
-    {
-      int chlen;
-      output = string_char_and_length (chp, &chlen);
-      b += chlen;
-    }
-  else
-    {
-      output = *chp;
-      b++;
-    }
+  int output = SREF (string, *charidx);
+
   (*charidx)++;
-  *byteidx = b;
+  (*byteidx)++;
   return output;
 }
 
 /* Like fetch_string_char_advance, but return a multibyte character
    even if STRING is unibyte.  */
 
+// FIX-guilemacs: remove
 INLINE int
 fetch_string_char_as_multibyte_advance (Lisp_Object string,
 					ptrdiff_t *charidx, ptrdiff_t *byteidx)
 {
-  int output;
-  ptrdiff_t b = *byteidx;
-  unsigned char *chp = SDATA (string) + b;
-  if (STRING_MULTIBYTE (string))
-    {
-      int chlen;
-      output = string_char_and_length (chp, &chlen);
-      b += chlen;
-    }
-  else
-    {
-      output = make_char_multibyte (*chp);
-      b++;
-    }
+  int output = SREF (string, *charidx);
+
   (*charidx)++;
-  *byteidx = b;
+  (*byteidx)++;
   return output;
 }
 
 
 /* Like fetch_string_char_advance, but assumes STRING is multibyte.  */
 
+// FIX-guilemacs: remove ?
 INLINE int
 fetch_string_char_advance_no_check (Lisp_Object string,
-				    ptrdiff_t *charidx, ptrdiff_t *byteidx)
+				    ptrdiff_t *charidx)
 {
-  ptrdiff_t b = *byteidx;
-  unsigned char *chp = SDATA (string) + b;
-  int chlen, output = string_char_and_length (chp, &chlen);
+  int output = SCM_CHAR (SREF (string, *charidx));
   (*charidx)++;
-  *byteidx = b + chlen;
   return output;
 }
 

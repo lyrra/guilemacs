@@ -1132,7 +1132,7 @@ binding KEY to DEF is added at the front of KEYMAP.  */)
   if (length == 0)
     return Qnil;
 
-  int meta_bit = (VECTORP (key) || (STRINGP (key) && STRING_MULTIBYTE (key))
+  int meta_bit = (VECTORP (key) || (STRINGP (key) /* FIX-guilemacs: && STRING_MULTIBYTE (key)*/)
 		  ? meta_modifier : 0x80);
 
   if (VECTORP (def) && ASIZE (def) > 0 && CONSP (AREF (def, 0)))
@@ -1361,8 +1361,9 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
 	    {
 	      Lisp_Object key_item = Fsymbol_name (item);
 	      Lisp_Object new_item;
-	      if (!STRING_MULTIBYTE (key_item))
+	      //if (!STRING_MULTIBYTE (key_item))
 		new_item = Fdowncase (key_item);
+#if 0
 	      else
 		{
 		  USE_SAFE_ALLOCA;
@@ -1390,6 +1391,7 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
 						    SBYTES (key_item));
 		  SAFE_FREE ();
 		}
+#endif
 	      ASET (new_key, i, Fintern (new_item, Qnil));
 	    }
 	}
@@ -2137,8 +2139,8 @@ For an approximate inverse of this, see `kbd'.  */)
 	  if (STRINGP (list))
 	    {
 	      int c = fetch_string_char_advance (list, &i, &i_byte);
-	      if (!STRING_MULTIBYTE (list) && (c & 0200))
-		c ^= 0200 | meta_modifier;
+	      //if (!STRING_MULTIBYTE (list) && (c & 0200))
+		//c ^= 0200 | meta_modifier;
 	      key = make_fixnum (c);
 	    }
 	  else if (VECTORP (list))
