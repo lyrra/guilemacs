@@ -8672,6 +8672,9 @@ It is valid if it is nil or a symbol defined as a coding system by the
 function `define-coding-system'.  */)
   (Lisp_Object coding_system)
 {
+  // FIX-guilemacs: disabled
+  //return Qnil;
+
   Lisp_Object define_form;
 
   define_form = Fget (coding_system, Qcoding_system_define_form);
@@ -9629,19 +9632,21 @@ code_convert_string (Lisp_Object string, Lisp_Object coding_system,
          act as identity if no EOL conversion is needed.  */
       Lisp_Object attrs = CODING_ID_ATTRS (coding.id);
       if (! NILP (CODING_ATTR_ASCII_COMPAT (attrs))
-          && (STRING_MULTIBYTE (string)
-              ? (chars == bytes) : string_ascii_p (string))
+          //&& (STRING_MULTIBYTE (string)
+          //    ? (chars == bytes) : string_ascii_p (string))
           && (EQ (CODING_ID_EOL_TYPE (coding.id), Qunix)
               || inhibit_eol_conversion
-              || ! memchr (SDATA (string), encodep ? '\n' : '\r', bytes)))
+              //|| ! memchr (SDATA (string), encodep ? '\n' : '\r', bytes)
+              ))
         {
           if (! norecord)
             Vlast_coding_system_used = coding_system;
           return (nocopy
                   ? string
-                  : (encodep
-                     ? make_unibyte_string (SSDATA (string), bytes)
-                     : make_multibyte_string (SSDATA (string), bytes, bytes)));
+                  : scm_from_utf8_stringn (SSDATA (string), bytes));
+                  //(encodep
+                  // ? make_unibyte_string (SSDATA (string), bytes)
+                  // : make_multibyte_string (SSDATA (string), bytes, bytes)));
         }
     }
   else if (BUFFERP (dst_object))
@@ -10469,10 +10474,13 @@ decode_file_name (Lisp_Object fname)
 static Lisp_Object
 encode_file_name_1 (Lisp_Object fname)
 {
+  // FIX-guilemacs: disabled
+  return fname;
   /* This is especially important during bootstrap and dumping, when
      file-name encoding is not yet known, and therefore any non-ASCII
      file names are unibyte strings, and could only be thrashed if we
      try to encode them.  */
+  // FIX-guilemacs: disabled
   if (!STRING_MULTIBYTE (fname))
     return fname;
 #ifdef WINDOWSNT
@@ -10500,7 +10508,12 @@ encode_file_name (Lisp_Object fname)
      cause subtle bugs because the system would silently use a
      different filename than expected.  Perform this check after
      encoding to not miss NUL bytes introduced through encoding.  */
-  CHECK_STRING_NULL_BYTES (encoded);
+  // FIX-guilemacs: replace below inline:
+  //CHECK_STRING_NULL_BYTES (encoded);
+  int len = scm_c_string_length (encoded);
+  for (int i = 0; i < len; i++)
+    if (!SCM_CHAR (scm_c_string_ref (encoded, i)))
+      CHECK_TYPE (0, Qfilenamep, encoded);
   return encoded;
 }
 
@@ -11077,10 +11090,9 @@ usage: (define-coding-system-internal ...)  */)
     }
   ASET (attrs, coding_attr_charset_list, charset_list);
 
-  Lisp_Object safe_charsets = make_uninit_string (max_charset_id + 1);
-  memset (SDATA (safe_charsets), 255, max_charset_id + 1);
+  Lisp_Object safe_charsets = scm_c_make_string (max_charset_id + 1, scm_c_make_char (255));
   for (Lisp_Object tail = charset_list; CONSP (tail); tail = XCDR (tail))
-    SSET (safe_charsets, XFIXNAT (XCAR (tail)), 0);
+    scm_c_string_set_x (safe_charsets, XFIXNAT (XCAR (tail)), scm_c_make_char (0));
   ASET (attrs, coding_attr_safe_charsets, safe_charsets);
 
   ASET (attrs, coding_attr_ascii_compat, args[coding_arg_ascii_compatible_p]);

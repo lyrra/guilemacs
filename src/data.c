@@ -419,8 +419,9 @@ DEFUN ("multibyte-string-p", Fmultibyte_string_p, Smultibyte_string_p,
 Return nil if OBJECT is either a unibyte string, or not a string.  */)
   (Lisp_Object object)
 {
-  if (STRINGP (object) && STRING_MULTIBYTE (object))
-    return Qt;
+  // FIX-guilemacs: it's possible to call scm_string_wide_p
+  //if (STRINGP (object))
+  //  return Qt;
   return Qnil;
 }
 
@@ -2443,17 +2444,10 @@ or a byte-code object.  IDX starts at 0.  */)
   idxval = XFIXNUM (idx);
   if (STRINGP (array))
     {
-      int c;
-      ptrdiff_t idxval_byte;
-
       if (idxval < 0 || idxval >= SCHARS (array))
 	args_out_of_range (array, idx);
-      if (! STRING_MULTIBYTE (array))
-	return make_fixnum ((unsigned char) SREF (array, idxval));
-      idxval_byte = string_char_to_byte (array, idxval);
 
-      c = STRING_CHAR (SDATA (array) + idxval_byte);
-      return make_fixnum (c);
+      return make_fixnum (SREF (array, idxval));
     }
   else if (BOOL_VECTOR_P (array))
     {
@@ -2790,7 +2784,8 @@ NUMBER may be an integer or a floating point number.  */)
     {
       char *end = buffer + sizeof buffer;
       char *p = fixnum_to_string (XFIXNUM (number), buffer, end);
-      return make_unibyte_string (p, end - p);
+      //return make_unibyte_string (p, end - p);
+      return scm_from_utf8_stringn (p, end - p);
     }
 
   if (GUILEBIGNUMP (number))
@@ -2841,6 +2836,7 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
 Lisp_Object
 string_from_scheme (Lisp_Object scheme_string)
 {
+  emacs_abort ();
   size_t nbytes;
   char *c_string = scm_to_utf8_stringn (scheme_string, &nbytes);
   return make_string_from_bytes (c_string,

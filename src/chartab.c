@@ -1318,6 +1318,8 @@ DEFUN ("get-unicode-property-internal", Fget_unicode_property_internal,
 CHAR-TABLE must be what returned by `unicode-property-table-internal'. */)
   (Lisp_Object char_table, Lisp_Object ch)
 {
+  // FIX-guilemacs: needed? why?
+  return Qnil;
   CHECK_CHAR_TABLE (char_table);
   CHECK_CHARACTER (ch);
   if (! UNIPROP_TABLE_P (char_table))

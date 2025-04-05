@@ -110,41 +110,6 @@ open_directory (Lisp_Object dirname, Lisp_Object encoded_dirname, int *fdp)
   emacs_dir *d;
   int fd, opendir_errno;
 
-#if defined DOS_NT || (defined HAVE_ANDROID && !defined ANDROID_STUBIFY)
-  /* On DOS_NT, directories cannot be opened.  The emulation assumes
-     that any file descriptor other than AT_FDCWD corresponds to the
-     most recently opened directory.  This hack is good enough for
-     Emacs.
-
-     This code is also used on Android for a different reason: a
-     special `assets' directory outside the normal file system is used
-     to open assets inside the Android application package, and must
-     be listed using the opendir-like interface provided in
-     android.h.  */
-  fd = 0;
-#ifndef HAVE_ANDROID
-  d = opendir (name);
-#else
-  /* `android_opendir' can return EINTR if DIRNAME designates a file
-     within a slow-to-respond document provider.  */
-
- again:
-  d = android_opendir (name);
-
-  if (d)
-    fd = android_dirfd (d);
-  else if (errno == EINTR)
-    {
-      maybe_quit ();
-
-      /* Reload the address of DIRNAME's data, as it might have been
-	 relocated by GC.  */
-      name = SSDATA (dirname);
-      goto again;
-    }
-#endif
-  opendir_errno = errno;
-#else
   fd = emacs_open (name, O_RDONLY | O_DIRECTORY, 0);
   if (fd < 0)
     {
@@ -158,21 +123,15 @@ open_directory (Lisp_Object dirname, Lisp_Object encoded_dirname, int *fdp)
       if (! d)
 	emacs_close (fd);
     }
-#endif
 
   if (!d)
-    report_file_errno ("Opening directory", dirname, opendir_errno);
+    {
+      xsignal2 (Qerror, build_string ("opening directory"), Qnil);
+      report_file_errno ("Opening directory", dirname, opendir_errno);
+    }
   *fdp = fd;
   return d;
 }
-
-#ifdef WINDOWSNT
-static void
-directory_files_internal_w32_unwind (Lisp_Object arg)
-{
-  Vw32_get_true_file_attributes = arg;
-}
-#endif
 
 static void
 directory_files_internal_unwind (void *d)
@@ -195,14 +154,6 @@ read_dirent (emacs_dir *dir, Lisp_Object dirname)
 	return dp;
       if (! (errno == EAGAIN || errno == EINTR))
 	{
-#ifdef WINDOWSNT
-	  /* The MS-Windows implementation of 'opendir' doesn't
-	     actually open a directory until the first call to
-	     'readdir'.  If 'readdir' fails to open the directory, it
-	     sets errno to ENOENT or EACCES, see w32.c.  */
-	  if (errno == ENOENT || errno == EACCES)
-	    report_file_error ("Opening directory", dirname);
-#endif
 	  report_file_error ("Reading directory", dirname);
 	}
       maybe_quit ();
@@ -273,12 +224,14 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
     }
 #endif
 
-  if (!NILP (full) && !STRING_MULTIBYTE (directory))
+#if 0
+  if (!NILP (full))
     { /* We will be concatenating 'directory' with local file name.
          We always decode local file names, so in order to safely concatenate
          them we need 'directory' to be decoded as well (bug#56469).  */
       directory = DECODE_FILE (directory);
     }
+#endif
 
   ptrdiff_t directory_nbytes = SBYTES (directory);
   re_match_object = Qt;
@@ -298,11 +251,8 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
   for (struct dirent *dp; (dp = read_dirent (d, directory)); )
     {
       ptrdiff_t len = dirent_namelen (dp);
-      Lisp_Object name = make_unibyte_string (dp->d_name, len);
+      Lisp_Object name = scm_from_utf8_stringn (dp->d_name, len);
       Lisp_Object finalname = name;
-
-      /* This can GC.  */
-      name = DECODE_FILE (name);
 
       maybe_quit ();
 
@@ -335,14 +285,25 @@ directory_files_internal (Lisp_Object directory, Lisp_Object full,
              FIXME: This last presumption is broken when 'directory' is
              multibyte (with non-ASCII), and 'name' is unibyte with non-ASCII
              (because file-name-coding-system is 'binary').  */
-	  finalname = (nchars == nbytes)
-	              ? make_uninit_string (nbytes)
-	              : make_uninit_multibyte_string (nchars, nbytes);
-	  memcpy (SDATA (finalname), SDATA (directory), directory_nbytes);
+	  finalname = make_uninit_string (nchars);
+
+          int dirlen = scm_c_string_length (directory);
+          for (int i = 0; i < dirlen; i++)
+            {
+              scm_c_string_set_x (finalname, i,
+                                  scm_c_string_ref (directory, i));
+            }
+
 	  if (needsep)
-	    SSET (finalname, directory_nbytes, DIRECTORY_SEP);
-	  memcpy (SDATA (finalname) + directory_nbytes + needsep,
-		  SDATA (name), name_nbytes);
+	    // SSET (finalname, directory_nbytes, DIRECTORY_SEP);
+            scm_c_string_set_x (finalname, directory_nbytes, scm_c_make_char (DIRECTORY_SEP));
+	  //memcpy (SDATA (finalname) + directory_nbytes + needsep,
+		  //SDATA (name), name_nbytes);
+          for (int i = 0; i < name_nbytes; i++)
+            {
+              scm_c_string_set_x (finalname, directory_nbytes + needsep + i,
+                                  scm_c_string_ref (name, i));
+            }
 	}
       else
 	finalname = name;

@@ -858,7 +858,7 @@ fill_gstring_header (ptrdiff_t from, ptrdiff_t from_byte,
       int c
 	= (NILP (string)
 	   ? fetch_char_advance_no_check (&from, &from_byte)
-	   : fetch_string_char_advance_no_check (string, &from, &from_byte));
+	   : fetch_string_char_advance_no_check (string, &from));
       ASET (header, i + 1, make_fixnum (c));
     }
   return header;
@@ -1098,7 +1098,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
     }
   if ((NILP (string)
        && NILP (BVAR (current_buffer, enable_multibyte_characters)))
-      || (STRINGP (string) && !STRING_MULTIBYTE (string))
+      || (STRINGP (string) /*&& !STRING_MULTIBYTE (string)*/) // FIX: guilemacs
       || inhibit_auto_composition ())
     return;
   if (bytepos < 0)
