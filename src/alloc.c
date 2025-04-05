@@ -642,19 +642,10 @@ string_overflow (void)
   error ("Maximum string size exceeded");
 }
 
-static Lisp_Object make_clear_string (EMACS_INT, bool);
-static Lisp_Object make_clear_multibyte_string (EMACS_INT, EMACS_INT, bool);
-
 static Lisp_Object
 make_empty_string (int multibyte)
 {
-  Lisp_Object string;
-
-  string = allocate_string ();
-  allocate_string_data (string, 0, 0, false);
-  if (! multibyte)
-    XSTRING (string)->u.s.size_byte = -1;			\
-  return string;
+  return scm_from_utf8_string ("");
 }
 
 DEFUN ("make-string", Fmake_string, Smake_string, 2, 3, 0,
@@ -671,48 +662,7 @@ a multibyte string even if INIT is an ASCII character.  */)
   CHECK_FIXNAT (length);
   CHECK_CHARACTER (init);
 
-  int c = XFIXNAT (init);
-  bool clearit = !c;
-
-  if (ASCII_CHAR_P (c) && NILP (multibyte))
-    {
-      nbytes = XFIXNUM (length);
-      val = make_clear_string (nbytes, clearit);
-      if (nbytes && !clearit)
-	{
-	  memset (SDATA (val), c, nbytes);
-	  SDATA (val)[nbytes] = 0;
-	}
-    }
-  else
-    {
-      unsigned char str[MAX_MULTIBYTE_LENGTH];
-      ptrdiff_t len = CHAR_STRING (c, str);
-      EMACS_INT string_len = XFIXNUM (length);
-
-      if (ckd_mul (&nbytes, len, string_len))
-	string_overflow ();
-      val = make_clear_multibyte_string (string_len, nbytes, clearit);
-      if (!clearit)
-	{
-	  unsigned char *beg = SDATA (val), *end = beg + nbytes;
-	  for (unsigned char *p = beg; p < end; p += len)
-	    {
-	      /* First time we just copy STR to the data of VAL.  */
-	      if (p == beg)
-		memcpy (p, str, len);
-	      else
-		{
-		  /* Next time we copy largest possible chunk from
-		     initialized to uninitialized part of VAL.  */
-		  len = min (p - beg, end - p);
-		  memcpy (p, beg, len);
-		}
-	    }
-	}
-    }
-
-  return val;
+  return scm_make_string (length, scm_c_make_char (XFIXNUM (init)));
 }
 
 /* Fill A with 1 bits if INIT is non-nil, and with 0 bits otherwise.
@@ -804,18 +754,7 @@ usage: (bool-vector &rest OBJECTS)  */)
 Lisp_Object
 make_string (const char *contents, ptrdiff_t nbytes)
 {
-  register Lisp_Object val;
-  ptrdiff_t nchars, multibyte_nbytes;
-
-  parse_str_as_multibyte ((const unsigned char *) contents, nbytes,
-			  &nchars, &multibyte_nbytes);
-  if (nbytes == nchars || nbytes != multibyte_nbytes)
-    /* CONTENTS contains no multibyte sequences or contains an invalid
-       multibyte sequence.  We must make unibyte string.  */
-    val = make_unibyte_string (contents, nbytes);
-  else
-    val = make_multibyte_string (contents, nchars, nbytes);
-  return val;
+  return scm_from_utf8_stringn (contents, nbytes);
 }
 
 /* Make a unibyte string from LENGTH bytes at CONTENTS.  */
@@ -823,10 +762,7 @@ make_string (const char *contents, ptrdiff_t nbytes)
 Lisp_Object
 make_unibyte_string (const char *contents, ptrdiff_t length)
 {
-  register Lisp_Object val;
-  val = make_uninit_string (length);
-  memcpy (SDATA (val), contents, length);
-  return val;
+  return scm_from_utf8_stringn (contents, length);
 }
 
 
@@ -837,12 +773,11 @@ Lisp_Object
 make_multibyte_string (const char *contents,
 		       ptrdiff_t nchars, ptrdiff_t nbytes)
 {
-  register Lisp_Object val;
-  val = make_uninit_multibyte_string (nchars, nbytes);
-  memcpy (SDATA (val), contents, nbytes);
-  return val;
+  // FIX-guilemacs: for safety, should use nchars
+  if (nchars != nbytes)
+    emacs_abort ();
+  return scm_from_utf8_stringn (contents, nbytes);
 }
-
 
 /* Make a string from NCHARS characters occupying NBYTES bytes at
    CONTENTS.  It is a multibyte string if NBYTES != NCHARS.  */
@@ -851,6 +786,8 @@ Lisp_Object
 make_string_from_bytes (const char *contents,
 			ptrdiff_t nchars, ptrdiff_t nbytes)
 {
+  // FIX-guilemacs: any nasty edge-cases? use something like guile bytevector->string ?
+  emacs_abort ();
   register Lisp_Object val;
   val = make_uninit_multibyte_string (nchars, nbytes);
   memcpy (SDATA (val), contents, nbytes);
@@ -869,38 +806,11 @@ Lisp_Object
 make_specified_string (const char *contents,
 		       ptrdiff_t nchars, ptrdiff_t nbytes, bool multibyte)
 {
-  Lisp_Object val;
-
   if (nchars < 0)
     {
-      if (multibyte)
-	nchars = multibyte_chars_in_text ((const unsigned char *) contents,
-					  nbytes);
-      else
-	nchars = nbytes;
+      return scm_from_utf8_stringn (contents, nbytes);
     }
-  val = make_uninit_multibyte_string (nchars, nbytes);
-  memcpy (SDATA (val), contents, nbytes);
-  if (!multibyte)
-    STRING_SET_UNIBYTE (val);
-  return val;
-}
-
-
-/* Return a unibyte Lisp_String set up to hold LENGTH characters
-   occupying LENGTH bytes.  If CLEARIT, clear its contents to null
-   bytes; otherwise, the contents are uninitialized.  */
-
-static Lisp_Object
-make_clear_string (EMACS_INT length, bool clearit)
-{
-  Lisp_Object val;
-
-  if (!length)
-    return empty_unibyte_string;
-  val = make_clear_multibyte_string (length, length, clearit);
-  STRING_SET_UNIBYTE (val);
-  return val;
+  return scm_from_utf8_stringn (contents, nbytes);
 }
 
 /* Return a unibyte Lisp_String set up to hold LENGTH characters
@@ -909,28 +819,7 @@ make_clear_string (EMACS_INT length, bool clearit)
 Lisp_Object
 make_uninit_string (EMACS_INT length)
 {
-  return make_clear_string (length, false);
-}
-
-
-/* Return a multibyte Lisp_String set up to hold NCHARS characters
-   which occupy NBYTES bytes.  If CLEARIT, clear its contents to null
-   bytes; otherwise, the contents are uninitialized.  */
-
-static Lisp_Object
-make_clear_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes, bool clearit)
-{
-  Lisp_Object string;
-
-  if (nchars < 0)
-    emacs_abort ();
-  if (!nbytes)
-    return empty_multibyte_string;
-
-  string = allocate_string ();
-  ((struct Lisp_String *) SCM_SMOB_DATA (string))->u.s.intervals = NULL;
-  allocate_string_data (string, nchars, nbytes, clearit);
-  return string;
+  return scm_c_make_string (length, SCM_UNDEFINED);
 }
 
 /* Return a multibyte Lisp_String set up to hold NCHARS characters
@@ -939,7 +828,8 @@ make_clear_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes, bool clearit)
 Lisp_Object
 make_uninit_multibyte_string (EMACS_INT nchars, EMACS_INT nbytes)
 {
-  return make_clear_multibyte_string (nchars, nbytes, false);
+  // FIX-guilemacs: what if nchars /= nbytes ?
+  return scm_c_make_string (nchars, scm_c_make_char (32));
 }
 
 /* Print arguments to BUF according to a FORMAT, then return
@@ -1379,11 +1269,9 @@ Its value is void, and its function definition and property list are nil.  */)
   (Lisp_Object name)
 {
   Lisp_Object val;
-
   CHECK_STRING (name);
 
-  val = scm_make_symbol (scm_from_utf8_stringn (SSDATA (name),
-                                                SBYTES (name)));
+  val = scm_make_symbol (name);
   return val;
 }
 
@@ -1666,7 +1554,7 @@ make_pure_string (const char *data,
 Lisp_Object
 make_pure_c_string (const char *data, ptrdiff_t nchars)
 {
-  return build_string (data);
+  return scm_from_utf8_stringn (data, nchars);
 }
 
 Lisp_Object
