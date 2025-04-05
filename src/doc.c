@@ -518,6 +518,7 @@ the same file name is found in the `doc-directory'.  */)
   dirname = SSDATA (Vdoc_directory);
   dirlen = SBYTES (Vdoc_directory);
 
+  // FIX-guilemacs: rebase fault, count shouldn't exist (replaced by dynwind)
   specpdl_ref count = SPECPDL_INDEX ();
   USE_SAFE_ALLOCA;
   name = SAFE_ALLOCA (dirlen + SBYTES (filename) + 1);
