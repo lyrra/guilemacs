@@ -152,14 +152,9 @@ DEFUN ("char-to-string", Fchar_to_string, Schar_to_string, 1, 1, 0,
 usage: (char-to-string CHAR)  */)
   (Lisp_Object character)
 {
-  int c, len;
-  unsigned char str[MAX_MULTIBYTE_LENGTH];
-
   CHECK_CHARACTER (character);
-  c = XFIXNAT (character);
-
-  len = CHAR_STRING (c, str);
-  return make_string_from_bytes ((char *) str, 1, len);
+  Lisp_Object s = scm_c_make_string (1, scm_c_make_char (XFIXNUM (character)));
+  return s;
 }
 
 DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
@@ -181,9 +176,7 @@ DEFUN ("string-to-char", Fstring_to_char, Sstring_to_char, 1, 1, 0,
   CHECK_STRING (string);
 
   /* This returns zero if STRING is empty.  */
-  return make_fixnum (STRING_MULTIBYTE (string)
-		      ? STRING_CHAR (SDATA (string))
-		      : SREF (string, 0));
+  return make_fixnum (SREF (string, 0));
 }
 
 DEFUN ("point", Fpoint, Spoint, 0, 0, 0,
@@ -1558,6 +1551,10 @@ make_buffer_string (ptrdiff_t start, ptrdiff_t end, bool props)
   ptrdiff_t start_byte = CHAR_TO_BYTE (start);
   ptrdiff_t end_byte = CHAR_TO_BYTE (end);
 
+  // FIX: buf_charpos_to_bytepos used by CHAR_TO_BYTE returns wrong value
+  start_byte = start;
+  end_byte = end;
+  // return make_buffer_string_both (start, start_byte, end, end_byte, props);
   return make_buffer_string_both (start, start_byte, end, end_byte, props);
 }
 
@@ -1566,20 +1563,19 @@ make_buffer_string (ptrdiff_t start, ptrdiff_t end, bool props)
 
    If text properties are in use and the current buffer
    has properties in the range specified, the resulting string will also
-   have them, if PROPS is true.
-
-   We don't want to use plain old make_string here, because it calls
-   make_uninit_string, which can cause the buffer arena to be
-   compacted.  make_string has no way of knowing that the data has
-   been moved, and thus copies the wrong data into the string.  This
-   doesn't effect most of the other users of make_string, so it should
-   be left as is.  But we should use this function when conjuring
-   buffer substrings.  */
+   have them, if PROPS is true.  */
 
 Lisp_Object
 make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
 			 ptrdiff_t end, ptrdiff_t end_byte, bool props)
 {
+  if (end != end_byte || start != start_byte)
+    {
+      fprintf(stderr, "ABORT: end != end_byte: %d, %d OR: start != start_byte: %d, %d\n",
+              end, end_byte, start, start_byte);
+      emacs_abort ();
+    }
+
   Lisp_Object result, tem, tem1;
   ptrdiff_t beg0, end0, beg1, end1, size;
 
@@ -1606,9 +1602,11 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
     result = make_uninit_string (end - start);
 
   size = end0 - beg0;
-  memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
+  // memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
+  result = scm_from_utf8_stringn (BYTE_POS_ADDR (beg0), size);
   if (beg1 != -1)
-    memcpy (SDATA (result) + size, BEG_ADDR + beg1, end1 - beg1);
+    // memcpy (SDATA (result) + size, BEG_ADDR + beg1, end1 - beg1);
+    result = scm_string_append (list2 (result, scm_from_utf8_stringn (BEG_ADDR + beg1, end1 - beg1)));
 
   /* If desired, update and copy the text properties.  */
   if (props)
@@ -1618,9 +1616,10 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
       tem = Fnext_property_change (make_fixnum (start), Qnil, make_fixnum (end));
       tem1 = Ftext_properties_at (make_fixnum (start), Qnil);
 
-      if (XFIXNUM (tem) != end || !NILP (tem1))
-	copy_intervals_to_string (result, current_buffer, start,
-				  end - start);
+      //if (XFIXNUM (tem) != end || !NILP (tem1))
+        // FIX-guilemacs: string intervals not supported
+	//copy_intervals_to_string (result, current_buffer, start,
+	//			  end - start);
     }
 
   return result;
@@ -3421,7 +3420,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   char initial_buffer[1000 + SPRINTF_BUFSIZE];
   char *buf = initial_buffer;
   ptrdiff_t bufsize = sizeof initial_buffer;
-  ptrdiff_t max_bufsize = STRING_BYTES_BOUND + 1;
   char *p;
   char *format, *end;
   ptrdiff_t nchars;
@@ -3453,7 +3451,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 
   CHECK_STRING (args[0]);
   char *format_start = SSDATA (args[0]);
-  bool multibyte_format = STRING_MULTIBYTE (args[0]);
+  bool multibyte_format = false;
   ptrdiff_t formatlen = SBYTES (args[0]);
   bool fmt_props = !!string_intervals (args[0]);
 
@@ -3473,18 +3471,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
   char *discarded = (char *) &info[nspec_bound];
   memset (discarded, 0, formatlen);
 
-  /* Try to determine whether the result should be multibyte.
-     This is not always right; sometimes the result needs to be multibyte
-     because of an object that we will pass through prin1.
-     or because a grave accent or apostrophe is requoted,
-     and in that case, we won't know it here.  */
-
-  /* True if the output should be a multibyte string,
-     which is true if any of the inputs is one.  */
-  bool multibyte = multibyte_format;
-  for (ptrdiff_t i = 1; !multibyte && i < nargs; i++)
-    if (STRINGP (args[i]) && STRING_MULTIBYTE (args[i]))
-      multibyte = true;
+  bool multibyte = false;
 
   Lisp_Object quoting_style = message ? Ftext_quoting_style () : Qnil;
 
@@ -3589,8 +3576,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  zero_flag &= ! minus_flag;
 
 	  num = str2num (format, &num_end);
-	  if (max_bufsize <= num)
-	    string_overflow ();
 	  ptrdiff_t field_width = num;
 
 	  bool precision_given = *num_end == '.';
@@ -3637,11 +3622,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		{
 		  Lisp_Object noescape = conversion == 'S' ? Qnil : Qt;
 		  spec->argument = arg = Fprin1_to_string (arg, noescape, Qnil);
-		  if (STRING_MULTIBYTE (arg) && ! multibyte)
-		    {
-		      multibyte = true;
-		      goto retry;
-		    }
 		}
 	      conversion = 's';
 	    }
@@ -3649,11 +3629,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    {
 	      if (FIXNUMP (arg) && ! ASCII_CHAR_P (XFIXNUM (arg)))
 		{
-		  if (!multibyte)
-		    {
-		      multibyte = true;
-		      goto retry;
-		    }
 		  spec->argument = arg = Fchar_to_string (arg);
 		}
 
@@ -3665,11 +3640,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  if (SYMBOLP (arg))
 	    {
 	      spec->argument = arg = SYMBOL_NAME (arg);
-	      if (STRING_MULTIBYTE (arg) && ! multibyte)
-		{
-		  multibyte = true;
-		  goto retry;
-		}
 	    }
 
 	  bool float_conversion
@@ -3716,14 +3686,10 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		}
 
 	      convbytes = nbytes;
-	      if (convbytes && multibyte && ! STRING_MULTIBYTE (arg))
-		convbytes = count_size_as_multibyte (SDATA (arg), nbytes);
 
 	      ptrdiff_t padding
 		= width < field_width ? field_width - width : 0;
 
-	      if (max_bufsize - padding <= convbytes)
-		string_overflow ();
 	      convbytes += padding;
 	      if (convbytes <= buf + bufsize - p)
 		{
@@ -3743,15 +3709,13 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		    spec->start = nchars;
 
 		  if (p > buf
-		      && multibyte
 		      && !ASCII_CHAR_P (*((unsigned char *) p - 1))
-		      && STRING_MULTIBYTE (arg)
 		      && !CHAR_HEAD_P (SREF (arg, 0)))
 		    maybe_combine_byte = true;
 
 		  p += copy_text (SDATA (arg), (unsigned char *) p,
 				  nbytes,
-				  STRING_MULTIBYTE (arg), multibyte);
+				  false, false);
 
 		  nchars += nchars_string;
 
@@ -4005,9 +3969,6 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		numwidth = PTRDIFF_MAX;
 	      ptrdiff_t padding
 		= numwidth < field_width ? field_width - numwidth : 0;
-	      if (max_bufsize - (prefixlen + sprintf_bytes) <= excess_precision
-		  || max_bufsize - padding <= numwidth)
-		string_overflow ();
 	      convbytes = numwidth + padding;
 
 	      if (convbytes <= buf + bufsize - p)
@@ -4165,15 +4126,8 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	string_overflow ();
       if (bufsize <= buflen_needed)
 	{
-	  if (max_bufsize <= buflen_needed)
-	    string_overflow ();
 
-	  /* Either there wasn't enough room to store this conversion,
-	     or there won't be enough room to do a sprintf the next
-	     time through the loop.  Allocate enough room (and then some).  */
-
-	  bufsize = (buflen_needed <= max_bufsize / 2
-		     ? buflen_needed * 2 : max_bufsize);
+	  bufsize = buflen_needed;
 
 	  if (buf == initial_buffer)
 	    {
