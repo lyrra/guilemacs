@@ -4981,7 +4981,7 @@ face_before_or_after_it_pos (struct it *it, bool before_p)
       /* Correct the face for charsets different from ASCII.  Do it
 	 for the multibyte case only.  The face returned above is
 	 suitable for unibyte text if IT->string is unibyte.  */
-      if (STRING_MULTIBYTE (it->string))
+      if (false /*STRING_MULTIBYTE (it->string)*/)
 	{
 	  struct text_pos pos1 = string_pos (charpos, it->string);
 	  const unsigned char *p = SDATA (it->string) + BYTEPOS (pos1);
@@ -6724,7 +6724,7 @@ handle_composition_prop (struct it *it)
       pos_byte = IT_STRING_BYTEPOS (*it);
       string = it->string;
       s = SDATA (string) + pos_byte;
-      if (STRING_MULTIBYTE (string))
+      if (false /*STRING_MULTIBYTE (string)*/)
 	it->c = STRING_CHAR (s);
       else
 	it->c = *s;
@@ -7141,7 +7141,7 @@ get_overlay_strings_1 (struct it *it, ptrdiff_t charpos, bool compute_stop_p)
       it->end_charpos = SCHARS (it->string);
       it->prev_stop = 0;
       it->base_level_stop = 0;
-      it->multibyte_p = STRING_MULTIBYTE (it->string);
+      it->multibyte_p = false; //STRING_MULTIBYTE (it->string);
       it->method = GET_FROM_STRING;
       it->from_disp_prop_p = 0;
       it->cmp_it.id = -1;
@@ -9427,7 +9427,7 @@ next_element_from_string (struct it *it)
 	{
 	  return true;
 	}
-      else if (STRING_MULTIBYTE (it->string))
+      else if (false) //STRING_MULTIBYTE (it->string)
 	{
 	  const unsigned char *s = (SDATA (it->string)
 				    + IT_STRING_BYTEPOS (*it));
@@ -9465,7 +9465,7 @@ next_element_from_string (struct it *it)
 	{
 	  return true;
 	}
-      else if (STRING_MULTIBYTE (it->string))
+      else if (false /*STRING_MULTIBYTE (it->string)*/)
 	{
 	  const unsigned char *s = (SDATA (it->string)
 				    + IT_STRING_BYTEPOS (*it));
@@ -12139,7 +12139,7 @@ vadd_to_log (char const *format, va_list ap)
   char *buffer = SAFE_ALLOCA (len);
   memcpy (buffer, SDATA (msg), len);
 
-  message_dolog (buffer, len - 1, true, STRING_MULTIBYTE (msg));
+  message_dolog (buffer, len - 1, true);
   SAFE_FREE ();
 }
 
@@ -12150,13 +12150,12 @@ void
 message_log_maybe_newline (void)
 {
   if (message_log_need_newline)
-    message_dolog ("", 0, true, false);
+    message_dolog ("", 0, true);
 }
 
 
 /* Add a string M of length NBYTES to the message log, optionally
-   terminated with a newline when NLFLAG is true.  MULTIBYTE, if
-   true, means interpret the contents of M as multibyte.  This
+   terminated with a newline when NLFLAG is true. This
    function calls low-level routines in order to bypass text property
    hooks, etc. which might not be safe to run.
 
@@ -12164,7 +12163,7 @@ message_log_maybe_newline (void)
    so the buffer M must NOT point to a Lisp string.  */
 
 void
-message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
+message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag)
 {
   const unsigned char *msg = (const unsigned char *) m;
 
@@ -12218,21 +12217,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag, bool multibyte)
 
       /* Insert the string--maybe converting multibyte to single byte
 	 or vice versa, so that all the text fits the buffer.  */
-      if (multibyte
-	  && NILP (BVAR (current_buffer, enable_multibyte_characters)))
-	{
-	  /* Convert a multibyte string to single-byte
-	     for the *Message* buffer.  */
-	  for (ptrdiff_t i = 0; i < nbytes; )
-	    {
-	      int char_bytes, c = check_char_and_length (msg + i, &char_bytes);
-	      char work = CHAR_TO_BYTE8 (c);
-	      insert_1_both (&work, 1, 1, true, false, false);
-	      i += char_bytes;
-	    }
-	}
-      else if (! multibyte
-	       && ! NILP (BVAR (current_buffer, enable_multibyte_characters)))
+      if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	{
 	  /* Convert a single-byte string to multibyte
 	     for the *Message* buffer.  */
@@ -13357,7 +13342,7 @@ set_message (Lisp_Object string)
 
   if (NILP (message))
     {
-      message_enable_multibyte = STRING_MULTIBYTE (string);
+      message_enable_multibyte = false; // STRING_MULTIBYTE (string);
 
       with_echo_area_buffer (0, -1, set_message_1, 0, string);
       message_buf_print = false;
@@ -27818,7 +27803,7 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		break;
 	      case MODE_LINE_DISPLAY:
 		n += display_string (NULL, elt, Qnil, 0, 0, it,
-				     0, prec, 0, STRING_MULTIBYTE (elt));
+				     0, prec, 0, false /*STRING_MULTIBYTE (elt)*/);
 		break;
 	      }
 
@@ -27880,7 +27865,8 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 			nchars = string_byte_to_char (elt, offset) - charpos;
 		      n += display_string (NULL, elt, Qnil, 0, charpos,
 					   it, 0, nchars, 0,
-					   STRING_MULTIBYTE (elt));
+					   false //STRING_MULTIBYTE (elt)
+                                           );
 		    }
 		    break;
 		  }
@@ -27914,12 +27900,12 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		    Lisp_Object string;
 
 		    bytepos = percent_position;
-		    charpos = (STRING_MULTIBYTE (elt)
-			       ? string_byte_to_char (elt, bytepos)
-			       : bytepos);
+		    charpos = bytepos;// (STRING_MULTIBYTE (elt)
+			       //? string_byte_to_char (elt, bytepos)
+			       //: bytepos);
 		    spec = decode_mode_spec (it->w, c, field, &string);
 		    eassert (NILP (string) || STRINGP (string));
-		    multibyte = !NILP (string) && STRING_MULTIBYTE (string);
+		    multibyte = !NILP (string) && false; // STRING_MULTIBYTE (string);
 		    /* Non-ASCII characters in SPEC should cause mode-line
 		       element be displayed as a multibyte string.  */
 		    ptrdiff_t nbytes = strlen (spec);

@@ -488,7 +488,7 @@ fast_string_match_internal (Lisp_Object regexp, Lisp_Object string,
   re_match_object = string;
   dynwind_begin ();
   struct regexp_cache *cache_entry
-    = compile_pattern (regexp, 0, table, 0, STRING_MULTIBYTE (string));
+    = compile_pattern (regexp, 0, table, 0, false);
   freeze_pattern (cache_entry);
   ptrdiff_t val = re_search (&cache_entry->buf, SSDATA (string),
 			     SBYTES (string), 0,
@@ -1316,12 +1316,13 @@ search_buffer_non_re (Lisp_Object string, ptrdiff_t pos,
      We must convert PATTERN to match that, or we will not really
      find things right.  */
 
-  if (multibyte == STRING_MULTIBYTE (string))
-    {
+//  if (multibyte == STRING_MULTIBYTE (string))
+//    {
       raw_pattern = SDATA (string);
       raw_pattern_size = SCHARS (string);
       raw_pattern_size_byte = SBYTES (string);
-    }
+//    }
+/*
   else if (multibyte)
     {
       raw_pattern_size = SCHARS (string);
@@ -3213,7 +3214,7 @@ DEFUN ("regexp-quote", Fregexp_quote, Sregexp_quote, 1, 1, 0,
        ? make_specified_string (temp,
                                 SCHARS (string) + backslashes_added,
                                 out - temp,
-                                STRING_MULTIBYTE (string))
+                                false)
        : string);
   SAFE_FREE ();
   return result;
