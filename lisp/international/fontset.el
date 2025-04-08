@@ -530,7 +530,7 @@
 		  (name target font-spec &optional frame add))
 
 ; FIX-GUILEMACS: disabled too much here
-'(eval-when-compile
+(eval-when-compile
 
 ;; Build data to initialize the default fontset at compile time to
 ;; avoid loading charsets that won't be necessary at runtime.
