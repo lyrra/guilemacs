@@ -1395,8 +1395,8 @@ string the same way whether it is unibyte or multibyte.)  */)
 {
   CHECK_STRING (string);
 
-  if (STRING_MULTIBYTE (string))
-    return string;
+  //if (STRING_MULTIBYTE (string))
+  //  return string;
 
   ptrdiff_t nchars = SCHARS (string);
   ptrdiff_t nbytes = count_size_as_multibyte (SDATA (string), nchars);
