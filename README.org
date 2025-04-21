@@ -328,6 +328,20 @@ echo GUILE=/t/ge/g3/lib > env.sh
 
 The prelude tests are located in the "test/pre" directory.
 
+** filter what tests to run
+
+using the --filter flag for the "run-tests.scm" script it is possible
+to filter what test that should be run, example:
+#+BEGIN_SRC
+./tool/run-tests.sh --prelude --filter=pre/eq
+#+END_SRC
+
+In this example we single out the only matching file "tests/pre/eq.scm" that will
+be runned.
+
+As for now, the --filter argument only works for the file name (ie, it doesnt filter using
+the test names).
+
 *** debug tests c-prelude
 
 To manually debug a bare Emacs session under gdb,
