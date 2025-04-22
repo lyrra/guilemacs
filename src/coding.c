@@ -11092,7 +11092,8 @@ usage: (define-coding-system-internal ...)  */)
 
   Lisp_Object safe_charsets = scm_c_make_string (max_charset_id + 1, scm_c_make_char (255));
   for (Lisp_Object tail = charset_list; CONSP (tail); tail = XCDR (tail))
-    scm_c_string_set_x (safe_charsets, XFIXNAT (XCAR (tail)), scm_c_make_char (0));
+    // FIX-guilemacs-string: 32 was 0, we can't have 0 in scheme strings
+    scm_c_string_set_x (safe_charsets, XFIXNAT (XCAR (tail)), scm_c_make_char (32));
   ASET (attrs, coding_attr_safe_charsets, safe_charsets);
 
   ASET (attrs, coding_attr_ascii_compat, args[coding_arg_ascii_compatible_p]);
