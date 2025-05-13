@@ -2796,7 +2796,7 @@ NUMBER may be an integer or a floating point number.  */)
   if (GUILEBIGNUMP (number))
     {
       // guilemacs, missing ancient feature: If BASE is negative, use upper-case digits in base -BASE.
-      return string_from_scheme (scm_number_to_string (number, make_fixnum (10)));
+      return scm_number_to_string (number, make_fixnum (10));
     }
 
   if (FLOATP (number))
