@@ -5239,7 +5239,7 @@ enum MAX_ALLOCA { MAX_ALLOCA = 16 * 1024 };
 
 #define AUTO_STRING_WITH_LEN(name, str, len)				\
   Lisp_Object name =							\
-     build_string (str)
+     make_string (str, len)
 
 /* The maximum length of "small" lists, as a heuristic.  These lists
    are so short that code need not check for cycles or quits while
