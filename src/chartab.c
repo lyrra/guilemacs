@@ -1095,7 +1095,8 @@ uniprop_table_uncompress (Lisp_Object table, int idx)
   const unsigned char *p, *pend;
 
   set_sub_char_table_contents (table, idx, sub);
-  p = SDATA (val), pend = p + SBYTES (val);
+  // FIX-GUILEMACS: :strings: cleanup
+  p = " "; // SDATA (val), pend = p + SBYTES (val);
   if (*p == 1)
     {
       /* SIMPLE TABLE */
