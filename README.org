@@ -621,6 +621,68 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   The coverage statistics is found in the file src/fns.c.gcov
   and will tell you what c-lines are runned.
 
+* troubleshooting
+** nul character in guile-string
+
+WHEN:
+
+  anytime during un of emacs
+
+SYMPTOMS:
+
+  FIX
+
+ERROR:
+
+  The emacs process prints to standard output/error.
+  Guile controls the standard input/output/error, and will
+  re-print them to the terminal so we can see the output
+  from emacs. Guile will prepend each line with '>>>'.
+
+  Emacs is printing a zero byte which guile stumbles upon,
+  and it is unexpected.
+
+COMPONENTS:
+
+  emacs, guile-test-program (tool/run-tests.scm)
+** emacs prints a null byte :test:
+WHEN:
+
+  running emacs inside guile
+
+SYMPTOMS:
+
+  | 0:0 >>> Scheme error: misc-error, (#^Scheme #f> "string contains #\\nul character: ~S" ("") #^Scheme #f>)
+
+ERROR:
+
+  The emacs process prints to standard output/error.
+  Guile controls the standard input/output/error, and will
+  re-print them to the terminal so we can see the output
+  from emacs. Guile will prepend each line with '>>>'.
+
+  Emacs is printing a zero byte which guile stumbles upon,
+  and it is unexpected.
+
+COMPONENTS:
+
+  emacs, guile-test-program (tool/run-tests.scm)
+
+** find scheme function name from pointer
+WHEN:
+  Something has gone wrong, and guile is printing some error message
+  containing a procedure reference:
+  | '#<scheme #<procedure 7fffe5d5fa00 at ice-9/eval.scm:417:6 args>>
+
+GOAL
+  To find out the procedure name.
+DO
+  | (gdb) call scm_object_to_string(0x7fffe5d5fa00, scm_current_output_port())
+
+  Note guile will again run into an error but the stacktrace now contain the name:
+  | Backtrace:
+  | In ice-9/eval.scm:
+  |   619:8 19 (_ #(#(#(#(#<directory (guile-user) 7ffff2b13c80>) tramp-password-prompt-regexp
 * bugs
 ** faults
 
