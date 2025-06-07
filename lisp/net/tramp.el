@@ -683,7 +683,7 @@ This regexp must match both `tramp-initial-end-of-output' and
    `(: bol (* nonl)
        (group (| . ,password-word-equivalents))
        (* nonl) (any . ,tramp-compat-password-colon-equivalents)
-       (? "\^@") (* blank)))
+       (? "   ") (* blank)))
   "Regexp matching password-like prompts.
 The regexp should match at end of buffer.
 
