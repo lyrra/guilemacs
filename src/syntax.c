@@ -1268,11 +1268,11 @@ usage: (modify-syntax-entry CHAR NEWENTRY &optional SYNTAX-TABLE)  */)
   else
     check_syntax_table (syntax_table);
 
-  newentry = Fstring_to_syntax (newentry);
-  if (CONSP (c))
-    SET_RAW_SYNTAX_ENTRY_RANGE (syntax_table, c, newentry);
-  else
-    SET_RAW_SYNTAX_ENTRY (syntax_table, XFIXNUM (c), newentry);
+  //newentry = Fstring_to_syntax (newentry);
+  //if (CONSP (c))
+  //  SET_RAW_SYNTAX_ENTRY_RANGE (syntax_table, c, newentry);
+  //else
+  //  SET_RAW_SYNTAX_ENTRY (syntax_table, XFIXNUM (c), newentry);
 
   /* We clear the regexp cache, since character classes can now have
      different values from those in the compiled regexps.*/
