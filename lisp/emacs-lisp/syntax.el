@@ -316,18 +316,18 @@ all RULES in total."
                           (thiscode
                            (cond
                             ((stringp action)
-                             `((put-text-property
+                             `('(put-text-property
                                 (match-beginning ,gn) (match-end ,gn)
                                 'syntax-table
-                                ',(string-to-syntax action))))
+                                ',(list 'string-to-syntax action))))
                             ((eq (car-safe action) 'ignore)
                              (cdr action))
                             ((eq (car-safe action) 'prog1)
                              (if (stringp (nth 1 action))
-                                 `((put-text-property
+                                 `('(put-text-property
                                     (match-beginning ,gn) (match-end ,gn)
                                     'syntax-table
-                                    ',(string-to-syntax (nth 1 action)))
+                                    ',(list 'string-to-syntax (nth 1 action)))
                                    ,@(nthcdr 2 action))
                                `((let ((mb (match-beginning ,gn))
                                        (me (match-end ,gn)))

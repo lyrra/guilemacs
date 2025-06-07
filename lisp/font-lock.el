@@ -1477,7 +1477,7 @@ see `font-lock-syntactic-keywords'."
 	    (error "No match %d in highlight %S" match highlight))
       (when (and (consp value) (not (numberp (car value))))
 	(setq value (eval value t)))
-      (when (stringp value) (setq value (string-to-syntax value)))
+;     (when (stringp value) (setq value (string-to-syntax value)))
       ;; Flush the syntax-cache.  I believe this is not necessary for
       ;; font-lock's use of syntax-ppss, but I'm not 100% sure and it can
       ;; still be necessary for other users of syntax-ppss anyway.
