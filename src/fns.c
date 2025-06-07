@@ -1339,6 +1339,7 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
 Lisp_Object
 string_to_multibyte (Lisp_Object string)
 {
+  return string;
   if (STRING_MULTIBYTE (string))
     return string;
 
