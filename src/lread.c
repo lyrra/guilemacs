@@ -2786,15 +2786,15 @@ read_char_escape (Lisp_Object readcharfun, int next_char)
     case -1:
       end_of_file_error ();
 
-    case 'a': chr = '\a'; break;
-    case 'b': chr = '\b'; break;
-    case 'd': chr =  127; break;
-    case 'e': chr =   27; break;
-    case 'f': chr = '\f'; break;
-    case 'n': chr = '\n'; break;
-    case 'r': chr = '\r'; break;
-    case 't': chr = '\t'; break;
-    case 'v': chr = '\v'; break;
+    case 'a': chr = '\a'; break; // audible bell
+    case 'b': chr = '\b'; break; // backspace
+    case 'd': chr =  127; break; // delete
+    case 'e': chr =   27; break; // escape
+    case 'f': chr = '\f'; break; // form feed
+    case 'n': chr = '\n'; break; // newline
+    case 'r': chr = '\r'; break; // carriage return
+    case 't': chr = '\t'; break; // horizontal tab
+    case 'v': chr = '\v'; break; // vertical tab
 
     case '\n':
       /* ?\LF is an error; it's probably a user mistake.  */
