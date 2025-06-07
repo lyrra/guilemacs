@@ -971,7 +971,7 @@ unset all properties and colors."
       (when do-clear
         (setq do-clear nil)
         ;; Zero out our bool vector without any allocation.
-        (bool-vector-intersection basic-faces #&8"\0" basic-faces)
+        ;(bool-vector-intersection basic-faces #&8"\0" basic-faces)
         (setcar colors nil)
         (setcar (cdr colors) nil)))))
 
