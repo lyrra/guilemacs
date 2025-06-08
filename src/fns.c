@@ -271,9 +271,7 @@ Letter-case is significant, but text properties are ignored. */)
   CHECK_STRING (string1);
   CHECK_STRING (string2);
 
-  bool use_byte_compare =
-    !NILP (bytecompare)
-    || (!STRING_MULTIBYTE (string1) && !STRING_MULTIBYTE (string2));
+  bool use_byte_compare = false;
   ptrdiff_t len1 = use_byte_compare ? SBYTES (string1) : SCHARS (string1);
   ptrdiff_t len2 = use_byte_compare ? SBYTES (string2) : SCHARS (string2);
   ptrdiff_t x, y, lastdiag, olddiag;
@@ -4088,7 +4086,7 @@ base64_encode_string_1 (Lisp_Object string, bool line_break,
   encoded_length = base64_encode_1 (SSDATA (string),
 				    encoded, length, line_break,
 				    pad, base64url,
-				    STRING_MULTIBYTE (string));
+				    true);
   if (encoded_length > allength)
     emacs_abort ();
 
@@ -5736,10 +5734,10 @@ extract_data_from_object (Lisp_Object spec,
 	{
 	  /* Decide the coding-system to encode the data with.  */
 
-	  if (STRING_MULTIBYTE (object))
+	  //if (STRING_MULTIBYTE (object))
 	    /* use default, we can't guess correct value */
-	    coding_system = preferred_coding_system ();
-	  else
+	    //coding_system = preferred_coding_system ();
+	  //else
 	    coding_system = Qraw_text;
 	}
 
@@ -5753,9 +5751,9 @@ extract_data_from_object (Lisp_Object spec,
 	    xsignal1 (Qcoding_system_error, coding_system);
 	}
 
-      if (STRING_MULTIBYTE (object))
-	object = code_convert_string (object, coding_system,
-				      Qnil, true, false, true);
+      //if (STRING_MULTIBYTE (object))
+	//object = code_convert_string (object, coding_system,
+	//			      Qnil, true, false, true);
 
       ptrdiff_t size = SCHARS (object), start_char, end_char;
       validate_subarray (object, start, end, size, &start_char, &end_char);
