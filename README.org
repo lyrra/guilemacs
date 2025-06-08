@@ -621,6 +621,63 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
   The coverage statistics is found in the file src/fns.c.gcov
   and will tell you what c-lines are runned.
 
+** gdb debugging ERT tests
+run the test scripts:
+
+| sh tool/run-tests.sh --filter=/fns-tests
+| ...
+| running ===> (../src/emacs --no-init-file --no-site-file --no-site-lisp -L :. -l ert -l src/fns-tests --batch --eval '(ert-run-tests-batch-and-exit (quote (not (or (tag :expensive-test) (tag :unstable) (tag :nativecomp)))))' 2>&1)
+| ...
+| failed ERT tests: (("fns-test-base64url-encode-string") ("fns-test-base64url-encode-region") ("fns-tests-string-version-lessp") ("fns-tests-collate-sort") ("fns-tests-sort-gc") ("fns-tests-sort-kw") ("fns-tests-sort") ("fns-tests-collate-strings") ("fns-tests-compare-strings") ("fns-tests-nreverse-bool-vector") ("fns-tests-reverse-bool-vector") ("fns-tests-nreverse") ("fns-tests-reverse") ("fns-tests-equal-including-properties") ("fns-tests-equality-nan") ("fns-tests-safe-length") ("fns-tests-length") ("fns-tests-identity"))
+| ...
+
+Note that ERT uses condition-case, so the tests will abort silently.
+
+By moving out the test code in an ert test case (just put them outside of ert-deftest, we will trigger the error.
+Example:
+
+|(base64-encode-string "")
+|
+|(ert-deftest fns-tests-base64-encode-string ()
+|  ;; standard variant RFC2045
+|  (should (equal (base64-encode-string "") ""))
+|  ...)
+
+And run the test manually in gdb:
+#+BEGIN_SRC
+#!/bin/sh
+# the env file should set the GUILE variable
+# which points to the installed guile-elisp
+. ./env.sh
+
+export PATH="$GUILE/bin:$PATH"
+export LD_LIBRARY_PATH="$GUILE/lib"
+
+export HOME=/nonexistent
+export LANG=C
+export EMACS_TEST_DIRECTORY="`pwd`/test"
+
+cd test
+
+gdb -x ../gdb --args \
+../src/emacs --no-init-file --no-site-file --no-site-lisp -L :. -l ert -l src/fns-tests --batch --eval '(ert-run-tests-batch-and-exit (quote (not (or (tag :expensive-test) (tag :unstable) (tag :nativecomp)))))'
+#+END_SRC
+
+
+Now gdb can hit the real error:
+
+| Fatal error 6: Aborted
+| Backtrace:
+| Thread 1 "emacs" received signal SIGABRT, Aborted.
+| (gdb) ba 22
+| #0  __pthread_kill_implementation (threadid=<optimized out>, signo=signo@entry=6, no_tid=no_tid@entry=0) at ./nptl/pthread_kill.c:44
+| #1  0x00007ffff614af4f in __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
+| #2  0x00007ffff60fbfb2 in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
+| #3  0x000000000051f184 in terminate_due_to_signal (sig=sig@entry=6, backtrace_limit=backtrace_limit@entry=40) at emacs.c:463
+| #4  0x000000000053d8a5 in emacs_abort () at sysdep.c:2323
+| #5  0x000000000059260b in STRING_MULTIBYTE (str=0x7fffcc324fc0) at /t/ge/guilemacs/src/lisp.h:1239
+| #6  base64_encode_string_1 (string=0x7fffcc324fc0, line_break=<optimized out>, pad=pad@entry=true, base64url=base64url@entry=false) at fns.c:4091
+| #7  0x000000000059a1c7 in Fbase64_encode_string (string=<optimized out>, no_line_break=<optimized out>) at fns.c:4052
 * troubleshooting
 ** nul character in guile-string
 
