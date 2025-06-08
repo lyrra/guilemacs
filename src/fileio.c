@@ -821,14 +821,13 @@ This function does not grok magic file names.  */)
   bool failed = fd < 0;
   if (!failed)
     {
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       record_unwind_protect_int (close_file_unwind, fd);
       val = DECODE_FILE (val);
       if (STRINGP (text) && SBYTES (text) != 0)
 	write_region (text, Qnil, val, Qnil, Qnil, Qnil, Qnil, fd);
       failed = NILP (dir_flag) && emacs_close (fd) != 0;
-      /* Discard the unwind protect.  */
-      specpdl_ptr = specpdl_ref_to_ptr (count);
+      dynwind_end ();
     }
   if (failed)
     {
