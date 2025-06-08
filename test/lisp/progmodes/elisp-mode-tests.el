@@ -44,7 +44,7 @@
       (should (member "backup-buffer" comps))
       (should-not (member "backup-inhibited" comps)))))
 
-(ert-deftest elisp-completes-variables ()
+'(ert-deftest elisp-completes-variables ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(foo ba")
@@ -64,7 +64,7 @@
         (should (member "backup-buffer" comps))
         (should (member "backup" comps))))))
 
-(ert-deftest elisp-completes-variables-unquoted ()
+'(ert-deftest elisp-completes-variables-unquoted ()
   (dolist (text '("`(foo ,ba" "`(,(foo ba" "`(,ba"))
     (with-temp-buffer
       (emacs-lisp-mode)
@@ -91,7 +91,7 @@
         (should (member "backup-buffer" comps))
         (should-not (member "backup-inhibited" comps))))))
 
-(ert-deftest elisp-completes-local-variables ()
+'(ert-deftest elisp-completes-local-variables ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(let ((bar 1) baz) (foo ba")
@@ -143,7 +143,7 @@
       (call-interactively #'eval-last-sexp)
       (should (equal (current-message) "t")))))
 
-(ert-deftest eval-last-sexp-print-format-small-int ()
+'(ert-deftest eval-last-sexp-print-format-small-int ()
   (with-temp-buffer
     (let ((current-prefix-arg '(4)))
       (erase-buffer) (insert "?A")
@@ -162,7 +162,7 @@
       (call-interactively #'eval-last-sexp)
       (should (equal (current-message) "65 (#o101, #x41, ?A)")))))
 
-(ert-deftest eval-last-sexp-print-format-large-int ()
+'(ert-deftest eval-last-sexp-print-format-large-int ()
   (with-temp-buffer
     (let ((eval-expression-print-maximum-character ?A))
       (let ((current-prefix-arg '(4)))
@@ -210,7 +210,7 @@
     (and end
          (substring string start end))))
 
-(ert-deftest elisp--highlight-function-argument-indexed ()
+'(ert-deftest elisp--highlight-function-argument-indexed ()
   (dotimes (i 3)
     (should
      (equal (elisp-mode-tests--face-propertized-string
@@ -218,7 +218,7 @@
             (propertize (nth i '("A" "B" "C"))
                         'face 'eldoc-highlight-function-argument)))))
 
-(ert-deftest elisp--highlight-function-argument-keyed-1 ()
+'(ert-deftest elisp--highlight-function-argument-keyed-1 ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(foo prompt bar :b 2)")
@@ -238,7 +238,7 @@
       (progn (forward-sexp) (forward-char))
       (should (equal (bold-arg 4) "B")))))
 
-(ert-deftest elisp--highlight-function-argument-keyed-2 ()
+'(ert-deftest elisp--highlight-function-argument-keyed-2 ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(foo :b :a 1)")
