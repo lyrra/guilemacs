@@ -5947,6 +5947,7 @@ secure_hash (Lisp_Object algorithm, Lisp_Object object, Lisp_Object start,
 
   hash_func (input + start_byte,
 	     end_byte - start_byte,
+             //FIX: guilemacs-string: digest is a byte array, not a string
 	     SSDATA (digest));
 
   if (NILP (binary))
