@@ -806,12 +806,12 @@ This function does not grok magic file names.  */)
   ptrdiff_t suffix_len = SBYTES (encoded_suffix);
   if (INT_MAX < suffix_len)
     args_out_of_range (prefix, suffix);
-  int nX = 6;
-  Lisp_Object val = make_uninit_string (prefix_len + nX + suffix_len);
+  //int nX = 6;
+  Lisp_Object val = scm_string_append (list3 (encoded_prefix, build_string ("XXXXXX"), encoded_suffix));
+  //memcpy (data, SSDATA (encoded_prefix), prefix_len);
+  //memset (data + prefix_len, 'X', nX);
+  //memcpy (data + prefix_len + nX, SSDATA (encoded_suffix), suffix_len);
   char *data = SSDATA (val);
-  memcpy (data, SSDATA (encoded_prefix), prefix_len);
-  memset (data + prefix_len, 'X', nX);
-  memcpy (data + prefix_len + nX, SSDATA (encoded_suffix), suffix_len);
   int kind = (NILP (dir_flag) ? GT_FILE
 	      : BASE_EQ (dir_flag, make_fixnum (0)) ? GT_NOCREATE
 	      : GT_DIR);
