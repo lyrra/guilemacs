@@ -19,9 +19,6 @@ Since guilemacs is using libguile, guile
  needs to be configured, compiled and installed. And since guilemacs is using
 some extended features of guile, a special flavor of guile is needed.
 
-The example assumes you have installed this special flavor of guile in "/t/ge/g3",
-or that you point out the guile-install-directory in the GUILE enviornment variable.
-
 After guile has been installed, guilemacs can be
  configured and built. It is not necessery to install guilemacs, it's possible
 to run it directly from the source directory (convenient for development).
@@ -32,23 +29,31 @@ First, install a version of guile that includes specific Elisp fixes:
   - Repository: https://codeberg.org/lyrra/guile
   - Original upstream: https://git.savannah.gnu.org/gitweb/?p=guile.git;a=shortlog;h=refs/heads/wip-elisp-rebased
 
-After that, please proceed with configuring and building Guilemacs:
+After that, it is possible to proceed with configuring and building Guilemacs.
 
-** configure
+** setup environment variables
 
-Notice where you installed the special flavor of guile.
-Also, since guilemacs loads scheme files during boot, it needs to know where those are.
+Use the following script and "source" it before running any other scripts
+in the following build instructions.
+
+Notice where you installed the special flavor of guile. Point out that in GUILE
+ environment variable.
+
+When emacs boots it will also load scheme files.
 By default it will search current and parents directory and also check the GUILEMACS
  environment variable.
 
-#+BEGIN_SRC
-GUILE=/t/ge/g3
-GUILEMACS=`pwd`
+To summarize GUILE and GUILEMACS environment variables need to be setup.
+To use any scripts below for configuring, making or testing please first 'source' this script:
 
+#+BEGIN_SRC
+env.sh:
+
+GUILE=/t/ge/g3   # this is the guile installation directory
+GUILEMACS=`pwd`  # this is the guilemacs source code directory
 #+END_SRC
 
-Use the above script and "source" it before running any other scripts
-in the following build instructions.
+** configure
 
 #+BEGIN_SRC
 export PATH=$GUILE/bin:$PATH
@@ -56,7 +61,7 @@ export PKG_CONFIG_PATH=$GUILE/lib/pkgconfig
 export CFLAGS="-Og -ggdb3"
 rm -f configure
 sh autogen.sh
-./configure --prefix=/t/ge/e2015 \
+./configure --prefix=/t/ge/guilemacs \
             --disable-silent-rules \
             --with-native-compilation=no --without-modules \
             --without-threads --with-jpeg=no --without-cairo \
@@ -73,7 +78,7 @@ export LD_LIBRARY_PATH=$GUILE/lib
 export CFLAGS="-Og -ggdb3"
 
 
-make V=1
+make V=1 2>&1 | tee b.log
 #+END_SRC
 
 ** make install
@@ -92,191 +97,23 @@ Use the following script to launch Guilemacs:
 
 #+BEGIN_SRC
 #!/bin/sh
+
 export LD_LIBRARY_PATH=$GUILE/lib
 
-/t/ge/e2015/bin/emacs -Q $*
+./src/emacs -Q $*
 #+END_SRC
 
 ** run tests
 
 After building emacs, the test suite can be runned.
+GUILE and GUILEMACS environment variables need to be setup (see env.sh above).
 
 #+BEGIN_SRC
-echo GUILE=/t/ge/g3/lib > env.sh
-
 ./tool/run-tests.sh
 #+END_SRC
 
 The test suite uses the Emacs ERT suite. Note that many tests will fail since Guilemacs is
 still under development. Only tests known to pass will be executed.
-* original work
-
- - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
-   also branch rebased wip-elisp: https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp-rebased
- - Robin's orig repo: https://git.hcoop.net/bpt/guile.git
-
- - Robin's orig emacs repo: https://git.hcoop.net/bpt/emacs.git
-
- - https://lists.gnu.org/archive/html/emacs-devel/2015-10/msg01538.html
-
-  Canonical test cases (tetris, org-mode, dunnet, mixed elisp/guile-scheme evalutation):
-  - https://news.slashdot.org/story/12/04/02/197221/guile-scheme-emacs-lisp-compatibility-matures
-  - http://dustycloud.org/tmp/guile-emacs-20150513.png
-  - http://dustycloud.org/tmp/guilemacs.png
-
-* Latest News
-** 20250201 Regression tests
-  A regression test program has been written
-  that can both run primordial guile-elisp + emacs-core tests.
-  And also run the full ERT framework suite.
-  This is good news since it makes us more confident in
-  doing more aggressive refactoring.
-** 20240906 load-order: try-completion
-  alot of load-order problems is caused by
-  missing try-completion, that in emacs
-  was in c-core, but in guilemacs is found
-  in `minibuffer.el'. And that file is loaded
-  too late.
-
-** 20240903 use Fcopy_sequence
-  see commit note for [[use an enum to select concat target type]]
-
-* FAQ
-** How can I help?
-  - testing what currently works:
-    - does it still build and start
-    - no regressions
-    - bugs, sigsegvs, etc
-  - enable known non-working stuff (see todo)
-  - packaging, guix
-** What is Guilemacs?
-  It is the worlds most complicated tetris game.
-** Can you use Guilemacs as a word processor?
-  No, you shouldn't do that, lets make a comparison to vanilla emacs:
-  - Emacs is a word processor that happens to be a OS.
-  - Guilemacs is a tetris player that happens to be a word processor.
-** But I want to do other stuff than tetris, like word processing!
-  Guilemacs can also play snake and dunnet.
-
-* guilemacs design
-
-** where are we at 2024
-
-  The long-term vision of using Guile as an Elisp engine has eroded
-  because both Emacs and Guile have evolved, each pursuing new goals:
-
-  - Guile wants to be a standalone scheme, driving Guile beyond being an optimal
-    embedding language (such as S7) to becoming a pure and efficient
-    general-purpose language.
-
-  - Guile isn't as universally compatible as Emacs requires.
-    It performs best on Linux/BSD, with Windows support being subpar,
-    32-bit OS support deteriorating, and support for other OS's is not prioritized.
-
-  - Emacs needs to support many esoteric and obscure platforms,
-    such as Ardent, Ultrix, ConvexOS, OpenIndiana, 32-bit OS on SPARC64, GNU/Linux Alpha, etc.
-
-  - Emacs is adapting its own garbage collector instead of trying to integrate with
-    Whippet.
-
-  - Extending is not scalable, for example see sqlite support (3d38d1d1) it adds a core type
-    struct Lisp_Sqlite, whereas a proper FFI would suffice.
-
-  Since neither Guile nor Emacs is likely to deviate from their current trajectories,
-  Guilemacs must reconcile these two conflicting paths.
-
-  - where is this going:
-  In broad strokes, guilemacs should be moving in a direction where guile-elisp
-  is becoming the substrate on which a new emacs takes form,
-  and the old c-core is reduced to FFI'able library.
-  This will severely reduce emacs availability on platforms beyond linux,win,macos.
-  But it has the potential to really become a potential alternative to fancy editors
-  like Visual Studio Code.
-
-  More ideas from the original gang:
-  - improve guile and emacs so guile can become emacs's elisp engine
-  - improve elisp to whatever point is politically feasible -- dragging in ideas from
-    CL and scheme (likely including a full CL-on-guile implementation as a bonus)
-  - use the result as a basis for lispifying more of the gnu system
-  - the gnu manifesto promised us c *and* lisp, after all
-  - merely integrating emacs and guile successfully would be a good start
-
-  To summarize, this hints as a two layer effort of guilemacs:
-  - guile-emacs that continues to rebase ontop of vanilla emacs.
-  - opinionated guilemacs, that builds furhter ontop of guile-emacs, removes
-    unwanted stuff, less target platforms, enabler for more radical ideas.
- 
-** lost opportunity in 2015
-  - "remove documentation-string reading hack"
-    already in upstream by c2bddf8f
-  - "remove redundant assignments"
-    partially found in later upstream (process.c:network_interface_list)
-  - "remove unused `defalias' function"
-    patch contents already upstream
-
-** hallmarks of an overstretched design
-  - "Now that EQ has become expensive.." (89bb5a5f)
-  - cl-generic requires cl-generic (itself!)
-  - overextended use of Make
-    the complicated makefiles is a sign of need of a system language to replace their
-    alogs, and reduce them to their core function of dependency manager.
-    Extreme kludges such as manipulation of unix-epoch (10083e78)
-  - shorthand symbols
-    This is a stop-gap feature because proper namespacing or modularity is missing.
-    The feature makes the reader slower, causing an rewrite from elisp to C
-    (commits 66f30875 90cbf0cb 68d73eb1 71857d41).
-    This is a sign of giving up on good design, and picking the path of least resistance
-    commit 66f30875 introduces a leaky abstraction to gain performance (avoid shorthand
-    if not used).
-  - lesser orthogonality
-    macroexp-let2, iter-defun, cl-iter-defun, dlet, defvar-local,
-    pcase-let* pcase-lambda, defvar-local, ...
-    these hints of lacking orthogonality and/or missing functionality
-    of basic operators.
-  - alot of circular development due to brownian-motion like design. Eg, see d468cf91
-
-**  Emacs features that needs to be removed:
-
-   - Emacs intentionally restricts user freedom by not having a proper FFI,
-     users are redirected to use C "modules".
-     Emacs developers are interpreting the GPL in a way that confluates distribution
-     and usage. *This points to a larger problem*, by porting emacs ontop of guile,
-     "they" will lose control over how emacs can be used.
-     Once ported to guile, and the c-core is gone, it is possible to port it
-     further to webbrowsers or non-free platforms.
-
-   - Portable dumper or unexec, these are bad hacks to attempt to mimick
-     image dumping that big-boy lisps do.
-     Image dumping will speed up start time, and is excellent if combined
-     with tree-shaking (but that is not relevant for emacs).
-
-   - non-pure sexp, ie using comments for more man humans (autoload cookie)
-     This conflicts with emacs long-term goal (everything is a sexp).
-     See loaddefs-gen.el if the situation can be salvaged.
-
-     Examples with possible remedy:
-     - encoding vars etc, though long history with emacs
-       (top-level proclaim?)
-     - autoloading (declare?)
-     - see BUG#35595 , finder package relies on comments
-       (proclaim code section?)
-     - too complicated read-table ?
-       (convert to sexp?)
-
-     All all these (and perhaps some more) is hindering removal of emacs own
-     reader and instead using a standard sexp reader
-     (like guile's, or why not S7 as an temporary trampoline).
-
-   - native compilation
-     its non-portability is a symptom of the feature being a hack, probably because
-     of the complexity in the C core.
-     see https://akrl.sdf.org/gccemacs.html
-     Compare this to guilemacs, where emacs isn't aware of if guile is doing jit or bytecode.
-
-   - increased orthogonality
-     a layer in scheme could provide building blocks to compose composite operators
-     such as macroexp-let2, et al.
-
 * testing
 
 Running the tool/run-tests.sh script will run through both guilemacs tests,
@@ -373,107 +210,68 @@ This will allow you to step through and debug the C-prelude tests.
 Since the prelude tests are designed to exercise a minimum of emacs, it should
 be easier to pin-point test faults, sigsegvs and so on.
 
-* guilemacs internals
- This section describes the inner workings of guilemacs.
+* troubleshooting
+** nul character in guile-string
 
-** comparing guilemacs to vanilla
-  | vanilla     | guilemacs  | really      |
-  |-------------+------------+-------------|
-  | XFASTINT(a) | XFIXNAT(a) | XFIXNUM (a) |
-  | XINT(a)     | XFIXNUM(a) | XLI (a)     |
+WHEN:
 
-  | emacs                   | guilemacs                                           |
-  |-------------------------+-----------------------------------------------------|
-  | sym->u.s.redirect       | SYMBOL_REDIRECT (sym)                               |
-  | sym->u.s.val.fwd        | scm_to_pointer (scm_c_vector_ref (sym, 4))          |
-  | sym->u.s.val.fwd.fwdptr | scm_to_pointer (scm_c_vector_ref (sym, 4))->fwdptr) |
+  anytime during un of emacs
 
-** strings
-  guile will bootstrap the elisp string constructor and predicate functions.
-  guile-elisp 'lisp-string?' predicate is bootstrapped to vanilla guile 'string?', and
-  when emacs binary is started (which is linked to libguile),
-  emacs binary will redefine the symbol-value of 'lisp-string?' (see emacs.c),
-  to an emacs FFI-like function (Fstringp).
-  The 'lisp-string?' predicate is found in guile (module/language/elisp/runtime.scm),
-  and used by 'module/language/elisp/compile-tree-il.scm'.
-  Similarly is setup for make-lisp-string.
+SYMPTOMS:
 
-** bignum
-  Delegating bignum type to libgmp should theoretically decrease the amount of
-  code in emacs dealing with bignum, instead it increased it:
+  FIX
 
-  | git diff ba1c4f63e3..78ec68e18 --shortstat
-  | 130 files changed, 10845 insertions(+), 4957 deletions(-)
+ERROR:
 
-  Moving bignum to guile should decrease the amount of code.
+  The emacs process prints to standard output/error.
+  Guile controls the standard input/output/error, and will
+  re-print them to the terminal so we can see the output
+  from emacs. Guile will prepend each line with '>>>'.
 
-*** bignum cleanups
-  If guile drives bignum.
-  - 5463b7e77ab4 migth not be needed.
+  Emacs is printing a zero byte which guile stumbles upon,
+  and it is unexpected.
 
-** guilemacs differences
-*** old-style obarray removed
-  (see vanilla check_obarray_slow)
+COMPONENTS:
 
-* Commit notes
-** guile-elisp bootstrap (C)
-  rebasing after 219c3f80, in function Fcommandp,
-  the commit bffc4cb39d0 has rearranged code, so not sure this
-  commit is correct, for example what to do with if_prop and genfun variables?
+  emacs, guile-test-program (tool/run-tests.scm)
+** emacs prints a null byte :test:
+WHEN:
 
-** guile-elisp bootstrap part (C)
-  20240906 
-  commit 39e8fd35 swapped around code in doc.c causing
-  this rebase commit to possibly confuse where to put
-  the clause:
-#+BEGIN_SRC 
-  else if (scm_is_true (scm_procedure_p (fun))) ...
-#+END_SRC 
+  running emacs inside guile
 
-** update unidata-gen.el
-  partially already in master, at height d22ddf594
+SYMPTOMS:
 
-** dynwind
-  in fileio.c:write_region should we begin with dynwind_begin?
+  | 0:0 >>> Scheme error: misc-error, (#^Scheme #f> "string contains #\\nul character: ~S" ("") #^Scheme #f>)
 
-** guile-elisp bootstrap part (C)
-  in eval.c:apply_lambda, why are we removing eval_sub? and why does emacs use
-  comma separator? wouldn't that rely on nil == zero?
-  |   tem = Fcar (args_left), args_left = Fcdr (args_left);
-  |-  tem = eval_sub (tem);
-  |   arg_vector[i] = tem;
+ERROR:
 
-** "* src/fns.c (Feql): Use `scm_eqv_p'."
-  comparing bignums might have been busted, see commit b3549359
-  see emacs test test/src/fns-tests.el
+  The emacs process prints to standard output/error.
+  Guile controls the standard input/output/error, and will
+  re-print them to the terminal so we can see the output
+  from emacs. Guile will prepend each line with '>>>'.
 
-** "smob equality predicates"
-  same as above, a list of bignum might not work for memql
+  Emacs is printing a zero byte which guile stumbles upon,
+  and it is unexpected.
 
-** "ignore-errors ignores scheme exceptions"
-  (defmacro ignore-error (condition &rest body) ...)
-  should also be treated like ignore-errors that calls guile,
-  but not sure how to filter the exception using the condition argument
+COMPONENTS:
 
-** "remove redundant assignments"
-  partially found in later upstream (process.c:network_interface_list)
+  emacs, guile-test-program (tool/run-tests.scm)
 
-** update nadvice
-  in lisp/emacs-lisp/nadvice.el do we really need to change nth to car/cdr etc?
+** find scheme function name from pointer
+WHEN:
+  Something has gone wrong, and guile is printing some error message
+  containing a procedure reference:
+  | '#<scheme #<procedure 7fffe5d5fa00 at ice-9/eval.scm:417:6 args>>
 
-** use BDW-GC
-  should xzalloc memset to zero? or does GC_MALLOC clear memory already
+GOAL
+  To find out the procedure name.
+DO
+  | (gdb) call scm_object_to_string(0x7fffe5d5fa00, scm_current_output_port())
 
-** remove inline bytecode
-  upstream finally got around to reinvent this
-
-
-** use an enum to select concat target type
-  The previous fix:
-  alist = concat (1, &alist, concat_cons, false);
-  Is now replaced by vanilla:
-  alist = Fcopy_sequence (alist);
-
+  Note guile will again run into an error but the stacktrace now contain the name:
+  | Backtrace:
+  | In ice-9/eval.scm:
+  |   619:8 19 (_ #(#(#(#(#<directory (guile-user) 7ffff2b13c80>) tramp-password-prompt-regexp
 * debugging
 ** finding regressions in history and git bisecting
   Since guilemacs is built ontop of emacs, and by staying fresh, all commits
@@ -624,24 +422,28 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
 ** gdb debugging ERT tests
 run the test scripts:
 
-| sh tool/run-tests.sh --filter=/fns-tests
-| ...
-| running ===> (../src/emacs --no-init-file --no-site-file --no-site-lisp -L :. -l ert -l src/fns-tests --batch --eval '(ert-run-tests-batch-and-exit (quote (not (or (tag :expensive-test) (tag :unstable) (tag :nativecomp)))))' 2>&1)
-| ...
-| failed ERT tests: (("fns-test-base64url-encode-string") ("fns-test-base64url-encode-region") ("fns-tests-string-version-lessp") ("fns-tests-collate-sort") ("fns-tests-sort-gc") ("fns-tests-sort-kw") ("fns-tests-sort") ("fns-tests-collate-strings") ("fns-tests-compare-strings") ("fns-tests-nreverse-bool-vector") ("fns-tests-reverse-bool-vector") ("fns-tests-nreverse") ("fns-tests-reverse") ("fns-tests-equal-including-properties") ("fns-tests-equality-nan") ("fns-tests-safe-length") ("fns-tests-length") ("fns-tests-identity"))
-| ...
+#+BEGIN_SRC
+  sh tool/run-tests.sh --filter=/fns-tests
+  ...
+  running ===> (../src/emacs --no-init-file --no-site-file --no-site-lisp -L :. -l ert -l src/fns-tests --batch --eval '(ert-run-tests-batch-and-exit (quote (not (or (tag :expensive-test) (tag :unstable) (tag :nativecomp)))))' 2>&1)
+  ...
+  failed ERT tests: (("fns-test-base64url-encode-string") ("fns-test-base64url-encode-region") ("fns-tests-string-version-lessp") ("fns-tests-collate-sort") ("fns-tests-sort-gc") ("fns-tests-sort-kw") ("fns-tests-sort") ("fns-tests-collate-strings") ("fns-tests-compare-strings") ("fns-tests-nreverse-bool-vector") ("fns-tests-reverse-bool-vector") ("fns-tests-nreverse") ("fns-tests-reverse") ("fns-tests-equal-including-properties") ("fns-tests-equality-nan") ("fns-tests-safe-length") ("fns-tests-length") ("fns-tests-identity"))
+  ...
+#+END_SRC
 
 Note that ERT uses condition-case, so the tests will abort silently.
 
 By moving out the test code in an ert test case (just put them outside of ert-deftest, we will trigger the error.
 Example:
 
-|(base64-encode-string "")
-|
-|(ert-deftest fns-tests-base64-encode-string ()
-|  ;; standard variant RFC2045
-|  (should (equal (base64-encode-string "") ""))
-|  ...)
+#+BEGIN_SRC
+  (base64-encode-string "")
+
+  (ert-deftest fns-tests-base64-encode-string ()
+    ;; standard variant RFC2045
+    (should (equal (base64-encode-string "") ""))
+    ...)
+#+END_SRC
 
 And run the test manually in gdb:
 #+BEGIN_SRC
@@ -666,80 +468,20 @@ gdb -x ../gdb --args \
 
 Now gdb can hit the real error:
 
-| Fatal error 6: Aborted
-| Backtrace:
-| Thread 1 "emacs" received signal SIGABRT, Aborted.
-| (gdb) ba 22
-| #0  __pthread_kill_implementation (threadid=<optimized out>, signo=signo@entry=6, no_tid=no_tid@entry=0) at ./nptl/pthread_kill.c:44
-| #1  0x00007ffff614af4f in __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
-| #2  0x00007ffff60fbfb2 in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
-| #3  0x000000000051f184 in terminate_due_to_signal (sig=sig@entry=6, backtrace_limit=backtrace_limit@entry=40) at emacs.c:463
-| #4  0x000000000053d8a5 in emacs_abort () at sysdep.c:2323
-| #5  0x000000000059260b in STRING_MULTIBYTE (str=0x7fffcc324fc0) at /t/ge/guilemacs/src/lisp.h:1239
-| #6  base64_encode_string_1 (string=0x7fffcc324fc0, line_break=<optimized out>, pad=pad@entry=true, base64url=base64url@entry=false) at fns.c:4091
-| #7  0x000000000059a1c7 in Fbase64_encode_string (string=<optimized out>, no_line_break=<optimized out>) at fns.c:4052
-* troubleshooting
-** nul character in guile-string
-
-WHEN:
-
-  anytime during un of emacs
-
-SYMPTOMS:
-
-  FIX
-
-ERROR:
-
-  The emacs process prints to standard output/error.
-  Guile controls the standard input/output/error, and will
-  re-print them to the terminal so we can see the output
-  from emacs. Guile will prepend each line with '>>>'.
-
-  Emacs is printing a zero byte which guile stumbles upon,
-  and it is unexpected.
-
-COMPONENTS:
-
-  emacs, guile-test-program (tool/run-tests.scm)
-** emacs prints a null byte :test:
-WHEN:
-
-  running emacs inside guile
-
-SYMPTOMS:
-
-  | 0:0 >>> Scheme error: misc-error, (#^Scheme #f> "string contains #\\nul character: ~S" ("") #^Scheme #f>)
-
-ERROR:
-
-  The emacs process prints to standard output/error.
-  Guile controls the standard input/output/error, and will
-  re-print them to the terminal so we can see the output
-  from emacs. Guile will prepend each line with '>>>'.
-
-  Emacs is printing a zero byte which guile stumbles upon,
-  and it is unexpected.
-
-COMPONENTS:
-
-  emacs, guile-test-program (tool/run-tests.scm)
-
-** find scheme function name from pointer
-WHEN:
-  Something has gone wrong, and guile is printing some error message
-  containing a procedure reference:
-  | '#<scheme #<procedure 7fffe5d5fa00 at ice-9/eval.scm:417:6 args>>
-
-GOAL
-  To find out the procedure name.
-DO
-  | (gdb) call scm_object_to_string(0x7fffe5d5fa00, scm_current_output_port())
-
-  Note guile will again run into an error but the stacktrace now contain the name:
-  | Backtrace:
-  | In ice-9/eval.scm:
-  |   619:8 19 (_ #(#(#(#(#<directory (guile-user) 7ffff2b13c80>) tramp-password-prompt-regexp
+#+BEGIN_SRC
+  Fatal error 6: Aborted
+  Backtrace:
+  Thread 1 "emacs" received signal SIGABRT, Aborted.
+  (gdb) ba 22
+  #0  __pthread_kill_implementation (threadid=<optimized out>, signo=signo@entry=6, no_tid=no_tid@entry=0) at ./nptl/pthread_kill.c:44
+  #1  0x00007ffff614af4f in __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
+  #2  0x00007ffff60fbfb2 in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
+  #3  0x000000000051f184 in terminate_due_to_signal (sig=sig@entry=6, backtrace_limit=backtrace_limit@entry=40) at emacs.c:463
+  #4  0x000000000053d8a5 in emacs_abort () at sysdep.c:2323
+  #5  0x000000000059260b in STRING_MULTIBYTE (str=0x7fffcc324fc0) at /t/ge/guilemacs/src/lisp.h:1239
+  #6  base64_encode_string_1 (string=0x7fffcc324fc0, line_break=<optimized out>, pad=pad@entry=true, base64url=base64url@entry=false) at fns.c:4091
+  #7  0x000000000059a1c7 in Fbase64_encode_string (string=<optimized out>, no_line_break=<optimized out>) at fns.c:4052
+#+END_SRC
 * bugs
 ** faults
 
@@ -894,6 +636,48 @@ Thread 1 "bootstrap-emacs" received signal SIGSEGV, Segmentation fault.
 ** 20240801 move obarray to guile ?
   see obarray global in lread.c
 
+* guilemacs internals
+ This section describes the inner workings of guilemacs.
+
+** comparing guilemacs to vanilla
+  | vanilla     | guilemacs  | really      |
+  |-------------+------------+-------------|
+  | XFASTINT(a) | XFIXNAT(a) | XFIXNUM (a) |
+  | XINT(a)     | XFIXNUM(a) | XLI (a)     |
+
+  | emacs                   | guilemacs                                           |
+  |-------------------------+-----------------------------------------------------|
+  | sym->u.s.redirect       | SYMBOL_REDIRECT (sym)                               |
+  | sym->u.s.val.fwd        | scm_to_pointer (scm_c_vector_ref (sym, 4))          |
+  | sym->u.s.val.fwd.fwdptr | scm_to_pointer (scm_c_vector_ref (sym, 4))->fwdptr) |
+
+** strings
+  guile will bootstrap the elisp string constructor and predicate functions.
+  guile-elisp 'lisp-string?' predicate is bootstrapped to vanilla guile 'string?', and
+  when emacs binary is started (which is linked to libguile),
+  emacs binary will redefine the symbol-value of 'lisp-string?' (see emacs.c),
+  to an emacs FFI-like function (Fstringp).
+  The 'lisp-string?' predicate is found in guile (module/language/elisp/runtime.scm),
+  and used by 'module/language/elisp/compile-tree-il.scm'.
+  Similarly is setup for make-lisp-string.
+
+** bignum
+  Delegating bignum type to libgmp should theoretically decrease the amount of
+  code in emacs dealing with bignum, instead it increased it:
+
+  | git diff ba1c4f63e3..78ec68e18 --shortstat
+  | 130 files changed, 10845 insertions(+), 4957 deletions(-)
+
+  Moving bignum to guile should decrease the amount of code.
+
+*** bignum cleanups
+  If guile drives bignum.
+  - 5463b7e77ab4 migth not be needed.
+
+** guilemacs differences
+*** old-style obarray removed
+  (see vanilla check_obarray_slow)
+
 * guile
 ** guile-elisp internals
 
@@ -944,8 +728,43 @@ by guile-elisp.
     remove the files installed by guile's build system (make install), eg, rm -rf /t/ge/g3, where /t/ge/g3 is the
     path you've used for the "configure --prefix=<PATH>" step in configuring guile.
 
-* misc notes:
+* History
+The idea of a guile-based emacs, is around 25 years old.
+See https://www.mit.edu/~raeburn/guilemacs/ for some history.
+Also some primordial thoughts https://web.archive.org/web/20000824101731/https://sanpietro.red-bean.com/guile/guile/old/3114.html
 
+** original work
+ - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
+   also branch rebased wip-elisp: https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp-rebased
+ - Robin's orig repo: https://git.hcoop.net/bpt/guile.git
+
+ - Robin's orig emacs repo: https://git.hcoop.net/bpt/emacs.git
+
+ - https://lists.gnu.org/archive/html/emacs-devel/2015-10/msg01538.html
+
+  Canonical test cases (tetris, org-mode, dunnet, mixed elisp/guile-scheme evalutation):
+  - https://news.slashdot.org/story/12/04/02/197221/guile-scheme-emacs-lisp-compatibility-matures
+  - http://dustycloud.org/tmp/guile-emacs-20150513.png
+  - http://dustycloud.org/tmp/guilemacs.png
+
+* FAQ
+** How can I help?
+  - testing what currently works:
+    - does it still build and start
+    - no regressions
+    - bugs, sigsegvs, etc
+  - enable known non-working stuff (see todo)
+  - packaging, guix
+** What is Guilemacs?
+  It is the worlds most complicated tetris game.
+** Can you use Guilemacs as a word processor?
+  No, you shouldn't do that, lets make a comparison to vanilla emacs:
+  - Emacs is a word processor that happens to be a OS.
+  - Guilemacs is a tetris player that happens to be a word processor.
+** But I want to do other stuff than tetris, like word processing!
+  Guilemacs can also play snake and dunnet.
+
+* misc notes:
 ** include c header quote
   if using <> or "", see commit 27be9015 and its bug#52669 for root-cause,
   there is a similar fix we do in one of the guilemacs-commit,
@@ -1020,12 +839,184 @@ this could be hoisted to startup
 
   hmm, no syntax errors in the file ".dir-locals.el"
 
-* links
-  Guile internals
-  - https://aartaka.me/guile-optimization
-  - https://mail.gnu.org/archive/html/guile-devel/2009-08/msg00206.html
-  - fibers https://www.youtube.com/watch?app=desktop&v=7IcI6sl5oBc
-* work flow
+* Commit notes
+** guile-elisp bootstrap (C)
+  rebasing after 219c3f80, in function Fcommandp,
+  the commit bffc4cb39d0 has rearranged code, so not sure this
+  commit is correct, for example what to do with if_prop and genfun variables?
+
+** guile-elisp bootstrap part (C)
+  20240906
+  commit 39e8fd35 swapped around code in doc.c causing
+  this rebase commit to possibly confuse where to put
+  the clause:
+#+BEGIN_SRC
+  else if (scm_is_true (scm_procedure_p (fun))) ...
+#+END_SRC
+
+** update unidata-gen.el
+  partially already in master, at height d22ddf594
+
+** dynwind
+  in fileio.c:write_region should we begin with dynwind_begin?
+
+** guile-elisp bootstrap part (C)
+  in eval.c:apply_lambda, why are we removing eval_sub? and why does emacs use
+  comma separator? wouldn't that rely on nil == zero?
+  |   tem = Fcar (args_left), args_left = Fcdr (args_left);
+  |-  tem = eval_sub (tem);
+  |   arg_vector[i] = tem;
+
+** "* src/fns.c (Feql): Use `scm_eqv_p'."
+  comparing bignums might have been busted, see commit b3549359
+  see emacs test test/src/fns-tests.el
+
+** "smob equality predicates"
+  same as above, a list of bignum might not work for memql
+
+** "ignore-errors ignores scheme exceptions"
+  (defmacro ignore-error (condition &rest body) ...)
+  should also be treated like ignore-errors that calls guile,
+  but not sure how to filter the exception using the condition argument
+
+** "remove redundant assignments"
+  partially found in later upstream (process.c:network_interface_list)
+
+** update nadvice
+  in lisp/emacs-lisp/nadvice.el do we really need to change nth to car/cdr etc?
+
+** use BDW-GC
+  should xzalloc memset to zero? or does GC_MALLOC clear memory already
+
+** remove inline bytecode
+  upstream finally got around to reinvent this
+
+
+** use an enum to select concat target type
+  The previous fix:
+  alist = concat (1, &alist, concat_cons, false);
+  Is now replaced by vanilla:
+  alist = Fcopy_sequence (alist);
+
+* guilemacs design
+
+* ramblings
+** where are we at 2024
+
+  The long-term vision of using Guile as an Elisp engine has eroded
+  because both Emacs and Guile have evolved, each pursuing new goals:
+
+  - Guile wants to be a standalone scheme, driving Guile beyond being an optimal
+    embedding language (such as S7) to becoming a pure and efficient
+    general-purpose language.
+
+  - Guile isn't as universally compatible as Emacs requires.
+    It performs best on Linux/BSD, with Windows support being subpar,
+    32-bit OS support deteriorating, and support for other OS's is not prioritized.
+
+  - Emacs needs to support many esoteric and obscure platforms,
+    such as Ardent, Ultrix, ConvexOS, OpenIndiana, 32-bit OS on SPARC64, GNU/Linux Alpha, etc.
+
+  - Emacs is adapting its own garbage collector instead of trying to integrate with
+    Whippet.
+
+  - Extending is not scalable, for example see sqlite support (3d38d1d1) it adds a core type
+    struct Lisp_Sqlite, whereas a proper FFI would suffice.
+
+  Since neither Guile nor Emacs is likely to deviate from their current trajectories,
+  Guilemacs must reconcile these two conflicting paths.
+
+  - where is this going:
+  In broad strokes, guilemacs should be moving in a direction where guile-elisp
+  is becoming the substrate on which a new emacs takes form,
+  and the old c-core is reduced to FFI'able library.
+  This will severely reduce emacs availability on platforms beyond linux,win,macos.
+  But it has the potential to really become a potential alternative to fancy editors
+  like Visual Studio Code.
+
+  More ideas from the original gang:
+  - improve guile and emacs so guile can become emacs's elisp engine
+  - improve elisp to whatever point is politically feasible -- dragging in ideas from
+    CL and scheme (likely including a full CL-on-guile implementation as a bonus)
+  - use the result as a basis for lispifying more of the gnu system
+  - the gnu manifesto promised us c *and* lisp, after all
+  - merely integrating emacs and guile successfully would be a good start
+
+  To summarize, this hints as a two layer effort of guilemacs:
+  - guile-emacs that continues to rebase ontop of vanilla emacs.
+  - opinionated guilemacs, that builds furhter ontop of guile-emacs, removes
+    unwanted stuff, less target platforms, enabler for more radical ideas.
+
+** lost opportunity in 2015
+  - "remove documentation-string reading hack"
+    already in upstream by c2bddf8f
+  - "remove redundant assignments"
+    partially found in later upstream (process.c:network_interface_list)
+  - "remove unused `defalias' function"
+    patch contents already upstream
+
+** hallmarks of an overstretched design
+  - "Now that EQ has become expensive.." (89bb5a5f)
+  - cl-generic requires cl-generic (itself!)
+  - overextended use of Make
+    the complicated makefiles is a sign of need of a system language to replace their
+    alogs, and reduce them to their core function of dependency manager.
+    Extreme kludges such as manipulation of unix-epoch (10083e78)
+  - shorthand symbols
+    This is a stop-gap feature because proper namespacing or modularity is missing.
+    The feature makes the reader slower, causing an rewrite from elisp to C
+    (commits 66f30875 90cbf0cb 68d73eb1 71857d41).
+    This is a sign of giving up on good design, and picking the path of least resistance
+    commit 66f30875 introduces a leaky abstraction to gain performance (avoid shorthand
+    if not used).
+  - lesser orthogonality
+    macroexp-let2, iter-defun, cl-iter-defun, dlet, defvar-local,
+    pcase-let* pcase-lambda, defvar-local, ...
+    these hints of lacking orthogonality and/or missing functionality
+    of basic operators.
+  - alot of circular development due to brownian-motion like design. Eg, see d468cf91
+
+** Emacs features that needs to be removed:
+   - Emacs intentionally restricts user freedom by not having a proper FFI,
+     users are redirected to use C "modules".
+     Emacs developers are interpreting the GPL in a way that confluates distribution
+     and usage. *This points to a larger problem*, by porting emacs ontop of guile,
+     "they" will lose control over how emacs can be used.
+     Once ported to guile, and the c-core is gone, it is possible to port it
+     further to webbrowsers or non-free platforms.
+
+   - Portable dumper or unexec, these are bad hacks to attempt to mimick
+     image dumping that big-boy lisps do.
+     Image dumping will speed up start time, and is excellent if combined
+     with tree-shaking (but that is not relevant for emacs).
+
+   - non-pure sexp, ie using comments for more man humans (autoload cookie)
+     This conflicts with emacs long-term goal (everything is a sexp).
+     See loaddefs-gen.el if the situation can be salvaged.
+
+     Examples with possible remedy:
+     - encoding vars etc, though long history with emacs
+       (top-level proclaim?)
+     - autoloading (declare?)
+     - see BUG#35595 , finder package relies on comments
+       (proclaim code section?)
+     - too complicated read-table ?
+       (convert to sexp?)
+
+     All all these (and perhaps some more) is hindering removal of emacs own
+     reader and instead using a standard sexp reader
+     (like guile's, or why not S7 as an temporary trampoline).
+
+   - native compilation
+     its non-portability is a symptom of the feature being a hack, probably because
+     of the complexity in the C core.
+     see https://akrl.sdf.org/gccemacs.html
+     Compare this to guilemacs, where emacs isn't aware of if guile is doing jit or bytecode.
+
+   - increased orthogonality
+     a layer in scheme could provide building blocks to compose composite operators
+     such as macroexp-let2, et al.
+
 ** magit workflow suggestions
 
   Here are some suggestions for an improved workflow using magit.
@@ -1067,82 +1058,30 @@ this could be hoisted to startup
     the git rebase "pick-list", is still named same.
   - in magit-revision collapse all files
 
-* ramblings
+* links
+  Guile internals
+  - https://aartaka.me/guile-optimization
+  - https://mail.gnu.org/archive/html/guile-devel/2009-08/msg00206.html
+  - fibers https://www.youtube.com/watch?app=desktop&v=7IcI6sl5oBc
+* Latest News
+** 20240710
+  in git diff 5761a2ecb..da4a31b1b1a
+  search-slow-speed has been moved
 
-  Much of "where are we at 2024" :)
-* Changelog
-** 20240824
-  Freshly built guilemacs with a jit-enabled guile:
-  tag r291-d0fa569b (6bce86b5),
-  has been built from scratch and tested with
-  jit-enabled guile (wip-elisp-rebased 4b9b8277).
+** 20240713
 
-** 20240823
-  - make doesn't exit on failure
-#+BEGIN_SRC
-  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
-  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
-  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
-  Fatal error 11: Segmentation fault
-  Backtrace:
-  ...
-  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
-  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
-  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
-  make[1]: Leaving directory '/t/ge/emacs/src'
-  make: *** [Makefile:409: src] Error 2
-#+END_SRC
+   - remove ? src/sheap.h
+   - remove hybrid malloc? dd951c00
 
-** 20240822
-  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
-  - mapbacktrace is missing, it is used by (seemingly redundant functions)
-  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
-  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
-  it will cause an error that prints backtraces (thought backtraces was broken)!
-  This is seen around 1d43c1854.
-  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
-  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!)
+   rebase over 60d1b18 resulting in ea302f67, was non-trivial
+   and it might have lead to unbalanced or missing dynwind
 
-** 20240810
-  emacs-devel partially has:
-  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
-  at commit 10527fca66e39d7067986904161fa33741abcd26
+   during rebase,
+   commit "* src/data.c (Ftype_of): Return `Qt' by default."
+   might have been butched, around Lisp_Vectorlike / VECTORLIKEP.
 
-** 27.0.50-20191008-20240809
-  rebased beyond introduction of new pdumper
-  went almost smoothly, only:
-  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
-  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
-
-** 20240807
-  merge gone wrong!
-  During a merge conflict resolve, what was merged without conflict made no sense.
-  The function allocate_vectorlike looks butched.
-  - File: alloc.c
-  - head: 3de046c9
-  - old base commit: 7e9f62c0
-  - new base commit: c8431a06
-
-** 20240725
-  "ldefs-boot, revert be538ba778"
-  causes guile error (it receives a SCM 0 object)
-  probably only partial is needed, ablate testing needed
-
-  Test if this is still needed in later rebases
-
-** 20240724
-  dunnet alive and kicking: 16efea3a883ebf633946ee9b9d0681eb55437878 and earlier commits
-
-** 20240722
-  rebase over threading patches
-  see "use libguile dynamic wind + c pseudo-closures"
-  - probably specpdl_saved_value should not be used
-  - unbind_to_1: remove?:
-      byte_stack_list = catch->byte_stack;
-
-  hmm, the patchset removes handlerlist_sentinel struct from eval.c,
-  whereas GM only changes it into a pointer,
-  still needed? NO, this has moved to thread.h where it is an #define
+   "store lisp structures in SCM objects" butched? compare to 3e12ebf33
+   definition of XCONS looks duplicated
 
 ** 20240718
   rebase trapped write
@@ -1182,21 +1121,92 @@ this could be hoisted to startup
   is:
   #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)))
 
-** 20240713
+** 20240722
+  rebase over threading patches
+  see "use libguile dynamic wind + c pseudo-closures"
+  - probably specpdl_saved_value should not be used
+  - unbind_to_1: remove?:
+      byte_stack_list = catch->byte_stack;
 
-   - remove ? src/sheap.h
-   - remove hybrid malloc? dd951c00
+  hmm, the patchset removes handlerlist_sentinel struct from eval.c,
+  whereas GM only changes it into a pointer,
+  still needed? NO, this has moved to thread.h where it is an #define
 
-   rebase over 60d1b18 resulting in ea302f67, was non-trivial
-   and it might have lead to unbalanced or missing dynwind
+** 20240724
+  dunnet alive and kicking: 16efea3a883ebf633946ee9b9d0681eb55437878 and earlier commits
 
-   during rebase,
-   commit "* src/data.c (Ftype_of): Return `Qt' by default."
-   might have been butched, around Lisp_Vectorlike / VECTORLIKEP.
+** 20240725
+  "ldefs-boot, revert be538ba778"
+  causes guile error (it receives a SCM 0 object)
+  probably only partial is needed, ablate testing needed
 
-   "store lisp structures in SCM objects" butched? compare to 3e12ebf33
-   definition of XCONS looks duplicated
+  Test if this is still needed in later rebases
 
-** 20240710
-  in git diff 5761a2ecb..da4a31b1b1a
-  search-slow-speed has been moved
+** 20240807
+  merge gone wrong!
+  During a merge conflict resolve, what was merged without conflict made no sense.
+  The function allocate_vectorlike looks butched.
+  - File: alloc.c
+  - head: 3de046c9
+  - old base commit: 7e9f62c0
+  - new base commit: c8431a06
+
+** 20240809
+  rebased from 27.0.50-20191008.
+  rebased beyond introduction of new pdumper
+  went almost smoothly, only:
+  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
+  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
+
+** 20240810
+  emacs-devel partially has:
+  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
+  at commit 10527fca66e39d7067986904161fa33741abcd26
+
+** 20240822
+  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
+  - mapbacktrace is missing, it is used by (seemingly redundant functions)
+  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
+  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
+  it will cause an error that prints backtraces (thought backtraces was broken)!
+  This is seen around 1d43c1854.
+  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
+  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!)
+
+** 20240823
+  - make doesn't exit on failure
+#+BEGIN_SRC
+  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
+  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
+  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
+  Fatal error 11: Segmentation fault
+  Backtrace:
+  ...
+  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
+  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
+  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
+  make[1]: Leaving directory '/t/ge/emacs/src'
+  make: *** [Makefile:409: src] Error 2
+#+END_SRC
+
+** 20240824
+  Freshly built guilemacs with a jit-enabled guile:
+  tag r291-d0fa569b (6bce86b5),
+  has been built from scratch and tested with
+  jit-enabled guile (wip-elisp-rebased 4b9b8277).
+
+** 20250201 Regression tests
+  A regression test program has been written
+  that can both run primordial guile-elisp + emacs-core tests.
+  And also run the full ERT framework suite.
+  This is good news since it makes us more confident in
+  doing more aggressive refactoring.
+** 20240906 load-order: try-completion
+  alot of load-order problems is caused by
+  missing try-completion, that in emacs
+  was in c-core, but in guilemacs is found
+  in `minibuffer.el'. And that file is loaded
+  too late.
+
+** 20240903 use Fcopy_sequence
+  see commit note for [[use an enum to select concat target type]]
