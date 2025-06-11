@@ -1429,7 +1429,7 @@ POS and RES.")
                           (car file)))))
         (cl-loop for (regexp replacement)
                  in compilation-transform-file-match-alist
-                 when (string-match regexp file-name)
+                 when nil; (string-match regexp file-name)
                  return (if replacement
                             (setq file (list (replace-match replacement nil nil
                                                             file-name)))
