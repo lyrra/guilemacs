@@ -91,30 +91,31 @@ Return first line of the output of (describe-function-1 FUNC)."
     (define-obsolete-function-alias f 'help-fns-test--undefined-function "past")
     (describe-symbol f)))
 
+; FIX: :guilemacs-string: bad string escaping. Also, should we be scheme compatible?
 ;;; Test describe-function over functions with funny names
-(defun abc\\\[universal-argument\]b\`c\'d\\e\"f (x)
-  "A function with a funny name.
+;(defun abc\\\[universal-argument\]b\`c\'d\\e\"f (x)
+;  "A function with a funny name.
+;
+;\(fn XYZZY)"
+;  x)
 
-\(fn XYZZY)"
-  x)
+;(defun defgh\\\[universal-argument\]b\`c\'d\\e\"f (x)
+;  "Another function with a funny name."
+;  x)
 
-(defun defgh\\\[universal-argument\]b\`c\'d\\e\"f (x)
-  "Another function with a funny name."
-  x)
-
-'(ert-deftest help-fns-test-funny-names ()
-  "Test for help with functions with funny names."
-  (describe-function 'abc\\\[universal-argument\]b\`c\'d\\e\"f)
-  (with-current-buffer "*Help*"
-    (goto-char (point-min))
-    (should (search-forward
-             "(abc\\\\\\[universal-argument\\]b\\`c\\'d\\\\e\\\"f XYZZY)")))
-  (describe-function 'defgh\\\[universal-argument\]b\`c\'d\\e\"f)
-  (with-current-buffer "*Help*"
-    (goto-char (point-min))
-    (should (search-forward
-             "(defgh\\\\\\[universal-argument\\]b\\`c\\'d\\\\e\\\"f X)"))))
-
+;'(ert-deftest help-fns-test-funny-names ()
+;  "Test for help with functions with funny names."
+;  (describe-function 'abc\\\[universal-argument\]b\`c\'d\\e\"f)
+;  (with-current-buffer "*Help*"
+;    (goto-char (point-min))
+;    (should (search-forward
+;             "(abc\\\\\\[universal-argument\\]b\\`c\\'d\\\\e\\\"f XYZZY)")))
+;  (describe-function 'defgh\\\[universal-argument\]b\`c\'d\\e\"f)
+;  (with-current-buffer "*Help*"
+;    (goto-char (point-min))
+;    (should (search-forward
+;             "(defgh\\\\\\[universal-argument\\]b\\`c\\'d\\\\e\\\"f X)"))))
+;
 
 ;;; Test for describe-symbol
 '(ert-deftest help-fns-test-describe-symbol ()
