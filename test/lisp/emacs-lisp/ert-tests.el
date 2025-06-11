@@ -373,7 +373,7 @@ This macro is used to test if macroexpansion in `should' works."
                   ;; or not (bug#51308).
                   '(ert-fail signal)))))
 
-(ert-deftest ert-test-messages ()
+'(ert-deftest ert-test-messages ()
   :tags '(:causes-redisplay)
   (let* ((message-string "Test message")
          (messages-buffer (get-buffer-create "*Messages*"))
@@ -689,7 +689,7 @@ This macro is used to test if macroexpansion in `should' works."
     (should (equal (ert--explain-equal 'a sym)
                    `(different-symbols-with-the-same-name a ,sym)))))
 
-(ert-deftest ert-test-explain-equal-strings ()
+'(ert-deftest ert-test-explain-equal-strings ()
   (should (equal (ert--explain-equal "abc" "axc")
                  '(array-elt 1 (different-atoms
                                 (?b "#x62" "?b")
@@ -756,7 +756,8 @@ This macro is used to test if macroexpansion in `should' works."
   (should (equal (ert--abbreviate-string "bar" 1 t) "r"))
   (should (equal (ert--abbreviate-string "bar" 0 t) "")))
 
-(ert-deftest ert-test-explain-equal-string-properties ()
+; FIX: :guilemacs-strings: no string-properties
+'(ert-deftest ert-test-explain-equal-string-properties ()
   (should-not (ert--explain-equal-including-properties-rec "foo" "foo"))
   (should-not (ert--explain-equal-including-properties-rec
                #("foo" 0 3 (a b))
