@@ -1002,7 +1002,9 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	      if (dest_multibyte)
 		toindex_byte += CHAR_STRING (c, SDATA (result) + toindex_byte);
 	      else
-		SSET (result, toindex_byte++, c);
+                // FIX: :upstream: why do we use SSET over ASET, when using AREF
+		//SSET (result, toindex_byte++, c);
+                scm_c_string_set_x (result, toindex_byte++, scm_c_make_char (c));
 	      toindex++;
 	    }
 	}
