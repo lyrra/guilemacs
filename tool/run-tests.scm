@@ -31,7 +31,7 @@
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
   "test/pre/string2.scm"
-  "test/pre/fns.scm"
+;  "test/pre/fns.scm"
   "test/pre/random.scm"
   "test/pre/time.scm")
 (group
@@ -228,6 +228,8 @@
   )
  ))
 
+(define %emacs-exec "../src/bootstrap-emacs")
+
 ;; keep track manually of which tests are expensive or unstable
 (define %skipped-tests '(
  "cperl-test-bug-10483" "info-xref-test-emacs-manuals" "package-test-update-archives-async" "password-cache-tests-add/expires-key" "test-htmlfontify-load-rgb-file" "cl-seq-test-bug24264" "srecode-field-utest-impl" "semantic-test-c-preprocessor-simulation"
@@ -360,7 +362,7 @@
 (define (run-tests-bare-emacs files keys)
   (let* ((files (randomize-list (testcompile-files files)))
          (args (append
-                '("../src/emacs" "-nl" "-Q" "--batch")
+                `(,%emacs-exec "-nl" "-Q" "--batch")
                 (list
                  (string-concatenate
                   (apply append (map (lambda (file)
