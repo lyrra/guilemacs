@@ -24,14 +24,14 @@
                   name
                   ; first string triplet :: (string start end)
                   (list str
-                        (if (= 0 (random 2)) 'nil 0)
-                        (if (= 0 (random 2)) 'nil len))
+                        (rand-pick '(nil 0))
+                        (rand-pick `(nil ,len)))
                   ; second string triplet
                   (list str
-                        (if (= 0 (random 2)) 'nil 0)
-                        (if (= 0 (random 2)) 'nil len))
+                        (rand-pick '(nil 0))
+                        (rand-pick `(nil ,len)))
                   ; ignore-case
-                  (if (= 0 (random 2)) 'nil 't)
+                  (rand-pick '(nil t))
                   ; expected result
                   't))))
    ; we need to pass the length, if calculated it would count the escaped chars

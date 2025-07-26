@@ -1,6 +1,6 @@
 (define-module (utils)
   #:use-module (srfi srfi-1)
-  #:export (push! push-append! randomize-list
+  #:export (push! push-append! randomize-list rand-pick
             string-remove-substr
             print-report-table))
 
@@ -28,6 +28,9 @@
 
 (define (randomize-list lst)
   (%randomize-list lst '()))
+
+(define (rand-pick lst)
+  (list-ref lst (random (length lst))))
 
 (define (string-remove-substr str sub)
   (let ((n (string-contains str sub)))
