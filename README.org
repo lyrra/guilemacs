@@ -367,6 +367,162 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
     prefix-arg
 
 ** testing
+*** emacs prelude
+**** example session debugging remainder :prelude:guile-elisp:
+  The modulo operator "%" in emacs is a wrapper that uses guile's remainder.
+  See the definition of "elisp-%" in "prelude/load.scm".
+
+  A test in test-prelude that tests the modulo operators looks like:
+
+#+BEGIN_SRC scheme
+(deftestf 'remainder (-1)
+  (el-expr `(let ((a -1))
+              (print (% -1 2)))))
+#+END_SRC
+
+Since the definition is pure guile scheme, we can just inserts some printf-debubbing style:
+
+#+BEGIN_SRC scheme
+(define elisp-% (lambda (a b)
+                  (format #t "---- elisp-% a=~d b=~d result: ~d~%"
+                          a b (remainder a b))
+                  (remainder a b)
+                  ;(remainder (check-number-coerce-marker a)
+                  ;           (check-number-coerce-marker b))
+                  ))
+#+END_SRC
+
+Not nessecery, but we could run the prelude-tests in gdb:
+
+#+BEGIN_SRC bash
+#!/bin/sh
+
+. ./env.sh
+
+export LD_LIBRARY_PATH=$GUILE/lib
+
+cd test
+
+gdb --args \
+../src/bootstrap-emacs -nl -Q --batch --prelude /t/ge/guilemacs/test/pre/arith
+#+END_SRC
+
+Which outputs:
+
+#+BEGIN_SRC
+...
+found prelude, trying to load ../prelude/load.scm
+[New Thread 0x7fffeadb86c0 (LWP 342676)]
+Loading /t/ge/guilemacs/test/pre/arith (source)...
+
+-- test begin: remainder
+
+-- test expect: -1
+
+1
+
+-- test end: remainder
+...
+#+END_SRC
+
+Besides that the expected result is wrong, we don't see the printf-debugging output.
+
+Try to remove the installment, which would make the "%" operator undefined:
+
+#+BEGIN_SRC
+;(set-symbol-function! '% elisp-%)
+#+END_SRC
+
+But, still same output if running the test.
+Could the old definition in C still be present?
+
+Issuing vanilla emacs "find-function" in a vanilla emacs source-dir, or C-h f
+says: "% is a built-in function in ‘src/data.c’."
+or goes to the definition "Frem".
+
+But Frem doesn't exist anymore.
+
+Lets ensure the prelude mechanism works, by just defining our own function:
+
+#+BEGIN_SRC scheme
+; ---- FILE prelude/load.scm:
+
+(define elisp-foo (lambda (a b)
+                  (format #t "---- elisp-foo a=~d b=~d result: ~d~%"
+                          a b (remainder a b))
+                  (remainder a b)))
+
+(set-symbol-function! 'foo elisp-foo)
+
+; ---- FILE test/prelude/arith.scm:
+
+(deftestf 'remainder (-1)
+  (el-expr `(let ((a -1))
+              (print (foo -1 2)))))
+#+END_SRC
+
+Whenever changing a test prelude scheme file, regenerate the elisp test before
+running gdb, by "sh tool/run-tests.sh --prelude --filter=arith"
+(if changing prelude/load.scm, no test re-generate is needed, because the prelude
+ file is loaded at runtime)
+
+#+BEGIN_SRC
+found prelude, trying to load ../prelude/load.scm
+[New Thread 0x7fffeadb86c0 (LWP 343206)]
+Loading /t/ge/guilemacs/test/pre/arith (source)...
+
+-- test begin: remainder
+
+-- test expect: -1
+---- elisp-foo a=-1 b=2 result: -1
+
+-1
+
+-- test end: remainder
+#+END_SRC
+
+Ok, changing "%" into our own "foo", and the test works.
+
+Strange. Beware that the test code is passing two guile compilers:
+- 1: The reader and compiler by the test-loader that generates the emacs-lisp test code.
+- 2: The reader and compiler by the built-in guile in the emacs binary.
+
+Lets print out the function to see what's going on:
+
+#+BEGIN_SRC
+(deftestf 'remainder (-1)
+  (el-expr `(let ((a -1)
+                  (op (symbol-function '%)))
+              (print op)
+              (print (funcall op a 2)))))
+#+END_SRC
+
+Which outputs:
+"#<scheme #<procedure modulo (_ _)>>"
+
+Ok, this is a more fundamental problem, it is the guile-elisp implementation,
+so we need to remove that definition.
+
+Look in your env.sh file to see where the "special-guile" is installed.
+From that we can just change the sources and guile will pick them up:
+#+BEGIN_SRC
+  find /t/ge/g3/share | grep elisp
+  ...
+  /t/ge/g3/share/guile/3.0/language/elisp/boot.el
+  /t/ge/g3/share/guile/3.0/language/elisp/runtime.scm
+  /t/ge/g3/share/guile/3.0/language/elisp/compile-tree-il.scm
+  ...
+#+END_SRC
+
+The definition is in "boot.el", just disable it:
+
+#+BEGIN_SRC
+;(fset '% (@ (guile) modulo))
+#+END_SRC
+
+And the test now works!
+
+*** ERT
   see 922ad238
 ** bytecode optimizer
   see 7feb5b2d
