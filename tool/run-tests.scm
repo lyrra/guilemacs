@@ -45,18 +45,22 @@
   "test/lisp/ansi-color-tests.el"
   "test/lisp/ansi-osc-tests.el"
   "test/lisp/auth-source-pass-tests.el"
+  )(group
   "test/lisp/autoinsert-tests.el"
   "test/lisp/battery-tests.el"
   "test/lisp/buff-menu-tests.el"
   "test/lisp/button-tests.el"
+  )(group
   "test/lisp/calculator-tests.el"
   "test/lisp/cedet/cedet-files-tests.el"
   "test/lisp/cedet/semantic-utest-c.el"
   "test/lisp/cedet/semantic/bovine/gcc-tests.el"
+  )(group
   "test/lisp/cedet/semantic/fw-tests.el"
   "test/lisp/cedet/srecode/fields-tests.el"
   "test/lisp/color-tests.el"
   "test/lisp/completion-tests.el"
+  )(group
   "test/lisp/cus-edit-tests.el"
   "test/lisp/delim-col-tests.el"
   "test/lisp/desktop-tests.el"
@@ -65,74 +69,92 @@
   ;
   ;"test/lisp/elide-head-tests.el"
   ;
+  )(group
   "test/lisp/emacs-lisp/byte-run-tests.el"
   "test/lisp/emacs-lisp/check-declare-tests.el"
   "test/lisp/emacs-lisp/cl-preloaded-tests.el"
   "test/lisp/emacs-lisp/cl-print-tests.el"
+  )(group
   "test/lisp/emacs-lisp/cl-seq-tests.el"
   "test/lisp/emacs-lisp/copyright-tests.el"
   "test/lisp/emacs-lisp/derived-tests.el"
   "test/lisp/emacs-lisp/easy-mmode-tests.el"
+  )(group
   "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el"
   "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el"
   "test/lisp/emacs-lisp/float-sup-tests.el"
   "test/lisp/emacs-lisp/hierarchy-tests.el"
+  )(group
   "test/lisp/emacs-lisp/icons-tests.el"
   "test/lisp/emacs-lisp/lisp-mnt-tests.el"
   "test/lisp/emacs-lisp/lisp-mode-tests.el"
   "test/lisp/emacs-lisp/memory-report-tests.el"
+  )(group
   "test/lisp/emacs-lisp/pp-tests.el"
   "test/lisp/emacs-lisp/range-tests.el"
   "test/lisp/emacs-lisp/regexp-opt-tests.el"
   "test/lisp/emacs-lisp/ring-tests.el"
+  )(group
   "test/lisp/emacs-lisp/seq-tests.el"
   "test/lisp/emacs-lisp/shadow-tests.el"
   "test/lisp/emacs-lisp/syntax-tests.el"
   "test/lisp/emacs-lisp/tabulated-list-tests.el"
+  )(group
   "test/lisp/emacs-lisp/text-property-search-tests.el"
   "test/lisp/emacs-lisp/thunk-tests.el"
   "test/lisp/emacs-lisp/unsafep-tests.el"
   "test/lisp/emacs-lisp/vtable-tests.el"
+  )(group
   "test/lisp/env-tests.el"
   "test/lisp/faces-tests.el"
   "test/lisp/find-cmd-tests.el"
   "test/lisp/font-lock-tests.el"
+  )(group
   "test/lisp/format-spec-tests.el"
   "test/lisp/hfy-cmap-tests.el"
   "test/lisp/hi-lock-tests.el"
   "test/lisp/htmlfontify-tests.el"
+  )(group
   "test/lisp/ido-tests.el"
   "test/lisp/image-file-tests.el"
   "test/lisp/imenu-tests.el"
   "test/lisp/info-tests.el"
+  )(group
   "test/lisp/international/mule-util-tests.el"
   "test/lisp/isearch-tests.el"
   "test/lisp/jit-lock-tests.el"
   "test/lisp/json-tests.el"
+  )(group
   "test/lisp/lpr-tests.el"
   "test/lisp/md4-tests.el"
   "test/lisp/misc-tests.el"
   "test/lisp/mwheel-tests.el"
+  )(group
   "test/lisp/nxml/nxml-mode-tests.el"
   "test/lisp/nxml/xsd-regexp-tests.el"
   "test/lisp/paren-tests.el"
   "test/lisp/password-cache-tests.el"
+  )(group
   "test/lisp/pcmpl-linux-tests.el"
   "test/lisp/pcomplete-tests.el"
   "test/lisp/progmodes/asm-mode-tests.el"
   "test/lisp/progmodes/autoconf-tests.el"
+  )(group
   "test/lisp/progmodes/bat-mode-tests.el"
   "test/lisp/progmodes/bug-reference-tests.el"
   "test/lisp/progmodes/executable-tests.el"
   "test/lisp/progmodes/gdb-mi-tests.el"
+  )(group
   "test/lisp/progmodes/glasses-tests.el"
   "test/lisp/progmodes/opascal-tests.el"
   "test/lisp/progmodes/pascal-tests.el"
   "test/lisp/progmodes/ps-mode-tests.el"
+  )(group
   "test/lisp/progmodes/sh-script-tests.el"
   "test/lisp/progmodes/subword-tests.el"
   "test/lisp/progmodes/tcl-tests.el"
   "test/lisp/ps-print-tests.el"
+  )(group
   "test/lisp/register-tests.el"
   "test/lisp/rot13-tests.el"
   "test/lisp/scroll-lock-tests.el"
@@ -153,29 +175,38 @@
   "test/lisp/progmodes/compile-tests.el"
   "test/lisp/progmodes/js-tests.el"
   "test/lisp/simple-tests.el"
+  )(group
   "test/lisp/emacs-lisp/pcase-tests.el"
   "test/lisp/emacs-lisp/package-tests.el"
   "test/lisp/replace-tests.el"
   "test/lisp/international/mule-tests.el"
+  )(group
   "test/lisp/mouse-tests.el"
   "test/lisp/auth-source-tests.el"
   "test/lisp/dabbrev-tests.el"
   "test/lisp/emacs-lisp/macroexp-tests.el"
+  )(group
   "test/lisp/ls-lisp-tests.el"
   "test/lisp/loadhist-tests.el"
   "test/lisp/abbrev-tests.el"
   "test/lisp/emacs-lisp/let-alist-tests.el"
+  )(group
   "test/lisp/info-xref-tests.el"
   "test/lisp/image-tests.el"
   "test/lisp/ibuffer-tests.el"
   "test/lisp/hl-line-tests.el"
+  )(group
   "test/lisp/help-tests.el"
   "test/lisp/obarray-tests.el"
   "test/lisp/emacs-lisp/gv-tests.el"
   "test/lisp/files-tests.el"
+  )(group
   "test/lisp/ffap-tests.el"
+  )(group
   "test/lisp/progmodes/f90-tests.el"
+  )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
+  )(group
   "test/lisp/emacs-lisp/ert-x-tests.el"
   )
 (group
@@ -189,41 +220,52 @@
   ;"test/lisp/emacs-lisp/timer-tests.el"
   "test/lisp/emacs-lisp/warnings-tests.el"
   "test/lisp/emacs-lisp/cl-generic-tests.el"
+  )(group
   "test/lisp/emacs-lisp/cl-lib-tests.el"
   "test/lisp/emacs-lisp/cl-macs-tests.el"
   "test/lisp/emacs-lisp/comp-cstr-tests.el"
   "test/lisp/emacs-lisp/ert-font-lock-tests.el"
+  )(group
   "test/lisp/emacs-lisp/map-tests.el"
   "test/lisp/emacs-lisp/rmc-tests.el"
   "test/lisp/emacs-lisp/rx-tests.el"
   "test/lisp/emacs-lisp/backquote-tests.el"
+  )(group
   "test/lisp/emacs-lisp/benchmark-tests.el"
   "test/lisp/emacs-lisp/bindat-tests.el"
   "test/lisp/emacs-lisp/cconv-tests.el"
   "test/lisp/emacs-lisp/cl-extra-tests.el"
+  )(group
   "test/lisp/emacs-lisp/checkdoc-tests.el" ; run this not with test/lisp/emacs-lisp/find-func-tests.el
 
   "test/lisp/saveplace-tests.el"
   "test/lisp/shell-tests.el"
   "test/lisp/international/ccl-tests.el"
+  )(group
   "test/lisp/minibuffer-tests.el"
   "test/lisp/align-tests.el"
   "test/lisp/allout-tests.el"
   "test/lisp/arc-mode-tests.el"
+  )(group
   "test/lisp/bookmark-tests.el"
   "test/lisp/completion-preview-tests.el"
   "test/lisp/custom-tests.el"
   "test/lisp/descr-text-tests.el"
+  )(group
   "test/lisp/dired-aux-tests.el"
   "test/lisp/dired-x-tests.el"
   "test/lisp/dnd-tests.el"
   "test/lisp/dom-tests.el"
 
+  )(group
   "test/lisp/progmodes/cperl-mode-tests.el"
   "test/lisp/progmodes/csharp-mode-tests.el"
   "test/lisp/progmodes/project-tests.el"
+  )(group
   "test/lisp/progmodes/ruby-mode-tests.el"
+  )(group
   "test/lisp/progmodes/scheme-tests.el"
+  )(group
   "test/lisp/progmodes/sql-tests.el"
   )
  ))

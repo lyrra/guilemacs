@@ -129,6 +129,9 @@ compile_pattern_1 (struct regexp_cache *cp, Lisp_Object pattern,
 
   if (val)
     {
+      fprintf(stderr, "-- invalid regexp: pattern: %s\n", SSDATA (pattern));
+      fprintf(stderr, "-- invalid regexp: val: %s\n", val);
+      Fdebug_gdb_break(Qnil);
       xsignal2 (Qinvalid_regexp,
                 build_string (val),
                 Qnil);

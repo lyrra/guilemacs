@@ -162,6 +162,10 @@ Each entry is:
  (NAME ARGS DEF) -- NAME is an rx form with arglist ARGS, defined
                     as the rx form DEF (which can contain members of ARGS).")
 
+(defvar *debug-rx* nil)
+(defmacro debug-rx (onoff)
+  (setq *debug-rx* onoff))
+
 (defsubst rx--lookup-def (name)
   "Current definition of NAME: (DEF) or (ARGS DEF), or nil if none."
   (or (cdr (assq name rx--local-definitions))
@@ -187,6 +191,7 @@ Each entry is:
 
 (defun rx--translate-symbol (sym)
   "Translate an rx symbol.  Return (REGEXP . PRECEDENCE)."
+  (if *debug-rx* (message (format "rx--translate-symbol 0 %s" sym)))
   (pcase sym
     ;; Use `list' instead of a quoted list to wrap the strings here,
     ;; since the return value may be mutated.
@@ -196,7 +201,10 @@ Each entry is:
     ((or 'bol 'line-start)        (cons (list "^") 'lseq))
     ((or 'eol 'line-end)          (cons (list "$") 'rseq))
     ((or 'bos 'string-start 'bot 'buffer-start) (cons (list "\\`") t))
-    ((or 'eos 'string-end   'eot 'buffer-end)   (cons (list "\\'") t))
+    ((or 'eos 'string-end   'eot 'buffer-end)
+     (if *debug-rx* (message (format "rx--translate-symbol 1 just eos")))
+     ; FIX-20250802: eos is translated into some quote, that is part of an regex, it will be read by the lisp-compiler (eval_sub) and possibly used by Fstring_match
+     (cons (list "\\'") t))
     ('point                       (cons (list "\\=") t))
     ((or 'bow 'word-start)        (cons (list "\\<") t))
     ((or 'eow 'word-end)          (cons (list "\\>") t))
@@ -1354,16 +1362,24 @@ can expand to any number of values."
 
 (defun rx--translate (item)
   "Translate the rx-expression ITEM.  Return (REGEXP . PRECEDENCE)."
+  (if *debug-rx* (message (format "rx-tran 0 %s" item)))
   (cond
    ((stringp item)
+    (if *debug-rx* (message "rx-tran string"))
     (if (= (length item) 0)
         (cons nil 'seq)
       (cons (list (regexp-quote item)) (if (= (length item) 1) t 'seq))))
    ((characterp item)
+    (if *debug-rx* (message "rx-tran char"))
     (cons (list (regexp-quote (char-to-string item))) t))
    ((symbolp item)
-    (rx--translate-symbol item))
+    (if *debug-rx* (message "rx-tran sym"))
+    (let ((tran (rx--translate-symbol item)))
+      (if *debug-rx* (message (format "rx-tran 3 %s" tran)))
+      (if *debug-rx* (message (format "rx-tran 3;")))
+      tran))
    ((consp item)
+    (if *debug-rx* (message "rx-tran cons"))
     (rx--translate-form item))
    (t (error "Bad rx expression: %S" item))))
 
@@ -1378,22 +1394,35 @@ group.
 
 For extending the `rx' notation in FORM, use `rx-define' or `rx-let-eval'."
   (declare (important-return-value t))
+  (if *debug-rx* (message "rx-to-string 0"))
   (let* ((item (rx--translate form))
          (exprs (if no-group
                     (car item)
                   (rx--atomic-regexp item))))
+    (if *debug-rx* (message "rx-to-string 1.0"))
+    (if *debug-rx* (message (format "rx-to-string 1.1 %s" exprs)))
+    (if *debug-rx* (message "rx-to-string 1.2"))
     (apply #'concat exprs)))
 
 (defun rx--to-expr (form)
   "Translate the rx-expression FORM to a Lisp expression yielding a regexp."
+  (when *debug-rx*
+    (message (format "rx--to-expr debug: %s" form)))
   (let* ((rx--local-definitions
           ;; Retrieve local definitions from the macroexpansion environment.
           ;; (It's unclear whether the previous value of `rx--local-definitions'
           ;; should be included, and if so, in which order.)
           (cdr (assq :rx-locals macroexpand-all-environment)))
          (rx--delayed-evaluation t)
-         (elems (car (rx--translate form)))
+         (t0 (if *debug-rx* (message "rx 0")))
+         (elems (car (progn
+                       (if *debug-rx* (message "rx 0-0"))
+                       (let ((r (rx--translate form)))
+                         (if *debug-rx* (message "rx 0-1"))
+                         r))))
+         (t1 (if *debug-rx* (message "rx 1")))
          (args nil))
+    (if *debug-rx* (message "rx 2"))
     ;; Merge adjacent strings.
     (while elems
       (let ((strings nil))

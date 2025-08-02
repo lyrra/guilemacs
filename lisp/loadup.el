@@ -575,7 +575,7 @@ lost after dumping")))
 
 ;; At this point, we're ready to resume undo recording for scratch.
 (buffer-enable-undo "*scratch*")
-
+(message "lu-578")
 (defvar load--bin-dest-dir nil
   "Store the original value passed by \"--bin-dest\" during dump.
 Internal use only.")
@@ -613,6 +613,7 @@ Internal use only.")
 ;; This file must be loaded each time Emacs is run from scratch, e.g., temacs.
 ;; So run the startup code now.  First, remove `-l loadup' from args.
 
+(message "lu-616")
 (if (and (member (nth 1 command-line-args) '("-l" "--load"))
 	 (equal (nth 2 command-line-args) "loadup"))
     (setcdr command-line-args (nthcdr 3 command-line-args)))
@@ -622,6 +623,7 @@ Internal use only.")
 ;; (or load-file-name byte-compile-current-file).
 (setq load-true-file-name nil)
 (setq load-file-name nil)
+(message "lu-626")
 (eval top-level t)
 
 ;; loadup.el is loaded at startup, but clobbers current-load-list.
