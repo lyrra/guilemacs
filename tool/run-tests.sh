@@ -8,7 +8,7 @@ export PATH="$GUILE/bin:$PATH"
 export LD_LIBRARY_PATH="$GUILE/lib"
 
 export HOME=/nonexistent
-export LANG=C
+export LANG=en_US.UTF-8
 export EMACS_TEST_DIRECTORY="`pwd`/test"
 
 cd test
