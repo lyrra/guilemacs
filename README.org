@@ -816,6 +816,29 @@ Thread 1 "bootstrap-emacs" received signal SIGSEGV, Segmentation fault.
   The 'lisp-string?' predicate is found in guile (module/language/elisp/runtime.scm),
   and used by 'module/language/elisp/compile-tree-il.scm'.
   Similarly is setup for make-lisp-string.
+*** debugging strings
+  In this example we we're unsure of the content of both the C-side string,
+  but also the guile-side string. Because we couldn't trust debug_print, since
+  that uses the emacs printer, we instead used scheme's "display".
+
+#+begin_src c
+  if (g_debug_print) {
+    fprintf(stderr, "-- str, buf[0]: %u\n", read_buffer[0] & 0xff);
+    fprintf(stderr, "-- str, buf[1]: %u\n", read_buffer[1] & 0xff);
+    fprintf(stderr, "-- str, buf[2]: %u\n", read_buffer[2] & 0xff);
+    if (p - read_buffer == 3) {
+      Lisp_Object s = scm_from_utf8_stringn (read_buffer, 3);
+      Lisp_Object bv = scm_string_to_utf8 (s);
+      int len = scm_c_string_length (s);
+      fprintf(stderr, "-- str, print raw: len=%d\n", len);
+      scm_newline(scm_current_error_port());
+      scm_display(bv, scm_current_error_port());
+      scm_newline(scm_current_error_port());
+      scm_force_output(scm_current_error_port());
+      fprintf(stderr, "-- str, done print raw\n");
+    }
+  }
+#+end_src c
 
 ** bignum
   Delegating bignum type to libgmp should theoretically decrease the amount of
