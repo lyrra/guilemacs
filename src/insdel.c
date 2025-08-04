@@ -1011,10 +1011,9 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     outgoing_nbytes = nchars;
-//  else if (! STRING_MULTIBYTE (string))
-//    outgoing_nbytes
-//      = count_size_as_multibyte (SDATA (string) + pos_byte,
-//				 nbytes);
+  /* FIX-guilemacs: For UTF-8 Guile strings, outgoing_nbytes should be nbytes */
+  else
+    outgoing_nbytes = nbytes;  /* UTF-8 strings: byte count = byte count */
 
   /* Do this before moving and increasing the gap,
      because the before-change hooks might move the gap
@@ -1028,8 +1027,9 @@ insert_from_string_1 (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 
   /* Copy the string text into the buffer, perhaps converting
      between single-byte and multibyte.  */
+  /* FIX-guilemacs: Guile strings are NOT always UTF-8 multibyte */
   copy_text (SDATA (string) + pos_byte, GPT_ADDR, nbytes,
-	     false,
+	     true,  /* always UTF-8 is a safe bet for Guile strings */
 	     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG

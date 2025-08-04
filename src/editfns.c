@@ -1601,9 +1601,16 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
   else
     result = make_uninit_string (end - start);
 
-  size = end0 - beg0;
+  /* FIX-guilemacs: correct byte length for UTF-8 */
+  size = end_byte - start_byte; /* Use byte positions (not character positions) */
+  if (start_byte < GPT_BYTE && GPT_BYTE < end_byte)
+    {
+      /* Split across gap: use first part size */
+      size = end0 - beg0;
+    }
   // memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
-  result = scm_from_utf8_stringn (BYTE_POS_ADDR (beg0), size);
+  unsigned char *bytes = BYTE_POS_ADDR (beg0);
+  result = scm_from_utf8_stringn ((char *)bytes, size);
   if (beg1 != -1)
     // memcpy (SDATA (result) + size, BEG_ADDR + beg1, end1 - beg1);
     result = scm_string_append (list2 (result, scm_from_utf8_stringn (BEG_ADDR + beg1, end1 - beg1)));
