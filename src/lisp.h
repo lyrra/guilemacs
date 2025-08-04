@@ -1321,7 +1321,8 @@ STRING_BYTES (struct Lisp_String *s)
 INLINE ptrdiff_t
 SBYTES (Lisp_Object string)
 {
-  return scm_c_string_length (string);
+  /* FIX-guilemacs: Use UTF-8 byte length, not character length */
+  return scm_c_string_utf8_length (string);
   emacs_abort ();
   return STRING_BYTES (XSTRING (string));
 }
