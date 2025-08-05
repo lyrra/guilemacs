@@ -2518,12 +2518,10 @@ A fancy display is used on graphic displays, normal otherwise."
   ;; on the command line (so "emacs --batch --file a --file b
   ;; --eval='(message "%s" (buffer-name))'" will print "b"), but this
   ;; does not affect the final displayed state of the buffers.
-  (message "cli1 0")
   (let ((displayable-buffers nil))
     ;; This `let' processes the command line arguments.
     (let ((command-line-args-left args-left))
       (when command-line-args-left
-        (message "cli1 1")
         ;; We have command args; process them.
         (let* ((dir command-line-default-directory)
                tem
@@ -2583,7 +2581,6 @@ nil default-directory" name)
                         (move-to-column (1- column)))
                       (setq column 0))))))
 
-          (message "cli1 2")
           ;; Add the long X options to longopts.
           (dolist (tem command-line-x-option-alist)
             (if (string-match "^--" (car tem))
@@ -2594,11 +2591,9 @@ nil default-directory" name)
             (if (string-match "^--" (car tem))
                 (push (list (car tem)) longopts)))
 
-          (message "cli1 3")
           ;; Loop, processing options.
           (while command-line-args-left
             (let* ((argi (car command-line-args-left))
-                   (x (message (format "cli1 arg: %s" argi)))
                    (orig-argi argi)
                    argval completion)
               (setq command-line-args-left (cdr command-line-args-left))
@@ -2624,7 +2619,6 @@ nil default-directory" name)
                       (setq argval nil
                             argi orig-argi)))))
 
-              (message "cli1 4")
               ;; Execute the option.
               (cond ((setq tem (assoc argi command-switch-alist))
                      (if argval
@@ -2682,7 +2676,6 @@ nil default-directory" name)
                             ;; Take file from default dir if it exists there;
                             ;; otherwise let `load' search for it.
                             (file-ex (file-truename (expand-file-name file))))
-                       (message (format "cli1 load file: %s" file))
                        (when (file-regular-p file-ex)
                          (setq file file-ex))
                        (load file nil t)))
@@ -2784,7 +2777,7 @@ nil default-directory" name)
               ;; to be deleted.  In this case, kill emacs to avoid an
               ;; abort later.
               (unless (frame-live-p (selected-frame)) (kill-emacs nil)))))))
-    (message "cli1 z")
+
     (when (eq initial-buffer-choice t)
       ;; When `initial-buffer-choice' equals t make sure that *scratch*
       ;; exists.

@@ -27,14 +27,9 @@
 ;; to ERT but are not mature yet and likely to change.
 
 ;;; Code:
-(message "ert-x 0")
 (eval-when-compile (require 'cl-lib))
-(message "ert-x 1")
 (require 'ert)
-(message "ert-x 2")
 (require 'subr-x) ; string-trim
-(message "ert-x 3")
-
 
 ;;; Test buffers.
 
@@ -377,14 +372,12 @@ convert it to a string and pass it to COLLECTOR first."
                            (funcall func object)))
       (funcall func object printcharfun))))
 
-(message "ert-x 380")
 (defvar ert-resource-directory-format "%s-resources/"
   "Format for `ert-resource-directory'.")
 (defvar ert-resource-directory-trim-left-regexp ""
   "Regexp for `string-trim' (left) used by `ert-resource-directory'.")
 (defvar ert-resource-directory-trim-right-regexp "\\(-tests?\\)?\\.el"
   "Regexp for `string-trim' (right) used by `ert-resource-directory'.")
-(message "ert-x 387")
 
 (defmacro ert-resource-directory ()
   "Return absolute file name of the resource (test data) directory.
@@ -412,7 +405,6 @@ file name will be trimmed using `string-trim' with arguments
                    (string-trim testfile
                                 ert-resource-directory-trim-left-regexp
                                 ert-resource-directory-trim-right-regexp))))))))
-(message "ert-x 415")
 
 (defmacro ert-resource-file (file)
   "Return absolute file name of resource (test data) file named FILE.
@@ -426,7 +418,6 @@ directory as returned by `ert-resource-directory'."
 (defvar ert-temp-file-suffix nil
   "Suffix used by `ert-with-temp-file' and `ert-with-temp-directory'.")
 
-(message "ert-x 429")
 (debug-rx t)
 (defun ert--with-temp-file-generate-suffix (filename)
   "Generate temp file suffix from FILENAME."
@@ -434,13 +425,11 @@ directory as returned by `ert-resource-directory'."
                                         (group (+? not-newline))
                                         (regexp "-?tests?")
                                         string-end)))
-    (message (format "rgx: %s" rgx))
     (concat "-"
             (replace-regexp-in-string rgx
                                       "\\1"
                                       (file-name-base filename)))))
 
-(message "ert-x 437")
 (defmacro ert-with-temp-file (name &rest body)
   "Bind NAME to the name of a new temporary file and evaluate BODY.
 Delete the temporary file after BODY exits normally or
@@ -535,7 +524,6 @@ The same keyword arguments are supported as in
      :directory t
      ,@body))
 
-(message "ert-x 532")
 (defun ert-gcc-is-clang-p ()
   "Return non-nil if the `gcc' command actually runs the Clang compiler."
   (internal--gcc-is-clang-p))
@@ -575,7 +563,6 @@ The same keyword arguments are supported as in
         (format "/mock::%s" temporary-file-directory))))
   "Temporary directory for remote file tests.")
 
-(message "ert-x z")
 (provide 'ert-x)
 
 ;;; ert-x.el ends here
