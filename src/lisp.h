@@ -1282,12 +1282,12 @@ STRING_SET_MULTIBYTE (Lisp_Object str)
 INLINE unsigned char *
 SDATA (Lisp_Object string)
 {
-  return scm_to_locale_string (string);
+  return scm_to_utf8_string (string);
 }
 INLINE char *
 SSDATA (Lisp_Object string)
 {
-  return scm_to_locale_string (string);
+  return scm_to_utf8_string (string);
 }
 INLINE scm_t_wchar
 SREF (Lisp_Object string, ptrdiff_t index)
