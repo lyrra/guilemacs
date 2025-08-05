@@ -1525,20 +1525,23 @@ the tests)."
     ;; behavior.
     (setq attempt-stack-overflow-recovery nil
           attempt-orderly-shutdown-on-fatal-signal nil)
-    (unwind-protect
+    ;(unwind-protect
         (let ((stats (ert-run-tests-batch selector)))
           (when eln-dir
             (ignore-errors
               (delete-directory eln-dir t)))
           (kill-emacs (if (zerop (ert-stats-completed-unexpected stats)) 0 1)))
-      (unwind-protect
-          (progn
-            (message "Error running tests")
-            (backtrace))
-        (when eln-dir
-          (ignore-errors
-            (delete-directory eln-dir t)))
-        (kill-emacs 2)))))
+      ;(unwind-protect
+      ;    (progn
+      ;      (message "Error running tests")
+      ;      (backtrace))
+      ;  (when eln-dir
+      ;    (ignore-errors
+      ;      (delete-directory eln-dir t)))
+      ;  (kill-emacs 2)
+      ;  )
+      ;)
+      ))
 
 (defvar ert-load-file-name nil
   "The name of the loaded ERT test file, a string.
