@@ -1237,20 +1237,24 @@ string_char_to_byte (Lisp_Object string, ptrdiff_t char_index)
 	}
     }
 
+  /* guilemacs: Cache SDATA pointer to ensure consistent pointer arithmetic
+     since SDATA now returns fresh C-strings for Guile strings */
+  unsigned char *string_data = SDATA (string);
+
   if (char_index - best_below < best_above - char_index)
     {
-      unsigned char *p = SDATA (string) + best_below_byte;
+      unsigned char *p = string_data + best_below_byte;
 
       while (best_below < char_index)
 	{
 	  p += BYTES_BY_CHAR_HEAD (*p);
 	  best_below++;
 	}
-      i_byte = p - SDATA (string);
+      i_byte = p - string_data;
     }
   else
     {
-      unsigned char *p = SDATA (string) + best_above_byte;
+      unsigned char *p = string_data + best_above_byte;
 
       while (best_above > char_index)
 	{
@@ -1258,7 +1262,7 @@ string_char_to_byte (Lisp_Object string, ptrdiff_t char_index)
 	  while (!CHAR_HEAD_P (*p)) p--;
 	  best_above--;
 	}
-      i_byte = p - SDATA (string);
+      i_byte = p - string_data;
     }
 
   string_char_byte_cache_bytepos = i_byte;
@@ -1297,10 +1301,14 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
 	}
     }
 
+  /* guilemacs: Cache SDATA pointer to ensure consistent pointer arithmetic
+     since SDATA now returns fresh C-strings for Guile strings */
+  unsigned char *string_data = SDATA (string);
+
   if (byte_index - best_below_byte < best_above_byte - byte_index)
     {
-      unsigned char *p = SDATA (string) + best_below_byte;
-      unsigned char *pend = SDATA (string) + byte_index;
+      unsigned char *p = string_data + best_below_byte;
+      unsigned char *pend = string_data + byte_index;
 
       while (p < pend)
 	{
@@ -1308,12 +1316,12 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
 	  best_below++;
 	}
       i = best_below;
-      i_byte = p - SDATA (string);
+      i_byte = p - string_data;
     }
   else
     {
-      unsigned char *p = SDATA (string) + best_above_byte;
-      unsigned char *pbeg = SDATA (string) + byte_index;
+      unsigned char *p = string_data + best_above_byte;
+      unsigned char *pbeg = string_data + byte_index;
 
       while (p > pbeg)
 	{
@@ -1322,7 +1330,7 @@ string_byte_to_char (Lisp_Object string, ptrdiff_t byte_index)
 	  best_above--;
 	}
       i = best_above;
-      i_byte = p - SDATA (string);
+      i_byte = p - string_data;
     }
 
   string_char_byte_cache_bytepos = i_byte;
