@@ -1569,13 +1569,6 @@ Lisp_Object
 make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
 			 ptrdiff_t end, ptrdiff_t end_byte, bool props)
 {
-  if (end != end_byte || start != start_byte)
-    {
-      fprintf(stderr, "ABORT: end != end_byte: %d, %d OR: start != start_byte: %d, %d\n",
-              end, end_byte, start, start_byte);
-      emacs_abort ();
-    }
-
   Lisp_Object result, tem, tem1;
   ptrdiff_t beg0, end0, beg1, end1, size;
 
