@@ -2846,7 +2846,7 @@ string_from_scheme (Lisp_Object scheme_string)
 Lisp_Object
 string_to_scheme (Lisp_Object string)
 {
-  return scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
+  return string;  /* String is already a Guile string - no conversion needed */
 }
 
 DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,

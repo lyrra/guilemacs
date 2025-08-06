@@ -1543,7 +1543,7 @@ DEFUN ("string-to-scheme", Fstring_to_scheme, Sstring_to_scheme, 1, 1, 0, 0)
   (Lisp_Object string)
 {
   CHECK_STRING (string);
-  return scm_from_utf8_stringn (SSDATA (string), SBYTES (string));
+  return string;  /* String is already a Guile string - no conversion needed */
 }
 
 DEFUN ("string-from-scheme", Fstring_from_scheme, Sstring_from_scheme, 1, 1, 0, 0)

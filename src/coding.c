@@ -9643,7 +9643,7 @@ code_convert_string (Lisp_Object string, Lisp_Object coding_system,
             Vlast_coding_system_used = coding_system;
           return (nocopy
                   ? string
-                  : scm_from_utf8_stringn (SSDATA (string), bytes));
+                  : scm_string_copy (string));  /* Copy Guile string directly */
                   //(encodep
                   // ? make_unibyte_string (SSDATA (string), bytes)
                   // : make_multibyte_string (SSDATA (string), bytes, bytes)));
