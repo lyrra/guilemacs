@@ -899,6 +899,9 @@ by guile-elisp.
   - So the final string returned by the lexer is one constructed by the c-function
     "string_from_scheme" if guile-elisp is runned within the emacs binary.
 
+** guile internals
+  - SCM_CHAR is a macro defined by guile It takes a SCM object and return the unicode codepoint as an integer.
+
 ** known problems
 *** guile-emacs build fails with Unbound variable: make-srfi-4-vector
   - error:
