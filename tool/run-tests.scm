@@ -31,14 +31,22 @@
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
   "test/pre/string2.scm"
+  "test/pre/reader-utf8.scm"
 ;  "test/pre/fns.scm"
   "test/pre/random.scm"
-  "test/pre/time.scm")
+  "test/pre/time.scm"
+  "test/pre/buffer.scm"
+  "test/pre/string-match-utf8.scm"
+  "test/pre/string-cache-debug.scm"
+  "test/pre/string-length-bytes-match.scm"
+  "test/pre/ensure-empty-lines-arithmetic.scm"
+  )
 (group
   ;"test/src/timefns-tests.el"
   "test/src/fns-tests.el"
   ;"test/src/floatfns-tests.el"
   )
+
 ;; in the following group, all of the test files works with guilemacs
 (group
   "test/lisp/allout-widgets-tests.el"
@@ -268,6 +276,7 @@
   )(group
   "test/lisp/progmodes/sql-tests.el"
   )
+
  ))
 
 (define %emacs-exec "../src/bootstrap-emacs")
