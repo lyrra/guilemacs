@@ -356,7 +356,6 @@ to the real `message'."
         (funcall collector (concat msg "\n"))
         (funcall func "%s" msg)))))
 
-(message "ert-x 364")
 (defun ert--make-print-advice (collector)
   "Create around advice for print functions for `ert-collect-messages'.
 The created advice function will just call the original function
@@ -418,13 +417,12 @@ directory as returned by `ert-resource-directory'."
 (defvar ert-temp-file-suffix nil
   "Suffix used by `ert-with-temp-file' and `ert-with-temp-directory'.")
 
-(debug-rx t)
 (defun ert--with-temp-file-generate-suffix (filename)
   "Generate temp file suffix from FILENAME."
   (let ((rgx (rx string-start
-                                        (group (+? not-newline))
-                                        (regexp "-?tests?")
-                                        string-end)))
+                 (group (+? not-newline))
+                 (regexp "-?tests?")
+                 string-end)))
     (concat "-"
             (replace-regexp-in-string rgx
                                       "\\1"
