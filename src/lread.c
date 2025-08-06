@@ -2349,10 +2349,11 @@ readevalloop (Lisp_Object readcharfun,
    If the input is not from a buffer, they must be nil.  */
 
 static int
-freadchar ()
+freadchar (bool *multibyte)
 {
-  return readchar_load ();
+  return readchar (Qget_file_char, multibyte);  // Use the same readchar as read0()
 }
+
 void
 funreadchar (char c)
 {
@@ -2370,6 +2371,7 @@ readevalloop_load (
   Lisp_Object readcharfun = Qget_file_char;
   int c;
   Lisp_Object val;
+  bool multibyte = false;
   dynwind_begin ();
   struct buffer *b = 0;
   bool continue_reading_p;
@@ -2411,10 +2413,10 @@ readevalloop_load (
       infile = infile0;
       eassert (!infile0 || infile == infile0);
     read_next:
-      c = freadchar();
+      c = freadchar(&multibyte);
       if (c == ';')
 	{
-	  while ((c = freadchar()) != '\n' && c != -1);
+	  while ((c = freadchar(&multibyte)) != '\n' && c != -1);
 	  goto read_next;
 	}
       if (c < 0)
@@ -4507,8 +4509,8 @@ fread0 ()
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
-  bool multibyte = false;
-  int c = freadchar ();
+  bool multibyte;
+  int c = freadchar (&multibyte);
   if (c < 0)
     end_of_file_error ();
 
@@ -4638,7 +4640,7 @@ fread0 ()
 	    READ_AND_BUFFER (ch);
 	    if (ch == '^')
 	      {
-		ch = freadchar ();
+		ch = freadchar (&multibyte);
 		if (ch == '[')
 		  {
 		    read_stack_push ((struct read_stack_entry) {
@@ -4702,7 +4704,7 @@ fread0 ()
 	    {
 	      int c;
 	      do
-		c = freadchar ();
+		c = freadchar (&multibyte);
 	      while (c >= 0 && c != '\n');
 	      goto read_obj;
 	    }
@@ -4738,7 +4740,7 @@ fread0 ()
 
 	  case ':':
 	    /* #:X -- uninterned symbol */
-	    c = freadchar ();
+	    c = freadchar (&multibyte);
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
@@ -4755,7 +4757,7 @@ fread0 ()
 
 	  case '_':
 	    /* #_X -- symbol without shorthand */
-	    c = freadchar ();
+	    c = freadchar (&multibyte);
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
@@ -4864,7 +4866,7 @@ fread0 ()
 
     case ',':
       {
-	int ch = freadchar ();
+	int ch = freadchar (&multibyte);
 	Lisp_Object sym;
 	if (ch == '@')
 	  sym = Qcomma_at;
@@ -4885,14 +4887,14 @@ fread0 ()
       {
 	int c;
 	do
-	  c = freadchar ();
+	  c = freadchar (&multibyte);
 	while (c >= 0 && c != '\n');
 	goto read_obj;
       }
 
     case '.':
       {
-	int nch = freadchar ();
+	int nch = freadchar (&multibyte);
 	funreadchar (nch);
 	if (nch <= 32 || nch == NO_BREAK_SPACE
 	    || nch == '"' || nch == '\'' || nch == ';'
@@ -4938,7 +4940,7 @@ fread0 ()
 
 	    if (c == '\\')
 	      {
-		c = freadchar ();
+		c = freadchar (&multibyte);
 		if (c < 0)
 		  end_of_file_error ();
 		quoted = true;
@@ -4948,7 +4950,7 @@ fread0 ()
 	      p += CHAR_STRING (c, (unsigned char *) p);
 	    else
 	      *p++ = c;
-	    c = freadchar ();
+	    c = freadchar (&multibyte);
 	  }
 	while (c > 32
 	       && c != NO_BREAK_SPACE
@@ -5036,7 +5038,7 @@ fread0 ()
 	case RE_list_dot:
 	  {
 	    skip_space_and_comments (readcharfun);
-	    int ch = freadchar ();
+	    int ch = freadchar (&multibyte);
 	    if (ch != ')')
 	      invalid_syntax ("expected )", readcharfun);
 	    XSETCDR (e->u.list.tail, obj);
