@@ -1236,6 +1236,7 @@ XSTRING (Lisp_Object a)
 INLINE bool
 STRING_MULTIBYTE (Lisp_Object str)
 {
+  fprintf(stderr, "-- STRING_MULTIBYTE detected, please check caller using gdb\n");
   emacs_abort ();
   return 0 <= XSTRING (str)->u.s.size_byte;
 }

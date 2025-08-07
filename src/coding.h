@@ -742,7 +742,7 @@ extern Lisp_Object from_unicode_buffer (const wchar_t *wstr);
 /* Macros for backward compatibility.  */
 
 #define encode_coding_string(coding, string, nocopy)			\
-  (STRING_MULTIBYTE(string) ?						\
+  (1 ? /* All strings are UTF-8/multibyte now */			\
     (encode_coding_object (coding, string, 0, 0, SCHARS (string),	\
 			   SBYTES (string), Qt),			\
      (coding)->dst_object) : (string))

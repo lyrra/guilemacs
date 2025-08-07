@@ -9075,7 +9075,7 @@ highest priority.  */)
 
   return detect_coding_system (SDATA (string),
 			       SCHARS (string), SBYTES (string),
-			       !NILP (highest), STRING_MULTIBYTE (string),
+			       !NILP (highest), 1, /* All strings are UTF-8/multibyte */
 			       Qnil);
 }
 
@@ -9121,9 +9121,10 @@ DEFUN ("find-coding-systems-region-internal",
 
   if (STRINGP (start))
     {
-      if (!STRING_MULTIBYTE (start)
-	  || SCHARS (start) == SBYTES (start))
-	return Qt;
+      //FIX-guilemacs: use guile scm string wide predicate?
+      //if (!STRING_MULTIBYTE (start)
+	//  || SCHARS (start) == SBYTES (start))
+	//return Qt;
       start_byte = 0;
       end_byte = SBYTES (start);
     }
