@@ -4503,24 +4503,42 @@ by calling `format-decode', which see.  */)
 
   eassert (PT == GPT);
 
-  /* GuilEmacs approach: Convert file data to Guile string and use normal insertion */
+  /* GuilEmacs approach: The file data is already in the gap, just update buffer metadata correctly */
   if (inserted > 0)
     {
-      /* Create a Guile string from the read data in the gap */
-      Lisp_Object file_string = scm_from_utf8_stringn (GPT_ADDR, inserted);
+      /* For GuilEmacs UTF-8 system: file data is already in the gap, just update the buffer bounds correctly.
+       * The key issue was that the original code didn't handle UTF-8 character/byte counting properly.
+       * We keep the data where it is and just ensure the buffer metadata is consistent. */
 
-      /* Move gap back to original position since we'll use string insertion */
-      GAP_SIZE += inserted;
-      ZV_BYTE -= inserted;
-      Z_BYTE -= inserted;
-      ZV -= inserted;
-      Z -= inserted;
+      /* The gap has shrunk by 'inserted' bytes and the buffer has grown by that amount.
+       * We need to make sure character counts are consistent with byte counts for UTF-8. */
 
-      /* Insert the string using the working string insertion mechanism */
-      insert_from_string (file_string, 0, 0, SCHARS (file_string), SBYTES (file_string), 0);
+      /* For UTF-8 strings, we need to count actual characters, not just bytes */
+      ptrdiff_t actual_chars = 0;
+      const unsigned char *data = GPT_ADDR - inserted;
+      const unsigned char *end = data + inserted;
 
-      /* Update inserted count to reflect actual characters inserted */
-      inserted = SCHARS (file_string);
+      /* Count UTF-8 characters */
+      while (data < end)
+        {
+          int c = *data;
+          if (c < 0x80)
+            data += 1;  /* ASCII */
+          else if (c < 0xC0)
+            data += 1;  /* Invalid UTF-8, skip */
+          else if (c < 0xE0)
+            data += 2;  /* 2-byte UTF-8 */
+          else if (c < 0xF0)
+            data += 3;  /* 3-byte UTF-8 */
+          else
+            data += 4;  /* 4-byte UTF-8 */
+          actual_chars++;
+        }
+
+      /* Update character counts based on actual UTF-8 character count */
+      ZV += actual_chars;
+      Z += actual_chars;
+      inserted = actual_chars;  /* Return character count for consistency */
     }
 
   /* Call after-change hooks for the inserted text, aside from the case
