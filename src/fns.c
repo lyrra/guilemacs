@@ -5765,13 +5765,24 @@ extract_data_from_object (Lisp_Object spec,
 	//object = code_convert_string (object, coding_system,
 	//			      Qnil, true, false, true);
 
+      /* GuilEmacs: For UTF-8 strings, work in bytes */
       ptrdiff_t size = SCHARS (object), start_char, end_char;
       validate_subarray (object, start, end, size, &start_char, &end_char);
 
-      *start_byte = !start_char ? 0 : string_char_to_byte (object, start_char);
-      *end_byte = (end_char == size
-                   ? SBYTES (object)
-                   : string_char_to_byte (object, end_char));
+      /* If using full string, use byte length directly */
+      if (start_char == 0 && end_char == size)
+        {
+          *start_byte = 0;
+          *end_byte = SBYTES (object);
+        }
+      else
+        {
+          /* For partial strings, convert character positions to byte positions */
+          *start_byte = !start_char ? 0 : string_char_to_byte (object, start_char);
+          *end_byte = (end_char == size
+                       ? SBYTES (object)
+                       : string_char_to_byte (object, end_char));
+        }
     }
   else if (BUFFERP (object))
     {
