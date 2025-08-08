@@ -1229,8 +1229,13 @@ FILE is the file from which we obtained this token."
 
 (defun auth-source--pad (string length)
   "Pad STRING to a modulo of LENGTH."
-  (let ((pad (- length (mod (length string) length))))
-    (concat string (make-string pad pad))))
+  ;; GuilEmacs: Use byte length for crypto operations, not character length
+  (let ((byte-length (string-bytes string)))
+    (if (<= byte-length length)
+        (let ((pad (- length (mod byte-length length))))
+          (concat string (make-string pad pad)))
+      ;; If string is already too long, truncate to byte length
+      (substring string 0 length))))
 
 (defun auth-source--unpad (string)
   "Remove PKCS#7 padding from STRING."
