@@ -2362,14 +2362,15 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	  printchar ('\"', printcharfun);
 	  size_byte = SBYTES (obj);
 
-	  for (i = 0, i_byte = 0; i_byte < size_byte;)
+	  for (i = 0, i_byte = 0; i < SCHARS (obj);)
 	    {
 	      /* Here, we must convert each multi-byte form to the
 		 corresponding character code before handing it to
 		 printchar.  */
 	      int c = SREF (obj, i);
               i++;
-              i_byte++;
+	      /* For GuilEmacs UTF-8: advance i_byte by the actual character byte length */
+	      i_byte += (c < 0x80) ? 1 : ((c < 0x800) ? 2 : ((c < 0x10000) ? 3 : 4));
 
 	      maybe_quit ();
 
@@ -2473,12 +2474,14 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	    break;
 	  }
 
-	for (ptrdiff_t i_byte = 0; i_byte < size_byte; )
+	for (ptrdiff_t i_char = 0, i_byte = 0; i_char < SCHARS (name); )
 	  {
 	    /* Here, we must convert each multi-byte form to the
 	       corresponding character code before handing it to PRINTCHAR.  */
-	    int c = SREF (name, i_byte);
-            i_byte++;
+	    int c = SREF (name, i_char);
+            i_char++;
+	    /* For GuilEmacs UTF-8: advance i_byte by the actual character byte length */
+	    i_byte += (c < 0x80) ? 1 : ((c < 0x800) ? 2 : ((c < 0x10000) ? 3 : 4));
 	    maybe_quit ();
 
 	    if (escapeflag)
