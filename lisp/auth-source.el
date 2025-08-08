@@ -1209,6 +1209,8 @@ FILE is the file from which we obtained this token."
   ;; useful information is leaked.  If you reset the nonce, you also
   ;; have to call `auth-source-forget-all-cached'.
   (unless auth-source--session-nonce
+    ;; GuilEmacs: Generate exactly 16 ASCII bytes (0-127) to avoid UTF-8 multi-byte issues
+    ;; This ensures the nonce is exactly 16 bytes, not UTF-8 characters
     (setq auth-source--session-nonce
           (apply #'string (cl-loop repeat 16
                                    collect (random 128)))))
@@ -1239,8 +1241,10 @@ FILE is the file from which we obtained this token."
 
 (defun auth-source--unpad (string)
   "Remove PKCS#7 padding from STRING."
-  (substring string 0 (- (length string)
-			 (aref string (1- (length string))))))
+  ;; GuilEmacs: Use byte length for crypto operations, not character length
+  (let ((byte-length (string-bytes string)))
+    (substring string 0 (- byte-length
+                           (aref string (1- byte-length))))))
 
 (defun auth-source--deobfuscate (data)
   (if (and (fboundp 'gnutls-symmetric-encrypt)
