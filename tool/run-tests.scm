@@ -35,11 +35,13 @@
 ;  "test/pre/fns.scm"
   "test/pre/random.scm"
   "test/pre/time.scm"
-  "test/pre/buffer.scm"
+  "test/pre/buffer-basic.scm"
+  "test/pre/buffer-string.scm"
   "test/pre/string-match-utf8.scm"
   "test/pre/string-cache-debug.scm"
   "test/pre/string-length-bytes-match.scm"
   "test/pre/ensure-empty-lines-arithmetic.scm"
+  "test/pre/string-print-utf8.scm"
   )
 (group
   ;"test/src/timefns-tests.el"
