@@ -37,6 +37,7 @@
   "test/pre/time.scm"
   "test/pre/buffer-basic.scm"
   "test/pre/buffer-string.scm"
+  "test/pre/clear-string.scm"
   "test/pre/string-match-utf8.scm"
   "test/pre/string-cache-debug.scm"
   "test/pre/string-length-bytes-match.scm"

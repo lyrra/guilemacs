@@ -3200,12 +3200,12 @@ removes all text properties.  This may change its length.  */)
   ptrdiff_t len = SBYTES (string);
   Fset_text_properties (make_fixnum (0), make_fixnum (SCHARS (string)),
 			Qnil, string);
-  if (len != 0 || STRING_MULTIBYTE (string))
+  if (len != 0)  /* GuilEmacs: All strings are UTF-8, no multibyte check needed */
     {
       CHECK_IMPURE (string, XSTRING (string));
       memset (SDATA (string), 0, len);
-      STRING_SET_CHARS (string, len);
-      STRING_SET_UNIBYTE (string);
+      /* GuilEmacs: In UTF-8-only system, just clear the string data.
+         No need to change size or convert to unibyte. */
     }
   return Qnil;
 }
