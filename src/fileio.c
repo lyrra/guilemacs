@@ -4503,31 +4503,25 @@ by calling `format-decode', which see.  */)
 
   eassert (PT == GPT);
 
-#if 0
-  coding.dst_multibyte
-    = !NILP (BVAR (current_buffer, enable_multibyte_characters));
-  if (CODING_MAY_REQUIRE_DECODING (&coding)
-      && (inserted > 0 || CODING_REQUIRE_FLUSHING (&coding)))
+  /* GuilEmacs approach: Convert file data to Guile string and use normal insertion */
+  if (inserted > 0)
     {
-      /* Now we have all the new bytes at the beginning of the gap,
-         but `decode_coding_gap` can't have them at the beginning of the gap,
-         so we need to move them.  */
-      memmove (GAP_END_ADDR - inserted, GPT_ADDR, inserted);
-      decode_coding_gap (&coding, inserted);
-      inserted = coding.produced_char;
-      coding_system = CODING_ID_NAME (coding.id);
-    }
-  else if (inserted > 0)
-    {
-      /* Make the text read part of the buffer.  */
-      eassert (NILP (BVAR (current_buffer, enable_multibyte_characters)));
-      insert_from_gap_1 (inserted, inserted, false);
+      /* Create a Guile string from the read data in the gap */
+      Lisp_Object file_string = scm_from_utf8_stringn (GPT_ADDR, inserted);
 
-      invalidate_buffer_caches (current_buffer, PT, PT + inserted);
-      adjust_after_insert (PT, PT_BYTE, PT + inserted, PT_BYTE + inserted,
-			   inserted);
+      /* Move gap back to original position since we'll use string insertion */
+      GAP_SIZE += inserted;
+      ZV_BYTE -= inserted;
+      Z_BYTE -= inserted;
+      ZV -= inserted;
+      Z -= inserted;
+
+      /* Insert the string using the working string insertion mechanism */
+      insert_from_string (file_string, 0, 0, SCHARS (file_string), SBYTES (file_string), 0);
+
+      /* Update inserted count to reflect actual characters inserted */
+      inserted = SCHARS (file_string);
     }
-#endif
 
   /* Call after-change hooks for the inserted text, aside from the case
      of normal visiting (not with REPLACE), which is done in a new buffer
