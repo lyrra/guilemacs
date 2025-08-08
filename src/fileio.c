@@ -4513,32 +4513,46 @@ by calling `format-decode', which see.  */)
       /* The gap has shrunk by 'inserted' bytes and the buffer has grown by that amount.
        * We need to make sure character counts are consistent with byte counts for UTF-8. */
 
-      /* For UTF-8 strings, we need to count actual characters, not just bytes */
+      /* For GuilEmacs UTF-8-only system: Count UTF-8 characters and use proper insertion */
       ptrdiff_t actual_chars = 0;
-      const unsigned char *data = GPT_ADDR - inserted;
+      const unsigned char *data = GPT_ADDR;
       const unsigned char *end = data + inserted;
 
-      /* Count UTF-8 characters */
+      /* Count UTF-8 characters in the gap data */
       while (data < end)
         {
           int c = *data;
           if (c < 0x80)
-            data += 1;  /* ASCII */
+            data += 1;  /* ASCII: 1 byte */
           else if (c < 0xC0)
             data += 1;  /* Invalid UTF-8, skip */
           else if (c < 0xE0)
-            data += 2;  /* 2-byte UTF-8 */
+            {
+              if (data + 2 <= end)
+                data += 2;  /* 2-byte UTF-8 */
+              else
+                break; /* Truncated sequence */
+            }
           else if (c < 0xF0)
-            data += 3;  /* 3-byte UTF-8 */
+            {
+              if (data + 3 <= end)
+                data += 3;  /* 3-byte UTF-8 */
+              else
+                break; /* Truncated sequence */
+            }
           else
-            data += 4;  /* 4-byte UTF-8 */
+            {
+              if (data + 4 <= end)
+                data += 4;  /* 4-byte UTF-8 */
+              else
+                break; /* Truncated sequence */
+            }
           actual_chars++;
         }
 
-      /* Update character counts based on actual UTF-8 character count */
-      ZV += actual_chars;
-      Z += actual_chars;
-      inserted = actual_chars;  /* Return character count for consistency */
+      /* Use proper Emacs function to transition data from gap to accessible buffer content */
+      insert_from_gap_1 (actual_chars, inserted, false);
+      inserted = actual_chars;  /* Return character count */
     }
 
   /* Call after-change hooks for the inserted text, aside from the case

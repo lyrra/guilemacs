@@ -1551,10 +1551,6 @@ make_buffer_string (ptrdiff_t start, ptrdiff_t end, bool props)
   ptrdiff_t start_byte = CHAR_TO_BYTE (start);
   ptrdiff_t end_byte = CHAR_TO_BYTE (end);
 
-  // FIX: buf_charpos_to_bytepos used by CHAR_TO_BYTE returns wrong value
-  start_byte = start;
-  end_byte = end;
-  // return make_buffer_string_both (start, start_byte, end, end_byte, props);
   return make_buffer_string_both (start, start_byte, end, end_byte, props);
 }
 
