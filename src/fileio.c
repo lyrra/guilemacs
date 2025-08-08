@@ -4957,7 +4957,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   bool file_locked = 0;
   struct buffer *given_buffer;
   struct coding_system coding;
-  fprintf(stderr, "-- Fwrite_region 0\n");
 
   if (current_buffer->base_buffer && visiting)
     error ("Cannot do file visiting in an indirect buffer");
@@ -4982,7 +4981,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
 
   annotations = Qnil;
 
-  fprintf(stderr, "-- Fwrite_region 1\n");
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
   handler = Ffind_file_name_handler (filename, Qwrite_region);
@@ -5044,7 +5042,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       XSETFASTINT (end, ZV);
     }
 
-  fprintf(stderr, "-- Fwrite_region 2\n");
   /* Decide the coding-system to encode the data with.
      We used to make this choice before calling build_annotations, but that
      leads to problems when a write-annotate-function takes care of
@@ -5053,7 +5050,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
     = choose_write_coding_system (start, end, filename,
                                  append, visit, lockname, &coding);
 
-  fprintf(stderr, "-- Fwrite_region 3\n");
   if (open_and_close_file && !auto_saving)
     {
       Flock_file (lockname);
