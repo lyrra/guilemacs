@@ -43,6 +43,7 @@
   "test/pre/string-length-bytes-match.scm"
   "test/pre/ensure-empty-lines-arithmetic.scm"
   "test/pre/string-print-utf8.scm"
+  "test/pre/string-char.scm"
   )
 (group
   ;"test/src/timefns-tests.el"
