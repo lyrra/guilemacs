@@ -2055,13 +2055,11 @@ usage: (make-process &rest ARGS)  */)
 	{
 	  Lisp_Object arg = XCAR (tem2);
 	  CHECK_STRING (arg);
-	  if (STRING_MULTIBYTE (arg))
-	    {
-	      if (NILP (arg_encoding))
-		arg_encoding = (complement_process_encoding_system
-				(XPROCESS (proc)->encode_coding_system));
-	      arg = code_convert_string_norecord (arg, arg_encoding, 1);
-	    }
+	  // GuilEmacs: All strings are UTF-8, so always do encoding conversion
+	  if (NILP (arg_encoding))
+	    arg_encoding = (complement_process_encoding_system
+			    (XPROCESS (proc)->encode_coding_system));
+	  arg = code_convert_string_norecord (arg, arg_encoding, 1);
 	  tem = Fcons (arg, tem);
 	  new_argc++;
 	}
