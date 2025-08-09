@@ -850,7 +850,7 @@ usage: (string &rest CHARACTERS)  */)
   for (ptrdiff_t i = 0; i < n; i++)
     {
       CHECK_CHARACTER (args[i]);
-      scm_c_string_set_x (str, i, scm_c_make_char (args[i]));
+      scm_c_string_set_x (str, i, scm_c_make_char (XFIXNUM (args[i])));
     }
   return str;
 }
