@@ -974,7 +974,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  ptrdiff_t nchars = SCHARS (arg);
           for (ptrdiff_t j = 0; j < nchars; j++)
             {
-              scm_c_string_set_x (result, toindex, scm_c_string_ref (arg, j));
+              scm_c_string_set_x (result, toindex_byte++, scm_c_string_ref (arg, j));
               toindex++;
             }
 #if 0
@@ -1015,7 +1015,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    if (dest_multibyte)
 	      toindex_byte += CHAR_STRING (c, SDATA (result) + toindex_byte);
 	    else
-              scm_c_string_set_x (result, toindex, scm_c_make_char (c));
+              scm_c_string_set_x (result, toindex_byte++, scm_c_make_char (c));
 	    toindex++;
 	  }
     }
