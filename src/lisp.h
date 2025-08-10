@@ -1236,9 +1236,13 @@ XSTRING (Lisp_Object a)
 INLINE bool
 STRING_MULTIBYTE (Lisp_Object str)
 {
+  // abort because in guilemacs doing STRING_MULTIBYTE might either be not needed or the wrong thing to do, ie the code calling STRING_MULTIBYTE might need be reworked.
   fprintf(stderr, "-- STRING_MULTIBYTE detected, please check caller using gdb\n");
   emacs_abort ();
-  return 0 <= XSTRING (str)->u.s.size_byte;
+  /* In Guile, strings are UTF-8. A string is multibyte if
+     its byte length differs from its character length. */
+  // note: maybe scm_string_bytes_per_char is enough?
+  return scm_c_string_utf8_length (str) != scm_c_string_length (str);
 }
 
 /* An upper bound on the number of bytes in a Lisp string, not
