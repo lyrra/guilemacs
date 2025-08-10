@@ -2341,17 +2341,13 @@ See also the function `nreverse', which is used more often.  */)
 	}
       else
 	{
-	  unsigned char *p, *q;
-          emacs_abort ();
-
-	  new = make_uninit_multibyte_string (size, bytes);
-	  p = SDATA (seq), q = SDATA (new) + bytes;
-	  while (q > SDATA (new))
-	    {
-	      int len, ch = string_char_and_length (p, &len);
-	      p += len, q -= len;
-	      CHAR_STRING (ch, q);
-	    }
+	  /* GuilEmacs: Handle multi-byte Unicode strings properly */
+	  new = make_uninit_string (size);
+	  for (ptrdiff_t i = 0; i < size; i++)
+            {
+              scm_t_wchar ch = scm_c_string_ref (seq, size - i - 1);
+              scm_c_string_set_x (new, i, ch);
+            }
 	}
     }
   else
