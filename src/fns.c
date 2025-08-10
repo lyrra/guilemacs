@@ -6004,19 +6004,29 @@ secure_hash (Lisp_Object algorithm, Lisp_Object object, Lisp_Object start,
   else
     error ("Invalid algorithm arg: %s", SDATA (Fsymbol_name (algorithm)));
 
-  /* allocate 2 x digest_size so that it can be reused to hold the
-     hexified value */
-  digest = make_uninit_string (digest_size * 2);
-
+  /* GuilEmacs: Use temporary buffer for binary data, then convert to hex */
+  char *binary_digest = xmalloc (digest_size);
   hash_func (input + start_byte,
 	     end_byte - start_byte,
-             //FIX: guilemacs-string: digest is a byte array, not a string
-	     SSDATA (digest));
+	     binary_digest);
 
   if (NILP (binary))
-    return make_digest_string (digest, digest_size);
+    {
+      /* Convert binary to hex string - use unibyte for hex characters */
+      char hex_buffer[digest_size * 2 + 1];
+      hexbuf_digest (hex_buffer, binary_digest, digest_size);
+      hex_buffer[digest_size * 2] = '\0';  /* null terminate */
+      digest = make_string (hex_buffer, digest_size * 2);
+      xfree (binary_digest);
+      return digest;
+    }
   else
-    return make_unibyte_string (SSDATA (digest), digest_size);
+    {
+      /* Return raw binary as unibyte string */
+      digest = make_unibyte_string (binary_digest, digest_size);
+      xfree (binary_digest);
+      return digest;
+    }
 }
 
 DEFUN ("md5", Fmd5, Smd5, 1, 5, 0,
@@ -6123,9 +6133,14 @@ It should not be used for anything security-related.  See
 			BUF_Z_ADDR (b) - BUF_GAP_END_ADDR (b),
 			&ctx);
 
-  Lisp_Object digest = make_uninit_string (SHA1_DIGEST_SIZE * 2);
-  sha1_finish_ctx (&ctx, SSDATA (digest));
-  return make_digest_string (digest, SHA1_DIGEST_SIZE);
+  /* GuilEmacs: Use temporary buffer for binary SHA1 data */
+  char binary_digest[SHA1_DIGEST_SIZE];
+  sha1_finish_ctx (&ctx, binary_digest);
+
+  char hex_buffer[SHA1_DIGEST_SIZE * 2 + 1];
+  hexbuf_digest (hex_buffer, binary_digest, SHA1_DIGEST_SIZE);
+  hex_buffer[SHA1_DIGEST_SIZE * 2] = '\0';  /* null terminate */
+  return make_string (hex_buffer, SHA1_DIGEST_SIZE * 2);
 }
 
 DEFUN ("buffer-line-statistics", Fbuffer_line_statistics,
