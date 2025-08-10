@@ -1214,7 +1214,7 @@ struct Lisp_String
 INLINE bool
 STRINGP (Lisp_Object x)
 {
-  return scm_string_p (x) == SCM_BOOL_T;
+  return scm_is_true(scm_string_p (x));
   //return SMOB_TYPEP (x, lisp_string_tag);
 }
 
