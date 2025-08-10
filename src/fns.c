@@ -1855,14 +1855,21 @@ DEFUN ("nthcdr", Fnthcdr, Snthcdr, 2, 2, 0,
       return Qnil;
     }
 
-  if (! FIXNUMP (n))
-    {
-      emacs_abort ();
-    }
-
   /* TAIL is part of a cycle.  Reduce NUM modulo the cycle length to
      avoid going around this cycle repeatedly.  */
   intptr_t cycle_length = tortoise_num - num;
+
+  if (! FIXNUMP (n))
+    {
+      /* Undo any error introduced when LARGE_NUM was substituted for
+	 N, by adding N - LARGE_NUM to NUM, using arithmetic modulo
+	 CYCLE_LENGTH.  */
+      /* Add N mod CYCLE_LENGTH to NUM.  */
+      Lisp_Object cycle_len = make_fixnum (cycle_length);
+      Lisp_Object remainder = scm_modulo (n, cycle_len);
+      num += XFIXNUM (remainder);
+      num += cycle_length - large_num % cycle_length;
+    }
   num %= cycle_length;
 
   /* One last time through the cycle.  */
