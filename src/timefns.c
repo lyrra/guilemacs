@@ -557,18 +557,50 @@ ticks_hz_list4 (Lisp_Object ticks, Lisp_Object hz)
   q2 = scm_floor_quotient (z, hz);
 
   scm_floor_divide (q2, scm_from_uintmax (TRILLION), &q, &r);
-  unsigned long int fullps = scm_to_uintmax (r);
-  int us = fullps / 1000000;
-  int ps = fullps % 1000000;
+
+  /* Handle remainders properly - convert to signed value first */
+  long int fullps_signed;
+  if (scm_negative_p (r) == SCM_BOOL_T)
+    {
+      /* For negative remainder, use signed conversion */
+      fullps_signed = scm_to_intmax (r);
+    }
+  else
+    {
+      /* For positive remainder, use unsigned conversion and cast */
+      fullps_signed = (long int)scm_to_uintmax (r);
+    }
+
+  /* Now handle division/modulo with signed arithmetic */
+  int us, ps;
+  if (fullps_signed < 0)
+    {
+      /* For negative values, we need to handle division differently */
+      us = -((-fullps_signed) / 1000000);
+      ps = -((-fullps_signed) % 1000000);
+    }
+  else
+    {
+      us = fullps_signed / 1000000;
+      ps = fullps_signed % 1000000;
+    }
 
   /* floor (_ / trillion), with US = the high six digits of the
      12-digit remainder, and PS = the low six digits.  */
 
   /* floor (_ / (1 << LO_TIME_BITS)), with LO = remainder.  */
-  unsigned long ulo = scm_to_uintmax (q);
-
+  unsigned long ulo;
   if (scm_negative_p (q) == SCM_BOOL_T)
-    ulo = -ulo;
+    {
+      /* For negative q, get absolute value first */
+      Lisp_Object abs_q = scm_abs (q);
+      ulo = scm_to_uintmax (abs_q);
+      ulo = -ulo;
+    }
+  else
+    {
+      ulo = scm_to_uintmax (q);
+    }
 
   int lo = ulo & ((1 << LO_TIME_BITS) - 1);
   q = scm_floor_quotient (q, scm_expt (make_fixnum (2), make_fixnum (LO_TIME_BITS)));
