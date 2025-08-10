@@ -5391,7 +5391,7 @@ string_to_number (char const *string, int base, ptrdiff_t *plen)
 Lisp_Object
 string_to_number_Ls (Lisp_Object ls, int base, ptrdiff_t *plen)
 {
-  char str = scm_to_locale_string (ls);
+  char *str = scm_to_locale_string (ls);
   Lisp_Object ret = string_to_number (str, base, plen);
   free (str);
   return ret;
