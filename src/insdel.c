@@ -1466,9 +1466,9 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
 
   if (NILP (BVAR (current_buffer, enable_multibyte_characters)))
     outgoing_insbytes = inschars;
-  else if (! STRING_MULTIBYTE (new))
-    outgoing_insbytes
-      = count_size_as_multibyte (SDATA (new), insbytes);
+  /* In Guile integration, all strings are UTF-8 (multibyte), so we skip
+     the STRING_MULTIBYTE check and count_size_as_multibyte conversion.
+     The string is already in the correct format. */
 
   /* Make sure the gap is somewhere in or next to what we are deleting.  */
   if (from > GPT)
@@ -1504,7 +1504,7 @@ replace_range (ptrdiff_t from, ptrdiff_t to, Lisp_Object new,
   /* Copy the string text into the buffer, perhaps converting
      between single-byte and multibyte.  */
   copy_text (SDATA (new), GPT_ADDR, insbytes,
-	     STRING_MULTIBYTE (new),
+	     true, /* In Guile, all strings are UTF-8 (multibyte) */
 	     ! NILP (BVAR (current_buffer, enable_multibyte_characters)));
 
 #ifdef BYTE_COMBINING_DEBUG

@@ -2650,7 +2650,7 @@ since only regular expressions have distinguished subexpressions.  */)
       unsigned char *substed;
       ptrdiff_t substed_alloc_size, substed_len;
       bool buf_multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
-      bool str_multibyte = STRING_MULTIBYTE (newtext);
+      bool str_multibyte = true; /* In Guile, all strings are UTF-8 (multibyte) */
       bool really_changed = 0;
 
       substed_alloc_size = (length <= (STRING_BYTES_BOUND - 100) / 2
