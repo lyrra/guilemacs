@@ -46,9 +46,9 @@
   "test/pre/string-char.scm"
   )
 (group
-  ;"test/src/timefns-tests.el"
+  "test/src/timefns-tests.el"
   "test/src/fns-tests.el"
-  ;"test/src/floatfns-tests.el"
+  "test/src/floatfns-tests.el"
   )
 
 ;; in the following group, all of the test files works with guilemacs
