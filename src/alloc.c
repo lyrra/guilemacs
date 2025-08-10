@@ -762,7 +762,9 @@ make_string (const char *contents, ptrdiff_t nbytes)
 Lisp_Object
 make_unibyte_string (const char *contents, ptrdiff_t length)
 {
-  return scm_from_utf8_stringn (contents, length);
+  /* GuilEmacs: For unibyte strings, use Latin-1 encoding to preserve all byte values.
+     UTF-8 encoding would fail for binary data containing invalid UTF-8 sequences. */
+  return scm_from_latin1_stringn (contents, length);
 }
 
 

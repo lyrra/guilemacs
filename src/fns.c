@@ -4083,30 +4083,40 @@ base64_encode_string_1 (Lisp_Object string, bool line_break,
 
   CHECK_STRING (string);
 
+  length = scm_c_string_length (string);
+  // check if strictly 0-255
+   int n = XFIXNUM (scm_string_bytes_per_char (string));
+
+  char *data_to_encode = n == 1 ?
+                         scm_to_latin1_stringn (string, &length) :
+                         scm_to_utf8_stringn (string, &length);
+
   /* We need to allocate enough room for encoding the text.
      We need 33 1/3% more space, plus a newline every 76
      characters, and then we round up. */
-  length = SBYTES (string);
   allength = length + length/3 + 1;
   allength += allength / MIME_LINE_LENGTH + 1 + 6;
 
   /* We need to allocate enough room for decoding the text. */
   encoded = SAFE_ALLOCA (allength);
 
-  encoded_length = base64_encode_1 (SSDATA (string),
+  /* Always encode as unibyte since we've prepared the data appropriately */
+  encoded_length = base64_encode_1 (data_to_encode,
 				    encoded, length, line_break,
 				    pad, base64url,
-				    true);
+				    false);
   if (encoded_length > allength)
     emacs_abort ();
 
   if (encoded_length < 0)
     {
-      /* The encoding wasn't possible. */
-      error ("Multibyte character in data for base64 encoding");
+      error ("Base64 encoding failed");
     }
 
   encoded_string = make_unibyte_string (encoded, encoded_length);
+
+  free (data_to_encode);
+
   SAFE_FREE ();
 
   return encoded_string;
@@ -5885,9 +5895,11 @@ extract_data_from_object (Lisp_Object spec,
       else
         {
 	  EMACS_INT start_hold = XFIXNAT (start);
-          object = make_uninit_string (start_hold);
-	  char *lim = SSDATA (object) + start_hold;
-	  for (char *p = SSDATA (object); p < lim; p++)
+          /* GuilEmacs: Use temporary buffer for random binary data.
+             Cannot fill the string directly since SSDATA() would try UTF-8 conversion. */
+          char *temp_buffer = xmalloc (start_hold);
+	  char *lim = temp_buffer + start_hold;
+	  for (char *p = temp_buffer; p < lim; p++)
 	    {
 	      ssize_t gotten = getrandom (p, lim - p, 0);
 	      if (0 <= gotten)
@@ -5896,6 +5908,9 @@ extract_data_from_object (Lisp_Object spec,
 		report_file_error ("Getting random data", Qnil);
 	    }
 
+          /* Create unibyte string from random binary data */
+          object = make_unibyte_string (temp_buffer, start_hold);
+          xfree (temp_buffer);
           *start_byte = 0;
           *end_byte = start_hold;
         }
@@ -5904,6 +5919,30 @@ extract_data_from_object (Lisp_Object spec,
   if (!STRINGP (object))
     signal_error ("Invalid object argument",
 		  NILP (object) ? build_string ("nil") : object);
+
+  /* GuilEmacs: For binary data (like crypto IVs), we need Latin-1 bytes, not UTF-8.
+     Check if this is a Latin-1 string (all codepoints 0-255) that likely contains binary data.
+     This is especially important for base64-decoded data used in crypto operations. */
+  ptrdiff_t string_length = scm_c_string_length (object);
+  bool is_latin1 = true;
+
+  for (ptrdiff_t i = 0; i < string_length; i++)
+    {
+      scm_t_wchar codepoint = scm_c_string_ref (object, i);
+      if (codepoint > 255)
+        {
+          is_latin1 = false;
+          break;
+        }
+    }
+
+  /* For Latin-1 strings (binary data), especially with raw_text coding or small sizes typical of IVs/crypto */
+  if (is_latin1 && (EQ (coding_system, Qraw_text) || string_length <= 64))
+    {
+      /* Return Latin-1 bytes directly for binary data */
+      return scm_to_latin1_string (object);
+    }
+
   return SSDATA (object);
 }
 

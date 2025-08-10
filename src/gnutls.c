@@ -26,6 +26,41 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "buffer.h"
 
+/* GuilEmacs: Helper functions for binary data using bytevectors */
+static Lisp_Object make_binary_data (const char *contents, ptrdiff_t length);
+static const char *get_binary_data (Lisp_Object obj, ptrdiff_t *length_out);
+
+/* GuilEmacs: Helper functions for binary data using bytevectors in gnutls.c only */
+
+static Lisp_Object
+make_binary_data (const char *contents, ptrdiff_t length)
+{
+  /* Create a bytevector for binary data to avoid UTF-8 encoding issues */
+  Lisp_Object bv = scm_c_make_bytevector (length);
+  if (contents && length > 0) {
+    memcpy (SCM_BYTEVECTOR_CONTENTS (bv), contents, length);
+  }
+  return bv;
+}
+
+static const char *
+get_binary_data (Lisp_Object obj, ptrdiff_t *length_out)
+{
+  /* Extract binary data from either bytevector or Latin-1 string */
+  if (scm_is_bytevector (obj)) {
+    if (length_out)
+      *length_out = scm_c_bytevector_length (obj);
+    return (const char *) SCM_BYTEVECTOR_CONTENTS (obj);
+  } else {
+    /* Fallback to Latin-1 string for compatibility */
+    char *data = scm_to_latin1_string (obj);
+    if (length_out)
+      *length_out = strlen (data);
+    return data;
+  }
+}
+
+
 #ifdef HAVE_GNUTLS
 
 # if GNUTLS_VERSION_NUMBER >= 0x030014
@@ -2385,7 +2420,7 @@ gnutls_symmetric_aead (bool encrypting, gnutls_cipher_algorithm_t gca,
 # ifdef HAVE_GNUTLS_AEAD
 
   const char *desc = encrypting ? "encrypt" : "decrypt";
-  Lisp_Object actual_iv = make_unibyte_string (vdata, vsize);
+  Lisp_Object actual_iv = make_binary_data (vdata, vsize);
 
   gnutls_aead_cipher_hd_t acipher;
   gnutls_datum_t key_datum = { (unsigned char *) kdata, ksize };
@@ -2444,7 +2479,7 @@ gnutls_symmetric_aead (bool encrypting, gnutls_cipher_algorithm_t gca,
 
   Lisp_Object output;
   if (GNUTLS_E_SUCCESS <= ret)
-    output = make_unibyte_string (storage, storage_length);
+    output = scm_from_latin1_stringn (storage, storage_length);
   memset_explicit (storage, 0, storage_length);
   gnutls_aead_cipher_deinit (acipher);
 
@@ -2454,8 +2489,13 @@ gnutls_symmetric_aead (bool encrypting, gnutls_cipher_algorithm_t gca,
 	    : "GnuTLS AEAD cipher %s decryption failed: %s"),
 	   gnutls_cipher_get_name (gca), emacs_gnutls_strerror (ret));
 
+  /* Convert IV bytevector to Latin-1 string for Elisp compatibility */
+  ptrdiff_t iv_length;
+  const char *iv_data = get_binary_data (actual_iv, &iv_length);
+  Lisp_Object iv_string = scm_from_latin1_stringn (iv_data, iv_length);
+
   SAFE_FREE ();
-  return list2 (output, actual_iv);
+  return list2 (output, iv_string);
 # else
   intmax_t print_gca = gca;
   error ("GnuTLS AEAD cipher %"PRIdMAX" is invalid or not found", print_gca);
@@ -2546,7 +2586,7 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
            gnutls_cipher_get_name (gca), desc,
 	   vend_byte - vstart_byte, iv_size);
 
-  Lisp_Object actual_iv = make_unibyte_string (vdata, vend_byte - vstart_byte);
+  Lisp_Object actual_iv = make_binary_data (vdata, vend_byte - vstart_byte);
 
   ptrdiff_t istart_byte, iend_byte;
   const char *idata
@@ -2592,17 +2632,21 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
   /* GnuTLS docs: "For the supported ciphers the encrypted data length
      will equal the plaintext size."  */
   ptrdiff_t storage_length = iend_byte - istart_byte;
-  Lisp_Object storage = make_uninit_string (storage_length);
+  /* GuilEmacs: Allocate a temporary buffer for binary encryption data.
+     make_uninit_string creates UTF-8 strings which can't handle binary data properly. */
+  char *temp_buffer = xmalloc (storage_length);
 
   ret = ((encrypting ? gnutls_cipher_encrypt2 : gnutls_cipher_decrypt2)
 	 (hcipher, idata, iend_byte - istart_byte,
-	  SSDATA (storage), storage_length));
+	  temp_buffer, storage_length));
 
   if (STRINGP (XCAR (key)))
     Fclear_string (XCAR (key));
 
+  Lisp_Object storage;
   if (ret < GNUTLS_E_SUCCESS)
     {
+      xfree (temp_buffer);
       gnutls_cipher_deinit (hcipher);
       if (encrypting)
 	error ("GnuTLS cipher %s encryption failed: %s",
@@ -2612,9 +2656,18 @@ gnutls_symmetric (bool encrypting, Lisp_Object cipher,
 	       gnutls_cipher_get_name (gca), emacs_gnutls_strerror (ret));
     }
 
+  /* Create binary-safe Latin-1 string from encrypted/decrypted data */
+  storage = scm_from_latin1_stringn (temp_buffer, storage_length);
+  xfree (temp_buffer);
+
   gnutls_cipher_deinit (hcipher);
 
-  return list2 (storage, actual_iv);
+  /* Convert IV bytevector to Latin-1 string for Elisp compatibility */
+  ptrdiff_t iv_length;
+  const char *iv_data = get_binary_data (actual_iv, &iv_length);
+  Lisp_Object iv_string = scm_from_latin1_stringn (iv_data, iv_length);
+
+  return list2 (storage, iv_string);
 }
 
 DEFUN ("gnutls-symmetric-encrypt", Fgnutls_symmetric_encrypt,
