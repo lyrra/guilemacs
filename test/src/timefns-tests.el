@@ -251,7 +251,7 @@ a fixed place on the right and are padded on the left."
           (should (= xdiv (float-time (time-convert xdiv t))))))
       (setq x (* x 2)))))
 
-'(ert-deftest time-convert-forms ()
+(ert-deftest time-convert-forms ()
   ;; These computations involve numbers that should have exact
   ;; representations on any Emacs platform.
   (dolist (time '(-86400 -1 0 1 86400))
