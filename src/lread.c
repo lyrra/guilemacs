@@ -3424,13 +3424,8 @@ bytecode_from_rev_list (Lisp_Object elems, Lisp_Object readcharfun)
 
   if (STRINGP (vec[CLOSURE_CODE]))
     {
-      if (STRING_MULTIBYTE (vec[CLOSURE_CODE]))
-        /* BYTESTR must have been produced by Emacs 20.2 or earlier
-           because it produced a raw 8-bit string for byte-code and
-           now such a byte-code string is loaded as multibyte with
-           raw 8-bit characters converted to multibyte form.
-           Convert them back to the original unibyte form.  */
-        vec[CLOSURE_CODE] = Fstring_as_unibyte (vec[CLOSURE_CODE]);
+      /* In GuilEmacs, all strings are UTF-8, so no multibyte/unibyte conversion needed.
+         Legacy bytecode from Emacs 20.2 is not supported. */
 
       /* Bytecode must be immovable.  */
       //pin_string (vec[CLOSURE_CODE]);
