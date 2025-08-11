@@ -1491,7 +1491,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
     memcpy (fn, SDATA (filename) + prefixlen, baselen);
 
     /* Loop over suffixes.  */
-    AUTO_LIST1 (empty_string_only, empty_unibyte_string);
+    AUTO_LIST1 (empty_string_only, build_string(""));
     tail = NILP (suffixes) ? empty_string_only : suffixes;
     FOR_EACH_TAIL_SAFE (tail)
       {
@@ -2751,12 +2751,6 @@ read_string_literal (Lisp_Object readcharfun)
   char *heapbuf = NULL;
   char *p = read_buffer;
   char *end = read_buffer + read_buffer_size;
-  /* True if we saw an escape sequence specifying
-     a multibyte character.  */
-  bool force_multibyte = false;
-  /* True if we saw an escape sequence specifying
-     a single-byte character.  */
-  bool force_singlebyte = false;
   ptrdiff_t nchars = 0;
 
   dynwind_begin ();
@@ -2795,40 +2789,33 @@ read_string_literal (Lisp_Object readcharfun)
 	  int modifiers = ch & CHAR_MODIFIER_MASK;
 	  ch &= ~CHAR_MODIFIER_MASK;
 
-	  if (CHAR_BYTE8_P (ch))
-	    force_singlebyte = true;
-	  else if (! ASCII_CHAR_P (ch))
-	    force_multibyte = true;
-	  else		/* I.e. ASCII_CHAR_P (ch).  */
+	  /* Handle character modifiers (was ASCII_CHAR_P case) */
+	  /* Allow `\C-SPC' and `\^SPC'.  This is done here because
+	     the literals ?\C-SPC and ?\^SPC (rather inconsistently)
+	     yield (' ' | CHAR_CTL); see bug#55738.  */
+	  if (modifiers == CHAR_CTL && ch == ' ')
 	    {
-	      /* Allow `\C-SPC' and `\^SPC'.  This is done here because
-		 the literals ?\C-SPC and ?\^SPC (rather inconsistently)
-		 yield (' ' | CHAR_CTL); see bug#55738.  */
-	      if (modifiers == CHAR_CTL && ch == ' ')
+	      ch = 0;
+	      modifiers = 0;
+	    }
+	  if (modifiers & CHAR_SHIFT)
+	    {
+	      /* Shift modifier is valid only with [A-Za-z].  */
+	      if (ch >= 'A' && ch <= 'Z')
+		modifiers &= ~CHAR_SHIFT;
+	      else if (ch >= 'a' && ch <= 'z')
 		{
-		  ch = 0;
-		  modifiers = 0;
+		  ch -= ('a' - 'A');
+		  modifiers &= ~CHAR_SHIFT;
 		}
-	      if (modifiers & CHAR_SHIFT)
-		{
-		  /* Shift modifier is valid only with [A-Za-z].  */
-		  if (ch >= 'A' && ch <= 'Z')
-		    modifiers &= ~CHAR_SHIFT;
-		  else if (ch >= 'a' && ch <= 'z')
-		    {
-		      ch -= ('a' - 'A');
-		      modifiers &= ~CHAR_SHIFT;
-		    }
-		}
+	    }
 
-	      if (modifiers & CHAR_META)
-		{
-		  /* Move the meta bit to the right place for a
-		     string.  */
-		  modifiers &= ~CHAR_META;
-		  ch = BYTE8_TO_CHAR (ch | 0x80);
-		  force_singlebyte = true;
-		}
+	  if (modifiers & CHAR_META)
+	    {
+	      /* Move the meta bit to the right place for a
+		 string.  */
+	      modifiers &= ~CHAR_META;
+	      ch = BYTE8_TO_CHAR (ch | 0x80);
 	    }
 
 	  /* Any modifiers remaining are invalid.  */
@@ -2841,10 +2828,6 @@ read_string_literal (Lisp_Object readcharfun)
       else
 	{
 	  p += CHAR_STRING (ch, (unsigned char *) p);
-	  if (CHAR_BYTE8_P (ch))
-	    force_singlebyte = true;
-	  else if (! ASCII_CHAR_P (ch))
-	    force_multibyte = true;
 	}
       nchars++;
     }
@@ -2852,18 +2835,7 @@ read_string_literal (Lisp_Object readcharfun)
   if (ch < 0)
     end_of_file_error ();
 
-  if (!force_multibyte && force_singlebyte)
-    {
-      /* READ_BUFFER contains raw 8-bit bytes and no multibyte
-	 forms.  Convert it to unibyte.  */
-      nchars = str_as_unibyte ((unsigned char *) read_buffer,
-			       p - read_buffer);
-      p = read_buffer + nchars;
-    }
-
-  Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer,
-					   (force_multibyte
-					    || (p - read_buffer != nchars)));
+  Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer, true);
   dynwind_end ();
   return obj;
 }
@@ -3328,7 +3300,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 
 	  case '#':
 	    /* ## -- the empty symbol */
-	    obj = Fintern (empty_unibyte_string, Qnil);
+	    obj = Fintern (build_string(""), Qnil);
 	    break;
 
 	  case 's':
@@ -3451,7 +3423,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
 		UNREAD (c);
-		obj = Fmake_symbol (empty_unibyte_string);
+		obj = Fmake_symbol (build_string(""));
 		break;
 	      }
 	    uninterned_symbol = true;
@@ -3468,7 +3440,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
 		UNREAD (c);
-		obj = Fintern (empty_unibyte_string, Qnil);
+		obj = Fintern (build_string(""), Qnil);
 		break;
 	      }
 	    uninterned_symbol = false;
@@ -3946,7 +3918,7 @@ fread0 ()
 
 	  case '#':
 	    /* ## -- the empty symbol */
-	    obj = Fintern (empty_unibyte_string, Qnil);
+	    obj = Fintern (build_string(""), Qnil);
 	    break;
 
 	  case 's':
@@ -4070,7 +4042,7 @@ fread0 ()
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
 		funreadchar (c);
-		obj = Fmake_symbol (empty_unibyte_string);
+		obj = Fmake_symbol (build_string(""));
 		break;
 	      }
 	    uninterned_symbol = true;
@@ -4087,7 +4059,7 @@ fread0 ()
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
 		funreadchar (c);
-		obj = Fintern (empty_unibyte_string, Qnil);
+		obj = Fintern (build_string(""), Qnil);
 		break;
 	      }
 	    uninterned_symbol = false;
@@ -5524,7 +5496,7 @@ and, if so, which suffixes they should try to append to the file name
 in order to do so.  However, if you want to customize which suffixes
 the loading functions recognize as compression suffixes, you should
 customize `jka-compr-load-suffixes' rather than the present variable.  */);
-  Vload_file_rep_suffixes = list1 (empty_unibyte_string);
+  Vload_file_rep_suffixes = list1 (build_string(""));
 
   DEFVAR_BOOL ("load-in-progress", load_in_progress,
 	       doc: /* Non-nil if inside of `load'.  */);
