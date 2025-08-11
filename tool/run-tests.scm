@@ -95,13 +95,13 @@
   "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el"
   "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el"
   "test/lisp/emacs-lisp/float-sup-tests.el"
-  "test/lisp/emacs-lisp/hierarchy-tests.el"
+  "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
   )(group
   "test/lisp/emacs-lisp/icons-tests.el"
   "test/lisp/emacs-lisp/lisp-mnt-tests.el"
   "test/lisp/emacs-lisp/lisp-mode-tests.el"
   "test/lisp/emacs-lisp/memory-report-tests.el"
-  )(group
+  )(group ;; fails
   "test/lisp/emacs-lisp/pp-tests.el"
   "test/lisp/emacs-lisp/range-tests.el"
   "test/lisp/emacs-lisp/regexp-opt-tests.el"
@@ -112,7 +112,8 @@
   "test/lisp/emacs-lisp/syntax-tests.el"
   "test/lisp/emacs-lisp/tabulated-list-tests.el"
   )(group
-  "test/lisp/emacs-lisp/text-property-search-tests.el"
+  "test/lisp/emacs-lisp/text-property-search-tests.el" ;; fails
+  )(group
   "test/lisp/emacs-lisp/thunk-tests.el"
   "test/lisp/emacs-lisp/unsafep-tests.el"
   "test/lisp/emacs-lisp/vtable-tests.el"
@@ -187,7 +188,7 @@
   "test/lisp/progmodes/compile-tests.el"
   "test/lisp/progmodes/js-tests.el"
   "test/lisp/simple-tests.el"
-  )(group
+  )(group ;; hangs
   "test/lisp/emacs-lisp/pcase-tests.el"
   "test/lisp/emacs-lisp/package-tests.el"
   "test/lisp/replace-tests.el"
@@ -200,7 +201,7 @@
   )(group
   "test/lisp/ls-lisp-tests.el"
   "test/lisp/loadhist-tests.el"
-  "test/lisp/abbrev-tests.el"
+  "test/lisp/abbrev-tests.el" ;; hangs (or group)
   "test/lisp/emacs-lisp/let-alist-tests.el"
   )(group
   "test/lisp/info-xref-tests.el"
@@ -213,13 +214,13 @@
   "test/lisp/emacs-lisp/gv-tests.el"
   "test/lisp/files-tests.el"
   )(group
-  "test/lisp/ffap-tests.el"
+  "test/lisp/ffap-tests.el" ;; multibyte bug
   )(group
-  "test/lisp/progmodes/f90-tests.el"
+  "test/lisp/progmodes/f90-tests.el" ;; crashes
   )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
   )(group
-  "test/lisp/emacs-lisp/ert-x-tests.el"
+  "test/lisp/emacs-lisp/ert-x-tests.el" ;; multibyte
   )
 (group
   "test/lisp/emacs-lisp/ert-tests.el"
