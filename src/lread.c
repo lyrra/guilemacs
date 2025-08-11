@@ -1013,22 +1013,6 @@ Return t if the file exists and loads successfully.  */)
   if (EQ (Qt, Vuser_init_file))
     Vuser_init_file = found;
 
-  /* If FD is -2, that means openp found a magic file.  */
-  if (lread_fd_cmp (-2))
-    {
-      if (NILP (Fequal (found, file)))
-	/* If FOUND is a different file name from FILE,
-	   find its handler even if we have already inhibited
-	   the `load' operation on FILE.  */
-	handler = Ffind_file_name_handler (found, Qt);
-      else
-	handler = Ffind_file_name_handler (found, Qload);
-      if (! NILP (handler)) {
-        dynwind_end ();
-        return call5 (handler, Qload, found, noerror, nomessage, Qt);
-      }
-    }
-
   if (0 <= fd)
     {
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
@@ -1109,9 +1093,6 @@ Return t if the file exists and loads successfully.  */)
 
   if (!lread_fd_p)
     {
-      /* We somehow got here with fd == -2, meaning the file is deemed
-	 to be remote.  Don't even try to reopen the file locally;
-	 just force a failure.  */
       stream = file_stream_invalid;
       errno = EINVAL;
     }
