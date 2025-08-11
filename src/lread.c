@@ -58,9 +58,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 #include <fcntl.h>
 
-#if !defined HAVE_ANDROID || defined ANDROID_STUBIFY	\
-  || (__ANDROID_API__ < 9)
-
 #define lread_fd	int
 #define lread_fd_cmp(n) (fd == (n))
 #define lread_fd_p	(fd >= 0)
@@ -82,79 +79,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #else
 #define file_offset long
 #define file_tell ftell
-#endif
-
-#else
-
-#include "android.h"
-
-/* Use an Android file descriptor under Android instead, as this
-   allows loading directly from asset files without loading each asset
-   into memory and creating a separate file descriptor every time.
-
-   Note that `struct android_fd_or_asset' as used here is different
-   from that returned from `android_open_asset'; if fd.asset is NULL,
-   then fd.fd is either a valid file descriptor or -1, meaning that
-   the file descriptor is invalid.
-
-   However, lread requires the ability to seek inside asset files,
-   which is not provided under Android 2.2.  So when building for that
-   particular system, fall back to the usual file descriptor-based
-   code.  */
-
-#define lread_fd	struct android_fd_or_asset
-#define lread_fd_cmp(n)	(!fd.asset && fd.fd == (n))
-#define lread_fd_p	(fd.asset || fd.fd >= 0)
-#define lread_close	android_close_asset
-#define lread_fstat	android_asset_fstat
-#define lread_read_quit	android_asset_read_quit
-#define lread_lseek	android_asset_lseek
-
-/* The invalid file stream.  */
-
-static struct android_fd_or_asset invalid_file_stream =
-  {
-    -1,
-    NULL,
-  };
-
-#define file_stream		struct android_fd_or_asset
-#define file_offset		off_t
-#define file_tell(n)		android_asset_lseek (n, 0, SEEK_CUR)
-#define file_seek		android_asset_lseek
-#define file_stream_valid_p(p)	((p).asset || (p).fd >= 0)
-#define file_stream_close	android_close_asset
-#define file_stream_invalid	invalid_file_stream
-
-/* Return a single character from the file input stream STREAM.
-   Value and errors are the same as getc.  */
-
-static int
-file_get_char (file_stream stream)
-{
-  int c;
-  char byte;
-  ssize_t rc;
-
- retry:
-  rc = android_asset_read (stream, &byte, 1);
-
-  if (rc == 0)
-    c = EOF;
-  else if (rc == -1)
-    {
-      if (errno == EINTR)
-	goto retry;
-      else
-	c = EOF;
-    }
-  else
-    c = (unsigned char) byte;
-
-  return c;
-}
-
-#define USE_ANDROID_ASSETS
 #endif
 
 #if IEEE_FLOATING_POINT
@@ -1054,21 +978,6 @@ loadhist_initialize (Lisp_Object filename)
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
 }
 
-#ifdef USE_ANDROID_ASSETS
-
-/* Like `close_file_unwind'.  However, PTR is a pointer to an Android
-   file descriptor instead of a system file descriptor.  */
-
-static void
-close_file_unwind_android_fd (void *ptr)
-{
-  struct android_fd_or_asset *fd;
-
-  fd = ptr;
-  android_close_asset (*fd);
-}
-
-#endif
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
@@ -1610,9 +1519,6 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
   ptrdiff_t max_suffix_len = 0;
   int last_errno = ENOENT;
   int save_fd = -1;
-#ifdef USE_ANDROID_ASSETS
-  struct android_fd_or_asset platform_fd;
-#endif
   USE_SAFE_ALLOCA;
 
   /* The last-modified time of the newest matching file found.
