@@ -62,23 +62,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define lread_fd_cmp(n) (fd == (n))
 #define lread_fd_p	(fd >= 0)
 #define lread_close	emacs_close
-#define lread_fstat	sys_fstat
-#define lread_read_quit	emacs_read_quit
-#define lread_lseek	lseek
 
 #define file_stream		FILE *
-#define file_seek		fseek
 #define file_stream_valid_p(p)	(p)
-#define file_stream_close	emacs_fclose
 #define file_stream_invalid	NULL
-#define file_get_char		getc
 
 #ifdef HAVE_FSEEKO
 #define file_offset off_t
-#define file_tell ftello
 #else
 #define file_offset long
-#define file_tell ftell
 #endif
 
 #if IEEE_FLOATING_POINT
@@ -348,7 +340,7 @@ skip_dyn_bytes (Lisp_Object readcharfun, ptrdiff_t n)
     {
       /* For file loading: direct seek with UTF-8 byte count */
       block_input ();
-      file_seek (infile->stream, n - infile->lookahead, SEEK_CUR);
+      fseek (infile->stream, n - infile->lookahead, SEEK_CUR);
       unblock_input ();
       infile->lookahead = 0;
     }
@@ -370,7 +362,7 @@ skip_dyn_eof (Lisp_Object readcharfun)
     {
       /* Direct seek to end for file loading */
       block_input ();
-      file_seek (infile->stream, 0, SEEK_END);
+      fseek (infile->stream, 0, SEEK_END);
       unblock_input ();
       infile->lookahead = 0;
     }
@@ -3360,7 +3352,11 @@ skip_lazy_string (Lisp_Object readcharfun)
 	}
 
       file_stream instream = infile->stream;
-      ss->position = (file_tell (instream) - infile->lookahead);
+#ifdef HAVE_FSEEKO
+      ss->position = (ftello (instream) - infile->lookahead);
+#else
+      ss->position = (ftell (instream) - infile->lookahead);
+#endif
 
       /* Copy that many bytes into the saved string.  */
       ptrdiff_t i = 0;
@@ -3369,7 +3365,7 @@ skip_lazy_string (Lisp_Object readcharfun)
 	ss->string[i++] = c = infile->buf[--infile->lookahead];
       block_input ();
       for (; i < nskip && c >= 0; i++)
-	ss->string[i] = c = file_get_char (instream);
+	ss->string[i] = c = getc (instream);
       unblock_input ();
 
       ss->length = i;
