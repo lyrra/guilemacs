@@ -295,19 +295,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   return STRING_CHAR (buf);
 }
 
-static int
-readbyte_from_stdio2 (struct infile *infile)
-{
-  if (infile->lookahead)
-    return infile->buf[--infile->lookahead];
-
-  int c;
-  file_stream instream = infile->stream;
-
-  c = getc (instream);
-
-  return (c == EOF ? -1 : c);
-}
+/* readbyte_from_stdio2 function removed - inlined for better performance */
 
 #define FROM_FILE_P(readcharfun)			\
   (EQ (readcharfun, Qget_file_char))
@@ -374,7 +362,12 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
       return 0;
     }
 
-  return readbyte_from_stdio2 (infile);
+  /* Inline stdio reading - check lookahead buffer first */
+  if (infile->lookahead)
+    return infile->buf[--infile->lookahead];
+
+  int ch = getc (infile->stream);
+  return (ch == EOF ? -1 : ch);
 }
 
 /* Signal Qinvalid_read_syntax error.
@@ -1916,7 +1909,14 @@ freadchar (void)
 
   /* File reading only - no buffer/string/function complexity */
   eassert (infile);
-  c = readbyte_from_stdio2 (infile);
+  /* Inline stdio reading - check lookahead buffer first */
+  if (infile->lookahead)
+    c = infile->buf[--infile->lookahead];
+  else
+    {
+      int ch = getc (infile->stream);
+      c = (ch == EOF ? -1 : ch);
+    }
 
   if (c < 0)
     return c;
@@ -1930,7 +1930,14 @@ freadchar (void)
   len = BYTES_BY_CHAR_HEAD (c);
   while (i < len)
     {
-      c = readbyte_from_stdio2 (infile);
+      /* Inline stdio reading - check lookahead buffer first */
+      if (infile->lookahead)
+        c = infile->buf[--infile->lookahead];
+      else
+        {
+          int ch = getc (infile->stream);
+          c = (ch == EOF ? -1 : ch);
+        }
       if (c < 0)
         return c; /* Error in multibyte sequence */
       buf[i++] = c;
