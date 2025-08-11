@@ -63,11 +63,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #define lread_fd_p	(fd >= 0)
 #define lread_close	emacs_close
 
-#define file_stream		FILE *
-#define file_stream_valid_p(p)	(p)
-#define file_stream_invalid	NULL
-
-
 #if IEEE_FLOATING_POINT
 # include <ieee754.h>
 # ifndef INFINITY
@@ -119,7 +114,7 @@ static Lisp_Object read_objects_completed;
 static struct infile
 {
   /* The input stream.  */
-  file_stream stream;
+  FILE *stream;
 
   /* Lookahead byte count.  */
   signed char lookahead;
@@ -938,7 +933,7 @@ Return t if the file exists and loads successfully.  */)
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
-  file_stream stream = NULL; // guilemacs cant use UNINIT, must always be zero
+  FILE *stream = NULL;
   lread_fd fd;
   dynwind_begin ();
   Lisp_Object found, efound, hist_file_name;
@@ -1093,7 +1088,7 @@ Return t if the file exists and loads successfully.  */)
 
   if (!lread_fd_p)
     {
-      stream = file_stream_invalid;
+      stream = NULL;
       errno = EINVAL;
     }
   else if (!is_module && !is_native_elisp)
@@ -1124,7 +1119,7 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      if (!file_stream_valid_p (stream))
+      if (!stream)
         report_file_error ("Opening stdio stream", file);
       input.stream = stream;
       input.lookahead = 0;
