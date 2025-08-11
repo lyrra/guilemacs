@@ -1199,10 +1199,9 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
     XSETBUFFER (object, current_buffer);
 
  retry:
-  return Qnil;
-  //i = validate_interval_range (object, &start, &end, hard);
-  //if (!i)
-  //  return Qnil;
+  i = validate_interval_range (object, &start, &end, soft);
+  if (!i)
+    return Qnil;
 
   s = XFIXNUM (start);
   len = XFIXNUM (end) - s;

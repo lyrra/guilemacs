@@ -481,10 +481,13 @@
   (let* ((labelfn-base (lambda (_item _indent) (insert "foo")))
          (actionfn #'identity)
          (labelfn (hierarchy-labelfn-button labelfn-base actionfn))
-         (properties (with-temp-buffer
-                       (funcall labelfn "bar" 1)
-                       (text-properties-at 1))))
-    (should (equal (car properties) 'action))))
+         (button-found (with-temp-buffer
+                         (funcall labelfn "bar" 1)
+                         ;; With overlay-based buttons, check overlays instead of text properties
+                         (let ((overlays (overlays-at 1)))
+                           (and overlays
+                                (overlay-get (car overlays) 'action))))))
+    (should button-found)))
 
 (ert-deftest hierarchy-labelfn-button-execute-labelfn ()
   (let* ((labelfn-base (lambda (_item _indent) (insert "foo")))
