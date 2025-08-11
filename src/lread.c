@@ -273,11 +273,7 @@ static int readbyte_from_file (int, Lisp_Object);
 /* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
 #define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
 
-/* When READCHARFUN is Qget_file_char,
-   we use this to keep an unread character because
-   a file stream can't handle multibyte-char unreading.  The value -1
-   means that there's no unread character.  */
-static int unread_char = -1;
+/* File reading now uses infile->lookahead buffer instead of global unread_char */
 
 static int
 readchar (Lisp_Object readcharfun, bool *multibyte)
@@ -385,12 +381,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   return XFIXNUM (tem);
 
  read_multibyte:
-  if (unread_char >= 0)
-    {
-      c = unread_char;
-      unread_char = -1;
-      return c;
-    }
   c = (*readbyte) (-1, readcharfun);
   if (c < 0)
     return c;
@@ -441,12 +431,6 @@ readchar_load ()
 
   eassert (infile);
 
-  if (unread_char >= 0)
-    {
-      c = unread_char;
-      unread_char = -1;
-      return c;
-    }
   c = readbyte_from_stdio2 (infile);
 
   if (c < 0)
@@ -547,7 +531,9 @@ unreadchar (Lisp_Object readcharfun, int c)
     }
   else if (FROM_FILE_P (readcharfun))
     {
-      unread_char = c;
+      /* For file reading, use infile->lookahead buffer */
+      eassert (infile && infile->lookahead < sizeof infile->buf);
+      infile->buf[infile->lookahead++] = c;
     }
   else
     call1 (readcharfun, make_fixnum (c));
@@ -1486,7 +1472,6 @@ Return t if the file exists and loads successfully.  */)
       input.stream = stream;
       input.lookahead = 0;
       infile = &input;
-      unread_char = -1;
     }
 
   if (! NILP (Vpurify_flag))
