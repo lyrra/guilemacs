@@ -5478,7 +5478,16 @@ e_write (int desc, Lisp_Object string, ptrdiff_t start, ptrdiff_t end,
       if (STRINGP (string))
 	{
 	  coding->src_multibyte = SCHARS (string) < SBYTES (string);
-	  if (CODING_REQUIRE_ENCODING (coding))
+
+	  /* GuilEmacs UTF-8 optimization: Skip encoding for UTF-8 to UTF-8
+	     Since Guile strings are already UTF-8, avoid double encoding */
+	  Lisp_Object attrs = CODING_ID_ATTRS (coding->id);
+	  Lisp_Object coding_type = CODING_ATTR_TYPE (attrs);
+	  bool is_utf8_target = EQ (coding_type, Qutf_8);
+	  bool skip_encoding = (is_utf8_target && coding->src_multibyte
+			        && !(coding->mode & CODING_MODE_SELECTIVE_DISPLAY));
+
+	  if (CODING_REQUIRE_ENCODING (coding) && !skip_encoding)
 	    {
 	      ptrdiff_t nchars = min (end - start, E_WRITE_MAX);
 
@@ -5504,7 +5513,16 @@ e_write (int desc, Lisp_Object string, ptrdiff_t start, ptrdiff_t end,
 	  ptrdiff_t end_byte = CHAR_TO_BYTE (end);
 
 	  coding->src_multibyte = (end - start) < (end_byte - start_byte);
-	  if (CODING_REQUIRE_ENCODING (coding))
+
+	  /* GuilEmacs UTF-8 optimization: Skip encoding for UTF-8 to UTF-8 (buffer case)
+	     Since buffer contents are UTF-8 Guile strings, avoid double encoding */
+	  Lisp_Object attrs = CODING_ID_ATTRS (coding->id);
+	  Lisp_Object coding_type = CODING_ATTR_TYPE (attrs);
+	  bool is_utf8_target = EQ (coding_type, Qutf_8);
+	  bool skip_encoding = (is_utf8_target && coding->src_multibyte
+			        && !(coding->mode & CODING_MODE_SELECTIVE_DISPLAY));
+
+	  if (CODING_REQUIRE_ENCODING (coding) && !skip_encoding)
 	    {
 	      ptrdiff_t nchars = min (end - start, E_WRITE_MAX);
 
