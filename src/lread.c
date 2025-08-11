@@ -1861,11 +1861,6 @@ build_load_history (Lisp_Object filename, bool entire)
     }
 }
 
-static void
-readevalloop_1 (int old)
-{
-  load_convert_to_unibyte = old;
-}
 
 /* Signal an `end-of-file' error, if possible with file name
    information.  */
@@ -1879,8 +1874,7 @@ end_of_file_error (void)
   xsignal0 (Qend_of_file);
 }
 
-/* UNIBYTE specifies how to set load_convert_to_unibyte
-   for this invocation.
+/* UNIBYTE handling removed - GuilEmacs uses pure UTF-8 strings only.
    READFUN, if non-nil, is used instead of `read'.
 
    START, END specify region to read in current buffer (from eval-region).
@@ -1926,8 +1920,7 @@ readevalloop (Lisp_Object readcharfun,
     emacs_abort ();
 
   specbind (Qstandard_input, readcharfun);
-  record_unwind_protect_int (readevalloop_1, load_convert_to_unibyte);
-  load_convert_to_unibyte = !NILP (unibyte);
+  /* Note: load_convert_to_unibyte logic removed - pure UTF-8 strings only */
 
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
@@ -2071,8 +2064,7 @@ readevalloop (Lisp_Object readcharfun,
 
 /* same as readevalloop, but used by LOAD (from file) only
  */
-/* UNIBYTE specifies how to set load_convert_to_unibyte
-   for this invocation.
+/* UNIBYTE handling removed - GuilEmacs uses pure UTF-8 strings only.
    READFUN, if non-nil, is used instead of `read'.
 
    START, END specify region to read in current buffer (from eval-region).
@@ -6056,11 +6048,7 @@ and NOERROR and NOMESSAGE are the corresponding arguments passed to
 This is useful when the file being loaded is a temporary copy.  */);
   load_force_doc_strings = 0;
 
-  DEFVAR_BOOL ("load-convert-to-unibyte", load_convert_to_unibyte,
-	       doc: /* Non-nil means `read' converts strings to unibyte whenever possible.
-This is normally bound by `load' and `eval-buffer' to control `read',
-and is not meant for users to change.  */);
-  load_convert_to_unibyte = 0;
+  /* load-convert-to-unibyte variable removed - GuilEmacs uses pure UTF-8 */
 
   DEFVAR_LISP ("source-directory", Vsource_directory,
 	       doc: /* Directory in which Emacs sources were found when Emacs was built.
