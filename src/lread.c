@@ -1856,8 +1856,6 @@ readevalloop (Lisp_Object readcharfun,
 	  else
 	    Fprint (val, Qnil);
 	}
-
-      first_sexp = 0;
     }
 
 
@@ -1879,9 +1877,6 @@ freadchar (void)
   register int c;
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i, len;
-
-  /* All strings are UTF-8 multibyte in GuilEmacs */
-
 
   /* File reading only - no buffer/string/function complexity */
   eassert (infile);
@@ -1941,22 +1936,17 @@ readevalloop_load (
 {
   /* File loading variables - simplified for pure UTF-8 */
   bool printflag = false; /* File loading doesn't print by default */
-  Lisp_Object readfun = Qnil, start = Qnil; /* Used in function */
+  Lisp_Object readfun = Qnil; /* Used in function */
   Lisp_Object readcharfun = Qget_file_char; /* Always file char for loading */
   int c;
   Lisp_Object val;
-  bool multibyte = false;
   dynwind_begin ();
   bool continue_reading_p;
   Lisp_Object lex_bound;
-  bool whole_buffer = 0; /* File loading reads entire file */
-  bool first_sexp = 1; /* Track first s-expression */
-  /* Removed truly unused variables: unibyte, end, b, compile_fn */
 
   CHECK_STRING (sourcename);
 
   specbind (Qstandard_input, Qget_file_char);
-  /* Note: load_convert_to_unibyte logic removed - pure UTF-8 strings only */
 
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
@@ -2040,9 +2030,6 @@ readevalloop_load (
 	  && XHASH_TABLE (read_objects_completed)->count > 0)
 	read_objects_completed = Qnil;
 
-      if (!NILP (start) && continue_reading_p)
-	start = Fpoint_marker ();
-
       /* Restore saved point and BEGV.  */
       dynwind_end ();
 
@@ -2056,10 +2043,7 @@ readevalloop_load (
 	  else
 	    Fprint (val, Qnil);
 	}
-
-      first_sexp = 0;
     }
-
 
   dynwind_end ();
 }
@@ -3143,10 +3127,7 @@ read_stack_reset (intmax_t sp)
   c = READCHAR;					\
   if (c < 0)					\
     INVALID_SYNTAX_WITH_BUFFER ();		\
-  if (multibyte)				\
-    p += CHAR_STRING (c, (unsigned char *) p);	\
-  else						\
-    *p++ = c;					\
+  p += CHAR_STRING (c, (unsigned char *) p);	\
   if (end - p < MAX_MULTIBYTE_LENGTH + 1)	\
     {						\
        offset = p - read_buffer;		\
@@ -3603,10 +3584,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		quoted = true;
 	      }
 
-	    if (multibyte)
-	      p += CHAR_STRING (c, (unsigned char *) p);
-	    else
-	      *p++ = c;
+	    p += CHAR_STRING (c, (unsigned char *) p);
 	    c = READCHAR;
 	  }
 	while (c > 32
@@ -3635,18 +3613,15 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	  }
 
 	/* symbol, possibly uninterned */
-	ptrdiff_t nchars
-	  = (multibyte
-	     ? multibyte_chars_in_text ((unsigned char *)read_buffer, nbytes)
-	     : nbytes);
+	ptrdiff_t nchars = multibyte_chars_in_text ((unsigned char *)read_buffer, nbytes);
 	Lisp_Object result;
 	if (uninterned_symbol)
 	  {
 	    Lisp_Object name
 	      = (!NILP (Vpurify_flag)
-		 ? make_pure_string (read_buffer, nchars, nbytes, multibyte)
+		 ? make_pure_string (read_buffer, nchars, nbytes, true)
 		 : make_specified_string (read_buffer, nchars, nbytes,
-					  multibyte));
+					  true));
 	    result = Fmake_symbol (name);
 	  }
 	else
@@ -3659,7 +3634,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		{
 		  Lisp_Object name
 		    = make_specified_string (read_buffer, nchars, nbytes,
-					     multibyte);
+					     true);
 		  result = intern_driver (name, obarray);
 		}
 	    }
@@ -3800,7 +3775,6 @@ fread0 ()
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
-  bool multibyte = true;
   int c = freadchar ();
   if (c < 0)
     end_of_file_error ();
@@ -4222,10 +4196,7 @@ fread0 ()
 		quoted = true;
 	      }
 
-	    if (multibyte)
-	      p += CHAR_STRING (c, (unsigned char *) p);
-	    else
-	      *p++ = c;
+	    p += CHAR_STRING (c, (unsigned char *) p);
 	    c = freadchar ();
 	  }
 	while (c > 32
@@ -4254,18 +4225,15 @@ fread0 ()
 	  }
 
 	/* symbol, possibly uninterned */
-	ptrdiff_t nchars
-	  = (multibyte
-	     ? multibyte_chars_in_text ((unsigned char *)read_buffer, nbytes)
-	     : nbytes);
+	ptrdiff_t nchars = multibyte_chars_in_text ((unsigned char *)read_buffer, nbytes);
 	Lisp_Object result;
 	if (uninterned_symbol)
 	  {
 	    Lisp_Object name
 	      = (!NILP (Vpurify_flag)
-		 ? make_pure_string (read_buffer, nchars, nbytes, multibyte)
+		 ? make_pure_string (read_buffer, nchars, nbytes, true)
 		 : make_specified_string (read_buffer, nchars, nbytes,
-					  multibyte));
+					  true));
 	    result = Fmake_symbol (name);
 	  }
 	else
@@ -4278,7 +4246,7 @@ fread0 ()
 		{
 		  Lisp_Object name
 		    = make_specified_string (read_buffer, nchars, nbytes,
-					     multibyte);
+					     true);
 		  result = intern_driver (name, obarray);
 		}
 	    }
