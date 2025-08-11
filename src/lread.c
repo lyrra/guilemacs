@@ -180,7 +180,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   if (multibyte)
     *multibyte = 0;
 
-
   if (BUFFERP (readcharfun))
     {
       register struct buffer *inbuffer = XBUFFER (readcharfun);
@@ -2721,7 +2720,6 @@ read_char_literal (Lisp_Object readcharfun)
      as there are well-established escape sequences for these.  */
   if (ch == ' ' || ch == '\t')
     return make_fixnum (ch);
-
 
   if (ch == '\\')
     ch = read_char_escape (readcharfun, READCHAR);
