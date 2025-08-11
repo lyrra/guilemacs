@@ -2956,58 +2956,6 @@ vector_from_rev_list (Lisp_Object elems)
 }
 
 
-static Lisp_Object
-bytecode_from_rev_list (Lisp_Object elems, Lisp_Object readcharfun)
-{
-  Lisp_Object obj = vector_from_rev_list (elems);
-  Lisp_Object *vec = XVECTOR (obj)->contents;
-  ptrdiff_t size = ASIZE (obj);
-
-  if (infile && size >= CLOSURE_CONSTANTS)
-    {
-      /* Lazily-loaded bytecode is represented by the constant slot being nil
-         and the bytecode slot a (lazily loaded) string containing the
-         print representation of (BYTECODE . CONSTANTS).  */
-      if (NILP (vec[CLOSURE_CONSTANTS]) && STRINGP (vec[CLOSURE_CODE]))
-        {
-          Lisp_Object enc = vec[CLOSURE_CODE];
-	  eassert (!STRING_MULTIBYTE (enc));
-	  /* The string (always unibyte) must be decoded to be parsed.  */
-	  enc = Fdecode_coding_string (enc, Qutf_8_emacs, Qt, Qnil);
-	  Lisp_Object pair = Fread (enc);
-          if (!CONSP (pair))
-	    invalid_syntax ("Invalid byte-code object", readcharfun);
-
-          vec[CLOSURE_CODE] = XCAR (pair);
-          vec[CLOSURE_CONSTANTS] = XCDR (pair);
-        }
-    }
-
-  if (!(size >= CLOSURE_STACK_DEPTH && size <= CLOSURE_INTERACTIVE + 1
-	&& (FIXNUMP (vec[CLOSURE_ARGLIST])
-	    || CONSP (vec[CLOSURE_ARGLIST])
-	    || NILP (vec[CLOSURE_ARGLIST]))
-	&& ((STRINGP (vec[CLOSURE_CODE]) /* Byte-code function.  */
-	     && VECTORP (vec[CLOSURE_CONSTANTS])
-	     && size > CLOSURE_STACK_DEPTH
-	     && (FIXNATP (vec[CLOSURE_STACK_DEPTH])))
-	    || (CONSP (vec[CLOSURE_CODE]) /* Interpreted function.  */
-	        && (CONSP (vec[CLOSURE_CONSTANTS])
-	            || NILP (vec[CLOSURE_CONSTANTS]))))))
-    invalid_syntax ("Invalid byte-code object", readcharfun);
-
-  if (STRINGP (vec[CLOSURE_CODE]))
-    {
-      /* In GuilEmacs, all strings are UTF-8, so no multibyte/unibyte conversion needed.
-         Legacy bytecode from Emacs 20.2 is not supported. */
-
-      /* Bytecode must be immovable.  */
-      //pin_string (vec[CLOSURE_CODE]);
-    }
-
-  XSETPVECTYPE (XVECTOR (obj), PVEC_CLOSURE);
-  return obj;
-}
 
 static Lisp_Object
 char_table_from_rev_list (Lisp_Object elems, Lisp_Object readcharfun)
@@ -3150,7 +3098,6 @@ enum read_entry_type
   RE_record,			/* "#s(" (* OBJECT) */
   RE_char_table,		/* "#^[" (* OBJECT) */
   RE_sub_char_table,		/* "#^^[" (* OBJECT) */
-  RE_byte_code,			/* "#[" (* OBJECT) */
   RE_string_props,		/* "#(" (* OBJECT) */
 
   RE_special,			/* "'" | "#'" | "`" | "," | ",@" */
@@ -3169,7 +3116,7 @@ struct read_stack_entry
     } list;
 
     /* RE_vector, RE_record, RE_char_table, RE_sub_char_table,
-       RE_byte_code, RE_string_props */
+       RE_string_props */
     struct {
       Lisp_Object elems;	/* list of elements in reverse order */
       bool old_locate_syms;	/* old value of locate_syms */
@@ -3353,11 +3300,6 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = vector_from_rev_list (read_stack_pop ()->u.vector.elems);
 	  break;
-	case RE_byte_code:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = bytecode_from_rev_list (read_stack_pop ()->u.vector.elems,
-					readcharfun);
-	  break;
 	case RE_char_table:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
@@ -3464,14 +3406,8 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	    goto read_obj;
 
 	  case '[':
-	    /* #[...] -- byte-code */
-	    read_stack_push ((struct read_stack_entry) {
-		.type = RE_byte_code,
-		.u.vector.elems = Qnil,
-		.u.vector.old_locate_syms = locate_syms,
-	      });
-	    locate_syms = false;
-	    goto read_obj;
+	    /* #[...] -- byte-code (not supported in Guile reader) */
+	    invalid_syntax ("Emacs bytecode syntax not supported", readcharfun);
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
@@ -3828,7 +3764,6 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	case RE_record:
 	case RE_char_table:
 	case RE_sub_char_table:
-	case RE_byte_code:
 	case RE_string_props:
 	  e->u.vector.elems = Fcons (obj, e->u.vector.elems);
 	  goto read_obj;
@@ -3987,11 +3922,6 @@ fread0 ()
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = vector_from_rev_list (read_stack_pop ()->u.vector.elems);
 	  break;
-	case RE_byte_code:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = bytecode_from_rev_list (read_stack_pop ()->u.vector.elems,
-					readcharfun);
-	  break;
 	case RE_char_table:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
@@ -4099,14 +4029,8 @@ fread0 ()
 	    goto read_obj;
 
 	  case '[':
-	    /* #[...] -- byte-code */
-	    read_stack_push ((struct read_stack_entry) {
-		.type = RE_byte_code,
-		.u.vector.elems = Qnil,
-		.u.vector.old_locate_syms = locate_syms,
-	      });
-	    locate_syms = false;
-	    goto read_obj;
+	    /* #[...] -- byte-code (not supported in Guile reader) */
+	    invalid_syntax ("Emacs bytecode syntax not supported", readcharfun);
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
@@ -4463,7 +4387,6 @@ fread0 ()
 	case RE_record:
 	case RE_char_table:
 	case RE_sub_char_table:
-	case RE_byte_code:
 	case RE_string_props:
 	  e->u.vector.elems = Fcons (obj, e->u.vector.elems);
 	  goto read_obj;
