@@ -2100,11 +2100,13 @@ freadchar (bool *multibyte)
   len = BYTES_BY_CHAR_HEAD (c);
   while (i < len)
     {
-      buf[i++] = c = readbyte_from_stdio2 (infile);
+      c = readbyte_from_stdio2 (infile);
       if (c < 0)
         return c; /* Error in multibyte sequence */
+      buf[i++] = c;
     }
-  return SREF (scm_from_utf8_stringn ((char *)buf, i), 0);
+  buf[i] = '\0'; /* Null terminate for string conversion */
+  return SREF (scm_from_utf8_string ((char *)buf), 0);
 }
 
 /* Simplified file unread - no readcharfun parameter needed */
