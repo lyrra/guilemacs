@@ -195,13 +195,10 @@ DEFUN ("unibyte-char-to-multibyte", Funibyte_char_to_multibyte,
        doc: /* Convert the byte CH to multibyte character.  */)
   (Lisp_Object ch)
 {
-  int c;
-
+  /* In GuilEmacs, all characters are UTF-8, so no conversion is needed.
+     For compatibility, we return the character as-is. */
   CHECK_CHARACTER (ch);
-  c = XFIXNAT (ch);
-  if (c >= 0x100)
-    error ("Not a unibyte character: %d", c);
-  return make_fixnum (make_char_multibyte (c));
+  return ch;
 }
 
 DEFUN ("multibyte-char-to-unibyte", Fmultibyte_char_to_unibyte,
