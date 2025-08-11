@@ -416,23 +416,21 @@ readbyte_from_stdio2 (struct infile *infile)
 #define FROM_FILE_P(readcharfun)			\
   (EQ (readcharfun, Qget_file_char))
 
+/* Simplified for UTF-8 - no multibyte boundary concerns */
 static void
 skip_dyn_bytes (Lisp_Object readcharfun, ptrdiff_t n)
 {
   if (FROM_FILE_P (readcharfun))
     {
-      block_input ();		/* FIXME: Not sure if it's needed.  */
+      /* For file loading: direct seek with UTF-8 byte count */
+      block_input ();
       file_seek (infile->stream, n - infile->lookahead, SEEK_CUR);
       unblock_input ();
       infile->lookahead = 0;
     }
   else
-    { /* We're not reading directly from a file.  In that case, it's difficult
-	 to reliably count bytes, since these are usually meant for the file's
-	 encoding, whereas we're now typically in the internal encoding.
-	 But luckily, skip_dyn_bytes is used to skip over a single
-	 dynamic-docstring (or dynamic byte-code) which is always quoted such
-	 that \037 is the final char.  */
+    {
+      /* Non-file case: skip until \037 delimiter */
       int c;
       do {
 	c = READCHAR;
@@ -440,12 +438,14 @@ skip_dyn_bytes (Lisp_Object readcharfun, ptrdiff_t n)
     }
 }
 
+/* Simplified EOF skip for UTF-8 */
 static void
 skip_dyn_eof (Lisp_Object readcharfun)
 {
   if (FROM_FILE_P (readcharfun))
     {
-      block_input ();		/* FIXME: Not sure if it's needed.  */
+      /* Direct seek to end for file loading */
+      block_input ();
       file_seek (infile->stream, 0, SEEK_END);
       unblock_input ();
       infile->lookahead = 0;
@@ -2172,16 +2172,54 @@ readevalloop (Lisp_Object readcharfun,
    START, END specify region to read in current buffer (from eval-region).
    If the input is not from a buffer, they must be nil.  */
 
+/* Dedicated file reading function - simplified for file loading only */
 static int
 freadchar (bool *multibyte)
 {
-  return readchar (Qget_file_char, multibyte);  // Use the same readchar as read0()
+  register int c;
+  unsigned char buf[MAX_MULTIBYTE_LENGTH];
+  int i, len;
+
+  if (multibyte)
+    *multibyte = 0;
+
+  readchar_offset++;
+
+  /* File reading only - no buffer/string/function complexity */
+  eassert (infile);
+  c = readbyte_from_stdio2 (infile);
+
+  if (c < 0)
+    return c;
+  if (multibyte)
+    *multibyte = 1;
+  if (ASCII_CHAR_P (c))
+    return c;
+
+  /* Handle multibyte UTF-8 character */
+  i = 0;
+  buf[i++] = c;
+  len = BYTES_BY_CHAR_HEAD (c);
+  while (i < len)
+    {
+      buf[i++] = c = readbyte_from_stdio2 (infile);
+      if (c < 0)
+        return c; /* Error in multibyte sequence */
+    }
+  return SREF (scm_from_utf8_stringn ((char *)buf, i), 0);
 }
 
+/* Simplified file unread - no readcharfun parameter needed */
 void
-funreadchar (char c)
+funreadchar (int c)
 {
-  unreadchar (Qget_file_char, c);
+  /* For file reading, use infile->lookahead buffer directly */
+  readchar_offset--;
+  if (c != -1)
+    {
+      eassert (infile && infile->lookahead < sizeof infile->buf);
+      infile->buf[infile->lookahead++] = c;
+    }
 }
 
 static void
@@ -4294,7 +4332,8 @@ static Lisp_Object
 fread0 ()
 {
   bool locate_syms = false;
-  Lisp_Object readcharfun = Qget_file_char;
+  Lisp_Object readcharfun = Qget_file_char; /* Still needed for error functions */
+  /* File loading - direct function calls, no macro overhead */
   char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
@@ -4425,7 +4464,7 @@ fread0 ()
 	    READ_AND_BUFFER (ch);
 	    if (ch != '(')
 	      {
-		UNREAD (ch);
+		funreadchar (ch);
 		INVALID_SYNTAX_WITH_BUFFER ();
 	      }
 	    read_stack_push ((struct read_stack_entry) {
@@ -4474,6 +4513,7 @@ fread0 ()
 		funreadchar (ch);
 		INVALID_SYNTAX_WITH_BUFFER ();
 	      }
+	    break;
 
 	  case '(':
 	    /* #(...) -- string with properties */
