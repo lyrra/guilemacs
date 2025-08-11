@@ -133,8 +133,6 @@ static struct infile
 static ptrdiff_t read_from_string_index;
 static ptrdiff_t read_from_string_limit;
 
-/* Position in object from which characters are being read by `readchar'.  */
-static EMACS_INT readchar_offset;
 
 /* A list of file names for files being loaded in Fload.  Used to
    check for recursive loads.  */
@@ -182,7 +180,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   if (multibyte)
     *multibyte = 0;
 
-  readchar_offset++;
 
   if (BUFFERP (readcharfun))
     {
@@ -323,7 +320,6 @@ readbyte_from_stdio2 (struct infile *infile)
 static void
 unreadchar (Lisp_Object readcharfun, int c)
 {
-  readchar_offset--;
   if (c == -1)
     /* Don't back up the pointer if we're unreading the end-of-input mark,
        since readchar didn't advance it when we read it.  */
@@ -1918,7 +1914,6 @@ freadchar (void)
 
   /* All strings are UTF-8 multibyte in GuilEmacs */
 
-  readchar_offset++;
 
   /* File reading only - no buffer/string/function complexity */
   eassert (infile);
@@ -1950,7 +1945,6 @@ void
 funreadchar (int c)
 {
   /* For file reading, use infile->lookahead buffer directly */
-  readchar_offset--;
   if (c != -1)
     {
       eassert (infile && infile->lookahead < sizeof infile->buf);
@@ -2269,7 +2263,6 @@ read_internal_start (Lisp_Object stream, Lisp_Object start, Lisp_Object end,
 {
   Lisp_Object retval;
 
-  readchar_offset = BUFFERP (stream) ? XBUFFER (stream)->pt : 0;
   /* We can get called from readevalloop which may have set these
      already.  */
   if (! HASH_TABLE_P (read_objects_map)
@@ -3637,7 +3630,6 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	char *p = read_buffer;
 	char *end = read_buffer + read_buffer_size;
 	bool quoted = false;
-	EMACS_INT start_position = readchar_offset - 1;
 
 	do
 	  {
@@ -3718,9 +3710,6 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		  result = intern_driver (name, obarray);
 		}
 	    }
-	  //if (locate_syms && !NILP (result))
-	  //  result = build_symbol_with_pos (result,
-		//			    make_fixnum (start_position));
 
 	obj = result;
 	break;
@@ -4260,7 +4249,6 @@ fread0 ()
 	char *p = read_buffer;
 	char *end = read_buffer + read_buffer_size;
 	bool quoted = false;
-	EMACS_INT start_position = readchar_offset - 1;
 
 	do
 	  {
@@ -4341,9 +4329,6 @@ fread0 ()
 		  result = intern_driver (name, obarray);
 		}
 	    }
-	  //if (locate_syms && !NILP (result))
-	  //  result = build_symbol_with_pos (result,
-		//			    make_fixnum (start_position));
 
 	obj = result;
 	break;
