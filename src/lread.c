@@ -247,11 +247,6 @@ static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
 
 static void build_load_history (Lisp_Object, bool);
 
-static Lisp_Object oblookup_considering_shorthand (Lisp_Object, const char *,
-						   ptrdiff_t, ptrdiff_t,
-						   char **, ptrdiff_t *,
-						   ptrdiff_t *);
-
 
 /* Function that reads one byte from the current source READCHARFUN
    or unreads one byte.  If the integer argument C is -1, it returns
@@ -418,35 +413,6 @@ readbyte_from_stdio2 (struct infile *infile)
   return (c == EOF ? -1 : c);
 }
 
-
-static int
-readchar_load ()
-{
-  Lisp_Object readcharfun = Qget_file_char;
-  register int c;
-  unsigned char buf[MAX_MULTIBYTE_LENGTH];
-  int i, len;
-
-  readchar_offset++;
-
-  eassert (infile);
-
-  c = readbyte_from_stdio2 (infile);
-
-  if (c < 0)
-    return c;
-  if (ASCII_CHAR_P (c))
-    return c;
-  i = 0;
-  buf[i++] = c;
-  len = BYTES_BY_CHAR_HEAD (c);
-  while (i < len)
-    {
-      buf[i++] = c = readbyte_from_stdio2 (infile);
-    }
-  return SREF (scm_from_utf8_stringn (buf, i), 0);
-}
-
 #define FROM_FILE_P(readcharfun)			\
   (EQ (readcharfun, Qget_file_char))
 
@@ -540,62 +506,6 @@ unreadchar (Lisp_Object readcharfun, int c)
 }
 
 static int
-readbyte_from_stdio (void)
-{
-  if (infile->lookahead)
-    return infile->buf[--infile->lookahead];
-
-  int c;
-  file_stream instream = infile->stream;
-
-  block_input ();
-
-#if !defined USE_ANDROID_ASSETS
-
-  /* Interrupted reads have been observed while reading over the network.  */
-  while ((c = getc (instream)) == EOF && errno == EINTR && ferror (instream))
-    {
-      unblock_input ();
-      maybe_quit ();
-      block_input ();
-      clearerr (instream);
-    }
-
-#else
-
-  {
-    char byte;
-    ssize_t rc;
-
-  retry:
-    rc = android_asset_read (instream, &byte, 1);
-
-    if (rc == 0)
-      c = EOF;
-    else if (rc == -1)
-      {
-	if (errno == EINTR)
-	  {
-	    unblock_input ();
-	    maybe_quit ();
-	    block_input ();
-	    goto retry;
-	  }
-	else
-	  c = EOF;
-      }
-    else
-      c = (unsigned char) byte;
-  }
-
-#endif
-
-  unblock_input ();
-
-  return (c == EOF ? -1 : c);
-}
-
-static int
 readbyte_from_file (int c, Lisp_Object readcharfun)
 {
   eassert (infile);
@@ -606,7 +516,7 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
       return 0;
     }
 
-  return readbyte_from_stdio ();
+  return readbyte_from_stdio2 (infile);
 }
 
 /* Signal Qinvalid_read_syntax error.
@@ -1066,47 +976,6 @@ lisp_file_lexical_cookie (Lisp_Object readcharfun)
     }
 }
 
-/* Value is a version number of byte compiled code if the file
-   associated with file descriptor FD is a compiled Lisp file that's
-   safe to load.  Only files compiled with Emacs can be loaded.  */
-
-static int
-safe_to_load_version (Lisp_Object file, lread_fd fd)
-{
-  struct stat st;
-  char buf[512];
-  int nbytes, i;
-  int version = 1;
-
-  /* If the file is not regular, then we cannot safely seek it.
-     Assume that it is not safe to load as a compiled file.  */
-  if (lread_fstat (fd, &st) == 0 && !S_ISREG (st.st_mode))
-    return 0;
-
-  /* Read the first few bytes from the file, and look for a line
-     specifying the byte compiler version used.  */
-  nbytes = lread_read_quit (fd, buf, sizeof buf);
-  if (nbytes > 0)
-    {
-      /* Skip to the next newline, skipping over the initial `ELC'
-	 with NUL bytes following it, but note the version.  */
-      for (i = 0; i < nbytes && buf[i] != '\n'; ++i)
-	if (i == 4)
-	  version = buf[i];
-
-      if (i >= nbytes
-	  || fast_c_string_match_ignore_case (Vbytecomp_version_regexp,
-					      buf + i, nbytes - i) < 0)
-	version = 0;
-    }
-
-  if (lread_lseek (fd, 0, SEEK_SET) < 0)
-    report_file_error ("Seeking to start of file", file);
-
-  return version;
-}
-
-
 /* Callback for record_unwind_protect.  Restore the old load list OLD,
    after loading a file successfully.  */
 
@@ -1159,15 +1028,6 @@ suffix_p (Lisp_Object string, const char *suffix)
 
   return (suffix_len <= string_len
 	  && strcmp (SSDATA (string) + string_len - suffix_len, suffix) == 0);
-}
-
-static void
-close_infile_unwind (void *arg)
-{
-  struct infile *prev_infile = arg;
-  eassert (infile && infile != prev_infile);
-  file_stream_close (infile->stream);
-  infile = prev_infile;
 }
 
 /* Compute the filename we want in `load-history' and `load-file-name'.  */
@@ -2113,27 +1973,6 @@ end_of_file_error (void)
   xsignal0 (Qend_of_file);
 }
 
-static Lisp_Object
-readevalloop_eager_expand_eval (Lisp_Object val, Lisp_Object macroexpand)
-{
-  /* If we macroexpand the toplevel form non-recursively and it ends
-     up being a `progn' (or if it was a progn to start), treat each
-     form in the progn as a top-level form.  This way, if one form in
-     the progn defines a macro, that macro is in effect when we expand
-     the remaining forms.  See similar code in bytecomp.el.  */
-  val = call2 (macroexpand, val, Qnil);
-  if (EQ (CAR_SAFE (val), Qprogn))
-    {
-      Lisp_Object subforms = XCDR (val);
-      val = Qnil;
-      FOR_EACH_TAIL (subforms)
-	val = readevalloop_eager_expand_eval (XCAR (subforms), macroexpand);
-    }
-  else
-      val = eval_sub (call2 (macroexpand, val, Qt));
-  return val;
-}
-
 /* UNIBYTE specifies how to set load_convert_to_unibyte
    for this invocation.
    READFUN, if non-nil, is used instead of `read'.
@@ -2350,29 +2189,24 @@ readevalloop_load (
 	      struct infile *infile0,
 	      Lisp_Object sourcename)
 {
-  bool printflag = false;
-  Lisp_Object unibyte = Qnil, readfun = Qnil,
-              start = Qnil, end = Qnil;
-  Lisp_Object readcharfun = Qget_file_char;
+  /* File loading variables - simplified for pure UTF-8 */
+  bool printflag = false; /* File loading doesn't print by default */
+  Lisp_Object readfun = Qnil, start = Qnil; /* Used in function */
+  Lisp_Object readcharfun = Qget_file_char; /* Always file char for loading */
   int c;
   Lisp_Object val;
   bool multibyte = false;
   dynwind_begin ();
-  struct buffer *b = 0;
   bool continue_reading_p;
   Lisp_Object lex_bound;
-  /* True if reading an entire buffer.  */
-  bool whole_buffer = 0;
-  /* True on the first time around.  */
-  bool first_sexp = 1;
+  bool whole_buffer = 0; /* File loading reads entire file */
+  bool first_sexp = 1; /* Track first s-expression */
+  /* Removed truly unused variables: unibyte, end, b, compile_fn */
 
   CHECK_STRING (sourcename);
 
-  Lisp_Object compile_fn = 0;
-
   specbind (Qstandard_input, Qget_file_char);
-  record_unwind_protect_int (readevalloop_1, load_convert_to_unibyte);
-  load_convert_to_unibyte = !NILP (Qnil);
+  /* Note: load_convert_to_unibyte logic removed - pure UTF-8 strings only */
 
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
@@ -3659,18 +3493,6 @@ get_lazy_string (Lisp_Object val)
     }
 
   return make_unibyte_string (str + start, to - start);
-}
-
-
-/* Length of prefix only consisting of symbol constituent characters.  */
-static ptrdiff_t
-symbol_char_span (const char *s)
-{
-  const char *p = s;
-  while (   *p == '^' || *p == '*' || *p == '+' || *p == '-' || *p == '/'
-	 || *p == '<' || *p == '=' || *p == '>' || *p == '_' || *p == '|')
-    p++;
-  return p - s;
 }
 
 static void
@@ -5398,35 +5220,12 @@ knuth_hash (hash_hash_t hash, unsigned bits)
   return (uint64_t)((uint32_t)hash * alpha) >> (32 - bits);
 }
 
-/* Intern a symbol with name STRING in OBARRAY.  */
-
-static Lisp_Object
-intern_sym (Lisp_Object sym, Lisp_Object obarray)
-{
-  return Fintern (sym, obarray);
-}
-
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray)
 {
   return Fintern (string, obarray);
 }
 
-#if 0
-static void
-define_symbol (Lisp_Object sym, char const *str)
-{
-  ptrdiff_t len = strlen (str);
-  Lisp_Object string = make_pure_c_string (str, len);
-
-  /* Qunbound is uninterned, so that it's not confused with any symbol
-     'unbound' created by a Lisp program.  */
-  if (! EQ (sym, Qunbound))
-    {
-      intern_sym (sym, initial_obarray);
-    }
-}
-#endif
 
 static Lisp_Object initial_obarray;
 
