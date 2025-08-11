@@ -146,7 +146,6 @@ static void readevalloop (Lisp_Object, struct infile *, Lisp_Object, bool,
                           Lisp_Object, Lisp_Object);
 static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
 
-static void build_load_history (Lisp_Object, bool);
 
 
 /* Function that reads one byte from the current source READCHARFUN
@@ -849,22 +848,6 @@ record_load_unwind (Lisp_Object old)
   Vloads_in_progress = old;
 }
 
-static void
-load_warn_unescaped_character_literals (Lisp_Object file)
-{
-  Lisp_Object function
-    = Fsymbol_function (Qbyte_run_unescaped_character_literals_warning);
-  /* If byte-run.el is being loaded,
-     `byte-run--unescaped-character-literals-warning' isn't yet
-     defined.  Since it'll be byte-compiled later, ignore potential
-     unescaped character literals. */
-  Lisp_Object warning = NILP (function) ? Qnil : call0 (function);
-  if (!NILP (warning))
-    {
-      AUTO_STRING (format, "Loading `%s': %s");
-      CALLN (Fmessage, format, file, warning);
-    }
-}
 
 DEFUN ("get-load-suffixes", Fget_load_suffixes, Sget_load_suffixes, 0, 0, 0,
        doc: /* Return the suffixes that `load' should try if a suffix is \
@@ -1115,10 +1098,6 @@ Return t if the file exists and loads successfully.  */)
 
   version = -1;
 
-  /* Check for the presence of unescaped character literals and warn
-     about them. */
-  specbind (Qlread_unescaped_character_literals, Qnil);
-  record_unwind_protect (load_warn_unescaped_character_literals, file);
 
   if (!is_module)
     {
@@ -1211,7 +1190,6 @@ Return t if the file exists and loads successfully.  */)
 #ifdef HAVE_MODULES
       loadhist_initialize (found);
       Fmodule_load (found);
-      build_load_history (found, true);
 #else
       /* This cannot happen.  */
       emacs_abort ();
@@ -1722,77 +1700,6 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 }
 
 
-/* Merge the list we've accumulated of globals from the current input source
-   into the load_history variable.  The details depend on whether
-   the source has an associated file name or not.
-
-   FILENAME is the file name that we are loading from.
-
-   ENTIRE is true if loading that entire file, false if evaluating
-   part of it.  */
-
-static void
-build_load_history (Lisp_Object filename, bool entire)
-{
-  Lisp_Object tail, prev, newelt;
-  Lisp_Object tem, tem2;
-  bool foundit = 0;
-
-  tail = Vload_history;
-  prev = Qnil;
-
-  FOR_EACH_TAIL (tail)
-    {
-      tem = XCAR (tail);
-
-      /* Find the feature's previous assoc list...  */
-      if (!NILP (Fequal (filename, Fcar (tem))))
-	{
-	  foundit = 1;
-
-	  /* If we're loading the entire file, remove old data.  */
-	  if (entire)
-	    {
-	      if (NILP (prev))
-		Vload_history = XCDR (tail);
-	      else
-		Fsetcdr (prev, XCDR (tail));
-	    }
-	  /* Otherwise, cons on new symbols that are not already
-	     members.  */
-	  else
-	    {
-	      tem2 = Vcurrent_load_list;
-
-	      FOR_EACH_TAIL (tem2)
-		{
-		  newelt = XCAR (tem2);
-
-		  if (NILP (Fmember (newelt, tem)))
-		    Fsetcar (tail, Fcons (XCAR (tem),
-		     			  Fcons (newelt, XCDR (tem))));
-		  maybe_quit ();
-		}
-	    }
-	}
-      else
-	prev = tail;
-      maybe_quit ();
-    }
-
-  /* If we're loading an entire file, cons the new assoc onto the
-     front of load-history, the most-recently-loaded position.  Also
-     do this if we didn't find an existing member for the file.  */
-  if (entire || !foundit)
-    {
-      Lisp_Object tem = Fnreverse (Vcurrent_load_list);
-      eassert (!NILP (Fequal (filename, Fcar (tem))));
-      Vload_history = Fcons (tem, Vload_history);
-      /* FIXME: There should be an unbind_to right after calling us which
-         should re-establish the previous value of Vcurrent_load_list.  */
-      Vcurrent_load_list = Qt;
-    }
-}
 
 
 /* Signal an `end-of-file' error, if possible with file name
@@ -1989,8 +1896,6 @@ readevalloop (Lisp_Object readcharfun,
       first_sexp = 0;
     }
 
-  build_load_history (sourcename,
-		      infile0 || whole_buffer);
 
   dynwind_end ();
 }
@@ -2179,8 +2084,6 @@ readevalloop_load (
       first_sexp = 0;
     }
 
-  build_load_history (sourcename,
-		      infile0 || whole_buffer);
 
   dynwind_end ();
 }
@@ -2826,15 +2729,6 @@ read_char_literal (Lisp_Object readcharfun)
   if (ch == ' ' || ch == '\t')
     return make_fixnum (ch);
 
-  if (   ch == '(' || ch == ')' || ch == '[' || ch == ']'
-      || ch == '"' || ch == ';')
-    {
-      CHECK_LIST (Vlread_unescaped_character_literals);
-      Lisp_Object char_obj = make_fixed_natnum (ch);
-      if (NILP (Fmemq (char_obj, Vlread_unescaped_character_literals)))
-	Vlread_unescaped_character_literals =
-	  Fcons (char_obj, Vlread_unescaped_character_literals);
-    }
 
   if (ch == '\\')
     ch = read_char_escape (readcharfun, READCHAR);
@@ -5861,17 +5755,6 @@ variables, this must be set in the first line of a file.  */);
 	       doc: /* List of buffers being read from by calls to `eval-buffer' and `eval-region'.  */);
   Veval_buffer_list = Qnil;
 
-  DEFVAR_LISP ("lread--unescaped-character-literals",
-               Vlread_unescaped_character_literals,
-               doc: /* List of deprecated unescaped character literals encountered by `read'.
-For internal use only.  */);
-  Vlread_unescaped_character_literals = Qnil;
-  DEFSYM (Qlread_unescaped_character_literals,
-          "lread--unescaped-character-literals");
-
-  /* Defined in lisp/emacs-lisp/byte-run.el.  */
-  DEFSYM (Qbyte_run_unescaped_character_literals_warning,
-          "byte-run--unescaped-character-literals-warning");
 
   DEFVAR_BOOL ("load-prefer-newer", load_prefer_newer,
                doc: /* Non-nil means `load' prefers the newest version of a file.
