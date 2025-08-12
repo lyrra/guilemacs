@@ -133,9 +133,9 @@ static Lisp_Object read_objects_completed;
 /* File and lookahead for get-file-char to read from.  Used by Fload.  */
 static struct infile
 {
-  /* The input stream (temporarily back to FILE*).  */
+  /* The input stream (FILE*).  */
   FILE *stream;
-  /* The input port (for future Guile integration).  */
+  /* The input port for Guile integration.  */
   SCM port;
 
   /* Lookahead byte count.  */
@@ -397,9 +397,17 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
   if (infile->lookahead)
     return infile->buf[--infile->lookahead];
 
-  /* Read from FILE* */
-  int ch = fgetc (infile->stream);
-  return (ch == EOF ? -1 : ch);
+  /* Try SCM port first if available, fallback to FILE* */
+  if (!scm_is_false (infile->port))
+    {
+      int ch = scm_getc (infile->port);
+      return (ch == EOF ? -1 : ch);
+    }
+  else
+    {
+      int ch = fgetc (infile->stream);
+      return (ch == EOF ? -1 : ch);
+    }
 }
 
 /* Signal Qinvalid_read_syntax error.
@@ -1159,6 +1167,8 @@ Return t if the file exists and loads successfully.  */)
       if (!stream)
         report_file_error ("Opening stdio stream", file);
       input.stream = stream;
+      /* Initialize SCM port as false for now */
+      input.port = SCM_BOOL_F;
       input.lookahead = 0;
       infile = &input;
     }
@@ -1927,9 +1937,17 @@ freadchar (void)
     c = infile->buf[--infile->lookahead];
   else
     {
-      /* Use standard stdio */
-      int ch = fgetc (infile->stream);
-      c = (ch == EOF ? -1 : ch);
+      /* Use SCM port if available, fallback to FILE* */
+      if (!scm_is_false (infile->port))
+        {
+          int ch = scm_getc (infile->port);
+          c = (ch == EOF ? -1 : ch);
+        }
+      else
+        {
+          int ch = fgetc (infile->stream);
+          c = (ch == EOF ? -1 : ch);
+        }
     }
 
   if (c < 0)
@@ -1952,8 +1970,16 @@ freadchar (void)
         next_byte = infile->buf[--infile->lookahead];
       else
         {
-          int ch = fgetc (infile->stream);
-          next_byte = (ch == EOF ? -1 : ch);
+          if (!scm_is_false (infile->port))
+            {
+              int ch = scm_getc (infile->port);
+              next_byte = (ch == EOF ? -1 : ch);
+            }
+          else
+            {
+              int ch = fgetc (infile->stream);
+              next_byte = (ch == EOF ? -1 : ch);
+            }
         }
 
       if (next_byte < 0 || ! TRAILING_CODE_P (next_byte))
