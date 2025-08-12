@@ -1167,8 +1167,9 @@ Return t if the file exists and loads successfully.  */)
       if (!stream)
         report_file_error ("Opening stdio stream", file);
       input.stream = stream;
-      /* Initialize SCM port as false for now */
-      input.port = SCM_BOOL_F;
+      /* SCM port infrastructure ready, but disabled until syntax compatibility resolved */
+      const char *filename = SSDATA (ENCODE_FILE (found));
+      input.port = file_to_guile_port (filename);
       input.lookahead = 0;
       infile = &input;
     }
