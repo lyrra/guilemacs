@@ -2752,9 +2752,15 @@ fread_char_escape (int next_char)
       for (int i = 0; i < unicode_hex_count; i++)
 	{
 	  int c1 = freadchar ();
+	  if (c1 < 0)
+	    end_of_file_error ();
 	  int digit = digit_to_number (c1, 16);
 	  if (digit < 0)
-	    finvalid_syntax ("Non-hex digit used for Unicode escape");
+	    {
+	      char buf[64];
+	      snprintf (buf, sizeof buf, "Non-hex digit '%c' used for Unicode escape", c1);
+	      finvalid_syntax (buf);
+	    }
 	  chr = (chr << 4) + digit;
 	}
       if (chr > MAX_UNICODE_CHAR)
