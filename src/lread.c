@@ -2011,12 +2011,12 @@ readevalloop_load (
       if (!NILP (readfun))
 	{
 	  /* Custom function-specific reader (currently unused) */
+          emacs_abort ();
 	  val = call1 (readfun, Qget_file_char);
 	}
       else if (! NILP (Vload_read_function))
 	{
-	  /* Global custom reader (reserved for future Guile integration) */
-	  val = call1 (Vload_read_function, Qget_file_char);
+          val = read_internal_start (Qget_file_char, Qnil, Qnil, false);
 	}
       else
 	{
