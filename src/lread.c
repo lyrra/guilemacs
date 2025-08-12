@@ -1957,7 +1957,6 @@ readevalloop_load (
   /* File loading variables - simplified for pure UTF-8 */
   bool printflag = false; /* File loading doesn't print by default */
   Lisp_Object readfun = Qnil; /* Used in function */
-  Lisp_Object readcharfun = Qget_file_char; /* Always file char for loading */
   int c;
   Lisp_Object val;
   dynwind_begin ();
@@ -2020,22 +2019,18 @@ readevalloop_load (
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
       if (!NILP (readfun))
 	{
-	  val = call1 (readfun, readcharfun);
-
-	  /* If READCHARFUN has set point to ZV, we should
-	     stop reading, even if the form read sets point
-	     to a different value when evaluated.  */
-	  if (BUFFERP (readcharfun))
-	    {
-	      struct buffer *buf = XBUFFER (readcharfun);
-	      if (BUF_PT (buf) == BUF_ZV (buf))
-		continue_reading_p = 0;
-	    }
+	  /* Custom function-specific reader (currently unused) */
+	  val = call1 (readfun, Qget_file_char);
 	}
       else if (! NILP (Vload_read_function))
-	val = call1 (Vload_read_function, readcharfun);
+	{
+	  /* Global custom reader (reserved for future Guile integration) */
+	  val = call1 (Vload_read_function, Qget_file_char);
+	}
       else
-	val = fread0 ();
+	{
+	  val = fread0 ();
+	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
 	  && XHASH_TABLE (read_objects_map)->count > 0)
@@ -4242,7 +4237,6 @@ static Lisp_Object
 fread0 ()
 {
   bool locate_syms = false;
-  /* File loading - direct function calls, no macro overhead */
   char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
