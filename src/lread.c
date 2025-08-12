@@ -133,8 +133,10 @@ static Lisp_Object read_objects_completed;
 /* File and lookahead for get-file-char to read from.  Used by Fload.  */
 static struct infile
 {
-  /* The input stream.  */
+  /* The input stream (temporarily back to FILE*).  */
   FILE *stream;
+  /* The input port (for future Guile integration).  */
+  SCM port;
 
   /* Lookahead byte count.  */
   signed char lookahead;
@@ -143,6 +145,20 @@ static struct infile
      not portable to ungetc more than one byte at a time.  */
   unsigned char buf[MAX_MULTIBYTE_LENGTH - 1];
 } *infile;
+
+/* Helper function to create Guile port from filename */
+static SCM
+file_to_guile_port (const char *filename)
+{
+  if (!filename)
+    return SCM_BOOL_F;
+
+  /* Open file directly with Guile instead of converting from FILE* */
+  SCM filename_scm = scm_from_locale_string (filename);
+  SCM mode_scm = scm_from_latin1_string ("r");
+
+  return scm_open_file (filename_scm, mode_scm);
+}
 
 /* For use within read-from-string (this reader is non-reentrant!!)  */
 static ptrdiff_t read_from_string_index;
@@ -377,11 +393,12 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
       return 0;
     }
 
-  /* Inline stdio reading - check lookahead buffer first */
+  /* Check lookahead buffer first */
   if (infile->lookahead)
     return infile->buf[--infile->lookahead];
 
-  int ch = getc (infile->stream);
+  /* Read from FILE* */
+  int ch = fgetc (infile->stream);
   return (ch == EOF ? -1 : ch);
 }
 
@@ -1890,51 +1907,25 @@ readevalloop (Lisp_Object readcharfun,
    START, END specify region to read in current buffer (from eval-region).
    If the input is not from a buffer, they must be nil.  */
 
-/* Dedicated file reading function - simplified for file loading only */
+/* Dedicated file reading function - using Guile port (handles UTF-8 automatically) */
 static int
 freadchar (void)
 {
   register int c;
-  unsigned char buf[MAX_MULTIBYTE_LENGTH];
-  int i, len;
 
   /* File reading only - no buffer/string/function complexity */
   eassert (infile);
-  /* Inline stdio reading - check lookahead buffer first */
+  /* Check lookahead buffer first */
   if (infile->lookahead)
     c = infile->buf[--infile->lookahead];
   else
     {
-      int ch = getc (infile->stream);
+      /* Use standard stdio */
+      int ch = fgetc (infile->stream);
       c = (ch == EOF ? -1 : ch);
     }
 
-  if (c < 0)
-    return c;
-  /* All characters are multibyte UTF-8 */
-  if (ASCII_CHAR_P (c))
-    return c;
-
-  /* Handle multibyte UTF-8 character */
-  i = 0;
-  buf[i++] = c;
-  len = BYTES_BY_CHAR_HEAD (c);
-  while (i < len)
-    {
-      /* Inline stdio reading - check lookahead buffer first */
-      if (infile->lookahead)
-        c = infile->buf[--infile->lookahead];
-      else
-        {
-          int ch = getc (infile->stream);
-          c = (ch == EOF ? -1 : ch);
-        }
-      if (c < 0)
-        return c; /* Error in multibyte sequence */
-      buf[i++] = c;
-    }
-  buf[i] = '\0'; /* Null terminate for string conversion */
-  return SREF (scm_from_utf8_string ((char *)buf), 0);
+  return c;
 }
 
 /* Simplified file unread - no readcharfun parameter needed */
