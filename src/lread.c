@@ -2007,14 +2007,13 @@ funreadchar (int c)
 static Lisp_Object
 fread_internal_start ()
 {
-  /* File-specific reading with proper multibyte UTF-8 handling.
-     TODO: fread0() with enhanced freadchar() should work but still has escape issues.
-     Using working mechanism temporarily while debugging escape sequence handling.
+  /* File-specific reading with enhanced UTF-8 multibyte handling.
+     Uses fread0() with enhanced freadchar() that properly assembles UTF-8 characters.
      Phase 2: Replace this with SCM port reading like:
      SCM port = file_to_scm_port(infile);
      return scm_read(port); */
 
-  return call1 (Qread, Qget_file_char);
+  return fread0 ();
 }
 
 static void
@@ -2750,42 +2749,44 @@ fread_char_escape (int next_char)
 		break;
 	      }
 	    else
-	      finvalid_syntax ("Invalid modifier");
+              finvalid_syntax ("Invalid modifier");
 	  }
 	modifiers |= mod;
-	next_char = freadchar ();
-	goto again;
+	c1 = freadchar ();
+	if (c1 == '\\')
+	  {
+	    next_char = freadchar ();
+	    goto again;
+	  }
+	chr = c1;
+	break;
       }
 
-    case '^':
-      /* \^X is equivalent to \C-X.  */
-      next_char = freadchar ();
-      if (next_char == '?')
-	{
-	  chr = 127;
-	  break;
-	}
-      if (next_char >= '@' && next_char <= '_')
-	chr = next_char & 0x1f;
-      else if (next_char >= 'a' && next_char <= 'z')
-	chr = (next_char & 0x1f);
-      else if (next_char == ' ')
-	chr = 0;
-      else
-	finvalid_syntax ("Invalid control character syntax");
-      break;
-
+    /* Control modifiers (\C-x or \^x) are messy and not actually idempotent.
+       For example, ?\C-\C-a = ?\C-\001 = 0x4000001.
+       Keep a count of them and apply them separately.  */
     case 'C':
-      /* \C-X is equivalent to \^X.  */
       {
 	int c1 = freadchar ();
 	if (c1 != '-')
-	  finvalid_syntax ("Invalid control character syntax");
+	  error ("Invalid escape char syntax: \\%c not followed by -", c);
+      }
+      FALLTHROUGH;
+    /* The prefixes \C- and \^ are equivalent.  */
+    case '^':
+      {
 	ncontrol++;
-	next_char = freadchar ();
-	goto again;
+	int c1 = freadchar ();
+	if (c1 == '\\')
+	  {
+	    next_char = freadchar ();
+	    goto again;
+	  }
+	chr = c1;
+	break;
       }
 
+    /* 1-3 octal digits.  Values in 0x80..0xff are encoded as raw bytes.  */
     case '0': case '1': case '2': case '3':
     case '4': case '5': case '6': case '7':
       /* An octal escape, as in ANSI C.  */
@@ -2803,13 +2804,15 @@ fread_char_escape (int next_char)
 	}
       break;
 
+    /* 1 or more hex digits.  Values may encode modifiers.
+       Values in 0x80..0xff using 2 hex digits are encoded as raw bytes.  */
     case 'x':
-      /* A hex escape, as in ANSI C, limited to two hex digits.  */
+      /* A hex escape, unlimited hex digits like the working version.  */
       chr = 0;
-      for (int i = 0; i < 2; i++)
+      while (1)
 	{
 	  int c1 = freadchar ();
-	  int digit = digit_to_number (c1, 16);
+	  int digit = char_hexdigit (c1);
 	  if (digit < 0)
 	    {
 	      funreadchar (c1);
@@ -2833,13 +2836,9 @@ fread_char_escape (int next_char)
 	  int c1 = freadchar ();
 	  if (c1 < 0)
 	    end_of_file_error ();
-	  int digit = digit_to_number (c1, 16);
+	  int digit = char_hexdigit (c1);
 	  if (digit < 0)
-	    {
-	      char buf[64];
-	      snprintf (buf, sizeof buf, "Non-hex digit '%c' used for Unicode escape", c1);
-	      finvalid_syntax (buf);
-	    }
+	    error ("Non-hex character used for Unicode escape: %c (%d)", c1, c1);
 	  chr = (chr << 4) + digit;
 	}
       if (chr > MAX_UNICODE_CHAR)
