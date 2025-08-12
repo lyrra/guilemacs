@@ -74,6 +74,26 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # endif
 #endif
 
+/* Return the digit that CHARACTER stands for in the given BASE.
+   Return -1 if CHARACTER is out of range for BASE,
+   and -2 if CHARACTER is not valid for any supported BASE.  */
+static int
+digit_to_number (int character, int base)
+{
+  int digit;
+
+  if ('0' <= character && character <= '9')
+    digit = character - '0';
+  else if ('a' <= character && character <= 'z')
+    digit = character - 'a' + 10;
+  else if ('A' <= character && character <= 'Z')
+    digit = character - 'A' + 10;
+  else
+    return -2;
+
+  return digit < base ? digit : -1;
+}
+
 Lisp_Object
 intern_driver (Lisp_Object string, Lisp_Object obarray);
 
@@ -1998,30 +2018,24 @@ readevalloop_load (
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (c == '(') {
-	  val = fread0 ();
-	}
-      else
+      if (!NILP (readfun))
 	{
-	  if (!NILP (readfun))
-	    {
-	      val = call1 (readfun, readcharfun);
+	  val = call1 (readfun, readcharfun);
 
-	      /* If READCHARFUN has set point to ZV, we should
-	         stop reading, even if the form read sets point
-		 to a different value when evaluated.  */
-	      if (BUFFERP (readcharfun))
-		{
-		  struct buffer *buf = XBUFFER (readcharfun);
-		  if (BUF_PT (buf) == BUF_ZV (buf))
-		    continue_reading_p = 0;
-		}
+	  /* If READCHARFUN has set point to ZV, we should
+	     stop reading, even if the form read sets point
+	     to a different value when evaluated.  */
+	  if (BUFFERP (readcharfun))
+	    {
+	      struct buffer *buf = XBUFFER (readcharfun);
+	      if (BUF_PT (buf) == BUF_ZV (buf))
+		continue_reading_p = 0;
 	    }
-	  else if (! NILP (Vload_read_function))
-	    val = call1 (Vload_read_function, readcharfun);
-	  else
-	    val = read_internal_start (readcharfun, Qnil, Qnil, false);
 	}
+      else if (! NILP (Vload_read_function))
+	val = call1 (Vload_read_function, readcharfun);
+      else
+	val = fread0 ();
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
 	  && XHASH_TABLE (read_objects_map)->count > 0)
@@ -2578,24 +2592,487 @@ read_char_escape (Lisp_Object readcharfun, int next_char)
   return chr | modifiers;
 }
 
-/* Return the digit that CHARACTER stands for in the given BASE.
-   Return -1 if CHARACTER is out of range for BASE,
-   and -2 if CHARACTER is not valid for any supported BASE.  */
-static int
-digit_to_number (int character, int base)
+/* File-specific error handling functions */
+static void
+finvalid_syntax (const char *s)
 {
-  int digit;
+  invalid_syntax (s, Qget_file_char);
+}
 
-  if ('0' <= character && character <= '9')
-    digit = character - '0';
-  else if ('a' <= character && character <= 'z')
-    digit = character - 'a' + 10;
-  else if ('A' <= character && character <= 'Z')
-    digit = character - 'A' + 10;
-  else
-    return -2;
+static void
+finvalid_radix_integer (EMACS_INT radix)
+{
+  char buf[64];
+  int n = snprintf (buf, sizeof buf, "integer, radix %"pI"d", radix);
+  eassert (n < sizeof buf);
+  finvalid_syntax (buf);
+}
 
-  return digit < base ? digit : -1;
+/* File-specific version of character_name_to_code - uses file error handling */
+static int
+fcharacter_name_to_code (char const *name, ptrdiff_t name_len)
+{
+  /* For "U+XXXX", pass the leading '+' to string_to_number to reject
+     monstrosities like "U+-0000".  */
+  ptrdiff_t len = name_len - 1;
+  Lisp_Object code
+    = (name[0] == 'U' && name[1] == '+'
+       ? string_to_number (name + 1, 16, &len)
+       : call2 (Qchar_from_name, scm_from_utf8_stringn (name, name_len), Qt));
+
+  if (! RANGED_FIXNUMP (0, code, MAX_UNICODE_CHAR)
+      || len != name_len - 1
+      || char_surrogate_p (XFIXNUM (code)))
+    {
+      AUTO_STRING (format, "\\N{%s}");
+      AUTO_STRING_WITH_LEN (namestr, name, name_len);
+      finvalid_syntax (SSDATA (CALLN (Fformat, format, namestr)));
+    }
+
+  return XFIXNUM (code);
+}
+
+/* File-specific version of read_char_escape - uses freadchar() directly */
+static int
+fread_char_escape (int next_char)
+{
+  int modifiers = 0;
+  ptrdiff_t ncontrol = 0;
+  int chr;
+
+ again: ;
+  int c = next_char;
+  int unicode_hex_count;
+  int mod;
+
+  switch (c)
+    {
+    case -1:
+      end_of_file_error ();
+
+    case 'a': chr = '\a'; break; // audible bell
+    case 'b': chr = '\b'; break; // backspace
+    case 'd': chr =  127; break; // delete
+    case 'e': chr =   27; break; // escape
+    case 'f': chr = '\f'; break; // form feed
+    case 'n': chr = '\n'; break; // newline
+    case 'r': chr = '\r'; break; // carriage return
+    case 't': chr = '\t'; break; // horizontal tab
+    case 'v': chr = '\v'; break; // vertical tab
+
+    case '\n':
+      /* ?\LF is an error; it's probably a user mistake.  */
+      error ("Invalid escape char syntax: \\<newline>");
+
+    /* \M-x etc: set modifier bit and parse the char to which it applies,
+       allowing for chains such as \M-\S-\A-\H-\s-\C-q.  */
+    case 'M': mod = meta_modifier;  goto mod_key;
+    case 'S': mod = shift_modifier; goto mod_key;
+    case 'H': mod = hyper_modifier; goto mod_key;
+    case 'A': mod = alt_modifier;   goto mod_key;
+    case 's': mod = super_modifier; goto mod_key;
+
+    mod_key:
+      {
+	int c1 = freadchar ();
+	if (c1 != '-')
+	  {
+	    if (c == 's')
+	      {
+		/* \s not followed by a hyphen is SPC.  */
+		funreadchar (c1);
+		chr = ' ';
+		break;
+	      }
+	    else
+	      finvalid_syntax ("Invalid modifier");
+	  }
+	modifiers |= mod;
+	next_char = freadchar ();
+	goto again;
+      }
+
+    case '^':
+      /* \^X is equivalent to \C-X.  */
+      next_char = freadchar ();
+      if (next_char == '?')
+	{
+	  chr = 127;
+	  break;
+	}
+      if (next_char >= '@' && next_char <= '_')
+	chr = next_char & 0x1f;
+      else if (next_char >= 'a' && next_char <= 'z')
+	chr = (next_char & 0x1f);
+      else if (next_char == ' ')
+	chr = 0;
+      else
+	finvalid_syntax ("Invalid control character syntax");
+      break;
+
+    case 'C':
+      /* \C-X is equivalent to \^X.  */
+      {
+	int c1 = freadchar ();
+	if (c1 != '-')
+	  finvalid_syntax ("Invalid control character syntax");
+	ncontrol++;
+	next_char = freadchar ();
+	goto again;
+      }
+
+    case '0': case '1': case '2': case '3':
+    case '4': case '5': case '6': case '7':
+      /* An octal escape, as in ANSI C.  */
+      chr = c - '0';
+      for (int i = 0; i < 2; i++)
+	{
+	  int c1 = freadchar ();
+	  if (c1 >= '0' && c1 <= '7')
+	    chr = (chr << 3) + (c1 - '0');
+	  else
+	    {
+	      funreadchar (c1);
+	      break;
+	    }
+	}
+      break;
+
+    case 'x':
+      /* A hex escape, as in ANSI C, limited to two hex digits.  */
+      chr = 0;
+      for (int i = 0; i < 2; i++)
+	{
+	  int c1 = freadchar ();
+	  int digit = digit_to_number (c1, 16);
+	  if (digit < 0)
+	    {
+	      funreadchar (c1);
+	      break;
+	    }
+	  chr = (chr << 4) + digit;
+	}
+      break;
+
+    case 'U':
+      /* A Unicode escape, with 8 hex digits.  */
+      unicode_hex_count = 8;
+      goto unicode_hex;
+    case 'u':
+      /* A Unicode escape, with 4 hex digits.  */
+      unicode_hex_count = 4;
+    unicode_hex:
+      chr = 0;
+      for (int i = 0; i < unicode_hex_count; i++)
+	{
+	  int c1 = freadchar ();
+	  int digit = digit_to_number (c1, 16);
+	  if (digit < 0)
+	    finvalid_syntax ("Non-hex digit used for Unicode escape");
+	  chr = (chr << 4) + digit;
+	}
+      if (chr > MAX_UNICODE_CHAR)
+	finvalid_syntax ("Unicode character out of range");
+      break;
+
+    case 'N':
+      /* A named escape, like \N{LATIN CAPITAL LETTER A WITH MACRON}.  */
+      {
+        if (freadchar () != '{')
+          finvalid_syntax ("Expected opening brace after \\N");
+        char name[UNICODE_CHARACTER_NAME_LENGTH_BOUND + 1];
+        bool whitespace = false;
+        ptrdiff_t length = 0;
+        while (true)
+          {
+            int c = freadchar ();
+            if (c < 0)
+              end_of_file_error ();
+            if (c == '}')
+              break;
+            if (c == ' ' || c == '\t')
+              {
+                if (!whitespace && length > 0)
+                  name[length++] = ' ';
+                whitespace = true;
+              }
+            else
+              {
+                name[length++] = c;
+                whitespace = false;
+              }
+            if (length >= sizeof name)
+              finvalid_syntax ("Character name too long");
+          }
+        if (length == 0)
+          finvalid_syntax ("Empty character name");
+	name[length] = '\0';
+
+	/* character_name_to_code can invoke read0, recursively.
+	   This is why read0 needs to be re-entrant.  */
+	chr = fcharacter_name_to_code (name, length);
+	break;
+      }
+
+    default:
+      /* The character following the backslash.  */
+      chr = c;
+      break;
+    }
+
+  /* Apply Control modifiers, using the rules:
+     \C-X = ascii_ctrl(nomod(X)) | mods(X)  if nomod(X) is one of:
+                                                A-Z a-z ? @ [ \ ] ^ _
+
+            X | ctrl_modifier               otherwise
+
+     where
+         nomod(c) = c without modifiers
+	 mods(c)  = the modifiers of c
+         ascii_ctrl(c) = 127       if c = '?'
+                         c & 0x1f  otherwise
+  */
+  while (ncontrol > 0)
+    {
+      if ((chr >= '@' && chr <= '_') || (chr >= 'a' && chr <= 'z'))
+	chr &= 0x1f;
+      else if (chr == '?')
+	chr = 127;
+      else
+	modifiers |= ctrl_modifier;
+      ncontrol--;
+    }
+
+  return chr | modifiers;
+}
+
+/* File-specific version of read_integer - uses freadchar() directly */
+static Lisp_Object
+fread_integer (int radix)
+{
+  char stackbuf[20];
+  char *read_buffer = stackbuf;
+  ptrdiff_t read_buffer_size = sizeof stackbuf;
+  char *p = read_buffer;
+  char *heapbuf = NULL;
+  int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
+
+  dynwind_begin();
+
+  int c = freadchar ();
+  if (c == '-' || c == '+')
+    {
+      *p++ = c;
+      c = freadchar ();
+    }
+
+  if (c == '0')
+    {
+      *p++ = c;
+      valid = 1;
+
+      /* Ignore redundant leading zeros, so the buffer doesn't
+	 fill up with them.  */
+      do
+	c = freadchar ();
+      while (c == '0');
+    }
+
+  for (int digit; (digit = digit_to_number (c, radix)) >= -1; )
+    {
+      if (digit == -1)
+	valid = 0;
+      if (valid < 0)
+	valid = 1;
+      /* Allow 1 extra byte for the \0.  */
+      if (p + 1 == read_buffer + read_buffer_size)
+	{
+	  ptrdiff_t offset = p - read_buffer;
+	  read_buffer = grow_read_buffer (read_buffer, offset,
+					  &heapbuf, &read_buffer_size);
+	  p = read_buffer + offset;
+	}
+      *p++ = c;
+      c = freadchar ();
+    }
+
+  funreadchar (c);
+
+  if (valid != 1)
+    finvalid_radix_integer (radix);
+
+  *p = '\0';
+  Lisp_Object tem = string_to_number (read_buffer, radix, NULL);
+  dynwind_end();
+  return tem;
+}
+
+/* File-specific version of read_char_literal - uses freadchar() directly */
+static Lisp_Object
+fread_char_literal (void)
+{
+  int ch = freadchar ();
+  if (ch < 0)
+    end_of_file_error ();
+
+  /* Accept `single space' syntax like (list ? x) where the
+     whitespace character is SPC or TAB.
+     Other literal whitespace like NL, CR, and FF are not accepted,
+     as there are well-established escape sequences for these.  */
+  if (ch == ' ' || ch == '\t')
+    return make_fixnum (ch);
+
+  if (ch == '\\')
+    ch = fread_char_escape (freadchar ());
+
+  int modifiers = ch & CHAR_MODIFIER_MASK;
+  ch &= ~CHAR_MODIFIER_MASK;
+  if (CHAR_BYTE8_P (ch))
+    ch = CHAR_TO_BYTE8 (ch);
+  ch |= modifiers;
+
+  int nch = freadchar ();
+  funreadchar (nch);
+  if (nch <= 32
+      || nch == '"' || nch == '\'' || nch == ';' || nch == '('
+      || nch == ')' || nch == '['  || nch == ']' || nch == '#'
+      || nch == '?' || nch == '`'  || nch == ',' || nch == '.')
+    return make_fixnum (ch);
+
+  finvalid_syntax ("?");
+}
+
+/* File-specific version of read_string_literal - uses freadchar() directly */
+static Lisp_Object
+fread_string_literal (void)
+{
+  char stackbuf[1024];
+  char *read_buffer = stackbuf;
+  ptrdiff_t read_buffer_size = sizeof stackbuf;
+  char *heapbuf = NULL;
+  char *p = read_buffer;
+  char *end = read_buffer + read_buffer_size;
+  ptrdiff_t nchars = 0;
+
+  dynwind_begin ();
+
+  int ch;
+  while ((ch = freadchar ()) >= 0 && ch != '\"')
+    {
+      if (end - p < MAX_MULTIBYTE_LENGTH)
+	{
+	  ptrdiff_t offset = p - read_buffer;
+	  read_buffer = grow_read_buffer (read_buffer, offset,
+					  &heapbuf, &read_buffer_size);
+	  p = read_buffer + offset;
+	  end = read_buffer + read_buffer_size;
+	}
+
+      if (ch == '\\')
+	{
+	  /* First apply string-specific escape rules:  */
+	  ch = freadchar ();
+	  switch (ch)
+	    {
+	    case 's':
+	      /* `\s' is always a space in strings.  */
+	      ch = ' ';
+	      break;
+	    case ' ':
+	    case '\n':
+	      /* `\SPC' and `\LF' generate no characters at all.  */
+	      continue;
+	    default:
+	      ch = fread_char_escape (ch);
+	      break;
+	    }
+
+	  int modifiers = ch & CHAR_MODIFIER_MASK;
+	  ch &= ~CHAR_MODIFIER_MASK;
+
+	  /* Handle character modifiers (was ASCII_CHAR_P case) */
+	  /* Allow `\C-SPC' and `\^SPC'.  This is done here because
+	     the literals ?\C-SPC and ?\^SPC (rather inconsistently)
+	     yield (' ' | CHAR_CTL); see bug#55738.  */
+	  if (modifiers == CHAR_CTL && ch == ' ')
+	    {
+	      ch = 0;
+	      modifiers = 0;
+	    }
+	  if (modifiers & CHAR_SHIFT)
+	    {
+	      /* Shift modifier is valid only with [A-Za-z].  */
+	      if (ch >= 'A' && ch <= 'Z')
+		modifiers &= ~CHAR_SHIFT;
+	      else if (ch >= 'a' && ch <= 'z')
+		{
+		  ch -= ('a' - 'A');
+		  modifiers &= ~CHAR_SHIFT;
+		}
+	    }
+
+	  if (modifiers & CHAR_META)
+	    {
+	      /* Move the meta bit to the right place for a
+		 string.  */
+	      modifiers &= ~CHAR_META;
+	      ch = BYTE8_TO_CHAR (ch | 0x80);
+	    }
+
+	  /* Any modifiers remaining are invalid.  */
+	  if (modifiers)
+	    finvalid_syntax ("Invalid modifier in string");
+
+	  int i = CHAR_STRING (ch, (unsigned char *) p);
+	  p += i;
+	}
+      else
+	{
+	  p += CHAR_STRING (ch, (unsigned char *) p);
+	}
+      nchars++;
+    }
+
+  if (ch < 0)
+    end_of_file_error ();
+
+  Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer, true);
+  dynwind_end ();
+  return obj;
+}
+
+/* File-specific version of read_bool_vector - uses freadchar() directly */
+static Lisp_Object
+fread_bool_vector (void)
+{
+  EMACS_INT length = 0;
+  for (;;)
+    {
+      int c = freadchar ();
+      if (c < '0' || c > '9')
+	{
+	  if (c != '"')
+	    finvalid_syntax ("#&");
+	  break;
+	}
+      if (ckd_mul (&length, length, 10)
+	  || ckd_add (&length, length, c - '0'))
+	finvalid_syntax ("#&");
+    }
+  if (BOOL_VECTOR_LENGTH_MAX < length)
+    finvalid_syntax ("#&");
+
+  ptrdiff_t size_in_chars = bool_vector_bytes (length);
+  Lisp_Object str = fread_string_literal ();
+  /* Validation commented out - multibyte handling simplified */
+
+  Lisp_Object obj = make_uninit_bool_vector (length);
+  unsigned char *data = bool_vector_uchar_data (obj);
+  memcpy (data, SDATA (str), size_in_chars);
+  /* Clear the extraneous bits in the last byte.  */
+  if (length != size_in_chars * BOOL_VECTOR_BITS_PER_CHAR)
+    data[size_in_chars - 1] &= (1 << (length % BOOL_VECTOR_BITS_PER_CHAR)) - 1;
+  return obj;
 }
 
 static void
@@ -3142,6 +3619,12 @@ read_stack_reset (intmax_t sp)
     invalid_syntax (read_buffer, readcharfun);	\
   }
 
+#define FINVALID_SYNTAX_WITH_BUFFER()		\
+  {						\
+    *p = 0;					\
+    finvalid_syntax (read_buffer);		\
+  }
+
 /* Read a Lisp object.
    If LOCATE_SYMS is true, symbols are read with position.  */
 static Lisp_Object
@@ -3465,7 +3948,9 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 			  = XHASH_TABLE (read_objects_map);
 			ptrdiff_t i = hash_lookup (h, make_fixnum (n));
 			if (i < 0)
-			  INVALID_SYNTAX_WITH_BUFFER ();
+			  {
+			    FINVALID_SYNTAX_WITH_BUFFER ();
+			  }
 			obj = HASH_VALUE (h, i);
 			break;
 		      }
@@ -3698,7 +4183,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 	      {
 		if (BASE_EQ (obj, placeholder))
 		  /* Catch silly games like #1=#1# */
-		  invalid_syntax ("nonsensical self-reference", readcharfun);
+		  finvalid_syntax ("nonsensical self-reference");
 
 		/* Optimization: since the placeholder is already
 		   a cons, repurpose it as the actual value.
@@ -3757,12 +4242,10 @@ static Lisp_Object
 fread0 ()
 {
   bool locate_syms = false;
-  Lisp_Object readcharfun = Qget_file_char; /* Still needed for error functions */
   /* File loading - direct function calls, no macro overhead */
   char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
-  ptrdiff_t offset;
   char *heapbuf = NULL;
 
   dynwind_begin ();
@@ -3787,7 +4270,7 @@ fread0 ()
 
     case ')':
       if (read_stack_empty_p (base_sp))
-	invalid_syntax (")", readcharfun);
+	finvalid_syntax (")");
       switch (read_stack_top ()->type)
 	{
 	case RE_list_start:
@@ -3802,7 +4285,7 @@ fread0 ()
 	    locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	    Lisp_Object elems = Fnreverse (read_stack_pop ()->u.vector.elems);
 	    if (NILP (elems))
-	      invalid_syntax ("#s", readcharfun);
+	      finvalid_syntax ("#s");
 
 	    if (BASE_EQ (XCAR (elems), Qhash_table))
 	      obj = hash_table_from_plist (XCDR (elems));
@@ -3813,10 +4296,10 @@ fread0 ()
 	case RE_string_props:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = string_props_from_rev_list (read_stack_pop () ->u.vector.elems,
-					    readcharfun);
+					    freadchar);
 	  break;
 	default:
-	  invalid_syntax (")", readcharfun);
+	  finvalid_syntax (")");
 	}
       break;
 
@@ -3831,7 +4314,7 @@ fread0 ()
 
     case ']':
       if (read_stack_empty_p (base_sp))
-	invalid_syntax ("]", readcharfun);
+	finvalid_syntax ("]");
       switch (read_stack_top ()->type)
 	{
 	case RE_vector:
@@ -3841,15 +4324,15 @@ fread0 ()
 	case RE_char_table:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-					  readcharfun);
+					  freadchar);
 	  break;
 	case RE_sub_char_table:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = sub_char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-					      readcharfun);
+					      freadchar);
 	  break;
 	default:
-	  invalid_syntax ("]", readcharfun);
+	  invalid_syntax ("]", freadchar);
 	  break;
 	}
       break;
@@ -3860,8 +4343,20 @@ fread0 ()
 	char *end = read_buffer + read_buffer_size;
 
 	*p++ = '#';
-	int ch;
-	READ_AND_BUFFER (ch);
+	int ch = freadchar ();
+	if (ch < 0)
+	  {
+	    *p = 0;
+	    finvalid_syntax (read_buffer);
+	  }
+	p += CHAR_STRING (ch, (unsigned char *) p);
+	if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+	  {
+	    ptrdiff_t offset = p - read_buffer;
+	    emacs_abort ();
+	    p = read_buffer + offset;
+	    end = read_buffer + read_buffer_size;
+	  }
 
 	switch (ch)
 	  {
@@ -3880,11 +4375,25 @@ fread0 ()
 
 	  case 's':
 	    /* #s(...) -- a record or hash-table */
-	    READ_AND_BUFFER (ch);
+	    ch = freadchar ();
+	    if (ch < 0)
+	      {
+		*p = 0;
+		finvalid_syntax (read_buffer);
+	      }
+	    p += CHAR_STRING (ch, (unsigned char *) p);
+	    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+	      {
+		ptrdiff_t offset = p - read_buffer;
+		emacs_abort ();
+		p = read_buffer + offset;
+		end = read_buffer + read_buffer_size;
+	      }
 	    if (ch != '(')
 	      {
 		funreadchar (ch);
-		INVALID_SYNTAX_WITH_BUFFER ();
+		*p = 0;
+		finvalid_syntax (read_buffer);
 	      }
 	    read_stack_push ((struct read_stack_entry) {
 		.type = RE_record,
@@ -3897,7 +4406,20 @@ fread0 ()
 	  case '^':
 	    /* #^[...]  -- char-table
 	       #^^[...] -- sub-char-table */
-	    READ_AND_BUFFER (ch);
+	    ch = freadchar ();
+	    if (ch < 0)
+	      {
+		*p = 0;
+		finvalid_syntax (read_buffer);
+	      }
+	    p += CHAR_STRING (ch, (unsigned char *) p);
+	    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+	      {
+		ptrdiff_t offset = p - read_buffer;
+		emacs_abort ();
+		p = read_buffer + offset;
+		end = read_buffer + read_buffer_size;
+	      }
 	    if (ch == '^')
 	      {
 		ch = freadchar ();
@@ -3914,7 +4436,8 @@ fread0 ()
 		else
 		  {
 		    funreadchar (ch);
-		    INVALID_SYNTAX_WITH_BUFFER ();
+		    *p = 0;
+		    finvalid_syntax (read_buffer);
 		  }
 	      }
 	    else if (ch == '[')
@@ -3930,7 +4453,8 @@ fread0 ()
 	    else
 	      {
 		funreadchar (ch);
-		INVALID_SYNTAX_WITH_BUFFER ();
+		*p = 0;
+		finvalid_syntax (read_buffer);
 	      }
 	    break;
 
@@ -3946,11 +4470,11 @@ fread0 ()
 
 	  case '[':
 	    /* #[...] -- byte-code (not supported in Guile reader) */
-	    invalid_syntax ("Emacs bytecode syntax not supported", readcharfun);
+	    finvalid_syntax ("Emacs bytecode syntax not supported");
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
-	    obj = read_bool_vector (readcharfun);
+	    obj = fread_bool_vector ();
 	    break;
 
 	  case '!':
@@ -3966,22 +4490,22 @@ fread0 ()
 
 	  case 'x':
 	  case 'X':
-	    obj = read_integer (Qget_file_char, 16);
+	    obj = fread_integer (16);
 	    break;
 
 	  case 'o':
 	  case 'O':
-	    obj = read_integer (Qget_file_char, 8);
+	    obj = fread_integer (8);
 	    break;
 
 	  case 'b':
 	  case 'B':
-	    obj = read_integer (Qget_file_char, 2);
+	    obj = fread_integer (2);
 	    break;
 
 	  case '@':
 	    /* #@NUMBER syntax removed - not needed for Guile reader */
-	    invalid_syntax ("#@", readcharfun);
+	    finvalid_syntax ("#@");
 	    break;
 
 	  case '$':
@@ -4031,19 +4555,35 @@ fread0 ()
 		int c;
 		for (;;)
 		  {
-		    READ_AND_BUFFER (c);
+		    c = freadchar ();
+		    if (c < 0)
+		      {
+			*p = 0;
+			finvalid_syntax (read_buffer);
+		      }
+		    p += CHAR_STRING (c, (unsigned char *) p);
+		    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+		      {
+			ptrdiff_t offset = p - read_buffer;
+			emacs_abort ();
+			p = read_buffer + offset;
+			end = read_buffer + read_buffer_size;
+		      }
 		    if (c < '0' || c > '9')
 		      break;
 		    if (ckd_mul (&n, n, 10)
 			|| ckd_add (&n, n, c - '0'))
-		      INVALID_SYNTAX_WITH_BUFFER ();
+		      {
+			*p = 0;
+			finvalid_syntax (read_buffer);
+		      }
 		  }
 		if (c == 'r' || c == 'R')
 		  {
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
-		      invalid_radix_integer (n, Qget_file_char);
-		    obj = read_integer (Qget_file_char, n);
+		      finvalid_radix_integer (n);
+		    obj = fread_integer (n);
 		    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
@@ -4077,28 +4617,30 @@ fread0 ()
 			  = XHASH_TABLE (read_objects_map);
 			ptrdiff_t i = hash_lookup (h, make_fixnum (n));
 			if (i < 0)
-			  INVALID_SYNTAX_WITH_BUFFER ();
+			  {
+			    FINVALID_SYNTAX_WITH_BUFFER ();
+			  }
 			obj = HASH_VALUE (h, i);
 			break;
 		      }
 		    else
-		      INVALID_SYNTAX_WITH_BUFFER ();
+		      FINVALID_SYNTAX_WITH_BUFFER ();
 		  }
 		else
-		  INVALID_SYNTAX_WITH_BUFFER ();
+		  FINVALID_SYNTAX_WITH_BUFFER ();
 	      }
 	    else
-	      INVALID_SYNTAX_WITH_BUFFER ();
+	      FINVALID_SYNTAX_WITH_BUFFER ();
 	  }
 	break;
       }
 
     case '?':
-      obj = read_char_literal (Qget_file_char);
+      obj = fread_char_literal ();
       break;
 
     case '"':
-      obj = read_string_literal (Qget_file_char);
+      obj = fread_string_literal ();
       break;
 
     case '\'':
@@ -4158,7 +4700,7 @@ fread0 ()
 		read_stack_top ()->type = RE_list_dot;
 		goto read_obj;
 	      }
-	    invalid_syntax (".", readcharfun);
+	    finvalid_syntax (".");
 	  }
       }
       /* may be a number or symbol starting with a dot */
@@ -4278,10 +4820,23 @@ fread0 ()
 
 	case RE_list_dot:
 	  {
-	    skip_space_and_comments (readcharfun);
-	    int ch = freadchar ();
+	    /* skip space and comments inline */
+	    int ch;
+	    do
+	      {
+		ch = freadchar ();
+		if (ch == ';')
+		  {
+		    /* Skip comment until end of line */
+		    do
+		      ch = freadchar ();
+		    while (ch >= 0 && ch != '\n');
+		  }
+	      }
+	    while (ch >= 0 && (ch <= 32 || ch == NO_BREAK_SPACE));
+
 	    if (ch != ')')
-	      invalid_syntax ("expected )", readcharfun);
+	      finvalid_syntax ("expected )");
 	    XSETCDR (e->u.list.tail, obj);
 	    read_stack_pop ();
 	    obj = e->u.list.head;
@@ -4310,7 +4865,7 @@ fread0 ()
 	      {
 		if (BASE_EQ (obj, placeholder))
 		  /* Catch silly games like #1=#1# */
-		  invalid_syntax ("nonsensical self-reference", readcharfun);
+		  finvalid_syntax ("nonsensical self-reference");
 
 		/* Optimization: since the placeholder is already
 		   a cons, repurpose it as the actual value.
