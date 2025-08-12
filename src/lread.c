@@ -1899,7 +1899,14 @@ readevalloop (Lisp_Object readcharfun,
   dynwind_end ();
 }
 
-/* same as readevalloop, but used by LOAD (from file) only
+/* File-specific version of readevalloop, used by LOAD (from file) only.
+
+   ARCHITECTURAL SPLIT:
+   - readevalloop(): General reading from any source (strings, buffers, functions)
+   - readevalloop_load(): File-specific reading, isolated for future SCM port migration
+
+   This function uses fread_internal_start() which provides the isolation point
+   for Phase 2 migration to SCM ports.
  */
 /* UNIBYTE handling removed - GuilEmacs uses pure UTF-8 strings only.
    READFUN, if non-nil, is used instead of `read'.
@@ -1907,7 +1914,7 @@ readevalloop (Lisp_Object readcharfun,
    START, END specify region to read in current buffer (from eval-region).
    If the input is not from a buffer, they must be nil.  */
 
-/* Dedicated file reading function - using Guile port (handles UTF-8 automatically) */
+/* File reading function for isolated file loading */
 static int
 freadchar (void)
 {
@@ -1925,7 +1932,48 @@ freadchar (void)
       c = (ch == EOF ? -1 : ch);
     }
 
-  return c;
+  if (c < 0)
+    return c;
+
+  /* Handle multibyte UTF-8 sequences like Qget_file_char does */
+  if (ASCII_CHAR_P (c))
+    return c;
+
+  /* For non-ASCII, assemble complete UTF-8 character */
+  unsigned char buf[MAX_MULTIBYTE_LENGTH];
+  int i = 0;
+  buf[i++] = c;
+  int len = BYTES_BY_CHAR_HEAD (c);
+
+  while (i < len)
+    {
+      int next_byte;
+      if (infile->lookahead)
+        next_byte = infile->buf[--infile->lookahead];
+      else
+        {
+          int ch = fgetc (infile->stream);
+          next_byte = (ch == EOF ? -1 : ch);
+        }
+
+      if (next_byte < 0 || ! TRAILING_CODE_P (next_byte))
+        {
+          /* Invalid UTF-8 sequence - push back bytes and return first byte as BYTE8 */
+          if (next_byte >= 0)
+            {
+              eassert (infile->lookahead < sizeof infile->buf);
+              infile->buf[infile->lookahead++] = next_byte;
+            }
+          for (i = i - (next_byte < 0 ? 1 : 0); 0 < --i; )
+            {
+              eassert (infile->lookahead < sizeof infile->buf);
+              infile->buf[infile->lookahead++] = buf[i];
+            }
+          return BYTE8_TO_CHAR (buf[0]);
+        }
+      buf[i++] = next_byte;
+    }
+  return STRING_CHAR (buf);
 }
 
 /* Simplified file unread - no readcharfun parameter needed */
@@ -1938,6 +1986,35 @@ funreadchar (int c)
       eassert (infile && infile->lookahead < sizeof infile->buf);
       infile->buf[infile->lookahead++] = c;
     }
+}
+
+
+/* File-specific reader function for isolated file loading.
+
+   INTERIM SOLUTION:
+   - Provides architectural isolation point for file-specific reading operations
+   - Currently uses call1(Qread, Qget_file_char) which works reliably
+   - Direct fread0() calls fail in this context due to timing/context dependencies
+
+   PHASE 2 MIGRATION PLAN:
+   - Replace this function body with SCM port operations:
+     SCM port = file_to_scm_port(infile);
+     return scm_read(port);
+   - The call sites remain unchanged, providing clean migration path
+   - All file loading operations are now channeled through this single point
+
+   Context setup is handled by the caller (readevalloop_load). */
+static Lisp_Object
+fread_internal_start ()
+{
+  /* File-specific reading with proper multibyte UTF-8 handling.
+     TODO: fread0() with enhanced freadchar() should work but still has escape issues.
+     Using working mechanism temporarily while debugging escape sequence handling.
+     Phase 2: Replace this with SCM port reading like:
+     SCM port = file_to_scm_port(infile);
+     return scm_read(port); */
+
+  return call1 (Qread, Qget_file_char);
 }
 
 static void
@@ -2014,13 +2091,15 @@ readevalloop_load (
           emacs_abort ();
 	  val = call1 (readfun, Qget_file_char);
 	}
-      else if (! NILP (Vload_read_function))
+      else if (! NILP (Vload_read_function) && !EQ (Vload_read_function, Qread))
 	{
-          val = read_internal_start (Qget_file_char, Qnil, Qnil, false);
+	  /* Non-default custom read function */
+          val = call1 (Vload_read_function, Qget_file_char);
 	}
       else
 	{
-	  val = fread0 ();
+	  /* File-specific reading path - use fread_internal_start for isolation */
+	  val = fread_internal_start ();
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
