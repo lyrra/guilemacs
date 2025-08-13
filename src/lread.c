@@ -188,6 +188,8 @@ static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
    interesting.  */
 
 static int readbyte (int, Lisp_Object);
+static int freadchar (void);
+static void funreadchar (int);
 
 /* Handle unreading and rereading of characters.
    Write READCHAR to read a character,
@@ -291,40 +293,20 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
         }
       return c;
     }
-  else // if (EQ (readcharfun, Qget_file_char))
+  else if (EQ (readcharfun, Qget_file_char))
     {
-      emacs_abort (); // this path cant be reached
+      /* Reading from file - use freadchar directly */
+      return freadchar ();
     }
-
-
-  tem = call0 (readcharfun);
-
-  if (NILP (tem))
-    return -1;
-  return XFIXNUM (tem);
-
- read_multibyte:
-  c = (*readbyte) (-1, readcharfun);
-  if (c < 0)
-    return c;
-  if (multibyte)
-    *multibyte = 1;
-  if (ASCII_CHAR_P (c))
-    return c;
-  i = 0;
-  buf[i++] = c;
-  len = BYTES_BY_CHAR_HEAD (c);
-  while (i < len)
+  else
     {
-      buf[i++] = c = (*readbyte) (-1, readcharfun);
-      if (c < 0 || ! TRAILING_CODE_P (c))
-	{
-	  for (i -= c < 0; 0 < --i; )
-	    (*readbyte) (buf[i], readcharfun);
-	  return BYTE8_TO_CHAR (buf[0]);
-	}
+      /* Custom read function */
+      tem = call0 (readcharfun);
+
+      if (NILP (tem))
+        return -1;
+      return XFIXNUM (tem);
     }
-  return STRING_CHAR (buf);
 }
 
 /* readbyte_from_stdio2 function removed - inlined for better performance */
@@ -2082,7 +2064,7 @@ lisp_file_lexical_cookie_scm_port (void)
 
    Context setup is handled by the caller (readevalloop_load). */
 static Lisp_Object
-fread_internal_start ()
+fread_internal_start (void)
 {
   /* File-specific reading with enhanced UTF-8 multibyte handling.
      Uses fread0() with enhanced freadchar() that properly assembles UTF-8 characters.
@@ -2163,14 +2145,13 @@ readevalloop_load (
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
       if (!NILP (readfun))
 	{
-	  /* Custom function-specific reader (currently unused) */
-          emacs_abort ();
+	  /* Custom function-specific reader */
 	  val = call1 (readfun, Qget_file_char);
 	}
       else if (! NILP (Vload_read_function) && !EQ (Vload_read_function, Qread))
 	{
 	  /* Non-default custom read function */
-          val = call1 (Vload_read_function, Qget_file_char);
+	  val = call1 (Vload_read_function, Qget_file_char);
 	}
       else
 	{
