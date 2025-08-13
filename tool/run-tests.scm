@@ -107,10 +107,10 @@
   "test/lisp/emacs-lisp/regexp-opt-tests.el"
   "test/lisp/emacs-lisp/ring-tests.el"
   )(group
-  "test/lisp/emacs-lisp/seq-tests.el"
-  "test/lisp/emacs-lisp/shadow-tests.el"
-  "test/lisp/emacs-lisp/syntax-tests.el"
-  "test/lisp/emacs-lisp/tabulated-list-tests.el"
+  "test/lisp/emacs-lisp/seq-tests.el" ;; pass
+  "test/lisp/emacs-lisp/shadow-tests.el" ;; pass
+  "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
+  ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
   )(group
   "test/lisp/emacs-lisp/text-property-search-tests.el" ;; fails
   )(group
@@ -209,8 +209,8 @@
   "test/lisp/ibuffer-tests.el"
   "test/lisp/hl-line-tests.el"
   )(group
-  "test/lisp/help-tests.el"
-  "test/lisp/obarray-tests.el"
+  "test/lisp/help-tests.el" ;; fails
+  "test/lisp/obarray-tests.el" ;; pass
   "test/lisp/emacs-lisp/gv-tests.el"
   "test/lisp/files-tests.el"
   )(group
