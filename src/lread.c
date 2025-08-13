@@ -133,8 +133,6 @@ static Lisp_Object read_objects_completed;
 /* File and lookahead for get-file-char to read from.  Used by Fload.  */
 static struct infile
 {
-  /* The input stream (FILE*).  */
-  FILE *stream;
   /* The input port for Guile integration.  */
   SCM port;
 
@@ -189,8 +187,7 @@ static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
    is 0 or positive, it unreads C, and the return value is not
    interesting.  */
 
-static int readbyte_from_file (int, Lisp_Object);
-static int readbyte_from_scm_port (int, Lisp_Object);
+static int readbyte (int, Lisp_Object);
 
 /* Handle unreading and rereading of characters.
    Write READCHAR to read a character,
@@ -251,7 +248,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 
       return c;
     }
-  if (MARKERP (readcharfun))
+  else if (MARKERP (readcharfun))
     {
       register struct buffer *inbuffer = XMARKER (readcharfun)->buffer;
 
@@ -283,15 +280,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 
       return c;
     }
-
-  if (EQ (readcharfun, Qget_file_char))
-    {
-      eassert (infile);
-      readbyte = readbyte_from_file;
-      goto read_multibyte;
-    }
-
-  if (STRINGP (readcharfun))
+  else if (STRINGP (readcharfun))
     {
       if (read_from_string_index >= read_from_string_limit)
 	c = -1;
@@ -302,6 +291,11 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
         }
       return c;
     }
+  else // if (EQ (readcharfun, Qget_file_char))
+    {
+      emacs_abort (); // this path cant be reached
+    }
+
 
   tem = call0 (readcharfun);
 
@@ -389,8 +383,10 @@ unreadchar (Lisp_Object readcharfun, int c)
     call1 (readcharfun, make_fixnum (c));
 }
 
+
+/* Read byte from SCM port with lookahead buffer support */
 static int
-readbyte_from_file (int c, Lisp_Object readcharfun)
+readbyte (int c, Lisp_Object readcharfun)
 {
   eassert (infile);
   if (c >= 0)
@@ -404,50 +400,10 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
   if (infile->lookahead)
     return infile->buf[--infile->lookahead];
 
-  /* Try SCM port first if available, fallback to FILE* */
-  if (!scm_is_false (infile->port))
-    {
-      emacs_abort ();
-      int ch = scm_getc (infile->port);
-      fprintf(stderr, "DEBUG: scm_getc returned %d (0x%x)\n", ch, ch);
-      return (ch == EOF ? -1 : ch);
-    }
-  else
-    {
-      int ch = fgetc (infile->stream);
-      fprintf(stderr, "DEBUG: fgetc returned %d (0x%x)\n", ch, ch);
-      return (ch == EOF ? -1 : ch);
-    }
-}
-
-/* SCM port-only version of readbyte_from_file for lexical cookie detection */
-static int
-readbyte_from_scm_port (int c, Lisp_Object readcharfun)
-{
-  eassert (infile);
-  if (c >= 0)
-    {
-      eassert (infile->lookahead < sizeof infile->buf);
-      infile->buf[infile->lookahead++] = c;
-      return 0;
-    }
-
-  /* Check lookahead buffer first */
-  if (infile->lookahead)
-    return infile->buf[--infile->lookahead];
-
-  /* Read only from SCM port */
-  if (!scm_is_false (infile->port))
-    {
-      int ch = scm_getc (infile->port);
-      return (ch == EOF ? -1 : ch);
-    }
-  else
-    {
-      /* No SCM port available, return EOF */
-      emacs_abort ();
-      return -1;
-    }
+  /* Read from SCM port */
+  eassert (!scm_is_false (infile->port));
+  int ch = scm_getc (infile->port);
+  return (ch == EOF ? -1 : ch);
 }
 
 /* Signal Qinvalid_read_syntax error.
@@ -1020,17 +976,14 @@ Return t if the file exists and loads successfully.  */)
   (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
-  FILE *stream = NULL;
   lread_fd fd;
   dynwind_begin ();
-  Lisp_Object found, efound, hist_file_name;
+  Lisp_Object found, hist_file_name;
   /* True means we printed the ".el is newer" message.  */
   bool newer = 0;
   /* True means we are loading a compiled file.  */
   bool compiled = 0;
   Lisp_Object handler;
-  const char *fmode = "r" FOPEN_TEXT;
-  int version;
 
   CHECK_STRING (file);
 
@@ -1098,7 +1051,6 @@ Return t if the file exists and loads successfully.  */)
   if (0 <= fd)
     {
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
-      record_unwind_protect_ptr (fclose_ptr_unwind, &stream);
     }
 
 #ifdef HAVE_MODULES
@@ -1150,7 +1102,6 @@ Return t if the file exists and loads successfully.  */)
                                Ffile_name_nondirectory (found_eff))
                     : found_eff);
 
-  version = -1;
 
 
   if (!is_module)
@@ -1175,19 +1126,16 @@ Return t if the file exists and loads successfully.  */)
 
   if (!lread_fd_p)
     {
-      stream = NULL;
       errno = EINVAL;
     }
   else if (!is_module && !is_native_elisp)
     {
-#ifdef WINDOWSNT
-      emacs_close (fd);
-      fd = -1;
-      efound = ENCODE_FILE (found);
-      stream = emacs_fopen (SSDATA (efound), fmode);
-#else
-      stream = emacs_fdopen (fd, fmode);
-#endif
+      /* Close file descriptor since we'll use SCM port */
+      if (lread_fd_p)
+        {
+          emacs_close (fd);
+          fd = -1;
+        }
     }
 
   /* Declare here rather than inside the else-part because the storage
@@ -1206,12 +1154,13 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      if (!stream)
-        report_file_error ("Opening stdio stream", file);
-      input.stream = stream;
-      /* SCM port infrastructure ready, but disabled until syntax compatibility resolved */
+      /* Set up input structure with SCM port */
       const char *filename = SSDATA (ENCODE_FILE (found));
       input.port = file_to_guile_port (filename);
+
+      if (scm_is_false (input.port))
+        report_file_error ("Opening file", file);
+
       input.lookahead = 0;
       infile = &input;
     }
@@ -1990,73 +1939,17 @@ freadchar (void)
     c = infile->buf[--infile->lookahead];
   else
     {
-      /* Use SCM port if available, fallback to FILE* */
-      if (!scm_is_false (infile->port))
-        {
-          int ch = scm_getc (infile->port);
-          c = (ch == EOF ? -1 : ch);
-        }
-      else
-        {
-          int ch = fgetc (infile->stream);
-          c = (ch == EOF ? -1 : ch);
-        }
+      /* Read from SCM port */
+      eassert (!scm_is_false (infile->port));
+      int ch = scm_getc (infile->port);
+      c = (ch == EOF ? -1 : ch);
     }
 
   if (c < 0)
     return c;
 
-  /* SCM port already returns complete codepoints, no assembly needed */
-  if (!scm_is_false (infile->port))
-    return c;
-
-  /* Handle multibyte UTF-8 sequences for FILE* path */
-  if (ASCII_CHAR_P (c))
-    return c;
-
-  /* For non-ASCII from FILE*, assemble complete UTF-8 character */
-  unsigned char buf[MAX_MULTIBYTE_LENGTH];
-  int i = 0;
-  buf[i++] = c;
-  int len = BYTES_BY_CHAR_HEAD (c);
-
-  while (i < len)
-    {
-      int next_byte;
-      if (infile->lookahead)
-        next_byte = infile->buf[--infile->lookahead];
-      else
-        {
-          if (!scm_is_false (infile->port))
-            {
-              int ch = scm_getc (infile->port);
-              next_byte = (ch == EOF ? -1 : ch);
-            }
-          else
-            {
-              int ch = fgetc (infile->stream);
-              next_byte = (ch == EOF ? -1 : ch);
-            }
-        }
-
-      if (next_byte < 0 || ! TRAILING_CODE_P (next_byte))
-        {
-          /* Invalid UTF-8 sequence - push back bytes and return first byte as BYTE8 */
-          if (next_byte >= 0)
-            {
-              eassert (infile->lookahead < sizeof infile->buf);
-              infile->buf[infile->lookahead++] = next_byte;
-            }
-          for (i = i - (next_byte < 0 ? 1 : 0); 0 < --i; )
-            {
-              eassert (infile->lookahead < sizeof infile->buf);
-              infile->buf[infile->lookahead++] = buf[i];
-            }
-          return BYTE8_TO_CHAR (buf[0]);
-        }
-      buf[i++] = next_byte;
-    }
-  return STRING_CHAR (buf);
+  /* SCM port returns complete UTF-8 codepoints */
+  return c;
 }
 
 /* Simplified file unread - no readcharfun parameter needed */
