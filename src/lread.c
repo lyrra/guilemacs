@@ -157,7 +157,13 @@ file_to_guile_port (const char *filename)
   SCM filename_scm = scm_from_locale_string (filename);
   SCM mode_scm = scm_from_latin1_string ("r");
 
-  return scm_open_file (filename_scm, mode_scm);
+  SCM port = scm_open_file (filename_scm, mode_scm);
+
+  /* Set the port encoding to UTF-8 to handle Unicode characters correctly */
+  if (!scm_is_false (port))
+    scm_set_port_encoding_x (port, scm_from_latin1_string ("UTF-8"));
+
+  return port;
 }
 
 /* For use within read-from-string (this reader is non-reentrant!!)  */
@@ -184,6 +190,7 @@ static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
    interesting.  */
 
 static int readbyte_from_file (int, Lisp_Object);
+static int readbyte_from_scm_port (int, Lisp_Object);
 
 /* Handle unreading and rereading of characters.
    Write READCHAR to read a character,
@@ -400,13 +407,46 @@ readbyte_from_file (int c, Lisp_Object readcharfun)
   /* Try SCM port first if available, fallback to FILE* */
   if (!scm_is_false (infile->port))
     {
+      emacs_abort ();
       int ch = scm_getc (infile->port);
+      fprintf(stderr, "DEBUG: scm_getc returned %d (0x%x)\n", ch, ch);
       return (ch == EOF ? -1 : ch);
     }
   else
     {
       int ch = fgetc (infile->stream);
+      fprintf(stderr, "DEBUG: fgetc returned %d (0x%x)\n", ch, ch);
       return (ch == EOF ? -1 : ch);
+    }
+}
+
+/* SCM port-only version of readbyte_from_file for lexical cookie detection */
+static int
+readbyte_from_scm_port (int c, Lisp_Object readcharfun)
+{
+  eassert (infile);
+  if (c >= 0)
+    {
+      eassert (infile->lookahead < sizeof infile->buf);
+      infile->buf[infile->lookahead++] = c;
+      return 0;
+    }
+
+  /* Check lookahead buffer first */
+  if (infile->lookahead)
+    return infile->buf[--infile->lookahead];
+
+  /* Read only from SCM port */
+  if (!scm_is_false (infile->port))
+    {
+      int ch = scm_getc (infile->port);
+      return (ch == EOF ? -1 : ch);
+    }
+  else
+    {
+      /* No SCM port available, return EOF */
+      emacs_abort ();
+      return -1;
     }
 }
 
@@ -929,6 +969,8 @@ loadhist_initialize (Lisp_Object filename)
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
 }
 
+static lexical_cookie_t
+lisp_file_lexical_cookie_scm_port (void);
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
@@ -1209,8 +1251,18 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      if (lisp_file_lexical_cookie (Qget_file_char) == Cookie_Lex)
+      /* Use SCM port version if available for lexical cookie detection */
+#if 0
+      lexical_cookie_t cookie;
+      if (!scm_is_false (input.port))
+        cookie = lisp_file_lexical_cookie_scm_port ();
+      else
+        cookie = lisp_file_lexical_cookie (Qget_file_char);
+
+      if (cookie == Cookie_Lex)
         Fset (Qlexical_binding, Qt);
+#endif
+      Fset (Qlexical_binding, Qt);
 
       readevalloop_load (&input, hist_file_name);
     }
@@ -2015,6 +2067,107 @@ funreadchar (int c)
     }
 }
 
+/* SCM port version of lexical cookie detection */
+static lexical_cookie_t
+lisp_file_lexical_cookie_scm_port (void)
+{
+  eassert (infile && !scm_is_false (infile->port));
+
+  int ch = freadchar();
+
+  if (ch == EOF) return Cookie_None;
+
+  if (ch == '#')
+    {
+      ch = freadchar();
+      if (ch != '!')
+        {
+          funreadchar (ch);
+          funreadchar ('#');
+          return Cookie_None;
+        }
+      while (ch != '\n' && ch != EOF)
+        ch = freadchar ();
+      if (ch == '\n') ch = freadchar ();
+      /* It is OK to leave the position after a #! line, since
+	 that is what read0 does.  */
+    }
+
+  if (ch != ';')
+    /* The first line isn't a comment, just give up.  */
+    {
+      funreadchar (ch);
+      return Cookie_None;
+    }
+  else
+    /* Look for an appropriate file-variable in the first line.  */
+    {
+      lexical_cookie_t rv = Cookie_None;
+      enum {
+	NOMINAL, AFTER_FIRST_DASH, AFTER_ASTERIX
+      } beg_end_state = NOMINAL;
+      bool in_file_vars = 0;
+
+#define UPDATE_BEG_END_STATE2(ch)				\
+  if (beg_end_state == NOMINAL)					\
+    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);	\
+  else if (beg_end_state == AFTER_FIRST_DASH)			\
+    beg_end_state = (ch == '*' ? AFTER_ASTERIX : NOMINAL);		\
+  else if (beg_end_state == AFTER_ASTERIX)			\
+    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);
+
+      while (ch != '\n' && ch != EOF)
+	{
+	  UPDATE_BEG_END_STATE2 (ch);
+	  if (in_file_vars)
+	    {
+	      if (c_isspace (ch))
+		ch = freadchar ();
+	      else if (ch == 'l')
+		{
+		  if (freadchar () == 'e'
+		      && freadchar () == 'x'
+		      && freadchar () == 'i'
+		      && freadchar () == 'c'
+		      && freadchar () == 'a'
+		      && freadchar () == 'l'
+		      && freadchar () == '-'
+		      && freadchar () == 'b'
+		      && freadchar () == 'i'
+		      && freadchar () == 'n'
+		      && freadchar () == 'd'
+		      && freadchar () == 'i'
+		      && freadchar () == 'n'
+		      && freadchar () == 'g')
+		    {
+		      ch = freadchar ();
+		      if (c_isspace (ch))
+			{
+			  while (c_isspace (ch))
+			    ch = freadchar ();
+			  if (ch == ':')
+			    {
+			      while (c_isspace (ch = freadchar ()))
+				;
+			      if (ch == 't' || ch == 'T')
+				rv = Cookie_Lex;
+			    }
+			}
+		    }
+		  ch = freadchar ();
+		}
+	      else
+		ch = freadchar ();
+	    }
+	  else if (ch == '-' && beg_end_state == AFTER_ASTERIX)
+	    in_file_vars = 1;
+	  else
+	    ch = freadchar ();
+	}
+#undef UPDATE_BEG_END_STATE2
+      return rv;
+    }
+}
 
 /* File-specific reader function for isolated file loading.
 
