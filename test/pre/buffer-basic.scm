@@ -33,3 +33,12 @@
     (print (point))
     (print (char-after))
     (print (point-max)))))
+
+(deftestf 'buffer-eval ('foobarquox)
+  (el-expr `(progn
+    (set-buffer (get-buffer-create (generate-new-buffer-name "\" \"") nil))
+    ;; t argument to print makes it print to stdout (instead of to *Messages*)
+    (print '(print 'foo t) (current-buffer))
+    (insert "\"(print 'bar t)\"")
+    (eval-buffer)
+    (print 'quox))))
