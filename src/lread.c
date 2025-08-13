@@ -2006,11 +2006,15 @@ freadchar (void)
   if (c < 0)
     return c;
 
-  /* Handle multibyte UTF-8 sequences like Qget_file_char does */
+  /* SCM port already returns complete codepoints, no assembly needed */
+  if (!scm_is_false (infile->port))
+    return c;
+
+  /* Handle multibyte UTF-8 sequences for FILE* path */
   if (ASCII_CHAR_P (c))
     return c;
 
-  /* For non-ASCII, assemble complete UTF-8 character */
+  /* For non-ASCII from FILE*, assemble complete UTF-8 character */
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i = 0;
   buf[i++] = c;
