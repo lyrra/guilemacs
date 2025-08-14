@@ -215,9 +215,6 @@ static void funreadchar (struct reader_context *, int);
 #define READCHAR readchar (readcharfun, NULL)
 #define UNREAD(c) unreadchar (readcharfun, c)
 
-/* Same as READCHAR but set *MULTIBYTE to the multibyteness of the source.  */
-#define READCHAR_REPORT_MULTIBYTE(multibyte) readchar (readcharfun, multibyte)
-
 /* File reading now uses infile->lookahead buffer instead of global unread_char */
 
 static int
@@ -230,7 +227,7 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
   int i, len;
 
   if (multibyte)
-    *multibyte = 0;
+    *multibyte = 1;  /* Always multibyte in GuilEmacs */
 
   if (BUFFERP (readcharfun))
     {
@@ -244,23 +241,11 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       if (pt_byte >= BUF_ZV_BYTE (inbuffer))
 	return -1;
 
-      if (! NILP (BVAR (inbuffer, enable_multibyte_characters)))
-	{
-	  /* Fetch the character code from the buffer.  */
-	  unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, pt_byte);
-	  int clen;
-	  c = string_char_and_length (p, &clen);
-	  pt_byte += clen;
-	  if (multibyte)
-	    *multibyte = 1;
-	}
-      else
-	{
-	  c = BUF_FETCH_BYTE (inbuffer, pt_byte);
-	  if (! ASCII_CHAR_P (c))
-	    c = BYTE8_TO_CHAR (c);
-	  pt_byte++;
-	}
+      /* GuilEmacs: All buffers are UTF-8, no need to check multibyte flag */
+      unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, pt_byte);
+      int clen;
+      c = string_char_and_length (p, &clen);
+      pt_byte += clen;
       SET_BUF_PT_BOTH (inbuffer, BUF_PT (inbuffer) + 1, pt_byte);
 
       return c;
@@ -274,23 +259,11 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
       if (bytepos >= BUF_ZV_BYTE (inbuffer))
 	return -1;
 
-      if (! NILP (BVAR (inbuffer, enable_multibyte_characters)))
-	{
-	  /* Fetch the character code from the buffer.  */
-	  unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, bytepos);
-	  int clen;
-	  c = string_char_and_length (p, &clen);
-	  bytepos += clen;
-	  if (multibyte)
-	    *multibyte = 1;
-	}
-      else
-	{
-	  c = BUF_FETCH_BYTE (inbuffer, bytepos);
-	  if (! ASCII_CHAR_P (c))
-	    c = BYTE8_TO_CHAR (c);
-	  bytepos++;
-	}
+      /* GuilEmacs: All buffers are UTF-8, no need to check multibyte flag */
+      unsigned char *p = BUF_BYTE_ADDRESS (inbuffer, bytepos);
+      int clen;
+      c = string_char_and_length (p, &clen);
+      bytepos += clen;
 
       XMARKER (readcharfun)->bytepos = bytepos;
       XMARKER (readcharfun)->charpos++;
@@ -359,11 +332,8 @@ unreadchar (Lisp_Object readcharfun, int c)
       ptrdiff_t bytepos = XMARKER (readcharfun)->bytepos;
 
       XMARKER (readcharfun)->charpos--;
-      if (! NILP (BVAR (b, enable_multibyte_characters)))
-	bytepos -= buf_prev_char_len (b, bytepos);
-      else
-	bytepos--;
-
+      /* GuilEmacs: All buffers are UTF-8 */
+      bytepos -= buf_prev_char_len (b, bytepos);
       XMARKER (readcharfun)->bytepos = bytepos;
     }
   else if (STRINGP (readcharfun))
@@ -1525,14 +1495,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 	   handler = Ffind_file_name_handler (filename, Qfile_exists_p);
 	   It's not clear why that was the case and it breaks things like
 	   (load "/bar.el") where the file is actually "/bar.el.gz".  */
-	/* make_string has its own ideas on when to return a unibyte
-	   string and when a multibyte string, but we know better.
-	   We must have a unibyte string when dumping, since
-	   file-name encoding is shaky at best at that time, and in
-	   particular default-file-name-coding-system is reset
-	   several times during loadup.  We therefore don't want to
-	   encode the file before passing it to file I/O library
-	   functions.  */
+	/* GuilEmacs: All strings are UTF-8, including file names */
         string = build_string (fn);
 	handler = Ffind_file_name_handler (string, Qfile_exists_p);
 	if ((!NILP (handler) || (!NILP (predicate) && !EQ (predicate, Qt)))
@@ -1723,7 +1686,7 @@ end_of_file_error (void)
   xsignal0 (Qend_of_file);
 }
 
-/* UNIBYTE handling removed - GuilEmacs uses pure UTF-8 strings only.
+/* GuilEmacs: All strings are UTF-8, unibyte parameter is ignored.
    READFUN, if non-nil, is used instead of `read'.
 
    START, END specify region to read in current buffer (from eval-region).
@@ -1733,7 +1696,8 @@ static void
 readevalloop (Lisp_Object readcharfun,
 	      Lisp_Object sourcename,
 	      bool printflag,
-	      Lisp_Object unibyte, Lisp_Object readfun,
+	      Lisp_Object unibyte, /* Ignored - kept for API compatibility */
+	      Lisp_Object readfun,
 	      Lisp_Object start, Lisp_Object end)
 {
   int c;
@@ -2205,8 +2169,7 @@ PRINTFLAG controls printing of output by any output functions in the
   a value of nil means discard it; anything else is the stream to print to.
   See Info node `(elisp)Output Streams' for details on streams.
 FILENAME specifies the file name to use for `load-history'.
-UNIBYTE, if non-nil, specifies `load-convert-to-unibyte' for this
- invocation.
+UNIBYTE is obsolete and ignored (GuilEmacs uses UTF-8 for all strings).
 DO-ALLOW-PRINT, if non-nil, specifies that output functions in the
  evaluated code should work normally even if PRINTFLAG is nil, in
  which case the output is displayed in the echo area.
@@ -3783,8 +3746,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
-  bool multibyte;
-  int c = READCHAR_REPORT_MULTIBYTE (&multibyte);
+  int c = READCHAR;
   if (c < 0)
     end_of_file_error ();
 
