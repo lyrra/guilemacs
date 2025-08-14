@@ -58,6 +58,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>
 #include <fcntl.h>
 
+/* File descriptor abstraction - used only for path resolution via openp().
+   GuilEmacs uses SCM ports for actual file I/O, not file descriptors. */
 #define lread_fd	int
 #define lread_fd_cmp(n) (fd == (n))
 #define lread_fd_p	(fd >= 0)
@@ -202,7 +204,6 @@ static void readevalloop_load (struct reader_context *infile0, Lisp_Object sourc
    is 0 or positive, it unreads C, and the return value is not
    interesting.  */
 
-static int readbyte (int, Lisp_Object);
 static int freadchar (struct reader_context *);
 static void funreadchar (struct reader_context *, int);
 
@@ -222,7 +223,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
 {
   Lisp_Object tem;
   register int c;
-  int (*readbyte) (int, Lisp_Object);
   unsigned char buf[MAX_MULTIBYTE_LENGTH];
   int i, len;
 
@@ -297,12 +297,6 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
     }
 }
 
-/* readbyte_from_stdio2 function removed - inlined for better performance */
-
-#define FROM_FILE_P(readcharfun)			\
-  (EQ (readcharfun, Qget_file_char))
-
-
 /* Unread the character C in the way appropriate for the stream READCHARFUN.
    If the stream is a user function, call it with the char as argument.  */
 
@@ -319,11 +313,8 @@ unreadchar (Lisp_Object readcharfun, int c)
       ptrdiff_t charpos = BUF_PT (b);
       ptrdiff_t bytepos = BUF_PT_BYTE (b);
 
-      if (! NILP (BVAR (b, enable_multibyte_characters)))
-	bytepos -= buf_prev_char_len (b, bytepos);
-      else
-	bytepos--;
-
+      /* GuilEmacs: All buffers are UTF-8 */
+      bytepos -= buf_prev_char_len (b, bytepos);
       SET_BUF_PT_BOTH (b, charpos - 1, bytepos);
     }
   else if (MARKERP (readcharfun))
@@ -340,7 +331,7 @@ unreadchar (Lisp_Object readcharfun, int c)
     {
       read_from_string_index--;
     }
-  else if (FROM_FILE_P (readcharfun))
+  else if (EQ (readcharfun, Qget_file_char))
     {
       /* For file reading, use infile->lookahead buffer */
       eassert (infile && infile->lookahead < sizeof infile->buf);
@@ -350,28 +341,6 @@ unreadchar (Lisp_Object readcharfun, int c)
     call1 (readcharfun, make_fixnum (c));
 }
 
-
-/* Read byte from SCM port with lookahead buffer support */
-static int
-readbyte (int c, Lisp_Object readcharfun)
-{
-  eassert (infile);
-  if (c >= 0)
-    {
-      eassert (infile->lookahead < sizeof infile->buf);
-      infile->buf[infile->lookahead++] = c;
-      return 0;
-    }
-
-  /* Check lookahead buffer first */
-  if (infile->lookahead)
-    return infile->buf[--infile->lookahead];
-
-  /* Read from SCM port */
-  eassert (!scm_is_false (infile->port));
-  int ch = scm_getc (infile->port);
-  return (ch == EOF ? -1 : ch);
-}
 
 /* Signal Qinvalid_read_syntax error.
    S is error string of length N (if > 0)  */
@@ -1097,7 +1066,7 @@ Return t if the file exists and loads successfully.  */)
     }
   else if (!is_module && !is_native_elisp)
     {
-      /* Close file descriptor since we'll use SCM port */
+      /* Close file descriptor since we only needed path resolution */
       if (lread_fd_p)
         {
           emacs_close (fd);
