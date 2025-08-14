@@ -131,7 +131,8 @@ static Lisp_Object read_objects_map;
 static Lisp_Object read_objects_completed;
 
 /* File and lookahead for get-file-char to read from.  Used by Fload.  */
-static struct infile
+/* Reader context structure - eliminates global state */
+struct reader_context
 {
   /* The input port for Guile integration.  */
   SCM port;
@@ -142,7 +143,21 @@ static struct infile
   /* Lookahead bytes, in reverse order.  Keep these here because it is
      not portable to ungetc more than one byte at a time.  */
   unsigned char buf[MAX_MULTIBYTE_LENGTH - 1];
-} *infile;
+};
+
+/* Global pointer for general reader compatibility.
+
+   The file-specific reading path (fread0 and related functions) no longer
+   uses this global - they pass context explicitly via parameters.
+
+   This global remains only for the general reader functions (readchar,
+   unreadchar, readbyte) when called with Qget_file_char. These functions
+   are part of the general reader infrastructure that handles multiple
+   source types (buffers, strings, files, etc.) and would require major
+   refactoring to eliminate the global completely.
+
+   TODO: Eliminate when refactoring the general reader infrastructure. */
+static struct reader_context *infile;
 
 /* Helper function to create Guile port from filename */
 static SCM
@@ -174,10 +189,10 @@ static ptrdiff_t read_from_string_limit;
 
 static Lisp_Object Vloads_in_progress;
 
-static void readevalloop (Lisp_Object, struct infile *, Lisp_Object, bool,
+static void readevalloop (Lisp_Object, Lisp_Object, bool,
                           Lisp_Object, Lisp_Object,
                           Lisp_Object, Lisp_Object);
-static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
+static void readevalloop_load (struct reader_context *infile0, Lisp_Object sourcename);
 
 
 
@@ -188,8 +203,8 @@ static void readevalloop_load (struct infile *infile0, Lisp_Object sourcename);
    interesting.  */
 
 static int readbyte (int, Lisp_Object);
-static int freadchar (void);
-static void funreadchar (int);
+static int freadchar (struct reader_context *);
+static void funreadchar (struct reader_context *, int);
 
 /* Handle unreading and rereading of characters.
    Write READCHAR to read a character,
@@ -295,8 +310,8 @@ readchar (Lisp_Object readcharfun, bool *multibyte)
     }
   else if (EQ (readcharfun, Qget_file_char))
     {
-      /* Reading from file - use freadchar directly */
-      return freadchar ();
+      /* Reading from file - use freadchar directly with global infile */
+      return freadchar (infile);
     }
   else
     {
@@ -440,7 +455,7 @@ struct subst
 static Lisp_Object read_internal_start (Lisp_Object, Lisp_Object,
                                         Lisp_Object, bool);
 static Lisp_Object read0 (Lisp_Object, bool);
-static Lisp_Object fread0 ();
+static Lisp_Object fread0 (struct reader_context *);
 
 static Lisp_Object substitute_object_recurse (struct subst *, Lisp_Object);
 static void substitute_in_interval (INTERVAL, void *);
@@ -908,7 +923,7 @@ loadhist_initialize (Lisp_Object filename)
 }
 
 static lexical_cookie_t
-lisp_file_lexical_cookie_scm_port (void);
+lisp_file_lexical_cookie_scm_port (struct reader_context *);
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
@@ -1122,7 +1137,7 @@ Return t if the file exists and loads successfully.  */)
 
   /* Declare here rather than inside the else-part because the storage
      might be accessed by the unbind_to call below.  */
-  struct infile input;
+  struct reader_context input;
 
   if (is_module || is_native_elisp)
     {
@@ -1144,7 +1159,6 @@ Return t if the file exists and loads successfully.  */)
         report_file_error ("Opening file", file);
 
       input.lookahead = 0;
-      infile = &input;
     }
 
   if (! NILP (Vpurify_flag))
@@ -1717,7 +1731,6 @@ end_of_file_error (void)
 
 static void
 readevalloop (Lisp_Object readcharfun,
-	      struct infile *infile0,
 	      Lisp_Object sourcename,
 	      bool printflag,
 	      Lisp_Object unibyte, Lisp_Object readfun,
@@ -1809,8 +1822,6 @@ readevalloop (Lisp_Object readcharfun,
       if (b && first_sexp)
 	whole_buffer = (BUF_PT (b) == BUF_BEG (b) && BUF_ZV (b) == BUF_Z (b));
 
-      infile = infile0;
-      eassert (!infile0 || infile == infile0);
     read_next:
       c = READCHAR;
       if (c == ';')
@@ -1910,20 +1921,20 @@ readevalloop (Lisp_Object readcharfun,
 
 /* File reading function for isolated file loading */
 static int
-freadchar (void)
+freadchar (struct reader_context *ctx)
 {
   register int c;
 
   /* File reading only - no buffer/string/function complexity */
-  eassert (infile);
+  eassert (ctx);
   /* Check lookahead buffer first */
-  if (infile->lookahead)
-    c = infile->buf[--infile->lookahead];
+  if (ctx->lookahead)
+    c = ctx->buf[--ctx->lookahead];
   else
     {
       /* Read from SCM port */
-      eassert (!scm_is_false (infile->port));
-      int ch = scm_getc (infile->port);
+      eassert (!scm_is_false (ctx->port));
+      int ch = scm_getc (ctx->port);
       c = (ch == EOF ? -1 : ch);
     }
 
@@ -1936,38 +1947,38 @@ freadchar (void)
 
 /* Simplified file unread - no readcharfun parameter needed */
 void
-funreadchar (int c)
+funreadchar (struct reader_context *ctx, int c)
 {
-  /* For file reading, use infile->lookahead buffer directly */
+  /* For file reading, use ctx->lookahead buffer directly */
   if (c != -1)
     {
-      eassert (infile && infile->lookahead < sizeof infile->buf);
-      infile->buf[infile->lookahead++] = c;
+      eassert (ctx && ctx->lookahead < sizeof ctx->buf);
+      ctx->buf[ctx->lookahead++] = c;
     }
 }
 
 /* SCM port version of lexical cookie detection */
 static lexical_cookie_t
-lisp_file_lexical_cookie_scm_port (void)
+lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
 {
-  eassert (infile && !scm_is_false (infile->port));
+  eassert (ctx && !scm_is_false (ctx->port));
 
-  int ch = freadchar();
+  int ch = freadchar(ctx);
 
   if (ch == EOF) return Cookie_None;
 
   if (ch == '#')
     {
-      ch = freadchar();
+      ch = freadchar(ctx);
       if (ch != '!')
         {
-          funreadchar (ch);
-          funreadchar ('#');
+          funreadchar (ctx, ch);
+          funreadchar (ctx, '#');
           return Cookie_None;
         }
       while (ch != '\n' && ch != EOF)
-        ch = freadchar ();
-      if (ch == '\n') ch = freadchar ();
+        ch = freadchar (ctx);
+      if (ch == '\n') ch = freadchar (ctx);
       /* It is OK to leave the position after a #! line, since
 	 that is what read0 does.  */
     }
@@ -1975,7 +1986,7 @@ lisp_file_lexical_cookie_scm_port (void)
   if (ch != ';')
     /* The first line isn't a comment, just give up.  */
     {
-      funreadchar (ch);
+      funreadchar (ctx, ch);
       return Cookie_None;
     }
   else
@@ -2001,47 +2012,47 @@ lisp_file_lexical_cookie_scm_port (void)
 	  if (in_file_vars)
 	    {
 	      if (c_isspace (ch))
-		ch = freadchar ();
+		ch = freadchar (ctx);
 	      else if (ch == 'l')
 		{
-		  if (freadchar () == 'e'
-		      && freadchar () == 'x'
-		      && freadchar () == 'i'
-		      && freadchar () == 'c'
-		      && freadchar () == 'a'
-		      && freadchar () == 'l'
-		      && freadchar () == '-'
-		      && freadchar () == 'b'
-		      && freadchar () == 'i'
-		      && freadchar () == 'n'
-		      && freadchar () == 'd'
-		      && freadchar () == 'i'
-		      && freadchar () == 'n'
-		      && freadchar () == 'g')
+		  if (freadchar (ctx) == 'e'
+		      && freadchar (ctx) == 'x'
+		      && freadchar (ctx) == 'i'
+		      && freadchar (ctx) == 'c'
+		      && freadchar (ctx) == 'a'
+		      && freadchar (ctx) == 'l'
+		      && freadchar (ctx) == '-'
+		      && freadchar (ctx) == 'b'
+		      && freadchar (ctx) == 'i'
+		      && freadchar (ctx) == 'n'
+		      && freadchar (ctx) == 'd'
+		      && freadchar (ctx) == 'i'
+		      && freadchar (ctx) == 'n'
+		      && freadchar (ctx) == 'g')
 		    {
-		      ch = freadchar ();
+		      ch = freadchar (ctx);
 		      if (c_isspace (ch))
 			{
 			  while (c_isspace (ch))
-			    ch = freadchar ();
+			    ch = freadchar (ctx);
 			  if (ch == ':')
 			    {
-			      while (c_isspace (ch = freadchar ()))
+			      while (c_isspace (ch = freadchar (ctx)))
 				;
 			      if (ch == 't' || ch == 'T')
 				rv = Cookie_Lex;
 			    }
 			}
 		    }
-		  ch = freadchar ();
+		  ch = freadchar (ctx);
 		}
 	      else
-		ch = freadchar ();
+		ch = freadchar (ctx);
 	    }
 	  else if (ch == '-' && beg_end_state == AFTER_ASTERIX)
 	    in_file_vars = 1;
 	  else
-	    ch = freadchar ();
+	    ch = freadchar (ctx);
 	}
 #undef UPDATE_BEG_END_STATE2
       return rv;
@@ -2064,20 +2075,20 @@ lisp_file_lexical_cookie_scm_port (void)
 
    Context setup is handled by the caller (readevalloop_load). */
 static Lisp_Object
-fread_internal_start (void)
+fread_internal_start (struct reader_context *ctx)
 {
   /* File-specific reading with enhanced UTF-8 multibyte handling.
      Uses fread0() with enhanced freadchar() that properly assembles UTF-8 characters.
      Phase 2: Replace this with SCM port reading like:
-     SCM port = file_to_scm_port(infile);
+     SCM port = file_to_scm_port(ctx);
      return scm_read(port); */
 
-  return fread0 ();
+  return fread0 (ctx);
 }
 
 static void
 readevalloop_load (
-	      struct infile *infile0,
+	      struct reader_context *infile0,
 	      Lisp_Object sourcename)
 {
   /* File loading variables - simplified for pure UTF-8 */
@@ -2114,13 +2125,11 @@ readevalloop_load (
     {
       dynwind_begin ();
 
-      infile = infile0;
-      eassert (!infile0 || infile == infile0);
     read_next:
-      c = freadchar();
+      c = freadchar(infile0);
       if (c == ';')
 	{
-	  while ((c = freadchar()) != '\n' && c != -1);
+	  while ((c = freadchar(infile0)) != '\n' && c != -1);
 	  goto read_next;
 	}
       if (c < 0)
@@ -2133,7 +2142,7 @@ readevalloop_load (
       if (c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
 	  || c == NO_BREAK_SPACE)
 	goto read_next;
-      funreadchar (c);
+      funreadchar (infile0, c);
 
       if (! HASH_TABLE_P (read_objects_map)
 	  || XHASH_TABLE (read_objects_map)->count)
@@ -2156,7 +2165,7 @@ readevalloop_load (
       else
 	{
 	  /* File-specific reading path - use fread_internal_start for isolation */
-	  val = fread_internal_start ();
+	  val = fread_internal_start (infile0);
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
@@ -2237,7 +2246,7 @@ This function preserves the position of point.  */)
   specbind (Qlexical_binding,
 	    lisp_file_lexical_cookie (buf) == Cookie_Lex ? Qt : Qnil);
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
-  readevalloop (buf, 0, filename,
+  readevalloop (buf, filename,
 		!NILP (printflag), unibyte, Qnil, Qnil, Qnil);
   dynwind_end ();
 
@@ -2273,7 +2282,7 @@ This function does not move point.  */)
   specbind (Qeval_buffer_list, Fcons (cbuf, Veval_buffer_list));
 
   /* `readevalloop' calls functions which check the type of start and end.  */
-  readevalloop (cbuf, 0, BVAR (XBUFFER (cbuf), filename),
+  readevalloop (cbuf, BVAR (XBUFFER (cbuf), filename),
 		!NILP (printflag), Qnil, read_function,
 		start, end);
 
@@ -2756,7 +2765,7 @@ fcharacter_name_to_code (char const *name, ptrdiff_t name_len)
 
 /* File-specific version of read_char_escape - uses freadchar() directly */
 static int
-fread_char_escape (int next_char)
+fread_char_escape (struct reader_context *ctx, int next_char)
 {
   int modifiers = 0;
   ptrdiff_t ncontrol = 0;
@@ -2796,13 +2805,13 @@ fread_char_escape (int next_char)
 
     mod_key:
       {
-	int c1 = freadchar ();
+	int c1 = freadchar (ctx);
 	if (c1 != '-')
 	  {
 	    if (c == 's')
 	      {
 		/* \s not followed by a hyphen is SPC.  */
-		funreadchar (c1);
+		funreadchar (ctx, c1);
 		chr = ' ';
 		break;
 	      }
@@ -2810,10 +2819,10 @@ fread_char_escape (int next_char)
               finvalid_syntax ("Invalid modifier");
 	  }
 	modifiers |= mod;
-	c1 = freadchar ();
+	c1 = freadchar (ctx);
 	if (c1 == '\\')
 	  {
-	    next_char = freadchar ();
+	    next_char = freadchar (ctx);
 	    goto again;
 	  }
 	chr = c1;
@@ -2825,7 +2834,7 @@ fread_char_escape (int next_char)
        Keep a count of them and apply them separately.  */
     case 'C':
       {
-	int c1 = freadchar ();
+	int c1 = freadchar (ctx);
 	if (c1 != '-')
 	  error ("Invalid escape char syntax: \\%c not followed by -", c);
       }
@@ -2834,10 +2843,10 @@ fread_char_escape (int next_char)
     case '^':
       {
 	ncontrol++;
-	int c1 = freadchar ();
+	int c1 = freadchar (ctx);
 	if (c1 == '\\')
 	  {
-	    next_char = freadchar ();
+	    next_char = freadchar (ctx);
 	    goto again;
 	  }
 	chr = c1;
@@ -2851,12 +2860,12 @@ fread_char_escape (int next_char)
       chr = c - '0';
       for (int i = 0; i < 2; i++)
 	{
-	  int c1 = freadchar ();
+	  int c1 = freadchar (ctx);
 	  if (c1 >= '0' && c1 <= '7')
 	    chr = (chr << 3) + (c1 - '0');
 	  else
 	    {
-	      funreadchar (c1);
+	      funreadchar (ctx, c1);
 	      break;
 	    }
 	}
@@ -2869,11 +2878,11 @@ fread_char_escape (int next_char)
       chr = 0;
       while (1)
 	{
-	  int c1 = freadchar ();
+	  int c1 = freadchar (ctx);
 	  int digit = char_hexdigit (c1);
 	  if (digit < 0)
 	    {
-	      funreadchar (c1);
+	      funreadchar (ctx, c1);
 	      break;
 	    }
 	  chr = (chr << 4) + digit;
@@ -2891,7 +2900,7 @@ fread_char_escape (int next_char)
       chr = 0;
       for (int i = 0; i < unicode_hex_count; i++)
 	{
-	  int c1 = freadchar ();
+	  int c1 = freadchar (ctx);
 	  if (c1 < 0)
 	    end_of_file_error ();
 	  int digit = char_hexdigit (c1);
@@ -2906,14 +2915,14 @@ fread_char_escape (int next_char)
     case 'N':
       /* A named escape, like \N{LATIN CAPITAL LETTER A WITH MACRON}.  */
       {
-        if (freadchar () != '{')
+        if (freadchar (ctx) != '{')
           finvalid_syntax ("Expected opening brace after \\N");
         char name[UNICODE_CHARACTER_NAME_LENGTH_BOUND + 1];
         bool whitespace = false;
         ptrdiff_t length = 0;
         while (true)
           {
-            int c = freadchar ();
+            int c = freadchar (ctx);
             if (c < 0)
               end_of_file_error ();
             if (c == '}')
@@ -2976,7 +2985,7 @@ fread_char_escape (int next_char)
 
 /* File-specific version of read_integer - uses freadchar() directly */
 static Lisp_Object
-fread_integer (int radix)
+fread_integer (struct reader_context *ctx, int radix)
 {
   char stackbuf[20];
   char *read_buffer = stackbuf;
@@ -2987,11 +2996,11 @@ fread_integer (int radix)
 
   dynwind_begin();
 
-  int c = freadchar ();
+  int c = freadchar (ctx);
   if (c == '-' || c == '+')
     {
       *p++ = c;
-      c = freadchar ();
+      c = freadchar (ctx);
     }
 
   if (c == '0')
@@ -3002,7 +3011,7 @@ fread_integer (int radix)
       /* Ignore redundant leading zeros, so the buffer doesn't
 	 fill up with them.  */
       do
-	c = freadchar ();
+	c = freadchar (ctx);
       while (c == '0');
     }
 
@@ -3021,10 +3030,10 @@ fread_integer (int radix)
 	  p = read_buffer + offset;
 	}
       *p++ = c;
-      c = freadchar ();
+      c = freadchar (ctx);
     }
 
-  funreadchar (c);
+  funreadchar (ctx, c);
 
   if (valid != 1)
     finvalid_radix_integer (radix);
@@ -3037,9 +3046,9 @@ fread_integer (int radix)
 
 /* File-specific version of read_char_literal - uses freadchar() directly */
 static Lisp_Object
-fread_char_literal (void)
+fread_char_literal (struct reader_context *ctx)
 {
-  int ch = freadchar ();
+  int ch = freadchar (ctx);
   if (ch < 0)
     end_of_file_error ();
 
@@ -3051,7 +3060,7 @@ fread_char_literal (void)
     return make_fixnum (ch);
 
   if (ch == '\\')
-    ch = fread_char_escape (freadchar ());
+    ch = fread_char_escape (ctx, freadchar (ctx));
 
   int modifiers = ch & CHAR_MODIFIER_MASK;
   ch &= ~CHAR_MODIFIER_MASK;
@@ -3059,8 +3068,8 @@ fread_char_literal (void)
     ch = CHAR_TO_BYTE8 (ch);
   ch |= modifiers;
 
-  int nch = freadchar ();
-  funreadchar (nch);
+  int nch = freadchar (ctx);
+  funreadchar (ctx, nch);
   if (nch <= 32
       || nch == '"' || nch == '\'' || nch == ';' || nch == '('
       || nch == ')' || nch == '['  || nch == ']' || nch == '#'
@@ -3072,7 +3081,7 @@ fread_char_literal (void)
 
 /* File-specific version of read_string_literal - uses freadchar() directly */
 static Lisp_Object
-fread_string_literal (void)
+fread_string_literal (struct reader_context *ctx)
 {
   char stackbuf[1024];
   char *read_buffer = stackbuf;
@@ -3085,7 +3094,7 @@ fread_string_literal (void)
   dynwind_begin ();
 
   int ch;
-  while ((ch = freadchar ()) >= 0 && ch != '\"')
+  while ((ch = freadchar (ctx)) >= 0 && ch != '\"')
     {
       if (end - p < MAX_MULTIBYTE_LENGTH)
 	{
@@ -3099,7 +3108,7 @@ fread_string_literal (void)
       if (ch == '\\')
 	{
 	  /* First apply string-specific escape rules:  */
-	  ch = freadchar ();
+	  ch = freadchar (ctx);
 	  switch (ch)
 	    {
 	    case 's':
@@ -3111,7 +3120,7 @@ fread_string_literal (void)
 	      /* `\SPC' and `\LF' generate no characters at all.  */
 	      continue;
 	    default:
-	      ch = fread_char_escape (ch);
+	      ch = fread_char_escape (ctx, ch);
 	      break;
 	    }
 
@@ -3171,12 +3180,12 @@ fread_string_literal (void)
 
 /* File-specific version of read_bool_vector - uses freadchar() directly */
 static Lisp_Object
-fread_bool_vector (void)
+fread_bool_vector (struct reader_context *ctx)
 {
   EMACS_INT length = 0;
   for (;;)
     {
-      int c = freadchar ();
+      int c = freadchar (ctx);
       if (c < '0' || c > '9')
 	{
 	  if (c != '"')
@@ -3191,7 +3200,7 @@ fread_bool_vector (void)
     finvalid_syntax ("#&");
 
   ptrdiff_t size_in_chars = bool_vector_bytes (length);
-  Lisp_Object str = fread_string_literal ();
+  Lisp_Object str = fread_string_literal (ctx);
   /* Validation commented out - multibyte handling simplified */
 
   Lisp_Object obj = make_uninit_bool_vector (length);
@@ -4367,7 +4376,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 /* like read0, but used by LOAD only
  */
 static Lisp_Object
-fread0 ()
+fread0 (struct reader_context *ctx)
 {
   bool locate_syms = false;
   char stackbuf[64];
@@ -4385,7 +4394,7 @@ fread0 ()
   /* Read an object into `obj'.  */
  read_obj: ;
   Lisp_Object obj;
-  int c = freadchar ();
+  int c = freadchar (ctx);
   if (c < 0)
     end_of_file_error ();
 
@@ -4470,7 +4479,7 @@ fread0 ()
 	char *end = read_buffer + read_buffer_size;
 
 	*p++ = '#';
-	int ch = freadchar ();
+	int ch = freadchar (ctx);
 	if (ch < 0)
 	  {
 	    *p = 0;
@@ -4502,7 +4511,7 @@ fread0 ()
 
 	  case 's':
 	    /* #s(...) -- a record or hash-table */
-	    ch = freadchar ();
+	    ch = freadchar (ctx);
 	    if (ch < 0)
 	      {
 		*p = 0;
@@ -4518,7 +4527,7 @@ fread0 ()
 	      }
 	    if (ch != '(')
 	      {
-		funreadchar (ch);
+		funreadchar (ctx, ch);
 		*p = 0;
 		finvalid_syntax (read_buffer);
 	      }
@@ -4533,7 +4542,7 @@ fread0 ()
 	  case '^':
 	    /* #^[...]  -- char-table
 	       #^^[...] -- sub-char-table */
-	    ch = freadchar ();
+	    ch = freadchar (ctx);
 	    if (ch < 0)
 	      {
 		*p = 0;
@@ -4549,7 +4558,7 @@ fread0 ()
 	      }
 	    if (ch == '^')
 	      {
-		ch = freadchar ();
+		ch = freadchar (ctx);
 		if (ch == '[')
 		  {
 		    read_stack_push ((struct read_stack_entry) {
@@ -4562,7 +4571,7 @@ fread0 ()
 		  }
 		else
 		  {
-		    funreadchar (ch);
+		    funreadchar (ctx, ch);
 		    *p = 0;
 		    finvalid_syntax (read_buffer);
 		  }
@@ -4579,7 +4588,7 @@ fread0 ()
 	      }
 	    else
 	      {
-		funreadchar (ch);
+		funreadchar (ctx, ch);
 		*p = 0;
 		finvalid_syntax (read_buffer);
 	      }
@@ -4601,7 +4610,7 @@ fread0 ()
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
-	    obj = fread_bool_vector ();
+	    obj = fread_bool_vector (ctx);
 	    break;
 
 	  case '!':
@@ -4610,24 +4619,24 @@ fread0 ()
 	    {
 	      int c;
 	      do
-		c = freadchar ();
+		c = freadchar (ctx);
 	      while (c >= 0 && c != '\n');
 	      goto read_obj;
 	    }
 
 	  case 'x':
 	  case 'X':
-	    obj = fread_integer (16);
+	    obj = fread_integer (ctx, 16);
 	    break;
 
 	  case 'o':
 	  case 'O':
-	    obj = fread_integer (8);
+	    obj = fread_integer (ctx, 8);
 	    break;
 
 	  case 'b':
 	  case 'B':
-	    obj = fread_integer (2);
+	    obj = fread_integer (ctx, 2);
 	    break;
 
 	  case '@':
@@ -4642,14 +4651,14 @@ fread0 ()
 
 	  case ':':
 	    /* #:X -- uninterned symbol */
-	    c = freadchar ();
+	    c = freadchar (ctx);
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
 		|| c == '`' || c == ',')
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
-		funreadchar (c);
+		funreadchar (ctx, c);
 		obj = Fmake_symbol (build_string(""));
 		break;
 	      }
@@ -4659,14 +4668,14 @@ fread0 ()
 
 	  case '_':
 	    /* #_X -- symbol without shorthand */
-	    c = freadchar ();
+	    c = freadchar (ctx);
 	    if (c <= 32 || c == NO_BREAK_SPACE
 		|| c == '"' || c == '\'' || c == ';' || c == '#'
 		|| c == '(' || c == ')'  || c == '[' || c == ']'
 		|| c == '`' || c == ',')
 	      {
 		/* No symbol character follows: this is the empty symbol.  */
-		funreadchar (c);
+		funreadchar (ctx, c);
 		obj = Fintern (build_string(""), Qnil);
 		break;
 	      }
@@ -4682,7 +4691,7 @@ fread0 ()
 		int c;
 		for (;;)
 		  {
-		    c = freadchar ();
+		    c = freadchar (ctx);
 		    if (c < 0)
 		      {
 			*p = 0;
@@ -4710,7 +4719,7 @@ fread0 ()
 		    /* #NrDIGITS -- radix-N number */
 		    if (n < 0 || n > 36)
 		      finvalid_radix_integer (n);
-		    obj = fread_integer (n);
+		    obj = fread_integer (ctx, n);
 		    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
@@ -4763,11 +4772,11 @@ fread0 ()
       }
 
     case '?':
-      obj = fread_char_literal ();
+      obj = fread_char_literal (ctx);
       break;
 
     case '"':
-      obj = fread_string_literal ();
+      obj = fread_string_literal (ctx);
       break;
 
     case '\'':
@@ -4786,14 +4795,14 @@ fread0 ()
 
     case ',':
       {
-	int ch = freadchar ();
+	int ch = freadchar (ctx);
 	Lisp_Object sym;
 	if (ch == '@')
 	  sym = Qcomma_at;
 	else
 	  {
 	    if (ch >= 0)
-	      funreadchar (ch);
+	      funreadchar (ctx, ch);
 	    sym = Qcomma;
 	  }
 	read_stack_push ((struct read_stack_entry) {
@@ -4807,15 +4816,15 @@ fread0 ()
       {
 	int c;
 	do
-	  c = freadchar ();
+	  c = freadchar (ctx);
 	while (c >= 0 && c != '\n');
 	goto read_obj;
       }
 
     case '.':
       {
-	int nch = freadchar ();
-	funreadchar (nch);
+	int nch = freadchar (ctx);
+	funreadchar (ctx, nch);
 	if (nch <= 32 || nch == NO_BREAK_SPACE
 	    || nch == '"' || nch == '\'' || nch == ';'
 	    || nch == '(' || nch == '[' || nch == '#'
@@ -4859,14 +4868,14 @@ fread0 ()
 
 	    if (c == '\\')
 	      {
-		c = freadchar ();
+		c = freadchar (ctx);
 		if (c < 0)
 		  end_of_file_error ();
 		quoted = true;
 	      }
 
 	    p += CHAR_STRING (c, (unsigned char *) p);
-	    c = freadchar ();
+	    c = freadchar (ctx);
 	  }
 	while (c > 32
 	       && c != NO_BREAK_SPACE
@@ -4877,7 +4886,7 @@ fread0 ()
 
 	*p = 0;
 	ptrdiff_t nbytes = p - read_buffer;
-	funreadchar (c);
+	funreadchar (ctx, c);
 
 	/* Only attempt to parse the token as a number if it starts as one.  */
 	char c0 = read_buffer[0];
@@ -4951,12 +4960,12 @@ fread0 ()
 	    int ch;
 	    do
 	      {
-		ch = freadchar ();
+		ch = freadchar (ctx);
 		if (ch == ';')
 		  {
 		    /* Skip comment until end of line */
 		    do
-		      ch = freadchar ();
+		      ch = freadchar (ctx);
 		    while (ch >= 0 && ch != '\n');
 		  }
 	      }
