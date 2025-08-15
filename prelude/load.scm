@@ -6,6 +6,7 @@
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (force-output (current-error-port))
 
+(use-modules (rnrs bytevectors)) ; FIX: move to (use-modules (scheme base))
 (use-modules (language elisp emacs))
 (use-modules (system foreign-library))
 
@@ -151,6 +152,14 @@
                      (check-number-coerce-marker b))))
 
 (set-symbol-function! 'mod elisp-mod)
+
+;; String operations
+
+(define (elisp-string-bytes string)
+  "Return the number of bytes in STRING."
+  (bytevector-length (string->utf8 string)))
+
+(set-symbol-function! 'string-bytes elisp-string-bytes)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

@@ -249,15 +249,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil).  */
   return make_fixnum (len);
 }
 
-DEFUN ("string-bytes", Fstring_bytes, Sstring_bytes, 1, 1, 0,
-       doc: /* Return the number of bytes in STRING.
-If STRING is multibyte, this may be greater than the length of STRING.  */)
-  (Lisp_Object string)
-{
-  CHECK_STRING (string);
-  return make_fixnum (SBYTES (string));
-}
-
 DEFUN ("string-distance", Fstring_distance, Sstring_distance, 2, 3, 0,
        doc: /* Return Levenshtein distance between STRING1 and STRING2.
 The distance is the number of deletions, insertions, and substitutions
