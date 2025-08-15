@@ -985,6 +985,7 @@ NOTE: The convention in Elisp is that any function, except for a few
 exceptions like car/assoc/+/goto-char, can clobber the match data,
 so `save-match-data' should normally be used to save *your* match data
 rather than your caller's match data."
+  ;; FIX-20250815: this is guilemacs, we're about to start using guile reader and is no longer bootstrapping
   ;; It is better not to use backquote here,
   ;; because that makes a bootstrapping problem
   ;; if you need to recompile all the Lisp files using interpreted code.
