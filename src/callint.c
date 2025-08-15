@@ -27,6 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "window.h"
 
 static Lisp_Object preserved_fns;
+static Lisp_Object char_to_string_fn;
 
 /* Marker used within call-interactively to refer to point.  */
 static Lisp_Object point_marker;
@@ -413,7 +414,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	  /* See bug#8479.  */
 	  if (! CHARACTERP (args[i]))
 	    error ("Non-character input-event");
-	  visargs[i] = Fchar_to_string (args[i]);
+	  visargs[i] = scm_call_1 (char_to_string_fn, args[i]);
 	  break;
 
 	case 'C':	      /* Command: symbol with interactive function.  */
@@ -839,4 +840,6 @@ use `event-start', `event-end', and `event-click-count'.  */);
   DEFSYM (Qread_file_name, "read-file-name");
   DEFSYM (Qcommand_history, "command-history");
   DEFSYM (Qeval_minibuffer, "eval-minibuffer");
+
+  char_to_string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-char-to-string");
 }

@@ -63,6 +63,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "treesit.h"
 #endif
 
+static Lisp_Object char_to_string_fn;
+
 Fapply (ptrdiff_t nargs, Lisp_Object *args);
 
 static void update_buffer_properties (ptrdiff_t, ptrdiff_t);
@@ -147,16 +149,6 @@ init_editfns (void)
 #endif
 }
 
-DEFUN ("char-to-string", Fchar_to_string, Schar_to_string, 1, 1, 0,
-       doc: /* Convert arg CHAR to a string containing that character.
-usage: (char-to-string CHAR)  */)
-  (Lisp_Object character)
-{
-  CHECK_CHARACTER (character);
-  Lisp_Object s = scm_c_make_string (1, scm_c_make_char (XFIXNUM (character)));
-  return s;
-}
-
 DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
        doc: /* Convert arg BYTE to a unibyte string containing that byte.  */)
   (Lisp_Object byte)
@@ -167,16 +159,6 @@ DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
     error ("Invalid byte");
   b = XFIXNUM (byte);
   return make_unibyte_string ((char *) &b, 1);
-}
-
-DEFUN ("string-to-char", Fstring_to_char, Sstring_to_char, 1, 1, 0,
-       doc: /* Return the first character in STRING.  */)
-  (Lisp_Object string)
-{
-  CHECK_STRING (string);
-
-  /* This returns zero if STRING is empty.  */
-  return make_fixnum (SREF (string, 0));
 }
 
 DEFUN ("point", Fpoint, Spoint, 0, 0, 0,
@@ -3625,7 +3607,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    {
 	      if (FIXNUMP (arg) && ! ASCII_CHAR_P (XFIXNUM (arg)))
 		{
-		  spec->argument = arg = Fchar_to_string (arg);
+		  spec->argument = arg = scm_call_1 (char_to_string_fn, arg);
 		}
 
 	      if (!EQ (arg, args[n]))
@@ -4789,4 +4771,6 @@ it to be non-nil.  */);
 
   /* A special value for Qfield properties.  */
   DEFSYM (Qboundary, "boundary");
+
+  char_to_string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-char-to-string");
 }

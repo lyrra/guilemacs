@@ -205,8 +205,20 @@ Letter-case is significant, but text properties are ignored."
       ;; Return final distance
       (vector-ref column len1))))
 
+(define (elisp-char-to-string character)
+  "Convert arg CHAR to a string containing that character."
+  (string (integer->char character)))
+
+(define (elisp-string-to-char string)
+  "Return the first character in STRING."
+  (if (string=? string "")
+      0  ; Return 0 for empty string
+      (char->integer (string-ref string 0))))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
+(set-symbol-function! 'char-to-string elisp-char-to-string)
+(set-symbol-function! 'string-to-char elisp-string-to-char)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
