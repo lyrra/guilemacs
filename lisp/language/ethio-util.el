@@ -826,18 +826,20 @@ The 2nd and 3rd arguments BEGIN and END specify the region."
 ;;;###autoload
 (defun ethio-input-special-character (arg)
   "This function is deprecated."
-  (interactive "*cInput number: 1.ö ‡  2.ö ‡‚  3.ö ‡ƒ  4.ö ‡„  5.ö ‡€")
+  ;; CONQUISTADOR FIX: Temporarily disabled due to UTF-8 encoding issues with Guile
+  ;; (interactive "*cInput number: 1.ï¿½ï¿½ï¿½ï¿½  2.ï¿½ï¿½ï¿½ï¿½  3.ï¿½ï¿½ï¿½ï¿½  4.ï¿½ï¿½ï¿½ï¿½  5.ï¿½ï¿½ï¿½ï¿½")
+  (interactive "*c")
   (cond
    ((eq arg ?1)
-    (insert "ö ‡"))
+    (insert "ï¿½ï¿½ï¿½ï¿½"))
    ((eq arg ?2)
-    (insert "ö ‡‚"))
+    (insert "ï¿½ï¿½ï¿½ï¿½"))
    ((eq arg ?3)
-    (insert "ö ‡ƒ"))
+    (insert "ï¿½ï¿½ï¿½ï¿½"))
    ((eq arg ?4)
-    (insert "ö ‡„"))
+    (insert "ï¿½ï¿½ï¿½ï¿½"))
    ((eq arg ?5)
-    (insert "ö ‡€"))
+    (insert "ï¿½ï¿½ï¿½ï¿½"))
    (t
     (error ""))))
 
@@ -856,7 +858,7 @@ FIDEL is the Amharic/Ethiopic alphabet."
     ;; Special treatment for geminated characters.
     ;; Geminated characters la", etc. change into \geminateG{\laG}, etc.
     (goto-char (point-min))
-    (while (re-search-forward "áŸ\\|ö ‡Š" nil t)
+    (while (re-search-forward "áŸ\\|ï¿½ï¿½ï¿½ï¿½" nil t)
       (setq comp (find-composition (match-beginning 0)))
       (if (null comp)
 	  (replace-match "\\\\geminateG{}" t)
@@ -1084,7 +1086,7 @@ many Ethiopic word separators."
    ((save-excursion
       (skip-chars-backward " ")
       (memq (preceding-char)
-	    '(?á¡ ?á¢ ?á£ ?á¤ ?á¥ ?á¦ ?á§ ?á¨ ?ö ‡‹ ?ö ‡Œ ?ö ‡ ?ö ‡Ž ?ö ‡)))
+	    '(?á¡ ?á¢ ?á£ ?á¤ ?á¥ ?á¦ ?á§ ?á¨ ?ï¿½ï¿½ï¿½ï¿½ ?ï¿½ï¿½ï¿½ï¿½ ?ï¿½ï¿½ï¿½ï¿½ ?ï¿½ï¿½ï¿½ï¿½ ?ï¿½ï¿½ï¿½ï¿½)))
     (insert-char 32 arg))
    (t
     (insert-char ?á¡ arg))))
@@ -1103,7 +1105,7 @@ With ARG, insert that many delimiters."
 ;;;###autoload
 (defun ethio-composition-function (pos _to _font-object string _direction)
   (setq pos (1- pos))
-  (let ((pattern "\\ce\\(áŸ\\|ö ‡Š\\)"))
+  (let ((pattern "\\ce\\(áŸ\\|ï¿½ï¿½ï¿½ï¿½\\)"))
     (if string
 	(if (and (>= pos 0)
 		 (eq (string-match pattern string pos) pos))
@@ -1124,10 +1126,10 @@ mark."
   (interactive "*")
   (let ((ch (preceding-char)))
     (cond
-     ((and (= ch ?ö ‡Š) (find-composition (1- (point))))
+     ((and (= ch ?ï¿½ï¿½ï¿½ï¿½) (find-composition (1- (point))))
       (decompose-region (- (point) 2) (point)))
      ((and (>= ch #x1200) (<= ch #x137f))
-      (insert "ö ‡Š")
+      (insert "ï¿½ï¿½ï¿½ï¿½")
       (compose-region (- (point) 2) (point)))
      (t
       (error "")))))
@@ -2000,98 +2002,98 @@ representation of Ethiopic script."
  ;; private extension
  ;;
 
- ("\\yWaG" ?ö ƒ¯)				; U+1A00EF (was U+12EF)
+ ("\\yWaG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A00EF (was U+12EF)
 
- ("\\GWaG" ?ö „Ÿ)				; U+1A011F (was U+131F)
+ ("\\GWaG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A011F (was U+131F)
 
- ("\\qqeG" ?ö †€)				; U+1A0180 .. (was U+1380 ..)
- ("\\qquG" ?ö †)
- ("\\qqiG" ?ö †‚)
- ("\\qqaG" ?ö †ƒ)
- ("\\qqEG" ?ö †„)
- ("\\qqG" ?ö †…)
- ("\\qqoG" ?ö ††)
+ ("\\qqeG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A0180 .. (was U+1380 ..)
+ ("\\qquG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\qqiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\qqaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\qqEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\qqG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\qqoG" ?ï¿½ï¿½ï¿½ï¿½)
  ;; unused
- ("\\MWeG" ?ö †ˆ)
- ("\\bWeG" ?ö †‰)
- ("\\GWeG" ?ö †Š)
- ("\\fWeG" ?ö †‹)
- ("\\pWeG" ?ö †Œ)
- ;; unused
- ;; unused
- ;; unused
-
- ("\\kkeG" ?ö †)				; U+1A0190 .. (was U+1390 ..)
- ("\\kkuG" ?ö †‘)
- ("\\kkiG" ?ö †’)
- ("\\kkaG" ?ö †“)
- ("\\kkEG" ?ö †”)
- ("\\kkG" ?ö †•)
- ("\\kkoG" ?ö †–)
- ;; unused
- ("\\mWiG" ?ö †˜)
- ("\\bWiG" ?ö †™)
- ("\\GWiG" ?ö †š)
- ("\\fWiG" ?ö †›)
- ("\\pWiG" ?ö †œ)
+ ("\\MWeG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\bWeG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\GWeG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\fWeG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\pWeG" ?ï¿½ï¿½ï¿½ï¿½)
  ;; unused
  ;; unused
  ;; unused
 
- ("\\XeG" ?ö † )				; U+1A01A0 .. (was U+13A0 ..)
- ("\\XuG" ?ö †¡)
- ("\\XiG" ?ö †¢)
- ("\\XaG" ?ö †£)
- ("\\XEG" ?ö †¤)
- ("\\XG" ?ö †¥)
- ("\\XoG" ?ö †¦)
+ ("\\kkeG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A0190 .. (was U+1390 ..)
+ ("\\kkuG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\kkiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\kkaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\kkEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\kkG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\kkoG" ?ï¿½ï¿½ï¿½ï¿½)
  ;; unused
- ("\\mWEG" ?ö †¨)
- ("\\bWEG" ?ö †©)
- ("\\GWEG" ?ö †ª)
- ("\\fWEG" ?ö †«)
- ("\\pWEG" ?ö †¬)
- ;; unused
- ;; unused
- ;; unused
-
- ("\\ggeG" ?ö †°)				; U+1A01B0 .. (was U+13B0 ..)
- ("\\gguG" ?ö †±)
- ("\\ggiG" ?ö †²)
- ("\\ggaG" ?ö †³)
- ("\\ggEG" ?ö †´)
- ("\\ggG" ?ö †µ)
- ("\\ggoG" ?ö †¶)
- ;; unused
- ("\\mWG" ?ö †¸)
- ("\\bWG" ?ö †¹)
- ("\\GWG" ?ö †º)
- ("\\fWG" ?ö †»)
- ("\\pWG" ?ö †¼)
+ ("\\mWiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\bWiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\GWiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\fWiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\pWiG" ?ï¿½ï¿½ï¿½ï¿½)
  ;; unused
  ;; unused
  ;; unused
 
- ("\\ornamentG" ?ö ‡€)			; U+1A01C0 .. (was U+FDF0 ..)
- ("\\flandG" ?ö ‡)
- ("\\iflandG" ?ö ‡‚)
- ("\\africaG" ?ö ‡ƒ)
- ("\\iafricaG" ?ö ‡„)
- ("\\wWeG" ?ö ‡…)
- ("\\wWiG" ?ö ‡†)
- ("\\wWaG" ?ö ‡‡)
- ("\\wWEG" ?ö ‡ˆ)
- ("\\wWG" ?ö ‡‰)
- ;; Gemination (ö ‡Š) is handled in a special way.
- ("\\slaqG" ?ö ‡‹)
+ ("\\XeG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A01A0 .. (was U+13A0 ..)
+ ("\\XuG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\XiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\XaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\XEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\XG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\XoG" ?ï¿½ï¿½ï¿½ï¿½)
+ ;; unused
+ ("\\mWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\bWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\GWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\fWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\pWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ;; unused
+ ;; unused
+ ;; unused
+
+ ("\\ggeG" ?ï¿½ï¿½ï¿½ï¿½)				; U+1A01B0 .. (was U+13B0 ..)
+ ("\\gguG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\ggiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\ggaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\ggEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\ggG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\ggoG" ?ï¿½ï¿½ï¿½ï¿½)
+ ;; unused
+ ("\\mWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\bWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\GWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\fWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\pWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ;; unused
+ ;; unused
+ ;; unused
+
+ ("\\ornamentG" ?ï¿½ï¿½ï¿½ï¿½)			; U+1A01C0 .. (was U+FDF0 ..)
+ ("\\flandG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\iflandG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\africaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\iafricaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\wWeG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\wWiG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\wWaG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\wWEG" ?ï¿½ï¿½ï¿½ï¿½)
+ ("\\wWG" ?ï¿½ï¿½ï¿½ï¿½)
+ ;; Gemination (ï¿½ï¿½ï¿½ï¿½) is handled in a special way.
+ ("\\slaqG" ?ï¿½ï¿½ï¿½ï¿½)
 
  ;; Assign reverse conversion to Fidel chars.
  ;; Then override forward conversion with ASCII chars.
  ;; ASCII chars should not have reverse conversions.
- ("\\dotG" ?ö ‡Œ) ("\\dotG" ".")
- ("\\lquoteG" ?ö ‡) ("\\lquoteG" "Â«")
- ("\\rquoteG" ?ö ‡Ž) ("\\rquoteG" "Â»")
- ("\\qmarkG" ?ö ‡) ("\\qmarkG" "?")
+ ("\\dotG" ?ï¿½ï¿½ï¿½ï¿½) ("\\dotG" ".")
+ ("\\lquoteG" ?ï¿½ï¿½ï¿½ï¿½) ("\\lquoteG" "Â«")
+ ("\\rquoteG" ?ï¿½ï¿½ï¿½ï¿½) ("\\rquoteG" "Â»")
+ ("\\qmarkG" ?ï¿½ï¿½ï¿½ï¿½) ("\\qmarkG" "?")
 
  ;;
  ;; New characters in Unicode 4.1.
