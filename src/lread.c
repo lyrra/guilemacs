@@ -2915,7 +2915,8 @@ fread_char_escape (struct reader_context *ctx, int next_char)
   return chr | modifiers;
 }
 
-/* File-specific version of read_integer - uses freadchar() directly */
+/* File-specific version of read_integer - uses freadchar() directly
+   TODO: Future integration point for Guile's scm_string_to_number */
 static Lisp_Object
 fread_integer (struct reader_context *ctx, int radix)
 {
@@ -3011,10 +3012,40 @@ fread_char_literal (struct reader_context *ctx)
   finvalid_syntax ("?");
 }
 
-/* File-specific version of read_string_literal - uses freadchar() directly */
+/* File-specific version of read_string_literal - uses Guile's reader when possible */
 static Lisp_Object
 fread_string_literal (struct reader_context *ctx)
 {
+  /* Try to use Guile's string reader if we have a SCM port */
+  if (!scm_is_false (ctx->port))
+    {
+      /* We've already consumed the opening quote, so push it back */
+      scm_ungetc ('"', ctx->port);
+
+      /* Let Guile read the string */
+      SCM result = scm_read (ctx->port);
+
+      /* Check if we got a valid string */
+      if (scm_is_string (result))
+        {
+          /* Reset lookahead buffer since Guile consumed the characters */
+          ctx->lookahead = 0;
+
+          /* Return the Guile string directly (Lisp_Object is typedef'd to SCM) */
+          return result;
+        }
+      else
+        {
+          /* If Guile didn't return a string, something went wrong.
+             Fall back to the original implementation */
+          /* Note: We can't easily recover the position, so we'll error out */
+          error ("Guile reader failed to parse string");
+        }
+    }
+
+  fprintf(stderr, "-- didnt use guile reader\n");
+  emacs_abort ();
+  /* Fallback: Original implementation for non-port contexts */
   char stackbuf[1024];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
