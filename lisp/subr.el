@@ -1491,8 +1491,8 @@ The normal global definition of the character ESC indirects to this keymap.")
 
     (define-key map "b" #'switch-to-buffer)
     (define-key map "k" #'kill-buffer)
-    (define-key map "\C-u" #'upcase-region)   (put 'upcase-region   'disabled t)
-    (define-key map "\C-l" #'downcase-region) (put 'downcase-region 'disabled t)
+    (define-key map (kbd "C-u") #'upcase-region)   (put 'upcase-region   'disabled t)
+    (define-key map (kbd "C-l") #'downcase-region) (put 'downcase-region 'disabled t)
     (define-key map "<" #'scroll-left)
     (define-key map ">" #'scroll-right)
     map)
@@ -1504,10 +1504,10 @@ keymap.")
 
 (defvar global-map
   (let ((map (make-keymap)))
-    (define-key map "\C-[" 'ESC-prefix)
-    (define-key map "\C-x" 'Control-X-prefix)
+    (define-key map (kbd "C-[") 'ESC-prefix)
+    (define-key map (kbd "C-x") 'Control-X-prefix)
 
-    (define-key map "\C-i" #'self-insert-command)
+    (define-key map (kbd "C-i") #'self-insert-command)
     (let* ((vec1 (make-vector 1 nil))
            (f (lambda (from to)
                 (while (< from to)
@@ -1519,21 +1519,21 @@ keymap.")
         (funcall f #o0200 #o0240))
       (funcall f #o0240 #o0400))
 
-    (define-key map "\C-a" #'beginning-of-line)
-    (define-key map "\C-b" #'backward-char)
-    (define-key map "\C-e" #'end-of-line)
-    (define-key map "\C-f" #'forward-char)
+    (define-key map (kbd "C-a") #'beginning-of-line)
+    (define-key map (kbd "C-b") #'backward-char)
+    (define-key map (kbd "C-e") #'end-of-line)
+    (define-key map (kbd "C-f") #'forward-char)
 
-    (define-key map "\C-z"     #'suspend-emacs) ;FIXME: Re-bound later!
-    (define-key map "\C-x\C-z" #'suspend-emacs) ;FIXME: Re-bound later!
+    (define-key map (kbd "C-z")     #'suspend-emacs) ;FIXME: Re-bound later!
+    (define-key map (kbd "C-x C-z") #'suspend-emacs) ;FIXME: Re-bound later!
 
-    (define-key map "\C-v"    #'scroll-up-command)
+    (define-key map (kbd "C-v")    #'scroll-up-command)
 ; FIX-guilemacs: input locale conversion error #<scheme #vu8(246)>
 ;    (define-key map "\M-v"    #'scroll-down-command)
 ;    (define-key map "\M-\C-v" #'scroll-other-window)
 
 ;    (define-key map "\M-\C-c" #'exit-recursive-edit)
-    (define-key map "\C-]"    #'abort-recursive-edit)
+    (define-key map (kbd "C-]")    #'abort-recursive-edit)
     map)
   "Default global keymap mapping Emacs keyboard input into commands.
 The value is a keymap that is usually (but not necessarily) Emacs's
