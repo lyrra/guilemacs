@@ -159,7 +159,54 @@
   "Return the number of bytes in STRING."
   (bytevector-length (string->utf8 string)))
 
+(define (elisp-string-distance string1 string2 bytecompare)
+  "Return Levenshtein distance between STRING1 and STRING2.
+The distance is the number of deletions, insertions, and substitutions
+required to transform STRING1 into STRING2.
+If BYTECOMPARE is nil or omitted, compute distance in terms of characters.
+If BYTECOMPARE is non-nil, compute distance in terms of bytes.
+Letter-case is significant, but text properties are ignored."
+  (let ((use-byte-compare (not (or (null? bytecompare) (eq? bytecompare #nil))))
+        (s1 string1)
+        (s2 string2))
+    ;; Convert to bytevectors if byte comparison requested
+    (when use-byte-compare
+      (set! s1 (string->utf8 s1))
+      (set! s2 (string->utf8 s2)))
+    (let* ((len1 (if use-byte-compare (bytevector-length s1) (string-length s1)))
+           (len2 (if use-byte-compare (bytevector-length s2) (string-length s2)))
+           (column (make-vector (+ len1 1) 0)))
+
+      ;; Initialize first column
+      (do ((y 0 (+ y 1)))
+          ((> y len1))
+        (vector-set! column y y))
+
+      ;; Main algorithm loop
+      (do ((x 1 (+ x 1)))
+          ((> x len2))
+        (let ((lastdiag (vector-ref column 0)))
+          (vector-set! column 0 x)
+          (do ((y 1 (+ y 1)))
+              ((> y len1))
+            (let* ((olddiag (vector-ref column y))
+                   (c1 (if use-byte-compare
+                          (bytevector-u8-ref s1 (- y 1))
+                          (char->integer (string-ref s1 (- y 1)))))
+                   (c2 (if use-byte-compare
+                          (bytevector-u8-ref s2 (- x 1))
+                          (char->integer (string-ref s2 (- x 1)))))
+                   (cost (if (= c1 c2) lastdiag (+ lastdiag 1)))
+                   (deletion (+ (vector-ref column y) 1))
+                   (insertion (+ (vector-ref column (- y 1)) 1)))
+              (vector-set! column y (min cost deletion insertion))
+              (set! lastdiag olddiag)))))
+
+      ;; Return final distance
+      (vector-ref column len1))))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
+(set-symbol-function! 'string-distance elisp-string-distance)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
