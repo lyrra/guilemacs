@@ -215,10 +215,15 @@ Letter-case is significant, but text properties are ignored."
       0  ; Return 0 for empty string
       (char->integer (string-ref string 0))))
 
+(define (elisp-byte-to-string byte)
+  "Convert arg BYTE to a unibyte string containing that byte."
+  (string (integer->char (modulo byte 256))))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
 (set-symbol-function! 'string-to-char elisp-string-to-char)
+(set-symbol-function! 'byte-to-string elisp-byte-to-string)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

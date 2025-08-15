@@ -149,18 +149,6 @@ init_editfns (void)
 #endif
 }
 
-DEFUN ("byte-to-string", Fbyte_to_string, Sbyte_to_string, 1, 1, 0,
-       doc: /* Convert arg BYTE to a unibyte string containing that byte.  */)
-  (Lisp_Object byte)
-{
-  unsigned char b;
-  CHECK_FIXNUM (byte);
-  if (XFIXNUM (byte) < 0 || XFIXNUM (byte) > 255)
-    error ("Invalid byte");
-  b = XFIXNUM (byte);
-  return make_unibyte_string ((char *) &b, 1);
-}
-
 DEFUN ("point", Fpoint, Spoint, 0, 0, 0,
        doc: /* Return value of point, as an integer.
 Beginning of buffer is position (point-min).  */)
