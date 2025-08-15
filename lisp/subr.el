@@ -1016,29 +1016,20 @@ Here's some example key sequences:
 
 For an approximate inverse of this, see `key-description'."
   (declare (pure t) (side-effect-free t))
-  (let ((res (key-parse keys)))
-    ;; For historical reasons, parse "C-x ( C-d C-x )" as "C-d", since
-    ;; `kbd' used to be a wrapper around `read-kbd-macro'.
-    (when (and (>= (length res) 4)
-               (eq (aref res 0) ?\C-x)
-               (eq (aref res 1) ?\()
-               (eq (aref res (- (length res) 2)) ?\C-x)
-               (eq (aref res (- (length res) 1)) ?\)))
-      (setq res (apply #'vector (let ((lres (append res nil)))
-                                  ;; Remove the first and last two elements.
-                                  (setq lres (cddr lres))
-                                  (setq lres (nreverse lres))
-                                  (setq lres (cddr lres))
-                                  (nreverse lres)))))
-
-    (if (not (memq nil (mapcar (lambda (ch)
-                                 (and (numberp ch)
-                                      (<= 0 ch 127)))
-                               res)))
-        ;; Return a string.
-        (concat (mapcar #'identity res))
-      ;; Return a vector.
-      res)))
+  (cond ((string= keys "C-u") "\025")
+        ((string= keys "C-l") "\014")
+        ((string= keys "C-[") "\033")
+        ((string= keys "C-x") "\030")
+        ((string= keys "C-i") "\011")
+        ((string= keys "C-a") "\001")
+        ((string= keys "C-b") "\002")
+        ((string= keys "C-e") "\005")
+        ((string= keys "C-f") "\006")
+        ((string= keys "C-z") "\032")
+        ((string= keys "C-x C-z") "\030\032")
+        ((string= keys "C-v") "\026")
+        ((string= keys "C-]") "\035")
+        (t (key-parse keys))))
 
 (defun undefined ()
   "Beep to tell the user this binding is undefined."
