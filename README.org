@@ -315,7 +315,7 @@ DO
 #+END_SRC
   Cause:
   defvar-keymap isn't defined, so the expression is expanded and evaluated as a function.
-  Check if the definition for define-keymap is loaded before the use site causing the error, 
+  Check if the definition for define-keymap is loaded before the use site causing the error,
   ie a load-order error.
 
 ** garbage collector
@@ -731,7 +731,7 @@ Thread 1 "bootstrap-emacs" received signal SIGSEGV, Segmentation fault.
 (gdb) call debug_print(0x7fffdc8cf580)
   (defvar compilation-mode-tool-bar-map (when (keymapp tool-bar-map)
     (let ((map (copy-keymap tool-bar-map))) ...)))
-(gdb) 
+(gdb)
 #+END_SRC
 ** 20240910 defvar-1 and defconst-1 support
   See "guile-elisp bootstrap (C)" it removes defvar support and relies on
