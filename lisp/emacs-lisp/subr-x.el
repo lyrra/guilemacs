@@ -589,7 +589,7 @@ Used by `emacs-authors-mode' and `emacs-news-mode'."
                       (goto-char (point-max))
                       ;; Obfuscate to avoid this being interpreted
                       ;; as a local variable section itself.
-                      (if (re-search-backward "^Local\sVariables:$" nil t)
+                      (if (re-search-backward "^Local Variables:$" nil t)
                           (progn (forward-line -1) (point))
                         (point-max)))))
 

@@ -1435,7 +1435,7 @@ BEG and END are the start and end of the output in current buffer.
 VALUE is the Lisp value printed, ALT1 and ALT2 are strings for the
 alternative printed representations that can be displayed."
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-m" #'elisp-last-sexp-toggle-display)
+    (define-key map (kbd "RET") #'elisp-last-sexp-toggle-display)
     (define-key map [down-mouse-2] #'mouse-set-point)
     (define-key map [mouse-2] #'elisp-last-sexp-toggle-display)
     (add-text-properties

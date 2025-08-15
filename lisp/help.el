@@ -437,7 +437,7 @@ Do not call this in the scope of `with-help-window'."
    " or "
    (help--key-description-fontified (kbd "<PageUp>"))
    " to scroll, "
-   (help--key-description-fontified "\C-s")
+   (help--key-description-fontified (kbd "C-s"))
    " to search, or \\<help-map>\\[help-quit] to exit.)"
    (help--for-help-make-sections
     `(("Commands, Keys and Functions"

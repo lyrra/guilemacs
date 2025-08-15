@@ -3511,8 +3511,8 @@ The completion method is determined by `completion-at-point-functions'."
 ;;; Key bindings.
 
 (let ((map minibuffer-local-map))
-  (define-key map "\C-g" 'abort-minibuffers)
-  (define-key map "\\M-<" 'minibuffer-beginning-of-buffer)
+  (define-key map (kbd "C-g") 'abort-minibuffers)
+  (define-key map (kbd "M-<") 'minibuffer-beginning-of-buffer)
 
   ;; Put RET last so that it is shown in doc strings in preference to
   ;; C-j, when using the \\[exit-minibuffer] notation.

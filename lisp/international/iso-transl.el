@@ -364,7 +364,7 @@ sequence VECTOR.  (VECTOR is normally one character long.)")
 	  (setq iso-transl-ctl-x-8-map (make-sparse-keymap))))
 (or key-translation-map
     (setq key-translation-map (make-sparse-keymap)))
-(define-key key-translation-map "\C-x8" iso-transl-ctl-x-8-map)
+(define-key key-translation-map (kbd "C-x 8") iso-transl-ctl-x-8-map)
 
 ;; For each entry in the alist, we'll make up to three ways to generate
 ;; the character in question: the prefix `C-x 8'; the ALT modifier on

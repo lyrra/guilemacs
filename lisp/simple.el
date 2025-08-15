@@ -631,7 +631,7 @@ Other major modes are defined by comparison with this one."
     (define-key map "q" 'quit-window)
     (define-key map " " 'scroll-up-command)
     (define-key map [?\S-\ ] 'scroll-down-command)
-    (define-key map "\C-?" 'scroll-down-command)
+    (define-key map (kbd "DEL") 'scroll-down-command)
     (define-key map "?" 'describe-mode)
     (define-key map "h" 'describe-mode)
     (define-key map "<" 'end-of-buffer)
@@ -1718,7 +1718,7 @@ rather than line counts."
                (unless relative (widen))
                (goto-char (point-min))
                (if (eq selective-display t)
-                   (re-search-forward "[\n\C-m]" nil 'end (1- line))
+                   (re-search-forward "[\n\r]" nil 'end (1- line))
                  (forward-line (1- line)))
                (point))))
     (when (and (not relative)
@@ -9015,7 +9015,7 @@ The default is \"\\s\\f\\n\\r\\t\\v\".  Do not prefix a `^' character."
     (error "DELIM argument must not begin with `^'"))
   (unless (zerop n)
     ;; We do skip over newlines by default because `backward-word' does.
-    (let* ((delim (or delim "\s\f\n\r\t\v"))
+    (let* ((delim (or delim " \f\n\r\t\v"))
            (ndelim (format "^%s" delim))
            (start (point))
            (fun (if (> n 0)
@@ -9053,7 +9053,7 @@ treated as delimiting words.  See this command's namesake in Info node
 `(readline)Commands For Killing'."
   (interactive "^p")
   (let ((start (point)))
-    (forward-unix-word (- arg) "\\\\/\s\f\n\r\t\v")
+    (forward-unix-word (- arg) "\\\\/ \f\n\r\t\v")
     (kill-region start (point))))
 
 (defcustom fill-prefix nil
@@ -10036,8 +10036,8 @@ makes it easier to edit it."
     (define-key map [mouse-2] 'choose-completion)
     (define-key map [follow-link] 'mouse-face)
     (define-key map [down-mouse-2] nil)
-    (define-key map "\C-m" 'choose-completion)
-    (define-key map "\e\e\e" 'delete-completion-window)
+    (define-key map (kbd "RET") 'choose-completion)
+    (define-key map (kbd "ESC ESC ESC") 'delete-completion-window)
     (define-key map [remap keyboard-quit] #'delete-completion-window)
     (define-key map [up] 'previous-line-completion)
     (define-key map [down] 'next-line-completion)

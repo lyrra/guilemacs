@@ -418,9 +418,9 @@ don't include."
           (when-let* ((beg
                        (re-search-forward "read-symbol-shorthands: *" nil t)))
             ;; `read-symbol-shorthands' alist ends with two parens.
-            (let* ((end (re-search-forward ")[;\n\s]*)"))
+            (let* ((end (re-search-forward ")[;\n ]*)"))
                    (commentless (replace-regexp-in-string
-                                 "\n\\s-*;+" ""
+                                 "\n[ \t]*;+" ""
                                  (buffer-substring beg end)))
                    (unsorted-shorthands (car (read-from-string commentless))))
               (setq read-symbol-shorthands

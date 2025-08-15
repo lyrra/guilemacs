@@ -1302,11 +1302,11 @@ a previously found match."
   (let ((map (make-sparse-keymap)))
     ;; We use this alternative name, so we can use \\[occur-mode-mouse-goto].
     (define-key map [mouse-2] 'occur-mode-mouse-goto)
-    (define-key map "\C-c\C-c" 'occur-mode-goto-occurrence)
+    (define-key map (kbd "C-c C-c") 'occur-mode-goto-occurrence)
     (define-key map "e" 'occur-edit-mode)
-    (define-key map "\C-m" 'occur-mode-goto-occurrence)
+    (define-key map (kbd "RET") 'occur-mode-goto-occurrence)
     (define-key map "o" 'occur-mode-goto-occurrence-other-window)
-    (define-key map "\C-o" 'occur-mode-display-occurrence)
+    (define-key map (kbd "C-o") 'occur-mode-display-occurrence)
     (define-key map "n" 'next-error-no-select)
     (define-key map "p" 'previous-error-no-select)
     (define-key map "l" 'recenter-current-error)
@@ -1314,7 +1314,7 @@ a previously found match."
     ;(define-key map "\M-p" 'occur-prev)
     (define-key map "r" 'occur-rename-buffer)
     (define-key map "c" 'clone-buffer)
-    (define-key map "\C-c\C-f" 'next-error-follow-minor-mode)
+    (define-key map (kbd "C-c C-f") 'next-error-follow-minor-mode)
     (bindings--define-key map [menu-bar occur] (cons "Occur" occur-menu-map))
     map)
   "Keymap for `occur-mode'.")
@@ -1365,9 +1365,9 @@ Alternatively, click \\[occur-mode-mouse-goto] on an item to go to it.
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map text-mode-map)
     (define-key map [mouse-2] 'occur-mode-mouse-goto)
-    (define-key map "\C-c\C-c" 'occur-cease-edit)
-    (define-key map "\C-o" 'occur-mode-display-occurrence)
-    (define-key map "\C-c\C-f" 'next-error-follow-minor-mode)
+    (define-key map (kbd "C-c C-c") 'occur-cease-edit)
+    (define-key map (kbd "C-o") 'occur-mode-display-occurrence)
+    (define-key map (kbd "C-c C-f") 'next-error-follow-minor-mode)
     (bindings--define-key map [menu-bar occur] (cons "Occur" occur-menu-map))
     map)
   "Keymap for `occur-edit-mode'.")
@@ -1697,9 +1697,9 @@ there are matches after it."
 (defcustom list-matching-lines-prefix-face 'shadow
   "Face used by \\[list-matching-lines] to show the prefix column.
 The prefix column is the part of display that precedes the actual
-contents of the line; it normally shows the line number.  \(For
+contents of the line; it normally shows the line number.  (For
 multiline matches, the prefix column shows the line number for the
-first line and whitespace for the rest of the lines.\)
+first line and whitespace for the rest of the lines.)
 If this face will display the same as the default face, the prefix
 column will not be highlighted specially."
   :type 'face
@@ -2466,7 +2466,7 @@ in the current buffer."
 (defvar query-replace-map
   (let ((map (make-sparse-keymap)))
     (define-key map " " 'act)
-    (define-key map "\d" 'skip)
+    (define-key map (kbd "DEL") 'skip)
     (define-key map [delete] 'skip)
     (define-key map [backspace] 'skip)
     (define-key map "y" 'act)
@@ -2480,20 +2480,20 @@ in the current buffer."
     (define-key map "\r" 'exit)
     (define-key map [return] 'exit)
     (define-key map "." 'act-and-exit)
-    (define-key map "\C-r" 'edit)
-    (define-key map "\C-w" 'delete-and-edit)
-    (define-key map "\C-l" 'recenter)
+    (define-key map (kbd "C-r") 'edit)
+    (define-key map (kbd "C-w") 'delete-and-edit)
+    (define-key map (kbd "C-l") 'recenter)
     (define-key map "!" 'automatic)
     (define-key map "^" 'backup)
     (define-key map "u" 'undo)
     (define-key map "U" 'undo-all)
-    (define-key map "\C-h" 'help)
+    (define-key map (kbd "C-h") 'help)
     (define-key map [f1] 'help)
     (define-key map [help] 'help)
     (define-key map "?" 'help)
-    (define-key map "\C-g" 'quit)
-    (define-key map "\C-]" 'quit)
-    (define-key map "\C-v" 'scroll-up)
+    (define-key map (kbd "C-g") 'quit)
+    (define-key map (kbd "C-]") 'quit)
+    (define-key map (kbd "C-v") 'scroll-up)
     ;(define-key map "\M-v" 'scroll-down)
     (define-key map [next] 'scroll-up)
     (define-key map [prior] 'scroll-down)

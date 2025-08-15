@@ -593,8 +593,8 @@ This is like `describe-bindings', but displays only Isearch keys."
       (define-key map (char-to-string meta-prefix-char) meta-map))
 
     ;; Several non-printing chars change the searching behavior.
-    (define-key map "\C-s" 'isearch-repeat-forward)
-    (define-key map "\C-r" 'isearch-repeat-backward)
+    (define-key map (kbd "C-s") 'isearch-repeat-forward)
+    (define-key map (kbd "C-r") 'isearch-repeat-backward)
     ;; Define M-C-s and M-C-r like C-s and C-r so that the same key
     ;; combinations can be used to repeat regexp isearches that can
     ;; be used to start these searches.
@@ -602,26 +602,26 @@ This is like `describe-bindings', but displays only Isearch keys."
 ;    (define-key map "\M-\C-r" 'isearch-repeat-backward)
 ;    (define-key map "\177" 'isearch-delete-char)
     (define-key map [backspace] 'undefined) ;bug#20466.
-    (define-key map "\C-g" 'isearch-abort)
+    (define-key map (kbd "C-g") 'isearch-abort)
 
     ;; This assumes \e is the meta-prefix-char.
     (or (= ?\e meta-prefix-char)
 	(error "Inconsistency in isearch.el"))
-    (define-key map "\e\e\e" 'isearch-cancel)
+    (define-key map (kbd "ESC ESC ESC") 'isearch-cancel)
 
-    (define-key map "\C-q" 'isearch-quote-char)
+    (define-key map (kbd "C-q") 'isearch-quote-char)
 
     (define-key map "\r" 'isearch-exit)
     (define-key map [return] 'isearch-exit)
-    (define-key map "\C-j" 'isearch-printing-char)
+    (define-key map (kbd "C-j") 'isearch-printing-char)
     (define-key map "\t" 'isearch-printing-char)
     (define-key map [?\S-\ ] 'isearch-printing-char)
 
-    (define-key map    "\C-w" 'isearch-yank-word-or-char)
+    (define-key map    (kbd "C-w") 'isearch-yank-word-or-char)
 ;    (define-key map "\M-\C-w" 'isearch-yank-symbol-or-char)
 ;    (define-key map "\M-\C-d" 'isearch-del-char)
 ;    (define-key map "\M-\C-y" 'isearch-yank-char)
-    (define-key map    "\C-y" 'isearch-yank-kill)
+    (define-key map    (kbd "C-y") 'isearch-yank-kill)
 ;    (define-key map "\M-\C-z" 'isearch-yank-until-char)
 ;    (define-key map "\M-s\C-e" 'isearch-yank-line)
 
@@ -649,9 +649,9 @@ This is like `describe-bindings', but displays only Isearch keys."
     (define-key map [language-change] nil)
 
     ;; For searching multilingual text.
-    (define-key map "\C-\\" 'isearch-toggle-input-method)
-    (define-key map "\C-^" 'isearch-toggle-specified-input-method)
-    (define-key map "\C-x\\" 'isearch-transient-input-method)
+    (define-key map (kbd "C-\\") 'isearch-toggle-input-method)
+    (define-key map (kbd "C-^") 'isearch-toggle-specified-input-method)
+    (define-key map (kbd "C-x \\") 'isearch-transient-input-method)
 
     ;; People expect to be able to paste with the mouse.
     (define-key map [mouse-2] #'isearch-mouse-2)
@@ -679,8 +679,8 @@ This is like `describe-bindings', but displays only Isearch keys."
 
     ;; The key translations defined in the C-x 8 prefix should add
     ;; characters to the search string.  See iso-transl.el.
-    (define-key map "\C-x8\r" 'isearch-char-by-name)
-    (define-key map "\C-x8e\r" 'isearch-emoji-by-name)
+    (define-key map (kbd "C-x 8 RET") 'isearch-char-by-name)
+    (define-key map (kbd "C-x 8 e RET") 'isearch-emoji-by-name)
     map)
   "Keymap for `isearch-mode'.")
 
@@ -993,10 +993,10 @@ Each element is an `isearch--state' struct where the slots are
 
 (defvar-local isearch-mode nil) ;; Name of the minor mode, if non-nil.
 
-(define-key global-map "\C-s" 'isearch-forward)
-(define-key esc-map    "\C-s" 'isearch-forward-regexp)
-(define-key global-map "\C-r" 'isearch-backward)
-(define-key esc-map    "\C-r" 'isearch-backward-regexp)
+(define-key global-map (kbd "C-s") 'isearch-forward)
+(define-key esc-map    (kbd "C-s") 'isearch-forward-regexp)
+(define-key global-map (kbd "C-r") 'isearch-backward)
+(define-key esc-map    (kbd "C-r") 'isearch-backward-regexp)
 (define-key search-map    "w" 'isearch-forward-word)
 (define-key search-map    "_" 'isearch-forward-symbol)
 (define-key search-map    "." 'isearch-forward-symbol-at-point)

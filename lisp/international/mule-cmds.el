@@ -45,14 +45,14 @@
     (define-key map "p" 'set-buffer-process-coding-system)
     (define-key map "x" 'set-selection-coding-system)
     (define-key map "X" 'set-next-selection-coding-system)
-    (define-key map "\C-\\" 'set-input-method)
+    (define-key map (kbd "C-\\") 'set-input-method)
     (define-key map "c" 'universal-coding-system-argument)
     (define-key map "l" 'set-language-environment)
     map)
   "Keymap for Mule (Multilingual environment) specific commands.")
 
 ;; Keep "C-x C-m ..." for mule specific commands.
-(define-key ctl-x-map "\C-m" mule-keymap)
+(define-key ctl-x-map (kbd "C-m") mule-keymap)
 (define-key ctl-x-map "\\" 'activate-transient-input-method)
 
 (defvar describe-language-environment-map
@@ -158,7 +158,7 @@
 ;; convenient because it requires shifting on most keyboards.  An
 ;; alternative is "\C-]" which is now bound to `abort-recursive-edit'
 ;; but it won't be used that frequently.
-(define-key global-map "\C-\\" 'toggle-input-method)
+(define-key global-map (kbd "C-\\") 'toggle-input-method)
 
 ;; This is no good because people often type Shift-SPC
 ;; meaning to type SPC.  -- rms.
@@ -566,7 +566,7 @@ Optional 4th arg EXCLUDES is a list of character sets to be ignored."
     (if (stringp from)
 	(if (multibyte-string-p from)
 	    (let ((idx 0))
-	      (while (setq idx (string-match-p "[^\000-\177]" from idx))
+	      (while (setq idx (string-match-p "[^\x00-\x7F]" from idx))
 		(setq char (aref from idx)
 		      charset (char-charset char))
 		(unless (memq charset excludes)
@@ -582,7 +582,7 @@ Optional 4th arg EXCLUDES is a list of character sets to be ignored."
       (if enable-multibyte-characters
 	  (save-excursion
 	    (goto-char from)
-	    (while (re-search-forward "[^\000-\177]" to t)
+	    (while (re-search-forward "[^\x00-\x7F]" to t)
 	      (setq char (preceding-char)
 		    charset (char-charset char))
 	      (unless (memq charset excludes)

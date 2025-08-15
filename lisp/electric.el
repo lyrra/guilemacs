@@ -293,7 +293,7 @@ or comment."
     (newline arg 'interactive)))
 
 ;;;###autoload
-(define-key global-map "\C-j" 'electric-newline-and-maybe-indent)
+(define-key global-map (kbd "C-j") 'electric-newline-and-maybe-indent)
 ;;;###autoload
 (defun electric-newline-and-maybe-indent ()
   "Insert a newline.

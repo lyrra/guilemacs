@@ -808,7 +808,7 @@ Use \\[edit-tab-stops] to edit them interactively."
               (delete-region (point) before)))))))
 
 (define-key global-map "\t" 'indent-for-tab-command)
-(define-key esc-map "\C-\\" 'indent-region)
+(define-key esc-map (kbd "C-\\") 'indent-region)
 (define-key ctl-x-map "\t" 'indent-rigidly)
 (define-key esc-map "i" 'tab-to-tab-stop)
 

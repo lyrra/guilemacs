@@ -273,7 +273,7 @@ The returned value is a list of strings, one per line."
       (when res
 	(setq res (list res))
 	(forward-line 1)
-	(while (looking-at "^;+\\(\t\\|[\t\s]\\{2,\\}\\)\\(.+\\)")
+	(while (looking-at "^;+\\(\t\\|[\t ]\\{2,\\}\\)\\(.+\\)")
 	  (push (match-string-no-properties 2) res)
 	  (forward-line 1)))
       (nreverse res))))
