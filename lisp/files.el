@@ -4226,7 +4226,7 @@ major-mode."
     ;; Look for "Local variables:" line in last page.
     (save-excursion
       (goto-char (point-max))
-      (search-backward "\n\^L" (max (- (point-max) 3000) (point-min))
+      (search-backward "\n\014" (max (- (point-max) 3000) (point-min))
 		       'move)
       (when (let ((case-fold-search t))
 	      (search-forward "Local Variables:" nil t))
@@ -7388,7 +7388,7 @@ Then you'll be asked about a number of files to recover."
     (when (bound-and-true-p dired-omit-mode)
       (dired-omit-mode -1)))
   (use-local-map (nconc (make-sparse-keymap) (current-local-map)))
-  (define-key (current-local-map) "\C-c\C-c" 'recover-session-finish)
+  (define-key (current-local-map) (kbd "C-c C-c") 'recover-session-finish)
   (save-excursion
     (goto-char (point-min))
     (or (looking-at " Move to the session you want to recover,")
@@ -8068,8 +8068,8 @@ If DIR's free space cannot be obtained, this function returns nil."
           (funcall byte-count-to-string-function avail)))))
 
 (defvar directory-listing-before-filename-regexp
-  (let* ((l "\\([A-Za-z]\\|[^\0-\177]\\)")
-	 (l-or-quote "\\([A-Za-z']\\|[^\0-\177]\\)")
+  (let* ((l "\\([A-Za-z]\\|[^\x00-\x7F]\\)")
+	 (l-or-quote "\\([A-Za-z']\\|[^\x00-\x7F]\\)")
 	 ;; In some locales, month abbreviations are as short as 2 letters,
 	 ;; and they can be followed by ".".
 	 ;; In Breton, a month name  can include a quote character.
