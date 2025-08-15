@@ -123,6 +123,7 @@
 (load "emacs-lisp/byte-run")
 (load "emacs-lisp/backquote")
 (load "subr")
+(load "keymap")  ; Load keymap after subr.el so save-match-data macro is available
 
 ;; Load-time macro-expansion can only take effect after setting
 ;; load-source-file-function because of where it is called in lread.c.
@@ -136,8 +137,6 @@
   ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
   (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
     (load "emacs-lisp/macroexp")))
-
-(load "keymap")
 
 
 (load "international/mule")
