@@ -1240,6 +1240,10 @@ this could be hoisted to startup
     the git rebase "pick-list", is still named same.
   - in magit-revision collapse all files
 
+* AI ramblings
+  - 20250815
+    "The stack trace shows we're deep in Guile VM execution."
+
 * links
   Guile internals
   - https://aartaka.me/guile-optimization
