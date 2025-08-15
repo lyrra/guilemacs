@@ -165,7 +165,7 @@ Emacs Lisp manual for more information and examples."
         ;; (puthash (car cases) `(,exp ,cases ,@expansion) pcase--memoize-2)
         expansion))))
 
-(defconst pcase--find-macro-def-regexp "(pcase-defmacro[\s\t\n]+%s[\s\t\n]*(")
+(defconst pcase--find-macro-def-regexp "(pcase-defmacro[ \t\n]+%s[ \t\n]*(")
 
 (with-eval-after-load 'find-func
   (defvar find-function-regexp-alist)

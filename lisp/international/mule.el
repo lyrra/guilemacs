@@ -1693,7 +1693,7 @@ in-place."
 	(dolist (elt encoding-table)
 	  (push (car elt) charset-list))
 	(setq end-pos (point-marker))
-	(while (re-search-forward "[^\0-\177]+" nil t)
+	(while (re-search-forward "[^[:ascii:]]+" nil t)
 	  ;; Found a sequence of non-ASCII characters.
 	  (set-marker end-pos (match-end 0))
 	  (goto-char (match-beginning 0))
@@ -1717,10 +1717,10 @@ in-place."
 		    ;; necessary to produce this extra designation
 		    ;; sequence, but some buggy application
 		    ;; (e.g. crxvt-gb) requires it.
-		    (insert "\e(B")
+		    (insert "\033(B")
 		    (save-excursion
 		      (goto-char last-pos)
-		      (insert (format "\e%%/%d" noctets))
+		      (insert (format "\033%%/%d" noctets))
 		      (insert-byte (+ (/ len 128) 128) 1)
 		      (insert-byte (+ (% len 128) 128) 1)
 		      (insert encoding-name)
@@ -1731,8 +1731,8 @@ in-place."
 	    (encode-coding-region last-pos (point) 'mule-utf-8)
 	    (save-excursion
 	      (goto-char last-pos)
-	      (insert "\e%G"))
-	    (insert "\e%@")))
+	      (insert "\033%G"))
+	    (insert "\033%@")))
 	(goto-char (point-min)))))
   ;; Must return nil, as build_annotations_2 expects that.
   nil)
@@ -1943,7 +1943,7 @@ use \"coding: 'raw-text\" instead."
 	;; is just "\r" and we can't use "^" nor "$" in regexp.
 	(when (and tail-found (or (not coding-system) (not char-trans)))
 	  (goto-char tail-start)
-	  (re-search-forward "[\r\n]\^L" tail-end t)
+	  (re-search-forward "[\r\n]\014" tail-end t)
 	  (if (re-search-forward
 	       "[\r\n]\\([^\r\n]*\\)[ \t]*Local Variables:[ \t]*\\([^\r\n]*\\)[\r\n]"
 	       tail-end t)

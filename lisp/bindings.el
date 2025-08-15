@@ -1086,29 +1086,28 @@ if `inhibit-field-text-motion' is non-nil."
       (backward-word n)
     (forward-word n)))
 
-(defvar-keymap narrow-map
-  :doc "Keymap for narrowing commands."
-  "n" #'narrow-to-region
-  "w" #'widen
-  "g" #'goto-line-relative)
+(defvar narrow-map (make-sparse-keymap) "Keymap for narrowing commands.")
+(define-key narrow-map "n" #'narrow-to-region)
+(define-key narrow-map "w" #'widen)
+(define-key narrow-map "g" #'goto-line-relative)
 (define-key ctl-x-map "n" narrow-map)
 
 ;; Quitting
-(define-key global-map "\e\e\e" 'keyboard-escape-quit)
-(define-key global-map "\C-g" 'keyboard-quit)
+(define-key global-map (kbd "ESC ESC ESC") 'keyboard-escape-quit)
+(define-key global-map (kbd "C-g") 'keyboard-quit)
 
 ;; Used to be in termdev.el: when using several terminals, make C-z
 ;; suspend only the relevant terminal.
 (substitute-key-definition 'suspend-emacs 'suspend-frame global-map)
 
-(define-key global-map "\C-m" 'newline)
-(define-key global-map "\C-o" 'open-line)
-(define-key esc-map "\C-o" 'split-line)
-(define-key global-map "\C-q" 'quoted-insert)
+(define-key global-map (kbd "C-m") 'newline)
+(define-key global-map (kbd "C-o") 'open-line)
+(define-key esc-map (kbd "C-o") 'split-line)
+(define-key global-map (kbd "C-q") 'quoted-insert)
 (define-key esc-map "^" 'delete-indentation)
 (define-key esc-map "\\" 'delete-horizontal-space)
 (define-key esc-map "m" 'back-to-indentation)
-(define-key ctl-x-map "\C-o" 'delete-blank-lines)
+(define-key ctl-x-map (kbd "C-o") 'delete-blank-lines)
 (define-key esc-map " " 'cycle-spacing)
 (define-key esc-map "z" 'zap-to-char)
 (define-key esc-map "=" 'count-words-region)
@@ -1117,24 +1116,23 @@ if `inhibit-field-text-motion' is non-nil."
 ;; Define ESC ESC : like ESC : for people who type ESC ESC out of habit.
 ;(define-key esc-map "\M-:" 'eval-expression)
 ;; Changed from C-x ESC so that function keys work following C-x.
-(define-key ctl-x-map "\e\e" 'repeat-complex-command)
+(define-key ctl-x-map (kbd "ESC ESC") 'repeat-complex-command)
 ;; New binding analogous to M-:.
 ;(define-key ctl-x-map "\M-:" 'repeat-complex-command)
 (define-key ctl-x-map "u" 'undo)
 (put 'undo :advertised-binding [?\C-x ?u])
 ;; Many people are used to typing C-/ on GUI frames and getting C-_.
 (define-key global-map [?\C-/] 'undo)
-(define-key global-map "\C-_" 'undo)
+(define-key global-map (kbd "C-_") 'undo)
 ;; Richard said that we should not use C-x <uppercase letter> and I have
 ;; no idea whereas to bind it.  Any suggestion welcome.  -stef
 ;; (define-key ctl-x-map "U" 'undo-only)
-(defvar-keymap undo-repeat-map
-  :doc "Keymap to repeat `undo' commands.  Used in `repeat-mode'."
-  :repeat t
-  "u" #'undo)
+(defvar undo-repeat-map (make-sparse-keymap) "Keymap to repeat `undo' commands.  Used in `repeat-mode'.")
+(put 'undo-repeat-map 'repeat-mode t)
+(define-key undo-repeat-map "u" #'undo)
 
-(define-key global-map '[(control ??)] 'undo-redo)
-(define-key global-map [?\C-\M-_] 'undo-redo)
+(define-key global-map (kbd "C-?") 'undo-redo)
+(define-key global-map (kbd "C-M-_") 'undo-redo)
 
 (define-key esc-map "!" 'shell-command)
 (define-key esc-map "|" 'shell-command-on-region)
@@ -1149,30 +1147,28 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key global-map [XF86Back] 'previous-buffer)
 (put 'previous-buffer :advertised-binding [?\C-x left])
 
-(defvar-keymap buffer-navigation-repeat-map
-  :doc "Keymap to repeat `next-buffer' and `previous-buffer'.  Used in `repeat-mode'."
-  :repeat t
-  "<right>" #'next-buffer
-  "<left>"  #'previous-buffer)
+(defvar buffer-navigation-repeat-map (make-sparse-keymap) "Keymap to repeat `next-buffer' and `previous-buffer'.  Used in `repeat-mode'.")
+(define-key buffer-navigation-repeat-map "<right>" #'next-buffer)
+(define-key buffer-navigation-repeat-map "<left>" #'previous-buffer)
 
 (let ((map minibuffer-local-map))
-  (define-key map "\en"   'next-history-element)
+  (define-key map (kbd "M-n")   'next-history-element)
   (define-key map [next]  'next-history-element)
   (define-key map [down]  'next-line-or-history-element)
   (define-key map [XF86Forward] 'next-history-element)
-  (define-key map "\ep"   'previous-history-element)
+  (define-key map (kbd "M-p")   'previous-history-element)
   (define-key map [prior] 'previous-history-element)
   (define-key map [up]    'previous-line-or-history-element)
   (define-key map [XF86Back] 'previous-history-element)
-  (define-key map "\es"   'next-matching-history-element)
-  (define-key map "\er"   'previous-matching-history-element)
+  (define-key map (kbd "M-s")   'next-matching-history-element)
+  (define-key map (kbd "M-r")   'previous-matching-history-element)
   ;; Override the global binding (which calls indent-relative via
   ;; indent-for-tab-command).  The alignment that indent-relative tries to
   ;; do doesn't make much sense here since the prompt messes it up.
   (define-key map "\t"    'self-insert-command)
   (define-key map [C-tab] 'file-cache-minibuffer-complete))
 
-(define-key global-map "\C-u" 'universal-argument)
+(define-key global-map (kbd "C-u") 'universal-argument)
 (let ((i ?0))
   (while (<= i ?9)
     (define-key esc-map (char-to-string i) 'digit-argument)
@@ -1181,82 +1177,82 @@ if `inhibit-field-text-motion' is non-nil."
 ;; Define control-digits.
 (let ((i ?0))
   (while (<= i ?9)
-    (define-key global-map (read (format "[?\\C-%c]" i)) 'digit-argument)
+    (define-key global-map (kbd (format "C-%c" i)) 'digit-argument)
     (setq i (1+ i))))
-(define-key global-map [?\C--] 'negative-argument)
+(define-key global-map (kbd "C--") 'negative-argument)
 ;; Define control-meta-digits.
 (let ((i ?0))
   (while (<= i ?9)
-    (define-key esc-map (read (format "[?\\C-%c]" i)) 'digit-argument)
+    (define-key esc-map (kbd (format "C-%c" i)) 'digit-argument)
     (setq i (1+ i))))
-(define-key global-map [?\C-\M--] 'negative-argument)
+(define-key global-map (kbd "C-M--") 'negative-argument)
 
 ;; Update tutorial--default-keys if you change these.
-(define-key global-map "\177" 'delete-backward-char)
+(define-key global-map (kbd "DEL") 'delete-backward-char)
 ;; We explicitly want C-d to use `delete-char' instead of
 ;; `delete-forward-char' so that it ignores `delete-active-region':
 ;; Most C-d users are old-timers who don't expect
 ;; `delete-active-region' here, while newer users who expect
 ;; `delete-active-region' use C-d much less.
-(define-key global-map "\C-d" 'delete-char)
+(define-key global-map (kbd "C-d") 'delete-char)
 
-(define-key global-map "\C-k" 'kill-line)
-(define-key global-map "\C-w" 'kill-region)
+(define-key global-map (kbd "C-k") 'kill-line)
+(define-key global-map (kbd "C-w") 'kill-region)
 (define-key esc-map "w" 'kill-ring-save)
-(define-key esc-map "\C-w" 'append-next-kill)
-(define-key global-map "\C-y" 'yank)
+(define-key esc-map (kbd "C-w") 'append-next-kill)
+(define-key global-map (kbd "C-y") 'yank)
 (define-key esc-map "y" 'yank-pop)
 
-(define-key global-map "\C-@" 'set-mark-command)
+(define-key global-map (kbd "C-@") 'set-mark-command)
 ;; Many people are used to typing C-SPC and getting C-@.
-(define-key global-map [?\C- ] 'set-mark-command)
-(put 'set-mark-command :advertised-binding [?\C- ])
+(define-key global-map (kbd "C-SPC") 'set-mark-command)
+(put 'set-mark-command :advertised-binding (kbd "C-SPC"))
 
-(define-key ctl-x-map "\C-x" 'exchange-point-and-mark)
-(define-key ctl-x-map "\C-@" 'pop-global-mark)
+(define-key ctl-x-map (kbd "C-x") 'exchange-point-and-mark)
+(define-key ctl-x-map (kbd "C-@") 'pop-global-mark)
 (define-key ctl-x-map " " 'rectangle-mark-mode)
-(define-key ctl-x-map [?\C- ] 'pop-global-mark)
+(define-key ctl-x-map (kbd "C-SPC") 'pop-global-mark)
 
-(define-key global-map "\C-n" 'next-line)
-(define-key global-map "\C-p" 'previous-line)
-(define-key ctl-x-map "\C-n" 'set-goal-column)
-(define-key global-map "\C-a" 'move-beginning-of-line)
-(define-key global-map "\C-e" 'move-end-of-line)
+(define-key global-map (kbd "C-n") 'next-line)
+(define-key global-map (kbd "C-p") 'previous-line)
+(define-key ctl-x-map (kbd "C-n") 'set-goal-column)
+(define-key global-map (kbd "C-a") 'move-beginning-of-line)
+(define-key global-map (kbd "C-e") 'move-end-of-line)
 
 (define-key ctl-x-map "`" 'next-error)
 
-(defvar-keymap next-error-repeat-map
-  :doc "Keymap to repeat `next-error' and `previous-error'.  Used in `repeat-mode'."
-  :repeat t
-  "n"   #'next-error
-  "M-n" #'next-error
-  "p"   #'previous-error
-  "M-p" #'previous-error)
+(defvar next-error-repeat-map (make-sparse-keymap) "Keymap to repeat `next-error' and `previous-error'.  Used in `repeat-mode'.")
+(define-key next-error-repeat-map "n" #'next-error)
+(define-key next-error-repeat-map "M-n" #'next-error)
+(define-key next-error-repeat-map "p" #'previous-error)
+(define-key next-error-repeat-map "M-p" #'previous-error)
 
-(defvar-keymap goto-map
-  :doc "Keymap for navigation commands."
-  "c"   #'goto-char
-  "g"   #'goto-line
-  "M-g" #'goto-line
-  "n"   #'next-error
-  "M-n" #'next-error
-  "p"   #'previous-error
-  "M-p" #'previous-error
-  "TAB" #'move-to-column
-  "i"   #'imenu)
+(defvar goto-map (make-sparse-keymap) "Keymap for navigation commands.")
+(define-key goto-map "c" #'goto-char)
+(define-key goto-map "g" #'goto-line)
+(define-key goto-map "M-g" #'goto-line)
+(define-key goto-map "n" #'next-error)
+(define-key goto-map "M-n" #'next-error)
+(define-key goto-map "p" #'previous-error)
+(define-key goto-map "M-p" #'previous-error)
+(define-key goto-map "TAB" #'move-to-column)
+(define-key goto-map "i" #'imenu)
 (define-key esc-map "g" goto-map)
 
-(defvar-keymap search-map
-  :doc "Keymap for search related commands."
-  "o"   #'occur
-  "M-w" #'eww-search-words
-  "h r" #'highlight-regexp
-  "h p" #'highlight-phrase
-  "h l" #'highlight-lines-matching-regexp
-  "h ." #'highlight-symbol-at-point
-  "h u" #'unhighlight-regexp
-  "h f" #'hi-lock-find-patterns
-  "h w" #'hi-lock-write-interactive-patterns)
+(defvar search-map (make-sparse-keymap) "Keymap for search related commands.")
+(define-key search-map "o" #'occur)
+(define-key search-map "M-w" #'eww-search-words)
+; Create a submap for highlight commands
+; FIX guilemacs: this should go upstream
+(defvar highlight-map (make-sparse-keymap) "Keymap for highlight commands.")
+(define-key highlight-map "r" #'highlight-regexp)
+(define-key highlight-map "p" #'highlight-phrase)
+(define-key highlight-map "l" #'highlight-lines-matching-regexp)
+(define-key highlight-map "." #'highlight-symbol-at-point)
+(define-key highlight-map "u" #'unhighlight-regexp)
+(define-key highlight-map "f" #'hi-lock-find-patterns)
+(define-key highlight-map "w" #'hi-lock-write-interactive-patterns)
+(define-key search-map "h" highlight-map)
 (define-key esc-map "s" search-map)
 
 (put 'highlight-regexp                   :advertised-binding [?\M-s ?h ?r])
@@ -1470,14 +1466,14 @@ if `inhibit-field-text-motion' is non-nil."
 
 (define-key global-map [mouse-movement] #'ignore-preserving-kill-region)
 
-(define-key global-map "\C-t" 'transpose-chars)
+(define-key global-map (kbd "C-t") 'transpose-chars)
 (define-key esc-map "t" 'transpose-words)
-(define-key esc-map "\C-t" 'transpose-sexps)
-(define-key ctl-x-map "\C-t" 'transpose-lines)
+(define-key esc-map (kbd "C-t") 'transpose-sexps)
+(define-key ctl-x-map (kbd "C-t") 'transpose-lines)
 
 (define-key esc-map ";" 'comment-dwim)
 (define-key esc-map "j" 'default-indent-new-line)
-(define-key esc-map "\C-j" 'default-indent-new-line)
+(define-key esc-map (kbd "C-j") 'default-indent-new-line)
 (define-key ctl-x-map ";" 'comment-set-column)
 (define-key ctl-x-map [?\C-\;] 'comment-line)
 (define-key ctl-x-map "f" 'set-fill-column)
@@ -1487,7 +1483,7 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key esc-map "f" 'forward-word)
 (define-key esc-map "b" 'backward-word)
 (define-key esc-map "d" 'kill-word)
-(define-key esc-map "\177" 'backward-kill-word)
+(define-key esc-map (kbd "DEL") 'backward-kill-word)
 
 (define-key esc-map "<" 'beginning-of-buffer)
 (define-key esc-map ">" 'end-of-buffer)
@@ -1497,7 +1493,7 @@ if `inhibit-field-text-motion' is non-nil."
 (defalias 'mode-specific-command-prefix (make-sparse-keymap))
 (defvar mode-specific-map (symbol-function 'mode-specific-command-prefix)
   "Keymap for characters following \\`C-c'.")
-(define-key global-map "\C-c" 'mode-specific-command-prefix)
+(define-key global-map (kbd "C-c") 'mode-specific-command-prefix)
 
 (global-set-key [M-right]  'right-word)
 (define-key esc-map [right] 'forward-word)
@@ -1525,27 +1521,27 @@ if `inhibit-field-text-motion' is non-nil."
 (global-set-key [C-M-end]     'end-of-defun)
 (define-key esc-map [C-end]   'end-of-defun)
 
-(define-key esc-map "\C-f" 'forward-sexp)
-(define-key esc-map "\C-b" 'backward-sexp)
-(define-key esc-map "\C-u" 'backward-up-list)
-(define-key esc-map "\C-@" 'mark-sexp)
-(define-key esc-map [?\C-\ ] 'mark-sexp)
-(define-key esc-map "\C-d" 'down-list)
-(define-key esc-map "\C-k" 'kill-sexp)
+(define-key esc-map (kbd "C-f") 'forward-sexp)
+(define-key esc-map (kbd "C-b") 'backward-sexp)
+(define-key esc-map (kbd "C-u") 'backward-up-list)
+(define-key esc-map (kbd "C-@") 'mark-sexp)
+(define-key esc-map (kbd "C-SPC") 'mark-sexp)
+(define-key esc-map (kbd "C-d") 'down-list)
+(define-key esc-map (kbd "C-k") 'kill-sexp)
 (define-key global-map [C-M-delete] 'backward-kill-sexp)
 (define-key global-map [C-M-backspace] 'backward-kill-sexp)
 (define-key esc-map [C-delete] 'backward-kill-sexp)
 (define-key esc-map [C-backspace] 'backward-kill-sexp)
-(define-key esc-map "\C-n" 'forward-list)
-(define-key esc-map "\C-p" 'backward-list)
-(define-key esc-map "\C-a" 'beginning-of-defun)
-(define-key esc-map "\C-e" 'end-of-defun)
-(define-key esc-map "\C-h" 'mark-defun)
+(define-key esc-map (kbd "C-n") 'forward-list)
+(define-key esc-map (kbd "C-p") 'backward-list)
+(define-key esc-map (kbd "C-a") 'beginning-of-defun)
+(define-key esc-map (kbd "C-e") 'end-of-defun)
+(define-key esc-map (kbd "C-h") 'mark-defun)
 (define-key ctl-x-map "nd" 'narrow-to-defun)
 (define-key esc-map "(" 'insert-parentheses)
 (define-key esc-map ")" 'move-past-close-and-reindent)
 
-(define-key ctl-x-map "\C-e" 'eval-last-sexp)
+(define-key ctl-x-map (kbd "C-e") 'eval-last-sexp)
 
 (define-key ctl-x-map "m" 'compose-mail)
 (define-key ctl-x-4-map "m" 'compose-mail-other-window)
@@ -1588,7 +1584,7 @@ if `inhibit-field-text-motion' is non-nil."
 (define-key esc-map "a" 'backward-sentence)
 (define-key esc-map "e" 'forward-sentence)
 (define-key esc-map "k" 'kill-sentence)
-(define-key ctl-x-map "\177" 'backward-kill-sentence)
+(define-key ctl-x-map (kbd "DEL") 'backward-kill-sentence)
 
 (define-key ctl-x-map "[" 'backward-page)
 (define-key ctl-x-map "]" 'forward-page)
@@ -1599,7 +1595,7 @@ if `inhibit-field-text-motion' is non-nil."
   "]" #'forward-page
   "[" #'backward-page)
 
-(define-key ctl-x-map "\C-p" 'mark-page)
+(define-key ctl-x-map (kbd "C-p") 'mark-page)
 (define-key ctl-x-map "l" 'count-lines-page)
 (define-key ctl-x-map "np" 'narrow-to-page)
 
@@ -1618,10 +1614,10 @@ if `inhibit-field-text-motion' is non-nil."
 
 (define-key esc-map "'" 'abbrev-prefix-mark)
 (define-key ctl-x-map "'" 'expand-abbrev)
-(define-key ctl-x-map "\C-b" 'list-buffers)
+(define-key ctl-x-map (kbd "C-b") 'list-buffers)
 
-(define-key ctl-x-map "\C-j" 'dired-jump)
-(define-key ctl-x-4-map "\C-j" 'dired-jump-other-window)
+(define-key ctl-x-map (kbd "C-j") 'dired-jump)
+(define-key ctl-x-4-map (kbd "C-j") 'dired-jump-other-window)
 
 (define-key ctl-x-map "z" 'repeat)
 
@@ -1636,7 +1632,7 @@ if `inhibit-field-text-motion' is non-nil."
   "t" #'toggle-truncate-lines)
 (define-key ctl-x-map "x" ctl-x-x-map)
 
-(define-key esc-map "\C-l" 'reposition-window)
+(define-key esc-map (kbd "C-l") 'reposition-window)
 
 (define-key ctl-x-4-map "a" 'add-change-log-entry-other-window)
 (define-key ctl-x-4-map "c" 'clone-indirect-buffer-other-window)
