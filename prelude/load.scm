@@ -234,6 +234,10 @@ Return nil if OBJECT is either a unibyte string, or not a string.
 In Guilemacs, all strings are UTF-8, so this always returns nil."
   #nil)
 
+(define (elisp-eval-scheme string)
+  "Evaluate a string containing a Scheme expression."
+  (eval-string string))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -242,6 +246,7 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'string elisp-string)
 (set-symbol-function! 'unibyte-string elisp-unibyte-string)
 (set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
+(set-symbol-function! 'eval-scheme elisp-eval-scheme)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
