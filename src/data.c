@@ -403,15 +403,9 @@ DEFUN ("recordp", Frecordp, Srecordp, 1, 1, 0,
   return Qnil;
 }
 
-DEFUN ("stringp", Fstringp, Sstringp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a string.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (STRINGP (object))
-    return Qt;
-  return Qnil;
-}
+/* HOISTED TO SCHEME: stringp
+   This function has been moved to prelude/load.scm as elisp-stringp.
+   Zero C callers made it a perfect candidate for complete hoisting. */
 
 /* HOISTED TO SCHEME: multibyte-string-p is now implemented in prelude/load.scm
    as elisp-multibyte-string-p. In Guilemacs all strings are UTF-8, so it
@@ -543,15 +537,9 @@ DEFUN ("module-function-p", Fmodule_function_p, Smodule_function_p, 1, 1, NULL,
   return MODULE_FUNCTIONP (object) ? Qt : Qnil;
 }
 
-DEFUN ("char-or-string-p", Fchar_or_string_p, Schar_or_string_p, 1, 1, 0,
-       doc: /* Return t if OBJECT is a character or a string.  */
-       attributes: const)
-  (register Lisp_Object object)
-{
-  if (CHARACTERP (object) || STRINGP (object))
-    return Qt;
-  return Qnil;
-}
+/* HOISTED TO SCHEME: char-or-string-p
+   This function has been moved to prelude/load.scm as elisp-char-or-string-p.
+   Zero C callers made it a perfect candidate for complete hoisting. */
 
 DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer.  */

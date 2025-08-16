@@ -1050,8 +1050,7 @@ install_emacs_strings ()
     scm_c_module_define (module, "make-lisp-string",
                          scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
                                            string_from_scheme));
-    scm_c_module_define (module, "lisp-string?",
-                         scm_c_make_gsubr ("stringp", 1, 0, 0, Fstringp));
+    /* HOISTED TO SCHEME: stringp is now defined in prelude/load.scm */
 }
 
 Lisp_Object xsymbol_fn;
