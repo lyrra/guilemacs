@@ -2915,131 +2915,79 @@ fread_char_escape (struct reader_context *ctx, int next_char)
   return chr | modifiers;
 }
 
-/* Forward declaration for original integer reader */
-static Lisp_Object fread_integer_original (struct reader_context *ctx, int radix);
-
 static Lisp_Object
-fread_integer_guile (struct reader_context *ctx, int radix)
+fread_integer (struct reader_context *ctx, int radix)
 {
   if (scm_is_false (ctx->port))
     {
       /* No Guile port available, fall back to original implementation */
       emacs_abort ();
-      return fread_integer_original (ctx, radix);
     }
 
-  /* Build radix prefix for Guile reader if needed */
-  char prefix[8];
+  /* Peek at first character and prepare for Guile reader */
+  int first_char = freadchar (ctx);
+  if (first_char < 0)
+    end_of_file_error ();
+
+  /* Handle sign if present */
+  int sign_char = 0;
+  if (first_char == '-' || first_char == '+')
+    {
+      sign_char = first_char;
+      first_char = freadchar (ctx);
+      if (first_char < 0)
+        finvalid_radix_integer (radix);
+    }
+
+  /* Push everything back in reverse order for Guile to read */
+  scm_ungetc (first_char, ctx->port);  /* The digit */
+
+  if (sign_char)
+    scm_ungetc (sign_char, ctx->port);  /* The sign if present */
+
+  /* Push radix prefix for non-decimal numbers */
   switch (radix)
     {
     case 2:
-      strcpy (prefix, "#b");
+      scm_ungetc ('b', ctx->port);
+      scm_ungetc ('#', ctx->port);
       break;
     case 8:
-      strcpy (prefix, "#o");
+      scm_ungetc ('o', ctx->port);
+      scm_ungetc ('#', ctx->port);
       break;
     case 16:
-      strcpy (prefix, "#x");
+      scm_ungetc ('x', ctx->port);
+      scm_ungetc ('#', ctx->port);
       break;
     case 10:
-      prefix[0] = '\0'; /* No prefix needed for decimal */
+      /* No prefix needed for decimal */
       break;
     default:
-      /* For arbitrary radix like #36r, we need to read the number manually
-         since Guile's reader expects the full #NrDIGITS format */
-      return fread_integer_original (ctx, radix);
+      /* arbitrary radix not supported */
+      emacs_abort ();
     }
 
-  /* If we have a prefix, ungetc it to the port */
-  if (prefix[0] != '\0')
+  /* Clear any C-side lookahead since we're giving control to Guile */
+  if (ctx->lookahead != 0)
     {
-      for (int i = strlen (prefix) - 1; i >= 0; i--)
-        scm_ungetc (prefix[i], ctx->port);
+      scm_ungetc (ctx->lookahead, ctx->port);
+      ctx->lookahead = 0;
     }
 
-  /* Let Guile read the number */
+  /* Let Guile read the complete number */
   SCM result = scm_read (ctx->port);
 
-  /* Check if we got a valid number */
+  /* Validate the result */
   if (scm_is_number (result))
     {
-      /* Reset lookahead buffer since Guile consumed the characters */
-      ctx->lookahead = 0;
       return result;
     }
   else
     {
-      /* If Guile didn't return a number, fall back to original */
-      error ("Guile reader failed to parse integer");
+      /* This shouldn't happen if our setup was correct */
+      error ("Guile reader failed to parse integer with radix %d", radix);
     }
-}
-
-/* Original C-based integer reader - kept as fallback */
-static Lisp_Object
-fread_integer_original (struct reader_context *ctx, int radix)
-{
-  char stackbuf[20];
-  char *read_buffer = stackbuf;
-  ptrdiff_t read_buffer_size = sizeof stackbuf;
-  char *p = read_buffer;
-  char *heapbuf = NULL;
-  int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
-
-  dynwind_begin();
-
-  int c = freadchar (ctx);
-  if (c == '-' || c == '+')
-    {
-      *p++ = c;
-      c = freadchar (ctx);
-    }
-
-  if (c == '0')
-    {
-      *p++ = c;
-      valid = 1;
-
-      /* Ignore redundant leading zeros, so the buffer doesn't
-	 fill up with them.  */
-      do
-	c = freadchar (ctx);
-      while (c == '0');
-    }
-
-  for (int digit; (digit = digit_to_number (c, radix)) >= -1; )
-    {
-      if (digit == -1)
-	valid = 0;
-      if (valid < 0)
-	valid = 1;
-      /* Allow 1 extra byte for the \0.  */
-      if (p + 1 == read_buffer + read_buffer_size)
-	{
-	  ptrdiff_t offset = p - read_buffer;
-	  read_buffer = grow_read_buffer (read_buffer, offset,
-					  &heapbuf, &read_buffer_size);
-	  p = read_buffer + offset;
-	}
-      *p++ = c;
-      c = freadchar (ctx);
-    }
-
-  funreadchar (ctx, c);
-
-  if (valid != 1)
-    finvalid_radix_integer (radix);
-
-  *p = '\0';
-  Lisp_Object tem = string_to_number (read_buffer, radix, NULL);
-  dynwind_end();
-  return tem;
-}
-
-/* File-specific version of read_integer - uses Guile reader when enabled */
-static Lisp_Object
-fread_integer (struct reader_context *ctx, int radix)
-{
-  return fread_integer_guile (ctx, radix);
 }
 
 /* File-specific version of read_char_literal - Pure Guile with modifier encoding */
@@ -4622,11 +4570,8 @@ fread0 (struct reader_context *ctx)
 		  }
 		if (c == 'r' || c == 'R')
 		  {
+                    emacs_abort (); // guilemacs: arbitrary radix support dropped
 		    /* #NrDIGITS -- radix-N number */
-		    if (n < 0 || n > 36)
-		      finvalid_radix_integer (n);
-		    obj = fread_integer (ctx, n);
-		    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
 		  {
