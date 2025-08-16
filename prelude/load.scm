@@ -238,6 +238,18 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
   "Evaluate a string containing a Scheme expression."
   (eval-string string))
 
+(define (elisp-stringp object)
+  "Return t if OBJECT is a string."
+  (if (string? object) #t #nil))
+
+(define (elisp-char-or-string-p object)
+  "Return t if OBJECT is a character or a string."
+  (if (or (char? object)
+          (and (number? object) (>= object 0) (<= object #x3fffff))  ; Emacs character range
+          (string? object))
+      #t
+      #nil))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -247,6 +259,8 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'unibyte-string elisp-unibyte-string)
 (set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
 (set-symbol-function! 'eval-scheme elisp-eval-scheme)
+(set-symbol-function! 'stringp elisp-stringp)
+(set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
