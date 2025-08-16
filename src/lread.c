@@ -2964,8 +2964,8 @@ fread_integer (struct reader_context *ctx, int radix)
       /* No prefix needed for decimal */
       break;
     default:
-      /* arbitrary radix not supported */
-      emacs_abort ();
+      /* arbitrary radix not supported with Guile reader */
+      finvalid_radix_integer (radix);
     }
 
   /* Clear any C-side lookahead since we're giving control to Guile */

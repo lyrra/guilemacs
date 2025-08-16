@@ -291,8 +291,12 @@
               (match ab
                 ((a b)
                  ;; data.c:integer_remainder
-                 (test-modulo (- (ash 1 (random a))
-                                 (ash 1 (random a)))
-                              (- (ash 1 (random b))
-                                 (ash 1 (random b)))))))
+                 ;; Ensure we don't get zero as divisor
+                 (let* ((dividend (- (ash 1 (random a))
+                                    (ash 1 (random a))))
+                        (divisor-raw (- (ash 1 (random b))
+                                       (ash 1 (random b))))
+                        ;; If divisor would be 0, use 1 instead
+                        (divisor (if (zero? divisor-raw) 1 divisor-raw)))
+                   (test-modulo dividend divisor)))))
             nums))
