@@ -219,11 +219,22 @@ Letter-case is significant, but text properties are ignored."
   "Convert arg BYTE to a unibyte string containing that byte."
   (string (integer->char (modulo byte 256))))
 
+(define (elisp-string . characters)
+  "Concatenate all the argument characters and make the result a string."
+  (list->string (map integer->char characters)))
+
+(define (elisp-unibyte-string . bytes)
+  "Concatenate all the argument bytes and make the result a unibyte string."
+  ;; In Guilemacs, all strings are UTF-8, so just call string
+  (apply elisp-string bytes))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
 (set-symbol-function! 'string-to-char elisp-string-to-char)
 (set-symbol-function! 'byte-to-string elisp-byte-to-string)
+(set-symbol-function! 'string elisp-string)
+(set-symbol-function! 'unibyte-string elisp-unibyte-string)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

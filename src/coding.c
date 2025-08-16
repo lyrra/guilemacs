@@ -309,6 +309,7 @@ struct coding_system safe_terminal_coding;
 /* Two special coding systems.  */
 static Lisp_Object Vsjis_coding_system;
 static Lisp_Object Vbig5_coding_system;
+static Lisp_Object string_fn;
 
 /* ISO2022 section */
 
@@ -7256,7 +7257,7 @@ produce_composition (struct coding_system *coding, int *charbuf, ptrdiff_t pos)
 	      args[j] = make_fixnum (charbuf[i] % 0x100);
 	    }
 	}
-      components = (i == j ? Fstring (j, args) : Fvector (j, args));
+      components = (i == j ? scm_call_n (string_fn, args, j) : Fvector (j, args));
     }
   compose_text (pos, to, components, Qnil, coding->dst_object);
 }
@@ -12271,4 +12272,6 @@ internal character representation.  */);
 
   DEFSYM (QUnknown_error, "Unknown error");
   DEFSYM (Qdefine_coding_system_internal, "define-coding-system-internal");
+
+  string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-string");
 }

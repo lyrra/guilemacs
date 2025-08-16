@@ -837,28 +837,12 @@ string_escape_byte8 (Lisp_Object string)
 }
 
 
-DEFUN ("string", Fstring, Sstring, 0, MANY, 0,
-       doc: /*
-Concatenate all the argument characters and make the result a string.
-usage: (string &rest CHARACTERS)  */)
-  (ptrdiff_t n, Lisp_Object *args)
-{
-  Lisp_Object str =  scm_c_make_string (n, scm_c_make_char (32));
-  for (ptrdiff_t i = 0; i < n; i++)
-    {
-      CHECK_CHARACTER (args[i]);
-      scm_c_string_set_x (str, i, scm_c_make_char (XFIXNUM (args[i])));
-    }
-  return str;
-}
+/* HOISTED TO SCHEME: string is now implemented in prelude/load.scm
+   as elisp-string using native Guile string operations. */
 
-DEFUN ("unibyte-string", Funibyte_string, Sunibyte_string, 0, MANY, 0,
-       doc: /* Concatenate all the argument bytes and make the result a unibyte string.
-usage: (unibyte-string &rest BYTES)  */)
-  (ptrdiff_t n, Lisp_Object *args)
-{
-  return Fstring (n, args);
-}
+/* HOISTED TO SCHEME: unibyte-string is now implemented in prelude/load.scm
+   as elisp-unibyte-string. In Guilemacs all strings are UTF-8, so it just
+   delegates to the string function. */
 
 DEFUN ("char-resolve-modifiers", Fchar_resolve_modifiers,
        Schar_resolve_modifiers, 1, 1, 0,
