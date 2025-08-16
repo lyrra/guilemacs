@@ -3016,129 +3016,35 @@ fread_char_literal (struct reader_context *ctx)
 static Lisp_Object
 fread_string_literal (struct reader_context *ctx)
 {
-  /* Try to use Guile's string reader if we have a SCM port */
-  if (!scm_is_false (ctx->port))
+
+  if (scm_is_false (ctx->port))
     {
-      /* We've already consumed the opening quote, so push it back */
-      scm_ungetc ('"', ctx->port);
-
-      /* Let Guile read the string */
-      SCM result = scm_read (ctx->port);
-
-      /* Check if we got a valid string */
-      if (scm_is_string (result))
-        {
-          /* Reset lookahead buffer since Guile consumed the characters */
-          ctx->lookahead = 0;
-
-          /* Return the Guile string directly (Lisp_Object is typedef'd to SCM) */
-          return result;
-        }
-      else
-        {
-          /* If Guile didn't return a string, something went wrong.
-             Fall back to the original implementation */
-          /* Note: We can't easily recover the position, so we'll error out */
-          error ("Guile reader failed to parse string");
-        }
+      fprintf(stderr, "-- didnt use guile reader\n");
+      emacs_abort ();
     }
 
-  fprintf(stderr, "-- didnt use guile reader\n");
-  emacs_abort ();
-  /* Fallback: Original implementation for non-port contexts */
-  char stackbuf[1024];
-  char *read_buffer = stackbuf;
-  ptrdiff_t read_buffer_size = sizeof stackbuf;
-  char *heapbuf = NULL;
-  char *p = read_buffer;
-  char *end = read_buffer + read_buffer_size;
-  ptrdiff_t nchars = 0;
+  /* We've already consumed the opening quote, so push it back */
+  scm_ungetc ('"', ctx->port);
 
-  dynwind_begin ();
+  /* Let Guile read the string */
+  SCM result = scm_read (ctx->port);
 
-  int ch;
-  while ((ch = freadchar (ctx)) >= 0 && ch != '\"')
+  /* Check if we got a valid string */
+  if (scm_is_string (result))
     {
-      if (end - p < MAX_MULTIBYTE_LENGTH)
-	{
-	  ptrdiff_t offset = p - read_buffer;
-	  read_buffer = grow_read_buffer (read_buffer, offset,
-					  &heapbuf, &read_buffer_size);
-	  p = read_buffer + offset;
-	  end = read_buffer + read_buffer_size;
-	}
+      /* Reset lookahead buffer since Guile consumed the characters */
+      ctx->lookahead = 0;
 
-      if (ch == '\\')
-	{
-	  /* First apply string-specific escape rules:  */
-	  ch = freadchar (ctx);
-	  switch (ch)
-	    {
-	    case 's':
-	      /* `\s' is always a space in strings.  */
-	      ch = ' ';
-	      break;
-	    case ' ':
-	    case '\n':
-	      /* `\SPC' and `\LF' generate no characters at all.  */
-	      continue;
-	    default:
-	      ch = fread_char_escape (ctx, ch);
-	      break;
-	    }
-
-	  int modifiers = ch & CHAR_MODIFIER_MASK;
-	  ch &= ~CHAR_MODIFIER_MASK;
-
-	  /* Handle character modifiers (was ASCII_CHAR_P case) */
-	  /* Allow `\C-SPC' and `\^SPC'.  This is done here because
-	     the literals ?\C-SPC and ?\^SPC (rather inconsistently)
-	     yield (' ' | CHAR_CTL); see bug#55738.  */
-	  if (modifiers == CHAR_CTL && ch == ' ')
-	    {
-	      ch = 0;
-	      modifiers = 0;
-	    }
-	  if (modifiers & CHAR_SHIFT)
-	    {
-	      /* Shift modifier is valid only with [A-Za-z].  */
-	      if (ch >= 'A' && ch <= 'Z')
-		modifiers &= ~CHAR_SHIFT;
-	      else if (ch >= 'a' && ch <= 'z')
-		{
-		  ch -= ('a' - 'A');
-		  modifiers &= ~CHAR_SHIFT;
-		}
-	    }
-
-	  if (modifiers & CHAR_META)
-	    {
-	      /* Move the meta bit to the right place for a
-		 string.  */
-	      modifiers &= ~CHAR_META;
-	      ch = BYTE8_TO_CHAR (ch | 0x80);
-	    }
-
-	  /* Any modifiers remaining are invalid.  */
-	  if (modifiers)
-	    finvalid_syntax ("Invalid modifier in string");
-
-	  int i = CHAR_STRING (ch, (unsigned char *) p);
-	  p += i;
-	}
-      else
-	{
-	  p += CHAR_STRING (ch, (unsigned char *) p);
-	}
-      nchars++;
+      /* Return the Guile string directly (Lisp_Object is typedef'd to SCM) */
+      return result;
     }
-
-  if (ch < 0)
-    end_of_file_error ();
-
-  Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer, true);
-  dynwind_end ();
-  return obj;
+  else
+    {
+      /* If Guile didn't return a string, something went wrong.
+         Fall back to the original implementation */
+      /* Note: We can't easily recover the position, so we'll error out */
+      error ("Guile reader failed to parse string");
+    }
 }
 
 /* File-specific version of read_bool_vector - uses freadchar() directly */
