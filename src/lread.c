@@ -3042,7 +3042,7 @@ fread_integer (struct reader_context *ctx, int radix)
   return fread_integer_guile (ctx, radix);
 }
 
-/* File-specific version of read_char_literal - uses freadchar() directly */
+/* File-specific version of read_char_literal - Pure Guile with modifier encoding */
 static Lisp_Object
 fread_char_literal (struct reader_context *ctx)
 {
@@ -3050,22 +3050,29 @@ fread_char_literal (struct reader_context *ctx)
   if (ch < 0)
     end_of_file_error ();
 
+
   /* Accept `single space' syntax like (list ? x) where the
-     whitespace character is SPC or TAB.
-     Other literal whitespace like NL, CR, and FF are not accepted,
-     as there are well-established escape sequences for these.  */
+     whitespace character is SPC or TAB. */
   if (ch == ' ' || ch == '\t')
     return make_fixnum (ch);
 
+  /* For escape sequences, we'll encode modifiers using high bits
+     that Guile can handle as regular Unicode codepoints */
   if (ch == '\\')
-    ch = fread_char_escape (ctx, freadchar (ctx));
+    {
+      /* Use a simplified escape reader that encodes modifiers
+         in a Guile-friendly way */
+      ch = fread_char_escape (ctx, freadchar (ctx));
 
-  int modifiers = ch & CHAR_MODIFIER_MASK;
-  ch &= ~CHAR_MODIFIER_MASK;
-  if (CHAR_BYTE8_P (ch))
-    ch = CHAR_TO_BYTE8 (ch);
-  ch |= modifiers;
+      /* Extract modifiers and base character */
+      int modifiers = ch & CHAR_MODIFIER_MASK;
+      int base_ch = ch & ~CHAR_MODIFIER_MASK;
 
+      /* Use the alchemy encoding for ASCII characters with modifiers */
+      ch = ENCODE_CHAR_WITH_MODIFIERS (base_ch, modifiers);
+    }
+
+  /* Check for valid character context */
   int nch = freadchar (ctx);
   funreadchar (ctx, nch);
   if (nch <= 32

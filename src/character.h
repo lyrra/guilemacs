@@ -137,6 +137,38 @@ CHAR_TO_BYTE_SAFE (int c)
   return ASCII_CHAR_P (c) ? c : CHAR_BYTE8_P (c) ? c - 0x3FFF00 : -1;
 }
 
+/* Modifier encoding for Guile-friendly character literals.
+   We use a range in the alchemy codepoints to encode ASCII chars with modifiers. */
+enum { MODIFIER_ENCODE_BASE = 0x1F800 };  /* Start of modifier encoding range */
+
+/* Encode ASCII character with Emacs modifiers into Guile-friendly codepoint */
+INLINE int
+ENCODE_CHAR_WITH_MODIFIERS (int base_ch, int modifiers)
+{
+  if (base_ch > 127 || modifiers == 0)
+    return base_ch | modifiers;  /* Use original Emacs encoding */
+
+  /* Map Emacs modifier bits to compact encoding:
+     CHAR_META    (0x8000000) -> bit 7
+     CHAR_CTL     (0x4000000) -> bit 6
+     CHAR_SHIFT   (0x2000000) -> bit 5
+     CHAR_HYPER   (0x1000000) -> bit 4
+     CHAR_SUPER   (0x0800000) -> bit 3
+     CHAR_ALT     (0x0400000) -> bit 2
+     Reserved bits 1,0 for future use
+  */
+  int compact_mod = 0;
+  if (modifiers & CHAR_META)  compact_mod |= (1 << 7);
+  if (modifiers & CHAR_CTL)   compact_mod |= (1 << 6);
+  if (modifiers & CHAR_SHIFT) compact_mod |= (1 << 5);
+  if (modifiers & CHAR_HYPER) compact_mod |= (1 << 4);
+  if (modifiers & CHAR_SUPER) compact_mod |= (1 << 3);
+  if (modifiers & CHAR_ALT)   compact_mod |= (1 << 2);
+
+  /* Encode as: base + (compact_modifiers << 7) + MODIFIER_ENCODE_BASE */
+  return MODIFIER_ENCODE_BASE + (compact_mod << 7) + base_ch;
+}
+
 /* True iff BYTE is the 1st byte of a multibyte form of a character
    that corresponds to a raw 8-bit byte.  */
 INLINE bool
