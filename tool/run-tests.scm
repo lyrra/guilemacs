@@ -31,6 +31,7 @@
   "test/pre/fixnum.scm"
   "test/pre/float.scm"
   "test/pre/string2.scm"
+  "test/pre/reader-integers.scm"
   "test/pre/reader-utf8.scm"
 ;  "test/pre/fns.scm"
   "test/pre/random.scm"
