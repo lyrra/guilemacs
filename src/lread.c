@@ -710,16 +710,16 @@ lisp_file_lexical_cookie (Lisp_Object readcharfun)
       } beg_end_state = NOMINAL;
       bool in_file_vars = 0;
 
-#define UPDATE_BEG_END_STATE(ch)				\
-  if (beg_end_state == NOMINAL)					\
-    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);	\
-  else if (beg_end_state == AFTER_FIRST_DASH)			\
-    beg_end_state = (ch == '*' ? AFTER_ASTERIX : NOMINAL);	\
-  else if (beg_end_state == AFTER_ASTERIX)			\
-    {								\
-      if (ch == '-')						\
-	in_file_vars = !in_file_vars;				\
-      beg_end_state = NOMINAL;					\
+#define UPDATE_BEG_END_STATE(ch)
+  if (beg_end_state == NOMINAL)
+    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);
+  else if (beg_end_state == AFTER_FIRST_DASH)
+    beg_end_state = (ch == '*' ? AFTER_ASTERIX : NOMINAL);
+  else if (beg_end_state == AFTER_ASTERIX)
+    {
+      if (ch == '-')
+	in_file_vars = !in_file_vars;
+      beg_end_state = NOMINAL;
     }
 
       /* Skip until we get to the file vars, if any.  */
@@ -810,7 +810,7 @@ record_load_unwind (Lisp_Object old)
 
 
 DEFUN ("get-load-suffixes", Fget_load_suffixes, Sget_load_suffixes, 0, 0, 0,
-       doc: /* Return the suffixes that `load' should try if a suffix is \
+       doc: /* Return the suffixes that `load' should try if a suffix is
 required.
 This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   (void)
@@ -1931,12 +1931,12 @@ lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
       } beg_end_state = NOMINAL;
       bool in_file_vars = 0;
 
-#define UPDATE_BEG_END_STATE2(ch)				\
-  if (beg_end_state == NOMINAL)					\
-    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);	\
-  else if (beg_end_state == AFTER_FIRST_DASH)			\
-    beg_end_state = (ch == '*' ? AFTER_ASTERIX : NOMINAL);		\
-  else if (beg_end_state == AFTER_ASTERIX)			\
+#define UPDATE_BEG_END_STATE2(ch)
+  if (beg_end_state == NOMINAL)
+    beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);
+  else if (beg_end_state == AFTER_FIRST_DASH)
+    beg_end_state = (ch == '*' ? AFTER_ASTERIX : NOMINAL);
+  else if (beg_end_state == AFTER_ASTERIX)
     beg_end_state = (ch == '-' ? AFTER_FIRST_DASH : NOMINAL);
 
       while (ch != '\n' && ch != EOF)
@@ -2294,6 +2294,70 @@ the end of STRING.  */)
   /* `read_internal_start' sets `read_from_string_index'.  */
   ret = read_internal_start (string, start, end, false);
   return Fcons (ret, make_fixnum (read_from_string_index));
+}
+
+/* Guile Reader Migration - Proof of Concept Implementation */
+
+static Lisp_Object
+guile_to_lisp_object (SCM obj)
+{
+  /* Convert Guile object back to Lisp_Object */
+  if (scm_is_null (obj))
+    return Qnil;
+  else if (scm_is_bool (obj))
+    return scm_is_true (obj) ? Qt : Qnil;
+  else if (scm_is_integer (obj))
+    return make_fixnum (scm_to_int (obj));
+  else if (scm_is_string (obj))
+    return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
+  else if (scm_is_symbol (obj))
+    return obj; /* Symbols should work directly */
+  else if (scm_is_pair (obj))
+    {
+      /* Recursively convert cons cells */
+      Lisp_Object car = guile_to_lisp_object (scm_car (obj));
+      Lisp_Object cdr = guile_to_lisp_object (scm_cdr (obj));
+      return Fcons (car, cdr);
+    }
+  else
+    {
+      /* For complex types, return as-is and let higher layers handle */
+      return obj;
+    }
+}
+
+DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
+       doc: /* Guile-based version of read-from-string.
+Read one Lisp expression which is represented as text by STRING.
+Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
+FINAL-STRING-INDEX is an integer giving the position of the next
+remaining character in STRING.  START and END optionally delimit
+a substring of STRING from which to read.  This function uses Guile's
+scm_read() for parsing instead of the C reader.  */)
+  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
+{
+  CHECK_STRING (string);
+
+  /* Handle START and END parameters */
+  Lisp_Object substring;
+  if (NILP (start) && NILP (end))
+    {
+      substring = string;
+    }
+  else
+    {
+      /* Extract substring - delegate to existing substring implementation */
+      substring = Fsubstring (string, start, end);
+    }
+
+  /* Use Guile to read from string */
+  SCM port = scm_open_input_string (substring);
+  SCM result = scm_read (port);
+
+  /* Calculate final string index */
+  ptrdiff_t final_index = SCHARS (substring);
+
+  return Fcons (guile_to_lisp_object (result), make_fixnum (final_index));
 }
 
 /* Function to set up the global context we need in toplevel read
@@ -3284,14 +3348,14 @@ hash_table_from_plist (Lisp_Object plist)
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
-#define ADDPARAM(name)					\
-  do {							\
-    Lisp_Object val = plist_get (plist, Q ## name);	\
-    if (!NILP (val))					\
-      {							\
-	*par++ = QC ## name;				\
-	*par++ = val;					\
-      }							\
+#define ADDPARAM(name)
+  do {
+    Lisp_Object val = plist_get (plist, Q ## name);
+    if (!NILP (val))
+      {
+	*par++ = QC ## name;
+	*par++ = val;
+      }
   } while (0)
 
   ADDPARAM (test);
@@ -3592,29 +3656,29 @@ read_stack_reset (intmax_t sp)
   rdstack.sp = sp;
 }
 
-#define READ_AND_BUFFER(c)			\
-  c = READCHAR;					\
-  if (c < 0)					\
-    INVALID_SYNTAX_WITH_BUFFER ();		\
-  p += CHAR_STRING (c, (unsigned char *) p);	\
-  if (end - p < MAX_MULTIBYTE_LENGTH + 1)	\
-    {						\
-       offset = p - read_buffer;		\
-       emacs_abort ();          		\
-       p = read_buffer + offset;					\
-       end = read_buffer + read_buffer_size;				\
+#define READ_AND_BUFFER(c)
+  c = READCHAR;
+  if (c < 0)
+    INVALID_SYNTAX_WITH_BUFFER ();
+  p += CHAR_STRING (c, (unsigned char *) p);
+  if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+    {
+       offset = p - read_buffer;
+       emacs_abort ();
+       p = read_buffer + offset;
+       end = read_buffer + read_buffer_size;
     }
 
-#define INVALID_SYNTAX_WITH_BUFFER()		\
-  {						\
-    *p = 0;					\
-    invalid_syntax (read_buffer, readcharfun);	\
+#define INVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    invalid_syntax (read_buffer, readcharfun);
   }
 
-#define FINVALID_SYNTAX_WITH_BUFFER()		\
-  {						\
-    *p = 0;					\
-    finvalid_syntax (read_buffer);		\
+#define FINVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    finvalid_syntax (read_buffer);
   }
 
 /* Read a Lisp object.
@@ -5977,7 +6041,7 @@ to the specified file name if a suffix is allowed or required.  */);
 #endif
 
   DEFVAR_LISP ("load-file-rep-suffixes", Vload_file_rep_suffixes,
-	       doc: /* List of suffixes that indicate representations of \
+	       doc: /* List of suffixes that indicate representations of
 the same file.
 This list should normally start with the empty string.
 
