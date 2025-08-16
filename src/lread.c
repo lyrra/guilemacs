@@ -3256,24 +3256,27 @@ read_char_literal (Lisp_Object readcharfun)
   invalid_syntax ("?", readcharfun);
 }
 
-/* Read a string literal (preceded by '"').  */
+/* Read a string literal (preceded by '"'). */
 static Lisp_Object
 read_string_literal (Lisp_Object readcharfun)
 {
+  /* collect the string and let Guile parse it */
   char stackbuf[1024];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
   char *heapbuf = NULL;
   char *p = read_buffer;
   char *end = read_buffer + read_buffer_size;
-  ptrdiff_t nchars = 0;
 
   dynwind_begin ();
 
+  /* Start with opening quote */
+  *p++ = '"';
+
   int ch;
-  while ((ch = READCHAR) >= 0 && ch != '\"')
+  while ((ch = READCHAR) >= 0 && ch != '"')
     {
-      if (end - p < MAX_MULTIBYTE_LENGTH)
+      if (end - p < MAX_MULTIBYTE_LENGTH + 2) /* +2 for potential escape and closing quote */
 	{
 	  ptrdiff_t offset = p - read_buffer;
 	  read_buffer = grow_read_buffer (read_buffer, offset,
@@ -3282,77 +3285,40 @@ read_string_literal (Lisp_Object readcharfun)
 	  end = read_buffer + read_buffer_size;
 	}
 
+      /* Preserve backslashes and escaped quotes for Guile to handle */
       if (ch == '\\')
 	{
-	  /* First apply string-specific escape rules:  */
+	  *p++ = ch;
 	  ch = READCHAR;
-	  switch (ch)
-	    {
-	    case 's':
-	      /* `\s' is always a space in strings.  */
-	      ch = ' ';
-	      break;
-	    case ' ':
-	    case '\n':
-	      /* `\SPC' and `\LF' generate no characters at all.  */
-	      continue;
-	    default:
-	      ch = read_char_escape (readcharfun, ch);
-	      break;
-	    }
-
-	  int modifiers = ch & CHAR_MODIFIER_MASK;
-	  ch &= ~CHAR_MODIFIER_MASK;
-
-	  /* Handle character modifiers (was ASCII_CHAR_P case) */
-	  /* Allow `\C-SPC' and `\^SPC'.  This is done here because
-	     the literals ?\C-SPC and ?\^SPC (rather inconsistently)
-	     yield (' ' | CHAR_CTL); see bug#55738.  */
-	  if (modifiers == CHAR_CTL && ch == ' ')
-	    {
-	      ch = 0;
-	      modifiers = 0;
-	    }
-	  if (modifiers & CHAR_SHIFT)
-	    {
-	      /* Shift modifier is valid only with [A-Za-z].  */
-	      if (ch >= 'A' && ch <= 'Z')
-		modifiers &= ~CHAR_SHIFT;
-	      else if (ch >= 'a' && ch <= 'z')
-		{
-		  ch -= ('a' - 'A');
-		  modifiers &= ~CHAR_SHIFT;
-		}
-	    }
-
-	  if (modifiers & CHAR_META)
-	    {
-	      /* Move the meta bit to the right place for a
-		 string.  */
-	      modifiers &= ~CHAR_META;
-	      ch = BYTE8_TO_CHAR (ch | 0x80);
-	    }
-
-	  /* Any modifiers remaining are invalid.  */
-	  if (modifiers)
-	    invalid_syntax ("Invalid modifier in string", readcharfun);
-
-	  int i = CHAR_STRING (ch, (unsigned char *) p);
-	  p += i;
+	  if (ch < 0)
+	    end_of_file_error ();
 	}
+
+      /* Store the character */
+      if (ch < 128)
+	*p++ = ch;
       else
-	{
-	  p += CHAR_STRING (ch, (unsigned char *) p);
-	}
-      nchars++;
+	p += CHAR_STRING (ch, (unsigned char *) p);
     }
 
   if (ch < 0)
     end_of_file_error ();
 
-  Lisp_Object obj = make_specified_string (read_buffer, nchars, p - read_buffer, true);
+  /* Add closing quote */
+  *p++ = '"';
+  *p = '\0';
+
+  /* Let Guile parse the complete string literal */
+  SCM str_scm = scm_from_locale_string (read_buffer);
+  SCM result = scm_call_with_input_string (str_scm,
+                                           scm_c_public_ref ("guile", "read"));
+
   dynwind_end ();
-  return obj;
+
+  if (!scm_is_string (result))
+    error ("Invalid string literal");
+
+  return result;
 }
 
 /* Make a hash table from the constructor plist.  */
