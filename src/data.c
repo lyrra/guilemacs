@@ -413,17 +413,9 @@ DEFUN ("stringp", Fstringp, Sstringp, 1, 1, 0,
   return Qnil;
 }
 
-DEFUN ("multibyte-string-p", Fmultibyte_string_p, Smultibyte_string_p,
-       1, 1, 0,
-       doc: /* Return t if OBJECT is a multibyte string.
-Return nil if OBJECT is either a unibyte string, or not a string.  */)
-  (Lisp_Object object)
-{
-  // FIX-guilemacs: it's possible to call scm_string_wide_p
-  //if (STRINGP (object))
-  //  return Qt;
-  return Qnil;
-}
+/* HOISTED TO SCHEME: multibyte-string-p is now implemented in prelude/load.scm
+   as elisp-multibyte-string-p. In Guilemacs all strings are UTF-8, so it
+   always returns nil. */
 
 DEFUN ("char-table-p", Fchar_table_p, Schar_table_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a char-table.  */)

@@ -228,6 +228,12 @@ Letter-case is significant, but text properties are ignored."
   ;; In Guilemacs, all strings are UTF-8, so just call string
   (apply elisp-string bytes))
 
+(define (elisp-multibyte-string-p object)
+  "Return t if OBJECT is a multibyte string.
+Return nil if OBJECT is either a unibyte string, or not a string.
+In Guilemacs, all strings are UTF-8, so this always returns nil."
+  #nil)
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -235,6 +241,7 @@ Letter-case is significant, but text properties are ignored."
 (set-symbol-function! 'byte-to-string elisp-byte-to-string)
 (set-symbol-function! 'string elisp-string)
 (set-symbol-function! 'unibyte-string elisp-unibyte-string)
+(set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
