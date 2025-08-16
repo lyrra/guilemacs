@@ -3338,6 +3338,101 @@ fread_integer (struct reader_context *ctx, int radix)
     }
 }
 
+/* Synchronize Guile port position with C reader position before scm_read */
+static void
+sync_guile_port_with_c_position (struct reader_context *ctx, int trigger_char)
+{
+  /* Push the trigger character back to Guile port so scm_read can see it */
+  scm_ungetc (trigger_char, ctx->port);
+
+  /* If there's a lookahead character in C buffer, push it to Guile too
+     This ensures Guile port sees the same character sequence as C reader */
+  if (ctx->lookahead != 0)
+    {
+      scm_ungetc (ctx->lookahead, ctx->port);
+      ctx->lookahead = 0;  /* Clear C-side lookahead since it's now in Guile */
+    }
+}
+
+/* File-specific version of read_symbol - Pure Guile symbol/number reading with proper sync */
+static Lisp_Object
+fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_symbol, bool skip_shorthand)
+{
+  if (scm_is_false (ctx->port))
+    {
+      error ("No Guile port available for symbol reading");
+    }
+
+  /* CRITICAL: Synchronize port position before letting Guile read */
+  sync_guile_port_with_c_position (ctx, first_char);
+
+  /* Now Guile port is properly positioned to read the symbol/number */
+  SCM result = scm_read (ctx->port);
+
+  /* Handle the result based on what Guile parsed */
+  if (scm_is_symbol (result))
+    {
+      /* For uninterned symbols, we need to create a new uninterned symbol */
+      if (uninterned_symbol)
+        {
+          SCM name = scm_symbol_to_string (result);
+          return Fmake_symbol (name);
+        }
+      else
+        {
+          /* For regular symbols, just return the Guile symbol directly.
+             In the pure Guile approach, symbols are already properly interned by Guile's reader.
+             This maintains compatibility while using Guile's native symbol handling. */
+          return result;
+        }
+    }
+  else if (scm_is_number (result))
+    {
+      /* Numbers are handled directly - Guile's parsing is authoritative */
+      return result;
+    }
+  else
+    {
+      /* Debug: what type did Guile actually return? */
+      if (scm_is_keyword (result))
+        {
+          /* Convert Guile keywords (#:foo) to Emacs symbols (:foo)
+             This handles both Common Lisp style (:foo) and Guile style (#:foo) keywords */
+          SCM keyword_name = scm_keyword_to_symbol (result);
+          SCM name_string = scm_symbol_to_string (keyword_name);
+
+          /* Create a new symbol with : prefix for Emacs compatibility */
+          char *keyword_str = scm_to_utf8_string (name_string);
+          char *emacs_keyword = malloc (strlen (keyword_str) + 2);
+          emacs_keyword[0] = ':';
+          strcpy (emacs_keyword + 1, keyword_str);
+
+          SCM emacs_symbol = scm_from_utf8_string (emacs_keyword);
+
+          free (keyword_str);
+          free (emacs_keyword);
+
+          return intern_driver (emacs_symbol, check_obarray (Vobarray));
+        }
+      else if (scm_is_string (result))
+        {
+          /* Sometimes strings are returned */
+          return result;
+        }
+      else
+        {
+          /* This shouldn't happen with valid symbol/number syntax */
+          error ("Guile symbol reader returned unexpected type: %s",
+                 scm_is_true (scm_symbol_p (result)) ? "symbol" :
+                 scm_is_true (scm_number_p (result)) ? "number" :
+                 scm_is_true (scm_keyword_p (result)) ? "keyword" :
+                 scm_is_true (scm_string_p (result)) ? "string" :
+                 scm_is_true (scm_list_p (result)) ? "list" :
+                 "unknown");
+        }
+    }
+}
+
 /* File-specific version of read_char_literal - Pure Guile with modifier encoding */
 static Lisp_Object
 fread_char_literal (struct reader_context *ctx)
@@ -5214,85 +5309,8 @@ fread0 (struct reader_context *ctx)
       /* symbol or number */
     read_symbol:
       {
-	char *p = read_buffer;
-	char *end = read_buffer + read_buffer_size;
-	bool quoted = false;
-
-	do
-	  {
-	    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-	      {
-		ptrdiff_t offset = p - read_buffer;
-		read_buffer = grow_read_buffer (read_buffer, offset,
-						&heapbuf, &read_buffer_size);
-		p = read_buffer + offset;
-		end = read_buffer + read_buffer_size;
-	      }
-
-	    if (c == '\\')
-	      {
-		c = freadchar (ctx);
-		if (c < 0)
-		  end_of_file_error ();
-		quoted = true;
-	      }
-
-	    p += CHAR_STRING (c, (unsigned char *) p);
-	    c = freadchar (ctx);
-	  }
-	while (c > 32
-	       && c != NO_BREAK_SPACE
-	       && (c >= 128
-		   || !(   c == '"' || c == '\'' || c == ';' || c == '#'
-			|| c == '(' || c == ')'  || c == '[' || c == ']'
-			|| c == '`' || c == ',')));
-
-	*p = 0;
-	ptrdiff_t nbytes = p - read_buffer;
-	funreadchar (ctx, c);
-
-	/* Only attempt to parse the token as a number if it starts as one.  */
-	char c0 = read_buffer[0];
-	if (((c0 >= '0' && c0 <= '9') || c0 == '.' || c0 == '-' || c0 == '+')
-	    && !quoted && !uninterned_symbol && !skip_shorthand)
-	  {
-	    ptrdiff_t len;
-	    Lisp_Object result = string_to_number (read_buffer, 10, &len);
-	    if (!NILP (result) && len == nbytes)
-	      {
-		obj = result;
-		break;
-	      }
-	  }
-
-	/* symbol, possibly uninterned */
-	ptrdiff_t nchars = multibyte_chars_in_text ((unsigned char *)read_buffer, nbytes);
-	Lisp_Object result;
-	if (uninterned_symbol)
-	  {
-	    Lisp_Object name
-	      = (!NILP (Vpurify_flag)
-		 ? make_pure_string (read_buffer, nchars, nbytes, true)
-		 : make_specified_string (read_buffer, nchars, nbytes,
-					  true));
-	    result = Fmake_symbol (name);
-	  }
-	else
-	  {
-	    /* Don't create the string object for the name unless
-	       we're going to retain it in a new symbol.
-
-		 Like intern_1 but supports multibyte names.  */
-	      Lisp_Object obarray = check_obarray (Vobarray);
-		{
-		  Lisp_Object name
-		    = make_specified_string (read_buffer, nchars, nbytes,
-					     true);
-		  result = intern_driver (name, obarray);
-		}
-	    }
-
-	obj = result;
+	/* Use pure Guile symbol/number reading with port synchronization */
+	obj = fread_symbol_guile (ctx, c, uninterned_symbol, skip_shorthand);
 	break;
       }
     }

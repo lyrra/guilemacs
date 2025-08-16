@@ -979,5 +979,8 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'parse-emacs-number parse-emacs-number)
   (module-define! elisp-emacs-module 'parse-emacs-number parse-emacs-number))
 
+;; when elisp reads keyword symbols, support common-lisp keywords
+(read-set! keywords 'prefix)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
