@@ -2915,10 +2915,68 @@ fread_char_escape (struct reader_context *ctx, int next_char)
   return chr | modifiers;
 }
 
-/* File-specific version of read_integer - uses freadchar() directly
-   TODO: Future integration point for Guile's scm_string_to_number */
+/* Forward declaration for original integer reader */
+static Lisp_Object fread_integer_original (struct reader_context *ctx, int radix);
+
 static Lisp_Object
-fread_integer (struct reader_context *ctx, int radix)
+fread_integer_guile (struct reader_context *ctx, int radix)
+{
+  if (scm_is_false (ctx->port))
+    {
+      /* No Guile port available, fall back to original implementation */
+      emacs_abort ();
+      return fread_integer_original (ctx, radix);
+    }
+
+  /* Build radix prefix for Guile reader if needed */
+  char prefix[8];
+  switch (radix)
+    {
+    case 2:
+      strcpy (prefix, "#b");
+      break;
+    case 8:
+      strcpy (prefix, "#o");
+      break;
+    case 16:
+      strcpy (prefix, "#x");
+      break;
+    case 10:
+      prefix[0] = '\0'; /* No prefix needed for decimal */
+      break;
+    default:
+      /* For arbitrary radix like #36r, we need to read the number manually
+         since Guile's reader expects the full #NrDIGITS format */
+      return fread_integer_original (ctx, radix);
+    }
+
+  /* If we have a prefix, ungetc it to the port */
+  if (prefix[0] != '\0')
+    {
+      for (int i = strlen (prefix) - 1; i >= 0; i--)
+        scm_ungetc (prefix[i], ctx->port);
+    }
+
+  /* Let Guile read the number */
+  SCM result = scm_read (ctx->port);
+
+  /* Check if we got a valid number */
+  if (scm_is_number (result))
+    {
+      /* Reset lookahead buffer since Guile consumed the characters */
+      ctx->lookahead = 0;
+      return result;
+    }
+  else
+    {
+      /* If Guile didn't return a number, fall back to original */
+      error ("Guile reader failed to parse integer");
+    }
+}
+
+/* Original C-based integer reader - kept as fallback */
+static Lisp_Object
+fread_integer_original (struct reader_context *ctx, int radix)
 {
   char stackbuf[20];
   char *read_buffer = stackbuf;
@@ -2975,6 +3033,13 @@ fread_integer (struct reader_context *ctx, int radix)
   Lisp_Object tem = string_to_number (read_buffer, radix, NULL);
   dynwind_end();
   return tem;
+}
+
+/* File-specific version of read_integer - uses Guile reader when enabled */
+static Lisp_Object
+fread_integer (struct reader_context *ctx, int radix)
+{
+  return fread_integer_guile (ctx, radix);
 }
 
 /* File-specific version of read_char_literal - uses freadchar() directly */
