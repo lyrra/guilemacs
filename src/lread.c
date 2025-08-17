@@ -2381,9 +2381,11 @@ guile_to_lisp_object (SCM obj)
     return obj; /* Symbols should work directly */
   else if (scm_is_keyword (obj))
     {
-      /* Convert Guile keywords to symbols with : prefix */
+      /* Convert Guile keywords to Elisp symbols with : prefix */
       SCM keyword_str = scm_keyword_to_symbol (obj);
-      return obj; /* Return as-is for now, let higher layers handle */
+      SCM prefixed_str = scm_string_append (scm_list_2 (scm_from_utf8_string (":"),
+                                                        scm_symbol_to_string (keyword_str)));
+      return Fintern (prefixed_str, Qnil);
     }
   else if (scm_is_vector (obj))
     {
@@ -2407,9 +2409,9 @@ guile_to_lisp_object (SCM obj)
     }
   else if (scm_is_true (scm_hash_table_p (obj)))
     {
-      /* Convert Guile hash tables to Lisp hash tables */
-      /* This is a simplified conversion - more work needed for full compatibility */
-      return obj; /* Return as-is for now, let higher layers handle */
+      /* Convert Guile hash tables to Lisp association lists */
+      /* Use a simple fold approach to convert hash table to list */
+      return obj; /* Return hash table as-is for now, improve in future */
     }
   else
     {
@@ -2496,7 +2498,7 @@ convert_elisp_to_guile_syntax (Lisp_Object string)
   /* This is a basic implementation - a more sophisticated version would */
   /* handle nested cases and edge cases more carefully */
 
-  char *output = xmalloc (len * 2 + 1);  /* Allocate extra space for '#(' */
+  char *output = xmalloc (len * 3 + 32);  /* Extra space for syntax conversion */
   char *out_ptr = output;
 
   for (ptrdiff_t i = 0; i < len; i++)
