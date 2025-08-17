@@ -637,5 +637,99 @@ This is a useful building block for higher-order functions."
 (set-symbol-function! 'identity elisp-identity)
 (set-symbol-function! 'constantly elisp-constantly)
 
+;; Phase 3: Type predicate functions migrated from C to Guile
+
+(define (elisp-symbolp object)
+  "Return t if OBJECT is a symbol."
+  (if (symbol? object) #t #nil))
+
+(define (elisp-bufferp object)
+  "Return t if OBJECT is an editor buffer."
+  ;; Note: BUFFERP check needs to be kept in C for now as buffer objects are C-specific
+  ;; This is a placeholder implementation
+  #nil)
+
+(define (elisp-consp object)
+  "Return t if OBJECT is a cons cell."
+  (if (pair? object) #t #nil))
+
+(define (elisp-atom object)
+  "Return t if OBJECT is not a cons cell. This includes nil."
+  (if (pair? object) #nil #t))
+
+(define (elisp-listp object)
+  "Return t if OBJECT is a list, that is, a cons cell or nil.
+Otherwise, return nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-nlistp object)
+  "Return t if OBJECT is not a list. Lists include nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #nil #t))
+
+(define (elisp-vectorp object)
+  "Return t if OBJECT is a vector."
+  (if (vector? object) #t #nil))
+
+;; Basic cons cell manipulation functions
+
+(define (elisp-cons car cdr)
+  "Create a new cons, give it CAR and CDR as components, and return it."
+  (cons car cdr))
+
+(define (elisp-car list)
+  "Return the car of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `car-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (car list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-cdr list)
+  "Return the cdr of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (cdr list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-car-safe object)
+  "Return the car of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (car object) #nil))
+
+(define (elisp-cdr-safe object)
+  "Return the cdr of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (cdr object) #nil))
+
+;; List construction functions
+
+(define (elisp-list . objects)
+  "Return a newly created list with specified arguments as elements.
+Allows any number of arguments, including zero."
+  objects)
+
+(define (elisp-make-list length init)
+  "Return a newly created list of length LENGTH, with each element being INIT."
+  (if (not (and (integer? length) (>= length 0)))
+      (error "Wrong type argument: natnump" length)
+      (make-list length init)))
+
+;; Register Phase 3 functions for Elisp use
+(set-symbol-function! 'symbolp elisp-symbolp)
+; Note: bufferp kept in C for now due to C-specific buffer object handling
+(set-symbol-function! 'consp elisp-consp)
+(set-symbol-function! 'atom elisp-atom)
+(set-symbol-function! 'listp elisp-listp)
+(set-symbol-function! 'nlistp elisp-nlistp)
+(set-symbol-function! 'vectorp elisp-vectorp)
+(set-symbol-function! 'cons elisp-cons)
+(set-symbol-function! 'car elisp-car)
+(set-symbol-function! 'cdr elisp-cdr)
+(set-symbol-function! 'car-safe elisp-car-safe)
+(set-symbol-function! 'cdr-safe elisp-cdr-safe)
+(set-symbol-function! 'list elisp-list)
+(set-symbol-function! 'make-list elisp-make-list)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
