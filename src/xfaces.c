@@ -3942,13 +3942,13 @@ face_boolean_x_resource_value (Lisp_Object value, bool signal_p)
 
   eassert (STRINGP (value));
 
-  if (xstrcasecmp (SSDATA (value), "on") == 0
-      || xstrcasecmp (SSDATA (value), "true") == 0)
+  if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("on")))
+      || scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("true"))))
     result = Qt;
-  else if (xstrcasecmp (SSDATA (value), "off") == 0
-	   || xstrcasecmp (SSDATA (value), "false") == 0)
+  else if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("off")))
+	   || scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("false"))))
     result = Qnil;
-  else if (xstrcasecmp (SSDATA (value), "unspecified") == 0)
+  else if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("unspecified"))))
     result = Qunspecified;
   else if (signal_p)
     signal_error ("Invalid face attribute value from X resource", value);
@@ -3967,7 +3967,7 @@ DEFUN ("internal-set-lisp-face-attribute-from-resource",
   CHECK_SYMBOL (attr);
   CHECK_STRING (value);
 
-  if (xstrcasecmp (SSDATA (value), "unspecified") == 0)
+  if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("unspecified"))))
     value = Qunspecified;
   else if (EQ (attr, QCheight))
     {
@@ -4528,10 +4528,10 @@ lface_same_font_attributes_p (Lisp_Object *lface1, Lisp_Object *lface2)
 {
   eassert (lface_fully_specified_p (lface1)
 	   && lface_fully_specified_p (lface2));
-  return (xstrcasecmp (SSDATA (lface1[LFACE_FAMILY_INDEX]),
-		       SSDATA (lface2[LFACE_FAMILY_INDEX])) == 0
-	  && xstrcasecmp (SSDATA (lface1[LFACE_FOUNDRY_INDEX]),
-			  SSDATA (lface2[LFACE_FOUNDRY_INDEX])) == 0
+  return (scm_is_true (scm_string_ci_equal_p (lface1[LFACE_FAMILY_INDEX],
+					      lface2[LFACE_FAMILY_INDEX]))
+	  && scm_is_true (scm_string_ci_equal_p (lface1[LFACE_FOUNDRY_INDEX],
+						 lface2[LFACE_FOUNDRY_INDEX]))
 	  && EQ (lface1[LFACE_HEIGHT_INDEX], lface2[LFACE_HEIGHT_INDEX])
 	  && EQ (lface1[LFACE_SWIDTH_INDEX], lface2[LFACE_SWIDTH_INDEX])
 	  && EQ (lface1[LFACE_WEIGHT_INDEX], lface2[LFACE_WEIGHT_INDEX])
@@ -4540,8 +4540,8 @@ lface_same_font_attributes_p (Lisp_Object *lface1, Lisp_Object *lface2)
 	  && (EQ (lface1[LFACE_FONTSET_INDEX], lface2[LFACE_FONTSET_INDEX])
 	      || (STRINGP (lface1[LFACE_FONTSET_INDEX])
 		  && STRINGP (lface2[LFACE_FONTSET_INDEX])
-		  && ! xstrcasecmp (SSDATA (lface1[LFACE_FONTSET_INDEX]),
-				    SSDATA (lface2[LFACE_FONTSET_INDEX]))))
+		  && scm_is_true (scm_string_ci_equal_p (lface1[LFACE_FONTSET_INDEX],
+							 lface2[LFACE_FONTSET_INDEX]))))
 	  );
 }
 

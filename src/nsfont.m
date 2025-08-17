@@ -580,13 +580,13 @@ ns_charset_covers(NSCharacterSet *set1, NSCharacterSet *set2, float pct)
 static NSString
 *ns_lang_to_script (Lisp_Object lang)
 {
-    if (!strcmp (SSDATA (SYMBOL_NAME (lang)), "ja"))
+    if (EQ (lang, intern ("ja")))
 	return @"han";
     /* NOTE: ja given for any hanzi that's also a kanji, but Chinese fonts
              have more characters.  */
-    else if (!strcmp (SSDATA (SYMBOL_NAME (lang)), "zh"))
+    else if (EQ (lang, intern ("zh")))
 	return @"han";
-    else if (!strcmp (SSDATA (SYMBOL_NAME (lang)), "ko"))
+    else if (EQ (lang, intern ("ko")))
 	return @"hangul";
     else
 	return @"";
