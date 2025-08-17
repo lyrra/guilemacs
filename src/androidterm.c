@@ -1947,7 +1947,8 @@ android_parse_color (struct frame *f, const char *color_name,
       tem1 = XCAR (tem);
 
       if (CONSP (tem1)
-	  && !xstrcasecmp (SSDATA (XCAR (tem1)), color_name))
+	  && scm_is_true (scm_string_ci_equal_p (XCAR (tem1),
+						 scm_from_utf8_string (color_name))))
 	{
 	  lisp_color = XFIXNUM (XCDR (tem1));
 	  color->red = RED_FROM_ULONG (lisp_color) * 257;
