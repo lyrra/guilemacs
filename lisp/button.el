@@ -297,6 +297,22 @@ Such area buttons are used for buttons in the mode-line and header-line."
 
 ;;; Creating overlay buttons
 
+(defun make-overlay-button (start end &rest properties)
+  "Create button using overlays instead of text properties.
+This is the recommended implementation for GuilEmacs to avoid
+text property compatibility issues with pure Guile strings."
+  (let ((overlay (make-overlay start end))
+        (button-props (cons 'category (cons 'button properties))))
+    (while button-props
+      (overlay-put overlay (car button-props) (cadr button-props))
+      (setq button-props (cddr button-props)))
+    ;; Put a pointer to the button in the overlay
+    (overlay-put overlay 'button overlay)
+    ;; Set default category if not provided
+    (unless (overlay-get overlay 'category)
+      (overlay-put overlay 'category 'default-button))
+    overlay))
+
 (defun make-button (beg end &rest properties)
   "Make a button from BEG to END in the current buffer.
 The remaining PROPERTIES arguments form a plist of PROPERTY VALUE
@@ -360,9 +376,15 @@ Also see `insert-text-button'."
    ;; Handle string case: create a copy with button properties
    ((stringp beg)
     (let ((button-string (copy-sequence beg)))
-      ;; For string buttons, we simulate the text-properties approach
-      ;; by storing properties in the string itself using overlays
-      ;; This is a simplified implementation for compatibility
+      ;; Add button properties to the string for compatibility
+      (while properties
+        (let ((prop (pop properties))
+              (val (pop properties)))
+          (put-text-property 0 (length button-string) prop val button-string)))
+      ;; Ensure the string has required button properties
+      (unless (get-text-property 0 'category button-string)
+        (put-text-property 0 (length button-string) 'category 'default-button button-string))
+      (put-text-property 0 (length button-string) 'button t button-string)
       button-string))
    ;; Handle buffer case: use overlay-based make-button
    (t
