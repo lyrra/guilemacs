@@ -4544,7 +4544,7 @@ network_interface_info (Lisp_Object ifname)
           int n;
 
           if (it->ifa_addr->sa_family != AF_LINK
-              || strcmp (it->ifa_name, SSDATA (ifname)) != 0
+              || !scm_is_true (scm_string_equal_p (scm_from_utf8_string (it->ifa_name), ifname))
               || sdl->sdl_alen != 6)
             continue;
 

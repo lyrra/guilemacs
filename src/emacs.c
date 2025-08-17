@@ -72,8 +72,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 # include <sys/socket.h>
 #endif
 
-#if defined HAVE_LINUX_SECCOMP_H && defined HAVE_LINUX_FILTER_H
-  && HAVE_DECL_SECCOMP_SET_MODE_FILTER
+#if defined HAVE_LINUX_SECCOMP_H && defined HAVE_LINUX_FILTER_H \
+  && HAVE_DECL_SECCOMP_SET_MODE_FILTER \
   && HAVE_DECL_SECCOMP_FILTER_FLAG_TSYNC
 # define SECCOMP_USABLE 1
 #else
@@ -258,135 +258,108 @@ static void syms_of_emacs (void);
 /* C99 needs each string to be at most 4095 characters, and the usage
    strings below are split to not overflow this limit.  */
 static char const *const usage_message[] =
-  { "
-\n
-Run Emacs, the extensible, customizable, self-documenting real-time\n
-display editor.  The recommended way to start Emacs for normal editing\n
-is with no options at all.\n
-\n
-Run M-x info RET m emacs RET m emacs invocation RET inside Emacs to\n
-read the main documentation for these command-line arguments.\n
-\n
-Initialization options:\n
-\n
-",
-    "
---batch                     do not do interactive display; implies -q\n
---chdir DIR                 change to directory DIR\n
---daemon, --bg-daemon[=NAME] start a (named) server in the background\n
---fg-daemon[=NAME]          start a (named) server in the foreground\n
---debug-init                enable Emacs Lisp debugger for init file\n
---display, -d DISPLAY       use X server DISPLAY\n
-",
+  { "\\n"
+"Run Emacs, the extensible, customizable, self-documenting real-time\\n"
+"display editor.  The recommended way to start Emacs for normal editing\\n"
+"is with no options at all.\\n"
+"\\n"
+"Run M-x info RET m emacs RET m emacs invocation RET inside Emacs to\\n"
+"read the main documentation for these command-line arguments.\\n"
+"\\n"
+"Initialization options:\\n"
+"\\n",
+    "--batch                     do not do interactive display; implies -q\\n"
+"--chdir DIR                 change to directory DIR\\n"
+"--daemon, --bg-daemon[=NAME] start a (named) server in the background\\n"
+"--fg-daemon[=NAME]          start a (named) server in the foreground\\n"
+"--debug-init                enable Emacs Lisp debugger for init file\\n"
+"--display, -d DISPLAY       use X server DISPLAY\\n",
 #ifdef HAVE_MODULES
-    "
---module-assertions         assert behavior of dynamic modules\n
-",
+    "--module-assertions         assert behavior of dynamic modules\\n",
 #endif
 #if SECCOMP_USABLE
-    "
---seccomp=FILE              read Seccomp BPF filter from FILE\n
-"
+    "--seccomp=FILE              read Seccomp BPF filter from FILE\\n"
 #endif
-    "
---no-build-details          do not add build details such as time stamps\n
---no-desktop                do not load a saved desktop\n
---no-init-file, -q          load neither ~/.emacs nor default.el\n
---prelude                   load file instead of loadup.el into bare Emacs\n
---no-loadup, -nl            do not load loadup.el into bare Emacs\n
---no-site-file              do not load site-start.el\n
---no-x-resources            do not load X resources\n
---no-site-lisp, -nsl        do not add site-lisp directories to load-path\n
---no-splash                 do not display a splash screen on startup\n
---no-window-system, -nw     do not communicate with X, ignoring $DISPLAY\n
---init-directory=DIR        use DIR when looking for the Emacs init files.\n
-",
-    "
---quick, -Q                 equivalent to:\n
-                              -q --no-site-file --no-site-lisp --no-splash\n
-                              --no-x-resources\n
---script FILE               run FILE as an Emacs Lisp script\n
--x                          to be used in #!/usr/bin/emacs -x\n
-                              and has approximately the same meaning\n
-			      as -Q --script\n
---terminal, -t DEVICE       use DEVICE for terminal I/O\n
---user, -u USER             load ~USER/.emacs instead of your own\n
-\n
-",
-    "
-Action options:\n
-\n
-FILE                    visit FILE\n
-+LINE                   go to line LINE in next FILE\n
-+LINE:COLUMN            go to line LINE, column COLUMN, in next FILE\n
---directory, -L DIR     prepend DIR to load-path (with :DIR, append DIR)\n
---eval EXPR             evaluate Emacs Lisp expression EXPR\n
---execute EXPR          evaluate Emacs Lisp expression EXPR\n
-",
-    "
---file FILE             visit FILE\n
---find-file FILE        visit FILE\n
---funcall, -f FUNC      call Emacs Lisp function FUNC with no arguments\n
---insert FILE           insert contents of FILE into current buffer\n
---kill                  exit without asking for confirmation\n
---load, -l FILE         load Emacs Lisp FILE using the load function\n
---visit FILE            visit FILE\n
-\n
-",
-    "
-Display options:\n
-\n
---background-color, -bg COLOR   window background color\n
---basic-display, -D             disable many display features;\n
-                                  used for debugging Emacs\n
---border-color, -bd COLOR       main border color\n
---border-width, -bw WIDTH       width of main border\n
-",
-    "
---color, --color=MODE           override color mode for character terminals;\n
-                                  MODE defaults to `auto', and\n
-                                  can also be `never', `always',\n
-                                  or a mode name like `ansi8'\n
---cursor-color, -cr COLOR       color of the Emacs cursor indicating point\n
---font, -fn FONT                default font; must be fixed-width\n
---foreground-color, -fg COLOR   window foreground color\n
-",
-    "
---fullheight, -fh               make the first frame high as the screen\n
---fullscreen, -fs               make the first frame fullscreen\n
---fullwidth, -fw                make the first frame wide as the screen\n
---maximized, -mm                make the first frame maximized\n
---geometry, -g GEOMETRY         window geometry\n
-",
-    "
---no-bitmap-icon, -nbi          do not use picture of gnu for Emacs icon\n
---iconic                        start Emacs in iconified state\n
---internal-border, -ib WIDTH    width between text and main border\n
---line-spacing, -lsp PIXELS     additional space to put between lines\n
---mouse-color, -ms COLOR        mouse cursor color in Emacs window\n
---name NAME                     title for initial Emacs frame\n
-",
-    "
---no-blinking-cursor, -nbc      disable blinking cursor\n
---reverse-video, -r, -rv        switch foreground and background\n
---title, -T TITLE               title for initial Emacs frame\n
---vertical-scroll-bars, -vb     enable vertical scroll bars\n
---xrm XRESOURCES                set additional X resources\n
---parent-id XID                 set parent window\n
---help                          display this help and exit\n
---version                       output version information and exit\n
-\n
-",
-    "
-You can generally also specify long option names with a single -; for\n
-example, -batch as well as --batch.  You can use any unambiguous\n
-abbreviation for a --option.\n
-\n
-Various environment variables and window system resources also affect\n
-the operation of Emacs.  See the main documentation.\n
-\n
-Report bugs to " PACKAGE_BUGREPORT ".  First, please see the Bugs\n
-section of the Emacs manual or the file BUGS.\n"
+    "--no-build-details          do not add build details such as time stamps\\n"
+"--no-desktop                do not load a saved desktop\\n"
+"--no-init-file, -q          load neither ~/.emacs nor default.el\\n"
+"--prelude                   load file instead of loadup.el into bare Emacs\\n"
+"--no-loadup, -nl            do not load loadup.el into bare Emacs\\n"
+"--no-site-file              do not load site-start.el\\n"
+"--no-x-resources            do not load X resources\\n"
+"--no-site-lisp, -nsl        do not add site-lisp directories to load-path\\n"
+"--no-splash                 do not display a splash screen on startup\\n"
+"--no-window-system, -nw     do not communicate with X, ignoring $DISPLAY\\n"
+"--init-directory=DIR        use DIR when looking for the Emacs init files.\\n",
+    "--quick, -Q                 equivalent to:\\n"
+"                              -q --no-site-file --no-site-lisp --no-splash\\n"
+"                              --no-x-resources\\n"
+"--script FILE               run FILE as an Emacs Lisp script\\n"
+"-x                          to be used in #!/usr/bin/emacs -x\\n"
+"                              and has approximately the same meaning\\n"
+"\t\t\t      as -Q --script\\n"
+"--terminal, -t DEVICE       use DEVICE for terminal I/O\\n"
+"--user, -u USER             load ~USER/.emacs instead of your own\\n"
+"\\n",
+    "Action options:\\n"
+"\\n"
+"FILE                    visit FILE\\n"
+"+LINE                   go to line LINE in next FILE\\n"
+"+LINE:COLUMN            go to line LINE, column COLUMN, in next FILE\\n"
+"--directory, -L DIR     prepend DIR to load-path (with :DIR, append DIR)\\n"
+"--eval EXPR             evaluate Emacs Lisp expression EXPR\\n"
+"--execute EXPR          evaluate Emacs Lisp expression EXPR\\n",
+    "--file FILE             visit FILE\\n"
+"--find-file FILE        visit FILE\\n"
+"--funcall, -f FUNC      call Emacs Lisp function FUNC with no arguments\\n"
+"--insert FILE           insert contents of FILE into current buffer\\n"
+"--kill                  exit without asking for confirmation\\n"
+"--load, -l FILE         load Emacs Lisp FILE using the load function\\n"
+"--visit FILE            visit FILE\\n"
+"\\n",
+    "Display options:\\n"
+"\\n"
+"--background-color, -bg COLOR   window background color\\n"
+"--basic-display, -D             disable many display features;\\n"
+"                                  used for debugging Emacs\\n"
+"--border-color, -bd COLOR       main border color\\n"
+"--border-width, -bw WIDTH       width of main border\\n",
+    "--color, --color=MODE           override color mode for character terminals;\\n"
+"                                  MODE defaults to \\`auto\\', and\\n"
+"                                  can also be \\`never\\', \\`always\\',\\n"
+"                                  or a mode name like \\`ansi8\\'\\n"
+"--cursor-color, -cr COLOR       color of the Emacs cursor indicating point\\n"
+"--font, -fn FONT                default font; must be fixed-width\\n"
+"--foreground-color, -fg COLOR   window foreground color\\n",
+    "--fullheight, -fh               make the first frame high as the screen\\n"
+"--fullscreen, -fs               make the first frame fullscreen\\n"
+"--fullwidth, -fw                make the first frame wide as the screen\\n"
+"--maximized, -mm                make the first frame maximized\\n"
+"--geometry, -g GEOMETRY         window geometry\\n",
+    "--no-bitmap-icon, -nbi          do not use picture of gnu for Emacs icon\\n"
+"--iconic                        start Emacs in iconified state\\n"
+"--internal-border, -ib WIDTH    width between text and main border\\n"
+"--line-spacing, -lsp PIXELS     additional space to put between lines\\n"
+"--mouse-color, -ms COLOR        mouse cursor color in Emacs window\\n"
+"--name NAME                     title for initial Emacs frame\\n",
+    "--no-blinking-cursor, -nbc      disable blinking cursor\\n"
+"--reverse-video, -r, -rv        switch foreground and background\\n"
+"--title, -T TITLE               title for initial Emacs frame\\n"
+"--vertical-scroll-bars, -vb     enable vertical scroll bars\\n"
+"--xrm XRESOURCES                set additional X resources\\n"
+"--parent-id XID                 set parent window\\n"
+"--help                          display this help and exit\\n"
+"--version                       output version information and exit\\n"
+"\\n",
+    "You can generally also specify long option names with a single -; for\\n"
+"example, -batch as well as --batch.  You can use any unambiguous\\n"
+"abbreviation for a --option.\\n"
+"\\n"
+"Various environment variables and window system resources also affect\\n"
+"the operation of Emacs.  See the main documentation.\\n"
+"\\n"
+"Report bugs to " PACKAGE_BUGREPORT ".  First, please see the Bugs\\n"
+"section of the Emacs manual or the file BUGS.\\n"
   };
 
 
@@ -1532,9 +1505,10 @@ main2 (void *ignore, int argc, char **argv)
 	     "to survive disconnects.\n",
 	     stderr);
 #elif defined USE_GTK
-      fputs ("\nWarning: due to a long standing Gtk+ bug\nhttps://gitlab.gnome.org/GNOME/gtk/issues/221\n
-Emacs might crash when run in daemon mode and the X11 connection is unexpectedly lost.\n
-Using an Emacs configured with --with-x-toolkit=lucid does not have this problem.\n",
+      fputs ("\\nWarning: due to a long standing Gtk+ bug\\n"
+	     "https://gitlab.gnome.org/GNOME/gtk/issues/221\\n"
+	     "Emacs might crash when run in daemon mode and the X11 connection is unexpectedly lost.\\n"
+	     "Using an Emacs configured with --with-x-toolkit=lucid does not have this problem.\\n",
 	     stderr);
 #endif
 

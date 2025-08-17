@@ -91,12 +91,12 @@ struct buffer buffer_local_symbols;
 /* Return the symbol of the per-buffer variable at offset OFFSET in
    the buffer structure.  */
 
-#define PER_BUFFER_SYMBOL(OFFSET) \
+#define PER_BUFFER_SYMBOL(OFFSET)
       (*(Lisp_Object *)((OFFSET) + (char *) &buffer_local_symbols))
 
 /* Maximum length of an overlay vector.  */
-#define OVERLAY_COUNT_MAX						\
-  ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM,				\
+#define OVERLAY_COUNT_MAX
+  ((ptrdiff_t) min (MOST_POSITIVE_FIXNUM,
 		    min (PTRDIFF_MAX, SIZE_MAX) / word_size))
 
 /* Flags indicating which built-in buffer-local variables
@@ -1653,8 +1653,8 @@ buffer as BUFFER.  */)
 }
 
 DEFUN ("rename-buffer", Frename_buffer, Srename_buffer, 1, 2,
-       "(list (read-string \"Rename buffer (to new name): \" \
-	      nil 'buffer-name-history (buffer-name (current-buffer))) \
+       "(list (read-string \"Rename buffer (to new name): \"
+	      nil 'buffer-name-history (buffer-name (current-buffer)))
 	      current-prefix-arg)",
        doc: /* Change current buffer's name to NEWNAME (a string).
 If second arg UNIQUE is nil or omitted, it is an error if a
@@ -2263,7 +2263,8 @@ the current buffer's major mode.  */)
   if (!BUFFER_LIVE_P (XBUFFER (buffer)))
     error ("Attempt to set major mode for a dead buffer");
 
-  if (strcmp (SSDATA (BVAR (XBUFFER (buffer), name)), "*scratch*") == 0)
+  if (scm_is_true (scm_string_equal_p (BVAR (XBUFFER (buffer), name),
+                                       scm_from_utf8_string ("*scratch*"))))
     function = find_symbol_value (Qinitial_major_mode);
   else
     {
@@ -2571,17 +2572,17 @@ results, see Info node `(elisp)Swapping Text'.  */)
 	error ("One of the buffers to swap has indirect buffers");
   }
 
-#define swapfield(field, type) \
-  do {							\
-    type tmp##field = other_buffer->field;		\
-    other_buffer->field = current_buffer->field;	\
-    current_buffer->field = tmp##field;			\
+#define swapfield(field, type)
+  do {
+    type tmp##field = other_buffer->field;
+    other_buffer->field = current_buffer->field;
+    current_buffer->field = tmp##field;
   } while (0)
-#define swapfield_(field, type) \
-  do {							\
-    type tmp##field = BVAR (other_buffer, field);		\
-    bset_##field (other_buffer, BVAR (current_buffer, field));	\
-    bset_##field (current_buffer, tmp##field);			\
+#define swapfield_(field, type)
+  do {
+    type tmp##field = BVAR (other_buffer, field);
+    bset_##field (other_buffer, BVAR (current_buffer, field));
+    bset_##field (current_buffer, tmp##field);
   } while (0)
 
   swapfield (own_text, struct buffer_text);
@@ -4285,19 +4286,19 @@ static bool mmap_initialized_p;
 
 /* Size of mmap_region structure plus padding.  */
 
-#define MMAP_REGION_STRUCT_SIZE	\
+#define MMAP_REGION_STRUCT_SIZE
      ROUND (sizeof (struct mmap_region), MEM_ALIGN)
 
 /* Given a pointer P to the start of the user-visible part of a mapped
    region, return a pointer to the start of the region.  */
 
-#define MMAP_REGION(P) \
+#define MMAP_REGION(P)
      ((struct mmap_region *) ((char *) (P) - MMAP_REGION_STRUCT_SIZE))
 
 /* Given a pointer P to the start of a mapped region, return a pointer
    to the start of the user-visible part of the region.  */
 
-#define MMAP_USER_AREA(P) \
+#define MMAP_USER_AREA(P)
      ((void *) ((char *) (P) + MMAP_REGION_STRUCT_SIZE))
 
 #define MEM_ALIGN	sizeof (double)
@@ -4994,10 +4995,10 @@ init_buffer (void)
    that nil is allowed too).  DOC is a dummy where you write the doc
    string as a comment.  */
 
-#define DEFVAR_PER_BUFFER(lname, vname, predicate, doc)		\
-  do {								\
-    static struct Lisp_Buffer_Objfwd bo_fwd;			\
-    defvar_per_buffer (&bo_fwd, lname, vname, predicate);	\
+#define DEFVAR_PER_BUFFER(lname, vname, predicate, doc)
+  do {
+    static struct Lisp_Buffer_Objfwd bo_fwd;
+    defvar_per_buffer (&bo_fwd, lname, vname, predicate);
   } while (0)
 
 static void

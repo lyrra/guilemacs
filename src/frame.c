@@ -5892,8 +5892,8 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	      return make_fixnum (atoi (SSDATA (tem)));
 
 	    case RES_TYPE_BOOLEAN_NUMBER:
-	      if (!strcmp (SSDATA (tem), "on")
-		  || !strcmp (SSDATA (tem), "true"))
+	      if (scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("on")))
+		  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("true"))))
 		return make_fixnum (1);
 	      return make_fixnum (atoi (SSDATA (tem)));
               break;

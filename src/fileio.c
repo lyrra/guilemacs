@@ -1267,7 +1267,8 @@ the root directory.  */)
 	}
       if (!lose)
 	{
-	  if (strcmp (nm, SSDATA (name)) != 0)
+	  SCM nm_string = scm_from_utf8_stringn (nm, nmlim - nm);
+	  if (!scm_is_true (scm_string_equal_p (nm_string, name)))
 	    name = make_specified_string (nm, -1, nmlim - nm, multibyte);
 	  SAFE_FREE ();
 	  return name;
