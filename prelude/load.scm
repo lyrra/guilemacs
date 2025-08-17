@@ -159,14 +159,20 @@
   "Return the number of bytes in STRING."
   (bytevector-length (string->utf8 string)))
 
-(define (elisp-string-distance string1 string2 bytecompare)
-  "Return Levenshtein distance between STRING1 and STRING2.
+(define elisp-string-distance
+  (case-lambda
+    ((string1 string2)
+     ;; Called with 2 arguments - default bytecompare to #nil
+     (elisp-string-distance string1 string2 #nil))
+    ((string1 string2 bytecompare)
+     ;; Called with 3 arguments
+     "Return Levenshtein distance between STRING1 and STRING2.
 The distance is the number of deletions, insertions, and substitutions
 required to transform STRING1 into STRING2.
 If BYTECOMPARE is nil or omitted, compute distance in terms of characters.
 If BYTECOMPARE is non-nil, compute distance in terms of bytes.
 Letter-case is significant, but text properties are ignored."
-  (let ((use-byte-compare (not (or (null? bytecompare) (eq? bytecompare #nil))))
+     (let ((use-byte-compare (not (or (null? bytecompare) (eq? bytecompare #nil))))
         (s1 string1)
         (s2 string2))
     ;; Convert to bytevectors if byte comparison requested
@@ -203,7 +209,7 @@ Letter-case is significant, but text properties are ignored."
               (set! lastdiag olddiag)))))
 
       ;; Return final distance
-      (vector-ref column len1))))
+      (vector-ref column len1))))))
 
 (define (elisp-char-to-string character)
   "Convert arg CHAR to a string containing that character."
