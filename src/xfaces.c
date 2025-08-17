@@ -1054,13 +1054,13 @@ is normalized to have its value in [0,65535].  */)
 static bool
 parse_rgb_list (Lisp_Object rgb_list, Emacs_Color *color)
 {
-#define PARSE_RGB_LIST_FIELD(field)
-  if (CONSP (rgb_list) && FIXNUMP (XCAR (rgb_list)))
-    {
-      color->field = XFIXNUM (XCAR (rgb_list));
-      rgb_list = XCDR (rgb_list);
-    }
-  else
+#define PARSE_RGB_LIST_FIELD(field) \
+  if (CONSP (rgb_list) && FIXNUMP (XCAR (rgb_list))) \
+    { \
+      color->field = XFIXNUM (XCAR (rgb_list)); \
+      rgb_list = XCDR (rgb_list); \
+    } \
+  else \
     return false;
 
   PARSE_RGB_LIST_FIELD (red);
@@ -1801,15 +1801,15 @@ the WIDTH times as wide as FACE on FRAME.  */)
 #define LFACE_INHERIT(LFACE)	    AREF (LFACE, LFACE_INHERIT_INDEX)
 #define LFACE_FONTSET(LFACE)	    AREF (LFACE, LFACE_FONTSET_INDEX)
 #define LFACE_EXTEND(LFACE)	    AREF (LFACE, LFACE_EXTEND_INDEX)
-#define LFACE_DISTANT_FOREGROUND(LFACE)
+#define LFACE_DISTANT_FOREGROUND(LFACE) \
   AREF (LFACE, LFACE_DISTANT_FOREGROUND_INDEX)
 
 /* True if LFACE is a Lisp face.  A Lisp face is a vector of size
    LFACE_VECTOR_SIZE which has the symbol `face' in slot 0.  */
 
-#define LFACEP(LFACE)
-     (VECTORP (LFACE)
-      && ASIZE (LFACE) == LFACE_VECTOR_SIZE
+#define LFACEP(LFACE) \
+     (VECTORP (LFACE) \
+      && ASIZE (LFACE) == LFACE_VECTOR_SIZE \
       && EQ (AREF (LFACE, 0), Qface))
 
 
@@ -3134,13 +3134,13 @@ The value is TO.  */)
 }
 
 
-#define HANDLE_INVALID_NIL_VALUE(A,F)
-  if (NILP (value))
-    {
-      add_to_log ("Warning: setting attribute `%s' of face `%s': nil "
-		  "value is invalid, use `unspecified' instead.", A, F);
-      /* Compatibility with 20.x.  */
-      value = Qunspecified;
+#define HANDLE_INVALID_NIL_VALUE(A,F) \
+  if (NILP (value)) \
+    { \
+      add_to_log ("Warning: setting attribute `%s' of face `%s': nil " \
+		  "value is invalid, use `unspecified' instead.", A, F); \
+      /* Compatibility with 20.x.  */ \
+      value = Qunspecified; \
     }
 
 DEFUN ("internal-set-lisp-face-attribute", Finternal_set_lisp_face_attribute,
