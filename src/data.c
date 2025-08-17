@@ -2743,8 +2743,10 @@ NUMBER may be an integer or a floating point number.  */)
     }
 
   if (FLOATP (number))
-    return make_unibyte_string (buffer,
-				float_to_string (buffer, XFLOAT_DATA (number)));
+    {
+      /* Optimize: Use Guile's native float-to-string conversion */
+      return scm_number_to_string (number, make_fixnum (10));
+    }
 
   wrong_type_argument (Qnumberp, number);
 }

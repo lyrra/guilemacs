@@ -25024,7 +25024,8 @@ maybe_produce_line_number (struct it *it)
       else
 	max_lnum = this_line + it->w->desired_matrix->nrows - 1 - it->vpos;
       max_lnum = max (1, max_lnum);
-      it->lnum_width = max (it->lnum_width, log10 (max_lnum) + 1);
+      /* Optimize: Use Guile's efficient number-to-string conversion for width calculation */
+      it->lnum_width = max (it->lnum_width, scm_c_string_length (scm_number_to_string (scm_from_long (max_lnum), scm_from_int (10))));
       eassert (it->lnum_width > 0);
     }
   if (EQ (Vdisplay_line_numbers, Qrelative))

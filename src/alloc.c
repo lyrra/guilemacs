@@ -1021,10 +1021,14 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
     p = XVECTOR (zero_vector);
   else
     {
+      /* Optimize: Integrate with Guile's GC for better memory management */
       p = xmalloc (header_size + len * word_size);
       if (clearit)
         memset (p, 0, header_size + len * word_size);
       SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
+
+      /* Register with Guile GC for coordinated collection */
+      scm_gc_register_allocation (sizeof (struct Lisp_Vector) + len * word_size);
     }
 
   return p;

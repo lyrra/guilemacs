@@ -3429,12 +3429,23 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
       ans = Fdowncase (Fread_from_minibuffer (prompt, Qnil, Qnil, Qnil,
 					      Qyes_or_no_p_history, Qnil,
 					      Qnil));
-      if (scm_is_true (scm_string_equal_p (ans, scm_from_utf8_string ("yes"))))
+      /* Optimize: Use static strings for common comparisons */
+      static SCM yes_string = SCM_UNDEFINED;
+      static SCM no_string = SCM_UNDEFINED;
+      if (SCM_UNBNDP (yes_string))
+        {
+          yes_string = scm_from_utf8_string ("yes");
+          no_string = scm_from_utf8_string ("no");
+          scm_gc_protect_object (yes_string);
+          scm_gc_protect_object (no_string);
+        }
+
+      if (scm_is_true (scm_string_equal_p (ans, yes_string)))
         {
           dynwind_end ();
           return Qt;
         }
-      if (scm_is_true (scm_string_equal_p (ans, scm_from_utf8_string ("no"))))
+      if (scm_is_true (scm_string_equal_p (ans, no_string)))
         {
           dynwind_end ();
           return Qnil;
