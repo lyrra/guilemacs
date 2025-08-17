@@ -2360,17 +2360,56 @@ guile_to_lisp_object (SCM obj)
   else if (scm_is_bool (obj))
     return scm_is_true (obj) ? Qt : Qnil;
   else if (scm_is_integer (obj))
-    return make_fixnum (scm_to_int (obj));
+    {
+      /* Handle both fixnum and bignum integers */
+      if (scm_is_true (scm_exact_integer_p (obj)))
+        {
+          /* For large integers, try to convert to Lisp bignum */
+          if (scm_is_true (scm_integer_p (obj)))
+            return obj; /* Let GuilEmacs handle bignums directly */
+        }
+      return make_fixnum (scm_to_int (obj));
+    }
+  else if (scm_is_real (obj))
+    {
+      /* Handle floating point numbers */
+      return make_float (scm_to_double (obj));
+    }
   else if (scm_is_string (obj))
     return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
   else if (scm_is_symbol (obj))
     return obj; /* Symbols should work directly */
+  else if (scm_is_keyword (obj))
+    {
+      /* Convert Guile keywords to symbols with : prefix */
+      SCM keyword_str = scm_keyword_to_symbol (obj);
+      return obj; /* Return as-is for now, let higher layers handle */
+    }
+  else if (scm_is_vector (obj))
+    {
+      /* Convert Guile vectors to Lisp vectors */
+      ptrdiff_t len = scm_c_vector_length (obj);
+      Lisp_Object vec = make_vector (len, Qnil);
+
+      for (ptrdiff_t i = 0; i < len; i++)
+        {
+          SCM elem = scm_c_vector_ref (obj, i);
+          ASET (vec, i, guile_to_lisp_object (elem));
+        }
+      return vec;
+    }
   else if (scm_is_pair (obj))
     {
       /* Recursively convert cons cells */
       Lisp_Object car = guile_to_lisp_object (scm_car (obj));
       Lisp_Object cdr = guile_to_lisp_object (scm_cdr (obj));
       return Fcons (car, cdr);
+    }
+  else if (scm_is_true (scm_hash_table_p (obj)))
+    {
+      /* Convert Guile hash tables to Lisp hash tables */
+      /* This is a simplified conversion - more work needed for full compatibility */
+      return obj; /* Return as-is for now, let higher layers handle */
     }
   else
     {
@@ -2445,6 +2484,44 @@ guile_reader_error_handler (void *data, SCM key, SCM args)
   return SCM_UNSPECIFIED;
 }
 
+/* Helper function to convert Elisp syntax to Guile syntax */
+static Lisp_Object
+convert_elisp_to_guile_syntax (Lisp_Object string)
+{
+  /* Convert Elisp vector syntax [1 2 3] to Guile syntax #(1 2 3) */
+  char *input = SSDATA (string);
+  ptrdiff_t len = SCHARS (string);
+
+  /* Simple conversion: replace '[' with '#(' and keep everything else */
+  /* This is a basic implementation - a more sophisticated version would */
+  /* handle nested cases and edge cases more carefully */
+
+  char *output = xmalloc (len * 2 + 1);  /* Allocate extra space for '#(' */
+  char *out_ptr = output;
+
+  for (ptrdiff_t i = 0; i < len; i++)
+    {
+      if (input[i] == '[')
+        {
+          *out_ptr++ = '#';
+          *out_ptr++ = '(';
+        }
+      else if (input[i] == ']')
+        {
+          *out_ptr++ = ')';
+        }
+      else
+        {
+          *out_ptr++ = input[i];
+        }
+    }
+  *out_ptr = '\0';
+
+  Lisp_Object result = build_string (output);
+  xfree (output);
+  return result;
+}
+
 /* Advanced Guile reader with proper error handling and position tracking */
 DEFUN ("read-from-string-guile-enhanced", Fread_from_string_guile_enhanced,
        Sread_from_string_guile_enhanced, 1, 3, 0,
@@ -2490,8 +2567,11 @@ proper error handling and accurate position tracking.  */)
       substring = Fsubstring (string, start, end);
     }
 
+  /* Convert Elisp syntax to Guile syntax (e.g., [1 2 3] -> #(1 2 3)) */
+  Lisp_Object guile_syntax = convert_elisp_to_guile_syntax (substring);
+
   /* Use Guile to read from string with error handling */
-  SCM port = scm_open_input_string (substring);
+  SCM port = scm_open_input_string (guile_syntax);
 
   /* Track position before reading */
   SCM initial_pos = scm_ftell (port);
