@@ -3427,12 +3427,12 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
       ans = Fdowncase (Fread_from_minibuffer (prompt, Qnil, Qnil, Qnil,
 					      Qyes_or_no_p_history, Qnil,
 					      Qnil));
-      if (SCHARS (ans) == 3 && !strcmp (SSDATA (ans), "yes"))
+      if (scm_is_true (scm_string_equal_p (ans, scm_from_utf8_string ("yes"))))
         {
           dynwind_end ();
           return Qt;
         }
-      if (SCHARS (ans) == 2 && !strcmp (SSDATA (ans), "no"))
+      if (scm_is_true (scm_string_equal_p (ans, scm_from_utf8_string ("no"))))
         {
           dynwind_end ();
           return Qnil;
