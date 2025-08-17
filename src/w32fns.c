@@ -8804,7 +8804,7 @@ a ShowWindow flag:
   /* Required on Windows 9X.  */
   maybe_load_unicows_dll ();
 
-  if (strncmp (SSDATA (document), file_url_str, file_url_len) == 0)
+  if (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (file_url_str), document, SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED)))
     {
       /* Passing "file:///" URLs to ShellExecute causes shlwapi.dll to
 	 start a thread in some rare system configurations, for

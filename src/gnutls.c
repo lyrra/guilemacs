@@ -1660,7 +1660,7 @@ string representation.  */)
   if (err < GNUTLS_E_SUCCESS)
     error ("gnutls-format-certificate error: %s", emacs_gnutls_strerror (err));
 
-  gnutls_datum_t crt_data = { SDATA (cert), strlen (SSDATA (cert)) };
+  gnutls_datum_t crt_data = { SDATA (cert), SBYTES (cert) };
   err = gnutls_x509_crt_import (crt, &crt_data, GNUTLS_X509_FMT_PEM);
   check_memory_full (err);
   if (err < GNUTLS_E_SUCCESS)

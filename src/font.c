@@ -1333,7 +1333,7 @@ font_dynamic_unparse_xlfd (Lisp_Object font, int pixel_size)
 	  if (SYMBOLP (val))
 	    val = SYMBOL_NAME (val);
 	  if (j == XLFD_REGISTRY_INDEX
-	      && ! strchr (SSDATA (val), '-'))
+	      && !scm_is_true (scm_string_index (val, SCM_MAKE_CHAR ('-'), SCM_INUM0, SCM_UNDEFINED)))
 	    {
 	      ptrdiff_t alloc = SBYTES (val) + 4;
 
@@ -1492,7 +1492,7 @@ font_unparse_xlfd (Lisp_Object font, int pixel_size, char *name, int nbytes)
 	  if (SYMBOLP (val))
 	    val = SYMBOL_NAME (val);
 	  if (j == XLFD_REGISTRY_INDEX
-	      && ! strchr (SSDATA (val), '-'))
+	      && !scm_is_true (scm_string_index (val, SCM_MAKE_CHAR ('-'), SCM_INUM0, SCM_UNDEFINED)))
 	    {
 	      /* Change "jisx0208*" and "jisx0208" to "jisx0208*-*".  */
 	      ptrdiff_t alloc = SBYTES (val) + 4;

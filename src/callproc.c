@@ -1799,7 +1799,7 @@ make_environment_block (Lisp_Object current_dir)
 	 tem = XCDR (tem))
       {
 #ifndef HAVE_ANDROID
-	if (strncmp (SSDATA (XCAR (tem)), "DISPLAY", 7) == 0
+	if (scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("DISPLAY"), XCAR (tem), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	    && (SDATA (XCAR (tem)) [7] == '\0'
 		|| SDATA (XCAR (tem)) [7] == '='))
 	  /* DISPLAY is specified in process-environment.  */

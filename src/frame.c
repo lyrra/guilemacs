@@ -3675,9 +3675,9 @@ store_frame_param (struct frame *f, Lisp_Object prop, Lisp_Object val)
 static Lisp_Object
 frame_unspecified_color (struct frame *f, Lisp_Object unspec)
 {
-  return (!strncmp (SSDATA (unspec), unspecified_bg, SBYTES (unspec))
+  return (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_bg), unspec, SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	  ? tty_color_name (f, FRAME_BACKGROUND_PIXEL (f))
-	  : (!strncmp (SSDATA (unspec), unspecified_fg, SBYTES (unspec))
+	  : (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_fg), unspec, SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	     ? tty_color_name (f, FRAME_FOREGROUND_PIXEL (f)) : Qnil));
 }
 
@@ -6125,7 +6125,7 @@ On Nextstep, this just calls `ns-parse-geometry'.  */)
   CHECK_STRING (string);
 
 #ifdef HAVE_NS
-  if (strchr (SSDATA (string), ' ') != NULL)
+  if (scm_is_true (scm_string_index (string, SCM_MAKE_CHAR (' '), SCM_INUM0, SCM_UNDEFINED)))
     return call1 (Qns_parse_geometry, string);
 #endif
   int geometry = XParseGeometry (SSDATA (string),

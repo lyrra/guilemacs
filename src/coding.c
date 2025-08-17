@@ -5379,10 +5379,8 @@ detect_coding_charset (struct coding_system *coding,
   attrs = CODING_ID_ATTRS (coding->id);
   valids = AREF (attrs, coding_attr_charset_valids);
   name = CODING_ID_NAME (coding->id);
-  if (strncmp (SSDATA (SYMBOL_NAME (name)),
-	       "iso-8859-", sizeof ("iso-8859-") - 1) == 0
-      || strncmp (SSDATA (SYMBOL_NAME (name)),
-		  "iso-latin-", sizeof ("iso-latin-") - 1) == 0)
+  if (scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("iso-8859-"), SYMBOL_NAME (name), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
+      || scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("iso-latin-"), SYMBOL_NAME (name), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED)))
     check_latin_extra = 1;
 
   if (! NILP (CODING_ATTR_ASCII_COMPAT (attrs)))
