@@ -266,6 +266,30 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
    Optimized for symbol name comparisons."
   (if (string=? (symbol->string symbol) c-string) #t #nil))
 
+;; Ultra-efficient comparison functions that avoid creating temporary string objects
+(define (elisp-string-equal-two-cstrs lisp-string c-string1 c-string2)
+  "Compare a Lisp string with two C strings efficiently.
+   Returns #t if lisp-string equals c-string1, checks c-string2 as fallback.
+   Designed to replace: (string-equal-cstr lisp-string (scm_from_utf8_string c-string2))"
+  (if (or (string=? lisp-string c-string1)
+          (string=? lisp-string c-string2)) #t #nil))
+
+(define (elisp-string-ci-equal-two-cstrs lisp-string c-string1 c-string2)
+  "Case-insensitive version of elisp-string-equal-two-cstrs."
+  (if (or (string-ci=? lisp-string c-string1)
+          (string-ci=? lisp-string c-string2)) #t #nil))
+
+;; Optimized constant string comparisons
+(define (elisp-string-ci-equal-none lisp-string)
+  "Optimized check if a string equals 'None' (case-insensitive).
+   Avoids repeated scm_from_utf8_string calls for this common constant."
+  (if (string-ci=? lisp-string "None") #t #nil))
+
+(define (elisp-string-equal-none lisp-string)
+  "Optimized check if a string equals 'None' (case-sensitive).
+   Avoids repeated scm_from_utf8_string calls for this common constant."
+  (if (string=? lisp-string "None") #t #nil))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -280,6 +304,10 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
 (set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
 (set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
+(set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
+(set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
+(set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
+(set-symbol-function! 'string-equal-none elisp-string-equal-none)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
