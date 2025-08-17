@@ -374,6 +374,99 @@ If N is omitted or nil, remove only the last element."
         result
         (loop (cdr remaining) (cons (car remaining) result)))))
 
+;; Additional list processing functions
+
+(define (elisp-member elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `equal'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((equal? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
+
+(define (elisp-assq key alist)
+  "Return non-nil if KEY is `eq' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-assoc key alist)
+  "Return non-nil if KEY is `equal' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((equal? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-rassq val alist)
+  "Return non-nil if VAL is `eq' to the cdr of an element of ALIST.
+The value is actually the first element of ALIST whose cdr is VAL.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? tail)) #nil)  ; Handle malformed alist
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? val (cdr (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-copy-sequence seq)
+  "Return a copy of a list, vector, string, or other sequence.
+The elements of a list are not copied; they are shared with the original."
+  (cond
+    ((null? seq) seq)
+    ((pair? seq) (list-copy seq))
+    ((string? seq) (string-copy seq))
+    ((vector? seq) (vector-copy seq))
+    (else seq))) ; Return as-is for other types
+
+;; Simple numerical predicates
+
+(define (elisp-zerop number)
+  "Return t if NUMBER is zero."
+  (if (and (number? number) (= number 0)) #t #nil))
+
+(define (elisp-plusp number)
+  "Return t if NUMBER is positive."
+  (if (and (number? number) (> number 0)) #t #nil))
+
+(define (elisp-minusp number)
+  "Return t if NUMBER is negative."
+  (if (and (number? number) (< number 0)) #t #nil))
+
+(define (elisp-evenp integer)
+  "Return t if INTEGER is even."
+  (if (and (integer? integer) (even? integer)) #t #nil))
+
+(define (elisp-oddp integer)
+  "Return t if INTEGER is odd."
+  (if (and (integer? integer) (odd? integer)) #t #nil))
+
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (integer or floating point)."
+  (if (number? object) #t #nil))
+
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (integer? object) #t #nil))
+
+(define (elisp-floatp object)
+  "Return t if OBJECT is a floating point number."
+  (if (and (number? object) (not (integer? object))) #t #nil))
+
+(define (elisp-natnump object)
+  "Return t if OBJECT is a natural number (non-negative integer)."
+  (if (and (integer? object) (>= object 0)) #t #nil))
+
 ;; Register the functions for Elisp use
 (set-symbol-function! 'memq elisp-memq)
 (set-symbol-function! 'nth elisp-nth)
@@ -381,6 +474,20 @@ If N is omitted or nil, remove only the last element."
 (set-symbol-function! 'last elisp-last)
 (set-symbol-function! 'butlast elisp-butlast)
 (set-symbol-function! 'reverse elisp-reverse)
+(set-symbol-function! 'member elisp-member)
+(set-symbol-function! 'assq elisp-assq)
+(set-symbol-function! 'assoc elisp-assoc)
+(set-symbol-function! 'rassq elisp-rassq)
+(set-symbol-function! 'copy-sequence elisp-copy-sequence)
+(set-symbol-function! 'zerop elisp-zerop)
+(set-symbol-function! 'plusp elisp-plusp)
+(set-symbol-function! 'minusp elisp-minusp)
+(set-symbol-function! 'evenp elisp-evenp)
+(set-symbol-function! 'oddp elisp-oddp)
+(set-symbol-function! 'numberp elisp-numberp)
+(set-symbol-function! 'integerp elisp-integerp)
+(set-symbol-function! 'floatp elisp-floatp)
+(set-symbol-function! 'natnump elisp-natnump)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
