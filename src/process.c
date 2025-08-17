@@ -4206,10 +4206,12 @@ usage: (make-network-process &rest ARGS)  */)
 	{
 	  /* Allow the service to be a string containing the port number,
 	     because that's allowed if you have getaddrbyname.  */
-	  char *service_end;
-	  long int lport = strtol (SSDATA (service), &service_end, 10);
-	  if (service_end == SSDATA (service) + SBYTES (service))
-	    port = lport;
+	  SCM service_number = scm_string_to_number (service, scm_from_int (10));
+	  if (scm_is_integer (service_number))
+	    {
+	      long int lport = scm_to_long (service_number);
+	      port = lport;
+	    }
 	  else
 	    {
 	      struct servent *svc_info

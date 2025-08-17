@@ -621,7 +621,7 @@ is not displayed.  */)
   struct timespec interval = dtotimespec (XFLOATINT (timeout));
   struct atimer *timer = start_atimer (ATIMER_RELATIVE, interval,
 				       with_delayed_message_display,
-				       xstrdup (SSDATA (message)));
+				       scm_to_utf8_string (message));
   dynwind_begin ();
   record_unwind_protect_ptr (with_delayed_message_cancel, timer);
 

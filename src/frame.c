@@ -5825,7 +5825,9 @@ x_get_resource_string (const char *attribute, const char *class)
   ptrdiff_t class_keysize = sizeof (EMACS_CLASS) - 1 + strlen (class) + 2;
   char *name_key = SAFE_ALLOCA (name_keysize + class_keysize);
   char *class_key = name_key + name_keysize;
-  esprintf (name_key, "%s.%s", SSDATA (Vinvocation_name), attribute);
+  char *invocation_name_str = scm_to_utf8_string (Vinvocation_name);
+  esprintf (name_key, "%s.%s", invocation_name_str, attribute);
+  free (invocation_name_str);
   sprintf (class_key, "%s.%s", EMACS_CLASS, class);
 
   result = x_get_string_resource (&FRAME_DISPLAY_INFO (sf)->rdb,
@@ -5889,13 +5891,13 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	  switch (type)
 	    {
 	    case RES_TYPE_NUMBER:
-	      return make_fixnum (atoi (SSDATA (tem)));
+	      return make_fixnum (scm_to_int (scm_string_to_number (tem, SCM_UNDEFINED)));
 
 	    case RES_TYPE_BOOLEAN_NUMBER:
 	      if (scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("on")))
 		  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("true"))))
 		return make_fixnum (1);
-	      return make_fixnum (atoi (SSDATA (tem)));
+	      return make_fixnum (scm_to_int (scm_string_to_number (tem, SCM_UNDEFINED)));
               break;
 
 	    case RES_TYPE_FLOAT:
