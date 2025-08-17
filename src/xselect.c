@@ -3271,9 +3271,9 @@ x_send_client_event (Lisp_Object display, Lisp_Object dest, Lisp_Object from,
     }
   else if (STRINGP (dest))
     {
-      if (strcmp (SSDATA (dest), "PointerWindow") == 0)
+      if (scm_is_true (scm_string_equal_p (dest, scm_from_utf8_string ("PointerWindow"))))
         wdest = PointerWindow;
-      else if (strcmp (SSDATA (dest), "InputFocus") == 0)
+      else if (scm_is_true (scm_string_equal_p (dest, scm_from_utf8_string ("InputFocus"))))
         wdest = InputFocus;
       else
         error ("DEST as a string must be one of PointerWindow or InputFocus");

@@ -30864,7 +30864,7 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
       /* Check if this is the keysym to be used.  */
 
-      if (strcmp (SSDATA (XCAR (quit_keysym)), ServerVendor (dpy)))
+      if (!scm_is_true (scm_string_equal_p (XCAR (quit_keysym), scm_from_utf8_string (ServerVendor (dpy)))))
 	continue;
 
       dpyinfo->quit_keysym = XFIXNUM (XCDR (quit_keysym));
@@ -31025,8 +31025,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 						  Qnil, Qnil);
 
     if (STRINGP (value)
-	&& (!strcmp (SSDATA (value), "false")
-	    || !strcmp (SSDATA (value), "off")))
+	&& (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("false")))
+	    || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("off")))))
       dpyinfo->xsync_supported_p = false;
   }
 #endif
@@ -31048,8 +31048,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 	    = gui_display_get_resource (dpyinfo, privateColormap,
                                         PrivateColormap, Qnil, Qnil);
 	  if (STRINGP (value)
-	      && (!strcmp (SSDATA (value), "true")
-		  || !strcmp (SSDATA (value), "on")))
+	      && (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("true")))
+		  || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("on")))))
 	    dpyinfo->cmap = XCopyColormapAndFree (dpyinfo->display, dpyinfo->cmap);
 	}
     }
@@ -31162,8 +31162,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 						  Qnil, Qnil);
 
     if (STRINGP (value)
-	&& (!strcmp (SSDATA (value), "on")
-	    || !strcmp (SSDATA (value), "true")))
+	&& (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("on")))
+	    || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("true")))))
       goto skip_xi_setup;
   }
 #endif
@@ -31540,8 +31540,8 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     Lisp_Object value = gui_display_get_resource (dpyinfo, synchronous,
                                                   Synchronous, Qnil, Qnil);
     if (STRINGP (value)
-	&& (!strcmp (SSDATA (value), "true")
-	    || !strcmp (SSDATA (value), "on")))
+	&& (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("true")))
+	    || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("on")))))
       XSynchronize (dpyinfo->display, True);
   }
 
@@ -31559,15 +31559,15 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
     dpyinfo->use_xim = true;
 
     if (STRINGP (value)
-	&& (!strcmp (SSDATA (value), "false")
-	    || !strcmp (SSDATA (value), "off")))
+	&& (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("false")))
+	    || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("off")))))
       dpyinfo->use_xim = false;
 #else /* !USE_XIM */
     dpyinfo->use_xim = false;
 
     if (STRINGP (value)
-	&& (!strcmp (SSDATA (value), "true")
-	    || !strcmp (SSDATA (value), "on")))
+	&& (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("true")))
+	    || scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("on")))))
       dpyinfo->use_xim = true;
 #endif /* USE_XIM */
   }
