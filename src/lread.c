@@ -104,6 +104,9 @@ static SCM obarrays;
 /* Phase 6: Guile Reader Migration - Control variable */
 static bool use_guile_reader_for_strings = false;
 
+/* Phase 7+: Enhanced Guile Reader Integration - Additional control */
+static bool use_guile_reader_aggressive = false;
+
 /* The objects or placeholders read with the #n=object form.
 
    A hash table maps a number to either a placeholder (while the
@@ -3384,6 +3387,50 @@ invalid_radix_integer (EMACS_INT radix, Lisp_Object readcharfun)
 static Lisp_Object
 read_integer (Lisp_Object readcharfun, int radix)
 {
+  /* Phase 7+: Use Guile reader for string-based integer parsing when enabled */
+  if (use_guile_reader_for_strings && use_guile_reader_aggressive && STRINGP (readcharfun))
+    {
+      /* For string input, let Guile handle the parsing completely.
+         We need to read the remaining characters and let Guile parse
+         the complete number including the radix prefix */
+
+      /* We've already read the radix prefix, so we need to reconstruct the full number */
+      char radix_prefix[4] = "";
+      if (radix == 16) strcpy(radix_prefix, "#x");
+      else if (radix == 8) strcpy(radix_prefix, "#o");
+      else if (radix == 2) strcpy(radix_prefix, "#b");
+
+      /* Read the remaining numeric characters */
+      char stackbuf[64];
+      char *read_buffer = stackbuf;
+      char *p = read_buffer;
+      int c;
+
+      /* Add radix prefix if needed */
+      if (strlen(radix_prefix) > 0)
+        {
+          strcpy(p, radix_prefix);
+          p += strlen(radix_prefix);
+        }
+
+      /* Read digits */
+      while ((c = READCHAR) >= 0 && (c_isalnum(c) || c == '+' || c == '-'))
+        {
+          *p++ = c;
+          if (p >= read_buffer + sizeof(stackbuf) - 1) break;
+        }
+
+      if (c >= 0) UNREAD(c);
+      *p = '\0';
+
+      /* Use Guile to parse the number */
+      SCM port = scm_open_input_string (scm_from_utf8_string (read_buffer));
+      SCM result = scm_read (port);
+
+      if (scm_is_number (result))
+        return guile_to_lisp_object (result);
+    }
+
   char stackbuf[20];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
@@ -3446,6 +3493,24 @@ read_integer (Lisp_Object readcharfun, int radix)
 static Lisp_Object
 read_char_literal (Lisp_Object readcharfun)
 {
+  /* Phase 7+: Use Guile reader for string input when enabled */
+  if (use_guile_reader_for_strings && use_guile_reader_aggressive && STRINGP (readcharfun))
+    {
+      /* For string input, let Guile handle character parsing.
+         We need to push back the ? character we already consumed */
+      UNREAD ('?');
+
+      /* Create Guile port and read the character */
+      SCM port = scm_open_input_string (readcharfun);
+      SCM result = scm_read (port);
+
+      /* Verify we got a character (Guile represents chars as integers) */
+      if (scm_is_integer (result))
+        return guile_to_lisp_object (result);
+
+      /* Fall through to C implementation if Guile parsing failed */
+    }
+
   int ch = READCHAR;
   if (ch < 0)
     end_of_file_error ();
@@ -3481,6 +3546,24 @@ read_char_literal (Lisp_Object readcharfun)
 static Lisp_Object
 read_string_literal (Lisp_Object readcharfun)
 {
+  /* Phase 7+: Use Guile reader for string input when enabled */
+  if (use_guile_reader_for_strings && use_guile_reader_aggressive && STRINGP (readcharfun))
+    {
+      /* For string input, we can let Guile handle the complete string parsing.
+         We need to push back the quote character we already consumed */
+      UNREAD ('"');
+
+      /* Create Guile port and read the string */
+      SCM port = scm_open_input_string (readcharfun);
+      SCM result = scm_read (port);
+
+      /* Verify we got a string */
+      if (scm_is_string (result))
+        return guile_to_lisp_object (result);
+
+      /* Fall through to C implementation if Guile didn't return a string */
+    }
+
   /* collect the string and let Guile parse it */
   char stackbuf[1024];
   char *read_buffer = stackbuf;
@@ -3550,14 +3633,14 @@ hash_table_from_plist (Lisp_Object plist)
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
-#define ADDPARAM(name) \
-  do { \
-    Lisp_Object val = plist_get (plist, Q##name); \
-    if (!NILP (val)) \
-      { \
-	*par++ = QC##name; \
-	*par++ = val; \
-      } \
+#define ADDPARAM(name)
+  do {
+    Lisp_Object val = plist_get (plist, Q##name);
+    if (!NILP (val))
+      {
+	*par++ = QC##name;
+	*par++ = val;
+      }
   } while (0)
 
   ADDPARAM (test);
@@ -3858,29 +3941,29 @@ read_stack_reset (intmax_t sp)
   rdstack.sp = sp;
 }
 
-#define READ_AND_BUFFER(c) \
-  c = READCHAR; \
-  if (c < 0) \
-    INVALID_SYNTAX_WITH_BUFFER (); \
-  p += CHAR_STRING (c, (unsigned char *) p); \
-  if (end - p < MAX_MULTIBYTE_LENGTH + 1) \
-    { \
-       offset = p - read_buffer; \
-       emacs_abort (); \
-       p = read_buffer + offset; \
-       end = read_buffer + read_buffer_size; \
+#define READ_AND_BUFFER(c)
+  c = READCHAR;
+  if (c < 0)
+    INVALID_SYNTAX_WITH_BUFFER ();
+  p += CHAR_STRING (c, (unsigned char *) p);
+  if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+    {
+       offset = p - read_buffer;
+       emacs_abort ();
+       p = read_buffer + offset;
+       end = read_buffer + read_buffer_size;
     }
 
-#define INVALID_SYNTAX_WITH_BUFFER() \
-  { \
-    *p = 0; \
-    invalid_syntax (read_buffer, readcharfun); \
+#define INVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    invalid_syntax (read_buffer, readcharfun);
   }
 
-#define FINVALID_SYNTAX_WITH_BUFFER() \
-  { \
-    *p = 0; \
-    finvalid_syntax (read_buffer); \
+#define FINVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    finvalid_syntax (read_buffer);
   }
 
 /* Guile Reader Integration Option - declared at top */
@@ -3901,6 +3984,25 @@ DEFUN ("guile-reader-mode-p", Fguile_reader_mode_p, Sguile_reader_mode_p, 0, 0, 
   (void)
 {
   return use_guile_reader_for_strings ? Qt : Qnil;
+}
+
+DEFUN ("set-guile-reader-aggressive", Fset_guile_reader_aggressive, Sset_guile_reader_aggressive, 1, 1, 0,
+       doc: /* Enable or disable aggressive Guile reader usage.
+When enabled, the reader will use Guile's scm_read() for additional data types
+including integers, characters, and strings, providing better Unicode support
+and more consistent parsing behavior. Requires guile-reader-mode to be enabled.
+Argument should be t to enable, nil to disable.  */)
+  (Lisp_Object enable)
+{
+  use_guile_reader_aggressive = !NILP (enable);
+  return use_guile_reader_aggressive ? Qt : Qnil;
+}
+
+DEFUN ("guile-reader-aggressive-p", Fguile_reader_aggressive_p, Sguile_reader_aggressive_p, 0, 0, 0,
+       doc: /* Return t if aggressive Guile reader mode is enabled.  */)
+  (void)
+{
+  return use_guile_reader_aggressive ? Qt : Qnil;
 }
 
 /* Hybrid read function that can use Guile reader for strings - currently unused */
@@ -4003,6 +4105,27 @@ Returns the expression read from the buffer content. */)
 static Lisp_Object
 read0 (Lisp_Object readcharfun, bool locate_syms)
 {
+  /* Phase 7+: Enhanced Guile Reader Integration
+     Use Guile reader for string-based input when enabled */
+  if (use_guile_reader_for_strings && STRINGP (readcharfun))
+    {
+      /* Create Guile port from string */
+      SCM port = scm_open_input_string (readcharfun);
+
+      /* Read with comprehensive error handling */
+      SCM result = scm_c_catch (SCM_BOOL_T,
+                                (scm_t_catch_body) scm_read, port,
+                                (scm_t_catch_handler) guile_reader_error_handler, readcharfun,
+                                NULL, NULL);
+
+      /* Handle EOF */
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        end_of_file_error ();
+
+      /* Convert Guile object to Lisp object */
+      return guile_to_lisp_object (result);
+    }
+
   char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
