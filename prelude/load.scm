@@ -309,5 +309,78 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
 (set-symbol-function! 'string-equal-none elisp-string-equal-none)
 
+;; List processing functions migrated from C to Guile for better maintainability
+
+(define (elisp-memq elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `eq'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((eq? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
+
+(define (elisp-nth n list)
+  "Return the Nth element of LIST.
+N counts from zero. If LIST is not that long, nil is returned."
+  (cond
+    ((not (number? n)) #nil)
+    ((< n 0) #nil)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) (car tail))
+         (else (loop (- count 1) (cdr tail))))))))
+
+(define (elisp-nthcdr n list)
+  "Take cdr N times on LIST, return the result."
+  (cond
+    ((not (number? n)) list)
+    ((< n 0) list)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) tail)
+         (else (loop (- count 1) (cdr tail))))))))
+
+(define (elisp-last list)
+  "Return the last cons cell of LIST.
+If LIST is empty, return nil."
+  (if (null? list)
+      #nil
+      (let loop ((current list))
+        (let ((next (cdr current)))
+          (if (null? next)
+              current
+              (loop next))))))
+
+(define (elisp-butlast list &optional n)
+  "Return a copy of LIST with the last N elements removed.
+If N is omitted or nil, remove only the last element."
+  (let ((num (if (or (null? n) (eq? n #nil)) 1 n)))
+    (if (or (not (integer? num)) (< num 0))
+        list
+        (let ((len (length list)))
+          (if (<= len num)
+              #nil
+              (list-head list (- len num)))))))
+
+(define (elisp-reverse list)
+  "Return a new list with elements of LIST in reverse order."
+  (let loop ((remaining list) (result '()))
+    (if (null? remaining)
+        result
+        (loop (cdr remaining) (cons (car remaining) result)))))
+
+;; Register the functions for Elisp use
+(set-symbol-function! 'memq elisp-memq)
+(set-symbol-function! 'nth elisp-nth)
+(set-symbol-function! 'nthcdr elisp-nthcdr)
+(set-symbol-function! 'last elisp-last)
+(set-symbol-function! 'butlast elisp-butlast)
+(set-symbol-function! 'reverse elisp-reverse)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
