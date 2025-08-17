@@ -3551,14 +3551,14 @@ hash_table_from_plist (Lisp_Object plist)
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
-#define ADDPARAM(name)
-  do {
-    Lisp_Object val = plist_get (plist, Q ## name);
-    if (!NILP (val))
-      {
-	*par++ = QC ## name;
-	*par++ = val;
-      }
+#define ADDPARAM(name) \
+  do { \
+    Lisp_Object val = plist_get (plist, Q##name); \
+    if (!NILP (val)) \
+      { \
+	*par++ = QC##name; \
+	*par++ = val; \
+      } \
   } while (0)
 
   ADDPARAM (test);
@@ -3859,29 +3859,29 @@ read_stack_reset (intmax_t sp)
   rdstack.sp = sp;
 }
 
-#define READ_AND_BUFFER(c)
-  c = READCHAR;
-  if (c < 0)
-    INVALID_SYNTAX_WITH_BUFFER ();
-  p += CHAR_STRING (c, (unsigned char *) p);
-  if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-    {
-       offset = p - read_buffer;
-       emacs_abort ();
-       p = read_buffer + offset;
-       end = read_buffer + read_buffer_size;
+#define READ_AND_BUFFER(c) \
+  c = READCHAR; \
+  if (c < 0) \
+    INVALID_SYNTAX_WITH_BUFFER (); \
+  p += CHAR_STRING (c, (unsigned char *) p); \
+  if (end - p < MAX_MULTIBYTE_LENGTH + 1) \
+    { \
+       offset = p - read_buffer; \
+       emacs_abort (); \
+       p = read_buffer + offset; \
+       end = read_buffer + read_buffer_size; \
     }
 
-#define INVALID_SYNTAX_WITH_BUFFER()
-  {
-    *p = 0;
-    invalid_syntax (read_buffer, readcharfun);
+#define INVALID_SYNTAX_WITH_BUFFER() \
+  { \
+    *p = 0; \
+    invalid_syntax (read_buffer, readcharfun); \
   }
 
-#define FINVALID_SYNTAX_WITH_BUFFER()
-  {
-    *p = 0;
-    finvalid_syntax (read_buffer);
+#define FINVALID_SYNTAX_WITH_BUFFER() \
+  { \
+    *p = 0; \
+    finvalid_syntax (read_buffer); \
   }
 
 /* Guile Reader Integration Option - declared at top */
