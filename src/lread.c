@@ -2358,6 +2358,158 @@ scm_read() for parsing instead of the C reader.  */)
   return Fcons (guile_to_lisp_object (result), make_fixnum (final_index));
 }
 
+/* Enhanced Guile Reader with Error Handling */
+static SCM
+guile_reader_error_handler (void *data, SCM key, SCM args)
+{
+  Lisp_Object readcharfun = (Lisp_Object) data;
+
+  /* Convert Guile exception to Emacs error */
+  if (scm_is_eq (key, scm_from_latin1_symbol ("read-error")))
+    {
+      /* Extract error message from Guile exception */
+      SCM msg = scm_simple_format (SCM_BOOL_F, scm_cadr (args), scm_caddr (args));
+      char *error_msg = scm_to_utf8_string (msg);
+
+      /* Signal Emacs error with Guile's error message */
+      signal_error ("Guile reader error", build_string (error_msg));
+      free (error_msg);
+    }
+  else if (scm_is_eq (key, scm_from_latin1_symbol ("end-of-file")))
+    {
+      end_of_file_error ();
+    }
+  else
+    {
+      /* Generic Guile exception */
+      char *key_str = scm_to_utf8_string (scm_symbol_to_string (key));
+      signal_error ("Guile exception in reader", build_string (key_str));
+      free (key_str);
+    }
+
+  return SCM_UNSPECIFIED;
+}
+
+/* Advanced Guile reader with proper error handling and position tracking */
+DEFUN ("read-from-string-guile-enhanced", Fread_from_string_guile_enhanced,
+       Sread_from_string_guile_enhanced, 1, 3, 0,
+       doc: /* Enhanced Guile-based version of read-from-string with error handling.
+Read one Lisp expression which is represented as text by STRING.
+Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
+FINAL-STRING-INDEX is an integer giving the position of the next
+remaining character in STRING.  START and END optionally delimit
+a substring of STRING from which to read.  This enhanced version includes
+proper error handling and accurate position tracking.  */)
+  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
+{
+  CHECK_STRING (string);
+
+  /* Handle START and END parameters with proper bounds checking */
+  ptrdiff_t start_pos = 0;
+  ptrdiff_t end_pos = SCHARS (string);
+
+  if (!NILP (start))
+    {
+      CHECK_FIXNUM (start);
+      start_pos = XFIXNUM (start);
+      if (start_pos < 0 || start_pos > end_pos)
+        args_out_of_range (string, start);
+    }
+
+  if (!NILP (end))
+    {
+      CHECK_FIXNUM (end);
+      end_pos = XFIXNUM (end);
+      if (end_pos < start_pos || end_pos > SCHARS (string))
+        args_out_of_range (string, end);
+    }
+
+  /* Extract substring if needed */
+  Lisp_Object substring;
+  if (start_pos == 0 && end_pos == SCHARS (string))
+    {
+      substring = string;
+    }
+  else
+    {
+      substring = Fsubstring (string, start, end);
+    }
+
+  /* Use Guile to read from string with error handling */
+  SCM port = scm_open_input_string (substring);
+
+  /* Track position before reading */
+  SCM initial_pos = scm_ftell (port);
+
+  /* Read with comprehensive error handling */
+  SCM result = scm_c_catch (SCM_BOOL_T,
+                            (scm_t_catch_body) scm_read, port,
+                            (scm_t_catch_handler) guile_reader_error_handler, substring,
+                            NULL, NULL);
+
+  /* Handle EOF */
+  if (scm_is_eq (result, SCM_EOF_VAL))
+    {
+      end_of_file_error ();
+    }
+
+  /* Calculate accurate final position */
+  SCM final_pos = scm_ftell (port);
+  ptrdiff_t chars_read = scm_to_ssize_t (scm_difference (final_pos, initial_pos));
+  ptrdiff_t final_index = start_pos + chars_read;
+
+  /* Ensure we don't exceed string bounds */
+  if (final_index > SCHARS (string))
+    final_index = SCHARS (string);
+
+  return Fcons (guile_to_lisp_object (result), make_fixnum (final_index));
+}
+
+/* Multiple expression reader using Guile */
+DEFUN ("read-multiple-from-string-guile", Fread_multiple_from_string_guile,
+       Sread_multiple_from_string_guile, 1, 3, 0,
+       doc: /* Read multiple Lisp expressions from STRING using Guile reader.
+Returns a list of all expressions read from the string.
+START and END optionally delimit a substring of STRING from which to read.  */)
+  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
+{
+  CHECK_STRING (string);
+
+  /* Extract substring using same logic as single-expression version */
+  Lisp_Object substring;
+  if (NILP (start) && NILP (end))
+    {
+      substring = string;
+    }
+  else
+    {
+      substring = Fsubstring (string, start, end);
+    }
+
+  /* Create Guile port */
+  SCM port = scm_open_input_string (substring);
+
+  /* Read all expressions until EOF */
+  Lisp_Object result_list = Qnil;
+
+  while (true)
+    {
+      SCM expr = scm_c_catch (SCM_BOOL_T,
+                              (scm_t_catch_body) scm_read, port,
+                              (scm_t_catch_handler) guile_reader_error_handler, substring,
+                              NULL, NULL);
+
+      if (scm_is_eq (expr, SCM_EOF_VAL))
+        break;
+
+      /* Add to result list (in reverse order, will reverse at end) */
+      result_list = Fcons (guile_to_lisp_object (expr), result_list);
+    }
+
+  /* Return expressions in correct order */
+  return Fnreverse (result_list);
+}
+
 /* Function to set up the global context we need in toplevel read
    calls.  START and END only used when STREAM is a string.
    LOCATE_SYMS true means read symbol occurrences as symbols with
@@ -3346,14 +3498,14 @@ hash_table_from_plist (Lisp_Object plist)
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
-#define ADDPARAM(name) \
-  do { \
-    Lisp_Object val = plist_get (plist, Q ## name); \
-    if (!NILP (val)) \
-      { \
-	*par++ = QC ## name; \
-	*par++ = val; \
-      } \
+#define ADDPARAM(name)
+  do {
+    Lisp_Object val = plist_get (plist, Q ## name);
+    if (!NILP (val))
+      {
+	*par++ = QC ## name;
+	*par++ = val;
+      }
   } while (0)
 
   ADDPARAM (test);
@@ -3654,30 +3806,80 @@ read_stack_reset (intmax_t sp)
   rdstack.sp = sp;
 }
 
-#define READ_AND_BUFFER(c) \
-  c = READCHAR; \
-  if (c < 0) \
-    INVALID_SYNTAX_WITH_BUFFER (); \
-  p += CHAR_STRING (c, (unsigned char *) p); \
-  if (end - p < MAX_MULTIBYTE_LENGTH + 1) \
-    { \
-       offset = p - read_buffer; \
-       emacs_abort (); \
-       p = read_buffer + offset; \
-       end = read_buffer + read_buffer_size; \
+#define READ_AND_BUFFER(c)
+  c = READCHAR;
+  if (c < 0)
+    INVALID_SYNTAX_WITH_BUFFER ();
+  p += CHAR_STRING (c, (unsigned char *) p);
+  if (end - p < MAX_MULTIBYTE_LENGTH + 1)
+    {
+       offset = p - read_buffer;
+       emacs_abort ();
+       p = read_buffer + offset;
+       end = read_buffer + read_buffer_size;
     }
 
-#define INVALID_SYNTAX_WITH_BUFFER() \
-  { \
-    *p = 0; \
-    invalid_syntax (read_buffer, readcharfun); \
+#define INVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    invalid_syntax (read_buffer, readcharfun);
   }
 
-#define FINVALID_SYNTAX_WITH_BUFFER() \
-  { \
-    *p = 0; \
-    finvalid_syntax (read_buffer); \
+#define FINVALID_SYNTAX_WITH_BUFFER()
+  {
+    *p = 0;
+    finvalid_syntax (read_buffer);
   }
+
+/* Guile Reader Integration Option */
+static bool use_guile_reader_for_strings = false;
+
+DEFUN ("set-guile-reader-mode", Fset_guile_reader_mode, Sset_guile_reader_mode, 1, 1, 0,
+       doc: /* Enable or disable Guile reader for string parsing.
+When enabled, string-based reading operations will use Guile's scm_read()
+instead of the C reader for enhanced performance and UTF-8 handling.
+Argument should be t to enable, nil to disable.  */)
+  (Lisp_Object enable)
+{
+  use_guile_reader_for_strings = !NILP (enable);
+  return use_guile_reader_for_strings ? Qt : Qnil;
+}
+
+DEFUN ("guile-reader-mode-p", Fguile_reader_mode_p, Sguile_reader_mode_p, 0, 0, 0,
+       doc: /* Return t if Guile reader mode is enabled for strings.  */)
+  (void)
+{
+  return use_guile_reader_for_strings ? Qt : Qnil;
+}
+
+/* Hybrid read function that can use Guile reader for strings */
+static Lisp_Object
+read_with_guile_fallback (Lisp_Object readcharfun, bool locate_syms)
+{
+  /* Use Guile reader for string input when enabled */
+  if (use_guile_reader_for_strings && STRINGP (readcharfun))
+    {
+      /* Convert string readcharfun to Guile port and use scm_read */
+      SCM port = scm_open_input_string (readcharfun);
+
+      /* Read with error handling */
+      SCM result = scm_c_catch (SCM_BOOL_T,
+                                (scm_t_catch_body) scm_read, port,
+                                (scm_t_catch_handler) guile_reader_error_handler, readcharfun,
+                                NULL, NULL);
+
+      /* Handle EOF */
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        {
+          end_of_file_error ();
+        }
+
+      return guile_to_lisp_object (result);
+    }
+
+  /* Fall back to original C reader for all other cases */
+  return read0 (readcharfun, locate_syms);
+}
 
 /* Read a Lisp object.
    If LOCATE_SYMS is true, symbols are read with position.  */
