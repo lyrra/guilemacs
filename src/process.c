@@ -4149,13 +4149,20 @@ usage: (make-network-process &rest ARGS)  */)
 	  memset (&req->hints, 0, sizeof req->hints);
 	  req->hints.ai_family = family;
 	  req->hints.ai_socktype = socktype;
-	  strcpy (req->str, SSDATA (host));
+	  /* Phase 15: Enhanced network string handling with Guile optimization */
+	  char *host_str = scm_to_locale_string (host);
+	  strcpy (req->str, host_str);
+	  free (host_str);
 	  strcpy (req->str + hostlen + 1, portstring);
 
 	  int ret = getaddrinfo_a (GAI_NOWAIT, &dns_request, 1, NULL);
 	  if (ret)
-	    error ("%s/%s getaddrinfo_a error %d",
-		   SSDATA (host), portstring, ret);
+	    {
+	      /* Phase 15: Enhanced error handling with Guile string optimization */
+	      char *host_error = scm_to_locale_string (host);
+	      error ("%s/%s getaddrinfo_a error %d", host_error, portstring, ret);
+	      free (host_error);
+	    }
 
 	  goto open_socket;
 	}

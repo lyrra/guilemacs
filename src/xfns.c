@@ -700,9 +700,10 @@ x_decode_color (struct frame *f, Lisp_Object color_name, int mono_color)
 #if false /* Don't do this.  It's wrong when we're not using the default
 	     colormap, it makes freeing difficult, and it's probably not
 	     an important optimization.  */
-  if (strcmp (SDATA (color_name), "black") == 0)
+  /* Phase 15: Enhanced string comparison with Guile integration */
+  if (scm_is_true (scm_string_equal_p (color_name, scm_from_utf8_string ("black"))))
     return BLACK_PIX_DEFAULT (f);
-  else if (strcmp (SDATA (color_name), "white") == 0)
+  else if (scm_is_true (scm_string_equal_p (color_name, scm_from_utf8_string ("white"))))
     return WHITE_PIX_DEFAULT (f);
 #endif
 

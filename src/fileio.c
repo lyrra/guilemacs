@@ -5867,11 +5867,19 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	  {
 	    block_input ();
 	    if (!NILP (BVAR (b, filename)))
-	      fwrite (SDATA (BVAR (b, filename)), 1,
-		      SBYTES (BVAR (b, filename)), stream);
+	      {
+		/* Phase 15: Enhanced I/O with Guile string optimization */
+		char *filename_str = scm_to_locale_string (BVAR (b, filename));
+		size_t filename_len = strlen (filename_str);
+		fwrite (filename_str, 1, filename_len, stream);
+		free (filename_str);
+	      }
 	    putc ('\n', stream);
-	    fwrite (SDATA (BVAR (b, auto_save_file_name)), 1,
-		    SBYTES (BVAR (b, auto_save_file_name)), stream);
+	    /* Phase 15: Enhanced I/O with Guile string optimization */
+	    char *auto_save_str = scm_to_locale_string (BVAR (b, auto_save_file_name));
+	    size_t auto_save_len = strlen (auto_save_str);
+	    fwrite (auto_save_str, 1, auto_save_len, stream);
+	    free (auto_save_str);
 	    putc ('\n', stream);
 	    unblock_input ();
 	  }
