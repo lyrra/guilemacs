@@ -1024,7 +1024,7 @@ inhibit_auto_composition (void)
     {
       char *name = tty_type_name (Qnil);
 
-      if (name && ! strcmp (SSDATA (Vauto_composition_mode), name))
+      if (name && ! scm_is_true (scm_string_equal_p (Vauto_composition_mode, scm_from_utf8_string (name))))
 	return true;
     }
 

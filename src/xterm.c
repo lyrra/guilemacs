@@ -31580,18 +31580,18 @@ x_term_init (Lisp_Object display_name, char *xrm_option, char *resource_name)
 
     if (STRINGP (value))
       {
-	if (!strcmp (SSDATA (value), "callback"))
+	if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("callback"))))
 	  dpyinfo->preferred_xim_style = STYLE_CALLBACK;
-	else if (!strcmp (SSDATA (value), "none"))
+	else if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("none"))))
 	  dpyinfo->preferred_xim_style = STYLE_NONE;
-	else if (!strcmp (SSDATA (value), "overthespot"))
+	else if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("overthespot"))))
 	  dpyinfo->preferred_xim_style = STYLE_OVERTHESPOT;
-	else if (!strcmp (SSDATA (value), "offthespot"))
+	else if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("offthespot"))))
 	  dpyinfo->preferred_xim_style = STYLE_OFFTHESPOT;
-	else if (!strcmp (SSDATA (value), "root"))
+	else if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("root"))))
 	  dpyinfo->preferred_xim_style = STYLE_ROOT;
 #ifdef USE_GTK
-	else if (!strcmp (SSDATA (value), "native"))
+	else if (scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("native"))))
 	  dpyinfo->prefer_native_input = true;
 #endif /* HAVE_GTK */
       }

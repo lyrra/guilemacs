@@ -47,8 +47,8 @@ kqueue_directory_listing (Lisp_Object directory_files)
 
   for (dl = directory_files; ! NILP (dl); dl = XCDR (dl)) {
     /* We ignore "." and "..".  */
-    if ((strcmp (".", SSDATA (XCAR (XCAR (dl)))) == 0) ||
-	(strcmp ("..", SSDATA (XCAR (XCAR (dl)))) == 0))
+    if (scm_is_true (scm_string_equal_p (XCAR (XCAR (dl)), scm_from_utf8_string ("."))) ||
+	scm_is_true (scm_string_equal_p (XCAR (XCAR (dl)), scm_from_utf8_string (".."))))
       continue;
 
     result = Fcons
@@ -150,8 +150,8 @@ kqueue_compare_dir_list (Lisp_Object watch_object)
     /* Both entries have the same inode.  */
     if (! NILP (new_entry)) {
       /* Both entries have the same file name.  */
-      if (strcmp (SSDATA (XCAR (XCDR (old_entry))),
-		  SSDATA (XCAR (XCDR (new_entry)))) == 0) {
+      if (scm_is_true (scm_string_equal_p (XCAR (XCDR (old_entry)),
+					   XCAR (XCDR (new_entry))))) {
 	/* Modification time has been changed, the file has been written.  */
 	if (NILP (Fequal (Fnth (make_fixnum (2), old_entry),
 			  Fnth (make_fixnum (2), new_entry))))
@@ -180,8 +180,8 @@ kqueue_compare_dir_list (Lisp_Object watch_object)
        inode.  */
     for (dl1 = new_dl; ! NILP (dl1); dl1 = XCDR (dl1)) {
       new_entry = XCAR (dl1);
-      if (strcmp (SSDATA (XCAR (XCDR (old_entry))),
-		  SSDATA (XCAR (XCDR (new_entry)))) == 0) {
+      if (scm_is_true (scm_string_equal_p (XCAR (XCDR (old_entry)),
+					   XCAR (XCDR (new_entry))))) {
 	pending_dl = Fcons (new_entry, pending_dl);
 	new_dl = Fdelq (new_entry, new_dl);
 	goto the_end;
@@ -195,8 +195,8 @@ kqueue_compare_dir_list (Lisp_Object watch_object)
       /* Check, whether this is an already deleted file (by rename).  */
       for (dl1 = deleted_dl; ! NILP (dl1); dl1 = XCDR (dl1)) {
 	new_entry = XCAR (dl1);
-	if (strcmp (SSDATA (XCAR (XCDR (old_entry))),
-		    SSDATA (XCAR (XCDR (new_entry)))) == 0) {
+	if (scm_is_true (scm_string_equal_p (XCAR (XCDR (old_entry)),
+					     XCAR (XCDR (new_entry))))) {
 	  deleted_dl = Fdelq (new_entry, deleted_dl);
 	  goto the_end;
 	}

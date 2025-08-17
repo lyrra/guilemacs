@@ -1482,8 +1482,7 @@ usage: (dbus-message-internal &rest REST)  */)
 	    uname = Qnil;
 
 	  if (STRINGP (uname)
-	      && (strcmp (dbus_bus_get_unique_name (connection), SSDATA (uname))
-		  != 0)
+	      && !scm_is_true (scm_string_equal_p (scm_from_utf8_string (dbus_bus_get_unique_name (connection)), uname))
 	      && (!dbus_message_set_destination (dmessage, SSDATA (service))))
 	    XD_SIGNAL2 (build_string ("Unable to set signal destination"),
 			service);
@@ -1735,13 +1734,13 @@ xd_read_message_1 (DBusConnection *connection, Lisp_Object bus)
 	  Lisp_Object key_uname = CAR_SAFE (key);
 	  /* key has the structure (UNAME SERVICE PATH HANDLER).  */
 	  if (uname && !NILP (key_uname)
-	      && strcmp (uname, SSDATA (key_uname)) != 0)
+	      && !scm_is_true (scm_string_equal_p (scm_from_utf8_string (uname), key_uname)))
 	    continue;
 	  Lisp_Object key_service_etc = CDR_SAFE (key);
 	  Lisp_Object key_path_etc = CDR_SAFE (key_service_etc);
 	  Lisp_Object key_path = CAR_SAFE (key_path_etc);
 	  if (path && !NILP (key_path)
-	      && strcmp (path, SSDATA (key_path)) != 0)
+	      && !scm_is_true (scm_string_equal_p (scm_from_utf8_string (path), key_path)))
 	    continue;
 	  Lisp_Object handler = CAR_SAFE (CDR_SAFE (key_path_etc));
 	  if (NILP (handler))

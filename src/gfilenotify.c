@@ -109,7 +109,7 @@ dir_monitor_callback (GFileMonitor *monitor,
 
       /* Cancel monitor if file or directory is deleted or unmounted.  */
       if (!NILP (Fmember (symbol, list3 (Qdeleted, Qmoved, Qunmounted)))
-	  && strcmp (name, SSDATA (XCAR (XCDR (watch_object)))) == 0
+	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (name), XCAR (XCDR (watch_object))))
 	  && !g_file_monitor_is_cancelled (monitor))
 	g_file_monitor_cancel (monitor);
     }
