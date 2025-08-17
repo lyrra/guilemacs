@@ -1569,13 +1569,10 @@ With one argument, just copy STRING (with properties, if any).  */)
 
   if (STRINGP (string))
     {
-      ptrdiff_t from_byte
-	= !ifrom ? 0 : string_char_to_byte (string, ifrom);
-      ptrdiff_t to_byte
-	= ito == size ? SBYTES (string) : string_char_to_byte (string, ito);
-      res = make_specified_string (SSDATA (string) + from_byte,
-				   ito - ifrom, to_byte - from_byte,
-				   false);
+      /* Use Guile's native substring function for better UTF-8 handling */
+      SCM start_scm = scm_from_ptrdiff_t (ifrom);
+      SCM end_scm = scm_from_ptrdiff_t (ito);
+      res = scm_substring (string, start_scm, end_scm);
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
