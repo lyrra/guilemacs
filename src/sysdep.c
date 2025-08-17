@@ -1610,7 +1610,7 @@ init_system_name (void)
     if (*p == ' ' || *p == '\t')
       *p = '-';
   if (! (STRINGP (Vsystem_name) && SBYTES (Vsystem_name) == p - hostname
-	 && strcmp (SSDATA (Vsystem_name), hostname) == 0))
+	 && scm_is_true (scm_string_equal_p (Vsystem_name, scm_from_utf8_string (hostname)))))
     Vsystem_name = build_string (hostname);
   xfree (hostname_alloc);
 }

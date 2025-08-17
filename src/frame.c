@@ -5903,11 +5903,11 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 
 	    case RES_TYPE_BOOLEAN:
 	      tem = Fdowncase (tem);
-	      if (!strcmp (SSDATA (tem), "on")
+	      if (scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("on")))
 #ifdef HAVE_NS
-                  || !strcmp (SSDATA (tem), "yes")
+                  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("yes")))
 #endif
-		  || !strcmp (SSDATA (tem), "true"))
+		  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("true"))))
 		return Qt;
 	      else
 		return Qnil;
@@ -5921,17 +5921,17 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	      {
 		Lisp_Object lower;
 		lower = Fdowncase (tem);
-		if (!strcmp (SSDATA (lower), "on")
+		if (scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("on")))
 #ifdef HAVE_NS
-                    || !strcmp (SSDATA (lower), "yes")
+                    || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("yes")))
 #endif
-		    || !strcmp (SSDATA (lower), "true"))
+		    || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("true"))))
 		  return Qt;
-		else if (!strcmp (SSDATA (lower), "off")
+		else if (scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("off")))
 #ifdef HAVE_NS
-                      || !strcmp (SSDATA (lower), "no")
+                      || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("no")))
 #endif
-		      || !strcmp (SSDATA (lower), "false"))
+		      || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("false"))))
 		  return Qnil;
 		else
 		  return Fintern (tem, Qnil);
