@@ -2787,9 +2787,11 @@ string_from_scheme (Lisp_Object scheme_string)
   emacs_abort ();
   size_t nbytes;
   char *c_string = scm_to_utf8_stringn (scheme_string, &nbytes);
-  return make_string_from_bytes (c_string,
-                                 scm_c_string_length (scheme_string),
-                                 nbytes);
+  Lisp_Object result = make_string_from_bytes (c_string,
+                                               scm_c_string_length (scheme_string),
+                                               nbytes);
+  free (c_string);
+  return result;
 }
 Lisp_Object
 string_to_scheme (Lisp_Object string)

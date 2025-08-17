@@ -313,7 +313,9 @@ If FILE is nil, an in-memory database will be opened instead.  */)
   if (sqlite3_open_v2 (SSDATA (name), &sdb, flags, NULL) != SQLITE_OK)
     return Qnil;
 
-  return make_sqlite (false, sdb, NULL, scm_to_utf8_string (name));
+  char *name_str = scm_to_utf8_string (name);
+  Lisp_Object result = make_sqlite (false, sdb, NULL, name_str);
+  return result;
 }
 
 DEFUN ("sqlite-close", Fsqlite_close, Ssqlite_close, 1, 1, 0,

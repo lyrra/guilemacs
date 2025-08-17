@@ -1480,7 +1480,9 @@ DEFUN ("string-from-scheme", Fstring_from_scheme, Sstring_from_scheme, 1, 1, 0, 
 
   CHECK_STRING (string);
   s = scm_to_utf8_stringn (string, &lenp);
-  return make_string (s, lenp);
+  Lisp_Object result = make_string (s, lenp);
+  free (s);
+  return result;
 }
 
 DEFUN ("copy-alist", Fcopy_alist, Scopy_alist, 1, 1, 0,

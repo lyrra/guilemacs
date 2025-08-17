@@ -3843,7 +3843,9 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		  int base = ((conversion == 'd' || conversion == 'i') ? 10
 			      : conversion == 'o' ? 8 : 16);
                   char *c_string = scm_to_utf8_string (scm_number_to_string (arg, make_fixnum (base)));
-                  sprintf_bytes = c_string;
+                  sprintf_bytes = strlen (c_string);
+                  strcpy (p, c_string);
+                  free (c_string);
 		}
 	      else if (conversion == 'd' || conversion == 'i')
 		{
