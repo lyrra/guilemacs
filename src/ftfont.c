@@ -673,7 +673,7 @@ xft_color_font_whitelisted_p (const char *family)
     {
       name = XCAR (tem);
 
-      if (STRINGP (name) && !strcmp (family, SSDATA (name)))
+      if (STRINGP (name) && scm_is_true (scm_string_equal_p (scm_from_utf8_string (family), name)))
 	return true;
     }
 

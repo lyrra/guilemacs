@@ -1122,7 +1122,7 @@ fontset_pattern_regexp (Lisp_Object pattern)
     return Qnil;
 
   if (!CONSP (Vcached_fontset_data)
-      || strcmp (SSDATA (pattern), CACHED_FONTSET_NAME))
+      || !scm_is_true (scm_string_equal_p (pattern, scm_from_utf8_string (CACHED_FONTSET_NAME))))
     {
       /* We must at first update the cached data.  */
       unsigned char *regex, *p0, *p1;
@@ -1285,7 +1285,7 @@ list_fontsets (struct frame *f, Lisp_Object pattern, int size)
 
       if (STRINGP (regexp)
 	  ? (fast_string_match (regexp, name) < 0)
-	  : strcmp (SSDATA (pattern), SSDATA (name)))
+	  : !scm_is_true (scm_string_equal_p (pattern, name)))
 	continue;
 
       val = Fcons (Fcopy_sequence (FONTSET_NAME (fontset)), val);
