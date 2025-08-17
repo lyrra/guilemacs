@@ -884,7 +884,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && !strcmp (dpyinfo->bitmaps[id].file, SSDATA (file)))
+	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -933,7 +933,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && !strcmp (dpyinfo->bitmaps[id].file, SSDATA (file)))
+	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -1023,7 +1023,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && !strcmp (dpyinfo->bitmaps[id].file, SSDATA (file)))
+	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -1514,7 +1514,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 
       /* Find key in KEYWORDS.  Error if not found.  */
       for (i = 0; i < nkeywords; ++i)
-	if (strcmp (keywords[i].name, SSDATA (SYMBOL_NAME (key))) == 0)
+	if (scm_is_true (scm_string_equal_p (scm_from_utf8_string (keywords[i].name), SYMBOL_NAME (key))))
 	  break;
 
       if (i == nkeywords)
