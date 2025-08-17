@@ -715,6 +715,42 @@ Allows any number of arguments, including zero."
       (error "Wrong type argument: natnump" length)
       (make-list length init)))
 
+;; Phase 4: DEFUN function migrations from C to Guile - COMMENTED OUT FOR DEBUGGING
+;;
+;; (define (elisp-proper-list-p object)
+;;   "Return OBJECT's length if it is a proper list, nil otherwise.
+;; A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+;;   (catch #t
+;;     (lambda ()
+;;       (let ((len (length object)))
+;;         (scm_from_size_t len)))
+;;     (lambda (key . args)
+;;       ;; If length fails (circular, dotted, or not a list), return nil
+;;       #nil)))
+;;
+;; (define (elisp-characterp object)
+;;   "Return non-nil if OBJECT is a character.
+;; In Emacs Lisp, characters are represented by character codes."
+;;   (if (and (integer? object)
+;;            (>= object 0)
+;;            (<= object #x3FFFFF))  ; max-char value
+;;       #t #nil))
+;;
+;; (define (elisp-max-char . args)
+;;   "Return the maximum character code.
+;; If UNICODE is non-nil, return the maximum character code defined by Unicode."
+;;   (let ((unicode (if (null? args) #f (car args))))
+;;     (if unicode
+;;         (scm_from_uint32 #x10FFFF)  ; MAX_UNICODE_CHAR
+;;         (scm_from_uint32 #x3FFFFF)))) ; MAX_CHAR
+;;
+;; (define (elisp-string-lessp string1 string2)
+;;   "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+;; Case is significant. Symbols are also allowed; their print names are used instead."
+;;   (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+;;         (s2 (if (symbol? string2) (symbol->string string2) string2)))
+;;     (if (string<? s1 s2) #t #nil)))
+
 ;; Register Phase 3 functions for Elisp use
 (set-symbol-function! 'symbolp elisp-symbolp)
 ; Note: bufferp kept in C for now due to C-specific buffer object handling
@@ -730,6 +766,10 @@ Allows any number of arguments, including zero."
 (set-symbol-function! 'cdr-safe elisp-cdr-safe)
 (set-symbol-function! 'list elisp-list)
 (set-symbol-function! 'make-list elisp-make-list)
+
+;; Phase 4 DEFUN function migrations are called directly from C code
+;; to avoid infinite recursion. The elisp-* versions are available
+;; for internal use but not registered as symbol replacements.
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
