@@ -101,6 +101,9 @@ intern_driver (Lisp_Object string, Lisp_Object obarray);
 
 static SCM obarrays;
 
+/* Phase 6: Guile Reader Migration - Control variable */
+static bool use_guile_reader_for_strings = false;
+
 /* The objects or placeholders read with the #n=object form.
 
    A hash table maps a number to either a placeholder (while the
@@ -395,6 +398,12 @@ static Lisp_Object read_internal_start (Lisp_Object, Lisp_Object,
                                         Lisp_Object, bool);
 static Lisp_Object read0 (Lisp_Object, bool);
 static Lisp_Object fread0 (struct reader_context *);
+
+/* Phase 6: Guile Reader Migration - Forward declarations */
+static SCM file_context_to_guile_port (struct reader_context *ctx);
+static Lisp_Object guile_to_lisp_object (SCM obj);
+static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
+static SCM buffer_to_guile_port (Lisp_Object buffer);
 
 static Lisp_Object substitute_object_recurse (struct subst *, Lisp_Object);
 static void substitute_in_interval (INTERVAL, void *);
@@ -1888,7 +1897,8 @@ funreadchar (struct reader_context *ctx, int c)
     }
 }
 
-/* SCM port version of lexical cookie detection */
+/* SCM port version of lexical cookie detection - currently unused */
+#if 0
 static lexical_cookie_t
 lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
 {
@@ -1989,6 +1999,7 @@ lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
       return rv;
     }
 }
+#endif /* 0 - lisp_file_lexical_cookie_scm_port unused */
 
 /* File-specific reader function for isolated file loading.
 
@@ -2005,15 +2016,56 @@ lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
    - All file loading operations are now channeled through this single point
 
    Context setup is handled by the caller (readevalloop_load). */
+
+/* Phase 6: File I/O Reader Integration - Convert file context to Guile port */
+static SCM
+file_context_to_guile_port (struct reader_context *ctx)
+{
+  /* Return the existing Guile port from the context
+     The reader_context already contains a Guile port */
+
+  if (scm_is_true (ctx->port))
+    {
+      return ctx->port;
+    }
+  else
+    {
+      /* No port available in context */
+      signal_error ("No Guile port available in reader context", Qnil);
+    }
+}
+
+/* Enhanced file reading with optional Guile integration */
 static Lisp_Object
 fread_internal_start (struct reader_context *ctx)
 {
-  /* File-specific reading with enhanced UTF-8 multibyte handling.
-     Uses fread0() with enhanced freadchar() that properly assembles UTF-8 characters.
-     Phase 2: Replace this with SCM port reading like:
-     SCM port = file_to_scm_port(ctx);
-     return scm_read(port); */
+  /* Phase 6: File I/O Reader Integration
+     Check if Guile reader is enabled for file operations */
 
+  if (use_guile_reader_for_strings && scm_is_true (ctx->port))
+    {
+      /* Use Guile reader for file input */
+      SCM port = file_context_to_guile_port (ctx);
+
+      /* Read with comprehensive error handling */
+      SCM result = scm_c_catch (SCM_BOOL_T,
+                                (scm_t_catch_body) scm_read, port,
+                                (scm_t_catch_handler) guile_reader_error_handler, Qnil,
+                                NULL, NULL);
+
+      /* Handle EOF condition */
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        {
+          end_of_file_error ();
+        }
+
+      /* Close the port to free resources */
+      scm_close_input_port (port);
+
+      return guile_to_lisp_object (result);
+    }
+
+  /* Fall back to original C reader implementation */
   return fread0 (ctx);
 }
 
@@ -2095,7 +2147,8 @@ readevalloop_load (
 	}
       else
 	{
-	  /* File-specific reading path - use fread_internal_start for isolation */
+	  /* Phase 6: Enhanced file-specific reading path with Guile integration
+	     Uses fread_internal_start which now supports Guile reader when enabled */
 	  val = fread_internal_start (infile0);
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
@@ -3831,8 +3884,7 @@ read_stack_reset (intmax_t sp)
     finvalid_syntax (read_buffer);
   }
 
-/* Guile Reader Integration Option */
-static bool use_guile_reader_for_strings = false;
+/* Guile Reader Integration Option - declared at top */
 
 DEFUN ("set-guile-reader-mode", Fset_guile_reader_mode, Sset_guile_reader_mode, 1, 1, 0,
        doc: /* Enable or disable Guile reader for string parsing.
@@ -3852,7 +3904,8 @@ DEFUN ("guile-reader-mode-p", Fguile_reader_mode_p, Sguile_reader_mode_p, 0, 0, 
   return use_guile_reader_for_strings ? Qt : Qnil;
 }
 
-/* Hybrid read function that can use Guile reader for strings */
+/* Hybrid read function that can use Guile reader for strings - currently unused */
+#if 0
 static Lisp_Object
 read_with_guile_fallback (Lisp_Object readcharfun, bool locate_syms)
 {
@@ -3879,6 +3932,71 @@ read_with_guile_fallback (Lisp_Object readcharfun, bool locate_syms)
 
   /* Fall back to original C reader for all other cases */
   return read0 (readcharfun, locate_syms);
+}
+#endif /* 0 - read_with_guile_fallback unused */
+
+/* Phase 6: Buffer-based Guile Reader Support */
+static SCM
+buffer_to_guile_port (Lisp_Object buffer)
+{
+  /* Convert buffer content to Guile string port for reading
+     This enables Guile reader for buffer-based input */
+
+  struct buffer *buf;
+
+  if (BUFFERP (buffer))
+    {
+      buf = XBUFFER (buffer);
+    }
+  else
+    {
+      /* Use current buffer if no specific buffer provided */
+      buf = current_buffer;
+    }
+
+  /* Extract buffer content as string */
+  Lisp_Object buffer_string;
+  ptrdiff_t start_pos = BUF_BEGV (buf);
+  ptrdiff_t end_pos = BUF_ZV (buf);
+
+  /* Create string from buffer range */
+  buffer_string = make_buffer_string (start_pos, end_pos, true);
+
+  /* Convert to Guile string port */
+  return scm_open_input_string (buffer_string);
+}
+
+/* Enhanced read function with buffer support for Guile reader */
+DEFUN ("read-from-buffer-guile", Fread_from_buffer_guile, Sread_from_buffer_guile, 0, 1, 0,
+       doc: /* Read one Lisp expression from BUFFER using Guile reader.
+If BUFFER is nil, read from the current buffer.
+Returns the expression read from the buffer content. */)
+  (Lisp_Object buffer)
+{
+  /* Phase 6: Buffer-based Guile reading capability */
+
+  if (!NILP (buffer))
+    CHECK_BUFFER (buffer);
+
+  /* Convert buffer to Guile port */
+  SCM port = buffer_to_guile_port (buffer);
+
+  /* Read with error handling */
+  SCM result = scm_c_catch (SCM_BOOL_T,
+                            (scm_t_catch_body) scm_read, port,
+                            (scm_t_catch_handler) guile_reader_error_handler, buffer,
+                            NULL, NULL);
+
+  /* Handle EOF */
+  if (scm_is_eq (result, SCM_EOF_VAL))
+    {
+      scm_close_input_port (port);
+      end_of_file_error ();
+    }
+
+  /* Close port and return converted result */
+  scm_close_input_port (port);
+  return guile_to_lisp_object (result);
 }
 
 /* Read a Lisp object.
@@ -5566,7 +5684,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
        doc: /* find-symbol */)
      (Lisp_Object string, Lisp_Object obarray)
 {
-  Lisp_Object tem, sstring, found;
+  Lisp_Object tem;
 
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
@@ -5592,7 +5710,7 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object string, Lisp_Object obarray)
 {
-  Lisp_Object tem, sym, *ptr;
+  Lisp_Object tem, sym;
 
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
