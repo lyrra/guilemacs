@@ -884,7 +884,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
+	  && scm_is_true (call2 (intern ("string-equal-cstr"), file, scm_from_utf8_string (dpyinfo->bitmaps[id].file))))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -933,7 +933,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
+	  && scm_is_true (call2 (intern ("string-equal-cstr"), file, scm_from_utf8_string (dpyinfo->bitmaps[id].file))))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -1023,7 +1023,7 @@ image_create_bitmap_from_file (struct frame *f, Lisp_Object file)
     {
       if (dpyinfo->bitmaps[id].refcount
 	  && dpyinfo->bitmaps[id].file
-	  && scm_is_true (scm_string_equal_p (scm_from_utf8_string (dpyinfo->bitmaps[id].file), file)))
+	  && scm_is_true (call2 (intern ("string-equal-cstr"), file, scm_from_utf8_string (dpyinfo->bitmaps[id].file))))
 	{
 	  ++dpyinfo->bitmaps[id].refcount;
 	  return id + 1;
@@ -1514,7 +1514,7 @@ parse_image_spec (Lisp_Object spec, struct image_keyword *keywords,
 
       /* Find key in KEYWORDS.  Error if not found.  */
       for (i = 0; i < nkeywords; ++i)
-	if (scm_is_true (scm_string_equal_p (scm_from_utf8_string (keywords[i].name), SYMBOL_NAME (key))))
+	if (scm_is_true (call2 (intern ("symbol-name-equal-cstr"), key, scm_from_utf8_string (keywords[i].name))))
 	  break;
 
       if (i == nkeywords)
@@ -6424,7 +6424,7 @@ xpm_load_image (struct frame *f,
 
 	  if (CONSP (specified_color) && STRINGP (XCDR (specified_color)))
 	    {
-	      if (scm_is_true (scm_string_ci_equal_p (XCDR (specified_color), scm_from_utf8_string ("None"))))
+	      if (scm_is_true (call2 (intern ("string-ci-equal-cstr"), XCDR (specified_color), scm_from_utf8_string ("None"))))
 		color_val = Qt;
 	      else if (FRAME_TERMINAL (f)->defined_color_hook
                        (f, SSDATA (XCDR (specified_color)), &cdef, false, false))

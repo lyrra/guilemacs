@@ -250,6 +250,22 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
       #t
       #nil))
 
+;; Efficient string comparison functions for C integration
+(define (elisp-string-equal-cstr lisp-string c-string)
+  "Compare a Lisp string with a C string (case-sensitive).
+   More efficient than creating temporary Guile string objects."
+  (if (string=? lisp-string c-string) #t #nil))
+
+(define (elisp-string-ci-equal-cstr lisp-string c-string)
+  "Compare a Lisp string with a C string (case-insensitive).
+   More efficient than creating temporary Guile string objects."
+  (if (string-ci=? lisp-string c-string) #t #nil))
+
+(define (elisp-symbol-name-equal-cstr symbol c-string)
+  "Compare a symbol's name with a C string (case-sensitive).
+   Optimized for symbol name comparisons."
+  (if (string=? (symbol->string symbol) c-string) #t #nil))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -261,6 +277,9 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'eval-scheme elisp-eval-scheme)
 (set-symbol-function! 'stringp elisp-stringp)
 (set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
+(set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
+(set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
+(set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
