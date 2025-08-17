@@ -5894,8 +5894,8 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	      return make_fixnum (scm_to_int (scm_string_to_number (tem, SCM_UNDEFINED)));
 
 	    case RES_TYPE_BOOLEAN_NUMBER:
-	      if (scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("on")))
-		  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("true"))))
+	      if (scm_is_true (call2 (intern ("string-equal-cstr"), tem, scm_from_utf8_string ("on")))
+		  || scm_is_true (call2 (intern ("string-equal-cstr"), tem, scm_from_utf8_string ("true"))))
 		return make_fixnum (1);
 	      return make_fixnum (scm_to_int (scm_string_to_number (tem, SCM_UNDEFINED)));
               break;
@@ -5905,11 +5905,11 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 
 	    case RES_TYPE_BOOLEAN:
 	      tem = Fdowncase (tem);
-	      if (scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("on")))
+	      if (scm_is_true (call2 (intern ("string-equal-cstr"), tem, scm_from_utf8_string ("on")))
 #ifdef HAVE_NS
-                  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("yes")))
+                  || scm_is_true (call2 (intern ("string-equal-cstr"), tem, scm_from_utf8_string ("yes")))
 #endif
-		  || scm_is_true (scm_string_equal_p (tem, scm_from_utf8_string ("true"))))
+		  || scm_is_true (call2 (intern ("string-equal-cstr"), tem, scm_from_utf8_string ("true"))))
 		return Qt;
 	      else
 		return Qnil;
@@ -5923,17 +5923,17 @@ gui_display_get_arg (Display_Info *dpyinfo, Lisp_Object alist, Lisp_Object param
 	      {
 		Lisp_Object lower;
 		lower = Fdowncase (tem);
-		if (scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("on")))
+		if (scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("on")))
 #ifdef HAVE_NS
-                    || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("yes")))
+                    || scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("yes")))
 #endif
-		    || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("true"))))
+		    || scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("true"))))
 		  return Qt;
-		else if (scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("off")))
+		else if (scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("off")))
 #ifdef HAVE_NS
-                      || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("no")))
+                      || scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("no")))
 #endif
-		      || scm_is_true (scm_string_equal_p (lower, scm_from_utf8_string ("false"))))
+		      || scm_is_true (call2 (intern ("string-equal-cstr"), lower, scm_from_utf8_string ("false"))))
 		  return Qnil;
 		else
 		  return Fintern (tem, Qnil);

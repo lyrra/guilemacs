@@ -701,9 +701,9 @@ x_decode_color (struct frame *f, Lisp_Object color_name, int mono_color)
 	     colormap, it makes freeing difficult, and it's probably not
 	     an important optimization.  */
   /* Phase 15: Enhanced string comparison with Guile integration */
-  if (scm_is_true (scm_string_equal_p (color_name, scm_from_utf8_string ("black"))))
+  if (scm_is_true (call2 (intern ("string-equal-cstr"), color_name, scm_from_utf8_string ("black"))))
     return BLACK_PIX_DEFAULT (f);
-  else if (scm_is_true (scm_string_equal_p (color_name, scm_from_utf8_string ("white"))))
+  else if (scm_is_true (call2 (intern ("string-equal-cstr"), color_name, scm_from_utf8_string ("white"))))
     return WHITE_PIX_DEFAULT (f);
 #endif
 
@@ -5472,7 +5472,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 	= XSyncCreateCounter (FRAME_X_DISPLAY (f),
 			      initial_value);
 
-      if (STRINGP (value) && scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("extended"))))
+      if (STRINGP (value) && scm_is_true (call2 (intern ("string-equal-cstr"), value, scm_from_utf8_string ("extended"))))
 	counters[1]
 	  = FRAME_X_EXTENDED_COUNTER (f)
 	  = XSyncCreateCounter (FRAME_X_DISPLAY (f),
@@ -5486,7 +5486,7 @@ This function is an internal primitive--use `make-frame' instead.  */)
 		       XA_CARDINAL, 32, PropModeReplace,
 		       (unsigned char *) &counters,
 		       ((STRINGP (value)
-			 && scm_is_true (scm_string_equal_p (value, scm_from_utf8_string ("extended")))) ? 2 : 1));
+			 && scm_is_true (call2 (intern ("string-equal-cstr"), value, scm_from_utf8_string ("extended")))) ? 2 : 1));
 
 #if defined HAVE_XSYNCTRIGGERFENCE && !defined USE_GTK \
   && defined HAVE_CLOCK_GETTIME
@@ -8077,7 +8077,7 @@ if PROP has no value of TYPE (always a string in the MS Windows case). */)
 
   if (STRINGP (type))
     {
-      if (scm_is_true (scm_string_equal_p (scm_from_utf8_string ("AnyPropertyType"), type)))
+      if (scm_is_true (call2 (intern ("string-equal-cstr"), type, scm_from_utf8_string ("AnyPropertyType"))))
         target_type = AnyPropertyType;
       else
         target_type = x_intern_cached_atom (FRAME_DISPLAY_INFO (f),
