@@ -861,8 +861,6 @@ loadhist_initialize (Lisp_Object filename)
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
 }
 
-static lexical_cookie_t
-lisp_file_lexical_cookie_scm_port (struct reader_context *);
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
@@ -2720,13 +2718,13 @@ read_char_escape (Lisp_Object readcharfun, int next_char)
 }
 
 /* File-specific error handling functions */
-static void
+static AVOID
 finvalid_syntax (const char *s)
 {
   invalid_syntax (s, Qget_file_char);
 }
 
-static void
+static AVOID
 finvalid_radix_integer (EMACS_INT radix)
 {
   char buf[64];
@@ -3348,14 +3346,14 @@ hash_table_from_plist (Lisp_Object plist)
   Lisp_Object *par = params;
 
   /* This is repetitive but fast and simple.  */
-#define ADDPARAM(name)
-  do {
-    Lisp_Object val = plist_get (plist, Q ## name);
-    if (!NILP (val))
-      {
-	*par++ = QC ## name;
-	*par++ = val;
-      }
+#define ADDPARAM(name) \
+  do { \
+    Lisp_Object val = plist_get (plist, Q ## name); \
+    if (!NILP (val)) \
+      { \
+	*par++ = QC ## name; \
+	*par++ = val; \
+      } \
   } while (0)
 
   ADDPARAM (test);
@@ -3656,29 +3654,29 @@ read_stack_reset (intmax_t sp)
   rdstack.sp = sp;
 }
 
-#define READ_AND_BUFFER(c)
-  c = READCHAR;
-  if (c < 0)
-    INVALID_SYNTAX_WITH_BUFFER ();
-  p += CHAR_STRING (c, (unsigned char *) p);
-  if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-    {
-       offset = p - read_buffer;
-       emacs_abort ();
-       p = read_buffer + offset;
-       end = read_buffer + read_buffer_size;
+#define READ_AND_BUFFER(c) \
+  c = READCHAR; \
+  if (c < 0) \
+    INVALID_SYNTAX_WITH_BUFFER (); \
+  p += CHAR_STRING (c, (unsigned char *) p); \
+  if (end - p < MAX_MULTIBYTE_LENGTH + 1) \
+    { \
+       offset = p - read_buffer; \
+       emacs_abort (); \
+       p = read_buffer + offset; \
+       end = read_buffer + read_buffer_size; \
     }
 
-#define INVALID_SYNTAX_WITH_BUFFER()
-  {
-    *p = 0;
-    invalid_syntax (read_buffer, readcharfun);
+#define INVALID_SYNTAX_WITH_BUFFER() \
+  { \
+    *p = 0; \
+    invalid_syntax (read_buffer, readcharfun); \
   }
 
-#define FINVALID_SYNTAX_WITH_BUFFER()
-  {
-    *p = 0;
-    finvalid_syntax (read_buffer);
+#define FINVALID_SYNTAX_WITH_BUFFER() \
+  { \
+    *p = 0; \
+    finvalid_syntax (read_buffer); \
   }
 
 /* Read a Lisp object.
@@ -3859,6 +3857,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 		UNREAD (ch);
 		INVALID_SYNTAX_WITH_BUFFER ();
 	      }
+	    break;
 
 	  case '(':
 	    /* #(...) -- string with properties */
@@ -4525,6 +4524,7 @@ fread0 (struct reader_context *ctx)
 	  case '[':
 	    /* #[...] -- byte-code (not supported in Guile reader) */
 	    finvalid_syntax ("Emacs bytecode syntax not supported");
+	    break;
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
@@ -5445,7 +5445,7 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted.
 OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   (Lisp_Object name, Lisp_Object obarray)
 {
-  Lisp_Object tem, string;
+  Lisp_Object string;
 
   if (NILP (obarray))
     obarray = Vobarray;
@@ -5465,7 +5465,7 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
       string = name;
     }
 
-  return (scm_is_true (scm_unintern (name, obhash (obarray))) ? Qt : Qnil);
+  return (scm_is_true (scm_unintern (string, obhash (obarray))) ? Qt : Qnil);
 }
 
 struct map_obarray_data
@@ -5570,7 +5570,6 @@ DEFUN ("internal--obarray-buckets",
     (Lisp_Object obarray)
 {
   emacs_abort ();
-  return Qnil;
 }
 
 void
