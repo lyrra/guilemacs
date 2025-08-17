@@ -5044,6 +5044,7 @@ extern void resume_text_conversion (void);
 extern void syms_of_textconv (void);
 #endif
 
+
 #ifdef HAVE_NATIVE_COMP
 INLINE bool
 NATIVE_COMP_FUNCTIONP (Lisp_Object a)
