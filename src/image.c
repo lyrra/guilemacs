@@ -6424,7 +6424,7 @@ xpm_load_image (struct frame *f,
 
 	  if (CONSP (specified_color) && STRINGP (XCDR (specified_color)))
 	    {
-	      if (xstrcasecmp (SSDATA (XCDR (specified_color)), "None") == 0)
+	      if (scm_is_true (scm_string_ci_equal_p (XCDR (specified_color), scm_from_utf8_string ("None"))))
 		color_val = Qt;
 	      else if (FRAME_TERMINAL (f)->defined_color_hook
                        (f, SSDATA (XCDR (specified_color)), &cdef, false, false))

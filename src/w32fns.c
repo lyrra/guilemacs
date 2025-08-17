@@ -853,7 +853,7 @@ w32_color_map_lookup (const char *colorname)
 
       tem = XCAR (elt);
 
-      if (lstrcmpi (SSDATA (tem), colorname) == 0)
+      if (scm_is_true (scm_string_ci_equal_p (tem, scm_from_utf8_string (colorname))))
 	{
 	  ret = Fcdr (elt);
 	  break;
@@ -1174,9 +1174,9 @@ w32_decode_color (struct frame *f, Lisp_Object arg, int def)
 
   CHECK_STRING (arg);
 
-  if (strcmp (SSDATA (arg), "black") == 0)
+  if (scm_is_true (scm_string_equal_p (arg, scm_from_utf8_string ("black"))))
     return BLACK_PIX_DEFAULT (f);
-  else if (strcmp (SSDATA (arg), "white") == 0)
+  else if (scm_is_true (scm_string_equal_p (arg, scm_from_utf8_string ("white"))))
     return WHITE_PIX_DEFAULT (f);
 
   if ((FRAME_DISPLAY_INFO (f)->n_planes * FRAME_DISPLAY_INFO (f)->n_cbits) == 1)
@@ -7138,7 +7138,7 @@ DEFUN ("x-open-connection", Fx_open_connection, Sx_open_connection,
    * we'll need callers to be precise about what window system they
    * want.  */
 
-  if (strcmp (SSDATA (display), "w32") != 0)
+  if (!scm_is_true (scm_string_equal_p (display, scm_from_utf8_string ("w32"))))
     error ("The name of the display in this Emacs must be \"w32\"");
 
   /* If initialization has already been done, return now to avoid

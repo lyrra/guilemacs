@@ -401,7 +401,7 @@ font_style_to_value (enum font_property_index prop, Lisp_Object val,
 	for (j = 1; j < ASIZE (AREF (table, i)); j++)
 	  {
 	    elt = AREF (AREF (table, i), j);
-	    if (xstrcasecmp (s, SSDATA (SYMBOL_NAME (elt))) == 0)
+	    if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string (s), SYMBOL_NAME (elt))))
 	      {
 		CHECK_FIXNUM (AREF (AREF (table, i), 0));
 		return ((XFIXNUM (AREF (AREF (table, i), 0)) << 8)

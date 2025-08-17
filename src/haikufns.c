@@ -353,7 +353,7 @@ haiku_get_color (const char *name, Emacs_Color *color)
 	{
 	  col = XCAR (tem);
 
-	  if (CONSP (col) && !xstrcasecmp (SSDATA (XCAR (col)), name))
+	  if (CONSP (col) && scm_is_true (scm_string_ci_equal_p (XCAR (col), scm_from_utf8_string (name))))
 	    {
 	      clr = XFIXNUM (XCDR (col));
 	      color->pixel = clr;
@@ -377,7 +377,7 @@ haiku_get_color (const char *name, Emacs_Color *color)
 	  string = AREF (Vhaiku_allowed_ui_colors, i);
 
 	  block_input ();
-	  if (STRINGP (string) && !strcmp (SSDATA (string), name))
+	  if (STRINGP (string) && scm_is_true (scm_string_equal_p (string, scm_from_utf8_string (name))))
 	    rc = be_get_ui_color (name, &ui_color);
 	  unblock_input ();
 	}
@@ -399,7 +399,7 @@ haiku_display_info_for_name (Lisp_Object name)
 {
   CHECK_STRING (name);
 
-  if (!strcmp (SSDATA (name), "be"))
+  if (scm_is_true (scm_string_equal_p (name, scm_from_utf8_string ("be"))))
     {
       if (x_display_list)
 	return x_display_list;
@@ -2082,7 +2082,7 @@ haiku_set_mouse_color (struct frame *f, Lisp_Object arg, Lisp_Object oldval)
   CHECK_STRING (arg);
   color_specified_p = true;
 
-  if (!strcmp (SSDATA (arg), "font-color"))
+  if (scm_is_true (scm_string_equal_p (arg, scm_from_utf8_string ("font-color"))))
     color_specified_p = false;
   else
     rc = haiku_get_color (SSDATA (arg), &color);

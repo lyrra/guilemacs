@@ -925,7 +925,7 @@ content is binary data).  */)
       /* If name doesn't match any of the formats, try the next format.  */
       bool match = false;
       for (Lisp_Object tail = formats; CONSP (tail); tail = XCDR (tail))
-	if (strcmp (name, SSDATA (SYMBOL_NAME (XCAR (tail)))) == 0)
+	if (scm_is_true (scm_string_equal_p (scm_from_utf8_string (name), SYMBOL_NAME (XCAR (tail)))))
 	    match = true;
       if (!match)
 	  continue;

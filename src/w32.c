@@ -9631,7 +9631,7 @@ network_interface_get_info (Lisp_Object ifname)
 				conv_sockaddr_to_lisp ((struct sockaddr*) &sa,
 						       sizeof (struct sockaddr))),
 			 res);
-	  else if (strcmp (namebuf, SSDATA (ifname)) == 0)
+	  else if (scm_is_true (scm_string_equal_p (scm_from_utf8_string (namebuf), ifname)))
 	    {
 	      Lisp_Object hwaddr = Fmake_vector (make_fixnum (6), Qnil);
 	      register struct Lisp_Vector *p = XVECTOR (hwaddr);
@@ -9721,7 +9721,7 @@ network_interface_get_info (Lisp_Object ifname)
 							 sizeof (struct sockaddr))),
 			   res);
 	    }
-	  else if (strcmp (SSDATA (ifname), "lo") == 0)
+	  else if (scm_is_true (scm_string_equal_p (ifname, scm_from_utf8_string ("lo"))))
 	    {
 	      res = Fcons (Fcons (intern ("running"),
 				  Fcons (intern ("loopback"),

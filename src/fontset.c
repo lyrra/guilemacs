@@ -1226,7 +1226,7 @@ fs_query_fontset (Lisp_Object name, int name_pattern)
       this_name = FONTSET_NAME (fontset);
       if (name_pattern == 1
 	  ? fast_string_match_ignore_case (name, this_name) >= 0
-	  : !xstrcasecmp (SSDATA (name), SSDATA (this_name)))
+	  : scm_is_true (scm_string_ci_equal_p (name, this_name)))
 	return i;
     }
   return -1;
