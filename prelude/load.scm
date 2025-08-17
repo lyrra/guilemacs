@@ -467,6 +467,143 @@ The elements of a list are not copied; they are shared with the original."
   "Return t if OBJECT is a natural number (non-negative integer)."
   (if (and (integer? object) (>= object 0)) #t #nil))
 
+;; Property list functions
+
+(define (elisp-plist-get plist prop &optional predicate)
+  "Extract a value from a property list.
+PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
+Returns the value corresponding to PROP, or nil if not found.
+Uses PREDICATE for comparison, defaulting to `eq'."
+  (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+    (let loop ((tail plist))
+      (cond
+        ((null? tail) #nil)
+        ((not (pair? tail)) #nil)
+        ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+        ((pred prop (car tail)) (car (cdr tail)))
+        (else (loop (cddr tail)))))))
+
+(define (elisp-plist-put plist prop value)
+  "Change value in PLIST of PROP to VALUE.
+PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
+Returns a new property list with the change."
+  (let loop ((tail plist) (result '()))
+    (cond
+      ((null? tail)
+       ;; Property not found, add it at the end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? tail))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? (cdr tail)))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((eq? prop (car tail))
+       ;; Found the property, update its value
+       (append (reverse result) (cons prop (cons value (cddr tail)))))
+      (else
+       ;; Continue searching, preserving current prop-value pair
+       (loop (cddr tail) (cons (car (cdr tail)) (cons (car tail) result)))))))
+
+(define (elisp-plist-member plist prop &optional predicate)
+  "Return non-nil if PROP is a property of PLIST.
+Unlike `plist-get', this allows distinguishing between a missing
+property and a property with value nil.
+Returns the tail of PLIST whose car is PROP."
+  (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+    (let loop ((tail plist))
+      (cond
+        ((null? tail) #nil)
+        ((not (pair? tail)) #nil)
+        ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+        ((pred prop (car tail)) tail)
+        (else (loop (cddr tail)))))))
+
+;; String comparison functions
+
+(define (elisp-string-equal s1 s2)
+  "Return t if two strings have identical contents.
+Case is significant. Symbols are allowed; their print names are used."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string=? str1 str2)) #t #nil)))
+
+(define (elisp-string-lessp s1 s2)
+  "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string<? str1 str2)) #t #nil)))
+
+(define (elisp-string-greaterp s1 s2)
+  "Return non-nil if STRING1 is greater than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string>? str1 str2)) #t #nil)))
+
+;; List construction and manipulation
+
+(define (elisp-append . lists)
+  "Concatenate all the arguments and make the result a list.
+The result is a list whose elements are the elements of all the arguments.
+Each argument may be a list, vector or string.
+All arguments except the last are copied."
+  (if (null? lists)
+      '()
+      (let ((result '()))
+        (let loop ((remaining lists))
+          (cond
+            ((null? remaining) result)
+            ((null? (cdr remaining))
+             ;; Last argument - append it as-is (not copied)
+             (if (null? result)
+                 (car remaining)
+                 (append result (car remaining))))
+            ((null? (car remaining)) (loop (cdr remaining)))
+            ((pair? (car remaining))
+             (set! result (append result (car remaining)))
+             (loop (cdr remaining)))
+            ((vector? (car remaining))
+             (set! result (append result (vector->list (car remaining))))
+             (loop (cdr remaining)))
+            ((string? (car remaining))
+             (set! result (append result (string->list (car remaining))))
+             (loop (cdr remaining)))
+            (else (loop (cdr remaining))))))))
+
+(define (elisp-mapcar function sequence)
+  "Apply FUNCTION to each element of SEQUENCE, and make a list of the results.
+The result is a list just as long as SEQUENCE.
+SEQUENCE may be a list, a vector, or a string."
+  (cond
+    ((null? sequence) '())
+    ((pair? sequence) (map function sequence))
+    ((vector? sequence) (map function (vector->list sequence)))
+    ((string? sequence) (map function (string->list sequence)))
+    (else '())))
+
+(define (elisp-mapc function sequence)
+  "Apply FUNCTION to each element of SEQUENCE for side effects only.
+Unlike `mapcar', don't accumulate the results. Return SEQUENCE."
+  (cond
+    ((null? sequence) sequence)
+    ((pair? sequence) (for-each function sequence) sequence)
+    ((vector? sequence) (for-each function (vector->list sequence)) sequence)
+    ((string? sequence) (for-each function (string->list sequence)) sequence)
+    (else sequence)))
+
+;; Simple utility functions
+
+(define (elisp-identity object)
+  "Return the argument unchanged."
+  object)
+
+(define (elisp-constantly value)
+  "Return a function that always returns VALUE.
+This is a useful building block for higher-order functions."
+  (lambda args value))
+
 ;; Register the functions for Elisp use
 (set-symbol-function! 'memq elisp-memq)
 (set-symbol-function! 'nth elisp-nth)
@@ -488,6 +625,17 @@ The elements of a list are not copied; they are shared with the original."
 (set-symbol-function! 'integerp elisp-integerp)
 (set-symbol-function! 'floatp elisp-floatp)
 (set-symbol-function! 'natnump elisp-natnump)
+(set-symbol-function! 'plist-get elisp-plist-get)
+(set-symbol-function! 'plist-put elisp-plist-put)
+(set-symbol-function! 'plist-member elisp-plist-member)
+(set-symbol-function! 'string-equal elisp-string-equal)
+(set-symbol-function! 'string-lessp elisp-string-lessp)
+(set-symbol-function! 'string-greaterp elisp-string-greaterp)
+(set-symbol-function! 'append elisp-append)
+(set-symbol-function! 'mapcar elisp-mapcar)
+(set-symbol-function! 'mapc elisp-mapc)
+(set-symbol-function! 'identity elisp-identity)
+(set-symbol-function! 'constantly elisp-constantly)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
