@@ -106,4 +106,27 @@ extern bool guile_is_safe_for_c_string_copy (Lisp_Object str);
 /* Check if string looks like network address */
 extern bool guile_looks_like_network_address (Lisp_Object addr_str);
 
+/* Path/Filename operation functions */
+
+/* Check if path is absolute (cross-platform) */
+extern bool guile_is_absolute_path (Lisp_Object path);
+
+/* Check if path ends with directory separator */
+extern bool guile_ends_with_directory_separator (Lisp_Object path);
+
+/* Normalize path separators (convert / to \ on Windows) */
+extern Lisp_Object guile_normalize_path_separators (Lisp_Object path);
+
+/* Check if string is empty */
+extern bool guile_string_empty (Lisp_Object str);
+
+/* Check if path has directory traversal patterns */
+extern bool guile_has_directory_traversal (Lisp_Object path);
+
+/* Get file extension from path */
+extern Lisp_Object guile_get_file_extension (Lisp_Object path);
+
+/* Check if path starts with specific prefix */
+extern bool guile_path_starts_with (Lisp_Object path, const char *prefix);
+
 #endif /* GUILE_LOOKUPS_H */

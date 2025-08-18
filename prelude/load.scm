@@ -822,6 +822,15 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
   (module-define! global-module 'looks-like-network-address? looks-like-network-address?)
 
+  ;; Export path/filename operation functions to global module
+  (module-define! global-module 'is-absolute-path? is-absolute-path?)
+  (module-define! global-module 'ends-with-directory-separator? ends-with-directory-separator?)
+  (module-define! global-module 'normalize-path-separators normalize-path-separators)
+  (module-define! global-module 'string-empty? string-empty?)
+  (module-define! global-module 'has-directory-traversal? has-directory-traversal?)
+  (module-define! global-module 'get-file-extension get-file-extension)
+  (module-define! global-module 'path-starts-with? path-starts-with?)
+
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
@@ -855,7 +864,16 @@ Allows any number of arguments, including zero."
   (module-define! elisp-emacs-module 'needs-filename-conversion? needs-filename-conversion?)
   (module-define! elisp-emacs-module 'is-utf8-filename? is-utf8-filename?)
   (module-define! elisp-emacs-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
-  (module-define! elisp-emacs-module 'looks-like-network-address? looks-like-network-address?))
+  (module-define! elisp-emacs-module 'looks-like-network-address? looks-like-network-address?)
+
+  ;; Export path/filename operation functions to elisp emacs module
+  (module-define! elisp-emacs-module 'is-absolute-path? is-absolute-path?)
+  (module-define! elisp-emacs-module 'ends-with-directory-separator? ends-with-directory-separator?)
+  (module-define! elisp-emacs-module 'normalize-path-separators normalize-path-separators)
+  (module-define! elisp-emacs-module 'string-empty? string-empty?)
+  (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?)
+  (module-define! elisp-emacs-module 'get-file-extension get-file-extension)
+  (module-define! elisp-emacs-module 'path-starts-with? path-starts-with?))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

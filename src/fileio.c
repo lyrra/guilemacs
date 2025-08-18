@@ -47,6 +47,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
+#include "guile_fns.h"
 #include "composite.h"
 #include "character.h"
 #include "buffer.h"
@@ -882,7 +883,7 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
       eargs++;
       /* We're not adding a slash to the final part. */
       if (i == nargs - 1
-	  || IS_DIRECTORY_SEP (*(SSDATA (arg) + SBYTES (arg) - 1)))
+	  || guile_ends_with_directory_separator (arg))
 	{
 	  bytes += SBYTES (arg);
 	  chars += SCHARS (arg);
@@ -920,7 +921,7 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
 	  arg = elements[i];
 	  /* We have to recompute the number of bytes. */
 	  if (i == eargs - 1
-	      || IS_DIRECTORY_SEP (*(SSDATA (arg) + SBYTES (arg) - 1)))
+	      || guile_ends_with_directory_separator (arg))
 	    {
 	      bytes += SBYTES (arg);
 	      chars += SCHARS (arg);
@@ -963,7 +964,7 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
 static bool
 file_name_absolute_no_tilde_p (Lisp_Object name)
 {
-  return IS_ABSOLUTE_FILE_NAME (SSDATA (name));
+  return guile_is_absolute_path (name);
 }
 
 /* Return the home directory of the user NAME, or a null pointer if

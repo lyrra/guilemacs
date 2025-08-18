@@ -3,6 +3,7 @@
 #include <config.h>
 #include "lisp.h"
 #include "guile_fns.h"
+#include "coding.h"
 #include <libguile.h>
 
 /* Scheme function references */
@@ -20,8 +21,6 @@ static SCM scm_validate_color_name = SCM_BOOL_F;
 static SCM scm_string_contains_whitespace = SCM_BOOL_F;
 static SCM scm_is_frame_name_fnn_format = SCM_BOOL_F;
 static SCM scm_validate_xlfd_font_name = SCM_BOOL_F;
-static SCM scm_is_absolute_path = SCM_BOOL_F;
-static SCM scm_has_directory_traversal = SCM_BOOL_F;
 static SCM scm_string_spaces_to_dashes = SCM_BOOL_F;
 static SCM scm_string_trim_leading_whitespace = SCM_BOOL_F;
 static SCM scm_parse_number_string = SCM_BOOL_F;
@@ -39,6 +38,15 @@ static SCM scm_needs_filename_conversion = SCM_BOOL_F;
 static SCM scm_is_utf8_filename = SCM_BOOL_F;
 static SCM scm_is_safe_for_c_string_copy = SCM_BOOL_F;
 static SCM scm_looks_like_network_address = SCM_BOOL_F;
+
+/* Path/Filename operation function references */
+static SCM scm_is_absolute_path = SCM_BOOL_F;
+static SCM scm_ends_with_directory_separator = SCM_BOOL_F;
+static SCM scm_normalize_path_separators = SCM_BOOL_F;
+static SCM scm_string_empty = SCM_BOOL_F;
+static SCM scm_has_directory_traversal = SCM_BOOL_F;
+static SCM scm_get_file_extension = SCM_BOOL_F;
+static SCM scm_path_starts_with = SCM_BOOL_F;
 
 /* Initialize the Guile lookup functions module */
 void
@@ -174,6 +182,35 @@ init_guile_fns (void)
   if (scm_is_false (scm_looks_like_network_address))
     scm_looks_like_network_address = scm_c_lookup ("looks-like-network-address?");
 
+  /* Initialize path/filename operation functions */
+  scm_is_absolute_path = scm_c_module_lookup (elisp_emacs_module, "is-absolute-path?");
+  if (scm_is_false (scm_is_absolute_path))
+    scm_is_absolute_path = scm_c_lookup ("is-absolute-path?");
+
+  scm_ends_with_directory_separator = scm_c_module_lookup (elisp_emacs_module, "ends-with-directory-separator?");
+  if (scm_is_false (scm_ends_with_directory_separator))
+    scm_ends_with_directory_separator = scm_c_lookup ("ends-with-directory-separator?");
+
+  scm_normalize_path_separators = scm_c_module_lookup (elisp_emacs_module, "normalize-path-separators");
+  if (scm_is_false (scm_normalize_path_separators))
+    scm_normalize_path_separators = scm_c_lookup ("normalize-path-separators");
+
+  scm_string_empty = scm_c_module_lookup (elisp_emacs_module, "string-empty?");
+  if (scm_is_false (scm_string_empty))
+    scm_string_empty = scm_c_lookup ("string-empty?");
+
+  scm_has_directory_traversal = scm_c_module_lookup (elisp_emacs_module, "has-directory-traversal?");
+  if (scm_is_false (scm_has_directory_traversal))
+    scm_has_directory_traversal = scm_c_lookup ("has-directory-traversal?");
+
+  scm_get_file_extension = scm_c_module_lookup (elisp_emacs_module, "get-file-extension");
+  if (scm_is_false (scm_get_file_extension))
+    scm_get_file_extension = scm_c_lookup ("get-file-extension");
+
+  scm_path_starts_with = scm_c_module_lookup (elisp_emacs_module, "path-starts-with?");
+  if (scm_is_false (scm_path_starts_with))
+    scm_path_starts_with = scm_c_lookup ("path-starts-with?");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -208,6 +245,15 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_is_utf8_filename);
   scm_gc_protect_object (scm_is_safe_for_c_string_copy);
   scm_gc_protect_object (scm_looks_like_network_address);
+
+  /* Protect path/filename operation functions from GC */
+  scm_gc_protect_object (scm_is_absolute_path);
+  scm_gc_protect_object (scm_ends_with_directory_separator);
+  scm_gc_protect_object (scm_normalize_path_separators);
+  scm_gc_protect_object (scm_string_empty);
+  scm_gc_protect_object (scm_has_directory_traversal);
+  scm_gc_protect_object (scm_get_file_extension);
+  scm_gc_protect_object (scm_path_starts_with);
 }
 
 /* Lookup a color by name in a color map */
@@ -486,37 +532,6 @@ guile_validate_xlfd_font_name (Lisp_Object name)
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
 }
 
-/* Check if path is absolute */
-bool
-guile_is_absolute_path (Lisp_Object path)
-{
-  if (!scm_is_true (scm_is_absolute_path))
-    return false;
-
-  if (!STRINGP (path))
-    return false;
-
-  SCM result = scm_call_1 (scm_is_absolute_path,
-                           scm_from_utf8_string (SSDATA (path)));
-
-  return scm_is_true (result);
-}
-
-/* Check if path has directory traversal patterns */
-bool
-guile_has_directory_traversal (Lisp_Object path)
-{
-  if (!scm_is_true (scm_has_directory_traversal))
-    return false;
-
-  if (!STRINGP (path))
-    return false;
-
-  SCM result = scm_call_1 (scm_has_directory_traversal,
-                           scm_from_utf8_string (SSDATA (path)));
-
-  return scm_is_true (result);
-}
 
 /* String preprocessing functions */
 
@@ -842,6 +857,152 @@ guile_looks_like_network_address (Lisp_Object addr_str)
 
   SCM result = scm_call_1 (scm_looks_like_network_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
+
+  return scm_is_true (result);
+}
+
+/* Path/Filename operation bridge functions */
+
+/* Check if path is absolute (cross-platform) */
+bool
+guile_is_absolute_path (Lisp_Object path)
+{
+  if (!scm_is_true (scm_is_absolute_path))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_is_absolute_path);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  return scm_is_true (result);
+}
+
+/* Check if path ends with directory separator */
+bool
+guile_ends_with_directory_separator (Lisp_Object path)
+{
+  if (!scm_is_true (scm_ends_with_directory_separator))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_ends_with_directory_separator);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  return scm_is_true (result);
+}
+
+/* Normalize path separators */
+Lisp_Object
+guile_normalize_path_separators (Lisp_Object path)
+{
+  if (!scm_is_true (scm_normalize_path_separators))
+    return path; /* Return original if Scheme not available */
+
+  if (!STRINGP (path))
+    return path;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_normalize_path_separators);
+  if (scm_is_false (function))
+    return path;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return path;
+}
+
+/* Check if string is empty */
+bool
+guile_string_empty (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_empty))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  SCM result = scm_call_1 (scm_string_empty,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if path has directory traversal patterns */
+bool
+guile_has_directory_traversal (Lisp_Object path)
+{
+  if (!scm_is_true (scm_has_directory_traversal))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  SCM result = scm_call_1 (scm_has_directory_traversal,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  return scm_is_true (result);
+}
+
+/* Get file extension from path */
+Lisp_Object
+guile_get_file_extension (Lisp_Object path)
+{
+  if (!scm_is_true (scm_get_file_extension))
+    return build_string (""); /* Return empty string if Scheme not available */
+
+  if (!STRINGP (path))
+    return build_string ("");
+
+  SCM result = scm_call_1 (scm_get_file_extension,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return build_string ("");
+}
+
+/* Check if path starts with specific prefix */
+bool
+guile_path_starts_with (Lisp_Object path, const char *prefix)
+{
+  if (!scm_is_true (scm_path_starts_with))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  SCM result = scm_call_2 (scm_path_starts_with,
+                           scm_from_utf8_string (SSDATA (path)),
+                           scm_from_utf8_string (prefix));
 
   return scm_is_true (result);
 }

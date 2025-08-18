@@ -492,3 +492,79 @@ Returns #t for IP-like or hostname-like patterns, #f otherwise."
       (string-contains addr-str ":")  ; IPv6 or port
       (string-contains addr-str "localhost")
       (string-contains addr-str "127.0.0.1")))
+
+;; Path/Filename Operations for SSDATA hoisting
+
+;; Check if path is absolute (cross-platform)
+(define (is-absolute-path? path)
+  "Check if PATH is an absolute path (cross-platform).
+Returns #t for absolute paths, #f for relative ones."
+  (cond
+    ;; Empty path is not absolute
+    ((= (string-length path) 0) #f)
+    ;; Unix-style absolute path (starts with /)
+    ((char=? (string-ref path 0) #\/) #t)
+    ;; Windows-style absolute path (C:\ or C:/)
+    ((and (>= (string-length path) 3)
+          (char-alphabetic? (string-ref path 0))
+          (char=? (string-ref path 1) #\:)
+          (or (char=? (string-ref path 2) #\\)
+              (char=? (string-ref path 2) #\/))) #t)
+    ;; UNC path (\\server\share)
+    ((and (>= (string-length path) 2)
+          (char=? (string-ref path 0) #\\)
+          (char=? (string-ref path 1) #\\)) #t)
+    ;; Not absolute
+    (else #f)))
+
+;; Check if path ends with directory separator
+(define (ends-with-directory-separator? path)
+  "Check if PATH ends with a directory separator (/ or \\).
+Returns #t if path ends with separator, #f otherwise."
+  (if (= (string-length path) 0)
+      #f
+      (let ((last-char (string-ref path (- (string-length path) 1))))
+        (or (char=? last-char #\/)
+            (char=? last-char #\\)))))
+
+;; Normalize path separators (convert / to \ on Windows)
+(define (normalize-path-separators path)
+  "Normalize PATH by converting forward slashes to backslashes.
+Returns the normalized path string."
+  (string-map (lambda (c)
+                (if (char=? c #\/) #\\ c))
+              path))
+
+;; Check if string is empty
+(define (string-empty? str)
+  "Check if STR is empty (zero length).
+Returns #t if empty, #f otherwise."
+  (= (string-length str) 0))
+
+;; Check if path has directory traversal patterns
+(define (has-directory-traversal? path)
+  "Check if PATH contains directory traversal patterns like .. or ./.
+Returns #t if potentially dangerous patterns found, #f otherwise."
+  (or (string-contains path "..")
+      (string-contains path "./")
+      (string-contains path ".\\")))
+
+;; Extract file extension from path
+(define (get-file-extension path)
+  "Extract the file extension from PATH.
+Returns the extension (including dot) or empty string if none."
+  (let ((last-dot (string-rindex path #\.))
+        (last-slash (or (string-rindex path #\/)
+                       (string-rindex path #\\)
+                       -1)))
+    (if (and last-dot (> last-dot last-slash))
+        (substring path last-dot)
+        "")))
+
+;; Check if path starts with specific prefix
+(define (path-starts-with? path prefix)
+  "Check if PATH starts with PREFIX (case-insensitive).
+Returns #t if path starts with prefix, #f otherwise."
+  (and (>= (string-length path) (string-length prefix))
+       (string-ci=? prefix
+                    (substring path 0 (string-length prefix)))))

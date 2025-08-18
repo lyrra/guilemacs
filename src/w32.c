@@ -95,6 +95,7 @@ extern void dynlib_reset_last_error (void);
 #endif
 
 #include "lisp.h"
+#include "guile_fns.h"
 #include "epaths.h"	/* for PATH_EXEC */
 
 #include <pwd.h>
@@ -10084,18 +10085,11 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
     }
   if (!use_unicode)
     {
-      /* Need to copy LKEY because we are going to modify it.  */
-      Lisp_Object local_lkey = Fcopy_sequence (lkey);
-
-      /* Mirror the slashes.  Note: this has to be done before
+      /* Need to normalize path separators for Windows.  Note: this has to be done before
 	 encoding, because after encoding we cannot guarantee that a
 	 slash '/' always stands for itself, it could be part of some
 	 multibyte sequence.  */
-      for (int i = 0; i < SBYTES (local_lkey); i++)
-	{
-	  if (SSDATA (local_lkey)[i] == '/')
-	    SSDATA (local_lkey)[i] = '\\';
-	}
+      Lisp_Object local_lkey = guile_normalize_path_separators (lkey);
 
       key = SSDATA (ENCODE_SYSTEM (local_lkey));
       value_name = SSDATA (ENCODE_SYSTEM (lname));
