@@ -243,16 +243,6 @@ Returns #t for special buffers, #f for regular ones."
       ((not (pred (string-ref str i))) #f)
       (else (loop (+ i 1))))))
 
-(define (string-contains-helper str substring)
-  "Check if STR contains SUBSTRING."
-  (let ((str-len (string-length str))
-        (sub-len (string-length substring)))
-    (let loop ((i 0))
-      (cond
-        ((> (+ i sub-len) str-len) #f)
-        ((string=? (substring str i (+ i sub-len)) substring) #t)
-        (else (loop (+ i 1)))))))
-
 ;; Color parsing and validation functions
 (define (parse-color-spec color-spec)
   "Parse a color specification string and return RGB values.
@@ -336,6 +326,9 @@ Returns 'valid if the name has the correct number of dashes, 'invalid otherwise.
         'valid
         'invalid)))
 
+;; Note: Using Guile's built-in string-contains function
+;; It returns the index of the substring if found, #f otherwise
+
 ;; File path validation helpers
 (define (is-absolute-path? path)
   "Check if PATH is an absolute file path."
@@ -344,7 +337,57 @@ Returns 'valid if the name has the correct number of dashes, 'invalid otherwise.
 
 (define (has-directory-traversal? path)
   "Check if PATH contains directory traversal patterns like '../'."
-  (or (and (string-contains path "../") #t)
-      (and (string-contains path "/..") #t)
+  (or (string-contains path "../")
+      (string-contains path "/..")
       (string=? path "..")
       (string-prefix? "../" path)))
+
+;; String preprocessing functions
+(define (string-spaces-to-dashes str)
+  "Replace all spaces in STR with dashes.
+Returns the processed string with spaces converted to dashes."
+  (string-map (lambda (c)
+                (if (char=? c #\space) #\- c))
+              str))
+
+;; String trimming and parsing functions
+(define (string-trim-leading-whitespace str)
+  "Remove leading whitespace from STR.
+Returns the string with leading spaces and tabs removed."
+  (let loop ((i 0))
+    (cond
+      ((>= i (string-length str)) "")
+      ((or (char=? (string-ref str i) #\space)
+           (char=? (string-ref str i) #\tab))
+       (loop (+ i 1)))
+      (else (substring str i)))))
+
+;; Number parsing with base support
+(define (parse-number-string str base)
+  "Parse STR as a number in the given BASE (2-16).
+Returns the parsed number or #f if invalid.
+Automatically trims leading whitespace."
+  (let ((trimmed (string-trim-leading-whitespace str)))
+    (if (string=? trimmed "")
+        #f
+        (string->number trimmed base))))
+
+;; String validation for memory copying
+(define (validate-string-for-copying str)
+  "Validate that STR is suitable for memory copying operations.
+Returns 'valid if safe to copy, 'invalid otherwise."
+  (cond
+    ((not (string? str)) 'invalid)
+    ((= (string-length str) 0) 'invalid)  ; Empty strings might be problematic
+    ;; Check for null bytes that could cause issues in C
+    ((string-any (lambda (c) (char=? c #\nul)) str) 'invalid)
+    (else 'valid)))
+
+;; String preprocessing for symbol creation
+(define (prepare-string-for-symbol str)
+  "Prepare STR for use as a symbol by converting spaces to dashes.
+Returns the processed string suitable for symbol internment."
+  (let ((processed (string-spaces-to-dashes str)))
+    (if (string=? processed "")
+        #f  ; Empty string after processing
+        processed)))

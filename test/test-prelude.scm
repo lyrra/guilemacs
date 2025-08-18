@@ -224,8 +224,9 @@
                (not (has-directory-traversal? "/usr/bin/emacs"))))
 
 (test-group "Helper Functions"
-  (test-assert "string-contains returns index when found"
-               (number? (string-contains "hello world" "wor")))
+  (test-equal "string-contains returns index when found"
+              6
+              (string-contains "hello world" "wor"))
 
   (test-assert "string-contains returns #f when not found"
                (not (string-contains "hello world" "xyz")))
@@ -330,5 +331,107 @@
   (test-assert "symbol list lookup not found"
                (let ((symbol-list '(sym1 sym2 sym3)))
                  (not (lookup-symbol-in-list symbol-list "sym4")))))
+
+(test-group "String Preprocessing Functions"
+  (test-equal "convert spaces to dashes"
+              "hello-world-test"
+              (string-spaces-to-dashes "hello world test"))
+
+  (test-equal "string with no spaces unchanged"
+              "hello"
+              (string-spaces-to-dashes "hello"))
+
+  (test-equal "empty string unchanged"
+              ""
+              (string-spaces-to-dashes ""))
+
+  (test-equal "multiple spaces converted"
+              "a-b-c-d"
+              (string-spaces-to-dashes "a b c d"))
+
+  (test-equal "mixed spaces and other characters"
+              "hello,-world!"
+              (string-spaces-to-dashes "hello, world!")))
+
+(test-group "String Trimming Functions"
+  (test-equal "trim leading spaces"
+              "hello world"
+              (string-trim-leading-whitespace "   hello world"))
+
+  (test-equal "trim leading tabs"
+              "hello world"
+              (string-trim-leading-whitespace "\t\thello world"))
+
+  (test-equal "trim mixed leading whitespace"
+              "hello world"
+              (string-trim-leading-whitespace " \t hello world"))
+
+  (test-equal "no leading whitespace unchanged"
+              "hello world"
+              (string-trim-leading-whitespace "hello world"))
+
+  (test-equal "all whitespace returns empty string"
+              ""
+              (string-trim-leading-whitespace "   \t  "))
+
+  (test-equal "empty string unchanged"
+              ""
+              (string-trim-leading-whitespace "")))
+
+(test-group "Number Parsing Functions"
+  (test-equal "parse decimal number"
+              42
+              (parse-number-string "42" 10))
+
+  (test-equal "parse hex number"
+              255
+              (parse-number-string "ff" 16))
+
+  (test-equal "parse binary number"
+              7
+              (parse-number-string "111" 2))
+
+  (test-equal "parse with leading whitespace"
+              123
+              (parse-number-string "  123" 10))
+
+  (test-assert "invalid number returns #f"
+               (not (parse-number-string "not-a-number" 10)))
+
+  (test-assert "empty string returns #f"
+               (not (parse-number-string "" 10))))
+
+(test-group "String Validation Functions"
+  (test-equal "valid string for copying"
+              'valid
+              (validate-string-for-copying "hello world"))
+
+  (test-equal "invalid empty string for copying"
+              'invalid
+              (validate-string-for-copying ""))
+
+  (test-equal "invalid string with null byte"
+              'invalid
+              (validate-string-for-copying (string-append "hello" (string #\nul) "world")))
+
+  (test-equal "invalid non-string object"
+              'invalid
+              (validate-string-for-copying 42)))
+
+(test-group "Symbol Preparation Functions"
+  (test-equal "prepare string for symbol"
+              "hello-world"
+              (prepare-string-for-symbol "hello world"))
+
+  (test-equal "string with no spaces unchanged"
+              "hello"
+              (prepare-string-for-symbol "hello"))
+
+  (test-assert "empty string returns #f"
+               (not (prepare-string-for-symbol "")))
+
+  (test-equal "multiple spaces converted to dashes"
+              "a-b-c"
+              (prepare-string-for-symbol "a b c")))
 
 (test-end)

@@ -57,4 +57,21 @@ extern bool guile_is_absolute_path (Lisp_Object path);
 /* Check if path contains directory traversal patterns */
 extern bool guile_has_directory_traversal (Lisp_Object path);
 
+/* String preprocessing functions */
+
+/* Convert spaces to dashes in a string */
+extern Lisp_Object guile_string_spaces_to_dashes (Lisp_Object str);
+
+/* Trim leading whitespace from a string */
+extern Lisp_Object guile_string_trim_leading_whitespace (Lisp_Object str);
+
+/* Parse a number string with given base */
+extern Lisp_Object guile_parse_number_string (Lisp_Object str, int base);
+
+/* Validate string for copying operations */
+extern bool guile_validate_string_for_copying (Lisp_Object str);
+
+/* Prepare string for symbol creation */
+extern Lisp_Object guile_prepare_string_for_symbol (Lisp_Object str);
+
 #endif /* GUILE_LOOKUPS_H */

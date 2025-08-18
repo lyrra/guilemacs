@@ -22,6 +22,11 @@ static SCM scm_is_frame_name_fnn_format = SCM_BOOL_F;
 static SCM scm_validate_xlfd_font_name = SCM_BOOL_F;
 static SCM scm_is_absolute_path = SCM_BOOL_F;
 static SCM scm_has_directory_traversal = SCM_BOOL_F;
+static SCM scm_string_spaces_to_dashes = SCM_BOOL_F;
+static SCM scm_string_trim_leading_whitespace = SCM_BOOL_F;
+static SCM scm_parse_number_string = SCM_BOOL_F;
+static SCM scm_validate_string_for_copying = SCM_BOOL_F;
+static SCM scm_prepare_string_for_symbol = SCM_BOOL_F;
 
 /* Initialize the Guile lookup functions module */
 void
@@ -96,6 +101,26 @@ init_guile_fns (void)
   if (scm_is_false (scm_has_directory_traversal))
     scm_has_directory_traversal = scm_c_lookup ("has-directory-traversal?");
 
+  scm_string_spaces_to_dashes = scm_c_module_lookup (elisp_emacs_module, "string-spaces-to-dashes");
+  if (scm_is_false (scm_string_spaces_to_dashes))
+    scm_string_spaces_to_dashes = scm_c_lookup ("string-spaces-to-dashes");
+
+  scm_string_trim_leading_whitespace = scm_c_module_lookup (elisp_emacs_module, "string-trim-leading-whitespace");
+  if (scm_is_false (scm_string_trim_leading_whitespace))
+    scm_string_trim_leading_whitespace = scm_c_lookup ("string-trim-leading-whitespace");
+
+  scm_parse_number_string = scm_c_module_lookup (elisp_emacs_module, "parse-number-string");
+  if (scm_is_false (scm_parse_number_string))
+    scm_parse_number_string = scm_c_lookup ("parse-number-string");
+
+  scm_validate_string_for_copying = scm_c_module_lookup (elisp_emacs_module, "validate-string-for-copying");
+  if (scm_is_false (scm_validate_string_for_copying))
+    scm_validate_string_for_copying = scm_c_lookup ("validate-string-for-copying");
+
+  scm_prepare_string_for_symbol = scm_c_module_lookup (elisp_emacs_module, "prepare-string-for-symbol");
+  if (scm_is_false (scm_prepare_string_for_symbol))
+    scm_prepare_string_for_symbol = scm_c_lookup ("prepare-string-for-symbol");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -113,6 +138,11 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_validate_xlfd_font_name);
   scm_gc_protect_object (scm_is_absolute_path);
   scm_gc_protect_object (scm_has_directory_traversal);
+  scm_gc_protect_object (scm_string_spaces_to_dashes);
+  scm_gc_protect_object (scm_string_trim_leading_whitespace);
+  scm_gc_protect_object (scm_parse_number_string);
+  scm_gc_protect_object (scm_validate_string_for_copying);
+  scm_gc_protect_object (scm_prepare_string_for_symbol);
 }
 
 /* Lookup a color by name in a color map */
@@ -421,4 +451,138 @@ guile_has_directory_traversal (Lisp_Object path)
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
+}
+
+/* String preprocessing functions */
+
+/* Convert spaces to dashes in a string */
+Lisp_Object
+guile_string_spaces_to_dashes (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_spaces_to_dashes))
+    return str; /* Fallback: return original string */
+
+  if (!STRINGP (str))
+    return str;
+
+  SCM result = scm_call_1 (scm_string_spaces_to_dashes,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  if (scm_is_false (result))
+    return str;
+
+  /* Convert Scheme string back to Lisp string */
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return str;
+}
+
+/* Trim leading whitespace from a string */
+Lisp_Object
+guile_string_trim_leading_whitespace (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_trim_leading_whitespace))
+    return str; /* Fallback: return original string */
+
+  if (!STRINGP (str))
+    return str;
+
+  SCM result = scm_call_1 (scm_string_trim_leading_whitespace,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  if (scm_is_false (result))
+    return str;
+
+  /* Convert Scheme string back to Lisp string */
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return str;
+}
+
+/* Parse a number string with given base */
+Lisp_Object
+guile_parse_number_string (Lisp_Object str, int base)
+{
+  if (!scm_is_true (scm_parse_number_string))
+    return make_fixnum (0); /* Fallback: return 0 */
+
+  if (!STRINGP (str))
+    return make_fixnum (0);
+
+  SCM result = scm_call_2 (scm_parse_number_string,
+                           scm_from_utf8_string (SSDATA (str)),
+                           scm_from_int (base));
+
+  if (scm_is_false (result))
+    return make_fixnum (0);
+
+  /* Convert Scheme number to Lisp number */
+  if (scm_is_integer (result))
+    {
+      long val = scm_to_long (result);
+      return make_fixnum (val);
+    }
+  else if (scm_is_real (result))
+    {
+      double val = scm_to_double (result);
+      return make_float (val);
+    }
+
+  return make_fixnum (0);
+}
+
+/* Validate string for copying operations */
+bool
+guile_validate_string_for_copying (Lisp_Object str)
+{
+  if (!scm_is_true (scm_validate_string_for_copying))
+    return true; /* Fallback: assume valid */
+
+  if (!STRINGP (str))
+    return false;
+
+  SCM result = scm_call_1 (scm_validate_string_for_copying,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result) && scm_is_eq (result, scm_from_utf8_symbol ("valid"));
+}
+
+/* Prepare string for symbol creation */
+Lisp_Object
+guile_prepare_string_for_symbol (Lisp_Object str)
+{
+  if (!scm_is_true (scm_prepare_string_for_symbol))
+    return str; /* Fallback: return original string */
+
+  if (!STRINGP (str))
+    return str;
+
+  SCM result = scm_call_1 (scm_prepare_string_for_symbol,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  if (scm_is_false (result))
+    return Qnil; /* Return nil if processing failed */
+
+  /* Convert Scheme string back to Lisp string */
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return str;
 }

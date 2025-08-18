@@ -804,6 +804,11 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'validate-xlfd-font-name validate-xlfd-font-name)
   (module-define! global-module 'is-absolute-path? is-absolute-path?)
   (module-define! global-module 'has-directory-traversal? has-directory-traversal?)
+  (module-define! global-module 'string-spaces-to-dashes string-spaces-to-dashes)
+  (module-define! global-module 'string-trim-leading-whitespace string-trim-leading-whitespace)
+  (module-define! global-module 'parse-number-string parse-number-string)
+  (module-define! global-module 'validate-string-for-copying validate-string-for-copying)
+  (module-define! global-module 'prepare-string-for-symbol prepare-string-for-symbol)
 
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
@@ -821,7 +826,12 @@ Allows any number of arguments, including zero."
   (module-define! elisp-emacs-module 'is-frame-name-fnn-format? is-frame-name-fnn-format?)
   (module-define! elisp-emacs-module 'validate-xlfd-font-name validate-xlfd-font-name)
   (module-define! elisp-emacs-module 'is-absolute-path? is-absolute-path?)
-  (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?))
+  (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?)
+  (module-define! elisp-emacs-module 'string-spaces-to-dashes string-spaces-to-dashes)
+  (module-define! elisp-emacs-module 'string-trim-leading-whitespace string-trim-leading-whitespace)
+  (module-define! elisp-emacs-module 'parse-number-string parse-number-string)
+  (module-define! elisp-emacs-module 'validate-string-for-copying validate-string-for-copying)
+  (module-define! elisp-emacs-module 'prepare-string-for-symbol prepare-string-for-symbol))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
