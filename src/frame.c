@@ -27,6 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
+#include "guile_fns.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
@@ -3502,7 +3503,7 @@ set_term_frame_name (struct frame *f, Lisp_Object name)
 
       /* Check for no change needed in this very common case
 	 before we do any consing.  */
-      if (frame_name_fnn_p (SSDATA (f->name), SBYTES (f->name)))
+      if (guile_is_frame_name_fnn_format (f->name))
 	return;
 
       name = make_formatted_string (namebuf, "F%"PRIdMAX, ++tty_frame_count);
@@ -3517,7 +3518,7 @@ set_term_frame_name (struct frame *f, Lisp_Object name)
 
       /* Don't allow the user to set the frame name to F<num>, so it
 	 doesn't clash with the names we generate for terminal frames.  */
-      if (frame_name_fnn_p (SSDATA (name), SBYTES (name)))
+      if (guile_is_frame_name_fnn_format (name))
 	error ("Frame names of the form F<num> are usurped by Emacs");
     }
 

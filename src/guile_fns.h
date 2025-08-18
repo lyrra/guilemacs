@@ -36,4 +36,25 @@ extern bool guile_filter_dbus_message (Lisp_Object message, Lisp_Object interfac
 /* Check if buffer name represents a special (internal) buffer */
 extern bool guile_is_special_buffer_name (Lisp_Object buffer_name);
 
+/* Parse color specification and return RGB values as Lisp list */
+extern Lisp_Object guile_parse_color_spec (Lisp_Object color_spec);
+
+/* Validate if color name is recognizable */
+extern bool guile_validate_color_name (Lisp_Object color_name);
+
+/* Check if string contains whitespace characters */
+extern bool guile_string_contains_whitespace (Lisp_Object str);
+
+/* Check if frame name follows F<number> format */
+extern bool guile_is_frame_name_fnn_format (Lisp_Object name);
+
+/* Validate XLFD font name format */
+extern bool guile_validate_xlfd_font_name (Lisp_Object name);
+
+/* Check if path is absolute */
+extern bool guile_is_absolute_path (Lisp_Object path);
+
+/* Check if path contains directory traversal patterns */
+extern bool guile_has_directory_traversal (Lisp_Object path);
+
 #endif /* GUILE_LOOKUPS_H */

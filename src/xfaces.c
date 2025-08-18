@@ -1042,10 +1042,8 @@ is normalized to have its value in [0,65535].  */)
   (Lisp_Object spec)
 {
   CHECK_STRING (spec);
-  unsigned short r, g, b;
-  return (parse_color_spec (SSDATA (spec), &r, &g, &b)
-          ? list3i (r, g, b)
-          : Qnil);
+  /* Use Guile-based color spec parser */
+  return guile_parse_color_spec (spec);
 }
 
 /* Parse RGB_LIST, and fill in the RGB fields of COLOR.

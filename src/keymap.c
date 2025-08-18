@@ -54,6 +54,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "intervals.h"
 #include "keymap.h"
 #include "window.h"
+#include "guile_fns.h"
 
 /* Actually allocate storage for these variables.  */
 
@@ -1412,7 +1413,7 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
 	  Lisp_Object lc_key = Fsymbol_name (AREF (new_key, i));
 
 	  /* If there are no spaces in this symbol, just skip it.  */
-	  if (!strstr (SSDATA (lc_key), " "))
+	  if (!guile_string_contains_whitespace (lc_key))
 	    continue;
 
 	  USE_SAFE_ALLOCA;
