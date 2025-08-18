@@ -83,6 +83,9 @@ static SCM scm_ip_address = SCM_BOOL_F;
 /* Registry to script mapping function reference */
 static SCM scm_lookup_registry_to_script = SCM_BOOL_F;
 
+/* Font name parsing function reference */
+static SCM scm_parse_font_name_with_size = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -355,6 +358,11 @@ init_guile_fns (void)
   if (scm_is_false (scm_lookup_registry_to_script))
     scm_lookup_registry_to_script = scm_c_lookup ("lookup-registry-to-script");
 
+  /* Initialize font name parsing function */
+  scm_parse_font_name_with_size = scm_c_module_lookup (elisp_emacs_module, "parse-font-name-with-size");
+  if (scm_is_false (scm_parse_font_name_with_size))
+    scm_parse_font_name_with_size = scm_c_lookup ("parse-font-name-with-size");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -434,6 +442,9 @@ init_guile_fns (void)
 
   /* Protect registry to script mapping function from GC */
   scm_gc_protect_object (scm_lookup_registry_to_script);
+
+  /* Protect font name parsing function from GC */
+  scm_gc_protect_object (scm_parse_font_name_with_size);
 }
 
 /* Lookup a color by name in a color map */
@@ -1751,6 +1762,28 @@ guile_lookup_registry_to_script (Lisp_Object reg_to_script_alist, const char *re
   SCM result = scm_call_2 (scm_lookup_registry_to_script,
                            reg_to_script_alist,
                            scm_from_utf8_string (registry_str));
+
+  if (scm_is_false (result))
+    return Qnil;
+
+  return result;
+}
+
+/* Font name parsing for size extraction */
+Lisp_Object
+guile_parse_font_name_with_size (Lisp_Object font_name, double current_size)
+{
+  if (!scm_is_true (scm_parse_font_name_with_size))
+    return Qnil;
+
+  if (!STRINGP (font_name))
+    return Qnil;
+
+  SCM size_scm = (current_size > 0) ? scm_from_double (current_size) : SCM_BOOL_F;
+
+  SCM result = scm_call_2 (scm_parse_font_name_with_size,
+                           scm_from_utf8_string (SSDATA (font_name)),
+                           size_scm);
 
   if (scm_is_false (result))
     return Qnil;

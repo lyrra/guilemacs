@@ -943,7 +943,11 @@ Allows any number of arguments, including zero."
 
   ;; Export registry to script mapping function to both modules
   (module-define! global-module 'lookup-registry-to-script lookup-registry-to-script)
-  (module-define! elisp-emacs-module 'lookup-registry-to-script lookup-registry-to-script))
+  (module-define! elisp-emacs-module 'lookup-registry-to-script lookup-registry-to-script)
+
+  ;; Export font name parsing function to both modules
+  (module-define! global-module 'parse-font-name-with-size parse-font-name-with-size)
+  (module-define! elisp-emacs-module 'parse-font-name-with-size parse-font-name-with-size))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

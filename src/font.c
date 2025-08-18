@@ -38,7 +38,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "fontset.h"
 #include "font.h"
-#include "guile_fns.h"
 #include "termhooks.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -3445,25 +3444,30 @@ font_load_for_lface (struct frame *f, Lisp_Object *attrs, Lisp_Object spec)
 	  name = Ffont_get (spec, QCuser_spec);
 	  if (STRINGP (name))
 	    {
-	      char *p = SSDATA (name), *q = strrchr (p, '-');
+	      /* Use Scheme-based font name parsing to replace SSDATA usage */
+	      Lisp_Object lsize = Ffont_get (spec, QCsize);
+	      double current_size = 0.0;
 
-	      if (q != NULL && c_isdigit (q[1]))
+	      /* Extract current size for validation */
+	      if (FLOATP (lsize))
+		current_size = XFLOAT_DATA (lsize);
+	      else if (FIXNUMP (lsize))
+		current_size = (double) XFIXNUM (lsize);
+
+	      Lisp_Object parsed = guile_parse_font_name_with_size (name, current_size);
+
+	      if (CONSP (parsed))
 		{
-		  char *tail;
-		  double font_size = strtod (q + 1, &tail);
+		  Lisp_Object family_name = XCAR (parsed);
+		  /* Size is in CDR but we already validated it in Scheme */
 
-		  if (font_size > 0 && tail != q + 1)
+		  if (STRINGP (family_name))
 		    {
-		      Lisp_Object lsize = Ffont_get (spec, QCsize);
-
-		      if ((FLOATP (lsize) && XFLOAT_DATA (lsize) == font_size)
-			  || (FIXNUMP (lsize) && XFIXNUM (lsize) == font_size))
-			{
-			  ASET (spec, FONT_FAMILY_INDEX,
-				font_intern_prop (p, tail - p, 1));
-			  ASET (spec, FONT_SIZE_INDEX, Qnil);
-			  entity = font_matching_entity (f, attrs, spec);
-			}
+		      ASET (spec, FONT_FAMILY_INDEX,
+			    font_intern_prop (SSDATA (family_name),
+					     SBYTES (family_name), 1));
+		      ASET (spec, FONT_SIZE_INDEX, Qnil);
+		      entity = font_matching_entity (f, attrs, spec);
 		    }
 		}
 	    }

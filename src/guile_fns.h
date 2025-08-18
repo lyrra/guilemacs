@@ -185,4 +185,7 @@ extern bool guile_url_string (Lisp_Object str);
 /* Registry to script mapping lookup */
 extern Lisp_Object guile_lookup_registry_to_script (Lisp_Object reg_to_script_alist, const char *registry_str);
 
+/* Font name parsing for size extraction */
+extern Lisp_Object guile_parse_font_name_with_size (Lisp_Object font_name, double current_size);
+
 #endif /* GUILE_LOOKUPS_H */

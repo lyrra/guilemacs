@@ -872,3 +872,33 @@ Matches if registry string starts with the pattern."
                      (substring registry-str 0 (string-length (caar alist)))))
        (cdar alist))  ; return script symbol
       (else (loop (cdr alist))))))
+
+;; Font name parsing for size extraction
+;; Parses font names like "Foobar-123" to extract family and size
+(define (parse-font-name-with-size font-name-str current-size)
+  "Parse FONT-NAME-STR to extract family name and size.
+Looks for pattern 'FontFamily-Size' where Size is a number.
+CURRENT-SIZE is the currently parsed size for validation.
+Returns (family-name . parsed-size) if successful, #f if no size found.
+This replaces SSDATA usage in font.c for font name parsing."
+  (if (or (not (string? font-name-str))
+          (= (string-length font-name-str) 0)) ; handle empty string
+      #f
+      (let ((dash-pos (string-rindex font-name-str #\-)))
+        (if (and dash-pos
+                 (> dash-pos 0) ; dash not at start
+                 (< dash-pos (- (string-length font-name-str) 1))) ; dash not at end
+            (let* ((after-dash (substring font-name-str (+ dash-pos 1)))
+                   (family-part (substring font-name-str 0 dash-pos)))
+              (if (and (> (string-length after-dash) 0)
+                       (char-numeric? (string-ref after-dash 0))) ; first char is digit
+                  (let ((parsed-size (string->number after-dash)))
+                    (if (and parsed-size
+                             (> parsed-size 0)
+                             ;; Validate against current size if provided
+                             (or (not current-size)
+                                 (= parsed-size current-size)))
+                        (cons family-part parsed-size)
+                        #f))
+                  #f))
+            #f))))
