@@ -35,6 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "frame.h"
 #include "dispextern.h"
 #include "fontset.h"
+#include "guile_fns.h"
 #ifdef HAVE_WINDOW_SYSTEM
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
@@ -1736,6 +1737,9 @@ FONT-SPEC is a vector, a cons, or a string.  See the documentation of
       Lisp_Object font_spec = Ffont_spec (0, NULL);
       Lisp_Object short_name;
 
+      /* Validate XLFD format before parsing */
+      if (!guile_validate_xlfd_font_name (name))
+	error ("Fontset name must be in XLFD format");
       if (font_parse_xlfd (SSDATA (name), SBYTES (name), font_spec) < 0)
 	error ("Fontset name must be in XLFD format");
       short_name = AREF (font_spec, FONT_REGISTRY_INDEX);

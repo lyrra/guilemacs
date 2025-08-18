@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "blockinput.h"
 #include "coding.h"
 #include "lisp.h"
+#include "guile_fns.h"
 
 #include <strftime.h>
 
@@ -1361,6 +1362,8 @@ usage: (format-time-string FORMAT-STRING &optional TIME ZONE)  */)
   CHECK_STRING (format_string);
   //format_string = code_convert_string_norecord (format_string,
 //						Vlocale_coding_system, 1);
+  /* Note: We don't validate time format specifiers here as format-time-string
+     should be permissive and allow any string, even if it has no % codes */
   return format_time_string (SSDATA (format_string), SBYTES (format_string),
 			     t, zone, &tm);
 }

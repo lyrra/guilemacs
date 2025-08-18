@@ -47,6 +47,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "buffer.h"
 #include "keyboard.h"
 #include "blockinput.h"
+#include "guile_fns.h"
 #include "coding.h"
 
 #include "w32common.h"
@@ -8308,9 +8309,11 @@ DEFUN ("x-file-dialog", Fx_file_dialog, Sx_file_dialog, 2, 5, 0,
 
     /* We modify these in-place, so make copies for safety.  */
     dir = Fcopy_sequence (dir);
-    unixtodos_filename (SSDATA (dir));
+    if (guile_needs_filename_conversion (dir))
+      unixtodos_filename (SSDATA (dir));
     filename = Fcopy_sequence (filename);
-    unixtodos_filename (SSDATA (filename));
+    if (guile_needs_filename_conversion (filename))
+      unixtodos_filename (SSDATA (filename));
     if (SBYTES (filename) >= MAX_UTF8_PATH)
       report_file_error ("filename too long", default_filename);
     if (w32_unicode_filenames)
@@ -8832,7 +8835,8 @@ a ShowWindow flag:
 	     slashes (expand-file-name above converts all backslashes
 	     to forward slashes).  Now that we know DOCUMENT is a
 	     file, we can mirror all forward slashes into backslashes.  */
-	  unixtodos_filename (SSDATA (absdoc_encoded));
+	  if (guile_needs_filename_conversion (absdoc_encoded))
+	    unixtodos_filename (SSDATA (absdoc_encoded));
 	  document = absdoc_encoded;
 	}
       else

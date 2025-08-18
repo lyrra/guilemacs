@@ -47,6 +47,7 @@ GNUstep port and post-20 update by Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "sysselect.h"
 #include "nsterm.h"
 #include "systime.h"
+#include "guile_fns.h"
 #include "character.h"
 #include "xwidget.h"
 #include "fontset.h"
@@ -5322,17 +5323,17 @@ static Lisp_Object ns_string_to_lispmod (const char *s)
      Convert modifier name to lisp symbol.
    -------------------------------------------------------------------------- */
 {
-  if (!strncmp (SSDATA (SYMBOL_NAME (Qmeta)), s, 10))
+  if (guile_is_modifier_symbol (Qmeta, s))
     return Qmeta;
-  else if (!strncmp (SSDATA (SYMBOL_NAME (Qsuper)), s, 10))
+  else if (guile_is_modifier_symbol (Qsuper, s))
     return Qsuper;
-  else if (!strncmp (SSDATA (SYMBOL_NAME (Qcontrol)), s, 10))
+  else if (guile_is_modifier_symbol (Qcontrol, s))
     return Qcontrol;
-  else if (!strncmp (SSDATA (SYMBOL_NAME (Qalt)), s, 10))
+  else if (guile_is_modifier_symbol (Qalt, s))
     return Qalt;
-  else if (!strncmp (SSDATA (SYMBOL_NAME (Qhyper)), s, 10))
+  else if (guile_is_modifier_symbol (Qhyper, s))
     return Qhyper;
-  else if (!strncmp (SSDATA (SYMBOL_NAME (Qnone)), s, 10))
+  else if (guile_is_modifier_symbol (Qnone, s))
     return Qnone;
   else
     return Qnil;

@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
+#include "guile_fns.h"
 #include "termhooks.h"
 #include "fontset.h"
 #include "font.h"
@@ -825,7 +826,8 @@ pgtk_set_scroll_bar_foreground (struct frame *f, Lisp_Object new_value,
     {
       Emacs_Color rgb;
 
-      if (!pgtk_parse_color (f, SSDATA (new_value), &rgb))
+      if (!guile_validate_color_name (new_value) ||
+          !pgtk_parse_color (f, SSDATA (new_value), &rgb))
 	error ("Unknown color");
 
       char css[64];
@@ -855,7 +857,8 @@ pgtk_set_scroll_bar_background (struct frame *f, Lisp_Object new_value,
     {
       Emacs_Color rgb;
 
-      if (!pgtk_parse_color (f, SSDATA (new_value), &rgb))
+      if (!guile_validate_color_name (new_value) ||
+          !pgtk_parse_color (f, SSDATA (new_value), &rgb))
 	error ("Unknown color");
 
       /* On pgtk, this frame parameter should be ignored, and honor
