@@ -10,6 +10,8 @@
 (use-modules (language elisp emacs))
 (use-modules (system foreign-library))
 
+(define %prelude-directory (dirname %prelude-filename))
+
 (let-syntax
     ((frob (syntax-rules ()
              ((_ lisp-name fun-name)

@@ -981,7 +981,10 @@ bool try_load_guile_prelude (const char *filename)
     {
       fprintf(stderr, "found prelude, trying to load %s\n", filename);
       emacs_close (fd);
-      scm_c_define ("%prelude-filename", scm_from_utf8_string (filename));
+
+      /* Add the prelude directory to Guile's load path */
+      SCM elisp_runtime_module = scm_c_resolve_module ("language elisp runtime");
+      scm_c_module_define (elisp_runtime_module, "%prelude-filename", scm_from_utf8_string (filename));
       scm_c_primitive_load (filename);
       return true;
     }
