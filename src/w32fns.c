@@ -51,6 +51,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "w32common.h"
 #include "w32inevt.h"
+#include "guile_fns.h"
 
 #ifdef WINDOWSNT
 /* mingw.org's MinGW headers mistakenly omit this enumeration: */
@@ -840,27 +841,12 @@ w32_default_color_map (void)
 static Lisp_Object
 w32_color_map_lookup (const char *colorname)
 {
-  Lisp_Object tail, ret = Qnil;
+  Lisp_Object ret;
 
   block_input ();
 
-  for (tail = Vw32_color_map; CONSP (tail); tail = XCDR (tail))
-    {
-      register Lisp_Object elt, tem;
-
-      elt = XCAR (tail);
-      if (!CONSP (elt)) continue;
-
-      tem = XCAR (elt);
-
-      if (scm_is_true (scm_string_ci_equal_p (tem, scm_from_utf8_string (colorname))))
-	{
-	  ret = Fcdr (elt);
-	  break;
-	}
-
-      maybe_quit ();
-    }
+  /* Use Guile lookup function to find color in color map */
+  ret = guile_lookup_alist_ci (Vw32_color_map, colorname);
 
   unblock_input ();
 

@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <sys/stat.h>
 #include <unistd.h>
 #include <libguile.h>
+#include "guile_fns.h"
 
 #define MAIN_PROGRAM
 #include "lisp.h"
@@ -1661,6 +1662,7 @@ main2 (void *ignore, int argc, char **argv)
       symbol_function_fn = scm_c_public_ref ("language elisp runtime", "symbol-function");
 
       init_guile ();
+      init_guile_fns ();  /* Initialize Guile lookup functions */
       init_fns_once ();
       init_obarray_once ();
       init_eval_once ();

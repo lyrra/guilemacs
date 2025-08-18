@@ -37,6 +37,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "fontset.h"
 #include "font.h"
+#include "guile_fns.h"
 #include "termhooks.h"
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -395,19 +396,18 @@ font_style_to_value (enum font_property_index prop, Lisp_Object val,
 			| (i << 4) | (j - 1));
 	      }
 	}
-      /* Try also with case-folding match.  */
+      /* Try also with case-folding match using Guile lookup.  */
       s = SSDATA (SYMBOL_NAME (val));
-      for (i = 0; i < len; i++)
-	for (j = 1; j < ASIZE (AREF (table, i)); j++)
-	  {
-	    elt = AREF (AREF (table, i), j);
-	    if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string (s), SYMBOL_NAME (elt))))
-	      {
-		CHECK_FIXNUM (AREF (AREF (table, i), 0));
-		return ((XFIXNUM (AREF (AREF (table, i), 0)) << 8)
-			| (i << 4) | (j - 1));
-	      }
-	  }
+      Lisp_Object indices = guile_lookup_font_style (table, s);
+
+      if (!NILP (indices) && CONSP (indices))
+	{
+	  i = XFIXNUM (XCAR (indices));
+	  j = XFIXNUM (XCDR (indices));
+	  CHECK_FIXNUM (AREF (AREF (table, i), 0));
+	  return ((XFIXNUM (AREF (AREF (table, i), 0)) << 8)
+		  | (i << 4) | (j - 1));
+	}
       if (! noerror)
 	return -1;
       eassert (len < 255);

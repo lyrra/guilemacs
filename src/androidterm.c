@@ -33,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "textconv.h"
 #include "coding.h"
 #include "keymap.h"
+#include "guile_fns.h"
 
 /* This is a chain of structures for all the X displays currently in
    use.  */
@@ -1929,7 +1930,7 @@ android_parse_color (struct frame *f, const char *color_name,
 		     Emacs_Color *color)
 {
   unsigned short r, g, b;
-  Lisp_Object tem, tem1;
+  Lisp_Object result;
   unsigned long lisp_color;
 
   if (parse_color_spec (color_name, &r, &g, &b))
@@ -1941,21 +1942,16 @@ android_parse_color (struct frame *f, const char *color_name,
       return 1;
     }
 
-  tem = x_display_list->color_map;
-  for (; CONSP (tem); tem = XCDR (tem))
-    {
-      tem1 = XCAR (tem);
+  /* Use Guile lookup function to find color in color map */
+  result = guile_lookup_color (x_display_list->color_map, color_name);
 
-      if (CONSP (tem1)
-	  && scm_is_true (scm_string_ci_equal_p (XCAR (tem1),
-						 scm_from_utf8_string (color_name))))
-	{
-	  lisp_color = XFIXNUM (XCDR (tem1));
-	  color->red = RED_FROM_ULONG (lisp_color) * 257;
-	  color->green = GREEN_FROM_ULONG (lisp_color) * 257;
-	  color->blue = BLUE_FROM_ULONG (lisp_color) * 257;
-	  return 1;
-	}
+  if (!NILP (result) && FIXNUMP (result))
+    {
+      lisp_color = XFIXNUM (result);
+      color->red = RED_FROM_ULONG (lisp_color) * 257;
+      color->green = GREEN_FROM_ULONG (lisp_color) * 257;
+      color->blue = BLUE_FROM_ULONG (lisp_color) * 257;
+      return 1;
     }
 
   return 0;

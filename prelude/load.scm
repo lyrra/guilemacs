@@ -779,5 +779,27 @@ Allows any number of arguments, including zero."
 ;; to avoid infinite recursion. The elisp-* versions are available
 ;; for internal use but not registered as symbol replacements.
 
+;; Load lookup functions for C integration
+;; Use the prelude directory defined in the current module by C
+(primitive-load (string-append %prelude-directory "/lookup-functions.scm"))
+
+;; Export the functions to both global module and language elisp emacs module
+;; so C code can find them from either location
+(let ((global-module (resolve-module '() #f))
+      (elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
+  ;; Export to global module
+  (module-define! global-module 'lookup-color-in-map lookup-color-in-map)
+  (module-define! global-module 'lookup-font-style lookup-font-style)
+  (module-define! global-module 'lookup-in-alist-ci lookup-in-alist-ci)
+  (module-define! global-module 'lookup-in-alist lookup-in-alist)
+  (module-define! global-module 'lookup-symbol-in-list lookup-symbol-in-list)
+
+  ;; Export to language elisp emacs module
+  (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
+  (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
+  (module-define! elisp-emacs-module 'lookup-in-alist-ci lookup-in-alist-ci)
+  (module-define! elisp-emacs-module 'lookup-in-alist lookup-in-alist)
+  (module-define! elisp-emacs-module 'lookup-symbol-in-list lookup-symbol-in-list))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

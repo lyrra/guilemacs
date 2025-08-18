@@ -33,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "haikuterm.h"
 #include "haiku_support.h"
 #include "termhooks.h"
+#include "guile_fns.h"
 
 #include "bitmaps/leftptr.xbm"
 #include "bitmaps/leftpmsk.xbm"
@@ -330,7 +331,6 @@ int
 haiku_get_color (const char *name, Emacs_Color *color)
 {
   unsigned short r16, g16, b16;
-  Lisp_Object tem, col;
   int32 clr, rc;
   uint32_t ui_color;
   ptrdiff_t size, i;
@@ -348,21 +348,19 @@ haiku_get_color (const char *name, Emacs_Color *color)
     {
       block_input ();
       eassert (x_display_list && !NILP (x_display_list->color_map));
-      tem = x_display_list->color_map;
-      for (; CONSP (tem); tem = XCDR (tem))
-	{
-	  col = XCAR (tem);
 
-	  if (CONSP (col) && scm_is_true (scm_string_ci_equal_p (XCAR (col), scm_from_utf8_string (name))))
-	    {
-	      clr = XFIXNUM (XCDR (col));
-	      color->pixel = clr;
-	      color->red = RED_FROM_ULONG (clr) * 257;
-	      color->green = GREEN_FROM_ULONG (clr) * 257;
-	      color->blue = BLUE_FROM_ULONG (clr) * 257;
-	      unblock_input ();
-	      return 0;
-	  }
+      /* Use Guile lookup function to find color in color map */
+      Lisp_Object result = guile_lookup_color (x_display_list->color_map, name);
+
+      if (!NILP (result) && FIXNUMP (result))
+	{
+	  clr = XFIXNUM (result);
+	  color->pixel = clr;
+	  color->red = RED_FROM_ULONG (clr) * 257;
+	  color->green = GREEN_FROM_ULONG (clr) * 257;
+	  color->blue = BLUE_FROM_ULONG (clr) * 257;
+	  unblock_input ();
+	  return 0;
 	}
       unblock_input ();
     }
