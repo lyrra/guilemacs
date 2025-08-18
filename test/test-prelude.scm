@@ -434,4 +434,193 @@
               "a-b-c"
               (prepare-string-for-symbol "a b c")))
 
+(test-group "New SSDATA Hoisting Functions"
+
+  (test-group "File Extension Validation"
+    (test-assert "file has .txt extension"
+                 (has-file-extension? "document.txt" ".txt"))
+
+    (test-assert "file has .scm extension (case insensitive)"
+                 (has-file-extension? "script.SCM" ".scm"))
+
+    (test-assert "file does not have .pdf extension"
+                 (not (has-file-extension? "document.txt" ".pdf")))
+
+    (test-assert "empty extension matches empty suffix"
+                 (has-file-extension? "filename" ""))
+
+    (test-assert "extension longer than filename"
+                 (not (has-file-extension? "a" ".txt"))))
+
+  (test-group "Path Component Extraction"
+    (test-equal "extract filename from unix path"
+                "file.txt"
+                (extract-filename-from-path "/home/user/file.txt"))
+
+    (test-equal "extract filename from complex path"
+                "script.scm"
+                (extract-filename-from-path "/usr/local/share/guile/script.scm"))
+
+    (test-equal "filename with no path returns as-is"
+                "filename.txt"
+                (extract-filename-from-path "filename.txt"))
+
+    (test-equal "empty path returns empty string"
+                ""
+                (extract-filename-from-path ""))
+
+    (test-equal "path ending with slash returns empty"
+                ""
+                (extract-filename-from-path "/path/to/dir/")))
+
+  (test-group "Modifier Symbol Matching"
+    (test-equal "meta symbol matches meta string"
+                 #t
+                 (is-modifier-symbol? "meta-key" "meta"))
+
+    (test-equal "super symbol matches super string (first 5 chars)"
+                 #t
+                 (is-modifier-symbol? "super-key" "super"))
+
+    (test-equal "control symbol matches ctrl string"
+                 #t
+                 (is-modifier-symbol? "control-key" "control"))
+
+    (test-equal "non-matching symbol"
+                 #f
+                 (is-modifier-symbol? "normal-key" "meta"))
+
+    (test-equal "short symbol doesn't match long string"
+                 #f
+                 (is-modifier-symbol? "key" "control")))
+
+  (test-group "Float Format Validation"
+    (test-equal "valid %f format"
+                 'valid
+                 (validate-float-format-string "%f"))
+
+    (test-equal "valid %g format"
+                 'valid
+                 (validate-float-format-string "%.2g"))
+
+    (test-equal "valid %e format"
+                 'valid
+                 (validate-float-format-string "%e"))
+
+    (test-equal "invalid format without %"
+                 'invalid
+                 (validate-float-format-string "f"))
+
+    (test-equal "invalid format with just %"
+                 'invalid
+                 (validate-float-format-string "%"))
+
+    (test-equal "invalid format with %d (not float)"
+                 'invalid
+                 (validate-float-format-string "%d")))
+
+  (test-group "Time Format Specifiers"
+    (test-assert "format with %Y year specifier"
+                 (has-time-format-specifiers? "%Y-%m-%d"))
+
+    (test-assert "format with %H hour specifier"
+                 (has-time-format-specifiers? "%H:%M:%S"))
+
+    (test-assert "format with %A day name"
+                 (has-time-format-specifiers? "Today is %A"))
+
+    (test-assert "format with %B month name"
+                 (has-time-format-specifiers? "%B %d, %Y"))
+
+    (test-assert "format without time specifiers"
+                 (not (has-time-format-specifiers? "Hello World")))
+
+    (test-assert "format with % but no time codes"
+                 (not (has-time-format-specifiers? "100% complete"))))
+
+  (test-group "Hex Color Parsing"
+    (test-equal "parse valid hex color"
+                '(255 128 0)
+                (parse-hex-color "#ff8000"))
+
+    (test-equal "parse hex color with valid range"
+                '(0 255 128)
+                (parse-hex-color "#00ff80"))
+
+    (test-assert "invalid hex color without #"
+                 (not (parse-hex-color "ff8000")))
+
+    (test-assert "invalid hex color wrong length"
+                 (not (parse-hex-color "#ff80")))
+
+    (test-assert "invalid hex color bad characters"
+                 (not (parse-hex-color "#gghhii"))))
+
+  (test-group "Filename Conversion Detection"
+    (test-assert "filename with backslashes needs conversion"
+                 (needs-filename-conversion? "C:\\Windows\\System32"))
+
+    (test-assert "unix path doesn't need conversion"
+                 (not (needs-filename-conversion? "/usr/bin/emacs")))
+
+    (test-assert "mixed slash path needs conversion"
+                 (needs-filename-conversion? "path\\to/file"))
+
+    (test-assert "empty path doesn't need conversion"
+                 (not (needs-filename-conversion? ""))))
+
+  (test-group "UTF-8 Filename Validation"
+    (test-assert "normal ascii filename is utf8"
+                 (is-utf8-filename? "normal_file.txt"))
+
+    (test-assert "unicode filename is utf8"
+                 (is-utf8-filename? "café.txt"))
+
+    (test-assert "empty filename is valid utf8"
+                 (is-utf8-filename? ""))
+
+    ; This test may be tricky to write portably
+    ; (test-assert "filename with control chars is not utf8"
+    ;              (not (is-utf8-filename? (string-append "file" (string (integer->char 1)) ".txt"))))
+    )
+
+  (test-group "C String Copy Safety"
+    (test-assert "normal string is safe for copying"
+                 (is-safe-for-c-string-copy? "Hello, World!"))
+
+    (test-assert "unicode string is safe for copying"
+                 (is-safe-for-c-string-copy? "Café résumé"))
+
+    (test-assert "empty string is not safe for copying"
+                 (not (is-safe-for-c-string-copy? "")))
+
+    ; Test would require creating string with null bytes
+    ; (test-assert "string with null byte is not safe"
+    ;              (not (is-safe-for-c-string-copy? (string-append "hello" (string #\nul) "world"))))
+
+    ; Test for very long strings (>4096 chars) would be platform dependent
+    )
+
+  (test-group "Network Address Detection"
+    (test-assert "IPv4 address detected"
+                 (looks-like-network-address? "192.168.1.1"))
+
+    (test-assert "domain name detected"
+                 (looks-like-network-address? "example.com"))
+
+    (test-assert "localhost detected"
+                 (looks-like-network-address? "localhost"))
+
+    (test-assert "IPv6 address detected"
+                 (looks-like-network-address? "::1"))
+
+    (test-assert "hostname with port detected"
+                 (looks-like-network-address? "server.com:8080"))
+
+    (test-assert "regular text is not network address"
+                 (not (looks-like-network-address? "just some text")))
+
+    (test-assert "filename is not network address"
+                 (not (looks-like-network-address? "README")))))
+
 (test-end)

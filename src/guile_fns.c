@@ -28,6 +28,18 @@ static SCM scm_parse_number_string = SCM_BOOL_F;
 static SCM scm_validate_string_for_copying = SCM_BOOL_F;
 static SCM scm_prepare_string_for_symbol = SCM_BOOL_F;
 
+/* New scheme function references for additional SSDATA hoisting */
+static SCM scm_has_file_extension = SCM_BOOL_F;
+static SCM scm_extract_filename_from_path = SCM_BOOL_F;
+static SCM scm_is_modifier_symbol = SCM_BOOL_F;
+static SCM scm_validate_float_format_string = SCM_BOOL_F;
+static SCM scm_has_time_format_specifiers = SCM_BOOL_F;
+static SCM scm_parse_hex_color = SCM_BOOL_F;
+static SCM scm_needs_filename_conversion = SCM_BOOL_F;
+static SCM scm_is_utf8_filename = SCM_BOOL_F;
+static SCM scm_is_safe_for_c_string_copy = SCM_BOOL_F;
+static SCM scm_looks_like_network_address = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -121,6 +133,47 @@ init_guile_fns (void)
   if (scm_is_false (scm_prepare_string_for_symbol))
     scm_prepare_string_for_symbol = scm_c_lookup ("prepare-string-for-symbol");
 
+  /* Initialize new scheme functions */
+  scm_has_file_extension = scm_c_module_lookup (elisp_emacs_module, "has-file-extension?");
+  if (scm_is_false (scm_has_file_extension))
+    scm_has_file_extension = scm_c_lookup ("has-file-extension?");
+
+  scm_extract_filename_from_path = scm_c_module_lookup (elisp_emacs_module, "extract-filename-from-path");
+  if (scm_is_false (scm_extract_filename_from_path))
+    scm_extract_filename_from_path = scm_c_lookup ("extract-filename-from-path");
+
+  scm_is_modifier_symbol = scm_c_module_lookup (elisp_emacs_module, "is-modifier-symbol?");
+  if (scm_is_false (scm_is_modifier_symbol))
+    scm_is_modifier_symbol = scm_c_lookup ("is-modifier-symbol?");
+
+  scm_validate_float_format_string = scm_c_module_lookup (elisp_emacs_module, "validate-float-format-string");
+  if (scm_is_false (scm_validate_float_format_string))
+    scm_validate_float_format_string = scm_c_lookup ("validate-float-format-string");
+
+  scm_has_time_format_specifiers = scm_c_module_lookup (elisp_emacs_module, "has-time-format-specifiers?");
+  if (scm_is_false (scm_has_time_format_specifiers))
+    scm_has_time_format_specifiers = scm_c_lookup ("has-time-format-specifiers?");
+
+  scm_parse_hex_color = scm_c_module_lookup (elisp_emacs_module, "parse-hex-color");
+  if (scm_is_false (scm_parse_hex_color))
+    scm_parse_hex_color = scm_c_lookup ("parse-hex-color");
+
+  scm_needs_filename_conversion = scm_c_module_lookup (elisp_emacs_module, "needs-filename-conversion?");
+  if (scm_is_false (scm_needs_filename_conversion))
+    scm_needs_filename_conversion = scm_c_lookup ("needs-filename-conversion?");
+
+  scm_is_utf8_filename = scm_c_module_lookup (elisp_emacs_module, "is-utf8-filename?");
+  if (scm_is_false (scm_is_utf8_filename))
+    scm_is_utf8_filename = scm_c_lookup ("is-utf8-filename?");
+
+  scm_is_safe_for_c_string_copy = scm_c_module_lookup (elisp_emacs_module, "is-safe-for-c-string-copy?");
+  if (scm_is_false (scm_is_safe_for_c_string_copy))
+    scm_is_safe_for_c_string_copy = scm_c_lookup ("is-safe-for-c-string-copy?");
+
+  scm_looks_like_network_address = scm_c_module_lookup (elisp_emacs_module, "looks-like-network-address?");
+  if (scm_is_false (scm_looks_like_network_address))
+    scm_looks_like_network_address = scm_c_lookup ("looks-like-network-address?");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -143,6 +196,18 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_parse_number_string);
   scm_gc_protect_object (scm_validate_string_for_copying);
   scm_gc_protect_object (scm_prepare_string_for_symbol);
+
+  /* Protect new scheme functions from GC */
+  scm_gc_protect_object (scm_has_file_extension);
+  scm_gc_protect_object (scm_extract_filename_from_path);
+  scm_gc_protect_object (scm_is_modifier_symbol);
+  scm_gc_protect_object (scm_validate_float_format_string);
+  scm_gc_protect_object (scm_has_time_format_specifiers);
+  scm_gc_protect_object (scm_parse_hex_color);
+  scm_gc_protect_object (scm_needs_filename_conversion);
+  scm_gc_protect_object (scm_is_utf8_filename);
+  scm_gc_protect_object (scm_is_safe_for_c_string_copy);
+  scm_gc_protect_object (scm_looks_like_network_address);
 }
 
 /* Lookup a color by name in a color map */
@@ -585,4 +650,198 @@ guile_prepare_string_for_symbol (Lisp_Object str)
     }
 
   return str;
+}
+
+
+/* Check if filename has specific extension */
+bool
+guile_has_file_extension (Lisp_Object filename, const char *extension)
+{
+  if (!scm_is_true (scm_has_file_extension))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  SCM result = scm_call_2 (scm_has_file_extension,
+                           scm_from_utf8_string (SSDATA (filename)),
+                           scm_from_utf8_string (extension));
+
+  return scm_is_true (result);
+}
+
+/* Extract filename from full path */
+Lisp_Object
+guile_extract_filename_from_path (Lisp_Object path)
+{
+  if (!scm_is_true (scm_extract_filename_from_path))
+    return path; /* Return original if Scheme not available */
+
+  if (!STRINGP (path))
+    return path;
+
+  SCM result = scm_call_1 (scm_extract_filename_from_path,
+                           scm_from_utf8_string (SSDATA (path)));
+
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return path;
+}
+
+/* Check if symbol matches modifier key string */
+bool
+guile_is_modifier_symbol (Lisp_Object symbol, const char *test_string)
+{
+  if (!scm_is_true (scm_is_modifier_symbol))
+    return false;
+
+  if (!SYMBOLP (symbol))
+    return false;
+
+  Lisp_Object name = SYMBOL_NAME (symbol);
+  if (!STRINGP (name))
+    return false;
+
+  SCM result = scm_call_2 (scm_is_modifier_symbol,
+                           scm_from_utf8_string (SSDATA (name)),
+                           scm_from_utf8_string (test_string));
+
+  return scm_is_true (result);
+}
+
+/* Validate float format string */
+bool
+guile_validate_float_format_string (Lisp_Object format_str)
+{
+  if (!scm_is_true (scm_validate_float_format_string))
+    return false;
+
+  if (!STRINGP (format_str))
+    return false;
+
+  SCM result = scm_call_1 (scm_validate_float_format_string,
+                           scm_from_utf8_string (SSDATA (format_str)));
+
+  return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
+}
+
+/* Check if string has time format specifiers */
+bool
+guile_has_time_format_specifiers (Lisp_Object format_str)
+{
+  if (!scm_is_true (scm_has_time_format_specifiers))
+    return false;
+
+  if (!STRINGP (format_str))
+    return false;
+
+  SCM result = scm_call_1 (scm_has_time_format_specifiers,
+                           scm_from_utf8_string (SSDATA (format_str)));
+
+  return scm_is_true (result);
+}
+
+/* Parse hex color string */
+Lisp_Object
+guile_parse_hex_color (Lisp_Object hex_str)
+{
+  if (!scm_is_true (scm_parse_hex_color))
+    return Qnil;
+
+  if (!STRINGP (hex_str))
+    return Qnil;
+
+  SCM result = scm_call_1 (scm_parse_hex_color,
+                           scm_from_utf8_string (SSDATA (hex_str)));
+
+  if (scm_is_false (result))
+    return Qnil;
+
+  /* Convert Scheme list (r g b) to Lisp list */
+  if (scm_is_pair (result))
+    {
+      SCM r_scm = scm_car (result);
+      SCM g_scm = scm_car (scm_cdr (result));
+      SCM b_scm = scm_car (scm_cdr (scm_cdr (result)));
+
+      if (scm_is_integer (r_scm) && scm_is_integer (g_scm) && scm_is_integer (b_scm))
+        {
+          int r = scm_to_int (r_scm);
+          int g = scm_to_int (g_scm);
+          int b = scm_to_int (b_scm);
+          return list3i (r, g, b);
+        }
+    }
+
+  return Qnil;
+}
+
+/* Check if filename needs DOS to Unix conversion */
+bool
+guile_needs_filename_conversion (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_needs_filename_conversion))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  SCM result = scm_call_1 (scm_needs_filename_conversion,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  return scm_is_true (result);
+}
+
+/* Check if filename is UTF-8 encoded */
+bool
+guile_is_utf8_filename (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_is_utf8_filename))
+    return true; /* Assume UTF-8 if Scheme not available */
+
+  if (!STRINGP (filename))
+    return false;
+
+  SCM result = scm_call_1 (scm_is_utf8_filename,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string is safe for C string copying */
+bool
+guile_is_safe_for_c_string_copy (Lisp_Object str)
+{
+  if (!scm_is_true (scm_is_safe_for_c_string_copy))
+    return true; /* Assume safe if Scheme not available */
+
+  if (!STRINGP (str))
+    return false;
+
+  SCM result = scm_call_1 (scm_is_safe_for_c_string_copy,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string looks like network address */
+bool
+guile_looks_like_network_address (Lisp_Object addr_str)
+{
+  if (!scm_is_true (scm_looks_like_network_address))
+    return false;
+
+  if (!STRINGP (addr_str))
+    return false;
+
+  SCM result = scm_call_1 (scm_looks_like_network_address,
+                           scm_from_utf8_string (SSDATA (addr_str)));
+
+  return scm_is_true (result);
 }

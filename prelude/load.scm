@@ -810,6 +810,18 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'validate-string-for-copying validate-string-for-copying)
   (module-define! global-module 'prepare-string-for-symbol prepare-string-for-symbol)
 
+  ;; Export new SSDATA hoisting functions to global module
+  (module-define! global-module 'has-file-extension? has-file-extension?)
+  (module-define! global-module 'extract-filename-from-path extract-filename-from-path)
+  (module-define! global-module 'is-modifier-symbol? is-modifier-symbol?)
+  (module-define! global-module 'validate-float-format-string validate-float-format-string)
+  (module-define! global-module 'has-time-format-specifiers? has-time-format-specifiers?)
+  (module-define! global-module 'parse-hex-color parse-hex-color)
+  (module-define! global-module 'needs-filename-conversion? needs-filename-conversion?)
+  (module-define! global-module 'is-utf8-filename? is-utf8-filename?)
+  (module-define! global-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
+  (module-define! global-module 'looks-like-network-address? looks-like-network-address?)
+
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
@@ -831,7 +843,19 @@ Allows any number of arguments, including zero."
   (module-define! elisp-emacs-module 'string-trim-leading-whitespace string-trim-leading-whitespace)
   (module-define! elisp-emacs-module 'parse-number-string parse-number-string)
   (module-define! elisp-emacs-module 'validate-string-for-copying validate-string-for-copying)
-  (module-define! elisp-emacs-module 'prepare-string-for-symbol prepare-string-for-symbol))
+  (module-define! elisp-emacs-module 'prepare-string-for-symbol prepare-string-for-symbol)
+
+  ;; Export new SSDATA hoisting functions to elisp emacs module
+  (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
+  (module-define! elisp-emacs-module 'extract-filename-from-path extract-filename-from-path)
+  (module-define! elisp-emacs-module 'is-modifier-symbol? is-modifier-symbol?)
+  (module-define! elisp-emacs-module 'validate-float-format-string validate-float-format-string)
+  (module-define! elisp-emacs-module 'has-time-format-specifiers? has-time-format-specifiers?)
+  (module-define! elisp-emacs-module 'parse-hex-color parse-hex-color)
+  (module-define! elisp-emacs-module 'needs-filename-conversion? needs-filename-conversion?)
+  (module-define! elisp-emacs-module 'is-utf8-filename? is-utf8-filename?)
+  (module-define! elisp-emacs-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
+  (module-define! elisp-emacs-module 'looks-like-network-address? looks-like-network-address?))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

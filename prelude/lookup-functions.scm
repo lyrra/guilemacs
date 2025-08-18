@@ -391,3 +391,104 @@ Returns the processed string suitable for symbol internment."
     (if (string=? processed "")
         #f  ; Empty string after processing
         processed)))
+
+;; Filename extension validation
+(define (has-file-extension? filename extension)
+  "Check if FILENAME has the given EXTENSION.
+Both parameters are case-insensitive. Extension should include the dot."
+  (and (>= (string-length filename) (string-length extension))
+       (string-ci=? extension
+                    (substring filename
+                               (- (string-length filename) (string-length extension))))))
+
+;; Path component extraction
+(define (extract-filename-from-path path)
+  "Extract the filename component from a full PATH.
+Returns the basename without directory components."
+  (let ((last-slash (string-rindex path #\/)))
+    (if last-slash
+        (substring path (+ last-slash 1))
+        path)))
+
+;; String symbol comparison for modifier keys
+(define (is-modifier-symbol? symbol-name test-string)
+  "Check if SYMBOL-NAME matches TEST-STRING for modifier key comparison.
+Returns #t if they match (case-insensitive first 10 chars), #f otherwise."
+  (and (>= (string-length symbol-name) (string-length test-string))
+       (string-ci=? test-string
+                    (substring symbol-name 0 (min 10 (string-length symbol-name))))))
+
+;; Float format validation
+(define (validate-float-format-string format-str)
+  "Validate that FORMAT-STR is a proper float format string.
+Returns 'valid if it starts with % and contains float specifiers, 'invalid otherwise."
+  (if (and (> (string-length format-str) 1)
+           (char=? (string-ref format-str 0) #\%)
+           (or (string-contains format-str "f")
+               (string-contains format-str "g")
+               (string-contains format-str "e")))
+      'valid
+      'invalid))
+
+;; Time format string validation
+(define (has-time-format-specifiers? format-str)
+  "Check if FORMAT-STR contains time formatting specifiers.
+Returns #t if it contains %-based time format codes, #f otherwise."
+  (and (string-contains format-str "%")
+       (or (string-contains format-str "%Y")  ; Year
+           (string-contains format-str "%m")  ; Month
+           (string-contains format-str "%d")  ; Day
+           (string-contains format-str "%H")  ; Hour
+           (string-contains format-str "%M")  ; Minute
+           (string-contains format-str "%S")  ; Second
+           (string-contains format-str "%A")  ; Day name
+           (string-contains format-str "%B")))) ; Month name
+
+;; RGB component parsing from color strings
+(define (parse-hex-color hex-str)
+  "Parse HEX-STR (#RRGGBB format) into RGB components.
+Returns (r g b) list or #f if invalid."
+  (if (and (= (string-length hex-str) 7)
+           (char=? (string-ref hex-str 0) #\#))
+      (let ((r-hex (substring hex-str 1 3))
+            (g-hex (substring hex-str 3 5))
+            (b-hex (substring hex-str 5 7)))
+        (let ((r (string->number r-hex 16))
+              (g (string->number g-hex 16))
+              (b (string->number b-hex 16)))
+          (if (and r g b (<= 0 r 255) (<= 0 g 255) (<= 0 b 255))
+              (list r g b)
+              #f)))
+      #f))
+
+;; DOS/Unix filename conversion validation
+(define (needs-filename-conversion? filename)
+  "Check if FILENAME needs DOS to Unix filename conversion.
+Returns #t if it contains backslashes, #f otherwise."
+  (string-contains filename "\\"))
+
+;; File encoding validation
+(define (is-utf8-filename? filename)
+  "Basic check if FILENAME appears to be UTF-8 encoded.
+Returns #t if no control characters found, #f otherwise."
+  (not (string-any (lambda (c)
+                     (let ((code (char->integer c)))
+                       (and (< code 32) (not (= code 9)) (not (= code 10)) (not (= code 13)))))
+                   filename)))
+
+;; Memory safety validation for string copying
+(define (is-safe-for-c-string-copy? str)
+  "Check if STR is safe for C string operations.
+Returns #t if string contains no null bytes and is reasonable length, #f otherwise."
+  (and (> (string-length str) 0)     ; Must be non-empty
+       (< (string-length str) 4096)  ; Reasonable length limit
+       (not (string-any (lambda (c) (char=? c #\nul)) str))))
+
+;; Network address validation
+(define (looks-like-network-address? addr-str)
+  "Basic check if ADDR-STR looks like a network address.
+Returns #t for IP-like or hostname-like patterns, #f otherwise."
+  (or (string-contains addr-str ".")  ; IP or domain
+      (string-contains addr-str ":")  ; IPv6 or port
+      (string-contains addr-str "localhost")
+      (string-contains addr-str "127.0.0.1")))

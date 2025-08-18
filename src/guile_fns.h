@@ -74,4 +74,36 @@ extern bool guile_validate_string_for_copying (Lisp_Object str);
 /* Prepare string for symbol creation */
 extern Lisp_Object guile_prepare_string_for_symbol (Lisp_Object str);
 
+/* New SSDATA hoisting functions */
+
+/* Check if filename has specific extension */
+extern bool guile_has_file_extension (Lisp_Object filename, const char *extension);
+
+/* Extract filename from full path */
+extern Lisp_Object guile_extract_filename_from_path (Lisp_Object path);
+
+/* Check if symbol matches modifier key string */
+extern bool guile_is_modifier_symbol (Lisp_Object symbol, const char *test_string);
+
+/* Validate float format string */
+extern bool guile_validate_float_format_string (Lisp_Object format_str);
+
+/* Check if string has time format specifiers */
+extern bool guile_has_time_format_specifiers (Lisp_Object format_str);
+
+/* Parse hex color string and return RGB values as Lisp list */
+extern Lisp_Object guile_parse_hex_color (Lisp_Object hex_str);
+
+/* Check if filename needs DOS to Unix conversion */
+extern bool guile_needs_filename_conversion (Lisp_Object filename);
+
+/* Check if filename is UTF-8 encoded */
+extern bool guile_is_utf8_filename (Lisp_Object filename);
+
+/* Check if string is safe for C string copying */
+extern bool guile_is_safe_for_c_string_copy (Lisp_Object str);
+
+/* Check if string looks like network address */
+extern bool guile_looks_like_network_address (Lisp_Object addr_str);
+
 #endif /* GUILE_LOOKUPS_H */
