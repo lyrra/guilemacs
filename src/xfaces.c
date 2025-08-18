@@ -226,6 +226,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "lisp.h"
 #include "character.h"
 #include "frame.h"
+#include "guile_fns.h"
 
 #ifdef USE_MOTIF
 #include <Xm/Xm.h>
@@ -3942,16 +3943,21 @@ face_boolean_x_resource_value (Lisp_Object value, bool signal_p)
 
   eassert (STRINGP (value));
 
-  if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("on")))
-      || scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("true"))))
+  /* Use Guile-based face attribute parser */
+  int parse_result = guile_parse_face_bool_attribute (value);
+
+  if (parse_result == 1)
     result = Qt;
-  else if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("off")))
-	   || scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("false"))))
+  else if (parse_result == -1)
     result = Qnil;
-  else if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("unspecified"))))
-    result = Qunspecified;
-  else if (signal_p)
-    signal_error ("Invalid face attribute value from X resource", value);
+  else if (parse_result == 0)
+    {
+      /* Check for "unspecified" specifically */
+      if (scm_is_true (scm_string_ci_equal_p (value, scm_from_utf8_string ("unspecified"))))
+        result = Qunspecified;
+      else if (signal_p)
+        signal_error ("Invalid face attribute value from X resource", value);
+    }
 
   return result;
 }

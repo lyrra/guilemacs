@@ -27,6 +27,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "keyboard.h"
 #include "process.h"
+#include "guile_fns.h"
 
 #ifndef DBUS_NUM_MESSAGE_TYPES
 #define DBUS_NUM_MESSAGE_TYPES 5

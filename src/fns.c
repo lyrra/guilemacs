@@ -34,6 +34,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "composite.h"
 #include "commands.h"
 #include "buffer.h"
+#include "guile_fns.h"
 #include "intervals.h"
 #include "window.h"
 #include "puresize.h"
@@ -3429,27 +3430,21 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
       ans = Fdowncase (Fread_from_minibuffer (prompt, Qnil, Qnil, Qnil,
 					      Qyes_or_no_p_history, Qnil,
 					      Qnil));
-      /* Optimize: Use static strings for common comparisons */
-      static SCM yes_string = SCM_UNDEFINED;
-      static SCM no_string = SCM_UNDEFINED;
-      if (SCM_UNBNDP (yes_string))
-        {
-          yes_string = scm_from_utf8_string ("yes");
-          no_string = scm_from_utf8_string ("no");
-          scm_gc_protect_object (yes_string);
-          scm_gc_protect_object (no_string);
-        }
 
-      if (scm_is_true (scm_string_equal_p (ans, yes_string)))
+      /* Use Guile-based yes/no response processor */
+      int response_result = guile_process_yesno_response (ans);
+
+      if (response_result == 1) /* yes */
         {
           dynwind_end ();
           return Qt;
         }
-      if (scm_is_true (scm_string_equal_p (ans, no_string)))
+      else if (response_result == 0) /* no */
         {
           dynwind_end ();
           return Qnil;
         }
+      /* else response_result == -1 (invalid), continue loop */
 
       Fding (Qnil);
       Fdiscard_input ();

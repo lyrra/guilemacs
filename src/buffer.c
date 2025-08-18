@@ -33,6 +33,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "systime.h"
 #include "window.h"
 #include "commands.h"
+#include "guile_fns.h"
 #include "character.h"
 #include "buffer.h"
 #include "region-cache.h"
@@ -2263,8 +2264,8 @@ the current buffer's major mode.  */)
   if (!BUFFER_LIVE_P (XBUFFER (buffer)))
     error ("Attempt to set major mode for a dead buffer");
 
-  if (scm_is_true (scm_string_equal_p (BVAR (XBUFFER (buffer), name),
-                                       scm_from_utf8_string ("*scratch*"))))
+  /* Use Guile-based special buffer name checker */
+  if (guile_is_special_buffer_name (BVAR (XBUFFER (buffer), name)))
     function = find_symbol_value (Qinitial_major_mode);
   else
     {

@@ -793,13 +793,21 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'lookup-in-alist-ci lookup-in-alist-ci)
   (module-define! global-module 'lookup-in-alist lookup-in-alist)
   (module-define! global-module 'lookup-symbol-in-list lookup-symbol-in-list)
+  (module-define! global-module 'parse-face-bool-attribute parse-face-bool-attribute)
+  (module-define! global-module 'process-yesno-response process-yesno-response)
+  (module-define! global-module 'filter-dbus-message filter-dbus-message)
+  (module-define! global-module 'is-special-buffer-name? is-special-buffer-name?)
 
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
   (module-define! elisp-emacs-module 'lookup-in-alist-ci lookup-in-alist-ci)
   (module-define! elisp-emacs-module 'lookup-in-alist lookup-in-alist)
-  (module-define! elisp-emacs-module 'lookup-symbol-in-list lookup-symbol-in-list))
+  (module-define! elisp-emacs-module 'lookup-symbol-in-list lookup-symbol-in-list)
+  (module-define! elisp-emacs-module 'parse-face-bool-attribute parse-face-bool-attribute)
+  (module-define! elisp-emacs-module 'process-yesno-response process-yesno-response)
+  (module-define! elisp-emacs-module 'filter-dbus-message filter-dbus-message)
+  (module-define! elisp-emacs-module 'is-special-buffer-name? is-special-buffer-name?))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
