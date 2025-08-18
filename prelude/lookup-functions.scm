@@ -568,3 +568,122 @@ Returns #t if path starts with prefix, #f otherwise."
   (and (>= (string-length path) (string-length prefix))
        (string-ci=? prefix
                     (substring path 0 (string-length prefix)))))
+
+;; Simple String Validation Operations for SSDATA hoisting
+
+;; Check if string has exactly one character
+(define (string-single-char? str)
+  "Check if STR contains exactly one character.
+Returns #t if string length is 1, #f otherwise."
+  (= (string-length str) 1))
+
+;; Check if string starts with space character
+(define (string-starts-with-space? str)
+  "Check if STR starts with a space character.
+Returns #t if first character is space, #f otherwise."
+  (and (> (string-length str) 0)
+       (char=? (string-ref str 0) #\space)))
+
+;; Check if string contains only ASCII characters
+(define (string-ascii-only? str)
+  "Check if STR contains only ASCII characters (0-127).
+Returns #t if all characters are ASCII, #f otherwise."
+  (string-every (lambda (c)
+                  (< (char->integer c) 128))
+                str))
+
+;; Check if string is a valid symbol name
+(define (valid-symbol-name? str)
+  "Check if STR is a valid Lisp symbol name.
+Returns #t if valid, #f otherwise."
+  (and (> (string-length str) 0)
+       ;; Cannot start with digit
+       (not (char-numeric? (string-ref str 0)))
+       ;; Must contain only valid symbol characters
+       (string-every (lambda (c)
+                       (or (char-alphabetic? c)
+                           (char-numeric? c)
+                           (char=? c #\-)
+                           (char=? c #\_)
+                           (char=? c #\?)
+                           (char=? c #\!)
+                           (char=? c #\*)))
+                     str)))
+
+;; Check if string looks like a number
+(define (string-numeric? str)
+  "Check if STR looks like a numeric string.
+Returns #t if it can be parsed as a number, #f otherwise."
+  (catch #t
+    (lambda ()
+      (string->number str))
+    (lambda (key . args)
+      #f)))
+
+;; Check if string contains special characters that need escaping
+(define (string-needs-escaping? str)
+  "Check if STR contains characters that typically need escaping.
+Returns #t if contains quotes, backslashes, or control chars, #f otherwise."
+  (string-any (lambda (c)
+                (or (char=? c #\")
+                    (char=? c #\\)
+                    (char=? c #\')
+                    (< (char->integer c) 32)))
+              str))
+
+;; Buffer name validation
+(define (special-buffer-name? buffer-name)
+  "Check if BUFFER-NAME represents a special/internal buffer.
+Returns #t for special buffers (starting with space or star), #f otherwise."
+  (cond
+    ;; Empty name
+    ((= (string-length buffer-name) 0) #t)
+    ;; Names starting with space (hidden buffers)
+    ((char=? (string-ref buffer-name 0) #\space) #t)
+    ;; Names starting and ending with asterisks (special buffers)
+    ((and (>= (string-length buffer-name) 2)
+          (char=? (string-ref buffer-name 0) #\*)
+          (char=? (string-ref buffer-name (- (string-length buffer-name) 1)) #\*)) #t)
+    ;; Regular buffer
+    (else #f)))
+
+;; Simple case-insensitive string comparison
+(define (string-equal-ignore-case? str1 str2)
+  "Case-insensitive string comparison.
+Returns #t if strings are equal ignoring case, #f otherwise."
+  (string-ci=? str1 str2))
+
+;; Check if string starts with specific character
+(define (string-starts-with-char? str char)
+  "Check if STR starts with specific CHAR.
+Returns #t if first character matches, #f otherwise."
+  (and (> (string-length str) 0)
+       (char=? (string-ref str 0) char)))
+
+;; Check if string ends with specific character
+(define (string-ends-with-char? str char)
+  "Check if STR ends with specific CHAR.
+Returns #t if last character matches, #f otherwise."
+  (and (> (string-length str) 0)
+       (char=? (string-ref str (- (string-length str) 1)) char)))
+
+;; Check if string contains only whitespace
+(define (string-whitespace-only? str)
+  "Check if STR contains only whitespace characters.
+Returns #t if all characters are whitespace, #f otherwise."
+  (string-every char-whitespace? str))
+
+;; Check if string is a valid identifier
+(define (valid-identifier? str)
+  "Check if STR is a valid programming identifier.
+Returns #t if valid (starts with letter/underscore, contains alphanumeric), #f otherwise."
+  (and (> (string-length str) 0)
+       ;; Must start with letter or underscore
+       (or (char-alphabetic? (string-ref str 0))
+           (char=? (string-ref str 0) #\_))
+       ;; Rest must be alphanumeric or underscore
+       (string-every (lambda (c)
+                       (or (char-alphabetic? c)
+                           (char-numeric? c)
+                           (char=? c #\_)))
+                     str)))

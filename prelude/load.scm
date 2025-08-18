@@ -831,6 +831,20 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'get-file-extension get-file-extension)
   (module-define! global-module 'path-starts-with? path-starts-with?)
 
+  ;; Export simple string validation functions to global module
+  (module-define! global-module 'string-single-char? string-single-char?)
+  (module-define! global-module 'string-starts-with-space? string-starts-with-space?)
+  (module-define! global-module 'string-ascii-only? string-ascii-only?)
+  (module-define! global-module 'valid-symbol-name? valid-symbol-name?)
+  (module-define! global-module 'string-numeric? string-numeric?)
+  (module-define! global-module 'string-needs-escaping? string-needs-escaping?)
+  (module-define! global-module 'special-buffer-name? special-buffer-name?)
+  (module-define! global-module 'string-equal-ignore-case? string-equal-ignore-case?)
+  (module-define! global-module 'string-starts-with-char? string-starts-with-char?)
+  (module-define! global-module 'string-ends-with-char? string-ends-with-char?)
+  (module-define! global-module 'string-whitespace-only? string-whitespace-only?)
+  (module-define! global-module 'valid-identifier? valid-identifier?)
+
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
@@ -873,7 +887,21 @@ Allows any number of arguments, including zero."
   (module-define! elisp-emacs-module 'string-empty? string-empty?)
   (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?)
   (module-define! elisp-emacs-module 'get-file-extension get-file-extension)
-  (module-define! elisp-emacs-module 'path-starts-with? path-starts-with?))
+  (module-define! elisp-emacs-module 'path-starts-with? path-starts-with?)
+
+  ;; Export simple string validation functions to elisp emacs module
+  (module-define! elisp-emacs-module 'string-single-char? string-single-char?)
+  (module-define! elisp-emacs-module 'string-starts-with-space? string-starts-with-space?)
+  (module-define! elisp-emacs-module 'string-ascii-only? string-ascii-only?)
+  (module-define! elisp-emacs-module 'valid-symbol-name? valid-symbol-name?)
+  (module-define! elisp-emacs-module 'string-numeric? string-numeric?)
+  (module-define! elisp-emacs-module 'string-needs-escaping? string-needs-escaping?)
+  (module-define! elisp-emacs-module 'special-buffer-name? special-buffer-name?)
+  (module-define! elisp-emacs-module 'string-equal-ignore-case? string-equal-ignore-case?)
+  (module-define! elisp-emacs-module 'string-starts-with-char? string-starts-with-char?)
+  (module-define! elisp-emacs-module 'string-ends-with-char? string-ends-with-char?)
+  (module-define! elisp-emacs-module 'string-whitespace-only? string-whitespace-only?)
+  (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

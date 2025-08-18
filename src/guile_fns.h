@@ -129,4 +129,27 @@ extern Lisp_Object guile_get_file_extension (Lisp_Object path);
 /* Check if path starts with specific prefix */
 extern bool guile_path_starts_with (Lisp_Object path, const char *prefix);
 
+/* Simple string validation functions */
+
+/* Check if string has exactly one character */
+extern bool guile_string_single_char (Lisp_Object str);
+
+/* Check if string starts with space character */
+extern bool guile_string_starts_with_space (Lisp_Object str);
+
+/* Check if string contains only ASCII characters */
+extern bool guile_string_ascii_only (Lisp_Object str);
+
+/* Check if string is a valid symbol name */
+extern bool guile_valid_symbol_name (Lisp_Object str);
+
+/* Check if string looks like a number */
+extern bool guile_string_numeric (Lisp_Object str);
+
+/* Check if buffer name represents a special buffer */
+extern bool guile_special_buffer_name (Lisp_Object buffer_name);
+
+/* Check if string starts with specific character */
+extern bool guile_string_starts_with_char (Lisp_Object str, int character);
+
 #endif /* GUILE_LOOKUPS_H */

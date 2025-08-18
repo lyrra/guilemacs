@@ -48,6 +48,20 @@ static SCM scm_has_directory_traversal = SCM_BOOL_F;
 static SCM scm_get_file_extension = SCM_BOOL_F;
 static SCM scm_path_starts_with = SCM_BOOL_F;
 
+/* Simple string validation function references */
+static SCM scm_string_single_char = SCM_BOOL_F;
+static SCM scm_string_starts_with_space = SCM_BOOL_F;
+static SCM scm_string_ascii_only = SCM_BOOL_F;
+static SCM scm_valid_symbol_name = SCM_BOOL_F;
+static SCM scm_string_numeric = SCM_BOOL_F;
+static SCM scm_string_needs_escaping = SCM_BOOL_F;
+static SCM scm_special_buffer_name = SCM_BOOL_F;
+static SCM scm_string_equal_ignore_case = SCM_BOOL_F;
+static SCM scm_string_starts_with_char = SCM_BOOL_F;
+static SCM scm_string_ends_with_char = SCM_BOOL_F;
+static SCM scm_string_whitespace_only = SCM_BOOL_F;
+static SCM scm_valid_identifier = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -211,6 +225,55 @@ init_guile_fns (void)
   if (scm_is_false (scm_path_starts_with))
     scm_path_starts_with = scm_c_lookup ("path-starts-with?");
 
+  /* Initialize simple string validation functions */
+  scm_string_single_char = scm_c_module_lookup (elisp_emacs_module, "string-single-char?");
+  if (scm_is_false (scm_string_single_char))
+    scm_string_single_char = scm_c_lookup ("string-single-char?");
+
+  scm_string_starts_with_space = scm_c_module_lookup (elisp_emacs_module, "string-starts-with-space?");
+  if (scm_is_false (scm_string_starts_with_space))
+    scm_string_starts_with_space = scm_c_lookup ("string-starts-with-space?");
+
+  scm_string_ascii_only = scm_c_module_lookup (elisp_emacs_module, "string-ascii-only?");
+  if (scm_is_false (scm_string_ascii_only))
+    scm_string_ascii_only = scm_c_lookup ("string-ascii-only?");
+
+  scm_valid_symbol_name = scm_c_module_lookup (elisp_emacs_module, "valid-symbol-name?");
+  if (scm_is_false (scm_valid_symbol_name))
+    scm_valid_symbol_name = scm_c_lookup ("valid-symbol-name?");
+
+  scm_string_numeric = scm_c_module_lookup (elisp_emacs_module, "string-numeric?");
+  if (scm_is_false (scm_string_numeric))
+    scm_string_numeric = scm_c_lookup ("string-numeric?");
+
+  scm_string_needs_escaping = scm_c_module_lookup (elisp_emacs_module, "string-needs-escaping?");
+  if (scm_is_false (scm_string_needs_escaping))
+    scm_string_needs_escaping = scm_c_lookup ("string-needs-escaping?");
+
+  scm_special_buffer_name = scm_c_module_lookup (elisp_emacs_module, "special-buffer-name?");
+  if (scm_is_false (scm_special_buffer_name))
+    scm_special_buffer_name = scm_c_lookup ("special-buffer-name?");
+
+  scm_string_equal_ignore_case = scm_c_module_lookup (elisp_emacs_module, "string-equal-ignore-case?");
+  if (scm_is_false (scm_string_equal_ignore_case))
+    scm_string_equal_ignore_case = scm_c_lookup ("string-equal-ignore-case?");
+
+  scm_string_starts_with_char = scm_c_module_lookup (elisp_emacs_module, "string-starts-with-char?");
+  if (scm_is_false (scm_string_starts_with_char))
+    scm_string_starts_with_char = scm_c_lookup ("string-starts-with-char?");
+
+  scm_string_ends_with_char = scm_c_module_lookup (elisp_emacs_module, "string-ends-with-char?");
+  if (scm_is_false (scm_string_ends_with_char))
+    scm_string_ends_with_char = scm_c_lookup ("string-ends-with-char?");
+
+  scm_string_whitespace_only = scm_c_module_lookup (elisp_emacs_module, "string-whitespace-only?");
+  if (scm_is_false (scm_string_whitespace_only))
+    scm_string_whitespace_only = scm_c_lookup ("string-whitespace-only?");
+
+  scm_valid_identifier = scm_c_module_lookup (elisp_emacs_module, "valid-identifier?");
+  if (scm_is_false (scm_valid_identifier))
+    scm_valid_identifier = scm_c_lookup ("valid-identifier?");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -254,6 +317,20 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_has_directory_traversal);
   scm_gc_protect_object (scm_get_file_extension);
   scm_gc_protect_object (scm_path_starts_with);
+
+  /* Protect simple string validation functions from GC */
+  scm_gc_protect_object (scm_string_single_char);
+  scm_gc_protect_object (scm_string_starts_with_space);
+  scm_gc_protect_object (scm_string_ascii_only);
+  scm_gc_protect_object (scm_valid_symbol_name);
+  scm_gc_protect_object (scm_string_numeric);
+  scm_gc_protect_object (scm_string_needs_escaping);
+  scm_gc_protect_object (scm_special_buffer_name);
+  scm_gc_protect_object (scm_string_equal_ignore_case);
+  scm_gc_protect_object (scm_string_starts_with_char);
+  scm_gc_protect_object (scm_string_ends_with_char);
+  scm_gc_protect_object (scm_string_whitespace_only);
+  scm_gc_protect_object (scm_valid_identifier);
 }
 
 /* Lookup a color by name in a color map */
@@ -1003,6 +1080,156 @@ guile_path_starts_with (Lisp_Object path, const char *prefix)
   SCM result = scm_call_2 (scm_path_starts_with,
                            scm_from_utf8_string (SSDATA (path)),
                            scm_from_utf8_string (prefix));
+
+  return scm_is_true (result);
+}
+
+/* Simple string validation bridge functions */
+
+/* Check if string has exactly one character */
+bool
+guile_string_single_char (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_single_char))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_single_char);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string starts with space character */
+bool
+guile_string_starts_with_space (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_starts_with_space))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_starts_with_space);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string contains only ASCII characters */
+bool
+guile_string_ascii_only (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_ascii_only))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_ascii_only);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string is a valid symbol name */
+bool
+guile_valid_symbol_name (Lisp_Object str)
+{
+  if (!scm_is_true (scm_valid_symbol_name))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_valid_symbol_name);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string looks like a number */
+bool
+guile_string_numeric (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_numeric))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_numeric);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if buffer name represents a special buffer */
+bool
+guile_special_buffer_name (Lisp_Object buffer_name)
+{
+  if (!scm_is_true (scm_special_buffer_name))
+    return false;
+
+  if (!STRINGP (buffer_name))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_special_buffer_name);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (buffer_name)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string starts with specific character */
+bool
+guile_string_starts_with_char (Lisp_Object str, int character)
+{
+  if (!scm_is_true (scm_string_starts_with_char))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_starts_with_char);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_2 (function,
+                           scm_from_utf8_string (SSDATA (str)),
+                           scm_from_char (character));
 
   return scm_is_true (result);
 }

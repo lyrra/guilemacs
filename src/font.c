@@ -28,6 +28,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
+#include "guile_fns.h"
 #include "character.h"
 #include "buffer.h"
 #include "frame.h"
@@ -641,7 +642,7 @@ font_prop_validate_spacing (Lisp_Object prop, Lisp_Object val)
 {
   if (NILP (val) || (FIXNATP (val) && XFIXNUM (val) <= FONT_SPACING_CHARCELL))
     return val;
-  if (SYMBOLP (val) && SBYTES (SYMBOL_NAME (val)) == 1)
+  if (SYMBOLP (val) && guile_string_single_char (SYMBOL_NAME (val)))
     {
       char spacing = SDATA (SYMBOL_NAME (val))[0];
 
