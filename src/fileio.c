@@ -2458,9 +2458,9 @@ This happens for interactive use with M-x.  */)
   CHECK_STRING (target);
   if (FIXNUMP (ok_if_already_exists))
     {
-      if (SREF (target, 0) == '~')
+      if (guile_string_starts_with_char (target, '~'))
 	target = Fexpand_file_name (target, Qnil);
-      else if (SREF (target, 0) == '/' && SREF (target, 1) == ':')
+      else if (guile_path_starts_with (target, "/:"))
 	target = Fsubstring_no_properties (target, make_fixnum (2), Qnil);
     }
   linkname = expand_cp_target (target, linkname);

@@ -329,18 +329,7 @@ Returns 'valid if the name has the correct number of dashes, 'invalid otherwise.
 ;; Note: Using Guile's built-in string-contains function
 ;; It returns the index of the substring if found, #f otherwise
 
-;; File path validation helpers
-(define (is-absolute-path? path)
-  "Check if PATH is an absolute file path."
-  (and (> (string-length path) 0)
-       (char=? (string-ref path 0) #\/)))
-
-(define (has-directory-traversal? path)
-  "Check if PATH contains directory traversal patterns like '../'."
-  (or (string-contains path "../")
-      (string-contains path "/..")
-      (string=? path "..")
-      (string-prefix? "../" path)))
+;; File path validation helpers (see more complete versions below in SSDATA hoisting section)
 
 ;; String preprocessing functions
 (define (string-spaces-to-dashes str)
@@ -392,14 +381,7 @@ Returns the processed string suitable for symbol internment."
         #f  ; Empty string after processing
         processed)))
 
-;; Filename extension validation
-(define (has-file-extension? filename extension)
-  "Check if FILENAME has the given EXTENSION.
-Both parameters are case-insensitive. Extension should include the dot."
-  (and (>= (string-length filename) (string-length extension))
-       (string-ci=? extension
-                    (substring filename
-                               (- (string-length filename) (string-length extension))))))
+;; Filename extension validation (see more complete version below in SSDATA hoisting section)
 
 ;; Path component extraction
 (define (extract-filename-from-path path)
@@ -412,11 +394,11 @@ Returns the basename without directory components."
 
 ;; String symbol comparison for modifier keys
 (define (is-modifier-symbol? symbol-name test-string)
-  "Check if SYMBOL-NAME matches TEST-STRING for modifier key comparison.
-Returns #t if they match (case-insensitive first 10 chars), #f otherwise."
+  "Check if SYMBOL-NAME starts with TEST-STRING for modifier key comparison.
+Returns #t if symbol name starts with test string (case-insensitive), #f otherwise."
   (and (>= (string-length symbol-name) (string-length test-string))
        (string-ci=? test-string
-                    (substring symbol-name 0 (min 10 (string-length symbol-name))))))
+                    (substring symbol-name 0 (string-length test-string)))))
 
 ;; Float format validation
 (define (validate-float-format-string format-str)
@@ -654,18 +636,26 @@ Returns #t if strings are equal ignoring case, #f otherwise."
   (string-ci=? str1 str2))
 
 ;; Check if string starts with specific character
-(define (string-starts-with-char? str char)
-  "Check if STR starts with specific CHAR.
+(define (string-starts-with-char? str char-or-int)
+  "Check if STR starts with specific CHAR-OR-INT.
+CHAR-OR-INT can be either a character or an integer character code.
 Returns #t if first character matches, #f otherwise."
   (and (> (string-length str) 0)
-       (char=? (string-ref str 0) char)))
+       (let ((char (if (integer? char-or-int)
+                       (integer->char char-or-int)
+                       char-or-int)))
+         (char=? (string-ref str 0) char))))
 
 ;; Check if string ends with specific character
-(define (string-ends-with-char? str char)
-  "Check if STR ends with specific CHAR.
+(define (string-ends-with-char? str char-or-int)
+  "Check if STR ends with specific CHAR-OR-INT.
+CHAR-OR-INT can be either a character or an integer character code.
 Returns #t if last character matches, #f otherwise."
   (and (> (string-length str) 0)
-       (char=? (string-ref str (- (string-length str) 1)) char)))
+       (let ((char (if (integer? char-or-int)
+                       (integer->char char-or-int)
+                       char-or-int)))
+         (char=? (string-ref str (- (string-length str) 1)) char))))
 
 ;; Check if string contains only whitespace
 (define (string-whitespace-only? str)
@@ -687,3 +677,178 @@ Returns #t if valid (starts with letter/underscore, contains alphanumeric), #f o
                            (char-numeric? c)
                            (char=? c #\_)))
                      str)))
+
+;; File Extension and Type Operations for SSDATA hoisting
+
+;; Check if filename has specific extension (case-insensitive)
+(define (has-file-extension? filename extension)
+  "Check if FILENAME ends with EXTENSION (case-insensitive).
+Returns #t if filename has the extension, #f otherwise."
+  (let ((ext-len (string-length extension))
+        (name-len (string-length filename)))
+    (and (>= name-len ext-len)
+         (string-ci=? extension
+                     (substring filename (- name-len ext-len))))))
+
+;; Check if filename is a source code file
+(define (source-code-file? filename)
+  "Check if FILENAME appears to be a source code file.
+Returns #t for common source file extensions, #f otherwise."
+  (or (has-file-extension? filename ".c")
+      (has-file-extension? filename ".h")
+      (has-file-extension? filename ".el")
+      (has-file-extension? filename ".scm")
+      (has-file-extension? filename ".lisp")
+      (has-file-extension? filename ".py")
+      (has-file-extension? filename ".js")
+      (has-file-extension? filename ".cpp")
+      (has-file-extension? filename ".hpp")))
+
+;; Check if filename is an image file
+(define (image-file? filename)
+  "Check if FILENAME appears to be an image file.
+Returns #t for common image extensions, #f otherwise."
+  (or (has-file-extension? filename ".png")
+      (has-file-extension? filename ".jpg")
+      (has-file-extension? filename ".jpeg")
+      (has-file-extension? filename ".gif")
+      (has-file-extension? filename ".bmp")
+      (has-file-extension? filename ".svg")
+      (has-file-extension? filename ".tiff")
+      (has-file-extension? filename ".webp")))
+
+;; Check if filename is a data/config file
+(define (config-file? filename)
+  "Check if FILENAME appears to be a configuration file.
+Returns #t for common config extensions, #f otherwise."
+  (or (has-file-extension? filename ".json")
+      (has-file-extension? filename ".xml")
+      (has-file-extension? filename ".yaml")
+      (has-file-extension? filename ".yml")
+      (has-file-extension? filename ".toml")
+      (has-file-extension? filename ".ini")
+      (has-file-extension? filename ".conf")))
+
+;; Extract file extension including the dot
+(define (extract-file-extension filename)
+  "Extract file extension from FILENAME including the dot.
+Returns the extension or empty string if none."
+  (let ((last-dot (string-rindex filename #\.))
+        (last-slash (or (string-rindex filename #\/)
+                       (string-rindex filename #\\)
+                       -1)))
+    (if (and last-dot (> last-dot last-slash))
+        (substring filename last-dot)
+        "")))
+
+;; Font and Color Validation Operations for SSDATA hoisting
+
+;; Check if string looks like a hex color
+(define (hex-color-string? str)
+  "Check if STR looks like a hex color (#RGB, #RRGGBB, etc.).
+Returns #t if valid hex color format, #f otherwise."
+  (and (> (string-length str) 1)
+       (char=? (string-ref str 0) #\#)
+       (let ((hex-part (substring str 1)))
+         (and (> (string-length hex-part) 0)
+              ;; Valid lengths: 3, 6, 8, 12 (RGB, RRGGBB, RRGGBBAA, RRRRGGGGBBBB)
+              (member (string-length hex-part) '(3 6 8 12))
+              ;; All characters must be hex digits
+              (string-every (lambda (c)
+                              (or (char<=? #\0 c #\9)
+                                  (char<=? #\a (char-downcase c) #\f)))
+                            hex-part)))))
+
+;; Check if string looks like RGB color function
+(define (rgb-color-string? str)
+  "Check if STR looks like rgb() or rgba() color function.
+Returns #t if valid RGB format, #f otherwise."
+  (and (> (string-length str) 4)
+       (or (string-prefix-ci? "rgb(" str)
+           (string-prefix-ci? "rgba(" str))
+       (string-suffix? ")" str)))
+
+;; Check if string is a named color
+(define (named-color? color-name)
+  "Check if COLOR-NAME is a known named color.
+Returns #t for common HTML/CSS color names, #f otherwise."
+  (member (string-downcase color-name)
+          '("red" "green" "blue" "white" "black" "yellow" "cyan" "magenta"
+            "orange" "purple" "pink" "brown" "gray" "grey" "silver" "gold"
+            "navy" "maroon" "olive" "lime" "aqua" "teal" "fuchsia" "violet"
+            "indigo" "crimson" "salmon" "coral" "khaki" "plum" "orchid"
+            "chocolate" "sienna" "peru" "tan" "wheat" "beige" "ivory")))
+
+;; Validate XLFD (X Logical Font Description) font name
+(define (valid-xlfd-font-name? font-name)
+  "Check if FONT-NAME is a valid XLFD format.
+Returns #t if valid XLFD format, #f otherwise."
+  (and (> (string-length font-name) 0)
+       ;; XLFD starts with dash and has exactly 14 dashes total
+       (char=? (string-ref font-name 0) #\-)
+       (= (string-count font-name #\-) 14)
+       ;; Must not be too short or too long
+       (> (string-length font-name) 20)
+       (< (string-length font-name) 200)))
+
+;; Check if string looks like a font family name
+(define (font-family-name? name)
+  "Check if NAME looks like a font family name.
+Returns #t if reasonable font name, #f otherwise."
+  (and (> (string-length name) 0)
+       (< (string-length name) 50)
+       ;; Must contain letters
+       (string-any char-alphabetic? name)
+       ;; Common font name patterns
+       (or (string-any char-alphabetic? name)
+           (string-contains name " ")
+           (string-contains name "-"))))
+
+;; Network and URL Operations for SSDATA hoisting
+
+;; Check if string looks like a URL
+(define (url-string? str)
+  "Check if STR looks like a URL.
+Returns #t if URL-like format, #f otherwise."
+  (and (> (string-length str) 4)
+       (or (string-prefix-ci? "http://" str)
+           (string-prefix-ci? "https://" str)
+           (string-prefix-ci? "ftp://" str)
+           (string-prefix-ci? "file://" str)
+           (string-prefix-ci? "mailto:" str))))
+
+;; Check if string looks like an email address
+(define (email-address? str)
+  "Check if STR looks like an email address.
+Returns #t if email-like format, #f otherwise."
+  (and (> (string-length str) 3)
+       (string-contains str "@")
+       (string-contains str ".")
+       ;; Basic validation - at least one char before @, domain after
+       (let ((at-pos (string-index str #\@)))
+         (and at-pos
+              (> at-pos 0)
+              (< at-pos (- (string-length str) 2))
+              (string-contains (substring str (+ at-pos 1)) ".")))))
+
+;; Check if string looks like an IP address
+(define (ip-address? str)
+  "Check if STR looks like an IPv4 address.
+Returns #t if IP-like format, #f otherwise."
+  (and (> (string-length str) 6)  ; minimum: 1.1.1.1
+       (< (string-length str) 16)  ; maximum: 255.255.255.255
+       (= (string-count str #\.) 3)
+       ;; Split and validate each octet
+       (let ((parts (string-split str #\.)))
+         (and (= (length parts) 4)
+              (let loop ((parts parts))
+                (cond
+                  ((null? parts) #t)
+                  ((let ((part (car parts)))
+                     (and (> (string-length part) 0)
+                          (< (string-length part) 4)
+                          (string-every char-numeric? part)
+                          (let ((num (string->number part)))
+                            (and num (>= num 0) (<= num 255)))))
+                   (loop (cdr parts)))
+                  (else #f)))))))

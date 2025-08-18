@@ -31,6 +31,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <fcntl.h>
 
 #include "lisp.h"
+#include "guile_fns.h"
 
 /* Only MS-DOS does not define `subprocesses'.  */
 #ifdef subprocesses
@@ -8286,7 +8287,7 @@ Lisp_Object
 remove_slash_colon (Lisp_Object name)
 {
   return
-    (SREF (name, 0) == '/' && SREF (name, 1) == ':'
+    (guile_path_starts_with (name, "/:")
      ? make_specified_string (SSDATA (name) + 2, SCHARS (name) - 2,
 			      SBYTES (name) - 2, STRING_MULTIBYTE (name))
      : name);

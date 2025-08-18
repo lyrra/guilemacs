@@ -845,6 +845,25 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'string-whitespace-only? string-whitespace-only?)
   (module-define! global-module 'valid-identifier? valid-identifier?)
 
+  ;; Export file extension and type checking functions to global module
+  (module-define! global-module 'has-file-extension? has-file-extension?)
+  (module-define! global-module 'source-code-file? source-code-file?)
+  (module-define! global-module 'image-file? image-file?)
+  (module-define! global-module 'config-file? config-file?)
+  (module-define! global-module 'extract-file-extension extract-file-extension)
+
+  ;; Export font and color validation functions to global module
+  (module-define! global-module 'hex-color-string? hex-color-string?)
+  (module-define! global-module 'rgb-color-string? rgb-color-string?)
+  (module-define! global-module 'named-color? named-color?)
+  (module-define! global-module 'valid-xlfd-font-name? valid-xlfd-font-name?)
+  (module-define! global-module 'font-family-name? font-family-name?)
+
+  ;; Export network and URL validation functions to global module
+  (module-define! global-module 'url-string? url-string?)
+  (module-define! global-module 'email-address? email-address?)
+  (module-define! global-module 'ip-address? ip-address?)
+
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
@@ -901,7 +920,26 @@ Allows any number of arguments, including zero."
   (module-define! elisp-emacs-module 'string-starts-with-char? string-starts-with-char?)
   (module-define! elisp-emacs-module 'string-ends-with-char? string-ends-with-char?)
   (module-define! elisp-emacs-module 'string-whitespace-only? string-whitespace-only?)
-  (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?))
+  (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?)
+
+  ;; Export file extension and type checking functions to elisp emacs module
+  (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
+  (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
+  (module-define! elisp-emacs-module 'image-file? image-file?)
+  (module-define! elisp-emacs-module 'config-file? config-file?)
+  (module-define! elisp-emacs-module 'extract-file-extension extract-file-extension)
+
+  ;; Export font and color validation functions to elisp emacs module
+  (module-define! elisp-emacs-module 'hex-color-string? hex-color-string?)
+  (module-define! elisp-emacs-module 'rgb-color-string? rgb-color-string?)
+  (module-define! elisp-emacs-module 'named-color? named-color?)
+  (module-define! elisp-emacs-module 'valid-xlfd-font-name? valid-xlfd-font-name?)
+  (module-define! elisp-emacs-module 'font-family-name? font-family-name?)
+
+  ;; Export network and URL validation functions to elisp emacs module
+  (module-define! elisp-emacs-module 'url-string? url-string?)
+  (module-define! elisp-emacs-module 'email-address? email-address?)
+  (module-define! elisp-emacs-module 'ip-address? ip-address?))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

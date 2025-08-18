@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "dispextern.h"
 #include "cm.h"
 #include "buffer.h"
+#include "guile_fns.h"
 #include "keyboard.h"
 #include "frame.h"
 #include "termhooks.h"
@@ -6963,7 +6964,7 @@ pass nil for VARIABLE.  */)
   FOR_EACH_LIVE_BUFFER (tail, buf)
     {
       /* Ignore buffers that aren't included in buffer lists.  */
-      if (SREF (BVAR (XBUFFER (buf), name), 0) == ' ')
+      if (guile_string_starts_with_space (BVAR (XBUFFER (buf), name)))
 	continue;
       if (idx == ASIZE (state))
 	goto changed;
@@ -7019,7 +7020,7 @@ pass nil for VARIABLE.  */)
   FOR_EACH_LIVE_BUFFER (tail, buf)
     {
       /* Ignore buffers that aren't included in buffer lists.  */
-      if (SREF (BVAR (XBUFFER (buf), name), 0) == ' ')
+      if (guile_string_starts_with_space (BVAR (XBUFFER (buf), name)))
 	continue;
       ASET (state, idx, buf);
       idx++;

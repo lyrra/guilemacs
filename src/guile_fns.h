@@ -152,4 +152,34 @@ extern bool guile_special_buffer_name (Lisp_Object buffer_name);
 /* Check if string starts with specific character */
 extern bool guile_string_starts_with_char (Lisp_Object str, int character);
 
+/* File extension and type checking functions */
+
+/* Check if filename has specific extension */
+extern bool guile_has_file_extension_new (Lisp_Object filename, const char *extension);
+
+/* Check if filename is a source code file */
+extern bool guile_source_code_file (Lisp_Object filename);
+
+/* Check if filename is an image file */
+extern bool guile_image_file (Lisp_Object filename);
+
+/* Font and color validation functions */
+
+/* Check if string looks like a hex color */
+extern bool guile_hex_color_string (Lisp_Object str);
+
+/* Check if string is a named color */
+extern bool guile_named_color (Lisp_Object color_name);
+
+/* Validate XLFD font name format */
+extern bool guile_valid_xlfd_font_name_new (Lisp_Object font_name);
+
+/* Check if string looks like a font family name */
+extern bool guile_font_family_name (Lisp_Object name);
+
+/* Network and URL validation functions */
+
+/* Check if string looks like a URL */
+extern bool guile_url_string (Lisp_Object str);
+
 #endif /* GUILE_LOOKUPS_H */

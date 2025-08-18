@@ -26,6 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <intprops.h>
 
 #include "lisp.h"
+#include "guile_fns.h"
 #include "puresize.h"
 #include "character.h"
 #include "buffer.h"
@@ -379,7 +380,7 @@ interned in the initial obarray.  */)
   (Lisp_Object object)
 {
   if (SYMBOLP (object)
-      && SREF (SYMBOL_NAME (object), 0) == ':'
+      && guile_string_starts_with_char (SYMBOL_NAME (object), ':')
       && SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (object))
     return Qt;
   return Qnil;

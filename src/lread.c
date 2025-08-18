@@ -32,6 +32,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 #include <stat-time.h>
 #include "lisp.h"
+#include "guile_fns.h"
 #include "dispextern.h"
 #include "intervals.h"
 #include "character.h"
@@ -1446,8 +1447,7 @@ openp (Lisp_Object path, Lisp_Object str, Lisp_Object suffixes,
 
     /* Copy FILENAME's data to FN but remove starting /: if any.  */
     prefixlen = ((SCHARS (filename) > 2
-		  && SREF (filename, 0) == '/'
-		  && SREF (filename, 1) == ':')
+		  && guile_path_starts_with (filename, "/:"))
 		 ? 2 : 0);
     baselen = SBYTES (filename) - prefixlen;
     memcpy (fn, SDATA (filename) + prefixlen, baselen);
@@ -5927,7 +5927,7 @@ it defaults to the value of `obarray'.  */)
   sym = scm_intern (string, obhash (obarray));
 
   if (scm_c_string_length (string)
-      && (SREF (string, 0) == ':') && EQ (obarray, initial_obarray))
+      && guile_string_starts_with_char (string, ':') && EQ (obarray, initial_obarray))
     {
       SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);

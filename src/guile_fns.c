@@ -62,6 +62,24 @@ static SCM scm_string_ends_with_char = SCM_BOOL_F;
 static SCM scm_string_whitespace_only = SCM_BOOL_F;
 static SCM scm_valid_identifier = SCM_BOOL_F;
 
+/* File extension and type checking function references */
+static SCM scm_source_code_file = SCM_BOOL_F;
+static SCM scm_image_file = SCM_BOOL_F;
+static SCM scm_config_file = SCM_BOOL_F;
+static SCM scm_extract_file_extension = SCM_BOOL_F;
+
+/* Font and color validation function references */
+static SCM scm_hex_color_string = SCM_BOOL_F;
+static SCM scm_rgb_color_string = SCM_BOOL_F;
+static SCM scm_named_color = SCM_BOOL_F;
+static SCM scm_valid_xlfd_font_name = SCM_BOOL_F;
+static SCM scm_font_family_name = SCM_BOOL_F;
+
+/* Network and URL validation function references */
+static SCM scm_url_string = SCM_BOOL_F;
+static SCM scm_email_address = SCM_BOOL_F;
+static SCM scm_ip_address = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -274,6 +292,61 @@ init_guile_fns (void)
   if (scm_is_false (scm_valid_identifier))
     scm_valid_identifier = scm_c_lookup ("valid-identifier?");
 
+  /* Initialize file extension and type checking functions */
+  scm_has_file_extension = scm_c_module_lookup (elisp_emacs_module, "has-file-extension?");
+  if (scm_is_false (scm_has_file_extension))
+    scm_has_file_extension = scm_c_lookup ("has-file-extension?");
+
+  scm_source_code_file = scm_c_module_lookup (elisp_emacs_module, "source-code-file?");
+  if (scm_is_false (scm_source_code_file))
+    scm_source_code_file = scm_c_lookup ("source-code-file?");
+
+  scm_image_file = scm_c_module_lookup (elisp_emacs_module, "image-file?");
+  if (scm_is_false (scm_image_file))
+    scm_image_file = scm_c_lookup ("image-file?");
+
+  scm_config_file = scm_c_module_lookup (elisp_emacs_module, "config-file?");
+  if (scm_is_false (scm_config_file))
+    scm_config_file = scm_c_lookup ("config-file?");
+
+  scm_extract_file_extension = scm_c_module_lookup (elisp_emacs_module, "extract-file-extension");
+  if (scm_is_false (scm_extract_file_extension))
+    scm_extract_file_extension = scm_c_lookup ("extract-file-extension");
+
+  /* Initialize font and color validation functions */
+  scm_hex_color_string = scm_c_module_lookup (elisp_emacs_module, "hex-color-string?");
+  if (scm_is_false (scm_hex_color_string))
+    scm_hex_color_string = scm_c_lookup ("hex-color-string?");
+
+  scm_rgb_color_string = scm_c_module_lookup (elisp_emacs_module, "rgb-color-string?");
+  if (scm_is_false (scm_rgb_color_string))
+    scm_rgb_color_string = scm_c_lookup ("rgb-color-string?");
+
+  scm_named_color = scm_c_module_lookup (elisp_emacs_module, "named-color?");
+  if (scm_is_false (scm_named_color))
+    scm_named_color = scm_c_lookup ("named-color?");
+
+  scm_valid_xlfd_font_name = scm_c_module_lookup (elisp_emacs_module, "valid-xlfd-font-name?");
+  if (scm_is_false (scm_valid_xlfd_font_name))
+    scm_valid_xlfd_font_name = scm_c_lookup ("valid-xlfd-font-name?");
+
+  scm_font_family_name = scm_c_module_lookup (elisp_emacs_module, "font-family-name?");
+  if (scm_is_false (scm_font_family_name))
+    scm_font_family_name = scm_c_lookup ("font-family-name?");
+
+  /* Initialize network and URL validation functions */
+  scm_url_string = scm_c_module_lookup (elisp_emacs_module, "url-string?");
+  if (scm_is_false (scm_url_string))
+    scm_url_string = scm_c_lookup ("url-string?");
+
+  scm_email_address = scm_c_module_lookup (elisp_emacs_module, "email-address?");
+  if (scm_is_false (scm_email_address))
+    scm_email_address = scm_c_lookup ("email-address?");
+
+  scm_ip_address = scm_c_module_lookup (elisp_emacs_module, "ip-address?");
+  if (scm_is_false (scm_ip_address))
+    scm_ip_address = scm_c_lookup ("ip-address?");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -331,6 +404,25 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_string_ends_with_char);
   scm_gc_protect_object (scm_string_whitespace_only);
   scm_gc_protect_object (scm_valid_identifier);
+
+  /* Protect file extension and type checking functions from GC */
+  scm_gc_protect_object (scm_has_file_extension);
+  scm_gc_protect_object (scm_source_code_file);
+  scm_gc_protect_object (scm_image_file);
+  scm_gc_protect_object (scm_config_file);
+  scm_gc_protect_object (scm_extract_file_extension);
+
+  /* Protect font and color validation functions from GC */
+  scm_gc_protect_object (scm_hex_color_string);
+  scm_gc_protect_object (scm_rgb_color_string);
+  scm_gc_protect_object (scm_named_color);
+  scm_gc_protect_object (scm_valid_xlfd_font_name);
+  scm_gc_protect_object (scm_font_family_name);
+
+  /* Protect network and URL validation functions from GC */
+  scm_gc_protect_object (scm_url_string);
+  scm_gc_protect_object (scm_email_address);
+  scm_gc_protect_object (scm_ip_address);
 }
 
 /* Lookup a color by name in a color map */
@@ -1077,7 +1169,12 @@ guile_path_starts_with (Lisp_Object path, const char *prefix)
   if (!STRINGP (path))
     return false;
 
-  SCM result = scm_call_2 (scm_path_starts_with,
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_path_starts_with);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_2 (function,
                            scm_from_utf8_string (SSDATA (path)),
                            scm_from_utf8_string (prefix));
 
@@ -1229,7 +1326,406 @@ guile_string_starts_with_char (Lisp_Object str, int character)
 
   SCM result = scm_call_2 (function,
                            scm_from_utf8_string (SSDATA (str)),
-                           scm_from_char (character));
+                           scm_from_int (character));
+
+  return scm_is_true (result);
+}
+
+/* File extension and type checking bridge functions */
+
+/* Check if filename has specific extension */
+bool
+guile_has_file_extension_new (Lisp_Object filename, const char *extension)
+{
+  if (!scm_is_true (scm_has_file_extension))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_has_file_extension);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_2 (function,
+                           scm_from_utf8_string (SSDATA (filename)),
+                           scm_from_utf8_string (extension));
+
+  return scm_is_true (result);
+}
+
+/* Check if filename is a source code file */
+bool
+guile_source_code_file (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_source_code_file))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_source_code_file);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  return scm_is_true (result);
+}
+
+/* Check if filename is an image file */
+bool
+guile_image_file (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_image_file))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_image_file);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  return scm_is_true (result);
+}
+
+/* Font and color validation bridge functions */
+
+/* Check if string looks like a hex color */
+bool
+guile_hex_color_string (Lisp_Object str)
+{
+  if (!scm_is_true (scm_hex_color_string))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_hex_color_string);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string is a named color */
+bool
+guile_named_color (Lisp_Object color_name)
+{
+  if (!scm_is_true (scm_named_color))
+    return false;
+
+  if (!STRINGP (color_name))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_named_color);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (color_name)));
+
+  return scm_is_true (result);
+}
+
+/* Validate XLFD font name format */
+bool
+guile_valid_xlfd_font_name_new (Lisp_Object font_name)
+{
+  if (!scm_is_true (scm_valid_xlfd_font_name))
+    return false;
+
+  if (!STRINGP (font_name))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_valid_xlfd_font_name);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (font_name)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string looks like a font family name */
+bool
+guile_font_family_name (Lisp_Object name)
+{
+  if (!scm_is_true (scm_font_family_name))
+    return false;
+
+  if (!STRINGP (name))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_font_family_name);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (name)));
+
+  return scm_is_true (result);
+}
+
+/* Network and URL validation bridge functions */
+
+/* Check if string looks like a URL */
+bool
+guile_url_string (Lisp_Object str)
+{
+  if (!scm_is_true (scm_url_string))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_url_string);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Additional missing bridge functions */
+
+/* Check if string is an email address */
+bool
+guile_email_address (Lisp_Object addr_str)
+{
+  if (!scm_is_true (scm_email_address))
+    return false;
+
+  if (!STRINGP (addr_str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_email_address);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (addr_str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string is an IP address */
+bool
+guile_ip_address (Lisp_Object addr_str)
+{
+  if (!scm_is_true (scm_ip_address))
+    return false;
+
+  if (!STRINGP (addr_str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_ip_address);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (addr_str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if filename is a config file */
+bool
+guile_config_file (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_config_file))
+    return false;
+
+  if (!STRINGP (filename))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_config_file);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  return scm_is_true (result);
+}
+
+/* Extract file extension from filename */
+Lisp_Object
+guile_extract_file_extension (Lisp_Object filename)
+{
+  if (!scm_is_true (scm_extract_file_extension))
+    return build_string (""); /* Return empty string if Scheme not available */
+
+  if (!STRINGP (filename))
+    return build_string ("");
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_extract_file_extension);
+  if (scm_is_false (function))
+    return build_string ("");
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (filename)));
+
+  if (scm_is_string (result))
+    {
+      char *c_str = scm_to_utf8_string (result);
+      Lisp_Object lisp_str = make_string_from_utf8 (c_str, strlen (c_str));
+      free (c_str);
+      return lisp_str;
+    }
+
+  return build_string ("");
+}
+
+/* Check if string is an RGB color string */
+bool
+guile_rgb_color_string (Lisp_Object str)
+{
+  if (!scm_is_true (scm_rgb_color_string))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_rgb_color_string);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Additional string validation functions */
+
+/* Check if string needs escaping */
+bool
+guile_string_needs_escaping (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_needs_escaping))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_needs_escaping);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if strings are equal ignoring case */
+bool
+guile_string_equal_ignore_case (Lisp_Object str1, Lisp_Object str2)
+{
+  if (!scm_is_true (scm_string_equal_ignore_case))
+    return false;
+
+  if (!STRINGP (str1) || !STRINGP (str2))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_equal_ignore_case);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_2 (function,
+                           scm_from_utf8_string (SSDATA (str1)),
+                           scm_from_utf8_string (SSDATA (str2)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string ends with specific character */
+bool
+guile_string_ends_with_char (Lisp_Object str, int character)
+{
+  if (!scm_is_true (scm_string_ends_with_char))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_ends_with_char);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_2 (function,
+                           scm_from_utf8_string (SSDATA (str)),
+                           scm_from_int (character));
+
+  return scm_is_true (result);
+}
+
+/* Check if string contains only whitespace */
+bool
+guile_string_whitespace_only (Lisp_Object str)
+{
+  if (!scm_is_true (scm_string_whitespace_only))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_string_whitespace_only);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
+
+  return scm_is_true (result);
+}
+
+/* Check if string is a valid identifier */
+bool
+guile_valid_identifier (Lisp_Object str)
+{
+  if (!scm_is_true (scm_valid_identifier))
+    return false;
+
+  if (!STRINGP (str))
+    return false;
+
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_valid_identifier);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
+                           scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
 }

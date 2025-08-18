@@ -30,6 +30,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "termhooks.h"
 #include "macros.h"
 #include "keyboard.h"
+#include "guile_fns.h"
 #include "window.h"
 #include "commands.h"
 #include "character.h"
@@ -7753,7 +7754,7 @@ parse_solitary_modifier (Lisp_Object symbol)
   switch (SREF (name, 0))
     {
 #define SINGLE_LETTER_MOD(BIT)				\
-      if (SBYTES (name) == 1)				\
+      if (guile_string_single_char (name))			\
 	return BIT;
 
 #define MULTI_LETTER_MOD(BIT, NAME, LEN)		\

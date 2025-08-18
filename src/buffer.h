@@ -26,6 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "character.h"
 #include "lisp.h"
 #include "itree.h"
+#include "guile_fns.h"
 
 INLINE_HEADER_BEGIN
 
@@ -1114,7 +1115,7 @@ BUFFER_LIVE_P (struct buffer *b)
 INLINE bool
 BUFFER_HIDDEN_P (struct buffer *b)
 {
-  return SREF (BVAR (b, name), 0) == ' ';
+  return guile_string_starts_with_space (BVAR (b, name));
 }
 
 /* Verify indirection counters.  */

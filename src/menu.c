@@ -22,6 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <limits.h> /* for INT_MAX */
 
 #include "lisp.h"
+#include "guile_fns.h"
 #include "character.h"
 #include "coding.h"
 #include "dispextern.h"
@@ -327,7 +328,7 @@ single_menu_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy, void *sk
   enabled = AREF (item_properties, ITEM_PROPERTY_ENABLE);
   item_string = AREF (item_properties, ITEM_PROPERTY_NAME);
 
-  if (!NILP (map) && SREF (item_string, 0) == '@')
+  if (!NILP (map) && guile_string_starts_with_char (item_string, '@'))
     {
       if (!NILP (enabled))
 	/* An enabled separate pane. Remember this to handle it later.  */
