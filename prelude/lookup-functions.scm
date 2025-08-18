@@ -852,3 +852,23 @@ Returns #t if IP-like format, #f otherwise."
                             (and num (>= num 0) (<= num 255)))))
                    (loop (cdr parts)))
                   (else #f)))))))
+
+;; Registry to script mapping lookup for font handling
+;; Looks up a registry string in the ns_reg_to_script mapping
+(define (lookup-registry-to-script reg-to-script-alist registry-str)
+  "Look up REGISTRY-STR in REG-TO-SCRIPT-ALIST to find matching script.
+The alist contains (registry-pattern . script-symbol) pairs.
+Returns the script symbol if found, #f otherwise.
+Matches if registry string starts with the pattern."
+  (let loop ((alist reg-to-script-alist))
+    (cond
+      ((null? alist) #f)
+      ((and (pair? (car alist))
+            (string? (caar alist))
+            (string? registry-str)
+            ;; Check if registry-str starts with the pattern (like strncmp)
+            (>= (string-length registry-str) (string-length (caar alist)))
+            (string=? (caar alist)
+                     (substring registry-str 0 (string-length (caar alist)))))
+       (cdar alist))  ; return script symbol
+      (else (loop (cdr alist))))))

@@ -939,7 +939,11 @@ Allows any number of arguments, including zero."
   ;; Export network and URL validation functions to elisp emacs module
   (module-define! elisp-emacs-module 'url-string? url-string?)
   (module-define! elisp-emacs-module 'email-address? email-address?)
-  (module-define! elisp-emacs-module 'ip-address? ip-address?))
+  (module-define! elisp-emacs-module 'ip-address? ip-address?)
+
+  ;; Export registry to script mapping function to both modules
+  (module-define! global-module 'lookup-registry-to-script lookup-registry-to-script)
+  (module-define! elisp-emacs-module 'lookup-registry-to-script lookup-registry-to-script))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

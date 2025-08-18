@@ -182,4 +182,7 @@ extern bool guile_font_family_name (Lisp_Object name);
 /* Check if string looks like a URL */
 extern bool guile_url_string (Lisp_Object str);
 
+/* Registry to script mapping lookup */
+extern Lisp_Object guile_lookup_registry_to_script (Lisp_Object reg_to_script_alist, const char *registry_str);
+
 #endif /* GUILE_LOOKUPS_H */

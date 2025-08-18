@@ -36,6 +36,7 @@ Author: Adrian Robert (arobert@cogsci.ucsd.edu)
 #include "character.h"
 #include "font.h"
 #include "termchar.h"
+#include "guile_fns.h"
 
 #import <Foundation/NSException.h>
 #import <AppKit/NSFontDescriptor.h>
@@ -609,18 +610,13 @@ static NSString
 static NSString
 *ns_registry_to_script (char *reg)
 {
-    Lisp_Object script, r, rts = Vns_reg_to_script;
-    while (CONSP (rts))
-      {
-        r = XCAR (XCAR (rts));
-        if (!strncmp (SSDATA (r), reg, SBYTES (r)))
-          {
-            script = XCDR (XCAR (rts));
-            return [NSString stringWithLispString: SYMBOL_NAME (script)];
-          }
-        rts = XCDR (rts);
-      }
-    return  @"";
+    /* Use Scheme-based lookup to replace SSDATA usage */
+    Lisp_Object script = guile_lookup_registry_to_script (Vns_reg_to_script, reg);
+
+    if (!NILP (script) && SYMBOLP (script))
+      return [NSString stringWithLispString: SYMBOL_NAME (script)];
+
+    return @"";
 }
 
 

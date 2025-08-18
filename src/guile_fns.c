@@ -80,6 +80,9 @@ static SCM scm_url_string = SCM_BOOL_F;
 static SCM scm_email_address = SCM_BOOL_F;
 static SCM scm_ip_address = SCM_BOOL_F;
 
+/* Registry to script mapping function reference */
+static SCM scm_lookup_registry_to_script = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -347,6 +350,11 @@ init_guile_fns (void)
   if (scm_is_false (scm_ip_address))
     scm_ip_address = scm_c_lookup ("ip-address?");
 
+  /* Initialize registry to script mapping function */
+  scm_lookup_registry_to_script = scm_c_module_lookup (elisp_emacs_module, "lookup-registry-to-script");
+  if (scm_is_false (scm_lookup_registry_to_script))
+    scm_lookup_registry_to_script = scm_c_lookup ("lookup-registry-to-script");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -423,6 +431,9 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_url_string);
   scm_gc_protect_object (scm_email_address);
   scm_gc_protect_object (scm_ip_address);
+
+  /* Protect registry to script mapping function from GC */
+  scm_gc_protect_object (scm_lookup_registry_to_script);
 }
 
 /* Lookup a color by name in a color map */
@@ -1728,4 +1739,21 @@ guile_valid_identifier (Lisp_Object str)
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
+}
+
+/* Registry to script mapping lookup */
+Lisp_Object
+guile_lookup_registry_to_script (Lisp_Object reg_to_script_alist, const char *registry_str)
+{
+  if (!scm_is_true (scm_lookup_registry_to_script))
+    return Qnil;
+
+  SCM result = scm_call_2 (scm_lookup_registry_to_script,
+                           reg_to_script_alist,
+                           scm_from_utf8_string (registry_str));
+
+  if (scm_is_false (result))
+    return Qnil;
+
+  return result;
 }
