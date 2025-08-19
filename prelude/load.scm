@@ -969,7 +969,15 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'string-concat-3 string-concat-3)
   (module-define! elisp-emacs-module 'string-concat-3 string-concat-3)
   (module-define! global-module 'string-concat-multi string-concat-multi)
-  (module-define! elisp-emacs-module 'string-concat-multi string-concat-multi))
+  (module-define! elisp-emacs-module 'string-concat-multi string-concat-multi)
+
+  ;; Export integer parsing functions to both modules
+  (module-define! global-module 'parse-integer-string parse-integer-string)
+  (module-define! elisp-emacs-module 'parse-integer-string parse-integer-string)
+  (module-define! global-module 'read-integer-guile read-integer-guile)
+  (module-define! elisp-emacs-module 'read-integer-guile read-integer-guile)
+  (module-define! global-module 'parse-emacs-number parse-emacs-number)
+  (module-define! elisp-emacs-module 'parse-emacs-number parse-emacs-number))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

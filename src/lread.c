@@ -3469,51 +3469,9 @@ invalid_radix_integer (EMACS_INT radix, Lisp_Object readcharfun)
 static Lisp_Object
 read_integer (Lisp_Object readcharfun, int radix)
 {
-  /* Phase 7+: Use Guile reader for string-based integer parsing when enabled */
-  if (use_guile_reader_for_strings && use_guile_reader_aggressive && STRINGP (readcharfun))
-    {
-      /* For string input, let Guile handle the parsing completely.
-         We need to read the remaining characters and let Guile parse
-         the complete number including the radix prefix */
+  /* Phase 8D: Use our enhanced Guile integer parsing functions */
 
-      /* We've already read the radix prefix, so we need to reconstruct the full number */
-      char radix_prefix[4] = "";
-      if (radix == 16) strcpy(radix_prefix, "#x");
-      else if (radix == 8) strcpy(radix_prefix, "#o");
-      else if (radix == 2) strcpy(radix_prefix, "#b");
-
-      /* Read the remaining numeric characters */
-      char stackbuf[64];
-      char *read_buffer = stackbuf;
-      char *p = read_buffer;
-      int c;
-
-      /* Add radix prefix if needed */
-      if (strlen(radix_prefix) > 0)
-        {
-          strcpy(p, radix_prefix);
-          p += strlen(radix_prefix);
-        }
-
-      /* Read digits */
-      while ((c = READCHAR) >= 0 && (c_isalnum(c) || c == '+' || c == '-'))
-        {
-          *p++ = c;
-          if (p >= read_buffer + sizeof(stackbuf) - 1) break;
-        }
-
-      if (c >= 0) UNREAD(c);
-      *p = '\0';
-
-      /* Use Guile to parse the number */
-      SCM port = scm_open_input_string (scm_from_utf8_string (read_buffer));
-      SCM result = scm_read (port);
-
-      if (scm_is_number (result))
-        return guile_to_lisp_object (result);
-    }
-
-  char stackbuf[20];
+  char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
   char *p = read_buffer;
@@ -3521,6 +3479,23 @@ read_integer (Lisp_Object readcharfun, int radix)
   int valid = -1; /* 1 if valid, 0 if not, -1 if incomplete.  */
 
   dynwind_begin();
+
+  /* Add radix prefix for better Guile compatibility */
+  if (radix == 16)
+    {
+      *p++ = '#';
+      *p++ = 'x';
+    }
+  else if (radix == 8)
+    {
+      *p++ = '#';
+      *p++ = 'o';
+    }
+  else if (radix == 2)
+    {
+      *p++ = '#';
+      *p++ = 'b';
+    }
 
   int c = READCHAR;
   if (c == '-' || c == '+')
@@ -3565,6 +3540,17 @@ read_integer (Lisp_Object readcharfun, int radix)
     invalid_radix_integer (radix, readcharfun);
 
   *p = '\0';
+
+  /* Try Guile integer parsing first for enhanced functionality */
+  Lisp_Object str = build_string (read_buffer);
+  Lisp_Object guile_result = guile_parse_integer_string (str, radix);
+  if (!NILP (guile_result))
+    {
+      dynwind_end();
+      return guile_result;
+    }
+
+  /* Fallback to traditional parsing if Guile is not available */
   Lisp_Object tem = string_to_number (read_buffer, radix, NULL);
   dynwind_end();
   return tem;

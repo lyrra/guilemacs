@@ -202,4 +202,9 @@ extern Lisp_Object guile_string_concat_2 (Lisp_Object s1, Lisp_Object s2);
 extern Lisp_Object guile_string_concat_3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3);
 extern Lisp_Object guile_string_concat_multi (Lisp_Object string_list);
 
+/* Integer parsing operations */
+extern Lisp_Object guile_parse_integer_string (Lisp_Object str, int radix);
+extern Lisp_Object guile_read_integer_guile (Lisp_Object input_string);
+extern Lisp_Object guile_parse_emacs_number (Lisp_Object str);
+
 #endif /* GUILE_LOOKUPS_H */

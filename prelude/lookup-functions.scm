@@ -945,6 +945,79 @@ Returns #t if safe, #f if potentially dangerous."
                (string-suffix? "\\.." path-str)
                (string=? ".." path-str)))))
 
+;; Integer reading operations for SSDATA migration
+;; These functions replace complex C integer parsing in lread.c
+
+;; Parse integer from string with specified radix
+(define (parse-integer-string str radix)
+  "Parse integer from STR using RADIX.
+This replaces SSDATA usage in read_integer function.
+Handles all Emacs integer formats including prefixes.
+Returns parsed integer or #f if invalid."
+  (if (or (not (string? str))
+          (= (string-length str) 0))
+      #f
+      (catch #t
+        (lambda ()
+          (cond
+            ;; Handle prefixed numbers (Guile native format)
+            ((string-prefix? "#x" str) (string->number (substring str 2) 16))
+            ((string-prefix? "#X" str) (string->number (substring str 2) 16))
+            ((string-prefix? "#o" str) (string->number (substring str 2) 8))
+            ((string-prefix? "#O" str) (string->number (substring str 2) 8))
+            ((string-prefix? "#b" str) (string->number (substring str 2) 2))
+            ((string-prefix? "#B" str) (string->number (substring str 2) 2))
+            ;; Handle numbers with explicit radix
+            ((and radix (> radix 1) (<= radix 36))
+             (string->number str radix))
+            ;; Default decimal parsing
+            (else (string->number str 10))))
+        (lambda (key . args) #f))))
+
+;; Read integer using native Guile reader
+(define (read-integer-guile input-string)
+  "Read integer from INPUT-STRING using Guile's native reader.
+This completely replaces C integer parsing logic.
+Returns the parsed Lisp object or #f if parsing fails."
+  (if (or (not (string? input-string))
+          (= (string-length input-string) 0))
+      #f
+      (catch #t
+        (lambda ()
+          (let ((port (open-input-string input-string)))
+            (let ((result (read port)))
+              (close-port port)
+              ;; Ensure we got a number
+              (if (number? result)
+                  result
+                  #f))))
+        (lambda (key . args) #f))))
+
+;; Complete number parsing with all Emacs features
+(define (parse-emacs-number str)
+  "Parse number from STR with full Emacs compatibility.
+Handles integers, floats, rationals, and all radix formats.
+This provides complete replacement for C number parsing."
+  (if (or (not (string? str))
+          (= (string-length str) 0))
+      #f
+      (catch #t
+        (lambda ()
+          ;; Use Guile's read to parse the complete number
+          (let ((port (open-input-string str)))
+            (let ((result (read port)))
+              (close-port port)
+              ;; Convert complex Guile numbers to Emacs-compatible format
+              (cond
+                ((and (number? result) (exact? result) (integer? result))
+                 result)  ; Integer - direct conversion
+                ((and (number? result) (inexact? result))
+                 result)  ; Float - direct conversion
+                ((rational? result)
+                 (exact->inexact result))  ; Convert rational to float
+                (else #f)))))  ; Not a valid number
+        (lambda (key . args) #f))))
+
 ;; String concatenation operations for SSDATA migration
 ;; These functions replace SSDATA usage in concat family functions
 

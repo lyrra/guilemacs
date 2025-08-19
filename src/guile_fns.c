@@ -100,6 +100,11 @@ static SCM scm_string_concat_2 = SCM_BOOL_F;
 static SCM scm_string_concat_3 = SCM_BOOL_F;
 static SCM scm_string_concat_multi = SCM_BOOL_F;
 
+/* Integer parsing function references */
+static SCM scm_parse_integer_string = SCM_BOOL_F;
+static SCM scm_read_integer_guile = SCM_BOOL_F;
+static SCM scm_parse_emacs_number = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -412,6 +417,19 @@ init_guile_fns (void)
   if (scm_is_false (scm_string_concat_multi))
     scm_string_concat_multi = scm_c_lookup ("string-concat-multi");
 
+  /* Initialize integer parsing functions */
+  scm_parse_integer_string = scm_c_module_lookup (elisp_emacs_module, "parse-integer-string");
+  if (scm_is_false (scm_parse_integer_string))
+    scm_parse_integer_string = scm_c_lookup ("parse-integer-string");
+
+  scm_read_integer_guile = scm_c_module_lookup (elisp_emacs_module, "read-integer-guile");
+  if (scm_is_false (scm_read_integer_guile))
+    scm_read_integer_guile = scm_c_lookup ("read-integer-guile");
+
+  scm_parse_emacs_number = scm_c_module_lookup (elisp_emacs_module, "parse-emacs-number");
+  if (scm_is_false (scm_parse_emacs_number))
+    scm_parse_emacs_number = scm_c_lookup ("parse-emacs-number");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -508,6 +526,11 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_string_concat_2);
   scm_gc_protect_object (scm_string_concat_3);
   scm_gc_protect_object (scm_string_concat_multi);
+
+  /* Protect integer parsing functions from GC */
+  scm_gc_protect_object (scm_parse_integer_string);
+  scm_gc_protect_object (scm_read_integer_guile);
+  scm_gc_protect_object (scm_parse_emacs_number);
 }
 
 /* Lookup a color by name in a color map */
@@ -2022,6 +2045,77 @@ guile_string_concat_multi (Lisp_Object string_list)
 
   if (scm_is_false (result))
     return build_string ("");
+
+  return result;
+}
+
+/* Integer parsing operations using Scheme implementations */
+
+/* Parse integer from string with radix */
+Lisp_Object
+guile_parse_integer_string (Lisp_Object str, int radix)
+{
+  if (!scm_is_true (scm_parse_integer_string))
+    return Qnil;
+
+  if (!STRINGP (str))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_parse_integer_string);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_2 (function, str, scm_from_int (radix));
+
+  if (scm_is_false (result))
+    return Qnil;
+
+  return result;
+}
+
+/* Read integer using Guile native reader */
+Lisp_Object
+guile_read_integer_guile (Lisp_Object input_string)
+{
+  if (!scm_is_true (scm_read_integer_guile))
+    return Qnil;
+
+  if (!STRINGP (input_string))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_read_integer_guile);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function, input_string);
+
+  if (scm_is_false (result))
+    return Qnil;
+
+  return result;
+}
+
+/* Parse Emacs number format (complete number parsing) */
+Lisp_Object
+guile_parse_emacs_number (Lisp_Object str)
+{
+  if (!scm_is_true (scm_parse_emacs_number))
+    return Qnil;
+
+  if (!STRINGP (str))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_parse_emacs_number);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function, str);
+
+  if (scm_is_false (result))
+    return Qnil;
 
   return result;
 }
