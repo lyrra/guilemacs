@@ -873,6 +873,33 @@ Matches if registry string starts with the pattern."
        (cdar alist))  ; return script symbol
       (else (loop (cdr alist))))))
 
+;; String operations without properties for SSDATA migration
+;; Pure substring operation that replaces SSDATA usage in substring-no-properties
+(define (substring-no-properties-scheme str start end)
+  "Extract substring from STR between START and END indices.
+This is a pure Scheme implementation that replaces SSDATA usage.
+Returns the substring without any text properties.
+Handles negative indices and boundary conditions."
+  (if (or (not (string? str))
+          (= (string-length str) 0))
+      ""
+      (let* ((len (string-length str))
+             ;; Handle negative indices and defaults
+             (actual-start (cond
+                            ((not start) 0)
+                            ((< start 0) (max 0 (+ len start)))
+                            (else (min start len))))
+             (actual-end (cond
+                          ((not end) len)
+                          ((< end 0) (max 0 (+ len end)))
+                          (else (min end len))))
+             ;; Ensure start <= end
+             (final-start (min actual-start actual-end))
+             (final-end (max actual-start actual-end)))
+        (if (>= final-start final-end)
+            ""
+            (substring str final-start final-end)))))
+
 ;; Font name parsing for size extraction
 ;; Parses font names like "Foobar-123" to extract family and size
 (define (parse-font-name-with-size font-name-str current-size)

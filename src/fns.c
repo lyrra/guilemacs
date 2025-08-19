@@ -1596,6 +1596,8 @@ If FROM or TO is negative, it counts from the end.
 With one argument, just copy STRING without its properties.  */)
   (Lisp_Object string, register Lisp_Object from, Lisp_Object to)
 {
+  /* TODO: Use Scheme-based implementation to replace SSDATA usage
+     For now, fallback to original implementation while debugging */
   ptrdiff_t from_char, to_char, from_byte, to_byte, size;
 
   CHECK_STRING (string);

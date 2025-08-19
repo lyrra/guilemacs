@@ -188,4 +188,7 @@ extern Lisp_Object guile_lookup_registry_to_script (Lisp_Object reg_to_script_al
 /* Font name parsing for size extraction */
 extern Lisp_Object guile_parse_font_name_with_size (Lisp_Object font_name, double current_size);
 
+/* String operations without properties */
+extern Lisp_Object guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Object end);
+
 #endif /* GUILE_LOOKUPS_H */

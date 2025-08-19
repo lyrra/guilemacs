@@ -86,6 +86,9 @@ static SCM scm_lookup_registry_to_script = SCM_BOOL_F;
 /* Font name parsing function reference */
 static SCM scm_parse_font_name_with_size = SCM_BOOL_F;
 
+/* String operations without properties function reference */
+static SCM scm_substring_no_properties_scheme = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -363,6 +366,11 @@ init_guile_fns (void)
   if (scm_is_false (scm_parse_font_name_with_size))
     scm_parse_font_name_with_size = scm_c_lookup ("parse-font-name-with-size");
 
+  /* Initialize string operations function */
+  scm_substring_no_properties_scheme = scm_c_module_lookup (elisp_emacs_module, "substring-no-properties-scheme");
+  if (scm_is_false (scm_substring_no_properties_scheme))
+    scm_substring_no_properties_scheme = scm_c_lookup ("substring-no-properties-scheme");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -445,6 +453,9 @@ init_guile_fns (void)
 
   /* Protect font name parsing function from GC */
   scm_gc_protect_object (scm_parse_font_name_with_size);
+
+  /* Protect string operations function from GC */
+  scm_gc_protect_object (scm_substring_no_properties_scheme);
 }
 
 /* Lookup a color by name in a color map */
@@ -1787,6 +1798,30 @@ guile_parse_font_name_with_size (Lisp_Object font_name, double current_size)
 
   if (scm_is_false (result))
     return Qnil;
+
+  return result;
+}
+
+/* String operations without properties using Scheme */
+Lisp_Object
+guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Object end)
+{
+  if (!scm_is_true (scm_substring_no_properties_scheme))
+    return Qnil;
+
+  if (!STRINGP (string))
+    return Qnil;
+
+  SCM start_scm = NILP (start) ? SCM_BOOL_F : scm_from_int (XFIXNUM (start));
+  SCM end_scm = NILP (end) ? SCM_BOOL_F : scm_from_int (XFIXNUM (end));
+
+  SCM result = scm_call_3 (scm_variable_ref (scm_substring_no_properties_scheme),
+                           string,  /* string is already a Scheme object */
+                           start_scm,
+                           end_scm);
+
+  if (scm_is_false (result))
+    return build_string ("");
 
   return result;
 }
