@@ -3380,10 +3380,50 @@ fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_
         }
       else
         {
-          /* For regular symbols, just return the Guile symbol directly.
-             In the pure Guile approach, symbols are already properly interned by Guile's reader.
-             This maintains compatibility while using Guile's native symbol handling. */
-          return result;
+          /* Check if this is a special reader macro symbol that needs identity mapping */
+          SCM name_scm = scm_symbol_to_string (result);
+          char *name_str = scm_to_utf8_string (name_scm);
+
+          /* Map reader macro symbols to their correct Emacs counterparts */
+          if (strcmp (name_str, "`") == 0 || strcmp (name_str, "\\`") == 0)
+            {
+              /* Backquote symbol - use the existing Qbackquote symbol */
+              /* Both ` and \` should map to the same symbol for pcase consistency */
+              free (name_str);
+              return Qbackquote;
+            }
+          else if (strcmp (name_str, ",") == 0 || strcmp (name_str, "\\,") == 0)
+            {
+              /* Unquote symbol - use the existing Qcomma symbol */
+              /* Both , and \, should map to the same symbol */
+              free (name_str);
+              return Qcomma;
+            }
+          else if (strcmp (name_str, ",@") == 0 || strcmp (name_str, "\\,@") == 0)
+            {
+              /* Unquote-splicing symbol - use the existing Qcomma_at symbol */
+              /* Both ,@ and \,@ should map to the same symbol */
+              free (name_str);
+              return Qcomma_at;
+            }
+          else if (strcmp (name_str, "nil") == 0)
+            {
+              /* Map nil symbol to the canonical Qnil for proper identity */
+              free (name_str);
+              return Qnil;
+            }
+          else if (strcmp (name_str, "t") == 0)
+            {
+              /* Map t symbol to the canonical Qt for proper identity */
+              free (name_str);
+              return Qt;
+            }
+          else
+            {
+              /* For regular symbols, return the Guile symbol directly */
+              free (name_str);
+              return result;
+            }
         }
     }
   else if (scm_is_number (result))
