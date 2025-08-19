@@ -2378,7 +2378,17 @@ guile_to_lisp_object (SCM obj)
   else if (scm_is_string (obj))
     return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
   else if (scm_is_symbol (obj))
-    return obj; /* Symbols should work directly */
+    {
+      /* Enhanced UTF-8 symbol handling for Phase 8
+         Convert Guile symbols to Emacs symbols with proper UTF-8 support */
+      SCM symbol_str = scm_symbol_to_string (obj);
+      char *symbol_name = scm_to_utf8_string (symbol_str);
+
+      /* Create Emacs symbol from UTF-8 string */
+      Lisp_Object result = Fintern (build_string (symbol_name), Qnil);
+      free (symbol_name);
+      return result;
+    }
   else if (scm_is_keyword (obj))
     {
       /* Convert Guile keywords to Elisp symbols with : prefix */
@@ -2444,8 +2454,13 @@ scm_read() for parsing instead of the C reader.  */)
       substring = Fsubstring (string, start, end);
     }
 
-  /* Use Guile to read from string */
+  /* Use Guile to read from string with enhanced UTF-8 handling */
   SCM port = scm_open_input_string (substring);
+
+  /* Phase 8: Try to ensure proper UTF-8 encoding for the port */
+  /* Set port encoding to UTF-8 explicitly to handle UTF-8 symbols correctly */
+  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
+
   SCM result = scm_read (port);
 
   /* Calculate final string index */
@@ -2574,6 +2589,8 @@ proper error handling and accurate position tracking.  */)
 
   /* Use Guile to read from string with error handling */
   SCM port = scm_open_input_string (guile_syntax);
+  /* Phase 8: Set UTF-8 encoding for proper symbol handling */
+  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
 
   /* Track position before reading */
   SCM initial_pos = scm_ftell (port);
@@ -2625,6 +2642,8 @@ START and END optionally delimit a substring of STRING from which to read.  */)
 
   /* Create Guile port */
   SCM port = scm_open_input_string (substring);
+  /* Phase 8: Set UTF-8 encoding for proper symbol handling */
+  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
 
   /* Read all expressions until EOF */
   Lisp_Object result_list = Qnil;
@@ -4179,6 +4198,8 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
     {
       /* Create Guile port from string */
       SCM port = scm_open_input_string (readcharfun);
+      /* Phase 8: Set UTF-8 encoding for proper symbol handling */
+      scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
 
       /* Read with comprehensive error handling */
       SCM result = scm_c_catch (SCM_BOOL_T,
