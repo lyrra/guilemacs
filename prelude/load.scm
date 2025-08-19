@@ -951,7 +951,17 @@ Allows any number of arguments, including zero."
 
   ;; Export substring-no-properties function to both modules
   (module-define! global-module 'substring-no-properties-scheme substring-no-properties-scheme)
-  (module-define! elisp-emacs-module 'substring-no-properties-scheme substring-no-properties-scheme))
+  (module-define! elisp-emacs-module 'substring-no-properties-scheme substring-no-properties-scheme)
+
+  ;; Export file path operation functions to both modules
+  (module-define! global-module 'file-path-absolute-p file-path-absolute-p)
+  (module-define! elisp-emacs-module 'file-path-absolute-p file-path-absolute-p)
+  (module-define! global-module 'file-path-directory file-path-directory)
+  (module-define! elisp-emacs-module 'file-path-directory file-path-directory)
+  (module-define! global-module 'file-path-nondirectory file-path-nondirectory)
+  (module-define! elisp-emacs-module 'file-path-nondirectory file-path-nondirectory)
+  (module-define! global-module 'file-path-safe-p file-path-safe-p)
+  (module-define! elisp-emacs-module 'file-path-safe-p file-path-safe-p))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

@@ -479,6 +479,12 @@ Given a Unix syntax file name, returns a string ending in slash.  */)
 Lisp_Object
 file_name_directory (Lisp_Object filename)
 {
+  /* Try Scheme-based implementation first to replace SSDATA usage */
+  Lisp_Object scheme_result = guile_file_path_directory (filename);
+  if (!NILP (scheme_result) && STRINGP (scheme_result) && SCHARS (scheme_result) > 0)
+    return scheme_result;
+
+  /* Fallback to original C implementation for complex cases */
   char *beg = SSDATA (filename);
   char const *p = beg + SBYTES (filename);
 
@@ -576,6 +582,12 @@ or the entire name if it contains no slash.  */)
       error ("Invalid handler in `file-name-handler-alist'");
     }
 
+  /* Try Scheme-based implementation first to replace SSDATA usage */
+  Lisp_Object scheme_result = guile_file_path_nondirectory (filename);
+  if (!NILP (scheme_result) && STRINGP (scheme_result))
+    return scheme_result;
+
+  /* Fallback to original C implementation for complex cases */
   beg = SSDATA (filename);
   end = p = beg + SBYTES (filename);
 
@@ -2508,6 +2520,12 @@ where USER is a valid login name.  */)
   (Lisp_Object filename)
 {
   CHECK_STRING (filename);
+
+  /* Use Scheme-based implementation to replace SSDATA usage */
+  if (guile_file_path_absolute_p (filename))
+    return Qt;
+
+  /* Fallback to original implementation if Scheme version unavailable */
   return file_name_absolute_p (SSDATA (filename)) ? Qt : Qnil;
 }
 

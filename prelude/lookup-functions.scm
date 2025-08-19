@@ -873,6 +873,78 @@ Matches if registry string starts with the pattern."
        (cdar alist))  ; return script symbol
       (else (loop (cdr alist))))))
 
+;; File path operations for SSDATA migration
+;; These functions replace SSDATA usage in fileio.c
+
+;; Check if a file path is absolute
+(define (file-path-absolute-p path-str)
+  "Check if PATH-STR represents an absolute file path.
+This replaces SSDATA usage in file_name_absolute_p.
+Returns #t for absolute paths, #f for relative paths."
+  (if (or (not (string? path-str))
+          (= (string-length path-str) 0))
+      #f
+      (let ((first-char (string-ref path-str 0)))
+        (or (char=? first-char #\/)           ; Unix absolute path
+            (char=? first-char #\~)           ; Home directory
+            (and (> (string-length path-str) 2)  ; Windows drive letter
+                 (char-alphabetic? first-char)
+                 (char=? (string-ref path-str 1) #\:)
+                 (or (char=? (string-ref path-str 2) #\/)
+                     (char=? (string-ref path-str 2) #\\)))))))
+
+;; Extract directory component from file path
+(define (file-path-directory path-str)
+  "Extract directory component from PATH-STR.
+This replaces SSDATA usage in file_name_directory function.
+Returns directory path or empty string if no directory."
+  (if (or (not (string? path-str))
+          (= (string-length path-str) 0))
+      ""
+      (let ((last-sep -1))
+        ;; Find last directory separator
+        (do ((i (- (string-length path-str) 1) (- i 1)))
+            ((or (< i 0) (>= last-sep 0)))
+          (let ((c (string-ref path-str i)))
+            (when (or (char=? c #\/) (char=? c #\\))
+              (set! last-sep i))))
+        (if (< last-sep 0)
+            ""  ; No directory separator found
+            (substring path-str 0 (+ last-sep 1))))))
+
+;; Extract filename component from file path
+(define (file-path-nondirectory path-str)
+  "Extract filename component from PATH-STR.
+This replaces SSDATA usage in file_name_nondirectory function.
+Returns filename without directory path."
+  (if (or (not (string? path-str))
+          (= (string-length path-str) 0))
+      ""
+      (let ((last-sep -1))
+        ;; Find last directory separator
+        (do ((i (- (string-length path-str) 1) (- i 1)))
+            ((or (< i 0) (>= last-sep 0)))
+          (let ((c (string-ref path-str i)))
+            (when (or (char=? c #\/) (char=? c #\\))
+              (set! last-sep i))))
+        (if (< last-sep 0)
+            path-str  ; No separator, entire string is filename
+            (substring path-str (+ last-sep 1))))))
+
+;; Validate file path for safety (detect directory traversal, etc.)
+(define (file-path-safe-p path-str)
+  "Check if PATH-STR is safe from directory traversal attacks.
+This replaces SSDATA usage in file path validation.
+Returns #t if safe, #f if potentially dangerous."
+  (if (or (not (string? path-str))
+          (= (string-length path-str) 0))
+      #f
+      (not (or (string-contains path-str "../")
+               (string-contains path-str "..\\")
+               (string-suffix? "/.." path-str)
+               (string-suffix? "\\.." path-str)
+               (string=? ".." path-str)))))
+
 ;; String operations without properties for SSDATA migration
 ;; Pure substring operation that replaces SSDATA usage in substring-no-properties
 (define (substring-no-properties-scheme str start end)

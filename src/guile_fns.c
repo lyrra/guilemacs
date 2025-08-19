@@ -89,6 +89,12 @@ static SCM scm_parse_font_name_with_size = SCM_BOOL_F;
 /* String operations without properties function reference */
 static SCM scm_substring_no_properties_scheme = SCM_BOOL_F;
 
+/* File path operation function references */
+static SCM scm_file_path_absolute_p = SCM_BOOL_F;
+static SCM scm_file_path_directory = SCM_BOOL_F;
+static SCM scm_file_path_nondirectory = SCM_BOOL_F;
+static SCM scm_file_path_safe_p = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -371,6 +377,23 @@ init_guile_fns (void)
   if (scm_is_false (scm_substring_no_properties_scheme))
     scm_substring_no_properties_scheme = scm_c_lookup ("substring-no-properties-scheme");
 
+  /* Initialize file path operation functions */
+  scm_file_path_absolute_p = scm_c_module_lookup (elisp_emacs_module, "file-path-absolute-p");
+  if (scm_is_false (scm_file_path_absolute_p))
+    scm_file_path_absolute_p = scm_c_lookup ("file-path-absolute-p");
+
+  scm_file_path_directory = scm_c_module_lookup (elisp_emacs_module, "file-path-directory");
+  if (scm_is_false (scm_file_path_directory))
+    scm_file_path_directory = scm_c_lookup ("file-path-directory");
+
+  scm_file_path_nondirectory = scm_c_module_lookup (elisp_emacs_module, "file-path-nondirectory");
+  if (scm_is_false (scm_file_path_nondirectory))
+    scm_file_path_nondirectory = scm_c_lookup ("file-path-nondirectory");
+
+  scm_file_path_safe_p = scm_c_module_lookup (elisp_emacs_module, "file-path-safe-p");
+  if (scm_is_false (scm_file_path_safe_p))
+    scm_file_path_safe_p = scm_c_lookup ("file-path-safe-p");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -456,6 +479,12 @@ init_guile_fns (void)
 
   /* Protect string operations function from GC */
   scm_gc_protect_object (scm_substring_no_properties_scheme);
+
+  /* Protect file path operation functions from GC */
+  scm_gc_protect_object (scm_file_path_absolute_p);
+  scm_gc_protect_object (scm_file_path_directory);
+  scm_gc_protect_object (scm_file_path_nondirectory);
+  scm_gc_protect_object (scm_file_path_safe_p);
 }
 
 /* Lookup a color by name in a color map */
@@ -1824,4 +1853,70 @@ guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Objec
     return build_string ("");
 
   return result;
+}
+
+/* File path operations using Scheme implementations */
+
+/* Check if path is absolute */
+bool
+guile_file_path_absolute_p (Lisp_Object path)
+{
+  if (!scm_is_true (scm_file_path_absolute_p))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_absolute_p), path);
+  return scm_is_true (result);
+}
+
+/* Extract directory component from path */
+Lisp_Object
+guile_file_path_directory (Lisp_Object path)
+{
+  if (!scm_is_true (scm_file_path_directory))
+    return Qnil;
+
+  if (!STRINGP (path))
+    return Qnil;
+
+  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_directory), path);
+
+  if (scm_is_false (result))
+    return build_string ("");
+
+  return result;
+}
+
+/* Extract filename component from path */
+Lisp_Object
+guile_file_path_nondirectory (Lisp_Object path)
+{
+  if (!scm_is_true (scm_file_path_nondirectory))
+    return Qnil;
+
+  if (!STRINGP (path))
+    return Qnil;
+
+  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_nondirectory), path);
+
+  if (scm_is_false (result))
+    return build_string ("");
+
+  return result;
+}
+
+/* Check if path is safe (no directory traversal) */
+bool
+guile_file_path_safe_p (Lisp_Object path)
+{
+  if (!scm_is_true (scm_file_path_safe_p))
+    return false;
+
+  if (!STRINGP (path))
+    return false;
+
+  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_safe_p), path);
+  return scm_is_true (result);
 }
