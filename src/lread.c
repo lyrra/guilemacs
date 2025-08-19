@@ -108,6 +108,9 @@ static bool use_guile_reader_for_strings = false;
 /* Phase 7+: Enhanced Guile Reader Integration - Additional control */
 static bool use_guile_reader_aggressive = false;
 
+/* Phase 8: Symbol Reader Migration - Control variable for symbols */
+static bool use_guile_reader_for_symbols = false;
+
 /* The objects or placeholders read with the #n=object form.
 
    A hash table maps a number to either a placeholder (while the
@@ -4092,6 +4095,24 @@ DEFUN ("guile-reader-aggressive-p", Fguile_reader_aggressive_p, Sguile_reader_ag
   return use_guile_reader_aggressive ? Qt : Qnil;
 }
 
+DEFUN ("set-guile-reader-symbols", Fset_guile_reader_symbols, Sset_guile_reader_symbols, 1, 1, 0,
+       doc: /* Enable or disable Guile reader for symbol parsing.
+When enabled, symbol and number reading in fread0 will use Guile's scm_read()
+instead of the C reader, providing better UTF-8 symbol support and unified parsing.
+Argument should be t to enable, nil to disable.  */)
+  (Lisp_Object enable)
+{
+  use_guile_reader_for_symbols = !NILP (enable);
+  return use_guile_reader_for_symbols ? Qt : Qnil;
+}
+
+DEFUN ("guile-reader-symbols-p", Fguile_reader_symbols_p, Sguile_reader_symbols_p, 0, 0, 0,
+       doc: /* Return t if Guile reader mode is enabled for symbols.  */)
+  (void)
+{
+  return use_guile_reader_for_symbols ? Qt : Qnil;
+}
+
 /* Hybrid read function that can use Guile reader for strings - currently unused */
 #if 0
 static Lisp_Object
@@ -5291,6 +5312,55 @@ fread0 (struct reader_context *ctx)
     default:
       if (c <= 32 || c == NO_BREAK_SPACE)
 	goto read_obj;
+
+      /* Phase 8: Symbol Reader Migration - Use Guile reader for symbols */
+      if (use_guile_reader_for_symbols && scm_is_true(ctx->port))
+	{
+	  /* Push back the character we already consumed */
+	  funreadchar(ctx, c);
+
+	  /* Let Guile read the complete symbol/number */
+	  SCM result = scm_read(ctx->port);
+
+	  /* Handle EOF */
+	  if (scm_is_eq (result, SCM_EOF_VAL))
+	    end_of_file_error();
+
+	  /* Convert SCM result directly to Lisp_Object */
+	  if (scm_is_symbol(result))
+	    {
+	      /* Convert Guile symbol to Elisp symbol */
+	      SCM symbol_str = scm_symbol_to_string(result);
+	      char *symbol_name = scm_to_utf8_string(symbol_str);
+	      obj = Fintern(build_string(symbol_name), Qnil);
+	      free(symbol_name);
+	    }
+	  else if (scm_is_number(result))
+	    {
+	      /* Handle numbers - convert SCM number to Lisp_Object */
+	      if (scm_is_integer(result))
+		{
+		  intmax_t val = scm_to_intmax(result);
+		  obj = make_fixnum(val);
+		}
+	      else if (scm_is_real(result))
+		{
+		  double val = scm_to_double(result);
+		  obj = make_float(val);
+		}
+	      else
+		{
+		  /* Complex numbers or other numeric types - fall back */
+		  obj = result; /* SCM is already a Lisp_Object in GuilEmacs */
+		}
+	    }
+	  else
+	    {
+	      /* For other types, use the SCM object directly */
+	      obj = result;
+	    }
+	  break;
+	}
 
       uninterned_symbol = false;
       skip_shorthand = false;
