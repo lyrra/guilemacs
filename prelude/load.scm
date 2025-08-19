@@ -961,7 +961,15 @@ Allows any number of arguments, including zero."
   (module-define! global-module 'file-path-nondirectory file-path-nondirectory)
   (module-define! elisp-emacs-module 'file-path-nondirectory file-path-nondirectory)
   (module-define! global-module 'file-path-safe-p file-path-safe-p)
-  (module-define! elisp-emacs-module 'file-path-safe-p file-path-safe-p))
+  (module-define! elisp-emacs-module 'file-path-safe-p file-path-safe-p)
+
+  ;; Export string concatenation functions to both modules
+  (module-define! global-module 'string-concat-2 string-concat-2)
+  (module-define! elisp-emacs-module 'string-concat-2 string-concat-2)
+  (module-define! global-module 'string-concat-3 string-concat-3)
+  (module-define! elisp-emacs-module 'string-concat-3 string-concat-3)
+  (module-define! global-module 'string-concat-multi string-concat-multi)
+  (module-define! elisp-emacs-module 'string-concat-multi string-concat-multi))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

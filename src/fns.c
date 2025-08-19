@@ -636,12 +636,24 @@ static Lisp_Object concat_to_string (ptrdiff_t nargs, Lisp_Object *args);
 Lisp_Object
 concat2 (Lisp_Object s1, Lisp_Object s2)
 {
+  /* Use Scheme-based implementation to replace SSDATA usage */
+  Lisp_Object result = guile_string_concat_2 (s1, s2);
+  if (!NILP (result))
+    return result;
+
+  /* Fallback to original implementation if Scheme version fails */
   return concat_to_string (2, ((Lisp_Object []) {s1, s2}));
 }
 
 Lisp_Object
 concat3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3)
 {
+  /* Use Scheme-based implementation to replace SSDATA usage */
+  Lisp_Object result = guile_string_concat_3 (s1, s2, s3);
+  if (!NILP (result))
+    return result;
+
+  /* Fallback to original implementation if Scheme version fails */
   return concat_to_string (3, ((Lisp_Object []) {s1, s2, s3}));
 }
 

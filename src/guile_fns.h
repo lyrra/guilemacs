@@ -197,4 +197,9 @@ extern Lisp_Object guile_file_path_directory (Lisp_Object path);
 extern Lisp_Object guile_file_path_nondirectory (Lisp_Object path);
 extern bool guile_file_path_safe_p (Lisp_Object path);
 
+/* String concatenation operations */
+extern Lisp_Object guile_string_concat_2 (Lisp_Object s1, Lisp_Object s2);
+extern Lisp_Object guile_string_concat_3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3);
+extern Lisp_Object guile_string_concat_multi (Lisp_Object string_list);
+
 #endif /* GUILE_LOOKUPS_H */

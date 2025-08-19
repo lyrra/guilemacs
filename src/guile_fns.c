@@ -95,6 +95,11 @@ static SCM scm_file_path_directory = SCM_BOOL_F;
 static SCM scm_file_path_nondirectory = SCM_BOOL_F;
 static SCM scm_file_path_safe_p = SCM_BOOL_F;
 
+/* String concatenation function references */
+static SCM scm_string_concat_2 = SCM_BOOL_F;
+static SCM scm_string_concat_3 = SCM_BOOL_F;
+static SCM scm_string_concat_multi = SCM_BOOL_F;
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
@@ -394,6 +399,19 @@ init_guile_fns (void)
   if (scm_is_false (scm_file_path_safe_p))
     scm_file_path_safe_p = scm_c_lookup ("file-path-safe-p");
 
+  /* Initialize string concatenation functions */
+  scm_string_concat_2 = scm_c_module_lookup (elisp_emacs_module, "string-concat-2");
+  if (scm_is_false (scm_string_concat_2))
+    scm_string_concat_2 = scm_c_lookup ("string-concat-2");
+
+  scm_string_concat_3 = scm_c_module_lookup (elisp_emacs_module, "string-concat-3");
+  if (scm_is_false (scm_string_concat_3))
+    scm_string_concat_3 = scm_c_lookup ("string-concat-3");
+
+  scm_string_concat_multi = scm_c_module_lookup (elisp_emacs_module, "string-concat-multi");
+  if (scm_is_false (scm_string_concat_multi))
+    scm_string_concat_multi = scm_c_lookup ("string-concat-multi");
+
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
   scm_gc_protect_object (scm_lookup_font_style);
@@ -485,6 +503,11 @@ init_guile_fns (void)
   scm_gc_protect_object (scm_file_path_directory);
   scm_gc_protect_object (scm_file_path_nondirectory);
   scm_gc_protect_object (scm_file_path_safe_p);
+
+  /* Protect string concatenation functions from GC */
+  scm_gc_protect_object (scm_string_concat_2);
+  scm_gc_protect_object (scm_string_concat_3);
+  scm_gc_protect_object (scm_string_concat_multi);
 }
 
 /* Lookup a color by name in a color map */
@@ -1841,13 +1864,18 @@ guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Objec
   if (!STRINGP (string))
     return Qnil;
 
-  SCM start_scm = NILP (start) ? SCM_BOOL_F : scm_from_int (XFIXNUM (start));
-  SCM end_scm = NILP (end) ? SCM_BOOL_F : scm_from_int (XFIXNUM (end));
+  /* Enhanced type safety - check for valid fixnums */
+  SCM start_scm = NILP (start) ? SCM_BOOL_F :
+    (FIXNUMP (start) ? scm_from_int (XFIXNUM (start)) : SCM_BOOL_F);
+  SCM end_scm = NILP (end) ? SCM_BOOL_F :
+    (FIXNUMP (end) ? scm_from_int (XFIXNUM (end)) : SCM_BOOL_F);
 
-  SCM result = scm_call_3 (scm_variable_ref (scm_substring_no_properties_scheme),
-                           string,  /* string is already a Scheme object */
-                           start_scm,
-                           end_scm);
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_substring_no_properties_scheme);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_3 (function, string, start_scm, end_scm);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1867,7 +1895,12 @@ guile_file_path_absolute_p (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_absolute_p), path);
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_file_path_absolute_p);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function, path);
   return scm_is_true (result);
 }
 
@@ -1881,7 +1914,12 @@ guile_file_path_directory (Lisp_Object path)
   if (!STRINGP (path))
     return Qnil;
 
-  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_directory), path);
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_file_path_directory);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1899,7 +1937,12 @@ guile_file_path_nondirectory (Lisp_Object path)
   if (!STRINGP (path))
     return Qnil;
 
-  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_nondirectory), path);
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_file_path_nondirectory);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1919,4 +1962,66 @@ guile_file_path_safe_p (Lisp_Object path)
 
   SCM result = scm_call_1 (scm_variable_ref (scm_file_path_safe_p), path);
   return scm_is_true (result);
+}
+
+/* String concatenation operations using Scheme implementations */
+
+/* Concatenate two strings */
+Lisp_Object
+guile_string_concat_2 (Lisp_Object s1, Lisp_Object s2)
+{
+  if (!scm_is_true (scm_string_concat_2))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_string_concat_2);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_2 (function, s1, s2);
+
+  if (scm_is_false (result))
+    return build_string ("");
+
+  return result;
+}
+
+/* Concatenate three strings */
+Lisp_Object
+guile_string_concat_3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3)
+{
+  if (!scm_is_true (scm_string_concat_3))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_string_concat_3);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_3 (function, s1, s2, s3);
+
+  if (scm_is_false (result))
+    return build_string ("");
+
+  return result;
+}
+
+/* Concatenate multiple strings from a list */
+Lisp_Object
+guile_string_concat_multi (Lisp_Object string_list)
+{
+  if (!scm_is_true (scm_string_concat_multi))
+    return Qnil;
+
+  /* Enhanced error handling - check function validity before calling */
+  SCM function = scm_variable_ref (scm_string_concat_multi);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function, string_list);
+
+  if (scm_is_false (result))
+    return build_string ("");
+
+  return result;
 }
