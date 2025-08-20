@@ -1115,7 +1115,7 @@ Also refresh various data structures that hinge on the regexp."
                            "\\)"
                            "+"
                            " ?[^" allout-primary-bullet "]")
-          formfeed-part "\\(\^L\\)"
+          formfeed-part "\\(\x0c\\)"
 
           allout-regexp (concat new-part
                                 "\\|"
@@ -5618,15 +5618,15 @@ BULLET string, and a list of TEXT strings for the body."
 	 (curr-line)
 	 body-content bop)
 					; Do the head line:
-    (insert (concat "\\OneHeadLine{\\verb\1 "
+    (insert (concat "\\OneHeadLine{\\verb\x01 "
                     (allout-latex-verb-quote bullet)
-                    "\1}{"
+                    "\x01}{"
                     depth
-                    "}{\\verb\1 "
+                    "}{\\verb\x01 "
                     (if head-line
                         (allout-latex-verb-quote head-line)
                       "")
-                    "\1}\n"))
+                    "\x01}\n"))
     (if (not body-lines)
 	nil
       ;;(insert "\\beginlines\n")

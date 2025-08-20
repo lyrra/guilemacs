@@ -26,7 +26,7 @@
 
 (ert-deftest lpr-test-printify-region ()
   (with-temp-buffer
-    (insert "foo\^@-\^h\^k\^n-\^_\177bar")
+    (insert "foo\x00-\x08\x0b\x0e-\x1f\x7fbar")
     (printify-region (point-min) (point-max))
     (should (equal (buffer-string) "foo\\^@-\\^H\\^K\\^N-\\^_\\7fbar"))))
 

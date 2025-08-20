@@ -210,7 +210,7 @@ If nil, use `temporary-file-directory'."
   '(("\\`%!PS.*" (0 font-lock-constant-face t))
     ("^%%BoundingBox:[ \t]+-?[0-9]+[ \t]+-?[0-9]+[ \t]+-?[0-9]+[ \t]+-?[0-9]+[ \t]*$"
      (0 font-lock-constant-face t))
-    ("[\200-\377]+" (0 font-lock-warning-face prepend nil)))
+    ("[\x80-\xff]+" (0 font-lock-warning-face prepend nil)))
   "Subdued level highlighting for PostScript mode.")
 
 ;; Level 2 font-lock:
@@ -721,7 +721,7 @@ Only one `%' is removed, and it has to be in the first column."
     (let ((endm (copy-marker end))
           (i 0))
       (goto-char begin)
-      (while (re-search-forward "[\200-\377]" (marker-position endm) t)
+      (while (re-search-forward "[\x80-\xff]" (marker-position endm) t)
         (setq i (1+ i))
         (replace-match (format "\\%03o"
                                (multibyte-char-to-unibyte (char-before)))

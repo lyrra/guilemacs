@@ -2074,7 +2074,7 @@ also be compiled."
   "Non-nil to prevent byte-compiling of Emacs Lisp code.
 This is normally set in local file variables at the end of the elisp file:
 
-\;; Local Variables:\n;; no-byte-compile: t\n;; End:") ;Backslash for compile-main.
+;; Local Variables:\n;; no-byte-compile: t\n;; End:") ;Backslash for compile-main.
 ;;;###autoload(put 'no-byte-compile 'safe-local-variable 'booleanp)
 
 (defun byte-recompile-file (filename &optional force arg load)
@@ -2472,7 +2472,7 @@ With argument ARG, insert value in current buffer after the form."
 
 	;; Compile the forms from the input buffer.
 	(while (progn
-		 (while (progn (skip-chars-forward " \t\n\^l")
+		 (while (progn (skip-chars-forward " \t\n\x0c")
 			       (= (following-char) ?\;))
 		   (forward-line 1))
 		 (not (eobp)))
@@ -2904,14 +2904,14 @@ otherwise, print without quoting."
       (goto-char position)
       ;; Quote certain special characters as needed.
       ;; get_doc_string in doc.c does the unquoting.
-      (while (search-forward "\^A" end t)
-        (replace-match "\^A\^A" t t))
+      (while (search-forward "\x01" end t)
+        (replace-match "\x01\x01" t t))
       (goto-char position)
       (while (search-forward "\000" end t)
-        (replace-match "\^A0" t t))
+        (replace-match "\x01\x30" t t))
       (goto-char position)
       (while (search-forward "\037" end t)
-        (replace-match "\^A_" t t))
+        (replace-match "\x01_" t t))
       (goto-char end)
       (insert "\037")
       (goto-char position)

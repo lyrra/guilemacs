@@ -310,7 +310,7 @@ The characters tab, linefeed, space, return and formfeed are not affected."
       (narrow-to-region begin end)
       (goto-char (point-min))
       (let (c)
-	(while (re-search-forward "[\^@-\^h\^k\^n-\^_\177-\377]" nil t)
+	(while (re-search-forward "[\x00-\x08\x0b\x0e-\x1f\x7f-\xff]" nil t)
 	  (setq c (preceding-char))
 	  (delete-char -1)
 	  (insert (if (< c ?\s)

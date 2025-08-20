@@ -929,7 +929,7 @@ In standalone mode, \\<Info-mode-map>\\[quit-window] exits Emacs itself."
 ;; REGEXP, if the function succeeds, nil otherwise.
 (defun Info-node-at-bob-matching (regexp)
   (and (bobp)				; are we at beginning of buffer?
-       (looking-at "\^_")		; does it begin with node delimiter?
+       (looking-at "\x1f")		; does it begin with node delimiter?
        (let (beg)
 	 (forward-line 1)
 	 (setq beg (point))
@@ -1048,7 +1048,7 @@ not preserve point."
   ;; Use string-equal, not equal, to ignore text props.
   (if (not (or (string-equal nodename "*")
 	       (not
-		(search-forward "\^_\nEnd tag table\n" nil t))))
+		(search-forward "\x1f\nEnd tag table\n" nil t))))
       (let (pos)
 	;; We have a tag table.  Find its beginning.
 	;; Is this an indirect file?
@@ -1179,7 +1179,7 @@ Value is the position at which a match was found, or nil if not found."
       (if (Info-node-at-bob-matching regexp)
           (setq found (point))
         (while (and (not found)
-                    (search-forward "\n\^_" nil t))
+                    (search-forward "\n\x1f" nil t))
           (forward-line 1)
           (let ((beg (point)))
             (forward-line 1)
@@ -1278,7 +1278,7 @@ is non-nil)."
 				(if (stringp nodename)
 				    (regexp-quote nodename)
 				  "")
-				"\\) *[,\t\n\177]")))
+				"\\) *[,\t\n\x7f]")))
 
 	    (catch 'foo
 

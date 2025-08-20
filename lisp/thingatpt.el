@@ -294,7 +294,7 @@ The bounds of THING are determined by `bounds-of-thing-at-point'."
 (defun thing-at-point-bounds-of-string-at-point ()
   "Return the bounds of the string at point.
 Prefer the enclosing string with fallback on sexp at point.
-\[Internal function used by `bounds-of-thing-at-point'.]"
+[Internal function used by `bounds-of-thing-at-point'.]"
   (save-excursion
     (let ((ppss (syntax-ppss)))
       (if (nth 3 ppss)
@@ -366,7 +366,7 @@ Prefer the enclosing string with fallback on sexp at point.
 (defun thing-at-point-bounds-of-list-at-point ()
   "Return the bounds of the list at point.
 Prefer the enclosing list with fallback on sexp at point.
-\[Internal function used by `bounds-of-thing-at-point'.]"
+[Internal function used by `bounds-of-thing-at-point'.]"
   (save-excursion
     (if (ignore-errors (up-list -1))
 	(ignore-errors (cons (point) (progn (forward-sexp) (point))))

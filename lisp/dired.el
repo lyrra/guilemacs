@@ -1787,7 +1787,7 @@ see `dired-use-ls-dired' for more details.")
 				    (text-properties-at (match-beginning 0)))
 			     nil t))
 	    (goto-char opoint)
-	    (while (search-forward "\^m" end t)
+	    (while (search-forward "\x0d" end t)
 	      (replace-match (apply #'propertize
 				    "\\015"
 				    (text-properties-at (match-beginning 0)))
@@ -3848,7 +3848,7 @@ the quoted forms of those characters.
 FULL-NAME specifies the actual file name the listing must have,
 as returned by `dired-get-filename'.  LIMIT is the search limit."
   (let (str)
-    (setq str (string-replace "\^m" "\\^m"  file))
+    (setq str (string-replace "\x0d" "\\^m"  file))
     (setq str (string-replace "\\" "\\\\" str))
     (and (dired-switches-escape-p dired-actual-switches)
 	 (string-match-p "[ \t\n]" str)

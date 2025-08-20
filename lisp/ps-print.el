@@ -3696,11 +3696,11 @@ The table depends on the current ps-print setup."
       '(20 . ps-underlined-faces)
       '(20 . ps-black-white-faces)
       "      )\n
-\;; The following customized variables have long lists and are seldom modified:
-\;;    ps-page-dimensions-database
-\;;    ps-font-info-database
+;; The following customized variables have long lists and are seldom modified:
+;;    ps-page-dimensions-database
+;;    ps-font-info-database
 
-\;;; ps-print - end of settings\n")
+;;; ps-print - end of settings\n")
      "\n")))
 
 
@@ -5716,11 +5716,11 @@ XSTART YSTART are the relative position for the first page in a sheet.")
 	ps-footer-font-size-internal (ps-get-font-size 'ps-footer-font-size)
 	ps-control-or-escape-regexp
 	(cond ((eq ps-print-control-characters '8-bit)
-	       "[\000-\037\177-\377]")
+	       "[\x00-\x1f\x7f-\xff]")
 	      ((eq ps-print-control-characters 'control-8-bit)
-	       "[\000-\037\177-\237]")
+	       "[\x00-\x1f\x7f-\x9f]")
 	      ((eq ps-print-control-characters 'control)
-	       "[\000-\037\177]")
+	       "[\x00-\x1f\x7f]")
 	      (t "[\t\n\f]"))
 	;; Set the color scale.  We do it here instead of in the defvar so
 	;; that ps-print can be dumped into emacs.  This expression can't be

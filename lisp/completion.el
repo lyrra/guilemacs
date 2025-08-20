@@ -1580,7 +1580,7 @@ Prefix args ::
     (let (string)
       (condition-case nil
 	   (while t
-	     (search-forward "\177")
+	     (search-forward "\x7f")
 	     (backward-char 3)
 	     (and (setq string (symbol-under-point))
 		  (add-completion-to-tail-if-new string))

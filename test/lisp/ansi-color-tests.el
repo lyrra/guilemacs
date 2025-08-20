@@ -31,35 +31,35 @@
         (yellow (face-foreground 'ansi-color-yellow nil 'default))
         (custom-color "#87FFFF"))
     `(("Hello World" "Hello World")
-      ("\e[33mHello World\e[0m" "Hello World"
+      ("\x1b[33mHello World\x1b[0m" "Hello World"
        (:foreground ,yellow))
-      ("\e[43mHello World\e[0m" "Hello World"
+      ("\x1b[43mHello World\x1b[0m" "Hello World"
        (:background ,yellow))
-      ("\e[93mHello World\e[0m" "Hello World"
+      ("\x1b[93mHello World\x1b[0m" "Hello World"
        (:foreground ,bright-yellow))
-      ("\e[103mHello World\e[0m" "Hello World"
+      ("\x1b[103mHello World\x1b[0m" "Hello World"
        (:background ,bright-yellow))
-      ("\e[1;33mHello World\e[0m" "Hello World"
+      ("\x1b[1;33mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:foreground ,yellow))
        (ansi-color-bold (:foreground ,bright-yellow)))
-      ("\e[33;1mHello World\e[0m" "Hello World"
+      ("\x1b[33;1mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:foreground ,yellow))
        (ansi-color-bold (:foreground ,bright-yellow)))
-      ("\e[1m\e[33mHello World\e[0m" "Hello World"
+      ("\x1b[1m\x1b[33mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:foreground ,yellow))
        (ansi-color-bold (:foreground ,bright-yellow)))
-      ("\e[33m\e[1mHello World\e[0m" "Hello World"
+      ("\x1b[33m\x1b[1mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:foreground ,yellow))
        (ansi-color-bold (:foreground ,bright-yellow)))
-      ("\e[1m\e[3m\e[5mbold italics blink\e[0m" "bold italics blink"
+      ("\x1b[1m\x1b[3m\x1b[5mbold italics blink\x1b[0m" "bold italics blink"
        (ansi-color-bold ansi-color-italic ansi-color-slow-blink))
-      ("\e[10munrecognized\e[0m" "unrecognized")
-      ("\e[38;5;3;1mHello World\e[0m" "Hello World"
+      ("\x1b[10munrecognized\x1b[0m" "unrecognized")
+      ("\x1b[38;5;3;1mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:foreground ,yellow))
        (ansi-color-bold (:foreground ,bright-yellow)))
-      ("\e[48;5;123;1mHello World\e[0m" "Hello World"
+      ("\x1b[48;5;123;1mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:background ,custom-color)))
-      ("\e[48;2;135;255;255;1mHello World\e[0m" "Hello World"
+      ("\x1b[48;2;135;255;255;1mHello World\x1b[0m" "Hello World"
        (ansi-color-bold (:background ,custom-color))))))
 
 (defun ansi-color-tests-equal-props (o1 o2)
@@ -104,9 +104,9 @@ strings with `eq', this function compares them with `equal'."
       (should (equal (buffer-string) (car pair))))))
 
 (ert-deftest ansi-color-incomplete-sequences-test ()
-  (let* ((strs (list "\e[" "2;31m Hello World "
-                     "\e" "[108;5;12" "3m" "Greetings"
-                     "\e[0m\e[35;6m" "Hello"))
+  (let* ((strs (list "\x1b[" "2;31m Hello World "
+                     "\x1b" "[108;5;12" "3m" "Greetings"
+                     "\x1b[0m\x1b[35;6m" "Hello"))
          (complete-str (apply #'concat strs))
          (filtered-str)
          (propertized-str)
@@ -119,7 +119,7 @@ strings with `eq', this function compares them with `equal'."
 
     (with-temp-buffer
       (setq filtered-str
-            (replace-regexp-in-string "\e\\[.*?m" "" complete-str))
+            (replace-regexp-in-string "\x1b\\[.*?m" "" complete-str))
       (setq propertized-str (funcall ansi-app complete-str))
 
       (should-not (ansi-color-tests-equal-props
@@ -173,23 +173,23 @@ strings with `eq', this function compares them with `equal'."
       (should (ansi-color-tests-equal-props
                propertized-str (buffer-string))))
 
-    ;; \e not followed by '[' and invalid ANSI escape sequences
+    ;; \x1b not followed by '[' and invalid ANSI escape sequences
     (dolist (fun (list ansi-filt ansi-app))
       (with-temp-buffer
-        (should (equal (funcall fun "\e") ""))
-        (should (equal (funcall fun "\e[33m test \e[0m")
+        (should (equal (funcall fun "\x1b") ""))
+        (should (equal (funcall fun "\x1b[33m test \x1b[0m")
                        (with-temp-buffer
-                         (concat "\e" (funcall fun "\e[33m test \e[0m"))))))
+                         (concat "\x1b" (funcall fun "\x1b[33m test \x1b[0m"))))))
       (with-temp-buffer
-        (should (equal (funcall fun "\e[") ""))
-        (should (equal (funcall fun "\e[33m Z \e[0m")
+        (should (equal (funcall fun "\x1b[") ""))
+        (should (equal (funcall fun "\x1b[33m Z \x1b[0m")
                        (with-temp-buffer
-                         (concat "\e[" (funcall fun "\e[33m Z \e[0m"))))))
+                         (concat "\x1b[" (funcall fun "\x1b[33m Z \x1b[0m"))))))
       (with-temp-buffer
-        (should (equal (funcall fun "\e a \e\e[\e[") "\e a \e\e["))
-        (should (equal (funcall fun "\e[33m Z \e[0m")
+        (should (equal (funcall fun "\x1b a \x1b\x1b[\x1b[") "\x1b a \x1b\x1b["))
+        (should (equal (funcall fun "\x1b[33m Z \x1b[0m")
                        (with-temp-buffer
-                         (concat "\e[" (funcall fun "\e[33m Z \e[0m")))))))))
+                         (concat "\x1b[" (funcall fun "\x1b[33m Z \x1b[0m")))))))))
 
 (provide 'ansi-color-tests)
 

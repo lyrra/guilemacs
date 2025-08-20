@@ -320,11 +320,11 @@ Valid elements include:
 	(lambda (cs)
 	  (if (mm-coding-system-p (car cs))
 	      (let ((c (string-to-char
-			(decode-coding-string "\341" (car cs)))))
+			(decode-coding-string "\xe1" (car cs)))))
 		(cons (char-charset c)
 		      (cons
 		       (- (string-to-char
-			   (decode-coding-string "\341" 'iso-8859-15)) c)
+			   (decode-coding-string "\xe1" 'iso-8859-15)) c)
 		       (string-to-list (decode-coding-string (car (cdr cs))
 							     (car cs))))))
 	    '(gnus-charset 0)))
@@ -457,7 +457,7 @@ If POS is out of range, the value is nil."
     (save-restriction
       (if e (narrow-to-region b e))
       (goto-char (point-min))
-      (skip-chars-forward "\0-\177")
+      (skip-chars-forward "\x00-\x7f")
       (while (not (eobp))
 	(cond
 	 ((not (setq item (assq (char-charset (setq c (char-after)))
@@ -469,7 +469,7 @@ If POS is out of range, the value is nil."
 	 (t
 	  (insert-before-markers (prog1 (+ c (car (cdr item)))
 				   (delete-char 1)))))
-	(skip-chars-forward "\0-\177")))
+	(skip-chars-forward "\x00-\x7f")))
     (not inconvertible)))
 
 (defun mm-sort-coding-systems-predicate (a b)
@@ -573,7 +573,7 @@ charset, and a longer list means no appropriate charset."
       (save-restriction
 	(narrow-to-region b e)
 	(goto-char (point-min))
-	(skip-chars-forward "\0-\177")
+	(skip-chars-forward "\x00-\x7f")
 	(if (eobp)
 	    '(ascii)
 	  (let (charset)

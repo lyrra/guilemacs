@@ -98,7 +98,7 @@ we add the wrapper characters =?ISO-8859-1?Q?....?=."
       (goto-char beg)
       (save-restriction
 	(narrow-to-region beg end)
-	(while (re-search-forward "[?=\"\200-\377]" nil t)
+	(while (re-search-forward "[?=\"\x80-\xff]" nil t)
 	  (replace-match (upcase (format "=%02x" (preceding-char)))
 			 t t))
 	(when wrapper

@@ -5072,7 +5072,7 @@ This function does not save the buffer."
 	    (case-fold-search t))
 	(save-excursion
 	  (goto-char (point-max))
-	  (search-backward "\n\^L" (max (- (point-max) 3000) (point-min))
+	  (search-backward "\n\x0c" (max (- (point-max) 3000) (point-min))
 			   'move)
 	  (when (search-forward "Local Variables:" nil t)
 	    (setq pos (line-beginning-position))))
