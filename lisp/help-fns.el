@@ -648,7 +648,8 @@ the C sources, too."
     (dolist (menu menus)
       (let ((map (lookup-key global-map (seq-take menu 1)))
             (string nil)
-            (sep (if (char-displayable-p ?-) " => " " => ")))
+            (sep (if (char-displayable-p ?→) " → " " => ")))
+
         (seq-do-indexed
          (lambda (entry level)
            (when (symbolp map)
