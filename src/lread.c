@@ -3418,6 +3418,18 @@ fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_
               free (name_str);
               return Qt;
             }
+          else if (strcmp (name_str, "and") == 0)
+            {
+              /* Map and symbol to the canonical interned and symbol for proper identity */
+              free (name_str);
+              return intern_c_string ("and");
+            }
+          else if (strcmp (name_str, ":") == 0)
+            {
+              /* Map colon symbol to the canonical interned colon symbol for proper identity */
+              free (name_str);
+              return intern_c_string (":");
+            }
           else
             {
               /* For regular symbols, return the Guile symbol directly */
@@ -5294,6 +5306,72 @@ fread0 (struct reader_context *ctx)
     default:
       if (c <= 32 || c == NO_BREAK_SPACE)
 	goto read_obj;
+
+      /* Special handling for colon symbols which Guile treats as keywords */
+      if (c == ':')
+        {
+          /* Check if next character indicates this is a bare colon symbol */
+          int next_char = freadchar (ctx);
+          if (next_char < 0
+              || next_char <= 32 || next_char == NO_BREAK_SPACE
+              || next_char == '"' || next_char == '\'' || next_char == ';'
+              || next_char == '(' || next_char == ')' || next_char == '['
+              || next_char == ']' || next_char == '#' || next_char == '?'
+              || next_char == '`' || next_char == ',')
+            {
+              /* This is a bare colon - return the interned colon symbol */
+              if (next_char >= 0)
+                funreadchar (ctx, next_char);
+              obj = intern_c_string (":");
+              break;
+            }
+          else
+            {
+              /* This is a colon-prefixed symbol like :documentation */
+              /* Collect the rest of the symbol name */
+              char stackbuf[256];
+              char *read_buffer = stackbuf;
+              ptrdiff_t read_buffer_size = sizeof stackbuf;
+              char *heapbuf = NULL;
+              char *p = read_buffer;
+              char *end = read_buffer + read_buffer_size;
+
+              /* Add the colon */
+              *p++ = ':';
+
+              /* Collect symbol characters */
+              do {
+                if (p >= end) {
+                  ptrdiff_t offset = p - read_buffer;
+                  read_buffer = grow_read_buffer (read_buffer, offset,
+                                                  &heapbuf, &read_buffer_size);
+                  p = read_buffer + offset;
+                  end = read_buffer + read_buffer_size;
+                }
+                *p++ = next_char;
+                next_char = freadchar (ctx);
+              } while (next_char >= 0 && next_char > 32 && next_char != NO_BREAK_SPACE
+                       && next_char != '"' && next_char != '\'' && next_char != ';'
+                       && next_char != '(' && next_char != ')' && next_char != '['
+                       && next_char != ']' && next_char != '#' && next_char != '?'
+                       && next_char != '`' && next_char != ',' && next_char != '.');
+
+              /* Put back the terminating character */
+              if (next_char >= 0)
+                funreadchar (ctx, next_char);
+
+              *p = '\0';
+
+              /* Create the colon-prefixed symbol */
+              obj = intern_c_string (read_buffer);
+
+              /* Clean up */
+              if (heapbuf)
+                xfree (heapbuf);
+
+              break;
+            }
+        }
 
       /* Phase 8: Symbol Reader Migration - Use Guile reader for symbols */
       if (use_guile_reader_for_symbols && scm_is_true(ctx->port))
