@@ -2051,7 +2051,7 @@ Also sets `ert--results-progress-bar-button-begin'."
      ;; should test it again.)
      "\n")))
 
-(defvar ert-test-run-redisplay-interval-secs .1
+(defvar ert-test-run-redisplay-interval-secs 0.1
   "How many seconds ERT should wait between redisplays while running tests.
 
 While running tests, ERT shows the current progress, and this variable
