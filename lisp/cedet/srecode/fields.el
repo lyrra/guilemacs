@@ -276,12 +276,12 @@ Try to use this to provide useful completion when available.")
 
 (defvar srecode-field-keymap
   (let ((km (make-sparse-keymap)))
-    (define-key km "\C-i" #'srecode-field-next)
-    (define-key km "\M-\C-i" #'srecode-field-prev)
-    (define-key km "\C-e" #'srecode-field-end)
-    (define-key km "\C-a" #'srecode-field-start)
-    (define-key km "\M-m" #'srecode-field-start)
-    (define-key km "\C-c\C-c" #'srecode-field-exit-ask)
+    (define-key km (kbd "TAB") #'srecode-field-next)
+    (define-key km (kbd "M-TAB") #'srecode-field-prev)
+    (define-key km (kbd "C-e") #'srecode-field-end)
+    (define-key km (kbd "C-a") #'srecode-field-start)
+    (define-key km (kbd "M-m") #'srecode-field-start)
+    (define-key km (kbd "C-c C-c") #'srecode-field-exit-ask)
     km)
   "Keymap applied to field overlays.")
 

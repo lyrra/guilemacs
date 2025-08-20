@@ -1060,8 +1060,8 @@ button end points."
 ;;;###autoload
 (defvar widget-keymap
   (let ((map (make-sparse-keymap)))
-    (define-key map "\t" 'widget-forward)
-    (define-key map "\e\t" 'widget-backward)
+    (define-key map (kbd "TAB") 'widget-forward)
+    (define-key map (kbd "M-TAB") 'widget-backward)
     (define-key map [(shift tab)] 'widget-backward)
     (put 'widget-backward :advertised-binding [(shift tab)])
     (define-key map [backtab] 'widget-backward)

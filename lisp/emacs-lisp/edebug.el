@@ -3867,12 +3867,12 @@ be installed in `emacs-lisp-mode-map'.")
 
 ;; Global GUD bindings for all emacs-lisp-mode buffers.
 (unless edebug-inhibit-emacs-lisp-mode-bindings
-  (define-key emacs-lisp-mode-map "\C-x\C-a\C-s" #'edebug-step-mode)
-  (define-key emacs-lisp-mode-map "\C-x\C-a\C-n" #'edebug-next-mode)
-  (define-key emacs-lisp-mode-map "\C-x\C-a\C-c" #'edebug-go-mode)
-  (define-key emacs-lisp-mode-map "\C-x\C-a\C-l" #'edebug-where)
+  (define-key emacs-lisp-mode-map (kbd "C-x C-a C-s") #'edebug-step-mode)
+  (define-key emacs-lisp-mode-map (kbd "C-x C-a C-n") #'edebug-next-mode)
+  (define-key emacs-lisp-mode-map (kbd "C-x C-a C-c") #'edebug-go-mode)
+  (define-key emacs-lisp-mode-map (kbd "C-x C-a C-l") #'edebug-where)
   ;; The following isn't a GUD binding.
-  (define-key emacs-lisp-mode-map "\C-x\C-a\C-m" #'edebug-set-initial-mode))
+  (define-key emacs-lisp-mode-map (kbd "C-x C-a C-m") #'edebug-set-initial-mode))
 
 (defvar-keymap edebug-mode-map
   :parent emacs-lisp-mode-map
