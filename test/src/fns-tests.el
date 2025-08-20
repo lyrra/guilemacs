@@ -67,7 +67,10 @@
 (ert-deftest fns-tests-equality-nan ()
   (dolist (test (list #'eq #'eql #'equal))
     (let* ((h (make-hash-table :test test))
-           (nan 0.0e+NaN)
+           ; vanilla emacs lisp syntax for Not a Number (not supported in guilemacs):
+           ; (nan 0.0e+NaN)
+           ; guile syntax for Not a Number:
+           (nan +nan.0)
            (-nan (- nan)))
       (puthash nan t h)
       (should (eq (funcall test nan -nan) (gethash -nan h))))))
@@ -1093,7 +1096,7 @@
     (should (eq x x))
     (should (eql x y))
     (should (equal x y))
-    (should-not (eql x 0.0e+NaN))
+    (should-not (eql x +nan.0))
     (should (memql x (list y)))))
 
 (ert-deftest test-bignum-hash ()
@@ -1611,7 +1614,7 @@
                  (0 . 0.0) (0 . -0.0) (0.0 . -0.0)
 
                  (72057594037927936 . 72057594037927936.0)
-                 (1 . 0.0e+NaN)
+                 (1 . +nan.0)
 
                  ;; symbols
                  (a . #:a)
