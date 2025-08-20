@@ -5339,8 +5339,13 @@ fread0 (struct reader_context *ctx)
               /* Add the colon */
               *p++ = ':';
 
-              /* Collect symbol characters */
-              do {
+              /* Collect symbol characters using a while loop with proper character handling */
+              while (next_char >= 0 && next_char > 32 && next_char != NO_BREAK_SPACE
+                     && next_char != '"' && next_char != '\'' && next_char != ';'
+                     && next_char != '(' && next_char != ')' && next_char != '['
+                     && next_char != ']' && next_char != '#' && next_char != '?'
+                     && next_char != '`' && next_char != ',' && next_char != '.') {
+
                 if (p >= end) {
                   ptrdiff_t offset = p - read_buffer;
                   read_buffer = grow_read_buffer (read_buffer, offset,
@@ -5350,11 +5355,7 @@ fread0 (struct reader_context *ctx)
                 }
                 *p++ = next_char;
                 next_char = freadchar (ctx);
-              } while (next_char >= 0 && next_char > 32 && next_char != NO_BREAK_SPACE
-                       && next_char != '"' && next_char != '\'' && next_char != ';'
-                       && next_char != '(' && next_char != ')' && next_char != '['
-                       && next_char != ']' && next_char != '#' && next_char != '?'
-                       && next_char != '`' && next_char != ',' && next_char != '.');
+              }
 
               /* Put back the terminating character */
               if (next_char >= 0)
