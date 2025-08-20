@@ -164,7 +164,7 @@ from the Local Variables list ignoring the input argument VALUE."
       ;; Look for "Local variables:" line in last page.
       (widen)
       (goto-char (point-max))
-      (search-backward "\n\^L" (max (- (point-max) 3000) (point-min)) 'move)
+      (search-backward "\n\x0c" (max (- (point-max) 3000) (point-min)) 'move)
 
       ;; Add "Local variables:" list if not found.
       (unless (let ((case-fold-search t))

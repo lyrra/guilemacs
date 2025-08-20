@@ -37,7 +37,7 @@
 
 (defconst ansi-osc-control-seq-regexp
   ;; See ECMA 48, section 8.3.89 "OSC - OPERATING SYSTEM COMMAND".
-  "\e\\][\x08-\x0D]*[\x20-\x7E]*\\(\a\\|\e\\\\\\)"
+  "\x1b\\][\x08-\x0D]*[\x20-\x7E]*\\(\x07\\|\x1b\\\\\\)"
   "Regexp matching an OSC control sequence.")
 
 (defun ansi-osc-filter-region (begin end)
@@ -74,12 +74,12 @@ located."
   (save-excursion
     (goto-char (or ansi-osc--marker begin))
     (when (eq (char-before) ?\e) (backward-char))
-    (while (re-search-forward "\e]" end t)
+    (while (re-search-forward "\x1b]" end t)
       (let ((pos0 (match-beginning 0))
             (code (and (re-search-forward "\\=\\([0-9A-Za-z]*\\);" end t)
                        (match-string 1)))
             (pos1 (point)))
-        (if (re-search-forward "\a\\|\e\\\\" end t)
+        (if (re-search-forward "\x07\\|\x1b\\\\" end t)
             (let ((text (buffer-substring-no-properties
                          pos1 (match-beginning 0))))
               (setq ansi-osc--marker nil)

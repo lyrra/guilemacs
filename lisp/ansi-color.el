@@ -344,11 +344,11 @@ version of that color."
 
 (defconst ansi-color-control-seq-regexp
   ;; See ECMA 48, section 5.4 "Control Sequences".
-  "\e\\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]"
+  "\x1b\\[[\x30-\x3F]*[\x20-\x2F]*[\x40-\x7E]"
   "Regexp matching an ANSI control sequence.")
 
 (defconst ansi-color--control-seq-fragment-regexp
-  "\e\\[[\x30-\x3F]*[\x20-\x2F]*\\|\e"
+  "\x1b\\[[\x30-\x3F]*[\x20-\x2F]*\\|\x1b"
   "Regexp matching a partial ANSI control sequence.")
 
 (defconst ansi-color-parameter-regexp "\\([0-9]*\\)[m;]"
