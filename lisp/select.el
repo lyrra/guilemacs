@@ -211,13 +211,14 @@ text/plain\\;charset=utf-8)."
 		 (const UTF8_STRING)
 		 (const STRING)
 		 (const TEXT)
-                 (const text/plain\;charset=utf-8)
+                 ;(const text/plain\;charset=utf-8)
 		 (set :tag "List of values"
 		      (const COMPOUND_TEXT)
 		      (const UTF8_STRING)
 		      (const STRING)
 		      (const TEXT)
-                      (const text/plain\;charset=utf-8)))
+                      ;(const text/plain\;charset=utf-8)
+                      ))
   :group 'killing)
 
 (defun gui--selection-value-internal (type)
@@ -236,7 +237,9 @@ decoded.  If `gui-get-selection' signals an error, return nil."
                (gui-backend-selection-owner-p type))
     (let ((request-type (if (memq window-system '(x pgtk haiku))
                             (or x-select-request-type
-                                '(UTF8_STRING COMPOUND_TEXT STRING text/plain\;charset=utf-8))
+                                '(UTF8_STRING COMPOUND_TEXT STRING
+                                  ;text/plain\;charset=utf-8
+                                  ))
                           'STRING))
 	  text)
       (with-demoted-errors "gui-get-selection: %S"
@@ -387,7 +390,7 @@ the formats available in the clipboard if TYPE is `CLIPBOARD'."
                         selection-coding-system
                         (pcase data-type
                           ('UTF8_STRING 'utf-8)
-                          ('text/plain\;charset=utf-8 'utf-8)
+                          ;('text/plain\;charset=utf-8 'utf-8)
                           ('COMPOUND_TEXT 'compound-text-with-extensions)
                           ('C_STRING nil)
                           ('STRING 'iso-8859-1)))))
@@ -623,7 +626,8 @@ two markers or an overlay.  Otherwise, it is nil."
 				 'STRING))))))))
 	  (cond
 	   ((or (eq type 'UTF8_STRING)
-                (eq type 'text/plain\;charset=utf-8))
+                ;(eq type 'text/plain\;charset=utf-8)
+                )
 	    (if (or (not coding)
 		    (not (eq (coding-system-type coding) 'utf-8)))
 		(setq coding 'utf-8))
@@ -901,7 +905,8 @@ VALUE should be SELECTION's local value."
 	(STRING . xselect-convert-to-string)
 	(UTF8_STRING . xselect-convert-to-string)
 	(text/plain . xselect-convert-to-string)
-	(text/plain\;charset=utf-8 . xselect-convert-to-string)
+	;(text/plain\;charset=utf-8 . xselect-convert-to-string)
+
         (text/uri-list . (xselect-uri-list-available-p
                           . xselect-convert-to-text-uri-list))
         (text/x-xdnd-username . (xselect-dnd-target-available-p
