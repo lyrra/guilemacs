@@ -4211,25 +4211,47 @@ Returns the expression read from the buffer content. */)
 static Lisp_Object
 read0 (Lisp_Object readcharfun, bool locate_syms)
 {
+  /* FIX-guilemacs: Enhanced Guile reader migration - temporarily disabled for debugging */
 #if 0
-  /* Create Guile port from string */
-  SCM port = scm_open_input_string (readcharfun);
-  /* Phase 8: Set UTF-8 encoding for proper symbol handling */
-  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
+  if (STRINGP (readcharfun))
+    {
+      /* Use Guile reader for string input - more robust than C reader */
+      SCM port = scm_open_input_string (readcharfun);
+      /* Phase 8: Set UTF-8 encoding for proper symbol handling */
+      scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
 
-  /* Read with comprehensive error handling */
-  SCM result = scm_c_catch (SCM_BOOL_T,
-                            (scm_t_catch_body) scm_read, port,
-                            (scm_t_catch_handler) guile_reader_error_handler, readcharfun,
-                            NULL, NULL);
+      /* Read with comprehensive error handling */
+      SCM result = scm_c_catch (SCM_BOOL_T,
+                                (scm_t_catch_body) scm_read, port,
+                                (scm_t_catch_handler) guile_reader_error_handler, readcharfun,
+                                NULL, NULL);
 
-  /* Handle EOF */
-  if (scm_is_eq (result, SCM_EOF_VAL))
-    end_of_file_error ();
+      /* Handle EOF */
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        end_of_file_error ();
 
-  /* Convert Guile object to Lisp object */
-  return guile_to_lisp_object (result);
+      /* Convert Guile object to Lisp object */
+      return guile_to_lisp_object (result);
+    }
+  else if (BUFFERP (readcharfun))
+    {
+      /* Use Guile reader for buffer input */
+      SCM port = buffer_to_guile_port (readcharfun);
+      scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
+
+      SCM result = scm_c_catch (SCM_BOOL_T,
+                                (scm_t_catch_body) scm_read, port,
+                                (scm_t_catch_handler) guile_reader_error_handler, readcharfun,
+                                NULL, NULL);
+
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        end_of_file_error ();
+
+      return guile_to_lisp_object (result);
+    }
 #endif
+
+  /* Use original C reader for all input types */
   char stackbuf[64];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
