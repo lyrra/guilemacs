@@ -1716,8 +1716,8 @@ comment block.  If not in a // comment, just does a normal newline."
              (list ;; '("\C-cd" opascal-find-current-def)
                    ;; '("\C-cx" opascal-find-current-xdef)
                    ;; '("\C-cb" opascal-find-current-body)
-                   '("\C-cu" opascal-find-unit)
-                   '("\M-q" opascal-fill-comment)
+                   '((kbd "C-c u") opascal-find-unit)
+                   '((kbd "M-q") opascal-fill-comment)
                    ;; '("\M-j" opascal-new-comment-line)
                    ;; Debug bindings:
                    (list "\C-c\C-d" opascal-debug-mode-map)))

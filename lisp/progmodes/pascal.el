@@ -86,7 +86,7 @@
     (define-key map (kbd "C-c C-c") 'pascal-comment-area)
     (define-key map (kbd "C-c C-u") 'pascal-uncomment-area)
     (define-key map (kbd "M-C-a")  'pascal-beg-of-defun)
-    (define-key map "\M-\C-e"  'pascal-end-of-defun)
+    (define-key map (kbd "M-C-e")  'pascal-end-of-defun)
     (define-key map "\C-c\C-d" 'pascal-goto-defun)
     (define-key map "\C-c\C-o" 'pascal-outline-mode)
     ;; A command to change the whole buffer won't be used terribly

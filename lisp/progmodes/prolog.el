@@ -1069,8 +1069,8 @@ VERSION is of the format (Major . Minor)"
 
 (defun prolog-mode-keybindings-common (map)
   "Define keybindings common to both Prolog modes in MAP."
-  (define-key map "\C-c?" 'prolog-help-on-predicate)
-  (define-key map "\C-c/" 'prolog-help-apropos)
+  (define-key map (kbd "C-c ?") 'prolog-help-on-predicate)
+  (define-key map (kbd "C-c /") 'prolog-help-apropos)
   (define-key map "\C-c\C-d" 'prolog-debug-on)
   (define-key map "\C-c\C-t" 'prolog-trace-on)
   (define-key map "\C-c\C-z" 'prolog-zip-on)

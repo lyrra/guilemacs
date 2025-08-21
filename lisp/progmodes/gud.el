@@ -442,7 +442,7 @@ we're in the GUD buffer)."
 	      `(gud-call ,cmd arg)
 	    ;; Unused lexical warning if cmd does not use "arg".
 	    cmd))))
-     ,(if key `(local-set-key ,(concat "\C-c" key) #',func))
+     ,(if key `(local-set-key (kbd ,(concat "C-c " key)) #',func))
      ,(if key `(define-key gud-global-map ,key #',func))))
 
 ;; Where gud-display-frame should put the debugging arrow; a cons of
@@ -511,7 +511,7 @@ The value t means that there is no stack, and we are in display-file mode.")
     (setq gud-speedbar-key-map (speedbar-make-specialized-keymap))
     (define-key gud-speedbar-key-map "j" #'speedbar-edit-line)
     (define-key gud-speedbar-key-map "e" #'speedbar-edit-line)
-    (define-key gud-speedbar-key-map "\C-m" #'speedbar-edit-line)
+    (define-key gud-speedbar-key-map (kbd "RET") #'speedbar-edit-line)
     (define-key gud-speedbar-key-map " " #'speedbar-toggle-line-expansion)
     (define-key gud-speedbar-key-map "D" #'gdb-var-delete)
     (define-key gud-speedbar-key-map "p" #'gud-pp))
