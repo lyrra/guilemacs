@@ -858,7 +858,7 @@ Return the new end point."
      ;; what it used to be.
      ;;;  ;; Equivalent to "^\000-\007\011\013\015-\037\200-\377=_?"
      ;;;  "\010\012\014\040-\074\076\100-\136\140-\177")
-     "-\b\n\f !#-'*+0-9A-Z\\^`-~\d")
+     "-\b\n\f !#-'*+0-9A-Z\\^`-~\x7f")
     (subst-char-in-region (point-min) (point-max) ?  ?_)
     (buffer-string)))
 

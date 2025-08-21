@@ -926,7 +926,7 @@ the user from the mailer."
 			  "\n"))))))
 	(unless (memq mail-send-nonascii '(t mime))
 	  (goto-char (point-min))
-	  (skip-chars-forward "\0-\177")
+	  (skip-chars-forward "\x00-\x7f")
 	  (or (= (point) (point-max))
 	      (if (eq mail-send-nonascii 'query)
 		  (or (y-or-n-p "Message contains non-ASCII characters; send anyway? ")

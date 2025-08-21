@@ -1525,17 +1525,17 @@ is non-nil)."
 	      (nodename (car node)))
 	  (goto-char (point-min))
 	  ;; Find the like-named node in the main buffer.
-	  (if (re-search-forward (concat "^\^_.*\n.*Node: "
+	  (if (re-search-forward (concat "^\x1f.*\n.*Node: "
 					 (regexp-quote nodename)
 					 "[,\n\t]")
 				 nil t)
 	      (progn
-		(search-forward "\n\^_" nil 'move)
+		(search-forward "\n\x1f" nil 'move)
 		(beginning-of-line)
 		(insert "\n"))
 	    ;; If none exists, add one.
 	    (goto-char (point-max))
-	    (insert "\^_\nFile: dir\tNode: " nodename "\n\n* Menu:\n\n"))
+	    (insert "\x1f\nFile: dir\tNode: " nodename "\n\n* Menu:\n\n"))
 	  ;; Merge the text from the other buffer's menu
 	  ;; into the menu in the like-named node in the main buffer.
 	  (apply #'insert-buffer-substring (cdr node))))
@@ -1564,7 +1564,7 @@ is non-nil)."
     (goto-char (point-min))
     ;; Remove duplicate headings in the same menu.
     (while (search-forward "\n* Menu:" nil t)
-      (setq limit (save-excursion (search-forward "\n\^_" nil t)))
+      (setq limit (save-excursion (search-forward "\n\x1f" nil t)))
       ;; Look for the next heading to unify.
       (while (re-search-forward "^\\(\\w.*\\)\n\\*" limit t)
 	(let ((name (match-string 1))
