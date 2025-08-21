@@ -2302,7 +2302,9 @@ init_user_info (void)
     {
       strcpy (dflt_passwd.pw_name, uname);
       /* Determine a reasonable uid value.  */
-      if (xstrcasecmp ("administrator", uname) == 0)
+      /* FIX-guilemacs: migrated to Guile case-insensitive string comparison */
+      if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string ("administrator"),
+					       scm_from_utf8_string (uname))))
 	{
 	  dflt_passwd.pw_uid = 500; /* well-known Administrator uid */
 	  dflt_passwd.pw_gid = 513; /* well-known None gid */
@@ -2344,7 +2346,9 @@ init_user_info (void)
   else if (GetUserName (uname, &ulength))
     {
       strcpy (dflt_passwd.pw_name, uname);
-      if (xstrcasecmp ("administrator", uname) == 0)
+      /* FIX-guilemacs: migrated to Guile case-insensitive string comparison */
+      if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string ("administrator"),
+					       scm_from_utf8_string (uname))))
 	dflt_passwd.pw_uid = 0;
       else
 	dflt_passwd.pw_uid = 123;
@@ -7509,7 +7513,9 @@ system_process_attributes (Lisp_Object pid)
       if (result)
 	{
 	  /* Determine a reasonable euid and gid values.  */
-	  if (xstrcasecmp ("administrator", uname) == 0)
+	  /* FIX-guilemacs: migrated to Guile case-insensitive string comparison */
+	  if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string ("administrator"),
+						   scm_from_utf8_string (uname))))
 	    {
 	      euid = 500;	/* well-known Administrator uid */
 	      egid = 513;	/* well-known None gid */
@@ -7570,7 +7576,9 @@ system_process_attributes (Lisp_Object pid)
 	 user.  */
       else if (GetUserName (uname, &ulength))
 	{
-	  if (xstrcasecmp ("administrator", uname) == 0)
+	  /* FIX-guilemacs: migrated to Guile case-insensitive string comparison */
+	  if (scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string ("administrator"),
+						   scm_from_utf8_string (uname))))
 	    euid = 0;
 	  else
 	    euid = 123;

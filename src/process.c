@@ -2880,15 +2880,14 @@ static const struct socket_options {
 static int
 set_socket_option (int s, Lisp_Object opt, Lisp_Object val)
 {
-  char *name;
   const struct socket_options *sopt;
   int ret = 0;
 
   CHECK_SYMBOL (opt);
 
-  name = SSDATA (SYMBOL_NAME (opt));
+  /* FIX-guilemacs: Optimized symbol comparison - avoid string extraction */
   for (sopt = socket_options; sopt->name; sopt++)
-    if (strcmp (name, sopt->name) == 0)
+    if (EQ (opt, intern (sopt->name)))
       break;
 
   switch (sopt->opttype)
@@ -2908,7 +2907,7 @@ set_socket_option (int s, Lisp_Object opt, Lisp_Object val)
 	if (TYPE_RANGED_FIXNUMP (int, val))
 	  optval = XFIXNUM (val);
 	else
-	  error ("Bad option value for %s", name);
+	  error ("Bad option value for %s", sopt->name);
 	ret = setsockopt (s, sopt->optlevel, sopt->optnum,
 			  &optval, sizeof (optval));
 	break;
@@ -2926,7 +2925,7 @@ set_socket_option (int s, Lisp_Object opt, Lisp_Object val)
 	if (STRINGP (val))
 	  memcpy (devname, SDATA (val), min (SBYTES (val), IFNAMSIZ));
 	else if (!NILP (val))
-	  error ("Bad option value for %s", name);
+	  error ("Bad option value for %s", sopt->name);
 	ret = setsockopt (s, sopt->optlevel, sopt->optnum,
 			  devname, IFNAMSIZ);
 	break;

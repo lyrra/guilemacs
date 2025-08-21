@@ -1242,8 +1242,11 @@ face_color_supported_p (struct frame *f, const char *color_name,
 #ifdef HAVE_WINDOW_SYSTEM
     FRAME_WINDOW_P (f)
     ? (!NILP (Fxw_display_color_p (frame))
-       || xstrcasecmp (color_name, "black") == 0
-       || xstrcasecmp (color_name, "white") == 0
+       /* FIX-guilemacs: migrated to Guile case-insensitive string comparison */
+       || scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string (color_name),
+					       scm_from_utf8_string ("black")))
+       || scm_is_true (scm_string_ci_equal_p (scm_from_utf8_string (color_name),
+					       scm_from_utf8_string ("white")))
        || (background_p
 	   && face_color_gray_p (f, color_name))
        || (!NILP (Fx_display_grayscale_p (frame))
