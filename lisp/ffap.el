@@ -1941,8 +1941,8 @@ Only intended for interactive use."
 
 (defun ffap-ro-mode-hook ()
   "Bind `ffap-next' and `ffap-menu' to \\`M-l' and \\`M-m', resp."
-  (local-set-key "\M-l" 'ffap-next)
-  (local-set-key "\M-m" 'ffap-menu))
+  (local-set-key (kbd "M-l") 'ffap-next)
+  (local-set-key (kbd "M-m") 'ffap-menu))
 
 (defun ffap-gnus-hook ()
   "Bind `ffap-gnus-next' and `ffap-gnus-menu' to \\`M-l' and \\`M-m', resp."

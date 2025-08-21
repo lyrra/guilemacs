@@ -436,7 +436,7 @@ be added."
     (define-key map (kbd "M-DEL") 'archive-unmark-all-files)
     (define-key map "v" 'archive-view)
     (define-key map "x" 'archive-expunge)
-    (define-key map "\177" 'archive-unflag-backwards)
+    (define-key map "\x7f" 'archive-unflag-backwards)
     (define-key map "E" 'archive-extract-other-window)
     (define-key map "M" 'archive-chmod-entry)
     (define-key map "G" 'archive-chgrp-entry)

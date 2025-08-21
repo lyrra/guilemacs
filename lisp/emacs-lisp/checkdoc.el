@@ -2806,7 +2806,7 @@ function called to create the messages."
       (setq default-directory dir)
       (goto-char (point-max))
       (let ((inhibit-read-only t))
-        (insert "\n\n\C-l\n*** " label ": "
+        (insert "\n\n\x0c\n*** " label ": "
                 check-type)))))
 
 (defun checkdoc-error (point msg)

@@ -1112,16 +1112,16 @@ VERSION is of the format (Major . Minor)"
     (define-key map (kbd "C-c C-p") 'prolog-consult-predicate)
     (define-key map (kbd "C-c C-r") 'prolog-consult-region)
     (define-key map (kbd "C-c C-b") 'prolog-consult-buffer)
-    (define-key map "\C-c\C-f" 'prolog-consult-file)
-    (define-key map "\C-c\C-cp" 'prolog-compile-predicate)
-    (define-key map "\C-c\C-cr" 'prolog-compile-region)
-    (define-key map "\C-c\C-cb" 'prolog-compile-buffer)
-    (define-key map "\C-c\C-cf" 'prolog-compile-file))
+    (define-key map (kbd "C-c C-f") 'prolog-consult-file)
+    (define-key map (kbd "C-c C-c p") 'prolog-compile-predicate)
+    (define-key map (kbd "C-c C-c r") 'prolog-compile-region)
+    (define-key map (kbd "C-c C-c b") 'prolog-compile-buffer)
+    (define-key map (kbd "C-c C-c f") 'prolog-compile-file))
 
   ;; Inherited from the old prolog.el.
-  (define-key map "\e\C-x" 'prolog-consult-region)
-  (define-key map "\C-c\C-l" 'prolog-consult-file)
-  (define-key map "\C-c\C-z" 'run-prolog))
+  (define-key map (kbd "M-C-x") 'prolog-consult-region)
+  (define-key map (kbd "C-c C-l") 'prolog-consult-file)
+  (define-key map (kbd "C-c C-z") 'run-prolog))
 
 (defun prolog-mode-keybindings-inferior (_map)
   "Define keybindings for inferior Prolog mode in MAP."

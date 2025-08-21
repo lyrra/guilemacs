@@ -154,7 +154,7 @@ It may return the same sort of thing as `ses-jump-cell-name-function'."
 		,(kbd "C-c C-j")    ses-jump
 		,(kbd "C-c C-p")    ses-read-default-printer
 		,(kbd "M-C-l")     ses-reprint-all
-		[?\S-\C-l]    ses-reprint-all
+		(kbd "S-C-l")    ses-reprint-all
 		[header-line down-mouse-3] ,ses-header-line-menu
 		[header-line mouse-2] ses-sort-column-click))
 	(newmap (make-sparse-keymap)))
@@ -197,13 +197,13 @@ Used for listing local printers or renamed cells.")
 
 
 (defconst ses-mode-edit-map
-  (let ((keys '("\C-c\C-r"    ses-insert-range
-		"\C-c\C-s"    ses-insert-ses-range
+  (let ((keys '((kbd "C-c C-r")    ses-insert-range
+		(kbd "C-c C-s")    ses-insert-ses-range
 		[S-mouse-3]   ses-insert-range-click
 		[C-S-mouse-3] ses-insert-ses-range-click
-                "\C-h\C-p"    ses-list-local-printers
-                "\C-h\C-n"    ses-list-named-cells
-                "\M-\C-i"     completion-at-point))
+                (kbd "C-h C-p")    ses-list-local-printers
+                (kbd "C-h C-n")    ses-list-named-cells
+                (kbd "M-C-i")     completion-at-point))
 	(newmap (make-sparse-keymap)))
     (set-keymap-parent newmap minibuffer-local-map)
     (while keys
@@ -215,18 +215,18 @@ Used for listing local printers or renamed cells.")
 (defalias 'ses-mode-print-map
   (let ((keys '([backtab] backward-char
 		[tab]     ses-forward-or-insert
-		"\C-i"	  ses-forward-or-insert  ; Needed for ses-coverage.el?
+		(kbd "C-i")	  ses-forward-or-insert  ; Needed for ses-coverage.el?
 		"\M-o"    ses-insert-column
-		"\C-o"	  ses-insert-row
-		"\C-m"    ses-edit-cell
+		(kbd "C-o")	  ses-insert-row
+		(kbd "C-m")    ses-edit-cell
 		"\M-k"    ses-delete-column
 		"\M-y"	  ses-yank-pop
-		"\C-k"    ses-delete-row
-		"\C-j"    ses-append-row-jump-first-column
+		(kbd "C-k")    ses-delete-row
+		(kbd "C-j")    ses-append-row-jump-first-column
 		"\M-h"    ses-mark-row
 		"\M-H"	  ses-mark-column
-		"\C-d"	  ses-clear-cell-forward
-		"\C-?"	  ses-clear-cell-backward
+		(kbd "C-d")	  ses-clear-cell-forward
+		(kbd "C-?")	  ses-clear-cell-backward
 		"("       ses-read-cell
 		"\""      ses-read-cell
 		"'"       ses-read-symbol

@@ -915,7 +915,7 @@ DIRS must contain directory names."
 
 (defvar project-other-window-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-o" #'project-display-buffer)
+    (define-key map (kbd "C-o") #'project-display-buffer)
     map)
   "Keymap for project commands that display buffers in other windows.")
 
