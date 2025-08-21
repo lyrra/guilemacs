@@ -759,6 +759,13 @@ Allows any number of arguments, including zero."
 ;;         (s2 (if (symbol? string2) (symbol->string string2) string2)))
 ;;     (if (string<? s1 s2) #t #nil)))
 
+;; FIX-guilemacs: Simple utility functions migrated from C DEFUN to Guile (load.scm pattern)
+;; These were identified as good candidates: used primarily by Elisp, not C
+
+(define (elisp-null object)
+  "Return t if OBJECT is nil, and return nil otherwise."
+  (if (or (null? object) (eq? object #nil)) #t #nil))
+
 ;; Register Phase 3 functions for Elisp use
 (set-symbol-function! 'symbolp elisp-symbolp)
 ; Note: bufferp kept in C for now due to C-specific buffer object handling
@@ -774,6 +781,9 @@ Allows any number of arguments, including zero."
 (set-symbol-function! 'cdr-safe elisp-cdr-safe)
 (set-symbol-function! 'list elisp-list)
 (set-symbol-function! 'make-list elisp-make-list)
+
+;; Register migrated DEFUN utility functions
+(set-symbol-function! 'null elisp-null)
 
 ;; Phase 4 DEFUN function migrations are called directly from C code
 ;; to avoid infinite recursion. The elisp-* versions are available
