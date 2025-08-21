@@ -6342,7 +6342,7 @@ Optional arg DO-DEFAULTING indicates to accept empty input (CR)."
 		  ((and do-defaulting (string= got "\r"))
 		   ;; Return empty string to default:
 		   "")
-		  ((string= got "\C-g") (signal 'quit nil))
+		  ((string= got "\x07") (signal 'quit nil))
 		  (t
 		   (setq new-prompt (concat prompt
 					    got
