@@ -2362,18 +2362,41 @@ guile_to_lisp_object (SCM obj)
       SCM symbol_str = scm_symbol_to_string (obj);
       char *symbol_name = scm_to_utf8_string (symbol_str);
 
-      /* Create Emacs symbol from UTF-8 string */
-      Lisp_Object result = Fintern (build_string (symbol_name), Qnil);
+      /* FIX-guilemacs: Enhanced symbol mapping for pcase patterns */
+      Lisp_Object result;
+      if (strcmp (symbol_name, "nil") == 0)
+        result = Qnil;
+      else if (strcmp (symbol_name, "t") == 0)
+        result = Qt;
+      else if (strcmp (symbol_name, "and") == 0)
+        result = intern_c_string ("and");
+      else if (strcmp (symbol_name, ":") == 0)
+        result = intern_c_string (":"); /* Ensure colon symbol identity */
+      else
+        result = Fintern (build_string (symbol_name), Qnil);
+
       free (symbol_name);
       return result;
     }
   else if (scm_is_keyword (obj))
     {
-      /* Convert Guile keywords to Elisp symbols with : prefix */
+      /* FIX-guilemacs: Enhanced keyword to symbol conversion for pcase patterns */
       SCM keyword_str = scm_keyword_to_symbol (obj);
+      char *keyword_name = scm_to_utf8_string (scm_symbol_to_string (keyword_str));
+
+      /* Special case: if keyword is empty (bare :), return colon symbol */
+      if (strlen (keyword_name) == 0)
+        {
+          free (keyword_name);
+          return intern_c_string (":");
+        }
+
+      /* Regular keywords get : prefix */
       SCM prefixed_str = scm_string_append (scm_list_2 (scm_from_utf8_string (":"),
                                                         scm_symbol_to_string (keyword_str)));
-      return Fintern (prefixed_str, Qnil);
+      Lisp_Object result = Fintern (prefixed_str, Qnil);
+      free (keyword_name);
+      return result;
     }
   else if (scm_is_vector (obj))
     {
