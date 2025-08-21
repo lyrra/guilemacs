@@ -150,7 +150,7 @@ If value is `verbose', the computed score is shown for each match."
     ;; Use `apropos-follow' instead of just using the button
     ;; definition of RET, so that users can use it anywhere in an
     ;; apropos item, not just on top of a button.
-    (define-key map "\C-m" #'apropos-follow)
+    (define-key map (kbd "RET") #'apropos-follow)
 
     ;; Movement keys
     (define-key map "n" #'apropos-next-symbol)

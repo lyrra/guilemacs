@@ -2179,7 +2179,7 @@ options can be found in the `completion' group."
       (global-set-key (car binding) (cdr binding))))
   (when dynamic-completion-mode
     (dolist (binding
-             '(("\M-\r"  . complete)
+             `((,(kbd "M-RET")  . complete)
                ([?\C-\r] . complete)
 
                ;; Tests -

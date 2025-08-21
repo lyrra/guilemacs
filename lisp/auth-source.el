@@ -2528,7 +2528,7 @@ Adapt also mode line."
   ;; minibuffer-local-map along the way!
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (define-key map "\C-u" #'delete-minibuffer-contents) ;bug#12570
+    (define-key map (kbd "C-u") #'delete-minibuffer-contents) ;bug#12570
     (define-key map "\t" #'read-passwd-toggle-visibility)
     map)
   "Keymap used while reading passwords.")

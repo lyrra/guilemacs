@@ -292,9 +292,9 @@ The default \"-b\" means to ignore whitespace-only changes,
      :help "Go to the next count'th file"]
     ))
 
-(defcustom diff-minor-mode-prefix "\C-c="
+(defcustom diff-minor-mode-prefix (kbd "C-c =")
   "Prefix key for `diff-minor-mode' commands."
-  :type '(choice (string "\e") (string "\C-c=") string))
+  :type `(choice (string ,(kbd "ESC")) (string ,(kbd "C-c =")) string))
 
 (defvar-keymap diff-minor-mode-map
   :doc "Keymap for `diff-minor-mode'.  See also `diff-mode-shared-map'."

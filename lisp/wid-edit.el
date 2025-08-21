@@ -1081,13 +1081,13 @@ Note that such modes will need to require wid-edit.")
 
 (defvar widget-field-keymap
   (let ((map (copy-keymap widget-keymap)))
-    (define-key map "\C-k" #'widget-kill-line)
-    (define-key map "\M-\t" #'widget-complete)
-    (define-key map "\C-m" #'widget-field-activate)
+    (define-key map (kbd "C-k") #'widget-kill-line)
+    (define-key map (kbd "M-TAB") #'widget-complete)
+    (define-key map (kbd "RET") #'widget-field-activate)
     ;; Since the widget code uses a `field' property to identify fields,
     ;; ordinary beginning-of-line does the right thing.
     ;;  (define-key map "\C-a" #'widget-beginning-of-line)
-    (define-key map "\C-e" #'widget-end-of-line)
+    (define-key map (kbd "C-e") #'widget-end-of-line)
     map)
   "Keymap used inside an editable field.")
 
@@ -1096,7 +1096,7 @@ Note that such modes will need to require wid-edit.")
     ;; Since the widget code uses a `field' property to identify fields,
     ;; ordinary beginning-of-line does the right thing.
     ;;  (define-key map "\C-a" #'widget-beginning-of-line)
-    (define-key map "\C-e" #'widget-end-of-line)
+    (define-key map (kbd "C-e") #'widget-end-of-line)
     map)
   "Keymap used inside a text field.")
 

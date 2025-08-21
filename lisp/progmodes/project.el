@@ -902,7 +902,7 @@ DIRS must contain directory names."
     (define-key map "r" 'project-query-replace-regexp)
     (define-key map "x" 'project-execute-extended-command)
     (define-key map "o" 'project-any-command)
-    (define-key map "\C-b" 'project-list-buffers)
+    (define-key map (kbd "C-b") 'project-list-buffers)
     map)
   "Keymap for project commands.")
 

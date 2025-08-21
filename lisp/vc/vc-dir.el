@@ -323,8 +323,8 @@ See `run-hooks'."
     (define-key map "M" #'vc-dir-mark-all-files)
     (define-key map "u" #'vc-dir-unmark)
     (define-key map "U" #'vc-dir-unmark-all-files)
-    (define-key map "\C-?" #'vc-dir-unmark-file-up)
-    (define-key map "\M-\C-?" #'vc-dir-unmark-all-files)
+    (define-key map (kbd "DEL") #'vc-dir-unmark-file-up)
+    (define-key map (kbd "M-DEL") #'vc-dir-unmark-all-files)
     ;; Movement.
     (define-key map "n" #'vc-dir-next-line)
     (define-key map " " #'vc-dir-next-line)
@@ -333,17 +333,17 @@ See `run-hooks'."
     (define-key map [?\S-\ ] #'vc-dir-previous-line)
     (define-key map [backtab] #'vc-dir-previous-directory)
     ;;; Rebind paragraph-movement commands.
-    (define-key map "\M-}" #'vc-dir-next-directory)
-    (define-key map "\M-{" #'vc-dir-previous-directory)
+    (define-key map (kbd "M-}") #'vc-dir-next-directory)
+    (define-key map (kbd "M-{") #'vc-dir-previous-directory)
     (define-key map [C-down] #'vc-dir-next-directory)
     (define-key map [C-up] #'vc-dir-previous-directory)
     ;; The remainder.
     (define-key map "f" #'vc-dir-find-file)
     (define-key map "e" #'vc-dir-find-file) ; dired-mode compatibility
-    (define-key map "\C-m" #'vc-dir-find-file)
+    (define-key map (kbd "RET") #'vc-dir-find-file)
     (define-key map "o" #'vc-dir-find-file-other-window)
-    (define-key map "\C-o" #'vc-dir-display-file)
-    (define-key map "\C-c\C-c" #'vc-dir-kill-dir-status-process)
+    (define-key map (kbd "C-o") #'vc-dir-display-file)
+    (define-key map (kbd "C-c C-c") #'vc-dir-kill-dir-status-process)
     (define-key map [down-mouse-3] #'vc-dir-menu)
     (define-key map [follow-link] 'mouse-face)
     (define-key map "x" #'vc-dir-hide-up-to-date)

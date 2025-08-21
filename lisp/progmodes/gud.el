@@ -86,7 +86,7 @@ pdb (Python), and jdb."
   :group 'tools)
 
 
-(defcustom gud-key-prefix "\C-x\C-a"
+(defcustom gud-key-prefix (kbd "C-x C-a")
   "Prefix of all GUD commands valid in C buffers."
   :type 'key-sequence)
 

@@ -209,8 +209,8 @@ quoted for Tcl."
     (define-key map "]" 'tcl-electric-char)
     (define-key map ";" 'tcl-electric-char)
     (define-key map "#" 'tcl-electric-hash) ;Remove?  -stef
-    (define-key map "\e\C-q" 'tcl-indent-exp)
-    (define-key map "\177" 'backward-delete-char-untabify)
+    (define-key map (kbd "M-C-q") 'tcl-indent-exp)
+    (define-key map (kbd "DEL") 'backward-delete-char-untabify)
     (define-key map "\t" 'tcl-indent-command)
     (define-key map "\M-\C-x" 'tcl-eval-defun)
     (define-key map "\C-c\C-i" 'tcl-help-on-word)

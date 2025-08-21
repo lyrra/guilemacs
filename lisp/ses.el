@@ -144,16 +144,16 @@ It may return the same sort of thing as `ses-jump-cell-name-function'."
     ["Unset row" ses-unset-header-row (> ses--header-row 0)]))
 
 (defconst ses-mode-map
-  (let ((keys `("\C-c\M-\C-l" ses-reconstruct-all
-		"\C-c\C-l"    ses-recalculate-all
-		"\C-c\C-n"    ses-renarrow-buffer
-		"\C-c\C-c"    ses-recalculate-cell
-		"\C-c\M-\C-s" ses-sort-column
-		"\C-c\M-\C-h" ses-set-header-row
-		"\C-c\C-t"    ses-truncate-cell
-		"\C-c\C-j"    ses-jump
-		"\C-c\C-p"    ses-read-default-printer
-		"\M-\C-l"     ses-reprint-all
+  (let ((keys `(,(kbd "C-c M-C-l") ses-reconstruct-all
+		,(kbd "C-c C-l")    ses-recalculate-all
+		,(kbd "C-c C-n")    ses-renarrow-buffer
+		,(kbd "C-c C-c")    ses-recalculate-cell
+		,(kbd "C-c M-C-s") ses-sort-column
+		,(kbd "C-c M-C-h") ses-set-header-row
+		,(kbd "C-c C-t")    ses-truncate-cell
+		,(kbd "C-c C-j")    ses-jump
+		,(kbd "C-c C-p")    ses-read-default-printer
+		,(kbd "M-C-l")     ses-reprint-all
 		[?\S-\C-l]    ses-reprint-all
 		[header-line down-mouse-3] ,ses-header-line-menu
 		[header-line mouse-2] ses-sort-column-click))
@@ -181,7 +181,7 @@ It may return the same sort of thing as `ses-jump-cell-name-function'."
     ["Export values" ses-export-tsv t]
     ["Export formulas" ses-export-tsf t]))
 
-(defconst ses-completion-keys '("\M-\C-i" "\C-i")
+(defconst ses-completion-keys `(,(kbd "M-TAB") ,(kbd "TAB"))
   "List for keys that can be used for completion while editing.")
 
 (defvar ses--completion-table nil

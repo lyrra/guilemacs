@@ -1628,8 +1628,8 @@ is enabled then some keybindings are changed in the keymap."
     (pcase ido-cur-item
       ((or 'file 'dir)
        (when ido-context-switch-command
-	 (define-key map "\C-x\C-b" ido-context-switch-command)
-	 (define-key map "\C-x\C-d" 'ignore))
+	 (define-key map (kbd "C-x C-b") ido-context-switch-command)
+	 (define-key map (kbd "C-x C-d") 'ignore))
        (when viper-p
 	 (define-key map [remap viper-backward-char]
 	   'ido-delete-backward-updir)
@@ -1643,7 +1643,7 @@ is enabled then some keybindings are changed in the keymap."
 			    ido-file-dir-completion-map)))
       ('buffer
        (when ido-context-switch-command
-	 (define-key map "\C-x\C-f" ido-context-switch-command))
+	 (define-key map (kbd "C-x C-f") ido-context-switch-command))
        (set-keymap-parent map ido-buffer-completion-map))
       (_
        (set-keymap-parent map ido-common-completion-map)))

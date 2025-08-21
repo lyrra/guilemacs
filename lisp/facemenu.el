@@ -255,7 +255,7 @@ return a string which is inserted.  It may set `facemenu-end-add-face'."
 (defvar facemenu-keymap
   (let ((map (make-sparse-keymap "Set face")))
     (define-key map "o" (cons "Other..." 'facemenu-set-face))
-    (define-key map "\M-o" 'font-lock-fontify-block)
+    (define-key map (kbd "M-o") 'font-lock-fontify-block)
     map)
   "Keymap for face-changing commands.
 `Facemenu-update' fills in the keymap according to the bindings

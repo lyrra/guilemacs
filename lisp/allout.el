@@ -158,7 +158,7 @@ respective `allout-mode' keybinding variables, `allout-command-prefix',
 ;; been invoked:
 (allout-compose-and-institute-keymap)
 ;;;_   = allout-command-prefix
-(defcustom allout-command-prefix "\C-c "
+(defcustom allout-command-prefix (kbd "C-c SPC")
   "Key sequence to be used as prefix for outline mode command key bindings.
 
 Default is \\`C-c SPC'; just \\`C-c' is more short-and-sweet, if you're

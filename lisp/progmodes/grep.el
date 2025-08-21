@@ -504,7 +504,7 @@ redundant).")
         (map (make-sparse-keymap)))
     (define-key map [down-mouse-2] #'mouse-set-point)
     (define-key map [mouse-2] #'grep-find-toggle-abbreviation)
-    (define-key map "\C-m" #'grep-find-toggle-abbreviation)
+    (define-key map (kbd "RET") #'grep-find-toggle-abbreviation)
     `(face nil display ,ellipsis mouse-face highlight
       help-echo "RET, mouse-2: show unabbreviated command"
       keymap ,map abbreviated-command t))
