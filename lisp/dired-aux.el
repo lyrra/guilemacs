@@ -3725,7 +3725,7 @@ Intended to be added to `isearch-mode-hook'."
   (when (or (eq dired-isearch-filenames t)
 	    (and (eq dired-isearch-filenames 'dwim)
 		 (get-text-property (point) 'dired-filename)))
-    (define-key isearch-mode-map "\M-sff" 'dired-isearch-filenames-mode)
+    (define-key isearch-mode-map (kbd "M-s f f") 'dired-isearch-filenames-mode)
     (dired-isearch-filenames-mode 1)
     (add-hook 'isearch-mode-end-hook #'dired-isearch-filenames-end nil t)))
 

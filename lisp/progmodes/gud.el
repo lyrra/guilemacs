@@ -842,18 +842,18 @@ the buffer in which this command was invoked."
   (gud-def gud-finish "finish"   "C-f" "Finish executing current function.")
   (gud-def gud-jump
 	   (progn (gud-call "tbreak %f:%l" arg) (gud-call "jump %f:%l"))
-	   "\C-j" "Set execution address to current line.")
+	   (kbd "C-j") "Set execution address to current line.")
 
   (gud-def gud-up     "up %p"     "<" "Up N stack frames (numeric arg).")
   (gud-def gud-down   "down %p"   ">" "Down N stack frames (numeric arg).")
-  (gud-def gud-print  "print %e"  "\C-p" "Evaluate C expression at point.")
+  (gud-def gud-print  "print %e"  (kbd "C-p") "Evaluate C expression at point.")
   (gud-def gud-pstar  "print* %e" nil
 	   "Evaluate C dereferenced pointer expression at point.")
 
   ;; For debugging Emacs only.
-  (gud-def gud-pv "pv %e"      "\C-v" "Print the value of the lisp variable.")
+  (gud-def gud-pv "pv %e"      (kbd "C-v") "Print the value of the lisp variable.")
 
-  (gud-def gud-until  "until %l" "\C-u" "Continue to current line.")
+  (gud-def gud-until  "until %l" (kbd "C-u") "Continue to current line.")
   (gud-def gud-run    "run"	 nil    "Run the program.")
 
   (gud-set-repeat-map-property 'gud-gdb-repeat-map)
@@ -862,7 +862,7 @@ the buffer in which this command was invoked."
             nil 'local)
   (setq-local gud-gdb-completion-function #'gud-gdb-completions)
 
-  (local-set-key "\C-i" #'completion-at-point)
+  (local-set-key (kbd "C-i") #'completion-at-point)
   (setq comint-prompt-regexp "^(.*gdb[+]?) *")
   (setq paragraph-start comint-prompt-regexp)
   (setq gdb-first-prompt t)
@@ -1129,14 +1129,14 @@ and source-file directory for your debugger."
   (gud-common-init command-line nil 'gud-sdb-marker-filter 'gud-sdb-find-file)
   (setq-local gud-minor-mode 'sdb)
 
-  (gud-def gud-break  "%l b" "\C-b"   "Set breakpoint at current line.")
-  (gud-def gud-tbreak "%l c" "\C-t"   "Set temporary breakpoint at current line.")
-  (gud-def gud-remove "%l d" "\C-d"   "Remove breakpoint at current line")
-  (gud-def gud-step   "s %p" "\C-s"   "Step one source line with display.")
-  (gud-def gud-stepi  "i %p" "\C-i"   "Step one instruction with display.")
-  (gud-def gud-next   "S %p" "\C-n"   "Step one line (skip functions).")
-  (gud-def gud-cont   "c"    "\C-r"   "Continue with display.")
-  (gud-def gud-print  "%e/"  "\C-p"   "Evaluate C expression at point.")
+  (gud-def gud-break  "%l b" (kbd "C-b")   "Set breakpoint at current line.")
+  (gud-def gud-tbreak "%l c" (kbd "C-t")   "Set temporary breakpoint at current line.")
+  (gud-def gud-remove "%l d" (kbd "C-d")   "Remove breakpoint at current line")
+  (gud-def gud-step   "s %p" (kbd "C-s")   "Step one source line with display.")
+  (gud-def gud-stepi  "i %p" (kbd "C-i")   "Step one instruction with display.")
+  (gud-def gud-next   "S %p" (kbd "C-n")   "Step one line (skip functions).")
+  (gud-def gud-cont   "c"    (kbd "C-r")   "Continue with display.")
+  (gud-def gud-print  "%e/"  (kbd "C-p")   "Evaluate C expression at point.")
 
   (gud-set-repeat-map-property 'gud-sdb-repeat-map)
 
@@ -1430,12 +1430,12 @@ and source-file directory for your debugger."
     (gud-def gud-up	"up %p"	  "<" "Up (numeric arg) stack frames.")
     (gud-def gud-down	"down %p" ">" "Down (numeric arg) stack frames.")
     (gud-def gud-break  "stop at \"%f\":%l"
-				  "\C-b" "Set breakpoint at current line.")
-    (gud-def gud-finish "return"  "\C-f" "Finish executing current function."))
+				  (kbd "C-b") "Set breakpoint at current line.")
+    (gud-def gud-finish "return"  (kbd "C-f") "Finish executing current function."))
    (gud-irix-p
     (gud-def gud-break  "stop at \"%d%f\":%l"
-				  "\C-b" "Set breakpoint at current line.")
-    (gud-def gud-finish "return"  "\C-f" "Finish executing current function.")
+				  (kbd "C-b") "Set breakpoint at current line.")
+    (gud-def gud-finish "return"  (kbd "C-f") "Finish executing current function.")
     (gud-def gud-up	"up %p; printf \"\032\032%1d:\",(int)$curline;file\n"
 	     "<" "Up (numeric arg) stack frames.")
     (gud-def gud-down "down %p; printf \"\032\032%1d:\",(int)$curline;file\n"
@@ -1447,18 +1447,18 @@ and source-file directory for your debugger."
     (gud-def gud-up	"up %p"   "<" "Up (numeric arg) stack frames.")
     (gud-def gud-down	"down %p" ">" "Down (numeric arg) stack frames.")
     (gud-def gud-break "file \"%d%f\"\nstop at %l"
-				  "\C-b" "Set breakpoint at current line.")
+				  (kbd "C-b") "Set breakpoint at current line.")
     (if gud-dbx-use-stopformat-p
 	(process-send-string (get-buffer-process gud-comint-buffer)
 			     "set $stopformat=1\n"))))
 
-  (gud-def gud-remove "clear %l"  "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "step %p"   "\C-s" "Step one line with display.")
-  (gud-def gud-stepi  "stepi %p"  "\C-i" "Step one instruction with display.")
-  (gud-def gud-next   "next %p"   "\C-n" "Step one line (skip functions).")
+  (gud-def gud-remove "clear %l"  (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   "step %p"   (kbd "C-s") "Step one line with display.")
+  (gud-def gud-stepi  "stepi %p"  (kbd "C-i") "Step one instruction with display.")
+  (gud-def gud-next   "next %p"   (kbd "C-n") "Step one line (skip functions).")
   (gud-def gud-nexti  "nexti %p"   nil  "Step one instruction (skip functions).")
-  (gud-def gud-cont   "cont"      "\C-r" "Continue with display.")
-  (gud-def gud-print  "print %e"  "\C-p" "Evaluate C expression at point.")
+  (gud-def gud-cont   "cont"      (kbd "C-r") "Continue with display.")
+  (gud-def gud-print  "print %e"  (kbd "C-p") "Evaluate C expression at point.")
   (gud-def gud-run    "run"	     nil    "Run the program.")
 
   (gud-set-repeat-map-property 'gud-dbx-repeat-map)
@@ -1539,17 +1539,17 @@ directories if your program contains sources from more than one directory."
 		   'gud-xdb-marker-filter)
   (setq-local gud-minor-mode 'xdb)
 
-  (gud-def gud-break  "b %f:%l"    "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-tbreak "b %f:%l\\t" "\C-t"
+  (gud-def gud-break  "b %f:%l"    (kbd "C-b") "Set breakpoint at current line.")
+  (gud-def gud-tbreak "b %f:%l\\t" (kbd "C-t")
 	   "Set temporary breakpoint at current line.")
-  (gud-def gud-remove "db"         "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "s %p"       "\C-s" "Step one line with display.")
-  (gud-def gud-next   "S %p"       "\C-n" "Step one line (skip functions).")
-  (gud-def gud-cont   "c"          "\C-r" "Continue with display.")
+  (gud-def gud-remove "db"         (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   "s %p"       (kbd "C-s") "Step one line with display.")
+  (gud-def gud-next   "S %p"       (kbd "C-n") "Step one line (skip functions).")
+  (gud-def gud-cont   "c"          (kbd "C-r") "Continue with display.")
   (gud-def gud-up     "up %p"      "<"    "Up (numeric arg) stack frames.")
   (gud-def gud-down   "down %p"    ">"    "Down (numeric arg) stack frames.")
-  (gud-def gud-finish "bu\\t"      "\C-f" "Finish executing current function.")
-  (gud-def gud-print  "p %e"       "\C-p" "Evaluate C expression at point.")
+  (gud-def gud-finish "bu\\t"      (kbd "C-f") "Finish executing current function.")
+  (gud-def gud-print  "p %e"       (kbd "C-p") "Evaluate C expression at point.")
 
   (gud-set-repeat-map-property 'gud-xdb-repeat-map)
 
@@ -1708,16 +1708,16 @@ working directory and source-file directory for your debugger."
 		   'gud-perldb-marker-filter)
   (setq-local gud-minor-mode 'perldb)
 
-  (gud-def gud-break  "b %l"         "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-remove "B %l"         "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "s"            "\C-s" "Step one source line with display.")
-  (gud-def gud-next   "n"            "\C-n" "Step one line (skip functions).")
-  (gud-def gud-cont   "c"            "\C-r" "Continue with display.")
-;  (gud-def gud-finish "finish"       "\C-f" "Finish executing current function.")
+  (gud-def gud-break  "b %l"         (kbd "C-b") "Set breakpoint at current line.")
+  (gud-def gud-remove "B %l"         (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   "s"            (kbd "C-s") "Step one source line with display.")
+  (gud-def gud-next   "n"            (kbd "C-n") "Step one line (skip functions).")
+  (gud-def gud-cont   "c"            (kbd "C-r") "Continue with display.")
+;  (gud-def gud-finish "finish"       (kbd "C-f") "Finish executing current function.")
 ;  (gud-def gud-up     "up %p"        "<" "Up N stack frames (numeric arg).")
 ;  (gud-def gud-down   "down %p"      ">" "Down N stack frames (numeric arg).")
-  (gud-def gud-print  "p %e"          "\C-p" "Evaluate perl expression at point.")
-  (gud-def gud-until  "c %l"          "\C-u" "Continue to current line.")
+  (gud-def gud-print  "p %e"          (kbd "C-p") "Evaluate perl expression at point.")
+  (gud-def gud-until  "c %l"          (kbd "C-u") "Continue to current line.")
 
   (gud-set-repeat-map-property 'gud-perldb-repeat-map)
 
@@ -1837,16 +1837,16 @@ directory and source-file directory for your debugger."
   (gud-common-init command-line nil 'gud-pdb-marker-filter)
   (setq-local gud-minor-mode 'pdb)
 
-  (gud-def gud-break  "break %d%f:%l"  "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-remove "clear %d%f:%l"  "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "step"         "\C-s" "Step one source line with display.")
-  (gud-def gud-next   "next"         "\C-n" "Step one line (skip functions).")
-  (gud-def gud-cont   "continue"     "\C-r" "Continue with display.")
-  (gud-def gud-finish "return"       "\C-f" "Finish executing current function.")
+  (gud-def gud-break  "break %d%f:%l"  (kbd "C-b") "Set breakpoint at current line.")
+  (gud-def gud-remove "clear %d%f:%l"  (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   "step"         (kbd "C-s") "Step one source line with display.")
+  (gud-def gud-next   "next"         (kbd "C-n") "Step one line (skip functions).")
+  (gud-def gud-cont   "continue"     (kbd "C-r") "Continue with display.")
+  (gud-def gud-finish "return"       (kbd "C-f") "Finish executing current function.")
   (gud-def gud-up     "up"           "<" "Up one stack frame.")
   (gud-def gud-down   "down"         ">" "Down one stack frame.")
-  (gud-def gud-print  "p %e"         "\C-p" "Evaluate Python expression at point.")
-  (gud-def gud-statement "!%e"      "\C-e" "Execute Python statement at point.")
+  (gud-def gud-print  "p %e"         (kbd "C-p") "Evaluate Python expression at point.")
+  (gud-def gud-statement "!%e"      (kbd "C-e") "Execute Python statement at point.")
 
   (gud-set-repeat-map-property 'gud-pdb-repeat-map)
 
@@ -1926,17 +1926,17 @@ and source-file directory for your debugger."
 
 ;; FIXME: absolute file-names are not grokked yet by Guile's ,break-at-source
 ;; and relative file names only when relative to %load-path.
-;;  (gud-def gud-break  ",break-at-source %d%f %l"  "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-break  ",break-at-source %f %l"  "\C-b" "Set breakpoint at current line.")
+;;  (gud-def gud-break  ",break-at-source %d%f %l"  (kbd "C-b") "Set breakpoint at current line.")
+  (gud-def gud-break  ",break-at-source %f %l"  (kbd "C-b") "Set breakpoint at current line.")
 ;; FIXME: remove breakpoint with file-line not yet supported by Guile
-;;  (gud-def gud-remove ",delete ---> %d%f:%l"  "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   ",step"         "\C-s" "Step one source line with display.")
-  (gud-def gud-next   ",next"         "\C-n" "Step one line (skip functions).")
-;;  (gud-def gud-cont   "continue"     "\C-r" "Continue with display.")
-  (gud-def gud-finish ",finish"       "\C-f" "Finish executing current function.")
+;;  (gud-def gud-remove ",delete ---> %d%f:%l"  (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   ",step"         (kbd "C-s") "Step one source line with display.")
+  (gud-def gud-next   ",next"         (kbd "C-n") "Step one line (skip functions).")
+;;  (gud-def gud-cont   "continue"     (kbd "C-r") "Continue with display.")
+  (gud-def gud-finish ",finish"       (kbd "C-f") "Finish executing current function.")
   (gud-def gud-up     ",up"           "<" "Up one stack frame.")
   (gud-def gud-down   ",down"         ">" "Down one stack frame.")
-  (gud-def gud-print  "%e"            "\C-p" "Evaluate Guile expression at point.")
+  (gud-def gud-print  "%e"            (kbd "C-p") "Evaluate Guile expression at point.")
 
   (gud-set-repeat-map-property 'gud-guiler-repeat-map)
 
@@ -2593,16 +2593,16 @@ gud, see `gud-mode'."
       (setq gud-jdb-sourcepath
 	    (gud-jdb-parse-classpath-string gud-jdb-sourcepath)))
 
-  (gud-def gud-break  "stop at %c:%l" "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-remove "clear %c:%l"   "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "step"          "\C-s" "Step one source line with display.")
-  (gud-def gud-next   "next"          "\C-n" "Step one line (skip functions).")
-  (gud-def gud-cont   "cont"          "\C-r" "Continue with display.")
-  (gud-def gud-finish "step up"       "\C-f" "Continue until current method returns.")
-  (gud-def gud-up     "up\C-Mwhere"   "<"    "Up one stack frame.")
-  (gud-def gud-down   "down\C-Mwhere" ">"    "Up one stack frame.")
+  (gud-def gud-break  "stop at %c:%l" (kbd "C-b") "Set breakpoint at current line.")
+  (gud-def gud-remove "clear %c:%l"   (kbd "C-d") "Remove breakpoint at current line")
+  (gud-def gud-step   "step"          (kbd "C-s") "Step one source line with display.")
+  (gud-def gud-next   "next"          (kbd "C-n") "Step one line (skip functions).")
+  (gud-def gud-cont   "cont"          (kbd "C-r") "Continue with display.")
+  (gud-def gud-finish "step up"       (kbd "C-f") "Continue until current method returns.")
+  (gud-def gud-up     "up\x0dwhere"   "<"    "Up one stack frame.")
+  (gud-def gud-down   "down\x0dwhere" ">"    "Up one stack frame.")
   (gud-def gud-run    "run"           nil    "Run the program.") ;if VM start using jdb
-  (gud-def gud-print  "print %e"  "\C-p" "Print value of expression at point.")
+  (gud-def gud-print  "print %e"  (kbd "C-p") "Print value of expression at point.")
   (gud-def gud-pstar  "dump %e"  nil "Print all object information at point.")
 
   (gud-set-repeat-map-property 'gud-jdb-repeat-map)
@@ -2739,7 +2739,7 @@ Commands:
 
 \\{gud-mode-map}"
   (setq mode-line-process '(":%s"))
-  (define-key (current-local-map) "\C-c\C-l" #'gud-refresh)
+  (define-key (current-local-map) (kbd "C-c C-l") #'gud-refresh)
   (setq-local gud-last-frame nil)
   (if (boundp 'tool-bar-map)            ; not --without-x
       (setq-local tool-bar-map gud-tool-bar-map))
@@ -4047,26 +4047,26 @@ This command runs functions from `lldb-mode-hook'."
 
   (gud-def gud-break
            "breakpoint set --joint-specifier %f:%l"
-           "\C-b"
+           (kbd "C-b")
            "Set breakpoint at current line.")
   (gud-def gud-tbreak
            "_regexp-tbreak %f:%l"
-           "\C-t"
+           (kbd "C-t")
 	   "Set temporary breakpoint at current line.")
   (gud-def gud-remove
            "breakpoint clear  --line %l --file %f"
-           "\C-d"
+           (kbd "C-d")
            "Remove breakpoint at current line")
   (gud-def gud-step "thread step-in --count %p"
-           "\C-s"
+           (kbd "C-s")
            "Step one source line with display.")
   (gud-def gud-stepi
            "thread step-inst --count %p"
-           "\C-i"
+           (kbd "C-i")
            "Step one instruction with display.")
   (gud-def gud-next
            "thread step-over --count %p"
-           "\C-n"
+           (kbd "C-n")
            "Step one line (skip functions).")
   (gud-def gud-nexti
            "thread step-inst-over --count %p"
@@ -4074,17 +4074,17 @@ This command runs functions from `lldb-mode-hook'."
            "Step one instruction (skip functions).")
   (gud-def gud-cont
            "process continue --ignore-count %p"
-           "\C-r"
+           (kbd "C-r")
            "Continue with display.")
   (gud-def gud-finish
            "thread step-out"
-           "\C-f"
+           (kbd "C-f")
            "Finish executing current function.")
   (gud-def gud-jump
 	   (progn
              (gud-call "_regexp-break %f:%l" arg)
              (gud-call "_regexp-jump %f:%l"))
-	   "\C-j"
+	   (kbd "C-j")
            "Set execution address to current line.")
   (gud-def gud-up
            "_regexp-up %p"
@@ -4096,7 +4096,7 @@ This command runs functions from `lldb-mode-hook'."
            "Down N stack frames (numeric arg).")
   (gud-def gud-print
            "dwim-print %e"
-           "\C-p"
+           (kbd "C-p")
            "Evaluate C expression at point.")
   (gud-def gud-pstar
            "dwim-print *%e"
@@ -4104,11 +4104,11 @@ This command runs functions from `lldb-mode-hook'."
 	   "Evaluate C dereferenced pointer expression at point.")
   (gud-def gud-pv
            "xprint %e"
-           "\C-v"
+           (kbd "C-v")
            "Print value of lisp variable (for debugging Emacs only).")
   (gud-def gud-until
            "thread until %l"
-           "\C-u"
+           (kbd "C-u")
            "Continue to current line.")
   (gud-def gud-run
            ;; Extension for process launch --tty?

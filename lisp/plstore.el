@@ -754,7 +754,7 @@ in plstore mode buffers."
   "Major mode for editing plstore files."
   (make-local-variable 'plstore-encoded)
   (add-hook 'write-contents-functions #'plstore--write-contents-functions)
-  (define-key plstore-mode-map "\C-c\C-c" #'plstore-mode-toggle-display)
+  (define-key plstore-mode-map (kbd "C-c C-c") #'plstore-mode-toggle-display)
   ;; to create a new file with plstore-mode, mark it as already decoded
   (if (called-interactively-p 'any)
       (setq plstore-encoded t)

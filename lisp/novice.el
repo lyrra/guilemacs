@@ -49,8 +49,8 @@ If nil, the feature is disabled, i.e., all commands work normally.")
           (concat
            (if (or (eq (aref keys 0)
                        (if (stringp keys)
-                           (aref "\M-x" 0)
-                         ?\M-x))
+                           (aref (kbd "M-x") 0)
+                         (aref (kbd "M-x") 0)))
                    (and (>= (length keys) 2)
                         (eq (aref keys 0) meta-prefix-char)
                         (eq (aref keys 1) ?x)))
@@ -99,7 +99,7 @@ You can now type:
                                      help-string
                                      "*Disabled Command*"))))
     (pcase char
-      (?\C-g (setq quit-flag t))
+      (?\x07 (setq quit-flag t))
       (?! (setq disabled-command-function nil))
       (?y
        (if (and user-init-file

@@ -940,35 +940,35 @@ detailed description of this mode.
   (setq comint-input-sender 'gdb-send)
   (gdb-load-history)
 
-  (gud-def gud-tbreak "tbreak %f:%l" "\C-t"
+  (gud-def gud-tbreak "tbreak %f:%l" (kbd "C-t")
 	   "Set temporary breakpoint at current line." t)
   (gud-def gud-jump
 	   (progn (gud-call "tbreak %f:%l" arg) (gud-call "jump %f:%l"))
-	   "\C-j" "Set execution address to current line.")
+	   (kbd "C-j") "Set execution address to current line.")
 
   (gud-def gud-up     "up %p"     "<" "Up N stack frames (numeric arg).")
   (gud-def gud-down   "down %p"   ">" "Down N stack frames (numeric arg).")
-  (gud-def gud-print  "print %e"  "\C-p" "Evaluate C expression at point.")
+  (gud-def gud-print  "print %e"  (kbd "C-p") "Evaluate C expression at point.")
   (gud-def gud-pstar  "print* %e" nil
 	   "Evaluate C dereferenced pointer expression at point.")
 
   (gud-def gud-step   (gdb-gud-context-call "-exec-step" "%p" t)
-           "\C-s"
+           (kbd "C-s")
 	   "Step one source line with display.")
   (gud-def gud-stepi  (gdb-gud-context-call "-exec-step-instruction" "%p" t)
-           "\C-i"
+           (kbd "C-i")
 	   "Step one instruction with display.")
   (gud-def gud-next   (gdb-gud-context-call "-exec-next" "%p" t)
-           "\C-n"
+           (kbd "C-n")
 	   "Step one line (skip functions).")
   (gud-def gud-nexti  (gdb-gud-context-call "-exec-next-instruction" "%p" t)
            nil
 	   "Step one instruction (skip functions).")
   (gud-def gud-cont   (gdb-gud-context-call "-exec-continue")
-           "\C-r"
+           (kbd "C-r")
 	   "Continue with display.")
   (gud-def gud-finish (gdb-gud-context-call "-exec-finish" nil t)
-           "\C-f"
+           (kbd "C-f")
 	   "Finish executing current function.")
   (gud-def gud-run    "-exec-run"
            nil
@@ -980,7 +980,7 @@ detailed description of this mode.
 			 (beginning-of-line)
 			 (forward-char 2)
 			 (gud-call "break *%a" arg)))
-	   "\C-b" "Set breakpoint at current line or address." t)
+	   (kbd "C-b") "Set breakpoint at current line or address." t)
 
   (gud-def gud-remove (if (not (string-match "Disassembly" mode-name))
 			  (gud-call "clear %f:%l" arg)
@@ -988,7 +988,7 @@ detailed description of this mode.
 			  (beginning-of-line)
 			  (forward-char 2)
 			  (gud-call "clear *%a" arg)))
-	   "\C-d" "Remove breakpoint at current line or address." t)
+	   (kbd "C-d") "Remove breakpoint at current line or address." t)
 
   ;; -exec-until doesn't support --all yet
   (gud-def gud-until  (if (not (string-match "Disassembly" mode-name))
@@ -997,7 +997,7 @@ detailed description of this mode.
 			  (beginning-of-line)
 			  (forward-char 2)
 			  (gud-call "-exec-until *%a" arg)))
-	   "\C-u" "Continue to current line or address.")
+	   (kbd "C-u") "Continue to current line or address.")
   (gud-def
    gud-go (progn
             (when (and current-prefix-arg arg)
@@ -1007,7 +1007,7 @@ detailed description of this mode.
              (if gdb-active-process
                  (gdb-gud-context-command "-exec-continue")
                "-exec-run")))
-   "\C-v" "Start or continue execution.  Use a prefix to specify arguments.")
+   (kbd "C-v") "Start or continue execution.  Use a prefix to specify arguments.")
 
   ;; For debugging Emacs only.
   (gud-def gud-pp
@@ -1052,7 +1052,7 @@ detailed description of this mode.
 
   (add-hook 'completion-at-point-functions #'gud-gdb-completion-at-point
             nil 'local)
-  (local-set-key "\C-i" 'completion-at-point)
+  (local-set-key (kbd "C-i") 'completion-at-point)
 
   (local-set-key [remap comint-delchar-or-maybe-eof] 'gdb-delchar-or-quit)
 
@@ -1355,7 +1355,7 @@ Used by Speedbar."
   :group 'gdb
   :version "22.1")
 
-(define-key gud-minor-mode-map "\C-c\C-w" 'gud-watch)
+(define-key gud-minor-mode-map (kbd "C-c C-w") 'gud-watch)
 (keymap-set gud-global-map "C-w" 'gud-watch)
 
 (declare-function tooltip-identifier-from-point "tooltip" (point))
@@ -1825,11 +1825,11 @@ this trigger is subscribed to `gdb-buf-publisher' and called with
 
 (defvar gdb-inferior-io-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-c\C-c" 'gdb-io-interrupt)
-    (define-key map "\C-c\C-z" 'gdb-io-stop)
-    (define-key map "\C-c\C-\\" 'gdb-io-quit)
-    (define-key map "\C-c\C-d" 'gdb-io-eof)
-    (define-key map "\C-d" 'gdb-io-eof)
+    (define-key map (kbd "C-c C-c") 'gdb-io-interrupt)
+    (define-key map (kbd "C-c C-z") 'gdb-io-stop)
+    (define-key map (kbd "C-c C-\\") 'gdb-io-quit)
+    (define-key map (kbd "C-c C-d") 'gdb-io-eof)
+    (define-key map (kbd "C-d") 'gdb-io-eof)
     map))
 
 ;; We want to use comint because it has various nifty and familiar features.

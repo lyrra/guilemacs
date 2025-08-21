@@ -986,25 +986,25 @@ Unless KEEP, removes the old indentation."
     (define-key map ")" 'cperl-electric-rparen)
     (define-key map ";" 'cperl-electric-semi)
     (define-key map ":" 'cperl-electric-terminator)
-    (define-key map "\C-j" 'newline-and-indent)
-    (define-key map "\C-c\C-j" 'cperl-linefeed)
-    (define-key map "\C-c\C-t" 'cperl-invert-if-unless)
-    (define-key map "\C-c\C-a" 'cperl-toggle-auto-newline)
-    (define-key map "\C-c\C-k" 'cperl-toggle-abbrev)
-    (define-key map "\C-c\C-w" 'cperl-toggle-construct-fix)
-    (define-key map "\C-c\C-f" 'auto-fill-mode)
-    (define-key map "\C-c\C-e" 'cperl-toggle-electric)
-    (define-key map "\C-c\C-b" 'cperl-find-bad-style)
-    (define-key map "\C-c\C-p" 'cperl-pod-spell)
-    (define-key map "\C-c\C-d" 'cperl-here-doc-spell)
-    (define-key map "\C-c\C-n" 'cperl-narrow-to-here-doc)
-    (define-key map "\C-c\C-v" 'cperl-next-interpolated-REx)
-    (define-key map "\C-c\C-x" 'cperl-next-interpolated-REx-0)
-    (define-key map "\C-c\C-y" 'cperl-next-interpolated-REx-1)
-    (define-key map "\C-c\C-ha" 'cperl-toggle-autohelp)
-    (define-key map "\C-c\C-hp" 'cperl-perldoc)
-    (define-key map "\C-c\C-hP" 'cperl-perldoc-at-point)
-    (define-key map "\e\C-q" 'cperl-indent-exp) ; Usually not bound
+    (define-key map (kbd "C-j") 'newline-and-indent)
+    (define-key map (kbd "C-c C-j") 'cperl-linefeed)
+    (define-key map (kbd "C-c C-t") 'cperl-invert-if-unless)
+    (define-key map (kbd "C-c C-a") 'cperl-toggle-auto-newline)
+    (define-key map (kbd "C-c C-k") 'cperl-toggle-abbrev)
+    (define-key map (kbd "C-c C-w") 'cperl-toggle-construct-fix)
+    (define-key map (kbd "C-c C-f") 'auto-fill-mode)
+    (define-key map (kbd "C-c C-e") 'cperl-toggle-electric)
+    (define-key map (kbd "C-c C-b") 'cperl-find-bad-style)
+    (define-key map (kbd "C-c C-p") 'cperl-pod-spell)
+    (define-key map (kbd "C-c C-d") 'cperl-here-doc-spell)
+    (define-key map (kbd "C-c C-n") 'cperl-narrow-to-here-doc)
+    (define-key map (kbd "C-c C-v") 'cperl-next-interpolated-REx)
+    (define-key map (kbd "C-c C-x") 'cperl-next-interpolated-REx-0)
+    (define-key map (kbd "C-c C-y") 'cperl-next-interpolated-REx-1)
+    (define-key map (kbd "C-c C-h a") 'cperl-toggle-autohelp)
+    (define-key map (kbd "C-c C-h p") 'cperl-perldoc)
+    (define-key map (kbd "C-c C-h P") 'cperl-perldoc-at-point)
+    (define-key map (kbd "M-C-q") 'cperl-indent-exp) ; Usually not bound
     (define-key map [(control meta ?|)] 'cperl-lineup)
     ;;(define-key map "\M-q" 'cperl-fill-paragraph)
     ;;(define-key map "\e;" 'cperl-indent-for-comment)
@@ -1022,10 +1022,10 @@ Unless KEEP, removes the old indentation."
 	    'cperl-get-help)
 	  (define-key map [(control ?c) (control ?h) ?f]
 	    ;;(concat (char-to-string help-char) "f") ; does not work
-	    (key-binding "\C-hf"))
+	    (key-binding (kbd "C-h f")))
 	  (define-key map [(control ?c) (control ?h) ?v]
 	    ;;(concat (char-to-string help-char) "v") ; does not work
-	    (key-binding "\C-hv")))
+	    (key-binding (kbd "C-h v")))
       (define-key map [(control ?c) (control ?h) ?f]
         'cperl-perldoc)
       (define-key map [(control ?c) (control ?h) ?v]
@@ -1879,15 +1879,15 @@ or as help on variables `cperl-tips', `cperl-problems',
 `cperl-praise', `cperl-speed'."
   (if (cperl-val 'cperl-electric-linefeed)
       (progn
-	(local-set-key "\C-J" 'cperl-linefeed)
-	(local-set-key "\C-C\C-J" 'newline-and-indent)))
+	(local-set-key (kbd "C-J") 'cperl-linefeed)
+	(local-set-key (kbd "C-C C-J") 'newline-and-indent)))
   (if (and
        (cperl-val 'cperl-clobber-lisp-bindings)
        (cperl-val 'cperl-info-on-command-no-prompt))
       (progn
 	;; don't clobber the backspace binding:
-	(define-key cperl-mode-map "\C-hf" 'cperl-perldoc)
-	(define-key cperl-mode-map "\C-c\C-hf" 'cperl-perldoc)))
+	(define-key cperl-mode-map (kbd "C-h f") 'cperl-perldoc)
+	(define-key cperl-mode-map (kbd "C-c C-h f") 'cperl-perldoc)))
   (setq local-abbrev-table cperl-mode-abbrev-table)
   (if (cperl-val 'cperl-electric-keywords)
       (abbrev-mode 1))

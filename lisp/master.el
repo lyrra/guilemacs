@@ -75,11 +75,11 @@ yourself the value of `master-of' by calling `master-show-slave'."
   ;; Not global, so no effect.
 ;;;  :group 'master
   :keymap
-  '(("\C-c\C-n" . master-says-scroll-up)
-    ("\C-c\C-p" . master-says-scroll-down)
-    ("\C-c<" . master-says-beginning-of-buffer)
-    ("\C-c>" . master-says-end-of-buffer)
-    ("\C-c\C-l" . master-says-recenter)))
+  `(((kbd "C-c C-n") . master-says-scroll-up)
+    ((kbd "C-c C-p") . master-says-scroll-down)
+    ((kbd "C-c <") . master-says-beginning-of-buffer)
+    ((kbd "C-c >") . master-says-end-of-buffer)
+    ((kbd "C-c C-l") . master-says-recenter)))
 
 ;; Initialize Master mode by setting a slave buffer.
 

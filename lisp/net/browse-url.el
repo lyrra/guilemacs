@@ -1592,7 +1592,7 @@ used instead of `browse-url-new-window-flag'."
 		 (if (eq (following-char) ?_)
 		     (error "Cannot move out of the input field, sorry")))))
       (term-send-string proc (concat "g"    ; goto
-				     "\C-u" ; kill default url
+				     "\x15" ; kill default url
 				     url
 				     "\r")))))
 

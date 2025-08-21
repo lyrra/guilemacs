@@ -61,8 +61,8 @@
 ;;;###autoload
 (defun mail-hist-define-keys ()
   "Define keys for accessing mail header history.  For use in hooks."
-  (local-set-key "\M-p" 'mail-hist-previous-input)
-  (local-set-key "\M-n" 'mail-hist-next-input))
+  (local-set-key (kbd "M-p") 'mail-hist-previous-input)
+  (local-set-key (kbd "M-n") 'mail-hist-next-input))
 
 ;;;###autoload
 (defun mail-hist-enable ()

@@ -132,8 +132,8 @@ This function runs the hooks `text-mode-hook' and `rmail-edit-mode-hook'.
   ;; Given the way this works, it has to.
   ;; If you kill the edit buffer, you've killed your rmail buffer.
   (force-mode-line-update)
-  (if (and (eq (key-binding "\C-c\C-c") 'rmail-cease-edit)
-	   (eq (key-binding "\C-c\C-]") 'rmail-abort-edit))
+  (if (and (eq (key-binding (kbd "C-c C-c")) 'rmail-cease-edit)
+	   (eq (key-binding (kbd "C-c C-]")) 'rmail-abort-edit))
       (message "Editing: Type C-c C-c to return to Rmail, C-c C-] to abort")
     (message "%s" (substitute-command-keys
 		   "Editing: Type \\[rmail-cease-edit] to return to Rmail, \\[rmail-abort-edit] to abort"))))

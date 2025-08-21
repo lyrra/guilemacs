@@ -95,13 +95,13 @@ Complete on start-tag names regardless.")
 This is typically called from `nxml-mode-hook'.
 Validation will be enabled if `rng-nxml-auto-validate-flag' is non-nil."
   (interactive)
-  (define-key nxml-mode-map "\C-c\C-v" 'rng-validate-mode)
-  (define-key nxml-mode-map "\C-c\C-s\C-w" 'rng-what-schema)
-  (define-key nxml-mode-map "\C-c\C-s\C-a" 'rng-auto-set-schema-and-validate)
-  (define-key nxml-mode-map "\C-c\C-s\C-f" 'rng-set-schema-file-and-validate)
-  (define-key nxml-mode-map "\C-c\C-s\C-l" 'rng-save-schema-location)
-  (define-key nxml-mode-map "\C-c\C-s\C-t" 'rng-set-document-type-and-validate)
-  (define-key nxml-mode-map "\C-c\C-n" 'rng-next-error)
+  (define-key nxml-mode-map (kbd "C-c C-v") 'rng-validate-mode)
+  (define-key nxml-mode-map (kbd "C-c C-s C-w") 'rng-what-schema)
+  (define-key nxml-mode-map (kbd "C-c C-s C-a") 'rng-auto-set-schema-and-validate)
+  (define-key nxml-mode-map (kbd "C-c C-s C-f") 'rng-set-schema-file-and-validate)
+  (define-key nxml-mode-map (kbd "C-c C-s C-l") 'rng-save-schema-location)
+  (define-key nxml-mode-map (kbd "C-c C-s C-t") 'rng-set-document-type-and-validate)
+  (define-key nxml-mode-map (kbd "C-c C-n") 'rng-next-error)
   (easy-menu-define rng-nxml-menu nxml-mode-map
     "Menu for nxml-mode used with rng-validate-mode."
     rng-nxml-easy-menu)

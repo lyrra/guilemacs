@@ -262,7 +262,7 @@ it finishes, type \\[kill-find]."
     (dired-mode dir (cdr find-ls-option))
     (let ((map (make-sparse-keymap)))
       (set-keymap-parent map (current-local-map))
-      (define-key map "\C-c\C-k" 'kill-find)
+      (define-key map (kbd "C-c C-k") 'kill-find)
       (use-local-map map))
     (setq-local dired-sort-inhibit t)
     (setq-local revert-buffer-function
