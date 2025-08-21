@@ -1367,7 +1367,7 @@ called and its result is inserted."
       ;; According to RFC 822 and its successors, the field name must
       ;; consist of printable US-ASCII characters other than colon,
       ;; i.e., decimal 33-56 and 59-126.
-      '(looking-at "[ \t]\\|[][!\"#$%&'()*+,./0-9;<=>?@A-Z\\^_`a-z{|}~-]+:"))
+      '(looking-at "[ \t]\\|[][!\"#$%&'()*+,./0-9;<=>?@A-Z\\x5e_`a-z{|}~-]+:"))
   "Set this non-nil if the system's mailer runs the header and body together.
 \(This problem exists on Sunos 4 when sendmail is run in remote mode.)
 The value should be an expression to test whether the problem will
@@ -1992,11 +1992,11 @@ You must have the \"hashcash\" binary installed, see `hashcash-program'."
      ;; We want to match the results of any of these manglings.
      ;; The following regexp rejects names whose first characters are
      ;; obviously bogus, but after that anything goes.
-     "\\([^\0-\b\n-\r\^?].*\\)?"
+     "\\([^\0-\b\n-\r\x7f].*\\)?"
 
      ;; The time the message was sent.
-     "\\([^\0-\r \^?]+\\) +"		; day of the week
-     "\\([^\0-\r \^?]+\\) +"		; month
+     "\\([^\0-\r \x7f]+\\) +"		; day of the week
+     "\\([^\0-\r \x7f]+\\) +"		; month
      "\\([0-3]?[0-9]\\) +"		; day of month
      "\\([0-2][0-9]:[0-5][0-9]\\(:[0-6][0-9]\\)?\\) *" ; time of day
 
@@ -8172,7 +8172,7 @@ which specify the range to operate on."
       (move-marker end1 (max start end))
       (goto-char (min start end))
       (while (< (point) end1)
-	(or (looking-at "[_\^@- ]")
+	(or (looking-at "[_\x00- ]")
 	    (insert (char-after) "\b"))
 	(forward-char 1)))))
 

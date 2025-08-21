@@ -1034,14 +1034,14 @@ but more functional."
 (defun which-key-add-keymap-based-replacements (keymap key replacement &rest more)
   "Replace the description of KEY using REPLACEMENT in KEYMAP.
 KEY should take a format suitable for use in `kbd'.  REPLACEMENT
-should be a cons cell of the form \(STRING . COMMAND\) for each
+should be a cons cell of the form (STRING . COMMAND) for each
 REPLACEMENT, where STRING is the replacement string and COMMAND
 is a symbol corresponding to the intended command to be
 replaced.  COMMAND can be nil if the binding corresponds to a key
 prefix.  An example is
 
-\(which-key-add-keymap-based-replacements global-map
-  \"C-x w\" \\='\(\"Save as\" . write-file\)\).
+(which-key-add-keymap-based-replacements global-map
+  \"C-x w\" \\='(\"Save as\" . write-file)).
 
 For backwards compatibility, REPLACEMENT can also be a string,
 but the above format is preferred, and the option to use a string
@@ -1068,14 +1068,14 @@ for REPLACEMENT will eventually be removed."
 KEY-SEQUENCE is a string suitable for use in `kbd'.
 REPLACEMENT may either be a string, as in
 
-\(which-key-add-key-based-replacements \"C-x 1\" \"maximize\"\)
+(which-key-add-key-based-replacements \"C-x 1\" \"maximize\")
 
 a cons of two strings as in
 
-\(which-key-add-key-based-replacements \"C-x 8\"
-                                        \\='(\"unicode\" . \"Unicode keys\")\)
+(which-key-add-key-based-replacements \"C-x 8\"
+                                        \\='(\"unicode\" . \"Unicode keys\"))
 
-or a function that takes a \(KEY . BINDING\) cons and returns a
+or a function that takes a (KEY . BINDING) cons and returns a
 replacement.
 
 In the second case, the second string is used to provide a longer
@@ -2712,7 +2712,7 @@ KEYMAP is selected interactively by mode in
           (setq which-key--inhibit-next-operator-popup t))
         (cond ((and which-key-use-C-h-commands (numberp key) (= key help-char))
                (which-key-C-h-dispatch))
-              ((and (numberp key) (= key ?\C-\[))
+              ((and (numberp key) (= key ?\x1b))
                (which-key--hide-popup)
                (keyboard-quit))
               (t
@@ -2788,7 +2788,7 @@ Finally, show the buffer."
                 (> (length prefix-keys) 0)
                 (keymapp overriding-terminal-local-map)
                 ;; basic test for it being a hydra
-                (not (eq (lookup-key overriding-terminal-local-map "\C-u")
+                (not (eq (lookup-key overriding-terminal-local-map (kbd "C-u"))
                          'hydra--universal-argument)))
            (which-key--create-buffer-and-show
             nil overriding-terminal-local-map))

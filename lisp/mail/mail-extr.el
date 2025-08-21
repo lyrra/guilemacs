@@ -486,10 +486,10 @@ by translating things like \"foo!bar!baz@host\" into \"baz@bar.UUCP\"."
 	     (modify-syntax-entry char syntax syntax-table)
 	     (setq char (1+ char))))))))
  '((mail-extr-address-syntax-table
-    (?\000 ?\037 "w")			;control characters
-    (?\040	 " ")			;SPC
+    (?\x00 ?\x1f "w")			;control characters
+    (?\x20	 " ")			;SPC
     (?! ?~	 "w")			;printable characters
-    (?\177	 "w")			;DEL
+    (?\x7f	 "w")			;DEL
     (?\t " ")
     (?\r " ")
     (?\n " ")
@@ -512,9 +512,9 @@ by translating things like \"foo!bar!baz@host\" into \"baz@bar.UUCP\"."
     (?!  ".") ;; this needs to be word-constituent when not in .UUCP mode
     )
    (mail-extr-address-comment-syntax-table
-    (?\000 ?\377 "w")
-    (?\040 " ")
-    (?\240 " ")
+    (?\x00 ?\xff "w")
+    (?\x20 " ")
+    (?\xa0 " ")
     (?\t " ")
     (?\r " ")
     (?\n " ")
@@ -522,9 +522,9 @@ by translating things like \"foo!bar!baz@host\" into \"baz@bar.UUCP\"."
     (?\) ")(")
     (?\\ "\\"))
    (mail-extr-address-domain-literal-syntax-table
-    (?\000 ?\377 "w")
-    (?\040 " ")
-    (?\240 " ")
+    (?\x00 ?\xff "w")
+    (?\x20 " ")
+    (?\xa0 " ")
     (?\t " ")
     (?\r " ")
     (?\n " ")
@@ -532,9 +532,9 @@ by translating things like \"foo!bar!baz@host\" into \"baz@bar.UUCP\"."
     (?\] ")[")			;??????
     (?\\ "\\"))
    (mail-extr-address-text-comment-syntax-table
-    (?\000 ?\377 "w")
-    (?\040 " ")
-    (?\240 " ")
+    (?\x00 ?\xff "w")
+    (?\x20 " ")
+    (?\xa0 " ")
     (?\t " ")
     (?\r " ")
     (?\n " ")
@@ -552,7 +552,7 @@ by translating things like \"foo!bar!baz@host\" into \"baz@bar.UUCP\"."
    (mail-extr-address-text-syntax-table
     (?\000 ?\177 ".")
     (?\200 ?\377 "w")
-    (?\040 " ")
+    (?\x20 " ")
     (?\t " ")
     (?\r " ")
     (?\n " ")
@@ -861,7 +861,7 @@ to the results."
 	      ;; Do `(forward-word 1)', recognizing non-ASCII characters
 	      ;; except Latin-1 nbsp as words.
 	      (while (progn
-		       (skip-chars-forward "^\000-\177 ")
+		       (skip-chars-forward "^\x00-\x7f ")
 		       (and (not (eobp))
 			    (eq ?w (char-syntax (char-after)))
 			    (progn

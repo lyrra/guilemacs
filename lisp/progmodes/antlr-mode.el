@@ -2409,7 +2409,7 @@ the default language."
   (setq c-buffer-is-cc-mode antlr-language)
   (c-init-language-vars-for antlr-language)
   (c-basic-common-init antlr-language (or antlr-indent-style "gnu"))
-  (set (make-local-variable 'outline-regexp) "[^#\n\^M]")
+  (set (make-local-variable 'outline-regexp) "[^#\n\x0d]")
   (set (make-local-variable 'outline-level) #'c-outline-level) ;TODO: define own
   (set (make-local-variable 'indent-line-function) #'antlr-indent-line)
   (set (make-local-variable 'indent-region-function) nil)	; too lazy

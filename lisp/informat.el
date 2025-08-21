@@ -58,7 +58,7 @@
     (progn
       (widen)
       (goto-char (point-min))
-      (if (search-forward "\^_\nIndirect:\n" nil t)
+      (if (search-forward "\x1f\nIndirect:\n" nil t)
           (message
            "Cannot tagify split info file.  Run this before splitting.")
         (let (tag-list
@@ -90,7 +90,7 @@
                 "\\|"
 
                 "\\("
-                "\n\^_\\(\^L\\)?"
+                "\n\x1f\\(\x0c\\)?"
                 "\\)"
 
                 "\\("
@@ -131,7 +131,7 @@
 	      (goto-char (point-max))
 	      (forward-line -8)
 	      (let ((buffer-read-only nil))
-		(if (search-forward "\^_\nEnd tag table\n" nil t)
+		(if (search-forward "\x1f\nEnd tag table\n" nil t)
 		    (let ((end (point)))
 		      (search-backward "\nTag table:\n")
 		      (beginning-of-line)
@@ -139,7 +139,7 @@
 		(goto-char (point-max))
 		(or (bolp)
 		    (newline))
-		(insert "\^_\f\nTag table:\n")
+		(insert "\x1f\x0c\nTag table:\n")
 		(if (derived-mode-p 'info-mode)
 		    (move-marker Info-tag-table-marker (point)))
 		(setq tag-list (nreverse tag-list))
@@ -148,7 +148,7 @@
 		  (princ (car (cdr (car tag-list))) (current-buffer))
 		  (insert ?\n)
 		  (setq tag-list (cdr tag-list)))
-		(insert "\^_\nEnd tag table\n")))))
+		(insert "\x1f\nEnd tag table\n")))))
       (goto-char opoint)
       (narrow-to-region omin (if nomax (1+ (buffer-size))
 			       (min omax (point-max)))))
@@ -181,7 +181,7 @@ contains just the tag table and a directory of subfiles."
   (if (< (buffer-size) (+ 20000 Info-split-threshold))
       (error "This is too small to be worth splitting"))
   (goto-char (point-min))
-  (search-forward "\^_")
+  (search-forward "\x1f")
   (forward-char -1)
   (let ((start (point))
 	(chars-deleted 0)
@@ -192,10 +192,10 @@ contains just the tag table and a directory of subfiles."
     (goto-char (point-max))
     (forward-line -8)
     (setq buffer-read-only nil)
-    (or (search-forward "\^_\nEnd tag table\n" nil t)
+    (or (search-forward "\x1f\nEnd tag table\n" nil t)
 	(error "Tag table required; use M-x Info-tagify"))
     (search-backward "\nTag table:\n")
-    (if (looking-at "\nTag table:\n\^_")
+    (if (looking-at "\nTag table:\n\x1f")
 	(error "Tag table is just a skeleton; use M-x Info-tagify"))
     (beginning-of-line)
     (forward-char 1)
@@ -204,7 +204,7 @@ contains just the tag table and a directory of subfiles."
       (goto-char (point-min))
       (while (< (1+ (point)) (point-max))
 	(goto-char (min (+ (point) Info-split-threshold) (point-max)))
-	(search-forward "\^_" nil 'move)
+	(search-forward "\x1f" nil 'move)
 	(setq subfiles
 	      (cons (list (+ start chars-deleted)
 			  (concat (file-name-nondirectory filename)
@@ -227,7 +227,7 @@ contains just the tag table and a directory of subfiles."
 	      "\n")
       (setq subfiles (cdr subfiles)))
     (goto-char start)
-    (insert "\^_\nIndirect:\n")
+    (insert "\x1f\nIndirect:\n")
     (search-forward "\nTag Table:\n")
     (insert "(Indirect)\n")))
 
@@ -253,7 +253,7 @@ Check that every node pointer points to an existing node."
 	    (case-fold-search t)
 	    (tags-losing nil)
 	    (Info-validate-lossages ()))
-	(while (search-forward "\n\^_" nil t)
+	(while (search-forward "\n\x1f" nil t)
 	  (forward-line 1)
 	  (let ((beg (point)))
 	    (forward-line 1)
@@ -282,7 +282,7 @@ Check that every node pointer points to an existing node."
 				      beg)
 				Info-validate-allnodes)))))))
 	(goto-char (point-min))
-	(while (search-forward "\n\^_" nil t)
+	(while (search-forward "\n\x1f" nil t)
 	  (forward-line 1)
 	  (let ((beg (point))
 		Info-validate-thisnode next)
@@ -290,7 +290,7 @@ Check that every node pointer points to an existing node."
 	    (if (re-search-backward regexp beg t)
 		(save-restriction
 		  (let ((md (match-data)))
-		    (search-forward "\n\^_" nil 'move)
+		    (search-forward "\n\x1f" nil 'move)
 		    (narrow-to-region beg (point))
 		    (set-match-data md))
 		  (setq Info-validate-thisnode (downcase
@@ -407,7 +407,7 @@ Check that every node pointer points to an existing node."
 
 (defun Info-validate-tags-table ()
   (goto-char (point-min))
-  (if (not (search-forward "\^_\nEnd tag table\n" nil t))
+  (if (not (search-forward "\x1f\nEnd tag table\n" nil t))
       t
     (not (catch 'losing
 	   (let* ((end (match-beginning 0))
@@ -438,7 +438,7 @@ Check that every node pointer points to an existing node."
 				 (if (> tem 0) tem (- tem)))))
 		   (throw 'losing 'y))
 	       (forward-line 1)))
-	   (if (looking-at "\^_\n")
+	   (if (looking-at "\x1f\n")
 	       (forward-line 1))
 	   (or (looking-at "End tag table\n")
 	       (throw 'losing 'z))
@@ -485,7 +485,7 @@ For example, invoke \"emacs -batch -f batch-info-validate $info/ ~/*.info\""
 		(fundamental-mode)
 		(let ((case-fold-search nil))
 		  (goto-char (point-max))
-		  (cond ((search-backward "\n\^_\^L\nTag table:\n" nil t)
+		  (cond ((search-backward "\n\x1f\x0c\nTag table:\n" nil t)
 			 (message "%s already tagified" file))
 			((< (point-max) 30000)
 			 (message "%s too small to bother tagifying" file))

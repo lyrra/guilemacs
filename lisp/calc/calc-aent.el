@@ -297,7 +297,7 @@ The value t means abort and give an error message.")
 	(progn
 	  (require 'calc-ext)
 	  (calc-alg-edit alg-exp))
-      (let* ((calc-simplify-mode (if (eq last-command-event ?\C-j)
+      (let* ((calc-simplify-mode (if (eq last-command-event ?\x0a)
 				     'none
 				   calc-simplify-mode))
 	     (nvals (mapcar 'calc-normalize alg-exp)))

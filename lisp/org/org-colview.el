@@ -873,7 +873,7 @@ Also sets `org-columns-top-level-marker' to the new position."
 Column view applies to the whole buffer if point is before the first
 headline.  Otherwise, it applies to the first ancestor setting
 \"COLUMNS\" property.  If there is none, it defaults to the current
-headline.  With a `\\[universal-argument]' prefix \ argument, GLOBAL,
+headline.  With a `\\[universal-argument]' prefix argument, GLOBAL,
 turn on column view for the whole buffer unconditionally.
 
 When COLUMNS-FMT-STRING is non-nil, use it as the column format."

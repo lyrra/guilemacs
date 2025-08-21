@@ -50,11 +50,11 @@
 ;; also.
 
 ;; ISO-2022 escape sequence to designate GB2312.
-(defvar iso2022-gb-designation "\e$A")
+(defvar iso2022-gb-designation "\x1b$A")
 ;; HZ escape sequence to designate GB2312.
 (defvar hz-gb-designation "~{")
 ;; ISO-2022 escape sequence to designate ASCII.
-(defvar iso2022-ascii-designation "\e(B")
+(defvar iso2022-ascii-designation "\x1b(B")
 ;; HZ escape sequence to designate ASCII.
 (defvar hz-ascii-designation "~}")
 ;; Regexp of ZW sequence to start GB2312.
@@ -147,7 +147,7 @@ Return the length of resulting text."
 
 	;; ESC -> ESC ESC
 	(goto-char (point-min))
-	(while (search-forward "\e" nil t) (insert ?\e))
+	(while (search-forward "\x1b" nil t) (insert ?\x1b))
 
 	;; Non-ASCII-GB2312 -> \uXXXX
 	(goto-char (point-min))
@@ -163,12 +163,12 @@ Return the length of resulting text."
 	;; ESC $ B ... ESC ( B  -> ~{ ... ~}
 	;; ESC ESC -> ESC
 	(goto-char (point-min))
-	(while (search-forward "\e" nil t)
-	  (if (= (following-char) ?\e)
+	(while (search-forward "\x1b" nil t)
+	  (if (= (following-char) ?\x1b)
 	      ;; ESC ESC -> ESC
 	      (delete-char 1)
 	    (forward-char -1)
-	    (if (looking-at "\e\\$A")
+	    (if (looking-at "\x1b\\$A")
 		(progn
 		  (delete-region (match-beginning 0) (match-end 0))
 		  (insert hz-gb-designation)

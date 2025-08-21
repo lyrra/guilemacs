@@ -2263,8 +2263,7 @@ LOCATION is a buffer position, consider the formulas there."
 					 " *:: *"))
 	      eq-alist seen)
 	  (dolist (string strings (nreverse eq-alist))
-	    (when (string-match "\\`\\(@[-+I<>0-9.$@]+\\|\\$\\([_a-zA-Z0-9]+\\|\
-\[<>]+\\)\\) *= *\\(.*[^ \t]\\)"
+	    (when (string-match "\\`\\(@[-+I<>0-9.$@]+\\|\\$\\([_a-zA-Z0-9]+\\|[<>]+\\)\\) *= *\\(.*[^ \t]\\)"
 				string)
 	      (let ((lhs
 		     (let ((m (match-string 1 string)))
@@ -4587,8 +4586,7 @@ function is being called interactively."
 			(t 1))))
 	(sorting-type
 	 (or sorting-type
-	     (read-char-exclusive "Sort Table: [a]lphabetic, [n]umeric, \
-\[t]ime, [f]unc.  A/N/T/F means reversed: ")))
+	     (read-char-exclusive "Sort Table: [a]lphabetic, [n]umeric, [t]ime, [f]unc.  A/N/T/F means reversed: ")))
 	(start (org-table-begin))
 	(end (org-table-end)))
     (save-restriction

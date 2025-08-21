@@ -565,8 +565,7 @@ value if point was successfully moved."
     (org-fold-show-context 'link-search)
     (when (derived-mode-p 'org-mode)
       (message "%s" (substitute-command-keys
-		     "Edit definition and go back with \
-`\\[org-mark-ring-goto]' or, if unique, with `\\[org-ctrl-c-ctrl-c]'.")))
+		     "Edit definition and go back with `\\[org-mark-ring-goto]' or, if unique, with `\\[org-ctrl-c-ctrl-c]'.")))
     t))
 
 (defun org-footnote-goto-previous-reference (label)
@@ -1012,8 +1011,7 @@ offer additional commands in a menu."
       (org-footnote-goto-previous-reference
        (org-element-property :label context)))
      ((or special (not (org-footnote--allow-reference-p)))
-      (message "Footnotes: [s]ort | [r]enumber fn:N | [S]=r+s | [n]ormalize | \
-\[d]elete")
+      (message "Footnotes: [s]ort | [r]enumber fn:N | [S]=r+s | [n]ormalize | [d]elete")
       (pcase (read-char-exclusive)
 	(?s (org-footnote-sort))
 	(?r (org-footnote-renumber-fn:N))

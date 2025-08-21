@@ -2955,7 +2955,7 @@ Will not look before LIM."
 		   ;; Now add a little if this is a continuation line.
 		   (and state
 			parse-data
-			(not (eq char-after ?\C-j))
+			(not (eq char-after ?\x0a))
 			(setcdr (cddr parse-data)
 				(list pre-indent-point)))
 		   (vector 'toplevel start char-after state (nth 2 s-s)))
@@ -5421,7 +5421,7 @@ recursive calls in starting lines of here-documents."
   "Return non-nil if this is the start of a block.  Point is before ?\\{."
   ;; No save-excursion!  This is more a distinguisher of a block/hash ref...
   (cperl-backward-to-noncomment (point-min))
-  (or (memq (preceding-char) (append ";){}$@&%\C-@" nil)) ; Or label!  \C-@ at bobp
+  (or (memq (preceding-char) (append ";){}$@&%\x00" nil)) ; Or label!  \x00 at bobp
 					; Label may be mixed up with `$blah :'
       (save-excursion (cperl-after-label))
       ;; text with the 'attrib-group property is also covered by the
@@ -7652,9 +7652,9 @@ If INBUFFER, do not select buffer, and do not save."
      "\\|"
       cperl-sub-regexp "\\>[^\n]+::"
      "\\|"
-      "[a-zA-Z_][a-zA-Z_0-9:]*(\C-?[^\n]+::" ; XSUB?
+      "[a-zA-Z_][a-zA-Z_0-9:]*(\x7f[^\n]+::" ; XSUB?
      "\\|"
-      "[ \t]*BOOT:\C-?[^\n]+::"		; BOOT section
+      "[ \t]*BOOT:\x7f[^\n]+::"		; BOOT section
    "\\)"))
 
 (defvar cperl-hierarchy '(() ())
@@ -7673,9 +7673,9 @@ If INBUFFER, do not select buffer, and do not save."
       (beginning-of-line)
       (if (looking-at (concat
 		       "\\([^\n]+\\)"
-		       "\C-?"
+		       "\x7f"
 		       "\\([^\n]+\\)"
-		       "\C-a"
+		       "\x01"
 		       "\\([0-9]+\\)"
 		       ","
 		       "\\([0-9]+\\)"))
@@ -7918,7 +7918,7 @@ Currently it is tuned to C and Perl syntax."
 		  (lambda (_) (insert " "))
 		  'cperl-next-bad-style
 		  '("location" "locations" "insert a space into")
-		  `((?\C-r ,(lambda (_)
+		  `((?\x12 ,(lambda (_)
 			      (let ((buffer-quit-function
 				     #'exit-recursive-edit))
 			        (message "Exit with Esc Esc")
@@ -8079,7 +8079,7 @@ than a line.  Your contribution to update/shorten it is appreciated."
       (setq val (concat "%" (substring val 1 (match-end 1)))))
      ((and (string= val "x") (string-match "^x=" val))
       (setq val "x="))
-     ((string-match "^\\$[\C-a-\C-z]" val)
+     ((string-match "^\\$[\x01-\x1a]" val)
       (setq val (concat "$^" (char-to-string (+ ?A -1 (aref val 1))))))
      ((string-match "^CORE::" val)
       (setq val "CORE::"))

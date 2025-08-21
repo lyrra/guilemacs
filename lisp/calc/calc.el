@@ -1176,9 +1176,9 @@ Used by `calc-user-invocation'.")
   (ignore-errors                   ; look for other keys bound to calc-dispatch
     (let ((keys (this-command-keys)))
       (unless (or (not (stringp keys))
-                  (string-match "\\`\C-u\\|\\`\e[-0-9#]\\|`[\M--\M-0-\M-9]" keys)
+                  (string-match "\\`\x15\\|\\`\x1b[-0-9#]\\|`[\x1d-\x19]" keys)
                   (eq (lookup-key calc-dispatch-map keys) 'calc-same-interface))
-        (when (and (string-match "\\`[\C-@-\C-_]" keys)
+        (when (and (string-match "\\`[\x00-\x1f]" keys)
                    (symbolp
                     (lookup-key calc-dispatch-map (substring keys 0 1))))
           (define-key calc-dispatch-map (substring keys 0 1) nil))

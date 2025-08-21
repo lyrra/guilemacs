@@ -216,7 +216,7 @@ For true \"word wrap\" behavior, use `visual-line-mode' instead."
   ;; Not global, so no effect.
 ;;;  :group 'refill
   :lighter " Refill"
-  :keymap '(("\177" . backward-delete-char-untabify))
+  :keymap '(("\x7f" . backward-delete-char-untabify))
   ;; Remove old state if necessary
   (when refill-ignorable-overlay
     (delete-overlay refill-ignorable-overlay)

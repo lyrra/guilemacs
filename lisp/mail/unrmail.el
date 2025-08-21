@@ -81,10 +81,10 @@ The variable `unrmail-mbox-format' controls which mbox format to use."
     (let ((coding-system rmail-file-coding-system)
 	  from to)
       (goto-char (point-min))
-      (search-forward "\n\^_" nil t)	; Skip BABYL header.
+      (search-forward "\n\x1f" nil t)	; Skip BABYL header.
       (setq from (point))
       (goto-char (point-max))
-      (search-backward "\n\^_" from 'mv)
+      (search-backward "\n\x1f" from 'mv)
       (if (= from (setq to (point)))
 	  (error "The input file contains no messages"))
       (unless (and coding-system
@@ -122,10 +122,10 @@ The variable `unrmail-mbox-format' controls which mbox format to use."
 	  (from-buffer (current-buffer)))
 
       ;; Process the messages one by one.
-      (while (re-search-forward "^\^_\^l" nil t)
+      (while (re-search-forward "^\x1f\x0c" nil t)
 	(let ((beg (point))
 	      (end (save-excursion
-		     (if (re-search-forward "^\^_\\(\^l\\|\\'\\)" nil t)
+		     (if (re-search-forward "^\x1f\\(\x0c\\|\\'\\)" nil t)
 			 (match-beginning 0)
 		       (point-max))))
 	      (coding 'raw-text)

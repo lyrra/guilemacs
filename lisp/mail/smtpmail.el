@@ -328,7 +328,7 @@ for `smtpmail-try-auth-method'.")
 	      (goto-char (point-min))
 	      (and (eq mail-send-nonascii 'mime)
 		   (not (re-search-forward "^MIME-version:" delimline t))
-		   (progn (skip-chars-forward "\0-\177")
+		   (progn (skip-chars-forward "\x00-\x7f")
 			  (/= (point) (point-max)))
 		   smtpmail-code-conv-from
 		   (setq charset
@@ -634,7 +634,7 @@ USER and PASSWORD should be non-nil."
   (smtpmail-command-or-throw
    process
    (concat "AUTH PLAIN "
-	   (base64-encode-string (concat "\0" user "\0" password) t))
+	   (base64-encode-string (concat "\x00" user "\x00" password) t))
    235))
 
 (cl-defmethod smtpmail-try-auth-method
@@ -643,7 +643,7 @@ USER and PASSWORD should be non-nil."
    process
    (concat "AUTH XOAUTH2 "
            (base64-encode-string
-            (concat "user=" user "\1auth=Bearer " password "\1\1") t))))
+            (concat "user=" user "\x01auth=Bearer " password "\x01\x01") t))))
 
 (defun smtpmail-response-code (string)
   (when string

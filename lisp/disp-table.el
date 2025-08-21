@@ -237,7 +237,7 @@ for a graphical frame."
   (or standard-display-table
       (setq standard-display-table (make-display-table)))
   (aset standard-display-table c
-	(vector (create-glyph (concat "\e(0" (char-to-string gc) "\e(B")))))
+	(vector (create-glyph (concat "\x1b(0" (char-to-string gc) "\x1b(B")))))
 
 ;;;###autoload
 (defun standard-display-underline (c uc)
@@ -248,7 +248,7 @@ for a graphical frame."
 	(vector
 	 (if window-system
 	     (make-glyph-code uc 'underline)
-	   (create-glyph (concat "\e[4m" (char-to-string uc) "\e[m"))))))
+	   (create-glyph (concat "\x1b[4m" (char-to-string uc) "\x1b[m"))))))
 
 ;;;###autoload
 (defun create-glyph (string)
@@ -380,8 +380,7 @@ which characters can be displayed and which cannot."
 	first)
     (with-current-buffer buf
       (erase-buffer)
-      (insert "\
-;; This code was produced by `standard-display-by-replacement-char'.
+      (insert ";; This code was produced by `standard-display-by-replacement-char'.
 ;; Evaluate the Lisp code below to make Emacs show the standard
 ;; replacement character as a substitute for each undisplayable character.
 ;; One way to do that is with \"C-x h M-x eval-region RET\".
@@ -406,7 +405,7 @@ which characters can be displayed and which cannot."
 	   (format "#x%x" first)
 	   " . "
 	   (format "#x%x" (1- ch))
-	   ")\n\                        (vconcat (list (make-glyph-code "
+	   ")\n                        (vconcat (list (make-glyph-code "
 	   (format "#x%x" repl) " 'homoglyph))))\n"))))
       (insert ")\n"))
     (pop-to-buffer buf)))

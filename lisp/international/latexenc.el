@@ -149,7 +149,7 @@ coding system names is determined from `latex-inputenc-coding-alist'."
             ;; section?
             (unless latexenc-dont-use-TeX-master-flag
               (goto-char (point-max))
-	      (search-backward "\n\^L" (max (- (point-max) 3000) (point-min))
+	      (search-backward "\n\x0c" (max (- (point-max) 3000) (point-min))
                                'move)
 	      (search-forward "Local Variables:" nil t)
               (when (re-search-forward

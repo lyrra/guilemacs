@@ -642,7 +642,7 @@ For details see `conf-mode'.  Example:
 
 # Conf mode font-locks this right with \\[conf-toml-mode]
 
-\[entry]
+[entry]
 value = \"some string\""
   (conf-mode-initialize "#")
   ;; Booleans are "always lowercase", so we must *not* use case

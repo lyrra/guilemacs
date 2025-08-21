@@ -23,7 +23,7 @@
 ;;; Commentary:
 
 ;; This package deals with the primitive form of underlining
-;; consisting of prefixing each character with "_\^h".  The entry
+;; consisting of prefixing each character with "_\x08".  The entry
 ;; point `underline-region' performs such underlining on a region.
 ;; The entry point `ununderline-region' removes it.
 
@@ -41,7 +41,7 @@ which specify the range to operate on."
      (move-marker end1 (max start end))
      (goto-char (min start end))
      (while (< (point) end1)
-       (or (looking-at "[_\^@- ]")
+       (or (looking-at "[_\x00- ]")
 	   (insert "_\b"))
        (forward-char 1)))))
 

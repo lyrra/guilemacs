@@ -1340,7 +1340,7 @@ With a `\\[universal-argument]' prefix argument SELECT, offer a list of \
 recently clocked
 tasks to clock into.
 
-When SELECT is `\\[universal-argument] \ \\[universal-argument]', \
+When SELECT is `\\[universal-argument] \\[universal-argument]',
 clock into the current task and mark it as
 the default task, a special task that will always be offered in the
 clocking selection, associated with the letter `d'.
@@ -2143,10 +2143,10 @@ By default, show the total time for the range defined in
 prefix, show
 the total time for today instead.
 
-With `\\[universal-argument] \\[universal-argument]' prefix, \
+With `\\[universal-argument] \\[universal-argument]' prefix,
 use a custom range, entered at prompt.
 
-With `\\[universal-argument] \ \\[universal-argument] \
+With `\\[universal-argument] \\[universal-argument]
 \\[universal-argument]' prefix, display the total time in the
 echo area.
 
