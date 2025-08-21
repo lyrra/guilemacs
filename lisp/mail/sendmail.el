@@ -1009,7 +1009,7 @@ This function does not perform RFC2047 encoding."
   (let* ((login user-mail-address)
 	 (fullname (user-full-name))
 	 (quote-fullname nil))
-    (if (string-match "[^\0-\177]" fullname)
+    (if (string-match "[^\x00-\x7f]" fullname)
 	(setq quote-fullname t))
     (cond ((null mail-from-style)
 	   (insert "From: " login "\n"))

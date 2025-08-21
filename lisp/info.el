@@ -919,7 +919,7 @@ In standalone mode, \\<Info-mode-map>\\[quit-window] exits Emacs itself."
 ;; See if the accessible portion of the buffer begins with a node
 ;; delimiter, and the node header line which follows matches REGEXP.
 ;; Typically, this test will be followed by a loop that examines the
-;; rest of the buffer with (search-forward "\n\^_"), and it's a pity
+;; rest of the buffer with (search-forward "\n\x1f"), and it's a pity
 ;; to have the overhead of this special test inside the loop.
 
 ;; This function changes match-data, but supposedly the caller might
@@ -1631,11 +1631,11 @@ is non-nil)."
     (if (numberp nodepos)
 	(with-current-buffer (marker-buffer Info-tag-table-marker)
 	  (goto-char (point-min))
-	  (or (looking-at "\^_")
-	      (search-forward "\n\^_"))
+	  (or (looking-at "\x1f")
+	      (search-forward "\n\x1f"))
 	  (forward-line 2)
 	  (catch 'foo
-	    (while (not (looking-at "\^_"))
+	    (while (not (looking-at "\x1f"))
 	      (if (not (eolp))
 		  (let ((beg (point))
 			thisfilepos thisfilename)
@@ -1666,9 +1666,9 @@ is non-nil)."
     (widen)
     (goto-char (point-min))
     ;; Skip the summary segment for `Info-search'.
-    (if (looking-at "\^_")
+    (if (looking-at "\x1f")
 	(forward-char 1)
-      (search-forward "\n\^_"))
+      (search-forward "\n\x1f"))
     (if (numberp nodepos)
         ;; Our caller ('Info-find-node-2') wants the (zero-based) byte
         ;; offset corresponding to NODEPOS, from the beginning of the
@@ -1777,11 +1777,11 @@ escaped (\\\",\\\\)."
   (let ((case-fold-search t))
     (save-excursion
       ;; Find beginning of node.
-      (if (search-backward "\n\^_" nil 'move)
+      (if (search-backward "\n\x1f" nil 'move)
 	  (forward-line 2)
-	(if (looking-at "\^_")
+	(if (looking-at "\x1f")
 	    (forward-line 1)
-	  (signal 'search-failed (list "\n\^_"))))
+	  (signal 'search-failed (list "\n\x1f"))))
       ;; Get nodename spelled as it is in the node.
       (re-search-forward "Node:[ \t]*")
       (setq Info-current-node
@@ -1795,10 +1795,10 @@ escaped (\\\",\\\\)."
       (let (active-expression)
 	;; Narrow to the node contents
 	(narrow-to-region (point)
-			  (if (re-search-forward "\n[\^_\f]" nil t)
+			  (if (re-search-forward "\n[\x1f\f]" nil t)
 			      (prog1
 				  (1- (point))
-				(if (looking-at "[\n\^_\f]*execute: ")
+				(if (looking-at "[\n\x1f\f]*execute: ")
 				    (progn
 				      (goto-char (match-end 0))
 				      (setq active-expression
@@ -2087,7 +2087,7 @@ the Top node in FILENAME."
 	  (if (Info-node-at-bob-matching node-regexp)
 	      (setq compl (list (match-string-no-properties 1))))
 	  ;; Now for the rest of the nodes.
-	  (while (search-forward "\n\^_" nil t)
+	  (while (search-forward "\n\x1f" nil t)
 	    (forward-line 1)
 	    (let ((beg (point)))
 	      (forward-line 1)
@@ -2122,7 +2122,7 @@ the Top node in FILENAME."
     ;; Hide Info file header for backward search.
     (narrow-to-region (save-excursion
                         (goto-char (point-min))
-                        (search-forward "\n\^_")
+                        (search-forward "\n\x1f")
                         (1- (point)))
                       (point-max)))
   (let ((give-up nil)
@@ -2193,10 +2193,10 @@ If DIRECTION is `backward', search in the reverse direction."
 	    (let ((list ()))
 	      (with-current-buffer (marker-buffer Info-tag-table-marker)
 		(goto-char (point-min))
-		(search-forward "\n\^_\nIndirect:")
+		(search-forward "\n\x1f\nIndirect:")
 		(save-restriction
 		  (narrow-to-region (point)
-				    (progn (search-forward "\n\^_")
+				    (progn (search-forward "\n\x1f")
 					   (1- (point))))
 		  (goto-char (point-min))
 		  ;; Find the subfile we just searched.
@@ -2367,13 +2367,13 @@ and is not in the header line or a tag table."
 		   (text-property-not-all beg-found found 'display nil))))
 	;; Skip node header line
 	(and (save-excursion (forward-line -1)
-			     (looking-at "\^_"))
+			     (looking-at "\x1f"))
 	     (forward-line (if backward -1 1)))
 	;; Skip Tag Table node
 	(save-excursion
-	  (and (search-backward "\^_" nil t)
+	  (and (search-backward "\x1f" nil t)
 	       (looking-at
-		"\^_\n\\(Tag Table\\|Local Variables\\)"))))))))
+		"\x1f\n\\(Tag Table\\|Local Variables\\)"))))))))
 
 
 (defun Info-extract-pointer (name &optional errorname)
@@ -2540,7 +2540,7 @@ If SAME-FILE is non-nil, do not move to a different Info file."
 
 (defun Info-history-find-node (filename nodename &optional _no-going-back)
   "History-specific implementation of `Info-find-node-2'."
-  (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: (dir)\n\n"
+  (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: (dir)\n\n"
 		  (or filename Info-current-file) nodename))
   (insert "History of Visited Nodes\n")
   (insert "************************\n\n")
@@ -2573,7 +2573,7 @@ If SAME-FILE is non-nil, do not move to a different Info file."
   (let* ((curr-file (substring-no-properties (or filename Info-current-file)))
 	 (curr-node (substring-no-properties (or nodename Info-current-node)))
 	 (node-list (Info-toc-nodes curr-file)))
-    (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 		    curr-file curr-node))
     (insert "Table of Contents\n")
     (insert "*****************\n\n")
@@ -2586,7 +2586,7 @@ If SAME-FILE is non-nil, do not move to a different Info file."
 	    (Info-fontify-visited-nodes nil))
 	(setq Info-current-file filename Info-current-node "*TOC*")
 	(goto-char (point-min))
-	(narrow-to-region (or (re-search-forward "\n[\^_\f]\n" nil t)
+	(narrow-to-region (or (re-search-forward "\n[\x1f\f]\n" nil t)
 			      (point-min))
 			  (point-max))
 	(Info-fontify-node)
@@ -2630,10 +2630,10 @@ Table of contents is created from the tree structure of menus."
         (erase-buffer)
         (info-insert-file-contents (or main-file (car subfiles)))
         (goto-char (point-min))
-        (while (and (search-forward "\n\^_\nFile:" nil 'move)
+        (while (and (search-forward "\n\x1f\nFile:" nil 'move)
                     (search-forward "Node: " nil 'move))
           (let* ((nodename (substring-no-properties (Info-following-node-name)))
-		 (bound (- (or (save-excursion (search-forward "\n\^_" nil t))
+		 (bound (- (or (save-excursion (search-forward "\n\x1f" nil t))
 			       (point-max)) 2))
 		 (upnode (and (re-search-forward
 			       (concat "Up:" (Info-following-node-name-re))
@@ -2677,8 +2677,8 @@ Table of contents is created from the tree structure of menus."
         (if main-file
             (save-excursion
               (goto-char (point-min))
-              (if (search-forward "\n\^_\nIndirect:" nil t)
-                  (let ((bound (save-excursion (search-forward "\n\^_" nil t))))
+              (if (search-forward "\n\x1f\nIndirect:" nil t)
+                  (let ((bound (save-excursion (search-forward "\n\x1f" nil t))))
                     (while (re-search-forward "^\\(.*\\): [0-9]+$" bound t)
                       (setq subfiles (cons (match-string-no-properties 1)
                                            subfiles)))))
@@ -3398,14 +3398,14 @@ following nodes whose names also contain the word \"Index\"."
 		    (goto-char (point-min))
 		    (while (search-forward "\0\b[index\0\b]" nil 'move)
 		      (save-excursion
-			(re-search-backward "^\^_")
+			(re-search-backward "^\x1f")
 			(search-forward "Node: ")
 			(setq nodes (cons (Info-following-node-name) nodes))))
 		    (if main-file
 			(save-excursion
 			  (goto-char (point-min))
-			  (if (search-forward "\n\^_\nIndirect:" nil t)
-			      (let ((bound (save-excursion (search-forward "\n\^_" nil t))))
+			  (if (search-forward "\n\x1f\nIndirect:" nil t)
+			      (let ((bound (save-excursion (search-forward "\n\x1f" nil t))))
 				(while (re-search-forward "^\\(.*\\): [0-9]+$" bound t)
 				  (setq subfiles (cons (match-string-no-properties 1)
 						       subfiles)))))
@@ -3458,11 +3458,11 @@ If FILE is nil, check the current Info file."
       (if (Info-file-supports-index-cookies file)
 	  (save-excursion
 	    (goto-char (+ (or (save-excursion
-				(search-backward "\n\^_" nil t))
+				(search-backward "\n\x1f" nil t))
 			      (point-min)) 2))
 	    (search-forward "\0\b[index\0\b]"
 			    (or (save-excursion
-				  (search-forward "\n\^_" nil t))
+				  (search-forward "\n\x1f" nil t))
 				(point-max)) t))
 	(string-match "\\<Index\\>" (or node Info-current-node ""))))))
 
@@ -3637,7 +3637,7 @@ MATCHES is a list of index matches found by `Info-index'.")
       (let* ((topic (match-string 1 nodename))
 	     (matches (cdr (assoc (cons (or filename Info-current-file) topic)
 				  Info-virtual-index-nodes))))
-	(insert (format "\n\^_\nFile: %s,  Node: %s,  Up: *Index*\n\n"
+	(insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: *Index*\n\n"
 			(or filename Info-current-file) nodename))
 	(insert "Info Virtual Index\n")
 	(insert "******************\n\n")
@@ -3655,7 +3655,7 @@ MATCHES is a list of index matches found by `Info-index'.")
 			      ""))))))
     ;; Else, Generate a list of previous search results
     (let ((nodes (reverse Info-virtual-index-nodes)))
-      (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+      (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 		      (or filename Info-current-file) nodename))
       (insert "Info Virtual Index\n")
       (insert "******************\n\n")
@@ -3738,7 +3738,7 @@ MATCHES is a list of index matches found by `Info-apropos-matches'.")
   (if (equal nodename "Top")
       ;; Generate Top menu
       (let ((nodes (reverse Info-apropos-nodes)))
-	(insert (format "\n\^_\nFile: %s,  Node: %s,  Up: (dir)\n\n"
+	(insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: (dir)\n\n"
 			Info-apropos-file nodename))
 	(insert "Apropos Index\n")
 	(insert "*************\n\n")
@@ -3752,7 +3752,7 @@ MATCHES is a list of index matches found by `Info-apropos-matches'.")
     (let* ((nodeinfo (assoc nodename Info-apropos-nodes))
 	   (matches (nth 2 nodeinfo)))
       (when matches
-	(insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+	(insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 			Info-apropos-file nodename))
 	(insert "Apropos Index\n")
 	(insert "*************\n\n")
@@ -3890,7 +3890,7 @@ Display a menu of the possible matches."
   (cond
    ((equal nodename "Top")
     ;; Display Top menu with descriptions of the keywords
-    (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: (dir)\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: (dir)\n\n"
 		    Info-finder-file nodename))
     (insert "Finder Keywords\n")
     (insert "***************\n\n")
@@ -3905,7 +3905,7 @@ Display a menu of the possible matches."
 			(info--prettify-description (cdr assoc)))))))
    ((equal nodename "Keyword unknown")
     ;; Display unknown keywords
-    (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 		    Info-finder-file nodename))
     (insert "Finder Unknown Keywords\n")
     (insert "***********************\n\n")
@@ -3919,7 +3919,7 @@ Display a menu of the possible matches."
      (finder-unknown-keywords)))
    ((equal nodename "Keyword all")
     ;; Display all package info.
-    (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 		    Info-finder-file nodename))
     (insert "Finder Package Info\n")
     (insert "*******************\n\n")
@@ -3935,7 +3935,7 @@ Display a menu of the possible matches."
     (setq nodename (substring nodename (match-end 0)))
     ;; Display packages that match the keyword
     ;; or the list of keywords separated by comma.
-    (insert (format "\n\^_\nFile: %s,  Node: Keyword %s,  Up: Top\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: Keyword %s,  Up: Top\n\n"
 		    Info-finder-file nodename))
     (insert "Finder Packages\n")
     (insert "***************\n\n")
@@ -3962,7 +3962,7 @@ Display a menu of the possible matches."
 			  (info--prettify-description (aref desc 2))))))))
    (t
     ;; Display commentary section
-    (insert (format "\n\^_\nFile: %s,  Node: %s,  Up: Top\n\n"
+    (insert (format "\n\x1f\nFile: %s,  Node: %s,  Up: Top\n\n"
 		    Info-finder-file nodename))
     (insert "Package Description\n")
     (insert "*******************\n\n")
