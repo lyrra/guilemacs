@@ -6396,6 +6396,7 @@ compilation.  */);
     doc: /* A list of symbols which are the features of the executing Emacs.
 Used by `featurep' and `require', and altered by `provide'.  */);
   Vfeatures = list1 (Qemacs);
+  /* FIX-guilemacs: Use direct intern for Guile symbol (optimized by intern caching) */
   Vfeatures = Fcons (intern_c_string ("guile"), Vfeatures);
   DEFSYM (Qfeatures, "features");
   /* Let people use lexically scoped vars named `features'.  */

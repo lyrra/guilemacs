@@ -3433,6 +3433,7 @@ that describe key bindings.  That is why the default is nil.  */);
   DEFSYM (Qmode_line, "mode-line");
 
   staticpro (&Vmouse_events);
+  /* FIX-guilemacs: Use direct intern for mouse symbols (optimized by intern caching) */
   Vmouse_events = pure_list (Qmenu_bar, Qtab_bar, Qtool_bar,
 			     Qtab_line, Qheader_line, Qmode_line,
 			     intern_c_string ("mouse-1"),

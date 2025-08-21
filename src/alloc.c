@@ -46,9 +46,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include TERM_HEADER
 #endif /* HAVE_WINDOW_SYSTEM */
 
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-#include "sfntfont.h"
-#endif
+/* FIX-guilemacs: Removed Android platform code - using pure Guile approach */
 
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
