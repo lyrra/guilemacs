@@ -1720,7 +1720,7 @@ comment block.  If not in a // comment, just does a normal newline."
                    '((kbd "M-q") opascal-fill-comment)
                    ;; '("\M-j" opascal-new-comment-line)
                    ;; Debug bindings:
-                   (list "\C-c\C-d" opascal-debug-mode-map)))
+                   (list (kbd "C-c C-d") opascal-debug-mode-map)))
       (define-key kmap (car binding) (cadr binding)))
     kmap)
   "Keymap used in OPascal mode.")

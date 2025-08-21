@@ -271,25 +271,25 @@ The default value matches citations like `foo-bar>' plus whitespace."
 (defvar mail-abbrevs-loaded nil)
 (defvar mail-mode-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-c?" 'describe-mode)
-    (define-key map "\C-c\C-f\C-t" 'mail-to)
-    (define-key map "\C-c\C-f\C-b" 'mail-bcc)
-    (define-key map "\C-c\C-f\C-f" 'mail-fcc)
-    (define-key map "\C-c\C-f\C-c" 'mail-cc)
-    (define-key map "\C-c\C-f\C-s" 'mail-subject)
-    (define-key map "\C-c\C-f\C-r" 'mail-reply-to)
-    (define-key map "\C-c\C-f\C-a" 'mail-mail-reply-to)    ; author
-    (define-key map "\C-c\C-f\C-l" 'mail-mail-followup-to) ; list
-    (define-key map "\C-c\C-f\C-d" 'mail-insert-disposition-notification-to)
-    (define-key map "\C-c\C-t" 'mail-text)
-    (define-key map "\C-c\C-y" 'mail-yank-original)
-    (define-key map "\C-c\C-r" 'mail-yank-region)
+    (define-key map (kbd "C-c ?") 'describe-mode)
+    (define-key map (kbd "C-c C-f C-t") 'mail-to)
+    (define-key map (kbd "C-c C-f C-b") 'mail-bcc)
+    (define-key map (kbd "C-c C-f C-f") 'mail-fcc)
+    (define-key map (kbd "C-c C-f C-c") 'mail-cc)
+    (define-key map (kbd "C-c C-f C-s") 'mail-subject)
+    (define-key map (kbd "C-c C-f C-r") 'mail-reply-to)
+    (define-key map (kbd "C-c C-f C-a") 'mail-mail-reply-to)    ; author
+    (define-key map (kbd "C-c C-f C-l") 'mail-mail-followup-to) ; list
+    (define-key map (kbd "C-c C-f C-d") 'mail-insert-disposition-notification-to)
+    (define-key map (kbd "C-c C-t") 'mail-text)
+    (define-key map (kbd "C-c C-y") 'mail-yank-original)
+    (define-key map (kbd "C-c C-r") 'mail-yank-region)
     (define-key map [remap split-line] 'mail-split-line)
-    (define-key map "\C-c\C-q" 'mail-fill-yanked-message)
-    (define-key map "\C-c\C-w" 'mail-signature)
-    (define-key map "\C-c\C-c" 'mail-send-and-exit)
-    (define-key map "\C-c\C-s" 'mail-send)
-    (define-key map "\C-c\C-i" 'mail-insert-file)
+    (define-key map (kbd "C-c C-q") 'mail-fill-yanked-message)
+    (define-key map (kbd "C-c C-w") 'mail-signature)
+    (define-key map (kbd "C-c C-c") 'mail-send-and-exit)
+    (define-key map (kbd "C-c C-s") 'mail-send)
+    (define-key map (kbd "C-c C-i") 'mail-insert-file)
     ;; FIXME add this? "b" = bury buffer.  It's in the menu-bar.
 ;;;    (define-key map "\C-c\C-b" 'mail-dont-send)
 

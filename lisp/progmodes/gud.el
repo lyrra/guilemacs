@@ -753,7 +753,7 @@ The option \"--fullname\" must be included in this value."
     output))
 
 (easy-mmode-defmap gud-minibuffer-local-map
-  '(("\C-i" . comint-dynamic-complete-filename))
+  '(((kbd "TAB") . comint-dynamic-complete-filename))
   "Keymap for minibuffer prompting of gud startup command."
   :inherit minibuffer-local-map)
 
@@ -830,16 +830,16 @@ the buffer in which this command was invoked."
   (gud-common-init command-line nil 'gud-gdb-marker-filter)
   (setq-local gud-minor-mode 'gdb)
 
-  (gud-def gud-break  "break %f:%l"  "\C-b" "Set breakpoint at current line.")
-  (gud-def gud-tbreak "tbreak %f:%l" "\C-t"
+  (gud-def gud-break  "break %f:%l"  "C-b" "Set breakpoint at current line.")
+  (gud-def gud-tbreak "tbreak %f:%l" "C-t"
 	   "Set temporary breakpoint at current line.")
-  (gud-def gud-remove "clear %f:%l" "\C-d" "Remove breakpoint at current line")
-  (gud-def gud-step   "step %p"     "\C-s" "Step one source line with display.")
-  (gud-def gud-stepi  "stepi %p"    "\C-i" "Step one instruction with display.")
-  (gud-def gud-next   "next %p"     "\C-n" "Step one line (skip functions).")
+  (gud-def gud-remove "clear %f:%l" "C-d" "Remove breakpoint at current line")
+  (gud-def gud-step   "step %p"     "C-s" "Step one source line with display.")
+  (gud-def gud-stepi  "stepi %p"    "TAB" "Step one instruction with display.")
+  (gud-def gud-next   "next %p"     "C-n" "Step one line (skip functions).")
   (gud-def gud-nexti  "nexti %p" nil   "Step one instruction (skip functions).")
-  (gud-def gud-cont   "cont"     "\C-r" "Continue with display.")
-  (gud-def gud-finish "finish"   "\C-f" "Finish executing current function.")
+  (gud-def gud-cont   "cont"     "C-r" "Continue with display.")
+  (gud-def gud-finish "finish"   "C-f" "Finish executing current function.")
   (gud-def gud-jump
 	   (progn (gud-call "tbreak %f:%l" arg) (gud-call "jump %f:%l"))
 	   "\C-j" "Set execution address to current line.")
