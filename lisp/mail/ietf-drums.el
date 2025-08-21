@@ -29,9 +29,9 @@
 
 (eval-when-compile (require 'cl-lib))
 
-(defvar ietf-drums-no-ws-ctl-token "\001-\010\013\014\016-\037\177"
+(defvar ietf-drums-no-ws-ctl-token "\x01-\x08\x0b\x0c\x0e-\x1f\x7f"
   "US-ASCII control characters excluding CR, LF and white space.")
-(defvar ietf-drums-text-token "\001-\011\013\014\016-\177"
+(defvar ietf-drums-text-token "\x01-\x09\x0b\x0c\x0e-\x7f"
   "US-ASCII characters excluding CR and LF.")
 (defvar ietf-drums-specials-token "()<>[]:;@\\,.\""
   "Special characters.")
@@ -47,7 +47,7 @@
 (defvar ietf-drums-dot-atext-token "-^a-zA-Z0-9!#$%&'*+/=?_`{|}~."
   "Textual token including full stop.")
 (defvar ietf-drums-qtext-token
-  (concat ietf-drums-no-ws-ctl-token "\041\043-\133\135-\177")
+  (concat ietf-drums-no-ws-ctl-token "\x21\x23-\x5b\x5d-\x7f")
   "Non-white-space control characters, plus the rest of ASCII excluding
 backslash and doublequote.")
 (defvar ietf-drums-tspecials "][()<>@,;:\\\"/?="

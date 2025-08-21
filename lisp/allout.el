@@ -6036,7 +6036,7 @@ signal."
 
      ;; Barf if encryption yields extraordinary control chars:
      ((and (not decrypt)
-           (string-match "[\C-a\C-k\C-o-\C-z\C-@]"
+           (string-match "[\x01\x0b\x0f-\x1a\x00]"
                          result-text))
       (error (concat "Encryption produced non-armored text, which"
                      "conflicts with allout mode -- reconfigure!")))
@@ -6205,7 +6205,7 @@ Returns a list of the form (BEGINNING-POINT PREFIX-STRING SUFFIX-STRING)."
   (let (beg prefix suffix)
     (save-excursion
       (goto-char (point-max))
-      (search-backward "\n\^L" (max (- (point-max) 3000) (point-min)) 'move)
+      (search-backward "\n\x0c" (max (- (point-max) 3000) (point-min)) 'move)
       (if (let ((case-fold-search t))
 	    (not (search-forward "Local Variables:" nil t)))
           nil

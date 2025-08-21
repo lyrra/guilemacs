@@ -371,8 +371,8 @@ Dynamically bind `rfc2047-encoding-type' to change that."
   (save-restriction
     (narrow-to-region b e)
     (let ((encodable-regexp (if rfc2047-encode-encoded-words
-				"[^\000-\177]+\\|=\\?"
-			      "[^\000-\177]+"))
+				"[^\x00-\x7f]+\\|=\\?"
+			      "[^\x00-\x7f]+"))
 	  start				; start of current token
 	  end begin csyntax
 	  ;; Whether there's an encoded word before the current token,
@@ -458,7 +458,7 @@ Dynamically bind `rfc2047-encoding-type' to change that."
 		  ;; in which all those contain non-ASCII characters.
 		  (setq end nil)
 		  (while (not (or end (eobp)))
-		    (when (looking-at "[\000-\177]+")
+		    (when (looking-at "[\x00-\x7f]+")
 		      (setq begin (point)
 			    end (match-end 0))
 		      (when (progn

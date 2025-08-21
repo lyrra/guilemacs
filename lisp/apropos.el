@@ -1034,7 +1034,7 @@ non-nil."
     (insert-file-contents (concat doc-directory internal-doc-file-name))
     (forward-char)
     (while (save-excursion
-	     (setq sepb (search-forward "\^_"))
+	     (setq sepb (search-forward "\x1f"))
 	     (not (eobp)))
       (beginning-of-line 2)
       (if (save-restriction

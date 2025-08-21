@@ -361,12 +361,12 @@ Affects: `cperl-font-lock', `cperl-electric-lbrace-space',
   :type 'boolean
   :group 'cperl-indentation-details)
 
-(defcustom cperl-vc-sccs-header '("($sccs) = ('%W\ %' =~ /(\\d+(\\.\\d+)+)/) ;")
+(defcustom cperl-vc-sccs-header '("($sccs) = ('%W\\x20%' =~ /(\\d+(\\.\\d+)+)/) ;")
   "Special version of `vc-sccs-header' that is used in CPerl mode buffers."
   :type '(repeat string)
   :group 'cperl)
 
-(defcustom cperl-vc-rcs-header '("($rcs) = (' $Id\ $ ' =~ /(\\d+(\\.\\d+)+)/);")
+(defcustom cperl-vc-rcs-header '("($rcs) = (' $Id $ ' =~ /(\\d+(\\.\\d+)+)/);")
   "Special version of `vc-rcs-header' that is used in CPerl mode buffers."
   :type '(repeat string)
   :group 'cperl)

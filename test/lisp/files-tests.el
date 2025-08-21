@@ -1979,7 +1979,7 @@ just returns `n' and `kill-emacs' is overridden to do nothing.
 ARGS-RESULTS is a list of elements (FN-ARGS CALLERS-DIR EXPECTED), where
 FN-ARGS are the arguments for FN-TEST;
 CALLERS-DIR specifies the value to let-bind
-\`save-some-buffers-default-predicate';
+`save-some-buffers-default-predicate';
  EXPECTED is the expected result of the test."
   (let* ((dir (make-temp-file "testdir" 'dir))
          (inhibit-message t)

@@ -6480,7 +6480,7 @@ If FACE is not a valid face name, use default face."
 		  ps-page-order))
 	       "\n\nEndDoc\n\n%%EOF\n")
     (and ps-end-with-control-d
-	 (ps-output "\C-d"))
+	 (ps-output "\x04"))
     (ps-flush-output))
   ;; disable selected pages
   (setq ps-selected-pages nil))

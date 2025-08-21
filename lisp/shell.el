@@ -503,7 +503,7 @@ can be determined, a default according to the shell type is used."
         (let ((arg ()))
           (while (looking-at
                   (concat
-                   "\\(?:[^\s\t\n\\\"';]+"
+                   "\\(?:[^ \t\n\\\"';]+"
                    "\\|'\\([^']*\\)'?"
                    "\\|\"\\(\\(?:[^\"\\]\\|\\\\.\\)*\\)\"?"
                    "\\|\\\\\\(\\(?:.\\|\n\\)?\\)\\)"))
@@ -834,8 +834,8 @@ Rendition (SGR) control sequences (formerly known as ANSI escape
 sequences) are used to color the prompt.
 
 This function can be put on `comint-preoutput-filter-functions'."
-  (if (string-match "[\C-a\C-b]" string)
-      (replace-regexp-in-string "[\C-a\C-b]" "" string t t)
+  (if (string-match "[\x01\x02]" string)
+      (replace-regexp-in-string "[\x01\x02]" "" string t t)
     string))
 
 (defun shell-filter-ring-bell (string)
