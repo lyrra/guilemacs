@@ -116,6 +116,7 @@
   "test/lisp/emacs-lisp/text-property-search-tests.el" ;; fails
   )(group
   "test/lisp/emacs-lisp/thunk-tests.el"
+  )(group
   "test/lisp/emacs-lisp/unsafep-tests.el"
   "test/lisp/emacs-lisp/vtable-tests.el"
   )(group
