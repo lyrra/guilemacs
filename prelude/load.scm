@@ -1617,5 +1617,40 @@ This is a non-destructive version of `delq'."
 (set-symbol-function! 'delq elisp-delq)
 (set-symbol-function! 'remq elisp-remq)
 
+;; Additional reader utility functions migrated from lread.c
+
+(define (elisp-complete-filename-p pathname)
+  "Return t if PATHNAME is an absolute path.
+This function replaces the C complete_filename_p function in lread.c:1203
+by using Guile's string manipulation capabilities instead of direct
+character array access."
+  (if (not (string? pathname))
+      #nil
+      (let ((len (string-length pathname)))
+        (if (< len 1)
+            #nil
+            (let ((first-char (string-ref pathname 0)))
+              (cond
+                ;; Unix-style absolute path starting with /
+                ((char=? first-char #\/) #t)
+                ;; Windows-style absolute path (C:\ or similar)
+                ((and (>= len 3)
+                      (char-alphabetic? first-char)
+                      (char=? (string-ref pathname 1) #\:)
+                      (or (char=? (string-ref pathname 2) #\\)
+                          (char=? (string-ref pathname 2) #\/)))
+                 #t)
+                ;; Not an absolute path
+                (else #nil)))))))
+
+(define (elisp-file-name-absolute-p filename)
+  "Return t if FILENAME is an absolute file name.
+This is an alias for complete-filename-p with better naming."
+  (elisp-complete-filename-p filename))
+
+;; Register the filename utility functions for use from C and Elisp
+(set-symbol-function! 'complete-filename-p elisp-complete-filename-p)
+(set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
