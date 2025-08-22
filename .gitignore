@@ -17,11 +17,51 @@
 # You should have received a copy of the GNU General Public License
 # along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.
 
+run-cmp.sh
+run-code-prelude.sh
+run-code-vanilla.sh
+run-code.sh
+run-ert.sh
+run-vanilla-ert.sh
+
+
 fea
 src/*.x
 test/pre/*.el
 docs
 udoc
+
+CLAUDE.md
+todo.org
+all.pl
+autocode.scm
+prompts.scm
+fix-whitespace.pl
+
+c.sh
+cg-prelude.sh
+cg.sh
+ch.sh
+env.sh
+g.sh
+gdb
+gdb-ni
+gdb.sh
+gdu.sh
+gt.sh
+m.pl
+m.sh
+r.sh
+tc.sh
+make.sh
+tags.sh
+
+old-c/
+old/
+t/
+tags
+test/benchmark/
+test/cmp/
 
 # Ignore all dot-files except for those under version control.
 .*
