@@ -34,6 +34,8 @@ udoc
 CLAUDE.md
 todo.org
 all.pl
+git-commit.sh
+git-reset.sh
 autocode.scm
 prompts.scm
 fix-whitespace.pl
