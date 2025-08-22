@@ -1789,7 +1789,7 @@ see `dired-use-ls-dired' for more details.")
 	    (goto-char opoint)
 	    (while (search-forward "\x0d" end t)
 	      (replace-match (apply #'propertize
-				    "\\015"
+				    "\x0d"
 				    (text-properties-at (match-beginning 0)))
 			     nil t))
 	    (set-marker end nil))

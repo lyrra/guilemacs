@@ -161,7 +161,7 @@ and then returns."
                                                                deletechar backspace vertical-scroll-bar
                                                                home end next prior up down))))
                          (eq (car-safe char) 'switch-frame)
-                         (equal key "\\M-v"))
+                         (equal key "\x1bv"))
                 (condition-case nil
                     (cond
                      ((eq (car-safe char) 'switch-frame)
@@ -169,7 +169,7 @@ and then returns."
                      ((memq char '(?\C-v ?\s next end))
                       (scroll-up))
                      ((or (memq char '(?\177 ?\M-v ?\S-\s deletechar backspace prior home))
-                          (equal key "\\M-v"))
+                          (equal key "\x1bv"))
                       (scroll-down))
                      ((memq char '(down))
                       (scroll-up 1))
