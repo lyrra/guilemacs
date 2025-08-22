@@ -32,7 +32,7 @@ escape them using %HH."
   (let ((url
 	 ;; FIXME. Explain why the pattern doesn't also have "!$&'()*+,/:@=".
 	 ;; See Internet RFC 3986 section 2.2.
-	 (replace-regexp-in-string "[]\0-\s\"#%;<>?[\\^`{|}\177]"
+	 (replace-regexp-in-string "[]\x00-\x20\"#%;<>?[\\^`{|}\x7f]"
 				   'rng-percent-encode f)))
     (concat "file:"
 	    (if (and (> (length url) 0)

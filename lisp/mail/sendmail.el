@@ -1279,7 +1279,7 @@ external program defined by `sendmail-program'."
 	      (goto-char (point-min))
 	      (and (eq mail-send-nonascii 'mime)
 		   (not (re-search-forward "^MIME-version:" delimline t))
-		   (progn (skip-chars-forward "\0-\177")
+		   (progn (skip-chars-forward "\x00-\x7f")
 			  (/= (point) (point-max)))
 		   selected-coding
 		   (setq charset

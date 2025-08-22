@@ -1763,7 +1763,7 @@ escaped (\\\",\\\\)."
 	  (case-fold-search t))
       (goto-char (point-min))
       (while (re-search-forward
-	      "\\(\0[\0-\37][[][^\0]*\0[\0-\37][]]\n?\\)"
+	      "\\(\x00[\x00-\x1f][[][^\x00]*\x00[\x00-\x1f][]]\n?\\)"
 	      nil t)
 	(let* ((start (match-beginning 1)))
 	  (if (and (not (get-text-property start 'invisible))
