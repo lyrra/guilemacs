@@ -2219,13 +2219,13 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
           (call-process "lsar" nil t nil "-l" (or file copy))
         (if copy (delete-file copy)))
       (goto-char (point-min))
-      (re-search-forward "^\\(?:\s+=+\\)+\s*\n")
-      (while (looking-at (concat "^\s+[0-9.]+\s+D?-+\s+"   ; Flags
-                                 "\\([0-9-]+\\)\s+"        ; Size
-                                 "\\([-0-9.]+\\)%?\s+"      ; Ratio
-                                 "\\([0-9a-zA-Z]+\\)\s+"   ; Mode
-                                 "\\([0-9-]+\\)\s+"        ; Date
-                                 "\\([0-9:]+\\)\s+"        ; Time
+      (re-search-forward "^\\(?:[[:space:]]+=+\\)+[[:space:]]*\n")
+      (while (looking-at (concat "^[[:space:]]+[0-9.]+[[:space:]]+D?-+[[:space:]]+"   ; Flags
+                                 "\\([0-9-]+\\)[[:space:]]+"        ; Size
+                                 "\\([-0-9.]+\\)%?[[:space:]]+"      ; Ratio
+                                 "\\([0-9a-zA-Z]+\\)[[:space:]]+"   ; Mode
+                                 "\\([0-9-]+\\)[[:space:]]+"        ; Date
+                                 "\\([0-9:]+\\)[[:space:]]+"        ; Time
                                  "\\(.*\\)\n"              ; Name
                                  ))
         (goto-char (match-end 0))

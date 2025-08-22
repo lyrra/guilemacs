@@ -200,7 +200,7 @@ KIND is the kind of message to log.  STRING and OBJECTS are as
 `format-message' (which see)."
   (declare (indent 1))
   (with-current-buffer (get-buffer-create eshell-debug-command-buffer)
-    (insert "\n\C-l\n[" (symbol-name kind) "] "
+    (insert "\n\x0C\n[" (symbol-name kind) "] "
             (apply #'format-message string objects))))
 
 (defmacro eshell-debug-command (kind string &rest objects)

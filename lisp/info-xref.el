@@ -377,7 +377,7 @@ in the path."
           (with-temp-buffer
             (info-insert-file-contents info-xref-filename)
             (goto-char (point-min))
-            (if (search-forward "\^_\nIndirect:\n" nil t)
+            (if (search-forward "\x1F\nIndirect:\n" nil t)
                 (let ((dir (file-name-directory info-xref-filename)))
                   (while (looking-at "\\(.*\\): [0-9]+\n")
                     (let ((info-xref-filename

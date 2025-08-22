@@ -108,7 +108,7 @@
   ;; Range of raw characters, multibyte.
   (should (equal (rx (any "Å\x89\xd6-\xff\x7f"))
                  "[\x7fÅ\x89\xd6-\xff]"))
-  ;; Split range; \177-\377ÿ should not be optimized to \177-\377.
+  ;; Split range; \\177-\\377ÿ should not be optimized to \\177-\\377.
   (should (equal (rx (any "\x7f-\xff" ?ÿ))
                  "[\x7fÿ\x80-\xff]"))
   ;; Range between normal chars and raw bytes: must be split to be parsed
