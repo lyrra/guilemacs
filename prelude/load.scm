@@ -723,45 +723,165 @@ Allows any number of arguments, including zero."
       (error "Wrong type argument: natnump" length)
       (make-list length init)))
 
-;; Phase 4: DEFUN function migrations from C to Guile - COMMENTED OUT FOR DEBUGGING
+;; Phase 4: DEFUN function migrations from C to Guile - NOW ACTIVE
 ;;
-;; (define (elisp-proper-list-p object)
-;;   "Return OBJECT's length if it is a proper list, nil otherwise.
-;; A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
-;;   (catch #t
-;;     (lambda ()
-;;       (let ((len (length object)))
-;;         (scm_from_size_t len)))
-;;     (lambda (key . args)
-;;       ;; If length fails (circular, dotted, or not a list), return nil
-;;       #nil)))
-;;
-;; (define (elisp-characterp object)
-;;   "Return non-nil if OBJECT is a character.
-;; In Emacs Lisp, characters are represented by character codes."
-;;   (if (and (integer? object)
-;;            (>= object 0)
-;;            (<= object #x3FFFFF))  ; max-char value
-;;       #t #nil))
-;;
-;; (define (elisp-max-char . args)
-;;   "Return the maximum character code.
-;; If UNICODE is non-nil, return the maximum character code defined by Unicode."
-;;   (let ((unicode (if (null? args) #f (car args))))
-;;     (if unicode
-;;         (scm_from_uint32 #x10FFFF)  ; MAX_UNICODE_CHAR
-;;         (scm_from_uint32 #x3FFFFF)))) ; MAX_CHAR
-;;
-;; (define (elisp-string-lessp string1 string2)
-;;   "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
-;; Case is significant. Symbols are also allowed; their print names are used instead."
-;;   (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
-;;         (s2 (if (symbol? string2) (symbol->string string2) string2)))
-;;     (if (string<? s1 s2) #t #nil)))
+(define (elisp-proper-list-p object)
+  "Return OBJECT's length if it is a proper list, nil otherwise.
+A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+  (catch #t
+    (lambda ()
+      (let ((len (length object)))
+        len))
+    (lambda (key . args)
+      ;; If length fails (circular, dotted, or not a list), return nil
+      #nil)))
 
-;; FIX-guilemacs: Simple utility functions migrated from C DEFUN to Guile (load.scm pattern)
-;; These were identified as good candidates: used primarily by Elisp, not C
+(define (elisp-characterp object)
+  "Return non-nil if OBJECT is a character.
+In Emacs Lisp, characters are represented by character codes."
+  (if (and (integer? object)
+           (>= object 0)
+           (<= object #x3FFFFF))  ; max-char value
+      #t #nil))
 
+(define (elisp-max-char . args)
+  "Return the maximum character code.
+If UNICODE is non-nil, return the maximum character code defined by Unicode."
+  (let ((unicode (if (null? args) #f (car args))))
+    (if unicode
+        #x10FFFF   ; MAX_UNICODE_CHAR
+        #x3FFFFF))) ; MAX_CHAR
+
+(define (elisp-string-lessp string1 string2)
+  "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+Case is significant. Symbols are also allowed; their print names are used instead."
+  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+    (if (string<? s1 s2) #t #nil)))
+
+;; FIX-guilemacs: Additional DEFUN function migrations from C to Guile
+;; New functions identified as migration candidates
+
+;; Length comparison functions - simple predicates
+(define (elisp-length< sequence length)
+  "Return non-nil if SEQUENCE is shorter than LENGTH."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #nil)
+    ((null? sequence) (if (> length 0) #t #nil))
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((>= count length) #nil)  ; Already at length, so not shorter
+         ((null? seq) #t)          ; Reached end before length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))            ; Improper list
+    (else
+     ;; For other sequences (vectors, strings), use regular length
+     (< (length sequence) length))))
+
+(define (elisp-length> sequence length)
+  "Return non-nil if SEQUENCE is longer than LENGTH."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #t)  ; Any sequence is longer than negative length
+    ((null? sequence) #nil)
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((> count length) #t)     ; Already longer than length
+         ((null? seq) #nil)        ; Reached end at or before length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))            ; Improper list
+    (else
+     ;; For other sequences (vectors, strings), use regular length
+     (> (length sequence) length))))
+
+(define (elisp-length= sequence length)
+  "Return non-nil if SEQUENCE has exactly LENGTH elements."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #nil)
+    ((null? sequence) (= length 0))
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((= count length) (null? seq))  ; Check if we're at end when count matches
+         ((null? seq) #nil)              ; Reached end before target length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))                  ; Improper list
+    (else
+     ;; For other sequences (vectors, strings), use regular length
+     (= (length sequence) length))))
+
+;; Safe length function
+(define (elisp-safe-length list)
+  "Return the length of a list, but avoid error or infinite loop.
+This function never gets an error. If LIST is not really a list,
+it returns 0. If LIST is circular, it returns an integer that is at
+least the number of distinct elements."
+  (catch #t
+    (lambda ()
+      (if (or (null? list) (pair? list))
+          (length list)
+          0))
+    (lambda (key . args)
+      ;; Return 0 on any error (circular lists, non-lists, etc.)
+      0)))
+
+;; Equality functions that use Guile primitives
+(define (elisp-eql obj1 obj2)
+  "Return t if the two args are `eq' or are indistinguishable numbers.
+Integers with the same value are `eql'.
+Floating-point values with the same sign, exponent and fraction are `eql'."
+  (if (eqv? obj1 obj2) #t #nil))
+
+(define (elisp-equal obj1 obj2)
+  "Return t if two Lisp objects have similar structure and contents."
+  (if (equal? obj1 obj2) #t #nil))
+
+;; List utility functions
+(define (elisp-take n list)
+  "Return the first N elements of LIST.
+If N is zero or negative, return nil.
+If N is greater or equal to the length of LIST, return LIST (or a copy)."
+  (cond
+    ((not (integer? n)) (error "Wrong type argument: integerp" n))
+    ((<= n 0) #nil)
+    ((null? list) #nil)
+    (else (list-head list (min n (length list))))))
+
+;; Case conversion functions that use Guile
+(define (elisp-upcase obj)
+  "Convert argument to upper case and return that."
+  (cond
+    ((string? obj) (string-upcase obj))
+    ((integer? obj) (string->number (string-upcase (string (integer->char obj)))))
+    (else obj)))
+
+(define (elisp-downcase obj)
+  "Convert argument to lower case and return that."
+  (cond
+    ((string? obj) (string-downcase obj))
+    ((integer? obj) (string->number (string-downcase (string (integer->char obj)))))
+    (else obj)))
+
+(define (elisp-capitalize obj)
+  "Convert argument to capitalized form and return that."
+  (cond
+    ((string? obj) (string-capitalize obj))
+    ((integer? obj) (string->number (string-capitalize (string (integer->char obj)))))
+    (else obj)))
+
+;; Type conversion functions
+(define (elisp-float arg)
+  "Return the floating point number equal to ARG."
+  (cond
+    ((integer? arg) (exact->inexact arg))
+    ((number? arg) arg)  ; Already a float
+    (else (error "Wrong type argument: numberp" arg))))
+
+;; Simple utility functions migrated from C DEFUN to Guile
 (define (elisp-null object)
   "Return t if OBJECT is nil, and return nil otherwise."
   (if (or (null? object) (eq? object #nil)) #t #nil))
@@ -784,6 +904,33 @@ Allows any number of arguments, including zero."
 
 ;; Register migrated DEFUN utility functions
 (set-symbol-function! 'null elisp-null)
+
+;; Register Phase 4 functions (uncommmented and new migrations)
+(set-symbol-function! 'proper-list-p elisp-proper-list-p)
+(set-symbol-function! 'characterp elisp-characterp)
+(set-symbol-function! 'max-char elisp-max-char)
+;; Note: string-lessp already exists as elisp-string-lessp above
+
+;; Register new length comparison functions
+(set-symbol-function! 'length< elisp-length<)
+(set-symbol-function! 'length> elisp-length>)
+(set-symbol-function! 'length= elisp-length=)
+(set-symbol-function! 'safe-length elisp-safe-length)
+
+;; Register equality functions
+(set-symbol-function! 'eql elisp-eql)
+(set-symbol-function! 'equal elisp-equal)
+
+;; Register list utility functions
+(set-symbol-function! 'take elisp-take)
+
+;; Register case conversion functions
+(set-symbol-function! 'upcase elisp-upcase)
+(set-symbol-function! 'downcase elisp-downcase)
+(set-symbol-function! 'capitalize elisp-capitalize)
+
+;; Register type conversion functions
+(set-symbol-function! 'float elisp-float)
 
 ;; Phase 4 DEFUN function migrations are called directly from C code
 ;; to avoid infinite recursion. The elisp-* versions are available
