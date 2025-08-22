@@ -1572,5 +1572,50 @@ This function may destructively modify SEQ to produce the value."
 ;; when elisp reads keyword symbols, support common-lisp keywords
 (read-set! keywords 'prefix)
 
+;; Additional DEFUN function migrations from C to Guile
+;; Migration of delq - destructive list removal function
+
+(define (elisp-delq elt list)
+  "Delete members of LIST which are `eq' to ELT, and return the result.
+More precisely, this function skips any members `eq' to ELT at the
+front of LIST, then removes members `eq' to ELT from the remaining
+sublist by modifying its list structure, then returns the resulting
+list.
+
+Write `(setq foo (delq element foo))' to be sure of correctly changing
+the value of a list `foo'.  See also `remq', which does not modify the
+argument."
+  (let loop ((remaining list) (prev #f))
+    (cond
+      ((null? remaining) list)
+      ((eq? elt (car remaining))
+       ;; Found element to delete
+       (if prev
+           ;; Not at front, modify previous cell
+           (begin
+             (set-cdr! prev (cdr remaining))
+             (loop (cdr remaining) prev))
+           ;; At front, update list head
+           (begin
+             (set! list (cdr remaining))
+             (loop (cdr remaining) #f))))
+      (else
+       ;; Keep this element, continue
+       (loop (cdr remaining) remaining))))
+  list)
+
+(define (elisp-remq elt list)
+  "Return a copy of LIST with all elements `eq' to ELT removed.
+This is a non-destructive version of `delq'."
+  (let loop ((remaining list) (result '()))
+    (cond
+      ((null? remaining) (reverse result))
+      ((eq? elt (car remaining)) (loop (cdr remaining) result))
+      (else (loop (cdr remaining) (cons (car remaining) result))))))
+
+;; Register new functions
+(set-symbol-function! 'delq elisp-delq)
+(set-symbol-function! 'remq elisp-remq)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
