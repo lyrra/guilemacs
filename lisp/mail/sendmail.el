@@ -1468,10 +1468,10 @@ just append to the file, in Babyl format if necessary."
 		  (let ((coding-system-for-write
 			 (or rmail-file-coding-system 'emacs-mule)))
 		    (with-temp-buffer
-		      (insert "\C-l\n0, unseen,,\n*** EOOH ***\nDate: "
+		      (insert "\x0c\n0, unseen,,\n*** EOOH ***\nDate: "
 			      (mail-rfc822-date) "\n")
 		      (insert-buffer-substring curbuf beg2 end)
-		      (insert "\n\C-_")
+		      (insert "\n\x1f")
 		      (write-region (point-min) (point-max) fcc t)))
 		;; Ensure there is a blank line between messages, but
 		;; not at the very start of the file.

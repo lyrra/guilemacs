@@ -2077,7 +2077,7 @@ the Top node in FILENAME."
 	      (set-buffer (marker-buffer marker))
 	      (widen)
 	      (goto-char marker)
-	      (while (re-search-forward "\n\\(Node\\|Ref\\): \\(.*\\)\177" nil t)
+	      (while (re-search-forward "\n\\(Node\\|Ref\\): \\(.*\\)\x7f" nil t)
 		(setq compl
 		      (cons (list (match-string-no-properties 2))
 			    compl))))

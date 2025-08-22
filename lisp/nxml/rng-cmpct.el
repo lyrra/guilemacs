@@ -360,7 +360,7 @@ OVERRIDE is either nil, require or t."
 (defun rng-c-process-escapes ()
   ;; Check for any NULs, since we will use NUL chars
   ;; for internal purposes.
-  (let ((pos (search-forward "\C-@" nil t)))
+  (let ((pos (search-forward "\x00" nil t)))
     (and pos
 	 (rng-c-error "Nul character found (binary file?)")))
   (let ((offset 0))
