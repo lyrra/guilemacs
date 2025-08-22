@@ -1537,6 +1537,10 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
 {
   Lisp_Object result, tem, tem1;
   ptrdiff_t beg0, end0, beg1, end1, size;
+  ptrdiff_t total_bytes = end_byte - start_byte;
+
+  /* Optimization: Small string threshold - use stack allocation and direct concatenation */
+  const ptrdiff_t SMALL_STRING_THRESHOLD = 256;
 
   if (start_byte < GPT_BYTE && GPT_BYTE < end_byte)
     {
@@ -1555,24 +1559,38 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
       end1 = -1;
     }
 
-  if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
-    result = make_uninit_multibyte_string (end - start, end_byte - start_byte);
-  else
-    result = make_uninit_string (end - start);
-
-  /* FIX-guilemacs: correct byte length for UTF-8 */
-  size = end_byte - start_byte; /* Use byte positions (not character positions) */
-  if (start_byte < GPT_BYTE && GPT_BYTE < end_byte)
+  /* Enhanced Gap-Split Buffer Optimization */
+  if (total_bytes <= SMALL_STRING_THRESHOLD && beg1 != -1)
     {
-      /* Split across gap: use first part size */
-      size = end0 - beg0;
+      /* Small buffer string split across gap: use stack allocation for efficiency */
+      char stack_buffer[SMALL_STRING_THRESHOLD + 1];
+      ptrdiff_t part1_size = end0 - beg0;
+      ptrdiff_t part2_size = end1 - beg1;
+
+      /* Copy first part */
+      unsigned char *bytes1 = BYTE_POS_ADDR (beg0);
+      memcpy (stack_buffer, bytes1, part1_size);
+
+      /* Copy second part */
+      memcpy (stack_buffer + part1_size, BEG_ADDR + beg1, part2_size);
+
+      /* Single UTF-8 string creation for small gap-split buffers */
+      result = scm_from_utf8_stringn (stack_buffer, total_bytes);
     }
-  // memcpy (SDATA (result), BYTE_POS_ADDR (beg0), size);
-  unsigned char *bytes = BYTE_POS_ADDR (beg0);
-  result = scm_from_utf8_stringn ((char *)bytes, size);
-  if (beg1 != -1)
-    // memcpy (SDATA (result) + size, BEG_ADDR + beg1, end1 - beg1);
-    result = scm_string_append (list2 (result, scm_from_utf8_stringn (BEG_ADDR + beg1, end1 - beg1)));
+  else if (beg1 == -1)
+    {
+      /* Single-Region Optimization: direct UTF-8 creation */
+      unsigned char *bytes = BYTE_POS_ADDR (beg0);
+      result = scm_from_utf8_stringn ((char *)bytes, total_bytes);
+    }
+  else
+    {
+      /* Large buffer strings: use concatenation approach */
+      size = end0 - beg0;
+      unsigned char *bytes = BYTE_POS_ADDR (beg0);
+      result = scm_from_utf8_stringn ((char *)bytes, size);
+      result = scm_string_append (list2 (result, scm_from_utf8_stringn (BEG_ADDR + beg1, end1 - beg1)));
+    }
 
   /* If desired, update and copy the text properties.  */
   if (props)

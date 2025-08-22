@@ -504,6 +504,10 @@ Symbols are also allowed; their print names are used instead.  */)
   else
     CHECK_STRING (string2);
 
+  /* Fast path for identical strings */
+  if (EQ (string1, string2))
+    return Qnil;
+
   return string_cmp (string1, string2) < 0 ? Qt : Qnil;
 }
 
@@ -528,6 +532,11 @@ Symbols are also allowed; their print names are used instead.  */)
     string2 = SYMBOL_NAME (string2);
   CHECK_STRING (string1);
   CHECK_STRING (string2);
+
+  /* Fast path for identical strings */
+  if (EQ (string1, string2))
+    return Qnil;
+
   int cmp = filenvercmp (SSDATA (string1), SBYTES (string1),
 			 SSDATA (string2), SBYTES (string2));
   return cmp < 0 ? Qt : Qnil;
