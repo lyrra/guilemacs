@@ -102,7 +102,7 @@
 
 (ert-deftest bindat-test-ip-to-string ()
   (should (equal (bindat-ip-to-string [192 168 0 1]) "192.168.0.1"))
-  (should (equal (bindat-ip-to-string "\300\250\0\1") "192.168.0.1")))
+  (should (equal (bindat-ip-to-string "\xc0\xa8\x00\x01") "192.168.0.1")))
 
 (defconst bindat-test--int-websocket-type
   (bindat-type
@@ -172,18 +172,18 @@
                 ((((x str 2)) ((x . "a"))) . "ax")
                 ((((x str 2)) ((x . "ab"))) . "ab")
                 ((((x str 2)) ((x . "abc"))) . "ab")
-                ((,(bindat-type strz 1) "") . "\0x")
-                ((,(bindat-type strz 2) "") . "\0x")
-                ((,(bindat-type strz 2) "a") . "a\0")
+                ((,(bindat-type strz 1) "") . "\x00x")
+                ((,(bindat-type strz 2) "") . "\x00x")
+                ((,(bindat-type strz 2) "a") . "a\x00")
                 ((,(bindat-type strz 2) "ab") . "ab")
                 ((,(bindat-type strz 2) "abc") . "ab")
-                ((((x strz 1)) ((x . ""))) . "\0x")
-                ((((x strz 2)) ((x . ""))) . "\0x")
-                ((((x strz 2)) ((x . "a"))) . "a\0")
+                ((((x strz 1)) ((x . ""))) . "\x00x")
+                ((((x strz 2)) ((x . ""))) . "\x00x")
+                ((((x strz 2)) ((x . "a"))) . "a\x00")
                 ((((x strz 2)) ((x . "ab"))) . "ab")
                 ((((x strz 2)) ((x . "abc"))) . "ab")
-                ((,(bindat-type strz) "") . "\0x")
-                ((,(bindat-type strz) "a") . "a\0")))
+                ((,(bindat-type strz) "") . "\x00x")
+                ((,(bindat-type strz) "a") . "a\x00")))
     (let ((prealloc (make-string 2 ?x)))
       (apply #'bindat-pack (append (car tc) (list prealloc)))
       (should (equal prealloc (cdr tc))))))
@@ -192,15 +192,15 @@
   (dolist (spec (list (bindat-type str 2)
                       (bindat-type strz 2)
                       (bindat-type strz)))
-    (should (equal (bindat-pack spec (string-to-multibyte "x")) "x\0"))
-    (should (equal (bindat-pack spec (string-to-multibyte "\xff")) "\xff\0"))
+    (should (equal (bindat-pack spec (string-to-multibyte "x")) "x\x00"))
+    (should (equal (bindat-pack spec (string-to-multibyte "\xff")) "\xff\x00"))
     (should-error (bindat-pack spec "💩"))
     (should-error (bindat-pack spec "\N{U+ff}")))
   (dolist (spec (list '((x str 2)) '((x strz 2))))
     (should (equal (bindat-pack spec `((x . ,(string-to-multibyte "x"))))
-                   "x\0"))
+                   "x\x00"))
     (should (equal (bindat-pack spec `((x . ,(string-to-multibyte "\xff"))))
-                   "\xff\0"))
+                   "\xff\x00"))
     (should-error (bindat-pack spec '((x . "💩"))))
     (should-error (bindat-pack spec '((x . "\N{U+ff}"))))))
 
@@ -214,8 +214,8 @@
     (should (equal (bindat-length spec "abc") 2)))
 
   (ert-deftest bindat-test--strz-fixedlen-pack ()
-    (should (equal (bindat-pack spec "") "\0\0"))
-    (should (equal (bindat-pack spec "a") "a\0")))
+    (should (equal (bindat-pack spec "") "\x00\x00"))
+    (should (equal (bindat-pack spec "a") "a\x00")))
 
   (ert-deftest bindat-test--strz-fixedlen-pack-overflow ()
     ;; This is not the only valid semantic, but it's the one we've
@@ -224,9 +224,9 @@
     (should (equal (bindat-pack spec "abc") "ab")))
 
   (ert-deftest bindat-test--strz-fixedlen-unpack ()
-    (should (equal (bindat-unpack spec "\0\0") ""))
-    (should (equal (bindat-unpack spec "\0X") ""))
-    (should (equal (bindat-unpack spec "a\0") "a"))
+    (should (equal (bindat-unpack spec "\x00\x00") ""))
+    (should (equal (bindat-unpack spec "\x00X") ""))
+    (should (equal (bindat-unpack spec "a\x00") "a"))
     ;; Same comment as for b-t-s-f-pack-overflow.
     (should (equal (bindat-unpack spec "ab") "ab"))
     ;; Missing null terminator.
@@ -239,17 +239,17 @@
     (should (equal (bindat-length spec "abc") 4)))
 
   (ert-deftest bindat-test--strz-varlen-pack ()
-    (should (equal (bindat-pack spec "") "\0"))
-    (should (equal (bindat-pack spec "abc") "abc\0"))
+    (should (equal (bindat-pack spec "") "\x00"))
+    (should (equal (bindat-pack spec "abc") "abc\x00"))
     ;; Null bytes in the input string break unpacking.
-    (should-error (bindat-pack spec "\0"))
-    (should-error (bindat-pack spec "\0x"))
-    (should-error (bindat-pack spec "x\0"))
-    (should-error (bindat-pack spec "x\0y")))
+    (should-error (bindat-pack spec "\x00"))
+    (should-error (bindat-pack spec "\x00x"))
+    (should-error (bindat-pack spec "x\x00"))
+    (should-error (bindat-pack spec "x\x00y")))
 
   (ert-deftest bindat-test--strz-varlen-unpack ()
-    (should (equal (bindat-unpack spec "\0") ""))
-    (should (equal (bindat-unpack spec "abc\0") "abc"))
+    (should (equal (bindat-unpack spec "\x00") ""))
+    (should (equal (bindat-unpack spec "abc\x00") "abc"))
     ;; Missing null terminator.
     (should-error (bindat-unpack spec ""))
     (should-error (bindat-unpack spec "a")))
@@ -281,8 +281,8 @@
     (should (equal (bindat-length spec '((x . "abc"))) 2)))
 
   (ert-deftest bindat-test--strz-legacy-fixedlen-pack ()
-    (should (equal (bindat-pack spec '((x . ""))) "\0\0"))
-    (should (equal (bindat-pack spec '((x . "a"))) "a\0")))
+    (should (equal (bindat-pack spec '((x . ""))) "\x00\x00"))
+    (should (equal (bindat-pack spec '((x . "a"))) "a\x00")))
 
   (ert-deftest bindat-test--strz-legacy-fixedlen-pack-overflow ()
     ;; Same comment as for b-t-s-f-pack-overflow.
@@ -290,9 +290,9 @@
     (should (equal (bindat-pack spec '((x . "abc"))) "ab")))
 
   (ert-deftest bindat-test--strz-legacy-fixedlen-unpack ()
-    (should (equal (bindat-unpack spec "\0\0") '((x . ""))))
-    (should (equal (bindat-unpack spec "\0X") '((x . ""))))
-    (should (equal (bindat-unpack spec "a\0") '((x . "a"))))
+    (should (equal (bindat-unpack spec "\x00\x00") '((x . ""))))
+    (should (equal (bindat-unpack spec "\x00X") '((x . ""))))
+    (should (equal (bindat-unpack spec "a\x00") '((x . "a"))))
     ;; Same comment as for b-t-s-f-pack-overflow.
     (should (equal (bindat-unpack spec "ab") '((x . "ab"))))
     ;; Missing null terminator.

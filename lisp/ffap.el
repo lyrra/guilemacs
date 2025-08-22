@@ -1949,8 +1949,8 @@ Only intended for interactive use."
   ;; message-id's
   (setq-local thing-at-point-default-mail-uri-scheme "news")
   ;; Note "l", "L", "m", "M" are taken:
-  (local-set-key "\M-l" 'ffap-gnus-next)
-  (local-set-key "\M-m" 'ffap-gnus-menu))
+  (local-set-key "\x1bl" 'ffap-gnus-next)
+  (local-set-key "\x1bm" 'ffap-gnus-menu))
 
 (defvar gnus-summary-buffer)
 (defvar gnus-article-buffer)

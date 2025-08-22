@@ -229,8 +229,8 @@ All commands in `lisp-mode-shared-map' are inherited by this map."
 ;; Used by cmuscheme
 (defun scheme-mode-commands (map)
   ;;(define-key map "\t" 'indent-for-tab-command) ; default
-  (define-key map "\177" 'backward-delete-char-untabify)
-  (define-key map "\e\C-q" 'indent-sexp))
+  (define-key map "\x7f" 'backward-delete-char-untabify)
+  (define-key map "\x1b\x11" 'indent-sexp))
 
 ;;;###autoload
 (define-derived-mode scheme-mode prog-mode "Scheme"
@@ -778,7 +778,7 @@ indentation."
   (let ((map (make-sparse-keymap))
 	(menu-map (make-sparse-keymap "Scheme-Interaction")))
     (set-keymap-parent map lisp-mode-shared-map)
-    (define-key map "\e\C-x" 'scheme-eval-defun)
+    (define-key map "\x1b\x18" 'scheme-eval-defun)
     (define-key map "\n" 'scheme-eval-print-last-sexp)
     (bindings--define-key map [menu-bar scheme-interaction]
       (cons "Scheme-Interaction" menu-map))

@@ -209,9 +209,9 @@ toggle between those two."
   (define-key dired-mode-map "*O" 'dired-mark-omitted)
   (define-key dired-mode-map "*." 'dired-mark-extension))
 
-(define-key dired-mode-map "\C-x\M-o" 'dired-omit-mode)
-(define-key dired-mode-map "\M-(" 'dired-mark-sexp)
-(define-key dired-mode-map "\M-!" 'dired-smart-shell-command)
+(define-key dired-mode-map "\x18\x1bo" 'dired-omit-mode)
+(define-key dired-mode-map "\x1b(" 'dired-mark-sexp)
+(define-key dired-mode-map "\x1b!" 'dired-smart-shell-command)
 (define-key dired-mode-map "F" 'dired-do-find-marked-files)
 (define-key dired-mode-map "V" 'dired-do-run-mail)
 
@@ -410,7 +410,7 @@ against the non-directory part of the file name.  Set it to nil if you
 need to match the entire file name.")
 
 ;; \017=^O for Omit - other packages can choose other control characters.
-(defvar dired-omit-marker-char ?\017
+(defvar dired-omit-marker-char ?\x0f
   "Temporary marker used by Dired-Omit.
 Should never be used as marker by the user or other packages.")
 
@@ -905,7 +905,7 @@ only in the active region if `dired-mark-region' is non-nil."
          current-prefix-arg)
    dired-mode)
   (message "%s" predicate)
-  (let ((dired-marker-char (if unflag-p ?\040 dired-marker-char))
+  (let ((dired-marker-char (if unflag-p ?\x20 dired-marker-char))
         inode s mode nlink uid gid size time name sym)
     (dired-mark-if
      (save-excursion

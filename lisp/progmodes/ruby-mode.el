@@ -1058,7 +1058,7 @@ The style of the comment is controlled by `ruby-encoding-magic-comment-style'."
 
 (defun ruby--encoding-comment-required-p ()
   (or (eq ruby-insert-encoding-magic-comment 'always-utf8)
-      (re-search-forward "[^\0-\177]" nil t)))
+      (re-search-forward "[^\x00-\x7f]" nil t)))
 
 (defun ruby-mode-set-encoding ()
   "Insert a magic comment header with the proper encoding if necessary."

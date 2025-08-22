@@ -388,12 +388,12 @@ to find the list of ignores for each directory."
                (not (eql status 127))
                (search-forward "Permission denied\n" nil t))
               (let ((end (1- (point))))
-                (re-search-backward "\\`\\|\0")
+                (re-search-backward "\\`\\|\x00")
                 (error "File listing failed: %s"
                        (buffer-substring (1+ (point)) end)))
             (error "File listing failed: %s" (buffer-string))))
         (goto-char pt)
-        (while (search-forward "\0" nil t)
+        (while (search-forward "\x00" nil t)
           (push (buffer-substring-no-properties (+ pt 2) (1- (point)))
                 res)
           (setq pt (point)))))
@@ -723,7 +723,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
                     (split-string
                      (with-output-to-string
                        (apply #'vc-git-command standard-output 0 nil "ls-files" args))
-                     "\0" t))))
+                     "\x00" t))))
        (when (project--vc-merge-submodules-p default-directory)
          ;; Unfortunately, 'ls-files --recurse-submodules' conflicts with '-o'.
          (let ((sub-files
@@ -763,7 +763,7 @@ See `project-vc-extra-root-markers' for the marker value format.")
                             extra-ignores))))
        (with-temp-buffer
          (apply #'vc-hg-command t 0 "." "status" args)
-         (setq files (split-string (buffer-string) "\0" t))
+         (setq files (split-string (buffer-string) "\x00" t))
          (unless project-files-relative-names
            (setq files (mapcar
                         (lambda (s) (concat default-directory s))
@@ -921,7 +921,7 @@ DIRS must contain directory names."
 
 (defvar project-other-frame-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\C-o" #'project-display-buffer-other-frame)
+    (define-key map "\x0f" #'project-display-buffer-other-frame)
     map)
   "Keymap for project commands that display buffers in other frames.")
 

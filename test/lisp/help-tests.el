@@ -266,8 +266,8 @@ M-g M-c		switch-to-completions
   ;; Cannot use string= here, as that compares unibyte and multibyte
   ;; strings not equal.
   (should (compare-strings
-           (substitute-command-keys "\200 \\[goto-char]") nil nil
-           "\200 M-g c" nil nil)))
+           (substitute-command-keys "\x80 \\[goto-char]") nil nil
+           "\x80 M-g c" nil nil)))
 
 '(ert-deftest help-tests-substitute-command-keys/apropos ()
   (save-window-excursion

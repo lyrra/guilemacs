@@ -451,13 +451,13 @@ any message type is accepted.")
 (defconst compile-tests--grep-regexp-testcases
   ;; Bug#32051.
   '((nil
-     "c:/Users/my.name/src/project\\src\\kbhit.hpp\0\ 29:#include <termios.h>"
+     "c:/Users/my.name/src/project\\src\\kbhit.hpp\x00\ 29:#include <termios.h>"
      1 nil 29 "c:/Users/my.name/src/project\\src\\kbhit.hpp")
     (nil
-     "d:/gnu/emacs/branch/src/callproc.c\0\ 214:#ifdef DOS_NT"
+     "d:/gnu/emacs/branch/src/callproc.c\x00\ 214:#ifdef DOS_NT"
      1 nil 214 "d:/gnu/emacs/branch/src/callproc.c")
     (nil
-     "/gnu/emacs/branch/src/callproc.c\0\ 214:#ifdef DOS_NT"
+     "/gnu/emacs/branch/src/callproc.c\x00\ 214:#ifdef DOS_NT"
      1 nil 214 "/gnu/emacs/branch/src/callproc.c"))
   "List of tests for `grep-regexp-list'.
 The format is the same as `compile-tests--test-regexps-data', but
@@ -467,10 +467,10 @@ with colon.")
 (defconst compile-tests--grep-regexp-tricky-testcases
   ;; Bug#7378.
   '((nil
-     "./x11-libs---nx/3.4.0:0:C.30253.1289557929.792611.C/nx-3.4.0.exheres-0\0\ 42:some text"
+     "./x11-libs---nx/3.4.0:0:C.30253.1289557929.792611.C/nx-3.4.0.exheres-0\x00\ 42:some text"
      1 nil 42 "./x11-libs---nx/3.4.0:0:C.30253.1289557929.792611.C/nx-3.4.0.exheres-0")
     (nil
-     "2011-08-31_11:57:03_1\0\ 7:Date: Wed, 31 Aug 2011 11:57:03 +0000"
+     "2011-08-31_11:57:03_1\x00\ 7:Date: Wed, 31 Aug 2011 11:57:03 +0000"
      1 nil 7 "2011-08-31_11:57:03_1"))
   "List of tricky tests for `grep-regexp-list'.
 Same as `compile-tests--grep-regexp-testcases', but these cases
@@ -555,7 +555,7 @@ The test data is in `compile-tests--grep-regexp-testcases'."
         ;; Make sure replacing the NUL character with a colon still matches.
         (let ((testcase2 (copy-sequence testcase)))
           (setf (nth 1 testcase2)
-                (string-replace "\0" ":" (nth 1 testcase2)))
+                (string-replace "\x00" ":" (nth 1 testcase2)))
           (setq msg2 (compile--test-error-line testcase2)))
         (should (equal msg1 msg2))))
     (dolist (testcase compile-tests--grep-regexp-tricky-testcases)

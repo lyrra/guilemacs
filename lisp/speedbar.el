@@ -3523,7 +3523,7 @@ Returns the tag list, or t for an error."
     ("\\.\\([cChH]\\|c\\+\\+\\|cpp\\|cc\\|hh\\|java\\|cxx\\|hxx\\)\\'" .
      speedbar-parse-c-or-c++tag)
     ("^\\.emacs$\\|.\\(el\\|l\\|lsp\\)\\'" .
-     "def[^i]+\\s-+\\(\\(\\w\\|[-_]\\)+\\)\\s-*\C-?")
+     "def[^i]+\\s-+\\(\\(\\w\\|[-_]\\)+\\)\\s-*\x7f")
 ;    ("\\.\\([fF]\\|for\\|FOR\\|77\\|90\\)\\'" .
 ;      speedbar-parse-fortran77-tag)
     ("\\.tex\\'" . speedbar-parse-tex-string)
@@ -3621,11 +3621,11 @@ Each symbol will be associated with its line position in FILE."
 ;  (save-excursion
 ;    (goto-char (point-min))
 ;    (while
-;	(re-search-forward "(?[ \t](?\C-?" nil t)
-;      (replace-match "\C-?" nil nil))
+;	(re-search-forward "(?[ \t](?\x7f" nil t)
+;      (replace-match "\x7f" nil nil))
 ;    (goto-char (point-min))
 ;    (while
-;	(re-search-forward "\\(.*[ \t]+\\)\\([^ \t\n]+.*\C-?\\)" nil t)
+;	(re-search-forward "\\(.*[ \t]+\\)\\([^ \t\n]+.*\x7f\\)" nil t)
 ;      (delete-region (match-beginning 1) (match-end 1)))))
 
 (defun speedbar-extract-one-symbol (expr)
@@ -3638,7 +3638,7 @@ regular expression EXPR."
 		      (buffer-substring-no-properties (match-beginning 1)
 						      (match-end 1)))
 		(funcall expr)))
-	 (pos (let ((j (re-search-forward "[\C-?\C-a]\\([0-9]+\\),\\([0-9]+\\)"
+	 (pos (let ((j (re-search-forward "[\x7f\x01]\\([0-9]+\\),\\([0-9]+\\)"
 					  (line-end-position) t)))
 		(if (and j sym)
 		    (1+ (string-to-number (buffer-substring-no-properties
@@ -3653,13 +3653,13 @@ regular expression EXPR."
   "Parse a C or C++ tag, which tends to be a little complex."
   (save-excursion
     (let ((bound (line-end-position)))
-      (cond ((re-search-forward "\C-?\\([^\C-a]+\\)\C-a" bound t)
+      (cond ((re-search-forward "\x7f\\([^\x01]+\\)\x01" bound t)
 	     (buffer-substring-no-properties (match-beginning 1)
 					     (match-end 1)))
 	    ((re-search-forward "\\<\\([^ \t]+\\)\\s-+new(" bound t)
 	     (buffer-substring-no-properties (match-beginning 1)
 					     (match-end 1)))
-	    ((re-search-forward "\\<\\([^ \t(]+\\)\\s-*(\C-?" bound t)
+	    ((re-search-forward "\\<\\([^ \t(]+\\)\\s-*(\x7f" bound t)
 	     (buffer-substring-no-properties (match-beginning 1)
 					     (match-end 1)))
 	    (t nil))
@@ -3669,7 +3669,7 @@ regular expression EXPR."
   "Parse a Tex string.  Only find data which is relevant."
   (save-excursion
     (let ((bound (line-end-position)))
-      (cond ((re-search-forward "\\(\\(sub\\)*section\\|chapter\\|cite\\)\\s-*{[^\C-?}]*}?" bound t)
+      (cond ((re-search-forward "\\(\\(sub\\)*section\\|chapter\\|cite\\)\\s-*{[^\x7f}]*}?" bound t)
 	     (buffer-substring-no-properties (match-beginning 0)
 					     (match-end 0)))
 	    (t nil)))))
@@ -3681,7 +3681,7 @@ regular expression EXPR."
   (let ((map (speedbar-make-specialized-keymap)))
     ;; Basic tree features
     (define-key map "e" #'speedbar-edit-line)
-    (define-key map "\C-m" #'speedbar-edit-line)
+    (define-key map "\x0d" #'speedbar-edit-line)
     (define-key map "+" #'speedbar-expand-line)
     (define-key map "=" #'speedbar-expand-line)
     (define-key map "-" #'speedbar-contract-line)

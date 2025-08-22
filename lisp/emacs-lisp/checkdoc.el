@@ -681,7 +681,7 @@ style."
 	      (if (not (integerp c)) (setq c ??))
 	      (cond
 	       ;; Exit condition
-	       ((eq c ?\C-g) (signal 'quit nil))
+	       ((eq c ?\x07) (signal 'quit nil))
 	       ;; Request an auto-fix
 	       ((memq c '(?y ?f))
 		(delete-overlay cdo)
@@ -725,7 +725,7 @@ style."
 			(sit-for 2))
 		    (setq err-list (cons ne err-list)))))
 	       ;; Go backwards in the list of errors
-	       ((memq c '(?p ?\C-?))
+	       ((memq c '(?p ?\x7f))
 		(if (/= (length err-list) 1)
 		    (progn
 		      (setq err-list (cdr err-list))
@@ -2832,7 +2832,7 @@ function called to create the messages."
 	(when win
           (with-selected-window win
             (goto-char (point-max))
-            (re-search-backward "\C-l" nil t)
+            (re-search-backward "\x0c" nil t)
             (beginning-of-line)
             (forward-line 1)
             (recenter 0)))

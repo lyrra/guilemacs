@@ -81,7 +81,7 @@ If no encoding was done, nil is returned."
       (or charset
 	  (save-excursion
 	    (goto-char (point-min))
-	    (if (re-search-forward "[^\x0-\x7f]" nil t)
+	    (if (re-search-forward "[^\x00-\x7f]" nil t)
 		(or mail-parse-charset
 		    (message-options-get 'mm-body-charset-encoding-alist)
 		    (message-options-set

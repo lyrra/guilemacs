@@ -99,30 +99,30 @@
   ;; the test had been byte-compiled or not, so we add explicit conversions.
 
   ;; Separate raw characters.
-  (should (equal (string-to-multibyte (rx (any "\326A\333B")))
-                 (string-to-multibyte "[AB\326\333]")))
+  (should (equal (string-to-multibyte (rx (any "\xd6A\xdbB")))
+                 (string-to-multibyte "[AB\xd6\xdb]")))
   ;; Range of raw characters, unibyte.
-  (should (equal (string-to-multibyte (rx (any "\200-\377")))
-                 (string-to-multibyte "[\200-\377]")))
+  (should (equal (string-to-multibyte (rx (any "\x80-\xff")))
+                 (string-to-multibyte "[\x80-\xff]"))")
 
   ;; Range of raw characters, multibyte.
-  (should (equal (rx (any "Å\211\326-\377\177"))
-                 "[\177Å\211\326-\377]"))
+  (should (equal (rx (any "Å\x89\xd6-\xff\x7f"))
+                 "[\x7fÅ\x89\xd6-\xff]"))
   ;; Split range; \177-\377ÿ should not be optimized to \177-\377.
-  (should (equal (rx (any "\177-\377" ?ÿ))
-                 "[\177ÿ\200-\377]"))
+  (should (equal (rx (any "\x7f-\xff" ?ÿ))
+                 "[\x7fÿ\x80-\xff]"))
   ;; Range between normal chars and raw bytes: must be split to be parsed
   ;; correctly by the Emacs regexp engine.
   (should (equal (rx (any (0 . #x3fffff) word) (any (?G . #x3fff9a) word)
                      (any (?Ü . #x3ffff2) word))
-                 (concat "[\0-\x3fff7f\x80-\xff[:word:]]"
+                 (concat "[\x00-\x3fff7f\x80-\xff[:word:]]"
                          "[G-\x3fff7f\x80-\x9a[:word:]]"
                          "[Ü-\x3fff7f\x80-\xf2[:word:]]")))
   ;; As above but with ranges in string form. For historical reasons,
   ;; we special-case ASCII-to-raw ranges to exclude non-ASCII unicode.
   (should (equal (rx (any "\x00-\xff" alpha) (any "G-\x9a" alpha)
                      (any "Ü-\xf2" alpha))
-                 (concat "[\0-\x7f\x80-\xff[:alpha:]]"
+                 (concat "[\x00-\x7f\x80-\xff[:alpha:]]"
                          "[G-\x7f\x80-\x9a[:alpha:]]"
                          "[Ü-\x3fff7f\x80-\xf2[:alpha:]]"))))
 
@@ -417,7 +417,7 @@
   (should (equal (rx (or (not (in "a-p")) (not (in "k-u"))))
                  "[^k-p]"))
   (should (equal (rx (or (not (in "a-p")) word (not (in "k-u"))))
-                 "[\0-jq-\x3fff7f\x80-\xff[:word:]]"))
+                 "[\x00-jq-\x3fff7f\x80-\xff[:word:]]"))
   (should (equal (rx (or (in "a-f" blank) (in "c-z") blank))
                  "[a-z[:blank:]]"))
   )

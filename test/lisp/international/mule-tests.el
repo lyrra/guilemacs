@@ -41,7 +41,7 @@
                    '(utf-8 . :coding)))))
 
 (ert-deftest mule-cmds-tests--encode-ebcdic ()
-  (should (equal (encode-coding-char ?a 'ebcdic-int) "\201"))
+  (should (equal (encode-coding-char ?a 'ebcdic-int) "\x81"))
   (should (not (multibyte-string-p (encode-coding-char ?a 'utf-8)))))
 
 (ert-deftest mule-cmds--test-universal-coding-system-argument ()

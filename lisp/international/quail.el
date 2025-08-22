@@ -283,15 +283,15 @@ installed together with Emacs.")))
     (define-key map [down] 'quail-next-translation-block)
     (define-key map [up] 'quail-prev-translation-block)
     (define-key map (kbd "TAB") 'quail-completion)
-    (define-key map "\C-@" 'quail-select-current)
+    (define-key map "\x00" 'quail-select-current)
     ;; Following simple.el, Enter key on numeric keypad selects the
     ;; current translation just like `C-SPC', and `mouse-2' chooses
     ;; any completion visible in the *Quail Completions* buffer.
     (define-key map [kp-enter] 'quail-select-current)
     (define-key map [mouse-2] 'quail-mouse-choose-completion)
     (define-key map [down-mouse-2] nil)
-    (define-key map "\C-h" 'quail-translation-help)
-    (define-key map [?\C- ] 'quail-select-current)
+    (define-key map "\x08" 'quail-translation-help)
+    (define-key map [?\x00] 'quail-select-current)
     (define-key map [tab] 'quail-completion)
     (define-key map [delete] 'quail-delete-last-char)
     (define-key map [backspace] 'quail-delete-last-char)
@@ -365,14 +365,14 @@ This map is activated while translation region is active.")
     (while (< i 256)
       (define-key map (vector i) 'quail-self-insert-command)
       (setq i (1+ i)))
-    (define-key map "\C-b" 'quail-conversion-backward-char)
-    (define-key map "\C-f" 'quail-conversion-forward-char)
-    (define-key map "\C-a" 'quail-conversion-beginning-of-region)
-    (define-key map "\C-e" 'quail-conversion-end-of-region)
-    (define-key map "\C-d" 'quail-conversion-delete-char)
-    (define-key map "\C-k" 'quail-conversion-delete-tail)
-    (define-key map "\C-h" 'quail-translation-help)
-    (define-key map "\177" 'quail-conversion-backward-delete-char)
+    (define-key map "\x02" 'quail-conversion-backward-char)
+    (define-key map "\x06" 'quail-conversion-forward-char)
+    (define-key map "\x01" 'quail-conversion-beginning-of-region)
+    (define-key map "\x05" 'quail-conversion-end-of-region)
+    (define-key map "\x04" 'quail-conversion-delete-char)
+    (define-key map "\x0b" 'quail-conversion-delete-tail)
+    (define-key map "\x08" 'quail-translation-help)
+    (define-key map "\x7f" 'quail-conversion-backward-delete-char)
     (define-key map [delete] 'quail-conversion-backward-delete-char)
     (define-key map [backspace] 'quail-conversion-backward-delete-char)
     map)
@@ -627,17 +627,17 @@ This layout is almost the same as that of VT100,
                               ")
    '("atari-german" . "\
                               \
-  1!2\"3\2474$5%6&7/8(9)0=\337?'`#^  \
-  qQwWeErRtTzZuUiIoOpP\374\334+*    \
-  aAsSdDfFgGhHjJkKlL\366\326\344\304~|    \
+  1!2\"3\xa74$5%6&7/8(9)0=\xdf?'`#^  \
+  qQwWeErRtTzZuUiIoOpP\xfc\xdc+*    \
+  aAsSdDfFgGhHjJkKlL\xf6\xd6\xe4\xc4~|    \
 <>yYxXcCvVbBnNmM,;.:-_        \
                               ")
 
    '("pc102-de" . "\
                               \
-^\2601!2\"3\2474$5%6&7/8(9)0=\337?\264`#'  \
-  qQwWeErRtTzZuUiIoOpP\374\334+*    \
-  aAsSdDfFgGhHjJkKlL\366\326\344\304      \
+^\xb01!2\"3\xa74$5%6&7/8(9)0=\xdf?\xb4`#'  \
+  qQwWeErRtTzZuUiIoOpP\xfc\xdc+*    \
+  aAsSdDfFgGhHjJkKlL\xf6\xd6\xe4\xc4      \
 <>yYxXcCvVbBnNmM,;.:-_        \
                               ")
 
@@ -650,7 +650,7 @@ This layout is almost the same as that of VT100,
                               ")
    '("pc105-uk" . "\
                               \
-`\2541!2\"3\2434$5%6^7&8*9(0)-_=+    \
+`\xac1!2\"3\xa34$5%6^7&8*9(0)-_=+    \
   qQwWeErRtTyYuUiIoOpP[{]}    \
   aAsSdDfFgGhHjJkKlL;:'@#~    \
 \\|zZxXcCvVbBnNmM,<.>/?        \

@@ -793,10 +793,10 @@ archive.
   ;; The funny [] here make it unlikely that the .elc file will be treated
   ;; as an archive by other software.
   (let (case-fold-search)
-    (cond ((looking-at "\\(PK00\\)?[P]K\003\004") 'zip)
+    (cond ((looking-at "\\(PK00\\)?[P]K\x03\x04") 'zip)
 	  ((looking-at "..-l[hz][0-9ds]-") 'lzh)
-	  ((looking-at "....................[\334]\247\304\375") 'zoo)
-	  ((and (looking-at "\C-z")	; signature too simple, IMHO
+	  ((looking-at "....................[\xdc]\xa7\xc4\xfd") 'zoo)
+	  ((and (looking-at "\x1a")	; signature too simple, IMHO
 		(string-match "\\.[aA][rR][cC]\\'"
 			      (or buffer-file-name (buffer-name))))
 	   'arc)
@@ -809,7 +809,7 @@ archive.
           ((and (looking-at "MZ")
                 (re-search-forward "Rar!" (+ (point) 100000) t))
            'rar-exe)
-	  ((looking-at "7z\274\257\047\034") '7z)
+	  ((looking-at "7z\xbc\xaf\x27\x1c") '7z)
           ((looking-at "hsqs") 'squashfs)
 	  (t (error "Buffer format not recognized")))))
 ;; -------------------------------------------------------------------------
@@ -1440,7 +1440,7 @@ NEW-NAME."
 	  (if (archive--file-desc-mode descr)
 	      ;; Set the file modes, but make sure we can read it.
 	      (set-file-modes tmpfile
-	                      (logior ?\400 (archive--file-desc-mode descr))))
+	                      (logior #o400 (archive--file-desc-mode descr))))
 	  (setq ename
 		(encode-coding-string ename archive-file-name-coding-system))
           (let* ((coding-system-for-write 'no-conversion)
@@ -1770,10 +1770,10 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
   (let ((p 1)
         files)
     (while (and (< (+ p 29) (point-max))
-		(= (get-byte p) ?\C-z)
+		(= (get-byte p) #x1a)
 		(> (get-byte (1+ p)) 0))
       (let* ((namefld (buffer-substring (+ p 2) (+ p 2 13)))
-	     (fnlen   (or (string-search "\0" namefld) 13))
+	     (fnlen   (or (string-search "\x00" namefld) 13))
 	     (efnname (decode-coding-string (substring namefld 0 fnlen)
 					    archive-file-name-coding-system))
              (csize   (archive-l-e (+ p 15) 4))
@@ -1796,7 +1796,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
       (error "File names in arc files must not contain a directory component"))
   (if (> (length newname) 12)
       (error "File names in arc files are limited to 12 characters"))
-  (let ((name (concat newname (make-string (- 13 (length newname)) ?\0)))
+  (let ((name (concat newname (make-string (- 13 (length newname)) ?\x00)))
 	(inhibit-read-only t))
     (save-restriction
       (save-excursion
@@ -2018,7 +2018,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
 (declare-function w32-get-console-codepage "w32proc.c")
 (defun archive-zip-summarize ()
   (goto-char (- (point-max) (- 22 18)))
-  (search-backward-regexp "[P]K\005\006")
+  (search-backward-regexp "[P]K\x05\x06")
   (let ((p (archive-l-e (+ (point) 16) 4))
         (w32-fname-encoding
          ;; On MS-Windows, both InfoZip's Zip and the system's
@@ -2037,17 +2037,17 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
       ;; info from Zip64 records instead.
       ;;
       ;; First, find the Zip64 end-of-central-directory locator.
-      (search-backward "PK\006\007")
+      (search-backward "PK\x06\x07")
       (setq p (+ (point-min)
                  (archive-l-e (+ (point) 8) 8)))
       (goto-char p)
       ;; We should be at Zip64 end-of-central-directory record now.
-      (or (string= "PK\006\006" (buffer-substring p (+ p 4)))
+      (or (string= "PK\x06\x06" (buffer-substring p (+ p 4)))
           (error "Unrecognized ZIP file format"))
       ;; Offset to central directory:
       (setq p (archive-l-e (+ p 48) 8)))
     (setq p (+ p (point-min)))
-    (while (string= "PK\001\002" (buffer-substring p (+ p 4)))
+    (while (string= "PK\x01\x02" (buffer-substring p (+ p 4)))
       (let* ((creator (get-byte (+ p 5)))
              (gpflags (archive-l-e (+ p 8) 2))
 	     ;; (method  (archive-l-e (+ p 10) 2))
@@ -2078,7 +2078,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
                                (> exlen 0))
                           ;; APPNOTE.TXT, para 4.5.3: the Extra Field
                           ;; begins with 2 bytes of signature
-                          ;; (\000\001), followed by 2 bytes that give
+                          ;; (\x00\x01), followed by 2 bytes that give
                           ;; the size of the extra block, followed by
                           ;; an 8-byte uncompressed size.
                           (archive-l-e (+ p 46 fnlen 4) 8)
@@ -2088,11 +2088,11 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
 	     (mode    (cond ((memq creator '(2 3)) ; Unix
 			     (archive-l-e (+ p 40) 2))
 			    ((memq creator '(0 5 6 7 10 11 15)) ; Dos etc.
-			     (logior ?\444
-				     (if isdir (logior 16384 ?\111) 0)
+			     (logior #o444
+				     (if isdir (logior 16384 #o111) 0)
 				     (if (zerop
 					  (logand 1 (get-byte (+ p 38))))
-					 ?\222 0)))
+					 #o222 0)))
 			    (t nil)))
 	     (fiddle  (and archive-zip-case-fiddle
 			   (memq creator '(0 2 4 5 9))
@@ -2168,7 +2168,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
 (defun archive-zoo-summarize ()
   (let ((p (1+ (archive-l-e 25 4)))
         files)
-    (while (and (string= "\334\247\304\375" (buffer-substring p (+ p 4)))
+    (while (and (string= "\xdc\xa7\xc4\xfd" (buffer-substring p (+ p 4)))
 		(> (archive-l-e (+ p 6) 4) 0))
       (let* ((next    (1+ (archive-l-e (+ p 6) 4)))
              (moddate (archive-l-e (+ p 14) 2))
@@ -2178,7 +2178,7 @@ This doesn't recover lost files, it just undoes changes in the buffer itself."
 	     (dirtype (get-byte (+ p 4)))
 	     (lfnlen  (if (= dirtype 2) (get-byte (+ p 56)) 0))
 	     (ldirlen (if (= dirtype 2) (get-byte (+ p 57)) 0))
-	     (fnlen   (or (string-search "\0" namefld) 13))
+	     (fnlen   (or (string-search "\x00" namefld) 13))
 	     (efnname (let ((str
 			     (concat
 			      (if (> ldirlen 0)
