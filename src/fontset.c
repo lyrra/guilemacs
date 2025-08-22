@@ -1624,10 +1624,11 @@ to be shown using the fonts from before the call.  */)
 	  if (charset->ascii_compatible_p)
 	    ascii_changed = 1;
 	}
-// FIX-guilemacs: not sure what to do here
-//      else if (NILP (range_list))
-//	error ("Invalid script or charset name: %s",
-//	       SDATA (SYMBOL_NAME (characters)));
+      /* Only error if we actually tried to process as script/charset but failed.
+         In prelude mode, char-script-table might not be fully initialized. */
+      else if (NILP (range_list) && !NILP (script_list))
+	error ("Invalid script or charset name: %s",
+	       SDATA (SYMBOL_NAME (characters)));
     }
   else if (NILP (characters))
     range_list = list1 (Qnil);
