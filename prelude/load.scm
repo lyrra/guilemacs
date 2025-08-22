@@ -1222,6 +1222,11 @@ This function may destructively modify SEQ to produce the value."
 ;; Use the prelude directory defined in the current module by C
 (primitive-load (string-append %prelude-directory "/lookup-functions.scm"))
 
+;; Load new UTF-8 string operations and migration functions
+(primitive-load (string-append %prelude-directory "/utf8-string-operations.scm"))
+(primitive-load (string-append %prelude-directory "/string-comparison-migration.scm"))
+(primitive-load (string-append %prelude-directory "/symbol-operations.scm"))
+
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
 (let ((global-module (resolve-module '() #f))
