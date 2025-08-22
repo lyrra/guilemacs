@@ -40,7 +40,7 @@
 ;;   - CR and LF MUST only occur together as CRLF; they MUST NOT
 ;;     appear independently in the body.
 
-(defvar mm-7bit-chars "\x20-\x7f\n\t\x7\x8\xb\xc\x1f")
+(defvar mm-7bit-chars "\x20-\x7f\n\t\x07\x08\x0b\x0c\x1f")
 
 (defcustom mm-body-charset-encoding-alist
   '((iso-2022-jp . 7bit)
