@@ -114,7 +114,7 @@ list that is the value of `ansi-osc-handlers'.  You should arrange
 for your shell to print the appropriate escape sequence at each prompt,
 such as with the following command:
 
-    printf \"\\e]7;file://%s%s\\e\\\\\" \"$HOSTNAME\" \"$PWD\"
+    printf \"\x1b]7;file://%s%s\x1b\\\\\" \"$HOSTNAME\" \"$PWD\"
 
 This functionality serves as an alternative to `dirtrack-mode'
 and `shell-dirtrack-mode'."
