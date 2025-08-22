@@ -2004,13 +2004,13 @@ in *Help* buffer.  See also the command `describe-char'."
 ;; Initialize read-expression-map.  It is defined at C level.
 (defvar read-expression-map
   (let ((m (make-sparse-keymap)))
-    (define-key m "\\M-\t" 'completion-at-point)
+    (define-key m (kbd "M-TAB") 'completion-at-point)
     ;; Might as well bind TAB to completion, since inserting a TAB char is
     ;; much too rarely useful.
     (define-key m "\t" 'completion-at-point)
     (define-key m "\r" 'read--expression-try-read)
     (define-key m "\n" 'read--expression-try-read)
-    (define-key m "\\M-g\\M-c" 'read-expression-switch-to-completions)
+    (define-key m (kbd "M-g M-c") 'read-expression-switch-to-completions)
     (set-keymap-parent m minibuffer-local-map)
     m))
 
@@ -2669,7 +2669,7 @@ customizing `read-extended-command-predicate'."
     ;; Some features, such as novice.el, rely on this-command-keys
     ;; including M-x COMMAND-NAME RET.
     ; FIX-guilemacs: \\M
-    (set--this-command-keys (concat "\\M-x" (symbol-name function) "\\r"))
+    (set--this-command-keys (concat "\x1bx" (symbol-name function) "\x0d"))
     (setq this-command function)
     ;; Normally `real-this-command' should never be changed, but here we really
     ;; want to pretend that M-x <cmd> RET is nothing more than a "key
@@ -10047,11 +10047,11 @@ makes it easier to edit it."
     (define-key map [backtab] 'previous-completion)
     (define-key map [M-up] 'minibuffer-previous-completion)
     (define-key map [M-down] 'minibuffer-next-completion)
-    (define-key map "\\M-\r" 'minibuffer-choose-completion)
+    (define-key map (kbd "M-RET") 'minibuffer-choose-completion)
     (define-key map "z" 'kill-current-buffer)
     (define-key map "n" 'next-completion)
     (define-key map "p" 'previous-completion)
-    (define-key map "\\M-g\\M-c" 'switch-to-minibuffer)
+    (define-key map (kbd "M-g M-c") 'switch-to-minibuffer)
     map)
   "Local map for completion list buffers.")
 

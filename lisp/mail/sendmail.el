@@ -1974,7 +1974,7 @@ The seventh argument ACTIONS is a list of actions to take
 	  (interactive)
 	  (let ((coding-system-for-read 'utf-8-emacs-unix))
 	    (dired-view-file))))
-      (define-key (current-local-map) "\C-c\C-c"
+      (define-key (current-local-map) (kbd "C-c C-c")
 	(lambda ()
 	  (interactive)
 	  (let ((fname (dired-get-filename))

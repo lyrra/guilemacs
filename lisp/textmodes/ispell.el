@@ -4001,7 +4001,7 @@ in your init file:
 
 You can bind this to a key in GNUS or mail by adding to
 `news-reply-mode-hook' or `mail-mode-hook' the following lambda expression:
-   (lambda () (local-set-key \"\\C-ci\" \\='ispell-message))"
+   (lambda () (local-set-key (kbd \"C-c i\") \\='ispell-message))"
   (interactive)
   (save-excursion
     (goto-char (point-min))

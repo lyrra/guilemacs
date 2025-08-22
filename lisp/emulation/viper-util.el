@@ -1011,17 +1011,17 @@ Otherwise return the normal value."
 ;; key is supposed to be in viper's representation, e.g., (control l), a
 ;; character, etc.
 (defun viper-key-to-character (key)
-  (cond ((eq key 'space) ?\ )
-	((eq key 'delete) ?\C-?)
-	((eq key 'return) ?\C-m)
-	((eq key 'backspace) ?\C-h)
+  (cond ((eq key 'space) ?\x20)
+	((eq key 'delete) ?\x7f)
+	((eq key 'return) ?\x0d)
+	((eq key 'backspace) ?\x08)
 	((and (symbolp key)
 	      (= 1 (length (symbol-name key))))
 	 (string-to-char (symbol-name key)))
 	((and (listp key)
 	      (eq (car key) 'control)
 	      (= 1 (length (symbol-name (nth 1 key)))))
-	 (read (format "?\\C-%s" (symbol-name (nth 1 key)))))
+	 (logand (string-to-char (symbol-name (nth 1 key))) ?\x1f))
 	(t key)))
 
 

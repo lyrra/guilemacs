@@ -128,9 +128,9 @@
 		  'quail-execute-non-quail-command)
 	    (<= key 127))
 	  (progn
-	    (princ (cons (cond ((< key ?\ ) (format "\"\\C-%c\"" (+ key ?@)))
+	    (princ (cons (cond ((< key ?\ ) (format "\"\x%02x\"" key))
 			       ((< key 127) (format "\"%c\"" key))
-			       (t "\"\\C-?\""))
+			       (t "\"\x7f\""))
 			 function-symbol))
 	    (setq first nil)))
       (setq i (1+ i)))))

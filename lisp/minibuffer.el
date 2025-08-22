@@ -3313,7 +3313,7 @@ Also respects the obsolete wrapper hook `completion-in-region-functions'.
   (let ((map (make-sparse-keymap)))
     ;; FIXME: Only works if completion-in-region-mode was activated via
     ;; completion-at-point called directly.
-    (define-key map "\\M-?" 'completion-help-at-point)
+    (define-key map (kbd "M-?") 'completion-help-at-point)
     (define-key map "\t" 'completion-at-point)
     map)
   "Keymap activated during `completion-in-region'.")
@@ -3530,11 +3530,11 @@ The completion method is determined by `completion-at-point-functions'."
     (define-key map " " 'minibuffer-complete-word)
     (define-key map "?" 'minibuffer-completion-help)
     (define-key map [prior] 'switch-to-completions)
-    (define-key map "\\M-v"  'switch-to-completions)
-    (define-key map "\\M-g\\M-c"  'switch-to-completions)
-    (define-key map "\\M-<up>"    'minibuffer-choose-previous-completion)
-    (define-key map "\\M-<down>"  'minibuffer-choose-next-completion)
-    (define-key map "\\M-RET"      'minibuffer-choose-completion)
+    (define-key map (kbd "M-v") 'switch-to-completions)
+    (define-key map (kbd "M-g M-c") 'switch-to-completions)
+    (define-key map (kbd "M-<up>") 'minibuffer-choose-previous-completion)
+    (define-key map (kbd "M-<down>") 'minibuffer-choose-next-completion)
+    (define-key map (kbd "M-RET") 'minibuffer-choose-completion)
     map)
   "Local keymap for minibuffer input with completion.")
 
