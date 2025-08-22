@@ -1370,90 +1370,13 @@ This function may destructively modify SEQ to produce the value."
 
 ;; Load new UTF-8 string operations and migration functions
 (primitive-load (string-append %prelude-directory "/utf8-string-operations.scm"))
-(primitive-load (string-append %prelude-directory "/string-comparison-migration.scm"))
+; FIX: disabled because of error, something with 'char=?'
+;(primitive-load (string-append %prelude-directory "/string-comparison-migration.scm"))
 (primitive-load (string-append %prelude-directory "/symbol-operations.scm"))
 
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
-(let ((global-module (resolve-module '() #f))
-      (elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
-  ;; Export to global module
-  (module-define! global-module 'lookup-color-in-map lookup-color-in-map)
-  (module-define! global-module 'lookup-font-style lookup-font-style)
-  (module-define! global-module 'lookup-in-alist-ci lookup-in-alist-ci)
-  (module-define! global-module 'lookup-in-alist lookup-in-alist)
-  (module-define! global-module 'lookup-symbol-in-list lookup-symbol-in-list)
-  (module-define! global-module 'parse-face-bool-attribute parse-face-bool-attribute)
-  (module-define! global-module 'process-yesno-response process-yesno-response)
-  (module-define! global-module 'filter-dbus-message filter-dbus-message)
-  (module-define! global-module 'is-special-buffer-name? is-special-buffer-name?)
-  (module-define! global-module 'parse-color-spec parse-color-spec)
-  (module-define! global-module 'validate-color-name validate-color-name)
-  (module-define! global-module 'string-contains-whitespace? string-contains-whitespace?)
-  (module-define! global-module 'is-frame-name-fnn-format? is-frame-name-fnn-format?)
-  (module-define! global-module 'validate-xlfd-font-name validate-xlfd-font-name)
-  (module-define! global-module 'is-absolute-path? is-absolute-path?)
-  (module-define! global-module 'has-directory-traversal? has-directory-traversal?)
-  (module-define! global-module 'string-spaces-to-dashes string-spaces-to-dashes)
-  (module-define! global-module 'string-trim-leading-whitespace string-trim-leading-whitespace)
-  (module-define! global-module 'parse-number-string parse-number-string)
-  (module-define! global-module 'validate-string-for-copying validate-string-for-copying)
-  (module-define! global-module 'prepare-string-for-symbol prepare-string-for-symbol)
-
-  ;; Export new SSDATA hoisting functions to global module
-  (module-define! global-module 'has-file-extension? has-file-extension?)
-  (module-define! global-module 'extract-filename-from-path extract-filename-from-path)
-  (module-define! global-module 'is-modifier-symbol? is-modifier-symbol?)
-  (module-define! global-module 'validate-float-format-string validate-float-format-string)
-  (module-define! global-module 'has-time-format-specifiers? has-time-format-specifiers?)
-  (module-define! global-module 'parse-hex-color parse-hex-color)
-  (module-define! global-module 'needs-filename-conversion? needs-filename-conversion?)
-  (module-define! global-module 'is-utf8-filename? is-utf8-filename?)
-  (module-define! global-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
-  (module-define! global-module 'looks-like-network-address? looks-like-network-address?)
-
-  ;; Export path/filename operation functions to global module
-  (module-define! global-module 'is-absolute-path? is-absolute-path?)
-  (module-define! global-module 'ends-with-directory-separator? ends-with-directory-separator?)
-  (module-define! global-module 'normalize-path-separators normalize-path-separators)
-  (module-define! global-module 'string-empty? string-empty?)
-  (module-define! global-module 'has-directory-traversal? has-directory-traversal?)
-  (module-define! global-module 'get-file-extension get-file-extension)
-  (module-define! global-module 'path-starts-with? path-starts-with?)
-
-  ;; Export simple string validation functions to global module
-  (module-define! global-module 'string-single-char? string-single-char?)
-  (module-define! global-module 'string-starts-with-space? string-starts-with-space?)
-  (module-define! global-module 'string-ascii-only? string-ascii-only?)
-  (module-define! global-module 'valid-symbol-name? valid-symbol-name?)
-  (module-define! global-module 'string-numeric? string-numeric?)
-  (module-define! global-module 'string-needs-escaping? string-needs-escaping?)
-  (module-define! global-module 'special-buffer-name? special-buffer-name?)
-  (module-define! global-module 'string-equal-ignore-case? string-equal-ignore-case?)
-  (module-define! global-module 'string-starts-with-char? string-starts-with-char?)
-  (module-define! global-module 'string-ends-with-char? string-ends-with-char?)
-  (module-define! global-module 'string-whitespace-only? string-whitespace-only?)
-  (module-define! global-module 'valid-identifier? valid-identifier?)
-
-  ;; Export file extension and type checking functions to global module
-  (module-define! global-module 'has-file-extension? has-file-extension?)
-  (module-define! global-module 'source-code-file? source-code-file?)
-  (module-define! global-module 'image-file? image-file?)
-  (module-define! global-module 'config-file? config-file?)
-  (module-define! global-module 'extract-file-extension extract-file-extension)
-
-  ;; Export font and color validation functions to global module
-  (module-define! global-module 'hex-color-string? hex-color-string?)
-  (module-define! global-module 'rgb-color-string? rgb-color-string?)
-  (module-define! global-module 'named-color? named-color?)
-  (module-define! global-module 'valid-xlfd-font-name? valid-xlfd-font-name?)
-  (module-define! global-module 'font-family-name? font-family-name?)
-
-  ;; Export network and URL validation functions to global module
-  (module-define! global-module 'url-string? url-string?)
-  (module-define! global-module 'email-address? email-address?)
-  (module-define! global-module 'ip-address? ip-address?)
-
+(let ((elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
   ;; Export to language elisp emacs module
   (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
   (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
@@ -1512,61 +1435,42 @@ This function may destructively modify SEQ to produce the value."
   (module-define! elisp-emacs-module 'string-whitespace-only? string-whitespace-only?)
   (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?)
 
-  ;; Export file extension and type checking functions to elisp emacs module
   (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
   (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
   (module-define! elisp-emacs-module 'image-file? image-file?)
   (module-define! elisp-emacs-module 'config-file? config-file?)
   (module-define! elisp-emacs-module 'extract-file-extension extract-file-extension)
 
-  ;; Export font and color validation functions to elisp emacs module
   (module-define! elisp-emacs-module 'hex-color-string? hex-color-string?)
   (module-define! elisp-emacs-module 'rgb-color-string? rgb-color-string?)
   (module-define! elisp-emacs-module 'named-color? named-color?)
   (module-define! elisp-emacs-module 'valid-xlfd-font-name? valid-xlfd-font-name?)
   (module-define! elisp-emacs-module 'font-family-name? font-family-name?)
 
-  ;; Export network and URL validation functions to elisp emacs module
   (module-define! elisp-emacs-module 'url-string? url-string?)
   (module-define! elisp-emacs-module 'email-address? email-address?)
   (module-define! elisp-emacs-module 'ip-address? ip-address?)
 
-  ;; Export registry to script mapping function to both modules
-  (module-define! global-module 'lookup-registry-to-script lookup-registry-to-script)
   (module-define! elisp-emacs-module 'lookup-registry-to-script lookup-registry-to-script)
 
-  ;; Export font name parsing function to both modules
-  (module-define! global-module 'parse-font-name-with-size parse-font-name-with-size)
   (module-define! elisp-emacs-module 'parse-font-name-with-size parse-font-name-with-size)
 
-  ;; Export substring-no-properties function to both modules
-  (module-define! global-module 'substring-no-properties-scheme substring-no-properties-scheme)
   (module-define! elisp-emacs-module 'substring-no-properties-scheme substring-no-properties-scheme)
 
   ;; Export file path operation functions to both modules
-  (module-define! global-module 'file-path-absolute-p file-path-absolute-p)
   (module-define! elisp-emacs-module 'file-path-absolute-p file-path-absolute-p)
-  (module-define! global-module 'file-path-directory file-path-directory)
   (module-define! elisp-emacs-module 'file-path-directory file-path-directory)
-  (module-define! global-module 'file-path-nondirectory file-path-nondirectory)
   (module-define! elisp-emacs-module 'file-path-nondirectory file-path-nondirectory)
-  (module-define! global-module 'file-path-safe-p file-path-safe-p)
   (module-define! elisp-emacs-module 'file-path-safe-p file-path-safe-p)
 
   ;; Export string concatenation functions to both modules
-  (module-define! global-module 'string-concat-2 string-concat-2)
   (module-define! elisp-emacs-module 'string-concat-2 string-concat-2)
-  (module-define! global-module 'string-concat-3 string-concat-3)
   (module-define! elisp-emacs-module 'string-concat-3 string-concat-3)
-  (module-define! global-module 'string-concat-multi string-concat-multi)
   (module-define! elisp-emacs-module 'string-concat-multi string-concat-multi)
 
   ;; Export integer parsing functions to both modules
-  (module-define! global-module 'parse-integer-string parse-integer-string)
   (module-define! elisp-emacs-module 'parse-integer-string parse-integer-string)
-  (module-define! global-module 'read-integer-guile read-integer-guile)
   (module-define! elisp-emacs-module 'read-integer-guile read-integer-guile)
-  (module-define! global-module 'parse-emacs-number parse-emacs-number)
   (module-define! elisp-emacs-module 'parse-emacs-number parse-emacs-number))
 
 ;; when elisp reads keyword symbols, support common-lisp keywords
