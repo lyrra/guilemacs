@@ -881,6 +881,61 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
     ((number? arg) arg)  ; Already a float
     (else (error "Wrong type argument: numberp" arg))))
 
+(define (elisp-number-to-string number)
+  "Return the decimal representation of NUMBER as a string."
+  (cond
+    ((integer? number) (number->string number))
+    ((number? number) (number->string number))
+    (else (error "Wrong type argument: numberp" number))))
+
+(define (elisp-string-to-number string base)
+  "Parse STRING as a decimal number and return the number.
+Optional BASE argument specifies the base (2-16)."
+  (let ((base-val (if base base 10)))
+    (cond
+      ((not (string? string)) (error "Wrong type argument: stringp" string))
+      ((not (and (integer? base-val) (>= base-val 2) (<= base-val 16)))
+       (error "Invalid base" base-val))
+      (else
+       (catch #t
+         (lambda ()
+           (string->number (string-trim string) base-val))
+         (lambda (key . args)
+           0))))))  ; Return 0 on parse error, like Emacs
+
+;; Additional type predicates
+(define (elisp-sequencep object)
+  "Return t if OBJECT is a sequence (list or array)."
+  (if (or (pair? object) (null? object) (vector? object) (string? object))
+      #t #nil))
+
+(define (elisp-arrayp object)
+  "Return t if OBJECT is an array (string or vector)."
+  (if (or (vector? object) (string? object))
+      #t #nil))
+
+(define (elisp-bool-vector-p object)
+  "Return t if OBJECT is a bool-vector."
+  ;; For now, check if it's a bitvector in Guile
+  (if (bitvector? object) #t #nil))
+
+(define (elisp-subrp object)
+  "Return t if OBJECT is a built-in function."
+  (if (or (procedure? object)
+          (and (pair? object) (eq? (car object) 'special-operator)))
+      #t #nil))
+
+;; String creation function
+(define (elisp-make-string length init multibyte)
+  "Return a newly created string of length LENGTH, with INIT in each element."
+  (cond
+    ((not (and (integer? length) (>= length 0)))
+     (error "Wrong type argument: natnump" length))
+    ((not (integer? init))
+     (error "Wrong type argument: characterp" init))
+    (else
+     (make-string length (integer->char init)))))
+
 ;; Simple utility functions migrated from C DEFUN to Guile
 (define (elisp-null object)
   "Return t if OBJECT is nil, and return nil otherwise."
@@ -931,6 +986,17 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
 
 ;; Register type conversion functions
 (set-symbol-function! 'float elisp-float)
+(set-symbol-function! 'number-to-string elisp-number-to-string)
+(set-symbol-function! 'string-to-number elisp-string-to-number)
+
+;; Register additional type predicates
+(set-symbol-function! 'sequencep elisp-sequencep)
+(set-symbol-function! 'arrayp elisp-arrayp)
+(set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
+(set-symbol-function! 'subrp elisp-subrp)
+
+;; Register string creation functions
+(set-symbol-function! 'make-string elisp-make-string)
 
 ;; Phase 4 DEFUN function migrations are called directly from C code
 ;; to avoid infinite recursion. The elisp-* versions are available
