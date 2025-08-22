@@ -87,13 +87,13 @@
     (define-key map (kbd "C-c C-u") 'pascal-uncomment-area)
     (define-key map (kbd "M-C-a")  'pascal-beg-of-defun)
     (define-key map (kbd "M-C-e")  'pascal-end-of-defun)
-    (define-key map "\C-c\C-d" 'pascal-goto-defun)
-    (define-key map "\C-c\C-o" 'pascal-outline-mode)
+    (define-key map (kbd "C-c C-d") 'pascal-goto-defun)
+    (define-key map (kbd "C-c C-o") 'pascal-outline-mode)
     ;; A command to change the whole buffer won't be used terribly
     ;; often, so no need for a key binding.
-    ;; (define-key map "\C-cd"    'pascal-downcase-keywords)
-    ;; (define-key map "\C-cu"    'pascal-upcase-keywords)
-    ;; (define-key map "\C-cc"    'pascal-capitalize-keywords)
+    ;; (define-key map (kbd "C-c d") 'pascal-downcase-keywords)
+    ;; (define-key map (kbd "C-c u") 'pascal-upcase-keywords)
+    ;; (define-key map (kbd "C-c c") 'pascal-capitalize-keywords)
     map)
   "Keymap used in Pascal mode.")
 
