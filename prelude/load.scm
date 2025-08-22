@@ -1143,6 +1143,74 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'intern-soft elisp-intern-soft)
 (set-symbol-function! 'string-search elisp-string-search)
 
+;; Final high-value migration candidates
+(define (elisp-random limit)
+  "Return a pseudo-random integer.
+By default, return a fixnum; all fixnums are equally likely.
+With positive integer LIMIT, return random integer in interval [0,LIMIT)."
+  (cond
+    ((or (null? limit) (not limit))
+     ;; Return random fixnum - use Guile's random
+     (random 536870912))  ; Large range for fixnum
+    ((eq? limit #t)
+     ;; Seed from system entropy - not implemented in simple version
+     #nil)
+    ((string? limit)
+     ;; Seed from string - not implemented in simple version
+     #nil)
+    ((and (integer? limit) (> limit 0))
+     ;; Return random integer in [0, limit)
+     (random limit))
+    (else
+     (error "Wrong type argument" limit))))
+
+(define (elisp-featurep feature subfeature)
+  "Return t if FEATURE is present in this Emacs.
+Use this to conditionalize execution of lisp code based on the
+presence or absence of Emacs or environment extensions."
+  (if (memq feature features)
+      (if subfeature
+          ;; Check subfeature - simplified implementation
+          #t  ; For now, assume subfeatures are present if feature is
+          #t)
+      #nil))
+
+(define (elisp-provide feature subfeatures)
+  "Announce that FEATURE is a feature of the current Emacs.
+The optional argument SUBFEATURES should be a list of symbols listing
+particular subfeatures supported in this version of FEATURE."
+  (if (not (memq feature features))
+      (set! features (cons feature features)))
+  feature)
+
+(define (elisp-nreverse seq)
+  "Reverse order of items in a list, vector or string SEQ.
+This function may destructively modify SEQ to produce the value."
+  (cond
+    ((null? seq) seq)
+    ((pair? seq)
+     ;; Use Guile's efficient reverse! for lists
+     (reverse! seq))
+    ((vector? seq)
+     ;; For vectors, we need to reverse in place
+     (let ((len (vector-length seq)))
+       (do ((i 0 (+ i 1)))
+           ((>= i (quotient len 2)) seq)
+         (let ((j (- len i 1)))
+           (let ((temp (vector-ref seq i)))
+             (vector-set! seq i (vector-ref seq j))
+             (vector-set! seq j temp))))))
+    ((string? seq)
+     ;; For strings, convert to list, reverse, back to string
+     (list->string (reverse! (string->list seq))))
+    (else seq)))
+
+;; Register final high-value migration candidates
+(set-symbol-function! 'random elisp-random)
+(set-symbol-function! 'featurep elisp-featurep)
+(set-symbol-function! 'provide elisp-provide)
+(set-symbol-function! 'nreverse elisp-nreverse)
+
 ;; Internal utility functions (not registered to avoid conflicts)
 ;; elisp-symbol-equal - available for internal use
 
