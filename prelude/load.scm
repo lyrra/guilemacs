@@ -936,6 +936,42 @@ Optional BASE argument specifies the base (2-16)."
     (else
      (make-string length (integer->char init)))))
 
+;; Final batch of simple predicates and utilities
+(define (elisp-hash-table-p obj)
+  "Return t if OBJ is a Lisp hash table object."
+  ;; Check if it's a Guile hash table
+  (if (hash-table? obj) #t #nil))
+
+(define (elisp-boundp symbol)
+  "Return t if SYMBOL's value is not void."
+  (cond
+    ((not (symbol? symbol))
+     (error "Wrong type argument: symbolp" symbol))
+    (else
+     ;; Check if symbol is bound in current environment
+     (catch #t
+       (lambda ()
+         (symbol-bound? symbol)
+         #t)
+       (lambda (key . args)
+         #nil)))))
+
+;; Hash functions (simple wrappers)
+(define (elisp-sxhash-eq obj)
+  "Return an integer hash code for OBJ suitable for `eq'."
+  ;; Use Guile's hash function for eq
+  (hashq obj 536870909))  ; Large prime number
+
+(define (elisp-sxhash-eql obj)
+  "Return an integer hash code for OBJ suitable for `eql'."
+  ;; Use Guile's hash function for eqv
+  (hashv obj 536870909))
+
+(define (elisp-sxhash-equal obj)
+  "Return an integer hash code for OBJ suitable for `equal'."
+  ;; Use Guile's hash function for equal
+  (hash obj 536870909))
+
 ;; Simple utility functions migrated from C DEFUN to Guile
 (define (elisp-null object)
   "Return t if OBJECT is nil, and return nil otherwise."
@@ -997,6 +1033,13 @@ Optional BASE argument specifies the base (2-16)."
 
 ;; Register string creation functions
 (set-symbol-function! 'make-string elisp-make-string)
+
+;; Register final batch of functions
+(set-symbol-function! 'hash-table-p elisp-hash-table-p)
+(set-symbol-function! 'boundp elisp-boundp)
+(set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
+(set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
+(set-symbol-function! 'sxhash-equal elisp-sxhash-equal)
 
 ;; Phase 4 DEFUN function migrations are called directly from C code
 ;; to avoid infinite recursion. The elisp-* versions are available
