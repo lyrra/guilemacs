@@ -364,16 +364,22 @@ If LIST is empty, return nil."
               current
               (loop next))))))
 
-(define (elisp-butlast list &optional n)
-  "Return a copy of LIST with the last N elements removed.
+(define elisp-butlast
+  (case-lambda
+    ((list)
+     ;; Called with 1 argument - default n to 1
+     (elisp-butlast list 1))
+    ((list n)
+     ;; Called with 2 arguments
+     "Return a copy of LIST with the last N elements removed.
 If N is omitted or nil, remove only the last element."
-  (let ((num (if (or (null? n) (eq? n #nil)) 1 n)))
-    (if (or (not (integer? num)) (< num 0))
-        list
-        (let ((len (length list)))
-          (if (<= len num)
-              #nil
-              (list-head list (- len num)))))))
+     (let ((num (if (or (null? n) (eq? n #nil)) 1 n)))
+       (if (or (not (integer? num)) (< num 0))
+           list
+           (let ((len (length list)))
+             (if (<= len num)
+                 #nil
+                 (list-head list (- len num)))))))))
 
 (define (elisp-reverse list)
   "Return a new list with elements of LIST in reverse order."
@@ -477,19 +483,25 @@ The elements of a list are not copied; they are shared with the original."
 
 ;; Property list functions
 
-(define (elisp-plist-get plist prop &optional predicate)
-  "Extract a value from a property list.
+(define elisp-plist-get
+  (case-lambda
+    ((plist prop)
+     ;; Called with 2 arguments - use default predicate eq?
+     (elisp-plist-get plist prop eq?))
+    ((plist prop predicate)
+     ;; Called with 3 arguments
+     "Extract a value from a property list.
 PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
 Returns the value corresponding to PROP, or nil if not found.
 Uses PREDICATE for comparison, defaulting to `eq'."
-  (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
-    (let loop ((tail plist))
-      (cond
-        ((null? tail) #nil)
-        ((not (pair? tail)) #nil)
-        ((not (pair? (cdr tail))) #nil)  ; Malformed plist
-        ((pred prop (car tail)) (car (cdr tail)))
-        (else (loop (cddr tail)))))))
+     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+       (let loop ((tail plist))
+         (cond
+           ((null? tail) #nil)
+           ((not (pair? tail)) #nil)
+           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+           ((pred prop (car tail)) (car (cdr tail)))
+           (else (loop (cddr tail)))))))))
 
 (define (elisp-plist-put plist prop value)
   "Change value in PLIST of PROP to VALUE.
@@ -513,19 +525,25 @@ Returns a new property list with the change."
        ;; Continue searching, preserving current prop-value pair
        (loop (cddr tail) (cons (car (cdr tail)) (cons (car tail) result)))))))
 
-(define (elisp-plist-member plist prop &optional predicate)
-  "Return non-nil if PROP is a property of PLIST.
+(define elisp-plist-member
+  (case-lambda
+    ((plist prop)
+     ;; Called with 2 arguments - use default predicate eq?
+     (elisp-plist-member plist prop eq?))
+    ((plist prop predicate)
+     ;; Called with 3 arguments
+     "Return non-nil if PROP is a property of PLIST.
 Unlike `plist-get', this allows distinguishing between a missing
 property and a property with value nil.
 Returns the tail of PLIST whose car is PROP."
-  (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
-    (let loop ((tail plist))
-      (cond
-        ((null? tail) #nil)
-        ((not (pair? tail)) #nil)
-        ((not (pair? (cdr tail))) #nil)  ; Malformed plist
-        ((pred prop (car tail)) tail)
-        (else (loop (cddr tail)))))))
+     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+       (let loop ((tail plist))
+         (cond
+           ((null? tail) #nil)
+           ((not (pair? tail)) #nil)
+           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+           ((pred prop (car tail)) tail)
+           (else (loop (cddr tail)))))))))
 
 ;; String comparison functions
 
@@ -1164,6 +1182,121 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
     (else
      (error "Wrong type argument" limit))))
 
+;; DEFUN migrations from lread.c - simple utility functions primarily used by elisp
+(define (elisp-get-load-suffixes)
+  "Return the suffixes that 'load' should try if a suffix is required.
+This uses the variables 'load-suffixes' and 'load-file-rep-suffixes'."
+  (let ((suffixes load-suffixes)
+        (rep-suffixes load-file-rep-suffixes))
+    (let loop ((suf-list suffixes) (result '()))
+      (if (null? suf-list)
+          (reverse result)
+          (let ((suffix (car suf-list)))
+            (let inner-loop ((rep-list rep-suffixes) (inner-result result))
+              (if (null? rep-list)
+                  (loop (cdr suf-list) inner-result)
+                  (inner-loop (cdr rep-list)
+                             (cons (string-append suffix (car rep-list)) inner-result)))))))))
+
+(define (elisp-obarrayp object)
+  "Return t if OBJECT is an obarray."
+  ;; For now, simple check - in full implementation would check Guile vector
+  (if (vector? object) #t #nil))
+
+(define (elisp-obarray-make size)
+  "Return a new obarray of size SIZE.
+The obarray will grow to accommodate any number of symbols; the size, if
+given, is only a hint for the expected number."
+  ;; Create a vector for obarray representation
+  (make-vector (if (and size (integer? size) (> size 0)) size 128) '()))
+
+(define (elisp-obarray-clear obarray)
+  "Remove all symbols from OBARRAY."
+  (if (vector? obarray)
+      (let ((len (vector-length obarray)))
+        (do ((i 0 (+ i 1)))
+            ((>= i len) obarray)
+          (vector-set! obarray i '())))
+      (error "Wrong type argument: obarrayp" obarray)))
+
+(define elisp-read-char
+  (case-lambda
+    (()
+     ;; Called with 0 arguments - defaults
+     (elisp-read-char #nil #nil #nil))
+    ((prompt)
+     ;; Called with 1 argument
+     (elisp-read-char prompt #nil #nil))
+    ((prompt inherit-input-method)
+     ;; Called with 2 arguments
+     (elisp-read-char prompt inherit-input-method #nil))
+    ((prompt inherit-input-method seconds)
+     ;; Called with 3 arguments
+     "Read a character event from the command input (keyboard or macro).
+It is returned as a number.
+If the optional argument PROMPT is non-nil, display that as a prompt.
+If the optional argument INHERIT-INPUT-METHOD is non-nil and some
+input method is turned on in the current buffer, that input method
+is used for reading a character.
+If the optional argument SECONDS is non-nil, it should be a number
+specifying the maximum number of seconds to wait for input."
+     ;; For now, a simple implementation that reads one character
+     ;; In full implementation, would handle prompts, input methods, and timeouts
+     (char->integer (read-char)))))
+
+;; Symbol property functions
+(define (elisp-symbol-plist symbol)
+  "Return SYMBOL's property list."
+  (if (symbol? symbol)
+      ;; Use symbol properties in Guile
+      (catch #t
+        (lambda ()
+          (symbol-property symbol '*elisp-plist*))
+        (lambda (key . args)
+          #nil))
+      (error "Wrong type argument: symbolp" symbol)))
+
+(define (elisp-setplist symbol plist)
+  "Set SYMBOL's property list to PLIST and return PLIST."
+  (if (symbol? symbol)
+      (begin
+        (set-symbol-property! symbol '*elisp-plist* plist)
+        plist)
+      (error "Wrong type argument: symbolp" symbol)))
+
+(define (elisp-get symbol propname)
+  "Return the value of SYMBOL's PROPNAME property.
+This is the last value stored with '(put SYMBOL PROPNAME VALUE)'."
+  (if (symbol? symbol)
+      (let ((plist (elisp-symbol-plist symbol)))
+        (elisp-plist-get plist propname))
+      (error "Wrong type argument: symbolp" symbol)))
+
+(define (elisp-put symbol propname value)
+  "Store SYMBOL's PROPNAME property with value VALUE.
+It can be retrieved with '(get SYMBOL PROPNAME)'."
+  (if (symbol? symbol)
+      (let ((old-plist (elisp-symbol-plist symbol)))
+        (let ((new-plist (elisp-plist-put old-plist propname value)))
+          (elisp-setplist symbol new-plist)
+          value))
+      (error "Wrong type argument: symbolp" symbol)))
+
+;; Hash table predicates that can be migrated
+(define (elisp-hash-table-count table)
+  "Return the number of entries in TABLE."
+  (if (hash-table? table)
+      (hash-table-size table)
+      (error "Wrong type argument: hash-table-p" table)))
+
+(define (elisp-clrhash table)
+  "Clear hash table TABLE and return it."
+  (if (hash-table? table)
+      (begin
+        (hash-table-clear! table)
+        table)
+      (error "Wrong type argument: hash-table-p" table)))
+
 (define (elisp-featurep feature subfeature)
   "Return t if FEATURE is present in this Emacs.
 Use this to conditionalize execution of lisp code based on the
@@ -1210,6 +1343,19 @@ This function may destructively modify SEQ to produce the value."
 (set-symbol-function! 'featurep elisp-featurep)
 (set-symbol-function! 'provide elisp-provide)
 (set-symbol-function! 'nreverse elisp-nreverse)
+
+;; Register DEFUN migrations from lread.c
+(set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
+(set-symbol-function! 'obarrayp elisp-obarrayp)
+(set-symbol-function! 'obarray-make elisp-obarray-make)
+(set-symbol-function! 'obarray-clear elisp-obarray-clear)
+(set-symbol-function! 'read-char elisp-read-char)
+(set-symbol-function! 'symbol-plist elisp-symbol-plist)
+(set-symbol-function! 'setplist elisp-setplist)
+(set-symbol-function! 'get elisp-get)
+(set-symbol-function! 'put elisp-put)
+(set-symbol-function! 'hash-table-count elisp-hash-table-count)
+(set-symbol-function! 'clrhash elisp-clrhash)
 
 ;; Internal utility functions (not registered to avoid conflicts)
 ;; elisp-symbol-equal - available for internal use
