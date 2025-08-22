@@ -3,6 +3,7 @@
 
 (import (srfi 64))
 
+(define %exit 0)
 (load "../prelude/lookup-functions.scm")
 
 ;; Custom test runner with fancy output
@@ -72,6 +73,7 @@
                                   "\n"))
 
           (when (> total-failed 0)
+            (set! %exit 1)
             (display "\n--- FAILED TESTS ---\n")
             (for-each
               (lambda (failure)
@@ -624,3 +626,5 @@
                  (not (looks-like-network-address? "README")))))
 
 (test-end)
+
+(exit %exit)
