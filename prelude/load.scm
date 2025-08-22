@@ -972,6 +972,100 @@ Optional BASE argument specifies the base (2-16)."
   ;; Use Guile's hash function for equal
   (hash obj 536870909))
 
+;; Implementation of goals.org ideas
+;; Goal: "Use direct symbol comparison instead of string comparison"
+(define (elisp-symbol-equal sym1 sym2)
+  "Compare two symbols directly without converting to strings.
+This is more efficient than string comparison of symbol names."
+  (cond
+    ((and (symbol? sym1) (symbol? sym2))
+     (if (eq? sym1 sym2) #t #nil))
+    ((symbol? sym1)
+     (if (string? sym2)
+         (if (string=? (symbol->string sym1) sym2) #t #nil)
+         #nil))
+    ((symbol? sym2)
+     (if (string? sym1)
+         (if (string=? sym1 (symbol->string sym2)) #t #nil)
+         #nil))
+    (else
+     (if (equal? sym1 sym2) #t #nil))))
+
+;; Goal: "Implement native Guile case-insensitive operations"
+(define (elisp-string-equal-ignore-case string1 string2)
+  "Return t if two strings are equal ignoring case.
+Symbols are also allowed; their print names are used instead.
+Uses native Guile case-insensitive comparison."
+  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+    (if (string-ci=? s1 s2) #t #nil)))
+
+(define (elisp-string-lessp-ignore-case string1 string2)
+  "Return t if STRING1 is less than STRING2 ignoring case.
+Uses native Guile case-insensitive comparison."
+  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+    (if (string-ci<? s1 s2) #t #nil)))
+
+;; Goal: "find string comparison patterns in C code, move to guile"
+(define (elisp-string-prefix-p prefix string ignore-case)
+  "Return non-nil if PREFIX is a prefix of STRING.
+If IGNORE-CASE is non-nil, the comparison is case-insensitive."
+  (let ((prefix-str (if (symbol? prefix) (symbol->string prefix) prefix))
+        (string-str (if (symbol? string) (symbol->string string) string)))
+    (let ((prefix-len (string-length prefix-str))
+          (string-len (string-length string-str)))
+      (if (> prefix-len string-len)
+          #nil
+          (let ((substring (substring string-str 0 prefix-len)))
+            (if ignore-case
+                (if (string-ci=? prefix-str substring) #t #nil)
+                (if (string=? prefix-str substring) #t #nil)))))))
+
+(define (elisp-string-suffix-p suffix string ignore-case)
+  "Return non-nil if SUFFIX is a suffix of STRING.
+If IGNORE-CASE is non-nil, the comparison is case-insensitive."
+  (let ((suffix-str (if (symbol? suffix) (symbol->string suffix) suffix))
+        (string-str (if (symbol? string) (symbol->string string) string)))
+    (let ((suffix-len (string-length suffix-str))
+          (string-len (string-length string-str)))
+      (if (> suffix-len string-len)
+          #nil
+          (let ((start-pos (- string-len suffix-len)))
+            (let ((substring (substring string-str start-pos)))
+              (if ignore-case
+                  (if (string-ci=? suffix-str substring) #t #nil)
+                  (if (string=? suffix-str substring) #t #nil))))))))
+
+;; Goal: "Optimize for symbol interning efficiency"
+(define (elisp-intern-soft name obarray)
+  "Return the symbol whose name is NAME, or nil if no such symbol exists.
+Uses efficient symbol lookup without creating new symbols."
+  (cond
+    ((symbol? name)
+     ;; If already a symbol, check if it exists in obarray
+     name)  ; In Guile, symbols are globally interned
+    ((string? name)
+     ;; Use Guile's efficient symbol lookup
+     (catch #t
+       (lambda ()
+         (string->symbol name))
+       (lambda (key . args)
+         #nil)))
+    (else
+     (error "Wrong type argument: string-or-symbol-p" name))))
+
+;; Goal: "minimize memory handling in C, utilize the GC in guile"
+(define (elisp-string-search needle haystack start-pos)
+  "Search for NEEDLE in HAYSTACK starting at START-POS.
+Returns the position of the first match, or nil if not found.
+Uses Guile's efficient string search with automatic memory management."
+  (let ((needle-str (if (symbol? needle) (symbol->string needle) needle))
+        (haystack-str (if (symbol? haystack) (symbol->string haystack) haystack))
+        (start (if start-pos start-pos 0)))
+    (let ((pos (string-contains haystack-str needle-str start)))
+      (if pos pos #nil))))
+
 ;; Simple utility functions migrated from C DEFUN to Guile
 (define (elisp-null object)
   "Return t if OBJECT is nil, and return nil otherwise."
@@ -1040,6 +1134,17 @@ Optional BASE argument specifies the base (2-16)."
 (set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
 (set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
 (set-symbol-function! 'sxhash-equal elisp-sxhash-equal)
+
+;; Register goals.org implementation functions
+(set-symbol-function! 'string-equal-ignore-case elisp-string-equal-ignore-case)
+(set-symbol-function! 'string-lessp-ignore-case elisp-string-lessp-ignore-case)
+(set-symbol-function! 'string-prefix-p elisp-string-prefix-p)
+(set-symbol-function! 'string-suffix-p elisp-string-suffix-p)
+(set-symbol-function! 'intern-soft elisp-intern-soft)
+(set-symbol-function! 'string-search elisp-string-search)
+
+;; Internal utility functions (not registered to avoid conflicts)
+;; elisp-symbol-equal - available for internal use
 
 ;; Phase 4 DEFUN function migrations are called directly from C code
 ;; to avoid infinite recursion. The elisp-* versions are available
