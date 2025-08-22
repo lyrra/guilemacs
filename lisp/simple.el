@@ -2007,9 +2007,9 @@ in *Help* buffer.  See also the command `describe-char'."
     (define-key m (kbd "M-TAB") 'completion-at-point)
     ;; Might as well bind TAB to completion, since inserting a TAB char is
     ;; much too rarely useful.
-    (define-key m "\t" 'completion-at-point)
-    (define-key m "\r" 'read--expression-try-read)
-    (define-key m "\n" 'read--expression-try-read)
+    (define-key m (kbd "TAB") 'completion-at-point)
+    (define-key m (kbd "RET") 'read--expression-try-read)
+    (define-key m (kbd "C-j") 'read--expression-try-read)
     (define-key m (kbd "M-g M-c") 'read-expression-switch-to-completions)
     (set-keymap-parent m minibuffer-local-map)
     m))

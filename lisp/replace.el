@@ -2477,7 +2477,7 @@ in the current buffer."
     (define-key map "E" 'edit-replacement-exact-case)
     (define-key map "," 'act-and-show)
     (define-key map "q" 'exit)
-    (define-key map "\r" 'exit)
+    (define-key map (kbd "RET") 'exit)
     (define-key map [return] 'exit)
     (define-key map "." 'act-and-exit)
     (define-key map (kbd "C-r") 'edit)

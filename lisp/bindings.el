@@ -949,7 +949,7 @@ okay.  See `mode-line-format'.")
 (provide 'overlay '(display syntax-table field))
 (provide 'text-properties '(display syntax-table field point-entered))
 
-(define-key esc-map "\t" 'complete-symbol)
+(define-key esc-map (kbd "TAB") 'complete-symbol)
 
 (defun complete-symbol (arg)
   "Perform completion on the text around point.
@@ -1165,7 +1165,7 @@ if `inhibit-field-text-motion' is non-nil."
   ;; Override the global binding (which calls indent-relative via
   ;; indent-for-tab-command).  The alignment that indent-relative tries to
   ;; do doesn't make much sense here since the prompt messes it up.
-  (define-key map "\t"    'self-insert-command)
+  (define-key map (kbd "TAB")    'self-insert-command)
   (define-key map [C-tab] 'file-cache-minibuffer-complete))
 
 (define-key global-map (kbd "C-u") 'universal-argument)

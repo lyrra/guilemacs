@@ -381,7 +381,7 @@ Useful for shells like zsh that has this feature."
   (let ((map (make-sparse-keymap)))
     (define-key map (kbd "C-c C-f") 'shell-forward-command)
     (define-key map (kbd "C-c C-b") 'shell-backward-command)
-    (define-key map "\t" 'completion-at-point)
+    (define-key map (kbd "TAB") 'completion-at-point)
     (define-key map (kbd "M-RET") 'shell-resync-dirs)
     (define-key map (kbd "M-?") 'comint-dynamic-list-filename-completions)
     (define-key map (kbd "C-x n d") 'shell-narrow-to-prompt)

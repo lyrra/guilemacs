@@ -1370,11 +1370,11 @@ The default is a name found in the buffer around point."
 ;;;
 (defvar pascal-outline-map
   (let ((map (make-sparse-keymap)))
-    (define-key map "\M-\C-a"  'pascal-outline-prev-defun)
-    (define-key map "\M-\C-e"  'pascal-outline-next-defun)
-    (define-key map "\C-c\C-d" 'pascal-outline-goto-defun)
-    (define-key map "\C-c\C-s" 'pascal-show-all)
-    (define-key map "\C-c\C-h" 'pascal-hide-other-defuns)
+    (define-key map (kbd "M-C-a")  'pascal-outline-prev-defun)
+    (define-key map (kbd "M-C-e")  'pascal-outline-next-defun)
+    (define-key map (kbd "C-c C-d") 'pascal-outline-goto-defun)
+    (define-key map (kbd "C-c C-s") 'pascal-show-all)
+    (define-key map (kbd "C-c C-h") 'pascal-hide-other-defuns)
     map)
   "Keymap used in Pascal Outline mode.")
 

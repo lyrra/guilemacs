@@ -729,10 +729,10 @@ If you want to change this while speedbar is active, either use
     ;; Navigation.
     (define-key map "n" 'speedbar-next)
     (define-key map "p" 'speedbar-prev)
-    (define-key map "\M-n" 'speedbar-restricted-next)
-    (define-key map "\M-p" 'speedbar-restricted-prev)
-    (define-key map "\C-\M-n" 'speedbar-forward-list)
-    (define-key map "\C-\M-p" 'speedbar-backward-list)
+    (define-key map (kbd "M-n") 'speedbar-restricted-next)
+    (define-key map (kbd "M-p") 'speedbar-restricted-prev)
+    (define-key map (kbd "C-M-n") 'speedbar-forward-list)
+    (define-key map (kbd "C-M-p") 'speedbar-backward-list)
     ;; These commands never seemed useful.
     ;;  (define-key map " " 'speedbar-scroll-up)
     ;;  (define-key map [delete] 'speedbar-scroll-down)

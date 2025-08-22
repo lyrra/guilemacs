@@ -3314,7 +3314,7 @@ Also respects the obsolete wrapper hook `completion-in-region-functions'.
     ;; FIXME: Only works if completion-in-region-mode was activated via
     ;; completion-at-point called directly.
     (define-key map (kbd "M-?") 'completion-help-at-point)
-    (define-key map "\t" 'completion-at-point)
+    (define-key map (kbd "TAB") 'completion-at-point)
     map)
   "Keymap activated during `completion-in-region'.")
 
@@ -3516,13 +3516,13 @@ The completion method is determined by `completion-at-point-functions'."
 
   ;; Put RET last so that it is shown in doc strings in preference to
   ;; C-j, when using the \\[exit-minibuffer] notation.
-  (define-key map "\n" 'exit-minibuffer)
-  (define-key map "\r" 'exit-minibuffer))
+  (define-key map (kbd "C-j") 'exit-minibuffer)
+  (define-key map (kbd "RET") 'exit-minibuffer))
 
 (defvar minibuffer-local-completion-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
-    (define-key map "\t" 'minibuffer-complete)
+    (define-key map (kbd "TAB") 'minibuffer-complete)
     (define-key map [backtab] 'minibuffer-complete)
     ;; M-TAB is already abused for many other purposes, so we should find
     ;; another binding for it.
@@ -3541,8 +3541,8 @@ The completion method is determined by `completion-at-point-functions'."
 (defvar minibuffer-local-must-match-map
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-completion-map)
-    (define-key map "\r" 'minibuffer-complete-and-exit)
-    (define-key map "\n" 'minibuffer-complete-and-exit)
+    (define-key map (kbd "RET") 'minibuffer-complete-and-exit)
+    (define-key map (kbd "C-j") 'minibuffer-complete-and-exit)
     map)
   "Local keymap for minibuffer input with completion, for exact match.")
 
@@ -3558,7 +3558,7 @@ with `minibuffer-local-must-match-map'.")
   (let ((map (make-sparse-keymap)))
     (set-keymap-parent map minibuffer-local-map)
     (define-key map " "  #'exit-minibuffer)
-    (define-key map "\t" #'exit-minibuffer)
+    (define-key map (kbd "TAB") #'exit-minibuffer)
     (define-key map "?"  #'self-insert-and-exit)
     map)
   "Local keymap for the minibuffer when spaces are not allowed.")

@@ -611,10 +611,10 @@ This is like `describe-bindings', but displays only Isearch keys."
 
     (define-key map (kbd "C-q") 'isearch-quote-char)
 
-    (define-key map "\r" 'isearch-exit)
+    (define-key map (kbd "RET") 'isearch-exit)
     (define-key map [return] 'isearch-exit)
     (define-key map (kbd "C-j") 'isearch-printing-char)
-    (define-key map "\t" 'isearch-printing-char)
+    (define-key map (kbd "TAB") 'isearch-printing-char)
     (define-key map [?\S-\ ] 'isearch-printing-char)
 
     (define-key map    (kbd "C-w") 'isearch-yank-word-or-char)
