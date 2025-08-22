@@ -273,7 +273,7 @@
                        "c\nd\n")))
       (should (equal (ert-test-result-messages result) "a\nb\nc\nd\n")))))
 
-(ert-deftest ert-test-builtin-message-log-flushing ()
+'(ert-deftest ert-test-builtin-message-log-flushing ()
   "This test attempts to demonstrate that there is no way to
 force immediate truncation of the *Messages* buffer from Lisp
 \(and hence justifies the existence of

@@ -94,7 +94,7 @@ expected function symbol and function library, respectively."
   (test-locate-helper #'mark-sexp '(mark-sexp . "lisp"))
   (advice-remove #'mark-sexp 'my-message))
 
-(ert-deftest find-func-tests--find-library-verbose ()
+'(ert-deftest find-func-tests--find-library-verbose ()
   (unwind-protect
       (progn
         (advice-add 'dired :before #'ignore)

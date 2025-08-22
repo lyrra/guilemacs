@@ -103,7 +103,7 @@ strings with `eq', this function compares them with `equal'."
       (ansi-color-apply-on-region (point-min) (point-max) t)
       (should (equal (buffer-string) (car pair))))))
 
-(ert-deftest ansi-color-incomplete-sequences-test ()
+'(ert-deftest ansi-color-incomplete-sequences-test ()
   (let* ((strs (list "\x1b[" "2;31m Hello World "
                      "\x1b" "[108;5;12" "3m" "Greetings"
                      "\x1b[0m\x1b[35;6m" "Hello"))

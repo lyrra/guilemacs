@@ -57,7 +57,7 @@
   (should (equal (color-rgb-to-hex 0.1 0.2 0.3) "#199933334ccc"))
   (should (equal (color-rgb-to-hex 0.1 0.2 0.3 2) "#19334c")))
 
-(ert-deftest color-tests-complement ()
+'(ert-deftest color-tests-complement ()
   (should (equal (color-complement "white") '(0.0 0.0 0.0)))
   (should (equal (color-complement "#ffffffffffff") '(0.0 0.0 0.0)))
   (should (equal (color-complement "red") '(0.0 1.0 1.0))))

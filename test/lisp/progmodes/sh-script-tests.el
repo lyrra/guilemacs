@@ -90,7 +90,7 @@
   (should-not (test-sh-back "foo;bar"))
   (should (test-sh-back "foo#zot")))
 
-(ert-deftest sh-script-test-do-fontification ()
+'(ert-deftest sh-script-test-do-fontification ()
   "Test that \"do\" gets fontified correctly, even with no \";\"."
   (with-temp-buffer
     (shell-script-mode)

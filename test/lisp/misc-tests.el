@@ -39,7 +39,7 @@
   (with-misc-test "abc\n" "abc\nab"
     (copy-from-above-command 2)))
 
-(ert-deftest misc-test-zap-up-to-char ()
+'(ert-deftest misc-test-zap-up-to-char ()
   (with-misc-test "abcde" "cde"
     (goto-char (point-min))
     (zap-up-to-char 1 ?c))

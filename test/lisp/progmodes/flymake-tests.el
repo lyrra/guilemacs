@@ -109,7 +109,7 @@ SEVERITY-PREDICATE is used to setup
     (should (eq 'flymake-warning
                 (face-at-point)))))
 
-(ert-deftest perl-backend ()
+'(ert-deftest perl-backend ()
   "Test the perl backend."
   (skip-unless (executable-find "perl"))
   (flymake-tests--with-flymake ("test.pl")

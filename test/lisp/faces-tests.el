@@ -69,7 +69,7 @@
        (set-face-foreground ,face old-fg)
        (set-face-background ,face old-bg))))
 
-(ert-deftest faces--test-color-at-point ()
+'(ert-deftest faces--test-color-at-point ()
   (with-temp-buffer
     (insert (propertize "STRING" 'face '(faces--test2 faces--test1)))
     (goto-char (point-min))

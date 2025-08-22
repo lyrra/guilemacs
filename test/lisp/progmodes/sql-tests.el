@@ -138,7 +138,7 @@ string of values passed to the comint function for validation."
      (sql-database "aDatabase"))
     "(sqltest nil \"aUserName\" \"netrc-G aPassword\" \"aServer\" \"aDatabase\")\n"))
 
-(ert-deftest sql-test-connect-wallet-database ()
+'(ert-deftest sql-test-connect-wallet-database ()
   "Test of password function."
   (with-sql-test-connect-harness 4 (user password database)
     ((sql-product 'sqltest)

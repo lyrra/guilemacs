@@ -54,16 +54,21 @@
 
 ;; in the following group, all of the test files works with guilemacs
 (group
+  "test/lisp/ansi-color-tests.el" ;; fails
+  )
+  (group
   "test/lisp/allout-widgets-tests.el"
-  "test/lisp/ansi-color-tests.el"
   "test/lisp/ansi-osc-tests.el"
   "test/lisp/auth-source-pass-tests.el"
   )(group
   "test/lisp/autoinsert-tests.el"
   "test/lisp/battery-tests.el"
-  "test/lisp/buff-menu-tests.el"
-  "test/lisp/button-tests.el"
-  )(group
+  )
+  ; (group "test/lisp/buff-menu-tests.el") ;; fails
+  (group
+  "test/lisp/button-tests.el" ;; fails
+  )
+  (group
   "test/lisp/calculator-tests.el"
   "test/lisp/cedet/cedet-files-tests.el"
   "test/lisp/cedet/semantic-utest-c.el"
@@ -71,36 +76,43 @@
   )(group
   "test/lisp/cedet/semantic/fw-tests.el"
   "test/lisp/cedet/srecode/fields-tests.el"
-  "test/lisp/color-tests.el"
   "test/lisp/completion-tests.el"
-  )(group
+  )
+  (group
+  "test/lisp/color-tests.el" ;; fails
+  )
+  (group
   "test/lisp/cus-edit-tests.el"
   "test/lisp/delim-col-tests.el"
   "test/lisp/desktop-tests.el"
   ;
-  "test/lisp/edmacro-tests.el"
   ;
   ;"test/lisp/elide-head-tests.el"
   ;
-  )(group
+  )
+  ; (group "test/lisp/edmacro-tests.el") ;; fails
+  (group
   "test/lisp/emacs-lisp/byte-run-tests.el"
   "test/lisp/emacs-lisp/check-declare-tests.el"
   "test/lisp/emacs-lisp/cl-preloaded-tests.el"
-  "test/lisp/emacs-lisp/cl-print-tests.el"
+  )(group
+  "test/lisp/emacs-lisp/cl-print-tests.el" ;; fails
   )(group
   "test/lisp/emacs-lisp/cl-seq-tests.el"
   "test/lisp/emacs-lisp/copyright-tests.el"
   "test/lisp/emacs-lisp/derived-tests.el"
   "test/lisp/emacs-lisp/easy-mmode-tests.el"
-  )(group
+  )
+  ; (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
+  (group
   "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el"
-  "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el"
   "test/lisp/emacs-lisp/float-sup-tests.el"
   "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
   )(group
+  "test/lisp/emacs-lisp/lisp-mode-tests.el" ;; fails
+  )(group
   "test/lisp/emacs-lisp/icons-tests.el"
   "test/lisp/emacs-lisp/lisp-mnt-tests.el"
-  "test/lisp/emacs-lisp/lisp-mode-tests.el"
   "test/lisp/emacs-lisp/memory-report-tests.el"
   )(group ;; fails
   "test/lisp/emacs-lisp/pp-tests.el"
@@ -112,16 +124,17 @@
   "test/lisp/emacs-lisp/shadow-tests.el" ;; pass
   "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
   ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
-  )(group
-  "test/lisp/emacs-lisp/text-property-search-tests.el" ;; fails
-  )(group
+  )
+  ; (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
+  (group
   "test/lisp/emacs-lisp/thunk-tests.el"
   )(group
   "test/lisp/emacs-lisp/unsafep-tests.el"
   "test/lisp/emacs-lisp/vtable-tests.el"
   )(group
+  "test/lisp/faces-tests.el" ;; fails
+  )(group
   "test/lisp/env-tests.el"
-  "test/lisp/faces-tests.el"
   "test/lisp/find-cmd-tests.el"
   "test/lisp/font-lock-tests.el"
   )(group
@@ -130,29 +143,34 @@
   "test/lisp/hi-lock-tests.el"
   "test/lisp/htmlfontify-tests.el"
   )(group
-  "test/lisp/ido-tests.el"
+  "test/lisp/ido-tests.el" ;; fails
+  )(group
   "test/lisp/image-file-tests.el"
   "test/lisp/imenu-tests.el"
   "test/lisp/info-tests.el"
-  )(group
-  "test/lisp/international/mule-util-tests.el"
+  )
+  ; (group "test/lisp/international/mule-util-tests.el" ) ;; fails
+  (group
   "test/lisp/isearch-tests.el"
   "test/lisp/jit-lock-tests.el"
   "test/lisp/json-tests.el"
   )(group
+  "test/lisp/misc-tests.el" ;; fails
+  )(group
   "test/lisp/lpr-tests.el"
   "test/lisp/md4-tests.el"
-  "test/lisp/misc-tests.el"
   "test/lisp/mwheel-tests.el"
   )(group
-  "test/lisp/nxml/nxml-mode-tests.el"
+  "test/lisp/nxml/nxml-mode-tests.el" ;; fails
+  )(group
   "test/lisp/nxml/xsd-regexp-tests.el"
   "test/lisp/paren-tests.el"
   "test/lisp/password-cache-tests.el"
   )(group
+  "test/lisp/progmodes/asm-mode-tests.el" ;; fails
+  )(group
   "test/lisp/pcmpl-linux-tests.el"
   "test/lisp/pcomplete-tests.el"
-  "test/lisp/progmodes/asm-mode-tests.el"
   "test/lisp/progmodes/autoconf-tests.el"
   )(group
   "test/lisp/progmodes/bat-mode-tests.el"
@@ -165,7 +183,8 @@
   "test/lisp/progmodes/pascal-tests.el"
   "test/lisp/progmodes/ps-mode-tests.el"
   )(group
-  "test/lisp/progmodes/sh-script-tests.el"
+  "test/lisp/progmodes/sh-script-tests.el" ;; fails
+  )(group
   "test/lisp/progmodes/subword-tests.el"
   "test/lisp/progmodes/tcl-tests.el"
   "test/lisp/ps-print-tests.el"

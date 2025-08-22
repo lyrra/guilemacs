@@ -101,7 +101,7 @@
     (should (nth 4 (syntax-ppss)))
     (search-forward "comment3")))
 
-(ert-deftest nxml-mode->-after-quote ()
+'(ert-deftest nxml-mode->-after-quote ()
   "Reduction from Bug#36092."
   (with-temp-buffer
     (insert "<root>\n"

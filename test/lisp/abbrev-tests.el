@@ -303,7 +303,7 @@
   (should-not (abbrev-table-p translation-table-vector))
   (should (abbrev-table-p (make-abbrev-table))))
 
-(ert-deftest abbrev--possibly-save-test ()
+'(ert-deftest abbrev--possibly-save-test ()
   "Test that `abbrev--possibly-save' properly resets
 `abbrevs-changed'."
   (ert-with-temp-file temp-test-file

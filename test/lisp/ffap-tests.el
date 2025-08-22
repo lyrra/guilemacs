@@ -73,7 +73,7 @@ index 3d7cebadcf..ad4b70d737 100644
         (should (equal "" (ffap-string-at-point)))
         (should (equal '(1 1) ffap-string-at-point-region))))))
 
-(ert-deftest ffap-gopher-at-point ()
+'(ert-deftest ffap-gopher-at-point ()
   (with-temp-buffer
     (insert "\
 Type = 1

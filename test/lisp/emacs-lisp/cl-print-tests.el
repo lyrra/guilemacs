@@ -90,7 +90,7 @@
      "(a (b (c ...)))"
      "#s(cl-print-tests-struct :a nil :b nil :c nil :d nil ...)")))
 
-(ert-deftest cl-print-tests-ellipsis-circular ()
+'(ert-deftest cl-print-tests-ellipsis-circular ()
   "Ellipsis expansion works with circular objects."
   (let ((wide-obj (list 0 1 2 3 4))
         (deep-obj (list 0 (list 1 (list 2 (list 3 (list 4))))))

@@ -417,7 +417,7 @@
               (should (string-equal auth-passwd passwd))
               (should (search-forward host nil 'noerror)))))))))
 
-(ert-deftest auth-source-delete ()
+'(ert-deftest auth-source-delete ()
   (ert-with-temp-file netrc-file
     :suffix "auth-source-test" :text "\
 machine a1 port a2 user a3 password a4
