@@ -4256,6 +4256,9 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
       /* Convert Guile object to Lisp object */
       return guile_to_lisp_object (result);
     }
+#endif
+  /* Buffer reader disabled during bootstrap - use fallback C reader */
+#if 0
   else if (BUFFERP (readcharfun))
     {
       /* Use Guile reader for buffer input */
