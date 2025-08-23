@@ -37,6 +37,7 @@ all.pl
 git-commit.sh
 git-reset.sh
 autocode.scm
+autocode.sh
 prompts.scm
 fix-whitespace.pl
 
