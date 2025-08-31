@@ -415,7 +415,7 @@ C-h		kkc-help
  #'quail-japanese-update-translation
  '(("K" . quail-japanese-toggle-kana)
    (" " . quail-japanese-kanji-kkc)
-   ("\C-m" . quail-no-conversion)
+   ((kbd "C-m") . quail-no-conversion)
    ([return] . quail-no-conversion))
  )
 

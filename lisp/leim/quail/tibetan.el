@@ -1,4 +1,4 @@
-;;; tibetan.el --- Quail package for inputting Tibetan characters -*-coding: utf-8-emacs; lexical-binding: t; -*-
+;;; tibetan.el --- Quail package for inputting Tibetan characters -*-coding: utf-8; lexical-binding: t; -*-
 
 ;; Copyright (C) 1997, 2001-2025 Free Software Foundation, Inc.
 ;; Copyright (C) 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
@@ -440,7 +440,7 @@
        vowel sign for `a'.
     2. Tsheg is assigned to SPC key.  You can input a space
        by typing `>'.
-    4. To avoid the default stacking ���� and to obtain གཡ,
+    4. To avoid the default stacking ���� and to obtain གཡ,
        type `E' instead of `v' (=ཡ).
     3. There are many characters that are not supported in the
        current implementation (especially special signs).

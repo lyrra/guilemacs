@@ -216,12 +216,12 @@ Doubling the postfix separates the letter and postfix: e.g. a\\='\\=' -> a\\='
 
 Doubling the postfix separates the letter and postfix: e.g. a\\='\\=' -> a\\='
 "
- '(("\C-?" . quail-delete-last-char)
+ '(((kbd "C-?") . quail-delete-last-char)
    (">" . quail-next-translation)
-   ("\C-f" . quail-next-translation)
+   ((kbd "C-f") . quail-next-translation)
    ([right] . quail-next-translation)
    ("<" . quail-prev-translation)
-   ("\C-b" . quail-prev-translation)
+   ((kbd "C-b") . quail-prev-translation)
    ([left] . quail-prev-translation))
  t nil nil nil nil nil nil nil nil t)
 

@@ -128,7 +128,9 @@
 		  'quail-execute-non-quail-command)
 	    (<= key 127))
 	  (progn
-	    (princ (cons (cond ((< key ?\ ) (format "\"\x%02x\"" key))
+	    (princ (cons (cond ((< key ?\ )
+                                ;(format "\"\x%02x\"" key)
+                                (error "FIX-guilemacs: use a proper (kbd ..)"))
 			       ((< key 127) (format "\"%c\"" key))
 			       (t "\"\x7f\""))
 			 function-symbol))
@@ -150,8 +152,8 @@
 	(tit-multichoice t)
 	(tit-prompt "")
 	(tit-comments nil)
-	(tit-backspace "\010\177")
-	(tit-deleteall "\015\025")
+	(tit-backspace "\x08\x7f")
+	(tit-deleteall "\x0d\x15")
 	(tit-moveright ".>")
 	(tit-moveleft ",<")
 	(tit-keyprompt nil))
@@ -737,7 +739,7 @@ have to know the exact tones), but verbose (many characters are assigned
 to the same key sequence) input.  You may also want to try the input
 method `chinese-tonepy' with which you must specify tones by digits
 \(1..5)."))
-  (insert "  '((\"\C-?\" . quail-delete-last-char)
+  (insert "  '(((kbd \"C-?\") . quail-delete-last-char)
    (\".\" . quail-next-translation)
    (\">\" . quail-next-translation)
    (\",\" . quail-prev-translation)
@@ -833,7 +835,7 @@ of the first three letters and the last letter.  For instance,
 
 To input symbols and punctuation, type `/' followed by one of `a' to
 `z', then select one of the candidates."))
-    (insert "  '((\"\C-?\" . quail-delete-last-char)
+    (insert "  '(((kbd \"C-?\") . quail-delete-last-char)
    (\".\" . quail-next-translation)
    (\"[\" . quail-next-translation)
    (\",\" . quail-prev-translation)
@@ -853,7 +855,7 @@ To input symbols and punctuation, type `/' followed by one of `a' to
 (defun tit--ctlau-converter (dicbuf description)
   (goto-char (point-max))
   (insert (format "%S\n" description))
-  (insert "  '((\"\C-?\" . quail-delete-last-char)
+  (insert "  '(((kbd \"C-?\") . quail-delete-last-char)
    (\".\" . quail-next-translation)
    (\">\" . quail-next-translation)
    (\",\" . quail-prev-translation)
