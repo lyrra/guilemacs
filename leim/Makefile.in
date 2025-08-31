@@ -99,28 +99,28 @@ ${leimdir}/quail ${leimdir}/ja-dic:
 
 
 ## All of TIT_GB and TIT_BIG5.
-${leimdir}/quail/%.el: ${srcdir}/CXTERM-DIC/%.tit
-	$(AM_V_GEN)${RUN_EMACS} -l titdic-cnv \
-	  -f batch-tit-dic-convert -dir ${leimdir}/quail $<
+#${leimdir}/quail/%.el: ${srcdir}/CXTERM-DIC/%.tit
+#	$(AM_V_GEN)${RUN_EMACS} -l titdic-cnv \
+#	  -f batch-tit-dic-convert -dir ${leimdir}/quail $<
 
 
 misc_convert = $(AM_V_GEN)${RUN_EMACS} \
   -l titdic-cnv -f batch-tit-miscdic-convert -dir ${leimdir}/quail
 
 ## CTLau.el, CTLau-b5.el.
-${leimdir}/quail/CT%.el: ${srcdir}/MISC-DIC/CT%.html
-	${misc_convert} $<
+#${leimdir}/quail/CT%.el: ${srcdir}/MISC-DIC/CT%.html
+#	${misc_convert} $<
 
-${leimdir}/quail/PY.el: ${srcdir}/MISC-DIC/pinyin.map
-	${misc_convert} $<
+#${leimdir}/quail/PY.el: ${srcdir}/MISC-DIC/pinyin.map
+#	${misc_convert} $<
 
-${leimdir}/quail/ZIRANMA.el: ${srcdir}/MISC-DIC/ziranma.cin
-	${misc_convert} $<
+#${leimdir}/quail/ZIRANMA.el: ${srcdir}/MISC-DIC/ziranma.cin
+#	${misc_convert} $<
 
 ## Processing cangjie-table.b5 and cangjie-table.cns generates two files
 ## in each case.
-${leimdir}/quail/tsang-%.el ${leimdir}/quail/quick-%.el: ${srcdir}/MISC-DIC/cangjie-table.%
-	${misc_convert} $<
+#${leimdir}/quail/tsang-%.el ${leimdir}/quail/quick-%.el: ${srcdir}/MISC-DIC/cangjie-table.%
+#	${misc_convert} $<
 
 
 .PHONY: leim-list.el
