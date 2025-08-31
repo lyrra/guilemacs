@@ -101,12 +101,12 @@
 (defun unidata-setup-list (unidata-text-file)
   (let* ((table (list nil))
 	 (tail table)
-	 (block-names '(("^<CJK Ideograph" . CJK\ IDEOGRAPH)
-                        ("^<Tangut Ideograph" . TANGUT\ IDEOGRAPH)
-			("^<Hangul Syllable" . HANGUL\ SYLLABLE)
-			("^<.*High Surrogate" . HIGH\ SURROGATE)
-			("^<.*Low Surrogate" . LOW\ SURROGATE)
-			("^<.*Private Use" . PRIVATE\ USE)))
+	 (block-names '(("^<CJK Ideograph" . "CJK IDEOGRAPH")
+                        ("^<Tangut Ideograph" . "TANGUT IDEOGRAPH")
+			("^<Hangul Syllable" . "HANGUL SYLLABLE")
+			("^<.*High Surrogate" . "HIGH SURROGATE")
+			("^<.*Low Surrogate" . "LOW SURROGATE")
+			("^<.*Private Use" . "PRIVATE USE")))
 	 val char name)
     (setq unidata-text-file (expand-file-name unidata-text-file unidata-dir))
     (or (file-readable-p unidata-text-file)
@@ -819,7 +819,7 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
    ((and (integerp val) (> val 0))
     (let* ((symbol-table (aref (char-table-extra-slot table 4) 1))
 	   (sym (aref symbol-table (1- val))))
-      (cond ((eq sym 'HANGUL\ SYLLABLE)
+      (cond ((eq sym "HANGUL SYLLABLE")
 	     (let ((jamo-name-table (aref (char-table-extra-slot table 4) 2)))
 	       ;; SIndex = S - SBase
 	       (setq char (- char #xAC00))
@@ -835,17 +835,17 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 			 (aref (aref jamo-name-table 1) V)
 			 (if (= T 0) ""
 			   (aref (aref jamo-name-table 2) (1- T)))))))
-	    ((eq sym 'CJK\ IDEOGRAPH)
+	    ((eq sym "CJK IDEOGRAPH")
 	     (format "%s-%04X" sym char))
-	    ((eq sym 'TANGUT\ IDEOGRAPH)
+	    ((eq sym "TANGUT IDEOGRAPH")
 	     (format "%s-%04X" sym char))
-	    ((eq sym 'CJK\ COMPATIBILITY\ IDEOGRAPH)
+	    ((eq sym "CJK COMPATIBILITY IDEOGRAPH")
 	     (format "%s-%04X" sym char))
-	    ((eq sym 'HIGH\ SURROGATE)
+	    ((eq sym "HIGH SURROGATE")
 	     (format "%s-%04X" sym char))
-	    ((eq sym 'LOW\ SURROGATE)
+	    ((eq sym "LOW SURROGATE")
 	     (format "%s-%04X" sym char))
-	    ((eq sym 'VARIATION\ SELECTOR)
+	    ((eq sym "VARIATION SELECTOR")
 	     (format "%s-%d" sym (+ (- char #xe0100) 17)))))))))
 
 ;; Store VAL as the name of CHAR in TABLE.
@@ -973,8 +973,8 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	      (setq block-end range
 		    tail (cdr tail)))
 	    (setq range (cons start block-end)
-		  val (if (eq first 'CJK) 'CJK\ COMPATIBILITY\ IDEOGRAPH
-			'VARIATION\ SELECTOR))))
+		  val (if (eq first 'CJK) "CJK COMPATIBILITY IDEOGRAPH"
+			"VARIATION SELECTOR"))))
 
       (if (consp range)
 	  (if val
