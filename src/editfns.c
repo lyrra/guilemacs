@@ -4780,5 +4780,5 @@ it to be non-nil.  */);
   /* A special value for Qfield properties.  */
   DEFSYM (Qboundary, "boundary");
 
-  char_to_string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-char-to-string");
+  char_to_string_fn = scm_c_private_ref ("language elisp runtime", "elisp-char-to-string");
 }

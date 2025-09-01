@@ -841,5 +841,5 @@ use `event-start', `event-end', and `event-click-count'.  */);
   DEFSYM (Qcommand_history, "command-history");
   DEFSYM (Qeval_minibuffer, "eval-minibuffer");
 
-  char_to_string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-char-to-string");
+  char_to_string_fn = scm_c_private_ref ("language elisp runtime", "elisp-char-to-string");
 }
