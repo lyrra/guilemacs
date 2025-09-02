@@ -512,7 +512,8 @@ with L, LRE, or LRO Unicode bidi character type.")
 ;; Bidi categories
 
 ;; If bootstrapping without generated uni-*.el files, table not defined.
-(let ((table (unicode-property-table-internal 'bidi-class)))
+; FIX-20250902-guilemacs: not scheme-syntax in international/uni-bidi.el
+'(let ((table (unicode-property-table-internal 'bidi-class)))
   (when table
     (map-char-table (lambda (key val)
 		      (cond
@@ -527,8 +528,10 @@ with L, LRE, or LRO Unicode bidi character type.")
 ;; force-load-messages in ~/.emacs, and avoid infinite recursion in
 ;; bidi_initialize, which needs to load uni-mirrored.el and
 ;; uni-brackets.el in order to display the "Loading" messages.
-(unicode-property-table-internal 'mirroring)
-(unicode-property-table-internal 'bracket-type)
+; FIX-20250902-guilemacs: not scheme-syntax in international/uni-mirrored.el
+'(unicode-property-table-internal 'mirroring)
+; FIX-20250902-guilemacs: not scheme-syntax in international/uni-scripts.el
+'(unicode-property-table-internal 'bracket-type)
 
 ;; Latin
 
@@ -770,7 +773,8 @@ with L, LRE, or LRO Unicode bidi character type.")
   ;; Combining marks
   (modify-category-entry '(#x20d0 . #x20ff) ?^)
 
-  (let ((gc (unicode-property-table-internal 'general-category))
+  ; FIX-20250902-guilemacs: not scheme-syntax in international/uni-category.el
+  '(let ((gc (unicode-property-table-internal 'general-category))
         (syn-table (standard-syntax-table)))
     ;; In early bootstrapping Unicode tables are not available so we need to
     ;; skip this step in those cases.
@@ -861,7 +865,8 @@ with L, LRE, or LRO Unicode bidi character type.")
 ;;; see charscript.el.
 ;;; Each character whose Unicode general-category is Nd gets the digit
 ;;; category:
-(let ((table (unicode-property-table-internal 'general-category)))
+; FIX-20250902-guilemacs: not scheme-syntax in international/uni-category.el
+'(let ((table (unicode-property-table-internal 'general-category)))
   (when table
     (map-char-table (lambda (key val)
                       (if (eq val 'Nd)
@@ -1740,7 +1745,8 @@ Setup `char-width-table' appropriate for non-CJK language environment."
 
 ;;; Setting unicode-category-table.
 
-(when (setq unicode-category-table
+; FIX-20250902-guilemacs: not scheme-syntax in international/uni-category.el
+'(when (setq unicode-category-table
 	    (unicode-property-table-internal 'general-category))
   (map-char-table (lambda (key val)
                     (if val
