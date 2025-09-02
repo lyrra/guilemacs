@@ -171,7 +171,7 @@ $(lisp)/finder-inf.el:
 # This is the OKURO-NASI compilation trigger.
 generate-ja-dic: main-first
 	$(AM_V_at)$(MAKE) -C ../leim generate-ja-dic EMACS="$(EMACS)"
-	$(AM_V_at)$(MAKE) compile-targets TARGETS="./leim/ja-dic/ja-dic.elc"
+#	$(AM_V_at)$(MAKE) compile-targets TARGETS="./leim/ja-dic/ja-dic.elc"
 
 org-manuals: main-first
 	$(AM_V_at)$(MAKE) -C ../doc/misc org.texi modus-themes.texi
