@@ -171,14 +171,14 @@
   '(
     ;; NB this list is parsed by the Makefile to extract the names of
     ;; the uni-*.el files, so preserve the formatting of those lines.
-    ("uni-name.el"
-     (name
-      1 unidata-gen-table-name
-      "Unicode character name.
-Property value is a string or nil.
-The value nil stands for the default value \"null string\")."
-      nil
-      nil))
+;    ("xni-name.el"
+;     (name
+;      1 unidata-gen-table-name
+;      "Unicode character name.
+;Property value is a string or nil.
+;The value nil stands for the default value \"null string\")."
+;      nil
+;      nil))
     ("uni-category.el"
      (general-category
       2 unidata-gen-table-symbol
