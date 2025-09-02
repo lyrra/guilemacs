@@ -957,6 +957,7 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
       ;; Treat the sequence of "CJK COMPATIBILITY IDEOGRAPH-XXXX" and
       ;; "VARIATION SELECTOR-XXX" as a block.
       (if (and (consp val) (eq prop 'name)
+               (fixnump range) ; FIX-guilemacs: >= cant handle cons
 	       (or (and (eq (car val) 'CJK)
 			(eq (nth 1 val) 'COMPATIBILITY))
 		   (and (>= range #xe0100)
