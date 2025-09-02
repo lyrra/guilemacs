@@ -436,7 +436,7 @@ q  trust status questionable.  -  trust status unspecified.
     (with-current-buffer epa-keys-buffer
       (epa-key-list-mode)
       ;; C-c C-c is the usual way to finish the selection (bug#11159).
-      (define-key (current-local-map) "\C-c\C-c" 'exit-recursive-edit)
+      (define-key (current-local-map) (kbd "C-c C-c") 'exit-recursive-edit)
       (let ((inhibit-read-only t)
 	    buffer-read-only)
         (erase-buffer)
