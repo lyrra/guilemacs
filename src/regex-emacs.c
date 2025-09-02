@@ -3421,6 +3421,8 @@ re_search_2 (struct re_pattern_buffer *bufp, const char *str1, ptrdiff_t size1,
   /* Nonzero if we are searching multibyte string.  */
   bool multibyte = RE_TARGET_MULTIBYTE_P (bufp);
 
+  fastmap = NULL; // FIX-20250902-guilemacs: not sure why, but it is an empty string (so indexing into it will sigsegv)
+
   /* Check for out-of-range STARTPOS.  */
   if (startpos < 0 || startpos > total_size)
     return -1;
