@@ -565,7 +565,7 @@ other modes.  See `override-global-mode'."
 (provide 'bind-key)
 
 ;; Local Variables:
-;; outline-regexp: ";;;\\(;* [^\s\t\n]\\|###autoload\\)\\|("
+;; outline-regexp: ";;;\\(;* [^\\s\\t\\n]\\|###autoload\\)\\|("
 ;; End:
 
 ;;; bind-key.el ends here
