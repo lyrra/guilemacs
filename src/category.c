@@ -82,8 +82,7 @@ those categories.  */)
   CHECK_STRING (categories);
   val = MAKE_CATEGORY_SET;
 
-  if (STRING_MULTIBYTE (categories))
-    error ("Multibyte string in `make-category-set'");
+  /* In Guile, all strings are UTF-8, so no multibyte check needed */
 
   len = SCHARS (categories);
   while (--len >= 0)
