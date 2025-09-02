@@ -4648,8 +4648,9 @@ activations need to be changed, such as when `package-load-list' is modified."
               (current-buffer))))
       ;; Use `\s' instead of a space character, so this code chunk is not
       ;; mistaken for an actual file-local section of package.el.
+      ;; FIX-20250902-guilemacs back to space (\s is non guile string-syntax), we're moving away from non-sexp anyway
       (insert "
-;; Local\sVariables:
+;; Local Variables:
 ;; version-control: never
 ;; no-update-autoloads: t
 ;; byte-compile-warnings: (not make-local)

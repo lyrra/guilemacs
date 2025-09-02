@@ -218,7 +218,7 @@ This is only used if `mm-inline-large-images' is set to
 	     (let ((coding-system-for-write 'iso-2022-jp)
 		   (coding-system-for-read 'iso-2022-jp)
 		   (str (decode-coding-string "\
-\e$B#D#o#e#s!!#w#3#m!!#s#u#p#p#o#r#t!!#m#1#7#n!)\e(B" 'iso-2022-jp)))
+\x1b$B#D#o#e#s!!#w#3#m!!#s#u#p#p#o#r#t!!#m#1#7#n!)\x1b(B" 'iso-2022-jp)))
 	       (mm-with-multibyte-buffer
 		 (insert str)
 		 (call-process-region
