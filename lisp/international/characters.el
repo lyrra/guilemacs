@@ -1725,10 +1725,10 @@ Setup `char-width-table' appropriate for non-CJK language environment."
     ;; in load-path.
     (progn
       (load "international/charscript")
-      '(load "international/emoji-zwj"))
+      '(load "international/emoji-zwj")) ; FIX-guilemacs: still needed (remark)
   (progn
     (require 'charscript)
-    '(require 'emoji-zwj)))
+    '(require 'emoji-zwj))) ; FIX-guilemacs: still needed (remark)
 
 (map-charset-chars
  (lambda (range _ignore)
