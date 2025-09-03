@@ -712,4 +712,5 @@
                    (+ num-total-failed-gen-tests num-total-failed-ert-tests)
                    ; %total-failed-tests
                    )))
-      (exit))))
+      (exit (if (> (+ num-total-failed-gen-tests num-total-failed-ert-tests) 0)
+                1 0)))))
