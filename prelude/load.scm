@@ -1344,12 +1344,56 @@ This function may destructively modify SEQ to produce the value."
 (set-symbol-function! 'provide elisp-provide)
 (set-symbol-function! 'nreverse elisp-nreverse)
 
+;; Additional critical DEFUN migrations from lread.c
+
+(define (elisp-intern string obarray)
+  "Return the canonical symbol whose name is STRING.
+If there is none, one is created by this function and returned.
+A second optional argument specifies the obarray to use;
+it defaults to the value of `obarray'."
+  (let ((str (if (symbol? string) (symbol->string string) string)))
+    (if (not (string? str))
+        ((symbol-function 'signal) 'wrong-type-argument (cons 'stringp str))
+        ;; Use Guile's efficient symbol interning
+        (string->symbol str))))
+
+(define (elisp-intern-soft-lread name obarray)
+  "Return the canonical symbol named NAME, or nil if none exists.
+NAME may be a string or a symbol. If it is a symbol, that exact
+symbol is searched for. A second optional argument specifies the obarray to use;
+it defaults to the value of `obarray'."
+  (let ((str (if (symbol? name) (symbol->string name) name)))
+    (if (not (string? str))
+        #nil
+        (catch #t
+          (lambda ()
+            ;; Try to find existing symbol without creating new one
+            (let ((sym (string->symbol str)))
+              (if (symbol-bound? sym) sym #nil)))
+          (lambda (key . args)
+            #nil)))))
+
+(define (elisp-unintern name obarray)
+  "Delete the symbol named NAME, if any, from OBARRAY.
+The value is t if a symbol was found and deleted, nil otherwise.
+NAME may be a string or a symbol. If it is a symbol, that symbol
+is deleted, if it belongs to OBARRAY--no other symbol is deleted."
+  (let ((str (if (symbol? name) (symbol->string name) name)))
+    (if (not (string? str))
+        #nil
+        ;; In Guile, symbols are globally interned, so we can't really unintern
+        ;; Return nil to indicate no symbol was found/deleted
+        #nil)))
+
 ;; Register DEFUN migrations from lread.c
 (set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
 (set-symbol-function! 'obarrayp elisp-obarrayp)
 (set-symbol-function! 'obarray-make elisp-obarray-make)
 (set-symbol-function! 'obarray-clear elisp-obarray-clear)
 (set-symbol-function! 'read-char elisp-read-char)
+(set-symbol-function! 'intern elisp-intern)
+(set-symbol-function! 'intern-soft elisp-intern-soft-lread)
+(set-symbol-function! 'unintern elisp-unintern)
 (set-symbol-function! 'symbol-plist elisp-symbol-plist)
 (set-symbol-function! 'setplist elisp-setplist)
 (set-symbol-function! 'get elisp-get)
