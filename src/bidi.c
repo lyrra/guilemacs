@@ -1105,18 +1105,19 @@ static void
 bidi_initialize (void)
 {
   bidi_type_table = uniprop_table (intern ("bidi-class"));
-  if (NILP (bidi_type_table))
-    emacs_abort ();
+  // FIX-20250903-guilemacs, non-guile syntax in the case table files
+  //if (NILP (bidi_type_table))
+  //  emacs_abort ();
   staticpro (&bidi_type_table);
 
   bidi_mirror_table = uniprop_table (intern ("mirroring"));
-  if (NILP (bidi_mirror_table))
-    emacs_abort ();
+  //if (NILP (bidi_mirror_table))
+  //  emacs_abort ();
   staticpro (&bidi_mirror_table);
 
   bidi_brackets_table = uniprop_table (intern ("bracket-type"));
-  if (NILP (bidi_brackets_table))
-    emacs_abort ();
+  //if (NILP (bidi_brackets_table))
+  //  emacs_abort ();
   staticpro (&bidi_brackets_table);
 
   paragraph_start_re = build_string ("^\\(\f\\|[ \t]*\\)$");

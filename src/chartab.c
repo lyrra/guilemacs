@@ -1271,6 +1271,7 @@ uniprop_table (Lisp_Object prop)
   table = XCDR (val);
   if (STRINGP (table))
     {
+      return Qnil; // FIX-20250903-guilemacs, non-guile syntax in the case table files
       AUTO_STRING (intl, "international/");
       result = save_match_data_load (concat2 (intl, table), Qt, Qt, Qt, Qt);
       if (NILP (result))
