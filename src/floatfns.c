@@ -133,6 +133,30 @@ This is the same as the exponent of a float. [Guile implementation] */)
   return call1 (intern ("elisp-logb"), arg);
 }
 
+DEFUN ("sign", Fsign, Ssign, 1, 1, 0,
+       doc: /* Return the sign of NUMBER: -1, 0, or 1. [Guile implementation] */)
+  (Lisp_Object number)
+{
+  return call1 (intern ("elisp-sign"), number);
+}
+
+DEFUN ("clamp", Fclamp, Sclamp, 3, 3, 0,
+       doc: /* Return NUMBER clamped between MIN and MAX.
+If NUMBER is less than MIN, return MIN.
+If NUMBER is greater than MAX, return MAX.
+Otherwise return NUMBER. [Guile implementation] */)
+  (Lisp_Object number, Lisp_Object min, Lisp_Object max)
+{
+  return call3 (intern ("elisp-clamp"), number, min, max);
+}
+
+DEFUN ("square", Fsquare, Ssquare, 1, 1, 0,
+       doc: /* Return the square of NUMBER. [Guile implementation] */)
+  (Lisp_Object number)
+{
+  return call1 (intern ("elisp-square"), number);
+}
+
 /* Return the integer exponent E such that D * FLT_RADIX**E (i.e.,
    scalbn (D, E)) is an integer that has precision equal to D and is
    representable as a double.

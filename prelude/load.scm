@@ -1742,11 +1742,78 @@ This is the same as the exponent of a float."
   "Return the ARGUMENT unchanged."
   argument)
 
+;; Reader and file loading functions migrated from C
+(define (elisp-get-load-suffixes)
+  "Return the suffixes that `load' should try if a suffix is required.
+This uses the variables `load-suffixes' and `load-file-rep-suffixes'."
+  (let ((result '()))
+    (for-each
+      (lambda (suffix)
+        (for-each
+          (lambda (ext)
+            (set! result (cons (string-append suffix ext) result)))
+          (symbol-value 'load-file-rep-suffixes)))
+      (symbol-value 'load-suffixes))
+    (reverse result)))
+
+(define (elisp-proper-list-p object)
+  "Return OBJECT's length if it is a proper list, nil otherwise.
+A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+  (let ((len 0)
+        (slow object)
+        (fast object))
+    ;; Use Floyd's cycle detection algorithm
+    (let loop ((current object) (len 0))
+      (cond
+        ((null? current) len)  ; Proper list - return length
+        ((not (pair? current)) 'nil)  ; Dotted list - return nil
+        (else
+          ;; Check for cycles using tortoise and hare
+          (set! fast (if (and (pair? fast) (pair? (cdr fast))) (cddr fast) #f))
+          (set! slow (cdr slow))
+          (if (and fast (eq? fast slow))
+              'nil  ; Circular list detected
+              (loop (cdr current) (+ len 1))))))))
+
+;; Additional mathematical utility functions - demonstrating migration pattern
+(define (elisp-sign number)
+  "Return the sign of NUMBER: -1, 0, or 1."
+  (let ((n (if (number? number) number
+               (error "Wrong type argument: numberp" number))))
+    (cond
+      ((< n 0) -1)
+      ((> n 0) 1)
+      (else 0))))
+
+(define (elisp-clamp value min-val max-val)
+  "Return VALUE clamped to the range [MIN-VAL, MAX-VAL]."
+  (if (not (and (number? value) (number? min-val) (number? max-val)))
+      (error "Wrong type arguments: numberp"))
+  (cond
+    ((< value min-val) min-val)
+    ((> value max-val) max-val)
+    (else value)))
+
+(define (elisp-square number)
+  "Return the square of NUMBER."
+  (let ((n (if (number? number) number
+               (error "Wrong type argument: numberp" number))))
+    (* n n)))
+
 ;; Register the new mathematical functions for Elisp use
 (set-symbol-function! 'elisp-copysign elisp-copysign)
 (set-symbol-function! 'elisp-frexp elisp-frexp)
 (set-symbol-function! 'elisp-ldexp elisp-ldexp)
 (set-symbol-function! 'elisp-logb elisp-logb)
+
+;; Register the new reader and file loading functions
+(set-symbol-function! 'elisp-get-load-suffixes elisp-get-load-suffixes)
+(set-symbol-function! 'elisp-proper-list-p elisp-proper-list-p)
+
+;; Register the additional utility functions
+(set-symbol-function! 'elisp-sign elisp-sign)
+(set-symbol-function! 'elisp-clamp elisp-clamp)
+(set-symbol-function! 'elisp-square elisp-square)
 
 ;; Note: identity is already registered above as elisp-identity at line 669
 
