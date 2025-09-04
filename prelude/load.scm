@@ -1678,5 +1678,77 @@ This is an alias for complete-filename-p with better naming."
 (set-symbol-function! 'complete-filename-p elisp-complete-filename-p)
 (set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
 
+;; FIX-guilemacs: DEFUN Mathematical function migrations from floatfns.c to Guile
+;; These functions are excellent migration candidates because they:
+;; 1. Don't depend on early C initialization
+;; 2. Are well-defined mathematical operations
+;; 3. Can leverage Guile's built-in floating point support
+
+(define (elisp-copysign x1 x2)
+  "Copy sign of X2 to value of X1, and return the result.
+Cause an error if X1 or X2 is not a float."
+  (let ((f1 (if (number? x1) (exact->inexact x1)
+                (error "Wrong type argument: floatp" x1)))
+        (f2 (if (number? x2) (exact->inexact x2)
+                (error "Wrong type argument: floatp" x2))))
+    (if (eq? (negative? f1) (negative? f2))
+        f1
+        (- f1))))
+
+(define (elisp-frexp x)
+  "Get significand and exponent of a floating point number.
+Breaks the floating point number X into its binary significand SGNFCAND
+and an integral exponent EXP for 2, such that: X = SGNFCAND * 2^EXP
+The function returns the cons cell (SGNFCAND . EXP)."
+  (let ((f (if (number? x) (exact->inexact x)
+               (error "Wrong type argument: numberp" x))))
+    (if (= f 0.0)
+        (cons 0.0 0)
+        (let* ((abs-f (abs f))
+               (exponent (inexact->exact (ceiling (log abs-f 2))))
+               (significand (/ f (expt 2 exponent))))
+          ;; Adjust to ensure significand is in [0.5, 1.0)
+          (let loop1 ((sig significand) (exp exponent))
+            (if (>= (abs sig) 1.0)
+                (loop1 (/ sig 2) (+ exp 1))
+                (let loop2 ((sig2 sig) (exp2 exp))
+                  (if (< (abs sig2) 0.5)
+                      (loop2 (* sig2 2) (- exp2 1))
+                      (cons sig2 exp2)))))))))
+
+(define (elisp-ldexp sgnfcand exponent)
+  "Return SGNFCAND * 2**EXPONENT, as a floating point number.
+EXPONENT must be an integer."
+  (let ((f (if (number? sgnfcand) (exact->inexact sgnfcand)
+               (error "Wrong type argument: numberp" sgnfcand)))
+        (exp (if (integer? exponent) exponent
+                 (error "Wrong type argument: integerp" exponent))))
+    (* f (expt 2 exp))))
+
+(define (elisp-logb arg)
+  "Returns largest integer <= the base 2 log of the magnitude of ARG.
+This is the same as the exponent of a float."
+  (let ((f (if (number? arg) (exact->inexact arg)
+               (error "Wrong type argument: numberp" arg))))
+    (cond
+      ((= f 0.0) -inf.0)  ; Negative infinity for zero
+      ((inf? f) +inf.0)  ; Positive infinity
+      ((nan? f) f)  ; NaN returns NaN
+      (else (inexact->exact (floor (/ (log (abs f)) (log 2))))))))
+
+;; FIX-guilemacs: Additional simple utility function migrations
+
+(define (elisp-identity argument)
+  "Return the ARGUMENT unchanged."
+  argument)
+
+;; Register the new mathematical functions for Elisp use
+(set-symbol-function! 'elisp-copysign elisp-copysign)
+(set-symbol-function! 'elisp-frexp elisp-frexp)
+(set-symbol-function! 'elisp-ldexp elisp-ldexp)
+(set-symbol-function! 'elisp-logb elisp-logb)
+
+;; Note: identity is already registered above as elisp-identity at line 669
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

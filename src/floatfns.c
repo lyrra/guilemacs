@@ -87,20 +87,10 @@ extract_float (Lisp_Object num)
 
 DEFUN ("copysign", Fcopysign, Scopysign, 2, 2, 0,
        doc: /* Copy sign of X2 to value of X1, and return the result.
-Cause an error if X1 or X2 is not a float.  */)
+Cause an error if X1 or X2 is not a float. [Guile implementation] */)
   (Lisp_Object x1, Lisp_Object x2)
 {
-  double f1, f2;
-
-  CHECK_FLOAT (x1);
-  CHECK_FLOAT (x2);
-
-  f1 = XFLOAT_DATA (x1);
-  f2 = XFLOAT_DATA (x2);
-
-  /* Use signbit instead of copysign, to avoid calling make_float when
-     the result is X1.  */
-  return signbit (f1) != signbit (f2) ? make_float (-f1) : x1;
+  return call2 (intern ("elisp-copysign"), x1, x2);
 }
 
 DEFUN ("frexp", Ffrexp, Sfrexp, 1, 1, 0,
@@ -112,23 +102,18 @@ and an integral exponent EXP for 2, such that:
   X = SGNFCAND * 2^EXP
 
 The function returns the cons cell (SGNFCAND . EXP).
-If X is zero, both parts (SGNFCAND and EXP) are zero.  */)
+If X is zero, both parts (SGNFCAND and EXP) are zero. [Guile implementation] */)
   (Lisp_Object x)
 {
-  double f = extract_float (x);
-  int exponent;
-  double sgnfcand = frexp (f, &exponent);
-  return Fcons (make_float (sgnfcand), make_fixnum (exponent));
+  return call1 (intern ("elisp-frexp"), x);
 }
 
 DEFUN ("ldexp", Fldexp, Sldexp, 2, 2, 0,
        doc: /* Return SGNFCAND * 2**EXPONENT, as a floating point number.
-EXPONENT must be an integer.   */)
+EXPONENT must be an integer. [Guile implementation] */)
   (Lisp_Object sgnfcand, Lisp_Object exponent)
 {
-  CHECK_FIXNUM (exponent);
-  int e = min (max (INT_MIN, XFIXNUM (exponent)), INT_MAX);
-  return make_float (ldexp (extract_float (sgnfcand), e));
+  return call2 (intern ("elisp-ldexp"), sgnfcand, exponent);
 }
 
 DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
@@ -142,18 +127,10 @@ DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
 
 DEFUN ("logb", Flogb, Slogb, 1, 1, 0,
        doc: /* Returns largest integer <= the base 2 log of the magnitude of ARG.
-This is the same as the exponent of a float.  */)
+This is the same as the exponent of a float. [Guile implementation] */)
   (Lisp_Object arg)
 {
-  EMACS_INT value;
-  CHECK_NUMBER (arg);
-
-  if (FLOATP (arg) || FIXNUMP (arg) || GUILEBIGNUMP (arg))
-    {
-      Lisp_Object x = scm_divide (scm_log (arg), scm_log (10)); // 10 = make_fixnum (2)
-      return scm_inexact_to_exact (scm_round_number (x));
-    }
-  emacs_abort ();
+  return call1 (intern ("elisp-logb"), arg);
 }
 
 /* Return the integer exponent E such that D * FLT_RADIX**E (i.e.,

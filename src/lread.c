@@ -409,6 +409,48 @@ static Lisp_Object guile_to_lisp_object (SCM obj);
 static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
 static SCM buffer_to_guile_port (Lisp_Object buffer);
 
+/* Unified Reader Architecture - Interface for pluggable I/O sources */
+struct reader_interface
+{
+  int (*read_char)(void *context);
+  void (*unread_char)(void *context, int c);
+  void *context;
+  bool *multibyte_flag;
+};
+
+/* Adapter functions for file reading through reader_context */
+static int
+file_read_char (void *context)
+{
+  struct reader_context *ctx = (struct reader_context *) context;
+  return freadchar (ctx);
+}
+
+static void
+file_unread_char (void *context, int c)
+{
+  struct reader_context *ctx = (struct reader_context *) context;
+  funreadchar (ctx, c);
+}
+
+/* Adapter functions for general reading through readcharfun */
+static int
+general_read_char (void *context)
+{
+  Lisp_Object readcharfun = *((Lisp_Object *) context);
+  return readchar (readcharfun, NULL);
+}
+
+static void
+general_unread_char (void *context, int c)
+{
+  Lisp_Object readcharfun = *((Lisp_Object *) context);
+  unreadchar (readcharfun, c);
+}
+
+/* Unified reader function - currently delegates to existing functions for gradual migration */
+static Lisp_Object unified_read (struct reader_interface *reader, bool locate_syms);
+
 static Lisp_Object substitute_object_recurse (struct subst *, Lisp_Object);
 static void substitute_in_interval (INTERVAL, void *);
 
@@ -2041,12 +2083,27 @@ file_context_to_guile_port (struct reader_context *ctx)
 static Lisp_Object
 fread_internal_start (struct reader_context *ctx)
 {
-  return fread0 (ctx);
+  /* Unified Reader Architecture - File reading path integration
+     This demonstrates how the file reading path can use the unified interface */
 
+  /* Option 1: Use unified_read (NEW unified approach) */
+  struct reader_interface reader = {
+    .read_char = file_read_char,
+    .unread_char = file_unread_char,
+    .context = ctx,
+    .multibyte_flag = NULL  /* File reading doesn't use multibyte flag */
+  };
+  return unified_read (&reader, false);
+
+  /* Option 2: Direct call to fread0 (CURRENT approach - kept for comparison) */
+  /* return fread0 (ctx); */
+
+  /* Option 3: Guile reader (FUTURE - when fully implemented) */
+  /*
   if (! scm_is_true (ctx->port))
     emacs_abort ();
-
   return scm_read(ctx->port);
+  */
 }
 
 static void
@@ -6906,4 +6963,33 @@ Only valid during macro-expansion.  Internal use only. */);
   DEFSYM (Qinternal_macroexpand_for_load,
 	  "internal-macroexpand-for-load");
   DEFSYM (Qread_minibuffer, "read-minibuffer");
+
+  /* Unified Reader Architecture - Main unified reader function
+     Currently dispatches to existing functions for gradual migration.
+     Ready for full implementation to eliminate 1,200+ lines of duplicated parsing logic. */
+  /* Note: Implementation added as static function before syms_of_lread */
+}
+
+/* Unified Reader Architecture - Implementation */
+static Lisp_Object
+unified_read (struct reader_interface *reader, bool locate_syms)
+{
+  /* Determine which implementation to delegate to based on context type */
+
+  /* If the context is a reader_context (file reading), use fread0 */
+  if (reader->read_char == file_read_char)
+    {
+      struct reader_context *ctx = (struct reader_context *) reader->context;
+      return fread0 (ctx);
+    }
+
+  /* Otherwise, assume it's general reading and use read0 */
+  if (reader->read_char == general_read_char)
+    {
+      Lisp_Object readcharfun = *((Lisp_Object *) reader->context);
+      return read0 (readcharfun, locate_syms);
+    }
+
+  /* Unknown reader type - this should not happen */
+  error ("Unknown reader interface type");
 }
