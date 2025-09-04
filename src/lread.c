@@ -105,9 +105,6 @@ static SCM obarrays;
 /* Phase 7+: Enhanced Guile Reader Integration - Additional control */
 static bool use_guile_reader_aggressive = false;
 
-/* Phase 8: Symbol Reader Migration - Control variable for symbols */
-static bool use_guile_reader_for_symbols = false;
-
 /* The objects or placeholders read with the #n=object form.
 
    A hash table maps a number to either a placeholder (while the
@@ -5510,11 +5507,11 @@ fread0 (struct reader_context *ctx)
             }
         }
 
-      /* Phase 8: Symbol Reader Migration - Use Guile reader for symbols */
-      if (use_guile_reader_for_symbols && scm_is_true(ctx->port))
+      if (scm_is_true(ctx->port)
+          && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
 	{
 	  /* Push back the character we already consumed */
-	  funreadchar(ctx, c);
+	  scm_ungetc(c, ctx->port);
 
 	  /* Let Guile read the complete symbol/number */
 	  SCM result = scm_read(ctx->port);
