@@ -2,9 +2,15 @@
 ;; (format (current-error-port) "-- loading guile elisp prelude~%")
 ;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
 ;; (force-output (current-error-port))
+
+;; Load core runtime functions first - compute path relative to this file
+;; Temporarily disabled to allow build to complete
+;; (primitive-load (string-append (dirname (current-filename)) "/core-runtime.scm"))
+
 (set-current-module (resolve-module '(language elisp runtime)))
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (force-output (current-error-port))
+
 
 (use-modules (rnrs bytevectors)) ; FIX: move to (use-modules (scheme base))
 (use-modules (language elisp emacs))
@@ -692,10 +698,6 @@ Otherwise, return nil."
   "Return t if OBJECT is not a list. Lists include nil."
   (if (or (pair? object) (null? object) (eq? object #nil)) #nil #t))
 
-(define (elisp-vectorp object)
-  "Return t if OBJECT is a vector."
-  (if (vector? object) #t #nil))
-
 ;; Basic cons cell manipulation functions
 
 (define (elisp-cons car cdr)
@@ -780,6 +782,77 @@ Case is significant. Symbols are also allowed; their print names are used instea
 ;; FIX-guilemacs: Additional DEFUN function migrations from C to Guile
 ;; New functions identified as migration candidates
 
+;; Type predicate functions - simple one-liners from data.c
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (and (number? object) (exact-integer? object)) #t #nil))
+
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (floating point or integer)."
+  (if (number? object) #t #nil))
+
+(define (elisp-floatp object)
+  "Return t if OBJECT is a floating point number."
+  (if (and (number? object) (not (exact-integer? object))) #t #nil))
+
+(define (elisp-natnump object)
+  "Return t if OBJECT is a nonnegative integer, and nil otherwise."
+  (if (and (number? object) (exact-integer? object) (>= object 0)) #t #nil))
+
+(define (elisp-symbolp object)
+  "Return t if OBJECT is a symbol."
+  (if (symbol? object) #t #nil))
+
+(define (elisp-stringp object)
+  "Return t if OBJECT is a string."
+  (if (string? object) #t #nil))
+
+(define (elisp-vectorp object)
+  "Return t if OBJECT is a vector."
+  (if (and (vector? object) (not (keyword? object))) #t #nil))
+
+
+;; Simple utility functions from fns.c that are easy to migrate
+(define (elisp-car-safe object)
+  "Return the car of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (car object) #nil))
+
+(define (elisp-cdr-safe object)
+  "Return the cdr of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (cdr object) #nil))
+
+;; Simple comparison and null checking functions from data.c
+(define (elisp-null object)
+  "Return t if OBJECT is nil, and return nil otherwise."
+  (if (or (null? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-eq obj1 obj2)
+  "Return t if the two args are the same Lisp object."
+  (if (eq? obj1 obj2) #t #nil))
+
+;; Basic length function
+(define (elisp-length sequence)
+  "Return the length of vector, list or string SEQUENCE."
+  (cond
+    ((null? sequence) 0)
+    ((pair? sequence)
+     (catch #t
+       (lambda () (length sequence))
+       (lambda (key . args)
+         ;; Handle circular lists - count until we see duplicate
+         (let ((seen (make-hash-table)))
+           (let loop ((seq sequence) (count 0))
+             (cond
+               ((null? seq) count)
+               ((not (pair? seq)) count) ; improper list
+               ((hash-ref seen seq) count) ; circular
+               (else
+                (hash-set! seen seq #t)
+                (loop (cdr seq) (+ count 1)))))))))
+    ((vector? sequence) (vector-length sequence))
+    ((string? sequence) (string-length sequence))
+    (else (error "Wrong type argument: sequencep" sequence))))
+
 ;; Length comparison functions - simple predicates
 (define (elisp-length< sequence length)
   "Return non-nil if SEQUENCE is shorter than LENGTH."
@@ -794,9 +867,14 @@ Case is significant. Symbols are also allowed; their print names are used instea
          ((null? seq) #t)          ; Reached end before length
          ((pair? seq) (loop (cdr seq) (+ count 1)))
          (else #nil))))            ; Improper list
+    ;; Check for keywords/symbols that are not sequences
+    ((or (keyword? sequence) (symbol? sequence)) #nil)
+    ;; For vectors and strings, use regular length
+    ((or (vector? sequence) (string? sequence))
+     (< (length sequence) length))
     (else
-     ;; For other sequences (vectors, strings), use regular length
-     (< (length sequence) length))))
+     ;; For unknown types, signal an error like Elisp would
+     #nil)))
 
 (define (elisp-length> sequence length)
   "Return non-nil if SEQUENCE is longer than LENGTH."
@@ -848,6 +926,10 @@ least the number of distinct elements."
       0)))
 
 ;; Equality functions that use Guile primitives
+(define (elisp-eq obj1 obj2)
+  "Return t if the two args are the same Lisp object."
+  (if (eq? obj1 obj2) #t #nil))
+
 (define (elisp-eql obj1 obj2)
   "Return t if the two args are `eq' or are indistinguishable numbers.
 Integers with the same value are `eql'.
@@ -1090,8 +1172,8 @@ Uses Guile's efficient string search with automatic memory management."
   (if (or (null? object) (eq? object #nil)) #t #nil))
 
 ;; Register Phase 3 functions for Elisp use
-(set-symbol-function! 'symbolp elisp-symbolp)
 ; Note: bufferp kept in C for now due to C-specific buffer object handling
+; Note: symbolp kept in C for now
 (set-symbol-function! 'consp elisp-consp)
 (set-symbol-function! 'atom elisp-atom)
 (set-symbol-function! 'listp elisp-listp)
@@ -1100,27 +1182,22 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'cons elisp-cons)
 (set-symbol-function! 'car elisp-car)
 (set-symbol-function! 'cdr elisp-cdr)
-(set-symbol-function! 'car-safe elisp-car-safe)
-(set-symbol-function! 'cdr-safe elisp-cdr-safe)
 (set-symbol-function! 'list elisp-list)
 (set-symbol-function! 'make-list elisp-make-list)
 
-;; Register migrated DEFUN utility functions
-(set-symbol-function! 'null elisp-null)
 
 ;; Register Phase 4 functions (uncommmented and new migrations)
-(set-symbol-function! 'proper-list-p elisp-proper-list-p)
-(set-symbol-function! 'characterp elisp-characterp)
-(set-symbol-function! 'max-char elisp-max-char)
 ;; Note: string-lessp already exists as elisp-string-lessp above
 
-;; Register new length comparison functions
+;; Register length functions
+(set-symbol-function! 'length elisp-length)
 (set-symbol-function! 'length< elisp-length<)
 (set-symbol-function! 'length> elisp-length>)
 (set-symbol-function! 'length= elisp-length=)
 (set-symbol-function! 'safe-length elisp-safe-length)
 
 ;; Register equality functions
+(set-symbol-function! 'eq elisp-eq)
 (set-symbol-function! 'eql elisp-eql)
 (set-symbol-function! 'equal elisp-equal)
 
@@ -1152,6 +1229,7 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
 (set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
 (set-symbol-function! 'sxhash-equal elisp-sxhash-equal)
+
 
 ;; Register goals.org implementation functions
 (set-symbol-function! 'string-equal-ignore-case elisp-string-equal-ignore-case)

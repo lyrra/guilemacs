@@ -1,1 +1,0 @@
-(message "Basic test")
