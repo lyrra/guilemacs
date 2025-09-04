@@ -5414,6 +5414,35 @@ fread0 (struct reader_context *ctx)
       if (c <= 32 || c == NO_BREAK_SPACE)
 	goto read_obj;
 
+      if (scm_is_true(ctx->port)
+	  && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.'))
+	{
+	  /* Push back the character for Guile to read */
+	  scm_ungetc(c, ctx->port);
+
+	  /* Let Guile read the number */
+	  SCM result = scm_read(ctx->port);
+
+	  /* Handle EOF */
+	  if (scm_is_eq (result, SCM_EOF_VAL))
+	    end_of_file_error();
+
+	  /* SCM numbers are already valid Lisp_Objects in GuilEmacs */
+	  if (scm_is_number(result))
+	    {
+	      obj = result;  /* Direct assignment like fread_integer */
+	    }
+	  else
+	    {
+	      /* Not a number - shouldn't happen, but handle gracefully */
+	      obj = result;
+	    }
+
+	  /* Reset lookahead buffer */
+	  ctx->lookahead = 0;
+	  break;
+	}
+
       /* Special handling for colon symbols which Guile treats as keywords */
       if (c == ':')
         {
