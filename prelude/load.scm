@@ -1815,6 +1815,11 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 (set-symbol-function! 'elisp-clamp elisp-clamp)
 (set-symbol-function! 'elisp-square elisp-square)
 
+;; Register short names for C function access
+(set-symbol-function! 'sign elisp-sign)
+(set-symbol-function! 'clamp elisp-clamp)
+(set-symbol-function! 'square elisp-square)
+
 ;; Note: identity is already registered above as elisp-identity at line 669
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
