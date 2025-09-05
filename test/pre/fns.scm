@@ -1,3 +1,15 @@
+(for-each (lambda (pair)
+            (match pair
+              ((name input expected)
+               (deftestf name (expected)
+                 (el-expr `(let ((x ,input))
+                             (print (atom x))))))))
+  '(
+    (atom-42 42 t)
+    (atom-symbol 'symbol t)
+    (atom-nil nil t)
+    (atom-list '(a b) nil)
+    ))
 
 ; test endianess
 (deftest byteorder (t)
