@@ -2183,10 +2183,23 @@ This means that it is a symbol with a print name beginning with ':'."
 (set-symbol-function! 'bufferp elisp-bufferp)
 (set-symbol-function! 'user-ptrp elisp-user-ptrp)
 
+;; System information functions
+(define (elisp-byteorder)
+  "Return the byteorder for the machine.
+Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
+lowercase l) for small endian machines."
+  ;; Guile provides the native endianness
+  (if (eq? (native-endianness) (endianness big))
+      66   ; 'B' for big endian
+      108)) ; 'l' for little endian
+
 ;; Register short names for C function access
 (set-symbol-function! 'sign elisp-sign)
 (set-symbol-function! 'clamp elisp-clamp)
 (set-symbol-function! 'square elisp-square)
+
+;; Register system information functions
+(set-symbol-function! 'byteorder elisp-byteorder)
 
 ;; Note: identity is already registered above as elisp-identity at line 669
 

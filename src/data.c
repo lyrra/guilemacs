@@ -2844,19 +2844,6 @@ string_to_scheme (Lisp_Object string)
   return string;  /* String is already a Guile string - no conversion needed */
 }
 
-DEFUN ("byteorder", Fbyteorder, Sbyteorder, 0, 0, 0,
-       doc: /* Return the byteorder for the machine.
-Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
-lowercase l) for small endian machines.  */
-       attributes: const)
-  (void)
-{
-  unsigned i = 0x04030201;
-  int order = *(char *)&i == 1 ? 108 : 66;
-
-  return make_fixnum (order);
-}
-
 /* Because we round up the bool vector allocate size to word_size
    units, we can safely read past the "end" of the vector in the
    operations below.  These extra bits are always zero.  */

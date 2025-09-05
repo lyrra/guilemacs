@@ -34,7 +34,7 @@
   "test/pre/reader-integers.scm"
   "test/pre/reader-utf8.scm"
   "test/pre/list.scm"
-;  "test/pre/fns.scm"
+  "test/pre/fns.scm"
   "test/pre/random.scm"
   "test/pre/time.scm"
   "test/pre/buffer-basic.scm"
