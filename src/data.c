@@ -316,29 +316,6 @@ DEFUN ("nlistp", Fnlistp, Snlistp, 1, 1, 0,
   return Qt;
 }
 
-/* MIGRATED TO GUILE: bare-symbol-p
-   This function has been moved to prelude/load.scm as elisp-bare-symbol-p.
-   But we keep the C implementation for bootstrap. */
-DEFUN ("bare-symbol-p", Fbare_symbol_p, Sbare_symbol_p, 1, 1, 0,
-       doc: /* Return t if OBJECT is a symbol, but not a symbol together with position.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  return SYMBOLP (object) ? Qt : Qnil;
-}
-
-/* MIGRATED TO GUILE: symbol-with-pos-p
-   This function has been moved to prelude/load.scm as elisp-symbol-with-pos-p.
-   But we keep the C implementation for bootstrap. */
-DEFUN ("symbol-with-pos-p", Fsymbol_with_pos_p, Ssymbol_with_pos_p, 1, 1, 0,
-       doc: /* Return t if OBJECT is a symbol together with position.
-Ignore `symbols-with-pos-enabled'.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  return Qnil;
-}
-
 /* MIGRATED TO GUILE: symbolp
    This function has been moved to prelude/load.scm as elisp-symbolp.
    Uses Guile's native symbol? predicate. */
@@ -3227,8 +3204,6 @@ syms_of_data (void)
 
   DEFSYM (Qlistp, "listp");
   DEFSYM (Qconsp, "consp");
-  DEFSYM (Qbare_symbol_p, "bare-symbol-p");
-  DEFSYM (Qsymbol_with_pos_p, "symbol-with-pos-p");
   DEFSYM (Qsymbolp, "symbolp");
   DEFSYM (Qfixnump, "fixnump");
   DEFSYM (Qintegerp, "integerp");
