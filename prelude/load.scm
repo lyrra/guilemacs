@@ -1936,6 +1936,36 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
                (error "Wrong type argument: numberp" number))))
     (* n n)))
 
+;; Additional predicate functions migrated from src/data.c
+(define (elisp-char-table-p object)
+  "Return t if OBJECT is a char-table."
+  ;; In Guile, char-tables don't exist as a built-in type
+  ;; For now, return nil since char-tables are specific to Emacs
+  #nil)
+
+(define (elisp-bool-vector-p object)
+  "Return t if OBJECT is a bool-vector."
+  ;; Bool-vectors are Emacs-specific, so return nil for now
+  #nil)
+
+(define (elisp-vector-or-char-table-p object)
+  "Return t if OBJECT is a char-table or vector."
+  (if (or (vector? object) (eq? #t (elisp-char-table-p object))) #t #nil))
+
+(define (elisp-arrayp object)
+  "Return t if OBJECT is an array (string, vector, char-table, or bool-vector)."
+  (if (or (string? object)
+          (vector? object)
+          (eq? #t (elisp-char-table-p object))
+          (eq? #t (elisp-bool-vector-p object))) #t #nil))
+
+(define (elisp-sequencep object)
+  "Return t if OBJECT is a sequence (a list or an array)."
+  (if (or (pair? object)
+          (null? object)
+          (eq? object #nil)
+          (eq? #t (elisp-arrayp object))) #t #nil))
+
 ;; Register the new mathematical functions for Elisp use
 (set-symbol-function! 'elisp-copysign elisp-copysign)
 (set-symbol-function! 'elisp-frexp elisp-frexp)
@@ -1950,6 +1980,13 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 (set-symbol-function! 'elisp-sign elisp-sign)
 (set-symbol-function! 'elisp-clamp elisp-clamp)
 (set-symbol-function! 'elisp-square elisp-square)
+
+;; Register the new predicate functions
+(set-symbol-function! 'char-table-p elisp-char-table-p)
+(set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
+(set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p)
+(set-symbol-function! 'arrayp elisp-arrayp)
+(set-symbol-function! 'sequencep elisp-sequencep)
 
 ;; Register short names for C function access
 (set-symbol-function! 'sign elisp-sign)

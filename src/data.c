@@ -431,6 +431,8 @@ DEFUN ("recordp", Frecordp, Srecordp, 1, 1, 0,
    as elisp-multibyte-string-p. In Guilemacs all strings are UTF-8, so it
    always returns nil. */
 
+/* MIGRATED TO GUILE: char-table-p
+   This function has been moved to prelude/load.scm as elisp-char-table-p. */
 DEFUN ("char-table-p", Fchar_table_p, Schar_table_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a char-table.  */)
   (Lisp_Object object)
@@ -440,6 +442,8 @@ DEFUN ("char-table-p", Fchar_table_p, Schar_table_p, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: vector-or-char-table-p
+   This function has been moved to prelude/load.scm as elisp-vector-or-char-table-p. */
 DEFUN ("vector-or-char-table-p", Fvector_or_char_table_p,
        Svector_or_char_table_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a char-table or vector.  */)
@@ -450,6 +454,8 @@ DEFUN ("vector-or-char-table-p", Fvector_or_char_table_p,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: bool-vector-p
+   This function has been moved to prelude/load.scm as elisp-bool-vector-p. */
 DEFUN ("bool-vector-p", Fbool_vector_p, Sbool_vector_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a bool-vector.  */)
   (Lisp_Object object)
@@ -459,6 +465,8 @@ DEFUN ("bool-vector-p", Fbool_vector_p, Sbool_vector_p, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: arrayp
+   This function has been moved to prelude/load.scm as elisp-arrayp. */
 DEFUN ("arrayp", Farrayp, Sarrayp, 1, 1, 0,
        doc: /* Return t if OBJECT is an array (string or vector).  */)
   (Lisp_Object object)
