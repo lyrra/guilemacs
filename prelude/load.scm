@@ -1971,6 +1971,25 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
     ((and (number? arg) (not (integer? arg))) arg) ; Already a float
     (else (exact->inexact arg)))) ; Convert to float
 
+;; Additional simple predicate functions migrated from src/data.c
+(define (elisp-listp object)
+  "Return t if OBJECT is a list, that is, a cons cell or nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-keywordp object)
+  "Return t if OBJECT is a keyword.
+This means that it is a symbol with a print name beginning with ':'."
+  (if (and (symbol? object)
+           (let ((name (symbol->string object)))
+             (and (> (string-length name) 0)
+                  (char=? (string-ref name 0) #\:))))
+      #t #nil))
+
+(define (elisp-subrp object)
+  "Return t if OBJECT is a built-in or native compiled Lisp function."
+  ;; In Guile, check if it's a primitive procedure
+  (if (primitive? object) #t #nil))
+
 ;; Additional predicate functions migrated from src/data.c
 (define (elisp-char-table-p object)
   "Return t if OBJECT is a char-table."
@@ -2024,6 +2043,11 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 (set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)
 (set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
 (set-symbol-function! 'float elisp-float)
+
+;; Register the new simple predicate functions
+(set-symbol-function! 'listp elisp-listp)
+(set-symbol-function! 'keywordp elisp-keywordp)
+(set-symbol-function! 'subrp elisp-subrp)
 
 ;; Register the new predicate functions
 (set-symbol-function! 'char-table-p elisp-char-table-p)

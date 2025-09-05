@@ -519,6 +519,8 @@ DEFUN ("user-ptrp", Fuser_ptrp, Suser_ptrp, 1, 1, 0,
 }
 #endif
 
+/* MIGRATED TO GUILE: subrp
+   This function has been moved to prelude/load.scm as elisp-subrp. */
 DEFUN ("subrp", Fsubrp, Ssubrp, 1, 1, 0,
        doc: /* Return t if OBJECT is a built-in or native compiled Lisp function.
 
