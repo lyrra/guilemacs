@@ -350,14 +350,20 @@ DEFUN ("nlistp", Fnlistp, Snlistp, 1, 1, 0,
   return Qt;
 }
 
+/* MIGRATED TO GUILE: bare-symbol-p
+   This function has been moved to prelude/load.scm as elisp-bare-symbol-p.
+   But we keep the C implementation for bootstrap. */
 DEFUN ("bare-symbol-p", Fbare_symbol_p, Sbare_symbol_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a symbol, but not a symbol together with position.  */
        attributes: const)
   (Lisp_Object object)
 {
-  return Qnil;
+  return SYMBOLP (object) ? Qt : Qnil;
 }
 
+/* MIGRATED TO GUILE: symbol-with-pos-p
+   This function has been moved to prelude/load.scm as elisp-symbol-with-pos-p.
+   But we keep the C implementation for bootstrap. */
 DEFUN ("symbol-with-pos-p", Fsymbol_with_pos_p, Ssymbol_with_pos_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a symbol together with position.
 Ignore `symbols-with-pos-enabled'.  */
@@ -492,6 +498,9 @@ DEFUN ("sequencep", Fsequencep, Ssequencep, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: bufferp
+   This function has been moved to prelude/load.scm as elisp-bufferp.
+   But we keep the C implementation for bootstrap. */
 DEFUN ("bufferp", Fbufferp, Sbufferp, 1, 1, 0,
        doc: /* Return t if OBJECT is an editor buffer.  */)
   (Lisp_Object object)
@@ -513,6 +522,9 @@ DEFUN ("markerp", Fmarkerp, Smarkerp, 1, 1, 0,
 }
 
 #ifdef HAVE_MODULES
+/* MIGRATED TO GUILE: user-ptrp
+   This function has been moved to prelude/load.scm as elisp-user-ptrp.
+   But we keep the C implementation for bootstrap. */
 DEFUN ("user-ptrp", Fuser_ptrp, Suser_ptrp, 1, 1, 0,
        doc: /* Return t if OBJECT is a module user pointer.  */)
      (Lisp_Object object)

@@ -2070,6 +2070,33 @@ This means that it is a symbol with a print name beginning with ':'."
   "Return the cdr of OBJECT if it is a cons cell, or else nil."
   (if (pair? object) (cdr object) #nil))
 
+;; Simple utility functions migrated from src/fns.c and src/data.c
+(define (elisp-identity argument)
+  "Return the ARGUMENT unchanged."
+  argument)
+
+(define (elisp-bare-symbol-p object)
+  "Return t if OBJECT is a symbol, but not a symbol together with position."
+  ;; In Guile implementation, symbols don't have position information
+  ;; so this is the same as symbolp for now
+  (if (symbol? object) #t #nil))
+
+(define (elisp-symbol-with-pos-p object)
+  "Return t if OBJECT is a symbol together with position."
+  ;; In Guile implementation, symbols don't have position information
+  ;; so this always returns nil
+  #nil)
+
+(define (elisp-bufferp object)
+  "Return t if OBJECT is an editor buffer."
+  ;; Buffers are Emacs-specific objects, return nil for now
+  #nil)
+
+(define (elisp-user-ptrp object)
+  "Return t if OBJECT is a module user pointer."
+  ;; User pointers are Emacs module-specific, return nil for now
+  #nil)
+
 (define (elisp-bool-vector-p object)
   "Return t if OBJECT is a bool-vector."
   ;; Bool-vectors are Emacs-specific, so return nil for now
@@ -2148,6 +2175,13 @@ This means that it is a symbol with a print name beginning with ':'."
 (set-symbol-function! 'cdr elisp-cdr)
 (set-symbol-function! 'car-safe elisp-car-safe)
 (set-symbol-function! 'cdr-safe elisp-cdr-safe)
+
+;; Register the simple utility functions
+(set-symbol-function! 'identity elisp-identity)
+(set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
+(set-symbol-function! 'symbol-with-pos-p elisp-symbol-with-pos-p)
+(set-symbol-function! 'bufferp elisp-bufferp)
+(set-symbol-function! 'user-ptrp elisp-user-ptrp)
 
 ;; Register short names for C function access
 (set-symbol-function! 'sign elisp-sign)

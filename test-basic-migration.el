@@ -76,4 +76,28 @@
 (message "  (cdr-safe '(a b c)) => %s" (cdr-safe '(a b c))) ; should be (b c)
 (message "  (cdr-safe 'not-a-list) => %s" (cdr-safe 'not-a-list)) ; should be nil
 
+;; Test newly migrated utility functions
+(message "Testing identity:")
+(message "  (identity 'a) => %s" (identity 'a))           ; should be a
+(message "  (identity 42) => %s" (identity 42))           ; should be 42
+(message "  (identity nil) => %s" (identity nil))         ; should be nil
+(message "  (identity \"hello\") => %s" (identity "hello")) ; should be "hello"
+
+(message "Testing bare-symbol-p:")
+(message "  (bare-symbol-p 'a) => %s" (bare-symbol-p 'a)) ; should be t
+(message "  (bare-symbol-p 42) => %s" (bare-symbol-p 42)) ; should be nil
+(message "  (bare-symbol-p \"a\") => %s" (bare-symbol-p "a")) ; should be nil
+
+(message "Testing symbol-with-pos-p:")
+(message "  (symbol-with-pos-p 'a) => %s" (symbol-with-pos-p 'a)) ; should be nil
+(message "  (symbol-with-pos-p 42) => %s" (symbol-with-pos-p 42)) ; should be nil
+
+(message "Testing bufferp:")
+(message "  (bufferp 'a) => %s" (bufferp 'a))             ; should be nil
+(message "  (bufferp 42) => %s" (bufferp 42))             ; should be nil
+
+(message "Testing user-ptrp:")
+(message "  (user-ptrp 'a) => %s" (user-ptrp 'a))         ; should be nil
+(message "  (user-ptrp 42) => %s" (user-ptrp 42))         ; should be nil
+
 (message "All basic function tests completed.")
