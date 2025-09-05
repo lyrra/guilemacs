@@ -116,6 +116,8 @@ EXPONENT must be an integer. [Guile implementation] */)
   return call2 (intern ("elisp-ldexp"), sgnfcand, exponent);
 }
 
+/* MIGRATED TO GUILE: float
+   This function has been moved to prelude/load.scm as elisp-float. */
 DEFUN ("float", Ffloat, Sfloat, 1, 1, 0,
        doc: /* Return the floating point number equal to ARG.  */)
   (register Lisp_Object arg)

@@ -1936,6 +1936,41 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
                (error "Wrong type argument: numberp" number))))
     (* n n)))
 
+;; Additional mathematical predicate functions migrated from src/data.c
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (integer? object) #t #nil))
+
+(define (elisp-natnump object)
+  "Return t if OBJECT is a nonnegative integer."
+  (if (and (integer? object) (>= object 0)) #t #nil))
+
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (floating point or integer)."
+  (if (number? object) #t #nil))
+
+(define (elisp-floatp object)
+  "Return t if OBJECT is a floating point number."
+  (if (and (number? object) (not (integer? object))) #t #nil))
+
+(define (elisp-number-or-marker-p object)
+  "Return t if OBJECT is a number or a marker."
+  ;; For now, markers are not implemented in Guile, so just check numbers
+  (if (number? object) #t #nil))
+
+(define (elisp-integer-or-marker-p object)
+  "Return t if OBJECT is an integer or a marker."
+  ;; For now, markers are not implemented in Guile, so just check integers
+  (if (integer? object) #t #nil))
+
+;; Mathematical conversion function migrated from src/floatfns.c
+(define (elisp-float arg)
+  "Return the floating point number equal to ARG."
+  (cond
+    ((not (number? arg)) (error "Wrong type argument: numberp" arg))
+    ((and (number? arg) (not (integer? arg))) arg) ; Already a float
+    (else (exact->inexact arg)))) ; Convert to float
+
 ;; Additional predicate functions migrated from src/data.c
 (define (elisp-char-table-p object)
   "Return t if OBJECT is a char-table."
@@ -1980,6 +2015,15 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 (set-symbol-function! 'elisp-sign elisp-sign)
 (set-symbol-function! 'elisp-clamp elisp-clamp)
 (set-symbol-function! 'elisp-square elisp-square)
+
+;; Register the new mathematical predicate functions
+(set-symbol-function! 'integerp elisp-integerp)
+(set-symbol-function! 'natnump elisp-natnump)
+(set-symbol-function! 'numberp elisp-numberp)
+(set-symbol-function! 'floatp elisp-floatp)
+(set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)
+(set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
+(set-symbol-function! 'float elisp-float)
 
 ;; Register the new predicate functions
 (set-symbol-function! 'char-table-p elisp-char-table-p)

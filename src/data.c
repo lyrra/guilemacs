@@ -574,6 +574,8 @@ DEFUN ("module-function-p", Fmodule_function_p, Smodule_function_p, 1, 1, NULL,
    This function has been moved to prelude/load.scm as elisp-char-or-string-p.
    Zero C callers made it a perfect candidate for complete hoisting. */
 
+/* MIGRATED TO GUILE: integerp
+   This function has been moved to prelude/load.scm as elisp-integerp. */
 DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer.  */
        attributes: const)
@@ -584,6 +586,8 @@ DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: integer-or-marker-p
+   This function has been moved to prelude/load.scm as elisp-integer-or-marker-p. */
 DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer or a marker (editor pointer).  */)
   (register Lisp_Object object)
@@ -593,6 +597,8 @@ DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: natnump
+   This function has been moved to prelude/load.scm as elisp-natnump. */
 DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
        doc: /* Return t if OBJECT is a nonnegative integer.  */
        attributes: const)
@@ -610,6 +616,8 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
     return Qnil;
 }
 
+/* MIGRATED TO GUILE: numberp
+   This function has been moved to prelude/load.scm as elisp-numberp. */
 DEFUN ("numberp", Fnumberp, Snumberp, 1, 1, 0,
        doc: /* Return t if OBJECT is a number (floating point or integer).  */
        attributes: const)
@@ -621,6 +629,8 @@ DEFUN ("numberp", Fnumberp, Snumberp, 1, 1, 0,
     return Qnil;
 }
 
+/* MIGRATED TO GUILE: number-or-marker-p
+   This function has been moved to prelude/load.scm as elisp-number-or-marker-p. */
 DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
        Snumber_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a number or a marker.  */)
@@ -631,6 +641,8 @@ DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: floatp
+   This function has been moved to prelude/load.scm as elisp-floatp. */
 DEFUN ("floatp", Ffloatp, Sfloatp, 1, 1, 0,
        doc: /* Return t if OBJECT is a floating point number.  */
        attributes: const)
