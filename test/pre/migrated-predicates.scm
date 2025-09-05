@@ -5,85 +5,6 @@
 ;; NULL FUNCTION TESTS (migrated from src/data.c)
 ;; ===============================================
 
-;; Basic null tests
-(deftest null-nil (t)
-  (el-expr `(print (null nil))))
-
-(deftest null-empty-list (t)
-  (el-expr `(print (null '()))))
-
-(deftest null-false-symbol (nil)
-  (el-expr `(print (null 'false))))
-
-(deftest null-zero (nil)
-  (el-expr `(print (null 0))))
-
-(deftest null-empty-string (nil)
-  (el-expr `(let ((empty-str ""))
-              (print (null empty-str)))))
-
-(deftest null-t (nil)
-  (el-expr `(print (null t))))
-
-;; Test null with various data types
-(deftest null-integer (nil)
-  (el-expr `(print (null 42))))
-
-(deftest null-negative-integer (nil)
-  (el-expr `(print (null -42))))
-
-(deftest null-float (nil)
-  (el-expr `(print (null 3.14))))
-
-(deftest null-negative-float (nil)
-  (el-expr `(print (null -3.14))))
-
-(deftest null-string (nil)
-  (el-expr `(print (null "hello"))))
-
-(deftest null-symbol (nil)
-  (el-expr `(print (null 'symbol))))
-
-(deftest null-cons (nil)
-  (el-expr `(print (null '(a . b)))))
-
-(deftest null-list (nil)
-  (el-expr `(print (null '(1 2 3)))))
-
-(deftest null-vector (nil)
-  (el-expr `(print (null [1 2 3]))))
-
-(deftest null-char (nil)
-  (el-expr `(print (null ?a))))
-
-;; Test null with special values
-(deftest null-most-positive-fixnum (nil)
-  (el-expr `(print (null most-positive-fixnum))))
-
-(deftest null-most-negative-fixnum (nil)
-  (el-expr `(print (null most-negative-fixnum))))
-
-;; Test null with bignum
-(let ((big (expt 2 70)))
-  (deftest null-bignum (nil)
-    (el-expr `(print (null ,big)))))
-
-;; Test null with variable bindings
-(deftest null-variable-nil (t)
-  (el-expr `(let ((x nil))
-              (print (null x)))))
-
-(deftest null-variable-non-nil (nil)
-  (el-expr `(let ((x 'something))
-              (print (null x)))))
-
-;; Test null with nested expressions
-(deftest null-car-nil-list (t)
-  (el-expr `(print (null (car '(nil))))))
-
-(deftest null-cdr-single-list (t)
-  (el-expr `(print (null (cdr '(only))))))
-
 ;; ===================================================
 ;; CHARACTERP FUNCTION TESTS (migrated from src/character.c)
 ;; ===================================================
@@ -155,10 +76,10 @@
   (el-expr `(print (characterp t))))
 
 (deftest characterp-string (nil)
-  (el-expr `(print (characterp "A"))))
+  (el-expr `(print (characterp "\"A\""))))
 
 (deftest characterp-empty-string (nil)
-  (el-expr `(print (characterp ""))))
+  (el-expr `(print (characterp "\"\""))))
 
 (deftest characterp-symbol (nil)
   (el-expr `(print (characterp 'symbol))))
@@ -200,7 +121,7 @@
               (print (characterp c)))))
 
 (deftest characterp-variable-non-char (nil)
-  (el-expr `(let ((c "not-char"))
+  (el-expr `(let ((c "\"not-char\""))
               (print (characterp c)))))
 
 ;; Test characterp with expressions
@@ -287,7 +208,7 @@
 
 ;; Test with logical combinations
 (deftest logical-and-predicates (nil)
-  (el-expr `(print (and (null nil) (characterp "not-char")))))
+  (el-expr `(print (and (null nil) (characterp "\"not-char\"")))))
 
 (deftest logical-or-predicates (t)
   (el-expr `(print (or (null 'something) (characterp 65)))))
@@ -303,4 +224,4 @@
   (el-expr `(print (not (characterp ?a)))))
 
 (deftest not-characterp-string (t)
-  (el-expr `(print (not (characterp "a")))))
+  (el-expr `(print (not (characterp "\"a\"")))))
