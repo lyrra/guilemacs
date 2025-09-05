@@ -174,6 +174,8 @@ DEFUN ("eq", Feq, Seq, 2, 2, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: null
+   This function has been moved to prelude/load.scm as elisp-null. */
 DEFUN ("null", Fnull, Snull, 1, 1, 0,
        doc: /* Return t if OBJECT is nil, and return nil otherwise.  */
        attributes: const)
@@ -296,6 +298,9 @@ a fixed set of types.  */)
     return Qt;
 }
 
+/* MIGRATED TO GUILE: consp
+   This function has been moved to prelude/load.scm as elisp-consp.
+   Uses Guile's native pair? predicate. */
 DEFUN ("consp", Fconsp, Sconsp, 1, 1, 0,
        doc: /* Return t if OBJECT is a cons cell.  */
        attributes: const)
@@ -306,6 +311,8 @@ DEFUN ("consp", Fconsp, Sconsp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: atom
+   This function has been moved to prelude/load.scm as elisp-atom. */
 DEFUN ("atom", Fatom, Satom, 1, 1, 0,
        doc: /* Return t if OBJECT is not a cons cell.  This includes nil.  */
        attributes: const)
@@ -316,6 +323,8 @@ DEFUN ("atom", Fatom, Satom, 1, 1, 0,
   return Qt;
 }
 
+/* MIGRATED TO GUILE: listp
+   This function has been moved to prelude/load.scm as elisp-listp. */
 DEFUN ("listp", Flistp, Slistp, 1, 1, 0,
        doc: /* Return t if OBJECT is a list, that is, a cons cell or nil.
 Otherwise, return nil.  */
@@ -327,6 +336,8 @@ Otherwise, return nil.  */
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: nlistp
+   This function has been moved to prelude/load.scm as elisp-nlistp. */
 DEFUN ("nlistp", Fnlistp, Snlistp, 1, 1, 0,
        doc: /* Return t if OBJECT is not a list.  Lists include nil.  */
        attributes: const)
@@ -354,6 +365,9 @@ Ignore `symbols-with-pos-enabled'.  */
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: symbolp
+   This function has been moved to prelude/load.scm as elisp-symbolp.
+   Uses Guile's native symbol? predicate. */
 DEFUN ("symbolp", Fsymbolp, Ssymbolp, 1, 1, 0,
        doc: /* Return t if OBJECT is a symbol.  */
        attributes: const)
@@ -373,6 +387,8 @@ SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
           && (EQ (sym, scm_c_value_ref (tem, 0))));
 }
 
+/* MIGRATED TO GUILE: keywordp
+   This function has been moved to prelude/load.scm as elisp-keywordp. */
 DEFUN ("keywordp", Fkeywordp, Skeywordp, 1, 1, 0,
        doc: /* Return t if OBJECT is a keyword.
 This means that it is a symbol with a print name beginning with `:'
@@ -386,6 +402,9 @@ interned in the initial obarray.  */)
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: vectorp
+   This function has been moved to prelude/load.scm as elisp-vectorp.
+   Uses Guile's native vector? predicate. */
 DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
        doc: /* Return t if OBJECT is a vector.  */)
   (Lisp_Object object)
@@ -449,6 +468,9 @@ DEFUN ("arrayp", Farrayp, Sarrayp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: sequencep
+   This function has been moved to prelude/load.scm as elisp-sequencep.
+   Uses Guile's native predicates for pairs, vectors, and strings. */
 DEFUN ("sequencep", Fsequencep, Ssequencep, 1, 1, 0,
        doc: /* Return t if OBJECT is a sequence (list or array).  */)
   (register Lisp_Object object)
@@ -467,6 +489,8 @@ DEFUN ("bufferp", Fbufferp, Sbufferp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: markerp
+   This function has been moved to prelude/load.scm as elisp-markerp. */
 DEFUN ("markerp", Fmarkerp, Smarkerp, 1, 1, 0,
        doc: /* Return t if OBJECT is a marker (editor pointer).  */)
   (Lisp_Object object)

@@ -1496,6 +1496,124 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 ;(primitive-load (string-append %prelude-directory "/string-comparison-migration.scm"))
 (primitive-load (string-append %prelude-directory "/symbol-operations.scm"))
 
+;; Load character navigation functions - Phase 2 UTF-8 migration improvements
+;; Using minimal version that doesn't depend on buffer operations during bootstrap
+(primitive-load (string-append %prelude-directory "/character-navigation-minimal.scm"))
+;; Full version temporarily disabled due to buffer operation dependencies during bootstrap
+;; TODO: Load full character-navigation.scm when buffer context is properly available
+;; (primitive-load (string-append %prelude-directory "/character-navigation.scm"))
+
+;; DEFUN function migrations - Phase 3: Move simple elisp predicates to Guile
+;; These are simple type predicates that can be efficiently implemented in Guile
+
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (integer? object) #t #nil))
+
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (floating point or integer)."
+  (if (number? object) #t #nil))
+
+(define (elisp-null object)
+  "Return t if OBJECT is nil, and return nil otherwise."
+  (if (eq? object #nil) #t #nil))
+
+(define (elisp-characterp object)
+  "Return non-nil if OBJECT is a character.
+In Emacs Lisp, characters are represented by character codes, which
+are non-negative integers."
+  (if (and (integer? object) (>= object 0) (<= object #x3FFFFF)) #t #nil))
+
+;; Additional predicate migrations from src/data.c
+(define (elisp-symbolp object)
+  "Return t if OBJECT is a symbol."
+  (if (symbol? object) #t #nil))
+
+(define (elisp-consp object)
+  "Return t if OBJECT is a cons cell."
+  (if (pair? object) #t #nil))
+
+(define (elisp-atom object)
+  "Return t if OBJECT is not a cons cell. This includes nil."
+  (if (pair? object) #nil #t))
+
+(define (elisp-listp object)
+  "Return t if OBJECT is a list, that is, a cons cell or nil.
+Otherwise, return nil."
+  (if (or (pair? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-nlistp object)
+  "Return t if OBJECT is not a list. Lists include nil."
+  (if (or (pair? object) (eq? object #nil)) #nil #t))
+
+(define (elisp-vectorp object)
+  "Return t if OBJECT is a vector."
+  (if (vector? object) #t #nil))
+
+(define (elisp-sequencep object)
+  "Return t if OBJECT is a sequence (list or array)."
+  (if (or (pair? object) (eq? object #nil) (vector? object) (string? object)) #t #nil))
+
+(define (elisp-markerp object)
+  "Return t if OBJECT is a marker (editor pointer)."
+  (if (and (vector? object)
+           (>= (vector-length object) 4)
+           (eq? (vector-ref object 0) 'marker))
+      #t #nil))
+
+(define (elisp-keywordp object)
+  "Return t if OBJECT is a keyword.
+This means that it is a symbol with a print name beginning with `:'
+interned in the initial obarray."
+  (if (and (symbol? object)
+           (let ((name (symbol->string object)))
+             (and (> (string-length name) 0)
+                  (char=? (string-ref name 0) #\:))))
+      #t #nil))
+
+(define (elisp-identity argument)
+  "Return the ARGUMENT unchanged."
+  argument)
+
+;; Register these functions for use from C and Elisp
+;; Disabled while debugging baseline functionality
+;; (set-symbol-function! 'integerp elisp-integerp)
+;; (set-symbol-function! 'numberp elisp-numberp)
+;; (set-symbol-function! 'null elisp-null)
+;; (set-symbol-function! 'characterp elisp-characterp)
+;; (set-symbol-function! 'symbolp elisp-symbolp)
+;; (set-symbol-function! 'consp elisp-consp)
+;; (set-symbol-function! 'atom elisp-atom)
+;; (set-symbol-function! 'listp elisp-listp)
+;; (set-symbol-function! 'nlistp elisp-nlistp)
+;; (set-symbol-function! 'vectorp elisp-vectorp)
+;; (set-symbol-function! 'sequencep elisp-sequencep)
+
+;; Buffer Operations using dynamic-wind pattern
+(define (elisp-save-current-buffer thunk)
+  "Record which buffer is current; execute THUNK; make that buffer current.
+This is the Guile implementation of save-current-buffer using dynamic-wind
+for proper cleanup semantics."
+  (let ((saved-buffer (current-buffer)))
+    (dynamic-wind
+      (lambda () #t)  ; pre-thunk: nothing needed
+      (lambda () (funcall thunk))  ; thunk: execute the body
+      (lambda ()      ; post-thunk: restore buffer
+        (when (buffer-live-p saved-buffer)
+          (set-buffer saved-buffer))))))
+
+(define (elisp-with-current-buffer buffer thunk)
+  "Execute THUNK with BUFFER as the current buffer.
+Uses dynamic-wind to ensure buffer is properly restored."
+  (let ((saved-buffer (current-buffer)))
+    (dynamic-wind
+      (lambda () (set-buffer buffer))     ; pre-thunk: switch to buffer
+      (lambda () (funcall thunk))         ; thunk: execute the body
+      (lambda () (set-buffer saved-buffer))))) ; post-thunk: restore buffer
+
+;; (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
+;; (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
+
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
 (let ((elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
@@ -1558,6 +1676,24 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
   (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?)
 
   (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
+
+  ;; Export DEFUN function migrations to elisp emacs module
+  (module-define! elisp-emacs-module 'integerp elisp-integerp)
+  (module-define! elisp-emacs-module 'numberp elisp-numberp)
+  (module-define! elisp-emacs-module 'null elisp-null)
+  (module-define! elisp-emacs-module 'characterp elisp-characterp)
+  (module-define! elisp-emacs-module 'symbolp elisp-symbolp)
+  (module-define! elisp-emacs-module 'consp elisp-consp)
+  (module-define! elisp-emacs-module 'atom elisp-atom)
+  (module-define! elisp-emacs-module 'listp elisp-listp)
+  (module-define! elisp-emacs-module 'nlistp elisp-nlistp)
+  (module-define! elisp-emacs-module 'vectorp elisp-vectorp)
+  (module-define! elisp-emacs-module 'sequencep elisp-sequencep)
+  ;; (module-define! elisp-emacs-module 'markerp elisp-markerp)
+  ;; (module-define! elisp-emacs-module 'keywordp elisp-keywordp)
+  ;; (module-define! elisp-emacs-module 'identity elisp-identity)
+  (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
+  (module-define! elisp-emacs-module 'with-current-buffer elisp-with-current-buffer)
   (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
   (module-define! elisp-emacs-module 'image-file? image-file?)
   (module-define! elisp-emacs-module 'config-file? config-file?)

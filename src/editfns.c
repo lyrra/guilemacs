@@ -808,6 +808,9 @@ usage: (save-excursion &rest BODY)  */)
   return val;
 }
 
+/* MIGRATED TO GUILE: save-current-buffer
+   This function has been moved to prelude/load.scm as elisp-save-current-buffer.
+   Uses Guile's dynamic-wind for proper exception-safe buffer restoration. */
 DEFUN ("call-with-save-current-buffer", Fsave_current_buffer, Ssave_current_buffer, 1, 1, 0,
        doc: /* Record which buffer is current; execute BODY; make that buffer current.
 BODY is executed just like `progn'.

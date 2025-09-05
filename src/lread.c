@@ -2086,22 +2086,15 @@ fread_internal_start (struct reader_context *ctx)
   /* Temporarily revert to original implementation to avoid bootstrap issues */
   return fread0 (ctx);
 
-  /* Option 1: Use unified_read (NEW unified approach) - disabled during bootstrap */
+  /* Phase 9: Pure Guile reader - disabled until bootstrap dependencies resolved */
   /*
-  struct reader_interface reader = {
-    .read_char = file_read_char,
-    .unread_char = file_unread_char,
-    .context = ctx,
-    .multibyte_flag = NULL
-  };
-  return unified_read (&reader, false);
-  */
-
-  /* Option 3: Guile reader (FUTURE - when fully implemented) */
-  /*
-  if (! scm_is_true (ctx->port))
-    emacs_abort ();
-  return scm_read(ctx->port);
+  if (scm_is_true (ctx->port))
+    {
+      SCM result = scm_read(ctx->port);
+      if (scm_is_eq (result, SCM_EOF_VAL))
+        end_of_file_error ();
+      return result;
+    }
   */
 }
 
