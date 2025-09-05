@@ -441,9 +441,6 @@ DEFUN ("sequencep", Fsequencep, Ssequencep, 1, 1, 0,
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: bufferp
-   This function has been moved to prelude/load.scm as elisp-bufferp.
-   But we keep the C implementation for bootstrap. */
 DEFUN ("bufferp", Fbufferp, Sbufferp, 1, 1, 0,
        doc: /* Return t if OBJECT is an editor buffer.  */)
   (Lisp_Object object)
@@ -453,8 +450,6 @@ DEFUN ("bufferp", Fbufferp, Sbufferp, 1, 1, 0,
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: markerp
-   This function has been moved to prelude/load.scm as elisp-markerp. */
 DEFUN ("markerp", Fmarkerp, Smarkerp, 1, 1, 0,
        doc: /* Return t if OBJECT is a marker (editor pointer).  */)
   (Lisp_Object object)
