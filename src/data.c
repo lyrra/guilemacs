@@ -176,17 +176,6 @@ DEFUN ("eq", Feq, Seq, 2, 2, 0,
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: null
-   This function has been moved to prelude/load.scm as elisp-null. */
-DEFUN ("null", Fnull, Snull, 1, 1, 0,
-       doc: /* Return t if OBJECT is nil, and return nil otherwise.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (NILP (object))
-    return Qt;
-  return Qnil;
-}
 
 DEFUN ("type-of", Ftype_of, Stype_of, 1, 1, 0,
        doc: /* Return a symbol representing the type of OBJECT.
@@ -300,30 +289,7 @@ a fixed set of types.  */)
     return Qt;
 }
 
-/* MIGRATED TO GUILE: consp
-   This function has been moved to prelude/load.scm as elisp-consp.
-   Uses Guile's native pair? predicate. */
-DEFUN ("consp", Fconsp, Sconsp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a cons cell.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (CONSP (object))
-    return Qt;
-  return Qnil;
-}
 
-/* MIGRATED TO GUILE: atom
-   This function has been moved to prelude/load.scm as elisp-atom. */
-DEFUN ("atom", Fatom, Satom, 1, 1, 0,
-       doc: /* Return t if OBJECT is not a cons cell.  This includes nil.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (CONSP (object))
-    return Qnil;
-  return Qt;
-}
 
 /* MIGRATED TO GUILE: listp
    This function has been moved to prelude/load.scm as elisp-listp. */
