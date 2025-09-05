@@ -166,6 +166,8 @@ translate_char (Lisp_Object table, int c)
   return c;
 }
 
+/* MIGRATED TO GUILE: characterp
+   This function has been moved to prelude/load.scm as elisp-characterp. */
 DEFUN ("characterp", Fcharacterp, Scharacterp, 1, 2, 0,
        doc: /* Return non-nil if OBJECT is a character.
 In Emacs Lisp, characters are represented by character codes, which

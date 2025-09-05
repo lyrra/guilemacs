@@ -2718,6 +2718,8 @@ plist_member (Lisp_Object plist, Lisp_Object prop)
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: eql
+   This function has been moved to prelude/load.scm as elisp-eql. */
 DEFUN ("eql", Feql, Seql, 2, 2, 0,
        doc: /* Return t if the two args are `eq' or are indistinguishable numbers.
 Integers with the same value are `eql'.
@@ -2729,6 +2731,8 @@ This differs from numeric comparison: (eql 0.0 -0.0) returns nil and
   return scm_is_true (scm_eqv_p (obj1, obj2)) ? Qt : Qnil;
 }
 
+/* MIGRATED TO GUILE: equal
+   This function has been moved to prelude/load.scm as elisp-equal. */
 DEFUN ("equal", Fequal, Sequal, 2, 2, 0,
        doc: /* Return t if two Lisp objects have similar structure and contents.
 They must have the same data type.

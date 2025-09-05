@@ -164,6 +164,8 @@ circular_list (Lisp_Object list)
 
 /* Data type predicates.  */
 
+/* MIGRATED TO GUILE: eq
+   This function has been moved to prelude/load.scm as elisp-eq. */
 DEFUN ("eq", Feq, Seq, 2, 2, 0,
        doc: /* Return t if the two args are the same Lisp object.  */
        attributes: const)
@@ -414,6 +416,8 @@ DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: recordp
+   This function has been moved to prelude/load.scm as elisp-recordp. */
 DEFUN ("recordp", Frecordp, Srecordp, 1, 1, 0,
        doc: /* Return t if OBJECT is a record.  */)
   (Lisp_Object object)
@@ -655,6 +659,8 @@ DEFUN ("floatp", Ffloatp, Sfloatp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: threadp
+   This function has been moved to prelude/load.scm as elisp-threadp. */
 DEFUN ("threadp", Fthreadp, Sthreadp, 1, 1, 0,
        doc: /* Return t if OBJECT is a thread.  */)
   (Lisp_Object object)
@@ -664,6 +670,8 @@ DEFUN ("threadp", Fthreadp, Sthreadp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: mutexp
+   This function has been moved to prelude/load.scm as elisp-mutexp. */
 DEFUN ("mutexp", Fmutexp, Smutexp, 1, 1, 0,
        doc: /* Return t if OBJECT is a mutex.  */)
   (Lisp_Object object)
@@ -673,6 +681,8 @@ DEFUN ("mutexp", Fmutexp, Smutexp, 1, 1, 0,
   return Qnil;
 }
 
+/* MIGRATED TO GUILE: condition-variable-p
+   This function has been moved to prelude/load.scm as elisp-condition-variable-p. */
 DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
        1, 1, 0,
        doc: /* Return t if OBJECT is a condition variable.  */)
@@ -685,6 +695,8 @@ DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
 
 /* Extract and set components of lists.  */
 
+/* MIGRATED TO GUILE: car
+   This function has been moved to prelude/load.scm as elisp-car. */
 DEFUN ("car", Fcar, Scar, 1, 1, 0,
        doc: /* Return the car of LIST.  If LIST is nil, return nil.
 Error if LIST is not nil and not a cons cell.  See also `car-safe'.
@@ -696,6 +708,8 @@ Lisp concepts such as car, cdr, cons cell and list.  */)
   return CAR (list);
 }
 
+/* MIGRATED TO GUILE: car-safe
+   This function has been moved to prelude/load.scm as elisp-car-safe. */
 DEFUN ("car-safe", Fcar_safe, Scar_safe, 1, 1, 0,
        doc: /* Return the car of OBJECT if it is a cons cell, or else nil.  */)
   (Lisp_Object object)
@@ -703,6 +717,8 @@ DEFUN ("car-safe", Fcar_safe, Scar_safe, 1, 1, 0,
   return CAR_SAFE (object);
 }
 
+/* MIGRATED TO GUILE: cdr
+   This function has been moved to prelude/load.scm as elisp-cdr. */
 DEFUN ("cdr", Fcdr, Scdr, 1, 1, 0,
        doc: /* Return the cdr of LIST.  If LIST is nil, return nil.
 Error if LIST is not nil and not a cons cell.  See also `cdr-safe'.
@@ -714,6 +730,8 @@ Lisp concepts such as cdr, car, cons cell and list.  */)
   return CDR (list);
 }
 
+/* MIGRATED TO GUILE: cdr-safe
+   This function has been moved to prelude/load.scm as elisp-cdr-safe. */
 DEFUN ("cdr-safe", Fcdr_safe, Scdr_safe, 1, 1, 0,
        doc: /* Return the cdr of OBJECT if it is a cons cell, or else nil.  */)
   (Lisp_Object object)

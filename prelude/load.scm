@@ -1997,6 +1997,79 @@ This means that it is a symbol with a print name beginning with ':'."
   ;; For now, return nil since char-tables are specific to Emacs
   #nil)
 
+;; Basic comparison and utility predicates migrated from src/data.c
+(define (elisp-eq obj1 obj2)
+  "Return t if the two args are the same Lisp object."
+  (if (eq? obj1 obj2) #t #nil))
+
+(define (elisp-atom object)
+  "Return t if OBJECT is not a cons cell. This includes nil."
+  (if (pair? object) #nil #t))
+
+;; Migrated from src/fns.c - equality predicates
+(define (elisp-equal o1 o2)
+  "Return t if two Lisp objects have similar structure and contents."
+  (if (equal? o1 o2) #t #nil))
+
+(define (elisp-eql obj1 obj2)
+  "Return t if the two args are `eq' or are indistinguishable numbers."
+  (if (eqv? obj1 obj2) #t #nil))
+
+;; Basic character predicate from src/character.c
+(define (elisp-characterp object . ignore)
+  "Return non-nil if OBJECT is a character."
+  (if (char? object) #t #nil))
+
+;; Additional type predicates migrated from src/data.c
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (integer? object) #t #nil))
+
+(define (elisp-recordp object)
+  "Return t if OBJECT is a record."
+  ;; Records are Emacs-specific structures, return nil for now
+  #nil)
+
+(define (elisp-threadp object)
+  "Return t if OBJECT is a thread."
+  ;; Threads are Emacs-specific, return nil for now
+  #nil)
+
+(define (elisp-mutexp object)
+  "Return t if OBJECT is a mutex."
+  ;; Mutexes are Emacs-specific, return nil for now
+  #nil)
+
+(define (elisp-condition-variable-p object)
+  "Return t if OBJECT is a condition variable."
+  ;; Condition variables are Emacs-specific, return nil for now
+  #nil)
+
+;; Basic list access functions from src/data.c
+(define (elisp-car list)
+  "Return the car of LIST. If LIST is nil, return nil."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (car list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-cdr list)
+  "Return the cdr of LIST. If LIST is nil, return nil."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (cdr list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-car-safe object)
+  "Return the car of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (car object) #nil))
+
+(define (elisp-cdr-safe object)
+  "Return the cdr of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (cdr object) #nil))
+
 (define (elisp-bool-vector-p object)
   "Return t if OBJECT is a bool-vector."
   ;; Bool-vectors are Emacs-specific, so return nil for now
@@ -2055,6 +2128,26 @@ This means that it is a symbol with a print name beginning with ':'."
 (set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p)
 (set-symbol-function! 'arrayp elisp-arrayp)
 (set-symbol-function! 'sequencep elisp-sequencep)
+
+;; Register the new basic comparison and utility functions
+(set-symbol-function! 'eq elisp-eq)
+(set-symbol-function! 'atom elisp-atom)
+(set-symbol-function! 'equal elisp-equal)
+(set-symbol-function! 'eql elisp-eql)
+(set-symbol-function! 'characterp elisp-characterp)
+
+;; Register the additional type predicates
+(set-symbol-function! 'integerp elisp-integerp)
+(set-symbol-function! 'recordp elisp-recordp)
+(set-symbol-function! 'threadp elisp-threadp)
+(set-symbol-function! 'mutexp elisp-mutexp)
+(set-symbol-function! 'condition-variable-p elisp-condition-variable-p)
+
+;; Register the basic list access functions
+(set-symbol-function! 'car elisp-car)
+(set-symbol-function! 'cdr elisp-cdr)
+(set-symbol-function! 'car-safe elisp-car-safe)
+(set-symbol-function! 'cdr-safe elisp-cdr-safe)
 
 ;; Register short names for C function access
 (set-symbol-function! 'sign elisp-sign)
