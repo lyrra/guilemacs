@@ -2203,5 +2203,79 @@ lowercase l) for small endian machines."
 
 ;; Note: identity is already registered above as elisp-identity at line 669
 
+(define (elisp-parse-list-from-port port)
+  "Parse an elisp list from PORT, handling both regular and dotted pairs.
+Called from C fread0() when '(' is encountered.
+Returns: '() for empty list, proper list for (a b c), dotted pair for (a . b)"
+  (let loop ((elements '()))
+    ;; Skip whitespace and comments
+    (let skip-ws ()
+      (let ((ch (read-char port)))
+        (cond
+          ((eof-object? ch)
+           (error "Unexpected EOF in list"))
+          ((char=? ch #\;)
+           ;; Skip comment until newline
+           (let skip-comment ()
+             (let ((c (read-char port)))
+               (if (not (or (eof-object? c) (char=? c #\newline)))
+                 (skip-comment))))
+           (skip-ws))
+          ((char-whitespace? ch) (skip-ws))
+          (else (unread-char ch port)))))
+    ;; Check what comes next
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) (error "Unexpected EOF in list"))
+        ((char=? ch #\))
+         ;; End of list - return reversed elements as proper list
+         (reverse elements))
+        ((char=? ch #\.)
+         ;; Dotted pair syntax: (a . b)
+         (if (null? elements)
+           (error "Invalid dot syntax at start of list"))
+         ;; Read the tail element
+         (let ((tail (elisp-read-from-port port)))
+           ;; Expect closing paren
+           (let skip-ws-after-dot ()
+             (let ((c (read-char port)))
+               (cond
+                 ((eof-object? c) (error "Expected ')' after dot"))
+                 ((char=? c #\))
+                  ;; Build dotted pair: manually fold elements into tail
+                  (let build-dotted ((elems (reverse elements)) (result tail))
+                    (if (null? elems)
+                        result
+                        (build-dotted (cdr elems) (cons (car elems) result)))))
+                 ((char-whitespace? c) (skip-ws-after-dot))
+                 (else (error "Expected ')' after dot, got" c)))))))
+        (else
+         ;; Regular list element
+         (unread-char ch port)
+         (let ((obj (elisp-read-from-port port)))
+           (loop (cons obj elements))))))))
+
+(define (elisp-read-integer-from-port port radix)
+  "Parse an elisp integer from PORT with given RADIX.
+Called from C fread_integer() when #x, #o, #b syntax is encountered.
+Returns: integer value"
+  ;; Read the digits as a string and convert with the given radix
+  (let ((digit-string ""))
+    ;; Read characters until we hit non-digit
+    (let loop ()
+      (let ((ch (peek-char port)))
+        (cond
+          ((eof-object? ch) #f) ; done
+          ((or (char-alphabetic? ch) (char-numeric? ch))
+           ;; Valid digit for some radix
+           (set! digit-string (string-append digit-string (string (read-char port))))
+           (loop))
+          (else #f)))) ; done
+    ;; Convert string to number using specified radix
+    (let ((result (string->number digit-string radix)))
+      (if result
+          result
+          (error "Could not parse integer with radix" radix digit-string)))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

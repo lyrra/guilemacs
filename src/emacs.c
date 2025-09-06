@@ -1052,11 +1052,21 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   scm_boot_guile (argc, argv, main2, NULL);
 }
 
+/* Forward declaration for elisp_read_from_port function from lread.c */
+extern Lisp_Object elisp_read_from_port (Lisp_Object);
+extern Lisp_Object elisp_read_integer_from_c (Lisp_Object, Lisp_Object);
+
 static void
 guilemacs_init (void *_)
 {
   scm_c_define_gsubr ("check-number-coerce-marker", 1, 0, 0, check_number_coerce_marker);
   scm_c_export ("check-number-coerce-marker", NULL);
+
+  scm_c_define_gsubr ("elisp-read-from-port", 1, 0, 0, elisp_read_from_port);
+  scm_c_export ("elisp-read-from-port", NULL);
+
+  scm_c_define_gsubr ("elisp-read-integer-from-c", 2, 0, 0, elisp_read_integer_from_c);
+  scm_c_export ("elisp-read-integer-from-c", NULL);
 }
 
 /* ARGSUSED */

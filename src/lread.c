@@ -406,6 +406,10 @@ static Lisp_Object guile_to_lisp_object (SCM obj);
 static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
 static SCM buffer_to_guile_port (Lisp_Object buffer);
 
+/* Integer reading hoisting - Forward declaration */
+Lisp_Object elisp_read_integer_from_c (Lisp_Object port, Lisp_Object radix_obj);
+Lisp_Object elisp_read_from_port (Lisp_Object port);
+
 /* Unified Reader Architecture - Interface for pluggable I/O sources */
 struct reader_interface
 {
@@ -2480,6 +2484,48 @@ guile_to_lisp_object (SCM obj)
     }
 }
 
+/* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
+static Lisp_Object
+elisp_parse_list_from_c_context (struct reader_context *ctx)
+{
+  /* Convert C file context to Guile port */
+  SCM port = file_context_to_guile_port (ctx);
+
+  if (scm_is_false (port))
+    {
+      error ("Failed to create Guile port from file context");
+    }
+
+  /* Call the Guile list parser function */
+  SCM parse_list_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-parse-list-from-port");
+
+  return scm_call_1 (parse_list_func, port);
+}
+
+/* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
+Lisp_Object
+elisp_read_from_port (Lisp_Object port)
+{
+  struct reader_context ctx;
+  ctx.port = port;
+  return fread_internal_start (&ctx);
+}
+
+/* Integer reading hoisted to Guile - allows Scheme code to handle integer parsing */
+Lisp_Object
+elisp_read_integer_from_c (Lisp_Object port, Lisp_Object radix_obj)
+{
+  /* Convert radix from Lisp_Object to int */
+  int radix = scm_to_int(radix_obj);
+
+  /* Call the Guile integer parser function */
+  SCM parse_integer_func = scm_c_private_ref ("language elisp runtime",
+                                              "elisp-read-integer-from-port");
+
+  return scm_call_2 (parse_integer_func, port, radix_obj);
+}
+
 DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
        doc: /* Guile-based version of read-from-string.
 Read one Lisp expression which is represented as text by STRING.
@@ -3340,74 +3386,21 @@ fread_integer (struct reader_context *ctx, int radix)
 {
   if (scm_is_false (ctx->port))
     {
-      /* No Guile port available, fall back to original implementation */
+      /* No Guile port available */
       emacs_abort ();
     }
 
-  /* Peek at first character and prepare for Guile reader */
-  int first_char = freadchar (ctx);
-  if (first_char < 0)
-    end_of_file_error ();
-
-  /* Handle sign if present */
-  int sign_char = 0;
-  if (first_char == '-' || first_char == '+')
+  /* Convert C file context to Guile port */
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
     {
-      sign_char = first_char;
-      first_char = freadchar (ctx);
-      if (first_char < 0)
-        finvalid_radix_integer (radix);
+      error ("Failed to create Guile port from file context");
     }
 
-  /* Push everything back in reverse order for Guile to read */
-  scm_ungetc (first_char, ctx->port);  /* The digit */
+  /* Convert radix to Lisp_Object */
+  SCM radix_obj = scm_from_int (radix);
 
-  if (sign_char)
-    scm_ungetc (sign_char, ctx->port);  /* The sign if present */
-
-  /* Push radix prefix for non-decimal numbers */
-  switch (radix)
-    {
-    case 2:
-      scm_ungetc ('b', ctx->port);
-      scm_ungetc ('#', ctx->port);
-      break;
-    case 8:
-      scm_ungetc ('o', ctx->port);
-      scm_ungetc ('#', ctx->port);
-      break;
-    case 16:
-      scm_ungetc ('x', ctx->port);
-      scm_ungetc ('#', ctx->port);
-      break;
-    case 10:
-      /* No prefix needed for decimal */
-      break;
-    default:
-      /* arbitrary radix not supported with Guile reader */
-      finvalid_radix_integer (radix);
-    }
-
-  /* Clear any C-side lookahead since we're giving control to Guile */
-  if (ctx->lookahead != 0)
-    {
-      scm_ungetc (ctx->lookahead, ctx->port);
-      ctx->lookahead = 0;
-    }
-
-  /* Let Guile read the complete number */
-  SCM result = scm_read (ctx->port);
-
-  /* Validate the result */
-  if (scm_is_number (result))
-    {
-      return result;
-    }
-  else
-    {
-      /* This shouldn't happen if our setup was correct */
-      error ("Guile reader failed to parse integer with radix %d", radix);
-    }
+  return elisp_read_integer_from_c (port, radix_obj);
 }
 
 /* Synchronize Guile port position with C reader position before scm_read */
@@ -4961,6 +4954,8 @@ fread0 (struct reader_context *ctx)
   switch (c)
     {
     case '(':
+      // guile-lisp-reader disabled for now:
+      // obj = elisp_parse_list_from_c_context (ctx);
       read_stack_push ((struct read_stack_entry) {.type = RE_list_start});
       goto read_obj;
 
