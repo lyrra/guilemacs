@@ -2207,6 +2207,7 @@ lowercase l) for small endian machines."
   "Parse an elisp list from PORT, handling both regular and dotted pairs.
 Called from C fread0() when '(' is encountered.
 Returns: '() for empty list, proper list for (a b c), dotted pair for (a . b)"
+  (let ((x
   (let loop ((elements '()))
     ;; Skip whitespace and comments
     (let skip-ws ()
@@ -2228,32 +2229,64 @@ Returns: '() for empty list, proper list for (a b c), dotted pair for (a . b)"
       (cond
         ((eof-object? ch) (error "Unexpected EOF in list"))
         ((char=? ch #\))
-         ;; End of list - return reversed elements as proper list
-         (reverse elements))
+         ;; End of list - return reversed elements as proper Elisp list (terminated with #nil)
+         (let reverse-to-elisp ((elems elements) (result #nil))
+           (if (null? elems)
+               result
+               (reverse-to-elisp (cdr elems) (cons (car elems) result)))))
         ((char=? ch #\.)
-         ;; Dotted pair syntax: (a . b)
-         (if (null? elements)
-           (error "Invalid dot syntax at start of list"))
-         ;; Read the tail element
-         (let ((tail (elisp-read-from-port port)))
-           ;; Expect closing paren
-           (let skip-ws-after-dot ()
-             (let ((c (read-char port)))
-               (cond
-                 ((eof-object? c) (error "Expected ')' after dot"))
-                 ((char=? c #\))
-                  ;; Build dotted pair: manually fold elements into tail
-                  (let build-dotted ((elems (reverse elements)) (result tail))
-                    (if (null? elems)
-                        result
-                        (build-dotted (cdr elems) (cons (car elems) result)))))
-                 ((char-whitespace? c) (skip-ws-after-dot))
-                 (else (error "Expected ')' after dot, got" c)))))))
+         ;; Check if this is dotted pair syntax (a . b) or dot-prefixed symbol (.rose)
+         (let ((next-ch (peek-char port)))
+           (if (and (not (eof-object? next-ch))
+                    (not (char-whitespace? next-ch))
+                    (not (char=? next-ch #\,)))
+               ;; This is a dot-prefixed symbol like .rose, not a dotted pair
+               ;; Unread the dot and let elisp-read-from-port handle it as a symbol
+               (begin
+                 (unread-char ch port)
+                 (let ((obj (elisp-read-from-port port)))
+                   (if (null? obj) (set! obj #nil))
+                   (loop (cons obj elements))))
+               ;; This is genuine dotted pair syntax (a . b)
+               (begin
+                 (if (null? elements)
+                   (error "Invalid dot syntax at start of list"))
+                 ;; Read the tail element
+                 (let ((tail (elisp-read-from-port port)))
+                   (if (null? tail) (set! tail #nil))
+                   ;; Expect closing paren
+                   (let skip-ws-after-dot ()
+                     (let ((c (read-char port)))
+                       (cond
+                         ((eof-object? c) (error "Expected ')' after dot"))
+                         ((char=? c #\))
+                          ;; Build dotted pair: fold right-to-left to get correct order
+                          ;; For (a b . c) we want (cons a (cons b c))
+                          (let build-dotted ((elems (reverse elements)) (result tail))
+                            (if (null? elems)
+                                result
+                                (cons (car elems) (build-dotted (cdr elems) result)))))
+                         ((char-whitespace? c) (skip-ws-after-dot))
+                         ((char=? c #\;)
+                          ;; Skip comment until newline, then continue skipping whitespace
+                          (let skip-comment ()
+                            (let ((comment-char (read-char port)))
+                              (if (not (or (eof-object? comment-char) (char=? comment-char #\newline)))
+                                (skip-comment))))
+                          (skip-ws-after-dot))
+                         (else
+                          (format #t "DEBUG: Found unexpected character after dot: ~a (~s), tail was: ~s~%" c (char->integer c) tail)
+                          (format #t "full form: ~s~%" (reverse elements))
+                          (force-output)
+                          (error "Expected ')' after dot, got" c))))))))))
         (else
          ;; Regular list element
          (unread-char ch port)
          (let ((obj (elisp-read-from-port port)))
-           (loop (cons obj elements))))))))
+           (if (null? obj) (set! obj #nil))
+           (loop (cons obj elements)))))))))
+    (if (null? x) (set! x #nil))
+    x))
 
 (define (elisp-read-integer-from-port port radix)
   "Parse an elisp integer from PORT with given RADIX.

@@ -2496,6 +2496,9 @@ elisp_parse_list_from_c_context (struct reader_context *ctx)
       error ("Failed to create Guile port from file context");
     }
 
+  /* Clear the C-side lookahead buffer */
+  ctx->lookahead = 0;
+
   /* Call the Guile list parser function */
   SCM parse_list_func = scm_c_private_ref ("language elisp runtime",
                                            "elisp-parse-list-from-port");
@@ -2509,7 +2512,8 @@ elisp_read_from_port (Lisp_Object port)
 {
   struct reader_context ctx;
   ctx.port = port;
-  return fread_internal_start (&ctx);
+  ctx.lookahead = 0;
+  return fread0 (&ctx);
 }
 
 /* Integer reading hoisted to Guile - allows Scheme code to handle integer parsing */
@@ -3582,7 +3586,7 @@ fread_char_literal (struct reader_context *ctx)
 
   /* Check for valid character context */
   int nch = freadchar (ctx);
-  funreadchar (ctx, nch);
+  scm_ungetc(nch, ctx->port);
   if (nch <= 32
       || nch == '"' || nch == '\'' || nch == ';' || nch == '('
       || nch == ')' || nch == '['  || nch == ']' || nch == '#'
@@ -4954,12 +4958,12 @@ fread0 (struct reader_context *ctx)
   switch (c)
     {
     case '(':
-      // guile-lisp-reader disabled for now:
-      // obj = elisp_parse_list_from_c_context (ctx);
-      read_stack_push ((struct read_stack_entry) {.type = RE_list_start});
-      goto read_obj;
+      // guile-lisp-reader re-enabled:
+      obj = elisp_parse_list_from_c_context (ctx);
+      break;
 
     case ')':
+      // get here if closing vector
       if (read_stack_empty_p (base_sp))
 	finvalid_syntax (")");
       switch (read_stack_top ()->type)
@@ -5082,6 +5086,8 @@ fread0 (struct reader_context *ctx)
 	      }
 	    if (ch != '(')
 	      {
+                fprintf(stderr, "-- x1\n");
+                emacs_abort ();
 		funreadchar (ctx, ch);
 		*p = 0;
 		finvalid_syntax (read_buffer);
@@ -5126,6 +5132,8 @@ fread0 (struct reader_context *ctx)
 		  }
 		else
 		  {
+                    fprintf(stderr, "-- x2\n");
+                    emacs_abort ();
 		    funreadchar (ctx, ch);
 		    *p = 0;
 		    finvalid_syntax (read_buffer);
@@ -5143,6 +5151,8 @@ fread0 (struct reader_context *ctx)
 	      }
 	    else
 	      {
+                fprintf(stderr, "-- x3\n");
+                emacs_abort ();
 		funreadchar (ctx, ch);
 		*p = 0;
 		finvalid_syntax (read_buffer);
@@ -5355,7 +5365,7 @@ fread0 (struct reader_context *ctx)
 	else
 	  {
 	    if (ch >= 0)
-	      funreadchar (ctx, ch);
+	      scm_ungetc(ch, ctx->port);
 	    sym = Qcomma;
 	  }
 	read_stack_push ((struct read_stack_entry) {
@@ -5377,7 +5387,7 @@ fread0 (struct reader_context *ctx)
     case '.':
       {
 	int nch = freadchar (ctx);
-	funreadchar (ctx, nch);
+	scm_ungetc(nch, ctx->port);
 	if (nch <= 32 || nch == NO_BREAK_SPACE
 	    || nch == '"' || nch == '\'' || nch == ';'
 	    || nch == '(' || nch == '[' || nch == '#'
@@ -5442,7 +5452,7 @@ fread0 (struct reader_context *ctx)
             {
               /* This is a bare colon - return the interned colon symbol */
               if (next_char >= 0)
-                funreadchar (ctx, next_char);
+	        scm_ungetc(next_char, ctx->port);
               obj = intern_c_string (":");
               break;
             }
@@ -5480,7 +5490,7 @@ fread0 (struct reader_context *ctx)
 
               /* Put back the terminating character */
               if (next_char >= 0)
-                funreadchar (ctx, next_char);
+	        scm_ungetc(next_char, ctx->port);
 
               *p = '\0';
 
