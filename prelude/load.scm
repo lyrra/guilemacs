@@ -2310,5 +2310,47 @@ Returns: integer value"
           result
           (error "Could not parse integer with radix" radix digit-string)))))
 
+(define (elisp-parse-vector-from-port port)
+  "Parse an elisp vector from PORT.
+Called from C fread0() when '[' is encountered.
+Returns: A proper elisp vector"
+  (let loop ((elements '()))
+    ;; Skip whitespace and comments
+    (let skip-ws ()
+      (let ((ch (read-char port)))
+        (cond
+          ((eof-object? ch)
+           (error "Unexpected EOF in vector"))
+          ((char=? ch #\;)
+           ;; Skip comment until newline
+           (let skip-comment ()
+             (let ((c (read-char port)))
+               (if (not (or (eof-object? c) (char=? c #\newline)))
+                 (skip-comment))))
+           (skip-ws))
+          ((char-whitespace? ch) (skip-ws))
+          (else (unread-char ch port)))))
+    ;; Check what comes next
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) (error "Unexpected EOF in vector"))
+        ((char=? ch #\])
+         ;; End of vector - create vector directly in Guile (now that float conversion works)
+         (let* ((rev-elems (reverse elements))
+                (len (length rev-elems))
+                (vec (make-vector len #nil)))
+           (let loop-fill ((i 0) (elems rev-elems))
+             (if (null? elems)
+                 vec
+                 (begin
+                   (vector-set! vec i (car elems))
+                   (loop-fill (+ i 1) (cdr elems)))))))
+        (else
+         ;; Regular vector element
+         (unread-char ch port)
+         (let ((obj (elisp-read-from-port port)))
+           (if (null? obj) (set! obj #nil))
+           (loop (cons obj elements))))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

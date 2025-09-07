@@ -2386,13 +2386,14 @@ static Lisp_Object
 guile_to_lisp_object (SCM obj)
 {
   /* Convert Guile object back to Lisp_Object */
+
   if (scm_is_null (obj))
     return Qnil;
   else if (scm_is_bool (obj))
     return scm_is_true (obj) ? Qt : Qnil;
-  else if (scm_is_integer (obj))
+  else if (scm_is_integer (obj) && scm_is_exact (obj))
     {
-      /* Handle both fixnum and bignum integers */
+      /* Handle both fixnum and bignum integers - but only exact ones */
       if (scm_is_true (scm_exact_integer_p (obj)))
         {
           /* For large integers, try to convert to Lisp bignum */
@@ -2403,7 +2404,7 @@ guile_to_lisp_object (SCM obj)
     }
   else if (scm_is_real (obj))
     {
-      /* Handle floating point numbers */
+      /* Handle floating point numbers and inexact integers like 0.0 */
       return make_float (scm_to_double (obj));
     }
   else if (scm_is_string (obj))
@@ -2504,6 +2505,31 @@ elisp_parse_list_from_c_context (struct reader_context *ctx)
                                            "elisp-parse-list-from-port");
 
   return scm_call_1 (parse_list_func, port);
+}
+
+/* Vector parsing hoisting: C wrapper for Guile elisp-parse-vector-from-port */
+static Lisp_Object
+elisp_parse_vector_from_c_context (struct reader_context *ctx)
+{
+  /* Convert C file context to Guile port */
+  SCM port = file_context_to_guile_port (ctx);
+
+  if (scm_is_false (port))
+    {
+      error ("Failed to create Guile port from file context");
+    }
+
+  /* Clear the C-side lookahead buffer */
+  ctx->lookahead = 0;
+
+  /* Call the Guile vector parser function */
+  SCM parse_vector_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-parse-vector-from-port");
+
+  SCM result = scm_call_1 (parse_vector_func, port);
+
+  /* Convert SCM result to proper Lisp_Object - guile_to_lisp_object now handles vectors correctly */
+  return guile_to_lisp_object (result);
 }
 
 /* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
@@ -4999,23 +5025,16 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '[':
-      read_stack_push ((struct read_stack_entry) {
-	  .type = RE_vector,
-	  .u.vector.elems = Qnil,
-	  .u.vector.old_locate_syms = locate_syms,
-	});
-      /* FIXME: should vectors be read with locate_syms=false?  */
-      goto read_obj;
+      // Vector parsing moved to Guile with proper conversion:
+      obj = elisp_parse_vector_from_c_context (ctx);
+      break;
 
     case ']':
+      // Regular vectors now handled by Guile, only char-tables use C stack
       if (read_stack_empty_p (base_sp))
 	finvalid_syntax ("]");
       switch (read_stack_top ()->type)
 	{
-	case RE_vector:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = vector_from_rev_list (read_stack_pop ()->u.vector.elems);
-	  break;
 	case RE_char_table:
 	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
 	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
@@ -5027,7 +5046,7 @@ fread0 (struct reader_context *ctx)
 					      freadchar);
 	  break;
 	default:
-	  invalid_syntax ("]", freadchar);
+	  finvalid_syntax ("]");
 	  break;
 	}
       break;
@@ -5611,7 +5630,6 @@ fread0 (struct reader_context *ctx)
 	    break;
 	  }
 
-	case RE_vector:
 	case RE_record:
 	case RE_char_table:
 	case RE_sub_char_table:
