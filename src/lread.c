@@ -407,7 +407,7 @@ static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
 static SCM buffer_to_guile_port (Lisp_Object buffer);
 
 /* Integer reading hoisting - Forward declaration */
-Lisp_Object elisp_read_integer_from_c (Lisp_Object port, Lisp_Object radix_obj);
+Lisp_Object elisp_read_integer_from_c (Lisp_Object port, int radix);
 Lisp_Object elisp_read_from_port (Lisp_Object port);
 
 /* Unified Reader Architecture - Interface for pluggable I/O sources */
@@ -2544,16 +2544,119 @@ elisp_read_from_port (Lisp_Object port)
 
 /* Integer reading hoisted to Guile - allows Scheme code to handle integer parsing */
 Lisp_Object
-elisp_read_integer_from_c (Lisp_Object port, Lisp_Object radix_obj)
+elisp_read_integer_from_c (Lisp_Object port, int radix)
 {
-  /* Convert radix from Lisp_Object to int */
-  int radix = scm_to_int(radix_obj);
-
   /* Call the Guile integer parser function */
   SCM parse_integer_func = scm_c_private_ref ("language elisp runtime",
                                               "elisp-read-integer-from-port");
 
-  return scm_call_2 (parse_integer_func, port, radix_obj);
+  return scm_call_2 (parse_integer_func, port, scm_from_int (radix));
+}
+
+/* Character literal parsing migrated to Guile */
+static Lisp_Object
+elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_char_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-parse-char-literal-from-port");
+  SCM result = scm_call_1 (parse_char_func, port);
+
+  /* Convert character result to fixnum */
+  if (scm_is_true (scm_char_p (result)))
+    return make_fixnum (scm_to_int (scm_char_to_integer (result)));
+  else if (scm_is_integer (result))
+    return result;
+  else
+    error ("Invalid character literal result from Guile");
+}
+
+/* Quote/backquote/comma forms migrated to Guile */
+static Lisp_Object
+elisp_parse_quote_forms_from_c_context (struct reader_context *ctx, Lisp_Object special_symbol)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_quote_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-quote-forms-from-port");
+  return scm_call_2 (parse_quote_func, port, special_symbol);
+}
+
+/* Comment skipping migrated to Guile */
+static void
+elisp_skip_comment_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM skip_comment_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-skip-comment-from-port");
+  scm_call_1 (skip_comment_func, port);
+}
+
+/* Hash function syntax (#') migrated to Guile */
+static Lisp_Object
+elisp_parse_hash_function_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_hash_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-parse-hash-function-from-port");
+  return scm_call_1 (parse_hash_func, port);
+}
+
+/* Empty symbol syntax (##) migrated to Guile */
+static Lisp_Object
+elisp_parse_hash_empty_symbol_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_empty_symbol_func = scm_c_private_ref ("language elisp runtime",
+                                                   "elisp-parse-hash-empty-symbol-from-port");
+  return scm_call_1 (parse_empty_symbol_func, port);
+}
+
+/* Shebang comment syntax (#!) migrated to Guile */
+static void
+elisp_parse_hash_shebang_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM skip_shebang_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-parse-hash-shebang-from-port");
+  scm_call_1 (skip_shebang_func, port);
+}
+
+/* Uninterned symbol syntax (#:) migrated to Guile */
+static Lisp_Object
+elisp_parse_hash_uninterned_symbol_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_uninterned_func = scm_c_private_ref ("language elisp runtime",
+                                                 "elisp-parse-hash-uninterned-symbol-from-port");
+  return scm_call_1 (parse_uninterned_func, port);
 }
 
 DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
@@ -3427,10 +3530,7 @@ fread_integer (struct reader_context *ctx, int radix)
       error ("Failed to create Guile port from file context");
     }
 
-  /* Convert radix to Lisp_Object */
-  SCM radix_obj = scm_from_int (radix);
-
-  return elisp_read_integer_from_c (port, radix_obj);
+  return elisp_read_integer_from_c (port, radix);
 }
 
 /* Synchronize Guile port position with C reader position before scm_read */
@@ -5081,10 +5181,13 @@ fread0 (struct reader_context *ctx)
 		.u.special.symbol = Qfunction,
 	      });
 	    goto read_obj;
+	    //obj = elisp_parse_hash_function_from_c_context (ctx);
+	    //break;
 
 	  case '#':
 	    /* ## -- the empty symbol */
 	    obj = Fintern (build_string(""), Qnil);
+	    //obj = elisp_parse_hash_empty_symbol_from_c_context (ctx);
 	    break;
 
 	  case 's':
@@ -5201,13 +5304,8 @@ fread0 (struct reader_context *ctx)
 	  case '!':
 	    /* #! appears at the beginning of an executable file.
 	       Skip the rest of the line.  */
-	    {
-	      int c;
-	      do
-		c = freadchar (ctx);
-	      while (c >= 0 && c != '\n');
-	      goto read_obj;
-	    }
+	    elisp_parse_hash_shebang_from_c_context (ctx);
+	    goto read_obj;
 
 	  case 'x':
 	  case 'X':
@@ -5250,6 +5348,8 @@ fread0 (struct reader_context *ctx)
 	    uninterned_symbol = true;
 	    skip_shorthand = false;
 	    goto read_symbol;
+	    //obj = elisp_parse_hash_uninterned_symbol_from_c_context (ctx);
+	    //break;
 
 	  case '_':
 	    /* #_X -- symbol without shorthand */

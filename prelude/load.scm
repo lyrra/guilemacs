@@ -2352,5 +2352,159 @@ Returns: A proper elisp vector"
            (if (null? obj) (set! obj #nil))
            (loop (cons obj elements))))))))
 
+;; Additional reader functions for fread0 migration
+
+(define (elisp-parse-char-literal-from-port port)
+  "Parse an elisp character literal from PORT.
+Called from C fread0() when '?' is encountered.
+Returns: A character fixnum"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (error "Unexpected EOF in character literal"))
+      ;; Accept single space or tab syntax like (list ? x)
+      ((or (char=? ch #\space) (char=? ch #\tab)) ch)
+      ;; Handle escape sequences
+      ((char=? ch #\\)
+       (let ((escape-ch (read-char port)))
+         (cond
+           ((eof-object? escape-ch) (error "Unexpected EOF after \\"))
+           ;; Standard escape sequences
+           ((char=? escape-ch #\n) #\newline)
+           ((char=? escape-ch #\t) #\tab)
+           ((char=? escape-ch #\r) #\return)
+           ((char=? escape-ch #\b) #\backspace)
+           ((char=? escape-ch #\f) (integer->char 12)) ; form feed
+           ((char=? escape-ch #\a) (integer->char 7))  ; bell
+           ((char=? escape-ch #\v) (integer->char 11)) ; vertical tab
+           ((char=? escape-ch #\e) (integer->char 27)) ; escape
+           ((char=? escape-ch #\s) #\space)
+           ((char=? escape-ch #\d) (integer->char 127)) ; delete
+           ;; Octal escape sequences \NNN
+           ((char<=? #\0 escape-ch #\7)
+            (unread-char escape-ch port)
+            (let ((octal-str ""))
+              (let loop ((count 0))
+                (if (< count 3)
+                    (let ((digit-ch (read-char port)))
+                      (if (and (not (eof-object? digit-ch))
+                               (char<=? #\0 digit-ch #\7))
+                          (begin
+                            (set! octal-str (string-append octal-str (string digit-ch)))
+                            (loop (+ count 1)))
+                          (when (not (eof-object? digit-ch))
+                            (unread-char digit-ch port))))))
+              (if (string=? octal-str "")
+                  (integer->char 0)
+                  (integer->char (string->number octal-str 8)))))
+           ;; Hex escape sequences \xHH
+           ((char=? escape-ch #\x)
+            (let ((hex-str ""))
+              (let loop ((count 0))
+                (if (< count 2)
+                    (let ((hex-ch (read-char port)))
+                      (if (and (not (eof-object? hex-ch))
+                               (or (char<=? #\0 hex-ch #\9)
+                                   (char<=? #\a hex-ch #\f)
+                                   (char<=? #\A hex-ch #\F)))
+                          (begin
+                            (set! hex-str (string-append hex-str (string hex-ch)))
+                            (loop (+ count 1)))
+                          (when (not (eof-object? hex-ch))
+                            (unread-char hex-ch port))))))
+              (if (string=? hex-str "")
+                  (integer->char 0)
+                  (integer->char (string->number hex-str 16)))))
+           ;; Control sequences \C-x
+           ((char=? escape-ch #\C)
+            (let ((dash-ch (read-char port)))
+              (if (char=? dash-ch #\-)
+                  (let ((ctrl-ch (read-char port)))
+                    (if (eof-object? ctrl-ch)
+                        (error "Unexpected EOF in control sequence")
+                        (integer->char (logand (char->integer (char-upcase ctrl-ch)) #x1f))))
+                  (error "Invalid control sequence"))))
+           ;; Meta sequences \M-x
+           ((char=? escape-ch #\M)
+            (let ((dash-ch (read-char port)))
+              (if (char=? dash-ch #\-)
+                  (let ((meta-ch (read-char port)))
+                    (if (eof-object? meta-ch)
+                        (error "Unexpected EOF in meta sequence")
+                        (integer->char (+ (char->integer meta-ch) 128))))
+                  (error "Invalid meta sequence"))))
+           ;; Default: return the escaped character literally
+           (else escape-ch))))
+      ;; Regular character
+      (else ch))))
+
+(define (elisp-parse-quote-forms-from-port port special-symbol)
+  "Parse quote, backquote, or comma forms from PORT.
+SPECIAL-SYMBOL should be 'quote, 'backquote, 'comma, or 'comma-at.
+Returns: (SPECIAL-SYMBOL object)"
+  (let ((obj (elisp-read-from-port port)))
+    (list special-symbol obj)))
+
+(define (elisp-skip-comment-from-port port)
+  "Skip a line comment starting with ; until newline.
+Returns: #t (to indicate successful skip)"
+  (let loop ()
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) #t)
+        ((char=? ch #\newline) #t)
+        (else (loop))))))
+
+(define (elisp-parse-hash-function-from-port port)
+  "Parse #' function syntax from PORT.
+Returns: (function object)"
+  (let ((obj (elisp-read-from-port port)))
+    (list 'function obj)))
+
+(define (elisp-parse-hash-empty-symbol-from-port port)
+  "Parse ## empty symbol syntax from PORT.
+Returns: interned empty symbol"
+  ;; In GuilEmacs, we need to return the interned empty symbol
+  ;; This is handled by calling the C intern function
+  (string->symbol ""))
+
+(define (elisp-parse-hash-shebang-from-port port)
+  "Parse #! shebang comment from PORT, skipping to end of line.
+Returns: #t (to indicate successful skip)"
+  (let loop ()
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) #t)
+        ((char=? ch #\newline) #t)
+        (else (loop))))))
+
+(define (elisp-parse-hash-uninterned-symbol-from-port port)
+  "Parse #: uninterned symbol syntax from PORT.
+Returns: uninterned symbol"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (gensym ""))
+      ;; Check for symbol terminator characters
+      ((or (char<=? ch #\space)
+           (char=? ch #\")
+           (char=? ch #\')
+           (char=? ch #\;)
+           (char=? ch #\#)
+           (char=? ch #\()
+           (char=? ch #\))
+           (char=? ch #\[)
+           (char=? ch #\])
+           (char=? ch #\`)
+           (char=? ch #\,))
+       ;; Empty uninterned symbol
+       (unread-char ch port)
+       (gensym ""))
+      (else
+       ;; Read the symbol name
+       (unread-char ch port)
+       (let ((sym (read port)))
+         (if (symbol? sym)
+             (gensym (symbol->string sym))
+             (error "Expected symbol after #:")))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
