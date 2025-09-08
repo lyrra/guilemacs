@@ -5195,7 +5195,7 @@ fread0 (struct reader_context *ctx)
 
 	  case '&':
 	    /* #&N"..." -- bool-vector */
-	    obj = fread_bool_vector (ctx);
+	    finvalid_syntax ("bool-vector syntax not supported");
 	    break;
 
 	  case '!':
