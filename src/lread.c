@@ -5201,68 +5201,8 @@ fread0 (struct reader_context *ctx)
             emacs_abort ();
 
 	  case '^':
-	    /* #^[...]  -- char-table
-	       #^^[...] -- sub-char-table */
-	    ch = freadchar (ctx);
-	    if (ch < 0)
-	      {
-		*p = 0;
-		finvalid_syntax (read_buffer);
-	      }
-	    p += CHAR_STRING (ch, (unsigned char *) p);
-	    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-	      {
-		ptrdiff_t offset = p - read_buffer;
-		emacs_abort ();
-		p = read_buffer + offset;
-		end = read_buffer + read_buffer_size;
-	      }
-	    if (ch == '^')
-	      {
-		ch = freadchar (ctx);
-		if (ch == '[')
-		  {
-                    fprintf(stderr, "sorry, no vector for char tables 1\n");
-                    emacs_abort ();
-		    read_stack_push ((struct read_stack_entry) {
-			.type = RE_sub_char_table,
-			.u.vector.elems = Qnil,
-			.u.vector.old_locate_syms = locate_syms,
-		      });
-		    locate_syms = false;
-		    goto read_obj;
-		  }
-		else
-		  {
-                    fprintf(stderr, "-- x2\n");
-                    emacs_abort ();
-		    funreadchar (ctx, ch);
-		    *p = 0;
-		    finvalid_syntax (read_buffer);
-		  }
-	      }
-	    else if (ch == '[')
-	      {
-                fprintf(stderr, "sorry, no vector for char tables 2\n");
-                emacs_abort ();
-		read_stack_push ((struct read_stack_entry) {
-		    .type = RE_char_table,
-		    .u.vector.elems = Qnil,
-		    .u.vector.old_locate_syms = locate_syms,
-		  });
-		locate_syms = false;
-		goto read_obj;
-	      }
-	    else
-	      {
-                fprintf(stderr, "-- x3\n");
-                emacs_abort ();
-		funreadchar (ctx, ch);
-		*p = 0;
-		finvalid_syntax (read_buffer);
-	      }
-	    break;
-
+            fprintf(stderr, "-- no char tables in elisp\n");
+            emacs_abort ();
 	  case '(':
 	    /* #(...) -- string with properties */
 	    read_stack_push ((struct read_stack_entry) {
