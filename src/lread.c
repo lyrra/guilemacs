@@ -5130,25 +5130,8 @@ fread0 (struct reader_context *ctx)
       break;
 
     case ']':
-      // Regular vectors now handled by Guile, only char-tables use C stack
-      if (read_stack_empty_p (base_sp))
-	finvalid_syntax ("]");
-      switch (read_stack_top ()->type)
-	{
-	case RE_char_table:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-					  freadchar);
-	  break;
-	case RE_sub_char_table:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = sub_char_table_from_rev_list (read_stack_pop ()->u.vector.elems,
-					      freadchar);
-	  break;
-	default:
-	  finvalid_syntax ("]");
-	  break;
-	}
+      fprintf(stderr, "close square-list is done by scheme\n");
+      emacs_abort ();
       break;
 
     case '#':
@@ -5214,13 +5197,8 @@ fread0 (struct reader_context *ctx)
 		*p = 0;
 		finvalid_syntax (read_buffer);
 	      }
-	    read_stack_push ((struct read_stack_entry) {
-		.type = RE_record,
-		.u.vector.elems = Qnil,
-		.u.vector.old_locate_syms = locate_syms,
-	      });
-	    locate_syms = false;
-	    goto read_obj;
+            fprintf(stderr, "---- what is this?\n");
+            emacs_abort ();
 
 	  case '^':
 	    /* #^[...]  -- char-table
@@ -5244,6 +5222,8 @@ fread0 (struct reader_context *ctx)
 		ch = freadchar (ctx);
 		if (ch == '[')
 		  {
+                    fprintf(stderr, "sorry, no vector for char tables 1\n");
+                    emacs_abort ();
 		    read_stack_push ((struct read_stack_entry) {
 			.type = RE_sub_char_table,
 			.u.vector.elems = Qnil,
@@ -5263,6 +5243,8 @@ fread0 (struct reader_context *ctx)
 	      }
 	    else if (ch == '[')
 	      {
+                fprintf(stderr, "sorry, no vector for char tables 2\n");
+                emacs_abort ();
 		read_stack_push ((struct read_stack_entry) {
 		    .type = RE_char_table,
 		    .u.vector.elems = Qnil,
