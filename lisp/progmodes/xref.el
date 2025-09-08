@@ -1151,9 +1151,14 @@ GROUP is a string for decoration purposes and XREF is an
                                    maximize (xref-location-line
                                              (xref-item-location xref)))
            for line-format = (and max-line
+                                  ; FIX-20250908-guilemacs textproperty
+                                  ;(format
+                                  ; #("%%%dd:" 0 4 (face xref-line-number) 5 6 (face shadow))
+                                  ; (1+ (floor (log max-line 10))))
                                   (format
-                                   #("%%%dd:" 0 4 (face xref-line-number) 5 6 (face shadow))
-                                   (1+ (floor (log max-line 10)))))
+                                   "%%%dd:"
+                                   (1+ (floor (log max-line 10))))
+                                  )
            with item-text-props = (list 'mouse-face 'highlight
                                         'keymap xref--button-map
                                         'help-echo
@@ -1423,7 +1428,9 @@ between them by typing in the minibuffer with completion."
                              (line (xref-location-line location))
                              (line-fmt
                               (if line
-                                  (format #("%d:" 0 2 (face xref-line-number))
+                                  ;(format #("%d:" 0 2 (face xref-line-number))
+                                  ;        line)
+                                  (format "%d:"
                                           line)
                                 ""))
                              (group-prefix

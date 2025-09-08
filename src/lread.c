@@ -5175,43 +5175,18 @@ fread0 (struct reader_context *ctx)
 
 	  case 's':
 	    /* #s(...) -- a record or hash-table */
-	    ch = freadchar (ctx);
-	    if (ch < 0)
-	      {
-		*p = 0;
-		finvalid_syntax (read_buffer);
-	      }
-	    p += CHAR_STRING (ch, (unsigned char *) p);
-	    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-	      {
-		ptrdiff_t offset = p - read_buffer;
-		emacs_abort ();
-		p = read_buffer + offset;
-		end = read_buffer + read_buffer_size;
-	      }
-	    if (ch != '(')
-	      {
-                fprintf(stderr, "-- x1\n");
-                emacs_abort ();
-		funreadchar (ctx, ch);
-		*p = 0;
-		finvalid_syntax (read_buffer);
-	      }
-            fprintf(stderr, "---- what is this?\n");
+            fprintf(stderr, "record or hash-table syntax not supported\n");
             emacs_abort ();
 
 	  case '^':
+	    /* #^^... */
             fprintf(stderr, "-- no char tables in elisp\n");
             emacs_abort ();
+
 	  case '(':
 	    /* #(...) -- string with properties */
-	    read_stack_push ((struct read_stack_entry) {
-		.type = RE_string_props,
-		.u.vector.elems = Qnil,
-		.u.vector.old_locate_syms = locate_syms,
-	      });
-	    locate_syms = false;
-	    goto read_obj;
+            fprintf(stderr, "-- ERROR: string with properties not supported\n");
+            emacs_abort ();
 
 	  case '[':
 	    /* #[...] -- byte-code (not supported in Guile reader) */

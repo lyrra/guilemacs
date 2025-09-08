@@ -1687,7 +1687,9 @@ Marked macros can be operated on by `kmacro-menu-do-copy' and
                       kmacro-menu--marks)
            t)
      (kmacro-menu--propertize-keys 'kmacro-menu-marked)
-     (tabulated-list-put-tag #("*" 0 1 (face kmacro-menu-mark))))))
+     ; FIX-20250908-guilemacs need to use a text-property structure
+     ;(tabulated-list-put-tag #("*" 0 1 (face kmacro-menu-mark)))
+     )))
 
 (defun kmacro-menu-flag-for-deletion ()
   "Flag macros in the region or on the current line.
@@ -1706,7 +1708,9 @@ Flagged macros can be deleted via `kmacro-menu-do-flagged-delete'."
                       kmacro-menu--deletion-flags)
            t)
      (kmacro-menu--propertize-keys 'kmacro-menu-flagged)
-     (tabulated-list-put-tag #("D" 0 1 (face kmacro-menu-mark))))))
+     ; -
+     ; (tabulated-list-put-tag #("D" 0 1 (face kmacro-menu-mark)))
+     )))
 
 (defun kmacro-menu-unmark ()
   "Unmark and unflag macros in the region or on the current line.
