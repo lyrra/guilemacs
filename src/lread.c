@@ -5304,6 +5304,8 @@ fread0 (struct reader_context *ctx)
 		  {
 		    if (c == '=')
 		      {
+                        fprintf(stderr, "circle-read not supported\n");
+                        emacs_abort ();
 			/* #N=OBJ -- assign number N to OBJ */
 			Lisp_Object placeholder = Fcons (Qnil, Qnil);
 
