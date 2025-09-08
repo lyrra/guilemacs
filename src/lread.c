@@ -5170,23 +5170,22 @@ fread0 (struct reader_context *ctx)
 	  case '#':
 	    /* ## -- the empty symbol */
 	    obj = Fintern (build_string(""), Qnil);
-	    //obj = elisp_parse_hash_empty_symbol_from_c_context (ctx);
 	    break;
 
 	  case 's':
 	    /* #s(...) -- a record or hash-table */
-            fprintf(stderr, "record or hash-table syntax not supported\n");
-            emacs_abort ();
+	    finvalid_syntax ("record or hash-table syntax not supported");
+	    break;
 
 	  case '^':
 	    /* #^^... */
-            fprintf(stderr, "-- no char tables in elisp\n");
-            emacs_abort ();
+	    finvalid_syntax ("char-tables syntax not supported");
+	    break;
 
 	  case '(':
 	    /* #(...) -- string with properties */
-            fprintf(stderr, "-- ERROR: string with properties not supported\n");
-            emacs_abort ();
+	    finvalid_syntax ("text-properties syntax not supported");
+	    break;
 
 	  case '[':
 	    /* #[...] -- byte-code (not supported in Guile reader) */
