@@ -5496,10 +5496,7 @@ fread0 (struct reader_context *ctx)
 
     case ';':
       {
-	int c;
-	do
-	  c = freadchar (ctx);
-	while (c >= 0 && c != '\n');
+        elisp_skip_comment_from_c_context (ctx);
 	goto read_obj;
       }
 
