@@ -2691,6 +2691,32 @@ elisp_parse_comma_at_from_c_context (struct reader_context *ctx)
   return scm_call_1 (parse_comma_at_func, port);
 }
 
+/* String literal parsing migrated to Guile */
+static Lisp_Object
+elisp_parse_string_literal_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  /* C has already consumed the opening quote, put it back for Scheme parser */
+  scm_ungetc ('"', ctx->port);
+  ctx->lookahead = 0;
+
+  SCM parse_string_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-parse-string-literal-from-port");
+  SCM result = scm_call_1 (parse_string_func, port);
+
+  /* Result should be a string */
+  if (scm_is_string (result))
+    {
+      return result; /* SCM strings are already Lisp_Objects in GuilEmacs */
+    }
+
+  /* Should always be a string for string literal syntax */
+  error ("String parser returned non-string");
+}
+
 /* Comment skipping migrated to Guile */
 static void
 elisp_skip_comment_from_c_context (struct reader_context *ctx)
@@ -2805,6 +2831,43 @@ elisp_parse_hash_from_c_context (struct reader_context *ctx)
         }
 
       free (symbol_name);
+    }
+
+  /* Handle bool vector result: (LENGTH . STRING-DATA) */
+  if (scm_is_pair (result))
+    {
+      SCM length_scm = scm_car (result);
+      SCM string_data = scm_cdr (result);
+
+      if (scm_is_integer (length_scm) && scm_is_string (string_data))
+        {
+          /* This is a bool vector - convert to Emacs bool vector */
+          EMACS_INT length = scm_to_int (length_scm);
+
+          if (length > BOOL_VECTOR_LENGTH_MAX)
+            finvalid_syntax ("#&");
+
+          ptrdiff_t size_in_chars = bool_vector_bytes (length);
+          Lisp_Object obj = make_uninit_bool_vector (length);
+          unsigned char *data = bool_vector_uchar_data (obj);
+
+          /* Copy string data to bool vector */
+          size_t str_len;
+          char *str_data = scm_to_utf8_stringn (string_data, &str_len);
+          if (str_len < size_in_chars)
+            {
+              free (str_data);
+              finvalid_syntax ("#&");
+            }
+          memcpy (data, str_data, size_in_chars);
+          free (str_data);
+
+          /* Clear the extraneous bits in the last byte */
+          if (length != size_in_chars * BOOL_VECTOR_BITS_PER_CHAR)
+            data[size_in_chars - 1] &= (1 << (length % BOOL_VECTOR_BITS_PER_CHAR)) - 1;
+
+          return obj;
+        }
     }
 
   return result;
@@ -3813,75 +3876,6 @@ fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_
                  "unknown");
         }
     }
-}
-
-/* File-specific version of read_string_literal - uses Guile's reader when possible */
-static Lisp_Object
-fread_string_literal (struct reader_context *ctx)
-{
-
-  if (scm_is_false (ctx->port))
-    {
-      fprintf(stderr, "-- didnt use guile reader\n");
-      emacs_abort ();
-    }
-
-  /* We've already consumed the opening quote, so push it back */
-  scm_ungetc ('"', ctx->port);
-
-  /* Let Guile read the string */
-  SCM result = scm_read (ctx->port);
-
-  /* Check if we got a valid string */
-  if (scm_is_string (result))
-    {
-      /* Reset lookahead buffer since Guile consumed the characters */
-      ctx->lookahead = 0;
-
-      /* Return the Guile string directly (Lisp_Object is typedef'd to SCM) */
-      return result;
-    }
-  else
-    {
-      /* If Guile didn't return a string, something went wrong.
-         Fall back to the original implementation */
-      /* Note: We can't easily recover the position, so we'll error out */
-      error ("Guile reader failed to parse string");
-    }
-}
-
-/* File-specific version of read_bool_vector - uses freadchar() directly */
-static Lisp_Object
-fread_bool_vector (struct reader_context *ctx)
-{
-  EMACS_INT length = 0;
-  for (;;)
-    {
-      int c = freadchar (ctx);
-      if (c < '0' || c > '9')
-	{
-	  if (c != '"')
-	    finvalid_syntax ("#&");
-	  break;
-	}
-      if (ckd_mul (&length, length, 10)
-	  || ckd_add (&length, length, c - '0'))
-	finvalid_syntax ("#&");
-    }
-  if (BOOL_VECTOR_LENGTH_MAX < length)
-    finvalid_syntax ("#&");
-
-  ptrdiff_t size_in_chars = bool_vector_bytes (length);
-  Lisp_Object str = fread_string_literal (ctx);
-  /* Validation commented out - multibyte handling simplified */
-
-  Lisp_Object obj = make_uninit_bool_vector (length);
-  unsigned char *data = bool_vector_uchar_data (obj);
-  memcpy (data, SDATA (str), size_in_chars);
-  /* Clear the extraneous bits in the last byte.  */
-  if (length != size_in_chars * BOOL_VECTOR_BITS_PER_CHAR)
-    data[size_in_chars - 1] &= (1 << (length % BOOL_VECTOR_BITS_PER_CHAR)) - 1;
-  return obj;
 }
 
 static void
@@ -5199,7 +5193,8 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '"':
-      obj = fread_string_literal (ctx);
+      // String literal parsing now handled by unified Guile parser
+      obj = elisp_parse_string_literal_from_c_context (ctx);
       break;
 
     case '\'':

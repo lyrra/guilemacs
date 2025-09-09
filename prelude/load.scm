@@ -2474,6 +2474,35 @@ Returns: (comma expr) or (comma-at expr) list structures using proper Elisp symb
 Returns: the unquote-spliced expression (for C to wrap in list2)"
   (elisp-read-from-port port))
 
+(define (elisp-parse-string-literal-from-port port)
+  "Parse a string literal from PORT.
+C has already consumed the opening quote, so we read the complete string.
+Returns: the parsed string"
+  ;; Use Guile's built-in string reader
+  (read port))
+
+(define (elisp-parse-bool-vector-from-port port)
+  "Parse a bool vector (#&LENGTH\"DATA\") from PORT.
+C has already consumed '#&', now we need to parse length and string data.
+Returns: a cons (LENGTH . STRING-DATA) for C to convert to bool vector"
+  ;; Read the length digits until we hit a quote
+  (let loop ((length 0))
+    (let ((ch (peek-char port)))
+      (cond
+        ((eof-object? ch)
+         (error "EOF while reading bool vector length"))
+        ((char=? ch #\")
+         ;; Found the quote, now read the string data
+         (let ((str (read port)))  ; This will read the complete string
+           (cons length str)))
+        ((and (char>=? ch #\0) (char<=? ch #\9))
+         ;; Consume the digit and continue
+         (read-char port) ; consume the digit
+         (let ((digit (- (char->integer ch) (char->integer #\0))))
+           (loop (+ (* length 10) digit))))
+        (else
+         (error "Invalid character in bool vector length"))))))
+
 (define (elisp-skip-comment-from-port port)
   "Skip a line comment starting with ; until newline.
 Returns: #t (to indicate successful skip)"
@@ -2609,7 +2638,8 @@ Returns: appropriate Lisp object based on hash syntax"
       ((char=? ch #\[)
        (error "Bytecode syntax (#[) not supported"))
       ((char=? ch #\&)
-       (error "Bool-vector syntax (#&) not supported"))
+       ;; #&N"..." bool vector syntax
+       (elisp-parse-bool-vector-from-port port))
       ((char=? ch #\@)
        (error "Obsolete load syntax (#@) not supported"))
       ((char=? ch #\_)
