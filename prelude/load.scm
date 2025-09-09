@@ -2538,5 +2538,98 @@ Returns: uninterned symbol"
                 (set! name (string-append name (string next-ch)))
                 (loop))))))))))
 
+(define (elisp-parse-hash-from-port port)
+  "Parse all hash (#) syntax forms from PORT.
+Unified dispatcher for all # syntax in Elisp reader.
+Returns: appropriate Lisp object based on hash syntax"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (error "Unexpected EOF after #"))
+
+      ;; #' function syntax - already implemented
+      ((char=? ch #\')
+       (elisp-parse-hash-function-from-port port))
+
+      ;; ## empty symbol
+      ((char=? ch #\#)
+       (string->symbol ""))
+
+      ;; #! shebang comments - already implemented
+      ((char=? ch #\!)
+       (elisp-parse-hash-shebang-from-port port)
+       ;; Return special value to indicate "continue reading"
+       'elisp-read-continue)
+
+      ;; #: uninterned symbols - already implemented
+      ((char=? ch #\:)
+       (elisp-parse-hash-uninterned-symbol-from-port port))
+
+      ;; #$ lazy file reference
+      ((char=? ch #\$)
+       ;; This needs to access Vload_file_name from C
+       ;; For now, use a placeholder that C can handle
+       'elisp-hash-dollar-placeholder)
+
+      ;; Radix integers: #x #X #o #O #b #B
+      ((or (char=? ch #\x) (char=? ch #\X))
+       (elisp-read-integer-from-port port 16))
+      ((or (char=? ch #\o) (char=? ch #\O))
+       (elisp-read-integer-from-port port 8))
+      ((or (char=? ch #\b) (char=? ch #\B))
+       (elisp-read-integer-from-port port 2))
+
+      ;; Complex number syntax #N=, #N#, #Nr
+      ((char-numeric? ch)
+       (elisp-parse-hash-number-from-port port ch))
+
+      ;; Unsupported syntax - consistent error messages
+      ((char=? ch #\s)
+       (error "Hash-table/record syntax (#s) not supported"))
+      ((char=? ch #\^)
+       (error "Char-table syntax (#^) not supported"))
+      ((char=? ch #\()
+       (error "Text-properties syntax (#() not supported"))
+      ((char=? ch #\[)
+       (error "Bytecode syntax (#[) not supported"))
+      ((char=? ch #\&)
+       (error "Bool-vector syntax (#&) not supported"))
+      ((char=? ch #\@)
+       (error "Obsolete load syntax (#@) not supported"))
+      ((char=? ch #\_)
+       (error "Shorthand syntax (#_) not supported"))
+
+      (else
+       (error "Invalid hash syntax" (string #\# ch))))))
+
+(define (elisp-parse-hash-number-from-port port first-digit)
+  "Parse hash syntax starting with a number: #N=, #N#, #Nr
+PORT: input port
+FIRST-DIGIT: first digit character already read
+Returns: appropriate object for the syntax"
+  ;; Read complete number first
+  (let ((n (- (char->integer first-digit) (char->integer #\0))))
+    (let loop ((result n))
+      (let ((ch (read-char port)))
+        (cond
+          ((eof-object? ch)
+           (error "Unexpected EOF in hash number syntax"))
+          ((char-numeric? ch)
+           ;; Continue reading digits
+           (let ((digit (- (char->integer ch) (char->integer #\0))))
+             (loop (+ (* result 10) digit))))
+          ((char=? ch #\=)
+           ;; #N= circle definition - needs C integration
+           'elisp-hash-circle-def-placeholder)
+          ((char=? ch #\#)
+           ;; #N# circle reference - needs C integration
+           'elisp-hash-circle-ref-placeholder)
+          ((or (char=? ch #\r) (char=? ch #\R))
+           ;; #Nr arbitrary radix
+           (if (or (< result 2) (> result 36))
+               (error "Invalid radix for integer" result)
+               (elisp-read-integer-from-port port result)))
+          (else
+           (error "Invalid character in hash number syntax" ch)))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

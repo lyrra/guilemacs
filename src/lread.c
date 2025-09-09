@@ -2380,6 +2380,22 @@ the end of STRING.  */)
   return Fcons (ret, make_fixnum (read_from_string_index));
 }
 
+/* File-specific error handling functions */
+static AVOID
+finvalid_syntax (const char *s)
+{
+  invalid_syntax (s, Qget_file_char);
+}
+
+static AVOID
+finvalid_radix_integer (EMACS_INT radix)
+{
+  char buf[64];
+  int n = snprintf (buf, sizeof buf, "integer, radix %"pI"d", radix);
+  eassert (n < sizeof buf);
+  finvalid_syntax (buf);
+}
+
 /* Guile Reader Migration - Proof of Concept Implementation */
 
 static Lisp_Object
@@ -2699,6 +2715,55 @@ elisp_parse_hash_uninterned_symbol_from_c_context (struct reader_context *ctx)
   SCM parse_uninterned_func = scm_c_private_ref ("language elisp runtime",
                                                  "elisp-parse-hash-uninterned-symbol-from-port");
   return scm_call_1 (parse_uninterned_func, port);
+}
+
+static Lisp_Object
+elisp_parse_hash_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_hash_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-parse-hash-from-port");
+  SCM result = scm_call_1 (parse_hash_func, port);
+
+  /* Handle special cases that need C integration */
+  if (scm_is_symbol (result))
+    {
+      SCM symbol_str = scm_symbol_to_string (result);
+      char *symbol_name = scm_to_utf8_string (symbol_str);
+
+      if (strcmp (symbol_name, "elisp-read-continue") == 0)
+        {
+          /* This was a comment (#!) - continue reading next object */
+          free (symbol_name);
+          return Qnil; /* Special marker for C to continue reading */
+        }
+      else if (strcmp (symbol_name, "elisp-hash-dollar-placeholder") == 0)
+        {
+          /* #$ lazy file reference */
+          free (symbol_name);
+          return Vload_file_name;
+        }
+      else if (strcmp (symbol_name, "elisp-hash-circle-def-placeholder") == 0)
+        {
+          /* #N= circle definition - not implemented yet */
+          free (symbol_name);
+          finvalid_syntax ("Circle definitions (#N=) not yet supported");
+        }
+      else if (strcmp (symbol_name, "elisp-hash-circle-ref-placeholder") == 0)
+        {
+          /* #N# circle reference - not implemented yet */
+          free (symbol_name);
+          finvalid_syntax ("Circle references (#N#) not yet supported");
+        }
+
+      free (symbol_name);
+    }
+
+  return result;
 }
 
 DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
@@ -3294,22 +3359,6 @@ read_char_escape (Lisp_Object readcharfun, int next_char)
     }
 
   return chr | modifiers;
-}
-
-/* File-specific error handling functions */
-static AVOID
-finvalid_syntax (const char *s)
-{
-  invalid_syntax (s, Qget_file_char);
-}
-
-static AVOID
-finvalid_radix_integer (EMACS_INT radix)
-{
-  char buf[64];
-  int n = snprintf (buf, sizeof buf, "integer, radix %"pI"d", radix);
-  eassert (n < sizeof buf);
-  finvalid_syntax (buf);
 }
 
 /* File-specific version of character_name_to_code - uses file error handling */
@@ -5145,108 +5194,14 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '#':
-      {
-	char *p = read_buffer;
-	char *end = read_buffer + read_buffer_size;
-
-	*p++ = '#';
-	int ch = freadchar (ctx);
-	if (ch < 0)
-	  {
-	    *p = 0;
-	    finvalid_syntax (read_buffer);
-	  }
-	p += CHAR_STRING (ch, (unsigned char *) p);
-	if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-	  {
-	    ptrdiff_t offset = p - read_buffer;
-	    emacs_abort ();
-	    p = read_buffer + offset;
-	    end = read_buffer + read_buffer_size;
-	  }
-
-	switch (ch)
-	  {
-	  case '\'':
-	    /* #'X -- special syntax for (function X) */
-	    obj = elisp_parse_hash_function_from_c_context (ctx);
-	    break;
-
-	  case '#':
-	    /* ## -- the empty symbol */
-	    obj = Fintern (build_string(""), Qnil);
-	    break;
-
-	  case 's':
-	    /* #s(...) -- a record or hash-table */
-	    finvalid_syntax ("record or hash-table syntax not supported");
-	    break;
-
-	  case '^':
-	    /* #^^... */
-	    finvalid_syntax ("char-tables syntax not supported");
-	    break;
-
-	  case '(':
-	    /* #(...) -- string with properties */
-	    finvalid_syntax ("text-properties syntax not supported");
-	    break;
-
-	  case '[':
-	    /* #[...] -- byte-code (not supported in Guile reader) */
-	    finvalid_syntax ("Emacs bytecode syntax not supported");
-	    break;
-
-	  case '&':
-	    /* #&N"..." -- bool-vector */
-	    finvalid_syntax ("bool-vector syntax not supported");
-	    break;
-
-	  case '!':
-	    /* #! appears at the beginning of an executable file.
-	       Skip the rest of the line.  */
-	    elisp_parse_hash_shebang_from_c_context (ctx);
-	    goto read_obj;
-
-	  case 'x':
-	  case 'X':
-	    obj = fread_integer (ctx, 16);
-	    break;
-
-	  case 'o':
-	  case 'O':
-	    obj = fread_integer (ctx, 8);
-	    break;
-
-	  case 'b':
-	  case 'B':
-	    obj = fread_integer (ctx, 2);
-	    break;
-
-	  case '@':
-	    /* #@NUMBER syntax removed - not needed for Guile reader */
-	    finvalid_syntax ("#@");
-	    break;
-
-	  case '$':
-	    /* #$ -- reference to lazy-loaded string */
-	    obj = Vload_file_name;
-	    break;
-
-	  case ':':
-	    /* #:X -- uninterned symbol */
-	    obj = elisp_parse_hash_uninterned_symbol_from_c_context (ctx);
-	    break;
-
-	  case '_':
-	    finvalid_syntax ("symbol without shorthand (#_X)");
-            emacs_abort ();
-
-	  default:
-	    finvalid_syntax ("unknown reader state");
-	  }
-	break;
-      }
+      // All hash syntax now handled by unified Guile parser
+      obj = elisp_parse_hash_from_c_context (ctx);
+      if (NILP (obj))
+        {
+          // Special case: #! comment processed, continue reading
+          goto read_obj;
+        }
+      break;
 
     case '?':
       obj = fread_char_literal (ctx);
