@@ -5131,39 +5131,7 @@ fread0 (struct reader_context *ctx)
       break;
 
     case ')':
-      // get here if closing vector
-      if (read_stack_empty_p (base_sp))
-	finvalid_syntax (")");
-      switch (read_stack_top ()->type)
-	{
-	case RE_list_start:
-	  read_stack_pop ();
-	  obj = Qnil;
-	  break;
-	case RE_list:
-	  obj = read_stack_pop ()->u.list.head;
-	  break;
-	case RE_record:
-	  {
-	    locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	    Lisp_Object elems = Fnreverse (read_stack_pop ()->u.vector.elems);
-	    if (NILP (elems))
-	      finvalid_syntax ("#s");
-
-	    if (BASE_EQ (XCAR (elems), Qhash_table))
-	      obj = hash_table_from_plist (XCDR (elems));
-	    else
-	      obj = record_from_list (elems);
-	    break;
-	  }
-	case RE_string_props:
-	  locate_syms = read_stack_top ()->u.vector.old_locate_syms;
-	  obj = string_props_from_rev_list (read_stack_pop () ->u.vector.elems,
-					    freadchar);
-	  break;
-	default:
-	  finvalid_syntax (")");
-	}
+      finvalid_syntax ("invalid syntax state");
       break;
 
     case '[':
@@ -5288,6 +5256,8 @@ fread0 (struct reader_context *ctx)
 	    goto read_symbol;
 
 	  default:
+            fprintf(stderr, "-- really default --\n");
+            emacs_abort ();
 	    if (ch >= '0' && ch <= '9')
 	      {
 		/* #N=OBJ or #N# -- first read the number N */
@@ -5311,6 +5281,8 @@ fread0 (struct reader_context *ctx)
 		      }
 		    if (c < '0' || c > '9')
 		      break;
+                    fprintf(stderr, "-- really ckd_mul --\n");
+                    emacs_abort ();
 		    if (ckd_mul (&n, n, 10)
 			|| ckd_add (&n, n, c - '0'))
 		      {
