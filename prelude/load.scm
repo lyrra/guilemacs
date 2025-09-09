@@ -2437,12 +2437,25 @@ Returns: A character fixnum"
       ;; Regular character
       (else ch))))
 
-(define (elisp-parse-quote-forms-from-port port special-symbol)
-  "Parse quote, backquote, or comma forms from PORT.
-SPECIAL-SYMBOL should be 'quote, 'backquote, 'comma, or 'comma-at.
-Returns: (SPECIAL-SYMBOL object)"
-  (let ((obj (elisp-read-from-port port)))
-    (list special-symbol obj)))
+(define (elisp-parse-quote-from-port port)
+  "Parse a quote form (') from PORT.
+Returns: the quoted expression (for C to wrap in list2)"
+  (elisp-read-from-port port))
+
+(define (elisp-parse-backquote-from-port port)
+  "Parse a backquote form (`) from PORT.
+Returns: the backquoted expression (for C to wrap in list2)"
+  (elisp-read-from-port port))
+
+(define (elisp-parse-comma-from-port port)
+  "Parse a comma form (,) from PORT.
+Returns: the unquoted expression (for C to wrap in list2)"
+  (elisp-read-from-port port))
+
+(define (elisp-parse-comma-at-from-port port)
+  "Parse a comma-at form (,@) from PORT.
+Returns: the unquote-spliced expression (for C to wrap in list2)"
+  (elisp-read-from-port port))
 
 (define (elisp-skip-comment-from-port port)
   "Skip a line comment starting with ; until newline.

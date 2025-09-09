@@ -2575,9 +2575,9 @@ elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
     error ("Invalid character literal result from Guile");
 }
 
-/* Quote/backquote/comma forms migrated to Guile */
+/* Quote form migrated to Guile */
 static Lisp_Object
-elisp_parse_quote_forms_from_c_context (struct reader_context *ctx, Lisp_Object special_symbol)
+elisp_parse_quote_from_c_context (struct reader_context *ctx)
 {
   SCM port = file_context_to_guile_port (ctx);
   if (scm_is_false (port))
@@ -2585,8 +2585,50 @@ elisp_parse_quote_forms_from_c_context (struct reader_context *ctx, Lisp_Object 
 
   ctx->lookahead = 0;
   SCM parse_quote_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-quote-forms-from-port");
-  return scm_call_2 (parse_quote_func, port, special_symbol);
+                                            "elisp-parse-quote-from-port");
+  return scm_call_1 (parse_quote_func, port);
+}
+
+/* Backquote form migrated to Guile */
+static Lisp_Object
+elisp_parse_backquote_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_backquote_func = scm_c_private_ref ("language elisp runtime",
+                                                "elisp-parse-backquote-from-port");
+  return scm_call_1 (parse_backquote_func, port);
+}
+
+/* Comma form migrated to Guile */
+static Lisp_Object
+elisp_parse_comma_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_comma_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-comma-from-port");
+  return scm_call_1 (parse_comma_func, port);
+}
+
+/* Comma-at form migrated to Guile */
+static Lisp_Object
+elisp_parse_comma_at_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_comma_at_func = scm_c_private_ref ("language elisp runtime",
+                                               "elisp-parse-comma-at-from-port");
+  return scm_call_1 (parse_comma_at_func, port);
 }
 
 /* Comment skipping migrated to Guile */
@@ -5334,36 +5376,35 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '\'':
-      read_stack_push ((struct read_stack_entry) {
-	  .type = RE_special,
-	  .u.special.symbol = Qquote,
-	});
-      goto read_obj;
+      {
+	Lisp_Object quoted_expr = elisp_parse_quote_from_c_context (ctx);
+	obj = list2 (Qquote, quoted_expr);
+	break;
+      }
 
     case '`':
-      read_stack_push ((struct read_stack_entry) {
-	  .type = RE_special,
-	  .u.special.symbol = Qbackquote,
-	});
-      goto read_obj;
+      {
+	Lisp_Object backquoted_expr = elisp_parse_backquote_from_c_context (ctx);
+	obj = list2 (Qbackquote, backquoted_expr);
+	break;
+      }
 
     case ',':
       {
 	int ch = freadchar (ctx);
-	Lisp_Object sym;
 	if (ch == '@')
-	  sym = Qcomma_at;
+	  {
+	    Lisp_Object comma_at_expr = elisp_parse_comma_at_from_c_context (ctx);
+	    obj = list2 (Qcomma_at, comma_at_expr);
+	  }
 	else
 	  {
 	    if (ch >= 0)
 	      scm_ungetc(ch, ctx->port);
-	    sym = Qcomma;
+	    Lisp_Object comma_expr = elisp_parse_comma_from_c_context (ctx);
+	    obj = list2 (Qcomma, comma_expr);
 	  }
-	read_stack_push ((struct read_stack_entry) {
-	    .type = RE_special,
-	    .u.special.symbol = sym,
-	  });
-	goto read_obj;
+	break;
       }
 
     case ';':
