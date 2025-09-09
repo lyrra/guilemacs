@@ -2625,6 +2625,29 @@ elisp_parse_colon_from_c_context (struct reader_context *ctx)
   error ("Colon parser returned non-symbol");
 }
 
+/* Comma syntax (,, ,@) migrated to Guile */
+static Lisp_Object
+elisp_parse_comma_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_comma_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-comma-from-port");
+  SCM result = scm_call_1 (parse_comma_func, port);
+
+  /* Result should be a list (comma expr) or (comma-at expr) */
+  if (scm_is_pair (result))
+    {
+      return result; /* SCM lists are already Lisp_Objects in GuilEmacs */
+    }
+
+  /* Should always be a list for comma syntax */
+  error ("Comma parser returned non-list");
+}
+
 /* Quote form migrated to Guile */
 static Lisp_Object
 elisp_parse_quote_from_c_context (struct reader_context *ctx)
@@ -2653,19 +2676,6 @@ elisp_parse_backquote_from_c_context (struct reader_context *ctx)
   return scm_call_1 (parse_backquote_func, port);
 }
 
-/* Comma form migrated to Guile */
-static Lisp_Object
-elisp_parse_comma_from_c_context (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_comma_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-comma-from-port");
-  return scm_call_1 (parse_comma_func, port);
-}
 
 /* Comma-at form migrated to Guile */
 static Lisp_Object
@@ -5207,22 +5217,9 @@ fread0 (struct reader_context *ctx)
       }
 
     case ',':
-      {
-	int ch = freadchar (ctx);
-	if (ch == '@')
-	  {
-	    Lisp_Object comma_at_expr = elisp_parse_comma_at_from_c_context (ctx);
-	    obj = list2 (Qcomma_at, comma_at_expr);
-	  }
-	else
-	  {
-	    if (ch >= 0)
-	      scm_ungetc(ch, ctx->port);
-	    Lisp_Object comma_expr = elisp_parse_comma_from_c_context (ctx);
-	    obj = list2 (Qcomma, comma_expr);
-	  }
-	break;
-      }
+      // Comma syntax (,, ,@) now handled by unified Guile parser
+      obj = elisp_parse_comma_from_c_context (ctx);
+      break;
 
     case ';':
       {

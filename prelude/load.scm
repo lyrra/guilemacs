@@ -2448,9 +2448,26 @@ Returns: the backquoted expression (for C to wrap in list2)"
   (elisp-read-from-port port))
 
 (define (elisp-parse-comma-from-port port)
-  "Parse a comma form (,) from PORT.
-Returns: the unquoted expression (for C to wrap in list2)"
-  (elisp-read-from-port port))
+  "Parse comma syntax from PORT, handling both , and ,@ forms.
+Called from C fread0() when ',' is encountered.
+Returns: (comma expr) or (comma-at expr) list structures using proper Elisp symbols"
+  ;; C has already detected the comma, now determine , vs ,@
+  (let ((next-ch (peek-char port)))
+    (cond
+      ;; Check for ,@ (comma-at)
+      ((and (not (eof-object? next-ch)) (char=? next-ch #\@))
+       ;; Consume the @ and read the expression
+       (read-char port) ; consume @
+       (let ((expr (elisp-read-from-port port)))
+         ;; Return (comma-at expr) with proper Elisp symbol and list termination
+         (cons (elisp-intern ",@" #nil) (cons expr #nil))))
+
+      ;; Regular comma ,
+      (else
+       ;; Read the expression
+       (let ((expr (elisp-read-from-port port)))
+         ;; Return (comma expr) with proper Elisp symbol and list termination
+         (cons (elisp-intern "," #nil) (cons expr #nil)))))))
 
 (define (elisp-parse-comma-at-from-port port)
   "Parse a comma-at form (,@) from PORT.
