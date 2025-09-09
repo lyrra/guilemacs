@@ -2591,6 +2591,40 @@ elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
     error ("Invalid character literal result from Guile");
 }
 
+/* Colon symbol syntax (:, :keyword) migrated to Guile */
+static Lisp_Object
+elisp_parse_colon_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_colon_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-colon-from-port");
+  SCM result = scm_call_1 (parse_colon_func, port);
+
+  /* Convert Scheme symbol to Elisp symbol */
+  if (scm_is_symbol (result))
+    {
+      SCM symbol_str = scm_symbol_to_string (result);
+      char *symbol_name = scm_to_utf8_string (symbol_str);
+      Lisp_Object elisp_symbol = intern_c_string (symbol_name);
+
+      /* If this is a keyword (starts with :), make it self-evaluating */
+      if (symbol_name[0] == ':')
+        {
+          Fset (elisp_symbol, elisp_symbol); /* Set symbol's value to itself */
+        }
+
+      free (symbol_name);
+      return elisp_symbol;
+    }
+
+  /* Should always be a symbol for colon syntax */
+  error ("Colon parser returned non-symbol");
+}
+
 /* Quote form migrated to Guile */
 static Lisp_Object
 elisp_parse_quote_from_c_context (struct reader_context *ctx)
@@ -5232,71 +5266,13 @@ fread0 (struct reader_context *ctx)
 	  break;
 	}
 
-      /* Special handling for colon symbols which Guile treats as keywords */
+      /* Colon symbol handling migrated to Guile parser */
       if (c == ':')
         {
-          /* Check if next character indicates this is a bare colon symbol */
-          int next_char = freadchar (ctx);
-          if (next_char < 0
-              || next_char <= 32 || next_char == NO_BREAK_SPACE
-              || next_char == '"' || next_char == '\'' || next_char == ';'
-              || next_char == '(' || next_char == ')' || next_char == '['
-              || next_char == ']' || next_char == '#' || next_char == '?'
-              || next_char == '`' || next_char == ',')
-            {
-              /* This is a bare colon - return the interned colon symbol */
-              if (next_char >= 0)
-	        scm_ungetc(next_char, ctx->port);
-              obj = intern_c_string (":");
-              break;
-            }
-          else
-            {
-              /* This is a colon-prefixed symbol like :documentation */
-              /* Collect the rest of the symbol name */
-              char stackbuf[256];
-              char *read_buffer = stackbuf;
-              ptrdiff_t read_buffer_size = sizeof stackbuf;
-              char *heapbuf = NULL;
-              char *p = read_buffer;
-              char *end = read_buffer + read_buffer_size;
-
-              /* Add the colon */
-              *p++ = ':';
-
-              /* Collect symbol characters using a while loop with proper character handling */
-              while (next_char >= 0 && next_char > 32 && next_char != NO_BREAK_SPACE
-                     && next_char != '"' && next_char != '\'' && next_char != ';'
-                     && next_char != '(' && next_char != ')' && next_char != '['
-                     && next_char != ']' && next_char != '#' && next_char != '?'
-                     && next_char != '`' && next_char != ',' && next_char != '.') {
-
-                if (p >= end) {
-                  ptrdiff_t offset = p - read_buffer;
-                  read_buffer = grow_read_buffer (read_buffer, offset,
-                                                  &heapbuf, &read_buffer_size);
-                  p = read_buffer + offset;
-                  end = read_buffer + read_buffer_size;
-                }
-                *p++ = next_char;
-                next_char = freadchar (ctx);
-              }
-
-              /* Put back the terminating character */
-              if (next_char >= 0)
-	        scm_ungetc(next_char, ctx->port);
-
-              *p = '\0';
-
-              /* Create the colon-prefixed symbol */
-              obj = intern_c_string (read_buffer);
-
-              /* Clean up */
-              if (heapbuf)
-                xfree (heapbuf);
-
-              break;
-            }
+          /* Put the colon back for the Scheme parser to read */
+          scm_ungetc (c, ctx->port);
+          obj = elisp_parse_colon_from_c_context (ctx);
+          break;
         }
 
       if (scm_is_true(ctx->port)

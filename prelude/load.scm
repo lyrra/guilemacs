@@ -2820,5 +2820,72 @@ Returns: Character code with modifiers encoded"
                                   (char->integer #\a)) 10))))
               (loop (+ (* result 16) digit) (+ count 1))))))))
 
+(define (elisp-parse-colon-from-port port)
+  "Parse colon syntax from PORT.
+Handles both bare colon ':' and colon-prefixed symbols ':keyword'.
+Called from C fread0() when ':' is encountered at symbol position.
+Returns: appropriate symbol object"
+  ;; First consume the colon character
+  (let ((colon-ch (read-char port)))
+    (if (not (char=? colon-ch #\:))
+        (error "Expected colon character")
+        (let ((next-ch (peek-char port)))
+          (cond
+            ;; EOF - bare colon
+            ((eof-object? next-ch)
+             (string->symbol ":"))
+
+            ;; Check for symbol terminator characters - this is a bare colon
+            ((or (char<=? next-ch #\space)
+                 (char=? next-ch #\")
+                 (char=? next-ch #\')
+                 (char=? next-ch #\;)
+                 (char=? next-ch #\()
+                 (char=? next-ch #\))
+                 (char=? next-ch #\[)
+                 (char=? next-ch #\])
+                 (char=? next-ch #\#)
+                 (char=? next-ch #\?)
+                 (char=? next-ch #\`)
+                 (char=? next-ch #\,)
+                 (char=? next-ch #\.))
+             ;; Bare colon symbol
+             (string->symbol ":"))
+
+            ;; This is a colon-prefixed symbol like :documentation
+            (else
+             (elisp-parse-colon-prefixed-symbol port)))))))
+
+(define (elisp-parse-colon-prefixed-symbol port)
+  "Parse a colon-prefixed symbol like :keyword from PORT.
+Assumes the colon has already been consumed and we're reading the rest."
+  (let ((name ":"))  ; Start with colon
+    (let loop ()
+      (let ((ch (peek-char port)))
+        (cond
+          ;; EOF or terminator character - done reading symbol
+          ((or (eof-object? ch)
+               (char<=? ch #\space)
+               (char=? ch #\")
+               (char=? ch #\')
+               (char=? ch #\;)
+               (char=? ch #\()
+               (char=? ch #\))
+               (char=? ch #\[)
+               (char=? ch #\])
+               (char=? ch #\#)
+               (char=? ch #\?)
+               (char=? ch #\`)
+               (char=? ch #\,)
+               (char=? ch #\.))
+           ;; Done - create the symbol
+           (string->symbol name))
+
+          ;; Regular symbol character - add to name and continue
+          (else
+           (read-char port) ; consume the character
+           (set! name (string-append name (string ch)))
+           (loop)))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
