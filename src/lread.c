@@ -5304,40 +5304,13 @@ fread0 (struct reader_context *ctx)
 		  {
 		    if (c == '=')
 		      {
-                        fprintf(stderr, "circle-read not supported\n");
-                        emacs_abort ();
-			/* #N=OBJ -- assign number N to OBJ */
-			Lisp_Object placeholder = Fcons (Qnil, Qnil);
-
-			struct Lisp_Hash_Table *h
-			  = XHASH_TABLE (read_objects_map);
-			Lisp_Object number = make_fixnum (n);
-			hash_hash_t hash;
-			ptrdiff_t i = hash_lookup_get_hash (h, number, &hash);
-			if (i >= 0)
-			  /* Not normal, but input could be malformed.  */
-			  set_hash_value_slot (h, i, placeholder);
-			else
-			  hash_put (h, number, placeholder, hash);
-			read_stack_push ((struct read_stack_entry) {
-			    .type = RE_numbered,
-			    .u.numbered.number = number,
-			    .u.numbered.placeholder = placeholder,
-			  });
-			goto read_obj;
+	                finvalid_syntax ("circle-read not supported");
+                        break;
 		      }
 		    else if (c == '#')
 		      {
-			/* #N# -- reference to numbered object */
-			struct Lisp_Hash_Table *h
-			  = XHASH_TABLE (read_objects_map);
-			ptrdiff_t i = hash_lookup (h, make_fixnum (n));
-			if (i < 0)
-			  {
-			    FINVALID_SYNTAX_WITH_BUFFER ();
-			  }
-			obj = HASH_VALUE (h, i);
-			break;
+	                finvalid_syntax ("circle-read-ref not supported");
+                        break;
 		      }
 		    else
 		      FINVALID_SYNTAX_WITH_BUFFER ();
