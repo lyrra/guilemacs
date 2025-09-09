@@ -2471,7 +2471,7 @@ Returns: #t (to indicate successful skip)"
   "Parse #' function syntax from PORT.
 Returns: (function object)"
   (let ((obj (elisp-read-from-port port)))
-    (list 'function obj)))
+    (cons 'function (cons obj #nil))))
 
 (define (elisp-parse-hash-empty-symbol-from-port port)
   "Parse ## empty symbol syntax from PORT.
@@ -2512,12 +2512,31 @@ Returns: uninterned symbol"
        (unread-char ch port)
        (gensym ""))
       (else
-       ;; Read the symbol name
-       (unread-char ch port)
-       (let ((sym (read port)))
-         (if (symbol? sym)
-             (gensym (symbol->string sym))
-             (error "Expected symbol after #:")))))))
+       ;; Read the symbol name manually to avoid circular dependency
+       (let ((name (string ch)))
+         (let loop ()
+           (let ((next-ch (read-char port)))
+             (cond
+               ((eof-object? next-ch)
+                (gensym name))
+               ((or (char<=? next-ch #\space)
+                    (char=? next-ch #\")
+                    (char=? next-ch #\')
+                    (char=? next-ch #\;)
+                    (char=? next-ch #\#)
+                    (char=? next-ch #\()
+                    (char=? next-ch #\))
+                    (char=? next-ch #\[)
+                    (char=? next-ch #\])
+                    (char=? next-ch #\`)
+                    (char=? next-ch #\,))
+                ;; Symbol terminator found, put it back and create symbol
+                (unread-char next-ch port)
+                (gensym name))
+               (else
+                ;; Regular symbol character, add to name and continue
+                (set! name (string-append name (string next-ch)))
+                (loop))))))))))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

@@ -5201,13 +5201,8 @@ fread0 (struct reader_context *ctx)
 	  {
 	  case '\'':
 	    /* #'X -- special syntax for (function X) */
-	    read_stack_push ((struct read_stack_entry) {
-		.type = RE_special,
-		.u.special.symbol = Qfunction,
-	      });
-	    goto read_obj;
-	    //obj = elisp_parse_hash_function_from_c_context (ctx);
-	    //break;
+	    obj = elisp_parse_hash_function_from_c_context (ctx);
+	    break;
 
 	  case '#':
 	    /* ## -- the empty symbol */
@@ -5272,22 +5267,8 @@ fread0 (struct reader_context *ctx)
 
 	  case ':':
 	    /* #:X -- uninterned symbol */
-	    c = freadchar (ctx);
-	    if (c <= 32 || c == NO_BREAK_SPACE
-		|| c == '"' || c == '\'' || c == ';' || c == '#'
-		|| c == '(' || c == ')'  || c == '[' || c == ']'
-		|| c == '`' || c == ',')
-	      {
-		/* No symbol character follows: this is the empty symbol.  */
-		funreadchar (ctx, c);
-		obj = Fmake_symbol (build_string(""));
-		break;
-	      }
-	    uninterned_symbol = true;
-	    skip_shorthand = false;
-	    goto read_symbol;
-	    //obj = elisp_parse_hash_uninterned_symbol_from_c_context (ctx);
-	    //break;
+	    obj = elisp_parse_hash_uninterned_symbol_from_c_context (ctx);
+	    break;
 
 	  case '_':
 	    /* #_X -- symbol without shorthand */
