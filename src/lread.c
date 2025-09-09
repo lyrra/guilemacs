@@ -5110,18 +5110,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 static Lisp_Object
 fread0 (struct reader_context *ctx)
 {
-  bool locate_syms = false;
-  char stackbuf[64];
-  char *read_buffer = stackbuf;
-  ptrdiff_t read_buffer_size = sizeof stackbuf;
-  char *heapbuf = NULL;
-
   dynwind_begin ();
-  ptrdiff_t base_sp = rdstack.sp;
-  record_unwind_protect_intmax (read_stack_reset, base_sp);
-
-  bool uninterned_symbol;
-  bool skip_shorthand;
 
   /* Read an object into `obj'.  */
  read_obj: ;
@@ -5359,13 +5348,11 @@ fread0 (struct reader_context *ctx)
 	  break;
 	}
 
-      uninterned_symbol = false;
-      skip_shorthand = false;
       /* symbol or number */
     read_symbol:
       {
 	/* Use pure Guile symbol/number reading with port synchronization */
-	obj = fread_symbol_guile (ctx, c, uninterned_symbol, skip_shorthand);
+	obj = fread_symbol_guile (ctx, c, false, false);
 	break;
       }
     }
