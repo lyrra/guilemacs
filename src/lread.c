@@ -5297,8 +5297,9 @@ fread0 (struct reader_context *ctx)
 		  }
 		if (c == 'r' || c == 'R')
 		  {
-                    emacs_abort (); // guilemacs: arbitrary radix support dropped
 		    /* #NrDIGITS -- radix-N number */
+                    finvalid_syntax ("arbitrary radix not supported");
+                    break;
 		  }
 		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
 		  {
