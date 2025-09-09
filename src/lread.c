@@ -5249,24 +5249,6 @@ fread0 (struct reader_context *ctx)
 	goto read_obj;
       }
 
-    case '.':
-      {
-	int nch = freadchar (ctx);
-	scm_ungetc(nch, ctx->port);
-	if (nch <= 32 || nch == NO_BREAK_SPACE
-	    || nch == '"' || nch == '\'' || nch == ';'
-	    || nch == '(' || nch == '[' || nch == '#'
-	    || nch == '?' || nch == '`' || nch == ',')
-	  {
-	    if (!read_stack_empty_p (base_sp)
-		&& read_stack_top ()->type ==  RE_list)
-	      {
-		read_stack_top ()->type = RE_list_dot;
-		goto read_obj;
-	      }
-	    finvalid_syntax (".");
-	  }
-      }
       /* may be a number or symbol starting with a dot */
       FALLTHROUGH;
 
