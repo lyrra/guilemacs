@@ -2631,5 +2631,194 @@ Returns: appropriate object for the syntax"
           (else
            (error "Invalid character in hash number syntax" ch)))))))
 
+(define (elisp-parse-char-literal-from-port port)
+  "Parse an Elisp character literal from PORT.
+Handles simple characters, escape sequences, and modifier combinations.
+Called from C fread0() when '?' is encountered.
+Returns: A character fixnum with appropriate encoding"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (error "Unexpected EOF in character literal"))
+
+      ;; Accept single space or tab syntax like (list ? x)
+      ((or (char=? ch #\space) (char=? ch #\tab))
+       (char->integer ch))
+
+      ;; Handle escape sequences
+      ((char=? ch #\\)
+       (elisp-parse-char-escape port))
+
+      ;; Regular character - check for valid terminator
+      (else
+       (let ((next-ch (peek-char port)))
+         (if (or (eof-object? next-ch)
+                 (char<=? next-ch #\space)
+                 (char=? next-ch #\")
+                 (char=? next-ch #\')
+                 (char=? next-ch #\;)
+                 (char=? next-ch #\()
+                 (char=? next-ch #\))
+                 (char=? next-ch #\[)
+                 (char=? next-ch #\])
+                 (char=? next-ch #\#)
+                 (char=? next-ch #\?)
+                 (char=? next-ch #\`)
+                 (char=? next-ch #\,)
+                 (char=? next-ch #\.))
+             (char->integer ch)
+             (error "Invalid character syntax")))))))
+
+(define (elisp-parse-char-escape port)
+  "Parse escape sequences in character literals.
+Handles \\n, \\t, \\M-x, \\C-x, \\S-x, etc.
+Returns: Character code with modifiers encoded"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (error "Unexpected EOF in escape sequence"))
+
+      ;; Basic escape sequences
+      ((char=? ch #\a) 7)    ; bell
+      ((char=? ch #\b) 8)    ; backspace
+      ((char=? ch #\d) 127)  ; delete
+      ((char=? ch #\e) 27)   ; escape
+      ((char=? ch #\f) 12)   ; form feed
+      ((char=? ch #\n) 10)   ; newline
+      ((char=? ch #\r) 13)   ; carriage return
+      ((char=? ch #\t) 9)    ; tab
+      ((char=? ch #\v) 11)   ; vertical tab
+      ((char=? ch #\newline) (error "Invalid escape: \\<newline>"))
+
+      ;; Modifier keys: \M-x, \C-x, \S-x, \H-x, \A-x, \s-x
+      ((char=? ch #\M) (elisp-parse-modifier port #x2000000))  ; meta
+      ((char=? ch #\C) (elisp-parse-control port))             ; control
+      ((char=? ch #\S) (elisp-parse-modifier port #x8000000))  ; shift
+      ((char=? ch #\H) (elisp-parse-modifier port #x10000000)) ; hyper
+      ((char=? ch #\A) (elisp-parse-modifier port #x4000000))  ; alt
+      ((char=? ch #\s) (elisp-parse-s-modifier port))          ; super or space
+      ((char=? ch #\^) (elisp-parse-control-hat port))         ; ^x syntax
+
+      ;; Octal sequences: \123
+      ((char-numeric? ch)
+       (elisp-parse-octal port ch))
+
+      ;; Unicode sequences: \u1234 or \U12345678
+      ((char=? ch #\u) (elisp-parse-unicode port 4))
+      ((char=? ch #\U) (elisp-parse-unicode port 8))
+      ((char=? ch #\x) (elisp-parse-hex-char port))
+
+      ;; Default: literal character after backslash
+      (else (char->integer ch)))))
+
+(define (elisp-parse-modifier port modifier-bit)
+  "Parse modifier syntax like \\M-x, \\S-x, etc."
+  (let ((dash (read-char port)))
+    (if (not (char=? dash #\-))
+        (error "Expected '-' after modifier")
+        (let ((next-ch (read-char port)))
+          (cond
+            ((eof-object? next-ch) (error "EOF after modifier"))
+            ((char=? next-ch #\\)
+             ;; Chained escape: \M-\C-x
+             (+ modifier-bit (elisp-parse-char-escape port)))
+            (else
+             ;; Simple modified char: \M-x
+             (+ modifier-bit (char->integer next-ch))))))))
+
+(define (elisp-parse-s-modifier port)
+  "Handle \\s which can be \\s-x (super) or just \\s (space)"
+  (let ((next-ch (peek-char port)))
+    (if (char=? next-ch #\-)
+        (begin
+          (read-char port) ; consume the '-'
+          (let ((ch (read-char port)))
+            (if (char=? ch #\\)
+                (+ #x1000000 (elisp-parse-char-escape port)) ; super + escape
+                (+ #x1000000 (char->integer ch)))))          ; super + char
+        32))) ; just space
+
+(define (elisp-parse-control port)
+  "Parse \\C-x control modifier"
+  (let ((dash (read-char port)))
+    (if (not (char=? dash #\-))
+        (error "Expected '-' after \\C")
+        (let ((ch (read-char port)))
+          (cond
+            ((eof-object? ch) (error "EOF after \\C-"))
+            ((char=? ch #\\)
+             ;; \C-\something
+             (logior #x4000000 (elisp-parse-char-escape port)))
+            (else
+             ;; \C-x - make control character
+             (let ((code (char->integer ch)))
+               (if (and (>= code 64) (<= code 95)) ; @ A-Z [ \ ] ^ _
+                   (- code 64)
+                   (logior #x4000000 code)))))))))
+
+(define (elisp-parse-control-hat port)
+  "Parse \\^x control syntax"
+  (let ((ch (read-char port)))
+    (cond
+      ((eof-object? ch) (error "EOF after \\^"))
+      ((char=? ch #\\)
+       (logior #x4000000 (elisp-parse-char-escape port)))
+      (else
+       (let ((code (char->integer ch)))
+         (if (and (>= code 64) (<= code 95))
+             (- code 64)
+             (logior #x4000000 code)))))))
+
+(define (elisp-parse-octal port first-digit)
+  "Parse octal character code \\123"
+  (let ((value (- (char->integer first-digit) (char->integer #\0))))
+    (let loop ((result value) (count 1))
+      (if (>= count 3)
+          result
+          (let ((ch (peek-char port)))
+            (if (and (not (eof-object? ch))
+                     (char-numeric? ch)
+                     (<= (char->integer ch) (char->integer #\7)))
+                (begin
+                  (read-char port)
+                  (loop (+ (* result 8) (- (char->integer ch) (char->integer #\0)))
+                        (+ count 1)))
+                result))))))
+
+(define (elisp-parse-unicode port digit-count)
+  "Parse Unicode escape \\u1234 or \\U12345678"
+  (let loop ((result 0) (count 0))
+    (if (>= count digit-count)
+        result
+        (let ((ch (read-char port)))
+          (cond
+            ((eof-object? ch) (error "EOF in Unicode escape"))
+            ((or (and (char>=? ch #\0) (char<=? ch #\9))
+                 (and (char>=? ch #\a) (char<=? ch #\f))
+                 (and (char>=? ch #\A) (char<=? ch #\F)))
+             (let ((digit (if (char-numeric? ch)
+                             (- (char->integer ch) (char->integer #\0))
+                             (+ (- (char->integer (char-downcase ch))
+                                   (char->integer #\a)) 10))))
+               (loop (+ (* result 16) digit) (+ count 1))))
+            (else (error "Invalid hex digit in Unicode escape")))))))
+
+(define (elisp-parse-hex-char port)
+  "Parse hex character \\x12"
+  (let loop ((result 0) (count 0))
+    (let ((ch (peek-char port)))
+      (if (or (eof-object? ch)
+              (not (or (and (char>=? ch #\0) (char<=? ch #\9))
+                      (and (char>=? ch #\a) (char<=? ch #\f))
+                      (and (char>=? ch #\A) (char<=? ch #\F)))))
+          (if (= count 0)
+              (error "No hex digits after \\x")
+              result)
+          (begin
+            (read-char port)
+            (let ((digit (if (char-numeric? ch)
+                            (- (char->integer ch) (char->integer #\0))
+                            (+ (- (char->integer (char-downcase ch))
+                                  (char->integer #\a)) 10))))
+              (loop (+ (* result 16) digit) (+ count 1))))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

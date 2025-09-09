@@ -3771,48 +3771,6 @@ fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_
     }
 }
 
-/* File-specific version of read_char_literal - Pure Guile with modifier encoding */
-static Lisp_Object
-fread_char_literal (struct reader_context *ctx)
-{
-  int ch = freadchar (ctx);
-  if (ch < 0)
-    end_of_file_error ();
-
-
-  /* Accept `single space' syntax like (list ? x) where the
-     whitespace character is SPC or TAB. */
-  if (ch == ' ' || ch == '\t')
-    return make_fixnum (ch);
-
-  /* For escape sequences, we'll encode modifiers using high bits
-     that Guile can handle as regular Unicode codepoints */
-  if (ch == '\\')
-    {
-      /* Use a simplified escape reader that encodes modifiers
-         in a Guile-friendly way */
-      ch = fread_char_escape (ctx, freadchar (ctx));
-
-      /* Extract modifiers and base character */
-      int modifiers = ch & CHAR_MODIFIER_MASK;
-      int base_ch = ch & ~CHAR_MODIFIER_MASK;
-
-      /* Use the alchemy encoding for ASCII characters with modifiers */
-      ch = ENCODE_CHAR_WITH_MODIFIERS (base_ch, modifiers);
-    }
-
-  /* Check for valid character context */
-  int nch = freadchar (ctx);
-  scm_ungetc(nch, ctx->port);
-  if (nch <= 32
-      || nch == '"' || nch == '\'' || nch == ';' || nch == '('
-      || nch == ')' || nch == '['  || nch == ']' || nch == '#'
-      || nch == '?' || nch == '`'  || nch == ',' || nch == '.')
-    return make_fixnum (ch);
-
-  finvalid_syntax ("?");
-}
-
 /* File-specific version of read_string_literal - uses Guile's reader when possible */
 static Lisp_Object
 fread_string_literal (struct reader_context *ctx)
@@ -5204,7 +5162,7 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '?':
-      obj = fread_char_literal (ctx);
+      obj = elisp_parse_char_literal_from_c_context (ctx);
       break;
 
     case '"':
