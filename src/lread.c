@@ -5239,83 +5239,11 @@ fread0 (struct reader_context *ctx)
 	    break;
 
 	  case '_':
-	    /* #_X -- symbol without shorthand */
-	    c = freadchar (ctx);
-	    if (c <= 32 || c == NO_BREAK_SPACE
-		|| c == '"' || c == '\'' || c == ';' || c == '#'
-		|| c == '(' || c == ')'  || c == '[' || c == ']'
-		|| c == '`' || c == ',')
-	      {
-		/* No symbol character follows: this is the empty symbol.  */
-		funreadchar (ctx, c);
-		obj = Fintern (build_string(""), Qnil);
-		break;
-	      }
-	    uninterned_symbol = false;
-	    skip_shorthand = true;
-	    goto read_symbol;
+	    finvalid_syntax ("symbol without shorthand (#_X)");
+            emacs_abort ();
 
 	  default:
-            fprintf(stderr, "-- really default --\n");
-            emacs_abort ();
-	    if (ch >= '0' && ch <= '9')
-	      {
-		/* #N=OBJ or #N# -- first read the number N */
-		EMACS_INT n = ch - '0';
-		int c;
-		for (;;)
-		  {
-		    c = freadchar (ctx);
-		    if (c < 0)
-		      {
-			*p = 0;
-			finvalid_syntax (read_buffer);
-		      }
-		    p += CHAR_STRING (c, (unsigned char *) p);
-		    if (end - p < MAX_MULTIBYTE_LENGTH + 1)
-		      {
-			ptrdiff_t offset = p - read_buffer;
-			emacs_abort ();
-			p = read_buffer + offset;
-			end = read_buffer + read_buffer_size;
-		      }
-		    if (c < '0' || c > '9')
-		      break;
-                    fprintf(stderr, "-- really ckd_mul --\n");
-                    emacs_abort ();
-		    if (ckd_mul (&n, n, 10)
-			|| ckd_add (&n, n, c - '0'))
-		      {
-			*p = 0;
-			finvalid_syntax (read_buffer);
-		      }
-		  }
-		if (c == 'r' || c == 'R')
-		  {
-		    /* #NrDIGITS -- radix-N number */
-                    finvalid_syntax ("arbitrary radix not supported");
-                    break;
-		  }
-		else if (n <= MOST_POSITIVE_FIXNUM && !NILP (Vread_circle))
-		  {
-		    if (c == '=')
-		      {
-	                finvalid_syntax ("circle-read not supported");
-                        break;
-		      }
-		    else if (c == '#')
-		      {
-	                finvalid_syntax ("circle-read-ref not supported");
-                        break;
-		      }
-		    else
-		      FINVALID_SYNTAX_WITH_BUFFER ();
-		  }
-		else
-		  FINVALID_SYNTAX_WITH_BUFFER ();
-	      }
-	    else
-	      FINVALID_SYNTAX_WITH_BUFFER ();
+	    finvalid_syntax ("unknown reader state");
 	  }
 	break;
       }
