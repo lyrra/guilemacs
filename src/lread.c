@@ -2409,19 +2409,11 @@ guile_to_lisp_object (SCM obj)
     return scm_is_true (obj) ? Qt : Qnil;
   else if (scm_is_integer (obj) && scm_is_exact (obj))
     {
-      /* Handle both fixnum and bignum integers - but only exact ones */
-      if (scm_is_true (scm_exact_integer_p (obj)))
-        {
-          /* For large integers, try to convert to Lisp bignum */
-          if (scm_is_true (scm_integer_p (obj)))
-            return obj; /* Let GuilEmacs handle bignums directly */
-        }
-      return make_fixnum (scm_to_int (obj));
+      return obj;
     }
   else if (scm_is_real (obj))
     {
-      /* Handle floating point numbers and inexact integers like 0.0 */
-      return make_float (scm_to_double (obj));
+      return obj;
     }
   else if (scm_is_string (obj))
     return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
@@ -2490,13 +2482,10 @@ guile_to_lisp_object (SCM obj)
     }
   else if (scm_is_true (scm_hash_table_p (obj)))
     {
-      /* Convert Guile hash tables to Lisp association lists */
-      /* Use a simple fold approach to convert hash table to list */
-      return obj; /* Return hash table as-is for now, improve in future */
+      return obj;
     }
   else
     {
-      /* For complex types, return as-is and let higher layers handle */
       return obj;
     }
 }
