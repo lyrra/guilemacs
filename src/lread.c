@@ -2625,6 +2625,31 @@ elisp_parse_colon_from_c_context (struct reader_context *ctx)
   error ("Colon parser returned non-symbol");
 }
 
+/* Symbol/number parsing migrated to Guile */
+static Lisp_Object
+elisp_parse_symbol_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_symbol_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-symbol-from-port");
+  SCM result = scm_call_1 (parse_symbol_func, port);
+
+  /* Convert symbols to Elisp symbols, return numbers/others directly */
+  if (scm_is_symbol (result))
+    {
+      /* Convert Scheme symbol to Elisp symbol - still more efficient than full C string dance */
+      SCM symbol_str = scm_symbol_to_string (result);
+      return Fintern (symbol_str, Qnil);  /* Use standard intern with default obarray */
+    }
+
+  /* Numbers and other types can be returned directly */
+  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
+}
+
 /* Comma syntax (,, ,@) migrated to Guile */
 static Lisp_Object
 elisp_parse_comma_from_c_context (struct reader_context *ctx)
@@ -5267,62 +5292,18 @@ fread0 (struct reader_context *ctx)
           break;
         }
 
+      /* Alphabetic symbol/number parsing migrated to Guile */
       if (scm_is_true(ctx->port)
           && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
-	{
-	  /* Push back the character we already consumed */
-	  scm_ungetc(c, ctx->port);
-
-	  /* Let Guile read the complete symbol/number */
-	  SCM result = scm_read(ctx->port);
-
-	  /* Handle EOF */
-	  if (scm_is_eq (result, SCM_EOF_VAL))
-	    end_of_file_error();
-
-	  /* Convert SCM result directly to Lisp_Object */
-	  if (scm_is_symbol(result))
-	    {
-	      /* Convert Guile symbol to Elisp symbol */
-	      SCM symbol_str = scm_symbol_to_string(result);
-	      char *symbol_name = scm_to_utf8_string(symbol_str);
-	      obj = Fintern(build_string(symbol_name), Qnil);
-	      free(symbol_name);
-	    }
-	  else if (scm_is_number(result))
-	    {
-	      /* Handle numbers - convert SCM number to Lisp_Object */
-	      if (scm_is_integer(result))
-		{
-		  intmax_t val = scm_to_intmax(result);
-		  obj = make_fixnum(val);
-		}
-	      else if (scm_is_real(result))
-		{
-		  double val = scm_to_double(result);
-		  obj = make_float(val);
-		}
-	      else
-		{
-		  /* Complex numbers or other numeric types - fall back */
-		  obj = result; /* SCM is already a Lisp_Object in GuilEmacs */
-		}
-	    }
-	  else
-	    {
-	      /* For other types, use the SCM object directly */
-	      obj = result;
-	    }
-	  break;
-	}
-
+        {
+          /* Put the character back for the Scheme parser to read */
+          scm_ungetc (c, ctx->port);
+          obj = elisp_parse_symbol_from_c_context (ctx);
+          break;
+        }
       /* symbol or number */
-    read_symbol:
-      {
-	/* Use pure Guile symbol/number reading with port synchronization */
-	obj = fread_symbol_guile (ctx, c, false, false);
-	break;
-      }
+      /* Use pure Guile symbol/number reading with port synchronization */
+      obj = fread_symbol_guile (ctx, c, false, false);
     }
 
   dynwind_end ();

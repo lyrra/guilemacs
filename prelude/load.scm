@@ -2934,5 +2934,20 @@ Assumes the colon has already been consumed and we're reading the rest."
            (set! name (string-append name (string ch)))
            (loop)))))))
 
+(define (elisp-parse-symbol-from-port port)
+  "Parse symbol or number from PORT using Guile's read.
+Called from C fread0() when alphabetic character is encountered.
+Returns the parsed symbol or number."
+  ;; Let Guile's read function handle the complete parsing
+  (let ((result (read port)))
+    (cond
+      ;; Handle EOF
+      ((eof-object? result)
+       (error "Unexpected EOF while reading symbol"))
+
+      ;; Return the result directly - let C handle symbol conversion if needed
+      ;; SCM objects are already Lisp_Objects in GuilEmacs
+      (else result))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
