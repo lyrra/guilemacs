@@ -2799,38 +2799,11 @@ elisp_parse_hash_from_c_context (struct reader_context *ctx)
                                            "elisp-parse-hash-from-port");
   SCM result = scm_call_1 (parse_hash_func, port);
 
-  /* Handle special cases that need C integration */
-  if (scm_is_symbol (result))
+  /* Handle comments - Scheme returns #nil for "continue reading" */
+  if (NILP (result))
     {
-      SCM symbol_str = scm_symbol_to_string (result);
-      char *symbol_name = scm_to_utf8_string (symbol_str);
-
-      if (strcmp (symbol_name, "elisp-read-continue") == 0)
-        {
-          /* This was a comment (#!) - continue reading next object */
-          free (symbol_name);
-          return Qnil; /* Special marker for C to continue reading */
-        }
-      else if (strcmp (symbol_name, "elisp-hash-dollar-placeholder") == 0)
-        {
-          /* #$ lazy file reference */
-          free (symbol_name);
-          return Vload_file_name;
-        }
-      else if (strcmp (symbol_name, "elisp-hash-circle-def-placeholder") == 0)
-        {
-          /* #N= circle definition - not implemented yet */
-          free (symbol_name);
-          finvalid_syntax ("Circle definitions (#N=) not yet supported");
-        }
-      else if (strcmp (symbol_name, "elisp-hash-circle-ref-placeholder") == 0)
-        {
-          /* #N# circle reference - not implemented yet */
-          free (symbol_name);
-          finvalid_syntax ("Circle references (#N#) not yet supported");
-        }
-
-      free (symbol_name);
+      /* This was a comment (#!) - continue reading next object */
+      return Qnil; /* Special marker for C to continue reading */
     }
 
   /* Handle bool vector result: (LENGTH . STRING-DATA) */

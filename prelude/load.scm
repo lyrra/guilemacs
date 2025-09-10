@@ -2603,8 +2603,8 @@ Returns: appropriate Lisp object based on hash syntax"
       ;; #! shebang comments - already implemented
       ((char=? ch #\!)
        (elisp-parse-hash-shebang-from-port port)
-       ;; Return special value to indicate "continue reading"
-       'elisp-read-continue)
+       ;; Return nil to indicate "continue reading"
+       #nil)
 
       ;; #: uninterned symbols - already implemented
       ((char=? ch #\:)
@@ -2612,9 +2612,8 @@ Returns: appropriate Lisp object based on hash syntax"
 
       ;; #$ lazy file reference
       ((char=? ch #\$)
-       ;; This needs to access Vload_file_name from C
-       ;; For now, use a placeholder that C can handle
-       'elisp-hash-dollar-placeholder)
+       ;; Access Vload_file_name directly from Scheme
+       ((symbol-function 'symbol-value) 'load-file-name))
 
       ;; Radix integers: #x #X #o #O #b #B
       ((or (char=? ch #\x) (char=? ch #\X))
@@ -2665,11 +2664,11 @@ Returns: appropriate object for the syntax"
            (let ((digit (- (char->integer ch) (char->integer #\0))))
              (loop (+ (* result 10) digit))))
           ((char=? ch #\=)
-           ;; #N= circle definition - needs C integration
-           'elisp-hash-circle-def-placeholder)
+           ;; #N= circle definition - not implemented yet
+           (error "Circle definitions (#N=) not yet supported"))
           ((char=? ch #\#)
-           ;; #N# circle reference - needs C integration
-           'elisp-hash-circle-ref-placeholder)
+           ;; #N# circle reference - not implemented yet
+           (error "Circle references (#N#) not yet supported"))
           ((or (char=? ch #\r) (char=? ch #\R))
            ;; #Nr arbitrary radix
            (if (or (< result 2) (> result 36))
