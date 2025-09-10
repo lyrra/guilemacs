@@ -2871,7 +2871,7 @@ Returns: Character code with modifiers encoded"
   "Parse colon syntax from PORT.
 Handles both bare colon ':' and colon-prefixed symbols ':keyword'.
 Called from C fread0() when ':' is encountered at symbol position.
-Returns: appropriate symbol object"
+Returns: appropriate Elisp symbol with keyword self-evaluation"
   ;; First consume the colon character
   (let ((colon-ch (read-char port)))
     (if (not (char=? colon-ch #\:))
@@ -2880,7 +2880,7 @@ Returns: appropriate symbol object"
           (cond
             ;; EOF - bare colon
             ((eof-object? next-ch)
-             (string->symbol ":"))
+             (elisp-intern-and-make-keyword ":"))
 
             ;; Check for symbol terminator characters - this is a bare colon
             ((or (char<=? next-ch #\space)
@@ -2897,11 +2897,11 @@ Returns: appropriate symbol object"
                  (char=? next-ch #\,)
                  (char=? next-ch #\.))
              ;; Bare colon symbol
-             (string->symbol ":"))
+             (elisp-intern-and-make-keyword ":"))
 
             ;; This is a colon-prefixed symbol like :documentation
             (else
-             (elisp-parse-colon-prefixed-symbol port)))))))
+             (elisp-parse-colon-prefixed-symbol-and-intern port)))))))
 
 (define (elisp-parse-colon-prefixed-symbol port)
   "Parse a colon-prefixed symbol like :keyword from PORT.
@@ -2937,7 +2937,7 @@ Assumes the colon has already been consumed and we're reading the rest."
 (define (elisp-parse-symbol-from-port port)
   "Parse symbol or number from PORT using Guile's read.
 Called from C fread0() when alphabetic character is encountered.
-Returns the parsed symbol or number."
+Returns the parsed symbol or number with proper Elisp conversion."
   ;; Let Guile's read function handle the complete parsing
   (let ((result (read port)))
     (cond
@@ -2945,9 +2945,52 @@ Returns the parsed symbol or number."
       ((eof-object? result)
        (error "Unexpected EOF while reading symbol"))
 
-      ;; Return the result directly - let C handle symbol conversion if needed
-      ;; SCM objects are already Lisp_Objects in GuilEmacs
+      ;; Convert symbols to Elisp symbols using the intern function
+      ((symbol? result)
+       (let ((sym-str (symbol->string result)))
+         ((symbol-function 'intern) sym-str #nil)))
+
+      ;; Return numbers and other types directly
       (else result))))
+
+(define (elisp-intern-and-make-keyword str)
+  "Intern STR as Elisp symbol and make it self-evaluating if it's a keyword."
+  (let ((elisp-symbol ((symbol-function 'intern) str #nil)))
+    ;; If it's a keyword (starts with :), make it self-evaluating
+    (if (and (> (string-length str) 0) (char=? (string-ref str 0) #\:))
+        ((symbol-function 'set) elisp-symbol elisp-symbol))
+    elisp-symbol))
+
+(define (elisp-parse-colon-prefixed-symbol-and-intern port)
+  "Parse a colon-prefixed symbol from PORT and return proper Elisp symbol.
+Assumes the colon has already been consumed."
+  (let ((name ":"))  ; Start with colon
+    (let loop ()
+      (let ((ch (peek-char port)))
+        (cond
+          ;; EOF or terminator character - done reading symbol
+          ((or (eof-object? ch)
+               (char<=? ch #\space)
+               (char=? ch #\")
+               (char=? ch #\')
+               (char=? ch #\;)
+               (char=? ch #\()
+               (char=? ch #\))
+               (char=? ch #\[)
+               (char=? ch #\])
+               (char=? ch #\#)
+               (char=? ch #\?)
+               (char=? ch #\`)
+               (char=? ch #\,)
+               (char=? ch #\.))
+           ;; Done - intern as Elisp symbol with keyword self-evaluation
+           (elisp-intern-and-make-keyword name))
+
+          ;; Regular symbol character - add to name and continue
+          (else
+           (read-char port) ; consume the character
+           (set! name (string-append name (string ch)))
+           (loop)))))))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

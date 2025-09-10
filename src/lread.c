@@ -2604,25 +2604,8 @@ elisp_parse_colon_from_c_context (struct reader_context *ctx)
                                             "elisp-parse-colon-from-port");
   SCM result = scm_call_1 (parse_colon_func, port);
 
-  /* Convert Scheme symbol to Elisp symbol */
-  if (scm_is_symbol (result))
-    {
-      SCM symbol_str = scm_symbol_to_string (result);
-      char *symbol_name = scm_to_utf8_string (symbol_str);
-      Lisp_Object elisp_symbol = intern_c_string (symbol_name);
-
-      /* If this is a keyword (starts with :), make it self-evaluating */
-      if (symbol_name[0] == ':')
-        {
-          Fset (elisp_symbol, elisp_symbol); /* Set symbol's value to itself */
-        }
-
-      free (symbol_name);
-      return elisp_symbol;
-    }
-
-  /* Should always be a symbol for colon syntax */
-  error ("Colon parser returned non-symbol");
+  /* Scheme function handles all conversion including keyword self-evaluation */
+  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
 }
 
 /* Symbol/number parsing migrated to Guile */
@@ -2638,15 +2621,7 @@ elisp_parse_symbol_from_c_context (struct reader_context *ctx)
                                             "elisp-parse-symbol-from-port");
   SCM result = scm_call_1 (parse_symbol_func, port);
 
-  /* Convert symbols to Elisp symbols, return numbers/others directly */
-  if (scm_is_symbol (result))
-    {
-      /* Convert Scheme symbol to Elisp symbol - still more efficient than full C string dance */
-      SCM symbol_str = scm_symbol_to_string (result);
-      return Fintern (symbol_str, Qnil);  /* Use standard intern with default obarray */
-    }
-
-  /* Numbers and other types can be returned directly */
+  /* Scheme function handles all conversion - return result directly */
   return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
 }
 
