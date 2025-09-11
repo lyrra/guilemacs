@@ -2515,6 +2515,25 @@ elisp_skip_comment_with_recursive_reading_from_c (struct reader_context *ctx)
   return scm_call_1 (enhanced_comment_func, port);
 }
 
+/* Unified literal parser - character and string consolidated in Scheme */
+static Lisp_Object
+elisp_parse_literal_unified_from_c_context (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM literal_func = scm_c_private_ref ("language elisp runtime",
+                                      "elisp-parse-literal-unified");
+  return scm_call_2 (literal_func, scm_from_int (c), port);
+}
+
+
+
+
+
+
 /* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
 static Lisp_Object
 elisp_parse_list_from_c_context (struct reader_context *ctx)
@@ -4900,18 +4919,9 @@ fread0 (struct reader_context *ctx)
       obj = elisp_parse_list_from_c_context (ctx);
       break;
 
-    case ')':
-      finvalid_syntax ("invalid syntax state");
-      break;
-
     case '[':
       // Vector parsing moved to Guile with proper conversion:
       obj = elisp_parse_vector_from_c_context (ctx);
-      break;
-
-    case ']':
-      fprintf(stderr, "close square-list is done by scheme\n");
-      emacs_abort ();
       break;
 
     case '#':
@@ -4924,13 +4934,22 @@ fread0 (struct reader_context *ctx)
         }
       break;
 
-    case '?':
-      obj = elisp_parse_char_literal_from_c_context (ctx);
+    case ')':
+    case ']':
+      // Invalid closing syntax - consolidated error handling
+      if (c == ')')
+        finvalid_syntax ("invalid syntax state");
+      else
+        {
+          fprintf(stderr, "close square-list is done by scheme\n");
+          emacs_abort ();
+        }
       break;
 
+    case '?':
     case '"':
-      // String literal parsing now handled by unified Guile parser
-      obj = elisp_parse_string_literal_from_c_context (ctx);
+      // Literal parsing unified in Scheme - single dispatcher
+      obj = elisp_parse_literal_unified_from_c_context (ctx, c);
       break;
 
     case '\'':

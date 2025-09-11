@@ -3303,6 +3303,98 @@ eliminating the need for multiple C character checks and scm_ungetc calls."
      (unread-char char port)
      (elisp-parse-symbol-from-port port))))
 
+;;; Unified parsers for fallthrough consolidation
+
+;; Simple literal parser dispatcher - character and string
+(define (elisp-parse-literal-unified char-code port)
+  "Parse character or string literal based on character code"
+  (let ((ch (integer->char char-code)))
+    (cond
+      ((char=? ch #\?)
+       ;; Character literal
+       (elisp-parse-char-literal-from-port port))
+      ((char=? ch #\")
+       ;; String literal
+       (unread-char #\" port)
+       (elisp-parse-string-literal-from-port port))
+      ;; Should not reach here given C switch logic
+      (else
+       #nil))))
+
+;; Safe quote and backquote dispatcher - minimal consolidation
+(define (elisp-parse-quote-backquote-dispatch char-code port)
+  "Dispatch quote and backquote syntax based on character code"
+  (let ((ch (integer->char char-code)))
+    (cond
+      ((char=? ch #\')
+       ;; Quote form
+       (let ((obj (elisp-read-from-port port)))
+         (cons 'quote (cons obj #nil))))
+      ((char=? ch #\`)
+       ;; Backquote form
+       (let ((obj (elisp-read-from-port port)))
+         (cons 'backquote (cons obj #nil))))
+      (else
+       ;; Default case should never be reached
+       #nil))))
+
+(define (elisp-parse-quote-like-syntax port ch)
+  "Unified parser for quote-like syntax: ', `, ,, ,@"
+  (cond
+    ((char=? ch #\')
+     ;; Quote form
+     (let ((obj (elisp-read-from-port port)))
+       (cons 'quote (cons obj #nil))))
+    ((char=? ch #\`)
+     ;; Backquote form
+     (let ((obj (elisp-read-from-port port)))
+       (cons 'backquote (cons obj #nil))))
+    ((char=? ch #\,)
+     ;; Comma syntax - check for ,@
+     (let ((next-ch (peek-char port)))
+       (if (and (char? next-ch) (char=? next-ch #\@))
+           (begin
+             (read-char port)  ; consume the @
+             (let ((expr (elisp-read-from-port port)))
+               (cons (elisp-intern ",@" #nil) (cons expr #nil))))
+           ;; Regular comma
+           (let ((expr (elisp-read-from-port port)))
+             (cons (elisp-intern "," #nil) (cons expr #nil))))))
+    (else
+     ;; Default case should never be reached
+     #nil)))
+
+(define (elisp-parse-literal port ch)
+  "Unified parser for literal syntax: ? (char) and \" (string)"
+  (cond
+    ((char=? ch #\?)
+     ;; Character literal
+     (elisp-parse-char-literal-from-port port))
+    ((char=? ch #\")
+     ;; String literal
+     (elisp-parse-string-literal-from-port port))
+    ;; Default case should never be reached
+    (else
+     #nil)))
+
+(define (elisp-parse-structural char-code port)
+  "Unified parser for structural syntax: (, [, # - takes character code"
+  (let ((ch (integer->char char-code)))
+    (cond
+      ((char=? ch #\()
+       ;; List parsing
+       (elisp-parse-list-from-port port))
+      ((char=? ch #\[)
+       ;; Vector parsing
+       (elisp-parse-vector-from-port port))
+      ((char=? ch #\#)
+       ;; Hash syntax
+       (elisp-parse-hash-from-port port))
+      ;; Default case should never be reached given the C switch logic
+      (else
+       ;; Return nil as fallback
+       #nil))))
+
 ;; Performance metrics function to measure migration benefits
 (define (elisp-reader-performance-info)
   "Return information about the Scheme-enhanced reader performance optimizations."
