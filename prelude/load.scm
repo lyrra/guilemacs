@@ -3205,6 +3205,72 @@ This function serves as a template for migrating more C logic to Scheme."
     ;; Apply common conversions and optimizations
     (elisp-convert-guile-object result)))
 
+;; Enhanced recursive parsing to eliminate C return fread0() patterns
+(define (elisp-parse-with-recursive-reading parser-func port)
+  "Enhanced parsing that handles recursive reading cases in Scheme.
+This eliminates C patterns like 'return fread0(ctx)' for comments and special cases."
+  (let loop ()
+    (let ((result (parser-func port)))
+      (cond
+        ;; Comment processed: read next object recursively
+        ((or (eq? result #nil)
+             (eq? result 'comment-processed)
+             (eq? result 'continue-reading))
+         ;; Instead of C calling fread0(), do recursive read in Scheme
+         (loop))
+        ;; Regular result: return it
+        (else result)))))
+
+;; Enhanced comment skipping with recursive reading
+(define (elisp-skip-comment-with-recursive-reading port)
+  "Skip comment and automatically read the next object.
+This eliminates the C pattern: skip_comment(); return fread0();"
+  (elisp-skip-comment-from-port port)
+  ;; Instead of returning to C to call fread0(), read next object in Scheme
+  (elisp-read-from-port port))
+
+;; Comprehensive switch statement replacement for multiple cases
+(define (elisp-parse-comprehensive-dispatch char port)
+  "Comprehensive parsing dispatcher that handles multiple switch cases.
+This function could replace large portions of the C switch statement."
+  (case char
+    ;; List parsing
+    ((#\() (elisp-parse-list-from-port port))
+
+    ;; Vector parsing
+    ((#\[) (elisp-parse-vector-from-port port))
+
+    ;; Hash syntax
+    ((#\#)
+     ;; Handle hash with potential comment recursion
+     (let ((result (elisp-parse-hash-from-port port)))
+       (if (eq? result #nil)
+           ;; Comment case: read next object
+           (elisp-read-from-port port)
+           ;; Regular result
+           result)))
+
+    ;; Character literal
+    ((#\?) (elisp-parse-char-literal-from-port port))
+
+    ;; String literal
+    ((#\") (elisp-parse-string-literal-from-port port))
+
+    ;; Quote with list construction
+    ((#\') (elisp-parse-quote-with-list-construction port))
+
+    ;; Backquote with list construction
+    ((#\`) (elisp-parse-backquote-with-list-construction port))
+
+    ;; Comma syntax
+    ((#\,) (elisp-parse-comma-from-port port))
+
+    ;; Comment with recursive reading
+    ((#\;) (elisp-skip-comment-with-recursive-reading port))
+
+    ;; Default: character-based dispatch
+    (else (elisp-parse-character-dispatch char port))))
+
 ;; Comprehensive character-based dispatcher to minimize C switch logic
 (define (elisp-parse-character-dispatch char port)
   "Comprehensive character-based parsing dispatcher.

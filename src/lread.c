@@ -2501,6 +2501,20 @@ elisp_parse_character_dispatch_from_c (struct reader_context *ctx, int c)
   return scm_call_2 (dispatch_func, scm_integer_to_char (scm_from_int (c)), port);
 }
 
+/* Enhanced comment skipping with recursive reading to eliminate return fread0() */
+static Lisp_Object
+elisp_skip_comment_with_recursive_reading_from_c (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM enhanced_comment_func = scm_c_private_ref ("language elisp runtime",
+                                                "elisp-skip-comment-with-recursive-reading");
+  return scm_call_1 (enhanced_comment_func, port);
+}
+
 /* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
 static Lisp_Object
 elisp_parse_list_from_c_context (struct reader_context *ctx)
@@ -4935,10 +4949,9 @@ fread0 (struct reader_context *ctx)
       break;
 
     case ';':
-      {
-        elisp_skip_comment_from_c_context (ctx);
-        return fread0 (ctx);
-      }
+      // Comment skipping with recursive reading moved to Scheme
+      obj = elisp_skip_comment_with_recursive_reading_from_c (ctx);
+      break;
 
       /* may be a number or symbol starting with a dot */
       FALLTHROUGH;
