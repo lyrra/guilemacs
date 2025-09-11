@@ -2419,46 +2419,17 @@ guile_to_lisp_object (SCM obj)
     return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
   else if (scm_is_symbol (obj))
     {
-      /* Enhanced UTF-8 symbol handling for Phase 8
-         Convert Guile symbols to Emacs symbols with proper UTF-8 support */
+      /* Use optimized direct Scheme-to-Scheme conversion instead of malloc/free */
       SCM symbol_str = scm_symbol_to_string (obj);
-      char *symbol_name = scm_to_utf8_string (symbol_str);
-
-      /* FIX-guilemacs: Enhanced symbol mapping for pcase patterns */
-      Lisp_Object result;
-      if (strcmp (symbol_name, "nil") == 0)
-        result = Qnil;
-      else if (strcmp (symbol_name, "t") == 0)
-        result = Qt;
-      else if (strcmp (symbol_name, "and") == 0)
-        result = intern_c_string ("and");
-      else if (strcmp (symbol_name, ":") == 0)
-        result = intern_c_string (":"); /* Ensure colon symbol identity */
-      else
-        result = Fintern (build_string (symbol_name), Qnil);
-
-      free (symbol_name);
-      return result;
+      return Fintern (symbol_str, Qnil);
     }
   else if (scm_is_keyword (obj))
     {
-      /* FIX-guilemacs: Enhanced keyword to symbol conversion for pcase patterns */
+      /* Use optimized conversion for keywords */
       SCM keyword_str = scm_keyword_to_symbol (obj);
-      char *keyword_name = scm_to_utf8_string (scm_symbol_to_string (keyword_str));
-
-      /* Special case: if keyword is empty (bare :), return colon symbol */
-      if (strlen (keyword_name) == 0)
-        {
-          free (keyword_name);
-          return intern_c_string (":");
-        }
-
-      /* Regular keywords get : prefix */
       SCM prefixed_str = scm_string_append (scm_list_2 (scm_from_utf8_string (":"),
                                                         scm_symbol_to_string (keyword_str)));
-      Lisp_Object result = Fintern (prefixed_str, Qnil);
-      free (keyword_name);
-      return result;
+      return Fintern (prefixed_str, Qnil);
     }
   else if (scm_is_vector (obj))
     {
@@ -2490,50 +2461,53 @@ guile_to_lisp_object (SCM obj)
     }
 }
 
+/* Generic C wrapper for Scheme parsing functions - reduces duplication */
+static Lisp_Object
+elisp_parse_generic_from_c_context (struct reader_context *ctx, const char *scheme_func_name)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_func = scm_c_private_ref ("language elisp runtime", scheme_func_name);
+  return scm_call_1 (parse_func, port);
+}
+
+/* Generic C wrapper for void-returning Scheme functions */
+static void
+elisp_parse_void_from_c_context (struct reader_context *ctx, const char *scheme_func_name)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_func = scm_c_private_ref ("language elisp runtime", scheme_func_name);
+  scm_call_1 (parse_func, port);
+}
+
 /* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
 static Lisp_Object
 elisp_parse_list_from_c_context (struct reader_context *ctx)
 {
-  /* Convert C file context to Guile port */
-  SCM port = file_context_to_guile_port (ctx);
-
-  if (scm_is_false (port))
-    {
-      error ("Failed to create Guile port from file context");
-    }
-
-  /* Clear the C-side lookahead buffer */
-  ctx->lookahead = 0;
-
-  /* Call the Guile list parser function */
-  SCM parse_list_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-parse-list-from-port");
-
-  return scm_call_1 (parse_list_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-list-from-port");
 }
 
 /* Vector parsing hoisting: C wrapper for Guile elisp-parse-vector-from-port */
 static Lisp_Object
 elisp_parse_vector_from_c_context (struct reader_context *ctx)
 {
-  /* Convert C file context to Guile port */
   SCM port = file_context_to_guile_port (ctx);
-
   if (scm_is_false (port))
-    {
-      error ("Failed to create Guile port from file context");
-    }
+    error ("Failed to create Guile port from file context");
 
-  /* Clear the C-side lookahead buffer */
   ctx->lookahead = 0;
-
-  /* Call the Guile vector parser function */
   SCM parse_vector_func = scm_c_private_ref ("language elisp runtime",
                                            "elisp-parse-vector-from-port");
-
   SCM result = scm_call_1 (parse_vector_func, port);
 
-  /* Convert SCM result to proper Lisp_Object - guile_to_lisp_object now handles vectors correctly */
+  /* Convert Guile vector to proper Elisp vector - this conversion is essential */
   return guile_to_lisp_object (result);
 }
 
@@ -2584,51 +2558,21 @@ elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_parse_colon_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_colon_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-colon-from-port");
-  SCM result = scm_call_1 (parse_colon_func, port);
-
-  /* Scheme function handles all conversion including keyword self-evaluation */
-  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-colon-from-port");
 }
 
 /* Symbol/number parsing migrated to Guile */
 static Lisp_Object
 elisp_parse_symbol_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_symbol_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-symbol-from-port");
-  SCM result = scm_call_1 (parse_symbol_func, port);
-
-  /* Scheme function handles all conversion - return result directly */
-  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-symbol-from-port");
 }
 
 /* Number parsing migrated to Guile */
 static Lisp_Object
 elisp_parse_number_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_number_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-number-from-port");
-  SCM result = scm_call_1 (parse_number_func, port);
-
-  /* Scheme function handles all conversion - return result directly */
-  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-number-from-port");
 }
 
 /* Comma syntax (,, ,@) migrated to Guile */
@@ -2658,28 +2602,14 @@ elisp_parse_comma_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_parse_quote_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_quote_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-quote-from-port");
-  return scm_call_1 (parse_quote_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-quote-from-port");
 }
 
 /* Backquote form migrated to Guile */
 static Lisp_Object
 elisp_parse_backquote_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_backquote_func = scm_c_private_ref ("language elisp runtime",
-                                                "elisp-parse-backquote-from-port");
-  return scm_call_1 (parse_backquote_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-backquote-from-port");
 }
 
 
@@ -2727,70 +2657,35 @@ elisp_parse_string_literal_from_c_context (struct reader_context *ctx)
 static void
 elisp_skip_comment_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM skip_comment_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-skip-comment-from-port");
-  scm_call_1 (skip_comment_func, port);
+  elisp_parse_void_from_c_context (ctx, "elisp-skip-comment-from-port");
 }
 
 /* Hash function syntax (#') migrated to Guile */
 static Lisp_Object
 elisp_parse_hash_function_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_hash_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-parse-hash-function-from-port");
-  return scm_call_1 (parse_hash_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-function-from-port");
 }
 
 /* Empty symbol syntax (##) migrated to Guile */
 static Lisp_Object
 elisp_parse_hash_empty_symbol_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_empty_symbol_func = scm_c_private_ref ("language elisp runtime",
-                                                   "elisp-parse-hash-empty-symbol-from-port");
-  return scm_call_1 (parse_empty_symbol_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-empty-symbol-from-port");
 }
 
 /* Shebang comment syntax (#!) migrated to Guile */
 static void
 elisp_parse_hash_shebang_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM skip_shebang_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-parse-hash-shebang-from-port");
-  scm_call_1 (skip_shebang_func, port);
+  elisp_parse_void_from_c_context (ctx, "elisp-parse-hash-shebang-from-port");
 }
 
 /* Uninterned symbol syntax (#:) migrated to Guile */
 static Lisp_Object
 elisp_parse_hash_uninterned_symbol_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_uninterned_func = scm_c_private_ref ("language elisp runtime",
-                                                 "elisp-parse-hash-uninterned-symbol-from-port");
-  return scm_call_1 (parse_uninterned_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-uninterned-symbol-from-port");
 }
 
 static Lisp_Object

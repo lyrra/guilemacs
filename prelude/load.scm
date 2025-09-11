@@ -3055,5 +3055,98 @@ Assumes the colon has already been consumed."
            (set! name (string-append name (string ch)))
            (loop)))))))
 
+(define (elisp-convert-guile-object obj)
+  "Convert Guile object to Elisp with proper semantics, eliminating C conversions.
+This function replaces the inefficient conversion patterns in guile_to_lisp_object
+by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
+  (cond
+    ;; Handle null - return Elisp nil
+    ((null? obj) #nil)
+
+    ;; Handle booleans - map to Elisp t/nil
+    ((boolean? obj) (if obj #t #nil))
+
+    ;; Handle exact integers - pass through directly
+    ((and (integer? obj) (exact? obj)) obj)
+
+    ;; Handle real numbers - pass through directly
+    ((real? obj) obj)
+
+    ;; Handle strings - pass through directly (already Lisp_Objects in GuilEmacs)
+    ((string? obj) obj)
+
+    ;; Handle symbols with special mapping using direct Elisp interning
+    ((symbol? obj)
+     (let ((sym-str (symbol->string obj)))
+       (cond
+         ;; Special Elisp symbols - use canonical values
+         ((string=? sym-str "nil") #nil)
+         ((string=? sym-str "t") #t)
+         ((string=? sym-str "and") ((symbol-function 'intern) "and" #nil))
+         ((string=? sym-str ":") ((symbol-function 'intern) ":" #nil))
+
+         ;; Reader macro symbols - map to canonical Elisp symbols
+         ((or (string=? sym-str "`") (string=? sym-str "\\`"))
+          ((symbol-function 'intern) "`" #nil))
+         ((or (string=? sym-str ",") (string=? sym-str "\\,"))
+          ((symbol-function 'intern) "," #nil))
+         ((or (string=? sym-str ",@") (string=? sym-str "\\,@"))
+          ((symbol-function 'intern) ",@" #nil))
+
+         ;; Regular symbols - intern using direct Scheme-to-Elisp conversion
+         (else ((symbol-function 'intern) sym-str #nil)))))
+
+    ;; Handle Guile keywords - convert to Elisp colon symbols
+    ((keyword? obj)
+     (let* ((keyword-symbol (keyword->symbol obj))
+            (base-name (symbol->string keyword-symbol)))
+       (cond
+         ;; Special case: empty keyword (bare :) -> colon symbol
+         ((= (string-length base-name) 0)
+          ((symbol-function 'intern) ":" #nil))
+         ;; Regular keywords get : prefix and self-evaluation
+         (else
+          (let* ((colon-name (string-append ":" base-name))
+                 (elisp-symbol ((symbol-function 'intern) colon-name #nil)))
+            ;; Make keyword self-evaluating
+            ((symbol-function 'set) elisp-symbol elisp-symbol)
+            elisp-symbol)))))
+
+    ;; Handle vectors - create Elisp vectors using vector function calls
+    ((vector? obj)
+     (let* ((len (vector-length obj))
+            ;; Create list of converted elements
+            (elem-list (let loop ((i 0) (result '()))
+                         (if (>= i len)
+                             (reverse result)
+                             (loop (+ i 1)
+                                   (cons (elisp-convert-guile-object (vector-ref obj i))
+                                         result))))))
+       ;; Use Elisp vector function to create proper Elisp vector
+       (apply (symbol-function 'vector) elem-list)))
+
+    ;; Handle pairs - convert recursively to Elisp cons cells
+    ((pair? obj)
+     (let ((car-converted (elisp-convert-guile-object (car obj)))
+           (cdr-converted (elisp-convert-guile-object (cdr obj))))
+       ((symbol-function 'cons) car-converted cdr-converted)))
+
+    ;; For other types, pass through directly
+    (else obj)))
+
+(define (elisp-parse-vector-from-port-enhanced port)
+  "Parse vector from PORT using existing Elisp vector parser with enhanced conversion.
+This replaces the C vector conversion logic with pure Scheme implementation."
+  ;; Use the existing elisp vector parser logic
+  (let ((guile-vector (elisp-parse-vector-from-port port)))
+    (cond
+      ((eof-object? guile-vector)
+       (error "Unexpected EOF while reading vector"))
+      ((vector? guile-vector)
+       ;; Use enhanced conversion function instead of C guile_to_lisp_object
+       (elisp-convert-guile-object guile-vector))
+      (else
+       (error "Vector parser returned non-vector")))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
