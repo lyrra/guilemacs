@@ -2614,6 +2614,23 @@ elisp_parse_symbol_from_c_context (struct reader_context *ctx)
   return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
 }
 
+/* Number parsing migrated to Guile */
+static Lisp_Object
+elisp_parse_number_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_number_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-parse-number-from-port");
+  SCM result = scm_call_1 (parse_number_func, port);
+
+  /* Scheme function handles all conversion - return result directly */
+  return result; /* SCM objects are already Lisp_Objects in GuilEmacs */
+}
+
 /* Comma syntax (,, ,@) migrated to Guile */
 static Lisp_Object
 elisp_parse_comma_from_c_context (struct reader_context *ctx)
@@ -5060,29 +5077,9 @@ fread0 (struct reader_context *ctx)
       if (scm_is_true(ctx->port)
 	  && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.'))
 	{
-	  /* Push back the character for Guile to read */
+	  /* Number parsing now handled by enhanced Guile parser */
 	  scm_ungetc(c, ctx->port);
-
-	  /* Let Guile read the number */
-	  SCM result = scm_read(ctx->port);
-
-	  /* Handle EOF */
-	  if (scm_is_eq (result, SCM_EOF_VAL))
-	    end_of_file_error();
-
-	  /* SCM numbers are already valid Lisp_Objects in GuilEmacs */
-	  if (scm_is_number(result))
-	    {
-	      obj = result;  /* Direct assignment like fread_integer */
-	    }
-	  else
-	    {
-	      /* Not a number - shouldn't happen, but handle gracefully */
-	      obj = result;
-	    }
-
-	  /* Reset lookahead buffer */
-	  ctx->lookahead = 0;
+	  obj = elisp_parse_number_from_c_context (ctx);
 	  break;
 	}
 

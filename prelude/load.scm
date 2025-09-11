@@ -2992,6 +2992,30 @@ Returns the parsed object with proper Elisp semantics."
       ;; Numbers and other types pass through directly
       (else result))))
 
+(define (elisp-parse-number-from-port port)
+  "Parse number from PORT using Guile's read with proper error handling.
+Called from C fread0() when numeric character is encountered.
+Returns the parsed number or symbol with proper Elisp semantics."
+  ;; Let Guile's read function handle the complete parsing
+  (let ((result (read port)))
+    (cond
+      ;; Handle EOF
+      ((eof-object? result)
+       (error "Unexpected EOF while reading number"))
+
+      ;; Numbers pass through directly - Guile's parsing is authoritative
+      ((number? result)
+       result)
+
+      ;; If not a number, it might be a symbol that looks numeric (like +foo, -bar, .symbol)
+      ;; Use the symbol parsing logic
+      ((symbol? result)
+       (let ((sym-str (symbol->string result)))
+         ((symbol-function 'intern) sym-str #nil)))
+
+      ;; Other types pass through (shouldn't happen in practice)
+      (else result))))
+
 (define (elisp-intern-and-make-keyword str)
   "Intern STR as Elisp symbol and make it self-evaluating if it's a keyword."
   (let ((elisp-symbol ((symbol-function 'intern) str #nil)))
