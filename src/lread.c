@@ -3709,137 +3709,6 @@ sync_guile_port_with_c_position (struct reader_context *ctx, int trigger_char)
     }
 }
 
-/* File-specific version of read_symbol - Pure Guile symbol/number reading with proper sync */
-static Lisp_Object
-fread_symbol_guile (struct reader_context *ctx, int first_char, bool uninterned_symbol, bool skip_shorthand)
-{
-  if (scm_is_false (ctx->port))
-    {
-      error ("No Guile port available for symbol reading");
-    }
-
-  /* CRITICAL: Synchronize port position before letting Guile read */
-  sync_guile_port_with_c_position (ctx, first_char);
-
-  /* Now Guile port is properly positioned to read the symbol/number */
-  SCM result = scm_read (ctx->port);
-
-  /* Handle the result based on what Guile parsed */
-  if (scm_is_symbol (result))
-    {
-      /* For uninterned symbols, we need to create a new uninterned symbol */
-      if (uninterned_symbol)
-        {
-          SCM name = scm_symbol_to_string (result);
-          return Fmake_symbol (name);
-        }
-      else
-        {
-          /* Check if this is a special reader macro symbol that needs identity mapping */
-          SCM name_scm = scm_symbol_to_string (result);
-          char *name_str = scm_to_utf8_string (name_scm);
-
-          /* Map reader macro symbols to their correct Emacs counterparts */
-          if (strcmp (name_str, "`") == 0 || strcmp (name_str, "\\`") == 0)
-            {
-              /* Backquote symbol - use the existing Qbackquote symbol */
-              /* Both ` and \` should map to the same symbol for pcase consistency */
-              free (name_str);
-              return Qbackquote;
-            }
-          else if (strcmp (name_str, ",") == 0 || strcmp (name_str, "\\,") == 0)
-            {
-              /* Unquote symbol - use the existing Qcomma symbol */
-              /* Both , and \, should map to the same symbol */
-              free (name_str);
-              return Qcomma;
-            }
-          else if (strcmp (name_str, ",@") == 0 || strcmp (name_str, "\\,@") == 0)
-            {
-              /* Unquote-splicing symbol - use the existing Qcomma_at symbol */
-              /* Both ,@ and \,@ should map to the same symbol */
-              free (name_str);
-              return Qcomma_at;
-            }
-          else if (strcmp (name_str, "nil") == 0)
-            {
-              /* Map nil symbol to the canonical Qnil for proper identity */
-              free (name_str);
-              return Qnil;
-            }
-          else if (strcmp (name_str, "t") == 0)
-            {
-              /* Map t symbol to the canonical Qt for proper identity */
-              free (name_str);
-              return Qt;
-            }
-          else if (strcmp (name_str, "and") == 0)
-            {
-              /* Map and symbol to the canonical interned and symbol for proper identity */
-              free (name_str);
-              return intern_c_string ("and");
-            }
-          else if (strcmp (name_str, ":") == 0)
-            {
-              /* Map colon symbol to the canonical interned colon symbol for proper identity */
-              free (name_str);
-              return intern_c_string (":");
-            }
-          else
-            {
-              /* For regular symbols, return the Guile symbol directly */
-              free (name_str);
-              return result;
-            }
-        }
-    }
-  else if (scm_is_number (result))
-    {
-      /* Numbers are handled directly - Guile's parsing is authoritative */
-      return result;
-    }
-  else
-    {
-      /* Debug: what type did Guile actually return? */
-      if (scm_is_keyword (result))
-        {
-          /* Convert Guile keywords (#:foo) to Emacs symbols (:foo)
-             This handles both Common Lisp style (:foo) and Guile style (#:foo) keywords */
-          SCM keyword_name = scm_keyword_to_symbol (result);
-          SCM name_string = scm_symbol_to_string (keyword_name);
-
-          /* Create a new symbol with : prefix for Emacs compatibility */
-          char *keyword_str = scm_to_utf8_string (name_string);
-          char *emacs_keyword = malloc (strlen (keyword_str) + 2);
-          emacs_keyword[0] = ':';
-          strcpy (emacs_keyword + 1, keyword_str);
-
-          SCM emacs_symbol = scm_from_utf8_string (emacs_keyword);
-
-          free (keyword_str);
-          free (emacs_keyword);
-
-          return intern_driver (emacs_symbol, check_obarray (Vobarray));
-        }
-      else if (scm_is_string (result))
-        {
-          /* Sometimes strings are returned */
-          return result;
-        }
-      else
-        {
-          /* This shouldn't happen with valid symbol/number syntax */
-          error ("Guile symbol reader returned unexpected type: %s",
-                 scm_is_true (scm_symbol_p (result)) ? "symbol" :
-                 scm_is_true (scm_number_p (result)) ? "number" :
-                 scm_is_true (scm_keyword_p (result)) ? "keyword" :
-                 scm_is_true (scm_string_p (result)) ? "string" :
-                 scm_is_true (scm_list_p (result)) ? "list" :
-                 "unknown");
-        }
-    }
-}
-
 static void
 invalid_radix_integer (EMACS_INT radix, Lisp_Object readcharfun)
 {
@@ -5110,10 +4979,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 static Lisp_Object
 fread0 (struct reader_context *ctx)
 {
-  dynwind_begin ();
-
   /* Read an object into `obj'.  */
- read_obj: ;
   Lisp_Object obj;
   int c = freadchar (ctx);
   if (c < 0)
@@ -5146,7 +5012,7 @@ fread0 (struct reader_context *ctx)
       if (NILP (obj))
         {
           // Special case: #! comment processed, continue reading
-          goto read_obj;
+          return fread0 (ctx);
         }
       break;
 
@@ -5181,7 +5047,7 @@ fread0 (struct reader_context *ctx)
     case ';':
       {
         elisp_skip_comment_from_c_context (ctx);
-	goto read_obj;
+        return fread0 (ctx);
       }
 
       /* may be a number or symbol starting with a dot */
@@ -5189,7 +5055,7 @@ fread0 (struct reader_context *ctx)
 
     default:
       if (c <= 32 || c == NO_BREAK_SPACE)
-	goto read_obj;
+        return fread0 (ctx);
 
       if (scm_is_true(ctx->port)
 	  && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.'))
@@ -5239,11 +5105,11 @@ fread0 (struct reader_context *ctx)
           break;
         }
       /* symbol or number */
-      /* Use pure Guile symbol/number reading with port synchronization */
-      obj = fread_symbol_guile (ctx, c, false, false);
+      /* Use enhanced Scheme parser with special symbol handling */
+      scm_ungetc (c, ctx->port);
+      obj = elisp_parse_symbol_from_c_context (ctx);
     }
 
-  dynwind_end ();
   return obj;
 }
 

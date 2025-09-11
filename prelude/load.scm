@@ -2934,9 +2934,10 @@ Assumes the colon has already been consumed and we're reading the rest."
            (loop)))))))
 
 (define (elisp-parse-symbol-from-port port)
-  "Parse symbol or number from PORT using Guile's read.
+  "Parse symbol or number from PORT with comprehensive Elisp conversion.
 Called from C fread0() when alphabetic character is encountered.
-Returns the parsed symbol or number with proper Elisp conversion."
+Handles special symbol identity mapping, keyword conversion, and uninterned symbols.
+Returns the parsed object with proper Elisp semantics."
   ;; Let Guile's read function handle the complete parsing
   (let ((result (read port)))
     (cond
@@ -2944,12 +2945,51 @@ Returns the parsed symbol or number with proper Elisp conversion."
       ((eof-object? result)
        (error "Unexpected EOF while reading symbol"))
 
-      ;; Convert symbols to Elisp symbols using the intern function
+      ;; Handle symbols with special identity mapping
       ((symbol? result)
        (let ((sym-str (symbol->string result)))
-         ((symbol-function 'intern) sym-str #nil)))
+         (cond
+           ;; Reader macro symbols - map to canonical Elisp symbols
+           ((or (string=? sym-str "`") (string=? sym-str "\\`"))
+            ;; Backquote symbol - use existing Qbackquote
+            ((symbol-function 'intern) "`" #nil))
+           ((or (string=? sym-str ",") (string=? sym-str "\\,"))
+            ;; Unquote symbol - use existing Qcomma
+            ((symbol-function 'intern) "," #nil))
+           ((or (string=? sym-str ",@") (string=? sym-str "\\,@"))
+            ;; Unquote-splicing symbol - use existing Qcomma_at
+            ((symbol-function 'intern) ",@" #nil))
 
-      ;; Return numbers and other types directly
+           ;; Special Elisp symbols - use canonical values
+           ((string=? sym-str "nil")
+            ;; Return canonical Elisp nil
+            #nil)
+           ((string=? sym-str "t")
+            ;; Return canonical Elisp t
+            #t)
+           ((string=? sym-str "and")
+            ;; Map to canonical interned symbol
+            ((symbol-function 'intern) "and" #nil))
+           ((string=? sym-str ":")
+            ;; Map colon to canonical interned symbol
+            ((symbol-function 'intern) ":" #nil))
+
+           ;; Regular symbols - intern normally
+           (else
+            ((symbol-function 'intern) sym-str #nil)))))
+
+      ;; Handle Guile keywords - convert to Elisp colon symbols
+      ((keyword? result)
+       (let* ((keyword-symbol (keyword->symbol result))
+              (base-name (symbol->string keyword-symbol))
+              (colon-name (string-append ":" base-name)))
+         ;; Create Elisp symbol with colon prefix
+         (let ((elisp-symbol ((symbol-function 'intern) colon-name #nil)))
+           ;; Make it self-evaluating (keywords evaluate to themselves)
+           ((symbol-function 'set) elisp-symbol elisp-symbol)
+           elisp-symbol)))
+
+      ;; Numbers and other types pass through directly
       (else result))))
 
 (define (elisp-intern-and-make-keyword str)
