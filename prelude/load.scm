@@ -2354,10 +2354,10 @@ Returns: A proper elisp vector"
 
 ;; Additional reader functions for fread0 migration
 
-(define (elisp-parse-char-literal-from-port port)
-  "Parse an elisp character literal from PORT.
+(define (elisp-parse-char-literal-from-port-enhanced port)
+  "Parse an elisp character literal from PORT with proper Elisp conversion.
 Called from C fread0() when '?' is encountered.
-Returns: A character fixnum"
+Returns: A character fixnum (Elisp integer) or proper Elisp object"
   (let ((ch (read-char port)))
     (cond
       ((eof-object? ch) (error "Unexpected EOF in character literal"))
@@ -2437,6 +2437,21 @@ Returns: A character fixnum"
       ;; Regular character
       (else ch))))
 
+;; Enhanced version that handles character to fixnum conversion in Scheme
+(define (elisp-parse-char-literal-from-port-with-conversion port)
+  "Parse character literal from PORT with automatic conversion to Elisp fixnum."
+  ;; Get the result from the original parser
+  (let ((char-result (elisp-parse-char-literal-from-port-enhanced port)))
+    (cond
+      ;; If it's a character, convert to fixnum using char->integer
+      ((char? char-result)
+       ;; Convert character to integer - this creates proper Elisp fixnum
+       (char->integer char-result))
+      ;; If it's already an integer, return directly
+      ((integer? char-result) char-result)
+      ;; Other types pass through
+      (else char-result))))
+
 (define (elisp-parse-quote-from-port port)
   "Parse a quote form (') from PORT.
 Returns: the quoted expression (for C to wrap in list2)"
@@ -2480,6 +2495,19 @@ C has already consumed the opening quote, so we read the complete string.
 Returns: the parsed string"
   ;; Use Guile's built-in string reader
   (read port))
+
+(define (elisp-parse-string-literal-from-port-enhanced port)
+  "Parse a string literal from PORT with enhanced quote handling.
+This version handles the case where C has consumed the opening quote.
+Returns: the parsed string with proper type validation in Scheme"
+  ;; C puts back the quote, so we can use normal read
+  (let ((result (read port)))
+    (cond
+      ((eof-object? result)
+       (error "Unexpected EOF while reading string"))
+      ((string? result) result)
+      (else
+       (error "String parser returned non-string")))))
 
 (define (elisp-parse-bool-vector-from-port port)
   "Parse a bool vector (#&LENGTH\"DATA\") from PORT.

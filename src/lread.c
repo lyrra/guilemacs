@@ -2532,7 +2532,7 @@ elisp_read_integer_from_c (Lisp_Object port, int radix)
   return scm_call_2 (parse_integer_func, port, scm_from_int (radix));
 }
 
-/* Character literal parsing migrated to Guile */
+/* Character literal parsing migrated to Guile with enhanced conversion */
 static Lisp_Object
 elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
 {
@@ -2579,23 +2579,7 @@ elisp_parse_number_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_parse_comma_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_comma_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-parse-comma-from-port");
-  SCM result = scm_call_1 (parse_comma_func, port);
-
-  /* Result should be a list (comma expr) or (comma-at expr) */
-  if (scm_is_pair (result))
-    {
-      return result; /* SCM lists are already Lisp_Objects in GuilEmacs */
-    }
-
-  /* Should always be a list for comma syntax */
-  error ("Comma parser returned non-list");
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-comma-from-port");
 }
 
 /* Quote form migrated to Guile */
@@ -2617,17 +2601,10 @@ elisp_parse_backquote_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_parse_comma_at_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_comma_at_func = scm_c_private_ref ("language elisp runtime",
-                                               "elisp-parse-comma-at-from-port");
-  return scm_call_1 (parse_comma_at_func, port);
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-comma-at-from-port");
 }
 
-/* String literal parsing migrated to Guile */
+/* String literal parsing migrated to Guile with enhanced quote handling */
 static Lisp_Object
 elisp_parse_string_literal_from_c_context (struct reader_context *ctx)
 {
@@ -2640,17 +2617,8 @@ elisp_parse_string_literal_from_c_context (struct reader_context *ctx)
   ctx->lookahead = 0;
 
   SCM parse_string_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-parse-string-literal-from-port");
-  SCM result = scm_call_1 (parse_string_func, port);
-
-  /* Result should be a string */
-  if (scm_is_string (result))
-    {
-      return result; /* SCM strings are already Lisp_Objects in GuilEmacs */
-    }
-
-  /* Should always be a string for string literal syntax */
-  error ("String parser returned non-string");
+                                             "elisp-parse-string-literal-from-port-enhanced");
+  return scm_call_1 (parse_string_func, port);
 }
 
 /* Comment skipping migrated to Guile */
