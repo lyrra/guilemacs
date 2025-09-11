@@ -2487,6 +2487,20 @@ elisp_parse_void_from_c_context (struct reader_context *ctx, const char *scheme_
   scm_call_1 (parse_func, port);
 }
 
+/* Comprehensive character-based dispatcher to minimize C switch logic */
+static Lisp_Object
+elisp_parse_character_dispatch_from_c (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM dispatch_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-parse-character-dispatch");
+  return scm_call_2 (dispatch_func, scm_integer_to_char (scm_from_int (c)), port);
+}
+
 /* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
 static Lisp_Object
 elisp_parse_list_from_c_context (struct reader_context *ctx)
@@ -2582,18 +2596,18 @@ elisp_parse_comma_from_c_context (struct reader_context *ctx)
   return elisp_parse_generic_from_c_context (ctx, "elisp-parse-comma-from-port");
 }
 
-/* Quote form migrated to Guile */
+/* Quote form migrated to Guile with complete list construction */
 static Lisp_Object
 elisp_parse_quote_from_c_context (struct reader_context *ctx)
 {
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-quote-from-port");
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-quote-with-list-construction");
 }
 
-/* Backquote form migrated to Guile */
+/* Backquote form migrated to Guile with complete list construction */
 static Lisp_Object
 elisp_parse_backquote_from_c_context (struct reader_context *ctx)
 {
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-backquote-from-port");
+  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-backquote-with-list-construction");
 }
 
 
@@ -4906,18 +4920,14 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '\'':
-      {
-	Lisp_Object quoted_expr = elisp_parse_quote_from_c_context (ctx);
-	obj = list2 (Qquote, quoted_expr);
-	break;
-      }
+      // Quote form with complete list construction moved to Scheme
+      obj = elisp_parse_quote_from_c_context (ctx);
+      break;
 
     case '`':
-      {
-	Lisp_Object backquoted_expr = elisp_parse_backquote_from_c_context (ctx);
-	obj = list2 (Qbackquote, backquoted_expr);
-	break;
-      }
+      // Backquote form with complete list construction moved to Scheme
+      obj = elisp_parse_backquote_from_c_context (ctx);
+      break;
 
     case ',':
       // Comma syntax (,, ,@) now handled by unified Guile parser
@@ -4937,37 +4947,8 @@ fread0 (struct reader_context *ctx)
       if (c <= 32 || c == NO_BREAK_SPACE)
         return fread0 (ctx);
 
-      if (scm_is_true(ctx->port)
-	  && ((c >= '0' && c <= '9') || c == '+' || c == '-' || c == '.'))
-	{
-	  /* Number parsing now handled by enhanced Guile parser */
-	  scm_ungetc(c, ctx->port);
-	  obj = elisp_parse_number_from_c_context (ctx);
-	  break;
-	}
-
-      /* Colon symbol handling migrated to Guile parser */
-      if (c == ':')
-        {
-          /* Put the colon back for the Scheme parser to read */
-          scm_ungetc (c, ctx->port);
-          obj = elisp_parse_colon_from_c_context (ctx);
-          break;
-        }
-
-      /* Alphabetic symbol/number parsing migrated to Guile */
-      if (scm_is_true(ctx->port)
-          && ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
-        {
-          /* Put the character back for the Scheme parser to read */
-          scm_ungetc (c, ctx->port);
-          obj = elisp_parse_symbol_from_c_context (ctx);
-          break;
-        }
-      /* symbol or number */
-      /* Use enhanced Scheme parser with special symbol handling */
-      scm_ungetc (c, ctx->port);
-      obj = elisp_parse_symbol_from_c_context (ctx);
+      /* All character-based parsing logic moved to comprehensive Scheme dispatcher */
+      obj = elisp_parse_character_dispatch_from_c (ctx, c);
     }
 
   return obj;
