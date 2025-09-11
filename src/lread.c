@@ -2529,6 +2529,28 @@ elisp_parse_literal_unified_from_c_context (struct reader_context *ctx, int c)
   return scm_call_2 (literal_func, scm_from_int (c), port);
 }
 
+/* Unified list and vector parser - structural syntax consolidated in Scheme */
+static Lisp_Object
+elisp_parse_list_vector_unified_from_c_context (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  /* Don't unget - both list and vector parsers expect opening delimiter consumed */
+  ctx->lookahead = 0;
+
+  SCM structural_func = scm_c_private_ref ("language elisp runtime",
+                                         "elisp-parse-list-vector-unified");
+  SCM result = scm_call_2 (structural_func, scm_from_int (c), port);
+
+  /* Vectors need special conversion, lists don't */
+  if (c == '[')
+    return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
+  else
+    return result;  /* Lists are returned as-is */
+}
+
 
 
 
@@ -4915,13 +4937,9 @@ fread0 (struct reader_context *ctx)
   switch (c)
     {
     case '(':
-      // guile-lisp-reader re-enabled:
-      obj = elisp_parse_list_from_c_context (ctx);
-      break;
-
     case '[':
-      // Vector parsing moved to Guile with proper conversion:
-      obj = elisp_parse_vector_from_c_context (ctx);
+      // List and vector parsing consolidated - unified structural parser
+      obj = elisp_parse_list_vector_unified_from_c_context (ctx, c);
       break;
 
     case '#':

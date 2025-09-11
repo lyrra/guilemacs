@@ -3321,6 +3321,21 @@ eliminating the need for multiple C character checks and scm_ungetc calls."
       (else
        #nil))))
 
+;; Unified list and vector parser
+(define (elisp-parse-list-vector-unified char-code port)
+  "Parse list or vector based on character code - opening delimiter already consumed"
+  (let ((ch (integer->char char-code)))
+    (cond
+      ((char=? ch #\()
+       ;; List parsing - ( already consumed by C, ready for list parser
+       (elisp-parse-list-from-port port))
+      ((char=? ch #\[)
+       ;; Vector parsing - [ already consumed by C, ready for vector parser
+       (elisp-parse-vector-from-port port))
+      ;; Should not reach here given C switch logic
+      (else
+       #nil))))
+
 ;; Safe quote and backquote dispatcher - minimal consolidation
 (define (elisp-parse-quote-backquote-dispatch char-code port)
   "Dispatch quote and backquote syntax based on character code"
