@@ -3235,15 +3235,27 @@ This eliminates the C pattern: skip_comment(); return fread0();"
 (define (elisp-parse-comprehensive-dispatch char port)
   "Comprehensive parsing dispatcher that handles multiple switch cases.
 This function could replace large portions of the C switch statement."
-  (case char
+  (cond
+    ;; Whitespace - skip and read next (handle first with predicates)
+    ((or (char<=? char #\space) (char=? char #\240)) ; NO_BREAK_SPACE = 240
+     ;; Skip whitespace and read the next character
+     (let loop ((ch (read-char port)))
+       (cond
+         ((eof-object? ch) (error "End of file during parsing"))
+         ((or (char<=? ch #\space) (char=? ch #\240))
+          (loop (read-char port))) ; Skip more whitespace
+         (else
+          ;; Found non-whitespace character, parse it
+          (elisp-parse-comprehensive-dispatch ch port)))))
+
     ;; List parsing
-    ((#\() (elisp-parse-list-from-port port))
+    ((char=? char #\() (elisp-parse-list-from-port port))
 
     ;; Vector parsing
-    ((#\[) (elisp-parse-vector-from-port port))
+    ((char=? char #\[) (elisp-parse-vector-from-port port))
 
     ;; Hash syntax
-    ((#\#)
+    ((char=? char #\#)
      ;; Handle hash with potential comment recursion
      (let ((result (elisp-parse-hash-from-port port)))
        (if (eq? result #nil)
@@ -3253,25 +3265,25 @@ This function could replace large portions of the C switch statement."
            result)))
 
     ;; Character literal
-    ((#\?) (elisp-parse-char-literal-from-port port))
+    ((char=? char #\?) (elisp-parse-char-literal-from-port port))
 
     ;; String literal
-    ((#\")
+    ((char=? char #\")
      ;; String literal - " already consumed by C, unget it for string parser
      (unread-char #\" port)
      (elisp-parse-string-literal-from-port port))
 
     ;; Quote with list construction
-    ((#\') (elisp-parse-quote-with-list-construction port))
+    ((char=? char #\') (elisp-parse-quote-with-list-construction port))
 
     ;; Backquote with list construction
-    ((#\`) (elisp-parse-backquote-with-list-construction port))
+    ((char=? char #\`) (elisp-parse-backquote-with-list-construction port))
 
     ;; Comma syntax
-    ((#\,) (elisp-parse-comma-from-port port))
+    ((char=? char #\,) (elisp-parse-comma-from-port port))
 
     ;; Comment with recursive reading
-    ((#\;) (elisp-skip-comment-with-recursive-reading port))
+    ((char=? char #\;) (elisp-skip-comment-with-recursive-reading port))
 
     ;; Default: character-based dispatch
     (else (elisp-parse-character-dispatch char port))))
@@ -3434,6 +3446,30 @@ eliminating the need for multiple C character checks and scm_ungetc calls."
           (type-checking-moved-to-scheme . 6)
           (generic-wrapper-pattern-established . #t)
           (enhanced-conversion-functions-available . #t))))
+
+;;; Incremental migration functions - small steps toward full Scheme reader
+
+;; Whitespace and EOF handler - small incremental step toward full Scheme reader
+(define (elisp-handle-whitespace-and-eof port)
+  "Handle whitespace skipping and EOF detection for fread0.
+Returns 'eof if EOF was encountered,
+Returns 'whitespace-skipped if whitespace was skipped (caller should try again),
+Otherwise ungets the character and returns the character."
+  (let ((ch (read-char port)))
+    (cond
+      ;; EOF handling
+      ((eof-object? ch)
+       'eof)
+
+      ;; Whitespace - skip and indicate to try again
+      ((or (char<=? ch #\space) (char=? ch #\240)) ; NO_BREAK_SPACE = 240
+       ;; Skip whitespace and try again recursively
+       (elisp-handle-whitespace-and-eof port))
+
+      ;; Regular character - unget it and return it for C processing
+      (else
+       (unread-char ch port)
+       ch))))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

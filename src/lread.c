@@ -2536,6 +2536,20 @@ elisp_parse_comprehensive_dispatch_from_c_context (struct reader_context *ctx, i
     return result;  /* All other forms returned as-is */
 }
 
+/* Incremental migration helpers - small steps toward full Scheme reader */
+static Lisp_Object
+elisp_handle_whitespace_and_eof_from_c (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM whitespace_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-handle-whitespace-and-eof");
+  return scm_call_1 (whitespace_func, port);
+}
+
 /* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
 Lisp_Object
 elisp_read_from_port (Lisp_Object port)
@@ -4896,22 +4910,11 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 static Lisp_Object
 fread0 (struct reader_context *ctx)
 {
-  /* Read an object into `obj'.  */
-  Lisp_Object obj;
+  /* Minimal C code - let Scheme handle everything */
   int c = freadchar (ctx);
-  if (c < 0)
+  if (c == -1)
     end_of_file_error ();
-
-  if (c <= 32 || c == NO_BREAK_SPACE) {
-    // Whitespace - skip and read next
-    return fread0 (ctx);
-  } else {
-    // Default: all syntax forms handled by comprehensive dispatcher
-    // This includes: ( [ ? " # ' ` , ; and all other characters
-    obj = elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
-  }
-
-  return obj;
+  return elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
 }
 
 DEFUN ("lread--substitute-object-in-subtree",
