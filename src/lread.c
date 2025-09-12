@@ -4902,43 +4902,14 @@ fread0 (struct reader_context *ctx)
   if (c < 0)
     end_of_file_error ();
 
-  switch (c)
-    {
-    case '(':
-    case '[':
-    case '?':
-    case '"':
-    case '#':
-    case '\'':
-    case '`':
-    case ',':
-    case ';':
-      // All major syntax forms unified in comprehensive Scheme dispatcher
-      obj = elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
-      break;
-
-    case ')':
-    case ']':
-      // Invalid closing syntax - consolidated error handling
-      if (c == ')')
-        finvalid_syntax ("invalid syntax state");
-      else
-        {
-          fprintf(stderr, "close square-list is done by scheme\n");
-          emacs_abort ();
-        }
-      break;
-
-      /* may be a number or symbol starting with a dot */
-      FALLTHROUGH;
-
-    default:
-      if (c <= 32 || c == NO_BREAK_SPACE)
-        return fread0 (ctx);
-
-      /* All character-based parsing logic moved to comprehensive Scheme dispatcher */
-      obj = elisp_parse_character_dispatch_from_c (ctx, c);
-    }
+  if (c <= 32 || c == NO_BREAK_SPACE) {
+    // Whitespace - skip and read next
+    return fread0 (ctx);
+  } else {
+    // Default: all syntax forms handled by comprehensive dispatcher
+    // This includes: ( [ ? " # ' ` , ; and all other characters
+    obj = elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
+  }
 
   return obj;
 }
