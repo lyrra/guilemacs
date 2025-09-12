@@ -2580,25 +2580,37 @@ elisp_parse_number_from_c_context (struct reader_context *ctx)
   return elisp_parse_generic_from_c_context (ctx, "elisp-parse-number-from-port");
 }
 
-/* Comma syntax (,, ,@) migrated to Guile */
+/* Unified quote-like syntax parsing (', `, ,) - dispatch moved to Scheme */
+static Lisp_Object
+elisp_parse_quote_like_from_c_context (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM parse_func = scm_c_private_ref ("language elisp runtime",
+                                      "elisp-parse-quote-like-from-port");
+  return scm_call_2 (parse_func, scm_integer_to_char (scm_from_int (c)), port);
+}
+
+/* Legacy functions for compatibility - now just wrappers */
 static Lisp_Object
 elisp_parse_comma_from_c_context (struct reader_context *ctx)
 {
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-comma-from-port");
+  return elisp_parse_quote_like_from_c_context (ctx, ',');
 }
 
-/* Quote form migrated to Guile with complete list construction */
 static Lisp_Object
 elisp_parse_quote_from_c_context (struct reader_context *ctx)
 {
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-quote-with-list-construction");
+  return elisp_parse_quote_like_from_c_context (ctx, '\'');
 }
 
-/* Backquote form migrated to Guile with complete list construction */
 static Lisp_Object
 elisp_parse_backquote_from_c_context (struct reader_context *ctx)
 {
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-backquote-with-list-construction");
+  return elisp_parse_quote_like_from_c_context (ctx, '`');
 }
 
 
@@ -4903,18 +4915,10 @@ fread0 (struct reader_context *ctx)
       break;
 
     case '\'':
-      // Quote form with complete list construction moved to Scheme
-      obj = elisp_parse_quote_from_c_context (ctx);
-      break;
-
     case '`':
-      // Backquote form with complete list construction moved to Scheme
-      obj = elisp_parse_backquote_from_c_context (ctx);
-      break;
-
     case ',':
-      // Comma syntax (,, ,@) now handled by unified Guile parser
-      obj = elisp_parse_comma_from_c_context (ctx);
+      // Quote-like syntax (', `, ,) unified in single handler
+      obj = elisp_parse_quote_like_from_c_context (ctx, c);
       break;
 
     case ';':

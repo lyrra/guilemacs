@@ -2500,6 +2500,24 @@ Returns: (comma expr) or (comma-at expr) list structures using proper Elisp symb
 Returns: the unquote-spliced expression (for C to wrap in list2)"
   (elisp-read-from-port port))
 
+;; Unified quote-like syntax parser - consolidates ', `, , dispatch
+(define (elisp-parse-quote-like-from-port char port)
+  "Parse quote-like syntax (', `, ,) based on character from PORT.
+This unified parser consolidates the dispatch logic that was previously in C.
+Returns the appropriate parsed structure for the given quote-like character."
+  (cond
+    ((char=? char #\')
+     ;; Quote form with complete list construction
+     (elisp-parse-quote-with-list-construction port))
+    ((char=? char #\`)
+     ;; Backquote form with complete list construction
+     (elisp-parse-backquote-with-list-construction port))
+    ((char=? char #\,)
+     ;; Comma syntax (, or ,@) handled by unified parser
+     (elisp-parse-comma-from-port port))
+    (else
+     (error "Unexpected character in quote-like parsing" char))))
+
 (define (elisp-parse-string-literal-from-port port)
   "Parse a string literal from PORT.
 C has already consumed the opening quote, so we read the complete string.
