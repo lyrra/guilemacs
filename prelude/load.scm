@@ -3256,7 +3256,10 @@ This function could replace large portions of the C switch statement."
     ((#\?) (elisp-parse-char-literal-from-port port))
 
     ;; String literal
-    ((#\") (elisp-parse-string-literal-from-port port))
+    ((#\")
+     ;; String literal - " already consumed by C, unget it for string parser
+     (unread-char #\" port)
+     (elisp-parse-string-literal-from-port port))
 
     ;; Quote with list construction
     ((#\') (elisp-parse-quote-with-list-construction port))
@@ -3325,7 +3328,7 @@ eliminating the need for multiple C character checks and scm_ungetc calls."
 
 ;; Comprehensive structural and literal parser - unified dispatcher
 (define (elisp-parse-structural-literal-unified char-code port)
-  "Parse structural (lists, vectors) and literal (chars, strings) based on character code"
+  "Parse structural (lists, vectors) and literal (chars, strings, hash syntax) based on character code"
   (let ((ch (integer->char char-code)))
     (cond
       ((char=? ch #\()
@@ -3341,6 +3344,9 @@ eliminating the need for multiple C character checks and scm_ungetc calls."
        ;; String literal - " already consumed by C, unget it for string parser
        (unread-char #\" port)
        (elisp-parse-string-literal-from-port port))
+      ((char=? ch #\#)
+       ;; Hash syntax - # already consumed by C, delegate to comprehensive hash parser
+       (elisp-parse-hash-from-port port))
       ;; Should not reach here given C switch logic
       (else
        #nil))))

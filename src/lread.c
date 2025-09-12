@@ -2509,11 +2509,31 @@ elisp_parse_structural_literal_unified_from_c_context (struct reader_context *ct
                                       "elisp-parse-structural-literal-unified");
   SCM result = scm_call_2 (unified_func, scm_from_int (c), port);
 
-  /* Vectors need special conversion, others don't */
+  /* Special conversions for different types */
   if (c == '[')
     return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
   else
-    return result;  /* Lists, chars, strings returned as-is */
+    return result;  /* Lists, chars, strings, hash syntax returned as-is */
+}
+
+/* Comprehensive dispatcher for all major syntax forms - maximum consolidation */
+static Lisp_Object
+elisp_parse_comprehensive_dispatch_from_c_context (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM comprehensive_func = scm_c_private_ref ("language elisp runtime",
+                                              "elisp-parse-comprehensive-dispatch");
+  SCM result = scm_call_2 (comprehensive_func, scm_integer_to_char (scm_from_int (c)), port);
+
+  /* Handle special cases that need C conversion or recursion */
+  if (c == '[')
+    return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
+  else
+    return result;  /* All other forms returned as-is */
 }
 
 /* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
@@ -4888,18 +4908,13 @@ fread0 (struct reader_context *ctx)
     case '[':
     case '?':
     case '"':
-      // Structural and literal parsing unified - comprehensive dispatcher
-      obj = elisp_parse_structural_literal_unified_from_c_context (ctx, c);
-      break;
-
     case '#':
-      // All hash syntax now handled by unified Guile parser
-      obj = elisp_parse_hash_from_c_context (ctx);
-      if (NILP (obj))
-        {
-          // Special case: #! comment processed, continue reading
-          return fread0 (ctx);
-        }
+    case '\'':
+    case '`':
+    case ',':
+    case ';':
+      // All major syntax forms unified in comprehensive Scheme dispatcher
+      obj = elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
       break;
 
     case ')':
@@ -4912,18 +4927,6 @@ fread0 (struct reader_context *ctx)
           fprintf(stderr, "close square-list is done by scheme\n");
           emacs_abort ();
         }
-      break;
-
-    case '\'':
-    case '`':
-    case ',':
-      // Quote-like syntax (', `, ,) unified in single handler
-      obj = elisp_parse_quote_like_from_c_context (ctx, c);
-      break;
-
-    case ';':
-      // Comment skipping with recursive reading moved to Scheme
-      obj = elisp_skip_comment_with_recursive_reading_from_c (ctx);
       break;
 
       /* may be a number or symbol starting with a dot */
