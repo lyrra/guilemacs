@@ -3004,10 +3004,10 @@ Returns the parsed object with proper Elisp semantics."
            ;; Special Elisp symbols - use canonical values
            ((string=? sym-str "nil")
             ;; Return canonical Elisp nil
-            #nil)
+            (elisp-nil))
            ((string=? sym-str "t")
             ;; Return canonical Elisp t
-            #t)
+            (elisp-t))
            ((string=? sym-str "and")
             ;; Map to canonical interned symbol
             ((symbol-function 'intern) "and" #nil))
