@@ -2336,15 +2336,7 @@ Returns: A proper elisp vector"
         ((eof-object? ch) (error "Unexpected EOF in vector"))
         ((char=? ch #\])
          ;; End of vector - create vector directly in Guile (now that float conversion works)
-         (let* ((rev-elems (reverse elements))
-                (len (length rev-elems))
-                (vec (make-vector len #nil)))
-           (let loop-fill ((i 0) (elems rev-elems))
-             (if (null? elems)
-                 vec
-                 (begin
-                   (vector-set! vec i (car elems))
-                   (loop-fill (+ i 1) (cdr elems)))))))
+         (list->vector (reverse elements)))
         (else
          ;; Regular vector element
          (unread-char ch port)
