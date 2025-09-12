@@ -2407,16 +2407,6 @@ guile_to_lisp_object (SCM obj)
     return Qnil;
   else if (scm_is_bool (obj))
     return scm_is_true (obj) ? Qt : Qnil;
-  else if (scm_is_integer (obj) && scm_is_exact (obj))
-    {
-      return obj;
-    }
-  else if (scm_is_real (obj))
-    {
-      return obj;
-    }
-  else if (scm_is_string (obj))
-    return obj; /* Pure Guile strings are already Lisp_Objects in GuilEmacs */
   else if (scm_is_symbol (obj))
     {
       /* Use optimized direct Scheme-to-Scheme conversion instead of malloc/free */
@@ -2443,17 +2433,6 @@ guile_to_lisp_object (SCM obj)
           ASET (vec, i, guile_to_lisp_object (elem));
         }
       return vec;
-    }
-  else if (scm_is_pair (obj))
-    {
-      /* Recursively convert cons cells */
-      Lisp_Object car = guile_to_lisp_object (scm_car (obj));
-      Lisp_Object cdr = guile_to_lisp_object (scm_cdr (obj));
-      return Fcons (car, cdr);
-    }
-  else if (scm_is_true (scm_hash_table_p (obj)))
-    {
-      return obj;
     }
   else
     {
@@ -2529,55 +2508,27 @@ elisp_parse_literal_unified_from_c_context (struct reader_context *ctx, int c)
   return scm_call_2 (literal_func, scm_from_int (c), port);
 }
 
-/* Unified list and vector parser - structural syntax consolidated in Scheme */
+/* Comprehensive structural and literal parser - all four cases unified */
 static Lisp_Object
-elisp_parse_list_vector_unified_from_c_context (struct reader_context *ctx, int c)
+elisp_parse_structural_literal_unified_from_c_context (struct reader_context *ctx, int c)
 {
   SCM port = file_context_to_guile_port (ctx);
   if (scm_is_false (port))
     error ("Failed to create Guile port from file context");
 
-  /* Don't unget - both list and vector parsers expect opening delimiter consumed */
+  /* Don't unget anything - let Scheme function handle ungetting internally */
+
   ctx->lookahead = 0;
 
-  SCM structural_func = scm_c_private_ref ("language elisp runtime",
-                                         "elisp-parse-list-vector-unified");
-  SCM result = scm_call_2 (structural_func, scm_from_int (c), port);
+  SCM unified_func = scm_c_private_ref ("language elisp runtime",
+                                      "elisp-parse-structural-literal-unified");
+  SCM result = scm_call_2 (unified_func, scm_from_int (c), port);
 
-  /* Vectors need special conversion, lists don't */
+  /* Vectors need special conversion, others don't */
   if (c == '[')
     return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
   else
-    return result;  /* Lists are returned as-is */
-}
-
-
-
-
-
-
-/* List parsing hoisting: C wrapper for Guile elisp-parse-list-from-port */
-static Lisp_Object
-elisp_parse_list_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-list-from-port");
-}
-
-/* Vector parsing hoisting: C wrapper for Guile elisp-parse-vector-from-port */
-static Lisp_Object
-elisp_parse_vector_from_c_context (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_vector_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-parse-vector-from-port");
-  SCM result = scm_call_1 (parse_vector_func, port);
-
-  /* Convert Guile vector to proper Elisp vector - this conversion is essential */
-  return guile_to_lisp_object (result);
+    return result;  /* Lists, chars, strings returned as-is */
 }
 
 /* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
@@ -4938,8 +4889,10 @@ fread0 (struct reader_context *ctx)
     {
     case '(':
     case '[':
-      // List and vector parsing consolidated - unified structural parser
-      obj = elisp_parse_list_vector_unified_from_c_context (ctx, c);
+    case '?':
+    case '"':
+      // Structural and literal parsing unified - comprehensive dispatcher
+      obj = elisp_parse_structural_literal_unified_from_c_context (ctx, c);
       break;
 
     case '#':
@@ -4962,12 +4915,6 @@ fread0 (struct reader_context *ctx)
           fprintf(stderr, "close square-list is done by scheme\n");
           emacs_abort ();
         }
-      break;
-
-    case '?':
-    case '"':
-      // Literal parsing unified in Scheme - single dispatcher
-      obj = elisp_parse_literal_unified_from_c_context (ctx, c);
       break;
 
     case '\'':
