@@ -2405,8 +2405,6 @@ guile_to_lisp_object (SCM obj)
 
   if (scm_is_null (obj))
     return Qnil;
-  else if (scm_is_bool (obj))
-    return scm_is_true (obj) ? Qt : Qnil;
   else if (scm_is_symbol (obj))
     {
       /* Use optimized direct Scheme-to-Scheme conversion instead of malloc/free */
@@ -2420,19 +2418,6 @@ guile_to_lisp_object (SCM obj)
       SCM prefixed_str = scm_string_append (scm_list_2 (scm_from_utf8_string (":"),
                                                         scm_symbol_to_string (keyword_str)));
       return Fintern (prefixed_str, Qnil);
-    }
-  else if (scm_is_vector (obj))
-    {
-      /* Convert Guile vectors to Lisp vectors */
-      ptrdiff_t len = scm_c_vector_length (obj);
-      Lisp_Object vec = make_vector (len, Qnil);
-
-      for (ptrdiff_t i = 0; i < len; i++)
-        {
-          SCM elem = scm_c_vector_ref (obj, i);
-          ASET (vec, i, guile_to_lisp_object (elem));
-        }
-      return vec;
     }
   else
     {

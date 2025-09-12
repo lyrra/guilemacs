@@ -2336,7 +2336,12 @@ Returns: A proper elisp vector"
         ((eof-object? ch) (error "Unexpected EOF in vector"))
         ((char=? ch #\])
          ;; End of vector - create vector directly in Guile (now that float conversion works)
-         (list->vector (reverse elements)))
+         (let ((vec ((symbol-function 'make-vector) (length elements) #t)))
+           (do ((i 0 (+ 1 i))
+                (ep (reverse elements) (cdr ep)))
+               ((null? ep))
+             ((symbol-function 'aset) vec i (car ep)))
+           vec))
         (else
          ;; Regular vector element
          (unread-char ch port)
@@ -3152,19 +3157,6 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
             ;; Make keyword self-evaluating
             ((symbol-function 'set) elisp-symbol elisp-symbol)
             elisp-symbol)))))
-
-    ;; Handle vectors - create Elisp vectors using vector function calls
-    ((vector? obj)
-     (let* ((len (vector-length obj))
-            ;; Create list of converted elements
-            (elem-list (let loop ((i 0) (result '()))
-                         (if (>= i len)
-                             (reverse result)
-                             (loop (+ i 1)
-                                   (cons (elisp-convert-guile-object (vector-ref obj i))
-                                         result))))))
-       ;; Use Elisp vector function to create proper Elisp vector
-       (apply (symbol-function 'vector) elem-list)))
 
     ;; Handle pairs - convert recursively to Elisp cons cells
     ((pair? obj)
