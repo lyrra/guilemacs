@@ -398,19 +398,14 @@ struct subst
 static Lisp_Object read_internal_start (Lisp_Object, Lisp_Object,
                                         Lisp_Object, bool);
 static Lisp_Object read0 (Lisp_Object, bool);
-static Lisp_Object fread0 (struct reader_context *);
-static Lisp_Object elisp_parse_with_eof_check_from_c_context (struct reader_context *, int);
-static Lisp_Object elisp_fread0_complete_from_c_context (struct reader_context *);
-static Lisp_Object elisp_fread0_from_internal_start (struct reader_context *);
+static Lisp_Object fread0 (SCM port);
+static Lisp_Object elisp_parse_with_eof_check_from_c_context (SCM port, int);
 
 /* Phase 6: Guile Reader Migration - Forward declarations */
-static SCM file_context_to_guile_port (struct reader_context *ctx);
 static Lisp_Object guile_to_lisp_object (SCM obj);
 static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
 static SCM buffer_to_guile_port (Lisp_Object buffer);
 
-/* Integer reading hoisting - Forward declaration */
-Lisp_Object elisp_read_integer_from_c (Lisp_Object port, int radix);
 Lisp_Object elisp_read_from_port (Lisp_Object port);
 
 /* Unified Reader Architecture - Interface for pluggable I/O sources */
@@ -2049,40 +2044,6 @@ lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
 }
 #endif /* 0 - lisp_file_lexical_cookie_scm_port unused */
 
-/* File-specific reader function for isolated file loading.
-
-   INTERIM SOLUTION:
-   - Provides architectural isolation point for file-specific reading operations
-   - Currently uses call1(Qread, Qget_file_char) which works reliably
-   - Direct fread0() calls fail in this context due to timing/context dependencies
-
-   PHASE 2 MIGRATION PLAN:
-   - Replace this function body with SCM port operations:
-     SCM port = file_to_scm_port(infile);
-     return scm_read(port);
-   - The call sites remain unchanged, providing clean migration path
-   - All file loading operations are now channeled through this single point
-
-   Context setup is handled by the caller (readevalloop_load). */
-
-/* Phase 6: File I/O Reader Integration - Convert file context to Guile port */
-static SCM
-file_context_to_guile_port (struct reader_context *ctx)
-{
-  /* Return the existing Guile port from the context
-     The reader_context already contains a Guile port */
-
-  if (scm_is_true (ctx->port))
-    {
-      return ctx->port;
-    }
-  else
-    {
-      /* No port available in context */
-      signal_error ("No Guile port available in reader context", Qnil);
-    }
-}
-
 static void
 sync_guile_reader (struct reader_context *ctx)
 {
@@ -2101,12 +2062,17 @@ sync_guile_reader (struct reader_context *ctx)
   }
 }
 
-/* Enhanced file reading with optional Guile integration */
 static Lisp_Object
-fread_internal_start (struct reader_context *ctx)
+fread_internal_start (SCM port)
 {
-  return elisp_fread0_from_internal_start (ctx);
+  int c = scm_getc (port);
 
+  SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
+                                                 "elisp-fread0-with-char-from-c");
+  SCM result = scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
+
+  /* Convert result back to Lisp_Object */
+  return guile_to_lisp_object (result);
 }
 
 static void
@@ -2188,7 +2154,7 @@ readevalloop_load (
       else
 	{
           sync_guile_reader (infile0);
-	  val = fread_internal_start (infile0);
+	  val = fread_internal_start (infile0->port);
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
@@ -2431,107 +2397,10 @@ guile_to_lisp_object (SCM obj)
     }
 }
 
-/* Generic C wrapper for Scheme parsing functions - reduces duplication */
-static Lisp_Object
-elisp_parse_generic_from_c_context (struct reader_context *ctx, const char *scheme_func_name)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_func = scm_c_private_ref ("language elisp runtime", scheme_func_name);
-  return scm_call_1 (parse_func, port);
-}
-
-/* Generic C wrapper for void-returning Scheme functions */
-static void
-elisp_parse_void_from_c_context (struct reader_context *ctx, const char *scheme_func_name)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_func = scm_c_private_ref ("language elisp runtime", scheme_func_name);
-  scm_call_1 (parse_func, port);
-}
-
-/* Comprehensive character-based dispatcher to minimize C switch logic */
-static Lisp_Object
-elisp_parse_character_dispatch_from_c (struct reader_context *ctx, int c)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM dispatch_func = scm_c_private_ref ("language elisp runtime",
-                                        "elisp-parse-character-dispatch");
-  return scm_call_2 (dispatch_func, scm_integer_to_char (scm_from_int (c)), port);
-}
-
-/* Enhanced comment skipping with recursive reading to eliminate return fread0() */
-static Lisp_Object
-elisp_skip_comment_with_recursive_reading_from_c (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM enhanced_comment_func = scm_c_private_ref ("language elisp runtime",
-                                                "elisp-skip-comment-with-recursive-reading");
-  return scm_call_1 (enhanced_comment_func, port);
-}
-
-/* Unified literal parser - character and string consolidated in Scheme */
-static Lisp_Object
-elisp_parse_literal_unified_from_c_context (struct reader_context *ctx, int c)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM literal_func = scm_c_private_ref ("language elisp runtime",
-                                      "elisp-parse-literal-unified");
-  return scm_call_2 (literal_func, scm_from_int (c), port);
-}
-
-/* Comprehensive structural and literal parser - all four cases unified */
-static Lisp_Object
-elisp_parse_structural_literal_unified_from_c_context (struct reader_context *ctx, int c)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  /* Don't unget anything - let Scheme function handle ungetting internally */
-
-  ctx->lookahead = 0;
-
-  SCM unified_func = scm_c_private_ref ("language elisp runtime",
-                                      "elisp-parse-structural-literal-unified");
-  SCM result = scm_call_2 (unified_func, scm_from_int (c), port);
-
-  /* Special conversions for different types */
-  if (c == '[')
-    return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
-  else
-    return result;  /* Lists, chars, strings, hash syntax returned as-is */
-}
-
 /* Conservative fread0 helper - moves EOF checking to Scheme */
 static Lisp_Object
-elisp_parse_with_eof_check_from_c_context (struct reader_context *ctx, int c)
+elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 {
-  SCM port = ctx->port;
-
-  if (ctx->lookahead != 0) {
-    fprintf(stderr, "-- elisp_parse_with_eof_check_from_c_context got c-unchar\n");
-    emacs_abort ();
-  }
   SCM eof_check_func = scm_c_private_ref ("language elisp runtime",
                                           "elisp-parse-with-eof-check");
   SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
@@ -2539,295 +2408,10 @@ elisp_parse_with_eof_check_from_c_context (struct reader_context *ctx, int c)
   return result;
 }
 
-/* Complete Scheme fread0 - no C character reading needed */
-static Lisp_Object
-elisp_fread0_complete_from_c_context (struct reader_context *ctx)
-{
-  SCM port = ctx->port;
-
-  if (ctx->lookahead != 0) {
-    fprintf(stderr, "-- elisp_fread0_complete_from_c_context got c-unchar\n");
-    emacs_abort ();
-  }
-
-  SCM complete_fread0_func = scm_c_private_ref ("language elisp runtime",
-                                                "elisp-fread0-complete");
-  SCM result = scm_call_1 (complete_fread0_func, port);
-
-  /* Convert result back to Lisp_Object */
-  return guile_to_lisp_object (result);
-}
-
-/* Complete Scheme fread0 called from fread_internal_start - reads char in C */
-static Lisp_Object
-elisp_fread0_from_internal_start (struct reader_context *ctx)
-{
-  SCM port = ctx->port;
-
-  if (ctx->lookahead != 0) {
-    fprintf(stderr, "-- elisp_fread0_from_internal_start got c-unchar\n");
-    emacs_abort ();
-  }
-
-  int c = scm_getc (ctx->port);
-
-  ctx->lookahead = 0;
-  SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
-                                                 "elisp-fread0-with-char-from-c");
-  SCM result = scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
-
-  /* Convert result back to Lisp_Object */
-  return guile_to_lisp_object (result);
-}
-
-/* Comprehensive dispatcher for all major syntax forms - maximum consolidation */
-static Lisp_Object
-elisp_parse_comprehensive_dispatch_from_c_context (struct reader_context *ctx, int c)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM comprehensive_func = scm_c_private_ref ("language elisp runtime",
-                                              "elisp-parse-comprehensive-dispatch");
-  SCM result = scm_call_2 (comprehensive_func, scm_integer_to_char (scm_from_int (c)), port);
-
-  /* Handle special cases that need C conversion or recursion */
-  if (c == '[')
-    return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
-  else
-    return result;  /* All other forms returned as-is */
-}
-
-/* Incremental migration helpers - small steps toward full Scheme reader */
-static Lisp_Object
-elisp_handle_whitespace_and_eof_from_c (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM whitespace_func = scm_c_private_ref ("language elisp runtime",
-                                          "elisp-handle-whitespace-and-eof");
-  return scm_call_1 (whitespace_func, port);
-}
-
-/* Simple Elisp reader wrapper for Guile - allows Scheme code to read using Elisp reader */
 Lisp_Object
 elisp_read_from_port (Lisp_Object port)
 {
-  struct reader_context ctx;
-  ctx.port = port;
-  ctx.lookahead = 0;
-  return fread0 (&ctx);
-}
-
-/* Integer reading hoisted to Guile - allows Scheme code to handle integer parsing */
-Lisp_Object
-elisp_read_integer_from_c (Lisp_Object port, int radix)
-{
-  /* Call the Guile integer parser function */
-  SCM parse_integer_func = scm_c_private_ref ("language elisp runtime",
-                                              "elisp-read-integer-from-port");
-
-  return scm_call_2 (parse_integer_func, port, scm_from_int (radix));
-}
-
-/* Character literal parsing migrated to Guile with enhanced conversion */
-static Lisp_Object
-elisp_parse_char_literal_from_c_context (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_char_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-parse-char-literal-from-port");
-  SCM result = scm_call_1 (parse_char_func, port);
-
-  /* Convert character result to fixnum */
-  if (scm_is_true (scm_char_p (result)))
-    return make_fixnum (scm_to_int (scm_char_to_integer (result)));
-  else if (scm_is_integer (result))
-    return result;
-  else
-    error ("Invalid character literal result from Guile");
-}
-
-/* Colon symbol syntax (:, :keyword) migrated to Guile */
-static Lisp_Object
-elisp_parse_colon_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-colon-from-port");
-}
-
-/* Symbol/number parsing migrated to Guile */
-static Lisp_Object
-elisp_parse_symbol_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-symbol-from-port");
-}
-
-/* Number parsing migrated to Guile */
-static Lisp_Object
-elisp_parse_number_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-number-from-port");
-}
-
-/* Unified quote-like syntax parsing (', `, ,) - dispatch moved to Scheme */
-static Lisp_Object
-elisp_parse_quote_like_from_c_context (struct reader_context *ctx, int c)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_func = scm_c_private_ref ("language elisp runtime",
-                                      "elisp-parse-quote-like-from-port");
-  return scm_call_2 (parse_func, scm_integer_to_char (scm_from_int (c)), port);
-}
-
-/* Legacy functions for compatibility - now just wrappers */
-static Lisp_Object
-elisp_parse_comma_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_quote_like_from_c_context (ctx, ',');
-}
-
-static Lisp_Object
-elisp_parse_quote_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_quote_like_from_c_context (ctx, '\'');
-}
-
-static Lisp_Object
-elisp_parse_backquote_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_quote_like_from_c_context (ctx, '`');
-}
-
-
-/* Comma-at form migrated to Guile */
-static Lisp_Object
-elisp_parse_comma_at_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-comma-at-from-port");
-}
-
-/* String literal parsing migrated to Guile with enhanced quote handling */
-static Lisp_Object
-elisp_parse_string_literal_from_c_context (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  /* C has already consumed the opening quote, put it back for Scheme parser */
-  scm_ungetc ('"', ctx->port);
-  ctx->lookahead = 0;
-
-  SCM parse_string_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-parse-string-literal-from-port-enhanced");
-  return scm_call_1 (parse_string_func, port);
-}
-
-/* Comment skipping migrated to Guile */
-static void
-elisp_skip_comment_from_c_context (struct reader_context *ctx)
-{
-  elisp_parse_void_from_c_context (ctx, "elisp-skip-comment-from-port");
-}
-
-/* Hash function syntax (#') migrated to Guile */
-static Lisp_Object
-elisp_parse_hash_function_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-function-from-port");
-}
-
-/* Empty symbol syntax (##) migrated to Guile */
-static Lisp_Object
-elisp_parse_hash_empty_symbol_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-empty-symbol-from-port");
-}
-
-/* Shebang comment syntax (#!) migrated to Guile */
-static void
-elisp_parse_hash_shebang_from_c_context (struct reader_context *ctx)
-{
-  elisp_parse_void_from_c_context (ctx, "elisp-parse-hash-shebang-from-port");
-}
-
-/* Uninterned symbol syntax (#:) migrated to Guile */
-static Lisp_Object
-elisp_parse_hash_uninterned_symbol_from_c_context (struct reader_context *ctx)
-{
-  return elisp_parse_generic_from_c_context (ctx, "elisp-parse-hash-uninterned-symbol-from-port");
-}
-
-static Lisp_Object
-elisp_parse_hash_from_c_context (struct reader_context *ctx)
-{
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
-
-  ctx->lookahead = 0;
-  SCM parse_hash_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-parse-hash-from-port");
-  SCM result = scm_call_1 (parse_hash_func, port);
-
-  /* Handle comments - Scheme returns #nil for "continue reading" */
-  if (NILP (result))
-    {
-      /* This was a comment (#!) - continue reading next object */
-      return Qnil; /* Special marker for C to continue reading */
-    }
-
-  /* Handle bool vector result: (LENGTH . STRING-DATA) */
-  if (scm_is_pair (result))
-    {
-      SCM length_scm = scm_car (result);
-      SCM string_data = scm_cdr (result);
-
-      if (scm_is_integer (length_scm) && scm_is_string (string_data))
-        {
-          /* This is a bool vector - convert to Emacs bool vector */
-          EMACS_INT length = scm_to_int (length_scm);
-
-          if (length > BOOL_VECTOR_LENGTH_MAX)
-            finvalid_syntax ("#&");
-
-          ptrdiff_t size_in_chars = bool_vector_bytes (length);
-          Lisp_Object obj = make_uninit_bool_vector (length);
-          unsigned char *data = bool_vector_uchar_data (obj);
-
-          /* Copy string data to bool vector */
-          size_t str_len;
-          char *str_data = scm_to_utf8_stringn (string_data, &str_len);
-          if (str_len < size_in_chars)
-            {
-              free (str_data);
-              finvalid_syntax ("#&");
-            }
-          memcpy (data, str_data, size_in_chars);
-          free (str_data);
-
-          /* Clear the extraneous bits in the last byte */
-          if (length != size_in_chars * BOOL_VECTOR_BITS_PER_CHAR)
-            data[size_in_chars - 1] &= (1 << (length % BOOL_VECTOR_BITS_PER_CHAR)) - 1;
-
-          return obj;
-        }
-    }
-
-  return result;
+  return fread0 (port);
 }
 
 DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
@@ -3667,25 +3251,6 @@ fread_char_escape (struct reader_context *ctx, int next_char)
     }
 
   return chr | modifiers;
-}
-
-static Lisp_Object
-fread_integer (struct reader_context *ctx, int radix)
-{
-  if (scm_is_false (ctx->port))
-    {
-      /* No Guile port available */
-      emacs_abort ();
-    }
-
-  /* Convert C file context to Guile port */
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    {
-      error ("Failed to create Guile port from file context");
-    }
-
-  return elisp_read_integer_from_c (port, radix);
 }
 
 static void
@@ -4953,13 +4518,14 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
   dynwind_end ();
   return obj;
 }
+
 /* like read0, but used by LOAD only
  */
-static Lisp_Object
-fread0 (struct reader_context *ctx)
+Lisp_Object
+fread0 (SCM port)
 {
-  int c = scm_getc (ctx->port);
-  return elisp_parse_with_eof_check_from_c_context (ctx, c);
+  int c = scm_getc (port);
+  return elisp_parse_with_eof_check_from_c_context (port, c);
 }
 
 DEFUN ("lread--substitute-object-in-subtree",
@@ -6434,7 +6000,11 @@ unified_read (struct reader_interface *reader, bool locate_syms)
 	{
 	  struct reader_context *ctx = (struct reader_context *) reader->context;
 	  dynwind_end ();
-	  return fread0 (ctx);
+          if (ctx->lookahead != 0) {
+            fprintf(stderr, "-- unified_read got c-unchar\n");
+            emacs_abort ();
+          }
+	  return fread0 (ctx->port);
 	}
       else
 	{

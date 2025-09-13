@@ -1080,9 +1080,6 @@ guilemacs_init (void *_)
 
   scm_c_define_gsubr ("elisp-read-from-port", 1, 0, 0, elisp_read_from_port);
   scm_c_export ("elisp-read-from-port", NULL);
-
-  scm_c_define_gsubr ("elisp-read-integer-from-c", 2, 0, 0, elisp_read_integer_from_c);
-  scm_c_export ("elisp-read-integer-from-c", NULL);
 }
 
 /* ARGSUSED */
