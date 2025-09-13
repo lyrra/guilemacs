@@ -3231,6 +3231,31 @@ This eliminates the C pattern: skip_comment(); return fread0();"
   ;; Instead of returning to C to call fread0(), read next object in Scheme
   (elisp-read-from-port port))
 
+;; Conservative fread0 helper - handles EOF checking in Scheme
+(define (elisp-parse-with-eof-check char-code port)
+  "Conservative Scheme helper for fread0 - handles EOF checking and dispatching.
+Takes character as integer from C, checks for EOF, then dispatches."
+  (if (= char-code -1)
+      (error "End of file during parsing")
+      (elisp-parse-comprehensive-dispatch (integer->char char-code) port)))
+
+;; Complete Scheme fread0 - reads character from port itself
+(define (elisp-fread0-complete port)
+  "Complete Scheme implementation of fread0.
+Reads character from port and handles all parsing logic."
+  (let ((c (read-char port)))
+    (cond
+      ((eof-object? c) (error "End of file during parsing"))
+      (else (elisp-parse-comprehensive-dispatch c port)))))
+
+;; Complete Scheme fread0 - receives character from C like comprehensive dispatch
+(define (elisp-fread0-with-char-from-c char-code port)
+  "Complete Scheme implementation of fread0 that receives character from C.
+More reliable for file context integration."
+  (if (= char-code -1)
+      (error "End of file during parsing")
+      (elisp-parse-comprehensive-dispatch (integer->char char-code) port)))
+
 ;; Comprehensive switch statement replacement for multiple cases
 (define (elisp-parse-comprehensive-dispatch char port)
   "Comprehensive parsing dispatcher that handles multiple switch cases.

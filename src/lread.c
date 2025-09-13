@@ -399,6 +399,9 @@ static Lisp_Object read_internal_start (Lisp_Object, Lisp_Object,
                                         Lisp_Object, bool);
 static Lisp_Object read0 (Lisp_Object, bool);
 static Lisp_Object fread0 (struct reader_context *);
+static Lisp_Object elisp_parse_with_eof_check_from_c_context (struct reader_context *, int);
+static Lisp_Object elisp_fread0_complete_from_c_context (struct reader_context *);
+static Lisp_Object elisp_fread0_from_internal_start (struct reader_context *);
 
 /* Phase 6: Guile Reader Migration - Forward declarations */
 static SCM file_context_to_guile_port (struct reader_context *ctx);
@@ -2084,22 +2087,8 @@ file_context_to_guile_port (struct reader_context *ctx)
 static Lisp_Object
 fread_internal_start (struct reader_context *ctx)
 {
-  /* Unified Reader Architecture - File reading path integration
-     This demonstrates how the file reading path can use the unified interface */
+  return elisp_fread0_from_internal_start (ctx);
 
-  /* Temporarily revert to original implementation to avoid bootstrap issues */
-  return fread0 (ctx);
-
-  /* Phase 9: Pure Guile reader - disabled until bootstrap dependencies resolved */
-  /*
-  if (scm_is_true (ctx->port))
-    {
-      SCM result = scm_read(ctx->port);
-      if (scm_is_eq (result, SCM_EOF_VAL))
-        end_of_file_error ();
-      return result;
-    }
-  */
 }
 
 static void
@@ -2514,6 +2503,59 @@ elisp_parse_structural_literal_unified_from_c_context (struct reader_context *ct
     return guile_to_lisp_object (result);  /* Convert Guile vector to Elisp vector */
   else
     return result;  /* Lists, chars, strings, hash syntax returned as-is */
+}
+
+/* Conservative fread0 helper - moves EOF checking to Scheme */
+static Lisp_Object
+elisp_parse_with_eof_check_from_c_context (struct reader_context *ctx, int c)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM eof_check_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-parse-with-eof-check");
+  SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
+
+  return result;
+}
+
+/* Complete Scheme fread0 - no C character reading needed */
+static Lisp_Object
+elisp_fread0_complete_from_c_context (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  ctx->lookahead = 0;
+  SCM complete_fread0_func = scm_c_private_ref ("language elisp runtime",
+                                                "elisp-fread0-complete");
+  SCM result = scm_call_1 (complete_fread0_func, port);
+
+  /* Convert result back to Lisp_Object */
+  return guile_to_lisp_object (result);
+}
+
+/* Complete Scheme fread0 called from fread_internal_start - reads char in C */
+static Lisp_Object
+elisp_fread0_from_internal_start (struct reader_context *ctx)
+{
+  SCM port = file_context_to_guile_port (ctx);
+  if (scm_is_false (port))
+    error ("Failed to create Guile port from file context");
+
+  /* Read character in C to avoid port synchronization issues */
+  int c = freadchar (ctx);
+
+  ctx->lookahead = 0;
+  SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
+                                                 "elisp-fread0-with-char-from-c");
+  SCM result = scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
+
+  /* Convert result back to Lisp_Object */
+  return guile_to_lisp_object (result);
 }
 
 /* Comprehensive dispatcher for all major syntax forms - maximum consolidation */
@@ -4910,11 +4952,9 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 static Lisp_Object
 fread0 (struct reader_context *ctx)
 {
-  /* Minimal C code - let Scheme handle everything */
+  /* Conservative approach - move EOF checking to Scheme */
   int c = freadchar (ctx);
-  if (c == -1)
-    end_of_file_error ();
-  return elisp_parse_comprehensive_dispatch_from_c_context (ctx, c);
+  return elisp_parse_with_eof_check_from_c_context (ctx, c);
 }
 
 DEFUN ("lread--substitute-object-in-subtree",
