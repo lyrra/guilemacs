@@ -402,7 +402,6 @@ static Lisp_Object fread0 (SCM port);
 static Lisp_Object elisp_parse_with_eof_check_from_c_context (SCM port, int);
 
 /* Phase 6: Guile Reader Migration - Forward declarations */
-static Lisp_Object guile_to_lisp_object (SCM obj);
 static SCM guile_reader_error_handler (void *data, SCM key, SCM args);
 static SCM buffer_to_guile_port (Lisp_Object buffer);
 
@@ -2069,10 +2068,7 @@ fread_internal_start (SCM port)
 
   SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
                                                  "elisp-fread0-with-char-from-c");
-  SCM result = scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
-
-  /* Convert result back to Lisp_Object */
-  return guile_to_lisp_object (result);
+  return scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
 }
 
 static void
@@ -2368,35 +2364,6 @@ finvalid_radix_integer (EMACS_INT radix)
   finvalid_syntax (buf);
 }
 
-/* Guile Reader Migration - Proof of Concept Implementation */
-
-static Lisp_Object
-guile_to_lisp_object (SCM obj)
-{
-  /* Convert Guile object back to Lisp_Object */
-
-  if (scm_is_null (obj))
-    return Qnil;
-  else if (scm_is_symbol (obj))
-    {
-      /* Use optimized direct Scheme-to-Scheme conversion instead of malloc/free */
-      SCM symbol_str = scm_symbol_to_string (obj);
-      return Fintern (symbol_str, Qnil);
-    }
-  else if (scm_is_keyword (obj))
-    {
-      /* Use optimized conversion for keywords */
-      SCM keyword_str = scm_keyword_to_symbol (obj);
-      SCM prefixed_str = scm_string_append (scm_list_2 (scm_from_utf8_string (":"),
-                                                        scm_symbol_to_string (keyword_str)));
-      return Fintern (prefixed_str, Qnil);
-    }
-  else
-    {
-      return obj;
-    }
-}
-
 /* Conservative fread0 helper - moves EOF checking to Scheme */
 static Lisp_Object
 elisp_parse_with_eof_check_from_c_context (SCM port, int c)
@@ -2450,7 +2417,7 @@ scm_read() for parsing instead of the C reader.  */)
   /* Calculate final string index */
   ptrdiff_t final_index = SCHARS (substring);
 
-  return Fcons (guile_to_lisp_object (result), make_fixnum (final_index));
+  return Fcons (result, make_fixnum (final_index));
 }
 
 /* Enhanced Guile Reader with Error Handling */
@@ -2600,7 +2567,7 @@ proper error handling and accurate position tracking.  */)
   if (final_index > SCHARS (string))
     final_index = SCHARS (string);
 
-  return Fcons (guile_to_lisp_object (result), make_fixnum (final_index));
+  return Fcons (result, make_fixnum (final_index));
 }
 
 /* Multiple expression reader using Guile */
@@ -2643,7 +2610,7 @@ START and END optionally delimit a substring of STRING from which to read.  */)
         break;
 
       /* Add to result list (in reverse order, will reverse at end) */
-      result_list = Fcons (guile_to_lisp_object (expr), result_list);
+      result_list = Fcons (expr, result_list);
     }
 
   /* Return expressions in correct order */
@@ -3858,9 +3825,8 @@ Returns the expression read from the buffer content. */)
       end_of_file_error ();
     }
 
-  /* Close port and return converted result */
   scm_close_input_port (port);
-  return guile_to_lisp_object (result);
+  return result;
 }
 
 /* Read a Lisp object.
@@ -3887,8 +3853,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
       if (scm_is_eq (result, SCM_EOF_VAL))
         end_of_file_error ();
 
-      /* Convert Guile object to Lisp object */
-      return guile_to_lisp_object (result);
+      return result;
     }
 #endif
   /* Buffer reader disabled during bootstrap - use fallback C reader */
@@ -3907,7 +3872,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
       if (scm_is_eq (result, SCM_EOF_VAL))
         end_of_file_error ();
 
-      return guile_to_lisp_object (result);
+      return result;
     }
 #endif
 
