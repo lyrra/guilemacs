@@ -2083,6 +2083,24 @@ file_context_to_guile_port (struct reader_context *ctx)
     }
 }
 
+static void
+sync_guile_reader (struct reader_context *ctx)
+{
+  if (ctx->lookahead > 1) {
+    fprintf(stderr, "sync_guile_reader: lookahead is too large: %d\n", ctx->lookahead);
+    emacs_abort ();
+  }
+  if (ctx->lookahead < 0) {
+    fprintf(stderr, "sync_guile_reader: lookahead is negative (!?): %d\n", ctx->lookahead);
+    emacs_abort ();
+  }
+
+  if (ctx->lookahead) {
+    scm_ungetc (ctx->buf[ctx->lookahead - 1], ctx->port);
+    ctx->lookahead = 0;
+  }
+}
+
 /* Enhanced file reading with optional Guile integration */
 static Lisp_Object
 fread_internal_start (struct reader_context *ctx)
@@ -2169,8 +2187,7 @@ readevalloop_load (
 	}
       else
 	{
-	  /* Phase 6: Enhanced file-specific reading path with Guile integration
-	     Uses fread_internal_start which now supports Guile reader when enabled */
+          sync_guile_reader (infile0);
 	  val = fread_internal_start (infile0);
 	}
       /* Empty hashes can be reused; otherwise, reset on next call.  */
@@ -2509,11 +2526,12 @@ elisp_parse_structural_literal_unified_from_c_context (struct reader_context *ct
 static Lisp_Object
 elisp_parse_with_eof_check_from_c_context (struct reader_context *ctx, int c)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
+  SCM port = ctx->port;
 
-  ctx->lookahead = 0;
+  if (ctx->lookahead != 0) {
+    fprintf(stderr, "-- elisp_parse_with_eof_check_from_c_context got c-unchar\n");
+    emacs_abort ();
+  }
   SCM eof_check_func = scm_c_private_ref ("language elisp runtime",
                                           "elisp-parse-with-eof-check");
   SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
@@ -2525,11 +2543,13 @@ elisp_parse_with_eof_check_from_c_context (struct reader_context *ctx, int c)
 static Lisp_Object
 elisp_fread0_complete_from_c_context (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
+  SCM port = ctx->port;
 
-  ctx->lookahead = 0;
+  if (ctx->lookahead != 0) {
+    fprintf(stderr, "-- elisp_fread0_complete_from_c_context got c-unchar\n");
+    emacs_abort ();
+  }
+
   SCM complete_fread0_func = scm_c_private_ref ("language elisp runtime",
                                                 "elisp-fread0-complete");
   SCM result = scm_call_1 (complete_fread0_func, port);
@@ -2542,12 +2562,14 @@ elisp_fread0_complete_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_fread0_from_internal_start (struct reader_context *ctx)
 {
-  SCM port = file_context_to_guile_port (ctx);
-  if (scm_is_false (port))
-    error ("Failed to create Guile port from file context");
+  SCM port = ctx->port;
 
-  /* Read character in C to avoid port synchronization issues */
-  int c = freadchar (ctx);
+  if (ctx->lookahead != 0) {
+    fprintf(stderr, "-- elisp_fread0_from_internal_start got c-unchar\n");
+    emacs_abort ();
+  }
+
+  int c = scm_getc (ctx->port);
 
   ctx->lookahead = 0;
   SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
@@ -3664,22 +3686,6 @@ fread_integer (struct reader_context *ctx, int radix)
     }
 
   return elisp_read_integer_from_c (port, radix);
-}
-
-/* Synchronize Guile port position with C reader position before scm_read */
-static void
-sync_guile_port_with_c_position (struct reader_context *ctx, int trigger_char)
-{
-  /* Push the trigger character back to Guile port so scm_read can see it */
-  scm_ungetc (trigger_char, ctx->port);
-
-  /* If there's a lookahead character in C buffer, push it to Guile too
-     This ensures Guile port sees the same character sequence as C reader */
-  if (ctx->lookahead != 0)
-    {
-      scm_ungetc (ctx->lookahead, ctx->port);
-      ctx->lookahead = 0;  /* Clear C-side lookahead since it's now in Guile */
-    }
 }
 
 static void
@@ -4952,8 +4958,7 @@ read0 (Lisp_Object readcharfun, bool locate_syms)
 static Lisp_Object
 fread0 (struct reader_context *ctx)
 {
-  /* Conservative approach - move EOF checking to Scheme */
-  int c = freadchar (ctx);
+  int c = scm_getc (ctx->port);
   return elisp_parse_with_eof_check_from_c_context (ctx, c);
 }
 
