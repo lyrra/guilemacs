@@ -3550,5 +3550,34 @@ Returns: The result of the appropriate read function"
       (else
        (elisp-read-from-port port)))))
 
+(define (elisp-load-read-next-expression-from-port port)
+  "Read the next complete expression from PORT, handling all preprocessing.
+This function unifies whitespace skipping, comment skipping, EOF detection,
+and expression reading into a single atomic operation.
+
+Returns:
+- The next expression to evaluate
+- 'eof if end of file reached
+- Automatically handles all whitespace and comments"
+  (let loop ()
+    ;; Skip whitespace first
+    (elisp-skip-load-whitespace-from-port port)
+
+    ;; Check what comes next
+    (let ((ch (peek-char port)))
+      (cond
+        ;; EOF reached
+        ((eof-object? ch) 'eof)
+
+        ;; Comment - skip it and try again
+        ((char=? ch #\;)
+         (read-char port) ; consume the semicolon
+         (elisp-skip-load-comment-from-port port)
+         (loop)) ; recursively try to read next expression
+
+        ;; Regular expression - read it
+        (else
+         (elisp-read-with-load-function-from-port port))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

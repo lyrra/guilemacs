@@ -204,6 +204,7 @@ static void readevalloop_load (struct reader_context *infile0, Lisp_Object sourc
 static void elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx);
 static void elisp_skip_load_comment_from_c_context (struct reader_context *ctx);
 static Lisp_Object elisp_read_with_load_function_from_c_context (struct reader_context *ctx);
+static Lisp_Object elisp_load_read_next_expression_from_c_context (struct reader_context *ctx);
 
 
 
@@ -2088,28 +2089,14 @@ readevalloop_load (
     {
       dynwind_begin ();
 
-    read_next:
-      /* Skip whitespace */
-      elisp_skip_load_whitespace_from_c_context (infile0);
+      val = elisp_load_read_next_expression_from_c_context (infile0);
 
-      /* Check for EOF after whitespace skipping */
-      c = freadchar(infile0);
-      if (c < 0)
+      /* Check for EOF */
+      if (val == NULL)
 	{
 	  dynwind_end ();
 	  break;
 	}
-
-      /* Handle comments */
-      if (c == ';')
-	{
-	  funreadchar (infile0, c); /* Put back the ';' for Scheme to handle */
-	  elisp_skip_load_comment_from_c_context (infile0);
-	  goto read_next;
-	}
-
-      /* Put back the non-whitespace, non-comment character for reading */
-      funreadchar (infile0, c);
 
       if (! HASH_TABLE_P (read_objects_map)
 	  || XHASH_TABLE (read_objects_map)->count)
@@ -2119,7 +2106,6 @@ readevalloop_load (
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      val = elisp_read_with_load_function_from_c_context (infile0);
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
 	  && XHASH_TABLE (read_objects_map)->count > 0)
@@ -2373,6 +2359,22 @@ elisp_read_with_load_function_from_c_context (struct reader_context *ctx)
   sync_guile_reader (ctx);
   SCM result = scm_call_1 (load_read_func, ctx->port);
   ctx->lookahead = 0;
+  return result;
+}
+
+static Lisp_Object
+elisp_load_read_next_expression_from_c_context (struct reader_context *ctx)
+{
+  SCM read_next_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-load-read-next-expression-from-port");
+  sync_guile_reader (ctx);
+  SCM result = scm_call_1 (read_next_func, ctx->port);
+  ctx->lookahead = 0;
+
+  /* Check if we got EOF - return NULL to indicate EOF to the caller */
+  if (scm_is_eq (result, scm_from_latin1_symbol ("eof")))
+    return NULL; /* NULL indicates EOF - let caller handle appropriately */
+
   return result;
 }
 
