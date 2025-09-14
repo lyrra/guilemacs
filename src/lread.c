@@ -2064,13 +2064,8 @@ readevalloop_load (
 
   specbind (Qstandard_input, Qget_file_char);
 
-  /* If lexical binding is active (either because it was specified in
-     the file's header, or via a buffer-local variable), create an empty
-     lexical environment, otherwise, turn off lexical binding.  */
-  Lisp_Object lex_bound = find_symbol_value (Qlexical_binding);
-  specbind (Qinternal_interpreter_environment,
-	    (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
-	     ? Qnil : list1 (Qt)));
+  /* Always in lexical binding */
+  specbind (Qinternal_interpreter_environment, list1 (Qt));
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   sourcename = elisp_normalize_load_path_from_c_context (sourcename);
