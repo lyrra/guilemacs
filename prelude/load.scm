@@ -357,6 +357,17 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
               'none))))
      (else 'none))))
 
+(define (elisp-check-file-handler file noerror nomessage nosuffix must-suffix)
+  "Check for magic file name handler and call it if found.
+  This replicates the handler check from Fload lines 973-977.
+  Returns handler result or #f if no handler."
+
+  (let ((handler ((symbol-function 'find-file-name-handler) file 'load)))
+    (if handler
+        ;; Call the handler with all arguments
+        ((symbol-function 'funcall) handler 'load file noerror nomessage nosuffix must-suffix)
+        #f))) ; No handler found
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)

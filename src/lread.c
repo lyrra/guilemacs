@@ -970,15 +970,17 @@ Return t if the file exists and loads successfully.  */)
     scm_call_1 (validate_func, file);
   }
 
-  /* If file name is magic, call the handler.  */
-  handler = Ffind_file_name_handler (file, Qload);
-  if (!NILP (handler))
-    return
-      call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
+  /* MIGRATED TO SCHEME: Magic file name handler check */
+  {
+    SCM handler_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-check-file-handler");
+    SCM handler_result = scm_call_5 (handler_func, file, noerror, nomessage, nosuffix, must_suffix);
+    if (!scm_is_false (handler_result))
+      return handler_result;
+  }
 
-  /* Empty file handling moved to Scheme validation above */
-  else
-    {
+  /* Continue with normal file loading */
+  {
       /* File path processing and suffix determination */
       SCM process_path_func = scm_c_private_ref ("language elisp runtime",
                                                  "elisp-process-load-file-path");
