@@ -985,37 +985,17 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      Lisp_Object suffixes;
+      /* File path processing and suffix determination */
+      SCM process_path_func = scm_c_private_ref ("language elisp runtime",
+                                                 "elisp-process-load-file-path");
+      SCM path_result = scm_call_3 (process_path_func, file, nosuffix, must_suffix);
+
+      /* Extract file and suffixes from the result pair */
+      Lisp_Object processed_file = SCM_CAR (path_result);
+      Lisp_Object suffixes = SCM_CDR (path_result);
+
       found = Qnil;
-
-      if (! NILP (must_suffix))
-	{
-	  /* Don't insist on adding a suffix if FILE already ends with one.  */
-	  if (suffix_p (file, ".el")
-#ifdef HAVE_MODULES
-	      || suffix_p (file, MODULES_SUFFIX)
-#ifdef MODULES_SECONDARY_SUFFIX
-              || suffix_p (file, MODULES_SECONDARY_SUFFIX)
-#endif
-#endif
-	      )
-	    must_suffix = Qnil;
-	  /* Don't insist on adding a suffix
-	     if the argument includes a directory name.  */
-	  else if (! NILP (Ffile_name_directory (file)))
-	    must_suffix = Qnil;
-	}
-
-      if (!NILP (nosuffix))
-	suffixes = Qnil;
-      else
-	{
-	  suffixes = Fget_load_suffixes ();
-	  if (NILP (must_suffix))
-	    suffixes = CALLN (Fappend, suffixes, Vload_file_rep_suffixes);
-	}
-
-      fd = openp (Vload_path, file, suffixes, &found, Qnil,
+      fd = openp (Vload_path, processed_file, suffixes, &found, Qnil,
 		  load_prefer_newer, false, NULL);
     }
 
@@ -1036,18 +1016,12 @@ Return t if the file exists and loads successfully.  */)
       record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
     }
 
-#ifdef HAVE_MODULES
-  bool is_module =
-    suffix_p (found, MODULES_SUFFIX)
-#ifdef MODULES_SECONDARY_SUFFIX
-    || suffix_p (found, MODULES_SECONDARY_SUFFIX)
-#endif
-    ;
-#else
-  bool is_module = false;
-#endif
-
-  bool is_native_elisp = false;
+  /* File type detection */
+  SCM file_type_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-detect-file-type");
+  SCM file_types = scm_call_1 (file_type_func, found);
+  bool is_module = scm_is_true (SCM_CAR (file_types));
+  bool is_native_elisp = scm_is_true (SCM_CDR (file_types));
 
   /* Check if we're stuck in a recursive load cycle.
 
@@ -1080,10 +1054,12 @@ Return t if the file exists and loads successfully.  */)
     ? compute_found_effective (found)
     : found;
 
-  hist_file_name = (! NILP (Vpurify_flag)
-                    ? concat2 (Ffile_name_directory (file),
-                               Ffile_name_nondirectory (found_eff))
-                    : found_eff);
+  /* History file name computation */
+  {
+    SCM hist_name_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-compute-hist-file-name");
+    hist_file_name = scm_call_3 (hist_name_func, file, found_eff, Vpurify_flag);
+  }
 
 
 
@@ -1147,23 +1123,27 @@ Return t if the file exists and loads successfully.  */)
       input.lookahead = 0;
     }
 
-  if (! NILP (Vpurify_flag))
-    Vpreloaded_file_list = Fcons (Fpurecopy (file), Vpreloaded_file_list);
+  /* Preloaded file list handling */
+  {
+    SCM preload_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-handle-preloaded-file-list");
+    scm_call_1 (preload_func, file);
+  }
 
-  if (NILP (nomessage) || force_load_messages)
-    {
-      if (is_module)
-        message_with_string ("Loading %s (module)...", file, 1);
-      else if (is_native_elisp)
-        message_with_string ("Loading %s (native compiled elisp)...", file, 1);
-      else if (!compiled)
-	message_with_string ("Loading %s (source)...", file, 1);
-      else if (newer)
-	message_with_string ("Loading %s (compiled; note, source file is newer)...",
-		 file, 1);
-      else /* The typical case; compiled file newer than source file.  */
-	message_with_string ("Loading %s...", file, 1);
-    }
+  /* MIGRATED TO SCHEME: Loading message display */
+  {
+    SCM show_msg_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-show-load-message");
+    scm_call_9 (show_msg_func, file,
+                is_module ? SCM_BOOL_T : SCM_BOOL_F,
+                is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F,
+                compiled ? SCM_BOOL_T : SCM_BOOL_F,
+                newer ? SCM_BOOL_T : SCM_BOOL_F,
+                SCM_BOOL_T,  /* loading-p = true */
+                nomessage,
+                force_load_messages ? SCM_BOOL_T : SCM_BOOL_F,
+                noninteractive ? SCM_BOOL_T : SCM_BOOL_F);
+  }
 
   specbind (Qload_file_name, hist_file_name);
   specbind (Qload_true_file_name, found);
@@ -1200,27 +1180,27 @@ Return t if the file exists and loads successfully.  */)
     }
   dynwind_end ();
 
-  /* Run any eval-after-load forms for this file.  */
-  if (!NILP (Ffboundp (Qdo_after_load_evaluation)))
-    call1 (Qdo_after_load_evaluation, hist_file_name) ;
+  /* MIGRATED TO SCHEME: eval-after-load forms execution */
+  {
+    SCM eval_after_load_func = scm_c_private_ref ("language elisp runtime",
+                                                  "elisp-run-eval-after-load");
+    scm_call_1 (eval_after_load_func, hist_file_name);
+  }
 
-  /* The "...done" messages are shown only in interactive mode, because
-     the echo-area can display only the last message, and we want to
-     avoid the impression that the load is still in progress.  */
-  if (!noninteractive && (NILP (nomessage) || force_load_messages))
-    {
-      if (is_module)
-        message_with_string ("Loading %s (module)...done", file, 1);
-      else if (is_native_elisp)
-	message_with_string ("Loading %s (native compiled elisp)...done", file, 1);
-      else if (!compiled)
-	message_with_string ("Loading %s (source)...done", file, 1);
-      else if (newer)
-	message_with_string ("Loading %s (compiled; note, source file is newer)...done",
-		 file, 1);
-      else /* The typical case; compiled file newer than source file.  */
-	message_with_string ("Loading %s...done", file, 1);
-    }
+  /* MIGRATED TO SCHEME: "...done" message display */
+  {
+    SCM show_msg_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-show-load-message");
+    scm_call_9 (show_msg_func, file,
+                is_module ? SCM_BOOL_T : SCM_BOOL_F,
+                is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F,
+                compiled ? SCM_BOOL_T : SCM_BOOL_F,
+                newer ? SCM_BOOL_T : SCM_BOOL_F,
+                SCM_BOOL_F,  /* loading-p = false */
+                nomessage,
+                force_load_messages ? SCM_BOOL_T : SCM_BOOL_F,
+                noninteractive ? SCM_BOOL_T : SCM_BOOL_F);
+  }
 
   return Qt;
 }

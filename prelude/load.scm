@@ -3663,5 +3663,111 @@ Replicates the core behavior of src/lread.c:2055-2088."
       ;; Return success (C function returns void, so we just complete)
       'done)))
 
+(define (elisp-process-load-file-path file nosuffix must-suffix)
+  "Process file path and determine suffixes for loading.
+This replicates the file path processing logic from Fload (lines 979-1020).
+
+Returns: (file-to-search . suffixes-list)
+- file-to-search: the file name to search for
+- suffixes-list: list of suffixes to try, or #nil"
+
+  ;; Validate file is not empty
+  (when (= ((symbol-function 'length) file) 0)
+    (error "Cannot load empty filename"))
+
+  (let ((suffixes #nil))
+    ;; Handle must-suffix logic
+    (unless (eq? must-suffix #nil)
+      ;; Don't insist on adding a suffix if FILE already ends with one
+      (when (or ((symbol-function 'string-suffix-p) ".el" file #t)
+                ;; TODO: Add module suffix checks when modules are supported
+                )
+        (set! must-suffix #nil))
+
+      ;; Don't insist on adding a suffix if the argument includes a directory name
+      (unless (eq? ((symbol-function 'file-name-directory) file) #nil)
+        (set! must-suffix #nil)))
+
+    ;; Determine suffixes to use
+    (cond
+      ;; If nosuffix is set, use no suffixes
+      ((not (eq? nosuffix #nil))
+       (set! suffixes #nil))
+
+      ;; Otherwise build suffixes list
+      (else
+       (set! suffixes ((symbol-function 'get-load-suffixes)))
+       (when (eq? must-suffix #nil)
+         (set! suffixes ((symbol-function 'append) suffixes
+                        ((symbol-function 'symbol-value)
+                         (elisp-intern "load-file-rep-suffixes" #nil)))))))
+
+    ;; Return the file and suffixes as a pair
+    (cons file suffixes)))
+
+(define (elisp-format-load-message file is-module is-native-elisp compiled newer loading-p)
+  "Format loading messages for different file types.
+This replicates the message formatting logic from Fload (lines 1153-1166, 1210-1223).
+
+- loading-p: #t for 'Loading...' messages, #f for '...done' messages"
+
+  (let ((base-msg
+         (cond
+           (is-module
+            (if loading-p "Loading %s (module)..." "Loading %s (module)...done"))
+           (is-native-elisp
+            (if loading-p "Loading %s (native compiled elisp)..."
+                          "Loading %s (native compiled elisp)...done"))
+           ((not compiled)
+            (if loading-p "Loading %s (source)..." "Loading %s (source)...done"))
+           (newer
+            (if loading-p "Loading %s (compiled; note, source file is newer)..."
+                          "Loading %s (compiled; note, source file is newer)...done"))
+           (else
+            (if loading-p "Loading %s..." "Loading %s...done")))))
+
+    ;; Use message-with-string equivalent
+    ((symbol-function 'message) base-msg file)))
+
+(define (elisp-show-load-message file is-module is-native-elisp compiled newer loading-p nomessage force-load-messages noninteractive-p)
+  "Display loading messages with proper conditional logic.
+This replicates the message display logic from Fload (lines 1133-1146, 1190-1203)."
+
+  ;; Check conditions for displaying messages (replicates C conditional logic)
+  (let ((should-show-loading (or (eq? nomessage #nil) force-load-messages))
+        (should-show-done (and (not noninteractive-p)
+                              (or (eq? nomessage #nil) force-load-messages))))
+
+    (when (if loading-p should-show-loading should-show-done)
+      (let ((base-msg
+             (cond
+               (is-module
+                (if loading-p "Loading %s (module)..." "Loading %s (module)...done"))
+               (is-native-elisp
+                (if loading-p "Loading %s (native compiled elisp)..."
+                              "Loading %s (native compiled elisp)...done"))
+               ((not compiled)
+                (if loading-p "Loading %s (source)..." "Loading %s (source)...done"))
+               (newer
+                (if loading-p "Loading %s (compiled; note, source file is newer)..."
+                              "Loading %s (compiled; note, source file is newer)...done"))
+               (else
+                (if loading-p "Loading %s..." "Loading %s...done")))))
+
+        ;; Use message function instead of message-with-string for simplicity
+        ((symbol-function 'message) base-msg file)))))
+
+(define (elisp-compute-hist-file-name file found-eff purify-flag)
+  "Compute the history file name for load-history.
+This replicates the hist_file_name computation from Fload (lines 1063-1067)."
+
+  (if (not (eq? purify-flag #nil))
+      ;; When purifying: concat2(file-name-directory(file), file-name-nondirectory(found-eff))
+      ((symbol-function 'concat)
+       ((symbol-function 'file-name-directory) file)
+       ((symbol-function 'file-name-nondirectory) found-eff))
+      ;; Otherwise just use found-eff
+      found-eff))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
