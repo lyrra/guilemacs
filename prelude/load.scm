@@ -3607,5 +3607,27 @@ This replaces the entire while loop from readevalloop_load."
            ;; Continue looping
            (loop)))))))
 
+(define (elisp-normalize-load-path sourcename)
+  "Normalize the file path for loading, making it absolute if needed.
+This replicates the C logic from readevalloop_load lines 2077-2080."
+  (if (not (eq? ((symbol-function 'file-name-absolute-p) sourcename) #nil))
+      ((symbol-function 'expand-file-name) sourcename #nil)
+      sourcename))
+
+(define (elisp-complete-file-load port sourcename printflag)
+  "Complete file loading function that handles all setup, loading, and cleanup.
+This could replace most of readevalloop_load, handling:
+- File path normalization
+- Load history initialization
+- Read-eval loop execution"
+
+  ;; Normalize file path
+  (let ((normalized-sourcename (elisp-normalize-load-path sourcename)))
+    ;; Initialize load history (delegate to C for now - complex integration)
+    ((symbol-function 'elisp-loadhist-initialize) normalized-sourcename)
+
+    ;; Execute the read-eval loop
+    (elisp-load-read-eval-loop-from-port port printflag)))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

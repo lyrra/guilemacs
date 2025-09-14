@@ -206,7 +206,7 @@ static void elisp_skip_load_comment_from_c_context (struct reader_context *ctx);
 static Lisp_Object elisp_read_with_load_function_from_c_context (struct reader_context *ctx);
 static Lisp_Object elisp_load_read_next_expression_from_c_context (struct reader_context *ctx);
 static void elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool printflag);
-
+static Lisp_Object elisp_normalize_load_path_from_c_context (Lisp_Object sourcename);
 
 
 /* Function that reads one byte from the current source READCHARFUN
@@ -2056,11 +2056,9 @@ readevalloop_load (
 	      struct reader_context *infile0,
 	      Lisp_Object sourcename)
 {
-  /* File loading variables - simplified for pure UTF-8 */
+  /* File loading setup */
   bool printflag = false; /* File loading doesn't print by default */
-  Lisp_Object val;
   dynwind_begin ();
-  Lisp_Object lex_bound;
 
   CHECK_STRING (sourcename);
 
@@ -2069,20 +2067,16 @@ readevalloop_load (
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
      lexical environment, otherwise, turn off lexical binding.  */
-  lex_bound = find_symbol_value (Qlexical_binding);
+  Lisp_Object lex_bound = find_symbol_value (Qlexical_binding);
   specbind (Qinternal_interpreter_environment,
 	    (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
 	     ? Qnil : list1 (Qt)));
   specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
-  /* Ensure sourcename is absolute, except whilst preloading.  */
-  if (!NILP (Ffile_name_absolute_p (sourcename))) {
-    sourcename = Fexpand_file_name (sourcename, Qnil);
-  }
+  sourcename = elisp_normalize_load_path_from_c_context (sourcename);
 
   loadhist_initialize (sourcename);
 
-  /* Phase 4 migration: Entire read-eval loop moved to Scheme */
   elisp_load_read_eval_loop_from_c_context (infile0, printflag);
 
   dynwind_end ();
@@ -2342,6 +2336,24 @@ elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool print
   sync_guile_reader (ctx);
   scm_call_2 (loop_func, ctx->port, printflag ? SCM_BOOL_T : SCM_BOOL_F);
   ctx->lookahead = 0;
+}
+
+static Lisp_Object
+elisp_normalize_load_path_from_c_context (Lisp_Object sourcename)
+{
+  SCM normalize_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-normalize-load-path");
+  return scm_call_1 (normalize_func, sourcename);
+}
+
+DEFUN ("elisp-loadhist-initialize", Felisp_loadhist_initialize,
+       Selisp_loadhist_initialize, 1, 1, 0,
+       doc: /* Initialize load history for SOURCENAME.
+This wraps the C loadhist_initialize function for Scheme access. */)
+  (Lisp_Object sourcename)
+{
+  loadhist_initialize (sourcename);
+  return Qt;
 }
 
 Lisp_Object
