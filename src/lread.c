@@ -198,7 +198,7 @@ static Lisp_Object Vloads_in_progress;
 static void readevalloop (Lisp_Object, Lisp_Object, bool,
                           Lisp_Object, Lisp_Object,
                           Lisp_Object, Lisp_Object);
-static void readevalloop_load (struct reader_context *infile0, Lisp_Object sourcename);
+static void readevalloop_load (SCM port, Lisp_Object sourcename);
 
 /* Load-specific helper function declarations */
 static void elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx);
@@ -893,6 +893,23 @@ loadhist_initialize (Lisp_Object filename)
   specbind (Qcurrent_load_list, Fcons (filename, Qnil));
 }
 
+static void
+sync_guile_reader (struct reader_context *ctx)
+{
+  if (ctx->lookahead > 1) {
+    fprintf(stderr, "sync_guile_reader: lookahead is too large: %d\n", ctx->lookahead);
+    emacs_abort ();
+  }
+  if (ctx->lookahead < 0) {
+    fprintf(stderr, "sync_guile_reader: lookahead is negative (!?): %d\n", ctx->lookahead);
+    emacs_abort ();
+  }
+
+  if (ctx->lookahead) {
+    scm_ungetc (ctx->buf[ctx->lookahead - 1], ctx->port);
+    ctx->lookahead = 0;
+  }
+}
 
 DEFUN ("load", Fload, Sload, 1, 5, 0,
        doc: /* Execute a file of Lisp code named FILE.
@@ -1178,7 +1195,8 @@ Return t if the file exists and loads successfully.  */)
 #endif
       Fset (Qlexical_binding, Qt);
 
-      readevalloop_load (&input, hist_file_name);
+      sync_guile_reader (&input);
+      readevalloop_load (input.port, hist_file_name);
     }
   dynwind_end ();
 
@@ -2023,24 +2041,6 @@ lisp_file_lexical_cookie_scm_port (struct reader_context *ctx)
 }
 #endif /* 0 - lisp_file_lexical_cookie_scm_port unused */
 
-static void
-sync_guile_reader (struct reader_context *ctx)
-{
-  if (ctx->lookahead > 1) {
-    fprintf(stderr, "sync_guile_reader: lookahead is too large: %d\n", ctx->lookahead);
-    emacs_abort ();
-  }
-  if (ctx->lookahead < 0) {
-    fprintf(stderr, "sync_guile_reader: lookahead is negative (!?): %d\n", ctx->lookahead);
-    emacs_abort ();
-  }
-
-  if (ctx->lookahead) {
-    scm_ungetc (ctx->buf[ctx->lookahead - 1], ctx->port);
-    ctx->lookahead = 0;
-  }
-}
-
 static Lisp_Object
 fread_internal_start (SCM port)
 {
@@ -2052,17 +2052,13 @@ fread_internal_start (SCM port)
 }
 
 static void
-readevalloop_load (
-	      struct reader_context *infile0,
-	      Lisp_Object sourcename)
+readevalloop_load (SCM port, Lisp_Object sourcename)
 {
   /* MINIMIZED: Following fread_internal_start pattern - minimal C wrapper */
 
   SCM readevalloop_load_func = scm_c_private_ref ("language elisp runtime",
                                                   "elisp-readevalloop-load-from-port");
-  sync_guile_reader (infile0);
-  scm_call_2 (readevalloop_load_func, infile0->port, sourcename);
-  infile0->lookahead = 0;
+  scm_call_2 (readevalloop_load_func, port, sourcename);
 }
 
 DEFUN ("eval-buffer", Feval_buffer, Seval_buffer, 0, 5, "",
