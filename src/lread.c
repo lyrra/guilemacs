@@ -848,15 +848,10 @@ required.
 This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   (void)
 {
-  Lisp_Object lst = Qnil, suffixes = Vload_suffixes;
-  FOR_EACH_TAIL (suffixes)
-    {
-      Lisp_Object exts = Vload_file_rep_suffixes;
-      Lisp_Object suffix = XCAR (suffixes);
-      FOR_EACH_TAIL (exts)
-	lst = Fcons (concat2 (suffix, XCAR (exts)), lst);
-    }
-  return Fnreverse (lst);
+  /* MIGRATED TO SCHEME: List processing logic moved to Scheme for better maintainability */
+  SCM get_suffixes_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-get-load-suffixes");
+  return scm_call_0 (get_suffixes_func);
 }
 
 /* Return true if STRING ends with SUFFIX.  */

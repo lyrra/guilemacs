@@ -3801,5 +3801,35 @@ All loads are by default dynamic, unless the file itself specifies otherwise."
   ;; This will be handled by specbind in the C wrapper since it needs proper cleanup
   'setup-for-c-specbind)
 
+(define (elisp-get-load-suffixes)
+  "Return the suffixes that load should try if a suffix is required.
+This replicates get-load-suffixes (src/lread.c:845-860) using Scheme list processing.
+Uses load-suffixes and load-file-rep-suffixes variables."
+
+  (let ((result-list #nil)
+        (suffixes ((symbol-function 'symbol-value) (elisp-intern "load-suffixes" #nil))))
+
+    ;; Process each suffix in load-suffixes (replicates FOR_EACH_TAIL loop)
+    (let outer-loop ((suffix-list suffixes))
+      (when (not (eq? suffix-list #nil))
+        (let ((suffix ((symbol-function 'car) suffix-list))
+              (exts ((symbol-function 'symbol-value) (elisp-intern "load-file-rep-suffixes" #nil))))
+
+          ;; Process each extension in load-file-rep-suffixes (replicates inner FOR_EACH_TAIL)
+          (let inner-loop ((ext-list exts))
+            (when (not (eq? ext-list #nil))
+              (let ((ext ((symbol-function 'car) ext-list)))
+                ;; Concatenate suffix + extension and add to result (replicates concat2 + Fcons)
+                (set! result-list
+                      ((symbol-function 'cons)
+                       ((symbol-function 'concat) suffix ext)
+                       result-list)))
+              (inner-loop ((symbol-function 'cdr) ext-list))))
+
+        (outer-loop ((symbol-function 'cdr) suffix-list))))
+
+    ;; Return reversed list (replicates Fnreverse)
+    ((symbol-function 'nreverse) result-list))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
