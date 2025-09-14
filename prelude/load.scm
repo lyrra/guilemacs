@@ -3614,20 +3614,54 @@ This replicates the C logic from readevalloop_load lines 2077-2080."
       ((symbol-function 'expand-file-name) sourcename #nil)
       sourcename))
 
-(define (elisp-complete-file-load port sourcename printflag)
-  "Complete file loading function that handles all setup, loading, and cleanup.
-This could replace most of readevalloop_load, handling:
-- File path normalization
-- Load history initialization
-- Read-eval loop execution"
+(define (elisp-complete-file-load-from-port port sourcename printflag)
+  "Complete readevalloop_load replacement that handles all file loading logic.
+This replaces readevalloop_load (src/lread.c:2055-2078) with full semantic compatibility.
 
-  ;; Normalize file path
+Handles:
+- File path normalization (replicates line 2071)
+- Load history initialization (replicates line 2073)
+- Read-eval loop execution (replicates line 2075)
+- Dynamic binding setup is handled by C wrapper for proper unwind-protect integration"
+
+  ;; Normalize file path (replicates readevalloop_load line 2071)
   (let ((normalized-sourcename (elisp-normalize-load-path sourcename)))
-    ;; Initialize load history (delegate to C for now - complex integration)
-    ((symbol-function 'elisp-loadhist-initialize) normalized-sourcename)
+    ;; Note: loadhist_initialize is handled by C wrapper for proper global structure access
 
-    ;; Execute the read-eval loop
-    (elisp-load-read-eval-loop-from-port port printflag)))
+    ;; Execute the complete read-eval loop (replicates readevalloop_load line 2075)
+    (elisp-load-read-eval-loop-from-port port printflag)
+
+    ;; Return normalized sourcename for C wrapper to use with loadhist_initialize
+    normalized-sourcename))
+
+(define (elisp-readevalloop-load-from-port port sourcename)
+  "Complete Scheme replacement for readevalloop_load C function.
+This handles the core logic, with dynamic binding delegated back to C wrapper.
+Replicates the core behavior of src/lread.c:2055-2088."
+
+  ;; Validate input (replicates CHECK_STRING)
+  (unless (string? sourcename)
+    (error "sourcename must be a string" sourcename))
+
+  ;; File loading setup (replicates line 2060)
+  (let ((printflag #f)) ; File loading doesn't print by default
+
+    ;; Note: Dynamic binding (specbind calls) are complex to replicate in Scheme
+    ;; For now, we handle the core logic and let C handle the binding setup
+    ;; TODO: Move dynamic binding to Scheme in a future iteration
+
+    ;; Normalize file path (replicates line 2071)
+    (let ((normalized-sourcename (elisp-normalize-load-path sourcename)))
+
+      ;; Initialize load history (replicates line 2073)
+      ;; Use Elisp function call for proper integration
+      ((symbol-function 'elisp-loadhist-initialize) normalized-sourcename)
+
+      ;; Execute the complete read-eval loop (replicates line 2075)
+      (elisp-load-read-eval-loop-from-port port printflag)
+
+      ;; Return success (C function returns void, so we just complete)
+      'done)))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

@@ -2056,25 +2056,13 @@ readevalloop_load (
 	      struct reader_context *infile0,
 	      Lisp_Object sourcename)
 {
-  /* File loading setup */
-  bool printflag = false; /* File loading doesn't print by default */
-  dynwind_begin ();
+  /* MINIMIZED: Following fread_internal_start pattern - minimal C wrapper */
 
-  CHECK_STRING (sourcename);
-
-  specbind (Qstandard_input, Qget_file_char);
-
-  /* Always in lexical binding */
-  specbind (Qinternal_interpreter_environment, list1 (Qt));
-  specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
-
-  sourcename = elisp_normalize_load_path_from_c_context (sourcename);
-
-  loadhist_initialize (sourcename);
-
-  elisp_load_read_eval_loop_from_c_context (infile0, printflag);
-
-  dynwind_end ();
+  SCM readevalloop_load_func = scm_c_private_ref ("language elisp runtime",
+                                                  "elisp-readevalloop-load-from-port");
+  sync_guile_reader (infile0);
+  scm_call_2 (readevalloop_load_func, infile0->port, sourcename);
+  infile0->lookahead = 0;
 }
 
 DEFUN ("eval-buffer", Feval_buffer, Seval_buffer, 0, 5, "",
