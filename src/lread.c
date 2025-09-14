@@ -205,6 +205,7 @@ static void elisp_skip_load_whitespace_from_c_context (struct reader_context *ct
 static void elisp_skip_load_comment_from_c_context (struct reader_context *ctx);
 static Lisp_Object elisp_read_with_load_function_from_c_context (struct reader_context *ctx);
 static Lisp_Object elisp_load_read_next_expression_from_c_context (struct reader_context *ctx);
+static void elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool printflag);
 
 
 
@@ -2057,11 +2058,8 @@ readevalloop_load (
 {
   /* File loading variables - simplified for pure UTF-8 */
   bool printflag = false; /* File loading doesn't print by default */
-  Lisp_Object readfun = Qnil; /* Used in function */
-  int c;
   Lisp_Object val;
   dynwind_begin ();
-  bool continue_reading_p;
   Lisp_Object lex_bound;
 
   CHECK_STRING (sourcename);
@@ -2084,28 +2082,8 @@ readevalloop_load (
 
   loadhist_initialize (sourcename);
 
-  continue_reading_p = 1;
-  while (continue_reading_p)
-    {
-      val = elisp_load_read_next_expression_from_c_context (infile0);
-
-      /* Check for EOF */
-      if (val == NULL)
-	{
-	  break;
-	}
-
-      val = eval_sub (val);
-
-      if (printflag)
-	{
-	  Vvalues = Fcons (val, Vvalues);
-	  if (EQ (Vstandard_output, Qt))
-	    Fprin1 (val, Qnil, Qnil);
-	  else
-	    Fprint (val, Qnil);
-	}
-    }
+  /* Phase 4 migration: Entire read-eval loop moved to Scheme */
+  elisp_load_read_eval_loop_from_c_context (infile0, printflag);
 
   dynwind_end ();
 }
@@ -2354,6 +2332,16 @@ elisp_load_read_next_expression_from_c_context (struct reader_context *ctx)
     return NULL; /* NULL indicates EOF - let caller handle appropriately */
 
   return result;
+}
+
+static void
+elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool printflag)
+{
+  SCM loop_func = scm_c_private_ref ("language elisp runtime",
+                                     "elisp-load-read-eval-loop-from-port");
+  sync_guile_reader (ctx);
+  scm_call_2 (loop_func, ctx->port, printflag ? SCM_BOOL_T : SCM_BOOL_F);
+  ctx->lookahead = 0;
 }
 
 Lisp_Object

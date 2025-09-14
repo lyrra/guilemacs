@@ -3579,5 +3579,33 @@ Returns:
         (else
          (elisp-read-with-load-function-from-port port))))))
 
+;; Phase 4: Complete Read-Eval Loop Migration
+
+(define (elisp-load-read-eval-loop-from-port port printflag)
+  "Complete read-eval loop for file loading.
+Reads expressions from PORT, evaluates them, and optionally prints results.
+This replaces the entire while loop from readevalloop_load."
+  (let loop ()
+    (let ((expr (elisp-load-read-next-expression-from-port port)))
+      (cond
+        ;; EOF reached - stop looping
+        ((eq? expr 'eof) 'done)
+
+        ;; Regular expression - evaluate and continue
+        (else
+         ;; Delegate evaluation to C eval_sub to preserve all Elisp semantics
+         (let ((result ((symbol-function 'eval) expr)))
+           ;; Handle printing if requested
+           (when (not (eq? printflag #f))
+             ;; Add result to Vvalues for interactive sessions
+             ((symbol-function 'set) 'values
+              ((symbol-function 'cons) result ((symbol-function 'symbol-value) 'values)))
+             ;; Print using appropriate function
+             (if (eq? ((symbol-function 'symbol-value) 'standard-output) #t)
+                 ((symbol-function 'prin1) result)
+                 ((symbol-function 'print) result)))
+           ;; Continue looping
+           (loop)))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
