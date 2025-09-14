@@ -3496,5 +3496,59 @@ Otherwise ungets the character and returns the character."
        (unread-char ch port)
        ch))))
 
+;;; Load-specific helper functions for readevalloop_load migration
+
+;; Phase 1: Extract Helper Functions for readevalloop_load
+
+(define (elisp-skip-load-whitespace-from-port port)
+  "Skip whitespace characters specific to load operations.
+This handles the exact same whitespace as readevalloop_load:
+space, tab, newline, form feed, carriage return, and NO_BREAK_SPACE.
+Returns: #t when done skipping whitespace"
+  (let loop ()
+    (let ((ch (peek-char port)))
+      (cond
+        ((eof-object? ch) #t)
+        ;; Match exact whitespace from readevalloop_load lines 2100-2102
+        ((or (char=? ch #\space)   ; ' '
+             (char=? ch #\tab)     ; '\t'
+             (char=? ch #\newline) ; '\n'
+             (char=? ch #\page)    ; '\f' (form feed)
+             (char=? ch #\return)  ; '\r'
+             (char=? ch #\x00A0))  ; NO_BREAK_SPACE
+         (read-char port) ; consume the whitespace character
+         (loop))
+        (else #t)))))
+
+(define (elisp-skip-load-comment-from-port port)
+  "Skip a line comment for load operations, matching readevalloop_load logic.
+This handles comments starting with ';' until newline or EOF.
+Returns: #t when comment is fully skipped"
+  ;; Consume characters until newline or EOF (matching lines 2090-2091)
+  (let loop ()
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) #t)
+        ((char=? ch #\newline) #t)
+        (else (loop))))))
+
+(define (elisp-read-with-load-function-from-port port)
+  "Handle custom reader function delegation for load operations.
+This replicates the conditional logic from readevalloop_load lines 2113-2127.
+Returns: The result of the appropriate read function"
+  ;; For now, simplify to only handle the main case since readfun is Qnil in readevalloop_load
+  ;; In the original C code, readfun is always Qnil for file loading
+  (let ((load-read-fn ((symbol-function 'symbol-value) 'load-read-function)))
+    (cond
+      ;; Non-default custom read function (lines 2118-2122)
+      ((and (not (eq? load-read-fn #nil))
+            (not (eq? load-read-fn ((symbol-function 'intern) "read" #nil))))
+       ((symbol-function 'funcall) load-read-fn ((symbol-function 'symbol-value) 'get-file-char)))
+
+      ;; Default case: use elisp-read-from-port (lines 2125-2126)
+      ;; This handles both readfun=nil and the standard case
+      (else
+       (elisp-read-from-port port)))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

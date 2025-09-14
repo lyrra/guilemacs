@@ -200,6 +200,11 @@ static void readevalloop (Lisp_Object, Lisp_Object, bool,
                           Lisp_Object, Lisp_Object);
 static void readevalloop_load (struct reader_context *infile0, Lisp_Object sourcename);
 
+/* Load-specific helper function declarations */
+static void elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx);
+static void elisp_skip_load_comment_from_c_context (struct reader_context *ctx);
+static Lisp_Object elisp_read_with_load_function_from_c_context (struct reader_context *ctx);
+
 
 
 /* Function that reads one byte from the current source READCHARFUN
@@ -2084,22 +2089,26 @@ readevalloop_load (
       dynwind_begin ();
 
     read_next:
+      /* Skip whitespace */
+      elisp_skip_load_whitespace_from_c_context (infile0);
+
+      /* Check for EOF after whitespace skipping */
       c = freadchar(infile0);
-      if (c == ';')
-	{
-	  while ((c = freadchar(infile0)) != '\n' && c != -1);
-	  goto read_next;
-	}
       if (c < 0)
 	{
 	  dynwind_end ();
 	  break;
 	}
 
-      /* Ignore whitespace here, so we can detect eof.  */
-      if (c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
-	  || c == NO_BREAK_SPACE)
-	goto read_next;
+      /* Handle comments */
+      if (c == ';')
+	{
+	  funreadchar (infile0, c); /* Put back the ';' for Scheme to handle */
+	  elisp_skip_load_comment_from_c_context (infile0);
+	  goto read_next;
+	}
+
+      /* Put back the non-whitespace, non-comment character for reading */
       funreadchar (infile0, c);
 
       if (! HASH_TABLE_P (read_objects_map)
@@ -2110,21 +2119,7 @@ readevalloop_load (
 	  || XHASH_TABLE (read_objects_completed)->count)
 	read_objects_completed
 	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (!NILP (readfun))
-	{
-	  /* Custom function-specific reader */
-	  val = call1 (readfun, Qget_file_char);
-	}
-      else if (! NILP (Vload_read_function) && !EQ (Vload_read_function, Qread))
-	{
-	  /* Non-default custom read function */
-	  val = call1 (Vload_read_function, Qget_file_char);
-	}
-      else
-	{
-          sync_guile_reader (infile0);
-	  val = fread_internal_start (infile0->port);
-	}
+      val = elisp_read_with_load_function_from_c_context (infile0);
       /* Empty hashes can be reused; otherwise, reset on next call.  */
       if (HASH_TABLE_P (read_objects_map)
 	  && XHASH_TABLE (read_objects_map)->count > 0)
@@ -2345,6 +2340,39 @@ elisp_parse_with_eof_check_from_c_context (SCM port, int c)
                                           "elisp-parse-with-eof-check");
   SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
 
+  return result;
+}
+
+/* Load-specific helper functions for readevalloop_load migration */
+
+static void
+elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
+{
+  SCM skip_ws_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-skip-load-whitespace-from-port");
+  sync_guile_reader (ctx);
+  scm_call_1 (skip_ws_func, ctx->port);
+  ctx->lookahead = 0;
+}
+
+static void
+elisp_skip_load_comment_from_c_context (struct reader_context *ctx)
+{
+  SCM skip_comment_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-skip-load-comment-from-port");
+  sync_guile_reader (ctx);
+  scm_call_1 (skip_comment_func, ctx->port);
+  ctx->lookahead = 0;
+}
+
+static Lisp_Object
+elisp_read_with_load_function_from_c_context (struct reader_context *ctx)
+{
+  SCM load_read_func = scm_c_private_ref ("language elisp runtime",
+                                          "elisp-read-with-load-function-from-port");
+  sync_guile_reader (ctx);
+  SCM result = scm_call_1 (load_read_func, ctx->port);
+  ctx->lookahead = 0;
   return result;
 }
 
