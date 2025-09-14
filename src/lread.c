@@ -2087,19 +2087,13 @@ readevalloop_load (
   continue_reading_p = 1;
   while (continue_reading_p)
     {
-      dynwind_begin ();
-
       val = elisp_load_read_next_expression_from_c_context (infile0);
 
       /* Check for EOF */
       if (val == NULL)
 	{
-	  dynwind_end ();
 	  break;
 	}
-
-      /* Restore saved point and BEGV.  */
-      dynwind_end ();
 
       val = eval_sub (val);
 
