@@ -1023,22 +1023,14 @@ Return t if the file exists and loads successfully.  */)
   bool is_module = scm_is_true (SCM_CAR (file_types));
   bool is_native_elisp = scm_is_true (SCM_CDR (file_types));
 
-  /* Check if we're stuck in a recursive load cycle.
-
-     2000-09-21: It's not possible to just check for the file loaded
-     being a member of Vloads_in_progress.  This fails because of the
-     way the byte compiler currently works; `provide's are not
-     evaluated, see font-lock.el/jit-lock.el as an example.  This
-     leads to a certain amount of ``normal'' recursion.
-
-     Also, just loading a file recursively is not always an error in
-     the general case; the second load may do something different.  */
+  /* PARTIALLY MIGRATED TO SCHEME: Recursive load cycle detection */
   {
-    int load_count = 0;
-    Lisp_Object tem = Vloads_in_progress;
-    FOR_EACH_TAIL_SAFE (tem)
-      if (!NILP (Fequal (found, XCAR (tem))) && (++load_count > 3))
-	signal_error ("Recursive load", Fcons (found, Vloads_in_progress));
+    /* Delegate counting logic to Scheme, keep C list management */
+    SCM count_loads_func = scm_c_private_ref ("language elisp runtime",
+                                              "elisp-count-recursive-loads");
+    scm_call_2 (count_loads_func, found, Vloads_in_progress);
+
+    /* C handles the unwind protection and list management */
     record_unwind_protect (record_load_unwind, Vloads_in_progress);
     Vloads_in_progress = Fcons (found, Vloads_in_progress);
   }

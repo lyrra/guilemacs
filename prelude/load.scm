@@ -3769,5 +3769,37 @@ This replicates the hist_file_name computation from Fload (lines 1063-1067)."
       ;; Otherwise just use found-eff
       found-eff))
 
+(define (elisp-count-recursive-loads found loads-in-progress-list)
+  "Count how many times a file appears in the loads-in-progress list.
+This replicates the counting logic from Fload recursive load detection.
+Signals an error if more than 3 recursive loads are detected."
+
+  (let ((load-count 0))
+    ;; Count occurrences using a simple loop
+    (let loop ((tem loads-in-progress-list))
+      (when (not (eq? tem #nil))
+        (when (not (eq? ((symbol-function 'equal) found ((symbol-function 'car) tem)) #nil))
+          (set! load-count (+ load-count 1)))
+        (loop ((symbol-function 'cdr) tem))))
+
+    ;; Check if we exceeded the limit (replicates the > 3 check)
+    (when (> load-count 3)
+      ;; Signal recursive load error
+      ((symbol-function 'signal) (elisp-intern "error" #nil)
+       ((symbol-function 'list) "Recursive load"
+        ((symbol-function 'cons) found loads-in-progress-list))))
+
+    ;; Return the count for debugging/logging if needed
+    load-count))
+
+(define (elisp-setup-default-lexical-binding)
+  "Set up default dynamic binding for load context.
+This replicates the lexical binding setup from Fload (lines 1046-1050).
+All loads are by default dynamic, unless the file itself specifies otherwise."
+
+  ;; Bind lexical-binding to nil (dynamic binding by default)
+  ;; This will be handled by specbind in the C wrapper since it needs proper cleanup
+  'setup-for-c-specbind)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
