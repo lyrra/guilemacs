@@ -963,7 +963,12 @@ Return t if the file exists and loads successfully.  */)
   bool compiled = 0;
   Lisp_Object handler;
 
-  CHECK_STRING (file);
+  /* File validation */
+  {
+    SCM validate_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-validate-load-file");
+    scm_call_1 (validate_func, file);
+  }
 
   /* If file name is magic, call the handler.  */
   handler = Ffind_file_name_handler (file, Qload);
@@ -971,13 +976,7 @@ Return t if the file exists and loads successfully.  */)
     return
       call6 (handler, Qload, file, noerror, nomessage, nosuffix, must_suffix);
 
-  /* Avoid weird lossage with null string as arg,
-     since it would try to load a directory as a Lisp file.  */
-  if (SCHARS (file) == 0)
-    {
-      fd = -1;
-      errno = ENOENT;
-    }
+  /* Empty file handling moved to Scheme validation above */
   else
     {
       /* File path processing and suffix determination */
@@ -1062,9 +1061,12 @@ Return t if the file exists and loads successfully.  */)
 	      lread_close (fd);
               fd = -1;
 	    }
-	  val = call4 (Vload_source_file_function, found, hist_file_name,
-		       NILP (noerror) ? Qnil : Qt,
-		       (NILP (nomessage) || force_load_messages) ? Qnil : Qt);
+	  /* MIGRATED TO SCHEME: Argument processing for load-source-file-function */
+	  SCM call_func = scm_c_private_ref ("language elisp runtime",
+	                                     "elisp-call-load-source-file-function");
+	  val = scm_call_6 (call_func, Vload_source_file_function, found, hist_file_name,
+	                    noerror, nomessage,
+	                    force_load_messages ? SCM_BOOL_T : SCM_BOOL_F);
 	  dynwind_end ();
 	  return val;
 	}
@@ -1149,18 +1151,21 @@ Return t if the file exists and loads successfully.  */)
     }
   else
     {
-      /* Use SCM port version if available for lexical cookie detection */
-#if 0
-      lexical_cookie_t cookie;
-      if (!scm_is_false (input.port))
-        cookie = lisp_file_lexical_cookie_scm_port ();
-      else
-        cookie = lisp_file_lexical_cookie (Qget_file_char);
+      /* MIGRATED TO SCHEME: Lexical binding detection */
+      {
+        SCM lexical_func = scm_c_private_ref ("language elisp runtime",
+                                              "elisp-detect-lexical-binding");
+        SCM lexical_result = scm_call_1 (lexical_func, input.port);
 
-      if (cookie == Cookie_Lex)
-        Fset (Qlexical_binding, Qt);
-#endif
-      Fset (Qlexical_binding, Qt);
+        /* Set lexical binding based on Scheme detection */
+        if (scm_is_eq (lexical_result, SCM_BOOL_T))
+          Fset (Qlexical_binding, Qt);
+        else if (scm_is_eq (lexical_result, SCM_BOOL_F))
+          Fset (Qlexical_binding, Qnil);
+        else
+          /* Default to lexical for 'none case */
+          Fset (Qlexical_binding, Qt);
+      }
 
       sync_guile_reader (&input);
       readevalloop_load (input.port, hist_file_name);

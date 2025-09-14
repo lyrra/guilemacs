@@ -304,6 +304,59 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
    Avoids repeated scm_from_utf8_string calls for this common constant."
   (if (string=? lisp-string "None") #t #nil))
 
+(define (elisp-detect-lexical-binding port)
+  "Detect lexical binding from first line of file.
+  Returns #t for lexical binding, #f for dynamic binding, 'none for no cookie.
+  This replicates the logic from lisp_file_lexical_cookie_scm_port."
+
+  (define (skip-whitespace)
+    "Skip whitespace characters"
+    (let ((ch (peek-char port)))
+      (when (and (not (eof-object? ch)) (char-whitespace? ch))
+        (read-char port)
+        (skip-whitespace))))
+
+  (define (read-first-line)
+    "Read first line as string"
+    (let loop ((chars '()))
+      (let ((ch (peek-char port)))
+        (cond
+         ((or (eof-object? ch) (char=? ch #\newline))
+          (list->string (reverse chars)))
+         (else
+          (read-char port)
+          (loop (cons ch chars)))))))
+
+  ;; Check if first character indicates a comment or shebang
+  (let ((first-ch (peek-char port)))
+    (cond
+     ((eof-object? first-ch) 'none)
+     ((char=? first-ch #\;)
+      ;; Comment line - read and parse for lexical-binding
+      (let ((line (read-first-line)))
+        (cond
+         ((string-contains line "lexical-binding: t") #t)
+         ((string-contains line "lexical-binding: nil") #f)
+         (else 'none))))
+     ((and (char=? first-ch #\#)
+           (not (eof-object? (peek-char port))))
+      ;; Potential shebang line
+      (read-char port) ; consume #
+      (let ((second-ch (peek-char port)))
+        (if (char=? second-ch #\!)
+            (begin
+              ;; Read shebang line and parse for lexical-binding
+              (let ((line (read-first-line)))
+                (cond
+                 ((string-contains line "lexical-binding: t") #t)
+                 ((string-contains line "lexical-binding: nil") #f)
+                 (else 'none))))
+            (begin
+              ;; Not a shebang, push back the #
+              (unread-char #\# port)
+              'none))))
+     (else 'none))))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -3830,6 +3883,35 @@ Uses load-suffixes and load-file-rep-suffixes variables."
 
     ;; Return reversed list (replicates Fnreverse)
     ((symbol-function 'nreverse) result-list))))
+
+(define (elisp-call-load-source-file-function load-source-file-function found hist-file-name noerror nomessage force-load-messages)
+  "Call the load-source-file-function with properly converted arguments.
+This replicates the call4 logic from Fload (lines 1065-1067)."
+
+  ;; Convert arguments to match the C call4 pattern
+  (let ((error-arg (if (eq? noerror #nil) #nil #t))
+        (message-arg (if (or (eq? nomessage #nil) force-load-messages) #nil #t)))
+
+    ;; Call the function with 4 arguments
+    ((symbol-function 'funcall) load-source-file-function found hist-file-name error-arg message-arg)))
+
+(define (elisp-validate-load-file file)
+  "Validate file argument for loading.
+This replicates the validation logic from Fload (lines 966, 976-977).
+Returns #t if valid, signals error if invalid."
+
+  ;; Check if file is a string (replicates CHECK_STRING)
+  (unless (string? file)
+    ((symbol-function 'signal) (elisp-intern "wrong-type-argument" #nil)
+     ((symbol-function 'list) (elisp-intern "stringp" #nil) file)))
+
+  ;; Check for empty string (replicates SCHARS(file) == 0 check)
+  (when (= ((symbol-function 'length) file) 0)
+    ((symbol-function 'signal) (elisp-intern "file-error" #nil)
+     ((symbol-function 'list) "Cannot load empty filename")))
+
+  ;; Return success
+  #t)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
