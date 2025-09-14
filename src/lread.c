@@ -2098,22 +2098,6 @@ readevalloop_load (
 	  break;
 	}
 
-      if (! HASH_TABLE_P (read_objects_map)
-	  || XHASH_TABLE (read_objects_map)->count)
-	read_objects_map
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (! HASH_TABLE_P (read_objects_completed)
-	  || XHASH_TABLE (read_objects_completed)->count)
-	read_objects_completed
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      /* Empty hashes can be reused; otherwise, reset on next call.  */
-      if (HASH_TABLE_P (read_objects_map)
-	  && XHASH_TABLE (read_objects_map)->count > 0)
-	read_objects_map = Qnil;
-      if (HASH_TABLE_P (read_objects_completed)
-	  && XHASH_TABLE (read_objects_completed)->count > 0)
-	read_objects_completed = Qnil;
-
       /* Restore saved point and BEGV.  */
       dynwind_end ();
 
@@ -2384,45 +2368,6 @@ elisp_read_from_port (Lisp_Object port)
   return fread0 (port);
 }
 
-DEFUN ("read-from-string-guile", Fread_from_string_guile, Sread_from_string_guile, 1, 3, 0,
-       doc: /* Guile-based version of read-from-string.
-Read one Lisp expression which is represented as text by STRING.
-Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
-FINAL-STRING-INDEX is an integer giving the position of the next
-remaining character in STRING.  START and END optionally delimit
-a substring of STRING from which to read.  This function uses Guile's
-scm_read() for parsing instead of the C reader.  */)
-  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
-{
-  CHECK_STRING (string);
-
-  /* Handle START and END parameters */
-  Lisp_Object substring;
-  if (NILP (start) && NILP (end))
-    {
-      substring = string;
-    }
-  else
-    {
-      /* Extract substring - delegate to existing substring implementation */
-      substring = Fsubstring (string, start, end);
-    }
-
-  /* Use Guile to read from string with enhanced UTF-8 handling */
-  SCM port = scm_open_input_string (substring);
-
-  /* Phase 8: Try to ensure proper UTF-8 encoding for the port */
-  /* Set port encoding to UTF-8 explicitly to handle UTF-8 symbols correctly */
-  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
-
-  SCM result = scm_read (port);
-
-  /* Calculate final string index */
-  ptrdiff_t final_index = SCHARS (substring);
-
-  return Fcons (result, make_fixnum (final_index));
-}
-
 /* Enhanced Guile Reader with Error Handling */
 static SCM
 guile_reader_error_handler (void *data, SCM key, SCM args)
@@ -2491,133 +2436,6 @@ convert_elisp_to_guile_syntax (Lisp_Object string)
   Lisp_Object result = build_string (output);
   xfree (output);
   return result;
-}
-
-/* Advanced Guile reader with proper error handling and position tracking */
-DEFUN ("read-from-string-guile-enhanced", Fread_from_string_guile_enhanced,
-       Sread_from_string_guile_enhanced, 1, 3, 0,
-       doc: /* Enhanced Guile-based version of read-from-string with error handling.
-Read one Lisp expression which is represented as text by STRING.
-Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
-FINAL-STRING-INDEX is an integer giving the position of the next
-remaining character in STRING.  START and END optionally delimit
-a substring of STRING from which to read.  This enhanced version includes
-proper error handling and accurate position tracking.  */)
-  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
-{
-  CHECK_STRING (string);
-
-  /* Handle START and END parameters with proper bounds checking */
-  ptrdiff_t start_pos = 0;
-  ptrdiff_t end_pos = SCHARS (string);
-
-  if (!NILP (start))
-    {
-      CHECK_FIXNUM (start);
-      start_pos = XFIXNUM (start);
-      if (start_pos < 0 || start_pos > end_pos)
-        args_out_of_range (string, start);
-    }
-
-  if (!NILP (end))
-    {
-      CHECK_FIXNUM (end);
-      end_pos = XFIXNUM (end);
-      if (end_pos < start_pos || end_pos > SCHARS (string))
-        args_out_of_range (string, end);
-    }
-
-  /* Extract substring if needed */
-  Lisp_Object substring;
-  if (start_pos == 0 && end_pos == SCHARS (string))
-    {
-      substring = string;
-    }
-  else
-    {
-      substring = Fsubstring (string, start, end);
-    }
-
-  /* Convert Elisp syntax to Guile syntax (e.g., [1 2 3] -> #(1 2 3)) */
-  Lisp_Object guile_syntax = convert_elisp_to_guile_syntax (substring);
-
-  /* Use Guile to read from string with error handling */
-  SCM port = scm_open_input_string (guile_syntax);
-  /* Phase 8: Set UTF-8 encoding for proper symbol handling */
-  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
-
-  /* Track position before reading */
-  SCM initial_pos = scm_ftell (port);
-
-  /* Read with comprehensive error handling */
-  SCM result = scm_c_catch (SCM_BOOL_T,
-                            (scm_t_catch_body) scm_read, port,
-                            (scm_t_catch_handler) guile_reader_error_handler, substring,
-                            NULL, NULL);
-
-  /* Handle EOF */
-  if (scm_is_eq (result, SCM_EOF_VAL))
-    {
-      end_of_file_error ();
-    }
-
-  /* Calculate accurate final position */
-  SCM final_pos = scm_ftell (port);
-  ptrdiff_t chars_read = scm_to_ssize_t (scm_difference (final_pos, initial_pos));
-  ptrdiff_t final_index = start_pos + chars_read;
-
-  /* Ensure we don't exceed string bounds */
-  if (final_index > SCHARS (string))
-    final_index = SCHARS (string);
-
-  return Fcons (result, make_fixnum (final_index));
-}
-
-/* Multiple expression reader using Guile */
-DEFUN ("read-multiple-from-string-guile", Fread_multiple_from_string_guile,
-       Sread_multiple_from_string_guile, 1, 3, 0,
-       doc: /* Read multiple Lisp expressions from STRING using Guile reader.
-Returns a list of all expressions read from the string.
-START and END optionally delimit a substring of STRING from which to read.  */)
-  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
-{
-  CHECK_STRING (string);
-
-  /* Extract substring using same logic as single-expression version */
-  Lisp_Object substring;
-  if (NILP (start) && NILP (end))
-    {
-      substring = string;
-    }
-  else
-    {
-      substring = Fsubstring (string, start, end);
-    }
-
-  /* Create Guile port */
-  SCM port = scm_open_input_string (substring);
-  /* Phase 8: Set UTF-8 encoding for proper symbol handling */
-  scm_set_port_encoding_x (port, scm_from_utf8_string ("UTF-8"));
-
-  /* Read all expressions until EOF */
-  Lisp_Object result_list = Qnil;
-
-  while (true)
-    {
-      SCM expr = scm_c_catch (SCM_BOOL_T,
-                              (scm_t_catch_body) scm_read, port,
-                              (scm_t_catch_handler) guile_reader_error_handler, substring,
-                              NULL, NULL);
-
-      if (scm_is_eq (expr, SCM_EOF_VAL))
-        break;
-
-      /* Add to result list (in reverse order, will reverse at end) */
-      result_list = Fcons (expr, result_list);
-    }
-
-  /* Return expressions in correct order */
-  return Fnreverse (result_list);
 }
 
 /* Function to set up the global context we need in toplevel read
