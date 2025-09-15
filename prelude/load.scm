@@ -368,6 +368,78 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
         ((symbol-function 'funcall) handler 'load file noerror nomessage nosuffix must-suffix)
         #f))) ; No handler found
 
+(define (elisp-compute-effective-filename found is-native-elisp)
+  "Compute effective filename for loading.
+  This replicates the found_eff computation from Fload lines 1040-1043."
+
+  (if is-native-elisp
+      ;; For native elisp, compute the effective name
+      ((symbol-function 'compute-found-effective) found)
+      ;; For regular files, use found as-is
+      found))
+
+(define (elisp-validate-file-descriptor fd-valid)
+  "Validate file descriptor state.
+  This replicates the errno setting from Fload lines 1078-1081.
+  Returns validation result: 'valid or 'invalid."
+
+  (if fd-valid
+      'valid
+      'invalid)) ; Will cause errno = EINVAL in C
+
+(define (elisp-should-close-fd is-module is-native-elisp fd-valid)
+  "Determine if file descriptor should be closed.
+  This replicates the close logic from Fload lines 1089-1097."
+
+  (and (not is-module)
+       (not is-native-elisp)
+       fd-valid)) ; Close fd if regular elisp file with valid fd
+
+(define (elisp-setup-port-input is-module is-native-elisp fd-valid)
+  "Set up input port based on file type.
+  This replicates the conditional setup from Fload lines 1108-1128.
+  Returns: 'close-fd, 'setup-port, or 'continue."
+
+  (cond
+   ((or is-module is-native-elisp)
+    ;; Module/native elisp - close file descriptor
+    (if fd-valid 'close-fd 'continue))
+   (else
+    ;; Regular elisp - set up port
+    'setup-port)))
+
+(define (elisp-prepare-load-bindings hist-file-name found)
+  "Prepare all dynamic bindings for load operation.
+  This replicates the specbind calls from Fload lines 1158-1161.
+  Returns list of (symbol . value) pairs for C to bind."
+
+  (list
+   (cons 'load-file-name hist-file-name)
+   (cons 'load-true-file-name found)
+   (cons 'inhibit-file-name-operation #nil)
+   (cons 'load-in-progress #t)))
+
+(define (elisp-determine-load-action is-module)
+  "Determine the loading action based on file type.
+  This replicates the conditional logic from Fload lines 1173-1183.
+  Returns: 'load-module or 'load-elisp."
+
+  (if is-module
+      'load-module
+      'load-elisp))
+
+(define (elisp-return-load-success)
+  "Return success value for load operation completion.
+  This replicates the final return Qt from Fload line 1235."
+  #t) ; Return success
+
+(define (elisp-load-with-match-data-protection file noerror nomessage nosuffix must-suffix)
+  "Load file with match data protection.
+  This replicates the save_match_data_load wrapper function."
+
+  ;; Call the main load function - C will handle the match data protection
+  ((symbol-function 'load) file noerror nomessage nosuffix must-suffix))
+
 (set-symbol-function! 'string-bytes elisp-string-bytes)
 (set-symbol-function! 'string-distance elisp-string-distance)
 (set-symbol-function! 'char-to-string elisp-char-to-string)
@@ -3923,6 +3995,65 @@ Returns #t if valid, signals error if invalid."
 
   ;; Return success
   #t)
+
+(define (elisp-complete-filename? pathname)
+  "Check if pathname is a complete filename.
+This replicates the complete_filename_p function from lread.c lines 1258-1265.
+Returns #t if pathname starts with directory separator or is a full Windows path."
+
+  (let* ((path-string (if (string? pathname) pathname (scm_to_utf8_string pathname)))
+         (path-length (string-length path-string)))
+
+    (if (= path-length 0)
+        #f  ; Empty string is not complete
+        (or
+         ;; Check if starts with directory separator (Unix: /, Windows: \ or /)
+         (or (char=? (string-ref path-string 0) #\/)
+             (char=? (string-ref path-string 0) #\\))
+
+         ;; Check for Windows drive letter format (C:\)
+         (and (> path-length 2)
+              (char=? (string-ref path-string 1) #\:)
+              (or (char=? (string-ref path-string 2) #\/)
+                  (char=? (string-ref path-string 2) #\\)))))))
+
+(define (elisp-compute-found-effective found)
+  "Compute effective filename from found filename.
+This replicates the compute_found_effective function from lread.c lines 869-882.
+Handles .el.gz files by removing .gz suffix and adding 'c' suffix for .elc files."
+
+  ;; Set src_name to nil initially (this matches the C code)
+  (let ((src-name #nil))
+
+    ;; If src_name is nil (which it always is in this implementation)
+    ;; return found as-is (manual eln load case)
+    (if (eq? src-name #nil)
+        found
+        ;; Original logic for when src_name is not nil:
+        ;; Check if it ends with "el.gz" and process accordingly
+        (let ((src-string (if (string? src-name) src-name (scm_to_utf8_string src-name))))
+          (if (string-suffix? "el.gz" src-string)
+              ;; Remove .gz suffix and add 'c' suffix
+              (let* ((base-name (substring src-string 0 (- (string-length src-string) 3)))
+                     (base-lisp ((symbol-function 'substring) src-name
+                                (elisp-intern "0" #nil)
+                                (elisp-intern "-3" #nil))))
+                ((symbol-function 'concat) base-lisp "c"))
+              ;; Just add 'c' suffix for regular .el files
+              ((symbol-function 'concat) src-name "c"))))))
+
+(define (elisp-loadhist-initialize filename)
+  "Initialize load history for filename.
+This replicates the loadhist_initialize function from lread.c lines 877-882.
+Validates filename and sets up current-load-list binding."
+
+  ;; Assertion check: filename must be string or nil
+  (unless (or (string? filename) (eq? filename #nil))
+    ((symbol-function 'error) "filename must be string or nil"))
+
+  ;; This function just sets up the binding - the actual specbind is done in C
+  ;; Return the cons to be used in specbind
+  ((symbol-function 'cons) filename #nil))
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

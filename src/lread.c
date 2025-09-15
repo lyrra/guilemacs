@@ -869,23 +869,18 @@ suffix_p (Lisp_Object string, const char *suffix)
 static Lisp_Object
 compute_found_effective (Lisp_Object found)
 {
-  /* Reconstruct the .elc filename.  */
-  Lisp_Object src_name = Qnil;
-
-  if (NILP (src_name))
-    /* Manual eln load.  */
-    return found;
-
-  if (suffix_p (src_name, "el.gz"))
-    src_name = Fsubstring (src_name, make_fixnum (0), make_fixnum (-3));
-  return concat2 (src_name, build_string ("c"));
+  SCM effective_func = scm_c_private_ref ("language elisp runtime",
+                                         "elisp-compute-found-effective");
+  return scm_call_1 (effective_func, found);
 }
 
 static void
 loadhist_initialize (Lisp_Object filename)
 {
-  eassert (STRINGP (filename) || NILP (filename));
-  specbind (Qcurrent_load_list, Fcons (filename, Qnil));
+  SCM loadhist_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-loadhist-initialize");
+  Lisp_Object binding = scm_call_1 (loadhist_func, filename);
+  specbind (Qcurrent_load_list, binding);
 }
 
 static void
@@ -1037,10 +1032,11 @@ Return t if the file exists and loads successfully.  */)
      Vload_source_file_function.  */
   specbind (Qlexical_binding, Qnil);
 
-  Lisp_Object found_eff =
-    is_native_elisp
-    ? compute_found_effective (found)
-    : found;
+  /* MIGRATED TO SCHEME: Effective filename computation */
+  SCM eff_filename_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-compute-effective-filename");
+  Lisp_Object found_eff = scm_call_2 (eff_filename_func, found,
+                                      is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F);
 
   /* History file name computation */
   {
@@ -1074,45 +1070,63 @@ Return t if the file exists and loads successfully.  */)
 	}
     }
 
-  if (!lread_fd_p)
-    {
-      errno = EINVAL;
-    }
-  else if (!is_module && !is_native_elisp)
-    {
-      /* Close file descriptor since we only needed path resolution */
-      if (lread_fd_p)
-        {
-          emacs_close (fd);
-          fd = -1;
-        }
-    }
+  /* MIGRATED TO SCHEME: File descriptor validation */
+  {
+    SCM validate_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-validate-file-descriptor");
+    SCM validation_result = scm_call_1 (validate_func, lread_fd_p ? SCM_BOOL_T : SCM_BOOL_F);
+
+    if (scm_is_eq (validation_result, scm_from_utf8_symbol ("invalid")))
+      {
+        errno = EINVAL;
+      }
+  }
+  /* MIGRATED TO SCHEME: File descriptor close decision */
+  {
+    SCM close_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-should-close-fd");
+    if (scm_is_true (scm_call_3 (close_func,
+                                is_module ? SCM_BOOL_T : SCM_BOOL_F,
+                                is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F,
+                                lread_fd_p ? SCM_BOOL_T : SCM_BOOL_F)))
+      {
+        /* Close file descriptor since we only needed path resolution */
+        emacs_close (fd);
+        fd = -1;
+      }
+  }
 
   /* Declare here rather than inside the else-part because the storage
      might be accessed by the unbind_to call below.  */
   struct reader_context input;
 
-  if (is_module || is_native_elisp)
-    {
-      /* `module-load' uses the file name, so we can close the stream
-         now.  */
-      if (lread_fd_p)
-        {
-          lread_close (fd);
-          fd = -1;
-        }
-    }
-  else
-    {
-      /* Set up input structure with SCM port */
-      const char *filename = SSDATA (ENCODE_FILE (found));
-      input.port = file_to_guile_port (filename);
+  /* MIGRATED TO SCHEME: Port input setup decision */
+  {
+    SCM setup_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-setup-port-input");
+    SCM setup_action = scm_call_3 (setup_func,
+                                  is_module ? SCM_BOOL_T : SCM_BOOL_F,
+                                  is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F,
+                                  lread_fd_p ? SCM_BOOL_T : SCM_BOOL_F);
 
-      if (scm_is_false (input.port))
-        report_file_error ("Opening file", file);
+    if (scm_is_eq (setup_action, scm_from_utf8_symbol ("close-fd")))
+      {
+        /* `module-load' uses the file name, so we can close the stream now.  */
+        lread_close (fd);
+        fd = -1;
+      }
+    else if (scm_is_eq (setup_action, scm_from_utf8_symbol ("setup-port")))
+      {
+        /* Set up input structure with SCM port */
+        const char *filename = SSDATA (ENCODE_FILE (found));
+        input.port = file_to_guile_port (filename);
 
-      input.lookahead = 0;
-    }
+        if (scm_is_false (input.port))
+          report_file_error ("Opening file", file);
+
+        input.lookahead = 0;
+      }
+  }
 
   /* Preloaded file list handling */
   {
@@ -1136,42 +1150,59 @@ Return t if the file exists and loads successfully.  */)
                 noninteractive ? SCM_BOOL_T : SCM_BOOL_F);
   }
 
-  specbind (Qload_file_name, hist_file_name);
-  specbind (Qload_true_file_name, found);
-  specbind (Qinhibit_file_name_operation, Qnil);
-  specbind (Qload_in_progress, Qt);
+  /* MIGRATED TO SCHEME: Dynamic binding setup */
+  {
+    SCM bindings_func = scm_c_private_ref ("language elisp runtime",
+                                           "elisp-prepare-load-bindings");
+    SCM bindings = scm_call_2 (bindings_func, hist_file_name, found);
 
-  if (is_module)
-    {
-#ifdef HAVE_MODULES
-      loadhist_initialize (found);
-      Fmodule_load (found);
-#else
-      /* This cannot happen.  */
-      emacs_abort ();
-#endif
-    }
-  else
-    {
-      /* MIGRATED TO SCHEME: Lexical binding detection */
+    /* Apply each binding using specbind */
+    while (!scm_is_null (bindings))
       {
-        SCM lexical_func = scm_c_private_ref ("language elisp runtime",
-                                              "elisp-detect-lexical-binding");
-        SCM lexical_result = scm_call_1 (lexical_func, input.port);
-
-        /* Set lexical binding based on Scheme detection */
-        if (scm_is_eq (lexical_result, SCM_BOOL_T))
-          Fset (Qlexical_binding, Qt);
-        else if (scm_is_eq (lexical_result, SCM_BOOL_F))
-          Fset (Qlexical_binding, Qnil);
-        else
-          /* Default to lexical for 'none case */
-          Fset (Qlexical_binding, Qt);
+        SCM binding = scm_car (bindings);
+        specbind (scm_car (binding), scm_cdr (binding));
+        bindings = scm_cdr (bindings);
       }
+  }
 
-      sync_guile_reader (&input);
-      readevalloop_load (input.port, hist_file_name);
-    }
+  /* MIGRATED TO SCHEME: Load action determination */
+  {
+    SCM action_func = scm_c_private_ref ("language elisp runtime",
+                                         "elisp-determine-load-action");
+    SCM load_action = scm_call_1 (action_func, is_module ? SCM_BOOL_T : SCM_BOOL_F);
+
+    if (scm_is_eq (load_action, scm_from_utf8_symbol ("load-module")))
+      {
+#ifdef HAVE_MODULES
+        loadhist_initialize (found);
+        Fmodule_load (found);
+#else
+        /* This cannot happen.  */
+        emacs_abort ();
+#endif
+      }
+    else
+      {
+        /* MIGRATED TO SCHEME: Lexical binding detection */
+        {
+          SCM lexical_func = scm_c_private_ref ("language elisp runtime",
+                                                "elisp-detect-lexical-binding");
+          SCM lexical_result = scm_call_1 (lexical_func, input.port);
+
+          /* Set lexical binding based on Scheme detection */
+          if (scm_is_eq (lexical_result, SCM_BOOL_T))
+            Fset (Qlexical_binding, Qt);
+          else if (scm_is_eq (lexical_result, SCM_BOOL_F))
+            Fset (Qlexical_binding, Qnil);
+          else
+            /* Default to lexical for 'none case */
+            Fset (Qlexical_binding, Qt);
+        }
+
+        sync_guile_reader (&input);
+        readevalloop_load (input.port, hist_file_name);
+      }
+  }
   dynwind_end ();
 
   /* MIGRATED TO SCHEME: eval-after-load forms execution */
@@ -1196,7 +1227,10 @@ Return t if the file exists and loads successfully.  */)
                 noninteractive ? SCM_BOOL_T : SCM_BOOL_F);
   }
 
-  return Qt;
+  /* MIGRATED TO SCHEME: Load completion return */
+  SCM success_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-return-load-success");
+  return scm_call_0 (success_func);
 }
 
 Lisp_Object
@@ -1204,9 +1238,14 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 		      Lisp_Object nomessage, Lisp_Object nosuffix,
 		      Lisp_Object must_suffix)
 {
+  /* MIGRATED TO SCHEME: Match data protection wrapper */
   dynwind_begin ();
   record_unwind_save_match_data ();
-  Lisp_Object result = Fload (file, noerror, nomessage, nosuffix, must_suffix);
+
+  SCM wrapper_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-load-with-match-data-protection");
+  Lisp_Object result = scm_call_5 (wrapper_func, file, noerror, nomessage, nosuffix, must_suffix);
+
   dynwind_end ();
   return result;
 }
@@ -1214,10 +1253,10 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 static bool
 complete_filename_p (Lisp_Object pathname)
 {
-  const unsigned char *s = SDATA (pathname);
-  return (IS_DIRECTORY_SEP (s[0])
-	  || (SCHARS (pathname) > 2
-	      && IS_DEVICE_SEP (s[1]) && IS_DIRECTORY_SEP (s[2])));
+  SCM complete_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-complete-filename?");
+  SCM result = scm_call_1 (complete_func, pathname);
+  return !NILP (result);
 }
 
 DEFUN ("locate-file-internal", Flocate_file_internal, Slocate_file_internal, 2, 4, 0,
