@@ -4094,5 +4094,47 @@ This replicates the orchestration from Fload (lines 1202-1203)."
   ;; For now, return success indicator - the C code will handle the actual calls
   #t)
 
+(define (elisp-handle-file-open-error fd noerror file)
+  "Handle file opening errors and determine response.
+This replicates the error handling from Fload (lines 993-999).
+Returns: 'continue if should continue, 'return-nil if should return nil."
+
+  ;; Check if file descriptor indicates failure (fd < 0)
+  ;; In the C code, lread_fd_cmp(-1) checks if fd equals -1
+  (if (< fd 0)
+      (if (eq? noerror #nil)
+          ;; If noerror is nil, we should signal an error (handled in C)
+          'signal-error
+          ;; If noerror is non-nil, return nil quietly
+          'return-nil)
+      ;; File opened successfully, continue
+      'continue))
+
+(define (elisp-setup-file-descriptor-protection fd)
+  "Determine if file descriptor needs unwind protection.
+This replicates the unwind protection logic from Fload (lines 1008-1011).
+Returns: #t if protection should be set up, #f otherwise."
+
+  ;; In C: if (0 <= fd) - set up unwind protection
+  (>= fd 0))
+
+(define (elisp-prepare-openp-call path-result)
+  "Prepare parameters for openp function call.
+This replicates the openp call preparation from Fload (lines 985-991).
+Returns: (processed-file . suffixes) pair for openp call."
+
+  ;; Extract the components that were computed by elisp-process-load-file-path
+  ;; path_result is already a (file . suffixes) pair from scheme
+  path-result)
+
+(define (elisp-handle-loads-in-progress found loads-in-progress)
+  "Prepare loads-in-progress list update.
+This extends the recursive load handling from Fload (lines 1027-1029).
+Returns: the new value for loads-in-progress list."
+
+  ;; The C code does: Vloads_in_progress = Fcons (found, Vloads_in_progress);
+  ;; We return the new cons cell for C to assign
+  ((symbol-function 'cons) found loads-in-progress))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

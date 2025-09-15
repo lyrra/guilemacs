@@ -990,13 +990,23 @@ Return t if the file exists and loads successfully.  */)
 		  load_prefer_newer, false, NULL);
     }
 
-  if (lread_fd_cmp (-1))
-    {
-      if (NILP (noerror))
-	report_file_error ("Cannot open load file", file);
-      dynwind_end ();
-      return Qnil;
-    }
+  /* MIGRATED TO SCHEME: File open error handling */
+  {
+    SCM error_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-handle-file-open-error");
+    SCM error_action = scm_call_3 (error_func, scm_from_int (fd), noerror, file);
+
+    if (scm_is_eq (error_action, scm_from_utf8_symbol ("signal-error")))
+      {
+        report_file_error ("Cannot open load file", file);
+      }
+    if (scm_is_eq (error_action, scm_from_utf8_symbol ("return-nil")))
+      {
+        dynwind_end ();
+        return Qnil;
+      }
+    /* Continue if action is 'continue */
+  }
 
   /* MIGRATED TO SCHEME: User init file detection */
   {
@@ -1005,10 +1015,15 @@ Return t if the file exists and loads successfully.  */)
     Vuser_init_file = scm_call_1 (user_init_func, found);
   }
 
-  if (0 <= fd)
-    {
-      record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
-    }
+  /* MIGRATED TO SCHEME: File descriptor protection setup */
+  {
+    SCM protection_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-setup-file-descriptor-protection");
+    if (scm_is_true (scm_call_1 (protection_func, scm_from_int (fd))))
+      {
+        record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
+      }
+  }
 
   /* File type detection */
   SCM file_type_func = scm_c_private_ref ("language elisp runtime",
@@ -1024,9 +1039,11 @@ Return t if the file exists and loads successfully.  */)
                                               "elisp-count-recursive-loads");
     scm_call_2 (count_loads_func, found, Vloads_in_progress);
 
-    /* C handles the unwind protection and list management */
+    /* MIGRATED TO SCHEME: Loads-in-progress list management */
     record_unwind_protect (record_load_unwind, Vloads_in_progress);
-    Vloads_in_progress = Fcons (found, Vloads_in_progress);
+    SCM loads_func = scm_c_private_ref ("language elisp runtime",
+                                        "elisp-handle-loads-in-progress");
+    Vloads_in_progress = scm_call_2 (loads_func, found, Vloads_in_progress);
   }
 
   /* MIGRATED TO SCHEME: Lexical binding specbind preparation */
