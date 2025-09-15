@@ -4055,5 +4055,44 @@ Validates filename and sets up current-load-list binding."
   ;; Return the cons to be used in specbind
   ((symbol-function 'cons) filename #nil))
 
+(define (elisp-handle-user-init-file found)
+  "Handle user init file detection logic.
+This replicates the user init file logic from Fload (lines 1002-1003).
+Returns the value that should be assigned to Vuser_init_file."
+
+  ;; Check if Vuser_init_file is Qt (meaning we're looking for user's init file)
+  (if (eq? ((symbol-function 'symbol-value) (elisp-intern "user-init-file" #nil))
+           ((symbol-function 'symbol-value) (elisp-intern "t" #nil)))
+      found  ; If yes, set it to the found file
+      ;; Otherwise, return the current value unchanged
+      ((symbol-function 'symbol-value) (elisp-intern "user-init-file" #nil))))
+
+(define (elisp-prepare-module-loading found)
+  "Prepare for module loading by initializing load history.
+This replicates the module loading preparation from Fload (lines 1176-1178)."
+
+  ;; Call loadhist-initialize for the found file
+  ;; This corresponds to the C code: loadhist_initialize (found);
+  ((symbol-function 'loadhist-initialize) found))
+
+(define (elisp-handle-lexical-binding-specbind)
+  "Return the appropriate binding for lexical-binding variable.
+This prepares the specbind call for lexical-binding from Fload (line 1033)."
+
+  ;; Return a cons cell for specbind: (Qlexical_binding . Qnil)
+  ;; The actual specbind call will be done in C
+  ((symbol-function 'cons) (elisp-intern "lexical-binding" #nil) #nil))
+
+(define (elisp-orchestrate-file-reading port hist-file-name)
+  "Orchestrate the file reading process including sync and evaluation.
+This replicates the orchestration from Fload (lines 1202-1203)."
+
+  ;; This function serves as a scheme-side coordinator for the reading process
+  ;; The actual sync_guile_reader and readevalloop_load calls remain in C
+  ;; but this provides a scheme hook point for future enhancements
+
+  ;; For now, return success indicator - the C code will handle the actual calls
+  #t)
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

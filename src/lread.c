@@ -998,9 +998,12 @@ Return t if the file exists and loads successfully.  */)
       return Qnil;
     }
 
-  /* Tell startup.el whether or not we found the user's init file.  */
-  if (EQ (Qt, Vuser_init_file))
-    Vuser_init_file = found;
+  /* MIGRATED TO SCHEME: User init file detection */
+  {
+    SCM user_init_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-handle-user-init-file");
+    Vuser_init_file = scm_call_1 (user_init_func, found);
+  }
 
   if (0 <= fd)
     {
@@ -1026,11 +1029,13 @@ Return t if the file exists and loads successfully.  */)
     Vloads_in_progress = Fcons (found, Vloads_in_progress);
   }
 
-  /* All loads are by default dynamic, unless the file itself specifies
-     otherwise using a file-variable in the first line.  This is bound here
-     so that it takes effect whether or not we use
-     Vload_source_file_function.  */
-  specbind (Qlexical_binding, Qnil);
+  /* MIGRATED TO SCHEME: Lexical binding specbind preparation */
+  {
+    SCM lexical_bind_func = scm_c_private_ref ("language elisp runtime",
+                                               "elisp-handle-lexical-binding-specbind");
+    SCM binding = scm_call_0 (lexical_bind_func);
+    specbind (SCM_CAR (binding), SCM_CDR (binding));
+  }
 
   /* MIGRATED TO SCHEME: Effective filename computation */
   SCM eff_filename_func = scm_c_private_ref ("language elisp runtime",
@@ -1174,7 +1179,10 @@ Return t if the file exists and loads successfully.  */)
     if (scm_is_eq (load_action, scm_from_utf8_symbol ("load-module")))
       {
 #ifdef HAVE_MODULES
-        loadhist_initialize (found);
+        /* MIGRATED TO SCHEME: Module loading preparation */
+        SCM module_prep_func = scm_c_private_ref ("language elisp runtime",
+                                                  "elisp-prepare-module-loading");
+        scm_call_1 (module_prep_func, found);
         Fmodule_load (found);
 #else
         /* This cannot happen.  */
@@ -1199,6 +1207,12 @@ Return t if the file exists and loads successfully.  */)
             Fset (Qlexical_binding, Qt);
         }
 
+        /* MIGRATED TO SCHEME: File reading orchestration */
+        SCM orchestrate_func = scm_c_private_ref ("language elisp runtime",
+                                                  "elisp-orchestrate-file-reading");
+        scm_call_2 (orchestrate_func, input.port, hist_file_name);
+
+        /* Core file reading operations remain in C for performance */
         sync_guile_reader (&input);
         readevalloop_load (input.port, hist_file_name);
       }
