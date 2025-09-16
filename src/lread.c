@@ -958,18 +958,11 @@ Return t if the file exists and loads successfully.  */)
   bool compiled = 0;
   Lisp_Object handler;
 
-  /* File validation */
+  /* MIGRATED TO SCHEME: File validation and handler check (compound) */
   {
-    SCM validate_func = scm_c_private_ref ("language elisp runtime",
-                                           "elisp-validate-load-file");
-    scm_call_1 (validate_func, file);
-  }
-
-  /* MIGRATED TO SCHEME: Magic file name handler check */
-  {
-    SCM handler_func = scm_c_private_ref ("language elisp runtime",
-                                          "elisp-check-file-handler");
-    SCM handler_result = scm_call_5 (handler_func, file, noerror, nomessage, nosuffix, must_suffix);
+    SCM validate_handler_func = scm_c_private_ref ("language elisp runtime",
+                                                   "elisp-validate-and-check-handler");
+    SCM handler_result = scm_call_5 (validate_handler_func, file, noerror, nomessage, nosuffix, must_suffix);
     if (!scm_is_false (handler_result))
       return handler_result;
   }
@@ -1008,63 +1001,47 @@ Return t if the file exists and loads successfully.  */)
     /* Continue if action is 'continue */
   }
 
-  /* MIGRATED TO SCHEME: User init file detection */
+  /* MIGRATED TO SCHEME: Post-openp processing (compound) */
+  bool is_module, is_native_elisp;
   {
-    SCM user_init_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-handle-user-init-file");
-    Vuser_init_file = scm_call_1 (user_init_func, found);
-  }
+    SCM post_openp_func = scm_c_private_ref ("language elisp runtime",
+                                             "elisp-post-openp-processing");
+    SCM results = scm_call_2 (post_openp_func, found, scm_from_int (fd));
 
-  /* MIGRATED TO SCHEME: File descriptor protection setup */
-  {
-    SCM protection_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-setup-file-descriptor-protection");
-    if (scm_is_true (scm_call_1 (protection_func, scm_from_int (fd))))
+    /* Extract results: (user-init-value . (needs-protection . (is-module . is-native-elisp))) */
+    Vuser_init_file = SCM_CAR (results);
+    SCM rest = SCM_CDR (results);
+
+    bool needs_protection = scm_is_true (SCM_CAR (rest));
+    if (needs_protection)
       {
         record_unwind_protect_ptr (close_file_ptr_unwind, &fd);
       }
+
+    rest = SCM_CDR (rest);
+    is_module = scm_is_true (SCM_CAR (rest));
+    is_native_elisp = scm_is_true (SCM_CDR (rest));
   }
 
-  /* File type detection */
-  SCM file_type_func = scm_c_private_ref ("language elisp runtime",
-                                          "elisp-detect-file-type");
-  SCM file_types = scm_call_1 (file_type_func, found);
-  bool is_module = scm_is_true (SCM_CAR (file_types));
-  bool is_native_elisp = scm_is_true (SCM_CDR (file_types));
-
-  /* PARTIALLY MIGRATED TO SCHEME: Recursive load cycle detection */
+  /* MIGRATED TO SCHEME: Load environment setup (compound) */
+  Lisp_Object found_eff;
   {
-    /* Delegate counting logic to Scheme, keep C list management */
-    SCM count_loads_func = scm_c_private_ref ("language elisp runtime",
-                                              "elisp-count-recursive-loads");
-    scm_call_2 (count_loads_func, found, Vloads_in_progress);
+    SCM setup_env_func = scm_c_private_ref ("language elisp runtime",
+                                            "elisp-setup-load-environment");
+    SCM results = scm_call_5 (setup_env_func, found, Vloads_in_progress, file, Vpurify_flag,
+                              is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F);
 
-    /* MIGRATED TO SCHEME: Loads-in-progress list management */
+    /* Extract results: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name))) */
     record_unwind_protect (record_load_unwind, Vloads_in_progress);
-    SCM loads_func = scm_c_private_ref ("language elisp runtime",
-                                        "elisp-handle-loads-in-progress");
-    Vloads_in_progress = scm_call_2 (loads_func, found, Vloads_in_progress);
-  }
+    Vloads_in_progress = SCM_CAR (results);
+    SCM rest = SCM_CDR (results);
 
-  /* MIGRATED TO SCHEME: Lexical binding specbind preparation */
-  {
-    SCM lexical_bind_func = scm_c_private_ref ("language elisp runtime",
-                                               "elisp-handle-lexical-binding-specbind");
-    SCM binding = scm_call_0 (lexical_bind_func);
-    specbind (SCM_CAR (binding), SCM_CDR (binding));
-  }
+    SCM lexical_binding = SCM_CAR (rest);
+    specbind (SCM_CAR (lexical_binding), SCM_CDR (lexical_binding));
+    rest = SCM_CDR (rest);
 
-  /* MIGRATED TO SCHEME: Effective filename computation */
-  SCM eff_filename_func = scm_c_private_ref ("language elisp runtime",
-                                             "elisp-compute-effective-filename");
-  Lisp_Object found_eff = scm_call_2 (eff_filename_func, found,
-                                      is_native_elisp ? SCM_BOOL_T : SCM_BOOL_F);
-
-  /* History file name computation */
-  {
-    SCM hist_name_func = scm_c_private_ref ("language elisp runtime",
-                                            "elisp-compute-hist-file-name");
-    hist_file_name = scm_call_3 (hist_name_func, file, found_eff, Vpurify_flag);
+    found_eff = SCM_CAR (rest);
+    hist_file_name = SCM_CDR (rest);
   }
 
 

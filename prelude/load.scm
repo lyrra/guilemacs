@@ -4136,5 +4136,44 @@ Returns: the new value for loads-in-progress list."
   ;; We return the new cons cell for C to assign
   ((symbol-function 'cons) found loads-in-progress))
 
+;; COMPOUND FUNCTIONS - Consolidate multiple operations to reduce C-Guile marshalling
+
+(define (elisp-validate-and-check-handler file noerror nomessage nosuffix must-suffix)
+  "Compound function: Validate file and check for magic file name handlers.
+This consolidates elisp-validate-load-file and elisp-check-file-handler.
+Returns: handler result if handler found, #f if should continue with normal loading."
+
+  ;; First, validate the file
+  (elisp-validate-load-file file)
+
+  ;; Then check for magic file name handlers
+  (elisp-check-file-handler file noerror nomessage nosuffix must-suffix))
+
+(define (elisp-setup-load-environment found loads-in-progress file purify-flag is-native-elisp)
+  "Compound function: Set up load environment including recursive loads, bindings, and filenames.
+This consolidates recursive load detection, loads-in-progress management, lexical binding setup,
+effective filename computation, and history file name computation.
+Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name)))"
+
+  ;; Handle recursive load counting
+  (elisp-count-recursive-loads found loads-in-progress)
+
+  ;; Prepare new loads-in-progress list
+  (let ((new-loads-in-progress (elisp-handle-loads-in-progress found loads-in-progress)))
+
+    ;; Prepare lexical binding
+    (let ((lexical-binding (elisp-handle-lexical-binding-specbind)))
+
+      ;; Compute effective filename
+      (let ((found-eff (elisp-compute-effective-filename found is-native-elisp)))
+
+        ;; Compute history file name
+        (let ((hist-file-name (elisp-compute-hist-file-name file found-eff purify-flag)))
+
+          ;; Return all results as nested cons cells
+          (cons new-loads-in-progress
+                (cons lexical-binding
+                      (cons found-eff hist-file-name))))))))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
