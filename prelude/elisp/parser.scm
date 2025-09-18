@@ -183,6 +183,11 @@
        (parse-error token "end of file during parsing"))
       ((integer float symbol character string)
        (return (cdr token)))
+      ((keyword)
+       ;; Keywords are self-evaluating - return a progn that sets the symbol
+       (let ((keyword-sym (cdr token)))
+         ;; Return a progn expression that sets the symbol and returns it
+         (return `(progn (setq ,keyword-sym (quote ,keyword-sym)) (quote ,keyword-sym)))))
       ((function)
        (return `(function ,(get-expression lex))))
       ((quote backquote unquote unquote-splicing)

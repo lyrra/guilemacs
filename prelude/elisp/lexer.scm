@@ -36,6 +36,12 @@
 ;;;
 ;;; TODO: #@count comments
 
+;;; Create a self-evaluating keyword symbol for elisp
+(define (make-keyword-symbol name)
+  "Create a self-evaluating elisp keyword symbol"
+  ;; Return the symbol, self-evaluation will be handled in parser
+  (string->symbol name))
+
 ;;; Report an error from the lexer (that is, invalid input given).
 
 (define (lexer-error port msg . args)
@@ -342,10 +348,13 @@
             ((#\')
              (return 'function #f))
             ((#\:)
+             ;; #: prefix - create keyword symbol
              (call-with-values
                  (lambda () (get-symbol-or-number port))
                (lambda (type str)
-                 (return 'symbol (make-symbol str))))))))
+                 (if (eq? type 'symbol)
+                     (return 'keyword (make-keyword-symbol (string-append ":" str)))
+                     (error "invalid keyword syntax after #:" str))))))))
         ;; Parentheses and other special-meaning single characters.
         ((#\() (return 'paren-open #f))
         ((#\)) (return 'paren-close #f))
@@ -360,6 +369,22 @@
                  (error "expected @ in unquote-splicing")
                  (return 'unquote-splicing #f))
              (return 'unquote #f)))
+        ;; Colon symbols (keywords) - self-evaluating
+        ((#\:)
+         (let ((next-char (peek-char port)))
+           (if (or (eof-object? next-char)
+                   (char-whitespace? next-char)
+                   (char=? next-char #\()
+                   (char=? next-char #\)))
+               ;; Bare colon
+               (return 'keyword (make-keyword-symbol ":"))
+               ;; Colon followed by symbol name
+               (call-with-values
+                   (lambda () (get-symbol-or-number port))
+                 (lambda (type str)
+                   (if (eq? type 'symbol)
+                       (return 'keyword (make-keyword-symbol (string-append ":" str)))
+                       (error "invalid keyword syntax" str)))))))
         ;; Remaining are numbers and symbols.  Process input until next
         ;; whitespace is found, and see if it looks like a number
         ;; (float/integer) or symbol and return accordingly.

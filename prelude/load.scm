@@ -4208,19 +4208,45 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                         #:output-file go)
           (load-compiled go)))))
 
+;; Custom elisp reader that handles colon symbols properly
+(define (custom-elisp-read port)
+  "Custom elisp reader that creates self-evaluating colon symbols"
+  (let ((original-result (read port)))
+    (cond
+      ;; Handle Guile keywords (converted from :symbol syntax)
+      ((keyword? original-result)
+       (let* ((keyword-symbol (keyword->symbol original-result))
+              (base-name (symbol->string keyword-symbol))
+              (colon-name (string-append ":" base-name)))
+         ;; Create self-evaluating elisp symbol
+         (let ((elisp-symbol ((symbol-function 'intern) colon-name #nil)))
+           ((symbol-function 'set) elisp-symbol elisp-symbol)
+           elisp-symbol)))
+      ;; Pass through everything else
+      (else original-result))))
+
+
 ;; Enhanced version that handles full Fload parameters
 (define (load-elisp-full found-file noerror nomessage nosuffix must-suffix)
   "Load elisp file with compilation, handling full Fload parameter set"
   (catch #t
     (lambda ()
+      (format #t "loading file: ~s~%" found-file)
       (let* ((src found-file)
+             (x (format #t "get compiled-file-name~%"))
              (go (compiled-file-name src))
+             (x (format #t "get lang~%"))
              (el (lookup-language 'elisp)))
+        (format #t "loading file 3.~%")
         (if (fresh-go? go src)
-            (load-compiled go)
             (begin
-              (unless nomessage
-                (format #t "Compiling ~a...~%" src))
+              (format #t "loading compiled file: ~s~%" go)
+              (load-compiled go))
+            (begin
+              ;(unless nomessage
+                (format #t "Compiling ~a...~%" src)
+                ;)
+              ;; Compile normally
               (compile-file src
                             #:from el
                             #:output-file go)
