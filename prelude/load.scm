@@ -3,6 +3,14 @@
 ;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
 ;; (force-output (current-error-port))
 
+;; reload guile elisp language, to get modifications
+(set! %load-path (cons "." %load-path))
+(format #t "scheme load-path: ~s~%" %load-path)
+(format #t "------- reloading guile elisp lexer ----------~%")
+(load "./elisp/lexer.scm")
+(format #t "------- reloading guile elisp parser ----------~%")
+(load "./elisp/parser.scm")
+
 ;; Load core runtime functions first - compute path relative to this file
 ;; Temporarily disabled to allow build to complete
 ;; (primitive-load (string-append (dirname (current-filename)) "/core-runtime.scm"))
@@ -4200,6 +4208,31 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                         #:output-file go)
           (load-compiled go)))))
 
+;; Enhanced version that handles full Fload parameters
+(define (load-elisp-full found-file noerror nomessage nosuffix must-suffix)
+  "Load elisp file with compilation, handling full Fload parameter set"
+  (catch #t
+    (lambda ()
+      (let* ((src found-file)
+             (go (compiled-file-name src))
+             (el (lookup-language 'elisp)))
+        (if (fresh-go? go src)
+            (load-compiled go)
+            (begin
+              (unless nomessage
+                (format #t "Compiling ~a...~%" src))
+              (compile-file src
+                            #:from el
+                            #:output-file go)
+              (unless nomessage
+                (format #t "Compiling ~a...done~%" src))
+              (load-compiled go)))
+        #t)) ; return t on success
+    (lambda (key . args)
+      (if noerror
+          #f ; return nil on error if noerror is true
+          (apply throw key args))))) ; re-throw error otherwise
+
 ; doesn't work, load-from-path doesn't care about current language/reader
 (define (load-elisp2 path)
   (let ((lang (lookup-language 'elisp)))
@@ -4212,7 +4245,64 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
       (format #t "loading elisp, current-module: ~s~%" (current-module))
       (load-from-path path))))
 
-(set-symbol-function! 'emacs-load load-elisp)
+;; Bridge function that reuses existing Fload Scheme migrations
+(define (fload-bridge file noerror nomessage nosuffix must-suffix)
+  "Bridge function that handles full Fload protocol using Guile elisp compilation"
+  (catch #t
+    (lambda ()
+      ;; File validation and handler check (reuse existing)
+      (let ((validate-handler-func (resolve-ref "language elisp runtime"
+                                                "elisp-validate-and-check-handler")))
+        (if validate-handler-func
+            (let ((handler-result (validate-handler-func file noerror nomessage nosuffix must-suffix)))
+              (when handler-result
+                (throw 'early-return handler-result)))))
+
+      ;; File path processing and suffix determination (reuse existing)
+      (let* ((process-path-func (resolve-ref "language elisp runtime"
+                                            "elisp-process-load-file-path"))
+             (path-result (if process-path-func
+                             (process-path-func file nosuffix must-suffix)
+                             (cons file '(".el" ".elc"))))
+             (processed-file (car path-result))
+             (suffixes (cdr path-result)))
+        (format #t "processed-file: ~s~%" processed-file)
+        ;; Find file using openp equivalent, including current directory
+        (let ((found (or (%search-load-path processed-file)
+                         ;; Also try current directory if not found in load-path
+                         (and (file-exists? processed-file) processed-file)
+                         ;; Try with .el suffix in current directory
+                         (and (file-exists? (string-append processed-file ".el"))
+                              (string-append processed-file ".el")))))
+          (unless found
+            (if noerror
+                (throw 'early-return #f)
+                (error "Cannot open load file" file)))
+
+          ;; Step 4: Setup load environment (reuse existing)
+          (let ((setup-env-func (resolve-ref "language elisp runtime"
+                                            "elisp-setup-load-environment")))
+            (when setup-env-func
+              (setup-env-func found '() file #f #t))) ; simplified params
+
+          ;; Step 5: Use enhanced elisp compilation instead of C reading
+          (load-elisp-full found noerror nomessage nosuffix must-suffix))))
+
+    (lambda (key . args)
+      (cond
+        ((eq? key 'early-return) (car args))
+        (noerror #f)
+        (else (apply throw key args))))))
+
+;; Helper to safely resolve scheme functions
+(define (resolve-ref module-name symbol-name)
+  (catch #t
+    (lambda ()
+      (let ((mod (resolve-module (string->symbol module-name))))
+        (and mod (module-ref mod (string->symbol symbol-name)))))
+    (lambda (key . args) #f)))
+
+(set-symbol-function! 'emacs-load fload-bridge)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
