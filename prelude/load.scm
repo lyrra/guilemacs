@@ -16,6 +16,12 @@
 (use-modules (language elisp emacs))
 (use-modules (system foreign-library))
 
+(use-modules ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
+             (ice-9 ftw) ; for stat etc.
+             (system base compile)
+             (system base language)
+             (language elisp spec))
+
 (define %prelude-directory (dirname %prelude-filename))
 
 (let-syntax
@@ -4174,6 +4180,39 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
           (cons new-loads-in-progress
                 (cons lexical-binding
                       (cons found-eff hist-file-name))))))))
+
+(define (fresh-go? go src)
+  (and (file-exists? go)
+       (>= (stat:mtime (stat go)) (stat:mtime (stat src)))))
+
+(define (load-elisp file)
+  (let* ((src (%search-load-path file)) ; find foo.el on %load-path
+         (go  (compiled-file-name src)) ; cache path for .go
+         (el  (lookup-language 'elisp)))
+    (unless src
+      (error "Not found on %load-path" file))
+    (if (fresh-go? go src)
+        (load-compiled go)
+        (begin
+          (compile-file src
+                        #:from el ; 'elisp
+                        ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
+                        #:output-file go)
+          (load-compiled go)))))
+
+; doesn't work, load-from-path doesn't care about current language/reader
+(define (load-elisp2 path)
+  (let ((lang (lookup-language 'elisp)))
+    (parameterize ((current-language lang)) ; use Elisp evaluator/compilers
+      (fluid-set! current-reader (language-reader lang)) ; parse Elisp if we hit source
+      (set-current-module (resolve-module '(language elisp runtime)))
+      ;(fluid-set! current-reader emacs-read)
+      (format #t "Current-language: ~s~%" (current-language))
+      (format #t "Current-reader: ~s~%" (fluid-ref current-reader))
+      (format #t "loading elisp, current-module: ~s~%" (current-module))
+      (load-from-path path))))
+
+(set-symbol-function! 'emacs-load load-elisp)
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
