@@ -20,6 +20,7 @@
 
 (define-module (language elisp parser)
   #:use-module (language elisp lexer)
+  #:use-module (language elisp runtime)
   #:export (read-elisp))
 
 ;;; The parser (reader) for elisp expressions.
@@ -184,10 +185,8 @@
       ((integer float symbol character string)
        (return (cdr token)))
       ((keyword)
-       ;; Keywords are self-evaluating - return a progn that sets the symbol
-       (let ((keyword-sym (cdr token)))
-         ;; Return a progn expression that sets the symbol and returns it
-         (return `(progn (setq ,keyword-sym (quote ,keyword-sym)) (quote ,keyword-sym)))))
+       ;; Return the keyword symbol for processing elsewhere
+       (return (cdr token)))
       ((function)
        (return `(function ,(get-expression lex))))
       ((quote backquote unquote unquote-splicing)

@@ -10,6 +10,10 @@
 (load "./elisp/lexer.scm")
 (format #t "------- reloading guile elisp parser ----------~%")
 (load "./elisp/parser.scm")
+(format #t "------- reloading guile elisp compile-tree-il ----------~%")
+(load "./elisp/compile-tree-il.scm")
+;(format #t "------- reloading guile elisp spec ----------~%")
+;(load "./elisp/spec.scm")
 
 ;; Load core runtime functions first - compute path relative to this file
 ;; Temporarily disabled to allow build to complete
@@ -28,9 +32,14 @@
              (ice-9 ftw) ; for stat etc.
              (system base compile)
              (system base language)
-             (language elisp spec))
+             ;; Don't load system elisp spec - use our custom one
+             ;(language elisp spec)
+             )
 
 (define %prelude-directory (dirname %prelude-filename))
+
+(format #t "Prelude system loading, current-reader: ~s~%" (fluid-ref current-reader))
+
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -4236,7 +4245,9 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
              (x (format #t "get compiled-file-name~%"))
              (go (compiled-file-name src))
              (x (format #t "get lang~%"))
-             (el (lookup-language 'elisp)))
+             ;; Load our custom elisp language to override system elisp
+             (el (lookup-language 'elisp))
+             (x (format #t "Using elisp language: ~s~%" (language-title el))))
         (format #t "loading file 3.~%")
         (if (fresh-go? go src)
             (begin
@@ -4274,27 +4285,31 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 ;; Bridge function that reuses existing Fload Scheme migrations
 (define (fload-bridge file noerror nomessage nosuffix must-suffix)
   "Bridge function that handles full Fload protocol using Guile elisp compilation"
+  (format #t "fload-bridge called with file: ~s~%" file)
   (catch #t
     (lambda ()
       ;; File validation and handler check (reuse existing)
-      (let ((validate-handler-func (resolve-ref "language elisp runtime"
-                                                "elisp-validate-and-check-handler")))
-        (if validate-handler-func
-            (let ((handler-result (validate-handler-func file noerror nomessage nosuffix must-suffix)))
-              (when handler-result
-                (throw 'early-return handler-result)))))
+      (let ((handler-result (elisp-validate-and-check-handler file noerror nomessage nosuffix must-suffix)))
+        (when handler-result
+          (throw 'early-return handler-result)))
 
       ;; File path processing and suffix determination (reuse existing)
-      (let* ((process-path-func (resolve-ref "language elisp runtime"
-                                            "elisp-process-load-file-path"))
-             (path-result (if process-path-func
-                             (process-path-func file nosuffix must-suffix)
-                             (cons file '(".el" ".elc"))))
+      (let* ((path-result (elisp-process-load-file-path file nosuffix must-suffix)
+                          ;(cons file '(".el" ".elc"))
+                         )
              (processed-file (car path-result))
              (suffixes (cdr path-result)))
+        (set! %load-path (cons "../lisp" %load-path))
+        (set! %load-path (cons "./lisp" %load-path))
+        (set! %load-extensions (cons ".el" %load-extensions))
         (format #t "processed-file: ~s~%" processed-file)
+        (format #t "%load-path: ~s~%" %load-path)
+        (format #t "%load-extensions: ~s~%" %load-extensions)
         ;; Find file using openp equivalent, including current directory
-        (let ((found (or (%search-load-path processed-file)
+        (let ((found (or
+                         ; FIX: %search-load-path is underspecified, does it search for compiled equivalent and if so, how is given suffix handled?
+                         (%search-load-path processed-file)
+                         ;processed-file
                          ;; Also try current directory if not found in load-path
                          (and (file-exists? processed-file) processed-file)
                          ;; Try with .el suffix in current directory

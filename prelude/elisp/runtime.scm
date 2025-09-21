@@ -261,7 +261,8 @@
   (set! set-lexical-binding-mode (lambda (x) (set-symbol-value! 'lexical-binding x))))
 
 (define (eval-elisp form)
-  (eval (compile form #:from 'elisp #:to 'tree-il) (current-module)))
+  (let ((lang (lookup-language 'elisp)))
+    (eval (compile form #:from lang #:to 'tree-il) (current-module))))
 
 (define (compile-elisp form)
   (compile (compile form #:from 'elisp #:to 'bytecode)

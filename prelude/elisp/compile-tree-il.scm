@@ -857,7 +857,12 @@
   (case sym
     ((nil) (nil-value loc))
     ((t) (t-value loc))
-    (else (reference-variable loc sym))))
+    (else
+     (let ((sym-name (symbol->string sym)))
+       (if (and (> (string-length sym-name) 0)
+                (char=? (string-ref sym-name 0) #\:))
+           (make-const loc sym)  ; Self-evaluating keyword
+           (reference-variable loc sym))))))
 
 ;;; Compile a single expression to TreeIL.
 
