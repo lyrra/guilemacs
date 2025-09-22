@@ -354,7 +354,22 @@
                (lambda (type str)
                  (if (eq? type 'symbol)
                      (return 'keyword (make-keyword-symbol (string-append ":" str)))
-                     (error "invalid keyword syntax after #:" str))))))))
+                     (error "invalid keyword syntax after #:" str)))))
+            ;; Number parsing with different bases
+            ((#\o #\O)
+             ;; Octal number #o777
+             (let ((number (charcode-escape port 8 #f #t)))
+               (return 'integer number)))
+            ((#\x #\X)
+             ;; Hexadecimal number #xFF
+             (let ((number (charcode-escape port 16 #f #t)))
+               (return 'integer number)))
+            ((#\b #\B)
+             ;; Binary number #b1010
+             (let ((number (charcode-escape port 2 #f #t)))
+               (return 'integer number)))
+            (else
+             (lexer-error port "invalid # syntax" c)))))
         ;; Parentheses and other special-meaning single characters.
         ((#\() (return 'paren-open #f))
         ((#\)) (return 'paren-close #f))
