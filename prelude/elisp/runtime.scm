@@ -62,6 +62,9 @@
             local-eval-elisp
             %make-lisp-string
             make-lisp-string
+            %debug-print-flag
+            set-debug-print-flag!
+            get-debug-print-flag
             %lisp-string
             lisp-string?)
   #:export-syntax (defspecial prim))
@@ -76,6 +79,13 @@
 
 (define make-lisp-string identity)
 (define lisp-string? string?)
+
+(define %debug-print-flag 0)
+(define (set-debug-print-flag! val)
+  (set! %debug-print-flag val))
+
+(define (get-debug-print-flag)
+  %debug-print-flag)
 
 (define %lisp-string
   (lambda (str)

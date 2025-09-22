@@ -4345,5 +4345,11 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 (set-symbol-function! 'emacs-load fload-bridge)
 
+(set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
+
+(set-symbol-function! 'get-debug-print-flag
+                      (lambda ()
+                        %debug-print-flag))
+
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))

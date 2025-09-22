@@ -882,10 +882,15 @@
       (compile-expr-1 expr)))
 
 (define (compile-tree-il expr env opts)
-  (values
-   (with-fluids ((bindings-data (make-bindings))
-                 (toplevel? #t)
-                 (compile-time-too? #f))
-     (compile-expr-1 expr))
-   env
-   env))
+  (let ((tree-il (with-fluids ((bindings-data (make-bindings))
+                               (toplevel? #t)
+                               (compile-time-too? #f))
+                   (compile-expr-1 expr)))
+        (d-p-f (get-debug-print-flag))) ; FIX: cant use %debug-print-flag directly
+    (when (and d-p-f (logbit? 16 d-p-f))
+      (format #t "---------------------------------------------------------------~%")
+      (format #t "expr: ~s~%" expr)
+      (format #t "tree-il---> : ~s~%" tree-il)
+      (format #t "tree-il ---> : ~s~%" (tree-il->scheme tree-il))
+      (force-output))
+    (values tree-il env env)))
