@@ -120,6 +120,7 @@ So far, FUNCTION can only be a symbol, not a lambda expression."
 ;; the lambdas and not for those properties that are used by functions
 ;; loaded before backquote.el.
 
+(eval-and-compile
 (defalias 'byte-run--set-advertised-calling-convention
   #'(lambda (f _args arglist when)
       (list 'set-advertised-calling-convention
@@ -247,7 +248,6 @@ declaration" f2 f))
             ''function-type (list 'quote val))))
 
 ;; Add any new entries to info node `(elisp)Declare Form'.
-(eval-and-compile
 (defvar defun-declarations-alist
   (list
    (list 'advertised-calling-convention
