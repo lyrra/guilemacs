@@ -10,6 +10,8 @@
 (load "./elisp/lexer.scm")
 (format #t "------- reloading guile elisp parser ----------~%")
 (load "./elisp/parser.scm")
+(format #t "------- reloading guile elisp runtime ----------~%")
+(load "./elisp/runtime.scm")
 (format #t "------- reloading guile elisp compile-tree-il ----------~%")
 (load "./elisp/compile-tree-il.scm")
 ;(format #t "------- reloading guile elisp spec ----------~%")
