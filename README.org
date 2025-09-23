@@ -1083,6 +1083,7 @@ this could be hoisted to startup
 * guilemacs design
 
 * ramblings
+Please read only for amusement. High possibility of wasting your time.
 ** where are we at 2024
 
   The long-term vision of using Guile as an Elisp engine has eroded
@@ -1152,10 +1153,39 @@ this could be hoisted to startup
     commit 66f30875 introduces a leaky abstraction to gain performance (avoid shorthand
     if not used).
   - lesser orthogonality
-    macroexp-let2, iter-defun, cl-iter-defun, dlet, defvar-local,
-    pcase-let* pcase-lambda, defvar-local, ...
+    macroexp-progn, macroexp-let2, iter-defun, cl-iter-defun, dlet, defvar-local,
+    pcase-let* pcase-lambda,
+    if-let*, when-let*, and-let*, if-let, when-let, while-let
+    , ... ad infinitum
     these hints of lacking orthogonality and/or missing functionality
     of basic operators.
+    They probably stem from the grandfather macro of such evils, aif.
+
+    Those experiments where probably created by Graham to teach us the amendabilty of lisp. Instead we took the idea literally to our hearts, and the lesson went over our heads.
+    #+BEGIN_SRC
+    ;; Example from On-Lisp by Graham:
+    (defmacro aif (test then &optional else)
+      `(let ((it ,test))
+         (if it ,then ,else)))
+    #+END_SRC
+    If you insist of having an ~aif~, go the long route which makes it more verbose
+    and defies the ergonomics of an unhygienic macros such as aif, but ensures you don't go overbroad with them. Ofcourse, this example is hygienic but unfortnately not ergonomic.
+     #+BEGIN_SRC
+    ;; Example from On-Lisp by Graham:
+    (defmacro anamorphic (operation ((residual condition) ...) &body body)
+      expanison code)
+
+    Example:
+
+    (anamorphic if ((it (= x y))) (print it))
+    (anamorphic or  ((r1 (logbitp 1 x))
+                     (r2 (logbitp 2 y)))
+      (print (list 'found-bits-in-x-y r1 r2)))
+    (anamorphic and ((integerp x) ; just ensure integer, no residual requested
+                     (r2 (logbitp 1 x)))
+      (print (list 'x-is-active r2)))
+    #+END_SRC
+
   - alot of circular development due to brownian-motion like design. Eg, see d468cf91
 
 ** Emacs features that needs to be removed:
