@@ -2131,7 +2131,7 @@ For an approximate inverse of this, see `kbd'.  */)
       Lisp_Object list = lists[li];
       ptrdiff_t listlen = listlens[li], i_byte = 0;
 
-      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || CONSP (list)))
+      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || scm_is_vector (list) || CONSP (list)))
 	wrong_type_argument (Qarrayp, list);
 
       for (ptrdiff_t i = 0; i < listlen; )
@@ -2147,6 +2147,11 @@ For an approximate inverse of this, see `kbd'.  */)
 	  else if (VECTORP (list))
 	    {
 	      key = AREF (list, i);
+	      i++;
+	    }
+	  else if (scm_is_vector (list))
+	    {
+	      key = scm_c_vector_ref (list, i);
 	      i++;
 	    }
 	  else

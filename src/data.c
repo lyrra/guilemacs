@@ -360,7 +360,7 @@ DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
        doc: /* Return t if OBJECT is a vector.  */)
   (Lisp_Object object)
 {
-  if (VECTORP (object))
+  if (VECTORP (object) || scm_is_vector (object))
     return Qt;
   return Qnil;
 }
@@ -2460,6 +2460,8 @@ or a byte-code object.  IDX starts at 0.  */)
       ptrdiff_t size = 0;
       if (VECTORP (array))
 	size = ASIZE (array);
+      else if (scm_is_vector (array))
+	size = scm_c_vector_length (array);
       else if (CLOSUREP (array) || RECORDP (array))
 	size = PVSIZE (array);
       else
@@ -2467,7 +2469,13 @@ or a byte-code object.  IDX starts at 0.  */)
 
       if (idxval < 0 || idxval >= size)
 	args_out_of_range (array, idx);
-      return AREF (array, idxval);
+
+      if (VECTORP (array))
+        return AREF (array, idxval);
+      else if (scm_is_vector (array))
+        return scm_c_vector_ref (array, idxval);
+      else
+        return AREF (array, idxval);
     }
 }
 
@@ -2490,6 +2498,12 @@ bool-vector.  IDX starts at 0.  */)
       if (idxval < 0 || idxval >= ASIZE (array))
 	args_out_of_range (array, idx);
       ASET (array, idxval, newelt);
+    }
+  else if (scm_is_vector (array))
+    {
+      if (idxval < 0 || idxval >= scm_c_vector_length (array))
+	args_out_of_range (array, idx);
+      scm_c_vector_set_x (array, idxval, newelt);
     }
   else if (BOOL_VECTOR_P (array))
     {

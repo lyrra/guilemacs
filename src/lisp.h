@@ -2855,7 +2855,7 @@ IMAGEP (Lisp_Object x)
 INLINE bool
 ARRAYP (Lisp_Object x)
 {
-  return VECTORP (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
+  return VECTORP (x) || scm_is_vector (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
 }
 
 INLINE void
@@ -2887,6 +2887,8 @@ CHECK_VECTOR_OR_STRING (Lisp_Object x)
 {
   if (VECTORP (x))
     return ASIZE (x);
+  if (scm_is_vector (x))
+    return scm_c_vector_length (x);
   if (STRINGP (x))
     return SCHARS (x);
   wrong_type_argument (Qarrayp, x);
