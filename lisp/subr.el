@@ -132,12 +132,14 @@ BODY should be a list of Lisp expressions.
   ;; depend on backquote.el.
   (list 'function (cons 'lambda cdr)))
 
+(eval-and-compile
 ; FIX: from macroexp
 (defun macroexp-progn (exps)
   "Return EXPS (a list of expressions) with `progn' prepended.
 If EXPS is a list with a single expression, `progn' is not
 prepended, but that expression is returned instead."
   (if (cdr exps) `(progn ,@exps) (car exps)))
+)
 
 
 (defmacro setq-local (&rest pairs)
@@ -2626,7 +2628,7 @@ Affects only hooks run in the current buffer."
        ,@body)))
 
 ;;; `when-let' and friends.
-
+(eval-and-compile
 (defun internal--build-binding (binding prev-var)
   "Check and build a single BINDING with PREV-VAR."
   (setq binding
@@ -2652,7 +2654,7 @@ Affects only hooks run in the current buffer."
                 (setq prev-var (car binding))
                 binding))
             bindings)))
-
+)
 (defmacro if-let* (varlist then &rest else)
   "Bind variables according to VARLIST and evaluate THEN or ELSE.
 Evaluate each binding in turn, as in `let*', stopping if a
