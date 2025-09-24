@@ -202,13 +202,16 @@
   (pmatch binding
     ((unquote var)
      (guard (symbol? var))
-     (cons var #nil))
+     (let ((var* (if ((@ (guile) symbol-interned?) var) var (gensym (symbol->string var)))))
+       (cons var* #nil)))
     ((,var)
      (guard (symbol? var))
-     (cons var #nil))
+     (let ((var* (if ((@ (guile) symbol-interned?) var) var (gensym (symbol->string var)))))
+       (cons var* #nil)))
     ((,var ,val)
      (guard (symbol? var))
-     (cons var val))
+     (let ((var* (if ((@ (guile) symbol-interned?) var) var (gensym (symbol->string var)))))
+       (cons var* val)))
     (else
      (report-error loc "malformed variable binding" binding))))
 
@@ -426,6 +429,22 @@
 (define (unquote-splicing-cell? expr)
   (and (list? expr) (= (length expr) 2) (unquote-splicing? (car expr))))
 
+;; Helper function to replace uninterned symbols in expressions
+(define (replace-uninterned-symbols expr)
+  (cond
+   ((symbol? expr)
+    (let ((interned? ((@ (guile) symbol-interned?) expr)))
+      (if interned?
+          expr  ; Keep interned symbols
+          (gensym (symbol->string expr)))))
+   ((pair? expr)
+    ;; Recursively process pairs
+    (cons (replace-uninterned-symbols (car expr))
+          (replace-uninterned-symbols (cdr expr))))
+   (else
+    ;; Leave other types unchanged
+    expr)))
+
 (define (process-backquote loc expr)
   (if (contains-unquotes? expr)
       (if (pair? expr)
@@ -453,7 +472,8 @@
           (report-error loc
                         "non-pair expression contains unquotes"
                         expr))
-      (make-const loc expr)))
+      ;; Replace uninterned symbols before making constants
+      (make-const loc (replace-uninterned-symbols expr))))
 
 ;;; Special operators
 
@@ -859,10 +879,20 @@
     ((t) (t-value loc))
     (else
      (let ((sym-name (symbol->string sym)))
-       (if (and (> (string-length sym-name) 0)
-                (char=? (string-ref sym-name 0) #\:))
-           (make-const loc sym)  ; Self-evaluating keyword
-           (reference-variable loc sym))))))
+       (cond
+        ;; Keywords (colon-prefixed symbols) are self-evaluating
+        ((and (> (string-length sym-name) 0)
+              (char=? (string-ref sym-name 0) #\:))
+         (make-const loc sym))
+        ;; Uninterned symbols need special handling - recreate at runtime
+        ((not ((@ (guile) symbol-interned?) sym))
+         (format #t "DEBUG: compile-symbol handling uninterned: ~s~%" sym)
+         (make-call loc
+                    (make-module-ref loc runtime 'make-symbol #t)
+                    (list (make-const loc sym-name))))
+        ;; Regular symbols are variable references
+        (else
+         (reference-variable loc sym)))))))
 
 ;;; Compile a single expression to TreeIL.
 
@@ -886,7 +916,8 @@
                                (toplevel? #t)
                                (compile-time-too? #f))
                    (compile-expr-1 expr)))
-        (d-p-f (get-debug-print-flag))) ; FIX: cant use %debug-print-flag directly
+        (d-p-f 0 ;(get-debug-print-flag)
+               )) ; FIX: cant use %debug-print-flag directly
     (when (and d-p-f (logbit? 16 d-p-f))
       (format #t "---------------------------------------------------------------~%")
       (format #t "expr: ~s~%" expr)

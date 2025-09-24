@@ -104,6 +104,8 @@
     (if list (%funcall (@ (guile) cdr) list) nil))
   (defun make-symbol (name)
     (%funcall (@ (guile) make-symbol) name))
+  (defun intern-gensym (prefix)
+    (%funcall (@ (guile) intern-gensym)))
   (defun gensym ()
     (%funcall (@ (guile) gensym)))
   (defun signal (error-symbol data)
@@ -640,10 +642,10 @@
 ;;; Nonlocal exits
 
 (defmacro condition-case (var bodyform &rest handlers)
-  (let ((key (make-symbol "key"))
-        (error-symbol (make-symbol "error-symbol"))
-        (data (make-symbol "data"))
-        (conditions (make-symbol "conditions")))
+  (let ((key (intern-gensym "key"))
+        (error-symbol (intern-gensym "error-symbol"))
+        (data (intern-gensym "data"))
+        (conditions (intern-gensym "conditions")))
     (flet ((handler->cond-clause (handler)
              `((or ,@(mapcar #'(lambda (c) `(memq ',c ,conditions))
                              (if (consp (car handler))
@@ -802,3 +804,5 @@
 (%define-compiler-macro require (form)
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (funcall #'require ,@(cdr form))))
+
+(print "--- load boot.el done \n")

@@ -3,28 +3,15 @@
 ;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
 ;; (force-output (current-error-port))
 
-;; reload guile elisp language, to get modifications
-(set! %load-path (cons "." %load-path))
-(format #t "scheme load-path: ~s~%" %load-path)
-(format #t "------- reloading guile elisp lexer ----------~%")
-(load "./elisp/lexer.scm")
-(format #t "------- reloading guile elisp parser ----------~%")
-(load "./elisp/parser.scm")
-(format #t "------- reloading guile elisp runtime ----------~%")
-(load "./elisp/runtime.scm")
-(format #t "------- reloading guile elisp compile-tree-il ----------~%")
-(load "./elisp/compile-tree-il.scm")
-;(format #t "------- reloading guile elisp spec ----------~%")
-;(load "./elisp/spec.scm")
-
 ;; Load core runtime functions first - compute path relative to this file
 ;; Temporarily disabled to allow build to complete
 ;; (primitive-load (string-append (dirname (current-filename)) "/core-runtime.scm"))
 
-(set-current-module (resolve-module '(language elisp runtime)))
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (force-output (current-error-port))
 
+
+(set-current-module (resolve-module '(language elisp runtime)))
 
 (use-modules (rnrs bytevectors)) ; FIX: move to (use-modules (scheme base))
 (use-modules (language elisp emacs))
@@ -32,16 +19,88 @@
 
 (use-modules ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
              (ice-9 ftw) ; for stat etc.
-             (system base compile)
+             (system base compile) ; compile-file, compiled-file-name, etc.
              (system base language)
              ;; Don't load system elisp spec - use our custom one
              ;(language elisp spec)
              )
 
+(use-modules (system base compile)       ; compile-file, compiled-file-name
+             (system base language)      ; current-language parameter
+             (ice-9 ftw))                ; file ops, optional
+
+
 (define %prelude-directory (dirname %prelude-filename))
 
 (format #t "Prelude system loading, current-reader: ~s~%" (fluid-ref current-reader))
 
+
+(format #t "------- %prelude-directory: ~s ----------~%" %prelude-directory)
+
+;; reload guile elisp language, to get modifications
+(set! %load-path (cons "." %load-path))
+(format #t "------- reloading guile elisp runtime ----------~%")
+(load "./elisp/runtime.scm")
+;(format #t "------- reloading guile elisp runtime ----------~%")
+;(format #t "scheme load-path: ~s~%" %load-path)
+;(format #t "------- reloading guile elisp lexer ----------~%")
+;(load "./elisp/lexer.scm")
+;(format #t "------- reloading guile elisp parser ----------~%")
+;(load "./elisp/parser.scm")
+;(format #t "------- reloading guile elisp compile-tree-il ----------~%")
+;(load "./elisp/compile-tree-il.scm")
+;(format #t "------- reloading guile elisp boot.el ----------~%")
+;(load "./elisp/boot.el")
+
+;(format #t "------- reloading guile elisp spec ----------~%")
+;(load "./elisp/spec.scm")
+;----------------------------------------------------------------------------------
+;; reload-elisp.scm
+;; Reload language/elisp pieces in the right order and load boot.el as *Elisp*.
+(define (join a b)
+  (if (or (string-null? a) (string-suffix? "/" a))
+      (string-append a b)
+      (string-append a "/" b)))
+
+(define (compile-and-load-elisp path)
+  ;; Compile PATH as Elisp, then load the resulting .go.
+  (let* ((out (compiled-file-name path)))
+    (compile-file path #:from 'elisp #:output-file out)
+    (load-compiled out)))
+
+(define (reload-local-elisp! base-dir)
+  "Reload local language/elisp Scheme pieces and boot.el from BASE-DIR.
+   Order: runtime.scm → lexer.scm → parser.scm → compile-tree-il.scm → boot.el"
+  (let* ((scheme-files '(; "runtime.scm" ; dont reload runtime it will redefine module
+                         "lexer.scm"
+                         "parser.scm"
+                         "compile-tree-il.scm"))
+         (old-load-path %load-path))
+    (dynamic-wind
+      (lambda () (set! %load-path (cons base-dir %load-path)))
+      (lambda ()
+        ;; 1) Reload Scheme-side modules in dependency order *as Scheme*.
+        (for-each (lambda (f)
+                    (let ((p (join base-dir f)))
+                      (format #t "Reloading ~a\n" p)
+                      (primitive-load p)))
+                  scheme-files)
+        ;; 2) Load boot.el *as Elisp*, either from source or via compiled .go.
+        ; dont reload boot.el, move stuff into this file, or push upstream
+        (let ((boot (join base-dir "boot.el")))
+          (format #t "Loading Elisp boot: ~a (~a)\n" boot "compiled")
+          (compile-and-load-elisp boot))
+        )
+      (lambda () (set! %load-path old-load-path)))))
+
+(reload-local-elisp! (join %prelude-directory "elisp"))
+(set-current-module (resolve-module '(language elisp runtime)))
+(define %prelude-directory (dirname %prelude-filename))
+
+(format #t "-------++ %prelude-directory: ~s ----------~%" %prelude-directory)
+
+(format #t "Done reloading guile elisp system~%")
+;----------------------------------------------------------------------------------
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -4347,6 +4406,24 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 (set-symbol-function! 'emacs-load fload-bridge)
 
+;; Make Guile's make-symbol available to elisp code
+(define make-symbol (@ (guile) make-symbol))
+(set-symbol-function! 'make-symbol make-symbol)
+
+(define %intern-gensym 0)
+(define (intern-gensym prefix)
+  (set! %intern-gensym (+ 1 %intern-gensym))
+  (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym)))))
+
+(set-symbol-function! 'intern-gensym intern-gensym)
+
+(define %debug-print-flag 0)
+(define (set-debug-print-flag! val)
+  (set! %debug-print-flag val))
+
+;(define (get-debug-print-flag)
+;  %debug-print-flag)
+(format #t "------------ x0 ------------~%")
 (set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
 
 (set-symbol-function! 'get-debug-print-flag

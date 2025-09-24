@@ -62,9 +62,10 @@
             local-eval-elisp
             %make-lisp-string
             make-lisp-string
-            %debug-print-flag
-            set-debug-print-flag!
-            get-debug-print-flag
+            ;%debug-print-flag
+            ;set-debug-print-flag!
+            ;get-debug-print-flag
+            make-symbol
             %lisp-string
             lisp-string?)
   #:export-syntax (defspecial prim))
@@ -79,13 +80,6 @@
 
 (define make-lisp-string identity)
 (define lisp-string? string?)
-
-(define %debug-print-flag 0)
-(define (set-debug-print-flag! val)
-  (set! %debug-print-flag val))
-
-(define (get-debug-print-flag)
-  %debug-print-flag)
 
 (define %lisp-string
   (lambda (str)
@@ -120,6 +114,7 @@
 (define (set-lexical-binding-mode x)
   (set! lexical-binding x))
 
+(define make-symbol (@ (guile) make-symbol))
 (define unbound (make-symbol "unbound"))
 
 (define dynamic? vector?)
