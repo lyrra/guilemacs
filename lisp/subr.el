@@ -333,8 +333,8 @@ in compilation warnings about unused variables.
   (declare (indent 1) (debug dolist))
   (let ((var (nth 0 spec))
         (end (nth 1 spec))
-        (upper-bound (make-symbol "upper-bound"))
-        (counter (make-symbol "counter")))
+        (upper-bound (intern-gensym "upper-bound"))
+        (counter (intern-gensym "counter")))
     `(let ((,upper-bound ,end)
            (,counter 0))
        (while (< ,counter ,upper-bound)
@@ -2559,7 +2559,7 @@ If `debug-on-error' is non-nil, run BODY without catching its errors.
 This is to be used around code that is not expected to signal an error
 but that should be robust in the unexpected case that an error is signaled."
   (declare (debug t) (indent 1))
-  (let* ((err (make-symbol "err"))
+  (let* ((err (intern-gensym "err"))
          (orig-body body)
          (orig-format format)
          (format (if (and (stringp format) body) format
@@ -3491,8 +3491,8 @@ called additional times).
 This macro actually adds an auxiliary function that calls FUN,
 rather than FUN itself, to `minibuffer-setup-hook'."
   (declare (indent 1) (debug t))
-  (let ((hook (make-symbol "setup-hook"))
-        (funsym (make-symbol "fun")))
+  (let ((hook (intern-gensym "setup-hook"))
+        (funsym (intern-gensym "fun")))
     `(let ((,funsym ,fun)
            ,hook)
        (setq ,hook
