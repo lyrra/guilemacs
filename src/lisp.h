@@ -1392,16 +1392,35 @@ XVECTOR (Lisp_Object a)
 INLINE ptrdiff_t
 ASIZE (Lisp_Object array)
 {
-  ptrdiff_t size = XVECTOR (array)->header.size;
-  eassume (0 <= size);
-  return size;
+  if (VECTORLIKEP (array) && ! scm_is_vector (array))
+    {
+      ptrdiff_t size = XVECTOR (array)->header.size;
+      eassume (0 <= size);
+      return size;
+    }
+  else if (scm_is_vector (array))
+    {
+      return scm_c_vector_length (array);
+    }
+  else
+    {
+      /* Fallback for other types */
+      ptrdiff_t size = XVECTOR (array)->header.size;
+      eassume (0 <= size);
+      return size;
+    }
 }
 
 INLINE ptrdiff_t
 gc_asize (Lisp_Object array)
 {
   /* Like ASIZE, but also can be used in the garbage collector.  */
-  return XVECTOR (array)->header.size;
+  if (VECTORLIKEP (array) && ! scm_is_vector (array))
+    return XVECTOR (array)->header.size;
+  else if (scm_is_vector (array))
+    return scm_c_vector_length (array);
+  else
+    return XVECTOR (array)->header.size;  /* Fallback */
 }
 
 INLINE ptrdiff_t
@@ -1623,8 +1642,17 @@ bool_vector_set (Lisp_Object a, EMACS_INT i, bool b)
 INLINE Lisp_Object
 AREF (Lisp_Object array, ptrdiff_t idx)
 {
-  eassert (0 <= idx && idx < gc_asize (array));
-  return XVECTOR (array)->contents[idx];
+  /* Check for Scheme vector first, since it's a direct test */
+  if (scm_is_vector (array))
+    {
+      eassert (0 <= idx && idx < scm_c_vector_length (array));
+      return scm_c_vector_ref (array, idx);
+    }
+  else
+    {
+      eassert (0 <= idx && idx < gc_asize (array));
+      return XVECTOR (array)->contents[idx];
+    }
 }
 
 INLINE Lisp_Object *
@@ -1637,8 +1665,17 @@ aref_addr (Lisp_Object array, ptrdiff_t idx)
 INLINE void
 ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
 {
-  eassert (0 <= idx && idx < ASIZE (array));
-  XVECTOR (array)->contents[idx] = val;
+  /* Check for Scheme vector first, since it's a direct test */
+  if (scm_is_vector (array))
+    {
+      eassert (0 <= idx && idx < scm_c_vector_length (array));
+      scm_c_vector_set_x (array, idx, val);
+    }
+  else
+    {
+      eassert (0 <= idx && idx < ASIZE (array));
+      XVECTOR (array)->contents[idx] = val;
+    }
 }
 
 INLINE void
@@ -4142,10 +4179,18 @@ extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t)
 extern struct Lisp_Vector *allocate_vector (ptrdiff_t)
   ATTRIBUTE_RETURNS_NONNULL;
 
+/* For internal C code that needs traditional Elisp vectors for pseudovectors */
+INLINE Lisp_Object
+make_uninit_elisp_vector (ptrdiff_t size)
+{
+  return make_lisp_ptr (allocate_vector (size), Lisp_Vectorlike);
+}
+
 INLINE Lisp_Object
 make_uninit_vector (ptrdiff_t size)
 {
-  return make_lisp_ptr (allocate_vector (size), Lisp_Vectorlike);
+  /* Create Scheme vector for consistency with vector literals [1 2 3] */
+  return scm_c_make_vector (size, SCM_UNDEFINED);
 }
 
 /* Like above, but special for sub char-tables.  */
@@ -4154,7 +4199,7 @@ INLINE Lisp_Object
 make_uninit_sub_char_table (int depth, int min_char)
 {
   int slots = SUB_CHAR_TABLE_OFFSET + chartab_size[depth];
-  Lisp_Object v = make_uninit_vector (slots);
+  Lisp_Object v = make_uninit_elisp_vector (slots);
 
   XSETPVECTYPE (XVECTOR (v), PVEC_SUB_CHAR_TABLE);
   XSUB_CHAR_TABLE (v)->depth = depth;
@@ -4168,7 +4213,7 @@ make_uninit_sub_char_table (int depth, int min_char)
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
-  Lisp_Object vec = make_uninit_vector (size);
+  Lisp_Object vec = make_uninit_elisp_vector (size);
   memsetnil (XVECTOR (vec)->contents, size);
   return vec;
 }

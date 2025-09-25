@@ -1089,23 +1089,23 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 
   /* Create the output vector.  */
   Lisp_Object result = make_uninit_vector (result_len);
-  Lisp_Object *dst = XVECTOR (result)->contents;
+  ptrdiff_t dst_idx = 0;
 
   /* Copy the contents of the args into the result.  */
 
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (VECTORP (arg))
+      if (VECTORP (arg) || scm_is_vector (arg))
 	{
 	  ptrdiff_t size = ASIZE (arg);
-	  memcpy (dst, XVECTOR (arg)->contents, size * sizeof *dst);
-	  dst += size;
+	  for (ptrdiff_t j = 0; j < size; j++)
+	    ASET (result, dst_idx++, AREF (arg, j));
 	}
       else if (CONSP (arg))
 	do
 	  {
-	    *dst++ = XCAR (arg);
+	    ASET (result, dst_idx++, XCAR (arg));
 	    arg = XCDR (arg);
 	  }
 	while (!NILP (arg));
@@ -1127,23 +1127,23 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	  else
           */
 	    for (ptrdiff_t i = 0; i < size; i++)
-	      *dst++ = make_fixnum (SREF (arg, i));
+	      ASET (result, dst_idx++, make_fixnum (SREF (arg, i)));
 	}
       else if (BOOL_VECTOR_P (arg))
 	{
 	  ptrdiff_t size = bool_vector_size (arg);
 	  for (ptrdiff_t i = 0; i < size; i++)
-	    *dst++ = bool_vector_ref (arg, i);
+	    ASET (result, dst_idx++, bool_vector_ref (arg, i));
 	}
       else
 	{
 	  eassert (CLOSUREP (arg));
 	  ptrdiff_t size = PVSIZE (arg);
-	  memcpy (dst, XVECTOR (arg)->contents, size * sizeof *dst);
-	  dst += size;
+	  for (ptrdiff_t j = 0; j < size; j++)
+	    ASET (result, dst_idx++, AREF (arg, j));
 	}
     }
-  eassert (dst == XVECTOR (result)->contents + result_len);
+  eassert (dst_idx == result_len);
 
   return result;
 }

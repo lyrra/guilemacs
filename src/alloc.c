@@ -1159,7 +1159,10 @@ See also the function `vector'.  */)
 {
   CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
 	      Qwholenump, length);
-  return make_vector (XFIXNAT (length), init);
+  /* Create Scheme vector for consistency with vector literals [1 2 3] */
+  ptrdiff_t len = XFIXNAT (length);
+  Lisp_Object val = scm_c_make_vector (len, init);
+  return val;
 }
 
 /* Return a new vector of length LENGTH with each element being INIT.  */
@@ -1167,12 +1170,9 @@ See also the function `vector'.  */)
 Lisp_Object
 make_vector (ptrdiff_t length, Lisp_Object init)
 {
-  Lisp_Object vector;
-  struct Lisp_Vector *p = allocate_vector (length);
-  for (ptrdiff_t i = 0; i < length; i++)
-    p->contents[i] = init;
-  XSETVECTOR (vector, p);
-  return vector; // make_lisp_ptr (p, Lisp_Vectorlike);
+  /* Create Scheme vector for consistency with user-facing make-vector */
+  Lisp_Object vector = scm_c_make_vector (length, init);
+  return vector;
 }
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
@@ -1181,9 +1181,10 @@ Allows any number of arguments, including zero.
 usage: (vector &rest OBJECTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object val = make_uninit_vector (nargs);
-  struct Lisp_Vector *p = XVECTOR (val);
-  memcpy (p->contents, args, nargs * sizeof *args);
+  /* Create Scheme vector for consistency with vector literals [1 2 3] */
+  Lisp_Object val = scm_c_make_vector (nargs, SCM_UNDEFINED);
+  for (ptrdiff_t i = 0; i < nargs; i++)
+    scm_c_vector_set_x (val, i, args[i]);
   return val;
 }
 
@@ -1248,10 +1249,10 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   if (nvars > constsize)
     error ("Closure vars do not fit in constvec");
   Lisp_Object constvec = make_uninit_vector (constsize);
-  memcpy (XVECTOR (constvec)->contents, args + 1, nvars * word_size);
-  memcpy (XVECTOR (constvec)->contents + nvars,
-	  XVECTOR (proto_constvec)->contents + nvars,
-	  (constsize - nvars) * word_size);
+  for (ptrdiff_t i = 0; i < nvars; i++)
+    ASET (constvec, i, args[1 + i]);
+  for (ptrdiff_t i = nvars; i < constsize; i++)
+    ASET (constvec, i, AREF (proto_constvec, i));
 
   /* Return a copy of the prototype function with the new constant vector. */
   ptrdiff_t protosize = PVSIZE (protofun);
