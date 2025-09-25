@@ -138,6 +138,8 @@ efficient.  */)
     val = 0;
   else if (VECTORP (sequence))
     val = ASIZE (sequence);
+  else if (scm_is_vector (sequence))
+    val = scm_c_vector_length (sequence);
   else if (CHAR_TABLE_P (sequence))
     val = MAX_CHAR;
   else if (BOOL_VECTOR_P (sequence))
@@ -768,6 +770,15 @@ the same empty object instead of its copy.  */)
   if (VECTORP (arg))
     return Fvector (ASIZE (arg), XVECTOR (arg)->contents);
 
+  if (scm_is_vector (arg))
+    {
+      ptrdiff_t n = scm_c_vector_length (arg);
+      Lisp_Object val = scm_c_make_vector (n, Qnil);
+      for (ptrdiff_t i = 0; i < n; i++)
+        scm_c_vector_set_x (val, i, scm_c_vector_ref (arg, i));
+      return val;
+    }
+
   if (RECORDP (arg))
     return Frecord (PVSIZE (arg), XVECTOR (arg)->contents);
 
@@ -1026,8 +1037,8 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
 	}
       else if (NILP (arg))
 	;
-      else if (VECTORP (arg) || STRINGP (arg)
-	       || BOOL_VECTOR_P (arg) || CLOSUREP (arg))
+      else if ((VECTORP (arg) || scm_is_vector (arg)) || STRINGP (arg)
+               || BOOL_VECTOR_P (arg) || CLOSUREP (arg))
 	{
 	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
 	  ptrdiff_t argindex_byte = 0;
@@ -1078,9 +1089,9 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (!(VECTORP (arg) || CONSP (arg) || NILP (arg) || STRINGP (arg)
-	    || BOOL_VECTOR_P (arg) || CLOSUREP (arg)))
-	wrong_type_argument (Qsequencep, arg);
+      if (!((VECTORP (arg) || scm_is_vector (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
+            || BOOL_VECTOR_P (arg) || CLOSUREP (arg)))
+        wrong_type_argument (Qsequencep, arg);
       EMACS_INT len = XFIXNAT (Flength (arg));
       result_len += len;
       if (MOST_POSITIVE_FIXNUM < result_len)

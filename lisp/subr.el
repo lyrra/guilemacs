@@ -992,7 +992,7 @@ rather than your caller's match data."
   ;; because that makes a bootstrapping problem
   ;; if you need to recompile all the Lisp files using interpreted code.
   (declare (indent 0) (debug t))
-  (let ((saved-match-data (make-symbol "saved-match-data")))
+  (let ((saved-match-data (intern-gensym "saved-match-data")))
     (list 'let
 	  (list (list saved-match-data '(match-data)))
 	  (list 'unwind-protect
@@ -3221,7 +3221,7 @@ and the file name is displayed in the echo area."
   "Create a temporary buffer, and evaluate BODY there like `progn'.
 See also `with-temp-file' and `with-output-to-string'."
   (declare (indent 0) (debug t))
-  (let ((temp-buffer (make-symbol "temp-buffer")))
+  (let ((temp-buffer (intern-gensym "temp-buffer")))
     `(let ((,temp-buffer (generate-new-buffer " *temp*")))
        ;; FIXME: kill-buffer can change current-buffer in some odd cases.
        (with-current-buffer ,temp-buffer
@@ -3520,7 +3520,7 @@ E.g. it should not be used to try and prevent some code from opening
 a new window, since that window may sometimes appear in another frame,
 in which case `save-window-excursion' cannot help."
   (declare (indent 0) (debug t))
-  (let ((c (make-symbol "wconfig")))
+  (let ((c (intern-gensym "wconfig")))
     `(let ((,c (current-window-configuration)))
        (unwind-protect (progn ,@body)
          (set-window-configuration ,c)))))
@@ -4092,8 +4092,8 @@ This mechanism is transparent to ordinary use of undo;
 if undo is enabled in the buffer and BODY succeeds, the
 user can undo the change normally."
   (declare (indent 0) (debug t))
-  (let ((handle (make-symbol "--change-group-handle--"))
-	(success (make-symbol "--change-group-success--")))
+  (let ((handle (intern-gensym "--change-group-handle--"))
+	(success (intern-gensym "--change-group-success--")))
     `(let ((,handle (prepare-change-group))
 	   ;; Don't truncate any undo data in the middle of this.
 	   (undo-outer-limit nil)
@@ -4120,7 +4120,7 @@ user can undo the change normally."
 This allows multiple operations to be undone in a single step.
 When undo is disabled this behaves like `progn'."
   (declare (indent 0) (debug t))
-  (let ((handle (make-symbol "--change-group-handle--")))
+  (let ((handle (intern-gensym "--change-group-handle--")))
     `(let ((,handle (prepare-change-group))
            ;; Don't truncate any undo data in the middle of this,
            ;; otherwise Emacs might truncate part of the resulting
@@ -5006,8 +5006,8 @@ This macro saves and restores the selected frame, and changes the
 order of neither the recently selected windows nor the buffers in
 the buffer list."
   (declare (indent 1) (debug t))
-  (let ((old-frame (make-symbol "old-frame"))
-	(old-buffer (make-symbol "old-buffer")))
+  (let ((old-frame (intern-gensym "old-frame"))
+	(old-buffer (intern-gensym "old-buffer")))
     `(let ((,old-frame (selected-frame))
 	   (,old-buffer (current-buffer)))
        (unwind-protect
@@ -5094,8 +5094,8 @@ clickable cross-references.
 
 See the related form `with-temp-buffer-window'."
   (declare (debug t) (indent 1))
-  (let ((old-dir (make-symbol "old-dir"))
-        (buf (make-symbol "buf")))
+  (let ((old-dir (intern-gensym "old-dir"))
+        (buf (intern-gensym "buf")))
     `(let* ((,old-dir default-directory)
             (,buf
              (with-current-buffer (get-buffer-create ,bufname)
@@ -5121,8 +5121,8 @@ The buffer does not run the hooks `kill-buffer-hook',
 `kill-buffer-query-functions', and `buffer-list-update-hook'.
 See also `with-temp-buffer'."
   (declare (indent 1) (debug t))
-  (let ((temp-file (make-symbol "temp-file"))
-	(temp-buffer (make-symbol "temp-buffer")))
+  (let ((temp-file (intern-gensym "temp-file"))
+	(temp-buffer (intern-gensym "temp-buffer")))
     `(let ((,temp-file ,file)
            (,temp-buffer (generate-new-buffer " *temp file*" t)))
        (unwind-protect
@@ -5142,8 +5142,8 @@ MESSAGE is written to the message log buffer if `message-log-max' is non-nil.
 If MESSAGE is nil, the echo area and message log buffer are unchanged.
 Use a MESSAGE of \"\" to temporarily clear the echo area."
   (declare (debug t) (indent 1))
-  (let ((current-message (make-symbol "current-message"))
-	(temp-message (make-symbol "with-temp-message")))
+  (let ((current-message (intern-gensym "current-message"))
+	(temp-message (intern-gensym "with-temp-message")))
     `(let ((,temp-message ,message)
 	   (,current-message))
        (unwind-protect
@@ -6610,8 +6610,8 @@ This macro is a convenience wrapper around `make-progress-reporter' and friends.
 
 \(fn (VAR COUNT [RESULT]) REPORTER-OR-MESSAGE BODY...)"
   (declare (indent 2) (debug ((symbolp form &optional form) form body)))
-  (let ((prep (make-symbol "--dotimes-prep--"))
-        (end (make-symbol "--dotimes-end--")))
+  (let ((prep (intern-gensym "--dotimes-prep--"))
+        (end (intern-gensym "--dotimes-end--")))
     `(let ((,prep ,reporter-or-message)
            (,end ,(cadr spec)))
        (when (stringp ,prep)
@@ -6636,9 +6636,9 @@ print the reporter message followed by the word \"done\".
 
 \(fn (VAR LIST [RESULT]) REPORTER-OR-MESSAGE BODY...)"
   (declare (indent 2) (debug ((symbolp form &optional form) form body)))
-  (let ((prep (make-symbol "--dolist-progress-reporter--"))
-        (count (make-symbol "--dolist-count--"))
-        (list (make-symbol "--dolist-list--")))
+  (let ((prep (intern-gensym "--dolist-progress-reporter--"))
+        (count (intern-gensym "--dolist-count--"))
+        (list (intern-gensym "--dolist-list--")))
     `(let ((,prep ,reporter-or-message)
            (,count 0)
            (,list ,(cadr spec)))
@@ -6920,7 +6920,7 @@ as a list.")
   "Invoke BODY with MUTEX held, releasing MUTEX when done.
 This is the simplest safe way to acquire and release a mutex."
   (declare (indent 1) (debug t))
-  (let ((sym (make-symbol "mutex")))
+  (let ((sym (intern-gensym "mutex")))
     `(let ((,sym ,mutex))
        (mutex-lock ,sym)
        (unwind-protect
