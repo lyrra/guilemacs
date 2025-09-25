@@ -794,13 +794,13 @@ test of free variables in the following ways:
 
 (defun macroexp--trim-backtrace-frame (frame)
   (pcase frame
-    (`(,_ macroexpand (,head . ,_) . ,_) `(macroexpand (,head …)))
+    (`(,_ macroexpand (,head . ,_) . ,_) `(macroexpand (,head ___))) ; FIX-20250925-guilemacs was: …
     (`(,_ internal-macroexpand-for-load (,head ,second . ,_) . ,_)
      (if (or (symbolp second)
              (and (eq 'quote (car-safe second))
                   (symbolp (cadr second))))
-         `(macroexpand-all (,head ,second …))
-       '(macroexpand-all …)))
+         `(macroexpand-all (,head ,second ___)) ; FIX-20250925-guilemacs was: …
+       '(macroexpand-all ___))) ; FIX-20250925-guilemacs was: …
     (`(,_ load-with-code-conversion ,name . ,_)
      `(load ,(file-name-nondirectory name)))))
 
@@ -822,7 +822,7 @@ test of free variables in the following ways:
                              (macroexp--backtrace))))
            (elem `(load ,(file-name-nondirectory load-file-name)))
            (tail (member elem (cdr (member elem bt)))))
-      (if tail (setcdr tail (list '…)))
+      (if tail (setcdr tail (list '___))) ; FIX-20250925-guilemacs was: '…
       (if (eq (car-safe (car bt)) 'macroexpand-all) (setq bt (cdr bt)))
       (if macroexp--debug-eager
           (debug 'eager-macroexp-cycle)
