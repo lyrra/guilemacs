@@ -126,8 +126,16 @@ the char-table has no extra slot.  */)
     }
 
   size = CHAR_TABLE_STANDARD_SLOTS + n_extras;
-  vector = make_vector (size, init);
-  XSETPVECTYPE (XVECTOR (vector), PVEC_CHAR_TABLE);
+  /* Use allocate_pseudovector to create proper elisp pseudovector for char table */
+  struct Lisp_Vector *p = allocate_pseudovector (size, size, size, PVEC_CHAR_TABLE);
+  vector = make_lisp_ptr (p, Lisp_Vectorlike);
+
+  /* Initialize all slots with init value using direct elisp vector access */
+  if (!NILP (init))
+    {
+      for (ptrdiff_t i = 0; i < size; i++)
+        p->contents[i] = init;
+    }
   set_char_table_parent (vector, Qnil);
   set_char_table_purpose (vector, purpose);
   XSETCHAR_TABLE (vector, XCHAR_TABLE (vector));
@@ -186,8 +194,13 @@ Lisp_Object
 copy_char_table (Lisp_Object table)
 {
   int size = PVSIZE (table);
-  Lisp_Object copy = make_nil_vector (size);
-  XSETPVECTYPE (XVECTOR (copy), PVEC_CHAR_TABLE);
+  /* Use allocate_pseudovector to create proper elisp pseudovector for char table copy */
+  struct Lisp_Vector *p = allocate_pseudovector (size, size, size, PVEC_CHAR_TABLE);
+  Lisp_Object copy = make_lisp_ptr (p, Lisp_Vectorlike);
+
+  /* Initialize all slots with nil since allocate_pseudovector zeroes them */
+  for (ptrdiff_t i = 0; i < size; i++)
+    p->contents[i] = Qnil;
   set_char_table_defalt (copy, XCHAR_TABLE (table)->defalt);
   set_char_table_parent (copy, XCHAR_TABLE (table)->parent);
   set_char_table_purpose (copy, XCHAR_TABLE (table)->purpose);
