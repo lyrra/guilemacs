@@ -665,11 +665,16 @@ TEST has to be a symbol, and if it is nil it can be omitted."
      `(macroexp-let2 ,test ,var ,exp
         (macroexp-let2* ,test ,tl ,@body)))))
 
+(defun macroexp--vectorp (object)
+  (condition-case nil
+      (vectorp object)
+    (wrong-type-argument nil)))
+
 (defun macroexp--maxsize (exp size)
   (cond ((< size 0) size)
         ((symbolp exp) (1- size))
         ((stringp exp) (- size (/ (length exp) 16)))
-        ((vectorp exp)
+        ((macroexp--vectorp exp)
          (dotimes (i (length exp))
            (setq size (macroexp--maxsize (aref exp i) size)))
          (1- size))
@@ -752,7 +757,8 @@ test of free variables in the following ways:
       (let ((sexps (pop sexpss)))
         (unless (gethash sexps seen)
           (puthash sexps t seen) ;; Using `setf' here causes bootstrap problems.
-          (if (vectorp sexps) (setq sexps (mapcar #'identity sexps)))
+          (if (macroexp--vectorp sexps)
+              (setq sexps (mapcar #'identity sexps)))
           (let ((tortoise sexps) (skip t))
             (while sexps
               (let ((sexp (if (consp sexps) (pop sexps)
@@ -764,7 +770,8 @@ test of free variables in the following ways:
                       (setq sexps nil) ;; Found a cycle: we're done!
                     (setq skip t)))
                 (cond
-                 ((or (consp sexp) (vectorp sexp)) (push sexp sexpss))
+                 ((or (consp sexp) (macroexp--vectorp sexp))
+                  (push sexp sexpss))
                  (t
                   (let ((tmp (assq sexp bindings)))
                     (when tmp

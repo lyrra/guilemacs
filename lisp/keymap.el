@@ -37,9 +37,12 @@
 
 (defun keymap--compile-check (&rest keys)
   (dolist (key keys)
-    (when (or (vectorp key)
-              (and (stringp key) (not (key-valid-p key))))
-      (byte-compile-warn "Invalid `kbd' syntax: %S" key))))
+    (let ((vector-like (condition-case nil
+                           (vectorp key)
+                         (wrong-type-argument nil))))
+      (when (or vector-like
+                (and (stringp key) (not (key-valid-p key))))
+        (byte-compile-warn "Invalid `kbd' syntax: %S" key)))))
 
 (defun keymap-set (keymap key definition)
   "Set KEY to DEFINITION in KEYMAP.

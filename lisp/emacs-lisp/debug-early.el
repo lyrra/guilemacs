@@ -131,4 +131,13 @@ available before `debug' was usable.)"
               (cons '(error "Error in a redisplay Lisp hook.  See buffer *Redisplay-trace*")
                     delayed-warnings-list)))))
 
+(defvar debug-early--vectorp-subr (symbol-function 'vectorp)
+  "Original `vectorp' implementation kept for delegation during bootstrap.")
+
+(defun vectorp (object)
+  "Return non-nil if OBJECT is a vector, tolerating foreign vector-likes."
+  (condition-case nil
+      (funcall debug-early--vectorp-subr object)
+    (wrong-type-argument nil)))
+
 ;;; debug-early.el ends here.
