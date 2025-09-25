@@ -105,7 +105,11 @@
   (defun make-symbol (name)
     (%funcall (@ (guile) make-symbol) name))
   (defun intern-gensym (prefix)
-    (%funcall (@ (guile) intern-gensym)))
+    (let ((sym (%funcall (@ (guile) gensym))))
+      (%funcall (@ (guile) string->symbol)
+                (%funcall (@ (guile) string-append)
+                          prefix "_"
+                          (%funcall (@ (guile) symbol->string) sym)))))
   (defun gensym ()
     (%funcall (@ (guile) gensym)))
   (defun signal (error-symbol data)
@@ -115,7 +119,7 @@
   `#'(lambda ,@cdr))
 
 (defmacro prog1 (first &rest body)
-  (let ((temp (gensym)))
+  (let ((temp (intern-gensym "prog1-temp")))
     `(let ((,temp ,first))
        (declare (lexical ,temp))
        ,@body
@@ -136,7 +140,7 @@
          (let ((condition (car first))
                (body (cdr first)))
            (if (null body)
-               (let ((temp (gensym)))
+               (let ((temp (intern-gensym "cond-temp")))
                  `(let ((,temp ,condition))
                     (declare (lexical ,temp))
                     (if ,temp
@@ -157,7 +161,7 @@
 (defmacro or (&rest conditions)
   (cond ((null conditions) nil)
         ((null (cdr conditions)) (car conditions))
-        (t (let ((temp (gensym)))
+        (t (let ((temp (intern-gensym "cond-body-temp")))
              `(let ((,temp ,(car conditions)))
                 (declare (lexical ,temp))
                 (if ,temp
@@ -189,7 +193,7 @@
     (loop bindings '())))
 
 (defmacro while (test &rest body)
-  (let ((loop (gensym)))
+  (let ((loop (intern-gensym "while-loop")))
     `(labels ((,loop ()
                  (if ,test
                      (progn ,@body (,loop))
