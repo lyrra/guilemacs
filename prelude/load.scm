@@ -10,7 +10,6 @@
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (force-output (current-error-port))
 
-
 (set-current-module (resolve-module '(language elisp runtime)))
 
 (use-modules (rnrs bytevectors)) ; FIX: move to (use-modules (scheme base))
@@ -30,10 +29,8 @@
              (ice-9 ftw))                ; file ops, optional
 
 
+(set-current-module (resolve-module '(language elisp runtime)))
 (define %prelude-directory (dirname %prelude-filename))
-
-(format #t "Prelude system loading, current-reader: ~s~%" (fluid-ref current-reader))
-
 
 (format #t "------- %prelude-directory: ~s ----------~%" %prelude-directory)
 
@@ -64,13 +61,14 @@
 
 (define (compile-and-load-elisp path)
   ;; Compile PATH as Elisp, then load the resulting .go.
-  (let* ((out (compiled-file-name path)))
+  (let* ((out (string-append path ".go"))) ; avoid compiled-file-name
     (compile-file path #:from 'elisp #:output-file out)
     (load-compiled out)))
 
 (define (reload-local-elisp! base-dir)
   "Reload local language/elisp Scheme pieces and boot.el from BASE-DIR.
    Order: runtime.scm → lexer.scm → parser.scm → compile-tree-il.scm → boot.el"
+  (format #t "reload-local-elisp! base-dir: ~s~%" base-dir)
   (let* ((scheme-files '(; "runtime.scm" ; dont reload runtime it will redefine module
                          "lexer.scm"
                          "parser.scm"
@@ -94,12 +92,9 @@
       (lambda () (set! %load-path old-load-path)))))
 
 (reload-local-elisp! (join %prelude-directory "elisp"))
-(set-current-module (resolve-module '(language elisp runtime)))
-(define %prelude-directory (dirname %prelude-filename))
-
-(format #t "-------++ %prelude-directory: ~s ----------~%" %prelude-directory)
 
 (format #t "Done reloading guile elisp system~%")
+(set-current-module (resolve-module '(language elisp runtime)))
 ;----------------------------------------------------------------------------------
 
 (let-syntax
@@ -4260,7 +4255,8 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                       (cons found-eff hist-file-name))))))))
 
 (define (fresh-go? go src)
-  (and (file-exists? go)
+  (and go
+       (file-exists? go)
        (>= (stat:mtime (stat go)) (stat:mtime (stat src)))))
 
 (define (load-elisp file)
@@ -4272,6 +4268,7 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
     (if (fresh-go? go src)
         (load-compiled go)
         (begin
+          (format #t "compile src ~a~%" src)
           (compile-file src
                         #:from el ; 'elisp
                         ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
@@ -4304,12 +4301,12 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
       (format #t "loading file: ~s~%" found-file)
       (let* ((src found-file)
              (x (format #t "get compiled-file-name~%"))
-             (go (compiled-file-name src))
+             (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
              (x (format #t "get lang~%"))
              ;; Load our custom elisp language to override system elisp
              (el (lookup-language 'elisp))
              (x (format #t "Using elisp language: ~s~%" (language-title el))))
-        (format #t "loading file 3.~%")
+        (format #t "loading or compiling file ~a ~a~%" src go)
         (if (fresh-go? go src)
             (begin
               (format #t "loading compiled file: ~s~%" go)
