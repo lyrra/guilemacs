@@ -258,7 +258,7 @@ nil."
                              ;; Simple vars and &rest/&optional are just passed
                              ;; through unchanged.
                              pat
-                           (let ((arg (make-symbol
+                           (let ((arg (intern-gensym
                                        (format "arg%s" (length bindings)))))
                              (push `(,pat ,arg) bindings)
                              arg)))
@@ -322,10 +322,10 @@ undetected, binding variables to arbitrary values, such as nil."
       (dolist (binding (prog1 bindings (setq bindings nil)))
         (cond
          ((memq (car binding) pcase--dontcare-upats)
-          (push (cons (make-symbol "_") (cdr binding)) bindings))
+          (push (cons (intern-gensym "_") (cdr binding)) bindings))
          ((pcase--trivial-upat-p (car binding)) (push binding bindings))
          (t
-          (let ((tmpvar (make-symbol (format "x%d" (length bindings)))))
+          (let ((tmpvar (intern-gensym (format "x%d" (length bindings)))))
             (push (cons tmpvar (cdr binding)) bindings)
             (push (list (car binding) tmpvar) matches)))))
       `(let ,(nreverse bindings) (pcase-let* ,matches ,@body)))))
@@ -499,7 +499,7 @@ how many time this CODEGEN is called."
                     ;; Several occurrence of this non-small branch in
                     ;; the output.
                     (unless bsym
-                      (setq bsym (make-symbol
+                      (setq bsym (intern-gensym
                                   (format "pcase-%d" (length defs))))
                       (push `(,bsym (lambda ,(mapcar #'car varvals)
                                       ,@ignores ,@code))
