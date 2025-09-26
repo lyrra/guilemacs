@@ -238,3 +238,86 @@
              (set! else-rest (cons (cons els code&vars) else-rest)))))
      (pcase-scm--proper-list rest))
     (cons (reverse then-rest) (reverse else-rest))))
+
+(define (pcase-scm--small-branch? code)
+  (and (pair? code)
+       (pcase-scm--null? (cdr code))
+       (let ((first (car code)))
+         (or (not (pair? first))
+             (let loop ((elts first))
+               (cond
+                ((pcase-scm--null? elts) #t)
+                ((pair? elts)
+                 (if (pair? (car elts))
+                     #f
+                     (loop (cdr elts))))
+                (else #t))))))
+
+(define (pcase-scm--if test then else)
+  (cond
+   ((eq? else ':pcase--dontcare)
+    (list 'progn (list 'ignore test) then))
+   ((eq? then ':pcase--dontcare)
+    (list 'progn (list 'ignore test) else))
+   (else (pcase--macroexp-if test then else))))
+
+(define (pcase-scm--ignore-errors thunk)
+  (with-exception-handler
+      (lambda (_exn) nil-value)
+    (lambda () (thunk))
+    #:unwind? #t))
+
+(define (pcase-scm--list-member? elem lst)
+  (let loop ((rest (pcase-scm--proper-list lst)))
+    (cond
+     ((pcase-scm--null? rest) #f)
+     ((equal? (car rest) elem) #t)
+     ((pair? rest) (loop (cdr rest)))
+     (else #f))))
+
+(define (pcase-scm--split-equal elem pat)
+  (cond
+   ((and (eq? (pcase-scm--car-safe pat) 'quote)
+         (let ((quoted (if (and (pair? pat) (pair? (cdr pat))) (cadr pat) nil-value)))
+           (equal? quoted elem)))
+    (cons ':pcase--succeed ':pcase--fail))
+   ((eq? (pcase-scm--car-safe pat) 'quote)
+    (cons ':pcase--fail nil-value))
+   ((and (eq? (pcase-scm--car-safe pat) 'pred)
+         (symbol? (cadr pat))
+         (pcase--true? (pcase--get (cadr pat) 'side-effect-free)))
+    (let ((res
+           (pcase-scm--ignore-errors
+            (lambda ()
+              (if (pcase--true? (pcase--call (cadr pat) elem))
+                  (cons ':pcase--succeed nil-value)
+                  (cons ':pcase--fail nil-value))))))
+      (if (eq? res nil-value) nil-value res)))
+   (else nil-value)))
+
+(define (pcase-scm--split-member elems pat)
+  (cond
+   ((and (eq? (pcase-scm--car-safe pat) 'quote)
+         (pcase-scm--list-member? (cadr pat) elems))
+    nil-value)
+   ((eq? (pcase-scm--car-safe pat) 'quote)
+    (cons ':pcase--fail nil-value))
+   ((and (eq? (pcase-scm--car-safe pat) 'pred)
+         (symbol? (cadr pat))
+         (pcase--true? (pcase--get (cadr pat) 'side-effect-free)))
+    (let ((res
+           (pcase-scm--ignore-errors
+            (lambda ()
+              (let ((p (cadr pat)))
+                (if (let loop ((rest (pcase-scm--proper-list elems)) (ok #t))
+                      (cond
+                       ((not ok) #f)
+                       ((pcase-scm--null? rest) #t)
+                       ((pair? rest)
+                        (loop (cdr rest)
+                              (and ok (pcase--true? (pcase--call p (car rest))))))
+                       (else ok)))
+                    (cons ':pcase--succeed nil-value)
+                    nil-value))))))
+      (if (eq? res nil-value) nil-value res)))
+   (else nil-value)))
