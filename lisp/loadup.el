@@ -142,7 +142,8 @@
 (load "international/mule")
 (load "international/mule-conf")
 ; Following is moved out from mule-conf:
-(defcustom password-word-equivalents
+; FIX-20250926-guilemacs: move back? bisect the root cause
+'(defcustom password-word-equivalents
   '("password" "passcode" "passphrase" "pass phrase" "pin"
     "decryption key" "encryption key" ; From ccrypt.
     )
@@ -154,7 +155,7 @@ included; callers should bind `case-fold-search' to t."
   :type '(repeat string)
   :version "27.1"
   :group 'processes)
-(defcustom password-colon-equivalents
+'(defcustom password-colon-equivalents
   '(?\u003a ; ?\N{COLON}
     ?\uff1a ; ?\N{FULLWIDTH COLON}
     ?\ufe55 ; ?\N{SMALL COLON}
@@ -175,7 +176,9 @@ included; callers should bind `case-fold-search' to t."
 (load "widget")
 (load "custom")
 
-(defcustom search-slow-speed 1200
+
+; FIX-20250926-guilemacs: move back? bisect the root cause
+'(defcustom search-slow-speed 1200
   "Highest terminal speed at which to use \"slow\" style incremental search.
 This is the style where a one-line window is created to show the line
 that the search has reached."
