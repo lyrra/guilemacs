@@ -95,6 +95,8 @@
 
 (format #t "Done reloading guile elisp system~%")
 (set-current-module (resolve-module '(language elisp runtime)))
+
+(primitive-load (join %prelude-directory "pcase.scm"))
 ;----------------------------------------------------------------------------------
 
 (let-syntax
