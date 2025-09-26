@@ -131,12 +131,44 @@
 ;; we build out the Scheme port.  This validates that Scheme-defined macros
 ;; can be installed via set-symbol-function! without behavioral changes.
 (let ((existing (symbol-function 'pcase)))
-  (when (and (pair? existing) (eq? (car existing) 'macro))
+  (unless (and (pair? existing) (eq? (car existing) 'macro))
     (pcase--require 'pcase)
-    (let ((orig existing)
-          (orig-fn (pcase--macro-function 'pcase)))
+    (set! existing (symbol-function 'pcase)))
+  (when (and (pair? existing) (eq? (car existing) 'macro))
+    (let* ((orig existing)
+           (orig-fn (pcase--macro-function 'pcase)))
       (when orig-fn
-        (define (pcase--scheme-placeholder exp . cases)
-          (apply orig-fn (cons exp cases)))
+        (define (pcase--scheme-placeholder form . rest)
+          (apply orig-fn (cons form rest)))
         (set-symbol-function! 'pcase (cons 'macro pcase--scheme-placeholder))
         (pcase--put 'pcase 'pcase-original orig)))))
+
+;; ----------------------------------------------------------------------------
+;; Scheme reimplementations of core helpers (built alongside the Elisp version
+;; so we can validate behavior before switching the macro binding).
+
+(define (pcase-scm--null? obj)
+  (or (eq? obj nil-value) (null? obj)))
+
+(define (pcase-scm--proper-list obj)
+  (cond
+   ((eq? obj nil-value) '())
+   ((pair? obj) obj)
+   (else '())))
+
+(define (pcase-scm--car-safe obj)
+  (if (pair? obj) (car obj) nil-value))
+
+(define (pcase-scm--match val upat)
+  (let ((head (pcase-scm--car-safe upat)))
+    (if (and (symbol? head)
+             (or (eq? head 'or) (eq? head 'and)))
+        (cons head
+              (map (lambda (sub) (pcase-scm--match val sub))
+                   (pcase-scm--proper-list (if (pair? upat) (cdr upat) nil-value))))
+        (cons 'match (cons val upat)))))
+
+(define (pcase-scm--and match matches)
+  (if (pcase-scm--null? matches)
+      match
+      (cons 'and (cons match matches))))
