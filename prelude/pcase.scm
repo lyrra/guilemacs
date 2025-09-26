@@ -321,3 +321,27 @@
                     nil-value))))))
       (if (eq? res nil-value) nil-value res)))
    (else nil-value)))
+
+;; Temporary bridge: use the original Elisp helpers when available while their
+;; Scheme counterparts are under construction.
+(define (pcase-scm--split-pred vars upat pat)
+  (let ((orig (pcase--maybe-elisp-function 'pcase--split-pred)))
+    (if orig
+        (orig vars upat pat)
+        nil-value)))
+
+(define (pcase-scm--mark-used sym)
+  (when (symbol? sym)
+    (pcase--put sym 'pcase-used t-value)))
+
+(define (pcase-scm--app-subst-match match sym fun nsym)
+  (let ((orig (pcase--maybe-elisp-function 'pcase--app-subst-match)))
+    (if orig
+        (orig match sym fun nsym)
+        match)))
+
+(define (pcase-scm--app-subst-rest rest sym fun nsym)
+  (map (lambda (branch)
+         (let ((new-match (pcase-scm--app-subst-match (car branch) sym fun nsym)))
+           (cons new-match (cdr branch))))
+       (pcase-scm--proper-list rest)))
