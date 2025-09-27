@@ -138,10 +138,10 @@
     (let* ((orig existing)
            (orig-fn (pcase--macro-function 'pcase)))
       (when orig-fn
-        (define (pcase--scheme-placeholder form . rest)
-          (apply orig-fn (cons form rest)))
-        (set-symbol-function! 'pcase (cons 'macro pcase--scheme-placeholder))
-        (pcase--put 'pcase 'pcase-original orig)))))
+        (let ((pcase--scheme-placeholder (lambda (form . rest)
+                                           (apply orig-fn (cons form rest)))))
+          (set-symbol-function! 'pcase (cons 'macro pcase--scheme-placeholder))
+          (pcase--put 'pcase 'pcase-original orig))))))
 
 ;; ----------------------------------------------------------------------------
 ;; Scheme reimplementations of core helpers (built alongside the Elisp version
@@ -235,7 +235,8 @@
          (if (not (eq? then ':pcase--fail))
              (set! then-rest (cons (cons then code&vars) then-rest)))
          (if (not (eq? els ':pcase--fail))
-             (set! else-rest (cons (cons els code&vars) else-rest)))))
+             (set! else-rest (cons (cons els code&vars) else-rest)))
+         #t))
      (pcase-scm--proper-list rest))
     (cons (reverse then-rest) (reverse else-rest))))
 
@@ -251,7 +252,7 @@
                  (if (pair? (car elts))
                      #f
                      (loop (cdr elts))))
-                (else #t))))))
+                (else #t)))))))
 
 (define (pcase-scm--if test then else)
   (cond
