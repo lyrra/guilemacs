@@ -1450,7 +1450,7 @@ VECTORP (Lisp_Object x)
 INLINE void
 CHECK_VECTOR (Lisp_Object x)
 {
-  CHECK_TYPE (VECTORP (x), Qvectorp, x);
+  CHECK_TYPE (VECTORP (x) || scm_is_vector (x), Qvectorp, x);
 }
 
 
