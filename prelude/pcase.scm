@@ -397,6 +397,62 @@
   (when (symbol? sym)
     (pcase--put sym 'pcase-used t-value)))
 
+(define (pcase-scm--macroexp-fgrep vars form)
+  (pcase-scm--proper-list (pcase--macroexp-fgrep vars form)))
+
+(define (pcase-scm--let-bindings vars)
+  (map (lambda (binding)
+         (set-cdr! (cdr binding) 'used)
+         (list (car binding) (cadr binding)))
+       vars))
+
+(define (pcase-scm--append env bindings)
+  (fold-right (lambda (x acc) (cons x acc)) bindings env))
+
+(define (pcase-scm--memq? elt lst)
+  (pcase-scm--member elt lst))
+
+(define (pcase-scm--funcall fun arg vars)
+  (cond
+   ((symbol? fun) (list fun arg))
+   ((and (pair? fun) (eq? (car fun) 'not))
+    (list 'not (pcase-scm--funcall (cadr fun) arg vars)))
+   (else
+    (let* ((env (map (lambda (x)
+                       (set-cdr! (cdr x) 'used)
+                       (list (car x) (cadr x)))
+                     (pcase-scm--macroexp-fgrep vars fun)))
+           (shadow (assoc arg env))
+           (arg* (if shadow
+                     (let ((newsym (pcase--gensym "x")))
+                       (set! env (cons (list newsym arg) env))
+                       newsym)
+                     arg))
+           (call (cond
+                  ((or (procedure? fun) (not (pair? fun)))
+                   (list 'funcall (list 'function fun) arg*))
+                  ((pcase-scm--memq? '_ fun)
+                   (map (lambda (x) (if (eq? '_ x) arg* x)) fun))
+                  (else
+                   (append fun (list arg*)))))
+           (env* (pcase-scm--let-bindings env)))
+      (if (null? env*)
+          call
+          (list 'let* env* call))))))
+
+(define (pcase-scm--eval exp vars)
+  (let ((found (assoc exp vars)))
+    (cond
+     (found
+      (set-cdr! (cdr found) 'used)
+      (cadr found))
+     (else
+      (let ((env (pcase-scm--macroexp-fgrep vars exp)))
+        (if (null? env)
+            exp
+            (pcase--macroexp-let* (pcase-scm--let-bindings env)
+                                  (list exp)))))))
+
 (define (pcase-scm--app-subst-match match sym fun nsym)
   (cond
    ((eq? (pcase-scm--car-safe match) 'match)
