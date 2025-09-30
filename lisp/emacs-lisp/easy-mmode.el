@@ -226,7 +226,7 @@ INIT-VALUE LIGHTER KEYMAP.
 ;			    &optional [&not keywordp] sexp]
 ;			   [&rest [keywordp sexp]]
 ;			   def-body)))
-  (let* ((last-message (make-symbol "last-message"))
+  (let* ((last-message (intern-gensym "last-message"))
          (mode-name (symbol-name mode))
          (init-value nil)
          (keymap nil)

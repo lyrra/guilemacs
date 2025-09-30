@@ -231,7 +231,7 @@ signaled.
 In contrast, `pcase' will return nil if there is no match, but
 not signal an error."
   (declare (indent 1) (debug pcase))
-  (let* ((x (gensym "x"))
+  (let* ((x (intern-gensym "x"))
          (pcase--dontwarn-upats (cons x pcase--dontwarn-upats)))
     (pcase--expand
      ;; FIXME: Could we add the FILE:LINE data in the error message?
@@ -345,7 +345,7 @@ of the elements of LIST is performed as if by `pcase-let'.
   (declare (indent 1) (debug ((pcase-PAT form) body)))
   (if (pcase--trivial-upat-p (car spec))
       `(dolist ,spec ,@body)
-    (let ((tmpvar (gensym "x")))
+    (let ((tmpvar (intern-gensym "x")))
       `(dolist (,tmpvar ,@(cdr spec))
          (pcase-let* ((,(car spec) ,tmpvar))
            ,@body)))))
@@ -931,7 +931,7 @@ A and B can be one of:
            (call (progn
                    (when (assq arg env)
                      ;; `arg' is shadowed by `env'.
-                     (let ((newsym (gensym "x")))
+                     (let ((newsym (intern-gensym "x")))
                        (push (list newsym arg) env)
                        (setq arg newsym)))
                    (cond
@@ -1060,7 +1060,7 @@ Otherwise, it defers to REST which is a list of branches of the form
         ;; A upat of the form (app FUN PAT)
         (pcase--mark-used sym)
         (let* ((fun (nth 1 upat))
-               (nsym (gensym "x"))
+               (nsym (intern-gensym "x"))
                (body
                 ;; We don't change `matches' to reuse the newly computed value,
                 ;; because we assume there shouldn't be such redundancy in there.
