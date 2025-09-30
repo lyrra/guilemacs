@@ -125,19 +125,13 @@
 (load "subr")
 (load "keymap")  ; Load keymap after subr.el so save-match-data macro is available
 
-;; Load-time macro-expansion can only take effect after setting
-;; load-source-file-function because of where it is called in lread.c.
-(load "emacs-lisp/macroexp")
-(if (compiled-function-p (symbol-function 'macroexpand-all))
-    nil
-  ;; Since loaddefs is not yet loaded, macroexp's uses of pcase will simply
-  ;; fail until pcase is explicitly loaded.  This also means that we have to
-  ;; disable eager macro-expansion while loading pcase.
-  (let ((macroexp--pending-eager-loads '(skip))) (load "emacs-lisp/pcase"))
-  ;; Re-load macroexp so as to eagerly macro-expand its uses of pcase.
-  (let ((max-lisp-eval-depth (* 2 max-lisp-eval-depth)))
-    (load "emacs-lisp/macroexp")))
+; ;; Load-time macro-expansion can only take effect after setting
+; ;; load-source-file-function because of where it is called in lread.c.
+; (load "emacs-lisp/macroexp-preload")
+; (macroexp-preload-load)
 
+(load "emacs-lisp/macroexp-expanded")
+(load "emacs-lisp/pcase")
 
 (load "international/mule")
 (load "international/mule-conf")
