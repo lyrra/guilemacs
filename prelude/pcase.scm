@@ -451,7 +451,7 @@
         (if (null? env)
             exp
             (pcase--macroexp-let* (pcase-scm--let-bindings env)
-                                  (list exp)))))))
+                                  (list exp))))))))
 
 (define (pcase-scm--app-subst-match match sym fun nsym)
   (cond
@@ -477,7 +477,7 @@
                          (match ,match-sym app ,otherfun ',(pcase--call otherfun val))))
                  `(match ,nsym . ',mapped)))))
         match)
-       (else match)))
+       (else match))))
    ((pcase-scm--member (pcase-scm--car-safe match) '(or and))
     (cons (car match)
           (map (lambda (sub) (pcase-scm--app-subst-match sub sym fun nsym))
