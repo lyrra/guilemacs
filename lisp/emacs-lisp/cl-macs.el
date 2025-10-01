@@ -176,7 +176,7 @@ The name is made by appending a number to PREFIX, default \"G\"."
 	(num (if (integerp prefix) prefix
 	       (prog1 cl--gensym-counter
 		 (setq cl--gensym-counter (1+ cl--gensym-counter))))))
-    (make-symbol (format "%s%d" pfix num))))
+    (intern (format "%s%d" pfix num))))
 
 (defvar cl--gentemp-counter 0)
 ;;;###autoload
@@ -658,7 +658,7 @@ its argument list allows full Common Lisp conventions."
                    (look `(plist-member ,restarg ',karg)))
 	      (and def cl--bind-enquote (setq def `',def))
 	      (if (cddr arg)
-		  (let* ((temp (or (nth 2 arg) (make-symbol "--cl-var--")))
+		  (let* ((temp (or (nth 2 arg) (intern-gensym "--cl-var--")))
 			 (val `(car (cdr ,temp))))
 		    (cl--do-arglist temp look)
 		    (cl--do-arglist varg
@@ -1293,9 +1293,9 @@ For more details, see Info node `(cl)Loop Facility'.
 		       (step (and (eq (car cl--loop-args) 'by)
                                   (cl--pop2 cl--loop-args)))
 		       (end-var (and (not (macroexp-const-p end))
-				     (make-symbol "--cl-var--")))
+				     (intern-gensym "--cl-var--")))
 		       (step-var (and (not (macroexp-const-p step))
-				      (make-symbol "--cl-var--"))))
+				      (intern-gensym "--cl-var--"))))
 		  (and step (numberp step) (<= step 0)
 		       (error "Loop `by' value is not positive: %s" step))
 		  (push (list var (or start 0)) loop-for-bindings)
@@ -1314,7 +1314,7 @@ For more details, see Info node `(cl)Loop Facility'.
 	       ((memq word '(in in-ref on))
 		(let* ((on (eq word 'on))
 		       (temp (if (and on (symbolp var))
-				 var (make-symbol "--cl-var--"))))
+				 var (intern-gensym "--cl-var--"))))
 		  (push (list temp (pop cl--loop-args)) loop-for-bindings)
                   (cl--push-clause-loop-body `(consp ,temp))
 		  (if (eq word 'in-ref)
@@ -1342,7 +1342,7 @@ For more details, see Info node `(cl)Loop Facility'.
                                  (cl--pop2 cl--loop-args) start))
                        (first-assign (or cl--loop-first-flag
 					 (setq cl--loop-first-flag
-					       (make-symbol "--cl-var--")))))
+					       (intern-gensym "--cl-var--")))))
 		  (push (list var nil) loop-for-bindings)
 		  (if (or ands (eq (car cl--loop-args) 'and))
 		      (progn
@@ -1415,7 +1415,7 @@ For more details, see Info node `(cl)Loop Facility'.
                                      (not (eq (caadr cl--loop-args) word)))
                                 (cadr (cl--pop2 cl--loop-args))
                               (error "Bad `using' clause"))
-                          (make-symbol "--cl-var--"))))
+                          (intern-gensym "--cl-var--"))))
 		  (if (memq word '(hash-value hash-values))
 		      (setq var (prog1 other (setq other var))))
 		  (cl--loop-set-iterator-function
@@ -1442,14 +1442,14 @@ For more details, see Info node `(cl)Loop Facility'.
 		  (cl--loop-set-iterator-function
                    'overlays (lambda (body)
                                `(cl--map-overlays
-                                 (lambda (,var ,(make-symbol "--cl-var--"))
+                                 (lambda (,var ,(intern-gensym "--cl-var--"))
                                    (progn . ,body) nil)
                                  ,buf ,from ,to)))))
 
 	       ((memq word '(interval intervals))
 		(let ((buf nil) (prop nil) (from nil) (to nil)
-		      (var1 (make-symbol "--cl-var1--"))
-		      (var2 (make-symbol "--cl-var2--")))
+		      (var1 (intern-gensym "--cl-var1--"))
+		      (var2 (intern-gensym "--cl-var2--")))
 		  (while (memq (car cl--loop-args) '(in of property from to))
 		    (cond ((eq (car cl--loop-args) 'from)
                            (setq from (cl--pop2 cl--loop-args)))
@@ -1479,7 +1479,7 @@ For more details, see Info node `(cl)Loop Facility'.
                                     (not (eq (caadr cl--loop-args) word)))
                                (cadr (cl--pop2 cl--loop-args))
                              (error "Bad `using' clause"))
-                         (make-symbol "--cl-var--"))))
+                         (intern-gensym "--cl-var--"))))
 		  (if (memq word '(key-binding key-bindings))
 		      (setq var (prog1 other (setq other var))))
 		  (cl--loop-set-iterator-function
@@ -1489,7 +1489,7 @@ For more details, see Info node `(cl)Loop Facility'.
                              (lambda (,var ,other) . ,body) ,cl-map)))))
 
 	       ((memq word '(frame frames screen screens))
-		(let ((temp (make-symbol "--cl-var--")))
+		(let ((temp (intern-gensym "--cl-var--")))
 		  (push (list var  '(selected-frame))
 			loop-for-bindings)
 		  (push (list temp nil) loop-for-bindings)
@@ -1501,8 +1501,8 @@ For more details, see Info node `(cl)Loop Facility'.
 	       ((memq word '(window windows))
 		(let ((scr (and (memq (car cl--loop-args) '(in of))
                                 (cl--pop2 cl--loop-args)))
-		      (temp (make-symbol "--cl-var--"))
-		      (minip (make-symbol "--cl-minip--")))
+		      (temp (intern-gensym "--cl-var--"))
+		      (minip (intern-gensym "--cl-minip--")))
 		  (push (list var (if scr
 				      `(frame-selected-window ,scr)
 				    '(selected-window)))
@@ -1545,7 +1545,7 @@ For more details, see Info node `(cl)Loop Facility'.
 		cl--loop-steps))))
 
      ((eq word 'repeat)
-      (let ((temp (make-symbol "--cl-var--")))
+      (let ((temp (intern-gensym "--cl-var--")))
 	(push (list (list temp (pop cl--loop-args))) cl--loop-bindings)
 	(push `(>= (setq ,temp (1- ,temp)) 0) cl--loop-body)))
 
@@ -1624,22 +1624,22 @@ For more details, see Info node `(cl)Loop Facility'.
 
      ((eq word 'always)
       (or cl--loop-finish-flag
-          (setq cl--loop-finish-flag (make-symbol "--cl-flag--")))
+          (setq cl--loop-finish-flag (intern-gensym "--cl-flag--")))
       (push `(setq ,cl--loop-finish-flag ,(pop cl--loop-args)) cl--loop-body)
       (setq cl--loop-result t))
 
      ((eq word 'never)
       (or cl--loop-finish-flag
-          (setq cl--loop-finish-flag (make-symbol "--cl-flag--")))
+          (setq cl--loop-finish-flag (intern-gensym "--cl-flag--")))
       (push `(setq ,cl--loop-finish-flag (not ,(pop cl--loop-args)))
 	    cl--loop-body)
       (setq cl--loop-result t))
 
      ((eq word 'thereis)
       (or cl--loop-finish-flag
-          (setq cl--loop-finish-flag (make-symbol "--cl-flag--")))
+          (setq cl--loop-finish-flag (intern-gensym "--cl-flag--")))
       (or cl--loop-result-var
-          (setq cl--loop-result-var (make-symbol "--cl-var--")))
+          (setq cl--loop-result-var (intern-gensym "--cl-var--")))
       (push `(setq ,cl--loop-finish-flag
                    (not (setq ,cl--loop-result-var ,(pop cl--loop-args))))
 	    cl--loop-body))
@@ -1671,9 +1671,9 @@ For more details, see Info node `(cl)Loop Facility'.
 
      ((eq word 'return)
       (or cl--loop-finish-flag
-          (setq cl--loop-finish-flag (make-symbol "--cl-var--")))
+          (setq cl--loop-finish-flag (intern-gensym "--cl-var--")))
       (or cl--loop-result-var
-          (setq cl--loop-result-var (make-symbol "--cl-var--")))
+          (setq cl--loop-result-var (intern-gensym "--cl-var--")))
       (push `(setq ,cl--loop-result-var ,(pop cl--loop-args)
                    ,cl--loop-finish-flag nil)
             cl--loop-body))
@@ -1704,7 +1704,7 @@ If BODY is `setq', then use SPECS for assignments rather than for bindings."
           (setq par nil)
           (dolist (spec specs)
             (or (macroexp-const-p (cadr spec))
-                (let ((temp (make-symbol "--cl-var--")))
+                (let ((temp (intern-gensym "--cl-var--")))
                   (push (list temp (cadr spec)) temps)
                   (setcar (cdr spec) temp)))))))
     (while specs
@@ -1721,7 +1721,8 @@ If BODY is `setq', then use SPECS for assignments rather than for bindings."
                           (and (eq body 'setq) (cl--unused-var-p temp)))
                   ;; Prefer a fresh uninterned symbol over "_to", to avoid
                   ;; warnings that we set an unused variable.
-                  (setq temp (make-symbol "--cl-var--"))
+                  ;; FIX-20251001-guilemacs: we cant serialize an uninterned symbol, need to use intern-gensym over make-symbol
+                  (setq temp (intern-gensym "--cl-var--"))
                   ;; Make sure this temp variable is locally declared.
                   (when (eq body 'setq)
                     (push (list (list temp)) cl--loop-bindings)))
@@ -1749,7 +1750,7 @@ If BODY is `setq', then use SPECS for assignments rather than for bindings."
     (or cl--loop-accum-var
 	(progn
 	  (push (list (list
-                       (setq cl--loop-accum-var (make-symbol "--cl-var--"))
+                       (setq cl--loop-accum-var (intern-gensym "--cl-var--"))
                        def))
                 cl--loop-bindings)
 	  (setq cl--loop-result (if func (list func cl--loop-accum-var)
@@ -2523,7 +2524,7 @@ by EXPANSION, and (setq NAME ...) will act like (setf EXPANSION ...).
   "Bind each of NAMES to an uninterned symbol and evaluate BODY."
   (declare (debug (sexp body)) (indent 1))
   `(let ,(cl-loop for name in names collect
-                  `(,name (gensym (symbol-name ',name))))
+                  `(,name (intern-gensym (symbol-name ',name))))
      ,@body))
 
 ;;;###autoload
@@ -2553,9 +2554,9 @@ once, as intended.
 See also `macroexp-let2'."
   (declare (debug (sexp body)) (indent 1))
   (setq names (mapcar #'ensure-list names))
-  (let ((our-gensyms (cl-loop for _ in names collect (gensym))))
+  (let ((our-gensyms (cl-loop for _ in names collect (intern-gensym "g"))))
     ;; During macroexpansion, obtain a gensym for each NAME.
-    `(let ,(cl-loop for sym in our-gensyms collect `(,sym (gensym)))
+    `(let ,(cl-loop for sym in our-gensyms collect `(,sym (intern-gensym "g")))
        ;; Evaluate each FORM and bind to the corresponding gensym.
        ;;
        ;; We require this explicit call to `list' rather than using
@@ -2582,7 +2583,7 @@ a synonym for (list A B C).
 
 \(fn (SYM...) FORM BODY)"
   (declare (indent 2) (debug ((&rest symbolp) form body)))
-  (let ((temp (make-symbol "--cl-var--")) (n -1))
+  (let ((temp (intern-gensym "--cl-var--")) (n -1))
     `(let* ((,temp ,form)
             ,@(mapcar (lambda (v)
                         (list v `(nth ,(setq n (1+ n)) ,temp)))
@@ -2602,7 +2603,7 @@ values.  For compatibility, (cl-values A B C) is a synonym for (list A B C).
   (cond ((null vars) `(progn ,form nil))
 	((null (cdr vars)) `(setq ,(car vars) (car ,form)))
 	(t
-	 (let* ((temp (make-symbol "--cl-var--")) (n 0))
+	 (let* ((temp (intern-gensym "--cl-var--")) (n 0))
 	   `(let ((,temp ,form))
               (prog1 (setq ,(pop vars) (car ,temp))
                 (setq ,@(apply #'nconc
