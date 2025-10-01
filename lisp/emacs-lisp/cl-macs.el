@@ -251,6 +251,7 @@ The name is made by appending a number to PREFIX, default \"T\"."
 (defvar cl--bind-lets) (defvar cl--bind-forms)
 )
 
+(eval-and-compile
 (defun cl--slet (bindings body &optional nowarn)
   "Like `cl--slet*' but for \"parallel let\"."
   (let ((dyns nil)) ;Vars declared as dynbound among the bindings?
@@ -273,6 +274,7 @@ The name is made by appending a number to PREFIX, default \"T\"."
   "Like `macroexp-let*' but uses static scoping for all the BINDINGS."
   (if (null bindings) body
     (cl--slet `(,(car bindings)) (cl--slet* (cdr bindings) body))))
+) ; end eval-and-compile
 
 (eval-and-compile
 (defun cl--transform-lambda (form bind-block)
@@ -1221,6 +1223,7 @@ For more details, see Info node `(cl)Loop Facility'.
 ;; (def-edebug-elem-spec 'loop-d-type-spec
 ;;   '(&or (loop-d-type-spec . [&or nil loop-d-type-spec]) cl-type-spec))
 
+(eval-and-compile
 (defun cl--parse-loop-clause ()		; uses loop-*
   (let ((word (pop cl--loop-args))
 	(hash-types '(hash-key hash-keys hash-value hash-values))
@@ -1783,7 +1786,7 @@ such that COMBO is equivalent to (and . CLAUSES)."
 			  (append ands (list (cons 'progn (append body '(t)))))
 			ands)))
 	    (if (cdr full) (cons 'and full) (car full))))))
-
+) ; end eval-and-compile
 
 ;;; Other iteration control structures.
 
