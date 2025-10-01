@@ -33424,7 +33424,10 @@ Whether Tramp is enabled.
 If it is set to nil, all remote file names are used literally.  Don't
 set it manually, use `inhibit-remote-files' or `without-remote-files'
 instead.")
-(defconst tramp-initial-file-name-regexp (rx bos "/" (+ (not (any "/:"))) ":" (* (not (any "/:"))) ":") "\
+; FIX-20251001-guilemacs: cant compile, bos is undefined; rx is undeined; not treated as macro
+(defconst tramp-initial-file-name-regexp
+          "" ;(rx bos "/" (+ (not (any "/:"))) ":" (* (not (any "/:"))) ":")
+          "\
 Value for `tramp-file-name-regexp' for autoload.
 It must match the initial `tramp-syntax' settings.")
 (defvar tramp-file-name-regexp tramp-initial-file-name-regexp "\
@@ -33435,7 +33438,10 @@ initial value is overwritten by the car of `tramp-file-name-structure'.")
 (defvar tramp-ignored-file-name-regexp nil "\
 Regular expression matching file names that are not under Tramp's control.")
 (custom-autoload 'tramp-ignored-file-name-regexp "tramp" t)
-(defconst tramp-autoload-file-name-regexp (rx bos "/" (| "-" (>= 2 (not (any "/:|")))) ":") "\
+(defconst tramp-autoload-file-name-regexp
+          ;(rx bos "/" (| "-" (>= 2 (not (any "/:|")))) ":")
+          ""
+          "\
 Regular expression matching file names handled by Tramp autoload.
 It must match the initial `tramp-syntax' settings.  It should not
 match file names at root of the underlying local file system,
