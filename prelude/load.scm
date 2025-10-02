@@ -4342,6 +4342,13 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
       (format #t "loading elisp, current-module: ~s~%" (current-module))
       (load-from-path path))))
 
+; FIX: kludge, move to some init function
+(set! %load-path (cons "../lisp" %load-path))
+(set! %load-path (cons "./lisp" %load-path))
+(set! %load-path (cons "../lisp/emacs-lisp" %load-path))
+(set! %load-path (cons "./lisp/emacs-lisp" %load-path))
+(set! %load-extensions (cons ".el" %load-extensions))
+
 ;; Bridge function that reuses existing Fload Scheme migrations
 (define (fload-bridge file noerror nomessage nosuffix must-suffix)
   "Bridge function that handles full Fload protocol using Guile elisp compilation"
@@ -4359,9 +4366,6 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                          )
              (processed-file (car path-result))
              (suffixes (cdr path-result)))
-        (set! %load-path (cons "../lisp" %load-path))
-        (set! %load-path (cons "./lisp" %load-path))
-        (set! %load-extensions (cons ".el" %load-extensions))
         (format #t "processed-file: ~s~%" processed-file)
         (format #t "%load-path: ~s~%" %load-path)
         (format #t "%load-extensions: ~s~%" %load-extensions)
