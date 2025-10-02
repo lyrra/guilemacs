@@ -66,6 +66,7 @@
             ;set-debug-print-flag!
             ;get-debug-print-flag
             make-symbol
+            intern-gensym
             %lisp-string
             lisp-string?)
   #:export-syntax (defspecial prim))
@@ -116,6 +117,11 @@
 
 (define make-symbol (@ (guile) make-symbol))
 (define unbound (make-symbol "unbound"))
+
+(define %intern-gensym-counter 0)
+(define (intern-gensym prefix)
+  (set! %intern-gensym-counter (+ 1 %intern-gensym-counter))
+  (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym-counter)))))
 
 (define dynamic? vector?)
 (define (make-dynamic)

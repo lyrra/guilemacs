@@ -104,14 +104,15 @@
     (if list (%funcall (@ (guile) cdr) list) nil))
   (defun make-symbol (name)
     (%funcall (@ (guile) make-symbol) name))
+  (defvar %gensym-counter 0)
   (defun intern-gensym (prefix)
-    (let ((sym (%funcall (@ (guile) gensym))))
-      (%funcall (@ (guile) string->symbol)
-                (%funcall (@ (guile) string-append)
-                          prefix "_"
-                          (%funcall (@ (guile) symbol->string) sym)))))
-  (defun gensym ()
-    (%funcall (@ (guile) gensym)))
+    (setq %gensym-counter (1+ %gensym-counter))
+    (%funcall (@ (guile) string->symbol)
+              (%funcall (@ (guile) string-append)
+                        prefix "_"
+                        (%funcall (@ (guile) number->string) %gensym-counter))))
+  (defun gensym (&optional prefix)
+    (intern-gensym (if prefix prefix "g")))
   (defun signal (error-symbol data)
     (%funcall (@ (guile) throw) 'elisp-condition error-symbol data)))
 
