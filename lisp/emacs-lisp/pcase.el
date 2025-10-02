@@ -1181,6 +1181,7 @@ The predicate is the logical-AND of:
                              "Nested ` are not supported in Pcase patterns"
                              t nil nil qpat))))))))
    ((or (stringp qpat) (numberp qpat) (symbolp qpat)) `',qpat)
+   ((null qpat) `',qpat)
    ;; In all other cases just raise an error so we can't break
    ;; backward compatibility when adding \` support for other
    ;; compounded values that are not `consp'
