@@ -202,7 +202,7 @@
 ;;; A dot is also allowed literally, only a single dort alone is parsed
 ;;; as the 'dot' terminal for dotted lists.
 
-(define no-escape-punctuation (string->char-set "-+=*/_~!@$%^&:<>{}?."))
+(define no-escape-punctuation (string->char-set "-+=*/_~!@$%^&:<>{}?.|"))
 
 (define (get-symbol-or-number port)
   (let iterate ((result-chars '())
