@@ -121,8 +121,8 @@
 
 (define (pcase--gensym prefix)
   (if prefix
-      (pcase--call 'gensym prefix)
-      (pcase--call 'gensym)))
+      (pcase--call 'intern-gensym prefix)
+      (pcase--call 'intern-gensym "g")))
 
 (define (pcase--intern-gensym prefix)
   (pcase--call 'intern-gensym prefix))
