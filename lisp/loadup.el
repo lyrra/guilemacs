@@ -225,8 +225,6 @@ that the search has reached."
            definition-prefixes)
   (setq definition-prefixes new))
 
-(load "button")                  ;After loaddefs, because of define-minor-mode!
-
 (when (interpreted-function-p (symbol-function 'add-hook))
   ;; `subr.el' is needed early and hence can't use macros like `setf'
   ;; liberally.  Yet, it does use such macros in code that it knows will not
@@ -243,15 +241,15 @@ that the search has reached."
   ;; where we can blissfully `require' packages like `gv'.
   (require 'gv))
 
+(load "emacs-lisp/cl-lib")
+(load "emacs-lisp/cl-macs")
 (load "emacs-lisp/cl-preloaded")
+(load "button")                  ;After loaddefs, because of define-minor-mode!
 (load "emacs-lisp/oclosure")          ;Used by cl-generic
 (load "emacs-lisp/derived")
 (load "emacs-lisp/easy-mmode")
 (load "obarray")        ;abbrev.el is implemented in terms of obarrays.
 (load "abbrev")         ;lisp-mode.el and simple.el use define-abbrev-table.
-
-(load "emacs-lisp/cl-lib")
-(load "emacs-lisp/cl-macs")
 
 (load "help-macro")
 (load "help")
