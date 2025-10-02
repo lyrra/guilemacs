@@ -146,7 +146,7 @@
       (begin
         (if (not (eq? (car (lex 'get)) type))
             (error "got different token than peeked"))
-        '()))
+        #nil))
      ((and allow-dot (eq? type 'dot))
       (begin
         (if (not (eq? (car (lex 'get)) type))
