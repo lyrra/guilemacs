@@ -43,6 +43,7 @@
 
 ;;; Code:
 
+(require 'inline)
 (require 'cl-lib)
 (require 'macroexp)
 ;; `gv' is required here because cl-macs can be loaded before loaddefs.el.
@@ -3508,6 +3509,7 @@ Of course, we really can't know that for sure, so it's just a heuristic."
                  ))
   (put type 'cl-deftype-satisfies pred))
 
+(eval-and-compile
 ;;;###autoload
 (define-inline cl-typep (val type)
   "Return t if VAL is of type TYPE, nil otherwise."
@@ -3567,7 +3569,7 @@ Of course, we really can't know that for sure, so it's just a heuristic."
            (t (error "Unknown type %S" type))))
         nil nil type))
       (type (error "Bad type spec: %S" type)))))
-
+)
 
 ;;;###autoload
 (defmacro cl-check-type (form type &optional string)
