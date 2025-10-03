@@ -428,14 +428,18 @@ The `slots' (and hence `index-table') are currently unused."
        ,(if predicate `(put ',name 'cl-deftype-satisfies #',predicate)
           ;; (message "Missing predicate for: %S" name)
           nil)
-       (put ',name 'cl--class
-            (built-in-class--make ',name ,docstring
-                                  (mapcar (lambda (type)
-                                            (let ((class (get type 'cl--class)))
-                                              (unless class
-                                                (error "Unknown type: %S" type))
-                                              class))
-                                          ',parents))))))
+       (let* ((resolved-parents
+               (mapcar (lambda (type)
+                         (let ((class (get type 'cl--class)))
+                           (unless class
+                             (error "Unknown type: %S" type))
+                           class))
+                       ',parents))
+              (descriptor (built-in-class--make ',name ,docstring resolved-parents)))
+         (put ',name 'cl--class
+              (if (fboundp 'cl--bootstrap--finalize-built-in)
+                  (cl--bootstrap--finalize-built-in ',name descriptor resolved-parents ,docstring)
+                descriptor))))))
 
 ;; FIXME: Our type DAG has various quirks:
 ;; - `subr' says it's a `compiled-function' but that's not true

@@ -8,6 +8,13 @@
 
 ;;; Code:
 
+;; Lightweight debugging hook; keep default false to avoid noisy bootstrap.
+(defvar cl--bootstrap-debug-log nil)
+
+(defun cl--bootstrap--log (fmt &rest args)
+  (when cl--bootstrap-debug-log
+    (apply #'message (concat "[boot-cl] " fmt) args)))
+
 ;; Bootstrap fallback for `cl-typep'.  `cl-preloaded.el' invokes
 ;; `cl-check-type' before `cl-macs.el' has been loaded, so provide a
 ;; conservative definition that covers the small set of type
@@ -183,9 +190,48 @@
 (unless (fboundp 'cl--set-class!)
   (defun cl--set-class! (symbol descriptor)
     (when (symbolp symbol)
+      (cl--bootstrap--log "set-class %S type=%S size=%s" symbol
+                          (condition-case nil (type-of descriptor) (error :no-type))
+                          (condition-case nil (length descriptor) (error :no-length)))
       (put symbol 'cl--class descriptor)
       (cl--bootstrap--store symbol descriptor)
       (cl--bootstrap--ensure-tag-witness descriptor))))
+
+(defvar cl--bootstrap--orig-put nil)
+
+(if (fboundp 'advice-add)
+    (progn
+      (cl--bootstrap--log "installing put advice")
+      (defun cl--bootstrap--put-advice (orig symbol prop value)
+        (if (and (eq prop 'cl--class)
+                 (or (recordp value)
+                     (and (consp value) (eq (car value) :cl-struct))))
+            (progn
+              (cl--bootstrap--log "put %S type=%S size=%s" symbol
+                                  (condition-case nil (type-of value) (error :no-type))
+                                  (condition-case nil (length value) (error :no-length)))
+              (prog1 (funcall orig symbol prop value)
+                (cl--bootstrap--store symbol value)
+                (cl--bootstrap--ensure-tag-witness value)))
+          (funcall orig symbol prop value)))
+      (advice-add 'put :around #'cl--bootstrap--put-advice))
+  (unless cl--bootstrap--orig-put
+    (setq cl--bootstrap--orig-put (symbol-function 'put))
+    (fset 'put
+          (lambda (symbol prop value)
+            (if (and (eq prop 'cl--class)
+                     (or (recordp value)
+                         (and (consp value) (eq (car value) :cl-struct))))
+                (let ((repr (condition-case nil (prin1-to-string value)
+                               (error "<#object>"))))
+                  (cl--bootstrap--log "put* %S type=%S size=%s value=%s" symbol
+                                      (condition-case nil (type-of value) (error :no-type))
+                                      (condition-case nil (length value) (error :no-length))
+                                      repr)
+                  (prog1 (funcall cl--bootstrap--orig-put symbol prop value)
+                    (cl--bootstrap--store symbol value)
+                    (cl--bootstrap--ensure-tag-witness value)))
+              (funcall cl--bootstrap--orig-put symbol prop value))))))
 
 (unless (fboundp 'cl-struct-p)
   (defun cl-struct-p (value)
@@ -225,3 +271,18 @@
 (provide 'boot-cl)
 
 ;;; boot-cl.el ends here
+(defun cl--bootstrap--finalize-built-in (name descriptor parent-classes docstring)
+  (if (and (recordp descriptor)
+           (eq (type-of descriptor) 'built-in-class)
+           (<= (length descriptor) 1))
+      (let* ((slots (make-vector 0 nil))
+             (index (make-hash-table :test 'eq :size 0))
+             (inflated (record 'built-in-class
+                               name
+                               docstring
+                               parent-classes
+                               slots
+                               index)))
+        (cl--bootstrap--log "inflate %S -> size=%s" name (length inflated))
+        inflated)
+    descriptor))
