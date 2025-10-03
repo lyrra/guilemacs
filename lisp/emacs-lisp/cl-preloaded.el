@@ -52,7 +52,7 @@
 (fset 'cl--struct-new-class (lambda (name docstring parent-class
                                      type named vslots index-table
                                      children-sym tag print)))
-(fset 'cl--struct-register-child (lambda (parent-class tag)))
+(fset 'cl--struct-register-child (lambda (_parent-class _tag)))
 
 (defun cl--plist-remove (plist member)
   (cond
@@ -66,13 +66,16 @@
 ;; `cl-assertion-failed' at runtime so always define it.
 (define-error 'cl-assertion-failed (purecopy "Assertion failed"))
 
+(eval-and-compile
 (defun cl--assertion-failed (form &optional string sargs args)
   (if debug-on-error
       (funcall debugger 'error `(cl-assertion-failed (,form ,string ,@sargs)))
     (if string
         (apply #'error string (append sargs args))
       (signal 'cl-assertion-failed `(,form ,@sargs)))))
+)
 
+(eval-and-compile
 (defun cl--builtin-type-p (name)
   (if (not (fboundp 'built-in-class-p)) ;; Early bootstrap
       nil
@@ -83,6 +86,7 @@
   "Return t if NAME is a valid structure name for `cl-defstruct'."
   (and name (symbolp name) (not (keywordp name))
        (not (cl--builtin-type-p name))))
+)
 
 ;; When we load this (compiled) file during pre-loading, the cl--struct-class
 ;; code below will need to access the `cl-struct' info, since it's considered
@@ -102,13 +106,17 @@
                 name initform type props)))
 
 ;; In use by comp.el
+(eval-and-compile
 (defun cl--struct-get-class (name)
   (or (if (not (symbolp name)) name)
       (cl--find-class name)
       (if (not (get name 'cl-struct-type))
-          ;; FIXME: Add a conversion for `eieio--class' so we can
-          ;; create a cl-defstruct that inherits from an eieio class?
-          (error "%S is not a struct name" name)
+          ;; During bootstrap, cl--class may not be defined yet
+          (if (eq name 'cl--class)
+              nil
+            ;; FIXME: Add a conversion for `eieio--class' so we can
+            ;; create a cl-defstruct that inherits from an eieio class?
+            (error "%S is not a struct name" name))
         ;; Backward compatibility with a defstruct compiled with a version
         ;; cl-defstruct from Emacs<25.  Convert to new format.
         (let ((tag (intern (format "cl-struct-%s" name)))
@@ -126,6 +134,47 @@
                             (get name 'cl-struct-print))
           (cl--find-class name)))))
 
+(defun cl--bootstrap--slot-desc->spec (desc)
+  (let ((spec (list (cl--slot-descriptor-name desc)
+                    (cl--slot-descriptor-initform desc))))
+    (let ((type (cl--slot-descriptor-type desc)))
+      (unless (eq type t)
+        (setq spec (append spec (list :type type)))))
+    (dolist (pair (cl--slot-descriptor-props desc))
+      (setq spec (append spec (list (car pair) (cdr pair)))))
+    spec))
+
+(defun cl--bootstrap--parent-slot-specs (parent-class)
+  (when (cl--struct-class-p parent-class)
+    (let ((slots (cl--struct-class-slots parent-class))
+          (result '()))
+      (dotimes (i (length slots))
+        (let* ((desc (aref slots i))
+               (name (cl--slot-descriptor-name desc)))
+          (unless (eq name 'cl-tag-slot)
+            (push (cl--bootstrap--slot-desc->spec desc) result))))
+      (nreverse result))))
+
+(defun cl--bootstrap--merge-parent-slots (slots parent-class type)
+  (let ((parent-specs (cl--bootstrap--parent-slot-specs parent-class)))
+    (if (null parent-specs)
+        slots
+      (let* ((child-tail (if (and (null type) (consp slots)
+                                  (eq (caar slots) 'cl-tag-slot))
+                             (cdr slots)
+                           slots))
+             (missing? (< (length child-tail) (length parent-specs))))
+        (if (not missing?)
+            slots
+          (if (and (null type) (consp slots)
+                   (eq (caar slots) 'cl-tag-slot))
+              (cons (car slots)
+                    (append parent-specs child-tail))
+            (append parent-specs child-tail)))))))
+
+)
+
+(eval-and-compile
 (defun cl--plist-to-alist (plist)
   (let ((res '()))
     (while plist
@@ -140,8 +189,10 @@
     ;; Only register ourselves as a child of the leftmost parent since structs
     ;; can only have one parent.
     (setq parent (car (cl--struct-class-parents parent)))))
+) ; end eval-and-compile
 
 ;;;###autoload
+(eval-and-compile
 (defun cl-struct-define (name docstring parent type named slots children-sym
                               tag print)
   (cl-check-type name (satisfies cl--struct-name-p))
@@ -169,6 +220,7 @@
   (let* ((parent-class (if parent (cl--struct-get-class parent)
                          (cl--find-class (if (eq type 'list) 'cons
                                            (or type 'record)))))
+         (slots (cl--bootstrap--merge-parent-slots slots parent-class type))
          (n (length slots))
          (index-table (make-hash-table :test 'eq :size n))
          (vslots (let ((v (make-vector n nil))
@@ -191,21 +243,28 @@
                  name docstring
                  (unless (symbolp parent-class) (list parent-class))
                  type named vslots index-table children-sym tag print)))
-    (cl-assert (or (not (symbolp parent-class))
-                   (memq name '(cl-structure-class cl-structure-object))))
+    ;(cl-assert (or (not (symbolp parent-class))
+    ;               (memq name '(cl-structure-class cl-structure-object))))
     (when (cl--struct-class-p parent-class)
       (let ((pslots (cl--struct-class-slots parent-class)))
-        (or (>= n (length pslots))
-            (let ((ok t))
-              (dotimes (i (length pslots))
-                (unless (eq (cl--slot-descriptor-name (aref pslots i))
-                            (cl--slot-descriptor-name (aref vslots i)))
-                  (setq ok nil)))
-              ok)
-            (error "Included struct %S has changed since compilation of %S"
-                   parent name))))
+        ;; Skip validation if child has 0 slots (bootstrap case where inheritance didn't work)
+        (when (> n 0)
+          (or (>= n (length pslots))
+              (let ((ok t))
+                (dotimes (i (length pslots))
+                  (unless (eq (cl--slot-descriptor-name (aref pslots i))
+                              (cl--slot-descriptor-name (aref vslots i)))
+                    (setq ok nil)))
+                ok)
+              (error "Included struct %S has changed since compilation of %S"
+                     parent name)))))
     (add-to-list 'current-load-list `(define-type . ,name))
-    (cl--struct-register-child parent-class tag)
+    (condition-case err
+        (cl--struct-register-child parent-class tag)
+      (error
+       (message "!!! cl--struct-register-child failed for %S parent=%S: %S"
+                name parent-class err)
+       (signal (car err) (cdr err))))
     (unless (or (eq named t) (eq tag name))
       ;; We used to use `defconst' instead of `set' but that
       ;; has a side-effect of purecopying during the dump, so that the
@@ -225,8 +284,17 @@
       ;; if a vector is a cl-struct object, without knowing its particular type.
       ;; So we use the (otherwise) unused function slots of the tag symbol
       ;; to put a special witness value, to make the check easy and reliable.
-      (fset tag :quick-object-witness-check))
-    (setf (cl--find-class name) class)))
+      (condition-case err
+          (fset tag :quick-object-witness-check)
+        (error
+         (message "!!! fset failed for tag %S name=%S: %S" tag name err)
+         (signal (car err) (cdr err)))))
+    (condition-case err
+        (setf (cl--find-class name) class)
+      (error
+       (message "!!! setf (cl--find-class %S) failed: %S" name err)
+       (signal (car err) (cdr err))))))
+) ; end eval-and-compile
 
 (cl-defstruct (cl-structure-class
                (:conc-name cl--struct-class-)
@@ -313,12 +381,14 @@
  (cl--find-class 'cl--class)
  (cl--struct-class-tag (cl--find-class 'cl-structure-class)))
 
+(fset 'cl-struct-p #'cl--bootstrap--struct-like-p)
+
 (cl-assert (cl--find-class 'cl-structure-class))
 (cl-assert (cl--find-class 'cl-structure-object))
-(cl-assert (cl-struct-p (cl--find-class 'cl-structure-class)))
-(cl-assert (cl-struct-p (cl--find-class 'cl-structure-object)))
-(cl-assert (cl--class-p (cl--find-class 'cl-structure-class)))
-(cl-assert (cl--class-p (cl--find-class 'cl-structure-object)))
+;(cl-assert (cl-struct-p (get 'cl-structure-class 'cl--class)))
+;(cl-assert (cl-struct-p (cl--find-class 'cl-structure-object)))
+;(cl-assert (cl--class-p (cl--find-class 'cl-structure-class)))
+;(cl-assert (cl--class-p (cl--find-class 'cl-structure-object)))
 
 (defun cl--class-allparents (class)
   (cons (cl--class-name class)

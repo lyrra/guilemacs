@@ -194,6 +194,7 @@ that the search has reached."
 (load "files")
 
 (load "emacs-lisp/gv")
+(load "../prelude/elisp/boot-cl")
 
 (load "cus-face")
 (load "faces")  ; after here, `defface' may be used.
