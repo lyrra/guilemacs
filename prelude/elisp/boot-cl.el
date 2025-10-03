@@ -268,6 +268,85 @@
   (defun cl--struct-class-children-sym (descriptor)
     (cl--bootstrap--descriptor-field descriptor :children 10)))
 
+;; Bootstrap stubs for oclosure functions.  The real implementations
+;; load later in `oclosure.el'.  During bootstrap, cl-preloaded's
+;; compiled code may reference these if the macro expansion included
+;; oclosure support, so we provide minimal stub versions.
+
+(unless (fboundp 'oclosure--define)
+  (defun oclosure--define (name docstring parent-names slots &rest props)
+    (cl--bootstrap--log "oclosure--define stub called for %S" name)
+    nil))
+
+(unless (fboundp 'oclosure--class-slots)
+  (defun oclosure--class-slots (class)
+    (cl--bootstrap--log "oclosure--class-slots stub called")
+    ;; Return empty vector for slots during bootstrap
+    []))
+
+(unless (fboundp 'oclosure--class-allparents)
+  (defun oclosure--class-allparents (class)
+    (cl--bootstrap--log "oclosure--class-allparents stub called")
+    nil))
+
+(unless (fboundp 'oclosure-type)
+  (defun oclosure-type (oclosure)
+    (cl--bootstrap--log "oclosure-type stub called")
+    nil))
+
+(unless (fboundp 'oclosure--defstruct-make-copiers)
+  (defun oclosure--defstruct-make-copiers (copiers slotdescs name)
+    (cl--bootstrap--log "oclosure--defstruct-make-copiers stub called for %S" name)
+    ;; Return empty list - no copiers needed during bootstrap
+    nil))
+
+(unless (fboundp 'oclosure--build-class)
+  (defun oclosure--build-class (name docstring parent-names slots)
+    (cl--bootstrap--log "oclosure--build-class stub called for %S" name)
+    ;; Return a minimal cl--class record
+    ;; Structure: cl--class has (name docstring parents slots index-table)
+    (record 'cl--class
+            name          ; name
+            docstring     ; docstring
+            parent-names  ; parents
+            []            ; slots (empty vector for bootstrap)
+            (make-hash-table :test 'eq :size 0)))) ; index-table
+
+;; Pre-register base oclosure classes to avoid "Unknown class" errors during bootstrap
+;; cl--find-class is a MACRO that expands to (get TYPE 'cl--class), so we must
+;; set the property, not just store in the registry.
+(cl--bootstrap--log "Pre-registering oclosure base classes")
+
+;; Create a minimal class descriptor with the fields that oclosure classes expect
+;; Including slots like 'name', 'doc', 'parents', 'slots', 'index-table' (from cl--class)
+;; and 'allparents' (from oclosure--class)
+(let ((base-class (record 'cl--class
+                           'oclosure      ; name
+                           nil           ; doc
+                           nil           ; parents
+                           []            ; slots
+                           (make-hash-table :test 'eq :size 0)))) ; index-table
+  (put 'oclosure 'cl--class base-class)
+  (cl--bootstrap--store 'oclosure base-class))
+
+(let ((accessor-class (record 'cl--class
+                               'accessor     ; name
+                               nil          ; doc
+                               '(oclosure)  ; parents
+                               []           ; slots
+                               (make-hash-table :test 'eq :size 0)))) ; index-table
+  (put 'accessor 'cl--class accessor-class)
+  (cl--bootstrap--store 'accessor accessor-class))
+
+(let ((accessor-class (record 'cl--class
+                               'oclosure-accessor  ; name
+                               nil                ; doc
+                               '(accessor)        ; parents
+                               []                 ; slots
+                               (make-hash-table :test 'eq :size 0)))) ; index-table
+  (put 'oclosure-accessor 'cl--class accessor-class)
+  (cl--bootstrap--store 'oclosure-accessor accessor-class))
+
 (provide 'boot-cl)
 
 ;;; boot-cl.el ends here
