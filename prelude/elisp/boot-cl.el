@@ -132,12 +132,15 @@
           (_ (condition-case nil
                  (aref descriptor index)
                (error nil)))))
-       ;; cl--class and built-in-class share the same compact layout.
-       ((memq dtype '(cl--class built-in-class))
+       ;; cl--class derivatives share the same first slots layout.
+       ((memq dtype '(cl--class built-in-class oclosure--class))
         (pcase plist-key
           (:parents (aref descriptor 3))
           (:slots (aref descriptor 4))
           (:index-table (aref descriptor 5))
+          (:allparents (condition-case nil
+                           (aref descriptor 6)
+                         (error nil)))
           ;; These descriptors do not carry tag/children/named fields.
           (:tag nil)
           (:named nil)
@@ -169,23 +172,11 @@
    ((condition-case nil
          (let ((tag (aref value 0)))
            (and (symbolp tag)
-                (or (cl--find-class tag)
+                (or (get tag 'cl--class)
                     (get tag 'cl-struct-type))
                 t))
        (error nil)))
    (t nil)))
-
-(unless (fboundp 'cl--find-class)
-  (defun cl--find-class (symbol)
-    (and (symbolp symbol)
-         (or (get symbol 'cl--class)
-             (cl--bootstrap--lookup symbol)))))
-
-;; Add setf expander for our bootstrap cl--find-class so (setf (cl--find-class ...) ...) works.
-(when (and (fboundp 'gv-define-setter)
-           (not (get 'cl--find-class 'gv-expander)))
-  (gv-define-setter cl--find-class (val symbol)
-    `(cl--set-class! ,symbol ,val)))
 
 (unless (fboundp 'cl--set-class!)
   (defun cl--set-class! (symbol descriptor)
@@ -268,84 +259,142 @@
   (defun cl--struct-class-children-sym (descriptor)
     (cl--bootstrap--descriptor-field descriptor :children 10)))
 
-;; Bootstrap stubs for oclosure functions.  The real implementations
-;; load later in `oclosure.el'.  During bootstrap, cl-preloaded's
-;; compiled code may reference these if the macro expansion included
-;; oclosure support, so we provide minimal stub versions.
+;; Slot descriptor functions - must be defined before oclosure code
+(defun cl--bootstrap--slot-desc (name initform type props)
+  (record 'cl-slot-descriptor name initform type props))
 
-(unless (fboundp 'oclosure--define)
-  (defun oclosure--define (name docstring parent-names slots &rest props)
-    (cl--bootstrap--log "oclosure--define stub called for %S" name)
-    nil))
+(unless (fboundp 'cl--make-slot-desc)
+  (defun cl--make-slot-desc (name &optional initform type props)
+    (cl--bootstrap--slot-desc name initform (or type t) props)))
+
+(unless (fboundp 'cl--slot-descriptor-name)
+  (defun cl--slot-descriptor-name (desc)
+    (condition-case nil (aref desc 1) (error nil))))
+
+(unless (fboundp 'cl--slot-descriptor-initform)
+  (defun cl--slot-descriptor-initform (desc)
+    (condition-case nil (aref desc 2) (error nil))))
+
+(unless (fboundp 'cl--slot-descriptor-type)
+  (defun cl--slot-descriptor-type (desc)
+    (condition-case nil (aref desc 3) (error t))))
+
+(unless (fboundp 'cl--slot-descriptor-props)
+  (defun cl--slot-descriptor-props (desc)
+    (condition-case nil (aref desc 4) (error nil))))
+
+(defvar cl--bootstrap--oclosure-table (make-hash-table :test 'eq))
+
+(defun cl--bootstrap--ensure-oclosure-base ()
+  (unless (gethash 'oclosure cl--bootstrap--oclosure-table)
+    (let* ((parent (get 'closure 'cl--class))
+           (slotvec (make-vector 0 nil))
+           (index-table (make-hash-table :test 'eq :size 0))
+           (class (cons :cl-struct
+                        (list :name 'oclosure
+                              :doc "Bootstrap OClosure root"
+                              :parents (if parent (list parent) nil)
+                              :slots slotvec
+                              :index-table index-table
+                              :allparents (list 'oclosure)))))
+      (puthash 'oclosure class cl--bootstrap--oclosure-table)
+      (cl--set-class! 'oclosure class))))
+
+(defun cl--bootstrap--oclosure-allparents (name parent-classes)
+  (let ((parents (delete-dups
+                  (apply #'append
+                         (mapcar (lambda (pc)
+                                   (or (cl--bootstrap--descriptor-field pc :allparents 6)
+                                       (let ((pname (and (recordp pc) (aref pc 1))))
+                                         (when pname (list pname)))))
+                                 parent-classes)))))
+    (delete-dups (cons name parents))))
+
+(defun cl--bootstrap--oclosure-slot-desc (spec)
+  (if (symbolp spec)
+      (cl--make-slot-desc spec nil nil '((:read-only . t)))
+    (let ((name (car spec))
+          (plist (cdr spec))
+          (mutable nil)
+          (type nil)
+          (extras '()))
+      (while plist
+        (let ((key (pop plist))
+              (val (pop plist)))
+          (pcase key
+            (:mutable (setq mutable val))
+            (:type (setq type val))
+            (_ (push (cons key val) extras)))))
+      (setq extras (assq-delete-all :read-only extras))
+      (push (cons :read-only (not mutable)) extras)
+      (cl--make-slot-desc name nil (or type t) extras))))
+
+(defun cl--bootstrap--register-oclosure (name class)
+  (puthash name class cl--bootstrap--oclosure-table)
+  (cl--set-class! name class)
+  class)
 
 (unless (fboundp 'oclosure--class-slots)
   (defun oclosure--class-slots (class)
-    (cl--bootstrap--log "oclosure--class-slots stub called")
-    ;; Return empty vector for slots during bootstrap
-    []))
+    (cl--bootstrap--descriptor-field class :slots 4)))
 
 (unless (fboundp 'oclosure--class-allparents)
   (defun oclosure--class-allparents (class)
-    (cl--bootstrap--log "oclosure--class-allparents stub called")
-    nil))
+    (cl--bootstrap--descriptor-field class :allparents 6)))
 
-(unless (fboundp 'oclosure-type)
-  (defun oclosure-type (oclosure)
-    (cl--bootstrap--log "oclosure-type stub called")
-    nil))
+(unless (fboundp 'oclosure--class-parents)
+  (defun oclosure--class-parents (class)
+    (cl--bootstrap--descriptor-field class :parents 3)))
 
-(unless (fboundp 'oclosure--defstruct-make-copiers)
-  (defun oclosure--defstruct-make-copiers (copiers slotdescs name)
-    (cl--bootstrap--log "oclosure--defstruct-make-copiers stub called for %S" name)
-    ;; Return empty list - no copiers needed during bootstrap
-    nil))
+(unless (fboundp 'oclosure--define)
+  (defun oclosure--define (name docstring parent-names slots &rest props)
+    (cl--bootstrap--ensure-oclosure-base)
+    (when cl--bootstrap-debug-log
+      (cl--bootstrap--log "oclosure--define %S slots=%S" name slots))
+    (let* ((parent-names (or (and parent-names (copy-sequence parent-names))
+                             (list 'oclosure)))
+           (parent-classes (mapcar (lambda (sym)
+                                     (or (get sym 'cl--class)
+                                         (prog1 nil (cl--bootstrap--ensure-oclosure-base))
+                                         (get sym 'cl--class)))
+                                   parent-names))
+           (slotdescs (mapcar #'cl--bootstrap--oclosure-slot-desc slots))
+           (slotvec (apply #'vector slotdescs))
+           (index-table (make-hash-table :test 'eq :size (max 1 (length slotdescs)))))
+      (dotimes (i (length slotvec))
+        (puthash (cl--slot-descriptor-name (aref slotvec i)) i index-table))
+      (let* ((allparents (cl--bootstrap--oclosure-allparents name parent-classes))
+             (class (cons :cl-struct
+                          (list :name name
+                                :doc docstring
+                                :parents parent-classes
+                                :slots slotvec
+                                :index-table index-table
+                                :allparents allparents)))
+             (predicate (plist-get props :predicate)))
+        (when predicate
+          (unless (fboundp predicate)
+            (fset predicate (lambda (_value) nil))))
+        (cl--bootstrap--register-oclosure name class)))))
 
 (unless (fboundp 'oclosure--build-class)
   (defun oclosure--build-class (name docstring parent-names slots)
-    (cl--bootstrap--log "oclosure--build-class stub called for %S" name)
-    ;; Return a minimal cl--class record
-    ;; Structure: cl--class has (name docstring parents slots index-table)
-    (record 'cl--class
-            name          ; name
-            docstring     ; docstring
-            parent-names  ; parents
-            []            ; slots (empty vector for bootstrap)
-            (make-hash-table :test 'eq :size 0)))) ; index-table
-
-;; Pre-register base oclosure classes to avoid "Unknown class" errors during bootstrap
-;; cl--find-class is a MACRO that expands to (get TYPE 'cl--class), so we must
-;; set the property, not just store in the registry.
-(cl--bootstrap--log "Pre-registering oclosure base classes")
-
-;; Create a minimal class descriptor with the fields that oclosure classes expect
-;; Including slots like 'name', 'doc', 'parents', 'slots', 'index-table' (from cl--class)
-;; and 'allparents' (from oclosure--class)
-(let ((base-class (record 'cl--class
-                           'oclosure      ; name
-                           nil           ; doc
-                           nil           ; parents
-                           []            ; slots
-                           (make-hash-table :test 'eq :size 0)))) ; index-table
-  (put 'oclosure 'cl--class base-class)
-  (cl--bootstrap--store 'oclosure base-class))
-
-(let ((accessor-class (record 'cl--class
-                               'accessor     ; name
-                               nil          ; doc
-                               '(oclosure)  ; parents
-                               []           ; slots
-                               (make-hash-table :test 'eq :size 0)))) ; index-table
-  (put 'accessor 'cl--class accessor-class)
-  (cl--bootstrap--store 'accessor accessor-class))
-
-(let ((accessor-class (record 'cl--class
-                               'oclosure-accessor  ; name
-                               nil                ; doc
-                               '(accessor)        ; parents
-                               []                 ; slots
-                               (make-hash-table :test 'eq :size 0)))) ; index-table
-  (put 'oclosure-accessor 'cl--class accessor-class)
-  (cl--bootstrap--store 'oclosure-accessor accessor-class))
+    (cl--bootstrap--ensure-oclosure-base)
+    (let* ((parent-names (or parent-names (list 'oclosure)))
+           (parent-classes (mapcar (lambda (sym) (get sym 'cl--class)) parent-names))
+           (slotdescs (mapcar #'cl--bootstrap--oclosure-slot-desc slots))
+           (slotvec (apply #'vector slotdescs))
+           (index-table (make-hash-table :test 'eq :size (max 1 (length slotdescs))))
+           (allparents (cl--bootstrap--oclosure-allparents name parent-classes)))
+      (dotimes (i (length slotvec))
+        (puthash (cl--slot-descriptor-name (aref slotvec i)) i index-table))
+      (cons :cl-struct
+            (list :name name
+                  :doc docstring
+                  :parents parent-classes
+                  :slots slotvec
+                  :index-table index-table
+                  :allparents allparents)))))
 
 (provide 'boot-cl)
 
@@ -365,3 +414,15 @@
         (cl--bootstrap--log "inflate %S -> size=%s" name (length inflated))
         inflated)
     descriptor))
+
+(defun cl--bootstrap--struct-record (name docstring parents slots index-table tag type named print children-sym)
+  (record 'cl-structure-class
+          name docstring parents slots index-table tag type named print children-sym))
+
+(unless (fboundp 'cl--struct-new-class)
+  (defun cl--struct-new-class (name docstring parents type named slots index-table children-sym tag print)
+    (cl--bootstrap--struct-record name docstring parents slots index-table tag type named print children-sym)))
+
+(unless (fboundp 'cl--struct-register-child)
+  (defun cl--struct-register-child (_parent-class _tag)
+    nil))
