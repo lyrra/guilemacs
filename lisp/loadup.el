@@ -256,6 +256,8 @@ that the search has reached."
 (load "help")
 (load "emacs-lisp/cl-generic")
 (load "simple")
+;; Load easymenu before help-fns because help-fns requires it at compile-time
+(load "emacs-lisp/easymenu")
 ;; Load radix-tree before help-fns because help-fns uses radix-tree-leaf pcase pattern
 (load "emacs-lisp/radix-tree")
 (load "help-fns")
@@ -331,7 +333,6 @@ that the search has reached."
     (load "scroll-bar"))
 (load "select")
 (load "emacs-lisp/timer")
-(load "emacs-lisp/easymenu")
 (load "isearch")
 (load "rfn-eshadow")
 
