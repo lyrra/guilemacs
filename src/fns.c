@@ -1613,8 +1613,19 @@ With one argument, just copy STRING (with properties, if any).  */)
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
+  else if (scm_is_vector (string))
+    {
+      /* Handle Scheme vectors by building element by element */
+      ptrdiff_t newlen = ito - ifrom;
+      res = scm_c_make_vector (newlen, Qnil);
+      for (ptrdiff_t i = 0; i < newlen; i++)
+        scm_c_vector_set_x (res, i, AREF (string, ifrom + i));
+    }
   else
-    res = Fvector (ito - ifrom, aref_addr (string, ifrom));
+    {
+      /* C vectorlike - can use direct pointer */
+      res = Fvector (ito - ifrom, aref_addr (string, ifrom));
+    }
 
   return res;
 }
@@ -1668,8 +1679,19 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
       copy_text_properties (make_fixnum (from), make_fixnum (to),
 			    string, make_fixnum (0), res, Qnil);
     }
+  else if (scm_is_vector (string))
+    {
+      /* Handle Scheme vectors by building element by element */
+      ptrdiff_t newlen = to - from;
+      res = scm_c_make_vector (newlen, Qnil);
+      for (ptrdiff_t i = 0; i < newlen; i++)
+        scm_c_vector_set_x (res, i, AREF (string, from + i));
+    }
   else
-    res = Fvector (to - from, aref_addr (string, from));
+    {
+      /* C vectorlike - can use direct pointer */
+      res = Fvector (to - from, aref_addr (string, from));
+    }
 
   return res;
 }
