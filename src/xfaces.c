@@ -3499,6 +3499,9 @@ FRAME 0 means change the face on all frames, and change the default
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
 	{
+	  /* Convert symbol to string for Guilemacs compatibility */
+	  if (SYMBOLP (value))
+	    value = SYMBOL_NAME (value);
 	  /* Don't check for valid color names here because it depends
 	     on the frame (display) whether the color will be valid
 	     when the face is realized.  */
@@ -3516,6 +3519,9 @@ FRAME 0 means change the face on all frames, and change the default
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
 	{
+	  /* Convert symbol to string for Guilemacs compatibility */
+	  if (SYMBOLP (value))
+	    value = SYMBOL_NAME (value);
 	  /* Don't check for valid color names here because it depends
 	     on the frame (display) whether the color will be valid
 	     when the face is realized.  */
@@ -3533,6 +3539,9 @@ FRAME 0 means change the face on all frames, and change the default
 	  && !IGNORE_DEFFACE_P (value)
 	  && !RESET_P (value))
 	{
+	  /* Convert symbol to string for Guilemacs compatibility */
+	  if (SYMBOLP (value))
+	    value = SYMBOL_NAME (value);
 	  /* Don't check for valid color names here because it depends
 	     on the frame (display) whether the color will be valid
 	     when the face is realized.  */
@@ -3720,9 +3729,15 @@ FRAME 0 means change the face on all frames, and change the default
 	  /* Changed font-related attributes of the `default' face are
 	     reflected in changed `font' frame parameters.  */
 	  if (FRAMEP (frame)
-	      && (prop_index || EQ (attr, QCfont))
-	      && lface_fully_specified_p (XVECTOR (lface)->contents))
-	    set_font_frame_param (frame, lface);
+	      && (prop_index || EQ (attr, QCfont)))
+	    {
+	      /* Use AREF for Scheme vector compatibility */
+	      Lisp_Object lface_attrs[LFACE_VECTOR_SIZE];
+	      for (int i = 0; i < LFACE_VECTOR_SIZE; i++)
+		lface_attrs[i] = AREF (lface, i);
+	      if (lface_fully_specified_p (lface_attrs))
+		set_font_frame_param (frame, lface);
+	    }
 	  else
 #endif /* HAVE_WINDOW_SYSTEM */
 
@@ -4313,7 +4328,9 @@ Default face attributes override any local face attributes.  */)
 	  memcpy (attrs, oldface->lface, sizeof attrs);
 
 	  merge_face_vectors (NULL, f, lvec, attrs, 0);
-	  vcopy (local_lface, 0, attrs, LFACE_VECTOR_SIZE);
+	  /* Use ASET instead of vcopy for Scheme vector compatibility */
+	  for (i = 0; i < LFACE_VECTOR_SIZE; i++)
+	    ASET (local_lface, i, attrs[i]);
 	  newface = realize_face (c, lvec, DEFAULT_FACE_ID);
 
 	  if ((! UNSPECIFIEDP (gvec[LFACE_FAMILY_INDEX])
@@ -6022,10 +6039,13 @@ realize_default_face (struct frame *f)
   if (UNSPECIFIEDP (LFACE_STIPPLE (lface)))
     ASET (lface, LFACE_STIPPLE_INDEX, Qnil);
 
+  /* Use AREF to copy lface to attrs for Scheme vector compatibility */
+  for (int i = 0; i < LFACE_VECTOR_SIZE; i++)
+    attrs[i] = AREF (lface, i);
+
   /* Realize the face; it must be fully-specified now.  */
-  eassert (lface_fully_specified_p (XVECTOR (lface)->contents));
+  eassert (lface_fully_specified_p (attrs));
   check_lface (lface);
-  memcpy (attrs, xvector_contents (lface), sizeof attrs);
   /* In some cases, realize_face below can call Lisp, which could
      trigger redisplay.  But we are in the process of realizing
      the default face, and therefore are not ready to do display.  */
