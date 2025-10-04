@@ -331,16 +331,54 @@
                                                  (lp (cdr f) (cdr v))
                                                  #f))))))))))
 
+(define (sanitize-uninterned-symbols expr replacements)
+  "Recursively replace uninterned symbols with interned equivalents.
+REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
+  (cond
+   ((symbol? expr)
+    (let ((replacement (assq expr replacements)))
+      (if replacement
+          (cdr replacement)
+          expr)))
+   ((pair? expr)
+    (cons (sanitize-uninterned-symbols (car expr) replacements)
+          (sanitize-uninterned-symbols (cdr expr) replacements)))
+   (else expr)))
+
+(define (find-uninterned-symbols expr)
+  "Find all uninterned symbols in an expression and create interned replacements."
+  (let ((uninterned '()))
+    (let walk ((e expr))
+      (cond
+       ((symbol? e)
+        (when (and (not ((@ (guile) symbol-interned?) e))
+                   (not (assq e uninterned)))
+          (set! uninterned (cons (cons e (string->symbol (symbol->string e)))
+                                uninterned))))
+       ((pair? e)
+        (walk (car e))
+        (walk (cdr e)))))
+    uninterned))
+
 (define (compile-lambda loc meta args body)
-  (receive (valid? req-ids opts rest-id)
-           (parse-lambda-list args)
-    (if valid?
+  ;; Find and replace all uninterned symbols in the lambda expression
+  ;; This is needed because Guile can't serialize uninterned symbols to .go files
+  (let* ((full-expr (cons args body))
+         (replacements (find-uninterned-symbols full-expr))
+         (sanitized (if (null? replacements)
+                        full-expr
+                        (sanitize-uninterned-symbols full-expr replacements)))
+         (sanitized-args (car sanitized))
+         (sanitized-body (cdr sanitized)))
+    (receive (valid? req-ids opts rest-id)
+             (parse-lambda-list sanitized-args)
+      (if valid?
         (let* ((all-ids (append req-ids
                                 (and opts (map car opts))
                                 (or (and=> rest-id list) '())))
                (all-vars (map (lambda (ignore) (gensym)) all-ids)))
           (let*-values (((decls intspec doc forms)
-                         (parse-lambda-body body))
+                         (parse-lambda-body sanitized-body))
                         ((lexical dynamic)
                          (partition
                           (compose (cut bind-lexically? <> decls)
@@ -396,7 +434,7 @@
                                          rest-id
                                          all-vars
                                          full-body)))))))))
-        (report-error "invalid function" `(lambda ,args ,@body)))))
+        (report-error "invalid function" `(lambda ,sanitized-args ,@sanitized-body))))))
 
 ;;; Handle macro and special operator bindings.
 
@@ -884,12 +922,15 @@
         ((and (> (string-length sym-name) 0)
               (char=? (string-ref sym-name 0) #\:))
          (make-const loc sym))
-        ;; Uninterned symbols need special handling - recreate at runtime
+        ;; Uninterned symbols: check if bound in lexical environment first
         ((not ((@ (guile) symbol-interned?) sym))
-         (format #t "DEBUG: compile-symbol handling uninterned: ~s~%" sym)
-         (make-call loc
-                    (make-module-ref loc runtime 'make-symbol #t)
-                    (list (make-const loc sym-name))))
+         (let ((binding (get-lexical-binding (fluid-ref bindings-data) sym)))
+           (if binding
+               ;; If bound, treat as a variable reference
+               (reference-variable loc sym)
+               ;; Otherwise, this is likely a quoted/constant uninterned symbol
+               ;; We can't serialize it, so intern it
+               (make-const loc (string->symbol sym-name)))))
         ;; Regular symbols are variable references
         (else
          (reference-variable loc sym)))))))
