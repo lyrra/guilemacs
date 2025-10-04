@@ -1623,8 +1623,21 @@ With one argument, just copy STRING (with properties, if any).  */)
     }
   else
     {
-      /* C vectorlike - can use direct pointer */
-      res = Fvector (ito - ifrom, aref_addr (string, ifrom));
+      /* Vectorlike - use element-by-element copy to be safe */
+      ptrdiff_t newlen = ito - ifrom;
+      Lisp_Object *addr = aref_addr (string, ifrom);
+      if (addr)
+        {
+          /* C vectorlike - can use direct pointer */
+          res = Fvector (newlen, addr);
+        }
+      else
+        {
+          /* Fallback for other vectorlikes - copy element by element */
+          res = scm_c_make_vector (newlen, Qnil);
+          for (ptrdiff_t i = 0; i < newlen; i++)
+            scm_c_vector_set_x (res, i, AREF (string, ifrom + i));
+        }
     }
 
   return res;

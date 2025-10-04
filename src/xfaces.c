@@ -2099,8 +2099,11 @@ get_lface_attributes_no_remap (struct frame *f, Lisp_Object face_name,
   lface = lface_from_face_name_no_resolve (f, face_name, signal_p);
 
   if (! NILP (lface))
-    memcpy (attrs, xvector_contents (lface),
-	    LFACE_VECTOR_SIZE * sizeof *attrs);
+    {
+      /* Use AREF for element-by-element copy to handle both C vectorlikes and Scheme vectors */
+      for (int i = 0; i < LFACE_VECTOR_SIZE; i++)
+        attrs[i] = AREF (lface, i);
+    }
 
   return !NILP (lface);
 }
@@ -4269,8 +4272,17 @@ Default face attributes override any local face attributes.  */)
      the local frame is defined from default specs in `face-defface-spec'
      and those should be overridden by global settings.  Hence the strange
      "global before local" priority.  */
-  lvec = XVECTOR (local_lface)->contents;
-  gvec = XVECTOR (global_lface)->contents;
+  /* Use AREF instead of direct pointer access for Scheme vector compatibility */
+  Lisp_Object gvec_array[LFACE_VECTOR_SIZE];
+  Lisp_Object lvec_array[LFACE_VECTOR_SIZE];
+  for (i = 0; i < LFACE_VECTOR_SIZE; ++i)
+    {
+      gvec_array[i] = AREF (global_lface, i);
+      lvec_array[i] = AREF (local_lface, i);
+    }
+  gvec = gvec_array;
+  lvec = lvec_array;
+
   for (i = 1; i < LFACE_VECTOR_SIZE; ++i)
     if (IGNORE_DEFFACE_P (gvec[i]))
       ASET (local_lface, i, Qunspecified);
@@ -4501,7 +4513,11 @@ hash_string_case_insensitive (Lisp_Object string)
 {
   const unsigned char *s;
   uintptr_t hash = 0;
-  eassert (STRINGP (string));
+
+  /* Handle non-string values (can be Qnil, Qunspecified, NULL, etc.) */
+  if (!string || !STRINGP (string))
+    return (uintptr_t) string;  /* Use pointer value as hash */
+
   for (s = SDATA (string); *s; ++s)
     hash = (hash << 1) ^ c_tolower (*s);
   return hash;
@@ -6065,6 +6081,10 @@ realize_named_face (struct frame *f, Lisp_Object symbol, int id)
       lface = Finternal_make_lisp_face (symbol, frame);
     }
 
+
+  /* Initialize symbol_attrs to avoid garbage values */
+  for (int i = 0; i < LFACE_VECTOR_SIZE; i++)
+    symbol_attrs[i] = Qunspecified;
 
   get_lface_attributes_no_remap (f, symbol, symbol_attrs, true);
 
