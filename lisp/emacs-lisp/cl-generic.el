@@ -404,10 +404,10 @@ the specializer used will be the one returned by BODY."
       (pcase (macroexpand fun macroenv)
         (`#'(lambda ,args . ,body)
          (let* ((parsed-body (macroexp-parse-body body))
-                (nm (make-symbol "cl--nm"))
-                (arglist (make-symbol "cl--args"))
-                (cnm (make-symbol "cl--cnm"))
-                (nmp (make-symbol "cl--nmp"))
+                (nm (intern-gensym "cl--nm"))
+                (arglist (intern-gensym "cl--args"))
+                (cnm (intern-gensym "cl--cnm"))
+                (nmp (intern-gensym "cl--nmp"))
                 (nbody (macroexpand-all
                         `(cl-flet ((cl-call-next-method ,cnm)
                                    (cl-next-method-p ,nmp))
@@ -739,7 +739,7 @@ You might need to add: %S"
         (setq fixedargs nil)
         (setq dispatch-idx 0))
       (dotimes (i dispatch-idx)
-        (push (make-symbol (format "arg%d" (- dispatch-idx i 1))) fixedargs))
+        (push (intern-gensym (format "arg%d" (- dispatch-idx i 1))) fixedargs))
       ;; FIXME: For generic functions with a single method (or with 2 methods,
       ;; one of which always matches), using a tagcode + hash-table is
       ;; overkill: better just use a `cl-typep' test.

@@ -115,13 +115,19 @@
 (define (set-lexical-binding-mode x)
   (set! lexical-binding x))
 
-(define make-symbol (@ (guile) make-symbol))
-(define unbound (make-symbol "unbound"))
-
+;; Define intern-gensym first - creates interned unique symbols
 (define %intern-gensym-counter 0)
 (define (intern-gensym prefix)
   (set! %intern-gensym-counter (+ 1 %intern-gensym-counter))
   (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym-counter)))))
+
+;; make-symbol should create interned symbols to avoid Guile serialization errors
+;; Uninterned symbols cannot be saved to .go files
+(define (make-symbol name)
+  (intern-gensym name))
+
+;; unbound marker - now using interned symbol
+(define unbound (make-symbol "unbound"))
 
 (define dynamic? vector?)
 (define (make-dynamic)

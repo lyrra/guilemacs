@@ -475,6 +475,9 @@ This function returns a timer object which you can use in `cancel-timer'."
 (defvar with-timeout-timers nil
   "List of all timers used by currently pending `with-timeout' calls.")
 
+(defvar with-timeout--gensym-counter 0
+  "Internal counter used to generate unique tags for `with-timeout'.")
+
 (defmacro with-timeout (list &rest body)
   "Run BODY, but if it doesn't finish in SECONDS seconds, give up.
 If we give up, we run the TIMEOUT-FORMS and return the value of the last one.
@@ -484,9 +487,15 @@ if the program loops without waiting in any way, the timeout will not
 be detected.
 \n(fn (SECONDS TIMEOUT-FORMS...) BODY)"
   (declare (indent 1) (debug ((form body) body)))
-  (let ((seconds (car list))
-	(timeout-forms (cdr list))
-        (timeout (make-symbol "timeout")))
+  (let* ((seconds (car list))
+	 (timeout-forms (cdr list))
+         (timeout
+          (let* ((n (if (boundp 'with-timeout--gensym-counter)
+                        with-timeout--gensym-counter
+                      0))
+                 (tag (intern (format "with-timeout--tag-%d" n))))
+            (setq with-timeout--gensym-counter (1+ n))
+            tag)))
     `(let ((-with-timeout-value-
             (catch ',timeout
               (let* ((-with-timeout-timer-

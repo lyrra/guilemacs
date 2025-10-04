@@ -102,8 +102,6 @@
   (defsubst cdr (list)
     (declare (lexical list))
     (if list (%funcall (@ (guile) cdr) list) nil))
-  (defun make-symbol (name)
-    (%funcall (@ (guile) make-symbol) name))
   (defvar %gensym-counter 0)
   (defun intern-gensym (prefix)
     (setq %gensym-counter (1+ %gensym-counter))
@@ -113,6 +111,9 @@
                         (%funcall (@ (guile) number->string) %gensym-counter))))
   (defun gensym (&optional prefix)
     (intern-gensym (if prefix prefix "g")))
+  ;; make-symbol should create interned symbols to avoid Guile serialization errors
+  (defun make-symbol (name)
+    (intern-gensym name))
   (defun signal (error-symbol data)
     (%funcall (@ (guile) throw) 'elisp-condition error-symbol data)))
 

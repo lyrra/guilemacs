@@ -54,6 +54,15 @@
             compile-%funcall
             compile-%set-lexical-binding-mode))
 
+;; Override Guile's gensym to create interned symbols (avoids .go serialization errors)
+(define gensym
+  (let ((counter 0))
+    (lambda args
+      (set! counter (+ counter 1))
+      (string->symbol (string-append
+                       (if (null? args) "g" (car args))
+                       (number->string counter))))))
+
 ;;; Certain common parameters (like the bindings data structure or
 ;;; compiler options) are not always passed around but accessed using
 ;;; fluids to simulate dynamic binding (hey, this is about elisp).
@@ -474,7 +483,7 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
     (let ((interned? ((@ (guile) symbol-interned?) expr)))
       (if interned?
           expr  ; Keep interned symbols
-          (gensym (symbol->string expr)))))
+          (string->symbol (symbol->string expr)))))  ; Convert to interned symbol
    ((pair? expr)
     ;; Recursively process pairs
     (cons (replace-uninterned-symbols (car expr))
@@ -953,12 +962,25 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
       (compile-expr-1 expr)))
 
 (define (compile-tree-il expr env opts)
-  (let ((tree-il (with-fluids ((bindings-data (make-bindings))
-                               (toplevel? #t)
-                               (compile-time-too? #f))
-                   (compile-expr-1 expr)))
-        (d-p-f 0 ;(get-debug-print-flag)
-               )) ; FIX: cant use %debug-print-flag directly
+  ;; Sanitize uninterned symbols before compilation to avoid Guile serialization errors
+  (let* ((replacements (find-uninterned-symbols expr))
+         (sanitized-expr (if (null? replacements)
+                             expr
+                             (begin
+                               (format #t "[sanitize] Found ~a uninterned symbols in expr, replacing...~%" (length replacements))
+                               (for-each (lambda (pair)
+                                          (let ((sym-name (symbol->string (car pair))))
+                                            (when (string-contains sym-name "--cl-")
+                                              (format #t "  *** Found --cl- symbol: ~S -> ~S~%" (car pair) (cdr pair)))
+                                            (format #t "  ~S -> ~S~%" (car pair) (cdr pair))))
+                                        replacements)
+                               (sanitize-uninterned-symbols expr replacements))))
+         (tree-il (with-fluids ((bindings-data (make-bindings))
+                                (toplevel? #t)
+                                (compile-time-too? #f))
+                    (compile-expr-1 sanitized-expr)))
+         (d-p-f 0 ;(get-debug-print-flag)
+                )) ; FIX: cant use %debug-print-flag directly
     (when (and d-p-f (logbit? 16 d-p-f))
       (format #t "---------------------------------------------------------------~%")
       (format #t "expr: ~s~%" expr)
