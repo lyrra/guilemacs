@@ -4420,14 +4420,17 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 (set-symbol-function! 'emacs-load fload-bridge)
 
-;; Make Guile's make-symbol available to elisp code
-(define make-symbol (@ (guile) make-symbol))
-(set-symbol-function! 'make-symbol make-symbol)
-
+;; Define intern-gensym first - creates interned unique symbols
 (define %intern-gensym 0)
 (define (intern-gensym prefix)
   (set! %intern-gensym (+ 1 %intern-gensym))
   (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym)))))
+
+;; Make make-symbol create interned symbols (not uninterned) to avoid Guile serialization errors
+;; Uninterned symbols cannot be saved to .go files
+(define (make-symbol name)
+  (intern-gensym name))
+(set-symbol-function! 'make-symbol make-symbol)
 
 (set-symbol-function! 'intern-gensym intern-gensym)
 
