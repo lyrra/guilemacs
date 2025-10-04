@@ -297,6 +297,14 @@ list of slot properties.  The currently known properties are the following:
 (defmacro oclosure--define-functions (name copiers)
   (let* ((class (cl--find-class name))
          (slotdescs (oclosure--class-slots class)))
+    (when (and (boundp 'cl--bootstrap-debug-log) cl--bootstrap-debug-log)
+      (message "[oclosure-debug] define-functions for %S slots=%S" name slotdescs)
+      (let ((i -1))
+        (mapc (lambda (desc)
+                (setq i (1+ i))
+                (message "[oclosure-debug]   slot[%d]=%S type=%S" i desc
+                         (condition-case nil (type-of desc) (error :no-type))))
+              (append slotdescs nil))))
     `(progn
      ,@(let ((i -1))
            (mapcar (lambda (desc)

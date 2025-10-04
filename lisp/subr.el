@@ -2332,10 +2332,12 @@ FUN is then called once."
   (declare (debug (form sexp def-body)))
   ;; We need those two gensyms because CL's lexical scoping is not available
   ;; for function arguments :-(
-  (let ((funs (make-symbol "funs"))
-        (global (make-symbol "global"))
-        (argssym (make-symbol "args"))
-        (runrestofhook (make-symbol "runrestofhook")))
+  ;; Note: Using gensym for Guilemacs compatibility, but need to ensure these are
+  ;; only used at macro-expansion time, not embedded in compiled code
+  (let ((funs (intern (format "subr--whook-funs-%d" (random))))
+        (global (intern (format "subr--whook-global-%d" (random))))
+        (argssym (intern (format "subr--whook-args-%d" (random))))
+        (runrestofhook (intern (format "subr--whook-runrest-%d" (random)))))
     ;; Since the hook is a wrapper, the loop has to be done via
     ;; recursion: a given hook function will call its parameter in order to
     ;; continue looping.
@@ -2755,7 +2757,7 @@ If all bindings are non-nil, eval BODY and repeat.
 
 The variable list SPEC is the same as in `if-let*'."
   (declare (indent 1) (debug if-let))
-  (let ((done (gensym "done")))
+  (let ((done (intern-gensym "done")))
     `(catch ',done
        (while t
          ;; This is `if-let*', not `if-let', deliberately, despite the
