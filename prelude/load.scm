@@ -4347,6 +4347,17 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 (set! %load-path (cons "./lisp" %load-path))
 (set! %load-path (cons "../lisp/emacs-lisp" %load-path))
 (set! %load-path (cons "./lisp/emacs-lisp" %load-path))
+;; Add subdirectories that loadup.el adds to load-path (when dump-mode is nil)
+(set! %load-path (cons "../lisp/progmodes" %load-path))
+(set! %load-path (cons "./lisp/progmodes" %load-path))
+(set! %load-path (cons "../lisp/language" %load-path))
+(set! %load-path (cons "./lisp/language" %load-path))
+(set! %load-path (cons "../lisp/international" %load-path))
+(set! %load-path (cons "./lisp/international" %load-path))
+(set! %load-path (cons "../lisp/textmodes" %load-path))
+(set! %load-path (cons "./lisp/textmodes" %load-path))
+(set! %load-path (cons "../lisp/vc" %load-path))
+(set! %load-path (cons "./lisp/vc" %load-path))
 (set! %load-extensions (cons ".el" %load-extensions))
 
 ;; Bridge function that reuses existing Fload Scheme migrations

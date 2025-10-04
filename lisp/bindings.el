@@ -849,11 +849,11 @@ okay.  See `mode-line-format'.")
 ;; Don't use purecopy here--some people want to change these strings,
 ;; also string properties are lost when put into pure space.
 (setq minor-mode-alist
-      '((abbrev-mode " Abbrev")
-        (overwrite-mode overwrite-mode)
-        (auto-fill-function " Fill")
-        ;; not really a minor mode...
-        (defining-kbd-macro mode-line-defining-kbd-macro)))
+      (list (list 'abbrev-mode " Abbrev")
+            (list 'overwrite-mode 'overwrite-mode)
+            (list 'auto-fill-function " Fill")
+            ;; not really a minor mode...
+            (list 'defining-kbd-macro 'mode-line-defining-kbd-macro)))
 
 ;; These variables are used by autoloadable packages.
 ;; They are defined here so that they do not get overridden
