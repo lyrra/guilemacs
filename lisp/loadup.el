@@ -256,6 +256,8 @@ that the search has reached."
 (load "help")
 (load "emacs-lisp/cl-generic")
 (load "simple")
+;; Load radix-tree before help-fns because help-fns uses radix-tree-leaf pcase pattern
+(load "emacs-lisp/radix-tree")
 (load "help-fns")
 
 (load "faces2")

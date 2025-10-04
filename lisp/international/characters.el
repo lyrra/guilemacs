@@ -1724,7 +1724,7 @@ Setup `char-width-table' appropriate for non-CJK language environment."
     ;; While dumping, we can't use require, and international is not
     ;; in load-path.
     (progn
-      (load "international/charscript")
+      (load "international/charscript.el")
       '(load "international/emoji-zwj")) ; FIX-guilemacs: still needed (remark)
   (progn
     (require 'charscript)
