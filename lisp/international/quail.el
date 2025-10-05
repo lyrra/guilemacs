@@ -261,42 +261,9 @@ installed together with Emacs.")))
   (message nil))
 
 (defvar quail-translation-keymap
-  (let ((map (make-keymap))
-	(i 0))
-; FIX-guilemacs: Key sequence C-@ 0 6 starts with non-prefix key C-@
-;    (while (< i ?\ )
-;      (define-key map (char-to-string i) 'quail-other-command)
-;      (setq i (1+ i)))
-;    (while (< i 127)
-;      (define-key map (char-to-string i) 'quail-self-insert-command)
-;      (setq i (1+ i)))
-;    (setq i 128)
-;    (while (< i 256)
-;      (define-key map (vector i) 'quail-self-insert-command)
-;      (setq i (1+ i)))
-    (define-key map (kbd "DEL") 'quail-delete-last-char)
-    (define-key map (kbd "C-f") 'quail-next-translation)
-    (define-key map (kbd "C-b") 'quail-prev-translation)
-    (define-key map (kbd "C-n") 'quail-next-translation-block)
-    (define-key map (kbd "C-p") 'quail-prev-translation-block)
-    (define-key map [right] 'quail-next-translation)
-    (define-key map [left] 'quail-prev-translation)
-    (define-key map [down] 'quail-next-translation-block)
-    (define-key map [up] 'quail-prev-translation-block)
-    (define-key map (kbd "TAB") 'quail-completion)
-    (define-key map (kbd "C-@") 'quail-select-current)
-    ;; Following simple.el, Enter key on numeric keypad selects the
-    ;; current translation just like `C-SPC', and `mouse-2' chooses
-    ;; any completion visible in the *Quail Completions* buffer.
-    (define-key map [kp-enter] 'quail-select-current)
-    (define-key map [mouse-2] 'quail-mouse-choose-completion)
-    (define-key map [down-mouse-2] nil)
-    (define-key map (kbd "C-h") 'quail-translation-help)
-    (define-key map [?\x00] 'quail-select-current)
-    (define-key map [tab] 'quail-completion)
-    (define-key map [delete] 'quail-delete-last-char)
-    (define-key map [backspace] 'quail-delete-last-char)
-    map)
+  ;; FIX-guilemacs: Temporarily use empty keymap to avoid ESC-related errors during bootstrap
+  ;; TODO: Re-enable keymap setup once kbd function is fixed
+  (make-keymap)
   "Keymap used processing translation in complex Quail modes.
 Only a few especially complex input methods use this map;
 most use `quail-simple-translation-keymap' instead.
@@ -333,50 +300,17 @@ of ten.")
     (setq l (cdr l))))
 
 (defvar quail-simple-translation-keymap
-  (let ((map (make-keymap))
-	(i 0))
-    (while (< i ?\ )
-      (define-key map (char-to-string i) 'quail-other-command)
-      (setq i (1+ i)))
-    (while (< i 127)
-      (define-key map (char-to-string i) 'quail-self-insert-command)
-      (setq i (1+ i)))
-    (setq i 128)
-    (while (< i 256)
-      (define-key map (vector i) 'quail-self-insert-command)
-      (setq i (1+ i)))
-    (define-key map (kbd "DEL") 'quail-delete-last-char)
-    (define-key map [delete] 'quail-delete-last-char)
-    (define-key map [backspace] 'quail-delete-last-char)
-    ;;(let ((meta-map (make-sparse-keymap)))
-    ;;(define-key map (char-to-string meta-prefix-char) meta-map)
-    ;;(define-key map [escape] meta-map))
-    map)
+  ;; FIX-guilemacs: Temporarily use empty keymap to avoid ESC-related errors during bootstrap
+  ;; TODO: Re-enable keymap setup once kbd function is fixed
+  (make-keymap)
   "Keymap used while processing translation in simple Quail modes.
 A few especially complex input methods use `quail-translation-keymap' instead.
 This map is activated while translation region is active.")
 
 (defvar quail-conversion-keymap
-  (let ((map (make-keymap))
-	(i ?\ ))
-    (while (< i 127)
-      (define-key map (char-to-string i) 'quail-self-insert-command)
-      (setq i (1+ i)))
-    (setq i 128)
-    (while (< i 256)
-      (define-key map (vector i) 'quail-self-insert-command)
-      (setq i (1+ i)))
-    (define-key map "\x02" 'quail-conversion-backward-char)
-    (define-key map "\x06" 'quail-conversion-forward-char)
-    (define-key map "\x01" 'quail-conversion-beginning-of-region)
-    (define-key map "\x05" 'quail-conversion-end-of-region)
-    (define-key map "\x04" 'quail-conversion-delete-char)
-    (define-key map "\x0b" 'quail-conversion-delete-tail)
-    (define-key map "\x08" 'quail-translation-help)
-    (define-key map "\x7f" 'quail-conversion-backward-delete-char)
-    (define-key map [delete] 'quail-conversion-backward-delete-char)
-    (define-key map [backspace] 'quail-conversion-backward-delete-char)
-    map)
+  ;; FIX-guilemacs: Temporarily use empty keymap to avoid ESC-related errors during bootstrap
+  ;; TODO: Re-enable keymap setup once kbd function is fixed
+  (make-keymap)
   "Keymap used for processing conversion in Quail mode.
 This map is activated while conversion region is active but translation
 region is not active.")
