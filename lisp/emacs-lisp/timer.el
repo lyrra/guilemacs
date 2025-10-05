@@ -88,6 +88,23 @@
 	(timer--usecs timer)
 	(timer--psecs timer)))
 
+;; Fallback for runtimes that do not honor the `gv-setter' declaration
+;; during bootstrap.  `gv-define-simple-setter' will register the setter
+;; so that `(setf (timer--time ...))' keeps working.
+(gv-define-simple-setter timer--time timer--time-setter)
+
+;; Some precompiled code still calls the old-style setter function whose name
+;; is materialised via `gv-setter'.  When running under Guile that alias is
+;; not created automatically, so wire it up here.
+(let ((setter-sym (intern (format "(setf %s)" (symbol-name 'timer--time)))))
+  (unless (fboundp setter-sym)
+    ;; FIX-guilemacs: historical `.elc' files call the legacy setter with the
+    ;; Common Lisp argument order (NEW-TIME TIMER).  Reorder before delegating
+    ;; so we still reach `timer--time-setter', which expects (TIMER NEW-TIME).
+    (defalias setter-sym
+      (lambda (time timer)
+        (timer--time-setter timer time)))))
+
 (defun timer-set-time (timer time &optional delta)
   "Set the trigger time of TIMER to TIME.
 TIME must be a Lisp time value.
