@@ -28,6 +28,19 @@
              (system base language)      ; current-language parameter
              (ice-9 ftw))                ; file ops, optional
 
+;; Map Emacs-specific encodings to Guile-compatible ones
+;; Guile doesn't recognize "UTF-8-EMACS" but it's essentially UTF-8
+(let ((original-set-port-encoding! set-port-encoding!))
+  (set! set-port-encoding!
+        (lambda (port encoding)
+          "Wrapper for set-port-encoding! that maps Emacs encodings to Guile encodings"
+          (let ((mapped-encoding
+                 (cond
+                  ((and (string? encoding) (string-ci=? encoding "UTF-8-EMACS")) "UTF-8")
+                  ((and (string? encoding) (string-ci=? encoding "utf-8-emacs")) "UTF-8")
+                  (else encoding))))
+            (original-set-port-encoding! port mapped-encoding)))))
+
 
 (set-current-module (resolve-module '(language elisp runtime)))
 (define %prelude-directory (dirname %prelude-filename))

@@ -1412,6 +1412,14 @@ is treated as a character."
   :mnemonic ?U
   :charset-list '(emacs))
 
+;; FIX-guilemacs: our Guile-based runtime cannot open iconv descriptors for
+;; the unconventional "UTF-8-EMACS" name.  We map the legacy variants back to
+;; plain UTF-8 so generated files still use a working encoder during bootstrap.
+(define-coding-system-alias 'utf-8-emacs 'utf-8)
+(define-coding-system-alias 'utf-8-emacs-unix 'utf-8-unix)
+(define-coding-system-alias 'utf-8-emacs-dos 'utf-8-dos)
+(define-coding-system-alias 'utf-8-emacs-mac 'utf-8-mac)
+
 ;; The encoding used internally.  This encoding is meant to be able to save
 ;; any multibyte buffer without losing information.  It can change between
 ;; Emacs releases, tho, so should only be used for internal files.
