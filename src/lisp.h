@@ -1287,11 +1287,17 @@ STRING_SET_MULTIBYTE (Lisp_Object str)
 INLINE unsigned char *
 SDATA (Lisp_Object string)
 {
+  /* FIX-guilemacs: Handle non-string values gracefully */
+  if (!string || !scm_is_string (string))
+    return (unsigned char *) "";  /* Return empty string for non-strings */
   return scm_to_utf8_string (string);
 }
 INLINE char *
 SSDATA (Lisp_Object string)
 {
+  /* FIX-guilemacs: Handle non-string values gracefully */
+  if (!string || !scm_is_string (string))
+    return (char *) "";  /* Return empty string for non-strings */
   return scm_to_utf8_string (string);
 }
 INLINE scm_t_wchar
