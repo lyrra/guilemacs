@@ -2090,8 +2090,10 @@ guile_reader_error_handler (void *data, SCM key, SCM args)
   /* Convert Guile exception to Emacs error */
   if (scm_is_eq (key, scm_from_latin1_symbol ("read-error")))
     {
-      /* Extract error message from Guile exception */
-      SCM msg = scm_simple_format (SCM_BOOL_F, scm_cadr (args), scm_caddr (args));
+      /* Extract error message from Guile exception
+         The args list contains: (port message-template format-args extra-data)
+         We just use object->string on the whole args to avoid format interpretation issues */
+      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
       char *error_msg = scm_to_utf8_string (msg);
 
       /* Signal Emacs error with Guile's error message */
@@ -2640,7 +2642,7 @@ read_char_literal (Lisp_Object readcharfun)
 static Lisp_Object
 read_string_literal (Lisp_Object readcharfun)
 {
-  /* collect the string and let Guile parse it */
+  /* Build the string by processing escape sequences in C */
   char stackbuf[1024];
   char *read_buffer = stackbuf;
   ptrdiff_t read_buffer_size = sizeof stackbuf;
@@ -2650,13 +2652,10 @@ read_string_literal (Lisp_Object readcharfun)
 
   dynwind_begin ();
 
-  /* Start with opening quote */
-  *p++ = '"';
-
   int ch;
   while ((ch = READCHAR) >= 0 && ch != '"')
     {
-      if (end - p < MAX_MULTIBYTE_LENGTH + 2) /* +2 for potential escape and closing quote */
+      if (end - p < MAX_MULTIBYTE_LENGTH + 1)
 	{
 	  ptrdiff_t offset = p - read_buffer;
 	  read_buffer = grow_read_buffer (read_buffer, offset,
@@ -2665,17 +2664,28 @@ read_string_literal (Lisp_Object readcharfun)
 	  end = read_buffer + read_buffer_size;
 	}
 
-      /* Preserve backslashes and escaped quotes for Guile to handle */
+      /* Handle escape sequences */
       if (ch == '\\')
 	{
-	  *p++ = ch;
 	  ch = READCHAR;
 	  if (ch < 0)
 	    end_of_file_error ();
+
+	  /* Process Elisp escape sequences */
+	  ch = read_char_escape (readcharfun, ch);
 	}
 
-      /* Store the character */
-      if (ch < 128)
+      /* Store the character (handle modifiers if present) */
+      int modifiers = ch & CHAR_MODIFIER_MASK;
+      ch &= ~CHAR_MODIFIER_MASK;
+
+      /* For strings, meta modifier sets bit 7, not bit 27 */
+      if (modifiers & CHAR_META)
+	ch |= 0x80;
+
+      if (CHAR_BYTE8_P (ch))
+	*p++ = CHAR_TO_BYTE8 (ch);
+      else if (ch < 128)
 	*p++ = ch;
       else
 	p += CHAR_STRING (ch, (unsigned char *) p);
@@ -2684,19 +2694,10 @@ read_string_literal (Lisp_Object readcharfun)
   if (ch < 0)
     end_of_file_error ();
 
-  /* Add closing quote */
-  *p++ = '"';
-  *p = '\0';
-
-  /* Let Guile parse the complete string literal */
-  SCM str_scm = scm_from_locale_string (read_buffer);
-  SCM result = scm_call_with_input_string (str_scm,
-                                           scm_c_public_ref ("guile", "read"));
+  /* Create a Guile string from the processed buffer */
+  Lisp_Object result = scm_from_utf8_stringn (read_buffer, p - read_buffer);
 
   dynwind_end ();
-
-  if (!scm_is_string (result))
-    error ("Invalid string literal");
 
   return result;
 }
@@ -2769,12 +2770,44 @@ vector_from_rev_list (Lisp_Object elems)
 {
   ptrdiff_t size = list_length (elems);
   Lisp_Object obj = make_nil_vector (size);
+
+  /* FIX-guilemacs: Safety check for vector validity */
+  if (!obj || !VECTORP (obj))
+    return obj;
+
   Lisp_Object *vec = XVECTOR (obj)->contents;
+
+  /* FIX-guilemacs: Check if vec is valid */
+  if (!vec)
+    return obj;
+
   for (ptrdiff_t i = size - 1; i >= 0; i--)
     {
-      vec[i] = XCAR (elems);
-      Lisp_Object next = XCDR (elems);
-      elems = next;
+      /* FIX-guilemacs: Bounds check */
+      if (i < 0 || i >= size)
+        break;
+
+      /* FIX-guilemacs: Safety check for invalid list elements */
+      if (!elems || !CONSP (elems))
+        {
+          /* List ended prematurely or became invalid, fill rest with nil */
+          for (ptrdiff_t j = i; j >= 0; j--)
+            {
+              if (j >= 0 && j < size)
+                vec[j] = Qnil;
+            }
+          break;
+        }
+      /* FIX-guilemacs: Use safe access with additional error check */
+      Lisp_Object car_val = Qnil;
+      Lisp_Object cdr_val = Qnil;
+      if (scm_is_pair (elems))
+        {
+          car_val = scm_car (elems);
+          cdr_val = scm_cdr (elems);
+        }
+      vec[i] = car_val;
+      elems = cdr_val;
     }
   return obj;
 }
