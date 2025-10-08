@@ -534,7 +534,8 @@ See `defclass' for more information."
 If SKIPNIL is non-nil, then if default value is nil return t instead."
   (let ((value (cl--slot-descriptor-initform slot))
         (spec (cl--slot-descriptor-type slot)))
-    (if (not (or (not (macroexp-const-p value))
+    (if (not (or (eq value eieio--unbound-form)
+                 (not (macroexp-const-p value))
                  eieio-skip-typecheck
                  (and skipnil (null value))
                  (eieio--perform-slot-validation spec (eval value t))))
