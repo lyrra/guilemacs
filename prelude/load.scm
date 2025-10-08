@@ -4371,6 +4371,8 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 (set! %load-path (cons "./lisp/textmodes" %load-path))
 (set! %load-path (cons "../lisp/vc" %load-path))
 (set! %load-path (cons "./lisp/vc" %load-path))
+(set! %load-path (cons "../lisp/mail" %load-path))
+
 (set! %load-extensions (cons ".el" %load-extensions))
 
 ;; Bridge function that reuses existing Fload Scheme migrations
