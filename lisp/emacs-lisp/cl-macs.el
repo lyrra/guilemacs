@@ -585,7 +585,7 @@ its argument list allows full Common Lisp conventions."
 	  (laterarg nil) (exactarg nil) minarg)
       (or num (setq num 0))
       (setq restarg (if (listp (cadr restarg))
-                        (make-symbol "--cl-rest--")
+                        (intern-gensym "--cl-rest--")
                       (cadr restarg)))
       (push (list restarg expr) cl--bind-lets)
       (if (eq (car args) '&whole)
