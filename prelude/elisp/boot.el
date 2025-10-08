@@ -728,7 +728,7 @@
       value)))
 
 (defun prin1-to-string (object)
-  (format* nil "~S" object))
+  (funcall (@ (guile) object->string) object))
 
 ;; Random number generation
 
