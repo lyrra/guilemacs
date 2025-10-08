@@ -652,6 +652,8 @@ Now gdb can hit the real error:
   over a org-mode link, after around 2 seconds, emacs craches
 
 * todo
+** 20251006 remove xwidgets?
+see https://lists.gnu.org/archive/html/emacs-devel/2025-02/msg00295.html
 ** 20241215 c-x not working :bug:
   Stopped working somewhere around r360.
   - symptoms:
