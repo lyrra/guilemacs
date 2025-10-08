@@ -278,8 +278,10 @@ looking_at_1 (Lisp_Object string, bool posix, bool modify_data)
 
   /* This is so set_image_of_range_1 in regex-emacs.c can find the EQV
      table.  */
-  set_char_table_extras (BVAR (current_buffer, case_canon_table), 2,
-			 BVAR (current_buffer, case_eqv_table));
+  Lisp_Object canon_table = BVAR (current_buffer, case_canon_table);
+  if (!NILP (canon_table))
+    set_char_table_extras (canon_table, 2,
+			   BVAR (current_buffer, case_eqv_table));
 
   CHECK_STRING (string);
 
@@ -404,8 +406,10 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 
   /* This is so set_image_of_range_1 in regex-emacs.c can find the EQV
      table.  */
-  set_char_table_extras (BVAR (current_buffer, case_canon_table), 2,
-			 BVAR (current_buffer, case_eqv_table));
+  Lisp_Object canon_table = BVAR (current_buffer, case_canon_table);
+  if (!NILP (canon_table))
+    set_char_table_extras (canon_table, 2,
+			   BVAR (current_buffer, case_eqv_table));
 
   dynwind_begin ();
   struct regexp_cache *cache_entry
@@ -1073,8 +1077,10 @@ search_command (Lisp_Object string, Lisp_Object bound, Lisp_Object noerror,
 
   /* This is so set_image_of_range_1 in regex-emacs.c can find the EQV
      table.  */
-  set_char_table_extras (BVAR (current_buffer, case_canon_table), 2,
-			 BVAR (current_buffer, case_eqv_table));
+  Lisp_Object canon_table = BVAR (current_buffer, case_canon_table);
+  if (!NILP (canon_table))
+    set_char_table_extras (canon_table, 2,
+			   BVAR (current_buffer, case_eqv_table));
 
   np = search_buffer (string, PT, PT_BYTE, lim, lim_byte, n, RE,
 		      (!NILP (Vcase_fold_search)
