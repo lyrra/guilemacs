@@ -5,6 +5,9 @@
 ;; expands forms that rely on `pcase', and writes the transformed output into
 ;; `macroexp-expanded.el'.
 
+(defun intern-gensym (prefix)
+  (gensym prefix))
+
 (defvar macroexp--pending-eager-loads) ; Silences let-binding before macroexp.
 
 (defconst macroexp-preload--dir
