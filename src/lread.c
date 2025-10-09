@@ -2671,6 +2671,10 @@ read_string_literal (Lisp_Object readcharfun)
 	  if (ch < 0)
 	    end_of_file_error ();
 
+	  /* Handle string continuation: backslash-newline is ignored */
+	  if (ch == '\n')
+	    continue;
+
 	  /* Process Elisp escape sequences */
 	  ch = read_char_escape (readcharfun, ch);
 	}
