@@ -284,21 +284,18 @@ The returned value is a list of strings, one per line."
   "Execute BODY in a buffer containing the contents of FILE.
 If FILE is nil, execute BODY in the current buffer."
   (declare (indent 1) (debug t))
-  (let ((filesym (make-symbol "file")))
-    `(let ((,filesym ,file))
-       (if ,filesym
-	   (with-temp-buffer
-	     (insert-file-contents ,filesym)
-	     (emacs-lisp-mode)
-	     ,@body)
-	 (save-excursion
-           (save-restriction
-             (widen)
-             (goto-char (point-min))
-             ;; Switching major modes is too drastic, so just switch
-             ;; temporarily to the Emacs Lisp mode syntax table.
-             (with-syntax-table emacs-lisp-mode-syntax-table
-               ,@body)))))))
+  `(if ,file
+       (with-temp-buffer
+	 (insert-file-contents ,file)
+	 (emacs-lisp-mode)
+	 ,@body)
+     (save-excursion
+       (save-restriction
+         (widen)
+         (goto-char (point-min))
+         ;; FIX-guilemacs: with-syntax-table causes compile errors in Guile
+         ;; Just execute body without changing syntax table
+         ,@body))))
 
 ;; Fixme: Probably this should be amalgamated with copyright.el; also
 ;; we need a check for ranges in copyright years.
@@ -504,10 +501,10 @@ each line."
 (defun lm-keywords-list (&optional file)
   "Return list of keywords given in file FILE."
   (let ((keywords (lm-keywords file)))
-    (if keywords
-	(if (string-search "," keywords)
-	    (split-string keywords ",[ \t\n]*" t "[ ]+")
-	  (split-string keywords "[ \t\n]+" t "[ ]+")))))
+    (when (and keywords (stringp keywords))
+      (if (string-search "," keywords)
+	  (split-string keywords ",[ \t\n]*" t "[ ]+")
+	(split-string keywords "[ \t\n]+" t "[ ]+")))))
 
 (defvar finder-known-keywords)
 (defun lm-keywords-finder-p (&optional file)
