@@ -4373,6 +4373,9 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 (set! %load-path (cons "./lisp/vc" %load-path))
 (set! %load-path (cons "../lisp/mail" %load-path))
 (set! %load-path (cons "../lisp/url" %load-path))
+(set! %load-path (cons "../lisp/gnus" %load-path))
+(set! %load-path (cons "../lisp/net" %load-path))
+(set! %load-path (cons "../lisp/calendar" %load-path))
 
 (set! %load-extensions (cons ".el" %load-extensions))
 
