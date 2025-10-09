@@ -191,11 +191,13 @@ ine-overloadable-function\\)\\)\
                               ((string-match
                                 "\\`define-\\(derived\\|generic\\)-mode\\'"
                                 type)
-                               '(0 . 0))
+                               ;; FIX-guilemacs: use cons instead of quoted literal for mutable pair
+                               (cons 0 0))
                               ((string-match
                                 "\\`define\\(-global\\(ized\\)?\\)?-minor-mode\\'"
                                 type)
-                               '(0 . 1))
+                               ;; FIX-guilemacs: use cons instead of quoted literal for mutable pair
+                               (cons 0 1))
                               ;; Prompt to update.
                               ((string-match
                                 "\\`define-obsolete-function-alias\\>"

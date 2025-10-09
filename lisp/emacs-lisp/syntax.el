@@ -572,8 +572,9 @@ These are valid when the buffer has no restriction.")
 ;; Perhaps the other slots should be removed?
 ;; This variable is only used when `syntax-begin-function' is used and
 ;; will hence be removed together with `syntax-begin-function'.
+;; FIX-guilemacs: use cons calls instead of quoted literals for mutable pairs
 (defvar syntax-ppss-stats
-  [(0 . 0) (0 . 0) (0 . 0) (0 . 0) (0 . 0) (2 . 2500)]
+  (vector (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 0 0) (cons 2 2500))
   "Statistics about which case is more/less frequent in `syntax-ppss'.
 The 5th slot drives the heuristic to use `syntax-begin-function'.
 The rest is only useful if you're interested in tweaking the algorithm.")
