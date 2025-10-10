@@ -1159,10 +1159,8 @@ See also the function `vector'.  */)
 {
   CHECK_TYPE (FIXNATP (length) && XFIXNAT (length) <= PTRDIFF_MAX,
 	      Qwholenump, length);
-  /* Create Scheme vector for consistency with vector literals [1 2 3] */
-  ptrdiff_t len = XFIXNAT (length);
-  Lisp_Object val = scm_c_make_vector (len, init);
-  return val;
+  /* FIX-guilemacs: Create Elisp vectorlike, not Scheme vector, for compatibility with fillarray */
+  return make_vector (XFIXNAT (length), init);
 }
 
 /* Return a new vector of length LENGTH with each element being INIT.  */
@@ -1170,8 +1168,12 @@ See also the function `vector'.  */)
 Lisp_Object
 make_vector (ptrdiff_t length, Lisp_Object init)
 {
-  /* Create Scheme vector for consistency with user-facing make-vector */
-  Lisp_Object vector = scm_c_make_vector (length, init);
+  /* FIX-guilemacs: Create Elisp vectorlike for type system consistency */
+  Lisp_Object vector;
+  struct Lisp_Vector *p = allocate_vector (length);
+  for (ptrdiff_t i = 0; i < length; i++)
+    p->contents[i] = init;
+  XSETVECTOR (vector, p);
   return vector;
 }
 
