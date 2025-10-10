@@ -507,14 +507,17 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 ** Found new bidi-class `%s', please update bidi.c and dispextern.h")
 	tail elt range val val-code
 	prev-range-data)
-    (setq val-list (cons nil (copy-sequence val-list)))
+    ;; FIX-guilemacs: use mapcar to create a fully mutable list, not just copy-sequence
+    (setq val-list (cons nil (mapcar #'identity val-list)))
     (setq tail val-list val-code 0)
     ;; Convert (nil A B ...) to ((nil . 0) (A . 1) (B . 2) ...)
     (while tail
       (setcar tail (cons (car tail) val-code))
       (setq tail (cdr tail) val-code (1+ val-code)))
+    ;; FIX-guilemacs: deep copy default-value to create fully mutable nested lists
     (setq default-value (if (consp default-value)
-	                    (copy-sequence default-value)
+	                    (mapcar (lambda (x) (if (consp x) (mapcar #'identity x) x))
+                                    default-value)
 	                  (list default-value)))
     (setcar default-value
 	    (unidata-encode-val val-list (car default-value)))
@@ -801,7 +804,8 @@ Property value is a symbol `o' (Open), `c' (Close), or `n' (None)."
 	  (setq c (+ first-char i))
 	  (let ((name (aref vec i)))
 	    (if name
-		(let ((tail (cdr (setq name (copy-sequence name))))
+		;; FIX-guilemacs: use mapcar to create a fully mutable list
+		(let ((tail (cdr (setq name (mapcar #'identity name))))
 		      elt)
 		  (while tail
 		    (setq elt (car tail))
