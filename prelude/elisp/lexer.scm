@@ -204,6 +204,11 @@
 
 (define no-escape-punctuation (string->char-set "-+=*/_~!@$%^&:<>{}?.|"))
 
+;; Characters that must be escaped or that terminate a symbol/number
+;; Note: ? and # have special meaning only at start of token, not in middle
+;; Similarly, . is only special when standalone
+(define symbol-delimiter-chars (string->char-set "()[]'\",;`"))
+
 (define (get-symbol-or-number port)
   (let iterate ((result-chars '())
                 (had-escape #f))
@@ -222,11 +227,13 @@
                          (else 'symbol))
                         result))))
            (need-no-escape? (lambda (c)
-                              (or (char-numeric? c)
-                                  (char-alphabetic? c)
-                                  (char-set-contains?
-                                   no-escape-punctuation
-                                   c)))))
+                              ;; Allow any character that is not:
+                              ;; - whitespace
+                              ;; - a delimiter (parens, quotes, etc)
+                              ;; - backslash (escape char)
+                              (and (not (char-whitespace? c))
+                                   (not (char-set-contains? symbol-delimiter-chars c))
+                                   (not (char=? c #\\))))))
       (cond
        ((eof-object? c) (finish))
        ((need-no-escape? c) (iterate (cons c result-chars) had-escape))

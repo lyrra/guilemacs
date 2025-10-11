@@ -45,11 +45,8 @@
 (set-current-module (resolve-module '(language elisp runtime)))
 (define %prelude-directory (dirname %prelude-filename))
 
-(format #t "------- %prelude-directory: ~s ----------~%" %prelude-directory)
-
 ;; reload guile elisp language, to get modifications
 (set! %load-path (cons "." %load-path))
-(format #t "------- reloading guile elisp runtime ----------~%")
 (load "./elisp/runtime.scm")
 ;(format #t "------- reloading guile elisp runtime ----------~%")
 ;(format #t "scheme load-path: ~s~%" %load-path)
@@ -81,7 +78,6 @@
 (define (reload-local-elisp! base-dir)
   "Reload local language/elisp Scheme pieces and boot.el from BASE-DIR.
    Order: runtime.scm → lexer.scm → parser.scm → compile-tree-il.scm → boot.el"
-  (format #t "reload-local-elisp! base-dir: ~s~%" base-dir)
   (let* ((scheme-files '(; "runtime.scm" ; dont reload runtime it will redefine module
                          "lexer.scm"
                          "parser.scm"
@@ -93,20 +89,15 @@
         ;; 1) Reload Scheme-side modules in dependency order *as Scheme*.
         (for-each (lambda (f)
                     (let ((p (join base-dir f)))
-                      (format #t "Reloading ~a\n" p)
                       (primitive-load p)))
                   scheme-files)
         ;; 2) Load boot.el *as Elisp*, either from source or via compiled .go.
         ; dont reload boot.el, move stuff into this file, or push upstream
-        (let ((boot (join base-dir "boot.el")))
-          (format #t "Loading Elisp boot: ~a (~a)\n" boot "compiled")
-          (compile-and-load-elisp boot))
-        )
+        (compile-and-load-elisp (join base-dir "boot.el")))
       (lambda () (set! %load-path old-load-path)))))
 
 (reload-local-elisp! (join %prelude-directory "elisp"))
 
-(format #t "Done reloading guile elisp system~%")
 (set-current-module (resolve-module '(language elisp runtime)))
 
 (primitive-load (join %prelude-directory "pcase.scm"))
@@ -4283,7 +4274,6 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
     (if (fresh-go? go src)
         (load-compiled go)
         (begin
-          (format #t "compile src ~a~%" src)
           (compile-file src
                         #:from el ; 'elisp
                         ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
@@ -4313,29 +4303,16 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
   "Load elisp file with compilation, handling full Fload parameter set"
   (catch #t
     (lambda ()
-      (format #t "loading file: ~s~%" found-file)
       (let* ((src found-file)
-             (x (format #t "get compiled-file-name~%"))
              (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
-             (x (format #t "get lang~%"))
              ;; Load our custom elisp language to override system elisp
-             (el (lookup-language 'elisp))
-             (x (format #t "Using elisp language: ~s~%" (language-title el))))
-        (format #t "loading or compiling file ~a ~a~%" src go)
+             (el (lookup-language 'elisp)))
         (if (fresh-go? go src)
+            (load-compiled go)
             (begin
-              (format #t "loading compiled file: ~s~%" go)
-              (load-compiled go))
-            (begin
-              ;(unless nomessage
-                (format #t "Compiling ~a...~%" src)
-                ;)
-              ;; Compile normally
               (compile-file src
                             #:from el
                             #:output-file go)
-              (unless nomessage
-                (format #t "Compiling ~a...done~%" src))
               (load-compiled go)))
         #t)) ; return t on success
     (lambda (key . args)
@@ -4343,21 +4320,8 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
           #f ; return nil on error if noerror is true
           (apply throw key args))))) ; re-throw error otherwise
 
-; doesn't work, load-from-path doesn't care about current language/reader
-(define (load-elisp2 path)
-  (let ((lang (lookup-language 'elisp)))
-    (parameterize ((current-language lang)) ; use Elisp evaluator/compilers
-      (fluid-set! current-reader (language-reader lang)) ; parse Elisp if we hit source
-      (set-current-module (resolve-module '(language elisp runtime)))
-      ;(fluid-set! current-reader emacs-read)
-      (format #t "Current-language: ~s~%" (current-language))
-      (format #t "Current-reader: ~s~%" (fluid-ref current-reader))
-      (format #t "loading elisp, current-module: ~s~%" (current-module))
-      (load-from-path path))))
-
 ; FIX: kludge, move to some init function
 (let ((str (canonicalize-path (string-concatenate (list %prelude-directory "/..")))))
-  (format #t "--------- code dir: ~s~%" str)
   (set! %load-path (append (list (string-concatenate (list str "/lisp"))
                                  (string-concatenate (list str "/lisp/emacs-lisp"))
                                  (string-concatenate (list str "/lisp/progmodes"))
@@ -4377,9 +4341,9 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 ;; Bridge function that reuses existing Fload Scheme migrations
 (define (fload-bridge file noerror nomessage nosuffix must-suffix)
   "Bridge function that handles full Fload protocol using Guile elisp compilation"
-  (format #t "fload-bridge called with file: ~s~%" file)
   (catch #t
     (lambda ()
+      (format (current-error-port) "loading ~a~%" file)
       ;; File validation and handler check (reuse existing)
       (let ((handler-result (elisp-validate-and-check-handler file noerror nomessage nosuffix must-suffix)))
         (when handler-result
@@ -4391,9 +4355,6 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                          )
              (processed-file (car path-result))
              (suffixes (cdr path-result)))
-        (format #t "processed-file: ~s~%" processed-file)
-        (format #t "%load-path: ~s~%" %load-path)
-        (format #t "%load-extensions: ~s~%" %load-extensions)
         ;; Find file using openp equivalent, including current directory
         (let ((found (or
                          ; FIX: %search-load-path is underspecified, does it search for compiled equivalent and if so, how is given suffix handled?
@@ -4454,7 +4415,6 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 ;(define (get-debug-print-flag)
 ;  %debug-print-flag)
-(format #t "------------ x0 ------------~%")
 (set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
 
 (set-symbol-function! 'get-debug-print-flag

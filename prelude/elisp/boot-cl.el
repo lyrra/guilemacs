@@ -9,7 +9,7 @@
 ;;; Code:
 
 ;; Lightweight debugging hook; keep default false to avoid noisy bootstrap.
-(defvar cl--bootstrap-debug-log t)
+(defvar cl--bootstrap-debug-log nil)
 (defvar cl--bootstrap--orig-signal nil)
 (unless cl--bootstrap--orig-signal
   (setq cl--bootstrap--orig-signal (symbol-function 'signal))
