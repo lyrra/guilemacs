@@ -72,6 +72,8 @@
 
 ;;; Code:
 
+(require 'so-long)
+
 (declare-function epa-passphrase-callback-function
 		  "epa" (context key-id handback))
 
