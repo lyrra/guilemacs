@@ -123,7 +123,7 @@ Usage: emacs -batch -l ./cus-dep.el -f custom-make-dependencies DIRS"
                     (beginning-of-line)
                     (let ((type (match-string 1))
 			  (expr (custom--get-def (read (current-buffer)))))
-                      (condition-case nil
+                      (condition-case err
                           (let ((custom-dont-initialize t)
                                 (sym (nth 1 expr)))
                             (put (if (eq (car-safe sym) 'quote)
@@ -138,6 +138,8 @@ Usage: emacs -batch -l ./cus-dep.el -f custom-make-dependencies DIRS"
                         ;; in the file (we haven't loaded the file).
                         ;; In most cases, we can still get the :group.
                         (error
+                         ;; FIX-guilemacs: Add debugging output for errors
+                         (message "Warning: Error in file %s, expr %S: %S" file (nth 1 expr) err)
                          (ignore-errors
                            (let ((group (cadr (memq :group expr))))
                              (and group
