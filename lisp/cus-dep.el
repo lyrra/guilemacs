@@ -49,7 +49,81 @@ ldefs-boot\\|cus-load\\|finder-inf\\|esh-groups\\|subdirs\\)\\.el$\\)"
   (mapc (lambda (e) (let ((sym (intern (format "%s-mh" e))))
 		      (or (fboundp sym)
 			  (defalias sym e))))
-	'(defcustom defface defgroup)))
+	'(defcustom defface defgroup))
+  ;; FIX-guilemacs: Similar workaround for semantic's defcustom-mode-local-... macro
+  ;; This macro expands to defcustom, so we can alias it to a wrapper that extracts
+  ;; the defcustom part for cus-dep scanning.
+  ;; The issue is that cus-dep.el's regex matches defcustom-mode-local-semantic-dependency-system-include-path because it starts with "defcustom". But this is a macro, not a
+  ;; defcustom.
+  ;; Use same workaround as above (where they create aliases for defcustom-mh, etc)
+  (unless (fboundp 'defcustom-mode-local-semantic-dependency-system-include-path)
+    (defmacro defcustom-mode-local-semantic-dependency-system-include-path
+        (mode name value &optional docstring)
+      "Simplified version for cus-dep scanning."
+      `(defcustom ,name ,value
+         ,(or docstring "")
+         :group 'semantic
+         :type '(repeat (directory :tag "Directory")))))
+  ;; FIX-guilemacs: Workaround for erc's erc--with-dependent-type-match macro
+  (unless (fboundp 'erc--with-dependent-type-match)
+    (defmacro erc--with-dependent-type-match (type &rest _features)
+      "Simplified version for cus-dep scanning - just return the type."
+      `',type))
+  ;; FIX-guilemacs: Workaround for todo-mode's todo--files-type-list function
+  (unless (fboundp 'todo--files-type-list)
+    (defun todo--files-type-list ()
+      "Simplified version for cus-dep scanning - return empty list."
+      nil))
+  ;; FIX-guilemacs: Workaround for eshell's eshell-cmpl--custom-variable-docstring function
+  (unless (fboundp 'eshell-cmpl--custom-variable-docstring)
+    (defun eshell-cmpl--custom-variable-docstring (pcomplete-var)
+      "Simplified version for cus-dep scanning - return placeholder docstring."
+      (format "Eshell customization derived from `%s'." (symbol-name pcomplete-var))))
+  ;; FIX-guilemacs: Workaround for eshell's eshell-subgroups function
+  (unless (fboundp 'eshell-subgroups)
+    (defun eshell-subgroups (groupsym)
+      "Simplified version for cus-dep scanning - return empty list."
+      nil))
+  ;; FIX-guilemacs: Workaround for gnus's mm-coding-system-p function
+  (unless (fboundp 'mm-coding-system-p)
+    (defun mm-coding-system-p (coding-system)
+      "Simplified version for cus-dep scanning - assume coding system exists."
+      t))
+  ;; FIX-guilemacs: Workaround for gnus's eieio-build-class-alist function
+  (unless (fboundp 'eieio-build-class-alist)
+    (defun eieio-build-class-alist (class &optional subclass)
+      "Simplified version for cus-dep scanning - return empty list."
+      nil))
+  ;; FIX-guilemacs: Workaround for pakistan's pakistan--make-setter function
+  (unless (fboundp 'pakistan--make-setter)
+    (defun pakistan--make-setter (&optional prefix)
+      "Simplified version for cus-dep scanning - return a simple setter."
+      (lambda (var val) (set-default-toplevel-value var val))))
+  ;; FIX-guilemacs: Workaround for mh-e's mh-variants function
+  (unless (fboundp 'mh-variants)
+    (defun mh-variants ()
+      "Simplified version for cus-dep scanning - return empty list."
+      nil))
+  ;; FIX-guilemacs: Workaround for mh-e's mh-face-data function
+  (unless (fboundp 'mh-face-data)
+    (defun mh-face-data (face &optional inherit)
+      "Simplified version for cus-dep scanning - return inherit or default spec."
+      (or inherit '((t (:foreground "black"))))))
+  ;; FIX-guilemacs: Workaround for cc-vars's defcustom-c-stylevar macro
+  (unless (fboundp 'defcustom-c-stylevar)
+    (defmacro defcustom-c-stylevar (name val doc &rest args)
+      "Simplified version for cus-dep scanning."
+      `(defcustom ,name ,val ,doc ,@args)))
+  ;; FIX-guilemacs: Workaround for cc-vars's c-constant-symbol function
+  (unless (fboundp 'c-constant-symbol)
+    (defun c-constant-symbol (sym len)
+      "Simplified version for cus-dep scanning."
+      `(const :tag ,(symbol-name sym) ,sym)))
+  ;; FIX-guilemacs: Workaround for cc-vars's c-make-font-lock-extra-types-blurb function
+  (unless (fboundp 'c-make-font-lock-extra-types-blurb)
+    (defun c-make-font-lock-extra-types-blurb (mode1 mode2 example)
+      "Simplified version for cus-dep scanning."
+      (format "List of extra types to recognize in %s mode." mode1))))
 
 (defun custom--get-def (expr)
   (if (not (memq (car-safe expr)
