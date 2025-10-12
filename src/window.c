@@ -8107,10 +8107,11 @@ saved by this function.  */)
   data->minibuf_selected_window = minibuf_level > 0 ? minibuf_selected_window : Qnil;
   data->root_window = FRAME_ROOT_WINDOW (f);
   data->focus_frame = FRAME_FOCUS_FRAME (f);
-  Lisp_Object tem = make_nil_vector (n_windows);
+  /* Use elisp vectors here because save_window_save accesses vector->contents[] */
+  Lisp_Object tem = make_nil_elisp_vector (n_windows);
   data->saved_windows = tem;
   for (ptrdiff_t i = 0; i < n_windows; i++)
-    ASET (tem, i, make_nil_vector (VECSIZE (struct saved_window)));
+    ASET (tem, i, make_nil_elisp_vector (VECSIZE (struct saved_window)));
   save_window_save (FRAME_ROOT_WINDOW (f), XVECTOR (tem), 0);
   XSETWINDOW_CONFIGURATION (tem, data);
   return tem;

@@ -4256,6 +4256,17 @@ make_nil_vector (ptrdiff_t size)
   return scm_c_make_vector (size, Qnil);
 }
 
+/* Make an Elisp vector (vectorlike) of SIZE nils.
+   Use this when code needs to access vector->contents[] directly. */
+
+INLINE Lisp_Object
+make_nil_elisp_vector (ptrdiff_t size)
+{
+  Lisp_Object result;
+  XSETVECTOR (result, allocate_nil_vector (size));
+  return result;
+}
+
 
 /* Allocate uninitialized pseudovector with no Lisp_Object slots.  */
 
