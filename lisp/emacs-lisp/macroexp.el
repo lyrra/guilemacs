@@ -158,7 +158,9 @@ Other uses risk returning non-nil value that point to the wrong file."
   ;; so prefer using it over using `load-file-name'.
   (let ((file (car (last current-load-list))))
     (or (if (stringp file) file)
-        (bound-and-true-p byte-compile-current-file))))
+        ;; Don't use bound-and-true-p macro since it may not be defined yet
+        (and (boundp 'byte-compile-current-file)
+             byte-compile-current-file))))
 
 (defvar macroexp--warned (make-hash-table :test #'equal :weakness 'key))
 

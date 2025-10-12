@@ -58,7 +58,7 @@ Returns nil when we do not know.
 A non-nil result is expected to be reliable when called from a macro in order
 to find the file in which the macro's call was found, and it should be
 reliable as well when used at the top-level of a file.
-Other uses risk returning non-nil value that point to the wrong file." (let ((file (car (last current-load-list)))) (or (if (stringp file) file) (bound-and-true-p byte-compile-current-file))))
+Other uses risk returning non-nil value that point to the wrong file." (let ((file (car (last current-load-list)))) (or (if (stringp file) file) (and (boundp 'byte-compile-current-file) byte-compile-current-file))))
 
 (defvar macroexp--warned (make-hash-table :test #'equal :weakness 'key))
 
