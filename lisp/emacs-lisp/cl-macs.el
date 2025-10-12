@@ -687,7 +687,7 @@ its argument list allows full Common Lisp conventions."
                             (car ,restarg)))
                   cl--bind-forms))
            (t
-	    (let* ((var (make-symbol "--cl-keys--"))
+	    (let* ((var (intern-gensym "--cl-keys--"))
 		   (allow '(:allow-other-keys))
 		   (check `(while ,var
                              (cond
