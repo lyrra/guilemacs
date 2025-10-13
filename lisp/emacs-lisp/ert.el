@@ -837,6 +837,7 @@ The elements are of type `ert-test'.")
   "Run ERT-TEST.
 
 Returns the result and stores it in ERT-TEST's `most-recent-result' slot."
+  (message "run test %s" ert-test)
   (setf (ert-test-most-recent-result ert-test) nil)
   (cl-block error
     (let ((begin-marker

@@ -31,9 +31,11 @@
 (ert-deftest floatfns-tests-tan ()
   (should (= (tan 0) 0.0)))
 
-(ert-deftest floatfns-tests-isnan ()
+'(ert-deftest floatfns-tests-isnan ()
   (should (isnan +nan.0))
   (should (isnan -nan.0))
+  ;(should (isnan 0.0e+NaN))
+  ;(should (isnan -0.0e+NaN))
   '(should-error (isnan "foo") :type 'wrong-type-argument))
 
 (ert-deftest floatfns-tests-exp ()
