@@ -1897,13 +1897,91 @@ grow_specpdl_allocation (void)
   specpdl_ptr = specpdl_ref_to_ptr (count);
 }
 
+/* Structure for passing eval arguments to scm_c_catch */
+struct scm_eval_data
+{
+  Lisp_Object form;
+};
+
+/* Body function for scm_c_catch - calls the Scheme eval */
+static SCM
+scm_eval_body (void *data)
+{
+  struct scm_eval_data *edata = (struct scm_eval_data *) data;
+  return scm_call_1 (eval_fn, edata->form);
+}
+
+/* Error handler for Guile exceptions during eval */
+static SCM
+scm_eval_error_handler (void *data, SCM key, SCM args)
+{
+  struct scm_eval_data *edata = (struct scm_eval_data *) data;
+
+  /* Handle wrong-number-of-arguments error */
+  if (scm_is_eq (key, scm_from_latin1_symbol ("wrong-number-of-args")))
+    {
+      /* Extract function name from args if possible */
+      SCM proc = SCM_BOOL_F;
+      if (scm_is_pair (args) && scm_is_pair (scm_cdr (args)))
+        {
+          SCM arg_list = scm_car (scm_cdr (scm_cdr (args)));
+          if (scm_is_pair (arg_list))
+            proc = scm_car (arg_list);
+        }
+
+      /* If we have the procedure, try to get its name */
+      Lisp_Object fun_name = Qnil;
+      if (scm_is_true (scm_procedure_p (proc)))
+        {
+          SCM proc_name = scm_procedure_name (proc);
+          if (scm_is_symbol (proc_name))
+            fun_name = proc_name;
+        }
+
+      /* Signal wrong-number-of-arguments error */
+      if (NILP (fun_name))
+        fun_name = build_string ("unknown");
+      xsignal2 (Qwrong_number_of_arguments, fun_name, make_fixnum (0));
+    }
+  /* Handle other Guile exceptions */
+  else
+    {
+      /* Build error message from Guile exception */
+      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
+      char *error_msg = scm_to_utf8_string (msg);
+      char *key_str = scm_to_utf8_string (scm_symbol_to_string (key));
+
+      /* Create combined error message */
+      char combined_msg[512];
+      snprintf (combined_msg, sizeof (combined_msg), "%s: %s", key_str, error_msg);
+
+      free (error_msg);
+      free (key_str);
+
+      /* Signal generic error */
+      xsignal1 (Qerror, build_string (combined_msg));
+    }
+
+  /* Should never reach here */
+  return SCM_UNDEFINED;
+}
+
 /* Eval a sub-expression of the current expression (i.e. in the same
    lexical scope).  */
 static Lisp_Object
 eval_sub_1 (Lisp_Object form)
 {
   maybe_quit ();
-  return scm_call_1 (eval_fn, form);
+
+  /* Wrap scm_call_1 with exception handling to catch Guile exceptions
+     and convert them to Elisp signals */
+  struct scm_eval_data edata;
+  edata.form = form;
+
+  return scm_c_catch (SCM_BOOL_T,
+                      scm_eval_body, &edata,
+                      scm_eval_error_handler, &edata,
+                      NULL, NULL);
 }
 
 Lisp_Object
@@ -2256,6 +2334,59 @@ FUNCTIONP (Lisp_Object object)
     return false;
 }
 
+/* Structure for passing funcall arguments to scm_c_catch */
+struct scm_funcall_data
+{
+  SCM fun;
+  Lisp_Object *args;
+  ptrdiff_t numargs;
+  Lisp_Object original_fun;
+};
+
+/* Body function for scm_c_catch - calls the Scheme procedure */
+static SCM
+scm_funcall_body (void *data)
+{
+  struct scm_funcall_data *fdata = (struct scm_funcall_data *) data;
+  return scm_call_n (fdata->fun, fdata->args + 1, fdata->numargs);
+}
+
+/* Error handler for Guile exceptions during funcall */
+static SCM
+scm_funcall_error_handler (void *data, SCM key, SCM args)
+{
+  struct scm_funcall_data *fdata = (struct scm_funcall_data *) data;
+
+  /* Handle wrong-number-of-arguments error */
+  if (scm_is_eq (key, scm_from_latin1_symbol ("wrong-number-of-args")))
+    {
+      /* Signal Elisp wrong-number-of-arguments error */
+      xsignal2 (Qwrong_number_of_arguments, fdata->original_fun,
+                make_fixnum (fdata->numargs));
+    }
+  /* Handle other Guile exceptions by converting to generic Elisp error */
+  else
+    {
+      /* Build error message from Guile exception */
+      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
+      char *error_msg = scm_to_utf8_string (msg);
+      char *key_str = scm_to_utf8_string (scm_symbol_to_string (key));
+
+      /* Create error message combining key and args */
+      char combined_msg[512];
+      snprintf (combined_msg, sizeof (combined_msg), "%s: %s", key_str, error_msg);
+
+      free (error_msg);
+      free (key_str);
+
+      /* Signal generic error */
+      xsignal1 (Qerror, build_string (combined_msg));
+    }
+
+  /* Should never reach here, but return SCM_UNDEFINED for safety */
+  return SCM_UNDEFINED;
+}
+
 Lisp_Object
 funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 {
@@ -2267,7 +2398,18 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 
   if (scm_is_true (scm_procedure_p (fun)))
     {
-      return scm_call_n (fun, args + 1, numargs);
+      /* Wrap scm_call_n with exception handling to catch Guile exceptions
+         and convert them to Elisp signals that condition-case can catch */
+      struct scm_funcall_data fdata;
+      fdata.fun = fun;
+      fdata.args = args;
+      fdata.numargs = numargs;
+      fdata.original_fun = original_fun;
+
+      return scm_c_catch (SCM_BOOL_T,
+                          scm_funcall_body, &fdata,
+                          scm_funcall_error_handler, &fdata,
+                          NULL, NULL);
     }
 
   else if (CLOSUREP (fun)
