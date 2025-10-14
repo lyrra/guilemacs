@@ -3147,6 +3147,9 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
   if (VECTORP (array))
     for (idx = 0, size = ASIZE (array); idx < size; idx++)
       ASET (array, idx, item);
+  else if (scm_is_vector (array))
+    for (idx = 0, size = scm_c_vector_length (array); idx < size; idx++)
+      scm_c_vector_set_x (array, idx, item);
   else if (CHAR_TABLE_P (array))
     {
       int i;
