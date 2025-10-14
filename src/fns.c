@@ -3290,6 +3290,15 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 	    vals[i] = dummy;
 	}
     }
+  else if (scm_is_vector (seq))
+    {
+      for (ptrdiff_t i = 0; i < leni; i++)
+	{
+	  Lisp_Object dummy = call1 (fn, scm_c_vector_ref (seq, i));
+	  if (vals)
+	    vals[i] = dummy;
+	}
+    }
   else if (STRINGP (seq))
     {
       ptrdiff_t i_byte = 0;
