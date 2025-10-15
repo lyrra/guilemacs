@@ -1288,6 +1288,8 @@ Please read only for amusement. High possibility of wasting your time.
 * AI ramblings
   - 20250815
     "The stack trace shows we're deep in Guile VM execution."
+  - 20251015
+    "- Similar to how V8 JavaScript has multiple internal string representations"
 
 * links
   Guile internals
