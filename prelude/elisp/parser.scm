@@ -195,7 +195,12 @@
       ((paren-open)
        (return (get-list lex #t #f)))
       ((square-open)
-       (return (list->vector (get-list lex #f #t))))
+       ;; Create mutable vector for Elisp compatibility
+       ;; In Elisp, all vectors are mutable
+       (let* ((lst (get-list lex #f #t))
+              (vec (list->vector lst)))
+         ;; Convert to mutable vector (Scheme vectors from list->vector are immutable)
+         (return (vector-copy vec))))
       ((circular-ref)
        (circular-ref token))
       ((circular-def)
