@@ -46,7 +46,9 @@ static Lisp_Object Vccl_program_table;
 
 /* Return a hash table of id number ID.  */
 #define GET_HASH_TABLE(id) \
-  XHASH_TABLE (XCDR (AREF (Vtranslation_hash_table_vector, id)))
+  XHASH_TABLE (XCDR ((VECTORP (Vtranslation_hash_table_vector) \
+                      ? AREF (Vtranslation_hash_table_vector, id) \
+                      : scm_c_vector_ref (Vtranslation_hash_table_vector, id))))
 
 /* CCL (Code Conversion Language) is a simple language which has
    operations on one input buffer, one output buffer, and 7 registers.
@@ -1367,10 +1369,14 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	      {
 		ptrdiff_t eop;
 		struct Lisp_Hash_Table *h;
-		GET_CCL_RANGE (eop, ccl_prog, ic++, 0,
-			       (VECTORP (Vtranslation_hash_table_vector)
-				? ASIZE (Vtranslation_hash_table_vector)
-				: -1));
+		ptrdiff_t table_size;
+		if (VECTORP (Vtranslation_hash_table_vector))
+		  table_size = ASIZE (Vtranslation_hash_table_vector);
+		else if (scm_is_vector (Vtranslation_hash_table_vector))
+		  table_size = scm_c_vector_length (Vtranslation_hash_table_vector);
+		else
+		  table_size = -1;
+		GET_CCL_RANGE (eop, ccl_prog, ic++, 0, table_size);
 		h = GET_HASH_TABLE (eop);
 
 		eop = hash_lookup (h, make_fixnum (reg[RRR]));
@@ -1393,10 +1399,14 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	      {
 		ptrdiff_t eop;
 		struct Lisp_Hash_Table *h;
-		GET_CCL_RANGE (eop, ccl_prog, ic++, 0,
-			       (VECTORP (Vtranslation_hash_table_vector)
-				? ASIZE (Vtranslation_hash_table_vector)
-				: -1));
+		ptrdiff_t table_size_char;
+		if (VECTORP (Vtranslation_hash_table_vector))
+		  table_size_char = ASIZE (Vtranslation_hash_table_vector);
+		else if (scm_is_vector (Vtranslation_hash_table_vector))
+		  table_size_char = scm_c_vector_length (Vtranslation_hash_table_vector);
+		else
+		  table_size_char = -1;
+		GET_CCL_RANGE (eop, ccl_prog, ic++, 0, table_size_char);
 		i = CCL_DECODE_CHAR (reg[RRR], reg[rrr]);
 		h = GET_HASH_TABLE (eop);
 
@@ -1882,15 +1892,19 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 {
   int i, veclen, unresolved = 0;
   Lisp_Object result, contents, val;
+  bool is_scheme_vector = scm_is_vector (ccl);
+  ptrdiff_t size;
 
-  if (! (CCL_HEADER_MAIN < ASIZE (ccl) && ASIZE (ccl) <= INT_MAX))
+  size = is_scheme_vector ? scm_c_vector_length (ccl) : ASIZE (ccl);
+  if (! (CCL_HEADER_MAIN < size && size <= INT_MAX))
     return Qnil;
   result = Fcopy_sequence (ccl);
-  veclen = ASIZE (result);
+  bool result_is_scheme = scm_is_vector (result);
+  veclen = result_is_scheme ? scm_c_vector_length (result) : ASIZE (result);
 
   for (i = 0; i < veclen; i++)
     {
-      contents = AREF (result, i);
+      contents = result_is_scheme ? scm_c_vector_ref (result, i) : AREF (result, i);
       if (TYPE_RANGED_FIXNUMP (int, contents))
 	continue;
       else if (CONSP (contents)
@@ -1902,7 +1916,12 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 	     an index number.  */
 	  val = Fget (XCAR (contents), XCDR (contents));
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
-	    ASET (result, i, val);
+	    {
+	      if (result_is_scheme)
+		scm_c_vector_set_x (result, i, val);
+	      else
+		ASET (result, i, val);
+	    }
 	  else
 	    unresolved = 1;
 	  continue;
@@ -1914,19 +1933,45 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
              and a code conversion map have the same name.  */
 	  val = Fget (contents, Qtranslation_table_id);
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
-	    ASET (result, i, val);
+	    {
+	      if (result_is_scheme)
+		scm_c_vector_set_x (result, i, val);
+	      else
+		ASET (result, i, val);
+	    }
 	  else
 	    {
-	      val = Fget (contents, Qcode_conversion_map_id);
+	      val = Fget (contents, Qtranslation_hash_table_id);
 	      if (RANGED_FIXNUMP (0, val, INT_MAX))
-		ASET (result, i, val);
+		{
+		  if (result_is_scheme)
+		    scm_c_vector_set_x (result, i, val);
+		  else
+		    ASET (result, i, val);
+		}
 	      else
 		{
-		  val = Fget (contents, Qccl_program_idx);
+		  val = Fget (contents, Qcode_conversion_map_id);
 		  if (RANGED_FIXNUMP (0, val, INT_MAX))
-		    ASET (result, i, val);
+		    {
+		      if (result_is_scheme)
+			scm_c_vector_set_x (result, i, val);
+		      else
+			ASET (result, i, val);
+		    }
 		  else
-		    unresolved = 1;
+		    {
+		      val = Fget (contents, Qccl_program_idx);
+		      if (RANGED_FIXNUMP (0, val, INT_MAX))
+			{
+			  if (result_is_scheme)
+			    scm_c_vector_set_x (result, i, val);
+			  else
+			    ASET (result, i, val);
+			}
+		      else
+			unresolved = 1;
+		    }
 		}
 	    }
 	  continue;
@@ -1934,9 +1979,9 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
       return Qnil;
     }
 
-  if (! (0 <= XFIXNUM (AREF (result, CCL_HEADER_BUF_MAG))
-	 && ASCENDING_ORDER (0, XFIXNUM (AREF (result, CCL_HEADER_EOF)),
-			     ASIZE (ccl))))
+  if (! (0 <= XFIXNUM (result_is_scheme ? scm_c_vector_ref (result, CCL_HEADER_BUF_MAG) : AREF (result, CCL_HEADER_BUF_MAG))
+	 && ASCENDING_ORDER (0, XFIXNUM (result_is_scheme ? scm_c_vector_ref (result, CCL_HEADER_EOF) : AREF (result, CCL_HEADER_EOF)),
+			     size)))
     return Qnil;
 
   return (unresolved ? Qt : result);
@@ -1953,11 +1998,11 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
 {
   Lisp_Object val, slot;
 
-  if (VECTORP (ccl_prog))
+  if (VECTORP (ccl_prog) || scm_is_vector (ccl_prog))
     {
       val = resolve_symbol_ccl_program (ccl_prog);
       *idx = -1;
-      return (VECTORP (val) ? val : Qnil);
+      return ((VECTORP (val) || scm_is_vector (val)) ? val : Qnil);
     }
   if (!SYMBOLP (ccl_prog))
     return Qnil;
@@ -1997,13 +2042,37 @@ setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
       struct Lisp_Vector *vp;
 
       ccl_prog = ccl_get_compiled_code (ccl_prog, &ccl->idx);
-      if (! VECTORP (ccl_prog))
+      bool is_scheme_vector = scm_is_vector (ccl_prog);
+
+      if (! (VECTORP (ccl_prog) || is_scheme_vector))
 	return false;
-      vp = XVECTOR (ccl_prog);
-      ccl->size = vp->header.size;
-      ccl->prog = vp->contents;
-      ccl->eof_ic = XFIXNUM (vp->contents[CCL_HEADER_EOF]);
-      ccl->buf_magnification = XFIXNUM (vp->contents[CCL_HEADER_BUF_MAG]);
+
+      if (is_scheme_vector)
+	{
+	  /* Convert Scheme vector to C vector for fast array access in ccl_driver */
+	  ptrdiff_t len = scm_c_vector_length (ccl_prog);
+	  Lisp_Object emacs_vec = make_vector (len, Qnil);
+
+	  for (ptrdiff_t i = 0; i < len; i++)
+	    ASET (emacs_vec, i, scm_c_vector_ref (ccl_prog, i));
+
+	  vp = XVECTOR (emacs_vec);
+	  ccl->size = vp->header.size;
+	  ccl->prog = vp->contents;
+	  ccl->prog_vec = emacs_vec;  /* Keep reference to prevent GC */
+	  ccl->eof_ic = XFIXNUM (vp->contents[CCL_HEADER_EOF]);
+	  ccl->buf_magnification = XFIXNUM (vp->contents[CCL_HEADER_BUF_MAG]);
+	}
+      else
+	{
+	  /* Handle C vectors */
+	  vp = XVECTOR (ccl_prog);
+	  ccl->size = vp->header.size;
+	  ccl->prog = vp->contents;
+	  ccl->prog_vec = ccl_prog;  /* Keep reference to prevent GC */
+	  ccl->eof_ic = XFIXNUM (vp->contents[CCL_HEADER_EOF]);
+	  ccl->buf_magnification = XFIXNUM (vp->contents[CCL_HEADER_BUF_MAG]);
+	}
       if (ccl->idx >= 0)
 	{
 	  Lisp_Object slot;
@@ -2372,6 +2441,9 @@ syms_of_ccl (void)
      map and their ID respectively.  */
   DEFSYM (Qcode_conversion_map, "code-conversion-map");
   DEFSYM (Qcode_conversion_map_id, "code-conversion-map-id");
+
+  /* Symbol for translation hash table ID property.  */
+  DEFSYM (Qtranslation_hash_table_id, "translation-hash-table-id");
 
   DEFVAR_LISP ("code-conversion-map-vector", Vcode_conversion_map_vector,
 	       doc: /* Vector of code conversion maps.  */);

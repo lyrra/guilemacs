@@ -42,7 +42,8 @@ struct ccl_program {
 				   by a vector, not by a program
 				   name.  */
   int size;			/* Size of the compiled code.  */
-  Lisp_Object *prog;		/* Pointer into the compiled code.  */
+  Lisp_Object *prog;		/* Pointer into the compiled code (for Emacs vectors).  */
+  Lisp_Object prog_vec;		/* The Scheme vector (for Scheme vectors), Qnil otherwise.  */
   int ic;			/* Instruction Counter (index for PROG).  */
   int eof_ic;			/* Instruction Counter for end-of-file
 				   processing code.  */
