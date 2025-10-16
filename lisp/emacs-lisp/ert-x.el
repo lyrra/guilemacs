@@ -419,14 +419,16 @@ directory as returned by `ert-resource-directory'."
 
 (defun ert--with-temp-file-generate-suffix (filename)
   "Generate temp file suffix from FILENAME."
-  (let ((rgx (rx string-start
-                 (group (+? not-newline))
-                 (regexp "-?tests?")
-                 string-end)))
-    (concat "-"
-            (replace-regexp-in-string rgx
-                                      "\\1"
-                                      (file-name-base filename)))))
+  (if (null filename)
+      "" ; Return empty suffix if no filename available
+    (let ((rgx (rx string-start
+                   (group (+? not-newline))
+                   (regexp "-?tests?")
+                   string-end)))
+      (concat "-"
+              (replace-regexp-in-string rgx
+                                        "\\1"
+                                        (file-name-base filename))))))
 
 (defmacro ert-with-temp-file (name &rest body)
   "Bind NAME to the name of a new temporary file and evaluate BODY.
