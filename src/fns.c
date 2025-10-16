@@ -837,7 +837,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  //  string_overflow ();
 	  result_len_byte += arg_len_byte;
 	}
-      else if (VECTORP (arg))
+      else if (VECTORP (arg) || scm_is_vector (arg))
 	{
 	  len = ASIZE (arg);
 	  ptrdiff_t arg_len_byte = 0;
@@ -954,7 +954,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    }
 #endif
 	}
-      else if (VECTORP (arg))
+      else if (VECTORP (arg) || scm_is_vector (arg))
 	{
 	  ptrdiff_t len = ASIZE (arg);
 	  for (ptrdiff_t j = 0; j < len; j++)
