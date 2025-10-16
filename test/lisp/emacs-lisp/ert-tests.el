@@ -553,7 +553,8 @@ This macro is used to test if macroexpansion in `should' works."
               (kill-buffer buffer-name))))))))
 
 '(DISABLE-guilemacs ert-deftest ert-test-run-tests-batch ()
-  (let* ((complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
+  (let* (;FIX-20251016-guilemacs no support for keyword :1 (invalid syntax)
+         ;(complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
 	 (long-list (make-list 11 1))
 	 (failing-test-1
           (make-ert-test :name 'failing-test-1
@@ -588,7 +589,7 @@ This macro is used to test if macroexpansion in `should' works."
 
 '(DISABLE-guilemacs ert-deftest ert-test-run-tests-batch-expensive ()
   :tags (if (getenv "EMACS_EMBA_CI") '(:unstable))
-  (let* ((complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
+  (let* (;(complex-list '((:1 (:2 (:3 (:4 (:5 (:6 "abc"))))))))
 	 (failing-test-1
           (make-ert-test :name 'failing-test-1
 			 :body (lambda () (should (equal complex-list 1))))))
