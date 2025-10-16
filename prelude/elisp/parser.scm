@@ -197,10 +197,17 @@
       ((square-open)
        ;; Create mutable vector for Elisp compatibility
        ;; In Elisp, all vectors are mutable
+       ;; Note: list->vector creates immutable vectors in Guile, so we must use make-vector
        (let* ((lst (get-list lex #f #t))
-              (vec (list->vector lst)))
-         ;; Convert to mutable vector (Scheme vectors from list->vector are immutable)
-         (return (vector-copy vec))))
+              (len (length lst))
+              (vec (make-vector len)))
+         (let loop ((i 0) (l lst))
+           (if (null? l)
+               vec
+               (begin
+                 (vector-set! vec i (car l))
+                 (loop (1+ i) (cdr l)))))
+         (return vec)))
       ((circular-ref)
        (circular-ref token))
       ((circular-def)

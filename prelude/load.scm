@@ -2556,12 +2556,14 @@ Returns: A proper elisp vector"
       (cond
         ((eof-object? ch) (error "Unexpected EOF in vector"))
         ((char=? ch #\])
-         ;; End of vector - create vector directly in Guile (now that float conversion works)
-         (let ((vec ((symbol-function 'make-vector) (length elements) #t)))
+         ;; End of vector - create mutable vector
+         ;; Note: Must use make-vector + vector-set! to create mutable vectors in Guile
+         (let* ((len (length elements))
+                (vec (make-vector len)))
            (do ((i 0 (+ 1 i))
                 (ep (reverse elements) (cdr ep)))
                ((null? ep))
-             ((symbol-function 'aset) vec i (car ep)))
+             (vector-set! vec i (car ep)))
            vec))
         (else
          ;; Regular vector element

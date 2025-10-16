@@ -4252,8 +4252,17 @@ make_uninit_sub_char_table (int depth, int min_char)
 INLINE Lisp_Object
 make_nil_vector (ptrdiff_t size)
 {
-  /* Create Scheme vector initialized with nil values */
-  return scm_c_make_vector (size, Qnil);
+  /* Create MUTABLE Scheme vector initialized with nil values
+     Note: scm_c_make_vector creates immutable vectors (like reader literals).
+     We must call the actual Scheme make-vector FUNCTION to get mutable vectors. */
+
+  /* Call Guile's make-vector procedure directly */
+  SCM make_vector_func = scm_c_public_ref ("guile", "make-vector");
+  Lisp_Object vec = scm_call_2 (make_vector_func,
+                                 scm_from_ptrdiff_t (size),
+                                 Qnil); /* Use Qnil as init value directly */
+
+  return vec;
 }
 
 /* Make an Elisp vector (vectorlike) of SIZE nils.

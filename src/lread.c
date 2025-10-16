@@ -2775,34 +2775,18 @@ vector_from_rev_list (Lisp_Object elems)
   ptrdiff_t size = list_length (elems);
   Lisp_Object obj = make_nil_vector (size);
 
-  /* FIX-guilemacs: Safety check for vector validity */
-  if (!obj || !VECTORP (obj))
-    return obj;
-
-  Lisp_Object *vec = XVECTOR (obj)->contents;
-
-  /* FIX-guilemacs: Check if vec is valid */
-  if (!vec)
-    return obj;
-
+  /* Work with Scheme vector using scm_c_vector_set_x */
   for (ptrdiff_t i = size - 1; i >= 0; i--)
     {
-      /* FIX-guilemacs: Bounds check */
       if (i < 0 || i >= size)
         break;
 
-      /* FIX-guilemacs: Safety check for invalid list elements */
       if (!elems || !CONSP (elems))
         {
-          /* List ended prematurely or became invalid, fill rest with nil */
-          for (ptrdiff_t j = i; j >= 0; j--)
-            {
-              if (j >= 0 && j < size)
-                vec[j] = Qnil;
-            }
+          /* List ended prematurely, remaining elements stay as nil */
           break;
         }
-      /* FIX-guilemacs: Use safe access with additional error check */
+
       Lisp_Object car_val = Qnil;
       Lisp_Object cdr_val = Qnil;
       if (scm_is_pair (elems))
@@ -2810,7 +2794,7 @@ vector_from_rev_list (Lisp_Object elems)
           car_val = scm_car (elems);
           cdr_val = scm_cdr (elems);
         }
-      vec[i] = car_val;
+      scm_c_vector_set_x (obj, i, car_val);
       elems = cdr_val;
     }
   return obj;
