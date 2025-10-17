@@ -1041,7 +1041,6 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
                || BOOL_VECTOR_P (arg) || CLOSUREP (arg))
 	{
 	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
-	  ptrdiff_t argindex_byte = 0;
 
 	  /* Copy element by element.  */
 	  for (ptrdiff_t argindex = 0; argindex < arglen; argindex++)
@@ -1098,8 +1097,8 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	memory_full (SIZE_MAX);
     }
 
-  /* Create the output vector.  */
-  Lisp_Object result = make_uninit_elisp_vector (result_len);
+  /* Create the output vector as a Scheme vector so it can live in compiled constants.  */
+  Lisp_Object result = scm_c_make_vector (result_len, Qnil);
   ptrdiff_t dst_idx = 0;
 
   /* Copy the contents of the args into the result.  */
@@ -1109,14 +1108,14 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
       Lisp_Object arg = args[i];
       if (VECTORP (arg) || scm_is_vector (arg))
 	{
-	  ptrdiff_t size = ASIZE (arg);
+	  ptrdiff_t size = VECTORP (arg) ? ASIZE (arg) : GASIZE (arg);
 	  for (ptrdiff_t j = 0; j < size; j++)
-	    ASET (result, dst_idx++, AREF (arg, j));
+	    GASET (result, dst_idx++, AREF (arg, j));
 	}
       else if (CONSP (arg))
 	do
 	  {
-	    ASET (result, dst_idx++, XCAR (arg));
+	    GASET (result, dst_idx++, XCAR (arg));
 	    arg = XCDR (arg);
 	  }
 	while (!NILP (arg));
@@ -1138,20 +1137,20 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	  else
           */
 	    for (ptrdiff_t i = 0; i < size; i++)
-	      ASET (result, dst_idx++, make_fixnum (SREF (arg, i)));
+	      GASET (result, dst_idx++, make_fixnum (SREF (arg, i)));
 	}
       else if (BOOL_VECTOR_P (arg))
 	{
 	  ptrdiff_t size = bool_vector_size (arg);
 	  for (ptrdiff_t i = 0; i < size; i++)
-	    ASET (result, dst_idx++, bool_vector_ref (arg, i));
+	    GASET (result, dst_idx++, bool_vector_ref (arg, i));
 	}
       else
 	{
 	  eassert (CLOSUREP (arg));
 	  ptrdiff_t size = PVSIZE (arg);
 	  for (ptrdiff_t j = 0; j < size; j++)
-	    ASET (result, dst_idx++, AREF (arg, j));
+	    GASET (result, dst_idx++, AREF (arg, j));
 	}
     }
   eassert (dst_idx == result_len);
