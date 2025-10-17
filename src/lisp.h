@@ -343,12 +343,12 @@ typedef EMACS_INT Lisp_Word;
 #define lisp_h_NILP(x) (scm_is_lisp_false (x))
 #define lisp_h_SET_SYMBOL_VAL(sym, v) \
    (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
-      scm_c_vector_set_x (sym, 4, v))
+      GASET (sym, 4, v))
 #define lisp_h_SYMBOL_CONSTANT_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)) == SYMBOL_NOWRITE)
 #define lisp_h_SYMBOL_TRAPPED_WRITE_P(sym) (SYMBOL_TRAPPED (XSYMBOL (sym)))
 #define lisp_h_SYMBOL_VAL(sym) \
    (eassert (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL), \
-    scm_c_vector_ref (sym, 4))
+    GAREF (sym, 4))
 #define lisp_h_SYMBOLP(x) \
   (x && (scm_is_symbol (x) || EQ (x, Qnil) || EQ (x, Qt)))
 #define lisp_h_VECTORLIKEP(x) SMOB_TYPEP (x, lisp_vectorlike_tag)
@@ -578,14 +578,14 @@ struct Lisp_Symbol
 };
 static_assert (GCALIGNED (struct Lisp_Symbol));
 
-#define SYMBOL_SELF(sym) (scm_c_vector_ref (sym, 0))
-#define SET_SYMBOL_SELF(sym, v) (scm_c_vector_set_x (sym, 0, v))
-#define SYMBOL_REDIRECT(sym) (XFIXNUM (scm_c_vector_ref (sym, 1)))
-#define SET_SYMBOL_REDIRECT(sym, v) (scm_c_vector_set_x (sym, 1, make_fixnum (v)))
-#define SYMBOL_TRAPPED(sym) (XFIXNUM (scm_c_vector_ref (sym, 2)))
-#define SET_SYMBOL_TRAPPED(sym, v) (scm_c_vector_set_x (sym, 2, make_fixnum (v)))
-#define SYMBOL_DECLARED_SPECIAL(sym) (XFIXNUM (scm_c_vector_ref (sym, 3)))
-#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (scm_c_vector_set_x (sym, 3, make_fixnum (v)))
+#define SYMBOL_SELF(sym) (GAREF (sym, 0))
+#define SET_SYMBOL_SELF(sym, v) (GASET (sym, 0, v))
+#define SYMBOL_REDIRECT(sym) (XFIXNUM (GAREF (sym, 1)))
+#define SET_SYMBOL_REDIRECT(sym, v) (GASET (sym, 1, make_fixnum (v)))
+#define SYMBOL_TRAPPED(sym) (XFIXNUM (GAREF (sym, 2)))
+#define SET_SYMBOL_TRAPPED(sym, v) (GASET (sym, 2, make_fixnum (v)))
+#define SYMBOL_DECLARED_SPECIAL(sym) (XFIXNUM (GAREF (sym, 3)))
+#define SET_SYMBOL_DECLARED_SPECIAL(sym, v) (GASET (sym, 3, make_fixnum (v)))
 
 /* Declare a Lisp-callable function.  The MAXARGS parameter has the same
    meaning as in the DEFUN macro, and is used to construct a prototype.  */
@@ -1030,7 +1030,7 @@ XTYPE (Lisp_Object o)
 #define XSETVECTOR(a, b) ((a) = (b)->header.self)
 #define XSETRECORD(a, b) ((a) = (b)->header.self)
 #define XSETSTRING(a, b) ((a) = (b)->self)
-#define XSETSYMBOL(a, b) ((a) = scm_c_vector_ref (b, 0))
+#define XSETSYMBOL(a, b) ((a) = GAREF (b, 0))
 
 /* Return a Lisp_Object value that does not correspond to any object.
    This can make some Lisp objects on free lists recognizable in O(1).  */
@@ -1395,52 +1395,6 @@ XVECTOR (Lisp_Object a)
   return SMOB_PTR3 (a, Lisp_Vectorlike, struct Lisp_Vector);
 }
 
-INLINE ptrdiff_t
-ASIZE (Lisp_Object array)
-{
-  if (VECTORLIKEP (array))
-    {
-      /* Handle elisp vectors and pseudovectors */
-      ptrdiff_t size = XVECTOR (array)->header.size;
-      eassume (0 <= size);
-      return size;
-    }
-  else if (scm_is_vector (array))
-    {
-      /* Handle Scheme vectors */
-      return scm_c_vector_length (array);
-    }
-  else
-    {
-      /* Handle other sequence types like strings */
-      wrong_type_argument (Qsequencep, array);
-      return 0;
-    }
-}
-
-INLINE ptrdiff_t
-gc_asize (Lisp_Object array)
-{
-  /* For GC purposes, use the same logic as ASIZE but without wrong_type_argument */
-  if (VECTORLIKEP (array))
-    {
-      /* Handle elisp vectors and pseudovectors */
-      ptrdiff_t size = XVECTOR (array)->header.size;
-      eassume (0 <= size);
-      return size;
-    }
-  else if (scm_is_vector (array))
-    {
-      /* Handle Scheme vectors */
-      return scm_c_vector_length (array);
-    }
-  else
-    {
-      /* Return 0 for unsupported types during GC */
-      return 0;
-    }
-}
-
 INLINE bool
 GVECTORP (Lisp_Object x)
 {
@@ -1473,6 +1427,52 @@ gvector_set (Lisp_Object v, ptrdiff_t idx, Lisp_Object val)
 #define GASIZE(v) gvector_length (v)
 #define GAREF(v, i) gvector_ref (v, i)
 #define GASET(v, i, val) gvector_set (v, i, val)
+
+INLINE ptrdiff_t
+ASIZE (Lisp_Object array)
+{
+  if (VECTORLIKEP (array))
+    {
+      /* Handle elisp vectors and pseudovectors */
+      ptrdiff_t size = XVECTOR (array)->header.size;
+      eassume (0 <= size);
+      return size;
+    }
+  else if (scm_is_vector (array))
+    {
+      /* Handle Scheme vectors */
+      return GASIZE (array);
+    }
+  else
+    {
+      /* Handle other sequence types like strings */
+      wrong_type_argument (Qsequencep, array);
+      return 0;
+    }
+}
+
+INLINE ptrdiff_t
+gc_asize (Lisp_Object array)
+{
+  /* For GC purposes, use the same logic as ASIZE but without wrong_type_argument */
+  if (VECTORLIKEP (array))
+    {
+      /* Handle elisp vectors and pseudovectors */
+      ptrdiff_t size = XVECTOR (array)->header.size;
+      eassume (0 <= size);
+      return size;
+    }
+  else if (scm_is_vector (array))
+    {
+      /* Handle Scheme vectors */
+      return GASIZE (array);
+    }
+  else
+    {
+      /* Return 0 for unsupported types during GC */
+	  return 0;
+	}
+}
 
 INLINE bool
 VECTOR_OR_PSEUDOVECTORP (Lisp_Object x)
@@ -1713,8 +1713,7 @@ AREF (Lisp_Object array, ptrdiff_t idx)
     }
   else if (scm_is_vector (array))
     {
-      eassert (0 <= idx && idx < scm_c_vector_length (array));
-      return scm_c_vector_ref (array, idx);
+      return GAREF (array, idx);
     }
   else
     {
@@ -1748,8 +1747,7 @@ ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
     }
   else if (scm_is_vector (array))
     {
-      eassert (0 <= idx && idx < scm_c_vector_length (array));
-      scm_c_vector_set_x (array, idx, val);
+      GASET (array, idx, val);
     }
   else
     {
@@ -2023,20 +2021,20 @@ INLINE sym_t
 SYMBOL_ALIAS (sym_t sym)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS);
-  return scm_c_vector_ref (sym, 4);
+  return GAREF (sym, 4);
 }
 INLINE struct Lisp_Buffer_Local_Value *
 SYMBOL_BLV (sym_t sym)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED);
-  return scm_to_pointer (scm_c_vector_ref (sym, 4));
+  return scm_to_pointer (GAREF (sym, 4));
 }
 INLINE lispfwd
 SYMBOL_FWD (sym_t sym)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED);
   lispfwd res;
-  res.fwdptr = scm_to_pointer (scm_c_vector_ref (sym, 4));
+  res.fwdptr = scm_to_pointer (GAREF (sym, 4));
   return res;
 }
 
@@ -2050,19 +2048,19 @@ INLINE void
 SET_SYMBOL_ALIAS (sym_t sym, sym_t v)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS && v);
-  scm_c_vector_set_x (sym, 4, v);
+  GASET (sym, 4, v);
 }
 INLINE void
 SET_SYMBOL_BLV (sym_t sym, struct Lisp_Buffer_Local_Value *v)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED && v);
-  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
+  GASET (sym, 4, scm_from_pointer (v, NULL));
 }
 INLINE void
 SET_SYMBOL_FWD (sym_t sym, void const *v)
 {
   eassert (SYMBOL_REDIRECT (sym) == SYMBOL_FORWARDED && v);
-  scm_c_vector_set_x (sym, 4, scm_from_pointer (v, NULL));
+  GASET (sym, 4, scm_from_pointer (v, NULL));
 }
 
 INLINE Lisp_Object
@@ -3004,7 +3002,7 @@ CHECK_VECTOR_OR_STRING (Lisp_Object x)
   if (VECTORP (x))
     return ASIZE (x);
   if (scm_is_vector (x))
-    return scm_c_vector_length (x);
+    return GASIZE (x);
   if (STRINGP (x))
     return SCHARS (x);
   wrong_type_argument (Qarrayp, x);

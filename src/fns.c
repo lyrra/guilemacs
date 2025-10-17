@@ -139,7 +139,7 @@ efficient.  */)
   else if (VECTORP (sequence))
     val = ASIZE (sequence);
   else if (scm_is_vector (sequence))
-    val = scm_c_vector_length (sequence);
+    val = GASIZE (sequence);
   else if (CHAR_TABLE_P (sequence))
     val = MAX_CHAR;
   else if (BOOL_VECTOR_P (sequence))
