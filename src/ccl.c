@@ -2051,7 +2051,7 @@ setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
 	{
 	  /* Convert Scheme vector to C vector for fast array access in ccl_driver */
 	  ptrdiff_t len = scm_c_vector_length (ccl_prog);
-	  Lisp_Object emacs_vec = make_vector (len, Qnil);
+	  Lisp_Object emacs_vec = make_elisp_vector (len, Qnil);
 
 	  for (ptrdiff_t i = 0; i < len; i++)
 	    ASET (emacs_vec, i, scm_c_vector_ref (ccl_prog, i));
@@ -2428,7 +2428,7 @@ syms_of_ccl (void)
 #include "ccl.x"
 
   staticpro (&Vccl_program_table);
-  Vccl_program_table = make_nil_vector (32);
+  Vccl_program_table = make_nil_elisp_vector (32);
 
   DEFSYM (Qccl, "ccl");
   DEFSYM (Qcclp, "cclp");
@@ -2447,7 +2447,7 @@ syms_of_ccl (void)
 
   DEFVAR_LISP ("code-conversion-map-vector", Vcode_conversion_map_vector,
 	       doc: /* Vector of code conversion maps.  */);
-  Vcode_conversion_map_vector = make_nil_vector (16);
+  Vcode_conversion_map_vector = make_nil_elisp_vector (16);
 
   DEFVAR_LISP ("font-ccl-encoder-alist", Vfont_ccl_encoder_alist,
 	       doc: /* Alist of fontname patterns vs corresponding CCL program.

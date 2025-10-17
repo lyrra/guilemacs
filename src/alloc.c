@@ -171,6 +171,34 @@ static void *spare_memory;
 
 const char *pending_malloc_warning;
 
+/* Phase 0 vector migration instrumentation hooks.  */
+static bool vector_phase0_noting;
+
+static void
+phase0_note_elisp_vector_allocation (const char *who, ptrdiff_t len)
+{
+  if (!guilemacs_warn_on_elisp_vector_allocation
+      && !guilemacs_error_on_elisp_vector_allocation)
+    return;
+
+  if (vector_phase0_noting)
+    return;
+
+  if (!who || !*who)
+    who = "unknown";
+
+  vector_phase0_noting = true;
+
+  if (guilemacs_warn_on_elisp_vector_allocation)
+    message ("[guilemacs] plain elisp vector allocation via %s (len=%"pD"d)",
+             who, len);
+
+  vector_phase0_noting = false;
+
+  if (guilemacs_error_on_elisp_vector_allocation)
+    emacs_abort ();
+}
+
 /* Hook run after GC has finished.  */
 
 #if !defined REL_ALLOC || defined SYSTEM_MALLOC || defined HYBRID_MALLOC
@@ -1022,7 +1050,13 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
       /* Optimize: Integrate with Guile's GC for better memory management */
       p = xmalloc (header_size + len * word_size);
       if (clearit)
-        memset (p, 0, header_size + len * word_size);
+        {
+          /* Zero the header */
+          memset (p, 0, header_size);
+          /* Initialize all slots to Qnil (not zero, since nil is not 0 in Guile) */
+          for (ptrdiff_t i = 0; i < len; i++)
+            p->contents[i] = Qnil;
+        }
       SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
 
       /* Register with Guile GC for coordinated collection */
@@ -1051,6 +1085,7 @@ allocate_clear_vector (ptrdiff_t len, bool clearit)
 struct Lisp_Vector *
 allocate_vector (ptrdiff_t len)
 {
+  phase0_note_elisp_vector_allocation (__func__, len);
   return allocate_clear_vector (len, false);
 }
 
@@ -1059,6 +1094,7 @@ allocate_vector (ptrdiff_t len)
 struct Lisp_Vector *
 allocate_nil_vector (ptrdiff_t len)
 {
+  phase0_note_elisp_vector_allocation (__func__, len);
   return allocate_clear_vector (len, true);
 }
 
@@ -1166,18 +1202,15 @@ See also the function `vector'.  */)
   return vector;
 }
 
-/* Return a new vector of length LENGTH with each element being INIT.  */
+/* Return a new vector of length LENGTH with each element being INIT.
+   FIX-guilemacs: For now, keep returning Guile vectors to match reader behavior.
+   This will be fully migrated in later phases. */
 
 Lisp_Object
 make_vector (ptrdiff_t length, Lisp_Object init)
 {
-  /* FIX-guilemacs: Create Elisp vectorlike for type system consistency */
-  Lisp_Object vector;
-  struct Lisp_Vector *p = allocate_vector (length);
-  for (ptrdiff_t i = 0; i < length; i++)
-    p->contents[i] = init;
-  XSETVECTOR (vector, p);
-  return vector;
+  eassert (length >= 0);
+  return scm_c_make_vector (length, init);
 }
 
 DEFUN ("vector", Fvector, Svector, 0, MANY, 0,
@@ -1253,7 +1286,7 @@ usage: (make-closure PROTOTYPE &rest CLOSURE-VARS) */)
   ptrdiff_t nvars = nargs - 1;
   if (nvars > constsize)
     error ("Closure vars do not fit in constvec");
-  Lisp_Object constvec = make_uninit_vector (constsize);
+  Lisp_Object constvec = make_uninit_elisp_vector (constsize);
   for (ptrdiff_t i = 0; i < nvars; i++)
     ASET (constvec, i, args[1 + i]);
   for (ptrdiff_t i = nvars; i < constsize; i++)
@@ -1750,6 +1783,20 @@ do hash-consing of the objects allocated to pure space.  */);
   DEFVAR_BOOL ("garbage-collection-messages", garbage_collection_messages,
 	       doc: /* Non-nil means display messages at start and end of garbage collection.  */);
   garbage_collection_messages = 0;
+
+  DEFVAR_BOOL ("guilemacs-warn-on-elisp-vector-allocation",
+               guilemacs_warn_on_elisp_vector_allocation,
+               doc: /* Non-nil enables Phase 0 instrumentation that logs whenever C code allocates
+plain elisp vectors (struct Lisp_Vector).  Use while migrating to Guile vectors to
+spot legacy allocation sites.  */);
+  guilemacs_warn_on_elisp_vector_allocation = 0;
+
+  DEFVAR_BOOL ("guilemacs-error-on-elisp-vector-allocation",
+               guilemacs_error_on_elisp_vector_allocation,
+               doc: /* Non-nil enables Phase 0 instrumentation that aborts when C code allocates
+plain elisp vectors (struct Lisp_Vector).  Intended for CI/ERT gating once legacy
+sites have been audited.  */);
+  guilemacs_error_on_elisp_vector_allocation = 0;
 
   DEFVAR_LISP ("post-gc-hook", Vpost_gc_hook,
 	       doc: /* Hook run after garbage collection has finished.  */);

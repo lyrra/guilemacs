@@ -3125,7 +3125,7 @@ Internal use only, use `display-monitor-attributes-list' instead.  */)
     monitor.work = monitor.geom;
 
   return make_monitor_attribute_list (&monitor, 1, 0,
-				      make_vector (1, frames),
+				      make_elisp_vector (1, frames),
 				      "fallback");
 }
 

@@ -1441,6 +1441,18 @@ gc_asize (Lisp_Object array)
     }
 }
 
+INLINE bool
+GVECTORP (Lisp_Object x)
+{
+  return scm_is_vector (x);
+}
+
+INLINE bool
+VECTOR_OR_PSEUDOVECTORP (Lisp_Object x)
+{
+  return GVECTORP (x) || VECTORLIKEP (x);
+}
+
 INLINE ptrdiff_t
 PVSIZE (Lisp_Object pv)
 {
@@ -1451,6 +1463,12 @@ INLINE bool
 VECTORP (Lisp_Object x)
 {
   return VECTORLIKEP (x) && ! (ASIZE (x) & PSEUDOVECTOR_FLAG);
+}
+
+INLINE bool
+PSEUDOVECTOR_ONLY_P (Lisp_Object x)
+{
+  return VECTORLIKEP (x) && !VECTORP (x);
 }
 
 INLINE void
@@ -1660,16 +1678,16 @@ bool_vector_set (Lisp_Object a, EMACS_INT i, bool b)
 INLINE Lisp_Object
 AREF (Lisp_Object array, ptrdiff_t idx)
 {
-  /* Dual-path: support both Guile vectors and C vectorlikes */
-  if (scm_is_vector (array))
-    {
-      eassert (0 <= idx && idx < scm_c_vector_length (array));
-      return scm_c_vector_ref (array, idx);
-    }
-  else if (VECTORLIKEP (array))
+  /* Dual-path: support both C vectorlikes and Guile vectors */
+  if (VECTORLIKEP (array))
     {
       eassert (0 <= idx && idx < gc_asize (array));
       return XVECTOR (array)->contents[idx];
+    }
+  else if (scm_is_vector (array))
+    {
+      eassert (0 <= idx && idx < scm_c_vector_length (array));
+      return scm_c_vector_ref (array, idx);
     }
   else
     {
@@ -1695,16 +1713,16 @@ aref_addr (Lisp_Object array, ptrdiff_t idx)
 INLINE void
 ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
 {
-  /* Dual-path: support both Guile vectors and C vectorlikes */
-  if (scm_is_vector (array))
-    {
-      eassert (0 <= idx && idx < scm_c_vector_length (array));
-      scm_c_vector_set_x (array, idx, val);
-    }
-  else if (VECTORLIKEP (array))
+  /* Dual-path: support both C vectorlikes and Guile vectors */
+  if (VECTORLIKEP (array))
     {
       eassert (0 <= idx && idx < gc_asize (array));
       XVECTOR (array)->contents[idx] = val;
+    }
+  else if (scm_is_vector (array))
+    {
+      eassert (0 <= idx && idx < scm_c_vector_length (array));
+      scm_c_vector_set_x (array, idx, val);
     }
   else
     {
@@ -4196,8 +4214,25 @@ build_lisp_string (const char *str)
 
 extern Lisp_Object pure_cons (Lisp_Object, Lisp_Object);
 extern Lisp_Object make_vector (ptrdiff_t, Lisp_Object);
+extern struct Lisp_Vector *allocate_vector (ptrdiff_t)
+  ATTRIBUTE_RETURNS_NONNULL;
 extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t)
   ATTRIBUTE_RETURNS_NONNULL;
+
+INLINE Lisp_Object
+make_elisp_vector (ptrdiff_t length, Lisp_Object init)
+{
+  Lisp_Object vector;
+  struct Lisp_Vector *p = allocate_vector (length);
+
+  eassert (length >= 0);
+
+  for (ptrdiff_t i = 0; i < length; i++)
+    p->contents[i] = init;
+
+  XSETVECTOR (vector, p);
+  return vector;
+}
 
 /* Make an uninitialized vector for SIZE objects.  NOTE: you must
    be sure that GC cannot happen until the vector is completely
@@ -4210,15 +4245,14 @@ extern struct Lisp_Vector *allocate_nil_vector (ptrdiff_t)
 
    allocate_vector has a similar problem.  */
 
-extern struct Lisp_Vector *allocate_vector (ptrdiff_t)
-  ATTRIBUTE_RETURNS_NONNULL;
-
 /* For internal C code that needs traditional Elisp vectors for pseudovectors */
 INLINE Lisp_Object
 make_uninit_elisp_vector (ptrdiff_t size)
 {
-  /* DEPRECATED: All vectors are now Scheme vectors */
-  return scm_c_make_vector (size, SCM_UNDEFINED);
+  eassert (size >= 0);
+  Lisp_Object vector;
+  XSETVECTOR (vector, allocate_vector (size));
+  return vector;
 }
 
 INLINE Lisp_Object

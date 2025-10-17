@@ -1310,7 +1310,7 @@ selection_data_to_lisp_data (struct pgtk_display_info *dpyinfo,
 	return gdk_atom_to_symbol (idata[0]);
       else
 	{
-	  Lisp_Object v = make_nil_vector (size / sizeof (GdkAtom));
+	  Lisp_Object v = make_nil_elisp_vector (size / sizeof (GdkAtom));
 
 	  for (i = 0; i < size / sizeof (GdkAtom); i++)
 	    ASET (v, i, gdk_atom_to_symbol (idata[i]));
@@ -1345,7 +1345,7 @@ selection_data_to_lisp_data (struct pgtk_display_info *dpyinfo,
   else if (format == 16)
     {
       ptrdiff_t i;
-      Lisp_Object v = make_uninit_vector (size / 2);
+      Lisp_Object v = make_uninit_elisp_vector (size / 2);
 
       if (type == GDK_SELECTION_TYPE_INTEGER)
         {
@@ -1368,7 +1368,7 @@ selection_data_to_lisp_data (struct pgtk_display_info *dpyinfo,
   else
     {
       ptrdiff_t i;
-      Lisp_Object v = make_nil_vector (size / sizeof (gint));
+      Lisp_Object v = make_nil_elisp_vector (size / sizeof (gint));
 
       if (type == GDK_SELECTION_TYPE_INTEGER)
         {
@@ -1574,7 +1574,7 @@ clean_local_selection_data (Lisp_Object obj)
       Lisp_Object copy;
       if (size == 1)
 	return clean_local_selection_data (AREF (obj, 0));
-      copy = make_nil_vector (size);
+      copy = make_nil_elisp_vector (size);
       for (i = 0; i < size; i++)
 	ASET (copy, i, clean_local_selection_data (AREF (obj, i)));
       return copy;
@@ -1667,7 +1667,7 @@ frame's display, or the first available X display.  */)
 	 symbol values (or nil) should be enclosed in vectors when
 	 TARGETS is being requested.  (bug#72254) */
       if (EQ (target_type, QTARGETS) && (NILP (val) || SYMBOLP (val)))
-	val = make_vector (NILP (val) ? 0 : 1, val);
+	val = make_elisp_vector (NILP (val) ? 0 : 1, val);
       return val;
     }
 

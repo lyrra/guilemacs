@@ -1107,7 +1107,7 @@ sfnt_enum_font_1 (int fd, const char *file,
          instance within, which specifies how to configure each axis
          to achieve a specified style.  */
 
-      desc->instances = make_vector (fvar->instance_count, Qnil);
+      desc->instances = make_elisp_vector (fvar->instance_count, Qnil);
 
       for (i = 0; i < fvar->instance_count; ++i)
 	{
@@ -1122,7 +1122,7 @@ sfnt_enum_font_1 (int fd, const char *file,
 	  sfnt_parse_style (style1, &temp);
 
 	  /* Set each field of the vector.  */
-	  instance = make_vector (5, Qnil);
+	  instance = make_elisp_vector (5, Qnil);
 	  ASET (instance, 0, style1);
 	  ASET (instance, 1, temp.adstyle);
 	  ASET (instance, 2, make_fixnum (temp.width));

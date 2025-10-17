@@ -4325,7 +4325,7 @@ syms_of_msdos (void)
 {
 #include "msdos.x"
 
-  recent_doskeys = Fmake_vector (make_fixnum (NUM_RECENT_DOSKEYS), Qnil);
+  recent_doskeys = Fmake_elisp_vector (make_fixnum (NUM_RECENT_DOSKEYS), Qnil);
   staticpro (&recent_doskeys);
 
 #ifndef HAVE_X_WINDOWS

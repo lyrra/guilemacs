@@ -9642,7 +9642,7 @@ network_interface_get_info (Lisp_Object ifname)
 			 res);
 	  else if (scm_is_true (scm_string_equal_p (scm_from_utf8_string (namebuf), ifname)))
 	    {
-	      Lisp_Object hwaddr = Fmake_vector (make_fixnum (6), Qnil);
+	      Lisp_Object hwaddr = Fmake_elisp_vector (make_fixnum (6), Qnil);
 	      register struct Lisp_Vector *p = XVECTOR (hwaddr);
 	      Lisp_Object flags = Qnil;
 	      int n;
@@ -9738,7 +9738,7 @@ network_interface_get_info (Lisp_Object ifname)
 	      /* 772 is what 3 different GNU/Linux systems report for
 		 the loopback interface.  */
 	      res = Fcons (Fcons (make_fixnum (772),
-				  Fmake_vector (make_fixnum (6),
+				  Fmake_elisp_vector (make_fixnum (6),
 						make_fixnum (0))),
 			   res);
 	      sa.sin_addr.s_addr = sys_inet_addr ("255.0.0.0");
@@ -10141,7 +10141,7 @@ w32_read_registry (HKEY rootkey, Lisp_Object lkey, Lisp_Object lname)
 	  int i;
 	  unsigned char *dbuf = (unsigned char *)pvalue;
 
-	  val = make_uninit_vector (vsize);
+	  val = make_uninit_elisp_vector (vsize);
 	  for (i = 0; i < vsize; i++)
 	    ASET (val, i, make_fixnum (dbuf[i]));
 

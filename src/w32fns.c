@@ -6900,7 +6900,7 @@ w32_display_monitor_attributes_list (void)
       monitor_list = XCDR (monitor_list);
     }
 
-  monitor_frames = Fmake_vector (make_fixnum (n_monitors), Qnil);
+  monitor_frames = Fmake_elisp_vector (make_fixnum (n_monitors), Qnil);
   FOR_EACH_FRAME (rest, frame)
     {
       struct frame *f = XFRAME (frame);

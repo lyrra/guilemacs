@@ -84,7 +84,7 @@ init_menu_items (void)
   if (NILP (menu_items))
     {
       menu_items_allocated = 60;
-      menu_items = make_nil_vector (menu_items_allocated);
+      menu_items = make_nil_elisp_vector (menu_items_allocated);
     }
 
   menu_items_inuse = true;

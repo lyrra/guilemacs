@@ -2773,7 +2773,7 @@ static Lisp_Object
 vector_from_rev_list (Lisp_Object elems)
 {
   ptrdiff_t size = list_length (elems);
-  Lisp_Object obj = make_nil_vector (size);
+  Lisp_Object obj = make_nil_elisp_vector (size);
 
   /* Work with Scheme vector using scm_c_vector_set_x */
   for (ptrdiff_t i = size - 1; i >= 0; i--)

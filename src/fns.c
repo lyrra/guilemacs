@@ -1099,7 +1099,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
     }
 
   /* Create the output vector.  */
-  Lisp_Object result = make_uninit_vector (result_len);
+  Lisp_Object result = make_uninit_elisp_vector (result_len);
   ptrdiff_t dst_idx = 0;
 
   /* Copy the contents of the args into the result.  */
@@ -2330,7 +2330,7 @@ See also the function `nreverse', which is used more often.  */)
     {
       ptrdiff_t i, size = ASIZE (seq);
 
-      new = make_uninit_vector (size);
+      new = make_uninit_elisp_vector (size);
       for (i = 0; i < size; i++)
 	ASET (new, i, AREF (seq, size - i - 1));
     }
@@ -2504,6 +2504,41 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
   else if (VECTORP (seq))
     return sort_vector (inplace ? seq : Fcopy_sequence (seq),
 			lessp, key, reverse);
+  else if (scm_is_vector (seq))
+    {
+      /* FIX-guilemacs: Handle Guile native vectors */
+      /* For Guile vectors, we need to convert to/from lists since sort_vector
+         expects VECTORP. An alternative would be to make sort_vector work with
+         scm_is_vector, but that would require more changes. */
+      ptrdiff_t len = scm_c_vector_length (seq);
+      Lisp_Object list = Qnil;
+
+      /* Convert vector to list */
+      for (ptrdiff_t i = len - 1; i >= 0; i--)
+        list = Fcons (scm_c_vector_ref (seq, i), list);
+
+      /* Sort the list */
+      Lisp_Object sorted_list = sort_list (list, lessp, key, reverse, false);
+
+      /* Convert back to vector */
+      if (inplace)
+        {
+          /* Modify in place */
+          ptrdiff_t j = 0;
+          for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
+            scm_c_vector_set_x (seq, j++, XCAR (tail));
+          return seq;
+        }
+      else
+        {
+          /* Create new vector */
+          Lisp_Object new_vec = scm_c_make_vector (len, Qnil);
+          ptrdiff_t j = 0;
+          for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
+            scm_c_vector_set_x (new_vec, j++, XCAR (tail));
+          return new_vec;
+        }
+    }
   else
     wrong_type_argument (Qlist_or_vector_p, seq);
 }
@@ -3855,7 +3890,7 @@ The data read from the system are decoded using `locale-coding-system'.  */)
 # ifdef DAY_1
   if (EQ (item, Qdays))  /* E.g., for calendar-day-name-array.  */
     {
-      Lisp_Object v = make_nil_vector (7);
+      Lisp_Object v = make_nil_elisp_vector (7);
       const int days[7] = {DAY_1, DAY_2, DAY_3, DAY_4, DAY_5, DAY_6, DAY_7};
       int i;
       synchronize_system_time_locale ();

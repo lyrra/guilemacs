@@ -2587,7 +2587,7 @@ conv_sockaddr_to_lisp (struct sockaddr *sa, ptrdiff_t len)
       {
 	DECLARE_POINTER_ALIAS (sin, struct sockaddr_in, sa);
 	len = sizeof (sin->sin_addr) + 1;
-	address = make_uninit_vector (len);
+	address = make_uninit_elisp_vector (len);
 	ASET (address, --len, make_fixnum (ntohs (sin->sin_port)));
 	cp = (unsigned char *) &sin->sin_addr;
 	break;
@@ -2598,7 +2598,7 @@ conv_sockaddr_to_lisp (struct sockaddr *sa, ptrdiff_t len)
 	DECLARE_POINTER_ALIAS (sin6, struct sockaddr_in6, sa);
 	DECLARE_POINTER_ALIAS (ip6, uint16_t, &sin6->sin6_addr);
 	len = sizeof (sin6->sin6_addr) / 2 + 1;
-	address = make_uninit_vector (len);
+	address = make_uninit_elisp_vector (len);
 	ASET (address, --len, make_fixnum (ntohs (sin6->sin6_port)));
 	for (ptrdiff_t i = 0; i < len; i++)
 	  ASET (address, i, make_fixnum (ntohs (ip6[i])));
@@ -2629,7 +2629,7 @@ conv_sockaddr_to_lisp (struct sockaddr *sa, ptrdiff_t len)
 #endif
     default:
       len -= offsetof (struct sockaddr, sa_family) + sizeof (sa->sa_family);
-      address = Fcons (make_fixnum (sa->sa_family), make_nil_vector (len));
+      address = Fcons (make_fixnum (sa->sa_family), make_nil_elisp_vector (len));
       cp = (unsigned char *) &sa->sa_family + sizeof (sa->sa_family);
       break;
     }
@@ -4527,7 +4527,7 @@ network_interface_info (Lisp_Object ifname)
 #if defined (SIOCGIFHWADDR) && defined (HAVE_STRUCT_IFREQ_IFR_HWADDR)
   if (ioctl (s, SIOCGIFHWADDR, &rq) == 0)
     {
-      Lisp_Object hwaddr = make_uninit_vector (6);
+      Lisp_Object hwaddr = make_uninit_elisp_vector (6);
 
       any = true;
       for (int n = 0; n < 6; n++)
@@ -4539,7 +4539,7 @@ network_interface_info (Lisp_Object ifname)
 #elif defined (HAVE_GETIFADDRS) && defined (LLADDR)
   if (getifaddrs (&ifap) != -1)
     {
-      Lisp_Object hwaddr = make_nil_vector (6);
+      Lisp_Object hwaddr = make_nil_elisp_vector (6);
 
       for (struct ifaddrs *it = ifap; it != NULL; it = it->ifa_next)
         {

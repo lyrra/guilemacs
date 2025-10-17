@@ -3305,7 +3305,7 @@ the query.  */)
   uint32_t patterns_count = ts_query_pattern_count (treesit_query);
   Lisp_Object result = Qnil;
   Lisp_Object prev_result = result;
-  Lisp_Object predicates_table = make_vector (patterns_count, Qt);
+  Lisp_Object predicates_table = make_elisp_vector (patterns_count, Qt);
   Lisp_Object predicate_signal_data = Qnil;
 
   struct buffer *old_buf = current_buffer;

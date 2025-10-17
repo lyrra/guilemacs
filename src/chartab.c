@@ -1243,7 +1243,7 @@ uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
     set_char_table_extras (table, 4,
 			   CALLN (Fvconcat,
 				  XCHAR_TABLE (table)->extras[4],
-				  make_vector (1, value)));
+				  make_elisp_vector (1, value)));
   return make_fixnum (i);
 }
 

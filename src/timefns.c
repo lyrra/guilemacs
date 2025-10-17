@@ -1945,7 +1945,7 @@ default to nil in a future Emacs version, and will be removed in some
 version after that.  */);
   current_time_list = CURRENT_TIME_LIST;
 
-  flt_radix_power = make_nil_vector (flt_radix_power_size);
+  flt_radix_power = make_nil_elisp_vector (flt_radix_power_size);
   staticpro (&flt_radix_power);
 
 }

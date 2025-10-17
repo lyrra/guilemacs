@@ -5076,7 +5076,7 @@ syms_of_buffer (void)
 #include "buffer.x"
 
   staticpro (&last_overlay_modification_hooks);
-  last_overlay_modification_hooks = make_nil_vector (10);
+  last_overlay_modification_hooks = make_nil_elisp_vector (10);
 
   staticpro (&QSFundamental);
   staticpro (&Vbuffer_alist);

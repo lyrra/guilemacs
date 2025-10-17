@@ -1429,7 +1429,7 @@ android_make_monitor_attribute_list (struct MonitorInfo *monitors,
   Lisp_Object frame, rest;
   struct frame *f;
 
-  monitor_frames = make_nil_vector (n_monitors);
+  monitor_frames = make_nil_elisp_vector (n_monitors);
 
   FOR_EACH_FRAME (rest, frame)
     {

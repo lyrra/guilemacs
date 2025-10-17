@@ -1274,7 +1274,7 @@ representing a data format that is currently available in the clipboard.  */)
 
 	      /* We generate a vector because that's what xselect.c
 		 does in this case.  */
-	      val = Fmake_vector (make_fixnum (fmtcount), Qnil);
+	      val = Fmake_elisp_vector (make_fixnum (fmtcount), Qnil);
 	      /* Note: when stepping with GDB through this code, the
 		 loop below terminates immediately because
 		 EnumClipboardFormats for some reason returns with

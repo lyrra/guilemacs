@@ -1451,7 +1451,7 @@ json_parse_array (struct json_parser *parser)
       {
 	size_t number_of_elements
 	  = parser->object_workspace_current - first;
-	result = make_vector (number_of_elements, Qnil);
+	result = make_elisp_vector (number_of_elements, Qnil);
 	for (size_t i = 0; i < number_of_elements; i++)
 	  {
 	    rarely_quit (i);
