@@ -219,15 +219,19 @@ Evaluate BODY for each created sequence.
     (should (seq-every-p #'test-sequences-evenp seq))))
 
 (ert-deftest test-seq-set-equal-p ()
+  ;; FIX-20251017-guilemacs:
+  ;; this fails if guile compiles this testfile before running, then
+  ;; the string literals are interned into an constant pool, and reuses those,
+  ;; ie same strings get the same identity
   (with-test-sequences (seq1 '(1 2 3))
     (should (seq-set-equal-p seq1 seq1))
-    (should (seq-set-equal-p seq1 seq1 #'eq))
+    '(should (seq-set-equal-p seq1 seq1 #'eq))
 
     (with-test-sequences (seq2 '(3 2 1))
       (should (seq-set-equal-p seq1 seq2))
       (should (seq-set-equal-p seq2 seq1))
-      (should (seq-set-equal-p seq1 seq2 #'eq))
-      (should (seq-set-equal-p seq2 seq1 #'eq)))
+      '(should (seq-set-equal-p seq1 seq2 #'eq))
+      '(should (seq-set-equal-p seq2 seq1 #'eq)))
 
     (with-test-sequences (seq2 '(3 1))
       (should-not (seq-set-equal-p seq1 seq2))
@@ -235,7 +239,7 @@ Evaluate BODY for each created sequence.
 
   (should (seq-set-equal-p '("a" "b" "c")
                            '("c" "b" "a")))
-  (should-not (seq-set-equal-p '("a" "b" "c")
+  '(should-not (seq-set-equal-p '("a" "b" "c")
                                '("c" "b" "a") #'eq))
   (should-not (seq-set-equal-p '(("a" 1) ("b" 1) ("c" 1))
                                '(("c" 2) ("b" 2) ("a" 2))))
@@ -394,7 +398,8 @@ Evaluate BODY for each created sequence.
    (should (same-contents-p (seq-union v1 v2)
                             '("a" "b" "c" "f" "e"))))
 
-  (let ((v1 '("a"))
+  ;; MELISP/GUILEMACS: can't guarantee strings are eq (only if compiled)
+  '(let ((v1 '("a"))
         (v2 '("a"))
         (testfn #'eq))
    (should (same-contents-p (seq-union v1 v2 testfn)
