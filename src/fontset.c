@@ -41,6 +41,23 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif /* HAVE_WINDOW_SYSTEM */
 #include "font.h"
 
+static Lisp_Object
+fontset_ensure_elisp_vector (Lisp_Object vec)
+{
+  if (VECTORP (vec))
+    return vec;
+  if (GVECTORP (vec))
+    {
+      ptrdiff_t size = GASIZE (vec);
+      Lisp_Object copy = make_elisp_vector (size, Qnil);
+      for (ptrdiff_t i = 0; i < size; i++)
+	ASET (copy, i, GAREF (vec, i));
+      return copy;
+    }
+  wrong_type_argument (Qvectorp, vec);
+  return vec;
+}
+
 /* FONTSET
 
    A fontset is a collection of font related information to give
@@ -397,6 +414,11 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
     font_object = Qnil;
 
   vec = XCDR (font_group);
+  if (!VECTORP (vec))
+    {
+      vec = fontset_ensure_elisp_vector (vec);
+      XSETCDR (font_group, vec);
+    }
   size = ASIZE (vec);
   /* Exclude the tailing nil element from the reordering.  */
   if (NILP (AREF (vec, size - 1)))
@@ -561,6 +583,11 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
   if (! CONSP (font_group))
     return font_group;
   vec = XCDR (font_group);
+  if (!VECTORP (vec))
+    {
+      vec = fontset_ensure_elisp_vector (vec);
+      XSETCDR (font_group, vec);
+    }
   if (ASIZE (vec) == 0)
     return Qnil;
 
