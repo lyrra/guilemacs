@@ -2149,9 +2149,9 @@ For an approximate inverse of this, see `kbd'.  */)
 	      key = AREF (list, i);
 	      i++;
 	    }
-	  else if (scm_is_vector (list))
+      else if (scm_is_vector (list))
 	    {
-	      key = scm_c_vector_ref (list, i);
+	      key = GAREF (list, i);
 	      i++;
 	    }
 	  else

@@ -1447,6 +1447,33 @@ GVECTORP (Lisp_Object x)
   return scm_is_vector (x);
 }
 
+INLINE ptrdiff_t
+gvector_length (Lisp_Object v)
+{
+  eassert (GVECTORP (v));
+  return scm_c_vector_length (v);
+}
+
+INLINE Lisp_Object
+gvector_ref (Lisp_Object v, ptrdiff_t idx)
+{
+  eassert (GVECTORP (v));
+  eassert (0 <= idx && idx < gvector_length (v));
+  return scm_c_vector_ref (v, idx);
+}
+
+INLINE void
+gvector_set (Lisp_Object v, ptrdiff_t idx, Lisp_Object val)
+{
+  eassert (GVECTORP (v));
+  eassert (0 <= idx && idx < gvector_length (v));
+  scm_c_vector_set_x (v, idx, val);
+}
+
+#define GASIZE(v) gvector_length (v)
+#define GAREF(v, i) gvector_ref (v, i)
+#define GASET(v, i, val) gvector_set (v, i, val)
+
 INLINE bool
 VECTOR_OR_PSEUDOVECTORP (Lisp_Object x)
 {

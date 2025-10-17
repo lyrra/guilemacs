@@ -48,7 +48,7 @@ static Lisp_Object Vccl_program_table;
 #define GET_HASH_TABLE(id) \
   XHASH_TABLE (XCDR ((VECTORP (Vtranslation_hash_table_vector) \
                       ? AREF (Vtranslation_hash_table_vector, id) \
-                      : scm_c_vector_ref (Vtranslation_hash_table_vector, id))))
+                      : GAREF (Vtranslation_hash_table_vector, id))))
 
 /* CCL (Code Conversion Language) is a simple language which has
    operations on one input buffer, one output buffer, and 7 registers.
@@ -1893,18 +1893,16 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
   int i, veclen, unresolved = 0;
   Lisp_Object result, contents, val;
   bool is_scheme_vector = scm_is_vector (ccl);
-  ptrdiff_t size;
-
-  size = is_scheme_vector ? scm_c_vector_length (ccl) : ASIZE (ccl);
+  ptrdiff_t size = is_scheme_vector ? GASIZE (ccl) : ASIZE (ccl);
   if (! (CCL_HEADER_MAIN < size && size <= INT_MAX))
     return Qnil;
   result = Fcopy_sequence (ccl);
   bool result_is_scheme = scm_is_vector (result);
-  veclen = result_is_scheme ? scm_c_vector_length (result) : ASIZE (result);
+  veclen = result_is_scheme ? GASIZE (result) : ASIZE (result);
 
   for (i = 0; i < veclen; i++)
     {
-      contents = result_is_scheme ? scm_c_vector_ref (result, i) : AREF (result, i);
+      contents = result_is_scheme ? GAREF (result, i) : AREF (result, i);
       if (TYPE_RANGED_FIXNUMP (int, contents))
 	continue;
       else if (CONSP (contents)
@@ -1918,7 +1916,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
 	    {
 	      if (result_is_scheme)
-		scm_c_vector_set_x (result, i, val);
+		GASET (result, i, val);
 	      else
 		ASET (result, i, val);
 	    }
@@ -1935,7 +1933,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
 	    {
 	      if (result_is_scheme)
-		scm_c_vector_set_x (result, i, val);
+		GASET (result, i, val);
 	      else
 		ASET (result, i, val);
 	    }
@@ -1945,7 +1943,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 	      if (RANGED_FIXNUMP (0, val, INT_MAX))
 		{
 		  if (result_is_scheme)
-		    scm_c_vector_set_x (result, i, val);
+		    GASET (result, i, val);
 		  else
 		    ASET (result, i, val);
 		}
@@ -1955,7 +1953,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 		  if (RANGED_FIXNUMP (0, val, INT_MAX))
 		    {
 		      if (result_is_scheme)
-			scm_c_vector_set_x (result, i, val);
+			GASET (result, i, val);
 		      else
 			ASET (result, i, val);
 		    }
@@ -1965,7 +1963,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 		      if (RANGED_FIXNUMP (0, val, INT_MAX))
 			{
 			  if (result_is_scheme)
-			    scm_c_vector_set_x (result, i, val);
+			    GASET (result, i, val);
 			  else
 			    ASET (result, i, val);
 			}
@@ -1979,8 +1977,8 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
       return Qnil;
     }
 
-  if (! (0 <= XFIXNUM (result_is_scheme ? scm_c_vector_ref (result, CCL_HEADER_BUF_MAG) : AREF (result, CCL_HEADER_BUF_MAG))
-	 && ASCENDING_ORDER (0, XFIXNUM (result_is_scheme ? scm_c_vector_ref (result, CCL_HEADER_EOF) : AREF (result, CCL_HEADER_EOF)),
+  if (! (0 <= XFIXNUM (result_is_scheme ? GAREF (result, CCL_HEADER_BUF_MAG) : AREF (result, CCL_HEADER_BUF_MAG))
+	 && ASCENDING_ORDER (0, XFIXNUM (result_is_scheme ? GAREF (result, CCL_HEADER_EOF) : AREF (result, CCL_HEADER_EOF)),
 			     size)))
     return Qnil;
 
@@ -2050,11 +2048,11 @@ setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
       if (is_scheme_vector)
 	{
 	  /* Convert Scheme vector to C vector for fast array access in ccl_driver */
-	  ptrdiff_t len = scm_c_vector_length (ccl_prog);
+	  ptrdiff_t len = GASIZE (ccl_prog);
 	  Lisp_Object emacs_vec = make_elisp_vector (len, Qnil);
 
 	  for (ptrdiff_t i = 0; i < len; i++)
-	    ASET (emacs_vec, i, scm_c_vector_ref (ccl_prog, i));
+	    ASET (emacs_vec, i, GAREF (ccl_prog, i));
 
 	  vp = XVECTOR (emacs_vec);
 	  ccl->size = vp->header.size;

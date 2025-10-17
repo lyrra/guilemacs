@@ -772,10 +772,10 @@ the same empty object instead of its copy.  */)
 
   if (scm_is_vector (arg))
     {
-      ptrdiff_t n = scm_c_vector_length (arg);
+      ptrdiff_t n = GASIZE (arg);
       Lisp_Object val = scm_c_make_vector (n, Qnil);
       for (ptrdiff_t i = 0; i < n; i++)
-        scm_c_vector_set_x (val, i, scm_c_vector_ref (arg, i));
+        GASET (val, i, GAREF (arg, i));
       return val;
     }
 
@@ -1619,7 +1619,7 @@ With one argument, just copy STRING (with properties, if any).  */)
       ptrdiff_t newlen = ito - ifrom;
       res = scm_c_make_vector (newlen, Qnil);
       for (ptrdiff_t i = 0; i < newlen; i++)
-        scm_c_vector_set_x (res, i, AREF (string, ifrom + i));
+        GASET (res, i, GAREF (string, ifrom + i));
     }
   else
     {
@@ -1636,7 +1636,7 @@ With one argument, just copy STRING (with properties, if any).  */)
           /* Fallback for other vectorlikes - copy element by element */
           res = scm_c_make_vector (newlen, Qnil);
           for (ptrdiff_t i = 0; i < newlen; i++)
-            scm_c_vector_set_x (res, i, AREF (string, ifrom + i));
+            GASET (res, i, AREF (string, ifrom + i));
         }
     }
 
@@ -1698,7 +1698,7 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
       ptrdiff_t newlen = to - from;
       res = scm_c_make_vector (newlen, Qnil);
       for (ptrdiff_t i = 0; i < newlen; i++)
-        scm_c_vector_set_x (res, i, AREF (string, from + i));
+        GASET (res, i, GAREF (string, from + i));
     }
   else
     {
@@ -2283,13 +2283,13 @@ This function may destructively modify SEQ to produce the value.  */)
   else if (scm_is_vector (seq))
     {
       /* FIX-guilemacs: Handle Guile native vectors - destructive reverse */
-      ptrdiff_t i, size = scm_c_vector_length (seq);
+      ptrdiff_t i, size = GASIZE (seq);
 
       for (i = 0; i < size / 2; i++)
 	{
-	  Lisp_Object tem = scm_c_vector_ref (seq, i);
-	  scm_c_vector_set_x (seq, i, scm_c_vector_ref (seq, size - i - 1));
-	  scm_c_vector_set_x (seq, size - i - 1, tem);
+	  Lisp_Object tem = GAREF (seq, i);
+	  GASET (seq, i, GAREF (seq, size - i - 1));
+	  GASET (seq, size - i - 1, tem);
 	}
     }
   else if (BOOL_VECTOR_P (seq))
@@ -2337,11 +2337,11 @@ See also the function `nreverse', which is used more often.  */)
   else if (scm_is_vector (seq))
     {
       /* FIX-guilemacs: Handle Guile native vectors */
-      ptrdiff_t i, size = scm_c_vector_length (seq);
+      ptrdiff_t i, size = GASIZE (seq);
 
       new = scm_c_make_vector (size, Qnil);
       for (i = 0; i < size; i++)
-	scm_c_vector_set_x (new, i, scm_c_vector_ref (seq, size - i - 1));
+	GASET (new, i, GAREF (seq, size - i - 1));
     }
   else if (BOOL_VECTOR_P (seq))
     {
@@ -2510,12 +2510,12 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
       /* For Guile vectors, we need to convert to/from lists since sort_vector
          expects VECTORP. An alternative would be to make sort_vector work with
          scm_is_vector, but that would require more changes. */
-      ptrdiff_t len = scm_c_vector_length (seq);
+      ptrdiff_t len = GASIZE (seq);
       Lisp_Object list = Qnil;
 
       /* Convert vector to list */
       for (ptrdiff_t i = len - 1; i >= 0; i--)
-        list = Fcons (scm_c_vector_ref (seq, i), list);
+        list = Fcons (GAREF (seq, i), list);
 
       /* Sort the list */
       Lisp_Object sorted_list = sort_list (list, lessp, key, reverse, false);
@@ -2526,7 +2526,7 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
           /* Modify in place */
           ptrdiff_t j = 0;
           for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
-            scm_c_vector_set_x (seq, j++, XCAR (tail));
+            GASET (seq, j++, XCAR (tail));
           return seq;
         }
       else
@@ -2535,7 +2535,7 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
           Lisp_Object new_vec = scm_c_make_vector (len, Qnil);
           ptrdiff_t j = 0;
           for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
-            scm_c_vector_set_x (new_vec, j++, XCAR (tail));
+            GASET (new_vec, j++, XCAR (tail));
           return new_vec;
         }
     }
@@ -3203,9 +3203,9 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
   if (VECTORP (array))
     for (idx = 0, size = ASIZE (array); idx < size; idx++)
       ASET (array, idx, item);
-  else if (scm_is_vector (array))
-    for (idx = 0, size = scm_c_vector_length (array); idx < size; idx++)
-      scm_c_vector_set_x (array, idx, item);
+  else if (GVECTORP (array))
+    for (idx = 0, size = GASIZE (array); idx < size; idx++)
+      GASET (array, idx, item);
   else if (CHAR_TABLE_P (array))
     {
       int i;
@@ -3350,7 +3350,7 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
     {
       for (ptrdiff_t i = 0; i < leni; i++)
 	{
-	  Lisp_Object dummy = call1 (fn, scm_c_vector_ref (seq, i));
+	  Lisp_Object dummy = call1 (fn, GAREF (seq, i));
 	  if (vals)
 	    vals[i] = dummy;
 	}

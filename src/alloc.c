@@ -1222,7 +1222,7 @@ usage: (vector &rest OBJECTS)  */)
   /* Create Scheme vector for consistency with vector literals [1 2 3] */
   Lisp_Object val = scm_c_make_vector (nargs, SCM_UNDEFINED);
   for (ptrdiff_t i = 0; i < nargs; i++)
-    scm_c_vector_set_x (val, i, args[i]);
+    GASET (val, i, args[i]);
   return val;
 }
 

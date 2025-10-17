@@ -2775,7 +2775,7 @@ vector_from_rev_list (Lisp_Object elems)
   ptrdiff_t size = list_length (elems);
   Lisp_Object obj = make_nil_elisp_vector (size);
 
-  /* Work with Scheme vector using scm_c_vector_set_x */
+  /* Populate the elisp vector with elements from the reversed list */
   for (ptrdiff_t i = size - 1; i >= 0; i--)
     {
       if (i < 0 || i >= size)
@@ -2794,7 +2794,7 @@ vector_from_rev_list (Lisp_Object elems)
           car_val = scm_car (elems);
           cdr_val = scm_cdr (elems);
         }
-      scm_c_vector_set_x (obj, i, car_val);
+      ASET (obj, i, car_val);
       elems = cdr_val;
     }
   return obj;
