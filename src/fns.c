@@ -2280,6 +2280,18 @@ This function may destructively modify SEQ to produce the value.  */)
 	  ASET (seq, size - i - 1, tem);
 	}
     }
+  else if (scm_is_vector (seq))
+    {
+      /* FIX-guilemacs: Handle Guile native vectors - destructive reverse */
+      ptrdiff_t i, size = scm_c_vector_length (seq);
+
+      for (i = 0; i < size / 2; i++)
+	{
+	  Lisp_Object tem = scm_c_vector_ref (seq, i);
+	  scm_c_vector_set_x (seq, i, scm_c_vector_ref (seq, size - i - 1));
+	  scm_c_vector_set_x (seq, size - i - 1, tem);
+	}
+    }
   else if (BOOL_VECTOR_P (seq))
     {
       ptrdiff_t i, size = bool_vector_size (seq);
