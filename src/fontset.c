@@ -41,7 +41,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif /* HAVE_WINDOW_SYSTEM */
 #include "font.h"
 
-static Lisp_Object
+Lisp_Object
 fontset_ensure_elisp_vector (Lisp_Object vec)
 {
   if (VECTORP (vec))

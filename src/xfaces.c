@@ -1630,7 +1630,7 @@ the face font sort order, see `face-font-selection-order'.  */)
   SAFE_ALLOCA_LISP (drivers, ndrivers);
   for (i = 0; i < ndrivers; i++, list = XCDR (list))
     drivers[i] = XCAR (list);
-  vec = Fvconcat (ndrivers, drivers);
+  vec = fontset_ensure_elisp_vector (Fvconcat (ndrivers, drivers));
   nfonts = ASIZE (vec);
 
   qsort (XVECTOR (vec)->contents, nfonts, word_size,
