@@ -2322,6 +2322,15 @@ See also the function `nreverse', which is used more often.  */)
       for (i = 0; i < size; i++)
 	ASET (new, i, AREF (seq, size - i - 1));
     }
+  else if (scm_is_vector (seq))
+    {
+      /* FIX-guilemacs: Handle Guile native vectors */
+      ptrdiff_t i, size = scm_c_vector_length (seq);
+
+      new = scm_c_make_vector (size, Qnil);
+      for (i = 0; i < size; i++)
+	scm_c_vector_set_x (new, i, scm_c_vector_ref (seq, size - i - 1));
+    }
   else if (BOOL_VECTOR_P (seq))
     {
       EMACS_INT nbits = bool_vector_size (seq);

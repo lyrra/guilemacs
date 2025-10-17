@@ -211,6 +211,8 @@ a fixed set of types.  */)
     return Qcons;
   else if (GUILEBIGNUMP (object))
     return Qbignum;
+  else if (scm_is_vector (object))
+    return Qvector;
   else if (VECTORLIKEP (object))
     {
       switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
