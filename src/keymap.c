@@ -84,6 +84,21 @@ static void describe_vector (Lisp_Object, Lisp_Object, Lisp_Object,
 static void silly_event_symbol_error (Lisp_Object);
 static Lisp_Object get_keyelt (Lisp_Object, bool);
 
+/* Ensure vectors stored inside keymaps are mutable Lisp vectors.  If CELL
+   is a cons cell whose CAR currently refers to VECTOR, update it to keep
+   the upgraded storage.  */
+static Lisp_Object
+ensure_keymap_elisp_vector (Lisp_Object vector, Lisp_Object cell)
+{
+  if (GVECTORP (vector))
+    {
+      vector = ensure_elisp_vector (vector);
+      if (!NILP (cell))
+	XSETCAR (cell, vector);
+    }
+  return vector;
+}
+
 static void
 CHECK_VECTOR_OR_CHAR_TABLE (Lisp_Object x)
 {
@@ -432,11 +447,12 @@ access_keymap_1 (Lisp_Object map, Lisp_Object idx,
 		t_binding = XCDR (binding);
 		t_ok = 0;
 	      }
-	  }
-	else if (VECTORP (binding))
+      }
+	else if (VECTORP (binding) || GVECTORP (binding))
 	  {
-	    if (FIXNUMP (idx) && XFIXNAT (idx) < ASIZE (binding))
-	      val = AREF (binding, XFIXNAT (idx));
+	    Lisp_Object vector = ensure_keymap_elisp_vector (binding, tail);
+	    if (FIXNUMP (idx) && XFIXNAT (idx) < ASIZE (vector))
+	      val = AREF (vector, XFIXNAT (idx));
 	  }
 	else if (CHAR_TABLE_P (binding))
 	  {
@@ -785,12 +801,14 @@ store_in_keymap (Lisp_Object keymap, register Lisp_Object idx,
     for (tail = XCDR (keymap); CONSP (tail); tail = XCDR (tail))
       {
 	Lisp_Object elt = XCAR (tail);
-	if (VECTORP (elt))
-	  {
-	    if (FIXNATP (idx) && XFIXNAT (idx) < ASIZE (elt))
+      if (VECTORP (elt) || GVECTORP (elt))
+	{
+	  Lisp_Object table = ensure_keymap_elisp_vector (elt, tail);
+
+	  if (FIXNATP (idx) && XFIXNAT (idx) < ASIZE (table))
 	      {
-		CHECK_IMPURE (elt, XVECTOR (elt));
-		ASET (elt, XFIXNAT (idx), def);
+		CHECK_IMPURE (table, XVECTOR (table));
+		ASET (table, XFIXNAT (idx), def);
 		return def;
 	      }
 	    else if (CONSP (idx) && CHARACTERP (XCAR (idx)))
@@ -798,10 +816,10 @@ store_in_keymap (Lisp_Object keymap, register Lisp_Object idx,
 		int from = XFIXNAT (XCAR (idx));
 		int to = XFIXNAT (XCDR (idx));
 
-		if (to >= ASIZE (elt))
-		  to = ASIZE (elt) - 1;
+		if (to >= ASIZE (table))
+		  to = ASIZE (table) - 1;
 		for (; from <= to; from++)
-		  ASET (elt, from, def);
+		  ASET (table, from, def);
 		if (to == XFIXNAT (XCDR (idx)))
 		  /* We have defined all keys in IDX.  */
 		  return def;
@@ -1002,11 +1020,23 @@ copy_keymap_1 (Lisp_Object keymap, int depth)
 	  map_char_table (copy_keymap_set_char_table, Qnil, elt,
 			  Fcons (elt, make_fixnum (depth + 1)));
 	}
-      else if (VECTORP (elt))
+      else if (VECTORP (elt) || GVECTORP (elt))
 	{
-	  elt = Fcopy_sequence (elt);
-	  for (int i = 0; i < ASIZE (elt); i++)
-	    ASET (elt, i, copy_keymap_item (AREF (elt, i), depth + 1));
+	  if (GVECTORP (elt))
+	    {
+	      ptrdiff_t len = GASIZE (elt);
+	      Lisp_Object copy_vec = make_uninit_elisp_vector (len);
+	      for (ptrdiff_t i = 0; i < len; i++)
+		ASET (copy_vec, i,
+		      copy_keymap_item (GAREF (elt, i), depth + 1));
+	      elt = copy_vec;
+	    }
+	  else
+	    {
+	      elt = Fcopy_sequence (elt);
+	      for (int i = 0; i < ASIZE (elt); i++)
+		ASET (elt, i, copy_keymap_item (AREF (elt, i), depth + 1));
+	    }
 	}
       else if (CONSP (elt))
 	{
@@ -1058,24 +1088,32 @@ is not copied.  */)
 static Lisp_Object
 possibly_translate_key_sequence (Lisp_Object key, ptrdiff_t *length)
 {
-  if (VECTORP (key) && ASIZE (key) == 1 && STRINGP (AREF (key, 0)))
+  if (VECTORP (key) || GVECTORP (key))
     {
-      /* KEY is on the ["C-c"] format, so translate to internal
-	 format.  */
-      if (NILP (Ffboundp (Qkey_valid_p)))
-	xsignal2 (Qerror,
-		  build_string ("`key-valid-p' is not defined, so this syntax can't be used: %s"),
-		  key);
-      /* If key-valid-p is unhappy about KEY, we return it as-is.
-         This happens when menu items define as bindings strings that
-         should be inserted into the buffer, not commands.  See
-         bug#64927, for example.  */
-      if (NILP (call1 (Qkey_valid_p, AREF (key, 0))))
-	return key;
-      key = call1 (Qkey_parse, AREF (key, 0));
-      *length = CHECK_VECTOR_OR_STRING (key);
-      if (*length == 0)
-	xsignal2 (Qerror, build_string ("Invalid `key-parse' syntax: %S"), key);
+      Lisp_Object vector = key;
+
+      if (GVECTORP (vector))
+	vector = ensure_elisp_vector (vector);
+
+      if (ASIZE (vector) == 1 && STRINGP (AREF (vector, 0)))
+	{
+	  /* KEY is on the ["C-c"] format, so translate to internal
+	     format.  */
+	  if (NILP (Ffboundp (Qkey_valid_p)))
+	    xsignal2 (Qerror,
+		      build_string ("`key-valid-p' is not defined, so this syntax can't be used: %s"),
+		      vector);
+	  /* If key-valid-p is unhappy about KEY, we return it as-is.
+	     This happens when menu items define as bindings strings that
+	     should be inserted into the buffer, not commands.  See
+	     bug#64927, for example.  */
+	  if (NILP (call1 (Qkey_valid_p, AREF (vector, 0))))
+	    return vector;
+	  key = call1 (Qkey_parse, AREF (vector, 0));
+	  *length = CHECK_VECTOR_OR_STRING (key);
+	  if (*length == 0)
+	    xsignal2 (Qerror, build_string ("Invalid `key-parse' syntax: %S"), key);
+	}
     }
 
   return key;
@@ -1133,21 +1171,30 @@ binding KEY to DEF is added at the front of KEYMAP.  */)
   if (length == 0)
     return Qnil;
 
-  int meta_bit = (VECTORP (key) || (STRINGP (key) /* FIX-guilemacs: && STRING_MULTIBYTE (key)*/)
-		  ? meta_modifier : 0x80);
+  int meta_bit = ((VECTORP (key) || GVECTORP (key)
+                   || (STRINGP (key) /* FIX-guilemacs: && STRING_MULTIBYTE (key)*/))
+                  ? meta_modifier : 0x80);
 
-  if (VECTORP (def) && ASIZE (def) > 0 && CONSP (AREF (def, 0)))
+  if (VECTORP (def) || GVECTORP (def))
     { /* DEF is apparently an XEmacs-style keyboard macro.  */
-      Lisp_Object tmp = make_nil_elisp_vector (ASIZE (def));
-      ptrdiff_t i = ASIZE (def);
-      while (--i >= 0)
-	{
-	  Lisp_Object defi = AREF (def, i);
-	  if (CONSP (defi) && lucid_event_type_list_p (defi))
-	    defi = Fevent_convert_list (defi);
-	  ASET (tmp, i, defi);
-	}
-      def = tmp;
+      Lisp_Object macro = def;
+
+      if (GVECTORP (macro))
+        macro = ensure_elisp_vector (macro);
+
+      if (ASIZE (macro) > 0 && CONSP (AREF (macro, 0)))
+        {
+          Lisp_Object tmp = make_nil_elisp_vector (ASIZE (macro));
+          ptrdiff_t i = ASIZE (macro);
+          while (--i >= 0)
+            {
+              Lisp_Object defi = AREF (macro, i);
+              if (CONSP (defi) && lucid_event_type_list_p (defi))
+                defi = Fevent_convert_list (defi);
+              ASET (tmp, i, defi);
+            }
+          def = tmp;
+        }
     }
 
   key = possibly_translate_key_sequence (key, &length);
@@ -1328,8 +1375,13 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
      backwards-compatibility.  (Bug#50752) */
 
   /* Just skip everything below unless this is a menu item.  */
-  if (!VECTORP (key) || !(ASIZE (key) > 0)
-      || !EQ (AREF (key, 0), Qmenu_bar))
+  if (!(VECTORP (key) || GVECTORP (key)))
+    return found;
+
+  if (GVECTORP (key))
+    key = ensure_elisp_vector (key);
+
+  if (!(ASIZE (key) > 0) || !EQ (AREF (key, 0), Qmenu_bar))
     return found;
 
   /* Initialize the unicode case table, if it wasn't already.  */
@@ -1822,6 +1874,9 @@ specified buffer position instead of point are used.
   */)
   (Lisp_Object key, Lisp_Object accept_default, Lisp_Object no_remap, Lisp_Object position)
 {
+  if (GVECTORP (key))
+    key = ensure_elisp_vector (key);
+
   if (NILP (position) && VECTORP (key))
     {
       if (ASIZE (key) == 0)
