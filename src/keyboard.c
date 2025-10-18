@@ -4676,6 +4676,9 @@ decode_timer (Lisp_Object timer)
 {
   Lisp_Object *vec;
 
+  if (GVECTORP (timer))
+    timer = ensure_elisp_vector (timer);
+
   if (! (VECTORP (timer) && ASIZE (timer) == 10))
     return invalid_timespec ();
   vec = XVECTOR (timer)->contents;
@@ -7590,9 +7593,12 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
      we've never used that symbol before.  */
   else
     {
+      if (GVECTORP (*symbol_table))
+        *symbol_table = ensure_elisp_vector (*symbol_table);
+
       if (! VECTORP (*symbol_table)
-	  || ASIZE (*symbol_table) != table_size)
-	*symbol_table = make_nil_elisp_vector (table_size);
+          || ASIZE (*symbol_table) != table_size)
+        *symbol_table = make_nil_elisp_vector (table_size);
 
       value = AREF (*symbol_table, symbol_num);
     }
@@ -8819,7 +8825,8 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 	      else if (EQ (tem, QCkey_sequence))
 		{
 		  tem = XCAR (item);
-		  if (SYMBOLP (tem) || STRINGP (tem) || VECTORP (tem))
+          if (SYMBOLP (tem) || STRINGP (tem)
+              || VECTORP (tem) || GVECTORP (tem))
 		    /* Be GC protected. Set keyhint to item instead of tem.  */
 		    keyhint = item;
 		}
@@ -9337,10 +9344,10 @@ parse_tab_bar_item (Lisp_Object key, Lisp_Object item)
 static void
 init_tab_bar_items (Lisp_Object reuse)
 {
-  if (VECTORP (reuse))
-    tab_bar_items_vector = reuse;
+  if (VECTORP (reuse) || GVECTORP (reuse))
+    tab_bar_items_vector = ensure_elisp_vector (reuse);
   else
-    tab_bar_items_vector = make_nil_vector (64);
+    tab_bar_items_vector = make_nil_elisp_vector (64);
   ntab_bar_items = 0;
 }
 
@@ -9720,12 +9727,18 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 	      set_prop (TOOL_BAR_ITEM_TYPE, type);
 	    }
 	}
-      else if (EQ (ikey, QCimage)
-	       && (CONSP (value)
-		   || (VECTORP (value) && ASIZE (value) == 4)))
-	/* Value is either a single image specification or a vector
-	   of 4 such specifications for the different button states.  */
-	set_prop (TOOL_BAR_ITEM_IMAGES, value);
+      else if (EQ (ikey, QCimage))
+        {
+          Lisp_Object image_value = value;
+          if (GVECTORP (image_value))
+            image_value = ensure_elisp_vector (image_value);
+
+          if (CONSP (image_value)
+              || (VECTORP (image_value) && ASIZE (image_value) == 4))
+            /* Value is either a single image specification or a vector
+               of 4 such specifications for the different button states.  */
+            set_prop (TOOL_BAR_ITEM_IMAGES, image_value);
+        }
       else if (EQ (ikey, QCrtl))
         /* ':rtl STRING' */
 	set_prop (TOOL_BAR_ITEM_RTL_IMAGE, value);
@@ -9851,8 +9864,8 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 static void
 init_tool_bar_items (Lisp_Object reuse)
 {
-  if (VECTORP (reuse))
-    tool_bar_items_vector = reuse;
+  if (VECTORP (reuse) || GVECTORP (reuse))
+    tool_bar_items_vector = ensure_elisp_vector (reuse);
   else
     tool_bar_items_vector = make_nil_elisp_vector (64);
   ntool_bar_items = 0;
@@ -10032,11 +10045,13 @@ read_char_minibuf_menu_prompt (int commandflag,
 	  else
 	    elt = Fcar_safe (rest);
 
-	  if (idx < 0 && VECTORP (elt))
+	  if (idx < 0 && (VECTORP (elt) || GVECTORP (elt)))
 	    {
 	      /* If we found a dense table in the keymap,
 		 advanced past it, but start scanning its contents.  */
 	      rest = Fcdr_safe (rest);
+	      if (GVECTORP (elt))
+		elt = ensure_elisp_vector (elt);
 	      vector = elt;
 	      idx = 0;
 	    }
@@ -10276,7 +10291,7 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
 
       /* If the function returned something invalid,
 	 barf--don't ignore it.  */
-      if (! (NILP (next) || VECTORP (next) || STRINGP (next)))
+      if (! (NILP (next) || VECTORP (next) || GVECTORP (next) || STRINGP (next)))
 	signal_error ("Function returns invalid key sequence", tem);
     }
   return next;
@@ -10315,7 +10330,7 @@ keyremap_step (Lisp_Object *keybuf, volatile keyremap *fkey,
   /* If keybuf[fkey->start..fkey->end] is bound in the
      map and we're in a position to do the key remapping, replace it with
      the binding and restart with fkey->start at the end.  */
-  if ((VECTORP (next) || STRINGP (next)) && doit)
+  if ((VECTORP (next) || GVECTORP (next) || STRINGP (next)) && doit)
     {
       int len = XFIXNAT (Flength (next));
       int i;
