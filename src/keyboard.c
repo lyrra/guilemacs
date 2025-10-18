@@ -11732,7 +11732,7 @@ represented as pseudo-events of the form (nil . COMMAND).  */)
 	    i = 0;
 	} while (i != recent_keys_index);
       es = Fnreverse (es);
-      return Fvconcat (1, &es);
+      return ensure_elisp_vector (Fvconcat (1, &es));
     }
 }
 

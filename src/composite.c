@@ -218,7 +218,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
   if (FIXNUMP (components))
     key = make_elisp_vector (1, components);
   else if (STRINGP (components) || CONSP (components))
-    key = Fvconcat (1, &components);
+    key = ensure_elisp_vector (Fvconcat (1, &components));
   else if (VECTORP (components))
     key = components;
   else if (NILP (components))

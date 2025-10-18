@@ -2179,7 +2179,7 @@ font_vconcat_entity_vectors (Lisp_Object list)
 
   for (ptrdiff_t i = 0; i < nargs; i++, list = XCDR (list))
     args[i] = XCAR (list);
-  Lisp_Object result = Fvconcat (nargs, args);
+  Lisp_Object result = ensure_elisp_vector (Fvconcat (nargs, args));
   SAFE_FREE ();
   return result;
 }
@@ -2781,7 +2781,7 @@ font_delete_unmatched (Lisp_Object vec, Lisp_Object spec, int size)
       if (prop < FONT_SPEC_MAX)
 	val = Fcons (entity, val);
     }
-  return (Fvconcat (1, &val));
+  return ensure_elisp_vector (Fvconcat (1, &val));
 }
 
 
@@ -2844,7 +2844,7 @@ font_list_entities (struct frame *f, Lisp_Object spec)
 	    if (NILP (val))
 	      val = zero_vector;
 	    else
-	      val = Fvconcat (1, &val);
+	      val = ensure_elisp_vector (Fvconcat (1, &val));
 	    copy = copy_font_spec (scratch_font_spec);
 	    ASET (copy, FONT_TYPE_INDEX, driver_list->driver->type);
 	    XSETCDR (cache, Fcons (Fcons (copy, val), XCDR (cache)));

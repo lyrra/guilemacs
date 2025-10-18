@@ -3641,6 +3641,7 @@ xvector_contents (Lisp_Object a)
   return xvector_contents_addr (a, 0);
 }
 
+
 /* Copy COUNT Lisp_Objects from ARGS to contents of V starting from OFFSET.  */
 
 INLINE void
@@ -4278,6 +4279,23 @@ make_uninit_elisp_vector (ptrdiff_t size)
   Lisp_Object vector;
   XSETVECTOR (vector, allocate_vector (size));
   return vector;
+}
+
+INLINE Lisp_Object
+ensure_elisp_vector (Lisp_Object vec)
+{
+  if (VECTORP (vec))
+    return vec;
+  if (GVECTORP (vec))
+    {
+      ptrdiff_t size = GASIZE (vec);
+      Lisp_Object copy = make_elisp_vector (size, Qnil);
+      for (ptrdiff_t i = 0; i < size; i++)
+        ASET (copy, i, GAREF (vec, i));
+      return copy;
+    }
+  wrong_type_argument (Qvectorp, vec);
+  return vec;
 }
 
 INLINE Lisp_Object
