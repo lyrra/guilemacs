@@ -1240,10 +1240,13 @@ uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
       break;
   value = make_fixnum (i);
   if (i == size)
-    set_char_table_extras (table, 4,
-			   CALLN (Fvconcat,
-				  XCHAR_TABLE (table)->extras[4],
-				  make_elisp_vector (1, value)));
+    {
+      Lisp_Object extended
+	= ensure_elisp_vector (CALLN (Fvconcat,
+				      XCHAR_TABLE (table)->extras[4],
+				      make_elisp_vector (1, value)));
+      set_char_table_extras (table, 4, extended);
+    }
   return make_fixnum (i);
 }
 

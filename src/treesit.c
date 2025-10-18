@@ -2741,13 +2741,14 @@ See Info node `(elisp)Pattern Matching' for detailed explanation.  */)
     return Vtreesit_str_pound_match;
   if (BASE_EQ (pattern, QCpred))
     return Vtreesit_str_pound_pred;
+  bool vector_pattern_p = VECTORP (pattern) || GVECTORP (pattern);
   Lisp_Object opening_delimeter
-    = VECTORP (pattern)
+    = vector_pattern_p
       ? Vtreesit_str_open_bracket : Vtreesit_str_open_paren;
   Lisp_Object closing_delimiter
-    = VECTORP (pattern)
+    = vector_pattern_p
       ? Vtreesit_str_close_bracket : Vtreesit_str_close_paren;
-  if (VECTORP (pattern) || CONSP (pattern))
+  if (vector_pattern_p || CONSP (pattern))
     return concat3 (opening_delimeter,
 		    Fmapconcat (Qtreesit_pattern_expand,
 				pattern,

@@ -1673,9 +1673,10 @@ Return nil if format of ADDRESS is invalid.  */)
   if (STRINGP (address))  /* AF_LOCAL */
     return address;
 
-  if (VECTORP (address))  /* AF_INET or AF_INET6 */
+  if (VECTORP (address) || GVECTORP (address))  /* AF_INET or AF_INET6 */
     {
-      register struct Lisp_Vector *p = XVECTOR (address);
+      Lisp_Object address_vec = ensure_elisp_vector (address);
+      register struct Lisp_Vector *p = XVECTOR (address_vec);
       ptrdiff_t size = p->header.size;
       Lisp_Object args[10];
       int nargs, i;
@@ -2657,10 +2658,12 @@ static ptrdiff_t
 get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
 {
   struct Lisp_Vector *p;
+  Lisp_Object address_vec = Qnil;
 
-  if (VECTORP (address))
+  if (VECTORP (address) || GVECTORP (address))
     {
-      p = XVECTOR (address);
+      address_vec = ensure_elisp_vector (address);
+      p = XVECTOR (address_vec);
       if (p->header.size == 5)
 	{
 	  *familyp = AF_INET;
@@ -2682,10 +2685,11 @@ get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
     }
 #endif
   else if (CONSP (address) && TYPE_RANGED_FIXNUMP (int, XCAR (address))
-	   && VECTORP (XCDR (address)))
+	   && (VECTORP (XCDR (address)) || GVECTORP (XCDR (address))))
     {
       struct sockaddr *sa;
-      p = XVECTOR (XCDR (address));
+      address_vec = ensure_elisp_vector (XCDR (address));
+      p = XVECTOR (address_vec);
       if (MAX_ALLOCA - sizeof sa->sa_family < p->header.size)
 	return 0;
       *familyp = XFIXNUM (XCAR (address));
@@ -2705,15 +2709,17 @@ static void
 conv_lisp_to_sockaddr (int family, Lisp_Object address, struct sockaddr *sa, int len)
 {
   register struct Lisp_Vector *p;
+  Lisp_Object address_vec = Qnil;
   register unsigned char *cp = NULL;
   register int i;
   EMACS_INT hostport;
 
   memset (sa, 0, len);
 
-  if (VECTORP (address))
+  if (VECTORP (address) || GVECTORP (address))
     {
-      p = XVECTOR (address);
+      address_vec = ensure_elisp_vector (address);
+      p = XVECTOR (address_vec);
       if (family == AF_INET)
 	{
 	  DECLARE_POINTER_ALIAS (sin, struct sockaddr_in, sa);
@@ -2760,7 +2766,8 @@ conv_lisp_to_sockaddr (int family, Lisp_Object address, struct sockaddr *sa, int
     }
   else
     {
-      p = XVECTOR (XCDR (address));
+      address_vec = ensure_elisp_vector (XCDR (address));
+      p = XVECTOR (address_vec);
       cp = (unsigned char *)sa + sizeof (sa->sa_family);
     }
 

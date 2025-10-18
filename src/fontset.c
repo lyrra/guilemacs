@@ -348,18 +348,20 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
       do {
 	from1 = from, to1 = to;
 	args[idx] = char_table_ref_and_range (fontset, from, &from1, &to1);
-	char_table_set_range (fontset, from, to1,
-			      (NILP (args[idx]) ? args[1 - idx]
-			       : CALLMANY (Fvconcat, args)));
+	Lisp_Object replacement
+	  = (NILP (args[idx]) ? args[1 - idx]
+	     : ensure_elisp_vector (CALLMANY (Fvconcat, args)));
+	char_table_set_range (fontset, from, to1, replacement);
 	from = to1 + 1;
       } while (from <= to);
     }
   else
     {
       args[idx] = FONTSET_FALLBACK (fontset);
-      set_fontset_fallback (fontset,
-			    (NILP (args[idx]) ? args[1 - idx]
-			     : CALLMANY (Fvconcat, args)));
+      Lisp_Object fallback
+	= (NILP (args[idx]) ? args[1 - idx]
+	   : ensure_elisp_vector (CALLMANY (Fvconcat, args)));
+      set_fontset_fallback (fontset, fallback);
     }
 }
 
