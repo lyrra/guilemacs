@@ -1002,6 +1002,9 @@ static enum prop_handled handle_display_prop (struct it *);
 static enum prop_handled handle_composition_prop (struct it *);
 static enum prop_handled handle_overlay_change (struct it *);
 static enum prop_handled handle_fontified_prop (struct it *);
+static Lisp_Object display_table_ensure_invis_vector (struct Lisp_Char_Table *);
+static Lisp_Object display_table_ensure_char_vector (struct Lisp_Char_Table *,
+						     int, Lisp_Object);
 
 /* Properties handled by iterators.  */
 
@@ -5543,6 +5546,42 @@ handle_invisible_prop (struct it *it)
 }
 
 
+static Lisp_Object
+display_table_ensure_invis_vector (struct Lisp_Char_Table *dp)
+{
+  Lisp_Object vec = DISP_INVIS_VECTOR (dp);
+
+  if (GVECTORP (vec))
+    {
+      vec = ensure_elisp_vector (vec);
+      DISP_INVIS_VECTOR (dp) = vec;
+    }
+
+  return vec;
+}
+
+static Lisp_Object
+display_table_ensure_char_vector (struct Lisp_Char_Table *dp, int c,
+				  Lisp_Object vec)
+{
+  if (!GVECTORP (vec))
+    return vec;
+
+  Lisp_Object upgraded = ensure_elisp_vector (vec);
+
+  if (EQ (vec, dp->defalt))
+    dp->defalt = upgraded;
+  else
+    {
+      Lisp_Object table;
+      XSETCHAR_TABLE (table, dp);
+      char_table_set_range (table, c, c, upgraded);
+    }
+
+  return upgraded;
+}
+
+
 /* Make iterator IT return `...' next.
    Replaces LEN characters from buffer.  */
 
@@ -5551,18 +5590,26 @@ setup_for_ellipsis (struct it *it, int len)
 {
   /* Use the display table definition for `...'.  Invalid glyphs
      will be handled by the method returning elements from dpvec.  */
-  if (it->dp && VECTORP (DISP_INVIS_VECTOR (it->dp)))
+  if (it->dp)
     {
-      struct Lisp_Vector *v = XVECTOR (DISP_INVIS_VECTOR (it->dp));
-      it->dpvec = v->contents;
-      it->dpend = v->contents + v->header.size;
+      Lisp_Object invis = DISP_INVIS_VECTOR (it->dp);
+
+      if (VECTORP (invis) || GVECTORP (invis))
+	{
+	  Lisp_Object ensured = display_table_ensure_invis_vector (it->dp);
+	  struct Lisp_Vector *v = XVECTOR (ensured);
+
+	  it->dpvec = v->contents;
+	  it->dpend = v->contents + v->header.size;
+	  goto finish;
+	}
     }
-  else
-    {
-      /* Default `...'.  */
-      it->dpvec = default_invis_vector;
-      it->dpend = default_invis_vector + 3;
-    }
+
+  /* Default `...'.  */
+  it->dpvec = default_invis_vector;
+  it->dpend = default_invis_vector + 3;
+
+ finish:
 
   it->dpvec_char_len = len;
   it->current.dpvec_index = 0;
@@ -8365,8 +8412,9 @@ get_next_display_element (struct it *it)
 
 	  if (it->dp
 	      && (dv = DISP_CHAR_VECTOR (it->dp, c),
-		  VECTORP (dv)))
+		  (VECTORP (dv) || GVECTORP (dv))))
 	    {
+	      dv = display_table_ensure_char_vector (it->dp, c, dv);
 	      struct Lisp_Vector *v = XVECTOR (dv);
 
 	      /* Return the first character from the display table
@@ -35449,9 +35497,16 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
   else if (EQ (XCAR (hot_spot), Qpoly))
     {
       /* CDR is [x0 y0 x1 y1 x2 y2 ...x(n-1) y(n-1)] */
-      if (VECTORP (XCDR (hot_spot)))
+      Lisp_Object coords = XCDR (hot_spot);
+      if (VECTORP (coords) || GVECTORP (coords))
 	{
-	  struct Lisp_Vector *v = XVECTOR (XCDR (hot_spot));
+	  if (GVECTORP (coords))
+	    {
+	      coords = ensure_elisp_vector (coords);
+	      XSETCDR (hot_spot, coords);
+	    }
+
+	  struct Lisp_Vector *v = XVECTOR (coords);
 	  Lisp_Object *poly = v->contents;
 	  ptrdiff_t n = v->header.size;
 	  ptrdiff_t i;
