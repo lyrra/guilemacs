@@ -3133,6 +3133,9 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	  || (VECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
 	      && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
 					    Vkeyboard_translate_table)))
+	  || (GVECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
+	      && XFIXNAT (c) < GASIZE (KVAR (current_kboard,
+					      Vkeyboard_translate_table)))
 	  || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
 	      && CHARACTERP (c)))
 	{
@@ -8758,8 +8761,9 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 
       /* Maybe an obsolete key binding cache.  */
       if (CONSP (item) && CONSP (XCAR (item))
-	  && (NILP (XCAR (XCAR (item)))
-	      || VECTORP (XCAR (XCAR (item)))))
+          && (NILP (XCAR (XCAR (item)))
+              || VECTORP (XCAR (XCAR (item)))
+              || GVECTORP (XCAR (XCAR (item)))))
 	item = XCDR (item);
 
       /* This is the real definition--the function to run.  */
@@ -9219,6 +9223,9 @@ parse_tab_bar_item (Lisp_Object key, Lisp_Object item)
 
   /* Create tab_bar_item_properties vector if necessary.  Reset it to
      defaults.  */
+  if (GVECTORP (tab_bar_item_properties))
+    tab_bar_item_properties = ensure_elisp_vector (tab_bar_item_properties);
+
   if (VECTORP (tab_bar_item_properties))
     {
       for (i = 0; i < TAB_BAR_ITEM_NSLOTS; ++i)
@@ -9618,6 +9625,9 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 
   /* Create tool_bar_item_properties vector if necessary.  Reset it to
      defaults.  */
+  if (GVECTORP (tool_bar_item_properties))
+    tool_bar_item_properties = ensure_elisp_vector (tool_bar_item_properties);
+
   if (VECTORP (tool_bar_item_properties))
     {
       for (i = 0; i < TOOL_BAR_ITEM_NSLOTS; ++i)
