@@ -531,14 +531,23 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       /* Save the frame's previous menu bar contents data.  */
       if (previous_menu_items_used)
-	memcpy (previous_items, XVECTOR (f->menu_bar_vector)->contents,
-		previous_menu_items_used * word_size);
+	{
+	  if (GVECTORP (f->menu_bar_vector))
+	    fset_menu_bar_vector (f, ensure_elisp_vector (f->menu_bar_vector));
+	  memcpy (previous_items, xvector_contents (f->menu_bar_vector),
+		  previous_menu_items_used * word_size);
+	}
 
       /* Fill in menu_items with the current menu bar contents.
 	 This can evaluate Lisp code.  */
       save_menu_items ();
 
       menu_items = f->menu_bar_vector;
+      if (GVECTORP (menu_items))
+	{
+	  menu_items = ensure_elisp_vector (menu_items);
+	  fset_menu_bar_vector (f, menu_items);
+	}
       menu_items_allocated = VECTORP (menu_items) ? ASIZE (menu_items) : 0;
       submenu_start = (int *) alloca (ASIZE (items) * sizeof (int));
       submenu_end = (int *) alloca (ASIZE (items) * sizeof (int));
