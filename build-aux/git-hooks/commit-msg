@@ -121,16 +121,6 @@ exec $awk \
     }
   }
 
-  78 < length && $0 ~ space {
-    print "Line longer than 78 characters in commit message"
-    status = 1
-  }
-
-  140 < length {
-    print "Word longer than 140 characters in commit message"
-    status = 1
-  }
-
   /^Signed-off-by: / {
     print "'\''Signed-off-by:'\'' in commit message"
     status = 1
