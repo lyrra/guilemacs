@@ -1621,6 +1621,9 @@ default_line_pixel_height (struct window *w)
 static Lisp_Object
 string_from_display_spec (Lisp_Object spec)
 {
+  if (GVECTORP (spec))
+    spec = ensure_elisp_vector (spec);
+
   if (VECTORP (spec))
     {
       for (ptrdiff_t i = 0; i < ASIZE (spec); i++)
@@ -5641,6 +5644,8 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
   Lisp_Object elem;
   if (NILP (disp))
     return Qnil;
+  if (GVECTORP (disp))
+    disp = ensure_elisp_vector (disp);
   /* We have a vector of display specs.  */
   if (VECTORP (disp))
     {
@@ -5981,10 +5986,11 @@ handle_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	    }
 	}
     }
-  else if (VECTORP (spec))
+  else if (VECTORP (spec) || GVECTORP (spec))
     {
-      ptrdiff_t i;
-      for (i = 0; i < ASIZE (spec); ++i)
+      if (GVECTORP (spec))
+	spec = ensure_elisp_vector (spec);
+      for (ptrdiff_t i = 0; i < ASIZE (spec); ++i)
 	{
 	  int rv = handle_single_display_spec (it, AREF (spec, i), object,
 					       overlay, position, bufpos,
@@ -6659,8 +6665,10 @@ display_prop_string_p (Lisp_Object prop, Lisp_Object string)
 	  prop = XCDR (prop);
 	}
     }
-  else if (VECTORP (prop))
+  else if (VECTORP (prop) || GVECTORP (prop))
     {
+      if (GVECTORP (prop))
+	prop = ensure_elisp_vector (prop);
       /* A vector of sub-properties.  */
       ptrdiff_t i;
       for (i = 0; i < ASIZE (prop); ++i)
@@ -15476,6 +15484,8 @@ build_desired_tool_bar_string (struct frame *f)
       /* If image is a vector, choose the image according to the
 	 button state.  */
       image = PROP (TOOL_BAR_ITEM_IMAGES);
+      if (GVECTORP (image))
+	image = ensure_elisp_vector (image);
       if (VECTORP (image))
 	{
 	  if (enabled_p)
@@ -28598,6 +28608,9 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
   val = CODING_SYSTEM_SPEC (coding_system);
   eoltype = Qnil;
 
+  if (GVECTORP (val))
+    val = ensure_elisp_vector (val);
+
   if (!VECTORP (val))		/* Not yet decided.  */
     {
       *buf++ = multibyte ? '-' : ' ';
@@ -28624,6 +28637,8 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
 	  /* The EOL conversion that is normal on this system.  */
 
 	  if (NILP (eolvalue))	/* Not yet decided.  */
+	    eoltype = eol_mnemonic_undecided;
+	  else if (GVECTORP (eolvalue))
 	    eoltype = eol_mnemonic_undecided;
 	  else if (VECTORP (eolvalue)) /* Not yet decided.  */
 	    eoltype = eol_mnemonic_undecided;
