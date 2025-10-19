@@ -2974,7 +2974,15 @@ make_cl_data (xg_menu_cb_data *cl_data, struct frame *f, GCallback highlight_cb)
     {
       cl_data = xmalloc_uncollectable (sizeof *cl_data);
       cl_data->f = f;
-      cl_data->menu_bar_vector = f->menu_bar_vector;
+      {
+	Lisp_Object menu_vec = f->menu_bar_vector;
+	if (GVECTORP (menu_vec))
+	  {
+	    menu_vec = ensure_elisp_vector (menu_vec);
+	    fset_menu_bar_vector (f, menu_vec);
+	  }
+	cl_data->menu_bar_vector = menu_vec;
+      }
       cl_data->menu_bar_items_used = f->menu_bar_items_used;
       cl_data->highlight_cb = highlight_cb;
       cl_data->ref_count = 0;
@@ -3006,7 +3014,15 @@ update_cl_data (xg_menu_cb_data *cl_data,
   if (cl_data)
     {
       cl_data->f = f;
-      cl_data->menu_bar_vector = f->menu_bar_vector;
+      {
+	Lisp_Object menu_vec = f->menu_bar_vector;
+	if (GVECTORP (menu_vec))
+	  {
+	    menu_vec = ensure_elisp_vector (menu_vec);
+	    fset_menu_bar_vector (f, menu_vec);
+	  }
+	cl_data->menu_bar_vector = menu_vec;
+      }
       cl_data->menu_bar_items_used = f->menu_bar_items_used;
       cl_data->highlight_cb = highlight_cb;
     }
