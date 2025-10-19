@@ -3420,9 +3420,12 @@ FUNCTION must be a function of one argument, and must return a value
 	  while (!NILP (src));
 	  goto concat;
 	}
-      else if (VECTORP (sequence))
+      else if (VECTORP (sequence) || GVECTORP (sequence))
 	{
-	  memcpy (args, XVECTOR (sequence)->contents, leni * sizeof *args);
+	  Lisp_Object vec = sequence;
+	  if (GVECTORP (vec))
+	    vec = ensure_elisp_vector (vec);
+	  memcpy (args, XVECTOR (vec)->contents, leni * sizeof *args);
 	  goto concat;
 	}
     }
@@ -4641,6 +4644,8 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
   ptrdiff_t C_language_max = min (PTRDIFF_MAX, SIZE_MAX) / sizeof *v->contents;
   ptrdiff_t n_max = (0 <= nitems_max && nitems_max < C_language_max
 		     ? nitems_max : C_language_max);
+  if (GVECTORP (vec))
+    vec = ensure_elisp_vector (vec);
   eassert (VECTORP (vec));
   eassert (0 < incr_min && -1 <= nitems_max);
   old_size = ASIZE (vec);
