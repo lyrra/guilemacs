@@ -2846,7 +2846,7 @@ font_list_entities (struct frame *f, Lisp_Object spec)
 	    if (NILP (val))
 	      val = zero_vector;
 	    else
-	      val = ensure_elisp_vector (Fvconcat (1, &val));
+	      val = Fvconcat (1, &val);
 	    copy = copy_font_spec (scratch_font_spec);
 	    ASET (copy, FONT_TYPE_INDEX, driver_list->driver->type);
 	    XSETCDR (cache, Fcons (Fcons (copy, val), XCDR (cache)));
