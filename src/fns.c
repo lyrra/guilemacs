@@ -138,7 +138,7 @@ efficient.  */)
     val = 0;
   else if (VECTORP (sequence))
     val = ASIZE (sequence);
-  else if (scm_is_vector (sequence))
+  else if (GVECTORP (sequence))
     val = GASIZE (sequence);
   else if (CHAR_TABLE_P (sequence))
     val = MAX_CHAR;
@@ -770,7 +770,7 @@ the same empty object instead of its copy.  */)
   if (VECTORP (arg))
     return Fvector (ASIZE (arg), XVECTOR (arg)->contents);
 
-  if (scm_is_vector (arg))
+  if (GVECTORP (arg))
     {
       ptrdiff_t n = GASIZE (arg);
       Lisp_Object val = scm_c_make_vector (n, Qnil);
@@ -837,13 +837,14 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  //  string_overflow ();
 	  result_len_byte += arg_len_byte;
 	}
-      else if (VECTORP (arg) || scm_is_vector (arg))
+      else if (VECTORP (arg) || GVECTORP (arg))
 	{
-	  len = ASIZE (arg);
+	  bool scheme_vec = GVECTORP (arg);
+	  len = scheme_vec ? GASIZE (arg) : ASIZE (arg);
 	  ptrdiff_t arg_len_byte = 0;
 	  for (ptrdiff_t j = 0; j < len; j++)
 	    {
-	      Lisp_Object ch = AREF (arg, j);
+	      Lisp_Object ch = scheme_vec ? GAREF (arg, j) : AREF (arg, j);
 	      CHECK_CHARACTER (ch);
 	      int c = XFIXNAT (ch);
 	      arg_len_byte += CHAR_BYTES (c);
@@ -954,18 +955,18 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    }
 #endif
 	}
-      else if (VECTORP (arg) || scm_is_vector (arg))
+      else if (VECTORP (arg) || GVECTORP (arg))
 	{
-	  ptrdiff_t len = ASIZE (arg);
+	  bool scheme_vec = GVECTORP (arg);
+	  ptrdiff_t len = scheme_vec ? GASIZE (arg) : ASIZE (arg);
 	  for (ptrdiff_t j = 0; j < len; j++)
 	    {
-	      int c = XFIXNAT (AREF (arg, j));
+	      Lisp_Object ch = scheme_vec ? GAREF (arg, j) : AREF (arg, j);
+	      int c = XFIXNAT (ch);
 	      if (dest_multibyte)
 		toindex_byte += CHAR_STRING (c, SDATA (result) + toindex_byte);
 	      else
-                // FIX: :upstream: why do we use SSET over ASET, when using AREF
-		//SSET (result, toindex_byte++, c);
-                scm_c_string_set_x (result, toindex_byte++, scm_c_make_char (c));
+		scm_c_string_set_x (result, toindex_byte++, scm_c_make_char (c));
 	      toindex++;
 	    }
 	}
@@ -1037,28 +1038,46 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
 	}
       else if (NILP (arg))
 	;
-      else if ((VECTORP (arg) || scm_is_vector (arg)) || STRINGP (arg)
-               || BOOL_VECTOR_P (arg) || CLOSUREP (arg))
+      else if (STRINGP (arg))
 	{
-	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
+	  ptrdiff_t arglen = SCHARS (arg);
 
-	  /* Copy element by element.  */
 	  for (ptrdiff_t argindex = 0; argindex < arglen; argindex++)
 	    {
-	      /* Fetch next element of `arg' arg into `elt', or break if
-		 `arg' is exhausted. */
-	      Lisp_Object elt;
-	      if (STRINGP (arg))
-		{
-		  int c = SREF (arg, argindex);
-		  elt = make_fixed_natnum (c);
-		}
-	      else if (BOOL_VECTOR_P (arg))
-		elt = bool_vector_ref (arg, argindex);
+	      int c = SREF (arg, argindex);
+	      Lisp_Object elt = make_fixed_natnum (c);
+	      Lisp_Object node = Fcons (elt, Qnil);
+	      if (NILP (result))
+		result = node;
 	      else
-		elt = AREF (arg, argindex);
+		XSETCDR (last, node);
+	      last = node;
+	    }
+	}
+      else if (BOOL_VECTOR_P (arg))
+	{
+	  ptrdiff_t arglen = bool_vector_size (arg);
 
-	      /* Store this element into the result.  */
+	  for (ptrdiff_t argindex = 0; argindex < arglen; argindex++)
+	    {
+	      Lisp_Object elt = bool_vector_ref (arg, argindex);
+
+	      Lisp_Object node = Fcons (elt, Qnil);
+	      if (NILP (result))
+		result = node;
+	      else
+		XSETCDR (last, node);
+	      last = node;
+	    }
+	}
+      else if (GVECTORP (arg) || VECTORP (arg) || CLOSUREP (arg))
+	{
+	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
+	  bool scheme_vec = GVECTORP (arg);
+
+	  for (ptrdiff_t argindex = 0; argindex < arglen; argindex++)
+	    {
+	      Lisp_Object elt = scheme_vec ? GAREF (arg, argindex) : AREF (arg, argindex);
 	      Lisp_Object node = Fcons (elt, Qnil);
 	      if (NILP (result))
 		result = node;
@@ -1088,7 +1107,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (!((VECTORP (arg) || scm_is_vector (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
+      if (!((VECTORP (arg) || GVECTORP (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
             || BOOL_VECTOR_P (arg) || CLOSUREP (arg)))
         wrong_type_argument (Qsequencep, arg);
       EMACS_INT len = XFIXNAT (Flength (arg));
@@ -1106,11 +1125,15 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (VECTORP (arg) || scm_is_vector (arg))
+      if (VECTORP (arg) || GVECTORP (arg))
 	{
-	  ptrdiff_t size = VECTORP (arg) ? ASIZE (arg) : GASIZE (arg);
+	  bool scheme_vec = GVECTORP (arg);
+	  ptrdiff_t size = scheme_vec ? GASIZE (arg) : ASIZE (arg);
 	  for (ptrdiff_t j = 0; j < size; j++)
-	    GASET (result, dst_idx++, AREF (arg, j));
+	    {
+	      Lisp_Object elt = scheme_vec ? GAREF (arg, j) : AREF (arg, j);
+	      GASET (result, dst_idx++, elt);
+	    }
 	}
       else if (CONSP (arg))
 	do
@@ -1612,7 +1635,7 @@ With one argument, just copy STRING (with properties, if any).  */)
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
-  else if (scm_is_vector (string))
+  else if (GVECTORP (string))
     {
       /* Handle Scheme vectors by building element by element */
       ptrdiff_t newlen = ito - ifrom;
@@ -1691,7 +1714,7 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
       copy_text_properties (make_fixnum (from), make_fixnum (to),
 			    string, make_fixnum (0), res, Qnil);
     }
-  else if (scm_is_vector (string))
+  else if (GVECTORP (string))
     {
       /* Handle Scheme vectors by building element by element */
       ptrdiff_t newlen = to - from;
@@ -2149,17 +2172,19 @@ does not modify the argument.  */)
 	}
       CHECK_LIST_END (tail, seq);
     }
-  else if (VECTORP (seq))
+  else if (VECTORP (seq) || GVECTORP (seq))
     {
       ptrdiff_t n = 0;
-      ptrdiff_t size = ASIZE (seq);
+      bool scheme_vec = GVECTORP (seq);
+      ptrdiff_t size = scheme_vec ? GASIZE (seq) : ASIZE (seq);
       USE_SAFE_ALLOCA;
       Lisp_Object *kept = SAFE_ALLOCA (size * sizeof *kept);
 
       for (ptrdiff_t i = 0; i < size; i++)
 	{
-	  kept[n] = AREF (seq, i);
-	  n += NILP (Fequal (AREF (seq, i), elt));
+	  Lisp_Object elem = scheme_vec ? GAREF (seq, i) : AREF (seq, i);
+	  kept[n] = elem;
+	  n += NILP (Fequal (elem, elt));
 	}
 
       if (n != size)
@@ -2268,27 +2293,27 @@ This function may destructively modify SEQ to produce the value.  */)
       CHECK_LIST_END (tail, seq);
       seq = prev;
     }
-  else if (VECTORP (seq))
+  else if (VECTORP (seq) || GVECTORP (seq))
     {
-      ptrdiff_t i, size = ASIZE (seq);
+      bool scheme_vec = GVECTORP (seq);
+      ptrdiff_t size = scheme_vec ? GASIZE (seq) : ASIZE (seq);
 
-      for (i = 0; i < size / 2; i++)
+      for (ptrdiff_t i = 0; i < size / 2; i++)
 	{
-	  Lisp_Object tem = AREF (seq, i);
-	  ASET (seq, i, AREF (seq, size - i - 1));
-	  ASET (seq, size - i - 1, tem);
-	}
-    }
-  else if (scm_is_vector (seq))
-    {
-      /* FIX-guilemacs: Handle Guile native vectors - destructive reverse */
-      ptrdiff_t i, size = GASIZE (seq);
+	  ptrdiff_t j = size - i - 1;
+	  Lisp_Object left = scheme_vec ? GAREF (seq, i) : AREF (seq, i);
+	  Lisp_Object right = scheme_vec ? GAREF (seq, j) : AREF (seq, j);
 
-      for (i = 0; i < size / 2; i++)
-	{
-	  Lisp_Object tem = GAREF (seq, i);
-	  GASET (seq, i, GAREF (seq, size - i - 1));
-	  GASET (seq, size - i - 1, tem);
+	  if (scheme_vec)
+	    {
+	      GASET (seq, i, right);
+	      GASET (seq, j, left);
+	    }
+	  else
+	    {
+	      ASET (seq, i, right);
+	      ASET (seq, j, left);
+	    }
 	}
     }
   else if (BOOL_VECTOR_P (seq))
@@ -2325,22 +2350,25 @@ See also the function `nreverse', which is used more often.  */)
 	new = Fcons (XCAR (seq), new);
       CHECK_LIST_END (seq, seq);
     }
-  else if (VECTORP (seq))
+  else if (VECTORP (seq) || GVECTORP (seq))
     {
-      ptrdiff_t i, size = ASIZE (seq);
+      bool scheme_vec = GVECTORP (seq);
+      ptrdiff_t size = scheme_vec ? GASIZE (seq) : ASIZE (seq);
+      Lisp_Object vec = scheme_vec
+	? scm_c_make_vector (size, Qnil)
+	: make_uninit_elisp_vector (size);
 
-      new = make_uninit_elisp_vector (size);
-      for (i = 0; i < size; i++)
-	ASET (new, i, AREF (seq, size - i - 1));
-    }
-  else if (scm_is_vector (seq))
-    {
-      /* FIX-guilemacs: Handle Guile native vectors */
-      ptrdiff_t i, size = GASIZE (seq);
+      for (ptrdiff_t i = 0; i < size; i++)
+	{
+	  ptrdiff_t j = size - i - 1;
+	  Lisp_Object elem = scheme_vec ? GAREF (seq, j) : AREF (seq, j);
+	  if (scheme_vec)
+	    GASET (vec, i, elem);
+	  else
+	    ASET (vec, i, elem);
+	}
 
-      new = scm_c_make_vector (size, Qnil);
-      for (i = 0; i < size; i++)
-	GASET (new, i, GAREF (seq, size - i - 1));
+      new = vec;
     }
   else if (BOOL_VECTOR_P (seq))
     {
@@ -3324,20 +3352,13 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 	  tail = XCDR (tail);
 	}
     }
-  else if (VECTORP (seq) || CLOSUREP (seq))
+  else if (GVECTORP (seq) || VECTORP (seq) || CLOSUREP (seq))
     {
+      bool scheme_vec = GVECTORP (seq);
       for (ptrdiff_t i = 0; i < leni; i++)
 	{
-	  Lisp_Object dummy = call1 (fn, AREF (seq, i));
-	  if (vals)
-	    vals[i] = dummy;
-	}
-    }
-  else if (scm_is_vector (seq))
-    {
-      for (ptrdiff_t i = 0; i < leni; i++)
-	{
-	  Lisp_Object dummy = call1 (fn, GAREF (seq, i));
+	  Lisp_Object item = scheme_vec ? GAREF (seq, i) : AREF (seq, i);
+	  Lisp_Object dummy = call1 (fn, item);
 	  if (vals)
 	    vals[i] = dummy;
 	}

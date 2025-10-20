@@ -211,7 +211,7 @@ a fixed set of types.  */)
     return Qcons;
   else if (GUILEBIGNUMP (object))
     return Qbignum;
-  else if (scm_is_vector (object))
+  else if (GVECTORP (object))
     return Qvector;
   else if (VECTORLIKEP (object))
     {
@@ -362,7 +362,7 @@ DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
        doc: /* Return t if OBJECT is a vector.  */)
   (Lisp_Object object)
 {
-  if (VECTORP (object) || scm_is_vector (object))
+  if (VECTORP (object) || GVECTORP (object))
     return Qt;
   return Qnil;
 }
@@ -1136,9 +1136,9 @@ The value, if non-nil, is a list of mode name symbols.  */)
       if (PVSIZE (fun) <= CLOSURE_INTERACTIVE)
 	return Qnil;
       Lisp_Object form = AREF (fun, CLOSURE_INTERACTIVE);
-      if (VECTORP (form))
+      if (VECTORP (form) || GVECTORP (form))
 	/* New form -- the second element is the command modes. */
-	return AREF (form, 1);
+	return GVECTORP (form) ? GAREF (form, 1) : AREF (form, 1);
       else
 	/* Old .elc file -- no command modes. */
 	return Qnil;
