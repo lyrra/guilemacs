@@ -1675,9 +1675,7 @@ Return nil if format of ADDRESS is invalid.  */)
 
   if (VECTORP (address) || GVECTORP (address))  /* AF_INET or AF_INET6 */
     {
-      Lisp_Object address_vec = ensure_elisp_vector (address);
-      register struct Lisp_Vector *p = XVECTOR (address_vec);
-      ptrdiff_t size = p->header.size;
+      ptrdiff_t size = ASIZE (address);
       Lisp_Object args[10];
       int nargs, i;
       char const *format;
@@ -1710,15 +1708,16 @@ Return nil if format of ADDRESS is invalid.  */)
 
       for (i = 0; i < nargs; i++)
 	{
-	  if (! RANGED_FIXNUMP (0, p->contents[i], 65535))
+	  Lisp_Object elem = AREF (address, i);
+	  if (! RANGED_FIXNUMP (0, elem, 65535))
 	    return Qnil;
 
 	  if (nargs <= 5         /* IPv4 */
 	      && i < 4           /* host, not port */
-	      && XFIXNUM (p->contents[i]) > 255)
+	      && XFIXNUM (elem) > 255)
 	    return Qnil;
 
-	  args[i + 1] = p->contents[i];
+	  args[i + 1] = elem;
 	}
 
       return Fformat (nargs + 1, args);
@@ -2657,20 +2656,16 @@ conv_addrinfo_to_lisp (struct addrinfo *res)
 static ptrdiff_t
 get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
 {
-  struct Lisp_Vector *p;
-  Lisp_Object address_vec = Qnil;
-
   if (VECTORP (address) || GVECTORP (address))
     {
-      address_vec = ensure_elisp_vector (address);
-      p = XVECTOR (address_vec);
-      if (p->header.size == 5)
+      ptrdiff_t vec_size = ASIZE (address);
+      if (vec_size == 5)
 	{
 	  *familyp = AF_INET;
 	  return sizeof (struct sockaddr_in);
 	}
 #ifdef AF_INET6
-      else if (p->header.size == 9)
+      else if (vec_size == 9)
 	{
 	  *familyp = AF_INET6;
 	  return sizeof (struct sockaddr_in6);
@@ -2687,13 +2682,13 @@ get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
   else if (CONSP (address) && TYPE_RANGED_FIXNUMP (int, XCAR (address))
 	   && (VECTORP (XCDR (address)) || GVECTORP (XCDR (address))))
     {
-      struct sockaddr *sa;
-      address_vec = ensure_elisp_vector (XCDR (address));
-      p = XVECTOR (address_vec);
-      if (MAX_ALLOCA - sizeof sa->sa_family < p->header.size)
+      Lisp_Object vec = XCDR (address);
+      ptrdiff_t vec_size = ASIZE (vec);
+      size_t family_field_size = sizeof (((struct sockaddr *)0)->sa_family);
+      if (MAX_ALLOCA - family_field_size < vec_size)
 	return 0;
       *familyp = XFIXNUM (XCAR (address));
-      return p->header.size + sizeof (sa->sa_family);
+      return vec_size + family_field_size;
     }
   return 0;
 }
@@ -2708,72 +2703,111 @@ get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
 static void
 conv_lisp_to_sockaddr (int family, Lisp_Object address, struct sockaddr *sa, int len)
 {
-  register struct Lisp_Vector *p;
-  Lisp_Object address_vec = Qnil;
   register unsigned char *cp = NULL;
   register int i;
   EMACS_INT hostport;
+  Lisp_Object vec = Qnil;
 
   memset (sa, 0, len);
 
   if (VECTORP (address) || GVECTORP (address))
-    {
-      address_vec = ensure_elisp_vector (address);
-      p = XVECTOR (address_vec);
-      if (family == AF_INET)
-	{
-	  DECLARE_POINTER_ALIAS (sin, struct sockaddr_in, sa);
-	  len = sizeof (sin->sin_addr) + 1;
-	  hostport = XFIXNUM (p->contents[--len]);
-	  sin->sin_port = htons (hostport);
-	  cp = (unsigned char *)&sin->sin_addr;
-	  sa->sa_family = family;
-	}
-#ifdef AF_INET6
-      else if (family == AF_INET6)
-	{
-	  DECLARE_POINTER_ALIAS (sin6, struct sockaddr_in6, sa);
-	  DECLARE_POINTER_ALIAS (ip6, uint16_t, &sin6->sin6_addr);
-	  len = sizeof (sin6->sin6_addr) / 2 + 1;
-	  hostport = XFIXNUM (p->contents[--len]);
-	  sin6->sin6_port = htons (hostport);
-	  for (i = 0; i < len; i++)
-	    if (FIXNUMP (p->contents[i]))
-	      {
-		int j = XFIXNUM (p->contents[i]) & 0xffff;
-		ip6[i] = ntohs (j);
-	      }
-	  sa->sa_family = family;
-	  return;
-	}
-#endif
-      else
-	return;
-    }
+    vec = address;
   else if (STRINGP (address))
     {
 #ifdef HAVE_LOCAL_SOCKETS
       if (family == AF_LOCAL)
-	{
-	  DECLARE_POINTER_ALIAS (sockun, struct sockaddr_un, sa);
-	  cp = SDATA (address);
-	  for (i = 0; i < sizeof (sockun->sun_path) && *cp; i++)
-	    sockun->sun_path[i] = *cp++;
-	  sa->sa_family = family;
-	}
+        {
+          DECLARE_POINTER_ALIAS (sockun, struct sockaddr_un, sa);
+          const unsigned char *src = SDATA (address);
+          for (i = 0; i < sizeof (sockun->sun_path) && src[i]; i++)
+            sockun->sun_path[i] = src[i];
+          sa->sa_family = family;
+        }
 #endif
       return;
     }
   else
     {
-      address_vec = ensure_elisp_vector (XCDR (address));
-      p = XVECTOR (address_vec);
-      cp = (unsigned char *)sa + sizeof (sa->sa_family);
+      vec = XCDR (address);
+      cp = (unsigned char *) sa + sizeof (sa->sa_family);
     }
 
-  for (i = 0; i < len; i++)
-    if (FIXNUMP (p->contents[i]))
-      *cp++ = XFIXNAT (p->contents[i]) & 0xff;
+  if (NILP (vec))
+    return;
+
+  ptrdiff_t vec_len = ASIZE (vec);
+
+  if (family == AF_INET)
+    {
+      if (vec_len == 0)
+        return;
+
+      DECLARE_POINTER_ALIAS (sin, struct sockaddr_in, sa);
+      ptrdiff_t host_elems = vec_len - 1;
+      Lisp_Object port_obj = AREF (vec, host_elems);
+      hostport = XFIXNUM (port_obj);
+      sin->sin_port = htons (hostport);
+      unsigned char *addr_bytes = (unsigned char *) &sin->sin_addr;
+      ptrdiff_t copy_len = host_elems;
+      if (copy_len > (ptrdiff_t) sizeof (sin->sin_addr))
+        copy_len = sizeof (sin->sin_addr);
+      for (i = 0; i < copy_len; i++)
+        {
+          Lisp_Object octet = AREF (vec, i);
+          if (FIXNUMP (octet))
+            addr_bytes[i] = XFIXNAT (octet) & 0xff;
+        }
+      sa->sa_family = family;
+      return;
+    }
+#ifdef AF_INET6
+  else if (family == AF_INET6)
+    {
+      if (vec_len == 0)
+        return;
+
+      DECLARE_POINTER_ALIAS (sin6, struct sockaddr_in6, sa);
+      DECLARE_POINTER_ALIAS (ip6, uint16_t, &sin6->sin6_addr);
+      ptrdiff_t host_elems = vec_len - 1;
+      Lisp_Object port_obj = AREF (vec, host_elems);
+      hostport = XFIXNUM (port_obj);
+      sin6->sin6_port = htons (hostport);
+      ptrdiff_t copy_len = host_elems;
+      ptrdiff_t ip_slots = sizeof (sin6->sin6_addr) / sizeof (uint16_t);
+      if (copy_len > ip_slots)
+        copy_len = ip_slots;
+      for (i = 0; i < copy_len; i++)
+        {
+          Lisp_Object chunk = AREF (vec, i);
+          if (FIXNUMP (chunk))
+            {
+              int word = XFIXNUM (chunk) & 0xffff;
+              ip6[i] = ntohs (word);
+            }
+        }
+      sa->sa_family = family;
+      return;
+    }
+#endif
+
+  if (!cp)
+    cp = (unsigned char *) sa + sizeof (sa->sa_family);
+
+  ptrdiff_t copy_cap = len - (ptrdiff_t) sizeof (sa->sa_family);
+  if (copy_cap < 0)
+    copy_cap = 0;
+  ptrdiff_t copy_len = vec_len;
+  if (copy_len > copy_cap)
+    copy_len = copy_cap;
+
+  for (i = 0; i < copy_len; i++)
+    {
+      Lisp_Object element = AREF (vec, i);
+      if (FIXNUMP (element))
+        *cp++ = XFIXNAT (element) & 0xff;
+    }
+
+  sa->sa_family = family;
 }
 
 #ifdef DATAGRAM_SOCKETS
