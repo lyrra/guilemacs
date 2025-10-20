@@ -3429,12 +3429,15 @@ FUNCTION must be a function of one argument, and must return a value
 	  while (!NILP (src));
 	  goto concat;
 	}
-      else if (VECTORP (sequence) || GVECTORP (sequence))
+      else if (VECTORP (sequence))
 	{
-	  Lisp_Object vec = sequence;
-	  if (GVECTORP (vec))
-	    vec = ensure_elisp_vector (vec);
-	  memcpy (args, XVECTOR (vec)->contents, leni * sizeof *args);
+	  memcpy (args, XVECTOR (sequence)->contents, leni * sizeof *args);
+	  goto concat;
+	}
+      else if (GVECTORP (sequence))
+	{
+	  for (ptrdiff_t i = 0; i < leni; i++)
+	    args[i] = GAREF (sequence, i);
 	  goto concat;
 	}
     }
