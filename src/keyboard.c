@@ -7599,14 +7599,13 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
      we've never used that symbol before.  */
   else
     {
-      if (GVECTORP (*symbol_table))
-        *symbol_table = ensure_elisp_vector (*symbol_table);
-
-      if (! VECTORP (*symbol_table)
-          || ASIZE (*symbol_table) != table_size)
+      if (! ((VECTORP (*symbol_table) || GVECTORP (*symbol_table))
+             && ASIZE (*symbol_table) == table_size))
         *symbol_table = make_nil_elisp_vector (table_size);
 
-      value = AREF (*symbol_table, symbol_num);
+      value = (GVECTORP (*symbol_table)
+               ? GAREF (*symbol_table, symbol_num)
+               : AREF (*symbol_table, symbol_num));
     }
 
   /* Have we already used this symbol before?  */
