@@ -2181,7 +2181,7 @@ font_vconcat_entity_vectors (Lisp_Object list)
 
   for (ptrdiff_t i = 0; i < nargs; i++, list = XCDR (list))
     args[i] = XCAR (list);
-  Lisp_Object result = ensure_elisp_vector (Fvconcat (nargs, args));
+  Lisp_Object result = Fvconcat (nargs, args);
   SAFE_FREE ();
   return result;
 }
@@ -2496,7 +2496,7 @@ font_match_p (Lisp_Object spec, Lisp_Object font)
 			return 0;
 		    }
 		}
-	      else if (VECTORP (val2))
+	      else if (VECTORP (val2) || GVECTORP (val2))
 		{
 		  /* At most one character in the vector must be supported.  */
 		  for (i = 0; i < ASIZE (val2); i++)
@@ -2783,7 +2783,7 @@ font_delete_unmatched (Lisp_Object vec, Lisp_Object spec, int size)
       if (prop < FONT_SPEC_MAX)
 	val = Fcons (entity, val);
     }
-  return ensure_elisp_vector (Fvconcat (1, &val));
+  return Fvconcat (1, &val);
 }
 
 
@@ -3961,7 +3961,7 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
 	  val = XCDR (val);
 	  if (CONSP (val))
 	    val = XCAR (val);
-	  else if (VECTORP (val))
+	  else if (VECTORP (val) || GVECTORP (val))
 	    val = AREF (val, 0);
 	  font_object = font_for_char (face, XFIXNAT (val), pos, string);
 	}
@@ -5425,7 +5425,7 @@ character.  */)
 	for (ptrdiff_t i = 0; i < len; i++)
 	  chars[i] = make_fixnum (p[ifrom + i]);
     }
-  else if (VECTORP (object))
+  else if (VECTORP (object) || GVECTORP (object))
     {
       ptrdiff_t ifrom, ito;
 
@@ -5433,12 +5433,25 @@ character.  */)
       if (ifrom == ito)
 	return Qnil;
       len = ito - ifrom;
-      for (ptrdiff_t i = 0; i < len; i++)
+      if (VECTORP (object))
 	{
-	  Lisp_Object elt = AREF (object, ifrom + i);
-	  CHECK_CHARACTER (elt);
+	  for (ptrdiff_t i = 0; i < len; i++)
+	    {
+	      Lisp_Object elt = AREF (object, ifrom + i);
+	      CHECK_CHARACTER (elt);
+	    }
+	  chars = aref_addr (object, ifrom);
 	}
-      chars = aref_addr (object, ifrom);
+      else
+	{
+	  SAFE_ALLOCA_LISP (chars, len);
+	  for (ptrdiff_t i = 0; i < len; i++)
+	    {
+	      Lisp_Object elt = GAREF (object, ifrom + i);
+	      CHECK_CHARACTER (elt);
+	      chars[i] = elt;
+	    }
+	}
     }
   else
     wrong_type_argument (Qarrayp, object);
@@ -5760,7 +5773,7 @@ font_add_log (const char *action, Lisp_Object arg, Lisp_Object result)
     }
 
   if (CONSP (result)
-      && VECTORP (XCAR (result))
+      && (VECTORP (XCAR (result)) || GVECTORP (XCAR (result)))
       && ASIZE (XCAR (result)) > 0
       && FONTP (AREF (XCAR (result), 0)))
     result = font_vconcat_entity_vectors (result);
@@ -5787,7 +5800,7 @@ font_add_log (const char *action, Lisp_Object arg, Lisp_Object result)
 	  XSETCAR (tail, val);
 	}
     }
-  else if (VECTORP (result))
+  else if (VECTORP (result) || GVECTORP (result))
     {
       result = Fcopy_sequence (result);
       for (i = 0; i < ASIZE (result); i++)
