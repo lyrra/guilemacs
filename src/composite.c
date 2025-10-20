@@ -166,7 +166,7 @@ ptrdiff_t
 get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
 		    Lisp_Object prop, Lisp_Object string)
 {
-  Lisp_Object id, length, components, key, *key_contents;
+  Lisp_Object id, length, components, key;
   ptrdiff_t glyph_len;
   struct Lisp_Hash_Table *hash_table = XHASH_TABLE (composition_hash_table);
   ptrdiff_t hash_index;
@@ -264,7 +264,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
     composition_table = xpalloc (composition_table, &composition_table_size,
 				 1, -1, sizeof *composition_table);
 
-  key_contents = XVECTOR (key)->contents;
+  bool key_is_scheme = GVECTORP (key);
 
   /* Check if the contents of COMPONENTS are valid if COMPONENTS is a
      vector or a list.  It should be a sequence of:
@@ -278,7 +278,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
       ptrdiff_t len = ASIZE (key);
 
       for (ptrdiff_t i = 1; i < len; i++)
-	if (! VECTORP (AREF (key, i)))
+	if (! VECTORP (key_is_scheme ? GAREF (key, i) : AREF (key, i)))
 	  goto invalid_composition;
     }
   else if (VECTORP (components) || CONSP (components))
@@ -292,7 +292,8 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
          composition rule).  */
       for (ptrdiff_t i = 0; i < len; i++)
 	{
-	  if (!FIXNUMP (key_contents[i]))
+	  Lisp_Object element = key_is_scheme ? GAREF (key, i) : AREF (key, i);
+	  if (!FIXNUMP (element))
 	    goto invalid_composition;
 	}
     }
@@ -335,7 +336,8 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
       for (ptrdiff_t i = 0; i < glyph_len; i++)
 	{
 	  int this_width;
-	  ch = XFIXNUM (key_contents[i]);
+	  Lisp_Object element = key_is_scheme ? GAREF (key, i) : AREF (key, i);
+	  ch = XFIXNUM (element);
 	  /* TAB in a composition means display glyphs with padding
 	     space on the left or right.  */
 	  this_width = (ch == '\t' ? 1 : CHARACTER_WIDTH (ch));
@@ -348,7 +350,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
       /* Rule-base composition.  */
       double leftmost = 0.0, rightmost;
 
-      ch = XFIXNUM (key_contents[0]);
+      ch = XFIXNUM (key_is_scheme ? GAREF (key, 0) : AREF (key, 0));
       rightmost = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
 
       for (ptrdiff_t i = 1; i < glyph_len; i += 2)
@@ -357,8 +359,10 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
 	  int this_width;
 	  double this_left;
 
-	  rule = XFIXNUM (key_contents[i]);
-	  ch = XFIXNUM (key_contents[i + 1]);
+	  Lisp_Object rule_obj = key_is_scheme ? GAREF (key, i) : AREF (key, i);
+	  Lisp_Object glyph_obj = key_is_scheme ? GAREF (key, i + 1) : AREF (key, i + 1);
+	  rule = XFIXNUM (rule_obj);
+	  ch = XFIXNUM (glyph_obj);
 	  this_width = ch != '\t' ? CHARACTER_WIDTH (ch) : 1;
 
 	  /* A composition rule is specified by an integer value
