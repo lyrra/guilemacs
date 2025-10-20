@@ -1164,13 +1164,13 @@ uniprop_table_uncompress (Lisp_Object table, int idx)
 static Lisp_Object
 uniprop_decode_value_run_length (Lisp_Object table, Lisp_Object value)
 {
-  if (VECTORP (XCHAR_TABLE (table)->extras[4]))
-    {
-      Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
+  Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
 
-      if (XFIXNUM (value) >= 0 && XFIXNUM (value) < ASIZE (valvec))
-	value = AREF (valvec, XFIXNUM (value));
-    }
+  if ((VECTORP (valvec) || GVECTORP (valvec))
+      && XFIXNUM (value) >= 0 && XFIXNUM (value) < ASIZE (valvec))
+    value = (GVECTORP (valvec)
+	     ? GAREF (valvec, XFIXNUM (value))
+	     : AREF (valvec, XFIXNUM (value)));
   return value;
 }
 
@@ -1213,12 +1213,17 @@ uniprop_encode_value_character (Lisp_Object table, Lisp_Object value)
 static Lisp_Object
 uniprop_encode_value_run_length (Lisp_Object table, Lisp_Object value)
 {
-  Lisp_Object *value_table = XVECTOR (XCHAR_TABLE (table)->extras[4])->contents;
-  int i, size = ASIZE (XCHAR_TABLE (table)->extras[4]);
+  Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
+  ptrdiff_t size = ASIZE (valvec);
+  bool scheme_vec = GVECTORP (valvec);
+  ptrdiff_t i;
 
   for (i = 0; i < size; i++)
-    if (EQ (value, value_table[i]))
-      break;
+    {
+      Lisp_Object entry = scheme_vec ? GAREF (valvec, i) : AREF (valvec, i);
+      if (EQ (value, entry))
+	break;
+    }
   if (i == size)
     wrong_type_argument (build_string ("Unicode property value"), value);
   return make_fixnum (i);
@@ -1231,20 +1236,38 @@ uniprop_encode_value_run_length (Lisp_Object table, Lisp_Object value)
 static Lisp_Object
 uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
 {
-  Lisp_Object *value_table = XVECTOR (XCHAR_TABLE (table)->extras[4])->contents;
-  int i, size = ASIZE (XCHAR_TABLE (table)->extras[4]);
+  Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
+  ptrdiff_t size = ASIZE (valvec);
+  bool scheme_vec = GVECTORP (valvec);
+  ptrdiff_t i;
 
   CHECK_FIXNUM (value);
   for (i = 0; i < size; i++)
-    if (EQ (value, value_table[i]))
-      break;
+    {
+      Lisp_Object entry = scheme_vec ? GAREF (valvec, i) : AREF (valvec, i);
+      if (EQ (value, entry))
+	break;
+    }
   value = make_fixnum (i);
   if (i == size)
     {
-      Lisp_Object extended
-	= ensure_elisp_vector (CALLN (Fvconcat,
-				      XCHAR_TABLE (table)->extras[4],
-				      make_elisp_vector (1, value)));
+      Lisp_Object extended;
+      if (VECTORP (valvec))
+	{
+	  Lisp_Object new_vec = make_elisp_vector (size + 1, Qnil);
+	  for (ptrdiff_t j = 0; j < size; j++)
+	    ASET (new_vec, j, AREF (valvec, j));
+	  ASET (new_vec, size, value);
+	  extended = new_vec;
+	}
+      else
+	{
+	  Lisp_Object new_vec = scm_c_make_vector (size + 1, Qnil);
+	  for (ptrdiff_t j = 0; j < size; j++)
+	    GASET (new_vec, j, GAREF (valvec, j));
+	  GASET (new_vec, size, value);
+	  extended = new_vec;
+	}
       set_char_table_extras (table, 4, extended);
     }
   return make_fixnum (i);
