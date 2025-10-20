@@ -1438,7 +1438,7 @@ ASIZE (Lisp_Object array)
       eassume (0 <= size);
       return size;
     }
-  else if (scm_is_vector (array))
+  else if (GVECTORP (array))
     {
       /* Handle Scheme vectors */
       return GASIZE (array);
@@ -1462,7 +1462,7 @@ gc_asize (Lisp_Object array)
       eassume (0 <= size);
       return size;
     }
-  else if (scm_is_vector (array))
+  else if (GVECTORP (array))
     {
       /* Handle Scheme vectors */
       return GASIZE (array);
@@ -1501,7 +1501,7 @@ PSEUDOVECTOR_ONLY_P (Lisp_Object x)
 INLINE void
 CHECK_VECTOR (Lisp_Object x)
 {
-  CHECK_TYPE (VECTORP (x) || scm_is_vector (x), Qvectorp, x);
+  CHECK_TYPE (VECTORP (x) || GVECTORP (x), Qvectorp, x);
 }
 
 
@@ -1711,7 +1711,7 @@ AREF (Lisp_Object array, ptrdiff_t idx)
       eassert (0 <= idx && idx < gc_asize (array));
       return XVECTOR (array)->contents[idx];
     }
-  else if (scm_is_vector (array))
+  else if (GVECTORP (array))
     {
       return GAREF (array, idx);
     }
@@ -1745,7 +1745,7 @@ ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
       eassert (0 <= idx && idx < gc_asize (array));
       XVECTOR (array)->contents[idx] = val;
     }
-  else if (scm_is_vector (array))
+  else if (GVECTORP (array))
     {
       GASET (array, idx, val);
     }
@@ -2969,7 +2969,7 @@ IMAGEP (Lisp_Object x)
 INLINE bool
 ARRAYP (Lisp_Object x)
 {
-  return VECTORP (x) || scm_is_vector (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
+  return VECTORP (x) || GVECTORP (x) || STRINGP (x) || CHAR_TABLE_P (x) || BOOL_VECTOR_P (x);
 }
 
 INLINE void
@@ -3001,7 +3001,7 @@ CHECK_VECTOR_OR_STRING (Lisp_Object x)
 {
   if (VECTORP (x))
     return ASIZE (x);
-  if (scm_is_vector (x))
+  if (GVECTORP (x))
     return GASIZE (x);
   if (STRINGP (x))
     return SCHARS (x);

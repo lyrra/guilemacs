@@ -1372,7 +1372,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		ptrdiff_t table_size;
 		if (VECTORP (Vtranslation_hash_table_vector))
 		  table_size = ASIZE (Vtranslation_hash_table_vector);
-		else if (scm_is_vector (Vtranslation_hash_table_vector))
+		else if (GVECTORP (Vtranslation_hash_table_vector))
 		  table_size = GASIZE (Vtranslation_hash_table_vector);
 		else
 		  table_size = -1;
@@ -1402,7 +1402,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		ptrdiff_t table_size_char;
 		if (VECTORP (Vtranslation_hash_table_vector))
 		  table_size_char = ASIZE (Vtranslation_hash_table_vector);
-		else if (scm_is_vector (Vtranslation_hash_table_vector))
+		else if (GVECTORP (Vtranslation_hash_table_vector))
 		  table_size_char = GASIZE (Vtranslation_hash_table_vector);
 		else
 		  table_size_char = -1;
@@ -1892,12 +1892,12 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 {
   int i, veclen, unresolved = 0;
   Lisp_Object result, contents, val;
-  bool is_scheme_vector = scm_is_vector (ccl);
+  bool is_scheme_vector = GVECTORP (ccl);
   ptrdiff_t size = is_scheme_vector ? GASIZE (ccl) : ASIZE (ccl);
   if (! (CCL_HEADER_MAIN < size && size <= INT_MAX))
     return Qnil;
   result = Fcopy_sequence (ccl);
-  bool result_is_scheme = scm_is_vector (result);
+  bool result_is_scheme = GVECTORP (result);
   veclen = result_is_scheme ? GASIZE (result) : ASIZE (result);
 
   for (i = 0; i < veclen; i++)
@@ -1996,11 +1996,11 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
 {
   Lisp_Object val, slot;
 
-  if (VECTORP (ccl_prog) || scm_is_vector (ccl_prog))
+  if (VECTORP (ccl_prog) || GVECTORP (ccl_prog))
     {
       val = resolve_symbol_ccl_program (ccl_prog);
       *idx = -1;
-      return ((VECTORP (val) || scm_is_vector (val)) ? val : Qnil);
+      return ((VECTORP (val) || GVECTORP (val)) ? val : Qnil);
     }
   if (!SYMBOLP (ccl_prog))
     return Qnil;
@@ -2040,7 +2040,7 @@ setup_ccl_program (struct ccl_program *ccl, Lisp_Object ccl_prog)
       struct Lisp_Vector *vp;
 
       ccl_prog = ccl_get_compiled_code (ccl_prog, &ccl->idx);
-      bool is_scheme_vector = scm_is_vector (ccl_prog);
+      bool is_scheme_vector = GVECTORP (ccl_prog);
 
       if (! (VECTORP (ccl_prog) || is_scheme_vector))
 	return false;

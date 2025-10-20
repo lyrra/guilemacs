@@ -102,7 +102,7 @@ ensure_keymap_elisp_vector (Lisp_Object vector, Lisp_Object cell)
 static void
 CHECK_VECTOR_OR_CHAR_TABLE (Lisp_Object x)
 {
-  CHECK_TYPE (VECTORP (x) || scm_is_vector (x) || CHAR_TABLE_P (x), Qvector_or_char_table_p, x);
+  CHECK_TYPE (VECTORP (x) || GVECTORP (x) || CHAR_TABLE_P (x), Qvector_or_char_table_p, x);
 }
 
 /* Keymap object support - constructors and predicates.			*/
@@ -2186,7 +2186,7 @@ For an approximate inverse of this, see `kbd'.  */)
       Lisp_Object list = lists[li];
       ptrdiff_t listlen = listlens[li], i_byte = 0;
 
-      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || scm_is_vector (list) || CONSP (list)))
+      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || GVECTORP (list) || CONSP (list)))
 	wrong_type_argument (Qarrayp, list);
 
       for (ptrdiff_t i = 0; i < listlen; )
@@ -2204,7 +2204,7 @@ For an approximate inverse of this, see `kbd'.  */)
 	      key = AREF (list, i);
 	      i++;
 	    }
-      else if (scm_is_vector (list))
+	  else if (GVECTORP (list))
 	    {
 	      key = GAREF (list, i);
 	      i++;
