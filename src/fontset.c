@@ -350,7 +350,7 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 	args[idx] = char_table_ref_and_range (fontset, from, &from1, &to1);
 	Lisp_Object replacement
 	  = (NILP (args[idx]) ? args[1 - idx]
-	     : ensure_elisp_vector (CALLMANY (Fvconcat, args)));
+	     : ensure_elisp_vector (Fvconcat (XFIXNUM (args[0]), &args[1])));
 	char_table_set_range (fontset, from, to1, replacement);
 	from = to1 + 1;
       } while (from <= to);

@@ -1621,14 +1621,20 @@ default_line_pixel_height (struct window *w)
 static Lisp_Object
 string_from_display_spec (Lisp_Object spec)
 {
-  if (GVECTORP (spec))
-    spec = ensure_elisp_vector (spec);
-
   if (VECTORP (spec))
     {
       for (ptrdiff_t i = 0; i < ASIZE (spec); i++)
 	if (STRINGP (AREF (spec, i)))
 	  return AREF (spec, i);
+    }
+  else if (GVECTORP (spec))
+    {
+      for (ptrdiff_t i = 0; i < GASIZE (spec); i++)
+	{
+	  Lisp_Object elt = GAREF (spec, i);
+	  if (STRINGP (elt))
+	    return elt;
+	}
     }
   else
     {
@@ -5644,14 +5650,13 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
   Lisp_Object elem;
   if (NILP (disp))
     return Qnil;
-  if (GVECTORP (disp))
-    disp = ensure_elisp_vector (disp);
   /* We have a vector of display specs.  */
-  if (VECTORP (disp))
+  if (VECTORP (disp) || GVECTORP (disp))
     {
+      bool scheme_vec = GVECTORP (disp);
       for (ptrdiff_t i = 0; i < ASIZE (disp); i++)
 	{
-	  elem = AREF (disp, i);
+	  elem = scheme_vec ? GAREF (disp, i) : AREF (disp, i);
 	  if (CONSP (elem)
 	      && CONSP (XCDR (elem))
 	      && EQ (XCAR (elem), prop))
@@ -5988,11 +5993,12 @@ handle_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
     }
   else if (VECTORP (spec) || GVECTORP (spec))
     {
-      if (GVECTORP (spec))
-	spec = ensure_elisp_vector (spec);
-      for (ptrdiff_t i = 0; i < ASIZE (spec); ++i)
+      ptrdiff_t len = ASIZE (spec);
+      bool scheme_vec = GVECTORP (spec);
+      for (ptrdiff_t i = 0; i < len; ++i)
 	{
-	  int rv = handle_single_display_spec (it, AREF (spec, i), object,
+	  Lisp_Object item = scheme_vec ? GAREF (spec, i) : AREF (spec, i);
+	  int rv = handle_single_display_spec (it, item, object,
 					       overlay, position, bufpos,
 					       replacing, frame_window_p,
 					       enable_eval);
@@ -6667,13 +6673,15 @@ display_prop_string_p (Lisp_Object prop, Lisp_Object string)
     }
   else if (VECTORP (prop) || GVECTORP (prop))
     {
-      if (GVECTORP (prop))
-	prop = ensure_elisp_vector (prop);
       /* A vector of sub-properties.  */
+      bool scheme_vec = GVECTORP (prop);
       ptrdiff_t i;
       for (i = 0; i < ASIZE (prop); ++i)
-	if (single_display_spec_string_p (AREF (prop, i), string))
-	  return true;
+        {
+          Lisp_Object elt = scheme_vec ? GAREF (prop, i) : AREF (prop, i);
+          if (single_display_spec_string_p (elt, string))
+            return true;
+        }
     }
   else
     return single_display_spec_string_p (prop, string);
@@ -15484,10 +15492,9 @@ build_desired_tool_bar_string (struct frame *f)
       /* If image is a vector, choose the image according to the
 	 button state.  */
       image = PROP (TOOL_BAR_ITEM_IMAGES);
-      if (GVECTORP (image))
-	image = ensure_elisp_vector (image);
-      if (VECTORP (image))
+      if (VECTORP (image) || GVECTORP (image))
 	{
+	  bool scheme_vec = GVECTORP (image);
 	  if (enabled_p)
 	    idx = (selected_p
 		   ? TOOL_BAR_IMAGE_ENABLED_SELECTED
@@ -15498,7 +15505,7 @@ build_desired_tool_bar_string (struct frame *f)
 		   : TOOL_BAR_IMAGE_DISABLED_DESELECTED);
 
 	  eassert (ASIZE (image) >= idx);
-	  image = AREF (image, idx);
+	  image = scheme_vec ? GAREF (image, idx) : AREF (image, idx);
 	}
       else
 	idx = -1;
@@ -28608,10 +28615,7 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
   val = CODING_SYSTEM_SPEC (coding_system);
   eoltype = Qnil;
 
-  if (GVECTORP (val))
-    val = ensure_elisp_vector (val);
-
-  if (!VECTORP (val))		/* Not yet decided.  */
+  if (!(VECTORP (val) || GVECTORP (val)))	/* Not yet decided.  */
     {
       *buf++ = multibyte ? '-' : ' ';
       if (eol_flag)
@@ -28622,9 +28626,10 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
     {
       Lisp_Object attrs;
       Lisp_Object eolvalue;
+      bool scheme_vec = GVECTORP (val);
 
-      attrs = AREF (val, 0);
-      eolvalue = AREF (val, 2);
+      attrs = scheme_vec ? GAREF (val, 0) : AREF (val, 0);
+      eolvalue = scheme_vec ? GAREF (val, 2) : AREF (val, 2);
 
       if (multibyte)
 	buf += CHAR_STRING (XFIXNAT (CODING_ATTR_MNEMONIC (attrs)),

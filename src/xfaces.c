@@ -1630,8 +1630,12 @@ the face font sort order, see `face-font-selection-order'.  */)
   SAFE_ALLOCA_LISP (drivers, ndrivers);
   for (i = 0; i < ndrivers; i++, list = XCDR (list))
     drivers[i] = XCAR (list);
-  vec = ensure_elisp_vector (Fvconcat (ndrivers, drivers));
+  vec = Fvconcat (ndrivers, drivers);
   nfonts = ASIZE (vec);
+
+  /* Sorting requires an Elisp vector for in-place permutation. */
+  if (GVECTORP (vec))
+    vec = ensure_elisp_vector (vec);
 
   qsort (XVECTOR (vec)->contents, nfonts, word_size,
 	 compare_fonts_by_sort_order);
