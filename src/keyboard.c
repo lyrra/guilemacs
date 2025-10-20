@@ -4677,19 +4677,22 @@ Lisp_Object pending_funcalls;
 static struct timespec
 decode_timer (Lisp_Object timer)
 {
-  Lisp_Object *vec;
+  if (! ((VECTORP (timer) || GVECTORP (timer)) && ASIZE (timer) == 10))
+    return invalid_timespec ();
 
-  if (GVECTORP (timer))
-    timer = ensure_elisp_vector (timer);
+  bool scheme_vec = GVECTORP (timer);
+  Lisp_Object slot0 = scheme_vec ? GAREF (timer, 0) : AREF (timer, 0);
+  if (! NILP (slot0))
+    return invalid_timespec ();
 
-  if (! (VECTORP (timer) && ASIZE (timer) == 10))
+  Lisp_Object slot2 = scheme_vec ? GAREF (timer, 2) : AREF (timer, 2);
+  if (! FIXNUMP (slot2))
     return invalid_timespec ();
-  vec = XVECTOR (timer)->contents;
-  if (! NILP (vec[0]))
-    return invalid_timespec ();
-  if (! FIXNUMP (vec[2]))
-    return invalid_timespec ();
-  return list4_to_timespec (vec[1], vec[2], vec[3], vec[8]);
+
+  Lisp_Object slot1 = scheme_vec ? GAREF (timer, 1) : AREF (timer, 1);
+  Lisp_Object slot3 = scheme_vec ? GAREF (timer, 3) : AREF (timer, 3);
+  Lisp_Object slot8 = scheme_vec ? GAREF (timer, 8) : AREF (timer, 8);
+  return list4_to_timespec (slot1, slot2, slot3, slot8);
 }
 
 
