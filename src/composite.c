@@ -221,6 +221,8 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
     key = ensure_elisp_vector (Fvconcat (1, &components));
   else if (VECTORP (components))
     key = components;
+  else if (GVECTORP (components))
+    key = components = ensure_elisp_vector (components);
   else if (NILP (components))
     {
       key = make_uninit_elisp_vector (nchars);

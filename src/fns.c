@@ -2434,9 +2434,32 @@ static Lisp_Object
 sort_vector (Lisp_Object vector, Lisp_Object predicate, Lisp_Object keyfunc,
 	     bool reverse)
 {
-  ptrdiff_t length = ASIZE (vector);
-  if (length >= 2)
-    tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
+  if (VECTORP (vector))
+    {
+      ptrdiff_t length = ASIZE (vector);
+      if (length >= 2)
+        tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
+      return vector;
+    }
+  else if (GVECTORP (vector))
+    {
+      ptrdiff_t length = GASIZE (vector);
+      if (length >= 2)
+        {
+          USE_SAFE_ALLOCA;
+          Lisp_Object *tmp;
+          SAFE_ALLOCA_LISP (tmp, length);
+          for (ptrdiff_t i = 0; i < length; i++)
+            tmp[i] = GAREF (vector, i);
+          tim_sort (predicate, keyfunc, tmp, length, reverse);
+          for (ptrdiff_t i = 0; i < length; i++)
+            GASET (vector, i, tmp[i]);
+          SAFE_FREE ();
+        }
+      return vector;
+    }
+  else
+    wrong_type_argument (Qvectorp, vector);
   return vector;
 }
 
@@ -2500,44 +2523,9 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
     return sort_list (seq, lessp, key, reverse, inplace);
   else if (NILP (seq))
     return seq;
-  else if (VECTORP (seq))
+  else if (VECTORP (seq) || GVECTORP (seq))
     return sort_vector (inplace ? seq : Fcopy_sequence (seq),
 			lessp, key, reverse);
-  else if (scm_is_vector (seq))
-    {
-      /* FIX-guilemacs: Handle Guile native vectors */
-      /* For Guile vectors, we need to convert to/from lists since sort_vector
-         expects VECTORP. An alternative would be to make sort_vector work with
-         scm_is_vector, but that would require more changes. */
-      ptrdiff_t len = GASIZE (seq);
-      Lisp_Object list = Qnil;
-
-      /* Convert vector to list */
-      for (ptrdiff_t i = len - 1; i >= 0; i--)
-        list = Fcons (GAREF (seq, i), list);
-
-      /* Sort the list */
-      Lisp_Object sorted_list = sort_list (list, lessp, key, reverse, false);
-
-      /* Convert back to vector */
-      if (inplace)
-        {
-          /* Modify in place */
-          ptrdiff_t j = 0;
-          for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
-            GASET (seq, j++, XCAR (tail));
-          return seq;
-        }
-      else
-        {
-          /* Create new vector */
-          Lisp_Object new_vec = scm_c_make_vector (len, Qnil);
-          ptrdiff_t j = 0;
-          for (Lisp_Object tail = sorted_list; CONSP (tail); tail = XCDR (tail))
-            GASET (new_vec, j++, XCAR (tail));
-          return new_vec;
-        }
-    }
   else
     wrong_type_argument (Qlist_or_vector_p, seq);
 }
