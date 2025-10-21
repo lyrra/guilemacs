@@ -411,7 +411,7 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
     font_object = Qnil;
 
   vec = XCDR (font_group);
-  if (!VECTORP (vec))
+  if (!(VECTORP (vec) || GVECTORP (vec)))
     {
       vec = ensure_elisp_vector (vec);
       XSETCDR (font_group, vec);
@@ -528,7 +528,7 @@ fontset_get_font_group (Lisp_Object fontset, int c)
 	char_table_set_range (fontset, from, to, font_group);
       return font_group;
     }
-  if (!VECTORP (font_group))
+  if (!(VECTORP (font_group) || GVECTORP (font_group)))
     return font_group;
 
   /* Now realize FONT-DEFs of this font group, and update the realized
