@@ -3160,7 +3160,7 @@ detect_coding_iso_2022 (struct coding_system *coding,
 	      break;
 	    }
 	check_extra_latin:
-	  if (! VECTORP (Vlatin_extra_code_table)
+  if (!(VECTORP (Vlatin_extra_code_table) || GVECTORP (Vlatin_extra_code_table))
 	      || NILP (AREF (Vlatin_extra_code_table, c)))
 	    {
 	      rejected = CATEGORY_MASK_ISO;
@@ -5402,10 +5402,11 @@ detect_coding_charset (struct coding_system *coding,
 	break;
       if (c >= 0x80)
 	{
-	  if (c < 0xA0
-	      && check_latin_extra
-	      && (!VECTORP (Vlatin_extra_code_table)
-		  || NILP (AREF (Vlatin_extra_code_table, c))))
+  if (c < 0xA0
+      && check_latin_extra
+      && (!(VECTORP (Vlatin_extra_code_table)
+            || GVECTORP (Vlatin_extra_code_table))
+          || NILP (AREF (Vlatin_extra_code_table, c))))
 	    break;
 	  found = CATEGORY_MASK_CHARSET;
 	}
@@ -5859,7 +5860,7 @@ setup_coding_system (Lisp_Object coding_system, struct coding_system *coding)
       if (! EQ (eol_type, Qunix))
 	{
 	  coding->common_flags |= CODING_REQUIRE_DECODING_MASK;
-	  if (! VECTORP (eol_type))
+      if (!(VECTORP (eol_type) || GVECTORP (eol_type)))
 	    coding->common_flags |= CODING_REQUIRE_ENCODING_MASK;
 	}
 
@@ -5941,10 +5942,12 @@ raw_text_coding_system (Lisp_Object coding_system)
     return coding_system;
 
   eol_type = AREF (spec, 2);
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     return Qraw_text;
   spec = CODING_SYSTEM_SPEC (Qraw_text);
   raw_text_eol_type = AREF (spec, 2);
+  if (GVECTORP (raw_text_eol_type))
+    raw_text_eol_type = ensure_elisp_vector (raw_text_eol_type);
   return (EQ (eol_type, Qunix) ? AREF (raw_text_eol_type, 0)
 	  : EQ (eol_type, Qdos) ? AREF (raw_text_eol_type, 1)
 	  : AREF (raw_text_eol_type, 2));
@@ -5975,8 +5978,10 @@ coding_inherit_eol_type (Lisp_Object coding_system, Lisp_Object parent)
     CHECK_CODING_SYSTEM (coding_system);
   spec = CODING_SYSTEM_SPEC (coding_system);
   eol_type = AREF (spec, 2);
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     {
+      if (GVECTORP (eol_type))
+        eol_type = ensure_elisp_vector (eol_type);
       /* Format of end-of-line decided by system.
 	 This is Qunix on Unix and Mac, Qdos on DOS/Windows.
 	 This has an effect only for external encoding (i.e., for output to
@@ -5992,7 +5997,7 @@ coding_inherit_eol_type (Lisp_Object coding_system, Lisp_Object parent)
 	  CHECK_CODING_SYSTEM (parent);
 	  Lisp_Object parent_spec = CODING_SYSTEM_SPEC (parent);
 	  Lisp_Object pspec_type = AREF (parent_spec, 2);
-	  if (!VECTORP (pspec_type))
+	  if (!(VECTORP (pspec_type) || GVECTORP (pspec_type)))
 	    parent_eol_type = pspec_type;
 	}
       if (EQ (parent_eol_type, Qunix))
@@ -6029,7 +6034,8 @@ complement_process_encoding_system (Lisp_Object coding_system)
       attrs = AREF (spec, 0);
       if (NILP (coding_base) && ! EQ (CODING_ATTR_TYPE (attrs), Qundecided))
 	coding_base = CODING_ATTR_BASE_NAME (attrs);
-      if (NILP (eol_base) && ! VECTORP (AREF (spec, 2)))
+      if (NILP (eol_base)
+          && !(VECTORP (AREF (spec, 2)) || GVECTORP (AREF (spec, 2))))
 	eol_base = coding_system;
       if (! NILP (coding_base) && ! NILP (eol_base))
 	break;
@@ -6491,7 +6497,7 @@ adjust_coding_eol_type (struct coding_system *coding, int eol_seen)
   Lisp_Object eol_type;
 
   eol_type = CODING_ID_EOL_TYPE (coding->id);
-  if (! VECTORP (eol_type))
+  if (!(VECTORP (eol_type) || GVECTORP (eol_type)))
     /* Already adjusted.  */
     return eol_type;
   if (eol_seen & EOL_SEEN_LF)
@@ -6760,7 +6766,7 @@ detect_coding (struct coding_system *coding)
 
   if (! NILP (found))
     {
-      int specified_eol = (VECTORP (eol_type) ? EOL_SEEN_NONE
+      int specified_eol = ((VECTORP (eol_type) || GVECTORP (eol_type)) ? EOL_SEEN_NONE
 			   : EQ (eol_type, Qdos) ? EOL_SEEN_CRLF
 			   : EQ (eol_type, Qmac) ? EOL_SEEN_CR
 			   : EOL_SEEN_LF);
@@ -6790,8 +6796,10 @@ decode_eol (struct coding_system *coding)
     pbeg = BYTE_POS_ADDR (coding->dst_pos_byte);
   pend = pbeg + coding->produced;
 
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     {
+      if (GVECTORP (eol_type))
+        eol_type = ensure_elisp_vector (eol_type);
       int eol_seen = EOL_SEEN_NONE;
 
       for (p = pbeg; p < pend; p++)
@@ -6979,7 +6987,7 @@ get_translation_table (Lisp_Object attrs, bool encodep, int *max_lookup)
 static Lisp_Object
 get_translation (Lisp_Object trans, int *buf, int *buf_end, ptrdiff_t *nchars)
 {
-  if (FIXNUMP (trans) || VECTORP (trans))
+      if (FIXNUMP (trans) || VECTORP (trans) || GVECTORP (trans))
     {
       *nchars = 1;
       return trans;
@@ -7047,7 +7055,7 @@ produce_chars (struct coding_system *coding, Lisp_Object translation_table,
 		  trans = get_translation (trans, buf, buf_end, &from_nchars);
 		  if (FIXNUMP (trans))
 		    c = XFIXNUM (trans);
-		  else if (VECTORP (trans))
+	  else if (VECTORP (trans) || GVECTORP (trans))
 		    {
 		      to_nchars = ASIZE (trans);
 		      c = XFIXNUM (AREF (trans, 0));
@@ -7636,7 +7644,7 @@ consume_chars (struct coding_system *coding, Lisp_Object translation_table,
     lookup_buf = alloca (sizeof (int) * max_lookup);
 
   eol_type = inhibit_eol_conversion ? Qunix : CODING_ID_EOL_TYPE (coding->id);
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     eol_type = Qunix;
 
   /* Note: composition handling is not yet implemented.  */
@@ -7723,7 +7731,7 @@ consume_chars (struct coding_system *coding, Lisp_Object translation_table,
 				   &from_nchars);
 	  if (FIXNUMP (trans))
 	    c = XFIXNUM (trans);
-	  else if (VECTORP (trans))
+	  else if (VECTORP (trans) || GVECTORP (trans))
 	    {
 	      to_nchars = ASIZE (trans);
 	      if (buf_end - buf < to_nchars)
@@ -7975,12 +7983,14 @@ decode_coding_gap (struct coding_system *coding, ptrdiff_t bytes)
 	{
 	  Lisp_Object eol_type;
 
-	  eol_type = CODING_ID_EOL_TYPE (coding->id);
-	  if (VECTORP (eol_type))
-	    {
-	      if (coding->eol_seen != EOL_SEEN_NONE)
-		eol_type = adjust_coding_eol_type (coding, coding->eol_seen);
-	    }
+      eol_type = CODING_ID_EOL_TYPE (coding->id);
+      if (VECTORP (eol_type) || GVECTORP (eol_type))
+        {
+          if (GVECTORP (eol_type))
+            eol_type = ensure_elisp_vector (eol_type);
+          if (coding->eol_seen != EOL_SEEN_NONE)
+            eol_type = adjust_coding_eol_type (coding, coding->eol_seen);
+        }
 	  if (EQ (eol_type, Qmac))
 	    {
 	      unsigned char *src_end = GAP_END_ADDR;
@@ -8952,24 +8962,24 @@ detect_coding_system (const unsigned char *src,
     int normal_eol = -1, utf_16_be_eol = -1, utf_16_le_eol = -1;
     Lisp_Object tail;
 
-    if (VECTORP (eol_type))
+    if (VECTORP (eol_type) || GVECTORP (eol_type))
       {
-	if (detect_info.found & ~CATEGORY_MASK_UTF_16)
+    if (detect_info.found & ~CATEGORY_MASK_UTF_16)
 	  {
 	    if (null_byte_found)
 	      normal_eol = EOL_SEEN_LF;
 	    else
 	      normal_eol = detect_eol (coding.source, src_bytes,
-				       coding_category_raw_text);
+			       coding_category_raw_text);
 	  }
 	if (detect_info.found & (CATEGORY_MASK_UTF_16_BE
-				 | CATEGORY_MASK_UTF_16_BE_NOSIG))
+			 | CATEGORY_MASK_UTF_16_BE_NOSIG))
 	  utf_16_be_eol = detect_eol (coding.source, src_bytes,
-				      coding_category_utf_16_be);
+			      coding_category_utf_16_be);
 	if (detect_info.found & (CATEGORY_MASK_UTF_16_LE
-				 | CATEGORY_MASK_UTF_16_LE_NOSIG))
+			 | CATEGORY_MASK_UTF_16_LE_NOSIG))
 	  utf_16_le_eol = detect_eol (coding.source, src_bytes,
-				      coding_category_utf_16_le);
+			      coding_category_utf_16_le);
       }
     else
       {
@@ -8990,8 +9000,10 @@ detect_coding_system (const unsigned char *src,
 	attrs = CODING_ID_ATTRS (id);
 	category = XFIXNUM (CODING_ATTR_CATEGORY (attrs));
 	eol_type = CODING_ID_EOL_TYPE (id);
-	if (VECTORP (eol_type))
+	if (VECTORP (eol_type) || GVECTORP (eol_type))
 	  {
+	    if (GVECTORP (eol_type))
+	      eol_type = ensure_elisp_vector (eol_type);
 	    if (category == coding_category_utf_16_be
 		|| category == coding_category_utf_16_be_nosig)
 	      this_eol = utf_16_be_eol;
@@ -11205,14 +11217,22 @@ usage: (define-coding-system-internal ...)  */)
 
       val = args[coding_arg_ccl_decoder];
       CHECK_CCL_PROGRAM (val);
-      if (VECTORP (val))
-	val = Fcopy_sequence (val);
+      if (VECTORP (val) || GVECTORP (val))
+	{
+	  if (GVECTORP (val))
+	    val = ensure_elisp_vector (val);
+	  val = Fcopy_sequence (val);
+	}
       ASET (attrs, coding_attr_ccl_decoder, val);
 
       val = args[coding_arg_ccl_encoder];
       CHECK_CCL_PROGRAM (val);
-      if (VECTORP (val))
-	val = Fcopy_sequence (val);
+      if (VECTORP (val) || GVECTORP (val))
+	{
+	  if (GVECTORP (val))
+	    val = ensure_elisp_vector (val);
+	  val = Fcopy_sequence (val);
+	}
       ASET (attrs, coding_attr_ccl_encoder, val);
 
       val = args[coding_arg_ccl_valids];
@@ -11625,9 +11645,11 @@ DEFUN ("define-coding-system-alias", Fdefine_coding_system_alias,
   XSETCDR (aliases, list1 (alias));
 
   eol_type = AREF (spec, 2);
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     {
       Lisp_Object subsidiaries;
+      if (GVECTORP (eol_type))
+        eol_type = ensure_elisp_vector (eol_type);
       int i;
 
       subsidiaries = make_subsidiaries (alias);
@@ -11711,8 +11733,12 @@ coding system whose eol-type is N.  */)
     return Qnil;
   spec = CODING_SYSTEM_SPEC (coding_system);
   eol_type = AREF (spec, 2);
-  if (VECTORP (eol_type))
-    return Fcopy_sequence (eol_type);
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
+    {
+      if (GVECTORP (eol_type))
+        eol_type = ensure_elisp_vector (eol_type);
+      return Fcopy_sequence (eol_type);
+    }
   n = EQ (eol_type, Qunix) ? 0 : EQ (eol_type, Qdos) ? 1 : 2;
   return make_fixnum (n);
 }
