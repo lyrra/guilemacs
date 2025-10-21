@@ -1244,6 +1244,10 @@ stack before executing the byte-code.
 usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INTERACTIVE-SPEC &rest ELEMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
+  bool constants_scheme = GVECTORP (args[CLOSURE_CONSTANTS]);
+  if (constants_scheme)
+    args[CLOSURE_CONSTANTS] = ensure_elisp_vector (args[CLOSURE_CONSTANTS]);
+
   if (! ((FIXNUMP (args[CLOSURE_ARGLIST])
 	  || CONSP (args[CLOSURE_ARGLIST])
 	  || NILP (args[CLOSURE_ARGLIST]))

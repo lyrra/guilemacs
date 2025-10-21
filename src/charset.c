@@ -1360,7 +1360,7 @@ Optional third argument DEUNIFY, if non-nil, means to de-unify CHARSET.  */)
 	unify_map = CHARSET_UNIFY_MAP (cs);
       else
 	{
-	  if (! STRINGP (unify_map) && ! VECTORP (unify_map))
+  if (! STRINGP (unify_map) && !(VECTORP (unify_map) || GVECTORP (unify_map)))
 	    signal_error ("Bad unify-map", unify_map);
 	  set_charset_attr (cs, charset_unify_map, unify_map);
 	}
@@ -1698,13 +1698,15 @@ decode_char (struct charset *charset, unsigned int code)
 	  Lisp_Object decoder;
 
 	  decoder = CHARSET_DECODER (charset);
-	  if (! VECTORP (decoder))
-	    {
-	      load_charset (charset, 1);
-	      decoder = CHARSET_DECODER (charset);
-	    }
-	  if (VECTORP (decoder))
-	    c = XFIXNUM (AREF (decoder, char_index));
+  if (!(VECTORP (decoder) || GVECTORP (decoder)))
+    {
+      load_charset (charset, 1);
+      decoder = CHARSET_DECODER (charset);
+    }
+  if (VECTORP (decoder) || GVECTORP (decoder))
+    c = XFIXNUM ((GVECTORP (decoder)
+                  ? GAREF (decoder, char_index)
+                  : AREF (decoder, char_index)));
 	  else
 	    c = GET_TEMP_CHARSET_WORK_DECODER (char_index);
 	}
