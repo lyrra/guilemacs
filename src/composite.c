@@ -218,11 +218,9 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
   if (FIXNUMP (components))
     key = make_elisp_vector (1, components);
   else if (STRINGP (components) || CONSP (components))
-    key = ensure_elisp_vector (Fvconcat (1, &components));
-  else if (VECTORP (components))
+    key = Fvconcat (1, &components);
+  else if (VECTORP (components) || GVECTORP (components))
     key = components;
-  else if (GVECTORP (components))
-    key = components = ensure_elisp_vector (components);
   else if (NILP (components))
     {
       key = make_uninit_elisp_vector (nchars);
@@ -270,9 +268,12 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
      vector or a list.  It should be a sequence of:
 	char1 rule1 char2 rule2 char3 ...    ruleN charN+1  */
 
-  if (VECTORP (components)
+  bool components_is_scheme = GVECTORP (components);
+
+  if ((VECTORP (components) || components_is_scheme)
       && ASIZE (components) >= 2
-      && VECTORP (AREF (components, 0)))
+      && VECTORP (components_is_scheme ? GAREF (components, 0)
+                                       : AREF (components, 0)))
     {
       /* COMPONENTS is a glyph-string.  */
       ptrdiff_t len = ASIZE (key);
@@ -281,7 +282,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
 	if (! VECTORP (key_is_scheme ? GAREF (key, i) : AREF (key, i)))
 	  goto invalid_composition;
     }
-  else if (VECTORP (components) || CONSP (components))
+  else if ((VECTORP (components) || components_is_scheme) || CONSP (components))
     {
       ptrdiff_t len = ASIZE (key);
 

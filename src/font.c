@@ -413,9 +413,7 @@ font_style_to_value (enum font_property_index prop, Lisp_Object val,
       eassert (len < 255);
       elt = make_elisp_vector (2, make_fixnum (100));
       ASET (elt, 1, val);
-      Lisp_Object new_table
-	= ensure_elisp_vector (CALLN (Fvconcat, table,
-				      make_elisp_vector (1, elt)));
+      Lisp_Object new_table = CALLN (Fvconcat, table, make_elisp_vector (1, elt));
       /* Update the corresponding variable with the new value of the
          modified slot of font_style_table.  */
       switch (prop)
