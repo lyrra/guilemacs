@@ -324,20 +324,36 @@ fontset_ref (Lisp_Object fontset, int c)
    replace with ELT, if ADD is `prepend', prepend ELT, otherwise,
    append ELT.  */
 
-#define FONTSET_ADD(fontset, range, elt, add)				\
-  (NILP (add)								\
-   ? (NILP (range)							\
-      ? set_fontset_fallback (fontset, make_elisp_vector (1, elt))		\
-      : (void) Fset_char_table_range (fontset, range, make_elisp_vector (1, elt))) \
+#define FONTSET_ADD(fontset, range, elt, add)\
+  (NILP (add)\
+   ? (NILP (range)\
+      ? set_fontset_fallback (fontset, fontset_extend_vector (Qnil, elt, true))\
+      : (void) Fset_char_table_range (fontset, range, fontset_extend_vector (Qnil, elt, true)))\
    : fontset_add (fontset, range, elt, add))
+
+static Lisp_Object
+fontset_extend_vector (Lisp_Object vec, Lisp_Object elt, bool append)
+{
+  ptrdiff_t old_len = (VECTORP (vec) || GVECTORP (vec)) ? ASIZE (vec) : 0;
+  Lisp_Object result = scm_c_make_vector (old_len + 1, Qnil);
+  bool vec_is_scheme = GVECTORP (vec);
+
+  for (ptrdiff_t i = 0; i < old_len; i++)
+    {
+      Lisp_Object value = vec_is_scheme ? GAREF (vec, i) : AREF (vec, i);
+      ptrdiff_t dst = append ? i : i + 1;
+      GASET (result, dst, value);
+    }
+
+  ptrdiff_t insert_idx = append ? old_len : 0;
+  GASET (result, insert_idx, elt);
+  return result;
+}
 
 static void
 fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Object add)
 {
-  Lisp_Object args[2];
-  int idx = (EQ (add, Qappend) ? 0 : 1);
-
-  args[1 - idx] = make_elisp_vector (1, elt);
+  bool append_p = EQ (add, Qappend);
 
   if (CONSP (range))
     {
@@ -347,20 +363,16 @@ fontset_add (Lisp_Object fontset, Lisp_Object range, Lisp_Object elt, Lisp_Objec
 
       do {
 	from1 = from, to1 = to;
-	args[idx] = char_table_ref_and_range (fontset, from, &from1, &to1);
-	Lisp_Object replacement
-	  = (NILP (args[idx]) ? args[1 - idx]
-	     : ensure_elisp_vector (Fvconcat (XFIXNUM (args[0]), &args[1])));
+	Lisp_Object existing = char_table_ref_and_range (fontset, from, &from1, &to1);
+	Lisp_Object replacement = fontset_extend_vector (existing, elt, append_p);
 	char_table_set_range (fontset, from, to1, replacement);
 	from = to1 + 1;
       } while (from <= to);
     }
   else
     {
-      args[idx] = FONTSET_FALLBACK (fontset);
-      Lisp_Object fallback
-	= (NILP (args[idx]) ? args[1 - idx]
-	   : ensure_elisp_vector (CALLMANY (Fvconcat, args)));
+      Lisp_Object existing = FONTSET_FALLBACK (fontset);
+      Lisp_Object fallback = fontset_extend_vector (existing, elt, append_p);
       set_fontset_fallback (fontset, fallback);
     }
 }
