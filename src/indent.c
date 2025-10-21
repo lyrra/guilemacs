@@ -75,15 +75,17 @@ buffer_display_table (void)
 static int
 character_width (int c, struct Lisp_Char_Table *dp)
 {
-  Lisp_Object elt;
-
   /* These width computations were determined by examining the cases
      in display_text_line.  */
 
   /* Everything can be handled by the display table, if it's
      present and the element is right.  */
-  if (dp && (elt = DISP_CHAR_VECTOR (dp, c), VECTORP (elt)))
-    return ASIZE (elt);
+  if (dp)
+    {
+      Lisp_Object elt = DISP_CHAR_VECTOR (dp, c);
+      if (VECTORP (elt) || GVECTORP (elt))
+	return ASIZE (elt);
+    }
 
   /* Some characters are special.  */
   if (c == '\n' || c == '\t' || c == '\015')
@@ -280,18 +282,25 @@ skip_invisible (ptrdiff_t pos, ptrdiff_t *next_boundary_p, ptrdiff_t to, Lisp_Ob
    This macro is used in scan_for_column and in
    compute_motion.  */
 
-#define MULTIBYTE_BYTES_WIDTH(p, dp, bytes, width)			\
-  do {									\
-    int ch = string_char_and_length (p, &(bytes));			\
-    if (BYTES_BY_CHAR_HEAD (*p) != bytes)				\
-      width = bytes * 4;						\
-    else								\
-      {									\
-	if (dp != 0 && VECTORP (DISP_CHAR_VECTOR (dp, ch)))		\
-	  width = sanitize_char_width (ASIZE (DISP_CHAR_VECTOR (dp, ch))); \
-	else								\
-	  width = CHARACTER_WIDTH (ch);					\
-      }									\
+#define MULTIBYTE_BYTES_WIDTH(p, dp, bytes, width)			       \
+  do {									       \
+    int ch = string_char_and_length (p, &(bytes));			       \
+    if (BYTES_BY_CHAR_HEAD (*p) != bytes)				       \
+      width = bytes * 4;							       \
+    else								       \
+      {									       \
+	struct Lisp_Char_Table *_mb_dp = (dp);				       \
+	if (_mb_dp)							       \
+	  {								       \
+	    Lisp_Object _mb_vec = DISP_CHAR_VECTOR (_mb_dp, ch);	       \
+	    if (VECTORP (_mb_vec) || GVECTORP (_mb_vec))		       \
+	      width = sanitize_char_width (ASIZE (_mb_vec));		       \
+	    else							       \
+	      width = CHARACTER_WIDTH (ch);				       \
+	  }								       \
+	else								       \
+	  width = CHARACTER_WIDTH (ch);				       \
+      }									       \
   } while (0)
 
 
@@ -395,12 +404,17 @@ current_column (void)
 
       c = *--ptr;
 
-      if (dp && VECTORP (DISP_CHAR_VECTOR (dp, c)))
+      bool charvec_vector_p = false;
+      if (dp)
 	{
 	  charvec = DISP_CHAR_VECTOR (dp, c);
-	  n = ASIZE (charvec);
+	  if (VECTORP (charvec) || GVECTORP (charvec))
+	    {
+	      charvec_vector_p = true;
+	      n = ASIZE (charvec);
+	    }
 	}
-      else
+      if (!charvec_vector_p)
 	{
 	  charvec = Qnil;
 	  n = 1;
@@ -408,7 +422,7 @@ current_column (void)
 
       for (i = n - 1; i >= 0; --i)
 	{
-	  if (VECTORP (charvec))
+	  if (charvec_vector_p)
 	    {
 	      /* This should be handled the same as
 		 next_element_from_display_vector does it.  */
@@ -438,7 +452,7 @@ current_column (void)
 	      col = 0;
 	      tab_seen = 1;
 	    }
-	  else if (VECTORP (charvec))
+	  else if (charvec_vector_p)
 	    /* With a display table entry, C is displayed as is, and
 	       not displayed as \NNN or as ^N.  If C is a single-byte
 	       character, it takes one column.  If C is multi-byte in
@@ -693,25 +707,21 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
       /* See if there is a display table and it relates
 	 to this character.  */
 
-      if (dp != 0
-	  && ! (multibyte && LEADING_CODE_P (c))
-	  && VECTORP (DISP_CHAR_VECTOR (dp, c)))
+      Lisp_Object disp_charvec = Qnil;
+      bool disp_vector_p = false;
+
+      if (dp != 0 && ! (multibyte && LEADING_CODE_P (c)))
 	{
-	  Lisp_Object charvec;
-	  ptrdiff_t i, n;
+	  disp_charvec = DISP_CHAR_VECTOR (dp, c);
+	  disp_vector_p = VECTORP (disp_charvec) || GVECTORP (disp_charvec);
+	}
 
-	  /* This character is displayed using a vector of glyphs.
-	     Update the column/position based on those glyphs.  */
-
-	  charvec = DISP_CHAR_VECTOR (dp, c);
-	  n = ASIZE (charvec);
-
-	  for (i = 0; i < n; i++)
+      if (disp_vector_p)
+	{
+	  ptrdiff_t n = ASIZE (disp_charvec);
+	  for (ptrdiff_t i = 0; i < n; i++)
 	    {
-	      /* This should be handled the same as
-		 next_element_from_display_vector does it.  */
-	      Lisp_Object entry = AREF (charvec, i);
-
+	      Lisp_Object entry = AREF (disp_charvec, i);
 	      if (GLYPH_CODE_P (entry))
 		c = GLYPH_CODE_CHAR (entry);
 	      else
@@ -851,8 +861,15 @@ string_display_width (Lisp_Object string, Lisp_Object beg, Lisp_Object end)
 	break;
 
       c = *--ptr;
-      if (dp != 0 && VECTORP (DISP_CHAR_VECTOR (dp, c)))
-	col += ASIZE (DISP_CHAR_VECTOR (dp, c));
+      Lisp_Object disp_vec = Qnil;
+      bool disp_vec_is_vector = false;
+      if (dp != 0)
+	{
+	  disp_vec = DISP_CHAR_VECTOR (dp, c);
+	  disp_vec_is_vector = VECTORP (disp_vec) || GVECTORP (disp_vec);
+	}
+      if (disp_vec_is_vector)
+	col += ASIZE (disp_vec);
       else if (c >= 040 && c < 0177)
 	col++;
       else if (c == '\n')
@@ -1211,9 +1228,10 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
     = (FIXNUMP (BVAR (current_buffer, selective_display))
        ? XFIXNUM (BVAR (current_buffer, selective_display))
        : !NILP (BVAR (current_buffer, selective_display)) ? -1 : 0);
+  Lisp_Object invis_vec = dp ? DISP_INVIS_VECTOR (dp) : Qnil;
   ptrdiff_t selective_rlen
-    = (selective && dp && VECTORP (DISP_INVIS_VECTOR (dp))
-       ? ASIZE (DISP_INVIS_VECTOR (dp)) : 0);
+    = (selective && (VECTORP (invis_vec) || GVECTORP (invis_vec))
+       ? ASIZE (invis_vec) : 0);
   /* The next location where the `invisible' property changes, or an
      overlay starts or ends.  */
   ptrdiff_t next_boundary = from;
@@ -1253,8 +1271,14 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
     cache_buffer = cache_buffer->base_buffer;
   if (dp == buffer_display_table ())
     {
-      width_table = (VECTORP (BVAR (current_buffer, width_table))
-		     ? XVECTOR (BVAR (current_buffer, width_table))->contents
+      Lisp_Object width_table_obj = BVAR (current_buffer, width_table);
+      if (GVECTORP (width_table_obj))
+	{
+	  width_table_obj = ensure_elisp_vector (width_table_obj);
+	  bset_width_table (current_buffer, width_table_obj);
+	}
+      width_table = (VECTORP (width_table_obj)
+		     ? XVECTOR (width_table_obj)->contents
 		     : 0);
       if (width_table)
 	width_cache = width_run_cache_on_off ();
@@ -1637,14 +1661,18 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 		}
 	    }
 
+	  bool charvec_vector_p = false;
 	  if (dp != 0
-	      && ! (multibyte && LEADING_CODE_P (c))
-	      && VECTORP (DISP_CHAR_VECTOR (dp, c)))
+	      && ! (multibyte && LEADING_CODE_P (c)))
 	    {
 	      charvec = DISP_CHAR_VECTOR (dp, c);
-	      n = ASIZE (charvec);
+	      if (VECTORP (charvec) || GVECTORP (charvec))
+		{
+		  charvec_vector_p = true;
+		  n = ASIZE (charvec);
+		}
 	    }
-	  else
+	  if (!charvec_vector_p)
 	    {
 	      charvec = Qnil;
 	      n = 1;
@@ -1652,7 +1680,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 
 	  for (i = 0; i < n; ++i)
 	    {
-	      if (VECTORP (charvec))
+	      if (charvec_vector_p)
 		{
 		  /* This should be handled the same as
 		     next_element_from_display_vector does it.  */
@@ -1753,7 +1781,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 		    wide_column_end_hpos = hpos + mb_width;
 		  hpos += mb_width;
 		}
-	      else if (VECTORP (charvec))
+	      else if (charvec_vector_p)
 		++hpos;
 	      else
 		hpos += (ctl_arrow && c < 0200) ? 2 : 4;
