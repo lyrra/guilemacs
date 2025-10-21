@@ -110,7 +110,7 @@ clean_local_selection_data (Lisp_Object obj)
         return make_fixnum (- XFIXNUM (XCDR (obj)));
     }
 
-  if (VECTORP (obj))
+  if (VECTORP (obj) || GVECTORP (obj))
     {
       ptrdiff_t i;
       ptrdiff_t size = ASIZE (obj);

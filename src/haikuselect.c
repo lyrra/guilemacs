@@ -949,7 +949,7 @@ after it starts.  */)
       CHECK_LIST_END (XCDR (file_or_type), file_or_type);
     }
 
-  if (VECTORP (args))
+  if (VECTORP (args) || GVECTORP (args))
     {
       nargs = ASIZE (args);
       cargs = SAFE_ALLOCA (nargs * sizeof *cargs);

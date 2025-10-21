@@ -645,10 +645,10 @@ validate_coding_system (Lisp_Object coding_system)
     return coding_system;
 
   /* Get EOL_TYPE vector of the base of CODING_SYSTEM.  */
-  if (!VECTORP (eol_type))
+  if (!(VECTORP (eol_type) || GVECTORP (eol_type)))
     {
       eol_type = Fcoding_system_eol_type (Fcoding_system_base (coding_system));
-      if (!VECTORP (eol_type))
+      if (!(VECTORP (eol_type) || GVECTORP (eol_type)))
 	return Qnil;
     }
 

@@ -202,7 +202,7 @@ pgtk_own_selection (Lisp_Object selection_name, Lisp_Object selection_value,
   block_input ();
   gtk_selection_clear_targets (FRAME_GTK_WIDGET (f), selection_atom);
 
-  if (VECTORP (targets))
+  if (VECTORP (targets) || GVECTORP (targets))
     {
       gtargets = xzalloc (sizeof *gtargets * ASIZE (targets));
       ntargets = 0;
@@ -287,7 +287,7 @@ pgtk_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
     check = XCDR (value);
 
   if (STRINGP (check)
-      || VECTORP (check)
+      || VECTORP (check) || GVECTORP (check)
       || SYMBOLP (check)
       || INTEGERP (check)
       || NILP (value))
@@ -611,7 +611,8 @@ pgtk_handle_selection_request (struct selection_input_event *event)
 							selection,
 							true);
 
-      if (!VECTORP (multprop) || ASIZE (multprop) % 2)
+      if (!(VECTORP (multprop) || GVECTORP (multprop))
+	  || ASIZE (multprop) % 2)
 	goto DONE;
 
       nselections = ASIZE (multprop) / 2;
@@ -1481,7 +1482,7 @@ lisp_data_to_selection_data (struct pgtk_display_info *dpyinfo,
       *x_long_ptr = cons_to_gdk_long (obj);
       if (NILP (type)) type = QINTEGER;
     }
-  else if (VECTORP (obj))
+  else if (VECTORP (obj) || GVECTORP (obj))
     {
       /* Lisp_Vectors may represent a set of ATOMs;
 	 a set of 16 or 32 bit INTEGERs;
@@ -1567,7 +1568,7 @@ clean_local_selection_data (Lisp_Object obj)
       if (BASE_EQ (XCAR (obj), make_fixnum (-1)))
 	return make_fixnum (- XFIXNUM (XCDR (obj)));
     }
-  if (VECTORP (obj))
+  if (VECTORP (obj) || GVECTORP (obj))
     {
       ptrdiff_t i;
       ptrdiff_t size = ASIZE (obj);
