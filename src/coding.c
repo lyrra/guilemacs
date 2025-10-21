@@ -4380,7 +4380,7 @@ encode_coding_iso_2022 (struct coding_system *coding)
 
   CODING_GET_INFO (coding, attrs, charset_list);
   eol_type = inhibit_eol_conversion ? Qunix : CODING_ID_EOL_TYPE (coding->id);
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     eol_type = Qunix;
 
   setup_iso_safe_charsets (attrs);
@@ -5677,7 +5677,7 @@ setup_coding_system (Lisp_Object coding_system, struct coding_system *coding)
   eol_type = inhibit_eol_conversion ? Qunix : CODING_ID_EOL_TYPE (coding->id);
 
   coding->mode = 0;
-  if (VECTORP (eol_type))
+  if (VECTORP (eol_type) || GVECTORP (eol_type))
     coding->common_flags = (CODING_REQUIRE_DECODING_MASK
 			    | CODING_REQUIRE_DETECTION_MASK);
   else if (! EQ (eol_type, Qunix))
