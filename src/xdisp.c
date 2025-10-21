@@ -20268,8 +20268,17 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     {
       struct Lisp_Char_Table *disptab = buffer_display_table ();
 
-      if (! disptab_matches_widthtab
-	  (disptab, XVECTOR (BVAR (current_buffer, width_table))))
+      Lisp_Object width_table_obj = BVAR (current_buffer, width_table);
+      if (GVECTORP (width_table_obj))
+	{
+	  width_table_obj = ensure_elisp_vector (width_table_obj);
+	  bset_width_table (current_buffer, width_table_obj);
+	}
+      struct Lisp_Vector *widthtab
+	= VECTORP (width_table_obj) ? XVECTOR (width_table_obj) : NULL;
+
+      if (!widthtab
+	  || !disptab_matches_widthtab (disptab, widthtab))
         {
 	  struct buffer *buf = current_buffer;
 
