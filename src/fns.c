@@ -4651,26 +4651,36 @@ next_almost_prime (EMACS_INT n)
 Lisp_Object
 larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
 {
-  struct Lisp_Vector *v;
+  struct Lisp_Vector *v = NULL;
   ptrdiff_t i, incr, incr_max, old_size, new_size;
-  ptrdiff_t C_language_max = min (PTRDIFF_MAX, SIZE_MAX) / sizeof *v->contents;
+  ptrdiff_t C_language_max = min (PTRDIFF_MAX, SIZE_MAX) / (ptrdiff_t) sizeof (Lisp_Object);
   ptrdiff_t n_max = (0 <= nitems_max && nitems_max < C_language_max
-		     ? nitems_max : C_language_max);
-  if (GVECTORP (vec))
-    vec = ensure_elisp_vector (vec);
-  eassert (VECTORP (vec));
+	     ? nitems_max : C_language_max);
   eassert (0 < incr_min && -1 <= nitems_max);
-  old_size = ASIZE (vec);
+
+  bool scheme_vec = GVECTORP (vec);
+  old_size = scheme_vec ? GASIZE (vec) : ASIZE (vec);
   incr_max = n_max - old_size;
   incr = max (incr_min, min (old_size >> 1, incr_max));
   if (incr_max < incr)
     memory_full (SIZE_MAX);
   new_size = old_size + incr;
-  v = allocate_vector (new_size);
-  memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
-  memsetnil(v->contents + old_size, new_size - old_size);
-  XSETVECTOR (vec, v);
-  return vec;
+
+  if (scheme_vec)
+    {
+      Lisp_Object new_vec = make_elisp_vector (new_size, Qnil);
+      for (i = 0; i < old_size; i++)
+        ASET (new_vec, i, GAREF (vec, i));
+      return new_vec;
+    }
+  else
+    {
+      v = allocate_vector (new_size);
+      memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
+      memsetnil(v->contents + old_size, new_size - old_size);
+      XSETVECTOR (vec, v);
+      return vec;
+    }
 }
 
 /***********************************************************************
