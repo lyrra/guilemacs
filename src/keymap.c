@@ -570,16 +570,19 @@ map_keymap_internal (Lisp_Object map,
 	break;
       else if (CONSP (binding))
 	map_keymap_item (fun, args, XCAR (binding), XCDR (binding), data);
-      else if (VECTORP (binding))
+      else if (VECTORP (binding) || GVECTORP (binding))
 	{
 	  /* Loop over the char values represented in the vector.  */
-	  int len = ASIZE (binding);
+	  Lisp_Object vector_binding = binding;
+	  if (GVECTORP (vector_binding))
+	    vector_binding = ensure_elisp_vector (vector_binding);
+	  int len = ASIZE (vector_binding);
 	  int c;
 	  for (c = 0; c < len; c++)
 	    {
 	      Lisp_Object character;
 	      XSETFASTINT (character, c);
-	      map_keymap_item (fun, args, character, AREF (binding, c), data);
+	      map_keymap_item (fun, args, character, AREF (vector_binding, c), data);
 	    }
 	}
       else if (CHAR_TABLE_P (binding))
