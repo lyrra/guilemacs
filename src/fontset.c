@@ -335,18 +335,18 @@ static Lisp_Object
 fontset_extend_vector (Lisp_Object vec, Lisp_Object elt, bool append)
 {
   ptrdiff_t old_len = (VECTORP (vec) || GVECTORP (vec)) ? ASIZE (vec) : 0;
-  Lisp_Object result = scm_c_make_vector (old_len + 1, Qnil);
+  Lisp_Object result = make_elisp_vector (old_len + 1, Qnil);
   bool vec_is_scheme = GVECTORP (vec);
 
   for (ptrdiff_t i = 0; i < old_len; i++)
     {
       Lisp_Object value = vec_is_scheme ? GAREF (vec, i) : AREF (vec, i);
       ptrdiff_t dst = append ? i : i + 1;
-      GASET (result, dst, value);
+      ASET (result, dst, value);
     }
 
   ptrdiff_t insert_idx = append ? old_len : 0;
-  GASET (result, insert_idx, elt);
+  ASET (result, insert_idx, elt);
   return result;
 }
 
