@@ -63,15 +63,34 @@ extern struct Lisp_Char_Table *window_display_table (struct window *);
 /* Defined in indent.c.  */
 extern struct Lisp_Char_Table *buffer_display_table (void);
 
+static inline struct Lisp_Vector *
+glyph_table_vector_struct (void)
+{
+  if (GVECTORP (Vglyph_table))
+    Vglyph_table = ensure_elisp_vector (Vglyph_table);
+  return VECTORP (Vglyph_table) ? XVECTOR (Vglyph_table) : NULL;
+}
+
 /* Return the current length of the GLYPH table,
    or 0 if the table isn't currently valid.  */
-#define GLYPH_TABLE_LENGTH  \
-  ((VECTORP (Vglyph_table)) ? ASIZE (Vglyph_table) : 0)
+static inline ptrdiff_t
+glyph_table_length_fn (void)
+{
+  struct Lisp_Vector *vec = glyph_table_vector_struct ();
+  return vec ? vec->header.size : 0;
+}
 
 /* Return the current base (for indexing) of the GLYPH table,
-   or 0 if the table isn't currently valid.  */
-#define GLYPH_TABLE_BASE  \
-  ((VECTORP (Vglyph_table)) ? XVECTOR (Vglyph_table)->contents : 0)
+   or NULL if the table isn't currently valid.  */
+static inline Lisp_Object *
+glyph_table_contents_ptr (void)
+{
+  struct Lisp_Vector *vec = glyph_table_vector_struct ();
+  return vec ? vec->contents : NULL;
+}
+
+#define GLYPH_TABLE_LENGTH (glyph_table_length_fn ())
+#define GLYPH_TABLE_BASE   (glyph_table_contents_ptr ())
 
 /* Given BASE and LEN returned by the two previous macros,
    return nonzero if the GLYPH code G should be output as a single
