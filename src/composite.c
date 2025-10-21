@@ -716,10 +716,10 @@ composition_gstring_p (Lisp_Object gstring)
   Lisp_Object header;
   ptrdiff_t i;
 
-  if (! VECTORP (gstring) || ASIZE (gstring) < 2)
+  if (! (VECTORP (gstring) || GVECTORP (gstring)) || ASIZE (gstring) < 2)
     return 0;
   header = LGSTRING_HEADER (gstring);
-  if (! VECTORP (header) || ASIZE (header) < 2)
+  if (! (VECTORP (header) || GVECTORP (header)) || ASIZE (header) < 2)
     return 0;
   if (! NILP (LGSTRING_FONT (gstring))
       && (! FONT_OBJECT_P (LGSTRING_FONT (gstring))
@@ -735,7 +735,8 @@ composition_gstring_p (Lisp_Object gstring)
       Lisp_Object glyph = LGSTRING_GLYPH (gstring, i);
       if (NILP (glyph))
 	break;
-      if (! VECTORP (glyph) || ASIZE (glyph) != LGLYPH_SIZE)
+      if (! (VECTORP (glyph) || GVECTORP (glyph))
+          || ASIZE (glyph) != LGLYPH_SIZE)
 	return 0;
     }
   return 1;
