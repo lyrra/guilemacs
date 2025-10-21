@@ -551,7 +551,7 @@ json_out_something (json_out_t *jo, Lisp_Object obj)
     json_out_float (jo, obj);
   else if (HASH_TABLE_P (obj))
     json_out_object_hash (jo, obj);
-  else if (VECTORP (obj))
+  else if (VECTORP (obj) || GVECTORP (obj))
     json_out_array (jo, obj);
   else if (GUILEBIGNUMP (obj))
     json_out_bignum (jo, obj);
