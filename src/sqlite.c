@@ -335,7 +335,10 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
 {
   sqlite3_reset (stmt);
   int len;
-  if (VECTORP (values))
+  bool values_is_scheme = GVECTORP (values);
+  if (values_is_scheme)
+    len = GASIZE (values);
+  else if (VECTORP (values))
     len = ASIZE (values);
   else
     len = list_length (values);
@@ -344,7 +347,9 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
     {
       int ret = SQLITE_MISMATCH;
       Lisp_Object value;
-      if (VECTORP (values))
+      if (values_is_scheme)
+	value = GAREF (values, i);
+      else if (VECTORP (values))
 	value = AREF (values, i);
       else
 	{
@@ -489,7 +494,7 @@ Value is the number of affected rows.  */)
 {
   check_sqlite (db, false);
   CHECK_STRING (query);
-  if (!(NILP (values) || CONSP (values) || VECTORP (values)))
+  if (!(NILP (values) || CONSP (values) || VECTORP (values) || GVECTORP (values)))
     xsignal1 (Qsqlite_error, build_string ("VALUES must be a list or a vector"));
 
   sqlite3 *sdb = XSQLITE (db)->db;
@@ -583,7 +588,7 @@ like `sqlite-next' etc., in order to get the data.  */)
   check_sqlite (db, false);
   CHECK_STRING (query);
 
-  if (!(NILP (values) || CONSP (values) || VECTORP (values)))
+  if (!(NILP (values) || CONSP (values) || VECTORP (values) || GVECTORP (values)))
     xsignal1 (Qsqlite_error, build_string ("VALUES must be a list or a vector"));
 
   sqlite3 *sdb = XSQLITE (db)->db;

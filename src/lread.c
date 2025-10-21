@@ -3836,7 +3836,15 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 
   /* Recurse according to subtree's type.
      Every branch must return a Lisp_Object.  */
-  if (VECTORLIKEP (subtree))
+  if (GVECTORP (subtree))
+    {
+      ptrdiff_t len = GASIZE (subtree);
+      for (ptrdiff_t i = 0; i < len; i++)
+	GASET (subtree, i,
+	       substitute_object_recurse (subst, GAREF (subtree, i)));
+      return subtree;
+    }
+  else if (VECTORLIKEP (subtree))
     {
 	ptrdiff_t i = 0, length = 0;
 	if (BOOL_VECTOR_P (subtree))
@@ -4105,7 +4113,7 @@ check_obarray_slow (Lisp_Object obarray)
 {
   /* For compatibility, we accept vectors whose first element is 0,
      and store an obarray object there.  */
-  if (VECTORP (obarray) && ASIZE (obarray) > 0)
+  if ((VECTORP (obarray) || GVECTORP (obarray)) && ASIZE (obarray) > 0)
     {
       //FIX: obsolete old-style obarrays
       return obarray;
