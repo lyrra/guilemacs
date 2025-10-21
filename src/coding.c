@@ -7543,7 +7543,7 @@ handle_composition_annotation (ptrdiff_t pos, ptrdiff_t limit,
 	      ptrdiff_t i, len, i_byte;
 
 	      components = COMPOSITION_COMPONENTS (prop);
-	      if (VECTORP (components))
+          if (VECTORP (components) || GVECTORP (components))
 		{
 		  len = ASIZE (components);
 		  for (i = 0; i < len; i++)
