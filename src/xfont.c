@@ -205,13 +205,16 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 	}
       return (NILP (chars));
     }
-  else if (VECTORP (chars))
+  else if (VECTORP (chars) || GVECTORP (chars))
     {
+      Lisp_Object vector_chars = chars;
+      if (GVECTORP (vector_chars))
+        vector_chars = ensure_elisp_vector (vector_chars);
       ptrdiff_t i;
 
-      for (i = ASIZE (chars) - 1; i >= 0; i--)
-	{
-	  int c = XFIXNUM (AREF (chars, i));
+      for (i = ASIZE (vector_chars) - 1; i >= 0; i--)
+        {
+          int c = XFIXNUM (AREF (vector_chars, i));
 	  unsigned code = ENCODE_CHAR (charset, c);
 
 	  if (code == CHARSET_INVALID_CODE (charset))
@@ -222,7 +225,7 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 	    continue;
 	  if (xfont_get_pcm (xfont, code))
 	    break;
-	}
+        }
       return (i >= 0);
     }
   return false;

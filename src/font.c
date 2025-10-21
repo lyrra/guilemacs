@@ -5429,27 +5429,27 @@ character.  */)
 
       validate_subarray (object, from, to, ASIZE (object), &ifrom, &ito);
       if (ifrom == ito)
-	return Qnil;
+        return Qnil;
       len = ito - ifrom;
-      if (VECTORP (object))
-	{
-	  for (ptrdiff_t i = 0; i < len; i++)
-	    {
-	      Lisp_Object elt = AREF (object, ifrom + i);
-	      CHECK_CHARACTER (elt);
-	    }
-	  chars = aref_addr (object, ifrom);
-	}
+      if (GVECTORP (object))
+        {
+          SAFE_ALLOCA_LISP (chars, len);
+          for (ptrdiff_t i = 0; i < len; i++)
+            {
+              Lisp_Object elt = GAREF (object, ifrom + i);
+              CHECK_CHARACTER (elt);
+              chars[i] = elt;
+            }
+        }
       else
-	{
-	  SAFE_ALLOCA_LISP (chars, len);
-	  for (ptrdiff_t i = 0; i < len; i++)
-	    {
-	      Lisp_Object elt = GAREF (object, ifrom + i);
-	      CHECK_CHARACTER (elt);
-	      chars[i] = elt;
-	    }
-	}
+        {
+          for (ptrdiff_t i = 0; i < len; i++)
+            {
+              Lisp_Object elt = AREF (object, ifrom + i);
+              CHECK_CHARACTER (elt);
+            }
+          chars = aref_addr (object, ifrom);
+        }
     }
   else
     wrong_type_argument (Qarrayp, object);
