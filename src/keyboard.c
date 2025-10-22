@@ -8611,8 +8611,19 @@ menu_bar_items (Lisp_Object old)
 Lisp_Object item_properties;
 
 static void
+ensure_item_properties_vector (void)
+{
+  if (GVECTORP (item_properties))
+    item_properties = ensure_elisp_vector (item_properties);
+  else if (!NILP (item_properties))
+    CHECK_TYPE (VECTORP (item_properties), Qvectorp, item_properties);
+}
+
+
+static void
 menu_bar_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy1, void *dummy2)
 {
+  ensure_item_properties_vector ();
   int i;
   bool parsed;
   Lisp_Object tem;
@@ -8738,6 +8749,7 @@ parse_menu_item (Lisp_Object item, int inmenubar)
     return 0;
 
   /* Create item_properties vector if necessary.  */
+  ensure_item_properties_vector ();
   if (NILP (item_properties))
     item_properties = make_nil_elisp_vector (ITEM_PROPERTY_MAX + 1);
 

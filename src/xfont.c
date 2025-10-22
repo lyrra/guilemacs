@@ -343,6 +343,10 @@ xfont_list_pattern (Display *display, const char *pattern,
 
   if (num_fonts > 0)
     {
+      if (GVECTORP (xfont_scratch_props))
+        xfont_scratch_props = ensure_elisp_vector (xfont_scratch_props);
+      else
+        CHECK_TYPE (VECTORP (xfont_scratch_props), Qvectorp, xfont_scratch_props);
       char **indices = alloca (sizeof (char *) * num_fonts);
       Lisp_Object *props = XVECTOR (xfont_scratch_props)->contents;
       Lisp_Object scripts = Qnil, entity = Qnil;
