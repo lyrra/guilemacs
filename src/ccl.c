@@ -1097,7 +1097,17 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	    ccl_prog_stack_struct[stack_idx].ic = ic;
 	    ccl_prog_stack_struct[stack_idx].eof_ic = eof_ic;
 	    stack_idx++;
-	    ccl_prog = XVECTOR (AREF (slot, 1))->contents;
+	    {
+	      Lisp_Object prog_vec = AREF (slot, 1);
+	      if (GVECTORP (prog_vec))
+		{
+		  prog_vec = ensure_elisp_vector (prog_vec);
+		  ASET (slot, 1, prog_vec);
+		}
+	      else
+		CHECK_TYPE (VECTORP (prog_vec), Qvectorp, prog_vec);
+	      ccl_prog = XVECTOR (prog_vec)->contents;
+	    }
 	    ic = CCL_HEADER_MAIN;
 	    eof_ic = XFIXNAT (ccl_prog[CCL_HEADER_EOF]);
 	  }
