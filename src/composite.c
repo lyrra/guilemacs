@@ -219,7 +219,7 @@ get_composition_id (ptrdiff_t charpos, ptrdiff_t bytepos, ptrdiff_t nchars,
     key = make_elisp_vector (1, components);
   else if (STRINGP (components) || CONSP (components))
     key = Fvconcat (1, &components);
-  else if (VECTORP (components) || GVECTORP (components))
+  else if (VECTOR_OR_PSEUDOVECTORP (components))
     key = components;
   else if (NILP (components))
     {
@@ -716,10 +716,10 @@ composition_gstring_p (Lisp_Object gstring)
   Lisp_Object header;
   ptrdiff_t i;
 
-  if (! (VECTORP (gstring) || GVECTORP (gstring)) || ASIZE (gstring) < 2)
+  if (! VECTOR_OR_PSEUDOVECTORP (gstring) || ASIZE (gstring) < 2)
     return 0;
   header = LGSTRING_HEADER (gstring);
-  if (! (VECTORP (header) || GVECTORP (header)) || ASIZE (header) < 2)
+  if (! VECTOR_OR_PSEUDOVECTORP (header) || ASIZE (header) < 2)
     return 0;
   if (! NILP (LGSTRING_FONT (gstring))
       && (! FONT_OBJECT_P (LGSTRING_FONT (gstring))
@@ -735,7 +735,7 @@ composition_gstring_p (Lisp_Object gstring)
       Lisp_Object glyph = LGSTRING_GLYPH (gstring, i);
       if (NILP (glyph))
 	break;
-      if (! (VECTORP (glyph) || GVECTORP (glyph))
+      if (! VECTOR_OR_PSEUDOVECTORP (glyph)
           || ASIZE (glyph) != LGLYPH_SIZE)
 	return 0;
     }
@@ -1138,7 +1138,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	      for (EMACS_INT ridx = 0; CONSP (val); val = XCDR (val), ridx++)
 		{
 		  Lisp_Object elt = XCAR (val);
-		  if (VECTORP (elt) && ASIZE (elt) == 3
+		  if (VECTOR_OR_PSEUDOVECTORP (elt) && ASIZE (elt) == 3
 		      && FIXNATP (AREF (elt, 1))
 		      && charpos - 1 - XFIXNAT (AREF (elt, 1)) >= start)
 		    {
@@ -1205,7 +1205,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  for (EMACS_INT ridx = 0; CONSP (val); val = XCDR (val), ridx++)
 	    {
 	      Lisp_Object elt = XCAR (val);
-	      if (VECTORP (elt) && ASIZE (elt) == 3
+	      if (VECTOR_OR_PSEUDOVECTORP (elt) && ASIZE (elt) == 3
 		  && FIXNATP (AREF (elt, 1))
 		  && charpos - XFIXNAT (AREF (elt, 1)) > endpos)
 		{
@@ -1356,7 +1356,7 @@ composition_reseat_it (struct composition_it *cmp_it, ptrdiff_t charpos,
 	  for (; CONSP (val); val = XCDR (val))
 	    {
 	      elt = XCAR (val);
-	      if (! VECTORP (elt) || ASIZE (elt) != 3
+	      if (! VECTOR_OR_PSEUDOVECTORP (elt) || ASIZE (elt) != 3
 		  || ! FIXNUMP (AREF (elt, 1)))
 		continue;
 	      if (XFIXNAT (AREF (elt, 1)) != cmp_it->lookback)
@@ -1787,7 +1787,7 @@ find_automatic_composition (ptrdiff_t pos, ptrdiff_t limit, ptrdiff_t backlim,
 	    {
 	      Lisp_Object elt = XCAR (val);
 
-	      if (VECTORP (elt) && ASIZE (elt) == 3 && FIXNATP (AREF (elt, 1)))
+	      if (VECTOR_OR_PSEUDOVECTORP (elt) && ASIZE (elt) == 3 && FIXNATP (AREF (elt, 1)))
 		{
 		  EMACS_INT check_pos = cur.pos - XFIXNAT (AREF (elt, 1));
 		  struct position_record check;
@@ -2168,7 +2168,7 @@ of the way buffer text is examined for matching one of the rules.  */)
       for (i = 0; i < nrules; i++)
 	{
 	  Lisp_Object elt = XCAR (rules);
-	  if (VECTORP (elt) && ASIZE (elt) == 3 && FIXNATP (AREF (elt, 1)))
+	  if (VECTOR_OR_PSEUDOVECTORP (elt) && ASIZE (elt) == 3 && FIXNATP (AREF (elt, 1)))
 	    sortvec[i] = elt;
 	  else
 	    error ("Invalid composition rule in RULES argument");
