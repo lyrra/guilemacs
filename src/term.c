@@ -3602,8 +3602,17 @@ tty_menu_help_callback (char const *help_string, int pane, int item)
   Lisp_Object *first_item;
   Lisp_Object pane_name;
   Lisp_Object menu_object;
+  Lisp_Object menu_vec = menu_items;
 
-  first_item = XVECTOR (menu_items)->contents;
+  if (GVECTORP (menu_vec))
+    {
+      menu_vec = ensure_elisp_vector (menu_vec);
+      menu_items = menu_vec;
+    }
+  else
+    CHECK_TYPE (VECTORP (menu_vec), Qvectorp, menu_vec);
+
+  first_item = XVECTOR (menu_vec)->contents;
   if (EQ (first_item[0], Qt))
     pane_name = first_item[MENU_ITEMS_PANE_NAME];
   else if (EQ (first_item[0], Qquote))
