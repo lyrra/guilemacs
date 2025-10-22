@@ -1930,6 +1930,10 @@ check_lface (Lisp_Object lface)
 {
   if (!NILP (lface))
     {
+      if (GVECTORP (lface))
+        lface = ensure_elisp_vector (lface);
+      else
+        CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
       eassert (LFACEP (lface));
       check_lface_attrs (XVECTOR (lface)->contents);
     }
@@ -3926,6 +3930,11 @@ set_font_frame_param (Lisp_Object frame, Lisp_Object lface)
   struct frame *f = XFRAME (frame);
   Lisp_Object font;
 
+  if (GVECTORP (lface))
+    lface = ensure_elisp_vector (lface);
+  else
+    CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
+
   if (FRAME_WINDOW_P (f)
       /* Don't do anything if the font is `unspecified'.  This can
 	 happen during frame creation.  */
@@ -4508,6 +4517,14 @@ If FRAME is omitted or nil, use the selected frame.  */)
 
   lface1 = lface_from_face_name (f, face1, true);
   lface2 = lface_from_face_name (f, face2, true);
+  if (GVECTORP (lface1))
+    lface1 = ensure_elisp_vector (lface1);
+  else
+    CHECK_TYPE (VECTORP (lface1), Qvectorp, lface1);
+  if (GVECTORP (lface2))
+    lface2 = ensure_elisp_vector (lface2);
+  else
+    CHECK_TYPE (VECTORP (lface2), Qvectorp, lface2);
   equal_p = lface_equal_p (XVECTOR (lface1)->contents,
 			   XVECTOR (lface2)->contents);
   return equal_p ? Qt : Qnil;
