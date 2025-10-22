@@ -887,13 +887,19 @@ ftfont_list (struct frame *f, Lisp_Object spec)
     return Qnil;
   if (FcPatternGetCharSet (pattern, FC_CHARSET, 0, &charset) != FcResultMatch)
     {
-      val = assq_no_quit (QCscript, AREF (spec, FONT_EXTRA_INDEX));
-      if (! NILP (val))
-	{
-	  val = assq_no_quit (XCDR (val), Vscript_representative_chars);
-	  if (CONSP (val) && VECTORP (XCDR (val)))
-	    chars = XCDR (val);
-	}
+	  val = assq_no_quit (QCscript, AREF (spec, FONT_EXTRA_INDEX));
+	  if (! NILP (val))
+	    {
+	      val = assq_no_quit (XCDR (val), Vscript_representative_chars);
+	      if (CONSP (val))
+		{
+		  Lisp_Object reps = XCDR (val);
+		  if (GVECTORP (reps))
+		    reps = ensure_elisp_vector (reps);
+		  if (VECTORP (reps))
+		    chars = reps;
+		}
+	    }
       val = Qnil;
     }
   if (FIXNUMP (AREF (spec, FONT_SPACING_INDEX)))
@@ -1039,20 +1045,24 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 	    continue;
 	}
 #endif	/* HAVE_LIBOTF || HAVE_HARFBUZZ */
-      if (VECTORP (chars))
-	{
-	  ptrdiff_t j;
+	      if (VECTORP (chars) || GVECTORP (chars))
+		{
+		  ptrdiff_t j;
+		  Lisp_Object vector_chars = chars;
 
-	  if (FcPatternGetCharSet (fontset->fonts[i], FC_CHARSET, 0, &charset)
-	      != FcResultMatch)
-	    continue;
-	  for (j = 0; j < ASIZE (chars); j++)
-	    if (TYPE_RANGED_FIXNUMP (FcChar32, AREF (chars, j))
-		&& FcCharSetHasChar (charset, XFIXNAT (AREF (chars, j))))
-	      break;
-	  if (j == ASIZE (chars))
-	    continue;
-	}
+		  if (GVECTORP (vector_chars))
+		    vector_chars = ensure_elisp_vector (vector_chars);
+
+		  if (FcPatternGetCharSet (fontset->fonts[i], FC_CHARSET, 0, &charset)
+		      != FcResultMatch)
+		    continue;
+		  for (j = 0; j < ASIZE (vector_chars); j++)
+		    if (TYPE_RANGED_FIXNUMP (FcChar32, AREF (vector_chars, j))
+			&& FcCharSetHasChar (charset, XFIXNAT (AREF (vector_chars, j))))
+		      break;
+		  if (j == ASIZE (vector_chars))
+		    continue;
+		}
       if (! NILP (adstyle) || langname)
 	{
 	  Lisp_Object this_adstyle = get_adstyle_property (fontset->fonts[i]);

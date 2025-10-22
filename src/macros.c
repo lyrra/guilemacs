@@ -306,8 +306,11 @@ buffer before the macro is executed.  */)
     }
 
   final = indirect_function (macro);
-  if (!STRINGP (final) && !VECTORP (final))
+  if (!STRINGP (final) && !VECTORP (final) && !GVECTORP (final))
     error ("Keyboard macros must be strings or vectors");
+
+  if (GVECTORP (final))
+    final = ensure_elisp_vector (final);
 
   tem = Fcons (Vexecuting_kbd_macro,
 	       Fcons (make_int (executing_kbd_macro_index),
@@ -379,7 +382,9 @@ buffer before the macro is executed.  */)
       maybe_quit ();
     }
   while (--repeat
-	 && (STRINGP (Vexecuting_kbd_macro) || VECTORP (Vexecuting_kbd_macro)));
+	 && (STRINGP (Vexecuting_kbd_macro)
+	     || VECTORP (Vexecuting_kbd_macro)
+	     || GVECTORP (Vexecuting_kbd_macro)));
 
   executing_kbd_macro = Qnil;
 

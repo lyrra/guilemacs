@@ -5933,8 +5933,13 @@ update_frame_tool_bar (struct frame *f)
               && STRINGP (rtl))
 	    image = find_rtl_image (f, image, rtl);
 
-          if (VECTORP (image))
+          if (VECTORP (image) || GVECTORP (image))
             {
+	      Lisp_Object image_vec = image;
+
+	      if (GVECTORP (image_vec))
+		image_vec = ensure_elisp_vector (image_vec);
+
               if (enabled_p)
                 idx = (selected_p
                        ? TOOL_BAR_IMAGE_ENABLED_SELECTED
@@ -5944,8 +5949,8 @@ update_frame_tool_bar (struct frame *f)
                        ? TOOL_BAR_IMAGE_DISABLED_SELECTED
                        : TOOL_BAR_IMAGE_DISABLED_DESELECTED);
 
-              eassert (ASIZE (image) >= idx);
-              image = AREF (image, idx);
+              eassert (ASIZE (image_vec) >= idx);
+              image = AREF (image_vec, idx);
             }
           else
             idx = -1;

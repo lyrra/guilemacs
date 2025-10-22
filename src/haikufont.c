@@ -563,28 +563,33 @@ haikufont_spec_or_entity_to_pattern (Lisp_Object ent, int list_p,
     {
       tem = assq_no_quit (XCDR (tem), Vscript_representative_chars);
 
-      if (CONSP (tem) && VECTORP (XCDR (tem)))
+      if (CONSP (tem))
 	{
-	  tem = XCDR (tem);
+	  Lisp_Object reps = XCDR (tem);
+	  if (GVECTORP (reps))
+	    reps = ensure_elisp_vector (reps);
 
-	  int count = 0;
-
-	  for (int j = 0; j < ASIZE (tem); ++j)
-	    if (TYPE_RANGED_FIXNUMP (uint32_t, AREF (tem, j)))
-	      ++count;
-
-	  if (count)
+	  if (VECTORP (reps))
 	    {
-	      ptn->specified |= FSPEC_NEED_ONE_OF;
-	      ptn->need_one_of_len = count;
-	      ptn->need_one_of = xmalloc (count * sizeof *ptn->need_one_of);
-	      count = 0;
-	      for (int j = 0; j < ASIZE (tem); ++j)
-		if (TYPE_RANGED_FIXNUMP (uint32_t, AREF (tem, j)))
-		  {
-		    ptn->need_one_of[j] = XFIXNAT (AREF (tem, j));
-		    ++count;
-		  }
+	      int count = 0;
+
+	      for (int j = 0; j < ASIZE (reps); ++j)
+		if (TYPE_RANGED_FIXNUMP (uint32_t, AREF (reps, j)))
+		  ++count;
+
+	      if (count)
+		{
+		  ptn->specified |= FSPEC_NEED_ONE_OF;
+		  ptn->need_one_of_len = count;
+		  ptn->need_one_of = xmalloc (count * sizeof *ptn->need_one_of);
+		  count = 0;
+		  for (int j = 0; j < ASIZE (reps); ++j)
+		    if (TYPE_RANGED_FIXNUMP (uint32_t, AREF (reps, j)))
+		      {
+			ptn->need_one_of[count] = XFIXNAT (AREF (reps, j));
+			++count;
+		      }
+		}
 	    }
 	}
       else if (CONSP (tem) && CONSP (XCDR (tem)))

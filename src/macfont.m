@@ -2193,7 +2193,7 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
 {
   Boolean result = true;
 
-  if (charset || VECTORP (chars))
+  if (charset || VECTORP (chars) || GVECTORP (chars))
     {
       CFCharacterSetRef desc_charset =
         CTFontDescriptorCopyAttribute (desc, kCTFontCharacterSetAttribute);
@@ -2204,16 +2204,20 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
         {
           if (charset)
             result = CFCharacterSetIsSupersetOfSet (desc_charset, charset);
-          else 			/* VECTORP (chars) */
+          else
             {
               ptrdiff_t j;
+	      Lisp_Object vector_chars = chars;
 
-              for (j = 0; j < ASIZE (chars); j++)
-                if (RANGED_FIXNUMP (0, AREF (chars, j), MAX_UNICODE_CHAR)
+	      if (GVECTORP (vector_chars))
+		vector_chars = ensure_elisp_vector (vector_chars);
+
+              for (j = 0; j < ASIZE (vector_chars); j++)
+                if (RANGED_FIXNUMP (0, AREF (vector_chars, j), MAX_UNICODE_CHAR)
                     && CFCharacterSetIsLongCharacterMember (desc_charset,
-                                                            XFIXNAT (AREF (chars, j))))
+                                                            XFIXNAT (AREF (vector_chars, j))))
                   break;
-              if (j == ASIZE (chars))
+              if (j == ASIZE (vector_chars))
                 result = false;
             }
           CFRelease (desc_charset);
@@ -2395,8 +2399,14 @@ macfont_list (struct frame *f, Lisp_Object spec)
       if (! NILP (val))
         {
           val = assq_no_quit (XCDR (val), Vscript_representative_chars);
-          if (CONSP (val) && VECTORP (XCDR (val)))
-            chars = XCDR (val);
+          if (CONSP (val))
+	    {
+	      Lisp_Object reps = XCDR (val);
+	      if (GVECTORP (reps))
+		reps = ensure_elisp_vector (reps);
+	      if (VECTORP (reps))
+		chars = reps;
+	    }
         }
       val = Qnil;
     }

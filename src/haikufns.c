@@ -366,13 +366,18 @@ haiku_get_color (const char *name, Emacs_Color *color)
     }
 
   rc = 1;
-  if (VECTORP (Vhaiku_allowed_ui_colors))
+  Lisp_Object allowed_colors = Vhaiku_allowed_ui_colors;
+
+  if (GVECTORP (allowed_colors))
+    allowed_colors = ensure_elisp_vector (allowed_colors);
+
+  if (VECTORP (allowed_colors))
     {
-      size = ASIZE (Vhaiku_allowed_ui_colors);
+      size = ASIZE (allowed_colors);
 
       for (i = 0; i < size; ++i)
 	{
-	  string = AREF (Vhaiku_allowed_ui_colors, i);
+	  string = AREF (allowed_colors, i);
 
 	  block_input ();
 	  if (STRINGP (string) && scm_is_true (scm_string_equal_p (string, scm_from_utf8_string (name))))

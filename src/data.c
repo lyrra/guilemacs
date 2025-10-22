@@ -404,7 +404,7 @@ DEFUN ("vector-or-char-table-p", Fvector_or_char_table_p,
        doc: /* Return t if OBJECT is a char-table or vector.  */)
   (Lisp_Object object)
 {
-  if (VECTORP (object) || CHAR_TABLE_P (object))
+  if (VECTORP (object) || GVECTORP (object) || CHAR_TABLE_P (object))
     return Qt;
   return Qnil;
 }

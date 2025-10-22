@@ -1180,15 +1180,20 @@ update_frame_tool_bar_1 (struct frame *f, EmacsToolbar *toolbar)
       /* If image is a vector, choose the image according to the
 	 button state.  */
       image = TOOLPROP (TOOL_BAR_ITEM_IMAGES);
-      if (VECTORP (image))
+      if (VECTORP (image) || GVECTORP (image))
 	{
+	  Lisp_Object image_vec = image;
+
+	  if (GVECTORP (image_vec))
+	    image_vec = ensure_elisp_vector (image_vec);
+
           /* NS toolbar auto-computes disabled and selected images.  */
           idx = TOOL_BAR_IMAGE_ENABLED_SELECTED;
-	  eassert (ASIZE (image) >= idx);
-	  image = AREF (image, idx);
+	  eassert (ASIZE (image_vec) >= idx);
+	  image = AREF (image_vec, idx);
 	}
       else
-        {
+	{
           idx = -1;
         }
       labelObj = TOOLPROP (TOOL_BAR_ITEM_LABEL);

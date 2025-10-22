@@ -253,6 +253,22 @@ char_width (int c, struct Lisp_Char_Table *dp)
 		  string_overflow ();
 	      }
 	  }
+      else if (GVECTORP (disp))
+	for (i = 0, width = 0; i < GASIZE (disp); i++)
+	  {
+	    int c = -1;
+	    ch = GAREF (disp, i);
+	    if (GLYPH_CODE_P (ch))
+	      c = GLYPH_CODE_CHAR (ch);
+	    else if (CHARACTERP (ch))
+	      c = XFIXNUM (ch);
+	    if (c >= 0)
+	      {
+		int w = CHARACTER_WIDTH (c);
+		if (ckd_add (&width, width, w))
+		  string_overflow ();
+	      }
+	  }
     }
   return width;
 }

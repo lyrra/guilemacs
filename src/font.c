@@ -2478,34 +2478,45 @@ font_match_p (Lisp_Object spec, Lisp_Object font)
 	}
       else if (EQ (key, QCscript))
 	{
-	  val2 = assq_no_quit (val, Vscript_representative_chars);
-	  if (CONSP (val2))
+	  Lisp_Object entry = assq_no_quit (val, Vscript_representative_chars);
+
+	  if (CONSP (entry))
 	    {
-	      val2 = XCDR (val2);
-	      if (CONSP (val2))
+	      Lisp_Object reps = XCDR (entry);
+
+	      if (CONSP (reps))
 		{
 		  /* All characters in the list must be supported.  */
-		  for (; CONSP (val2); val2 = XCDR (val2))
+		  for (Lisp_Object it = reps; CONSP (it); it = XCDR (it))
 		    {
-		      if (! CHARACTERP (XCAR (val2)))
+		      if (! CHARACTERP (XCAR (it)))
 			continue;
-		      if (font_encode_char (font, XFIXNAT (XCAR (val2)))
+		      if (font_encode_char (font, XFIXNAT (XCAR (it)))
 			  == FONT_INVALID_CODE)
 			return 0;
 		    }
 		}
-	      else if (VECTORP (val2) || GVECTORP (val2))
+	      else if (VECTORP (reps) || GVECTORP (reps))
 		{
 		  /* At most one character in the vector must be supported.  */
-		  for (i = 0; i < ASIZE (val2); i++)
+		  Lisp_Object vector_chars = reps;
+		  bool supported = false;
+
+		  if (GVECTORP (vector_chars))
+		    vector_chars = ensure_elisp_vector (vector_chars);
+
+		  for (i = 0; i < ASIZE (vector_chars); i++)
 		    {
-		      if (! CHARACTERP (AREF (val2, i)))
+		      if (! CHARACTERP (AREF (vector_chars, i)))
 			continue;
-		      if (font_encode_char (font, XFIXNAT (AREF (val2, i)))
+		      if (font_encode_char (font, XFIXNAT (AREF (vector_chars, i)))
 			  != FONT_INVALID_CODE)
-			break;
+			{
+			  supported = true;
+			  break;
+			}
 		    }
-		  if (i == ASIZE (val2))
+		  if (!supported)
 		    return 0;
 		}
 	    }
@@ -3959,8 +3970,16 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
 	  val = XCDR (val);
 	  if (CONSP (val))
 	    val = XCAR (val);
-	  else if (VECTORP (val) || GVECTORP (val))
-	    val = AREF (val, 0);
+		  else if (VECTORP (val) || GVECTORP (val))
+		    {
+		      Lisp_Object vector_chars = val;
+
+		      if (GVECTORP (vector_chars))
+			vector_chars = ensure_elisp_vector (vector_chars);
+
+		      if (ASIZE (vector_chars) > 0)
+			val = AREF (vector_chars, 0);
+		    }
 	  font_object = font_for_char (face, XFIXNAT (val), pos, string);
 	}
     }

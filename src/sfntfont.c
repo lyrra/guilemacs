@@ -1783,27 +1783,34 @@ sfntfont_list_1 (struct sfnt_font_desc *desc, Lisp_Object spec,
 	 requires reading the cmap.  */
       tem = assq_no_quit (XCDR (tem), Vscript_representative_chars);
 
-      if (CONSP (tem) && VECTORP (XCDR (tem)))
+      if (CONSP (tem))
 	{
-	  tem = XCDR (tem);
+	  Lisp_Object reps = XCDR (tem);
+	  if (GVECTORP (reps))
+	    reps = ensure_elisp_vector (reps);
 
-	  /* The vector contains characters, of which one must be
-	     present in the font.  */
-	  matching = false;
-	  for (i = 0; i < ASIZE (tem); ++i)
+	  if (VECTORP (reps))
 	    {
-	      if (FIXNUMP (AREF (tem, i)))
+	      tem = reps;
+
+	      /* The vector contains characters, of which one must be
+		 present in the font.  */
+	      matching = false;
+	      for (i = 0; i < ASIZE (tem); ++i)
 		{
-		  if (sfntfont_lookup_char (desc, AREF (tem, i),
-					    &cmap, &subtable))
+		  if (FIXNUMP (AREF (tem, i)))
 		    {
-		      matching = true;
-		      break;
+		      if (sfntfont_lookup_char (desc, AREF (tem, i),
+						&cmap, &subtable))
+			{
+			  matching = true;
+			  break;
+			}
 		    }
 		}
+	      if (!matching)
+		goto fail;
 	    }
-	  if (!matching)
-	    goto fail;
 	}
       else if (CONSP (tem) && CONSP (XCDR (tem)))
 	{
