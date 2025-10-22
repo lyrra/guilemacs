@@ -768,7 +768,13 @@ the same empty object instead of its copy.  */)
     }
 
   if (VECTORP (arg))
-    return Fvector (ASIZE (arg), XVECTOR (arg)->contents);
+    {
+      if (GVECTORP (arg))
+	arg = ensure_elisp_vector (arg);
+      else
+	CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
+      return Fvector (ASIZE (arg), XVECTOR (arg)->contents);
+    }
 
   if (GVECTORP (arg))
     {
@@ -780,7 +786,13 @@ the same empty object instead of its copy.  */)
     }
 
   if (RECORDP (arg))
-    return Frecord (PVSIZE (arg), XVECTOR (arg)->contents);
+    {
+      if (GVECTORP (arg))
+	arg = ensure_elisp_vector (arg);
+      else
+	CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
+      return Frecord (PVSIZE (arg), XVECTOR (arg)->contents);
+    }
 
   if (CHAR_TABLE_P (arg))
     return copy_char_table (arg);
@@ -2464,6 +2476,10 @@ sort_vector (Lisp_Object vector, Lisp_Object predicate, Lisp_Object keyfunc,
 {
   if (VECTORP (vector))
     {
+      if (GVECTORP (vector))
+	vector = ensure_elisp_vector (vector);
+      else
+	CHECK_TYPE (VECTORP (vector), Qvectorp, vector);
       ptrdiff_t length = ASIZE (vector);
       if (length >= 2)
         tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
@@ -3431,6 +3447,10 @@ FUNCTION must be a function of one argument, and must return a value
 	}
       else if (VECTORP (sequence))
 	{
+	  if (GVECTORP (sequence))
+	    sequence = ensure_elisp_vector (sequence);
+	  else
+	    CHECK_TYPE (VECTORP (sequence), Qvectorp, sequence);
 	  memcpy (args, XVECTOR (sequence)->contents, leni * sizeof *args);
 	  goto concat;
 	}
@@ -4675,6 +4695,7 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
     }
   else
     {
+      CHECK_TYPE (VECTORP (vec), Qvectorp, vec);
       v = allocate_vector (new_size);
       memcpy (v->contents, XVECTOR (vec)->contents, old_size * sizeof *v->contents);
       memsetnil(v->contents + old_size, new_size - old_size);
