@@ -215,6 +215,9 @@ ns_update_menubar (struct frame *f, bool deep_p)
 	{
 	  if (GVECTORP (f->menu_bar_vector))
 	    fset_menu_bar_vector (f, ensure_elisp_vector (f->menu_bar_vector));
+	  else
+	    CHECK_TYPE (VECTORP (f->menu_bar_vector), Qvectorp,
+			f->menu_bar_vector);
 	  memcpy (previous_items, xvector_contents (f->menu_bar_vector),
 		  previous_menu_items_used * word_size);
 	}
@@ -229,6 +232,8 @@ ns_update_menubar (struct frame *f, bool deep_p)
 	  menu_items = ensure_elisp_vector (menu_items);
 	  fset_menu_bar_vector (f, menu_items);
 	}
+      else
+	CHECK_TYPE (VECTORP (menu_items), Qvectorp, menu_items);
       menu_items_allocated = VECTORP (menu_items) ? ASIZE (menu_items) : 0;
       subitems = ASIZE (items) / 4;
       submenu_start = alloca ((subitems + 1) * sizeof *submenu_start);

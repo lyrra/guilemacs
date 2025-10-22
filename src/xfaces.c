@@ -1636,6 +1636,8 @@ the face font sort order, see `face-font-selection-order'.  */)
   /* Sorting requires an Elisp vector for in-place permutation. */
   if (GVECTORP (vec))
     vec = ensure_elisp_vector (vec);
+  else
+    CHECK_TYPE (VECTORP (vec), Qvectorp, vec);
 
   qsort (XVECTOR (vec)->contents, nfonts, word_size,
 	 compare_fonts_by_sort_order);
