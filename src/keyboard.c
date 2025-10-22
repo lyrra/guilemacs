@@ -8487,7 +8487,13 @@ menu_bar_items (Lisp_Object old)
   Vinhibit_quit = Qt;
 
   if (!NILP (old))
-    menu_bar_items_vector = old;
+    {
+      if (GVECTORP (old))
+	old = ensure_elisp_vector (old);
+      else
+	CHECK_TYPE (VECTORP (old), Qvectorp, old);
+      menu_bar_items_vector = old;
+    }
   else
     menu_bar_items_vector = make_nil_elisp_vector (24);
   menu_bar_items_index = 0;
