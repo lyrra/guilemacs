@@ -2407,6 +2407,11 @@ Each input key receives two values in this vector: first the ASCII code,
 and then the scan code.  */)
   (void)
 {
+  if (GVECTORP (recent_doskeys))
+    recent_doskeys = ensure_elisp_vector (recent_doskeys);
+  else
+    CHECK_TYPE (VECTORP (recent_doskeys), Qvectorp, recent_doskeys);
+
   Lisp_Object val, *keys = XVECTOR (recent_doskeys)->contents;
 
   if (total_doskeys < NUM_RECENT_DOSKEYS)
