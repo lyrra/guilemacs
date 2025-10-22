@@ -9126,6 +9126,8 @@ process_tab_bar_item (Lisp_Object key, Lisp_Object def, Lisp_Object data, void *
     {
       /* If a map has an explicit `undefined' as definition,
 	 discard any previously made item.  */
+      CHECK_TYPE (VECTORP (tab_bar_items_vector), Qvectorp,
+		  tab_bar_items_vector);
       for (i = 0; i < ntab_bar_items; i += TAB_BAR_ITEM_NSLOTS)
 	{
 	  Lisp_Object *v = XVECTOR (tab_bar_items_vector)->contents + i;
@@ -9513,6 +9515,8 @@ process_tool_bar_item (Lisp_Object key, Lisp_Object def, Lisp_Object data, void 
     {
       /* If a map has an explicit `undefined' as definition,
 	 discard any previously made item.  */
+      CHECK_TYPE (VECTORP (tool_bar_items_vector), Qvectorp,
+		  tool_bar_items_vector);
       for (i = 0; i < ntool_bar_items; i += TOOL_BAR_ITEM_NSLOTS)
 	{
 	  Lisp_Object *v = XVECTOR (tool_bar_items_vector)->contents + i;
