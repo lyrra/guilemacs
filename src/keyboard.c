@@ -11748,6 +11748,11 @@ If INCLUDE-CMDS is non-nil, include the commands that were run,
 represented as pseudo-events of the form (nil . COMMAND).  */)
   (Lisp_Object include_cmds)
 {
+  if (GVECTORP (recent_keys))
+    recent_keys = ensure_elisp_vector (recent_keys);
+  else
+    CHECK_TYPE (VECTORP (recent_keys), Qvectorp, recent_keys);
+
   bool cmds = !NILP (include_cmds);
 
   if (!total_keys
@@ -11782,6 +11787,11 @@ The value is a string or a vector.
 See also `this-command-keys-vector'.  */)
   (void)
 {
+  if (GVECTORP (this_command_keys))
+    this_command_keys = ensure_elisp_vector (this_command_keys);
+  else
+    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+
   return make_event_array (this_command_key_count,
 			   XVECTOR (this_command_keys)->contents);
 }
@@ -11827,6 +11837,11 @@ the last key sequence that has been read.
 See also `this-command-keys'.  */)
   (void)
 {
+  if (GVECTORP (this_command_keys))
+    this_command_keys = ensure_elisp_vector (this_command_keys);
+  else
+    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+
   return Fvector (this_command_key_count,
 		  XVECTOR (this_command_keys)->contents);
 }
@@ -11839,6 +11854,11 @@ the command loop or by `read-key-sequence'.
 The value is always a vector.  */)
   (void)
 {
+  if (GVECTORP (this_command_keys))
+    this_command_keys = ensure_elisp_vector (this_command_keys);
+  else
+    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+
   ptrdiff_t nkeys = this_command_key_count - this_single_command_key_start;
   return Fvector (nkeys < 0 ? 0 : nkeys,
 		  (XVECTOR (this_command_keys)->contents
@@ -11855,6 +11875,10 @@ shows the events before all translations (except for input methods).
 The value is always a vector.  */)
   (void)
 {
+  if (GVECTORP (raw_keybuf))
+    raw_keybuf = ensure_elisp_vector (raw_keybuf);
+  else
+    CHECK_TYPE (VECTORP (raw_keybuf), Qvectorp, raw_keybuf);
   return Fvector (raw_keybuf_count, XVECTOR (raw_keybuf)->contents);
 }
 
