@@ -3227,6 +3227,11 @@ FRAME 0 means change the face on all frames, and change the default
 	lface = Finternal_make_lisp_face (face, frame);
     }
 
+  if (GVECTORP (lface))
+    lface = ensure_elisp_vector (lface);
+  else
+    CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
+
   if (EQ (attr, QCfamily))
     {
       if (!UNSPECIFIEDP (value)
