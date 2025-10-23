@@ -2741,7 +2741,7 @@ See Info node `(elisp)Pattern Matching' for detailed explanation.  */)
     return Vtreesit_str_pound_match;
   if (BASE_EQ (pattern, QCpred))
     return Vtreesit_str_pound_pred;
-  bool vector_pattern_p = VECTORP (pattern) || GVECTORP (pattern);
+  bool vector_pattern_p = PLAIN_VECTORP (pattern);
   Lisp_Object opening_delimeter
     = vector_pattern_p
       ? Vtreesit_str_open_bracket : Vtreesit_str_open_paren;

@@ -2193,7 +2193,7 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
 {
   Boolean result = true;
 
-  if (charset || VECTORP (chars) || GVECTORP (chars))
+  if (charset || PLAIN_VECTORP (chars))
     {
       CFCharacterSetRef desc_charset =
         CTFontDescriptorCopyAttribute (desc, kCTFontCharacterSetAttribute);

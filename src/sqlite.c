@@ -494,7 +494,7 @@ Value is the number of affected rows.  */)
 {
   check_sqlite (db, false);
   CHECK_STRING (query);
-  if (!(NILP (values) || CONSP (values) || VECTORP (values) || GVECTORP (values)))
+  if (!(NILP (values) || CONSP (values) || PLAIN_VECTORP (values)))
     xsignal1 (Qsqlite_error, build_string ("VALUES must be a list or a vector"));
 
   sqlite3 *sdb = XSQLITE (db)->db;
@@ -588,7 +588,7 @@ like `sqlite-next' etc., in order to get the data.  */)
   check_sqlite (db, false);
   CHECK_STRING (query);
 
-  if (!(NILP (values) || CONSP (values) || VECTORP (values) || GVECTORP (values)))
+  if (!(NILP (values) || CONSP (values) || PLAIN_VECTORP (values)))
     xsignal1 (Qsqlite_error, build_string ("VALUES must be a list or a vector"));
 
   sqlite3 *sdb = XSQLITE (db)->db;

@@ -83,7 +83,7 @@ character_width (int c, struct Lisp_Char_Table *dp)
   if (dp)
     {
       Lisp_Object elt = DISP_CHAR_VECTOR (dp, c);
-      if (VECTORP (elt) || GVECTORP (elt))
+      if (PLAIN_VECTORP (elt))
 	return ASIZE (elt);
     }
 
@@ -293,7 +293,7 @@ skip_invisible (ptrdiff_t pos, ptrdiff_t *next_boundary_p, ptrdiff_t to, Lisp_Ob
 	if (_mb_dp)							       \
 	  {								       \
 	    Lisp_Object _mb_vec = DISP_CHAR_VECTOR (_mb_dp, ch);	       \
-	    if (VECTORP (_mb_vec) || GVECTORP (_mb_vec))		       \
+	    if (PLAIN_VECTORP (_mb_vec))		       \
 	      width = sanitize_char_width (ASIZE (_mb_vec));		       \
 	    else							       \
 	      width = CHARACTER_WIDTH (ch);				       \
@@ -408,7 +408,7 @@ current_column (void)
       if (dp)
 	{
 	  charvec = DISP_CHAR_VECTOR (dp, c);
-	  if (VECTORP (charvec) || GVECTORP (charvec))
+	  if (PLAIN_VECTORP (charvec))
 	    {
 	      charvec_vector_p = true;
 	      n = ASIZE (charvec);
@@ -713,7 +713,7 @@ scan_for_column (ptrdiff_t *endpos, EMACS_INT *goalcol,
       if (dp != 0 && ! (multibyte && LEADING_CODE_P (c)))
 	{
 	  disp_charvec = DISP_CHAR_VECTOR (dp, c);
-	  disp_vector_p = VECTORP (disp_charvec) || GVECTORP (disp_charvec);
+	  disp_vector_p = PLAIN_VECTORP (disp_charvec);
 	}
 
       if (disp_vector_p)
@@ -866,7 +866,7 @@ string_display_width (Lisp_Object string, Lisp_Object beg, Lisp_Object end)
       if (dp != 0)
 	{
 	  disp_vec = DISP_CHAR_VECTOR (dp, c);
-	  disp_vec_is_vector = VECTORP (disp_vec) || GVECTORP (disp_vec);
+	  disp_vec_is_vector = PLAIN_VECTORP (disp_vec);
 	}
       if (disp_vec_is_vector)
 	col += ASIZE (disp_vec);
@@ -1230,7 +1230,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
        : !NILP (BVAR (current_buffer, selective_display)) ? -1 : 0);
   Lisp_Object invis_vec = dp ? DISP_INVIS_VECTOR (dp) : Qnil;
   ptrdiff_t selective_rlen
-    = (selective && (VECTORP (invis_vec) || GVECTORP (invis_vec))
+    = (selective && (PLAIN_VECTORP (invis_vec))
        ? ASIZE (invis_vec) : 0);
   /* The next location where the `invisible' property changes, or an
      overlay starts or ends.  */
@@ -1666,7 +1666,7 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
 	      && ! (multibyte && LEADING_CODE_P (c)))
 	    {
 	      charvec = DISP_CHAR_VECTOR (dp, c);
-	      if (VECTORP (charvec) || GVECTORP (charvec))
+	      if (PLAIN_VECTORP (charvec))
 		{
 		  charvec_vector_p = true;
 		  n = ASIZE (charvec);

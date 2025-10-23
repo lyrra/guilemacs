@@ -1045,7 +1045,7 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 	    continue;
 	}
 #endif	/* HAVE_LIBOTF || HAVE_HARFBUZZ */
-	      if (VECTORP (chars) || GVECTORP (chars))
+	      if (PLAIN_VECTORP (chars))
 		{
 		  ptrdiff_t j;
 		  Lisp_Object vector_chars = chars;

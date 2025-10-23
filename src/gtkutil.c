@@ -5933,7 +5933,7 @@ update_frame_tool_bar (struct frame *f)
               && STRINGP (rtl))
 	    image = find_rtl_image (f, image, rtl);
 
-          if (VECTORP (image) || GVECTORP (image))
+          if (PLAIN_VECTORP (image))
             {
 	      Lisp_Object image_vec = image;
 

@@ -4113,7 +4113,7 @@ check_obarray_slow (Lisp_Object obarray)
 {
   /* For compatibility, we accept vectors whose first element is 0,
      and store an obarray object there.  */
-  if ((VECTORP (obarray) || GVECTORP (obarray)) && ASIZE (obarray) > 0)
+  if ((PLAIN_VECTORP (obarray)) && ASIZE (obarray) > 0)
     {
       //FIX: obsolete old-style obarrays
       return obarray;

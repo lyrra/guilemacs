@@ -134,7 +134,7 @@ restore_menu_items (Lisp_Object saved)
   else if (!NILP (menu_items))
     CHECK_TYPE (VECTORP (menu_items), Qvectorp, menu_items);
   menu_items_inuse = ! NILP (menu_items);
-  menu_items_allocated = ((VECTORP (menu_items) || GVECTORP (menu_items))
+  menu_items_allocated = ((PLAIN_VECTORP (menu_items))
 			  ? ASIZE (menu_items) : 0);
   saved = XCDR (saved);
   menu_items_used = XFIXNUM (XCAR (saved));
