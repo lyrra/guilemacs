@@ -1645,27 +1645,19 @@ With one argument, just copy STRING (with properties, if any).  */)
       copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
 			    string, make_fixnum (0), res, Qnil);
     }
-  else if (GVECTORP (string))
-    {
-      /* Handle Scheme vectors by building element by element */
-      ptrdiff_t newlen = ito - ifrom;
-      res = scm_c_make_vector (newlen, Qnil);
-      for (ptrdiff_t i = 0; i < newlen; i++)
-        GASET (res, i, GAREF (string, ifrom + i));
-    }
   else
     {
-      /* Vectorlike - use element-by-element copy to be safe */
+      /* Vectorlike (both Guile and Elisp) - use element-by-element copy */
       ptrdiff_t newlen = ito - ifrom;
       Lisp_Object *addr = aref_addr (string, ifrom);
       if (addr)
         {
-          /* C vectorlike - can use direct pointer */
+          /* C vectorlike - can use direct pointer for efficiency */
           res = Fvector (newlen, addr);
         }
       else
         {
-          /* Fallback for other vectorlikes - copy element by element */
+          /* Guile vectors or other vectorlikes - copy element by element */
           res = scm_c_make_vector (newlen, Qnil);
           for (ptrdiff_t i = 0; i < newlen; i++)
             GASET (res, i, AREF (string, ifrom + i));
@@ -1724,18 +1716,23 @@ substring_both (Lisp_Object string, ptrdiff_t from, ptrdiff_t from_byte,
       copy_text_properties (make_fixnum (from), make_fixnum (to),
 			    string, make_fixnum (0), res, Qnil);
     }
-  else if (GVECTORP (string))
-    {
-      /* Handle Scheme vectors by building element by element */
-      ptrdiff_t newlen = to - from;
-      res = scm_c_make_vector (newlen, Qnil);
-      for (ptrdiff_t i = 0; i < newlen; i++)
-        GASET (res, i, GAREF (string, from + i));
-    }
   else
     {
-      /* C vectorlike - can use direct pointer */
-      res = Fvector (to - from, aref_addr (string, from));
+      /* Vectorlike (both Guile and Elisp) */
+      ptrdiff_t newlen = to - from;
+      Lisp_Object *addr = aref_addr (string, from);
+      if (addr)
+        {
+          /* C vectorlike - can use direct pointer for efficiency */
+          res = Fvector (newlen, addr);
+        }
+      else
+        {
+          /* Guile vectors - copy element by element */
+          res = scm_c_make_vector (newlen, Qnil);
+          for (ptrdiff_t i = 0; i < newlen; i++)
+            GASET (res, i, AREF (string, from + i));
+        }
     }
 
   return res;
@@ -2472,32 +2469,17 @@ static Lisp_Object
 sort_vector (Lisp_Object vector, Lisp_Object predicate, Lisp_Object keyfunc,
 	     bool reverse)
 {
-  if (VECTORP (vector))
+  if (PLAIN_VECTORP (vector))
     {
+      /* Ensure we have an Elisp vector for direct pointer access */
       if (GVECTORP (vector))
 	vector = ensure_elisp_vector (vector);
       else
 	CHECK_TYPE (VECTORP (vector), Qvectorp, vector);
+
       ptrdiff_t length = ASIZE (vector);
       if (length >= 2)
         tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
-      return vector;
-    }
-  else if (GVECTORP (vector))
-    {
-      ptrdiff_t length = GASIZE (vector);
-      if (length >= 2)
-        {
-          USE_SAFE_ALLOCA;
-          Lisp_Object *tmp;
-          SAFE_ALLOCA_LISP (tmp, length);
-          for (ptrdiff_t i = 0; i < length; i++)
-            tmp[i] = GAREF (vector, i);
-          tim_sort (predicate, keyfunc, tmp, length, reverse);
-          for (ptrdiff_t i = 0; i < length; i++)
-            GASET (vector, i, tmp[i]);
-          SAFE_FREE ();
-        }
       return vector;
     }
   else
@@ -3440,19 +3422,14 @@ FUNCTION must be a function of one argument, and must return a value
 	  while (!NILP (src));
 	  goto concat;
 	}
-      else if (VECTORP (sequence))
+      else if (PLAIN_VECTORP (sequence))
 	{
+	  /* Ensure Elisp vector for efficient memcpy */
 	  if (GVECTORP (sequence))
 	    sequence = ensure_elisp_vector (sequence);
 	  else
 	    CHECK_TYPE (VECTORP (sequence), Qvectorp, sequence);
 	  memcpy (args, XVECTOR (sequence)->contents, leni * sizeof *args);
-	  goto concat;
-	}
-      else if (GVECTORP (sequence))
-	{
-	  for (ptrdiff_t i = 0; i < leni; i++)
-	    args[i] = GAREF (sequence, i);
 	  goto concat;
 	}
     }
