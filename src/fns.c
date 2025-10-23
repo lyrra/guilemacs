@@ -4660,9 +4660,10 @@ larger_vector (Lisp_Object vec, ptrdiff_t incr_min, ptrdiff_t nitems_max)
 
   if (scheme_vec)
     {
-      Lisp_Object new_vec = make_elisp_vector (new_size, Qnil);
+      /* Preserve Guile vector type - use scm_c_make_vector */
+      Lisp_Object new_vec = scm_c_make_vector (new_size, Qnil);
       for (i = 0; i < old_size; i++)
-        ASET (new_vec, i, GAREF (vec, i));
+        GASET (new_vec, i, GAREF (vec, i));
       return new_vec;
     }
   else
