@@ -237,27 +237,11 @@ char_width (int c, struct Lisp_Char_Table *dp)
       Lisp_Object disp = DISP_CHAR_VECTOR (dp, c), ch;
       int i;
 
-      if (VECTORP (disp))
+      if (PLAIN_VECTORP (disp))
 	for (i = 0, width = 0; i < ASIZE (disp); i++)
 	  {
 	    int c = -1;
 	    ch = AREF (disp, i);
-	    if (GLYPH_CODE_P (ch))
-	      c = GLYPH_CODE_CHAR (ch);
-	    else if (CHARACTERP (ch))
-	      c = XFIXNUM (ch);
-	    if (c >= 0)
-	      {
-		int w = CHARACTER_WIDTH (c);
-		if (ckd_add (&width, width, w))
-		  string_overflow ();
-	      }
-	  }
-      else if (GVECTORP (disp))
-	for (i = 0, width = 0; i < GASIZE (disp); i++)
-	  {
-	    int c = -1;
-	    ch = GAREF (disp, i);
 	    if (GLYPH_CODE_P (ch))
 	      c = GLYPH_CODE_CHAR (ch);
 	    else if (CHARACTERP (ch))

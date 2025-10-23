@@ -1621,20 +1621,11 @@ default_line_pixel_height (struct window *w)
 static Lisp_Object
 string_from_display_spec (Lisp_Object spec)
 {
-  if (VECTORP (spec))
+  if (PLAIN_VECTORP (spec))
     {
       for (ptrdiff_t i = 0; i < ASIZE (spec); i++)
 	if (STRINGP (AREF (spec, i)))
 	  return AREF (spec, i);
-    }
-  else if (GVECTORP (spec))
-    {
-      for (ptrdiff_t i = 0; i < GASIZE (spec); i++)
-	{
-	  Lisp_Object elt = GAREF (spec, i);
-	  if (STRINGP (elt))
-	    return elt;
-	}
     }
   else
     {
@@ -28652,9 +28643,7 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
 
 	  if (NILP (eolvalue))	/* Not yet decided.  */
 	    eoltype = eol_mnemonic_undecided;
-	  else if (GVECTORP (eolvalue))
-	    eoltype = eol_mnemonic_undecided;
-	  else if (VECTORP (eolvalue)) /* Not yet decided.  */
+	  else if (PLAIN_VECTORP (eolvalue)) /* Not yet decided.  */
 	    eoltype = eol_mnemonic_undecided;
 	  else			/* eolvalue is Qunix, Qdos, or Qmac.  */
 	    eoltype = (EQ (eolvalue, Qunix)
