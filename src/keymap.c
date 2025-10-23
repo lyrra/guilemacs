@@ -102,7 +102,7 @@ ensure_keymap_elisp_vector (Lisp_Object vector, Lisp_Object cell)
 static void
 CHECK_VECTOR_OR_CHAR_TABLE (Lisp_Object x)
 {
-  CHECK_TYPE (VECTORP (x) || GVECTORP (x) || CHAR_TABLE_P (x), Qvector_or_char_table_p, x);
+  CHECK_TYPE (PLAIN_VECTORP (x) || CHAR_TABLE_P (x), Qvector_or_char_table_p, x);
 }
 
 /* Keymap object support - constructors and predicates.			*/
@@ -448,7 +448,7 @@ access_keymap_1 (Lisp_Object map, Lisp_Object idx,
 		t_ok = 0;
 	      }
       }
-	else if (VECTORP (binding) || GVECTORP (binding))
+	else if (PLAIN_VECTORP (binding))
 	  {
 	    Lisp_Object vector = ensure_keymap_elisp_vector (binding, tail);
 	    if (FIXNUMP (idx) && XFIXNAT (idx) < ASIZE (vector))
@@ -570,7 +570,7 @@ map_keymap_internal (Lisp_Object map,
 	break;
       else if (CONSP (binding))
 	map_keymap_item (fun, args, XCAR (binding), XCDR (binding), data);
-      else if (VECTORP (binding) || GVECTORP (binding))
+      else if (PLAIN_VECTORP (binding))
 	{
 	  /* Loop over the char values represented in the vector.  */
 	  Lisp_Object vector_binding = binding;
@@ -804,7 +804,7 @@ store_in_keymap (Lisp_Object keymap, register Lisp_Object idx,
     for (tail = XCDR (keymap); CONSP (tail); tail = XCDR (tail))
       {
 	Lisp_Object elt = XCAR (tail);
-      if (VECTORP (elt) || GVECTORP (elt))
+      if (PLAIN_VECTORP (elt))
 	{
 	  Lisp_Object table = ensure_keymap_elisp_vector (elt, tail);
 
@@ -1023,7 +1023,7 @@ copy_keymap_1 (Lisp_Object keymap, int depth)
 	  map_char_table (copy_keymap_set_char_table, Qnil, elt,
 			  Fcons (elt, make_fixnum (depth + 1)));
 	}
-      else if (VECTORP (elt) || GVECTORP (elt))
+      else if (PLAIN_VECTORP (elt))
 	{
 	  if (GVECTORP (elt))
 	    {
@@ -1091,7 +1091,7 @@ is not copied.  */)
 static Lisp_Object
 possibly_translate_key_sequence (Lisp_Object key, ptrdiff_t *length)
 {
-  if (VECTORP (key) || GVECTORP (key))
+  if (PLAIN_VECTORP (key))
     {
       Lisp_Object vector = key;
 
@@ -1174,11 +1174,11 @@ binding KEY to DEF is added at the front of KEYMAP.  */)
   if (length == 0)
     return Qnil;
 
-  int meta_bit = ((VECTORP (key) || GVECTORP (key)
+  int meta_bit = ((PLAIN_VECTORP (key)
                    || (STRINGP (key) /* FIX-guilemacs: && STRING_MULTIBYTE (key)*/))
                   ? meta_modifier : 0x80);
 
-  if (VECTORP (def) || GVECTORP (def))
+  if (PLAIN_VECTORP (def))
     { /* DEF is apparently an XEmacs-style keyboard macro.  */
       Lisp_Object macro = def;
 
@@ -1378,7 +1378,7 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
      backwards-compatibility.  (Bug#50752) */
 
   /* Just skip everything below unless this is a menu item.  */
-  if (!(VECTORP (key) || GVECTORP (key)))
+  if (!(PLAIN_VECTORP (key)))
     return found;
 
   if (GVECTORP (key))
@@ -2189,7 +2189,7 @@ For an approximate inverse of this, see `kbd'.  */)
       Lisp_Object list = lists[li];
       ptrdiff_t listlen = listlens[li], i_byte = 0;
 
-      if (! (NILP (list) || STRINGP (list) || VECTORP (list) || GVECTORP (list) || CONSP (list)))
+      if (! (NILP (list) || STRINGP (list) || PLAIN_VECTORP (list) || CONSP (list)))
 	wrong_type_argument (Qarrayp, list);
 
       for (ptrdiff_t i = 0; i < listlen; )

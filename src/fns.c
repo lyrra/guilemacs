@@ -849,7 +849,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	  //  string_overflow ();
 	  result_len_byte += arg_len_byte;
 	}
-      else if (VECTORP (arg) || GVECTORP (arg))
+      else if (VECTOR_OR_PSEUDOVECTORP (arg))
 	{
 	  bool scheme_vec = GVECTORP (arg);
 	  len = scheme_vec ? GASIZE (arg) : ASIZE (arg);
@@ -967,7 +967,7 @@ concat_to_string (ptrdiff_t nargs, Lisp_Object *args)
 	    }
 #endif
 	}
-      else if (VECTORP (arg) || GVECTORP (arg))
+      else if (VECTOR_OR_PSEUDOVECTORP (arg))
 	{
 	  bool scheme_vec = GVECTORP (arg);
 	  ptrdiff_t len = scheme_vec ? GASIZE (arg) : ASIZE (arg);
@@ -1082,7 +1082,7 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
 	      last = node;
 	    }
 	}
-      else if (GVECTORP (arg) || VECTORP (arg) || CLOSUREP (arg))
+      else if (VECTOR_OR_PSEUDOVECTORP (arg) || CLOSUREP (arg))
 	{
 	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
 	  bool scheme_vec = GVECTORP (arg);
@@ -1119,7 +1119,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (!((VECTORP (arg) || GVECTORP (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
+      if (!((VECTOR_OR_PSEUDOVECTORP (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
             || BOOL_VECTOR_P (arg) || CLOSUREP (arg)))
         wrong_type_argument (Qsequencep, arg);
       EMACS_INT len = XFIXNAT (Flength (arg));
@@ -1137,7 +1137,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (VECTORP (arg) || GVECTORP (arg))
+      if (VECTOR_OR_PSEUDOVECTORP (arg))
 	{
 	  bool scheme_vec = GVECTORP (arg);
 	  ptrdiff_t size = scheme_vec ? GASIZE (arg) : ASIZE (arg);
@@ -2184,7 +2184,7 @@ does not modify the argument.  */)
 	}
       CHECK_LIST_END (tail, seq);
     }
-  else if (VECTORP (seq) || GVECTORP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq))
     {
       ptrdiff_t n = 0;
       bool scheme_vec = GVECTORP (seq);
@@ -2305,7 +2305,7 @@ This function may destructively modify SEQ to produce the value.  */)
       CHECK_LIST_END (tail, seq);
       seq = prev;
     }
-  else if (VECTORP (seq) || GVECTORP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq))
     {
       bool scheme_vec = GVECTORP (seq);
       ptrdiff_t size = scheme_vec ? GASIZE (seq) : ASIZE (seq);
@@ -2362,7 +2362,7 @@ See also the function `nreverse', which is used more often.  */)
 	new = Fcons (XCAR (seq), new);
       CHECK_LIST_END (seq, seq);
     }
-  else if (VECTORP (seq) || GVECTORP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq))
     {
       bool scheme_vec = GVECTORP (seq);
       ptrdiff_t size = scheme_vec ? GASIZE (seq) : ASIZE (seq);
@@ -2567,7 +2567,7 @@ usage: (sort SEQ &key KEY LESSP REVERSE IN-PLACE)  */)
     return sort_list (seq, lessp, key, reverse, inplace);
   else if (NILP (seq))
     return seq;
-  else if (VECTORP (seq) || GVECTORP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq))
     return sort_vector (inplace ? seq : Fcopy_sequence (seq),
 			lessp, key, reverse);
   else
@@ -3368,7 +3368,7 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 	  tail = XCDR (tail);
 	}
     }
-  else if (GVECTORP (seq) || VECTORP (seq) || CLOSUREP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq) || CLOSUREP (seq))
     {
       bool scheme_vec = GVECTORP (seq);
       for (ptrdiff_t i = 0; i < leni; i++)

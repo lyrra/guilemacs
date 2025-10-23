@@ -4640,7 +4640,7 @@ xbm_image_p (Lisp_Object object)
 
       /* Check type of data, and width and height against contents of
 	 data.  */
-      if (VECTORP (data) || GVECTORP (data))
+      if (VECTOR_OR_PSEUDOVECTORP (data))
 	{
 	  EMACS_INT i;
 
@@ -5284,7 +5284,7 @@ xbm_load (struct frame *f, struct image *img)
 	{
 	  USE_SAFE_ALLOCA;
 
-	  if (VECTORP (data) || GVECTORP (data))
+	  if (VECTOR_OR_PSEUDOVECTORP (data))
 	    {
 	      int i;
 	      char *p;
@@ -7131,7 +7131,7 @@ image_edge_detection (struct frame *f, struct image *img,
 	   ++i, matrix = XCDR (matrix))
 	trans[i] = XFLOATINT (XCAR (matrix));
     }
-  else if ((VECTORP (matrix) || GVECTORP (matrix)) && ASIZE (matrix) >= 9)
+  else if ((VECTOR_OR_PSEUDOVECTORP (matrix)) && ASIZE (matrix) >= 9)
     {
       for (i = 0; i < 9 && NUMBERP (AREF (matrix, i)); ++i)
 	trans[i] = XFLOATINT (AREF (matrix, i));
@@ -12536,7 +12536,7 @@ gs_image_p (Lisp_Object object)
       if (!NILP (tem))
 	return 0;
     }
-  else if (VECTORP (tem) || GVECTORP (tem))
+  else if (VECTOR_OR_PSEUDOVECTORP (tem))
     {
       if (ASIZE (tem) != 4)
 	return 0;

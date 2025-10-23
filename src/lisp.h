@@ -1492,6 +1492,15 @@ VECTORP (Lisp_Object x)
   return VECTORLIKEP (x) && ! (ASIZE (x) & PSEUDOVECTOR_FLAG);
 }
 
+/* True for plain vectors (either Guile or Elisp) but NOT pseudovectors.
+   Use this when you want to accept user-provided vectors but not
+   special internal structures like closures, hash-tables, etc. */
+INLINE bool
+PLAIN_VECTORP (Lisp_Object x)
+{
+  return GVECTORP (x) || VECTORP (x);
+}
+
 INLINE bool
 PSEUDOVECTOR_ONLY_P (Lisp_Object x)
 {

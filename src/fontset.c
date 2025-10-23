@@ -334,7 +334,7 @@ fontset_ref (Lisp_Object fontset, int c)
 static Lisp_Object
 fontset_extend_vector (Lisp_Object vec, Lisp_Object elt, bool append)
 {
-  ptrdiff_t old_len = (VECTORP (vec) || GVECTORP (vec)) ? ASIZE (vec) : 0;
+  ptrdiff_t old_len = (VECTOR_OR_PSEUDOVECTORP (vec)) ? ASIZE (vec) : 0;
   Lisp_Object result = make_elisp_vector (old_len + 1, Qnil);
   bool vec_is_scheme = GVECTORP (vec);
 
@@ -533,7 +533,7 @@ fontset_get_font_group (Lisp_Object fontset, int c)
 	char_table_set_range (fontset, from, to, font_group);
       return font_group;
     }
-  if (!(VECTORP (font_group) || GVECTORP (font_group)))
+  if (!(VECTOR_OR_PSEUDOVECTORP (font_group)))
     return font_group;
 
   /* Now realize FONT-DEFs of this font group, and update the realized
@@ -796,7 +796,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
   /* Try a font-group of FONTSET. */
   FONT_DEFERRED_LOG ("current fontset: font for", make_fixnum (c), Qnil);
   rfont_def = fontset_find_font (fontset, c, face, id, 0);
-  if (VECTORP (rfont_def) || GVECTORP (rfont_def))
+  if (VECTOR_OR_PSEUDOVECTORP (rfont_def))
     return rfont_def;
   if (NILP (rfont_def))
     FONTSET_SET (fontset, make_fixnum (c), make_fixnum (0));
@@ -812,7 +812,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
       FONT_DEFERRED_LOG ("default fontset: font for", make_fixnum (c), Qnil);
       default_rfont_def
 	= fontset_find_font (FONTSET_DEFAULT (fontset), c, face, id, 0);
-      if (VECTORP (default_rfont_def) || GVECTORP (default_rfont_def))
+      if (VECTOR_OR_PSEUDOVECTORP (default_rfont_def))
 	return default_rfont_def;
       if (NILP (default_rfont_def))
 	FONTSET_SET (FONTSET_DEFAULT (fontset), make_fixnum (c),
@@ -824,7 +824,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
     {
       FONT_DEFERRED_LOG ("current fallback: font for", make_fixnum (c), Qnil);
       rfont_def = fontset_find_font (fontset, c, face, id, 1);
-      if (VECTORP (rfont_def) || GVECTORP (rfont_def))
+      if (VECTOR_OR_PSEUDOVECTORP (rfont_def))
 	return rfont_def;
       /* Remember that FONTSET has no font for C.  */
       FONTSET_SET (fontset, make_fixnum (c), Qt);
@@ -836,7 +836,7 @@ fontset_font (Lisp_Object fontset, int c, struct face *face, int id)
     {
       FONT_DEFERRED_LOG ("default fallback: font for", make_fixnum (c), Qnil);
       rfont_def = fontset_find_font (FONTSET_DEFAULT (fontset), c, face, id, 1);
-      if (VECTORP (rfont_def) || GVECTORP (rfont_def))
+      if (VECTOR_OR_PSEUDOVECTORP (rfont_def))
 	return rfont_def;
       /* Remember that the default fontset has no font for C.  */
       FONTSET_SET (FONTSET_DEFAULT (fontset), make_fixnum (c), Qt);
@@ -1034,7 +1034,7 @@ face_for_char (struct frame *f, struct face *face, int c,
     }
 
   rfont_def = fontset_font (fontset, c, face, id);
-  if (VECTORP (rfont_def) || GVECTORP (rfont_def))
+  if (VECTOR_OR_PSEUDOVECTORP (rfont_def))
     {
       if (FIXNUMP (RFONT_DEF_FACE (rfont_def)))
 	face_id = XFIXNUM (RFONT_DEF_FACE (rfont_def));
@@ -1101,7 +1101,7 @@ font_for_char (struct face *face, int c, ptrdiff_t pos, Lisp_Object object)
     }
 
   rfont_def = fontset_font (fontset, c, face, id);
-  return ((VECTORP (rfont_def) || GVECTORP (rfont_def))
+  return ((VECTOR_OR_PSEUDOVECTORP (rfont_def))
 	  ? RFONT_DEF_OBJECT (rfont_def)
 	  : Qnil);
 }
@@ -1984,7 +1984,7 @@ format is the same as above.  */)
 	      val = FONTSET_FALLBACK (fontsets[k]);
 	      to = MAX_CHAR;
 	    }
-	  if (VECTORP (val) || GVECTORP (val))
+	  if (VECTOR_OR_PSEUDOVECTORP (val))
 	    {
 	      Lisp_Object alist;
 
@@ -2003,7 +2003,7 @@ format is the same as above.  */)
 		  else
 		    val = FONTSET_FALLBACK (realized[k][i]);
 		  if (! CONSP (val)
-		      || !(VECTORP (XCDR (val)) || GVECTORP (XCDR (val))))
+		      || !VECTOR_OR_PSEUDOVECTORP (XCDR (val)))
 		    continue;
 		  /* VAL: (int . [[FACE-ID FONT-DEF FONT-OBJECT int] ... ])  */
 		  val = XCDR (val);
@@ -2076,7 +2076,7 @@ patterns.  */)
     {
       for (i = 0, elt = FONTSET_REF (fontset, c); i < 2;
 	   i++, elt = FONTSET_FALLBACK (fontset))
-	if (VECTORP (elt) || GVECTORP (elt))
+	if (VECTOR_OR_PSEUDOVECTORP (elt))
 	  for (j = 0; j < ASIZE (elt); j++)
 	    {
 	      Lisp_Object family, registry;

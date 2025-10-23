@@ -1673,7 +1673,7 @@ Return nil if format of ADDRESS is invalid.  */)
   if (STRINGP (address))  /* AF_LOCAL */
     return address;
 
-  if (VECTORP (address) || GVECTORP (address))  /* AF_INET or AF_INET6 */
+  if (VECTOR_OR_PSEUDOVECTORP (address))  /* AF_INET or AF_INET6 */
     {
       ptrdiff_t size = ASIZE (address);
       Lisp_Object args[10];
@@ -2656,7 +2656,7 @@ conv_addrinfo_to_lisp (struct addrinfo *res)
 static ptrdiff_t
 get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
 {
-  if (VECTORP (address) || GVECTORP (address))
+  if (VECTOR_OR_PSEUDOVECTORP (address))
     {
       ptrdiff_t vec_size = ASIZE (address);
       if (vec_size == 5)
@@ -2680,7 +2680,7 @@ get_lisp_to_sockaddr_size (Lisp_Object address, int *familyp)
     }
 #endif
   else if (CONSP (address) && TYPE_RANGED_FIXNUMP (int, XCAR (address))
-	   && (VECTORP (XCDR (address)) || GVECTORP (XCDR (address))))
+	   && VECTOR_OR_PSEUDOVECTORP (XCDR (address)))
     {
       Lisp_Object vec = XCDR (address);
       ptrdiff_t vec_size = ASIZE (vec);
@@ -2710,7 +2710,7 @@ conv_lisp_to_sockaddr (int family, Lisp_Object address, struct sockaddr *sa, int
 
   memset (sa, 0, len);
 
-  if (VECTORP (address) || GVECTORP (address))
+  if (VECTOR_OR_PSEUDOVECTORP (address))
     vec = address;
   else if (STRINGP (address))
     {

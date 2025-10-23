@@ -362,7 +362,7 @@ DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
        doc: /* Return t if OBJECT is a vector.  */)
   (Lisp_Object object)
 {
-  if (VECTORP (object) || GVECTORP (object))
+  if (VECTOR_OR_PSEUDOVECTORP (object))
     return Qt;
   return Qnil;
 }
@@ -404,7 +404,7 @@ DEFUN ("vector-or-char-table-p", Fvector_or_char_table_p,
        doc: /* Return t if OBJECT is a char-table or vector.  */)
   (Lisp_Object object)
 {
-  if (VECTORP (object) || GVECTORP (object) || CHAR_TABLE_P (object))
+  if (VECTOR_OR_PSEUDOVECTORP (object) || CHAR_TABLE_P (object))
     return Qt;
   return Qnil;
 }
@@ -1136,7 +1136,7 @@ The value, if non-nil, is a list of mode name symbols.  */)
       if (PVSIZE (fun) <= CLOSURE_INTERACTIVE)
 	return Qnil;
       Lisp_Object form = AREF (fun, CLOSURE_INTERACTIVE);
-      if (VECTORP (form) || GVECTORP (form))
+      if (VECTOR_OR_PSEUDOVECTORP (form))
 	/* New form -- the second element is the command modes. */
 	return GVECTORP (form) ? GAREF (form, 1) : AREF (form, 1);
       else

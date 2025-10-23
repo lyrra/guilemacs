@@ -4677,7 +4677,7 @@ Lisp_Object pending_funcalls;
 static struct timespec
 decode_timer (Lisp_Object timer)
 {
-  if (! ((VECTORP (timer) || GVECTORP (timer)) && ASIZE (timer) == 10))
+  if (! ((VECTOR_OR_PSEUDOVECTORP (timer)) && ASIZE (timer) == 10))
     return invalid_timespec ();
 
   bool scheme_vec = GVECTORP (timer);
@@ -7599,7 +7599,7 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
      we've never used that symbol before.  */
   else
     {
-      if (! ((VECTORP (*symbol_table) || GVECTORP (*symbol_table))
+      if (! ((VECTOR_OR_PSEUDOVECTORP (*symbol_table))
              && ASIZE (*symbol_table) == table_size))
         *symbol_table = make_nil_elisp_vector (table_size);
 
@@ -8850,7 +8850,7 @@ parse_menu_item (Lisp_Object item, int inmenubar)
 		{
 		  tem = XCAR (item);
           if (SYMBOLP (tem) || STRINGP (tem)
-              || VECTORP (tem) || GVECTORP (tem))
+              || VECTOR_OR_PSEUDOVECTORP (tem))
 		    /* Be GC protected. Set keyhint to item instead of tem.  */
 		    keyhint = item;
 		}
@@ -9373,7 +9373,7 @@ parse_tab_bar_item (Lisp_Object key, Lisp_Object item)
 static void
 init_tab_bar_items (Lisp_Object reuse)
 {
-  if (VECTORP (reuse) || GVECTORP (reuse))
+  if (VECTOR_OR_PSEUDOVECTORP (reuse))
     tab_bar_items_vector = ensure_elisp_vector (reuse);
   else
     tab_bar_items_vector = make_nil_elisp_vector (64);
@@ -9898,7 +9898,7 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 static void
 init_tool_bar_items (Lisp_Object reuse)
 {
-  if (VECTORP (reuse) || GVECTORP (reuse))
+  if (VECTOR_OR_PSEUDOVECTORP (reuse))
     tool_bar_items_vector = ensure_elisp_vector (reuse);
   else
     tool_bar_items_vector = make_nil_elisp_vector (64);
@@ -10079,7 +10079,7 @@ read_char_minibuf_menu_prompt (int commandflag,
 	  else
 	    elt = Fcar_safe (rest);
 
-	  if (idx < 0 && (VECTORP (elt) || GVECTORP (elt)))
+	  if (idx < 0 && (VECTOR_OR_PSEUDOVECTORP (elt)))
 	    {
 	      /* If we found a dense table in the keymap,
 		 advanced past it, but start scanning its contents.  */
@@ -10325,7 +10325,7 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
 
       /* If the function returned something invalid,
 	 barf--don't ignore it.  */
-      if (! (NILP (next) || VECTORP (next) || GVECTORP (next) || STRINGP (next)))
+      if (! (NILP (next) || VECTOR_OR_PSEUDOVECTORP (next) || STRINGP (next)))
 	signal_error ("Function returns invalid key sequence", tem);
     }
   return next;
@@ -10364,7 +10364,7 @@ keyremap_step (Lisp_Object *keybuf, volatile keyremap *fkey,
   /* If keybuf[fkey->start..fkey->end] is bound in the
      map and we're in a position to do the key remapping, replace it with
      the binding and restart with fkey->start at the end.  */
-  if ((VECTORP (next) || GVECTORP (next) || STRINGP (next)) && doit)
+  if ((VECTOR_OR_PSEUDOVECTORP (next) || STRINGP (next)) && doit)
     {
       int len = XFIXNAT (Flength (next));
       int i;

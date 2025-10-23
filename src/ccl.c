@@ -1082,7 +1082,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		|| prog_id < 0
 		|| prog_id >= ASIZE (Vccl_program_table)
         || (slot = AREF (Vccl_program_table, prog_id), !VECTORP (slot))
-        || !(VECTORP (AREF (slot, 1)) || GVECTORP (AREF (slot, 1))))
+        || !VECTOR_OR_PSEUDOVECTORP (AREF (slot, 1)))
 	      {
 		if (stack_idx > 0)
 		  {
@@ -1366,7 +1366,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	      {
 		ptrdiff_t eop;
         GET_CCL_RANGE (eop, ccl_prog, ic++, 0,
-               ((VECTORP (Vtranslation_table_vector) || GVECTORP (Vtranslation_table_vector))
+               ((VECTOR_OR_PSEUDOVECTORP (Vtranslation_table_vector))
                 ? (GVECTORP (Vtranslation_table_vector)
                    ? GASIZE (Vtranslation_table_vector)
                    : ASIZE (Vtranslation_table_vector))
@@ -1461,7 +1461,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 
 		for (;i < j;i++)
 		  {
-		    if (!(VECTORP (Vcode_conversion_map_vector) || GVECTORP (Vcode_conversion_map_vector))) continue;
+		    if (!(VECTOR_OR_PSEUDOVECTORP (Vcode_conversion_map_vector))) continue;
 		    size = ASIZE (Vcode_conversion_map_vector);
 		    point = XFIXNUM (ccl_prog[ic++]);
 		    if (! (0 <= point && point < size)) continue;
@@ -1470,7 +1470,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		    /* Check map validity.  */
 		    if (!CONSP (map)) continue;
 		    map = XCDR (map);
-          if (!(VECTORP (map) || GVECTORP (map))) continue;
+          if (!(VECTOR_OR_PSEUDOVECTORP (map))) continue;
 		    size = ASIZE (map);
 		    if (size <= 1) continue;
 
@@ -1621,7 +1621,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 			break;
 		      }
 		  }
-        if (!(VECTORP (Vcode_conversion_map_vector) || GVECTORP (Vcode_conversion_map_vector)))
+        if (!(VECTOR_OR_PSEUDOVECTORP (Vcode_conversion_map_vector)))
           CCL_INVALID_CMD;
         map_vector_size = (GVECTORP (Vcode_conversion_map_vector)
                            ? GASIZE (Vcode_conversion_map_vector)
@@ -1653,7 +1653,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		      /* Check map validity.  */
 		      if (!CONSP (map)) continue;
 		      map = XCDR (map);
-		      if (!(VECTORP (map) || GVECTORP (map))) continue;
+		      if (!(VECTOR_OR_PSEUDOVECTORP (map))) continue;
 		      size = ASIZE (map);
 		      if (size <= 1) continue;
 
@@ -2012,11 +2012,11 @@ ccl_get_compiled_code (Lisp_Object ccl_prog, ptrdiff_t *idx)
 {
   Lisp_Object val, slot;
 
-  if (VECTORP (ccl_prog) || GVECTORP (ccl_prog))
+  if (VECTOR_OR_PSEUDOVECTORP (ccl_prog))
     {
       val = resolve_symbol_ccl_program (ccl_prog);
       *idx = -1;
-      return ((VECTORP (val) || GVECTORP (val)) ? val : Qnil);
+      return ((VECTOR_OR_PSEUDOVECTORP (val)) ? val : Qnil);
     }
   if (!SYMBOLP (ccl_prog))
     return Qnil;
