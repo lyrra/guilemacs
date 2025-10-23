@@ -1382,10 +1382,8 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		ptrdiff_t eop;
 		struct Lisp_Hash_Table *h;
 		ptrdiff_t table_size;
-		if (VECTORP (Vtranslation_hash_table_vector))
+		if (VECTOR_OR_PSEUDOVECTORP (Vtranslation_hash_table_vector))
 		  table_size = ASIZE (Vtranslation_hash_table_vector);
-		else if (GVECTORP (Vtranslation_hash_table_vector))
-		  table_size = GASIZE (Vtranslation_hash_table_vector);
 		else
 		  table_size = -1;
 		GET_CCL_RANGE (eop, ccl_prog, ic++, 0, table_size);
@@ -1412,10 +1410,8 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		ptrdiff_t eop;
 		struct Lisp_Hash_Table *h;
 		ptrdiff_t table_size_char;
-		if (VECTORP (Vtranslation_hash_table_vector))
+		if (VECTOR_OR_PSEUDOVECTORP (Vtranslation_hash_table_vector))
 		  table_size_char = ASIZE (Vtranslation_hash_table_vector);
-		else if (GVECTORP (Vtranslation_hash_table_vector))
-		  table_size_char = GASIZE (Vtranslation_hash_table_vector);
 		else
 		  table_size_char = -1;
 		GET_CCL_RANGE (eop, ccl_prog, ic++, 0, table_size_char);

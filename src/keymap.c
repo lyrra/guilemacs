@@ -2202,14 +2202,9 @@ For an approximate inverse of this, see `kbd'.  */)
 		//c ^= 0200 | meta_modifier;
 	      key = make_fixnum (c);
 	    }
-	  else if (VECTORP (list))
+	  else if (PLAIN_VECTORP (list))
 	    {
 	      key = AREF (list, i);
-	      i++;
-	    }
-	  else if (GVECTORP (list))
-	    {
-	      key = GAREF (list, i);
 	      i++;
 	    }
 	  else

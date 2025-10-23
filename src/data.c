@@ -2459,25 +2459,18 @@ or a byte-code object.  IDX starts at 0.  */)
     }
   else
     {
-      ptrdiff_t size = 0;
-      if (VECTORP (array))
-	size = ASIZE (array);
-      else if (GVECTORP (array))
-	size = GASIZE (array);
-      else if (CLOSUREP (array) || RECORDP (array))
+      ptrdiff_t size;
+      if (CLOSUREP (array) || RECORDP (array))
 	size = PVSIZE (array);
+      else if (PLAIN_VECTORP (array))
+	size = ASIZE (array);
       else
 	wrong_type_argument (Qarrayp, array);
 
       if (idxval < 0 || idxval >= size)
 	args_out_of_range (array, idx);
 
-      if (VECTORP (array))
-        return AREF (array, idxval);
-      else if (GVECTORP (array))
-        return GAREF (array, idxval);
-      else
-        return AREF (array, idxval);
+      return AREF (array, idxval);
     }
 }
 
@@ -2494,18 +2487,20 @@ bool-vector.  IDX starts at 0.  */)
   if (! RECORDP (array))
     CHECK_ARRAY (array, Qarrayp);
 
-  if (VECTORP (array))
+  if (RECORDP (array))
     {
       CHECK_IMPURE (array, XVECTOR (array));
-      if (idxval < 0 || idxval >= ASIZE (array))
+      if (idxval < 0 || idxval >= PVSIZE (array))
 	args_out_of_range (array, idx);
       ASET (array, idxval, newelt);
     }
-  else if (GVECTORP (array))
+  else if (PLAIN_VECTORP (array))
     {
-      if (idxval < 0 || idxval >= GASIZE (array))
+      if (VECTORLIKEP (array))
+	CHECK_IMPURE (array, XVECTOR (array));
+      if (idxval < 0 || idxval >= ASIZE (array))
 	args_out_of_range (array, idx);
-      GASET (array, idxval, newelt);
+      ASET (array, idxval, newelt);
     }
   else if (BOOL_VECTOR_P (array))
     {
@@ -2517,13 +2512,6 @@ bool-vector.  IDX starts at 0.  */)
     {
       CHECK_CHARACTER (idx);
       CHAR_TABLE_SET (array, idxval, newelt);
-    }
-  else if (RECORDP (array))
-    {
-      CHECK_IMPURE (array, XVECTOR (array));
-      if (idxval < 0 || idxval >= PVSIZE (array))
-	args_out_of_range (array, idx);
-      ASET (array, idxval, newelt);
     }
   else /* STRINGP */
     {

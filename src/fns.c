@@ -136,10 +136,8 @@ efficient.  */)
     val = list_length (sequence);
   else if (NILP (sequence))
     val = 0;
-  else if (VECTORP (sequence))
+  else if (PLAIN_VECTORP (sequence))
     val = ASIZE (sequence);
-  else if (GVECTORP (sequence))
-    val = GASIZE (sequence);
   else if (CHAR_TABLE_P (sequence))
     val = MAX_CHAR;
   else if (BOOL_VECTOR_P (sequence))
@@ -3231,12 +3229,9 @@ ARRAY is a vector, string, char-table, or bool-vector.  */)
 {
   register ptrdiff_t size, idx;
 
-  if (VECTORP (array))
+  if (PLAIN_VECTORP (array))
     for (idx = 0, size = ASIZE (array); idx < size; idx++)
       ASET (array, idx, item);
-  else if (GVECTORP (array))
-    for (idx = 0, size = GASIZE (array); idx < size; idx++)
-      GASET (array, idx, item);
   else if (CHAR_TABLE_P (array))
     {
       int i;
