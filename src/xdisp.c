@@ -5594,7 +5594,7 @@ setup_for_ellipsis (struct it *it, int len)
     {
       Lisp_Object invis = DISP_INVIS_VECTOR (it->dp);
 
-      if (VECTORP (invis) || GVECTORP (invis))
+      if (PLAIN_VECTORP (invis))
 	{
 	  Lisp_Object ensured = display_table_ensure_invis_vector (it->dp);
 	  struct Lisp_Vector *v = XVECTOR (ensured);
@@ -5642,12 +5642,11 @@ find_display_property (Lisp_Object disp, Lisp_Object prop)
   if (NILP (disp))
     return Qnil;
   /* We have a vector of display specs.  */
-  if (VECTORP (disp) || GVECTORP (disp))
+  if (PLAIN_VECTORP (disp))
     {
-      bool scheme_vec = GVECTORP (disp);
       for (ptrdiff_t i = 0; i < ASIZE (disp); i++)
 	{
-	  elem = scheme_vec ? GAREF (disp, i) : AREF (disp, i);
+	  elem = AREF (disp, i);
 	  if (CONSP (elem)
 	      && CONSP (XCDR (elem))
 	      && EQ (XCAR (elem), prop))
@@ -5982,13 +5981,12 @@ handle_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	    }
 	}
     }
-  else if (VECTORP (spec) || GVECTORP (spec))
+  else if (PLAIN_VECTORP (spec))
     {
       ptrdiff_t len = ASIZE (spec);
-      bool scheme_vec = GVECTORP (spec);
       for (ptrdiff_t i = 0; i < len; ++i)
 	{
-	  Lisp_Object item = scheme_vec ? GAREF (spec, i) : AREF (spec, i);
+	  Lisp_Object item = AREF (spec, i);
 	  int rv = handle_single_display_spec (it, item, object,
 					       overlay, position, bufpos,
 					       replacing, frame_window_p,
@@ -6662,14 +6660,13 @@ display_prop_string_p (Lisp_Object prop, Lisp_Object string)
 	  prop = XCDR (prop);
 	}
     }
-  else if (VECTORP (prop) || GVECTORP (prop))
+  else if (PLAIN_VECTORP (prop))
     {
       /* A vector of sub-properties.  */
-      bool scheme_vec = GVECTORP (prop);
       ptrdiff_t i;
       for (i = 0; i < ASIZE (prop); ++i)
         {
-          Lisp_Object elt = scheme_vec ? GAREF (prop, i) : AREF (prop, i);
+          Lisp_Object elt = AREF (prop, i);
           if (single_display_spec_string_p (elt, string))
             return true;
         }
@@ -15483,9 +15480,8 @@ build_desired_tool_bar_string (struct frame *f)
       /* If image is a vector, choose the image according to the
 	 button state.  */
       image = PROP (TOOL_BAR_ITEM_IMAGES);
-      if (VECTORP (image) || GVECTORP (image))
+      if (PLAIN_VECTORP (image))
 	{
-	  bool scheme_vec = GVECTORP (image);
 	  if (enabled_p)
 	    idx = (selected_p
 		   ? TOOL_BAR_IMAGE_ENABLED_SELECTED
@@ -15496,7 +15492,7 @@ build_desired_tool_bar_string (struct frame *f)
 		   : TOOL_BAR_IMAGE_DISABLED_DESELECTED);
 
 	  eassert (ASIZE (image) >= idx);
-	  image = scheme_vec ? GAREF (image, idx) : AREF (image, idx);
+	  image = AREF (image, idx);
 	}
       else
 	idx = -1;

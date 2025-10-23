@@ -205,10 +205,10 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
 	}
       return (NILP (chars));
     }
-  else if (VECTORP (chars) || GVECTORP (chars))
+  else if (PLAIN_VECTORP (chars))
     {
       Lisp_Object vector_chars = chars;
-      if (GVECTORP (vector_chars))
+      if (GVECTORP (chars))
         vector_chars = ensure_elisp_vector (vector_chars);
       ptrdiff_t i;
 
