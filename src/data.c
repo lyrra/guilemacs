@@ -1138,7 +1138,7 @@ The value, if non-nil, is a list of mode name symbols.  */)
       Lisp_Object form = AREF (fun, CLOSURE_INTERACTIVE);
       if (VECTOR_OR_PSEUDOVECTORP (form))
 	/* New form -- the second element is the command modes. */
-	return GVECTORP (form) ? GAREF (form, 1) : AREF (form, 1);
+	return AREF (form, 1);
       else
 	/* Old .elc file -- no command modes. */
 	return Qnil;

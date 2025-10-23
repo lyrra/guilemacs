@@ -336,11 +336,10 @@ fontset_extend_vector (Lisp_Object vec, Lisp_Object elt, bool append)
 {
   ptrdiff_t old_len = (VECTOR_OR_PSEUDOVECTORP (vec)) ? ASIZE (vec) : 0;
   Lisp_Object result = make_elisp_vector (old_len + 1, Qnil);
-  bool vec_is_scheme = GVECTORP (vec);
 
   for (ptrdiff_t i = 0; i < old_len; i++)
     {
-      Lisp_Object value = vec_is_scheme ? GAREF (vec, i) : AREF (vec, i);
+      Lisp_Object value = AREF (vec, i);
       ptrdiff_t dst = append ? i : i + 1;
       ASET (result, dst, value);
     }
