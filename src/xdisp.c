@@ -8416,7 +8416,7 @@ get_next_display_element (struct it *it)
 
 	  if (it->dp
 	      && (dv = DISP_CHAR_VECTOR (it->dp, c),
-		  (VECTORP (dv) || GVECTORP (dv))))
+		  PLAIN_VECTORP (dv)))
 	    {
 	      dv = display_table_ensure_char_vector (it->dp, c, dv);
 	      struct Lisp_Vector *v = XVECTOR (dv);
@@ -28611,7 +28611,7 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
   val = CODING_SYSTEM_SPEC (coding_system);
   eoltype = Qnil;
 
-  if (!(VECTORP (val) || GVECTORP (val)))	/* Not yet decided.  */
+  if (!PLAIN_VECTORP (val))	/* Not yet decided.  */
     {
       *buf++ = multibyte ? '-' : ' ';
       if (eol_flag)
@@ -28622,10 +28622,9 @@ decode_mode_spec_coding (Lisp_Object coding_system, char *buf, bool eol_flag)
     {
       Lisp_Object attrs;
       Lisp_Object eolvalue;
-      bool scheme_vec = GVECTORP (val);
 
-      attrs = scheme_vec ? GAREF (val, 0) : AREF (val, 0);
-      eolvalue = scheme_vec ? GAREF (val, 2) : AREF (val, 2);
+      attrs = AREF (val, 0);
+      eolvalue = AREF (val, 2);
 
       if (multibyte)
 	buf += CHAR_STRING (XFIXNAT (CODING_ATTR_MNEMONIC (attrs)),
@@ -35512,7 +35511,7 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
     {
       /* CDR is [x0 y0 x1 y1 x2 y2 ...x(n-1) y(n-1)] */
       Lisp_Object coords = XCDR (hot_spot);
-      if (VECTORP (coords) || GVECTORP (coords))
+      if (PLAIN_VECTORP (coords))
 	{
 	  if (GVECTORP (coords))
 	    {
