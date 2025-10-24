@@ -584,13 +584,7 @@ fontset_find_font (Lisp_Object fontset, int c, struct face *face,
   if (! CONSP (font_group))
     return font_group;
   vec = XCDR (font_group);
-  if (GVECTORP (vec))
-    {
-      vec = ensure_elisp_vector (vec);
-      XSETCDR (font_group, vec);
-    }
-  else
-    CHECK_TYPE (VECTORP (vec), Qvectorp, vec);
+  CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
   if (ASIZE (vec) == 0)
     return Qnil;
 

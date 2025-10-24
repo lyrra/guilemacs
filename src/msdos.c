@@ -2407,15 +2407,17 @@ Each input key receives two values in this vector: first the ASCII code,
 and then the scan code.  */)
   (void)
 {
-  if (GVECTORP (recent_doskeys))
-    recent_doskeys = ensure_elisp_vector (recent_doskeys);
-  else
-    CHECK_TYPE (VECTORP (recent_doskeys), Qvectorp, recent_doskeys);
+  CHECK_TYPE (PLAIN_VECTORP (recent_doskeys), Qvectorp, recent_doskeys);
 
-  Lisp_Object val, *keys = XVECTOR (recent_doskeys)->contents;
+  ptrdiff_t size = ASIZE (recent_doskeys);
+  USE_SAFE_ALLOCA;
+  Lisp_Object *keys = SAFE_ALLOCA (size * sizeof *keys);
+  for (ptrdiff_t i = 0; i < size; i++)
+    keys[i] = AREF (recent_doskeys, i);
 
+  Lisp_Object val;
   if (total_doskeys < NUM_RECENT_DOSKEYS)
-    return Fvector (total_doskeys, keys);
+    val = Fvector (total_doskeys, keys);
   else
     {
       val = Fvector (NUM_RECENT_DOSKEYS, keys);
@@ -2423,8 +2425,10 @@ and then the scan code.  */)
 	     NUM_RECENT_DOSKEYS - recent_doskeys_index);
       vcopy (val, NUM_RECENT_DOSKEYS - recent_doskeys_index,
 	     keys, recent_doskeys_index);
-      return val;
     }
+
+  SAFE_FREE ();
+  return val;
 }
 
 /* Get a char from keyboard.  Function keys are put into the event queue.  */

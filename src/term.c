@@ -3599,27 +3599,19 @@ tty_menu_destroy (tty_menu *menu)
 static void
 tty_menu_help_callback (char const *help_string, int pane, int item)
 {
-  Lisp_Object *first_item;
   Lisp_Object pane_name;
   Lisp_Object menu_object;
   Lisp_Object menu_vec = menu_items;
 
-  if (GVECTORP (menu_vec))
-    {
-      menu_vec = ensure_elisp_vector (menu_vec);
-      menu_items = menu_vec;
-    }
-  else
-    CHECK_TYPE (VECTORP (menu_vec), Qvectorp, menu_vec);
+  CHECK_TYPE (PLAIN_VECTORP (menu_vec), Qvectorp, menu_vec);
 
-  first_item = XVECTOR (menu_vec)->contents;
-  if (EQ (first_item[0], Qt))
-    pane_name = first_item[MENU_ITEMS_PANE_NAME];
-  else if (EQ (first_item[0], Qquote))
+  if (EQ (AREF (menu_vec, 0), Qt))
+    pane_name = AREF (menu_vec, MENU_ITEMS_PANE_NAME);
+  else if (EQ (AREF (menu_vec, 0), Qquote))
     /* This shouldn't happen, see xmenu_show.  */
     pane_name = empty_unibyte_string;
   else
-    pane_name = first_item[MENU_ITEMS_ITEM_NAME];
+    pane_name = AREF (menu_vec, MENU_ITEMS_ITEM_NAME);
 
   /* (menu-item MENU-NAME PANE-NUMBER)  */
   menu_object = list3 (Qmenu_item, pane_name, make_fixnum (pane));

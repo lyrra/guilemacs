@@ -1244,16 +1244,14 @@ stack before executing the byte-code.
 usage: (make-byte-code ARGLIST BYTE-CODE CONSTANTS DEPTH &optional DOCSTRING INTERACTIVE-SPEC &rest ELEMENTS)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  bool constants_scheme = GVECTORP (args[CLOSURE_CONSTANTS]);
-  if (constants_scheme)
-    args[CLOSURE_CONSTANTS] = ensure_elisp_vector (args[CLOSURE_CONSTANTS]);
+  CHECK_TYPE (PLAIN_VECTORP (args[CLOSURE_CONSTANTS]), Qvectorp, args[CLOSURE_CONSTANTS]);
 
   if (! ((FIXNUMP (args[CLOSURE_ARGLIST])
 	  || CONSP (args[CLOSURE_ARGLIST])
 	  || NILP (args[CLOSURE_ARGLIST]))
 	 && STRINGP (args[CLOSURE_CODE])
 	 && !STRING_MULTIBYTE (args[CLOSURE_CODE])
-	 && VECTORP (args[CLOSURE_CONSTANTS])
+	 && PLAIN_VECTORP (args[CLOSURE_CONSTANTS])
 	 && FIXNATP (args[CLOSURE_STACK_DEPTH])))
     error ("Invalid byte-code object");
 
