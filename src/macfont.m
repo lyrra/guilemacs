@@ -2208,9 +2208,7 @@ macfont_supports_charset_and_languages_p (CTFontDescriptorRef desc,
             {
               ptrdiff_t j;
 	      Lisp_Object vector_chars = chars;
-
-	      if (GVECTORP (vector_chars))
-		vector_chars = ensure_elisp_vector (vector_chars);
+	      CHECK_TYPE (PLAIN_VECTORP (vector_chars), Qvectorp, vector_chars);
 
               for (j = 0; j < ASIZE (vector_chars); j++)
                 if (RANGED_FIXNUMP (0, AREF (vector_chars, j), MAX_UNICODE_CHAR)
@@ -2402,9 +2400,7 @@ macfont_list (struct frame *f, Lisp_Object spec)
           if (CONSP (val))
 	    {
 	      Lisp_Object reps = XCDR (val);
-	      if (GVECTORP (reps))
-		reps = ensure_elisp_vector (reps);
-	      if (VECTORP (reps))
+	      if (PLAIN_VECTORP (reps))
 		chars = reps;
 	    }
         }

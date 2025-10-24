@@ -5936,9 +5936,7 @@ update_frame_tool_bar (struct frame *f)
           if (PLAIN_VECTORP (image))
             {
 	      Lisp_Object image_vec = image;
-
-	      if (GVECTORP (image_vec))
-		image_vec = ensure_elisp_vector (image_vec);
+	      CHECK_TYPE (PLAIN_VECTORP (image_vec), Qvectorp, image_vec);
 
               if (enabled_p)
                 idx = (selected_p

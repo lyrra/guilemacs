@@ -8613,10 +8613,8 @@ Lisp_Object item_properties;
 static void
 ensure_item_properties_vector (void)
 {
-  if (GVECTORP (item_properties))
-    item_properties = ensure_elisp_vector (item_properties);
-  else if (!NILP (item_properties))
-    CHECK_TYPE (VECTORP (item_properties), Qvectorp, item_properties);
+  if (!NILP (item_properties))
+    CHECK_TYPE (PLAIN_VECTORP (item_properties), Qvectorp, item_properties);
 }
 
 
@@ -9245,10 +9243,7 @@ parse_tab_bar_item (Lisp_Object key, Lisp_Object item)
 
   /* Create tab_bar_item_properties vector if necessary.  Reset it to
      defaults.  */
-  if (GVECTORP (tab_bar_item_properties))
-    tab_bar_item_properties = ensure_elisp_vector (tab_bar_item_properties);
-
-  if (VECTORP (tab_bar_item_properties))
+  if (PLAIN_VECTORP (tab_bar_item_properties))
     {
       for (i = 0; i < TAB_BAR_ITEM_NSLOTS; ++i)
 	set_prop_tab_bar (i, Qnil);
@@ -9649,10 +9644,7 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
 
   /* Create tool_bar_item_properties vector if necessary.  Reset it to
      defaults.  */
-  if (GVECTORP (tool_bar_item_properties))
-    tool_bar_item_properties = ensure_elisp_vector (tool_bar_item_properties);
-
-  if (VECTORP (tool_bar_item_properties))
+  if (PLAIN_VECTORP (tool_bar_item_properties))
     {
       for (i = 0; i < TOOL_BAR_ITEM_NSLOTS; ++i)
 	set_prop (i, Qnil);
@@ -9765,10 +9757,10 @@ parse_tool_bar_item (Lisp_Object key, Lisp_Object item)
         {
           Lisp_Object image_value = value;
           if (GVECTORP (image_value))
-            image_value = ensure_elisp_vector (image_value);
+            CHECK_TYPE (PLAIN_VECTORP (image_value), Qvectorp, image_value);
 
           if (CONSP (image_value)
-              || (VECTORP (image_value) && ASIZE (image_value) == 4))
+              || (PLAIN_VECTORP (image_value) && ASIZE (image_value) == 4))
             /* Value is either a single image specification or a vector
                of 4 such specifications for the different button states.  */
             set_prop (TOOL_BAR_ITEM_IMAGES, image_value);

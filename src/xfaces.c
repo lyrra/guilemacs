@@ -3109,10 +3109,7 @@ The value is TO.  */)
       /* Copy global definition of FROM.  We don't make copies of
 	 strings etc. because 20.2 didn't do it either.  */
       lface = lface_from_face_name (NULL, from, true);
-      if (GVECTORP (lface))
-	lface = ensure_elisp_vector (lface);
-      else
-	CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
+      CHECK_TYPE (PLAIN_VECTORP (lface), Qvectorp, lface);
       copy = Finternal_make_lisp_face (to, Qnil);
       CHECK_TYPE (VECTORP (copy), Qvectorp, copy);
       f = NULL;
