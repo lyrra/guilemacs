@@ -8488,10 +8488,7 @@ menu_bar_items (Lisp_Object old)
 
   if (!NILP (old))
     {
-      if (GVECTORP (old))
-	old = ensure_elisp_vector (old);
-      else
-	CHECK_TYPE (VECTORP (old), Qvectorp, old);
+      CHECK_TYPE (PLAIN_VECTORP (old), Qvectorp, old);
       menu_bar_items_vector = old;
     }
   else
@@ -8574,10 +8571,11 @@ menu_bar_items (Lisp_Object old)
 	    tem1 = AREF (menu_bar_items_vector, i + 1);
 	    tem2 = AREF (menu_bar_items_vector, i + 2);
 	    tem3 = AREF (menu_bar_items_vector, i + 3);
+	    /* Forward copy is safe since dest (i) < source (i+4) */
 	    if (end > i + 4)
-	      memmove (aref_addr (menu_bar_items_vector, i),
-		       aref_addr (menu_bar_items_vector, i + 4),
-		       (end - i - 4) * word_size);
+	      for (ptrdiff_t j = i; j < end - 4; j++)
+		ASET (menu_bar_items_vector, j,
+		      AREF (menu_bar_items_vector, j + 4));
 	    ASET (menu_bar_items_vector, end - 4, tem0);
 	    ASET (menu_bar_items_vector, end - 3, tem1);
 	    ASET (menu_bar_items_vector, end - 2, tem2);
@@ -8634,10 +8632,11 @@ menu_bar_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy1, void *dumm
       for (i = 0; i < menu_bar_items_index; i += 4)
 	if (EQ (key, AREF (menu_bar_items_vector, i)))
 	  {
+	    /* Forward copy is safe since dest (i) < source (i+4) */
 	    if (menu_bar_items_index > i + 4)
-	      memmove (aref_addr (menu_bar_items_vector, i),
-		       aref_addr (menu_bar_items_vector, i + 4),
-		       (menu_bar_items_index - i - 4) * word_size);
+	      for (ptrdiff_t j = i; j < menu_bar_items_index - 4; j++)
+		ASET (menu_bar_items_vector, j,
+		      AREF (menu_bar_items_vector, j + 4));
 	    menu_bar_items_index -= 4;
 	  }
     }
@@ -9369,7 +9368,10 @@ static void
 init_tab_bar_items (Lisp_Object reuse)
 {
   if (VECTOR_OR_PSEUDOVECTORP (reuse))
-    tab_bar_items_vector = ensure_elisp_vector (reuse);
+    {
+      CHECK_TYPE (PLAIN_VECTORP (reuse), Qvectorp, reuse);
+      tab_bar_items_vector = reuse;
+    }
   else
     tab_bar_items_vector = make_nil_elisp_vector (64);
   ntab_bar_items = 0;
@@ -9392,8 +9394,9 @@ append_tab_bar_item (void)
 
   /* Append entries from tab_bar_item_properties to the end of
      tab_bar_items_vector.  */
-  vcopy (tab_bar_items_vector, ntab_bar_items,
-	 xvector_contents (tab_bar_item_properties), TAB_BAR_ITEM_NSLOTS);
+  for (ptrdiff_t j = 0; j < TAB_BAR_ITEM_NSLOTS; j++)
+    ASET (tab_bar_items_vector, ntab_bar_items + j,
+	  AREF (tab_bar_item_properties, j));
   ntab_bar_items += TAB_BAR_ITEM_NSLOTS;
 }
 
@@ -9891,7 +9894,10 @@ static void
 init_tool_bar_items (Lisp_Object reuse)
 {
   if (VECTOR_OR_PSEUDOVECTORP (reuse))
-    tool_bar_items_vector = ensure_elisp_vector (reuse);
+    {
+      CHECK_TYPE (PLAIN_VECTORP (reuse), Qvectorp, reuse);
+      tool_bar_items_vector = reuse;
+    }
   else
     tool_bar_items_vector = make_nil_elisp_vector (64);
   ntool_bar_items = 0;
@@ -9914,8 +9920,9 @@ append_tool_bar_item (void)
 
   /* Append entries from tool_bar_item_properties to the end of
      tool_bar_items_vector.  */
-  vcopy (tool_bar_items_vector, ntool_bar_items,
-	 xvector_contents (tool_bar_item_properties), TOOL_BAR_ITEM_NSLOTS);
+  for (ptrdiff_t j = 0; j < TOOL_BAR_ITEM_NSLOTS; j++)
+    ASET (tool_bar_items_vector, ntool_bar_items + j,
+	  AREF (tool_bar_item_properties, j));
   ntool_bar_items += TOOL_BAR_ITEM_NSLOTS;
 }
 
