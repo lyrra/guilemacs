@@ -2976,13 +2976,7 @@ make_cl_data (xg_menu_cb_data *cl_data, struct frame *f, GCallback highlight_cb)
       cl_data->f = f;
       {
 	Lisp_Object menu_vec = f->menu_bar_vector;
-	if (GVECTORP (menu_vec))
-	  {
-	    menu_vec = ensure_elisp_vector (menu_vec);
-	    fset_menu_bar_vector (f, menu_vec);
-	  }
-	else
-	  CHECK_TYPE (VECTORP (menu_vec), Qvectorp, menu_vec);
+	CHECK_TYPE (PLAIN_VECTORP (menu_vec), Qvectorp, menu_vec);
 	cl_data->menu_bar_vector = menu_vec;
       }
       cl_data->menu_bar_items_used = f->menu_bar_items_used;
@@ -3018,13 +3012,7 @@ update_cl_data (xg_menu_cb_data *cl_data,
       cl_data->f = f;
       {
 	Lisp_Object menu_vec = f->menu_bar_vector;
-	if (GVECTORP (menu_vec))
-	  {
-	    menu_vec = ensure_elisp_vector (menu_vec);
-	    fset_menu_bar_vector (f, menu_vec);
-	  }
-	else
-	  CHECK_TYPE (VECTORP (menu_vec), Qvectorp, menu_vec);
+	CHECK_TYPE (PLAIN_VECTORP (menu_vec), Qvectorp, menu_vec);
 	cl_data->menu_bar_vector = menu_vec;
       }
       cl_data->menu_bar_items_used = f->menu_bar_items_used;
