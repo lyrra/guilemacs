@@ -3122,16 +3122,15 @@ The value is TO.  */)
       CHECK_LIVE_FRAME (frame);
       CHECK_LIVE_FRAME (new_frame);
       lface = lface_from_face_name (XFRAME (frame), from, true);
-      if (GVECTORP (lface))
-	lface = ensure_elisp_vector (lface);
-      else
-	CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
+      CHECK_TYPE (PLAIN_VECTORP (lface), Qvectorp, lface);
       copy = Finternal_make_lisp_face (to, new_frame);
       CHECK_TYPE (VECTORP (copy), Qvectorp, copy);
       f = XFRAME (new_frame);
     }
 
-  vcopy (copy, 0, xvector_contents (lface), LFACE_VECTOR_SIZE);
+  /* like vcopy, with element-by-element copy using AREF/ASET */
+  for (ptrdiff_t i = 0; i < LFACE_VECTOR_SIZE; i++)
+    ASET (copy, i, AREF (lface, i));
 
   /* Changing a named face means that all realized faces depending on
      that face are invalid.  Since we cannot tell which realized faces
