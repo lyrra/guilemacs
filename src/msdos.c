@@ -1970,11 +1970,11 @@ static struct dos_keyboard_map us_keyboard = {
 static struct dos_keyboard_map fr_keyboard = {
 /* 0         1         2         3         4         5      */
 /* 012 3456789012345678901234567890123456789012345678901234 */
-  "ı&‚\"'(-Š_€…)=  azertyuiop^$   qsdfghjklm—*  <wxcvbn,;:!  ",
+  "ï¿½&ï¿½\"'(-ï¿½_ï¿½ï¿½)=  azertyuiop^$   qsdfghjklmï¿½*  <wxcvbn,;:!  ",
 /* 0123456789012345678901234567890123456789012345678901234 */
-  " 1234567890ø+  AZERTYUIOPùœ   QSDFGHJKLM%æ  >WXCVBN?./õ  ",
+  " 1234567890ï¿½+  AZERTYUIOPï¿½ï¿½   QSDFGHJKLM%ï¿½  >WXCVBN?./ï¿½  ",
 /* 01234567 89012345678901234567890123456789012345678901234 */
-  "  ~#{[|`\\^@]}             Ï                              ",
+  "  ~#{[|`\\^@]}             ï¿½                              ",
   0				/* no translate table */
 };
 
@@ -1994,9 +1994,9 @@ static struct kbd_translate it_kbd_translate_table[] = {
 static struct dos_keyboard_map it_keyboard = {
 /* 0          1         2         3         4         5     */
 /* 0 123456789012345678901234567890123456789012345678901234 */
-  "\\1234567890'< qwertyuiopŠ+>  asdfghjkl•…—  <zxcvbnm,.-  ",
+  "\\1234567890'ï¿½< qwertyuiopï¿½+>  asdfghjklï¿½ï¿½ï¿½  <zxcvbnm,.-  ",
 /* 01 23456789012345678901234567890123456789012345678901234 */
-  "|!\"œ$%&/()=?^> QWERTYUIOP‚*   ASDFGHJKL‡øõ  >ZXCVBNM;:_  ",
+  "|!\"ï¿½$%&/()=?^> QWERTYUIOPï¿½*   ASDFGHJKLï¿½ï¿½ï¿½  >ZXCVBNM;:_  ",
 /* 0123456789012345678901234567890123456789012345678901234 */
   "        {}~`             []             @#               ",
   it_kbd_translate_table
@@ -2005,11 +2005,11 @@ static struct dos_keyboard_map it_keyboard = {
 static struct dos_keyboard_map dk_keyboard = {
 /* 0         1         2         3         4         5      */
 /* 0123456789012345678901234567890123456789012345678901234 */
-  "«1234567890+|  qwertyuiop†~   asdfghjkl‘›'  <zxcvbnm,.-  ",
+  "ï¿½1234567890+|  qwertyuiopï¿½~   asdfghjklï¿½ï¿½'  <zxcvbnm,.-  ",
 /* 01 23456789012345678901234567890123456789012345678901234 */
-  "õ!\"#$%&/()=?`  QWERTYUIOP^   ASDFGHJKL’*  >ZXCVBNM;:_  ",
+  "ï¿½!\"#$%&/()=?`  QWERTYUIOPï¿½^   ASDFGHJKLï¿½ï¿½*  >ZXCVBNM;:_  ",
 /* 0123456789012345678901234567890123456789012345678901234 */
-  "  @œ$  {[]} |                                             ",
+  "  @ï¿½$  {[]} |                                             ",
   0				/* no translate table */
 };
 
