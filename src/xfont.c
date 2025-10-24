@@ -208,8 +208,6 @@ xfont_chars_supported (Lisp_Object chars, XFontStruct *xfont,
   else if (PLAIN_VECTORP (chars))
     {
       Lisp_Object vector_chars = chars;
-      if (GVECTORP (chars))
-        vector_chars = ensure_elisp_vector (vector_chars);
       ptrdiff_t i;
 
       for (i = ASIZE (vector_chars) - 1; i >= 0; i--)

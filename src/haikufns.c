@@ -368,10 +368,7 @@ haiku_get_color (const char *name, Emacs_Color *color)
   rc = 1;
   Lisp_Object allowed_colors = Vhaiku_allowed_ui_colors;
 
-  if (GVECTORP (allowed_colors))
-    allowed_colors = ensure_elisp_vector (allowed_colors);
-
-  if (VECTORP (allowed_colors))
+  if (PLAIN_VECTORP (allowed_colors))
     {
       size = ASIZE (allowed_colors);
 

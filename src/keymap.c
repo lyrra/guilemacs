@@ -574,8 +574,6 @@ map_keymap_internal (Lisp_Object map,
 	{
 	  /* Loop over the char values represented in the vector.  */
 	  Lisp_Object vector_binding = binding;
-	  if (GVECTORP (vector_binding))
-	    vector_binding = ensure_elisp_vector (vector_binding);
 	  int len = ASIZE (vector_binding);
 	  int c;
 	  for (c = 0; c < len; c++)
@@ -1095,9 +1093,6 @@ possibly_translate_key_sequence (Lisp_Object key, ptrdiff_t *length)
     {
       Lisp_Object vector = key;
 
-      if (GVECTORP (vector))
-	vector = ensure_elisp_vector (vector);
-
       if (ASIZE (vector) == 1 && STRINGP (AREF (vector, 0)))
 	{
 	  /* KEY is on the ["C-c"] format, so translate to internal
@@ -1181,9 +1176,6 @@ binding KEY to DEF is added at the front of KEYMAP.  */)
   if (PLAIN_VECTORP (def))
     { /* DEF is apparently an XEmacs-style keyboard macro.  */
       Lisp_Object macro = def;
-
-      if (GVECTORP (macro))
-        macro = ensure_elisp_vector (macro);
 
       if (ASIZE (macro) > 0 && CONSP (AREF (macro, 0)))
         {
@@ -1380,9 +1372,6 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
   /* Just skip everything below unless this is a menu item.  */
   if (!(PLAIN_VECTORP (key)))
     return found;
-
-  if (GVECTORP (key))
-    key = ensure_elisp_vector (key);
 
   if (!(ASIZE (key) > 0) || !EQ (AREF (key, 0), Qmenu_bar))
     return found;
@@ -1877,9 +1866,6 @@ specified buffer position instead of point are used.
   */)
   (Lisp_Object key, Lisp_Object accept_default, Lisp_Object no_remap, Lisp_Object position)
 {
-  if (GVECTORP (key))
-    key = ensure_elisp_vector (key);
-
   if (NILP (position) && VECTORP (key))
     {
       if (ASIZE (key) == 0)

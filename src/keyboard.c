@@ -10084,8 +10084,6 @@ read_char_minibuf_menu_prompt (int commandflag,
 	      /* If we found a dense table in the keymap,
 		 advanced past it, but start scanning its contents.  */
 	      rest = Fcdr_safe (rest);
-	      if (GVECTORP (elt))
-		elt = ensure_elisp_vector (elt);
 	      vector = elt;
 	      idx = 0;
 	    }
@@ -11760,17 +11758,13 @@ If INCLUDE-CMDS is non-nil, include the commands that were run,
 represented as pseudo-events of the form (nil . COMMAND).  */)
   (Lisp_Object include_cmds)
 {
-  if (GVECTORP (recent_keys))
-    recent_keys = ensure_elisp_vector (recent_keys);
-  else
-    CHECK_TYPE (VECTORP (recent_keys), Qvectorp, recent_keys);
+  CHECK_TYPE (PLAIN_VECTORP (recent_keys), Qvectorp, recent_keys);
 
   bool cmds = !NILP (include_cmds);
 
   if (!total_keys
       || (cmds && total_keys < lossage_limit))
-    return Fvector (total_keys,
-		    XVECTOR (recent_keys)->contents);
+    return make_event_array_from_vector (recent_keys, 0, total_keys);
   else
     {
       Lisp_Object es = Qnil;
@@ -11799,13 +11793,9 @@ The value is a string or a vector.
 See also `this-command-keys-vector'.  */)
   (void)
 {
-  if (GVECTORP (this_command_keys))
-    this_command_keys = ensure_elisp_vector (this_command_keys);
-  else
-    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
 
-  return make_event_array (this_command_key_count,
-			   XVECTOR (this_command_keys)->contents);
+  return make_event_array_from_vector (this_command_keys, 0, this_command_key_count);
 }
 
 DEFUN ("set--this-command-keys", Fset__this_command_keys,
@@ -11849,13 +11839,9 @@ the last key sequence that has been read.
 See also `this-command-keys'.  */)
   (void)
 {
-  if (GVECTORP (this_command_keys))
-    this_command_keys = ensure_elisp_vector (this_command_keys);
-  else
-    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
 
-  return Fvector (this_command_key_count,
-		  XVECTOR (this_command_keys)->contents);
+  return make_event_array_from_vector (this_command_keys, 0, this_command_key_count);
 }
 
 DEFUN ("this-single-command-keys", Fthis_single_command_keys,
@@ -11866,15 +11852,11 @@ the command loop or by `read-key-sequence'.
 The value is always a vector.  */)
   (void)
 {
-  if (GVECTORP (this_command_keys))
-    this_command_keys = ensure_elisp_vector (this_command_keys);
-  else
-    CHECK_TYPE (VECTORP (this_command_keys), Qvectorp, this_command_keys);
+  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
 
   ptrdiff_t nkeys = this_command_key_count - this_single_command_key_start;
-  return Fvector (nkeys < 0 ? 0 : nkeys,
-		  (XVECTOR (this_command_keys)->contents
-		   + this_single_command_key_start));
+  return make_event_array_from_vector (this_command_keys, this_single_command_key_start,
+				       nkeys < 0 ? 0 : nkeys);
 }
 
 DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,
@@ -11887,11 +11869,8 @@ shows the events before all translations (except for input methods).
 The value is always a vector.  */)
   (void)
 {
-  if (GVECTORP (raw_keybuf))
-    raw_keybuf = ensure_elisp_vector (raw_keybuf);
-  else
-    CHECK_TYPE (VECTORP (raw_keybuf), Qvectorp, raw_keybuf);
-  return Fvector (raw_keybuf_count, XVECTOR (raw_keybuf)->contents);
+  CHECK_TYPE (PLAIN_VECTORP (raw_keybuf), Qvectorp, raw_keybuf);
+  return make_event_array_from_vector (raw_keybuf, 0, raw_keybuf_count);
 }
 
 DEFUN ("clear-this-command-keys", Fclear_this_command_keys,

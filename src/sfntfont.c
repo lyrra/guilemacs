@@ -1786,10 +1786,8 @@ sfntfont_list_1 (struct sfnt_font_desc *desc, Lisp_Object spec,
       if (CONSP (tem))
 	{
 	  Lisp_Object reps = XCDR (tem);
-	  if (GVECTORP (reps))
-	    reps = ensure_elisp_vector (reps);
 
-	  if (VECTORP (reps))
+	  if (PLAIN_VECTORP (reps))
 	    {
 	      tem = reps;
 

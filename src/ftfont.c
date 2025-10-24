@@ -894,9 +894,7 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 	      if (CONSP (val))
 		{
 		  Lisp_Object reps = XCDR (val);
-		  if (GVECTORP (reps))
-		    reps = ensure_elisp_vector (reps);
-		  if (VECTORP (reps))
+		  if (PLAIN_VECTORP (reps))
 		    chars = reps;
 		}
 	    }
@@ -1049,9 +1047,6 @@ ftfont_list (struct frame *f, Lisp_Object spec)
 		{
 		  ptrdiff_t j;
 		  Lisp_Object vector_chars = chars;
-
-		  if (GVECTORP (vector_chars))
-		    vector_chars = ensure_elisp_vector (vector_chars);
 
 		  if (FcPatternGetCharSet (fontset->fonts[i], FC_CHARSET, 0, &charset)
 		      != FcResultMatch)

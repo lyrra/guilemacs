@@ -566,10 +566,8 @@ haikufont_spec_or_entity_to_pattern (Lisp_Object ent, int list_p,
       if (CONSP (tem))
 	{
 	  Lisp_Object reps = XCDR (tem);
-	  if (GVECTORP (reps))
-	    reps = ensure_elisp_vector (reps);
 
-	  if (VECTORP (reps))
+	  if (PLAIN_VECTORP (reps))
 	    {
 	      int count = 0;
 

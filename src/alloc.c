@@ -1437,6 +1437,42 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
   }
 }
 
+/* Works with both Guile and Elisp vectors - no pointer access needed.
+   Extracts COUNT elements starting at START from VEC.  */
+Lisp_Object
+make_event_array_from_vector (Lisp_Object vec, ptrdiff_t start, ptrdiff_t count)
+{
+  ptrdiff_t i;
+
+  /* Check if all elements are simple characters (fit in string) */
+  for (i = 0; i < count; i++)
+    {
+      Lisp_Object elt = AREF (vec, start + i);  /* Works with both vector types! */
+      if (!FIXNUMP (elt)
+	  || (XFIXNUM (elt) & ~(-CHAR_META)) >= 0200)
+	{
+	  /* Not all characters - return as vector */
+	  Lisp_Object result = scm_c_make_vector (count, Qnil);
+	  for (ptrdiff_t j = 0; j < count; j++)
+	    GASET (result, j, AREF (vec, start + j));
+	  return result;
+	}
+    }
+
+  /* All elements are characters - make a string */
+  Lisp_Object result = Fmake_string (make_fixnum (count), make_fixnum (0), Qnil);
+  for (i = 0; i < count; i++)
+    {
+      Lisp_Object elt = AREF (vec, start + i);
+      SSET (result, i, XFIXNUM (elt));
+      /* Move the meta bit to the right place for a string char.  */
+      if (XFIXNUM (elt) & CHAR_META)
+	SSET (result, i, SREF (result, i) | 0x80);
+    }
+
+  return result;
+}
+
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,
        doc: /* Make a finalizer that will run FUNCTION.
 FUNCTION will be called after garbage collection when the returned

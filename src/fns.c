@@ -765,31 +765,26 @@ the same empty object instead of its copy.  */)
       */
     }
 
-  if (VECTORP (arg))
+  if (PLAIN_VECTORP (arg))
     {
-      if (GVECTORP (arg))
-	arg = ensure_elisp_vector (arg);
-      else
-	CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
-      return Fvector (ASIZE (arg), XVECTOR (arg)->contents);
-    }
-
-  if (GVECTORP (arg))
-    {
-      ptrdiff_t n = GASIZE (arg);
+      ptrdiff_t n = ASIZE (arg);
       Lisp_Object val = scm_c_make_vector (n, Qnil);
       for (ptrdiff_t i = 0; i < n; i++)
-        GASET (val, i, GAREF (arg, i));
+        GASET (val, i, AREF (arg, i));
       return val;
     }
 
   if (RECORDP (arg))
     {
-      if (GVECTORP (arg))
-	arg = ensure_elisp_vector (arg);
-      else
-	CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
-      return Frecord (PVSIZE (arg), XVECTOR (arg)->contents);
+      CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
+      ptrdiff_t n = PVSIZE (arg);
+      USE_SAFE_ALLOCA;
+      Lisp_Object *args = SAFE_ALLOCA (n * sizeof *args);
+      for (ptrdiff_t i = 0; i < n; i++)
+        args[i] = AREF (arg, i);
+      Lisp_Object record = Frecord (n, args);
+      SAFE_FREE ();
+      return record;
     }
 
   if (CHAR_TABLE_P (arg))
@@ -3424,12 +3419,8 @@ FUNCTION must be a function of one argument, and must return a value
 	}
       else if (PLAIN_VECTORP (sequence))
 	{
-	  /* Ensure Elisp vector for efficient memcpy */
-	  if (GVECTORP (sequence))
-	    sequence = ensure_elisp_vector (sequence);
-	  else
-	    CHECK_TYPE (VECTORP (sequence), Qvectorp, sequence);
-	  memcpy (args, XVECTOR (sequence)->contents, leni * sizeof *args);
+	  for (ptrdiff_t i = 0; i < leni; i++)
+	    args[i] = AREF (sequence, i);
 	  goto concat;
 	}
     }

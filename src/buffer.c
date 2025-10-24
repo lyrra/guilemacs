@@ -4170,12 +4170,9 @@ report_overlay_modification (Lisp_Object start, Lisp_Object end, bool after,
 
     USE_SAFE_ALLOCA;
     SAFE_ALLOCA_LISP (copy, size);
-    if (GVECTORP (last_overlay_modification_hooks))
-      last_overlay_modification_hooks = ensure_elisp_vector (last_overlay_modification_hooks);
-    else
-      CHECK_TYPE (VECTORP (last_overlay_modification_hooks), Qvectorp, last_overlay_modification_hooks);
-    memcpy (copy, XVECTOR (last_overlay_modification_hooks)->contents,
-	    size * word_size);
+    CHECK_TYPE (PLAIN_VECTORP (last_overlay_modification_hooks), Qvectorp, last_overlay_modification_hooks);
+    for (i = 0; i < size; i++)
+      copy[i] = AREF (last_overlay_modification_hooks, i);
 
     for (i = 0; i < size;)
       {

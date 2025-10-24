@@ -309,9 +309,6 @@ buffer before the macro is executed.  */)
   if (!STRINGP (final) && !VECTORP (final) && !GVECTORP (final))
     error ("Keyboard macros must be strings or vectors");
 
-  if (GVECTORP (final))
-    final = ensure_elisp_vector (final);
-
   tem = Fcons (Vexecuting_kbd_macro,
 	       Fcons (make_int (executing_kbd_macro_index),
 		      Vreal_this_command));

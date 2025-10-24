@@ -2502,9 +2502,6 @@ font_match_p (Lisp_Object spec, Lisp_Object font)
 		  Lisp_Object vector_chars = reps;
 		  bool supported = false;
 
-		  if (GVECTORP (vector_chars))
-		    vector_chars = ensure_elisp_vector (vector_chars);
-
 		  for (i = 0; i < ASIZE (vector_chars); i++)
 		    {
 		      if (! CHARACTERP (AREF (vector_chars, i)))
@@ -3973,9 +3970,6 @@ font_range (ptrdiff_t pos, ptrdiff_t pos_byte, ptrdiff_t *limit,
 		  else if (VECTOR_OR_PSEUDOVECTORP (val))
 		    {
 		      Lisp_Object vector_chars = val;
-
-		      if (GVECTORP (vector_chars))
-			vector_chars = ensure_elisp_vector (vector_chars);
 
 		      if (ASIZE (vector_chars) > 0)
 			val = AREF (vector_chars, 0);
