@@ -66,8 +66,8 @@ extern struct Lisp_Char_Table *buffer_display_table (void);
 static inline struct Lisp_Vector *
 glyph_table_vector_struct (void)
 {
-  if (GVECTORP (Vglyph_table))
-    Vglyph_table = ensure_elisp_vector (Vglyph_table);
+  if (GVECTORP (Vglyph_table) || VECTORP (Vglyph_table))
+    CHECK_TYPE (PLAIN_VECTORP (Vglyph_table), Qvectorp, Vglyph_table);
   return VECTORP (Vglyph_table) ? XVECTOR (Vglyph_table) : NULL;
 }
 

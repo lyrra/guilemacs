@@ -1099,13 +1099,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 	    stack_idx++;
 	    {
 	      Lisp_Object prog_vec = AREF (slot, 1);
-	      if (GVECTORP (prog_vec))
-		{
-		  prog_vec = ensure_elisp_vector (prog_vec);
-		  ASET (slot, 1, prog_vec);
-		}
-	      else
-		CHECK_TYPE (VECTORP (prog_vec), Qvectorp, prog_vec);
+	      CHECK_TYPE (PLAIN_VECTORP (prog_vec), Qvectorp, prog_vec);
 	      ccl_prog = XVECTOR (prog_vec)->contents;
 	    }
 	    ic = CCL_HEADER_MAIN;

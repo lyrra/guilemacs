@@ -1272,11 +1272,8 @@ compute_motion (ptrdiff_t from, ptrdiff_t frombyte, EMACS_INT fromvpos,
   if (dp == buffer_display_table ())
     {
       Lisp_Object width_table_obj = BVAR (current_buffer, width_table);
-      if (GVECTORP (width_table_obj))
-	{
-	  width_table_obj = ensure_elisp_vector (width_table_obj);
-	  bset_width_table (current_buffer, width_table_obj);
-	}
+      if (GVECTORP (width_table_obj) || VECTORP (width_table_obj))
+	CHECK_TYPE (PLAIN_VECTORP (width_table_obj), Qvectorp, width_table_obj);
       width_table = (VECTORP (width_table_obj)
 		     ? XVECTOR (width_table_obj)->contents
 		     : 0);

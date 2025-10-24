@@ -5550,13 +5550,8 @@ static Lisp_Object
 display_table_ensure_invis_vector (struct Lisp_Char_Table *dp)
 {
   Lisp_Object vec = DISP_INVIS_VECTOR (dp);
-
-  if (GVECTORP (vec))
-    {
-      vec = ensure_elisp_vector (vec);
-      DISP_INVIS_VECTOR (dp) = vec;
-    }
-
+  if (GVECTORP (vec) || VECTORP (vec))
+    CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
   return vec;
 }
 
@@ -5564,21 +5559,9 @@ static Lisp_Object
 display_table_ensure_char_vector (struct Lisp_Char_Table *dp, int c,
 				  Lisp_Object vec)
 {
-  if (!GVECTORP (vec))
-    return vec;
-
-  Lisp_Object upgraded = ensure_elisp_vector (vec);
-
-  if (EQ (vec, dp->defalt))
-    dp->defalt = upgraded;
-  else
-    {
-      Lisp_Object table;
-      XSETCHAR_TABLE (table, dp);
-      char_table_set_range (table, c, c, upgraded);
-    }
-
-  return upgraded;
+  if (GVECTORP (vec) || VECTORP (vec))
+    CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
+  return vec;
 }
 
 
@@ -20256,11 +20239,8 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
       struct Lisp_Char_Table *disptab = buffer_display_table ();
 
       Lisp_Object width_table_obj = BVAR (current_buffer, width_table);
-      if (GVECTORP (width_table_obj))
-	{
-	  width_table_obj = ensure_elisp_vector (width_table_obj);
-	  bset_width_table (current_buffer, width_table_obj);
-	}
+      if (GVECTORP (width_table_obj) || VECTORP (width_table_obj))
+	CHECK_TYPE (PLAIN_VECTORP (width_table_obj), Qvectorp, width_table_obj);
       struct Lisp_Vector *widthtab
 	= VECTORP (width_table_obj) ? XVECTOR (width_table_obj) : NULL;
 

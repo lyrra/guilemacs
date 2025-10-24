@@ -2466,15 +2466,20 @@ sort_vector (Lisp_Object vector, Lisp_Object predicate, Lisp_Object keyfunc,
 {
   if (PLAIN_VECTORP (vector))
     {
-      /* Ensure we have an Elisp vector for direct pointer access */
-      if (GVECTORP (vector))
-	vector = ensure_elisp_vector (vector);
-      else
-	CHECK_TYPE (VECTORP (vector), Qvectorp, vector);
+      CHECK_TYPE (PLAIN_VECTORP (vector), Qvectorp, vector);
 
       ptrdiff_t length = ASIZE (vector);
       if (length >= 2)
-        tim_sort (predicate, keyfunc, XVECTOR (vector)->contents, length, reverse);
+	{
+	  USE_SAFE_ALLOCA;
+	  Lisp_Object *vec_data = SAFE_ALLOCA (length * sizeof *vec_data);
+	  for (ptrdiff_t j = 0; j < length; j++)
+	    vec_data[j] = AREF (vector, j);
+	  tim_sort (predicate, keyfunc, vec_data, length, reverse);
+	  for (ptrdiff_t j = 0; j < length; j++)
+	    ASET (vector, j, vec_data[j]);
+	  SAFE_FREE ();
+	}
       return vector;
     }
   else
