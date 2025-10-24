@@ -1633,14 +1633,15 @@ the face font sort order, see `face-font-selection-order'.  */)
   vec = Fvconcat (ndrivers, drivers);
   nfonts = ASIZE (vec);
 
-  /* Sorting requires an Elisp vector for in-place permutation. */
-  if (GVECTORP (vec))
-    vec = ensure_elisp_vector (vec);
-  else
-    CHECK_TYPE (VECTORP (vec), Qvectorp, vec);
-
-  qsort (XVECTOR (vec)->contents, nfonts, word_size,
-	 compare_fonts_by_sort_order);
+  CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
+  USE_SAFE_ALLOCA;
+  Lisp_Object *vec_data = SAFE_ALLOCA (nfonts * sizeof *vec_data);
+  for (ptrdiff_t j = 0; j < nfonts; j++)
+    vec_data[j] = AREF (vec, j);
+  qsort (vec_data, nfonts, word_size, compare_fonts_by_sort_order);
+  for (ptrdiff_t j = 0; j < nfonts; j++)
+    ASET (vec, j, vec_data[j]);
+  SAFE_FREE ();
 
   result = Qnil;
   for (i = nfonts - 1; i >= 0; --i)
@@ -1930,12 +1931,14 @@ check_lface (Lisp_Object lface)
 {
   if (!NILP (lface))
     {
-      if (GVECTORP (lface))
-        lface = ensure_elisp_vector (lface);
-      else
-        CHECK_TYPE (VECTORP (lface), Qvectorp, lface);
+      CHECK_TYPE (PLAIN_VECTORP (lface), Qvectorp, lface);
       eassert (LFACEP (lface));
-      check_lface_attrs (XVECTOR (lface)->contents);
+      USE_SAFE_ALLOCA;
+      Lisp_Object *attrs = SAFE_ALLOCA (LFACE_VECTOR_SIZE * sizeof *attrs);
+      for (ptrdiff_t i = 0; i < LFACE_VECTOR_SIZE; i++)
+        attrs[i] = AREF (lface, i);
+      check_lface_attrs (attrs);
+      SAFE_FREE ();
     }
 }
 
@@ -3933,7 +3936,12 @@ set_font_frame_param (Lisp_Object frame, Lisp_Object lface)
     {
       if (FONT_SPEC_P (font))
 	{
-	  font = font_load_for_lface (f, XVECTOR (lface)->contents, font);
+	  USE_SAFE_ALLOCA;
+	  Lisp_Object *attrs = SAFE_ALLOCA (LFACE_VECTOR_SIZE * sizeof *attrs);
+	  for (ptrdiff_t i = 0; i < LFACE_VECTOR_SIZE; i++)
+	    attrs[i] = AREF (lface, i);
+	  font = font_load_for_lface (f, attrs, font);
+	  SAFE_FREE ();
 	  if (NILP (font))
 	    return;
 	  ASET (lface, LFACE_FONT_INDEX, font);
@@ -4475,13 +4483,13 @@ face_attr_equal_p (Lisp_Object v1, Lisp_Object v2)
    is called quite often.  */
 
 static bool
-lface_equal_p (Lisp_Object *v1, Lisp_Object *v2)
+lface_equal_p (Lisp_Object v1, Lisp_Object v2)
 {
   int i;
   bool equal_p = true;
 
   for (i = 1; i < LFACE_VECTOR_SIZE && equal_p; ++i)
-    equal_p = face_attr_equal_p (v1[i], v2[i]);
+    equal_p = face_attr_equal_p (AREF (v1, i), AREF (v2, i));
 
   return equal_p;
 }

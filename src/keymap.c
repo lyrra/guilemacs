@@ -84,18 +84,10 @@ static void describe_vector (Lisp_Object, Lisp_Object, Lisp_Object,
 static void silly_event_symbol_error (Lisp_Object);
 static Lisp_Object get_keyelt (Lisp_Object, bool);
 
-/* Ensure vectors stored inside keymaps are mutable Lisp vectors.  If CELL
-   is a cons cell whose CAR currently refers to VECTOR, update it to keep
-   the upgraded storage.  */
 static Lisp_Object
 ensure_keymap_elisp_vector (Lisp_Object vector, Lisp_Object cell)
 {
-  if (GVECTORP (vector))
-    {
-      vector = ensure_elisp_vector (vector);
-      if (!NILP (cell))
-	XSETCAR (cell, vector);
-    }
+  CHECK_TYPE (PLAIN_VECTORP (vector), Qvectorp, vector);
   return vector;
 }
 

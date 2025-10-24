@@ -35513,15 +35513,13 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
       Lisp_Object coords = XCDR (hot_spot);
       if (PLAIN_VECTORP (coords))
 	{
-	  if (GVECTORP (coords))
-	    {
-	      coords = ensure_elisp_vector (coords);
-	      XSETCDR (hot_spot, coords);
-	    }
+	  CHECK_TYPE (PLAIN_VECTORP (coords), Qvectorp, coords);
 
-	  struct Lisp_Vector *v = XVECTOR (coords);
-	  Lisp_Object *poly = v->contents;
-	  ptrdiff_t n = v->header.size;
+	  ptrdiff_t n = ASIZE (coords);
+	  USE_SAFE_ALLOCA;
+	  Lisp_Object *poly = SAFE_ALLOCA (n * sizeof *poly);
+	  for (ptrdiff_t j = 0; j < n; j++)
+	    poly[j] = AREF (coords, j);
 	  ptrdiff_t i;
 	  bool inside = false;
 	  Lisp_Object lx, ly;
@@ -35529,7 +35527,10 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
 
 	  /* Need an even number of coordinates, and at least 3 edges.  */
 	  if (n < 6 || n & 1)
-	    return false;
+	    {
+	      SAFE_FREE ();
+	      return false;
+	    }
 
 	  /* Count edge segments intersecting line from (X,Y) to (X,infinity).
 	     If count is odd, we are inside polygon.  Pixels on edges
@@ -35537,14 +35538,20 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
 	     polygon.  */
 	  if ((lx = poly[n-2], !FIXNUMP (lx))
 	      || (ly = poly[n-1], !FIXNUMP (lx)))
-	    return false;
+	    {
+	      SAFE_FREE ();
+	      return false;
+	    }
 	  x0 = XFIXNUM (lx), y0 = XFIXNUM (ly);
 	  for (i = 0; i < n; i += 2)
 	    {
 	      int x1 = x0, y1 = y0;
 	      if ((lx = poly[i], !FIXNUMP (lx))
 		  || (ly = poly[i+1], !FIXNUMP (ly)))
-		return false;
+		{
+		  SAFE_FREE ();
+		  return false;
+		}
 	      x0 = XFIXNUM (lx), y0 = XFIXNUM (ly);
 
 	      /* Does this segment cross the X line?  */
@@ -35560,6 +35567,7 @@ on_hot_spot_p (Lisp_Object hot_spot, int x, int y)
 	      if (y < y0 + ((y1 - y0) * (x - x0)) / (x1 - x0))
 		inside = !inside;
 	    }
+	  SAFE_FREE ();
 	  return inside;
 	}
     }

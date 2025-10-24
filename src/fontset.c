@@ -410,13 +410,7 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
     font_object = Qnil;
 
   vec = XCDR (font_group);
-  if (GVECTORP (vec))
-    {
-      vec = ensure_elisp_vector (vec);
-      XSETCDR (font_group, vec);
-    }
-  else
-    CHECK_TYPE (VECTORP (vec), Qvectorp, vec);
+  CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
   size = ASIZE (vec);
   /* Exclude the tailing nil element from the reordering.  */
   if (NILP (AREF (vec, size - 1)))
@@ -479,9 +473,14 @@ reorder_font_vector (Lisp_Object font_group, struct font *font)
 
   if (score_changed)
     {
-      struct Lisp_Vector *vec_data = XVECTOR (vec);
-      qsort (vec_data->contents, size, word_size,
-	     fontset_compare_rfontdef);
+      USE_SAFE_ALLOCA;
+      Lisp_Object *vec_data = SAFE_ALLOCA (size * sizeof *vec_data);
+      for (ptrdiff_t j = 0; j < size; j++)
+	vec_data[j] = AREF (vec, j);
+      qsort (vec_data, size, word_size, fontset_compare_rfontdef);
+      for (ptrdiff_t j = 0; j < size; j++)
+	ASET (vec, j, vec_data[j]);
+      SAFE_FREE ();
     }
   EMACS_INT low_tick_bits = charset_ordered_list_tick & MOST_POSITIVE_FIXNUM;
   XSETCAR (font_group, make_fixnum (low_tick_bits));

@@ -341,12 +341,13 @@ xfont_list_pattern (Display *display, const char *pattern,
 
   if (num_fonts > 0)
     {
-      if (GVECTORP (xfont_scratch_props))
-        xfont_scratch_props = ensure_elisp_vector (xfont_scratch_props);
-      else
-        CHECK_TYPE (VECTORP (xfont_scratch_props), Qvectorp, xfont_scratch_props);
+      CHECK_TYPE (PLAIN_VECTORP (xfont_scratch_props), Qvectorp, xfont_scratch_props);
       char **indices = alloca (sizeof (char *) * num_fonts);
-      Lisp_Object *props = XVECTOR (xfont_scratch_props)->contents;
+      USE_SAFE_ALLOCA;
+      ptrdiff_t props_size = ASIZE (xfont_scratch_props);
+      Lisp_Object *props = SAFE_ALLOCA (props_size * sizeof *props);
+      for (ptrdiff_t j = 0; j < props_size; j++)
+        props[j] = AREF (xfont_scratch_props, j);
       Lisp_Object scripts = Qnil, entity = Qnil;
 
       for (i = 0; i < ASIZE (xfont_scratch_props); i++)
@@ -451,6 +452,7 @@ xfont_list_pattern (Display *display, const char *pattern,
 	      list = Fcons (entity, list), entity = Qnil;
 	  }
       XFreeFontNames (names);
+      SAFE_FREE ();
     }
 
   x_uncatch_errors ();
