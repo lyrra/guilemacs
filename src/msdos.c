@@ -2421,10 +2421,12 @@ and then the scan code.  */)
   else
     {
       val = Fvector (NUM_RECENT_DOSKEYS, keys);
-      vcopy (val, 0, keys + recent_doskeys_index,
-	     NUM_RECENT_DOSKEYS - recent_doskeys_index);
-      vcopy (val, NUM_RECENT_DOSKEYS - recent_doskeys_index,
-	     keys, recent_doskeys_index);
+      /* Replace vcopy with ASET loop - vcopy doesn't work with Guile vectors */
+      ptrdiff_t count1 = NUM_RECENT_DOSKEYS - recent_doskeys_index;
+      for (ptrdiff_t i = 0; i < count1; i++)
+        ASET (val, i, keys[recent_doskeys_index + i]);
+      for (ptrdiff_t i = 0; i < recent_doskeys_index; i++)
+        ASET (val, count1 + i, keys[i]);
     }
 
   SAFE_FREE ();
