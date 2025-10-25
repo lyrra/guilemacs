@@ -1704,9 +1704,7 @@ decode_char (struct charset *charset, unsigned int code)
       decoder = CHARSET_DECODER (charset);
     }
   if (VECTOR_OR_PSEUDOVECTORP (decoder))
-    c = XFIXNUM ((GVECTORP (decoder)
-                  ? GAREF (decoder, char_index)
-                  : AREF (decoder, char_index)));
+    c = XFIXNUM (AREF (decoder, char_index));
 	  else
 	    c = GET_TEMP_CHARSET_WORK_DECODER (char_index);
 	}

@@ -1016,7 +1016,7 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       menu_items = f->menu_bar_vector;
       CHECK_TYPE (PLAIN_VECTORP (menu_items), Qvectorp, menu_items);
-      menu_items_allocated = VECTORP (menu_items) ? ASIZE (menu_items) : 0;
+      menu_items_allocated = ASIZE (menu_items);
       subitems = ASIZE (items) / 4;
       submenu_start = alloca ((subitems + 1) * sizeof *submenu_start);
       submenu_end = alloca (subitems * sizeof *submenu_end);

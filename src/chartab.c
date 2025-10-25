@@ -1168,9 +1168,7 @@ uniprop_decode_value_run_length (Lisp_Object table, Lisp_Object value)
 
   if ((VECTOR_OR_PSEUDOVECTORP (valvec))
       && XFIXNUM (value) >= 0 && XFIXNUM (value) < ASIZE (valvec))
-    value = (GVECTORP (valvec)
-	     ? GAREF (valvec, XFIXNUM (value))
-	     : AREF (valvec, XFIXNUM (value)));
+    value = AREF (valvec, XFIXNUM (value));
   return value;
 }
 

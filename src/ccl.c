@@ -1361,9 +1361,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		ptrdiff_t eop;
         GET_CCL_RANGE (eop, ccl_prog, ic++, 0,
                ((VECTOR_OR_PSEUDOVECTORP (Vtranslation_table_vector))
-                ? (GVECTORP (Vtranslation_table_vector)
-                   ? GASIZE (Vtranslation_table_vector)
-                   : ASIZE (Vtranslation_table_vector))
+                ? ASIZE (Vtranslation_table_vector)
                 : -1));
 		i = CCL_DECODE_CHAR (reg[RRR], reg[rrr]);
 		op = translate_char (GET_TRANSLATION_TABLE (eop), i);
@@ -1613,9 +1611,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 		  }
         if (!(VECTOR_OR_PSEUDOVECTORP (Vcode_conversion_map_vector)))
           CCL_INVALID_CMD;
-        map_vector_size = (GVECTORP (Vcode_conversion_map_vector)
-                           ? GASIZE (Vcode_conversion_map_vector)
-                           : ASIZE (Vcode_conversion_map_vector));
+        map_vector_size = ASIZE (Vcode_conversion_map_vector);
 
 		do {
 		  for (;map_set_rest_length > 0;i++, ic++, map_set_rest_length--)
@@ -1636,9 +1632,7 @@ ccl_driver (struct ccl_program *ccl, int *source, int *destination, int src_size
 			}
 
 		      if (point >= map_vector_size) continue;
-          map = (GVECTORP (Vcode_conversion_map_vector)
-                 ? GAREF (Vcode_conversion_map_vector, point)
-                 : AREF (Vcode_conversion_map_vector, point));
+          map = AREF (Vcode_conversion_map_vector, point);
 
 		      /* Check map validity.  */
 		      if (!CONSP (map)) continue;
