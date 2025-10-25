@@ -3836,15 +3836,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 
   /* Recurse according to subtree's type.
      Every branch must return a Lisp_Object.  */
-  if (GVECTORP (subtree))
-    {
-      ptrdiff_t len = GASIZE (subtree);
-      for (ptrdiff_t i = 0; i < len; i++)
-	GASET (subtree, i,
-	       substitute_object_recurse (subst, GAREF (subtree, i)));
-      return subtree;
-    }
-  else if (VECTORLIKEP (subtree))
+  if (VECTORLIKEP (subtree))
     {
 	ptrdiff_t i = 0, length = 0;
 	if (BOOL_VECTOR_P (subtree))
@@ -3853,7 +3845,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 		 || CLOSUREP (subtree) || HASH_TABLE_P (subtree)
 		 || RECORDP (subtree))
 	  length = PVSIZE (subtree);
-	else if (VECTORP (subtree))
+	else if (PLAIN_VECTORP (subtree))
 	  length = ASIZE (subtree);
 	else
 	  /* An unknown pseudovector may contain non-Lisp fields, so we

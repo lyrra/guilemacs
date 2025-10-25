@@ -1015,21 +1015,10 @@ copy_keymap_1 (Lisp_Object keymap, int depth)
 	}
       else if (PLAIN_VECTORP (elt))
 	{
-	  if (GVECTORP (elt))
-	    {
-	      ptrdiff_t len = GASIZE (elt);
-	      Lisp_Object copy_vec = make_uninit_elisp_vector (len);
-	      for (ptrdiff_t i = 0; i < len; i++)
-		ASET (copy_vec, i,
-		      copy_keymap_item (GAREF (elt, i), depth + 1));
-	      elt = copy_vec;
-	    }
-	  else
-	    {
-	      elt = Fcopy_sequence (elt);
-	      for (int i = 0; i < ASIZE (elt); i++)
-		ASET (elt, i, copy_keymap_item (AREF (elt, i), depth + 1));
-	    }
+	  /* Fcopy_sequence works for both Guile and Elisp vectors */
+	  elt = Fcopy_sequence (elt);
+	  for (ptrdiff_t i = 0; i < ASIZE (elt); i++)
+	    ASET (elt, i, copy_keymap_item (AREF (elt, i), depth + 1));
 	}
       else if (CONSP (elt))
 	{

@@ -1247,24 +1247,12 @@ uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
   value = make_fixnum (i);
   if (i == size)
     {
-      Lisp_Object extended;
-      if (VECTORP (valvec))
-	{
-	  Lisp_Object new_vec = make_elisp_vector (size + 1, Qnil);
-	  for (ptrdiff_t j = 0; j < size; j++)
-	    ASET (new_vec, j, AREF (valvec, j));
-	  ASET (new_vec, size, value);
-	  extended = new_vec;
-	}
-      else
-	{
-	  Lisp_Object new_vec = scm_c_make_vector (size + 1, Qnil);
-	  for (ptrdiff_t j = 0; j < size; j++)
-	    GASET (new_vec, j, GAREF (valvec, j));
-	  GASET (new_vec, size, value);
-	  extended = new_vec;
-	}
-      set_char_table_extras (table, 4, extended);
+      /* Always use Guile vectors - AREF/ASET work uniformly */
+      Lisp_Object new_vec = scm_c_make_vector (size + 1, Qnil);
+      for (ptrdiff_t j = 0; j < size; j++)
+	ASET (new_vec, j, AREF (valvec, j));
+      ASET (new_vec, size, value);
+      set_char_table_extras (table, 4, new_vec);
     }
   return make_fixnum (i);
 }

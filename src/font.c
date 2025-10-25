@@ -5444,24 +5444,13 @@ character.  */)
       if (ifrom == ito)
         return Qnil;
       len = ito - ifrom;
-      if (GVECTORP (object))
+      /* Use SAFE_ALLOCA_LISP for both vector types - works uniformly */
+      SAFE_ALLOCA_LISP (chars, len);
+      for (ptrdiff_t i = 0; i < len; i++)
         {
-          SAFE_ALLOCA_LISP (chars, len);
-          for (ptrdiff_t i = 0; i < len; i++)
-            {
-              Lisp_Object elt = GAREF (object, ifrom + i);
-              CHECK_CHARACTER (elt);
-              chars[i] = elt;
-            }
-        }
-      else
-        {
-          for (ptrdiff_t i = 0; i < len; i++)
-            {
-              Lisp_Object elt = AREF (object, ifrom + i);
-              CHECK_CHARACTER (elt);
-            }
-          chars = aref_addr (object, ifrom);
+          Lisp_Object elt = AREF (object, ifrom + i);
+          CHECK_CHARACTER (elt);
+          chars[i] = elt;
         }
     }
   else
