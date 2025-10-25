@@ -1215,12 +1215,11 @@ uniprop_encode_value_run_length (Lisp_Object table, Lisp_Object value)
 {
   Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
   ptrdiff_t size = ASIZE (valvec);
-  bool scheme_vec = GVECTORP (valvec);
   ptrdiff_t i;
 
   for (i = 0; i < size; i++)
     {
-      Lisp_Object entry = scheme_vec ? GAREF (valvec, i) : AREF (valvec, i);
+      Lisp_Object entry = AREF (valvec, i);
       if (EQ (value, entry))
 	break;
     }
@@ -1238,13 +1237,12 @@ uniprop_encode_value_numeric (Lisp_Object table, Lisp_Object value)
 {
   Lisp_Object valvec = XCHAR_TABLE (table)->extras[4];
   ptrdiff_t size = ASIZE (valvec);
-  bool scheme_vec = GVECTORP (valvec);
   ptrdiff_t i;
 
   CHECK_FIXNUM (value);
   for (i = 0; i < size; i++)
     {
-      Lisp_Object entry = scheme_vec ? GAREF (valvec, i) : AREF (valvec, i);
+      Lisp_Object entry = AREF (valvec, i);
       if (EQ (value, entry))
 	break;
     }

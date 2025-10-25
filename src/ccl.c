@@ -1898,17 +1898,15 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 {
   int i, veclen, unresolved = 0;
   Lisp_Object result, contents, val;
-  bool is_scheme_vector = GVECTORP (ccl);
-  ptrdiff_t size = is_scheme_vector ? GASIZE (ccl) : ASIZE (ccl);
+  ptrdiff_t size = ASIZE (ccl);
   if (! (CCL_HEADER_MAIN < size && size <= INT_MAX))
     return Qnil;
   result = Fcopy_sequence (ccl);
-  bool result_is_scheme = GVECTORP (result);
-  veclen = result_is_scheme ? GASIZE (result) : ASIZE (result);
+  veclen = ASIZE (result);
 
   for (i = 0; i < veclen; i++)
     {
-      contents = result_is_scheme ? GAREF (result, i) : AREF (result, i);
+      contents = AREF (result, i);
       if (TYPE_RANGED_FIXNUMP (int, contents))
 	continue;
       else if (CONSP (contents)
@@ -1920,12 +1918,7 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
 	     an index number.  */
 	  val = Fget (XCAR (contents), XCDR (contents));
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
-	    {
-	      if (result_is_scheme)
-		GASET (result, i, val);
-	      else
-		ASET (result, i, val);
-	    }
+	    ASET (result, i, val);
 	  else
 	    unresolved = 1;
 	  continue;
@@ -1937,42 +1930,22 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
              and a code conversion map have the same name.  */
 	  val = Fget (contents, Qtranslation_table_id);
 	  if (RANGED_FIXNUMP (0, val, INT_MAX))
-	    {
-	      if (result_is_scheme)
-		GASET (result, i, val);
-	      else
-		ASET (result, i, val);
-	    }
+	    ASET (result, i, val);
 	  else
 	    {
 	      val = Fget (contents, Qtranslation_hash_table_id);
 	      if (RANGED_FIXNUMP (0, val, INT_MAX))
-		{
-		  if (result_is_scheme)
-		    GASET (result, i, val);
-		  else
-		    ASET (result, i, val);
-		}
+		ASET (result, i, val);
 	      else
 		{
 		  val = Fget (contents, Qcode_conversion_map_id);
 		  if (RANGED_FIXNUMP (0, val, INT_MAX))
-		    {
-		      if (result_is_scheme)
-			GASET (result, i, val);
-		      else
-			ASET (result, i, val);
-		    }
+		    ASET (result, i, val);
 		  else
 		    {
 		      val = Fget (contents, Qccl_program_idx);
 		      if (RANGED_FIXNUMP (0, val, INT_MAX))
-			{
-			  if (result_is_scheme)
-			    GASET (result, i, val);
-			  else
-			    ASET (result, i, val);
-			}
+			ASET (result, i, val);
 		      else
 			unresolved = 1;
 		    }
@@ -1983,8 +1956,8 @@ resolve_symbol_ccl_program (Lisp_Object ccl)
       return Qnil;
     }
 
-  if (! (0 <= XFIXNUM (result_is_scheme ? GAREF (result, CCL_HEADER_BUF_MAG) : AREF (result, CCL_HEADER_BUF_MAG))
-	 && ASCENDING_ORDER (0, XFIXNUM (result_is_scheme ? GAREF (result, CCL_HEADER_EOF) : AREF (result, CCL_HEADER_EOF)),
+  if (! (0 <= XFIXNUM (AREF (result, CCL_HEADER_BUF_MAG))
+	 && ASCENDING_ORDER (0, XFIXNUM (AREF (result, CCL_HEADER_EOF)),
 			     size)))
     return Qnil;
 

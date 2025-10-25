@@ -335,10 +335,8 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
 {
   sqlite3_reset (stmt);
   int len;
-  bool values_is_scheme = GVECTORP (values);
-  if (values_is_scheme)
-    len = GASIZE (values);
-  else if (VECTORP (values))
+  bool values_is_vector = VECTOR_OR_PSEUDOVECTORP (values);
+  if (values_is_vector)
     len = ASIZE (values);
   else
     len = list_length (values);
@@ -347,9 +345,7 @@ bind_values (sqlite3 *db, sqlite3_stmt *stmt, Lisp_Object values)
     {
       int ret = SQLITE_MISMATCH;
       Lisp_Object value;
-      if (values_is_scheme)
-	value = GAREF (values, i);
-      else if (VECTORP (values))
+      if (values_is_vector)
 	value = AREF (values, i);
       else
 	{

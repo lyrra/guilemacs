@@ -3130,12 +3130,9 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
       if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
 	   && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
 					  Vkeyboard_translate_table)))
-	  || (VECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
+	  || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
 	      && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
 					    Vkeyboard_translate_table)))
-	  || (GVECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
-	      && XFIXNAT (c) < GASIZE (KVAR (current_kboard,
-					      Vkeyboard_translate_table)))
 	  || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
 	      && CHARACTERP (c)))
 	{
@@ -4680,18 +4677,17 @@ decode_timer (Lisp_Object timer)
   if (! ((VECTOR_OR_PSEUDOVECTORP (timer)) && ASIZE (timer) == 10))
     return invalid_timespec ();
 
-  bool scheme_vec = GVECTORP (timer);
-  Lisp_Object slot0 = scheme_vec ? GAREF (timer, 0) : AREF (timer, 0);
+  Lisp_Object slot0 = AREF (timer, 0);
   if (! NILP (slot0))
     return invalid_timespec ();
 
-  Lisp_Object slot2 = scheme_vec ? GAREF (timer, 2) : AREF (timer, 2);
+  Lisp_Object slot2 = AREF (timer, 2);
   if (! FIXNUMP (slot2))
     return invalid_timespec ();
 
-  Lisp_Object slot1 = scheme_vec ? GAREF (timer, 1) : AREF (timer, 1);
-  Lisp_Object slot3 = scheme_vec ? GAREF (timer, 3) : AREF (timer, 3);
-  Lisp_Object slot8 = scheme_vec ? GAREF (timer, 8) : AREF (timer, 8);
+  Lisp_Object slot1 = AREF (timer, 1);
+  Lisp_Object slot3 = AREF (timer, 3);
+  Lisp_Object slot8 = AREF (timer, 8);
   return list4_to_timespec (slot1, slot2, slot3, slot8);
 }
 
@@ -7603,9 +7599,7 @@ modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kin
              && ASIZE (*symbol_table) == table_size))
         *symbol_table = make_nil_elisp_vector (table_size);
 
-      value = (GVECTORP (*symbol_table)
-               ? GAREF (*symbol_table, symbol_num)
-               : AREF (*symbol_table, symbol_num));
+      value = AREF (*symbol_table, symbol_num);
     }
 
   /* Have we already used this symbol before?  */
