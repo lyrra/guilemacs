@@ -2290,8 +2290,12 @@ This function may destructively modify SEQ to produce the value.  */)
       CHECK_LIST_END (tail, seq);
       seq = prev;
     }
-  else if (VECTOR_OR_PSEUDOVECTORP (seq))
+  else if (PLAIN_VECTORP (seq))
     {
+      /* Guile vectors from reader literals are immutable; make mutable copy */
+      if (GVECTORP (seq))
+	seq = scm_vector_copy (seq);
+
       ptrdiff_t size = ASIZE (seq);
 
       for (ptrdiff_t i = 0; i < size / 2; i++)
@@ -2337,7 +2341,7 @@ See also the function `nreverse', which is used more often.  */)
 	new = Fcons (XCAR (seq), new);
       CHECK_LIST_END (seq, seq);
     }
-  else if (VECTOR_OR_PSEUDOVECTORP (seq))
+  else if (PLAIN_VECTORP (seq))
     {
       bool scheme_vec = GVECTORP (seq);
       ptrdiff_t size = ASIZE (seq);
