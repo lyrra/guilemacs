@@ -49,7 +49,11 @@
   )
 (group
   "test/src/timefns-tests.el"
+  )
+(group
   "test/src/fns-tests.el"
+  )
+(group
   "test/src/floatfns-tests.el"
   )
 
@@ -125,11 +129,11 @@
   "test/lisp/emacs-lisp/shadow-tests.el" ;; pass
   "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
   ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
-;;;  )
+ )
   ; (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
-;;;  (group
+  (group
   "test/lisp/emacs-lisp/thunk-tests.el"
-;;;  )(group
+  )(group
   "test/lisp/emacs-lisp/unsafep-tests.el"
   "test/lisp/emacs-lisp/vtable-tests.el"
 ;;;  )(group
@@ -232,6 +236,8 @@
 (group
   "test/lisp/ls-lisp-tests.el"
   ; "test/lisp/loadhist-tests.el" ; fails
+  )
+(group
   "test/lisp/abbrev-tests.el" ;; hangs (or group)
   ; "test/lisp/emacs-lisp/let-alist-tests.el" ; fails
   )
