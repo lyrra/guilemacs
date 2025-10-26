@@ -1127,7 +1127,17 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
   for (ptrdiff_t i = 0; i < nargs; i++)
     {
       Lisp_Object arg = args[i];
-      if (VECTOR_OR_PSEUDOVECTORP (arg))
+      if (BOOL_VECTOR_P (arg))
+	{
+	  ptrdiff_t size = bool_vector_size (arg);
+	  for (ptrdiff_t i = 0; i < size; i++)
+	    {
+	      Lisp_Object val = bool_vector_ref (arg, i);
+	      GASET (result, dst_idx, val);
+	      dst_idx++;
+	    }
+	}
+      else if (VECTOR_OR_PSEUDOVECTORP (arg))
 	{
 	  ptrdiff_t size = ASIZE (arg);
 	  for (ptrdiff_t j = 0; j < size; j++)
@@ -1162,12 +1172,6 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
           */
 	    for (ptrdiff_t i = 0; i < size; i++)
 	      GASET (result, dst_idx++, make_fixnum (SREF (arg, i)));
-	}
-      else if (BOOL_VECTOR_P (arg))
-	{
-	  ptrdiff_t size = bool_vector_size (arg);
-	  for (ptrdiff_t i = 0; i < size; i++)
-	    GASET (result, dst_idx++, bool_vector_ref (arg, i));
 	}
       else
 	{
