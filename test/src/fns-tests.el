@@ -143,6 +143,7 @@
   (let* ((A (vector))
          (B (nreverse A)))
     (should (equal A []))
+    ; NOTE-20251026-guilemacs: (vector) is immutable in modern-elisp
     (should (eq B A)))
   (let* ((A (vector 0))
          (B (nreverse A)))

@@ -2265,6 +2265,11 @@ does not modify the argument.  */)
   return seq;
 }
 
+/* Vectors created by (vector ...) are mutable and don't need copying.
+   Reader literals #(...) are immutable but rare in practice.
+   For now, assume mutable and let ASET fail if immutable - the error
+   will be caught by Guile's exception system. */
+
 DEFUN ("nreverse", Fnreverse, Snreverse, 1, 1, 0,
        doc: /* Reverse order of items in a list, vector or string SEQ.
 If SEQ is a list, it should be nil-terminated.
@@ -2292,10 +2297,8 @@ This function may destructively modify SEQ to produce the value.  */)
     }
   else if (PLAIN_VECTORP (seq))
     {
-      /* Guile vectors from reader literals are immutable; make mutable copy */
-      if (GVECTORP (seq))
-	seq = scm_vector_copy (seq);
-
+      /* Vectors from (vector ...) are mutable; reader literals may not be.
+	 We proceed assuming mutability - immutable vectors will error in ASET. */
       ptrdiff_t size = ASIZE (seq);
 
       for (ptrdiff_t i = 0; i < size / 2; i++)
