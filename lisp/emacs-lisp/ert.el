@@ -296,6 +296,7 @@ DATA is displayed to the user and should state the reason for skipping."
            (error `(signal ',(car err) ',(cdr err))))))
     (cond
      ((or (atom form) (ert--special-operator-p (car form)))
+      ; FIX-20251026-guilemacs strange, these gensym doesn't cause serialization problems, used in timefns-tests.el
       (let ((value (gensym "value-")))
         `(let ((,value (gensym "ert-form-evaluation-aborted-")))
            ,(funcall inner-expander
@@ -310,10 +311,10 @@ DATA is displayed to the user and should state the reason for skipping."
                        (and (consp fn-name)
                             (eql (car fn-name) 'lambda)
                             (listp (cdr fn-name)))))
-        (let ((fn (gensym "fn-"))
-              (args (gensym "args-"))
-              (value (gensym "value-"))
-              (default-value (gensym "ert-form-evaluation-aborted-")))
+        (let ((fn (intern-gensym "fn-"))
+              (args (intern-gensym "args-"))
+              (value (intern-gensym "value-"))
+              (default-value (intern-gensym "ert-form-evaluation-aborted-")))
           `(let* ((,fn (function ,fn-name))
                   (,args (condition-case err
                              (list ,@arg-forms)
