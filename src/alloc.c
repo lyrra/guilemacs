@@ -1051,11 +1051,9 @@ allocate_vectorlike (ptrdiff_t len, bool clearit)
       p = xmalloc (header_size + len * word_size);
       if (clearit)
         {
-          /* Zero the header */
-          memset (p, 0, header_size);
-          /* Initialize all slots to Qnil (not zero, since nil is not 0 in Guile) */
-          for (ptrdiff_t i = 0; i < len; i++)
-            p->contents[i] = Qnil;
+          /* Zero the entire allocation to clear bool-vector bit arrays.
+             Regular vectors will have their contents[] initialized separately. */
+          memset (p, 0, header_size + len * word_size);
         }
       SCM_NEWSMOB (p->header.self, lisp_vectorlike_tag, p);
 
@@ -1095,7 +1093,11 @@ struct Lisp_Vector *
 allocate_nil_vector (ptrdiff_t len)
 {
   phase0_note_elisp_vector_allocation (__func__, len);
-  return allocate_clear_vector (len, true);
+  struct Lisp_Vector *v = allocate_clear_vector (len, true);
+  /* memset cleared everything to 0, but we need Qnil (not 0 in Guile) */
+  for (ptrdiff_t i = 0; i < len; i++)
+    v->contents[i] = Qnil;
+  return v;
 }
 
 
