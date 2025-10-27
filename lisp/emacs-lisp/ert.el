@@ -523,7 +523,8 @@ Return nil if they are."
                        `(cdr ,cdr-x)
                      (cl-assert (equal a b) t)
                      nil))))))))
-      ((pred cl-struct-p)
+      ((and (pred cl-struct-p)
+            (guard (not (cl--builtin-type-p (type-of a)))))
        (cl-loop for slot in (cl-struct-slot-info (type-of a))
                 for ai across a
                 for bi across b
