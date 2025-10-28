@@ -393,9 +393,14 @@ multibyte_length (unsigned char const *p, unsigned char const *pend,
 INLINE int
 raw_prev_char_len (unsigned char const *p)
 {
-  for (int len = 1; ; len++)
+  /* Safety check: UTF-8 characters are at most 4 bytes.
+     If we don't find a character head within 4 bytes, something is wrong. */
+  for (int len = 1; len <= 4; len++)
     if (CHAR_HEAD_P (p[-len]))
       return len;
+  /* Should never reach here in valid UTF-8.
+     Return 1 as a fallback to avoid infinite loop. */
+  return 1;
 }
 
 
