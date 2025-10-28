@@ -82,10 +82,12 @@
   "test/lisp/cedet/semantic/fw-tests.el"
   "test/lisp/cedet/srecode/fields-tests.el"
   "test/lisp/completion-tests.el"
-;;  )
+  )
   ; (group "test/lisp/color-tests.el" ) ;; fails
-;;  (group
+  (group
   "test/lisp/cus-edit-tests.el"
+  )
+  (group
   "test/lisp/delim-col-tests.el"
   "test/lisp/desktop-tests.el"
   ;
@@ -110,7 +112,7 @@
   ; (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
   (group
   "test/lisp/emacs-lisp/float-sup-tests.el"
-  "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
+;  "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
 ;;;  )
   ;(group "test/lisp/emacs-lisp/lisp-mode-tests.el" ) ;; fails
 ;;;  (group
@@ -126,7 +128,11 @@
 ;;;  )
 (group
   "test/lisp/emacs-lisp/seq-tests.el" ;; pass
+  )
+(group
   "test/lisp/emacs-lisp/shadow-tests.el" ;; pass
+  )
+(group
   "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
   ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
  )
@@ -138,7 +144,7 @@
   "test/lisp/emacs-lisp/vtable-tests.el"
 ;;;  )(group
   "test/lisp/faces-tests.el" ;; fails
-;;;  )(group
+  )(group
   "test/lisp/env-tests.el"
   ; "test/lisp/find-cmd-tests.el" ; fails
   ;"test/lisp/font-lock-tests.el" ; fails
@@ -196,6 +202,8 @@
   ; (group "test/lisp/progmodes/sh-script-tests.el" ) ;; fails
   (group
   "test/lisp/progmodes/subword-tests.el"
+  )
+  (group
   "test/lisp/progmodes/tcl-tests.el"
   "test/lisp/ps-print-tests.el"
   )
@@ -256,12 +264,14 @@
   ; (group "test/lisp/ffap-tests.el" ) ;; multibyte bug ; fails
   (group
   "test/lisp/progmodes/f90-tests.el" ;; crashes
-;;;  )(group
+  )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
-;;;  )
+  )
   ;(group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; multibyte ; fails
-;;;(group
+(group
   "test/lisp/emacs-lisp/ert-tests.el"
+  )
+(group
   "test/lisp/progmodes/flymake-tests.el"
   )
 ;;;(group
