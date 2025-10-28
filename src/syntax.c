@@ -1473,7 +1473,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
       /* Now CH0 is a character which begins a word and FROM is the
          position of the next character.  */
       func = CHAR_TABLE_REF (Vfind_word_boundary_function_table, ch0);
-      if (! NILP (Ffboundp (func)))
+      if (! NILP (func) && ! NILP (Ffboundp (func)))
 	{
 	  pos = call2 (func, make_fixnum (from - 1), make_fixnum (end));
 	  if (FIXNUMP (pos) && from < XFIXNUM (pos) && XFIXNUM (pos) <= ZV)
@@ -1522,7 +1522,7 @@ scan_words (ptrdiff_t from, EMACS_INT count)
       /* Now CH1 is a character which ends a word and FROM is the
          position of it.  */
       func = CHAR_TABLE_REF (Vfind_word_boundary_function_table, ch1);
-      if (! NILP (Ffboundp (func)))
+      if (! NILP (func) && ! NILP (Ffboundp (func)))
  	{
 	  pos = call2 (func, make_fixnum (from), make_fixnum (beg));
 	  if (FIXNUMP (pos) && BEGV <= XFIXNUM (pos) && XFIXNUM (pos) < from)
