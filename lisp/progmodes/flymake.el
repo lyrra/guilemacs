@@ -1029,7 +1029,7 @@ collections of diagnostics outside the buffer where this
 (defmacro flymake--with-backend-state (backend state-var &rest body)
   "Bind BACKEND's STATE-VAR to its state, run BODY."
   (declare (indent 2) (debug (sexp sexp &rest form)))
-  (let ((b (make-symbol "b")))
+  (let ((b (intern-gensym "b")))
     `(let* ((,b ,backend)
             (,state-var
              (or (gethash ,b flymake--state)
