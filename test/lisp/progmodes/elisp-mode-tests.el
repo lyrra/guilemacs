@@ -389,8 +389,10 @@ to (xref-elisp-test-descr-to-target xref)."
 ;; `xref-elisp-test-run'.
 (defvar emacs-test-dir
   (funcall (if xref--case-insensitive 'downcase 'identity)
-           (file-truename (file-name-directory
-                           (or load-file-name (buffer-file-name))))))
+           "."
+           ;(file-truename (file-name-directory
+           ;                (or load-file-name (buffer-file-name))))
+           ))
 
 
 ;; alphabetical by test name
@@ -1138,8 +1140,8 @@ evaluation of BODY."
     (should (equal observed expected-longhand-form))))
 
 (ert-deftest elisp-mode-test-indentation ()
-  (ert-test-erts-file (ert-resource-file "elisp-indents.erts"))
-  (ert-test-erts-file (ert-resource-file "flet.erts")
+  (ert-test-erts-file "lisp/progmodes/elisp-mode-resources/elisp-indents.erts")
+  (ert-test-erts-file "lisp/progmodes/elisp-mode-resources/flet.erts"
                       (lambda ()
                         (emacs-lisp-mode)
                         (indent-region (point-min) (point-max)))))
