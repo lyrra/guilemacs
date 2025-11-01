@@ -1331,6 +1331,7 @@ Lisp function does not specify a special indentation."
 
 (put 'autoload 'lisp-indent-function 'defun) ;Elisp
 (put 'progn 'lisp-indent-function 0)
+(put 'defun 'lisp-indent-function 'defun)
 (put 'defvar 'lisp-indent-function 'defun)
 (put 'defalias 'lisp-indent-function 'defun)
 (put 'defvaralias 'lisp-indent-function 'defun)
