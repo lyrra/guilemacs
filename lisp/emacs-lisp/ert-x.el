@@ -479,7 +479,7 @@ See also `ert-with-temp-directory'."
         (_ (push keyw extra-keywords) (pop body))))
     (when extra-keywords
       (error "Invalid keywords: %s" (mapconcat #'symbol-name extra-keywords " ")))
-    (let ((temp-file (make-symbol "temp-file"))
+    (let ((temp-file (intern-gensym "temp-file"))
           (prefix (or prefix ert-temp-file-prefix))
           (suffix (or suffix ert-temp-file-suffix
                       (ert--with-temp-file-generate-suffix
