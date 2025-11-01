@@ -379,7 +379,7 @@ automatically killed, which means that in a such case
 Like `with-temp-buffer', but reuse an already created temporary
 buffer when possible, instead of creating a new one on each call."
   (declare (indent 0) (debug t))
-  (let ((work-buffer (make-symbol "work-buffer")))
+  (let ((work-buffer (intern-gensym "work-buffer")))
     `(let ((,work-buffer (work-buffer--get)))
        (with-current-buffer ,work-buffer
          (unwind-protect

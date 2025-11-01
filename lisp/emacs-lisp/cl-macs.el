@@ -2010,10 +2010,10 @@ second list (or to nil if VALUES is shorter than SYMBOLS); then the
 BODY forms are executed and their result is returned.  This is much like
 a `let' form, except that the list of symbols can be computed at run-time."
   (declare (indent 2) (debug (form form def-body)))
-  (let ((bodyfun (make-symbol "body"))
-        (binds (make-symbol "binds"))
-        (syms (make-symbol "syms"))
-        (vals (make-symbol "vals")))
+  (let ((bodyfun (intern-gensym "body"))
+        (binds (intern-gensym "binds"))
+        (syms (intern-gensym "syms"))
+        (vals (intern-gensym "vals")))
     `(progn
        (let* ((,syms ,symbols)
               (,vals ,values)
