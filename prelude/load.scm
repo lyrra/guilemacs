@@ -4336,6 +4336,7 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
                                  (string-concatenate (list str "/lisp/gnus"))
                                  (string-concatenate (list str "/lisp/net"))
                                  (string-concatenate (list str "/lisp/calendar"))
+                                 (string-concatenate (list str "/lisp/cedet"))
                                  (string-concatenate (list str "/lisp/eshell")))
                            %load-path)))
 
