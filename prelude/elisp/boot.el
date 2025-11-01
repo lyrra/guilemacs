@@ -113,7 +113,8 @@
     (intern-gensym (if prefix prefix "g")))
   ;; make-symbol should create interned symbols to avoid Guile serialization errors
   (defun make-symbol (name)
-    (intern-gensym name))
+    (%funcall (@ (guile) make-symbol) name)
+    )
   (defun signal (error-symbol data)
     (%funcall (@ (guile) throw) 'elisp-condition error-symbol data)))
 

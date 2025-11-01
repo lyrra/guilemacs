@@ -123,8 +123,10 @@
 
 ;; make-symbol should create interned symbols to avoid Guile serialization errors
 ;; Uninterned symbols cannot be saved to .go files
+;; Use Guile's native make-symbol to create uninterned symbols
 (define (make-symbol name)
-  (intern-gensym name))
+  ;(intern-gensym name)
+  ((@ (guile) make-symbol) name))
 
 ;; unbound marker - now using interned symbol
 (define unbound (make-symbol "unbound"))
