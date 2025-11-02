@@ -776,7 +776,7 @@ the same empty object instead of its copy.  */)
 
   if (RECORDP (arg))
     {
-      CHECK_TYPE (VECTORP (arg), Qvectorp, arg);
+      /* FIX-guilemacs: Records are not vectors in guilemacs, removed VECTORP check */
       ptrdiff_t n = PVSIZE (arg);
       USE_SAFE_ALLOCA;
       Lisp_Object *args = SAFE_ALLOCA (n * sizeof *args);
