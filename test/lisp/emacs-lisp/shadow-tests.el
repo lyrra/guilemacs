@@ -28,15 +28,16 @@
   "Test shadowing for case insensitive filenames."
   ;; Override `file-name-case-insensitive-p' so we test the same thing
   ;; regardless of what file system we're running on.
+  (let ((erf "lisp/emacs-lisp/shadow-resources/"))
   (cl-letf (((symbol-function 'file-name-case-insensitive-p) (lambda (_f) t)))
-    (should (equal (list (ert-resource-file "p1/foo")
-                         (ert-resource-file "p2/FOO"))
+    (should (equal (list (concat erf        "p1/foo")
+                         (concat erf        "p2/FOO"))
                    (load-path-shadows-find
-                    (list (ert-resource-file "p1/")
-                          (ert-resource-file "p2/"))))))
+                    (list (concat erf        "p1/")
+                          (concat erf        "p2/"))))))
   (cl-letf (((symbol-function 'file-name-case-insensitive-p) (lambda (_f) nil)))
     (should-not (load-path-shadows-find
-                 (list (ert-resource-file "p1/")
-                       (ert-resource-file "p2/"))))))
+                 (list (concat erf        "p1/")
+                       (concat erf        "p2/")))))))
 
 ;;; shadow-tests.el ends here.
