@@ -128,7 +128,7 @@
   (should (equal (face-attribute 'spiff-changed-face :extend) t))
   (should (equal (face-attribute 'spiff-added :extend) 'unspecified))
   (should (equal (face-attribute 'spiff-file-header-face :extend) nil))
-  (add-to-list 'custom-theme-load-path (ert-resource-directory))
+  (add-to-list 'custom-theme-load-path "lisp/faces-resources")
   (load-theme 'faces-test-dark t t)
   (load-theme 'faces-test-light t t)
   (should (equal (face-attribute 'faces--test-inherit-extend :extend)
