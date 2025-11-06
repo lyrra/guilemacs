@@ -849,8 +849,8 @@ Image files should not be larger than specified by `max-image-size'."
                 ;; At this point, remove the :type and :file properties.
                 ;; `create-image' will set them depending on image file.
                 (setq image (cons 'image (copy-sequence spec)))
-                (setf (image-property image :type) nil)
-                (setf (image-property image :file) nil)
+                (image--set-property image :type nil)
+                (image--set-property image :file nil)
                 (and (setq image (ignore-errors
                                    (apply #'create-image file nil nil
                                           (cdr image))))
@@ -864,8 +864,8 @@ Image files should not be larger than specified by `max-image-size'."
               ;; At this point, remove the :type and :data properties.
               ;; `create-image' will set them depending on image data.
               (setq image (cons 'image (copy-sequence spec)))
-              (setf (image-property image :type) nil)
-              (setf (image-property image :data) nil)
+              (image--set-property image :type nil)
+              (image--set-property image :data nil)
 	      (and (setq image (ignore-errors
                                  (apply #'create-image data nil t
                                         (cdr image))))
@@ -1333,7 +1333,7 @@ POSITION can be a buffer position or a marker, and defaults to point."
     (setcdr image (cdr new-image))
     (plist-put (cdr image) :scale (* scale factor))
     (when (and (image-property image :original-map) image-recompute-map-p)
-      (setf (image-property image :map) (image--compute-map image)))))
+      (image--set-property image :map (image--compute-map image)))))
 
 (defun image--image-without-parameters (image)
   (cons (pop image)
@@ -1366,14 +1366,14 @@ When user option `image-recompute-map-p' is non-nil, the image's `:map'
 is recomputed to fit the newly transformed image."
   (interactive (and current-prefix-arg '(-90)))
   (let ((image (image--get-imagemagick-and-warn)))
-    (setf (image-property image :rotation)
+    (image--set-property image :rotation
           (float (mod (+ (or (image-property image :rotation) 0)
                          (or angle 90))
                       ;; We don't want to exceed 360 degrees rotation,
                       ;; because it's not seen as valid in Exif data.
                       360)))
     (when (and (image-property image :original-map) image-recompute-map-p)
-      (setf (image-property image :map) (image--compute-map image))))
+      (image--set-property image :map (image--compute-map image))))
   (set-transient-map image--repeat-map nil nil
                      "Use %k for further adjustments"))
 
@@ -1401,10 +1401,10 @@ is recomputed to fit the newly transformed image."
   (interactive)
   (let ((image (image--get-image)))
     (image-flush image)
-    (setf (image-property image :flip)
+    (image--set-property image :flip
           (not (image-property image :flip)))
     (when (and (image-property image :original-map) image-recompute-map-p)
-      (setf (image-property image :map) (image--compute-map image)))))
+      (image--set-property image :map (image--compute-map image)))))
 
 (defun image-flip-vertically ()
   "Vertically flip the image under point.
@@ -1414,10 +1414,10 @@ is recomputed to fit the newly transformed image."
   (interactive)
   (let ((image (image--get-image)))
     (image-rotate 180)
-    (setf (image-property image :flip)
+    (image--set-property image :flip
           (not (image-property image :flip)))
     (when (and (image-property image :original-map) image-recompute-map-p)
-      (setf (image-property image :map) (image--compute-map image)))))
+      (image--set-property image :map (image--compute-map image)))))
 
 (define-obsolete-function-alias 'image-refresh #'image-flush "29.1")
 
@@ -1506,13 +1506,13 @@ Destructively modifies and returns MAP."
   (pcase-dolist (`(,`(,type . ,coords) ,_id ,_plist) map)
     (pcase-exhaustive type
       ('rect
-       (setf (caar coords) (round (* (caar coords) scale)))
-       (setf (cdar coords) (round (* (cdar coords) scale)))
-       (setf (cadr coords) (round (* (cadr coords) scale)))
-       (setf (cddr coords) (round (* (cddr coords) scale))))
+       (setcar (car coords) (round (* (caar coords) scale)))
+       (setcdr (car coords) (round (* (cdar coords) scale)))
+       (setcar (cdr coords) (round (* (cadr coords) scale)))
+       (setcdr (cdr coords) (round (* (cddr coords) scale))))
       ('circle
-       (setf (caar coords) (round (* (caar coords) scale)))
-       (setf (cdar coords) (round (* (cdar coords) scale)))
+       (setcar (car coords) (round (* (caar coords) scale)))
+       (setcdr (car coords) (round (* (cdar coords) scale)))
        (setcdr coords (round (* (cdr coords) scale))))
       ('poly
        (dotimes (i (length coords))
@@ -1592,7 +1592,7 @@ Destructively modifies and returns MAP."
          (setcar coords (cons x0 y0))
          (setcdr coords (cons x1 y1))))
       ('circle
-       (setf (caar coords) (- (car size) (caar coords))))
+       (setcar (car coords) (- (car size) (caar coords))))
       ('poly
        (dotimes (i (length coords))
          (when (= 0 (% i 2))
