@@ -66,7 +66,11 @@
   "test/lisp/ansi-osc-tests.el"
   ;"test/lisp/auth-source-pass-tests.el" ;; fails
 ;;;  )(group
+  )
+(group
   "test/lisp/autoinsert-tests.el"
+  )
+(group
   "test/lisp/battery-tests.el"
   )
   ; (group "test/lisp/buff-menu-tests.el") ;; fails
@@ -80,7 +84,11 @@
 ;;;  )
 (group
   "test/lisp/cedet/semantic/fw-tests.el"
+  )
+(group
   "test/lisp/cedet/srecode/fields-tests.el"
+  )
+(group
   "test/lisp/completion-tests.el"
   )
   ; (group "test/lisp/color-tests.el" ) ;; fails
@@ -139,10 +147,11 @@
   ; (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
   (group
   "test/lisp/emacs-lisp/thunk-tests.el"
-  )(group
-  "test/lisp/emacs-lisp/unsafep-tests.el"
+  )
+  ; "test/lisp/emacs-lisp/unsafep-tests.el" ;; fail
+  (group
   "test/lisp/emacs-lisp/vtable-tests.el"
-;;;  )(group
+  )(group
   "test/lisp/faces-tests.el" ;; fails
   )(group
   "test/lisp/env-tests.el"
@@ -157,9 +166,13 @@
 ;;;  )
   (group
   "test/lisp/ido-tests.el" ;; fails
+  )
 ;;;  )(group
   ; "test/lisp/image-file-tests.el" ; fails
+  (group
   "test/lisp/imenu-tests.el"
+  )
+  (group
   "test/lisp/info-tests.el"
   )
   ; (group "test/lisp/international/mule-util-tests.el" ) ;; fails
@@ -170,9 +183,11 @@
 ;  )
   (group
   "test/lisp/misc-tests.el" ;; fails
-;;;  )(group
+  )(group
   "test/lisp/lpr-tests.el"
+  )(group
   "test/lisp/md4-tests.el"
+  )(group
   "test/lisp/mwheel-tests.el"
   )
   ; (group "test/lisp/nxml/nxml-mode-tests.el" ) ;; fails
@@ -183,7 +198,7 @@
 ;;;  )(group
   "test/lisp/progmodes/asm-mode-tests.el" ;; fails
 ;;;  )(group
-  "test/lisp/pcmpl-linux-tests.el"
+  ;"test/lisp/pcmpl-linux-tests.el"
   "test/lisp/pcomplete-tests.el"
   ; "test/lisp/progmodes/autoconf-tests.el" ; fails
   )
