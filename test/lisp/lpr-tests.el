@@ -26,7 +26,9 @@
 
 (ert-deftest lpr-test-printify-region ()
   (with-temp-buffer
-    (insert "foo\x00-\x08\x0b\x0e-\x1f\x7fbar")
+    ;; Use octal \177 instead of hex \x7f because \x7fbar would parse
+    ;; as \x7fba (since 'b' and 'a' are hex digits) + 'r'
+    (insert "foo\x00-\x08\x0b\x0e-\x1f\177bar")
     (printify-region (point-min) (point-max))
     (should (equal (buffer-string) "foo\\^@-\\^H\\^K\\^N-\\^_\\7fbar"))))
 
