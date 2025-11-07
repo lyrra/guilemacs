@@ -249,11 +249,21 @@ uni_combining (hb_unicode_funcs_t *funcs, hb_codepoint_t ch, void *user_data)
     {
       canonical_combining_class_table =
 	uniprop_table (Qcanonical_combining_class);
+      /* FIX-guilemacs: Unicode property tables not yet loaded, fall back
+         to HarfBuzz's default Unicode data. This allows ligatures and font
+         shaping to work even without Emacs Unicode property tables. */
       if (NILP (canonical_combining_class_table))
-	emacs_abort ();
+	{
+	  combining_class_loaded = true;
+	  return HB_UNICODE_COMBINING_CLASS_NOT_REORDERED;
+	}
       staticpro (&canonical_combining_class_table);
       combining_class_loaded = true;
     }
+
+  /* If table failed to load, use HarfBuzz default. */
+  if (NILP (canonical_combining_class_table))
+    return HB_UNICODE_COMBINING_CLASS_NOT_REORDERED;
 
   Lisp_Object combining =
     get_unicode_property (canonical_combining_class_table, ch);

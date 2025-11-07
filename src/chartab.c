@@ -1326,7 +1326,9 @@ and put an element value.  */)
 
   if (CHAR_TABLE_P (table))
     return table;
-  return Fcdr (Fassq (prop, Vchar_code_property_alist));
+  /* FIX-guilemacs: Don't return string filename when table fails to load.
+     Return nil so that callers can fall back to ASCII-only checks. */
+  return Qnil;
 }
 
 Lisp_Object
