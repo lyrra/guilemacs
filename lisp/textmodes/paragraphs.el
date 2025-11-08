@@ -201,8 +201,17 @@ must be followed by two spaces, with perhaps some closing delimiters
 in between.  See Info node `(elisp)Standard Regexps'."
   (or sentence-end
       ;; We accept non-break space along with space.
-      "."
-      ))
+      (concat (if sentence-end-without-period "\\w[ \u00a0][ \u00a0]\\|")
+	      "\\("
+	      sentence-end-base
+              (if sentence-end-double-space
+                  "\\($\\|[ \u00a0]$\\|\t\\|[ \u00a0][ \u00a0]\\)" "\\($\\|[\t \u00a0]\\)")
+              (if (and sentence-end-without-space
+                       (not (string-equal sentence-end-without-space "")))
+                  (concat "\\|[" sentence-end-without-space "]+")
+                "")
+	      "\\)"
+              "[ \u00a0\t\n]*")))
 
 (defcustom page-delimiter "^\\014"
   "Regexp describing line-beginnings that separate pages."
