@@ -361,7 +361,7 @@ FORM-DESCRIPTION-FORM before it has called INNER-FORM."
   (ert--expand-should-1
    whole form
    (lambda (inner-form form-description-form value-var)
-     (let ((form-description (gensym "form-description-")))
+     (let ((form-description (intern-gensym "form-description-")))
        `(let (,form-description)
           ,(funcall inner-expander
                     `(unwind-protect

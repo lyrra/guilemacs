@@ -2871,7 +2871,7 @@ Each PLACE may be a symbol, or any generalized variable allowed by `setf'.
                               simplebinds)
                         binds body)
             (cl--letf (cdr bindings) simplebinds
-                      (cons `(,(make-symbol "old") ,getter ,setter
+                      (cons `(,(intern-gensym "old") ,getter ,setter
                               ,@(if (cdr binding) (list vnew)))
                             binds)
                       body)))))))
