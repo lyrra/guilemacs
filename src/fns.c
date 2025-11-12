@@ -752,6 +752,9 @@ the same empty object instead of its copy.  */)
 
   if (STRINGP (arg))
     {
+      /* Guile-Emacs: Handle empty string - scm_string_append may fail on empty strings */
+      if (SCHARS(arg) == 0)
+        return arg; /* Return the same empty string object */
       return scm_string_append (list1 (arg));
       /*
       INTERVAL ivs = string_intervals (arg);
