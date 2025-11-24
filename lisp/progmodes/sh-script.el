@@ -1879,6 +1879,11 @@ Does not preserve point."
 
 (defun sh-smie--default-backward-token ()
   (forward-comment (- (point)))
+  ;; FIX-guilemacs: forward-comment fails on unterminated comments at EOF.
+  ;; If we're still in a comment, use syntax-ppss to find the comment start.
+  (let ((state (syntax-ppss)))
+    (when (nth 4 state)  ; In a comment
+      (goto-char (nth 8 state))))  ; Go to comment start
   (let ((pos (point))
         (n (skip-syntax-backward ".")))
     (if (or (zerop n)
