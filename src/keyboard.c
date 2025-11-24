@@ -11832,6 +11832,21 @@ the last key sequence that has been read.
 See also `this-command-keys'.  */)
   (void)
 {
+  /* FIX: Guile-Emacs - somehow this_command_keys can become an empty string.
+     This appears to be a GC or binding issue. As a workaround, if we detect
+     this_command_keys is a string (which should never happen), reset it to
+     an empty vector. */
+  if (STRINGP(this_command_keys))
+    {
+      fprintf(stderr, "\nWARNING Fthis_command_keys_vector: this_command_keys was corrupted to a string! Resetting to vector.\n");
+      fprintf(stderr, "  String length: %ld, this_command_key_count: %d\n",
+              (long)SCHARS(this_command_keys), (int)this_command_key_count);
+
+      /* Reset to an empty vector */
+      this_command_keys = make_nil_elisp_vector (40);
+      this_command_key_count = 0;
+    }
+
   CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
 
   return make_event_array_from_vector (this_command_keys, 0, this_command_key_count);

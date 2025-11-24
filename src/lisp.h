@@ -1398,6 +1398,10 @@ XVECTOR (Lisp_Object a)
 INLINE bool
 GVECTORP (Lisp_Object x)
 {
+  /* Strings are not vectors even if Guile thinks they are sequence-like */
+  if (scm_is_string (x))
+    return false;
+
   return scm_is_vector (x);
 }
 
@@ -1443,9 +1447,14 @@ ASIZE (Lisp_Object array)
       /* Handle Scheme vectors */
       return GASIZE (array);
     }
+  else if (STRINGP (array))
+    {
+      /* Handle strings - return character count */
+      return SCHARS (array);
+    }
   else
     {
-      /* Handle other sequence types like strings */
+      /* Not a valid array type */
       wrong_type_argument (Qsequencep, array);
       return 0;
     }
