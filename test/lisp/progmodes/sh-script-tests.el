@@ -52,7 +52,7 @@
 "))))
 
 (ert-deftest sh-script-test-indentation ()
-  (ert-test-erts-file (ert-resource-file "sh-indents.erts")))
+  (ert-test-erts-file "lisp/progmodes/sh-script-resources/sh-indents.erts"))
 
 (ert-deftest test-indent-after-continuation ()
   (with-temp-buffer
