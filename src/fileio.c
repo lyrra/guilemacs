@@ -1611,7 +1611,8 @@ those `/' is discarded.  */)
 
   CHECK_STRING (filename);
 
-  multibyte = STRING_MULTIBYTE (filename);
+  /* In Guile, all strings are UTF-8, so we always use multibyte mode */
+  multibyte = true;
 
   /* If the file name has special constructs in it,
      call the corresponding file name handler.  */
