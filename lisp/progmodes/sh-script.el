@@ -2030,6 +2030,12 @@ May return nil if the line should not be treated as continued."
     (unless (sh-smie--looking-back-at-continuation-p)
       (current-indentation))))
 
+;; FIX-guilemacs: Dynamic binding of sh-indent-after-continuation doesn't work
+;; correctly in Guile when doing recursive calls through SMIE. Use a global
+;; flag to prevent infinite recursion.
+(defvar sh-smie--indent-continuation-recursing nil
+  "Non-nil when already inside sh-smie--indent-continuation recursive call.")
+
 (defun sh-smie--indent-continuation ()
   (cond
    ((not (and sh-indent-after-continuation
@@ -2044,11 +2050,17 @@ May return nil if the line should not be treated as continued."
       (if (sh-smie--looking-back-at-continuation-p)
           (current-indentation)
         (+ (current-indentation) (sh-var-value 'sh-indent-for-continuation)))))
+   ;; FIX-guilemacs: Check recursion flag to prevent infinite loop
+   (sh-smie--indent-continuation-recursing
+    nil)
    (t
     ;; Just make sure a line-continuation is indented deeper.
     (save-excursion
-      (let ((indent (let ((sh-indent-after-continuation nil))
-                      (smie-indent-calculate)))
+      ;; FIX-guilemacs: Set flag globally since let-binding doesn't work in Guile
+      (setq sh-smie--indent-continuation-recursing t)
+      (let ((indent (unwind-protect
+                        (smie-indent-calculate)
+                      (setq sh-smie--indent-continuation-recursing nil)))
             (max most-positive-fixnum))
         (if (not (numberp indent)) indent
           (while (progn
