@@ -72,7 +72,7 @@ DOC should be a doc string, and ARGS are keywords as applicable to
                         ,@args)
      ,@(list doc)))
 
-(defconst multisession--unbound (make-symbol "unbound"))
+(defconst multisession--unbound (intern-gensym "unbound"))
 
 (cl-defstruct (multisession
                (:constructor nil)

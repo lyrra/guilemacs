@@ -2024,7 +2024,7 @@ a `let' form, except that the list of symbols can be computed at run-time."
          (eval (list 'let (nreverse ,binds)
                      (list 'funcall (list 'quote ,bodyfun))))))))
 
-(defconst cl--labels-magic (make-symbol "cl--labels-magic"))
+(defconst cl--labels-magic (intern-gensym "cl--labels-magic"))
 
 (defvar cl--labels-convert-cache nil)
 

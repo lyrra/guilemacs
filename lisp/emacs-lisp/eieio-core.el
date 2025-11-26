@@ -71,7 +71,7 @@ Currently under control of this var:
 - Allow object names in constructors.")
 
 (define-obsolete-variable-alias 'eieio-unbound 'eieio--unbound "28.1")
-(defvar eieio--unbound (make-symbol "eieio--unbound")
+(defvar eieio--unbound (intern-gensym "eieio--unbound")
   "Uninterned symbol representing an unbound slot in an object.")
 (defvar eieio--unbound-form (macroexp-quote eieio--unbound))
 
