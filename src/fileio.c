@@ -946,25 +946,28 @@ usage: (file-name-concat DIRECTORY &rest COMPONENTS)  */)
 	}
     }
 
-  /* Allocate an empty string. */
-  if (multibytes == 0)
-    result = make_uninit_string (chars);
-  else
-    result = make_uninit_multibyte_string (chars, bytes);
-  /* Null-terminate the string. */
-  *(SSDATA (result) + SBYTES (result)) = 0;
+  /* In Guile, strings are immutable, so we can't use make_uninit_string
+     and write to it. Instead, build the result in a temporary C buffer. */
+  USE_SAFE_ALLOCA;
+  char *buffer = SAFE_ALLOCA (bytes + 1);
+  char *p = buffer;
 
   /* Copy over the data. */
-  char *p = SSDATA (result);
   for (i = 0; i < eargs; i++)
     {
       Lisp_Object arg = elements[i];
-      memcpy (p, SSDATA (arg), SBYTES (arg));
-      p += SBYTES (arg);
+      ptrdiff_t arg_bytes = SBYTES (arg);
+      memcpy (p, SSDATA (arg), arg_bytes);
+      p += arg_bytes;
       /* The last element shouldn't have a slash added at the end. */
       if (i < eargs - 1 && !IS_DIRECTORY_SEP (*(p - 1)))
 	*p++ = DIRECTORY_SEP;
     }
+
+  /* Null-terminate and create the Guile string */
+  *p = '\0';
+  result = make_multibyte_string (buffer, chars, bytes);
+  SAFE_FREE ();
 
   if (elements != args)
     xfree (elements);
