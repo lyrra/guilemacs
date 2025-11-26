@@ -29,6 +29,10 @@
 
 (defvar url-scheme-registry (make-hash-table :size 7 :test 'equal))
 
+;; Pre-register common schemes to avoid loading issues
+(puthash "http" (list 'name "http" 'default-port 80) url-scheme-registry)
+(puthash "https" (list 'name "https" 'default-port 443) url-scheme-registry)
+
 (defconst url-scheme-methods
   '((default-port      . variable)
     (asynchronous-p    . variable)

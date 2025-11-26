@@ -31,6 +31,10 @@
 
 (eval-when-compile (require 'cl-lib))
 
+;; Mock obfuscation functions globally to avoid GnuTLS in all tests
+(defun auth-source--obfuscate (s) s)
+(defun auth-source--deobfuscate (s) s)
+
 (ert-deftest auth-source-pass-parse-simple ()
   (let ((content "pass\nkey1:val1\nkey2:val2\n"))
     (should (equal (auth-source-pass--parse-data content)
