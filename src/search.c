@@ -411,6 +411,10 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
     set_char_table_extras (canon_table, 2,
 			   BVAR (current_buffer, case_eqv_table));
 
+  /* In Guile, strings are UTF-8. A string is multibyte if its byte length
+     differs from its character length. */
+  bool string_is_multibyte = SCHARS (string) != SBYTES (string);
+
   dynwind_begin ();
   struct regexp_cache *cache_entry
     = compile_pattern (regexp,
@@ -419,7 +423,7 @@ string_match_1 (Lisp_Object regexp, Lisp_Object string, Lisp_Object start,
 			? BVAR (current_buffer, case_canon_table)
 			: Qnil),
 		       posix,
-		       false);
+		       string_is_multibyte);
   freeze_pattern (cache_entry);
   re_match_object = string;
   val = re_search (&cache_entry->buf, SSDATA (string),
