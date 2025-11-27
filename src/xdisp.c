@@ -12169,13 +12169,15 @@ vadd_to_log (char const *format, va_list ap)
   Lisp_Object msg = Qnil;
   msg = Fformat_message (nargs, args);
 
-  ptrdiff_t len = SBYTES (msg) + 1;
-  USE_SAFE_ALLOCA;
-  char *buffer = SAFE_ALLOCA (len);
-  memcpy (buffer, SDATA (msg), len);
+  /* Get the C string from the Guile string.
+     scm_to_utf8_stringn returns allocated memory that must be freed. */
+  size_t c_len;
+  char *c_str = scm_to_utf8_stringn (msg, &c_len);
 
-  message_dolog (buffer, len - 1, true);
-  SAFE_FREE ();
+  message_dolog (c_str, c_len, true);
+
+  /* Free the temporary string allocated by scm_to_utf8_stringn */
+  free (c_str);
 }
 
 
@@ -12254,15 +12256,10 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag)
 	 or vice versa, so that all the text fits the buffer.  */
       if (! NILP (BVAR (current_buffer, enable_multibyte_characters)))
 	{
-	  /* Convert a single-byte string to multibyte
-	     for the *Message* buffer.  */
-	  for (ptrdiff_t i = 0; i < nbytes; i++)
-	    {
-	      int c = make_char_multibyte (msg[i]);
-	      unsigned char str[MAX_MULTIBYTE_LENGTH];
-	      int char_bytes = CHAR_STRING (c, str);
-	      insert_1_both ((char *) str, 1, char_bytes, true, false, false);
-	    }
+	  /* The message string is already in UTF-8 format from Guile.
+	     Just insert it directly. */
+	  insert_1_both (m, chars_in_text (msg, nbytes), nbytes,
+			 true, false, false);
 	}
       else if (nbytes)
 	insert_1_both (m, chars_in_text (msg, nbytes), nbytes,
@@ -12433,7 +12430,12 @@ message3 (Lisp_Object m)
   message_log_maybe_newline ();
   if (STRINGP (m))
     {
-      message_dolog (m, SBYTES (m), true);
+      /* Get C string from Guile string.
+         scm_to_utf8_stringn allocates memory that must be freed. */
+      size_t c_len;
+      char *c_str = scm_to_utf8_stringn (m, &c_len);
+      message_dolog (c_str, c_len, true);
+      free (c_str);
     }
   if (! inhibit_message)
     message3_nolog (m);
