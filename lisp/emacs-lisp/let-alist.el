@@ -153,7 +153,7 @@ the following form evaluates to nil:
     (let-alist \\='((some-key . nil))
       .some-key)"
   (declare (indent 1) (debug t))
-  (let ((var (make-symbol "alist")))
+  (let ((var (intern-gensym "alist")))
     `(let ((,var ,alist))
        (let ,(mapcar (lambda (x) `(,(car x) ,(let-alist--access-sexp (car x) var)))
                      (delete-dups (let-alist--deep-dot-search body)))
