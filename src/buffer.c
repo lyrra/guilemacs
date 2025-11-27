@@ -4581,7 +4581,9 @@ alloc_buffer_text (struct buffer *b, ptrdiff_t nbytes)
 #elif defined REL_ALLOC
   p = r_alloc ((void **) &b->text->beg, nbytes);
 #else
-  p = xmalloc_atomic (nbytes);
+  /* Use xzalloc to zero-initialize the buffer to avoid reading
+     uninitialized memory. */
+  p = xzalloc (nbytes);
 #endif
 
   if (p == NULL)
@@ -4607,27 +4609,26 @@ enlarge_buffer_text (struct buffer *b, ptrdiff_t delta)
     BUF_Z_BYTE (b) - BUF_BEG_BYTE (b) + BUF_GAP_SIZE (b) + 1;
   ptrdiff_t new_nbytes = old_nbytes + delta;
 
-  old_beg = NULL;
-
 #if defined USE_MMAP_FOR_BUFFERS
   p = mmap_realloc ((void **) &b->text->beg, new_nbytes);
 #elif defined REL_ALLOC
   p = r_re_alloc ((void **) &b->text->beg, new_nbytes);
 #else
+  /* xrealloc copies the old data automatically. */
   p = xrealloc (b->text->beg, new_nbytes);
 #endif
   __lsan_ignore_object (p);
 
   if (p == NULL)
     {
-      if (old_beg)
-        b->text->beg = old_beg;
+      b->text->beg = old_beg;
       unblock_input ();
       memory_full (new_nbytes);
     }
 
-  if (old_beg)
-    memcpy (p, old_beg, min (old_nbytes, new_nbytes));
+  /* All realloc variants (mmap_realloc, r_re_alloc, xrealloc) handle copying
+     old data to the new location automatically. The original code had
+     old_beg = NULL before realloc, so the subsequent memcpy was never executed. */
 
   BUF_BEG_ADDR (b) = p;
   unblock_input ();
