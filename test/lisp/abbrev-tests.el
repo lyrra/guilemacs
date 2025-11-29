@@ -303,17 +303,17 @@
   (should-not (abbrev-table-p translation-table-vector))
   (should (abbrev-table-p (make-abbrev-table))))
 
-'(ert-deftest abbrev--possibly-save-test ()
+(ert-deftest abbrev--possibly-save-test ()
   "Test that `abbrev--possibly-save' properly resets
 `abbrevs-changed'."
   (ert-with-temp-file temp-test-file
     (let ((abbrev-file-name temp-test-file)
           (save-abbrevs t))
-      ;; Save
+      ;; Save - test with second arg t to force save without prompting
       (let ((abbrevs-changed t))
         (should-not (abbrev--possibly-save nil t))
         (should-not abbrevs-changed))
-      ;; Don't save
+      ;; Don't save - test with ert-simulate-keys now that it works in batch mode
       (let ((abbrevs-changed t))
         (ert-simulate-keys '(?n ?\C-m)
           (should (abbrev--possibly-save nil)))

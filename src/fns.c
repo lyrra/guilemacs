@@ -771,7 +771,11 @@ the same empty object instead of its copy.  */)
   if (PLAIN_VECTORP (arg))
     {
       ptrdiff_t n = ASIZE (arg);
-      Lisp_Object val = scm_c_make_vector (n, Qnil);
+      /* FIX-guilemacs: Use make_nil_vector instead of scm_c_make_vector
+         to create a MUTABLE vector. scm_c_make_vector creates immutable
+         vectors which can cause issues when the vector is later modified.
+         This fixes the bug where this_command_keys gets corrupted to a string. */
+      Lisp_Object val = make_nil_vector (n);
       for (ptrdiff_t i = 0; i < n; i++)
         GASET (val, i, AREF (arg, i));
       return val;

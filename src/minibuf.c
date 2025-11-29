@@ -315,6 +315,45 @@ read_minibuf_noninteractive (Lisp_Object prompt, bool expflag,
   struct emacs_tty etty;
   bool etty_valid UNINIT;
 
+  /* FIX-guilemacs: Check if we should read from unread-command-events
+     instead of stdin (for ert-simulate-keys support in batch mode).  */
+  if (!NILP (Vexecuting_kbd_macro) && CONSP (Vunread_command_events))
+    {
+      /* Build string from unread-command-events */
+      size = 100;
+      len = 0;
+      line = xmalloc_atomic (size);
+
+      while (CONSP (Vunread_command_events))
+        {
+          Lisp_Object event = XCAR (Vunread_command_events);
+          Vunread_command_events = XCDR (Vunread_command_events);
+
+          /* Handle simple character events */
+          if (FIXNUMP (event))
+            {
+              c = XFIXNUM (event);
+
+              /* Stop on newline or carriage return */
+              if (c == '\n' || c == '\r' || c == 13)
+                break;
+
+              if (len == size)
+                line = xpalloc (line, &size, 1, -1, sizeof *line);
+              line[len++] = c;
+            }
+        }
+
+      val = make_string (line, len);
+      xfree (line);
+
+      /* If Lisp form desired instead of string, parse it.  */
+      if (expflag)
+        val = string_to_object (val, CONSP (defalt) ? XCAR (defalt) : defalt);
+
+      return val;
+    }
+
   /* Check, whether we need to suppress echoing.  */
   if (CHARACTERP (Vread_hide_char))
     hide_char = XFIXNAT (Vread_hide_char);
@@ -646,11 +685,15 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 	Fthrow (Qexit, str);
     }
 
+  /* FIX-guilemacs: In batch mode, use read_minibuf_noninteractive either when
+     there's no kbd macro (normal batch mode) OR when executing-kbd-macro is set
+     and we have unread-command-events (ert-simulate-keys case).  */
   if ((noninteractive
        /* In case we are running as a daemon, only do this before
 	  detaching from the terminal.  */
        || (IS_DAEMON && DAEMON_RUNNING))
-      && NILP (Vexecuting_kbd_macro))
+      && (NILP (Vexecuting_kbd_macro)
+          || (!NILP (Vexecuting_kbd_macro) && CONSP (Vunread_command_events))))
     {
       val = read_minibuf_noninteractive (prompt, expflag, defalt);
       dynwind_end ();
