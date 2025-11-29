@@ -27,7 +27,7 @@
 
 (require 'ido)
 
-'(ert-deftest ido-tests--other-window-frame ()
+(ert-deftest ido-tests--other-window-frame ()
   "Verifies that Bug#26360 is fixed."
   (should-not ido-mode)
   (unwind-protect

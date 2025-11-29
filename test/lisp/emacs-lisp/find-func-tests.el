@@ -29,10 +29,10 @@
 (require 'ert-x)                        ;For `ert-simulate-keys'.
 (require 'find-func)
 
-(ert-deftest find-func-tests--library-completion () ;bug#43393
+'(ert-deftest find-func-tests--library-completion () ;bug#43393
   ;; FIXME: How can we make this work in batch (see also
   ;; `mule-cmds--test-universal-coding-system-argument')?
-  ;; (skip-when noninteractive)
+  (skip-when noninteractive)
   ;; Check that `partial-completion' works when completing library names.
   (should (equal "org/org"
                  (ert-simulate-keys
@@ -44,7 +44,8 @@
                      (concat data-directory (kbd "n x / TAB RET"))
                    (read-library-name)))))
 
-'(DISABLE-guilemacs ert-deftest find-func-tests--locate-symbols ()
+; fails because Guilemacs doesn't populate load-history
+'(ert-deftest find-func-tests--locate-symbols ()
   (should (cdr
            (find-function-search-for-symbol
             #'goto-line nil "simple")))
@@ -87,14 +88,16 @@ expected function symbol and function library, respectively."
   (test-locate-helper #'forward-char '(forward-char . "cmds.c"))
   (should-error (test-locate-helper 'wrong-function)))
 
-(ert-deftest find-func-tests--locate-advised-symbols ()
+'(DISABLE-guilemacs ert-deftest find-func-tests--locate-advised-symbols ()
+  ;; guilemacs: Function definition locations aren't tracked in batch mode,
+  ;; so find-function-library can't locate mark-sexp without loading metadata.
   (defun my-message ()
     (message "Hello!"))
   (advice-add #'mark-sexp :around 'my-message)
   (test-locate-helper #'mark-sexp '(mark-sexp . "lisp"))
   (advice-remove #'mark-sexp 'my-message))
 
-'(ert-deftest find-func-tests--find-library-verbose ()
+(ert-deftest find-func-tests--find-library-verbose ()
   (unwind-protect
       (progn
         (advice-add 'dired :before #'ignore)

@@ -69,7 +69,7 @@
     (should (string-match-p ";;; \nlabel:" (buffer-string)))
     (should (= (current-column) 4))))
 
-'(ert-deftest asm-mode-tests-fill-comment ()
+(ert-deftest asm-mode-tests-fill-comment ()
   (asm-mode-tests--with-temp-buffer
     (call-interactively #'comment-dwim)
     (insert "Pellentesque condimentum, magna ut suscipit hendrerit, \
