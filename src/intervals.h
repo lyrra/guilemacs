@@ -307,6 +307,9 @@ extern int text_property_stickiness (Lisp_Object prop, Lisp_Object pos,
 
 extern void syms_of_textprop (void);
 
+/* Bridge between Scheme text properties and C intervals */
+extern INTERVAL string_get_intervals (Lisp_Object);
+
 INLINE_HEADER_END
 
 #endif /* EMACS_INTERVALS_H */

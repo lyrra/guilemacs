@@ -3738,8 +3738,9 @@ set_overlay_plist (Lisp_Object overlay, Lisp_Object plist)
 INLINE INTERVAL
 string_intervals (Lisp_Object s)
 {
-  //return XSTRING (s)->u.s.intervals;
-  return NULL;
+  /* For Guile strings, convert from Scheme storage to C intervals */
+  extern INTERVAL string_get_intervals (Lisp_Object);
+  return string_get_intervals (s);
 }
 
 /* Set text properties of S to I.  */

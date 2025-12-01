@@ -18,10 +18,168 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 
+#include <unistd.h>  /* For access() */
+
 #include "lisp.h"
 #include "intervals.h"
 #include "buffer.h"
 #include "window.h"
+
+/* Scheme text properties implementation */
+static SCM scm_text_properties_module = SCM_BOOL_F;
+static SCM scm_get_text_property_proc = SCM_BOOL_F;
+static SCM scm_text_properties_at_proc = SCM_BOOL_F;
+static SCM scm_add_text_properties_proc = SCM_BOOL_F;
+static SCM scm_propertize_proc = SCM_BOOL_F;
+static SCM scm_string_intervals_get_proc = SCM_BOOL_F;
+
+static void
+ensure_text_properties_loaded (void)
+{
+  if (scm_is_false (scm_text_properties_module))
+    {
+      /* Load the text-properties module - try different paths based on current directory */
+      const char *paths[] = {
+        "prelude/text-properties.scm",      /* From root directory */
+        "../prelude/text-properties.scm",   /* From test or src directory */
+        NULL
+      };
+
+      bool loaded = false;
+      for (int i = 0; paths[i] != NULL; i++)
+        {
+          if (access (paths[i], R_OK) == 0)
+            {
+              scm_c_primitive_load (paths[i]);
+              loaded = true;
+              break;
+            }
+        }
+
+      if (!loaded)
+        error ("Cannot find prelude/text-properties.scm");
+
+      scm_text_properties_module = scm_c_resolve_module ("text-properties");
+
+      /* Cache procedure references */
+      scm_get_text_property_proc = scm_c_module_lookup (scm_text_properties_module, "get-text-property");
+      scm_text_properties_at_proc = scm_c_module_lookup (scm_text_properties_module, "text-properties-at");
+      scm_add_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "add-text-properties");
+      scm_propertize_proc = scm_c_module_lookup (scm_text_properties_module, "propertize");
+      scm_string_intervals_get_proc = scm_c_module_lookup (scm_text_properties_module, "string-intervals-get");
+    }
+}
+
+/* Convert a Scheme property list to a C Lisp_Object plist */
+static Lisp_Object
+scm_plist_to_lisp (SCM scm_plist)
+{
+  Lisp_Object result = Qnil;
+
+  /* Scheme plists are just lists: (prop1 val1 prop2 val2 ...) */
+  while (scm_is_pair (scm_plist))
+    {
+      SCM prop = scm_car (scm_plist);
+      scm_plist = scm_cdr (scm_plist);
+
+      if (!scm_is_pair (scm_plist))
+        break;  /* Malformed plist */
+
+      SCM value = scm_car (scm_plist);
+      scm_plist = scm_cdr (scm_plist);
+
+      /* Convert to Lisp_Object and cons onto result */
+      result = Fcons (prop, Fcons (value, result));
+    }
+
+  return Fnreverse (result);
+}
+
+/* Convert Scheme interval list to C INTERVAL tree
+   Returns the root interval or NULL if empty */
+static INTERVAL
+scm_intervals_to_c (SCM scm_intervals, Lisp_Object string)
+{
+  if (scm_is_null (scm_intervals))
+    return NULL;
+
+  /* For simplicity, we'll create a linear interval structure
+     The C code expects intervals to be linked, but we'll create
+     them one by one and link them together */
+
+  INTERVAL first = NULL;
+  INTERVAL prev = NULL;
+
+  while (scm_is_pair (scm_intervals))
+    {
+      SCM interval_record = scm_car (scm_intervals);
+
+      /* Extract interval fields using Scheme wrapper functions
+         (wrapper functions are needed because record accessors are syntax transformers) */
+      SCM start_proc = scm_c_public_ref ("text-properties", "get-interval-start");
+      SCM end_proc = scm_c_public_ref ("text-properties", "get-interval-end");
+      SCM plist_proc = scm_c_public_ref ("text-properties", "get-interval-plist");
+
+      SCM scm_start = scm_call_1 (start_proc, interval_record);
+      SCM scm_end = scm_call_1 (end_proc, interval_record);
+      SCM scm_plist = scm_call_1 (plist_proc, interval_record);
+
+      ptrdiff_t start = scm_to_int (scm_start);
+      ptrdiff_t end = scm_to_int (scm_end);
+      Lisp_Object plist = scm_plist_to_lisp (scm_plist);
+
+      /* Create C interval */
+      INTERVAL interval = make_interval ();
+      interval->position = start;
+      interval->left = NULL;
+      interval->right = NULL;
+      set_interval_parent (interval, NULL);
+      interval->write_protect = 0;
+      interval->visible = 0;
+      interval->front_sticky = 0;
+      interval->rear_sticky = 0;
+      set_interval_plist (interval, plist);
+
+      /* Set the total length of this interval */
+      interval->total_length = end - start;
+
+      /* Link intervals together */
+      if (prev)
+        {
+          prev->right = interval;
+          set_interval_parent (interval, prev);
+        }
+      else
+        {
+          first = interval;
+        }
+
+      prev = interval;
+      scm_intervals = scm_cdr (scm_intervals);
+    }
+
+  return first;
+}
+
+/* Get C INTERVAL tree for a string by converting from Scheme storage */
+INTERVAL
+string_get_intervals (Lisp_Object string)
+{
+  ensure_text_properties_loaded ();
+
+  if (scm_is_false (scm_string_intervals_get_proc))
+    return NULL;
+
+  /* Call Scheme to get interval list */
+  SCM scm_intervals = scm_call_1 (scm_variable_ref (scm_string_intervals_get_proc),
+                                  string);
+
+  if (scm_is_null (scm_intervals))
+    return NULL;
+
+  /* Convert to C intervals */
+  return scm_intervals_to_c (scm_intervals, string);
+}
 
 /* Test for membership, allowing for t (actually any non-cons) to mean the
    universal set.  */
@@ -572,6 +730,22 @@ If you want to display the text properties at point in a human-readable
 form, use the `describe-text-properties' command.  */)
   (Lisp_Object position, Lisp_Object object)
 {
+  /* Use Scheme implementation for strings */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_text_properties_at_proc))
+        {
+          SCM result = scm_call_2 (scm_variable_ref (scm_text_properties_at_proc),
+                                  position, object);
+          return result;
+        }
+    }
+
+  /* C implementation for buffers */
   register INTERVAL i;
 
   if (NILP (object))
@@ -1171,6 +1345,21 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 		       Lisp_Object properties, Lisp_Object object,
 		       enum property_set_type set_type,
 		       bool destructive) {
+  /* Use Scheme implementation for strings */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_add_text_properties_proc))
+        {
+          SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
+                                  start, end, properties, object);
+          return result;
+        }
+    }
+
   /* Ensure we run the modification hooks for the right buffer,
      without switching buffers twice (bug 36190).  FIXME: Switching
      buffers is slow and often unnecessary.  */
