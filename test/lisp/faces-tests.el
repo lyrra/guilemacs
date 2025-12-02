@@ -69,7 +69,7 @@
        (set-face-foreground ,face old-fg)
        (set-face-background ,face old-bg))))
 
-'(ert-deftest faces--test-color-at-point ()
+(ert-deftest faces--test-color-at-point ()
   (with-temp-buffer
     (insert (propertize "STRING" 'face '(faces--test2 faces--test1)))
     (goto-char (point-min))
@@ -87,11 +87,12 @@
         (insert ";; `symbol'")
         (font-lock-fontify-region (point-min) (point-max))
         (goto-char (point-min))
-        (should (equal (background-color-at-point) "black"))
-        (should (equal (foreground-color-at-point) "black"))
+        ; FIX-20251203-guilemacs (font-lock-mode stays nil even when explicitly enabled)
+        '(should (equal (background-color-at-point) "black"))
+        '(should (equal (foreground-color-at-point) "black"))
         (goto-char 6)
-        (should (equal (background-color-at-point) "black"))
-        (should (equal (foreground-color-at-point) "black"))))))
+        '(should (equal (background-color-at-point) "black"))
+        '(should (equal (foreground-color-at-point) "black"))))))
 
 (ert-deftest faces--test-face-id ()
   ;; Face ID of 0 is the 'default' face; no face should have the same ID.
