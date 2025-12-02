@@ -519,13 +519,16 @@ FACES may be either a single face or a list of faces.
 			       (face-attribute faces attribute frame t)))))
 
 
-(defmacro face-attribute-specified-or (value &rest body)
-  "Return VALUE or, if it's `unspecified', the result of evaluating BODY."
-  (let ((temp (make-symbol "value")))
-    `(let ((,temp ,value))
-       (if (not (eq ,temp 'unspecified))
-	   ,temp
-	 ,@body))))
+;; WORKAROUND: Changed from macro to function due to Guile compiler bug
+;; The original macro used make-symbol which caused variable dereferencing issues
+;; Even with regular symbols, the compiled Tree-IL code has the bug
+;; So we use a function instead, with the body as a lambda
+(defun face-attribute-specified-or (value body-fn)
+  "Return VALUE or, if it's `unspecified', the result of calling BODY-FN.
+BODY-FN should be a function of no arguments."
+  (if (not (eq value 'unspecified))
+      value
+    (funcall body-fn)))
 
 (defun face-foreground (face &optional frame inherit)
   "Return the foreground color name of FACE, or nil if unspecified.
@@ -549,7 +552,7 @@ To ensure that a valid color is always returned, use a value of
 `default' for INHERIT; this will resolve any unspecified values by
 merging with the `default' face (which is always completely specified)."
   (face-attribute-specified-or (face-attribute face :foreground frame inherit)
-			       nil))
+			       (lambda () nil)))
 
 (defun face-background (face &optional frame inherit)
   "Return the background color name of FACE, or nil if unspecified.
@@ -573,7 +576,7 @@ To ensure that a valid color is always returned, use a value of
 `default' for INHERIT; this will resolve any unspecified values by
 merging with the `default' face (which is always completely specified)."
   (face-attribute-specified-or (face-attribute face :background frame inherit)
-			       nil))
+			       (lambda () nil)))
 
 (defun face-stipple (face &optional frame inherit)
  "Return the stipple pixmap name of FACE, or nil if unspecified.
@@ -593,7 +596,7 @@ To ensure that a valid stipple or nil is always returned, use a value of
 `default' for INHERIT; this will resolve any unspecified values by merging
 with the `default' face (which is always completely specified)."
   (face-attribute-specified-or (face-attribute face :stipple frame inherit)
-			       nil))
+			       (lambda () nil)))
 
 
 (defun face-underline-p (face &optional frame inherit)
@@ -603,7 +606,7 @@ If FRAME is t, report on the defaults for face FACE (for new frames).
 If FRAME is omitted or nil, use the selected frame.
 Optional argument INHERIT is passed to `face-attribute'."
  (face-attribute-specified-or
-  (face-attribute face :underline frame inherit) nil))
+  (face-attribute face :underline frame inherit) (lambda () nil)))
 
 
 (defun face-inverse-video-p (face &optional frame inherit)
@@ -2045,7 +2048,7 @@ unnamed faces (e.g, `foreground-color')."
             ((and face (symbolp face))
              (let ((value (face-attribute-specified-or
                            (face-attribute face attribute nil t)
-                           nil)))
+                           (lambda () nil))))
                (unless (member value '(nil "unspecified-fg" "unspecified-bg"))
                  (setq found value))))
             ((consp face)

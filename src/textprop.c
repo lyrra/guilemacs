@@ -74,9 +74,11 @@ ensure_text_properties_loaded (void)
 static Lisp_Object
 scm_plist_to_lisp (SCM scm_plist)
 {
-  Lisp_Object result = Qnil;
+  Lisp_Object head = Qnil;
+  Lisp_Object tail = Qnil;
 
   /* Scheme plists are just lists: (prop1 val1 prop2 val2 ...) */
+  /* Build the list in order by maintaining a tail cons cell */
   while (scm_is_pair (scm_plist))
     {
       SCM prop = scm_car (scm_plist);
@@ -88,11 +90,24 @@ scm_plist_to_lisp (SCM scm_plist)
       SCM value = scm_car (scm_plist);
       scm_plist = scm_cdr (scm_plist);
 
-      /* Convert to Lisp_Object and cons onto result */
-      result = Fcons (prop, Fcons (value, result));
+      /* Append prop and value to the end of the list */
+      Lisp_Object new_prop = Fcons (prop, Qnil);
+      Lisp_Object new_val = Fcons (value, Qnil);
+      XSETCDR (new_prop, new_val);
+
+      if (NILP (head))
+        {
+          head = new_prop;
+          tail = new_val;
+        }
+      else
+        {
+          XSETCDR (tail, new_prop);
+          tail = new_val;
+        }
     }
 
-  return Fnreverse (result);
+  return head;
 }
 
 /* Convert Scheme interval list to C INTERVAL tree
