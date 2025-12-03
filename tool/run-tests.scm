@@ -60,11 +60,11 @@
 ;; in the following group, all of the test files works with guilemacs
 (group
   "test/lisp/ansi-color-tests.el" ;; fails
-;;;  )
-;;;  (group
+)(group
   "test/lisp/allout-widgets-tests.el"
   "test/lisp/ansi-osc-tests.el"
-  ;"test/lisp/auth-source-pass-tests.el" ;; fails
+)(group
+  "test/lisp/auth-source-pass-tests.el" ;; fails
 ;;;  )(group
   )
 (group
@@ -73,8 +73,8 @@
 (group
   "test/lisp/battery-tests.el"
   )
-  ; (group "test/lisp/buff-menu-tests.el") ;; fails
-  ; (group "test/lisp/button-tests.el" ) ;; fails
+   (group "test/lisp/buff-menu-tests.el") ;; fails
+   (group "test/lisp/button-tests.el" ) ;; fails
 
 ;;;  (group
 ;;;  "test/lisp/calculator-tests.el"
@@ -91,7 +91,7 @@
 (group
   "test/lisp/completion-tests.el"
   )
-  ; (group "test/lisp/color-tests.el" ) ;; fails
+   (group "test/lisp/color-tests.el" ) ;; fails
   (group
   "test/lisp/cus-edit-tests.el"
   )
@@ -103,27 +103,27 @@
   ;"test/lisp/elide-head-tests.el"
   ;
   )
-  ; (group "test/lisp/edmacro-tests.el") ;; fails
+   (group "test/lisp/edmacro-tests.el") ;; fails
   (group
   "test/lisp/emacs-lisp/byte-run-tests.el"
   "test/lisp/emacs-lisp/check-declare-tests.el"
   "test/lisp/emacs-lisp/cl-preloaded-tests.el"
   )
-  ; (group "test/lisp/emacs-lisp/cl-print-tests.el" ) ;; fails
+   (group "test/lisp/emacs-lisp/cl-print-tests.el" ) ;; fails
 ;;;  (group
 ;;;  "test/lisp/emacs-lisp/cl-seq-tests.el"
 ;;;  "test/lisp/emacs-lisp/copyright-tests.el"
 ;;;  "test/lisp/emacs-lisp/derived-tests.el"
 ;;;  "test/lisp/emacs-lisp/easy-mmode-tests.el"
 ;;;  )
-  ; (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
-  ; (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
+   (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
+   (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
   (group
   "test/lisp/emacs-lisp/float-sup-tests.el"
 ;  "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
-;;;  )
-  ;(group "test/lisp/emacs-lisp/lisp-mode-tests.el" ) ;; fails
-;;;  (group
+  )
+  (group "test/lisp/emacs-lisp/lisp-mode-tests.el" ) ;; fails
+  (group
   "test/lisp/emacs-lisp/icons-tests.el"
   ; "test/lisp/emacs-lisp/lisp-mnt-tests.el" ; fails
   ;"test/lisp/emacs-lisp/memory-report-tests.el" ; fails
@@ -190,18 +190,19 @@
   )(group
   "test/lisp/mwheel-tests.el"
   )
-  ; (group "test/lisp/nxml/nxml-mode-tests.el" ) ;; fails
+   ;(group "test/lisp/nxml/nxml-mode-tests.el" ) ;; fails
   (group
   ; "test/lisp/nxml/xsd-regexp-tests.el" ; fails
   "test/lisp/paren-tests.el"
+  )(group
   "test/lisp/password-cache-tests.el"
-;;;  )(group
+  )(group
   "test/lisp/progmodes/asm-mode-tests.el" ;; fails
-;;;  )(group
+  )(group
   ;"test/lisp/pcmpl-linux-tests.el"
   "test/lisp/pcomplete-tests.el"
   ; "test/lisp/progmodes/autoconf-tests.el" ; fails
-  )
+ )
 ;;; (group
 ;;;  "test/lisp/progmodes/bat-mode-tests.el"
 ;;;  "test/lisp/progmodes/bug-reference-tests.el"
@@ -214,7 +215,7 @@
 ;;;  "test/lisp/progmodes/pascal-tests.el"
 ;;;  "test/lisp/progmodes/ps-mode-tests.el"
 ;;;  )
-  ; (group "test/lisp/progmodes/sh-script-tests.el" ) ;; fails
+   (group "test/lisp/progmodes/sh-script-tests.el" ) ;; fails
   (group
   "test/lisp/progmodes/subword-tests.el"
   )
@@ -232,12 +233,12 @@
 ;; had to be disabled to work with guilemacs, they are counted as
 ;; false positives. So if you count total passed tests,
 ;; they need to be subtracted.
-;(group
+(group
   ;; these doesn't want to play with others
-  ; "test/lisp/emacs-lisp/find-func-tests.el" ; doesn't like test/lisp/emacs-lisp/checkdoc-tests.el fails
+   "test/lisp/emacs-lisp/find-func-tests.el" ; doesn't like test/lisp/emacs-lisp/checkdoc-tests.el fails
 ;  "test/lisp/help-mode-tests.el" ; fails
   ; "test/lisp/help-fns-tests.el" ; fails
-;  )
+  )
 ;;;(group
 ;;;  "test/lisp/dired-tests.el"
 ;;;  "test/lisp/progmodes/compile-tests.el"
@@ -276,13 +277,13 @@
 ;;;  "test/lisp/emacs-lisp/gv-tests.el"
 ;;;  "test/lisp/files-tests.el"
 ;;;  )
-  ; (group "test/lisp/ffap-tests.el" ) ;; multibyte bug ; fails
+  (group "test/lisp/ffap-tests.el" ) ;; multibyte bug ; fails
   (group
   "test/lisp/progmodes/f90-tests.el" ;; crashes
   )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
   )
-  ;(group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; multibyte ; fails
+  (group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; multibyte ; fails
 (group
   "test/lisp/emacs-lisp/ert-tests.el"
   )
@@ -351,7 +352,7 @@
 ;;;(group
 ;;;  "test/lisp/progmodes/scheme-tests.el"
 ;;;  )
-  ; (group "test/lisp/progmodes/sql-tests.el") ; fails
+   (group "test/lisp/progmodes/sql-tests.el") ; fails
 
  ))
 
