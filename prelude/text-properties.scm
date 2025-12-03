@@ -250,6 +250,12 @@ OBJECT can be a string or buffer. If nil, use current buffer."
 (define (add-text-properties start end properties object)
   "Add PROPERTIES to text from START to END in OBJECT.
 PROPERTIES is a property list. Returns t if any property changed."
+  ;; Debug: check for negative positions
+  (when (or (< start 0) (< end 0))
+    (format #t "ERROR in add-text-properties: start=~a end=~a object-type=~a~%"
+            start end (if (string? object) "string" "buffer"))
+    (format #t "  Stack trace:~%")
+    (backtrace))
   (let* ((is-string (string? object))
          (old-intervals (if is-string
                            (string-intervals-get object)

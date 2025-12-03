@@ -1610,6 +1610,7 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
              then copy each range as a single operation. */
           Lisp_Object buffer = Fcurrent_buffer ();
           ptrdiff_t pos = start;
+          ptrdiff_t result_len = SCHARS (result);
 
           while (pos < end)
             {
@@ -1628,11 +1629,31 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
                       range_end++;
                     }
 
-                  /* Copy properties for this entire range */
-                  Fadd_text_properties (make_fixnum (range_start - start),
-                                       make_fixnum (range_end - start),
-                                       props,
-                                       result);
+                  /* Copy properties for this entire range.
+                     Convert buffer positions to string positions (0-based). */
+                  ptrdiff_t str_start = range_start - start;
+                  ptrdiff_t str_end = range_end - start;
+
+                  /* Safety check: ensure positions are valid and within result string bounds */
+                  fprintf(stderr, "DEBUG: buf[%ld,%ld) -> str[%ld,%ld) (start=%ld, end=%ld, result_len=%ld)\n",
+                          (long)range_start, (long)range_end,
+                          (long)str_start, (long)str_end,
+                          (long)start, (long)end, (long)result_len);
+                  if (str_start >= 0 && str_end >= 0 && str_start < str_end
+                      && str_start < result_len && str_end <= result_len)
+                    {
+                      Fadd_text_properties (make_fixnum (str_start),
+                                           make_fixnum (str_end),
+                                           props,
+                                           result);
+                    }
+                  else
+                    {
+                      fprintf(stderr, "WARNING: Invalid property range: buf[%ld,%ld) -> str[%ld,%ld) (start=%ld, end=%ld, result_len=%ld)\n",
+                              (long)range_start, (long)range_end,
+                              (long)str_start, (long)str_end,
+                              (long)start, (long)end, (long)result_len);
+                    }
                   pos = range_end;
                 }
               else
