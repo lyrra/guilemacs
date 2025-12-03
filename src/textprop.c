@@ -745,11 +745,11 @@ If you want to display the text properties at point in a human-readable
 form, use the `describe-text-properties' command.  */)
   (Lisp_Object position, Lisp_Object object)
 {
-  /* Use Scheme implementation for strings */
+  /* Use Scheme implementation for strings and buffers */
   if (NILP (object))
     object = Fcurrent_buffer ();
 
-  if (STRINGP (object))
+  if (STRINGP (object) || BUFFERP (object))
     {
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_text_properties_at_proc))
@@ -1360,15 +1360,38 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
 		       Lisp_Object properties, Lisp_Object object,
 		       enum property_set_type set_type,
 		       bool destructive) {
-  /* Use Scheme implementation for strings */
+  /* Use Scheme implementation for strings and buffers */
   if (NILP (object))
     object = Fcurrent_buffer ();
 
-  if (STRINGP (object))
+  if (STRINGP (object) || BUFFERP (object))
     {
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_add_text_properties_proc))
         {
+          /* Validate start/end arguments.
+             For buffers, convert markers to positions and check bounds.
+             For strings, just check that they're integers. */
+          CHECK_FIXNUM_COERCE_MARKER (start);
+          CHECK_FIXNUM_COERCE_MARKER (end);
+
+          if (BUFFERP (object))
+            {
+              /* Check buffer bounds */
+              register struct buffer *b = XBUFFER (object);
+              if (!(BUF_BEGV (b) <= XFIXNUM (start) && XFIXNUM (start) <= XFIXNUM (end)
+                    && XFIXNUM (end) <= BUF_ZV (b)))
+                args_out_of_range (start, end);
+            }
+          else
+            {
+              /* Check string bounds */
+              ptrdiff_t len = SCHARS (object);
+              if (! (0 <= XFIXNUM (start) && XFIXNUM (start) <= XFIXNUM (end)
+                     && XFIXNUM (end) <= len))
+                args_out_of_range (start, end);
+            }
+
           SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
                                   start, end, properties, object);
           return result;
@@ -1814,6 +1837,8 @@ Use `set-text-properties' if you want to remove all text properties.  */)
 	    return Qnil;
 	  len -= got;
 	  i = next_interval (i);
+	  if (!i)
+	    return Qnil;
 	  got = LENGTH (i);
 	}
       while (! interval_has_some_properties (properties, i));
