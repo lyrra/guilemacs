@@ -715,7 +715,12 @@ guile_parse_color_spec (Lisp_Object color_spec)
   if (!STRINGP (color_spec))
     return Qnil;
 
-  SCM result = scm_call_1 (scm_parse_color_spec,
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_parse_color_spec);
+  if (scm_is_false (function))
+    return Qnil;
+
+  SCM result = scm_call_1 (function,
                            scm_from_utf8_string (SSDATA (color_spec)));
 
   if (scm_is_false (result))
@@ -750,7 +755,12 @@ guile_validate_color_name (Lisp_Object color_name)
   if (!STRINGP (color_name))
     return false;
 
-  SCM result = scm_call_1 (scm_validate_color_name,
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_validate_color_name);
+  if (scm_is_false (function))
+    return false;
+
+  SCM result = scm_call_1 (function,
                            scm_from_utf8_string (SSDATA (color_name)));
 
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
