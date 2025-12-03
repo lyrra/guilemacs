@@ -1603,10 +1603,44 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
       tem = Fnext_property_change (make_fixnum (start), Qnil, make_fixnum (end));
       tem1 = Ftext_properties_at (make_fixnum (start), Qnil);
 
-      //if (XFIXNUM (tem) != end || !NILP (tem1))
-        // FIX-guilemacs: string intervals not supported
-	//copy_intervals_to_string (result, current_buffer, start,
-	//			  end - start);
+      if (!NILP (tem1))
+        {
+          /* Copy properties from buffer to string using Scheme implementation.
+             Group adjacent positions with identical properties into ranges,
+             then copy each range as a single operation. */
+          Lisp_Object buffer = Fcurrent_buffer ();
+          ptrdiff_t pos = start;
+
+          while (pos < end)
+            {
+              Lisp_Object props = Ftext_properties_at (make_fixnum (pos), buffer);
+              if (!NILP (props))
+                {
+                  /* Find the extent of this property range */
+                  ptrdiff_t range_start = pos;
+                  ptrdiff_t range_end = pos + 1;
+
+                  while (range_end < end)
+                    {
+                      Lisp_Object next_props = Ftext_properties_at (make_fixnum (range_end), buffer);
+                      if (NILP (next_props) || !EQ (props, next_props))
+                        break;
+                      range_end++;
+                    }
+
+                  /* Copy properties for this entire range */
+                  Fadd_text_properties (make_fixnum (range_start - start),
+                                       make_fixnum (range_end - start),
+                                       props,
+                                       result);
+                  pos = range_end;
+                }
+              else
+                {
+                  pos++;
+                }
+            }
+        }
     }
 
   return result;
