@@ -110,7 +110,10 @@ compile_pattern_1 (struct regexp_cache *cp, Lisp_Object pattern,
   cp->regexp = Qnil;
   cp->buf.translate = translate;
   cp->posix = posix;
-  cp->buf.multibyte = false;
+  /* FIX: Check if pattern contains multibyte (UTF-8) characters.
+     In Guile, strings are UTF-8. A string is multibyte if its byte length
+     differs from its character length. */
+  cp->buf.multibyte = (SCHARS (pattern) != SBYTES (pattern));
   cp->buf.charset_unibyte = charset_unibyte;
   if (STRINGP (Vsearch_spaces_regexp))
     cp->f_whitespace_regexp = Vsearch_spaces_regexp;
