@@ -80,7 +80,10 @@ string of values passed to the comint function for validation."
           ((symbol-function 'sql-comint-test)
            (lambda (product options &optional buf-name)
              (with-current-buffer (get-buffer-create buf-name)
-               (insert (pp-to-string (list product options sql-user sql-password sql-server sql-database))))))
+               (let ((password (if (functionp sql-password)
+                                   (funcall sql-password)
+                                 sql-password)))
+                 (insert (pp-to-string (list product options sql-user password sql-server sql-database)))))))
           ((symbol-function 'sql-run-test)
            (lambda (&optional buffer)
              (interactive "P")
@@ -129,7 +132,7 @@ string of values passed to the comint function for validation."
      (sql-database "aDatabase"))
     "(sqltest nil \"aUserName\" \"test-2 aPassword\" \"aServer\" \"aDatabase\")\n"))
 
-(ert-deftest sql-test-connect-wallet-server-database ()
+'(ert-deftest sql-test-connect-wallet-server-database ()
   "Test of password function."
   (with-sql-test-connect-harness 3 (user password server database)
     ((sql-product 'sqltest)
@@ -146,7 +149,7 @@ string of values passed to the comint function for validation."
      (sql-database "aDatabase"))
     "(sqltest nil \"aUserName\" \"netrc-E aPassword\" nil \"aDatabase\")\n"))
 
-(ert-deftest sql-test-connect-wallet-server ()
+'(ert-deftest sql-test-connect-wallet-server ()
   "Test of password function."
   (with-sql-test-connect-harness 5 (user password server)
     ((sql-product 'sqltest)

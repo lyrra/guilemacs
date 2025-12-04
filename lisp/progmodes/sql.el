@@ -4658,10 +4658,12 @@ the call to \\[sql-product-interactive] with
 (defun sql-comint-automatic-password (_)
   "Intercept password prompts when we know the password.
 This must also do the job of detecting password prompts."
-  (when (and
-         sql-password
-         (not (string= "" sql-password)))
-    sql-password))
+  (when sql-password
+    (let ((password (if (functionp sql-password)
+                        (funcall sql-password)
+                      sql-password)))
+      (when (and password (not (string= "" password)))
+        password))))
 
 (defun sql-comint (product params &optional buf-name)
   "Set up a comint buffer to run the SQL processor.
@@ -4739,10 +4741,13 @@ The default comes from `process-coding-system-alist' and
   ;; is meaningless; database without user/password is meaningless,
   ;; because "@param" will ask sqlplus to interpret the script
   ;; "param".
-  (let (parameter nlslang coding)
+  (let ((password (if (functionp sql-password)
+                      (funcall sql-password)
+                    sql-password))
+        parameter nlslang coding)
     (if (not (string= "" sql-user))
-	(if (not (string= "" sql-password))
-	    (setq parameter (concat sql-user "/" sql-password))
+	(if (and password (not (string= "" password)))
+	    (setq parameter (concat sql-user "/" password))
 	  (setq parameter sql-user)))
     (if (and parameter (not (string= "" sql-database)))
 	(setq parameter (concat parameter "@" sql-database)))
@@ -4974,17 +4979,20 @@ The default comes from `process-coding-system-alist' and
   "Create comint buffer and connect to Sybase."
   ;; Put all parameters to the program (if defined) in a list and call
   ;; make-comint.
-  (let ((params
-         (append
-          (if (not (string= "" sql-user))
-              (list "-U" sql-user))
-          (if (not (string= "" sql-password))
-              (list "-P" sql-password))
-          (if (not (string= "" sql-database))
-              (list "-D" sql-database))
-          (if (not (string= "" sql-server))
-              (list "-S" sql-server))
-          options)))
+  (let* ((password (if (functionp sql-password)
+                       (funcall sql-password)
+                     sql-password))
+         (params
+          (append
+           (if (not (string= "" sql-user))
+               (list "-U" sql-user))
+           (if (and password (not (string= "" password)))
+               (list "-P" password))
+           (if (not (string= "" sql-database))
+               (list "-D" sql-database))
+           (if (not (string= "" sql-server))
+               (list "-S" sql-server))
+           options)))
     (sql-comint product params buf-name)))
 
 
