@@ -3304,26 +3304,47 @@ See Info node `(elisp) Text Properties' for more information.
 usage: (propertize STRING &rest PROPERTIES)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
-  Lisp_Object properties, string;
-  ptrdiff_t i;
+  /* Phase 1: Delegate to Scheme propertize which returns wrapper */
+  extern SCM scm_propertize_proc;
+  extern void ensure_text_properties_loaded (void);
 
   /* Number of args must be odd.  */
   if ((nargs & 1) == 0)
     xsignal2 (Qwrong_number_of_arguments, Qpropertize, make_fixnum (nargs));
 
-  properties = string = Qnil;
-
   /* First argument must be a string.  */
   CHECK_STRING (args[0]);
-  string = Fcopy_sequence (args[0]);
 
-  for (i = 1; i < nargs; i += 2)
-    properties = Fcons (args[i], Fcons (args[i + 1], properties));
+  /* Load Scheme text-properties module */
+  ensure_text_properties_loaded ();
 
-  Fadd_text_properties (make_fixnum (0),
-			make_fixnum (SCHARS (string)),
-			properties, string);
-  return string;
+  if (!scm_is_false (scm_propertize_proc))
+    {
+      /* Build Scheme argument list: (string prop1 val1 prop2 val2 ...) */
+      SCM scm_args = SCM_EOL;
+      for (ptrdiff_t i = nargs - 1; i >= 0; i--)
+        scm_args = scm_cons (args[i], scm_args);
+
+      /* Call Scheme propertize */
+      return scm_apply_0 (scm_variable_ref (scm_propertize_proc), scm_args);
+    }
+  else
+    {
+      /* Fallback to old implementation if Scheme not loaded */
+      Lisp_Object properties, string;
+      ptrdiff_t i;
+
+      properties = string = Qnil;
+      string = Fcopy_sequence (args[0]);
+
+      for (i = 1; i < nargs; i += 2)
+        properties = Fcons (args[i], Fcons (args[i + 1], properties));
+
+      Fadd_text_properties (make_fixnum (0),
+                           make_fixnum (SCHARS (string)),
+                           properties, string);
+      return string;
+    }
 }
 
 /* Convert the prefix of STR from ASCII decimal digits to a number.

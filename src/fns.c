@@ -43,6 +43,60 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_TREE_SITTER
 #include "treesit.h"
 #endif
+
+/* Scheme string operations module (Phase 2) */
+static SCM scm_string_operations_module = SCM_BOOL_F;
+static SCM scm_substring_with_properties_proc = SCM_BOOL_F;
+static SCM scm_concat_with_properties_proc = SCM_BOOL_F;
+
+static void
+ensure_string_operations_loaded (void)
+{
+  if (scm_is_false (scm_string_operations_module))
+    {
+      /* Load dependencies first: intervals -> emacs-string -> text-properties -> string-operations */
+      const char *modules[] = {
+        "prelude/intervals.scm",
+        "prelude/emacs-string.scm",
+        "prelude/text-properties.scm",
+        "prelude/string-operations.scm",
+        NULL
+      };
+      const char *bases[] = {"", "../", NULL};
+
+      for (int mod = 0; modules[mod] != NULL; mod++)
+        {
+          bool loaded = false;
+          for (int i = 0; bases[i] != NULL && !loaded; i++)
+            {
+              char path[512];
+              snprintf (path, sizeof (path), "%s%s", bases[i], modules[mod]);
+              if (access (path, R_OK) == 0)
+                {
+                  fprintf (stderr, "Loading %s...\n", path);
+                  scm_c_primitive_load (path);
+                  loaded = true;
+                }
+            }
+          if (!loaded)
+            {
+              fprintf (stderr, "WARNING: Could not load %s\n", modules[mod]);
+            }
+        }
+
+      /* Resolve modules and lookup procedures */
+      scm_string_operations_module = scm_c_resolve_module ("string-operations");
+      scm_substring_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "substring-with-properties");
+      scm_concat_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "concat-with-properties");
+
+      fprintf (stderr, "Phase 2: String operations loaded\n");
+      fprintf (stderr, "  substring-with-properties: %s\n",
+               scm_is_false (scm_substring_with_properties_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  concat-with-properties: %s\n",
+               scm_is_false (scm_concat_with_properties_proc) ? "FALSE" : "ok");
+    }
+}
+
 static EMACS_UINT sxhash_obj (Lisp_Object, int);
 ptrdiff_t
 knuth_hash (hash_hash_t hash, unsigned bits);
@@ -699,6 +753,39 @@ to be `eq'.
 usage: (concat &rest SEQUENCES)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
+  /* Phase 2: Check if all args are strings - if so, use wrapper-aware concat */
+  bool all_strings = true;
+  for (ptrdiff_t i = 0; i < nargs; i++)
+    {
+      if (!STRINGP (args[i]) && !NILP (args[i]))
+        {
+          all_strings = false;
+          break;
+        }
+    }
+
+  if (all_strings && nargs > 0)
+    {
+      /* Use wrapper-aware Scheme concat to preserve properties */
+      ensure_string_operations_loaded ();
+
+      if (!scm_is_false (scm_concat_with_properties_proc))
+        {
+          /* Build Scheme list of arguments */
+          SCM scm_args = SCM_EOL;
+          for (ptrdiff_t i = nargs - 1; i >= 0; i--)
+            {
+              if (!NILP (args[i]))  /* Skip nil args */
+                scm_args = scm_cons (args[i], scm_args);
+            }
+
+          /* Call Scheme concat-with-properties */
+          return scm_apply_0 (scm_variable_ref (scm_concat_with_properties_proc),
+                             scm_args);
+        }
+    }
+
+  /* Fallback to original concat for non-string args or if Scheme not loaded */
   return concat_to_string (nargs, args);
 }
 
@@ -1640,12 +1727,25 @@ With one argument, just copy STRING (with properties, if any).  */)
 
   if (STRINGP (string))
     {
-      /* Use Guile's native substring function for better UTF-8 handling */
-      SCM start_scm = scm_from_ptrdiff_t (ifrom);
-      SCM end_scm = scm_from_ptrdiff_t (ito);
-      res = scm_substring (string, start_scm, end_scm);
-      copy_text_properties (make_fixnum (ifrom), make_fixnum (ito),
-			    string, make_fixnum (0), res, Qnil);
+      /* Phase 2: Use wrapper-aware Scheme substring to preserve properties */
+      ensure_string_operations_loaded ();
+
+      if (!scm_is_false (scm_substring_with_properties_proc))
+        {
+          /* Call Scheme substring-with-properties */
+          SCM start_scm = scm_from_ptrdiff_t (ifrom);
+          SCM end_scm = scm_from_ptrdiff_t (ito);
+          res = scm_call_3 (scm_variable_ref (scm_substring_with_properties_proc),
+                           string, start_scm, end_scm);
+        }
+      else
+        {
+          /* Fallback to plain substring (no properties) */
+          fprintf (stderr, "WARNING: substring-with-properties not loaded, properties will be lost\n");
+          SCM start_scm = scm_from_ptrdiff_t (ifrom);
+          SCM end_scm = scm_from_ptrdiff_t (ito);
+          res = scm_substring (string, start_scm, end_scm);
+        }
     }
   else
     {

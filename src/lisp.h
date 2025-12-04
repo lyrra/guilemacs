@@ -1214,8 +1214,33 @@ struct Lisp_String
 INLINE bool
 STRINGP (Lisp_Object x)
 {
-  return scm_is_true(scm_string_p (x));
-  //return SMOB_TYPEP (x, lisp_string_tag);
+  /* Phase 2: Recognize both plain strings and emacs-string wrappers */
+  if (scm_is_true(scm_string_p (x)))
+    return true;
+
+  /* Check if it's an emacs-string wrapper */
+  static SCM emacs_string_p_proc = SCM_BOOL_F;
+  static bool tried_lookup = false;
+
+  if (!tried_lookup)
+    {
+      /* Try to load emacs-string? predicate (only once) */
+      tried_lookup = true;
+      SCM handler = scm_c_eval_string ("(lambda (key . args) #f)");
+      SCM thunk = scm_c_eval_string
+        ("(lambda () (let ((mod (resolve-module '(emacs-string))))"
+         "  (module-ref mod 'emacs-string?)))");
+      emacs_string_p_proc = scm_catch (SCM_BOOL_T, thunk, handler);
+    }
+
+  if (!scm_is_false (emacs_string_p_proc) &&
+      scm_is_true (scm_procedure_p (emacs_string_p_proc)))
+    {
+      SCM result = scm_call_1 (emacs_string_p_proc, x);
+      return scm_is_true (result);
+    }
+
+  return false;
 }
 
 INLINE void

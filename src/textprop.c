@@ -30,9 +30,9 @@ static SCM scm_text_properties_module = SCM_BOOL_F;
 static SCM scm_get_text_property_proc = SCM_BOOL_F;
 static SCM scm_text_properties_at_proc = SCM_BOOL_F;
 static SCM scm_add_text_properties_proc = SCM_BOOL_F;
-static SCM scm_propertize_proc = SCM_BOOL_F;
+SCM scm_propertize_proc = SCM_BOOL_F;  /* Non-static for editfns.c */
 
-static void
+void
 ensure_text_properties_loaded (void)
 {
   if (scm_is_false (scm_text_properties_module))
