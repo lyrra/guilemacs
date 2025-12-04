@@ -139,10 +139,13 @@ Returns #t if properties were added."
        (emacs-string-intervals-set! obj new-intervals)
        #t))
 
-    ;; Plain string - cannot add properties to plain string!
+    ;; Plain string - wrap it first, then add properties (Phase 3)
     ((string? obj)
-     (format #t "WARNING: Cannot add properties to plain string, must be wrapped~%")
-     #f)
+     (let* ((wrapped (wrap-string obj))
+            (new-intervals (add-properties-to-intervals
+                            '() start end props)))
+       (emacs-string-intervals-set! wrapped new-intervals)
+       wrapped))  ; Return the wrapper!
 
     ;; Buffer
     (else

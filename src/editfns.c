@@ -1642,10 +1642,11 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
                   if (str_start >= 0 && str_end >= 0 && str_start < str_end
                       && str_start < result_len && str_end <= result_len)
                     {
-                      Fadd_text_properties (make_fixnum (str_start),
-                                           make_fixnum (str_end),
-                                           props,
-                                           result);
+                      /* Phase 3: Capture return value - may be wrapper with properties */
+                      result = Fadd_text_properties (make_fixnum (str_start),
+                                                     make_fixnum (str_end),
+                                                     props,
+                                                     result);
                     }
                   else
                     {
