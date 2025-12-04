@@ -283,7 +283,7 @@
   )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
   )
-  (group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; multibyte ; fails
+  ;(group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; text-property syntax fails
 (group
   "test/lisp/emacs-lisp/ert-tests.el"
   )

@@ -35,7 +35,8 @@
 ;; Note: The byte compiler needs the value to load `faceup-test-mode',
 ;; hence the `eval-and-compile'.
 (eval-and-compile
-  (defvar faceup-test-files-dir (faceup-this-file-directory)
+  ; FIX-20251204-guilemacs: faceup-this-file-directory uses file-location macro
+  (defvar faceup-test-files-dir "lisp/emacs-lisp/faceup-tests/"
     "The directory of this file."))
 
 (require 'faceup-test-mode
