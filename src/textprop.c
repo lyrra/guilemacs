@@ -31,33 +31,49 @@ static SCM scm_get_text_property_proc = SCM_BOOL_F;
 static SCM scm_text_properties_at_proc = SCM_BOOL_F;
 static SCM scm_add_text_properties_proc = SCM_BOOL_F;
 static SCM scm_propertize_proc = SCM_BOOL_F;
-static SCM scm_string_intervals_get_proc = SCM_BOOL_F;
 
 static void
 ensure_text_properties_loaded (void)
 {
   if (scm_is_false (scm_text_properties_module))
     {
-      /* Load the text-properties module - try different paths based on current directory */
-      const char *paths[] = {
-        "prelude/text-properties.scm",      /* From root directory */
-        "../prelude/text-properties.scm",   /* From test or src directory */
+      /* Load Phase 1 wrapper-based modules */
+      /* These modules must be loaded in order: intervals, emacs-string, then text-properties */
+      const char *modules[] = {
+        "prelude/intervals.scm",
+        "prelude/emacs-string.scm",
+        "prelude/text-properties.scm",
         NULL
       };
 
-      bool loaded = false;
-      for (int i = 0; paths[i] != NULL; i++)
+      bool all_loaded = true;
+      for (int i = 0; modules[i] != NULL && all_loaded; i++)
         {
-          if (access (paths[i], R_OK) == 0)
+          /* Try different base paths */
+          const char *bases[] = {"", "../", NULL};
+          bool module_loaded = false;
+
+          for (int j = 0; bases[j] != NULL && !module_loaded; j++)
             {
-              scm_c_primitive_load (paths[i]);
-              loaded = true;
-              break;
+              char path[512];
+              snprintf (path, sizeof (path), "%s%s", bases[j], modules[i]);
+              if (access (path, R_OK) == 0)
+                {
+                  fprintf (stderr, "Loading %s...\n", path);
+                  scm_c_primitive_load (path);
+                  module_loaded = true;
+                }
+            }
+
+          if (!module_loaded)
+            {
+              fprintf (stderr, "ERROR: Cannot find %s\n", modules[i]);
+              all_loaded = false;
             }
         }
 
-      if (!loaded)
-        error ("Cannot find prelude/text-properties.scm");
+      if (!all_loaded)
+        error ("Cannot load text-properties modules");
 
       scm_text_properties_module = scm_c_resolve_module ("text-properties");
 
@@ -66,7 +82,12 @@ ensure_text_properties_loaded (void)
       scm_text_properties_at_proc = scm_c_module_lookup (scm_text_properties_module, "text-properties-at");
       scm_add_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "add-text-properties");
       scm_propertize_proc = scm_c_module_lookup (scm_text_properties_module, "propertize");
-      scm_string_intervals_get_proc = scm_c_module_lookup (scm_text_properties_module, "string-intervals-get");
+
+      fprintf (stderr, "DEBUG: Looked up procedures (Phase 1 - Wrapper-based):\n");
+      fprintf (stderr, "  get-text-property: %s\n", scm_is_false (scm_get_text_property_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  text-properties-at: %s\n", scm_is_false (scm_text_properties_at_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  add-text-properties: %s\n", scm_is_false (scm_add_text_properties_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  propertize: %s\n", scm_is_false (scm_propertize_proc) ? "FALSE" : "ok");
     }
 }
 
@@ -176,24 +197,21 @@ scm_intervals_to_c (SCM scm_intervals, Lisp_Object string)
   return first;
 }
 
-/* Get C INTERVAL tree for a string by converting from Scheme storage */
+/* Get C INTERVAL tree for a string by converting from Scheme storage
+
+   Phase 1 Note: In the new wrapper-based approach, properties are embedded
+   directly in the emacs-string wrapper (a Scheme record), not stored in a
+   separate hash table. This function will be updated in Phase 2 to detect
+   if a string is actually an emacs-string wrapper and extract intervals.
+
+   For now, we simply return NULL, which means C code won't see properties,
+   but Scheme code (via get-text-property DEFUN) will work correctly.
+*/
 INTERVAL
 string_get_intervals (Lisp_Object string)
 {
-  ensure_text_properties_loaded ();
-
-  if (scm_is_false (scm_string_intervals_get_proc))
-    return NULL;
-
-  /* Call Scheme to get interval list */
-  SCM scm_intervals = scm_call_1 (scm_variable_ref (scm_string_intervals_get_proc),
-                                  string);
-
-  if (scm_is_null (scm_intervals))
-    return NULL;
-
-  /* Convert to C intervals */
-  return scm_intervals_to_c (scm_intervals, string);
+  /* Phase 1: Properties are in Scheme wrapper, not accessible via C INTERVAL tree yet */
+  return NULL;
 }
 
 /* Test for membership, allowing for t (actually any non-cons) to mean the
@@ -1364,11 +1382,17 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
   if (NILP (object))
     object = Fcurrent_buffer ();
 
+  fprintf (stderr, "DEBUG add_text_properties_1: object is %s\n",
+           STRINGP (object) ? "STRING" : BUFFERP (object) ? "BUFFER" : "OTHER");
+
   if (STRINGP (object) || BUFFERP (object))
     {
       ensure_text_properties_loaded ();
+      fprintf (stderr, "DEBUG: After ensure, scm_add_text_properties_proc is %s\n",
+               scm_is_false (scm_add_text_properties_proc) ? "FALSE" : "ok");
       if (!scm_is_false (scm_add_text_properties_proc))
         {
+          fprintf (stderr, "DEBUG: Calling Scheme add-text-properties\n");
           /* Validate start/end arguments.
              For buffers, convert markers to positions and check bounds.
              For strings, just check that they're integers. */
