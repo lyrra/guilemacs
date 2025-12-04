@@ -137,3 +137,7 @@ Plain strings always return #f."
 ;;; Module initialization
 
 (format #t "~%;; emacs-string.scm loaded~%")
+
+;; Note: Custom printer for emacs-string wrappers is not implemented yet.
+;; Guile's set-record-type-printer! is not available in Guile 3.0.8.
+;; For now, avoid printing wrappers with %S - use %s or unwrap first.
