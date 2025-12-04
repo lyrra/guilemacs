@@ -32,6 +32,65 @@ static SCM scm_text_properties_at_proc = SCM_BOOL_F;
 static SCM scm_add_text_properties_proc = SCM_BOOL_F;
 SCM scm_propertize_proc = SCM_BOOL_F;  /* Non-static for editfns.c */
 
+/* Phase 2: Wrapper checking - centralized to avoid duplicate static variables */
+static SCM emacs_string_p_proc = SCM_BOOL_F;
+static SCM emacs_string_content_proc = SCM_BOOL_F;
+
+bool
+is_emacs_string_wrapper (Lisp_Object x)
+{
+  /* Load emacs-string-predicate (runtime-callable version) on first call */
+  if (scm_is_false (emacs_string_p_proc))
+    {
+      /* Module is already loaded by prelude/load.scm, just look it up */
+      SCM mod = scm_c_resolve_module ("emacs-string");
+      if (!scm_is_false (mod))
+        {
+          emacs_string_p_proc = scm_c_module_lookup (mod, "emacs-string-predicate");
+          emacs_string_content_proc = scm_c_module_lookup (mod, "emacs-string-content");
+          fprintf(stderr, "Phase 2: Loaded emacs-string-predicate and emacs-string-content from prelude\n");
+        }
+      else
+        {
+          fprintf(stderr, "ERROR: emacs-string module not found!\n");
+          return false;
+        }
+    }
+
+  if (!scm_is_false (emacs_string_p_proc))
+    {
+      SCM result = scm_call_1 (scm_variable_ref (emacs_string_p_proc), x);
+      return scm_is_true (result);
+    }
+
+  return false;
+}
+
+/* Phase 2: Unwrap emacs-string wrapper to get the underlying Guile string.
+   If x is already a plain string, return it unchanged.
+   This is needed because Guile string functions like scm_c_string_length
+   don't know about our wrapper type. */
+Lisp_Object
+unwrap_emacs_string (Lisp_Object x)
+{
+  /* Plain strings pass through unchanged */
+  if (scm_is_true (scm_string_p (x)))
+    return x;
+
+  /* Check if it's a wrapper */
+  if (!is_emacs_string_wrapper (x))
+    return x;  /* Not a string at all, return unchanged */
+
+  /* It's a wrapper - extract the content */
+  if (!scm_is_false (emacs_string_content_proc))
+    {
+      return scm_call_1 (scm_variable_ref (emacs_string_content_proc), x);
+    }
+
+  /* Fallback: return as-is if we can't unwrap */
+  return x;
+}
+
 void
 ensure_text_properties_loaded (void)
 {

@@ -36,6 +36,7 @@
   #:use-module (ice-9 format)
   #:export (make-emacs-string
             emacs-string?
+            emacs-string-predicate  ; Runtime-callable version for C
             emacs-string-content
             emacs-string-intervals
             emacs-string-intervals-set!
@@ -56,6 +57,13 @@
   emacs-string?
   (content %emacs-string-content)
   (intervals emacs-string-intervals emacs-string-intervals-set!))
+
+;;; Runtime-callable predicate for C code
+;; emacs-string? might be a macro in some Guile versions, so we wrap it
+(define (emacs-string-predicate obj)
+  "Runtime-callable wrapper for emacs-string? predicate.
+This is needed because C code can't call macros directly."
+  (emacs-string? obj))
 
 ;;; Constructors
 

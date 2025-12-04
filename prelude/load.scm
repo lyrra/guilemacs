@@ -338,14 +338,19 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
   (eval-string string))
 
 (define (elisp-stringp object)
-  "Return t if OBJECT is a string."
-  (if (string? object) #t #nil))
+  "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
+  (if (or (string? object)
+          (and (defined? 'emacs-string-predicate)
+               ((@ (emacs-string) emacs-string-predicate) object)))
+      #t #nil))
 
 (define (elisp-char-or-string-p object)
-  "Return t if OBJECT is a character or a string."
+  "Return t if OBJECT is a character or a string (Phase 2: includes wrappers)."
   (if (or (char? object)
           (and (number? object) (>= object 0) (<= object #x3fffff))  ; Emacs character range
-          (string? object))
+          (string? object)
+          (and (defined? 'emacs-string-predicate)
+               ((@ (emacs-string) emacs-string-predicate) object)))
       #t
       #nil))
 
@@ -1025,8 +1030,11 @@ Case is significant. Symbols are also allowed; their print names are used instea
   (if (symbol? object) #t #nil))
 
 (define (elisp-stringp object)
-  "Return t if OBJECT is a string."
-  (if (string? object) #t #nil))
+  "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
+  (if (or (string? object)
+          (and (defined? 'emacs-string-predicate)
+               ((@ (emacs-string) emacs-string-predicate) object)))
+      #t #nil))
 
 (define (elisp-vectorp object)
   "Return t if OBJECT is a vector."
@@ -1710,6 +1718,19 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 ;; Load lookup functions for C integration
 ;; Use the prelude directory defined in the current module by C
 (primitive-load (string-append %prelude-directory "/lookup-functions.scm"))
+
+;; Load Phase 1 & 2 text properties wrapper infrastructure
+;; These must be loaded in order: intervals -> emacs-string -> text-properties -> string-operations
+;; Use save-module-excursion to preserve current module context
+(let ((saved-module (current-module)))
+  (primitive-load (string-append %prelude-directory "/intervals.scm"))
+  (set-current-module saved-module)
+  (primitive-load (string-append %prelude-directory "/emacs-string.scm"))
+  (set-current-module saved-module)
+  (primitive-load (string-append %prelude-directory "/text-properties.scm"))
+  (set-current-module saved-module)
+  (primitive-load (string-append %prelude-directory "/string-operations.scm"))
+  (set-current-module saved-module))
 
 ;; Load new UTF-8 string operations and migration functions
 (primitive-load (string-append %prelude-directory "/utf8-string-operations.scm"))

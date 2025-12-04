@@ -1218,29 +1218,9 @@ STRINGP (Lisp_Object x)
   if (scm_is_true(scm_string_p (x)))
     return true;
 
-  /* Check if it's an emacs-string wrapper */
-  static SCM emacs_string_p_proc = SCM_BOOL_F;
-  static bool tried_lookup = false;
-
-  if (!tried_lookup)
-    {
-      /* Try to load emacs-string? predicate (only once) */
-      tried_lookup = true;
-      SCM handler = scm_c_eval_string ("(lambda (key . args) #f)");
-      SCM thunk = scm_c_eval_string
-        ("(lambda () (let ((mod (resolve-module '(emacs-string))))"
-         "  (module-ref mod 'emacs-string?)))");
-      emacs_string_p_proc = scm_catch (SCM_BOOL_T, thunk, handler);
-    }
-
-  if (!scm_is_false (emacs_string_p_proc) &&
-      scm_is_true (scm_procedure_p (emacs_string_p_proc)))
-    {
-      SCM result = scm_call_1 (emacs_string_p_proc, x);
-      return scm_is_true (result);
-    }
-
-  return false;
+  /* Check if it's an emacs-string wrapper - use centralized function */
+  extern bool is_emacs_string_wrapper (Lisp_Object);
+  return is_emacs_string_wrapper (x);
 }
 
 INLINE void
@@ -1264,10 +1244,13 @@ STRING_MULTIBYTE (Lisp_Object str)
   // abort because in guilemacs doing STRING_MULTIBYTE might either be not needed or the wrong thing to do, ie the code calling STRING_MULTIBYTE might need be reworked.
   fprintf(stderr, "-- STRING_MULTIBYTE detected, please check caller using gdb\n");
   emacs_abort ();
+  /* Phase 2: Unwrap emacs-string wrappers before checking multibyte */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (str);
   /* In Guile, strings are UTF-8. A string is multibyte if
      its byte length differs from its character length. */
   // note: maybe scm_string_bytes_per_char is enough?
-  return scm_c_string_utf8_length (str) != scm_c_string_length (str);
+  return scm_c_string_utf8_length (unwrapped) != scm_c_string_length (unwrapped);
 }
 
 /* An upper bound on the number of bytes in a Lisp string, not
@@ -1312,23 +1295,32 @@ STRING_SET_MULTIBYTE (Lisp_Object str)
 INLINE unsigned char *
 SDATA (Lisp_Object string)
 {
+  /* Phase 2: Unwrap emacs-string wrappers before getting data */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (string);
   /* FIX-guilemacs: Handle non-string values gracefully */
-  if (!string || !scm_is_string (string))
+  if (!unwrapped || !scm_is_string (unwrapped))
     return (unsigned char *) "";  /* Return empty string for non-strings */
-  return scm_to_utf8_string (string);
+  return scm_to_utf8_string (unwrapped);
 }
 INLINE char *
 SSDATA (Lisp_Object string)
 {
+  /* Phase 2: Unwrap emacs-string wrappers before getting data */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (string);
   /* FIX-guilemacs: Handle non-string values gracefully */
-  if (!string || !scm_is_string (string))
+  if (!unwrapped || !scm_is_string (unwrapped))
     return (char *) "";  /* Return empty string for non-strings */
-  return scm_to_utf8_string (string);
+  return scm_to_utf8_string (unwrapped);
 }
 INLINE scm_t_wchar
 SREF (Lisp_Object string, ptrdiff_t index)
 {
-  return SCM_CHAR (scm_c_string_ref (string, index));
+  /* Phase 2: Unwrap emacs-string wrappers before getting character */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (string);
+  return SCM_CHAR (scm_c_string_ref (unwrapped, index));
   //return SDATA (string)[index];
 }
 INLINE void
@@ -1340,7 +1332,10 @@ SSET (Lisp_Object string, ptrdiff_t index, unsigned char new)
 INLINE ptrdiff_t
 SCHARS (Lisp_Object string)
 {
-  ptrdiff_t nchars = scm_c_string_length (string);
+  /* Phase 2: Unwrap emacs-string wrappers before getting length */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (string);
+  ptrdiff_t nchars = scm_c_string_length (unwrapped);
   eassume (0 <= nchars);
   return nchars;
 }
@@ -1357,8 +1352,11 @@ STRING_BYTES (struct Lisp_String *s)
 INLINE ptrdiff_t
 SBYTES (Lisp_Object string)
 {
+  /* Phase 2: Unwrap emacs-string wrappers before getting byte length */
+  extern Lisp_Object unwrap_emacs_string (Lisp_Object);
+  Lisp_Object unwrapped = unwrap_emacs_string (string);
   /* FIX-guilemacs: Use UTF-8 byte length, not character length */
-  return scm_c_string_utf8_length (string);
+  return scm_c_string_utf8_length (unwrapped);
   emacs_abort ();
   return STRING_BYTES (XSTRING (string));
 }
