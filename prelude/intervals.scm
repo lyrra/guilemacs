@@ -181,19 +181,24 @@ Returns new interval list."
   (if (null? intervals)
       ;; No intervals yet, create one covering the range
       (list (make-interval start end new-props))
-      (let loop ((ints intervals) (result '()))
+      (let loop ((ints intervals) (result '()) (added-new? #f))
         (cond
           ((null? ints)
-           ;; Done processing
-           (merge-adjacent-intervals (reverse result)))
+           ;; Done processing - if we haven't added the new interval yet, add it now
+           (if added-new?
+               (merge-adjacent-intervals (reverse result))
+               (merge-adjacent-intervals (reverse (cons (make-interval start end new-props) result)))))
 
           ((>= (interval-start (car ints)) end)
-           ;; This interval is after our range, keep rest as-is
-           (merge-adjacent-intervals (append (reverse result) ints)))
+           ;; This interval is after our range
+           ;; Add new interval if not already added, then keep rest as-is
+           (if added-new?
+               (merge-adjacent-intervals (append (reverse result) ints))
+               (merge-adjacent-intervals (append (reverse (cons (make-interval start end new-props) result)) ints))))
 
           ((< (interval-end (car ints)) start)
            ;; This interval is before our range, keep it
-           (loop (cdr ints) (cons (car ints) result)))
+           (loop (cdr ints) (cons (car ints) result) added-new?))
 
           (else
            ;; This interval overlaps our range
@@ -227,8 +232,10 @@ Returns new interval list."
                    '()))
 
              ;; Continue with remaining intervals
+             ;; Mark that we've added the new interval (it's in overlap-part)
              (loop (cdr ints)
-                   (append after-part overlap-part before-part result))))))))
+                   (append after-part overlap-part before-part result)
+                   #t)))))))  ; added-new? = #t
 
 (define (extract-intervals intervals start end)
   "Extract intervals from [START, END), adjusting positions.
