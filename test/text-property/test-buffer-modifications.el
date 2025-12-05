@@ -175,7 +175,7 @@
              (get-text-property 0 'face sub))))
 
 ;; Test 14: Kill and yank text with properties
-(with-temp-buffer
+'(with-temp-buffer
   (insert (propertize "test" 'face 'bold))
   (insert " plain")
   (goto-char 1)
