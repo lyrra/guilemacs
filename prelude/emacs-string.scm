@@ -46,6 +46,7 @@
             wrap-string
             unwrap-string
             deep-unwrap-for-printing  ; Phase 4: for prin1-to-string
+            emacs-string-equal        ; Phase 4: for equal comparison
             ;; Wrapper check
             has-properties?))
 
@@ -144,6 +145,38 @@ This is used by prin1-to-string to ensure wrapper objects don't appear in output
     (else
      ;; Return other objects as-is
      obj)))
+
+(define (emacs-string-equal obj1 obj2)
+  "Custom equal comparison that treats emacs-string wrappers transparently.
+Compares wrapper content, ignoring text properties, but preserves list/vector structure.
+This is called by the C `equal` function."
+  (cond
+    ;; Both are wrappers - compare content
+    ((and (emacs-string? obj1) (emacs-string? obj2))
+     (string=? (%emacs-string-content obj1) (%emacs-string-content obj2)))
+
+    ;; One is wrapper, one is plain string - compare content
+    ((and (emacs-string? obj1) (string? obj2))
+     (string=? (%emacs-string-content obj1) obj2))
+    ((and (string? obj1) (emacs-string? obj2))
+     (string=? obj1 (%emacs-string-content obj2)))
+
+    ;; Both are lists - compare recursively
+    ((and (pair? obj1) (pair? obj2))
+     (and (emacs-string-equal (car obj1) (car obj2))
+          (emacs-string-equal (cdr obj1) (cdr obj2))))
+
+    ;; Both are vectors - compare recursively
+    ((and (vector? obj1) (vector? obj2))
+     (and (= (vector-length obj1) (vector-length obj2))
+          (let loop ((i 0))
+            (or (>= i (vector-length obj1))
+                (and (emacs-string-equal (vector-ref obj1 i) (vector-ref obj2 i))
+                     (loop (+ i 1)))))))
+
+    ;; For everything else, use Guile's equal?
+    (else
+     (equal? obj1 obj2))))
 
 ;;; Predicates
 

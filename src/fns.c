@@ -2959,29 +2959,33 @@ Numbers are compared via `eql', so integers do not equal floats.
 Symbols must match exactly.  */)
   (Lisp_Object o1, Lisp_Object o2)
 {
-  /* Phase 4: Deep-unwrap emacs-strings before comparison (equal ignores text properties) */
-  static SCM deep_unwrap_proc = SCM_BOOL_F;
-  if (scm_is_false (deep_unwrap_proc))
+  /* Phase 4: For emacs-string wrappers, compare content ignoring properties.
+     We need a custom comparison that:
+     1. Treats wrapper + wrapper as equal if content matches
+     2. Treats wrapper + plain string as equal if content matches
+     3. Doesn't break list/vector comparisons (delegates to scm_equal_p)
+
+     Strategy: Define a custom equal in Scheme that handles wrappers specially */
+  static SCM custom_equal_proc = SCM_BOOL_F;
+  if (scm_is_false (custom_equal_proc))
     {
       SCM mod = scm_c_resolve_module ("emacs-string");
       if (!scm_is_false (mod))
         {
-          SCM var = scm_c_module_lookup (mod, "deep-unwrap-for-printing");
+          SCM var = scm_c_module_lookup (mod, "emacs-string-equal");
           if (!scm_is_false (var))
-            deep_unwrap_proc = scm_variable_ref (var);
+            custom_equal_proc = scm_variable_ref (var);
         }
     }
 
-  Lisp_Object unwrapped_o1 = o1;
-  Lisp_Object unwrapped_o2 = o2;
-
-  if (!scm_is_false (deep_unwrap_proc))
+  if (!scm_is_false (custom_equal_proc))
     {
-      unwrapped_o1 = scm_call_1 (deep_unwrap_proc, o1);
-      unwrapped_o2 = scm_call_1 (deep_unwrap_proc, o2);
+      Lisp_Object result = scm_call_2 (custom_equal_proc, o1, o2);
+      return scm_is_true (result) ? Qt : Qnil;
     }
 
-  Lisp_Object x = scm_equal_p (unwrapped_o1, unwrapped_o2);
+  /* Fallback to Guile's equal if custom proc not available */
+  Lisp_Object x = scm_equal_p (o1, o2);
   return scm_is_true (x) ? Qt : Qnil;
 }
 

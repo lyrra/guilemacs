@@ -31,6 +31,11 @@ static SCM scm_get_text_property_proc = SCM_BOOL_F;
 static SCM scm_text_properties_at_proc = SCM_BOOL_F;
 static SCM scm_add_text_properties_proc = SCM_BOOL_F;
 SCM scm_propertize_proc = SCM_BOOL_F;  /* Non-static for editfns.c */
+/* Phase 5: Additional property API functions */
+static SCM scm_remove_text_properties_proc = SCM_BOOL_F;
+static SCM scm_set_text_properties_proc = SCM_BOOL_F;
+static SCM scm_text_property_any_proc = SCM_BOOL_F;
+static SCM scm_text_property_not_all_proc = SCM_BOOL_F;
 
 /* Phase 2: Wrapper checking - centralized to avoid duplicate static variables */
 static SCM emacs_string_p_proc = SCM_BOOL_F;
@@ -141,12 +146,21 @@ ensure_text_properties_loaded (void)
       scm_text_properties_at_proc = scm_c_module_lookup (scm_text_properties_module, "text-properties-at");
       scm_add_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "add-text-properties");
       scm_propertize_proc = scm_c_module_lookup (scm_text_properties_module, "propertize");
+      /* Phase 5: Additional property API functions */
+      scm_remove_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "remove-text-properties");
+      scm_set_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "set-text-properties");
+      scm_text_property_any_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-any");
+      scm_text_property_not_all_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-not-all");
 
       fprintf (stderr, "DEBUG: Looked up procedures (Phase 1 - Wrapper-based):\n");
       fprintf (stderr, "  get-text-property: %s\n", scm_is_false (scm_get_text_property_proc) ? "FALSE" : "ok");
       fprintf (stderr, "  text-properties-at: %s\n", scm_is_false (scm_text_properties_at_proc) ? "FALSE" : "ok");
       fprintf (stderr, "  add-text-properties: %s\n", scm_is_false (scm_add_text_properties_proc) ? "FALSE" : "ok");
       fprintf (stderr, "  propertize: %s\n", scm_is_false (scm_propertize_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  remove-text-properties: %s\n", scm_is_false (scm_remove_text_properties_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  set-text-properties: %s\n", scm_is_false (scm_set_text_properties_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  text-property-any: %s\n", scm_is_false (scm_text_property_any_proc) ? "FALSE" : "ok");
+      fprintf (stderr, "  text-property-not-all: %s\n", scm_is_false (scm_text_property_not_all_proc) ? "FALSE" : "ok");
     }
 }
 
@@ -1617,6 +1631,22 @@ If PROPERTIES is nil, the effect is to remove all properties from
 the designated part of OBJECT.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object properties, Lisp_Object object)
 {
+  /* Phase 5: Use Scheme implementation for strings and buffers */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object) || BUFFERP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_set_text_properties_proc))
+        {
+          SCM result = scm_call_4 (scm_variable_ref (scm_set_text_properties_proc),
+                                  start, end, properties, object);
+          return result;
+        }
+    }
+
+  /* Fallback to old implementation */
   return set_text_properties (start, end, properties, object, Qt);
 }
 
@@ -1846,6 +1876,21 @@ Return t if any property was actually removed, nil otherwise.
 Use `set-text-properties' if you want to remove all text properties.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object properties, Lisp_Object object)
 {
+  /* Phase 5: Use Scheme implementation for strings and buffers */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object) || BUFFERP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_remove_text_properties_proc))
+        {
+          SCM result = scm_call_4 (scm_variable_ref (scm_remove_text_properties_proc),
+                                  start, end, properties, object);
+          return result;
+        }
+    }
+
   /* Ensure we run the modification hooks for the right buffer,
      without switching buffers twice (bug 36190).  FIXME: Switching
      buffers is slow and often unnecessary.  */
@@ -2113,11 +2158,25 @@ the current buffer), START and END are buffer positions (integers or
 markers).  If OBJECT is a string, START and END are 0-based indices into it.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object property, Lisp_Object value, Lisp_Object object)
 {
+  /* Phase 5: Use Scheme implementation for strings and buffers */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object) || BUFFERP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_text_property_any_proc))
+        {
+          SCM result = scm_call_5 (scm_variable_ref (scm_text_property_any_proc),
+                                  start, end, property, value, object);
+          return result;
+        }
+    }
+
+  /* Fallback to old implementation */
   register INTERVAL i;
   register ptrdiff_t e, pos;
 
-  if (NILP (object))
-    XSETBUFFER (object, current_buffer);
   i = validate_interval_range (object, &start, &end, soft);
   if (!i)
     return (!NILP (value) || EQ (start, end) ? Qnil : start);
@@ -2149,11 +2208,25 @@ the current buffer), START and END are buffer positions (integers or
 markers).  If OBJECT is a string, START and END are 0-based indices into it.  */)
   (Lisp_Object start, Lisp_Object end, Lisp_Object property, Lisp_Object value, Lisp_Object object)
 {
+  /* Phase 5: Use Scheme implementation for strings and buffers */
+  if (NILP (object))
+    object = Fcurrent_buffer ();
+
+  if (STRINGP (object) || BUFFERP (object))
+    {
+      ensure_text_properties_loaded ();
+      if (!scm_is_false (scm_text_property_not_all_proc))
+        {
+          SCM result = scm_call_5 (scm_variable_ref (scm_text_property_not_all_proc),
+                                  start, end, property, value, object);
+          return result;
+        }
+    }
+
+  /* Fallback to old implementation */
   register INTERVAL i;
   register ptrdiff_t s, e;
 
-  if (NILP (object))
-    XSETBUFFER (object, current_buffer);
   i = validate_interval_range (object, &start, &end, soft);
   if (!i)
     return (NILP (value) || EQ (start, end)) ? Qnil : start;
