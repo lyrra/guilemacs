@@ -144,7 +144,7 @@
   "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
   ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
  )
-  ; (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
+  (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
   (group
   "test/lisp/emacs-lisp/thunk-tests.el"
   )
