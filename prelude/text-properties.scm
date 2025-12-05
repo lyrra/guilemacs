@@ -576,15 +576,11 @@ Returns the position of first mismatch, or #nil if all match."
 ;;
 ;; These functions are called from C when buffer content changes
 
-(define (buffer-on-insert buffer pos length)
-  "Hook called after inserting LENGTH characters at POS in BUFFER.
+(define (buffer-on-insert buffer pos len)
+  "Hook called after inserting LEN characters at POS in BUFFER.
 Adjusts text property intervals accordingly."
   (let* ((old-intervals (buffer-intervals-get buffer))
-         (new-intervals (adjust-intervals-on-insert old-intervals pos length)))
-    (when (not (null? old-intervals))
-      (format #t "buffer-on-insert: pos=~a len=~a~%" pos length)
-      (format #t "  old intervals: ~a~%" old-intervals)
-      (format #t "  new intervals: ~a~%" new-intervals))
+         (new-intervals (adjust-intervals-on-insert old-intervals pos len)))
     (buffer-intervals-set! buffer new-intervals)))
 
 (define (buffer-on-delete buffer start end)

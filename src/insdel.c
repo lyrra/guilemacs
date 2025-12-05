@@ -998,6 +998,19 @@ insert_from_string (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 			inherit, 0);
   signal_after_change (opoint, 0, PT - opoint);
   update_compositions (opoint, PT, CHECK_BORDER);
+
+  /* Adjust text properties for insertion */
+  {
+    ptrdiff_t len = PT - opoint;
+    SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+    if (!scm_is_false (buffer_on_insert))
+      {
+        SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
+        SCM pos_scm = scm_from_ptrdiff_t (opoint);
+        SCM length_scm = scm_from_ptrdiff_t (len);
+        scm_call_3 (buffer_on_insert, buffer, pos_scm, length_scm);
+      }
+  }
 }
 
 /* Like `insert_from_string' except that all markers pointing
