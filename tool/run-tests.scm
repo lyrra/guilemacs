@@ -120,7 +120,7 @@
    (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
   (group
   "test/lisp/emacs-lisp/float-sup-tests.el"
-;  "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, needs text-properties
+  ; "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, strings are eq in guilemacs, internalized
   )
   (group "test/lisp/emacs-lisp/lisp-mode-tests.el" ) ;; fails
   (group
