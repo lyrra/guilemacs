@@ -1297,8 +1297,15 @@ If the optional fourth argument LIMIT is non-nil, don't search
 past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   (Lisp_Object position, Lisp_Object prop, Lisp_Object object, Lisp_Object limit)
 {
-  register INTERVAL i, next;
-  register Lisp_Object here_val;
+  /* Guilemacs: Use Scheme implementation that works with Scheme intervals */
+  static SCM scm_next_single_property_change = SCM_BOOL_F;
+
+  if (scm_is_false (scm_next_single_property_change))
+    {
+      SCM module = scm_c_resolve_module ("text-properties");
+      SCM symbol = scm_c_module_lookup (module, "next-single-property-change");
+      scm_next_single_property_change = scm_variable_ref (symbol);
+    }
 
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
@@ -1306,27 +1313,8 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   if (!NILP (limit))
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
-  i = validate_interval_range (object, &position, &position, soft);
-  if (!i)
-    return limit;
-
-  here_val = textget (i->plist, prop);
-  next = next_interval (i);
-  while (next
-	 && EQ (here_val, textget (next->plist, prop))
-	 && (NILP (limit) || next->position < XFIXNUM (limit)))
-    next = next_interval (next);
-
-  if (!next
-      || (next->position
-	  >= (FIXNUMP (limit)
-	      ? XFIXNUM (limit)
-	      : (STRINGP (object)
-		 ? SCHARS (object)
-		 : BUF_ZV (XBUFFER (object))))))
-    return limit;
-  else
-    return make_fixnum (next->position);
+  /* Call Scheme function: (next-single-property-change position prop object limit) */
+  return scm_call_4 (scm_next_single_property_change, position, prop, object, limit);
 }
 
 DEFUN ("previous-property-change", Fprevious_property_change,
@@ -1394,8 +1382,15 @@ If the optional fourth argument LIMIT is non-nil, don't search
 back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   (Lisp_Object position, Lisp_Object prop, Lisp_Object object, Lisp_Object limit)
 {
-  register INTERVAL i, previous;
-  register Lisp_Object here_val;
+  /* Guilemacs: Use Scheme implementation that works with Scheme intervals */
+  static SCM scm_previous_single_property_change = SCM_BOOL_F;
+
+  if (scm_is_false (scm_previous_single_property_change))
+    {
+      SCM module = scm_c_resolve_module ("text-properties");
+      SCM symbol = scm_c_module_lookup (module, "previous-single-property-change");
+      scm_previous_single_property_change = scm_variable_ref (symbol);
+    }
 
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
@@ -1403,31 +1398,8 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   if (!NILP (limit))
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
-  i = validate_interval_range (object, &position, &position, soft);
-
-  /* Start with the interval containing the char before point.  */
-  if (i && i->position == XFIXNAT (position))
-    i = previous_interval (i);
-
-  if (!i)
-    return limit;
-
-  here_val = textget (i->plist, prop);
-  previous = previous_interval (i);
-  while (previous
-	 && EQ (here_val, textget (previous->plist, prop))
-	 && (NILP (limit)
-	     || (previous->position + LENGTH (previous) > XFIXNUM (limit))))
-    previous = previous_interval (previous);
-
-  if (!previous
-      || (previous->position + LENGTH (previous)
-	  <= (FIXNUMP (limit)
-	      ? XFIXNUM (limit)
-	      : (STRINGP (object) ? 0 : BUF_BEGV (XBUFFER (object))))))
-    return limit;
-  else
-    return make_fixnum (previous->position + LENGTH (previous));
+  /* Call Scheme function: (previous-single-property-change position prop object limit) */
+  return scm_call_4 (scm_previous_single_property_change, position, prop, object, limit);
 }
 
 /* Used by add-text-properties and add-face-text-property. */

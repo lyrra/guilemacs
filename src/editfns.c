@@ -1271,6 +1271,77 @@ DEFUN ("emacs-pid", Femacs_pid, Semacs_pid, 0, 0, 0,
 }
 
 
+/* Phase 4: Apply text properties from a wrapper to buffer range.
+   WRAPPER is an emacs-string wrapper with intervals.
+   START and END are buffer positions (1-based, like Emacs positions).
+   This function extracts intervals from the wrapper and applies them
+   to the corresponding positions in the buffer. */
+static void
+apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
+                                     ptrdiff_t start, ptrdiff_t end)
+{
+  /* Get the intervals from the wrapper using runtime-callable version */
+  static SCM get_intervals_proc = SCM_BOOL_F;
+  if (scm_is_false (get_intervals_proc))
+    {
+      SCM module = scm_c_resolve_module ("emacs-string");
+      SCM symbol = scm_c_module_lookup (module, "emacs-string-intervals-runtime");
+      get_intervals_proc = scm_variable_ref (symbol);
+    }
+
+  SCM intervals = scm_call_1 (get_intervals_proc, wrapper);
+
+  /* If no intervals, nothing to do */
+  if (scm_is_null (intervals))
+    return;
+
+  /* Apply each interval to the buffer */
+  while (!scm_is_null (intervals))
+    {
+      SCM interval = scm_car (intervals);
+
+      /* Get interval fields */
+      static SCM interval_start_proc = SCM_BOOL_F;
+      static SCM interval_end_proc = SCM_BOOL_F;
+      static SCM interval_plist_proc = SCM_BOOL_F;
+
+      if (scm_is_false (interval_start_proc))
+        {
+          SCM intervals_module = scm_c_resolve_module ("intervals");
+          SCM start_sym = scm_c_module_lookup (intervals_module, "get-interval-start");
+          interval_start_proc = scm_variable_ref (start_sym);
+          SCM end_sym = scm_c_module_lookup (intervals_module, "get-interval-end");
+          interval_end_proc = scm_variable_ref (end_sym);
+          SCM plist_sym = scm_c_module_lookup (intervals_module, "get-interval-plist");
+          interval_plist_proc = scm_variable_ref (plist_sym);
+        }
+
+      SCM interval_start_scm = scm_call_1 (interval_start_proc, interval);
+      SCM interval_end_scm = scm_call_1 (interval_end_proc, interval);
+      SCM plist = scm_call_1 (interval_plist_proc, interval);
+
+      /* Convert interval positions (0-based) to buffer positions (1-based) */
+      ptrdiff_t int_start = scm_to_int (interval_start_scm);
+      ptrdiff_t int_end = scm_to_int (interval_end_scm);
+
+      /* Map wrapper positions to buffer positions */
+      ptrdiff_t buf_start = start + int_start;
+      ptrdiff_t buf_end = start + int_end;
+
+      /* DEBUG: Print what we're about to apply */
+      fprintf (stderr, "DEBUG Phase4: Applying properties to [%ld, %ld)\n",
+               (long)buf_start, (long)buf_end);
+
+      /* Apply properties to this range in the buffer */
+      Fadd_text_properties (make_fixnum (buf_start),
+                            make_fixnum (buf_end),
+                            plist,
+                            Qnil);  /* Qnil means current buffer */
+
+      intervals = scm_cdr (intervals);
+    }
+}
+
 /* Insert NARGS Lisp objects in the array ARGS by calling INSERT_FUNC
    (if a type of object is Lisp_Int) or INSERT_FROM_STRING_FUNC (if a
    type of object is Lisp_String).  INHERIT is passed to
@@ -1307,10 +1378,22 @@ general_insert_function (void (*insert_func)
 	}
       else if (STRINGP (val))
 	{
+	  /* Phase 4: Check if this is a wrapper with text properties */
+	  bool is_wrapper = is_emacs_string_wrapper (val);
+	  ptrdiff_t start_pos = PT;  /* Save position before insertion */
+
 	  (*insert_from_string_func) (val, 0, 0,
 				      SCHARS (val),
 				      SBYTES (val),
 				      inherit);
+
+	  /* Phase 4: If it was a wrapper, apply its properties to the buffer */
+	  if (is_wrapper)
+	    {
+	      ptrdiff_t end_pos = PT;  /* Position after insertion */
+	      /* Get intervals from wrapper and apply to buffer range */
+	      apply_wrapper_properties_to_buffer (val, start_pos, end_pos);
+	    }
 	}
       else
 	wrong_type_argument (Qchar_or_string_p, val);

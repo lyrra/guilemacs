@@ -44,6 +44,9 @@
             add-text-properties
             put-text-property
             text-properties-at
+            ;; Property change search
+            next-single-property-change
+            previous-single-property-change
             ;; Buffer property storage
             buffer-intervals-get
             buffer-intervals-set!
@@ -176,6 +179,145 @@ Returns #t if properties were added."
 (define (buffer-text-properties-at buffer pos)
   "Get all properties at POS in BUFFER."
   (text-properties-at pos buffer))
+
+;;; Property Change Search Functions
+
+(define (next-single-property-change position prop obj limit)
+  "Find next position where PROP changes in OBJ starting from POSITION.
+Returns the position of the change, or LIMIT if no change found.
+OBJ can be a buffer, string, or emacs-string wrapper.
+LIMIT is optional - defaults to end of object if not provided."
+  (let* ((intervals (cond
+                     ((emacs-string? obj) (emacs-string-intervals obj))
+                     ((string? obj) '())
+                     (else (buffer-intervals-get obj))))
+         (obj-end (cond
+                   ((emacs-string? obj) (emacs-string-length obj))
+                   ((string? obj) (string-length obj))
+                   (else #f)))  ; For buffers, we don't know the end
+         (actual-limit (if (and limit (not (eq? limit #nil)))
+                          limit
+                          obj-end))
+         (current-val (interval-get-property-at intervals position prop)))
+
+    ;; If no intervals or position is at/past limit, return limit
+    (if (or (null? intervals)
+            (and actual-limit (>= position actual-limit)))
+        (or limit #nil)
+        ;; Search through intervals for a change
+        (let loop ((ints intervals)
+                   (pos position))
+          (cond
+           ;; No more intervals - return limit
+           ((null? ints)
+            (or limit #nil))
+
+           ;; Check current interval
+           (else
+            (let* ((int (car ints))
+                   (int-start (interval-start int))
+                   (int-end (interval-end int))
+                   (int-val (plist-get (interval-plist int) prop)))
+
+              (cond
+               ;; This interval is entirely before our position - skip it
+               ((<= int-end pos)
+                (loop (cdr ints) pos))
+
+               ;; We're inside this interval
+               ((and (>= pos int-start) (< pos int-end))
+                ;; Check if value differs from current
+                (if (not (equal? int-val current-val))
+                    ;; Value changed at start of this interval
+                    (if (and actual-limit (>= int-start actual-limit))
+                        (or limit #nil)
+                        int-start)
+                    ;; Value same, property changes at end of interval
+                    (if (and actual-limit (>= int-end actual-limit))
+                        (or limit #nil)
+                        ;; Check if next interval exists and has same value
+                        (if (null? (cdr ints))
+                            ;; No next interval - change at end
+                            int-end
+                            (let ((next-val (plist-get (interval-plist (cadr ints)) prop)))
+                              (if (equal? int-val next-val)
+                                  ;; Same value continues - keep searching
+                                  (loop (cdr ints) int-end)
+                                  ;; Different value - change at end
+                                  int-end))))))
+
+               ;; We're before this interval - property changes at its start
+               (else
+                (if (and actual-limit (>= int-start actual-limit))
+                    (or limit #nil)
+                    int-start))))))))))
+
+(define (previous-single-property-change position prop obj limit)
+  "Find previous position where PROP changes in OBJ before POSITION.
+Returns the position of the change, or LIMIT if no change found.
+OBJ can be a buffer, string, or emacs-string wrapper.
+LIMIT is optional - defaults to start of object (0) if not provided."
+  (let* ((intervals (cond
+                     ((emacs-string? obj) (emacs-string-intervals obj))
+                     ((string? obj) '())
+                     (else (buffer-intervals-get obj))))
+         (actual-limit (if (and limit (not (eq? limit #nil)))
+                          limit
+                          0))
+         ;; Get property value just before position
+         (current-val (if (> position 0)
+                         (interval-get-property-at intervals (- position 1) prop)
+                         #nil)))
+
+    ;; If no intervals or position is at/before limit, return limit
+    (if (or (null? intervals)
+            (<= position actual-limit))
+        (or limit #nil)
+        ;; Search backward through intervals for a change
+        (let loop ((ints (reverse intervals))
+                   (pos position))
+          (cond
+           ;; No more intervals - return limit
+           ((null? ints)
+            (or limit #nil))
+
+           ;; Check current interval
+           (else
+            (let* ((int (car ints))
+                   (int-start (interval-start int))
+                   (int-end (interval-end int))
+                   (int-val (plist-get (interval-plist int) prop)))
+
+              (cond
+               ;; This interval is entirely after our position - skip it
+               ((>= int-start pos)
+                (loop (cdr ints) pos))
+
+               ;; We're inside this interval or just past it
+               ((< int-start pos)
+                ;; Check if value at end differs from current
+                (if (and (<= int-end pos) (not (equal? int-val current-val)))
+                    ;; Value changed at end of this interval
+                    (if (<= int-end actual-limit)
+                        (or limit #nil)
+                        int-end)
+                    ;; Check at start of interval
+                    (if (<= int-start actual-limit)
+                        (or limit #nil)
+                        ;; Check if previous interval has different value
+                        (if (null? (cdr ints))
+                            (if (<= int-start actual-limit)
+                                (or limit #nil)
+                                int-start)
+                            (let ((prev-val (plist-get (interval-plist (cadr ints)) prop)))
+                              (if (equal? int-val prev-val)
+                                  (loop (cdr ints) int-start)
+                                  (if (<= int-start actual-limit)
+                                      (or limit #nil)
+                                      int-start)))))))
+
+               (else
+                (loop (cdr ints) pos))))))))))
 
 ;;; Module initialization
 

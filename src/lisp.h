@@ -972,6 +972,9 @@ INLINE bool OVERLAYP (Lisp_Object);
 INLINE bool PSEUDOVECTORP (Lisp_Object, int);
 INLINE void set_sub_char_table_contents (Lisp_Object, ptrdiff_t,
 					      Lisp_Object);
+/* Phase 4: Wrapper detection function (defined in textprop.c) */
+extern bool is_emacs_string_wrapper (Lisp_Object);
+extern Lisp_Object unwrap_emacs_string (Lisp_Object);
 INLINE bool STRINGP (Lisp_Object);
 INLINE bool SUB_CHAR_TABLE_P (Lisp_Object);
 INLINE bool (SYMBOLP) (Lisp_Object);
@@ -1219,7 +1222,6 @@ STRINGP (Lisp_Object x)
     return true;
 
   /* Check if it's an emacs-string wrapper - use centralized function */
-  extern bool is_emacs_string_wrapper (Lisp_Object);
   return is_emacs_string_wrapper (x);
 }
 
@@ -5039,6 +5041,8 @@ extern void record_property_change (ptrdiff_t, ptrdiff_t,
 extern void syms_of_undo (void);
 
 /* Defined in textprop.c.  */
+extern bool is_emacs_string_wrapper (Lisp_Object);
+extern Lisp_Object unwrap_emacs_string (Lisp_Object);
 extern void report_interval_modification (Lisp_Object, Lisp_Object);
 
 /* Defined in menu.c.  */

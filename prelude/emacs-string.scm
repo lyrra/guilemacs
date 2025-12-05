@@ -39,6 +39,7 @@
             emacs-string-predicate  ; Runtime-callable version for C
             emacs-string-content
             emacs-string-intervals
+            emacs-string-intervals-runtime  ; Runtime-callable version for C
             emacs-string-intervals-set!
             emacs-string-length
             ;; Conversion utilities
@@ -64,6 +65,13 @@
   "Runtime-callable wrapper for emacs-string? predicate.
 This is needed because C code can't call macros directly."
   (emacs-string? obj))
+
+;;; Runtime-callable accessor for C code
+;; SRFI-9 record accessors are syntax transformers, not procedures
+(define (emacs-string-intervals-runtime obj)
+  "Runtime-callable wrapper for emacs-string-intervals accessor.
+This is needed because SRFI-9 accessors are syntax transformers, not procedures."
+  (emacs-string-intervals obj))
 
 ;;; Constructors
 
