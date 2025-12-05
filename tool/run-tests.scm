@@ -116,8 +116,9 @@
 ;;;  "test/lisp/emacs-lisp/derived-tests.el"
 ;;;  "test/lisp/emacs-lisp/easy-mmode-tests.el"
 ;;;  )
-   (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
-   (group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
+   ; faceup uses syntax for string text-property #("ABC") but guile reader doesn't support  that
+   ;(group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
+   ;(group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
   (group
   "test/lisp/emacs-lisp/float-sup-tests.el"
   ; "test/lisp/emacs-lisp/hierarchy-tests.el" ;; fails, strings are eq in guilemacs, internalized
