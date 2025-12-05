@@ -51,6 +51,8 @@
             split-interval
             extract-intervals
             shift-intervals
+            adjust-intervals-on-insert
+            adjust-intervals-on-delete
             ;; Property list operations
             plist-get
             plist-put
@@ -181,24 +183,25 @@ Returns new interval list."
   (if (null? intervals)
       ;; No intervals yet, create one covering the range
       (list (make-interval start end new-props))
-      (let loop ((ints intervals) (result '()) (added-new? #f))
+      ;; Track last covered position to handle gaps
+      (let loop ((ints intervals) (result '()) (last-covered start))
         (cond
           ((null? ints)
-           ;; Done processing - if we haven't added the new interval yet, add it now
-           (if added-new?
-               (merge-adjacent-intervals (reverse result))
-               (merge-adjacent-intervals (reverse (cons (make-interval start end new-props) result)))))
+           ;; Done processing - add final gap if needed
+           (if (< last-covered end)
+               (merge-adjacent-intervals (reverse (cons (make-interval last-covered end new-props) result)))
+               (merge-adjacent-intervals (reverse result))))
 
           ((>= (interval-start (car ints)) end)
            ;; This interval is after our range
-           ;; Add new interval if not already added, then keep rest as-is
-           (if added-new?
-               (merge-adjacent-intervals (append (reverse result) ints))
-               (merge-adjacent-intervals (append (reverse (cons (make-interval start end new-props) result)) ints))))
+           ;; Add any remaining gap, then keep rest as-is
+           (if (< last-covered end)
+               (merge-adjacent-intervals (append (reverse (cons (make-interval last-covered end new-props) result)) ints))
+               (merge-adjacent-intervals (append (reverse result) ints))))
 
           ((<= (interval-end (car ints)) start)
            ;; This interval is before our range (or adjacent), keep it
-           (loop (cdr ints) (cons (car ints) result) added-new?))
+           (loop (cdr ints) (cons (car ints) result) last-covered))
 
           (else
            ;; This interval overlaps our range
@@ -211,6 +214,12 @@ Returns new interval list."
              (define before-part
                (if (< int-start start)
                    (list (make-interval int-start start int-props))
+                   '()))
+
+             ;; Handle gap before this interval (if any)
+             (define gap-part
+               (if (< last-covered (max int-start start))
+                   (list (make-interval last-covered (max int-start start) new-props))
                    '()))
 
              ;; Handle the overlapping part
@@ -232,10 +241,10 @@ Returns new interval list."
                    '()))
 
              ;; Continue with remaining intervals
-             ;; Mark that we've added the new interval (it's in overlap-part)
+             ;; Update last-covered to end of overlap
              (loop (cdr ints)
-                   (append after-part overlap-part before-part result)
-                   #t)))))))  ; added-new? = #t
+                   (append after-part overlap-part gap-part before-part result)
+                   overlap-end)))))))  ; added-new? = #t
 
 (define (extract-intervals intervals start end)
   "Extract intervals from [START, END), adjusting positions.
@@ -275,6 +284,107 @@ Returns new interval list."
                        (+ (interval-end int) offset)
                        (interval-plist int)))
        intervals))
+
+;;; Buffer Modification Hooks
+;;
+;; These functions adjust intervals when buffer content changes
+
+(define (adjust-intervals-on-insert intervals pos length)
+  "Adjust INTERVALS after inserting LENGTH characters at POS.
+All intervals at or after POS are shifted right by LENGTH.
+Returns new interval list."
+  (if (null? intervals)
+      '()
+      (let loop ((ints intervals) (result '()))
+        (cond
+          ((null? ints)
+           (merge-adjacent-intervals (reverse result)))
+
+          (else
+           (let* ((int (car ints))
+                  (int-start (interval-start int))
+                  (int-end (interval-end int))
+                  (int-plist (interval-plist int)))
+
+             (cond
+               ;; Interval completely before insertion - keep as-is
+               ((<= int-end pos)
+                (loop (cdr ints) (cons int result)))
+
+               ;; Interval completely after insertion - shift right
+               ((>= int-start pos)
+                (loop (cdr ints)
+                      (cons (make-interval (+ int-start length)
+                                          (+ int-end length)
+                                          int-plist)
+                            result)))
+
+               ;; Insertion is inside interval - split and expand
+               (else
+                ;; Create single expanded interval covering insertion
+                (loop (cdr ints)
+                      (cons (make-interval int-start
+                                          (+ int-end length)
+                                          int-plist)
+                            result))))))))))
+
+(define (adjust-intervals-on-delete intervals start end)
+  "Adjust INTERVALS after deleting text from START to END.
+Intervals in the deleted range are removed/clipped.
+Intervals after END are shifted left by (END - START).
+Returns new interval list."
+  (if (null? intervals)
+      '()
+      (let ((delete-len (- end start)))
+        (let loop ((ints intervals) (result '()))
+          (cond
+            ((null? ints)
+             (merge-adjacent-intervals (reverse result)))
+
+            (else
+             (let* ((int (car ints))
+                    (int-start (interval-start int))
+                    (int-end (interval-end int))
+                    (int-plist (interval-plist int)))
+
+               (cond
+                 ;; Interval completely before deletion - keep as-is
+                 ((<= int-end start)
+                  (loop (cdr ints) (cons int result)))
+
+                 ;; Interval completely after deletion - shift left
+                 ((>= int-start end)
+                  (loop (cdr ints)
+                        (cons (make-interval (- int-start delete-len)
+                                            (- int-end delete-len)
+                                            int-plist)
+                              result)))
+
+                 ;; Interval completely inside deletion - remove it
+                 ((and (>= int-start start) (<= int-end end))
+                  (loop (cdr ints) result))
+
+                 ;; Deletion inside interval - shrink it
+                 ((and (<= int-start start) (>= int-end end))
+                  (loop (cdr ints)
+                        (cons (make-interval int-start
+                                            (- int-end delete-len)
+                                            int-plist)
+                              result)))
+
+                 ;; Interval starts before, ends inside deletion - clip end
+                 ((< int-start start)
+                  (loop (cdr ints)
+                        (cons (make-interval int-start start int-plist)
+                              result)))
+
+                 ;; Interval starts inside deletion, ends after - clip start and shift
+                 (else
+                  (loop (cdr ints)
+                        (cons (make-interval start
+                                            (- int-end delete-len)
+                                            int-plist)
+                              result)))))))))))
 
 ;;; C Bridge - Wrapper functions for record accessors
 ;;; (needed because record accessors are syntax transformers)

@@ -57,7 +57,10 @@
             buffer-add-text-properties
             buffer-put-text-property
             buffer-get-text-property
-            buffer-text-properties-at))
+            buffer-text-properties-at
+            ;; Buffer modification hooks
+            buffer-on-insert
+            buffer-on-delete))
 
 ;;; Buffer Property Storage
 ;;
@@ -568,6 +571,28 @@ Returns the position of first mismatch, or #nil if all match."
                  ;; Interval is before pos (shouldn't happen with sorted intervals)
                  ((<= int-end pos)
                   (loop (cdr ints) pos))))))))))
+
+;;; Buffer Modification Hooks
+;;
+;; These functions are called from C when buffer content changes
+
+(define (buffer-on-insert buffer pos length)
+  "Hook called after inserting LENGTH characters at POS in BUFFER.
+Adjusts text property intervals accordingly."
+  (let* ((old-intervals (buffer-intervals-get buffer))
+         (new-intervals (adjust-intervals-on-insert old-intervals pos length)))
+    (when (not (null? old-intervals))
+      (format #t "buffer-on-insert: pos=~a len=~a~%" pos length)
+      (format #t "  old intervals: ~a~%" old-intervals)
+      (format #t "  new intervals: ~a~%" new-intervals))
+    (buffer-intervals-set! buffer new-intervals)))
+
+(define (buffer-on-delete buffer start end)
+  "Hook called after deleting text from START to END in BUFFER.
+Adjusts text property intervals accordingly."
+  (let* ((old-intervals (buffer-intervals-get buffer))
+         (new-intervals (adjust-intervals-on-delete old-intervals start end)))
+    (buffer-intervals-set! buffer new-intervals)))
 
 ;;; Module initialization
 

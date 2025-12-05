@@ -679,6 +679,18 @@ insert (const char *string, ptrdiff_t nbytes)
       opoint = PT - len;
       signal_after_change (opoint, 0, len);
       update_compositions (opoint, PT, CHECK_BORDER);
+
+      /* Adjust text properties for insertion */
+      {
+        SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+        if (!scm_is_false (buffer_on_insert))
+          {
+            SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
+            SCM pos = scm_from_ptrdiff_t (opoint);
+            SCM length = scm_from_ptrdiff_t (len);
+            scm_call_3 (buffer_on_insert, buffer, pos, length);
+          }
+      }
     }
 }
 
@@ -694,6 +706,18 @@ insert_and_inherit (const char *string, ptrdiff_t nbytes)
       opoint = PT - len;
       signal_after_change (opoint, 0, len);
       update_compositions (opoint, PT, CHECK_BORDER);
+
+      /* Adjust text properties for insertion */
+      {
+        SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+        if (!scm_is_false (buffer_on_insert))
+          {
+            SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
+            SCM pos = scm_from_ptrdiff_t (opoint);
+            SCM length = scm_from_ptrdiff_t (len);
+            scm_call_3 (buffer_on_insert, buffer, pos, length);
+          }
+      }
     }
 }
 
@@ -1783,6 +1807,18 @@ del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare, bool ret_string)
 
   from_byte = CHAR_TO_BYTE (from);
   to_byte = CHAR_TO_BYTE (to);
+
+  /* Adjust text properties BEFORE deletion (while positions are still valid) */
+  {
+    SCM buffer_on_delete = scm_c_public_ref ("text-properties", "buffer-on-delete");
+    if (!scm_is_false (buffer_on_delete))
+      {
+        SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
+        SCM start_pos = scm_from_ptrdiff_t (from);
+        SCM end_pos = scm_from_ptrdiff_t (to);
+        scm_call_3 (buffer_on_delete, buffer, start_pos, end_pos);
+      }
+  }
 
   deletion = del_range_2 (from, from_byte, to, to_byte, ret_string);
   signal_after_change (from, to - from, 0);
