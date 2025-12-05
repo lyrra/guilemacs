@@ -786,6 +786,23 @@ See `prin1' for the meaning of OVERRIDES.
 A printed representation of an object is text which describes that object.  */)
   (Lisp_Object object, Lisp_Object noescape, Lisp_Object overrides)
 {
+  /* Phase 4: Deep-unwrap emacs-strings before printing to avoid
+     Guile printer trying to print wrapper record structures */
+  static SCM deep_unwrap_proc = SCM_BOOL_F;
+  if (scm_is_false (deep_unwrap_proc))
+    {
+      SCM mod = scm_c_resolve_module ("emacs-string");
+      if (!scm_is_false (mod))
+        {
+          SCM var = scm_c_module_lookup (mod, "deep-unwrap-for-printing");
+          if (!scm_is_false (var))
+            deep_unwrap_proc = scm_variable_ref (var);
+        }
+    }
+
+  if (!scm_is_false (deep_unwrap_proc))
+    object = scm_call_1 (deep_unwrap_proc, object);
+
   dynwind_begin ();
   specbind (Qinhibit_modification_hooks, Qt);
 

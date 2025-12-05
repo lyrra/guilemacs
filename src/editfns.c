@@ -1714,10 +1714,6 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
                   ptrdiff_t str_end = range_end - start;
 
                   /* Safety check: ensure positions are valid and within result string bounds */
-                  fprintf(stderr, "DEBUG: buf[%ld,%ld) -> str[%ld,%ld) (start=%ld, end=%ld, result_len=%ld)\n",
-                          (long)range_start, (long)range_end,
-                          (long)str_start, (long)str_end,
-                          (long)start, (long)end, (long)result_len);
                   if (str_start >= 0 && str_end >= 0 && str_start < str_end
                       && str_start < result_len && str_end <= result_len)
                     {
@@ -3747,7 +3743,8 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	  struct info *spec = &info[ispec++];
 	  if (nspec < ispec)
 	    {
-	      spec->argument = args[n];
+	      /* Phase 4: Unwrap emacs-strings before formatting */
+	      spec->argument = unwrap_emacs_string (args[n]);
 	      spec->intervals = false;
 	      nspec = ispec;
 	    }

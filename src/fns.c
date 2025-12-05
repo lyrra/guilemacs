@@ -321,7 +321,11 @@ See also `string-equal-ignore-case'.  */)
   CHECK_STRING (s1);
   CHECK_STRING (s2);
 
-  return scm_string_equal_p (s1, s2) == SCM_BOOL_T ? Qt : Qnil;
+  /* Phase 4: Unwrap emacs-strings before comparison */
+  Lisp_Object unwrapped_s1 = unwrap_emacs_string (s1);
+  Lisp_Object unwrapped_s2 = unwrap_emacs_string (s2);
+
+  return scm_string_equal_p (unwrapped_s1, unwrapped_s2) == SCM_BOOL_T ? Qt : Qnil;
 }
 
 DEFUN ("compare-strings", Fcompare_strings, Scompare_strings, 6, 7, 0,
@@ -2955,7 +2959,29 @@ Numbers are compared via `eql', so integers do not equal floats.
 Symbols must match exactly.  */)
   (Lisp_Object o1, Lisp_Object o2)
 {
-  Lisp_Object x = scm_equal_p (o1, o2);
+  /* Phase 4: Deep-unwrap emacs-strings before comparison (equal ignores text properties) */
+  static SCM deep_unwrap_proc = SCM_BOOL_F;
+  if (scm_is_false (deep_unwrap_proc))
+    {
+      SCM mod = scm_c_resolve_module ("emacs-string");
+      if (!scm_is_false (mod))
+        {
+          SCM var = scm_c_module_lookup (mod, "deep-unwrap-for-printing");
+          if (!scm_is_false (var))
+            deep_unwrap_proc = scm_variable_ref (var);
+        }
+    }
+
+  Lisp_Object unwrapped_o1 = o1;
+  Lisp_Object unwrapped_o2 = o2;
+
+  if (!scm_is_false (deep_unwrap_proc))
+    {
+      unwrapped_o1 = scm_call_1 (deep_unwrap_proc, o1);
+      unwrapped_o2 = scm_call_1 (deep_unwrap_proc, o2);
+    }
+
+  Lisp_Object x = scm_equal_p (unwrapped_o1, unwrapped_o2);
   return scm_is_true (x) ? Qt : Qnil;
 }
 

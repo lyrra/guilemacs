@@ -45,6 +45,7 @@
             ;; Conversion utilities
             wrap-string
             unwrap-string
+            deep-unwrap-for-printing  ; Phase 4: for prin1-to-string
             ;; Wrapper check
             has-properties?))
 
@@ -121,6 +122,28 @@ If ESTR is already a plain string, return it as-is."
   (if (emacs-string? estr)
       (%emacs-string-content estr)
       estr))
+
+(define (deep-unwrap-for-printing obj)
+  "Recursively unwrap emacs-strings in OBJ for printing.
+This is used by prin1-to-string to ensure wrapper objects don't appear in output.
+- Unwraps emacs-string wrappers to plain strings
+- Recursively processes lists
+- Recursively processes vectors
+- Leaves other objects unchanged"
+  (cond
+    ((emacs-string? obj)
+     ;; Unwrap the string
+     (%emacs-string-content obj))
+    ((pair? obj)
+     ;; Recursively unwrap car and cdr
+     (cons (deep-unwrap-for-printing (car obj))
+           (deep-unwrap-for-printing (cdr obj))))
+    ((vector? obj)
+     ;; Recursively unwrap vector elements
+     (list->vector (map deep-unwrap-for-printing (vector->list obj))))
+    (else
+     ;; Return other objects as-is
+     obj)))
 
 ;;; Predicates
 
