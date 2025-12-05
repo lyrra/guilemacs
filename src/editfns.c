@@ -1328,10 +1328,6 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
       ptrdiff_t buf_start = start + int_start;
       ptrdiff_t buf_end = start + int_end;
 
-      /* DEBUG: Print what we're about to apply */
-      fprintf (stderr, "DEBUG Phase4: Applying properties to [%ld, %ld)\n",
-               (long)buf_start, (long)buf_end);
-
       /* Apply properties to this range in the buffer */
       Fadd_text_properties (make_fixnum (buf_start),
                             make_fixnum (buf_end),

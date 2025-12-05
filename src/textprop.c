@@ -1413,17 +1413,12 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
   if (NILP (object))
     object = Fcurrent_buffer ();
 
-  fprintf (stderr, "DEBUG add_text_properties_1: object is %s\n",
-           STRINGP (object) ? "STRING" : BUFFERP (object) ? "BUFFER" : "OTHER");
 
   if (STRINGP (object) || BUFFERP (object))
     {
       ensure_text_properties_loaded ();
-      fprintf (stderr, "DEBUG: After ensure, scm_add_text_properties_proc is %s\n",
-               scm_is_false (scm_add_text_properties_proc) ? "FALSE" : "ok");
       if (!scm_is_false (scm_add_text_properties_proc))
         {
-          fprintf (stderr, "DEBUG: Calling Scheme add-text-properties\n");
           /* Validate start/end arguments.
              For buffers, convert markers to positions and check bounds.
              For strings, just check that they're integers. */
