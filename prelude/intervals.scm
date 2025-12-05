@@ -196,8 +196,8 @@ Returns new interval list."
                (merge-adjacent-intervals (append (reverse result) ints))
                (merge-adjacent-intervals (append (reverse (cons (make-interval start end new-props) result)) ints))))
 
-          ((< (interval-end (car ints)) start)
-           ;; This interval is before our range, keep it
+          ((<= (interval-end (car ints)) start)
+           ;; This interval is before our range (or adjacent), keep it
            (loop (cdr ints) (cons (car ints) result) added-new?))
 
           (else
