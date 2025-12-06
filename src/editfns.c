@@ -1617,7 +1617,7 @@ Lisp_Object
 make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
 			 ptrdiff_t end, ptrdiff_t end_byte, bool props)
 {
-  Lisp_Object result, tem, tem1;
+  Lisp_Object result, tem1;
   ptrdiff_t beg0, end0, beg1, end1, size;
   ptrdiff_t total_bytes = end_byte - start_byte;
 
@@ -1679,15 +1679,15 @@ make_buffer_string_both (ptrdiff_t start, ptrdiff_t start_byte,
     {
       update_buffer_properties (start, end);
 
-      tem = Fnext_property_change (make_fixnum (start), Qnil, make_fixnum (end));
-      tem1 = Ftext_properties_at (make_fixnum (start), Qnil);
+      /* Check if there are any properties to copy */
+      Lisp_Object buffer = Fcurrent_buffer ();
+      Lisp_Object tem1 = Ftext_properties_at (make_fixnum (start), buffer);
 
       if (!NILP (tem1))
         {
           /* Copy properties from buffer to string using Scheme implementation.
              Group adjacent positions with identical properties into ranges,
              then copy each range as a single operation. */
-          Lisp_Object buffer = Fcurrent_buffer ();
           ptrdiff_t pos = start;
           ptrdiff_t result_len = SCHARS (result);
 

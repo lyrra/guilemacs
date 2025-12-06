@@ -364,8 +364,8 @@ LIMIT is optional - defaults to end of object if not provided."
                ((<= int-end position)
                 (loop (cdr ints)))
 
-               ;; We're before or at start of this interval
-               ((<= position int-start)
+               ;; We're before this interval (strictly less than start)
+               ((< position int-start)
                 ;; Next change is at start of this interval
                 (if (and actual-limit (>= int-start actual-limit))
                     (or limit #nil)
