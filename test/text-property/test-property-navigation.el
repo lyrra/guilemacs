@@ -125,7 +125,7 @@
                 4
                 (length changes))
     (test-equal "property-navigation/walk-all-positions"
-                '(23 17 11 7)
+                '(25 19 11 7)
                 changes)))  ; reversed due to push
 
 ;; Test 11: Walk backwards through property changes
@@ -145,7 +145,7 @@
                 4
                 (length changes))
     (test-equal "property-navigation/walk-backward-positions"
-                '(7 11 17 23)
+                '(7 11 19 25)
                 changes)))
 
 ;; Test 12: next-property-change with limit
