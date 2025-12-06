@@ -47,6 +47,8 @@
             remove-text-properties
             set-text-properties
             ;; Property change search
+            next-property-change
+            previous-property-change
             next-single-property-change
             previous-single-property-change
             text-property-any
@@ -325,6 +327,110 @@ LIMIT is optional - defaults to start of object (0) if not provided."
 
                (else
                 (loop (cdr ints) pos))))))))))
+
+(define (next-property-change position object limit)
+  "Find next position where ANY property changes in OBJECT starting from POSITION.
+Returns the position of the change, or LIMIT if no change found.
+OBJECT can be a buffer, string, or emacs-string wrapper.
+LIMIT is optional - defaults to end of object if not provided."
+  (let* ((intervals (cond
+                     ((emacs-string? object) (emacs-string-intervals object))
+                     ((string? object) '())
+                     (else (buffer-intervals-get object))))
+         (obj-end (cond
+                   ((emacs-string? object) (emacs-string-length object))
+                   ((string? object) (string-length object))
+                   (else #f)))
+         (actual-limit (if (and limit (not (eq? limit #nil)))
+                          limit
+                          obj-end)))
+
+    ;; If no intervals, no property changes
+    (if (null? intervals)
+        (or limit #nil)
+        ;; Find the next interval boundary after position
+        (let loop ((ints intervals))
+          (cond
+           ((null? ints)
+            (or limit #nil))
+
+           (else
+            (let* ((int (car ints))
+                   (int-start (interval-start int))
+                   (int-end (interval-end int)))
+
+              (cond
+               ;; Interval is entirely before position - skip
+               ((<= int-end position)
+                (loop (cdr ints)))
+
+               ;; We're before or at start of this interval
+               ((<= position int-start)
+                ;; Next change is at start of this interval
+                (if (and actual-limit (>= int-start actual-limit))
+                    (or limit #nil)
+                    int-start))
+
+               ;; We're inside this interval
+               ((< position int-end)
+                ;; Next change is at end of this interval
+                (if (and actual-limit (>= int-end actual-limit))
+                    (or limit #nil)
+                    int-end))
+
+               ;; Shouldn't reach here
+               (else
+                (loop (cdr ints)))))))))))
+
+(define (previous-property-change position object limit)
+  "Find previous position where ANY property changes in OBJECT before POSITION.
+Returns the position of the change, or LIMIT if no change found.
+OBJECT can be a buffer, string, or emacs-string wrapper.
+LIMIT is optional - defaults to start of object (0) if not provided."
+  (let* ((intervals (cond
+                     ((emacs-string? object) (emacs-string-intervals object))
+                     ((string? object) '())
+                     (else (buffer-intervals-get object))))
+         (actual-limit (if (and limit (not (eq? limit #nil)))
+                          limit
+                          0)))
+
+    ;; If no intervals, no property changes
+    (if (null? intervals)
+        (or limit #nil)
+        ;; Find the previous interval boundary before position
+        (let loop ((ints (reverse intervals)))
+          (cond
+           ((null? ints)
+            (or limit #nil))
+
+           (else
+            (let* ((int (car ints))
+                   (int-start (interval-start int))
+                   (int-end (interval-end int)))
+
+              (cond
+               ;; Interval is entirely after position - skip
+               ((>= int-start position)
+                (loop (cdr ints)))
+
+               ;; Position is after end of this interval
+               ((> position int-end)
+                ;; Previous change is at end of this interval
+                (if (<= int-end actual-limit)
+                    (or limit #nil)
+                    int-end))
+
+               ;; We're inside this interval
+               ((>= position int-start)
+                ;; Previous change is at start of this interval
+                (if (<= int-start actual-limit)
+                    (or limit #nil)
+                    int-start))
+
+               ;; Shouldn't reach here
+               (else
+                (loop (cdr ints)))))))))))
 
 ;;; Property Removal and Setting Functions (Phase 5)
 
