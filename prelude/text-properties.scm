@@ -255,11 +255,16 @@ LIMIT is optional - defaults to end of object if not provided."
                                   ;; Different value - change at end
                                   int-end))))))
 
-               ;; We're before this interval - property changes at its start
+               ;; We're before this interval
                (else
-                (if (and actual-limit (>= int-start actual-limit))
-                    (or limit #nil)
-                    int-start))))))))))
+                ;; Check if property value changes at start of this interval
+                (if (not (equal? int-val current-val))
+                    ;; Property changes at start of this interval
+                    (if (and actual-limit (>= int-start actual-limit))
+                        (or limit #nil)
+                        int-start)
+                    ;; Property value is same, keep searching
+                    (loop (cdr ints) int-start)))))))))))
 
 (define (previous-single-property-change position prop obj limit)
   "Find previous position where PROP changes in OBJ before POSITION.

@@ -1817,11 +1817,21 @@ If narrowing is in effect, this function returns only the visible part
 of the buffer.
 
 This function copies the text properties of that part of the buffer
-into the result string; if you don’t want the text properties,
-use `buffer-substring-no-properties' instead.  */)
+into the result string; if you don't want the text properties,
+use `buffer-string-no-properties' instead.  */)
   (void)
 {
   return make_buffer_string_both (BEGV, BEGV_BYTE, ZV, ZV_BYTE, 1);
+}
+
+DEFUN ("buffer-string-no-properties", Fbuffer_string_no_properties,
+       Sbuffer_string_no_properties, 0, 0, 0,
+       doc: /* Return the contents of the current buffer as a string, without text properties.
+If narrowing is in effect, this function returns only the visible part
+of the buffer.  */)
+  (void)
+{
+  return make_buffer_string_both (BEGV, BEGV_BYTE, ZV, ZV_BYTE, 0);
 }
 
 DEFUN ("insert-buffer-substring", Finsert_buffer_substring, Sinsert_buffer_substring,
