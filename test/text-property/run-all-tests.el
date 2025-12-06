@@ -31,6 +31,15 @@
 (load-file "test/text-property/test-buffer-modifications.el")
 (message "")
 
+(load-file "test/text-property/test-property-navigation.el")
+(message "")
+
+(load-file "test/text-property/test-no-properties.el")
+(message "")
+
+(load-file "test/text-property/test-narrow-widen.el")
+(message "")
+
 (load-file "test/text-property/test-substring-operations.el")
 (message "")
 
