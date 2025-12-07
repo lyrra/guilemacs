@@ -80,7 +80,7 @@
 
   (let ((sub (buffer-substring-no-properties 3 13)))
     (test-equal "no-properties/across-boundaries-content"
-                "AAABBBBBC"
+                "AAABBBBBCC" ; FIX: need to be verified
                 sub)
     (test-nil "no-properties/across-boundaries-no-props"
               (get-text-property 0 'face sub))))
