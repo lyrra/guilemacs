@@ -101,44 +101,7 @@ ensure_text_properties_loaded (void)
 {
   if (scm_is_false (scm_text_properties_module))
     {
-      /* Load Phase 1 wrapper-based modules */
-      /* These modules must be loaded in order: intervals, emacs-string, then text-properties */
-      const char *modules[] = {
-        "prelude/intervals.scm",
-        "prelude/emacs-string.scm",
-        "prelude/text-properties.scm",
-        NULL
-      };
-
-      bool all_loaded = true;
-      for (int i = 0; modules[i] != NULL && all_loaded; i++)
-        {
-          /* Try different base paths */
-          const char *bases[] = {"", "../", NULL};
-          bool module_loaded = false;
-
-          for (int j = 0; bases[j] != NULL && !module_loaded; j++)
-            {
-              char path[512];
-              snprintf (path, sizeof (path), "%s%s", bases[j], modules[i]);
-              if (access (path, R_OK) == 0)
-                {
-                  fprintf (stderr, "Loading %s...\n", path);
-                  scm_c_primitive_load (path);
-                  module_loaded = true;
-                }
-            }
-
-          if (!module_loaded)
-            {
-              fprintf (stderr, "ERROR: Cannot find %s\n", modules[i]);
-              all_loaded = false;
-            }
-        }
-
-      if (!all_loaded)
-        error ("Cannot load text-properties modules");
-
+      /* Resolve the text-properties module (already loaded by prelude/load.scm) */
       scm_text_properties_module = scm_c_resolve_module ("text-properties");
 
       /* Cache procedure references */
@@ -146,7 +109,6 @@ ensure_text_properties_loaded (void)
       scm_text_properties_at_proc = scm_c_module_lookup (scm_text_properties_module, "text-properties-at");
       scm_add_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "add-text-properties");
       scm_propertize_proc = scm_c_module_lookup (scm_text_properties_module, "propertize");
-      /* Phase 5: Additional property API functions */
       scm_remove_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "remove-text-properties");
       scm_set_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "set-text-properties");
       scm_text_property_any_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-any");
