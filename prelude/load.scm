@@ -1090,10 +1090,6 @@ Case is significant. Symbols are also allowed; their print names are used instea
   "Return t if OBJECT is an integer."
   (if (and (number? object) (exact-integer? object)) #t #nil))
 
-(define (elisp-natnump object)
-  "Return t if OBJECT is a nonnegative integer, and nil otherwise."
-  (if (and (number? object) (exact-integer? object) (>= object 0)) #t #nil))
-
 (define (elisp-stringp object)
   "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
   (if (or (string? object)
@@ -1107,13 +1103,6 @@ Case is significant. Symbols are also allowed; their print names are used instea
 
 
 ;; Simple utility functions from fns.c that are easy to migrate
-(define (elisp-car-safe object)
-  "Return the car of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (car object) #nil))
-
-(define (elisp-cdr-safe object)
-  "Return the cdr of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (cdr object) #nil))
 
 ;; Simple comparison and null checking functions from data.c
 (define (elisp-null object)
@@ -1220,9 +1209,6 @@ least the number of distinct elements."
       0)))
 
 ;; Equality functions that use Guile primitives
-(define (elisp-eq obj1 obj2)
-  "Return t if the two args are the same Lisp object."
-  (if (eq? obj1 obj2) #t #nil))
 
 (define (elisp-eql obj1 obj2)
   "Return t if the two args are `eq' or are indistinguishable numbers.
@@ -1834,12 +1820,6 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 ;; DEFUN function migrations - Phase 3: Move simple elisp predicates to Guile
 ;; These are simple type predicates that can be efficiently implemented in Guile
 
-(define (elisp-characterp object)
-  "Return non-nil if OBJECT is a character.
-In Emacs Lisp, characters are represented by character codes, which
-are non-negative integers."
-  (if (and (integer? object) (>= object 0) (<= object #x3FFFFF)) #t #nil))
-
 ;; Additional predicate migrations from src/data.c
 
 (define (elisp-consp object)
@@ -1858,9 +1838,6 @@ are non-negative integers."
   "Return t if OBJECT is a vector."
   (if (vector? object) #t #nil))
 
-(define (elisp-sequencep object)
-  "Return t if OBJECT is a sequence (list or array)."
-  (if (or (pair? object) (eq? object #nil) (vector? object) (string? object)) #t #nil))
 
 (define (elisp-markerp object)
   "Return t if OBJECT is a marker (editor pointer)."
@@ -2238,10 +2215,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 
 ;; Additional mathematical predicate functions migrated from src/data.c
 
-(define (elisp-natnump object)
-  "Return t if OBJECT is a nonnegative integer."
-  (if (and (integer? object) (>= object 0)) #t #nil))
-
 (define (elisp-number-or-marker-p object)
   "Return t if OBJECT is a number or a marker."
   ;; For now, markers are not implemented in Guile, so just check numbers
@@ -2284,13 +2257,6 @@ This means that it is a symbol with a print name beginning with ':'."
   #nil)
 
 ;; Basic comparison and utility predicates migrated from src/data.c
-(define (elisp-eq obj1 obj2)
-  "Return t if the two args are the same Lisp object."
-  (if (eq? obj1 obj2) #t #nil))
-
-(define (elisp-atom object)
-  "Return t if OBJECT is not a cons cell. This includes nil."
-  (if (pair? object) #nil #t))
 
 ;; Migrated from src/fns.c - equality predicates
 (define (elisp-equal o1 o2)
@@ -2302,9 +2268,6 @@ This means that it is a symbol with a print name beginning with ':'."
   (if (eqv? obj1 obj2) #t #nil))
 
 ;; Basic character predicate from src/character.c
-(define (elisp-characterp object . ignore)
-  "Return non-nil if OBJECT is a character."
-  (if (char? object) #t #nil))
 
 ;; Additional type predicates migrated from src/data.c
 
@@ -2345,14 +2308,6 @@ This means that it is a symbol with a print name beginning with ':'."
     ((pair? list) (cdr list))
     (else (error "Wrong type argument: listp" list))))
 
-(define (elisp-car-safe object)
-  "Return the car of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (car object) #nil))
-
-(define (elisp-cdr-safe object)
-  "Return the cdr of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (cdr object) #nil))
-
 ;; Simple utility functions migrated from src/fns.c and src/data.c
 
 (define (elisp-bare-symbol-p object)
@@ -2392,13 +2347,6 @@ This means that it is a symbol with a print name beginning with ':'."
           (vector? object)
           (eq? #t (elisp-char-table-p object))
           (eq? #t (elisp-bool-vector-p object))) #t #nil))
-
-(define (elisp-sequencep object)
-  "Return t if OBJECT is a sequence (a list or an array)."
-  (if (or (pair? object)
-          (null? object)
-          (eq? object #nil)
-          (eq? #t (elisp-arrayp object))) #t #nil))
 
 ;; Register the new mathematical functions for Elisp use
 (set-symbol-function! 'elisp-copysign elisp-copysign)
