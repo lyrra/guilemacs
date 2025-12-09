@@ -773,10 +773,6 @@ The elements of a list are not copied; they are shared with the original."
   "Return t if OBJECT is a number (integer or floating point)."
   (if (number? object) #t #nil))
 
-(define (elisp-integerp object)
-  "Return t if OBJECT is an integer."
-  (if (integer? object) #t #nil))
-
 (define (elisp-floatp object)
   "Return t if OBJECT is a floating point number."
   (if (and (number? object) (not (integer? object))) #t #nil))
@@ -952,7 +948,6 @@ This is a useful building block for higher-order functions."
 (set-symbol-function! 'evenp elisp-evenp)
 (set-symbol-function! 'oddp elisp-oddp)
 (set-symbol-function! 'numberp elisp-numberp)
-(set-symbol-function! 'integerp elisp-integerp)
 (set-symbol-function! 'floatp elisp-floatp)
 (set-symbol-function! 'natnump elisp-natnump)
 (set-symbol-function! 'plist-get elisp-plist-get)
@@ -1854,10 +1849,6 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 ;; DEFUN function migrations - Phase 3: Move simple elisp predicates to Guile
 ;; These are simple type predicates that can be efficiently implemented in Guile
 
-(define (elisp-integerp object)
-  "Return t if OBJECT is an integer."
-  (if (integer? object) #t #nil))
-
 (define (elisp-numberp object)
   "Return t if OBJECT is a number (floating point or integer)."
   (if (number? object) #t #nil))
@@ -2285,9 +2276,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
     (* n n)))
 
 ;; Additional mathematical predicate functions migrated from src/data.c
-(define (elisp-integerp object)
-  "Return t if OBJECT is an integer."
-  (if (integer? object) #t #nil))
 
 (define (elisp-natnump object)
   "Return t if OBJECT is a nonnegative integer."
@@ -2369,9 +2357,6 @@ This means that it is a symbol with a print name beginning with ':'."
   (if (char? object) #t #nil))
 
 ;; Additional type predicates migrated from src/data.c
-(define (elisp-integerp object)
-  "Return t if OBJECT is an integer."
-  (if (integer? object) #t #nil))
 
 (define (elisp-recordp object)
   "Return t if OBJECT is a record."
