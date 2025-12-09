@@ -1,3 +1,36 @@
+;;; ============================================================================
+;;; PRELUDE/LOAD.SCM - Guilemacs Elisp Runtime Functions
+;;; ============================================================================
+;;;
+;;; This file contains the Guile-side implementations of Elisp functions
+;;; migrated from C for better maintainability and leveraging Guile's GC.
+;;;
+;;; CONTENTS:
+;;;   1. Module Setup & Initialization       (Lines ~1-115)
+;;;   2. Reload Infrastructure                (Lines ~116-248)
+;;;   3. Arithmetic & Math Operations         (Lines ~249-677)
+;;;   4. Type Predicates & Conversions        (Lines ~678-1010)
+;;;   5. String Operations                    (Lines ~1011-1401)
+;;;   6. List & Sequence Operations           (Lines ~1402-2025)
+;;;   7. Property Lists & Utilities           (Lines ~2026-2364)
+;;;   8. Reader & Parser Functions            (Lines ~2365-3800)
+;;;   9. Load System                          (Lines ~3801-4365)
+;;;  10. Goals.org Optimizations              (Lines ~4366-4420)
+;;;  11. Debug & Development Tools            (Lines ~4421-END)
+;;;
+;;; NOTE: This file has grown organically and contains duplicate definitions.
+;;;       A cleanup/deduplication pass is planned.
+;;;
+;;; ============================================================================
+
+
+;;; ============================================================================
+;;; SECTION 1: MODULE SETUP & INITIALIZATION
+;;; ============================================================================
+;;;
+;;; Sets up the runtime module, imports dependencies, and configures encoding.
+;;; This section must come first as it establishes the execution environment.
+
 ;; (force-output (current-error-port))
 ;; (format (current-error-port) "-- loading guile elisp prelude~%")
 ;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
@@ -61,6 +94,17 @@
 
 ;(format #t "------- reloading guile elisp spec ----------~%")
 ;(load "./elisp/spec.scm")
+
+;;; End Section 1
+
+
+;;; ============================================================================
+;;; SECTION 2: RELOAD INFRASTRUCTURE
+;;; ============================================================================
+;;;
+;;; Functions for hot-reloading Elisp language components during development.
+;;; This section is executed during prelude initialization.
+
 ;----------------------------------------------------------------------------------
 ;; reload-elisp.scm
 ;; Reload language/elisp pieces in the right order and load boot.el as *Elisp*.
@@ -101,7 +145,17 @@
 (set-current-module (resolve-module '(language elisp runtime)))
 
 (primitive-load (join %prelude-directory "pcase.scm"))
-;----------------------------------------------------------------------------------
+
+;;; End Section 2
+
+
+;;; ============================================================================
+;;; SECTION 3: ARITHMETIC & MATH OPERATIONS
+;;; ============================================================================
+;;;
+;;; Migrated from C DEFUN arithmetic and mathematical functions.
+;;; Includes: basic ops, floating point, predicates.
+;;; NOTE: This section contains some duplicates that need cleanup.
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -246,7 +300,15 @@
 
 (set-symbol-function! 'mod elisp-mod)
 
-;; String operations
+;;; End Section 3
+
+
+;;; ============================================================================
+;;; SECTION 4: STRING OPERATIONS
+;;; ============================================================================
+;;;
+;;; String manipulation, comparison, and creation functions.
+;;; Includes optimized C-string comparisons for C integration.
 
 (define (elisp-string-bytes string)
   "Return the number of bytes in STRING."
@@ -548,6 +610,16 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 (set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
 (set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
 (set-symbol-function! 'string-equal-none elisp-string-equal-none)
+
+;;; End Section 4
+
+
+;;; ============================================================================
+;;; SECTION 5: LIST & SEQUENCE OPERATIONS
+;;; ============================================================================
+;;;
+;;; List/cons manipulation, sequences, property lists, and association lists.
+;;; Migrated from C for better maintainability and GC efficiency.
 
 ;; List processing functions migrated from C to Guile for better maintainability
 
@@ -894,6 +966,16 @@ This is a useful building block for higher-order functions."
 (set-symbol-function! 'mapc elisp-mapc)
 (set-symbol-function! 'identity elisp-identity)
 (set-symbol-function! 'constantly elisp-constantly)
+
+;;; End Section 5
+
+
+;;; ============================================================================
+;;; SECTION 6: TYPE PREDICATES & CONVERSIONS
+;;; ============================================================================
+;;;
+;;; Type checking and conversion functions migrated from C (Phase 3 & 4).
+;;; NOTE: Contains significant duplication - cleanup needed.
 
 ;; Phase 3: Type predicate functions migrated from C to Guile
 
@@ -1301,6 +1383,19 @@ Optional BASE argument specifies the base (2-16)."
   ;; Use Guile's hash function for equal
   (hash obj 536870909))
 
+;;; End Section 6
+
+
+;;; ============================================================================
+;;; SECTION 7: GOALS.ORG OPTIMIZATIONS
+;;; ============================================================================
+;;;
+;;; Performance optimizations from goals.org:
+;;; - Direct symbol comparison instead of string comparison
+;;; - Native Guile case-insensitive operations
+;;; - Symbol interning efficiency
+;;; - Memory handling moved to Guile GC
+
 ;; Implementation of goals.org ideas
 ;; Goal: "Use direct symbol comparison instead of string comparison"
 (define (elisp-symbol-equal sym1 sym2)
@@ -1488,6 +1583,17 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
      (random limit))
     (else
      (error "Wrong type argument" limit))))
+
+;;; End Section 7
+
+
+;;; ============================================================================
+;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
+;;; ============================================================================
+;;;
+;;; Additional function migrations from C to Guile from various source files.
+;;; Includes functions from: lread.c, data.c, fns.c, floatfns.c
+;;; NOTE: Some functions here may overlap with earlier sections.
 
 ;; DEFUN migrations from lread.c - simple utility functions primarily used by elisp
 (define (elisp-get-load-suffixes)
@@ -2444,6 +2550,17 @@ lowercase l) for small endian machines."
 (set-symbol-function! 'byteorder elisp-byteorder)
 
 ;; Note: identity is already registered above as elisp-identity at line 669
+
+;;; End Section 8
+
+
+;;; ============================================================================
+;;; SECTION 9: READER & PARSER FUNCTIONS
+;;; ============================================================================
+;;;
+;;; Elisp reader implementation - parses lists, vectors, literals, etc.
+;;; Migrated from lread.c to enable better extensibility.
+;;; This is a large section with 50+ parse functions.
 
 (define (elisp-parse-list-from-port port)
   "Parse an elisp list from PORT, handling both regular and dotted pairs.
@@ -3794,6 +3911,17 @@ Returns: The result of the appropriate read function"
       (else
        (elisp-read-from-port port)))))
 
+;;; End Section 9
+
+
+;;; ============================================================================
+;;; SECTION 10: LOAD SYSTEM
+;;; ============================================================================
+;;;
+;;; File loading infrastructure - handles .el/.elc files, load-path, etc.
+;;; Migrated from lread.c Fload function.
+;;; Includes: file validation, load-path management, read-eval loop, history.
+
 (define (elisp-load-read-next-expression-from-port port)
   "Read the next complete expression from PORT, handling all preprocessing.
 This function unifies whitespace skipping, comment skipping, EOF detection,
@@ -4420,6 +4548,16 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 (set-symbol-function! 'emacs-load fload-bridge)
 
+;;; End Section 10
+
+
+;;; ============================================================================
+;;; SECTION 11: DEBUG & DEVELOPMENT TOOLS
+;;; ============================================================================
+;;;
+;;; Utilities for debugging and development - not part of core runtime.
+;;; Includes: symbol generation, debug flags, eval-scheme for testing.
+
 ;; Define intern-gensym first - creates interned unique symbols
 (define %intern-gensym 0)
 (define (intern-gensym prefix)
@@ -4445,6 +4583,13 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 (set-symbol-function! 'get-debug-print-flag
                       (lambda ()
                         %debug-print-flag))
+
+;;; End Section 11
+
+
+;;; ============================================================================
+;;; END OF PRELUDE/LOAD.SCM
+;;; ============================================================================
 
 ;; (format (current-error-port) "-- done loading guile elisp prelude~%")
 ;; (force-output (current-error-port))
