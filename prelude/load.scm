@@ -1090,21 +1090,9 @@ Case is significant. Symbols are also allowed; their print names are used instea
   "Return t if OBJECT is an integer."
   (if (and (number? object) (exact-integer? object)) #t #nil))
 
-(define (elisp-numberp object)
-  "Return t if OBJECT is a number (floating point or integer)."
-  (if (number? object) #t #nil))
-
-(define (elisp-floatp object)
-  "Return t if OBJECT is a floating point number."
-  (if (and (number? object) (not (exact-integer? object))) #t #nil))
-
 (define (elisp-natnump object)
   "Return t if OBJECT is a nonnegative integer, and nil otherwise."
   (if (and (number? object) (exact-integer? object) (>= object 0)) #t #nil))
-
-(define (elisp-symbolp object)
-  "Return t if OBJECT is a symbol."
-  (if (symbol? object) #t #nil))
 
 (define (elisp-stringp object)
   "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
@@ -1486,9 +1474,6 @@ Uses Guile's efficient string search with automatic memory management."
       (if pos pos #nil))))
 
 ;; Simple utility functions migrated from C DEFUN to Guile
-(define (elisp-null object)
-  "Return t if OBJECT is nil, and return nil otherwise."
-  (if (or (null? object) (eq? object #nil)) #t #nil))
 
 ;; Register Phase 3 functions for Elisp use
 ; Note: bufferp kept in C for now due to C-specific buffer object handling
@@ -1849,14 +1834,6 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 ;; DEFUN function migrations - Phase 3: Move simple elisp predicates to Guile
 ;; These are simple type predicates that can be efficiently implemented in Guile
 
-(define (elisp-numberp object)
-  "Return t if OBJECT is a number (floating point or integer)."
-  (if (number? object) #t #nil))
-
-(define (elisp-null object)
-  "Return t if OBJECT is nil, and return nil otherwise."
-  (if (eq? object #nil) #t #nil))
-
 (define (elisp-characterp object)
   "Return non-nil if OBJECT is a character.
 In Emacs Lisp, characters are represented by character codes, which
@@ -1864,9 +1841,6 @@ are non-negative integers."
   (if (and (integer? object) (>= object 0) (<= object #x3FFFFF)) #t #nil))
 
 ;; Additional predicate migrations from src/data.c
-(define (elisp-symbolp object)
-  "Return t if OBJECT is a symbol."
-  (if (symbol? object) #t #nil))
 
 (define (elisp-consp object)
   "Return t if OBJECT is a cons cell."
@@ -1875,11 +1849,6 @@ are non-negative integers."
 (define (elisp-atom object)
   "Return t if OBJECT is not a cons cell. This includes nil."
   (if (pair? object) #nil #t))
-
-(define (elisp-listp object)
-  "Return t if OBJECT is a list, that is, a cons cell or nil.
-Otherwise, return nil."
-  (if (or (pair? object) (eq? object #nil)) #t #nil))
 
 (define (elisp-nlistp object)
   "Return t if OBJECT is not a list. Lists include nil."
@@ -1909,10 +1878,6 @@ interned in the initial obarray."
              (and (> (string-length name) 0)
                   (char=? (string-ref name 0) #\:))))
       #t #nil))
-
-(define (elisp-identity argument)
-  "Return the ARGUMENT unchanged."
-  argument)
 
 ;; Register these functions for use from C and Elisp
 ;; Disabled while debugging baseline functionality
@@ -2213,10 +2178,6 @@ This is the same as the exponent of a float."
 
 ;; FIX-guilemacs: Additional simple utility function migrations
 
-(define (elisp-identity argument)
-  "Return the ARGUMENT unchanged."
-  argument)
-
 ;; Reader and file loading functions migrated from C
 (define (elisp-get-load-suffixes)
   "Return the suffixes that `load' should try if a suffix is required.
@@ -2281,14 +2242,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
   "Return t if OBJECT is a nonnegative integer."
   (if (and (integer? object) (>= object 0)) #t #nil))
 
-(define (elisp-numberp object)
-  "Return t if OBJECT is a number (floating point or integer)."
-  (if (number? object) #t #nil))
-
-(define (elisp-floatp object)
-  "Return t if OBJECT is a floating point number."
-  (if (and (number? object) (not (integer? object))) #t #nil))
-
 (define (elisp-number-or-marker-p object)
   "Return t if OBJECT is a number or a marker."
   ;; For now, markers are not implemented in Guile, so just check numbers
@@ -2308,9 +2261,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
     (else (exact->inexact arg)))) ; Convert to float
 
 ;; Additional simple predicate functions migrated from src/data.c
-(define (elisp-listp object)
-  "Return t if OBJECT is a list, that is, a cons cell or nil."
-  (if (or (pair? object) (null? object) (eq? object #nil)) #t #nil))
 
 (define (elisp-keywordp object)
   "Return t if OBJECT is a keyword.
@@ -2404,9 +2354,6 @@ This means that it is a symbol with a print name beginning with ':'."
   (if (pair? object) (cdr object) #nil))
 
 ;; Simple utility functions migrated from src/fns.c and src/data.c
-(define (elisp-identity argument)
-  "Return the ARGUMENT unchanged."
-  argument)
 
 (define (elisp-bare-symbol-p object)
   "Return t if OBJECT is a symbol, but not a symbol together with position."
