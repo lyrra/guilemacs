@@ -1075,13 +1075,6 @@ If UNICODE is non-nil, return the maximum character code defined by Unicode."
         #x10FFFF   ; MAX_UNICODE_CHAR
         #x3FFFFF))) ; MAX_CHAR
 
-(define (elisp-string-lessp string1 string2)
-  "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
-Case is significant. Symbols are also allowed; their print names are used instead."
-  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
-        (s2 (if (symbol? string2) (symbol->string string2) string2)))
-    (if (string<? s1 s2) #t #nil)))
-
 ;; FIX-guilemacs: Additional DEFUN function migrations from C to Guile
 ;; New functions identified as migration candidates
 
@@ -1089,13 +1082,6 @@ Case is significant. Symbols are also allowed; their print names are used instea
 (define (elisp-integerp object)
   "Return t if OBJECT is an integer."
   (if (and (number? object) (exact-integer? object)) #t #nil))
-
-(define (elisp-stringp object)
-  "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
-  (if (or (string? object)
-          (and (defined? 'emacs-string-predicate)
-               ((@ (emacs-string) emacs-string-predicate) object)))
-      #t #nil))
 
 (define (elisp-vectorp object)
   "Return t if OBJECT is a vector."
@@ -1822,23 +1808,6 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
 
 ;; Additional predicate migrations from src/data.c
 
-(define (elisp-consp object)
-  "Return t if OBJECT is a cons cell."
-  (if (pair? object) #t #nil))
-
-(define (elisp-atom object)
-  "Return t if OBJECT is not a cons cell. This includes nil."
-  (if (pair? object) #nil #t))
-
-(define (elisp-nlistp object)
-  "Return t if OBJECT is not a list. Lists include nil."
-  (if (or (pair? object) (eq? object #nil)) #nil #t))
-
-(define (elisp-vectorp object)
-  "Return t if OBJECT is a vector."
-  (if (vector? object) #t #nil))
-
-
 (define (elisp-markerp object)
   "Return t if OBJECT is a marker (editor pointer)."
   (if (and (vector? object)
@@ -2225,49 +2194,12 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
   ;; For now, markers are not implemented in Guile, so just check integers
   (if (integer? object) #t #nil))
 
-;; Mathematical conversion function migrated from src/floatfns.c
-(define (elisp-float arg)
-  "Return the floating point number equal to ARG."
-  (cond
-    ((not (number? arg)) (error "Wrong type argument: numberp" arg))
-    ((and (number? arg) (not (integer? arg))) arg) ; Already a float
-    (else (exact->inexact arg)))) ; Convert to float
-
-;; Additional simple predicate functions migrated from src/data.c
-
-(define (elisp-keywordp object)
-  "Return t if OBJECT is a keyword.
-This means that it is a symbol with a print name beginning with ':'."
-  (if (and (symbol? object)
-           (let ((name (symbol->string object)))
-             (and (> (string-length name) 0)
-                  (char=? (string-ref name 0) #\:))))
-      #t #nil))
-
-(define (elisp-subrp object)
-  "Return t if OBJECT is a built-in or native compiled Lisp function."
-  ;; In Guile, check if it's a primitive procedure
-  (if (primitive? object) #t #nil))
-
 ;; Additional predicate functions migrated from src/data.c
 (define (elisp-char-table-p object)
   "Return t if OBJECT is a char-table."
   ;; In Guile, char-tables don't exist as a built-in type
   ;; For now, return nil since char-tables are specific to Emacs
   #nil)
-
-;; Basic comparison and utility predicates migrated from src/data.c
-
-;; Migrated from src/fns.c - equality predicates
-(define (elisp-equal o1 o2)
-  "Return t if two Lisp objects have similar structure and contents."
-  (if (equal? o1 o2) #t #nil))
-
-(define (elisp-eql obj1 obj2)
-  "Return t if the two args are `eq' or are indistinguishable numbers."
-  (if (eqv? obj1 obj2) #t #nil))
-
-;; Basic character predicate from src/character.c
 
 ;; Additional type predicates migrated from src/data.c
 
@@ -2290,23 +2222,6 @@ This means that it is a symbol with a print name beginning with ':'."
   "Return t if OBJECT is a condition variable."
   ;; Condition variables are Emacs-specific, return nil for now
   #nil)
-
-;; Basic list access functions from src/data.c
-(define (elisp-car list)
-  "Return the car of LIST. If LIST is nil, return nil."
-  (cond
-    ((null? list) #nil)
-    ((eq? list #nil) #nil)
-    ((pair? list) (car list))
-    (else (error "Wrong type argument: listp" list))))
-
-(define (elisp-cdr list)
-  "Return the cdr of LIST. If LIST is nil, return nil."
-  (cond
-    ((null? list) #nil)
-    ((eq? list #nil) #nil)
-    ((pair? list) (cdr list))
-    (else (error "Wrong type argument: listp" list))))
 
 ;; Simple utility functions migrated from src/fns.c and src/data.c
 
