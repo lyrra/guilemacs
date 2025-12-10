@@ -1549,19 +1549,17 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 
 ;; DEFUN migrations from lread.c - simple utility functions primarily used by elisp
 (define (elisp-get-load-suffixes)
-  "Return the suffixes that 'load' should try if a suffix is required.
-This uses the variables 'load-suffixes' and 'load-file-rep-suffixes'."
-  (let ((suffixes load-suffixes)
-        (rep-suffixes load-file-rep-suffixes))
-    (let loop ((suf-list suffixes) (result '()))
-      (if (null? suf-list)
-          (reverse result)
-          (let ((suffix (car suf-list)))
-            (let inner-loop ((rep-list rep-suffixes) (inner-result result))
-              (if (null? rep-list)
-                  (loop (cdr suf-list) inner-result)
-                  (inner-loop (cdr rep-list)
-                             (cons (string-append suffix (car rep-list)) inner-result)))))))))
+  "Return the suffixes that `load' should try if a suffix is required.
+This uses the variables `load-suffixes' and `load-file-rep-suffixes'."
+  (let ((result '()))
+    (for-each
+      (lambda (suffix)
+        (for-each
+          (lambda (ext)
+            (set! result (cons (string-append suffix ext) result)))
+          (symbol-value 'load-file-rep-suffixes)))
+      (symbol-value 'load-suffixes))
+    (reverse result)))
 
 (define (elisp-obarrayp object)
   "Return t if OBJECT is an obarray."
@@ -2125,18 +2123,6 @@ This is the same as the exponent of a float."
 ;; FIX-guilemacs: Additional simple utility function migrations
 
 ;; Reader and file loading functions migrated from C
-(define (elisp-get-load-suffixes)
-  "Return the suffixes that `load' should try if a suffix is required.
-This uses the variables `load-suffixes' and `load-file-rep-suffixes'."
-  (let ((result '()))
-    (for-each
-      (lambda (suffix)
-        (for-each
-          (lambda (ext)
-            (set! result (cons (string-append suffix ext) result)))
-          (symbol-value 'load-file-rep-suffixes)))
-      (symbol-value 'load-suffixes))
-    (reverse result)))
 
 (define (elisp-proper-list-p object)
   "Return OBJECT's length if it is a proper list, nil otherwise.
@@ -3967,36 +3953,6 @@ All loads are by default dynamic, unless the file itself specifies otherwise."
   ;; Bind lexical-binding to nil (dynamic binding by default)
   ;; This will be handled by specbind in the C wrapper since it needs proper cleanup
   'setup-for-c-specbind)
-
-(define (elisp-get-load-suffixes)
-  "Return the suffixes that load should try if a suffix is required.
-This replicates get-load-suffixes (src/lread.c:845-860) using Scheme list processing.
-Uses load-suffixes and load-file-rep-suffixes variables."
-
-  (let ((result-list #nil)
-        (suffixes ((symbol-function 'symbol-value) (elisp-intern "load-suffixes" #nil))))
-
-    ;; Process each suffix in load-suffixes (replicates FOR_EACH_TAIL loop)
-    (let outer-loop ((suffix-list suffixes))
-      (when (not (eq? suffix-list #nil))
-        (let ((suffix ((symbol-function 'car) suffix-list))
-              (exts ((symbol-function 'symbol-value) (elisp-intern "load-file-rep-suffixes" #nil))))
-
-          ;; Process each extension in load-file-rep-suffixes (replicates inner FOR_EACH_TAIL)
-          (let inner-loop ((ext-list exts))
-            (when (not (eq? ext-list #nil))
-              (let ((ext ((symbol-function 'car) ext-list)))
-                ;; Concatenate suffix + extension and add to result (replicates concat2 + Fcons)
-                (set! result-list
-                      ((symbol-function 'cons)
-                       ((symbol-function 'concat) suffix ext)
-                       result-list)))
-              (inner-loop ((symbol-function 'cdr) ext-list))))
-
-        (outer-loop ((symbol-function 'cdr) suffix-list))))
-
-    ;; Return reversed list (replicates Fnreverse)
-    ((symbol-function 'nreverse) result-list))))
 
 (define (elisp-call-load-source-file-function load-source-file-function found hist-file-name noerror nomessage force-load-messages)
   "Call the load-source-file-function with properly converted arguments.
