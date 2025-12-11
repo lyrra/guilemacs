@@ -1,0 +1,228 @@
+;;; Guilemacs Lisp
+;;;
+;;; Type Predicates - Foundation Layer
+;;;
+
+(define (elisp-symbolp object)
+  "Return t if OBJECT is a symbol."
+  (if (symbol? object) #t #nil))
+
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (and (number? object) (exact? object) (integer? object))
+      #t #nil))
+
+(define (elisp-floatp object)
+  "Return t if OBJECT is a floating point number."
+  (if (and (number? object) (inexact? object)) #t #nil))
+
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (floating point or integer)."
+  (if (number? object) #t #nil))
+
+(define (elisp-natnump object)
+  "Return t if OBJECT is a nonnegative integer."
+  (if (and (number? object) (exact? object) (integer? object) (>= object 0))
+      #t #nil))
+
+(define (elisp-characterp object)
+  "Return non-nil if OBJECT is a character.
+In Emacs Lisp, characters are represented by character codes."
+  (if (and (integer? object)
+           (>= object 0)
+           (<= object 4194303))  ; MAX_CHAR
+      #t #nil))
+
+(define (elisp-stringp object)
+  "Return t if OBJECT is a string."
+  (if (string? object) #t #nil))
+
+(define (elisp-vectorp object)
+  "Return t if OBJECT is a vector."
+  (if (vector? object) #t #nil))
+
+(define (elisp-bool-vector-p object)
+  "Return t if OBJECT is a bool-vector."
+  ;; For now, check if it's a bitvector in Guile
+  (if (bitvector? object) #t #nil))
+
+(define (elisp-arrayp object)
+  "Return t if OBJECT is an array (string, vector, char-table, or bool-vector)."
+  (if (or (string? object)
+          (vector? object)
+          (eq? #t (elisp-char-table-p object))
+          (eq? #t (elisp-bool-vector-p object))) #t #nil))
+
+(define (elisp-sequencep object)
+  "Return t if OBJECT is a sequence (list or array)."
+  (if (or (pair? object) (null? object) (vector? object) (string? object))
+      #t #nil))
+
+(define (elisp-bufferp object)
+  "Return t if OBJECT is an editor buffer."
+  ;; Buffers are Emacs-specific objects, return nil for now
+  #nil)
+
+(define (elisp-subrp object)
+  "Return t if OBJECT is a built-in function."
+  (if (or (procedure? object)
+          ;; Check if it's a wrapped C function
+          (and (hash-table? object)
+               (hash-ref object 'subrp #f)))
+      #t #nil))
+
+;;;
+;;; List Type Predicates
+;;;
+
+(define (elisp-consp object)
+  "Return t if OBJECT is a cons cell."
+  (if (pair? object) #t #nil))
+
+(define (elisp-atom object)
+  "Return t if OBJECT is not a cons cell. This includes nil."
+  (if (pair? object) #nil #t))
+
+(define (elisp-listp object)
+  "Return t if OBJECT is a list, that is, a cons cell or nil.
+Otherwise, return nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-nlistp object)
+  "Return t if OBJECT is not a list. Lists include nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #nil #t))
+
+(define (elisp-null object)
+  "Return t if OBJECT is nil, and return nil otherwise."
+  (if (or (null? object) (eq? object #nil)) #t #nil))
+
+(define (elisp-proper-list-p object)
+  "Return OBJECT's length if it is a proper list, nil otherwise.
+A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+  (let ((len 0)
+        (slow object)
+        (fast object))
+    ;; Use Floyd's cycle detection algorithm
+    (let loop ((current object) (len 0))
+      (cond
+        ((null? current) len)  ; Proper list - return length
+        ((not (pair? current)) 'nil)  ; Dotted list - return nil
+        (else
+          ;; Check for cycles using tortoise and hare
+          (set! fast (if (and (pair? fast) (pair? (cdr fast))) (cddr fast) #f))
+          (set! slow (cdr slow))
+          (if (and fast (eq? slow fast))
+              'nil  ; Circular - return nil
+              (loop (cdr current) (+ len 1))))))))
+
+;;;
+;;; Equality Predicates
+;;;
+
+(define (elisp-eq obj1 obj2)
+  "Return t if the two args are the same Lisp object."
+  (if (eq? obj1 obj2) #t #nil))
+
+(define (elisp-eql obj1 obj2)
+  "Return t if the two args are `eq' or are indistinguishable numbers."
+  (if (eqv? obj1 obj2) #t #nil))
+
+(define (elisp-equal obj1 obj2)
+  "Return t if two Lisp objects have similar structure and contents."
+  (if (equal? obj1 obj2) #t #nil))
+
+;;;
+;;; Basic Cons Cell Operations (Foundation)
+;;;
+
+(define (elisp-cons car cdr)
+  "Create a new cons, give it CAR and CDR as components, and return it."
+  (cons car cdr))
+
+(define (elisp-car list)
+  "Return the car of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `car-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (car list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-cdr list)
+  "Return the cdr of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (cdr list))
+    (else (error "Wrong type argument: listp" list))))
+
+(define (elisp-car-safe object)
+  "Return the car of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (car object) #nil))
+
+(define (elisp-cdr-safe object)
+  "Return the cdr of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (cdr object) #nil))
+
+;;;
+;;; Character Operations
+;;;
+
+(define (elisp-max-char)
+  "Return the character with the maximum code."
+  4194303)  ; MAX_CHAR constant
+
+;;;
+;;; Utility Functions
+;;;
+
+(define (elisp-identity arg)
+  "Return the argument unchanged."
+  arg)
+
+;;; Helper for arrayp (placeholder for char-table support)
+(define (elisp-char-table-p object)
+  "Return t if OBJECT is a char-table."
+  ;; Placeholder - char-tables not yet implemented
+  #nil)
+
+;;;
+;;; Registration with Elisp symbol table
+;;; These functions are now available in the runtime module and need to be registered
+;;;
+
+(set-symbol-function! 'symbolp elisp-symbolp)
+(set-symbol-function! 'integerp elisp-integerp)
+(set-symbol-function! 'floatp elisp-floatp)
+(set-symbol-function! 'numberp elisp-numberp)
+(set-symbol-function! 'natnump elisp-natnump)
+(set-symbol-function! 'characterp elisp-characterp)
+(set-symbol-function! 'stringp elisp-stringp)
+(set-symbol-function! 'vectorp elisp-vectorp)
+(set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
+(set-symbol-function! 'arrayp elisp-arrayp)
+(set-symbol-function! 'sequencep elisp-sequencep)
+(set-symbol-function! 'bufferp elisp-bufferp)
+(set-symbol-function! 'subrp elisp-subrp)
+
+(set-symbol-function! 'consp elisp-consp)
+(set-symbol-function! 'atom elisp-atom)
+(set-symbol-function! 'listp elisp-listp)
+(set-symbol-function! 'nlistp elisp-nlistp)
+(set-symbol-function! 'null elisp-null)
+(set-symbol-function! 'proper-list-p elisp-proper-list-p)
+
+(set-symbol-function! 'eq elisp-eq)
+(set-symbol-function! 'eql elisp-eql)
+(set-symbol-function! 'equal elisp-equal)
+
+(set-symbol-function! 'cons elisp-cons)
+(set-symbol-function! 'car elisp-car)
+(set-symbol-function! 'cdr elisp-cdr)
+(set-symbol-function! 'car-safe elisp-car-safe)
+(set-symbol-function! 'cdr-safe elisp-cdr-safe)
+
+(set-symbol-function! 'max-char elisp-max-char)
+
+(set-symbol-function! 'identity elisp-identity)

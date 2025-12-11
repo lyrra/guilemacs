@@ -81,6 +81,10 @@
 ;; reload guile elisp language, to get modifications
 (set! %load-path (cons "." %load-path))
 (load "./elisp/runtime.scm")
+
+;; Note: The join function is defined later in the reload infrastructure section
+;; We'll add types module loading after that
+
 ;(format #t "------- reloading guile elisp runtime ----------~%")
 ;(format #t "scheme load-path: ~s~%" %load-path)
 ;(format #t "------- reloading guile elisp lexer ----------~%")
@@ -143,6 +147,10 @@
 (reload-local-elisp! (join %prelude-directory "elisp"))
 
 (set-current-module (resolve-module '(language elisp runtime)))
+
+;; Load modular runtime components
+;; These submodules provide organized, maintainable runtime functionality
+(primitive-load (join %prelude-directory "elisp/runtime/types.scm"))
 
 (primitive-load (join %prelude-directory "pcase.scm"))
 
