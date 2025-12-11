@@ -1,0 +1,375 @@
+;;; Guilemacs Lisp
+;;;
+;;; List & Sequence Operations
+;;;
+;;; List/cons manipulation, sequences, property lists, and association lists.
+;;; Migrated from C for better maintainability and GC efficiency.
+
+;;;
+;;; List Search & Access Operations
+;;;
+
+(define (elisp-memq elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `eq'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((eq? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
+
+(define (elisp-member elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `equal'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((equal? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
+
+(define (elisp-nth n list)
+  "Return the Nth element of LIST.
+N counts from zero. If LIST is not that long, nil is returned."
+  (cond
+    ((not (number? n)) #nil)
+    ((< n 0) #nil)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) (car tail))
+         (else (loop (- count 1) (cdr tail))))))))
+
+(define (elisp-nthcdr n list)
+  "Take cdr N times on LIST, return the result."
+  (cond
+    ((not (number? n)) list)
+    ((< n 0) list)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) tail)
+         (else (loop (- count 1) (cdr tail))))))))
+
+(define (elisp-last list)
+  "Return the last cons cell of LIST.
+If LIST is empty, return nil."
+  (if (null? list)
+      #nil
+      (let loop ((current list))
+        (let ((next (cdr current)))
+          (if (null? next)
+              current
+              (loop next))))))
+
+(define elisp-butlast
+  (case-lambda
+    ((list)
+     ;; Called with 1 argument - default n to 1
+     (elisp-butlast list 1))
+    ((list n)
+     ;; Called with 2 arguments
+     "Return a copy of LIST with the last N elements removed.
+If N is omitted or nil, remove only the last element."
+     (let ((num (if (or (null? n) (eq? n #nil)) 1 n)))
+       (if (or (not (integer? num)) (< num 0))
+           list
+           (let ((len (length list)))
+             (if (<= len num)
+                 #nil
+                 (list-head list (- len num)))))))))
+
+;;;
+;;; List Transformation Operations
+;;;
+
+(define (elisp-reverse list)
+  "Return a new list with elements of LIST in reverse order."
+  (let loop ((remaining list) (result '()))
+    (if (null? remaining)
+        result
+        (loop (cdr remaining) (cons (car remaining) result)))))
+
+(define (elisp-append . lists)
+  "Concatenate all the arguments and make the result a list.
+The result is a list whose elements are the elements of all the arguments.
+Each argument may be a list, vector or string.
+All arguments except the last are copied."
+  (if (null? lists)
+      '()
+      (let ((result '()))
+        (let loop ((remaining lists))
+          (cond
+            ((null? remaining) result)
+            ((null? (cdr remaining))
+             ;; Last argument - append it as-is (not copied)
+             (if (null? result)
+                 (car remaining)
+                 (append result (car remaining))))
+            ((null? (car remaining)) (loop (cdr remaining)))
+            ((pair? (car remaining))
+             (set! result (append result (car remaining)))
+             (loop (cdr remaining)))
+            ((vector? (car remaining))
+             (set! result (append result (vector->list (car remaining))))
+             (loop (cdr remaining)))
+            ((string? (car remaining))
+             (set! result (append result (string->list (car remaining))))
+             (loop (cdr remaining)))
+            (else (loop (cdr remaining))))))))
+
+;;;
+;;; Association List Operations
+;;;
+
+(define (elisp-assq key alist)
+  "Return non-nil if KEY is `eq' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-assoc key alist)
+  "Return non-nil if KEY is `equal' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((equal? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-rassq val alist)
+  "Return non-nil if VAL is `eq' to the cdr of an element of ALIST.
+The value is actually the first element of ALIST whose cdr is VAL.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? tail)) #nil)  ; Handle malformed alist
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? val (cdr (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+;;;
+;;; Sequence Operations
+;;;
+
+(define (elisp-copy-sequence seq)
+  "Return a copy of a list, vector, string, or other sequence.
+The elements of a list are not copied; they are shared with the original."
+  (cond
+    ((null? seq) seq)
+    ((pair? seq) (list-copy seq))
+    ((string? seq) (string-copy seq))
+    ((vector? seq) (vector-copy seq))
+    (else seq))) ; Return as-is for other types
+
+;;;
+;;; Property List Operations
+;;;
+
+(define elisp-plist-get
+  (case-lambda
+    ((plist prop)
+     ;; Called with 2 arguments - use default predicate eq?
+     (elisp-plist-get plist prop eq?))
+    ((plist prop predicate)
+     ;; Called with 3 arguments
+     "Extract a value from a property list.
+PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
+Returns the value corresponding to PROP, or nil if not found.
+Uses PREDICATE for comparison, defaulting to `eq'."
+     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+       (let loop ((tail plist))
+         (cond
+           ((null? tail) #nil)
+           ((not (pair? tail)) #nil)
+           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+           ((pred prop (car tail)) (car (cdr tail)))
+           (else (loop (cddr tail)))))))))
+
+(define (elisp-plist-put plist prop value)
+  "Change value in PLIST of PROP to VALUE.
+PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
+Returns a new property list with the change."
+  (let loop ((tail plist) (result '()))
+    (cond
+      ((null? tail)
+       ;; Property not found, add it at the end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? tail))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? (cdr tail)))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((eq? prop (car tail))
+       ;; Found the property, update its value
+       (append (reverse result) (cons prop (cons value (cddr tail)))))
+      (else
+       ;; Continue searching, preserving current prop-value pair
+       (loop (cddr tail) (cons (car (cdr tail)) (cons (car tail) result)))))))
+
+(define elisp-plist-member
+  (case-lambda
+    ((plist prop)
+     ;; Called with 2 arguments - use default predicate eq?
+     (elisp-plist-member plist prop eq?))
+    ((plist prop predicate)
+     ;; Called with 3 arguments
+     "Return non-nil if PROP is a property of PLIST.
+Unlike `plist-get', this allows distinguishing between a missing
+property and a property with value nil.
+Returns the tail of PLIST whose car is PROP."
+     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
+       (let loop ((tail plist))
+         (cond
+           ((null? tail) #nil)
+           ((not (pair? tail)) #nil)
+           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
+           ((pred prop (car tail)) tail)
+           (else (loop (cddr tail)))))))))
+
+;;;
+;;; Number Predicates
+;;; Note: Some of these are duplicates from types.scm but included here
+;;; for completeness in the sequences module context
+;;;
+
+(define (elisp-zerop number)
+  "Return t if NUMBER is zero."
+  (if (and (number? number) (= number 0)) #t #nil))
+
+(define (elisp-plusp number)
+  "Return t if NUMBER is positive."
+  (if (and (number? number) (> number 0)) #t #nil))
+
+(define (elisp-minusp number)
+  "Return t if NUMBER is negative."
+  (if (and (number? number) (< number 0)) #t #nil))
+
+(define (elisp-evenp integer)
+  "Return t if INTEGER is even."
+  (if (and (integer? integer) (even? integer)) #t #nil))
+
+(define (elisp-oddp integer)
+  "Return t if INTEGER is odd."
+  (if (and (integer? integer) (odd? integer)) #t #nil))
+
+;;;
+;;; String Comparison Functions
+;;;
+
+(define (elisp-string-equal s1 s2)
+  "Return t if two strings have identical contents.
+Case is significant. Symbols are allowed; their print names are used."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string=? str1 str2)) #t #nil)))
+
+(define (elisp-string-lessp s1 s2)
+  "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string<? str1 str2)) #t #nil)))
+
+(define (elisp-string-greaterp s1 s2)
+  "Return non-nil if STRING1 is greater than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string>? str1 str2)) #t #nil)))
+
+;;;
+;;; Higher-Order Functions
+;;;
+
+(define (elisp-mapcar function sequence)
+  "Apply FUNCTION to each element of SEQUENCE, and make a list of the results.
+The result is a list just as long as SEQUENCE.
+SEQUENCE may be a list, a vector, or a string."
+  (cond
+    ((null? sequence) '())
+    ((pair? sequence) (map function sequence))
+    ((vector? sequence) (map function (vector->list sequence)))
+    ((string? sequence) (map function (string->list sequence)))
+    (else '())))
+
+(define (elisp-mapc function sequence)
+  "Apply FUNCTION to each element of SEQUENCE for side effects only.
+Unlike `mapcar', don't accumulate the results. Return SEQUENCE."
+  (cond
+    ((null? sequence) sequence)
+    ((pair? sequence) (for-each function sequence) sequence)
+    ((vector? sequence) (for-each function (vector->list sequence)) sequence)
+    ((string? sequence) (for-each function (string->list sequence)) sequence)
+    (else sequence)))
+
+;;;
+;;; Utility Functions
+;;;
+
+(define (elisp-constantly value)
+  "Return a function that always returns VALUE.
+This is a useful building block for higher-order functions."
+  (lambda args value))
+
+;;;
+;;; Registration with Elisp symbol table
+;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
+;;; These functions are defined here but registered in load.scm for now.
+;;; Once we migrate functions from load.scm to this module, we can uncomment
+;;; the registrations incrementally.
+;;;
+
+;; List search & access
+;; (set-symbol-function! 'memq elisp-memq)
+;; (set-symbol-function! 'member elisp-member)
+;; (set-symbol-function! 'nth elisp-nth)
+;; (set-symbol-function! 'nthcdr elisp-nthcdr)
+;; (set-symbol-function! 'last elisp-last)
+;; (set-symbol-function! 'butlast elisp-butlast)
+
+;; List transformation
+;; (set-symbol-function! 'reverse elisp-reverse)
+;; (set-symbol-function! 'append elisp-append)
+
+;; Association lists
+;; (set-symbol-function! 'assq elisp-assq)
+;; (set-symbol-function! 'assoc elisp-assoc)
+;; (set-symbol-function! 'rassq elisp-rassq)
+
+;; Sequence operations
+;; (set-symbol-function! 'copy-sequence elisp-copy-sequence)
+
+;; Property lists
+;; (set-symbol-function! 'plist-get elisp-plist-get)
+;; (set-symbol-function! 'plist-put elisp-plist-put)
+;; (set-symbol-function! 'plist-member elisp-plist-member)
+
+;; Number predicates
+;; (set-symbol-function! 'zerop elisp-zerop)
+;; (set-symbol-function! 'plusp elisp-plusp)
+;; (set-symbol-function! 'minusp elisp-minusp)
+;; (set-symbol-function! 'evenp elisp-evenp)
+;; (set-symbol-function! 'oddp elisp-oddp)
+
+;; String comparisons
+;; (set-symbol-function! 'string-equal elisp-string-equal)
+;; (set-symbol-function! 'string-lessp elisp-string-lessp)
+;; (set-symbol-function! 'string-greaterp elisp-string-greaterp)
+
+;; Higher-order functions
+;; (set-symbol-function! 'mapcar elisp-mapcar)
+;; (set-symbol-function! 'mapc elisp-mapc)
+
+;; Utilities
+;; (set-symbol-function! 'constantly elisp-constantly)

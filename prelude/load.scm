@@ -153,6 +153,7 @@
 (primitive-load (join %prelude-directory "elisp/runtime/types.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/numbers.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/strings.scm"))
+(primitive-load (join %prelude-directory "elisp/runtime/sequences.scm"))
 
 (primitive-load (join %prelude-directory "pcase.scm"))
 
