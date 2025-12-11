@@ -189,40 +189,43 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
 
 ;;;
 ;;; Registration with Elisp symbol table
-;;; These functions are now available in the runtime module and need to be registered
+;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
+;;; These functions are defined here but registered in load.scm for now.
+;;; Once we migrate functions from load.scm to this module, we can uncomment
+;;; the registrations incrementally.
 ;;;
 
-(set-symbol-function! 'symbolp elisp-symbolp)
-(set-symbol-function! 'integerp elisp-integerp)
-(set-symbol-function! 'floatp elisp-floatp)
-(set-symbol-function! 'numberp elisp-numberp)
-(set-symbol-function! 'natnump elisp-natnump)
-(set-symbol-function! 'characterp elisp-characterp)
-(set-symbol-function! 'stringp elisp-stringp)
-(set-symbol-function! 'vectorp elisp-vectorp)
-(set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
-(set-symbol-function! 'arrayp elisp-arrayp)
-(set-symbol-function! 'sequencep elisp-sequencep)
-(set-symbol-function! 'bufferp elisp-bufferp)
-(set-symbol-function! 'subrp elisp-subrp)
+;; (set-symbol-function! 'symbolp elisp-symbolp)
+;; (set-symbol-function! 'integerp elisp-integerp)
+;; (set-symbol-function! 'floatp elisp-floatp)
+;; (set-symbol-function! 'numberp elisp-numberp)
+;; (set-symbol-function! 'natnump elisp-natnump)
+;; (set-symbol-function! 'characterp elisp-characterp)
+;; (set-symbol-function! 'stringp elisp-stringp)
+;; (set-symbol-function! 'vectorp elisp-vectorp)
+;; (set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
+;; (set-symbol-function! 'arrayp elisp-arrayp)
+;; (set-symbol-function! 'sequencep elisp-sequencep)
+;; (set-symbol-function! 'bufferp elisp-bufferp)
+;; (set-symbol-function! 'subrp elisp-subrp)
 
-(set-symbol-function! 'consp elisp-consp)
-(set-symbol-function! 'atom elisp-atom)
-(set-symbol-function! 'listp elisp-listp)
-(set-symbol-function! 'nlistp elisp-nlistp)
-(set-symbol-function! 'null elisp-null)
-(set-symbol-function! 'proper-list-p elisp-proper-list-p)
+;; (set-symbol-function! 'consp elisp-consp)
+;; (set-symbol-function! 'atom elisp-atom)
+;; (set-symbol-function! 'listp elisp-listp)
+;; (set-symbol-function! 'nlistp elisp-nlistp)
+;; (set-symbol-function! 'null elisp-null)
+;; (set-symbol-function! 'proper-list-p elisp-proper-list-p)
 
-(set-symbol-function! 'eq elisp-eq)
-(set-symbol-function! 'eql elisp-eql)
-(set-symbol-function! 'equal elisp-equal)
+;; (set-symbol-function! 'eq elisp-eq)
+;; (set-symbol-function! 'eql elisp-eql)
+;; (set-symbol-function! 'equal elisp-equal)
 
-(set-symbol-function! 'cons elisp-cons)
-(set-symbol-function! 'car elisp-car)
-(set-symbol-function! 'cdr elisp-cdr)
-(set-symbol-function! 'car-safe elisp-car-safe)
-(set-symbol-function! 'cdr-safe elisp-cdr-safe)
+;; (set-symbol-function! 'cons elisp-cons)
+;; (set-symbol-function! 'car elisp-car)
+;; (set-symbol-function! 'cdr elisp-cdr)
+;; (set-symbol-function! 'car-safe elisp-car-safe)
+;; (set-symbol-function! 'cdr-safe elisp-cdr-safe)
 
-(set-symbol-function! 'max-char elisp-max-char)
+;; (set-symbol-function! 'max-char elisp-max-char)
 
-(set-symbol-function! 'identity elisp-identity)
+;; (set-symbol-function! 'identity elisp-identity)
