@@ -606,24 +606,7 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
   ;; Call the main load function - C will handle the match data protection
   ((symbol-function 'load) file noerror nomessage nosuffix must-suffix))
 
-(set-symbol-function! 'string-bytes elisp-string-bytes)
-(set-symbol-function! 'string-distance elisp-string-distance)
-(set-symbol-function! 'char-to-string elisp-char-to-string)
-(set-symbol-function! 'string-to-char elisp-string-to-char)
-(set-symbol-function! 'byte-to-string elisp-byte-to-string)
-(set-symbol-function! 'string elisp-string)
-(set-symbol-function! 'unibyte-string elisp-unibyte-string)
-(set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
-(set-symbol-function! 'eval-scheme elisp-eval-scheme)
-(set-symbol-function! 'stringp elisp-stringp)
-(set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
-(set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
-(set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
-(set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
-(set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
-(set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
-(set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
-(set-symbol-function! 'string-equal-none elisp-string-equal-none)
+;; String function registrations migrated to prelude/elisp/runtime/strings.scm
 
 ;;; End Section 4
 

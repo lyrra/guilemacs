@@ -173,36 +173,33 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 
 ;;;
 ;;; Registration with Elisp symbol table
-;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
-;;; These functions are defined here but registered in load.scm for now.
-;;; Once we migrate functions from load.scm to this module, we can uncomment
-;;; the registrations incrementally.
+;;; Phase 2: Registrations migrated from prelude/load.scm
 ;;;
 
 ;; String metrics
-;; (set-symbol-function! 'string-bytes elisp-string-bytes)
-;; (set-symbol-function! 'string-distance elisp-string-distance)
+(set-symbol-function! 'string-bytes elisp-string-bytes)
+(set-symbol-function! 'string-distance elisp-string-distance)
 
 ;; String creation & conversion
-;; (set-symbol-function! 'char-to-string elisp-char-to-string)
-;; (set-symbol-function! 'string-to-char elisp-string-to-char)
-;; (set-symbol-function! 'byte-to-string elisp-byte-to-string)
-;; (set-symbol-function! 'string elisp-string)
-;; (set-symbol-function! 'unibyte-string elisp-unibyte-string)
+(set-symbol-function! 'char-to-string elisp-char-to-string)
+(set-symbol-function! 'string-to-char elisp-string-to-char)
+(set-symbol-function! 'byte-to-string elisp-byte-to-string)
+(set-symbol-function! 'string elisp-string)
+(set-symbol-function! 'unibyte-string elisp-unibyte-string)
 
 ;; String type predicates
-;; (set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
-;; (set-symbol-function! 'stringp elisp-stringp)
-;; (set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
+(set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
+(set-symbol-function! 'stringp elisp-stringp)
+(set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
 
 ;; Optimized C-string comparisons
-;; (set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
-;; (set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
-;; (set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
-;; (set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
-;; (set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
-;; (set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
-;; (set-symbol-function! 'string-equal-none elisp-string-equal-none)
+(set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
+(set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
+(set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
+(set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
+(set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
+(set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
+(set-symbol-function! 'string-equal-none elisp-string-equal-none)
 
 ;; Special
-;; (set-symbol-function! 'eval-scheme elisp-eval-scheme)
+(set-symbol-function! 'eval-scheme elisp-eval-scheme)
