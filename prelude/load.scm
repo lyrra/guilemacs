@@ -944,9 +944,6 @@ This is a useful building block for higher-order functions."
 (set-symbol-function! 'minusp elisp-minusp)
 (set-symbol-function! 'evenp elisp-evenp)
 (set-symbol-function! 'oddp elisp-oddp)
-(set-symbol-function! 'numberp elisp-numberp)
-(set-symbol-function! 'floatp elisp-floatp)
-(set-symbol-function! 'natnump elisp-natnump)
 (set-symbol-function! 'plist-get elisp-plist-get)
 (set-symbol-function! 'plist-put elisp-plist-put)
 (set-symbol-function! 'plist-member elisp-plist-member)
@@ -956,7 +953,6 @@ This is a useful building block for higher-order functions."
 (set-symbol-function! 'append elisp-append)
 (set-symbol-function! 'mapcar elisp-mapcar)
 (set-symbol-function! 'mapc elisp-mapc)
-(set-symbol-function! 'identity elisp-identity)
 (set-symbol-function! 'constantly elisp-constantly)
 
 ;;; End Section 5
@@ -1448,13 +1444,9 @@ Uses Guile's efficient string search with automatic memory management."
 ; Note: bufferp kept in C for now due to C-specific buffer object handling
 ; Note: symbolp kept in C for now
 (set-symbol-function! 'consp elisp-consp)
-(set-symbol-function! 'atom elisp-atom)
-(set-symbol-function! 'listp elisp-listp)
 (set-symbol-function! 'nlistp elisp-nlistp)
 (set-symbol-function! 'vectorp elisp-vectorp)
 (set-symbol-function! 'cons elisp-cons)
-(set-symbol-function! 'car elisp-car)
-(set-symbol-function! 'cdr elisp-cdr)
 (set-symbol-function! 'list elisp-list)
 (set-symbol-function! 'make-list elisp-make-list)
 
@@ -1470,9 +1462,6 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'safe-length elisp-safe-length)
 
 ;; Register equality functions
-(set-symbol-function! 'eq elisp-eq)
-(set-symbol-function! 'eql elisp-eql)
-(set-symbol-function! 'equal elisp-equal)
 
 ;; Register list utility functions
 (set-symbol-function! 'take elisp-take)
@@ -1483,15 +1472,10 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'capitalize elisp-capitalize)
 
 ;; Register type conversion functions
-(set-symbol-function! 'float elisp-float)
 (set-symbol-function! 'number-to-string elisp-number-to-string)
 (set-symbol-function! 'string-to-number elisp-string-to-number)
 
 ;; Register additional type predicates
-(set-symbol-function! 'sequencep elisp-sequencep)
-(set-symbol-function! 'arrayp elisp-arrayp)
-(set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
-(set-symbol-function! 'subrp elisp-subrp)
 
 ;; Register string creation functions
 (set-symbol-function! 'make-string elisp-make-string)
@@ -1509,7 +1493,6 @@ Uses Guile's efficient string search with automatic memory management."
 (set-symbol-function! 'string-lessp-ignore-case elisp-string-lessp-ignore-case)
 (set-symbol-function! 'string-prefix-p elisp-string-prefix-p)
 (set-symbol-function! 'string-suffix-p elisp-string-suffix-p)
-(set-symbol-function! 'intern-soft elisp-intern-soft)
 (set-symbol-function! 'string-search elisp-string-search)
 
 ;; Final high-value migration candidates
@@ -2262,7 +2245,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 (set-symbol-function! 'elisp-square elisp-square)
 
 ;; Register the new mathematical predicate functions
-(set-symbol-function! 'integerp elisp-integerp)
 (set-symbol-function! 'natnump elisp-natnump)
 (set-symbol-function! 'numberp elisp-numberp)
 (set-symbol-function! 'floatp elisp-floatp)
