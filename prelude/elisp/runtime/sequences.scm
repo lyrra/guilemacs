@@ -324,52 +324,49 @@ This is a useful building block for higher-order functions."
 
 ;;;
 ;;; Registration with Elisp symbol table
-;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
-;;; These functions are defined here but registered in load.scm for now.
-;;; Once we migrate functions from load.scm to this module, we can uncomment
-;;; the registrations incrementally.
+;;; Phase 2: Registrations migrated from prelude/load.scm
 ;;;
 
 ;; List search & access
-;; (set-symbol-function! 'memq elisp-memq)
-;; (set-symbol-function! 'member elisp-member)
-;; (set-symbol-function! 'nth elisp-nth)
-;; (set-symbol-function! 'nthcdr elisp-nthcdr)
-;; (set-symbol-function! 'last elisp-last)
-;; (set-symbol-function! 'butlast elisp-butlast)
+(set-symbol-function! 'memq elisp-memq)
+(set-symbol-function! 'member elisp-member)
+(set-symbol-function! 'nth elisp-nth)
+(set-symbol-function! 'nthcdr elisp-nthcdr)
+(set-symbol-function! 'last elisp-last)
+(set-symbol-function! 'butlast elisp-butlast)
 
 ;; List transformation
-;; (set-symbol-function! 'reverse elisp-reverse)
-;; (set-symbol-function! 'append elisp-append)
+(set-symbol-function! 'reverse elisp-reverse)
+(set-symbol-function! 'append elisp-append)
 
 ;; Association lists
-;; (set-symbol-function! 'assq elisp-assq)
-;; (set-symbol-function! 'assoc elisp-assoc)
-;; (set-symbol-function! 'rassq elisp-rassq)
+(set-symbol-function! 'assq elisp-assq)
+(set-symbol-function! 'assoc elisp-assoc)
+(set-symbol-function! 'rassq elisp-rassq)
 
 ;; Sequence operations
-;; (set-symbol-function! 'copy-sequence elisp-copy-sequence)
+(set-symbol-function! 'copy-sequence elisp-copy-sequence)
 
 ;; Property lists
-;; (set-symbol-function! 'plist-get elisp-plist-get)
-;; (set-symbol-function! 'plist-put elisp-plist-put)
-;; (set-symbol-function! 'plist-member elisp-plist-member)
+(set-symbol-function! 'plist-get elisp-plist-get)
+(set-symbol-function! 'plist-put elisp-plist-put)
+(set-symbol-function! 'plist-member elisp-plist-member)
 
 ;; Number predicates
-;; (set-symbol-function! 'zerop elisp-zerop)
-;; (set-symbol-function! 'plusp elisp-plusp)
-;; (set-symbol-function! 'minusp elisp-minusp)
-;; (set-symbol-function! 'evenp elisp-evenp)
-;; (set-symbol-function! 'oddp elisp-oddp)
+(set-symbol-function! 'zerop elisp-zerop)
+(set-symbol-function! 'plusp elisp-plusp)
+(set-symbol-function! 'minusp elisp-minusp)
+(set-symbol-function! 'evenp elisp-evenp)
+(set-symbol-function! 'oddp elisp-oddp)
 
 ;; String comparisons
-;; (set-symbol-function! 'string-equal elisp-string-equal)
-;; (set-symbol-function! 'string-lessp elisp-string-lessp)
-;; (set-symbol-function! 'string-greaterp elisp-string-greaterp)
+(set-symbol-function! 'string-equal elisp-string-equal)
+(set-symbol-function! 'string-lessp elisp-string-lessp)
+(set-symbol-function! 'string-greaterp elisp-string-greaterp)
 
 ;; Higher-order functions
-;; (set-symbol-function! 'mapcar elisp-mapcar)
-;; (set-symbol-function! 'mapc elisp-mapc)
+(set-symbol-function! 'mapcar elisp-mapcar)
+(set-symbol-function! 'mapc elisp-mapc)
 
 ;; Utilities
-;; (set-symbol-function! 'constantly elisp-constantly)
+(set-symbol-function! 'constantly elisp-constantly)

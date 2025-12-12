@@ -145,23 +145,35 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
 ;;; Feature/Provide System
 ;;;
 
-(define (elisp-featurep feature subfeature)
-  "Return t if FEATURE is present in this Emacs.
+(define elisp-featurep
+  (case-lambda
+    ((feature)
+     ;; Called with 1 argument - no subfeature check
+     (elisp-featurep feature #nil))
+    ((feature subfeature)
+     ;; Called with 2 arguments
+     "Return t if FEATURE is present in this Emacs.
 Use this to conditionalize execution of lisp code based on the
 presence or absence of Emacs or environment extensions."
-  (if (memq feature features)
-      (if subfeature
-          #t  ; Simplified: assume subfeatures are present if feature is
-          #t)
-      #nil))
+     (if (memq feature features)
+         (if (or (null? subfeature) (eq? subfeature #nil))
+             #t
+             #t)  ; Simplified: assume subfeatures are present if feature is
+         #nil))))
 
-(define (elisp-provide feature subfeatures)
-  "Announce that FEATURE is a feature of the current Emacs.
+(define elisp-provide
+  (case-lambda
+    ((feature)
+     ;; Called with 1 argument - no subfeatures
+     (elisp-provide feature #nil))
+    ((feature subfeatures)
+     ;; Called with 2 arguments
+     "Announce that FEATURE is a feature of the current Emacs.
 The optional argument SUBFEATURES should be a list of symbols listing
 particular subfeatures supported in this version of FEATURE."
-  (if (not (memq feature features))
-      (set! features (cons feature features)))
-  feature)
+     (if (not (memq feature features))
+         (set! features (cons feature features)))
+     feature)))
 
 ;;;
 ;;; List Utilities

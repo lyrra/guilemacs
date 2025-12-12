@@ -928,36 +928,13 @@ This is a useful building block for higher-order functions."
   (lambda args value))
 
 ;; Register the functions for Elisp use
-(set-symbol-function! 'memq elisp-memq)
-(set-symbol-function! 'nth elisp-nth)
-(set-symbol-function! 'nthcdr elisp-nthcdr)
-(set-symbol-function! 'last elisp-last)
 (set-symbol-function! 'butlast elisp-butlast)
-(set-symbol-function! 'reverse elisp-reverse)
-(set-symbol-function! 'member elisp-member)
-(set-symbol-function! 'assq elisp-assq)
-(set-symbol-function! 'assoc elisp-assoc)
-(set-symbol-function! 'rassq elisp-rassq)
-(set-symbol-function! 'copy-sequence elisp-copy-sequence)
-(set-symbol-function! 'zerop elisp-zerop)
-(set-symbol-function! 'plusp elisp-plusp)
-(set-symbol-function! 'minusp elisp-minusp)
-(set-symbol-function! 'evenp elisp-evenp)
-(set-symbol-function! 'oddp elisp-oddp)
 (set-symbol-function! 'numberp elisp-numberp)
 (set-symbol-function! 'floatp elisp-floatp)
 (set-symbol-function! 'natnump elisp-natnump)
 (set-symbol-function! 'plist-get elisp-plist-get)
-(set-symbol-function! 'plist-put elisp-plist-put)
 (set-symbol-function! 'plist-member elisp-plist-member)
-(set-symbol-function! 'string-equal elisp-string-equal)
-(set-symbol-function! 'string-lessp elisp-string-lessp)
-(set-symbol-function! 'string-greaterp elisp-string-greaterp)
-(set-symbol-function! 'append elisp-append)
-(set-symbol-function! 'mapcar elisp-mapcar)
-(set-symbol-function! 'mapc elisp-mapc)
 (set-symbol-function! 'identity elisp-identity)
-(set-symbol-function! 'constantly elisp-constantly)
 
 ;;; End Section 5
 
@@ -1657,24 +1634,35 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
         table)
       (error "Wrong type argument: hash-table-p" table)))
 
-(define (elisp-featurep feature subfeature)
-  "Return t if FEATURE is present in this Emacs.
+(define elisp-featurep
+  (case-lambda
+    ((feature)
+     ;; Called with 1 argument - no subfeature check
+     (elisp-featurep feature #nil))
+    ((feature subfeature)
+     ;; Called with 2 arguments
+     "Return t if FEATURE is present in this Emacs.
 Use this to conditionalize execution of lisp code based on the
 presence or absence of Emacs or environment extensions."
-  (if (memq feature features)
-      (if subfeature
-          ;; Check subfeature - simplified implementation
-          #t  ; For now, assume subfeatures are present if feature is
-          #t)
-      #nil))
+     (if (memq feature features)
+         (if (or (null? subfeature) (eq? subfeature #nil))
+             #t
+             #t)  ; Simplified: assume subfeatures are present if feature is
+         #nil))))
 
-(define (elisp-provide feature subfeatures)
-  "Announce that FEATURE is a feature of the current Emacs.
+(define elisp-provide
+  (case-lambda
+    ((feature)
+     ;; Called with 1 argument - no subfeatures
+     (elisp-provide feature #nil))
+    ((feature subfeatures)
+     ;; Called with 2 arguments
+     "Announce that FEATURE is a feature of the current Emacs.
 The optional argument SUBFEATURES should be a list of symbols listing
 particular subfeatures supported in this version of FEATURE."
-  (if (not (memq feature features))
-      (set! features (cons feature features)))
-  feature)
+     (if (not (memq feature features))
+         (set! features (cons feature features)))
+     feature)))
 
 (define (elisp-nreverse seq)
   "Reverse order of items in a list, vector or string SEQ.
