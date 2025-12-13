@@ -148,6 +148,10 @@
 
 (set-current-module (resolve-module '(language elisp runtime)))
 
+;; Initialize core Elisp variables BEFORE loading runtime modules
+;; This breaks circular dependencies (e.g., featurep needs features)
+(set-symbol-value! 'features '())
+
 ;; Load modular runtime components
 ;; These submodules provide organized, maintainable runtime functionality
 (primitive-load (join %prelude-directory "elisp/runtime/types.scm"))
@@ -1688,9 +1692,6 @@ This function may destructively modify SEQ to produce the value."
 
 ;; Register final high-value migration candidates
 (set-symbol-function! 'random elisp-random)
-(set-symbol-function! 'featurep elisp-featurep)
-(set-symbol-function! 'provide elisp-provide)
-(set-symbol-function! 'nreverse elisp-nreverse)
 
 ;; Additional critical DEFUN migrations from lread.c
 
@@ -1734,20 +1735,6 @@ is deleted, if it belongs to OBARRAY--no other symbol is deleted."
         #nil)))
 
 ;; Register DEFUN migrations from lread.c
-(set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
-(set-symbol-function! 'obarrayp elisp-obarrayp)
-(set-symbol-function! 'obarray-make elisp-obarray-make)
-(set-symbol-function! 'obarray-clear elisp-obarray-clear)
-(set-symbol-function! 'read-char elisp-read-char)
-(set-symbol-function! 'intern elisp-intern)
-(set-symbol-function! 'intern-soft elisp-intern-soft-lread)
-(set-symbol-function! 'unintern elisp-unintern)
-(set-symbol-function! 'symbol-plist elisp-symbol-plist)
-(set-symbol-function! 'setplist elisp-setplist)
-(set-symbol-function! 'get elisp-get)
-(set-symbol-function! 'put elisp-put)
-(set-symbol-function! 'hash-table-count elisp-hash-table-count)
-(set-symbol-function! 'clrhash elisp-clrhash)
 
 ;; Internal utility functions (not registered to avoid conflicts)
 ;; elisp-symbol-equal - available for internal use
@@ -2009,8 +1996,6 @@ This is a non-destructive version of `delq'."
       (else (loop (cdr remaining) (cons (car remaining) result))))))
 
 ;; Register new functions
-(set-symbol-function! 'delq elisp-delq)
-(set-symbol-function! 'remq elisp-remq)
 
 ;; Additional reader utility functions migrated from lread.c
 
@@ -2045,7 +2030,6 @@ This is an alias for complete-filename-p with better naming."
 
 ;; Register the filename utility functions for use from C and Elisp
 (set-symbol-function! 'complete-filename-p elisp-complete-filename-p)
-(set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
 
 ;; FIX-guilemacs: DEFUN Mathematical function migrations from floatfns.c to Guile
 ;; These functions are excellent migration candidates because they:
@@ -2260,7 +2244,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 
 ;; Register the new simple predicate functions
 (set-symbol-function! 'listp elisp-listp)
-(set-symbol-function! 'keywordp elisp-keywordp)
 (set-symbol-function! 'subrp elisp-subrp)
 
 ;; Register the new predicate functions
@@ -2309,7 +2292,6 @@ lowercase l) for small endian machines."
 
 ;; Register short names for C function access
 (set-symbol-function! 'sign elisp-sign)
-(set-symbol-function! 'clamp elisp-clamp)
 (set-symbol-function! 'square elisp-square)
 
 ;; Register system information functions

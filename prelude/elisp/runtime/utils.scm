@@ -155,7 +155,7 @@ It can be retrieved with '(get SYMBOL PROPNAME)'."
      "Return t if FEATURE is present in this Emacs.
 Use this to conditionalize execution of lisp code based on the
 presence or absence of Emacs or environment extensions."
-     (if (memq feature features)
+     (if (memq feature (symbol-value 'features))
          (if (or (null? subfeature) (eq? subfeature #nil))
              #t
              #t)  ; Simplified: assume subfeatures are present if feature is
@@ -171,8 +171,9 @@ presence or absence of Emacs or environment extensions."
      "Announce that FEATURE is a feature of the current Emacs.
 The optional argument SUBFEATURES should be a list of symbols listing
 particular subfeatures supported in this version of FEATURE."
-     (if (not (memq feature features))
-         (set! features (cons feature features)))
+     (let ((current-features (symbol-value 'features)))
+       (if (not (memq feature current-features))
+           (set-symbol-value! 'features (cons feature current-features))))
      feature)))
 
 ;;;
@@ -382,59 +383,57 @@ Uses dynamic-wind to ensure buffer is properly restored."
 
 ;;;
 ;;; Registration with Elisp symbol table
-;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
-;;; These functions are defined here but registered in load.scm for now.
-;;; Once we migrate functions from load.scm to this module, we can uncomment
-;;; the registrations incrementally.
+;;; Phase 2: Registrations migrated from prelude/load.scm
+;;; NOTE: Circular dependency resolved by initializing features variable before loading this module
 ;;;
 
 ;; Load system
-;; (set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
+(set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
 
 ;; Obarray operations
-;; (set-symbol-function! 'obarrayp elisp-obarrayp)
-;; (set-symbol-function! 'obarray-make elisp-obarray-make)
-;; (set-symbol-function! 'obarray-clear elisp-obarray-clear)
-;; (set-symbol-function! 'intern elisp-intern)
-;; (set-symbol-function! 'intern-soft elisp-intern-soft-lread)
-;; (set-symbol-function! 'unintern elisp-unintern)
+(set-symbol-function! 'obarrayp elisp-obarrayp)
+(set-symbol-function! 'obarray-make elisp-obarray-make)
+(set-symbol-function! 'obarray-clear elisp-obarray-clear)
+(set-symbol-function! 'intern elisp-intern)
+(set-symbol-function! 'intern-soft elisp-intern-soft-lread)
+(set-symbol-function! 'unintern elisp-unintern)
 
 ;; Symbol properties
-;; (set-symbol-function! 'symbol-plist elisp-symbol-plist)
-;; (set-symbol-function! 'setplist elisp-setplist)
-;; (set-symbol-function! 'get elisp-get)
-;; (set-symbol-function! 'put elisp-put)
+(set-symbol-function! 'symbol-plist elisp-symbol-plist)
+(set-symbol-function! 'setplist elisp-setplist)
+(set-symbol-function! 'get elisp-get)
+(set-symbol-function! 'put elisp-put)
 
 ;; Hash tables
-;; (set-symbol-function! 'hash-table-count elisp-hash-table-count)
-;; (set-symbol-function! 'clrhash elisp-clrhash)
+(set-symbol-function! 'hash-table-count elisp-hash-table-count)
+(set-symbol-function! 'clrhash elisp-clrhash)
 
 ;; Feature/provide
-;; (set-symbol-function! 'featurep elisp-featurep)
-;; (set-symbol-function! 'provide elisp-provide)
+(set-symbol-function! 'featurep elisp-featurep)
+(set-symbol-function! 'provide elisp-provide)
 
 ;; List utilities
-;; (set-symbol-function! 'nreverse elisp-nreverse)
-;; (set-symbol-function! 'delq elisp-delq)
-;; (set-symbol-function! 'remq elisp-remq)
+(set-symbol-function! 'nreverse elisp-nreverse)
+(set-symbol-function! 'delq elisp-delq)
+(set-symbol-function! 'remq elisp-remq)
 
 ;; Type predicates
-;; (set-symbol-function! 'markerp elisp-markerp)
-;; (set-symbol-function! 'keywordp elisp-keywordp)
+(set-symbol-function! 'markerp elisp-markerp)
+(set-symbol-function! 'keywordp elisp-keywordp)
 
 ;; File utilities
-;; (set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
+(set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
 
 ;; Mathematical utilities
-;; (set-symbol-function! 'copysign elisp-copysign)
-;; (set-symbol-function! 'frexp elisp-frexp)
-;; (set-symbol-function! 'ldexp elisp-ldexp)
-;; (set-symbol-function! 'logb elisp-logb)
-;; (set-symbol-function! 'clamp elisp-clamp)
+(set-symbol-function! 'copysign elisp-copysign)
+(set-symbol-function! 'frexp elisp-frexp)
+(set-symbol-function! 'ldexp elisp-ldexp)
+(set-symbol-function! 'logb elisp-logb)
+(set-symbol-function! 'clamp elisp-clamp)
 
 ;; I/O functions
-;; (set-symbol-function! 'read-char elisp-read-char)
+(set-symbol-function! 'read-char elisp-read-char)
 
 ;; Buffer operations
-;; (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
-;; (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
+(set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
+(set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
