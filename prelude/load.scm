@@ -188,14 +188,12 @@
   (frob - elisp--)
   (frob * elisp-*))
 
-(define (elisp-/-fold a lst seen-inexact)
-  (if (null? lst)
-      (cons a seen-inexact)
-      (let ((b (car lst)))
-        (elisp-/-fold (/ a b) (cdr lst) (or seen-inexact (inexact? b))))))
 
 
 
+(set-symbol-function! '/ elisp-/)
+(set-symbol-function! '1+ elisp-1+)
+(set-symbol-function! '1- elisp-1-)
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -212,12 +210,14 @@
   (frob >= elisp->=))
 
 
+(set-symbol-function! '/= elisp-/=)
 
 
 (set-symbol-function! 'logcount logcount)
 (set-symbol-function! 'lognot lognot)
 (set-symbol-function! 'logior logior)
 (set-symbol-function! 'logxor logxor)
+(set-symbol-function! 'logand elisp-logand)
 (set-symbol-function! 'ash ash)
 
 (set-symbol-function! 'cos cos)
@@ -280,6 +280,7 @@
 (set-symbol-function! '% elisp-%)
 
 
+(set-symbol-function! 'mod elisp-mod)
 
 ;;; End Section 3
 
@@ -292,57 +293,6 @@
 ;;; Includes optimized C-string comparisons for C integration.
 
 
-(define elisp-string-distance
-  (case-lambda
-    ((string1 string2)
-     ;; Called with 2 arguments - default bytecompare to #nil
-     (elisp-string-distance string1 string2 #nil))
-    ((string1 string2 bytecompare)
-     ;; Called with 3 arguments
-     "Return Levenshtein distance between STRING1 and STRING2.
-The distance is the number of deletions, insertions, and substitutions
-required to transform STRING1 into STRING2.
-If BYTECOMPARE is nil or omitted, compute distance in terms of characters.
-If BYTECOMPARE is non-nil, compute distance in terms of bytes.
-Letter-case is significant, but text properties are ignored."
-     (let ((use-byte-compare (not (or (null? bytecompare) (eq? bytecompare #nil))))
-        (s1 string1)
-        (s2 string2))
-    ;; Convert to bytevectors if byte comparison requested
-    (when use-byte-compare
-      (set! s1 (string->utf8 s1))
-      (set! s2 (string->utf8 s2)))
-    (let* ((len1 (if use-byte-compare (bytevector-length s1) (string-length s1)))
-           (len2 (if use-byte-compare (bytevector-length s2) (string-length s2)))
-           (column (make-vector (+ len1 1) 0)))
-
-      ;; Initialize first column
-      (do ((y 0 (+ y 1)))
-          ((> y len1))
-        (vector-set! column y y))
-
-      ;; Main algorithm loop
-      (do ((x 1 (+ x 1)))
-          ((> x len2))
-        (let ((lastdiag (vector-ref column 0)))
-          (vector-set! column 0 x)
-          (do ((y 1 (+ y 1)))
-              ((> y len1))
-            (let* ((olddiag (vector-ref column y))
-                   (c1 (if use-byte-compare
-                          (bytevector-u8-ref s1 (- y 1))
-                          (char->integer (string-ref s1 (- y 1)))))
-                   (c2 (if use-byte-compare
-                          (bytevector-u8-ref s2 (- x 1))
-                          (char->integer (string-ref s2 (- x 1)))))
-                   (cost (if (= c1 c2) lastdiag (+ lastdiag 1)))
-                   (deletion (+ (vector-ref column y) 1))
-                   (insertion (+ (vector-ref column (- y 1)) 1)))
-              (vector-set! column y (min cost deletion insertion))
-              (set! lastdiag olddiag)))))
-
-      ;; Return final distance
-      (vector-ref column len1))))))
 
 
 
@@ -556,6 +506,9 @@ Letter-case is significant, but text properties are ignored."
 
 
 ;; Register the functions for Elisp use
+(set-symbol-function! 'butlast elisp-butlast)
+(set-symbol-function! 'plist-get elisp-plist-get)
+(set-symbol-function! 'plist-member elisp-plist-member)
 
 ;;; End Section 5
 
@@ -692,6 +645,9 @@ This is more efficient than string comparison of symbol names."
 ;; Note: string-lessp already exists as elisp-string-lessp above
 
 ;; Register length functions
+(set-symbol-function! 'length< elisp-length<)
+(set-symbol-function! 'length> elisp-length>)
+(set-symbol-function! 'length= elisp-length=)
 
 ;; Register equality functions
 
@@ -729,30 +685,6 @@ This is more efficient than string comparison of symbol names."
 
 
 
-(define elisp-read-char
-  (case-lambda
-    (()
-     ;; Called with 0 arguments - defaults
-     (elisp-read-char #nil #nil #nil))
-    ((prompt)
-     ;; Called with 1 argument
-     (elisp-read-char prompt #nil #nil))
-    ((prompt inherit-input-method)
-     ;; Called with 2 arguments
-     (elisp-read-char prompt inherit-input-method #nil))
-    ((prompt inherit-input-method seconds)
-     ;; Called with 3 arguments
-     "Read a character event from the command input (keyboard or macro).
-It is returned as a number.
-If the optional argument PROMPT is non-nil, display that as a prompt.
-If the optional argument INHERIT-INPUT-METHOD is non-nil and some
-input method is turned on in the current buffer, that input method
-is used for reading a character.
-If the optional argument SECONDS is non-nil, it should be a number
-specifying the maximum number of seconds to wait for input."
-     ;; For now, a simple implementation that reads one character
-     ;; In full implementation, would handle prompts, input methods, and timeouts
-     (char->integer (read-char)))))
 
 ;; Symbol property functions
 
@@ -762,35 +694,7 @@ specifying the maximum number of seconds to wait for input."
 ;; Hash table predicates that can be migrated
 
 
-(define elisp-featurep
-  (case-lambda
-    ((feature)
-     ;; Called with 1 argument - no subfeature check
-     (elisp-featurep feature #nil))
-    ((feature subfeature)
-     ;; Called with 2 arguments
-     "Return t if FEATURE is present in this Emacs.
-Use this to conditionalize execution of lisp code based on the
-presence or absence of Emacs or environment extensions."
-     (if (memq feature features)
-         (if (or (null? subfeature) (eq? subfeature #nil))
-             #t
-             #t)  ; Simplified: assume subfeatures are present if feature is
-         #nil))))
 
-(define elisp-provide
-  (case-lambda
-    ((feature)
-     ;; Called with 1 argument - no subfeatures
-     (elisp-provide feature #nil))
-    ((feature subfeatures)
-     ;; Called with 2 arguments
-     "Announce that FEATURE is a feature of the current Emacs.
-The optional argument SUBFEATURES should be a list of symbols listing
-particular subfeatures supported in this version of FEATURE."
-     (if (not (memq feature features))
-         (set! features (cons feature features)))
-     feature)))
 
 
 ;; Register final high-value migration candidates

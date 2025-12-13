@@ -272,8 +272,8 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 (set-symbol-function! '1- elisp-1-)
 
 ;; Min/Max
-;; (set-symbol-function! 'min elisp-min)
-;; (set-symbol-function! 'max elisp-max)
+(set-symbol-function! 'min elisp-min)
+(set-symbol-function! 'max elisp-max)
 
 ;; Comparisons
 (set-symbol-function! '= elisp-=)
@@ -292,34 +292,34 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 (set-symbol-function! 'ash ash)
 
 ;; Trigonometric
-;; (set-symbol-function! 'cos cos)
-;; (set-symbol-function! 'tan tan)
-;; (set-symbol-function! 'sin sin)
-;; (set-symbol-function! 'acos acos)
-;; (set-symbol-function! 'atan atan)
-;; (set-symbol-function! 'asin asin)
+(set-symbol-function! 'cos cos)
+(set-symbol-function! 'tan tan)
+(set-symbol-function! 'sin sin)
+(set-symbol-function! 'acos acos)
+(set-symbol-function! 'atan atan)
+(set-symbol-function! 'asin asin)
 
 ;; Exponential & Logarithmic
-;; (set-symbol-function! 'abs abs)
-;; (set-symbol-function! 'sqrt sqrt)
-;; (set-symbol-function! 'exp exp)
-;; (set-symbol-function! 'expt expt)
-;; (set-symbol-function! 'log elisp-log)
+(set-symbol-function! 'abs abs)
+(set-symbol-function! 'sqrt sqrt)
+(set-symbol-function! 'exp exp)
+(set-symbol-function! 'expt expt)
+(set-symbol-function! 'log elisp-log)
 
 ;; Rounding & Truncation
-;; (set-symbol-function! 'truncate elisp-truncate)
-;; (set-symbol-function! 'ceiling elisp-ceiling)
-;; (set-symbol-function! 'floor elisp-floor)
-;; (set-symbol-function! 'round elisp-round)
+(set-symbol-function! 'truncate elisp-truncate)
+(set-symbol-function! 'ceiling elisp-ceiling)
+(set-symbol-function! 'floor elisp-floor)
+(set-symbol-function! 'round elisp-round)
 
 ;; Floating-point rounding
-;; (set-symbol-function! 'ftruncate elisp-ftruncate)
-;; (set-symbol-function! 'fceiling elisp-fceiling)
-;; (set-symbol-function! 'ffloor elisp-ffloor)
-;; (set-symbol-function! 'fround elisp-fround)
+(set-symbol-function! 'ftruncate elisp-ftruncate)
+(set-symbol-function! 'fceiling elisp-fceiling)
+(set-symbol-function! 'ffloor elisp-ffloor)
+(set-symbol-function! 'fround elisp-fround)
 
 ;; Special predicates
-;; (set-symbol-function! 'isnan elisp-isnan)
+(set-symbol-function! 'isnan elisp-isnan)
 
 ;; Modulo & Remainder
 (set-symbol-function! '% elisp-%)
