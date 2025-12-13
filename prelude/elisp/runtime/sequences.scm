@@ -389,6 +389,65 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
     ((null? list) #nil)
     (else (list-head list (min n (length list))))))
 
+;;;
+;;; Length Comparison Functions
+;;;
+
+(define (elisp-length< sequence length)
+  "Return non-nil if SEQUENCE is shorter than LENGTH."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #nil)
+    ((null? sequence) (if (> length 0) #t #nil))
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((>= count length) #nil)  ; Already at length, so not shorter
+         ((null? seq) #t)          ; Reached end before length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))            ; Improper list
+    ;; Check for keywords/symbols that are not sequences
+    ((or (keyword? sequence) (symbol? sequence)) #nil)
+    ;; For vectors and strings, use regular length
+    ((or (vector? sequence) (string? sequence))
+     (< (length sequence) length))
+    (else
+     ;; For unknown types, signal an error like Elisp would
+     #nil)))
+
+(define (elisp-length> sequence length)
+  "Return non-nil if SEQUENCE is longer than LENGTH."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #t)  ; Any sequence is longer than negative length
+    ((null? sequence) #nil)
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((> count length) #t)     ; Already longer than length
+         ((null? seq) #nil)        ; Reached end at or before length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))            ; Improper list
+    (else
+     ;; For other sequences (vectors, strings), use regular length
+     (> (length sequence) length))))
+
+(define (elisp-length= sequence length)
+  "Return non-nil if SEQUENCE has exactly LENGTH elements."
+  (cond
+    ((not (integer? length)) #nil)
+    ((< length 0) #nil)
+    ((null? sequence) (= length 0))
+    ((pair? sequence)
+     (let loop ((seq sequence) (count 0))
+       (cond
+         ((= count length) (null? seq))  ; Check if we're at end when count matches
+         ((null? seq) #nil)              ; Reached end before target length
+         ((pair? seq) (loop (cdr seq) (+ count 1)))
+         (else #nil))))                  ; Improper list
+    (else
+     ;; For other sequences (vectors, strings), use regular length
+     (= (length sequence) length))))
 
 ;;; Registration with Elisp symbol table
 ;;; Phase 2: Registrations migrated from prelude/load.scm
@@ -443,3 +502,8 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
 (set-symbol-function! 'make-list elisp-make-list)
 (set-symbol-function! 'safe-length elisp-safe-length)
 (set-symbol-function! 'take elisp-take)
+
+;; Length comparisons
+(set-symbol-function! 'length< elisp-length<)
+(set-symbol-function! 'length> elisp-length>)
+(set-symbol-function! 'length= elisp-length=)

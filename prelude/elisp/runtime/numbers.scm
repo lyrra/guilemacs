@@ -264,32 +264,32 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 ;;;
 
 ;; Basic arithmetic
-;; (set-symbol-function! '+ elisp-+)
-;; (set-symbol-function! '- elisp--)
-;; (set-symbol-function! '* elisp-*)
-;; (set-symbol-function! '/ elisp-/)
-;; (set-symbol-function! '1+ elisp-1+)
-;; (set-symbol-function! '1- elisp-1-)
+(set-symbol-function! '+ elisp-+)
+(set-symbol-function! '- elisp--)
+(set-symbol-function! '* elisp-*)
+(set-symbol-function! '/ elisp-/)
+(set-symbol-function! '1+ elisp-1+)
+(set-symbol-function! '1- elisp-1-)
 
 ;; Min/Max
 ;; (set-symbol-function! 'min elisp-min)
 ;; (set-symbol-function! 'max elisp-max)
 
 ;; Comparisons
-;; (set-symbol-function! '= elisp-=)
-;; (set-symbol-function! '< elisp-<)
-;; (set-symbol-function! '> elisp->)
-;; (set-symbol-function! '<= elisp-<=)
-;; (set-symbol-function! '>= elisp->=)
-;; (set-symbol-function! '/= elisp-/=)
+(set-symbol-function! '= elisp-=)
+(set-symbol-function! '< elisp-<)
+(set-symbol-function! '> elisp->)
+(set-symbol-function! '<= elisp-<=)
+(set-symbol-function! '>= elisp->=)
+(set-symbol-function! '/= elisp-/=)
 
 ;; Bitwise operations
-;; (set-symbol-function! 'logcount logcount)
-;; (set-symbol-function! 'lognot lognot)
-;; (set-symbol-function! 'logior logior)
-;; (set-symbol-function! 'logxor logxor)
-;; (set-symbol-function! 'logand elisp-logand)
-;; (set-symbol-function! 'ash ash)
+(set-symbol-function! 'logcount logcount)
+(set-symbol-function! 'lognot lognot)
+(set-symbol-function! 'logior logior)
+(set-symbol-function! 'logxor logxor)
+(set-symbol-function! 'logand elisp-logand)
+(set-symbol-function! 'ash ash)
 
 ;; Trigonometric
 ;; (set-symbol-function! 'cos cos)
@@ -322,8 +322,8 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 ;; (set-symbol-function! 'isnan elisp-isnan)
 
 ;; Modulo & Remainder
-;; (set-symbol-function! '% elisp-%)
-;; (set-symbol-function! 'mod elisp-mod)
+(set-symbol-function! '% elisp-%)
+(set-symbol-function! 'mod elisp-mod)
 
 (set-symbol-function! 'byteorder elisp-byteorder)
 (set-symbol-function! 'float elisp-float)

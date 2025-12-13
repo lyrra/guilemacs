@@ -194,27 +194,8 @@
       (let ((b (car lst)))
         (elisp-/-fold (/ a b) (cdr lst) (or seen-inexact (inexact? b))))))
 
-(define elisp-/ (lambda args
-                  (if (null? args)
-                      ((symbol-function 'signal) 'wrong-type-argument num)
-                      (let ((a (car args)))
-                        (if (null? (cdr args))
-                            (if (exact? a)
-                                (inexact->exact (truncate (car (elisp-/-fold 1.0 (list a) #f))))
-                                (car (elisp-/-fold 1.0 (list a) #f)))
-                            (let ((p (elisp-/-fold a (cdr args) (inexact? a))))
-                              (if (cdr p) ; a float was seen among the operands
-                                  (car p)
-                                  (inexact->exact (truncate (car p))))))))))
 
-(define elisp-1+ (lambda (a)
-                   (1+ (check-number-coerce-marker a))))
-(define elisp-1- (lambda (a)
-                   (1- (check-number-coerce-marker a))))
 
-(set-symbol-function! '/ elisp-/)
-(set-symbol-function! '1+ elisp-1+)
-(set-symbol-function! '1- elisp-1-)
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -230,24 +211,13 @@
   (frob <= elisp-<=)
   (frob >= elisp->=))
 
-(define elisp-/= (lambda args
-                   (if (apply = (map check-number-coerce-marker args))
-                       #nil #t)))
 
-(set-symbol-function! '/= elisp-/=)
 
-(define elisp-logand (lambda args
-                       (map (lambda (num)
-                              (unless (and (integer? num) (exact? num))
-                                ((symbol-function 'signal) 'wrong-type-argument num)))
-                            args)
-                       (apply logand (map check-number-coerce-marker args))))
 
 (set-symbol-function! 'logcount logcount)
 (set-symbol-function! 'lognot lognot)
 (set-symbol-function! 'logior logior)
 (set-symbol-function! 'logxor logxor)
-(set-symbol-function! 'logand elisp-logand)
 (set-symbol-function! 'ash ash)
 
 (set-symbol-function! 'cos cos)
@@ -309,14 +279,7 @@
 
 (set-symbol-function! '% elisp-%)
 
-(define elisp-mod (lambda (a b)
-                    ((if (or (inexact? a) (inexact? b))
-                         euclidean-remainder
-                         modulo)
-                     (check-number-coerce-marker a)
-                     (check-number-coerce-marker b))))
 
-(set-symbol-function! 'mod elisp-mod)
 
 ;;; End Section 3
 
@@ -554,22 +517,6 @@ Letter-case is significant, but text properties are ignored."
 
 
 
-(define elisp-butlast
-  (case-lambda
-    ((list)
-     ;; Called with 1 argument - default n to 1
-     (elisp-butlast list 1))
-    ((list n)
-     ;; Called with 2 arguments
-     "Return a copy of LIST with the last N elements removed.
-If N is omitted or nil, remove only the last element."
-     (let ((num (if (or (null? n) (eq? n #nil)) 1 n)))
-       (if (or (not (integer? num)) (< num 0))
-           list
-           (let ((len (length list)))
-             (if (<= len num)
-                 #nil
-                 (list-head list (- len num)))))))))
 
 
 ;; Additional list processing functions
@@ -591,46 +538,8 @@ If N is omitted or nil, remove only the last element."
 
 ;; Property list functions
 
-(define elisp-plist-get
-  (case-lambda
-    ((plist prop)
-     ;; Called with 2 arguments - use default predicate eq?
-     (elisp-plist-get plist prop eq?))
-    ((plist prop predicate)
-     ;; Called with 3 arguments
-     "Extract a value from a property list.
-PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
-Returns the value corresponding to PROP, or nil if not found.
-Uses PREDICATE for comparison, defaulting to `eq'."
-     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
-       (let loop ((tail plist))
-         (cond
-           ((null? tail) #nil)
-           ((not (pair? tail)) #nil)
-           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
-           ((pred prop (car tail)) (car (cdr tail)))
-           (else (loop (cddr tail)))))))))
 
 
-(define elisp-plist-member
-  (case-lambda
-    ((plist prop)
-     ;; Called with 2 arguments - use default predicate eq?
-     (elisp-plist-member plist prop eq?))
-    ((plist prop predicate)
-     ;; Called with 3 arguments
-     "Return non-nil if PROP is a property of PLIST.
-Unlike `plist-get', this allows distinguishing between a missing
-property and a property with value nil.
-Returns the tail of PLIST whose car is PROP."
-     (let ((pred (if (or (null? predicate) (eq? predicate #nil)) eq? predicate)))
-       (let loop ((tail plist))
-         (cond
-           ((null? tail) #nil)
-           ((not (pair? tail)) #nil)
-           ((not (pair? (cdr tail))) #nil)  ; Malformed plist
-           ((pred prop (car tail)) tail)
-           (else (loop (cddr tail)))))))))
 
 ;; String comparison functions
 
@@ -647,9 +556,6 @@ Returns the tail of PLIST whose car is PROP."
 
 
 ;; Register the functions for Elisp use
-(set-symbol-function! 'butlast elisp-butlast)
-(set-symbol-function! 'plist-get elisp-plist-get)
-(set-symbol-function! 'plist-member elisp-plist-member)
 
 ;;; End Section 5
 
@@ -700,61 +606,8 @@ Returns the tail of PLIST whose car is PROP."
 ;; Basic length function
 
 ;; Length comparison functions - simple predicates
-(define (elisp-length< sequence length)
-  "Return non-nil if SEQUENCE is shorter than LENGTH."
-  (cond
-    ((not (integer? length)) #nil)
-    ((< length 0) #nil)
-    ((null? sequence) (if (> length 0) #t #nil))
-    ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((>= count length) #nil)  ; Already at length, so not shorter
-         ((null? seq) #t)          ; Reached end before length
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))            ; Improper list
-    ;; Check for keywords/symbols that are not sequences
-    ((or (keyword? sequence) (symbol? sequence)) #nil)
-    ;; For vectors and strings, use regular length
-    ((or (vector? sequence) (string? sequence))
-     (< (length sequence) length))
-    (else
-     ;; For unknown types, signal an error like Elisp would
-     #nil)))
 
-(define (elisp-length> sequence length)
-  "Return non-nil if SEQUENCE is longer than LENGTH."
-  (cond
-    ((not (integer? length)) #nil)
-    ((< length 0) #t)  ; Any sequence is longer than negative length
-    ((null? sequence) #nil)
-    ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((> count length) #t)     ; Already longer than length
-         ((null? seq) #nil)        ; Reached end at or before length
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))            ; Improper list
-    (else
-     ;; For other sequences (vectors, strings), use regular length
-     (> (length sequence) length))))
 
-(define (elisp-length= sequence length)
-  "Return non-nil if SEQUENCE has exactly LENGTH elements."
-  (cond
-    ((not (integer? length)) #nil)
-    ((< length 0) #nil)
-    ((null? sequence) (= length 0))
-    ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((= count length) (null? seq))  ; Check if we're at end when count matches
-         ((null? seq) #nil)              ; Reached end before target length
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))                  ; Improper list
-    (else
-     ;; For other sequences (vectors, strings), use regular length
-     (= (length sequence) length))))
 
 ;; Safe length function
 
@@ -839,9 +692,6 @@ This is more efficient than string comparison of symbol names."
 ;; Note: string-lessp already exists as elisp-string-lessp above
 
 ;; Register length functions
-(set-symbol-function! 'length< elisp-length<)
-(set-symbol-function! 'length> elisp-length>)
-(set-symbol-function! 'length= elisp-length=)
 
 ;; Register equality functions
 
