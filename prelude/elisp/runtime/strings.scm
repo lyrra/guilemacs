@@ -285,39 +285,43 @@ Optional BASE argument specifies the base (2-16)."
 ;;;
 
 ;; String metrics
-(set-symbol-function! 'string-bytes elisp-string-bytes)
-(set-symbol-function! 'string-distance elisp-string-distance)
 
 ;; String creation & conversion
-(set-symbol-function! 'char-to-string elisp-char-to-string)
-(set-symbol-function! 'string-to-char elisp-string-to-char)
-(set-symbol-function! 'byte-to-string elisp-byte-to-string)
-(set-symbol-function! 'string elisp-string)
-(set-symbol-function! 'unibyte-string elisp-unibyte-string)
 
 ;; String type predicates
-(set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
-(set-symbol-function! 'stringp elisp-stringp)
-(set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
 
 ;; Optimized C-string comparisons
-(set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
-(set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
-(set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
-(set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
-(set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
-(set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
-(set-symbol-function! 'string-equal-none elisp-string-equal-none)
 
 ;; Special
-(set-symbol-function! 'eval-scheme elisp-eval-scheme)
 
-(set-symbol-function! 'capitalize elisp-capitalize)
-(set-symbol-function! 'downcase elisp-downcase)
-(set-symbol-function! 'upcase elisp-upcase)
-(set-symbol-function! 'string-equal-ignore-case elisp-string-equal-ignore-case)
-(set-symbol-function! 'string-lessp-ignore-case elisp-string-lessp-ignore-case)
-(set-symbol-function! 'string-prefix-p elisp-string-prefix-p)
-(set-symbol-function! 'string-search elisp-string-search)
-(set-symbol-function! 'string-suffix-p elisp-string-suffix-p)
-(set-symbol-function! 'string-to-number elisp-string-to-number)
+;; Registration initialization function
+;; Called by load.scm after module is loaded
+(define (init-strings-registrations)
+  "Initialize symbol function registrations for strings module."
+  (set-symbol-function! 'string-bytes elisp-string-bytes)
+  (set-symbol-function! 'string-distance elisp-string-distance)
+  (set-symbol-function! 'char-to-string elisp-char-to-string)
+  (set-symbol-function! 'string-to-char elisp-string-to-char)
+  (set-symbol-function! 'byte-to-string elisp-byte-to-string)
+  (set-symbol-function! 'string elisp-string)
+  (set-symbol-function! 'unibyte-string elisp-unibyte-string)
+  (set-symbol-function! 'multibyte-string-p elisp-multibyte-string-p)
+  (set-symbol-function! 'stringp elisp-stringp)
+  (set-symbol-function! 'char-or-string-p elisp-char-or-string-p)
+  (set-symbol-function! 'string-equal-cstr elisp-string-equal-cstr)
+  (set-symbol-function! 'string-ci-equal-cstr elisp-string-ci-equal-cstr)
+  (set-symbol-function! 'symbol-name-equal-cstr elisp-symbol-name-equal-cstr)
+  (set-symbol-function! 'string-equal-two-cstrs elisp-string-equal-two-cstrs)
+  (set-symbol-function! 'string-ci-equal-two-cstrs elisp-string-ci-equal-two-cstrs)
+  (set-symbol-function! 'string-ci-equal-none elisp-string-ci-equal-none)
+  (set-symbol-function! 'string-equal-none elisp-string-equal-none)
+  (set-symbol-function! 'eval-scheme elisp-eval-scheme)
+  (set-symbol-function! 'capitalize elisp-capitalize)
+  (set-symbol-function! 'downcase elisp-downcase)
+  (set-symbol-function! 'upcase elisp-upcase)
+  (set-symbol-function! 'string-equal-ignore-case elisp-string-equal-ignore-case)
+  (set-symbol-function! 'string-lessp-ignore-case elisp-string-lessp-ignore-case)
+  (set-symbol-function! 'string-prefix-p elisp-string-prefix-p)
+  (set-symbol-function! 'string-search elisp-string-search)
+  (set-symbol-function! 'string-suffix-p elisp-string-suffix-p)
+  (set-symbol-function! 'string-to-number elisp-string-to-number))

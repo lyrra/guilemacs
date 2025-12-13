@@ -440,58 +440,62 @@ Uses efficient symbol lookup without creating new symbols."
 ;;;
 
 ;; Load system
-(set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
 
 ;; Obarray operations
-(set-symbol-function! 'obarrayp elisp-obarrayp)
-(set-symbol-function! 'obarray-make elisp-obarray-make)
-(set-symbol-function! 'obarray-clear elisp-obarray-clear)
-(set-symbol-function! 'intern elisp-intern)
-(set-symbol-function! 'intern-soft elisp-intern-soft-lread)
-(set-symbol-function! 'unintern elisp-unintern)
 
 ;; Symbol properties
-(set-symbol-function! 'symbol-plist elisp-symbol-plist)
-(set-symbol-function! 'setplist elisp-setplist)
-(set-symbol-function! 'get elisp-get)
-(set-symbol-function! 'put elisp-put)
 
 ;; Hash tables
-(set-symbol-function! 'hash-table-count elisp-hash-table-count)
-(set-symbol-function! 'clrhash elisp-clrhash)
 
 ;; Feature/provide
-(set-symbol-function! 'featurep elisp-featurep)
-(set-symbol-function! 'provide elisp-provide)
 
 ;; List utilities
-(set-symbol-function! 'nreverse elisp-nreverse)
-(set-symbol-function! 'delq elisp-delq)
-(set-symbol-function! 'remq elisp-remq)
 
 ;; Type predicates
-(set-symbol-function! 'markerp elisp-markerp)
-(set-symbol-function! 'keywordp elisp-keywordp)
 
 ;; File utilities
-(set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
 
 ;; Mathematical utilities
-(set-symbol-function! 'copysign elisp-copysign)
-(set-symbol-function! 'frexp elisp-frexp)
-(set-symbol-function! 'ldexp elisp-ldexp)
-(set-symbol-function! 'logb elisp-logb)
-(set-symbol-function! 'clamp elisp-clamp)
 
 ;; I/O functions
-(set-symbol-function! 'read-char elisp-read-char)
 
 ;; Buffer operations
-(set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
-(set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
 
-(set-symbol-function! 'intern-soft elisp-intern-soft)
-(set-symbol-function! 'make-string elisp-make-string)
-(set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
-(set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
-(set-symbol-function! 'sxhash-equal elisp-sxhash-equal)
+;; Registration initialization function
+;; Called by load.scm after module is loaded
+(define (init-utils-registrations)
+  "Initialize symbol function registrations for utils module."
+  (set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
+  (set-symbol-function! 'obarrayp elisp-obarrayp)
+  (set-symbol-function! 'obarray-make elisp-obarray-make)
+  (set-symbol-function! 'obarray-clear elisp-obarray-clear)
+  (set-symbol-function! 'intern elisp-intern)
+  (set-symbol-function! 'intern-soft elisp-intern-soft-lread)
+  (set-symbol-function! 'unintern elisp-unintern)
+  (set-symbol-function! 'symbol-plist elisp-symbol-plist)
+  (set-symbol-function! 'setplist elisp-setplist)
+  (set-symbol-function! 'get elisp-get)
+  (set-symbol-function! 'put elisp-put)
+  (set-symbol-function! 'hash-table-count elisp-hash-table-count)
+  (set-symbol-function! 'clrhash elisp-clrhash)
+  (set-symbol-function! 'featurep elisp-featurep)
+  (set-symbol-function! 'provide elisp-provide)
+  (set-symbol-function! 'nreverse elisp-nreverse)
+  (set-symbol-function! 'delq elisp-delq)
+  (set-symbol-function! 'remq elisp-remq)
+  (set-symbol-function! 'markerp elisp-markerp)
+  (set-symbol-function! 'keywordp elisp-keywordp)
+  (set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
+  (set-symbol-function! 'copysign elisp-copysign)
+  (set-symbol-function! 'frexp elisp-frexp)
+  (set-symbol-function! 'ldexp elisp-ldexp)
+  (set-symbol-function! 'logb elisp-logb)
+  (set-symbol-function! 'clamp elisp-clamp)
+  (set-symbol-function! 'read-char elisp-read-char)
+  (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
+  (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
+  (set-symbol-function! 'intern-soft elisp-intern-soft)
+  (set-symbol-function! 'make-string elisp-make-string)
+  (set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
+  (set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
+  (set-symbol-function! 'sxhash-equal elisp-sxhash-equal))

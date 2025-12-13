@@ -317,14 +317,18 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
 
 ;; (set-symbol-function! 'identity elisp-identity)
 
-(set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
-(set-symbol-function! 'boundp elisp-boundp)
-(set-symbol-function! 'condition-variable-p elisp-condition-variable-p)
-(set-symbol-function! 'hash-table-p elisp-hash-table-p)
-(set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
-(set-symbol-function! 'mutexp elisp-mutexp)
-(set-symbol-function! 'recordp elisp-recordp)
-(set-symbol-function! 'symbol-with-pos-p elisp-symbol-with-pos-p)
-(set-symbol-function! 'threadp elisp-threadp)
-(set-symbol-function! 'user-ptrp elisp-user-ptrp)
-(set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p)
+;; Registration initialization function
+;; Called by load.scm after module is loaded
+(define (init-types-registrations)
+  "Initialize symbol function registrations for types module."
+  (set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
+  (set-symbol-function! 'boundp elisp-boundp)
+  (set-symbol-function! 'condition-variable-p elisp-condition-variable-p)
+  (set-symbol-function! 'hash-table-p elisp-hash-table-p)
+  (set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
+  (set-symbol-function! 'mutexp elisp-mutexp)
+  (set-symbol-function! 'recordp elisp-recordp)
+  (set-symbol-function! 'symbol-with-pos-p elisp-symbol-with-pos-p)
+  (set-symbol-function! 'threadp elisp-threadp)
+  (set-symbol-function! 'user-ptrp elisp-user-ptrp)
+  (set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p))

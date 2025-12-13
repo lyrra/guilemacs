@@ -167,8 +167,11 @@
 
 ;; Initialize symbol function registrations from runtime modules
 ;; This allows modules to manage their own registrations
+(init-types-registrations)
 (init-numbers-registrations)
+(init-strings-registrations)
 (init-sequences-registrations)
+(init-utils-registrations)
 
 (primitive-load (join %prelude-directory "pcase.scm"))
 
