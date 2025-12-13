@@ -319,6 +319,25 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
 
 ;; Registration initialization function
 ;; Called by load.scm after module is loaded
+
+
+(define (elisp-symbol-equal sym1 sym2)
+  "Compare two symbols directly without converting to strings.
+This is more efficient than string comparison of symbol names."
+  (cond
+    ((and (symbol? sym1) (symbol? sym2))
+     (if (eq? sym1 sym2) #t #nil))
+    ((symbol? sym1)
+     (if (string? sym2)
+         (if (string=? (symbol->string sym1) sym2) #t #nil)
+         #nil))
+    ((symbol? sym2)
+     (if (string? sym1)
+         (if (string=? sym1 (symbol->string sym2)) #t #nil)
+         #nil))
+    (else
+     (if (equal? sym1 sym2) #t #nil))))
+
 (define (init-types-registrations)
   "Initialize symbol function registrations for types module."
   (set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
