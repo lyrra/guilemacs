@@ -1,25 +1,28 @@
 ;;; ============================================================================
-;;; PRELUDE/LOAD.SCM - Guilemacs Elisp Runtime Functions
+;;; PRELUDE/LOAD.SCM - Guilemacs Bootstrap & Core Infrastructure
 ;;; ============================================================================
 ;;;
-;;; This file contains the Guile-side implementations of Elisp functions
-;;; migrated from C for better maintainability and leveraging Guile's GC.
+;;; This file contains the core bootstrap code and infrastructure for Guilemacs.
+;;; Domain-specific runtime functions have been migrated to modular runtime files.
 ;;;
-;;; CONTENTS:
-;;;   1. Module Setup & Initialization       (Lines ~1-115)
-;;;   2. Reload Infrastructure                (Lines ~116-248)
-;;;   3. Arithmetic & Math Operations         (Lines ~249-677)
-;;;   4. Type Predicates & Conversions        (Lines ~678-1010)
-;;;   5. String Operations                    (Lines ~1011-1401)
-;;;   6. List & Sequence Operations           (Lines ~1402-2025)
-;;;   7. Property Lists & Utilities           (Lines ~2026-2364)
-;;;   8. Reader & Parser Functions            (Lines ~2365-3800)
-;;;   9. Load System                          (Lines ~3801-4365)
-;;;  10. Goals.org Optimizations              (Lines ~4366-4420)
-;;;  11. Debug & Development Tools            (Lines ~4421-END)
+;;; ARCHITECTURE:
+;;;   - Bootstrap & initialization code
+;;;   - Runtime module loading infrastructure
+;;;   - Elisp reader/parser functions (96 functions)
+;;;   - File loading system (load, require, provide)
+;;;   - Essential symbol management
 ;;;
-;;; NOTE: This file has grown organically and contains duplicate definitions.
-;;;       A cleanup/deduplication pass is planned.
+;;; MODULAR RUNTIME:
+;;;   Runtime functionality is organized into focused modules:
+;;;   - elisp/runtime/types.scm     - Type predicates & conversions (41 functions)
+;;;   - elisp/runtime/numbers.scm   - Arithmetic & math operations (32 functions)
+;;;   - elisp/runtime/strings.scm   - String operations (27 functions)
+;;;   - elisp/runtime/sequences.scm - List & sequence operations (34 functions)
+;;;   - elisp/runtime/utils.scm     - Property lists & utilities (37 functions)
+;;;   - elisp/runtime/loader.scm    - Additional load support
+;;;   - elisp/runtime/reader.scm    - Additional reader support
+;;;
+;;;   Each runtime module manages its own symbol registrations via init functions.
 ;;;
 ;;; ============================================================================
 
@@ -211,13 +214,6 @@
   (frob <= elisp-<=)
   (frob >= elisp->=))
 
-
-
-
-
-
-
-
 (let-syntax
     ((frob (syntax-rules ()
              ((_ el-name scm-op-arity1 scm-op-arity2)
@@ -250,39 +246,12 @@
                   (remainder (check-number-coerce-marker a)
                              (check-number-coerce-marker b))))
 
-
-
-
-;;; End Section 3
-
-
 ;;; ============================================================================
 ;;; SECTION 4: STRING OPERATIONS
 ;;; ============================================================================
 ;;;
 ;;; String manipulation, comparison, and creation functions.
 ;;; Includes optimized C-string comparisons for C integration.
-
-
-
-
-
-
-
-
-
-
-
-
-;; Efficient string comparison functions for C integration
-
-
-
-;; Ultra-efficient comparison functions that avoid creating temporary string objects
-
-
-;; Optimized constant string comparisons
-
 
 (define (elisp-detect-lexical-binding port)
   "Detect lexical binding from first line of file.
@@ -424,145 +393,6 @@
 
 ;;; End Section 4
 
-
-;;; ============================================================================
-;;; SECTION 5: LIST & SEQUENCE OPERATIONS
-;;; ============================================================================
-;;;
-;;; List/cons manipulation, sequences, property lists, and association lists.
-;;; Migrated from C for better maintainability and GC efficiency.
-
-;; List processing functions migrated from C to Guile for better maintainability
-
-
-
-
-
-
-
-;; Additional list processing functions
-
-
-
-
-
-
-;; Simple numerical predicates
-
-
-
-
-
-
-
-
-
-;; Property list functions
-
-
-
-
-;; String comparison functions
-
-
-
-
-;; List construction and manipulation
-
-
-
-
-;; Simple utility functions
-
-
-
-;; Register the functions for Elisp use
-
-;;; End Section 5
-
-
-;;; ============================================================================
-;;; SECTION 6: TYPE PREDICATES & CONVERSIONS
-;;; ============================================================================
-;;;
-;;; Type checking and conversion functions migrated from C (Phase 3 & 4).
-;;; NOTE: Contains significant duplication - cleanup needed.
-
-;; Phase 3: Type predicate functions migrated from C to Guile
-
-
-
-
-
-
-
-;; Basic cons cell manipulation functions
-
-
-
-
-
-
-;; List construction functions
-
-
-
-;; Phase 4: DEFUN function migrations from C to Guile - NOW ACTIVE
-;;
-
-
-
-;; FIX-guilemacs: Additional DEFUN function migrations from C to Guile
-;; New functions identified as migration candidates
-
-;; Type predicate functions - simple one-liners from data.c
-
-
-
-;; Simple utility functions from fns.c that are easy to migrate
-
-;; Simple comparison and null checking functions from data.c
-
-
-;; Basic length function
-
-;; Length comparison functions - simple predicates
-
-
-
-;; Safe length function
-
-;; Equality functions that use Guile primitives
-
-
-
-;; List utility functions
-
-;; Case conversion functions that use Guile
-
-
-
-;; Type conversion functions
-
-
-
-;; Additional type predicates
-
-
-
-
-;; String creation function
-
-;; Final batch of simple predicates and utilities
-
-
-;; Hash functions (simple wrappers)
-
-
-
-;;; End Section 6
-
-
 ;;; ============================================================================
 ;;; SECTION 7: GOALS.ORG OPTIMIZATIONS
 ;;; ============================================================================
@@ -592,51 +422,6 @@ This is more efficient than string comparison of symbol names."
     (else
      (if (equal? sym1 sym2) #t #nil))))
 
-;; Goal: "Implement native Guile case-insensitive operations"
-
-
-;; Goal: "find string comparison patterns in C code, move to guile"
-
-
-;; Goal: "Optimize for symbol interning efficiency"
-
-;; Goal: "minimize memory handling in C, utilize the GC in guile"
-
-;; Simple utility functions migrated from C DEFUN to Guile
-
-;; Register Phase 3 functions for Elisp use
-; Note: bufferp kept in C for now due to C-specific buffer object handling
-; Note: symbolp kept in C for now
-
-
-;; Register Phase 4 functions (uncommmented and new migrations)
-;; Note: string-lessp already exists as elisp-string-lessp above
-
-;; Register length functions
-
-;; Register equality functions
-
-;; Register list utility functions
-
-;; Register case conversion functions
-
-;; Register type conversion functions
-
-;; Register additional type predicates
-
-;; Register string creation functions
-
-;; Register final batch of functions
-
-
-;; Register goals.org implementation functions
-
-;; Final high-value migration candidates
-;; (elisp-random moved to numbers.scm)
-
-;;; End Section 7
-
-
 ;;; ============================================================================
 ;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
 ;;; ============================================================================
@@ -644,39 +429,6 @@ This is more efficient than string comparison of symbol names."
 ;;; Additional function migrations from C to Guile from various source files.
 ;;; Includes functions from: lread.c, data.c, fns.c, floatfns.c
 ;;; NOTE: Some functions here may overlap with earlier sections.
-
-;; DEFUN migrations from lread.c - simple utility functions primarily used by elisp
-
-
-
-
-
-;; Symbol property functions
-
-
-
-
-;; Hash table predicates that can be migrated
-
-
-
-
-
-;; Register final high-value migration candidates
-
-;; Additional critical DEFUN migrations from lread.c
-
-
-
-
-;; Register DEFUN migrations from lread.c
-
-;; Internal utility functions (not registered to avoid conflicts)
-;; elisp-symbol-equal - available for internal use
-
-;; Phase 4 DEFUN function migrations are called directly from C code
-;; to avoid infinite recursion. The elisp-* versions are available
-;; for internal use but not registered as symbol replacements.
 
 ;; Load lookup functions for C integration
 ;; Use the prelude directory defined in the current module by C
@@ -707,19 +459,6 @@ This is more efficient than string comparison of symbol names."
 ;; Full version temporarily disabled due to buffer operation dependencies during bootstrap
 ;; TODO: Load full character-navigation.scm when buffer context is properly available
 ;; (primitive-load (string-append %prelude-directory "/character-navigation.scm"))
-
-;; DEFUN function migrations - Phase 3: Move simple elisp predicates to Guile
-;; These are simple type predicates that can be efficiently implemented in Guile
-
-;; Additional predicate migrations from src/data.c
-
-
-
-;; Register these functions for use from C and Elisp
-;; Disabled while debugging baseline functionality
-
-;; Buffer Operations using dynamic-wind pattern
-
 
 
 ;; Export the functions to both global module and language elisp emacs module
@@ -841,90 +580,6 @@ This is more efficient than string comparison of symbol names."
 
 ;; when elisp reads keyword symbols, support common-lisp keywords
 (read-set! keywords 'prefix)
-
-;; Additional DEFUN function migrations from C to Guile
-;; Migration of delq - destructive list removal function
-
-
-
-;; Register new functions
-
-;; Additional reader utility functions migrated from lread.c
-
-
-
-;; Register the filename utility functions for use from C and Elisp
-
-;; FIX-guilemacs: DEFUN Mathematical function migrations from floatfns.c to Guile
-;; These functions are excellent migration candidates because they:
-;; 1. Don't depend on early C initialization
-;; 2. Are well-defined mathematical operations
-;; 3. Can leverage Guile's built-in floating point support
-
-
-
-
-
-;; FIX-guilemacs: Additional simple utility function migrations
-
-;; Reader and file loading functions migrated from C
-
-
-;; Additional mathematical utility functions - demonstrating migration pattern
-
-
-
-;; Additional mathematical predicate functions migrated from src/data.c
-
-
-
-;; Additional predicate functions migrated from src/data.c
-
-;; Additional type predicates migrated from src/data.c
-
-
-
-
-
-;; Simple utility functions migrated from src/fns.c and src/data.c
-
-
-
-
-
-
-
-
-;; Register the new mathematical functions for Elisp use
-
-;; Register the new reader and file loading functions
-
-;; Register the additional utility functions
-
-;; Register the new mathematical predicate functions
-
-;; Register the new simple predicate functions
-
-;; Register the new predicate functions
-
-;; Register the new basic comparison and utility functions
-
-;; Register the additional type predicates
-
-;; Register the basic list access functions
-
-;; Register the simple utility functions
-
-;; System information functions
-
-;; Register short names for C function access
-
-;; Register system information functions
-
-;; Note: identity is already registered above as elisp-identity at line 669
-
-;;; End Section 8
-
 
 ;;; ============================================================================
 ;;; SECTION 9: READER & PARSER FUNCTIONS
