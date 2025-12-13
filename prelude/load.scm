@@ -182,72 +182,8 @@
 ;;; SECTION 3: ARITHMETIC & MATH OPERATIONS
 ;;; ============================================================================
 ;;;
-;;; Migrated from C DEFUN arithmetic and mathematical functions.
-;;; Includes: basic ops, floating point, predicates.
-;;; NOTE: This section contains some duplicates that need cleanup.
-
-(let-syntax
-    ((frob (syntax-rules ()
-             ((_ lisp-name fun-name)
-              (begin
-                (define fun-name (lambda args
-                                   (apply lisp-name (map check-number-coerce-marker args))))
-                (set-symbol-function! 'lisp-name fun-name))))))
-  (frob min elisp-min)
-  (frob max elisp-max)
-  (frob + elisp-+)
-  (frob - elisp--)
-  (frob * elisp-*))
-
-
-
-
-
-(let-syntax
-    ((frob (syntax-rules ()
-             ((_ lisp-name fun-name)
-              (begin
-                (define fun-name (lambda args
-                                  (if (apply lisp-name (map check-number-coerce-marker args))
-                                      #t #nil)))
-                (set-symbol-function! 'lisp-name fun-name))))))
-  (frob = elisp-=)
-  (frob < elisp-<)
-  (frob > elisp->)
-  (frob <= elisp-<=)
-  (frob >= elisp->=))
-
-(let-syntax
-    ((frob (syntax-rules ()
-             ((_ el-name scm-op-arity1 scm-op-arity2)
-              (set-symbol-function! 'el-name
-                                    (lambda* (num #:optional div)
-                                      (inexact->exact
-                                       (if (not div)
-                                           (scm-op-arity1 num)
-                                           (scm-op-arity2 num div)))))))))
-  (frob truncate truncate truncate-quotient)
-  (frob ceiling  ceiling  ceiling-quotient)
-  (frob floor    floor    floor-quotient)
-  (frob round    round    round-quotient))
-
-(let-syntax
-    ((frob (syntax-rules ()
-             ((_ el-name scm-op)
-              (set-symbol-function! 'el-name
-                                    (lambda (num)
-                                      (unless (and (real? num) (not (exact? num)))
-                                        ((symbol-function 'signal) 'wrong-type-argument num))
-                                      (exact->inexact (scm-op num))))))))
-  (frob ftruncate truncate)
-  (frob fceiling ceiling)
-  (frob ffloor floor)
-  (frob fround round))
-
-
-(define elisp-% (lambda (a b)
-                  (remainder (check-number-coerce-marker a)
-                             (check-number-coerce-marker b))))
+;;; Migrated to prelude/elisp/runtime/numbers.scm
+;;; All arithmetic operations and registrations are now handled by init-numbers-registrations
 
 ;;; ============================================================================
 ;;; SECTION 4: STRING OPERATIONS

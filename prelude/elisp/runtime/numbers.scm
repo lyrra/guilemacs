@@ -47,35 +47,29 @@
 ;;; Min/Max Operations
 ;;;
 
-(define elisp-min (lambda args
-                    (apply min (map check-number-coerce-marker args))))
-
-(define elisp-max (lambda args
-                    (apply max (map check-number-coerce-marker args))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ lisp-name fun-name)
+              (define fun-name (lambda args
+                                 (apply lisp-name (map check-number-coerce-marker args))))))))
+  (frob min elisp-min)
+  (frob max elisp-max))
 
 ;;;
 ;;; Comparison Operations
 ;;;
 
-(define elisp-= (lambda args
-                  (if (apply = (map check-number-coerce-marker args))
-                      #t #nil)))
-
-(define elisp-< (lambda args
-                  (if (apply < (map check-number-coerce-marker args))
-                      #t #nil)))
-
-(define elisp-> (lambda args
-                  (if (apply > (map check-number-coerce-marker args))
-                      #t #nil)))
-
-(define elisp-<= (lambda args
-                   (if (apply <= (map check-number-coerce-marker args))
-                       #t #nil)))
-
-(define elisp->= (lambda args
-                   (if (apply >= (map check-number-coerce-marker args))
-                       #t #nil)))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ lisp-name fun-name)
+              (define fun-name (lambda args
+                                 (if (apply lisp-name (map check-number-coerce-marker args))
+                                     #t #nil)))))))
+  (frob = elisp-=)
+  (frob < elisp-<)
+  (frob > elisp->)
+  (frob <= elisp-<=)
+  (frob >= elisp->=))
 
 (define elisp-/= (lambda args
                    (if (apply = (map check-number-coerce-marker args))
@@ -116,61 +110,36 @@
 ;;; Rounding & Truncation Functions
 ;;;
 
-(define elisp-truncate
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (truncate num)
-         (truncate-quotient num div)))))
-
-(define elisp-ceiling
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (ceiling num)
-         (ceiling-quotient num div)))))
-
-(define elisp-floor
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (floor num)
-         (floor-quotient num div)))))
-
-(define elisp-round
-  (lambda* (num #:optional div)
-    (inexact->exact
-     (if (not div)
-         (round num)
-         (round-quotient num div)))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ el-name scm-op-arity1 scm-op-arity2)
+              (define el-name
+                (lambda* (num #:optional div)
+                  (inexact->exact
+                   (if (not div)
+                       (scm-op-arity1 num)
+                       (scm-op-arity2 num div)))))))))
+  (frob elisp-truncate truncate truncate-quotient)
+  (frob elisp-ceiling  ceiling  ceiling-quotient)
+  (frob elisp-floor    floor    floor-quotient)
+  (frob elisp-round    round    round-quotient))
 
 ;;;
 ;;; Floating-Point Rounding Functions
 ;;;
 
-(define elisp-ftruncate
-  (lambda (num)
-    (unless (and (real? num) (not (exact? num)))
-      ((symbol-function 'signal) 'wrong-type-argument num))
-    (exact->inexact (truncate num))))
-
-(define elisp-fceiling
-  (lambda (num)
-    (unless (and (real? num) (not (exact? num)))
-      ((symbol-function 'signal) 'wrong-type-argument num))
-    (exact->inexact (ceiling num))))
-
-(define elisp-ffloor
-  (lambda (num)
-    (unless (and (real? num) (not (exact? num)))
-      ((symbol-function 'signal) 'wrong-type-argument num))
-    (exact->inexact (floor num))))
-
-(define elisp-fround
-  (lambda (num)
-    (unless (and (real? num) (not (exact? num)))
-      ((symbol-function 'signal) 'wrong-type-argument num))
-    (exact->inexact (round num))))
+(let-syntax
+    ((frob (syntax-rules ()
+             ((_ el-name scm-op)
+              (define el-name
+                (lambda (num)
+                  (unless (and (real? num) (not (exact? num)))
+                    ((symbol-function 'signal) 'wrong-type-argument num))
+                  (exact->inexact (scm-op num))))))))
+  (frob elisp-ftruncate truncate)
+  (frob elisp-fceiling ceiling)
+  (frob elisp-ffloor floor)
+  (frob elisp-fround round))
 
 ;;;
 ;;; Special Floating-Point Predicates
