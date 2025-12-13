@@ -26,7 +26,6 @@
 ;;;
 ;;; ============================================================================
 
-
 ;;; ============================================================================
 ;;; SECTION 1: MODULE SETUP & INITIALIZATION
 ;;; ============================================================================
@@ -102,9 +101,6 @@
 ;(format #t "------- reloading guile elisp spec ----------~%")
 ;(load "./elisp/spec.scm")
 
-;;; End Section 1
-
-
 ;;; ============================================================================
 ;;; SECTION 2: RELOAD INFRASTRUCTURE
 ;;; ============================================================================
@@ -112,7 +108,6 @@
 ;;; Functions for hot-reloading Elisp language components during development.
 ;;; This section is executed during prelude initialization.
 
-;----------------------------------------------------------------------------------
 ;; reload-elisp.scm
 ;; Reload language/elisp pieces in the right order and load boot.el as *Elisp*.
 (define (join a b)
@@ -174,50 +169,6 @@
 (init-utils-registrations)
 
 (primitive-load (join %prelude-directory "pcase.scm"))
-
-;;; End Section 2
-
-
-;;; ============================================================================
-;;; SECTION 3: ARITHMETIC & MATH OPERATIONS
-;;; ============================================================================
-;;;
-;;; Migrated to prelude/elisp/runtime/numbers.scm
-;;; All arithmetic operations and registrations are now handled by init-numbers-registrations
-
-;;; ============================================================================
-;;; SECTION 4: STRING OPERATIONS
-;;; ============================================================================
-;;;
-;;; String manipulation, comparison, and creation functions.
-;;; Includes optimized C-string comparisons for C integration.
-
-
-
-
-
-
-
-
-
-
-
-;; String function registrations migrated to prelude/elisp/runtime/strings.scm
-
-;;; End Section 4
-
-;;; ============================================================================
-;;; SECTION 7: GOALS.ORG OPTIMIZATIONS
-;;; ============================================================================
-;;;
-;;; Performance optimizations from goals.org:
-;;; - Direct symbol comparison instead of string comparison
-;;; - Native Guile case-insensitive operations
-;;; - Symbol interning efficiency
-;;; - Memory handling moved to Guile GC
-
-;; Implementation of goals.org ideas
-;; Goal: "Use direct symbol comparison instead of string comparison"
 
 ;;; ============================================================================
 ;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
