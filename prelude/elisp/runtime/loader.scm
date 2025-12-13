@@ -736,3 +736,69 @@ Returns: #t if protection should be set up, #f otherwise."
   (if fd-valid
       'valid
       'invalid)) ; Will cause errno = EINVAL in C
+
+(define (elisp-detect-lexical-binding port)
+  "Detect lexical binding from first line of file.
+  Returns #t for lexical binding, #f for dynamic binding, 'none for no cookie.
+  This replicates the logic from lisp_file_lexical_cookie_scm_port."
+
+  (define (skip-whitespace)
+    "Skip whitespace characters"
+    (let ((ch (peek-char port)))
+      (when (and (not (eof-object? ch)) (char-whitespace? ch))
+        (read-char port)
+        (skip-whitespace))))
+
+  (define (read-first-line)
+    "Read first line as string"
+    (let loop ((chars '()))
+      (let ((ch (peek-char port)))
+        (cond
+         ((or (eof-object? ch) (char=? ch #\newline))
+          (list->string (reverse chars)))
+         (else
+          (read-char port)
+          (loop (cons ch chars)))))))
+
+  ;; Check if first character indicates a comment or shebang
+  (let ((first-ch (peek-char port)))
+    (cond
+     ((eof-object? first-ch) 'none)
+     ((char=? first-ch #\;)
+      ;; Comment line - read and parse for lexical-binding
+      (let ((line (read-first-line)))
+        (cond
+         ((string-contains line "lexical-binding: t") #t)
+         ((string-contains line "lexical-binding: nil") #f)
+         (else 'none))))
+     ((and (char=? first-ch #\#)
+           (not (eof-object? (peek-char port))))
+      ;; Potential shebang line
+      (read-char port) ; consume #
+      (let ((second-ch (peek-char port)))
+        (if (char=? second-ch #\!)
+            (begin
+              ;; Read shebang line and parse for lexical-binding
+              (let ((line (read-first-line)))
+                (cond
+                 ((string-contains line "lexical-binding: t") #t)
+                 ((string-contains line "lexical-binding: nil") #f)
+                 (else 'none))))
+            (begin
+              ;; Not a shebang, push back the #
+              (unread-char #\# port)
+              'none))))
+     (else 'none))))
+
+(define (elisp-setup-port-input is-module is-native-elisp fd-valid)
+  "Set up input port based on file type.
+  This replicates the conditional setup from Fload lines 1108-1128.
+  Returns: 'close-fd, 'setup-port, or 'continue."
+
+  (cond
+   ((or is-module is-native-elisp)
+    ;; Module/native elisp - close file descriptor
+    (if fd-valid 'close-fd 'continue))
+   (else
+    ;; Regular elisp - set up port
+    'setup-port)))

@@ -5773,3 +5773,20 @@ This eliminates the C pattern: skip_comment(); return fread0();"
 (define (intern-gensym prefix)
   (set! %intern-gensym (+ 1 %intern-gensym))
   (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym)))))
+
+(define (elisp-create-bool-vector-from-scheme length string-data)
+  "Create Elisp bool vector directly in Scheme to avoid malloc/free cycles.
+This function uses Scheme's string access functions to eliminate C string allocation."
+  ;; For now, we return the same format but could enhance this with bytevectors
+  ;; to completely eliminate the C malloc/free cycle in the future
+  (cons length string-data))
+
+(define (elisp-skip-comment-from-port port)
+  "Skip a line comment starting with ; until newline.
+Returns: #t (to indicate successful skip)"
+  (let loop ()
+    (let ((ch (read-char port)))
+      (cond
+        ((eof-object? ch) #t)
+        ((char=? ch #\newline) #t)
+        (else (loop))))))

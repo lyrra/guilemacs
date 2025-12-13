@@ -256,75 +256,11 @@
 ;;; String manipulation, comparison, and creation functions.
 ;;; Includes optimized C-string comparisons for C integration.
 
-(define (elisp-detect-lexical-binding port)
-  "Detect lexical binding from first line of file.
-  Returns #t for lexical binding, #f for dynamic binding, 'none for no cookie.
-  This replicates the logic from lisp_file_lexical_cookie_scm_port."
-
-  (define (skip-whitespace)
-    "Skip whitespace characters"
-    (let ((ch (peek-char port)))
-      (when (and (not (eof-object? ch)) (char-whitespace? ch))
-        (read-char port)
-        (skip-whitespace))))
-
-  (define (read-first-line)
-    "Read first line as string"
-    (let loop ((chars '()))
-      (let ((ch (peek-char port)))
-        (cond
-         ((or (eof-object? ch) (char=? ch #\newline))
-          (list->string (reverse chars)))
-         (else
-          (read-char port)
-          (loop (cons ch chars)))))))
-
-  ;; Check if first character indicates a comment or shebang
-  (let ((first-ch (peek-char port)))
-    (cond
-     ((eof-object? first-ch) 'none)
-     ((char=? first-ch #\;)
-      ;; Comment line - read and parse for lexical-binding
-      (let ((line (read-first-line)))
-        (cond
-         ((string-contains line "lexical-binding: t") #t)
-         ((string-contains line "lexical-binding: nil") #f)
-         (else 'none))))
-     ((and (char=? first-ch #\#)
-           (not (eof-object? (peek-char port))))
-      ;; Potential shebang line
-      (read-char port) ; consume #
-      (let ((second-ch (peek-char port)))
-        (if (char=? second-ch #\!)
-            (begin
-              ;; Read shebang line and parse for lexical-binding
-              (let ((line (read-first-line)))
-                (cond
-                 ((string-contains line "lexical-binding: t") #t)
-                 ((string-contains line "lexical-binding: nil") #f)
-                 (else 'none))))
-            (begin
-              ;; Not a shebang, push back the #
-              (unread-char #\# port)
-              'none))))
-     (else 'none))))
 
 
 
 
 
-(define (elisp-setup-port-input is-module is-native-elisp fd-valid)
-  "Set up input port based on file type.
-  This replicates the conditional setup from Fload lines 1108-1128.
-  Returns: 'close-fd, 'setup-port, or 'continue."
-
-  (cond
-   ((or is-module is-native-elisp)
-    ;; Module/native elisp - close file descriptor
-    (if fd-valid 'close-fd 'continue))
-   (else
-    ;; Regular elisp - set up port
-    'setup-port)))
 
 
 
@@ -505,46 +441,3 @@
 
 ;; when elisp reads keyword symbols, support common-lisp keywords
 (read-set! keywords 'prefix)
-
-;;; ============================================================================
-;;; SECTION 9: READER & PARSER FUNCTIONS
-;;; ============================================================================
-;;;
-;;; Elisp reader implementation - parses lists, vectors, literals, etc.
-;;; Migrated from lread.c to enable better extensibility.
-;;; Reader functions have been migrated to elisp/runtime/reader.scm
-
-
-
-;; Additional reader functions for fread0 migration
-
-
-;; Enhanced version that handles character to fixnum conversion in Scheme
-
-
-
-
-
-
-
-;; Unified quote-like syntax parser - consolidates ', `, , dispatch
-
-
-
-
-(define (elisp-create-bool-vector-from-scheme length string-data)
-  "Create Elisp bool vector directly in Scheme to avoid malloc/free cycles.
-This function uses Scheme's string access functions to eliminate C string allocation."
-  ;; For now, we return the same format but could enhance this with bytevectors
-  ;; to completely eliminate the C malloc/free cycle in the future
-  (cons length string-data))
-
-(define (elisp-skip-comment-from-port port)
-  "Skip a line comment starting with ; until newline.
-Returns: #t (to indicate successful skip)"
-  (let loop ()
-    (let ((ch (read-char port)))
-      (cond
-        ((eof-object? ch) #t)
-        ((char=? ch #\newline) #t)
-        (else (loop))))))
