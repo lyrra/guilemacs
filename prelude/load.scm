@@ -162,6 +162,11 @@
 (primitive-load (join %prelude-directory "elisp/runtime/loader.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/reader.scm"))
 
+;; Initialize symbol function registrations from runtime modules
+;; This allows modules to manage their own registrations
+(init-numbers-registrations)
+(init-sequences-registrations)
+
 (primitive-load (join %prelude-directory "pcase.scm"))
 
 ;;; End Section 2
@@ -191,9 +196,6 @@
 
 
 
-(set-symbol-function! '/ elisp-/)
-(set-symbol-function! '1+ elisp-1+)
-(set-symbol-function! '1- elisp-1-)
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -210,35 +212,11 @@
   (frob >= elisp->=))
 
 
-(set-symbol-function! '/= elisp-/=)
 
 
-(set-symbol-function! 'logcount logcount)
-(set-symbol-function! 'lognot lognot)
-(set-symbol-function! 'logior logior)
-(set-symbol-function! 'logxor logxor)
-(set-symbol-function! 'logand elisp-logand)
-(set-symbol-function! 'ash ash)
 
-(set-symbol-function! 'cos cos)
-(set-symbol-function! 'tan tan)
-(set-symbol-function! 'sin sin)
-(set-symbol-function! 'acos acos)
-(set-symbol-function! 'atan atan)
-(set-symbol-function! 'asin asin)
 
-(set-symbol-function! 'abs abs)
-(set-symbol-function! 'sqrt sqrt)
-(set-symbol-function! 'exp exp)
-(set-symbol-function! 'expt expt)
 
-(set-symbol-function! 'log
-  (lambda* (num #:optional base)
-    (if (not base)
-        (log num)
-        (if (= base 10.0)
-            (log10 num)
-            (/ (log num) (log base))))))
 
 (let-syntax
     ((frob (syntax-rules ()
@@ -267,20 +245,13 @@
   (frob ffloor floor)
   (frob fround round))
 
-(set-symbol-function! 'isnan
-                      (lambda (num)
-                        (unless (and (real? num) (not (exact? num)))
-                          ((symbol-function 'signal) 'wrong-type-argument num))
-                        (nan? num)))
 
 (define elisp-% (lambda (a b)
                   (remainder (check-number-coerce-marker a)
                              (check-number-coerce-marker b))))
 
-(set-symbol-function! '% elisp-%)
 
 
-(set-symbol-function! 'mod elisp-mod)
 
 ;;; End Section 3
 
@@ -506,9 +477,6 @@
 
 
 ;; Register the functions for Elisp use
-(set-symbol-function! 'butlast elisp-butlast)
-(set-symbol-function! 'plist-get elisp-plist-get)
-(set-symbol-function! 'plist-member elisp-plist-member)
 
 ;;; End Section 5
 
@@ -645,9 +613,6 @@ This is more efficient than string comparison of symbol names."
 ;; Note: string-lessp already exists as elisp-string-lessp above
 
 ;; Register length functions
-(set-symbol-function! 'length< elisp-length<)
-(set-symbol-function! 'length> elisp-length>)
-(set-symbol-function! 'length= elisp-length=)
 
 ;; Register equality functions
 

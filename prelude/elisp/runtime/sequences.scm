@@ -507,3 +507,14 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
 (set-symbol-function! 'length< elisp-length<)
 (set-symbol-function! 'length> elisp-length>)
 (set-symbol-function! 'length= elisp-length=)
+
+;; Registration initialization function
+;; Called by load.scm after module is loaded
+(define (init-sequences-registrations)
+  "Initialize symbol function registrations for sequences module."
+    (set-symbol-function! 'butlast elisp-butlast)
+  (set-symbol-function! 'length< elisp-length<)
+  (set-symbol-function! 'length= elisp-length=)
+  (set-symbol-function! 'length> elisp-length>)
+  (set-symbol-function! 'plist-get elisp-plist-get)
+  (set-symbol-function! 'plist-member elisp-plist-member))
