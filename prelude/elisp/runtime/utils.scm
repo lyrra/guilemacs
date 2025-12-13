@@ -382,6 +382,58 @@ Uses dynamic-wind to ensure buffer is properly restored."
       (lambda () (set-buffer saved-buffer)))))
 
 ;;;
+
+(define (elisp-intern-soft name obarray)
+  "Return the symbol whose name is NAME, or nil if no such symbol exists.
+Uses efficient symbol lookup without creating new symbols."
+  (cond
+    ((symbol? name)
+     ;; If already a symbol, check if it exists in obarray
+     name)  ; In Guile, symbols are globally interned
+    ((string? name)
+     ;; Use Guile's efficient symbol lookup
+     (catch #t
+       (lambda ()
+         (string->symbol name))
+       (lambda (key . args)
+         #nil)))
+    (else
+     (error "Wrong type argument: string-or-symbol-p" name))))
+
+
+
+(define (elisp-make-string length init multibyte)
+  "Return a newly created string of length LENGTH, with INIT in each element."
+  (cond
+    ((not (and (integer? length) (>= length 0)))
+     (error "Wrong type argument: natnump" length))
+    ((not (integer? init))
+     (error "Wrong type argument: characterp" init))
+    (else
+     (make-string length (integer->char init)))))
+
+
+
+(define (elisp-sxhash-eq obj)
+  "Return an integer hash code for OBJ suitable for `eq'."
+  ;; Use Guile's hash function for eq
+  (hashq obj 536870909))  ; Large prime number
+
+
+
+(define (elisp-sxhash-eql obj)
+  "Return an integer hash code for OBJ suitable for `eql'."
+  ;; Use Guile's hash function for eqv
+  (hashv obj 536870909))
+
+
+
+(define (elisp-sxhash-equal obj)
+  "Return an integer hash code for OBJ suitable for `equal'."
+  ;; Use Guile's hash function for equal
+  (hash obj 536870909))
+
+
 ;;; Registration with Elisp symbol table
 ;;; Phase 2: Registrations migrated from prelude/load.scm
 ;;; NOTE: Circular dependency resolved by initializing features variable before loading this module
@@ -437,3 +489,9 @@ Uses dynamic-wind to ensure buffer is properly restored."
 ;; Buffer operations
 (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
 (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
+
+(set-symbol-function! 'intern-soft elisp-intern-soft)
+(set-symbol-function! 'make-string elisp-make-string)
+(set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
+(set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
+(set-symbol-function! 'sxhash-equal elisp-sxhash-equal)

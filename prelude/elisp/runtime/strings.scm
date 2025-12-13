@@ -172,6 +172,114 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
   (eval-string string))
 
 ;;;
+
+(define (elisp-capitalize obj)
+  "Convert argument to capitalized form and return that."
+  (cond
+    ((string? obj) (string-capitalize obj))
+    ((integer? obj) (string->number (string-capitalize (string (integer->char obj)))))
+    (else obj)))
+
+
+
+(define (elisp-downcase obj)
+  "Convert argument to lower case and return that."
+  (cond
+    ((string? obj) (string-downcase obj))
+    ((integer? obj) (string->number (string-downcase (string (integer->char obj)))))
+    (else obj)))
+
+
+
+(define (elisp-upcase obj)
+  "Convert argument to upper case and return that."
+  (cond
+    ((string? obj) (string-upcase obj))
+    ((integer? obj) (string->number (string-upcase (string (integer->char obj)))))
+    (else obj)))
+
+
+
+(define (elisp-string-equal-ignore-case string1 string2)
+  "Return t if two strings are equal ignoring case.
+Symbols are also allowed; their print names are used instead.
+Uses native Guile case-insensitive comparison."
+  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+    (if (string-ci=? s1 s2) #t #nil)))
+
+
+
+(define (elisp-string-lessp-ignore-case string1 string2)
+  "Return t if STRING1 is less than STRING2 ignoring case.
+Uses native Guile case-insensitive comparison."
+  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
+        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+    (if (string-ci<? s1 s2) #t #nil)))
+
+
+
+(define (elisp-string-prefix-p prefix string ignore-case)
+  "Return non-nil if PREFIX is a prefix of STRING.
+If IGNORE-CASE is non-nil, the comparison is case-insensitive."
+  (let ((prefix-str (if (symbol? prefix) (symbol->string prefix) prefix))
+        (string-str (if (symbol? string) (symbol->string string) string)))
+    (let ((prefix-len (string-length prefix-str))
+          (string-len (string-length string-str)))
+      (if (> prefix-len string-len)
+          #nil
+          (let ((substring (substring string-str 0 prefix-len)))
+            (if ignore-case
+                (if (string-ci=? prefix-str substring) #t #nil)
+                (if (string=? prefix-str substring) #t #nil)))))))
+
+
+
+(define (elisp-string-search needle haystack start-pos)
+  "Search for NEEDLE in HAYSTACK starting at START-POS.
+Returns the position of the first match, or nil if not found.
+Uses Guile's efficient string search with automatic memory management."
+  (let ((needle-str (if (symbol? needle) (symbol->string needle) needle))
+        (haystack-str (if (symbol? haystack) (symbol->string haystack) haystack))
+        (start (if start-pos start-pos 0)))
+    (let ((pos (string-contains haystack-str needle-str start)))
+      (if pos pos #nil))))
+
+
+
+(define (elisp-string-suffix-p suffix string ignore-case)
+  "Return non-nil if SUFFIX is a suffix of STRING.
+If IGNORE-CASE is non-nil, the comparison is case-insensitive."
+  (let ((suffix-str (if (symbol? suffix) (symbol->string suffix) suffix))
+        (string-str (if (symbol? string) (symbol->string string) string)))
+    (let ((suffix-len (string-length suffix-str))
+          (string-len (string-length string-str)))
+      (if (> suffix-len string-len)
+          #nil
+          (let ((start-pos (- string-len suffix-len)))
+            (let ((substring (substring string-str start-pos)))
+              (if ignore-case
+                  (if (string-ci=? suffix-str substring) #t #nil)
+                  (if (string=? suffix-str substring) #t #nil))))))))
+
+
+
+(define (elisp-string-to-number string base)
+  "Parse STRING as a decimal number and return the number.
+Optional BASE argument specifies the base (2-16)."
+  (let ((base-val (if base base 10)))
+    (cond
+      ((not (string? string)) (error "Wrong type argument: stringp" string))
+      ((not (and (integer? base-val) (>= base-val 2) (<= base-val 16)))
+       (error "Invalid base" base-val))
+      (else
+       (catch #t
+         (lambda ()
+           (string->number (string-trim string) base-val))
+         (lambda (key . args)
+           0))))))  ; Return 0 on parse error, like Emacs
+
+
 ;;; Registration with Elisp symbol table
 ;;; Phase 2: Registrations migrated from prelude/load.scm
 ;;;
@@ -203,3 +311,13 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 
 ;; Special
 (set-symbol-function! 'eval-scheme elisp-eval-scheme)
+
+(set-symbol-function! 'capitalize elisp-capitalize)
+(set-symbol-function! 'downcase elisp-downcase)
+(set-symbol-function! 'upcase elisp-upcase)
+(set-symbol-function! 'string-equal-ignore-case elisp-string-equal-ignore-case)
+(set-symbol-function! 'string-lessp-ignore-case elisp-string-lessp-ignore-case)
+(set-symbol-function! 'string-prefix-p elisp-string-prefix-p)
+(set-symbol-function! 'string-search elisp-string-search)
+(set-symbol-function! 'string-suffix-p elisp-string-suffix-p)
+(set-symbol-function! 'string-to-number elisp-string-to-number)

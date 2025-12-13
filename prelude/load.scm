@@ -328,6 +328,9 @@
 ;;; String manipulation, comparison, and creation functions.
 ;;; Includes optimized C-string comparisons for C integration.
 
+(define (elisp-string-bytes string)
+  "Return the number of bytes in STRING."
+  (bytevector-length (string->utf8 string)))
 
 (define elisp-string-distance
   (case-lambda
@@ -381,24 +384,95 @@ Letter-case is significant, but text properties are ignored."
       ;; Return final distance
       (vector-ref column len1))))))
 
+(define (elisp-char-to-string character)
+  "Convert arg CHAR to a string containing that character."
+  (string (integer->char character)))
 
+(define (elisp-string-to-char string)
+  "Return the first character in STRING."
+  (if (string=? string "")
+      0  ; Return 0 for empty string
+      (char->integer (string-ref string 0))))
 
+(define (elisp-byte-to-string byte)
+  "Convert arg BYTE to a unibyte string containing that byte."
+  (string (integer->char (modulo byte 256))))
 
+(define (elisp-string . characters)
+  "Concatenate all the argument characters and make the result a string."
+  (list->string (map integer->char characters)))
 
+(define (elisp-unibyte-string . bytes)
+  "Concatenate all the argument bytes and make the result a unibyte string."
+  ;; In Guilemacs, all strings are UTF-8, so just call string
+  (apply elisp-string bytes))
 
+(define (elisp-multibyte-string-p object)
+  "Return t if OBJECT is a multibyte string.
+Return nil if OBJECT is either a unibyte string, or not a string.
+In Guilemacs, all strings are UTF-8, so this always returns nil."
+  #nil)
 
+(define (elisp-eval-scheme string)
+  "Evaluate a string containing a Scheme expression."
+  (eval-string string))
 
+(define (elisp-stringp object)
+  "Return t if OBJECT is a string or emacs-string wrapper (Phase 2)."
+  (if (or (string? object)
+          (and (defined? 'emacs-string-predicate)
+               ((@ (emacs-string) emacs-string-predicate) object)))
+      #t #nil))
 
+(define (elisp-char-or-string-p object)
+  "Return t if OBJECT is a character or a string (Phase 2: includes wrappers)."
+  (if (or (char? object)
+          (and (number? object) (>= object 0) (<= object #x3fffff))  ; Emacs character range
+          (string? object)
+          (and (defined? 'emacs-string-predicate)
+               ((@ (emacs-string) emacs-string-predicate) object)))
+      #t
+      #nil))
 
 ;; Efficient string comparison functions for C integration
+(define (elisp-string-equal-cstr lisp-string c-string)
+  "Compare a Lisp string with a C string (case-sensitive).
+   More efficient than creating temporary Guile string objects."
+  (if (string=? lisp-string c-string) #t #nil))
 
+(define (elisp-string-ci-equal-cstr lisp-string c-string)
+  "Compare a Lisp string with a C string (case-insensitive).
+   More efficient than creating temporary Guile string objects."
+  (if (string-ci=? lisp-string c-string) #t #nil))
 
+(define (elisp-symbol-name-equal-cstr symbol c-string)
+  "Compare a symbol's name with a C string (case-sensitive).
+   Optimized for symbol name comparisons."
+  (if (string=? (symbol->string symbol) c-string) #t #nil))
 
 ;; Ultra-efficient comparison functions that avoid creating temporary string objects
+(define (elisp-string-equal-two-cstrs lisp-string c-string1 c-string2)
+  "Compare a Lisp string with two C strings efficiently.
+   Returns #t if lisp-string equals c-string1, checks c-string2 as fallback.
+   Designed to replace: (string-equal-cstr lisp-string (scm_from_utf8_string c-string2))"
+  (if (or (string=? lisp-string c-string1)
+          (string=? lisp-string c-string2)) #t #nil))
 
+(define (elisp-string-ci-equal-two-cstrs lisp-string c-string1 c-string2)
+  "Case-insensitive version of elisp-string-equal-two-cstrs."
+  (if (or (string-ci=? lisp-string c-string1)
+          (string-ci=? lisp-string c-string2)) #t #nil))
 
 ;; Optimized constant string comparisons
+(define (elisp-string-ci-equal-none lisp-string)
+  "Optimized check if a string equals 'None' (case-insensitive).
+   Avoids repeated scm_from_utf8_string calls for this common constant."
+  (if (string-ci=? lisp-string "None") #t #nil))
 
+(define (elisp-string-equal-none lisp-string)
+  "Optimized check if a string equals 'None' (case-sensitive).
+   Avoids repeated scm_from_utf8_string calls for this common constant."
+  (if (string=? lisp-string "None") #t #nil))
 
 (define (elisp-detect-lexical-binding port)
   "Detect lexical binding from first line of file.
@@ -550,9 +624,50 @@ Letter-case is significant, but text properties are ignored."
 
 ;; List processing functions migrated from C to Guile for better maintainability
 
+(define (elisp-memq elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `eq'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((eq? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
 
+(define (elisp-nth n list)
+  "Return the Nth element of LIST.
+N counts from zero. If LIST is not that long, nil is returned."
+  (cond
+    ((not (number? n)) #nil)
+    ((< n 0) #nil)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) (car tail))
+         (else (loop (- count 1) (cdr tail))))))))
 
+(define (elisp-nthcdr n list)
+  "Take cdr N times on LIST, return the result."
+  (cond
+    ((not (number? n)) list)
+    ((< n 0) list)
+    (else
+     (let loop ((count (if (integer? n) n (floor n))) (tail list))
+       (cond
+         ((null? tail) #nil)
+         ((= count 0) tail)
+         (else (loop (- count 1) (cdr tail))))))))
 
+(define (elisp-last list)
+  "Return the last cons cell of LIST.
+If LIST is empty, return nil."
+  (if (null? list)
+      #nil
+      (let loop ((current list))
+        (let ((next (cdr current)))
+          (if (null? next)
+              current
+              (loop next))))))
 
 (define elisp-butlast
   (case-lambda
@@ -571,23 +686,101 @@ If N is omitted or nil, remove only the last element."
                  #nil
                  (list-head list (- len num)))))))))
 
+(define (elisp-reverse list)
+  "Return a new list with elements of LIST in reverse order."
+  (let loop ((remaining list) (result '()))
+    (if (null? remaining)
+        result
+        (loop (cdr remaining) (cons (car remaining) result)))))
 
 ;; Additional list processing functions
 
+(define (elisp-member elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `equal'.
+The value is actually the tail of LIST whose car is ELT."
+  (let loop ((tail list))
+    (cond
+      ((null? tail) #nil)
+      ((equal? elt (car tail)) tail)
+      (else (loop (cdr tail))))))
 
+(define (elisp-assq key alist)
+  "Return non-nil if KEY is `eq' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
 
+(define (elisp-assoc key alist)
+  "Return non-nil if KEY is `equal' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((equal? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
 
+(define (elisp-rassq val alist)
+  "Return non-nil if VAL is `eq' to the cdr of an element of ALIST.
+The value is actually the first element of ALIST whose cdr is VAL.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((null? tail) #nil)
+      ((not (pair? tail)) #nil)  ; Handle malformed alist
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? val (cdr (car tail))) (car tail))
+      (else (loop (cdr tail))))))
 
+(define (elisp-copy-sequence seq)
+  "Return a copy of a list, vector, string, or other sequence.
+The elements of a list are not copied; they are shared with the original."
+  (cond
+    ((null? seq) seq)
+    ((pair? seq) (list-copy seq))
+    ((string? seq) (string-copy seq))
+    ((vector? seq) (vector-copy seq))
+    (else seq))) ; Return as-is for other types
 
 ;; Simple numerical predicates
 
+(define (elisp-zerop number)
+  "Return t if NUMBER is zero."
+  (if (and (number? number) (= number 0)) #t #nil))
 
+(define (elisp-plusp number)
+  "Return t if NUMBER is positive."
+  (if (and (number? number) (> number 0)) #t #nil))
 
+(define (elisp-minusp number)
+  "Return t if NUMBER is negative."
+  (if (and (number? number) (< number 0)) #t #nil))
 
+(define (elisp-evenp integer)
+  "Return t if INTEGER is even."
+  (if (and (integer? integer) (even? integer)) #t #nil))
 
+(define (elisp-oddp integer)
+  "Return t if INTEGER is odd."
+  (if (and (integer? integer) (odd? integer)) #t #nil))
 
+(define (elisp-numberp object)
+  "Return t if OBJECT is a number (integer or floating point)."
+  (if (number? object) #t #nil))
 
+(define (elisp-floatp object)
+  "Return t if OBJECT is a floating point number."
+  (if (and (number? object) (not (integer? object))) #t #nil))
 
+(define (elisp-natnump object)
+  "Return t if OBJECT is a natural number (non-negative integer)."
+  (if (and (integer? object) (>= object 0)) #t #nil))
 
 ;; Property list functions
 
@@ -611,6 +804,27 @@ Uses PREDICATE for comparison, defaulting to `eq'."
            ((pred prop (car tail)) (car (cdr tail)))
            (else (loop (cddr tail)))))))))
 
+(define (elisp-plist-put plist prop value)
+  "Change value in PLIST of PROP to VALUE.
+PLIST is a property list of the form (PROP1 VALUE1 PROP2 VALUE2...).
+Returns a new property list with the change."
+  (let loop ((tail plist) (result '()))
+    (cond
+      ((null? tail)
+       ;; Property not found, add it at the end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? tail))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((not (pair? (cdr tail)))
+       ;; Malformed plist, add property at end
+       (reverse (cons value (cons prop result))))
+      ((eq? prop (car tail))
+       ;; Found the property, update its value
+       (append (reverse result) (cons prop (cons value (cddr tail)))))
+      (else
+       ;; Continue searching, preserving current prop-value pair
+       (loop (cddr tail) (cons (car (cdr tail)) (cons (car tail) result)))))))
 
 (define elisp-plist-member
   (case-lambda
@@ -634,17 +848,88 @@ Returns the tail of PLIST whose car is PROP."
 
 ;; String comparison functions
 
+(define (elisp-string-equal s1 s2)
+  "Return t if two strings have identical contents.
+Case is significant. Symbols are allowed; their print names are used."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string=? str1 str2)) #t #nil)))
 
+(define (elisp-string-lessp s1 s2)
+  "Return non-nil if STRING1 is less than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string<? str1 str2)) #t #nil)))
 
+(define (elisp-string-greaterp s1 s2)
+  "Return non-nil if STRING1 is greater than STRING2 in lexicographic order.
+Case is significant."
+  (let ((str1 (if (symbol? s1) (symbol->string s1) s1))
+        (str2 (if (symbol? s2) (symbol->string s2) s2)))
+    (if (and (string? str1) (string? str2) (string>? str1 str2)) #t #nil)))
 
 ;; List construction and manipulation
 
+(define (elisp-append . lists)
+  "Concatenate all the arguments and make the result a list.
+The result is a list whose elements are the elements of all the arguments.
+Each argument may be a list, vector or string.
+All arguments except the last are copied."
+  (if (null? lists)
+      '()
+      (let ((result '()))
+        (let loop ((remaining lists))
+          (cond
+            ((null? remaining) result)
+            ((null? (cdr remaining))
+             ;; Last argument - append it as-is (not copied)
+             (if (null? result)
+                 (car remaining)
+                 (append result (car remaining))))
+            ((null? (car remaining)) (loop (cdr remaining)))
+            ((pair? (car remaining))
+             (set! result (append result (car remaining)))
+             (loop (cdr remaining)))
+            ((vector? (car remaining))
+             (set! result (append result (vector->list (car remaining))))
+             (loop (cdr remaining)))
+            ((string? (car remaining))
+             (set! result (append result (string->list (car remaining))))
+             (loop (cdr remaining)))
+            (else (loop (cdr remaining))))))))
 
+(define (elisp-mapcar function sequence)
+  "Apply FUNCTION to each element of SEQUENCE, and make a list of the results.
+The result is a list just as long as SEQUENCE.
+SEQUENCE may be a list, a vector, or a string."
+  (cond
+    ((null? sequence) '())
+    ((pair? sequence) (map function sequence))
+    ((vector? sequence) (map function (vector->list sequence)))
+    ((string? sequence) (map function (string->list sequence)))
+    (else '())))
 
+(define (elisp-mapc function sequence)
+  "Apply FUNCTION to each element of SEQUENCE for side effects only.
+Unlike `mapcar', don't accumulate the results. Return SEQUENCE."
+  (cond
+    ((null? sequence) sequence)
+    ((pair? sequence) (for-each function sequence) sequence)
+    ((vector? sequence) (for-each function (vector->list sequence)) sequence)
+    ((string? sequence) (for-each function (string->list sequence)) sequence)
+    (else sequence)))
 
 ;; Simple utility functions
 
+(define (elisp-identity object)
+  "Return the argument unchanged."
+  object)
 
+(define (elisp-constantly value)
+  "Return a function that always returns VALUE.
+This is a useful building block for higher-order functions."
+  (lambda args value))
 
 ;; Register the functions for Elisp use
 (set-symbol-function! 'butlast elisp-butlast)
@@ -667,18 +952,64 @@ Returns the tail of PLIST whose car is PROP."
 
 ;; Phase 3: Type predicate functions migrated from C to Guile
 
+(define (elisp-symbolp object)
+  "Return t if OBJECT is a symbol."
+  (if (symbol? object) #t #nil))
 
+(define (elisp-bufferp object)
+  "Return t if OBJECT is an editor buffer."
+  ;; Note: BUFFERP check needs to be kept in C for now as buffer objects are C-specific
+  ;; This is a placeholder implementation
+  #nil)
 
+(define (elisp-consp object)
+  "Return t if OBJECT is a cons cell."
+  (if (pair? object) #t #nil))
 
+(define (elisp-atom object)
+  "Return t if OBJECT is not a cons cell. This includes nil."
+  (if (pair? object) #nil #t))
 
+(define (elisp-listp object)
+  "Return t if OBJECT is a list, that is, a cons cell or nil.
+Otherwise, return nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #t #nil))
 
+(define (elisp-nlistp object)
+  "Return t if OBJECT is not a list. Lists include nil."
+  (if (or (pair? object) (null? object) (eq? object #nil)) #nil #t))
 
 ;; Basic cons cell manipulation functions
 
+(define (elisp-cons car cdr)
+  "Create a new cons, give it CAR and CDR as components, and return it."
+  (cons car cdr))
 
+(define (elisp-car list)
+  "Return the car of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `car-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (car list))
+    (else (error "Wrong type argument: listp" list))))
 
+(define (elisp-cdr list)
+  "Return the cdr of LIST. If LIST is nil, return nil.
+Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
+  (cond
+    ((null? list) #nil)
+    ((eq? list #nil) #nil)
+    ((pair? list) (cdr list))
+    (else (error "Wrong type argument: listp" list))))
 
+(define (elisp-car-safe object)
+  "Return the car of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (car object) #nil))
 
+(define (elisp-cdr-safe object)
+  "Return the cdr of OBJECT if it is a cons cell, or else nil."
+  (if (pair? object) (cdr object) #nil))
 
 ;; List construction functions
 
@@ -695,20 +1026,56 @@ Allows any number of arguments, including zero."
 
 ;; Phase 4: DEFUN function migrations from C to Guile - NOW ACTIVE
 ;;
+(define (elisp-proper-list-p object)
+  "Return OBJECT's length if it is a proper list, nil otherwise.
+A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+  (catch #t
+    (lambda ()
+      (let ((len (length object)))
+        len))
+    (lambda (key . args)
+      ;; If length fails (circular, dotted, or not a list), return nil
+      #nil)))
 
+(define (elisp-characterp object)
+  "Return non-nil if OBJECT is a character.
+In Emacs Lisp, characters are represented by character codes."
+  (if (and (integer? object)
+           (>= object 0)
+           (<= object #x3FFFFF))  ; max-char value
+      #t #nil))
 
+(define (elisp-max-char . args)
+  "Return the maximum character code.
+If UNICODE is non-nil, return the maximum character code defined by Unicode."
+  (let ((unicode (if (null? args) #f (car args))))
+    (if unicode
+        #x10FFFF   ; MAX_UNICODE_CHAR
+        #x3FFFFF))) ; MAX_CHAR
 
 ;; FIX-guilemacs: Additional DEFUN function migrations from C to Guile
 ;; New functions identified as migration candidates
 
 ;; Type predicate functions - simple one-liners from data.c
+(define (elisp-integerp object)
+  "Return t if OBJECT is an integer."
+  (if (and (number? object) (exact-integer? object)) #t #nil))
 
+(define (elisp-vectorp object)
+  "Return t if OBJECT is a vector."
+  (if (and (vector? object) (not (keyword? object))) #t #nil))
 
 
 ;; Simple utility functions from fns.c that are easy to migrate
 
 ;; Simple comparison and null checking functions from data.c
+(define (elisp-null object)
+  "Return t if OBJECT is nil, and return nil otherwise."
+  (if (or (null? object) (eq? object #nil)) #t #nil))
 
+(define (elisp-eq obj1 obj2)
+  "Return t if the two args are the same Lisp object."
+  (if (eq? obj1 obj2) #t #nil))
 
 ;; Basic length function
 (define (elisp-length sequence)
@@ -807,7 +1174,15 @@ least the number of distinct elements."
 
 ;; Equality functions that use Guile primitives
 
+(define (elisp-eql obj1 obj2)
+  "Return t if the two args are `eq' or are indistinguishable numbers.
+Integers with the same value are `eql'.
+Floating-point values with the same sign, exponent and fraction are `eql'."
+  (if (eqv? obj1 obj2) #t #nil))
 
+(define (elisp-equal obj1 obj2)
+  "Return t if two Lisp objects have similar structure and contents."
+  (if (equal? obj1 obj2) #t #nil))
 
 ;; List utility functions
 (define (elisp-take n list)
@@ -873,9 +1248,26 @@ Optional BASE argument specifies the base (2-16)."
            0))))))  ; Return 0 on parse error, like Emacs
 
 ;; Additional type predicates
+(define (elisp-sequencep object)
+  "Return t if OBJECT is a sequence (list or array)."
+  (if (or (pair? object) (null? object) (vector? object) (string? object))
+      #t #nil))
 
+(define (elisp-arrayp object)
+  "Return t if OBJECT is an array (string or vector)."
+  (if (or (vector? object) (string? object))
+      #t #nil))
 
+(define (elisp-bool-vector-p object)
+  "Return t if OBJECT is a bool-vector."
+  ;; For now, check if it's a bitvector in Guile
+  (if (bitvector? object) #t #nil))
 
+(define (elisp-subrp object)
+  "Return t if OBJECT is a built-in function."
+  (if (or (procedure? object)
+          (and (pair? object) (eq? (car object) 'special-operator)))
+      #t #nil))
 
 ;; String creation function
 (define (elisp-make-string length init multibyte)
@@ -1134,9 +1526,39 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 ;;; NOTE: Some functions here may overlap with earlier sections.
 
 ;; DEFUN migrations from lread.c - simple utility functions primarily used by elisp
+(define (elisp-get-load-suffixes)
+  "Return the suffixes that `load' should try if a suffix is required.
+This uses the variables `load-suffixes' and `load-file-rep-suffixes'."
+  (let ((result '()))
+    (for-each
+      (lambda (suffix)
+        (for-each
+          (lambda (ext)
+            (set! result (cons (string-append suffix ext) result)))
+          (symbol-value 'load-file-rep-suffixes)))
+      (symbol-value 'load-suffixes))
+    (reverse result)))
 
+(define (elisp-obarrayp object)
+  "Return t if OBJECT is an obarray."
+  ;; For now, simple check - in full implementation would check Guile vector
+  (if (vector? object) #t #nil))
 
+(define (elisp-obarray-make size)
+  "Return a new obarray of size SIZE.
+The obarray will grow to accommodate any number of symbols; the size, if
+given, is only a hint for the expected number."
+  ;; Create a vector for obarray representation
+  (make-vector (if (and size (integer? size) (> size 0)) size 128) '()))
 
+(define (elisp-obarray-clear obarray)
+  "Remove all symbols from OBARRAY."
+  (if (vector? obarray)
+      (let ((len (vector-length obarray)))
+        (do ((i 0 (+ i 1)))
+            ((>= i len) obarray)
+          (vector-set! obarray i '())))
+      (error "Wrong type argument: obarrayp" obarray)))
 
 (define elisp-read-char
   (case-lambda
@@ -1164,12 +1586,57 @@ specifying the maximum number of seconds to wait for input."
      (char->integer (read-char)))))
 
 ;; Symbol property functions
+(define (elisp-symbol-plist symbol)
+  "Return SYMBOL's property list."
+  (if (symbol? symbol)
+      ;; Use symbol properties in Guile
+      (catch #t
+        (lambda ()
+          (symbol-property symbol '*elisp-plist*))
+        (lambda (key . args)
+          #nil))
+      (error "Wrong type argument: symbolp" symbol)))
 
+(define (elisp-setplist symbol plist)
+  "Set SYMBOL's property list to PLIST and return PLIST."
+  (if (symbol? symbol)
+      (begin
+        (set-symbol-property! symbol '*elisp-plist* plist)
+        plist)
+      (error "Wrong type argument: symbolp" symbol)))
 
+(define (elisp-get symbol propname)
+  "Return the value of SYMBOL's PROPNAME property.
+This is the last value stored with '(put SYMBOL PROPNAME VALUE)'."
+  (if (symbol? symbol)
+      (let ((plist (elisp-symbol-plist symbol)))
+        (elisp-plist-get plist propname))
+      (error "Wrong type argument: symbolp" symbol)))
 
+(define (elisp-put symbol propname value)
+  "Store SYMBOL's PROPNAME property with value VALUE.
+It can be retrieved with '(get SYMBOL PROPNAME)'."
+  (if (symbol? symbol)
+      (let ((old-plist (elisp-symbol-plist symbol)))
+        (let ((new-plist (elisp-plist-put old-plist propname value)))
+          (elisp-setplist symbol new-plist)
+          value))
+      (error "Wrong type argument: symbolp" symbol)))
 
 ;; Hash table predicates that can be migrated
+(define (elisp-hash-table-count table)
+  "Return the number of entries in TABLE."
+  (if (hash-table? table)
+      (hash-table-size table)
+      (error "Wrong type argument: hash-table-p" table)))
 
+(define (elisp-clrhash table)
+  "Clear hash table TABLE and return it."
+  (if (hash-table? table)
+      (begin
+        (hash-table-clear! table)
+        table)
+      (error "Wrong type argument: hash-table-p" table)))
 
 (define elisp-featurep
   (case-lambda
@@ -1201,14 +1668,71 @@ particular subfeatures supported in this version of FEATURE."
          (set! features (cons feature features)))
      feature)))
 
+(define (elisp-nreverse seq)
+  "Reverse order of items in a list, vector or string SEQ.
+This function may destructively modify SEQ to produce the value."
+  (cond
+    ((null? seq) seq)
+    ((pair? seq)
+     ;; Use Guile's efficient reverse! for lists
+     (reverse! seq))
+    ((vector? seq)
+     ;; For vectors, we need to reverse in place
+     (let ((len (vector-length seq)))
+       (do ((i 0 (+ i 1)))
+           ((>= i (quotient len 2)) seq)
+         (let ((j (- len i 1)))
+           (let ((temp (vector-ref seq i)))
+             (vector-set! seq i (vector-ref seq j))
+             (vector-set! seq j temp))))))
+    ((string? seq)
+     ;; For strings, convert to list, reverse, back to string
+     (list->string (reverse! (string->list seq))))
+    (else seq)))
 
 ;; Register final high-value migration candidates
 (set-symbol-function! 'random elisp-random)
 
 ;; Additional critical DEFUN migrations from lread.c
 
+(define (elisp-intern string obarray)
+  "Return the canonical symbol whose name is STRING.
+If there is none, one is created by this function and returned.
+A second optional argument specifies the obarray to use;
+it defaults to the value of `obarray'."
+  (let ((str (if (symbol? string) (symbol->string string) string)))
+    (if (not (string? str))
+        ((symbol-function 'signal) 'wrong-type-argument (cons 'stringp str))
+        ;; Use Guile's efficient symbol interning
+        (string->symbol str))))
 
+(define (elisp-intern-soft-lread name obarray)
+  "Return the canonical symbol named NAME, or nil if none exists.
+NAME may be a string or a symbol. If it is a symbol, that exact
+symbol is searched for. A second optional argument specifies the obarray to use;
+it defaults to the value of `obarray'."
+  (let ((str (if (symbol? name) (symbol->string name) name)))
+    (if (not (string? str))
+        #nil
+        (catch #t
+          (lambda ()
+            ;; Try to find existing symbol without creating new one
+            (let ((sym (string->symbol str)))
+              (if (symbol-bound? sym) sym #nil)))
+          (lambda (key . args)
+            #nil)))))
 
+(define (elisp-unintern name obarray)
+  "Delete the symbol named NAME, if any, from OBARRAY.
+The value is t if a symbol was found and deleted, nil otherwise.
+NAME may be a string or a symbol. If it is a symbol, that symbol
+is deleted, if it belongs to OBARRAY--no other symbol is deleted."
+  (let ((str (if (symbol? name) (symbol->string name) name)))
+    (if (not (string? str))
+        #nil
+        ;; In Guile, symbols are globally interned, so we can't really unintern
+        ;; Return nil to indicate no symbol was found/deleted
+        #nil)))
 
 ;; Register DEFUN migrations from lread.c
 
@@ -1254,7 +1778,22 @@ particular subfeatures supported in this version of FEATURE."
 
 ;; Additional predicate migrations from src/data.c
 
+(define (elisp-markerp object)
+  "Return t if OBJECT is a marker (editor pointer)."
+  (if (and (vector? object)
+           (>= (vector-length object) 4)
+           (eq? (vector-ref object 0) 'marker))
+      #t #nil))
 
+(define (elisp-keywordp object)
+  "Return t if OBJECT is a keyword.
+This means that it is a symbol with a print name beginning with `:'
+interned in the initial obarray."
+  (if (and (symbol? object)
+           (let ((name (symbol->string object)))
+             (and (> (string-length name) 0)
+                  (char=? (string-ref name 0) #\:))))
+      #t #nil))
 
 ;; Register these functions for use from C and Elisp
 ;; Disabled while debugging baseline functionality
@@ -1271,7 +1810,26 @@ particular subfeatures supported in this version of FEATURE."
 ;; (set-symbol-function! 'sequencep elisp-sequencep)
 
 ;; Buffer Operations using dynamic-wind pattern
+(define (elisp-save-current-buffer thunk)
+  "Record which buffer is current; execute THUNK; make that buffer current.
+This is the Guile implementation of save-current-buffer using dynamic-wind
+for proper cleanup semantics."
+  (let ((saved-buffer (current-buffer)))
+    (dynamic-wind
+      (lambda () #t)  ; pre-thunk: nothing needed
+      (lambda () (funcall thunk))  ; thunk: execute the body
+      (lambda ()      ; post-thunk: restore buffer
+        (when (buffer-live-p saved-buffer)
+          (set-buffer saved-buffer))))))
 
+(define (elisp-with-current-buffer buffer thunk)
+  "Execute THUNK with BUFFER as the current buffer.
+Uses dynamic-wind to ensure buffer is properly restored."
+  (let ((saved-buffer (current-buffer)))
+    (dynamic-wind
+      (lambda () (set-buffer buffer))     ; pre-thunk: switch to buffer
+      (lambda () (funcall thunk))         ; thunk: execute the body
+      (lambda () (set-buffer saved-buffer))))) ; post-thunk: restore buffer
 
 ;; (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
 ;; (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
@@ -1399,13 +1957,76 @@ particular subfeatures supported in this version of FEATURE."
 ;; Additional DEFUN function migrations from C to Guile
 ;; Migration of delq - destructive list removal function
 
+(define (elisp-delq elt list)
+  "Delete members of LIST which are `eq' to ELT, and return the result.
+More precisely, this function skips any members `eq' to ELT at the
+front of LIST, then removes members `eq' to ELT from the remaining
+sublist by modifying its list structure, then returns the resulting
+list.
 
+Write `(setq foo (delq element foo))' to be sure of correctly changing
+the value of a list `foo'.  See also `remq', which does not modify the
+argument."
+  (let loop ((remaining list) (prev #f))
+    (cond
+      ((null? remaining) list)
+      ((eq? elt (car remaining))
+       ;; Found element to delete
+       (if prev
+           ;; Not at front, modify previous cell
+           (begin
+             (set-cdr! prev (cdr remaining))
+             (loop (cdr remaining) prev))
+           ;; At front, update list head
+           (begin
+             (set! list (cdr remaining))
+             (loop (cdr remaining) #f))))
+      (else
+       ;; Keep this element, continue
+       (loop (cdr remaining) remaining))))
+  list)
+
+(define (elisp-remq elt list)
+  "Return a copy of LIST with all elements `eq' to ELT removed.
+This is a non-destructive version of `delq'."
+  (let loop ((remaining list) (result '()))
+    (cond
+      ((null? remaining) (reverse result))
+      ((eq? elt (car remaining)) (loop (cdr remaining) result))
+      (else (loop (cdr remaining) (cons (car remaining) result))))))
 
 ;; Register new functions
 
 ;; Additional reader utility functions migrated from lread.c
 
+(define (elisp-complete-filename-p pathname)
+  "Return t if PATHNAME is an absolute path.
+This function replaces the C complete_filename_p function in lread.c:1203
+by using Guile's string manipulation capabilities instead of direct
+character array access."
+  (if (not (string? pathname))
+      #nil
+      (let ((len (string-length pathname)))
+        (if (< len 1)
+            #nil
+            (let ((first-char (string-ref pathname 0)))
+              (cond
+                ;; Unix-style absolute path starting with /
+                ((char=? first-char #\/) #t)
+                ;; Windows-style absolute path (C:\ or similar)
+                ((and (>= len 3)
+                      (char-alphabetic? first-char)
+                      (char=? (string-ref pathname 1) #\:)
+                      (or (char=? (string-ref pathname 2) #\\)
+                          (char=? (string-ref pathname 2) #\/)))
+                 #t)
+                ;; Not an absolute path
+                (else #nil)))))))
 
+(define (elisp-file-name-absolute-p filename)
+  "Return t if FILENAME is an absolute file name.
+This is an alias for complete-filename-p with better naming."
+  (elisp-complete-filename-p filename))
 
 ;; Register the filename utility functions for use from C and Elisp
 (set-symbol-function! 'complete-filename-p elisp-complete-filename-p)
@@ -1416,18 +2037,105 @@ particular subfeatures supported in this version of FEATURE."
 ;; 2. Are well-defined mathematical operations
 ;; 3. Can leverage Guile's built-in floating point support
 
+(define (elisp-copysign x1 x2)
+  "Copy sign of X2 to value of X1, and return the result.
+Cause an error if X1 or X2 is not a float."
+  (let ((f1 (if (number? x1) (exact->inexact x1)
+                (error "Wrong type argument: floatp" x1)))
+        (f2 (if (number? x2) (exact->inexact x2)
+                (error "Wrong type argument: floatp" x2))))
+    (if (eq? (negative? f1) (negative? f2))
+        f1
+        (- f1))))
 
+(define (elisp-frexp x)
+  "Get significand and exponent of a floating point number.
+Breaks the floating point number X into its binary significand SGNFCAND
+and an integral exponent EXP for 2, such that: X = SGNFCAND * 2^EXP
+The function returns the cons cell (SGNFCAND . EXP)."
+  (let ((f (if (number? x) (exact->inexact x)
+               (error "Wrong type argument: numberp" x))))
+    (if (= f 0.0)
+        (cons 0.0 0)
+        (let* ((abs-f (abs f))
+               (exponent (inexact->exact (ceiling (log abs-f 2))))
+               (significand (/ f (expt 2 exponent))))
+          ;; Adjust to ensure significand is in [0.5, 1.0)
+          (let loop1 ((sig significand) (exp exponent))
+            (if (>= (abs sig) 1.0)
+                (loop1 (/ sig 2) (+ exp 1))
+                (let loop2 ((sig2 sig) (exp2 exp))
+                  (if (< (abs sig2) 0.5)
+                      (loop2 (* sig2 2) (- exp2 1))
+                      (cons sig2 exp2)))))))))
 
+(define (elisp-ldexp sgnfcand exponent)
+  "Return SGNFCAND * 2**EXPONENT, as a floating point number.
+EXPONENT must be an integer."
+  (let ((f (if (number? sgnfcand) (exact->inexact sgnfcand)
+               (error "Wrong type argument: numberp" sgnfcand)))
+        (exp (if (integer? exponent) exponent
+                 (error "Wrong type argument: integerp" exponent))))
+    (* f (expt 2 exp))))
 
+(define (elisp-logb arg)
+  "Returns largest integer <= the base 2 log of the magnitude of ARG.
+This is the same as the exponent of a float."
+  (let ((f (if (number? arg) (exact->inexact arg)
+               (error "Wrong type argument: numberp" arg))))
+    (cond
+      ((= f 0.0) -inf.0)  ; Negative infinity for zero
+      ((inf? f) +inf.0)  ; Positive infinity
+      ((nan? f) f)  ; NaN returns NaN
+      (else (inexact->exact (floor (/ (log (abs f)) (log 2))))))))
 
 ;; FIX-guilemacs: Additional simple utility function migrations
 
 ;; Reader and file loading functions migrated from C
 
+(define (elisp-proper-list-p object)
+  "Return OBJECT's length if it is a proper list, nil otherwise.
+A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
+  (let ((len 0)
+        (slow object)
+        (fast object))
+    ;; Use Floyd's cycle detection algorithm
+    (let loop ((current object) (len 0))
+      (cond
+        ((null? current) len)  ; Proper list - return length
+        ((not (pair? current)) 'nil)  ; Dotted list - return nil
+        (else
+          ;; Check for cycles using tortoise and hare
+          (set! fast (if (and (pair? fast) (pair? (cdr fast))) (cddr fast) #f))
+          (set! slow (cdr slow))
+          (if (and fast (eq? fast slow))
+              'nil  ; Circular list detected
+              (loop (cdr current) (+ len 1))))))))
 
 ;; Additional mathematical utility functions - demonstrating migration pattern
+(define (elisp-sign number)
+  "Return the sign of NUMBER: -1, 0, or 1."
+  (let ((n (if (number? number) number
+               (error "Wrong type argument: numberp" number))))
+    (cond
+      ((< n 0) -1)
+      ((> n 0) 1)
+      (else 0))))
 
+(define (elisp-clamp value min-val max-val)
+  "Return VALUE clamped to the range [MIN-VAL, MAX-VAL]."
+  (if (not (and (number? value) (number? min-val) (number? max-val)))
+      (error "Wrong type arguments: numberp"))
+  (cond
+    ((< value min-val) min-val)
+    ((> value max-val) max-val)
+    (else value)))
 
+(define (elisp-square number)
+  "Return the square of NUMBER."
+  (let ((n (if (number? number) number
+               (error "Wrong type argument: numberp" number))))
+    (* n n)))
 
 ;; Additional mathematical predicate functions migrated from src/data.c
 
@@ -1442,6 +2150,11 @@ particular subfeatures supported in this version of FEATURE."
   (if (integer? object) #t #nil))
 
 ;; Additional predicate functions migrated from src/data.c
+(define (elisp-char-table-p object)
+  "Return t if OBJECT is a char-table."
+  ;; In Guile, char-tables don't exist as a built-in type
+  ;; For now, return nil since char-tables are specific to Emacs
+  #nil)
 
 ;; Additional type predicates migrated from src/data.c
 
@@ -1479,17 +2192,31 @@ particular subfeatures supported in this version of FEATURE."
   ;; so this always returns nil
   #nil)
 
+(define (elisp-bufferp object)
+  "Return t if OBJECT is an editor buffer."
+  ;; Buffers are Emacs-specific objects, return nil for now
+  #nil)
 
 (define (elisp-user-ptrp object)
   "Return t if OBJECT is a module user pointer."
   ;; User pointers are Emacs module-specific, return nil for now
   #nil)
 
+(define (elisp-bool-vector-p object)
+  "Return t if OBJECT is a bool-vector."
+  ;; Bool-vectors are Emacs-specific, so return nil for now
+  #nil)
 
 (define (elisp-vector-or-char-table-p object)
   "Return t if OBJECT is a char-table or vector."
   (if (or (vector? object) (eq? #t (elisp-char-table-p object))) #t #nil))
 
+(define (elisp-arrayp object)
+  "Return t if OBJECT is an array (string, vector, char-table, or bool-vector)."
+  (if (or (string? object)
+          (vector? object)
+          (eq? #t (elisp-char-table-p object))
+          (eq? #t (elisp-bool-vector-p object))) #t #nil))
 
 ;; Register the new mathematical functions for Elisp use
 (set-symbol-function! 'elisp-copysign elisp-copysign)

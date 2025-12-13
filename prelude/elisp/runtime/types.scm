@@ -188,6 +188,93 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
   #nil)
 
 ;;;
+
+(define (elisp-bare-symbol-p object)
+  "Return t if OBJECT is a symbol, but not a symbol together with position."
+  ;; In Guile implementation, symbols don't have position information
+  ;; so this is the same as symbolp for now
+  (if (symbol? object) #t #nil))
+
+
+
+(define (elisp-boundp symbol)
+  "Return t if SYMBOL's value is not void."
+  (cond
+    ((not (symbol? symbol))
+     (error "Wrong type argument: symbolp" symbol))
+    (else
+     ;; Check if symbol is bound in current environment
+     (catch #t
+       (lambda ()
+         (symbol-bound? symbol)
+         #t)
+       (lambda (key . args)
+         #nil)))))
+
+
+
+(define (elisp-condition-variable-p object)
+  "Return t if OBJECT is a condition variable."
+  ;; Condition variables are Emacs-specific, return nil for now
+  #nil)
+
+
+
+(define (elisp-hash-table-p obj)
+  "Return t if OBJ is a Lisp hash table object."
+  ;; Check if it's a Guile hash table
+  (if (hash-table? obj) #t #nil))
+
+
+
+(define (elisp-integer-or-marker-p object)
+  "Return t if OBJECT is an integer or a marker."
+  ;; For now, markers are not implemented in Guile, so just check integers
+  (if (integer? object) #t #nil))
+
+
+
+(define (elisp-mutexp object)
+  "Return t if OBJECT is a mutex."
+  ;; Mutexes are Emacs-specific, return nil for now
+  #nil)
+
+
+
+(define (elisp-recordp object)
+  "Return t if OBJECT is a record."
+  ;; Records are Emacs-specific structures, return nil for now
+  #nil)
+
+
+
+(define (elisp-symbol-with-pos-p object)
+  "Return t if OBJECT is a symbol together with position."
+  ;; In Guile implementation, symbols don't have position information
+  ;; so this always returns nil
+  #nil)
+
+
+
+(define (elisp-threadp object)
+  "Return t if OBJECT is a thread."
+  ;; Threads are Emacs-specific, return nil for now
+  #nil)
+
+
+
+(define (elisp-user-ptrp object)
+  "Return t if OBJECT is a module user pointer."
+  ;; User pointers are Emacs module-specific, return nil for now
+  #nil)
+
+
+
+(define (elisp-vector-or-char-table-p object)
+  "Return t if OBJECT is a char-table or vector."
+  (if (or (vector? object) (eq? #t (elisp-char-table-p object))) #t #nil))
+
+
 ;;; Registration with Elisp symbol table
 ;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
 ;;; These functions are defined here but registered in load.scm for now.
@@ -229,3 +316,15 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
 ;; (set-symbol-function! 'max-char elisp-max-char)
 
 ;; (set-symbol-function! 'identity elisp-identity)
+
+(set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
+(set-symbol-function! 'boundp elisp-boundp)
+(set-symbol-function! 'condition-variable-p elisp-condition-variable-p)
+(set-symbol-function! 'hash-table-p elisp-hash-table-p)
+(set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
+(set-symbol-function! 'mutexp elisp-mutexp)
+(set-symbol-function! 'recordp elisp-recordp)
+(set-symbol-function! 'symbol-with-pos-p elisp-symbol-with-pos-p)
+(set-symbol-function! 'threadp elisp-threadp)
+(set-symbol-function! 'user-ptrp elisp-user-ptrp)
+(set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p)

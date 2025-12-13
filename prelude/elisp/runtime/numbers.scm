@@ -198,6 +198,64 @@
                      (check-number-coerce-marker b))))
 
 ;;;
+
+(define (elisp-byteorder)
+  "Return the byteorder for the machine.
+Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
+lowercase l) for small endian machines."
+  ;; Guile provides the native endianness
+  (if (eq? (native-endianness) (endianness big))
+      66   ; 'B' for big endian
+      108)) ; 'l' for little endian
+
+
+
+(define (elisp-float arg)
+  "Return the floating point number equal to ARG."
+  (cond
+    ((integer? arg) (exact->inexact arg))
+    ((number? arg) arg)  ; Already a float
+    (else (error "Wrong type argument: numberp" arg))))
+
+
+
+(define (elisp-number-to-string number)
+  "Return the decimal representation of NUMBER as a string."
+  (cond
+    ((integer? number) (number->string number))
+    ((number? number) (number->string number))
+    (else (error "Wrong type argument: numberp" number))))
+
+
+
+(define (elisp-random limit)
+  "Return a pseudo-random integer.
+By default, return a fixnum; all fixnums are equally likely.
+With positive integer LIMIT, return random integer in interval [0,LIMIT)."
+  (cond
+    ((or (null? limit) (not limit))
+     ;; Return random fixnum - use Guile's random
+     (random 536870912))  ; Large range for fixnum
+    ((eq? limit #t)
+     ;; Seed from system entropy - not implemented in simple version
+     #nil)
+    ((string? limit)
+     ;; Seed from string - not implemented in simple version
+     #nil)
+    ((and (integer? limit) (> limit 0))
+     ;; Return random integer in [0, limit)
+     (random limit))
+    (else
+     (error "Wrong type argument" limit))))
+
+
+
+(define (elisp-number-or-marker-p object)
+  "Return t if OBJECT is a number or a marker."
+  ;; For now, markers are not implemented in Guile, so just check numbers
+  (if (number? object) #t #nil))
+
+
 ;;; Registration with Elisp symbol table
 ;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
 ;;; These functions are defined here but registered in load.scm for now.
@@ -266,3 +324,9 @@
 ;; Modulo & Remainder
 ;; (set-symbol-function! '% elisp-%)
 ;; (set-symbol-function! 'mod elisp-mod)
+
+(set-symbol-function! 'byteorder elisp-byteorder)
+(set-symbol-function! 'float elisp-float)
+(set-symbol-function! 'number-to-string elisp-number-to-string)
+(set-symbol-function! 'random elisp-random)
+(set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)

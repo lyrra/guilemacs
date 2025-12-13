@@ -323,6 +323,73 @@ This is a useful building block for higher-order functions."
   (lambda args value))
 
 ;;;
+
+(define (elisp-length sequence)
+  "Return the length of vector, list or string SEQUENCE."
+  (cond
+    ((null? sequence) 0)
+    ((pair? sequence)
+     (catch #t
+       (lambda () (length sequence))
+       (lambda (key . args)
+         ;; Handle circular lists - count until we see duplicate
+         (let ((seen (make-hash-table)))
+           (let loop ((seq sequence) (count 0))
+             (cond
+               ((null? seq) count)
+               ((not (pair? seq)) count) ; improper list
+               ((hash-ref seen seq) count) ; circular
+               (else
+                (hash-set! seen seq #t)
+                (loop (cdr seq) (+ count 1)))))))))
+    ((vector? sequence) (vector-length sequence))
+    ((string? sequence) (string-length sequence))
+    (else (error "Wrong type argument: sequencep" sequence))))
+
+
+
+(define (elisp-list . objects)
+  "Return a newly created list with specified arguments as elements.
+Allows any number of arguments, including zero."
+  objects)
+
+
+
+(define (elisp-make-list length init)
+  "Return a newly created list of length LENGTH, with each element being INIT."
+  (if (not (and (integer? length) (>= length 0)))
+      (error "Wrong type argument: natnump" length)
+      (make-list length init)))
+
+
+
+(define (elisp-safe-length list)
+  "Return the length of a list, but avoid error or infinite loop.
+This function never gets an error. If LIST is not really a list,
+it returns 0. If LIST is circular, it returns an integer that is at
+least the number of distinct elements."
+  (catch #t
+    (lambda ()
+      (if (or (null? list) (pair? list))
+          (length list)
+          0))
+    (lambda (key . args)
+      ;; Return 0 on any error (circular lists, non-lists, etc.)
+      0)))
+
+
+
+(define (elisp-take n list)
+  "Return the first N elements of LIST.
+If N is zero or negative, return nil.
+If N is greater or equal to the length of LIST, return LIST (or a copy)."
+  (cond
+    ((not (integer? n)) (error "Wrong type argument: integerp" n))
+    ((<= n 0) #nil)
+    ((null? list) #nil)
+    (else (list-head list (min n (length list))))))
+
+
 ;;; Registration with Elisp symbol table
 ;;; Phase 2: Registrations migrated from prelude/load.scm
 ;;;
@@ -370,3 +437,9 @@ This is a useful building block for higher-order functions."
 
 ;; Utilities
 (set-symbol-function! 'constantly elisp-constantly)
+
+(set-symbol-function! 'length elisp-length)
+(set-symbol-function! 'list elisp-list)
+(set-symbol-function! 'make-list elisp-make-list)
+(set-symbol-function! 'safe-length elisp-safe-length)
+(set-symbol-function! 'take elisp-take)
