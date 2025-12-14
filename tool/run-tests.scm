@@ -511,7 +511,7 @@
          ((eof-object? line) #f)
          (else
           (cond
-           ((string-contains line "Symbol's function definition is void") #f)
+           ((string-contains line "Symbol's elisp-function definition is void") #f)
            ((and (string-contains line "Loading ")
                  (string-contains line "(source)"))
             #f)
