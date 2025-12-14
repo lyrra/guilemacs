@@ -309,8 +309,8 @@ SIGNIFICAND is in the range [0.5, 1.0)."
   (if (not (number? arg))
       (error "Wrong type argument: numberp" arg)
       (if (= arg 0)
-          most-negative-fixnum  ; Return large negative value for zero
-          (inexact->exact (floor (log (abs arg) 2))))))
+          (symbol-value 'most-negative-fixnum)  ; Return large negative value for zero
+          (inexact->exact (floor (/ (log (abs arg)) (log 2)))))))
 
 (define (elisp-sign number)
   "Return -1, 0, or 1 according to the sign of NUMBER."
@@ -557,7 +557,7 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'copysign elisp-copysign)
   (set-symbol-function! 'frexp elisp-frexp)
   (set-symbol-function! 'ldexp elisp-ldexp)
-  (set-symbol-function! 'logb elisp-logb)
+  (set-symbol-function! 'elisp-logb elisp-logb)
   (set-symbol-function! 'sign elisp-sign)
   (set-symbol-function! 'clamp elisp-clamp)
   (set-symbol-function! 'square elisp-square)
