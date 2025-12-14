@@ -791,7 +791,7 @@ A printed representation of an object is text which describes that object.  */)
   static SCM deep_unwrap_proc = SCM_BOOL_F;
   if (scm_is_false (deep_unwrap_proc))
     {
-      SCM mod = scm_c_resolve_module ("emacs-string");
+      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
       if (!scm_is_false (mod))
         {
           SCM var = scm_c_module_lookup (mod, "deep-unwrap-for-printing");

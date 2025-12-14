@@ -47,17 +47,17 @@ is_emacs_string_wrapper (Lisp_Object x)
   /* Load emacs-string-predicate (runtime-callable version) on first call */
   if (scm_is_false (emacs_string_p_proc))
     {
-      /* Module is already loaded by prelude/load.scm, just look it up */
-      SCM mod = scm_c_resolve_module ("emacs-string");
+      /* Module is already loaded by prelude/load.scm - use consolidated module */
+      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
       if (!scm_is_false (mod))
         {
           emacs_string_p_proc = scm_c_module_lookup (mod, "emacs-string-predicate");
           emacs_string_content_proc = scm_c_module_lookup (mod, "emacs-string-content");
-          fprintf(stderr, "Phase 2: Loaded emacs-string-predicate and emacs-string-content from prelude\n");
+          fprintf(stderr, "Phase 2: Loaded emacs-string-predicate and emacs-string-content from consolidated text-properties module\n");
         }
       else
         {
-          fprintf(stderr, "ERROR: emacs-string module not found!\n");
+          fprintf(stderr, "ERROR: language elisp emacs text-properties module not found!\n");
           return false;
         }
     }
@@ -101,8 +101,8 @@ ensure_text_properties_loaded (void)
 {
   if (scm_is_false (scm_text_properties_module))
     {
-      /* Resolve the text-properties module (already loaded by prelude/load.scm) */
-      scm_text_properties_module = scm_c_resolve_module ("text-properties");
+      /* Resolve the consolidated text-properties module (already loaded by prelude/load.scm) */
+      scm_text_properties_module = scm_c_resolve_module ("language elisp emacs text-properties");
 
       /* Cache procedure references */
       scm_get_text_property_proc = scm_c_module_lookup (scm_text_properties_module, "get-text-property");
@@ -187,9 +187,9 @@ scm_intervals_to_c (SCM scm_intervals, Lisp_Object string)
 
       /* Extract interval fields using Scheme wrapper functions
          (wrapper functions are needed because record accessors are syntax transformers) */
-      SCM start_proc = scm_c_public_ref ("text-properties", "get-interval-start");
-      SCM end_proc = scm_c_public_ref ("text-properties", "get-interval-end");
-      SCM plist_proc = scm_c_public_ref ("text-properties", "get-interval-plist");
+      SCM start_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-start");
+      SCM end_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-end");
+      SCM plist_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-plist");
 
       SCM scm_start = scm_call_1 (start_proc, interval_record);
       SCM scm_end = scm_call_1 (end_proc, interval_record);
@@ -1212,7 +1212,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
 
   if (scm_is_false (scm_next_property_change))
     {
-      SCM module = scm_c_resolve_module ("text-properties");
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
       SCM symbol = scm_c_module_lookup (module, "next-property-change");
       scm_next_property_change = scm_variable_ref (symbol);
     }
@@ -1249,7 +1249,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
 
   if (scm_is_false (scm_next_single_property_change))
     {
-      SCM module = scm_c_resolve_module ("text-properties");
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
       SCM symbol = scm_c_module_lookup (module, "next-single-property-change");
       scm_next_single_property_change = scm_variable_ref (symbol);
     }
@@ -1285,7 +1285,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
 
   if (scm_is_false (scm_previous_property_change))
     {
-      SCM module = scm_c_resolve_module ("text-properties");
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
       SCM symbol = scm_c_module_lookup (module, "previous-property-change");
       scm_previous_property_change = scm_variable_ref (symbol);
     }
@@ -1322,7 +1322,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
 
   if (scm_is_false (scm_previous_single_property_change))
     {
-      SCM module = scm_c_resolve_module ("text-properties");
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
       SCM symbol = scm_c_module_lookup (module, "previous-single-property-change");
       scm_previous_single_property_change = scm_variable_ref (symbol);
     }

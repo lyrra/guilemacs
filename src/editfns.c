@@ -1284,7 +1284,7 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
   static SCM get_intervals_proc = SCM_BOOL_F;
   if (scm_is_false (get_intervals_proc))
     {
-      SCM module = scm_c_resolve_module ("emacs-string");
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
       SCM symbol = scm_c_module_lookup (module, "emacs-string-intervals-runtime");
       get_intervals_proc = scm_variable_ref (symbol);
     }
@@ -1307,7 +1307,7 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
 
       if (scm_is_false (interval_start_proc))
         {
-          SCM intervals_module = scm_c_resolve_module ("intervals");
+          SCM intervals_module = scm_c_resolve_module ("language elisp emacs text-properties");
           SCM start_sym = scm_c_module_lookup (intervals_module, "get-interval-start");
           interval_start_proc = scm_variable_ref (start_sym);
           SCM end_sym = scm_c_module_lookup (intervals_module, "get-interval-end");

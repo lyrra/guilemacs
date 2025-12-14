@@ -182,18 +182,11 @@
 ;; Use the prelude directory defined in the current module by C
 (primitive-load (string-append %prelude-directory "/lookup-functions.scm"))
 
-;; Load Phase 1 & 2 text properties wrapper infrastructure
-;; These must be loaded in order: intervals -> emacs-string -> text-properties -> string-operations
-;; Use save-module-excursion to preserve current module context
-(let ((saved-module (current-module)))
-  (primitive-load (string-append %prelude-directory "/intervals.scm"))
-  (set-current-module saved-module)
-  (primitive-load (string-append %prelude-directory "/emacs-string.scm"))
-  (set-current-module saved-module)
-  (primitive-load (string-append %prelude-directory "/text-properties.scm"))
-  (set-current-module saved-module)
-  (primitive-load (string-append %prelude-directory "/string-operations.scm"))
-  (set-current-module saved-module))
+;; Load consolidated text properties system as proper Guile module
+;; This replaces the old 4-file split (intervals, emacs-string, text-properties, string-operations)
+;; with a single unified module under (language elisp emacs text-properties) namespace
+(primitive-load (string-append %prelude-directory "/elisp/runtime/text-properties.scm"))
+(set-current-module (resolve-module '(language elisp runtime)))
 
 ;; Load new UTF-8 string operations and migration functions
 (primitive-load (string-append %prelude-directory "/utf8-string-operations.scm"))

@@ -682,7 +682,7 @@ insert (const char *string, ptrdiff_t nbytes)
 
       /* Adjust text properties for insertion */
       {
-        SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+        SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
         if (!scm_is_false (buffer_on_insert))
           {
             SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
@@ -709,7 +709,7 @@ insert_and_inherit (const char *string, ptrdiff_t nbytes)
 
       /* Adjust text properties for insertion */
       {
-        SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+        SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
         if (!scm_is_false (buffer_on_insert))
           {
             SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
@@ -1002,7 +1002,7 @@ insert_from_string (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
   /* Adjust text properties for insertion */
   {
     ptrdiff_t len = PT - opoint;
-    SCM buffer_on_insert = scm_c_public_ref ("text-properties", "buffer-on-insert");
+    SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
     if (!scm_is_false (buffer_on_insert))
       {
         SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
@@ -1823,7 +1823,7 @@ del_range_1 (ptrdiff_t from, ptrdiff_t to, bool prepare, bool ret_string)
 
   /* Adjust text properties BEFORE deletion (while positions are still valid) */
   {
-    SCM buffer_on_delete = scm_c_public_ref ("text-properties", "buffer-on-delete");
+    SCM buffer_on_delete = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-delete");
     if (!scm_is_false (buffer_on_delete))
       {
         SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
