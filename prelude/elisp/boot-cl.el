@@ -594,6 +594,14 @@
                   :index-table index-table
                   :allparents allparents)))))
 
+;;; Essential macros needed during bootstrap
+;;; These macros MUST be defined before any code that uses them gets compiled
+
+(defmacro save-current-buffer (&rest body)
+  "Record which buffer is current; execute BODY; make that buffer current.
+This is implemented as a macro that expands to call-with-save-current-buffer."
+  `(call-with-save-current-buffer #'(lambda () ,@body)))
+
 (provide 'boot-cl)
 
 ;;; boot-cl.el ends here
