@@ -31,13 +31,11 @@ static SCM scm_get_text_property_proc = SCM_BOOL_F;
 static SCM scm_text_properties_at_proc = SCM_BOOL_F;
 static SCM scm_add_text_properties_proc = SCM_BOOL_F;
 SCM scm_propertize_proc = SCM_BOOL_F;  /* Non-static for editfns.c */
-/* Phase 5: Additional property API functions */
 static SCM scm_remove_text_properties_proc = SCM_BOOL_F;
 static SCM scm_set_text_properties_proc = SCM_BOOL_F;
 static SCM scm_text_property_any_proc = SCM_BOOL_F;
 static SCM scm_text_property_not_all_proc = SCM_BOOL_F;
 
-/* Phase 2: Wrapper checking - centralized to avoid duplicate static variables */
 static SCM emacs_string_p_proc = SCM_BOOL_F;
 static SCM emacs_string_content_proc = SCM_BOOL_F;
 
@@ -53,7 +51,6 @@ is_emacs_string_wrapper (Lisp_Object x)
         {
           emacs_string_p_proc = scm_c_module_lookup (mod, "emacs-string-predicate");
           emacs_string_content_proc = scm_c_module_lookup (mod, "emacs-string-content");
-          fprintf(stderr, "Phase 2: Loaded emacs-string-predicate and emacs-string-content from consolidated text-properties module\n");
         }
       else
         {
@@ -71,7 +68,7 @@ is_emacs_string_wrapper (Lisp_Object x)
   return false;
 }
 
-/* Phase 2: Unwrap emacs-string wrapper to get the underlying Guile string.
+/* Unwrap emacs-string wrapper to get the underlying Guile string.
    If x is already a plain string, return it unchanged.
    This is needed because Guile string functions like scm_c_string_length
    don't know about our wrapper type. */
@@ -113,16 +110,6 @@ ensure_text_properties_loaded (void)
       scm_set_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "set-text-properties");
       scm_text_property_any_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-any");
       scm_text_property_not_all_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-not-all");
-
-      fprintf (stderr, "DEBUG: Looked up procedures (Phase 1 - Wrapper-based):\n");
-      fprintf (stderr, "  get-text-property: %s\n", scm_is_false (scm_get_text_property_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  text-properties-at: %s\n", scm_is_false (scm_text_properties_at_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  add-text-properties: %s\n", scm_is_false (scm_add_text_properties_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  propertize: %s\n", scm_is_false (scm_propertize_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  remove-text-properties: %s\n", scm_is_false (scm_remove_text_properties_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  set-text-properties: %s\n", scm_is_false (scm_set_text_properties_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  text-property-any: %s\n", scm_is_false (scm_text_property_any_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  text-property-not-all: %s\n", scm_is_false (scm_text_property_not_all_proc) ? "FALSE" : "ok");
     }
 }
 
