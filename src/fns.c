@@ -49,54 +49,6 @@ static SCM scm_string_operations_module = SCM_BOOL_F;
 static SCM scm_substring_with_properties_proc = SCM_BOOL_F;
 static SCM scm_concat_with_properties_proc = SCM_BOOL_F;
 
-static void
-ensure_string_operations_loaded (void)
-{
-  if (scm_is_false (scm_string_operations_module))
-    {
-      /* Load dependencies first: intervals -> emacs-string -> text-properties -> string-operations */
-      const char *modules[] = {
-        "prelude/intervals.scm",
-        "prelude/emacs-string.scm",
-        "prelude/text-properties.scm",
-        "prelude/string-operations.scm",
-        NULL
-      };
-      const char *bases[] = {"", "../", NULL};
-
-      for (int mod = 0; modules[mod] != NULL; mod++)
-        {
-          bool loaded = false;
-          for (int i = 0; bases[i] != NULL && !loaded; i++)
-            {
-              char path[512];
-              snprintf (path, sizeof (path), "%s%s", bases[i], modules[mod]);
-              if (access (path, R_OK) == 0)
-                {
-                  fprintf (stderr, "Loading %s...\n", path);
-                  scm_c_primitive_load (path);
-                  loaded = true;
-                }
-            }
-          if (!loaded)
-            {
-              fprintf (stderr, "WARNING: Could not load %s\n", modules[mod]);
-            }
-        }
-
-      /* Resolve modules and lookup procedures */
-      scm_string_operations_module = scm_c_resolve_module ("string-operations");
-      scm_substring_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "substring-with-properties");
-      scm_concat_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "concat-with-properties");
-
-      fprintf (stderr, "Phase 2: String operations loaded\n");
-      fprintf (stderr, "  substring-with-properties: %s\n",
-               scm_is_false (scm_substring_with_properties_proc) ? "FALSE" : "ok");
-      fprintf (stderr, "  concat-with-properties: %s\n",
-               scm_is_false (scm_concat_with_properties_proc) ? "FALSE" : "ok");
-    }
-}
-
 static EMACS_UINT sxhash_obj (Lisp_Object, int);
 ptrdiff_t
 knuth_hash (hash_hash_t hash, unsigned bits);
@@ -770,11 +722,6 @@ usage: (concat &rest SEQUENCES)  */)
 
   if (all_strings && nargs > 0)
     {
-      /* Use wrapper-aware Scheme concat to preserve properties */
-      ensure_string_operations_loaded ();
-
-      if (!scm_is_false (scm_concat_with_properties_proc))
-        {
           /* Build Scheme list of arguments */
           SCM scm_args = SCM_EOL;
           for (ptrdiff_t i = nargs - 1; i >= 0; i--)
@@ -786,7 +733,6 @@ usage: (concat &rest SEQUENCES)  */)
           /* Call Scheme concat-with-properties */
           return scm_apply_0 (scm_variable_ref (scm_concat_with_properties_proc),
                              scm_args);
-        }
     }
 
   /* Fallback to original concat for non-string args or if Scheme not loaded */
@@ -1731,25 +1677,11 @@ With one argument, just copy STRING (with properties, if any).  */)
 
   if (STRINGP (string))
     {
-      /* Phase 2: Use wrapper-aware Scheme substring to preserve properties */
-      ensure_string_operations_loaded ();
-
-      if (!scm_is_false (scm_substring_with_properties_proc))
-        {
           /* Call Scheme substring-with-properties */
           SCM start_scm = scm_from_ptrdiff_t (ifrom);
           SCM end_scm = scm_from_ptrdiff_t (ito);
           res = scm_call_3 (scm_variable_ref (scm_substring_with_properties_proc),
                            string, start_scm, end_scm);
-        }
-      else
-        {
-          /* Fallback to plain substring (no properties) */
-          fprintf (stderr, "WARNING: substring-with-properties not loaded, properties will be lost\n");
-          SCM start_scm = scm_from_ptrdiff_t (ifrom);
-          SCM end_scm = scm_from_ptrdiff_t (ito);
-          res = scm_substring (string, start_scm, end_scm);
-        }
     }
   else
     {
@@ -2969,7 +2901,7 @@ Symbols must match exactly.  */)
   static SCM custom_equal_proc = SCM_BOOL_F;
   if (scm_is_false (custom_equal_proc))
     {
-      SCM mod = scm_c_resolve_module ("emacs-string");
+      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
       if (!scm_is_false (mod))
         {
           SCM var = scm_c_module_lookup (mod, "emacs-string-equal");
@@ -6627,6 +6559,9 @@ init_fns_once (void)
   scm_set_smob_equalp (lisp_misc_tag, misc_equal_p);
   scm_set_smob_equalp (lisp_string_tag, string_equal_p);
   scm_set_smob_equalp (lisp_vectorlike_tag, vectorlike_equal_p);
+  scm_string_operations_module = scm_c_resolve_module ("language elisp emacs text-properties");
+  scm_substring_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "substring-with-properties");
+  scm_concat_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "concat-with-properties");
 }
 
 void
