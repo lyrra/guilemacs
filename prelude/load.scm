@@ -280,7 +280,8 @@
   ;; (module-define! elisp-emacs-module 'markerp elisp-markerp)
   ;; (module-define! elisp-emacs-module 'keywordp elisp-keywordp)
   ;; (module-define! elisp-emacs-module 'identity elisp-identity)
-  (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
+  ;; save-current-buffer is a MACRO defined in boot.el, not a function - don't register the Scheme version
+  ;; (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
   (module-define! elisp-emacs-module 'with-current-buffer elisp-with-current-buffer)
   (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
   (module-define! elisp-emacs-module 'image-file? image-file?)

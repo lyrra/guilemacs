@@ -560,7 +560,8 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'logb elisp-logb)
   (set-symbol-function! 'clamp elisp-clamp)
   (set-symbol-function! 'read-char elisp-read-char)
-  (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
+  ;; save-current-buffer is a MACRO in boot.el, not a function - don't register Scheme version
+  ;; (set-symbol-function! 'save-current-buffer elisp-save-current-buffer)
   (set-symbol-function! 'with-current-buffer elisp-with-current-buffer)
   (set-symbol-function! 'intern-soft elisp-intern-soft)
   (set-symbol-function! 'make-string elisp-make-string)
