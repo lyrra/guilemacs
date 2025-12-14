@@ -188,10 +188,9 @@
 (primitive-load (string-append %prelude-directory "/elisp/runtime/text-properties.scm"))
 (set-current-module (resolve-module '(language elisp runtime)))
 
-;; Load new UTF-8 string operations and migration functions
-(primitive-load (string-append %prelude-directory "/utf8-string-operations.scm"))
-; FIX: disabled because of error, something with 'char=?'
-;(primitive-load (string-append %prelude-directory "/string-comparison-migration.scm"))
+;; Load consolidated UTF-8 string operations (Phase 2 consolidation)
+;; Replaces: utf8-string-operations.scm (only file actually being loaded)
+(primitive-load (join %prelude-directory "elisp/runtime/utf8-strings.scm"))
 (primitive-load (string-append %prelude-directory "/symbol-operations.scm"))
 
 ;; Load character navigation functions - Phase 2 UTF-8 migration improvements
