@@ -239,6 +239,8 @@
     object)
    ((null object)
     (signal 'void-function nil))
+   ((and (consp object) (eq (car object) 'macro))
+    (signal 'invalid-function `(,object)))
    ((symbolp object)                    ;++ cycle detection
     (%indirect-function
      (%funcall (@ (language elisp runtime) symbol-function) object)))
