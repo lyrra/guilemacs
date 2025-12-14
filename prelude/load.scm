@@ -168,7 +168,9 @@
 (init-sequences-registrations)
 (init-utils-registrations)
 
-(primitive-load (join %prelude-directory "pcase.scm"))
+;; Load pcase macro support (Phase 5 consolidation)
+;; Replaces: pcase.scm
+(primitive-load (join %prelude-directory "elisp/runtime/pcase.scm"))
 
 ;;; ============================================================================
 ;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
