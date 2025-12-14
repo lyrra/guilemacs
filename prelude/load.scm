@@ -178,9 +178,9 @@
 ;;; Includes functions from: lread.c, data.c, fns.c, floatfns.c
 ;;; NOTE: Some functions here may overlap with earlier sections.
 
-;; Load lookup functions for C integration
-;; Use the prelude directory defined in the current module by C
-(primitive-load (string-append %prelude-directory "/lookup-functions.scm"))
+;; Load lookup functions for C integration (Phase 4 consolidation)
+;; Replaces: lookup-functions.scm
+(primitive-load (join %prelude-directory "elisp/runtime/lookup-functions.scm"))
 
 ;; Load consolidated text properties system as proper Guile module
 ;; This replaces the old 4-file split (intervals, emacs-string, text-properties, string-operations)
@@ -191,14 +191,11 @@
 ;; Load consolidated UTF-8 string operations (Phase 2 consolidation)
 ;; Replaces: utf8-string-operations.scm (only file actually being loaded)
 (primitive-load (join %prelude-directory "elisp/runtime/utf8-strings.scm"))
-(primitive-load (string-append %prelude-directory "/symbol-operations.scm"))
 
-;; Load character navigation functions - Phase 2 UTF-8 migration improvements
-;; Using minimal version that doesn't depend on buffer operations during bootstrap
-(primitive-load (string-append %prelude-directory "/character-navigation-minimal.scm"))
-;; Full version temporarily disabled due to buffer operation dependencies during bootstrap
-;; TODO: Load full character-navigation.scm when buffer context is properly available
-;; (primitive-load (string-append %prelude-directory "/character-navigation.scm"))
+;; Load consolidated symbol and character operations (Phase 3 consolidation)
+;; Replaces: symbol-operations.scm, character-navigation-minimal.scm
+(primitive-load (join %prelude-directory "elisp/runtime/symbol-operations.scm"))
+(primitive-load (join %prelude-directory "elisp/runtime/character-predicates.scm"))
 
 
 ;; Export the functions to both global module and language elisp emacs module
