@@ -31,6 +31,7 @@
   #:use-module (srfi srfi-9)    ; define-record-type
   #:use-module (srfi srfi-1)    ; list utilities (for 'any')
   #:use-module (ice-9 format)
+  #:use-module (srfi srfi-9 gnu)  ; set-record-type-printer!
   #:export (
     ;; Record types and predicates
     interval? emacs-string? emacs-string-predicate
@@ -443,6 +444,14 @@ Returns new interval list."
   emacs-string?
   (content %emacs-string-content)
   (intervals emacs-string-intervals emacs-string-intervals-set!))
+
+;;; Install custom printer for emacs-string records
+;;; This makes emacs-strings transparent in error messages and backtraces
+;;; Without this, Guile's error formatter tries to string-append the record fields, which fails
+;;; Use 'write' to properly quote the string content
+(set-record-type-printer! <emacs-string>
+  (lambda (record port)
+    (write (%emacs-string-content record) port)))
 
 ;;; Runtime-callable predicate for C code
 (define (emacs-string-predicate obj)
@@ -951,17 +960,64 @@ Returns the position of the change, or LIMIT if no change found."
          (current-val (interval-get-property-at intervals position prop)))
     (if (null? intervals)
         (or limit #nil)
-        (let loop ((ints intervals) (pos position))
+        ;; We need to track gaps between intervals as we search forward
+        ;; Intervals only exist for text WITH properties, gaps have nil properties
+        ;; prev-end tracks the END of the previously processed interval
+        (let loop ((ints intervals) (prev-end #f))
           (cond
-            ((null? ints) (or limit #nil))
+            ((null? ints)
+             ;; No more intervals - if current position is inside a non-nil region,
+             ;; the property changes to nil at prev-end
+             (if (and prev-end
+                      (not (eq? current-val #nil)))
+                 prev-end
+                 (or limit #nil)))
+
             (else
              (let* ((int (car ints))
+                    (int-start (interval-start int))
+                    (int-end (interval-end int))
                     (int-val (plist-get (interval-plist int) prop)))
                (cond
-                 ((<= (interval-end int) pos) (loop (cdr ints) pos))
-                 ((not (equal? int-val current-val))
-                  (interval-start int))
-                 (else (loop (cdr ints) (interval-end int)))))))))))
+                 ;; Interval is completely before position - skip it (update prev-end)
+                 ((<= int-end position)
+                  (loop (cdr ints) int-end))
+
+                 ;; We're before this interval - check value
+                 ((< position int-start)
+                  (if (eq? current-val #nil)
+                      ;; In nil region, change is at start of interval (if different value)
+                      (if (eq? int-val #nil)
+                          (loop (cdr ints) int-end)
+                          int-start)
+                      ;; In non-nil region before any interval - shouldn't normally happen
+                      int-start))
+
+                 ;; We're inside this interval
+                 ((and (>= position int-start) (< position int-end))
+                  (if (equal? int-val current-val)
+                      ;; Same value - need to check what comes after this interval
+                      ;; If there's a gap or next interval has different value, return int-end
+                      ;; Otherwise continue searching
+                      (if (null? (cdr ints))
+                          ;; No more intervals after this, property changes to nil at int-end
+                          (if (eq? current-val #nil)
+                              (or limit #nil)
+                              int-end)
+                          ;; Check next interval
+                          (let* ((next-int (cadr ints))
+                                 (next-start (interval-start next-int))
+                                 (next-val (plist-get (interval-plist next-int) prop)))
+                            (if (or (> next-start int-end)  ; Gap after this interval
+                                    (not (equal? next-val current-val)))  ; Or different value
+                                int-end
+                                ;; Next interval is adjacent with same value, keep searching
+                                (loop (cdr ints) int-end))))
+                      ;; Different value - change is at interval start
+                      int-start))
+
+                 (else
+                  (loop (cdr ints) int-end))))))))))
 
 (define (previous-single-property-change position prop obj limit)
   "Find previous position where PROP changes in OBJ before POSITION."
@@ -974,17 +1030,46 @@ Returns the position of the change, or LIMIT if no change found."
                          #nil)))
     (if (null? intervals)
         (or limit #nil)
-        (let loop ((ints (reverse intervals)))
+        ;; We need to track gaps between intervals as we search backward
+        ;; Intervals only exist for text WITH properties, gaps have nil properties
+        ;; prev-start tracks the START of the previously processed interval
+        (let loop ((ints (reverse intervals)) (prev-start #f))
           (cond
-            ((null? ints) (or limit #nil))
+            ((null? ints)
+             ;; No more intervals - check if there's a gap at the beginning
+             ;; If the first interval doesn't start at 0 and current-val is not nil,
+             ;; there's an implicit nil-property region before the first interval
+             (if (and (not (null? intervals))
+                      (> (interval-start (car intervals)) 0)
+                      (not (eq? current-val #nil)))
+                 ;; There's a property change at the start of the first interval
+                 (interval-start (car intervals))
+                 (or limit #nil)))
             (else
              (let* ((int (car ints))
+                    (int-start (interval-start int))
+                    (int-end (interval-end int))
                     (int-val (plist-get (interval-plist int) prop)))
                (cond
-                 ((>= (interval-start int) position) (loop (cdr ints)))
+                 ;; Interval at or after position - skip it (don't update prev-start)
+                 ((>= int-start position)
+                  (loop (cdr ints) prev-start))
+
+                 ;; Check if there's a gap AFTER this interval (before prev-start)
+                 ;; The gap has nil properties, so if current-val is not nil, this is a change
+                 ((and prev-start
+                       (< int-end prev-start)  ; There's a gap between this and previous interval
+                       (not (eq? current-val #nil)))  ; And we're searching from a non-nil region
+                  ;; Return the position where the gap ends (start of next interval in forward order)
+                  prev-start)
+
+                 ;; This interval's value differs from current-val
                  ((not (equal? int-val current-val))
                   (interval-end int))
-                 (else (loop (cdr ints)))))))))))
+
+                 ;; This interval has the same value - continue searching
+                 (else
+                  (loop (cdr ints) int-start))))))))))
 
 (define (text-property-any start end prop value obj)
   "Check if any character in range [START, END) has PROP set to VALUE."
