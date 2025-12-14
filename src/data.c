@@ -3268,7 +3268,7 @@ syms_of_data (void)
   PUT_ERROR (Qtype_mismatch, error_tail, "Types do not match");
   PUT_ERROR (Qargs_out_of_range, error_tail, "Args out of range");
   PUT_ERROR (Qvoid_function, error_tail,
-	     "Symbol's function definition is void");
+	     "Symbol's elisp-function definition is void");
   PUT_ERROR (Qcyclic_function_indirection, error_tail,
 	     "Symbol's chain of function indirections contains a loop");
   PUT_ERROR (Qcyclic_variable_indirection, error_tail,
