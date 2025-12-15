@@ -22,11 +22,28 @@
 ;;;   Registration: init-types-registrations
 ;;;
 ;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
+;;;       when load.scm is updated to use use-modules (Phase 2).
+;;;
+;;;       Phase 2a attempt showed that define-module + primitive-load don't mix.
+;;;       Must update load.scm to use use-modules before enabling these declarations.
 ;;;
 ;;; (define-module (language elisp runtime types)
-;;;   #:use-module (language elisp runtime)
-;;;   #:export (...))
+;;;   #:declarative? #f
+;;;   #:export (
+;;;     ;; Scheme implementation functions
+;;;     elisp-symbolp elisp-integerp elisp-floatp elisp-numberp elisp-natnump
+;;;     elisp-characterp elisp-stringp elisp-vectorp elisp-bool-vector-p
+;;;     elisp-arrayp elisp-sequencep elisp-bufferp elisp-subrp
+;;;     elisp-consp elisp-atom elisp-listp elisp-nlistp elisp-null elisp-proper-list-p
+;;;     elisp-eq elisp-eql elisp-equal
+;;;     elisp-cons elisp-car elisp-cdr elisp-car-safe elisp-cdr-safe
+;;;     elisp-max-char elisp-identity elisp-char-table-p
+;;;     elisp-bare-symbol-p elisp-boundp elisp-condition-variable-p
+;;;     elisp-hash-table-p elisp-integer-or-marker-p elisp-mutexp
+;;;     elisp-recordp elisp-symbol-with-pos-p elisp-threadp
+;;;     elisp-user-ptrp elisp-vector-or-char-table-p
+;;;     elisp-symbol-equal init-types-registrations
+;;;   ))
 
 ;;;
 ;;; Type Predicates
