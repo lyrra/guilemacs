@@ -164,8 +164,11 @@
 ;; Make all types functions available in (language elisp runtime) namespace
 (module-use! (current-module) (resolve-module '(language elisp types)))
 
+;; Load numbers module as proper Guile module
+(use-modules (language elisp numbers))
+(module-use! (current-module) (resolve-module '(language elisp numbers)))
+
 ;; Remaining modules still using primitive-load (will be migrated incrementally)
-(primitive-load (join %prelude-directory "elisp/runtime/numbers.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/strings.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/sequences.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/utils.scm"))

@@ -2,9 +2,9 @@
 ;;;
 ;;; Arithmetic & Math Operations
 ;;;
-;;; Module: (language elisp runtime numbers)
+;;; Module: (language elisp numbers)
 ;;; Purpose: Arithmetic and mathematical operations for Elisp runtime
-;;; Loaded into: (language elisp runtime) via primitive-load
+;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (32+ functions):
 ;;;   Basic arithmetic: +, -, *, /, 1+, 1-
@@ -20,12 +20,60 @@
 ;;;   Other: byteorder, float, number-to-string, random, number-or-marker-p
 ;;;   Registration: init-numbers-registrations
 ;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
+;;; NOTE: Phase 2 - Using flat module naming (language elisp numbers)
+
+(define-module (language elisp numbers)
+  #:use-module (rnrs bytevectors)
+  #:use-module (language elisp runtime)
+  #:export (
+    ;; Scheme implementation functions
+    elisp-+
+    elisp--
+    elisp-*
+    elisp-/
+    elisp-1+
+    elisp-1-
+    elisp-min
+    elisp-max
+    elisp-=
+    elisp-<
+    elisp->
+    elisp-<=
+    elisp->=
+    elisp-/=
+    elisp-logand
+    elisp-log
+    elisp-truncate
+    elisp-ceiling
+    elisp-floor
+    elisp-round
+    elisp-ftruncate
+    elisp-fceiling
+    elisp-ffloor
+    elisp-fround
+    elisp-isnan
+    elisp-%
+    elisp-mod
+    elisp-byteorder
+    elisp-float
+    elisp-number-to-string
+    elisp-random
+    elisp-number-or-marker-p
+    init-numbers-registrations
+  ))
+
 ;;;
-;;; (define-module (language elisp runtime numbers)
-;;;   #:use-module (language elisp runtime)
-;;;   #:export (...))
+;;;
+;;;
+
+;; really defined in src/data.c but we dont want to call into C from scheme
+;; so use a dummy here. Real fix is to have marker arith functions for markers instead of this bolted on polymorphism
+(define (check-number-coerce-marker obj)
+  "Check if OBJ is a number, or a marker that can be coerced to a number.
+Since passing markers to pure arith functions is obsolete, raise error."
+  (if (number? obj)
+      obj
+      (error "Wrong type argument: numberp" obj)))
 
 ;;;
 ;;; Basic Arithmetic Operations
