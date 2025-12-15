@@ -1,12 +1,33 @@
-;;; symbol-operations.scm --- Enhanced symbol operations for efficient symbol handling
-
-;; This module implements the goals.org requirement for "direct symbol comparison
-;; instead of string comparison" and "optimize for symbol interning efficiency"
+;;; Guilemacs Lisp
+;;;
+;;; Symbol Operations
+;;;
+;;; Module: (language elisp runtime symbols)
+;;; Purpose: Enhanced symbol interning and operations
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (~20 functions):
+;;;   Symbol interning: efficient-intern, intern-with-cache
+;;;   Symbol comparison: symbol-compare-direct, symbol-equal-fast
+;;;   Symbol properties: symbol-intern-count, symbol-frequency
+;;;   Statistics: get-intern-stats, clear-intern-stats
+;;;
+;;; This module implements direct symbol comparison instead of string comparison
+;;; and optimizes for symbol interning efficiency.
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime symbols)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 (use-modules (srfi srfi-1)
              (srfi srfi-69))
 
-;; Symbol Interning and Efficiency - Enhanced for Direct Comparison
+;;;
+;;; Symbol Interning and Efficiency - Enhanced for Direct Comparison
+;;;
 
 (define *symbol-intern-table* (make-hash-table))
 (define *symbol-intern-stats* (make-hash-table))

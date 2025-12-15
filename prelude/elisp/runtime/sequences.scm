@@ -2,8 +2,29 @@
 ;;;
 ;;; List & Sequence Operations
 ;;;
-;;; List/cons manipulation, sequences, property lists, and association lists.
-;;; Migrated from C for better maintainability and GC efficiency.
+;;; Module: (language elisp runtime sequences)
+;;; Purpose: List/cons manipulation, sequences, and association lists
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (34+ functions):
+;;;   List search: memq, member, nth, nthcdr, last, butlast
+;;;   List transformation: reverse, append
+;;;   Association lists: assq, assoc, rassq
+;;;   Sequence operations: copy-sequence, elt, length, safe-length, take
+;;;   Property lists: plist-get, plist-put, plist-member
+;;;   Number predicates: zerop, plusp, minusp, evenp, oddp
+;;;   String comparisons: string-equal, string-lessp, string-greaterp
+;;;   Higher-order: mapcar, mapc
+;;;   Length comparisons: length<, length>, length=
+;;;   Utilities: list, make-list, constantly
+;;;   Registration: init-sequences-registrations
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime sequences)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 ;;;
 ;;; List Search & Access Operations

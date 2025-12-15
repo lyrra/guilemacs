@@ -2,8 +2,30 @@
 ;;;
 ;;; Arithmetic & Math Operations
 ;;;
-;;; Migrated from C DEFUN arithmetic and mathematical functions.
-;;; Includes: basic ops (+, -, *, /), comparisons, bitwise ops, floating point, predicates.
+;;; Module: (language elisp runtime numbers)
+;;; Purpose: Arithmetic and mathematical operations for Elisp runtime
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (32+ functions):
+;;;   Basic arithmetic: +, -, *, /, 1+, 1-
+;;;   Min/Max: min, max
+;;;   Comparisons: =, <, >, <=, >=, /=
+;;;   Bitwise: logand, logior, logxor, lognot, logcount, ash
+;;;   Trigonometric: cos, sin, tan, acos, asin, atan
+;;;   Exponential: abs, sqrt, exp, expt, log
+;;;   Rounding: truncate, ceiling, floor, round
+;;;   Float rounding: ftruncate, fceiling, ffloor, fround
+;;;   Special predicates: isnan
+;;;   Modulo/Remainder: %, mod
+;;;   Other: byteorder, float, number-to-string, random, number-or-marker-p
+;;;   Registration: init-numbers-registrations
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime numbers)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 ;;;
 ;;; Basic Arithmetic Operations

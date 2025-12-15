@@ -1,6 +1,29 @@
-;;; pcase.scm --- Scheme support for rewriting Elisp pcase macros
+;;; Guilemacs Lisp
+;;;
+;;; Pattern Matching (pcase) Support
+;;;
+;;; Module: (language elisp runtime pcase)
+;;; Purpose: Scheme support for Elisp pcase macros
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (~15 functions):
+;;;   Pattern testing: pcase--true?, pcase--match
+;;;   Function helpers: pcase--maybe-elisp-function, pcase--elisp-function
+;;;   Pattern compilation: pcase--compile-pattern
+;;;   Feature detection: pcase--featurep-helper
+;;;
+;;; Helpers shared by the Guile-based pcase implementation.
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime pcase)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
-;; Helpers shared by the upcoming Guile-based pcase implementation.
+;;;
+;;; Pattern Matching Helpers
+;;;
 
 (define (pcase--true? value)
   (not (eq? value nil-value)))

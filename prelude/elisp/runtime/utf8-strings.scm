@@ -1,14 +1,36 @@
-;;; utf8-string-operations.scm --- Enhanced UTF-8 string operations for guilemacs
-
-;; This module provides native UTF-8 string operations to replace C string
-;; handling with pure Guile implementations, focusing on UTF-8 by default
-;; as specified in the goals.
+;;; Guilemacs Lisp
+;;;
+;;; UTF-8 String Operations
+;;;
+;;; Module: (language elisp runtime utf8)
+;;; Purpose: Enhanced UTF-8 string operations for Guilemacs
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (57 functions):
+;;;   UTF-8 creation: string-from-utf8-bytes, string-to-utf8-bytes
+;;;   Validation: utf8-valid-p, multibyte-string-p
+;;;   Conversion: multibyte-to-unibyte, unibyte-to-multibyte
+;;;   String operations: string-width, char-width
+;;;   Comparison: string-collate, string-version-lessp
+;;;   Case operations: upcase-multibyte, downcase-multibyte
+;;;
+;;; This module provides native UTF-8 string operations to replace C string
+;;; handling with pure Guile implementations, focusing on UTF-8 by default.
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime utf8)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 (use-modules (ice-9 regex)
              (ice-9 textual-ports)
              (srfi srfi-1))
 
-;; UTF-8 String Creation and Manipulation
+;;;
+;;; UTF-8 String Creation and Manipulation
+;;;
 
 (define (string-from-utf8-bytes bytes)
   "Create a string from UTF-8 byte sequence BYTES.

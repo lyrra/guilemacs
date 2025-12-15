@@ -2,9 +2,23 @@
 ;;;
 ;;; File Loading Infrastructure
 ;;;
-;;; File loading infrastructure - handles .el/.elc files, load-path, etc.
-;;; Migrated from lread.c Fload function.
-;;; Includes: file validation, load-path management, read-eval loop, history.
+;;; Module: (language elisp runtime loader)
+;;; Purpose: File loading infrastructure for Elisp files
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS:
+;;;   Read-eval loop: load-read-next-expression-from-port, read-and-eval-buffer
+;;;   File operations: load-file-internal, find-file-in-load-path
+;;;   Path validation: validate-load-file-name, expand-load-file-name
+;;;   History tracking: add-to-load-history
+;;;   Load context: with-load-context
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime loader)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 ;;;
 ;;; Read-Eval Loop Functions

@@ -2,6 +2,35 @@
 ;;;
 ;;; Type Predicates - Foundation Layer
 ;;;
+;;; Module: (language elisp runtime types)
+;;; Purpose: Type predicates and type-related operations for Elisp runtime
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (41 functions):
+;;;   Type predicates: symbolp, integerp, floatp, numberp, natnump,
+;;;                    characterp, stringp, vectorp, bool-vector-p,
+;;;                    arrayp, sequencep, bufferp, subrp
+;;;   List predicates: consp, atom, listp, nlistp, null, proper-list-p
+;;;   Equality: eq, eql, equal
+;;;   Cons operations: cons, car, cdr, car-safe, cdr-safe
+;;;   Character ops: max-char
+;;;   Utilities: identity, char-table-p
+;;;   Extended: bare-symbol-p, boundp, condition-variable-p, hash-table-p,
+;;;            integer-or-marker-p, mutexp, recordp, symbol-with-pos-p,
+;;;            threadp, user-ptrp, vector-or-char-table-p
+;;;   Helpers: elisp-symbol-equal
+;;;   Registration: init-types-registrations
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime types)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
+
+;;;
+;;; Type Predicates
+;;;
 
 (define (elisp-symbolp object)
   "Return t if OBJECT is a symbol."

@@ -2,10 +2,32 @@
 ;;;
 ;;; Utility Functions
 ;;;
-;;; Miscellaneous utility functions migrated from C to Guile.
-;;; Includes: symbol properties, obarray operations, hash tables,
-;;; features/provide, list utilities, predicates, file utilities,
-;;; math utilities, I/O functions, and buffer operations.
+;;; Module: (language elisp runtime utils)
+;;; Purpose: Property lists, symbol properties, obarray, and utilities
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (37+ functions):
+;;;   Load system: get-load-suffixes
+;;;   Obarray: obarrayp, obarray-make, obarray-clear, intern, intern-soft, unintern
+;;;   Symbol properties: symbol-plist, setplist, get, put
+;;;   Hash tables: hash-table-count, clrhash
+;;;   Features: featurep, provide
+;;;   List utilities: nreverse, delq, remq
+;;;   Type predicates: markerp, keywordp
+;;;   File utilities: file-name-absolute-p
+;;;   Math utilities: copysign, frexp, ldexp, logb, sign, clamp, square
+;;;   I/O: read-char
+;;;   Buffer operations: with-current-buffer
+;;;   Hashing: sxhash-eq, sxhash-eql, sxhash-equal
+;;;   Other: make-string, convert-guile-object
+;;;   Registration: init-utils-registrations
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime utils)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 ;;;
 ;;; Load System Utilities

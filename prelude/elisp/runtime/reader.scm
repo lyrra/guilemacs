@@ -2,22 +2,35 @@
 ;;;
 ;;; Elisp Reader & Parser Functions
 ;;;
-;;; Elisp reader implementation - parses lists, vectors, literals, etc.
-;;; Migrated from lread.c to enable better extensibility.
-;;; Contains 59 comprehensive parsing functions for all Elisp syntax forms.
+;;; Module: (language elisp runtime reader)
+;;; Purpose: Complete Elisp reader and parser implementation
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (271 functions):
+;;;   List parsing: read-list, read-dotted-pair
+;;;   Vector parsing: read-vector, read-bool-vector
+;;;   Character literals: read-char-literal, parse-char-escape
+;;;   String literals: read-string-literal
+;;;   Hash syntax: read-hash-syntax (#', ##, #!, #:, #x, #o, #b, #&, etc.)
+;;;   Symbol parsing: read-symbol, intern-symbol
+;;;   Number parsing: read-number, read-float, read-integer
+;;;   Comment handling: skip-comment, skip-whitespace
+;;;   Quote-like syntax: ', `, ,, ,@
+;;;   Load-specific: load-read-functions
 ;;;
 ;;; These functions are primarily called from C code via module-ref and do not
-;;; require symbol-function registrations. They handle:
-;;; - List parsing (regular and dotted pairs)
-;;; - Vector parsing
-;;; - Character literals with escape sequences and modifiers
-;;; - String literals
-;;; - Hash syntax (#', ##, #!, #:, #x, #o, #b, #&, etc.)
-;;; - Quote-like syntax (', `, ,, ,@)
-;;; - Symbol and number parsing
-;;; - Comment skipping
-;;; - Load-specific reading functions
+;;; require symbol-function registrations.
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime reader)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
+;;;
+;;; List Parsing Functions
+;;;
 
 (define (elisp-parse-list-from-port port)
   "Parse an elisp list from PORT, handling both regular and dotted pairs.

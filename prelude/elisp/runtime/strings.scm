@@ -2,8 +2,28 @@
 ;;;
 ;;; String Operations
 ;;;
-;;; String manipulation, comparison, and creation functions.
-;;; Includes optimized C-string comparisons for C integration.
+;;; Module: (language elisp runtime strings)
+;;; Purpose: String manipulation, comparison, and creation functions
+;;; Loaded into: (language elisp runtime) via primitive-load
+;;;
+;;; EXPORTS (27 functions):
+;;;   Metrics: string-bytes, string-width
+;;;   Comparison: string=, string<, string-lessp, string-equal,
+;;;               string-prefix-p, string-suffix-p, compare-strings
+;;;   Search: string-search, string-match
+;;;   Manipulation: substring, concat, make-string, string, upcase,
+;;;                 downcase, capitalize, upcase-initials
+;;;   Conversion: string-to-char, char-to-string, string-to-number,
+;;;               format-message, format
+;;;   Creation: copy-sequence
+;;;   Registration: init-strings-registrations
+;;;
+;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
+;;;       when load.scm is updated to use use-modules.
+;;;
+;;; (define-module (language elisp runtime strings)
+;;;   #:use-module (language elisp runtime)
+;;;   #:export (...))
 
 ;;;
 ;;; String Metrics & Analysis
