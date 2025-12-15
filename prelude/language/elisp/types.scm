@@ -2,9 +2,9 @@
 ;;;
 ;;; Type Predicates - Foundation Layer
 ;;;
-;;; Module: (language elisp runtime types)
+;;; Module: (language elisp types)
 ;;; Purpose: Type predicates and type-related operations for Elisp runtime
-;;; Loaded into: (language elisp runtime) via primitive-load
+;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (41 functions):
 ;;;   Type predicates: symbolp, integerp, floatp, numberp, natnump,
@@ -21,29 +21,57 @@
 ;;;   Helpers: elisp-symbol-equal
 ;;;   Registration: init-types-registrations
 ;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules (Phase 2).
-;;;
-;;;       Phase 2a attempt showed that define-module + primitive-load don't mix.
-;;;       Must update load.scm to use use-modules before enabling these declarations.
-;;;
-;;; (define-module (language elisp runtime types)
-;;;   #:declarative? #f
-;;;   #:export (
-;;;     ;; Scheme implementation functions
-;;;     elisp-symbolp elisp-integerp elisp-floatp elisp-numberp elisp-natnump
-;;;     elisp-characterp elisp-stringp elisp-vectorp elisp-bool-vector-p
-;;;     elisp-arrayp elisp-sequencep elisp-bufferp elisp-subrp
-;;;     elisp-consp elisp-atom elisp-listp elisp-nlistp elisp-null elisp-proper-list-p
-;;;     elisp-eq elisp-eql elisp-equal
-;;;     elisp-cons elisp-car elisp-cdr elisp-car-safe elisp-cdr-safe
-;;;     elisp-max-char elisp-identity elisp-char-table-p
-;;;     elisp-bare-symbol-p elisp-boundp elisp-condition-variable-p
-;;;     elisp-hash-table-p elisp-integer-or-marker-p elisp-mutexp
-;;;     elisp-recordp elisp-symbol-with-pos-p elisp-threadp
-;;;     elisp-user-ptrp elisp-vector-or-char-table-p
-;;;     elisp-symbol-equal init-types-registrations
-;;;   ))
+;;; NOTE: Phase 2 - Using flat module naming (language elisp types) instead of
+;;;       nested (language elisp runtime types) to avoid submodule complexity.
+
+(define-module (language elisp types)
+  #:use-module (language elisp runtime)
+  #:export (
+    ;; Scheme implementation functions
+    elisp-symbolp
+    elisp-integerp
+    elisp-floatp
+    elisp-numberp
+    elisp-natnump
+    elisp-characterp
+    elisp-stringp
+    elisp-vectorp
+    elisp-bool-vector-p
+    elisp-arrayp
+    elisp-sequencep
+    elisp-bufferp
+    elisp-subrp
+    elisp-consp
+    elisp-atom
+    elisp-listp
+    elisp-nlistp
+    elisp-null
+    elisp-proper-list-p
+    elisp-eq
+    elisp-eql
+    elisp-equal
+    elisp-cons
+    elisp-car
+    elisp-cdr
+    elisp-car-safe
+    elisp-cdr-safe
+    elisp-max-char
+    elisp-identity
+    elisp-char-table-p
+    elisp-bare-symbol-p
+    elisp-boundp
+    elisp-condition-variable-p
+    elisp-hash-table-p
+    elisp-integer-or-marker-p
+    elisp-mutexp
+    elisp-recordp
+    elisp-symbol-with-pos-p
+    elisp-threadp
+    elisp-user-ptrp
+    elisp-vector-or-char-table-p
+    elisp-symbol-equal
+    init-types-registrations
+  ))
 
 ;;;
 ;;; Type Predicates

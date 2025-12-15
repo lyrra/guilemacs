@@ -151,8 +151,20 @@
 (set-symbol-value! 'features '())
 
 ;; Load modular runtime components
-;; These submodules provide organized, maintainable runtime functionality
-(primitive-load (join %prelude-directory "elisp/runtime/types.scm"))
+;; Phase 2: Migrating to proper Guile modules with use-modules
+;; Using flat module naming (language elisp MODULE) instead of nested (language elisp runtime MODULE)
+
+;; Add prelude directory to load path so module files can be found
+;; Module (language elisp types) maps to file language/elisp/types.scm
+;; Files are in prelude/language/elisp/*.scm
+(set! %load-path (cons %prelude-directory %load-path))
+
+;; Load types module as proper Guile module
+(use-modules (language elisp types))
+;; Make all types functions available in (language elisp runtime) namespace
+(module-use! (current-module) (resolve-module '(language elisp types)))
+
+;; Remaining modules still using primitive-load (will be migrated incrementally)
 (primitive-load (join %prelude-directory "elisp/runtime/numbers.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/strings.scm"))
 (primitive-load (join %prelude-directory "elisp/runtime/sequences.scm"))
