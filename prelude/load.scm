@@ -47,7 +47,7 @@
 
 (set-current-module (resolve-module '(language elisp runtime)))
 
-(use-modules (rnrs bytevectors)) ; FIX: move to (use-modules (scheme base))
+(use-modules (rnrs bytevectors)) ; R6RS bytevector support (Guile standard)
 (use-modules (language elisp emacs))
 (use-modules (system foreign-library))
 
