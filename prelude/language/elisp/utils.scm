@@ -36,6 +36,21 @@
     elisp-fset elisp-setq elisp-setcar elisp-setcdr
     elisp-make-symbol elisp-gensym
     set-debug-print-flag
+    ;; Mathematical utilities
+    elisp-copysign elisp-frexp elisp-ldexp elisp-logb
+    elisp-sign elisp-clamp elisp-square
+    ;; Other utilities
+    elisp-nreverse elisp-delq elisp-remq
+    elisp-markerp elisp-keywordp
+    elisp-file-name-absolute-p
+    elisp-get-load-suffixes
+    elisp-obarrayp elisp-obarray-make elisp-obarray-clear
+    elisp-intern-soft-lread elisp-unintern
+    elisp-read-char
+    elisp-save-current-buffer elisp-with-current-buffer
+    elisp-make-string
+    elisp-sxhash-eq elisp-sxhash-eql elisp-sxhash-equal
+    elisp-convert-guile-object
     init-utils-registrations
   ))
 
@@ -595,10 +610,15 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'markerp elisp-markerp)
   (set-symbol-function! 'keywordp elisp-keywordp)
   (set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)
+  ;; Register both the Elisp name and elisp-* name for C wrappers to find
   (set-symbol-function! 'copysign elisp-copysign)
+  (set-symbol-function! 'elisp-copysign elisp-copysign)
   (set-symbol-function! 'frexp elisp-frexp)
+  (set-symbol-function! 'elisp-frexp elisp-frexp)
   (set-symbol-function! 'ldexp elisp-ldexp)
+  (set-symbol-function! 'elisp-ldexp elisp-ldexp)
   (set-symbol-function! 'logb elisp-logb)
+  (set-symbol-function! 'elisp-logb elisp-logb)
   (set-symbol-function! 'sign elisp-sign)
   (set-symbol-function! 'clamp elisp-clamp)
   (set-symbol-function! 'square elisp-square)

@@ -20,6 +20,7 @@
 (define-module (language elisp strings)
   #:use-module (rnrs bytevectors)
   #:use-module (language elisp runtime)
+  #:use-module (rnrs bytevectors)
   #:export (
     ;; Scheme implementation functions
     elisp-char-to-string
