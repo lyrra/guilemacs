@@ -598,7 +598,7 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'copysign elisp-copysign)
   (set-symbol-function! 'frexp elisp-frexp)
   (set-symbol-function! 'ldexp elisp-ldexp)
-  (set-symbol-function! 'elisp-logb elisp-logb)
+  (set-symbol-function! 'logb elisp-logb)
   (set-symbol-function! 'sign elisp-sign)
   (set-symbol-function! 'clamp elisp-clamp)
   (set-symbol-function! 'square elisp-square)

@@ -72,20 +72,20 @@
 ;; We'll just stub it here and let the actual C function be called via a different mechanism
 ;; Real fix: Have the comparison operators call the C function directly
 (define (check-number-coerce-marker obj)
-  "Stub - actual implementation should call C check_number_coerce_marker from data.c"
-  (if (number? obj)
-      obj
-      ;; For markers, we need to extract the position
-      ;; But we can't access C functions from this module context
-      ;; So we'll use symbol-function to call marker-position
-      (if (and (not (null? obj)) (not (boolean? obj)))
-          ;; Try to treat it as a marker and extract position
-          (let ((markerp-func (false-if-exception (symbol-function 'markerp)))
-                (marker-position-func (false-if-exception (symbol-function 'marker-position))))
-            (if (and markerp-func (markerp-func obj) marker-position-func)
-                (marker-position-func obj)
-                (error "Wrong type argument: numberp" obj)))
-          (error "Wrong type argument: numberp" obj))))
+  "Check if OBJ is a number, or a marker that can be coerced to a number.
+Markers are coerced to their position value."
+  (cond
+    ((number? obj) obj)
+
+    ;; Check if it's a marker using markerp and extract its position
+    ((not (eq? ((symbol-function 'markerp) obj) #nil))
+     ;; Call marker-position to get the numeric position
+     (let ((pos ((symbol-function 'marker-position) obj)))
+       (if (and pos (not (eq? pos #nil)) (number? pos))
+           pos
+           (error "Wrong type argument: numberp" obj))))
+    (else
+      (error "Wrong type argument: numberp" obj))))
 
 ;;;
 ;;; Basic Arithmetic Operations
