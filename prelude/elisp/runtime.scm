@@ -19,6 +19,7 @@
 ;;; Code:
 
 (define-module (language elisp runtime)
+  #:declarative? #f
   #:use-module (ice-9 format)
   #:use-module (ice-9 pretty-print)
   #:use-module ((system base compile)
@@ -68,7 +69,8 @@
             make-symbol
             intern-gensym
             %lisp-string
-            lisp-string?)
+            lisp-string?
+            elisp-load-with-match-data-protection)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -338,6 +340,13 @@
 (define (guile-tracelog-set flags)
   (c-guile-tracelog-set flags)
   (set! %traceflags flags))
+
+(define (elisp-load-with-match-data-protection file noerror nomessage nosuffix must-suffix)
+  "Load file with match data protection.
+This replicates the save_match_data_load wrapper function."
+  ;; Dynamically resolve fload-bridge from reader module (loaded after runtime)
+  (let ((fload-bridge (module-ref (resolve-module '(language elisp reader)) 'fload-bridge)))
+    (fload-bridge file noerror nomessage nosuffix must-suffix)))
 
 (define (emacs-read port)
   (format #t "using emacs-read!~%")
