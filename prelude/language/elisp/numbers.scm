@@ -66,14 +66,26 @@
 ;;;
 ;;;
 
-;; really defined in src/data.c but we dont want to call into C from scheme
-;; so use a dummy here. Real fix is to have marker arith functions for markers instead of this bolted on polymorphism
+;; The C primitive check-number-coerce-marker is defined in src/data.c
+;; and exported in src/emacs.c via scm_c_define_gsubr
+;; Since this file uses define-module, it doesn't automatically have access to the C primitives
+;; We'll just stub it here and let the actual C function be called via a different mechanism
+;; Real fix: Have the comparison operators call the C function directly
 (define (check-number-coerce-marker obj)
-  "Check if OBJ is a number, or a marker that can be coerced to a number.
-Since passing markers to pure arith functions is obsolete, raise error."
+  "Stub - actual implementation should call C check_number_coerce_marker from data.c"
   (if (number? obj)
       obj
-      (error "Wrong type argument: numberp" obj)))
+      ;; For markers, we need to extract the position
+      ;; But we can't access C functions from this module context
+      ;; So we'll use symbol-function to call marker-position
+      (if (and (not (null? obj)) (not (boolean? obj)))
+          ;; Try to treat it as a marker and extract position
+          (let ((markerp-func (false-if-exception (symbol-function 'markerp)))
+                (marker-position-func (false-if-exception (symbol-function 'marker-position))))
+            (if (and markerp-func (markerp-func obj) marker-position-func)
+                (marker-position-func obj)
+                (error "Wrong type argument: numberp" obj)))
+          (error "Wrong type argument: numberp" obj))))
 
 ;;;
 ;;; Basic Arithmetic Operations
