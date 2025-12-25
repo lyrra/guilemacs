@@ -190,7 +190,7 @@
 
 ;; Load pcase macro support (Phase 5 consolidation)
 ;; Replaces: pcase.scm
-(primitive-load (join %prelude-directory "elisp/runtime/pcase.scm"))
+(use-modules (language elisp pcase))
 
 ;;; ============================================================================
 ;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
