@@ -2,31 +2,59 @@
 ;;;
 ;;; String Operations
 ;;;
-;;; Module: (language elisp runtime strings)
-;;; Purpose: String manipulation, comparison, and creation functions
-;;; Loaded into: (language elisp runtime) via primitive-load
+;;; Module: (language elisp strings)
+;;; Purpose: String manipulation and operations for Elisp runtime
+;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (27 functions):
-;;;   Metrics: string-bytes, string-width
-;;;   Comparison: string=, string<, string-lessp, string-equal,
-;;;               string-prefix-p, string-suffix-p, compare-strings
-;;;   Search: string-search, string-match
-;;;   Manipulation: substring, concat, make-string, string, upcase,
-;;;                 downcase, capitalize, upcase-initials
-;;;   Conversion: string-to-char, char-to-string, string-to-number,
-;;;               format-message, format
-;;;   Creation: copy-sequence
+;;;   String metrics: string-bytes, string-width, string-to-multibyte
+;;;   String comparison: string=, string<, string-equal
+;;;   String search: string-match, string-search
+;;;   String manipulation: substring, concat, upcase, downcase, capitalize
+;;;   String conversion: string-to-number, format, make-string
+;;;   String predicates: string-lessp, string-greaterp, string-empty-p
 ;;;   Registration: init-strings-registrations
 ;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
-;;;
-;;; (define-module (language elisp runtime strings)
-;;;   #:use-module (language elisp runtime)
-;;;   #:export (...))
+;;; NOTE: Phase 2 - Using flat module naming (language elisp strings)
 
-;;;
-;;; String Metrics & Analysis
+(define-module (language elisp strings)
+  #:use-module (rnrs bytevectors)
+  #:use-module (language elisp runtime)
+  #:export (
+    ;; Scheme implementation functions
+    elisp-char-to-string
+    elisp-string
+    elisp-string-bytes
+    elisp-string-width
+    elisp-string-to-multibyte
+    elisp-string=
+    elisp-string<
+    elisp-string-equal
+    elisp-string-match
+    elisp-string-search
+    elisp-substring
+    elisp-concat
+    elisp-upcase
+    elisp-downcase
+    elisp-capitalize
+    elisp-string-to-number
+    elisp-format
+    elisp-make-string
+    elisp-string-lessp
+    elisp-string-greaterp
+    elisp-string-empty-p
+    elisp-string-version-lessp
+    elisp-string-pad
+    elisp-string-chop-newline
+    elisp-string-clean-whitespace
+    elisp-string-fill
+    elisp-string-limit
+    elisp-string-lines
+    elisp-string-pixel-width
+    elisp-length
+    init-strings-registrations
+  ))
+
 ;;;
 
 (define (elisp-string-bytes string)

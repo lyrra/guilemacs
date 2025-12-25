@@ -1,32 +1,43 @@
 ;;; Guilemacs Lisp
 ;;;
-;;; Utility Functions
+;;; Utilities & Property Lists
 ;;;
-;;; Module: (language elisp runtime utils)
-;;; Purpose: Property lists, symbol properties, obarray, and utilities
-;;; Loaded into: (language elisp runtime) via primitive-load
+;;; Module: (language elisp utils)
+;;; Purpose: Symbol properties, hash tables, features, and utilities
+;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (37+ functions):
-;;;   Load system: get-load-suffixes
-;;;   Obarray: obarrayp, obarray-make, obarray-clear, intern, intern-soft, unintern
-;;;   Symbol properties: symbol-plist, setplist, get, put
-;;;   Hash tables: hash-table-count, clrhash
-;;;   Features: featurep, provide
-;;;   List utilities: nreverse, delq, remq
-;;;   Type predicates: markerp, keywordp
-;;;   File utilities: file-name-absolute-p
-;;;   Math utilities: copysign, frexp, ldexp, logb, sign, clamp, square
-;;;   I/O: read-char
-;;;   Buffer operations: with-current-buffer
-;;;   Hashing: sxhash-eq, sxhash-eql, sxhash-equal
-;;;   Other: make-string, convert-guile-object
+;;;   Symbol properties: get, put, symbol-plist, setplist
+;;;   Obarray: intern, intern-soft, mapatoms, unintern
+;;;   Features: featurep, provide, require
+;;;   Hash tables: make-hash-table, gethash, puthash, remhash, clrhash, hash-table-count
+;;;   Comparison: equal-including-properties
+;;;   Other: copy-tree, fillarray
 ;;;   Registration: init-utils-registrations
 ;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
-;;;
-;;; (define-module (language elisp runtime utils)
-;;;   #:use-module (language elisp runtime)
+;;; NOTE: Phase 2 - Using flat module naming (language elisp utils)
+
+(define-module (language elisp utils)
+  #:use-module (language elisp runtime)
+  #:use-module (srfi srfi-69)
+  #:export (
+    ;; Scheme implementation functions
+    elisp-get-load-suffixes
+    elisp-get elisp-put elisp-symbol-plist elisp-setplist
+    elisp-intern elisp-intern-soft elisp-mapatoms elisp-unintern
+    elisp-featurep elisp-provide elisp-require
+    elisp-make-hash-table elisp-gethash elisp-puthash elisp-remhash
+    elisp-clrhash elisp-hash-table-count elisp-hash-table-test
+    elisp-hash-table-weakness elisp-hash-table-rehash-size
+    elisp-hash-table-rehash-threshold elisp-hash-table-size
+    elisp-hash-table-keys elisp-hash-table-values
+    elisp-equal-including-properties elisp-copy-tree elisp-fillarray
+    elisp-symbol-function elisp-symbol-value elisp-set
+    elisp-fset elisp-setq elisp-setcar elisp-setcdr
+    elisp-make-symbol elisp-gensym
+    init-utils-registrations
+  ))
+
 ;;;   #:export (...))
 
 ;;;

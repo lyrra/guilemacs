@@ -168,12 +168,17 @@
 (use-modules (language elisp numbers))
 (module-use! (current-module) (resolve-module '(language elisp numbers)))
 
-;; Remaining modules still using primitive-load (will be migrated incrementally)
-(primitive-load (join %prelude-directory "elisp/runtime/strings.scm"))
-(primitive-load (join %prelude-directory "elisp/runtime/sequences.scm"))
-(primitive-load (join %prelude-directory "elisp/runtime/utils.scm"))
-(primitive-load (join %prelude-directory "elisp/runtime/loader.scm"))
-(primitive-load (join %prelude-directory "elisp/runtime/reader.scm"))
+(use-modules (language elisp strings))
+(use-modules (language elisp sequences))
+(use-modules (language elisp utils))
+
+(let ((loader (lambda (file)
+                (primitive-load (join %prelude-directory file))
+                (set-current-module (resolve-module '(language elisp runtime))))))
+  (loader "elisp/runtime/loader.scm")
+  (loader "elisp/runtime/reader.scm"))
+
+(set-current-module (resolve-module '(language elisp runtime)))
 
 ;; Initialize symbol function registrations from runtime modules
 ;; This allows modules to manage their own registrations
@@ -202,18 +207,18 @@
 ;; Load consolidated text properties system as proper Guile module
 ;; This replaces the old 4-file split (intervals, emacs-string, text-properties, string-operations)
 ;; with a single unified module under (language elisp emacs text-properties) namespace
-(primitive-load (string-append %prelude-directory "/elisp/runtime/text-properties.scm"))
-(set-current-module (resolve-module '(language elisp runtime)))
+(primitive-load (join %prelude-directory "elisp/runtime/text-properties.scm"))
 
 ;; Load consolidated UTF-8 string operations (Phase 2 consolidation)
 ;; Replaces: utf8-string-operations.scm (only file actually being loaded)
-(primitive-load (join %prelude-directory "elisp/runtime/utf8-strings.scm"))
+(set-current-module (resolve-module '(language elisp runtime)))
+(primitive-load (join %prelude-directory "language/elisp/utf8.scm"))
 
 ;; Load consolidated symbol and character operations (Phase 3 consolidation)
 ;; Replaces: symbol-operations.scm, character-navigation-minimal.scm
-(primitive-load (join %prelude-directory "elisp/runtime/symbol-operations.scm"))
-(primitive-load (join %prelude-directory "elisp/runtime/character-predicates.scm"))
-
+(set-current-module (resolve-module '(language elisp runtime)))
+(use-modules (language elisp symbol-operations))
+(use-modules (language elisp character-predicates))
 
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
@@ -295,7 +300,6 @@
   ;; (module-define! elisp-emacs-module 'identity elisp-identity)
   ;; save-current-buffer is a MACRO defined in boot.el, not a function - don't register the Scheme version
   ;; (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
-  (module-define! elisp-emacs-module 'with-current-buffer elisp-with-current-buffer)
   (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
   (module-define! elisp-emacs-module 'image-file? image-file?)
   (module-define! elisp-emacs-module 'config-file? config-file?)

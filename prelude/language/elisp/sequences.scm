@@ -1,32 +1,38 @@
 ;;; Guilemacs Lisp
 ;;;
-;;; List & Sequence Operations
+;;; Sequence & List Operations
 ;;;
-;;; Module: (language elisp runtime sequences)
-;;; Purpose: List/cons manipulation, sequences, and association lists
-;;; Loaded into: (language elisp runtime) via primitive-load
+;;; Module: (language elisp sequences)
+;;; Purpose: List and sequence operations for Elisp runtime
+;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (34+ functions):
-;;;   List search: memq, member, nth, nthcdr, last, butlast
-;;;   List transformation: reverse, append
-;;;   Association lists: assq, assoc, rassq
-;;;   Sequence operations: copy-sequence, elt, length, safe-length, take
-;;;   Property lists: plist-get, plist-put, plist-member
-;;;   Number predicates: zerop, plusp, minusp, evenp, oddp
-;;;   String comparisons: string-equal, string-lessp, string-greaterp
-;;;   Higher-order: mapcar, mapc
-;;;   Length comparisons: length<, length>, length=
-;;;   Utilities: list, make-list, constantly
+;;;   List operations: memq, member, memql, nth, nthcdr, append, reverse, nreverse
+;;;   Association lists: assq, assoc, rassq, rassoc
+;;;   Property lists: plist-get, plist-put, plist-member, lax-plist-get, lax-plist-put
+;;;   List predicates: member-ignore-case
+;;;   Higher-order: mapcar, mapc, mapcan, mapconcat
+;;;   Utilities: last, butlast, length, safe-length, sort, delete, remove
 ;;;   Registration: init-sequences-registrations
 ;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
-;;;
-;;; (define-module (language elisp runtime sequences)
-;;;   #:use-module (language elisp runtime)
-;;;   #:export (...))
+;;; NOTE: Phase 2 - Using flat module naming (language elisp sequences)
 
-;;;
+(define-module (language elisp sequences)
+  #:use-module (language elisp runtime)
+  #:export (
+    ;; Scheme implementation functions
+    elisp-memq elisp-member elisp-memql elisp-nth elisp-nthcdr
+    elisp-append elisp-reverse elisp-nreverse elisp-assq elisp-assoc
+    elisp-rassq elisp-rassoc elisp-plist-get elisp-plist-put
+    elisp-plist-member elisp-lax-plist-get elisp-lax-plist-put
+    elisp-member-ignore-case elisp-mapcar elisp-mapc elisp-mapcan
+    elisp-mapconcat elisp-last elisp-butlast elisp-length
+    elisp-safe-length elisp-sort elisp-delete elisp-remove
+    elisp-delq elisp-remq elisp-delete-dups elisp-copy-sequence
+    elisp-elt elisp-copy-alist elisp-assq-delete-all
+    init-sequences-registrations
+  ))
+
 ;;; List Search & Access Operations
 ;;;
 

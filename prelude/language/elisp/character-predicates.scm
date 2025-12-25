@@ -1,25 +1,15 @@
-;;; Guilemacs Lisp
+;;; Guilemacs Lisp - Character Predicates
 ;;;
-;;; Character Predicates
-;;;
-;;; Module: (language elisp runtime characters)
+;;; Module: (language elisp character-predicates)
 ;;; Purpose: Character type checking and navigation
-;;; Loaded into: (language elisp runtime) via primitive-load
-;;;
-;;; EXPORTS (4 functions):
-;;;   Type checking: char-alphabetic-p, char-numeric-p
-;;;   Whitespace: char-whitespace-p
-;;;   Boundaries: char-boundary-p
-;;;
-;;; Minimal safe implementation that doesn't depend on buffer operations.
-;;; Addresses UTF-8 migration requirements for character type checking.
-;;;
-;;; NOTE: Module declaration commented out for Phase 1. Will be enabled
-;;;       when load.scm is updated to use use-modules.
-;;;
-;;; (define-module (language elisp runtime characters)
-;;;   #:use-module (language elisp runtime)
-;;;   #:export (...))
+;;; Loading: via use-modules in load.scm
+
+(define-module (language elisp character-predicates)
+  #:use-module (language elisp runtime)
+  #:export (
+    elisp-char-alphabetic-p elisp-char-numeric-p
+    elisp-char-whitespace-p elisp-char-boundary-p
+  ))
 
 ;;;
 ;;; Character Type Checking Functions
