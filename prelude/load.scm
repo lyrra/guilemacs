@@ -171,12 +171,14 @@
 (use-modules (language elisp strings))
 (use-modules (language elisp sequences))
 (use-modules (language elisp utils))
+(use-modules (language elisp loader))
+(use-modules (language elisp reader))
 
-(let ((loader (lambda (file)
-                (primitive-load (join %prelude-directory file))
-                (set-current-module (resolve-module '(language elisp runtime))))))
-  (loader "elisp/runtime/loader.scm")
-  (loader "elisp/runtime/reader.scm"))
+;(let ((loader (lambda (file)
+;                (primitive-load (join %prelude-directory file))
+;                (set-current-module (resolve-module '(language elisp runtime))))))
+;  (loader "elisp/runtime/loader.scm")
+;  (loader "elisp/runtime/reader.scm"))
 
 (set-current-module (resolve-module '(language elisp runtime)))
 
