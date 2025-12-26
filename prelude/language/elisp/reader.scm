@@ -13,6 +13,7 @@
   #:use-module (system base language)
   #:export (
     custom-elisp-read
+    init-reader
     elisp-complete-file-load-from-port
     elisp-compute-found-effective
     elisp-convert-guile-object
@@ -1676,7 +1677,6 @@ Returns: handler result if handler found, #f if should continue with normal load
       ;; Pass through everything else
       (else original-result))))
 
-
 ;; Enhanced version that handles full Fload parameters
 (define (load-elisp-full found-file noerror nomessage nosuffix must-suffix)
   "Load elisp file with compilation, handling full Fload parameter set"
@@ -1698,26 +1698,6 @@ Returns: handler result if handler found, #f if should continue with normal load
       (if noerror
           #f ; return nil on error if noerror is true
           (apply throw key args))))) ; re-throw error otherwise
-
-;; COMMENTED OUT FOR MODULE MIGRATION: ; FIX: kludge, move to some init function
-;; COMMENTED OUT FOR MODULE MIGRATION: (let ((str (canonicalize-path (string-concatenate (list %prelude-directory "/..")))))
-;; COMMENTED OUT FOR MODULE MIGRATION:   (set! %load-path (append (list (string-concatenate (list str "/lisp"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/emacs-lisp"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/progmodes"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/language"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/international"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/textmodes"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/vc"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/mail"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/url"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/gnus"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/net"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/calendar"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/cedet"))
-;; COMMENTED OUT FOR MODULE MIGRATION:                                  (string-concatenate (list str "/lisp/eshell")))
-;; COMMENTED OUT FOR MODULE MIGRATION:                            %load-path)))
-
-(set! %load-extensions (cons ".el" %load-extensions))
 
 ;; Bridge function that reuses existing Fload Scheme migrations
 (define (fload-bridge file noerror nomessage nosuffix must-suffix)
@@ -1774,8 +1754,6 @@ Returns: handler result if handler found, #f if should continue with normal load
         (and mod (module-ref mod (string->symbol symbol-name)))))
     (lambda (key . args) #f)))
 
-(set-symbol-function! 'emacs-load fload-bridge)
-
 ;;; End Section 10
 
 
@@ -1796,9 +1774,7 @@ Returns: handler result if handler found, #f if should continue with normal load
 ;; Uninterned symbols cannot be saved to .go files
 (define (make-symbol name)
   (intern-gensym name))
-(set-symbol-function! 'make-symbol make-symbol)
 
-(set-symbol-function! 'intern-gensym intern-gensym)
 
 (define %debug-print-flag 0)
 (define (set-debug-print-flag! val)
@@ -1806,10 +1782,36 @@ Returns: handler result if handler found, #f if should continue with normal load
 
 ;(define (get-debug-print-flag)
 ;  %debug-print-flag)
-(set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
-
-(set-symbol-function! 'get-debug-print-flag
-                      (lambda ()
-                        %debug-print-flag))
 
 ;;; End Section 11
+(define (init-reader prelude-directory)
+  (set-current-module (resolve-module '(language elisp runtime)))
+  (let ((str (canonicalize-path (string-concatenate (list prelude-directory "/..")))))
+    (set! %load-path (append (list (string-concatenate (list str "/lisp"))
+                                   (string-concatenate (list str "/lisp/emacs-lisp"))
+                                   (string-concatenate (list str "/lisp/progmodes"))
+                                   (string-concatenate (list str "/lisp/language"))
+                                   (string-concatenate (list str "/lisp/international"))
+                                   (string-concatenate (list str "/lisp/textmodes"))
+                                   (string-concatenate (list str "/lisp/vc"))
+                                   (string-concatenate (list str "/lisp/mail"))
+                                   (string-concatenate (list str "/lisp/url"))
+                                   (string-concatenate (list str "/lisp/gnus"))
+                                   (string-concatenate (list str "/lisp/net"))
+                                   (string-concatenate (list str "/lisp/calendar"))
+                                   (string-concatenate (list str "/lisp/cedet"))
+                                   (string-concatenate (list str "/lisp/eshell")))
+                             %load-path)))
+
+  (set! %load-extensions (cons ".el" %load-extensions))
+
+
+  (set-symbol-function! 'make-symbol make-symbol)
+  (set-symbol-function! 'intern-gensym intern-gensym)
+  (set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
+
+  (set-symbol-function! 'get-debug-print-flag
+                        (lambda ()
+                          %debug-print-flag))
+  (set-symbol-function! 'emacs-load fload-bridge)
+  )
