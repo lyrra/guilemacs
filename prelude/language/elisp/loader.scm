@@ -48,6 +48,7 @@
     elisp-validate-file-descriptor
     elisp-validate-load-file
     fload-bridge
+    search-elisp-load-path
     load-elisp
     load-elisp-full
   ))
@@ -514,6 +515,22 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
 
 ;; Bridge function that reuses existing Fload Scheme migrations
 
+(define (search-elisp-load-path file)
+  "Search for FILE in Elisp load-path.
+Returns the full path to the file if found, #f otherwise.
+Only returns actual files, not directories."
+  (let ((load-path ((symbol-function 'symbol-value) 'load-path)))
+    (let loop ((paths load-path))
+      (cond
+        ((eq? paths #nil) #f)  ; end of list
+        (else
+         (let* ((dir ((symbol-function 'car) paths))
+                (full-path ((symbol-function 'expand-file-name) file dir)))
+           (if (and (file-exists? full-path)
+                    (not ((symbol-function 'file-directory-p) full-path)))
+               full-path
+               (loop ((symbol-function 'cdr) paths)))))))))
+
 (define (fload-bridge file noerror nomessage nosuffix must-suffix)
   "Bridge function that handles full Fload protocol using Guile elisp compilation"
   (catch #t
@@ -525,21 +542,19 @@ Returns: (new-loads-in-progress . (lexical-binding . (found-eff . hist-file-name
           (throw 'early-return handler-result)))
 
       ;; File path processing and suffix determination (reuse existing)
-      (let* ((path-result (elisp-process-load-file-path file nosuffix must-suffix)
-                          ;(cons file '(".el" ".elc"))
-                         )
+      (let* ((path-result (elisp-process-load-file-path file nosuffix must-suffix))
              (processed-file (car path-result))
              (suffixes (cdr path-result)))
-        ;; Find file using openp equivalent, including current directory
+        ;; Find file using Elisp load-path search
         (let ((found (or
-                         ; FIX: %search-load-path is underspecified, does it search for compiled equivalent and if so, how is given suffix handled?
-                         (%search-load-path processed-file)
-                         ;processed-file
-                         ;; Also try current directory if not found in load-path
-                         (and (file-exists? processed-file) processed-file)
-                         ;; Try with .el suffix in current directory
-                         (and (file-exists? (string-append processed-file ".el"))
-                              (string-append processed-file ".el")))))
+                      ;; Search Elisp load-path (not Guile's %load-path)
+                      (search-elisp-load-path processed-file)
+                      (search-elisp-load-path (string-append processed-file ".el"))
+                      ;; Also try current directory if not found in load-path
+                      (and (file-exists? processed-file) processed-file)
+                      ;; Try with .el suffix in current directory
+                      (and (file-exists? (string-append processed-file ".el"))
+                           (string-append processed-file ".el")))))
           (unless found
             (if noerror
                 (throw 'early-return #f)
