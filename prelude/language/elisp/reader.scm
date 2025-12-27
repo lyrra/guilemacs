@@ -81,12 +81,7 @@
     elisp-skip-comment-with-recursive-reading
     elisp-skip-load-comment-from-port
     elisp-skip-load-whitespace-from-port
-    elisp-validate-and-check-handler
-    fload-bridge
-    fresh-go
     intern-gensym
-    load-elisp
-    load-elisp-full
     make-symbol
     resolve-ref
     set-debug-print-flag
@@ -1627,39 +1622,6 @@ This replicates the orchestration from Fload (lines 1202-1203)."
 
 ;; COMPOUND FUNCTIONS - Consolidate multiple operations to reduce C-Guile marshalling
 
-(define (elisp-validate-and-check-handler file noerror nomessage nosuffix must-suffix)
-  "Compound function: Validate file and check for magic file name handlers.
-This consolidates elisp-validate-load-file and elisp-check-file-handler.
-Returns: handler result if handler found, #f if should continue with normal loading."
-
-  ;; First, validate the file
-  (elisp-validate-load-file file)
-
-  ;; Then check for magic file name handlers
-  ;; File name handler checking not yet implemented in Scheme loader
-  ;; Return #f to indicate no handler found, continue with normal loading
-  #f)
-
-(define (fresh-go? go src)
-  (and go
-       (file-exists? go)
-       (>= (stat:mtime (stat go)) (stat:mtime (stat src)))))
-
-(define (load-elisp file)
-  (let* ((src (%search-load-path file)) ; find foo.el on %load-path
-         (go  (compiled-file-name src)) ; cache path for .go
-         (el  (lookup-language 'elisp)))
-    (unless src
-      (error "Not found on %load-path" file))
-    (if (fresh-go? go src)
-        (load-compiled go)
-        (begin
-          (compile-file src
-                        #:from el ; 'elisp
-                        ;#:to 'value ; warmbyte , FIX-GUILE: cant combine with output-file
-                        #:output-file go)
-          (load-compiled go)))))
-
 ;; Custom elisp reader that handles colon symbols properly
 (define (custom-elisp-read port)
   "Custom elisp reader that creates self-evaluating colon symbols"
@@ -1677,93 +1639,6 @@ Returns: handler result if handler found, #f if should continue with normal load
       ;; Pass through everything else
       (else original-result))))
 
-;; Enhanced version that handles full Fload parameters
-(define (load-elisp-full found-file noerror nomessage nosuffix must-suffix)
-  "Load elisp file with compilation, handling full Fload parameter set"
-  (catch #t
-    (lambda ()
-      (let* ((src found-file)
-             (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
-             ;; Load our custom elisp language to override system elisp
-             (el (lookup-language 'elisp)))
-        (if (fresh-go? go src)
-            (load-compiled go)
-            (begin
-              (compile-file src
-                            #:from el
-                            #:output-file go)
-              (load-compiled go)))
-        #t)) ; return t on success
-    (lambda (key . args)
-      (if noerror
-          #f ; return nil on error if noerror is true
-          (apply throw key args))))) ; re-throw error otherwise
-
-;; Bridge function that reuses existing Fload Scheme migrations
-(define (fload-bridge file noerror nomessage nosuffix must-suffix)
-  "Bridge function that handles full Fload protocol using Guile elisp compilation"
-  (catch #t
-    (lambda ()
-      (format (current-error-port) "loading ~a~%" file)
-      ;; File validation and handler check (reuse existing)
-      (let ((handler-result (elisp-validate-and-check-handler file noerror nomessage nosuffix must-suffix)))
-        (when handler-result
-          (throw 'early-return handler-result)))
-
-      ;; File path processing and suffix determination (reuse existing)
-      (let* ((path-result (elisp-process-load-file-path file nosuffix must-suffix)
-                          ;(cons file '(".el" ".elc"))
-                         )
-             (processed-file (car path-result))
-             (suffixes (cdr path-result)))
-        ;; Find file using openp equivalent, including current directory
-        (let ((found (or
-                         ; FIX: %search-load-path is underspecified, does it search for compiled equivalent and if so, how is given suffix handled?
-                         (%search-load-path processed-file)
-                         ;processed-file
-                         ;; Also try current directory if not found in load-path
-                         (and (file-exists? processed-file) processed-file)
-                         ;; Try with .el suffix in current directory
-                         (and (file-exists? (string-append processed-file ".el"))
-                              (string-append processed-file ".el")))))
-          (unless found
-            (if noerror
-                (throw 'early-return #f)
-                (error "Cannot open load file" file)))
-
-          ;; Step 4: Setup load environment (reuse existing)
-          (let ((setup-env-func (resolve-ref "language elisp runtime"
-                                            "elisp-setup-load-environment")))
-            (when setup-env-func
-              (setup-env-func found '() file #f #t))) ; simplified params
-
-          ;; Step 5: Use enhanced elisp compilation instead of C reading
-          (load-elisp-full found noerror nomessage nosuffix must-suffix))))
-
-    (lambda (key . args)
-      (cond
-        ((eq? key 'early-return) (car args))
-        (noerror #f)
-        (else (apply throw key args))))))
-
-;; Helper to safely resolve scheme functions
-(define (resolve-ref module-name symbol-name)
-  (catch #t
-    (lambda ()
-      (let ((mod (resolve-module (string->symbol module-name))))
-        (and mod (module-ref mod (string->symbol symbol-name)))))
-    (lambda (key . args) #f)))
-
-;;; End Section 10
-
-
-;;; ============================================================================
-;;; SECTION 11: DEBUG & DEVELOPMENT TOOLS
-;;; ============================================================================
-;;;
-;;; Utilities for debugging and development - not part of core runtime.
-;;; Includes: symbol generation, debug flags, eval-scheme for testing.
-
 ;; Define intern-gensym first - creates interned unique symbols
 (define %intern-gensym 0)
 (define (intern-gensym prefix)
@@ -1775,43 +1650,9 @@ Returns: handler result if handler found, #f if should continue with normal load
 (define (make-symbol name)
   (intern-gensym name))
 
-
-(define %debug-print-flag 0)
-(define (set-debug-print-flag! val)
-  (set! %debug-print-flag val))
-
-;(define (get-debug-print-flag)
-;  %debug-print-flag)
-
-;;; End Section 11
 (define (init-reader prelude-directory)
   (set-current-module (resolve-module '(language elisp runtime)))
-  (let ((str (canonicalize-path (string-concatenate (list prelude-directory "/..")))))
-    (set! %load-path (append (list (string-concatenate (list str "/lisp"))
-                                   (string-concatenate (list str "/lisp/emacs-lisp"))
-                                   (string-concatenate (list str "/lisp/progmodes"))
-                                   (string-concatenate (list str "/lisp/language"))
-                                   (string-concatenate (list str "/lisp/international"))
-                                   (string-concatenate (list str "/lisp/textmodes"))
-                                   (string-concatenate (list str "/lisp/vc"))
-                                   (string-concatenate (list str "/lisp/mail"))
-                                   (string-concatenate (list str "/lisp/url"))
-                                   (string-concatenate (list str "/lisp/gnus"))
-                                   (string-concatenate (list str "/lisp/net"))
-                                   (string-concatenate (list str "/lisp/calendar"))
-                                   (string-concatenate (list str "/lisp/cedet"))
-                                   (string-concatenate (list str "/lisp/eshell")))
-                             %load-path)))
-
-  (set! %load-extensions (cons ".el" %load-extensions))
-
 
   (set-symbol-function! 'make-symbol make-symbol)
   (set-symbol-function! 'intern-gensym intern-gensym)
-  (set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
-
-  (set-symbol-function! 'get-debug-print-flag
-                        (lambda ()
-                          %debug-print-flag))
-  (set-symbol-function! 'emacs-load fload-bridge)
   )

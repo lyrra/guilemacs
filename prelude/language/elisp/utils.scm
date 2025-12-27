@@ -35,6 +35,7 @@
     elisp-symbol-function elisp-symbol-value elisp-set
     elisp-fset elisp-setq elisp-setcar elisp-setcdr
     elisp-make-symbol elisp-gensym
+    set-debug-print-flag
     init-utils-registrations
   ))
 
@@ -564,6 +565,13 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
     ;; For other types, pass through directly
     (else obj)))
 
+(define %debug-print-flag 0)
+(define (set-debug-print-flag! val)
+  (set! %debug-print-flag val))
+
+;(define (get-debug-print-flag)
+;  %debug-print-flag)
+
 (define (init-utils-registrations)
   "Initialize symbol function registrations for utils module."
   (set-symbol-function! 'get-load-suffixes elisp-get-load-suffixes)
@@ -602,4 +610,10 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'make-string elisp-make-string)
   (set-symbol-function! 'sxhash-eq elisp-sxhash-eq)
   (set-symbol-function! 'sxhash-eql elisp-sxhash-eql)
-  (set-symbol-function! 'sxhash-equal elisp-sxhash-equal))
+  (set-symbol-function! 'sxhash-equal elisp-sxhash-equal)
+  (set-symbol-function! 'set-debug-print-flag! set-debug-print-flag!)
+
+  (set-symbol-function! 'get-debug-print-flag
+                        (lambda ()
+                          %debug-print-flag))
+  )

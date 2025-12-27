@@ -190,6 +190,7 @@
 (init-sequences-registrations)
 (init-utils-registrations)
 (init-reader %prelude-directory)
+(init-loader %prelude-directory)
 
 ;; Load pcase macro support (Phase 5 consolidation)
 ;; Replaces: pcase.scm
