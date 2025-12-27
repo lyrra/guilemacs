@@ -40,7 +40,7 @@
   (let* ((ap (lambda (fun &rest arguments)
                (%funcall (@ (guile) apply)
                          (@ (guile) apply)
-                         (%indirect-function function)
+                         (%indirect-function fun)
                          arguments)))
          (fmt (lambda (string args)
                 (ap (@ (guile) format) nil string args))))
