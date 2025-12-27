@@ -1,37 +1,32 @@
-;;; ============================================================================
-;;; PRELUDE/LOAD.SCM - Guilemacs Bootstrap & Core Infrastructure
-;;; ============================================================================
+;;; * Guilemacs Bootstrap & Core Infrastructure
+;;;   This file contains the core bootstrap code and infrastructure for Guilemacs.
+;;;   Domain-specific runtime functions have been migrated to modular runtime files.
 ;;;
-;;; This file contains the core bootstrap code and infrastructure for Guilemacs.
-;;; Domain-specific runtime functions have been migrated to modular runtime files.
-;;;
-;;; ARCHITECTURE:
+;;; ** Architecture
 ;;;   - Bootstrap & initialization code
 ;;;   - Runtime module loading infrastructure
 ;;;   - Elisp reader/parser functions (96 functions)
 ;;;   - File loading system (load, require, provide)
 ;;;   - Essential symbol management
 ;;;
-;;; MODULAR RUNTIME:
+;;; ** Modules
 ;;;   Runtime functionality is organized into focused modules:
-;;;   - elisp/runtime/types.scm     - Type predicates & conversions (41 functions)
-;;;   - elisp/runtime/numbers.scm   - Arithmetic & math operations (32 functions)
-;;;   - elisp/runtime/strings.scm   - String operations (27 functions)
-;;;   - elisp/runtime/sequences.scm - List & sequence operations (34 functions)
-;;;   - elisp/runtime/utils.scm     - Property lists & utilities (37 functions)
-;;;   - elisp/runtime/loader.scm    - Additional load support
-;;;   - elisp/runtime/reader.scm    - Additional reader support
-;;;
 ;;;   Each runtime module manages its own symbol registrations via init functions.
+;;; *** (language elisp types)
+;;;   Type predicates & conversions
+;;; *** (language/elisp numbers)
+;;;   Arithmetic & math operations
+;;; *** (language elisp strings)
+;;;   String operations
+;;; *** (language elisp sequences)
+;;;   List & sequence operations
+;;; *** (language elisp utils)
+;;;   Property lists & utilities
+;;; *** (language elisp loader)
+;;;   Additional load support
+;;; *** (language elisp reader)
+;;;   Additional reader support
 ;;;
-;;; ============================================================================
-
-;;; ============================================================================
-;;; SECTION 1: MODULE SETUP & INITIALIZATION
-;;; ============================================================================
-;;;
-;;; Sets up the runtime module, imports dependencies, and configures encoding.
-;;; This section must come first as it establishes the execution environment.
 
 ;; (force-output (current-error-port))
 ;; (format (current-error-port) "-- loading guile elisp prelude~%")
@@ -45,6 +40,9 @@
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (force-output (current-error-port))
 
+;; switch current-module to guile's original runtime module
+;; Note that any changes to this module later on it scrapped,
+;; because we do a module reload
 (set-current-module (resolve-module '(language elisp runtime)))
 
 (use-modules (rnrs bytevectors)) ; R6RS bytevector support (Guile standard)
@@ -80,36 +78,17 @@
 (set-current-module (resolve-module '(language elisp runtime)))
 (define %prelude-directory (dirname %prelude-filename))
 
-;; reload guile elisp language, to get modifications
-(set! %load-path (cons "." %load-path))
+;; Note that we replace the guile's original runtime module here,
+;; by reloading it with our local modifications
+(set! %load-path (cons "." %load-path)) ; FIX-20251227-guilemacs was prelude already on the load path (set by C)?
 (load "./elisp/runtime.scm")
 
-;; Note: The join function is defined later in the reload infrastructure section
-;; We'll add types module loading after that
-
-;(format #t "------- reloading guile elisp runtime ----------~%")
-;(format #t "scheme load-path: ~s~%" %load-path)
-;(format #t "------- reloading guile elisp lexer ----------~%")
 ;(load "./elisp/lexer.scm")
-;(format #t "------- reloading guile elisp parser ----------~%")
 ;(load "./elisp/parser.scm")
-;(format #t "------- reloading guile elisp compile-tree-il ----------~%")
 ;(load "./elisp/compile-tree-il.scm")
-;(format #t "------- reloading guile elisp boot.el ----------~%")
 ;(load "./elisp/boot.el")
-
-;(format #t "------- reloading guile elisp spec ----------~%")
 ;(load "./elisp/spec.scm")
 
-;;; ============================================================================
-;;; SECTION 2: RELOAD INFRASTRUCTURE
-;;; ============================================================================
-;;;
-;;; Functions for hot-reloading Elisp language components during development.
-;;; This section is executed during prelude initialization.
-
-;; reload-elisp.scm
-;; Reload language/elisp pieces in the right order and load boot.el as *Elisp*.
 (define (join a b)
   (if (or (string-null? a) (string-suffix? "/" a))
       (string-append a b)
