@@ -391,20 +391,23 @@ for more information."
   ;; It is better not to use backquote in this file,
   ;; because that makes a bootstrapping problem
   ;; if you need to recompile all the Lisp files using interpreted code.
-  `(custom-declare-variable
-    ',symbol
-    ,(if lexical-binding
-         ;; The STANDARD arg should be an expression that evaluates to
-         ;; the standard value.  The use of `eval' for it is spread
-         ;; over many different places and hence difficult to
-         ;; eliminate, yet we want to make sure that the `standard'
-         ;; expression is checked by the byte-compiler, and that
-         ;; lexical-binding is obeyed, so quote the expression with
-         ;; `lambda' rather than with `quote'.
-         ``(funcall #',(lambda () "" ,standard))
-       `',standard)
-    ,doc
-    ,@args))
+  (cons 'progn
+        (cons (list 'defvar symbol)
+              (cons (append (list 'custom-declare-variable
+                                  (list 'quote symbol)
+                                  (if lexical-binding
+                                      ;; The STANDARD arg should be an expression that evaluates to
+                                      ;; the standard value.  The use of `eval' for it is spread
+                                      ;; over many different places and hence difficult to
+                                      ;; eliminate, yet we want to make sure that the `standard'
+                                      ;; expression is checked by the byte-compiler, and that
+                                      ;; lexical-binding is obeyed, so quote the expression with
+                                      ;; `lambda' rather than with `quote'.
+                                      (list '\` (list 'funcall (list 'function (list 'lambda nil "" standard))))
+                                    (list 'quote standard))
+                                  doc)
+                            args)
+                    nil))))
 
 ;;; The `defface' Macro.
 
