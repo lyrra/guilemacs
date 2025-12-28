@@ -1,5 +1,7 @@
 ;;; run-all-tests.el --- Run all text property tests
 
+(load-file "test/test-framework.el")
+
 (message "")
 (message "========================================")
 (message "TEXT PROPERTIES TEST SUITE")

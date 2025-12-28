@@ -1,7 +1,5 @@
 ;;; test-no-properties.el --- Test *-no-properties variants
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "no-properties")
 
 ;; Test 1: buffer-substring-no-properties strips properties

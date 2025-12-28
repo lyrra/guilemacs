@@ -1,7 +1,5 @@
 ;;; test-buffer-modifications.el --- Test insert/delete with text properties
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "buffer-modifications")
 
 ;; Test 1: Insert plain text in middle of propertized region

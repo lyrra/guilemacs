@@ -7,7 +7,7 @@ echo "=========================================="
 echo ""
 
 # Run tests and capture output
-OUTPUT=$(./src/emacs -Q --batch -l test/text-property/run-all-tests.el 2>&1 | grep "TEST")
+OUTPUT=$(./src/emacs -Q --batch -l test/run-all-tests.el 2>&1 | grep "TEST")
 
 # Count results (exclude suite summaries)
 TOTAL_PASS=$(echo "$OUTPUT" | grep " PASS$" | grep -v "TEST-SUITE-END" | wc -l)

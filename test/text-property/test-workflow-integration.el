@@ -5,8 +5,6 @@
 ;; - set-text-properties in loops doesn't work correctly on first interval
 ;; These bugs need to be fixed before enabling those tests.
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "workflow-integration")
 
 ;; Test 1: Build complex document with propertize

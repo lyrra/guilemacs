@@ -1,7 +1,5 @@
 ;;; test-property-navigation.el --- Test next/previous property change functions
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "property-navigation")
 
 ;; Test 1: next-property-change - single interval

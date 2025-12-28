@@ -1,7 +1,5 @@
 ;;; test-font-lock-faces.el --- Test text properties with font-lock faces
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "font-lock-faces")
 
 ;; Test manual application of all font-lock face types

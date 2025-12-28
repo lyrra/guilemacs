@@ -1,7 +1,5 @@
 ;;; test-substring-operations.el --- Test substring and copy operations
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "substring-operations")
 
 ;; Test 1: buffer-substring preserves properties

@@ -1,7 +1,5 @@
 ;;; test-string-operations.el --- Test text property operations on strings
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "string-operations")
 
 ;; Test 1: remove-text-properties on string - selective removal

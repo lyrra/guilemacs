@@ -1,7 +1,5 @@
 ;;; test-edge-cases.el --- Test edge cases and corner scenarios
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "edge-cases")
 
 ;; Test 1: Empty buffer

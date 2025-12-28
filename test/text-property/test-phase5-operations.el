@@ -1,7 +1,5 @@
 ;;; test-phase5-operations.el --- Test Phase 5 property operations
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "phase5-operations")
 
 ;; Test 1: remove-text-properties - selective removal

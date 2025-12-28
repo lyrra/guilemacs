@@ -1,7 +1,5 @@
 ;;; test-interval-management.el --- Test interval splitting, merging, coalescing
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "interval-management")
 
 ;; Test 1: Adjacent intervals with same properties - do they merge?

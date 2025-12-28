@@ -1,7 +1,5 @@
 ;;; test-basic-operations.el --- Test basic text property operations
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "basic-operations")
 
 ;; Test 1: put-text-property

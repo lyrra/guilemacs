@@ -1,7 +1,5 @@
 ;;; test-narrow-widen.el --- Test text properties in narrowed buffers
 
-(load-file "test/text-property/test-framework.el")
-
 (test-begin "narrow-widen")
 
 ;; Test 1: Properties visible in narrowed region
