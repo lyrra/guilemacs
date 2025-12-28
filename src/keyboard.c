@@ -700,6 +700,14 @@ echo_truncate (ptrdiff_t nchars)
 static void
 add_command_key (Lisp_Object key)
 {
+  /* FIX-guilemacs: Defend against this_command_keys becoming corrupted
+     (e.g., to a string or invalid object).  */
+  if (!VECTORP (this_command_keys))
+    {
+      this_command_keys = make_nil_elisp_vector (40);
+      this_command_key_count = 0;
+    }
+
   if (this_command_key_count >= ASIZE (this_command_keys))
     this_command_keys = larger_vector (this_command_keys, 1, -1);
 

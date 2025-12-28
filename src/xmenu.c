@@ -1003,20 +1003,15 @@ set_frame_menubar (struct frame *f, bool deep_p)
 
       /* Save the frame's previous menu bar contents data.  */
       if (previous_menu_items_used)
-	{
-	  CHECK_TYPE (PLAIN_VECTORP (f->menu_bar_vector), Qvectorp,
-		      f->menu_bar_vector);
-	  for (ptrdiff_t i = 0; i < previous_menu_items_used; i++)
-	    previous_items[i] = AREF (f->menu_bar_vector, i);
-	}
+	memcpy (previous_items, xvector_contents (f->menu_bar_vector),
+		previous_menu_items_used * word_size);
 
       /* Fill in menu_items with the current menu bar contents.
 	 This can evaluate Lisp code.  */
       save_menu_items ();
 
       menu_items = f->menu_bar_vector;
-      CHECK_TYPE (PLAIN_VECTORP (menu_items), Qvectorp, menu_items);
-      menu_items_allocated = ASIZE (menu_items);
+      menu_items_allocated = VECTORP (menu_items) ? ASIZE (menu_items) : 0;
       subitems = ASIZE (items) / 4;
       submenu_start = alloca ((subitems + 1) * sizeof *submenu_start);
       submenu_end = alloca (subitems * sizeof *submenu_end);

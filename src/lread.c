@@ -4417,6 +4417,9 @@ init_obarray_once (void)
   lispsym[iQnil].u.s.self_ = SCM_ELISP_NIL;
   lispsym[iQt].u.s.self_ = SCM_BOOL_T;
 
+  fprintf(stderr, "DEBUG: Qnil = %p, Qt = %p\n", (void*)Qnil, (void*)Qt);
+  fprintf(stderr, "DEBUG: SCM_ELISP_NIL = %p, SCM_BOOL_T = %p\n", (void*)SCM_ELISP_NIL, (void*)SCM_BOOL_T);
+
   //Qnil_ = intern_c_string ("nil");
   //define_symbol (Qnil_, "nil");
   //SET_SYMBOL_VAL (XSYMBOL (Qnil_), Qnil);

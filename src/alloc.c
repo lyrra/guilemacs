@@ -1420,20 +1420,21 @@ make_event_array (ptrdiff_t nargs, Lisp_Object *args)
       return Fvector (nargs, args);
 
   /* Since the loop exited, we know that all the things in it are
-     characters, so we can make a string.  */
+     characters, so we can make a string.
+     FIX-guilemacs: Build string content first since Guile strings are immutable.
+     Use make_unibyte_string since meta bits create non-UTF-8 bytes. */
   {
-    Lisp_Object result;
-
-    result = Fmake_string (make_fixnum (nargs), make_fixnum (0), Qnil);
+    char *buf = alloca (nargs + 1);
     for (i = 0; i < nargs; i++)
       {
-	SSET (result, i, XFIXNUM (args[i]));
+	unsigned char c = XFIXNUM (args[i]);
 	/* Move the meta bit to the right place for a string char.  */
 	if (XFIXNUM (args[i]) & CHAR_META)
-	  SSET (result, i, SREF (result, i) | 0x80);
+	  c |= 0x80;
+	buf[i] = c;
       }
-
-    return result;
+    buf[nargs] = '\0';
+    return make_unibyte_string (buf, nargs);
   }
 }
 
@@ -1459,18 +1460,23 @@ make_event_array_from_vector (Lisp_Object vec, ptrdiff_t start, ptrdiff_t count)
 	}
     }
 
-  /* All elements are characters - make a string */
-  Lisp_Object result = Fmake_string (make_fixnum (count), make_fixnum (0), Qnil);
-  for (i = 0; i < count; i++)
-    {
-      Lisp_Object elt = AREF (vec, start + i);
-      SSET (result, i, XFIXNUM (elt));
-      /* Move the meta bit to the right place for a string char.  */
-      if (XFIXNUM (elt) & CHAR_META)
-	SSET (result, i, SREF (result, i) | 0x80);
-    }
-
-  return result;
+  /* All elements are characters - make a string.
+     FIX-guilemacs: Build string content first since Guile strings are immutable.
+     Use make_unibyte_string since meta bits create non-UTF-8 bytes. */
+  {
+    char *buf = alloca (count + 1);
+    for (i = 0; i < count; i++)
+      {
+	Lisp_Object elt = AREF (vec, start + i);
+	unsigned char c = XFIXNUM (elt);
+	/* Move the meta bit to the right place for a string char.  */
+	if (XFIXNUM (elt) & CHAR_META)
+	  c |= 0x80;
+	buf[i] = c;
+      }
+    buf[count] = '\0';
+    return make_unibyte_string (buf, count);
+  }
 }
 
 DEFUN ("make-finalizer", Fmake_finalizer, Smake_finalizer, 1, 1, 0,

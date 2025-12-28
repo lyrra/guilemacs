@@ -281,13 +281,27 @@ bidi_get_type (int ch, bidi_dir_t override)
   if (ch < 0 || ch > MAX_CHAR)
     emacs_abort ();
 
-  default_type = (bidi_type_t) XFIXNUM (CHAR_TABLE_REF (bidi_type_table, ch));
-  /* Every valid character code, even those that are unassigned by the
-     UCD, have some bidi-class property, according to
-     DerivedBidiClass.txt file.  Therefore, if we ever get UNKNOWN_BT
-     (= zero) code from CHAR_TABLE_REF, that's a bug.  */
-  if (default_type == UNKNOWN_BT)
-    emacs_abort ();
+  /* FIX-guilemacs: Handle case where bidi_type_table is not loaded.
+     Fall back to basic ASCII classification.  */
+  if (NILP (bidi_type_table))
+    {
+      if (ch >= 'A' && ch <= 'z')
+	default_type = STRONG_L;
+      else if (ch >= '0' && ch <= '9')
+	default_type = WEAK_EN;
+      else
+	default_type = NEUTRAL_WS;
+    }
+  else
+    {
+      default_type = (bidi_type_t) XFIXNUM (CHAR_TABLE_REF (bidi_type_table, ch));
+      /* Every valid character code, even those that are unassigned by the
+	 UCD, have some bidi-class property, according to
+	 DerivedBidiClass.txt file.  Therefore, if we ever get UNKNOWN_BT
+	 (= zero) code from CHAR_TABLE_REF, that's a bug.  */
+      if (default_type == UNKNOWN_BT)
+	emacs_abort ();
+    }
 
   switch (default_type)
     {
@@ -378,6 +392,10 @@ bidi_mirror_char (int c)
     return c;
   if (c < 0 || c > MAX_CHAR)
     emacs_abort ();
+
+  /* FIX-guilemacs: Handle case where bidi_mirror_table is not loaded. */
+  if (NILP (bidi_mirror_table))
+    return c;
 
   val = CHAR_TABLE_REF (bidi_mirror_table, c);
   if (FIXNUMP (val))
@@ -1859,6 +1877,9 @@ bidi_explicit_dir_char (int ch)
       eassert (ch == BIDI_EOB);
       return false;
     }
+  /* FIX-guilemacs: Handle case where bidi_type_table is not loaded. */
+  if (NILP (bidi_type_table))
+    return false;
   ch_type = (bidi_type_t) XFIXNUM (CHAR_TABLE_REF (bidi_type_table, ch));
   return (ch_type == LRE || ch_type == LRO
 	  || ch_type == RLE || ch_type == RLO

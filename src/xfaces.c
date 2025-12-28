@@ -4483,13 +4483,13 @@ face_attr_equal_p (Lisp_Object v1, Lisp_Object v2)
    is called quite often.  */
 
 static bool
-lface_equal_p (Lisp_Object v1, Lisp_Object v2)
+lface_equal_p (Lisp_Object *v1, Lisp_Object *v2)
 {
   int i;
   bool equal_p = true;
 
   for (i = 1; i < LFACE_VECTOR_SIZE && equal_p; ++i)
-    equal_p = face_attr_equal_p (AREF (v1, i), AREF (v2, i));
+    equal_p = face_attr_equal_p (v1[i], v2[i]);
 
   return equal_p;
 }
@@ -4515,9 +4515,8 @@ If FRAME is omitted or nil, use the selected frame.  */)
 
   lface1 = lface_from_face_name (f, face1, true);
   lface2 = lface_from_face_name (f, face2, true);
-  CHECK_TYPE (PLAIN_VECTORP (lface1), Qvectorp, lface1);
-  CHECK_TYPE (PLAIN_VECTORP (lface2), Qvectorp, lface2);
-  equal_p = lface_equal_p (lface1, lface2);
+  equal_p = lface_equal_p (XVECTOR (lface1)->contents,
+			   XVECTOR (lface2)->contents);
   return equal_p ? Qt : Qnil;
 }
 
