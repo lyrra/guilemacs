@@ -4,6 +4,15 @@
 
 (message "")
 (message "========================================")
+(message "ELISP EVAL CLOSURE TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/elisp/test-eval-closure.el")
+(message "")
+
+(message "")
+(message "========================================")
 (message "TEXT PROPERTIES TEST SUITE")
 (message "========================================")
 (message "")
