@@ -79,13 +79,53 @@
     (:filter-return . (funcall function (apply main args))))
   "List of descriptions of how to add a function.")
 
+;; Guile fix: Create proper lexical closures instead of using eval
+;; which loses lexical context in Guile Emacs
 (setq advice--how-alist
-      (mapcar #'(lambda (tem)
-                  (cons (car tem)
-                        (eval `(lambda (function main)
-                                 (lambda (&rest args)
-                                   ,(cdr tem))))))
-              advice--how-alist))
+      (list
+       (cons :around
+             (lambda (function main)
+               (lambda (&rest args)
+                 (apply function main args))))
+       (cons :before
+             (lambda (function main)
+               (lambda (&rest args)
+                 (progn
+                   (apply function args)
+                   (apply main args)))))
+       (cons :after
+             (lambda (function main)
+               (lambda (&rest args)
+                 (prog1 (apply main args)
+                   (apply function args)))))
+       (cons :override
+             (lambda (function main)
+               (lambda (&rest args)
+                 (apply function args))))
+       (cons :after-until
+             (lambda (function main)
+               (lambda (&rest args)
+                 (or (apply main args) (apply function args)))))
+       (cons :after-while
+             (lambda (function main)
+               (lambda (&rest args)
+                 (and (apply main args) (apply function args)))))
+       (cons :before-until
+             (lambda (function main)
+               (lambda (&rest args)
+                 (or (apply function args) (apply main args)))))
+       (cons :before-while
+             (lambda (function main)
+               (lambda (&rest args)
+                 (and (apply function args) (apply main args)))))
+       (cons :filter-args
+             (lambda (function main)
+               (lambda (&rest args)
+                 (apply main (apply function args)))))
+       (cons :filter-return
+             (lambda (function main)
+               (lambda (&rest args)
+                 (funcall function (apply main args)))))))
 
 (defun advice--p (object)
   (when (funcall (@ (guile) procedure?) object)
