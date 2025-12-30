@@ -4120,6 +4120,7 @@ handle_stop (struct it *it)
   struct props *p;
 
   it->dpvec = NULL;
+  it->dpvec_vec = Qnil;
   it->current.dpvec_index = -1;
   handle_overlay_change_p = !it->ignore_overlay_strings_at_pos_p;
   it->ellipsis_p = false;
@@ -5552,6 +5553,18 @@ display_table_ensure_invis_vector (struct Lisp_Char_Table *dp)
   Lisp_Object vec = DISP_INVIS_VECTOR (dp);
   if (GVECTORP (vec) || VECTORP (vec))
     CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
+  /* Convert Guile vector to real Emacs vector if needed.
+     make_vector creates Guile vectors in Guile-Emacs, so we need
+     to use allocate_nil_vector which creates proper Emacs vectors
+     with header.size that XVECTOR can access. */
+  if (GVECTORP (vec) && !VECTORP (vec))
+    {
+      ptrdiff_t len = gvector_length (vec);
+      struct Lisp_Vector *v = allocate_nil_vector (len);
+      for (ptrdiff_t i = 0; i < len; i++)
+        v->contents[i] = gvector_ref (vec, i);
+      vec = make_lisp_ptr (v, Lisp_Vectorlike);
+    }
   return vec;
 }
 
@@ -5561,6 +5574,18 @@ display_table_ensure_char_vector (struct Lisp_Char_Table *dp, int c,
 {
   if (GVECTORP (vec) || VECTORP (vec))
     CHECK_TYPE (PLAIN_VECTORP (vec), Qvectorp, vec);
+  /* Convert Guile vector to real Emacs vector if needed.
+     make_vector creates Guile vectors in Guile-Emacs, so we need
+     to use allocate_nil_vector which creates proper Emacs vectors
+     with header.size that XVECTOR can access. */
+  if (GVECTORP (vec) && !VECTORP (vec))
+    {
+      ptrdiff_t len = gvector_length (vec);
+      struct Lisp_Vector *v = allocate_nil_vector (len);
+      for (ptrdiff_t i = 0; i < len; i++)
+        v->contents[i] = gvector_ref (vec, i);
+      vec = make_lisp_ptr (v, Lisp_Vectorlike);
+    }
   return vec;
 }
 
@@ -5584,6 +5609,7 @@ setup_for_ellipsis (struct it *it, int len)
 
 	  it->dpvec = v->contents;
 	  it->dpend = v->contents + v->header.size;
+	  it->dpvec_vec = ensured;  /* Prevent GC of converted vector */
 	  goto finish;
 	}
     }
@@ -5591,6 +5617,7 @@ setup_for_ellipsis (struct it *it, int len)
   /* Default `...'.  */
   it->dpvec = default_invis_vector;
   it->dpend = default_invis_vector + 3;
+  it->dpvec_vec = Qnil;  /* Static array, no GC protection needed */
 
  finish:
 
@@ -7988,6 +8015,7 @@ reseat_1 (struct it *it, struct text_pos pos, bool set_stop_p)
   it->current.pos = it->position = pos;
   it->end_charpos = ZV;
   it->dpvec = NULL;
+  it->dpvec_vec = Qnil;
   it->current.dpvec_index = -1;
   it->current.overlay_string_index = -1;
   IT_STRING_CHARPOS (*it) = -1;
@@ -8401,17 +8429,27 @@ get_next_display_element (struct it *it)
 	      && (dv = DISP_CHAR_VECTOR (it->dp, c),
 		  PLAIN_VECTORP (dv)))
 	    {
+	      /* Ensure we have an Emacs vector (converts Guile vectors) */
 	      dv = display_table_ensure_char_vector (it->dp, c, dv);
+	      if (NILP (dv) || !VECTORP (dv))
+		{
+		  set_iterator_to_next (it, false);
+		  goto get_next;
+		}
+
 	      struct Lisp_Vector *v = XVECTOR (dv);
+	      ptrdiff_t vsize = v->header.size;
+	      Lisp_Object *vcontents = v->contents;
 
 	      /* Return the first character from the display table
 		 entry, if not empty.  If empty, don't display the
 		 current character.  */
-	      if (v->header.size)
+	      if (vsize)
 		{
 		  it->dpvec_char_len = it->len;
-		  it->dpvec = v->contents;
-		  it->dpend = v->contents + v->header.size;
+		  it->dpvec = vcontents;
+		  it->dpend = vcontents + vsize;
+		  it->dpvec_vec = dv;  /* Prevent GC of converted vector */
 		  it->current.dpvec_index = 0;
 		  it->dpvec_face_id = -1;
 		  it->saved_face_id = it->face_id;
@@ -8582,6 +8620,7 @@ get_next_display_element (struct it *it)
 	      it->dpvec_char_len = it->len;
 	      it->dpvec = it->ctl_chars;
 	      it->dpend = it->dpvec + ctl_len;
+	      it->dpvec_vec = Qnil;  /* Static array, no GC protection needed */
 	      it->current.dpvec_index = 0;
 	      it->dpvec_face_id = face_id;
 	      it->saved_face_id = it->face_id;
@@ -8950,6 +8989,7 @@ set_iterator_to_next (struct it *it, bool reseat_p)
 	    }
 
 	  it->dpvec = NULL;
+	  it->dpvec_vec = Qnil;
 	  it->current.dpvec_index = -1;
 
 	  /* Skip over characters which were displayed via IT->dpvec.  */
@@ -27859,7 +27899,9 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 	/* Handle the non-literal case.  */
 
 	while ((precision <= 0 || n < precision)
-               && (scm_c_string_length (elt) > 0)
+	       /* FIX-guilemacs: Use SCHARS instead of scm_c_string_length
+		  to properly handle emacs-string wrappers.  */
+               && (SCHARS (elt) > 0)
 	       && SREF (elt, offset) != 0
 	       && (mode_line_target != MODE_LINE_DISPLAY
 		   || it->current_x < it->last_visible_x))
@@ -27868,8 +27910,8 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 
 	    /* Advance to end of string or next format specifier.  */
             {
-              int len = scm_c_string_length (elt);
-              for (int i = offset; i < len; i++)
+              ptrdiff_t len = SCHARS (elt);
+              for (ptrdiff_t i = offset; i < len; i++)
                 {
                   int c = SREF (elt, offset++);
                   if (c == '%')
@@ -27933,8 +27975,8 @@ display_mode_element (struct it *it, int depth, int field_width, int precision,
 		   don't pad.  */
 		field = 0;
                 {
-                  int len = scm_c_string_length (elt);
-                  for (int i = offset; i < len; i++)
+                  ptrdiff_t len = SCHARS (elt);
+                  for (ptrdiff_t i = offset; i < len; i++)
                     {
                       int c = SREF (elt, offset++);
 		      if (!(c >= '0' && c <= '9'))

@@ -2493,6 +2493,12 @@ struct it
   /* Face id to use for all characters in display vector.  -1 if unused. */
   int dpvec_face_id;
 
+  /* Reference to the vector object containing dpvec contents.
+     This is needed to prevent GC from collecting converted Guile vectors
+     while we're iterating over their contents via dpvec/dpend pointers.
+     Qnil means dpvec points to a static array (like ctl_chars or default_invis_vector).  */
+  Lisp_Object dpvec_vec;
+
   /* Face id of the iterator saved in case a glyph from dpvec contains
      a face.  The face is restored when all glyphs from dpvec have
      been delivered.  */

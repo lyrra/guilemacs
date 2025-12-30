@@ -225,8 +225,13 @@ CHECK_CHARACTER_CDR (Lisp_Object x)
 INLINE bool
 CHAR_PRINTABLE_P (int c)
 {
-  return ((32 <= c && c < 127)
-	  || ! NILP (CHAR_TABLE_REF (Vprintable_chars, c)));
+  if (32 <= c && c < 127)
+    return true;
+  /* If printable_chars table not yet initialized, assume printable
+     for non-control Unicode characters.  */
+  if (NILP (Vprintable_chars))
+    return c >= 32 && c < 0x10FFFF;
+  return ! NILP (CHAR_TABLE_REF (Vprintable_chars, c));
 }
 
 /* Return byte length of multibyte form for character C.  */

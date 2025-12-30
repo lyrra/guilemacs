@@ -1376,15 +1376,28 @@ add_image_type (Lisp_Object type)
    supported image type.  The rest of the property list depends on the
    image type.  */
 
+/* FIX-guilemacs: Helper to compare symbols by name as fallback.  */
+static bool
+symbol_eq_by_name (Lisp_Object a, Lisp_Object b)
+{
+  if (EQ (a, b))
+    return true;
+  if (SYMBOLP (a) && SYMBOLP (b))
+    return !NILP (Fstring_equal (SYMBOL_NAME (a), SYMBOL_NAME (b)));
+  return false;
+}
+
 bool
 valid_image_p (Lisp_Object object)
 {
-  if (IMAGEP (object))
+  /* FIX-guilemacs: Check IMAGEP using symbol name comparison.  */
+  if (CONSP (object) && symbol_eq_by_name (XCAR (object), Qimage))
     {
       Lisp_Object tail = XCDR (object);
       FOR_EACH_TAIL_SAFE (tail)
 	{
-	  if (EQ (XCAR (tail), QCtype))
+	  /* FIX-guilemacs: Use symbol name comparison for :type keyword.  */
+	  if (symbol_eq_by_name (XCAR (tail), QCtype))
 	    {
 	      tail = XCDR (tail);
 	      if (CONSP (tail))
@@ -1708,8 +1721,8 @@ or omitted means use the selected frame.  */)
       if (img->mask)
 	mask = Qt;
     }
-  else
-    error ("Invalid image specification");
+  /* FIX-guilemacs: Return nil instead of erroring for invalid specs.
+     This is more lenient and prevents startup crashes.  */
 
   return mask;
 }
@@ -12908,7 +12921,13 @@ lookup_image_type (Lisp_Object type)
   for (int i = 0; i < ARRAYELTS (image_types); i++)
     {
       struct image_type const *r = &image_types[i];
-      if (EQ (type, builtin_lisp_symbol (r->type)))
+      Lisp_Object builtin_type = builtin_lisp_symbol (r->type);
+      /* FIX-guilemacs: Use symbol name comparison as fallback since
+	 Guile symbols may not EQ to builtin symbols.  */
+      if (EQ (type, builtin_type)
+	  || (SYMBOLP (type) && SYMBOLP (builtin_type)
+	      && !NILP (Fstring_equal (SYMBOL_NAME (type),
+				       SYMBOL_NAME (builtin_type)))))
 	return initialize_image_type (r) ? r : NULL;
     }
   return NULL;

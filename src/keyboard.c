@@ -6177,6 +6177,10 @@ make_lispy_event (struct input_event *event)
 
 	/* Add in the other modifier bits.  The shift key was taken care
 	   of by the X code.  */
+	/* DEBUG: print modifiers */
+	if (event->modifiers & super_modifier)
+	  fprintf (stderr, "DEBUG: super_modifier set! modifiers=0x%x code=%d\n",
+	           event->modifiers, (int)event->code);
 	c |= (event->modifiers
 	      & (meta_modifier | alt_modifier
 		 | hyper_modifier | super_modifier | ctrl_modifier));

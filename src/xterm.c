@@ -14183,6 +14183,12 @@ x_find_modifier_meanings (struct x_display_info *dpyinfo)
       if (dpyinfo->hyper_mod_mask & dpyinfo->super_mod_mask)
 	dpyinfo->hyper_mod_mask &= ~dpyinfo->super_mod_mask;
 
+      /* Ensure modifier masks don't overlap with basic X modifiers.  */
+      dpyinfo->meta_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+      dpyinfo->alt_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+      dpyinfo->super_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+      dpyinfo->hyper_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+
       return;
     }
 #endif
@@ -14291,6 +14297,12 @@ x_find_modifier_meanings (struct x_display_info *dpyinfo)
   if (dpyinfo->hyper_mod_mask & dpyinfo->super_mod_mask)
     dpyinfo->hyper_mod_mask &= ~dpyinfo->super_mod_mask;
 
+  /* Ensure modifier masks don't overlap with basic X modifiers.  */
+  dpyinfo->meta_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+  dpyinfo->alt_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+  dpyinfo->super_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+  dpyinfo->hyper_mod_mask &= ~(ShiftMask | LockMask | ControlMask);
+
   XFree (syms);
 
   if (dpyinfo->modmap)
@@ -14312,6 +14324,10 @@ x_x_to_emacs_modifiers (struct x_display_info *dpyinfo, int state)
   Lisp_Object tem;
 
   tem = Fget (Vx_ctrl_keysym, Qmodifier_value);
+  /* DEBUG */
+  if (FIXNUMP (tem) && XFIXNUM (tem) != ctrl_modifier)
+    fprintf (stderr, "DEBUG: Vx_ctrl_keysym modifier_value = 0x%lx (expected 0x%x)\n",
+             (long)XFIXNUM (tem), ctrl_modifier);
   if (FIXNUMP (tem)) mod_ctrl = XFIXNUM (tem) & INT_MAX;
   tem = Fget (Vx_alt_keysym, Qmodifier_value);
   if (FIXNUMP (tem)) mod_alt = XFIXNUM (tem) & INT_MAX;
@@ -14322,6 +14338,13 @@ x_x_to_emacs_modifiers (struct x_display_info *dpyinfo, int state)
   tem = Fget (Vx_super_keysym, Qmodifier_value);
   if (FIXNUMP (tem)) mod_super = XFIXNUM (tem) & INT_MAX;
 
+  /* DEBUG: print state and masks */
+  static int debug_count = 0;
+  if (debug_count < 5 && state != 0) {
+    fprintf (stderr, "DEBUG x_x_to_emacs: state=0x%x ControlMask=0x%x super_mod_mask=0x%x mod_ctrl=0x%x\n",
+             state, ControlMask, dpyinfo->super_mod_mask, mod_ctrl);
+    debug_count++;
+  }
   return (  ((state & (ShiftMask | dpyinfo->shift_lock_mask)) ? shift_modifier : 0)
             | ((state & ControlMask)			? mod_ctrl	: 0)
             | ((state & dpyinfo->meta_mod_mask)		? mod_meta	: 0)

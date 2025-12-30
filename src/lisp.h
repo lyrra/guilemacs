@@ -1147,12 +1147,16 @@ INLINE Lisp_Object
 INLINE void
 XSETCAR (Lisp_Object c, Lisp_Object n)
 {
-  scm_set_car_x (c, n);
+  /* Use SCM_SETCAR to bypass Guile's mutability check - Elisp expects
+     all cons cells to be mutable.  */
+  SCM_SETCAR (c, n);
 }
 INLINE void
 XSETCDR (Lisp_Object c, Lisp_Object n)
 {
-  scm_set_cdr_x (c, n);
+  /* Use SCM_SETCDR to bypass Guile's mutability check - Elisp expects
+     all cons cells to be mutable.  */
+  SCM_SETCDR (c, n);
 }
 
 /* Take the car or cdr of something whose type is not known.  */
@@ -1243,15 +1247,11 @@ XSTRING (Lisp_Object a)
 INLINE bool
 STRING_MULTIBYTE (Lisp_Object str)
 {
-  // abort because in guilemacs doing STRING_MULTIBYTE might either be not needed or the wrong thing to do, ie the code calling STRING_MULTIBYTE might need be reworked.
-  fprintf(stderr, "-- STRING_MULTIBYTE detected, please check caller using gdb\n");
-  emacs_abort ();
   /* Phase 2: Unwrap emacs-string wrappers before checking multibyte */
   extern Lisp_Object unwrap_emacs_string (Lisp_Object);
   Lisp_Object unwrapped = unwrap_emacs_string (str);
   /* In Guile, strings are UTF-8. A string is multibyte if
      its byte length differs from its character length. */
-  // note: maybe scm_string_bytes_per_char is enough?
   return scm_c_string_utf8_length (unwrapped) != scm_c_string_length (unwrapped);
 }
 

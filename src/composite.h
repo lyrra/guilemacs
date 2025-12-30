@@ -227,6 +227,9 @@ composition_method (Lisp_Object prop)
 INLINE bool
 composition_valid_p (ptrdiff_t start, ptrdiff_t end, Lisp_Object prop)
 {
+  /* Quick check: nil is not a valid composition property.  */
+  if (NILP (prop))
+    return false;
   return (CONSP (prop)
 	  && (composition_registered_p (prop)
 	      ? (COMPOSITION_ID (prop) >= 0

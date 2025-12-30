@@ -792,7 +792,9 @@ the same empty object instead of its copy.  */)
       /* Guile-Emacs: Handle empty string - scm_string_append may fail on empty strings */
       if (SCHARS(arg) == 0)
         return arg; /* Return the same empty string object */
-      return scm_string_append (list1 (arg));
+      /* FIX-guilemacs: Unwrap emacs-string before passing to Guile.  */
+      Lisp_Object unwrapped = unwrap_emacs_string (arg);
+      return scm_string_append (list1 (unwrapped));
       /*
       INTERVAL ivs = string_intervals (arg);
       if (ivs)

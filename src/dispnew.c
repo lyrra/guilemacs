@@ -7329,6 +7329,10 @@ syms_of_display (void)
 
   /* This is the "purpose" slot of a display table.  */
   DEFSYM (Qdisplay_table, "display-table");
+  /* Set the char-table-extra-slots property for display tables.
+     This is normally done in disp-table.el but that file is only loaded
+     on Windows/DOS.  Games like tetris need this to display correctly.  */
+  Fput (Qdisplay_table, Qchar_table_extra_slots, make_fixnum (12));
   DEFSYM (Qframe__z_order_lessp, "frame--z-order-lessp");
   DEFSYM (Qtty_non_selected_cursor, "tty-non-selected-cursor");
 

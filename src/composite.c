@@ -1058,7 +1058,7 @@ composition_compute_stop_pos (struct composition_it *cmp_it, ptrdiff_t charpos,
 {
   ptrdiff_t start, end;
   int c;
-  Lisp_Object prop, val;
+  Lisp_Object prop = Qnil, val = Qnil;
   /* This is from forward_to_next_line_start in xdisp.c.  */
   const int MAX_NEWLINE_DISTANCE = 500;
 

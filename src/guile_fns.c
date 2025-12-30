@@ -699,7 +699,12 @@ guile_is_special_buffer_name (Lisp_Object buffer_name)
   if (!STRINGP (buffer_name))
     return false;
 
-  SCM result = scm_call_1 (scm_is_special_buffer_name,
+  /* Get the actual function from the variable */
+  SCM function = scm_variable_ref (scm_is_special_buffer_name);
+  if (!scm_is_true (function) || !scm_is_true (scm_procedure_p (function)))
+    return false;
+
+  SCM result = scm_call_1 (function,
                            scm_from_utf8_string (SSDATA (buffer_name)));
 
   return scm_is_true (result);

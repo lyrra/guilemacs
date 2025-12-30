@@ -23,9 +23,27 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "lisp.h"
 
+/* Symbol identity workaround for Guile: compare symbol names
+   instead of pointer equality since Qdisplay_table from DEFSYM
+   may not EQ to 'display-table created in Elisp via Guile.  */
+INLINE bool
+disp_table_purpose_p (Lisp_Object purpose)
+{
+  if (EQ (purpose, Qdisplay_table))
+    return true;
+  if (SYMBOLP (purpose))
+    {
+      Lisp_Object name = SYMBOL_NAME (purpose);
+      if (STRINGP (name) && SCHARS (name) == 13
+          && memcmp (SDATA (name), "display-table", 13) == 0)
+        return true;
+    }
+  return false;
+}
+
 #define DISP_TABLE_P(obj)						    \
   (CHAR_TABLE_P (obj)							    \
-   && EQ (XCHAR_TABLE (obj)->purpose, Qdisplay_table)			    \
+   && disp_table_purpose_p (XCHAR_TABLE (obj)->purpose)			    \
    && CHAR_TABLE_EXTRA_SLOTS (XCHAR_TABLE (obj)) == DISP_TABLE_EXTRA_SLOTS)
 
 #define DISP_TABLE_EXTRA_SLOTS 12

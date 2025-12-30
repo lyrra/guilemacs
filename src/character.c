@@ -1024,6 +1024,8 @@ graphic_base_p (int c)
 bool
 blankp (int c)
 {
+  if (NILP (Vunicode_category_table))
+    return c == ' ' || c == '\t';
   Lisp_Object category = CHAR_TABLE_REF (Vunicode_category_table, c);
   if (! FIXNUMP (category))
     return false;

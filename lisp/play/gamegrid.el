@@ -351,7 +351,23 @@ format."
     (cond ((characterp data)
 	   (vector data))
 	  ((eq data 'colorize)
-	   (gamegrid-colorize-glyph color))
+           ;; Try to create image glyph, fall back to text if it fails
+           (or (gamegrid-colorize-glyph color)
+               ;; Fallback: find any character entry in the spec list
+               ;; We can't use gamegrid-match-spec-list because we're in glyph mode
+               ;; but glyph mode failed, so we need any visible character
+               (let ((fallback-char nil)
+                     (space-char nil))
+                 (dolist (spec (cdr data-spec-list))
+                   (let ((val (cadr spec)))
+                     (when (characterp val)
+                       (if (= val ?\040)
+                           (setq space-char val)  ; remember space as last resort
+                         (unless fallback-char
+                           (setq fallback-char val))))))
+                 ;; Use non-space if found, otherwise space
+                 (let ((ch (or fallback-char space-char)))
+                   (and ch (vector ch))))))
 	  ((listp data)
 	   (find-image data)) ;untested!
           ;; Remove when `gamegrid-make-image-from-vector' is removed:

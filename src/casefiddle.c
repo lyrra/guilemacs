@@ -257,6 +257,13 @@ cased, e.g. ﬁ, are returned unchanged.
 See also `capitalize', `downcase' and `upcase-initials'.  */)
   (Lisp_Object obj)
 {
+  if (FIXNUMP (obj))
+    {
+      int c = XFIXNUM (obj);
+      c = upcase (c);
+      return make_fixnum (c);
+    }
+  CHECK_STRING (obj);
   return scm_string_locale_upcase (obj, SCM_UNDEFINED);
 }
 
@@ -274,6 +281,13 @@ locale, the string must be converted into multibyte first.
 The argument object is not altered--the value is a copy.  */)
   (Lisp_Object obj)
 {
+  if (FIXNUMP (obj))
+    {
+      int c = XFIXNUM (obj);
+      c = downcase (c);
+      return make_fixnum (c);
+    }
+  CHECK_STRING (obj);
   return scm_string_locale_downcase (obj, SCM_UNDEFINED);
 }
 
@@ -290,6 +304,13 @@ is a character, characters which map to multiple code points when
 cased, e.g. ﬁ, are returned unchanged.  */)
   (Lisp_Object obj)
 {
+  if (FIXNUMP (obj))
+    {
+      int c = XFIXNUM (obj);
+      c = upcase (c);  /* For single char, capitalize = upcase */
+      return make_fixnum (c);
+    }
+  CHECK_STRING (obj);
   return scm_string_locale_titlecase (obj, SCM_UNDEFINED);
 }
 
