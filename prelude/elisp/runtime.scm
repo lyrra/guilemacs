@@ -194,10 +194,10 @@
   value)
 
 (define (symbol-function symbol)
-  (cond
-   ((module-variable function-slot-module (schemify symbol))
-    => variable-ref)
-   (else #nil)))
+  (let ((var (module-variable function-slot-module (schemify symbol))))
+    (if (and var (variable-bound? var))
+        (variable-ref var)
+        #nil)))
 
 (define (set-symbol-function! symbol value)
   (set! symbol (schemify symbol))
@@ -264,7 +264,15 @@
   symbol)
 
 (define (special? sym)
-  (eqv? (vector-ref (symbol-desc sym) 3) 1))
+  ;; Check both the Guile-side tracking (symbol-desc vector index 3)
+  ;; AND the C-level SYMBOL_DECLARED_SPECIAL flag (via special-variable-p).
+  ;; C-level DEFVAR_LISP variables like throw-on-input set the C flag
+  ;; but not the Guile-side flag, so we need to check both.
+  (or (eqv? (vector-ref (symbol-desc sym) 3) 1)
+      ;; Check C-level special-variable-p if available
+      (let ((svp-fn (symbol-function 'special-variable-p)))
+        (and (not (eq? svp-fn #nil))
+             (not (eq? #nil (svp-fn sym)))))))
 
 (define (proclaim-special! sym)
   (vector-set! (symbol-desc sym) 3 1)
