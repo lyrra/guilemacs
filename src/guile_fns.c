@@ -105,330 +105,130 @@ static SCM scm_parse_integer_string = SCM_BOOL_F;
 static SCM scm_read_integer_guile = SCM_BOOL_F;
 static SCM scm_parse_emacs_number = SCM_BOOL_F;
 
+/* Helper function to safely lookup a procedure from a module.
+   Returns SCM_BOOL_F if not found or unbound, the procedure otherwise. */
+static SCM
+safe_public_ref (const char *module, const char *name)
+{
+  SCM mod = scm_c_resolve_module (module);
+  SCM var = scm_module_variable (mod, scm_from_utf8_symbol (name));
+  if (scm_is_false (var))
+    return SCM_BOOL_F;
+  /* Check if the variable is bound before trying to get its value */
+  if (scm_is_false (scm_variable_bound_p (var)))
+    return SCM_BOOL_F;
+  SCM val = scm_variable_ref (var);
+  /* Return the value only if it's a procedure */
+  if (scm_is_true (scm_procedure_p (val)))
+    return val;
+  return SCM_BOOL_F;
+}
+
 /* Initialize the Guile lookup functions module */
 void
 init_guile_fns (void)
 {
-  /* Get references to the Scheme functions loaded by prelude/load.scm */
-  /* Try to look them up from language elisp emacs module first, fallback to global */
-
-  SCM elisp_emacs_module = scm_c_resolve_module ("language elisp emacs");
-
-  scm_lookup_color_in_map = scm_c_module_lookup (elisp_emacs_module, "lookup-color-in-map");
-  if (scm_is_false (scm_lookup_color_in_map))
-    scm_lookup_color_in_map = scm_c_lookup ("lookup-color-in-map");
-
-  scm_lookup_font_style = scm_c_module_lookup (elisp_emacs_module, "lookup-font-style");
-  if (scm_is_false (scm_lookup_font_style))
-    scm_lookup_font_style = scm_c_lookup ("lookup-font-style");
-
-  scm_lookup_in_alist_ci = scm_c_module_lookup (elisp_emacs_module, "lookup-in-alist-ci");
-  if (scm_is_false (scm_lookup_in_alist_ci))
-    scm_lookup_in_alist_ci = scm_c_lookup ("lookup-in-alist-ci");
-
-  scm_lookup_in_alist = scm_c_module_lookup (elisp_emacs_module, "lookup-in-alist");
-  if (scm_is_false (scm_lookup_in_alist))
-    scm_lookup_in_alist = scm_c_lookup ("lookup-in-alist");
-
-  scm_lookup_symbol_in_list = scm_c_module_lookup (elisp_emacs_module, "lookup-symbol-in-list");
-  if (scm_is_false (scm_lookup_symbol_in_list))
-    scm_lookup_symbol_in_list = scm_c_lookup ("lookup-symbol-in-list");
-
-  scm_parse_face_bool_attribute = scm_c_module_lookup (elisp_emacs_module, "parse-face-bool-attribute");
-  if (scm_is_false (scm_parse_face_bool_attribute))
-    scm_parse_face_bool_attribute = scm_c_lookup ("parse-face-bool-attribute");
-
-  scm_process_yesno_response = scm_c_module_lookup (elisp_emacs_module, "process-yesno-response");
-  if (scm_is_false (scm_process_yesno_response))
-    scm_process_yesno_response = scm_c_lookup ("process-yesno-response");
-
-  scm_filter_dbus_message = scm_c_module_lookup (elisp_emacs_module, "filter-dbus-message");
-  if (scm_is_false (scm_filter_dbus_message))
-    scm_filter_dbus_message = scm_c_lookup ("filter-dbus-message");
-
-  scm_is_special_buffer_name = scm_c_module_lookup (elisp_emacs_module, "is-special-buffer-name?");
-  if (scm_is_false (scm_is_special_buffer_name))
-    scm_is_special_buffer_name = scm_c_lookup ("is-special-buffer-name?");
-
-  scm_parse_color_spec = scm_c_module_lookup (elisp_emacs_module, "parse-color-spec");
-  if (scm_is_false (scm_parse_color_spec))
-    scm_parse_color_spec = scm_c_lookup ("parse-color-spec");
-
-  scm_validate_color_name = scm_c_module_lookup (elisp_emacs_module, "validate-color-name");
-  if (scm_is_false (scm_validate_color_name))
-    scm_validate_color_name = scm_c_lookup ("validate-color-name");
-
-  scm_string_contains_whitespace = scm_c_module_lookup (elisp_emacs_module, "string-contains-whitespace?");
-  if (scm_is_false (scm_string_contains_whitespace))
-    scm_string_contains_whitespace = scm_c_lookup ("string-contains-whitespace?");
-
-  scm_is_frame_name_fnn_format = scm_c_module_lookup (elisp_emacs_module, "is-frame-name-fnn-format?");
-  if (scm_is_false (scm_is_frame_name_fnn_format))
-    scm_is_frame_name_fnn_format = scm_c_lookup ("is-frame-name-fnn-format?");
-
-  scm_validate_xlfd_font_name = scm_c_module_lookup (elisp_emacs_module, "validate-xlfd-font-name");
-  if (scm_is_false (scm_validate_xlfd_font_name))
-    scm_validate_xlfd_font_name = scm_c_lookup ("validate-xlfd-font-name");
-
-  scm_is_absolute_path = scm_c_module_lookup (elisp_emacs_module, "is-absolute-path?");
-  if (scm_is_false (scm_is_absolute_path))
-    scm_is_absolute_path = scm_c_lookup ("is-absolute-path?");
-
-  scm_has_directory_traversal = scm_c_module_lookup (elisp_emacs_module, "has-directory-traversal?");
-  if (scm_is_false (scm_has_directory_traversal))
-    scm_has_directory_traversal = scm_c_lookup ("has-directory-traversal?");
-
-  scm_string_spaces_to_dashes = scm_c_module_lookup (elisp_emacs_module, "string-spaces-to-dashes");
-  if (scm_is_false (scm_string_spaces_to_dashes))
-    scm_string_spaces_to_dashes = scm_c_lookup ("string-spaces-to-dashes");
-
-  scm_string_trim_leading_whitespace = scm_c_module_lookup (elisp_emacs_module, "string-trim-leading-whitespace");
-  if (scm_is_false (scm_string_trim_leading_whitespace))
-    scm_string_trim_leading_whitespace = scm_c_lookup ("string-trim-leading-whitespace");
-
-  scm_parse_number_string = scm_c_module_lookup (elisp_emacs_module, "parse-number-string");
-  if (scm_is_false (scm_parse_number_string))
-    scm_parse_number_string = scm_c_lookup ("parse-number-string");
-
-  scm_validate_string_for_copying = scm_c_module_lookup (elisp_emacs_module, "validate-string-for-copying");
-  if (scm_is_false (scm_validate_string_for_copying))
-    scm_validate_string_for_copying = scm_c_lookup ("validate-string-for-copying");
-
-  scm_prepare_string_for_symbol = scm_c_module_lookup (elisp_emacs_module, "prepare-string-for-symbol");
-  if (scm_is_false (scm_prepare_string_for_symbol))
-    scm_prepare_string_for_symbol = scm_c_lookup ("prepare-string-for-symbol");
-
-  /* Initialize new scheme functions */
-  scm_has_file_extension = scm_c_module_lookup (elisp_emacs_module, "has-file-extension?");
-  if (scm_is_false (scm_has_file_extension))
-    scm_has_file_extension = scm_c_lookup ("has-file-extension?");
-
-  scm_extract_filename_from_path = scm_c_module_lookup (elisp_emacs_module, "extract-filename-from-path");
-  if (scm_is_false (scm_extract_filename_from_path))
-    scm_extract_filename_from_path = scm_c_lookup ("extract-filename-from-path");
-
-  scm_is_modifier_symbol = scm_c_module_lookup (elisp_emacs_module, "is-modifier-symbol?");
-  if (scm_is_false (scm_is_modifier_symbol))
-    scm_is_modifier_symbol = scm_c_lookup ("is-modifier-symbol?");
-
-  scm_validate_float_format_string = scm_c_module_lookup (elisp_emacs_module, "validate-float-format-string");
-  if (scm_is_false (scm_validate_float_format_string))
-    scm_validate_float_format_string = scm_c_lookup ("validate-float-format-string");
-
-  scm_has_time_format_specifiers = scm_c_module_lookup (elisp_emacs_module, "has-time-format-specifiers?");
-  if (scm_is_false (scm_has_time_format_specifiers))
-    scm_has_time_format_specifiers = scm_c_lookup ("has-time-format-specifiers?");
-
-  scm_parse_hex_color = scm_c_module_lookup (elisp_emacs_module, "parse-hex-color");
-  if (scm_is_false (scm_parse_hex_color))
-    scm_parse_hex_color = scm_c_lookup ("parse-hex-color");
-
-  scm_needs_filename_conversion = scm_c_module_lookup (elisp_emacs_module, "needs-filename-conversion?");
-  if (scm_is_false (scm_needs_filename_conversion))
-    scm_needs_filename_conversion = scm_c_lookup ("needs-filename-conversion?");
-
-  scm_is_utf8_filename = scm_c_module_lookup (elisp_emacs_module, "is-utf8-filename?");
-  if (scm_is_false (scm_is_utf8_filename))
-    scm_is_utf8_filename = scm_c_lookup ("is-utf8-filename?");
-
-  scm_is_safe_for_c_string_copy = scm_c_module_lookup (elisp_emacs_module, "is-safe-for-c-string-copy?");
-  if (scm_is_false (scm_is_safe_for_c_string_copy))
-    scm_is_safe_for_c_string_copy = scm_c_lookup ("is-safe-for-c-string-copy?");
-
-  scm_looks_like_network_address = scm_c_module_lookup (elisp_emacs_module, "looks-like-network-address?");
-  if (scm_is_false (scm_looks_like_network_address))
-    scm_looks_like_network_address = scm_c_lookup ("looks-like-network-address?");
-
-  /* Initialize path/filename operation functions */
-  scm_is_absolute_path = scm_c_module_lookup (elisp_emacs_module, "is-absolute-path?");
-  if (scm_is_false (scm_is_absolute_path))
-    scm_is_absolute_path = scm_c_lookup ("is-absolute-path?");
-
-  scm_ends_with_directory_separator = scm_c_module_lookup (elisp_emacs_module, "ends-with-directory-separator?");
-  if (scm_is_false (scm_ends_with_directory_separator))
-    scm_ends_with_directory_separator = scm_c_lookup ("ends-with-directory-separator?");
-
-  scm_normalize_path_separators = scm_c_module_lookup (elisp_emacs_module, "normalize-path-separators");
-  if (scm_is_false (scm_normalize_path_separators))
-    scm_normalize_path_separators = scm_c_lookup ("normalize-path-separators");
-
-  scm_string_empty = scm_c_module_lookup (elisp_emacs_module, "string-empty?");
-  if (scm_is_false (scm_string_empty))
-    scm_string_empty = scm_c_lookup ("string-empty?");
-
-  scm_has_directory_traversal = scm_c_module_lookup (elisp_emacs_module, "has-directory-traversal?");
-  if (scm_is_false (scm_has_directory_traversal))
-    scm_has_directory_traversal = scm_c_lookup ("has-directory-traversal?");
-
-  scm_get_file_extension = scm_c_module_lookup (elisp_emacs_module, "get-file-extension");
-  if (scm_is_false (scm_get_file_extension))
-    scm_get_file_extension = scm_c_lookup ("get-file-extension");
-
-  scm_path_starts_with = scm_c_module_lookup (elisp_emacs_module, "path-starts-with?");
-  if (scm_is_false (scm_path_starts_with))
-    scm_path_starts_with = scm_c_lookup ("path-starts-with?");
-
-  /* Initialize simple string validation functions */
-  scm_string_single_char = scm_c_module_lookup (elisp_emacs_module, "string-single-char?");
-  if (scm_is_false (scm_string_single_char))
-    scm_string_single_char = scm_c_lookup ("string-single-char?");
-
-  scm_string_starts_with_space = scm_c_module_lookup (elisp_emacs_module, "string-starts-with-space?");
-  if (scm_is_false (scm_string_starts_with_space))
-    scm_string_starts_with_space = scm_c_lookup ("string-starts-with-space?");
-
-  scm_string_ascii_only = scm_c_module_lookup (elisp_emacs_module, "string-ascii-only?");
-  if (scm_is_false (scm_string_ascii_only))
-    scm_string_ascii_only = scm_c_lookup ("string-ascii-only?");
-
-  scm_valid_symbol_name = scm_c_module_lookup (elisp_emacs_module, "valid-symbol-name?");
-  if (scm_is_false (scm_valid_symbol_name))
-    scm_valid_symbol_name = scm_c_lookup ("valid-symbol-name?");
-
-  scm_string_numeric = scm_c_module_lookup (elisp_emacs_module, "string-numeric?");
-  if (scm_is_false (scm_string_numeric))
-    scm_string_numeric = scm_c_lookup ("string-numeric?");
-
-  scm_string_needs_escaping = scm_c_module_lookup (elisp_emacs_module, "string-needs-escaping?");
-  if (scm_is_false (scm_string_needs_escaping))
-    scm_string_needs_escaping = scm_c_lookup ("string-needs-escaping?");
-
-  scm_special_buffer_name = scm_c_module_lookup (elisp_emacs_module, "special-buffer-name?");
-  if (scm_is_false (scm_special_buffer_name))
-    scm_special_buffer_name = scm_c_lookup ("special-buffer-name?");
-
-  scm_string_equal_ignore_case = scm_c_module_lookup (elisp_emacs_module, "string-equal-ignore-case?");
-  if (scm_is_false (scm_string_equal_ignore_case))
-    scm_string_equal_ignore_case = scm_c_lookup ("string-equal-ignore-case?");
-
-  scm_string_starts_with_char = scm_c_module_lookup (elisp_emacs_module, "string-starts-with-char?");
-  if (scm_is_false (scm_string_starts_with_char))
-    scm_string_starts_with_char = scm_c_lookup ("string-starts-with-char?");
-
-  scm_string_ends_with_char = scm_c_module_lookup (elisp_emacs_module, "string-ends-with-char?");
-  if (scm_is_false (scm_string_ends_with_char))
-    scm_string_ends_with_char = scm_c_lookup ("string-ends-with-char?");
-
-  scm_string_whitespace_only = scm_c_module_lookup (elisp_emacs_module, "string-whitespace-only?");
-  if (scm_is_false (scm_string_whitespace_only))
-    scm_string_whitespace_only = scm_c_lookup ("string-whitespace-only?");
-
-  scm_valid_identifier = scm_c_module_lookup (elisp_emacs_module, "valid-identifier?");
-  if (scm_is_false (scm_valid_identifier))
-    scm_valid_identifier = scm_c_lookup ("valid-identifier?");
-
-  /* Initialize file extension and type checking functions */
-  scm_has_file_extension = scm_c_module_lookup (elisp_emacs_module, "has-file-extension?");
-  if (scm_is_false (scm_has_file_extension))
-    scm_has_file_extension = scm_c_lookup ("has-file-extension?");
-
-  scm_source_code_file = scm_c_module_lookup (elisp_emacs_module, "source-code-file?");
-  if (scm_is_false (scm_source_code_file))
-    scm_source_code_file = scm_c_lookup ("source-code-file?");
-
-  scm_image_file = scm_c_module_lookup (elisp_emacs_module, "image-file?");
-  if (scm_is_false (scm_image_file))
-    scm_image_file = scm_c_lookup ("image-file?");
-
-  scm_config_file = scm_c_module_lookup (elisp_emacs_module, "config-file?");
-  if (scm_is_false (scm_config_file))
-    scm_config_file = scm_c_lookup ("config-file?");
-
-  scm_extract_file_extension = scm_c_module_lookup (elisp_emacs_module, "extract-file-extension");
-  if (scm_is_false (scm_extract_file_extension))
-    scm_extract_file_extension = scm_c_lookup ("extract-file-extension");
-
-  /* Initialize font and color validation functions */
-  scm_hex_color_string = scm_c_module_lookup (elisp_emacs_module, "hex-color-string?");
-  if (scm_is_false (scm_hex_color_string))
-    scm_hex_color_string = scm_c_lookup ("hex-color-string?");
-
-  scm_rgb_color_string = scm_c_module_lookup (elisp_emacs_module, "rgb-color-string?");
-  if (scm_is_false (scm_rgb_color_string))
-    scm_rgb_color_string = scm_c_lookup ("rgb-color-string?");
-
-  scm_named_color = scm_c_module_lookup (elisp_emacs_module, "named-color?");
-  if (scm_is_false (scm_named_color))
-    scm_named_color = scm_c_lookup ("named-color?");
-
-  scm_valid_xlfd_font_name = scm_c_module_lookup (elisp_emacs_module, "valid-xlfd-font-name?");
-  if (scm_is_false (scm_valid_xlfd_font_name))
-    scm_valid_xlfd_font_name = scm_c_lookup ("valid-xlfd-font-name?");
-
-  scm_font_family_name = scm_c_module_lookup (elisp_emacs_module, "font-family-name?");
-  if (scm_is_false (scm_font_family_name))
-    scm_font_family_name = scm_c_lookup ("font-family-name?");
-
-  /* Initialize network and URL validation functions */
-  scm_url_string = scm_c_module_lookup (elisp_emacs_module, "url-string?");
-  if (scm_is_false (scm_url_string))
-    scm_url_string = scm_c_lookup ("url-string?");
-
-  scm_email_address = scm_c_module_lookup (elisp_emacs_module, "email-address?");
-  if (scm_is_false (scm_email_address))
-    scm_email_address = scm_c_lookup ("email-address?");
-
-  scm_ip_address = scm_c_module_lookup (elisp_emacs_module, "ip-address?");
-  if (scm_is_false (scm_ip_address))
-    scm_ip_address = scm_c_lookup ("ip-address?");
-
-  /* Initialize registry to script mapping function */
-  scm_lookup_registry_to_script = scm_c_module_lookup (elisp_emacs_module, "lookup-registry-to-script");
-  if (scm_is_false (scm_lookup_registry_to_script))
-    scm_lookup_registry_to_script = scm_c_lookup ("lookup-registry-to-script");
-
-  /* Initialize font name parsing function */
-  scm_parse_font_name_with_size = scm_c_module_lookup (elisp_emacs_module, "parse-font-name-with-size");
-  if (scm_is_false (scm_parse_font_name_with_size))
-    scm_parse_font_name_with_size = scm_c_lookup ("parse-font-name-with-size");
-
-  /* Initialize string operations function */
-  scm_substring_no_properties_scheme = scm_c_module_lookup (elisp_emacs_module, "substring-no-properties-scheme");
-  if (scm_is_false (scm_substring_no_properties_scheme))
-    scm_substring_no_properties_scheme = scm_c_lookup ("substring-no-properties-scheme");
-
-  /* Initialize file path operation functions */
-  scm_file_path_absolute_p = scm_c_module_lookup (elisp_emacs_module, "file-path-absolute-p");
-  if (scm_is_false (scm_file_path_absolute_p))
-    scm_file_path_absolute_p = scm_c_lookup ("file-path-absolute-p");
-
-  scm_file_path_directory = scm_c_module_lookup (elisp_emacs_module, "file-path-directory");
-  if (scm_is_false (scm_file_path_directory))
-    scm_file_path_directory = scm_c_lookup ("file-path-directory");
-
-  scm_file_path_nondirectory = scm_c_module_lookup (elisp_emacs_module, "file-path-nondirectory");
-  if (scm_is_false (scm_file_path_nondirectory))
-    scm_file_path_nondirectory = scm_c_lookup ("file-path-nondirectory");
-
-  scm_file_path_safe_p = scm_c_module_lookup (elisp_emacs_module, "file-path-safe-p");
-  if (scm_is_false (scm_file_path_safe_p))
-    scm_file_path_safe_p = scm_c_lookup ("file-path-safe-p");
-
-  /* Initialize string concatenation functions */
-  scm_string_concat_2 = scm_c_module_lookup (elisp_emacs_module, "string-concat-2");
-  if (scm_is_false (scm_string_concat_2))
-    scm_string_concat_2 = scm_c_lookup ("string-concat-2");
-
-  scm_string_concat_3 = scm_c_module_lookup (elisp_emacs_module, "string-concat-3");
-  if (scm_is_false (scm_string_concat_3))
-    scm_string_concat_3 = scm_c_lookup ("string-concat-3");
-
-  scm_string_concat_multi = scm_c_module_lookup (elisp_emacs_module, "string-concat-multi");
-  if (scm_is_false (scm_string_concat_multi))
-    scm_string_concat_multi = scm_c_lookup ("string-concat-multi");
-
-  /* Initialize integer parsing functions */
-  scm_parse_integer_string = scm_c_module_lookup (elisp_emacs_module, "parse-integer-string");
-  if (scm_is_false (scm_parse_integer_string))
-    scm_parse_integer_string = scm_c_lookup ("parse-integer-string");
-
-  scm_read_integer_guile = scm_c_module_lookup (elisp_emacs_module, "read-integer-guile");
-  if (scm_is_false (scm_read_integer_guile))
-    scm_read_integer_guile = scm_c_lookup ("read-integer-guile");
-
-  scm_parse_emacs_number = scm_c_module_lookup (elisp_emacs_module, "parse-emacs-number");
-  if (scm_is_false (scm_parse_emacs_number))
-    scm_parse_emacs_number = scm_c_lookup ("parse-emacs-number");
+  /* Get direct references to the Scheme functions (not variables).
+     This avoids issues with scm_variable_ref on unbound variables.
+     We use safe_public_ref which returns #f for missing bindings. */
+
+  scm_lookup_color_in_map = safe_public_ref ("language elisp emacs", "lookup-color-in-map");
+  scm_lookup_font_style = safe_public_ref ("language elisp emacs", "lookup-font-style");
+  scm_lookup_in_alist_ci = safe_public_ref ("language elisp emacs", "lookup-in-alist-ci");
+  scm_lookup_in_alist = safe_public_ref ("language elisp emacs", "lookup-in-alist");
+  scm_lookup_symbol_in_list = safe_public_ref ("language elisp emacs", "lookup-symbol-in-list");
+  scm_parse_face_bool_attribute = safe_public_ref ("language elisp emacs", "parse-face-bool-attribute");
+  scm_process_yesno_response = safe_public_ref ("language elisp emacs", "process-yesno-response");
+  scm_filter_dbus_message = safe_public_ref ("language elisp emacs", "filter-dbus-message");
+  scm_is_special_buffer_name = safe_public_ref ("language elisp emacs", "is-special-buffer-name?");
+  scm_parse_color_spec = safe_public_ref ("language elisp emacs", "parse-color-spec");
+  scm_validate_color_name = safe_public_ref ("language elisp emacs", "validate-color-name");
+  scm_string_contains_whitespace = safe_public_ref ("language elisp emacs", "string-contains-whitespace?");
+  scm_is_frame_name_fnn_format = safe_public_ref ("language elisp emacs", "is-frame-name-fnn-format?");
+  scm_validate_xlfd_font_name = safe_public_ref ("language elisp emacs", "validate-xlfd-font-name");
+  scm_is_absolute_path = safe_public_ref ("language elisp emacs", "is-absolute-path?");
+  scm_has_directory_traversal = safe_public_ref ("language elisp emacs", "has-directory-traversal?");
+  scm_string_spaces_to_dashes = safe_public_ref ("language elisp emacs", "string-spaces-to-dashes");
+  scm_string_trim_leading_whitespace = safe_public_ref ("language elisp emacs", "string-trim-leading-whitespace");
+  scm_parse_number_string = safe_public_ref ("language elisp emacs", "parse-number-string");
+  scm_validate_string_for_copying = safe_public_ref ("language elisp emacs", "validate-string-for-copying");
+  scm_prepare_string_for_symbol = safe_public_ref ("language elisp emacs", "prepare-string-for-symbol");
+
+  /* New scheme functions */
+  scm_has_file_extension = safe_public_ref ("language elisp emacs", "has-file-extension?");
+  scm_extract_filename_from_path = safe_public_ref ("language elisp emacs", "extract-filename-from-path");
+  scm_is_modifier_symbol = safe_public_ref ("language elisp emacs", "is-modifier-symbol?");
+  scm_validate_float_format_string = safe_public_ref ("language elisp emacs", "validate-float-format-string");
+  scm_has_time_format_specifiers = safe_public_ref ("language elisp emacs", "has-time-format-specifiers?");
+  scm_parse_hex_color = safe_public_ref ("language elisp emacs", "parse-hex-color");
+  scm_needs_filename_conversion = safe_public_ref ("language elisp emacs", "needs-filename-conversion?");
+  scm_is_utf8_filename = safe_public_ref ("language elisp emacs", "is-utf8-filename?");
+  scm_is_safe_for_c_string_copy = safe_public_ref ("language elisp emacs", "is-safe-for-c-string-copy?");
+  scm_looks_like_network_address = safe_public_ref ("language elisp emacs", "looks-like-network-address?");
+
+  /* Path/filename operation functions */
+  scm_ends_with_directory_separator = safe_public_ref ("language elisp emacs", "ends-with-directory-separator?");
+  scm_normalize_path_separators = safe_public_ref ("language elisp emacs", "normalize-path-separators");
+  scm_string_empty = safe_public_ref ("language elisp emacs", "string-empty?");
+  scm_get_file_extension = safe_public_ref ("language elisp emacs", "get-file-extension");
+  scm_path_starts_with = safe_public_ref ("language elisp emacs", "path-starts-with?");
+
+  /* Simple string validation functions */
+  scm_string_single_char = safe_public_ref ("language elisp emacs", "string-single-char?");
+  scm_string_starts_with_space = safe_public_ref ("language elisp emacs", "string-starts-with-space?");
+  scm_string_ascii_only = safe_public_ref ("language elisp emacs", "string-ascii-only?");
+  scm_valid_symbol_name = safe_public_ref ("language elisp emacs", "valid-symbol-name?");
+  scm_string_numeric = safe_public_ref ("language elisp emacs", "string-numeric?");
+  scm_string_needs_escaping = safe_public_ref ("language elisp emacs", "string-needs-escaping?");
+  scm_special_buffer_name = safe_public_ref ("language elisp emacs", "special-buffer-name?");
+  scm_string_equal_ignore_case = safe_public_ref ("language elisp emacs", "string-equal-ignore-case?");
+  scm_string_starts_with_char = safe_public_ref ("language elisp emacs", "string-starts-with-char?");
+  scm_string_ends_with_char = safe_public_ref ("language elisp emacs", "string-ends-with-char?");
+  scm_string_whitespace_only = safe_public_ref ("language elisp emacs", "string-whitespace-only?");
+  scm_valid_identifier = safe_public_ref ("language elisp emacs", "valid-identifier?");
+
+  /* File extension and type checking functions */
+  scm_source_code_file = safe_public_ref ("language elisp emacs", "source-code-file?");
+  scm_image_file = safe_public_ref ("language elisp emacs", "image-file?");
+  scm_config_file = safe_public_ref ("language elisp emacs", "config-file?");
+  scm_extract_file_extension = safe_public_ref ("language elisp emacs", "extract-file-extension");
+
+  /* Font and color validation functions */
+  scm_hex_color_string = safe_public_ref ("language elisp emacs", "hex-color-string?");
+  scm_rgb_color_string = safe_public_ref ("language elisp emacs", "rgb-color-string?");
+  scm_named_color = safe_public_ref ("language elisp emacs", "named-color?");
+  scm_valid_xlfd_font_name = safe_public_ref ("language elisp emacs", "valid-xlfd-font-name?");
+  scm_font_family_name = safe_public_ref ("language elisp emacs", "font-family-name?");
+
+  /* Network and URL validation functions */
+  scm_url_string = safe_public_ref ("language elisp emacs", "url-string?");
+  scm_email_address = safe_public_ref ("language elisp emacs", "email-address?");
+  scm_ip_address = safe_public_ref ("language elisp emacs", "ip-address?");
+
+  /* Registry to script mapping function */
+  scm_lookup_registry_to_script = safe_public_ref ("language elisp emacs", "lookup-registry-to-script");
+
+  /* Font name parsing function */
+  scm_parse_font_name_with_size = safe_public_ref ("language elisp emacs", "parse-font-name-with-size");
+
+  /* String operations function */
+  scm_substring_no_properties_scheme = safe_public_ref ("language elisp emacs", "substring-no-properties-scheme");
+
+  /* File path operation functions */
+  scm_file_path_absolute_p = safe_public_ref ("language elisp emacs", "file-path-absolute-p");
+  scm_file_path_directory = safe_public_ref ("language elisp emacs", "file-path-directory");
+  scm_file_path_nondirectory = safe_public_ref ("language elisp emacs", "file-path-nondirectory");
+  scm_file_path_safe_p = safe_public_ref ("language elisp emacs", "file-path-safe-p");
+
+  /* String concatenation functions */
+  scm_string_concat_2 = safe_public_ref ("language elisp emacs", "string-concat-2");
+  scm_string_concat_3 = safe_public_ref ("language elisp emacs", "string-concat-3");
+  scm_string_concat_multi = safe_public_ref ("language elisp emacs", "string-concat-multi");
+
+  /* Integer parsing functions */
+  scm_parse_integer_string = safe_public_ref ("language elisp emacs", "parse-integer-string");
+  scm_read_integer_guile = safe_public_ref ("language elisp emacs", "read-integer-guile");
+  scm_parse_emacs_number = safe_public_ref ("language elisp emacs", "parse-emacs-number");
 
   /* Protect from GC */
   scm_gc_protect_object (scm_lookup_color_in_map);
@@ -699,12 +499,8 @@ guile_is_special_buffer_name (Lisp_Object buffer_name)
   if (!STRINGP (buffer_name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_is_special_buffer_name);
-  if (!scm_is_true (function) || !scm_is_true (scm_procedure_p (function)))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_is_special_buffer_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_is_special_buffer_name,
                            scm_from_utf8_string (SSDATA (buffer_name)));
 
   return scm_is_true (result);
@@ -720,12 +516,8 @@ guile_parse_color_spec (Lisp_Object color_spec)
   if (!STRINGP (color_spec))
     return Qnil;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_parse_color_spec);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function,
+  /* scm_parse_color_spec is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_parse_color_spec,
                            scm_from_utf8_string (SSDATA (color_spec)));
 
   if (scm_is_false (result))
@@ -760,12 +552,8 @@ guile_validate_color_name (Lisp_Object color_name)
   if (!STRINGP (color_name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_validate_color_name);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_validate_color_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_validate_color_name,
                            scm_from_utf8_string (SSDATA (color_name)));
 
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
@@ -781,12 +569,8 @@ guile_string_contains_whitespace (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_contains_whitespace);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_contains_whitespace is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_contains_whitespace,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1165,12 +949,8 @@ guile_is_absolute_path (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_is_absolute_path);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_is_absolute_path is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_is_absolute_path,
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
@@ -1186,12 +966,8 @@ guile_ends_with_directory_separator (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_ends_with_directory_separator);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_ends_with_directory_separator is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_ends_with_directory_separator,
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
@@ -1207,12 +983,8 @@ guile_normalize_path_separators (Lisp_Object path)
   if (!STRINGP (path))
     return path;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_normalize_path_separators);
-  if (scm_is_false (function))
-    return path;
-
-  SCM result = scm_call_1 (function,
+  /* scm_normalize_path_separators is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_normalize_path_separators,
                            scm_from_utf8_string (SSDATA (path)));
 
   if (scm_is_string (result))
@@ -1292,12 +1064,8 @@ guile_path_starts_with (Lisp_Object path, const char *prefix)
   if (!STRINGP (path))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_path_starts_with);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_2 (function,
+  /* scm_path_starts_with is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_path_starts_with,
                            scm_from_utf8_string (SSDATA (path)),
                            scm_from_utf8_string (prefix));
 
@@ -1316,12 +1084,8 @@ guile_string_single_char (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_single_char);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_single_char is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_single_char,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1337,12 +1101,8 @@ guile_string_starts_with_space (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_starts_with_space);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_starts_with_space is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_starts_with_space,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1358,12 +1118,8 @@ guile_string_ascii_only (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_ascii_only);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_ascii_only is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_ascii_only,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1379,12 +1135,8 @@ guile_valid_symbol_name (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_valid_symbol_name);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_valid_symbol_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_valid_symbol_name,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1400,12 +1152,8 @@ guile_string_numeric (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_numeric);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_numeric is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_numeric,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1421,12 +1169,8 @@ guile_special_buffer_name (Lisp_Object buffer_name)
   if (!STRINGP (buffer_name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_special_buffer_name);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_special_buffer_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_special_buffer_name,
                            scm_from_utf8_string (SSDATA (buffer_name)));
 
   return scm_is_true (result);
@@ -1442,12 +1186,8 @@ guile_string_starts_with_char (Lisp_Object str, int character)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_starts_with_char);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_2 (function,
+  /* scm_string_starts_with_char is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_string_starts_with_char,
                            scm_from_utf8_string (SSDATA (str)),
                            scm_from_int (character));
 
@@ -1466,12 +1206,8 @@ guile_has_file_extension_new (Lisp_Object filename, const char *extension)
   if (!STRINGP (filename))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_has_file_extension);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_2 (function,
+  /* scm_has_file_extension is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_has_file_extension,
                            scm_from_utf8_string (SSDATA (filename)),
                            scm_from_utf8_string (extension));
 
@@ -1488,12 +1224,8 @@ guile_source_code_file (Lisp_Object filename)
   if (!STRINGP (filename))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_source_code_file);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_source_code_file is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_source_code_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1509,12 +1241,8 @@ guile_image_file (Lisp_Object filename)
   if (!STRINGP (filename))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_image_file);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_image_file is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_image_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1532,12 +1260,8 @@ guile_hex_color_string (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_hex_color_string);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_hex_color_string is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_hex_color_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1553,12 +1277,8 @@ guile_named_color (Lisp_Object color_name)
   if (!STRINGP (color_name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_named_color);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_named_color is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_named_color,
                            scm_from_utf8_string (SSDATA (color_name)));
 
   return scm_is_true (result);
@@ -1574,12 +1294,8 @@ guile_valid_xlfd_font_name_new (Lisp_Object font_name)
   if (!STRINGP (font_name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_valid_xlfd_font_name);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_valid_xlfd_font_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_valid_xlfd_font_name,
                            scm_from_utf8_string (SSDATA (font_name)));
 
   return scm_is_true (result);
@@ -1595,12 +1311,8 @@ guile_font_family_name (Lisp_Object name)
   if (!STRINGP (name))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_font_family_name);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_font_family_name is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_font_family_name,
                            scm_from_utf8_string (SSDATA (name)));
 
   return scm_is_true (result);
@@ -1618,12 +1330,8 @@ guile_url_string (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_url_string);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_url_string is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_url_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1641,12 +1349,8 @@ guile_email_address (Lisp_Object addr_str)
   if (!STRINGP (addr_str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_email_address);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_email_address is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_email_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
 
   return scm_is_true (result);
@@ -1662,12 +1366,8 @@ guile_ip_address (Lisp_Object addr_str)
   if (!STRINGP (addr_str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_ip_address);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_ip_address is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_ip_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
 
   return scm_is_true (result);
@@ -1683,12 +1383,8 @@ guile_config_file (Lisp_Object filename)
   if (!STRINGP (filename))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_config_file);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_config_file is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_config_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1704,12 +1400,8 @@ guile_extract_file_extension (Lisp_Object filename)
   if (!STRINGP (filename))
     return build_string ("");
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_extract_file_extension);
-  if (scm_is_false (function))
-    return build_string ("");
-
-  SCM result = scm_call_1 (function,
+  /* scm_extract_file_extension is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_extract_file_extension,
                            scm_from_utf8_string (SSDATA (filename)));
 
   if (scm_is_string (result))
@@ -1733,12 +1425,8 @@ guile_rgb_color_string (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_rgb_color_string);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_rgb_color_string is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_rgb_color_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1756,12 +1444,8 @@ guile_string_needs_escaping (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_needs_escaping);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_needs_escaping is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_needs_escaping,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1777,12 +1461,8 @@ guile_string_equal_ignore_case (Lisp_Object str1, Lisp_Object str2)
   if (!STRINGP (str1) || !STRINGP (str2))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_equal_ignore_case);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_2 (function,
+  /* scm_string_equal_ignore_case is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_string_equal_ignore_case,
                            scm_from_utf8_string (SSDATA (str1)),
                            scm_from_utf8_string (SSDATA (str2)));
 
@@ -1799,12 +1479,8 @@ guile_string_ends_with_char (Lisp_Object str, int character)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_ends_with_char);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_2 (function,
+  /* scm_string_ends_with_char is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_string_ends_with_char,
                            scm_from_utf8_string (SSDATA (str)),
                            scm_from_int (character));
 
@@ -1821,12 +1497,8 @@ guile_string_whitespace_only (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_string_whitespace_only);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_string_whitespace_only is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_whitespace_only,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1842,12 +1514,8 @@ guile_valid_identifier (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  /* Get the actual function from the variable */
-  SCM function = scm_variable_ref (scm_valid_identifier);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function,
+  /* scm_valid_identifier is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_valid_identifier,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1908,12 +1576,8 @@ guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Objec
   SCM end_scm = NILP (end) ? SCM_BOOL_F :
     (FIXNUMP (end) ? scm_from_int (XFIXNUM (end)) : SCM_BOOL_F);
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_substring_no_properties_scheme);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_3 (function, string, start_scm, end_scm);
+  /* scm_substring_no_properties_scheme is now the actual procedure (not a variable) */
+  SCM result = scm_call_3 (scm_substring_no_properties_scheme, string, start_scm, end_scm);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1933,12 +1597,8 @@ guile_file_path_absolute_p (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_file_path_absolute_p);
-  if (scm_is_false (function))
-    return false;
-
-  SCM result = scm_call_1 (function, path);
+  /* scm_file_path_absolute_p is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_file_path_absolute_p, path);
   return scm_is_true (result);
 }
 
@@ -1952,12 +1612,8 @@ guile_file_path_directory (Lisp_Object path)
   if (!STRINGP (path))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_file_path_directory);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function, path);
+  /* scm_file_path_directory is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_file_path_directory, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1975,12 +1631,8 @@ guile_file_path_nondirectory (Lisp_Object path)
   if (!STRINGP (path))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_file_path_nondirectory);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function, path);
+  /* scm_file_path_nondirectory is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_file_path_nondirectory, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1998,7 +1650,8 @@ guile_file_path_safe_p (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  SCM result = scm_call_1 (scm_variable_ref (scm_file_path_safe_p), path);
+  /* scm_file_path_safe_p is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_file_path_safe_p, path);
   return scm_is_true (result);
 }
 
@@ -2011,12 +1664,8 @@ guile_string_concat_2 (Lisp_Object s1, Lisp_Object s2)
   if (!scm_is_true (scm_string_concat_2))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_string_concat_2);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_2 (function, s1, s2);
+  /* scm_string_concat_2 is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_string_concat_2, s1, s2);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -2031,12 +1680,8 @@ guile_string_concat_3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3)
   if (!scm_is_true (scm_string_concat_3))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_string_concat_3);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_3 (function, s1, s2, s3);
+  /* scm_string_concat_3 is now the actual procedure (not a variable) */
+  SCM result = scm_call_3 (scm_string_concat_3, s1, s2, s3);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -2051,12 +1696,8 @@ guile_string_concat_multi (Lisp_Object string_list)
   if (!scm_is_true (scm_string_concat_multi))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_string_concat_multi);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function, string_list);
+  /* scm_string_concat_multi is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_string_concat_multi, string_list);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -2076,12 +1717,8 @@ guile_parse_integer_string (Lisp_Object str, int radix)
   if (!STRINGP (str))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_parse_integer_string);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_2 (function, str, scm_from_int (radix));
+  /* scm_parse_integer_string is now the actual procedure (not a variable) */
+  SCM result = scm_call_2 (scm_parse_integer_string, str, scm_from_int (radix));
 
   if (scm_is_false (result))
     return Qnil;
@@ -2099,12 +1736,8 @@ guile_read_integer_guile (Lisp_Object input_string)
   if (!STRINGP (input_string))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_read_integer_guile);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function, input_string);
+  /* scm_read_integer_guile is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_read_integer_guile, input_string);
 
   if (scm_is_false (result))
     return Qnil;
@@ -2122,12 +1755,8 @@ guile_parse_emacs_number (Lisp_Object str)
   if (!STRINGP (str))
     return Qnil;
 
-  /* Enhanced error handling - check function validity before calling */
-  SCM function = scm_variable_ref (scm_parse_emacs_number);
-  if (scm_is_false (function))
-    return Qnil;
-
-  SCM result = scm_call_1 (function, str);
+  /* scm_parse_emacs_number is now the actual procedure (not a variable) */
+  SCM result = scm_call_1 (scm_parse_emacs_number, str);
 
   if (scm_is_false (result))
     return Qnil;
