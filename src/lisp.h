@@ -1393,7 +1393,8 @@ string_immovable_p (Lisp_Object str)
 INLINE bool
 LISP_STRCMP_C_L (char* ac, Lisp_Object bl)
 {
-  return scm_string_equal_p (scm_from_utf8_string (ac), bl);
+  /* FIX-guilemacs: scm_string_equal_p returns SCM bool, need scm_is_true */
+  return scm_is_true (scm_string_equal_p (scm_from_utf8_string (ac), bl));
 }
 
 #define MaybeLsToC(ls) \
@@ -3005,7 +3006,16 @@ CHECK_RECORD (Lisp_Object x)
 INLINE bool
 IMAGEP (Lisp_Object x)
 {
-  return CONSP (x) && EQ (XCAR (x), Qimage);
+  /* FIX-guilemacs: Use symbol name comparison since Guile symbols
+     may not EQ to builtin Qimage symbol.  */
+  if (!CONSP (x))
+    return false;
+  Lisp_Object car = XCAR (x);
+  if (EQ (car, Qimage))
+    return true;
+  if (SYMBOLP (car))
+    return !NILP (Fstring_equal (SYMBOL_NAME (car), SYMBOL_NAME (Qimage)));
+  return false;
 }
 
 /* Array types.  */
