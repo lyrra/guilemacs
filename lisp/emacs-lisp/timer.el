@@ -351,10 +351,9 @@ This function is called, by name, directly by the C code."
             ;; and it can be hellish to track down their source.
             (save-current-buffer
               (apply (timer--function timer) (timer--args timer)))
-          (error (message "Error running timer%s: %S"
-                          (if (symbolp (timer--function timer))
-                              (format-message " `%s'" (timer--function timer))
-                            "")
+          (error (message "Error running timer %S with args %S: %S"
+                          (timer--function timer)
+                          (timer--args timer)
                           err)))
         (when (and retrigger
                    ;; If the timer's been canceled, don't "retrigger" it
