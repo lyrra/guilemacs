@@ -5684,7 +5684,8 @@ xpm_image_p (Lisp_Object object)
 {
   struct image_keyword fmt[XPM_LAST];
   memcpy (fmt, xpm_format, sizeof fmt);
-  return (parse_image_spec (object, fmt, XPM_LAST, Qxpm)
+  bool parsed = parse_image_spec (object, fmt, XPM_LAST, Qxpm);
+  return (parsed
 	  /* Either `:file' or `:data' must be present.  */
 	  && fmt[XPM_FILE].count + fmt[XPM_DATA].count == 1
 	  /* Either no `:color-symbols' or it's a list of conses
