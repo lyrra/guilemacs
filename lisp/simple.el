@@ -2658,7 +2658,7 @@ customizing `read-extended-command-predicate'."
 		       (not executing-kbd-macro)
 		       (where-is-internal function overriding-local-map t)))
          (delay-before-suggest 0)
-         find-shorter shorter)
+         find-shorter)
     (unless (commandp function)
       (error "`%s' is not a valid command name" command-name))
     ;; If we're executing a command that's remapped, we can't actually
@@ -2705,23 +2705,26 @@ customizing `read-extended-command-predicate'."
         (setq execute-extended-command--binding-timer
               (run-at-time
                delay-before-suggest nil
-               (lambda ()
+               ;; Guilemacs: pass all variables as args to avoid closure capture issues
+               (lambda (function find-shorter typed binding saved-real-last-command saved-suggest-key-bindings)
                  ;; If the user has typed any other commands in the
                  ;; meantime, then don't display anything.
-                 (when (eq function real-last-command)
+                 (when (eq function saved-real-last-command)
                    ;; Find shorter string.
-                   (when find-shorter
-                     (while-no-input
-                       ;; FIXME: Can be slow.  Cache it maybe?
-                       (setq shorter (execute-extended-command--shorter
-                                      (symbol-name function) typed))))
-                   (when (or binding shorter)
-                     (with-temp-message
-                         (execute-extended-command--describe-binding-msg
-                          function binding shorter)
-                       (sit-for (if (numberp suggest-key-bindings)
-                                    suggest-key-bindings
-                                  2))))))))))))
+                   (let ((shorter nil))
+                     (when find-shorter
+                       (while-no-input
+                         ;; FIXME: Can be slow.  Cache it maybe?
+                         (setq shorter (execute-extended-command--shorter
+                                        (symbol-name function) typed))))
+                     (when (or binding shorter)
+                       (with-temp-message
+                           (execute-extended-command--describe-binding-msg
+                            function binding shorter)
+                         (sit-for (if (numberp saved-suggest-key-bindings)
+                                      saved-suggest-key-bindings
+                                    2)))))))
+               function find-shorter typed binding real-last-command suggest-key-bindings))))))
 
 (defun execute-extended-command-for-buffer (prefixarg &optional
                                                       command-name typed)
