@@ -244,7 +244,8 @@
    (module-bound? function-slot-module symbol)
    (variable-bound?
     (module-variable function-slot-module symbol))
-   (variable-ref (module-variable function-slot-module symbol))))
+   ;; Must return #t, not the function value itself - fboundp callers expect t
+   (not (eq? #nil (variable-ref (module-variable function-slot-module symbol))))))
 
 (define (bind-symbol symbol value thunk)
   (dynamic-bind (symbol-desc symbol) value thunk))
