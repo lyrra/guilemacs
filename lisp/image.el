@@ -851,8 +851,10 @@ Image files should not be larger than specified by `max-image-size'."
                 (setq image (cons 'image (copy-sequence spec)))
                 (image--set-property image :type nil)
                 (image--set-property image :file nil)
+                ;; Pass explicit type if provided - auto-detection is disabled
+                ;; for some types (xpm, xbm) so we must use the specified type.
                 (and (setq image (ignore-errors
-                                   (apply #'create-image file nil nil
+                                   (apply #'create-image file type nil
                                           (cdr image))))
                      ;; Ensure, if a type has been provided, it is
                      ;; consistent with the type returned by
@@ -866,8 +868,10 @@ Image files should not be larger than specified by `max-image-size'."
               (setq image (cons 'image (copy-sequence spec)))
               (image--set-property image :type nil)
               (image--set-property image :data nil)
+              ;; Pass explicit type if provided - auto-detection is disabled
+              ;; for some types (xpm, xbm) so we must use the specified type.
 	      (and (setq image (ignore-errors
-                                 (apply #'create-image data nil t
+                                 (apply #'create-image data type t
                                         (cdr image))))
                    ;; Ensure, if a type has been provided, it is
                    ;; consistent with the type returned by
