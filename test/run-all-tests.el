@@ -54,6 +54,9 @@
 (load-file "test/text-property/test-substring-operations.el")
 (message "")
 
+(load-file "test/text-property/test-scheme-storage.el")
+(message "")
+
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")
