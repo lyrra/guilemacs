@@ -1271,6 +1271,24 @@ DEFUN ("emacs-pid", Femacs_pid, Semacs_pid, 0, 0, 0,
 }
 
 
+/* Helper to safely lookup a procedure from a module.
+   Returns SCM_BOOL_F if not found, unbound, or not a procedure. */
+static SCM
+editfns_safe_lookup (const char *module_name, const char *proc_name)
+{
+  SCM mod = scm_c_resolve_module (module_name);
+  SCM var = scm_module_variable (mod, scm_from_utf8_symbol (proc_name));
+  if (scm_is_false (var))
+    return SCM_BOOL_F;
+  /* Check if the variable is bound before trying to get its value */
+  if (scm_is_false (scm_variable_bound_p (var)))
+    return SCM_BOOL_F;
+  SCM val = scm_variable_ref (var);
+  if (scm_is_true (scm_procedure_p (val)))
+    return val;
+  return SCM_BOOL_F;
+}
+
 /* Phase 4: Apply text properties from a wrapper to buffer range.
    WRAPPER is an emacs-string wrapper with intervals.
    START and END are buffer positions (1-based, like Emacs positions).
@@ -1282,12 +1300,17 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
 {
   /* Get the intervals from the wrapper using runtime-callable version */
   static SCM get_intervals_proc = SCM_BOOL_F;
-  if (scm_is_false (get_intervals_proc))
+  static bool intervals_lookup_done = false;
+  if (!intervals_lookup_done)
     {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
-      SCM symbol = scm_c_module_lookup (module, "emacs-string-intervals-runtime");
-      get_intervals_proc = scm_variable_ref (symbol);
+      get_intervals_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+                                                 "emacs-string-intervals-runtime");
+      intervals_lookup_done = true;
     }
+
+  /* If procedure not found, just return */
+  if (scm_is_false (get_intervals_proc))
+    return;
 
   SCM intervals = scm_call_1 (get_intervals_proc, wrapper);
 
@@ -1304,16 +1327,26 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
       static SCM interval_start_proc = SCM_BOOL_F;
       static SCM interval_end_proc = SCM_BOOL_F;
       static SCM interval_plist_proc = SCM_BOOL_F;
+      static bool interval_procs_lookup_done = false;
 
-      if (scm_is_false (interval_start_proc))
+      if (!interval_procs_lookup_done)
         {
-          SCM intervals_module = scm_c_resolve_module ("language elisp emacs text-properties");
-          SCM start_sym = scm_c_module_lookup (intervals_module, "get-interval-start");
-          interval_start_proc = scm_variable_ref (start_sym);
-          SCM end_sym = scm_c_module_lookup (intervals_module, "get-interval-end");
-          interval_end_proc = scm_variable_ref (end_sym);
-          SCM plist_sym = scm_c_module_lookup (intervals_module, "get-interval-plist");
-          interval_plist_proc = scm_variable_ref (plist_sym);
+          interval_start_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+                                                      "get-interval-start");
+          interval_end_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+                                                    "get-interval-end");
+          interval_plist_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+                                                      "get-interval-plist");
+          interval_procs_lookup_done = true;
+        }
+
+      /* If any procedure not found, skip this interval processing */
+      if (scm_is_false (interval_start_proc) ||
+          scm_is_false (interval_end_proc) ||
+          scm_is_false (interval_plist_proc))
+        {
+          intervals = scm_cdr (intervals);
+          continue;
         }
 
       SCM interval_start_scm = scm_call_1 (interval_start_proc, interval);
@@ -3416,7 +3449,7 @@ usage: (propertize STRING &rest PROPERTIES)  */)
       for (ptrdiff_t i = nargs - 1; i >= 0; i--)
         scm_args = scm_cons (args[i], scm_args);
 
-      /* Call Scheme propertize */
+      /* Call Scheme propertize (scm_propertize_proc is a module variable) */
       return scm_apply_0 (scm_variable_ref (scm_propertize_proc), scm_args);
     }
   else

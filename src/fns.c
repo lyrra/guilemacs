@@ -730,9 +730,8 @@ usage: (concat &rest SEQUENCES)  */)
                 scm_args = scm_cons (args[i], scm_args);
             }
 
-          /* Call Scheme concat-with-properties */
-          return scm_apply_0 (scm_variable_ref (scm_concat_with_properties_proc),
-                             scm_args);
+          /* Call Scheme concat-with-properties (proc is already cached) */
+          return scm_apply_0 (scm_concat_with_properties_proc, scm_args);
     }
 
   /* Fallback to original concat for non-string args or if Scheme not loaded */
@@ -1679,10 +1678,10 @@ With one argument, just copy STRING (with properties, if any).  */)
 
   if (STRINGP (string))
     {
-          /* Call Scheme substring-with-properties */
+          /* Call Scheme substring-with-properties (proc is already cached) */
           SCM start_scm = scm_from_ptrdiff_t (ifrom);
           SCM end_scm = scm_from_ptrdiff_t (ito);
-          res = scm_call_3 (scm_variable_ref (scm_substring_with_properties_proc),
+          res = scm_call_3 (scm_substring_with_properties_proc,
                            string, start_scm, end_scm);
     }
   else
@@ -2893,6 +2892,10 @@ Numbers are compared via `eql', so integers do not equal floats.
 Symbols must match exactly.  */)
   (Lisp_Object o1, Lisp_Object o2)
 {
+  /* Fast path: identical objects are always equal */
+  if (EQ (o1, o2))
+    return Qt;
+
   /* Phase 4: For emacs-string wrappers, compare content ignoring properties.
      We need a custom comparison that:
      1. Treats wrapper + wrapper as equal if content matches
@@ -2901,24 +2904,34 @@ Symbols must match exactly.  */)
 
      Strategy: Define a custom equal in Scheme that handles wrappers specially */
   static SCM custom_equal_proc = SCM_BOOL_F;
-  if (scm_is_false (custom_equal_proc))
+  static bool custom_equal_lookup_done = false;
+  if (!custom_equal_lookup_done)
     {
       SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
       if (!scm_is_false (mod))
         {
-          SCM var = scm_c_module_lookup (mod, "emacs-string-equal");
-          if (!scm_is_false (var))
-            custom_equal_proc = scm_variable_ref (var);
+          /* Use scm_module_variable which returns #f if binding doesn't exist */
+          SCM var = scm_module_variable (mod, scm_from_utf8_symbol ("emacs-string-equal"));
+          if (!scm_is_false (var) && scm_is_true (scm_variable_bound_p (var)))
+            {
+              SCM val = scm_variable_ref (var);
+              if (scm_is_true (scm_procedure_p (val)))
+                custom_equal_proc = val;
+            }
         }
+      custom_equal_lookup_done = true;
     }
 
-  if (!scm_is_false (custom_equal_proc))
+  /* Only use custom Scheme equal for strings (which may be emacs-string wrappers).
+     For all other types, use Guile's native equal? directly to avoid GC issues
+     with complex nested objects like keymaps. */
+  if (!scm_is_false (custom_equal_proc) && (STRINGP (o1) || STRINGP (o2)))
     {
       Lisp_Object result = scm_call_2 (custom_equal_proc, o1, o2);
       return scm_is_true (result) ? Qt : Qnil;
     }
 
-  /* Fallback to Guile's equal if custom proc not available */
+  /* Use Guile's equal for all non-string types */
   Lisp_Object x = scm_equal_p (o1, o2);
   return scm_is_true (x) ? Qt : Qnil;
 }
@@ -6562,8 +6575,9 @@ init_fns_once (void)
   scm_set_smob_equalp (lisp_string_tag, string_equal_p);
   scm_set_smob_equalp (lisp_vectorlike_tag, vectorlike_equal_p);
   scm_string_operations_module = scm_c_resolve_module ("language elisp emacs text-properties");
-  scm_substring_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "substring-with-properties");
-  scm_concat_with_properties_proc = scm_c_module_lookup (scm_string_operations_module, "concat-with-properties");
+  /* Use scm_c_public_ref to get actual procedures directly */
+  scm_substring_with_properties_proc = scm_c_public_ref ("language elisp emacs text-properties", "substring-with-properties");
+  scm_concat_with_properties_proc = scm_c_public_ref ("language elisp emacs text-properties", "concat-with-properties");
 }
 
 void

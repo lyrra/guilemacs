@@ -789,15 +789,22 @@ A printed representation of an object is text which describes that object.  */)
   /* Phase 4: Deep-unwrap emacs-strings before printing to avoid
      Guile printer trying to print wrapper record structures */
   static SCM deep_unwrap_proc = SCM_BOOL_F;
-  if (scm_is_false (deep_unwrap_proc))
+  static bool deep_unwrap_lookup_done = false;
+  if (!deep_unwrap_lookup_done)
     {
       SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
       if (!scm_is_false (mod))
         {
-          SCM var = scm_c_module_lookup (mod, "deep-unwrap-for-printing");
-          if (!scm_is_false (var))
-            deep_unwrap_proc = scm_variable_ref (var);
+          /* Use scm_module_variable which returns #f if binding doesn't exist */
+          SCM var = scm_module_variable (mod, scm_from_utf8_symbol ("deep-unwrap-for-printing"));
+          if (!scm_is_false (var) && scm_is_true (scm_variable_bound_p (var)))
+            {
+              SCM val = scm_variable_ref (var);
+              if (scm_is_true (scm_procedure_p (val)))
+                deep_unwrap_proc = val;
+            }
         }
+      deep_unwrap_lookup_done = true;
     }
 
   if (!scm_is_false (deep_unwrap_proc))
