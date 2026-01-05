@@ -4389,6 +4389,21 @@ compute_stop_pos (struct it *it)
 	    it->stop_charpos = min (it->stop_charpos, next_iv->position);
 	}
     }
+  else if (BUFFERP (object))
+    {
+      /* Guilemacs: C intervals are empty because text properties are
+         stored in Scheme. Use Fnext_property_change to find the next
+         position where ANY text property changes. */
+      Lisp_Object next_prop_change;
+      next_prop_change = Fnext_property_change (position, object, limit);
+
+      if (!NILP (next_prop_change))
+        {
+          ptrdiff_t next_pos = XFIXNUM (next_prop_change);
+          if (next_pos < it->stop_charpos)
+            it->stop_charpos = next_pos;
+        }
+    }
 
   if (it->cmp_it.id < 0)
     {
