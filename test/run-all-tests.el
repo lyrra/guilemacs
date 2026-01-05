@@ -57,6 +57,9 @@
 (load-file "test/text-property/test-scheme-storage.el")
 (message "")
 
+(load-file "test/text-property/test-known-bugs.el")
+(message "")
+
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")
