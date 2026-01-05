@@ -3897,6 +3897,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 		    spec->start = nchars;
 
 		  if (p > buf
+		      && nbytes > 0
 		      && !ASCII_CHAR_P (*((unsigned char *) p - 1))
 		      && !CHAR_HEAD_P (SREF (arg, 0)))
 		    maybe_combine_byte = true;
