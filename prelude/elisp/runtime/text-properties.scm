@@ -763,9 +763,17 @@ Returns #t if any properties were removed, #nil otherwise."
                  ((<= int-end start)
                   (loop (cdr ints) (cons int result) int-end))
 
-                 ;; Interval completely after range - keep rest as-is
+                 ;; Interval completely after range - store and return
                  ((>= int-start end)
-                  (merge-adjacent-intervals (append (reverse result) ints)))
+                  (let ((new-intervals (merge-adjacent-intervals (append (reverse result) ints))))
+                    (cond
+                      ((emacs-string? obj)
+                       (emacs-string-intervals-set! obj new-intervals)
+                       removed?)
+                      ((string? obj) #nil)
+                      (else
+                       (buffer-intervals-set! obj new-intervals)
+                       removed?))))
 
                  ;; Interval overlaps range - remove properties
                  (else
@@ -777,13 +785,16 @@ Returns #t if any properties were removed, #nil otherwise."
                          (overlap-start (max int-start start))
                          (overlap-end (min int-end end))
                          ;; Remove each property in props from plist
+                         ;; props is a plist (prop val prop val ...), step by 2
                          (new-plist (let remove-loop ((plist int-plist) (props-to-remove props))
                                      (if (null? props-to-remove)
                                          plist
                                          (let ((without-prop (remove-from-plist plist (car props-to-remove))))
                                            (when (not (equal? plist without-prop))
                                              (set! removed? #t))
-                                           (remove-loop without-prop (cdr props-to-remove))))))
+                                           (remove-loop without-prop (if (null? (cdr props-to-remove))
+                                                                         '()
+                                                                         (cddr props-to-remove)))))))
                          (overlap-part (if (null? new-plist)
                                           '()
                                           (list (make-interval overlap-start overlap-end new-plist))))
@@ -852,9 +863,23 @@ Returns #t."
              ((<= int-end start)
               (loop (cdr ints) (cons int result)))
 
-             ;; Interval completely after range - keep rest
+             ;; Interval completely after range - add new interval and store
              ((>= int-start end)
-              (append (reverse result) ints))
+              (let* ((cleared (reverse result))
+                     (new-interval (if (null? props)
+                                      '()
+                                      (list (make-interval start end props))))
+                     (merged (merge-adjacent-intervals
+                              (if (null? new-interval)
+                                  (append cleared ints)
+                                  (insert-sorted new-interval (append cleared ints))))))
+                (cond
+                  ((emacs-string? obj)
+                   (emacs-string-intervals-set! obj merged))
+                  ((string? obj) #f)
+                  (else
+                   (buffer-intervals-set! obj merged)))
+                #t))
 
              ;; Interval overlaps range - split and clear
              (else
