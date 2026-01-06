@@ -4347,56 +4347,12 @@ compute_stop_pos (struct it *it)
   /* Get the interval containing IT's position.  Value is a null
      interval if there isn't such an interval.  */
   position = make_fixnum (charpos);
-  iv = validate_interval_range (object, &position, &position, false);
-  /* Guilemacs: C intervals may exist but have empty plists because
-     text properties are stored in Scheme.  Only use C interval path
-     if plist is non-empty. */
-  if (iv && !NILP (iv->plist))
+
+  /* Guilemacs: For buffers, ALWAYS use Scheme path because text properties
+     are stored in Scheme.  C intervals may have stale data from property
+     inheritance during insert operations. */
+  if (BUFFERP (object))
     {
-      Lisp_Object values_here[LAST_PROP_IDX];
-      struct props *p;
-
-      /* Get properties here.  */
-      for (p = it_props; p->handler; ++p)
-	values_here[p->idx] = textget (iv->plist,
-				       builtin_lisp_symbol (p->name));
-
-      /* Look for an interval following iv that has different
-	 properties.  */
-      for (next_iv = next_interval (iv);
-	   (next_iv
-	    && (NILP (limit)
-		|| XFIXNAT (limit) > next_iv->position));
-	   next_iv = next_interval (next_iv))
-	{
-	  for (p = it_props; p->handler; ++p)
-	    {
-	      Lisp_Object new_value = textget (next_iv->plist,
-					       builtin_lisp_symbol (p->name));
-	      if (!EQ (values_here[p->idx], new_value))
-		break;
-	    }
-
-	  if (p->handler)
-	    break;
-	}
-
-      if (next_iv)
-	{
-	  if (FIXNUMP (limit)
-	      && next_iv->position >= XFIXNAT (limit))
-	    /* No text property change up to limit.  */
-	    it->stop_charpos = min (XFIXNAT (limit), it->stop_charpos);
-	  else
-	    /* Text properties change in next_iv.  */
-	    it->stop_charpos = min (it->stop_charpos, next_iv->position);
-	}
-    }
-  else if (BUFFERP (object))
-    {
-      /* Guilemacs: C intervals are empty because text properties are
-         stored in Scheme. Use Fnext_property_change to find the next
-         position where ANY text property changes. */
       Lisp_Object next_prop_change;
       next_prop_change = Fnext_property_change (position, object, limit);
 
@@ -4405,6 +4361,52 @@ compute_stop_pos (struct it *it)
           ptrdiff_t next_pos = XFIXNUM (next_prop_change);
           if (next_pos < it->stop_charpos)
             it->stop_charpos = next_pos;
+        }
+    }
+  else
+    {
+      /* For strings, use C interval path. */
+      iv = validate_interval_range (object, &position, &position, false);
+      if (iv)
+        {
+          Lisp_Object values_here[LAST_PROP_IDX];
+          struct props *p;
+
+          /* Get properties here.  */
+          for (p = it_props; p->handler; ++p)
+            values_here[p->idx] = textget (iv->plist,
+                                           builtin_lisp_symbol (p->name));
+
+          /* Look for an interval following iv that has different
+             properties.  */
+          for (next_iv = next_interval (iv);
+               (next_iv
+                && (NILP (limit)
+                    || XFIXNAT (limit) > next_iv->position));
+               next_iv = next_interval (next_iv))
+            {
+              for (p = it_props; p->handler; ++p)
+                {
+                  Lisp_Object new_value = textget (next_iv->plist,
+                                                   builtin_lisp_symbol (p->name));
+                  if (!EQ (values_here[p->idx], new_value))
+                    break;
+                }
+
+              if (p->handler)
+                break;
+            }
+
+          if (next_iv)
+            {
+              if (FIXNUMP (limit)
+                  && next_iv->position >= XFIXNAT (limit))
+                /* No text property change up to limit.  */
+                it->stop_charpos = min (XFIXNAT (limit), it->stop_charpos);
+              else
+                /* Text properties change in next_iv.  */
+                it->stop_charpos = min (it->stop_charpos, next_iv->position);
+            }
         }
     }
 
