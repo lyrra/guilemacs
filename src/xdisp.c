@@ -4348,7 +4348,10 @@ compute_stop_pos (struct it *it)
      interval if there isn't such an interval.  */
   position = make_fixnum (charpos);
   iv = validate_interval_range (object, &position, &position, false);
-  if (iv)
+  /* Guilemacs: C intervals may exist but have empty plists because
+     text properties are stored in Scheme.  Only use C interval path
+     if plist is non-empty. */
+  if (iv && !NILP (iv->plist))
     {
       Lisp_Object values_here[LAST_PROP_IDX];
       struct props *p;
