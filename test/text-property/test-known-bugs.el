@@ -10,16 +10,17 @@
 (test-begin "known-bugs")
 
 ;;; ============================================================
-;;; Bug #1: remove-text-properties Loop Bug
+;;; Bug #1: remove-text-properties Loop Bug - FIXED!
 ;;;
 ;;; When remove-text-properties is called in a loop to process
 ;;; multiple regions, the FIRST region's properties are not removed.
 ;;; Subsequent regions work correctly.
 ;;;
-;;; See BUGS-DISCOVERED.md for full details.
+;;; Fixed by: cddr not cdr for plist stepping, and storing intervals
+;;; on early return path.
 ;;; ============================================================
 
-(test-expect-fail 1)
+;; No longer XFAIL - bug is fixed!
 (with-temp-buffer
   (insert "text1 text2")
   (put-text-property 1 6 'face 'bold)
@@ -65,16 +66,16 @@
             (get-text-property 8 'invisible)))
 
 ;;; ============================================================
-;;; Bug #2: set-text-properties Loop Bug
+;;; Bug #2: set-text-properties Loop Bug - FIXED!
 ;;;
 ;;; When set-text-properties is called in a loop to process
 ;;; multiple regions, the FIRST region's properties are not set.
 ;;; Subsequent regions work correctly.
 ;;;
-;;; See BUGS-DISCOVERED.md for full details.
+;;; Fixed by: storing intervals on early return path.
 ;;; ============================================================
 
-(test-expect-fail 1)
+;; No longer XFAIL - bug is fixed!
 (with-temp-buffer
   (insert "bold1 bold2")
   (put-text-property 1 6 'face 'bold)

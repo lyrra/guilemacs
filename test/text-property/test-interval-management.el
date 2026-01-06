@@ -217,4 +217,56 @@
              'special
              (plist-get props 'category))))
 
+;;; ============================================================
+;;; XFAIL Tests - Known Bugs in Interval Management
+;;; ============================================================
+
+;; Bug #5: Interval merging uses equal? instead of eq
+;;
+;; When consecutive positions have structurally-equal but distinct
+;; objects as property values, they are incorrectly merged.
+;; Emacs uses eq (object identity) for merge decisions, but
+;; Guilemacs uses equal? (structural comparison).
+;;
+;; Impact: Tetris/gamegrid shows only first cell of each color.
+;; Fix: Change equal? to eq? in plist-equal? (text-properties.scm:117)
+
+(test-expect-fail 1)
+(with-temp-buffer
+  (insert (make-string 20 ?.))
+  ;; Add properties with UNIQUE objects at consecutive positions
+  (dotimes (i 5)
+    (let ((pos (+ 6 i))
+          ;; Each position gets a unique cons cell (simulates unique image)
+          (unique-value (cons 'display-value i)))
+      (put-text-property pos (1+ pos) 'display unique-value)))
+
+  ;; Count property boundaries
+  ;; With consecutive positions having DIFFERENT values:
+  ;; 1->6 (nil->val), 6->7, 7->8, 8->9, 9->10, 10->11 (val->nil) = 6 changes
+  ;; Before fix: only 2 changes (all merged into one interval)
+  (let ((pos 1)
+        (changes 0))
+    (while (and pos (< pos (point-max)))
+      (setq pos (next-property-change pos))
+      (when pos (setq changes (1+ changes))))
+    (test-equal "interval-management/merge-uses-eq-not-equal"
+                6 changes)))
+
+;; Verify same-object properties SHOULD merge (this is correct behavior)
+(with-temp-buffer
+  (insert (make-string 20 ?.))
+  ;; Use SAME object for all positions
+  (let ((same-value (cons 'display-value 'shared)))
+    (dotimes (i 5)
+      (put-text-property (+ 6 i) (+ 7 i) 'display same-value)))
+  ;; With same object, merging is correct - should be 2 changes
+  (let ((pos 1)
+        (changes 0))
+    (while (and pos (< pos (point-max)))
+      (setq pos (next-property-change pos))
+      (when pos (setq changes (1+ changes))))
+    (test-equal "interval-management/same-object-merges-correctly"
+                2 changes)))
+
 (test-end)
