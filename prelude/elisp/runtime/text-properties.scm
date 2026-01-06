@@ -110,11 +110,15 @@ Returns new plist."
        (loop (cddr lst) (cons (cadr lst) (cons (car lst) result)))))))
 
 (define (plist-equal? p1 p2)
-  "Return #t if property lists P1 and P2 are equal."
+  "Return #t if property lists P1 and P2 are equal.
+Uses eq? for value comparison to match Emacs behavior - intervals
+should only merge when property values are the exact same object,
+not just structurally equal.  This is critical for display properties
+where each cell needs its own image object."
   (and (= (length p1) (length p2))
        (let loop ((lst p1))
          (or (null? lst)
-             (and (equal? (plist-get p2 (car lst)) (cadr lst))
+             (and (eq? (plist-get p2 (car lst)) (cadr lst))
                   (loop (cddr lst)))))))
 
 (define (parse-plist props)

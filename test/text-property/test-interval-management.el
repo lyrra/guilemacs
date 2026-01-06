@@ -231,7 +231,7 @@
 ;; Impact: Tetris/gamegrid shows only first cell of each color.
 ;; Fix: Change equal? to eq? in plist-equal? (text-properties.scm:117)
 
-(test-expect-fail 1)
+;; Bug #5 is now FIXED - no longer XFAIL
 (with-temp-buffer
   (insert (make-string 20 ?.))
   ;; Add properties with UNIQUE objects at consecutive positions
@@ -268,5 +268,26 @@
       (when pos (setq changes (1+ changes))))
     (test-equal "interval-management/same-object-merges-correctly"
                 2 changes)))
+
+;; Gamegrid-style pattern: shared glyph wrapped in new list each time
+;; This is the critical test - with equal? these would merge (same structure)
+;; but with eq? they stay separate (different list objects)
+(with-temp-buffer
+  (insert (make-string 20 ?.))
+  ;; Shared "glyph" (simulated) wrapped in new list each time
+  (let ((shared-glyph (cons 'image 'data)))
+    (dotimes (i 5)
+      (let ((pos (+ 6 i)))
+        ;; Like gamegrid: (list 'display (list glyph)) - new list each call
+        (put-text-property pos (1+ pos) 'display (list shared-glyph)))))
+  ;; With eq?: different list objects -> 6 changes (no merge)
+  ;; With equal?: same structure -> would be 2 changes (merged) - WRONG!
+  (let ((pos 1)
+        (changes 0))
+    (while (and pos (< pos (point-max)))
+      (setq pos (next-property-change pos))
+      (when pos (setq changes (1+ changes))))
+    (test-equal "interval-management/gamegrid-pattern-no-merge"
+                6 changes)))
 
 (test-end)
