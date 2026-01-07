@@ -1359,14 +1359,21 @@ adjust_intervals_for_deletion (struct buffer *buffer,
 void
 offset_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t length)
 {
-  if (!buffer_intervals (buffer) || length == 0)
+  if (length == 0)
     return;
 
-  if (length > 0)
-    adjust_intervals_for_insertion (buffer_intervals (buffer),
-				    start, length);
-  else
-    adjust_intervals_for_deletion (buffer, start, -length);
+  /* Adjust C intervals if present */
+  if (buffer_intervals (buffer))
+    {
+      if (length > 0)
+        adjust_intervals_for_insertion (buffer_intervals (buffer),
+                                        start, length);
+      else
+        adjust_intervals_for_deletion (buffer, start, -length);
+    }
+
+  /* Always adjust Scheme intervals (they may exist even if C intervals don't) */
+  offset_scheme_intervals (buffer, start, length);
 }
 
 /* Merge interval I with its lexicographic successor. The resulting
@@ -1569,6 +1576,16 @@ graft_intervals_into_buffer (INTERVAL source, ptrdiff_t position,
 			     ptrdiff_t length, struct buffer *buffer,
 			     bool inherit)
 {
+  /* Guilemacs: Buffer text properties are stored in Scheme, not C intervals.
+     Skip C interval processing entirely for buffers to avoid duplicate work.
+     This is a performance optimization - Scheme intervals are authoritative. */
+  (void) source;
+  (void) position;
+  (void) length;
+  (void) buffer;
+  (void) inherit;
+  return;
+
   INTERVAL tree = buffer_intervals (buffer);
   INTERVAL under, over, this;
   ptrdiff_t over_used;
@@ -2138,7 +2155,48 @@ get_property_and_range (ptrdiff_t pos, Lisp_Object prop, Lisp_Object *val,
 			ptrdiff_t *start, ptrdiff_t *end, Lisp_Object object)
 {
   INTERVAL i, prev, next;
+  Lisp_Object obj = object;
 
+  if (NILP (obj))
+    XSETBUFFER (obj, current_buffer);
+
+  /* Guilemacs: For buffers, try Scheme text properties first.
+     This is needed because C intervals may be empty while Scheme
+     intervals have the actual properties. */
+  if (BUFFERP (obj))
+    {
+      Lisp_Object position = make_fixnum (pos);
+      *val = Fget_text_property (position, prop, obj);
+      if (!NILP (*val))
+        {
+          /* Found property in Scheme.  Use Scheme navigation to find range. */
+          Lisp_Object prev_change, next_change;
+          struct buffer *b = XBUFFER (obj);
+          ptrdiff_t begv = BUF_BEGV (b);
+          ptrdiff_t zv = BUF_ZV (b);
+
+          /* Find start of region with same property value */
+          prev_change = Fprevious_single_property_change (position, prop, obj,
+                                                          make_fixnum (begv));
+          if (NILP (prev_change))
+            *start = begv;
+          else
+            *start = XFIXNUM (prev_change);
+
+          /* Find end of region with same property value */
+          next_change = Fnext_single_property_change (position, prop, obj,
+                                                      make_fixnum (zv));
+          if (NILP (next_change))
+            *end = zv;
+          else
+            *end = XFIXNUM (next_change);
+
+          return 1;
+        }
+      /* Fall through to C interval check if Scheme returned nil */
+    }
+
+  /* Original C interval implementation for strings and fallback */
   if (NILP (object))
     i = find_interval (buffer_intervals (current_buffer), pos);
   else if (BUFFERP (object))

@@ -262,6 +262,7 @@ extern INTERVAL next_interval (INTERVAL);
 extern INTERVAL previous_interval (INTERVAL);
 extern INTERVAL merge_interval_left (INTERVAL);
 extern void offset_intervals (struct buffer *, ptrdiff_t, ptrdiff_t);
+extern void offset_scheme_intervals (struct buffer *, ptrdiff_t, ptrdiff_t);
 extern void graft_intervals_into_buffer (INTERVAL, ptrdiff_t, ptrdiff_t,
                                          struct buffer *, bool);
 extern void verify_interval_modification (struct buffer *,
