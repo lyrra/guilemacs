@@ -115,18 +115,31 @@ Uses eq? for value comparison to match Emacs behavior - intervals
 should only merge when property values are the exact same object,
 not just structurally equal.  This is critical for display properties
 where each cell needs its own image object."
-  (and (= (length p1) (length p2))
-       (let loop ((lst p1))
-         (or (null? lst)
-             (and (eq? (plist-get p2 (car lst)) (cadr lst))
-                  (loop (cddr lst)))))))
+  ;; First check: both lists have same properties with same values
+  ;; Avoid O(n) length call by checking during traversal
+  (let loop ((lst p1))
+    (cond
+      ((null? lst)
+       ;; All p1 properties matched, now check p2 doesn't have extra
+       (let check-p2 ((lst2 p2))
+         (or (null? lst2)
+             (and (eq? (plist-get p1 (car lst2)) (cadr lst2))
+                  (check-p2 (cddr lst2))))))
+      (else
+       (and (eq? (plist-get p2 (car lst)) (cadr lst))
+            (loop (cddr lst)))))))
 
 (define (parse-plist props)
   "Parse property list from list of alternating keys and values.
 Example: '(face bold mouse-face highlight) -> same list
 Validates that length is even."
-  (when (odd? (length props))
-    (error "parse-plist: property list must have even length" props))
+  ;; Check length is even without calling length (O(n))
+  (let check ((lst props) (even? #t))
+    (cond
+      ((null? lst)
+       (unless even?
+         (error "parse-plist: property list must have even length" props)))
+      (else (check (cdr lst) (not even?)))))
   props)
 
 (define (remove-from-plist plist prop)
@@ -190,7 +203,8 @@ If POS is outside interval bounds, return (interval . #f)."
 (define (merge-adjacent-intervals intervals)
   "Merge adjacent intervals with identical properties.
 Returns new interval list."
-  (if (< (length intervals) 2)
+  ;; Fast check: empty or single element list (avoid O(n) length call)
+  (if (or (null? intervals) (null? (cdr intervals)))
       intervals
       (let loop ((remaining intervals) (result '()))
         (if (null? (cdr remaining))
@@ -208,6 +222,38 @@ Returns new interval list."
                   ;; Keep them separate
                   (loop (cdr remaining) (cons int1 result))))))))
 
+(define (merge-at-boundaries intervals start-pos end-pos)
+  "Merge only around the modified region [start-pos, end-pos).
+Much faster than merge-adjacent-intervals for large interval lists
+when only a small region was modified."
+  (if (or (null? intervals) (null? (cdr intervals)))
+      intervals
+      ;; Find intervals touching the modified region and only merge those
+      (let loop ((remaining intervals) (result '()) (in-region? #f))
+        (cond
+          ((null? (cdr remaining))
+           (reverse (cons (car remaining) result)))
+          (else
+           (let* ((int1 (car remaining))
+                  (int2 (cadr remaining))
+                  (near-region? (or in-region?
+                                    (and (< (interval-start int1) end-pos)
+                                         (> (interval-end int2) start-pos)))))
+             (if (and near-region?
+                      (= (interval-end int1) (interval-start int2))
+                      (plist-equal? (interval-plist int1) (interval-plist int2)))
+                 ;; Merge the two intervals
+                 (loop (cons (make-interval (interval-start int1)
+                                           (interval-end int2)
+                                           (interval-plist int1))
+                            (cddr remaining))
+                       result
+                       #t)
+                 ;; Keep them separate
+                 (loop (cdr remaining)
+                       (cons int1 result)
+                       (and near-region? (< (interval-end int1) end-pos))))))))))
+
 (define (add-properties-to-intervals intervals start end new-props)
   "Add NEW-PROPS to INTERVALS in range [START, END).
 Returns new interval list."
@@ -220,15 +266,15 @@ Returns new interval list."
           ((null? ints)
            ;; Done processing - add final gap if needed
            (if (< last-covered end)
-               (merge-adjacent-intervals (reverse (cons (make-interval last-covered end new-props) result)))
-               (merge-adjacent-intervals (reverse result))))
+               (merge-at-boundaries (reverse (cons (make-interval last-covered end new-props) result)) start end)
+               (merge-at-boundaries (reverse result) start end)))
 
           ((>= (interval-start (car ints)) end)
            ;; This interval is after our range
            ;; Add any remaining gap, then keep rest as-is
            (if (< last-covered end)
-               (merge-adjacent-intervals (append (reverse (cons (make-interval last-covered end new-props) result)) ints))
-               (merge-adjacent-intervals (append (reverse result) ints))))
+               (merge-at-boundaries (append (reverse (cons (make-interval last-covered end new-props) result)) ints) start end)
+               (merge-at-boundaries (append (reverse result) ints) start end)))
 
           ((<= (interval-end (car ints)) start)
            ;; This interval is before our range (or adjacent), keep it
@@ -588,15 +634,41 @@ Plain strings always return #f."
 
 (define *buffer-text-properties* (make-hash-table))
 
+;; Cache for interval vectors - avoids list->vector on every next-property-change
+(define *buffer-interval-vector-cache* (make-hash-table))
+
 (define (buffer-intervals-get buffer)
   "Get interval list for BUFFER."
   (hashq-ref *buffer-text-properties* buffer '()))
 
 (define (buffer-intervals-set! buffer intervals)
-  "Set interval list for BUFFER."
+  "Set interval list for BUFFER.
+Also invalidates the vector cache for this buffer."
+  ;; Invalidate vector cache
+  (hashq-remove! *buffer-interval-vector-cache* buffer)
   (if (null? intervals)
       (hashq-remove! *buffer-text-properties* buffer)
       (hashq-set! *buffer-text-properties* buffer intervals)))
+
+(define (buffer-intervals-vector-get buffer)
+  "Get cached vector of intervals for BUFFER.
+Creates and caches the vector if not already cached.
+Returns #f if buffer has no intervals."
+  (let ((cached (hashq-ref *buffer-interval-vector-cache* buffer 'not-cached)))
+    (if (not (eq? cached 'not-cached))
+        ;; Cached - return it (may be empty vector)
+        cached
+        ;; Not cached - build and cache
+        (let ((intervals (buffer-intervals-get buffer)))
+          (if (null? intervals)
+              ;; No intervals - cache #f to avoid rebuilding
+              (begin
+                (hashq-set! *buffer-interval-vector-cache* buffer #f)
+                #f)
+              ;; Has intervals - cache vector
+              (let ((vec (list->vector intervals)))
+                (hashq-set! *buffer-interval-vector-cache* buffer vec)
+                vec))))))
 
 ;;;
 ;;; SECTION 12: TEXT PROPERTY OPERATIONS
@@ -622,9 +694,10 @@ OBJ can be:
   - A plain string (returns #nil)
   - A buffer (looks up in buffer property table)
   - #nil (uses current buffer - TODO)
-Returns property value or #nil if not found."
+Returns property value or #nil if not found.
+Uses binary search for buffers (O(log n))."
   (cond
-    ;; Wrapped string - get from intervals
+    ;; Wrapped string - get from intervals (linear, but strings are usually small)
     ((emacs-string? obj)
      (let ((intervals (emacs-string-intervals obj)))
        (interval-get-property-at intervals pos prop)))
@@ -633,14 +706,25 @@ Returns property value or #nil if not found."
     ((string? obj)
      #nil)
 
-    ;; Buffer - get from buffer property table
+    ;; Buffer - use cached vector with binary search for O(log n)
     (else
-     (let ((intervals (buffer-intervals-get obj)))
-       (interval-get-property-at intervals pos prop)))))
+     (let ((vec (buffer-intervals-vector-get obj)))
+       (if (not vec)
+           #nil
+           (let ((idx (binary-search-interval vec pos)))
+             (if (not idx)
+                 #nil
+                 (let* ((int (vector-ref vec idx))
+                        (int-start (interval-start int))
+                        (int-end (interval-end int)))
+                   (if (and (>= pos int-start) (< pos int-end))
+                       (plist-get (interval-plist int) prop)
+                       #nil)))))))))
 
 (define (text-properties-at pos obj)
   "Get all properties at POS in OBJ.
-Returns property list or #nil."
+Returns property list or #nil.
+Uses binary search for buffers (O(log n))."
   (cond
     ;; Wrapped string
     ((emacs-string? obj)
@@ -651,10 +735,20 @@ Returns property list or #nil."
     ((string? obj)
      #nil)
 
-    ;; Buffer
+    ;; Buffer - use cached vector with binary search for O(log n)
     (else
-     (let ((intervals (buffer-intervals-get obj)))
-       (interval-get-plist-at intervals pos)))))
+     (let ((vec (buffer-intervals-vector-get obj)))
+       (if (not vec)
+           #nil
+           (let ((idx (binary-search-interval vec pos)))
+             (if (not idx)
+                 #nil
+                 (let* ((int (vector-ref vec idx))
+                        (int-start (interval-start int))
+                        (int-end (interval-end int)))
+                   (if (and (>= pos int-start) (< pos int-end))
+                       (interval-plist int)
+                       #nil)))))))))
 
 (define (add-text-properties start end props obj)
   "Add PROPS to text from START to END in OBJ.
@@ -711,19 +805,54 @@ Returns #t if properties were added."
   "Get all properties at POS in BUFFER."
   (text-properties-at pos buffer))
 
+;; Track pending interval adjustments to coalesce delete+insert at same position.
+;; This is critical for gamegrid performance - each cell update does delete+insert
+;; of same length at same position, which results in no net interval change.
+(define *pending-delete* (make-hash-table))  ; buffer -> (pos . len)
+
 (define (buffer-on-insert buffer pos len)
   "Hook called after inserting LEN characters at POS in BUFFER.
-Adjusts text property intervals accordingly."
-  (let* ((old-intervals (buffer-intervals-get buffer))
-         (new-intervals (adjust-intervals-on-insert old-intervals pos len)))
-    (buffer-intervals-set! buffer new-intervals)))
+Adjusts text property intervals accordingly.
+Optimizes by detecting delete+insert at same position with same length."
+  (let ((pending (hashq-ref *pending-delete* buffer #f)))
+    (cond
+     ;; Check if this insert cancels a pending delete
+     ((and pending
+           (= pos (car pending))
+           (= len (cdr pending)))
+      ;; Delete and insert at same position with same length - no net change!
+      ;; Just clear the pending delete, no interval adjustment needed.
+      (hashq-remove! *pending-delete* buffer))
+
+     (else
+      ;; Apply any pending delete first
+      (when pending
+        (let* ((del-pos (car pending))
+               (del-len (cdr pending))
+               (old-intervals (buffer-intervals-get buffer))
+               (new-intervals (adjust-intervals-on-delete old-intervals del-pos (+ del-pos del-len))))
+          (buffer-intervals-set! buffer new-intervals))
+        (hashq-remove! *pending-delete* buffer))
+
+      ;; Now apply this insert
+      (let* ((old-intervals (buffer-intervals-get buffer))
+             (new-intervals (adjust-intervals-on-insert old-intervals pos len)))
+        (buffer-intervals-set! buffer new-intervals))))))
 
 (define (buffer-on-delete buffer start end)
   "Hook called after deleting text from START to END in BUFFER.
-Adjusts text property intervals accordingly."
-  (let* ((old-intervals (buffer-intervals-get buffer))
-         (new-intervals (adjust-intervals-on-delete old-intervals start end)))
-    (buffer-intervals-set! buffer new-intervals)))
+Records pending delete for potential coalescing with subsequent insert."
+  ;; First, apply any existing pending delete
+  (let ((pending (hashq-ref *pending-delete* buffer #f)))
+    (when pending
+      (let* ((del-pos (car pending))
+             (del-len (cdr pending))
+             (old-intervals (buffer-intervals-get buffer))
+             (new-intervals (adjust-intervals-on-delete old-intervals del-pos (+ del-pos del-len))))
+        (buffer-intervals-set! buffer new-intervals))))
+
+  ;; Record this delete as pending (may be cancelled by subsequent insert)
+  (hashq-set! *pending-delete* buffer (cons start (- end start))))
 
 ;;;
 ;;; SECTION 14: PROPERTY REMOVAL AND SETTING
@@ -903,150 +1032,244 @@ Returns #t."
 ;;; Functions to find positions where text properties change.
 ;;;
 
+;; Binary search helper for finding interval containing or after position
+(define (binary-search-interval vec position)
+  "Find index of first interval that ends after POSITION using binary search.
+Returns index or #f if none found."
+  (let ((len (vector-length vec)))
+    (if (zero? len)
+        #f
+        (let loop ((lo 0) (hi (- len 1)))
+          (if (> lo hi)
+              (if (< lo len) lo #f)
+              (let* ((mid (quotient (+ lo hi) 2))
+                     (int (vector-ref vec mid))
+                     (int-end (interval-end int)))
+                (cond
+                 ((<= int-end position)
+                  (loop (+ mid 1) hi))
+                 (else
+                  (loop lo (- mid 1))))))))))
+
 (define (next-property-change position object limit)
   "Find next position where ANY property changes in OBJECT starting from POSITION.
 Returns the position of the change, or LIMIT if no change found.
 OBJECT can be a buffer, string, or emacs-string wrapper.
 LIMIT is optional - defaults to end of object if not provided."
-  (let* ((intervals (cond
-                     ((emacs-string? object) (emacs-string-intervals object))
-                     ((string? object) '())
-                     (else (buffer-intervals-get object))))
-         (obj-end (cond
-                   ((emacs-string? object) (emacs-string-length object))
-                   ((string? object) (string-length object))
-                   (else #f)))
-         (actual-limit (if (and limit (not (eq? limit #nil)))
-                          limit
-                          obj-end)))
+  (cond
+   ;; Emacs-string wrapper
+   ((emacs-string? object)
+    (let* ((intervals (emacs-string-intervals object))
+           (obj-end (emacs-string-length object))
+           (actual-limit (if (and limit (not (eq? limit #nil))) limit obj-end)))
+      (if (null? intervals)
+          (or limit #nil)
+          (let* ((vec (list->vector intervals))
+                 (idx (binary-search-interval vec position)))
+            (next-property-change-from-index vec idx position actual-limit limit)))))
 
-    ;; If no intervals, no property changes
-    (if (null? intervals)
-        (or limit #nil)
-        ;; Find the next interval boundary after position
-        (let loop ((ints intervals))
-          (cond
-           ((null? ints)
-            (or limit #nil))
+   ;; Plain string - no properties
+   ((string? object)
+    (or limit #nil))
 
-           (else
-            (let* ((int (car ints))
-                   (int-start (interval-start int))
-                   (int-end (interval-end int)))
+   ;; Buffer - use cached vector for performance
+   (else
+    (let ((vec (buffer-intervals-vector-get object)))
+      (if (not vec)
+          ;; No intervals
+          (or limit #nil)
+          ;; Use binary search
+          (let ((idx (binary-search-interval vec position)))
+            (next-property-change-from-index vec idx position #f limit)))))))
 
-              (cond
-               ;; Interval is entirely before position - skip
-               ((<= int-end position)
-                (loop (cdr ints)))
+(define (next-property-change-from-index vec idx position actual-limit limit)
+  "Helper: find next property change given vector and index."
+  (if (not idx)
+      (or limit #nil)
+      (let* ((int (vector-ref vec idx))
+             (int-start (interval-start int))
+             (int-end (interval-end int)))
+        (cond
+         ;; We're before this interval - return its start
+         ((< position int-start)
+          (if (and actual-limit (>= int-start actual-limit))
+              (or limit #nil)
+              int-start))
+         ;; We're inside this interval - return its end
+         ((< position int-end)
+          (if (and actual-limit (>= int-end actual-limit))
+              (or limit #nil)
+              int-end))
+         ;; Shouldn't happen with correct binary search
+         (else
+          (or limit #nil))))))
 
-               ;; We're before this interval
-               ((< position int-start)
-                (if (and actual-limit (>= int-start actual-limit))
-                    (or limit #nil)
-                    int-start))
-
-               ;; We're inside this interval
-               ((< position int-end)
-                (if (and actual-limit (>= int-end actual-limit))
-                    (or limit #nil)
-                    int-end))
-
-               (else
-                (loop (cdr ints)))))))))))
+(define (binary-search-interval-before vec position)
+  "Find index of last interval that starts before POSITION using binary search.
+Returns index or #f if none found."
+  (let ((len (vector-length vec)))
+    (if (zero? len)
+        #f
+        (let loop ((lo 0) (hi (- len 1)) (best #f))
+          (if (> lo hi)
+              best
+              (let* ((mid (quotient (+ lo hi) 2))
+                     (int (vector-ref vec mid))
+                     (int-start (interval-start int)))
+                (cond
+                 ((< int-start position)
+                  ;; This interval starts before position - it could be the one
+                  (loop (+ mid 1) hi mid))
+                 (else
+                  ;; This interval starts at or after position
+                  (loop lo (- mid 1) best)))))))))
 
 (define (previous-property-change position object limit)
   "Find previous position where ANY property changes in OBJECT before POSITION.
 Returns the position of the change, or LIMIT if no change found."
-  (let* ((intervals (cond
-                     ((emacs-string? object) (emacs-string-intervals object))
-                     ((string? object) '())
-                     (else (buffer-intervals-get object))))
-         (actual-limit (if (and limit (not (eq? limit #nil))) limit 0)))
+  (let ((actual-limit (if (and limit (not (eq? limit #nil))) limit 0)))
+    (cond
+     ;; Emacs-string wrapper
+     ((emacs-string? object)
+      (let ((intervals (emacs-string-intervals object)))
+        (if (null? intervals)
+            (or limit #nil)
+            (let* ((vec (list->vector intervals))
+                   (idx (binary-search-interval-before vec position)))
+              (previous-property-change-from-index vec idx position actual-limit limit)))))
 
-    (if (null? intervals)
-        (or limit #nil)
-        (let loop ((ints (reverse intervals)))
-          (cond
-           ((null? ints) (or limit #nil))
-           (else
-            (let* ((int (car ints))
-                   (int-start (interval-start int))
-                   (int-end (interval-end int)))
-              (cond
-               ((>= int-start position) (loop (cdr ints)))
-               ((> position int-end)
-                (if (<= int-end actual-limit) (or limit #nil) int-end))
-               ((>= position int-start)
-                (if (<= int-start actual-limit) (or limit #nil) int-start))
-               (else (loop (cdr ints)))))))))))
+     ;; Plain string - no properties
+     ((string? object)
+      (or limit #nil))
+
+     ;; Buffer - use cached vector for performance
+     (else
+      (let ((vec (buffer-intervals-vector-get object)))
+        (if (not vec)
+            (or limit #nil)
+            (let ((idx (binary-search-interval-before vec position)))
+              (previous-property-change-from-index vec idx position actual-limit limit))))))))
+
+(define (previous-property-change-from-index vec idx position actual-limit limit)
+  "Helper: find previous property change given vector and index."
+  (if (not idx)
+      (or limit #nil)
+      (let* ((int (vector-ref vec idx))
+             (int-start (interval-start int))
+             (int-end (interval-end int)))
+        (cond
+         ;; Position is after this interval's end - return end
+         ((> position int-end)
+          (if (<= int-end actual-limit) (or limit #nil) int-end))
+         ;; Position is inside this interval - return start
+         ((>= position int-start)
+          (if (<= int-start actual-limit) (or limit #nil) int-start))
+         ;; Shouldn't happen with correct binary search
+         (else
+          (or limit #nil))))))
 
 (define (next-single-property-change position prop obj limit)
-  "Find next position where PROP changes in OBJ starting from POSITION."
-  (let* ((intervals (cond
-                     ((emacs-string? obj) (emacs-string-intervals obj))
-                     ((string? obj) '())
-                     (else (buffer-intervals-get obj))))
-         (current-val (interval-get-property-at intervals position prop)))
-    (if (null? intervals)
-        (or limit #nil)
-        ;; We need to track gaps between intervals as we search forward
-        ;; Intervals only exist for text WITH properties, gaps have nil properties
-        ;; prev-end tracks the END of the previously processed interval
-        (let loop ((ints intervals) (prev-end #f))
-          (cond
-            ((null? ints)
-             ;; No more intervals - if current position is inside a non-nil region,
-             ;; the property changes to nil at prev-end
-             (if (and prev-end
-                      (not (eq? current-val #nil)))
-                 prev-end
-                 (or limit #nil)))
+  "Find next position where PROP changes in OBJ starting from POSITION.
+Uses binary search for O(log n) initial lookup."
+  (cond
+   ;; Emacs-string wrapper
+   ((emacs-string? obj)
+    (let ((intervals (emacs-string-intervals obj)))
+      (if (null? intervals)
+          (or limit #nil)
+          (let ((vec (list->vector intervals)))
+            (next-single-property-change-from-vec vec position prop limit)))))
 
-            (else
-             (let* ((int (car ints))
-                    (int-start (interval-start int))
-                    (int-end (interval-end int))
-                    (int-val (plist-get (interval-plist int) prop)))
-               (cond
-                 ;; Interval is completely before position - skip it (update prev-end)
-                 ((<= int-end position)
-                  (loop (cdr ints) int-end))
+   ;; Plain string - no properties
+   ((string? obj)
+    (or limit #nil))
 
-                 ;; We're before this interval - check value
-                 ((< position int-start)
-                  (if (eq? current-val #nil)
-                      ;; In nil region, change is at start of interval (if different value)
-                      (if (eq? int-val #nil)
-                          (loop (cdr ints) int-end)
-                          int-start)
-                      ;; In non-nil region before any interval - shouldn't normally happen
-                      int-start))
+   ;; Buffer - use cached vector for O(log n) lookup
+   (else
+    (let ((vec (buffer-intervals-vector-get obj)))
+      (if (not vec)
+          (or limit #nil)
+          (next-single-property-change-from-vec vec position prop limit))))))
 
-                 ;; We're inside this interval
-                 ((and (>= position int-start) (< position int-end))
-                  (if (equal? int-val current-val)
-                      ;; Same value - need to check what comes after this interval
-                      ;; If there's a gap or next interval has different value, return int-end
-                      ;; Otherwise continue searching
-                      (if (null? (cdr ints))
-                          ;; No more intervals after this, property changes to nil at int-end
-                          (if (eq? current-val #nil)
-                              (or limit #nil)
-                              int-end)
-                          ;; Check next interval
-                          (let* ((next-int (cadr ints))
-                                 (next-start (interval-start next-int))
-                                 (next-val (plist-get (interval-plist next-int) prop)))
-                            (if (or (> next-start int-end)  ; Gap after this interval
-                                    (not (equal? next-val current-val)))  ; Or different value
-                                int-end
-                                ;; Next interval is adjacent with same value, keep searching
-                                (loop (cdr ints) int-end))))
-                      ;; Different value - change is at interval start
-                      int-start))
+(define (next-single-property-change-from-vec vec position prop limit)
+  "Find next position where PROP changes, using vector with binary search."
+  (let* ((len (vector-length vec))
+         (actual-limit (if (and limit (not (eq? limit #nil))) limit #f))
+         ;; Get current value at position (need to check if position is in an interval)
+         (idx (binary-search-interval vec position))
+         (current-val (if idx
+                         (let* ((int (vector-ref vec idx))
+                                (int-start (interval-start int))
+                                (int-end (interval-end int)))
+                           (if (and (>= position int-start) (< position int-end))
+                               (plist-get (interval-plist int) prop)
+                               #nil))
+                         #nil)))
+    ;; Start from idx (or 0 if no interval found)
+    (let loop ((i (or idx 0)))
+      (if (>= i len)
+          ;; No more intervals
+          (or limit #nil)
+          (let* ((int (vector-ref vec i))
+                 (int-start (interval-start int))
+                 (int-end (interval-end int))
+                 (int-val (plist-get (interval-plist int) prop)))
+            (cond
+             ;; Interval ends at or before position - skip
+             ((<= int-end position)
+              (loop (+ i 1)))
 
-                 (else
-                  (loop (cdr ints) int-end))))))))))
+             ;; Check limit
+             ((and actual-limit (>= int-start actual-limit))
+              (or limit #nil))
+
+             ;; Position is before this interval (in a gap)
+             ((< position int-start)
+              (if (eq? current-val #nil)
+                  ;; We're in nil region - change is at int-start if prop is non-nil there
+                  (if (eq? int-val #nil)
+                      (loop (+ i 1))  ; Same value, keep looking
+                      int-start)       ; Property becomes non-nil here
+                  ;; We have a value but we're in a gap? That's inconsistent, return start
+                  int-start))
+
+             ;; Position is inside this interval
+             ((< position int-end)
+              (if (equal? int-val current-val)
+                  ;; Same value - check what comes next
+                  (let ((next-i (+ i 1)))
+                    (if (>= next-i len)
+                        ;; No more intervals - property changes to nil at int-end
+                        (if (eq? current-val #nil)
+                            (or limit #nil)
+                            (if (and actual-limit (>= int-end actual-limit))
+                                (or limit #nil)
+                                int-end))
+                        ;; Check next interval
+                        (let* ((next-int (vector-ref vec next-i))
+                               (next-start (interval-start next-int))
+                               (next-val (plist-get (interval-plist next-int) prop)))
+                          (cond
+                           ;; Gap after this interval - property changes at int-end
+                           ((> next-start int-end)
+                            (if (and actual-limit (>= int-end actual-limit))
+                                (or limit #nil)
+                                int-end))
+                           ;; Next interval has different value
+                           ((not (equal? next-val current-val))
+                            (if (and actual-limit (>= int-end actual-limit))
+                                (or limit #nil)
+                                int-end))
+                           ;; Same value, keep searching
+                           (else
+                            (loop next-i))))))
+                  ;; Different value - this shouldn't happen if we computed current-val correctly
+                  ;; But handle it: the change was at int-start
+                  int-start))
+
+             ;; Should not reach here
+             (else
+              (loop (+ i 1)))))))))
 
 (define (previous-single-property-change position prop obj limit)
   "Find previous position where PROP changes in OBJ before POSITION."
