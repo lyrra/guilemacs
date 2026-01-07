@@ -35,9 +35,18 @@ static SCM scm_remove_text_properties_proc = SCM_BOOL_F;
 static SCM scm_set_text_properties_proc = SCM_BOOL_F;
 static SCM scm_text_property_any_proc = SCM_BOOL_F;
 static SCM scm_text_property_not_all_proc = SCM_BOOL_F;
+static SCM scm_buffer_on_insert_proc = SCM_BOOL_F;
+static SCM scm_buffer_on_delete_proc = SCM_BOOL_F;
 
 static SCM emacs_string_p_proc = SCM_BOOL_F;
 static SCM emacs_string_content_proc = SCM_BOOL_F;
+
+static void
+protect_scheme_proc (SCM proc)
+{
+  if (!scm_is_false (proc))
+    scm_gc_protect_object (proc);
+}
 
 bool
 is_emacs_string_wrapper (Lisp_Object x)
@@ -45,23 +54,16 @@ is_emacs_string_wrapper (Lisp_Object x)
   /* Load emacs-string-predicate (runtime-callable version) on first call */
   if (scm_is_false (emacs_string_p_proc))
     {
-      /* Module is already loaded by prelude/load.scm - use consolidated module */
-      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
-      if (!scm_is_false (mod))
-        {
-          emacs_string_p_proc = scm_c_module_lookup (mod, "emacs-string-predicate");
-          emacs_string_content_proc = scm_c_module_lookup (mod, "emacs-string-content");
-        }
-      else
-        {
-          fprintf(stderr, "ERROR: language elisp emacs text-properties module not found!\n");
-          return false;
-        }
+      /* Use scm_c_public_ref to get actual procedure values directly */
+      emacs_string_p_proc = scm_c_public_ref ("language elisp emacs text-properties", "emacs-string-predicate");
+      emacs_string_content_proc = scm_c_public_ref ("language elisp emacs text-properties", "emacs-string-content");
+      protect_scheme_proc (emacs_string_p_proc);
+      protect_scheme_proc (emacs_string_content_proc);
     }
 
   if (!scm_is_false (emacs_string_p_proc))
     {
-      SCM result = scm_call_1 (scm_variable_ref (emacs_string_p_proc), x);
+      SCM result = scm_call_1 (emacs_string_p_proc, x);
       return scm_is_true (result);
     }
 
@@ -86,7 +88,7 @@ unwrap_emacs_string (Lisp_Object x)
   /* It's a wrapper - extract the content */
   if (!scm_is_false (emacs_string_content_proc))
     {
-      return scm_call_1 (scm_variable_ref (emacs_string_content_proc), x);
+      return scm_call_1 (emacs_string_content_proc, x);
     }
 
   /* Fallback: return as-is if we can't unwrap */
@@ -100,16 +102,57 @@ ensure_text_properties_loaded (void)
     {
       /* Resolve the consolidated text-properties module (already loaded by prelude/load.scm) */
       scm_text_properties_module = scm_c_resolve_module ("language elisp emacs text-properties");
+      scm_permanent_object (scm_text_properties_module);
 
-      /* Cache procedure references */
+      /* Cache module variable handles; values are fetched at call time. */
       scm_get_text_property_proc = scm_c_module_lookup (scm_text_properties_module, "get-text-property");
+      scm_permanent_object (scm_get_text_property_proc);
       scm_text_properties_at_proc = scm_c_module_lookup (scm_text_properties_module, "text-properties-at");
+      scm_permanent_object (scm_text_properties_at_proc);
       scm_add_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "add-text-properties");
+      scm_permanent_object (scm_add_text_properties_proc);
       scm_propertize_proc = scm_c_module_lookup (scm_text_properties_module, "propertize");
+      scm_permanent_object (scm_propertize_proc);
       scm_remove_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "remove-text-properties");
+      scm_permanent_object (scm_remove_text_properties_proc);
       scm_set_text_properties_proc = scm_c_module_lookup (scm_text_properties_module, "set-text-properties");
+      scm_permanent_object (scm_set_text_properties_proc);
       scm_text_property_any_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-any");
+      scm_permanent_object (scm_text_property_any_proc);
       scm_text_property_not_all_proc = scm_c_module_lookup (scm_text_properties_module, "text-property-not-all");
+      scm_permanent_object (scm_text_property_not_all_proc);
+      scm_buffer_on_insert_proc = scm_c_module_lookup (scm_text_properties_module, "buffer-on-insert");
+      scm_permanent_object (scm_buffer_on_insert_proc);
+      scm_buffer_on_delete_proc = scm_c_module_lookup (scm_text_properties_module, "buffer-on-delete");
+      scm_permanent_object (scm_buffer_on_delete_proc);
+    }
+}
+
+/* Adjust Scheme text property intervals for buffer modification.
+   Called from offset_intervals in intervals.c.
+   LENGTH > 0 means insertion at START, LENGTH < 0 means deletion. */
+void
+offset_scheme_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t length)
+{
+  ensure_text_properties_loaded ();
+
+  if (length > 0)
+    {
+      /* Insertion */
+      if (!scm_is_false (scm_buffer_on_insert_proc))
+        scm_call_3 (scm_variable_ref (scm_buffer_on_insert_proc),
+                    make_lisp_ptr (buffer, Lisp_Vectorlike),
+                    make_fixnum (start),
+                    make_fixnum (length));
+    }
+  else if (length < 0)
+    {
+      /* Deletion */
+      if (!scm_is_false (scm_buffer_on_delete_proc))
+        scm_call_3 (scm_variable_ref (scm_buffer_on_delete_proc),
+                    make_lisp_ptr (buffer, Lisp_Vectorlike),
+                    make_fixnum (start),
+                    make_fixnum (start - length));  /* end = start + abs(length) */
     }
 }
 
@@ -296,6 +339,7 @@ modify_text_properties (Lisp_Object buffer, Lisp_Object start, Lisp_Object end)
   set_buffer_internal (buf);
 
   prepare_to_modify_buffer_1 (b, e, NULL);
+  invalidate_buffer_caches (buf, b, e);
 
   BUF_COMPUTE_UNCHANGED (buf, b - 1, e);
   if (MODIFF <= SAVE_MODIFF)
@@ -791,16 +835,16 @@ form, use the `describe-text-properties' command.  */)
 
   if (STRINGP (object) || BUFFERP (object))
     {
-      ensure_text_properties_loaded ();
+      if (scm_is_false (scm_text_properties_at_proc))
+        ensure_text_properties_loaded ();
       if (!scm_is_false (scm_text_properties_at_proc))
         {
-          SCM result = scm_call_2 (scm_variable_ref (scm_text_properties_at_proc),
-                                  position, object);
-          return result;
+          return scm_call_2 (scm_variable_ref (scm_text_properties_at_proc),
+                             position, object);
         }
     }
 
-  /* C implementation for buffers */
+  /* C implementation for buffers (fallback when Scheme not loaded) */
   register INTERVAL i;
 
   if (NILP (object))
@@ -1033,6 +1077,7 @@ The property values are compared with `eq'.  */)
   else
     {
       Lisp_Object initial_value, value;
+      struct buffer *buf;
       dynwind_begin ();
 
       if (! NILP (object))
@@ -1046,6 +1091,30 @@ The property values are compared with `eq'.  */)
 
       CHECK_FIXNUM_COERCE_MARKER (position);
 
+      buf = NILP (object) ? current_buffer : XBUFFER (object);
+
+      /* Fast path: if buffer has no overlays, use optimized Scheme implementation
+         which uses binary search O(log n) instead of linear scan O(n).  */
+      if (itree_empty_p (buf->overlays))
+        {
+          position = Fnext_single_property_change (position, prop, object, limit);
+          if (NILP (position))
+            {
+              if (NILP (limit))
+                XSETFASTINT (position, ZV);
+              else
+                {
+                  CHECK_FIXNUM_COERCE_MARKER (limit);
+                  position = limit;
+                  if (XFIXNUM (position) > ZV)
+                    XSETFASTINT (position, ZV);
+                }
+            }
+          dynwind_end ();
+          return position;
+        }
+
+      /* Slow path: buffer has overlays, need to check both text props and overlays */
       initial_value = Fget_char_property (position, prop, object);
 
       if (NILP (limit))
@@ -1197,21 +1266,21 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   /* Guilemacs: Use Scheme implementation that works with Scheme intervals */
   static SCM scm_next_property_change = SCM_BOOL_F;
 
-  if (scm_is_false (scm_next_property_change))
-    {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
-      SCM symbol = scm_c_module_lookup (module, "next-property-change");
-      scm_next_property_change = scm_variable_ref (symbol);
-    }
-
   if (NILP (object))
     XSETBUFFER (object, current_buffer);
 
   if (!NILP (limit) && !EQ (limit, Qt))
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
-  /* Call Scheme function: (next-property-change position object limit) */
-  return scm_call_3 (scm_next_property_change, position, object, limit);
+  if (scm_is_false (scm_next_property_change))
+    {
+      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
+      scm_next_property_change = scm_c_module_lookup (module, "next-property-change");
+      scm_permanent_object (scm_next_property_change);
+    }
+
+  return scm_call_3 (scm_variable_ref (scm_next_property_change),
+                     position, object, limit);
 }
 
 DEFUN ("next-single-property-change", Fnext_single_property_change,
@@ -1237,8 +1306,8 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
   if (scm_is_false (scm_next_single_property_change))
     {
       SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
-      SCM symbol = scm_c_module_lookup (module, "next-single-property-change");
-      scm_next_single_property_change = scm_variable_ref (symbol);
+      scm_next_single_property_change = scm_c_module_lookup (module, "next-single-property-change");
+      scm_permanent_object (scm_next_single_property_change);
     }
 
   if (NILP (object))
@@ -1248,7 +1317,8 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (next-single-property-change position prop object limit) */
-  return scm_call_4 (scm_next_single_property_change, position, prop, object, limit);
+  return scm_call_4 (scm_variable_ref (scm_next_single_property_change),
+                     position, prop, object, limit);
 }
 
 DEFUN ("previous-property-change", Fprevious_property_change,
@@ -1273,8 +1343,8 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   if (scm_is_false (scm_previous_property_change))
     {
       SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
-      SCM symbol = scm_c_module_lookup (module, "previous-property-change");
-      scm_previous_property_change = scm_variable_ref (symbol);
+      scm_previous_property_change = scm_c_module_lookup (module, "previous-property-change");
+      scm_permanent_object (scm_previous_property_change);
     }
 
   if (NILP (object))
@@ -1284,7 +1354,8 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (previous-property-change position object limit) */
-  return scm_call_3 (scm_previous_property_change, position, object, limit);
+  return scm_call_3 (scm_variable_ref (scm_previous_property_change),
+                     position, object, limit);
 }
 
 DEFUN ("previous-single-property-change", Fprevious_single_property_change,
@@ -1310,8 +1381,8 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
   if (scm_is_false (scm_previous_single_property_change))
     {
       SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
-      SCM symbol = scm_c_module_lookup (module, "previous-single-property-change");
-      scm_previous_single_property_change = scm_variable_ref (symbol);
+      scm_previous_single_property_change = scm_c_module_lookup (module, "previous-single-property-change");
+      scm_permanent_object (scm_previous_single_property_change);
     }
 
   if (NILP (object))
@@ -1321,7 +1392,8 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (previous-single-property-change position prop object limit) */
-  return scm_call_4 (scm_previous_single_property_change, position, prop, object, limit);
+  return scm_call_4 (scm_variable_ref (scm_previous_single_property_change),
+                     position, prop, object, limit);
 }
 
 /* Used by add-text-properties and add-face-text-property. */
@@ -1334,7 +1406,6 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
   /* Use Scheme implementation for strings and buffers */
   if (NILP (object))
     object = Fcurrent_buffer ();
-
 
   if (STRINGP (object) || BUFFERP (object))
     {
@@ -1362,6 +1433,18 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
               if (! (0 <= XFIXNUM (start) && XFIXNUM (start) <= XFIXNUM (end)
                      && XFIXNUM (end) <= len))
                 args_out_of_range (start, end);
+            }
+
+          /* Notify redisplay that text properties changed */
+          if (BUFFERP (object))
+            {
+              modify_text_properties (object, start, end);
+              SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
+                                       start, end, properties, object);
+              signal_after_change (XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start));
+              return result;
             }
 
           SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
@@ -1548,6 +1631,20 @@ the designated part of OBJECT.  */)
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_set_text_properties_proc))
         {
+          /* Notify redisplay that text properties changed */
+          if (BUFFERP (object))
+            {
+              CHECK_FIXNUM_COERCE_MARKER (start);
+              CHECK_FIXNUM_COERCE_MARKER (end);
+              modify_text_properties (object, start, end);
+              SCM result = scm_call_4 (scm_variable_ref (scm_set_text_properties_proc),
+                                       start, end, properties, object);
+              signal_after_change (XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start));
+              return result;
+            }
+
           SCM result = scm_call_4 (scm_variable_ref (scm_set_text_properties_proc),
                                   start, end, properties, object);
           return result;
@@ -1793,6 +1890,20 @@ Use `set-text-properties' if you want to remove all text properties.  */)
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_remove_text_properties_proc))
         {
+          /* Notify redisplay that text properties changed */
+          if (BUFFERP (object))
+            {
+              CHECK_FIXNUM_COERCE_MARKER (start);
+              CHECK_FIXNUM_COERCE_MARKER (end);
+              modify_text_properties (object, start, end);
+              SCM result = scm_call_4 (scm_variable_ref (scm_remove_text_properties_proc),
+                                       start, end, properties, object);
+              signal_after_change (XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start),
+                                   XFIXNUM (end) - XFIXNUM (start));
+              return result;
+            }
+
           SCM result = scm_call_4 (scm_variable_ref (scm_remove_text_properties_proc),
                                   start, end, properties, object);
           return result;
