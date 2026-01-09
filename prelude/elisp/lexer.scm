@@ -77,12 +77,18 @@
 
 (define (add-control chr)
   (let ((real (real-character chr)))
-    (if (char-alphabetic? real)
-        (- (char->integer (char-upcase real)) (char->integer #\@))
-        (case real
-          ((#\?) 127)
-          ((#\@) 0)
-          (else (set-char-bit chr 26))))))
+    (cond
+      ;; Alphabetic: A-Z, a-z -> control codes 1-26
+      ((char-alphabetic? real)
+       (- (char->integer (char-upcase real)) (char->integer #\@)))
+      ;; Special cases
+      ((char=? real #\?) 127)  ; C-? -> DEL
+      ((char=? real #\@) 0)    ; C-@ -> NUL
+      ;; Characters in @-_ range (ASCII 64-95): mask with 0x1F
+      ((and (>= chr 64) (<= chr 95))
+       (logand chr #x1F))
+      ;; Other characters: set CHAR_CTL bit (0x4000000)
+      (else (set-char-bit chr 26)))))
 
 ;;; Parse a charcode given in some base, basically octal or hexadecimal
 ;;; are needed.  A requested number of digits can be given (#f means it
