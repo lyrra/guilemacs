@@ -274,11 +274,11 @@
   (set! set-lexical-binding-mode (lambda (x) (set-symbol-value! 'lexical-binding x))))
 
 (define (eval-elisp form)
-  (let ((lang (lookup-language 'elisp)))
+  (let ((lang (lookup-language 'emacs-elisp)))
     (eval (compile form #:from lang #:to 'tree-il) (current-module))))
 
 (define (compile-elisp form)
-  (compile (compile form #:from 'elisp #:to 'bytecode)
+  (compile (compile form #:from 'emacs-elisp #:to 'bytecode)
            #:from 'bytecode #:to 'value))
 
 (set-symbol-value! nil_ #nil)
@@ -351,6 +351,6 @@ This replicates the save_match_data_load wrapper function."
 ;  (fluid-set! current-reader emacs-read)
 ;  (compile-file
 ;           filename
-;           #:from 'elisp
+;           #:from 'emacs-elisp
 ;           #:to 'value)
 ;  #t)

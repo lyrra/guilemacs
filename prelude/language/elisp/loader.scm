@@ -609,7 +609,7 @@ Returns: handler result if handler found, #f if should continue with normal load
 (define (load-elisp file)
   (let* ((src (%search-load-path file)) ; find foo.el on %load-path
          (go  (compiled-file-name src)) ; cache path for .go
-         (el  (lookup-language 'elisp)))
+         (el  (lookup-language 'emacs-elisp)))
     (unless src
       (error "Not found on %load-path" file))
     (if (fresh-go? go src)
@@ -629,7 +629,7 @@ Returns: handler result if handler found, #f if should continue with normal load
       (let* ((src found-file)
              (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
              ;; Load our custom elisp language to override system elisp
-             (el (lookup-language 'elisp)))
+             (el (lookup-language 'emacs-elisp)))
         (if (fresh-go? go src)
             (load-compiled go)
             (begin

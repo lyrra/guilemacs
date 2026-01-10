@@ -319,7 +319,7 @@
   (funcall (@ (system base compile) compile-file)
            file
            (funcall (@ (guile) symbol->keyword) 'from)
-           'elisp
+           'emacs-elisp
            (funcall (@ (guile) symbol->keyword) 'to)
            'value)
   t)

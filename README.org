@@ -885,7 +885,7 @@ by guile-elisp.
   - a "(eload ...)" expression in loadup.el will
     be evaluated, that during evaluation calls
     to guile's boot.el and runtime.scm where eload is defined
-  - the eload function calls guile's elisp support "(compile-and-load ... #:from 'elisp)"
+  - the eload function calls guile's elisp support "(compile-and-load ... #:from 'emacs-elisp)"
   - that elisp support system guile has, has several components,
     reader, lexer, parser, compiler etc..
     and the lexer (language/elisp/lexer.scm) will export the lexer as a

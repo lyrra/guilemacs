@@ -8,7 +8,7 @@
   #:use-module (system base compile)
   #:use-module (system base target)
   #:use-module (system vm vm)
-  #:export (elisp))
+  #:export (emacs-elisp))
 
 (save-module-excursion
  (lambda ()
@@ -16,8 +16,8 @@
    (define-module (elisp-functions) #:pure #:filename #f)
    (define-module (elisp-plists) #:pure #:filename #f)))
 
-(define-language elisp
-  #:title     "Emacs Lisp"
+(define-language emacs-elisp
+  #:title     "Modern Emacs Lisp"
   #:reader    (lambda (port env) (read-elisp port))
   ;;#:joiner (lambda (exps env) (cons 'progn exps))
   #:printer   write
@@ -34,4 +34,4 @@
 (with-native-target
   (lambda ()
     (compile-and-load (%search-load-path "emacs-elisp/boot.el")
-                      #:from 'elisp)))
+                      #:from 'emacs-elisp)))

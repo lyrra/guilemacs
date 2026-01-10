@@ -55,6 +55,42 @@
 ;(set! %load-path (cons "." %load-path))
 ;(set! %load-path (cons "./mod/" %load-path))
 
+;-------------------
+; monkey patch guile
+;-------------------
+;; Replace lookup-language to find our emacs-elisp language module
+;; instead of looking in (language NAME spec) which is Guile's default
+(let ((lang-module (resolve-module '(system base language)))
+      (compile-module (resolve-module '(system base compile)))
+      (original-lookup (module-ref (resolve-module '(system base language)) 'lookup-language))
+      (original-default-env (module-ref (resolve-module '(system base language)) 'default-environment)))
+  (let ((patched-lookup
+         (lambda (name)
+           ;; For emacs-elisp, look in (emacs-elisp spec) not (language emacs-elisp spec)
+           (if (equal? 'lisp name)
+               (error "bad language: elisp"))
+           (if (eq? name 'emacs-elisp)
+               (let ((m (resolve-module '(emacs-elisp spec))))
+                 (if (module-bound? m 'emacs-elisp)
+                     (module-ref m 'emacs-elisp)
+                     (error "emacs-elisp language not found in module")))
+               ;; For other languages, use original lookup
+               (original-lookup name)))))
+    ;; Patch lookup-language in both modules
+    (module-set! lang-module 'lookup-language patched-lookup)
+    (module-set! compile-module 'lookup-language patched-lookup)
+    ;; Also patch default-environment to use our patched lookup
+    (let ((patched-default-env
+           (lambda (lang)
+             (let ((language-make-default-environment
+                    (module-ref lang-module 'language-make-default-environment)))
+               ((language-make-default-environment
+                 (if ((module-ref lang-module 'language?) lang)
+                     lang
+                     (patched-lookup lang))))))))
+      (module-set! lang-module 'default-environment patched-default-env)
+      (module-set! compile-module 'default-environment patched-default-env))))
+;===================
 
 ;; switch current-module to guile's original runtime module
 ;; Note that any changes to this module later on it scrapped,
@@ -66,7 +102,9 @@
 ;; (format (current-error-port) "-- switched module: ~s~%" (current-module))
 
 (use-modules (rnrs bytevectors)) ; R6RS bytevector support (Guile standard)
+(format (current-error-port) "-- load language elisp emacs~%")
 (use-modules (language elisp emacs))
+(format (current-error-port) "-- load done language elisp emacs~%")
 (use-modules (system foreign-library))
 
 (use-modules ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
@@ -106,7 +144,9 @@
          (out-stat (stat out #f)))
     (when (or (not out-stat)
               (> (stat:mtime src-stat) (stat:mtime out-stat)))
-      (compile-file path #:from 'elisp #:output-file out))
+      (format (current-error-port) "-- compile ~s~%" path)
+      (compile-file path #:from 'emacs-elisp #:output-file out))
+    (format (current-error-port) "-- load-compile ~s~%" out)
     (load-compiled out)))
 
 (define (reload-local-elisp! base-dir)
