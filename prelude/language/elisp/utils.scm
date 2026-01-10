@@ -19,6 +19,7 @@
 
 (define-module (language elisp utils)
   #:use-module (language elisp runtime)
+  #:use-module (language elisp sequences)
   #:use-module (srfi srfi-69)
   #:export (
     ;; Scheme implementation functions
