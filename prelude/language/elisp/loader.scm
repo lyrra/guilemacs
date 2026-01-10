@@ -644,7 +644,7 @@ Returns: handler result if handler found, #f if should continue with normal load
           (apply throw key args)))))
 
 (define (init-loader prelude-directory)
-  (set-current-module (resolve-module '(language elisp runtime)))
+  (set-current-module (resolve-module '(emacs-elisp runtime)))
   (let ((str (canonicalize-path (string-concatenate (list prelude-directory "/..")))))
     (set! %load-path (append (list (string-concatenate (list str "/lisp"))
                                    (string-concatenate (list str "/lisp/emacs-lisp"))

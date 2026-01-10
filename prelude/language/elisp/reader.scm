@@ -6,7 +6,7 @@
 
 (define-module (language elisp reader)
   #:declarative? #f
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:use-module (language elisp loader)
   #:use-module (language elisp utils)
   #:use-module (system base compile)
@@ -1651,7 +1651,7 @@ This replicates the orchestration from Fload (lines 1202-1203)."
   (intern-gensym name))
 
 (define (init-reader prelude-directory)
-  (set-current-module (resolve-module '(language elisp runtime)))
+  (set-current-module (resolve-module '(emacs-elisp runtime)))
 
   (set-symbol-function! 'make-symbol make-symbol)
   (set-symbol-function! 'intern-gensym intern-gensym)
