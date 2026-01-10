@@ -96,8 +96,13 @@
 
 (define (compile-and-load-elisp path)
   ;; Compile PATH as Elisp, then load the resulting .go.
-  (let* ((out (string-append path ".go"))) ; avoid compiled-file-name
-    (compile-file path #:from 'elisp #:output-file out)
+  ;; Skip compilation if .go is newer than source.
+  (let* ((out (string-append path ".go"))
+         (src-stat (stat path #f))
+         (out-stat (stat out #f)))
+    (when (or (not out-stat)
+              (> (stat:mtime src-stat) (stat:mtime out-stat)))
+      (compile-file path #:from 'elisp #:output-file out))
     (load-compiled out)))
 
 (define (reload-local-elisp! base-dir)
