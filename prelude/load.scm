@@ -121,7 +121,7 @@
         (compile-and-load-elisp (join base-dir "boot.el")))
       (lambda () (set! %load-path old-load-path)))))
 
-(reload-local-elisp! (join %prelude-directory "elisp"))
+(reload-local-elisp! (join %prelude-directory "language/elisp"))
 
 (set-current-module (resolve-module '(language elisp runtime)))
 
