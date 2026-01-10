@@ -33,5 +33,5 @@
 ;; example, this happens when cross-compiling Guile itself.
 (with-native-target
   (lambda ()
-    (compile-and-load (%search-load-path "language/elisp/boot.el")
+    (compile-and-load (%search-load-path "emacs-elisp/boot.el")
                       #:from 'elisp)))

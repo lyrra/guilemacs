@@ -6490,6 +6490,6 @@ This includes interactive calls to `delete-file' and
   DEFSYM (QCerror, ":error");
   DEFSYM (Qauto_save_hook, "auto-save-hook");
 
-  times_fn = scm_c_private_ref ("language elisp runtime", "elisp-*");
-  minus_fn = scm_c_private_ref ("language elisp runtime", "-");
+  times_fn = scm_c_private_ref ("emacs-elisp runtime", "elisp-*");
+  minus_fn = scm_c_private_ref ("emacs-elisp runtime", "-");
 }

@@ -24,7 +24,7 @@
 
 (define-module (language elisp numbers)
   #:use-module (rnrs bytevectors)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions
     elisp-+

@@ -38,12 +38,32 @@
 ;; (primitive-load (string-append (dirname (current-filename)) "/core-runtime.scm"))
 
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
-;; (force-output (current-error-port))
+;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
+
+;; Save prelude paths BEFORE switching modules, by keeping them in module guile-user
+(define %saved-prelude-filename %prelude-filename)
+(define %saved-prelude-directory (dirname %prelude-filename))
+
+;; remove filename part of pathfile:
+(let ((dir %saved-prelude-directory))
+  (set! %load-path (cons (canonicalize-path (string-append dir "/../mod")) %load-path)))
+;; (format (current-error-port) "-- %load-path: ~s~%" %load-path)
+
+;; %prelude-filename is passed to us by try_load_guile_prelude
+;; Note that we replace the guile's original runtime module here,
+;; by reloading it with our local modifications
+;(set! %load-path (cons "." %load-path))
+;(set! %load-path (cons "./mod/" %load-path))
+
 
 ;; switch current-module to guile's original runtime module
 ;; Note that any changes to this module later on it scrapped,
 ;; because we do a module reload
-(set-current-module (resolve-module '(language elisp runtime)))
+(use-modules (emacs-elisp runtime))
+;; (format (current-error-port) "-- loaded emacs-lisp runtime~%")
+;; not sure this is needed anymore if we do pure modules
+(set-current-module (resolve-module '(emacs-elisp runtime)))
+;; (format (current-error-port) "-- switched module: ~s~%" (current-module))
 
 (use-modules (rnrs bytevectors)) ; R6RS bytevector support (Guile standard)
 (use-modules (language elisp emacs))
@@ -52,14 +72,7 @@
 (use-modules ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
              (ice-9 ftw) ; for stat etc.
              (system base compile) ; compile-file, compiled-file-name, etc.
-             (system base language)
-             ;; Don't load system elisp spec - use our custom one
-             ;(language elisp spec)
-             )
-
-(use-modules (system base compile)       ; compile-file, compiled-file-name
-             (system base language)      ; current-language parameter
-             (ice-9 ftw))                ; file ops, optional
+             (system base language))
 
 ;; Map Emacs-specific encodings to Guile-compatible ones
 ;; Guile doesn't recognize "UTF-8-EMACS" but it's essentially UTF-8
@@ -75,19 +88,10 @@
             (original-set-port-encoding! port mapped-encoding)))))
 
 
-(set-current-module (resolve-module '(language elisp runtime)))
-(define %prelude-directory (dirname %prelude-filename))
-
-;; Note that we replace the guile's original runtime module here,
-;; by reloading it with our local modifications
-(set! %load-path (cons "." %load-path)) ; FIX-20251227-guilemacs was prelude already on the load path (set by C)?
-(load "./elisp/runtime.scm")
-
-;(load "./elisp/lexer.scm")
-;(load "./elisp/parser.scm")
-;(load "./elisp/compile-tree-il.scm")
-;(load "./elisp/boot.el")
-;(load "./elisp/spec.scm")
+(set-current-module (resolve-module '(emacs-elisp runtime)))
+;; Get saved values from guile-user module (where they were saved before switching)
+(define %prelude-filename (module-ref (resolve-module '(guile-user)) '%saved-prelude-filename))
+(define %prelude-directory (module-ref (resolve-module '(guile-user)) '%saved-prelude-directory))
 
 (define (join a b)
   (if (or (string-null? a) (string-suffix? "/" a))
@@ -126,17 +130,16 @@
         (compile-and-load-elisp (join base-dir "boot.el")))
       (lambda () (set! %load-path old-load-path)))))
 
-(reload-local-elisp! (join %prelude-directory "language/elisp"))
+;; Files now in mod/emacs-elisp/ directory (one level up from prelude, then into mod)
+(reload-local-elisp! (canonicalize-path (join %prelude-directory "../mod/emacs-elisp")))
 
-(set-current-module (resolve-module '(language elisp runtime)))
+(set-current-module (resolve-module '(emacs-elisp runtime)))
 
 ;; Initialize core Elisp variables BEFORE loading runtime modules
 ;; This breaks circular dependencies (e.g., featurep needs features)
 (set-symbol-value! 'features '())
 
 ;; Load modular runtime components
-;; Phase 2: Migrating to proper Guile modules with use-modules
-;; Using flat module naming (language elisp MODULE) instead of nested (language elisp runtime MODULE)
 
 ;; Add prelude directory to load path so module files can be found
 ;; Module (language elisp types) maps to file language/elisp/types.scm
@@ -145,7 +148,7 @@
 
 ;; Load types module as proper Guile module
 (use-modules (language elisp types))
-;; Make all types functions available in (language elisp runtime) namespace
+;; Make all types functions available in (emacs-elisp runtime) namespace
 (module-use! (current-module) (resolve-module '(language elisp types)))
 
 ;; Load numbers module as proper Guile module
@@ -160,14 +163,10 @@
 
 ;(let ((loader (lambda (file)
 ;                (primitive-load (join %prelude-directory file))
-;                (set-current-module (resolve-module '(language elisp runtime))))))
+;                (set-current-module (resolve-module '(emacs-elisp runtime))))))
 ;  (loader "elisp/runtime/loader.scm")
 ;  (loader "elisp/runtime/reader.scm"))
 
-(set-current-module (resolve-module '(language elisp runtime)))
-
-;; Initialize symbol function registrations from runtime modules
-;; This allows modules to manage their own registrations
 (init-types-registrations)
 (init-numbers-registrations)
 (init-strings-registrations)
@@ -199,12 +198,12 @@
 
 ;; Load consolidated UTF-8 string operations (Phase 2 consolidation)
 ;; Replaces: utf8-string-operations.scm (only file actually being loaded)
-(set-current-module (resolve-module '(language elisp runtime)))
+(set-current-module (resolve-module '(emacs-elisp runtime)))
 (primitive-load (join %prelude-directory "language/elisp/utf8.scm"))
 
 ;; Load consolidated symbol and character operations (Phase 3 consolidation)
 ;; Replaces: symbol-operations.scm, character-navigation-minimal.scm
-(set-current-module (resolve-module '(language elisp runtime)))
+(set-current-module (resolve-module '(emacs-elisp runtime)))
 (use-modules (language elisp symbol-operations))
 (use-modules (language elisp character-predicates))
 

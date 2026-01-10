@@ -10,7 +10,7 @@
 
 (defmacro defun (name args &rest body)
   `(let ((proc (function (lambda ,args ,@body))))
-     (%funcall (@ (language elisp runtime) set-symbol-function!)
+     (%funcall (@ (emacs-elisp runtime) set-symbol-function!)
                ',name
                proc)
      (%funcall (@ (guile) set-procedure-property!)
@@ -28,8 +28,8 @@
          (fmt (lambda (string args)
                 (ap (@ (guile) format) nil string args))))
     (%funcall (if p
-                  (@ (language elisp runtime) guile-tracelog-print)
-                (@ (language elisp runtime) guile-tracelog-write))
+                  (@ (emacs-elisp runtime) guile-tracelog-print)
+                (@ (emacs-elisp runtime) guile-tracelog-write))
               (fmt string args))))
 
 (defmacro eval-and-compile (&rest body)
@@ -40,13 +40,13 @@
 (defmacro %define-compiler-macro (name args &rest body)
   `(eval-and-compile
      (%funcall
-      (@ (language elisp runtime) set-symbol-plist!)
+      (@ (emacs-elisp runtime) set-symbol-plist!)
       ',name
       (%funcall
        (@ (guile) cons*)
        '%compiler-macro
        #'(lambda ,args ,@body)
-       (%funcall (@ (language elisp runtime) symbol-plist) ',name)))
+       (%funcall (@ (emacs-elisp runtime) symbol-plist) ',name)))
      ',name))
 
 (defmacro defsubst (name args &rest body)
@@ -64,7 +64,7 @@
 
 (eval-and-compile
   (defun eval (form)
-    (%funcall (@ (language elisp runtime) eval-elisp) form)))
+    (%funcall (@ (emacs-elisp runtime) eval-elisp) form)))
 
 (eval-and-compile
   (defsubst null (object)
@@ -207,14 +207,14 @@
   (%funcall (@ (guile) procedure?) object))
 
 (defun symbol-function (symbol)
-  (let ((f (%funcall (@ (language elisp runtime) symbol-function)
+  (let ((f (%funcall (@ (emacs-elisp runtime) symbol-function)
                      symbol)))
-    (if (%funcall (@ (language elisp falias) falias?) f)
-        (%funcall (@ (language elisp falias) falias-object) f)
+    (if (%funcall (@ (emacs-elisp falias) falias?) f)
+        (%funcall (@ (emacs-elisp falias) falias-object) f)
       f)))
 
 (defun eval (form)
-  (%funcall (@ (language elisp runtime) eval-elisp) form))
+  (%funcall (@ (emacs-elisp runtime) eval-elisp) form))
 
 (defun %indirect-function (object)
   (cond
@@ -226,7 +226,7 @@
     (signal 'invalid-function `(,object)))
    ((symbolp object)                    ;++ cycle detection
     (%indirect-function
-     (%funcall (@ (language elisp runtime) symbol-function) object)))
+     (%funcall (@ (emacs-elisp runtime) symbol-function) object)))
    ((listp object)
     (eval `(function ,object)))
    (t
@@ -248,7 +248,7 @@
        (%indirect-function funname)))
 
 (defun fset (symbol definition)
-  (funcall (@ (language elisp runtime) set-symbol-function!)
+  (funcall (@ (emacs-elisp runtime) set-symbol-function!)
            symbol
            definition))
 
@@ -268,7 +268,7 @@
   (car (nthcdr n list)))
 
 (defun fset (symbol definition)
-  (funcall (@ (language elisp runtime) set-symbol-function!)
+  (funcall (@ (emacs-elisp runtime) set-symbol-function!)
            symbol
            (cond
             ((%funcall (@ (guile) procedure?) definition)
@@ -278,7 +278,7 @@
              (if (%funcall (@ (guile) procedure?) (cdr definition))
                  definition
                (cons 'macro
-                     (funcall (@ (language elisp falias) make-falias)
+                     (funcall (@ (emacs-elisp falias) make-falias)
                               (function
                                (lambda (&rest args) (apply (cdr definition) args)))
                               (cdr definition)))))
@@ -288,12 +288,12 @@
                      (eq (nth 4 definition) t))
                  (cons 'macro
                        (funcall
-                        (@ (language elisp falias) make-falias)
+                        (@ (emacs-elisp falias) make-falias)
                         (function (lambda (&rest args)
                                     (apply (cdr (autoload-do-load definition symbol nil)) args)))
                         definition))
                (funcall
-                (@ (language elisp falias) make-falias)
+                (@ (emacs-elisp falias) make-falias)
                 (function (lambda (&rest args)
                             (apply (autoload-do-load definition symbol nil) args)))
                 definition)))
@@ -306,11 +306,11 @@
                                       (eq (nth 4 fn) t)))))))
              (cons 'macro
                    (funcall
-                    (@ (language elisp falias) make-falias)
+                    (@ (emacs-elisp falias) make-falias)
                     (function (lambda (&rest args) `(,definition ,@args)))
                     definition)))
             (t
-             (funcall (@ (language elisp falias) make-falias)
+             (funcall (@ (emacs-elisp falias) make-falias)
                       (function (lambda (&rest args) (apply definition args)))
                       definition))))
   definition)
@@ -325,7 +325,7 @@
   t)
 
 ;(defun emacs-load (file)
-;  (%funcall (@ (language elisp runtime) emacs-load) file))
+;  (%funcall (@ (emacs-elisp runtime) emacs-load) file))
 
 ;;; Equality predicates
 
@@ -344,18 +344,18 @@
 ;;; `symbolp' and `symbol-function' are defined above.
 
 (fset 'symbol-name (@ (guile) symbol->string))
-(fset 'symbol-value (@ (language elisp runtime) symbol-value))
-(fset 'set (@ (language elisp runtime) set-symbol-value!))
-(fset 'makunbound (@ (language elisp runtime) makunbound!))
-(fset 'fmakunbound (@ (language elisp runtime) fmakunbound!))
-(fset 'boundp (@ (language elisp runtime) symbol-bound?))
-(fset 'fboundp (@ (language elisp runtime) symbol-fbound?))
+(fset 'symbol-value (@ (emacs-elisp runtime) symbol-value))
+(fset 'set (@ (emacs-elisp runtime) set-symbol-value!))
+(fset 'makunbound (@ (emacs-elisp runtime) makunbound!))
+(fset 'fmakunbound (@ (emacs-elisp runtime) fmakunbound!))
+(fset 'boundp (@ (emacs-elisp runtime) symbol-bound?))
+(fset 'fboundp (@ (emacs-elisp runtime) symbol-fbound?))
 (fset 'intern (@ (guile) string->symbol))
 
 ;(defun defvaralias (new-alias base-variable &optional docstring)
-;  (let ((fluid (funcall (@ (language elisp runtime) symbol-fluid)
+;  (let ((fluid (funcall (@ (emacs-elisp runtime) symbol-fluid)
 ;                        base-variable)))
-;    (funcall (@ (language elisp runtime) set-symbol-fluid!)
+;    (funcall (@ (emacs-elisp runtime) set-symbol-fluid!)
 ;             new-alias
 ;             fluid)
 ;    base-variable))

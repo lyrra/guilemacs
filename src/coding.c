@@ -12279,5 +12279,5 @@ internal character representation.  */);
   DEFSYM (QUnknown_error, "Unknown error");
   DEFSYM (Qdefine_coding_system_internal, "define-coding-system-internal");
 
-  string_fn = scm_c_private_lookup ("language elisp runtime", "elisp-string");
+  string_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-string");
 }

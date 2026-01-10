@@ -66,18 +66,18 @@
 ;;; Values to use for Elisp's nil and t.
 
 (define (nil-value loc)
-  (make-const loc (@ (language elisp runtime) nil-value)))
+  (make-const loc (@ (emacs-elisp runtime) nil-value)))
 
 (define (t-value loc)
-  (make-const loc (@ (language elisp runtime) t-value)))
+  (make-const loc (@ (emacs-elisp runtime) t-value)))
 
 ;;; Modules that contain the value and function slot bindings.
 
-(define runtime '(language elisp runtime))
+(define runtime '(emacs-elisp runtime))
 
-(define value-slot (@ (language elisp runtime) value-slot-module))
+(define value-slot (@ (emacs-elisp runtime) value-slot-module))
 
-(define function-slot (@ (language elisp runtime) function-slot-module))
+(define function-slot (@ (emacs-elisp runtime) function-slot-module))
 
 ;;; The backquoting works the same as quasiquotes in Scheme, but the
 ;;; forms are named differently; to make easy adaptions, we define these

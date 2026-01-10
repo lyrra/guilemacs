@@ -9,7 +9,7 @@
   #:use-module ((system base compile)
                 #:select (compile compile-file))
 
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:use-module (language elisp utils)
   #:export (
     init-loader
@@ -561,7 +561,7 @@ Only returns actual files, not directories."
                 (error "Cannot open load file" file)))
 
           ;; Step 4: Setup load environment (reuse existing)
-          (let ((setup-env-func (resolve-ref "language elisp runtime"
+          (let ((setup-env-func (resolve-ref "emacs-elisp runtime"
                                             "elisp-setup-load-environment")))
             (when setup-env-func
               (setup-env-func found '() file #f #t))) ; simplified params

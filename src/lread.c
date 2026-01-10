@@ -849,7 +849,7 @@ This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   (void)
 {
   /* MIGRATED TO SCHEME: List processing logic moved to Scheme for better maintainability */
-  SCM get_suffixes_func = scm_c_private_ref ("language elisp runtime",
+  SCM get_suffixes_func = scm_c_private_ref ("emacs-elisp runtime",
                                              "elisp-get-load-suffixes");
   return scm_call_0 (get_suffixes_func);
 }
@@ -869,7 +869,7 @@ suffix_p (Lisp_Object string, const char *suffix)
 static Lisp_Object
 compute_found_effective (Lisp_Object found)
 {
-  SCM effective_func = scm_c_private_ref ("language elisp runtime",
+  SCM effective_func = scm_c_private_ref ("emacs-elisp runtime",
                                          "elisp-compute-found-effective");
   return scm_call_1 (effective_func, found);
 }
@@ -877,7 +877,7 @@ compute_found_effective (Lisp_Object found)
 static void
 loadhist_initialize (Lisp_Object filename)
 {
-  SCM loadhist_func = scm_c_private_ref ("language elisp runtime",
+  SCM loadhist_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-loadhist-initialize");
   Lisp_Object binding = scm_call_1 (loadhist_func, filename);
   specbind (Qcurrent_load_list, binding);
@@ -950,7 +950,7 @@ Return t if the file exists and loads successfully.  */)
    Lisp_Object nosuffix, Lisp_Object must_suffix)
 {
   /* FULLY MIGRATED TO GUILE: Use fload-bridge for guile-compiled elisp loading */
-  SCM bridge_func = scm_c_private_ref ("language elisp runtime", "fload-bridge");
+  SCM bridge_func = scm_c_private_ref ("emacs-elisp runtime", "fload-bridge");
   if (scm_is_false (bridge_func))
     {
       /* Fallback if bridge function not available */
@@ -969,7 +969,7 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
   dynwind_begin ();
   record_unwind_save_match_data ();
 
-  SCM wrapper_func = scm_c_private_ref ("language elisp runtime",
+  SCM wrapper_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-load-with-match-data-protection");
   Lisp_Object result = scm_call_5 (wrapper_func, file, noerror, nomessage, nosuffix, must_suffix);
 
@@ -980,7 +980,7 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 static bool
 complete_filename_p (Lisp_Object pathname)
 {
-  SCM complete_func = scm_c_private_ref ("language elisp runtime",
+  SCM complete_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-complete-filename?");
   SCM result = scm_call_1 (complete_func, pathname);
   return !NILP (result);
@@ -1786,7 +1786,7 @@ fread_internal_start (SCM port)
 {
   int c = scm_getc (port);
 
-  SCM fread0_with_char_func = scm_c_private_ref ("language elisp runtime",
+  SCM fread0_with_char_func = scm_c_private_ref ("emacs-elisp runtime",
                                                  "elisp-fread0-with-char-from-c");
   return scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
 }
@@ -1796,7 +1796,7 @@ readevalloop_load (SCM port, Lisp_Object sourcename)
 {
   /* MINIMIZED: Following fread_internal_start pattern - minimal C wrapper */
 
-  SCM readevalloop_load_func = scm_c_private_ref ("language elisp runtime",
+  SCM readevalloop_load_func = scm_c_private_ref ("emacs-elisp runtime",
                                                   "elisp-readevalloop-load-from-port");
   scm_call_2 (readevalloop_load_func, port, sourcename);
 }
@@ -1991,7 +1991,7 @@ finvalid_radix_integer (EMACS_INT radix)
 static Lisp_Object
 elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 {
-  SCM eof_check_func = scm_c_private_ref ("language elisp runtime",
+  SCM eof_check_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-parse-with-eof-check");
   SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
 
@@ -2003,7 +2003,7 @@ elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 static void
 elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
 {
-  SCM skip_ws_func = scm_c_private_ref ("language elisp runtime",
+  SCM skip_ws_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-skip-load-whitespace-from-port");
   sync_guile_reader (ctx);
   scm_call_1 (skip_ws_func, ctx->port);
@@ -2013,7 +2013,7 @@ elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
 static void
 elisp_skip_load_comment_from_c_context (struct reader_context *ctx)
 {
-  SCM skip_comment_func = scm_c_private_ref ("language elisp runtime",
+  SCM skip_comment_func = scm_c_private_ref ("emacs-elisp runtime",
                                              "elisp-skip-load-comment-from-port");
   sync_guile_reader (ctx);
   scm_call_1 (skip_comment_func, ctx->port);
@@ -2023,7 +2023,7 @@ elisp_skip_load_comment_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_read_with_load_function_from_c_context (struct reader_context *ctx)
 {
-  SCM load_read_func = scm_c_private_ref ("language elisp runtime",
+  SCM load_read_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-read-with-load-function-from-port");
   sync_guile_reader (ctx);
   SCM result = scm_call_1 (load_read_func, ctx->port);
@@ -2034,7 +2034,7 @@ elisp_read_with_load_function_from_c_context (struct reader_context *ctx)
 static Lisp_Object
 elisp_load_read_next_expression_from_c_context (struct reader_context *ctx)
 {
-  SCM read_next_func = scm_c_private_ref ("language elisp runtime",
+  SCM read_next_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-load-read-next-expression-from-port");
   sync_guile_reader (ctx);
   SCM result = scm_call_1 (read_next_func, ctx->port);
@@ -2050,7 +2050,7 @@ elisp_load_read_next_expression_from_c_context (struct reader_context *ctx)
 static void
 elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool printflag)
 {
-  SCM loop_func = scm_c_private_ref ("language elisp runtime",
+  SCM loop_func = scm_c_private_ref ("emacs-elisp runtime",
                                      "elisp-load-read-eval-loop-from-port");
   sync_guile_reader (ctx);
   scm_call_2 (loop_func, ctx->port, printflag ? SCM_BOOL_T : SCM_BOOL_F);
@@ -2060,7 +2060,7 @@ elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool print
 static Lisp_Object
 elisp_normalize_load_path_from_c_context (Lisp_Object sourcename)
 {
-  SCM normalize_func = scm_c_private_ref ("language elisp runtime",
+  SCM normalize_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-normalize-load-path");
   return scm_call_1 (normalize_func, sourcename);
 }
@@ -4432,7 +4432,7 @@ init_obarray_once (void)
   //SET_SYMBOL_CONSTANT (XSYMBOL (Qt_), 1);
   //SET_SYMBOL_DECLARED_SPECIAL (XSYMBOL (Qt_), 1);
 
-  lispsym[iQunbound].u.s.self_ = scm_c_public_ref ("language elisp runtime", "unbound");
+  lispsym[iQunbound].u.s.self_ = scm_c_public_ref ("emacs-elisp runtime", "unbound");
   SET_SYMBOL_VAL (XSYMBOL (Qunbound), Qunbound);
 
   //for (int i = 0; i <  ARRAYELTS (lispsym); i++)

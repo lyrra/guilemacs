@@ -5,7 +5,7 @@
 ;;; Loading: via use-modules in load.scm
 
 (define-module (language elisp character-predicates)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:export (
     elisp-char-alphabetic-p elisp-char-numeric-p
     elisp-char-whitespace-p elisp-char-boundary-p

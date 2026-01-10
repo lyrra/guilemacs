@@ -69,10 +69,10 @@
 
 (define %lisp-string
   (lambda (str)
-    ((module-ref (resolve-module '(language elisp runtime)) 'lisp-string?) str)))
+    ((module-ref (resolve-module '(emacs-elisp runtime)) 'lisp-string?) str)))
 (define %make-lisp-string
   (lambda (str)
-    ((module-ref (resolve-module '(language elisp runtime)) 'make-lisp-string) str)))
+    ((module-ref (resolve-module '(emacs-elisp runtime)) 'make-lisp-string) str)))
 ;;; Modules for the binding slots.
 ;;; Note: Naming those value-slot and/or function-slot clashes with the
 ;;; submodules of these names!
@@ -344,7 +344,7 @@ This replicates the save_match_data_load wrapper function."
   (format #t "using emacs-read!~%")
   (read port))
 
-;;; FIX: move to (language elisp emacs) ?
+;;; FIX: move to (emacs) ?
 ;;; pretty much like gload (see boot.el)
 ;(define (emacs-load filename)
 ;  (format #t "current-reader: ~s~%" (fluid-ref current-reader))

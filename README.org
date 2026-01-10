@@ -894,9 +894,9 @@ by guile-elisp.
     If it happens to be a literal string, it will be constructed by
     "%make-lisp-string".
 
-  - "%make-lisp-string" is defined in language/elisp/runtime.scm,
+  - "%make-lisp-string" is defined in mod/emacs-elisp/runtime.scm,
     and it is a function that does a dynamic call into the same
-    module (language elisp runtime), but function "make-lisp-string".
+    module (emacs-elisp runtime), but function "make-lisp-string".
 
     and that function ("make-lisp-string"), is just the identity function.
 

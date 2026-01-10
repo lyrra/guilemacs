@@ -2110,7 +2110,7 @@ SET_SYMBOL_FWD (sym_t sym, void const *v)
 INLINE Lisp_Object
 SYMBOL_NAME (Lisp_Object sym)
 {
-  return build_string (scm_to_locale_string (scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-name"), sym)));
+  return build_string (scm_to_locale_string (scm_call_1 (scm_c_public_ref ("emacs-elisp runtime", "symbol-name"), sym)));
 }
 
 /* Value is true if SYM is an interned symbol.  */
@@ -3727,21 +3727,21 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
 {
-  scm_call_2 (scm_c_public_ref ("language elisp runtime", "set-symbol-function!"),
+  scm_call_2 (scm_c_public_ref ("emacs-elisp runtime", "set-symbol-function!"),
               sym, function);
 }
 
 INLINE Lisp_Object
 symbol_plist (Lisp_Object sym)
 {
-  return scm_call_1 (scm_c_public_ref ("language elisp runtime", "symbol-plist"),
+  return scm_call_1 (scm_c_public_ref ("emacs-elisp runtime", "symbol-plist"),
                      sym);
 }
 
 INLINE void
 set_symbol_plist (Lisp_Object sym, Lisp_Object plist)
 {
-  scm_call_2 (scm_c_public_ref ("language elisp runtime", "set-symbol-plist!"),
+  scm_call_2 (scm_c_public_ref ("emacs-elisp runtime", "set-symbol-plist!"),
               sym, plist);
 }
 

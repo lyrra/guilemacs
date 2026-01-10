@@ -18,7 +18,7 @@
 ;;; NOTE: Phase 2 - Using flat module naming (language elisp utils)
 
 (define-module (language elisp utils)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:use-module (language elisp sequences)
   #:use-module (srfi srfi-69)
   #:export (

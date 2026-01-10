@@ -5,7 +5,7 @@
 ;;; Loading: via use-modules in load.scm
 
 (define-module (language elisp utf8)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:use-module (rnrs bytevectors)
   #:export (
     string-from-utf8-bytes utf8-valid-p multibyte-to-unibyte

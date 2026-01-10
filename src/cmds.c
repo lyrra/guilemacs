@@ -554,5 +554,5 @@ This is run after inserting a character.
 The hook can access the inserted character via `last-command-event'.  */);
   Vpost_self_insert_hook = Qnil;
 
-  plus_fn = scm_c_private_lookup ("language elisp runtime", "elisp-+");
+  plus_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-+");
 }

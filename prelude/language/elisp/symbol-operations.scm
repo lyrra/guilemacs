@@ -5,7 +5,7 @@
 ;;; Loading: via use-modules in load.scm
 
 (define-module (language elisp symbol-operations)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-69)
   #:export (
     make-symbol-table lookup-symbol cache-symbol

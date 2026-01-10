@@ -5,7 +5,7 @@
 ;;; Loading: via use-modules in load.scm
 
 (define-module (language elisp pcase)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:export (
     pcase--true? pcase--maybe-elisp-function pcase-exhaustive
     pcase-dolist pcase-let pcase-let* pcase-lambda

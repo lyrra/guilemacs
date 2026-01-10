@@ -983,8 +983,8 @@ bool try_load_guile_prelude (const char *filename)
       fprintf(stderr, "found prelude, trying to load %s\n", filename);
       emacs_close (fd);
 
-      /* Add the prelude directory to Guile's load path */
-      SCM elisp_runtime_module = scm_c_resolve_module ("language elisp runtime");
+      /* Pass the prelude directory (added to Guile's load path later) */
+      SCM elisp_runtime_module = scm_c_resolve_module ("guile-user");
       scm_c_module_define (elisp_runtime_module, "%prelude-filename", scm_from_utf8_string (filename));
       scm_c_primitive_load (filename);
       return true;
@@ -1023,7 +1023,7 @@ void load_guile_prelude ()
 void
 install_emacs_strings ()
 {
-    SCM module = scm_c_resolve_module ("language elisp runtime");
+    SCM module = scm_c_resolve_module ("emacs-elisp runtime");
     scm_c_module_define (module, "make-lisp-string",
                          scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
                                            string_from_scheme));
@@ -1667,11 +1667,11 @@ main2 (void *ignore, int argc, char **argv)
 
   if (!initialized)
     {
-      /* scm_c_module_define (scm_c_resolve_module ("language elisp lexer"), */
+      /* scm_c_module_define (scm_c_resolve_module ("emacs-elisp lexer"), */
       /*                      "make-lisp-string", */
       /*                      scm_c_make_gsubr ("make-lisp-string", 1, 0, 0, */
       /*                                        string_from_scheme)); */
-      (void *) scm_c_resolve_module ("language elisp spec");
+      (void *) scm_c_resolve_module ("emacs-elisp spec");
       symbol_module = scm_c_resolve_module ("elisp-symbols");
       function_module = scm_c_resolve_module ("elisp-functions");
       plist_module = scm_c_resolve_module ("elisp-plists");
@@ -1681,8 +1681,8 @@ main2 (void *ignore, int argc, char **argv)
 
       //install_emacs_strings ();
 
-      xsymbol_fn = scm_c_public_ref ("language elisp runtime", "symbol-desc");
-      symbol_function_fn = scm_c_public_ref ("language elisp runtime", "symbol-function");
+      xsymbol_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-desc");
+      symbol_function_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-function");
 
       init_guile ();
       init_guile_fns ();  /* Initialize Guile lookup functions */
@@ -1703,7 +1703,7 @@ main2 (void *ignore, int argc, char **argv)
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
-      scm_call_7 (scm_c_public_ref ("language elisp runtime", "emacs!"),
+      scm_call_7 (scm_c_public_ref ("emacs-elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),
                   SYMBOL_FUNCTION (intern ("boundp")),

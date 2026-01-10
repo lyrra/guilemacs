@@ -152,7 +152,7 @@ init_eval_once (void)
   specpdl = specpdl_ptr = pdlvec + 1;
   specpdl_end = specpdl + size;
 
-  eval_fn = scm_c_public_ref ("language elisp runtime", "eval-elisp");
+  eval_fn = scm_c_public_ref ("emacs-elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
 
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);

@@ -18,7 +18,7 @@
 ;;; NOTE: Phase 2 - Using flat module naming (language elisp sequences)
 
 (define-module (language elisp sequences)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions
     elisp-memq elisp-member elisp-memql elisp-nth elisp-nthcdr

@@ -13198,5 +13198,5 @@ The options are:
   DEFSYM (QCformat, ":format");
 #endif /* HAVE_IMAGEMAGICK */
 
-  mod_fn = scm_c_private_lookup ("language elisp runtime", "elisp-mod");
+  mod_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-mod");
 }

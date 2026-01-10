@@ -21,11 +21,9 @@
 ;;;   Helpers: elisp-symbol-equal
 ;;;   Registration: init-types-registrations
 ;;;
-;;; NOTE: Phase 2 - Using flat module naming (language elisp types) instead of
-;;;       nested (language elisp runtime types) to avoid submodule complexity.
 
 (define-module (language elisp types)
-  #:use-module (language elisp runtime)
+  #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions
     elisp-symbolp

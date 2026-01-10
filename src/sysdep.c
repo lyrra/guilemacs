@@ -4686,6 +4686,6 @@ syms_of_sysdep (void)
 {
 #include "sysdep.x"
 
-  plus_fn = scm_c_private_lookup ("language elisp runtime", "elisp-+");
-  times_fn = scm_c_private_lookup ("language elisp runtime", "elisp-*");
+  plus_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-+");
+  times_fn = scm_c_private_lookup ("emacs-elisp runtime", "elisp-*");
 }
