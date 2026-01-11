@@ -49,12 +49,6 @@
   (set! %load-path (cons (canonicalize-path (string-append dir "/../mod")) %load-path)))
 ;; (format (current-error-port) "-- %load-path: ~s~%" %load-path)
 
-;; %prelude-filename is passed to us by try_load_guile_prelude
-;; Note that we replace the guile's original runtime module here,
-;; by reloading it with our local modifications
-;(set! %load-path (cons "." %load-path))
-;(set! %load-path (cons "./mod/" %load-path))
-
 ;-------------------
 ; monkey patch guile
 ;-------------------
@@ -92,25 +86,16 @@
       (module-set! compile-module 'default-environment patched-default-env))))
 ;===================
 
-;; switch current-module to guile's original runtime module
-;; Note that any changes to this module later on it scrapped,
-;; because we do a module reload
-(use-modules (emacs-elisp runtime))
-;; (format (current-error-port) "-- loaded emacs-lisp runtime~%")
-;; not sure this is needed anymore if we do pure modules
-(set-current-module (resolve-module '(emacs-elisp runtime)))
-;; (format (current-error-port) "-- switched module: ~s~%" (current-module))
-
-(use-modules (rnrs bytevectors)) ; R6RS bytevector support (Guile standard)
-(format (current-error-port) "-- load language elisp emacs~%")
-(use-modules (language elisp emacs))
-(format (current-error-port) "-- load done language elisp emacs~%")
-(use-modules (system foreign-library))
-
-(use-modules ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
-             (ice-9 ftw) ; for stat etc.
+(use-modules (rnrs bytevectors) ; R6RS bytevector support (Guile standard)
+             (system foreign-library)
              (system base compile) ; compile-file, compiled-file-name, etc.
-             (system base language))
+             (system base language)
+             ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
+             (ice-9 ftw)) ; for stat etc.
+
+(use-modules (emacs-elisp runtime)
+             (emacs-elisp compile-tree-il)
+             (language elisp emacs))
 
 ;; Map Emacs-specific encodings to Guile-compatible ones
 ;; Guile doesn't recognize "UTF-8-EMACS" but it's essentially UTF-8
@@ -135,43 +120,6 @@
   (if (or (string-null? a) (string-suffix? "/" a))
       (string-append a b)
       (string-append a "/" b)))
-
-(define (compile-and-load-elisp path)
-  ;; Compile PATH as Elisp, then load the resulting .go.
-  ;; Skip compilation if .go is newer than source.
-  (let* ((out (string-append path ".go"))
-         (src-stat (stat path #f))
-         (out-stat (stat out #f)))
-    (when (or (not out-stat)
-              (> (stat:mtime src-stat) (stat:mtime out-stat)))
-      (format (current-error-port) "-- compile ~s~%" path)
-      (compile-file path #:from 'emacs-elisp #:output-file out))
-    (format (current-error-port) "-- load-compile ~s~%" out)
-    (load-compiled out)))
-
-(define (reload-local-elisp! base-dir)
-  "Reload local language/elisp Scheme pieces and boot.el from BASE-DIR.
-   Order: runtime.scm → lexer.scm → parser.scm → compile-tree-il.scm → boot.el"
-  (let* ((scheme-files '(; "runtime.scm" ; dont reload runtime it will redefine module
-                         "lexer.scm"
-                         "parser.scm"
-                         "compile-tree-il.scm"))
-         (old-load-path %load-path))
-    (dynamic-wind
-      (lambda () (set! %load-path (cons base-dir %load-path)))
-      (lambda ()
-        ;; 1) Reload Scheme-side modules in dependency order *as Scheme*.
-        (for-each (lambda (f)
-                    (let ((p (join base-dir f)))
-                      (primitive-load p)))
-                  scheme-files)
-        ;; 2) Load boot.el *as Elisp*, either from source or via compiled .go.
-        ; dont reload boot.el, move stuff into this file, or push upstream
-        (compile-and-load-elisp (join base-dir "boot.el")))
-      (lambda () (set! %load-path old-load-path)))))
-
-;; Files now in mod/emacs-elisp/ directory (one level up from prelude, then into mod)
-(reload-local-elisp! (canonicalize-path (join %prelude-directory "../mod/emacs-elisp")))
 
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 
