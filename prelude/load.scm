@@ -140,9 +140,7 @@
 (module-use! (current-module) (resolve-module '(language elisp types)))
 
 ;; Load numbers module as proper Guile module
-(use-modules (language elisp numbers))
-(module-use! (current-module) (resolve-module '(language elisp numbers)))
-
+(use-modules (numbers))
 (use-modules (language elisp strings))
 (use-modules (language elisp sequences))
 (use-modules (language elisp utils))

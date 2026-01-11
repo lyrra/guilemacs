@@ -22,7 +22,7 @@
 ;;;
 ;;; NOTE: Phase 2 - Using flat module naming (language elisp numbers)
 
-(define-module (language elisp numbers)
+(define-module (numbers)
   #:use-module (rnrs bytevectors)
   #:use-module (emacs-elisp runtime)
   #:export (
