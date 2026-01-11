@@ -4,6 +4,7 @@
 (define-module (emacs-elisp spec)
   #:use-module (emacs-elisp compile-tree-il)
   #:use-module (emacs-elisp parser)
+  #:use-module (emacs-elisp falias)  ; Pre-load before boot.el compilation
   #:use-module (system base language)
   #:use-module (system base compile)
   #:use-module (system base target)
