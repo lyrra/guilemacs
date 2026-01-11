@@ -969,9 +969,8 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
          (d-p-f 0 ;(get-debug-print-flag)
                 )) ; FIX: cant use %debug-print-flag directly
     (when (and d-p-f (logbit? 16 d-p-f))
-      (format #t "---------------------------------------------------------------~%")
-      (format #t "expr: ~s~%" expr)
-      (format #t "tree-il---> : ~s~%" tree-il)
-      (format #t "tree-il ---> : ~s~%" (tree-il->scheme tree-il))
-      (force-output))
+      (format (current-error-port) "---------------------------------------------------------------~%")
+      (format (current-error-port) "expr: ~s~%" expr)
+      (format (current-error-port) "tree-il---> : ~s~%" tree-il)
+      (format (current-error-port) "tree-il ---> : ~s~%" (tree-il->scheme tree-il)))
     (values tree-il env env)))
