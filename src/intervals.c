@@ -1362,16 +1362,8 @@ offset_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t length)
   if (length == 0)
     return;
 
-  /* Adjust C intervals if present */
-  if (buffer_intervals (buffer))
-    {
-      if (length > 0)
-        adjust_intervals_for_insertion (buffer_intervals (buffer),
-                                        start, length);
-      else
-        adjust_intervals_for_deletion (buffer, start, -length);
-    }
-
+  /* Guilemacs: Buffer text properties are stored in Scheme intervals.
+     The Scheme interval handles all buffer property . */
   /* Always adjust Scheme intervals (they may exist even if C intervals don't) */
   offset_scheme_intervals (buffer, start, length);
 }

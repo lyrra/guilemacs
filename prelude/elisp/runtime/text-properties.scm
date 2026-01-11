@@ -396,14 +396,19 @@ Returns new interval list."
                                           int-plist)
                             result)))
 
-               ;; Insertion is inside interval - split and expand
+               ;; Insertion is inside interval - split into before and after parts
+               ;; Newly inserted text does NOT inherit properties
                (else
-                ;; Create single expanded interval covering insertion
-                (loop (cdr ints)
-                      (cons (make-interval int-start
-                                          (+ int-end length)
-                                          int-plist)
-                            result))))))))))
+                (let ((before-part (if (> pos int-start)
+                                       (make-interval int-start pos int-plist)
+                                       #f))
+                      (after-part (make-interval (+ pos length)
+                                                 (+ int-end length)
+                                                 int-plist)))
+                  (loop (cdr ints)
+                        (if before-part
+                            (cons after-part (cons before-part result))
+                            (cons after-part result))))))))))))
 
 (define (adjust-intervals-on-delete intervals start end)
   "Adjust INTERVALS after deleting text from START to END.
@@ -708,6 +713,7 @@ Uses binary search for buffers (O(log n))."
 
     ;; Buffer - use cached vector with binary search for O(log n)
     (else
+     (flush-pending-delete obj)  ; Ensure pending deletes are applied first
      (let ((vec (buffer-intervals-vector-get obj)))
        (if (not vec)
            #nil
@@ -737,6 +743,7 @@ Uses binary search for buffers (O(log n))."
 
     ;; Buffer - use cached vector with binary search for O(log n)
     (else
+     (flush-pending-delete obj)  ; Ensure pending deletes are applied first
      (let ((vec (buffer-intervals-vector-get obj)))
        (if (not vec)
            #nil
@@ -775,6 +782,7 @@ Returns #t if properties were added."
 
     ;; Buffer
     (else
+     (flush-pending-delete obj)  ; Ensure intervals match current buffer positions
      (let* ((old-intervals (buffer-intervals-get obj))
             (new-intervals (add-properties-to-intervals
                             old-intervals start end props)))
@@ -810,34 +818,35 @@ Returns #t if properties were added."
 ;; of same length at same position, which results in no net interval change.
 (define *pending-delete* (make-hash-table))  ; buffer -> (pos . len)
 
+(define (flush-pending-delete buffer)
+  "Apply any pending delete for BUFFER.
+This must be called before reading properties to ensure consistency."
+  (let ((pending (hashq-ref *pending-delete* buffer #f)))
+    (when pending
+      (let* ((del-pos (car pending))
+             (del-len (cdr pending))
+             (old-intervals (buffer-intervals-get buffer))
+             (new-intervals (adjust-intervals-on-delete old-intervals del-pos (+ del-pos del-len))))
+        (buffer-intervals-set! buffer new-intervals))
+      (hashq-remove! *pending-delete* buffer))))
+
 (define (buffer-on-insert buffer pos len)
   "Hook called after inserting LEN characters at POS in BUFFER.
-Adjusts text property intervals accordingly.
-Optimizes by detecting delete+insert at same position with same length."
+Adjusts text property intervals accordingly."
+  ;; Apply any pending delete first
   (let ((pending (hashq-ref *pending-delete* buffer #f)))
-    (cond
-     ;; Check if this insert cancels a pending delete
-     ((and pending
-           (= pos (car pending))
-           (= len (cdr pending)))
-      ;; Delete and insert at same position with same length - no net change!
-      ;; Just clear the pending delete, no interval adjustment needed.
-      (hashq-remove! *pending-delete* buffer))
+    (when pending
+      (let* ((del-pos (car pending))
+             (del-len (cdr pending))
+             (old-intervals (buffer-intervals-get buffer))
+             (new-intervals (adjust-intervals-on-delete old-intervals del-pos (+ del-pos del-len))))
+        (buffer-intervals-set! buffer new-intervals))
+      (hashq-remove! *pending-delete* buffer)))
 
-     (else
-      ;; Apply any pending delete first
-      (when pending
-        (let* ((del-pos (car pending))
-               (del-len (cdr pending))
-               (old-intervals (buffer-intervals-get buffer))
-               (new-intervals (adjust-intervals-on-delete old-intervals del-pos (+ del-pos del-len))))
-          (buffer-intervals-set! buffer new-intervals))
-        (hashq-remove! *pending-delete* buffer))
-
-      ;; Now apply this insert
-      (let* ((old-intervals (buffer-intervals-get buffer))
-             (new-intervals (adjust-intervals-on-insert old-intervals pos len)))
-        (buffer-intervals-set! buffer new-intervals))))))
+  ;; Now apply this insert
+  (let* ((old-intervals (buffer-intervals-get buffer))
+         (new-intervals (adjust-intervals-on-insert old-intervals pos len)))
+    (buffer-intervals-set! buffer new-intervals)))
 
 (define (buffer-on-delete buffer start end)
   "Hook called after deleting text from START to END in BUFFER.
@@ -862,6 +871,9 @@ Records pending delete for potential coalescing with subsequent insert."
   "Remove properties in PROPS from text in range [START, END) in OBJ.
 PROPS is a list of property names to remove.
 Returns #t if any properties were removed, #nil otherwise."
+  ;; Flush pending deletes for buffers before accessing intervals
+  (when (not (or (emacs-string? obj) (string? obj)))
+    (flush-pending-delete obj))
   (let* ((intervals (cond
                      ((emacs-string? obj) (emacs-string-intervals obj))
                      ((string? obj) '())
@@ -957,6 +969,9 @@ Returns #t if any properties were removed, #nil otherwise."
   "Set properties to PROPS for text in range [START, END) in OBJ.
 This replaces all existing properties in the range with PROPS.
 Returns #t."
+  ;; Flush pending deletes for buffers before accessing intervals
+  (when (not (or (emacs-string? obj) (string? obj)))
+    (flush-pending-delete obj))
   (let* ((intervals (cond
                      ((emacs-string? obj) (emacs-string-intervals obj))
                      ((string? obj) '())
@@ -1074,13 +1089,15 @@ LIMIT is optional - defaults to end of object if not provided."
 
    ;; Buffer - use cached vector for performance
    (else
+    (flush-pending-delete object)  ; Ensure pending deletes are applied first
     (let ((vec (buffer-intervals-vector-get object)))
       (if (not vec)
           ;; No intervals
           (or limit #nil)
           ;; Use binary search
-          (let ((idx (binary-search-interval vec position)))
-            (next-property-change-from-index vec idx position #f limit)))))))
+          (let* ((actual-limit (if (and limit (not (eq? limit #nil))) limit #f))
+                 (idx (binary-search-interval vec position)))
+            (next-property-change-from-index vec idx position actual-limit limit)))))))
 
 (define (next-property-change-from-index vec idx position actual-limit limit)
   "Helper: find next property change given vector and index."
