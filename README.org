@@ -366,6 +366,17 @@ Thread 1 "emacs" received signal SIGSEGV, Segmentation fault.
     (gdb) call debug_print(0x7fffea620ea0)
     prefix-arg
 
+** backtrace and go files
+if guile loads a go file (previously compiled elisp file), it wont
+produce any compile errors, since compilation never takes place.
+In that case, try removing all go files and run your test again:
+#+BEGIN_SRC
+find . -name "*.el.go" -type f -delete
+find . -name "*.el.go.*" -type f -delete
+Or even empty your homedir-cache: ~/.cache/guile/ccache
+
+Also setting GUILE_AUTO_COMPILE=0 can be helpful
+#+END_SRC
 ** testing
 *** emacs prelude
 **** example session debugging remainder :prelude:guile-elisp:
