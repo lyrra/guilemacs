@@ -180,13 +180,12 @@ Markers are coerced to their position value."
 
 ;; Note: abs, sqrt, exp, expt are directly mapped from Guile
 
-(define elisp-log
-  (lambda* (num #:optional base)
-    (if (not base)
-        (log num)
-        (if (= base 10.0)
-            (log10 num)
-            (/ (log num) (log base))))))
+(define* (elisp-log num #:optional base)
+  (if (not base)
+      (log num)
+      (if (= base 10.0)
+          (log10 num)
+          (/ (log num) (log base)))))
 
 ;;;
 ;;; Rounding & Truncation Functions
@@ -227,11 +226,10 @@ Markers are coerced to their position value."
 ;;; Special Floating-Point Predicates
 ;;;
 
-(define elisp-isnan
-  (lambda (num)
-    (unless (and (real? num) (not (exact? num)))
-      ((symbol-function 'signal) 'wrong-type-argument num))
-    (nan? num)))
+(define (elisp-isnan num)
+  (unless (and (real? num) (not (exact? num)))
+    ((symbol-function 'signal) 'wrong-type-argument num))
+  (nan? num))
 
 ;;;
 ;;; Modulo & Remainder Operations
@@ -247,7 +245,6 @@ Markers are coerced to their position value."
                          modulo)
                      (check-number-coerce-marker a)
                      (check-number-coerce-marker b))))
-
 ;;;
 
 (define (elisp-byteorder)
@@ -259,8 +256,6 @@ lowercase l) for small endian machines."
       66   ; 'B' for big endian
       108)) ; 'l' for little endian
 
-
-
 (define (elisp-float arg)
   "Return the floating point number equal to ARG."
   (cond
@@ -268,16 +263,12 @@ lowercase l) for small endian machines."
     ((number? arg) arg)  ; Already a float
     (else (error "Wrong type argument: numberp" arg))))
 
-
-
 (define (elisp-number-to-string number)
   "Return the decimal representation of NUMBER as a string."
   (cond
     ((integer? number) (number->string number))
     ((number? number) (number->string number))
     (else (error "Wrong type argument: numberp" number))))
-
-
 
 (define (elisp-random limit)
   "Return a pseudo-random integer.
@@ -299,13 +290,10 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
     (else
      (error "Wrong type argument" limit))))
 
-
-
 (define (elisp-number-or-marker-p object)
   "Return t if OBJECT is a number or a marker."
   ;; For now, markers are not implemented in Guile, so just check numbers
   (if (number? object) #t #nil))
-
 
 ;;; Registration with Elisp symbol table
 ;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
@@ -314,80 +302,22 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
 ;;; the registrations incrementally.
 ;;;
 
-;; Basic arithmetic
-(set-symbol-function! '+ elisp-+)
-(set-symbol-function! '- elisp--)
-(set-symbol-function! '* elisp-*)
-(set-symbol-function! '/ elisp-/)
-(set-symbol-function! '1+ elisp-1+)
-(set-symbol-function! '1- elisp-1-)
-
-;; Min/Max
-(set-symbol-function! 'min elisp-min)
-(set-symbol-function! 'max elisp-max)
-
-;; Comparisons
-(set-symbol-function! '= elisp-=)
-(set-symbol-function! '< elisp-<)
-(set-symbol-function! '> elisp->)
-(set-symbol-function! '<= elisp-<=)
-(set-symbol-function! '>= elisp->=)
-(set-symbol-function! '/= elisp-/=)
-
-;; Bitwise operations
-(set-symbol-function! 'logcount logcount)
-(set-symbol-function! 'lognot lognot)
-(set-symbol-function! 'logior logior)
-(set-symbol-function! 'logxor logxor)
-(set-symbol-function! 'logand elisp-logand)
-(set-symbol-function! 'ash ash)
-
-;; Trigonometric
-(set-symbol-function! 'cos cos)
-(set-symbol-function! 'tan tan)
-(set-symbol-function! 'sin sin)
-(set-symbol-function! 'acos acos)
-(set-symbol-function! 'atan atan)
-(set-symbol-function! 'asin asin)
-
-;; Exponential & Logarithmic
-(set-symbol-function! 'abs abs)
-(set-symbol-function! 'sqrt sqrt)
-(set-symbol-function! 'exp exp)
-(set-symbol-function! 'expt expt)
-(set-symbol-function! 'log elisp-log)
-
-;; Rounding & Truncation
-(set-symbol-function! 'truncate elisp-truncate)
-(set-symbol-function! 'ceiling elisp-ceiling)
-(set-symbol-function! 'floor elisp-floor)
-(set-symbol-function! 'round elisp-round)
-
-;; Floating-point rounding
-(set-symbol-function! 'ftruncate elisp-ftruncate)
-(set-symbol-function! 'fceiling elisp-fceiling)
-(set-symbol-function! 'ffloor elisp-ffloor)
-(set-symbol-function! 'fround elisp-fround)
-
-;; Special predicates
-(set-symbol-function! 'isnan elisp-isnan)
-
-;; Modulo & Remainder
-(set-symbol-function! '% elisp-%)
-(set-symbol-function! 'mod elisp-mod)
-
-(set-symbol-function! 'byteorder elisp-byteorder)
-(set-symbol-function! 'float elisp-float)
-(set-symbol-function! 'number-to-string elisp-number-to-string)
-(set-symbol-function! 'random elisp-random)
-(set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)
-
 ;; Registration initialization function
 ;; Called by load.scm after module is loaded
 (define (init-numbers-registrations)
   "Initialize symbol function registrations for numbers module."
-    (set-symbol-function! '% elisp-%)
+  (set-symbol-function! 'min elisp-min)
+  (set-symbol-function! 'max elisp-max)
+  (set-symbol-function! '% elisp-%)
   (set-symbol-function! '/ elisp-/)
+  (set-symbol-function! '+ elisp-+)
+  (set-symbol-function! '- elisp--)
+  (set-symbol-function! '* elisp-*)
+  (set-symbol-function! '= elisp-=)
+  (set-symbol-function! '< elisp-<)
+  (set-symbol-function! '> elisp->)
+  (set-symbol-function! '<= elisp-<=)
+  (set-symbol-function! '>= elisp->=)
   (set-symbol-function! '/= elisp-/=)
   (set-symbol-function! '1+ elisp-1+)
   (set-symbol-function! '1- elisp-1-)
@@ -399,18 +329,8 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
   (set-symbol-function! 'cos cos)
   (set-symbol-function! 'exp exp)
   (set-symbol-function! 'expt expt)
-  (set-symbol-function! 'isnan
-                      (lambda (num)
-                        (unless (and (real? num) (not (exact? num)))
-                          ((symbol-function 'signal) 'wrong-type-argument num))
-                        (nan? num)))
-  (set-symbol-function! 'log
-  (lambda* (num #:optional base)
-    (if (not base)
-        (log num)
-        (if (= base 10.0)
-            (log10 num)
-            (/ (log num) (log base))))))
+  (set-symbol-function! 'isnan elisp-isnan)
+  (set-symbol-function! 'log elisp-log)
   (set-symbol-function! 'logand elisp-logand)
   (set-symbol-function! 'logcount logcount)
   (set-symbol-function! 'logior logior)
@@ -419,4 +339,24 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
   (set-symbol-function! 'mod elisp-mod)
   (set-symbol-function! 'sin sin)
   (set-symbol-function! 'sqrt sqrt)
-  (set-symbol-function! 'tan tan))
+  (set-symbol-function! 'tan tan)
+
+  ;; Rounding & Truncation
+  (set-symbol-function! 'truncate elisp-truncate)
+  (set-symbol-function! 'ceiling elisp-ceiling)
+  (set-symbol-function! 'floor elisp-floor)
+  (set-symbol-function! 'round elisp-round)
+
+  ;; Floating-point rounding
+  (set-symbol-function! 'ftruncate elisp-ftruncate)
+  (set-symbol-function! 'fceiling elisp-fceiling)
+  (set-symbol-function! 'ffloor elisp-ffloor)
+  (set-symbol-function! 'fround elisp-fround)
+
+  (set-symbol-function! 'byteorder elisp-byteorder)
+  (set-symbol-function! 'float elisp-float)
+  (set-symbol-function! 'number-to-string elisp-number-to-string)
+  (set-symbol-function! 'random elisp-random)
+  (set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)
+
+  )
