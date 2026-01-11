@@ -1412,6 +1412,7 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_add_text_properties_proc))
         {
+          SCM proc = scm_variable_ref (scm_add_text_properties_proc);
           /* Validate start/end arguments.
              For buffers, convert markers to positions and check bounds.
              For strings, just check that they're integers. */
@@ -1439,16 +1440,14 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
           if (BUFFERP (object))
             {
               modify_text_properties (object, start, end);
-              SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
-                                       start, end, properties, object);
+              SCM result = scm_call_4 (proc, start, end, properties, object);
               signal_after_change (XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start));
               return result;
             }
 
-          SCM result = scm_call_4 (scm_variable_ref (scm_add_text_properties_proc),
-                                  start, end, properties, object);
+          SCM result = scm_call_4 (proc, start, end, properties, object);
           return result;
         }
     }

@@ -679,18 +679,8 @@ insert (const char *string, ptrdiff_t nbytes)
       opoint = PT - len;
       signal_after_change (opoint, 0, len);
       update_compositions (opoint, PT, CHECK_BORDER);
-
-      /* Adjust text properties for insertion */
-      {
-        SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
-        if (!scm_is_false (buffer_on_insert))
-          {
-            SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
-            SCM pos = scm_from_ptrdiff_t (opoint);
-            SCM length = scm_from_ptrdiff_t (len);
-            scm_call_3 (buffer_on_insert, buffer, pos, length);
-          }
-      }
+      /* Note: text property interval adjustment is handled by offset_intervals
+         which is called from insert_1_both via offset_scheme_intervals */
     }
 }
 
@@ -706,18 +696,8 @@ insert_and_inherit (const char *string, ptrdiff_t nbytes)
       opoint = PT - len;
       signal_after_change (opoint, 0, len);
       update_compositions (opoint, PT, CHECK_BORDER);
-
-      /* Adjust text properties for insertion */
-      {
-        SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
-        if (!scm_is_false (buffer_on_insert))
-          {
-            SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
-            SCM pos = scm_from_ptrdiff_t (opoint);
-            SCM length = scm_from_ptrdiff_t (len);
-            scm_call_3 (buffer_on_insert, buffer, pos, length);
-          }
-      }
+      /* Note: text property interval adjustment is handled by offset_intervals
+         which is called from insert_1_both via offset_scheme_intervals */
     }
 }
 
@@ -998,19 +978,8 @@ insert_from_string (Lisp_Object string, ptrdiff_t pos, ptrdiff_t pos_byte,
 			inherit, 0);
   signal_after_change (opoint, 0, PT - opoint);
   update_compositions (opoint, PT, CHECK_BORDER);
-
-  /* Adjust text properties for insertion */
-  {
-    ptrdiff_t len = PT - opoint;
-    SCM buffer_on_insert = scm_c_public_ref ("language elisp emacs text-properties", "buffer-on-insert");
-    if (!scm_is_false (buffer_on_insert))
-      {
-        SCM buffer = make_lisp_ptr (current_buffer, Lisp_Vectorlike);
-        SCM pos_scm = scm_from_ptrdiff_t (opoint);
-        SCM length_scm = scm_from_ptrdiff_t (len);
-        scm_call_3 (buffer_on_insert, buffer, pos_scm, length_scm);
-      }
-  }
+  /* Note: text property interval adjustment is handled by offset_intervals
+     which is called from insert_from_string_1 via offset_scheme_intervals */
 }
 
 /* Like `insert_from_string' except that all markers pointing
