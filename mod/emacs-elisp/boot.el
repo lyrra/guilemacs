@@ -797,4 +797,19 @@
   `(eval-when (:compile-toplevel :load-toplevel :execute)
      (funcall #'require ,@(cdr form))))
 
+;; FIX: provide must also run at compile time to match require behavior
+;; Without this, (provide 'foo) followed by (require 'bar) where bar requires foo
+;; will fail because provide wasn't executed yet at compile time
+;; NOTE: At compile time we use a simple features update without running
+;; after-load hooks (which can fail during early bootstrap). At load/execute
+;; time we use the full provide with hooks.
+(%define-compiler-macro provide (form)
+  `(progn
+     ;; At compile time, just update features list without hooks
+     (eval-when (:compile-toplevel)
+       (%funcall (@ (language elisp utils) elisp-provide) ,@(cdr form)))
+     ;; At load/execute time, use full provide with after-load hooks
+     (eval-when (:load-toplevel :execute)
+       (funcall #'provide ,@(cdr form)))))
+
 (print "--- load boot.el done \n")
