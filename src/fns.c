@@ -2922,10 +2922,15 @@ Symbols must match exactly.  */)
       custom_equal_lookup_done = true;
     }
 
-  /* Only use custom Scheme equal for strings (which may be emacs-string wrappers).
-     For all other types, use Guile's native equal? directly to avoid GC issues
-     with complex nested objects like keymaps. */
-  if (!scm_is_false (custom_equal_proc) && (STRINGP (o1) || STRINGP (o2)))
+  /* Use custom Scheme equal for strings (which may be emacs-string wrappers)
+     and for lists/vectors (which may contain emacs-string wrappers).
+     This ensures that lists containing emacs-strings compare equal to
+     lists containing plain strings with the same content.
+     Note: We avoid calling this for all types to prevent GC issues with
+     complex nested objects like keymaps that don't contain strings. */
+  if (!scm_is_false (custom_equal_proc)
+      && (STRINGP (o1) || STRINGP (o2) || CONSP (o1) || CONSP (o2)
+          || VECTORP (o1) || VECTORP (o2)))
     {
       Lisp_Object result = scm_call_2 (custom_equal_proc, o1, o2);
       return scm_is_true (result) ? Qt : Qnil;
