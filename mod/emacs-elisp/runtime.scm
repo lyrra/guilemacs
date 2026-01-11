@@ -7,6 +7,8 @@
   #:use-module (ice-9 pretty-print)
   #:use-module ((system base compile)
                 #:select (compile compile-file))
+  #:use-module ((system base language)
+                #:select (lookup-language))
   #:export (nil-value
             t-value
             value-slot-module
