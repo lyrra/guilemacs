@@ -58,7 +58,7 @@
   (with-temp-buffer
     ;; Test text property buttons with dynamic scoping.
     (setq lexical-binding nil)
-    (let* ((help   (make-symbol "help"))
+    (let* ((help   (intern-gensym "help"))
            (form   `(funcall (let ((,help "lexical form"))
                                (lambda () ,help))))
            (button (insert-text-button "text" 'help-echo form)))
