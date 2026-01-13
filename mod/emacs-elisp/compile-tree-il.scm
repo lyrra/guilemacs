@@ -515,6 +515,7 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
   (list->seq loc
              (if (null? args)
                  (list (nil-value loc))
+                 ; NOTE: map = map-in-order is too ingrained in usage, to consider this a user-side bug, but rather a scheme-spec-bug
                  (map compile-expr-1 args))))
 
 (defspecial eval-when-compile (loc args)
