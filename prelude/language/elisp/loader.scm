@@ -8,9 +8,10 @@
   #:use-module (system base language)
   #:use-module ((system base compile)
                 #:select (compile compile-file))
-
+  #:use-module ((srfi srfi-1) #:select (count any))
   #:use-module (emacs-elisp runtime)
   #:use-module (language elisp utils)
+  #:use-module (language elisp reader)
   #:export (
     init-loader
     elisp-call-load-source-file-function
@@ -51,11 +52,18 @@
     search-elisp-load-path
     load-elisp
     load-elisp-full
+    elisp-autoload-do-load
+    file-being-loaded?
   ))
 
 ;;;
 ;;; All loader function implementations below
 ;;;
+
+;;; Track files currently being loaded to prevent circular require loops
+;;; This is a fluid/parameter that holds a list of file paths currently being loaded
+(define *files-being-loaded* (make-parameter '()))
+
 ;;;
 ;;; Read-Eval Loop Functions
 ;;;
@@ -425,9 +433,86 @@ Returns: the new value for loads-in-progress list."
 (define (elisp-load-with-match-data-protection file noerror nomessage nosuffix must-suffix)
   "Load file with match data protection.
   This replicates the save_match_data_load wrapper function."
-
   ;; Call the main load function - C will handle the match data protection
   ((symbol-function 'load) file noerror nomessage nosuffix must-suffix))
+
+(define (file-being-loaded? autoload-file)
+  "Check if autoload-file (base name like 'gnus-sum') matches any file in *files-being-loaded*.
+Returns #t if the file is currently being loaded (circular autoload situation)."
+  (let ((files (*files-being-loaded*)))
+    (any (lambda (path)
+           (or
+            ;; Check if path ends with /file.el
+            (string-suffix? (string-append "/" autoload-file ".el") path)
+            ;; Check if path ends with /file (no extension)
+            (string-suffix? (string-append "/" autoload-file) path)
+            ;; Check exact match
+            (equal? autoload-file path)
+            ;; Check if path is just file.el (no directory)
+            (equal? (string-append autoload-file ".el") path)))
+         files)))
+
+(define (elisp-autoload-do-load fundef funname macro-only)
+  "Scheme implementation of autoload-do-load.
+Load FUNDEF which should be an autoload.
+If non-nil, FUNNAME should be the symbol whose function value is FUNDEF,
+in which case the function returns the new autoloaded function value.
+If equal to 'macro, MACRO-ONLY specifies that FUNDEF should only be loaded if
+it defines a macro."
+  ;; Check if fundef is an autoload form (autoload FILE ...)
+  (if (not (and (pair? fundef) (eq? (car fundef) (elisp-intern "autoload" #nil))))
+      fundef
+      (let* ((kind ((symbol-function 'nth) 4 fundef))
+             (qt ((symbol-function 'symbol-value) (elisp-intern "t" #nil)))
+             (qmacro (elisp-intern "macro" #nil)))
+        ;; If macro-only is 'macro and kind isn't t or 'macro, return fundef unchanged
+        (if (and (eq? macro-only qmacro)
+                 (not (or (eq? kind qt) (eq? kind qmacro))))
+            fundef
+            (let* ((autoload-file ((symbol-function 'car) ((symbol-function 'cdr) fundef)))
+                   ;; ignore-errors is true if macro-only is set but kind isn't macro/t
+                   (ignore-errors (if (or (eq? kind qt) (eq? kind qmacro))
+                                      #nil
+                                      macro-only)))
+              ;; Check for circular autoload BEFORE loading
+              (when (and (string? autoload-file)
+                         (file-being-loaded? autoload-file))
+                ;; File is already being loaded - this is a circular autoload.
+                ;; Remove the autoload to prevent retry loops and signal void-function.
+                ((symbol-function 'fmakunbound) funname)
+                ((symbol-function 'signal) (elisp-intern "void-function" #nil)
+                 ((symbol-function 'list) funname)))
+
+              ;; Load the file
+              ((symbol-function 'load) autoload-file ignore-errors qt #nil qt)
+
+              ;; Check result
+              (cond
+               ;; If funname is nil or ignore-errors is set, return nil
+               ((or (eq? funname #nil) (not (eq? ignore-errors #nil)))
+                #nil)
+               (else
+                (let ((fun ((symbol-function 'indirect-function) funname #nil)))
+                  (if (not ((symbol-function 'equal) fun fundef))
+                      ;; Function was defined, return it
+                      fun
+                      ;; Function still equals autoload form - check for circular load
+                      (if (and (string? autoload-file)
+                               (file-being-loaded? autoload-file))
+                          ;; Circular autoload - remove the autoload to stop retry loop
+                          ;; The function will be defined when the outer load completes
+                          (begin
+                            ((symbol-function 'fset) funname #nil)
+                            #nil)
+                          ;; Real error - function wasn't defined
+                          ((symbol-function 'error)
+                           "Autoloading file %s failed to define function %s"
+                           (let ((hist ((symbol-function 'symbol-value)
+                                        (elisp-intern "load-history" #nil))))
+                             (if (pair? hist)
+                                 ((symbol-function 'car) ((symbol-function 'car) hist))
+                                 ""))
+                           ((symbol-function 'symbol-name) funname))))))))))))
 
 ;;;
 ;;; Compound Operations
@@ -560,14 +645,32 @@ Only returns actual files, not directories."
                 (throw 'early-return #f)
                 (error "Cannot open load file" file)))
 
-          ;; Step 4: Setup load environment (reuse existing)
-          (let ((setup-env-func (resolve-ref "emacs-elisp runtime"
-                                            "elisp-setup-load-environment")))
-            (when setup-env-func
-              (setup-env-func found '() file #f #t))) ; simplified params
+          ;; FIX-20260114-guilemacs: Check for recursive load cycle
+          ;; If this file is already being loaded (circular require), skip re-loading
+          ;; This allows circular requires like gnus-sum <-> gnus-art to work
+          (let ((load-count (count (lambda (f) (equal? f found)) (*files-being-loaded*))))
+            (when (> load-count 0)
+              ;; File is already being loaded - skip to prevent infinite loop
+              ;; Also early-provide the feature so require doesn't error
+              (format (current-error-port) "skipping circular load of ~a (already loading)~%" found)
+              (let* ((base (basename found))
+                     (feature-name (if (string-suffix? ".el" base)
+                                      (substring base 0 (- (string-length base) 3))
+                                      base))
+                     (feature-sym (string->symbol feature-name)))
+                (elisp-provide feature-sym))
+              (throw 'early-return #t))
 
-          ;; Step 5: Use enhanced elisp compilation instead of C reading
-          (load-elisp-full found noerror nomessage nosuffix must-suffix))))
+            ;; Step 4: Setup load environment (reuse existing)
+            (let ((setup-env-func (resolve-ref "language elisp loader"
+                                              "elisp-setup-load-environment")))
+              (when setup-env-func
+                (setup-env-func found '() file #f #t))) ; simplified params
+
+            ;; Step 5: Use enhanced elisp compilation instead of C reading
+            ;; Wrap in parameterize to track this file as being loaded
+            (parameterize ((*files-being-loaded* (cons found (*files-being-loaded*))))
+              (load-elisp-full found noerror nomessage nosuffix must-suffix))))))
 
     (lambda (key . args)
       (cond
@@ -664,4 +767,5 @@ Returns: handler result if handler found, #f if should continue with normal load
   (set! %load-extensions (cons ".el" %load-extensions))
 
   (set-symbol-function! 'emacs-load fload-bridge)
+  (set-symbol-function! 'autoload-do-load elisp-autoload-do-load)
   )

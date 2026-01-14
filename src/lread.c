@@ -841,6 +841,40 @@ record_load_unwind (Lisp_Object old)
   Vloads_in_progress = old;
 }
 
+/* Check if a file (by base name) is currently being loaded via C's load.
+   Used by autoload-do-load to detect circular autoloads.  */
+bool
+file_in_loads_in_progress (const char *basename)
+{
+  for (Lisp_Object tail = Vloads_in_progress; CONSP (tail); tail = XCDR (tail))
+    {
+      Lisp_Object path = XCAR (tail);
+      if (STRINGP (path))
+        {
+          const char *pathstr = SDATA (path);
+          /* Check if path ends with /basename.el or /basename */
+          size_t pathlen = strlen (pathstr);
+          size_t baselen = strlen (basename);
+          if (pathlen > baselen)
+            {
+              const char *suffix = pathstr + pathlen - baselen;
+              if ((suffix[-1] == '/' || suffix[-1] == '\\')
+                  && strcmp (suffix, basename) == 0)
+                return true;
+              /* Also check with .el suffix */
+              if (pathlen > baselen + 3
+                  && strcmp (pathstr + pathlen - 3, ".el") == 0)
+                {
+                  suffix = pathstr + pathlen - baselen - 3;
+                  if ((suffix[-1] == '/' || suffix[-1] == '\\')
+                      && strncmp (suffix, basename, baselen) == 0)
+                    return true;
+                }
+            }
+        }
+    }
+  return false;
+}
 
 DEFUN ("get-load-suffixes", Fget_load_suffixes, Sget_load_suffixes, 0, 0, 0,
        doc: /* Return the suffixes that `load' should try if a suffix is
@@ -2003,7 +2037,7 @@ elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 static void
 elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
 {
-  SCM skip_ws_func = scm_c_private_ref ("emacs-elisp runtime",
+  SCM skip_ws_func = scm_c_private_ref ("language elisp reader",
                                         "elisp-skip-load-whitespace-from-port");
   sync_guile_reader (ctx);
   scm_call_1 (skip_ws_func, ctx->port);

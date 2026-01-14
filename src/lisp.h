@@ -4533,6 +4533,7 @@ extern void init_obarray_once (void);
 extern void init_lread (void);
 extern void syms_of_lread (void);
 extern void mark_lread (void);
+extern bool file_in_loads_in_progress (const char *basename);
 
 INLINE Lisp_Object
 intern (const char *str)

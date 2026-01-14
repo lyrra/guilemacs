@@ -1823,38 +1823,11 @@ If equal to `macro', MACRO-ONLY specifies that FUNDEF should only be loaded if
 it defines a macro.  */)
   (Lisp_Object fundef, Lisp_Object funname, Lisp_Object macro_only)
 {
-  if (!CONSP (fundef) || !EQ (Qautoload, XCAR (fundef)))
-    return fundef;
-
-  Lisp_Object kind = Fnth (make_fixnum (4), fundef);
-  if (EQ (macro_only, Qmacro)
-      && !(EQ (kind, Qt) || EQ (kind, Qmacro)))
-    {
-      return fundef;
-    }
-
-  CHECK_SYMBOL (funname);
-
-  /* If `macro_only' is set and fundef isn't a macro, assume this autoload to
-     be a "best-effort" (e.g. to try and find a compiler macro),
-     so don't signal an error if autoloading fails.  */
-  Lisp_Object ignore_errors
-    = (EQ (kind, Qt) || EQ (kind, Qmacro)) ? Qnil : macro_only;
-  load_with_autoload_queue (Fcar (Fcdr (fundef)), ignore_errors, Qt, Qnil, Qt);
-
-  if (NILP (funname) || !NILP (ignore_errors))
-    return Qnil;
-  else
-    {
-      Lisp_Object fun = Findirect_function (funname, Qnil);
-
-      if (!NILP (Fequal (fun, fundef)))
-	error ("Autoloading file %s failed to define function %s",
-	       SDATA (Fcar (Fcar (Vload_history))),
-	       SDATA (SYMBOL_NAME (funname)));
-      else
-	return fun;
-    }
+  /* Delegate to Scheme implementation in (language elisp loader).
+     The Scheme version handles circular autoload detection via *files-being-loaded*.  */
+  SCM scm_func = scm_c_private_ref ("language elisp loader",
+                                    "elisp-autoload-do-load");
+  return scm_call_3 (scm_func, fundef, funname, macro_only);
 }
 
 
@@ -2419,7 +2392,11 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
   else
     {
       if (NILP (fun))
-	xsignal1 (Qvoid_function, original_fun);
+	{
+	  fprintf (stderr, "DEBUG funcall_general: void-function signal for %s\n",
+		   SDATA (SYMBOL_NAME (original_fun)));
+	  xsignal1 (Qvoid_function, original_fun);
+	}
       if (!CONSP (fun))
 	xsignal1 (Qinvalid_function, original_fun);
       Lisp_Object funcar = XCAR (fun);
@@ -2429,7 +2406,11 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 	return funcall_lambda (fun, numargs, args);
       else if (EQ (funcar, Qautoload))
 	{
+	  fprintf (stderr, "DEBUG funcall_general: before autoload-do-load for %s\n",
+		   SDATA (SYMBOL_NAME (original_fun)));
 	  Fautoload_do_load (fun, original_fun, Qnil);
+	  fprintf (stderr, "DEBUG funcall_general: after autoload-do-load, fun now = %s\n",
+		   NILP (SYMBOL_FUNCTION (original_fun)) ? "nil" : "non-nil");
 	  fun = original_fun;
 	  goto retry;
 	}

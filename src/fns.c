@@ -3785,6 +3785,13 @@ particular subfeatures supported in this version of FEATURE.  */)
 
 static Lisp_Object require_nesting_list;
 
+/* FIX-20260114-guilemacs: List of features currently being loaded.
+   Unlike require_nesting_list, this is NOT restored by dynwind.
+   When a feature is in this list and require is called again for it,
+   we return early (success) to break circular require chains.
+   This handles cases like gnus-sum <-> gnus-art circular requires.  */
+static Lisp_Object features_being_loaded;
+
 static void
 require_unwind (Lisp_Object old_value)
 {
@@ -3840,6 +3847,17 @@ FILENAME are suppressed.  */)
 
   if (NILP (tem))
     {
+      /* FIX-20260114-guilemacs: Check if this feature is already being loaded.
+         If so, return early to break circular require chains.
+         This handles cases like gnus-sum requiring gnus-art which requires gnus-sum.  */
+      if (!NILP (Fmemq (feature, features_being_loaded)))
+        {
+          /* Feature is already being loaded - circular require detected.
+             Return the feature (success) without re-loading.
+             The original load will complete and provide the feature.  */
+          return feature;
+        }
+
       dynwind_begin ();
       int nesting = 0;
 
@@ -3861,10 +3879,18 @@ FILENAME are suppressed.  */)
       record_unwind_protect (require_unwind, require_nesting_list);
       require_nesting_list = Fcons (feature, require_nesting_list);
 
+      /* FIX-20260114-guilemacs: Add feature to features_being_loaded.
+         This persists until the load completes (no dynwind).  */
+      features_being_loaded = Fcons (feature, features_being_loaded);
+
       /* Load the file.  */
       tem = load_with_autoload_queue
 	(NILP (filename) ? Fsymbol_name (feature) : filename,
 	 noerror, Qt, Qnil, (NILP (filename) ? Qt : Qnil));
+
+      /* FIX-20260114-guilemacs: Remove feature from features_being_loaded.
+         Use Fdelq to remove the first occurrence.  */
+      features_being_loaded = Fdelq (feature, features_being_loaded);
 
       /* If load failed entirely, return nil.  */
       if (NILP (tem))
@@ -6637,6 +6663,10 @@ compilation.  */);
 
   require_nesting_list = Qnil;
   staticpro (&require_nesting_list);
+
+  /* FIX-20260114-guilemacs: Initialize features_being_loaded for circular require detection */
+  features_being_loaded = Qnil;
+  staticpro (&features_being_loaded);
 
   Fset (Qyes_or_no_p_history, Qnil);
 
