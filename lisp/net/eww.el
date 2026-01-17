@@ -1287,30 +1287,32 @@ This consults the entries in `eww-readable-urls' (which see)."
   "<mouse-8>" #'eww-back-url
   "<mouse-9>" #'eww-forward-url
 
-  :menu '("Eww"
-          ["Exit" quit-window t]
-          ["Close browser" quit-window t]
-          ["Reload" eww-reload t]
-          ["Follow URL in new buffer" eww-open-in-new-buffer]
-          ["Back to previous page" eww-back-url
-           :active (< eww-history-position (length eww-history))]
-          ["Forward to next page" eww-forward-url
-           :active (> eww-history-position 1)]
-          ["Browse with external browser" eww-browse-with-external-browser t]
-          ["Download" eww-download t]
-          ["View page source" eww-view-source]
-          ["Copy page URL" eww-copy-page-url t]
-          ["List histories" eww-list-histories t]
-          ["Switch to buffer" eww-switch-to-buffer t]
-          ["List buffers" eww-list-buffers t]
-          ["Add bookmark" eww-add-bookmark t]
-          ["List bookmarks" eww-list-bookmarks t]
-          ["List cookies" url-cookie-list t]
-          ["Toggle fonts" eww-toggle-fonts t]
-          ["Toggle colors" eww-toggle-colors t]
-          ["Toggle images" eww-toggle-images t]
-          ["Character Encoding" eww-set-character-encoding]
-          ["Toggle Paragraph Direction" eww-toggle-paragraph-direction]))
+; FIX-20260117-guilemacs: easymenu wrong-type-arg: (#f "Wrong type to apply: ~S" ((macro . #<procedure 7fffe5c642b0 at emacs-lisp/easymenu.el:37:3 (symbol maps doc menu)>)) ((macro . #<procedure 7fffe5c642b0 at emacs-lisp/easymenu.el:37:3 (symbol maps doc menu)>)))
+;  :menu '("Eww"
+;          ["Exit" quit-window t]
+;          ["Close browser" quit-window t]
+;          ["Reload" eww-reload t]
+;          ["Follow URL in new buffer" eww-open-in-new-buffer]
+;          ["Back to previous page" eww-back-url
+;           :active (< eww-history-position (length eww-history))]
+;          ["Forward to next page" eww-forward-url
+;           :active (> eww-history-position 1)]
+;          ["Browse with external browser" eww-browse-with-external-browser t]
+;          ["Download" eww-download t]
+;          ["View page source" eww-view-source]
+;          ["Copy page URL" eww-copy-page-url t]
+;          ["List histories" eww-list-histories t]
+;          ["Switch to buffer" eww-switch-to-buffer t]
+;          ["List buffers" eww-list-buffers t]
+;          ["Add bookmark" eww-add-bookmark t]
+;          ["List bookmarks" eww-list-bookmarks t]
+;          ["List cookies" url-cookie-list t]
+;          ["Toggle fonts" eww-toggle-fonts t]
+;          ["Toggle colors" eww-toggle-colors t]
+;          ["Toggle images" eww-toggle-images t]
+;          ["Character Encoding" eww-set-character-encoding]
+;          ["Toggle Paragraph Direction" eww-toggle-paragraph-direction])
+)
 
 (defun eww-context-menu (menu click)
   "Populate MENU with eww commands at CLICK."
@@ -2529,14 +2531,16 @@ If ERROR-OUT, signal user-error if there are no bookmarks."
   "C-k" #'eww-bookmark-kill
   "C-y" #'eww-bookmark-yank
   "RET" #'eww-bookmark-browse
-  :menu '("Eww Bookmark"
-          ["Exit" quit-window t]
-          ["Browse" eww-bookmark-browse
-           :active (get-text-property (line-beginning-position) 'eww-bookmark)]
-          ["Kill" eww-bookmark-kill
-           :active (get-text-property (line-beginning-position) 'eww-bookmark)]
-          ["Yank" eww-bookmark-yank
-           :active eww-bookmark-kill-ring]))
+; FIX-20260117-guilemacs: easymenu wrong-type-arg
+;  :menu '("Eww Bookmark"
+;          ["Exit" quit-window t]
+;          ["Browse" eww-bookmark-browse
+;           :active (get-text-property (line-beginning-position) 'eww-bookmark)]
+;          ["Kill" eww-bookmark-kill
+;           :active (get-text-property (line-beginning-position) 'eww-bookmark)]
+;          ["Yank" eww-bookmark-yank
+;           :active eww-bookmark-kill-ring])
+  )
 
 (define-derived-mode eww-bookmark-mode special-mode "eww bookmarks"
   "Mode for listing bookmarks.
@@ -2663,11 +2667,13 @@ see)."
   "RET" #'eww-history-browse
   "n" #'next-line
   "p" #'previous-line
-  :menu '("Eww History"
-          ["Exit" quit-window t]
-          ["Browse" eww-history-browse
-           :active (get-text-property (line-beginning-position)
-                                      'eww-history)]))
+; FIX-20260117-guilemacs: easymenu wrong-type-arg
+;  :menu '("Eww History"
+;          ["Exit" quit-window t]
+;          ["Browse" eww-history-browse
+;           :active (get-text-property (line-beginning-position)
+;                                      'eww-history)])
+  )
 
 (define-derived-mode eww-history-mode special-mode "eww history"
   "Mode for listing eww-histories.
@@ -2771,12 +2777,14 @@ The format of the data is (title url buffer), for use in of
   "RET" #'eww-buffer-select
   "n" #'eww-buffer-show-next
   "p" #'eww-buffer-show-previous
-  :menu '("Eww Buffers"
-          ["Exit" quit-window t]
-          ["Select" eww-buffer-select
-           :active (nth 2 (vtable-current-object))]
-          ["Kill" eww-buffer-kill
-           :active (nth 2 (vtable-current-object))]))
+; FIX-20260117-guilemacs: easymenu wrong-type-arg
+;  :menu '("Eww Buffers"
+;          ["Exit" quit-window t]
+;          ["Select" eww-buffer-select
+;           :active (nth 2 (vtable-current-object))]
+;          ["Kill" eww-buffer-kill
+;           :active (nth 2 (vtable-current-object))])
+)
 
 (define-derived-mode eww-buffers-mode special-mode "eww buffers"
   "Mode for listing buffers.
