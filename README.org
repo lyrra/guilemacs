@@ -336,8 +336,21 @@ DO
   how to inspect lisp variables from gdb
 
 *** breakpoints
-  If guile gets an error it will be reported as "Scheme error:" (see src/keyboard.c).
+  If guile gets an error it can be reported as "Scheme error:" (see src/keyboard.c).
   A useful breakpoint then are "command_loop_2_handler".
+  This is also an example of an error coming from guile:
+  misc-error: (#f "~A ~S" ("invalid # syntax" #\#) #f)
+
+List of good breakpoints:
+  break Fdebug_gdb_break
+  break emacs_abort
+  break xsignal2
+  #break xsignal1 -- hits too often, use with "c 600"
+  break command_loop_2_handler
+  break eval.c:error
+  break signal_error
+  break scm_misc_error -- this wont hit (?!)
+  break scm_error
 
 ** backtrace
 
