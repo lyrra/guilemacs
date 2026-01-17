@@ -16,7 +16,7 @@
 
 (define-module (emacs utils)
   #:use-module (emacs-elisp runtime)
-  #:use-module (language elisp sequences)
+  #:use-module (emacs sequences)
   #:use-module (srfi srfi-69)
   #:export (
     ;; Scheme implementation functions

@@ -2,7 +2,6 @@
 ;;;
 ;;; Sequence & List Operations
 ;;;
-;;; Module: (language elisp sequences)
 ;;; Purpose: List and sequence operations for Elisp runtime
 ;;; Loading: via use-modules in load.scm
 ;;;
@@ -14,10 +13,8 @@
 ;;;   Higher-order: mapcar, mapc, mapcan, mapconcat
 ;;;   Utilities: last, butlast, length, safe-length, sort, delete, remove
 ;;;   Registration: init-sequences-registrations
-;;;
-;;; NOTE: Phase 2 - Using flat module naming (language elisp sequences)
 
-(define-module (language elisp sequences)
+(define-module (emacs sequences)
   #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions

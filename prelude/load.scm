@@ -18,7 +18,7 @@
 ;;;   Arithmetic & math operations
 ;;; *** (emacs strings)
 ;;;   String operations
-;;; *** (language elisp sequences)
+;;; *** (emacs sequences)
 ;;;   List & sequence operations
 ;;; *** (emacs utils)
 ;;;   Property lists & utilities
@@ -142,7 +142,7 @@
 ;; Load numbers module as proper Guile module
 (use-modules (numbers))
 (use-modules (emacs strings))
-(use-modules (language elisp sequences))
+(use-modules (emacs sequences))
 (use-modules (emacs utils))
 (use-modules (emacs loader))
 (use-modules (emacs reader))
