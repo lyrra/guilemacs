@@ -161,9 +161,7 @@
 (init-reader %prelude-directory)
 (init-loader %prelude-directory)
 
-;; Load pcase macro support (Phase 5 consolidation)
-;; Replaces: pcase.scm
-(use-modules (language elisp pcase))
+(use-modules (emacs pcase))
 
 ;;; ============================================================================
 ;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS

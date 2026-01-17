@@ -1,10 +1,9 @@
 ;;; Guilemacs Lisp - Pattern Matching Support
 ;;;
-;;; Module: (language elisp pcase)
 ;;; Purpose: Pattern matching helper functions for pcase macro
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp pcase)
+(define-module (emacs pcase)
   #:use-module (emacs-elisp runtime)
   #:export (
     pcase--true? pcase--maybe-elisp-function pcase-exhaustive
