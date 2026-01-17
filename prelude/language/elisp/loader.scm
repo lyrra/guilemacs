@@ -48,7 +48,7 @@
     elisp-validate-and-check-handler
     elisp-validate-file-descriptor
     elisp-validate-load-file
-    fload-bridge
+    elisp-load
     search-elisp-load-path
     load-elisp
     load-elisp-full
@@ -610,8 +610,9 @@ Only returns actual files, not directories."
                full-path
                (loop ((symbol-function 'cdr) paths)))))))))
 
-(define (fload-bridge file noerror nomessage nosuffix must-suffix)
-  "Bridge function that handles full Fload protocol using Guile elisp compilation"
+(define* (elisp-load file #:optional (noerror #nil) (nomessage #nil) (nosuffix #nil) (must-suffix #nil))
+  "Bridge function that handles full Fload protocol using Guile elisp compilation.
+Optional args default to nil, matching Elisp's (load FILE &optional NOERROR NOMESSAGE NOSUFFIX MUST-SUFFIX)."
   (catch #t
     (lambda ()
       (format (current-error-port) "loading ~a~%" file)
@@ -769,6 +770,6 @@ Returns: handler result if handler found, #f if should continue with normal load
                              %load-path)))
   (set! %load-extensions (cons ".el" %load-extensions))
 
-  (set-symbol-function! 'emacs-load fload-bridge)
+  (set-symbol-function! 'load elisp-load)
   (set-symbol-function! 'autoload-do-load elisp-autoload-do-load)
   )

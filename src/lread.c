@@ -935,65 +935,6 @@ sync_guile_reader (struct reader_context *ctx)
   }
 }
 
-DEFUN ("load", Fload, Sload, 1, 5, 0,
-       doc: /* Execute a file of Lisp code named FILE.
-First try FILE with `.elc' appended, then try with `.el', then try
-with a system-dependent suffix of dynamic modules (see `load-suffixes'),
-then try FILE unmodified (the exact suffixes in the exact order are
-determined by `load-suffixes').  Environment variable references in
-FILE are replaced with their values by calling `substitute-in-file-name'.
-This function searches the directories in `load-path'.
-
-If optional second arg NOERROR is non-nil,
-report no error if FILE doesn't exist.
-Print messages at start and end of loading unless
-optional third arg NOMESSAGE is non-nil (but `force-load-messages'
-overrides that).
-If optional fourth arg NOSUFFIX is non-nil, don't try adding
-suffixes to the specified name FILE.
-If optional fifth arg MUST-SUFFIX is non-nil, insist on
-the suffix `.elc' or `.el' or the module suffix; don't accept just
-FILE unless it ends in one of those suffixes or includes a directory name.
-
-If NOSUFFIX is nil, then if a file could not be found, try looking for
-a different representation of the file by adding non-empty suffixes to
-its name, before trying another file.  Emacs uses this feature to find
-compressed versions of files when Auto Compression mode is enabled.
-If NOSUFFIX is non-nil, disable this feature.
-
-The suffixes that this function tries out, when NOSUFFIX is nil, are
-given by the return value of `get-load-suffixes' and the values listed
-in `load-file-rep-suffixes'.  If MUST-SUFFIX is non-nil, only the
-return value of `get-load-suffixes' is used, i.e. the file name is
-required to have a non-empty suffix.
-
-When searching suffixes, this function normally stops at the first
-one that exists.  If the option `load-prefer-newer' is non-nil,
-however, it tries all suffixes, and uses whichever file is the newest.
-
-Loading a file records its definitions, and its `provide' and
-`require' calls, in an element of `load-history' whose
-car is the file name loaded.  See `load-history'.
-
-While the file is in the process of being loaded, the variable
-`load-in-progress' is non-nil and the variable `load-file-name'
-is bound to the file's name.
-
-Return t if the file exists and loads successfully.  */)
-  (Lisp_Object file, Lisp_Object noerror, Lisp_Object nomessage,
-   Lisp_Object nosuffix, Lisp_Object must_suffix)
-{
-  /* FULLY MIGRATED TO GUILE: Use fload-bridge for guile-compiled elisp loading */
-  SCM bridge_func = scm_c_private_ref ("emacs-elisp runtime", "fload-bridge");
-  if (scm_is_false (bridge_func))
-    {
-      /* Fallback if bridge function not available */
-      return Fsignal (Qerror, list1 (build_string ("fload-bridge not available")));
-    }
-
-  return scm_call_5 (bridge_func, file, noerror, nomessage, nosuffix, must_suffix);
-}
-
 Lisp_Object
 save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 		      Lisp_Object nomessage, Lisp_Object nosuffix,

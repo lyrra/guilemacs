@@ -338,9 +338,10 @@
 (define (elisp-load-with-match-data-protection file noerror nomessage nosuffix must-suffix)
   "Load file with match data protection.
 This replicates the save_match_data_load wrapper function."
-  ;; Dynamically resolve fload-bridge from reader module (loaded after runtime)
-  (let ((fload-bridge (module-ref (resolve-module '(language elisp reader)) 'fload-bridge)))
-    (fload-bridge file noerror nomessage nosuffix must-suffix)))
+  ;; Dynamically resolve elisp-load from reader module (loaded after runtime)
+  ; FIX-20260117: use a module import instead:
+  (let ((elisp-load (module-ref (resolve-module '(language elisp reader)) 'elisp-load)))
+    (elisp-load file noerror nomessage nosuffix must-suffix)))
 
 (define (emacs-read port)
   (format #t "using emacs-read!~%")
