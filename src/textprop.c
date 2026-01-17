@@ -55,8 +55,8 @@ is_emacs_string_wrapper (Lisp_Object x)
   if (scm_is_false (emacs_string_p_proc))
     {
       /* Use scm_c_public_ref to get actual procedure values directly */
-      emacs_string_p_proc = scm_c_public_ref ("language elisp emacs text-properties", "emacs-string-predicate");
-      emacs_string_content_proc = scm_c_public_ref ("language elisp emacs text-properties", "emacs-string-content");
+      emacs_string_p_proc = scm_c_public_ref ("emacs text-properties", "emacs-string-predicate");
+      emacs_string_content_proc = scm_c_public_ref ("emacs text-properties", "emacs-string-content");
       protect_scheme_proc (emacs_string_p_proc);
       protect_scheme_proc (emacs_string_content_proc);
     }
@@ -101,7 +101,7 @@ ensure_text_properties_loaded (void)
   if (scm_is_false (scm_text_properties_module))
     {
       /* Resolve the consolidated text-properties module (already loaded by prelude/load.scm) */
-      scm_text_properties_module = scm_c_resolve_module ("language elisp emacs text-properties");
+      scm_text_properties_module = scm_c_resolve_module ("emacs text-properties");
       scm_permanent_object (scm_text_properties_module);
 
       /* Cache module variable handles; values are fetched at call time. */
@@ -217,9 +217,9 @@ scm_intervals_to_c (SCM scm_intervals, Lisp_Object string)
 
       /* Extract interval fields using Scheme wrapper functions
          (wrapper functions are needed because record accessors are syntax transformers) */
-      SCM start_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-start");
-      SCM end_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-end");
-      SCM plist_proc = scm_c_public_ref ("language elisp emacs text-properties", "get-interval-plist");
+      SCM start_proc = scm_c_public_ref ("emacs text-properties", "get-interval-start");
+      SCM end_proc = scm_c_public_ref ("emacs text-properties", "get-interval-end");
+      SCM plist_proc = scm_c_public_ref ("emacs text-properties", "get-interval-plist");
 
       SCM scm_start = scm_call_1 (start_proc, interval_record);
       SCM scm_end = scm_call_1 (end_proc, interval_record);
@@ -1274,7 +1274,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
 
   if (scm_is_false (scm_next_property_change))
     {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM module = scm_c_resolve_module ("emacs text-properties");
       scm_next_property_change = scm_c_module_lookup (module, "next-property-change");
       scm_permanent_object (scm_next_property_change);
     }
@@ -1305,7 +1305,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
 
   if (scm_is_false (scm_next_single_property_change))
     {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM module = scm_c_resolve_module ("emacs text-properties");
       scm_next_single_property_change = scm_c_module_lookup (module, "next-single-property-change");
       scm_permanent_object (scm_next_single_property_change);
     }
@@ -1342,7 +1342,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
 
   if (scm_is_false (scm_previous_property_change))
     {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM module = scm_c_resolve_module ("emacs text-properties");
       scm_previous_property_change = scm_c_module_lookup (module, "previous-property-change");
       scm_permanent_object (scm_previous_property_change);
     }
@@ -1380,7 +1380,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
 
   if (scm_is_false (scm_previous_single_property_change))
     {
-      SCM module = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM module = scm_c_resolve_module ("emacs text-properties");
       scm_previous_single_property_change = scm_c_module_lookup (module, "previous-single-property-change");
       scm_permanent_object (scm_previous_single_property_change);
     }

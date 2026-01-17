@@ -23,11 +23,11 @@
 ;;;
 ;;; SECTION 1: MODULE SETUP
 ;;;
-;;; This module is properly declared as (language elisp emacs text-properties).
+;;; This module is properly declared as (emacs text-properties).
 ;;; C code accesses these functions via scm_c_resolve_module and scm_c_public_ref.
 ;;;
 
-(define-module (language elisp emacs text-properties)
+(define-module (emacs text-properties)
   #:use-module (srfi srfi-9)    ; define-record-type
   #:use-module (srfi srfi-1)    ; list utilities (for 'any')
   #:use-module (ice-9 format)

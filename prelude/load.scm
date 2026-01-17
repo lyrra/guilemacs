@@ -173,12 +173,8 @@
 ;; Replaces: lookup-functions.scm
 (primitive-load (join %prelude-directory "elisp/runtime/lookup-functions.scm"))
 
-;; Load consolidated text properties system as proper Guile module
-;; This replaces the old 4-file split (intervals, emacs-string, text-properties, string-operations)
-;; with a single unified module under (language elisp emacs text-properties) namespace
-(primitive-load (join %prelude-directory "elisp/runtime/text-properties.scm"))
-
 (set-current-module (resolve-module '(emacs-elisp runtime)))
+(use-modules (emacs text-properties))
 (use-modules (emacs utf8))
 
 

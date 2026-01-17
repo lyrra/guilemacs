@@ -2907,7 +2907,7 @@ Symbols must match exactly.  */)
   static bool custom_equal_lookup_done = false;
   if (!custom_equal_lookup_done)
     {
-      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM mod = scm_c_resolve_module ("emacs text-properties");
       if (!scm_is_false (mod))
         {
           /* Use scm_module_variable which returns #f if binding doesn't exist */
@@ -6605,10 +6605,10 @@ init_fns_once (void)
   scm_set_smob_equalp (lisp_misc_tag, misc_equal_p);
   scm_set_smob_equalp (lisp_string_tag, string_equal_p);
   scm_set_smob_equalp (lisp_vectorlike_tag, vectorlike_equal_p);
-  scm_string_operations_module = scm_c_resolve_module ("language elisp emacs text-properties");
+  scm_string_operations_module = scm_c_resolve_module ("emacs text-properties");
   /* Use scm_c_public_ref to get actual procedures directly */
-  scm_substring_with_properties_proc = scm_c_public_ref ("language elisp emacs text-properties", "substring-with-properties");
-  scm_concat_with_properties_proc = scm_c_public_ref ("language elisp emacs text-properties", "concat-with-properties");
+  scm_substring_with_properties_proc = scm_c_public_ref ("emacs text-properties", "substring-with-properties");
+  scm_concat_with_properties_proc = scm_c_public_ref ("emacs text-properties", "concat-with-properties");
 }
 
 void

@@ -1303,7 +1303,7 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
   static bool intervals_lookup_done = false;
   if (!intervals_lookup_done)
     {
-      get_intervals_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+      get_intervals_proc = editfns_safe_lookup ("emacs text-properties",
                                                  "emacs-string-intervals-runtime");
       intervals_lookup_done = true;
     }
@@ -1331,11 +1331,11 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
 
       if (!interval_procs_lookup_done)
         {
-          interval_start_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+          interval_start_proc = editfns_safe_lookup ("emacs text-properties",
                                                       "get-interval-start");
-          interval_end_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+          interval_end_proc = editfns_safe_lookup ("emacs text-properties",
                                                     "get-interval-end");
-          interval_plist_proc = editfns_safe_lookup ("language elisp emacs text-properties",
+          interval_plist_proc = editfns_safe_lookup ("emacs text-properties",
                                                       "get-interval-plist");
           interval_procs_lookup_done = true;
         }

@@ -792,7 +792,7 @@ A printed representation of an object is text which describes that object.  */)
   static bool deep_unwrap_lookup_done = false;
   if (!deep_unwrap_lookup_done)
     {
-      SCM mod = scm_c_resolve_module ("language elisp emacs text-properties");
+      SCM mod = scm_c_resolve_module ("emacs text-properties");
       if (!scm_is_false (mod))
         {
           /* Use scm_module_variable which returns #f if binding doesn't exist */
