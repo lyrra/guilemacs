@@ -340,7 +340,7 @@
 This replicates the save_match_data_load wrapper function."
   ;; Dynamically resolve elisp-load from reader module (loaded after runtime)
   ; FIX-20260117: use a module import instead:
-  (let ((elisp-load (module-ref (resolve-module '(language elisp reader)) 'elisp-load)))
+  (let ((elisp-load (module-ref (resolve-module '(emacs reader)) 'elisp-load)))
     (elisp-load file noerror nomessage nosuffix must-suffix)))
 
 (define (emacs-read port)

@@ -11,7 +11,7 @@
   #:use-module ((srfi srfi-1) #:select (count any))
   #:use-module (emacs-elisp runtime)
   #:use-module (language elisp utils)
-  #:use-module (language elisp reader)
+  #:use-module (emacs reader)
   #:export (
     init-loader
     elisp-call-load-source-file-function

@@ -1978,7 +1978,7 @@ elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 static void
 elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
 {
-  SCM skip_ws_func = scm_c_private_ref ("language elisp reader",
+  SCM skip_ws_func = scm_c_private_ref ("emacs reader",
                                         "elisp-skip-load-whitespace-from-port");
   sync_guile_reader (ctx);
   scm_call_1 (skip_ws_func, ctx->port);

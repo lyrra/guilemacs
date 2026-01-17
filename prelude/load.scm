@@ -145,7 +145,7 @@
 (use-modules (language elisp sequences))
 (use-modules (language elisp utils))
 (use-modules (emacs loader))
-(use-modules (language elisp reader))
+(use-modules (emacs reader))
 
 ;(let ((loader (lambda (file)
 ;                (primitive-load (join %prelude-directory file))

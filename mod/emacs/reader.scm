@@ -1,10 +1,9 @@
 ;;; Guilemacs Lisp - Elisp Reader & Parser Functions
 ;;;
-;;; Module: (language elisp reader)
 ;;; Purpose: Complete Elisp reader and parser implementation
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp reader)
+(define-module (emacs reader)
   #:declarative? #f
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs loader)
