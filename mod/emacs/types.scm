@@ -2,7 +2,6 @@
 ;;;
 ;;; Type Predicates - Foundation Layer
 ;;;
-;;; Module: (language elisp types)
 ;;; Purpose: Type predicates and type-related operations for Elisp runtime
 ;;; Loading: via use-modules in load.scm
 ;;;
@@ -22,7 +21,7 @@
 ;;;   Registration: init-types-registrations
 ;;;
 
-(define-module (language elisp types)
+(define-module (emacs types)
   #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions

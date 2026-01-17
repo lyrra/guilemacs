@@ -12,7 +12,7 @@
 ;;; ** Modules
 ;;;   Runtime functionality is organized into focused modules:
 ;;;   Each runtime module manages its own symbol registrations via init functions.
-;;; *** (language elisp types)
+;;; *** (emacs types)
 ;;;   Type predicates & conversions
 ;;; *** (language/elisp numbers)
 ;;;   Arithmetic & math operations
@@ -130,14 +130,12 @@
 ;; Load modular runtime components
 
 ;; Add prelude directory to load path so module files can be found
-;; Module (language elisp types) maps to file language/elisp/types.scm
-;; Files are in prelude/language/elisp/*.scm
 (set! %load-path (cons %prelude-directory %load-path))
 
 ;; Load types module as proper Guile module
-(use-modules (language elisp types))
+(use-modules (emacs types))
 ;; Make all types functions available in (emacs-elisp runtime) namespace
-(module-use! (current-module) (resolve-module '(language elisp types)))
+(module-use! (current-module) (resolve-module '(emacs types)))
 
 ;; Load numbers module as proper Guile module
 (use-modules (numbers))
@@ -180,10 +178,9 @@
 ;; with a single unified module under (language elisp emacs text-properties) namespace
 (primitive-load (join %prelude-directory "elisp/runtime/text-properties.scm"))
 
-;; Load consolidated UTF-8 string operations (Phase 2 consolidation)
-;; Replaces: utf8-string-operations.scm (only file actually being loaded)
 (set-current-module (resolve-module '(emacs-elisp runtime)))
-(primitive-load (join %prelude-directory "language/elisp/utf8.scm"))
+(use-modules (emacs utf8))
+
 
 ;; Load consolidated symbol and character operations (Phase 3 consolidation)
 ;; Replaces: symbol-operations.scm, character-navigation-minimal.scm

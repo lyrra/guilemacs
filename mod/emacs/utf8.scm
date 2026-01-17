@@ -1,10 +1,9 @@
 ;;; Guilemacs Lisp - UTF-8 String Operations
 ;;;
-;;; Module: (language elisp utf8)
 ;;; Purpose: UTF-8 string operations and multibyte/unibyte handling
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp utf8)
+(define-module (emacs utf8)
   #:use-module (emacs-elisp runtime)
   #:use-module (rnrs bytevectors)
   #:export (
