@@ -6258,8 +6258,8 @@ prefix,
 which will prompt for the width."
   (interactive "P")
   (let ((col (org-table-current-column))
-	(min  1e999)		 ; 1e999 will be converted to infinity
-	(max -1e999)		 ; which is the desired result
+	(min  999999999) ; 1e999		 ; 1e999 will be converted to infinity
+	(max -999999999) ; -1e999		 ; which is the desired result
 	(table (org-table-to-lisp))
 	(length
 	 (cond ((consp ask)
