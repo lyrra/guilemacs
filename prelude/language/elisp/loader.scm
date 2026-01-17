@@ -475,44 +475,38 @@ it defines a macro."
                                       #nil
                                       macro-only)))
               ;; Check for circular autoload BEFORE loading
-              (when (and (string? autoload-file)
-                         (file-being-loaded? autoload-file))
-                ;; File is already being loaded - this is a circular autoload.
-                ;; Remove the autoload to prevent retry loops and signal void-function.
-                ((symbol-function 'fmakunbound) funname)
-                ((symbol-function 'signal) (elisp-intern "void-function" #nil)
-                 ((symbol-function 'list) funname)))
-
-              ;; Load the file
-              ((symbol-function 'load) autoload-file ignore-errors qt #nil qt)
-
-              ;; Check result
-              (cond
-               ;; If funname is nil or ignore-errors is set, return nil
-               ((or (eq? funname #nil) (not (eq? ignore-errors #nil)))
-                #nil)
-               (else
-                (let ((fun ((symbol-function 'indirect-function) funname #nil)))
-                  (if (not ((symbol-function 'equal) fun fundef))
-                      ;; Function was defined, return it
-                      fun
-                      ;; Function still equals autoload form - check for circular load
-                      (if (and (string? autoload-file)
-                               (file-being-loaded? autoload-file))
-                          ;; Circular autoload - remove the autoload to stop retry loop
-                          ;; The function will be defined when the outer load completes
-                          (begin
-                            ((symbol-function 'fset) funname #nil)
-                            #nil)
-                          ;; Real error - function wasn't defined
-                          ((symbol-function 'error)
-                           "Autoloading file %s failed to define function %s"
-                           (let ((hist ((symbol-function 'symbol-value)
-                                        (elisp-intern "load-history" #nil))))
-                             (if (pair? hist)
-                                 ((symbol-function 'car) ((symbol-function 'car) hist))
-                                 ""))
-                           ((symbol-function 'symbol-name) funname))))))))))))
+              ;; If circular, return fundef unchanged - callers will handle gracefully
+              (if (and (string? autoload-file)
+                       (file-being-loaded? autoload-file))
+                  ;; Circular autoload - return unchanged, function will be defined later
+                  fundef
+                  ;; Normal case - proceed to load the file
+                  (begin
+                    ((symbol-function 'load) autoload-file ignore-errors qt #nil qt)
+                    ;; Check result
+                    (cond
+                     ;; If funname is nil or ignore-errors is set, return nil
+                     ((or (eq? funname #nil) (not (eq? ignore-errors #nil)))
+                      #nil)
+                     (else
+                      (let ((fun ((symbol-function 'indirect-function) funname #nil)))
+                        (if (not ((symbol-function 'equal) fun fundef))
+                            ;; Function was defined, return it
+                            fun
+                            ;; Function still equals autoload form - check for circular load
+                            (if (and (string? autoload-file)
+                                     (file-being-loaded? autoload-file))
+                                ;; Circular autoload - return fundef unchanged
+                                fundef
+                                ;; Real error - function wasn't defined
+                                ((symbol-function 'error)
+                                 "Autoloading file %s failed to define function %s"
+                                 (let ((hist ((symbol-function 'symbol-value)
+                                              (elisp-intern "load-history" #nil))))
+                                   (if (pair? hist)
+                                       ((symbol-function 'car) ((symbol-function 'car) hist))
+                                       ""))
+                                 ((symbol-function 'symbol-name) funname))))))))))))))
 
 ;;;
 ;;; Compound Operations
