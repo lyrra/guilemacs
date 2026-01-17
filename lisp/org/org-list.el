@@ -112,7 +112,8 @@
 (declare-function org-element-context "org-element" (&optional element))
 (declare-function org-element-interpret-data "org-element" (data))
 (declare-function org-element-lineage "org-element-ast" (blob &optional types with-self))
-(declare-function org-element-macro-interpreter "org-element" (macro ##))
+; FIX-20260117-guilemacs no read support for ##
+;(declare-function org-element-macro-interpreter "org-element" (macro ##))
 (declare-function org-element-map "org-element" (data types fun &optional info first-match no-recursion with-affiliated))
 (declare-function org-element-normalize-string "org-element" (s))
 (declare-function org-element-parse-buffer "org-element" (&optional granularity visible-only keep-deferred))
