@@ -1823,9 +1823,9 @@ If equal to `macro', MACRO-ONLY specifies that FUNDEF should only be loaded if
 it defines a macro.  */)
   (Lisp_Object fundef, Lisp_Object funname, Lisp_Object macro_only)
 {
-  /* Delegate to Scheme implementation in (language elisp loader).
+  /* Delegate to Scheme implementation in (emacs loader).
      The Scheme version handles circular autoload detection via *files-being-loaded*.  */
-  SCM scm_func = scm_c_private_ref ("language elisp loader",
+  SCM scm_func = scm_c_private_ref ("emacs loader",
                                     "elisp-autoload-do-load");
   return scm_call_3 (scm_func, fundef, funname, macro_only);
 }

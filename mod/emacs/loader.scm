@@ -1,10 +1,10 @@
 ;;; Guilemacs Lisp - File Loading Infrastructure
 ;;;
-;;; Module: (language elisp loader)
+;;; Module: (emacs loader)
 ;;; Purpose: File loading infrastructure for Elisp files
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp loader)
+(define-module (emacs loader)
   #:use-module (system base language)
   #:use-module ((system base compile)
                 #:select (compile compile-file))
@@ -657,8 +657,8 @@ Optional args default to nil, matching Elisp's (load FILE &optional NOERROR NOME
               (throw 'early-return #t))
 
             ;; Step 4: Setup load environment (reuse existing)
-            (let ((setup-env-func (resolve-ref "language elisp loader"
-                                              "elisp-setup-load-environment")))
+            (let ((setup-env-func (resolve-ref "emacs loader"
+                                               "elisp-setup-load-environment")))
               (when setup-env-func
                 (setup-env-func found '() file #f #t))) ; simplified params
 

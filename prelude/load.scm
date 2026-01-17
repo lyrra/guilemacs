@@ -22,7 +22,7 @@
 ;;;   List & sequence operations
 ;;; *** (language elisp utils)
 ;;;   Property lists & utilities
-;;; *** (language elisp loader)
+;;; *** (emacs loader)
 ;;;   Additional load support
 ;;; *** (language elisp reader)
 ;;;   Additional reader support
@@ -144,7 +144,7 @@
 (use-modules (language elisp strings))
 (use-modules (language elisp sequences))
 (use-modules (language elisp utils))
-(use-modules (language elisp loader))
+(use-modules (emacs loader))
 (use-modules (language elisp reader))
 
 ;(let ((loader (lambda (file)
