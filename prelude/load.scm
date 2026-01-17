@@ -171,7 +171,7 @@
 
 ;; Load lookup functions for C integration (Phase 4 consolidation)
 ;; Replaces: lookup-functions.scm
-(primitive-load (join %prelude-directory "elisp/runtime/lookup-functions.scm"))
+(primitive-load (join %prelude-directory "../mod/emacs/lookup-functions.scm"))
 
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 (use-modules (emacs text-properties))
