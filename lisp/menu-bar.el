@@ -2213,7 +2213,9 @@ key, a click, or a menu-item"))
 (bindings--define-key global-map [menu-bar help-menu]
   (cons (purecopy "Help") menu-bar-help-menu))
 
-(define-key global-map [menu-bar mouse-1] 'menu-bar-open-mouse)
+; FIX-20260117-guilemacs: wrong-fix, thinks 'menu-bar-open-mouse is a list (given to Fmember)
+;(define-key global-map [menu-bar mouse-1] 'menu-bar-open-mouse)
+(define-key global-map [menu-bar mouse-1] '())
 
 (defun menu-bar-menu-frame-live-and-visible-p ()
   "Return non-nil if the menu frame is alive and visible.
