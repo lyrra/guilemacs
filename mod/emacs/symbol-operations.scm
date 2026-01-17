@@ -1,10 +1,9 @@
 ;;; Guilemacs Lisp - Symbol Operations
 ;;;
-;;; Module: (language elisp symbol-operations)
 ;;; Purpose: Symbol interning, caching, and direct comparison
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp symbol-operations)
+(define-module (emacs symbol-operations)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-69)
   #:export (

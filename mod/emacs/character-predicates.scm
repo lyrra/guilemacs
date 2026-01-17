@@ -1,10 +1,9 @@
 ;;; Guilemacs Lisp - Character Predicates
 ;;;
-;;; Module: (language elisp character-predicates)
 ;;; Purpose: Character type checking and navigation
 ;;; Loading: via use-modules in load.scm
 
-(define-module (language elisp character-predicates)
+(define-module (emacs character-predicates)
   #:use-module (emacs-elisp runtime)
   #:export (
     elisp-char-alphabetic-p elisp-char-numeric-p

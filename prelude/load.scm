@@ -178,11 +178,9 @@
 (use-modules (emacs utf8))
 
 
-;; Load consolidated symbol and character operations (Phase 3 consolidation)
-;; Replaces: symbol-operations.scm, character-navigation-minimal.scm
 (set-current-module (resolve-module '(emacs-elisp runtime)))
-(use-modules (language elisp symbol-operations))
-(use-modules (language elisp character-predicates))
+(use-modules (emacs symbol-operations))
+(use-modules (emacs character-predicates))
 
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
