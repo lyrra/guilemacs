@@ -16,7 +16,7 @@
 ;;;   Type predicates & conversions
 ;;; *** (language/elisp numbers)
 ;;;   Arithmetic & math operations
-;;; *** (language elisp strings)
+;;; *** (emacs strings)
 ;;;   String operations
 ;;; *** (language elisp sequences)
 ;;;   List & sequence operations
@@ -141,7 +141,7 @@
 
 ;; Load numbers module as proper Guile module
 (use-modules (numbers))
-(use-modules (language elisp strings))
+(use-modules (emacs strings))
 (use-modules (language elisp sequences))
 (use-modules (language elisp utils))
 (use-modules (emacs loader))

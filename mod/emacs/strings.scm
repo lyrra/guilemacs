@@ -2,7 +2,6 @@
 ;;;
 ;;; String Operations
 ;;;
-;;; Module: (language elisp strings)
 ;;; Purpose: String manipulation and operations for Elisp runtime
 ;;; Loading: via use-modules in load.scm
 ;;;
@@ -14,10 +13,8 @@
 ;;;   String conversion: string-to-number, format, make-string
 ;;;   String predicates: string-lessp, string-greaterp, string-empty-p
 ;;;   Registration: init-strings-registrations
-;;;
-;;; NOTE: Phase 2 - Using flat module naming (language elisp strings)
 
-(define-module (language elisp strings)
+(define-module (emacs strings)
   #:use-module (rnrs bytevectors)
   #:use-module (emacs-elisp runtime)
   #:use-module (rnrs bytevectors)
