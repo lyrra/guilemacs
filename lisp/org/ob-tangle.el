@@ -194,10 +194,10 @@ replace contents otherwise."
 `progn', then kill the FILE buffer returning the result of
 evaluating BODY."
   (declare (indent 1) (debug t))
-  (let ((temp-path (make-symbol "temp-path"))
-	(temp-result (make-symbol "temp-result"))
-	(temp-file (make-symbol "temp-file"))
-	(visited-p (make-symbol "visited-p")))
+  (let ((temp-path (intern-gensym "temp-path"))
+	(temp-result (intern-gensym "temp-result"))
+	(temp-file (intern-gensym "temp-file"))
+	(visited-p (intern-gensym "visited-p")))
     `(let* ((,temp-path ,file)
 	    (,visited-p (get-file-buffer ,temp-path))
 	    ,temp-result ,temp-file)
