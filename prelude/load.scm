@@ -20,7 +20,7 @@
 ;;;   String operations
 ;;; *** (language elisp sequences)
 ;;;   List & sequence operations
-;;; *** (language elisp utils)
+;;; *** (emacs utils)
 ;;;   Property lists & utilities
 ;;; *** (emacs loader)
 ;;;   Additional load support
@@ -143,7 +143,7 @@
 (use-modules (numbers))
 (use-modules (emacs strings))
 (use-modules (language elisp sequences))
-(use-modules (language elisp utils))
+(use-modules (emacs utils))
 (use-modules (emacs loader))
 (use-modules (emacs reader))
 

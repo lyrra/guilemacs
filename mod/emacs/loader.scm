@@ -10,7 +10,7 @@
                 #:select (compile compile-file))
   #:use-module ((srfi srfi-1) #:select (count any))
   #:use-module (emacs-elisp runtime)
-  #:use-module (language elisp utils)
+  #:use-module (emacs utils)
   #:use-module (emacs reader)
   #:export (
     init-loader

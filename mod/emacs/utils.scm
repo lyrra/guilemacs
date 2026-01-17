@@ -2,7 +2,6 @@
 ;;;
 ;;; Utilities & Property Lists
 ;;;
-;;; Module: (language elisp utils)
 ;;; Purpose: Symbol properties, hash tables, features, and utilities
 ;;; Loading: via use-modules in load.scm
 ;;;
@@ -14,10 +13,8 @@
 ;;;   Comparison: equal-including-properties
 ;;;   Other: copy-tree, fillarray
 ;;;   Registration: init-utils-registrations
-;;;
-;;; NOTE: Phase 2 - Using flat module naming (language elisp utils)
 
-(define-module (language elisp utils)
+(define-module (emacs utils)
   #:use-module (emacs-elisp runtime)
   #:use-module (language elisp sequences)
   #:use-module (srfi srfi-69)

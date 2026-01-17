@@ -7,7 +7,7 @@
   #:declarative? #f
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs loader)
-  #:use-module (language elisp utils)
+  #:use-module (emacs utils)
   #:use-module (system base compile)
   #:use-module (system base language)
   #:export (

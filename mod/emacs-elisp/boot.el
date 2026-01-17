@@ -807,7 +807,7 @@
   `(progn
      ;; At compile time, just update features list without hooks
      (eval-when (:compile-toplevel)
-       (%funcall (@ (language elisp utils) elisp-provide) ,@(cdr form)))
+       (%funcall (@ (emacs utils) elisp-provide) ,@(cdr form)))
      ;; At load/execute time, use full provide with after-load hooks
      (eval-when (:load-toplevel :execute)
        (funcall #'provide ,@(cdr form)))))
