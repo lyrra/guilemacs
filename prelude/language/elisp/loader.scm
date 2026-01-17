@@ -726,15 +726,24 @@ Returns: handler result if handler found, #f if should continue with normal load
       (let* ((src found-file)
              (go (string-append src ".go")) ; FIX: compiled-file-name returns #f ?!
              ;; Load our custom elisp language to override system elisp
-             (el (lookup-language 'emacs-elisp)))
-        (if (fresh-go? go src)
-            (load-compiled go)
-            (begin
-              (compile-file src
-                            #:from el
-                            #:output-file go)
-              (load-compiled go)))
-        #t)) ; return t on success
+             (el (lookup-language 'emacs-elisp))
+             ;; Save current load-file-name for restoration
+             (old-load-file-name ((symbol-function 'symbol-value) 'load-file-name)))
+        ;; Bind load-file-name to current file during loading
+        (dynamic-wind
+          (lambda ()
+            (set-symbol-value! 'load-file-name found-file))
+          (lambda ()
+            (if (fresh-go? go src)
+                (load-compiled go)
+                (begin
+                  (compile-file src
+                                #:from el
+                                #:output-file go)
+                  (load-compiled go)))
+            #t) ; return t on success
+          (lambda ()
+            (set-symbol-value! 'load-file-name old-load-file-name)))))
     (lambda (key . args)
       (if noerror
           #f ; return nil on error if noerror is true
