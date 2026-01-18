@@ -1,25 +1,7 @@
-;;; Guilemacs Lisp
-;;;
-;;; Type Predicates - Foundation Layer
-;;;
+;;; Type Predicates
 ;;; Purpose: Type predicates and type-related operations for Elisp runtime
 ;;; Loading: via use-modules in load.scm
-;;;
-;;; EXPORTS (41 functions):
-;;;   Type predicates: symbolp, integerp, floatp, numberp, natnump,
-;;;                    characterp, stringp, vectorp, bool-vector-p,
-;;;                    arrayp, sequencep, bufferp, subrp
-;;;   List predicates: consp, atom, listp, nlistp, null, proper-list-p
-;;;   Equality: eq, eql, equal
-;;;   Cons operations: cons, car, cdr, car-safe, cdr-safe
-;;;   Character ops: max-char
-;;;   Utilities: identity, char-table-p
-;;;   Extended: bare-symbol-p, boundp, condition-variable-p, hash-table-p,
-;;;            integer-or-marker-p, mutexp, recordp, symbol-with-pos-p,
-;;;            threadp, user-ptrp, vector-or-char-table-p
-;;;   Helpers: elisp-symbol-equal
-;;;   Registration: init-types-registrations
-;;;
+;;; Registration: init-types-registrations
 
 (define-module (emacs types)
   #:use-module (emacs-elisp runtime)
@@ -258,15 +240,11 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
   ;; Placeholder - char-tables not yet implemented
   #nil)
 
-;;;
-
 (define (elisp-bare-symbol-p object)
   "Return t if OBJECT is a symbol, but not a symbol together with position."
   ;; In Guile implementation, symbols don't have position information
   ;; so this is the same as symbolp for now
   (if (symbol? object) #t #nil))
-
-
 
 (define (elisp-boundp symbol)
   "Return t if SYMBOL's value is not void."
@@ -282,42 +260,30 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
        (lambda (key . args)
          #nil)))))
 
-
-
 (define (elisp-condition-variable-p object)
   "Return t if OBJECT is a condition variable."
   ;; Condition variables are Emacs-specific, return nil for now
   #nil)
-
-
 
 (define (elisp-hash-table-p obj)
   "Return t if OBJ is a Lisp hash table object."
   ;; Check if it's a Guile hash table
   (if (hash-table? obj) #t #nil))
 
-
-
 (define (elisp-integer-or-marker-p object)
   "Return t if OBJECT is an integer or a marker."
   ;; For now, markers are not implemented in Guile, so just check integers
   (if (integer? object) #t #nil))
-
-
 
 (define (elisp-mutexp object)
   "Return t if OBJECT is a mutex."
   ;; Mutexes are Emacs-specific, return nil for now
   #nil)
 
-
-
 (define (elisp-recordp object)
   "Return t if OBJECT is a record."
   ;; Records are Emacs-specific structures, return nil for now
   #nil)
-
-
 
 (define (elisp-symbol-with-pos-p object)
   "Return t if OBJECT is a symbol together with position."
@@ -325,72 +291,19 @@ Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
   ;; so this always returns nil
   #nil)
 
-
-
 (define (elisp-threadp object)
   "Return t if OBJECT is a thread."
   ;; Threads are Emacs-specific, return nil for now
   #nil)
-
-
 
 (define (elisp-user-ptrp object)
   "Return t if OBJECT is a module user pointer."
   ;; User pointers are Emacs module-specific, return nil for now
   #nil)
 
-
-
 (define (elisp-vector-or-char-table-p object)
   "Return t if OBJECT is a char-table or vector."
   (if (or (vector? object) (eq? #t (elisp-char-table-p object))) #t #nil))
-
-
-;;; Registration with Elisp symbol table
-;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
-;;; These functions are defined here but registered in load.scm for now.
-;;; Once we migrate functions from load.scm to this module, we can uncomment
-;;; the registrations incrementally.
-;;;
-
-;; (set-symbol-function! 'symbolp elisp-symbolp)
-;; (set-symbol-function! 'integerp elisp-integerp)
-;; (set-symbol-function! 'floatp elisp-floatp)
-;; (set-symbol-function! 'numberp elisp-numberp)
-;; (set-symbol-function! 'natnump elisp-natnump)
-;; (set-symbol-function! 'characterp elisp-characterp)
-;; (set-symbol-function! 'stringp elisp-stringp)
-;; (set-symbol-function! 'vectorp elisp-vectorp)
-;; (set-symbol-function! 'bool-vector-p elisp-bool-vector-p)
-;; (set-symbol-function! 'arrayp elisp-arrayp)
-;; (set-symbol-function! 'sequencep elisp-sequencep)
-;; (set-symbol-function! 'bufferp elisp-bufferp)
-;; (set-symbol-function! 'subrp elisp-subrp)
-
-;; (set-symbol-function! 'consp elisp-consp)
-;; (set-symbol-function! 'atom elisp-atom)
-;; (set-symbol-function! 'listp elisp-listp)
-;; (set-symbol-function! 'nlistp elisp-nlistp)
-;; (set-symbol-function! 'null elisp-null)
-;; (set-symbol-function! 'proper-list-p elisp-proper-list-p)
-
-;; (set-symbol-function! 'eq elisp-eq)
-;; (set-symbol-function! 'eql elisp-eql)
-;; (set-symbol-function! 'equal elisp-equal)
-
-;; (set-symbol-function! 'cons elisp-cons)
-;; (set-symbol-function! 'car elisp-car)
-;; (set-symbol-function! 'cdr elisp-cdr)
-;; (set-symbol-function! 'car-safe elisp-car-safe)
-;; (set-symbol-function! 'cdr-safe elisp-cdr-safe)
-
-;; (set-symbol-function! 'max-char elisp-max-char)
-
-;; (set-symbol-function! 'identity elisp-identity)
-
-;; Registration initialization function
-;; Called by load.scm after module is loaded
-
 
 (define (elisp-symbol-equal sym1 sym2)
   "Compare two symbols directly without converting to strings.
@@ -411,14 +324,46 @@ This is more efficient than string comparison of symbol names."
 
 (define (init-types-registrations)
   "Initialize symbol function registrations for types module."
-  (set-symbol-function! 'bare-symbol-p elisp-bare-symbol-p)
-  (set-symbol-function! 'boundp elisp-boundp)
-  (set-symbol-function! 'condition-variable-p elisp-condition-variable-p)
-  (set-symbol-function! 'hash-table-p elisp-hash-table-p)
-  (set-symbol-function! 'integer-or-marker-p elisp-integer-or-marker-p)
-  (set-symbol-function! 'mutexp elisp-mutexp)
-  (set-symbol-function! 'recordp elisp-recordp)
-  (set-symbol-function! 'symbol-with-pos-p elisp-symbol-with-pos-p)
-  (set-symbol-function! 'threadp elisp-threadp)
-  (set-symbol-function! 'user-ptrp elisp-user-ptrp)
-  (set-symbol-function! 'vector-or-char-table-p elisp-vector-or-char-table-p))
+  (for-each (lambda (sym-fun)
+              (set-symbol-function! (car sym-fun) (cadr sym-fun)))
+            `((bare-symbol-p          ,elisp-bare-symbol-p)
+              (boundp                 ,elisp-boundp)
+              (condition-variable-p   ,elisp-condition-variable-p)
+              (hash-table-p           ,elisp-hash-table-p)
+              (integer-or-marker-p    ,elisp-integer-or-marker-p)
+              (mutexp                 ,elisp-mutexp)
+              (recordp                ,elisp-recordp)
+              (symbol-with-pos-p      ,elisp-symbol-with-pos-p)
+              (threadp                ,elisp-threadp)
+              (user-ptrp              ,elisp-user-ptrp)
+              (vector-or-char-table-p ,elisp-vector-or-char-table-p)
+              (sequencep  ,elisp-sequencep)
+              (vectorp    ,elisp-vectorp)
+              (nlistp     ,elisp-nlistp)
+              (listp      ,elisp-listp)
+              (atom       ,elisp-atom)
+              (consp      ,elisp-consp)
+              (symbolp    ,elisp-symbolp)
+              (characterp ,elisp-characterp)
+              (null       ,elisp-null)
+              (numberp    ,elisp-numberp)
+              (integerp   ,elisp-integerp)
+              ;; (floatp ,elisp-floatp)
+              ;; (natnump ,elisp-natnump)
+              ;; (stringp ,elisp-stringp)
+              ;; (bool-vector-p ,elisp-bool-vector-p)
+              ;; (arrayp ,elisp-arrayp)
+              ;; (bufferp ,elisp-bufferp)
+              ;; (subrp ,elisp-subrp)
+              ;; (proper-list-p ,elisp-proper-list-p)
+              ;; (eq ,elisp-eq)
+              ;; (eql ,elisp-eql)
+              ;; (equal ,elisp-equal)
+              ;; (cons ,elisp-cons)
+              ;; (car ,elisp-car)
+              ;; (cdr ,elisp-cdr)
+              ;; (car-safe ,elisp-car-safe)
+              ;; (cdr-safe ,elisp-cdr-safe)
+              ;; (max-char ,elisp-max-char)
+              ;; (identity ,elisp-identity)
+              )))

@@ -145,13 +145,6 @@
 (use-modules (emacs loader))
 (use-modules (emacs reader))
 (use-modules (emacs lookup-functions))
-
-;(let ((loader (lambda (file)
-;                (primitive-load (join %prelude-directory file))
-;                (set-current-module (resolve-module '(emacs-elisp runtime))))))
-;  (loader "elisp/runtime/loader.scm")
-;  (loader "elisp/runtime/reader.scm"))
-
 (init-types-registrations)
 (init-numbers-registrations)
 (init-strings-registrations)
@@ -160,46 +153,11 @@
 (init-reader %prelude-directory)
 (init-loader %prelude-directory)
 (init-lookup-functions)
-
 (use-modules (emacs pcase))
-
-;;; ============================================================================
-;;; SECTION 8: ADDITIONAL DEFUN MIGRATIONS
-;;; ============================================================================
-;;;
-;;; Additional function migrations from C to Guile from various source files.
-;;; Includes functions from: lread.c, data.c, fns.c, floatfns.c
-;;; NOTE: Some functions here may overlap with earlier sections.
-
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 (use-modules (emacs text-properties))
 (use-modules (emacs utf8))
-
-
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 (use-modules (emacs symbol-operations))
 (use-modules (emacs character-predicates))
-
-;; Export the functions to both global module and language elisp emacs module
-;; so C code can find them from either location
-(let ((elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
-  ;; Export DEFUN function migrations to elisp emacs module
-  (module-define! elisp-emacs-module 'integerp elisp-integerp)
-  (module-define! elisp-emacs-module 'numberp elisp-numberp)
-  (module-define! elisp-emacs-module 'null elisp-null)
-  (module-define! elisp-emacs-module 'characterp elisp-characterp)
-  (module-define! elisp-emacs-module 'symbolp elisp-symbolp)
-  (module-define! elisp-emacs-module 'consp elisp-consp)
-  (module-define! elisp-emacs-module 'atom elisp-atom)
-  (module-define! elisp-emacs-module 'listp elisp-listp)
-  (module-define! elisp-emacs-module 'nlistp elisp-nlistp)
-  (module-define! elisp-emacs-module 'vectorp elisp-vectorp)
-  (module-define! elisp-emacs-module 'sequencep elisp-sequencep)
-  ;; (module-define! elisp-emacs-module 'markerp elisp-markerp)
-  ;; (module-define! elisp-emacs-module 'keywordp elisp-keywordp)
-  ;; (module-define! elisp-emacs-module 'identity elisp-identity)
-  ;; save-current-buffer is a MACRO defined in boot.el, not a function - don't register the Scheme version
-  ;; (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
-  )
-;; when elisp reads keyword symbols, support common-lisp keywords
 (read-set! keywords 'prefix)
