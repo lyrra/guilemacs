@@ -1076,7 +1076,8 @@ LIMIT is optional - defaults to end of object if not provided."
    ((emacs-string? object)
     (let* ((intervals (emacs-string-intervals object))
            (obj-end (emacs-string-length object))
-           (actual-limit (if (and limit (not (eq? limit #nil))) limit obj-end)))
+           ;; limit must be a number, not just non-nil (t is not a valid limit)
+           (actual-limit (if (and limit (not (eq? limit #nil)) (number? limit)) limit obj-end)))
       (if (null? intervals)
           (or limit #nil)
           (let* ((vec (list->vector intervals))
@@ -1094,8 +1095,8 @@ LIMIT is optional - defaults to end of object if not provided."
       (if (not vec)
           ;; No intervals
           (or limit #nil)
-          ;; Use binary search
-          (let* ((actual-limit (if (and limit (not (eq? limit #nil))) limit #f))
+          ;; Use binary search - limit must be a number
+          (let* ((actual-limit (if (and limit (not (eq? limit #nil)) (number? limit)) limit #f))
                  (idx (binary-search-interval vec position)))
             (next-property-change-from-index vec idx position actual-limit limit)))))))
 
@@ -1144,7 +1145,8 @@ Returns index or #f if none found."
 (define (previous-property-change position object limit)
   "Find previous position where ANY property changes in OBJECT before POSITION.
 Returns the position of the change, or LIMIT if no change found."
-  (let ((actual-limit (if (and limit (not (eq? limit #nil))) limit 0)))
+  ;; limit must be a number, not just non-nil (t is not a valid limit)
+  (let ((actual-limit (if (and limit (not (eq? limit #nil)) (number? limit)) limit 0)))
     (cond
      ;; Emacs-string wrapper
      ((emacs-string? object)
@@ -1211,7 +1213,8 @@ Uses binary search for O(log n) initial lookup."
 (define (next-single-property-change-from-vec vec position prop limit)
   "Find next position where PROP changes, using vector with binary search."
   (let* ((len (vector-length vec))
-         (actual-limit (if (and limit (not (eq? limit #nil))) limit #f))
+         ;; limit must be a number, not just non-nil (t is not a valid limit)
+         (actual-limit (if (and limit (not (eq? limit #nil)) (number? limit)) limit #f))
          ;; Get current value at position (need to check if position is in an interval)
          (idx (binary-search-interval vec position))
          (current-val (if idx
