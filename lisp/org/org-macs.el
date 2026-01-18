@@ -134,7 +134,7 @@ SYMBOL.  Show warning instead of error when NOERROR is non-nil."
 (defmacro org-with-gensyms (symbols &rest body)
   (declare (debug (sexp body)) (indent 1))
   `(let ,(mapcar (lambda (s)
-		   `(,s (make-symbol (concat "--" (symbol-name ',s)))))
+		   `(,s (intern-gensym (concat "--" (symbol-name ',s)))))
                  symbols)
      ,@body))
 
@@ -750,7 +750,7 @@ Beware: this performs O(N) memory allocations, so if you use it in a loop, you
 get an unnecessary O(N²) space complexity, so you're usually better off using
 `cl-pushnew' (with a final `reverse' if you care about the order of elements)."
   (declare (debug (form gv-place)))
-  (let ((v (make-symbol "v")))
+  (let ((v (intern-gensym "v")))
     `(let ((,v ,val))
        (unless (member ,v ,var)
          (setf ,var (append ,var (list ,v)))))))
