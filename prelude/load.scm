@@ -115,7 +115,7 @@
 
 ;; Load core emacs functionallity
 (use-modules (emacs types))
-(use-modules (numbers))
+(use-modules (emacs numbers))
 (use-modules (emacs strings))
 (use-modules (emacs sequences))
 (use-modules (emacs utils))

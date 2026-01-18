@@ -1,28 +1,9 @@
-;;; Guilemacs Lisp
-;;;
 ;;; Arithmetic & Math Operations
-;;;
-;;; Module: (language elisp numbers)
 ;;; Purpose: Arithmetic and mathematical operations for Elisp runtime
 ;;; Loading: via use-modules in load.scm
-;;;
-;;; EXPORTS (32+ functions):
-;;;   Basic arithmetic: +, -, *, /, 1+, 1-
-;;;   Min/Max: min, max
-;;;   Comparisons: =, <, >, <=, >=, /=
-;;;   Bitwise: logand, logior, logxor, lognot, logcount, ash
-;;;   Trigonometric: cos, sin, tan, acos, asin, atan
-;;;   Exponential: abs, sqrt, exp, expt, log
-;;;   Rounding: truncate, ceiling, floor, round
-;;;   Float rounding: ftruncate, fceiling, ffloor, fround
-;;;   Special predicates: isnan
-;;;   Modulo/Remainder: %, mod
-;;;   Other: byteorder, float, number-to-string, random, number-or-marker-p
-;;;   Registration: init-numbers-registrations
-;;;
-;;; NOTE: Phase 2 - Using flat module naming (language elisp numbers)
+;;; Registration: init-numbers-registrations
 
-(define-module (numbers)
+(define-module (emacs numbers)
   #:use-module (rnrs bytevectors)
   #:use-module (emacs-elisp runtime)
   #:export (
@@ -61,10 +42,6 @@
     elisp-number-or-marker-p
     init-numbers-registrations
   ))
-
-;;;
-;;;
-;;;
 
 ;; The C primitive check-number-coerce-marker is defined in src/data.c
 ;; and exported in src/emacs.c via scm_c_define_gsubr
@@ -295,68 +272,61 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
   ;; For now, markers are not implemented in Guile, so just check numbers
   (if (number? object) #t #nil))
 
-;;; Registration with Elisp symbol table
-;;; NOTE: All registrations commented out to avoid conflicts with prelude/load.scm
-;;; These functions are defined here but registered in load.scm for now.
-;;; Once we migrate functions from load.scm to this module, we can uncomment
-;;; the registrations incrementally.
-;;;
-
-;; Registration initialization function
-;; Called by load.scm after module is loaded
 (define (init-numbers-registrations)
   "Initialize symbol function registrations for numbers module."
-  (set-symbol-function! 'min elisp-min)
-  (set-symbol-function! 'max elisp-max)
-  (set-symbol-function! '% elisp-%)
-  (set-symbol-function! '/ elisp-/)
-  (set-symbol-function! '+ elisp-+)
-  (set-symbol-function! '- elisp--)
-  (set-symbol-function! '* elisp-*)
-  (set-symbol-function! '= elisp-=)
-  (set-symbol-function! '< elisp-<)
-  (set-symbol-function! '> elisp->)
-  (set-symbol-function! '<= elisp-<=)
-  (set-symbol-function! '>= elisp->=)
-  (set-symbol-function! '/= elisp-/=)
-  (set-symbol-function! '1+ elisp-1+)
-  (set-symbol-function! '1- elisp-1-)
-  (set-symbol-function! 'abs abs)
-  (set-symbol-function! 'acos acos)
-  (set-symbol-function! 'ash ash)
-  (set-symbol-function! 'asin asin)
-  (set-symbol-function! 'atan atan)
-  (set-symbol-function! 'cos cos)
-  (set-symbol-function! 'exp exp)
-  (set-symbol-function! 'expt expt)
-  (set-symbol-function! 'isnan elisp-isnan)
-  (set-symbol-function! 'log elisp-log)
-  (set-symbol-function! 'logand elisp-logand)
-  (set-symbol-function! 'logcount logcount)
-  (set-symbol-function! 'logior logior)
-  (set-symbol-function! 'lognot lognot)
-  (set-symbol-function! 'logxor logxor)
-  (set-symbol-function! 'mod elisp-mod)
-  (set-symbol-function! 'sin sin)
-  (set-symbol-function! 'sqrt sqrt)
-  (set-symbol-function! 'tan tan)
+  (for-each (lambda (sym-fun)
+              (set-symbol-function! (car sym-fun) (cadr sym-fun)))
+            `((min ,elisp-min)
+              (max ,elisp-max)
+              (% ,elisp-%)
+              (/ ,elisp-/)
+              (+ ,elisp-+)
+              (- ,elisp--)
+              (* ,elisp-*)
+              (= ,elisp-=)
+              (< ,elisp-<)
+              (> ,elisp->)
+              (<= ,elisp-<=)
+              (>= ,elisp->=)
+              (/= ,elisp-/=)
+              (1+ ,elisp-1+)
+              (1- ,elisp-1-)
+              (abs ,abs)
+              (acos ,acos)
+              (ash ,ash)
+              (asin ,asin)
+              (atan ,atan)
+              (cos ,cos)
+              (exp ,exp)
+              (expt ,expt)
+              (isnan ,elisp-isnan)
+              (log ,elisp-log)
+              (logand ,elisp-logand)
+              (logcount ,logcount)
+              (logior ,logior)
+              (lognot ,lognot)
+              (logxor ,logxor)
+              (mod ,elisp-mod)
+              (sin ,sin)
+              (sqrt ,sqrt)
+              (tan ,tan)
 
-  ;; Rounding & Truncation
-  (set-symbol-function! 'truncate elisp-truncate)
-  (set-symbol-function! 'ceiling elisp-ceiling)
-  (set-symbol-function! 'floor elisp-floor)
-  (set-symbol-function! 'round elisp-round)
+              ;; Rounding & Truncation
+              (truncate ,elisp-truncate)
+              (ceiling ,elisp-ceiling)
+              (floor ,elisp-floor)
+              (round ,elisp-round)
 
-  ;; Floating-point rounding
-  (set-symbol-function! 'ftruncate elisp-ftruncate)
-  (set-symbol-function! 'fceiling elisp-fceiling)
-  (set-symbol-function! 'ffloor elisp-ffloor)
-  (set-symbol-function! 'fround elisp-fround)
+              ;; Floating-point rounding
+              (ftruncate ,elisp-ftruncate)
+              (fceiling ,elisp-fceiling)
+              (ffloor ,elisp-ffloor)
+              (fround ,elisp-fround)
 
-  (set-symbol-function! 'byteorder elisp-byteorder)
-  (set-symbol-function! 'float elisp-float)
-  (set-symbol-function! 'number-to-string elisp-number-to-string)
-  (set-symbol-function! 'random elisp-random)
-  (set-symbol-function! 'number-or-marker-p elisp-number-or-marker-p)
+              (byteorder ,elisp-byteorder)
+              (float ,elisp-float)
+              (number-to-string ,elisp-number-to-string)
+              (random ,elisp-random)
+              (number-or-marker-p ,elisp-number-or-marker-p)
 
-  )
+              )))
