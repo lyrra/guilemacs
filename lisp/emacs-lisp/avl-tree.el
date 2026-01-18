@@ -105,7 +105,9 @@ NODE is the node, and BRANCH is the branch.
 ;; The funcall/aref trick wouldn't work for the setf method, unless we
 ;; tried to access the underlying setter function, but this wouldn't be
 ;; portable either.
-(gv-define-simple-setter avl-tree--node-branch aset)
+;; eval-and-compile needed so gv-expander is available when compiling setf forms below
+(eval-and-compile
+  (gv-define-simple-setter avl-tree--node-branch aset))
 
 
 

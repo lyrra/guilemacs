@@ -62,7 +62,7 @@
 (require 'org-macs)
 (org-assert-version)
 
-(require 'avl-tree)
+(eval-and-compile (require 'avl-tree))
 (require 'ring)
 (require 'cl-lib)
 (require 'ol)
