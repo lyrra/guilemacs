@@ -1114,6 +1114,11 @@ Default value of `command-error-function'.  */)
 	  bitch_at_user ();
 	}
 
+      /* DEBUG: Also print errors to stderr for debugging */
+      print_error_message (data, Qexternal_debugging_output,
+			   SSDATA (context), signal);
+      Fterpri (Qexternal_debugging_output, Qnil);
+
       print_error_message (data, Qt, SSDATA (context), signal);
     }
   return Qnil;
