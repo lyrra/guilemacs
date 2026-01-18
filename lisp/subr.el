@@ -84,6 +84,17 @@ Testcover will raise an error."
   (declare (debug t))
   form)
 
+(eval-and-compile
+;; Moved here from bindings.el for guilemacs - needs to be available
+;; before subr.el uses it (e.g., in read-char-choice).
+(defmacro bound-and-true-p (var)
+  "Return the value of symbol VAR if it is bound, else nil.
+Note that if `lexical-binding' is in effect, this function isn't
+meaningful if it refers to a lexically bound variable."
+  (unless (symbolp var)
+    (signal 'wrong-type-argument (list 'symbolp var)))
+  `(and (boundp (quote ,var)) ,var)))
+
 (defmacro def-edebug-spec (symbol spec)
   "Set the Edebug SPEC to use for sexps which have SYMBOL as head.
 Both SYMBOL and SPEC are unevaluated.  The SPEC can be:
