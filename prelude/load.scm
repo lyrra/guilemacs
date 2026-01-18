@@ -144,6 +144,7 @@
 (use-modules (emacs utils))
 (use-modules (emacs loader))
 (use-modules (emacs reader))
+(use-modules (emacs lookup-functions))
 
 ;(let ((loader (lambda (file)
 ;                (primitive-load (join %prelude-directory file))
@@ -158,6 +159,7 @@
 (init-utils-registrations)
 (init-reader %prelude-directory)
 (init-loader %prelude-directory)
+(init-lookup-functions)
 
 (use-modules (emacs pcase))
 
@@ -168,10 +170,6 @@
 ;;; Additional function migrations from C to Guile from various source files.
 ;;; Includes functions from: lread.c, data.c, fns.c, floatfns.c
 ;;; NOTE: Some functions here may overlap with earlier sections.
-
-;; Load lookup functions for C integration (Phase 4 consolidation)
-;; Replaces: lookup-functions.scm
-(primitive-load (join %prelude-directory "../mod/emacs/lookup-functions.scm"))
 
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 (use-modules (emacs text-properties))
@@ -185,66 +183,6 @@
 ;; Export the functions to both global module and language elisp emacs module
 ;; so C code can find them from either location
 (let ((elisp-emacs-module (resolve-module '(language elisp emacs) #f)))
-  ;; Export to language elisp emacs module
-  (module-define! elisp-emacs-module 'lookup-color-in-map lookup-color-in-map)
-  (module-define! elisp-emacs-module 'lookup-font-style lookup-font-style)
-  (module-define! elisp-emacs-module 'lookup-in-alist-ci lookup-in-alist-ci)
-  (module-define! elisp-emacs-module 'lookup-in-alist lookup-in-alist)
-  (module-define! elisp-emacs-module 'lookup-symbol-in-list lookup-symbol-in-list)
-  (module-define! elisp-emacs-module 'parse-face-bool-attribute parse-face-bool-attribute)
-  (module-define! elisp-emacs-module 'process-yesno-response process-yesno-response)
-  (module-define! elisp-emacs-module 'filter-dbus-message filter-dbus-message)
-  (module-define! elisp-emacs-module 'is-special-buffer-name? is-special-buffer-name?)
-  (module-define! elisp-emacs-module 'parse-color-spec parse-color-spec)
-  (module-define! elisp-emacs-module 'validate-color-name validate-color-name)
-  (module-define! elisp-emacs-module 'string-contains-whitespace? string-contains-whitespace?)
-  (module-define! elisp-emacs-module 'is-frame-name-fnn-format? is-frame-name-fnn-format?)
-  (module-define! elisp-emacs-module 'validate-xlfd-font-name validate-xlfd-font-name)
-  (module-define! elisp-emacs-module 'is-absolute-path? is-absolute-path?)
-  (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?)
-  (module-define! elisp-emacs-module 'string-spaces-to-dashes string-spaces-to-dashes)
-  (module-define! elisp-emacs-module 'string-trim-leading-whitespace string-trim-leading-whitespace)
-  (module-define! elisp-emacs-module 'parse-number-string parse-number-string)
-  (module-define! elisp-emacs-module 'validate-string-for-copying validate-string-for-copying)
-  (module-define! elisp-emacs-module 'prepare-string-for-symbol prepare-string-for-symbol)
-
-  ;; Export new SSDATA hoisting functions to elisp emacs module
-  (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
-  (module-define! elisp-emacs-module 'extract-filename-from-path extract-filename-from-path)
-  (module-define! elisp-emacs-module 'is-modifier-symbol? is-modifier-symbol?)
-  (module-define! elisp-emacs-module 'validate-float-format-string validate-float-format-string)
-  (module-define! elisp-emacs-module 'has-time-format-specifiers? has-time-format-specifiers?)
-  (module-define! elisp-emacs-module 'parse-hex-color parse-hex-color)
-  (module-define! elisp-emacs-module 'needs-filename-conversion? needs-filename-conversion?)
-  (module-define! elisp-emacs-module 'is-utf8-filename? is-utf8-filename?)
-  (module-define! elisp-emacs-module 'is-safe-for-c-string-copy? is-safe-for-c-string-copy?)
-  (module-define! elisp-emacs-module 'looks-like-network-address? looks-like-network-address?)
-
-  ;; Export path/filename operation functions to elisp emacs module
-  (module-define! elisp-emacs-module 'is-absolute-path? is-absolute-path?)
-  (module-define! elisp-emacs-module 'ends-with-directory-separator? ends-with-directory-separator?)
-  (module-define! elisp-emacs-module 'normalize-path-separators normalize-path-separators)
-  (module-define! elisp-emacs-module 'string-empty? string-empty?)
-  (module-define! elisp-emacs-module 'has-directory-traversal? has-directory-traversal?)
-  (module-define! elisp-emacs-module 'get-file-extension get-file-extension)
-  (module-define! elisp-emacs-module 'path-starts-with? path-starts-with?)
-
-  ;; Export simple string validation functions to elisp emacs module
-  (module-define! elisp-emacs-module 'string-single-char? string-single-char?)
-  (module-define! elisp-emacs-module 'string-starts-with-space? string-starts-with-space?)
-  (module-define! elisp-emacs-module 'string-ascii-only? string-ascii-only?)
-  (module-define! elisp-emacs-module 'valid-symbol-name? valid-symbol-name?)
-  (module-define! elisp-emacs-module 'string-numeric? string-numeric?)
-  (module-define! elisp-emacs-module 'string-needs-escaping? string-needs-escaping?)
-  (module-define! elisp-emacs-module 'special-buffer-name? special-buffer-name?)
-  (module-define! elisp-emacs-module 'string-equal-ignore-case? string-equal-ignore-case?)
-  (module-define! elisp-emacs-module 'string-starts-with-char? string-starts-with-char?)
-  (module-define! elisp-emacs-module 'string-ends-with-char? string-ends-with-char?)
-  (module-define! elisp-emacs-module 'string-whitespace-only? string-whitespace-only?)
-  (module-define! elisp-emacs-module 'valid-identifier? valid-identifier?)
-
-  (module-define! elisp-emacs-module 'has-file-extension? has-file-extension?)
-
   ;; Export DEFUN function migrations to elisp emacs module
   (module-define! elisp-emacs-module 'integerp elisp-integerp)
   (module-define! elisp-emacs-module 'numberp elisp-numberp)
@@ -262,42 +200,6 @@
   ;; (module-define! elisp-emacs-module 'identity elisp-identity)
   ;; save-current-buffer is a MACRO defined in boot.el, not a function - don't register the Scheme version
   ;; (module-define! elisp-emacs-module 'save-current-buffer elisp-save-current-buffer)
-  (module-define! elisp-emacs-module 'source-code-file? source-code-file?)
-  (module-define! elisp-emacs-module 'image-file? image-file?)
-  (module-define! elisp-emacs-module 'config-file? config-file?)
-  (module-define! elisp-emacs-module 'extract-file-extension extract-file-extension)
-
-  (module-define! elisp-emacs-module 'hex-color-string? hex-color-string?)
-  (module-define! elisp-emacs-module 'rgb-color-string? rgb-color-string?)
-  (module-define! elisp-emacs-module 'named-color? named-color?)
-  (module-define! elisp-emacs-module 'valid-xlfd-font-name? valid-xlfd-font-name?)
-  (module-define! elisp-emacs-module 'font-family-name? font-family-name?)
-
-  (module-define! elisp-emacs-module 'url-string? url-string?)
-  (module-define! elisp-emacs-module 'email-address? email-address?)
-  (module-define! elisp-emacs-module 'ip-address? ip-address?)
-
-  (module-define! elisp-emacs-module 'lookup-registry-to-script lookup-registry-to-script)
-
-  (module-define! elisp-emacs-module 'parse-font-name-with-size parse-font-name-with-size)
-
-  (module-define! elisp-emacs-module 'substring-no-properties-scheme substring-no-properties-scheme)
-
-  ;; Export file path operation functions to both modules
-  (module-define! elisp-emacs-module 'file-path-absolute-p file-path-absolute-p)
-  (module-define! elisp-emacs-module 'file-path-directory file-path-directory)
-  (module-define! elisp-emacs-module 'file-path-nondirectory file-path-nondirectory)
-  (module-define! elisp-emacs-module 'file-path-safe-p file-path-safe-p)
-
-  ;; Export string concatenation functions to both modules
-  (module-define! elisp-emacs-module 'string-concat-2 string-concat-2)
-  (module-define! elisp-emacs-module 'string-concat-3 string-concat-3)
-  (module-define! elisp-emacs-module 'string-concat-multi string-concat-multi)
-
-  ;; Export integer parsing functions to both modules
-  (module-define! elisp-emacs-module 'parse-integer-string parse-integer-string)
-  (module-define! elisp-emacs-module 'read-integer-guile read-integer-guile)
-  (module-define! elisp-emacs-module 'parse-emacs-number parse-emacs-number))
-
+  )
 ;; when elisp reads keyword symbols, support common-lisp keywords
 (read-set! keywords 'prefix)
