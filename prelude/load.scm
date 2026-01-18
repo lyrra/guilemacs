@@ -90,10 +90,8 @@
              (system foreign-library)
              (system base compile) ; compile-file, compiled-file-name, etc.
              (system base language)
-             ;(ice-9 auto-compile) ; enables the autocompile hook for loaders
-             (ice-9 ftw)) ; for stat etc.
-
-(use-modules (emacs-elisp runtime)
+             (ice-9 ftw)  ; for stat etc.
+             (emacs-elisp runtime)
              (emacs-elisp compile-tree-il)
              (language elisp emacs))
 
@@ -110,34 +108,13 @@
                   (else encoding))))
             (original-set-port-encoding! port mapped-encoding)))))
 
-
 (set-current-module (resolve-module '(emacs-elisp runtime)))
 ;; Get saved values from guile-user module (where they were saved before switching)
 (define %prelude-filename (module-ref (resolve-module '(guile-user)) '%saved-prelude-filename))
 (define %prelude-directory (module-ref (resolve-module '(guile-user)) '%saved-prelude-directory))
 
-(define (join a b)
-  (if (or (string-null? a) (string-suffix? "/" a))
-      (string-append a b)
-      (string-append a "/" b)))
-
-(set-current-module (resolve-module '(emacs-elisp runtime)))
-
-;; Initialize core Elisp variables BEFORE loading runtime modules
-;; This breaks circular dependencies (e.g., featurep needs features)
-(set-symbol-value! 'features '())
-
-;; Load modular runtime components
-
-;; Add prelude directory to load path so module files can be found
-(set! %load-path (cons %prelude-directory %load-path))
-
-;; Load types module as proper Guile module
+;; Load core emacs functionallity
 (use-modules (emacs types))
-;; Make all types functions available in (emacs-elisp runtime) namespace
-(module-use! (current-module) (resolve-module '(emacs types)))
-
-;; Load numbers module as proper Guile module
 (use-modules (numbers))
 (use-modules (emacs strings))
 (use-modules (emacs sequences))
@@ -145,6 +122,12 @@
 (use-modules (emacs loader))
 (use-modules (emacs reader))
 (use-modules (emacs lookup-functions))
+(use-modules (emacs pcase))
+(use-modules (emacs text-properties))
+(use-modules (emacs utf8))
+(use-modules (emacs symbol-operations))
+(use-modules (emacs character-predicates))
+
 (init-types-registrations)
 (init-numbers-registrations)
 (init-strings-registrations)
@@ -153,11 +136,6 @@
 (init-reader %prelude-directory)
 (init-loader %prelude-directory)
 (init-lookup-functions)
-(use-modules (emacs pcase))
-(set-current-module (resolve-module '(emacs-elisp runtime)))
-(use-modules (emacs text-properties))
-(use-modules (emacs utf8))
-(set-current-module (resolve-module '(emacs-elisp runtime)))
-(use-modules (emacs symbol-operations))
-(use-modules (emacs character-predicates))
+
+(set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
