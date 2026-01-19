@@ -2679,6 +2679,21 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   else if (MODULE_FUNCTIONP (function))
     result = module_function_arity (XMODULE_FUNCTION (function));
 #endif
+  else if (scm_is_true (scm_procedure_p (function)))
+    {
+      /* Handle Guile procedures */
+      Lisp_Object arity = scm_procedure_minimum_arity (function);
+      if (scm_is_false (arity))
+	xsignal1 (Qinvalid_function, original);
+      Lisp_Object min = XCAR (arity);
+      Lisp_Object max;
+      /* arity is (required optional rest) */
+      if (scm_is_true (XCAR (XCDR (XCDR (arity)))))
+	max = Qmany;
+      else
+	max = scm_sum (min, XCAR (XCDR (arity)));
+      result = Fcons (min, max);
+    }
   else
     {
       if (NILP (function))
