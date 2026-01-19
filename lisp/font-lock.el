@@ -1719,11 +1719,9 @@ LOUDLY, if non-nil, allows progress-meter bar."
       (setq keyword (car keywords) matcher (car keyword))
       (goto-char start)
       (while (and (< (point) end)
-                  nil
-                  ; FIX: GUILEMACS: regex string is butched
-		  ;(if (stringp matcher)
-		  ;    (re-search-forward matcher end t)
-		  ;  (funcall matcher end))
+		  (if (stringp matcher)
+		      (re-search-forward matcher end t)
+		    (funcall matcher end))
                   ;; Beware empty string matches since they will
                   ;; loop indefinitely.
                   (or (> (point) (match-beginning 0))

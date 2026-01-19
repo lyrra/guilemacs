@@ -2379,8 +2379,7 @@ the suggested string to use instead.  See
 `help-uni-confusable-suggestions'.")
 
 (defconst help-uni-confusables-regexp
-  (concat "[" () ;(mapcar #'car help-uni-confusables)
-          "]")
+  (concat "[" (apply #'string (mapcar #'car help-uni-confusables)) "]")
   "Regexp matching any character listed in `help-uni-confusables'.")
 
 (defun help-uni-confusable-suggestions (string)
