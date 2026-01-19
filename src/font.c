@@ -1368,6 +1368,7 @@ font_dynamic_unparse_xlfd (Lisp_Object font, int pixel_size)
 	      if (c != '-' && c != '?' && c != ',' && c != '"')
 		p[l++] = c;
 	    }
+	  p[l] = '\0';  /* Null-terminate after filtering */
 	}
     }
 
@@ -1530,6 +1531,7 @@ font_unparse_xlfd (Lisp_Object font, int pixel_size, char *name, int nbytes)
 	      if (c != '-' && c != '?' && c != ',' && c != '"')
 		p[l++] = c;
 	    }
+	  p[l] = '\0';  /* Null-terminate after filtering */
 	}
     }
 
