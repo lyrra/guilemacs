@@ -264,7 +264,9 @@ See also `capitalize', `downcase' and `upcase-initials'.  */)
       return make_fixnum (c);
     }
   CHECK_STRING (obj);
-  return scm_string_locale_upcase (obj, SCM_UNDEFINED);
+  /* Unwrap emacs-string wrappers - Guile's string functions don't know about them */
+  Lisp_Object raw_str = unwrap_emacs_string (obj);
+  return scm_string_locale_upcase (raw_str, SCM_UNDEFINED);
 }
 
 DEFUN ("downcase", Fdowncase, Sdowncase, 1, 1, 0,
@@ -288,7 +290,9 @@ The argument object is not altered--the value is a copy.  */)
       return make_fixnum (c);
     }
   CHECK_STRING (obj);
-  return scm_string_locale_downcase (obj, SCM_UNDEFINED);
+  /* Unwrap emacs-string wrappers - Guile's string functions don't know about them */
+  Lisp_Object raw_str = unwrap_emacs_string (obj);
+  return scm_string_locale_downcase (raw_str, SCM_UNDEFINED);
 }
 
 DEFUN ("capitalize", Fcapitalize, Scapitalize, 1, 1, 0,
@@ -311,7 +315,9 @@ cased, e.g. ﬁ, are returned unchanged.  */)
       return make_fixnum (c);
     }
   CHECK_STRING (obj);
-  return scm_string_locale_titlecase (obj, SCM_UNDEFINED);
+  /* Unwrap emacs-string wrappers - Guile's string functions don't know about them */
+  Lisp_Object raw_str = unwrap_emacs_string (obj);
+  return scm_string_locale_titlecase (raw_str, SCM_UNDEFINED);
 }
 
 /* Like Fcapitalize but change only the initials.  */
@@ -329,7 +335,10 @@ is a character, characters which map to multiple code points when
 cased, e.g. ﬁ, are returned unchanged.  */)
   (Lisp_Object obj)
 {
-  return scm_string_locale_titlecase (obj, SCM_UNDEFINED);
+  CHECK_STRING (obj);
+  /* Unwrap emacs-string wrappers - Guile's string functions don't know about them */
+  Lisp_Object raw_str = unwrap_emacs_string (obj);
+  return scm_string_locale_titlecase (raw_str, SCM_UNDEFINED);
 }
 
 /* Based on CTX, case region in a unibyte buffer from *STARTP to *ENDP.

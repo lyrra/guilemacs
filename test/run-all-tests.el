@@ -13,6 +13,15 @@
 
 (message "")
 (message "========================================")
+(message "STRINGS TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/strings/casefiddle.el")
+(message "")
+
+(message "")
+(message "========================================")
 (message "TEXT PROPERTIES TEST SUITE")
 (message "========================================")
 (message "")
