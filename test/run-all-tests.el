@@ -22,6 +22,15 @@
 
 (message "")
 (message "========================================")
+(message "GENERALIZED VARIABLES (GV) TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/gv/test-gv-setf.el")
+(message "")
+
+(message "")
+(message "========================================")
 (message "TEXT PROPERTIES TEST SUITE")
 (message "========================================")
 (message "")
