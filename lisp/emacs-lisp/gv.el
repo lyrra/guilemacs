@@ -153,7 +153,8 @@ NAME is a symbol: the name of a function, macro, or special form.
 HANDLER is a function which takes an argument DO followed by the same
 arguments as NAME.  DO is a function as defined in `gv-get'."
   (declare (indent 1) (debug (sexp form)))
-  `(function-put ',name 'gv-expander ,handler))
+  `(eval-and-compile
+     (function-put ',name 'gv-expander ,handler)))
 
 ;;;###autoload
 (defun gv--defun-declaration (symbol name args handler &optional fix)
