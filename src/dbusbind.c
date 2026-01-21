@@ -21,6 +21,8 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #ifdef HAVE_DBUS
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
+#include <sys/stat.h>
 #include <dbus/dbus.h>
 
 #include "lisp.h"
@@ -1061,6 +1063,20 @@ xd_add_watch (DBusWatch *watch, void *data)
   XD_DEBUG_MESSAGE ("fd %d, write %u, enabled %u",
 		    fd, flags & DBUS_WATCH_WRITABLE,
 		    dbus_watch_get_enabled (watch));
+
+  /* Debug: check what FD D-Bus is returning */
+  if (fd == 0)
+    {
+      struct stat st;
+      int ret = fstat (fd, &st);
+      fprintf (stderr, "DEBUG dbus: xd_add_watch got fd=0! fstat ret=%d mode=0%o errno=%d\n",
+               ret, ret == 0 ? st.st_mode : 0, ret < 0 ? errno : 0);
+      /* WORKAROUND: FD 0 should be stdin, not a D-Bus socket.
+         If we get here, stdin was closed and D-Bus socket got FD 0.
+         Skip registering it to avoid EBADF issues later. */
+      fprintf (stderr, "DEBUG dbus: Skipping FD 0 registration (stdin hijacked)\n");
+      return TRUE;  /* Return success but don't register */
+    }
 
   if (fd == -1)
     return FALSE;
