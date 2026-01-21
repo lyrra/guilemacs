@@ -210,7 +210,9 @@ present in `eshell-debug-command', output this message; otherwise, ignore it.
 
 STRING and OBJECTS are as `format-message' (which see)."
   (declare (indent 1))
-  (let ((kind-sym (make-symbol "kind")))
+  ;; Use intern-gensym instead of make-symbol because Guile cannot
+  ;; serialize uninterned symbols to compiled object files
+  (let ((kind-sym (intern-gensym "kind")))
     `(let ((,kind-sym ,kind))
        (when (memq ,kind-sym eshell-debug-command)
          (eshell-always-debug-command ,kind-sym ,string ,@objects)))))
@@ -262,9 +264,9 @@ and set point to the beginning of the narrowed region.
 
 The value returned is the last form in BODY."
   (declare (indent 1))
-  (let ((command-sym (make-symbol "command"))
-        (begin-sym (make-symbol "begin"))
-        (end-sym (make-symbol "end")))
+  (let ((command-sym (intern-gensym "command"))
+        (begin-sym (intern-gensym "beg"))
+        (end-sym (intern-gensym "end")))
     `(let ((,command-sym ,command))
        (if (eshell--region-p ,command-sym)
            (save-restriction

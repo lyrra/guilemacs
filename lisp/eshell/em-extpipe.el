@@ -69,7 +69,9 @@ again."
 
 If `eshell-incomplete' is thrown during the evaluation of a
 disjunct, that disjunct yields nil."
-  (let ((result (gensym)))
+  ;; Use intern-gensym instead of gensym because Guile cannot
+  ;; serialize uninterned symbols to compiled object files
+  (let ((result (intern-gensym "result")))
     `(let (,result)
        (or ,@(cl-loop for disjunct in disjuncts collect
                       `(if (catch 'eshell-incomplete

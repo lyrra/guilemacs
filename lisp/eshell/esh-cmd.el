@@ -951,7 +951,9 @@ This avoids the need to use `let*'."
 
 (defmacro eshell-command-to-value (command)
   "Run an Eshell COMMAND synchronously, returning its output."
-  (let ((value (make-symbol "eshell-temp")))
+  ;; Use intern-gensym instead of make-symbol because Guile cannot
+  ;; serialize uninterned symbols to compiled object files
+  (let ((value (intern-gensym "eshell-temp")))
     `(eshell-with-handles (',value 'overwrite)
        (let ((eshell-in-pipeline-p nil))
          ,command
@@ -1128,7 +1130,9 @@ the form (:eshell-background . PROCESSES)."
 (defmacro eshell-manipulate (form tag &rest body)
   "Manipulate a command FORM with BODY, using TAG as a debug identifier."
   (declare (indent 2))
-  (let ((tag-symbol (make-symbol "tag")))
+  ;; Use intern-gensym instead of make-symbol because Guile cannot
+  ;; serialize uninterned symbols to compiled object files
+  (let ((tag-symbol (intern-gensym "tag")))
     `(if (not (memq 'form eshell-debug-command))
          (progn ,@body)
        (let ((,tag-symbol ,tag))
