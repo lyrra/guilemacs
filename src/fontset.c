@@ -1767,7 +1767,7 @@ FONT-SPEC is a vector, a cons, or a string.  See the documentation of
       if (font_parse_xlfd (SSDATA (name), SBYTES (name), font_spec) < 0)
 	error ("Fontset name must be in XLFD format");
       short_name = AREF (font_spec, FONT_REGISTRY_INDEX);
-      if (!scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("fontset-"), SYMBOL_NAME (short_name), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
+      if (!scm_is_true (scm_string_prefix_p (scm_from_utf8_string ("fontset-"), unwrap_emacs_string (SYMBOL_NAME (short_name)), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	  || SBYTES (SYMBOL_NAME (short_name)) < 9)
 	error ("Registry field of fontset name must be \"fontset-*\"");
       Vfontset_alias_alist = Fcons (Fcons (name, SYMBOL_NAME (short_name)),

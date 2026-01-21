@@ -3673,9 +3673,9 @@ store_frame_param (struct frame *f, Lisp_Object prop, Lisp_Object val)
 static Lisp_Object
 frame_unspecified_color (struct frame *f, Lisp_Object unspec)
 {
-  return (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_bg), unspec, SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
+  return (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_bg), unwrap_emacs_string (unspec), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	  ? tty_color_name (f, FRAME_BACKGROUND_PIXEL (f))
-	  : (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_fg), unspec, SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
+	  : (scm_is_true (scm_string_prefix_p (scm_from_utf8_string (unspecified_fg), unwrap_emacs_string (unspec), SCM_INUM0, SCM_UNDEFINED, SCM_INUM0, SCM_UNDEFINED))
 	     ? tty_color_name (f, FRAME_FOREGROUND_PIXEL (f)) : Qnil));
 }
 
