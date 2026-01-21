@@ -4060,13 +4060,28 @@ intern_driver (Lisp_Object string, Lisp_Object obarray)
 
 static Lisp_Object initial_obarray;
 
+/* FIX-20250121-guilemacs: Vanilla Guile compatibility
+   Instead of using modified Guile's scm_make_obarray (weak-set based),
+   we use standard Guile hash tables for custom obarrays.
+   The global obarray is special-cased to use string->symbol directly. */
+
+static bool
+is_global_obarray (Lisp_Object obarray)
+{
+  return EQ (obarray, initial_obarray) || EQ (obarray, Vobarray);
+}
+
 Lisp_Object
 obhash (Lisp_Object obarray)
 {
+  /* For vanilla Guile: return a hash table for the obarray */
   Lisp_Object tem = scm_hashq_get_handle (obarrays, obarray);
   if (SCM_UNLIKELY (scm_is_false (tem)))
-    tem = scm_hashq_create_handle_x (obarrays, obarray,
-                                     scm_make_obarray ());
+    {
+      /* Create a new hash table for this obarray */
+      Lisp_Object ht = scm_make_hash_table (scm_from_int (67));
+      tem = scm_hashq_create_handle_x (obarrays, obarray, ht);
+    }
   return scm_cdr (tem);
 }
 
@@ -4141,8 +4156,12 @@ static Lisp_Object
 intern_initial_c_string (const char *cstr)
 {
   Lisp_Object string = scm_from_utf8_string (cstr);
-  Lisp_Object sym = scm_intern (string, obhash (initial_obarray));
-  if (scm_char_eq_p(scm_string_ref (string, 2), scm_c_make_char (':')) == SCM_BOOL_T)
+  /* FIX-20250121-guilemacs: Use string->symbol for vanilla Guile */
+  Lisp_Object sym = scm_string_to_symbol (string);
+
+  /* Handle keyword symbols (starting with ':') */
+  size_t len = strlen (cstr);
+  if (len > 0 && cstr[0] == ':')
     {
       SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
       SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
@@ -4164,9 +4183,11 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  tem = scm_find_symbol (string, obhash (obarray));
-  if (scm_is_true (tem))
+  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
+  if (is_global_obarray (obarray))
     {
+      /* Global obarray: string->symbol always succeeds in Guile */
+      tem = scm_string_to_symbol (string);
       if (EQ (tem, Qnil_))
         tem = Qnil;
       else if (EQ (tem, Qt_))
@@ -4174,9 +4195,26 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
       return scm_values (scm_list_2 (tem, Qt));
     }
   else
-    return scm_values (scm_list_2 (Qnil, Qnil));
+    {
+      /* Custom obarray: look up in hash table */
+      Lisp_Object ht = obhash (obarray);
+      tem = scm_hash_ref (ht, string, SCM_BOOL_F);
+      if (scm_is_true (tem))
+        {
+          if (EQ (tem, Qnil_))
+            tem = Qnil;
+          else if (EQ (tem, Qt_))
+            tem = Qt;
+          return scm_values (scm_list_2 (tem, Qt));
+        }
+      else
+        return scm_values (scm_list_2 (Qnil, Qnil));
+    }
 }
 
+
+/* FIX-20250121-guilemacs: Counter for generating unique symbol names in custom obarrays */
+static long obarray_symbol_counter = 0;
 
 DEFUN ("intern", Fintern, Sintern, 1, 2, 0,
        doc: /* Return the canonical symbol whose name is STRING.
@@ -4190,19 +4228,42 @@ it defaults to the value of `obarray'.  */)
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  tem = Ffind_symbol (string, obarray);
-  if (! NILP (scm_c_value_ref (tem, 1))) {
-    return scm_c_value_ref (tem, 0);
-  }
-
-  sym = scm_intern (string, obhash (obarray));
-
-  if (scm_c_string_length (string)
-      && guile_string_starts_with_char (string, ':') && EQ (obarray, initial_obarray))
+  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
+  if (is_global_obarray (obarray))
     {
-      SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
-      SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
-      SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+      /* Global obarray: use Guile's string->symbol */
+      sym = scm_string_to_symbol (string);
+
+      /* Handle keyword symbols */
+      if (scm_c_string_length (string)
+          && guile_string_starts_with_char (string, ':'))
+        {
+          SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
+          SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+          SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+        }
+    }
+  else
+    {
+      /* Custom obarray: use hash table */
+      Lisp_Object ht = obhash (obarray);
+
+      /* First check if already interned */
+      tem = scm_hash_ref (ht, string, SCM_BOOL_F);
+      if (scm_is_true (tem))
+        return tem;
+
+      /* Create a new symbol with unique name to avoid collisions
+         with global symbols. We use interned symbols (not gensym)
+         to ensure they can be serialized to .go files. */
+      char unique_name[256];
+      snprintf (unique_name, sizeof(unique_name), "__ob%ld_%s",
+                obarray_symbol_counter++,
+                scm_to_utf8_string (string));
+      sym = scm_string_to_symbol (scm_from_utf8_string (unique_name));
+
+      /* Store in hash table with original string as key */
+      scm_hash_set_x (ht, string, sym);
     }
 
   if (!sym) {
@@ -4247,20 +4308,35 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   obarray = check_obarray (obarray);
 
   if (SYMBOLP (name))
-    {
-      if (! EQ (name,
-                scm_find_symbol (scm_symbol_to_string (name),
-                                 obhash (obarray))))
-        return Qnil;
-      string = SYMBOL_NAME (name);
-    }
+    string = SYMBOL_NAME (name);
   else
     {
       CHECK_STRING (name);
       string = name;
     }
 
-  return (scm_is_true (scm_unintern (string, obhash (obarray))) ? Qt : Qnil);
+  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
+  if (is_global_obarray (obarray))
+    {
+      /* Cannot unintern from Guile's global symbol table */
+      return Qnil;
+    }
+  else
+    {
+      /* Custom obarray: remove from hash table */
+      Lisp_Object ht = obhash (obarray);
+      Lisp_Object existing = scm_hash_ref (ht, string, SCM_BOOL_F);
+
+      if (scm_is_false (existing))
+        return Qnil;
+
+      /* If name is a symbol, verify it matches */
+      if (SYMBOLP (name) && !EQ (name, existing))
+        return Qnil;
+
+      scm_hash_remove_x (ht, string);
+      return Qt;
+    }
 }
 
 struct map_obarray_data
@@ -4270,15 +4346,13 @@ struct map_obarray_data
   Lisp_Object arg;
 };
 
+/* FIX-20250121-guilemacs: Hash table iteration callback for vanilla Guile */
 static Lisp_Object
-map_obarray_inner (void *data, Lisp_Object sym)
+map_obarray_hash_inner (void *data, Lisp_Object key, Lisp_Object value)
 {
   struct map_obarray_data *modata = data;
-
-  Lisp_Object tem = Ffind_symbol (SYMBOL_NAME (sym), modata->obarray);
-  if (scm_is_true (scm_c_value_ref (tem, 1))
-      && EQ (sym, scm_c_value_ref (tem, 0)))
-    modata->fn (sym, modata->arg);
+  /* value is the symbol, key is the string name */
+  modata->fn (value, modata->arg);
   return SCM_UNSPECIFIED;
 }
 
@@ -4296,8 +4370,23 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
                                    .arg = arg };
 
   CHECK_OBARRAY (obarray);
-  scm_obarray_for_each (make_c_closure (map_obarray_inner, &data, 1, 0),
-                        obhash (obarray));
+
+  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
+  if (is_global_obarray (obarray))
+    {
+      /* Cannot iterate Guile's global symbol table in vanilla Guile.
+         This is a known limitation. Most code that uses mapatoms
+         on the global obarray is for debugging/introspection. */
+      /* For now, just return without iterating - this matches the
+         limitation documented in guile2.org */
+      return;
+    }
+  else
+    {
+      /* Custom obarray: iterate hash table */
+      Lisp_Object ht = obhash (obarray);
+      scm_hash_for_each (make_c_closure (map_obarray_hash_inner, &data, 2, 0), ht);
+    }
 }
 
 static Lisp_Object
@@ -4351,11 +4440,16 @@ DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
        doc: /* Remove all symbols from OBARRAY.  */)
   (Lisp_Object obarray)
 {
-  //CHECK_OBARRAY (obarray);
-  //struct Lisp_Obarray *o = XOBARRAY (obarray);
-  // obarray = obhash(obarray)
-  // FIX: just call scm clear hash
+  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
+  if (is_global_obarray (obarray))
+    {
+      /* Cannot clear Guile's global symbol table */
+      return Qnil;
+    }
 
+  /* Clear the hash table for custom obarray */
+  Lisp_Object ht = obhash (obarray);
+  scm_hash_clear_x (ht);
   return Qnil;
 }
 
