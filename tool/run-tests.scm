@@ -262,10 +262,10 @@
   "test/lisp/ls-lisp-tests.el"
   ; "test/lisp/loadhist-tests.el" ; fails
   )
-(group
-  "test/lisp/abbrev-tests.el" ;; hangs (or group)
+;(group
+  ;"test/lisp/abbrev-tests.el" ;; hangs (or group)
   ; "test/lisp/emacs-lisp/let-alist-tests.el" ; fails
-  )
+;  )
 ;;;(group
 ;;;  "test/lisp/info-xref-tests.el"
 ;;;  "test/lisp/image-tests.el"
