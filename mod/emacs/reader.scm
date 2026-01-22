@@ -925,11 +925,11 @@ Returns the parsed object with proper Elisp semantics."
 
            ;; Special Elisp symbols - use canonical values
            ((string=? sym-str "nil")
-            ;; Return canonical Elisp nil
-            (elisp-nil))
+            ;; Return canonical Elisp nil (#nil in Guile)
+            #nil)
            ((string=? sym-str "t")
-            ;; Return canonical Elisp t
-            (elisp-t))
+            ;; Return canonical Elisp t (#t in Guile)
+            #t)
            ((string=? sym-str "and")
             ;; Map to canonical interned symbol
             ((symbol-function 'intern) "and" #nil))
