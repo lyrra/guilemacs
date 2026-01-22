@@ -4060,10 +4060,83 @@ intern_driver (Lisp_Object string, Lisp_Object obarray)
 
 static Lisp_Object initial_obarray;
 
-/* FIX-20250121-guilemacs: Vanilla Guile compatibility
-   Instead of using modified Guile's scm_make_obarray (weak-set based),
-   we use standard Guile hash tables for custom obarrays.
-   The global obarray is special-cased to use string->symbol directly. */
+/* Scheme obarray module integration.
+   After bootstrap, we delegate to (emacs obarray) for all obarray operations.
+   This provides a single source of truth for symbol tracking. */
+
+static bool obarray_scheme_ready = false;
+static SCM obarray_intern_fn = SCM_BOOL_F;
+static SCM obarray_find_symbol_fn = SCM_BOOL_F;
+static SCM obarray_mapatoms_fn = SCM_BOOL_F;
+static SCM obarray_register_fn = SCM_BOOL_F;
+static SCM obarray_unintern_fn = SCM_BOOL_F;
+static SCM obarray_clear_fn = SCM_BOOL_F;
+
+/* Callback to migrate bootstrap symbols to Scheme */
+static Lisp_Object
+migrate_symbol_to_scheme (void *data, Lisp_Object key, Lisp_Object sym)
+{
+  (void)data;
+  /* Register this symbol in Scheme's *global-symbols* */
+  scm_call_2 (obarray_register_fn, key, sym);
+  return SCM_UNSPECIFIED;
+}
+
+/* Initialize Scheme obarray module references.
+   Called once after Scheme is fully loaded. */
+static void
+init_obarray_scheme (void)
+{
+  if (obarray_scheme_ready)
+    return;
+
+  SCM module = scm_c_resolve_module ("emacs obarray");
+  if (scm_is_false (module))
+    return;  /* Module not yet available */
+
+  SCM var;
+
+  var = scm_c_module_lookup (module, "obarray-intern");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_intern_fn = scm_variable_ref (var);
+
+  var = scm_c_module_lookup (module, "obarray-find-symbol");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_find_symbol_fn = scm_variable_ref (var);
+
+  var = scm_c_module_lookup (module, "obarray-mapatoms");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_mapatoms_fn = scm_variable_ref (var);
+
+  var = scm_c_module_lookup (module, "register-symbol!");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_register_fn = scm_variable_ref (var);
+
+  var = scm_c_module_lookup (module, "obarray-unintern");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_unintern_fn = scm_variable_ref (var);
+
+  var = scm_c_module_lookup (module, "obarray-clear");
+  if (scm_is_true (var) && scm_variable_bound_p (var))
+    obarray_clear_fn = scm_variable_ref (var);
+
+  /* All functions must be available */
+  if (scm_is_true (obarray_intern_fn) &&
+      scm_is_true (obarray_find_symbol_fn) &&
+      scm_is_true (obarray_mapatoms_fn) &&
+      scm_is_true (obarray_register_fn) &&
+      scm_is_true (obarray_unintern_fn) &&
+      scm_is_true (obarray_clear_fn))
+    {
+      obarray_scheme_ready = true;
+
+      /* Migrate bootstrap symbols from C hash table to Scheme.
+         This ensures symbols created before Scheme was ready
+         are visible to mapatoms. */
+      Lisp_Object ht = obhash (initial_obarray);
+      scm_hash_for_each (make_c_closure (migrate_symbol_to_scheme, NULL, 2, 0), ht);
+    }
+}
 
 static bool
 is_global_obarray (Lisp_Object obarray)
@@ -4190,26 +4263,29 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
      (Lisp_Object string, Lisp_Object obarray)
 {
   Lisp_Object tem;
+  bool is_global;
 
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  /* unwrap emacs-string wrappers before passing to Guile */
+  /* Unwrap emacs-string wrappers before passing to Guile */
   Lisp_Object raw_string = unwrap_emacs_string (string);
+  is_global = is_global_obarray (obarray);
 
-  /* Vanilla Guile compatibility */
-  if (is_global_obarray (obarray))
+  /* Try to use Scheme module if ready */
+  init_obarray_scheme ();
+  if (obarray_scheme_ready)
     {
-      /* Global obarray: string->symbol always succeeds in Guile.
+      /* Delegate to Scheme: (obarray-find-symbol string obarray-or-nil)
+         Returns multiple values: (symbol found?) */
+      Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
+      return scm_call_2 (obarray_find_symbol_fn, raw_string, ob_arg);
+    }
 
-         NOTE: This means intern-soft always returns a symbol for the global
-         obarray, which differs from standard Emacs behavior. Code that relies
-         on intern-soft returning nil for non-existent symbols (like checking
-         if a face exists) may need adjustment.
-
-         A proper fix would require tracking which symbols have been "used"
-         (have value/function bindings), but this is complex and can cause
-         issues during startup. For now, we accept this limitation. */
+  /* Bootstrap fallback */
+  if (is_global)
+    {
+      /* Global obarray: string->symbol always succeeds in Guile */
       tem = scm_string_to_symbol (raw_string);
       if (EQ (tem, Qnil_))
         tem = Qnil;
@@ -4236,8 +4312,6 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
 }
 
 
-static long obarray_symbol_counter = 0;
-
 DEFUN ("intern", Fintern, Sintern, 1, 2, 0,
        doc: /* Return the canonical symbol whose name is STRING.
 If there is none, one is created by this function and returned.
@@ -4245,21 +4319,41 @@ A second optional argument specifies the obarray to use;
 it defaults to the value of `obarray'.  */)
   (Lisp_Object string, Lisp_Object obarray)
 {
-  Lisp_Object tem, sym;
+  Lisp_Object sym;
+  bool is_global;
 
   obarray = check_obarray (NILP (obarray) ? Vobarray : obarray);
   CHECK_STRING (string);
 
-  /* unwrap emacs-string wrappers before passing to vanilla Guile */
+  /* Unwrap emacs-string wrappers before passing to Guile */
   Lisp_Object raw_string = unwrap_emacs_string (string);
+  is_global = is_global_obarray (obarray);
 
-  if (is_global_obarray (obarray))
+  /* Try to use Scheme module if ready */
+  init_obarray_scheme ();
+  if (obarray_scheme_ready)
     {
-      /* Special case: "nil" and "t" must return canonical elisp values,
-         not regular Guile symbols. This is critical because:
-         - Guile symbol 'nil is truthy in conditionals
-         - Elisp #nil is falsy (the canonical nil)
-         - (eq (intern "nil") nil) must be true */
+      /* Delegate to Scheme: (obarray-intern string obarray-or-nil) */
+      Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
+      sym = scm_call_2 (obarray_intern_fn, raw_string, ob_arg);
+
+      /* Post-process keywords in C (need access to XSYMBOL macros) */
+      if (SYMBOLP (sym) && is_global
+          && scm_c_string_length (raw_string) > 0
+          && guile_string_starts_with_char (raw_string, ':'))
+        {
+          SET_SYMBOL_TRAPPED (XSYMBOL (sym), SYMBOL_NOWRITE);
+          SET_SYMBOL_REDIRECT (XSYMBOL (sym), SYMBOL_PLAINVAL);
+          SET_SYMBOL_VAL (XSYMBOL (sym), sym);
+        }
+
+      return sym;
+    }
+
+  /* Bootstrap fallback: Scheme not ready yet, use C implementation */
+  if (is_global)
+    {
+      /* Special case: "nil" and "t" must return canonical elisp values */
       size_t len = scm_c_string_length (raw_string);
       if (len == 3)
         {
@@ -4290,9 +4384,7 @@ it defaults to the value of `obarray'.  */)
           SET_SYMBOL_VAL (XSYMBOL (sym), sym);
         }
 
-      /* Add to obarray's hash table for mapatoms support.
-         Use string as key, symbol as value (same format as custom obarrays).
-         Also increment the obarray count for accurate display. */
+      /* Track in C-side hash table (for bootstrap, before Scheme takes over) */
       Lisp_Object ht = obhash (obarray);
       Lisp_Object existing = scm_hash_ref (ht, raw_string, SCM_BOOL_F);
       if (scm_is_false (existing))
@@ -4307,13 +4399,12 @@ it defaults to the value of `obarray'.  */)
       Lisp_Object ht = obhash (obarray);
 
       /* First check if already interned */
-      tem = scm_hash_ref (ht, raw_string, SCM_BOOL_F);
+      Lisp_Object tem = scm_hash_ref (ht, raw_string, SCM_BOOL_F);
       if (scm_is_true (tem))
         return tem;
 
-      /* Create a new symbol with unique name to avoid collisions
-         with global symbols. We use interned symbols (not gensym)
-         to ensure they can be serialized to .go files. */
+      /* Create unique symbol for custom obarray */
+      static long obarray_symbol_counter = 0;
       char unique_name[256];
       snprintf (unique_name, sizeof(unique_name), "__ob%ld_%s",
                 obarray_symbol_counter++,
@@ -4324,9 +4415,6 @@ it defaults to the value of `obarray'.  */)
       scm_hash_set_x (ht, raw_string, sym);
     }
 
-  if (!sym) {
-    printf("ouch! sym is zero\n");
-  }
   return sym;
 }
 
@@ -4360,6 +4448,7 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   (Lisp_Object name, Lisp_Object obarray)
 {
   Lisp_Object string;
+  bool is_global;
 
   if (NILP (obarray))
     obarray = Vobarray;
@@ -4373,8 +4462,20 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
       string = name;
     }
 
-  /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
-  if (is_global_obarray (obarray))
+  Lisp_Object raw_string = unwrap_emacs_string (string);
+  is_global = is_global_obarray (obarray);
+
+  /* Try to use Scheme module if ready */
+  init_obarray_scheme ();
+  if (obarray_scheme_ready)
+    {
+      Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
+      Lisp_Object result = scm_call_2 (obarray_unintern_fn, raw_string, ob_arg);
+      return scm_is_true (result) ? Qt : Qnil;
+    }
+
+  /* Bootstrap fallback */
+  if (is_global)
     {
       /* Cannot unintern from Guile's global symbol table */
       return Qnil;
@@ -4383,7 +4484,7 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
     {
       /* Custom obarray: remove from hash table */
       Lisp_Object ht = obhash (obarray);
-      Lisp_Object existing = scm_hash_ref (ht, string, SCM_BOOL_F);
+      Lisp_Object existing = scm_hash_ref (ht, raw_string, SCM_BOOL_F);
 
       if (scm_is_false (existing))
         return Qnil;
@@ -4392,7 +4493,7 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
       if (SYMBOLP (name) && !EQ (name, existing))
         return Qnil;
 
-      scm_hash_remove_x (ht, string);
+      scm_hash_remove_x (ht, raw_string);
       return Qt;
     }
 }
@@ -4420,7 +4521,7 @@ allocate_obarray (void)
   return ALLOCATE_PLAIN_PSEUDOVECTOR (struct Lisp_Obarray, PVEC_OBARRAY);
 }
 
-/* callback for for-each-elisp-symbol iteration */
+/* Callback for Scheme obarray iteration */
 static Lisp_Object
 map_obarray_scheme_callback (void *data_ptr, Lisp_Object sym)
 {
@@ -4435,22 +4536,31 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
   struct map_obarray_data data = { .obarray = obarray,
                                    .fn = fn,
                                    .arg = arg };
+  bool is_global;
 
   CHECK_OBARRAY (obarray);
+  is_global = is_global_obarray (obarray);
 
-  /* Vanilla Guile compatibility.
-     Both global and custom obarrays use the same hash table format
-     (string key, symbol value) accessible via obhash(). */
+  /* Try to use Scheme module if ready */
+  init_obarray_scheme ();
+  if (obarray_scheme_ready)
+    {
+      /* Delegate to Scheme: (obarray-mapatoms proc obarray-or-nil)
+         The Scheme side uses *global-symbols* as single source of truth. */
+      Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
+      Lisp_Object callback = make_c_closure (map_obarray_scheme_callback, &data, 1, 0);
+      scm_call_2 (obarray_mapatoms_fn, callback, ob_arg);
+      return;
+    }
+
+  /* Bootstrap fallback: use C-side hash tables */
   Lisp_Object ht = obhash (obarray);
   scm_hash_for_each (make_c_closure (map_obarray_hash_inner, &data, 2, 0), ht);
 
-  /* For the global obarray, also iterate symbols
-     from the Scheme-side runtime modules (value-slot-module, function-slot-module,
-     plist-slot-module). These contain symbols that were created by Guile's reader
-     during file loading and never went through Fintern. */
-  if (is_global_obarray (obarray))
+  /* For the global obarray during bootstrap, also iterate symbols
+     from the Scheme-side runtime modules. */
+  if (is_global)
     {
-      /* Call (for-each-elisp-symbol proc) from (emacs-elisp runtime) module */
       Lisp_Object runtime_module = scm_c_resolve_module ("emacs-elisp runtime");
       Lisp_Object for_each_sym = scm_c_module_lookup (runtime_module,
                                                       "for-each-elisp-symbol");
@@ -4515,7 +4625,19 @@ DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
        doc: /* Remove all symbols from OBARRAY.  */)
   (Lisp_Object obarray)
 {
-  if (is_global_obarray (obarray))
+  bool is_global = is_global_obarray (obarray);
+
+  /* Try to use Scheme module if ready */
+  init_obarray_scheme ();
+  if (obarray_scheme_ready)
+    {
+      Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
+      scm_call_1 (obarray_clear_fn, ob_arg);
+      return Qnil;
+    }
+
+  /* Bootstrap fallback */
+  if (is_global)
     {
       /* Cannot clear Guile's global symbol table */
       return Qnil;
