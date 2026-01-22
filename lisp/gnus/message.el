@@ -1757,24 +1757,23 @@ number of levels specified in the faces `message-cited-text-*'."
        ("<#/?\\(?:multipart\\|part\\|external\\|mml\\|secure\\)[^>]*>"
 	0 'message-mml)))
    ;; Additional font locks to highlight different levels of cited text
-   (let ((maxlevel 1)
-         (level 1)
-         cited-text-face
-         keywords)
+   (let (keywords)
      ;; Compute the max level.
-     (while (setq cited-text-face
-                  (intern-soft (format "message-cited-text-%d" maxlevel)))
-       (setq maxlevel (1+ maxlevel)))
-     (setq maxlevel (1- maxlevel))
+     ;(while (setq cited-text-face
+     ;             (intern-soft (format "message-cited-text-%d" maxlevel)))
+     ;  (setq maxlevel (1+ maxlevel)))
+     ;(setq maxlevel (1- maxlevel))
      ;; Generate the keywords.
-     (while (setq cited-text-face
-                  (intern-soft (format "message-cited-text-%d" level)))
+     (dolist (cited-text-face
+              (list (list 1 (intern-soft "message-cited-text-1"))
+                    (list 2 (intern-soft "message-cited-text-2"))
+                    (list 3 (intern-soft "message-cited-text-3"))
+                    (list 4 (intern-soft "message-cited-text-4"))))
        (setq keywords
              (cons
-              `(,(message-font-lock-make-cited-text-matcher level maxlevel)
-                (0 ',cited-text-face))
-              keywords))
-       (setq level (1+ level)))
+              `(,(message-font-lock-make-cited-text-matcher (car cited-text-face) 4)
+                (0 ',(cadr cited-text-face)))
+              keywords)))
      keywords)
    ;; Match signature.  This `field' stuff ensures that hitting `RET'
    ;; after the signature separator doesn't remove the trailing space.

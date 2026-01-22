@@ -224,4 +224,23 @@
   (test-assert "intern/fset-makes-fbound"
                (fboundp sym)))
 
+;;; ============================================================
+;;; Known limitations in vanilla Guile
+;;; ============================================================
+
+;; In vanilla Guile, intern-soft always returns a symbol for the global
+;; obarray because scm_string_to_symbol always succeeds. This differs
+;; from standard Emacs where intern-soft returns nil for non-existent symbols.
+;; Code that relies on this behavior (like checking if a face exists by
+;; testing if its symbol is interned) will not work correctly.
+;;
+;; Example of affected pattern (from gnus/message.el):
+;;   (while (setq face (intern-soft (format "message-cited-text-%d" level)))
+;;     ...)  ; loops forever because intern-soft never returns nil
+
+;; Mark this as expected failure (known limitation)
+(test-expect-fail 1)
+(test-nil "intern-soft/nonexistent-global-returns-nil"
+          (intern-soft "definitely-nonexistent-symbol-xyz987654"))
+
 (test-end)

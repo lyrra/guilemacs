@@ -4200,7 +4200,16 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
   /* Vanilla Guile compatibility */
   if (is_global_obarray (obarray))
     {
-      /* Global obarray: string->symbol always succeeds in Guile */
+      /* Global obarray: string->symbol always succeeds in Guile.
+
+         NOTE: This means intern-soft always returns a symbol for the global
+         obarray, which differs from standard Emacs behavior. Code that relies
+         on intern-soft returning nil for non-existent symbols (like checking
+         if a face exists) may need adjustment.
+
+         A proper fix would require tracking which symbols have been "used"
+         (have value/function bindings), but this is complex and can cause
+         issues during startup. For now, we accept this limitation. */
       tem = scm_string_to_symbol (raw_string);
       if (EQ (tem, Qnil_))
         tem = Qnil;
