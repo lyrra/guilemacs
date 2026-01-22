@@ -4231,6 +4231,27 @@ it defaults to the value of `obarray'.  */)
   /* FIX-20250121-guilemacs: Vanilla Guile compatibility */
   if (is_global_obarray (obarray))
     {
+      /* Special case: "nil" and "t" must return canonical elisp values,
+         not regular Guile symbols. This is critical because:
+         - Guile symbol 'nil is truthy in conditionals
+         - Elisp #nil is falsy (the canonical nil)
+         - (eq (intern "nil") nil) must be true */
+      size_t len = scm_c_string_length (string);
+      if (len == 3)
+        {
+          char buf[4];
+          scm_to_locale_stringbuf (string, buf, 4);
+          buf[3] = '\0';
+          if (strcmp (buf, "nil") == 0)
+            return Qnil;
+        }
+      else if (len == 1)
+        {
+          char c = scm_c_string_ref (string, 0);
+          if (c == 't')
+            return Qt;
+        }
+
       /* Global obarray: use Guile's string->symbol */
       sym = scm_string_to_symbol (string);
 

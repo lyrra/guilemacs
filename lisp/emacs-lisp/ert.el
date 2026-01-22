@@ -129,6 +129,13 @@ mode.")
   (tags '())
   (file-name nil))
 
+;; Guilemacs: Registry of all test symbols.
+;; This is needed because mapatoms cannot enumerate the global obarray
+;; when running on vanilla Guile (see guile2.org).
+(defvar ert--test-symbol-registry nil
+  "List of all symbols that have been registered as ERT tests.
+This registry is maintained by `ert-set-test' and `ert-make-test-unbound'.")
+
 (defun ert-test-boundp (symbol)
   "Return non-nil if SYMBOL names a test."
   (and (get symbol 'ert--test) t))
@@ -154,12 +161,28 @@ mode.")
     ;; be ignored silently otherwise.
     (error "Test `%s' redefined (or loaded twice)" symbol))
   (define-symbol-prop symbol 'ert--test definition)
+  ;; Guilemacs: Add to registry for test discovery (see guile2.org)
+  (unless (memq symbol ert--test-symbol-registry)
+    (push symbol ert--test-symbol-registry))
   definition)
 
 (defun ert-make-test-unbound (symbol)
   "Make SYMBOL name no test.  Return SYMBOL."
   (cl-remprop symbol 'ert--test)
+  ;; Guilemacs: Remove from registry (see guile2.org)
+  (setq ert--test-symbol-registry (delq symbol ert--test-symbol-registry))
   symbol)
+
+(defun ert--find-tests-matching (regexp)
+  "Return list of test symbols whose names match REGEXP.
+This uses `ert--test-symbol-registry' instead of `apropos-internal'
+because mapatoms cannot enumerate the global obarray on vanilla Guile."
+  (let (result)
+    (dolist (sym ert--test-symbol-registry)
+      (when (and (ert-test-boundp sym)
+                 (string-match regexp (symbol-name sym)))
+        (push sym result)))
+    (sort result #'string-lessp)))
 
 (defun ert--parse-keys-and-body (keys-and-body)
   "Split KEYS-AND-BODY into keyword-and-value pairs and the remaining body.
@@ -995,7 +1018,9 @@ contained in UNIVERSE."
     ((pred stringp)
      (pcase-exhaustive universe
        (`t (mapcar #'ert-get-test
-                   (apropos-internal selector #'ert-test-boundp)))
+                   ;; Guilemacs: Use registry instead of apropos-internal
+                   ;; because mapatoms cannot enumerate global obarray
+                   (ert--find-tests-matching selector)))
        ((pred listp)
         (cl-remove-if-not (lambda (test)
                             (and (ert-test-name test)
