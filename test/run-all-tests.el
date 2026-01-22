@@ -13,6 +13,15 @@
 
 (message "")
 (message "========================================")
+(message "INTERN/OBARRAY/MAPATOMS TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/obarray/test-intern-obarray.el")
+(message "")
+
+(message "")
+(message "========================================")
 (message "STRINGS TEST SUITE")
 (message "========================================")
 (message "")

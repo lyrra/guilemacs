@@ -55,7 +55,8 @@
             intern-gensym
             %lisp-string
             lisp-string?
-            elisp-load-with-match-data-protection)
+            elisp-load-with-match-data-protection
+            for-each-elisp-symbol)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -87,6 +88,25 @@
 
 (define nil_ 'nil)
 (define t_ 't)
+
+;; Guilemacs: Iterate over all known elisp symbols for mapatoms support.
+;; This is needed because we cannot enumerate Guile's global symbol table
+;; directly. We collect symbols from all three slot modules.
+(define (for-each-elisp-symbol proc)
+  "Call PROC on each known elisp symbol.
+This iterates over all symbols that have been registered in the
+value-slot-module, function-slot-module, or plist-slot-module."
+  (let ((seen (make-hash-table)))
+    ;; Helper to call proc only once per symbol
+    (define (visit name var)
+      (let ((sym (string->symbol (symbol->string name))))
+        (unless (hashq-ref seen sym)
+          (hashq-set! seen sym #t)
+          (proc sym))))
+    ;; Iterate all three modules
+    (module-for-each visit value-slot-module)
+    (module-for-each visit function-slot-module)
+    (module-for-each visit plist-slot-module)))
 
 ;;; Routines for access to elisp dynamically bound symbols.  This is
 ;;; used for runtime access using functions like symbol-value or set,
