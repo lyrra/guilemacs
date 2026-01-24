@@ -4166,31 +4166,13 @@ static Lisp_Object make_obarray (unsigned bits);
 Lisp_Object
 check_obarray_slow (Lisp_Object obarray)
 {
-  /* For compatibility, we accept vectors whose first element is 0,
-     and store an obarray object there.  */
+  /* For Guile-based obarrays, we accept vectors (old-style) and
+     actual obarray objects. The obarray is used as a hash-key to
+     look up the real hash table stored in Guile. */
   if ((PLAIN_VECTORP (obarray)) && ASIZE (obarray) > 0)
-    {
-      //FIX: obsolete old-style obarrays
-      return obarray;
-      Lisp_Object obj = AREF (obarray, 0);
-      if (OBARRAYP (obj))
-	return obj;
-      if (BASE_EQ (obj, make_fixnum (0)))
-	{
-	  /* Put an actual obarray object in the first slot.
-	     The rest of the vector remains unused.  */
-	  obj = make_obarray (0);
-	  ASET (obarray, 0, obj);
-	  return obj;
-	}
-    }
-  // we really dont care about obarray, because it is only used as a hash-key
-  // to the real obarray that lies in guile
-  return obarray;
-  /* Reset Vobarray to the standard obarray for nicer error handling. */
-  if (BASE_EQ (Vobarray, obarray)) Vobarray = initial_obarray;
+    return obarray;
 
-  wrong_type_argument (Qobarrayp, obarray);
+  return obarray;
 }
 
 /* Intern the C string STR: return a symbol with that name,
@@ -4210,9 +4192,7 @@ Lisp_Object
 intern_c_string_1 (const char *str, ptrdiff_t len)
 {
   Lisp_Object s = make_pure_c_string (str, len);
-  if (!s) printf("WARNING, zero string\n");
   return Fintern (s, initial_obarray);
-  //return Fintern (make_pure_c_string (str, len), initial_obarray);
 }
 
 /* Intern STR of NBYTES bytes and NCHARS characters in the default obarray.  */
@@ -4252,9 +4232,6 @@ intern_initial_c_string (const char *cstr)
       XOBARRAY (initial_obarray)->count++;
     }
 
-  if (!sym) {
-    printf("ouch! sym is zero\n");
-  }
   return sym;
 }
 
@@ -4654,7 +4631,8 @@ DEFUN ("internal--obarray-buckets",
        doc: /* Symbols in each bucket of OBARRAY.  Internal use only.  */)
     (Lisp_Object obarray)
 {
-  emacs_abort ();
+  /* Not implemented for Guile-based obarrays - return empty list */
+  return Qnil;
 }
 
 void
@@ -4683,9 +4661,6 @@ init_obarray_once (void)
 
   lispsym[iQnil].u.s.self_ = SCM_ELISP_NIL;
   lispsym[iQt].u.s.self_ = SCM_BOOL_T;
-
-  fprintf(stderr, "DEBUG: Qnil = %p, Qt = %p\n", (void*)Qnil, (void*)Qt);
-  fprintf(stderr, "DEBUG: SCM_ELISP_NIL = %p, SCM_BOOL_T = %p\n", (void*)SCM_ELISP_NIL, (void*)SCM_BOOL_T);
 
   //Qnil_ = intern_c_string ("nil");
   //define_symbol (Qnil_, "nil");
