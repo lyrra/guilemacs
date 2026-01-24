@@ -327,6 +327,6 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
               (float ,elisp-float)
               (number-to-string ,elisp-number-to-string)
               (random ,elisp-random)
-              (number-or-marker-p ,elisp-number-or-marker-p)
+              ;(number-or-marker-p ,elisp-number-or-marker-p)
 
               )))

@@ -574,19 +574,6 @@ DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
     return Qnil;
 }
 
-/* MIGRATED TO GUILE: numberp
-   This function has been moved to prelude/load.scm as elisp-numberp. */
-DEFUN ("numberp", Fnumberp, Snumberp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a number (floating point or integer).  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (NUMBERP (object))
-    return Qt;
-  else
-    return Qnil;
-}
-
 /* MIGRATED TO GUILE: number-or-marker-p
    This function has been moved to prelude/load.scm as elisp-number-or-marker-p. */
 DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
@@ -599,52 +586,6 @@ DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: floatp
-   This function has been moved to prelude/load.scm as elisp-floatp. */
-DEFUN ("floatp", Ffloatp, Sfloatp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a floating point number.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (FLOATP (object))
-    return Qt;
-  return Qnil;
-}
-
-/* MIGRATED TO GUILE: threadp
-   This function has been moved to prelude/load.scm as elisp-threadp. */
-DEFUN ("threadp", Fthreadp, Sthreadp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a thread.  */)
-  (Lisp_Object object)
-{
-  if (THREADP (object))
-    return Qt;
-  return Qnil;
-}
-
-/* MIGRATED TO GUILE: mutexp
-   This function has been moved to prelude/load.scm as elisp-mutexp. */
-DEFUN ("mutexp", Fmutexp, Smutexp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a mutex.  */)
-  (Lisp_Object object)
-{
-  if (MUTEXP (object))
-    return Qt;
-  return Qnil;
-}
-
-/* MIGRATED TO GUILE: condition-variable-p
-   This function has been moved to prelude/load.scm as elisp-condition-variable-p. */
-DEFUN ("condition-variable-p", Fcondition_variable_p, Scondition_variable_p,
-       1, 1, 0,
-       doc: /* Return t if OBJECT is a condition variable.  */)
-  (Lisp_Object object)
-{
-  if (CONDVARP (object))
-    return Qt;
-  return Qnil;
-}
-
 /* Extract and set components of lists.  */
 
 /* MIGRATED TO GUILE: car
