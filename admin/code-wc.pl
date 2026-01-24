@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-my @tmp = `find prelude src lib-src lwlib lisp | grep -e '\\.c\$' -e '\\.h\$' -e '\\.el\$' -e '\\.scm\$'`;
+my @tmp = `find prelude mod src lib-src lwlib lisp | grep -e '\\.c\$' -e '\\.h\$' -e '\\.el\$' -e '\\.scm\$'`;
 
 my $elcnt = 0;
 my $chcnt = 0;

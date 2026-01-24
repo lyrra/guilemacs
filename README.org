@@ -2,16 +2,27 @@
 
 If you're looking for guile-emacs, check out the repository at
  https://codeberg.org/guile-emacs/guile-emacs/.
-This is an experimental and exploratory branch of guile-emacs.
+This is an experimental and exploratory branch of guile-emacs, that breaks with
+emacs compatibility.
 
 *Work in progress.* Dont try this yet! This will not produce a functioning Emacs.
- Please note that this project still has alot of lose ends to tie, ie alpha stage,
- and will therefore not produce a fully functional Emacs at this stage.
+ Please note that this project has a moving goal, so alot of stuff will not work at times.
 
- Proceed with caution and only if you're comfortable with experimental software.
+ Proceed with caution and dont use it for important stuff.
 
  This branch of guile-emacs tries to explore a few of the vast plethora of features
  that are possible when the underlying elisp engine is driven by guile.
+
+* News
+
+- guilemacs runs on vanilla guile (brings its own copy of language/elisp)
+- guile can compile elisp files. This is enabled because:
+- all strings are now guile-strings (no more elisp strings)
+- text-properties are hoisted to its own structure (not as a feature of strings)
+- guilemacs is utf-8 only
+- elisp reader is moved to scheme
+- alot of bootstrap unentangling (pcase, gv, cl-struct, oclosure)
+- vectors are moved to scheme
 
 * Getting Started
 
@@ -148,6 +159,11 @@ The problem with this is that elisp isn't compatible with scheme, and so the
 scheme reader will error.
 
 The final test result report will reflect any of these issues.
+
+There is also a second test framework that has a simpler layout, it can be run by:
+#+BEGIN_SRC
+test/summarize-results.sh
+#+END_SRC
 
 ** run tests for C defined elisp functions
 
