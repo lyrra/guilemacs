@@ -26,6 +26,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <intprops.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "guile_fns.h"
 #include "puresize.h"
 #include "character.h"
@@ -586,19 +587,11 @@ DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
   return Qnil;
 }
 
-/* Extract and set components of lists.  */
-
-/* MIGRATED TO GUILE: car
-   This function has been moved to prelude/load.scm as elisp-car. */
-DEFUN ("car", Fcar, Scar, 1, 1, 0,
-       doc: /* Return the car of LIST.  If LIST is nil, return nil.
-Error if LIST is not nil and not a cons cell.  See also `car-safe'.
-
-See Info node `(elisp)Cons Cells' for a discussion of related basic
-Lisp concepts such as car, cdr, cons cell and list.  */)
-  (register Lisp_Object list)
+
+Lisp_Object
+Fcar (Lisp_Object list)
 {
-  return CAR (list);
+  return GUILECALL1(car, list);
 }
 
 /* MIGRATED TO GUILE: car-safe
@@ -610,17 +603,10 @@ DEFUN ("car-safe", Fcar_safe, Scar_safe, 1, 1, 0,
   return CAR_SAFE (object);
 }
 
-/* MIGRATED TO GUILE: cdr
-   This function has been moved to prelude/load.scm as elisp-cdr. */
-DEFUN ("cdr", Fcdr, Scdr, 1, 1, 0,
-       doc: /* Return the cdr of LIST.  If LIST is nil, return nil.
-Error if LIST is not nil and not a cons cell.  See also `cdr-safe'.
-
-See Info node `(elisp)Cons Cells' for a discussion of related basic
-Lisp concepts such as cdr, car, cons cell and list.  */)
-  (register Lisp_Object list)
+Lisp_Object
+Fcdr (Lisp_Object list)
 {
-  return CDR (list);
+  return GUILECALL1(cdr, list);
 }
 
 /* MIGRATED TO GUILE: cdr-safe

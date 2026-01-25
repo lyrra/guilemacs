@@ -19,6 +19,9 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <config.h>
 #include "lisp.h"
+#include "guile.h"
+
+struct elisp_functions_ptr elisp_functions_ptr;
 
 scm_t_bits c_closure_tag;
 
@@ -85,8 +88,18 @@ apply_c_closure (SCM c_closure, SCM args)
 }
 
 void
+init_elisp_functions (void)
+{
+  SCM emacs_types = scm_c_resolve_module ("emacs types");
+
+  elisp_functions_ptr.f_car = scm_c_module_lookup (emacs_types, "elisp-car");
+  elisp_functions_ptr.f_cdr = scm_c_module_lookup (emacs_types, "elisp-cdr");
+}
+
+void
 init_guile (void)
 {
+  init_elisp_functions();
   c_closure_tag = scm_make_smob_type ("c-closure", 0);
   scm_set_smob_apply (c_closure_tag, apply_c_closure, 0, 0, 1);
 }

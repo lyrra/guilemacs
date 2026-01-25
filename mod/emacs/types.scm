@@ -192,18 +192,20 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
   "Create a new cons, give it CAR and CDR as components, and return it."
   (cons car cdr))
 
+;; info: (elisp) Cons Cells
 (define (elisp-car list)
   "Return the car of LIST. If LIST is nil, return nil.
-Error if LIST is not nil and not a cons cell. See also `car-safe'."
+   Error if LIST is not nil and not a cons cell. See also `car-safe'."
   (cond
     ((null? list) #nil)
     ((eq? list #nil) #nil)
     ((pair? list) (car list))
     (else (error "Wrong type argument: listp" list))))
 
+;; info: (elisp) Cons Cells
 (define (elisp-cdr list)
   "Return the cdr of LIST. If LIST is nil, return nil.
-Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
+   Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
   (cond
     ((null? list) #nil)
     ((eq? list #nil) #nil)
