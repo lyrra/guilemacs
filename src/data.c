@@ -556,25 +556,6 @@ DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: natnump
-   This function has been moved to prelude/load.scm as elisp-natnump. */
-DEFUN ("natnump", Fnatnump, Snatnump, 1, 1, 0,
-       doc: /* Return t if OBJECT is a nonnegative integer.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (FIXNUMP (object))
-    {
-      return 0 <= XFIXNUM (object) ? Qt : Qnil;
-    }
-  else if (GUILEBIGNUMP (object))
-    {
-      return scm_positive_p (object) ? Qt : Qnil;
-    }
-  else
-    return Qnil;
-}
-
 /* MIGRATED TO GUILE: number-or-marker-p
    This function has been moved to prelude/load.scm as elisp-number-or-marker-p. */
 DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
@@ -587,7 +568,12 @@ DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
   return Qnil;
 }
 
-
+Lisp_Object
+Fnatnump (Lisp_Object object)
+{
+  return call1 (intern ("natnump"), object);
+}
+
 Lisp_Object
 Fcar (Lisp_Object list)
 {

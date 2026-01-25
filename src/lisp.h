@@ -2142,6 +2142,7 @@ extern Lisp_Object Fsymbol_function (Lisp_Object);
 /* List operations - declared here since they're no longer using DEFUN */
 extern Lisp_Object Fcar (Lisp_Object);
 extern Lisp_Object Fcdr (Lisp_Object);
+extern Lisp_Object Fnatnump (Lisp_Object);
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)

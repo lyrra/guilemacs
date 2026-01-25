@@ -74,6 +74,7 @@
   (if (number? object) #t #nil))
 
 (define (elisp-natnump object)
+  ;; object: const
   "Return t if OBJECT is a nonnegative integer."
   (if (and (number? object) (exact? object) (integer? object) (>= object 0))
       #t #nil))
@@ -351,7 +352,7 @@ This is more efficient than string comparison of symbol names."
               (numberp    ,elisp-numberp)
               (integerp   ,elisp-integerp)
               ;; (floatp ,elisp-floatp)
-              ;; (natnump ,elisp-natnump)
+              (natnump ,elisp-natnump)
               ;; (stringp ,elisp-stringp)
               ;; (bool-vector-p ,elisp-bool-vector-p)
               ;; (arrayp ,elisp-arrayp)
