@@ -678,36 +678,6 @@
 (defun throw (tag value)
   (signal (if %catch 'throw 'no-catch) (list tag value)))
 
-;;; I/O
-
-(defun princ (object)
-  (funcall (@ (guile) display) object))
-
-(defun print (object)
-  (funcall (@ (guile) write) object))
-
-(defun prin1 (object)
-  (funcall (@ (guile) write) object))
-
-(defun terpri ()
-  (funcall (@ (guile) newline)))
-
-(defun format* (stream string &rest args)
-  (apply (@ (guile) format) stream string args))
-
-(defun send-string-to-terminal (string)
-  (princ string))
-
-(defun read-from-minibuffer (prompt &rest ignore)
-  (princ prompt)
-  (let ((value (funcall (@ (ice-9 rdelim) read-line))))
-    (if (funcall (@ (guile) eof-object?) value)
-        ""
-      value)))
-
-(defun prin1-to-string (object)
-  (funcall (@ (guile) object->string) object))
-
 ;; Random number generation
 
 (defvar %random-state (funcall (@ (guile) copy-random-state)
