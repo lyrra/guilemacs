@@ -34,6 +34,7 @@
   "test/pre/reader-integers.scm"
   "test/pre/reader-utf8.scm"
   "test/pre/list.scm"
+  "test/pre/predicate-simple.scm"
   "test/pre/natnump.scm"
   "test/pre/integer-or-marker-p.scm"
   "test/pre/fns.scm"

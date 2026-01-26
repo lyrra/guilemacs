@@ -2137,7 +2137,9 @@ extern Lisp_Object Ffboundp (Lisp_Object);
 extern Lisp_Object Fmakunbound (Lisp_Object);
 extern Lisp_Object Ffmakunbound (Lisp_Object);
 extern Lisp_Object Ffset (Lisp_Object, Lisp_Object);
+extern Lisp_Object Flistp (Lisp_Object);
 extern Lisp_Object Fsymbol_function (Lisp_Object);
+extern Lisp_Object Fsymbol (Lisp_Object);
 
 /* List operations - declared here since they're no longer using DEFUN */
 extern Lisp_Object Fcar (Lisp_Object);

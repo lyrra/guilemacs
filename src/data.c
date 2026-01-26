@@ -298,31 +298,6 @@ a fixed set of types.  */)
 
 SLOWWRAP1(Flistp, "listp")
 
-/* MIGRATED TO GUILE: nlistp
-   This function has been moved to prelude/load.scm as elisp-nlistp. */
-DEFUN ("nlistp", Fnlistp, Snlistp, 1, 1, 0,
-       doc: /* Return t if OBJECT is not a list.  Lists include nil.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (CONSP (object) || NILP (object))
-    return Qnil;
-  return Qt;
-}
-
-/* MIGRATED TO GUILE: symbolp
-   This function has been moved to prelude/load.scm as elisp-symbolp.
-   Uses Guile's native symbol? predicate. */
-DEFUN ("symbolp", Fsymbolp, Ssymbolp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a symbol.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (SYMBOLP (object))
-    return Qt;
-  return Qnil;
-}
-
 bool
 SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)
 {

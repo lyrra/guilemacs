@@ -58,7 +58,10 @@
 
 (define (elisp-symbolp object)
   "Return t if OBJECT is a symbol."
-  (if (symbol? object) #t #nil))
+  (if (or (symbol? object)
+          (eq? #t object)
+          (eq? #nil object))
+      #t #nil))
 
 (define (elisp-integerp object)
   "Return t if OBJECT is an integer."

@@ -2,6 +2,9 @@
 ;;; Copyright (C) Free Software Foundation, Inc.
 ;;; SPDX-License-Identifier: GPL-3.0-or-later
 
+; boot.el is loaded (by spec.scm) lazy at first elisp file compile
+; so any scheme module initialization in load.scm takes place earlier
+
 (defmacro @ (module symbol)
   `(guile-ref ,module ,symbol))
 
@@ -200,8 +203,8 @@
   `(when (not ,cond)
      ,@body))
 
-(defun symbolp (object)
-  (%funcall (@ (guile) symbol?) object))
+;(defun symbolp (object)
+; (%funcall (@ (guile) symbol?) object))
 
 (defun %functionp (object)
   (%funcall (@ (guile) procedure?) object))
