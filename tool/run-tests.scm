@@ -36,6 +36,7 @@
   "test/pre/list.scm"
   "test/pre/predicate-simple.scm"
   "test/pre/predicate-comprehensive.scm"
+  "test/pre/stringp.scm"
   "test/pre/natnump.scm"
   "test/pre/integer-or-marker-p.scm"
   "test/pre/fns.scm"
