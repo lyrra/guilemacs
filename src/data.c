@@ -529,22 +529,6 @@ DEFUN ("module-function-p", Fmodule_function_p, Smodule_function_p, 1, 1, NULL,
   return MODULE_FUNCTIONP (object) ? Qt : Qnil;
 }
 
-/* HOISTED TO SCHEME: char-or-string-p
-   This function has been moved to prelude/load.scm as elisp-char-or-string-p.
-   Zero C callers made it a perfect candidate for complete hoisting. */
-
-/* MIGRATED TO GUILE: integerp
-   This function has been moved to prelude/load.scm as elisp-integerp. */
-DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
-       doc: /* Return t if OBJECT is an integer.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (INTEGERP (object))
-    return Qt;
-  return Qnil;
-}
-
 DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer or a marker (editor pointer).  */)
   (register Lisp_Object object)
