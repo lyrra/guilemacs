@@ -114,6 +114,7 @@
 (define %prelude-directory (module-ref (resolve-module '(guile-user)) '%saved-prelude-directory))
 
 ;; Load core emacs functionallity
+(use-modules (emacs boot))
 (use-modules (emacs types))
 (use-modules (emacs numbers))
 (use-modules (emacs strings))
@@ -128,6 +129,8 @@
 (use-modules (emacs symbol-operations))
 (use-modules (emacs character-predicates))
 
+(format (current-error-port) ";; initializing emacs modules~%")
+(init-boot-registrations)
 (init-types-registrations)
 (init-numbers-registrations)
 (init-strings-registrations)
@@ -139,3 +142,5 @@
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
+
+(format (current-error-port) ";; load.scm done~%")

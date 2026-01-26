@@ -5,6 +5,10 @@
 ; boot.el is loaded (by spec.scm) lazy at first elisp file compile
 ; so any scheme module initialization in load.scm takes place earlier
 
+(%funcall (guile-ref (guile) format)
+          (%funcall (guile-ref (guile) current-error-port))
+          ";; load boot.el~%")
+
 (defmacro @ (module symbol)
   `(guile-ref ,module ,symbol))
 
@@ -800,4 +804,6 @@
      (eval-when (:load-toplevel :execute)
        (funcall #'provide ,@(cdr form)))))
 
-(print "--- load boot.el done \n")
+(%funcall (guile-ref (guile) format)
+          (%funcall (guile-ref (guile) current-error-port))
+          ";; load boot.el done~%")

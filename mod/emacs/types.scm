@@ -29,11 +29,6 @@
     elisp-eq
     elisp-eql
     elisp-equal
-    elisp-cons
-    elisp-car
-    elisp-cdr
-    elisp-car-safe
-    elisp-cdr-safe
     elisp-max-char
     elisp-identity
     elisp-char-table-p
@@ -189,42 +184,6 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
   (if (equal? obj1 obj2) #t #nil))
 
 ;;;
-;;; Basic Cons Cell Operations (Foundation)
-;;;
-
-(define (elisp-cons car cdr)
-  "Create a new cons, give it CAR and CDR as components, and return it."
-  (cons car cdr))
-
-;; info: (elisp) Cons Cells
-(define (elisp-car list)
-  "Return the car of LIST. If LIST is nil, return nil.
-   Error if LIST is not nil and not a cons cell. See also `car-safe'."
-  (cond
-    ((null? list) #nil)
-    ((eq? list #nil) #nil)
-    ((pair? list) (car list))
-    (else (error "Wrong type argument: listp" list))))
-
-;; info: (elisp) Cons Cells
-(define (elisp-cdr list)
-  "Return the cdr of LIST. If LIST is nil, return nil.
-   Error if LIST is not nil and not a cons cell. See also `cdr-safe'."
-  (cond
-    ((null? list) #nil)
-    ((eq? list #nil) #nil)
-    ((pair? list) (cdr list))
-    (else (error "Wrong type argument: listp" list))))
-
-(define (elisp-car-safe object)
-  "Return the car of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (car object) #nil))
-
-(define (elisp-cdr-safe object)
-  "Return the cdr of OBJECT if it is a cons cell, or else nil."
-  (if (pair? object) (cdr object) #nil))
-
-;;;
 ;;; Character Operations
 ;;;
 
@@ -367,11 +326,6 @@ This is more efficient than string comparison of symbol names."
               ;; (eq ,elisp-eq)
               ;; (eql ,elisp-eql)
               ;; (equal ,elisp-equal)
-              ;; (cons ,elisp-cons)
-              (car ,elisp-car)
-              (cdr ,elisp-cdr)
-              ;; (car-safe ,elisp-car-safe)
-              ;; (cdr-safe ,elisp-cdr-safe)
               ;; (max-char ,elisp-max-char)
               ;; (identity ,elisp-identity)
               )))
