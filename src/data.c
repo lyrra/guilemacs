@@ -45,6 +45,10 @@ value_cmp_scm (Lisp_Object a, Lisp_Object b);
 
 #define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
 
+#define SLOWWRAP1(cfn, lfn) \
+  Lisp_Object cfn (Lisp_Object a) \
+  { return call1 (intern (lfn), a); }
+
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
 static bool
@@ -292,20 +296,7 @@ a fixed set of types.  */)
     return Qt;
 }
 
-
-
-/* MIGRATED TO GUILE: listp
-   This function has been moved to prelude/load.scm as elisp-listp. */
-DEFUN ("listp", Flistp, Slistp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a list, that is, a cons cell or nil.
-Otherwise, return nil.  */
-       attributes: const)
-  (Lisp_Object object)
-{
-  if (CONSP (object) || NILP (object))
-    return Qt;
-  return Qnil;
-}
+SLOWWRAP1(Flistp, "listp")
 
 /* MIGRATED TO GUILE: nlistp
    This function has been moved to prelude/load.scm as elisp-nlistp. */
