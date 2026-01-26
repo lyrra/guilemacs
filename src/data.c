@@ -545,8 +545,6 @@ DEFUN ("integerp", Fintegerp, Sintegerp, 1, 1, 0,
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: integer-or-marker-p
-   This function has been moved to prelude/load.scm as elisp-integer-or-marker-p. */
 DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is an integer or a marker (editor pointer).  */)
   (register Lisp_Object object)
@@ -556,8 +554,6 @@ DEFUN ("integer-or-marker-p", Finteger_or_marker_p, Sinteger_or_marker_p, 1, 1, 
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: number-or-marker-p
-   This function has been moved to prelude/load.scm as elisp-number-or-marker-p. */
 DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
        Snumber_or_marker_p, 1, 1, 0,
        doc: /* Return t if OBJECT is a number or a marker.  */)

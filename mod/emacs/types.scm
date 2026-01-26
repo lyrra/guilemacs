@@ -275,8 +275,10 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 
 (define (elisp-integer-or-marker-p object)
   "Return t if OBJECT is an integer or a marker."
-  ;; For now, markers are not implemented in Guile, so just check integers
-  (if (integer? object) #t #nil))
+  ;; Check for exact integers (not floats)
+  ;; TODO: Add marker check when markers are implemented in Scheme
+  (if (and (integer? object) (exact? object))
+      #t #nil))
 
 (define (elisp-mutexp object)
   "Return t if OBJECT is a mutex."
@@ -333,7 +335,7 @@ This is more efficient than string comparison of symbol names."
               (boundp                 ,elisp-boundp)
               (condition-variable-p   ,elisp-condition-variable-p)
               (hash-table-p           ,elisp-hash-table-p)
-              (integer-or-marker-p    ,elisp-integer-or-marker-p)
+              ;(integer-or-marker-p    ,elisp-integer-or-marker-p)
               (mutexp                 ,elisp-mutexp)
               (recordp                ,elisp-recordp)
               (symbol-with-pos-p      ,elisp-symbol-with-pos-p)
