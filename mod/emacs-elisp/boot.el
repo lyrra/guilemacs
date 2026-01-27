@@ -330,55 +330,6 @@
                    result))
          spec))
 
-;;; Property lists
-
-(defun %plist-member (plist property test)
-  (cond
-   ((null plist) nil)
-   ((consp plist)
-    (if (funcall test (car plist) property)
-        (cdr plist)
-      (%plist-member (cdr (cdr plist)) property test)))
-   (t (signal 'wrong-type-argument `(listp ,plist)))))
-
-(defun %plist-get (plist property test)
-  (car (%plist-member plist property test)))
-
-(defun %plist-put (plist property value test)
-  (let ((x (%plist-member plist property test)))
-    (if x
-        (progn (setcar x value) plist)
-      (cons property (cons value plist)))))
-
-(defun plist-get (plist property)
-  (%plist-get plist property #'eq))
-
-(defun plist-put (plist property value)
-  (%plist-put plist property value #'eq))
-
-(defun plist-member (plist property)
-  (%plist-member plist property #'eq))
-
-(defun lax-plist-get (plist property)
-  (%plist-get plist property #'equal))
-
-(defun lax-plist-put (plist property value)
-  (%plist-put plist property value #'equal))
-
-(defvar plist-function (funcall (@ (guile) make-object-property)))
-
-(defun symbol-plist (symbol)
-  (funcall plist-function symbol))
-
-(defun setplist (symbol plist)
-  (funcall (funcall (@ (guile) setter) plist-function) symbol plist))
-
-(defun get (symbol propname)
-  (plist-get (symbol-plist symbol) propname))
-
-(defun put (symbol propname value)
-  (setplist symbol (plist-put (symbol-plist symbol) propname value)))
-
 ;;; Nonlocal exits
 
 (defmacro condition-case (var bodyform &rest handlers)
