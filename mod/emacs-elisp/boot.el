@@ -489,18 +489,6 @@
   (funcall (@ (guile) set-cdr!) cell newcdr)
   newcdr)
 
-(defun caar (x)
-  (car (car x)))
-
-(defun cadr (x)
-  (car (cdr x)))
-
-(defun cdar (x)
-  (cdr (car x)))
-
-(defun cddr (x)
-  (cdr (cdr x)))
-
 (defmacro dolist (spec &rest body)
   (apply #'(lambda (var list &optional result)
              (list 'progn

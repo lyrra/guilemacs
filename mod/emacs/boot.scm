@@ -6,6 +6,10 @@
     elisp-cdr
     elisp-car-safe
     elisp-cdr-safe
+    elisp-caar
+    elisp-cadr
+    elisp-cdar
+    elisp-cddr
     init-boot-registrations))
 
 ;;;
@@ -44,6 +48,11 @@
   "Return the cdr of OBJECT if it is a cons cell, or else nil."
   (if (pair? object) (cdr object) #nil))
 
+(define (elisp-caar list) (elisp-car (elisp-car list)))
+(define (elisp-cadr list) (elisp-car (elisp-cdr list)))
+(define (elisp-cdar list) (elisp-cdr (elisp-car list)))
+(define (elisp-cddr list) (elisp-cdr (elisp-cdr list)))
+
 ;;
 
 (define (init-boot-registrations)
@@ -56,4 +65,8 @@
               (cdr ,elisp-cdr)
               ;; (car-safe ,elisp-car-safe)
               ;; (cdr-safe ,elisp-cdr-safe)
+              (caar ,elisp-caar)
+              (cadr ,elisp-cadr)
+              (cdar ,elisp-cdar)
+              (cddr ,elisp-cddr)
               )))

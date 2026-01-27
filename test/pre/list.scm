@@ -62,3 +62,29 @@
 
 (deftest null-cdr-single-list (t)
   (el-expr `(print (null (cdr '(only))))))
+
+(for-each (lambda (pair)
+            (match pair
+              ((name oper input expected)
+               (deftestf name (expected)
+                 (el-expr `(let ((x ,input))
+                             (print (,oper x))))))))
+  '((car-nil car nil nil)
+    (cdr-nil cdr nil nil)
+    (caar-nil caar nil nil)
+    (cadr-nil cadr nil nil)
+    (cdar-nil cdar nil nil)
+    (cddr-nil cddr nil nil)))
+
+(for-each (lambda (pair)
+            (match pair
+              ((name oper input expected)
+               (deftestf name (expected)
+                 (el-expr `(let ((x ',input))
+                             (print (,oper x))))))))
+  '((car-1 car (1) 1)
+    (cdr-1 cdr (0 . 1) 1)
+    (caar-1 caar ((1)) 1)
+    (cadr-1 cadr (0 . (1)) 1)
+    (cdar-1 cdar ((0 . 1)) 1)
+    (cddr-1 cddr (0 . (0 . 1)) 1)))

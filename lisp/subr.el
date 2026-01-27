@@ -572,25 +572,7 @@ treatment of negative COUNT provided by this function."
         (setq i (1- i)))
       x)))
 
-(defun caar (x)
-  "Return the car of the car of X."
-  (declare (compiler-macro internal--compiler-macro-cXXr))
-  (car (car x)))
-
-(defun cadr (x)
-  "Return the car of the cdr of X."
-  (declare (compiler-macro internal--compiler-macro-cXXr))
-  (car (cdr x)))
-
-(defun cdar (x)
-  "Return the cdr of the car of X."
-  (declare (compiler-macro internal--compiler-macro-cXXr))
-  (cdr (car x)))
-
-(defun cddr (x)
-  "Return the cdr of the cdr of X."
-  (declare (compiler-macro internal--compiler-macro-cXXr))
-  (cdr (cdr x)))
+; NOTE caar..cddr is defined in mod/emacs/boot.scm
 
 (defun caaar (x)
   "Return the `car' of the `car' of the `car' of X."
