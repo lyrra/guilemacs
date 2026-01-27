@@ -86,7 +86,7 @@ Markers are coerced to their position value."
 
 (define elisp-/ (lambda args
                   (if (null? args)
-                      ((symbol-function 'signal) 'wrong-type-argument num)
+                      ((symbol-function 'signal) 'wrong-type-argument args)
                       (let ((a (car args)))
                         (if (null? (cdr args))
                             (if (exact? a)
