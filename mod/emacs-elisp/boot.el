@@ -184,17 +184,6 @@
              #'(lambda () ,bodyform)
              #'(lambda () ,@unwindforms)))
 
-(defmacro when (cond &rest body)
-  `(if ,cond
-       (progn ,@body)))
-
-(defmacro unless (cond &rest body)
-  `(when (not ,cond)
-     ,@body))
-
-;(defun symbolp (object)
-; (%funcall (@ (guile) symbol?) object))
-
 (defun %functionp (object)
   (%funcall (@ (guile) procedure?) object))
 
@@ -204,9 +193,6 @@
     (if (%funcall (@ (emacs-elisp falias) falias?) f)
         (%funcall (@ (emacs-elisp falias) falias-object) f)
       f)))
-
-(defun eval (form)
-  (%funcall (@ (emacs-elisp runtime) eval-elisp) form))
 
 (defun %indirect-function (object)
   (cond
