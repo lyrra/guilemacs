@@ -91,3 +91,13 @@
     (cadr-1 cadr (0 . (1)) 1)
     (cdar-1 cdar ((0 . 1)) 1)
     (cddr-1 cddr (0 . (0 . 1)) 1)))
+
+(deftest rplaca (1)
+  (el-expr `(let ((x (cons 0 0)))
+              (rplaca x 1)
+              (print (car x)))))
+
+(deftest rplacd (1)
+  (el-expr `(let ((x (cons 0 0)))
+              (rplacd x 1)
+              (print (cdr x)))))

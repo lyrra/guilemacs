@@ -459,14 +459,6 @@
 (defun assq (key list)
   (funcall (@ (srfi srfi-1) assoc) key list #'eq))
 
-(defun rplaca (cell newcar)
-  (funcall (@ (guile) set-car!) cell newcar)
-  newcar)
-
-(defun rplacd (cell newcdr)
-  (funcall (@ (guile) set-cdr!) cell newcdr)
-  newcdr)
-
 (defmacro dolist (spec &rest body)
   (apply #'(lambda (var list &optional result)
              (list 'progn

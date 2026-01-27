@@ -115,6 +115,7 @@
 
 ;; Load core emacs functionallity
 (use-modules (emacs boot))
+(use-modules (emacs list))
 (use-modules (emacs types))
 (use-modules (emacs numbers))
 (use-modules (emacs strings))
@@ -131,6 +132,7 @@
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
+(init-list-registrations)
 (init-types-registrations)
 (init-numbers-registrations)
 (init-strings-registrations)
