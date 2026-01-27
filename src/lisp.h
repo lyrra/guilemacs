@@ -2145,6 +2145,9 @@ extern Lisp_Object Fsymbol (Lisp_Object);
 extern Lisp_Object Fcar (Lisp_Object);
 extern Lisp_Object Fcdr (Lisp_Object);
 extern Lisp_Object Fnatnump (Lisp_Object);
+extern Lisp_Object Feq (Lisp_Object, Lisp_Object);
+extern Lisp_Object Feql (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fequal (Lisp_Object, Lisp_Object);
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
@@ -3199,6 +3202,18 @@ CHECK_SUBR (Lisp_Object x)
                 intern (lname), make_fixnum (i));           \
     return fn (i, args);                                    \
   }
+
+/* if we move a C-function to scheme, and we have alot of
+ * Fxxx references, instead of doing a huge rewrite,
+ * define Fxxx as a wrapper function that calls into scheme
+ */
+#define DEFUNWRAP1(cfn, lfn) \
+  Lisp_Object cfn (Lisp_Object a) \
+  { return call1 (intern (lfn), a); }
+
+#define DEFUNWRAP2(cfn, lfn) \
+  Lisp_Object cfn (Lisp_Object a, Lisp_Object b) \
+  { return call2 (intern (lfn), a, b); }
 
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */

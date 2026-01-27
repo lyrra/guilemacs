@@ -45,10 +45,6 @@ value_cmp_scm (Lisp_Object a, Lisp_Object b);
 
 #define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
 
-#define SLOWWRAP1(cfn, lfn) \
-  Lisp_Object cfn (Lisp_Object a) \
-  { return call1 (intern (lfn), a); }
-
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
 static bool
@@ -169,18 +165,7 @@ circular_list (Lisp_Object list)
 
 /* Data type predicates.  */
 
-/* MIGRATED TO GUILE: eq
-   This function has been moved to prelude/load.scm as elisp-eq. */
-DEFUN ("eq", Feq, Seq, 2, 2, 0,
-       doc: /* Return t if the two args are the same Lisp object.  */
-       attributes: const)
-  (Lisp_Object obj1, Lisp_Object obj2)
-{
-  if (EQ (obj1, obj2))
-    return Qt;
-  return Qnil;
-}
-
+DEFUNWRAP2(Feq, "eq")
 
 DEFUN ("type-of", Ftype_of, Stype_of, 1, 1, 0,
        doc: /* Return a symbol representing the type of OBJECT.
@@ -296,7 +281,7 @@ a fixed set of types.  */)
     return Qt;
 }
 
-SLOWWRAP1(Flistp, "listp")
+DEFUNWRAP1(Flistp, "listp")
 
 bool
 SYMBOL_INTERNED_IN_INITIAL_OBARRAY_P (Lisp_Object sym)

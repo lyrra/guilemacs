@@ -2867,79 +2867,8 @@ plist_member (Lisp_Object plist, Lisp_Object prop)
   return Qnil;
 }
 
-/* MIGRATED TO GUILE: eql
-   This function has been moved to prelude/load.scm as elisp-eql. */
-DEFUN ("eql", Feql, Seql, 2, 2, 0,
-       doc: /* Return t if the two args are `eq' or are indistinguishable numbers.
-Integers with the same value are `eql'.
-Floating-point values with the same sign, exponent and fraction are `eql'.
-This differs from numeric comparison: (eql 0.0 -0.0) returns nil and
-\(eql 0.0e+NaN 0.0e+NaN) returns t, whereas `=' does the opposite.  */)
-  (Lisp_Object obj1, Lisp_Object obj2)
-{
-  return scm_is_true (scm_eqv_p (obj1, obj2)) ? Qt : Qnil;
-}
-
-/* MIGRATED TO GUILE: equal
-   This function has been moved to prelude/load.scm as elisp-equal. */
-DEFUN ("equal", Fequal, Sequal, 2, 2, 0,
-       doc: /* Return t if two Lisp objects have similar structure and contents.
-They must have the same data type.
-Conses are compared by comparing the cars and the cdrs.
-Vectors and strings are compared element by element.
-Numbers are compared via `eql', so integers do not equal floats.
-\(Use `=' if you want integers and floats to be able to be equal.)
-Symbols must match exactly.  */)
-  (Lisp_Object o1, Lisp_Object o2)
-{
-  /* Fast path: identical objects are always equal */
-  if (EQ (o1, o2))
-    return Qt;
-
-  /* Phase 4: For emacs-string wrappers, compare content ignoring properties.
-     We need a custom comparison that:
-     1. Treats wrapper + wrapper as equal if content matches
-     2. Treats wrapper + plain string as equal if content matches
-     3. Doesn't break list/vector comparisons (delegates to scm_equal_p)
-
-     Strategy: Define a custom equal in Scheme that handles wrappers specially */
-  static SCM custom_equal_proc = SCM_BOOL_F;
-  static bool custom_equal_lookup_done = false;
-  if (!custom_equal_lookup_done)
-    {
-      SCM mod = scm_c_resolve_module ("emacs text-properties");
-      if (!scm_is_false (mod))
-        {
-          /* Use scm_module_variable which returns #f if binding doesn't exist */
-          SCM var = scm_module_variable (mod, scm_from_utf8_symbol ("emacs-string-equal"));
-          if (!scm_is_false (var) && scm_is_true (scm_variable_bound_p (var)))
-            {
-              SCM val = scm_variable_ref (var);
-              if (scm_is_true (scm_procedure_p (val)))
-                custom_equal_proc = val;
-            }
-        }
-      custom_equal_lookup_done = true;
-    }
-
-  /* Use custom Scheme equal for strings (which may be emacs-string wrappers)
-     and for lists/vectors (which may contain emacs-string wrappers).
-     This ensures that lists containing emacs-strings compare equal to
-     lists containing plain strings with the same content.
-     Note: We avoid calling this for all types to prevent GC issues with
-     complex nested objects like keymaps that don't contain strings. */
-  if (!scm_is_false (custom_equal_proc)
-      && (STRINGP (o1) || STRINGP (o2) || CONSP (o1) || CONSP (o2)
-          || VECTORP (o1) || VECTORP (o2)))
-    {
-      Lisp_Object result = scm_call_2 (custom_equal_proc, o1, o2);
-      return scm_is_true (result) ? Qt : Qnil;
-    }
-
-  /* Use Guile's equal for all non-string types */
-  Lisp_Object x = scm_equal_p (o1, o2);
-  return scm_is_true (x) ? Qt : Qnil;
-}
+DEFUNWRAP2(Feql, "eql")
+DEFUNWRAP2(Fequal, "equal")
 
 SCM compare_text_properties = SCM_BOOL_F;
 

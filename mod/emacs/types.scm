@@ -177,11 +177,57 @@ A proper list is neither circular nor dotted (i.e., its last cdr is nil)."
 
 (define (elisp-eql obj1 obj2)
   "Return t if the two args are `eq' or are indistinguishable numbers."
+  "Return t if the two args are `eq' or are indistinguishable numbers.
+Integers with the same value are `eql'.
+Floating-point values with the same sign, exponent and fraction are `eql'.
+This differs from numeric comparison: (eql 0.0 -0.0) returns nil and
+\(eql 0.0e+NaN 0.0e+NaN) returns t, whereas `=' does the opposite."
   (if (eqv? obj1 obj2) #t #nil))
 
+;; Lazy lookup for emacs-string-equal from text-properties module
+;; We use a thunk pattern to avoid circular dependency at load time
+(define *emacs-string-equal-proc* #f)
+(define *emacs-string-equal-lookup-done* #f)
+
+(define (get-emacs-string-equal)
+  "Lazily look up emacs-string-equal from text-properties module."
+  (unless *emacs-string-equal-lookup-done*
+    (catch #t
+      (lambda ()
+        (let* ((mod (resolve-module '(emacs text-properties) #:ensure #f))
+               (var (and mod (module-variable mod 'emacs-string-equal))))
+          (when (and var (variable-bound? var))
+            (let ((val (variable-ref var)))
+              (when (procedure? val)
+                (set! *emacs-string-equal-proc* val))))))
+      (lambda (key . args)
+        ;; Module not available yet, will retry later
+        #f))
+    (set! *emacs-string-equal-lookup-done* #t))
+  *emacs-string-equal-proc*)
+
 (define (elisp-equal obj1 obj2)
-  "Return t if two Lisp objects have similar structure and contents."
-  (if (equal? obj1 obj2) #t #nil))
+  "Return t if two Lisp objects have similar structure and contents.
+They must have the same data type.
+Conses are compared by comparing the cars and the cdrs.
+Vectors and strings are compared element by element.
+Numbers are compared via `eql', so integers do not equal floats.
+\(Use `=' if you want integers and floats to be able to be equal.)
+Symbols must match exactly."
+  ;; Fast path: identical objects are always equal
+  (if (eq? obj1 obj2)
+      #t
+      ;; Get the custom equal proc for emacs-string handling
+      (let ((custom-equal (get-emacs-string-equal)))
+        (if (and custom-equal
+                 (or (string? obj1) (string? obj2)
+                     (pair? obj1) (pair? obj2)
+                     (vector? obj1) (vector? obj2)))
+            ;; Use custom Scheme equal for strings, lists, vectors
+            ;; (which may contain emacs-string wrappers)
+            (if (custom-equal obj1 obj2) #t #nil)
+            ;; Use Guile's equal? for all other types
+            (if (equal? obj1 obj2) #t #nil)))))
 
 ;;;
 ;;; Character Operations
@@ -323,9 +369,9 @@ This is more efficient than string comparison of symbol names."
               ;; (bufferp ,elisp-bufferp)
               ;; (subrp ,elisp-subrp)
               ;; (proper-list-p ,elisp-proper-list-p)
-              ;; (eq ,elisp-eq)
-              ;; (eql ,elisp-eql)
-              ;; (equal ,elisp-equal)
+              (eq ,elisp-eq)
+              (eql ,elisp-eql)
+              (equal ,elisp-equal)
               ;; (max-char ,elisp-max-char)
               ;; (identity ,elisp-identity)
               )))
