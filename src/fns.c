@@ -2869,42 +2869,7 @@ plist_member (Lisp_Object plist, Lisp_Object prop)
 
 DEFUNWRAP2(Feql, "eql")
 DEFUNWRAP2(Fequal, "equal")
-
-SCM compare_text_properties = SCM_BOOL_F;
-
-DEFUN ("equal-including-properties", Fequal_including_properties, Sequal_including_properties, 2, 2, 0,
-       doc: /* Return t if two Lisp objects have similar structure and contents.
-This is like `equal' except that it compares the text properties
-of strings.  (`equal' ignores text properties.)  */)
-  (Lisp_Object o1, Lisp_Object o2)
-{
-  /* For Guilemacs, we can't rely on Guile's equal? to check text properties
-     for native Guile strings, so we handle strings specially. */
-  if (STRINGP (o1) && STRINGP (o2))
-    {
-      /* First check if the string contents are equal */
-      if (SCHARS (o1) != SCHARS (o2))
-        return Qnil;
-      if (SBYTES (o1) != SBYTES (o2))
-        return Qnil;
-      if (memcmp (SDATA (o1), SDATA (o2), SBYTES (o1)))
-        return Qnil;
-
-      /* Now check text properties */
-      if (!compare_string_intervals (o1, o2))
-        return Qnil;
-
-      return Qt;
-    }
-
-  /* For non-strings, use the regular equal with the fluid set */
-  Lisp_Object tem;
-  dynwind_begin ();
-  scm_dynwind_fluid (compare_text_properties, SCM_BOOL_T);
-  tem = Fequal (o1, o2);
-  dynwind_end ();
-  return tem;
-}
+DEFUNWRAP2(Fequal_including_properties, "equal-including-properties")
 
 static ptrdiff_t hash_lookup_with_hash (struct Lisp_Hash_Table *h,
 					Lisp_Object key, hash_hash_t hash);
@@ -3001,9 +2966,9 @@ string_equal_p (SCM o1, SCM o2)
     return SCM_BOOL_F;
   if (memcmp (SDATA (o1), SDATA (o2), SBYTES (o1)))
     return SCM_BOOL_F;
-  if (scm_is_true (scm_fluid_ref (compare_text_properties))
-      && !compare_string_intervals (o1, o2))
-    return SCM_BOOL_F;
+//  if (scm_is_true (scm_fluid_ref (compare_text_properties))
+//      && !compare_string_intervals (o1, o2))
+//    return SCM_BOOL_F;
   return SCM_BOOL_T;
 }
 
@@ -6530,7 +6495,7 @@ from the absolute start of the buffer, disregarding the narrowing.  */)
 void
 init_fns_once (void)
 {
-  compare_text_properties = scm_make_fluid ();
+  //compare_text_properties = scm_make_fluid ();
   scm_set_smob_equalp (lisp_misc_tag, misc_equal_p);
   scm_set_smob_equalp (lisp_string_tag, string_equal_p);
   scm_set_smob_equalp (lisp_vectorlike_tag, vectorlike_equal_p);

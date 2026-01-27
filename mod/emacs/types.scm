@@ -29,6 +29,7 @@
     elisp-eq
     elisp-eql
     elisp-equal
+    elisp-equal-including-properties
     elisp-max-char
     elisp-identity
     elisp-char-table-p
@@ -229,6 +230,167 @@ Symbols must match exactly."
             ;; Use Guile's equal? for all other types
             (if (equal? obj1 obj2) #t #nil)))))
 
+;; Lazy lookup for text-properties module functions
+(define *text-props-module* #f)
+(define *text-props-lookup-done* #f)
+
+(define (get-text-props-module)
+  "Lazily look up text-properties module."
+  (unless *text-props-lookup-done*
+    (catch #t
+      (lambda ()
+        (set! *text-props-module* (resolve-module '(emacs text-properties) #:ensure #f)))
+      (lambda (key . args) #f))
+    (set! *text-props-lookup-done* #t))
+  *text-props-module*)
+
+(define (get-text-props-proc name)
+  "Get a procedure from text-properties module."
+  (let ((mod (get-text-props-module)))
+    (and mod
+         (let ((var (module-variable mod name)))
+           (and var (variable-bound? var) (variable-ref var))))))
+
+(define (get-string-intervals s)
+  "Get intervals from a string or emacs-string.
+Plain strings return '(). Uses runtime-safe accessors."
+  (if (string? s)
+      '()  ; plain string, no intervals
+      ;; Assume emacs-string wrapper
+      (let ((intervals-proc (get-text-props-proc 'emacs-string-intervals-runtime)))
+        (if intervals-proc (intervals-proc s) '()))))
+
+(define (get-string-content s)
+  "Get raw string content from string or emacs-string wrapper."
+  (if (string? s)
+      s
+      (let ((unwrap (get-text-props-proc 'unwrap-string)))
+        (if unwrap (unwrap s) s))))
+
+(define (compare-string-intervals s1 s2)
+  "Compare text properties of two strings.
+Returns #t if they have identical properties at all positions."
+  (let ((interval-start (get-text-props-proc 'get-interval-start))
+        (interval-end (get-text-props-proc 'get-interval-end))
+        (interval-plist (get-text-props-proc 'get-interval-plist)))
+    (if (not (and interval-start interval-end interval-plist))
+        ;; Module not available - plain strings have no properties, so equal
+        #t
+        ;; Get intervals from both strings
+        (let ((i1 (get-string-intervals s1))
+              (i2 (get-string-intervals s2)))
+          ;; Both have no properties - equal
+          (if (and (null? i1) (null? i2))
+              #t
+              ;; One has properties, other doesn't - not equal
+              (if (or (null? i1) (null? i2))
+                  #f
+                  ;; Both have intervals - compare them
+                  (let ((len (string-length (get-string-content s1))))
+                    (compare-intervals-walk i1 i2 0 len
+                                           interval-start interval-end interval-plist))))))))
+
+(define (compare-intervals-walk i1 i2 pos end interval-start interval-end interval-plist)
+  "Walk through interval lists comparing properties.
+Returns #t if all properties match, #f otherwise."
+  (if (>= pos end)
+      #t
+      ;; Find intervals containing pos
+      (let ((int1 (find-interval-at i1 pos interval-start interval-end))
+            (int2 (find-interval-at i2 pos interval-start interval-end)))
+        (let ((plist1 (if int1 (interval-plist int1) '()))
+              (plist2 (if int2 (interval-plist int2) '())))
+          ;; Compare plists using equal (not eq) for values
+          (if (not (plists-equal-deep? plist1 plist2))
+              #f
+              ;; Advance to end of shorter interval
+              (let ((end1 (if int1 (interval-end int1) end))
+                    (end2 (if int2 (interval-end int2) end)))
+                (compare-intervals-walk i1 i2 (min end1 end2) end
+                                       interval-start interval-end interval-plist)))))))
+
+(define (find-interval-at intervals pos interval-start interval-end)
+  "Find interval containing pos."
+  (let loop ((ints intervals))
+    (if (null? ints)
+        #f
+        (let ((int (car ints)))
+          (if (and (>= pos (interval-start int))
+                   (< pos (interval-end int)))
+              int
+              (loop (cdr ints)))))))
+
+(define (plists-equal-deep? p1 p2)
+  "Compare property lists using equal for values (not eq).
+This matches the behavior of equal-including-properties."
+  (and (= (length p1) (length p2))
+       (let loop ((lst p1))
+         (if (null? lst)
+             #t
+             (let ((key (car lst))
+                   (val (cadr lst)))
+               (and (plist-has-equal-value? p2 key val)
+                    (loop (cddr lst))))))))
+
+(define (plist-has-equal-value? plist key val)
+  "Check if plist has key with a value equal to val."
+  (let loop ((lst plist))
+    (cond
+      ((null? lst) #f)
+      ((eq? (car lst) key)
+       (equal? (cadr lst) val))
+      (else (loop (cddr lst))))))
+
+(define (string-like? obj)
+  "Return #t if obj is a string or emacs-string wrapper."
+  (or (string? obj)
+      ;; Check if it's an emacs-string wrapper by trying has-properties?
+      ;; or unwrap-string. emacs-string? is a syntax transformer, not callable.
+      (let ((unwrap (get-text-props-proc 'unwrap-string)))
+        (and unwrap
+             (catch #t
+               (lambda () (string? (unwrap obj)))
+               (lambda (key . args) #f))))))
+
+(define (equal-including-properties-internal o1 o2)
+  "Internal recursive comparison including text properties.
+Returns Scheme boolean for easier recursion."
+  (cond
+    ;; Fast path: identical objects
+    ((eq? o1 o2) #t)
+
+    ;; Both strings (plain or emacs-string) - compare content and properties
+    ((and (string-like? o1) (string-like? o2))
+     (and (string=? (unwrap-string-content o1) (unwrap-string-content o2))
+          (compare-string-intervals o1 o2)))
+
+    ;; Both lists - recurse on car and cdr
+    ((and (pair? o1) (pair? o2))
+     (and (equal-including-properties-internal (car o1) (car o2))
+          (equal-including-properties-internal (cdr o1) (cdr o2))))
+
+    ;; Both vectors - recurse on elements
+    ((and (vector? o1) (vector? o2))
+     (and (= (vector-length o1) (vector-length o2))
+          (let loop ((i 0))
+            (or (>= i (vector-length o1))
+                (and (equal-including-properties-internal
+                      (vector-ref o1 i) (vector-ref o2 i))
+                     (loop (+ i 1)))))))
+
+    ;; Everything else - use Guile's equal?
+    (else (equal? o1 o2))))
+
+(define (elisp-equal-including-properties o1 o2)
+  "Return t if two Lisp objects have similar structure and contents.
+This is like `equal' except that it compares the text properties
+of strings.  (`equal' ignores text properties.)"
+  (if (equal-including-properties-internal o1 o2) #t #nil))
+
+(define (unwrap-string-content s)
+  "Get the raw string content, unwrapping emacs-string if needed."
+  (get-string-content s))
+
 ;;;
 ;;; Character Operations
 ;;;
@@ -372,6 +534,7 @@ This is more efficient than string comparison of symbol names."
               (eq ,elisp-eq)
               (eql ,elisp-eql)
               (equal ,elisp-equal)
+              (equal-including-properties ,elisp-equal-including-properties)
               ;; (max-char ,elisp-max-char)
               ;; (identity ,elisp-identity)
               )))
