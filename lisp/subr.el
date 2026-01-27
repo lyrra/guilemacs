@@ -25,6 +25,10 @@
 
 ;;; Code:
 
+(eval-and-compile
+(defalias 'string= #'string-equal)
+)
+
 ;; declare-function's args use &rest, not &optional, for compatibility
 ;; with byte-compile-macroexpand-declare-function.
 
@@ -2046,7 +2050,6 @@ instead; it will indirectly limit the specpdl stack size as well.")
 (defalias 'drop #'nthcdr)
 (defalias 'send-string #'process-send-string)
 (defalias 'send-region #'process-send-region)
-(defalias 'string= #'string-equal)
 (defalias 'string< #'string-lessp)
 (defalias 'string> #'string-greaterp)
 (defalias 'move-marker #'set-marker)

@@ -512,51 +512,6 @@
 
 ;;; Strings
 
-(defun string (&rest characters)
-  (funcall (@ (guile) list->string)
-           (mapcar (@ (guile) integer->char) characters)))
-
-(defun stringp (object)
-  (funcall (@ (guile) string?) object))
-
-(defun string-equal (s1 s2)
-  (let ((s1 (if (symbolp s1) (symbol-name s1) s1))
-        (s2 (if (symbolp s2) (symbol-name s2) s2)))
-   (funcall (@ (guile) string=?) s1 s2)))
-
-(fset 'string= 'string-equal)
-
-(defun substring (string from &optional to)
-  (apply (@ (guile) substring) string from (if to (list to) nil)))
-
-(defun upcase (obj)
-  (funcall (@ (guile) string-upcase) obj))
-
-(defun downcase (obj)
-  (funcall (@ (guile) string-downcase) obj))
-
-(defun string-match (regexp string &optional start)
-  (let ((m (funcall (@ (ice-9 regex) string-match)
-                    regexp
-                    string
-                    (or start 0))))
-    (if m
-        (funcall (@ (ice-9 regex) match:start) m 0)
-      nil)))
-
-;; Vectors
-
-(defun make-vector (length init)
-  (funcall (@ (guile) make-vector) length init))
-
-;;; Sequences
-
-(defun length (sequence)
-  (funcall (if (listp sequence)
-               (@ (guile) length)
-             (@ (guile) generalized-vector-length))
-           sequence))
-
 (defun mapcar (function sequence)
   (funcall (@ (guile) map) function sequence))
 
@@ -570,9 +525,6 @@
 (defun aset (array idx newelt)
   (funcall (@ (guile) generalized-vector-set!) array idx newelt)
   newelt)
-
-(defun concat (&rest sequences)
-  (apply (@ (guile) string-append) sequences))
 
 ;;; Property lists
 
