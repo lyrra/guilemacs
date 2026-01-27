@@ -416,32 +416,10 @@
 
 ;;; List predicates
 
+; FIX: cant disable: cl-preloaded: wrong-type-arg
 (fset 'not #'null)
 
-(defun atom (object)
-  (null (consp object)))
-
-(defun nlistp (object)
-  (null (listp object)))
-
 ;;; Lists
-
-(fset 'cons (@ (guile) cons))
-(fset 'list (@ (guile) list))
-(fset 'make-list (@ (guile) make-list))
-(fset 'append (@ (guile) append))
-(fset 'reverse (@ (guile) reverse))
-(fset 'nreverse (@ (guile) reverse!))
-
-(defun car-safe (object)
-  (if (consp object)
-      (car object)
-    nil))
-
-(defun cdr-safe (object)
-  (if (consp object)
-      (cdr object)
-    nil))
 
 (defun setcar (cell newcar)
   (if (consp cell)
@@ -497,22 +475,6 @@
                          list)
                    result))
          spec))
-
-;;; Strings
-
-(defun mapcar (function sequence)
-  (funcall (@ (guile) map) function sequence))
-
-(defun mapc (function sequence)
-  (funcall (@ (guile) for-each) function sequence)
-  sequence)
-
-(defun aref (array idx)
-  (funcall (@ (guile) generalized-vector-ref) array idx))
-
-(defun aset (array idx newelt)
-  (funcall (@ (guile) generalized-vector-set!) array idx newelt)
-  newelt)
 
 ;;; Property lists
 

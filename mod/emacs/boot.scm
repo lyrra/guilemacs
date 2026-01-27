@@ -10,6 +10,9 @@
     elisp-cadr
     elisp-cdar
     elisp-cddr
+    elisp-list
+    elisp-make-list
+    elisp-not
     init-boot-registrations))
 
 ;;;
@@ -53,6 +56,15 @@
 (define (elisp-cdar list) (elisp-cdr (elisp-car list)))
 (define (elisp-cddr list) (elisp-cdr (elisp-cdr list)))
 
+(define (elisp-list . elms)
+  elms)
+
+(define (elisp-make-list len obj)
+  (make-list len obj))
+
+(define (elisp-not x)
+  (if (or (null? x) (eq? x #nil)) #t #nil))
+
 ;;
 
 (define (init-boot-registrations)
@@ -60,7 +72,7 @@
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `(
-              ;; (cons ,elisp-cons)
+              (cons ,elisp-cons)
               (car ,elisp-car)
               (cdr ,elisp-cdr)
               ;; (car-safe ,elisp-car-safe)
@@ -69,4 +81,7 @@
               (cadr ,elisp-cadr)
               (cdar ,elisp-cdar)
               (cddr ,elisp-cddr)
+              (list ,elisp-list)
+              (make-list ,elisp-make-list)
+              (not ,elisp-not)
               )))

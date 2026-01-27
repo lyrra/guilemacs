@@ -63,6 +63,9 @@
 (deftest null-cdr-single-list (t)
   (el-expr `(print (null (cdr '(only))))))
 
+(deftest not-car-nil-list (t)
+  (el-expr `(print (not (car '(nil))))))
+
 (for-each (lambda (pair)
             (match pair
               ((name oper input expected)
