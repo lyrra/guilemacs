@@ -40,8 +40,9 @@
     elisp-number-to-string
     elisp-random
     elisp-number-or-marker-p
-    init-numbers-registrations
-  ))
+    elisp-wholenump
+    elisp-floatp
+    init-numbers-registrations))
 
 ;; The C primitive check-number-coerce-marker is defined in src/data.c
 ;; and exported in src/emacs.c via scm_c_define_gsubr
@@ -233,12 +234,11 @@ lowercase l) for small endian machines."
       66   ; 'B' for big endian
       108)) ; 'l' for little endian
 
-(define (elisp-float arg)
-  "Return the floating point number equal to ARG."
-  (cond
-    ((integer? arg) (exact->inexact arg))
-    ((number? arg) arg)  ; Already a float
-    (else (error "Wrong type argument: numberp" arg))))
+(define (elisp-floatp x)
+  (if (and (real? x)
+           (or (inexact? x)
+               (not (integer? x))))
+      #t #nil))
 
 (define (elisp-number-to-string number)
   "Return the decimal representation of NUMBER as a string."
@@ -271,6 +271,9 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
   "Return t if OBJECT is a number or a marker."
   ;; For now, markers are not implemented in Guile, so just check numbers
   (if (number? object) #t #nil))
+
+(define (elisp-wholenump x)
+  (if (and (integer? x) (exact? x) (>= x 0)) #t #nil))
 
 (define (init-numbers-registrations)
   "Initialize symbol function registrations for numbers module."
@@ -311,6 +314,10 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
               (sqrt ,sqrt)
               (tan ,tan)
 
+              ;; predicates
+              (floatp ,elisp-floatp)
+              (wholenump ,elisp-wholenump)
+
               ;; Rounding & Truncation
               (truncate ,elisp-truncate)
               (ceiling ,elisp-ceiling)
@@ -324,7 +331,6 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
               (fround ,elisp-fround)
 
               (byteorder ,elisp-byteorder)
-              (float ,elisp-float)
               (number-to-string ,elisp-number-to-string)
               (random ,elisp-random)
               ;(number-or-marker-p ,elisp-number-or-marker-p)

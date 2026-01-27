@@ -352,26 +352,6 @@
 ;             fluid)
 ;    base-variable))
 
-;;; Numerical type predicates
-
-(defun floatp (object)
-  (and (funcall (@ (guile) real?) object)
-       (or (funcall (@ (guile) inexact?) object)
-           (null (funcall (@ (guile) integer?) object)))))
-
-(defun integerp (object)
-  (and (funcall (@ (guile) integer?) object)
-       (funcall (@ (guile) exact?) object)))
-
-(defun numberp (object)
-  (funcall (@ (guile) real?) object))
-
-(defun wholenump (object)
-  (and (integerp object) (>= object 0)))
-
-(defun zerop (object)
-  (= object 0))
-
 ;;; List predicates
 
 ; FIX: cant disable: cl-preloaded: wrong-type-arg
