@@ -372,48 +372,6 @@
 (defun zerop (object)
   (= object 0))
 
-;;; Numerical comparisons
-
-;(fset '= (@ (guile) =))
-
-;(defun /= (num1 num2)
-;  (null (= num1 num2)))
-
-;(fset '< (@ (guile) <))
-;(fset '<= (@ (guile) <=))
-;(fset '> (@ (guile) >))
-;(fset '>= (@ (guile) >=))
-
-;(defun max (&rest numbers)
-;  (apply (@ (guile) max) numbers))
-
-;(defun min (&rest numbers)
-;  (apply (@ (guile) min) numbers))
-
-;;; Arithmetic functions
-
-;(fset '1+ (@ (guile) 1+))
-;(fset '1- (@ (guile) 1-))
-;(fset '+ (@ (guile) +))
-;(fset '- (@ (guile) -))
-;(fset '* (@ (guile) *))
-;(fset '% (@ (guile) modulo))
-;(fset 'abs (@ (guile) abs))
-
-;;; Floating-point rounding
-
-;(fset 'ffloor (@ (guile) floor))
-;(fset 'fceiling (@ (guile) ceiling))
-;(fset 'ftruncate (@ (guile) truncate))
-;(fset 'fround (@ (guile) round))
-
-;;; Numeric conversion
-
-(defun float (arg)
-  (if (numberp arg)
-      (funcall (@ (guile) exact->inexact) arg)
-    (signal 'wrong-type-argument `(numberp ,arg))))
-
 ;;; List predicates
 
 ; FIX: cant disable: cl-preloaded: wrong-type-arg
@@ -434,30 +392,6 @@
         (funcall (@ (guile) set-cdr!) cell newcdr)
         newcdr)
     (signal 'wrong-type-argument `(consp ,cell))))
-
-(defun %member (elt list test)
-  (cond
-   ((null list) nil)
-   ((consp list)
-    (if (funcall test elt (car list))
-        list
-      (%member elt (cdr list) test)))
-   (t (signal 'wrong-type-argument `(listp ,list)))))
-
-(defun member (elt list)
-  (%member elt list #'equal))
-
-(defun memql (elt list)
-  (%member elt list #'eql))
-
-(defun memq (elt list)
-  (%member elt list #'eq))
-
-(defun assoc (key list)
-  (funcall (@ (srfi srfi-1) assoc) key list #'equal))
-
-(defun assq (key list)
-  (funcall (@ (srfi srfi-1) assoc) key list #'eq))
 
 (defmacro dolist (spec &rest body)
   (apply #'(lambda (var list &optional result)
