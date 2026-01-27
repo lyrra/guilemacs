@@ -331,19 +331,6 @@
       (funcall (@ (guile) equal?) obj1 obj2)
     (null obj2)))
 
-;;; Symbols
-
-;;; `symbolp' and `symbol-function' are defined above.
-
-(fset 'symbol-name (@ (guile) symbol->string))
-(fset 'symbol-value (@ (emacs-elisp runtime) symbol-value))
-(fset 'set (@ (emacs-elisp runtime) set-symbol-value!))
-(fset 'makunbound (@ (emacs-elisp runtime) makunbound!))
-(fset 'fmakunbound (@ (emacs-elisp runtime) fmakunbound!))
-(fset 'boundp (@ (emacs-elisp runtime) symbol-bound?))
-(fset 'fboundp (@ (emacs-elisp runtime) symbol-fbound?))
-(fset 'intern (@ (guile) string->symbol))
-
 ;(defun defvaralias (new-alias base-variable &optional docstring)
 ;  (let ((fluid (funcall (@ (emacs-elisp runtime) symbol-fluid)
 ;                        base-variable)))
