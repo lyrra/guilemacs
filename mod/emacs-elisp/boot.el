@@ -244,21 +244,6 @@
            symbol
            definition))
 
-(defun eq (obj1 obj2)
-  (if obj1
-      (%funcall (@ (guile) eq?) obj1 obj2)
-    (if obj2 nil t)))
-
-(defun nthcdr (n list)
-  (let ((i 0))
-    (while (< i n)
-      (setq list (cdr list)
-            i (+ i 1)))
-    list))
-
-(defun nth (n list)
-  (car (nthcdr n list)))
-
 (defun fset (symbol definition)
   (funcall (@ (emacs-elisp runtime) set-symbol-function!)
            symbol
@@ -306,30 +291,6 @@
                       (function (lambda (&rest args) (apply definition args)))
                       definition))))
   definition)
-
-(defun gload (file)
-  (funcall (@ (system base compile) compile-file)
-           file
-           (funcall (@ (guile) symbol->keyword) 'from)
-           'emacs-elisp
-           (funcall (@ (guile) symbol->keyword) 'to)
-           'value)
-  t)
-
-;(defun emacs-load (file)
-;  (%funcall (@ (emacs-elisp runtime) emacs-load) file))
-
-;;; Equality predicates
-
-(defun eql (obj1 obj2)
-  (if obj1
-      (funcall (@ (guile) eqv?) obj1 obj2)
-    (null obj2)))
-
-(defun equal (obj1 obj2)
-  (if obj1
-      (funcall (@ (guile) equal?) obj1 obj2)
-    (null obj2)))
 
 ;(defun defvaralias (new-alias base-variable &optional docstring)
 ;  (let ((fluid (funcall (@ (emacs-elisp runtime) symbol-fluid)

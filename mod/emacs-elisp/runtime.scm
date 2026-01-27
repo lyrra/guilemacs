@@ -368,7 +368,6 @@ This replicates the save_match_data_load wrapper function."
   (read port))
 
 ;;; FIX: move to (emacs) ?
-;;; pretty much like gload (see boot.el)
 ;(define (emacs-load filename)
 ;  (format #t "current-reader: ~s~%" (fluid-ref current-reader))
 ;  (fluid-set! current-reader emacs-read)
