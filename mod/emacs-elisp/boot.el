@@ -191,6 +191,14 @@
              #'(lambda () ,bodyform)
              #'(lambda () ,@unwindforms)))
 
+(defmacro when (cond &rest body)
+  `(if ,cond
+       (progn ,@body)))
+
+(defmacro unless (cond &rest body)
+  `(when (not ,cond)
+     ,@body))
+
 (defun %functionp (object)
   (%funcall (@ (guile) procedure?) object))
 
