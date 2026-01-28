@@ -262,32 +262,6 @@ Returns the tail of PLIST whose car is PROP."
            (else (loop (cddr tail)))))))))
 
 ;;;
-;;; Number Predicates
-;;; Note: Some of these are duplicates from types.scm but included here
-;;; for completeness in the sequences module context
-;;;
-
-(define (elisp-zerop number)
-  "Return t if NUMBER is zero."
-  (if (and (number? number) (= number 0)) #t #nil))
-
-(define (elisp-plusp number)
-  "Return t if NUMBER is positive."
-  (if (and (number? number) (> number 0)) #t #nil))
-
-(define (elisp-minusp number)
-  "Return t if NUMBER is negative."
-  (if (and (number? number) (< number 0)) #t #nil))
-
-(define (elisp-evenp integer)
-  "Return t if INTEGER is even."
-  (if (and (integer? integer) (even? integer)) #t #nil))
-
-(define (elisp-oddp integer)
-  "Return t if INTEGER is odd."
-  (if (and (integer? integer) (odd? integer)) #t #nil))
-
-;;;
 ;;; String Comparison Functions
 ;;;
 
@@ -473,72 +447,62 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
      ;; For other sequences (vectors, strings), use regular length
      (= (length sequence) length))))
 
-;;; Registration with Elisp symbol table
-;;; Phase 2: Registrations migrated from prelude/load.scm
-;;;
-
-;; List search & access
-(set-symbol-function! 'memq elisp-memq)
-(set-symbol-function! 'member elisp-member)
-(set-symbol-function! 'nth elisp-nth)
-(set-symbol-function! 'nthcdr elisp-nthcdr)
-(set-symbol-function! 'last elisp-last)
-(set-symbol-function! 'butlast elisp-butlast)
-
-;; List transformation
-(set-symbol-function! 'reverse elisp-reverse)
-(set-symbol-function! 'append elisp-append)
-
-;; Association lists
-(set-symbol-function! 'assq elisp-assq)
-(set-symbol-function! 'assoc elisp-assoc)
-(set-symbol-function! 'rassq elisp-rassq)
-
-;; Sequence operations
-(set-symbol-function! 'copy-sequence elisp-copy-sequence)
-
-;; Property lists
-(set-symbol-function! 'plist-get elisp-plist-get)
-(set-symbol-function! 'plist-put elisp-plist-put)
-(set-symbol-function! 'plist-member elisp-plist-member)
-
-;; Number predicates
-(set-symbol-function! 'zerop elisp-zerop)
-(set-symbol-function! 'plusp elisp-plusp)
-(set-symbol-function! 'minusp elisp-minusp)
-(set-symbol-function! 'evenp elisp-evenp)
-(set-symbol-function! 'oddp elisp-oddp)
-
-;; String comparisons
-(set-symbol-function! 'string-equal elisp-string-equal)
-(set-symbol-function! 'string-lessp elisp-string-lessp)
-(set-symbol-function! 'string-greaterp elisp-string-greaterp)
-
-;; Higher-order functions
-(set-symbol-function! 'mapcar elisp-mapcar)
-(set-symbol-function! 'mapc elisp-mapc)
-
-;; Utilities
-(set-symbol-function! 'constantly elisp-constantly)
-
-(set-symbol-function! 'length elisp-length)
-(set-symbol-function! 'list elisp-list)
-(set-symbol-function! 'make-list elisp-make-list)
-(set-symbol-function! 'safe-length elisp-safe-length)
-(set-symbol-function! 'take elisp-take)
-
-;; Length comparisons
-(set-symbol-function! 'length< elisp-length<)
-(set-symbol-function! 'length> elisp-length>)
-(set-symbol-function! 'length= elisp-length=)
-
-;; Registration initialization function
-;; Called by load.scm after module is loaded
 (define (init-sequences-registrations)
-  "Initialize symbol function registrations for sequences module."
-    (set-symbol-function! 'butlast elisp-butlast)
-  (set-symbol-function! 'length< elisp-length<)
-  (set-symbol-function! 'length= elisp-length=)
-  (set-symbol-function! 'length> elisp-length>)
-  (set-symbol-function! 'plist-get elisp-plist-get)
-  (set-symbol-function! 'plist-member elisp-plist-member))
+  (for-each (lambda (sym-fun)
+              (set-symbol-function! (car sym-fun) (cadr sym-fun)))
+            `(
+              (butlast ,elisp-butlast)
+              (length< ,elisp-length<)
+              (length= ,elisp-length=)
+              (length> ,elisp-length>)
+              (plist-get ,elisp-plist-get)
+              (plist-member ,elisp-plist-member)
+
+              ;; List search & access
+              (memq ,elisp-memq)
+              (member ,elisp-member)
+              (nth ,elisp-nth)
+              (nthcdr ,elisp-nthcdr)
+              (last ,elisp-last)
+              (butlast ,elisp-butlast)
+
+              ;; List transformation
+              (reverse ,elisp-reverse)
+              (append ,elisp-append)
+
+              ;; Association lists
+              (assq ,elisp-assq)
+              (assoc ,elisp-assoc)
+              (rassq ,elisp-rassq)
+
+              ;; Sequence operations
+              (copy-sequence ,elisp-copy-sequence)
+
+              ;; Property lists
+              (plist-get ,elisp-plist-get)
+              (plist-put ,elisp-plist-put)
+              (plist-member ,elisp-plist-member)
+
+              ;; String comparisons
+              (string-equal ,elisp-string-equal)
+              (string-lessp ,elisp-string-lessp)
+              (string-greaterp ,elisp-string-greaterp)
+
+              ;; Higher-order functions
+              (mapcar ,elisp-mapcar)
+              (mapc ,elisp-mapc)
+
+              ;; Utilities
+              (constantly ,elisp-constantly)
+
+              (length ,elisp-length)
+              (list ,elisp-list)
+              (make-list ,elisp-make-list)
+              (safe-length ,elisp-safe-length)
+              (take ,elisp-take)
+
+              ;; Length comparisons
+              (length< ,elisp-length<)
+              (length> ,elisp-length>)
+              (length= ,elisp-length=)
+              )))

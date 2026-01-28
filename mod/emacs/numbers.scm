@@ -234,6 +234,26 @@ lowercase l) for small endian machines."
       66   ; 'B' for big endian
       108)) ; 'l' for little endian
 
+(define (elisp-zerop number)
+  "Return t if NUMBER is zero."
+  (if (= number 0) #t #nil))
+
+(define (elisp-plusp number)
+  "Return t if NUMBER is positive."
+  (if (and (number? number) (> number 0)) #t #nil))
+
+(define (elisp-minusp number)
+  "Return t if NUMBER is negative."
+  (if (and (number? number) (< number 0)) #t #nil))
+
+(define (elisp-evenp integer)
+  "Return t if INTEGER is even."
+  (if (and (integer? integer) (even? integer)) #t #nil))
+
+(define (elisp-oddp integer)
+  "Return t if INTEGER is odd."
+  (if (and (integer? integer) (odd? integer)) #t #nil))
+
 (define (elisp-floatp x)
   (if (and (real? x)
            (or (inexact? x)
@@ -317,6 +337,12 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
               ;; predicates
               (floatp ,elisp-floatp)
               (wholenump ,elisp-wholenump)
+              ;; Number predicates
+              (zerop ,elisp-zerop)
+              (plusp ,elisp-plusp)
+              (minusp ,elisp-minusp)
+              (evenp ,elisp-evenp)
+              (oddp ,elisp-oddp)
 
               ;; Rounding & Truncation
               (truncate ,elisp-truncate)
