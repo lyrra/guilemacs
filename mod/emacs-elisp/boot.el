@@ -26,6 +26,13 @@
 
 (defun omega () (omega))
 
+(defun debugflag ()
+  (funcall (@ (emacs-elisp runtime) debugflag)))
+
+(defun set-debugflag! (x)
+  (funcall (@ (emacs-elisp runtime) set-debugflag!)
+           x))
+
 (defun guile-tracelog (p string &rest args)
   (let* ((ap (lambda (fun &rest arguments)
                (%funcall (@ (guile) apply)

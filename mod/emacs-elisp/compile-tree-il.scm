@@ -13,6 +13,7 @@
   #:use-module (srfi srfi-11)
   #:use-module (srfi srfi-26)
   #:use-module (ice-9 format)
+  #:use-module (ice-9 pretty-print)
   #:export (compile-tree-il
             compile-progn
             compile-eval-when-compile
@@ -966,12 +967,10 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
          (tree-il (with-fluids ((bindings-data (make-bindings))
                                 (toplevel? #t)
                                 (compile-time-too? #f))
-                    (compile-expr-1 sanitized-expr)))
-         (d-p-f 0 ;(get-debug-print-flag)
-                )) ; FIX: cant use %debug-print-flag directly
-    (when (and d-p-f (logbit? 16 d-p-f))
+                    (compile-expr-1 sanitized-expr))))
+    (when (logbit? 16 %debugflag)
       (format (current-error-port) "---------------------------------------------------------------~%")
       (format (current-error-port) "expr: ~s~%" expr)
-      (format (current-error-port) "tree-il---> : ~s~%" tree-il)
-      (format (current-error-port) "tree-il ---> : ~s~%" (tree-il->scheme tree-il)))
+      (format (current-error-port) "tree-il: ~s~%" (tree-il->scheme tree-il))
+      (pretty-print (tree-il->scheme tree-il) (current-error-port)))
     (values tree-il env env)))

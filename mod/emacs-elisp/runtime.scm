@@ -48,9 +48,9 @@
             local-eval-elisp
             %make-lisp-string
             make-lisp-string
-            ;%debug-print-flag
-            ;set-debug-print-flag!
-            ;get-debug-print-flag
+            %debugflag
+            debugflag
+            set-debugflag!
             make-symbol
             intern-gensym
             %lisp-string
@@ -60,6 +60,14 @@
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
+
+(define %debugflag 0)
+
+(define (set-debugflag! x)
+  (set! %debugflag x))
+
+(define (debugflag)
+  %debugflag)
 
 ;;; Values for t and nil. (FIXME remove this abstraction)
 
