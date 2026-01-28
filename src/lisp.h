@@ -2149,6 +2149,10 @@ extern Lisp_Object Feq (Lisp_Object, Lisp_Object);
 extern Lisp_Object Feql (Lisp_Object, Lisp_Object);
 extern Lisp_Object Fequal (Lisp_Object, Lisp_Object);
 extern Lisp_Object Fdelq (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fassq (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fmemq (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fmemql (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fmember (Lisp_Object, Lisp_Object);
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)

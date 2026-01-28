@@ -6,8 +6,8 @@
 ;;; Loading: via use-modules in load.scm
 ;;;
 ;;; EXPORTS (34+ functions):
-;;;   List operations: memq, member, memql, nth, nthcdr, append, reverse, nreverse
-;;;   Association lists: assq, assoc, rassq, rassoc
+;;;   List operations: nth, nthcdr, append, reverse, nreverse
+;;;   Association lists: assoc, rassq, rassoc
 ;;;   Property lists: plist-get, plist-put, plist-member, lax-plist-get, lax-plist-put
 ;;;   List predicates: member-ignore-case
 ;;;   Higher-order: mapcar, mapc, mapcan, mapconcat
@@ -18,8 +18,8 @@
   #:use-module (emacs-elisp runtime)
   #:export (
     ;; Scheme implementation functions
-    elisp-memq elisp-member elisp-memql elisp-nth elisp-nthcdr
-    elisp-append elisp-reverse elisp-nreverse elisp-assq elisp-assoc
+    elisp-nth elisp-nthcdr
+    elisp-append elisp-reverse elisp-nreverse elisp-assoc
     elisp-rassq elisp-rassoc elisp-plist-get elisp-plist-put
     elisp-plist-member elisp-lax-plist-get elisp-lax-plist-put
     elisp-member-ignore-case elisp-mapcar elisp-mapc elisp-mapcan
@@ -32,24 +32,6 @@
 
 ;;; List Search & Access Operations
 ;;;
-
-(define (elisp-memq elt list)
-  "Return non-nil if ELT is an element of LIST. Comparison done with `eq'.
-The value is actually the tail of LIST whose car is ELT."
-  (let loop ((tail list))
-    (cond
-      ((null? tail) #nil)
-      ((eq? elt (car tail)) tail)
-      (else (loop (cdr tail))))))
-
-(define (elisp-member elt list)
-  "Return non-nil if ELT is an element of LIST. Comparison done with `equal'.
-The value is actually the tail of LIST whose car is ELT."
-  (let loop ((tail list))
-    (cond
-      ((null? tail) #nil)
-      ((equal? elt (car tail)) tail)
-      (else (loop (cdr tail))))))
 
 (define (elisp-nth n list)
   "Return the Nth element of LIST.
@@ -146,17 +128,6 @@ All arguments except the last are copied."
 ;;;
 ;;; Association List Operations
 ;;;
-
-(define (elisp-assq key alist)
-  "Return non-nil if KEY is `eq' to the car of an element of ALIST.
-The value is actually the first element of ALIST whose car is KEY.
-Elements of ALIST that are not conses are ignored."
-  (let loop ((tail alist))
-    (cond
-      ((null? tail) #nil)
-      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
-      ((eq? key (car (car tail))) (car tail))
-      (else (loop (cdr tail))))))
 
 (define (elisp-assoc key alist)
   "Return non-nil if KEY is `equal' to the car of an element of ALIST.
@@ -459,8 +430,6 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
               (plist-member ,elisp-plist-member)
 
               ;; List search & access
-              (memq ,elisp-memq)
-              (member ,elisp-member)
               (nth ,elisp-nth)
               (nthcdr ,elisp-nthcdr)
               (last ,elisp-last)
@@ -471,7 +440,6 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
               (append ,elisp-append)
 
               ;; Association lists
-              (assq ,elisp-assq)
               (assoc ,elisp-assoc)
               (rassq ,elisp-rassq)
 

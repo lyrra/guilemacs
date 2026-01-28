@@ -1982,33 +1982,8 @@ eq_comparable_value (Lisp_Object x)
   return SYMBOLP (x) || FIXNUMP (x);
 }
 
-DEFUN ("member", Fmember, Smember, 2, 2, 0,
-       doc: /* Return non-nil if ELT is an element of LIST.  Comparison done with `equal'.
-The value is actually the tail of LIST whose car is ELT.  */)
-  (Lisp_Object elt, Lisp_Object list)
-{
-  if (eq_comparable_value (elt))
-    return Fmemq (elt, list);
-  Lisp_Object tail = list;
-  FOR_EACH_TAIL (tail)
-    if (! NILP (Fequal (elt, XCAR (tail))))
-      return tail;
-  CHECK_LIST_END (tail, list);
-  return Qnil;
-}
-
-DEFUN ("memq", Fmemq, Smemq, 2, 2, 0,
-       doc: /* Return non-nil if ELT is an element of LIST.  Comparison done with `eq'.
-The value is actually the tail of LIST whose car is ELT.  */)
-  (Lisp_Object elt, Lisp_Object list)
-{
-  Lisp_Object tail = list;
-  FOR_EACH_TAIL (tail)
-    if (EQ (XCAR (tail), elt))
-      return tail;
-  CHECK_LIST_END (tail, list);
-  return Qnil;
-}
+DEFUNWRAP2(Fmember, "member")
+DEFUNWRAP2(Fmemq, "memq")
 
 Lisp_Object
 memq_no_quit (Lisp_Object elt, Lisp_Object list)
@@ -2019,35 +1994,8 @@ memq_no_quit (Lisp_Object elt, Lisp_Object list)
   return Qnil;
 }
 
-DEFUN ("memql", Fmemql, Smemql, 2, 2, 0,
-       doc: /* Return non-nil if ELT is an element of LIST.  Comparison done with `eql'.
-The value is actually the tail of LIST whose car is ELT.  */)
-  (Lisp_Object elt, Lisp_Object list)
-{
-  Lisp_Object tail = list;
-  FOR_EACH_TAIL (tail)
-    {
-      Lisp_Object tem = XCAR (tail);
-      if (!NILP (Feql (elt, tem)))
-	return tail;
-    }
-  CHECK_LIST_END (tail, list);
-  return Qnil;
-}
-
-DEFUN ("assq", Fassq, Sassq, 2, 2, 0,
-       doc: /* Return non-nil if KEY is `eq' to the car of an element of ALIST.
-The value is actually the first element of ALIST whose car is KEY.
-Elements of ALIST that are not conses are ignored.  */)
-  (Lisp_Object key, Lisp_Object alist)
-{
-  Lisp_Object tail = alist;
-  FOR_EACH_TAIL (tail)
-    if (CONSP (XCAR (tail)) && EQ (XCAR (XCAR (tail)), key))
-      return XCAR (tail);
-  CHECK_LIST_END (tail, alist);
-  return Qnil;
-}
+DEFUNWRAP2(Fmemql, "memql")
+DEFUNWRAP2(Fassq, "assq")
 
 /* Like Fassq but never report an error and do not allow quits.
    Use only on objects known to be non-circular lists.  */

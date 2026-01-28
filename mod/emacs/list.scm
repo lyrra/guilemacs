@@ -101,6 +101,32 @@ sublist by modifying its list structure, then returns the resulting list."
       ((eq? elt (car tail)) (loop (cdr tail) result))
       (else (loop (cdr tail) (cons (car tail) result))))))
 
+(define (elisp-assq key alist)
+  "Return non-nil if KEY is `eq' to the car of an element of ALIST.
+The value is actually the first element of ALIST whose car is KEY.
+Elements of ALIST that are not conses are ignored."
+  (let loop ((tail alist))
+    (cond
+      ((or (null? tail) (eq? #nil tail)) #nil)
+      ((not (pair? (car tail))) (loop (cdr tail))) ; Skip non-conses
+      ((eq? key (car (car tail))) (car tail))
+      (else (loop (cdr tail))))))
+
+(define (elisp-memq elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `eq'.
+The value is actually the tail of LIST whose car is ELT."
+  (or (memq elt list) #nil))
+
+(define (elisp-memql elt list)
+  "Return non-nil if ELT is an element of LIST.  Comparison done with `eql'.
+The value is actually the tail of LIST whose car is ELT."
+  (or (memv elt list) #nil))
+
+(define (elisp-member elt list)
+  "Return non-nil if ELT is an element of LIST. Comparison done with `equal'.
+The value is actually the tail of LIST whose car is ELT."
+  (or (member elt list) #nil))
+
 ;;
 
 (define (init-list-registrations)
@@ -124,4 +150,8 @@ sublist by modifying its list structure, then returns the resulting list."
               (rplacd ,elisp-rplacd)
               (delq ,elisp-delq)
               (remq ,elisp-remq)
+              (assq ,elisp-assq)
+              (memq ,elisp-memq)
+              (memql ,elisp-memql)
+              (member ,elisp-member)
               )))
