@@ -25,7 +25,7 @@
     elisp-member-ignore-case elisp-mapcar elisp-mapc elisp-mapcan
     elisp-mapconcat elisp-last elisp-butlast elisp-length
     elisp-safe-length elisp-sort elisp-delete elisp-remove
-    elisp-delq elisp-remq elisp-delete-dups elisp-copy-sequence
+    elisp-delete-dups elisp-copy-sequence
     elisp-elt elisp-copy-alist elisp-assq-delete-all
     init-sequences-registrations
   ))

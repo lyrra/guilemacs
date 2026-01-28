@@ -956,15 +956,6 @@ SEQ is not modified."
                   seq
                 (copy-sequence seq))))
 
-(defun remq (elt list)
-  "Return LIST with all occurrences of ELT removed.
-The comparison is done with `eq'.  Contrary to `delq', this does not use
-side-effects, and the argument LIST is not modified."
-  (declare (side-effect-free t))
-  (while (and (eq elt (car list)) (setq list (cdr list))))
-  (if (memq elt list)
-      (delq elt (copy-sequence list))
-    list))
 
 ;; guilemacs define save-match-data before usage
 

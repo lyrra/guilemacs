@@ -38,7 +38,7 @@
     elisp-copysign elisp-frexp elisp-ldexp elisp-logb
     elisp-sign elisp-clamp elisp-square
     ;; Other utilities
-    elisp-nreverse elisp-delq elisp-remq
+    elisp-nreverse
     elisp-markerp elisp-keywordp
     elisp-file-name-absolute-p
     elisp-get-load-suffixes
@@ -244,34 +244,6 @@ This function may destructively modify SEQ to produce the value."
     ((string? seq)
      (list->string (reverse! (string->list seq))))
     (else seq)))
-
-(define (elisp-delq elt list)
-  "Delete members of LIST which are `eq' to ELT, and return the result.
-More precisely, this function skips any members `eq' to ELT at the
-front of LIST, then removes members `eq' to ELT from the remaining
-sublist by modifying its list structure, then returns the resulting list."
-  (let skip-front ((tail list))
-    (cond
-      ((null? tail) '())
-      ((eq? elt (car tail)) (skip-front (cdr tail)))
-      (else
-       (let remove-rest ((prev tail) (curr (cdr tail)))
-         (cond
-           ((null? curr) tail)
-           ((eq? elt (car curr))
-            (set-cdr! prev (cdr curr))
-            (remove-rest prev (cdr curr)))
-           (else
-            (remove-rest curr (cdr curr)))))))))
-
-(define (elisp-remq elt list)
-  "Return a copy of LIST with all elements `eq' to ELT removed.
-This is like `delq', but it does not modify the original list."
-  (let loop ((tail list) (result '()))
-    (cond
-      ((null? tail) (reverse result))
-      ((eq? elt (car tail)) (loop (cdr tail) result))
-      (else (loop (cdr tail) (cons (car tail) result))))))
 
 ;;;
 ;;; Type Predicates
@@ -603,8 +575,6 @@ by using direct Scheme-to-Elisp function calls instead of malloc/free cycles."
   (set-symbol-function! 'featurep elisp-featurep)
   (set-symbol-function! 'provide elisp-provide)
   (set-symbol-function! 'nreverse elisp-nreverse)
-  (set-symbol-function! 'delq elisp-delq)
-  (set-symbol-function! 'remq elisp-remq)
   (set-symbol-function! 'markerp elisp-markerp)
   (set-symbol-function! 'keywordp elisp-keywordp)
   (set-symbol-function! 'file-name-absolute-p elisp-file-name-absolute-p)

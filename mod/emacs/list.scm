@@ -13,6 +13,7 @@
     elisp-list
     elisp-make-list
     elisp-not
+    elisp-delq elisp-remq
     init-list-registrations))
 
 ;;;
@@ -71,6 +72,35 @@
 (define (elisp-rplacd cell x)
   (set-cdr! cell x))
 
+(define (elisp-delq elt list)
+  "Delete members of LIST which are `eq' to ELT, and return the result.
+More precisely, this function skips any members `eq' to ELT at the
+front of LIST, then removes members `eq' to ELT from the remaining
+sublist by modifying its list structure, then returns the resulting list."
+  ; FIX: could probably use a simple destructive filter:
+  (filter! (lambda (x) (not (eq? elt x))) list)
+  (let skip-front ((tail list))
+    (cond
+      ((or (null? tail) (eq? tail #nil)) #nil)
+      ((eq? elt (car tail)) (skip-front (cdr tail)))
+      (else
+       (let remove-rest ((prev tail) (curr (cdr tail)))
+         (cond
+           ((or (null? curr) (eq? curr #nil)) tail)
+           ((eq? elt (car curr))
+            (set-cdr! prev (cdr curr))
+            (remove-rest prev (cdr curr)))
+           (else
+            (remove-rest curr (cdr curr)))))))))
+
+(define (elisp-remq elt list)
+  "Return a copy of LIST with all elements `eq' to ELT removed."
+  (let loop ((tail list) (result '()))
+    (cond
+      ((null? tail) (reverse result))
+      ((eq? elt (car tail)) (loop (cdr tail) result))
+      (else (loop (cdr tail) (cons (car tail) result))))))
+
 ;;
 
 (define (init-list-registrations)
@@ -92,4 +122,6 @@
               (not ,elisp-not)
               (rplaca ,elisp-rplaca)
               (rplacd ,elisp-rplacd)
+              (delq ,elisp-delq)
+              (remq ,elisp-remq)
               )))
