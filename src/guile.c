@@ -103,3 +103,145 @@ init_guile (void)
   c_closure_tag = scm_make_smob_type ("c-closure", 0);
   scm_set_smob_apply (c_closure_tag, apply_c_closure, 0, 0, 1);
 }
+
+/*
+ * debugging
+ */
+
+/* Dump all fboundp symbols to a file.
+   Call from GDB: call debug_dump_symbol_functions("/tmp/sym.txt") */
+static FILE *debug_dump_file;
+
+static SCM
+debug_dump_one_symbol (SCM sym)
+{
+  SCM sym_name_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-name");
+  SCM sym_fn_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-function");
+  SCM fboundp_fn = scm_c_public_ref ("emacs-elisp runtime", "fboundp");
+
+  if (scm_is_false (scm_call_1 (fboundp_fn, sym)))
+    return SCM_UNSPECIFIED;
+
+  SCM name_str = scm_call_1 (sym_name_fn, sym);
+  SCM func = scm_call_1 (sym_fn_fn, sym);
+  char *name = scm_to_utf8_string (name_str);
+
+  if (scm_is_true (scm_procedure_p (func)))
+    {
+      SCM pname = (scm_procedure_name) (func);
+      if (scm_is_true (pname))
+        {
+          char *pn = scm_to_utf8_string (scm_symbol_to_string (pname));
+          fprintf (debug_dump_file, "%-40s -> %p  [%s]\n",
+                   name, (void *) SCM_UNPACK (func), pn);
+          free (pn);
+        }
+      else
+        fprintf (debug_dump_file, "%-40s -> %p  [anonymous]\n",
+                 name, (void *) SCM_UNPACK (func));
+    }
+  else
+    fprintf (debug_dump_file, "%-40s -> %p  [non-procedure]\n",
+             name, (void *) SCM_UNPACK (func));
+
+  free (name);
+  return SCM_UNSPECIFIED;
+}
+
+void
+debug_dump_symbol_functions (const char *filename)
+{
+  debug_dump_file = fopen (filename, "w");
+  if (!debug_dump_file)
+    {
+      fprintf (stderr, "Cannot open %s\n", filename);
+      return;
+    }
+
+  SCM for_each_fn = scm_c_public_ref ("emacs-elisp runtime",
+                                       "for-each-elisp-symbol");
+  SCM callback = scm_c_make_gsubr ("debug-dump-cb", 1, 0, 0,
+                                    (scm_t_subr) debug_dump_one_symbol);
+  scm_call_1 (for_each_fn, callback);
+
+  fclose (debug_dump_file);
+  debug_dump_file = NULL;
+  fprintf (stderr, "Dumped to %s\n", filename);
+}
+
+/* Call from GDB: call debug_scm_proc_name(fn) */
+void
+debug_scm_proc_name (SCM fn)
+{
+  SCM name = scm_procedure_name (fn);
+  if (scm_is_true (name))
+    fprintf (stderr, "%s\n", scm_to_utf8_string (scm_symbol_to_string (name)));
+  else
+    fprintf (stderr, "(anonymous)\n");
+}
+
+/* Call from GDB: call debug_guile_backtrace()
+   Prints the Guile VM stack (Scheme + gsubr frames). */
+void
+debug_guile_backtrace (void)
+{
+  SCM stack = scm_make_stack (SCM_BOOL_T, SCM_EOL);
+  SCM port = scm_current_error_port ();
+  scm_display_backtrace (stack, port, SCM_BOOL_F, SCM_BOOL_F);
+  scm_force_output (port);
+}
+
+/* Call from GDB: call debug_scm_print(obj)
+   Print any SCM value to stderr. */
+void
+debug_scm_print (SCM obj)
+{
+  SCM port = scm_current_error_port ();
+  scm_write (obj, port);
+  scm_newline (port);
+  scm_force_output (port);
+}
+
+/* Call from GDB: call debug_lisp_print(obj)
+   Print a Lisp_Object using Emacs' printer. */
+void
+debug_lisp_print (Lisp_Object obj)
+{
+  Fprin1 (obj, Qexternal_debugging_output, Qnil);
+  fprintf (stderr, "\n");
+}
+
+/* Call from GDB: call debug_scm_value(obj)
+   Identify the type and value of an SCM. */
+void
+debug_scm_value (SCM obj)
+{
+  if (scm_is_false (obj))
+    fprintf (stderr, "#f\n");
+  else if (scm_is_null (obj))
+    fprintf (stderr, "()\n");
+  else if (scm_is_true (scm_symbol_p (obj)))
+    fprintf (stderr, "symbol: %s\n",
+             scm_to_utf8_string (scm_symbol_to_string (obj)));
+  else if (scm_is_string (obj))
+    fprintf (stderr, "string: \"%s\"\n", scm_to_utf8_string (obj));
+  else if (scm_is_integer (obj))
+    fprintf (stderr, "integer: %ld\n", scm_to_long (obj));
+  else if (scm_is_true (scm_procedure_p (obj)))
+    {
+      fprintf (stderr, "procedure: %p", (void *) SCM_UNPACK (obj));
+      SCM name = scm_procedure_name (obj);
+      if (scm_is_true (name))
+        fprintf (stderr, " [%s]",
+                 scm_to_utf8_string (scm_symbol_to_string (name)));
+      fprintf (stderr, "\n");
+    }
+  else if (scm_is_pair (obj))
+    {
+      fprintf (stderr, "pair: ");
+      debug_scm_print (obj);
+    }
+  else
+    fprintf (stderr, "SCM %p (use debug_scm_print for details)\n",
+             (void *) SCM_UNPACK (obj));
+}

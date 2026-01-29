@@ -364,6 +364,18 @@ counts how many times scheme crosses over to C and vice-versa.
    Let 'A' be a literal address like 0x12345, or a variable
    | call scm_display(A, scm_current_output_port())
 *** helpers
+
+The following C functions can be used from gdb to inspect the
+lisp/scheme state:
+  | call debug_guile_backtrace()                     | Prints the Guile VM stack — shows you which Scheme/Elisp functions are on the call stack |
+  | call debug_scm_proc_name(fn)                     | Prints the name of an SCM procedure                                                      |
+  | call debug_scm_value(obj)                        | Identifies type + value of any SCM (symbol, string, integer, procedure, pair)            |
+  | call debug_scm_print(obj)                        | Pretty-prints any SCM to stderr using Guile's writer                                     |
+  | call debug_lisp_print(obj)                       | Prints a Lisp_Object using Emacs' prin1                                                  |
+  | call debug_dump_symbol_functions("/tmp/sym.txt") | Dumps all fboundp symbols with addresses                                                 |
+
+**** misc debug notes
+
   see 7f129f2ecfbdded5c31e9d9fc8bf11ce0e017000
   how to inspect lisp variables from gdb
 
