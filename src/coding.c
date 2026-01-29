@@ -290,6 +290,7 @@ encode_coding_XXX (struct coding_system *coding)
 #endif /* HAVE_WCHAR_H */
 
 #include "lisp.h"
+#include "guile.h"
 #include "character.h"
 #include "buffer.h"
 #include "charset.h"
@@ -7257,7 +7258,7 @@ produce_composition (struct coding_system *coding, int *charbuf, ptrdiff_t pos)
 	      args[j] = make_fixnum (charbuf[i] % 0x100);
 	    }
 	}
-      components = (i == j ? scm_call_n (string_fn, args, j) : Fvector (j, args));
+      components = (i == j ? SCM_CALL_N (string_fn, args, j) : Fvector (j, args));
     }
   compose_text (pos, to, components, Qnil, coding->dst_object);
 }

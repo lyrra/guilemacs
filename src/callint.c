@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "character.h"
 #include "buffer.h"
 #include "keyboard.h"
@@ -414,7 +415,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	  /* See bug#8479.  */
 	  if (! CHARACTERP (args[i]))
 	    error ("Non-character input-event");
-	  visargs[i] = scm_call_1 (char_to_string_fn, args[i]);
+	  visargs[i] = SCM_CALL_1 (char_to_string_fn, args[i]);
 	  break;
 
 	case 'C':	      /* Command: symbol with interactive function.  */

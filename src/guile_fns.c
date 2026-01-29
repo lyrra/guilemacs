@@ -2,6 +2,7 @@
 
 #include <config.h>
 #include "lisp.h"
+#include "guile.h"
 #include "guile_fns.h"
 #include "coding.h"
 #include <libguile.h>
@@ -340,7 +341,7 @@ guile_lookup_color (Lisp_Object color_map, const char *color_name)
   if (!scm_is_true (scm_lookup_color_in_map))
     return Qnil;
 
-  SCM result = scm_call_2 (scm_lookup_color_in_map,
+  SCM result = SCM_CALL_2 (scm_lookup_color_in_map,
                            color_map,
                            scm_from_utf8_string (color_name));
 
@@ -357,7 +358,7 @@ guile_lookup_font_style (Lisp_Object table, const char *style_name)
   if (!scm_is_true (scm_lookup_font_style))
     return Qnil;
 
-  SCM result = scm_call_2 (scm_lookup_font_style,
+  SCM result = SCM_CALL_2 (scm_lookup_font_style,
                            table,
                            scm_from_utf8_string (style_name));
 
@@ -388,7 +389,7 @@ guile_lookup_alist_ci (Lisp_Object alist, const char *key)
   if (!scm_is_true (scm_lookup_in_alist_ci))
     return Qnil;
 
-  SCM result = scm_call_2 (scm_lookup_in_alist_ci,
+  SCM result = SCM_CALL_2 (scm_lookup_in_alist_ci,
                            alist,
                            scm_from_utf8_string (key));
 
@@ -405,7 +406,7 @@ guile_lookup_alist (Lisp_Object alist, const char *key)
   if (!scm_is_true (scm_lookup_in_alist))
     return Qnil;
 
-  SCM result = scm_call_2 (scm_lookup_in_alist,
+  SCM result = SCM_CALL_2 (scm_lookup_in_alist,
                            alist,
                            scm_from_utf8_string (key));
 
@@ -422,7 +423,7 @@ guile_lookup_symbol_in_list (Lisp_Object list, const char *name)
   if (!scm_is_true (scm_lookup_symbol_in_list))
     return false;
 
-  SCM result = scm_call_2 (scm_lookup_symbol_in_list,
+  SCM result = SCM_CALL_2 (scm_lookup_symbol_in_list,
                            list,
                            scm_from_utf8_string (name));
 
@@ -439,7 +440,7 @@ guile_parse_face_bool_attribute (Lisp_Object attr_string)
   if (!STRINGP (attr_string))
     return 0; /* unknown */
 
-  SCM result = scm_call_1 (scm_parse_face_bool_attribute,
+  SCM result = SCM_CALL_1 (scm_parse_face_bool_attribute,
                            scm_from_utf8_string (SSDATA (attr_string)));
 
   if (scm_is_eq (result, scm_from_utf8_symbol ("true")))
@@ -460,7 +461,7 @@ guile_process_yesno_response (Lisp_Object response_string)
   if (!STRINGP (response_string))
     return -1; /* invalid */
 
-  SCM result = scm_call_1 (scm_process_yesno_response,
+  SCM result = SCM_CALL_1 (scm_process_yesno_response,
                            scm_from_utf8_string (SSDATA (response_string)));
 
   if (scm_is_eq (result, scm_from_utf8_symbol ("yes")))
@@ -481,7 +482,7 @@ guile_filter_dbus_message (Lisp_Object message, Lisp_Object interface_pattern, L
   if (!STRINGP (interface_pattern) || !STRINGP (member_pattern))
     return false;
 
-  SCM result = scm_call_3 (scm_filter_dbus_message,
+  SCM result = SCM_CALL_3 (scm_filter_dbus_message,
                            message,
                            scm_from_utf8_string (SSDATA (interface_pattern)),
                            scm_from_utf8_string (SSDATA (member_pattern)));
@@ -500,7 +501,7 @@ guile_is_special_buffer_name (Lisp_Object buffer_name)
     return false;
 
   /* scm_is_special_buffer_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_is_special_buffer_name,
+  SCM result = SCM_CALL_1 (scm_is_special_buffer_name,
                            scm_from_utf8_string (SSDATA (buffer_name)));
 
   return scm_is_true (result);
@@ -517,7 +518,7 @@ guile_parse_color_spec (Lisp_Object color_spec)
     return Qnil;
 
   /* scm_parse_color_spec is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_parse_color_spec,
+  SCM result = SCM_CALL_1 (scm_parse_color_spec,
                            scm_from_utf8_string (SSDATA (color_spec)));
 
   if (scm_is_false (result))
@@ -553,7 +554,7 @@ guile_validate_color_name (Lisp_Object color_name)
     return false;
 
   /* scm_validate_color_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_validate_color_name,
+  SCM result = SCM_CALL_1 (scm_validate_color_name,
                            scm_from_utf8_string (SSDATA (color_name)));
 
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
@@ -570,7 +571,7 @@ guile_string_contains_whitespace (Lisp_Object str)
     return false;
 
   /* scm_string_contains_whitespace is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_contains_whitespace,
+  SCM result = SCM_CALL_1 (scm_string_contains_whitespace,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -586,7 +587,7 @@ guile_is_frame_name_fnn_format (Lisp_Object name)
   if (!STRINGP (name))
     return false;
 
-  SCM result = scm_call_1 (scm_is_frame_name_fnn_format,
+  SCM result = SCM_CALL_1 (scm_is_frame_name_fnn_format,
                            scm_from_utf8_string (SSDATA (name)));
 
   return scm_is_true (result);
@@ -602,7 +603,7 @@ guile_validate_xlfd_font_name (Lisp_Object name)
   if (!STRINGP (name))
     return false;
 
-  SCM result = scm_call_1 (scm_validate_xlfd_font_name,
+  SCM result = SCM_CALL_1 (scm_validate_xlfd_font_name,
                            scm_from_utf8_string (SSDATA (name)));
 
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
@@ -621,7 +622,7 @@ guile_string_spaces_to_dashes (Lisp_Object str)
   if (!STRINGP (str))
     return str;
 
-  SCM result = scm_call_1 (scm_string_spaces_to_dashes,
+  SCM result = SCM_CALL_1 (scm_string_spaces_to_dashes,
                            scm_from_utf8_string (SSDATA (str)));
 
   if (scm_is_false (result))
@@ -649,7 +650,7 @@ guile_string_trim_leading_whitespace (Lisp_Object str)
   if (!STRINGP (str))
     return str;
 
-  SCM result = scm_call_1 (scm_string_trim_leading_whitespace,
+  SCM result = SCM_CALL_1 (scm_string_trim_leading_whitespace,
                            scm_from_utf8_string (SSDATA (str)));
 
   if (scm_is_false (result))
@@ -677,7 +678,7 @@ guile_parse_number_string (Lisp_Object str, int base)
   if (!STRINGP (str))
     return make_fixnum (0);
 
-  SCM result = scm_call_2 (scm_parse_number_string,
+  SCM result = SCM_CALL_2 (scm_parse_number_string,
                            scm_from_utf8_string (SSDATA (str)),
                            scm_from_int (base));
 
@@ -709,7 +710,7 @@ guile_validate_string_for_copying (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  SCM result = scm_call_1 (scm_validate_string_for_copying,
+  SCM result = SCM_CALL_1 (scm_validate_string_for_copying,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result) && scm_is_eq (result, scm_from_utf8_symbol ("valid"));
@@ -725,7 +726,7 @@ guile_prepare_string_for_symbol (Lisp_Object str)
   if (!STRINGP (str))
     return str;
 
-  SCM result = scm_call_1 (scm_prepare_string_for_symbol,
+  SCM result = SCM_CALL_1 (scm_prepare_string_for_symbol,
                            scm_from_utf8_string (SSDATA (str)));
 
   if (scm_is_false (result))
@@ -754,7 +755,7 @@ guile_has_file_extension (Lisp_Object filename, const char *extension)
   if (!STRINGP (filename))
     return false;
 
-  SCM result = scm_call_2 (scm_has_file_extension,
+  SCM result = SCM_CALL_2 (scm_has_file_extension,
                            scm_from_utf8_string (SSDATA (filename)),
                            scm_from_utf8_string (extension));
 
@@ -771,7 +772,7 @@ guile_extract_filename_from_path (Lisp_Object path)
   if (!STRINGP (path))
     return path;
 
-  SCM result = scm_call_1 (scm_extract_filename_from_path,
+  SCM result = SCM_CALL_1 (scm_extract_filename_from_path,
                            scm_from_utf8_string (SSDATA (path)));
 
   if (scm_is_string (result))
@@ -799,7 +800,7 @@ guile_is_modifier_symbol (Lisp_Object symbol, const char *test_string)
   if (!STRINGP (name))
     return false;
 
-  SCM result = scm_call_2 (scm_is_modifier_symbol,
+  SCM result = SCM_CALL_2 (scm_is_modifier_symbol,
                            scm_from_utf8_string (SSDATA (name)),
                            scm_from_utf8_string (test_string));
 
@@ -816,7 +817,7 @@ guile_validate_float_format_string (Lisp_Object format_str)
   if (!STRINGP (format_str))
     return false;
 
-  SCM result = scm_call_1 (scm_validate_float_format_string,
+  SCM result = SCM_CALL_1 (scm_validate_float_format_string,
                            scm_from_utf8_string (SSDATA (format_str)));
 
   return scm_is_eq (result, scm_from_utf8_symbol ("valid"));
@@ -832,7 +833,7 @@ guile_has_time_format_specifiers (Lisp_Object format_str)
   if (!STRINGP (format_str))
     return false;
 
-  SCM result = scm_call_1 (scm_has_time_format_specifiers,
+  SCM result = SCM_CALL_1 (scm_has_time_format_specifiers,
                            scm_from_utf8_string (SSDATA (format_str)));
 
   return scm_is_true (result);
@@ -848,7 +849,7 @@ guile_parse_hex_color (Lisp_Object hex_str)
   if (!STRINGP (hex_str))
     return Qnil;
 
-  SCM result = scm_call_1 (scm_parse_hex_color,
+  SCM result = SCM_CALL_1 (scm_parse_hex_color,
                            scm_from_utf8_string (SSDATA (hex_str)));
 
   if (scm_is_false (result))
@@ -883,7 +884,7 @@ guile_needs_filename_conversion (Lisp_Object filename)
   if (!STRINGP (filename))
     return false;
 
-  SCM result = scm_call_1 (scm_needs_filename_conversion,
+  SCM result = SCM_CALL_1 (scm_needs_filename_conversion,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -899,7 +900,7 @@ guile_is_utf8_filename (Lisp_Object filename)
   if (!STRINGP (filename))
     return false;
 
-  SCM result = scm_call_1 (scm_is_utf8_filename,
+  SCM result = SCM_CALL_1 (scm_is_utf8_filename,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -915,7 +916,7 @@ guile_is_safe_for_c_string_copy (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  SCM result = scm_call_1 (scm_is_safe_for_c_string_copy,
+  SCM result = SCM_CALL_1 (scm_is_safe_for_c_string_copy,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -931,7 +932,7 @@ guile_looks_like_network_address (Lisp_Object addr_str)
   if (!STRINGP (addr_str))
     return false;
 
-  SCM result = scm_call_1 (scm_looks_like_network_address,
+  SCM result = SCM_CALL_1 (scm_looks_like_network_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
 
   return scm_is_true (result);
@@ -950,7 +951,7 @@ guile_is_absolute_path (Lisp_Object path)
     return false;
 
   /* scm_is_absolute_path is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_is_absolute_path,
+  SCM result = SCM_CALL_1 (scm_is_absolute_path,
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
@@ -967,7 +968,7 @@ guile_ends_with_directory_separator (Lisp_Object path)
     return false;
 
   /* scm_ends_with_directory_separator is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_ends_with_directory_separator,
+  SCM result = SCM_CALL_1 (scm_ends_with_directory_separator,
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
@@ -984,7 +985,7 @@ guile_normalize_path_separators (Lisp_Object path)
     return path;
 
   /* scm_normalize_path_separators is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_normalize_path_separators,
+  SCM result = SCM_CALL_1 (scm_normalize_path_separators,
                            scm_from_utf8_string (SSDATA (path)));
 
   if (scm_is_string (result))
@@ -1008,7 +1009,7 @@ guile_string_empty (Lisp_Object str)
   if (!STRINGP (str))
     return false;
 
-  SCM result = scm_call_1 (scm_string_empty,
+  SCM result = SCM_CALL_1 (scm_string_empty,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1024,7 +1025,7 @@ guile_has_directory_traversal (Lisp_Object path)
   if (!STRINGP (path))
     return false;
 
-  SCM result = scm_call_1 (scm_has_directory_traversal,
+  SCM result = SCM_CALL_1 (scm_has_directory_traversal,
                            scm_from_utf8_string (SSDATA (path)));
 
   return scm_is_true (result);
@@ -1040,7 +1041,7 @@ guile_get_file_extension (Lisp_Object path)
   if (!STRINGP (path))
     return build_string ("");
 
-  SCM result = scm_call_1 (scm_get_file_extension,
+  SCM result = SCM_CALL_1 (scm_get_file_extension,
                            scm_from_utf8_string (SSDATA (path)));
 
   if (scm_is_string (result))
@@ -1065,7 +1066,7 @@ guile_path_starts_with (Lisp_Object path, const char *prefix)
     return false;
 
   /* scm_path_starts_with is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_path_starts_with,
+  SCM result = SCM_CALL_2 (scm_path_starts_with,
                            scm_from_utf8_string (SSDATA (path)),
                            scm_from_utf8_string (prefix));
 
@@ -1085,7 +1086,7 @@ guile_string_single_char (Lisp_Object str)
     return false;
 
   /* scm_string_single_char is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_single_char,
+  SCM result = SCM_CALL_1 (scm_string_single_char,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1102,7 +1103,7 @@ guile_string_starts_with_space (Lisp_Object str)
     return false;
 
   /* scm_string_starts_with_space is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_starts_with_space,
+  SCM result = SCM_CALL_1 (scm_string_starts_with_space,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1119,7 +1120,7 @@ guile_string_ascii_only (Lisp_Object str)
     return false;
 
   /* scm_string_ascii_only is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_ascii_only,
+  SCM result = SCM_CALL_1 (scm_string_ascii_only,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1136,7 +1137,7 @@ guile_valid_symbol_name (Lisp_Object str)
     return false;
 
   /* scm_valid_symbol_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_valid_symbol_name,
+  SCM result = SCM_CALL_1 (scm_valid_symbol_name,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1153,7 +1154,7 @@ guile_string_numeric (Lisp_Object str)
     return false;
 
   /* scm_string_numeric is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_numeric,
+  SCM result = SCM_CALL_1 (scm_string_numeric,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1170,7 +1171,7 @@ guile_special_buffer_name (Lisp_Object buffer_name)
     return false;
 
   /* scm_special_buffer_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_special_buffer_name,
+  SCM result = SCM_CALL_1 (scm_special_buffer_name,
                            scm_from_utf8_string (SSDATA (buffer_name)));
 
   return scm_is_true (result);
@@ -1187,7 +1188,7 @@ guile_string_starts_with_char (Lisp_Object str, int character)
     return false;
 
   /* scm_string_starts_with_char is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_string_starts_with_char,
+  SCM result = SCM_CALL_2 (scm_string_starts_with_char,
                            scm_from_utf8_string (SSDATA (str)),
                            scm_from_int (character));
 
@@ -1207,7 +1208,7 @@ guile_has_file_extension_new (Lisp_Object filename, const char *extension)
     return false;
 
   /* scm_has_file_extension is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_has_file_extension,
+  SCM result = SCM_CALL_2 (scm_has_file_extension,
                            scm_from_utf8_string (SSDATA (filename)),
                            scm_from_utf8_string (extension));
 
@@ -1225,7 +1226,7 @@ guile_source_code_file (Lisp_Object filename)
     return false;
 
   /* scm_source_code_file is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_source_code_file,
+  SCM result = SCM_CALL_1 (scm_source_code_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1242,7 +1243,7 @@ guile_image_file (Lisp_Object filename)
     return false;
 
   /* scm_image_file is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_image_file,
+  SCM result = SCM_CALL_1 (scm_image_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1261,7 +1262,7 @@ guile_hex_color_string (Lisp_Object str)
     return false;
 
   /* scm_hex_color_string is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_hex_color_string,
+  SCM result = SCM_CALL_1 (scm_hex_color_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1278,7 +1279,7 @@ guile_named_color (Lisp_Object color_name)
     return false;
 
   /* scm_named_color is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_named_color,
+  SCM result = SCM_CALL_1 (scm_named_color,
                            scm_from_utf8_string (SSDATA (color_name)));
 
   return scm_is_true (result);
@@ -1295,7 +1296,7 @@ guile_valid_xlfd_font_name_new (Lisp_Object font_name)
     return false;
 
   /* scm_valid_xlfd_font_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_valid_xlfd_font_name,
+  SCM result = SCM_CALL_1 (scm_valid_xlfd_font_name,
                            scm_from_utf8_string (SSDATA (font_name)));
 
   return scm_is_true (result);
@@ -1312,7 +1313,7 @@ guile_font_family_name (Lisp_Object name)
     return false;
 
   /* scm_font_family_name is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_font_family_name,
+  SCM result = SCM_CALL_1 (scm_font_family_name,
                            scm_from_utf8_string (SSDATA (name)));
 
   return scm_is_true (result);
@@ -1331,7 +1332,7 @@ guile_url_string (Lisp_Object str)
     return false;
 
   /* scm_url_string is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_url_string,
+  SCM result = SCM_CALL_1 (scm_url_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1350,7 +1351,7 @@ guile_email_address (Lisp_Object addr_str)
     return false;
 
   /* scm_email_address is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_email_address,
+  SCM result = SCM_CALL_1 (scm_email_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
 
   return scm_is_true (result);
@@ -1367,7 +1368,7 @@ guile_ip_address (Lisp_Object addr_str)
     return false;
 
   /* scm_ip_address is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_ip_address,
+  SCM result = SCM_CALL_1 (scm_ip_address,
                            scm_from_utf8_string (SSDATA (addr_str)));
 
   return scm_is_true (result);
@@ -1384,7 +1385,7 @@ guile_config_file (Lisp_Object filename)
     return false;
 
   /* scm_config_file is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_config_file,
+  SCM result = SCM_CALL_1 (scm_config_file,
                            scm_from_utf8_string (SSDATA (filename)));
 
   return scm_is_true (result);
@@ -1401,7 +1402,7 @@ guile_extract_file_extension (Lisp_Object filename)
     return build_string ("");
 
   /* scm_extract_file_extension is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_extract_file_extension,
+  SCM result = SCM_CALL_1 (scm_extract_file_extension,
                            scm_from_utf8_string (SSDATA (filename)));
 
   if (scm_is_string (result))
@@ -1426,7 +1427,7 @@ guile_rgb_color_string (Lisp_Object str)
     return false;
 
   /* scm_rgb_color_string is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_rgb_color_string,
+  SCM result = SCM_CALL_1 (scm_rgb_color_string,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1445,7 +1446,7 @@ guile_string_needs_escaping (Lisp_Object str)
     return false;
 
   /* scm_string_needs_escaping is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_needs_escaping,
+  SCM result = SCM_CALL_1 (scm_string_needs_escaping,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1462,7 +1463,7 @@ guile_string_equal_ignore_case (Lisp_Object str1, Lisp_Object str2)
     return false;
 
   /* scm_string_equal_ignore_case is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_string_equal_ignore_case,
+  SCM result = SCM_CALL_2 (scm_string_equal_ignore_case,
                            scm_from_utf8_string (SSDATA (str1)),
                            scm_from_utf8_string (SSDATA (str2)));
 
@@ -1480,7 +1481,7 @@ guile_string_ends_with_char (Lisp_Object str, int character)
     return false;
 
   /* scm_string_ends_with_char is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_string_ends_with_char,
+  SCM result = SCM_CALL_2 (scm_string_ends_with_char,
                            scm_from_utf8_string (SSDATA (str)),
                            scm_from_int (character));
 
@@ -1498,7 +1499,7 @@ guile_string_whitespace_only (Lisp_Object str)
     return false;
 
   /* scm_string_whitespace_only is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_whitespace_only,
+  SCM result = SCM_CALL_1 (scm_string_whitespace_only,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1515,7 +1516,7 @@ guile_valid_identifier (Lisp_Object str)
     return false;
 
   /* scm_valid_identifier is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_valid_identifier,
+  SCM result = SCM_CALL_1 (scm_valid_identifier,
                            scm_from_utf8_string (SSDATA (str)));
 
   return scm_is_true (result);
@@ -1528,7 +1529,7 @@ guile_lookup_registry_to_script (Lisp_Object reg_to_script_alist, const char *re
   if (!scm_is_true (scm_lookup_registry_to_script))
     return Qnil;
 
-  SCM result = scm_call_2 (scm_lookup_registry_to_script,
+  SCM result = SCM_CALL_2 (scm_lookup_registry_to_script,
                            reg_to_script_alist,
                            scm_from_utf8_string (registry_str));
 
@@ -1550,7 +1551,7 @@ guile_parse_font_name_with_size (Lisp_Object font_name, double current_size)
 
   SCM size_scm = (current_size > 0) ? scm_from_double (current_size) : SCM_BOOL_F;
 
-  SCM result = scm_call_2 (scm_parse_font_name_with_size,
+  SCM result = SCM_CALL_2 (scm_parse_font_name_with_size,
                            scm_from_utf8_string (SSDATA (font_name)),
                            size_scm);
 
@@ -1577,7 +1578,7 @@ guile_substring_no_properties (Lisp_Object string, Lisp_Object start, Lisp_Objec
     (FIXNUMP (end) ? scm_from_int (XFIXNUM (end)) : SCM_BOOL_F);
 
   /* scm_substring_no_properties_scheme is now the actual procedure (not a variable) */
-  SCM result = scm_call_3 (scm_substring_no_properties_scheme, string, start_scm, end_scm);
+  SCM result = SCM_CALL_3 (scm_substring_no_properties_scheme, string, start_scm, end_scm);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1598,7 +1599,7 @@ guile_file_path_absolute_p (Lisp_Object path)
     return false;
 
   /* scm_file_path_absolute_p is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_file_path_absolute_p, path);
+  SCM result = SCM_CALL_1 (scm_file_path_absolute_p, path);
   return scm_is_true (result);
 }
 
@@ -1613,7 +1614,7 @@ guile_file_path_directory (Lisp_Object path)
     return Qnil;
 
   /* scm_file_path_directory is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_file_path_directory, path);
+  SCM result = SCM_CALL_1 (scm_file_path_directory, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1632,7 +1633,7 @@ guile_file_path_nondirectory (Lisp_Object path)
     return Qnil;
 
   /* scm_file_path_nondirectory is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_file_path_nondirectory, path);
+  SCM result = SCM_CALL_1 (scm_file_path_nondirectory, path);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1651,7 +1652,7 @@ guile_file_path_safe_p (Lisp_Object path)
     return false;
 
   /* scm_file_path_safe_p is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_file_path_safe_p, path);
+  SCM result = SCM_CALL_1 (scm_file_path_safe_p, path);
   return scm_is_true (result);
 }
 
@@ -1665,7 +1666,7 @@ guile_string_concat_2 (Lisp_Object s1, Lisp_Object s2)
     return Qnil;
 
   /* scm_string_concat_2 is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_string_concat_2, s1, s2);
+  SCM result = SCM_CALL_2 (scm_string_concat_2, s1, s2);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1681,7 +1682,7 @@ guile_string_concat_3 (Lisp_Object s1, Lisp_Object s2, Lisp_Object s3)
     return Qnil;
 
   /* scm_string_concat_3 is now the actual procedure (not a variable) */
-  SCM result = scm_call_3 (scm_string_concat_3, s1, s2, s3);
+  SCM result = SCM_CALL_3 (scm_string_concat_3, s1, s2, s3);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1697,7 +1698,7 @@ guile_string_concat_multi (Lisp_Object string_list)
     return Qnil;
 
   /* scm_string_concat_multi is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_string_concat_multi, string_list);
+  SCM result = SCM_CALL_1 (scm_string_concat_multi, string_list);
 
   if (scm_is_false (result))
     return build_string ("");
@@ -1718,7 +1719,7 @@ guile_parse_integer_string (Lisp_Object str, int radix)
     return Qnil;
 
   /* scm_parse_integer_string is now the actual procedure (not a variable) */
-  SCM result = scm_call_2 (scm_parse_integer_string, str, scm_from_int (radix));
+  SCM result = SCM_CALL_2 (scm_parse_integer_string, str, scm_from_int (radix));
 
   if (scm_is_false (result))
     return Qnil;
@@ -1737,7 +1738,7 @@ guile_read_integer_guile (Lisp_Object input_string)
     return Qnil;
 
   /* scm_read_integer_guile is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_read_integer_guile, input_string);
+  SCM result = SCM_CALL_1 (scm_read_integer_guile, input_string);
 
   if (scm_is_false (result))
     return Qnil;
@@ -1756,7 +1757,7 @@ guile_parse_emacs_number (Lisp_Object str)
     return Qnil;
 
   /* scm_parse_emacs_number is now the actual procedure (not a variable) */
-  SCM result = scm_call_1 (scm_parse_emacs_number, str);
+  SCM result = SCM_CALL_1 (scm_parse_emacs_number, str);
 
   if (scm_is_false (result))
     return Qnil;

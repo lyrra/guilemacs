@@ -38,6 +38,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #endif
 
 #include "lisp.h"
+#include "guile.h"
 
 #include <float.h>
 #include <limits.h>
@@ -1312,7 +1313,7 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
   if (scm_is_false (get_intervals_proc))
     return;
 
-  SCM intervals = scm_call_1 (get_intervals_proc, wrapper);
+  SCM intervals = SCM_CALL_1 (get_intervals_proc, wrapper);
 
   /* If no intervals, nothing to do */
   if (scm_is_null (intervals))
@@ -1349,9 +1350,9 @@ apply_wrapper_properties_to_buffer (Lisp_Object wrapper,
           continue;
         }
 
-      SCM interval_start_scm = scm_call_1 (interval_start_proc, interval);
-      SCM interval_end_scm = scm_call_1 (interval_end_proc, interval);
-      SCM plist = scm_call_1 (interval_plist_proc, interval);
+      SCM interval_start_scm = SCM_CALL_1 (interval_start_proc, interval);
+      SCM interval_end_scm = SCM_CALL_1 (interval_end_proc, interval);
+      SCM plist = SCM_CALL_1 (interval_plist_proc, interval);
 
       /* Convert interval positions (0-based) to buffer positions (1-based) */
       ptrdiff_t int_start = scm_to_int (interval_start_scm);
@@ -3817,7 +3818,7 @@ styled_format (ptrdiff_t nargs, Lisp_Object *args, bool message)
 	    {
 	      if (FIXNUMP (arg) && ! ASCII_CHAR_P (XFIXNUM (arg)))
 		{
-		  spec->argument = arg = scm_call_1 (char_to_string_fn, arg);
+		  spec->argument = arg = SCM_CALL_1 (char_to_string_fn, arg);
 		}
 
 	      if (!EQ (arg, args[n]))

@@ -93,3 +93,5 @@
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")
+
+(message "scheme->C and C->scheme calls: %S" (debug-guile-cross-count))

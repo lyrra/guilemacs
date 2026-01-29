@@ -23,13 +23,16 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <limits.h>
 #include <stdlib.h>
 #include "lisp.h"
+#include "guile.h"
 #include "blockinput.h"
 #include "commands.h"
 #include "keyboard.h"
 #include "dispextern.h"
 #include "buffer.h"
 #include "atimer.h"
-#include "guile.h"
+
+uint64_t scheme_to_c_crossings;
+uint64_t c_to_scheme_crossings;
 
 static void unbind_once (void *ignore);
 
@@ -1827,7 +1830,7 @@ it defines a macro.  */)
      The Scheme version handles circular autoload detection via *files-being-loaded*.  */
   SCM scm_func = scm_c_private_ref ("emacs loader",
                                     "elisp-autoload-do-load");
-  return scm_call_3 (scm_func, fundef, funname, macro_only);
+  return SCM_CALL_3 (scm_func, fundef, funname, macro_only);
 }
 
 
@@ -1881,7 +1884,7 @@ static SCM
 scm_eval_body (void *data)
 {
   struct scm_eval_data *edata = (struct scm_eval_data *) data;
-  return scm_call_1 (eval_fn, edata->form);
+  return SCM_CALL_1 (eval_fn, edata->form);
 }
 
 /* Error handler for Guile exceptions during eval */
@@ -1920,7 +1923,7 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
   else
     {
       /* Build error message from Guile exception */
-      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
+      SCM msg = SCM_CALL_1 (scm_c_public_ref ("guile", "object->string"), args);
       char *error_msg = scm_to_utf8_string (msg);
       char *key_str = scm_to_utf8_string (scm_symbol_to_string (key));
 
@@ -1946,7 +1949,7 @@ eval_sub_1 (Lisp_Object form)
 {
   maybe_quit ();
 
-  /* Wrap scm_call_1 with exception handling to catch Guile exceptions
+  /* Wrap SCM_CALL_1 with exception handling to catch Guile exceptions
      and convert them to Elisp signals */
   struct scm_eval_data edata;
   edata.form = form;
@@ -2321,7 +2324,7 @@ static SCM
 scm_funcall_body (void *data)
 {
   struct scm_funcall_data *fdata = (struct scm_funcall_data *) data;
-  return scm_call_n (fdata->fun, fdata->args + 1, fdata->numargs);
+  return SCM_CALL_N (fdata->fun, fdata->args + 1, fdata->numargs);
 }
 
 /* Error handler for Guile exceptions during funcall */
@@ -2341,7 +2344,7 @@ scm_funcall_error_handler (void *data, SCM key, SCM args)
   else
     {
       /* Build error message from Guile exception */
-      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
+      SCM msg = SCM_CALL_1 (scm_c_public_ref ("guile", "object->string"), args);
       char *error_msg = scm_to_utf8_string (msg);
       char *key_str = scm_to_utf8_string (scm_symbol_to_string (key));
 
@@ -2371,7 +2374,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 
   if (scm_is_true (scm_procedure_p (fun)))
     {
-      /* Wrap scm_call_n with exception handling to catch Guile exceptions
+      /* Wrap SCM_CALL_n with exception handling to catch Guile exceptions
          and convert them to Elisp signals that condition-case can catch */
       struct scm_funcall_data fdata;
       fdata.fun = fun;
@@ -2422,7 +2425,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
 static Lisp_Object
 Ffuncall1 (ptrdiff_t nargs, Lisp_Object *args)
 {
-  return scm_call_n (funcall_fn, args, nargs);
+  return SCM_CALL_N (funcall_fn, args, nargs);
 }
 
 Lisp_Object
@@ -3118,7 +3121,7 @@ call_with_prompt (SCM tag, SCM thunk, SCM handler)
   if (SCM_UNBNDP (var))
     var = scm_c_public_lookup ("guile", "call-with-prompt");
 
-  return scm_call_3 (scm_variable_ref (var), tag, thunk, handler);
+  return SCM_CALL_3 (scm_variable_ref (var), tag, thunk, handler);
 }
 
 SCM
@@ -3128,9 +3131,29 @@ make_prompt_tag (void)
   if (SCM_UNBNDP (var))
     var = scm_c_public_lookup ("guile", "make-prompt-tag");
 
-  return scm_call_0 (scm_variable_ref (var));
+  return SCM_CALL_0 (scm_variable_ref (var));
 }
 
+DEFUN ("debug-guile-cross-count", Fdebug_guile_cross_count,
+       Sdebug_guile_cross_count, 0, 0, 0,
+       doc: /* Return boundary crossing counts as (SCHEME-TO-C . C-TO-SCHEME).
+These count the number of times execution has crossed between Scheme and C.  */)
+  (void)
+{
+  return Fcons (make_int ((intmax_t) scheme_to_c_crossings),
+                make_int ((intmax_t) c_to_scheme_crossings));
+}
+
+DEFUN ("debug-reset-guile-cross-count", Fdebug_reset_guile_cross_count,
+       Sdebug_reset_guile_cross_count, 0, 0, 0,
+       doc: /* Reset boundary crossing counters to zero.  */)
+  (void)
+{
+  scheme_to_c_crossings = 0;
+  c_to_scheme_crossings = 0;
+  return Qnil;
+}
+
 void
 syms_of_eval (void)
 {

@@ -3160,17 +3160,20 @@ CHECK_SUBR (Lisp_Object x)
 #define GSUBR_ARGS(n) GSUBR_ARGS_PASTE (GSUBR_ARGS_, n)
 #define GSUBR_ARGS_PASTE(a, b) a ## b
 
+extern uint64_t scheme_to_c_crossings;
+
 #define DEFUN_GSUBR_N(fn, maxargs)                              \
   Lisp_Object                                                   \
   gsubr_ ## fn                                                  \
   (GSUBR_ARGS (maxargs) (Lisp_Object))                          \
   {                                                             \
+    scheme_to_c_crossings++;                                    \
     return fn (GSUBR_ARGS (maxargs) (GSUBR_ARG));               \
   }
 #define GSUBR_ARG(x) (SCM_UNBNDP (x) ? Qnil : x)
 
 #define DEFUN_GSUBR_0(lname, fn, minargs, maxargs)       \
-  Lisp_Object gsubr_ ## fn (void) { return fn (); }
+  Lisp_Object gsubr_ ## fn (void) { scheme_to_c_crossings++; return fn (); }
 #define DEFUN_GSUBR_1(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
 #define DEFUN_GSUBR_2(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
 #define DEFUN_GSUBR_3(lname, fn, min, max) DEFUN_GSUBR_N(fn, max)
@@ -3184,6 +3187,7 @@ CHECK_SUBR (Lisp_Object x)
   Lisp_Object                                               \
   gsubr_ ## fn (Lisp_Object rest)                           \
   {                                                         \
+    scheme_to_c_crossings++;                                \
     Lisp_Object len = Flength (rest);                       \
     if (XFIXNUM (len) < minargs)                            \
       xsignal2 (Qwrong_number_of_arguments,                 \
@@ -3194,6 +3198,7 @@ CHECK_SUBR (Lisp_Object x)
   Lisp_Object                                               \
   gsubr_ ## fn (Lisp_Object rest)                           \
   {                                                         \
+    scheme_to_c_crossings++;                                \
     int len = scm_to_int (scm_length (rest));               \
     Lisp_Object *args;                                      \
     SAFE_ALLOCA_LISP (args, len);                           \

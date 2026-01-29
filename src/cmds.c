@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <config.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "commands.h"
 #include "character.h"
 #include "buffer.h"
@@ -168,7 +169,7 @@ go to its beginning.  */)
 		  : (BEGV < ZV && PT != opoint
 		     && FETCH_BYTE (PT_BYTE - 1) != '\n'));
   return (excessive
-	  ? scm_call_2 (plus_fn, make_fixnum (shortage - count), n)
+	  ? SCM_CALL_2 (plus_fn, make_fixnum (shortage - count), n)
 	  : make_fixnum (shortage));
 }
 

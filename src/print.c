@@ -22,6 +22,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "sysstdio.h"
 
 #include "lisp.h"
+#include "guile.h"
 #include "character.h"
 #include "coding.h"
 #include "buffer.h"
@@ -808,7 +809,7 @@ A printed representation of an object is text which describes that object.  */)
     }
 
   if (!scm_is_false (deep_unwrap_proc))
-    object = scm_call_1 (deep_unwrap_proc, object);
+    object = SCM_CALL_1 (deep_unwrap_proc, object);
 
   dynwind_begin ();
   specbind (Qinhibit_modification_hooks, Qt);

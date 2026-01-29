@@ -35,6 +35,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <pathmax.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "sysselect.h"
 #include "blockinput.h"
 
@@ -3368,7 +3369,7 @@ make_lisp_s_us (time_t s, long us)
   Lisp_Object sec = make_int (s);
   Lisp_Object usec = make_fixnum (us);
   Lisp_Object hz = make_fixnum (1000000);
-  Lisp_Object ticks = scm_call_2 (plus_fn, scm_call_2 (times_fn, sec, hz), usec);
+  Lisp_Object ticks = SCM_CALL_2 (plus_fn, SCM_CALL_2 (times_fn, sec, hz), usec);
   return Ftime_convert (Fcons (ticks, hz), Qnil);
 }
 

@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <math.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "character.h"
 #include "coding.h"
 #include "composite.h"
@@ -1681,7 +1682,7 @@ With one argument, just copy STRING (with properties, if any).  */)
           /* Call Scheme substring-with-properties (proc is already cached) */
           SCM start_scm = scm_from_ptrdiff_t (ifrom);
           SCM end_scm = scm_from_ptrdiff_t (ito);
-          res = scm_call_3 (scm_substring_with_properties_proc,
+          res = SCM_CALL_3 (scm_substring_with_properties_proc,
                            string, start_scm, end_scm);
     }
   else

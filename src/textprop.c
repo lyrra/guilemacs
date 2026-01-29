@@ -21,6 +21,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <unistd.h>  /* For access() */
 
 #include "lisp.h"
+#include "guile.h"
 #include "intervals.h"
 #include "buffer.h"
 #include "window.h"
@@ -63,7 +64,7 @@ is_emacs_string_wrapper (Lisp_Object x)
 
   if (!scm_is_false (emacs_string_p_proc))
     {
-      SCM result = scm_call_1 (emacs_string_p_proc, x);
+      SCM result = SCM_CALL_1 (emacs_string_p_proc, x);
       return scm_is_true (result);
     }
 
@@ -88,7 +89,7 @@ unwrap_emacs_string (Lisp_Object x)
   /* It's a wrapper - extract the content */
   if (!scm_is_false (emacs_string_content_proc))
     {
-      return scm_call_1 (emacs_string_content_proc, x);
+      return SCM_CALL_1 (emacs_string_content_proc, x);
     }
 
   /* Fallback: return as-is if we can't unwrap */
@@ -140,7 +141,7 @@ offset_scheme_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t lengt
     {
       /* Insertion */
       if (!scm_is_false (scm_buffer_on_insert_proc))
-        scm_call_3 (scm_variable_ref (scm_buffer_on_insert_proc),
+        SCM_CALL_3 (scm_variable_ref (scm_buffer_on_insert_proc),
                     make_lisp_ptr (buffer, Lisp_Vectorlike),
                     make_fixnum (start),
                     make_fixnum (length));
@@ -149,7 +150,7 @@ offset_scheme_intervals (struct buffer *buffer, ptrdiff_t start, ptrdiff_t lengt
     {
       /* Deletion */
       if (!scm_is_false (scm_buffer_on_delete_proc))
-        scm_call_3 (scm_variable_ref (scm_buffer_on_delete_proc),
+        SCM_CALL_3 (scm_variable_ref (scm_buffer_on_delete_proc),
                     make_lisp_ptr (buffer, Lisp_Vectorlike),
                     make_fixnum (start),
                     make_fixnum (start - length));  /* end = start + abs(length) */
@@ -221,9 +222,9 @@ scm_intervals_to_c (SCM scm_intervals, Lisp_Object string)
       SCM end_proc = scm_c_public_ref ("emacs text-properties", "get-interval-end");
       SCM plist_proc = scm_c_public_ref ("emacs text-properties", "get-interval-plist");
 
-      SCM scm_start = scm_call_1 (start_proc, interval_record);
-      SCM scm_end = scm_call_1 (end_proc, interval_record);
-      SCM scm_plist = scm_call_1 (plist_proc, interval_record);
+      SCM scm_start = SCM_CALL_1 (start_proc, interval_record);
+      SCM scm_end = SCM_CALL_1 (end_proc, interval_record);
+      SCM scm_plist = SCM_CALL_1 (plist_proc, interval_record);
 
       ptrdiff_t start = scm_to_int (scm_start);
       ptrdiff_t end = scm_to_int (scm_end);
@@ -839,7 +840,7 @@ form, use the `describe-text-properties' command.  */)
         ensure_text_properties_loaded ();
       if (!scm_is_false (scm_text_properties_at_proc))
         {
-          return scm_call_2 (scm_variable_ref (scm_text_properties_at_proc),
+          return SCM_CALL_2 (scm_variable_ref (scm_text_properties_at_proc),
                              position, object);
         }
     }
@@ -1279,7 +1280,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
       scm_permanent_object (scm_next_property_change);
     }
 
-  return scm_call_3 (scm_variable_ref (scm_next_property_change),
+  return SCM_CALL_3 (scm_variable_ref (scm_next_property_change),
                      position, object, limit);
 }
 
@@ -1317,7 +1318,7 @@ past position LIMIT; return LIMIT if nothing is found before LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (next-single-property-change position prop object limit) */
-  return scm_call_4 (scm_variable_ref (scm_next_single_property_change),
+  return SCM_CALL_4 (scm_variable_ref (scm_next_single_property_change),
                      position, prop, object, limit);
 }
 
@@ -1354,7 +1355,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (previous-property-change position object limit) */
-  return scm_call_3 (scm_variable_ref (scm_previous_property_change),
+  return SCM_CALL_3 (scm_variable_ref (scm_previous_property_change),
                      position, object, limit);
 }
 
@@ -1392,7 +1393,7 @@ back past position LIMIT; return LIMIT if nothing is found until LIMIT.  */)
     CHECK_FIXNUM_COERCE_MARKER (limit);
 
   /* Call Scheme function: (previous-single-property-change position prop object limit) */
-  return scm_call_4 (scm_variable_ref (scm_previous_single_property_change),
+  return SCM_CALL_4 (scm_variable_ref (scm_previous_single_property_change),
                      position, prop, object, limit);
 }
 
@@ -1440,14 +1441,14 @@ add_text_properties_1 (Lisp_Object start, Lisp_Object end,
           if (BUFFERP (object))
             {
               modify_text_properties (object, start, end);
-              SCM result = scm_call_4 (proc, start, end, properties, object);
+              SCM result = SCM_CALL_4 (proc, start, end, properties, object);
               signal_after_change (XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start));
               return result;
             }
 
-          SCM result = scm_call_4 (proc, start, end, properties, object);
+          SCM result = SCM_CALL_4 (proc, start, end, properties, object);
           return result;
         }
     }
@@ -1636,7 +1637,7 @@ the designated part of OBJECT.  */)
               CHECK_FIXNUM_COERCE_MARKER (start);
               CHECK_FIXNUM_COERCE_MARKER (end);
               modify_text_properties (object, start, end);
-              SCM result = scm_call_4 (scm_variable_ref (scm_set_text_properties_proc),
+              SCM result = SCM_CALL_4 (scm_variable_ref (scm_set_text_properties_proc),
                                        start, end, properties, object);
               signal_after_change (XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start),
@@ -1644,7 +1645,7 @@ the designated part of OBJECT.  */)
               return result;
             }
 
-          SCM result = scm_call_4 (scm_variable_ref (scm_set_text_properties_proc),
+          SCM result = SCM_CALL_4 (scm_variable_ref (scm_set_text_properties_proc),
                                   start, end, properties, object);
           return result;
         }
@@ -1895,7 +1896,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
               CHECK_FIXNUM_COERCE_MARKER (start);
               CHECK_FIXNUM_COERCE_MARKER (end);
               modify_text_properties (object, start, end);
-              SCM result = scm_call_4 (scm_variable_ref (scm_remove_text_properties_proc),
+              SCM result = SCM_CALL_4 (scm_variable_ref (scm_remove_text_properties_proc),
                                        start, end, properties, object);
               signal_after_change (XFIXNUM (start),
                                    XFIXNUM (end) - XFIXNUM (start),
@@ -1903,7 +1904,7 @@ Use `set-text-properties' if you want to remove all text properties.  */)
               return result;
             }
 
-          SCM result = scm_call_4 (scm_variable_ref (scm_remove_text_properties_proc),
+          SCM result = SCM_CALL_4 (scm_variable_ref (scm_remove_text_properties_proc),
                                   start, end, properties, object);
           return result;
         }
@@ -2185,7 +2186,7 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_text_property_any_proc))
         {
-          SCM result = scm_call_5 (scm_variable_ref (scm_text_property_any_proc),
+          SCM result = SCM_CALL_5 (scm_variable_ref (scm_text_property_any_proc),
                                   start, end, property, value, object);
           return result;
         }
@@ -2235,7 +2236,7 @@ markers).  If OBJECT is a string, START and END are 0-based indices into it.  */
       ensure_text_properties_loaded ();
       if (!scm_is_false (scm_text_property_not_all_proc))
         {
-          SCM result = scm_call_5 (scm_variable_ref (scm_text_property_not_all_proc),
+          SCM result = SCM_CALL_5 (scm_variable_ref (scm_text_property_not_all_proc),
                                   start, end, property, value, object);
           return result;
         }

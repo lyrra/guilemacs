@@ -47,6 +47,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <c-ctype.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "guile_fns.h"
 #include "composite.h"
 #include "character.h"
@@ -6121,8 +6122,8 @@ blocks_to_bytes (uintmax_t blocksize, uintmax_t blocks, bool negate)
     return make_int (negate ? -n : n);
   Lisp_Object bs = make_uint (blocksize);
   if (negate)
-    bs = scm_call_1 (minus_fn, bs);
-  return scm_call_2 (times_fn, bs, make_uint (blocks));
+    bs = SCM_CALL_1 (minus_fn, bs);
+  return SCM_CALL_2 (times_fn, bs, make_uint (blocks));
 }
 
 #endif

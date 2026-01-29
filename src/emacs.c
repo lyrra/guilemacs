@@ -34,6 +34,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #define MAIN_PROGRAM
 #include "lisp.h"
+#include "guile.h"
 #include "sysstdio.h"
 
 #ifdef HAVE_ANDROID
@@ -1703,7 +1704,7 @@ main2 (void *ignore, int argc, char **argv)
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
-      scm_call_7 (scm_c_public_ref ("emacs-elisp runtime", "emacs!"),
+      SCM_CALL_7 (scm_c_public_ref ("emacs-elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),
                   SYMBOL_FUNCTION (intern ("boundp")),

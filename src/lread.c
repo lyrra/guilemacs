@@ -885,7 +885,7 @@ This uses the variables `load-suffixes' and `load-file-rep-suffixes'.  */)
   /* MIGRATED TO SCHEME: List processing logic moved to Scheme for better maintainability */
   SCM get_suffixes_func = scm_c_private_ref ("emacs-elisp runtime",
                                              "elisp-get-load-suffixes");
-  return scm_call_0 (get_suffixes_func);
+  return SCM_CALL_0 (get_suffixes_func);
 }
 
 /* Return true if STRING ends with SUFFIX.  */
@@ -905,7 +905,7 @@ compute_found_effective (Lisp_Object found)
 {
   SCM effective_func = scm_c_private_ref ("emacs-elisp runtime",
                                          "elisp-compute-found-effective");
-  return scm_call_1 (effective_func, found);
+  return SCM_CALL_1 (effective_func, found);
 }
 
 static void
@@ -913,7 +913,7 @@ loadhist_initialize (Lisp_Object filename)
 {
   SCM loadhist_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-loadhist-initialize");
-  Lisp_Object binding = scm_call_1 (loadhist_func, filename);
+  Lisp_Object binding = SCM_CALL_1 (loadhist_func, filename);
   specbind (Qcurrent_load_list, binding);
 }
 
@@ -946,7 +946,7 @@ save_match_data_load (Lisp_Object file, Lisp_Object noerror,
 
   SCM wrapper_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-load-with-match-data-protection");
-  Lisp_Object result = scm_call_5 (wrapper_func, file, noerror, nomessage, nosuffix, must_suffix);
+  Lisp_Object result = SCM_CALL_5 (wrapper_func, file, noerror, nomessage, nosuffix, must_suffix);
 
   dynwind_end ();
   return result;
@@ -957,7 +957,7 @@ complete_filename_p (Lisp_Object pathname)
 {
   SCM complete_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-complete-filename?");
-  SCM result = scm_call_1 (complete_func, pathname);
+  SCM result = SCM_CALL_1 (complete_func, pathname);
   return !NILP (result);
 }
 
@@ -1763,7 +1763,7 @@ fread_internal_start (SCM port)
 
   SCM fread0_with_char_func = scm_c_private_ref ("emacs-elisp runtime",
                                                  "elisp-fread0-with-char-from-c");
-  return scm_call_2 (fread0_with_char_func, scm_from_int (c), port);
+  return SCM_CALL_2 (fread0_with_char_func, scm_from_int (c), port);
 }
 
 static void
@@ -1773,7 +1773,7 @@ readevalloop_load (SCM port, Lisp_Object sourcename)
 
   SCM readevalloop_load_func = scm_c_private_ref ("emacs-elisp runtime",
                                                   "elisp-readevalloop-load-from-port");
-  scm_call_2 (readevalloop_load_func, port, sourcename);
+  SCM_CALL_2 (readevalloop_load_func, port, sourcename);
 }
 
 DEFUN ("eval-buffer", Feval_buffer, Seval_buffer, 0, 5, "",
@@ -1968,7 +1968,7 @@ elisp_parse_with_eof_check_from_c_context (SCM port, int c)
 {
   SCM eof_check_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-parse-with-eof-check");
-  SCM result = scm_call_2 (eof_check_func, scm_from_int (c), port);
+  SCM result = SCM_CALL_2 (eof_check_func, scm_from_int (c), port);
 
   return result;
 }
@@ -1981,7 +1981,7 @@ elisp_skip_load_whitespace_from_c_context (struct reader_context *ctx)
   SCM skip_ws_func = scm_c_private_ref ("emacs reader",
                                         "elisp-skip-load-whitespace-from-port");
   sync_guile_reader (ctx);
-  scm_call_1 (skip_ws_func, ctx->port);
+  SCM_CALL_1 (skip_ws_func, ctx->port);
   ctx->lookahead = 0;
 }
 
@@ -1991,7 +1991,7 @@ elisp_skip_load_comment_from_c_context (struct reader_context *ctx)
   SCM skip_comment_func = scm_c_private_ref ("emacs-elisp runtime",
                                              "elisp-skip-load-comment-from-port");
   sync_guile_reader (ctx);
-  scm_call_1 (skip_comment_func, ctx->port);
+  SCM_CALL_1 (skip_comment_func, ctx->port);
   ctx->lookahead = 0;
 }
 
@@ -2001,7 +2001,7 @@ elisp_read_with_load_function_from_c_context (struct reader_context *ctx)
   SCM load_read_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-read-with-load-function-from-port");
   sync_guile_reader (ctx);
-  SCM result = scm_call_1 (load_read_func, ctx->port);
+  SCM result = SCM_CALL_1 (load_read_func, ctx->port);
   ctx->lookahead = 0;
   return result;
 }
@@ -2012,7 +2012,7 @@ elisp_load_read_next_expression_from_c_context (struct reader_context *ctx)
   SCM read_next_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-load-read-next-expression-from-port");
   sync_guile_reader (ctx);
-  SCM result = scm_call_1 (read_next_func, ctx->port);
+  SCM result = SCM_CALL_1 (read_next_func, ctx->port);
   ctx->lookahead = 0;
 
   /* Check if we got EOF - return NULL to indicate EOF to the caller */
@@ -2028,7 +2028,7 @@ elisp_load_read_eval_loop_from_c_context (struct reader_context *ctx, bool print
   SCM loop_func = scm_c_private_ref ("emacs-elisp runtime",
                                      "elisp-load-read-eval-loop-from-port");
   sync_guile_reader (ctx);
-  scm_call_2 (loop_func, ctx->port, printflag ? SCM_BOOL_T : SCM_BOOL_F);
+  SCM_CALL_2 (loop_func, ctx->port, printflag ? SCM_BOOL_T : SCM_BOOL_F);
   ctx->lookahead = 0;
 }
 
@@ -2037,7 +2037,7 @@ elisp_normalize_load_path_from_c_context (Lisp_Object sourcename)
 {
   SCM normalize_func = scm_c_private_ref ("emacs-elisp runtime",
                                           "elisp-normalize-load-path");
-  return scm_call_1 (normalize_func, sourcename);
+  return SCM_CALL_1 (normalize_func, sourcename);
 }
 
 DEFUN ("elisp-loadhist-initialize", Felisp_loadhist_initialize,
@@ -2068,7 +2068,7 @@ guile_reader_error_handler (void *data, SCM key, SCM args)
       /* Extract error message from Guile exception
          The args list contains: (port message-template format-args extra-data)
          We just use object->string on the whole args to avoid format interpretation issues */
-      SCM msg = scm_call_1 (scm_c_public_ref ("guile", "object->string"), args);
+      SCM msg = SCM_CALL_1 (scm_c_public_ref ("guile", "object->string"), args);
       char *error_msg = scm_to_utf8_string (msg);
 
       /* Signal Emacs error with Guile's error message */
@@ -4078,7 +4078,7 @@ migrate_symbol_to_scheme (void *data, Lisp_Object key, Lisp_Object sym)
 {
   (void)data;
   /* Register this symbol in Scheme's *global-symbols* */
-  scm_call_2 (obarray_register_fn, key, sym);
+  SCM_CALL_2 (obarray_register_fn, key, sym);
   return SCM_UNSPECIFIED;
 }
 
@@ -4256,7 +4256,7 @@ DEFUN ("find-symbol", Ffind_symbol, Sfind_symbol, 1, 2, 0,
       /* Delegate to Scheme: (obarray-find-symbol string obarray-or-nil)
          Returns multiple values: (symbol found?) */
       Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
-      return scm_call_2 (obarray_find_symbol_fn, raw_string, ob_arg);
+      return SCM_CALL_2 (obarray_find_symbol_fn, raw_string, ob_arg);
     }
 
   /* Bootstrap fallback */
@@ -4312,7 +4312,7 @@ it defaults to the value of `obarray'.  */)
     {
       /* Delegate to Scheme: (obarray-intern string obarray-or-nil) */
       Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
-      sym = scm_call_2 (obarray_intern_fn, raw_string, ob_arg);
+      sym = SCM_CALL_2 (obarray_intern_fn, raw_string, ob_arg);
 
       /* Post-process keywords in C (need access to XSYMBOL macros) */
       if (SYMBOLP (sym) && is_global
@@ -4447,7 +4447,7 @@ OBARRAY, if nil, defaults to the value of the variable `obarray'.  */)
   if (obarray_scheme_ready)
     {
       Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
-      Lisp_Object result = scm_call_2 (obarray_unintern_fn, raw_string, ob_arg);
+      Lisp_Object result = SCM_CALL_2 (obarray_unintern_fn, raw_string, ob_arg);
       return scm_is_true (result) ? Qt : Qnil;
     }
 
@@ -4526,7 +4526,7 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
          The Scheme side uses *global-symbols* as single source of truth. */
       Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
       Lisp_Object callback = make_c_closure (map_obarray_scheme_callback, &data, 1, 0);
-      scm_call_2 (obarray_mapatoms_fn, callback, ob_arg);
+      SCM_CALL_2 (obarray_mapatoms_fn, callback, ob_arg);
       return;
     }
 
@@ -4546,7 +4546,7 @@ map_obarray (Lisp_Object obarray, void (*fn) (Lisp_Object, Lisp_Object), Lisp_Ob
           Lisp_Object for_each_fn = scm_variable_ref (for_each_sym);
           Lisp_Object callback = make_c_closure (map_obarray_scheme_callback,
                                                  &data, 1, 0);
-          scm_call_1 (for_each_fn, callback);
+          SCM_CALL_1 (for_each_fn, callback);
         }
     }
 }
@@ -4609,7 +4609,7 @@ DEFUN ("obarray-clear", Fobarray_clear, Sobarray_clear, 1, 1, 0,
   if (obarray_scheme_ready)
     {
       Lisp_Object ob_arg = is_global ? Qnil : obhash (obarray);
-      scm_call_1 (obarray_clear_fn, ob_arg);
+      SCM_CALL_1 (obarray_clear_fn, ob_arg);
       return Qnil;
     }
 

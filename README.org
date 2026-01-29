@@ -357,6 +357,9 @@ we need to set the debugflag at that time (not later when loading the compiled r
 Note, it is a bit tricky because compile-tree-il can itself call into elisp,
 so if a error occurs there, you wont see any compiled tree-il. In that case see how the debugflag is used in ~compile-tree-il.scm~ and add similar debug-prints beginning at compile-expr-1, and work your way towards final compile-tree-il.
 
+** trace scheme/C crossings
+Use the elisp ~debug-guile-cross-count~ and ~debug-reset-guile-cross-count~ which
+counts how many times scheme crosses over to C and vice-versa.
 ** using gdb
    Let 'A' be a literal address like 0x12345, or a variable
    | call scm_display(A, scm_current_output_port())

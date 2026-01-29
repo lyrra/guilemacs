@@ -39,6 +39,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include <flexmember.h>
 
 #include "lisp.h"
+#include "guile.h"
 #include "frame.h"
 #include "process.h"
 #include "window.h"
@@ -2923,7 +2924,7 @@ compute_image_rotation (struct image *img, double *rotation)
       return;
     }
 
-  Lisp_Object reduced_angle = scm_call_2 (mod_fn, value, make_fixnum (360));
+  Lisp_Object reduced_angle = SCM_CALL_2 (mod_fn, value, make_fixnum (360));
   if (FLOATP (reduced_angle))
     *rotation = XFLOAT_DATA (reduced_angle);
   else
