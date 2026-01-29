@@ -101,3 +101,101 @@
   (el-expr `(let ((x (cons 0 0)))
               (rplacd x 1)
               (print (cdr x)))))
+
+;; --- length ---
+
+(deftest length-nil (0)
+  (el-expr `(print (length nil))))
+
+(deftest length-empty-list (0)
+  (el-expr `(print (length '()))))
+
+(deftest length-single (1)
+  (el-expr `(print (length '(a)))))
+
+(deftest length-list (3)
+  (el-expr `(print (length '(a b c)))))
+
+(deftest length-string (5)
+  (el-expr `(print (length "\"hello\""))))
+
+(deftest length-empty-string (0)
+  (el-expr `(print (length "\"\""))))
+
+(deftest length-vector (3)
+  (el-expr `(print (length "[1 2 3]"))))
+
+(deftest length-empty-vector (0)
+  (el-expr `(print (length "[]"))))
+
+(deftest length-bool-vector (8)
+  (el-expr `(print (length (make-bool-vector 8 nil)))))
+
+;; --- length< ---
+
+(deftest length<-shorter (t)
+  (el-expr `(print (length< '(a b) 3))))
+
+(deftest length<-equal (nil)
+  (el-expr `(print (length< '(a b c) 3))))
+
+(deftest length<-longer (nil)
+  (el-expr `(print (length< '(a b c d) 3))))
+
+(deftest length<-empty (t)
+  (el-expr `(print (length< nil 1))))
+
+(deftest length<-zero (nil)
+  (el-expr `(print (length< '(a) 0))))
+
+(deftest length<-string (t)
+  (el-expr `(print (length< "\"ab\"" 3))))
+
+(deftest length<-vector (t)
+  (el-expr `(print (length< (vector 1) 2))))
+
+;; --- length> ---
+
+(deftest length>-longer (t)
+  (el-expr `(print (length> '(a b c d) 3))))
+
+(deftest length>-equal (nil)
+  (el-expr `(print (length> '(a b c) 3))))
+
+(deftest length>-shorter (nil)
+  (el-expr `(print (length> '(a b) 3))))
+
+(deftest length>-empty (nil)
+  (el-expr `(print (length> nil 0))))
+
+(deftest length>-one (t)
+  (el-expr `(print (length> '(a) 0))))
+
+(deftest length>-string (t)
+  (el-expr `(print (length> "\"hello\"" 3))))
+
+(deftest length>-vector (nil)
+  (el-expr `(print (length> (vector 1 2) 3))))
+
+;; --- length= ---
+
+(deftest length=-match (t)
+  (el-expr `(print (length= '(a b c) 3))))
+
+(deftest length=-mismatch-short (nil)
+  (el-expr `(print (length= '(a b) 3))))
+
+(deftest length=-mismatch-long (nil)
+  (el-expr `(print (length= '(a b c d) 3))))
+
+(deftest length=-empty (t)
+  (el-expr `(print (length= nil 0))))
+
+(deftest length=-negative (nil)
+  (el-expr `(print (length= '(a) -1))))
+
+(deftest length=-string (t)
+  (el-expr `(print (length= "\"hi\"" 2))))
+
+(deftest length=-vector (t)
+  (el-expr `(print (length= (vector 1 2 3) 3))))
