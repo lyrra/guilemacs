@@ -170,12 +170,8 @@
    symbol
    (lambda (gensym) (make-lexical-ref loc symbol gensym))
    (lambda ()
-     ;; Use symbol-function wrapper to safely lookup functions
-     ;; This returns #nil for undefined functions instead of throwing "Unbound variable"
-     (make-call
-      loc
-      (make-module-ref loc runtime 'symbol-function #t)
-      (list (make-const loc symbol))))))
+     ;; Direct module ref into (elisp-functions) — avoids symbol-function call overhead
+     (make-module-ref loc '(elisp-functions) symbol #t))))
 
 (define (set-function! loc symbol value)
   (access-function
