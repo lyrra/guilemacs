@@ -418,7 +418,7 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
                                                      '())
                                                  meta)
                                          req-ids
-                                         (map car opts)
+                                         (if (null? opts) #f (map car opts))
                                          (map (lambda (x)
                                                 (if (pair? (cdr x))
                                                     (compile-expr (car (cdr x)))
