@@ -40,6 +40,10 @@
 ;; (format (current-error-port) "-- current-module: ~s~%" (current-module))
 ;; (format (current-error-port) "-- prelude path: ~s~%" %prelude-filename)
 
+; Note, if doing redirecting when debugging, guile will buffer (no TTY)
+; (setvbuf (current-error-port) 'none)
+; (setvbuf (current-output-port) 'none)
+
 ;; Save prelude paths BEFORE switching modules, by keeping them in module guile-user
 (define %saved-prelude-filename %prelude-filename)
 (define %saved-prelude-directory (dirname %prelude-filename))

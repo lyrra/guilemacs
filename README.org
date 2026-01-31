@@ -288,6 +288,11 @@ DO
   | Backtrace:
   | In ice-9/eval.scm:
   |   619:8 19 (_ #(#(#(#(#<directory (guile-user) 7ffff2b13c80>) tramp-password-prompt-regexp
+** I cant see my logs doing redirection
+Note, if doing redirecting when debugging, guile will buffer (no TTY)
+| (setvbuf (current-error-port) 'none)
+| (setvbuf (current-output-port) 'none)
+
 * debugging
 ** finding regressions in history and git bisecting
   Since guilemacs is built ontop of emacs, and by staying fresh, all commits
