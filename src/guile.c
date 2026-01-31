@@ -90,10 +90,10 @@ apply_c_closure (SCM c_closure, SCM args)
 void
 init_elisp_functions (void)
 {
-  SCM emacs_types = scm_c_resolve_module ("emacs list");
+  SCM emacs_list = scm_c_resolve_module ("emacs list");
 
-  elisp_functions_ptr.f_car = scm_c_module_lookup (emacs_types, "elisp-car");
-  elisp_functions_ptr.f_cdr = scm_c_module_lookup (emacs_types, "elisp-cdr");
+  elisp_functions_ptr.f_car = scm_c_module_lookup (emacs_list, "elisp-car");
+  elisp_functions_ptr.f_cdr = scm_c_module_lookup (emacs_list, "elisp-cdr");
 }
 
 void
