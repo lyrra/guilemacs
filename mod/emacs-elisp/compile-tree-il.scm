@@ -882,6 +882,10 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
 
 ;;; Compile a compound expression to Tree-IL.
 
+(define (inline-call loc inline-tree-il oper args)
+  (make-call loc inline-tree-il
+             (map compile-expr-1 args)))
+
 (define (compile-pair loc expr)
   (let ((operator (car expr))
         (arguments (cdr expr)))
@@ -899,6 +903,10 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
              (if (eq? new expr)
                  (compile-expr `(%funcall (%function ,operator) ,@arguments))
                  (compile-expr-1 new)))))
+     ((and (symbol? operator)
+           (get-inline-source operator))
+      => (lambda (inline-tree-il)
+           (inline-call loc inline-tree-il operator arguments)))
      (else
       (compile-expr `(%funcall (%function ,operator) ,@arguments))))))
 

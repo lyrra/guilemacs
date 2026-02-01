@@ -9,6 +9,8 @@
                 #:select (compile compile-file))
   #:use-module ((system base language)
                 #:select (lookup-language))
+  #:use-module ((language tree-il)
+                #:select (unparse-tree-il parse-tree-il))
   #:export (nil-value
             t-value
             value-slot-module
@@ -56,10 +58,90 @@
             %lisp-string
             lisp-string?
             elisp-load-with-match-data-protection
-            for-each-elisp-symbol)
+            for-each-elisp-symbol
+            scheme->tree-il
+            define-elisp-inline
+            set-inline-source!
+            get-inline-source)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
+
+;;; Inline source compilation.
+;;;
+;;; When `define-elisp-inline' defines a primitive, we need to store a
+;;; pre-compiled tree-il lambda that the elisp compiler can splice into
+;;; call sites.  The body is written as Scheme (using Guile primitives),
+;;; compiled to tree-il, then `toplevel' refs are resolved to absolute
+;;; module refs so the tree-il works in any module context.
+;;;
+;;; The resolution walks the module import chain to find the actual
+;;; defining module for each binding — no heuristics or guessing.
+
+(define (resolve-binding-module mod name)
+  "Find which module provides NAME in MOD's binding environment.
+Walks the import chain to find the module that locally defines NAME."
+  (cond
+   ((module-local-variable mod name)
+    (module-name mod))
+   (else
+    (let loop ((uses (module-uses mod)))
+      (cond
+       ((null? uses) '(guile))
+       ((module-local-variable (car uses) name)
+        (module-name (car uses)))
+       (else (loop (cdr uses))))))))
+
+(define (absolutize-refs sexp mod)
+  "Walk tree-il s-expression SEXP, replacing (toplevel NAME) with
+absolute (@ defining-module NAME) by consulting MOD's binding chain."
+  (cond
+   ((not (pair? sexp)) sexp)
+   ((and (eq? (car sexp) 'toplevel)
+         (pair? (cdr sexp))
+         (symbol? (cadr sexp))
+         (null? (cddr sexp)))
+    (let ((name (cadr sexp)))
+      `(@ ,(resolve-binding-module mod name) ,name)))
+   (else
+    (cons (absolutize-refs (car sexp) mod)
+          (absolutize-refs (cdr sexp) mod)))))
+
+(define (scheme->tree-il expr mod)
+  "Compile a Scheme expression to tree-il with all references resolved
+to absolute module refs.  Compiles in MOD's context, then absolutizes
+toplevel refs via MOD's import chain."
+  (let* ((til (compile expr #:from 'scheme #:to 'tree-il #:env mod))
+         (sexp (unparse-tree-il til))
+         (fixed (absolutize-refs sexp mod)))
+    (parse-tree-il fixed)))
+
+(define-syntax define-elisp-inline
+  (lambda (x)
+    (define (make-scheme-name name-stx)
+      (datum->syntax name-stx
+        (string->symbol
+          (string-append "elisp-"
+            (symbol->string (syntax->datum name-stx))))))
+    (syntax-case x ()
+      ((_ (name . formals) body ...)
+       (with-syntax ((sname (make-scheme-name #'name)))
+         #'(begin
+             (define (sname . formals) body ...)
+             (set-symbol-function! 'name sname)
+             (set-inline-source! 'name
+               (scheme->tree-il '(lambda formals body ...)
+                                (current-module)))))))))
+
+;; Maps elisp symbol -> lambda expression for inlinable primitives.
+;; The compiler can inline these at call sites.
+(define %inline-source-table (make-hash-table))
+
+(define (set-inline-source! elisp-sym lambda-expr)
+  (hashq-set! %inline-source-table elisp-sym lambda-expr))
+
+(define (get-inline-source elisp-sym)
+  (hashq-ref %inline-source-table elisp-sym))
 
 (define %debugflag 0)
 
