@@ -359,6 +359,27 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
     (else (list-head list (min n (length list))))))
 
 ;;;
+;;; Cycle Detection
+;;;
+
+;; Floyd's tortoise-and-hare: walk list one element at a time, calling
+;; CHECK-FN with (count tail) at each step.  CHECK-FN returns (value)
+;; to stop iteration with that value, or #f to continue.
+;; Signals circular-list on cycle.
+(define (list-for-each-cycle-safe sequence check-fn)
+  (let loop ((slow sequence) (fast sequence) (count 0))
+    (let ((result (check-fn count slow)))
+      (if (pair? result)
+          (car result)  ; unwrap boxed return value
+          ;; Advance slow one step, fast two steps
+          (let* ((next-slow (cdr slow))
+                 (f1 (if (pair? fast) (cdr fast) fast))
+                 (next-fast (if (pair? f1) (cdr f1) f1)))
+            (if (and (pair? next-slow) (eq? next-slow next-fast))
+                ((symbol-function 'signal) 'circular-list (list sequence))
+                (loop next-slow next-fast (+ count 1))))))))
+
+;;;
 ;;; Length Comparison Functions
 ;;;
 
@@ -369,36 +390,35 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
     ((< len 0) #nil)
     ((null? sequence) (if (> len 0) #t #nil))
     ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((>= count len) #nil)  ; Already at len, so not shorter
-         ((null? seq) #t)       ; Reached end before len
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))         ; Improper list
+     (list-for-each-cycle-safe sequence
+       (lambda (count tail)
+         (cond
+           ((>= count len) (list #nil))  ; Already at len, not shorter
+           ((null? tail) (list #t))      ; Reached end before len
+           ((not (pair? tail)) (list #nil)) ; Improper list
+           (else #f)))))                 ; Continue
     ;; Check for keywords/symbols that are not sequences
     ((or (keyword? sequence) (symbol? sequence)) #nil)
     ;; For vectors and strings, use regular length
     ((or (vector? sequence) (string? sequence))
      (if (< (elisp-length sequence) len) #t #nil))
-    (else
-     ;; For unknown types, signal an error like Elisp would
-     #nil)))
+    (else #nil)))
 
 (define (elisp-length> sequence len)
   "Return non-nil if SEQUENCE is longer than LEN."
   (cond
     ((not (integer? len)) #nil)
-    ((< len 0) #t)  ; Any sequence is longer than negative length
+    ((< len 0) #t)
     ((null? sequence) #nil)
     ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((> count len) #t)     ; Already longer than len
-         ((null? seq) #nil)     ; Reached end at or before len
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))         ; Improper list
+     (list-for-each-cycle-safe sequence
+       (lambda (count tail)
+         (cond
+           ((> count len) (list #t))     ; Already longer than len
+           ((null? tail) (list #nil))    ; Reached end at or before len
+           ((not (pair? tail)) (list #nil)) ; Improper list
+           (else #f)))))                 ; Continue
     (else
-     ;; For other sequences (vectors, strings), use regular length
      (if (> (elisp-length sequence) len) #t #nil))))
 
 (define (elisp-length= sequence len)
@@ -408,14 +428,15 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
     ((< len 0) #nil)
     ((null? sequence) (if (= len 0) #t #nil))
     ((pair? sequence)
-     (let loop ((seq sequence) (count 0))
-       (cond
-         ((= count len) (if (null? seq) #t #nil))  ; Check if we're at end when count matches
-         ((null? seq) #nil)                         ; Reached end before target length
-         ((pair? seq) (loop (cdr seq) (+ count 1)))
-         (else #nil))))                             ; Improper list
+     (list-for-each-cycle-safe sequence
+       (lambda (count tail)
+         (cond
+           ((= count len)
+            (list (if (null? tail) #t #nil))) ; At target count, check end
+           ((null? tail) (list #nil))    ; Ended before target
+           ((not (pair? tail)) (list #nil)) ; Improper list
+           (else #f)))))                 ; Continue
     (else
-     ;; For other sequences (vectors, strings), use regular length
      (if (= (elisp-length sequence) len) #t #nil))))
 
 (define (init-sequences-registrations)
