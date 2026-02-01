@@ -317,13 +317,6 @@ This is a useful building block for higher-order functions."
 
 
 
-(define (elisp-list . objects)
-  "Return a newly created list with specified arguments as elements.
-Allows any number of arguments, including zero."
-  objects)
-
-
-
 (define (elisp-make-list length init)
   "Return a newly created list of length LENGTH, with each element being INIT."
   (if (not (and (integer? length) (>= length 0)))
@@ -485,7 +478,6 @@ If N is greater or equal to the length of LIST, return LIST (or a copy)."
               (constantly ,elisp-constantly)
 
               (length ,elisp-length)
-              (list ,elisp-list)
               (make-list ,elisp-make-list)
               (safe-length ,elisp-safe-length)
               (take ,elisp-take)

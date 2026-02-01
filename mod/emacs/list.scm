@@ -14,6 +14,7 @@
     elisp-make-list
     elisp-not
     elisp-delq elisp-remq
+    nil-terminate!
     init-list-registrations))
 
 ;;;
@@ -53,8 +54,19 @@
 (define-elisp-inline (cdar lst) (elisp-cdr (elisp-car lst)))
 (define-elisp-inline (cddr lst) (elisp-cdr (elisp-cdr lst)))
 
+(define (nil-terminate! lst)
+  "Re-terminate a Guile ()-list with Elisp #nil."
+  (if (null? lst)
+      #nil
+      (begin
+        (let loop ((tail lst))
+          (if (null? (cdr tail))
+              (set-cdr! tail #nil)
+              (loop (cdr tail))))
+        lst)))
+
 (define-elisp-inline (list . elms)
-  elms)
+  (nil-terminate! elms))
 
 (define-elisp-inline (make-list len obj)
   (make-list len obj))
