@@ -170,8 +170,15 @@
    symbol
    (lambda (gensym) (make-lexical-ref loc symbol gensym))
    (lambda ()
-     ;; Direct module ref into (elisp-functions) — avoids symbol-function call overhead
-     (make-module-ref loc '(elisp-functions) symbol #t))))
+     ;; If this function has a known (emacs ...) module location, emit a
+     ;; direct module-ref there.  This lets peval find inlinable-exports
+     ;; from #:declarative? modules and inline the function body.
+     (cond
+      ((get-direct-module-ref symbol)
+       => (lambda (mod-name)
+            (make-module-ref loc (car mod-name) (cdr mod-name) #t)))
+      (else
+       (make-module-ref loc '(elisp-functions) symbol #t))))))
 
 (define (set-function! loc symbol value)
   (access-function
@@ -1074,6 +1081,47 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
           (make-lexical-ref loc 'result tmp)
           (make-lexical-ref loc 'result tmp)
           (nil-value loc))))))
+
+;;; Direct module-ref table for (emacs ...) functions.
+;;; Maps elisp function names to (module . scheme-name) pairs.
+;;; When the compiler emits (@ (emacs numbers) elisp-1+) instead of
+;;; (@ (elisp-functions) 1+), peval can find inlinable-exports from
+;;; #:declarative? modules and inline the function body at compile time.
+;;; Note, this is much like an compile-time obarray, so we could
+;;; actually just lend the runtime-obarray and record which module
+;;; the function is defined in
+(define *direct-module-refs* (make-hash-table))
+
+(define (get-direct-module-ref name)
+  (hashq-ref *direct-module-refs* name))
+
+(define-syntax define-direct-module-ref
+  (syntax-rules ()
+    ((_ elisp-name module scheme-name)
+     (hashq-set! *direct-module-refs* 'elisp-name
+                 '(module . scheme-name)))))
+
+;; (emacs numbers) — arithmetic & predicates
+(define-direct-module-ref 1+  (emacs numbers) elisp-1+)
+(define-direct-module-ref 1-  (emacs numbers) elisp-1-)
+(define-direct-module-ref %   (emacs numbers) elisp-%)
+(define-direct-module-ref mod (emacs numbers) elisp-mod)
+(define-direct-module-ref zerop   (emacs numbers) elisp-zerop)
+(define-direct-module-ref plusp   (emacs numbers) elisp-plusp)
+(define-direct-module-ref minusp  (emacs numbers) elisp-minusp)
+(define-direct-module-ref evenp   (emacs numbers) elisp-evenp)
+(define-direct-module-ref oddp    (emacs numbers) elisp-oddp)
+(define-direct-module-ref floatp  (emacs numbers) elisp-floatp)
+(define-direct-module-ref wholenump (emacs numbers) elisp-wholenump)
+; FIX-20260211-guilemacs numbers can be passed a marker
+;(define-direct-module-ref number-or-marker-p (emacs numbers) elisp-number-or-marker-p)
+(define-direct-module-ref byteorder (emacs numbers) elisp-byteorder)
+(define-direct-module-ref number-to-string (emacs numbers) elisp-number-to-string)
+
+;; (emacs list) — list operations not already handled by primcall emitters
+(define-direct-module-ref delq (emacs list) elisp-delq)
+(define-direct-module-ref remq (emacs list) elisp-remq)
+(define-direct-module-ref assq (emacs list) elisp-assq)
 
 ;;; Compile a compound expression to Tree-IL.
 
