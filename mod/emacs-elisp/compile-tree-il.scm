@@ -312,24 +312,44 @@
                meta
                (make-lambda-case #f req opt rest #f init vars body #f)))
 
+;; Dynamic let-bindings via bind-symbol (C-level specbind).
+;;
+;; bind-symbol handles all redirect types (PLAINVAL, LOCALIZED,
+;; FORWARDED) correctly through specbind/unbind_once in C.
+;;
+;; The body appears exactly once per binding (passed as thunk to
+;; bind-symbol), so tree-il grows O(N) for N bindings.
+
+(define (make-thunk src body)
+  "Wrap BODY in a nullary lambda for use as a thunk argument."
+  (make-lambda src '()
+    (make-lambda-case src '() #f #f #f '() '() body #f)))
+
+(define (make-runtime-call src name args)
+  "Generate a call to (@ (emacs-elisp runtime) NAME) with ARGS."
+  (make-call src
+    (make-module-ref src runtime name #t)
+    args))
+
+(define (make-dynlet-one src fluid-sym val-sym body)
+  "Generate a single dynamic binding via bind-symbol.
+FLUID-SYM and VAL-SYM are gensyms for the already-bound fluid and value.
+BODY is the tree-il for the body (appears exactly once as a thunk)."
+  (make-runtime-call src 'bind-symbol
+    (list (make-lexical-ref #f 'fluid fluid-sym)
+          (make-lexical-ref #f 'val val-sym)
+          (make-thunk src body))))
+
 (define (make-dynlet src fluids vals body)
   (let ((f (map (lambda (x) (gensym "fluid ")) fluids))
         (v (map (lambda (x) (gensym "valud ")) vals)))
     (make-let src (map (lambda (_) 'fluid) fluids) f fluids
-              (make-let src (map (lambda (_) 'val) vals) v vals
-                        (let lp ((f f) (v v))
-                          (if (null? f)
-                              body
-                              (make-call src
-                                         (make-module-ref src runtime 'bind-symbol #t)
-                                         (list (make-lexical-ref #f 'fluid (car f))
-                                               (make-lexical-ref #f 'val (car v))
-                                               (make-lambda
-                                                src '()
-                                                (make-lambda-case
-                                                 src '() #f #f #f '() '()
-                                                 (lp (cdr f) (cdr v))
-                                                 #f))))))))))
+      (make-let src (map (lambda (_) 'val) vals) v vals
+        (let lp ((f f) (v v))
+          (if (null? f)
+              body
+              (make-dynlet-one src (car f) (car v)
+                (lp (cdr f) (cdr v)))))))))
 
 (define (sanitize-uninterned-symbols expr replacements)
   "Recursively replace uninterned symbols with interned equivalents.
