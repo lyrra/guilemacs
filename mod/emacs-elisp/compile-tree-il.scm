@@ -312,13 +312,21 @@
                meta
                (make-lambda-case #f req opt rest #f init vars body #f)))
 
-;; Dynamic let-bindings via bind-symbol (C-level specbind).
+;; Dynamic let-bindings with inline dynamic-wind.
 ;;
-;; bind-symbol handles all redirect types (PLAINVAL, LOCALIZED,
-;; FORWARDED) correctly through specbind/unbind_once in C.
+;; We always emit (primcall dynamic-wind winder thunk unwinder).
+;; peval expands this and beta-reduces the body thunk, making the
+;; body fully transparent to the CPS optimizer.
 ;;
-;; The body appears exactly once per binding (passed as thunk to
-;; bind-symbol), so tree-il grows O(N) for N bindings.
+;; The PLAINVAL/non-PLAINVAL dispatch is inside the winder and
+;; unwinder lambdas (not around the body), so the body appears
+;; exactly ONCE and tree-il grows O(N) for N bindings.
+;;
+;; For PLAINVAL (slot 1 == 4): winder/unwinder use vector-set!
+;; directly on slot 4 — the fast path.
+;;
+;; For non-PLAINVAL (LOCALIZED, FORWARDED): winder/unwinder use
+;; symbol-value / set-symbol-value! which dispatch through C.
 
 (define (make-thunk src body)
   "Wrap BODY in a nullary lambda for use as a thunk argument."
@@ -332,13 +340,66 @@
     args))
 
 (define (make-dynlet-one src fluid-sym val-sym body)
-  "Generate a single dynamic binding via bind-symbol.
-FLUID-SYM and VAL-SYM are gensyms for the already-bound fluid and value.
-BODY is the tree-il for the body (appears exactly once as a thunk)."
-  (make-runtime-call src 'bind-symbol
-    (list (make-lexical-ref #f 'fluid fluid-sym)
-          (make-lexical-ref #f 'val val-sym)
-          (make-thunk src body))))
+  "Generate a single dynamic binding via inline dynamic-wind.
+The PLAINVAL check is inside the winder/unwinder lambdas so the
+body appears exactly ONCE (O(N) tree-il for N bindings).
+peval expands dynamic-wind and beta-reduces the body thunk."
+  (let ((desc-sym (gensym "desc "))
+        (plain-sym (gensym "plain "))
+        (old-sym (gensym "old ")))
+    ;; let desc = (symbol-desc fluid)
+    (make-let src '(desc) (list desc-sym)
+      (list (make-runtime-call src 'symbol-desc
+              (list (make-lexical-ref #f 'fluid fluid-sym))))
+      ;; let plain = (eq? (vector-ref desc 1) 4)
+      (make-let src '(plain) (list plain-sym)
+        (list (make-primcall src 'eq?
+                (list (make-primcall src 'vector-ref
+                        (list (make-lexical-ref #f 'desc desc-sym)
+                              (make-const #f 1)))
+                      (make-const #f 4))))
+        ;; let old = (if plain (vector-ref desc 4) (symbol-value fluid))
+        (make-let src '(old) (list old-sym)
+          (list (make-conditional src
+                  (make-lexical-ref #f 'plain plain-sym)
+                  ;; PLAINVAL: read slot 4 directly (handles void/unbound)
+                  (make-primcall src 'vector-ref
+                    (list (make-lexical-ref #f 'desc desc-sym)
+                          (make-const #f 4)))
+                  ;; non-PLAINVAL: use symbol-value (C function after emacs!)
+                  (make-runtime-call src 'symbol-value
+                    (list (make-lexical-ref #f 'fluid fluid-sym)))))
+          ;; dynamic-wind with conditional winder/unwinder, body ONCE
+          (make-primcall src 'dynamic-wind
+            (list
+              ;; winder
+              (make-lambda src '()
+                (make-lambda-case src '() #f #f #f '() '()
+                  (make-conditional src
+                    (make-lexical-ref #f 'plain plain-sym)
+                    (make-primcall src 'vector-set!
+                      (list (make-lexical-ref #f 'desc desc-sym)
+                            (make-const #f 4)
+                            (make-lexical-ref #f 'val val-sym)))
+                    (make-runtime-call src 'set-symbol-value!
+                      (list (make-lexical-ref #f 'fluid fluid-sym)
+                            (make-lexical-ref #f 'val val-sym))))
+                  #f))
+              ;; thunk: body appears exactly ONCE — peval beta-reduces
+              (make-thunk src body)
+              ;; unwinder
+              (make-lambda src '()
+                (make-lambda-case src '() #f #f #f '() '()
+                  (make-conditional src
+                    (make-lexical-ref #f 'plain plain-sym)
+                    (make-primcall src 'vector-set!
+                      (list (make-lexical-ref #f 'desc desc-sym)
+                            (make-const #f 4)
+                            (make-lexical-ref #f 'old old-sym)))
+                    (make-runtime-call src 'set-symbol-value!
+                      (list (make-lexical-ref #f 'fluid fluid-sym)
+                            (make-lexical-ref #f 'old old-sym))))
+                  #f)))))))))
 
 (define (make-dynlet src fluids vals body)
   (let ((f (map (lambda (x) (gensym "fluid ")) fluids))
