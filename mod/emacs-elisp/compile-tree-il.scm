@@ -880,6 +880,201 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
       ((symbol-function 'get) s p)
       #nil))
 
+;;; Direct primcall emitters for common elisp functions.
+;;; These bypass the inline mechanism entirely and emit tree-il with
+;;; primcalls (direct VM instructions) instead of module refs like
+;;; (@ (guile) cons).  This eliminates module variable lookup overhead.
+
+(define *primcall-emitters* (make-hash-table))
+
+(define (get-primcall-emitter name)
+  (hashq-ref *primcall-emitters* name))
+
+(define-syntax define-primcall-emitter
+  (syntax-rules ()
+    ((_ name proc)
+     (hashq-set! *primcall-emitters* 'name proc))))
+
+;;; Helper: wrap a single-use arg in a let to avoid double evaluation.
+(define (with-temp-var loc compiled-arg proc)
+  (let ((tmp (gensym "v")))
+    (make-let loc '(v) (list tmp) (list compiled-arg)
+              (proc (make-lexical-ref loc 'v tmp)))))
+
+;;; Helper: convert Scheme boolean (#t/#f) to elisp boolean (#t/#nil).
+(define (schemebool->elisp loc test-primcall)
+  (make-conditional loc test-primcall
+                    (make-const loc #t)
+                    (make-const loc #nil)))
+
+;;; --- Value-returning primcalls (no boolean conversion) ---
+
+(define-primcall-emitter cons
+  (lambda (loc args)
+    (make-primcall loc 'cons args)))
+
+(define-primcall-emitter car
+  (lambda (loc args)
+    (with-temp-var loc (car args)
+      (lambda (v)
+        (make-conditional loc
+          (call-primitive loc 'nil? v)
+          (nil-value loc)
+          (make-conditional loc
+            (call-primitive loc 'pair? v)
+            (call-primitive loc 'car v)
+            (make-call loc
+              (make-module-ref loc '(guile) 'error #t)
+              (list (make-const loc "Wrong type argument: listp") v))))))))
+
+(define-primcall-emitter cdr
+  (lambda (loc args)
+    (with-temp-var loc (car args)
+      (lambda (v)
+        (make-conditional loc
+          (call-primitive loc 'nil? v)
+          (nil-value loc)
+          (make-conditional loc
+            (call-primitive loc 'pair? v)
+            (call-primitive loc 'cdr v)
+            (make-call loc
+              (make-module-ref loc '(guile) 'error #t)
+              (list (make-const loc "Wrong type argument: listp") v))))))))
+
+(define-primcall-emitter car-safe
+  (lambda (loc args)
+    (with-temp-var loc (car args)
+      (lambda (v)
+        (make-conditional loc
+          (call-primitive loc 'pair? v)
+          (call-primitive loc 'car v)
+          (nil-value loc))))))
+
+(define-primcall-emitter cdr-safe
+  (lambda (loc args)
+    (with-temp-var loc (car args)
+      (lambda (v)
+        (make-conditional loc
+          (call-primitive loc 'pair? v)
+          (call-primitive loc 'cdr v)
+          (nil-value loc))))))
+
+;; caar..cddr — Guile has these as primitives too
+(define-primcall-emitter caar
+  (lambda (loc args)
+    ((get-primcall-emitter 'car) loc
+     (list ((get-primcall-emitter 'car) loc args)))))
+
+(define-primcall-emitter cadr
+  (lambda (loc args)
+    ((get-primcall-emitter 'car) loc
+     (list ((get-primcall-emitter 'cdr) loc args)))))
+
+(define-primcall-emitter cdar
+  (lambda (loc args)
+    ((get-primcall-emitter 'cdr) loc
+     (list ((get-primcall-emitter 'car) loc args)))))
+
+(define-primcall-emitter cddr
+  (lambda (loc args)
+    ((get-primcall-emitter 'cdr) loc
+     (list ((get-primcall-emitter 'cdr) loc args)))))
+
+(define-primcall-emitter rplaca
+  (lambda (loc args)
+    (call-primitive loc 'set-car! (car args) (cadr args))))
+
+(define-primcall-emitter rplacd
+  (lambda (loc args)
+    (call-primitive loc 'set-cdr! (car args) (cadr args))))
+
+;;; --- Boolean-returning primcalls (need #t/#nil conversion) ---
+
+(define-primcall-emitter not
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'nil? (car args)))))
+
+(define-primcall-emitter null
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'nil? (car args)))))
+
+(define-primcall-emitter consp
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'pair? (car args)))))
+
+(define-primcall-emitter atom
+  (lambda (loc args)
+    (schemebool->elisp loc
+      (call-primitive loc 'not (call-primitive loc 'pair? (car args))))))
+
+(define-primcall-emitter listp
+  (lambda (loc args)
+    (with-temp-var loc (car args)
+      (lambda (v)
+        (schemebool->elisp loc
+          (make-conditional loc
+            (call-primitive loc 'nil? v)
+            (make-const loc #t)
+            (call-primitive loc 'pair? v)))))))
+
+(define-primcall-emitter eq
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'eq? (car args) (cadr args)))))
+
+(define-primcall-emitter integerp
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'exact-integer? (car args)))))
+
+(define-primcall-emitter numberp
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'number? (car args)))))
+
+(define-primcall-emitter stringp
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'string? (car args)))))
+
+;;; symbolp and characterp have elisp-specific semantics (e.g. t and nil
+;;; are symbols in elisp but not symbol? in Guile) — leave to runtime.
+
+(define-primcall-emitter vectorp
+  (lambda (loc args)
+    (schemebool->elisp loc (call-primitive loc 'vector? (car args)))))
+
+;;; 1+ and 1- have marker-coercion semantics (check-number-coerce-marker)
+;;; that a bare primcall can't handle — leave to runtime.
+
+;;; --- Membership (return tail or #nil) ---
+
+(define-primcall-emitter memq
+  (lambda (loc args)
+    (let ((tmp (gensym "memq")))
+      (make-let loc '(result) (list tmp)
+        (list (call-primitive loc 'memq (car args) (cadr args)))
+        (make-conditional loc
+          (make-lexical-ref loc 'result tmp)
+          (make-lexical-ref loc 'result tmp)
+          (nil-value loc))))))
+
+(define-primcall-emitter memql
+  (lambda (loc args)
+    (let ((tmp (gensym "memql")))
+      (make-let loc '(result) (list tmp)
+        (list (call-primitive loc 'memv (car args) (cadr args)))
+        (make-conditional loc
+          (make-lexical-ref loc 'result tmp)
+          (make-lexical-ref loc 'result tmp)
+          (nil-value loc))))))
+
+(define-primcall-emitter member
+  (lambda (loc args)
+    (let ((tmp (gensym "member")))
+      (make-let loc '(result) (list tmp)
+        (list (call-primitive loc 'member (car args) (cadr args)))
+        (make-conditional loc
+          (make-lexical-ref loc 'result tmp)
+          (make-lexical-ref loc 'result tmp)
+          (nil-value loc))))))
+
 ;;; Compile a compound expression to Tree-IL.
 
 (define (inline-call loc inline-tree-il oper args)
@@ -903,6 +1098,10 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
              (if (eq? new expr)
                  (compile-expr `(%funcall (%function ,operator) ,@arguments))
                  (compile-expr-1 new)))))
+     ((and (symbol? operator)
+           (get-primcall-emitter operator))
+      => (lambda (emitter)
+           (emitter loc (map compile-expr-1 arguments))))
      ((and (symbol? operator)
            (get-inline-source operator))
       => (lambda (inline-tree-il)
