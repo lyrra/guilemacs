@@ -1,5 +1,6 @@
 (define-module (emacs list)
   #:use-module (emacs-elisp runtime)
+  #:declarative? #t
   #:export
    (elisp-cons
     elisp-car
@@ -13,7 +14,7 @@
     elisp-list
     elisp-make-list
     elisp-not
-    elisp-delq elisp-remq
+    elisp-delq elisp-remq elisp-assq
     nil-terminate!
     init-list-registrations))
 

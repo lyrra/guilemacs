@@ -6,7 +6,10 @@
 (define-module (emacs numbers)
   #:use-module (rnrs bytevectors)
   #:use-module (emacs-elisp runtime)
+  #:declarative? #t
   #:export (
+    ;; Exported for cross-module inlining
+    check-number-coerce-marker
     ;; Scheme implementation functions
     elisp-+
     elisp--
@@ -42,6 +45,7 @@
     elisp-number-or-marker-p
     elisp-wholenump
     elisp-floatp
+    elisp-zerop
     init-numbers-registrations))
 
 ;; The C primitive check-number-coerce-marker is defined in src/data.c
@@ -97,11 +101,11 @@ Markers are coerced to their position value."
                                   (car p)
                                   (inexact->exact (truncate (car p))))))))))
 
-(define elisp-1+ (lambda (a)
-                   (1+ (check-number-coerce-marker a))))
+(define (elisp-1+ a)
+  (1+ (check-number-coerce-marker a)))
 
-(define elisp-1- (lambda (a)
-                   (1- (check-number-coerce-marker a))))
+(define (elisp-1- a)
+  (1- (check-number-coerce-marker a)))
 
 ;;;
 ;;; Min/Max Operations
@@ -213,45 +217,36 @@ Markers are coerced to their position value."
 ;;; Modulo & Remainder Operations
 ;;;
 
-(define elisp-% (lambda (a b)
-                  (remainder (check-number-coerce-marker a)
-                             (check-number-coerce-marker b))))
+(define (elisp-% a b)
+  (remainder (check-number-coerce-marker a)
+             (check-number-coerce-marker b)))
 
-(define elisp-mod (lambda (a b)
-                    ((if (or (inexact? a) (inexact? b))
-                         euclidean-remainder
-                         modulo)
-                     (check-number-coerce-marker a)
-                     (check-number-coerce-marker b))))
+(define (elisp-mod a b)
+  ((if (or (inexact? a) (inexact? b))
+       euclidean-remainder
+       modulo)
+   (check-number-coerce-marker a)
+   (check-number-coerce-marker b)))
 ;;;
 
 (define (elisp-byteorder)
-  "Return the byteorder for the machine.
-Returns 66 (ASCII uppercase B) for big endian machines or 108 (ASCII
-lowercase l) for small endian machines."
-  ;; Guile provides the native endianness
   (if (eq? (native-endianness) (endianness big))
-      66   ; 'B' for big endian
-      108)) ; 'l' for little endian
+      66
+      108))
 
 (define (elisp-zerop number)
-  "Return t if NUMBER is zero."
   (if (= number 0) #t #nil))
 
 (define (elisp-plusp number)
-  "Return t if NUMBER is positive."
   (if (and (number? number) (> number 0)) #t #nil))
 
 (define (elisp-minusp number)
-  "Return t if NUMBER is negative."
   (if (and (number? number) (< number 0)) #t #nil))
 
 (define (elisp-evenp integer)
-  "Return t if INTEGER is even."
   (if (and (integer? integer) (even? integer)) #t #nil))
 
 (define (elisp-oddp integer)
-  "Return t if INTEGER is odd."
   (if (and (integer? integer) (odd? integer)) #t #nil))
 
 (define (elisp-floatp x)
@@ -261,7 +256,6 @@ lowercase l) for small endian machines."
       #t #nil))
 
 (define (elisp-number-to-string number)
-  "Return the decimal representation of NUMBER as a string."
   (cond
     ((integer? number) (number->string number))
     ((number? number) (number->string number))
@@ -288,8 +282,6 @@ With positive integer LIMIT, return random integer in interval [0,LIMIT)."
      (error "Wrong type argument" limit))))
 
 (define (elisp-number-or-marker-p object)
-  "Return t if OBJECT is a number or a marker."
-  ;; For now, markers are not implemented in Guile, so just check numbers
   (if (number? object) #t #nil))
 
 (define (elisp-wholenump x)
