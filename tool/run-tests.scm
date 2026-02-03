@@ -23,6 +23,7 @@
 
 (define %tests '(
 (group (prelude)
+  ;; emacs-elisp -- core language
   "test/pre/eq.scm"
   "test/pre/arith.scm"
   "test/pre/value-cmp.scm"
@@ -51,6 +52,8 @@
   "test/pre/ensure-empty-lines-arithmetic.scm"
   "test/pre/string-print-utf8.scm"
   "test/pre/string-char.scm"
+  ;; emacs -- as an editor
+  "test/pre/miscvar.scm"
   )
 (group
   "test/src/timefns-tests.el"

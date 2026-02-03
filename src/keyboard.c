@@ -12744,6 +12744,9 @@ init_keyboard (void)
   command_loop_level = -1;
   quit_char = Ctl ('g');
   Vunread_command_events = Qnil;
+  last_command_event = Qnil;
+  last_nonmenu_event = Qnil;
+  last_input_event = Qnil;
   timer_idleness_start_time = invalid_timespec ();
   total_keys = 0;
   recent_keys_index = 0;
