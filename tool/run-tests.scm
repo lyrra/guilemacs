@@ -64,7 +64,9 @@
 (group
   "test/src/floatfns-tests.el"
   )
-
+(group
+  "test/lisp/sort-tests.el"
+  )
 ;; in the following group, all of the test files works with guilemacs
 (group
   "test/lisp/ansi-color-tests.el" ;; fails
