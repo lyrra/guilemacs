@@ -91,6 +91,7 @@ release_global_lock (void)
 static void
 rebind_for_thread_switch (void)
 {
+  emacs_abort();
   ptrdiff_t distance
     = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
   // specpdl_unrewind (specpdl_ptr, -distance, true);
@@ -99,6 +100,7 @@ rebind_for_thread_switch (void)
 static void
 unbind_for_thread_switch (struct thread_state *thr)
 {
+  emacs_abort();
   ptrdiff_t distance = thr->m_specpdl_ptr - thr->m_specpdl;
   // specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
 }
@@ -705,6 +707,7 @@ record_thread_error (Lisp_Object error_form)
 static void *
 run_thread (void *state)
 {
+  emacs_abort();
   /* Make sure stack_top and m_stack_bottom are properly aligned as GC
      expects.  */
   union
@@ -803,6 +806,7 @@ free_search_regs (struct re_registers *regs)
 void
 finalize_one_thread (struct thread_state *state)
 {
+  emacs_abort();
   free_search_regs (&state->m_search_regs);
   free_search_regs (&state->m_saved_search_regs);
   sys_cond_destroy (&state->thread_condvar);
@@ -815,6 +819,7 @@ When the function exits, the thread dies.
 If NAME is given, it must be a string; it names the new thread.  */)
   (Lisp_Object function, Lisp_Object name)
 {
+  emacs_abort();
   /* Can't start a thread in temacs.  */
   if (!initialized)
     emacs_abort ();
@@ -954,6 +959,7 @@ DEFUN ("thread-live-p", Fthread_live_p, Sthread_live_p, 1, 1, 0,
   CHECK_THREAD (thread);
   tstate = XTHREAD (thread);
 
+  emacs_abort();
   return thread_live_p (tstate) ? Qt : Qnil;
 }
 
@@ -980,6 +986,7 @@ thread_join_callback (void *arg)
   struct thread_state *tstate = arg;
   struct thread_state *self = current_thread;
   Lisp_Object thread;
+  emacs_abort();
 
   XSETTHREAD (thread, tstate);
   self->event_object = thread;
@@ -1002,6 +1009,7 @@ is an error for a thread to try to join itself.  */)
   struct thread_state *tstate;
   Lisp_Object error_symbol, error_data;
 
+  emacs_abort();
   CHECK_THREAD (thread);
   tstate = XTHREAD (thread);
 
@@ -1026,6 +1034,7 @@ DEFUN ("all-threads", Fall_threads, Sall_threads, 0, 0, 0,
 {
   Lisp_Object result = Qnil;
   struct thread_state *iter;
+  emacs_abort();
 
   for (iter = all_threads; iter; iter = iter->next_thread)
     {
