@@ -575,9 +575,9 @@
    `("};"
      "extern struct emacs_globals globals;"
      ""
-     ,(format #f "extern struct Lisp_Symbol lispsym[~a];" num-symbols)
+     ,(format #f "extern Lisp_Object lispsym[~a];" num-symbols)
      "#ifdef DEFINE_SYMBOLS"
-     ,(format #f "struct Lisp_Symbol lispsym[~a];" num-symbols)
+     ,(format #f "Lisp_Object lispsym[~a];" num-symbols)
      "#endif")))
 
 (define (write-globals)

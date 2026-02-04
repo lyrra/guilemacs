@@ -403,7 +403,7 @@ signal a `cyclic-variable-indirection' error.  */)
   sym_t sym = XSYMBOL (new_alias);
 
   /* Ensure non-circularity.  */
-  struct Lisp_Symbol *s = XSYMBOL (base_variable);
+  Lisp_Object s = XSYMBOL (base_variable);
   for (;;)
     {
       if (s == sym)
@@ -2793,7 +2793,7 @@ let_shadows_buffer_binding_p (sym_t symbol)
 }
 
 static void
-do_specbind (struct Lisp_Symbol *sym, union specbinding *bind,
+do_specbind (Lisp_Object sym, union specbinding *bind,
              Lisp_Object value, enum Set_Internal_Bind bindflag)
 {
   switch (SYMBOL_REDIRECT (sym))

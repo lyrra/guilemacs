@@ -261,8 +261,7 @@ DEFINE_GDB_SYMBOL_END (VALMASK)
    alignment, use static_assert (GCALIGNED (T)) to verify the
    requirement on the current platform.  Types need this check if their
    objects can be allocated outside the garbage collector.  For example,
-   struct Lisp_Symbol needs the check because of lispsym and struct
-   Lisp_Cons needs it because of STACK_CONS.  */
+   struct Lisp_Cons needs it because of STACK_CONS.  */
 
 #define GCALIGNED_UNION_MEMBER char alignas (GCALIGNMENT) gcaligned;
 #if HAVE_STRUCT_ATTRIBUTE_ALIGNED
@@ -381,7 +380,7 @@ extern scm_t_bits lisp_vectorlike_tag;
 /* Lisp_Object tagging scheme:
         Tag location
    Upper bits  Lower bits  Type        Payload
-   000.......  .......000  symbol      offset from lispsym to struct Lisp_Symbol
+   000.......  .......000  symbol      offset from lispsym to Symbol
    001.......  .......001  unused
    01........  ........10  fixnum      signed integer of FIXNUM_BITS
    110.......  .......011  cons        pointer to struct Lisp_Cons
@@ -392,7 +391,7 @@ enum Lisp_Type
   {
     Lisp_Other,
 
-    /* Symbol.  XSYMBOL (object) points to a struct Lisp_Symbol.  */
+    /* Symbol.  XSYMBOL (object) points to a Symbol.  */
     Lisp_Symbol,
 
     /* Integer.  XINT (obj) is the integer value.  */
@@ -557,27 +556,6 @@ enum symbol_trapped_write
   SYMBOL_TRAPPED_WRITE     /* trap the write, call watcher functions */
 };
 
-struct Lisp_Symbol
-{
-  union
-  {
-    struct
-    {
-      Lisp_Object self_;
-      /* Value of the symbol or Qunbound if unbound.  Which alternative of the
-	 union is used depends on the `redirect' field above.  */
-      union {
-	Lisp_Object value_;
-        sym_t alias_;
-	struct Lisp_Buffer_Local_Value *blv_;
-	lispfwd fwd_;
-      } val;
-    } s;
-    GCALIGNED_UNION_MEMBER
-  } u;
-};
-static_assert (GCALIGNED (struct Lisp_Symbol));
-
 #define SYMBOL_SELF(sym) (GAREF (sym, 0))
 #define SET_SYMBOL_SELF(sym, v) (GASET (sym, 0, v))
 #define SYMBOL_REDIRECT(sym) (XFIXNUM (GAREF (sym, 1)))
@@ -714,13 +692,6 @@ struct vectorlike_header
     ptrdiff_t size;
   };
 
-struct Lisp_Symbol_With_Pos
-{
-  struct vectorlike_header header;
-  Lisp_Object sym;              /* A symbol */
-  Lisp_Object pos;              /* A fixnum */
-} GCALIGNED_STRUCT;
-
 INLINE Lisp_Object builtin_lisp_symbol (int index);
 
 #include <globals.h>
@@ -834,22 +805,7 @@ XSYMBOL (Lisp_Object a)
 INLINE Lisp_Object
 builtin_lisp_symbol (int index)
 {
-  struct Lisp_Symbol *sym = lispsym + index;
-  return sym->u.s.self_;
-}
-
-INLINE bool
-c_symbol_p (struct Lisp_Symbol *sym)
-{
-  char *bp = (char *) lispsym;
-  char *sp = (char *) sym;
-  if (PTRDIFF_MAX < INTPTR_MAX)
-    return bp <= sp && sp < bp + sizeof lispsym;
-  else
-    {
-      ptrdiff_t offset = sp - bp;
-      return 0 <= offset && offset < sizeof lispsym;
-    }
+  return lispsym[index];
 }
 
 INLINE void
@@ -3752,9 +3708,6 @@ set_hash_value_slot (struct Lisp_Hash_Table *h, ptrdiff_t idx, Lisp_Object val)
   eassert (idx >= 0 && idx < h->table_size);
   h->key_and_value[2 * idx + 1] = val;;
 }
-
-/* Use these functions to set Lisp_Object
-   or pointer slots of struct Lisp_Symbol.  */
 
 INLINE void
 set_symbol_function (Lisp_Object sym, Lisp_Object function)
