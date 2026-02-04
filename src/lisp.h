@@ -3416,32 +3416,6 @@ unwrap_specpdl_ref (specpdl_ref ref)
 #endif
 }
 
-INLINE specpdl_ref
-specpdl_count_to_ref (ptrdiff_t count)
-{
-  return wrap_specpdl_ref (count * sizeof (union specbinding));
-}
-
-INLINE ptrdiff_t
-specpdl_ref_to_count (specpdl_ref ref)
-{
-  return unwrap_specpdl_ref (ref) / sizeof (union specbinding);
-}
-
-/* Whether two `specpdl_ref' refer to the same entry.  */
-INLINE bool
-specpdl_ref_eq (specpdl_ref a, specpdl_ref b)
-{
-  return unwrap_specpdl_ref (a) == unwrap_specpdl_ref (b);
-}
-
-/* Whether `a' refers to an earlier entry than `b'.  */
-INLINE bool
-specpdl_ref_lt (specpdl_ref a, specpdl_ref b)
-{
-  return unwrap_specpdl_ref (a) < unwrap_specpdl_ref (b);
-}
-
 INLINE bool
 specpdl_ref_valid_p (specpdl_ref ref)
 {
