@@ -178,7 +178,6 @@ typedef struct merge_state
 
   sortslice a;
   ptrdiff_t alloced;
-  specpdl_ref count;
   Lisp_Object temparray[MERGESTATE_TEMP_SIZE];
 
   /* If an exception is thrown while merging we might have to relocate
@@ -478,8 +477,6 @@ gallop_right (merge_state *ms, const Lisp_Object key, Lisp_Object *a,
 }
 
 
-static void merge_register_cleanup (merge_state *ms);
-
 static void
 merge_init (merge_state *ms, const ptrdiff_t list_size,
 	    Lisp_Object *allocated_keys, sortslice *lo, Lisp_Object predicate)
@@ -516,32 +513,6 @@ merge_init (merge_state *ms, const ptrdiff_t list_size,
   ms->pred_fun = NILP (predicate) ? order_pred_valuelt : order_pred_lisp;
   ms->predicate = predicate;
   ms->reloc = (struct reloc){NULL, NULL, NULL, 0};
-  ms->count = make_invalid_specpdl_ref ();
-  if (allocated_keys != NULL)
-    merge_register_cleanup (ms);
-}
-
-
-/* The dynamically allocated memory may hold lisp objects during
-   merging.  MERGE_MARKMEM marks them so they aren't reaped during
-   GC.  */
-
-static void
-merge_markmem (void *arg)
-{
-  merge_state *ms = arg;
-  eassume (ms != NULL);
-
-  //if (ms->allocated_keys != NULL)
-  //  mark_objects (ms->allocated_keys, ms->listlen);
-
-  if (ms->reloc.size != NULL && *ms->reloc.size > 0)
-    {
-      Lisp_Object *src = (ms->reloc.src->values
-			  ? ms->reloc.src->values : ms->reloc.src->keys);
-      eassume (src != NULL);
-      //mark_objects (src, *ms->reloc.size);
-    }
 }
 
 
@@ -587,13 +558,6 @@ cleanup_mem (void *arg)
     }
 }
 
-static void
-merge_register_cleanup (merge_state *ms)
-{
-  specpdl_ref count = SPECPDL_INDEX ();
-  //record_unwind_protect_ptr_mark (cleanup_mem, ms, merge_markmem);
-  ms->count = count;
-}
 
 /* Allocate enough temp memory for NEED array slots.  Any previously
    allocated memory is first freed, and a cleanup routine is
@@ -605,21 +569,11 @@ merge_getmem (merge_state *ms, const ptrdiff_t need)
 {
   eassume (ms != NULL);
 
-  if (ms->a.keys == ms->temparray)
-    {
-      /* We only get here if alloc is needed and this is the first
-	 time, so we set up the unwind protection.  */
-      if (!specpdl_ref_valid_p (ms->count))
-	merge_register_cleanup (ms);
-    }
-  else
-    {
-      /* We have previously alloced storage.  Since we don't care
-         what's in the block we don't use realloc which would waste
-         cycles copying the old data.  We just free and alloc
-         again.  */
-      xfree (ms->a.keys);
-    }
+  /* Free any previously allocated storage.  We don't use realloc since
+     we don't care about the old contents.  */
+  if (ms->a.keys != ms->temparray)
+    xfree (ms->a.keys);
+
   ptrdiff_t bytes = (need * word_size) << (ms->a.values != NULL ? 1 : 0);
   ms->a.keys = xmalloc (bytes);
   ms->alloced = need;
@@ -1095,6 +1049,12 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
   Lisp_Object *allocated_keys = NULL;
   merge_state ms;
 
+  /* Register cleanup handler using Guile's dynwind mechanism.
+     cleanup_mem will free allocated memory and relocate elements
+     back to the original array on exception.  */
+  scm_dynwind_begin (0);
+  scm_dynwind_unwind_handler (cleanup_mem, &ms, SCM_F_WIND_EXPLICITLY);
+
   if (reverse && 0 < length)
     reverse_slice (seq, seq + length);    /* preserve stability */
 
@@ -1124,8 +1084,8 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
 
   merge_init (&ms, length, allocated_keys, &lo, predicate);
 
-  /* Compute keys after merge_markmem has been registered by merge_init
-     (any call to keyfunc might trigger a GC).  */
+  /* Compute keys after merge_init (any call to keyfunc might trigger
+     a GC, but Guile's GC traces the keys automatically).  */
   if (!NILP (keyfunc))
     for (ptrdiff_t i = 0; i < length; i++)
       keys[i] = call1 (keyfunc, seq[i]);
@@ -1174,6 +1134,6 @@ tim_sort (Lisp_Object predicate, Lisp_Object keyfunc,
   if (reverse)
     reverse_slice (seq, seq + length);
 
-  //if (ms.a.keys != ms.temparray || allocated_keys != NULL)
-  //  unbind_to (ms.count, Qnil);
+  /* End dynwind block - calls cleanup_mem to free any allocated memory.  */
+  scm_dynwind_end ();
 }
