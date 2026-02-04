@@ -499,61 +499,13 @@ DEFUN ("number-or-marker-p", Fnumber_or_marker_p,
   return Qnil;
 }
 
-Lisp_Object
-Fnatnump (Lisp_Object object)
-{
-  return call1 (intern ("natnump"), object);
-}
-
-Lisp_Object
-Fcar (Lisp_Object list)
-{
-  return GUILECALL1(car, list);
-}
-
-/* MIGRATED TO GUILE: car-safe
-   This function has been moved to prelude/load.scm as elisp-car-safe. */
-DEFUN ("car-safe", Fcar_safe, Scar_safe, 1, 1, 0,
-       doc: /* Return the car of OBJECT if it is a cons cell, or else nil.  */)
-  (Lisp_Object object)
-{
-  return CAR_SAFE (object);
-}
-
-Lisp_Object
-Fcdr (Lisp_Object list)
-{
-  return GUILECALL1(cdr, list);
-}
-
-/* MIGRATED TO GUILE: cdr-safe
-   This function has been moved to prelude/load.scm as elisp-cdr-safe. */
-DEFUN ("cdr-safe", Fcdr_safe, Scdr_safe, 1, 1, 0,
-       doc: /* Return the cdr of OBJECT if it is a cons cell, or else nil.  */)
-  (Lisp_Object object)
-{
-  return CDR_SAFE (object);
-}
-
-DEFUN ("setcar", Fsetcar, Ssetcar, 2, 2, 0,
-       doc: /* Set the car of CELL to be NEWCAR.  Returns NEWCAR.  */)
-  (register Lisp_Object cell, Lisp_Object newcar)
-{
-  CHECK_CONS (cell);
-  CHECK_IMPURE (cell, XCONS (cell));
-  XSETCAR (cell, newcar);
-  return newcar;
-}
-
-DEFUN ("setcdr", Fsetcdr, Ssetcdr, 2, 2, 0,
-       doc: /* Set the cdr of CELL to be NEWCDR.  Returns NEWCDR.  */)
-  (register Lisp_Object cell, Lisp_Object newcdr)
-{
-  CHECK_CONS (cell);
-  CHECK_IMPURE (cell, XCONS (cell));
-  XSETCDR (cell, newcdr);
-  return newcdr;
-}
+DEFUNWRAP1(Fnatnump, "natnump")
+DEFUNWRAP1(Fcar, "car")
+DEFUNWRAP1(Fcdr, "cdr")
+DEFUNWRAP1(Fcar_safe, "car-safe")
+DEFUNWRAP1(Fcdr_safe, "cdr-safe")
+DEFUNWRAP2(Fsetcar, "setcar")
+DEFUNWRAP2(Fsetcdr, "setcdr")
 
 /* Extract and set components of symbols.  */
 

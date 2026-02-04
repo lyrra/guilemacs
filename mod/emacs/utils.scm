@@ -31,7 +31,7 @@
     elisp-hash-table-keys elisp-hash-table-values
     elisp-equal-including-properties elisp-copy-tree elisp-fillarray
     elisp-symbol-function elisp-symbol-value elisp-set
-    elisp-fset elisp-setq elisp-setcar elisp-setcdr
+    elisp-fset elisp-setq
     elisp-make-symbol elisp-gensym
     set-debug-print-flag
     ;; Mathematical utilities

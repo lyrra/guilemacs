@@ -2100,6 +2100,10 @@ extern Lisp_Object Fsymbol (Lisp_Object);
 /* List operations - declared here since they're no longer using DEFUN */
 extern Lisp_Object Fcar (Lisp_Object);
 extern Lisp_Object Fcdr (Lisp_Object);
+extern Lisp_Object Fsetcar (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fsetcdr (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fcar_safe (Lisp_Object);
+extern Lisp_Object Fcdr_safe (Lisp_Object);
 extern Lisp_Object Fnatnump (Lisp_Object);
 extern Lisp_Object Feq (Lisp_Object, Lisp_Object);
 extern Lisp_Object Feql (Lisp_Object, Lisp_Object);

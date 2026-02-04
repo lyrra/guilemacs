@@ -308,20 +308,6 @@
 
 ;;; Lists
 
-(defun setcar (cell newcar)
-  (if (consp cell)
-      (progn
-        (funcall (@ (guile) set-car!) cell newcar)
-        newcar)
-    (signal 'wrong-type-argument `(consp ,cell))))
-
-(defun setcdr (cell newcdr)
-  (if (consp cell)
-      (progn
-        (funcall (@ (guile) set-cdr!) cell newcdr)
-        newcdr)
-    (signal 'wrong-type-argument `(consp ,cell))))
-
 (defmacro dolist (spec &rest body)
   (apply #'(lambda (var list &optional result)
              (list 'progn

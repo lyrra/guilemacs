@@ -55,6 +55,22 @@
 (define-elisp-inline (cdar lst) (elisp-cdr (elisp-car lst)))
 (define-elisp-inline (cddr lst) (elisp-cdr (elisp-cdr lst)))
 
+(define-elisp-inline (setcar cell newcar)
+  "Set the car of CELL to be NEWCAR.  Returns NEWCAR."
+  (if (pair? cell)
+      (begin
+        (set-car! cell newcar)
+        newcar)
+    (error "wrong-type-argument: consp")))
+
+(define-elisp-inline (setcdr cell newcdr)
+  "Set the cdr of CELL to be NEWCDR.  Returns NEWCDR."
+  (if (pair? cell)
+      (begin
+        (set-cdr! cell newcdr)
+        newcdr)
+    (error "wrong-type-argument consp")))
+
 (define (nil-terminate! lst)
   "Re-terminate a Guile ()-list with Elisp #nil."
   (if (null? lst)
