@@ -153,254 +153,69 @@ fix_position (Lisp_Object pos)
 }
 
 /* These setters are used only in this file, so they can be private.
-   The public setters are inline functions defined in buffer.h.  */
-static void
-bset_abbrev_mode (struct buffer *b, Lisp_Object val)
-{
-  b->abbrev_mode_ = val;
-}
-static void
-bset_abbrev_table (struct buffer *b, Lisp_Object val)
-{
-  b->abbrev_table_ = val;
-}
-static void
-bset_auto_fill_function (struct buffer *b, Lisp_Object val)
-{
-  b->auto_fill_function_ = val;
-}
-static void
-bset_auto_save_file_format (struct buffer *b, Lisp_Object val)
-{
-  b->auto_save_file_format_ = val;
-}
-static void
-bset_auto_save_file_name (struct buffer *b, Lisp_Object val)
-{
-  b->auto_save_file_name_ = val;
-}
-static void
-bset_backed_up (struct buffer *b, Lisp_Object val)
-{
-  b->backed_up_ = val;
-}
-static void
-bset_begv_marker (struct buffer *b, Lisp_Object val)
-{
-  b->begv_marker_ = val;
-}
-static void
-bset_bidi_display_reordering (struct buffer *b, Lisp_Object val)
-{
-  b->bidi_display_reordering_ = val;
-}
-static void
-bset_bidi_paragraph_start_re (struct buffer *b, Lisp_Object val)
-{
-  b->bidi_paragraph_start_re_ = val;
-}
-static void
-bset_bidi_paragraph_separate_re (struct buffer *b, Lisp_Object val)
-{
-  b->bidi_paragraph_separate_re_ = val;
-}
-static void
-bset_buffer_file_coding_system (struct buffer *b, Lisp_Object val)
-{
-  b->buffer_file_coding_system_ = val;
-}
-static void
-bset_ctl_arrow (struct buffer *b, Lisp_Object val)
-{
-  b->ctl_arrow_ = val;
-}
-static void
-bset_cursor_in_non_selected_windows (struct buffer *b, Lisp_Object val)
-{
-  b->cursor_in_non_selected_windows_ = val;
-}
-static void
-bset_cursor_type (struct buffer *b, Lisp_Object val)
-{
-  b->cursor_type_ = val;
-}
-static void
-bset_display_table (struct buffer *b, Lisp_Object val)
-{
-  b->display_table_ = val;
-}
-static void
-bset_extra_line_spacing (struct buffer *b, Lisp_Object val)
-{
-  b->extra_line_spacing_ = val;
-}
+   The public setters are inline functions defined in buffer.h.
+   Each setter writes the C struct field AND syncs to the per-buffer
+   hash table (Phase 1: dual write path for validation).  */
+
+#define STATIC_BSET(field)					\
+  static void							\
+  bset_##field (struct buffer *b, Lisp_Object val)		\
+  {								\
+    b->field##_ = val;						\
+    BVAR_HASH_SYNC (b, field, val);				\
+  }
+
+STATIC_BSET (abbrev_mode)
+STATIC_BSET (abbrev_table)
+STATIC_BSET (auto_fill_function)
+STATIC_BSET (auto_save_file_format)
+STATIC_BSET (auto_save_file_name)
+STATIC_BSET (backed_up)
+STATIC_BSET (begv_marker)
+STATIC_BSET (bidi_display_reordering)
+STATIC_BSET (bidi_paragraph_start_re)
+STATIC_BSET (bidi_paragraph_separate_re)
+STATIC_BSET (buffer_file_coding_system)
+STATIC_BSET (ctl_arrow)
+STATIC_BSET (cursor_in_non_selected_windows)
+STATIC_BSET (cursor_type)
+STATIC_BSET (display_table)
+STATIC_BSET (extra_line_spacing)
 #ifdef HAVE_TREE_SITTER
-static void
-bset_ts_parser_list (struct buffer *b, Lisp_Object val)
-{
-  b->ts_parser_list_ = val;
-}
+STATIC_BSET (ts_parser_list)
 #endif
-static void
-bset_file_format (struct buffer *b, Lisp_Object val)
-{
-  b->file_format_ = val;
-}
-static void
-bset_file_truename (struct buffer *b, Lisp_Object val)
-{
-  b->file_truename_ = val;
-}
-static void
-bset_fringe_cursor_alist (struct buffer *b, Lisp_Object val)
-{
-  b->fringe_cursor_alist_ = val;
-}
-static void
-bset_fringe_indicator_alist (struct buffer *b, Lisp_Object val)
-{
-  b->fringe_indicator_alist_ = val;
-}
-static void
-bset_fringes_outside_margins (struct buffer *b, Lisp_Object val)
-{
-  b->fringes_outside_margins_ = val;
-}
-static void
-bset_header_line_format (struct buffer *b, Lisp_Object val)
-{
-  b->header_line_format_ = val;
-}
-static void
-bset_tab_line_format (struct buffer *b, Lisp_Object val)
-{
-  b->tab_line_format_ = val;
-}
-static void
-bset_indicate_buffer_boundaries (struct buffer *b, Lisp_Object val)
-{
-  b->indicate_buffer_boundaries_ = val;
-}
-static void
-bset_indicate_empty_lines (struct buffer *b, Lisp_Object val)
-{
-  b->indicate_empty_lines_ = val;
-}
-static void
-bset_invisibility_spec (struct buffer *b, Lisp_Object val)
-{
-  b->invisibility_spec_ = val;
-}
-static void
-bset_left_fringe_width (struct buffer *b, Lisp_Object val)
-{
-  b->left_fringe_width_ = val;
-}
-static void
-bset_major_mode (struct buffer *b, Lisp_Object val)
-{
-  b->major_mode_ = val;
-}
-static void
-bset_local_minor_modes (struct buffer *b, Lisp_Object val)
-{
-  b->local_minor_modes_ = val;
-}
-static void
-bset_mark (struct buffer *b, Lisp_Object val)
-{
-  b->mark_ = val;
-}
-static void
-bset_mode_line_format (struct buffer *b, Lisp_Object val)
-{
-  b->mode_line_format_ = val;
-}
-static void
-bset_mode_name (struct buffer *b, Lisp_Object val)
-{
-  b->mode_name_ = val;
-}
-static void
-bset_name (struct buffer *b, Lisp_Object val)
-{
-  b->name_ = val;
-}
-static void
-bset_last_name (struct buffer *b, Lisp_Object val)
-{
-  b->last_name_ = val;
-}
-static void
-bset_overwrite_mode (struct buffer *b, Lisp_Object val)
-{
-  b->overwrite_mode_ = val;
-}
-static void
-bset_pt_marker (struct buffer *b, Lisp_Object val)
-{
-  b->pt_marker_ = val;
-}
-static void
-bset_right_fringe_width (struct buffer *b, Lisp_Object val)
-{
-  b->right_fringe_width_ = val;
-}
-static void
-bset_save_length (struct buffer *b, Lisp_Object val)
-{
-  b->save_length_ = val;
-}
-static void
-bset_scroll_bar_width (struct buffer *b, Lisp_Object val)
-{
-  b->scroll_bar_width_ = val;
-}
-static void
-bset_scroll_bar_height (struct buffer *b, Lisp_Object val)
-{
-  b->scroll_bar_height_ = val;
-}
-static void
-bset_scroll_down_aggressively (struct buffer *b, Lisp_Object val)
-{
-  b->scroll_down_aggressively_ = val;
-}
-static void
-bset_scroll_up_aggressively (struct buffer *b, Lisp_Object val)
-{
-  b->scroll_up_aggressively_ = val;
-}
-static void
-bset_selective_display (struct buffer *b, Lisp_Object val)
-{
-  b->selective_display_ = val;
-}
-static void
-bset_selective_display_ellipses (struct buffer *b, Lisp_Object val)
-{
-  b->selective_display_ellipses_ = val;
-}
-static void
-bset_vertical_scroll_bar_type (struct buffer *b, Lisp_Object val)
-{
-  b->vertical_scroll_bar_type_ = val;
-}
-static void
-bset_horizontal_scroll_bar_type (struct buffer *b, Lisp_Object val)
-{
-  b->horizontal_scroll_bar_type_ = val;
-}
-static void
-bset_word_wrap (struct buffer *b, Lisp_Object val)
-{
-  b->word_wrap_ = val;
-}
-static void
-bset_zv_marker (struct buffer *b, Lisp_Object val)
-{
-  b->zv_marker_ = val;
-}
+STATIC_BSET (file_format)
+STATIC_BSET (file_truename)
+STATIC_BSET (fringe_cursor_alist)
+STATIC_BSET (fringe_indicator_alist)
+STATIC_BSET (fringes_outside_margins)
+STATIC_BSET (header_line_format)
+STATIC_BSET (tab_line_format)
+STATIC_BSET (indicate_buffer_boundaries)
+STATIC_BSET (indicate_empty_lines)
+STATIC_BSET (invisibility_spec)
+STATIC_BSET (left_fringe_width)
+STATIC_BSET (major_mode)
+STATIC_BSET (local_minor_modes)
+STATIC_BSET (mark)
+STATIC_BSET (mode_line_format)
+STATIC_BSET (mode_name)
+STATIC_BSET (name)
+STATIC_BSET (last_name)
+STATIC_BSET (overwrite_mode)
+STATIC_BSET (pt_marker)
+STATIC_BSET (right_fringe_width)
+STATIC_BSET (save_length)
+STATIC_BSET (scroll_bar_width)
+STATIC_BSET (scroll_bar_height)
+STATIC_BSET (scroll_down_aggressively)
+STATIC_BSET (scroll_up_aggressively)
+STATIC_BSET (selective_display)
+STATIC_BSET (selective_display_ellipses)
+STATIC_BSET (vertical_scroll_bar_type)
+STATIC_BSET (horizontal_scroll_bar_type)
+STATIC_BSET (word_wrap)
+STATIC_BSET (zv_marker)
 
 void
 nsberror (Lisp_Object spec)
@@ -1257,8 +1072,7 @@ init_buffer_local_hash (struct buffer *b)
 
 /* Populate buffer B's local variable hash table from its current
    per-buffer C struct fields.  This mirrors the struct fields into the
-   hash table.  During Phase 0, nothing reads from the hash yet ---
-   this just builds the infrastructure.  */
+   hash table so the hash stays in sync for validation.  */
 
 static void
 populate_buffer_local_hash (struct buffer *b)
@@ -1271,10 +1085,76 @@ populate_buffer_local_hash (struct buffer *b)
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
     {
       Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
-      if (SYMBOLP (sym))
+      if (!NILP (sym) && SYMBOLP (sym))
 	{
 	  Lisp_Object val = per_buffer_value (b, offset);
 	  scm_hashq_set_x (b->local_variables, sym, val);
+	}
+    }
+}
+
+/* Sync a single per-buffer variable write to the hash table.
+   OFFSET is the byte offset of the variable in struct buffer.
+   VAL is the new value being written to the C struct field.
+   Called from bset_* functions and set_per_buffer_value.  */
+
+void
+bvar_hash_sync (struct buffer *b, int offset, Lisp_Object val)
+{
+  if (b->local_variables && !scm_is_false (b->local_variables))
+    {
+      Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
+      if (!NILP (sym) && SYMBOLP (sym))
+	scm_hashq_set_x (b->local_variables, sym, val);
+    }
+}
+
+/* Read a per-buffer variable from the hash table.
+   Returns the hash value, or Qunbound if not in hash.
+   OFFSET is the byte offset of the variable in struct buffer.  */
+
+Lisp_Object
+bvar_hash_ref (struct buffer *b, int offset)
+{
+  if (b->local_variables && !scm_is_false (b->local_variables))
+    {
+      Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
+      if (!NILP (sym) && SYMBOLP (sym))
+	return scm_hashq_ref (b->local_variables, sym, Qunbound);
+    }
+  return Qunbound;
+}
+
+/* Validate that all per-buffer C struct fields match the hash table.
+   Aborts if any mismatch is found.  For debugging.  */
+
+void
+validate_buffer_local_hash (struct buffer *b)
+{
+  int offset;
+
+  if (!b->local_variables || scm_is_false (b->local_variables))
+    return;
+
+  FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
+    {
+      Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
+      if (!NILP (sym) && SYMBOLP (sym))
+	{
+	  Lisp_Object c_val = per_buffer_value (b, offset);
+	  Lisp_Object h_val = scm_hashq_ref (b->local_variables,
+					      sym, Qunbound);
+	  if (!BASE_EQ (c_val, h_val))
+	    {
+	      fprintf (stderr,
+		       "buffer hash mismatch for %s in buffer %p: "
+		       "C=%p hash=%p\n",
+		       SSDATA (SYMBOL_NAME (sym)),
+		       (void *) b,
+		       (void *) c_val,
+		       (void *) h_val);
+	      emacs_abort ();
+	    }
 	}
     }
 }
@@ -1537,6 +1417,18 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
   return result;
 }
 
+DEFUN ("validate-buffer-local-hash", Fvalidate_buffer_local_hash,
+       Svalidate_buffer_local_hash, 0, 1, 0,
+       doc: /* Validate that BUFFER's per-buffer hash matches its C struct fields.
+Signals an error if any mismatch is found.  Returns t if valid.
+No argument or nil as argument means use current buffer as BUFFER.  */)
+  (Lisp_Object buffer)
+{
+  struct buffer *buf = decode_buffer (buffer);
+  validate_buffer_local_hash (buf);
+  return Qt;
+}
+
 DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
        0, 1, 0,
        doc: /* Return non-nil if BUFFER was modified since its file was last read or saved.

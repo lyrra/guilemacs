@@ -294,6 +294,21 @@ struct buffer_text
 
 #define BVAR(buf, field) ((buf)->field ## _)
 
+/* Read a per-buffer variable from the hash table (Phase 1 validation).
+   Uses offsetof directly rather than PER_BUFFER_VAR_OFFSET so this
+   macro works before PER_BUFFER_VAR_OFFSET is defined.  */
+#define BVAR_HASH(buf, field) \
+  bvar_hash_ref (buf, offsetof (struct buffer, field##_))
+
+/* Sync a per-buffer variable write to the hash table.
+   Called by bset_* setters and set_per_buffer_value.  */
+extern void bvar_hash_sync (struct buffer *, int, Lisp_Object);
+extern Lisp_Object bvar_hash_ref (struct buffer *, int);
+extern void validate_buffer_local_hash (struct buffer *);
+
+#define BVAR_HASH_SYNC(buf, field, val) \
+  bvar_hash_sync (buf, offsetof (struct buffer, field##_), val)
+
 /* Max number of builtin per-buffer variables.  */
 enum { MAX_PER_BUFFER_VARS = 50 };
 
@@ -744,123 +759,40 @@ XBUFFER (Lisp_Object a)
 
 /* Most code should use these functions to set Lisp fields in struct
    buffer.  (Some setters that are private to a single .c file are
-   defined as static in those files.)  */
-INLINE void
-bset_bidi_paragraph_direction (struct buffer *b, Lisp_Object val)
-{
-  b->bidi_paragraph_direction_ = val;
-}
-INLINE void
-bset_cache_long_scans (struct buffer *b, Lisp_Object val)
-{
-  b->cache_long_scans_ = val;
-}
-INLINE void
-bset_case_canon_table (struct buffer *b, Lisp_Object val)
-{
-  b->case_canon_table_ = val;
-}
-INLINE void
-bset_case_eqv_table (struct buffer *b, Lisp_Object val)
-{
-  b->case_eqv_table_ = val;
-}
-INLINE void
-bset_directory (struct buffer *b, Lisp_Object val)
-{
-  b->directory_ = val;
-}
-INLINE void
-bset_display_count (struct buffer *b, Lisp_Object val)
-{
-  b->display_count_ = val;
-}
-INLINE void
-bset_left_margin_cols (struct buffer *b, Lisp_Object val)
-{
-  b->left_margin_cols_ = val;
-}
-INLINE void
-bset_right_margin_cols (struct buffer *b, Lisp_Object val)
-{
-  b->right_margin_cols_ = val;
-}
-INLINE void
-bset_display_time (struct buffer *b, Lisp_Object val)
-{
-  b->display_time_ = val;
-}
-INLINE void
-bset_downcase_table (struct buffer *b, Lisp_Object val)
-{
-  b->downcase_table_ = val;
-}
-INLINE void
-bset_enable_multibyte_characters (struct buffer *b, Lisp_Object val)
-{
-  b->enable_multibyte_characters_ = val;
-}
-INLINE void
-bset_filename (struct buffer *b, Lisp_Object val)
-{
-  b->filename_ = val;
-}
-INLINE void
-bset_keymap (struct buffer *b, Lisp_Object val)
-{
-  b->keymap_ = val;
-}
-INLINE void
-bset_last_selected_window (struct buffer *b, Lisp_Object val)
-{
-  b->last_selected_window_ = val;
-}
-INLINE void
-bset_local_var_alist (struct buffer *b, Lisp_Object val)
-{
-  b->local_var_alist_ = val;
-}
-INLINE void
-bset_mark_active (struct buffer *b, Lisp_Object val)
-{
-  b->mark_active_ = val;
-}
-INLINE void
-bset_point_before_scroll (struct buffer *b, Lisp_Object val)
-{
-  b->point_before_scroll_ = val;
-}
-INLINE void
-bset_read_only (struct buffer *b, Lisp_Object val)
-{
-  b->read_only_ = val;
-}
-INLINE void
-bset_truncate_lines (struct buffer *b, Lisp_Object val)
-{
-  b->truncate_lines_ = val;
-}
-INLINE void
-bset_undo_list (struct buffer *b, Lisp_Object val)
-{
-  b->undo_list_ = val;
-}
-INLINE void
-bset_upcase_table (struct buffer *b, Lisp_Object val)
-{
-  b->upcase_table_ = val;
-}
-INLINE void
-bset_width_table (struct buffer *b, Lisp_Object val)
-{
-  b->width_table_ = val;
-}
+   defined as static in those files.)  Each setter writes the C struct
+   field AND syncs to the per-buffer hash table.  */
 
-INLINE void
-bset_text_conversion_style (struct buffer *b, Lisp_Object val)
-{
-  b->text_conversion_style_ = val;
-}
+#define INLINE_BSET(field)					\
+  INLINE void							\
+  bset_##field (struct buffer *b, Lisp_Object val)		\
+  {								\
+    b->field##_ = val;						\
+    BVAR_HASH_SYNC (b, field, val);				\
+  }
+
+INLINE_BSET (bidi_paragraph_direction)
+INLINE_BSET (cache_long_scans)
+INLINE_BSET (case_canon_table)
+INLINE_BSET (case_eqv_table)
+INLINE_BSET (directory)
+INLINE_BSET (display_count)
+INLINE_BSET (left_margin_cols)
+INLINE_BSET (right_margin_cols)
+INLINE_BSET (display_time)
+INLINE_BSET (downcase_table)
+INLINE_BSET (enable_multibyte_characters)
+INLINE_BSET (filename)
+INLINE_BSET (keymap)
+INLINE_BSET (last_selected_window)
+INLINE_BSET (local_var_alist)
+INLINE_BSET (mark_active)
+INLINE_BSET (point_before_scroll)
+INLINE_BSET (read_only)
+INLINE_BSET (truncate_lines)
+INLINE_BSET (undo_list)
+INLINE_BSET (upcase_table)
+INLINE_BSET (width_table)
+INLINE_BSET (text_conversion_style)
 
 /* BUFFER_CEILING_OF (resp. BUFFER_FLOOR_OF), when applied to n, return
    the max (resp. min) p such that
@@ -1572,6 +1504,7 @@ INLINE void
 set_per_buffer_value (struct buffer *b, int offset, Lisp_Object value)
 {
   *(Lisp_Object *)(offset + (char *) b) = value;
+  bvar_hash_sync (b, offset, value);
 }
 
 /* Downcase a character C, or make no change if that cannot be done.  */
