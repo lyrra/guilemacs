@@ -342,8 +342,30 @@ value-slot-module, function-slot-module, or plist-slot-module."
    ;; Must return #t, not the function value itself - fboundp callers expect t
    (not (eq? #nil (variable-ref (module-variable function-slot-module symbol))))))
 
+;; bind-symbol: dynamically bind SYMBOL to VALUE during THUNK.
+;; Fast path (PLAINVAL, no trapped writes): pure Scheme vector-set!
+;; on the descriptor's slot 4.  Fully transparent to peval.
+;; Slow path (FORWARDED, LOCALIZED, VARALIAS, trapped): goes through
+;; C's symbol-value / set-symbol-value! which handles all redirect types.
+;; The conditional is inside the winder/unwinder so THUNK appears
+;; exactly once, preserving O(N) tree-il growth for N bindings.
 (define (bind-symbol symbol value thunk)
-  (dynamic-bind (symbol-desc symbol) value thunk))
+  (let* ((desc (symbol-desc symbol))
+         (fast (and (= (vector-ref desc 1) 4)    ;; SYMBOL_PLAINVAL
+                    (= (vector-ref desc 2) 0)))   ;; no trapped write
+         (old (if fast
+                  (vector-ref desc 4)
+                  (symbol-value symbol))))
+    (dynamic-wind
+      (lambda ()
+        (if fast
+            (vector-set! desc 4 value)
+            (set-symbol-value! symbol value)))
+      thunk
+      (lambda ()
+        (if fast
+            (vector-set! desc 4 old)
+            (set-symbol-value! symbol old))))))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)
@@ -381,7 +403,10 @@ value-slot-module, function-slot-module, or plist-slot-module."
   (set! symbol-default-value dref)
   (set! set-symbol-default-value! dset)
   (set! symbol-default-bound? dboundp)
-  (set! bind-symbol bind)
+  ;; bind-symbol is now pure Scheme (uses dynamic-wind + vector-set!
+  ;; for PLAINVAL, falls back to symbol-value/set-symbol-value! for
+  ;; others).  Don't replace with C Fbind_symbol.
+  ;; (set! bind-symbol bind)
   (set! lexical-binding? (lambda () (symbol-value 'lexical-binding)))
   (set! set-lexical-binding-mode (lambda (x) (set-symbol-value! 'lexical-binding x))))
 
