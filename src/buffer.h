@@ -290,13 +290,23 @@ struct buffer_text
     bool_bf redisplay : 1;
   };
 
-/* Most code should use this macro to access Lisp fields in struct buffer.  */
+/* Direct struct field access — use for l-value contexts (&address,
+   initialization of buffer_local_flags / buffer_defaults) and for
+   internal paths that must bypass the hash table (validation, GC).  */
 
-#define BVAR(buf, field) ((buf)->field ## _)
+#define BVAR_FIELD(buf, field) ((buf)->field ## _)
 
-/* Read a per-buffer variable from the hash table (Phase 1 validation).
-   Uses offsetof directly rather than PER_BUFFER_VAR_OFFSET so this
-   macro works before PER_BUFFER_VAR_OFFSET is defined.  */
+/* Read a per-buffer Lisp field.  Reads from the per-buffer hash table
+   when available (DEFVAR_PER_BUFFER variables); falls back to the C
+   struct field for internal fields without hash entries.
+   Phase 3: hash is now the primary read path.  */
+
+extern Lisp_Object bvar_hash_read (struct buffer *, int);
+
+#define BVAR(buf, field) bvar_hash_read (buf, offsetof (struct buffer, field##_))
+
+/* Read a per-buffer variable from the hash table only (returns Qunbound
+   if not present).  Used for Phase 1 validation.  */
 #define BVAR_HASH(buf, field) \
   bvar_hash_ref (buf, offsetof (struct buffer, field##_))
 
@@ -788,6 +798,7 @@ INLINE_BSET (local_var_alist)
 INLINE_BSET (mark_active)
 INLINE_BSET (point_before_scroll)
 INLINE_BSET (read_only)
+INLINE_BSET (save_length)
 INLINE_BSET (truncate_lines)
 INLINE_BSET (undo_list)
 INLINE_BSET (upcase_table)

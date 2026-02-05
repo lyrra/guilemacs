@@ -4613,7 +4613,7 @@ by calling `format-decode', which see.  */)
 
       SAVE_MODIFF = MODIFF;
       BUF_AUTOSAVE_MODIFF (current_buffer) = MODIFF;
-      XSETFASTINT (BVAR (current_buffer, save_length), Z - BEG);
+      bset_save_length (current_buffer, make_fixed_natnum (Z - BEG));
       if (NILP (handler))
 	{
 	  if (!NILP (BVAR (current_buffer, file_truename)))
@@ -5036,7 +5036,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
       if (visiting)
 	{
 	  SAVE_MODIFF = MODIFF;
-	  XSETFASTINT (BVAR (current_buffer, save_length), Z - BEG);
+	  bset_save_length (current_buffer, make_fixed_natnum (Z - BEG));
 	  bset_filename (current_buffer, visit_file);
 	}
 
@@ -5303,7 +5303,7 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   if (visiting)
     {
       SAVE_MODIFF = MODIFF;
-      XSETFASTINT (BVAR (current_buffer, save_length), Z - BEG);
+      bset_save_length (current_buffer, make_fixed_natnum (Z - BEG));
       bset_filename (current_buffer, visit_file);
       update_mode_lines = 14;
       if (auto_saving_into_visited_file)
@@ -5960,7 +5960,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 		minibuffer_auto_raise = 0;
 		/* Turn off auto-saving until there's a real save,
 		   and prevent any more warnings.  */
-		XSETINT (BVAR (b, save_length), -1);
+		bset_save_length (b, make_fixnum (-1));
 		Fsleep_for (make_fixnum (1), Qnil);
 		continue;
 	      }
@@ -5969,7 +5969,7 @@ A non-nil CURRENT-ONLY argument means save only current buffer.  */)
 	    internal_condition_case (auto_save_1, Qt, auto_save_error);
 	    auto_saved = 1;
 	    BUF_AUTOSAVE_MODIFF (b) = BUF_MODIFF (b);
-	    XSETFASTINT (BVAR (current_buffer, save_length), Z - BEG);
+	    bset_save_length (current_buffer, make_fixed_natnum (Z - BEG));
 	    set_buffer_internal (old);
 
 	    after_time = current_timespec ();
@@ -6016,7 +6016,7 @@ No auto-save file will be written until the buffer changes again.  */)
   /* FIXME: This should not be called in indirect buffers, since
      they're not autosaved.  */
   BUF_AUTOSAVE_MODIFF (current_buffer) = MODIFF;
-  XSETFASTINT (BVAR (current_buffer, save_length), Z - BEG);
+  bset_save_length (current_buffer, make_fixed_natnum (Z - BEG));
   current_buffer->auto_save_failure_time = 0;
   return Qnil;
 }

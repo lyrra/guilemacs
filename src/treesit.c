@@ -1697,7 +1697,7 @@ an indirect buffer.  */)
 						 language, tag);
 
   /* Update parser-list.  */
-  BVAR (buf, ts_parser_list) = Fcons (lisp_parser, BVAR (buf, ts_parser_list));
+  bset_ts_parser_list (buf, Fcons (lisp_parser, BVAR (buf, ts_parser_list)));
 
   return lisp_parser;
 }
