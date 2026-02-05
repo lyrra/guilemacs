@@ -112,6 +112,8 @@ static void call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay,
                                     bool after, Lisp_Object arg1,
                                     Lisp_Object arg2, Lisp_Object arg3);
 static void reset_buffer_local_variables (struct buffer *, int);
+static void init_buffer_local_hash (struct buffer *);
+static void populate_buffer_local_hash (struct buffer *);
 
 /* Alist of all buffer names vs the buffers.  This used to be
    a Lisp-visible variable, but is no longer, to prevent lossage
@@ -658,6 +660,12 @@ even if it is dead.  The return value is never nil.  */)
   reset_buffer (b);
   reset_buffer_local_variables (b, 1);
 
+  /* Initialize and populate the per-buffer local variable hash table.
+     Must be after reset_buffer_local_variables which sets the C struct
+     fields to their default values.  */
+  init_buffer_local_hash (b);
+  populate_buffer_local_hash (b);
+
   bset_mark (b, Fmake_marker ());
   BUF_MARKERS (b) = NULL;
 
@@ -744,6 +752,9 @@ clone_per_buffer_values (struct buffer *from, struct buffer *to)
   /* Get (a copy of) the alist of Lisp-level local variables of FROM
      and install that in TO.  */
   bset_local_var_alist (to, buffer_lisp_local_variables (from, 1));
+
+  /* Populate the cloned buffer's local variable hash from its C fields.  */
+  populate_buffer_local_hash (to);
 }
 
 
@@ -877,6 +888,12 @@ Interactively, CLONE and INHIBIT-BUFFER-HOOKS are nil.  */)
 
   reset_buffer (b);
   reset_buffer_local_variables (b, 1);
+
+  /* Initialize the per-buffer local variable hash table.
+     For indirect buffers, this is populated here from defaults.
+     For clone buffers, clone_per_buffer_values will re-populate it.  */
+  init_buffer_local_hash (b);
+  populate_buffer_local_hash (b);
 
   /* Put this in the alist of all live buffers.  */
   XSETBUFFER (buf, b);
@@ -1221,6 +1238,44 @@ reset_buffer_local_variables (struct buffer *b, int permanent_too)
 	   && (permanent_too
 	       || buffer_permanent_local_flags[idx] == 0)))
 	set_per_buffer_value (b, offset, per_buffer_default (offset));
+    }
+
+  /* Re-sync the per-buffer hash table with the (now-reset) C fields.  */
+  if (!scm_is_false (b->local_variables))
+    populate_buffer_local_hash (b);
+}
+
+/* Initialize the per-buffer local variable hash table for buffer B.
+   Creates an empty hash table.  Call populate_buffer_local_hash
+   after the buffer's per-buffer values have been set.  */
+
+static void
+init_buffer_local_hash (struct buffer *b)
+{
+  b->local_variables = scm_c_make_hash_table (97);
+}
+
+/* Populate buffer B's local variable hash table from its current
+   per-buffer C struct fields.  This mirrors the struct fields into the
+   hash table.  During Phase 0, nothing reads from the hash yet ---
+   this just builds the infrastructure.  */
+
+static void
+populate_buffer_local_hash (struct buffer *b)
+{
+  int offset;
+
+  if (!b->local_variables || scm_is_false (b->local_variables))
+    return;
+
+  FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
+    {
+      Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
+      if (SYMBOLP (sym))
+	{
+	  Lisp_Object val = per_buffer_value (b, offset);
+	  scm_hashq_set_x (b->local_variables, sym, val);
+	}
     }
 }
 
@@ -2121,6 +2176,10 @@ cleaning up all windows currently displaying the buffer to be killed. */)
     }
   delete_all_overlays (b);
   free_buffer_overlays (b);
+
+  /* Release the per-buffer variable hash table so its entries
+     don't prevent GC of the values.  */
+  b->local_variables = SCM_BOOL_F;
 
   /* Reset the local variables, so that this buffer's local values
      won't be protected from GC.  They would be protected
@@ -4777,6 +4836,11 @@ init_buffer_once (void)
 
   /* Make sure all markable slots in buffer_defaults
      are initialized reasonably, so mark_buffer won't choke.  */
+  /* These pseudo-buffers don't need local variable hash tables.
+     Must be set before reset_buffer_local_variables which may
+     call populate_buffer_local_hash.  */
+  buffer_defaults.local_variables = SCM_BOOL_F;
+  buffer_local_symbols.local_variables = SCM_BOOL_F;
   reset_buffer (&buffer_defaults);
   eassert (NILP (BVAR (&buffer_defaults, name)));
   reset_buffer_local_variables (&buffer_defaults, 1);

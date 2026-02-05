@@ -582,6 +582,12 @@ struct buffer
   /* No more Lisp_Object beyond cursor_in_non_selected_windows_.
      Except undo_list, which is handled specially in Fgarbage_collect.  */
 
+  /* Per-buffer variable hash table: maps symbols to their buffer-local
+     values.  This will eventually replace both the DEFVAR_PER_BUFFER
+     struct fields above and the BLV mechanism.  During Phase 0, the
+     hash table mirrors the struct fields for validation.  */
+  SCM local_variables;
+
   /* This structure holds the coordinates of the buffer contents
      in ordinary buffers.  In indirect buffers, this is not used.  */
   struct buffer_text own_text;

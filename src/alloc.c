@@ -1135,6 +1135,7 @@ allocate_buffer (void)
   SCM_NEWSMOB (b->header.self, lisp_vectorlike_tag, b);
   BUFFER_PVEC_INIT (b);
   /* Note that the rest fields of B are not initialized.  */
+  b->local_variables = SCM_BOOL_F;
   return b;
 }
 
