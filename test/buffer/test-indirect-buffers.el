@@ -1,0 +1,10 @@
+;; Test indirect buffer creation
+(message "About to create base buffer...")
+(let ((base (get-buffer-create "base-buf")))
+  (message "Base buffer created: %s" base)
+  (message "About to create indirect buffer...")
+  (let ((indirect (make-indirect-buffer base "indirect-buf" t)))
+    (message "Indirect buffer created: %s" indirect)
+    (kill-buffer indirect)
+    (kill-buffer base))
+  (message "Test PASS: indirect buffer"))

@@ -90,6 +90,15 @@
 (load-file "test/text-property/test-known-bugs.el")
 (message "")
 
+(message "")
+(message "========================================")
+(message "BUFFER LOCALS TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/buffer/test-buffer-locals.el")
+(message "")
+
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")

@@ -192,7 +192,6 @@ See also `find-buffer-visiting'."
   "Register Scheme buffer accessor functions, replacing C DEFUNs."
   ;; Register Scheme replacements.
   (for-each (lambda (sym-fun)
-              (format (current-error-port) "-- registering ~s~%" sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((buffer-file-name ,elisp-buffer-file-name)
               (buffer-name ,elisp-buffer-name)
