@@ -40,6 +40,7 @@ static void
 bset_category_table (struct buffer *b, Lisp_Object val)
 {
   b->category_table_ = val;
+  BVAR_HASH_SYNC (b, category_table, val);
 }
 
 

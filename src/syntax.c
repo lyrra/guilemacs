@@ -194,6 +194,7 @@ static void
 bset_syntax_table (struct buffer *b, Lisp_Object val)
 {
   b->syntax_table_ = val;
+  BVAR_HASH_SYNC (b, syntax_table, val);
 }
 
 /* Whether the syntax of the character C has the prefix flag set.  */

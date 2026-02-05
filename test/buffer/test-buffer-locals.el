@@ -133,6 +133,26 @@
                  (char-table-p (syntax-table))))
   (kill-buffer buf))
 
+;;; Regression: set-syntax-table must sync to the per-buffer hash so that
+;;; the Scheme (syntax-table) accessor returns the *same* table object.
+;;; Without BVAR_HASH_SYNC in bset_syntax_table, (syntax-table) returns
+;;; the stale previous table — which broke f90-mode and any mode that
+;;; relies on syntax-table identity after set-syntax-table.
+
+(with-temp-buffer
+  (let ((custom (make-syntax-table)))
+    (set-syntax-table custom)
+    (test-eq "syntax-table/identity-after-set"
+             custom (syntax-table))))
+
+(with-temp-buffer
+  (let ((t1 (make-syntax-table))
+        (t2 (make-syntax-table)))
+    (set-syntax-table t1)
+    (test-eq "syntax-table/first-set" t1 (syntax-table))
+    (set-syntax-table t2)
+    (test-eq "syntax-table/second-set" t2 (syntax-table))))
+
 ;;; --- category-table ---
 
 (let ((buf (get-buffer-create "p5-test-category")))
@@ -140,6 +160,23 @@
     (test-assert "category-table/is-char-table"
                  (char-table-p (category-table))))
   (kill-buffer buf))
+
+;;; Regression: set-category-table must sync to the per-buffer hash,
+;;; same issue as syntax-table above.
+
+(with-temp-buffer
+  (let ((custom (make-category-table)))
+    (set-category-table custom)
+    (test-eq "category-table/identity-after-set"
+             custom (category-table))))
+
+(with-temp-buffer
+  (let ((t1 (make-category-table))
+        (t2 (make-category-table)))
+    (set-category-table t1)
+    (test-eq "category-table/first-set" t1 (category-table))
+    (set-category-table t2)
+    (test-eq "category-table/second-set" t2 (category-table))))
 
 ;;; --- current-case-table ---
 

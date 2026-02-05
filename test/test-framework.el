@@ -75,17 +75,19 @@ DETAILS is optional string with extra info for failures."
 
 (defun test-equal (name expected actual)
   "Assert EXPECTED equals ACTUAL, output result with NAME."
-  (test-framework--record-result
-   name
-   (equal expected actual)
-   (format "expected=%S actual=%S" expected actual)))
+  (let ((pass (equal expected actual)))
+    (test-framework--record-result
+     name
+     pass
+     (unless pass (format "expected=%S actual=%S" expected actual)))))
 
 (defun test-eq (name expected actual)
   "Assert EXPECTED is eq to ACTUAL, output result with NAME."
-  (test-framework--record-result
-   name
-   (eq expected actual)
-   (format "expected=%S actual=%S" expected actual)))
+  (let ((pass (eq expected actual)))
+    (test-framework--record-result
+     name
+     pass
+     (unless pass (format "expected=%S actual=%S" expected actual)))))
 
 (defun test-not-nil (name actual)
   "Assert ACTUAL is not nil, output result with NAME."
@@ -96,9 +98,10 @@ DETAILS is optional string with extra info for failures."
 
 (defun test-nil (name actual)
   "Assert ACTUAL is nil, output result with NAME."
-  (test-framework--record-result
-   name
-   (null actual)
-   (format "expected=nil actual=%S" actual)))
+  (let ((pass (null actual)))
+    (test-framework--record-result
+     name
+     pass
+     (unless pass (format "expected=nil actual=%S" actual)))))
 
 (provide 'test-framework)
