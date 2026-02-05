@@ -1033,8 +1033,10 @@ do_symval_forwarding (lispfwd valcontents)
       return *XOBJFWD (valcontents)->objvar;
 
     case Lisp_Fwd_Buffer_Obj:
-      return per_buffer_value (current_buffer,
-			       XBUFFER_OBJFWD (valcontents)->offset);
+      /* Phase 4: read from hash table (single source of truth).
+	 bvar_hash_read falls back to struct for non-hash fields.  */
+      return bvar_hash_read (current_buffer,
+			     XBUFFER_OBJFWD (valcontents)->offset);
 
     case Lisp_Fwd_Kboard_Obj:
       return *(Lisp_Object *) (XKBOARD_OBJFWD (valcontents)->offset

@@ -342,30 +342,64 @@ value-slot-module, function-slot-module, or plist-slot-module."
    ;; Must return #t, not the function value itself - fboundp callers expect t
    (not (eq? #nil (variable-ref (module-variable function-slot-module symbol))))))
 
+;; Sentinel for detecting "not found" in hash table lookups.
+(define *buffer-local-unset* (list 'buffer-local-unset))
+
+;; Lazily-cached handle for the C `buffer-local-hash' DEFUN.
+;; Not available at module load time (syms_of_buffer runs later),
+;; but always available by the time bind-symbol is first called.
+(define %buffer-local-hash-fn #f)
+(define (buffer-local-hash-fn)
+  (or %buffer-local-hash-fn
+      (let ((fn (symbol-function 'buffer-local-hash)))
+        (set! %buffer-local-hash-fn fn)
+        fn)))
+
 ;; bind-symbol: dynamically bind SYMBOL to VALUE during THUNK.
-;; Fast path (PLAINVAL, no trapped writes): pure Scheme vector-set!
-;; on the descriptor's slot 4.  Fully transparent to peval.
-;; Slow path (FORWARDED, LOCALIZED, VARALIAS, trapped): goes through
-;; C's symbol-value / set-symbol-value! which handles all redirect types.
-;; The conditional is inside the winder/unwinder so THUNK appears
-;; exactly once, preserving O(N) tree-il growth for N bindings.
+;;
+;; Three paths (conditional is inside the winder/unwinder so THUNK
+;; appears exactly once, preserving O(N) tree-il growth):
+;;
+;; 1. Fast path (PLAINVAL, no trapped writes): pure Scheme vector-set!
+;;    on the descriptor's slot 4.  Fully transparent to peval.
+;;
+;; 2. Buffer-local path: symbol is in the current buffer's per-buffer
+;;    hash table (DEFVAR_PER_BUFFER variables).  Uses hashq-ref/hashq-set!
+;;    directly — pure Scheme, transparent to peval.  The hash table is
+;;    captured at bind time so the unwinder restores to the correct buffer
+;;    even after buffer switches in the body.
+;;
+;; 3. Slow path (other FORWARDED, LOCALIZED, VARALIAS, trapped): goes
+;;    through C's symbol-value / set-symbol-value!.
 (define (bind-symbol symbol value thunk)
   (let* ((desc (symbol-desc symbol))
-         (fast (and (= (vector-ref desc 1) 4)    ;; SYMBOL_PLAINVAL
-                    (= (vector-ref desc 2) 0)))   ;; no trapped write
-         (old (if fast
-                  (vector-ref desc 4)
-                  (symbol-value symbol))))
+         (redirect (vector-ref desc 1))
+         (trapped  (vector-ref desc 2))
+         (fast (and (= redirect 4)     ;; SYMBOL_PLAINVAL
+                    (= trapped  0)))    ;; no trapped write
+         ;; For non-fast: check if symbol lives in buffer-local hash.
+         ;; buffer-local-hash returns the current buffer's hash table.
+         (hash (if fast #f ((buffer-local-hash-fn))))
+         (hash-val (if hash
+                       (hashq-ref hash symbol *buffer-local-unset*)
+                       *buffer-local-unset*))
+         (buf-local? (not (eq? hash-val *buffer-local-unset*)))
+         (old (cond
+                (fast      (vector-ref desc 4))
+                (buf-local? hash-val)
+                (else      (symbol-value symbol)))))
     (dynamic-wind
       (lambda ()
-        (if fast
-            (vector-set! desc 4 value)
-            (set-symbol-value! symbol value)))
+        (cond
+          (fast       (vector-set! desc 4 value))
+          (buf-local? (hashq-set! hash symbol value))
+          (else       (set-symbol-value! symbol value))))
       thunk
       (lambda ()
-        (if fast
-            (vector-set! desc 4 old)
-            (set-symbol-value! symbol old))))))
+        (cond
+          (fast       (vector-set! desc 4 old))
+          (buf-local? (hashq-set! hash symbol old))
+          (else       (set-symbol-value! symbol old)))))))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)

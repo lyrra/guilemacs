@@ -314,7 +314,7 @@ extern Lisp_Object bvar_hash_read (struct buffer *, int);
    Called by bset_* setters and set_per_buffer_value.  */
 extern void bvar_hash_sync (struct buffer *, int, Lisp_Object);
 extern Lisp_Object bvar_hash_ref (struct buffer *, int);
-extern void validate_buffer_local_hash (struct buffer *);
+extern int validate_buffer_local_hash (struct buffer *);
 
 #define BVAR_HASH_SYNC(buf, field, val) \
   bvar_hash_sync (buf, offsetof (struct buffer, field##_), val)

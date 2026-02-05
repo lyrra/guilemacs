@@ -548,7 +548,8 @@ clone_per_buffer_values (struct buffer *from, struct buffer *to)
       if (offset == PER_BUFFER_VAR_OFFSET (name))
 	continue;
 
-      obj = per_buffer_value (from, offset);
+      /* Phase 4: read from hash (single source of truth).  */
+      obj = bvar_hash_read (from, offset);
       if (MARKERP (obj) && XMARKER (obj)->buffer == from)
 	{
 	  struct Lisp_Marker *m = XMARKER (obj);
@@ -1152,15 +1153,18 @@ bvar_hash_read (struct buffer *b, int offset)
 }
 
 /* Validate that all per-buffer C struct fields match the hash table.
-   Aborts if any mismatch is found.  For debugging.  */
+   Phase 4: hash is the primary store.  During let-bindings,
+   bind-symbol writes to hash only, so mismatches are expected.
+   Returns count of mismatches (0 = fully in sync).  */
 
-void
+int
 validate_buffer_local_hash (struct buffer *b)
 {
   int offset;
+  int mismatches = 0;
 
   if (!b->local_variables || scm_is_false (b->local_variables))
-    return;
+    return 0;
 
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
     {
@@ -1171,18 +1175,10 @@ validate_buffer_local_hash (struct buffer *b)
 	  Lisp_Object h_val = scm_hashq_ref (b->local_variables,
 					      sym, Qunbound);
 	  if (!BASE_EQ (c_val, h_val))
-	    {
-	      fprintf (stderr,
-		       "buffer hash mismatch for %s in buffer %p: "
-		       "C=%p hash=%p\n",
-		       SSDATA (SYMBOL_NAME (sym)),
-		       (void *) b,
-		       (void *) c_val,
-		       (void *) h_val);
-	      emacs_abort ();
-	    }
+	    mismatches++;
 	}
     }
+  return mismatches;
 }
 
 /* We split this away from generate-new-buffer, because rename-buffer
@@ -1344,7 +1340,8 @@ buffer_local_value (Lisp_Object variable, Lisp_Object buffer)
       {
 	lispfwd fwd = SYMBOL_FWD (sym);
 	if (BUFFER_OBJFWDP (fwd))
-	  result = per_buffer_value (buf, XBUFFER_OBJFWD (fwd)->offset);
+	  /* Phase 4: read from hash (single source of truth).  */
+	  result = bvar_hash_read (buf, XBUFFER_OBJFWD (fwd)->offset);
 	else
 	  result = Fdefault_value (variable);
 	break;
@@ -1404,7 +1401,8 @@ buffer_local_variables_1 (struct buffer *buf, int offset, Lisp_Object sym)
       && SYMBOLP (PER_BUFFER_SYMBOL (offset)))
     {
       sym = NILP (sym) ? PER_BUFFER_SYMBOL (offset) : sym;
-      Lisp_Object val = per_buffer_value (buf, offset);
+      /* Phase 4: read from hash (single source of truth).  */
+      Lisp_Object val = bvar_hash_read (buf, offset);
       return BASE_EQ (val, Qunbound) ? sym : Fcons (sym, val);
     }
   return Qnil;
@@ -1451,8 +1449,22 @@ No argument or nil as argument means use current buffer as BUFFER.  */)
   (Lisp_Object buffer)
 {
   struct buffer *buf = decode_buffer (buffer);
-  validate_buffer_local_hash (buf);
-  return Qt;
+  int mismatches = validate_buffer_local_hash (buf);
+  return make_fixnum (mismatches);
+}
+
+DEFUN ("buffer-local-hash", Fbuffer_local_hash,
+       Sbuffer_local_hash, 0, 1, 0,
+       doc: /* Return BUFFER's per-buffer local-variables hash table.
+This is a Scheme hashq table mapping symbols to their buffer-local values.
+No argument or nil as argument means use current buffer as BUFFER.
+Returns nil if the hash table has not been initialized.  */)
+  (Lisp_Object buffer)
+{
+  struct buffer *buf = decode_buffer (buffer);
+  if (buf->local_variables && !scm_is_false (buf->local_variables))
+    return buf->local_variables;
+  return Qnil;
 }
 
 DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
