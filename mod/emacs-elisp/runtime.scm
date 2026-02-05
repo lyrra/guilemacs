@@ -360,13 +360,44 @@ value-slot-module, function-slot-module, or plist-slot-module."
 
 ;; Lazily-cached handle for the C `set-default' DEFUN.
 ;; Used by bind-symbol's unwind path when a PLAINVAL variable was
-;; changed to LOCALIZED (via make-local-variable) during the body.
+;; changed to LOCALIZED (via make-local-variable) during the body,
+;; and for the let-default path (SPECPDL_LET_DEFAULT equivalent).
 (define %set-default-fn #f)
 (define (set-default-fn)
   (or %set-default-fn
       (let ((fn (symbol-function 'set-default)))
         (set! %set-default-fn fn)
         fn)))
+
+;; Lazily-cached handles for local-variable-p and default-value.
+;; Used by bind-symbol to distinguish "has local value" from
+;; "in hash but no local value" (SPECPDL_LET_DEFAULT path).
+(define %local-variable-p-fn #f)
+(define (local-variable-p sym)
+  (let ((fn (or %local-variable-p-fn
+                (let ((f (symbol-function 'local-variable-p)))
+                  (set! %local-variable-p-fn f)
+                  f))))
+    (not (eq? #nil (fn sym)))))
+
+(define %default-value-fn #f)
+(define (default-value sym)
+  (let ((fn (or %default-value-fn
+                (let ((f (symbol-function 'default-value)))
+                  (set! %default-value-fn f)
+                  f))))
+    (fn sym)))
+
+;; Lazily-cached handle for local-variable-if-set-p.
+;; Returns #t for variables that are automatically buffer-local
+;; (via make-variable-buffer-local), even if no local value exists yet.
+(define %local-variable-if-set-p-fn #f)
+(define (local-variable-if-set-p sym)
+  (let ((fn (or %local-variable-if-set-p-fn
+                (let ((f (symbol-function 'local-variable-if-set-p)))
+                  (set! %local-variable-if-set-p-fn f)
+                  f))))
+    (not (eq? #nil (fn sym)))))
 
 ;; Phase 5: Scheme accessors for per-buffer hash table.
 ;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).
@@ -380,19 +411,27 @@ value-slot-module, function-slot-module, or plist-slot-module."
 
 ;; bind-symbol: dynamically bind SYMBOL to VALUE during THUNK.
 ;;
-;; Three paths (conditional is inside the winder/unwinder so THUNK
+;; Four paths (conditional is inside the winder/unwinder so THUNK
 ;; appears exactly once, preserving O(N) tree-il growth):
 ;;
 ;; 1. Fast path (PLAINVAL, no trapped writes): pure Scheme vector-set!
 ;;    on the descriptor's slot 4.  Fully transparent to peval.
 ;;
-;; 2. Buffer-local path: symbol is in the current buffer's per-buffer
-;;    hash table (DEFVAR_PER_BUFFER variables).  Uses hashq-ref/hashq-set!
+;; 2. Buffer-local path: symbol has an actual local value in the
+;;    current buffer (local-variable-p is true).  Uses hashq-ref/hashq-set!
 ;;    directly — pure Scheme, transparent to peval.  The hash table is
 ;;    captured at bind time so the unwinder restores to the correct buffer
 ;;    even after buffer switches in the body.
 ;;
-;; 3. Slow path (other FORWARDED, LOCALIZED, VARALIAS, trapped): goes
+;; 3. Default-value path: symbol is buffer-local-capable but has NO
+;;    local value in this buffer (either a DEFVAR_PER_BUFFER in the hash,
+;;    or a LOCALIZED/FORWARDED variable made buffer-local via
+;;    make-variable-buffer-local).  Like C's SPECPDL_LET_DEFAULT, we
+;;    save/restore the default value via set-default, so that
+;;    kill-all-local-variables inside the body doesn't lose the
+;;    let-bound value.
+;;
+;; 4. Slow path (other FORWARDED, LOCALIZED, VARALIAS, trapped): goes
 ;;    through C's symbol-value / set-symbol-value!.
 (define (bind-symbol symbol value thunk)
   (let* ((desc (symbol-desc symbol))
@@ -406,17 +445,32 @@ value-slot-module, function-slot-module, or plist-slot-module."
          (hash-val (if hash
                        (hashq-ref hash symbol *buffer-local-unset*)
                        *buffer-local-unset*))
-         (buf-local? (not (eq? hash-val *buffer-local-unset*)))
+         (in-hash? (not (eq? hash-val *buffer-local-unset*)))
+         ;; Check whether the variable has an actual local value.
+         ;; If it's buffer-local-capable but has no local, we use
+         ;; the default-value path (SPECPDL_LET_DEFAULT).
+         (has-local? (and (not fast) (local-variable-p symbol)))
+         (buf-local? (and in-hash? has-local?))
+         ;; let-default?: buffer-local-capable but no local value.
+         ;; Covers both DEFVAR_PER_BUFFER (in-hash, no local) and
+         ;; make-variable-buffer-local'd LOCALIZED vars (not in hash,
+         ;; but local-variable-if-set-p is true, no local value).
+         (let-default? (and (not fast)
+                            (not buf-local?)
+                            (not has-local?)
+                            (local-variable-if-set-p symbol)))
          (old (cond
-                (fast      (vector-ref desc 4))
-                (buf-local? hash-val)
-                (else      (symbol-value symbol)))))
+                (fast         (vector-ref desc 4))
+                (buf-local?   hash-val)
+                (let-default? (default-value symbol))
+                (else         (symbol-value symbol)))))
     (dynamic-wind
       (lambda ()
         (cond
-          (fast       (vector-set! desc 4 value))
-          (buf-local? (hashq-set! hash symbol value))
-          (else       (set-symbol-value! symbol value))))
+          (fast         (vector-set! desc 4 value))
+          (buf-local?   (hashq-set! hash symbol value))
+          (let-default? ((set-default-fn) symbol value))
+          (else         (set-symbol-value! symbol value))))
       thunk
       (lambda ()
         (cond
@@ -433,8 +487,9 @@ value-slot-module, function-slot-module, or plist-slot-module."
           (fast
            ;; Was PLAINVAL at bind-time but changed since.
            ((set-default-fn) symbol old))
-          (buf-local? (hashq-set! hash symbol old))
-          (else       (set-symbol-value! symbol old)))))))
+          (buf-local?   (hashq-set! hash symbol old))
+          (let-default? ((set-default-fn) symbol old))
+          (else         (set-symbol-value! symbol old)))))))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)

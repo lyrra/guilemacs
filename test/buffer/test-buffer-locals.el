@@ -268,6 +268,25 @@
     (setq p5--mlv-var2 "local")))
 (test-equal "bind-symbol/plainval-to-localized-string" "initial" p5--mlv-var2)
 
+;;; --- bind-symbol let-default path (SPECPDL_LET_DEFAULT) ---
+;;; Regression: when let-binding a buffer-local-capable variable that
+;;; has NO local value, bind-symbol must save/restore the DEFAULT value
+;;; (like C's SPECPDL_LET_DEFAULT).  Otherwise kill-all-local-variables
+;;; (called by every major mode switch) destroys the let-bound value.
+;;; This broke indent-sexp and 20 other lisp-mode-tests.
+
+(with-temp-buffer
+  (let ((indent-tabs-mode nil))
+    (kill-all-local-variables)
+    (test-assert "let-default/survives-kill-all-local-variables"
+                 (not indent-tabs-mode))))
+
+(with-temp-buffer
+  (let ((indent-tabs-mode nil))
+    (fundamental-mode)
+    (test-assert "let-default/survives-mode-switch"
+                 (not indent-tabs-mode))))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))
