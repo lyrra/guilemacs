@@ -330,69 +330,8 @@ BUFFER-OR-NAME is a buffer, return it as given.  */)
   return Fcdr (assoc_ignore_text_properties (buffer_or_name, Vbuffer_alist));
 }
 
-DEFUN ("get-file-buffer", Fget_file_buffer, Sget_file_buffer, 1, 1, 0,
-       doc: /* Return the buffer visiting file FILENAME (a string).
-The buffer's `buffer-file-name' must match exactly the expansion of FILENAME.
-If there is no such live buffer, return nil.
-See also `find-buffer-visiting'.  */)
-  (register Lisp_Object filename)
-{
-  register Lisp_Object tail, buf, handler;
-
-  CHECK_STRING (filename);
-  filename = Fexpand_file_name (filename, Qnil);
-
-  /* If the file name has special constructs in it,
-     call the corresponding file name handler.  */
-  handler = Ffind_file_name_handler (filename, Qget_file_buffer);
-  if (!NILP (handler))
-    {
-      Lisp_Object handled_buf = call2 (handler, Qget_file_buffer,
-				       filename);
-      return BUFFERP (handled_buf) ? handled_buf : Qnil;
-    }
-
-  FOR_EACH_LIVE_BUFFER (tail, buf)
-    {
-      if (!STRINGP (BVAR (XBUFFER (buf), filename))) continue;
-      if (!NILP (Fstring_equal (BVAR (XBUFFER (buf), filename), filename)))
-	return buf;
-    }
-  return Qnil;
-}
-
-DEFUN ("get-truename-buffer", Fget_truename_buffer, Sget_truename_buffer, 1, 1, 0,
-       doc: /* Return the buffer with `file-truename' equal to FILENAME (a string).
-If there is no such live buffer, return nil.
-See also `find-buffer-visiting'.  */)
-  (register Lisp_Object filename)
-{
-  register Lisp_Object tail, buf;
-
-  FOR_EACH_LIVE_BUFFER (tail, buf)
-    {
-      if (!STRINGP (BVAR (XBUFFER (buf), file_truename))) continue;
-      if (!NILP (Fstring_equal (BVAR (XBUFFER (buf), file_truename), filename)))
-	return buf;
-    }
-  return Qnil;
-}
-
-DEFUN ("find-buffer", Ffind_buffer, Sfind_buffer, 2, 2, 0,
-       doc: /* Return the buffer with buffer-local VARIABLE `equal' to VALUE.
-If there is no such live buffer, return nil.
-See also `find-buffer-visiting'.  */)
-  (Lisp_Object variable, Lisp_Object value)
-{
-  register Lisp_Object tail, buf;
-
-  FOR_EACH_LIVE_BUFFER (tail, buf)
-    {
-      if (!NILP (Fequal (value, Fbuffer_local_value (variable, buf))))
-	return buf;
-    }
-  return Qnil;
-}
+/* get-file-buffer, get-truename-buffer, find-buffer: migrated to Scheme
+   (mod/emacs/buffer-locals.scm). */
 
 /* Run buffer-list-update-hook if Vrun_hooks is non-nil and BUF does
    not have buffer hooks inhibited.  */
@@ -1292,33 +1231,8 @@ is first appended to NAME, to speed up finding a non-existent buffer.  */)
 }
 
 
-DEFUN ("buffer-name", Fbuffer_name, Sbuffer_name, 0, 1, 0,
-       doc: /* Return the name of BUFFER, as a string.
-BUFFER defaults to the current buffer.
-Return nil if BUFFER has been killed.  */)
-  (register Lisp_Object buffer)
-{
-  return BVAR (decode_buffer (buffer), name);
-}
-
-DEFUN ("buffer-last-name", Fbuffer_last_name, Sbuffer_last_name, 0, 1, 0,
-       doc: /* Return last name of BUFFER, as a string.
-BUFFER defaults to the current buffer.
-
-This is the name BUFFER had before the last time it was renamed or
-immediately before it was killed.  */)
-  (Lisp_Object buffer)
-{
-  return BVAR (decode_buffer (buffer), last_name);
-}
-
-DEFUN ("buffer-file-name", Fbuffer_file_name, Sbuffer_file_name, 0, 1, 0,
-       doc: /* Return name of file BUFFER is visiting, or nil if none.
-No argument or nil as argument means use the current buffer.  */)
-  (register Lisp_Object buffer)
-{
-  return BVAR (decode_buffer (buffer), filename);
-}
+/* buffer-name, buffer-last-name, buffer-file-name: migrated to Scheme
+   in mod/emacs/buffer-locals.scm (Phase 5).  */
 
 DEFUN ("buffer-base-buffer", Fbuffer_base_buffer, Sbuffer_base_buffer,
        0, 1, 0,
@@ -5158,7 +5072,6 @@ syms_of_buffer (void)
   DEFSYM (Qmodification_hooks, "modification-hooks");
   DEFSYM (Qinsert_in_front_hooks, "insert-in-front-hooks");
   DEFSYM (Qinsert_behind_hooks, "insert-behind-hooks");
-  DEFSYM (Qget_file_buffer, "get-file-buffer");
   DEFSYM (Qpriority, "priority");
   DEFSYM (Qbefore_string, "before-string");
   DEFSYM (Qafter_string, "after-string");

@@ -182,14 +182,6 @@ check_category_table (Lisp_Object table)
   return table;
 }
 
-DEFUN ("category-table", Fcategory_table, Scategory_table, 0, 0, 0,
-       doc: /* Return the current category table.
-This is the one specified by the current buffer.  */)
-  (void)
-{
-  return BVAR (current_buffer, category_table);
-}
-
 DEFUN ("standard-category-table", Fstandard_category_table,
    Sstandard_category_table, 0, 0, 0,
        doc: /* Return the standard category table.

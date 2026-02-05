@@ -227,15 +227,6 @@ DEFUN ("region-end", Fregion_end, Sregion_end, 0, 0, 0,
   return region_limit (0);
 }
 
-DEFUN ("mark-marker", Fmark_marker, Smark_marker, 0, 0, 0,
-       doc: /* Return this buffer's mark, as a marker object.
-Watch out!  Moving this marker changes the mark position.
-If you set the marker not to point anywhere, the buffer will have no mark.  */)
-  (void)
-{
-  return BVAR (current_buffer, mark);
-}
-
 
 DEFUN ("get-pos-property", Fget_pos_property, Sget_pos_property, 2, 3, 0,
        doc: /* Return the value of POSITION's property PROP, in OBJECT.
@@ -968,26 +959,6 @@ At the beginning of the buffer or accessible region, return 0.  */)
   else
     XSETFASTINT (temp, FETCH_BYTE (PT_BYTE - 1));
   return temp;
-}
-
-DEFUN ("bobp", Fbobp, Sbobp, 0, 0, 0,
-       doc: /* Return t if point is at the beginning of the buffer.
-If the buffer is narrowed, this means the beginning of the narrowed part.  */)
-  (void)
-{
-  if (PT == BEGV)
-    return Qt;
-  return Qnil;
-}
-
-DEFUN ("eobp", Feobp, Seobp, 0, 0, 0,
-       doc: /* Return t if point is at the end of the buffer.
-If the buffer is narrowed, this means the end of the narrowed part.  */)
-  (void)
-{
-  if (PT == ZV)
-    return Qt;
-  return Qnil;
 }
 
 DEFUN ("bolp", Fbolp, Sbolp, 0, 0, 0,

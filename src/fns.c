@@ -2992,8 +2992,8 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	      case PVEC_BUFFER:
 		{
 		  /* Killed buffers lack names and sort before those alive.  */
-		  Lisp_Object na = Fbuffer_name (a);
-		  Lisp_Object nb = Fbuffer_name (b);
+		  Lisp_Object na = BVAR (XBUFFER (a), name);
+		  Lisp_Object nb = BVAR (XBUFFER (b), name);
 		  if (NILP (na))
 		    return NILP (nb) ? 0 : -1;
 		  if (NILP (nb))
@@ -5801,13 +5801,13 @@ extract_data_from_object (Lisp_Object spec,
 		    force_raw_text = true;
 		}
 
-	      if (NILP (coding_system) && !NILP (Fbuffer_file_name (object)))
+	      if (NILP (coding_system) && !NILP (BVAR (XBUFFER (object), filename)))
 		{
 		  /* Check file-coding-system-alist.  */
 		  Lisp_Object val = CALLN (Ffind_operation_coding_system,
 					   Qwrite_region,
 					   make_fixnum (b), make_fixnum (e),
-					   Fbuffer_file_name (object));
+					   BVAR (XBUFFER (object), filename));
 		  if (CONSP (val) && !NILP (XCDR (val)))
 		    coding_system = XCDR (val);
 		}

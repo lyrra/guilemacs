@@ -589,7 +589,16 @@ lock_file (Lisp_Object fn)
 
   /* See if this file is visited and has changed on disk since it was
      visited.  */
-  Lisp_Object subject_buf = Fget_truename_buffer (fn);
+  Lisp_Object subject_buf = Qnil;
+  {
+    Lisp_Object tail, buf;
+    FOR_EACH_LIVE_BUFFER (tail, buf)
+      {
+        if (STRINGP (BVAR (XBUFFER (buf), file_truename))
+            && !NILP (Fstring_equal (BVAR (XBUFFER (buf), file_truename), fn)))
+          { subject_buf = buf; break; }
+      }
+  }
   if (!NILP (subject_buf)
       && NILP (Fverify_visited_file_modtime (subject_buf))
       && !NILP (Ffile_exists_p (fn))

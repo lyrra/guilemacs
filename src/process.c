@@ -5081,7 +5081,7 @@ server_accept_connection (Lisp_Object server, int channel)
     {
       buffer = ps->buffer;
       if (!NILP (buffer))
-	buffer = Fbuffer_name (buffer);
+	buffer = BVAR (XBUFFER (buffer), name);
       else
 	buffer = ps->name;
       if (!NILP (buffer))

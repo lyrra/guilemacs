@@ -62,13 +62,6 @@ check_case_table (Lisp_Object obj)
   return (obj);
 }
 
-DEFUN ("current-case-table", Fcurrent_case_table, Scurrent_case_table, 0, 0, 0,
-       doc: /* Return the case table of the current buffer.  */)
-  (void)
-{
-  return BVAR (current_buffer, downcase_table);
-}
-
 DEFUN ("standard-case-table", Fstandard_case_table, Sstandard_case_table, 0, 0, 0,
        doc: /* Return the standard case table.
 This is the one used for new buffers.  */)

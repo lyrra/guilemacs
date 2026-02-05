@@ -1373,7 +1373,7 @@ recognize the default bindings, just as `read-key-sequence' does.  */)
   /* Try both the Unicode case table, and the buffer local one.
      Otherwise, we will fail for e.g. the "Turkish" language
      environment where 'I' does not downcase to 'i'.  */
-  Lisp_Object tables[2] = {unicode_case_table, Fcurrent_case_table ()};
+  Lisp_Object tables[2] = {unicode_case_table, BVAR (current_buffer, downcase_table)};
   for (int tbl_num = 0; tbl_num < 2; tbl_num++)
     {
       /* First, let's try converting all symbols like "Foo-Bar-Baz" to
@@ -1942,14 +1942,6 @@ If KEYMAP is nil, that means no local keymap.  */)
   bset_keymap (current_buffer, keymap);
 
   return Qnil;
-}
-
-DEFUN ("current-local-map", Fcurrent_local_map, Scurrent_local_map, 0, 0, 0,
-       doc: /* Return current buffer's local keymap, or nil if it has none.
-Normally the local keymap is set by the major mode with `use-local-map'.  */)
-  (void)
-{
-  return BVAR (current_buffer, keymap);
 }
 
 DEFUN ("current-global-map", Fcurrent_global_map, Scurrent_global_map, 0, 0, 0,

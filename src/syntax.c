@@ -985,14 +985,6 @@ check_syntax_table (Lisp_Object obj)
 	      Qsyntax_table_p, obj);
 }
 
-DEFUN ("syntax-table", Fsyntax_table, Ssyntax_table, 0, 0, 0,
-       doc: /* Return the current syntax table.
-This is the one specified by the current buffer.  */)
-  (void)
-{
-  return BVAR (current_buffer, syntax_table);
-}
-
 DEFUN ("standard-syntax-table", Fstandard_syntax_table,
    Sstandard_syntax_table, 0, 0, 0,
        doc: /* Return the standard syntax table.
