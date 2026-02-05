@@ -108,6 +108,33 @@ static char buffer_permanent_local_flags[MAX_PER_BUFFER_VARS];
 
 static int last_per_buffer_idx;
 
+/* Phase 5: Scheme keyword keys for internal (non-DEFVAR_PER_BUFFER)
+   Lisp_Object fields in struct buffer.  These use #:name style keys
+   to avoid collision with DEFVAR_PER_BUFFER symbol keys in the
+   per-buffer hash table.  Initialized in init_buffer_once.  */
+
+static SCM kw_name, kw_last_name, kw_mark, kw_keymap;
+static SCM kw_local_var_alist, kw_syntax_table, kw_category_table;
+static SCM kw_downcase_table, kw_upcase_table;
+
+/* Return the Scheme keyword for an internal buffer field at OFFSET,
+   or SCM_BOOL_F if OFFSET is not an internal field.  */
+
+static SCM
+internal_field_keyword (int offset)
+{
+  if (offset == offsetof (struct buffer, name_)) return kw_name;
+  if (offset == offsetof (struct buffer, last_name_)) return kw_last_name;
+  if (offset == offsetof (struct buffer, mark_)) return kw_mark;
+  if (offset == offsetof (struct buffer, keymap_)) return kw_keymap;
+  if (offset == offsetof (struct buffer, local_var_alist_)) return kw_local_var_alist;
+  if (offset == offsetof (struct buffer, syntax_table_)) return kw_syntax_table;
+  if (offset == offsetof (struct buffer, category_table_)) return kw_category_table;
+  if (offset == offsetof (struct buffer, downcase_table_)) return kw_downcase_table;
+  if (offset == offsetof (struct buffer, upcase_table_)) return kw_upcase_table;
+  return SCM_BOOL_F;
+}
+
 static void call_overlay_mod_hooks (Lisp_Object list, Lisp_Object overlay,
                                     bool after, Lisp_Object arg1,
                                     Lisp_Object arg2, Lisp_Object arg3);
@@ -1083,6 +1110,7 @@ populate_buffer_local_hash (struct buffer *b)
   if (!b->local_variables || scm_is_false (b->local_variables))
     return;
 
+  /* DEFVAR_PER_BUFFER fields: keyed by their Lisp symbol.  */
   FOR_EACH_PER_BUFFER_OBJECT_AT (offset)
     {
       Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
@@ -1092,6 +1120,18 @@ populate_buffer_local_hash (struct buffer *b)
 	  scm_hashq_set_x (b->local_variables, sym, val);
 	}
     }
+
+  /* Phase 5: Internal (non-DEFVAR) Lisp_Object fields, keyed by
+     Scheme keywords (#:name, #:mark, etc.).  */
+  scm_hashq_set_x (b->local_variables, kw_name, b->name_);
+  scm_hashq_set_x (b->local_variables, kw_last_name, b->last_name_);
+  scm_hashq_set_x (b->local_variables, kw_mark, b->mark_);
+  scm_hashq_set_x (b->local_variables, kw_keymap, b->keymap_);
+  scm_hashq_set_x (b->local_variables, kw_local_var_alist, b->local_var_alist_);
+  scm_hashq_set_x (b->local_variables, kw_syntax_table, b->syntax_table_);
+  scm_hashq_set_x (b->local_variables, kw_category_table, b->category_table_);
+  scm_hashq_set_x (b->local_variables, kw_downcase_table, b->downcase_table_);
+  scm_hashq_set_x (b->local_variables, kw_upcase_table, b->upcase_table_);
 }
 
 /* Sync a single per-buffer variable write to the hash table.
@@ -1107,6 +1147,13 @@ bvar_hash_sync (struct buffer *b, int offset, Lisp_Object val)
       Lisp_Object sym = PER_BUFFER_SYMBOL (offset);
       if (!NILP (sym) && SYMBOLP (sym))
 	scm_hashq_set_x (b->local_variables, sym, val);
+      else
+	{
+	  /* Phase 5: internal fields use keyword keys.  */
+	  SCM kw = internal_field_keyword (offset);
+	  if (!scm_is_false (kw))
+	    scm_hashq_set_x (b->local_variables, kw, val);
+	}
     }
 }
 
@@ -1144,11 +1191,21 @@ bvar_hash_read (struct buffer *b, int offset)
 	  if (!BASE_EQ (val, Qunbound))
 	    return val;
 	}
+      else
+	{
+	  /* Phase 5: internal fields use keyword keys.  */
+	  SCM kw = internal_field_keyword (offset);
+	  if (!scm_is_false (kw))
+	    {
+	      Lisp_Object val = scm_hashq_ref (b->local_variables, kw, Qunbound);
+	      if (!BASE_EQ (val, Qunbound))
+		return val;
+	    }
+	}
     }
   /* Fallback: read directly from the C struct field.  This path is
-     used for fields without DEFVAR_PER_BUFFER (internal fields like
-     pt_marker_, begv_marker_, etc.) and during early initialization
-     before the hash table is populated.  */
+     used for fields not yet in the hash (e.g. pt_marker_, begv_marker_)
+     and during early initialization before the hash table is populated.  */
   return *(Lisp_Object *)(offset + (char *) b);
 }
 
@@ -4661,6 +4718,19 @@ init_buffer_once (void)
 
      There must be a simpler way to store the metadata.
   */
+
+  /* Phase 5: Initialize Scheme keywords for internal buffer fields.
+     Must happen before any buffers are created (which calls
+     populate_buffer_local_hash).  */
+  kw_name = scm_from_utf8_keyword ("name");
+  kw_last_name = scm_from_utf8_keyword ("last-name");
+  kw_mark = scm_from_utf8_keyword ("mark");
+  kw_keymap = scm_from_utf8_keyword ("keymap");
+  kw_local_var_alist = scm_from_utf8_keyword ("local-var-alist");
+  kw_syntax_table = scm_from_utf8_keyword ("syntax-table");
+  kw_category_table = scm_from_utf8_keyword ("category-table");
+  kw_downcase_table = scm_from_utf8_keyword ("downcase-table");
+  kw_upcase_table = scm_from_utf8_keyword ("upcase-table");
 
   int idx;
 

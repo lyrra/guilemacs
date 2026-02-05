@@ -62,7 +62,10 @@
             scheme->tree-il
             define-elisp-inline
             set-inline-source!
-            get-inline-source)
+            get-inline-source
+            buffer-local-hash-fn
+            buffer-local-ref
+            buffer-local-set!)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -354,6 +357,16 @@ value-slot-module, function-slot-module, or plist-slot-module."
       (let ((fn (symbol-function 'buffer-local-hash)))
         (set! %buffer-local-hash-fn fn)
         fn)))
+
+;; Phase 5: Scheme accessors for per-buffer hash table.
+;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).
+(define (buffer-local-ref buf sym)
+  "Read SYM's value in BUF's per-buffer hash table."
+  (hashq-ref ((buffer-local-hash-fn) buf) sym))
+
+(define (buffer-local-set! buf sym val)
+  "Set SYM's value in BUF's per-buffer hash table."
+  (hashq-set! ((buffer-local-hash-fn) buf) sym val))
 
 ;; bind-symbol: dynamically bind SYMBOL to VALUE during THUNK.
 ;;
