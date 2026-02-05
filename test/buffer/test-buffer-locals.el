@@ -212,6 +212,25 @@
   (kill-buffer buf1)
   (kill-buffer buf2))
 
+;;; --- bind-symbol PLAINVAL→LOCALIZED transition ---
+;;; Regression test: if make-local-variable is called during a let body,
+;;; bind-symbol's fast-path unwind must not overwrite the BLV pointer.
+;;; Without the fix this crashes (scm_to_pointer on a non-pointer).
+
+(defvar p5--mlv-var "" "Test var with empty-string default.")
+(let ((p5--mlv-var nil))
+  (with-temp-buffer
+    (make-local-variable 'p5--mlv-var)
+    (setq p5--mlv-var "local")))
+(test-equal "bind-symbol/plainval-to-localized" "" p5--mlv-var)
+
+(defvar p5--mlv-var2 "initial" "Test var for PLAINVAL→LOCALIZED.")
+(let ((p5--mlv-var2 nil))
+  (with-temp-buffer
+    (make-local-variable 'p5--mlv-var2)
+    (setq p5--mlv-var2 "local")))
+(test-equal "bind-symbol/plainval-to-localized-string" "initial" p5--mlv-var2)
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

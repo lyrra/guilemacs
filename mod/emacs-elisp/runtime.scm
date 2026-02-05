@@ -358,6 +358,16 @@ value-slot-module, function-slot-module, or plist-slot-module."
         (set! %buffer-local-hash-fn fn)
         fn)))
 
+;; Lazily-cached handle for the C `set-default' DEFUN.
+;; Used by bind-symbol's unwind path when a PLAINVAL variable was
+;; changed to LOCALIZED (via make-local-variable) during the body.
+(define %set-default-fn #f)
+(define (set-default-fn)
+  (or %set-default-fn
+      (let ((fn (symbol-function 'set-default)))
+        (set! %set-default-fn fn)
+        fn)))
+
 ;; Phase 5: Scheme accessors for per-buffer hash table.
 ;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).
 (define (buffer-local-ref buf sym)
@@ -410,7 +420,19 @@ value-slot-module, function-slot-module, or plist-slot-module."
       thunk
       (lambda ()
         (cond
-          (fast       (vector-set! desc 4 old))
+          ;; Fast path: re-check that the variable is still PLAINVAL +
+          ;; untrapped.  If make-local-variable was called during the
+          ;; body, the redirect changed to LOCALIZED and slot 4 is now
+          ;; a BLV pointer — we must NOT overwrite it.  Instead, restore
+          ;; the default value via set-default (mirroring C's
+          ;; do_one_unbind fallthrough to set_default_internal).
+          ((and fast
+                (= (vector-ref desc 1) 4)    ;; still SYMBOL_PLAINVAL
+                (= (vector-ref desc 2) 0))   ;; still no trapped write
+           (vector-set! desc 4 old))
+          (fast
+           ;; Was PLAINVAL at bind-time but changed since.
+           ((set-default-fn) symbol old))
           (buf-local? (hashq-set! hash symbol old))
           (else       (set-symbol-value! symbol old)))))))
 

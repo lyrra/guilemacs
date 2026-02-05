@@ -135,4 +135,52 @@
   (error "Rapid cycle: expected 0, got %s" test-p2-rapid))
 (message "Test 11 PASS: 1000 rapid bind/unbind cycles")
 
+;; Test 12: PLAINVAL → LOCALIZED transition during let
+;; Regression test for scm_to_pointer crash: if make-local-variable is
+;; called during a let body, the symbol's redirect changes from PLAINVAL
+;; to LOCALIZED.  The unwind must not overwrite the BLV pointer in slot 4
+;; with the saved old value — it must use set-default instead.
+(defvar test-p2-mlv "initial" "Variable for make-local-variable-during-let test.")
+(let ((test-p2-mlv nil))
+  (with-temp-buffer
+    (make-local-variable 'test-p2-mlv)
+    (setq test-p2-mlv "local-val")))
+(unless (equal test-p2-mlv "initial")
+  (error "make-local-during-let: expected \"initial\", got %S" test-p2-mlv))
+(message "Test 12 PASS: PLAINVAL->LOCALIZED transition during let")
+
+;; Test 13: Same, but with "" default (the value that triggered scm_to_pointer)
+(defvar test-p2-mlv2 "" "Variable with empty-string default.")
+(let ((test-p2-mlv2 nil))
+  (with-temp-buffer
+    (make-local-variable 'test-p2-mlv2)
+    (setq test-p2-mlv2 "local")))
+(unless (equal test-p2-mlv2 "")
+  (error "make-local-during-let (empty string): expected \"\", got %S" test-p2-mlv2))
+(message "Test 13 PASS: PLAINVAL->LOCALIZED with \"\" default")
+
+;; Test 14: Transition during let + error unwind
+(defvar test-p2-mlv3 "safe" "Variable for error-during-transition test.")
+(condition-case nil
+    (let ((test-p2-mlv3 nil))
+      (with-temp-buffer
+        (make-local-variable 'test-p2-mlv3)
+        (setq test-p2-mlv3 "local")
+        (error "boom")))
+  (error nil))
+(unless (equal test-p2-mlv3 "safe")
+  (error "transition+error: expected \"safe\", got %S" test-p2-mlv3))
+(message "Test 14 PASS: PLAINVAL->LOCALIZED + error unwind")
+
+;; Test 15: Transition with set-default inside let body
+(defvar test-p2-mlv4 "orig" "Variable for set-default-during-let test.")
+(let ((test-p2-mlv4 nil))
+  (set-default 'test-p2-mlv4 "changed-default")
+  (with-temp-buffer
+    (make-local-variable 'test-p2-mlv4)
+    (setq test-p2-mlv4 "local")))
+(unless (equal test-p2-mlv4 "orig")
+  (error "set-default+transition: expected \"orig\", got %S" test-p2-mlv4))
+(message "Test 15 PASS: set-default + PLAINVAL->LOCALIZED during let")
+
 (message "All Phase 2 tests passed!")
