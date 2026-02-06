@@ -143,7 +143,7 @@ print_prepare (Lisp_Object printcharfun)
   dynwind_begin ();
   bool multibyte = !NILP (BVAR (current_buffer, enable_multibyte_characters));
   record_unwind_current_buffer ();
-  specbind(Qprint__unreadable_callback_buffer, Fcurrent_buffer ());
+  specbind_guile (Qprint__unreadable_callback_buffer, Fcurrent_buffer ());
   if (NILP (printcharfun))
     printcharfun = Qt;
   if (BUFFERP (printcharfun))
@@ -644,7 +644,7 @@ print_bind_all_defaults (void)
        vars = XCDR (vars))
     {
       Lisp_Object elem = XCDR (XCAR (vars));
-      specbind (XCAR (elem), XCAR (XCDR (elem)));
+      specbind_guile (XCAR (elem), XCAR (XCDR (elem)));
     }
 }
 
@@ -704,7 +704,7 @@ print_bind_overrides (Lisp_Object overrides)
 	      Lisp_Object map = Fassq (key, Vprint_variable_mapping);
 	      if (NILP (map))
 		xsignal2 (Qwrong_type_argument, Qsymbolp, map);
-	      specbind (XCAR (XCDR (map)), value);
+	      specbind_guile (XCAR (XCDR (map)), value);
 	    }
 
 	  if (!NILP (XCDR (overrides)) && !CONSP (XCDR (overrides)))

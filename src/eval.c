@@ -34,7 +34,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 uint64_t scheme_to_c_crossings;
 uint64_t c_to_scheme_crossings;
 
-static void unbind_once (void *ignore);
 static void unbind_guile (void *data);
 
 /* Non-nil means record all fset's and provide's, to be undone
@@ -837,14 +836,7 @@ icc_lisp_handler (void *data, Lisp_Object k, Lisp_Object val)
   scm_dynwind_begin (0);
   if (!NILP (var))
     {
-#if 0
-      if (!NILP (Vinternal_interpreter_environment))
-        specbind_guile (Qinternal_interpreter_environment,
-                  Fcons (Fcons (var, val),
-                         Vinternal_interpreter_environment));
-      else
-#endif
-        specbind (var, val);
+specbind_guile (var, val);
     }
   tem = Fprogn (h->body);
   scm_dynwind_end ();
@@ -2630,7 +2622,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 	    lexenv = Fcons (Fcons (next, arg), lexenv);
 	  else
 	    /* Dynamically bind NEXT.  */
-	    specbind (next, arg);
+	    specbind_guile (next, arg);
 	  previous_rest = false;
 	}
     }
@@ -2793,37 +2785,6 @@ let_shadows_buffer_binding_p (sym_t symbol)
   return 0;
 }
 
-static void
-do_specbind (Lisp_Object sym, union specbinding *bind,
-             Lisp_Object value, enum Set_Internal_Bind bindflag)
-{
-  switch (SYMBOL_REDIRECT (sym))
-    {
-    case SYMBOL_PLAINVAL:
-      if (!SYMBOL_TRAPPED (sym))
-	SET_SYMBOL_VAL (sym, value);
-      else
-        set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
-      break;
-
-    case SYMBOL_FORWARDED:
-      if (BUFFER_OBJFWDP (SYMBOL_FWD (sym))
-	  && specpdl_kind (bind) == SPECPDL_LET_DEFAULT)
-	{
-          set_default_internal (specpdl_symbol (bind), value, bindflag,
-				NULL);
-	  return;
-	}
-      FALLTHROUGH;
-    case SYMBOL_LOCALIZED:
-      set_internal (specpdl_symbol (bind), value, Qnil, bindflag);
-      break;
-
-    default:
-      emacs_abort ();
-    }
-}
-
 /* `specpdl_ptr' describes which variable is
    let-bound, so it can be properly undone when we unbind_to.
    It can be either a plain SPECPDL_LET or a SPECPDL_LET_LOCAL/DEFAULT.
@@ -2861,6 +2822,9 @@ unbind_guile (void *data)
   Lisp_Object symbol = AREF (binding, 1);
   Lisp_Object old_value = AREF (binding, 2);
   Lisp_Object where = AREF (binding, 3);
+
+  /* Decrement specpdl_ptr to remove the tracking entry.  */
+  specpdl_ptr--;
 
   switch (kind)
     {
@@ -2956,6 +2920,27 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
   ASET (binding, 2, old_value);
   ASET (binding, 3, where);
 
+  /* Add tracking entry to specpdl (for functions that iterate bindings).  */
+  switch (kind)
+    {
+    case BINDING_KIND_LET:
+      specpdl_ptr->let.kind = SPECPDL_LET;
+      break;
+    case BINDING_KIND_LET_LOCAL:
+      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
+      break;
+    case BINDING_KIND_LET_DEFAULT:
+      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
+      break;
+    }
+  specpdl_ptr->let.symbol = symbol;
+  specpdl_ptr->let.old_value = old_value;
+  if (kind == BINDING_KIND_LET_LOCAL)
+    specpdl_ptr->let.where.buf = where;
+  else
+    specpdl_ptr->let.where.kbd = NULL;
+  grow_specpdl ();
+
   /* Set the new value.  */
   switch (kind)
     {
@@ -2979,70 +2964,6 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
      GC-protected because it's passed to Guile.  */
   scm_dynwind_unwind_handler (unbind_guile, (void *) binding,
                               SCM_F_WIND_EXPLICITLY);
-}
-
-void
-specbind (Lisp_Object symbol, Lisp_Object value)
-{
-  /* The caller must ensure that the SYMBOL argument is a bare symbol.  */
-  sym_t sym = XBARE_SYMBOL (symbol);
-
- start:
-  switch (SYMBOL_REDIRECT (sym))
-    {
-    case SYMBOL_VARALIAS:
-      sym = SYMBOL_ALIAS (sym); XSETSYMBOL (symbol, sym); goto start;
-    case SYMBOL_PLAINVAL:
-      /* The most common case is that of a non-constant symbol with a
-	 trivial value.  Make that as fast as we can.  */
-      specpdl_ptr->let.kind = SPECPDL_LET;
-      specpdl_ptr->let.symbol = symbol;
-      specpdl_ptr->let.old_value = SYMBOL_VAL (sym);
-      specpdl_ptr->let.where.kbd = NULL;
-      break;
-    case SYMBOL_LOCALIZED:
-    case SYMBOL_FORWARDED:
-      {
-	Lisp_Object ovalue = find_symbol_value (symbol);
-	specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
-	specpdl_ptr->let.symbol = symbol;
-	specpdl_ptr->let.old_value = ovalue;
-	specpdl_ptr->let.where.buf = Fcurrent_buffer ();
-
-	eassert (SYMBOL_REDIRECT (sym) != SYMBOL_LOCALIZED
-		 || (BASE_EQ (SYMBOL_BLV (sym)->where, Fcurrent_buffer ())));
-
-	if (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED)
-	  {
-	    if (!blv_found (SYMBOL_BLV (sym)))
-	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-	  }
-	else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
-	  {
-	    /* If SYMBOL is a per-buffer variable which doesn't have a
-	       buffer-local value here, make the `let' change the global
-	       value by changing the value of SYMBOL in all buffers not
-	       having their own value.  This is consistent with what
-	       happens with other buffer-local variables.  */
-	    if (NILP (Flocal_variable_p (symbol, Qnil)))
-	      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-	  }
-	else if (KBOARD_OBJFWDP (SYMBOL_FWD (sym)))
-	  {
-	    specpdl_ptr->let.where.kbd = kboard_for_bindings ();
-	    specpdl_ptr->let.kind = SPECPDL_LET;
-	  }
-	else
-	  specpdl_ptr->let.kind = SPECPDL_LET;
-
-	break;
-      }
-    default: emacs_abort ();
-    }
-  grow_specpdl ();
-  do_specbind (sym, specpdl_ptr - 1, value, SET_INTERNAL_BIND);
-
-  scm_dynwind_unwind_handler (unbind_once, NULL, SCM_F_WIND_EXPLICITLY);
 }
 
 /* Push unwind-protect entries of various types.  */
@@ -3121,16 +3042,6 @@ record_unwind_protect_void (void (*function) (void))
   record_unwind_protect_void_1 (function, true);
 }
 
-void
-record_unwind_protect_module (enum specbind_tag kind, void *ptr)
-{
-  specpdl_ptr->kind = kind;
-  specpdl_ptr->unwind_ptr.func = NULL;
-  specpdl_ptr->unwind_ptr.arg = ptr;
-  specpdl_ptr->unwind_ptr.mark = NULL;
-  grow_specpdl ();
-}
-
 static void
 do_one_unbind (union specbinding *this_binding, bool unwinding,
                enum Set_Internal_Bind bindflag)
@@ -3174,54 +3085,6 @@ do_one_unbind (union specbinding *this_binding, bool unwinding,
 	   buffer, but only if that buffer's binding still exists.  */
 	if (!NILP (Flocal_variable_p (symbol, where)))
           set_internal (symbol, old_value, where, bindflag);
-      }
-      break;
-    }
-}
-
-static void
-unbind_once (void *ignore)
-{
-  /* Decrement specpdl_ptr before we do the work to unbind it, so
-     that an error in unbinding won't try to unbind the same entry
-     again.  Take care to copy any parts of the binding needed
-     before invoking any code that can make more bindings.  */
-
-  specpdl_ptr--;
-
-  switch (specpdl_ptr->kind)
-    {
-    case SPECPDL_LET:
-      { /* If variable has a trivial value (no forwarding), we can
-           just set it.  No need to check for constant symbols here,
-           since that was already done by specbind.  */
-        sym_t sym = XSYMBOL (specpdl_symbol (specpdl_ptr));
-        if (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL)
-          {
-            SET_SYMBOL_VAL (sym, specpdl_old_value (specpdl_ptr));
-            break;
-          }
-        else
-          { /* FALLTHROUGH!!
-               NOTE: we only ever come here if make_local_foo was used for
-               the first time on this var within this let.  */
-          }
-      }
-    case SPECPDL_LET_DEFAULT:
-      Fset_default (specpdl_symbol (specpdl_ptr),
-                    specpdl_old_value (specpdl_ptr));
-      break;
-    case SPECPDL_LET_LOCAL:
-      {
-        Lisp_Object symbol = specpdl_symbol (specpdl_ptr);
-        Lisp_Object where = specpdl_where (specpdl_ptr);
-        Lisp_Object old_value = specpdl_old_value (specpdl_ptr);
-        eassert (BUFFERP (where));
-
-        /* If this was a local binding, reset the value in the appropriate
-           buffer, but only if that buffer's binding still exists.  */
-        if (!NILP (Flocal_variable_p (symbol, where)))
-          set_internal (symbol, old_value, where, 1);
       }
       break;
     }

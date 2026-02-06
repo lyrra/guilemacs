@@ -2936,7 +2936,7 @@ DEFUN ("bind-symbol", Fbind_symbol, Sbind_symbol, 3, 3, 0,
 {
   Lisp_Object val;
   dynwind_begin ();
-  specbind (symbol, value);
+  specbind_guile (symbol, value);
   val = call0 (thunk);
   dynwind_end ();
   return val;

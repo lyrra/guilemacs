@@ -3303,10 +3303,6 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
 
 enum specbind_tag {
   SPECPDL_NOP,			/* A filler.  */
-#ifdef HAVE_MODULES
-  SPECPDL_MODULE_RUNTIME,       /* A live module runtime.  */
-  SPECPDL_MODULE_ENVIRONMENT,   /* A live module environment.  */
-#endif /* !HAVE_MODULES */
   SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
   /* Tags greater than SPECPDL_LET must be "subkinds" of LET.  */
   SPECPDL_LET_LOCAL,		/* A buffer-local let-binding.  */
@@ -4560,7 +4556,6 @@ extern struct handler *push_handler (Lisp_Object, enum handlertype)
 extern void pop_handler (void);
 extern void push_handler_bind (Lisp_Object, Lisp_Object, int);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
-extern void specbind (Lisp_Object, Lisp_Object);
 extern void specbind_guile (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);
