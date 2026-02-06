@@ -205,6 +205,58 @@ static bool value_storage_contains_p (const struct emacs_value_storage *,
                                       emacs_value, ptrdiff_t *);
 
 static bool module_assertions = false;
+
+/* Lists tracking live module runtimes and environments for assertions.
+   Used instead of specpdl iteration for Guile compatibility.  */
+static Lisp_Object module_runtimes_list;
+static Lisp_Object module_environments_list;
+
+/* Add a pointer to a tracking list.  */
+static void
+module_track_add (Lisp_Object *list, void *ptr)
+{
+  *list = Fcons (make_pointer_integer ((uintptr_t) ptr), *list);
+}
+
+/* Remove a pointer from a tracking list.  */
+static void
+module_track_remove (Lisp_Object *list, void *ptr)
+{
+  Lisp_Object target = make_pointer_integer ((uintptr_t) ptr);
+  *list = Fdelq (target, *list);
+}
+
+/* Unwind handler for module runtime tracking.  */
+static void
+module_untrack_runtime (void *ptr)
+{
+  module_track_remove (&module_runtimes_list, ptr);
+}
+
+/* Unwind handler for module environment tracking.  */
+static void
+module_untrack_environment (void *ptr)
+{
+  module_track_remove (&module_environments_list, ptr);
+}
+
+/* Register a module runtime for assertion tracking.  */
+static void
+record_module_runtime (void *rt)
+{
+  module_track_add (&module_runtimes_list, rt);
+  scm_dynwind_unwind_handler (module_untrack_runtime, rt,
+                              SCM_F_WIND_EXPLICITLY);
+}
+
+/* Register a module environment for assertion tracking.  */
+static void
+record_module_environment (void *env)
+{
+  module_track_add (&module_environments_list, env);
+  scm_dynwind_unwind_handler (module_untrack_environment, env,
+                              SCM_F_WIND_EXPLICITLY);
+}
 
 
 /* Small helper functions.  */
@@ -1239,9 +1291,9 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
   rt->private_members = &rt_priv;
   rt->get_environment = module_get_environment;
 
-  specpdl_ref count = SPECPDL_INDEX ();
-  record_unwind_protect_module (SPECPDL_MODULE_RUNTIME, rt);
-  record_unwind_protect_module (SPECPDL_MODULE_ENVIRONMENT, rt_priv.env);
+  dynwind_begin ();
+  record_module_runtime (rt);
+  record_module_environment (rt_priv.env);
 
   int r = module_init (rt);
 
@@ -1253,7 +1305,8 @@ DEFUN ("module-load", Fmodule_load, Smodule_load, 1, 1, 0,
     xsignal2 (Qmodule_init_failed, file, INT_TO_INTEGER (r));
 
   module_signal_or_throw (&env_priv);
-  return unbind_to (count, Qt);
+  dynwind_end ();
+  return Qt;
 }
 
 Lisp_Object
@@ -1269,7 +1322,7 @@ funcall_module (Lisp_Object function, ptrdiff_t nargs, Lisp_Object *arglist)
   struct emacs_env_private priv;
   emacs_env *env = initialize_environment (&pub, &priv);
   dynwind_begin ();
-  record_unwind_protect_module (SPECPDL_MODULE_ENVIRONMENT, env);
+  record_module_environment (env);
 
   USE_SAFE_ALLOCA;
   emacs_value *args;
@@ -1355,13 +1408,13 @@ module_assert_runtime (struct emacs_runtime *runtime)
   if (! module_assertions)
     return;
   ptrdiff_t count = 0;
-  for (const union specbinding *pdl = specpdl; pdl != specpdl_ptr; ++pdl)
-    if (pdl->kind == SPECPDL_MODULE_RUNTIME)
-      {
-        if (pdl->unwind_ptr.arg == runtime)
-          return;
-        ++count;
-      }
+  Lisp_Object target = make_pointer_integer ((uintptr_t) runtime);
+  for (Lisp_Object tail = module_runtimes_list; CONSP (tail); tail = XCDR (tail))
+    {
+      if (EQ (XCAR (tail), target))
+        return;
+      ++count;
+    }
   module_abort ("Runtime pointer not found in list of %"pD"d runtimes",
 		count);
 }
@@ -1372,13 +1425,13 @@ module_assert_env (emacs_env *env)
   if (! module_assertions)
     return;
   ptrdiff_t count = 0;
-  for (const union specbinding *pdl = specpdl; pdl != specpdl_ptr; ++pdl)
-    if (pdl->kind == SPECPDL_MODULE_ENVIRONMENT)
-      {
-        if (pdl->unwind_ptr.arg == env)
-          return;
-        ++count;
-      }
+  Lisp_Object target = make_pointer_integer ((uintptr_t) env);
+  for (Lisp_Object tail = module_environments_list; CONSP (tail); tail = XCDR (tail))
+    {
+      if (EQ (XCAR (tail), target))
+        return;
+      ++count;
+    }
   module_abort ("Environment pointer not found in list of %"pD"d environments",
                 count);
 }
@@ -1436,22 +1489,21 @@ value_to_lisp (emacs_value v)
          environments.  */
       ptrdiff_t num_environments = 0;
       ptrdiff_t num_values = 0;
-      for (const union specbinding *pdl = specpdl; pdl != specpdl_ptr; ++pdl)
-        if (pdl->kind == SPECPDL_MODULE_ENVIRONMENT)
-          {
-            const emacs_env *env = pdl->unwind_ptr.arg;
-            struct emacs_env_private *priv = env->private_members;
-            /* The value might be one of the nonlocal exit values.  Note
-               that we don't check whether a nonlocal exit is currently
-               pending, because the module might have cleared the flag
-               in the meantime.  */
-            if (&priv->non_local_exit_symbol == v
-                || &priv->non_local_exit_data == v)
-              goto ok;
-            if (value_storage_contains_p (&priv->storage, v, &num_values))
-              goto ok;
-            ++num_environments;
-          }
+      for (Lisp_Object tail = module_environments_list; CONSP (tail); tail = XCDR (tail))
+        {
+          const emacs_env *env = (const emacs_env *) (uintptr_t) XFIXNUM (XCAR (tail));
+          struct emacs_env_private *priv = env->private_members;
+          /* The value might be one of the nonlocal exit values.  Note
+             that we don't check whether a nonlocal exit is currently
+             pending, because the module might have cleared the flag
+             in the meantime.  */
+          if (&priv->non_local_exit_symbol == v
+              || &priv->non_local_exit_data == v)
+            goto ok;
+          if (value_storage_contains_p (&priv->storage, v, &num_values))
+            goto ok;
+          ++num_environments;
+        }
       /* Also check global values.  */
       if (module_global_reference_p (v, &num_values))
         goto ok;
@@ -1712,6 +1764,12 @@ syms_of_module (void)
   staticpro (&Vmodule_refs_hash);
   Vmodule_refs_hash
     = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
+
+  /* Initialize module tracking lists for assertion checking.  */
+  staticpro (&module_runtimes_list);
+  module_runtimes_list = Qnil;
+  staticpro (&module_environments_list);
+  module_environments_list = Qnil;
 
   DEFSYM (Qmodule_load_failed, "module-load-failed");
   Fput (Qmodule_load_failed, Qerror_conditions,
