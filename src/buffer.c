@@ -1438,26 +1438,8 @@ Returns nil if the hash table has not been initialized.  */)
   return Qnil;
 }
 
-DEFUN ("buffer-modified-p", Fbuffer_modified_p, Sbuffer_modified_p,
-       0, 1, 0,
-       doc: /* Return non-nil if BUFFER was modified since its file was last read or saved.
-No argument or nil as argument means use current buffer as BUFFER.
-
-If BUFFER was autosaved since it was last modified, this function
-returns the symbol `autosaved'.  */)
-  (Lisp_Object buffer)
-{
-  struct buffer *buf = decode_buffer (buffer);
-  if (BUF_SAVE_MODIFF (buf) < BUF_MODIFF (buf))
-    {
-      if (BUF_AUTOSAVE_MODIFF (buf) == BUF_MODIFF (buf))
-	return Qautosaved;
-      else
-	return Qt;
-    }
-  else
-    return Qnil;
-}
+/* buffer-modified-p is now implemented in Scheme.
+   See mod/emacs/buffer-locals.scm elisp-buffer-modified-p.  */
 
 DEFUN ("force-mode-line-update", Fforce_mode_line_update,
        Sforce_mode_line_update, 0, 1, 0,
@@ -1607,6 +1589,29 @@ buffer as BUFFER.  */)
   (Lisp_Object buffer)
 {
   return modiff_to_integer (BUF_CHARS_MODIFF (decode_buffer (buffer)));
+}
+
+DEFUN ("buffer-save-modiff", Fbuffer_save_modiff, Sbuffer_save_modiff, 0, 1, 0,
+       doc: /* Return BUFFER's saved modification tick counter.
+This is the value of `buffer-modified-tick' at the time the buffer was
+last saved.  If `buffer-modified-tick' equals `buffer-save-modiff',
+the buffer has not been modified since last save.
+No argument or nil as argument means use current buffer as BUFFER.  */)
+  (Lisp_Object buffer)
+{
+  return modiff_to_integer (BUF_SAVE_MODIFF (decode_buffer (buffer)));
+}
+
+DEFUN ("buffer-autosave-modiff", Fbuffer_autosave_modiff, Sbuffer_autosave_modiff,
+       0, 1, 0,
+       doc: /* Return BUFFER's auto-save modification tick counter.
+This is the value of `buffer-modified-tick' at the time the buffer was
+last auto-saved.  If this equals `buffer-modified-tick', the buffer
+was auto-saved since it was last modified.
+No argument or nil as argument means use current buffer as BUFFER.  */)
+  (Lisp_Object buffer)
+{
+  return make_fixnum (BUF_AUTOSAVE_MODIFF (decode_buffer (buffer)));
 }
 
 DEFUN ("rename-buffer", Frename_buffer, Srename_buffer, 1, 2,
@@ -2681,7 +2686,7 @@ current buffer is cleared.  */)
   Lisp_Object btail, other;
   ptrdiff_t begv, zv;
   bool narrowed = (BEG != BEGV || Z != ZV);
-  bool modified_p = !NILP (Fbuffer_modified_p (Qnil));
+  bool modified_p = BUF_MODIFIED_P (current_buffer);
   Lisp_Object old_undo = BVAR (current_buffer, undo_list);
 
   if (current_buffer->base_buffer)
@@ -2937,7 +2942,7 @@ current buffer is cleared.  */)
     }
 
   /* Restore the modifiedness of the buffer.  */
-  if (!modified_p && !NILP (Fbuffer_modified_p (Qnil)))
+  if (!modified_p && BUF_MODIFIED_P (current_buffer))
     Fset_buffer_modified_p (Qnil);
 
   /* Update coding systems of this buffer's process (if any).  */

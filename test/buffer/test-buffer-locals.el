@@ -287,6 +287,35 @@
     (test-assert "let-default/survives-mode-switch"
                  (not indent-tabs-mode))))
 
+;;; --- buffer-modified-p (Scheme implementation) ---
+
+(with-temp-buffer
+  (test-nil "buffer-modified-p/new-buffer" (buffer-modified-p)))
+
+(with-temp-buffer
+  (insert "hello")
+  (test-assert "buffer-modified-p/after-insert" (buffer-modified-p)))
+
+(let ((buf (get-buffer-create "p5-test-modified")))
+  (with-current-buffer buf
+    (insert "hello"))
+  (test-assert "buffer-modified-p/with-arg" (buffer-modified-p buf))
+  (kill-buffer buf))
+
+(with-temp-buffer
+  (insert "hello")
+  (set-buffer-modified-p nil)
+  (test-nil "buffer-modified-p/after-clear" (buffer-modified-p)))
+
+;;; --- buffer-save-modiff primitive ---
+
+(with-temp-buffer
+  (test-assert "buffer-save-modiff/initial-equals-modiff"
+               (= (buffer-save-modiff) (buffer-modified-tick)))
+  (insert "hello")
+  (test-assert "buffer-save-modiff/after-insert-differs"
+               (not (= (buffer-save-modiff) (buffer-modified-tick)))))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

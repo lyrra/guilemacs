@@ -129,6 +129,9 @@ enum { BEG = 1, BEG_BYTE = BEG };
 /* Modification count as of last visit or save.  */
 #define BUF_SAVE_MODIFF(buf) ((buf)->text->save_modiff)
 
+/* Return true if BUF has been modified since last save.  */
+#define BUF_MODIFIED_P(buf) (BUF_SAVE_MODIFF (buf) < BUF_MODIFF (buf))
+
 /* Overlay modification count.  */
 #define BUF_OVERLAY_MODIFF(buf) ((buf)->text->overlay_modiff)
 

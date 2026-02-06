@@ -91,6 +91,39 @@
   "Return t if point is at the end of the buffer."
   (if (= ((point-fn)) ((point-max-fn))) #t #nil))
 
+;; Modiff accessors for buffer-modified-p.
+(define %buffer-modified-tick-fn #f)
+(define (buffer-modified-tick-fn)
+  (or %buffer-modified-tick-fn
+      (let ((fn (symbol-function 'buffer-modified-tick)))
+        (set! %buffer-modified-tick-fn fn) fn)))
+
+(define %buffer-save-modiff-fn #f)
+(define (buffer-save-modiff-fn)
+  (or %buffer-save-modiff-fn
+      (let ((fn (symbol-function 'buffer-save-modiff)))
+        (set! %buffer-save-modiff-fn fn) fn)))
+
+(define %buffer-autosave-modiff-fn #f)
+(define (buffer-autosave-modiff-fn)
+  (or %buffer-autosave-modiff-fn
+      (let ((fn (symbol-function 'buffer-autosave-modiff)))
+        (set! %buffer-autosave-modiff-fn fn) fn)))
+
+(define (elisp-buffer-modified-p . args)
+  "Return non-nil if BUFFER was modified since its file was last read or saved.
+No argument or nil as argument means use current buffer as BUFFER.
+If BUFFER was autosaved since it was last modified, return `autosaved'."
+  (let* ((buf (if (null? args) #nil (car args)))
+         (save-modiff ((buffer-save-modiff-fn) buf))
+         (modiff ((buffer-modified-tick-fn) buf)))
+    (if (< save-modiff modiff)
+        ;; Buffer is modified - check if autosaved
+        (if (= ((buffer-autosave-modiff-fn) buf) modiff)
+            'autosaved
+            #t)
+        #nil)))
+
 ;;; ----------------------------------------------------------------
 ;;; Tier 4 -- Buffer-list iteration functions
 ;;; ----------------------------------------------------------------
@@ -203,6 +236,7 @@ See also `find-buffer-visiting'."
               (current-case-table ,elisp-current-case-table)
               (bobp ,elisp-bobp)
               (eobp ,elisp-eobp)
+              (buffer-modified-p ,elisp-buffer-modified-p)
               (get-file-buffer ,elisp-get-file-buffer)
               (get-truename-buffer ,elisp-get-truename-buffer)
               (find-buffer ,elisp-find-buffer))))

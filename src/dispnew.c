@@ -6976,7 +6976,8 @@ pass nil for VARIABLE.  */)
 	goto changed;
       if (idx == ASIZE (state))
 	goto changed;
-      if (!EQ (AREF (state, idx++), Fbuffer_modified_p (buf)))
+      if (!EQ (AREF (state, idx++),
+	       BUF_MODIFIED_P (XBUFFER (buf)) ? Qt : Qnil))
 	goto changed;
     }
   if (idx == ASIZE (state))
@@ -7026,7 +7027,7 @@ pass nil for VARIABLE.  */)
       idx++;
       ASET (state, idx, BVAR (XBUFFER (buf), read_only));
       idx++;
-      ASET (state, idx, Fbuffer_modified_p (buf));
+      ASET (state, idx, BUF_MODIFIED_P (XBUFFER (buf)) ? Qt : Qnil);
       idx++;
     }
   /* Fill up the vector with lambdas (always at least one).  */

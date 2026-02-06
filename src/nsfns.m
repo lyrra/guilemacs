@@ -589,7 +589,7 @@ ns_set_doc_edited (void)
       w = XWINDOW (FRAME_SELECTED_WINDOW (f));
       view = FRAME_NS_VIEW (f);
       if (!MINI_WINDOW_P (w))
-        edited = ! NILP (Fbuffer_modified_p (w->contents)) &&
+        edited = BUF_MODIFIED_P (XBUFFER (w->contents)) &&
           ! NILP (Fbuffer_file_name (w->contents));
       [[view window] setDocumentEdited: edited];
     }
