@@ -391,6 +391,24 @@
   (test-equal "region-beginning/narrowed-clip-max" 4 (region-beginning))
   (test-equal "region-end/narrowed-clip-max" 7 (region-end)))
 
+;;; --- buffer-enable-undo (Scheme implementation) ---
+
+(with-temp-buffer
+  (buffer-disable-undo)
+  (test-assert "buffer-enable-undo/disabled" (eq buffer-undo-list t))
+  (buffer-enable-undo)
+  (test-assert "buffer-enable-undo/enabled" (null buffer-undo-list))
+  (insert "hello")
+  (test-assert "buffer-enable-undo/records-insert" (listp buffer-undo-list)))
+
+(let ((buf (get-buffer-create "p7-test-undo")))
+  (with-current-buffer buf
+    (buffer-disable-undo))
+  (buffer-enable-undo buf)
+  (test-assert "buffer-enable-undo/with-arg"
+               (null (buffer-local-value 'buffer-undo-list buf)))
+  (kill-buffer buf))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

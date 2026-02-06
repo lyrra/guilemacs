@@ -1097,7 +1097,7 @@ get_minibuffer (EMACS_INT depth)
       XSETCAR (tail, buf);
       /* Although the buffer's name starts with a space, undo should be
 	 enabled in it.  */
-      Fbuffer_enable_undo (buf);
+      BUFFER_ENABLE_UNDO (XBUFFER (buf));
     }
   else
     {

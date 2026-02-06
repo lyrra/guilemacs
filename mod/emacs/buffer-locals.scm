@@ -331,6 +331,38 @@ See also `find-buffer-visiting'."
   (region-limit #f))
 
 ;;; ----------------------------------------------------------------
+;;; Tier 6 -- Undo functions (Phase 7)
+;;; ----------------------------------------------------------------
+
+;; Cached function handles for undo functions.
+(define %get-buffer-fn #f)
+(define (get-buffer-fn)
+  (or %get-buffer-fn
+      (let ((fn (symbol-function 'get-buffer)))
+        (set! %get-buffer-fn fn) fn)))
+
+(define (elisp-buffer-enable-undo . args)
+  "Start keeping undo information for buffer BUFFER.
+No argument or nil as argument means do this for the current buffer."
+  (let* ((buffer-arg (if (null? args) #nil (car args)))
+         (buf (if (eq? buffer-arg #nil)
+                  #nil  ; current buffer
+                  (let ((found ((get-buffer-fn) buffer-arg)))
+                    (if (eq? found #nil)
+                        (error "No such buffer: %s" buffer-arg)
+                        found)))))
+    ;; Get the undo-list from the buffer's hash
+    (let ((undo-list (buf-hash-ref buf 'buffer-undo-list)))
+      ;; If undo is disabled (undo-list is t), enable it by setting to nil
+      ;; Check for both Emacs t symbol and Scheme #t
+      (when (or (eq? undo-list #t) (eq? undo-list 't))
+        ;; hashq-set! on the buffer's hash
+        (let ((h (buf-hash buf)))
+          (when (not (eq? h #nil))
+            (hashq-set! h 'buffer-undo-list #nil)))))
+    #nil))
+
+;;; ----------------------------------------------------------------
 ;;; Registration
 ;;; ----------------------------------------------------------------
 
@@ -359,4 +391,5 @@ See also `find-buffer-visiting'."
               (get-truename-buffer ,elisp-get-truename-buffer)
               (find-buffer ,elisp-find-buffer)
               (region-beginning ,elisp-region-beginning)
-              (region-end ,elisp-region-end))))
+              (region-end ,elisp-region-end)
+              (buffer-enable-undo ,elisp-buffer-enable-undo))))

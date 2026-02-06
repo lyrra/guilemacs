@@ -64,6 +64,12 @@ enum { BEG = 1, BEG_BYTE = BEG };
 /* Return the character following point (0 at end of buffer).  */
 #define FOLLOWING_CHAR() (PT >= ZV ? 0 : FETCH_CHAR (PT_BYTE))
 
+/* Enable undo for buffer B if it's currently disabled.  */
+#define BUFFER_ENABLE_UNDO(b) do {			\
+    if (EQ (BVAR ((b), undo_list), Qt))			\
+      bset_undo_list ((b), Qnil);			\
+  } while (0)
+
 /* Position of end of buffer.  */
 #define Z (current_buffer->text->z)
 #define Z_BYTE (current_buffer->text->z_byte)
