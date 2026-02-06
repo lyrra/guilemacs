@@ -2240,7 +2240,7 @@ get_local_map (ptrdiff_t position, struct buffer *buffer, Lisp_Object type)
   old_begv_byte = BUF_BEGV_BYTE (buffer);
   old_zv_byte = BUF_ZV_BYTE (buffer);
 
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   SET_BUF_BEGV_BOTH (buffer, BUF_BEG (buffer), BUF_BEG_BYTE (buffer));
   SET_BUF_ZV_BOTH (buffer, BUF_Z (buffer), BUF_Z_BYTE (buffer));
 

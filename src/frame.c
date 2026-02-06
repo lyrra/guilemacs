@@ -2545,7 +2545,7 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
       dynwind_begin ();
 
       if (EQ (force, Qnoelisp))
-	specbind (Qx_auto_preserve_selections, Qnil);
+	specbind_guile (Qx_auto_preserve_selections, Qnil);
 
       x_clear_frame_selections (f);
       dynwind_end ();

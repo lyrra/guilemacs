@@ -492,7 +492,7 @@ file_name_completion (Lisp_Object file, Lisp_Object dirname, bool all_flag,
 
   bestmatch = Qnil;
   encoded_file = encoded_dir = Qnil;
-  specbind (Qdefault_directory, dirname);
+  specbind_guile (Qdefault_directory, dirname);
 
   /* Do completion on the encoded file name
      because the other names in the directory are (we presume)

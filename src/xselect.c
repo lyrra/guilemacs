@@ -371,7 +371,7 @@ x_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
       dynwind_begin ();
 
       if (!may_quit)
-	specbind (Qinhibit_quit, Qt);
+	specbind_guile (Qinhibit_quit, Qt);
 
       CHECK_SYMBOL (target_type);
       handler_fn = CDR (Fassq (target_type, Vselection_converter_alist));

@@ -199,7 +199,7 @@ textconv_query (struct frame *f, struct textconv_callback_struct *query,
   record_unwind_protect (restore_selected_window, selected_window);
 
   /* Inhibit quitting.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   /* Temporarily switch to F's selected window at the time of the last
      redisplay.  */
@@ -2095,7 +2095,7 @@ get_extracted_text (struct frame *f, ptrdiff_t n,
   record_unwind_protect (restore_selected_window, selected_window);
 
   /* Inhibit quitting.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   /* Temporarily switch to F's selected window at the time of the last
      redisplay.  */
@@ -2217,7 +2217,7 @@ get_surrounding_text (struct frame *f, ptrdiff_t left,
   record_unwind_protect (restore_selected_window, selected_window);
 
   /* Inhibit quitting.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   /* Temporarily switch to F's selected window at the time of the last
      redisplay.  */

@@ -2207,7 +2207,7 @@ signal_before_change (ptrdiff_t start_int, ptrdiff_t end_int,
   start_marker = Qnil;
   end_marker = Qnil;
 
-  specbind (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
 
   /* If buffer is unmodified, run a special hook for that case.  The
    check for Vfirst_change_hook is just a minor optimization.  */
@@ -2311,7 +2311,7 @@ signal_after_change (ptrdiff_t charpos, ptrdiff_t lendel, ptrdiff_t lenins)
   if (!NILP (combine_after_change_list))
     Fcombine_after_change_execute ();
 
-  specbind (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
 
   if (!NILP (Vafter_change_functions))
     {

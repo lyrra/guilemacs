@@ -582,9 +582,9 @@ update_compositions (ptrdiff_t from, ptrdiff_t to, int check_mask)
     {
       dynwind_begin ();
 
-      specbind (Qinhibit_read_only, Qt);
-      specbind (Qinhibit_modification_hooks, Qt);
-      specbind (Qinhibit_point_motion_hooks, Qt);
+      specbind_guile (Qinhibit_read_only, Qt);
+      specbind_guile (Qinhibit_modification_hooks, Qt);
+      specbind_guile (Qinhibit_point_motion_hooks, Qt);
       Fremove_list_of_text_properties (make_fixnum (min_pos),
 				       make_fixnum (max_pos),
 				       list1 (Qauto_composed), Qnil);

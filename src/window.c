@@ -2703,7 +2703,7 @@ window_list (void)
       /*  Don't allow quitting in Fnconc.  Otherwise we might end up
 	  with a too short Vwindow_list and Fkill_buffer not being able
 	  to replace a buffer in all windows showing it (Bug#47244).  */
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
       FOR_EACH_FRAME (tail, frame)
 	{
 	  Lisp_Object arglist = Qnil;
@@ -2866,7 +2866,7 @@ next_window (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames,
     return Fframe_first_window (all_frames);
 
   /*  Don't allow quitting in Fmemq.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   if (next_p)
     {
@@ -3015,7 +3015,7 @@ window_list_1 (Lisp_Object window, Lisp_Object minibuf, Lisp_Object all_frames)
   list = Qnil;
 
   /*  Don't allow quitting in Fmemq and Fnconc.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   for (tail = window_list (); CONSP (tail); tail = XCDR (tail))
     if (candidate_window_p (XCAR (tail), window, minibuf, all_frames))
@@ -4094,7 +4094,7 @@ run_window_change_functions (void)
 
   window_change_record_frames = false;
   record_unwind_protect_void (window_change_record);
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
 
   FOR_EACH_FRAME (tail, frame)
     {
@@ -5905,7 +5905,7 @@ window_scroll (Lisp_Object window, EMACS_INT n, bool whole, bool noerror)
     }
 
   if (whole && (fast_but_imprecise_scrolling || long_lines_truncated))
-    specbind (Qfontification_functions, Qnil);
+    specbind_guile (Qfontification_functions, Qnil);
 
   if (whole && long_lines_truncated)
     window_scroll_for_long_lines (w, n, noerror);

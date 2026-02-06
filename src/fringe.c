@@ -993,7 +993,7 @@ update_window_fringes (struct window *w, bool keep_current_p)
      windows, in which case point has been temporarily moved to that
      window's window-point.  So we cannot afford quitting out of here,
      as point is restored after this function returns.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   if (!MINI_WINDOW_P (w)
       && (ind = BVAR (XBUFFER (w->contents), indicate_buffer_boundaries), !NILP (ind)))

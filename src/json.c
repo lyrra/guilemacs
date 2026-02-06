@@ -579,7 +579,7 @@ json_serialize (json_out_t *jo, Lisp_Object object,
 
   /* Make float conversion independent of float-output-format.  */
   if (!NILP (Vfloat_output_format))
-    specbind (Qfloat_output_format, Qnil);
+    specbind_guile (Qfloat_output_format, Qnil);
 
   json_out_something (jo, object);
 }

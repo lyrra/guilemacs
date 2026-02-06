@@ -3076,7 +3076,7 @@ DESCRIBER is the output function used; nil means use `princ'.  */)
   dynwind_begin ();
   if (NILP (describer))
     describer = Qprinc;
-  specbind (Qstandard_output, Fcurrent_buffer ());
+  specbind_guile (Qstandard_output, Fcurrent_buffer ());
   CHECK_VECTOR_OR_CHAR_TABLE (vector);
   describe_vector (vector, Qnil, describer, describe_vector_princ, 0,
 		   Qnil, Qnil, 0, 0);
@@ -3121,7 +3121,7 @@ the one in this keymap, we ignore this one.  */)
    Lisp_Object mention_shadow)
 {
   dynwind_begin ();
-  specbind (Qstandard_output, Fcurrent_buffer ());
+  specbind_guile (Qstandard_output, Fcurrent_buffer ());
   CHECK_VECTOR_OR_CHAR_TABLE (vector);
 
   bool b_partial = NILP (partial) ? false : true;

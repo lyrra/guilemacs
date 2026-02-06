@@ -1371,7 +1371,7 @@ This function is an internal primitive--use `make-frame' instead.  */ )
       fset_name (f, name);
       f->explicit_name = true;
       /* Use the frame's title when getting resources for this frame.  */
-      specbind (Qx_resource_name, name);
+      specbind_guile (Qx_resource_name, name);
     }
 
   register_font_driver (&ftcrfont_driver, f);
@@ -2729,7 +2729,7 @@ x_create_tip_frame (struct pgtk_display_info *dpyinfo, Lisp_Object parms, struct
       fset_name (f, name);
       f->explicit_name = true;
       /* use the frame's title when getting resources for this frame.  */
-      specbind (Qx_resource_name, name);
+      specbind_guile (Qx_resource_name, name);
     }
 
   register_font_driver (&ftcrfont_driver, f);
@@ -3025,8 +3025,8 @@ pgtk_hide_tip (bool delete)
       Lisp_Object was_open = Qnil;
 
       dynwind_begin ();
-      specbind (Qinhibit_redisplay, Qt);
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_redisplay, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
 
       /* Try to hide the GTK+ system tip first.  */
       if (FRAMEP (tip_last_frame))
@@ -3127,7 +3127,7 @@ Text larger than the specified size is clipped.  */)
 #endif
   AUTO_STRING (tip, " *tip*");
 
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
   if (SCHARS (string) == 0)
@@ -3327,9 +3327,9 @@ Text larger than the specified size is clipped.  */)
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
-  specbind (Qinhibit_read_only, Qt);
-  specbind (Qinhibit_modification_hooks, Qt);
-  specbind (Qinhibit_point_motion_hooks, Qt);
+  specbind_guile (Qinhibit_read_only, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_point_motion_hooks, Qt);
   Ferase_buffer ();
   Finsert (1, &string);
   clear_glyph_matrix (w->desired_matrix);
@@ -3731,7 +3731,7 @@ value of DIR as in previous invocations; this is standard MS Windows behavior.  
   CHECK_STRING (dir);
 
   /* Prevent redisplay.  */
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
   record_unwind_protect_void (clean_up_dialog);
 
   block_input ();
@@ -3794,7 +3794,7 @@ nil, it defaults to the selected frame. */)
     pgtk_menu_set_in_use (true);
 
   /* Prevent redisplay.  */
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
   record_unwind_protect_void (clean_up_dialog);
 
   block_input ();

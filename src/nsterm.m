@@ -7222,7 +7222,7 @@ static Lisp_Object
 ns_in_echo_area_1 (void *ptr)
 {
   const specpdl_ref count = SPECPDL_INDEX ();
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   const Lisp_Object in_echo_area = safe_calln (Qns_in_echo_area);
   return unbind_to (count, in_echo_area);
 }

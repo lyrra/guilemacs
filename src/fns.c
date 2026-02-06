@@ -3411,10 +3411,10 @@ by a mouse, or by some window-system gesture, or via a menu.  */)
 		  Vyes_or_no_prompt);
 
   dynwind_begin ();
-  specbind (Qenable_recursive_minibuffers, Qt);
+  specbind_guile (Qenable_recursive_minibuffers, Qt);
   /* Preserve the actual command that eventually called `yes-or-no-p'
      (otherwise `repeat' will be repeating `exit-minibuffer').  */
-  specbind (Qreal_this_command, Vreal_this_command);
+  specbind_guile (Qreal_this_command, Vreal_this_command);
 
   while (1)
     {

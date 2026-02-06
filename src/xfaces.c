@@ -4349,7 +4349,7 @@ Default face attributes override any local face attributes.  */)
              trigger redisplay.  But we are in the process of realizing
              the default face, and therefore are not ready to do display.  */
 	  dynwind_begin ();
-	  specbind (Qinhibit_redisplay, Qt);
+	  specbind_guile (Qinhibit_redisplay, Qt);
 
 	  /* Ensure that the face vector is fully specified by merging
 	     the previously-cached vector.  */
@@ -5927,7 +5927,7 @@ realize_basic_faces (struct frame *f)
          face cache, if this function happens to be invoked with current
 	 buffer set to a buffer with a non-nil face-remapping-alist.  */
       dynwind_begin ();
-      specbind (Qface_remapping_alist, Qnil);
+      specbind_guile (Qface_remapping_alist, Qnil);
       realize_named_face (f, Qmode_line_active, MODE_LINE_ACTIVE_FACE_ID);
       realize_named_face (f, Qmode_line_inactive, MODE_LINE_INACTIVE_FACE_ID);
       realize_named_face (f, Qtool_bar, TOOL_BAR_FACE_ID);
@@ -6079,7 +6079,7 @@ realize_default_face (struct frame *f)
      the default face, and therefore are not ready to do display.  */
   dynwind_begin ();
   specpdl_ref count = SPECPDL_INDEX ();
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
   struct face *face = realize_face (c, attrs, DEFAULT_FACE_ID);
   dynwind_end ();
 

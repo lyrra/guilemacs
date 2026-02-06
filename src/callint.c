@@ -206,7 +206,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
   /* Bound recursively so that code can check the current command from
      code running from minibuffer hooks (and the like), without being
      overwritten by subsequent minibuffer calls.  */
-  specbind (Qcurrent_minibuffer_command, Vthis_command);
+  specbind_guile (Qcurrent_minibuffer_command, Vthis_command);
 
   if (NILP (keys))
     keys = this_command_keys, key_count = this_command_key_count;
@@ -371,7 +371,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
   memsetnil (args, nargs * 2);
 
   if (!NILP (enable))
-    specbind (Qenable_recursive_minibuffers, Qt);
+    specbind_guile (Qenable_recursive_minibuffers, Qt);
 
   char const *tem = string;
   for (ptrdiff_t i = 2; tem < string_end; i++)
@@ -457,7 +457,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	case 'k':		/* Key sequence.  */
 	  {
 	    dynwind_begin ();
-	    specbind (Qcursor_in_echo_area, Qt);
+	    specbind_guile (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_fixnum (0),
 				make_fixnum (SCHARS (callint_message)),
@@ -488,7 +488,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
 	case 'K':		/* Key sequence to be defined.  */
 	  {
 	    dynwind_begin ();
-	    specbind (Qcursor_in_echo_area, Qt);
+	    specbind_guile (Qcursor_in_echo_area, Qt);
 	    /* Prompt in `minibuffer-prompt' face.  */
 	    Fput_text_property (make_fixnum (0),
 				make_fixnum (SCHARS (callint_message)),
@@ -711,7 +711,7 @@ invoke it (via an `interactive' spec that contains, for instance, an
   Vreal_this_command = save_real_this_command;
   kset_last_command (current_kboard, save_last_command);
 
-  specbind (Qcommand_debug_status, Qnil);
+  specbind_guile (Qcommand_debug_status, Qnil);
 
   Lisp_Object val = Ffuncall (nargs, args);
   SAFE_FREE ();

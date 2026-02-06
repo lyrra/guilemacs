@@ -2391,7 +2391,7 @@ This is what happens in interactive use with M-x.  */)
     report_file_errno ("Renaming", list2 (file, newname), rename_errno);
 
   dynwind_begin ();
-  specbind (Qdelete_by_moving_to_trash, Qnil);
+  specbind_guile (Qdelete_by_moving_to_trash, Qnil);
   if (dirp)
     call2 (Qdelete_directory, file, Qt);
   else
@@ -4116,7 +4116,7 @@ by calling `format-decode', which see.  */)
              current_buffer->modtime earlier, but we could still end up calling
              ask-user-about-supersession-threat if the file is modified while
              we read it, so we bind buffer-file-name instead.  */
-          specbind (Qbuffer_file_name, Qnil);
+          specbind_guile (Qbuffer_file_name, Qnil);
 	  del_range_byte (same_at_start, same_at_end);
 	  /* Insert from the file at the proper position.  */
 	  temp = BYTE_TO_CHAR (same_at_start);
@@ -4226,7 +4226,7 @@ by calling `format-decode', which see.  */)
 	  if (same_at_start != same_at_end)
 	    {
               /* See previous specbind for the reason behind this.  */
-              specbind (Qbuffer_file_name, Qnil);
+              specbind_guile (Qbuffer_file_name, Qnil);
 	      del_range_byte (same_at_start, same_at_end);
 	    }
 	  inserted = 0;
@@ -4276,7 +4276,7 @@ by calling `format-decode', which see.  */)
       inserted -= (ZV_BYTE - same_at_end) + (same_at_start - BEGV_BYTE);
 
       /* See previous specbind for the reason behind this.  */
-      specbind (Qbuffer_file_name, Qnil);
+      specbind_guile (Qbuffer_file_name, Qnil);
       if (same_at_end != same_at_start)
 	{
 	  del_range_byte (same_at_start, same_at_end);
@@ -4655,8 +4655,8 @@ by calling `format-decode', which see.  */)
       /* Don't run point motion or modification hooks when decoding.  */
       ptrdiff_t old_inserted = inserted;
       dynwind_begin ();
-      specbind (Qinhibit_point_motion_hooks, Qt);
-      specbind (Qinhibit_modification_hooks, Qt);
+      specbind_guile (Qinhibit_point_motion_hooks, Qt);
+      specbind_guile (Qinhibit_modification_hooks, Qt);
 
       /* Save old undo list and don't record undo for decoding.  */
       old_undo = BVAR (current_buffer, undo_list);

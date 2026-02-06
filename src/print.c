@@ -173,10 +173,10 @@ print_prepare (Lisp_Object printcharfun)
     {
       if (NILP (BVAR (current_buffer, enable_multibyte_characters))
 	  && ! print_escape_multibyte)
-	specbind (Qprint_escape_multibyte, Qt);
+	specbind_guile (Qprint_escape_multibyte, Qt);
       if (! NILP (BVAR (current_buffer, enable_multibyte_characters))
 	  && ! print_escape_nonascii)
-	specbind (Qprint_escape_nonascii, Qt);
+	specbind_guile (Qprint_escape_nonascii, Qt);
       if (print_buffer.buffer != NULL)
 	{
 	  Lisp_Object string = make_string_from_bytes (print_buffer.buffer,
@@ -589,8 +589,8 @@ temp_output_buffer_setup (const char *bufname)
   eassert (current_buffer->overlays == NULL);
   bset_enable_multibyte_characters
     (current_buffer, BVAR (&buffer_defaults, enable_multibyte_characters));
-  specbind (Qinhibit_read_only, Qt);
-  specbind (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_read_only, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
   Ferase_buffer ();
   XSETBUFFER (buf, current_buffer);
 
@@ -598,7 +598,7 @@ temp_output_buffer_setup (const char *bufname)
 
   dynwind_end ();
 
-  specbind (Qstandard_output, buf);
+  specbind_guile (Qstandard_output, buf);
 }
 
 static void print (Lisp_Object, Lisp_Object, bool);
@@ -812,7 +812,7 @@ A printed representation of an object is text which describes that object.  */)
     object = SCM_CALL_1 (deep_unwrap_proc, object);
 
   dynwind_begin ();
-  specbind (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
 
   if (!NILP (overrides))
     print_bind_overrides (overrides);
@@ -1736,7 +1736,7 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
       /* Bind `print-unreadable-function' to nil to avoid accidental
 	 infinite recursion in the function called.  */
       Lisp_Object func = Vprint_unreadable_function;
-      specbind (Qprint_unreadable_function, Qnil);
+      specbind_guile (Qprint_unreadable_function, Qnil);
 
       /* If we're being called from `prin1-to-string' or the like,
 	 we're now in the secret " prin1" buffer.  This can lead to

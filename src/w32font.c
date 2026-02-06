@@ -2793,7 +2793,7 @@ in the font selection dialog. */)
     Lisp_Object value = Qnil;
 
     w32_dialog_in_progress (Qt);
-    specbind (Qinhibit_redisplay, Qt);
+    specbind_guile (Qinhibit_redisplay, Qt);
     record_unwind_protect (w32_dialog_in_progress, Qnil);
 
     if (ChooseFont (&cf)

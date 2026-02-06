@@ -1307,7 +1307,7 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
     {
       fset_name (f, name);
       f->explicit_name = 1;
-      specbind (Qx_resource_name, name);
+      specbind_guile (Qx_resource_name, name);
     }
 
   block_input ();
@@ -3212,8 +3212,8 @@ x_hide_tip (bool delete)
       Lisp_Object was_open = Qnil;
 
       count = SPECPDL_INDEX ();
-      specbind (Qinhibit_redisplay, Qt);
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_redisplay, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
 
       /* Now look whether there's an Emacs tip around.  */
       if (!NILP (tip_frame))
@@ -3269,7 +3269,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   AUTO_STRING (tip, " *tip*");
 
   dynwind_begin ();
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
   str = SSDATA (string);
@@ -3487,9 +3487,9 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
       old_buffer = current_buffer;
       set_buffer_internal_1 (XBUFFER (w->contents));
       bset_truncate_lines (current_buffer, Qnil);
-      specbind (Qinhibit_read_only, Qt);
-      specbind (Qinhibit_modification_hooks, Qt);
-      specbind (Qinhibit_point_motion_hooks, Qt);
+      specbind_guile (Qinhibit_read_only, Qt);
+      specbind_guile (Qinhibit_modification_hooks, Qt);
+      specbind_guile (Qinhibit_point_motion_hooks, Qt);
       Ferase_buffer ();
       Finsert (1, &string);
       clear_glyph_matrix (w->desired_matrix);

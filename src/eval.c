@@ -35,6 +35,7 @@ uint64_t scheme_to_c_crossings;
 uint64_t c_to_scheme_crossings;
 
 static void unbind_once (void *ignore);
+static void unbind_guile (void *data);
 
 /* Non-nil means record all fset's and provide's, to be undone
    if the file being autoloaded is not fully loaded.
@@ -228,19 +229,19 @@ call_debugger (Lisp_Object arg)
      displayed if the debugger is invoked during redisplay.  */
   debug_while_redisplaying = redisplaying_p;
   redisplaying_p = 0;
-  specbind (Qdebugger_may_continue,
+  specbind_guile (Qdebugger_may_continue,
 	    debug_while_redisplaying ? Qnil : Qt);
-  specbind (Qinhibit_redisplay, Qnil);
-  specbind (Qinhibit_debugger, Qt);
+  specbind_guile (Qinhibit_redisplay, Qnil);
+  specbind_guile (Qinhibit_debugger, Qt);
 
   /* If we are debugging an error while `inhibit-changing-match-data'
      is bound to non-nil (e.g., within a call to `string-match-p'),
      then make sure debugger code can still use match data.  */
-  specbind (Qinhibit_changing_match_data, Qnil);
+  specbind_guile (Qinhibit_changing_match_data, Qnil);
 
 #if 0 /* Binding this prevents execution of Lisp code during
 	 redisplay, which necessarily leads to display problems.  */
-  specbind (Qinhibit_eval_during_redisplay, Qt);
+  specbind_guile (Qinhibit_eval_during_redisplay, Qt);
 #endif
 
   val = apply1 (Vdebugger, arg);
@@ -838,7 +839,7 @@ icc_lisp_handler (void *data, Lisp_Object k, Lisp_Object val)
     {
 #if 0
       if (!NILP (Vinternal_interpreter_environment))
-        specbind (Qinternal_interpreter_environment,
+        specbind_guile (Qinternal_interpreter_environment,
                   Fcons (Fcons (var, val),
                          Vinternal_interpreter_environment));
       else
@@ -1848,7 +1849,7 @@ node `(elisp)Eval' for details.  */)
   (Lisp_Object form, Lisp_Object lexical)
 {
   dynwind_begin ();
-  specbind (Qinternal_interpreter_environment,
+  specbind_guile (Qinternal_interpreter_environment,
 	    CONSP (lexical) || NILP (lexical) ? lexical : list_of_t);
   Lisp_Object tem = eval_sub (form);
   dynwind_end ();
@@ -2451,7 +2452,7 @@ safe_funcall (ptrdiff_t nargs, Lisp_Object *args)
      by the redisplay.  So it was important to inhibit redisplay.
      Not clear if we still need this 'specbind' now that 'xdisp.c' has its
      own version of this code.  */
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
   /* Use Qt to ensure debugger does not run.  */
   Lisp_Object val = internal_condition_case_n (Ffuncall, nargs, args, Qt,
 				               safe_eval_handler);
@@ -2641,7 +2642,7 @@ funcall_lambda (Lisp_Object fun, ptrdiff_t nargs, Lisp_Object *arg_vector)
 
   if (!BASE_EQ (lexenv, Vinternal_interpreter_environment))
     /* Instantiate a new lexical environment.  */
-    specbind (Qinternal_interpreter_environment, lexenv);
+    specbind_guile (Qinternal_interpreter_environment, lexenv);
 
   Lisp_Object val = Fprogn (XCDR (XCDR (fun)));
   dynwind_end ();
@@ -2834,6 +2835,151 @@ do_specbind (Lisp_Object sym, union specbinding *bind,
      buffer-local variable) as well as for SPECPDL_LET_DEFAULT bindings,
      i.e. bindings to the default value of a variable which can be
      buffer-local.  */
+
+/* specbind_guile: Dynamic binding without using the specpdl stack.
+   Uses a Lisp vector to store binding data and Guile's dynamic-wind
+   for unwinding.  This is the first step toward eliminating specpdl.
+
+   Binding data vector layout:
+     [0] = kind (fixnum: 0=LET, 1=LET_LOCAL, 2=LET_DEFAULT)
+     [1] = symbol
+     [2] = old_value
+     [3] = where (buffer for LET_LOCAL, nil otherwise)
+*/
+
+#define BINDING_KIND_LET         0
+#define BINDING_KIND_LET_LOCAL   1
+#define BINDING_KIND_LET_DEFAULT 2
+
+static void
+unbind_guile (void *data)
+{
+  Lisp_Object binding = (Lisp_Object) data;
+  eassert (VECTORP (binding) && ASIZE (binding) == 4);
+
+  EMACS_INT kind = XFIXNUM (AREF (binding, 0));
+  Lisp_Object symbol = AREF (binding, 1);
+  Lisp_Object old_value = AREF (binding, 2);
+  Lisp_Object where = AREF (binding, 3);
+
+  switch (kind)
+    {
+    case BINDING_KIND_LET:
+      {
+        /* If variable has a trivial value (no forwarding), we can
+           just set it.  But check if it changed to LOCALIZED during
+           the binding (via make-local-variable).  */
+        sym_t sym = XSYMBOL (symbol);
+        if (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL)
+          {
+            SET_SYMBOL_VAL (sym, old_value);
+            break;
+          }
+        /* FALLTHROUGH: variable became localized during binding */
+      }
+    case BINDING_KIND_LET_DEFAULT:
+      Fset_default (symbol, old_value);
+      break;
+
+    case BINDING_KIND_LET_LOCAL:
+      {
+        eassert (BUFFERP (where));
+        /* If this was a local binding, reset the value in the appropriate
+           buffer, but only if that buffer's binding still exists.  */
+        if (!NILP (Flocal_variable_p (symbol, where)))
+          set_internal (symbol, old_value, where, SET_INTERNAL_UNBIND);
+      }
+      break;
+    }
+}
+
+void
+specbind_guile (Lisp_Object symbol, Lisp_Object value)
+{
+  /* Resolve aliases.  */
+  sym_t sym = XBARE_SYMBOL (symbol);
+  while (SYMBOL_REDIRECT (sym) == SYMBOL_VARALIAS)
+    {
+      sym = SYMBOL_ALIAS (sym);
+      XSETSYMBOL (symbol, sym);
+    }
+
+  /* Create binding data vector: [kind, symbol, old_value, where] */
+  Lisp_Object binding = make_vector (4, Qnil);
+  EMACS_INT kind;
+  Lisp_Object old_value;
+  Lisp_Object where = Qnil;
+
+  switch (SYMBOL_REDIRECT (sym))
+    {
+    case SYMBOL_PLAINVAL:
+      /* The most common case: non-constant symbol with trivial value.  */
+      kind = BINDING_KIND_LET;
+      old_value = SYMBOL_VAL (sym);
+      break;
+
+    case SYMBOL_LOCALIZED:
+    case SYMBOL_FORWARDED:
+      {
+        old_value = find_symbol_value (symbol);
+        kind = BINDING_KIND_LET_LOCAL;
+        where = Fcurrent_buffer ();
+
+        if (SYMBOL_REDIRECT (sym) == SYMBOL_LOCALIZED)
+          {
+            if (!blv_found (SYMBOL_BLV (sym)))
+              kind = BINDING_KIND_LET_DEFAULT;
+          }
+        else if (BUFFER_OBJFWDP (SYMBOL_FWD (sym)))
+          {
+            /* Per-buffer variable without local value: bind the default.  */
+            if (NILP (Flocal_variable_p (symbol, Qnil)))
+              kind = BINDING_KIND_LET_DEFAULT;
+          }
+        else if (KBOARD_OBJFWDP (SYMBOL_FWD (sym)))
+          {
+            /* KBOARD-forwarded: treat as plain LET.  */
+            kind = BINDING_KIND_LET;
+          }
+        else
+          kind = BINDING_KIND_LET;
+        break;
+      }
+
+    default:
+      emacs_abort ();
+    }
+
+  /* Store binding data.  */
+  ASET (binding, 0, make_fixnum (kind));
+  ASET (binding, 1, symbol);
+  ASET (binding, 2, old_value);
+  ASET (binding, 3, where);
+
+  /* Set the new value.  */
+  switch (kind)
+    {
+    case BINDING_KIND_LET:
+      if (SYMBOL_REDIRECT (sym) == SYMBOL_PLAINVAL && !SYMBOL_TRAPPED (sym))
+        SET_SYMBOL_VAL (sym, value);
+      else
+        set_internal (symbol, value, Qnil, SET_INTERNAL_BIND);
+      break;
+
+    case BINDING_KIND_LET_DEFAULT:
+      set_default_internal (symbol, value, SET_INTERNAL_BIND, NULL);
+      break;
+
+    case BINDING_KIND_LET_LOCAL:
+      set_internal (symbol, value, Qnil, SET_INTERNAL_BIND);
+      break;
+    }
+
+  /* Register unwind handler with Guile.  The binding vector will be
+     GC-protected because it's passed to Guile.  */
+  scm_dynwind_unwind_handler (unbind_guile, (void *) binding,
+                              SCM_F_WIND_EXPLICITLY);
+}
 
 void
 specbind (Lisp_Object symbol, Lisp_Object value)

@@ -8658,7 +8658,7 @@ are lower-case).  */)
 
   if (SYMBOLP (default_coding_system))
     default_coding_system = SYMBOL_NAME (default_coding_system);
-  specbind (Qcompletion_ignore_case, Qt);
+  specbind_guile (Qcompletion_ignore_case, Qt);
   val = Fcompleting_read (prompt, Vcoding_system_alist, Qnil,
 			  Qt, Qnil, Qcoding_system_history,
 			  default_coding_system, Qnil);

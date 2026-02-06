@@ -843,7 +843,7 @@ call_process (ptrdiff_t nargs, Lisp_Object *args, int *filefd, Lisp_Object *temp
 		 buffer, while we rely on process_coding.produced to
 		 faithfully reflect inserted text until we
 		 TEMP_SET_PT_BOTH below.  */
-	      specbind (Qinhibit_modification_hooks, Qt);
+	      specbind_guile (Qinhibit_modification_hooks, Qt);
 	      decode_coding_c_string (&process_coding,
 				      (unsigned char *) buf, nread, curbuf);
               dynwind_end ();
@@ -1033,10 +1033,10 @@ create_temp_file (ptrdiff_t nargs, Lisp_Object *args,
   {
     dynwind_begin ();
 
-    specbind (Qcoding_system_for_write, val);
+    specbind_guile (Qcoding_system_for_write, val);
     /* POSIX lets mk[s]temp use "."; don't invoke jka-compr if we
        happen to get a ".Z" suffix.  */
-    specbind (Qfile_name_handler_alist, Qnil);
+    specbind_guile (Qfile_name_handler_alist, Qnil);
     write_region (start, end, filename_string, Qnil, Qlambda, Qnil, Qnil, fd);
 
     dynwind_end ();

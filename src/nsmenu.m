@@ -179,16 +179,16 @@ ns_update_menubar (struct frame *f, bool deep_p)
 
       dynwind_begin ();
       buffer = XWINDOW (FRAME_SELECTED_WINDOW (f))->contents;
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
       /* Don't let the debugger step into this code
 	 because it is not reentrant.  */
-      specbind (Qdebug_on_next_call, Qnil);
+      specbind_guile (Qdebug_on_next_call, Qnil);
 
       record_unwind_save_match_data ();
       if (NILP (Voverriding_local_map_menu_flag))
 	{
-	  specbind (Qoverriding_terminal_local_map, Qnil);
-	  specbind (Qoverriding_local_map, Qnil);
+	  specbind_guile (Qoverriding_terminal_local_map, Qnil);
+	  specbind_guile (Qoverriding_local_map, Qnil);
 	}
 
       set_buffer_internal_1 (XBUFFER (buffer));

@@ -12732,7 +12732,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
   /* Bind this here to avoid juggling bindings and SAFE_FREE in
      Fx_begin_drag.  */
-  specbind (Qx_dnd_targets_list, selection_target_list);
+  specbind_guile (Qx_dnd_targets_list, selection_target_list);
 
   if (!FRAME_VISIBLE_P (f))
     error ("Frame must be visible");
@@ -12872,7 +12872,7 @@ x_dnd_begin_drag_and_drop (struct frame *f, Time time, Atom xaction,
 
   /* Bind this here.  The cell doesn't actually alias between
      anything until `xm_setup_dnd_targets' is called.  */
-  specbind (Qx_selection_alias_alist,
+  specbind_guile (Qx_selection_alias_alist,
 	    Fcons (x_dnd_selection_alias_cell,
 		   Vx_selection_alias_alist));
 
@@ -26811,7 +26811,7 @@ x_connection_closed (Display *dpy, const char *error_message, bool ioerror)
   strcpy (error_msg, error_message);
 
   /* Inhibit redisplay while frames are being deleted. */
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
 
   /* If drag-and-drop is in progress, cancel drag-and-drop.  If DND
      frame's display is DPY, don't reset event masks or try to send

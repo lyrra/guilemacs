@@ -3210,7 +3210,7 @@ haiku_wait_for_event (struct frame *f, int type)
   info.events = B_EVENT_READ;
 
   depth = SPECPDL_INDEX ();
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   FRAME_OUTPUT_DATA (f)->wait_for_event_type = type;
 

@@ -2126,7 +2126,7 @@ nil.  */)
   if (!inhibit_modification_hooks)
     {
       prepare_to_modify_buffer (BEGV, ZV, NULL);
-      specbind (Qinhibit_modification_hooks, Qt);
+      specbind_guile (Qinhibit_modification_hooks, Qt);
       modification_hooks_inhibited = true;
     }
 

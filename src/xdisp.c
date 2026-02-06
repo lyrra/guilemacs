@@ -3094,9 +3094,9 @@ dsafe__call (bool inhibit_quit, Lisp_Object (f) (ptrdiff_t, Lisp_Object *),
   else
     {
       dynwind_begin ();
-      specbind (Qinhibit_redisplay, Qt);
+      specbind_guile (Qinhibit_redisplay, Qt);
       if (inhibit_quit)
-	specbind (Qinhibit_quit, Qt);
+	specbind_guile (Qinhibit_quit, Qt);
       /* Use Qt to ensure debugger does not run,
 	 so there is no possibility of wanting to redisplay.  */
       val = internal_condition_case_n (f, nargs, args, Qt,
@@ -4625,7 +4625,7 @@ handle_fontified_prop (struct it *it)
       bool saved_inhibit_flag = it->f->inhibit_clear_image_cache;
 
       val = Vfontification_functions;
-      specbind (Qfontification_functions, Qnil);
+      specbind_guile (Qfontification_functions, Qnil);
 
       eassert (it->end_charpos == ZV);
 
@@ -4832,7 +4832,7 @@ handle_face_prop (struct it *it)
   /* Don't allow the user to quit out of face-merging code, in case
      this is called when redisplaying a non-selected window, with
      point temporarily moved to window-point.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   const int new_face_id = face_at_pos (it, 0);
   dynwind_end ();
 
@@ -6120,9 +6120,9 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 
       if (NILP (object))
 	XSETBUFFER (object, current_buffer);
-      specbind (Qobject, object);
-      specbind (Qposition, make_fixnum (CHARPOS (*position)));
-      specbind (Qbuffer_position, make_fixnum (bufpos));
+      specbind_guile (Qobject, object);
+      specbind_guile (Qposition, make_fixnum (CHARPOS (*position)));
+      specbind_guile (Qbuffer_position, make_fixnum (bufpos));
       /* Save and restore the bidi cache, since FORM could be crazy
 	 enough to re-enter redisplay, e.g., by calling 'message'.  */
       itdata = bidi_shelve_cache ();
@@ -6191,7 +6191,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		  dynwind_begin ();
 		  struct face *face = FACE_FROM_ID (it->f, it->face_id);
 
-		  specbind (Qheight, face->lface[LFACE_HEIGHT_INDEX]);
+		  specbind_guile (Qheight, face->lface[LFACE_HEIGHT_INDEX]);
 		  itdata = bidi_shelve_cache ();
 		  value = dsafe_eval (it->font_height);
 		  bidi_unshelve_cache (itdata, false);
@@ -6396,7 +6396,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 		 we are displaying a non-selected window, and the buffer's
 		 point was temporarily moved to the window-point.  */
 	      dynwind_begin ();
-	      specbind (Qinhibit_quit, Qt);
+	      specbind_guile (Qinhibit_quit, Qt);
 	      face_id2 = lookup_derived_face (it->w, it->f, face_name,
 					      FRINGE_FACE_ID, false);
 	      dynwind_end ();
@@ -6581,7 +6581,7 @@ handle_single_display_spec (struct it *it, Lisp_Object spec, Lisp_Object object,
 	  /* Don't allow quitting from lookup_image, for when we are
 	     displaying a non-selected window, and the buffer's point
 	     was temporarily moved to the window-point.  */
-	  specbind (Qinhibit_quit, Qt);
+	  specbind_guile (Qinhibit_quit, Qt);
 	  it->image_id = lookup_image (it->f, value, it->face_id);
 	  dynwind_end ();
 	  it->position = start_pos;
@@ -12335,7 +12335,7 @@ message_dolog (const char *m, ptrdiff_t nbytes, bool nlflag)
              end up calling modification hooks from another buffer and
              only with AFTER=t, Bug#21824).  */
           dynwind_begin ();
-          specbind (Qinhibit_modification_hooks, Qt);
+          specbind_guile (Qinhibit_modification_hooks, Qt);
 
 	  insert_1_both ("\n", 1, 1, true, false, false);
 
@@ -12857,8 +12857,8 @@ with_echo_area_buffer (struct window *w, int which,
 
   bset_undo_list (current_buffer, Qt);
   bset_read_only (current_buffer, Qnil);
-  specbind (Qinhibit_read_only, Qt);
-  specbind (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_read_only, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
 
   if (clear_buffer_p && Z > BEG)
     del_range (BEG, Z);
@@ -12982,7 +12982,7 @@ setup_echo_area_for_printing (bool multibyte_p)
       if (Z > BEG)
 	{
 	  dynwind_begin ();
-	  specbind (Qinhibit_read_only, Qt);
+	  specbind_guile (Qinhibit_read_only, Qt);
 	  /* Note that undo recording is always disabled.  */
 	  del_range (BEG, Z);
 	  dynwind_end ();
@@ -13428,7 +13428,7 @@ set_message (Lisp_Object string)
       )
     {
       dynwind_begin ();
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
       message = dsafe_call1 (Vset_message_function, string);
       dynwind_end ();
 
@@ -13508,7 +13508,7 @@ clear_message (bool current_p, bool last_displayed_p)
           )
         {
           dynwind_begin ();
-          specbind (Qinhibit_quit, Qt);
+          specbind_guile (Qinhibit_quit, Qt);
           preserve = dsafe_calln (false, Vclear_message_function);
           dynwind_end ();
         }
@@ -14011,7 +14011,7 @@ gui_consider_frame_title (Lisp_Object frame)
 	 window/frame: This avoids that resize_mini_window sizes back
 	 the minibuffer window of a temporarily selected frame.  See
 	 Bug#34317.  */
-      specbind (Qinhibit_redisplay, Qt);
+      specbind_guile (Qinhibit_redisplay, Qt);
 
       /* Switch to the buffer of selected window of the frame.  Set up
 	 mode_line_target so that display_mode_element will output
@@ -14258,15 +14258,15 @@ update_menu_bar (struct frame *f, bool save_match_data, bool hooks_run)
 	  struct buffer *prev = current_buffer;
 	  dynwind_begin ();
 
-	  specbind (Qinhibit_menubar_update, Qt);
+	  specbind_guile (Qinhibit_menubar_update, Qt);
 
 	  set_buffer_internal_1 (XBUFFER (w->contents));
 	  if (save_match_data)
 	    record_unwind_save_match_data ();
 	  if (NILP (Voverriding_local_map_menu_flag))
 	    {
-	      specbind (Qoverriding_terminal_local_map, Qnil);
-	      specbind (Qoverriding_local_map, Qnil);
+	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
+	      specbind_guile (Qoverriding_local_map, Qnil);
 	    }
 
 	  if (!hooks_run)
@@ -14440,8 +14440,8 @@ update_tab_bar (struct frame *f, bool save_match_data)
 	  /* Make sure that we don't accidentally use bogus keymaps.  */
 	  if (NILP (Voverriding_local_map_menu_flag))
 	    {
-	      specbind (Qoverriding_terminal_local_map, Qnil);
-	      specbind (Qoverriding_local_map, Qnil);
+	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
+	      specbind_guile (Qoverriding_local_map, Qnil);
 	    }
 
 	  /* We must temporarily set the selected frame to this frame
@@ -15410,8 +15410,8 @@ update_tool_bar (struct frame *f, bool save_match_data)
 	  /* Make sure that we don't accidentally use bogus keymaps.  */
 	  if (NILP (Voverriding_local_map_menu_flag))
 	    {
-	      specbind (Qoverriding_terminal_local_map, Qnil);
-	      specbind (Qoverriding_local_map, Qnil);
+	      specbind_guile (Qoverriding_terminal_local_map, Qnil);
+	      specbind_guile (Qoverriding_local_map, Qnil);
 	    }
 
 	  /* We must temporarily set the selected frame to this frame
@@ -17111,7 +17111,7 @@ redisplay_internal (void)
   record_unwind_protect_void (unwind_redisplay);
   redisplaying_p = true;
   block_buffer_flips ();
-  specbind (Qinhibit_free_realized_faces, Qnil);
+  specbind_guile (Qinhibit_free_realized_faces, Qnil);
 
   /* Record this function, so it appears on the profiler's backtraces.  */
   /*record_in_backtrace (Qredisplay_internal_xC_functionx, 0, 0);*/
@@ -20238,7 +20238,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
   SET_TEXT_POS (opoint, PT, PT_BYTE);
   ochars_modiff = CHARS_MODIFF;
 
-  specbind (Qinhibit_point_motion_hooks, Qt);
+  specbind_guile (Qinhibit_point_motion_hooks, Qt);
 
   /* When windows_or_buffers_changed is non-zero, we can't rely
      on the window end being valid, so set it to zero there.  */
@@ -21119,7 +21119,7 @@ redisplay_window (Lisp_Object window, bool just_this_one_p)
     {
       dynwind_begin ();
 
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
       display_mode_lines (w);
       dynwind_end ();
 
@@ -24009,7 +24009,7 @@ extend_face_to_end_of_line (struct it *it)
   /* Don't allow the user to quit out of face-merging code, in case
      this is called when redisplaying a non-selected window, with
      point temporarily moved to window-point.  */
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   /* The default face, possibly remapped. */
   struct face *default_face =
     FACE_FROM_ID_OR_NULL (f, lookup_basic_face (it->w, f, DEFAULT_FACE_ID));
@@ -24977,7 +24977,7 @@ display_count_lines_visually (struct it *it)
       /* Need to disable visual mode temporarily, since otherwise the
 	 call to move_it_to below and inside start_display will cause
 	 infinite recursion.  */
-      specbind (Qdisplay_line_numbers, Qrelative);
+      specbind_guile (Qdisplay_line_numbers, Qrelative);
       start_display (&tem_it, it->w, from);
       /* Some redisplay optimizations could invoke us very far from
 	 PT, which will make the caller painfully slow.  There should

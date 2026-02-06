@@ -3612,7 +3612,7 @@ buffer.  */)
       temp = beg; beg = end; end = temp;
     }
 
-  specbind (Qinhibit_quit, Qt); /* FIXME: Why?  */
+  specbind_guile (Qinhibit_quit, Qt); /* FIXME: Why?  */
 
   obuffer = Foverlay_buffer (overlay);
   b = XBUFFER (buffer);
@@ -3693,7 +3693,7 @@ DEFUN ("delete-overlay", Fdelete_overlay, Sdelete_overlay, 1, 1, 0,
       return Qnil;
     }
 
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   drop_overlay (XOVERLAY (overlay));
 

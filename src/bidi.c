@@ -1504,7 +1504,7 @@ bidi_at_paragraph_end (ptrdiff_t charpos, ptrdiff_t bytepos)
   /* Prevent quitting inside re_match_2, as redisplay_window could
      have temporarily moved point.  */
   dynwind_begin ();
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   val = fast_looking_at (sep_re, charpos, bytepos, ZV, ZV_BYTE, Qnil);
   if (val < 0)
@@ -1594,7 +1594,7 @@ bidi_find_paragraph_start (ptrdiff_t pos, ptrdiff_t pos_byte)
   /* Prevent quitting inside re_match_2, as redisplay_window could
      have temporarily moved point.  */
   dynwind_begin ();
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   while (pos_byte > BEGV_BYTE
 	 && n++ < MAX_PARAGRAPH_SEARCH

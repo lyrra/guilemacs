@@ -724,10 +724,10 @@ recursive_edit_1 (void)
 
   if (command_loop_level > 0)
     {
-      specbind (Qstandard_output, Qt);
-      specbind (Qstandard_input, Qt);
-      specbind (Qsymbols_with_pos_enabled, Qnil);
-      specbind (Qprint_symbols_bare, Qnil);
+      specbind_guile (Qstandard_output, Qt);
+      specbind_guile (Qstandard_input, Qt);
+      specbind_guile (Qsymbols_with_pos_enabled, Qnil);
+      specbind_guile (Qprint_symbols_bare, Qnil);
     }
 
 #ifdef HAVE_WINDOW_SYSTEM
@@ -747,7 +747,7 @@ recursive_edit_1 (void)
      tag is not caught anywhere in redisplay, i.e. when we leave the
      recursive edit, the original redisplay leading to the recursive
      edit will be unwound.  The outcome should therefore be safe.  */
-  specbind (Qinhibit_redisplay, Qnil);
+  specbind_guile (Qinhibit_redisplay, Qnil);
   redisplaying_p = 0;
 
   /* This variable stores buffers that have changed so that an undo
@@ -756,7 +756,7 @@ recursive_edit_1 (void)
      changed before we entered there recursive edit.
      See Bug #23632.
   */
-  specbind (Qundo_auto__undoably_changed_buffers, Qnil);
+  specbind_guile (Qundo_auto__undoably_changed_buffers, Qnil);
 
   val = command_loop ();
   if (EQ (val, Qt))
@@ -1013,8 +1013,8 @@ cmd_error (Lisp_Object data)
        that's part of a kbd macro.  */
     finalize_kbd_macro_chars ();
 
-  specbind (Qstandard_output, Qt);
-  specbind (Qstandard_input, Qt);
+  specbind_guile (Qstandard_output, Qt);
+  specbind_guile (Qstandard_input, Qt);
   kset_prefix_arg (current_kboard, Qnil);
   kset_last_prefix_arg (current_kboard, Qnil);
   cancel_echoing ();
@@ -1444,7 +1444,7 @@ command_loop_1 (void)
 	  /* Bind inhibit-quit to t so that C-g gets read in
 	     rather than quitting back to the minibuffer.  */
           dynwind_begin ();
-	  specbind (Qinhibit_quit, Qt);
+	  specbind_guile (Qinhibit_quit, Qt);
 
 	  sit_for (Vminibuffer_message_timeout, 0, 2);
 
@@ -1747,7 +1747,7 @@ read_menu_command (void)
 
   /* We don't want to echo the keystrokes while navigating the
      menus.  */
-  specbind (Qecho_keystrokes, make_fixnum (0));
+  specbind_guile (Qecho_keystrokes, make_fixnum (0));
 
   Lisp_Object keybuf[READ_KEY_ELTS];
   int i = read_key_sequence (keybuf, Qnil, false, true, true, true,
@@ -2003,7 +2003,7 @@ void
 safe_run_hooks (Lisp_Object hook)
 {
   dynwind_begin ();
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   run_hook_with_args (2, ((Lisp_Object []) {hook, hook}),
                       safe_run_hook_funcall);
   dynwind_end ();
@@ -2014,7 +2014,7 @@ safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
 {
   dynwind_begin ();
 
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
 
   if (current_buffer->long_line_optimizations_p
       && long_line_optimizations_region_size > 0)
@@ -2035,7 +2035,7 @@ safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1, Lisp_Object arg2)
 {
   dynwind_begin ();
 
-  specbind (Qinhibit_quit, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
   run_hook_with_args (4, ((Lisp_Object []) {hook, hook, arg1, arg2}),
 		      safe_run_hook_funcall);
   dynwind_end ();
@@ -2140,14 +2140,14 @@ bind_polling_period (int n)
 	new = n;
 
       stop_other_atimers (poll_timer);
-      specbind (Qpolling_period, make_int (new));
+      specbind_guile (Qpolling_period, make_int (new));
     }
   else if (FLOATP (Vpolling_period))
     {
       double new = XFLOAT_DATA (Vpolling_period);
 
       stop_other_atimers (poll_timer);
-      specbind (Qpolling_period, (n > new
+      specbind_guile (Qpolling_period, (n > new
 				  ? make_int (n)
 				  : Vpolling_period));
     }
@@ -3286,7 +3286,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 	 never use the echo area.  */
       if (!KEYMAPP (map))
 	{
-	  specbind (Qinput_method_use_echo_area, Qt);
+	  specbind_guile (Qinput_method_use_echo_area, Qt);
 	}
 
       /* Call the input method.  */
@@ -4830,7 +4830,7 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 		 code fails to reschedule it right.  */
 	      ASET (chosen_timer, 0, Qt);
 
-	      specbind (Qinhibit_quit, Qt);
+	      specbind_guile (Qinhibit_quit, Qt);
 
 	      call1 (Qtimer_event_handler, chosen_timer);
 	      Vdeactivate_mark = old_deactivate_mark;
@@ -8726,7 +8726,7 @@ menu_item_eval_property (Lisp_Object sexpr)
 {
   dynwind_begin ();
   Lisp_Object val;
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
   val = internal_condition_case_1 (eval_dyn, sexpr, Qerror,
 				   menu_item_eval_property_1);
   dynwind_end ();
@@ -10327,7 +10327,7 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
       /* Bind `current-key-remap-sequence' to the key sequence being
 	 remapped.  */
       dynwind_begin ();
-      specbind (Qcurrent_key_remap_sequence, remap);
+      specbind_guile (Qcurrent_key_remap_sequence, remap);
       next = call1 (next, prompt);
       dynwind_end ();
 
@@ -11501,9 +11501,9 @@ read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
     CHECK_STRING (prompt);
   maybe_quit ();
 
-  specbind (Qinput_method_exit_on_first_char,
+  specbind_guile (Qinput_method_exit_on_first_char,
 	    (NILP (cmd_loop) ? Qt : Qnil));
-  specbind (Qinput_method_use_echo_area,
+  specbind_guile (Qinput_method_use_echo_area,
 	    (NILP (cmd_loop) ? Qt : Qnil));
 
   if (NILP (continue_echo))

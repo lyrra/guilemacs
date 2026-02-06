@@ -923,7 +923,7 @@ DEFUN ("x-create-frame", Fx_create_frame, Sx_create_frame,
       fset_name (f, name);
       f->explicit_name = true;
       /* Use the frame's title when getting resources for this frame.  */
-      specbind (Qx_resource_name, name);
+      specbind_guile (Qx_resource_name, name);
     }
 
   register_font_driver (&androidfont_driver, f);
@@ -2001,7 +2001,7 @@ android_create_tip_frame (struct android_display_info *dpyinfo,
       fset_name (f, name);
       f->explicit_name = true;
       /* use the frame's title when getting resources for this frame.  */
-      specbind (Qx_resource_name, name);
+      specbind_guile (Qx_resource_name, name);
     }
 
   register_font_driver (&androidfont_driver, f);
@@ -2180,8 +2180,8 @@ android_hide_tip (bool delete)
       Lisp_Object was_open = Qnil;
 
       specpdl_ref count = SPECPDL_INDEX ();
-      specbind (Qinhibit_redisplay, Qt);
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_redisplay, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
 
       if (!NILP (tip_frame))
 	{
@@ -2311,7 +2311,7 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
 #endif
   AUTO_STRING (tip, " *tip*");
 
-  specbind (Qinhibit_redisplay, Qt);
+  specbind_guile (Qinhibit_redisplay, Qt);
 
   CHECK_STRING (string);
   if (SCHARS (string) == 0)
@@ -2495,9 +2495,9 @@ DEFUN ("x-show-tip", Fx_show_tip, Sx_show_tip, 1, 6, 0,
   old_buffer = current_buffer;
   set_buffer_internal_1 (XBUFFER (w->contents));
   bset_truncate_lines (current_buffer, Qnil);
-  specbind (Qinhibit_read_only, Qt);
-  specbind (Qinhibit_modification_hooks, Qt);
-  specbind (Qinhibit_point_motion_hooks, Qt);
+  specbind_guile (Qinhibit_read_only, Qt);
+  specbind_guile (Qinhibit_modification_hooks, Qt);
+  specbind_guile (Qinhibit_point_motion_hooks, Qt);
   Ferase_buffer ();
   Finsert (1, &string);
   clear_glyph_matrix (w->desired_matrix);

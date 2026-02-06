@@ -6486,7 +6486,7 @@ read_and_insert_process_output (struct Lisp_Process *p, char *buf,
 	 buffer, while we rely on process_coding.produced to
 	 faithfully reflect inserted text until we
 	 TEMP_SET_PT_BOTH below.  */
-      specbind (Qinhibit_modification_hooks, Qt);
+      specbind_guile (Qinhibit_modification_hooks, Qt);
       decode_coding_c_string (process_coding,
 			      (unsigned char *) buf, nread, curbuf);
       dynwind_end ();
@@ -6522,8 +6522,8 @@ read_and_dispose_of_process_output (struct Lisp_Process *p, char *chars,
   /* We inhibit quit here instead of just catching it so that
      hitting ^G when a filter happens to be running won't screw
      it up.  */
-  specbind (Qinhibit_quit, Qt);
-  specbind (Qlast_nonmenu_event, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
+  specbind_guile (Qlast_nonmenu_event, Qt);
 
   /* In case we get recursively called,
      and we already saved the match data nonrecursively,
@@ -7807,8 +7807,8 @@ exec_sentinel (Lisp_Object proc, Lisp_Object reason)
   sentinel = p->sentinel;
 
   /* Inhibit quit so that random quits don't screw up a running filter.  */
-  specbind (Qinhibit_quit, Qt);
-  specbind (Qlast_nonmenu_event, Qt); /* Why? --Stef  */
+  specbind_guile (Qinhibit_quit, Qt);
+  specbind_guile (Qlast_nonmenu_event, Qt); /* Why? --Stef  */
 
   /* In case we get recursively called,
      and we already saved the match data nonrecursively,

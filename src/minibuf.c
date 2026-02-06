@@ -627,14 +627,14 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
 
   dynwind_begin ();
 
-  specbind (Qminibuffer_default, defalt);
-  specbind (Qinhibit_read_only, Qnil);
+  specbind_guile (Qminibuffer_default, defalt);
+  specbind_guile (Qinhibit_read_only, Qnil);
 
   /* If Vminibuffer_completing_file_name is `lambda' on entry, it was t
      in previous recursive minibuffer, but was not set explicitly
      to t for this invocation, so set it to nil in this minibuffer.
      Save the old value now, before we change it.  */
-  specbind (Qminibuffer_completing_file_name,
+  specbind_guile (Qminibuffer_completing_file_name,
 	    Vminibuffer_completing_file_name);
   if (EQ (Vminibuffer_completing_file_name, Qlambda))
     Vminibuffer_completing_file_name = Qnil;
@@ -877,8 +877,8 @@ read_minibuf (Lisp_Object map, Lisp_Object initial, Lisp_Object prompt,
   /* Erase the buffer.  */
   {
     dynwind_begin ();
-    specbind (Qinhibit_read_only, Qt);
-    specbind (Qinhibit_modification_hooks, Qt);
+    specbind_guile (Qinhibit_read_only, Qt);
+    specbind_guile (Qinhibit_modification_hooks, Qt);
     Ferase_buffer ();
 
     /* If appropriate, copy enable-multibyte-characters into the minibuffer.
@@ -1220,8 +1220,8 @@ read_minibuf_unwind (void)
   {
     dynwind_begin ();
     /* Prevent error in erase-buffer.  */
-    specbind (Qinhibit_read_only, Qt);
-    specbind (Qinhibit_modification_hooks, Qt);
+    specbind_guile (Qinhibit_read_only, Qt);
+    specbind_guile (Qinhibit_modification_hooks, Qt);
     old_deactivate_mark = Vdeactivate_mark;
     Ferase_buffer ();
     Vdeactivate_mark = old_deactivate_mark;
@@ -1475,7 +1475,7 @@ Fifth arg INHERIT-INPUT-METHOD, if non-nil, means the minibuffer inherits
      previous minibuffer's completion table does not apply to the new
      minibuffer.
      FIXME: `minibuffer-completion-table' should be buffer-local instead.  */
-  specbind (Qminibuffer_completion_table, Qnil);
+  specbind_guile (Qminibuffer_completion_table, Qnil);
 
   val = Fread_from_minibuffer (prompt, initial_input, Qnil,
 			       Qnil, history, default_value,
@@ -1574,7 +1574,7 @@ function, instead of the usual behavior.  */)
   if (BUFFERP (def))
     def = BVAR (XBUFFER (def), name);
 
-  specbind (Qcompletion_ignore_case,
+  specbind_guile (Qcompletion_ignore_case,
 	    read_buffer_completion_ignore_case ? Qt : Qnil);
 
   if (NILP (Vread_buffer_function))

@@ -487,7 +487,7 @@ load_charset_map_from_file (struct charset *charset, Lisp_Object mapfile,
   record_unwind_protect_ptr (fclose_ptr_unwind, &fp);
   {
     dynwind_begin ();
-    specbind (Qfile_name_handler_alist, Qnil);
+    specbind_guile (Qfile_name_handler_alist, Qnil);
     fd = openp (Vcharset_map_path, mapfile, suffixes, NULL, Qnil, false, false,
                 NULL);
     fp = fd < 0 ? 0 : emacs_fdopen (fd, "r");

@@ -914,7 +914,7 @@ loadhist_initialize (Lisp_Object filename)
   SCM loadhist_func = scm_c_private_ref ("emacs-elisp runtime",
                                         "elisp-loadhist-initialize");
   Lisp_Object binding = SCM_CALL_1 (loadhist_func, filename);
-  specbind (Qcurrent_load_list, binding);
+  specbind_guile (Qcurrent_load_list, binding);
 }
 
 static void
@@ -1462,17 +1462,17 @@ readevalloop (Lisp_Object readcharfun,
   if (! NILP (start) && !b)
     emacs_abort ();
 
-  specbind (Qstandard_input, readcharfun);
+  specbind_guile (Qstandard_input, readcharfun);
   /* Note: load_convert_to_unibyte logic removed - pure UTF-8 strings only */
 
   /* If lexical binding is active (either because it was specified in
      the file's header, or via a buffer-local variable), create an empty
      lexical environment, otherwise, turn off lexical binding.  */
   lex_bound = find_symbol_value (Qlexical_binding);
-  specbind (Qinternal_interpreter_environment,
+  specbind_guile (Qinternal_interpreter_environment,
 	    (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
 	     ? Qnil : list1 (Qt)));
-  specbind (Qmacroexp__dynvars, Vmacroexp__dynvars);
+  specbind_guile (Qmacroexp__dynvars, Vmacroexp__dynvars);
 
   /* Ensure sourcename is absolute, except whilst preloading.  */
   if (!NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
@@ -1821,11 +1821,11 @@ This function preserves the position of point.  */)
   if (NILP (filename))
     filename = BVAR (XBUFFER (buf), filename);
 
-  specbind (Qeval_buffer_list, Fcons (buf, Veval_buffer_list));
-  specbind (Qstandard_output, tem);
+  specbind_guile (Qeval_buffer_list, Fcons (buf, Veval_buffer_list));
+  specbind_guile (Qstandard_output, tem);
   record_unwind_protect_excursion ();
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
-  specbind (Qlexical_binding,
+  specbind_guile (Qlexical_binding,
 	    lisp_file_lexical_cookie (buf) == Cookie_Lex ? Qt : Qnil);
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
   readevalloop (buf, filename,
@@ -1860,8 +1860,8 @@ This function does not move point.  */)
     tem = Qsymbolp;
   else
     tem = printflag;
-  specbind (Qstandard_output, tem);
-  specbind (Qeval_buffer_list, Fcons (cbuf, Veval_buffer_list));
+  specbind_guile (Qstandard_output, tem);
+  specbind_guile (Qeval_buffer_list, Fcons (cbuf, Veval_buffer_list));
 
   /* `readevalloop' calls functions which check the type of start and end.  */
   readevalloop (cbuf, BVAR (XBUFFER (cbuf), filename),

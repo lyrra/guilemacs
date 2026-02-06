@@ -3915,7 +3915,7 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
 			     &((struct tty_pop_down_menu)
 			       {menu, current_buffer}));
 
-  specbind (Qoverriding_terminal_local_map,
+  specbind_guile (Qoverriding_terminal_local_map,
 	    Fsymbol_value (Qtty_menu_navigation_map));
   status = tty_menu_activate (menu, &pane, &selidx, x, y, &datap,
 			      tty_menu_help_callback,

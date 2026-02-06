@@ -246,7 +246,7 @@ pgtk_get_local_selection (Lisp_Object selection_symbol, Lisp_Object target_type,
 	 When the user types C-g, he would be surprised
 	 if by luck it came during a converter.  */
       dynwind_begin ();
-      specbind (Qinhibit_quit, Qt);
+      specbind_guile (Qinhibit_quit, Qt);
 
       CHECK_SYMBOL (target_type);
       handler_fn = Fcdr (Fassq (target_type, Vselection_converter_alist));
