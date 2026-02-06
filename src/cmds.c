@@ -442,8 +442,8 @@ internal_self_insert (int c, EMACS_INT n)
       && NILP (BVAR (current_buffer, read_only))
       && PT > BEGV
       && (SYNTAX (!NILP (BVAR (current_buffer, enable_multibyte_characters))
-		  ? XFIXNAT (Fprevious_char ())
-		  : UNIBYTE_TO_CHAR (XFIXNAT (Fprevious_char ())))
+		  ? preceding_char ()
+		  : UNIBYTE_TO_CHAR (preceding_char ()))
 	  == Sword))
     {
       modiff_count modiff = MODIFF;

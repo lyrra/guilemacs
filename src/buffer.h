@@ -61,6 +61,9 @@ enum { BEG = 1, BEG_BYTE = BEG };
 /* Return true if point is at the end of a line (including end of buffer).  */
 #define EOLP() (PT == ZV || FETCH_BYTE (PT_BYTE) == '\n')
 
+/* Return the character following point (0 at end of buffer).  */
+#define FOLLOWING_CHAR() (PT >= ZV ? 0 : FETCH_CHAR (PT_BYTE))
+
 /* Position of end of buffer.  */
 #define Z (current_buffer->text->z)
 #define Z_BYTE (current_buffer->text->z_byte)
@@ -1697,6 +1700,23 @@ dec_both (ptrdiff_t *charpos, ptrdiff_t *bytepos)
   (*charpos)--;
   (*bytepos) -= (!NILP (BVAR (current_buffer, enable_multibyte_characters))
 		 ? prev_char_len (*bytepos) : 1);
+}
+
+/* Return the character preceding point (0 at beginning of buffer).  */
+
+INLINE int
+preceding_char (void)
+{
+  if (PT <= BEGV)
+    return 0;
+  else if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
+    {
+      ptrdiff_t pos = PT_BYTE;
+      pos -= prev_char_len (pos);
+      return FETCH_CHAR (pos);
+    }
+  else
+    return FETCH_BYTE (PT_BYTE - 1);
 }
 
 INLINE_HEADER_END

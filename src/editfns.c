@@ -929,39 +929,7 @@ If BYTEPOS is out of range, the value is nil.  */)
   return make_fixnum (BYTE_TO_CHAR (pos_byte));
 }
 
-DEFUN ("following-char", Ffollowing_char, Sfollowing_char, 0, 0, 0,
-       doc: /* Return the character following point, as a number.
-At the end of the buffer or accessible region, return 0.  */)
-  (void)
-{
-  Lisp_Object temp;
-  if (PT >= ZV)
-    XSETFASTINT (temp, 0);
-  else
-    XSETFASTINT (temp, FETCH_CHAR (PT_BYTE));
-  return temp;
-}
-
-DEFUN ("preceding-char", Fprevious_char, Sprevious_char, 0, 0, 0,
-       doc: /* Return the character preceding point, as a number.
-At the beginning of the buffer or accessible region, return 0.  */)
-  (void)
-{
-  Lisp_Object temp;
-  if (PT <= BEGV)
-    XSETFASTINT (temp, 0);
-  else if (!NILP (BVAR (current_buffer, enable_multibyte_characters)))
-    {
-      ptrdiff_t pos = PT_BYTE;
-      pos -= prev_char_len (pos);
-      XSETFASTINT (temp, FETCH_CHAR (pos));
-    }
-  else
-    XSETFASTINT (temp, FETCH_BYTE (PT_BYTE - 1));
-  return temp;
-}
-
-/* bolp and eolp are now implemented in Scheme.
+/* following-char, preceding-char, bolp, and eolp are implemented in Scheme.
    See mod/emacs/buffer-locals.scm elisp-bolp and elisp-eolp.  */
 
 DEFUN ("char-after", Fchar_after, Schar_after, 0, 1, 0,

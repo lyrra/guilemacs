@@ -350,6 +350,25 @@
   (test-nil "bolp/at-point-max" (bolp))
   (test-assert "eolp/at-point-max" (eolp)))
 
+;;; --- following-char / preceding-char (Scheme implementation) ---
+
+(with-temp-buffer
+  ;; Empty buffer: at both beginning and end
+  (test-equal "following-char/empty-buffer" 0 (following-char))
+  (test-equal "preceding-char/empty-buffer" 0 (preceding-char)))
+
+(with-temp-buffer
+  (insert "hello")
+  (goto-char (point-min))
+  (test-equal "following-char/at-bob" ?h (following-char))
+  (test-equal "preceding-char/at-bob" 0 (preceding-char))
+  (goto-char (point-max))
+  (test-equal "following-char/at-eob" 0 (following-char))
+  (test-equal "preceding-char/at-eob" ?o (preceding-char))
+  (goto-char 3)
+  (test-equal "following-char/middle" ?l (following-char))
+  (test-equal "preceding-char/middle" ?e (preceding-char)))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

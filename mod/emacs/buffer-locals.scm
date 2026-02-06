@@ -119,6 +119,18 @@
       #t
       #nil))
 
+(define (elisp-following-char)
+  "Return the character following point, as a number.
+At the end of the buffer or accessible region, return 0."
+  (let ((c ((char-after-fn))))
+    (if (eq? c #nil) 0 c)))
+
+(define (elisp-preceding-char)
+  "Return the character preceding point, as a number.
+At the beginning of the buffer or accessible region, return 0."
+  (let ((c ((char-before-fn))))
+    (if (eq? c #nil) 0 c)))
+
 ;; Modiff accessors for buffer-modified-p.
 (define %buffer-modified-tick-fn #f)
 (define (buffer-modified-tick-fn)
@@ -290,6 +302,8 @@ See also `find-buffer-visiting'."
               (eobp ,elisp-eobp)
               (bolp ,elisp-bolp)
               (eolp ,elisp-eolp)
+              (following-char ,elisp-following-char)
+              (preceding-char ,elisp-preceding-char)
               (buffer-modified-p ,elisp-buffer-modified-p)
               (set-buffer-modified-p ,elisp-set-buffer-modified-p)
               (get-file-buffer ,elisp-get-file-buffer)
