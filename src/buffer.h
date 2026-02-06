@@ -55,6 +55,12 @@ enum { BEG = 1, BEG_BYTE = BEG };
 #define ZV (current_buffer->zv)
 #define ZV_BYTE (current_buffer->zv_byte)
 
+/* Return true if point is at the beginning of a line.  */
+#define BOLP() (PT == BEGV || FETCH_BYTE (PT_BYTE - 1) == '\n')
+
+/* Return true if point is at the end of a line (including end of buffer).  */
+#define EOLP() (PT == ZV || FETCH_BYTE (PT_BYTE) == '\n')
+
 /* Position of end of buffer.  */
 #define Z (current_buffer->text->z)
 #define Z_BYTE (current_buffer->text->z_byte)

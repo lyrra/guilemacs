@@ -4126,7 +4126,7 @@ by calling `format-decode', which see.  */)
 	  /* If display currently starts at beginning of line,
 	     keep it that way.  */
 	  if (XBUFFER (XWINDOW (selected_window)->contents) == current_buffer)
-	    XWINDOW (selected_window)->start_at_line_beg = !NILP (Fbolp ());
+	    XWINDOW (selected_window)->start_at_line_beg = BOLP ();
 
 	  replace_handled = true;
 	}
@@ -4268,7 +4268,7 @@ by calling `format-decode', which see.  */)
       /* If display currently starts at beginning of line,
 	 keep it that way.  */
       if (XBUFFER (XWINDOW (selected_window)->contents) == current_buffer)
-	XWINDOW (selected_window)->start_at_line_beg = !NILP (Fbolp ());
+	XWINDOW (selected_window)->start_at_line_beg = BOLP ();
 
       /* Replace the chars that we need to replace,
 	 and update INSERTED to equal the number of bytes

@@ -627,7 +627,7 @@ If PRINTCHARFUN is omitted or nil, the value of `standard-output' is used.  */)
   else if (noninteractive && !NILP (pc.printcharfun))
     val = printchar_stdout_last == 10 ? Qnil : Qt;
   else
-    val = NILP (Fbolp ()) ? Qt : Qnil;
+    val = BOLP () ? Qnil : Qt;
 
   if (!NILP (val))
     printchar ('\n', pc.printcharfun);

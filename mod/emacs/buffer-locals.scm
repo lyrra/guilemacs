@@ -91,6 +91,34 @@
   "Return t if point is at the end of the buffer."
   (if (= ((point-fn)) ((point-max-fn))) #t #nil))
 
+;; Character accessors for bolp/eolp.
+(define %char-before-fn #f)
+(define (char-before-fn)
+  (or %char-before-fn
+      (let ((fn (symbol-function 'char-before)))
+        (set! %char-before-fn fn) fn)))
+
+(define %char-after-fn #f)
+(define (char-after-fn)
+  (or %char-after-fn
+      (let ((fn (symbol-function 'char-after)))
+        (set! %char-after-fn fn) fn)))
+
+(define (elisp-bolp)
+  "Return t if point is at the beginning of a line."
+  (if (or (eq? #t (elisp-bobp))
+          (eqv? ((char-before-fn)) 10))  ; 10 = newline character code
+      #t
+      #nil))
+
+(define (elisp-eolp)
+  "Return t if point is at the end of a line.
+`End of a line' includes point being at the end of the buffer."
+  (if (or (eq? #t (elisp-eobp))
+          (eqv? ((char-after-fn)) 10))  ; 10 = newline character code
+      #t
+      #nil))
+
 ;; Modiff accessors for buffer-modified-p.
 (define %buffer-modified-tick-fn #f)
 (define (buffer-modified-tick-fn)
@@ -236,6 +264,8 @@ See also `find-buffer-visiting'."
               (current-case-table ,elisp-current-case-table)
               (bobp ,elisp-bobp)
               (eobp ,elisp-eobp)
+              (bolp ,elisp-bolp)
+              (eolp ,elisp-eolp)
               (buffer-modified-p ,elisp-buffer-modified-p)
               (get-file-buffer ,elisp-get-file-buffer)
               (get-truename-buffer ,elisp-get-truename-buffer)

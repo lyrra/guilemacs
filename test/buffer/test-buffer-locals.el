@@ -316,6 +316,28 @@
   (test-assert "buffer-save-modiff/after-insert-differs"
                (not (= (buffer-save-modiff) (buffer-modified-tick)))))
 
+;;; --- bolp / eolp (Scheme implementation) ---
+
+(with-temp-buffer
+  ;; Empty buffer: at both beginning and end of line
+  (test-assert "bolp/empty-buffer" (bolp))
+  (test-assert "eolp/empty-buffer" (eolp)))
+
+(with-temp-buffer
+  (insert "hello\nworld")
+  (goto-char (point-min))
+  (test-assert "bolp/at-bol" (bolp))
+  (test-nil "eolp/at-bol" (eolp))
+  (end-of-line)
+  (test-nil "bolp/at-eol" (bolp))
+  (test-assert "eolp/at-eol" (eolp))
+  (forward-char)  ;; move past newline to beginning of second line
+  (test-assert "bolp/after-newline" (bolp))
+  (test-nil "eolp/after-newline" (eolp))
+  (goto-char (point-max))
+  (test-nil "bolp/at-point-max" (bolp))
+  (test-assert "eolp/at-point-max" (eolp)))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

@@ -6576,7 +6576,7 @@ window_scroll_line_based (Lisp_Object window, int n, bool whole, bool noerror)
   Fvertical_motion (make_fixnum (n), window, Qnil);
   pos = PT;
   pos_byte = PT_BYTE;
-  bolp = Fbolp ();
+  bolp = BOLP () ? Qt : Qnil;
   SET_PT_BOTH (marker_position (opoint_marker),
 	       marker_byte_position (opoint_marker));
 
@@ -7260,7 +7260,7 @@ from the top of the window.  */)
       int height = window_internal_height (w);
       Fvertical_motion (make_fixnum (- (height / 2)), window, Qnil);
       set_marker_both (w->start, w->contents, PT, PT_BYTE);
-      w->start_at_line_beg = !NILP (Fbolp ());
+      w->start_at_line_beg = BOLP ();
       w->force_start = true;
 
       /* Since `Fvertical_motion' computes coordinates after vscroll is
