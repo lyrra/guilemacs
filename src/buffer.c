@@ -1463,33 +1463,6 @@ menu bar menus and the frame title.  */)
   return all;
 }
 
-DEFUN ("set-buffer-modified-p", Fset_buffer_modified_p, Sset_buffer_modified_p,
-       1, 1, 0,
-       doc: /* Mark current buffer as modified or unmodified according to FLAG.
-A non-nil FLAG means mark the buffer modified.
-In addition, this function unconditionally forces redisplay of the
-mode lines of the windows that display the current buffer, and also
-locks or unlocks the file visited by the buffer, depending on whether
-the function's argument is non-nil, but only if both `buffer-file-name'
-and `buffer-file-truename' are non-nil.  */)
-  (Lisp_Object flag)
-{
-  Frestore_buffer_modified_p (flag);
-
-  /* Set update_mode_lines only if buffer is displayed in some window.
-     Packages like jit-lock or lazy-lock preserve a buffer's modified
-     state by recording/restoring the state around blocks of code.
-     Setting update_mode_lines makes redisplay consider all windows
-     (on all frames).  Stealth fontification of buffers not displayed
-     would incur additional redisplay costs if we'd set
-     update_modes_lines unconditionally.
-
-     Ideally, I think there should be another mechanism for fontifying
-     buffers without "modifying" buffers, or redisplay should be
-     smarter about updating the `*' in mode lines.  --gerd  */
-  return Fforce_mode_line_update (Qnil);
-}
-
 DEFUN ("restore-buffer-modified-p", Frestore_buffer_modified_p,
        Srestore_buffer_modified_p, 1, 1, 0,
        doc: /* Like `set-buffer-modified-p', but doesn't redisplay buffer's mode line.
@@ -2943,7 +2916,7 @@ current buffer is cleared.  */)
 
   /* Restore the modifiedness of the buffer.  */
   if (!modified_p && BUF_MODIFIED_P (current_buffer))
-    Fset_buffer_modified_p (Qnil);
+    Frestore_buffer_modified_p (Qnil);
 
   /* Update coding systems of this buffer's process (if any).  */
   {

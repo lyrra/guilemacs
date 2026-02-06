@@ -152,6 +152,30 @@ If BUFFER was autosaved since it was last modified, return `autosaved'."
             #t)
         #nil)))
 
+;; Cached function handles for set-buffer-modified-p.
+(define %restore-buffer-modified-p-fn #f)
+(define (restore-buffer-modified-p-fn)
+  (or %restore-buffer-modified-p-fn
+      (let ((fn (symbol-function 'restore-buffer-modified-p)))
+        (set! %restore-buffer-modified-p-fn fn) fn)))
+
+(define %force-mode-line-update-fn #f)
+(define (force-mode-line-update-fn)
+  (or %force-mode-line-update-fn
+      (let ((fn (symbol-function 'force-mode-line-update)))
+        (set! %force-mode-line-update-fn fn) fn)))
+
+(define (elisp-set-buffer-modified-p flag)
+  "Mark current buffer as modified or unmodified according to FLAG.
+A non-nil FLAG means mark the buffer modified.
+In addition, this function unconditionally forces redisplay of the
+mode lines of the windows that display the current buffer, and also
+locks or unlocks the file visited by the buffer, depending on whether
+the function's argument is non-nil, but only if both `buffer-file-name'
+and `buffer-file-truename' are non-nil."
+  ((restore-buffer-modified-p-fn) flag)
+  ((force-mode-line-update-fn) #nil))
+
 ;;; ----------------------------------------------------------------
 ;;; Tier 4 -- Buffer-list iteration functions
 ;;; ----------------------------------------------------------------
@@ -267,6 +291,7 @@ See also `find-buffer-visiting'."
               (bolp ,elisp-bolp)
               (eolp ,elisp-eolp)
               (buffer-modified-p ,elisp-buffer-modified-p)
+              (set-buffer-modified-p ,elisp-set-buffer-modified-p)
               (get-file-buffer ,elisp-get-file-buffer)
               (get-truename-buffer ,elisp-get-truename-buffer)
               (find-buffer ,elisp-find-buffer))))

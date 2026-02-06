@@ -307,6 +307,18 @@
   (set-buffer-modified-p nil)
   (test-nil "buffer-modified-p/after-clear" (buffer-modified-p)))
 
+;;; --- set-buffer-modified-p (Scheme implementation) ---
+
+(with-temp-buffer
+  (set-buffer-modified-p t)
+  (test-assert "set-buffer-modified-p/set-to-t" (buffer-modified-p))
+  (set-buffer-modified-p nil)
+  (test-nil "set-buffer-modified-p/set-to-nil" (buffer-modified-p))
+  (insert "hello")
+  (test-assert "set-buffer-modified-p/after-insert" (buffer-modified-p))
+  (set-buffer-modified-p nil)
+  (test-nil "set-buffer-modified-p/clear-after-insert" (buffer-modified-p)))
+
 ;;; --- buffer-save-modiff primitive ---
 
 (with-temp-buffer
