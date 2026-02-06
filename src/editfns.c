@@ -188,46 +188,6 @@ minibuffer.  The default value is the number at point (if any).  */)
   return position;
 }
 
-
-/* Return the start or end position of the region.
-   BEGINNINGP means return the start.
-   If there is no region active, signal an error. */
-
-static Lisp_Object
-region_limit (bool beginningp)
-{
-  Lisp_Object m;
-
-  if (!NILP (Vtransient_mark_mode)
-      && NILP (Vmark_even_if_inactive)
-      && NILP (BVAR (current_buffer, mark_active)))
-    xsignal0 (Qmark_inactive);
-
-  m = Fmarker_position (BVAR (current_buffer, mark));
-  if (NILP (m))
-    error ("The mark is not set now, so there is no region");
-
-  /* Clip to the current narrowing (bug#11770).  */
-  return make_fixnum ((PT < XFIXNAT (m)) == beginningp
-		      ? PT
-		      : clip_to_bounds (BEGV, XFIXNAT (m), ZV));
-}
-
-DEFUN ("region-beginning", Fregion_beginning, Sregion_beginning, 0, 0, 0,
-       doc: /* Return the integer value of point or mark, whichever is smaller.  */)
-  (void)
-{
-  return region_limit (1);
-}
-
-DEFUN ("region-end", Fregion_end, Sregion_end, 0, 0, 0,
-       doc: /* Return the integer value of point or mark, whichever is larger.  */)
-  (void)
-{
-  return region_limit (0);
-}
-
-
 DEFUN ("get-pos-property", Fget_pos_property, Sget_pos_property, 2, 3, 0,
        doc: /* Return the value of POSITION's property PROP, in OBJECT.
 Almost identical to `get-char-property' except for the following difference:

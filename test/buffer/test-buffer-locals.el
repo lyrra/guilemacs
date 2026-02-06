@@ -369,6 +369,28 @@
   (test-equal "following-char/middle" ?l (following-char))
   (test-equal "preceding-char/middle" ?e (preceding-char)))
 
+;;; --- region-beginning / region-end (Scheme implementation) ---
+
+(with-temp-buffer
+  (insert "hello world")
+  (goto-char 3)
+  (push-mark 8 t t)
+  (test-equal "region-beginning/point-before-mark" 3 (region-beginning))
+  (test-equal "region-end/point-before-mark" 8 (region-end))
+  (goto-char 10)
+  (test-equal "region-beginning/point-after-mark" 8 (region-beginning))
+  (test-equal "region-end/point-after-mark" 10 (region-end)))
+
+;; Test mark clipping to narrowed region
+(with-temp-buffer
+  (insert "0123456789")
+  (goto-char 3)
+  (push-mark 8 t t)
+  (narrow-to-region 4 7)
+  ;; Mark at 8 should be clipped to 7 (point-max)
+  (test-equal "region-beginning/narrowed-clip-max" 4 (region-beginning))
+  (test-equal "region-end/narrowed-clip-max" 7 (region-end)))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

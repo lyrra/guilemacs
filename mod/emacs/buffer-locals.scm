@@ -282,6 +282,55 @@ See also `find-buffer-visiting'."
               (loop (cdr bufs)))))))
 
 ;;; ----------------------------------------------------------------
+;;; Tier 5 -- Region functions (Phase 6)
+;;; ----------------------------------------------------------------
+
+;; Cached function handles for region functions.
+(define %marker-position-fn #f)
+(define (marker-position-fn)
+  (or %marker-position-fn
+      (let ((fn (symbol-function 'marker-position)))
+        (set! %marker-position-fn fn) fn)))
+
+(define %signal-fn #f)
+(define (signal-fn)
+  (or %signal-fn
+      (let ((fn (symbol-function 'signal)))
+        (set! %signal-fn fn) fn)))
+
+;; Helper to get the region limit (beginning or end).
+;; BEGINNINGP is #t for region-beginning, #f for region-end.
+(define (region-limit beginningp)
+  (let ((transient-mark-mode (symbol-value 'transient-mark-mode))
+        (mark-even-if-inactive (symbol-value 'mark-even-if-inactive))
+        (mark-active (symbol-value 'mark-active)))
+    ;; Check if mark is inactive when it should be active.
+    (when (and (not (eq? transient-mark-mode #nil))
+               (eq? mark-even-if-inactive #nil)
+               (eq? mark-active #nil))
+      ((signal-fn) 'mark-inactive #nil))
+    ;; Get mark position.
+    (let ((m ((marker-position-fn) (elisp-mark-marker))))
+      (when (eq? m #nil)
+        (error "The mark is not set now, so there is no region"))
+      ;; Clip mark to current narrowing and compare with point.
+      (let* ((pt ((point-fn)))
+             (pt-min ((point-min-fn)))
+             (pt-max ((point-max-fn)))
+             (clipped-m (max pt-min (min m pt-max))))
+        (if beginningp
+            (min pt clipped-m)
+            (max pt clipped-m))))))
+
+(define (elisp-region-beginning)
+  "Return the integer value of point or mark, whichever is smaller."
+  (region-limit #t))
+
+(define (elisp-region-end)
+  "Return the integer value of point or mark, whichever is larger."
+  (region-limit #f))
+
+;;; ----------------------------------------------------------------
 ;;; Registration
 ;;; ----------------------------------------------------------------
 
@@ -308,4 +357,6 @@ See also `find-buffer-visiting'."
               (set-buffer-modified-p ,elisp-set-buffer-modified-p)
               (get-file-buffer ,elisp-get-file-buffer)
               (get-truename-buffer ,elisp-get-truename-buffer)
-              (find-buffer ,elisp-find-buffer))))
+              (find-buffer ,elisp-find-buffer)
+              (region-beginning ,elisp-region-beginning)
+              (region-end ,elisp-region-end))))
