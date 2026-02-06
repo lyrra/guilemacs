@@ -5331,16 +5331,6 @@ write_region (Lisp_Object start, Lisp_Object end, Lisp_Object filename,
   return Qnil;
 }
 
-DEFUN ("car-less-than-car", Fcar_less_than_car, Scar_less_than_car, 2, 2, 0,
-       doc: /* Return t if (car A) is numerically less than (car B).  */)
-  (Lisp_Object a, Lisp_Object b)
-{
-  Lisp_Object ca = Fcar (a), cb = Fcar (b);
-  if (FIXNUMP (ca) && FIXNUMP (cb))
-    return XFIXNUM (ca) < XFIXNUM (cb) ? Qt : Qnil;
-  return arithcompare (ca, cb) & Cmp_LT ? Qt : Qnil;
-}
-
 /* Build the complete list of annotations appropriate for writing out
    the text between START and END, by calling all the functions in
    write-region-annotate-functions and merging the lists they return.

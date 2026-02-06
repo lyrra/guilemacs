@@ -422,6 +422,14 @@
   (insert "hello")
   (test-nil "recent-auto-save-p/modified-not-autosaved" (recent-auto-save-p)))
 
+;;; --- car-less-than-car (Phase 8) ---
+
+(test-assert "car-less-than-car/less" (car-less-than-car '(1 . a) '(2 . b)))
+(test-nil "car-less-than-car/equal" (car-less-than-car '(5 . a) '(5 . b)))
+(test-nil "car-less-than-car/greater" (car-less-than-car '(10 . a) '(3 . b)))
+(test-assert "car-less-than-car/floats" (car-less-than-car '(1.5 . a) '(2.5 . b)))
+(test-assert "car-less-than-car/negative" (car-less-than-car '(-5 . a) '(0 . b)))
+
 ;;; --- stress test ---
 
 (let ((bufs nil))

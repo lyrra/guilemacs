@@ -378,6 +378,10 @@ then any auto-save counts as \"recent\"."
       #t
       #nil))
 
+(define (elisp-car-less-than-car a b)
+  "Return t if (car A) is numerically less than (car B)."
+  (if (< (car a) (car b)) #t #nil))
+
 ;;; ----------------------------------------------------------------
 ;;; Registration
 ;;; ----------------------------------------------------------------
@@ -409,4 +413,5 @@ then any auto-save counts as \"recent\"."
               (region-beginning ,elisp-region-beginning)
               (region-end ,elisp-region-end)
               (buffer-enable-undo ,elisp-buffer-enable-undo)
-              (recent-auto-save-p ,elisp-recent-auto-save-p))))
+              (recent-auto-save-p ,elisp-recent-auto-save-p)
+              (car-less-than-car ,elisp-car-less-than-car))))
