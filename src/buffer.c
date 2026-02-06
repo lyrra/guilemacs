@@ -1862,7 +1862,7 @@ cleaning up all windows currently displaying the buffer to be killed. */)
     if (modified
 	&& kill_buffer_delete_auto_save_files
 	&& delete_auto_save_files
-	&& !NILP (Frecent_auto_save_p ())
+	&& RECENT_AUTO_SAVE_P ()
 	&& STRINGP (BVAR (b, auto_save_file_name))
 	&& !NILP (Ffile_exists_p (BVAR (b, auto_save_file_name)))
 	/* If `auto-save-visited-mode' is on, then we're auto-saving

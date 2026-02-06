@@ -6030,19 +6030,6 @@ DEFUN ("clear-buffer-auto-save-failure", Fclear_buffer_auto_save_failure,
   return Qnil;
 }
 
-DEFUN ("recent-auto-save-p", Frecent_auto_save_p, Srecent_auto_save_p,
-       0, 0, 0,
-       doc: /* Return t if current buffer has been auto-saved recently.
-More precisely, if it has been auto-saved since last read from or saved
-in the visited file.  If the buffer has no visited file,
-then any auto-save counts as "recent".  */)
-  (void)
-{
-  /* FIXME: maybe we should return nil for indirect buffers since
-     they're never autosaved.  */
-  return (SAVE_MODIFF < BUF_AUTOSAVE_MODIFF (current_buffer) ? Qt : Qnil);
-}
-
 /* Reading and completing file names.  */
 
 DEFUN ("next-read-file-uses-dialog-p", Fnext_read_file_uses_dialog_p,

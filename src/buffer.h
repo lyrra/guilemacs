@@ -70,6 +70,10 @@ enum { BEG = 1, BEG_BYTE = BEG };
       bset_undo_list ((b), Qnil);			\
   } while (0)
 
+/* Return true if current buffer has been auto-saved recently.
+   "Recently" means since the last read or save.  */
+#define RECENT_AUTO_SAVE_P() (SAVE_MODIFF < BUF_AUTOSAVE_MODIFF (current_buffer))
+
 /* Position of end of buffer.  */
 #define Z (current_buffer->text->z)
 #define Z_BYTE (current_buffer->text->z_byte)

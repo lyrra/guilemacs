@@ -363,6 +363,22 @@ No argument or nil as argument means do this for the current buffer."
     #nil))
 
 ;;; ----------------------------------------------------------------
+;;; Tier 7 -- File I/O functions (Phase 8)
+;;; ----------------------------------------------------------------
+
+(define (elisp-recent-auto-save-p)
+  "Return t if current buffer has been auto-saved recently.
+More precisely, if it has been auto-saved since last read from or saved
+in the visited file.  If the buffer has no visited file,
+then any auto-save counts as \"recent\"."
+  ;; SAVE_MODIFF < BUF_AUTOSAVE_MODIFF means we've autosaved since last save.
+  ;; Note: buffer-save-modiff with no arg returns SAVE_MODIFF for current buffer.
+  ;; Note: buffer-autosave-modiff with no arg returns BUF_AUTOSAVE_MODIFF for current buffer.
+  (if (< ((buffer-save-modiff-fn)) ((buffer-autosave-modiff-fn)))
+      #t
+      #nil))
+
+;;; ----------------------------------------------------------------
 ;;; Registration
 ;;; ----------------------------------------------------------------
 
@@ -392,4 +408,5 @@ No argument or nil as argument means do this for the current buffer."
               (find-buffer ,elisp-find-buffer)
               (region-beginning ,elisp-region-beginning)
               (region-end ,elisp-region-end)
-              (buffer-enable-undo ,elisp-buffer-enable-undo))))
+              (buffer-enable-undo ,elisp-buffer-enable-undo)
+              (recent-auto-save-p ,elisp-recent-auto-save-p))))
