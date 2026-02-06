@@ -463,9 +463,17 @@ value-slot-module, function-slot-module, or plist-slot-module."
                 (fast         (vector-ref desc 4))
                 (buf-local?   hash-val)
                 (let-default? (default-value symbol))
-                (else         (symbol-value symbol)))))
+                (else         (symbol-value symbol))))
+         ;; Determine binding kind for specpdl tracking:
+         ;; 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT
+         (kind (cond (buf-local?   1)
+                     (let-default? 2)
+                     (else         0))))
     (dynamic-wind
       (lambda ()
+        ;; Track in specpdl for introspection (default-toplevel-value etc.)
+        (if (symbol-fbound? 'specpdl-track-binding)
+            ((symbol-function 'specpdl-track-binding) symbol old kind))
         (cond
           (fast         (vector-set! desc 4 value))
           (buf-local?   (hashq-set! hash symbol value))
@@ -473,6 +481,9 @@ value-slot-module, function-slot-module, or plist-slot-module."
           (else         (set-symbol-value! symbol value))))
       thunk
       (lambda ()
+        ;; Untrack from specpdl
+        (if (symbol-fbound? 'specpdl-untrack-binding)
+            ((symbol-function 'specpdl-untrack-binding)))
         (cond
           ;; Fast path: re-check that the variable is still PLAINVAL +
           ;; untrapped.  If make-local-variable was called during the

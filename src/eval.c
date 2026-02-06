@@ -2966,6 +2966,51 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
                               SCM_F_WIND_EXPLICITLY);
 }
 
+DEFUN ("specpdl-track-binding", Fspecpdl_track_binding, Sspecpdl_track_binding,
+       3, 3, 0,
+       doc: /* Add a specpdl tracking entry for introspection functions.
+SYMBOL is the bound symbol, OLD-VALUE is its previous value,
+KIND is 0 for LET, 1 for LET_LOCAL, 2 for LET_DEFAULT.
+This is called by Scheme's bind-symbol to enable functions like
+`default-toplevel-value' to see through dynamic bindings.  */)
+  (Lisp_Object symbol, Lisp_Object old_value, Lisp_Object kind)
+{
+  CHECK_SYMBOL (symbol);
+  CHECK_FIXNUM (kind);
+  EMACS_INT k = XFIXNUM (kind);
+
+  switch (k)
+    {
+    case 0:
+      specpdl_ptr->let.kind = SPECPDL_LET;
+      break;
+    case 1:
+      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
+      break;
+    case 2:
+      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
+      break;
+    default:
+      error ("Invalid binding kind: %"pI"d", k);
+    }
+  specpdl_ptr->let.symbol = symbol;
+  specpdl_ptr->let.old_value = old_value;
+  specpdl_ptr->let.where.kbd = NULL;
+  grow_specpdl ();
+  return Qnil;
+}
+
+DEFUN ("specpdl-untrack-binding", Fspecpdl_untrack_binding, Sspecpdl_untrack_binding,
+       0, 0, 0,
+       doc: /* Remove the most recent specpdl tracking entry.
+This is called by Scheme's bind-symbol unwind handler.  */)
+  (void)
+{
+  if (specpdl_ptr > specpdl)
+    specpdl_ptr--;
+  return Qnil;
+}
+
 /* Push unwind-protect entries of various types.  */
 
 void
