@@ -332,99 +332,94 @@
     args))
 
 (define (make-dynlet-one src fluid-sym val-sym body)
-  "Generate a single dynamic binding via inline dynamic-wind.
+  "Generate a single dynamic binding via inline dynamic-wind for PLAINVAL,
+falling back to bind-symbol for non-PLAINVAL (buffer-local, forwarded).
+
 FLUID-SYM is the gensym bound to the symbol being bound.
 VAL-SYM is the gensym bound to the new value.
-BODY is the tree-il for the body (appears exactly once in thunk).
+BODY is the tree-il for the body.
 
-Strategy 1: emit dynamic-wind with conditionals inside winder/unwinder.
-- For PLAINVAL (slot 1 == 4): direct vector-set!/vector-ref on slot 4
-- For non-PLAINVAL: symbol-value/set-symbol-value! (C handles buffer-local etc.)
+Strategy 1: For PLAINVAL variables (~95% of cases), emit inline dynamic-wind
+with direct vector-set!/vector-ref on slot 4. peval can see through this
+and beta-reduce the body thunk.
 
-Body appears exactly once, so peval can beta-reduce the thunk.
-The winder/unwinder have conditionals but that's fine - peval sees:
-  (call winder) ; opaque OK
-  BODY          ; transparent!
-  (call unwinder) ; opaque OK
+For non-PLAINVAL (buffer-local, forwarded), fall back to bind-symbol which
+handles all the edge cases correctly (let-default?, buffer-local hash, etc.).
+
+IMPORTANT: The thunk wrapping body is bound to a variable once and referenced
+in both branches. This prevents exponential tree growth with nested let-bindings.
 
 Known limitation: specpdl tracking for introspection (default-toplevel-value)
-is not included in the fast path. This means default-toplevel-value won't
-see through PLAINVAL let-bindings created by compiled code."
+is not included in the PLAINVAL fast path."
   (let ((desc-sym (gensym "desc"))
         (plainval-sym (gensym "plainval"))
-        (old-sym (gensym "old")))
-    ;; (let ((desc (symbol-desc fluid)))
-    ;;   (let ((plainval? (eq? (vector-ref desc 1) 4)))
-    ;;     (let ((old (if plainval? (vector-ref desc 4) (symbol-value fluid))))
-    ;;       (dynamic-wind winder thunk unwinder))))
-    (make-let src '(desc) (list desc-sym)
-      (list (make-runtime-call src 'symbol-desc
-              (list (make-lexical-ref src 'fluid fluid-sym))))
-      (make-let src '(plainval?) (list plainval-sym)
-        (list (call-primitive src 'eq?
-                (call-primitive src 'vector-ref
-                  (make-lexical-ref src 'desc desc-sym)
-                  (make-const src 1))
-                (make-const src 4)))  ; SYMBOL_PLAINVAL = 4
-        (make-let src '(old) (list old-sym)
-          (list (make-conditional src
-                  (make-lexical-ref src 'plainval? plainval-sym)
-                  ;; PLAINVAL: read from slot 4
+        (old-sym (gensym "old"))
+        (thunk-sym (gensym "thunk")))
+    ;; (let ((thunk (lambda () body)))
+    ;;   (let ((desc (symbol-desc fluid)))
+    ;;     (let ((plainval? (eq? (vector-ref desc 1) 4)))
+    ;;       (if plainval?
+    ;;           <inline dynamic-wind with thunk>
+    ;;           (bind-symbol fluid val thunk)))))
+    ;;
+    ;; The thunk is bound once and referenced in both branches to avoid
+    ;; duplicating the body tree-il (which would cause exponential blowup
+    ;; with nested let-bindings).
+    (make-let src '(thunk) (list thunk-sym)
+      (list (make-thunk src body))  ;; body appears exactly once!
+      (make-let src '(desc) (list desc-sym)
+        (list (make-runtime-call src 'symbol-desc
+                (list (make-lexical-ref src 'fluid fluid-sym))))
+        (make-let src '(plainval?) (list plainval-sym)
+          (list (call-primitive src 'eq?
                   (call-primitive src 'vector-ref
                     (make-lexical-ref src 'desc desc-sym)
-                    (make-const src 4))
-                  ;; non-PLAINVAL: use symbol-value
-                  (make-runtime-call src 'symbol-value
-                    (list (make-lexical-ref src 'fluid fluid-sym)))))
-          ;; dynamic-wind with inline winder, thunk, unwinder
-          (call-primitive src 'dynamic-wind
-            ;; winder: set new value
-            (make-lambda src '()
-              (make-lambda-case src '() #f #f #f '() '()
-                (make-conditional src
-                  (make-lexical-ref src 'plainval? plainval-sym)
-                  ;; PLAINVAL: vector-set! desc 4 val
-                  (call-primitive src 'vector-set!
-                    (make-lexical-ref src 'desc desc-sym)
-                    (make-const src 4)
-                    (make-lexical-ref src 'val val-sym))
-                  ;; non-PLAINVAL: set-symbol-value!
-                  (make-runtime-call src 'set-symbol-value!
-                    (list (make-lexical-ref src 'fluid fluid-sym)
-                          (make-lexical-ref src 'val val-sym))))
-                #f))
-            ;; thunk: the body (appears exactly once!)
-            (make-thunk src body)
-            ;; unwinder: restore old value
-            ;; Must re-check redirect because make-local-variable during
-            ;; body can change PLAINVAL to LOCALIZED.  In that case, slot 4
-            ;; is now a BLV pointer - we must NOT overwrite it.  Instead,
-            ;; restore via set-default (mirroring C's do_one_unbind).
-            (make-lambda src '()
-              (make-lambda-case src '() #f #f #f '() '()
-                (make-conditional src
-                  (make-lexical-ref src 'plainval? plainval-sym)
-                  ;; Was PLAINVAL at bind time - check if still is
-                  (make-conditional src
-                    (call-primitive src 'eq?
-                      (call-primitive src 'vector-ref
-                        (make-lexical-ref src 'desc desc-sym)
-                        (make-const src 1))
-                      (make-const src 4))  ; still PLAINVAL?
-                    ;; Still PLAINVAL: vector-set! desc 4 old
+                    (make-const src 1))
+                  (make-const src 4)))  ; SYMBOL_PLAINVAL = 4
+          (make-conditional src
+            (make-lexical-ref src 'plainval? plainval-sym)
+            ;; PLAINVAL fast path: inline dynamic-wind
+            (make-let src '(old) (list old-sym)
+              (list (call-primitive src 'vector-ref
+                      (make-lexical-ref src 'desc desc-sym)
+                      (make-const src 4)))
+              (call-primitive src 'dynamic-wind
+                ;; winder: set new value
+                (make-lambda src '()
+                  (make-lambda-case src '() #f #f #f '() '()
                     (call-primitive src 'vector-set!
                       (make-lexical-ref src 'desc desc-sym)
                       (make-const src 4)
-                      (make-lexical-ref src 'old old-sym))
-                    ;; Changed to LOCALIZED/FORWARDED: use set-default
-                    (make-runtime-call src 'set-symbol-default-value!
-                      (list (make-lexical-ref src 'fluid fluid-sym)
-                            (make-lexical-ref src 'old old-sym))))
-                  ;; non-PLAINVAL at bind time: set-symbol-value!
-                  (make-runtime-call src 'set-symbol-value!
-                    (list (make-lexical-ref src 'fluid fluid-sym)
-                          (make-lexical-ref src 'old old-sym))))
-                #f))))))))
+                      (make-lexical-ref src 'val val-sym))
+                    #f))
+                ;; thunk: reference the shared thunk variable
+                (make-lexical-ref src 'thunk thunk-sym)
+                ;; unwinder: restore old value
+                ;; Must re-check redirect because make-local-variable during
+                ;; body can change PLAINVAL to LOCALIZED.
+                (make-lambda src '()
+                  (make-lambda-case src '() #f #f #f '() '()
+                    (make-conditional src
+                      (call-primitive src 'eq?
+                        (call-primitive src 'vector-ref
+                          (make-lexical-ref src 'desc desc-sym)
+                          (make-const src 1))
+                        (make-const src 4))  ; still PLAINVAL?
+                      ;; Still PLAINVAL: vector-set! desc 4 old
+                      (call-primitive src 'vector-set!
+                        (make-lexical-ref src 'desc desc-sym)
+                        (make-const src 4)
+                        (make-lexical-ref src 'old old-sym))
+                      ;; Changed to LOCALIZED: use set-default
+                      (make-runtime-call src 'set-symbol-default-value!
+                        (list (make-lexical-ref src 'fluid fluid-sym)
+                              (make-lexical-ref src 'old old-sym))))
+                    #f))))
+            ;; non-PLAINVAL: fall back to bind-symbol which handles all edge cases
+            (make-runtime-call src 'bind-symbol
+              (list (make-lexical-ref src 'fluid fluid-sym)
+                    (make-lexical-ref src 'val val-sym)
+                    (make-lexical-ref src 'thunk thunk-sym)))))))))
 
 (define (make-dynlet src fluids vals body)
   (let ((f (map (lambda (x) (gensym "fluid ")) fluids))
