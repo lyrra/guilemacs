@@ -1003,6 +1003,22 @@ The idea of a guile-based emacs, is around 25 years old.
 See https://www.mit.edu/~raeburn/guilemacs/ for some history.
 Also some primordial thoughts https://web.archive.org/web/20000824101731/https://sanpietro.red-bean.com/guile/guile/old/3114.html
 
+Guilemacs is one of those “it should have changed everything, but didn’t” stories — and the reasons are much more social, political, and architectural than technical. In fact, Guilemacs failed despite being a technically superior design.
+
+Guilemacs never became mainstream, and to understand why, we need to connects the dots between Emacs culture, Guile’s design, and the realities of maintaining a 40‑year‑old editor.
+
+Emacs is stuck in the 80's and 90's. Because alot of packages was written in those times
+and relied on quirks.
+Therefore the the Emacs community was deeply conservative about breaking changes.
+
+The maintainers were (understandably) terrified of breaking anything.
+Guilemacs was a big bang change, whereas Emacs prefers incremental changes.
+
+This cultural mismatch alone killed momentum.
+
+Also Guile itself was not stable enough at the time (2010-2015), so Emacs maintainers were reluctant to tie Emacs to a moving target.
+Although Guile is much more mature today — the window of opportunity passed.
+
 ** original work
  - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
    also branch rebased wip-elisp: https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp-rebased
