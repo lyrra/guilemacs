@@ -91,7 +91,9 @@
           (default-toplevel-value 'this-var-does-not-exist-12345)
           ;; If no error, that's also acceptable if it returns nil/void
           )
-      ;; Any error is acceptable - void-variable or generic error
-      ;; Note: Guilemacs condition-case void-variable matching has a known issue
-      (error nil))
-    (princ t))))
+      (void-variable
+       ;; Expected - void-variable error is correct
+       nil)
+      (error
+       (princ nil)))
+      (princ t))))

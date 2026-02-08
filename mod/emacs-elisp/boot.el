@@ -408,10 +408,14 @@
 (defmacro catch (tag &rest body)
   `(call-with-catch ,tag #'(lambda () ,@body)))
 
+;; This macro uses call-with-handler which pushes handlers onto a LIFO stack.
+;; We reverse args so first-defined handlers are pushed last (on top), ensuring
+;; specific handlers like (void-variable ...) are checked before generic (error ...).
 (defmacro condition-case (var bodyform &rest args)
   (if (consp args)
-      (let* ((handler (car args))
-             (handlers (cdr args))
+      (let* ((reversed-args (reverse args))
+             (handler (car reversed-args))
+             (handlers (cdr reversed-args))
              (handler-conditions (car handler))
              (handler-body (cdr handler)))
         `(call-with-handler ',var

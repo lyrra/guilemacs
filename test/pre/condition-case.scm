@@ -1,4 +1,4 @@
-(deftest xfail-condition-case-void-function (nilt)
+(deftest condition-case-void-function (t)
   (el-expr `(progn
     (condition-case err
       (signal 'void-function nil)
