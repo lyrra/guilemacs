@@ -67,6 +67,8 @@
             buffer-local-ref
             buffer-local-set!
             symbol-simple-forward-p
+            specpdl-track-binding
+            specpdl-untrack-binding
             prepare-complex-binding
             do-complex-bind
             do-complex-unbind)
@@ -414,6 +416,27 @@ value-slot-module, function-slot-module, or plist-slot-module."
                   (set! %symbol-simple-forward-p-fn f)
                   f))))
     (not (eq? #nil (fn sym)))))
+
+;; Lazily-cached handles for specpdl introspection functions.
+;; These allow functions like default-toplevel-value to see through dynamic bindings.
+(define %specpdl-track-binding-fn #f)
+(define (specpdl-track-binding sym old-value kind)
+  "Track a binding in specpdl for introspection.
+KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT."
+  (let ((fn (or %specpdl-track-binding-fn
+                (let ((f (symbol-function 'specpdl-track-binding)))
+                  (set! %specpdl-track-binding-fn f)
+                  f))))
+    (fn sym old-value kind)))
+
+(define %specpdl-untrack-binding-fn #f)
+(define (specpdl-untrack-binding)
+  "Untrack the most recent binding from specpdl."
+  (let ((fn (or %specpdl-untrack-binding-fn
+                (let ((f (symbol-function 'specpdl-untrack-binding)))
+                  (set! %specpdl-untrack-binding-fn f)
+                  f))))
+    (fn)))
 
 ;; Phase 5: Scheme accessors for per-buffer hash table.
 ;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).

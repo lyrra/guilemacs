@@ -353,8 +353,8 @@ Three paths based on variable type:
 IMPORTANT: The thunk wrapping body is bound to a variable once and referenced
 in all branches. This prevents exponential tree growth with nested let-bindings.
 
-Known limitation: specpdl tracking for introspection (default-toplevel-value)
-is not included in the fast paths."
+All paths include specpdl-track-binding/specpdl-untrack-binding calls so that
+introspection functions like default-toplevel-value work correctly."
   (let ((desc-sym (gensym "desc"))
         (plainval-sym (gensym "plainval"))
         (simple-fwd-sym (gensym "simple-fwd"))
@@ -392,36 +392,45 @@ is not included in the fast paths."
                       (make-lexical-ref src 'desc desc-sym)
                       (make-const src 4)))
               (call-primitive src 'dynamic-wind
-                ;; winder: set new value
+                ;; winder: track in specpdl and set new value
                 (make-lambda src '()
                   (make-lambda-case src '() #f #f #f '() '()
-                    (call-primitive src 'vector-set!
-                      (make-lexical-ref src 'desc desc-sym)
-                      (make-const src 4)
-                      (make-lexical-ref src 'val val-sym))
+                    (make-seq src
+                      ;; Track in specpdl for introspection (kind=0 means LET)
+                      (make-runtime-call src 'specpdl-track-binding
+                        (list (make-lexical-ref src 'fluid fluid-sym)
+                              (make-lexical-ref src 'old old-sym)
+                              (make-const src 0)))
+                      (call-primitive src 'vector-set!
+                        (make-lexical-ref src 'desc desc-sym)
+                        (make-const src 4)
+                        (make-lexical-ref src 'val val-sym)))
                     #f))
                 ;; thunk: reference the shared thunk variable
                 (make-lexical-ref src 'thunk thunk-sym)
-                ;; unwinder: restore old value
+                ;; unwinder: restore old value and untrack from specpdl
                 ;; Must re-check redirect because make-local-variable during
                 ;; body can change PLAINVAL to LOCALIZED.
                 (make-lambda src '()
                   (make-lambda-case src '() #f #f #f '() '()
-                    (make-conditional src
-                      (call-primitive src 'eq?
-                        (call-primitive src 'vector-ref
+                    (make-seq src
+                      (make-conditional src
+                        (call-primitive src 'eq?
+                          (call-primitive src 'vector-ref
+                            (make-lexical-ref src 'desc desc-sym)
+                            (make-const src 1))
+                          (make-const src 4))  ; still PLAINVAL?
+                        ;; Still PLAINVAL: vector-set! desc 4 old
+                        (call-primitive src 'vector-set!
                           (make-lexical-ref src 'desc desc-sym)
-                          (make-const src 1))
-                        (make-const src 4))  ; still PLAINVAL?
-                      ;; Still PLAINVAL: vector-set! desc 4 old
-                      (call-primitive src 'vector-set!
-                        (make-lexical-ref src 'desc desc-sym)
-                        (make-const src 4)
-                        (make-lexical-ref src 'old old-sym))
-                      ;; Changed to LOCALIZED: use set-default
-                      (make-runtime-call src 'set-symbol-default-value!
-                        (list (make-lexical-ref src 'fluid fluid-sym)
-                              (make-lexical-ref src 'old old-sym))))
+                          (make-const src 4)
+                          (make-lexical-ref src 'old old-sym))
+                        ;; Changed to LOCALIZED: use set-default
+                        (make-runtime-call src 'set-symbol-default-value!
+                          (list (make-lexical-ref src 'fluid fluid-sym)
+                                (make-lexical-ref src 'old old-sym))))
+                      ;; Untrack from specpdl
+                      (make-runtime-call src 'specpdl-untrack-binding '()))
                     #f))))
             ;; non-PLAINVAL: check if simple FORWARDED
             (make-let src '(simple-fwd?) (list simple-fwd-sym)
@@ -434,21 +443,30 @@ is not included in the fast paths."
                   (list (make-runtime-call src 'symbol-value
                           (list (make-lexical-ref src 'fluid fluid-sym))))
                   (call-primitive src 'dynamic-wind
-                    ;; winder: set new value via set-symbol-value!
+                    ;; winder: track in specpdl and set new value via set-symbol-value!
                     (make-lambda src '()
                       (make-lambda-case src '() #f #f #f '() '()
-                        (make-runtime-call src 'set-symbol-value!
-                          (list (make-lexical-ref src 'fluid fluid-sym)
-                                (make-lexical-ref src 'val val-sym)))
+                        (make-seq src
+                          ;; Track in specpdl for introspection (kind=0 means LET)
+                          (make-runtime-call src 'specpdl-track-binding
+                            (list (make-lexical-ref src 'fluid fluid-sym)
+                                  (make-lexical-ref src 'old old-sym)
+                                  (make-const src 0)))
+                          (make-runtime-call src 'set-symbol-value!
+                            (list (make-lexical-ref src 'fluid fluid-sym)
+                                  (make-lexical-ref src 'val val-sym))))
                         #f))
                     ;; thunk: reference the shared thunk variable
                     (make-lexical-ref src 'thunk thunk-sym)
-                    ;; unwinder: restore old value via set-symbol-value!
+                    ;; unwinder: restore old value via set-symbol-value! and untrack
                     (make-lambda src '()
                       (make-lambda-case src '() #f #f #f '() '()
-                        (make-runtime-call src 'set-symbol-value!
-                          (list (make-lexical-ref src 'fluid fluid-sym)
-                                (make-lexical-ref src 'old old-sym)))
+                        (make-seq src
+                          (make-runtime-call src 'set-symbol-value!
+                            (list (make-lexical-ref src 'fluid fluid-sym)
+                                  (make-lexical-ref src 'old old-sym)))
+                          ;; Untrack from specpdl
+                          (make-runtime-call src 'specpdl-untrack-binding '()))
                         #f))))
                 ;; Complex: buffer-local, kboard, LOCALIZED, VARALIAS
                 ;; inline dynamic-wind with context functions
