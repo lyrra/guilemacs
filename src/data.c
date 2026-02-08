@@ -2930,17 +2930,6 @@ A is a bool vector, B is t or nil, and I is an index into A.  */)
 }
 
 
-DEFUN ("bind-symbol", Fbind_symbol, Sbind_symbol, 3, 3, 0,
-       doc: /* Bind symbol.  */)
-  (Lisp_Object symbol, Lisp_Object value, Lisp_Object thunk)
-{
-  Lisp_Object val;
-  dynwind_begin ();
-  specbind_guile (symbol, value);
-  val = call0 (thunk);
-  dynwind_end ();
-  return val;
-}
 DEFUN ("symbol-simple-forward-p", Fsymbol_simple_forward_p,
        Ssymbol_simple_forward_p, 1, 1, 0,
        doc: /* Return t if SYMBOL is a simple forwarded variable.

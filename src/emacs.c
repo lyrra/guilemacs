@@ -1704,6 +1704,9 @@ main2 (void *ignore, int argc, char **argv)
          functions because it sets up symbols used by defsubr.  */
       syms_of_data ();
 
+      /* Initialize Scheme runtime with C accessor functions.
+         Note: bind-symbol parameter is now unused (Qnil) - dynamic binding
+         is handled entirely in Scheme via inline dynamic-wind.  */
       SCM_CALL_7 (scm_c_public_ref ("emacs-elisp runtime", "emacs!"),
                   SYMBOL_FUNCTION (intern ("symbol-value")),
                   SYMBOL_FUNCTION (intern ("set")),
@@ -1711,7 +1714,7 @@ main2 (void *ignore, int argc, char **argv)
                   SYMBOL_FUNCTION (intern ("default-value")),
                   SYMBOL_FUNCTION (intern ("set-default")),
                   SYMBOL_FUNCTION (intern ("default-boundp")),
-                  SYMBOL_FUNCTION (intern ("bind-symbol")));
+                  Qnil);
 
       syms_of_fns ();  /* Before syms_of_charset which uses hash tables.  */
 
