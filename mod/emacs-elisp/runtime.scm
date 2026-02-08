@@ -65,7 +65,8 @@
             get-inline-source
             buffer-local-hash-fn
             buffer-local-ref
-            buffer-local-set!)
+            buffer-local-set!
+            symbol-simple-forward-p)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -396,6 +397,18 @@ value-slot-module, function-slot-module, or plist-slot-module."
   (let ((fn (or %local-variable-if-set-p-fn
                 (let ((f (symbol-function 'local-variable-if-set-p)))
                   (set! %local-variable-if-set-p-fn f)
+                  f))))
+    (not (eq? #nil (fn sym)))))
+
+;; Lazily-cached handle for symbol-simple-forward-p.
+;; Returns #t for "simple" FORWARDED variables (DEFVAR_INT, DEFVAR_BOOL,
+;; DEFVAR_LISP) that don't depend on buffer/kboard context.
+;; Returns #f for buffer-local forwards, kboard forwards, and non-forwarded.
+(define %symbol-simple-forward-p-fn #f)
+(define (symbol-simple-forward-p sym)
+  (let ((fn (or %symbol-simple-forward-p-fn
+                (let ((f (symbol-function 'symbol-simple-forward-p)))
+                  (set! %symbol-simple-forward-p-fn f)
                   f))))
     (not (eq? #nil (fn sym)))))
 

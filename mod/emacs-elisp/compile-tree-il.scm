@@ -332,37 +332,45 @@
     args))
 
 (define (make-dynlet-one src fluid-sym val-sym body)
-  "Generate a single dynamic binding via inline dynamic-wind for PLAINVAL,
-falling back to bind-symbol for non-PLAINVAL (buffer-local, forwarded).
+  "Generate a single dynamic binding via inline dynamic-wind.
 
 FLUID-SYM is the gensym bound to the symbol being bound.
 VAL-SYM is the gensym bound to the new value.
 BODY is the tree-il for the body.
 
-Strategy 1: For PLAINVAL variables (~95% of cases), emit inline dynamic-wind
-with direct vector-set!/vector-ref on slot 4. peval can see through this
-and beta-reduce the body thunk.
+Three paths based on variable type:
 
-For non-PLAINVAL (buffer-local, forwarded), fall back to bind-symbol which
-handles all the edge cases correctly (let-default?, buffer-local hash, etc.).
+1. PLAINVAL (~95% of cases): inline dynamic-wind with direct vector-set!/ref
+   on slot 4. peval can see through this and beta-reduce the body thunk.
+
+2. Simple FORWARDED (DEFVAR_INT, DEFVAR_BOOL, DEFVAR_LISP): inline dynamic-wind
+   with symbol-value/set-symbol-value! calls. These are context-independent
+   C variables, so save/restore is straightforward.
+
+3. Complex (buffer-local, kboard forwards, LOCALIZED, VARALIAS): fall back to
+   bind-symbol which handles let-default?, buffer-local hash, etc.
 
 IMPORTANT: The thunk wrapping body is bound to a variable once and referenced
-in both branches. This prevents exponential tree growth with nested let-bindings.
+in all branches. This prevents exponential tree growth with nested let-bindings.
 
 Known limitation: specpdl tracking for introspection (default-toplevel-value)
-is not included in the PLAINVAL fast path."
+is not included in the fast paths."
   (let ((desc-sym (gensym "desc"))
         (plainval-sym (gensym "plainval"))
+        (simple-fwd-sym (gensym "simple-fwd"))
         (old-sym (gensym "old"))
         (thunk-sym (gensym "thunk")))
     ;; (let ((thunk (lambda () body)))
     ;;   (let ((desc (symbol-desc fluid)))
     ;;     (let ((plainval? (eq? (vector-ref desc 1) 4)))
     ;;       (if plainval?
-    ;;           <inline dynamic-wind with thunk>
-    ;;           (bind-symbol fluid val thunk)))))
+    ;;           <PLAINVAL path>
+    ;;           (let ((simple-fwd? (symbol-simple-forward-p fluid)))
+    ;;             (if simple-fwd?
+    ;;                 <SIMPLE FORWARDED path>
+    ;;                 (bind-symbol fluid val thunk)))))))
     ;;
-    ;; The thunk is bound once and referenced in both branches to avoid
+    ;; The thunk is bound once and referenced in all branches to avoid
     ;; duplicating the body tree-il (which would cause exponential blowup
     ;; with nested let-bindings).
     (make-let src '(thunk) (list thunk-sym)
@@ -378,7 +386,7 @@ is not included in the PLAINVAL fast path."
                   (make-const src 4)))  ; SYMBOL_PLAINVAL = 4
           (make-conditional src
             (make-lexical-ref src 'plainval? plainval-sym)
-            ;; PLAINVAL fast path: inline dynamic-wind
+            ;; PLAINVAL fast path: inline dynamic-wind with vector-set!/ref
             (make-let src '(old) (list old-sym)
               (list (call-primitive src 'vector-ref
                       (make-lexical-ref src 'desc desc-sym)
@@ -415,11 +423,39 @@ is not included in the PLAINVAL fast path."
                         (list (make-lexical-ref src 'fluid fluid-sym)
                               (make-lexical-ref src 'old old-sym))))
                     #f))))
-            ;; non-PLAINVAL: fall back to bind-symbol which handles all edge cases
-            (make-runtime-call src 'bind-symbol
-              (list (make-lexical-ref src 'fluid fluid-sym)
-                    (make-lexical-ref src 'val val-sym)
-                    (make-lexical-ref src 'thunk thunk-sym)))))))))
+            ;; non-PLAINVAL: check if simple FORWARDED
+            (make-let src '(simple-fwd?) (list simple-fwd-sym)
+              (list (make-runtime-call src 'symbol-simple-forward-p
+                      (list (make-lexical-ref src 'fluid fluid-sym))))
+              (make-conditional src
+                (make-lexical-ref src 'simple-fwd? simple-fwd-sym)
+                ;; Simple FORWARDED path: inline dynamic-wind with symbol-value/set-symbol-value!
+                (make-let src '(old) (list old-sym)
+                  (list (make-runtime-call src 'symbol-value
+                          (list (make-lexical-ref src 'fluid fluid-sym))))
+                  (call-primitive src 'dynamic-wind
+                    ;; winder: set new value via set-symbol-value!
+                    (make-lambda src '()
+                      (make-lambda-case src '() #f #f #f '() '()
+                        (make-runtime-call src 'set-symbol-value!
+                          (list (make-lexical-ref src 'fluid fluid-sym)
+                                (make-lexical-ref src 'val val-sym)))
+                        #f))
+                    ;; thunk: reference the shared thunk variable
+                    (make-lexical-ref src 'thunk thunk-sym)
+                    ;; unwinder: restore old value via set-symbol-value!
+                    (make-lambda src '()
+                      (make-lambda-case src '() #f #f #f '() '()
+                        (make-runtime-call src 'set-symbol-value!
+                          (list (make-lexical-ref src 'fluid fluid-sym)
+                                (make-lexical-ref src 'old old-sym)))
+                        #f))))
+                ;; Complex: buffer-local, kboard, LOCALIZED, VARALIAS
+                ;; Fall back to bind-symbol which handles all edge cases
+                (make-runtime-call src 'bind-symbol
+                  (list (make-lexical-ref src 'fluid fluid-sym)
+                        (make-lexical-ref src 'val val-sym)
+                        (make-lexical-ref src 'thunk thunk-sym)))))))))))
 
 (define (make-dynlet src fluids vals body)
   (let ((f (map (lambda (x) (gensym "fluid ")) fluids))

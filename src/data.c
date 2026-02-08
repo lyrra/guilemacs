@@ -2941,6 +2941,37 @@ DEFUN ("bind-symbol", Fbind_symbol, Sbind_symbol, 3, 3, 0,
   dynwind_end ();
   return val;
 }
+DEFUN ("symbol-simple-forward-p", Fsymbol_simple_forward_p,
+       Ssymbol_simple_forward_p, 1, 1, 0,
+       doc: /* Return t if SYMBOL is a simple forwarded variable.
+Simple forwards are DEFVAR_LISP, DEFVAR_INT, DEFVAR_BOOL -- variables
+that forward to a simple C variable without buffer or keyboard context.
+Buffer-local forwards (DEFVAR_PER_BUFFER) and kboard forwards return nil.
+Non-forwarded variables also return nil.  */)
+  (Lisp_Object symbol)
+{
+  symbol = Findirect_variable (symbol);
+  sym_t sym = XSYMBOL (symbol);
+
+  if (SYMBOL_REDIRECT (sym) != SYMBOL_FORWARDED)
+    return Qnil;
+
+  lispfwd fwd = SYMBOL_FWD (sym);
+  switch (XFWDTYPE (fwd))
+    {
+    case Lisp_Fwd_Int:
+    case Lisp_Fwd_Bool:
+    case Lisp_Fwd_Obj:
+      return Qt;
+    case Lisp_Fwd_Buffer_Obj:
+    case Lisp_Fwd_Kboard_Obj:
+      return Qnil;
+    default:
+      return Qnil;
+    }
+}
+
+
 
 
 void
