@@ -66,7 +66,10 @@
             buffer-local-hash-fn
             buffer-local-ref
             buffer-local-set!
-            symbol-simple-forward-p)
+            symbol-simple-forward-p
+            prepare-complex-binding
+            do-complex-bind
+            do-complex-unbind)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -514,6 +517,74 @@ value-slot-module, function-slot-module, or plist-slot-module."
           (buf-local?   (hashq-set! hash symbol old))
           (let-default? ((set-default-fn) symbol old))
           (else         (set-symbol-value! symbol old)))))))
+
+;; Helper functions for inline dynamic-wind on complex bindings.
+;; These allow make-dynlet-one to emit dynamic-wind directly, making the
+;; body transparent to peval while encapsulating binding complexity here.
+;;
+;; Context vector layout:
+;; [0] old-value
+;; [1] binding-kind (0=LET, 1=LET_LOCAL, 2=LET_DEFAULT)
+;; [2] hash table (buffer's hash, or #f)
+;; [3] symbol
+;; [4] buf-local? flag
+;; [5] let-default? flag
+
+(define (prepare-complex-binding symbol)
+  "Prepare for binding a complex (buffer-local, kboard, etc.) variable.
+Returns a context vector with all information needed to bind/unbind.
+Called before dynamic-wind; captures current buffer's hash table."
+  (let* ((hash ((buffer-local-hash-fn)))
+         (hash-val (hashq-ref hash symbol *buffer-local-unset*))
+         (in-hash? (not (eq? hash-val *buffer-local-unset*)))
+         (has-local? (local-variable-p symbol))
+         (buf-local? (and in-hash? has-local?))
+         (let-default? (and (not buf-local?)
+                            (not has-local?)
+                            (local-variable-if-set-p symbol)))
+         (old (cond
+                (buf-local?   hash-val)
+                (let-default? (default-value symbol))
+                (else         (symbol-value symbol))))
+         (kind (cond (buf-local?   1)
+                     (let-default? 2)
+                     (else         0))))
+    (vector old kind hash symbol buf-local? let-default?)))
+
+(define (do-complex-bind ctx value)
+  "Set new value using context from prepare-complex-binding.
+Called as dynamic-wind winder."
+  (let ((symbol (vector-ref ctx 3))
+        (buf-local? (vector-ref ctx 4))
+        (let-default? (vector-ref ctx 5))
+        (hash (vector-ref ctx 2))
+        (old (vector-ref ctx 0))
+        (kind (vector-ref ctx 1)))
+    ;; Track in specpdl for introspection (default-toplevel-value etc.)
+    (if (symbol-fbound? 'specpdl-track-binding)
+        ((symbol-function 'specpdl-track-binding) symbol old kind))
+    ;; Set new value via appropriate path
+    (cond
+      (buf-local?   (hashq-set! hash symbol value))
+      (let-default? ((set-default-fn) symbol value))
+      (else         (set-symbol-value! symbol value)))))
+
+(define (do-complex-unbind ctx)
+  "Restore old value using context from prepare-complex-binding.
+Called as dynamic-wind unwinder."
+  (let ((symbol (vector-ref ctx 3))
+        (buf-local? (vector-ref ctx 4))
+        (let-default? (vector-ref ctx 5))
+        (hash (vector-ref ctx 2))
+        (old (vector-ref ctx 0)))
+    ;; Untrack from specpdl
+    (if (symbol-fbound? 'specpdl-untrack-binding)
+        ((symbol-function 'specpdl-untrack-binding)))
+    ;; Restore old value via appropriate path
+    (cond
+      (buf-local?   (hashq-set! hash symbol old))
+      (let-default? ((set-default-fn) symbol old))
+      (else         (set-symbol-value! symbol old)))))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)

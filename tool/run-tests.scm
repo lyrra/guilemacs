@@ -26,6 +26,7 @@
   ;; emacs-elisp -- core language
   "test/pre/dynamic-binding.scm"
   "test/pre/forwarded-binding.scm"
+  "test/pre/complex-binding.scm"
   "test/pre/eq.scm"
   "test/pre/arith.scm"
   "test/pre/value-cmp.scm"

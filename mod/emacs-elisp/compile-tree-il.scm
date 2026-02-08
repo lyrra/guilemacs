@@ -451,11 +451,28 @@ is not included in the fast paths."
                                 (make-lexical-ref src 'old old-sym)))
                         #f))))
                 ;; Complex: buffer-local, kboard, LOCALIZED, VARALIAS
-                ;; Fall back to bind-symbol which handles all edge cases
-                (make-runtime-call src 'bind-symbol
-                  (list (make-lexical-ref src 'fluid fluid-sym)
-                        (make-lexical-ref src 'val val-sym)
-                        (make-lexical-ref src 'thunk thunk-sym)))))))))))
+                ;; inline dynamic-wind with context functions
+                ;; Body is transparent to peval; winder/unwinder are opaque but that's OK
+                (let ((ctx-sym (gensym "ctx")))
+                  (make-let src '(ctx) (list ctx-sym)
+                    (list (make-runtime-call src 'prepare-complex-binding
+                            (list (make-lexical-ref src 'fluid fluid-sym))))
+                    (call-primitive src 'dynamic-wind
+                      ;; winder: set new value via do-complex-bind
+                      (make-lambda src '()
+                        (make-lambda-case src '() #f #f #f '() '()
+                          (make-runtime-call src 'do-complex-bind
+                            (list (make-lexical-ref src 'ctx ctx-sym)
+                                  (make-lexical-ref src 'val val-sym)))
+                          #f))
+                      ;; thunk: reference the shared thunk variable - TRANSPARENT!
+                      (make-lexical-ref src 'thunk thunk-sym)
+                      ;; unwinder: restore old value via do-complex-unbind
+                      (make-lambda src '()
+                        (make-lambda-case src '() #f #f #f '() '()
+                          (make-runtime-call src 'do-complex-unbind
+                            (list (make-lexical-ref src 'ctx ctx-sym)))
+                          #f)))))))))))))
 
 (define (make-dynlet src fluids vals body)
   (let ((f (map (lambda (x) (gensym "fluid ")) fluids))
