@@ -3175,15 +3175,25 @@ extern uint64_t scheme_to_c_crossings;
 
 /* if we move a C-function to scheme, and we have alot of
  * Fxxx references, instead of doing a huge rewrite,
- * define Fxxx as a wrapper function that calls into scheme
+ * define Fxxx as a wrapper function that calls into scheme.
+ * Cache the interned symbol to avoid allocating on every call
+ * (which can trigger GC at bad times).
  */
 #define DEFUNWRAP1(cfn, lfn) \
   Lisp_Object cfn (Lisp_Object a) \
-  { return call1 (intern (lfn), a); }
+  { \
+    static Lisp_Object sym; \
+    if (!sym) { sym = intern_c_string (lfn); scm_permanent_object (sym); } \
+    return call1 (sym, a); \
+  }
 
 #define DEFUNWRAP2(cfn, lfn) \
   Lisp_Object cfn (Lisp_Object a, Lisp_Object b) \
-  { return call2 (intern (lfn), a, b); }
+  { \
+    static Lisp_Object sym; \
+    if (!sym) { sym = intern_c_string (lfn); scm_permanent_object (sym); } \
+    return call2 (sym, a, b); \
+  }
 
 /* defsubr (Sname);
    is how we define the symbol for function `name' at start-up time.  */
