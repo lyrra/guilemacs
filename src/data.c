@@ -39,11 +39,35 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 int
 value_cmp_scm (Lisp_Object a, Lisp_Object b);
 
+/* Cache function object and call directly,
+   bypassing Ffuncall dispatch overhead.
+   Use symbol_function_fn (Scheme's symbol-function) directly to avoid
+   infinite loop: indirect_function -> SYMBOL_FUNCTION -> Fsymbol_function */
+extern Lisp_Object symbol_function_fn;
+
 #define WRAP1(cfn, lfn) \
   Lisp_Object cfn (Lisp_Object a) \
-  { return call1 (cfn ## _sym, a); }
+  { \
+    static Lisp_Object fn; \
+    if (!fn) \
+      { \
+        fn = scm_call_1 (symbol_function_fn, cfn ## _sym); \
+        scm_permanent_object (fn); \
+      } \
+    return scm_call_1 (fn, a); \
+  }
 
-#define WRAP2(cfn, lfn) Lisp_Object cfn (Lisp_Object a, Lisp_Object b) { return call2 (intern (lfn), a, b); }
+#define WRAP2(cfn, lfn) \
+  Lisp_Object cfn (Lisp_Object a, Lisp_Object b) \
+  { \
+    static Lisp_Object fn; \
+    if (!fn) \
+      { \
+        fn = scm_call_1 (symbol_function_fn, cfn ## _sym); \
+        scm_permanent_object (fn); \
+      } \
+    return scm_call_2 (fn, a, b); \
+  }
 
 static void swap_in_symval_forwarding (sym_t, struct Lisp_Buffer_Local_Value *);
 
