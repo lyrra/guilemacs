@@ -1383,11 +1383,17 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
 
   if (!NILP (clause))
     unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, error);
-  else if (handlerlist != handlerlist_sentinel)
-    /* FIXME: This will come right back here if there's no `top-level'
-       catcher.  A better solution would be to abort here, and instead
-       add a catch-all condition handler so we never come here.  */
-    Fthrow (Qtop_level, Qt);
+  else
+    {
+      /* No C handler found. Throw to Guile's 'elisp-condition so elisp
+         condition-case (which uses Guile's catch) can handle it.  */
+      static SCM elisp_condition_sym = SCM_BOOL_F;
+      if (scm_is_false (elisp_condition_sym))
+        elisp_condition_sym = scm_from_utf8_symbol ("elisp-condition");
+      scm_throw (elisp_condition_sym, scm_list_2 (error_symbol, data));
+      /* scm_throw doesn't return, but if it somehow does (shouldn't happen),
+         fall through to fatal.  */
+    }
 
   string = Ferror_message_string (error);
   fatal ("%s", SDATA (string));
