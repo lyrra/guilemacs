@@ -323,6 +323,12 @@
 ;; Returns (error-symbol . error-data) pair
 (defun %convert-guile-exception (key args)
   (cond
+   ;; elisp-throw: (tag value) - uncaught throw becomes no-catch error
+   ((eq key 'elisp-throw)
+    (let ((tag (car args))
+          (value (cadr args)))
+      (cons 'no-catch (list tag value))))
+
    ;; wrong-number-of-args: (subr fmt-string (proc) #f)
    ;; where (nth 2 args) is a list containing the procedure
    ;; -> (wrong-number-of-arguments proc-name actual-count)
@@ -367,19 +373,25 @@
                              ;; Handler receives (key args-list)
                              #'(lambda (,guile-key-sym ,guile-args-sym)
                                  (declare (lexical ,guile-key-sym ,guile-args-sym))
-                                 (if (eq ,guile-key-sym 'elisp-condition)
-                                     ;; Re-throw elisp conditions directly - args-sym is (error-sym error-data)
+                                 (if (eq ,guile-key-sym 'elisp-throw)
+                                     ;; Re-throw elisp throws so catch can receive them
                                      (%funcall (@ (guile) apply)
                                                (@ (guile) throw)
-                                               'elisp-condition
+                                               'elisp-throw
                                                ,guile-args-sym)
-                                   ;; Convert Guile exceptions to elisp format
-                                   (let ((converted (%convert-guile-exception ,guile-key-sym ,guile-args-sym)))
-                                     (declare (lexical converted))
-                                     (%funcall (@ (guile) throw)
-                                               'elisp-condition
-                                               (car converted)
-                                               (cdr converted)))))))
+                                   (if (eq ,guile-key-sym 'elisp-condition)
+                                       ;; Re-throw elisp conditions directly - args-sym is (error-sym error-data)
+                                       (%funcall (@ (guile) apply)
+                                                 (@ (guile) throw)
+                                                 'elisp-condition
+                                                 ,guile-args-sym)
+                                     ;; Convert Guile exceptions to elisp format
+                                     (let ((converted (%convert-guile-exception ,guile-key-sym ,guile-args-sym)))
+                                       (declare (lexical converted))
+                                       (%funcall (@ (guile) throw)
+                                                 'elisp-condition
+                                                 (car converted)
+                                                 (cdr converted))))))))
                 #'(lambda (,key-sym ,err-sym-sym ,err-data-sym)
                     (declare (lexical ,key-sym ,err-sym-sym ,err-data-sym))
                     (let ((,conditions-sym (get ,err-sym-sym 'error-conditions))

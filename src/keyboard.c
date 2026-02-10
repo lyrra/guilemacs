@@ -1193,14 +1193,14 @@ top_level_2_body (void *ignore)
 {
   /* If we're in batch mode, print a backtrace unconditionally when
      encountering an error, to help with debugging.  */
-  bool setup_handler = noninteractive;
-  if (setup_handler)
+  bool pushed = false;
+  if (noninteractive)
     /* FIXME: Should we (re)use `list_of_error` from `xdisp.c`? */
-    push_handler_bind (list1 (Qerror), Qdebug_early__handler, 0);
+    pushed = push_handler_bind (list1 (Qerror), Qdebug_early__handler, 0);
 
   Lisp_Object res = Feval (Vtop_level, Qt);
 
-  if (setup_handler)
+  if (pushed)
     pop_handler ();
   return res;
 }

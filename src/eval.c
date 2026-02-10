@@ -59,6 +59,10 @@ Lisp_Object Vsignaling_function;
    All elisp errors are thrown to this key.  */
 static SCM elisp_condition_sym = SCM_BOOL_F;
 
+/* Symbol used for Guile-based catch/throw.
+   All elisp throws use this key, with the actual tag in the args.  */
+static SCM elisp_throw_sym = SCM_BOOL_F;
+
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
@@ -161,6 +165,10 @@ init_eval_once (void)
 
   eval_fn = scm_c_public_ref ("emacs-elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
+
+  /* Initialize symbols for Guile-based exception handling */
+  elisp_condition_sym = scm_from_utf8_symbol ("elisp-condition");
+  elisp_throw_sym = scm_from_utf8_symbol ("elisp-throw");
 
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
@@ -975,20 +983,68 @@ specbind_guile (var, val);
 
 /* Set up a catch, then call C function FUNC on argument ARG.
    FUNC should return a Lisp_Object.
-   This is how catches are done from within C code.  */
+   This is how catches are done from within C code.
+
+   Uses scm_c_catch with 'elisp-throw key instead of C handlerlist.  */
+
+/* Environment for internal_catch using Guile catch */
+struct internal_catch_env
+{
+  Lisp_Object tag;                        /* Expected catch tag */
+  Lisp_Object (*func) (Lisp_Object);      /* Function to call */
+  Lisp_Object arg;                        /* Argument to function */
+};
+
+/* Body function for scm_c_catch in internal_catch */
+static SCM
+internal_catch_body (void *data)
+{
+  struct internal_catch_env *env = data;
+
+  /* Save and restore handlerlist on unwind, so handlers pushed by
+     code inside the body are properly cleaned up if a throw happens.  */
+  scm_dynwind_begin (0);
+  scm_dynwind_unwind_handler (set_handlerlist,
+                              handlerlist,
+                              SCM_F_WIND_EXPLICITLY);
+
+  Lisp_Object result = env->func (env->arg);
+
+  scm_dynwind_end ();
+  return result;
+}
+
+/* Handler function for scm_c_catch in internal_catch.
+   args is (thrown-tag value) from scm_throw.
+   If thrown-tag matches our expected tag, return value.
+   Otherwise re-throw to outer catch.  */
+static SCM
+internal_catch_handler (void *data, SCM key, SCM args)
+{
+  struct internal_catch_env *env = data;
+  Lisp_Object thrown_tag = scm_car (args);
+  Lisp_Object value = scm_cadr (args);
+
+  if (EQ (thrown_tag, env->tag))
+    return value;  /* Tag matches - return the caught value */
+  else
+    {
+      /* Tag doesn't match - re-throw to outer catch */
+      scm_throw (key, args);
+      /* scm_throw doesn't return */
+      emacs_abort ();
+    }
+}
 
 Lisp_Object
 internal_catch (Lisp_Object tag,
 		Lisp_Object (*func) (Lisp_Object), Lisp_Object arg)
 {
-  struct handler *c = make_catch_handler (tag);
-  struct icc_thunk_env env = { .type = ICC_1,
-                               .fun1 = func,
-                               .arg1 = arg,
-                               .c = c };
-  return call_with_prompt (c->ptag,
-                           make_c_closure (icc_thunk, &env, 0, 0),
-                           make_c_closure (icc_handler, Fidentity, 2, 0));
+  struct internal_catch_env env = { .tag = tag, .func = func, .arg = arg };
+  return scm_c_catch (elisp_throw_sym,
+                      internal_catch_body, &env,
+                      internal_catch_handler, &env,
+                      NULL, NULL);
 }
 
 /* Unwind the specbind, catch, and handler stacks back to CATCH, and
@@ -1022,17 +1078,17 @@ Both TAG and VALUE are evalled.  */
        attributes: noreturn)
   (register Lisp_Object tag, Lisp_Object value)
 {
-  struct handler *c;
+  /* nil tag is always an error - no catch can match it */
+  if (NILP (tag))
+    xsignal2 (Qno_catch, tag, value);
 
-  if (!NILP (tag))
-    for (c = handlerlist; c; c = c->next)
-      {
-	if (c->type == CATCHER_ALL)
-          unwind_to_catch (c, NONLOCAL_EXIT_THROW, Fcons (tag, value));
-        if (c->type == CATCHER && EQ (c->tag_or_ch, tag))
-	  unwind_to_catch (c, NONLOCAL_EXIT_THROW, value);
-      }
-  xsignal2 (Qno_catch, tag, value);
+  /* Throw to Guile's catch mechanism.
+     The args are (tag value) - internal_catch_handler will check tag match.
+     If no catch matches, scm_eval_error_handler will convert to no-catch.  */
+  scm_throw (elisp_throw_sym, scm_list_2 (tag, value));
+
+  /* scm_throw doesn't return. If we somehow get here, abort.  */
+  emacs_abort ();
 }
 
 DEFUN ("call-with-handler", Fcall_with_handler, Scall_with_handler, 4, 4, 0,
@@ -1077,14 +1133,21 @@ usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
                                        list1 (list2 (conditions, list2 (intern ("funcall"), hthunk))));
 }
 
-void
+/* Push a handler-bind handler.
+   Currently disabled - handler-bind is a no-op until we implement
+   proper Guile-based handler-bind support.  Returns true if a handler
+   was actually pushed.  */
+bool
 push_handler_bind (Lisp_Object conditions, Lisp_Object handler, int skip)
 {
   if (!CONSP (conditions))
     conditions = Fcons (conditions, Qnil);
+  /* TODO: Implement handler-bind using Guile's exception system.
+     For now, handler-bind is a no-op.  */
   //struct handler *c = push_handler (conditions, HANDLER_BIND);
   //c->val = handler;
   //c->bytecode_dest = skip;
+  return false;  /* Nothing pushed */
 }
 
 DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
@@ -1112,7 +1175,8 @@ usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
       Lisp_Object conditions = args[i], handler = args[i + 1];
       if (NILP (conditions))
         continue;
-      push_handler_bind (conditions, handler, count++);
+      if (push_handler_bind (conditions, handler, count))
+        count++;
     }
   Lisp_Object ret = call0 (bodyfun);
   for (; count > 0; count--)
@@ -1972,6 +2036,18 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
       /* scm_throw doesn't return */
     }
 
+  /* If this is an uncaught elisp throw, convert to no-catch error.  */
+  if (scm_is_eq (key, elisp_throw_sym))
+    {
+      /* args is (tag value) */
+      Lisp_Object thrown_tag = scm_car (args);
+      Lisp_Object thrown_value = scm_cadr (args);
+      /* Convert to elisp no-catch error */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qno_catch, list2 (thrown_tag, thrown_value)));
+      /* scm_throw doesn't return */
+    }
+
   /* Handle wrong-number-of-arguments error - convert and throw as elisp-condition */
   if (scm_is_eq (key, scm_from_latin1_symbol ("wrong-number-of-args")))
     {
@@ -2420,6 +2496,18 @@ scm_funcall_error_handler (void *data, SCM key, SCM args)
   if (scm_is_eq (key, elisp_condition_sym))
     {
       scm_throw (key, args);
+      /* scm_throw doesn't return */
+    }
+
+  /* If this is an uncaught elisp throw, convert to no-catch error.  */
+  if (scm_is_eq (key, elisp_throw_sym))
+    {
+      /* args is (tag value) */
+      Lisp_Object thrown_tag = scm_car (args);
+      Lisp_Object thrown_value = scm_cadr (args);
+      /* Convert to elisp no-catch error */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qno_catch, list2 (thrown_tag, thrown_value)));
       /* scm_throw doesn't return */
     }
 

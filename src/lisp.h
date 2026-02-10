@@ -4575,7 +4575,7 @@ extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Ob
 extern struct handler *push_handler (Lisp_Object, enum handlertype)
   ATTRIBUTE_RETURNS_NONNULL;
 extern void pop_handler (void);
-extern void push_handler_bind (Lisp_Object, Lisp_Object, int);
+extern bool push_handler_bind (Lisp_Object, Lisp_Object, int);
 extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind_guile (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
