@@ -55,6 +55,10 @@ union specbinding *specpdl_base;
 /* FIXME: We should probably get rid of this!  */
 Lisp_Object Vsignaling_function;
 
+/* Symbol used for Guile-based condition handling.
+   All elisp errors are thrown to this key.  */
+static SCM elisp_condition_sym = SCM_BOOL_F;
+
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
@@ -813,6 +817,132 @@ icc_handler (void *data, Lisp_Object k, Lisp_Object v)
   return f (v);
 }
 
+/* Guile-based condition handling structures and functions.
+   These use scm_c_catch with 'elisp-condition key instead of
+   the C handlerlist mechanism.  */
+
+struct guile_condition_env
+{
+  enum { GCE_0, GCE_1, GCE_2, GCE_N } type;
+  union
+  {
+    Lisp_Object (*fun0) (void);
+    Lisp_Object (*fun1) (Lisp_Object);
+    Lisp_Object (*fun2) (Lisp_Object, Lisp_Object);
+    Lisp_Object (*funn) (ptrdiff_t, Lisp_Object *);
+  };
+  Lisp_Object arg1;
+  Lisp_Object arg2;
+  ptrdiff_t nargs;
+  Lisp_Object *args;
+  Lisp_Object handlers;  /* Conditions to catch (Qerror, Qt, or list) */
+  Lisp_Object (*hfun) (Lisp_Object);  /* Handler function */
+  Lisp_Object (*hfunn) (Lisp_Object, ptrdiff_t, Lisp_Object *);
+};
+
+/* Check if error matches the handler conditions.  */
+static bool
+error_matches_handlers (Lisp_Object error_symbol, Lisp_Object handlers)
+{
+  if (EQ (handlers, Qt))
+    return true;
+  if (EQ (handlers, Qerror))
+    {
+      Lisp_Object conditions = Fget (error_symbol, Qerror_conditions);
+      return !NILP (Fmemq (Qerror, conditions));
+    }
+  if (CONSP (handlers))
+    {
+      Lisp_Object conditions = Fget (error_symbol, Qerror_conditions);
+      for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
+        {
+          if (!NILP (Fmemq (XCAR (tail), conditions)))
+            return true;
+        }
+      return false;
+    }
+  /* Single symbol */
+  Lisp_Object conditions = Fget (error_symbol, Qerror_conditions);
+  return !NILP (Fmemq (handlers, conditions));
+}
+
+/* Body function for Guile-based condition case.  */
+static SCM
+guile_condition_body (void *data)
+{
+  struct guile_condition_env *e = data;
+  Lisp_Object result;
+
+  switch (e->type)
+    {
+    case GCE_0:
+      result = e->fun0 ();
+      break;
+    case GCE_1:
+      result = e->fun1 (e->arg1);
+      break;
+    case GCE_2:
+      result = e->fun2 (e->arg1, e->arg2);
+      break;
+    case GCE_N:
+      result = e->funn (e->nargs, e->args);
+      break;
+    default:
+      emacs_abort ();
+    }
+  return result;
+}
+
+/* Handler function for Guile-based condition case.
+   Checks if error matches handlers, calls hfun or re-throws.  */
+static SCM
+guile_condition_handler (void *data, SCM key, SCM args)
+{
+  struct guile_condition_env *e = data;
+
+  /* args is (error-symbol . error-data) from scm_throw */
+  Lisp_Object error_symbol = scm_is_pair (args) ? scm_car (args) : Qerror;
+  Lisp_Object error_data = scm_is_pair (args) && scm_is_pair (scm_cdr (args))
+    ? scm_cadr (args) : Qnil;
+  Lisp_Object error = Fcons (error_symbol, error_data);
+
+  /* Check if this handler should catch the error */
+  if (error_matches_handlers (error_symbol, e->handlers))
+    {
+      /* Call the handler function */
+      return e->hfun (error);
+    }
+  else
+    {
+      /* Re-throw for outer handler */
+      scm_throw (key, args);
+      /* scm_throw doesn't return */
+      emacs_abort ();
+    }
+}
+
+/* Handler variant for internal_condition_case_n that passes nargs/args.  */
+static SCM
+guile_condition_handler_n (void *data, SCM key, SCM args)
+{
+  struct guile_condition_env *e = data;
+
+  Lisp_Object error_symbol = scm_is_pair (args) ? scm_car (args) : Qerror;
+  Lisp_Object error_data = scm_is_pair (args) && scm_is_pair (scm_cdr (args))
+    ? scm_cadr (args) : Qnil;
+  Lisp_Object error = Fcons (error_symbol, error_data);
+
+  if (error_matches_handlers (error_symbol, e->handlers))
+    {
+      return e->hfunn (error, e->nargs, e->args);
+    }
+  else
+    {
+      scm_throw (key, args);
+      emacs_abort ();
+    }
+}
+
 struct icc_handler_n_env
 {
   Lisp_Object (*fun) (Lisp_Object, ptrdiff_t, Lisp_Object *);
@@ -1065,13 +1195,18 @@ Lisp_Object
 internal_condition_case (Lisp_Object (*bfun) (void), Lisp_Object handlers,
 			 Lisp_Object (*hfun) (Lisp_Object))
 {
-  Lisp_Object val;
-  struct handler *c = make_condition_handler (handlers);
-
-  struct icc_thunk_env env = { .type = ICC_0, .fun0 = bfun, .c = c };
-  return call_with_prompt (c->ptag,
-                           make_c_closure (icc_thunk, &env, 0, 0),
-                           make_c_closure (icc_handler, hfun, 2, 0));
+  /* Use Guile's catch mechanism for condition handling.
+     All errors are thrown to 'elisp-condition by signal_or_quit.  */
+  struct guile_condition_env env = {
+    .type = GCE_0,
+    .fun0 = bfun,
+    .handlers = handlers,
+    .hfun = hfun
+  };
+  return scm_c_catch (elisp_condition_sym,
+                      guile_condition_body, &env,
+                      guile_condition_handler, &env,
+                      NULL, NULL);
 }
 
 /* Like internal_condition_case but call BFUN with ARG as its argument.  */
@@ -1081,16 +1216,17 @@ internal_condition_case_1 (Lisp_Object (*bfun) (Lisp_Object), Lisp_Object arg,
 			   Lisp_Object handlers,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
-  Lisp_Object val;
-  struct handler *c = make_condition_handler (handlers);
-
-  struct icc_thunk_env env = { .type = ICC_1,
-                               .fun1 = bfun,
-                               .arg1 = arg,
-                               .c = c };
-  return call_with_prompt (c->ptag,
-                           make_c_closure (icc_thunk, &env, 0, 0),
-                           make_c_closure (icc_handler, hfun, 2, 0));
+  struct guile_condition_env env = {
+    .type = GCE_1,
+    .fun1 = bfun,
+    .arg1 = arg,
+    .handlers = handlers,
+    .hfun = hfun
+  };
+  return scm_c_catch (elisp_condition_sym,
+                      guile_condition_body, &env,
+                      guile_condition_handler, &env,
+                      NULL, NULL);
 }
 
 /* Like internal_condition_case_1 but call BFUN with ARG1 and ARG2 as
@@ -1103,16 +1239,18 @@ internal_condition_case_2 (Lisp_Object (*bfun) (Lisp_Object, Lisp_Object),
 			   Lisp_Object handlers,
 			   Lisp_Object (*hfun) (Lisp_Object))
 {
-  Lisp_Object val;
-  struct handler *c = make_condition_handler (handlers);
-  struct icc_thunk_env env = { .type = ICC_2,
-                               .fun2 = bfun,
-                               .arg1 = arg1,
-                               .arg2 = arg2,
-                               .c = c };
-  return call_with_prompt (c->ptag,
-                           make_c_closure (icc_thunk, &env, 0, 0),
-                           make_c_closure (icc_handler, hfun, 2, 0));
+  struct guile_condition_env env = {
+    .type = GCE_2,
+    .fun2 = bfun,
+    .arg1 = arg1,
+    .arg2 = arg2,
+    .handlers = handlers,
+    .hfun = hfun
+  };
+  return scm_c_catch (elisp_condition_sym,
+                      guile_condition_body, &env,
+                      guile_condition_handler, &env,
+                      NULL, NULL);
 }
 
 /* Like internal_condition_case but call BFUN with NARGS as first,
@@ -1127,18 +1265,18 @@ internal_condition_case_n (Lisp_Object (*bfun) (ptrdiff_t, Lisp_Object *),
 						ptrdiff_t nargs,
 						Lisp_Object *args))
 {
-   Lisp_Object val;
-  struct handler *c = make_condition_handler (handlers);
-
-  struct icc_thunk_env env = { .type = ICC_N,
-                               .funn = bfun,
-                               .nargs = nargs,
-                               .args = args,
-                               .c = c };
-  struct icc_handler_n_env henv = { .fun = hfun, .nargs = nargs, .args = args };
-  return call_with_prompt (c->ptag,
-                           make_c_closure (icc_thunk, &env, 0, 0),
-                           make_c_closure (icc_handler_n, &henv, 2, 0));
+  struct guile_condition_env env = {
+    .type = GCE_N,
+    .funn = bfun,
+    .nargs = nargs,
+    .args = args,
+    .handlers = handlers,
+    .hfunn = hfun
+  };
+  return scm_c_catch (elisp_condition_sym,
+                      guile_condition_body, &env,
+                      guile_condition_handler_n, &env,
+                      NULL, NULL);
 }
 
 static Lisp_Object Qcatch_all_memory_full;
@@ -1294,12 +1432,8 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
       : (!SYMBOLP (error_symbol) && NILP (data)) ? error_symbol
       : Fcons (error_symbol, data);
   Lisp_Object conditions;
-  Lisp_Object string;
   Lisp_Object real_error_symbol
     = CONSP (error) ? XCAR (error) : error_symbol;
-  Lisp_Object clause = Qnil;
-  struct handler *h;
-  int skip;
 
   if (waiting_for_input)
     emacs_abort ();
@@ -1310,92 +1444,28 @@ signal_or_quit (Lisp_Object error_symbol, Lisp_Object data, bool continuable)
     {
       dynwind_begin ();
       max_ensure_room (20);
-      /* FIXME: 'handler-bind' makes `signal-hook-function' obsolete?  */
-      /* FIXME: Here we still "split" the error object
-         into its error-symbol and its error-data?  */
       call2 (Vsignal_hook_function, error_symbol, data);
       dynwind_end ();
     }
 
   conditions = Fget (real_error_symbol, Qerror_conditions);
 
-  for (skip = 0, h = handlerlist; h; skip++, h = h->next)
-    {
-      switch (h->type)
-        {
-        case CATCHER_ALL:
-          clause = Qt;
-          break;
-	case CATCHER:
-	  continue;
-        case CONDITION_CASE:
-          clause = find_handler_clause (h->tag_or_ch, conditions);
-	  break;
-	case HANDLER_BIND:
-	  {
-	    if (!NILP (find_handler_clause (h->tag_or_ch, conditions)))
-	      {
-		dynwind_begin ();
-	        max_ensure_room (20);
-	        //push_handler (make_fixnum (skip + h->bytecode_dest),
-	        //              SKIP_CONDITIONS);
-	        call1 (h->val, error);
-		dynwind_end ();
-	        pop_handler ();
-	      }
-	    continue;
-	  }
-	case SKIP_CONDITIONS:
-	  {
-	    int toskip = XFIXNUM (h->tag_or_ch);
-	    while (toskip-- >= 0)
-	      h = h->next;
-	    continue;
-	  }
-	default:
-	  abort ();
-	}
-      if (!NILP (clause))
-	break;
-    }
-
+  /* Check if debugger should be called.  */
   bool debugger_called = false;
-  if (/* Don't run the debugger for a memory-full error.
-	 (There is no room in memory to do that!)  */
-      !oom
-      && (!NILP (Vdebug_on_signal)
-	  /* If no handler is present now, try to run the debugger.  */
-	  || NILP (clause)
-	  /* A `debug' symbol in the handler list disables the normal
-	     suppression of the debugger.  */
-	  || (CONSP (clause) && !NILP (Fmemq (Qdebug, clause)))
-	  /* Special handler that means "print a message and run debugger
-	     if requested".  */
-	  || EQ (clause, Qerror)))
+  if (!oom && !NILP (Vdebug_on_signal))
     {
-      debugger_called
-	= maybe_call_debugger (conditions, error);
-      /* We can't return values to code which signaled an error, but we
-	 can continue code which has signaled a quit.  */
+      debugger_called = maybe_call_debugger (conditions, error);
       if (continuable && debugger_called)
 	return Qnil;
     }
 
-  if (!NILP (clause))
-    unwind_to_catch (h, NONLOCAL_EXIT_SIGNAL, error);
-  else
-    {
-      /* No C handler found. Throw to Guile's 'elisp-condition so elisp
-         condition-case (which uses Guile's catch) can handle it.  */
-      static SCM elisp_condition_sym = SCM_BOOL_F;
-      if (scm_is_false (elisp_condition_sym))
-        elisp_condition_sym = scm_from_utf8_symbol ("elisp-condition");
-      scm_throw (elisp_condition_sym, scm_list_2 (error_symbol, data));
-      /* scm_throw doesn't return, but if it somehow does (shouldn't happen),
-         fall through to fatal.  */
-    }
+  /* Always throw to Guile's 'elisp-condition.
+     All condition handlers (including internal_condition_case) use
+     scm_c_catch to catch this.  */
+  scm_throw (elisp_condition_sym, scm_list_2 (error_symbol, data));
 
-  string = Ferror_message_string (error);
+  /* scm_throw doesn't return. If we somehow get here, it's fatal.  */
+  Lisp_Object string = Ferror_message_string (error);
   fatal ("%s", SDATA (string));
 }
 
@@ -1886,17 +1956,28 @@ scm_eval_body (void *data)
   return SCM_CALL_1 (eval_fn, edata->form);
 }
 
-/* Error handler for Guile exceptions during eval */
+/* Error handler for Guile exceptions during eval.
+   This converts Guile exceptions to elisp signals by throwing directly
+   to 'elisp-condition.  We can't use xsignal here because throwing from
+   inside a handler goes to the OUTER catch, bypassing elisp condition-case.  */
 static SCM
 scm_eval_error_handler (void *data, SCM key, SCM args)
 {
   struct scm_eval_data *edata = (struct scm_eval_data *) data;
 
-  /* Handle wrong-number-of-arguments error */
+  /* If this is an elisp condition, re-throw it directly.  */
+  if (scm_is_eq (key, elisp_condition_sym))
+    {
+      scm_throw (key, args);
+      /* scm_throw doesn't return */
+    }
+
+  /* Handle wrong-number-of-arguments error - convert and throw as elisp-condition */
   if (scm_is_eq (key, scm_from_latin1_symbol ("wrong-number-of-args")))
     {
       /* Extract function name from args if possible */
       SCM proc = SCM_BOOL_F;
+      Lisp_Object fun_name = Qnil;
       if (scm_is_pair (args) && scm_is_pair (scm_cdr (args)))
         {
           SCM arg_list = scm_car (scm_cdr (scm_cdr (args)));
@@ -1904,8 +1985,6 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
             proc = scm_car (arg_list);
         }
 
-      /* If we have the procedure, try to get its name */
-      Lisp_Object fun_name = Qnil;
       if (scm_is_true (scm_procedure_p (proc)))
         {
           SCM proc_name = scm_procedure_name (proc);
@@ -1913,10 +1992,13 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
             fun_name = proc_name;
         }
 
-      /* Signal wrong-number-of-arguments error */
       if (NILP (fun_name))
         fun_name = build_string ("unknown");
-      xsignal2 (Qwrong_number_of_arguments, fun_name, make_fixnum (0));
+
+      /* Throw directly to elisp-condition instead of using xsignal */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qwrong_number_of_arguments,
+                             list2 (fun_name, make_fixnum (0))));
     }
   /* Handle other Guile exceptions */
   else
@@ -1933,8 +2015,9 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
       free (error_msg);
       free (key_str);
 
-      /* Signal generic error */
-      xsignal1 (Qerror, build_string (combined_msg));
+      /* Throw directly to elisp-condition instead of using xsignal */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qerror, list1 (build_string (combined_msg))));
     }
 
   /* Should never reach here */
@@ -2326,18 +2409,28 @@ scm_funcall_body (void *data)
   return SCM_CALL_N (fdata->fun, fdata->args + 1, fdata->numargs);
 }
 
-/* Error handler for Guile exceptions during funcall */
+/* Error handler for Guile exceptions during funcall.
+   Converts Guile exceptions to elisp signals by throwing directly.  */
 static SCM
 scm_funcall_error_handler (void *data, SCM key, SCM args)
 {
   struct scm_funcall_data *fdata = (struct scm_funcall_data *) data;
 
+  /* If this is an elisp condition, re-throw it directly.  */
+  if (scm_is_eq (key, elisp_condition_sym))
+    {
+      scm_throw (key, args);
+      /* scm_throw doesn't return */
+    }
+
   /* Handle wrong-number-of-arguments error */
   if (scm_is_eq (key, scm_from_latin1_symbol ("wrong-number-of-args")))
     {
-      /* Signal Elisp wrong-number-of-arguments error */
-      xsignal2 (Qwrong_number_of_arguments, fdata->original_fun,
-                make_fixnum (fdata->numargs));
+      /* Throw directly to elisp-condition */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qwrong_number_of_arguments,
+                             list2 (fdata->original_fun,
+                                    make_fixnum (fdata->numargs))));
     }
   /* Handle other Guile exceptions by converting to generic Elisp error */
   else
@@ -2354,8 +2447,9 @@ scm_funcall_error_handler (void *data, SCM key, SCM args)
       free (error_msg);
       free (key_str);
 
-      /* Signal generic error */
-      xsignal1 (Qerror, build_string (combined_msg));
+      /* Throw directly to elisp-condition */
+      scm_throw (elisp_condition_sym,
+                 scm_list_2 (Qerror, list1 (build_string (combined_msg))));
     }
 
   /* Should never reach here, but return SCM_UNDEFINED for safety */
@@ -3218,6 +3312,11 @@ void
 syms_of_eval (void)
 {
 #include "eval.x"
+
+  /* Initialize the Guile symbol for condition handling.  */
+  elisp_condition_sym = scm_from_utf8_symbol ("elisp-condition");
+  scm_gc_protect_object (elisp_condition_sym);
+
   DEFVAR_INT ("max-lisp-eval-depth", max_lisp_eval_depth,
 	      doc: /* Limit on depth in `eval', `apply' and `funcall' before error.
 

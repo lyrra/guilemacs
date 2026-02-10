@@ -13,6 +13,7 @@
                 #:select (unparse-tree-il parse-tree-il))
   #:export (nil-value
             t-value
+            catch-all
             value-slot-module
             function-slot-module
             elisp-bool
@@ -165,6 +166,15 @@ toplevel refs via MOD's import chain."
 (define nil-value #nil)
 
 (define t-value #t)
+
+;; catch-all: like Guile's catch with #t, but handler receives (key args-list)
+;; instead of (key arg1 arg2 ...). This makes it easier to use from elisp
+;; where we can't easily use rest parameters in handlers.
+(define (catch-all thunk handler)
+  (catch #t
+    thunk
+    (lambda args
+      (handler (car args) (cdr args)))))
 
 (define make-lisp-string identity)
 (define lisp-string? string?)

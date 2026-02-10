@@ -319,31 +319,88 @@
 
 ;;; Nonlocal exits
 
+;; Helper to convert Guile exception to elisp error
+;; Returns (error-symbol . error-data) pair
+(defun %convert-guile-exception (key args)
+  (cond
+   ;; wrong-number-of-args: (subr fmt-string (proc) #f)
+   ;; where (nth 2 args) is a list containing the procedure
+   ;; -> (wrong-number-of-arguments proc-name actual-count)
+   ((eq key 'wrong-number-of-args)
+    (let* ((fmt-args (if (> (length args) 2) (nth 2 args) nil))
+           (proc (if (consp fmt-args) (car fmt-args) nil))
+           (name (if (and proc (functionp proc))
+                     (funcall (@ (guile) procedure-name) proc)
+                   'unknown)))
+      (cons 'wrong-number-of-arguments (list name 0))))
+
+   ;; wrong-type-arg: (position message (expected got) #f)
+   ;; -> (wrong-type-argument expected got)
+   ((eq key 'wrong-type-arg)
+    (let* ((fmt-args (if (> (length args) 2) (nth 2 args) nil))
+           (expected (if (consp fmt-args) (car fmt-args) nil))
+           (got (if (and (consp fmt-args) (cdr fmt-args)) (cadr fmt-args) nil)))
+      (cons 'wrong-type-argument (list expected got))))
+
+   ;; Default: pass args as-is
+   (t
+    (cons 'error args))))
+
+;; condition-case using Guile's catch for 'elisp-condition.
+;; Also wraps body to catch raw Guile exceptions and convert them.
 (defmacro condition-case (var bodyform &rest handlers)
-  (let ((key (intern-gensym "key"))
-        (error-symbol (intern-gensym "error-symbol"))
-        (data (intern-gensym "data"))
-        (conditions (intern-gensym "conditions")))
-    (flet ((handler->cond-clause (handler)
-             `((or ,@(mapcar #'(lambda (c) `(memq ',c ,conditions))
-                             (if (consp (car handler))
-                                 (car handler)
-                               (list (car handler)))))
-               ,@(cdr handler))))
+  (if (null handlers)
+      bodyform
+    (let ((key-sym (make-symbol "key"))
+          (err-sym-sym (make-symbol "err-sym"))
+          (err-data-sym (make-symbol "err-data"))
+          (conditions-sym (make-symbol "conditions"))
+          (guile-key-sym (make-symbol "guile-key"))
+          (guile-args-sym (make-symbol "guile-args")))
+      ;; Outer catch for elisp-condition
       `(funcall (@ (guile) catch)
                 'elisp-condition
-                #'(lambda () ,bodyform)
-                #'(lambda (,key ,error-symbol ,data)
-                    (declare (lexical ,key ,error-symbol ,data))
-                    (let ((,conditions
-                           (get ,error-symbol 'error-conditions))
+                #'(lambda ()
+                    ;; Inner catch for raw Guile exceptions
+                    (funcall (@ (emacs-elisp runtime) catch-all)
+                             #'(lambda () ,bodyform)
+                             ;; Handler receives (key args-list)
+                             #'(lambda (,guile-key-sym ,guile-args-sym)
+                                 (declare (lexical ,guile-key-sym ,guile-args-sym))
+                                 (if (eq ,guile-key-sym 'elisp-condition)
+                                     ;; Re-throw elisp conditions directly - args-sym is (error-sym error-data)
+                                     (%funcall (@ (guile) apply)
+                                               (@ (guile) throw)
+                                               'elisp-condition
+                                               ,guile-args-sym)
+                                   ;; Convert Guile exceptions to elisp format
+                                   (let ((converted (%convert-guile-exception ,guile-key-sym ,guile-args-sym)))
+                                     (declare (lexical converted))
+                                     (%funcall (@ (guile) throw)
+                                               'elisp-condition
+                                               (car converted)
+                                               (cdr converted)))))))
+                #'(lambda (,key-sym ,err-sym-sym ,err-data-sym)
+                    (declare (lexical ,key-sym ,err-sym-sym ,err-data-sym))
+                    (let ((,conditions-sym (get ,err-sym-sym 'error-conditions))
                           ,@(if var
-                                `((,var (cons ,error-symbol ,data)))
-                              '()))
-                      (declare (lexical ,conditions
-                                        ,@(if var `(,var) '())))
-                      (cond ,@(mapcar #'handler->cond-clause handlers)
-                            (t (signal ,error-symbol ,data)))))))))
+                                `((,var (cons ,err-sym-sym ,err-data-sym)))
+                              nil))
+                      (declare (lexical ,conditions-sym ,@(if var `(,var) nil)))
+                      (cond
+                       ,@(mapcar
+                          #'(lambda (handler)
+                              (let ((conds (car handler))
+                                    (body (cdr handler)))
+                                `(,(if (eq conds t)
+                                       t
+                                     (if (consp conds)
+                                         `(or ,@(mapcar #'(lambda (c) `(memq ',c ,conditions-sym)) conds))
+                                       `(memq ',conds ,conditions-sym)))
+                                  ,@body)))
+                          handlers)
+                       ;; No handler matched, re-signal
+                       (t (signal ,err-sym-sym ,err-data-sym)))))))))
 
 (put 'error 'error-conditions '(error))
 (put 'wrong-type-argument 'error-conditions '(wrong-type-argument error))
@@ -351,26 +408,8 @@
 (put 'no-catch 'error-conditions '(no-catch error))
 (put 'throw 'error-conditions '(throw))
 
-(defvar %catch nil)
-
-(defmacro catch (tag &rest body)
-  (let ((tag-value (make-symbol "tag-value"))
-        (c (make-symbol "c"))
-        (data (make-symbol "data")))
-    `(let ((,tag-value ,tag))
-       (declare (lexical ,tag-value))
-       (condition-case ,c
-           (let ((%catch t))
-             ,@body)
-         (throw
-          (let ((,data (cdr ,c)))
-            (declare (lexical ,data))
-            (if (eq (car ,data) ,tag-value)
-                (car (cdr ,data))
-              (apply #'throw ,data))))))))
-
-(defun throw (tag value)
-  (signal (if %catch 'throw 'no-catch) (list tag value)))
+;; catch uses call-with-catch (C mechanism)
+;; throw is the C primitive Fthrow
 
 ;; Random number generation
 
@@ -408,24 +447,7 @@
 (defmacro catch (tag &rest body)
   `(call-with-catch ,tag #'(lambda () ,@body)))
 
-;; This macro uses call-with-handler which pushes handlers onto a LIFO stack.
-;; We reverse args so first-defined handlers are pushed last (on top), ensuring
-;; specific handlers like (void-variable ...) are checked before generic (error ...).
-(defmacro condition-case (var bodyform &rest args)
-  (if (consp args)
-      (let* ((reversed-args (reverse args))
-             (handler (car reversed-args))
-             (handlers (cdr reversed-args))
-             (handler-conditions (car handler))
-             (handler-body (cdr handler)))
-        `(call-with-handler ',var
-                            ',handler-conditions
-                            #'(lambda () ,@handler-body)
-                            #'(lambda ()
-                                (condition-case ,var
-                                    ,bodyform
-                                  ,@handlers))))
-    bodyform))
+;; Note: condition-case is defined earlier using call-with-handler.
 
 (defun backtrace-frame (nframes)
   (let* ((stack (funcall (@ (guile) make-stack) t))
