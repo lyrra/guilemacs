@@ -4564,7 +4564,7 @@ extern Lisp_Object funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp
 extern Lisp_Object eval_sub (Lisp_Object form);
 extern Lisp_Object apply1 (Lisp_Object, Lisp_Object);
 extern Lisp_Object internal_catch (Lisp_Object, Lisp_Object (*) (Lisp_Object), Lisp_Object);
-extern Lisp_Object internal_lisp_condition_case (Lisp_Object, Lisp_Object, Lisp_Object);
+/* internal_lisp_condition_case removed - condition-case uses boot.el */
 extern Lisp_Object internal_condition_case (Lisp_Object (*) (void), Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_1 (Lisp_Object (*) (Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));
 extern Lisp_Object internal_condition_case_2 (Lisp_Object (*) (Lisp_Object, Lisp_Object), Lisp_Object, Lisp_Object, Lisp_Object, Lisp_Object (*) (Lisp_Object));

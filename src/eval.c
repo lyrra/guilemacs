@@ -125,21 +125,7 @@ make_catch_handler (Lisp_Object tag)
   return c;
 }
 
-struct handler *
-make_condition_handler (Lisp_Object tag)
-{
-  struct handler *c = xmalloc (sizeof (*c));
-  c->type = CONDITION_CASE;
-  c->tag_or_ch = tag;
-  c->val = Qnil;
-  c->var = Qnil;
-  c->body = Qnil;
-  c->next = handlerlist;
-  c->_lisp_eval_depth = lisp_eval_depth;
-  c->interrupt_input_blocked = interrupt_input_blocked;
-  c->ptag = make_prompt_tag ();
-  return c;
-}
+/* make_condition_handler removed - condition-case now uses Guile catch */
 
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
@@ -746,84 +732,7 @@ set_handlerlist (void *data)
   handlerlist = data;
 }
 
-static void
-restore_handler (void *data)
-{
-  struct handler *c = data;
-  unblock_input_to (c->interrupt_input_blocked);
-}
-
-struct icc_thunk_env
-{
-  enum { ICC_0, ICC_1, ICC_2, ICC_3, ICC_N } type;
-  union
-  {
-    Lisp_Object (*fun0) (void);
-    Lisp_Object (*fun1) (Lisp_Object);
-    Lisp_Object (*fun2) (Lisp_Object, Lisp_Object);
-    Lisp_Object (*fun3) (Lisp_Object, Lisp_Object, Lisp_Object);
-    Lisp_Object (*funn) (ptrdiff_t, Lisp_Object *);
-  };
-  union
-  {
-    struct
-    {
-      Lisp_Object arg1;
-      Lisp_Object arg2;
-      Lisp_Object arg3;
-      Lisp_Object arg4;
-      Lisp_Object arg5;
-    };
-    struct
-    {
-      ptrdiff_t nargs;
-      Lisp_Object *args;
-    };
-  };
-  struct handler *c;
-};
-
-static Lisp_Object
-icc_thunk (void *data)
-{
-  Lisp_Object tem;
-  struct icc_thunk_env *e = data;
-  scm_dynwind_begin (0);
-  scm_dynwind_unwind_handler (restore_handler, e->c, 0);
-  scm_dynwind_unwind_handler (set_handlerlist,
-                              handlerlist,
-                              SCM_F_WIND_EXPLICITLY);
-  handlerlist = e->c;
-  switch (e->type)
-    {
-    case ICC_0:
-      tem = e->fun0 ();
-      break;
-    case ICC_1:
-      tem = e->fun1 (e->arg1);
-      break;
-    case ICC_2:
-      tem = e->fun2 (e->arg1, e->arg2);
-      break;
-    case ICC_3:
-      tem = e->fun3 (e->arg1, e->arg2, e->arg3);
-      break;
-    case ICC_N:
-      tem = e->funn (e->nargs, e->args);
-      break;
-    default:
-      emacs_abort ();
-    }
-  scm_dynwind_end ();
-  return tem;
-}
-
-static Lisp_Object
-icc_handler (void *data, Lisp_Object k, Lisp_Object v)
-{
-  Lisp_Object (*f) (Lisp_Object) = data;
-  return f (v);
-}
+/* icc_thunk, icc_handler, restore_handler removed - condition-case now uses Guile catch */
 
 /* Guile-based condition handling structures and functions.
    These use scm_c_catch with 'elisp-condition key instead of
@@ -951,35 +860,7 @@ guile_condition_handler_n (void *data, SCM key, SCM args)
     }
 }
 
-struct icc_handler_n_env
-{
-  Lisp_Object (*fun) (Lisp_Object, ptrdiff_t, Lisp_Object *);
-  ptrdiff_t nargs;
-  Lisp_Object *args;
-};
-
-static Lisp_Object
-icc_handler_n (void *data, Lisp_Object k, Lisp_Object v)
-{
-  struct icc_handler_n_env *e = data;
-  return e->fun (v, e->nargs, e->args);
-}
-
-static Lisp_Object
-icc_lisp_handler (void *data, Lisp_Object k, Lisp_Object val)
-{
-  Lisp_Object tem;
-  struct handler *h = data;
-  Lisp_Object var = h->var;
-  scm_dynwind_begin (0);
-  if (!NILP (var))
-    {
-specbind_guile (var, val);
-    }
-  tem = Fprogn (h->body);
-  scm_dynwind_end ();
-  return tem;
-}
+/* icc_handler_n, icc_lisp_handler removed - condition-case now uses Guile catch */
 
 /* Set up a catch, then call C function FUNC on argument ARG.
    FUNC should return a Lisp_Object.
@@ -1065,12 +946,7 @@ internal_catch (Lisp_Object tag,
 
 static Lisp_Object unbind_to_1 (ptrdiff_t, Lisp_Object, bool);
 
-static AVOID
-unwind_to_catch (struct handler *catch, enum nonlocal_exit type,
-                 Lisp_Object value)
-{
-  abort_to_prompt (catch->ptag, scm_list_1 (value));
-}
+/* unwind_to_catch removed - catch/throw uses Guile's scm_throw */
 
 DEFUN ("throw", Fthrow, Sthrow, 2, 2, 0,
        doc: /* Throw to the catch for TAG and return VALUE from it.
@@ -1091,47 +967,7 @@ Both TAG and VALUE are evalled.  */
   emacs_abort ();
 }
 
-DEFUN ("call-with-handler", Fcall_with_handler, Scall_with_handler, 4, 4, 0,
-       doc: /* Regain control when an error is signaled.
-Executes BODYFORM and returns its value if no error happens.
-Each element of HANDLERS looks like (CONDITION-NAME BODY...)
-or (:success BODY...), where the BODY is made of Lisp expressions.
-
-A handler is applicable to an error if CONDITION-NAME is one of the
-error's condition names.  Handlers may also apply when non-error
-symbols are signaled (e.g., `quit').  A CONDITION-NAME of t applies to
-any symbol, including non-error symbols.  If multiple handlers are
-applicable, only the first one runs.
-
-The car of a handler may be a list of condition names instead of a
-single condition name; then it handles all of them.  If the special
-condition name `debug' is present in this list, it allows another
-condition in the list to run the debugger if `debug-on-error' and the
-other usual mechanisms say it should (otherwise, `condition-case'
-suppresses the debugger).
-
-When a handler handles an error, control returns to the `condition-case'
-and it executes the handler's BODY...
-with VAR bound to (ERROR-SYMBOL . SIGNAL-DATA) from the error.
-\(If VAR is nil, the handler can't access that information.)
-Then the value of the last BODY form is returned from the `condition-case'
-expression.
-
-The special handler (:success BODY...) is invoked if BODYFORM terminated
-without signaling an error.  BODY is then evaluated with VAR bound to
-the value returned by BODYFORM.
-
-See also the function `signal' for more info.
-usage: (condition-case VAR BODYFORM &rest HANDLERS)  */)
-  (Lisp_Object var,
-   Lisp_Object conditions,
-   Lisp_Object hthunk,
-   Lisp_Object thunk)
-{
-  return internal_lisp_condition_case (var,
-                                       list2 (intern ("funcall"), thunk),
-                                       list1 (list2 (conditions, list2 (intern ("funcall"), hthunk))));
-}
+/* Fcall_with_handler removed - condition-case uses boot.el Guile catch */
 
 /* Push a handler-bind handler.
    Currently disabled - handler-bind is a no-op until we implement
@@ -1184,66 +1020,7 @@ usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
   return ret;
 }
 
-static Lisp_Object
-ilcc1 (Lisp_Object var, Lisp_Object bodyform, Lisp_Object handlers)
-{
-  if (CONSP (handlers))
-    {
-      Lisp_Object clause = XCAR (handlers);
-      Lisp_Object condition = XCAR (clause);
-      Lisp_Object body = XCDR (clause);
-      if (!CONSP (condition))
-        condition = Fcons (condition, Qnil);
-      struct handler *c = make_condition_handler (condition);
-      c->var = var;
-      c->body = body;
-      struct icc_thunk_env env = { .type = ICC_3,
-                                   .fun3 = ilcc1,
-                                   .arg1 = var,
-                                   .arg2 = bodyform,
-                                   .arg3 = XCDR (handlers),
-                                   .c = c };
-      return call_with_prompt (c->ptag,
-                               make_c_closure (icc_thunk, &env, 0, 0),
-                               make_c_closure (icc_lisp_handler, c, 2, 0));
-    }
-  else
-    {
-      return eval_sub (bodyform);
-    }
-}
-
-/* Like Fcondition_case, but the args are separate
-   rather than passed in a list.  Used by Fbyte_code.  */
-
-Lisp_Object
-internal_lisp_condition_case (Lisp_Object var, Lisp_Object bodyform,
-			      Lisp_Object handlers)
-{
-  struct handler *volatile oldhandlerlist = handlerlist;
-
-  CHECK_TYPE (BARE_SYMBOL_P (var), Qsymbolp, var);
-
-  Lisp_Object success_handler = Qnil;
-
-  for (Lisp_Object tail = handlers; CONSP (tail); tail = XCDR (tail))
-    {
-      Lisp_Object tem = XCAR (tail);
-      if (! (NILP (tem)
-	     || (CONSP (tem)
-		 && (SYMBOLP (XCAR (tem))
-		     || CONSP (XCAR (tem))))))
-	error ("Invalid condition handler: %s",
-	       SDATA (Fprin1_to_string (tem, Qt, Qnil)));
-      if (CONSP (tem) && EQ (XCAR (tem), QCsuccess))
-	success_handler = tem;
-      // FIX-20240823: guilemacs, not used?
-      //else
-	//clausenb++;
-    }
-
-  return ilcc1 (var, bodyform, Freverse (handlers));
-}
+/* ilcc1 and internal_lisp_condition_case removed - condition-case uses boot.el Guile catch */
 
 /* Call the function BFUN with no arguments, catching errors within it
    according to HANDLERS.  If there is an error, call HFUN with
@@ -1353,74 +1130,14 @@ Lisp_Object
 internal_catch_all (Lisp_Object (*function) (void *), void *argument,
                     Lisp_Object (*handler) (enum nonlocal_exit, Lisp_Object))
 {
-  /*
-  struct handler *c = push_handler_nosignal (Qt, CATCHER_ALL);
-  if (c == NULL)
-    return Qcatch_all_memory_full;
-
-  if (sys_setjmp (c->jmp) == 0)
-    {
-      Lisp_Object val = function (argument);
-      eassert (handlerlist == c);
-      handlerlist = c->next;
-      return val;
-    }
-  else
-    {
-      eassert (handlerlist == c);
-      enum nonlocal_exit type = c->nonlocal_exit;
-      Lisp_Object val = c->val;
-      handlerlist = c->next;
-      return handler (type, val);
-    }
-  */
+  /* Simplified - now uses Guile catch mechanism */
   return internal_condition_case_1 (function, argument, Qnil, handler);
 }
 
-/*
-struct handler *
-push_handler (Lisp_Object tag_ch_val, enum handlertype handlertype)
-{
-  struct handler *c = push_handler_nosignal (tag_ch_val, handlertype);
-  if (!c)
-    memory_full (sizeof *c);
-  return c;
-}
+/* push_handler and push_handler_nosignal removed - uses Guile catch */
 
-struct handler *
-push_handler_nosignal (Lisp_Object tag_ch_val, enum handlertype handlertype)
-{
-  struct handler *c = handlerlist->nextfree;
-  if (!c)
-    {
-      c = malloc (sizeof *c);
-      if (!c)
-	return c;
-      if (profiler_memory_running)
-	malloc_probe (sizeof *c);
-      c->nextfree = NULL;
-      handlerlist->nextfree = c;
-    }
-  c->type = handlertype;
-  c->tag_or_ch = tag_ch_val;
-  c->val = Qnil;
-  c->next = handlerlist;
-  c->f_lisp_eval_depth = lisp_eval_depth;
-  c->pdlcount = SPECPDL_INDEX ();
-  c->act_rec = get_act_rec (current_thread);
-  c->poll_suppress_count = poll_suppress_count;
-  c->interrupt_input_blocked = interrupt_input_blocked;
-#ifdef HAVE_X_WINDOWS
-  c->x_error_handler_depth = x_error_message_count;
-#endif
-  handlerlist = c;
-  return c;
-}
-*/
-
-
 static Lisp_Object signal_or_quit (Lisp_Object, Lisp_Object, bool);
-static Lisp_Object find_handler_clause (Lisp_Object, Lisp_Object);
+/* find_handler_clause removed - unused with Guile catch mechanism */
 static bool maybe_call_debugger (Lisp_Object conditions, Lisp_Object error);
 
 static void
@@ -1699,29 +1416,7 @@ maybe_call_debugger (Lisp_Object conditions, Lisp_Object error)
   return 0;
 }
 
-static Lisp_Object
-find_handler_clause (Lisp_Object handlers, Lisp_Object conditions)
-{
-  register Lisp_Object h;
-
-  /* t is used by handlers for all conditions, set up by C code.  */
-  /* error is used similarly, but means print an error message
-     and run the debugger if that is enabled.  */
-  if (!CONSP (handlers))
-    return handlers;
-
-  for (h = handlers; CONSP (h); h = XCDR (h))
-    {
-      Lisp_Object handler = XCAR (h);
-      if (!NILP (Fmemq (handler, conditions))
-          /* t is also used as a catch-all by Lisp code.  */
-          || EQ (handler, Qt))
-	return handlers;
-    }
-
-  return Qnil;
-}
-
+/* find_handler_clause removed - unused with Guile catch mechanism */
 
 /* Format and return a string; called like vprintf.  */
 Lisp_Object
