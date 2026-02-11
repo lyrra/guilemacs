@@ -4572,11 +4572,9 @@ extern Lisp_Object internal_condition_case_n
     (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
      Lisp_Object, Lisp_Object (*) (Lisp_Object, ptrdiff_t, Lisp_Object *));
 extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Object (*) (enum nonlocal_exit, Lisp_Object));
-extern struct handler *push_handler (Lisp_Object, enum handlertype)
-  ATTRIBUTE_RETURNS_NONNULL;
+/* push_handler and push_handler_nosignal removed - uses Guile catch */
 extern void pop_handler (void);
 extern bool push_handler_bind (Lisp_Object, Lisp_Object, int);
-extern struct handler *push_handler_nosignal (Lisp_Object, enum handlertype);
 extern void specbind_guile (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);

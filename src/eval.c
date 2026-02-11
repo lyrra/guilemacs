@@ -109,19 +109,17 @@ specpdl_kboard (union specbinding *pdl)
   return pdl->let.where.kbd;
 }
 
+/* Create a minimal handler for use as handlerlist sentinel.
+   With Guile-based condition system, this is just a placeholder -
+   nothing actually pushes to or walks the handlerlist anymore.  */
 struct handler *
 make_catch_handler (Lisp_Object tag)
 {
   struct handler *c = xmalloc (sizeof (*c));
+  memset (c, 0, sizeof (*c));
   c->type = CATCHER;
   c->tag_or_ch = tag;
-  c->val = Qnil;
-  c->var = Qnil;
-  c->body = Qnil;
-  c->next = handlerlist;
-  c->_lisp_eval_depth = lisp_eval_depth;
-  c->interrupt_input_blocked = interrupt_input_blocked;
-  c->ptag = make_prompt_tag ();
+  c->next = NULL;
   return c;
 }
 
@@ -726,12 +724,7 @@ pop_handler (void)
   handlerlist = handlerlist->next;
 }
 
-static void
-set_handlerlist (void *data)
-{
-  handlerlist = data;
-}
-
+/* set_handlerlist removed - no longer needed */
 /* icc_thunk, icc_handler, restore_handler removed - condition-case now uses Guile catch */
 
 /* Guile-based condition handling structures and functions.
@@ -881,18 +874,8 @@ static SCM
 internal_catch_body (void *data)
 {
   struct internal_catch_env *env = data;
-
-  /* Save and restore handlerlist on unwind, so handlers pushed by
-     code inside the body are properly cleaned up if a throw happens.  */
-  scm_dynwind_begin (0);
-  scm_dynwind_unwind_handler (set_handlerlist,
-                              handlerlist,
-                              SCM_F_WIND_EXPLICITLY);
-
-  Lisp_Object result = env->func (env->arg);
-
-  scm_dynwind_end ();
-  return result;
+  /* No longer need to save/restore handlerlist - nothing pushes to it anymore */
+  return env->func (env->arg);
 }
 
 /* Handler function for scm_c_catch in internal_catch.

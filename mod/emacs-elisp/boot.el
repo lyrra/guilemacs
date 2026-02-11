@@ -459,7 +459,7 @@
 (defmacro catch (tag &rest body)
   `(call-with-catch ,tag #'(lambda () ,@body)))
 
-;; Note: condition-case is defined earlier using call-with-handler.
+;; Note: condition-case is defined earlier using Guile's catch with 'elisp-condition.
 
 (defun backtrace-frame (nframes)
   (let* ((stack (funcall (@ (guile) make-stack) t))
