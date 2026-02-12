@@ -45,6 +45,7 @@
   "test/pre/stringp.scm"
   "test/pre/natnump.scm"
   "test/pre/integer-or-marker-p.scm"
+  "test/pre/number-or-marker-p.scm"
   "test/pre/fns.scm"
   "test/pre/random.scm"
   "test/pre/time.scm"

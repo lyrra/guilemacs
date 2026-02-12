@@ -37,3 +37,47 @@
 ;   (stringp-vector "[1 2 3]" nil)
 ;   (stringp-empty-list '() nil)
     ))
+
+; FIX-20260212-guilemacs, what is the status with stringp and text-properties?
+'(deftest stringp-propertized-string (ok)
+  (el-expr `(if (stringp (propertize "\"hello\"" 'face 'bold))
+                (print 'ok)
+              (print 'fail))))
+
+'(deftest stringp-buffer-substring-with-props (ok)
+  (el-expr `(let ((buf (get-buffer-create "\" *stringp-test*\"")))
+              (set-buffer buf)
+              (erase-buffer)
+              (insert (propertize "\"hello\"" 'face 'bold))
+              (let ((s (buffer-substring (point-min) (point-max))))
+                (kill-buffer buf)
+                (if (stringp s)
+                    (print 'ok)
+                  (print 'fail))))))
+
+'(deftest stringp-buffer-string-with-props (ok)
+  (el-expr `(let ((buf (get-buffer-create "\" *stringp-test2*\"")))
+              (set-buffer buf)
+              (erase-buffer)
+              (insert (propertize "\"world\"" 'custom-prop 'value))
+              (let ((s (buffer-string)))
+                (kill-buffer buf)
+                (if (stringp s)
+                    (print 'ok)
+                  (print 'fail))))))
+
+;; Test that triggers "Wrong type argument: stringp, <number>" when bug exists.
+;; This simulates the eshell error where stringp returning nil causes code to
+;; fall through and pass a buffer position to string-match.
+'(deftest stringp-trigger-wrong-type-error (ok)
+  (el-expr `(let ((buf (get-buffer-create "\" *trigger-test*\"")))
+              (set-buffer buf)
+              (erase-buffer)
+              (insert "\"prefix text\"")
+              (let ((input (propertize "\"echo\"" 'face 'bold)))
+                (let ((cmd (if (stringp input)
+                               input
+                             (point))))
+                  (string-match "\"echo\"" cmd)
+                  (kill-buffer buf)
+                  (print 'ok))))))
