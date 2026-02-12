@@ -29,14 +29,14 @@
 (eval-when-compile (require 'cl-lib))
 (require 'subr-x)
 
-(ert-deftest eval-tests--bug24673 ()
+'(ert-deftest eval-tests--bug24673 ()
   "Check that Bug#24673 has been fixed."
   ;; This should not crash.
   (should-error (funcall '(closure)) :type 'invalid-function))
 
 (defvar byte-compile-debug)
 
-(ert-deftest eval-tests--bugs-24912-and-24913 ()
+'(ert-deftest eval-tests--bugs-24912-and-24913 ()
   "Check that Emacs doesn't accept weird argument lists.
 Bug#24912 and Bug#24913."
   (dolist (lb '(t false))
@@ -57,7 +57,7 @@ Bug#24912 and Bug#24913."
             (let ((byte-compile-debug t))
               (should-error (eval `(byte-compile (lambda ,args)) lb)))))))))
 
-(ert-deftest eval-tests-accept-empty-optional ()
+'(ert-deftest eval-tests-accept-empty-optional ()
   "Check that Emacs accepts empty &optional arglists.
 Bug#24912."
   (dolist (lb '(t false))
@@ -75,7 +75,7 @@ Bug#24912."
                   (should (eq (funcall (byte-compile fun)) 'ok)))))))))))
 
 
-(dolist (form '(let let*))
+'(dolist (form '(let let*))
   (dolist (arg '(1 "a" [a]))
     (eval
      `(ert-deftest ,(intern (format "eval-tests--%s--%s" form (type-of arg))) ()
@@ -84,7 +84,7 @@ Bug#24912."
         (should-error (,form ,arg) :type 'wrong-type-argument))
      t)))
 
-(ert-deftest eval-tests--if-dot-string ()
+'(ert-deftest eval-tests--if-dot-string ()
   "Check that Emacs rejects (if . \"string\")."
   (should-error (eval '(if . "abc") nil) :type 'wrong-type-argument)
   (should-error (eval '(if . "abc") t) :type 'wrong-type-argument)
@@ -95,7 +95,7 @@ Bug#24912."
     (should-error (eval (cons 'if if-tail) nil) :type 'void-variable)
     (should-error (eval (cons 'if if-tail) t) :type 'void-variable)))
 
-(ert-deftest eval-tests--let-with-circular-defs ()
+'(ert-deftest eval-tests--let-with-circular-defs ()
   "Check that Emacs reports an error for (let VARS ...) when VARS is circular."
   (let ((vars (list 'v)))
     (setcdr vars vars)
@@ -108,7 +108,7 @@ Bug#24912."
     (should-error (eval (cons 'cond clauses) nil))
     (should-error (eval (cons 'cond clauses) t))))
 
-(ert-deftest defvar/bug31072 ()
+'(ert-deftest defvar/bug31072 ()
   "Check that Bug#31072 is fixed."
   (should-error (eval '(defvar 1) t) :type 'wrong-type-argument))
 
@@ -171,7 +171,7 @@ expressions works for identifiers starting with period."
   (should (equal (let ((.x 'identity)) (eval `(,.x 'ok) nil)) 'ok))
   (should (equal (let ((.x 'identity)) (eval `(,.x 'ok) t)) 'ok)))
 
-(ert-deftest eval-tests/backtrace-in-batch-mode ()
+'(ert-deftest eval-tests/backtrace-in-batch-mode ()
   (let ((emacs (expand-file-name invocation-name invocation-directory)))
     (skip-unless (file-executable-p emacs))
     (with-temp-buffer
@@ -189,7 +189,7 @@ expressions works for identifiers starting with period."
         (search-forward "  foo()")
         (search-forward "  normal-top-level()")))))
 
-(ert-deftest eval-tests/backtrace-in-batch-mode/inhibit ()
+'(ert-deftest eval-tests/backtrace-in-batch-mode/inhibit ()
   (let ((emacs (expand-file-name invocation-name invocation-directory)))
     (skip-unless (file-executable-p emacs))
     (with-temp-buffer
@@ -206,7 +206,7 @@ expressions works for identifiers starting with period."
         (should-not (eql status 0)))
       (should (equal (string-trim (buffer-string)) "Boo")))))
 
-(ert-deftest eval-tests/backtrace-in-batch-mode/demoted-errors ()
+'(ert-deftest eval-tests/backtrace-in-batch-mode/demoted-errors ()
   (let ((emacs (expand-file-name invocation-name invocation-directory)))
     (skip-unless (file-executable-p emacs))
     (with-temp-buffer
@@ -220,7 +220,7 @@ expressions works for identifiers starting with period."
       (should (equal (string-trim (buffer-string))
                      "Error: (error \"Boo\")")))))
 
-(ert-deftest eval-tests/funcall-with-delayed-message ()
+'(ert-deftest eval-tests/funcall-with-delayed-message ()
   ;; Check that `funcall-with-delayed-message' displays its message before
   ;; its function terminates if the timeout is short enough.
 
@@ -316,7 +316,7 @@ expressions works for identifiers starting with period."
         (should (eq 'default-value (default-value 'eval-tests/buffer-local-var)))
         (should (eq 'default-value eval-tests/buffer-local-var))))))
 
-(ert-deftest eval-tests--handler-bind ()
+'(ert-deftest eval-tests--handler-bind ()
   ;; A `handler-bind' has no effect if no error is signaled.
   (should (equal (catch 'tag
                    (handler-bind ((error (lambda (_err) (throw 'tag 'wow))))
@@ -353,7 +353,7 @@ expressions works for identifiers starting with period."
                    (error 'plain-error))
                  'wrong-type-argument)))
 
-(ert-deftest eval-tests--error-id ()
+'(ert-deftest eval-tests--error-id ()
   (let* (inner-error
          (outer-error
           (condition-case err
@@ -362,7 +362,7 @@ expressions works for identifiers starting with period."
             (error err))))
     (should (eq inner-error outer-error))))
 
-(ert-deftest eval-bad-specbind ()
+'(ert-deftest eval-bad-specbind ()
   (should-error (eval '(let (((a b) 23)) (+ 1 2)) t)
                 :type 'wrong-type-argument)
   (should-error (eval '(let* (((a b) 23)) (+ 1 2)) t)

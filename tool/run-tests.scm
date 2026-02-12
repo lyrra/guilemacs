@@ -62,6 +62,9 @@
   "test/pre/miscvar.scm"
   )
 (group
+  "test/src/eval-tests.el"
+  )
+(group
   "test/src/timefns-tests.el"
   )
 (group
