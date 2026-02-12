@@ -109,22 +109,6 @@ specpdl_kboard (union specbinding *pdl)
   return pdl->let.where.kbd;
 }
 
-/* Create a minimal handler for use as handlerlist sentinel.
-   With Guile-based condition system, this is just a placeholder -
-   nothing actually pushes to or walks the handlerlist anymore.  */
-struct handler *
-make_catch_handler (Lisp_Object tag)
-{
-  struct handler *c = xmalloc (sizeof (*c));
-  memset (c, 0, sizeof (*c));
-  c->type = CATCHER;
-  c->tag_or_ch = tag;
-  c->next = NULL;
-  return c;
-}
-
-/* make_condition_handler removed - condition-case now uses Guile catch */
-
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
 
@@ -157,14 +141,10 @@ init_eval_once (void)
   //scm_set_smob_apply (lisp_vectorlike_tag, apply_lambda, 0, 0, 1);
 }
 
-/*static struct handler *handlerlist_sentinel;*/
-
 void
 init_eval (void)
 {
   specpdl_ptr = specpdl;
-  handlerlist_sentinel = make_catch_handler (Qunbound);
-  handlerlist = handlerlist_sentinel;
   Vquit_flag = Qnil;
   debug_on_next_call = 0;
   lisp_eval_depth = 0;
@@ -718,14 +698,8 @@ usage: (catch TAG BODY...)  */)
 
 #define clobbered_eassert(E) static_assert (sizeof (E) != 0)
 
-void
-pop_handler (void)
-{
-  handlerlist = handlerlist->next;
-}
-
-/* set_handlerlist removed - no longer needed */
-/* icc_thunk, icc_handler, restore_handler removed - condition-case now uses Guile catch */
+/* pop_handler, set_handlerlist, icc_thunk, icc_handler, restore_handler
+   removed - catch/throw and condition-case now use Guile's exception system.  */
 
 /* Guile-based condition handling structures and functions.
    These use scm_c_catch with 'elisp-condition key instead of
@@ -950,24 +924,7 @@ Both TAG and VALUE are evalled.  */
   emacs_abort ();
 }
 
-/* Fcall_with_handler removed - condition-case uses boot.el Guile catch */
-
-/* Push a handler-bind handler.
-   Currently disabled - handler-bind is a no-op until we implement
-   proper Guile-based handler-bind support.  Returns true if a handler
-   was actually pushed.  */
-bool
-push_handler_bind (Lisp_Object conditions, Lisp_Object handler, int skip)
-{
-  if (!CONSP (conditions))
-    conditions = Fcons (conditions, Qnil);
-  /* TODO: Implement handler-bind using Guile's exception system.
-     For now, handler-bind is a no-op.  */
-  //struct handler *c = push_handler (conditions, HANDLER_BIND);
-  //c->val = handler;
-  //c->bytecode_dest = skip;
-  return false;  /* Nothing pushed */
-}
+/* Fcall_with_handler, push_handler_bind removed - handler-bind needs Guile implementation */
 
 DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
        doc: /* Set up error handlers around execution of BODYFUN.
@@ -981,26 +938,20 @@ or return normally.
 If it returns normally, the search for an error handler continues
 from where it left off.
 
+NOTE: handler-bind is currently a no-op stub.  The handlers are ignored
+and BODYFUN is simply called.  TODO: Implement using Guile's
+with-exception-handler with #:unwind? #f for proper semantics.
+
 usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
 {
   eassert (nargs >= 1);
   Lisp_Object bodyfun = args[0];
-  int count = 0;
   if (nargs % 2 == 0)
     error ("Trailing CONDITIONS without HANDLER in `handler-bind`");
-  for (ptrdiff_t i = nargs - 2; i > 0; i -= 2)
-    {
-      Lisp_Object conditions = args[i], handler = args[i + 1];
-      if (NILP (conditions))
-        continue;
-      if (push_handler_bind (conditions, handler, count))
-        count++;
-    }
-  Lisp_Object ret = call0 (bodyfun);
-  for (; count > 0; count--)
-    pop_handler ();
-  return ret;
+  /* TODO: Implement handler-bind using Guile's with-exception-handler.
+     For now, handler-bind is a no-op - just call the body function.  */
+  return call0 (bodyfun);
 }
 
 /* ilcc1 and internal_lisp_condition_case removed - condition-case uses boot.el Guile catch */

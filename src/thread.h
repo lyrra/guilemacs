@@ -109,19 +109,9 @@ struct thread_state
      should set this to the address of a local variable.  */
   void const *stack_top;
 
-  struct catchtag *m_catchlist;
-#define catchlist (current_thread->m_catchlist)
-
-  /* Chain of condition handlers currently in effect.
-     The elements of this chain are contained in the stack frames
-     of Fcondition_case and internal_condition_case.
-     When an error is signaled (by calling Fsignal),
-     this chain is searched for an element that applies.  */
-  struct handler *m_handlerlist;
-#define handlerlist (current_thread->m_handlerlist)
-
-  struct handler *m_handlerlist_sentinel;
-#define handlerlist_sentinel (current_thread->m_handlerlist_sentinel)
+  /* C handler mechanism (catchlist, handlerlist) removed.
+     catch/throw and condition-case now use Guile's exception system.
+     See CONDITION-SYSTEM-MIGRATION.org for details.  */
 
   /* Pointer to beginning of specpdl.  */
   union specbinding *m_specpdl;

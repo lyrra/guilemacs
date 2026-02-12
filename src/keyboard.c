@@ -1192,17 +1192,10 @@ static Lisp_Object
 top_level_2_body (void *ignore)
 {
   /* If we're in batch mode, print a backtrace unconditionally when
-     encountering an error, to help with debugging.  */
-  bool pushed = false;
-  if (noninteractive)
-    /* FIXME: Should we (re)use `list_of_error` from `xdisp.c`? */
-    pushed = push_handler_bind (list1 (Qerror), Qdebug_early__handler, 0);
-
-  Lisp_Object res = Feval (Vtop_level, Qt);
-
-  if (pushed)
-    pop_handler ();
-  return res;
+     encountering an error, to help with debugging.
+     TODO: handler-bind is currently a no-op, implement using Guile's
+     with-exception-handler when available.  */
+  return Feval (Vtop_level, Qt);
 }
 
 static Lisp_Object

@@ -3490,102 +3490,15 @@ grow_specpdl (void)
     grow_specpdl_allocation ();
 }
 
-/* This structure helps implement the `catch/throw' and `condition-case/signal'
-   control structures as well as 'handler-bind'.
-   A struct handler contains all the information needed to
-   restore the state of the interpreter after a non-local jump.
-
-   Handler structures are chained together in a doubly linked list; the `next'
-   member points to the next outer catchtag and the `nextfree' member points in
-   the other direction to the next inner element (which is typically the next
-   free element since we mostly use it on the deepest handler).
-
-   A call like (throw TAG VAL) searches for a catchtag whose `tag_or_ch'
-   member is TAG, and then unbinds to it.  The `val' member is used to
-   hold VAL while the stack is unwound; `val' is returned as the value
-   of the catch form.  If there is a handler of type CATCHER_ALL, it will
-   be treated as a handler for all invocations of `signal' and `throw';
-   in this case `val' will be set to (ERROR-SYMBOL . DATA) or (TAG . VAL),
-   respectively.  During stack unwinding, `nonlocal_exit' is set to
-   specify the type of nonlocal exit that caused the stack unwinding.
-
-   All the other members are concerned with restoring the interpreter
-   state.
-
-   When running the HANDLER of a 'handler-bind', we need to
-   temporarily "mute" the CONDITION_CASEs and HANDLERs that are "below"
-   the current handler, but without hiding any CATCHERs.  We do that by
-   installing a SKIP_CONDITIONS which tells the search to skip the
-   N next conditions.  */
-
-enum handlertype {
-  CATCHER,                      /* Entry for 'catch'.
-                                   'tag_or_ch' holds the catch's tag.
-                                   'val' holds the retval during longjmp.  */
-  CONDITION_CASE,               /* Entry for 'condition-case'.
-                                   'tag_or_ch' holds the list of conditions.
-                                   'val' holds the retval during longjmp.  */
-  CATCHER_ALL,                  /* Wildcard which catches all 'throw's.
-                                   'tag_or_ch' is unused.
-                                   'val' holds the retval during longjmp.  */
-  HANDLER_BIND,                 /* Entry for 'handler-bind'.
-                                   'tag_or_ch' holds the list of conditions.
-                                   'val' holds the handler function.
-                                   The rest of the handler is unused,
-                                   except for 'bytecode_dest' that holds
-                                   the number of preceding HANDLER_BIND
-                                   entries which belong to the same
-                                   'handler-bind' (and hence need to
-                                   be muted together).  */
-  SKIP_CONDITIONS               /* Mask out the N preceding entries.
-                                   Used while running the handler of
-                                   a HANDLER_BIND to hides the condition
-                                   handlers underneath (and including)
-                                   the 'handler-bind'.
-                                   'tag_or_ch' holds that number, the rest
-                                   is unused.  */
-};
+/* Nonlocal exit type - used by internal_catch_all and callers.
+   The C handler mechanism (struct handler, handlerlist) has been removed;
+   catch/throw and condition-case now use Guile's exception system directly.
+   See CONDITION-SYSTEM-MIGRATION.org for details.  */
 
 enum nonlocal_exit
 {
   NONLOCAL_EXIT_SIGNAL,
   NONLOCAL_EXIT_THROW,
-};
-
-struct handler
-{
-  enum handlertype type;
-  Lisp_Object ptag;
-  Lisp_Object tag_or_ch;
-
-  /* The next two are set by unwind_to_catch.  */
-  enum nonlocal_exit nonlocal_exit;
-  Lisp_Object val;
-  Lisp_Object var;
-  Lisp_Object body;
-  struct handler *next;
-  struct handler *nextfree;
-
-  /* The bytecode interpreter can have several handlers active at the same
-     time, so when we longjmp to one of them, it needs to know which handler
-     this was and what was the corresponding internal state.  This is stored
-     here, and when we longjmp we make sure that handlerlist points to the
-     proper handler.  */
-  Lisp_Object *bytecode_top;
-  int bytecode_dest;
-
-  /* Most global vars are reset to their value via the specpdl mechanism,
-     but a few others are handled by storing their value here.  */
-  sys_jmp_buf jmp;
-  EMACS_INT f_lisp_eval_depth;
-  specpdl_ref pdlcount;
-  struct bc_frame *act_rec;
-  EMACS_INT _lisp_eval_depth;
-  int interrupt_input_blocked;
-
-#ifdef HAVE_X_WINDOWS
-  int x_error_handler_depth;
-#endif
 };
 
 extern Lisp_Object memory_signal_data;
@@ -4572,9 +4485,7 @@ extern Lisp_Object internal_condition_case_n
     (Lisp_Object (*) (ptrdiff_t, Lisp_Object *), ptrdiff_t, Lisp_Object *,
      Lisp_Object, Lisp_Object (*) (Lisp_Object, ptrdiff_t, Lisp_Object *));
 extern Lisp_Object internal_catch_all (Lisp_Object (*) (void *), void *, Lisp_Object (*) (enum nonlocal_exit, Lisp_Object));
-/* push_handler and push_handler_nosignal removed - uses Guile catch */
-extern void pop_handler (void);
-extern bool push_handler_bind (Lisp_Object, Lisp_Object, int);
+/* C handler mechanism removed - uses Guile catch.  See CONDITION-SYSTEM-MIGRATION.org */
 extern void specbind_guile (Lisp_Object, Lisp_Object);
 extern void record_unwind_protect_1 (void (*) (Lisp_Object), Lisp_Object, bool);
 extern void record_unwind_protect (void (*) (Lisp_Object), Lisp_Object);

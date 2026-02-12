@@ -3111,12 +3111,10 @@ static Lisp_Object
 funcall_with_backtraces (ptrdiff_t nargs, Lisp_Object *args)
 {
   /* If an error is signaled during a Lisp hook in redisplay, write a
-     backtrace into the buffer *Redisplay-trace*.  */
-  bool pushed = push_handler_bind (list_of_error, Qdebug_early__muted, 0);
-  Lisp_Object res = Ffuncall (nargs, args);
-  if (pushed)
-    pop_handler ();
-  return res;
+     backtrace into the buffer *Redisplay-trace*.
+     TODO: handler-bind is currently a no-op, implement using Guile's
+     with-exception-handler when available.  */
+  return Ffuncall (nargs, args);
 }
 
 #define SAFE_CALLMANY(inhibit_quit, f, array) \

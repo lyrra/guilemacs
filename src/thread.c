@@ -146,11 +146,10 @@ post_acquire_global_lock (struct thread_state *self)
 #endif /* defined HAVE_ANDROID && !defined ANDROID_STUBIFY */
 
    /* We could have been signaled while waiting to grab the global lock
-      for the first time since this thread was created, in which case
-      we didn't yet have the opportunity to set up the handlers.  Delay
-      raising the signal in that case (it will be actually raised when
-      the thread comes here after acquiring the lock the next time).  */
-  if (!NILP (current_thread->error_symbol) && handlerlist)
+      for the first time since this thread was created.  With Guile's
+      exception system, we can always signal since the thread is managed
+      by Guile from the start.  */
+  if (!NILP (current_thread->error_symbol))
     {
       Lisp_Object sym = current_thread->error_symbol;
       Lisp_Object data = current_thread->error_data;
@@ -752,9 +751,7 @@ run_thread (void *state)
 
   acquire_global_lock (self);
 
-  // RBTT "use libguile dynamic wind + c pseudo-closures"
-  handlerlist_sentinel = make_catch_handler (Qunbound);
-  handlerlist = handlerlist_sentinel;
+  /* C handler mechanism removed - Guile handles exceptions directly.  */
 
   /* It might be nice to do something with errors here.  */
   internal_condition_case (invoke_thread_function, Qt, record_thread_error);
