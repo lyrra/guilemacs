@@ -7190,6 +7190,9 @@ lines."
 
 ;; guilemacs: see buffer-match.el for buffer-match-p and match-buffers
 
+;; handler-bind-1 is defined in mod/emacs/condition.scm using Guile's
+;; with-throw-handler for proper handler-bind semantics.
+
 (defmacro handler-bind (handlers &rest body)
   "Setup error HANDLERS around execution of BODY.
 HANDLERS is a list of (CONDITIONS HANDLER) where

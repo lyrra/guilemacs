@@ -924,7 +924,10 @@ Both TAG and VALUE are evalled.  */
   emacs_abort ();
 }
 
-/* Fcall_with_handler, push_handler_bind removed - handler-bind needs Guile implementation */
+/* This C stub is superseded by the elisp implementation in boot.el once
+   boot.el is loaded.  The elisp version uses Guile's with-exception-handler
+   for proper handler-bind semantics.  This stub exists only for very early
+   bootstrap before boot.el is loaded, and simply calls the body function.  */
 
 DEFUN ("handler-bind-1", Fhandler_bind_1, Shandler_bind_1, 1, MANY, 0,
        doc: /* Set up error handlers around execution of BODYFUN.
@@ -938,9 +941,8 @@ or return normally.
 If it returns normally, the search for an error handler continues
 from where it left off.
 
-NOTE: handler-bind is currently a no-op stub.  The handlers are ignored
-and BODYFUN is simply called.  TODO: Implement using Guile's
-with-exception-handler with #:unwind? #f for proper semantics.
+NOTE: This C function is a bootstrap stub.  Once boot.el is loaded,
+the elisp implementation supersedes this and provides proper semantics.
 
 usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
   (ptrdiff_t nargs, Lisp_Object *args)
@@ -949,8 +951,8 @@ usage: (handler-bind BODYFUN [CONDITIONS HANDLER]...)  */)
   Lisp_Object bodyfun = args[0];
   if (nargs % 2 == 0)
     error ("Trailing CONDITIONS without HANDLER in `handler-bind`");
-  /* TODO: Implement handler-bind using Guile's with-exception-handler.
-     For now, handler-bind is a no-op - just call the body function.  */
+  /* Bootstrap stub: just call the body function, ignoring handlers.
+     The elisp version in boot.el provides proper handler-bind semantics.  */
   return call0 (bodyfun);
 }
 

@@ -27,6 +27,7 @@
   "test/pre/dynamic-binding.scm"
   "test/pre/forwarded-binding.scm"
   "test/pre/condition-case.scm"
+  "test/pre/handler-bind.scm"
   "test/pre/complex-binding.scm"
   "test/pre/specpdl-introspection.scm"
   "test/pre/eq.scm"

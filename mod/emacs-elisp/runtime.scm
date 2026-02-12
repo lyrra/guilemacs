@@ -14,6 +14,7 @@
   #:export (nil-value
             t-value
             catch-all
+            elisp-handler-bind
             value-slot-module
             function-slot-module
             elisp-bool
@@ -175,6 +176,59 @@ toplevel refs via MOD's import chain."
     thunk
     (lambda args
       (handler (car args) (cdr args)))))
+
+;; elisp-handler-bind: implements handler-bind semantics using Guile's
+;; with-throw-handler.  Handlers run within the dynamic extent of
+;; the error (before unwinding).  If a handler returns normally, the
+;; exception continues propagating to outer handlers.
+;;
+;; bodyfun: thunk to execute
+;; conditions-handlers: flat list (conditions1 handler1 conditions2 handler2 ...)
+;;   where conditions is a list of condition symbols
+;;   and handler is a procedure taking (error-symbol . error-data)
+(define (elisp-handler-bind bodyfun conditions-handlers)
+  ;; Helper to check if error-symbol matches conditions list
+  (define (error-matches? error-symbol conditions)
+    (let ((error-conditions (get-error-conditions error-symbol)))
+      (if (null? conditions)
+          #f
+          (let loop ((conds conditions))
+            (cond
+             ((null? conds) #f)
+             ((memq (car conds) error-conditions) #t)
+             (else (loop (cdr conds))))))))
+
+  ;; Get error-conditions property from symbol plist
+  (define (get-error-conditions sym)
+    (let ((plist (symbol-plist sym)))
+      (let loop ((pl plist))
+        (cond
+         ((null? pl) '())
+         ((eq? (car pl) 'error-conditions) (cadr pl))
+         (else (loop (cddr pl)))))))
+
+  ;; Build nested handlers from inside out
+  ;; Each with-throw-handler wraps the next
+  (let loop ((pairs conditions-handlers))
+    (if (or (null? pairs) (not (pair? pairs)))
+        ;; No more handlers, run the body
+        (bodyfun)
+        ;; Install handler for this conditions/handler pair
+        (let ((conditions (car pairs))
+              (handler (cadr pairs))
+              (rest (if (> (length pairs) 2) (cddr pairs) '())))
+          ;; Use with-throw-handler to run handler in dynamic context
+          ;; If handler returns normally, exception continues propagating
+          (with-throw-handler 'elisp-condition
+            (lambda ()
+              ;; Recurse to install remaining handlers, then run body
+              (loop rest))
+            (lambda (key error-symbol error-data)
+              ;; Check if error matches this handler's conditions
+              (when (error-matches? error-symbol conditions)
+                ;; Matches - call handler with (error-symbol . error-data)
+                ;; If handler returns, with-throw-handler re-raises
+                (handler (cons error-symbol error-data)))))))))
 
 (define make-lisp-string identity)
 (define lisp-string? string?)

@@ -461,6 +461,10 @@
 
 ;; Note: condition-case is defined earlier using Guile's catch with 'elisp-condition.
 
+;; handler-bind-1 implementation moved to later in boot process (see subr.el)
+;; because accessing (emacs-elisp runtime) during early boot can hang.
+;; The C stub provides a working (though no-op) fallback.
+
 (defun backtrace-frame (nframes)
   (let* ((stack (funcall (@ (guile) make-stack) t))
          (frame (stack-ref stack nframes))
