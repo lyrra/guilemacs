@@ -456,14 +456,15 @@
                var
              `(setq-default ,@args))))
 
+;; catch: uses elisp-catch from (emacs condition) which catches 'elisp-throw
+;; and matches the tag. Replaces the C call-with-catch for elisp code.
 (defmacro catch (tag &rest body)
-  `(call-with-catch ,tag #'(lambda () ,@body)))
+  `(funcall (@ (emacs condition) elisp-catch) ,tag #'(lambda () ,@body)))
 
 ;; Note: condition-case is defined earlier using Guile's catch with 'elisp-condition.
 
-;; handler-bind-1 implementation moved to later in boot process (see subr.el)
-;; because accessing (emacs-elisp runtime) during early boot can hang.
-;; The C stub provides a working (though no-op) fallback.
+;; handler-bind-1 is defined in (emacs condition) module, loaded during prelude.
+;; The C stub in eval.c provides a no-op fallback for very early bootstrap.
 
 (defun backtrace-frame (nframes)
   (let* ((stack (funcall (@ (guile) make-stack) t))

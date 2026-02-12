@@ -2,13 +2,14 @@
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export
-   (init-condition-registrations))
+   (init-condition-registrations
+    elisp-catch))
 
 ;;; Condition System Support
 ;;;
-;;; This module provides handler-bind-1, the core primitive for handler-bind.
-;;; handler-bind runs handlers in the dynamic extent (before unwinding),
-;;; unlike condition-case which unwinds first.
+;;; This module provides:
+;;; - handler-bind-1: core primitive for handler-bind (runs handlers before unwinding)
+;;; - elisp-catch: Scheme implementation of elisp catch (replaces C call-with-catch)
 
 ;; handler-bind-1: elisp function that wraps elisp-handler-bind from runtime
 ;; Arguments: BODYFUN &rest CONDITIONS-HANDLERS
@@ -26,7 +27,29 @@ signaling code, before unwinding.  If a handler returns normally,
 the error continues propagating to outer handlers."
   (elisp-handler-bind bodyfun conditions-handlers))
 
+;;; Catch/Throw Support
+;;;
+;;; elisp-catch implements the elisp catch semantics using Guile's catch.
+;;; throw uses 'elisp-throw as the Guile key, with (tag value) as args.
+;;; elisp-catch catches 'elisp-throw and compares the thrown tag.
+
+(define (elisp-catch tag thunk)
+  "Catch throws to TAG during execution of THUNK.
+TAG is the elisp catch tag (a symbol).
+THUNK is a zero-argument function to execute.
+
+If (throw TAG VALUE) is called during THUNK, returns VALUE.
+If throw is to a different tag, re-throws to outer catch.
+If no throw occurs, returns the result of THUNK."
+  (catch 'elisp-throw
+    thunk
+    (lambda (key thrown-tag value)
+      (if (eq? thrown-tag tag)
+          value
+          (throw 'elisp-throw thrown-tag value)))))
+
 (define (init-condition-registrations)
   "Initialize condition system registrations."
   ;; handler-bind-1 is registered via define-elisp-inline above
+  ;; elisp-catch is exported directly for use by boot.el
   #t)

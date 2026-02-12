@@ -124,6 +124,36 @@
                (throw 'tag 'inner))
              'outer)))))
 
+;; Test: Throw from deeply nested function call
+(deftest catch-throw-deep (deep-value)
+  (el-expr `(progn
+    (defun inner-throw () (throw 'outer 'deep-value))
+    (defun middle () (inner-throw))
+    (defun outer-fn () (middle))
+    (princ (catch 'outer (outer-fn))))))
+
+;; Test: Catch returning nil value (not same as no catch)
+(deftest catch-throw-nil (nil)
+  (el-expr `(progn
+    (princ (catch 'tag (throw 'tag nil))))))
+
+;; Test: Throw with complex value (list)
+(deftest catch-throw-list (t)
+  (el-expr `(progn
+    (let ((result (catch 'tag (throw 'tag '(a b c)))))
+      (princ (and (eq (car result) 'a)
+                  (eq (car (cdr result)) 'b)
+                  (eq (car (cdr (cdr result))) 'c)))))))
+
+;; Test: Multiple expressions in catch body - throw stops execution
+(deftest catch-throw-stops-body (first)
+  (el-expr `(progn
+    (setq executed nil)
+    (princ (catch 'tag
+             (throw 'tag 'first)
+             (setq executed t)
+             'second)))))
+
 ;; =============================================================================
 ;; UNWIND-PROTECT TESTS
 ;; =============================================================================
