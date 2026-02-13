@@ -68,6 +68,11 @@ static SCM elisp_throw_sym = SCM_BOOL_F;
    See docs/specbind2.org for migration plan.  */
 static SCM push_binding_fn = SCM_BOOL_F;
 static SCM pop_binding_fn = SCM_BOOL_F;
+static SCM find_toplevel_binding_fn = SCM_BOOL_F;
+static SCM set_toplevel_binding_fn = SCM_BOOL_F;
+static SCM symbol_lexbound_fn = SCM_BOOL_F;
+static SCM let_shadows_buffer_binding_fn = SCM_BOOL_F;
+static SCM symbol_has_binding_fn = SCM_BOOL_F;
 
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
@@ -432,14 +437,13 @@ signal a `cyclic-variable-indirection' error.  */)
 	     formatted);
     }
 
+  /* Check if symbol is let-bound using Scheme binding registry (Phase 3).  */
   {
-    union specbinding *p;
-
-    for (p = specpdl_ptr; p > specpdl; )
-      if ((--p)->kind >= SPECPDL_LET
-	  && (EQ (new_alias, specpdl_symbol (p))))
-	error ("Don't know how to make a let-bound variable an alias: %s",
-	       SDATA (SYMBOL_NAME (new_alias)));
+    if (scm_is_false (symbol_has_binding_fn))
+      symbol_has_binding_fn = scm_c_public_ref ("emacs bindings", "symbol-has-binding?");
+    if (!scm_is_false (scm_call_1 (symbol_has_binding_fn, new_alias)))
+      error ("Don't know how to make a let-bound variable an alias: %s",
+	     SDATA (SYMBOL_NAME (new_alias)));
   }
 
   // fix guilemacs, no Qdefvaralias, rebase error?
@@ -485,25 +489,10 @@ default_toplevel_binding (Lisp_Object symbol)
 static bool
 lexbound_p (Lisp_Object symbol)
 {
-  union specbinding *pdl = specpdl_ptr;
-  while (pdl > specpdl)
-    {
-      switch ((--pdl)->kind)
-	{
-	case SPECPDL_LET_DEFAULT:
-	case SPECPDL_LET:
-	  if (BASE_EQ (specpdl_symbol (pdl), Qinternal_interpreter_environment))
-	    {
-	      Lisp_Object env = specpdl_old_value (pdl);
-	      if (CONSP (env) && !NILP (Fassq (symbol, env)))
-	        return true;
-	    }
-	  break;
-
-	default: break;
-	}
-    }
-  return false;
+  /* Use Scheme binding registry for introspection.  */
+  if (scm_is_false (symbol_lexbound_fn))
+    symbol_lexbound_fn = scm_c_public_ref ("emacs bindings", "symbol-lexbound?");
+  return !scm_is_false (scm_call_1 (symbol_lexbound_fn, symbol));
 }
 
 DEFUN ("default-toplevel-value", Fdefault_toplevel_value, Sdefault_toplevel_value, 1, 1, 0,
@@ -511,9 +500,15 @@ DEFUN ("default-toplevel-value", Fdefault_toplevel_value, Sdefault_toplevel_valu
 "Toplevel" means outside of any let binding.  */)
   (Lisp_Object symbol)
 {
-  union specbinding *binding = default_toplevel_binding (symbol);
-  Lisp_Object value
-    = binding ? specpdl_old_value (binding) : Fdefault_value (symbol);
+  /* Use Scheme binding registry for introspection.  */
+  if (scm_is_false (find_toplevel_binding_fn))
+    find_toplevel_binding_fn = scm_c_public_ref ("emacs bindings", "find-toplevel-binding");
+  Lisp_Object value = scm_call_1 (find_toplevel_binding_fn, symbol);
+
+  /* If no binding found in registry, fall back to default-value.  */
+  if (scm_is_false (value))
+    value = Fdefault_value (symbol);
+
   if (!BASE_EQ (value, Qunbound))
     return value;
   xsignal1 (Qvoid_variable, symbol);
@@ -525,11 +520,22 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
 "Toplevel" means outside of any let binding.  */)
      (Lisp_Object symbol, Lisp_Object value)
 {
+  /* Update both C specpdl and Scheme binding registry.
+     The C specpdl is still used for actual value restoration on unbind,
+     while the Scheme registry is for introspection.  */
+
+  /* Update C specpdl (for actual restoration).  */
   union specbinding *binding = default_toplevel_binding (symbol);
   if (binding)
     set_specpdl_old_value (binding, value);
   else
     Fset_default (symbol, value);
+
+  /* Also update Scheme binding registry (for introspection).  */
+  if (scm_is_false (set_toplevel_binding_fn))
+    set_toplevel_binding_fn = scm_c_public_ref ("emacs bindings", "set-toplevel-binding!");
+  scm_call_2 (set_toplevel_binding_fn, symbol, value);
+
   return Qnil;
 }
 
@@ -2593,21 +2599,11 @@ lambda_arity (Lisp_Object fun)
 bool
 let_shadows_buffer_binding_p (sym_t symbol)
 {
-  union specbinding *p;
+  /* Use Scheme binding registry for introspection.  */
+  if (scm_is_false (let_shadows_buffer_binding_fn))
+    let_shadows_buffer_binding_fn = scm_c_public_ref ("emacs bindings", "let-shadows-buffer-binding?");
   Lisp_Object buf = Fcurrent_buffer ();
-
-  for (p = specpdl_ptr; p > specpdl; )
-    if ((--p)->kind > SPECPDL_LET)
-      {
-	sym_t let_bound_symbol = XSYMBOL (specpdl_symbol (p));
-	eassert (SYMBOL_REDIRECT (let_bound_symbol) != SYMBOL_VARALIAS);
-	if (symbol == let_bound_symbol
-	    && p->kind != SPECPDL_LET_LOCAL /* bug#62419 */
-	    && BASE_EQ (specpdl_where (p), buf))
-	  return 1;
-      }
-
-  return 0;
+  return !scm_is_false (scm_call_2 (let_shadows_buffer_binding_fn, symbol, buf));
 }
 
 /* `specpdl_ptr' describes which variable is

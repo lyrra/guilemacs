@@ -598,24 +598,30 @@ Dual-write: calls both C specpdl and Scheme binding registry."
         ;; Dual-write: call both C specpdl and Scheme binding registry
         (if (symbol-fbound? 'specpdl-untrack-binding)
             ((symbol-function 'specpdl-untrack-binding)))
-        (pop-binding!)
-        (cond
-          ;; Fast path: re-check that the variable is still PLAINVAL +
-          ;; untrapped.  If make-local-variable was called during the
-          ;; body, the redirect changed to LOCALIZED and slot 4 is now
-          ;; a BLV pointer — we must NOT overwrite it.  Instead, restore
-          ;; the default value via set-default (mirroring C's
-          ;; do_one_unbind fallthrough to set_default_internal).
-          ((and fast
-                (= (vector-ref desc 1) 4)    ;; still SYMBOL_PLAINVAL
-                (= (vector-ref desc 2) 0))   ;; still no trapped write
-           (vector-set! desc 4 old))
-          (fast
-           ;; Was PLAINVAL at bind-time but changed since.
-           ((set-default-fn) symbol old))
-          (buf-local?   (hashq-set! hash symbol old))
-          (let-default? ((set-default-fn) symbol old))
-          (else         (set-symbol-value! symbol old)))))))
+        ;; Pop binding and get the old value from registry.
+        ;; This allows set-default-toplevel-value to modify the old value
+        ;; that will be restored on unbind (for interpreted code).
+        ;; Note: compiled code uses inline dynamic-wind with captured old values,
+        ;; so set-default-toplevel-value won't affect compiled code paths.
+        (let* ((entry (pop-binding!))
+               (restore-val (if entry (vector-ref entry 1) old)))
+          (cond
+            ;; Fast path: re-check that the variable is still PLAINVAL +
+            ;; untrapped.  If make-local-variable was called during the
+            ;; body, the redirect changed to LOCALIZED and slot 4 is now
+            ;; a BLV pointer — we must NOT overwrite it.  Instead, restore
+            ;; the default value via set-default (mirroring C's
+            ;; do_one_unbind fallthrough to set_default_internal).
+            ((and fast
+                  (= (vector-ref desc 1) 4)    ;; still SYMBOL_PLAINVAL
+                  (= (vector-ref desc 2) 0))   ;; still no trapped write
+             (vector-set! desc 4 restore-val))
+            (fast
+             ;; Was PLAINVAL at bind-time but changed since.
+             ((set-default-fn) symbol restore-val))
+            (buf-local?   (hashq-set! hash symbol restore-val))
+            (let-default? ((set-default-fn) symbol restore-val))
+            (else         (set-symbol-value! symbol restore-val))))))))
 
 ;; Helper functions for inline dynamic-wind on complex bindings.
 ;; These allow make-dynlet-one to emit dynamic-wind directly, making the
@@ -677,17 +683,21 @@ Called as dynamic-wind unwinder."
         (buf-local? (vector-ref ctx 4))
         (let-default? (vector-ref ctx 5))
         (hash (vector-ref ctx 2))
-        (old (vector-ref ctx 0)))
+        (ctx-old (vector-ref ctx 0)))
     ;; Untrack from specpdl
     ;; Dual-write: call both C specpdl and Scheme binding registry
     (if (symbol-fbound? 'specpdl-untrack-binding)
         ((symbol-function 'specpdl-untrack-binding)))
-    (pop-binding!)
-    ;; Restore old value via appropriate path
-    (cond
-      (buf-local?   (hashq-set! hash symbol old))
-      (let-default? ((set-default-fn) symbol old))
-      (else         (set-symbol-value! symbol old)))))
+    ;; Pop binding and get the old value from registry.
+    ;; This allows set-default-toplevel-value to modify the old value
+    ;; that will be restored on unbind.
+    (let* ((entry (pop-binding!))
+           (restore-val (if entry (vector-ref entry 1) ctx-old)))
+      ;; Restore old value via appropriate path
+      (cond
+        (buf-local?   (hashq-set! hash symbol restore-val))
+        (let-default? ((set-default-fn) symbol restore-val))
+        (else         (set-symbol-value! symbol restore-val))))))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)

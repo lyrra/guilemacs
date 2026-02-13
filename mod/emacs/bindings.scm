@@ -16,7 +16,9 @@
 
             ;; Introspection
             find-toplevel-binding
+            set-toplevel-binding!
             find-all-bindings
+            symbol-has-binding?
             symbol-lexbound?
             let-shadows-buffer-binding?
 
@@ -116,6 +118,26 @@ This is used by `default-toplevel-value' to find the value before any let bindin
               (loop (cdr stack) (vector-ref entry 1))
               (loop (cdr stack) found))))))
 
+(define (set-toplevel-binding! symbol value)
+  "Set the old-value of the toplevel (outermost) binding for SYMBOL.
+Returns #t if a binding was found and modified, #f otherwise.
+This is used by `set-default-toplevel-value' to modify the toplevel value."
+  (let loop ((stack (*binding-stack*))
+             (found-entry #f))
+    (if (null? stack)
+        ;; Reached end - modify the outermost binding if we found one
+        (if found-entry
+            (begin
+              (vector-set! found-entry 1 value)
+              #t)
+            #f)
+        (let ((entry (car stack)))
+          (if (eq? (vector-ref entry 0) symbol)
+              ;; Found a binding - remember it but continue
+              ;; looking for an even older binding
+              (loop (cdr stack) entry)
+              (loop (cdr stack) found-entry))))))
+
 (define (find-all-bindings symbol)
   "Find all bindings for SYMBOL on the stack.
 Returns a list of binding entries, most recent first.
@@ -123,6 +145,18 @@ For debugging and testing."
   (filter (lambda (entry)
             (eq? (vector-ref entry 0) symbol))
           (*binding-stack*)))
+
+(define (symbol-has-binding? symbol)
+  "Check if SYMBOL has any binding on the stack.
+Returns #t if at least one binding exists, #f otherwise.
+This is used by defvaralias to prevent aliasing let-bound variables."
+  (let loop ((stack (*binding-stack*)))
+    (if (null? stack)
+        #f
+        (let ((entry (car stack)))
+          (if (eq? (vector-ref entry 0) symbol)
+              #t
+              (loop (cdr stack)))))))
 
 (define (symbol-lexbound? symbol)
   "Check if SYMBOL is lexically bound in the interpreter environment.
