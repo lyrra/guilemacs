@@ -353,8 +353,8 @@ Three paths based on variable type:
 IMPORTANT: The thunk wrapping body is bound to a variable once and referenced
 in all branches. This prevents exponential tree growth with nested let-bindings.
 
-All paths include specpdl-track-binding/specpdl-untrack-binding calls so that
-introspection functions like default-toplevel-value work correctly."
+All paths include push-binding!/pop-binding! calls to the Scheme binding registry
+so that introspection functions like default-toplevel-value work correctly."
   (let ((desc-sym (gensym "desc"))
         (plainval-sym (gensym "plainval"))
         (simple-fwd-sym (gensym "simple-fwd"))
@@ -392,15 +392,16 @@ introspection functions like default-toplevel-value work correctly."
                       (make-lexical-ref src 'desc desc-sym)
                       (make-const src 4)))
               (call-primitive src 'dynamic-wind
-                ;; winder: track in specpdl and set new value
+                ;; winder: track in binding registry and set new value
                 (make-lambda src '()
                   (make-lambda-case src '() #f #f #f '() '()
                     (make-seq src
-                      ;; Track in specpdl for introspection (kind=0 means LET)
-                      (make-runtime-call src 'specpdl-track-binding
+                      ;; Track in Scheme binding registry (Phase 4: C specpdl removed)
+                      (make-runtime-call src 'push-binding!
                         (list (make-lexical-ref src 'fluid fluid-sym)
                               (make-lexical-ref src 'old old-sym)
-                              (make-const src 0)))
+                              (make-const src 0)
+                              (make-const src #f)))
                       (call-primitive src 'vector-set!
                         (make-lexical-ref src 'desc desc-sym)
                         (make-const src 4)
@@ -429,8 +430,8 @@ introspection functions like default-toplevel-value work correctly."
                         (make-runtime-call src 'set-symbol-default-value!
                           (list (make-lexical-ref src 'fluid fluid-sym)
                                 (make-lexical-ref src 'old old-sym))))
-                      ;; Untrack from specpdl
-                      (make-runtime-call src 'specpdl-untrack-binding '()))
+                      ;; Pop from Scheme binding registry (Phase 4: C specpdl removed)
+                      (make-runtime-call src 'pop-binding! '()))
                     #f))))
             ;; non-PLAINVAL: check if simple FORWARDED
             (make-let src '(simple-fwd?) (list simple-fwd-sym)
@@ -443,15 +444,16 @@ introspection functions like default-toplevel-value work correctly."
                   (list (make-runtime-call src 'symbol-value
                           (list (make-lexical-ref src 'fluid fluid-sym))))
                   (call-primitive src 'dynamic-wind
-                    ;; winder: track in specpdl and set new value via set-symbol-value!
+                    ;; winder: track in binding registry and set new value via set-symbol-value!
                     (make-lambda src '()
                       (make-lambda-case src '() #f #f #f '() '()
                         (make-seq src
-                          ;; Track in specpdl for introspection (kind=0 means LET)
-                          (make-runtime-call src 'specpdl-track-binding
+                          ;; Track in Scheme binding registry (Phase 4: C specpdl removed)
+                          (make-runtime-call src 'push-binding!
                             (list (make-lexical-ref src 'fluid fluid-sym)
                                   (make-lexical-ref src 'old old-sym)
-                                  (make-const src 0)))
+                                  (make-const src 0)
+                                  (make-const src #f)))
                           (make-runtime-call src 'set-symbol-value!
                             (list (make-lexical-ref src 'fluid fluid-sym)
                                   (make-lexical-ref src 'val val-sym))))
@@ -465,8 +467,8 @@ introspection functions like default-toplevel-value work correctly."
                           (make-runtime-call src 'set-symbol-value!
                             (list (make-lexical-ref src 'fluid fluid-sym)
                                   (make-lexical-ref src 'old old-sym)))
-                          ;; Untrack from specpdl
-                          (make-runtime-call src 'specpdl-untrack-binding '()))
+                          ;; Pop from Scheme binding registry (Phase 4: C specpdl removed)
+                          (make-runtime-call src 'pop-binding! '()))
                         #f))))
                 ;; Complex: buffer-local, kboard, LOCALIZED, VARALIAS
                 ;; inline dynamic-wind with context functions

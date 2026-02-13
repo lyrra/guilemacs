@@ -2644,10 +2644,7 @@ unbind_guile (void *data)
   Lisp_Object old_value = AREF (binding, 2);
   Lisp_Object where = AREF (binding, 3);
 
-  /* Decrement specpdl_ptr to remove the tracking entry.  */
-  specpdl_ptr--;
-
-  /* Dual-write to Scheme binding registry.  */
+  /* Pop from Scheme binding registry (Phase 4: specpdl writes removed).  */
   if (scm_is_false (pop_binding_fn))
     pop_binding_fn = scm_c_public_ref ("emacs bindings", "pop-binding!");
   scm_call_0 (pop_binding_fn);
@@ -2746,28 +2743,7 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
   ASET (binding, 2, old_value);
   ASET (binding, 3, where);
 
-  /* Add tracking entry to specpdl (for functions that iterate bindings).  */
-  switch (kind)
-    {
-    case BINDING_KIND_LET:
-      specpdl_ptr->let.kind = SPECPDL_LET;
-      break;
-    case BINDING_KIND_LET_LOCAL:
-      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
-      break;
-    case BINDING_KIND_LET_DEFAULT:
-      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-      break;
-    }
-  specpdl_ptr->let.symbol = symbol;
-  specpdl_ptr->let.old_value = old_value;
-  if (kind == BINDING_KIND_LET_LOCAL)
-    specpdl_ptr->let.where.buf = where;
-  else
-    specpdl_ptr->let.where.kbd = NULL;
-  grow_specpdl ();
-
-  /* Dual-write to Scheme binding registry.  */
+  /* Write to Scheme binding registry (Phase 4: specpdl writes removed).  */
   if (scm_is_false (push_binding_fn))
     push_binding_fn = scm_c_public_ref ("emacs bindings", "push-binding!");
   scm_call_4 (push_binding_fn, symbol, old_value, scm_from_int (kind), where);
@@ -2797,50 +2773,9 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
                               SCM_F_WIND_EXPLICITLY);
 }
 
-DEFUN ("specpdl-track-binding", Fspecpdl_track_binding, Sspecpdl_track_binding,
-       3, 3, 0,
-       doc: /* Add a specpdl tracking entry for introspection functions.
-SYMBOL is the bound symbol, OLD-VALUE is its previous value,
-KIND is 0 for LET, 1 for LET_LOCAL, 2 for LET_DEFAULT.
-This is called by Scheme's bind-symbol to enable functions like
-`default-toplevel-value' to see through dynamic bindings.  */)
-  (Lisp_Object symbol, Lisp_Object old_value, Lisp_Object kind)
-{
-  CHECK_SYMBOL (symbol);
-  CHECK_FIXNUM (kind);
-  EMACS_INT k = XFIXNUM (kind);
-
-  switch (k)
-    {
-    case 0:
-      specpdl_ptr->let.kind = SPECPDL_LET;
-      break;
-    case 1:
-      specpdl_ptr->let.kind = SPECPDL_LET_LOCAL;
-      break;
-    case 2:
-      specpdl_ptr->let.kind = SPECPDL_LET_DEFAULT;
-      break;
-    default:
-      error ("Invalid binding kind: %"pI"d", k);
-    }
-  specpdl_ptr->let.symbol = symbol;
-  specpdl_ptr->let.old_value = old_value;
-  specpdl_ptr->let.where.kbd = NULL;
-  grow_specpdl ();
-  return Qnil;
-}
-
-DEFUN ("specpdl-untrack-binding", Fspecpdl_untrack_binding, Sspecpdl_untrack_binding,
-       0, 0, 0,
-       doc: /* Remove the most recent specpdl tracking entry.
-This is called by Scheme's bind-symbol unwind handler.  */)
-  (void)
-{
-  if (specpdl_ptr > specpdl)
-    specpdl_ptr--;
-  return Qnil;
-}
+/* Phase 4: specpdl-track-binding and specpdl-untrack-binding removed.
+   Scheme binding registry (emacs bindings) is now the sole source of truth
+   for introspection functions like default-toplevel-value.  */
 
 /* Push unwind-protect entries of various types.  */
 

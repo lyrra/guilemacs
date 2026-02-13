@@ -11,8 +11,8 @@
                 #:select (lookup-language))
   #:use-module ((language tree-il)
                 #:select (unparse-tree-il parse-tree-il))
-  #:use-module ((emacs bindings)
-                #:select (push-binding! pop-binding!))
+  #:use-module (emacs bindings)
+  #:re-export (push-binding! pop-binding!)
   #:export (nil-value
             t-value
             catch-all
@@ -71,8 +71,6 @@
             buffer-local-ref
             buffer-local-set!
             symbol-simple-forward-p
-            specpdl-track-binding
-            specpdl-untrack-binding
             prepare-complex-binding
             do-complex-bind
             do-complex-unbind)
@@ -483,33 +481,6 @@ value-slot-module, function-slot-module, or plist-slot-module."
                   f))))
     (not (eq? #nil (fn sym)))))
 
-;; Lazily-cached handles for specpdl introspection functions.
-;; These allow functions like default-toplevel-value to see through dynamic bindings.
-(define %specpdl-track-binding-fn #f)
-(define (specpdl-track-binding sym old-value kind)
-  "Track a binding in specpdl for introspection.
-KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT.
-Dual-write: calls both C specpdl and Scheme binding registry."
-  (let ((fn (or %specpdl-track-binding-fn
-                (let ((f (symbol-function 'specpdl-track-binding)))
-                  (set! %specpdl-track-binding-fn f)
-                  f))))
-    (fn sym old-value kind))
-  ;; Dual-write to Scheme binding registry for Phase 2 validation
-  (push-binding! sym old-value kind #f))
-
-(define %specpdl-untrack-binding-fn #f)
-(define (specpdl-untrack-binding)
-  "Untrack the most recent binding from specpdl.
-Dual-write: calls both C specpdl and Scheme binding registry."
-  (let ((fn (or %specpdl-untrack-binding-fn
-                (let ((f (symbol-function 'specpdl-untrack-binding)))
-                  (set! %specpdl-untrack-binding-fn f)
-                  f))))
-    (fn))
-  ;; Dual-write to Scheme binding registry for Phase 2 validation
-  (pop-binding!))
-
 ;; Phase 5: Scheme accessors for per-buffer hash table.
 ;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).
 (define (buffer-local-ref buf sym)
@@ -582,10 +553,7 @@ Dual-write: calls both C specpdl and Scheme binding registry."
                      (else         0))))
     (dynamic-wind
       (lambda ()
-        ;; Track in specpdl for introspection (default-toplevel-value etc.)
-        ;; Dual-write: call both C specpdl and Scheme binding registry
-        (if (symbol-fbound? 'specpdl-track-binding)
-            ((symbol-function 'specpdl-track-binding) symbol old kind))
+        ;; Track in Scheme binding registry (Phase 4: C specpdl removed)
         (push-binding! symbol old kind #f)
         (cond
           (fast         (vector-set! desc 4 value))
@@ -594,11 +562,7 @@ Dual-write: calls both C specpdl and Scheme binding registry."
           (else         (set-symbol-value! symbol value))))
       thunk
       (lambda ()
-        ;; Untrack from specpdl
-        ;; Dual-write: call both C specpdl and Scheme binding registry
-        (if (symbol-fbound? 'specpdl-untrack-binding)
-            ((symbol-function 'specpdl-untrack-binding)))
-        ;; Pop binding and get the old value from registry.
+        ;; Pop binding and get the old value from registry (Phase 4: C specpdl removed).
         ;; This allows set-default-toplevel-value to modify the old value
         ;; that will be restored on unbind (for interpreted code).
         ;; Note: compiled code uses inline dynamic-wind with captured old values,
@@ -665,10 +629,7 @@ Called as dynamic-wind winder."
         (hash (vector-ref ctx 2))
         (old (vector-ref ctx 0))
         (kind (vector-ref ctx 1)))
-    ;; Track in specpdl for introspection (default-toplevel-value etc.)
-    ;; Dual-write: call both C specpdl and Scheme binding registry
-    (if (symbol-fbound? 'specpdl-track-binding)
-        ((symbol-function 'specpdl-track-binding) symbol old kind))
+    ;; Track in Scheme binding registry (Phase 4: C specpdl removed)
     (push-binding! symbol old kind #f)
     ;; Set new value via appropriate path
     (cond
@@ -684,11 +645,7 @@ Called as dynamic-wind unwinder."
         (let-default? (vector-ref ctx 5))
         (hash (vector-ref ctx 2))
         (ctx-old (vector-ref ctx 0)))
-    ;; Untrack from specpdl
-    ;; Dual-write: call both C specpdl and Scheme binding registry
-    (if (symbol-fbound? 'specpdl-untrack-binding)
-        ((symbol-function 'specpdl-untrack-binding)))
-    ;; Pop binding and get the old value from registry.
+    ;; Pop binding and get the old value from registry (Phase 4: C specpdl removed).
     ;; This allows set-default-toplevel-value to modify the old value
     ;; that will be restored on unbind.
     (let* ((entry (pop-binding!))
