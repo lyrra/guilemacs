@@ -113,17 +113,9 @@ struct thread_state
      catch/throw and condition-case now use Guile's exception system.
      See CONDITION-SYSTEM-MIGRATION.org for details.  */
 
-  /* Pointer to beginning of specpdl.  */
-  union specbinding *m_specpdl;
-#define specpdl (current_thread->m_specpdl)
-
-  /* End of specpld (just beyond the last element).  */
-  union specbinding *m_specpdl_end;
-#define specpdl_end (current_thread->m_specpdl_end)
-
-  /* Pointer to first unused element in specpdl.  */
-  union specbinding *m_specpdl_ptr;
-#define specpdl_ptr (current_thread->m_specpdl_ptr)
+  /* specpdl removed - binding stack now in Scheme (emacs bindings).
+     We keep m_thread_alive for thread liveness checks.  */
+  bool m_thread_alive;
 
   /* Depth in Lisp evaluations and function calls.  */
   intmax_t m_lisp_eval_depth;

@@ -76,9 +76,8 @@ flush_stack_call_func (void (*func) (void *arg), void *arg)
   (*func) (arg);
 }
 
-/* m_specpdl is set when the thread is created and cleared when the
-   thread dies.  */
-#define thread_live_p(STATE) ((STATE)->m_specpdl != NULL)
+/* m_thread_alive indicates thread liveness only (specpdl removed).  */
+#define thread_live_p(STATE) ((STATE)->m_thread_alive)
 
 
 
@@ -88,21 +87,18 @@ release_global_lock (void)
   sys_mutex_unlock (&global_lock);
 }
 
+/* specpdl removed - these functions are stubs.
+   TODO: Implement proper thread switching for Guile-based bindings.  */
 static void
 rebind_for_thread_switch (void)
 {
   emacs_abort();
-  ptrdiff_t distance
-    = current_thread->m_specpdl_ptr - current_thread->m_specpdl;
-  // specpdl_unrewind (specpdl_ptr, -distance, true);
 }
 
 static void
 unbind_for_thread_switch (struct thread_state *thr)
 {
   emacs_abort();
-  ptrdiff_t distance = thr->m_specpdl_ptr - thr->m_specpdl;
-  // specpdl_unrewind (thr->m_specpdl_ptr, distance, true);
 }
 
 
@@ -758,9 +754,8 @@ run_thread (void *state)
 
   update_processes_for_thread_death (Fcurrent_thread ());
 
-  self->m_specpdl = NULL;
-  self->m_specpdl_ptr = NULL;
-  self->m_specpdl_end = NULL;
+  /* specpdl removed - just clear thread_alive flag.  */
+  self->m_thread_alive = false;
 
   current_thread = NULL;
   sys_cond_broadcast (&self->thread_condvar);
@@ -832,11 +827,8 @@ If NAME is given, it must be a string; it names the new thread.  */)
   /* Perhaps copy m_last_thing_searched from parent?  */
   new_thread->m_current_buffer = current_thread->m_current_buffer;
 
-  ptrdiff_t size = 50;
-  union specbinding *pdlvec = xmalloc ((1 + size) * sizeof (union specbinding));
-  new_thread->m_specpdl = pdlvec + 1;  /* Skip the dummy entry.  */
-  new_thread->m_specpdl_end = new_thread->m_specpdl + size;
-  new_thread->m_specpdl_ptr = new_thread->m_specpdl;
+  /* specpdl removed - just set thread_alive flag.  */
+  new_thread->m_thread_alive = true;
 
   //init_bc_thread (&new_thread->bc);
 

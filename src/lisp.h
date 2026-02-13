@@ -3458,36 +3458,14 @@ specpdl_ref_add (specpdl_ref ref, ptrdiff_t delta)
 			   + delta * sizeof (union specbinding));
 }
 
-INLINE union specbinding *
-specpdl_ref_to_ptr (specpdl_ref ref)
-{
-  return (union specbinding *)((char *)specpdl + unwrap_specpdl_ref (ref));
-}
+/* Binding stack is now managed in Scheme (emacs bindings).
+   SPECPDL_INDEX now returns a dummy value for compatibility with
+   legacy code that still declares specpdl_ref variables.  */
 
-/* Return a reference to the most recent specpdl entry.  */
 INLINE specpdl_ref
 SPECPDL_INDEX (void)
 {
-  return wrap_specpdl_ref ((char *)specpdl_ptr - (char *)specpdl);
-}
-
-void grow_specpdl_allocation (void);
-
-/* Grow the specpdl stack by one entry.
-   The caller should have already initialized the entry.
-   Signal an error on stack overflow.
-
-   Make sure that there is always one unused entry past the top of the
-   stack, so that the just-initialized entry is safely unwound if
-   memory exhausted and an error is signaled here.  Also, allocate a
-   never-used entry just before the bottom of the stack; sometimes its
-   address is taken.  */
-INLINE void
-grow_specpdl (void)
-{
-  specpdl_ptr++;
-  if (specpdl_ptr == specpdl_end)
-    grow_specpdl_allocation ();
+  return wrap_specpdl_ref (0);
 }
 
 /* Nonlocal exit type - used by internal_catch_all and callers.
@@ -4496,8 +4474,6 @@ extern void record_unwind_protect_int (void (*) (int), int);
 extern void record_unwind_protect_intmax (void (*) (intmax_t), intmax_t);
 extern void record_unwind_protect_void_1 (void (*) (void), bool);
 extern void record_unwind_protect_void (void (*) (void));
-extern Lisp_Object unbind_to (specpdl_ref, Lisp_Object);
-void specpdl_unrewind (union specbinding *pdl, int distance, bool vars_only);
 extern void dynwind_begin (void);
 extern void dynwind_end (void);
 extern AVOID error (const char *, ...) ATTRIBUTE_FORMAT_PRINTF (1, 2);
@@ -4517,9 +4493,7 @@ extern Lisp_Object safe_funcall (ptrdiff_t, Lisp_Object*);
 extern void init_eval (void);
 extern void syms_of_eval (void);
 extern void prog_ignore (Lisp_Object);
-extern void mark_specpdl (void);
 extern bool let_shadows_buffer_binding_p (sym_t symbol);
-void do_debug_on_call (Lisp_Object code, specpdl_ref count);
 Lisp_Object funcall_general (Lisp_Object fun,
 			     ptrdiff_t numargs, Lisp_Object *args);
 extern _Noreturn SCM abort_to_prompt (SCM, SCM);

@@ -48,8 +48,6 @@ Lisp_Object Vautoload_queue;
    is shutting down.  */
 Lisp_Object Vrun_hooks;
 
-union specbinding *specpdl_base;
-
 /* The function from which the last `signal' was called.  Set in
    Fsignal.  */
 /* FIXME: We should probably get rid of this!  */
@@ -63,9 +61,7 @@ static SCM elisp_condition_sym = SCM_BOOL_F;
    All elisp throws use this key, with the actual tag in the args.  */
 static SCM elisp_throw_sym = SCM_BOOL_F;
 
-/* Scheme binding registry functions for dual-write mode.
-   These mirror specpdl tracking to the Scheme binding stack.
-   See docs/specbind2.org for migration plan.  */
+/* Scheme binding registry functions */
 static SCM push_binding_fn = SCM_BOOL_F;
 static SCM pop_binding_fn = SCM_BOOL_F;
 static SCM find_toplevel_binding_fn = SCM_BOOL_F;
@@ -75,50 +71,7 @@ static SCM let_shadows_buffer_binding_fn = SCM_BOOL_F;
 static SCM symbol_has_binding_fn = SCM_BOOL_F;
 
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
-static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
-
-static Lisp_Object
-specpdl_symbol (union specbinding *pdl)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.symbol;
-}
-
-static enum specbind_tag
-specpdl_kind (union specbinding *pdl)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.kind;
-}
-
-static Lisp_Object
-specpdl_old_value (union specbinding *pdl)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  return pdl->let.old_value;
-}
-
-static void
-set_specpdl_old_value (union specbinding *pdl, Lisp_Object val)
-{
-  eassert (pdl->kind >= SPECPDL_LET);
-  pdl->let.old_value = val;
-}
-
-static Lisp_Object
-specpdl_where (union specbinding *pdl)
-{
-  eassert (pdl->kind > SPECPDL_LET);
-  return pdl->let.where.buf;
-}
-
-static KBOARD *
-specpdl_kboard (union specbinding *pdl)
-{
-  eassert (pdl->kind == SPECPDL_LET);
-  return pdl->let.where.kbd;
-}
 
 static Lisp_Object eval_fn;
 static Lisp_Object funcall_fn;
@@ -136,11 +89,7 @@ init_eval_once (void)
   max_lisp_eval_depth = 10000;
   Vrun_hooks = Qnil;
 
-  enum { size = 50 };
-  union specbinding *pdlvec = xmalloc ((size + 1) * sizeof *specpdl);
-  specpdl_base = pdlvec;
-  specpdl = specpdl_ptr = pdlvec + 1;
-  specpdl_end = specpdl + size;
+  current_thread->m_thread_alive = true;
 
   eval_fn = scm_c_public_ref ("emacs-elisp runtime", "eval-elisp");
   funcall_fn = scm_c_public_ref ("elisp-functions", "funcall");
@@ -155,7 +104,6 @@ init_eval_once (void)
 void
 init_eval (void)
 {
-  specpdl_ptr = specpdl;
   Vquit_flag = Qnil;
   debug_on_next_call = 0;
   lisp_eval_depth = 0;
@@ -462,27 +410,6 @@ signal a `cyclic-variable-indirection' error.  */)
   return base_variable;
 }
 
-static union specbinding *
-default_toplevel_binding (Lisp_Object symbol)
-{
-  union specbinding *binding = NULL;
-  union specbinding *pdl = specpdl_ptr;
-  while (pdl > specpdl)
-    {
-      switch ((--pdl)->kind)
-	{
-	case SPECPDL_LET_DEFAULT:
-	case SPECPDL_LET:
-	  if (EQ (specpdl_symbol (pdl), symbol))
-	    binding = pdl;
-	  break;
-
-	default: break;
-	}
-    }
-  return binding;
-}
-
 /* Look for a lexical-binding of SYMBOL somewhere up the stack.
    This will only find bindings created with interpreted code, since once
    compiled names of lexical variables are basically gone anyway.  */
@@ -520,21 +447,23 @@ DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
 "Toplevel" means outside of any let binding.  */)
      (Lisp_Object symbol, Lisp_Object value)
 {
-  /* Update both C specpdl and Scheme binding registry.
-     The C specpdl is still used for actual value restoration on unbind,
-     while the Scheme registry is for introspection.  */
+  /*
+     1. Update the Scheme binding registry (for interpreted code)
+     2. Set the default value directly (for unbound case and compiled code)
 
-  /* Update C specpdl (for actual restoration).  */
-  union specbinding *binding = default_toplevel_binding (symbol);
-  if (binding)
-    set_specpdl_old_value (binding, value);
-  else
-    Fset_default (symbol, value);
+     For interpreted code, bind-symbol's unwinder reads old-value from
+     the binding registry, so updating it affects the restored value.
+     For compiled code, old values are captured in closures so this
+     won't affect them (known limitation).  */
 
-  /* Also update Scheme binding registry (for introspection).  */
+  /* Update Scheme binding registry.  */
   if (scm_is_false (set_toplevel_binding_fn))
     set_toplevel_binding_fn = scm_c_public_ref ("emacs bindings", "set-toplevel-binding!");
-  scm_call_2 (set_toplevel_binding_fn, symbol, value);
+  SCM result = scm_call_2 (set_toplevel_binding_fn, symbol, value);
+
+  /* If no binding exists in registry, set the default directly.  */
+  if (scm_is_false (result))
+    Fset_default (symbol, value);
 
   return Qnil;
 }
@@ -911,11 +840,10 @@ internal_catch (Lisp_Object tag,
    some static info saved in CATCH, and longjmp to the location
    specified there.
 
-   This is used for correct unwinding in Fthrow and Fsignal.  */
+   This is used for correct unwinding in Fthrow and Fsignal.
 
-static Lisp_Object unbind_to_1 (ptrdiff_t, Lisp_Object, bool);
-
-/* unwind_to_catch removed - catch/throw uses Guile's scm_throw */
+   Bindings is handled by Guile's dynamic-wind --
+   catch/throw uses Guile's scm_throw.  */
 
 DEFUN ("throw", Fthrow, Sthrow, 2, 2, 0,
        doc: /* Throw to the catch for TAG and return VALUE from it.
@@ -1631,24 +1559,6 @@ node `(elisp)Eval' for details.  */)
   return tem;
 }
 
-void
-grow_specpdl_allocation (void)
-{
-  eassert (specpdl_ptr == specpdl_end);
-
-  specpdl_ref count = SPECPDL_INDEX ();
-  ptrdiff_t max_size = PTRDIFF_MAX - 1000;
-  union specbinding *pdlvec = specpdl - 1;
-  ptrdiff_t size = specpdl_end - specpdl;
-  ptrdiff_t pdlvecsize = size + 1;
-  eassert (max_size > size);
-  pdlvec = xpalloc (pdlvec, &pdlvecsize, 1, max_size + 1, sizeof *specpdl);
-  specpdl_base = pdlvec;
-  specpdl = pdlvec + 1;
-  specpdl_end = specpdl + pdlvecsize - 1;
-  specpdl_ptr = specpdl_ref_to_ptr (count);
-}
-
 /* Structure for passing eval arguments to scm_c_catch */
 struct scm_eval_data
 {
@@ -2355,31 +2265,6 @@ funcall_subr (struct Lisp_Subr *subr, ptrdiff_t numargs, Lisp_Object *args)
 }
 #endif
 
-static Lisp_Object
-apply_lambda (Lisp_Object fun, Lisp_Object args, specpdl_ref count)
-{
-  Lisp_Object *arg_vector;
-  Lisp_Object tem;
-  USE_SAFE_ALLOCA;
-
-  ptrdiff_t numargs = list_length (args);
-  SAFE_ALLOCA_LISP (arg_vector, numargs);
-  Lisp_Object args_left = args;
-
-  for (ptrdiff_t i = 0; i < numargs; i++)
-    {
-      tem = Fcar (args_left), args_left = Fcdr (args_left);
-      arg_vector[i] = tem;
-    }
-
-  tem = funcall_lambda (fun, numargs, arg_vector);
-
-  lisp_eval_depth--;
-  SAFE_FREE ();
-  specpdl_ptr--;
-  return tem;
-}
-
 /* Apply a Lisp function FUN to the NARGS evaluated arguments in ARG_VECTOR
    and return the result of evaluation.
    FUN must be either a lambda-expression, a compiled-code object,
@@ -2606,21 +2491,9 @@ let_shadows_buffer_binding_p (sym_t symbol)
   return !scm_is_false (scm_call_2 (let_shadows_buffer_binding_fn, symbol, buf));
 }
 
-/* `specpdl_ptr' describes which variable is
-   let-bound, so it can be properly undone when we unbind_to.
-   It can be either a plain SPECPDL_LET or a SPECPDL_LET_LOCAL/DEFAULT.
-   - SYMBOL is the variable being bound.  Note that it should not be
-     aliased (i.e. when let-binding V1 that's aliased to V2, we want
-     to record V2 here).
-   - WHERE tells us in which buffer the binding took place.
-     This is used for SPECPDL_LET_LOCAL bindings (i.e. bindings to a
-     buffer-local variable) as well as for SPECPDL_LET_DEFAULT bindings,
-     i.e. bindings to the default value of a variable which can be
-     buffer-local.  */
-
-/* specbind_guile: Dynamic binding without using the specpdl stack.
-   Uses a Lisp vector to store binding data and Guile's dynamic-wind
-   for unwinding.  This is the first step toward eliminating specpdl.
+/* specbind_guile: Dynamic binding using Guile's dynamic-wind.
+   Binding stack is managed in Scheme (emacs bindings).
+   Uses a Lisp vector to store binding data for the Guile unwinder.
 
    Binding data vector layout:
      [0] = kind (fixnum: 0=LET, 1=LET_LOCAL, 2=LET_DEFAULT)
@@ -2851,54 +2724,6 @@ void
 record_unwind_protect_void (void (*function) (void))
 {
   record_unwind_protect_void_1 (function, true);
-}
-
-static void
-do_one_unbind (union specbinding *this_binding, bool unwinding,
-               enum Set_Internal_Bind bindflag)
-{
-  KBOARD *kbdwhere = NULL;
-
-  eassert (unwinding || this_binding->kind >= SPECPDL_LET);
-  switch (this_binding->kind)
-    {
-    case SPECPDL_LET:
-      { /* If variable has a trivial value (no forwarding), and isn't
-	   trapped, we can just set it.  */
-	Lisp_Object sym = specpdl_symbol (this_binding);
-	if (SYMBOLP (sym) && SYMBOL_REDIRECT (XSYMBOL (sym)) == SYMBOL_PLAINVAL)
-	  {
-	    if (SYMBOL_TRAPPED_WRITE_P (sym) == SYMBOL_UNTRAPPED_WRITE)
-	      SET_SYMBOL_VAL (XSYMBOL (sym), specpdl_old_value (this_binding));
-	    else
-	      set_internal (sym, specpdl_old_value (this_binding),
-                            Qnil, bindflag);
-	    break;
-	  }
-      }
-      /* Come here only if make_local_foo was used for the first time
-	 on this var within this let or the symbol is not a plainval.  */
-      kbdwhere = specpdl_kboard (this_binding);
-      FALLTHROUGH;
-    case SPECPDL_LET_DEFAULT:
-      set_default_internal (specpdl_symbol (this_binding),
-                            specpdl_old_value (this_binding),
-                            bindflag, kbdwhere);
-      break;
-    case SPECPDL_LET_LOCAL:
-      {
-	Lisp_Object symbol = specpdl_symbol (this_binding);
-	Lisp_Object where = specpdl_where (this_binding);
-	Lisp_Object old_value = specpdl_old_value (this_binding);
-	eassert (BUFFERP (where));
-
-	/* If this was a local binding, reset the value in the appropriate
-	   buffer, but only if that buffer's binding still exists.  */
-	if (!NILP (Flocal_variable_p (symbol, where)))
-          set_internal (symbol, old_value, where, bindflag);
-      }
-      break;
-    }
 }
 
 void

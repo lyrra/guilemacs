@@ -12686,21 +12686,6 @@ delete_kboard (KBOARD *kb)
 	emacs_abort ();
     }
 
-  /* Clean thread specpdls of references to this KBOARD.  */
-  for (thread = all_threads; thread; thread = thread->next_thread)
-    {
-      union specbinding *p;
-
-      for (p = thread->m_specpdl_ptr; p > thread->m_specpdl;)
-	{
-	  p -= 1;
-
-	  if (p->kind == SPECPDL_LET
-	      && p->let.where.kbd == kb)
-	    p->let.where.kbd = NULL;
-	}
-    }
-
   wipe_kboard (kb);
   xfree (kb);
 }
