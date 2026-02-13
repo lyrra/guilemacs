@@ -63,6 +63,12 @@ static SCM elisp_condition_sym = SCM_BOOL_F;
    All elisp throws use this key, with the actual tag in the args.  */
 static SCM elisp_throw_sym = SCM_BOOL_F;
 
+/* Scheme binding registry functions for dual-write mode.
+   These mirror specpdl tracking to the Scheme binding stack.
+   See docs/specbind2.org for migration plan.  */
+static SCM push_binding_fn = SCM_BOOL_F;
+static SCM pop_binding_fn = SCM_BOOL_F;
+
 static Lisp_Object funcall_lambda (Lisp_Object, ptrdiff_t, Lisp_Object *);
 static Lisp_Object apply_lambda (Lisp_Object, Lisp_Object, specpdl_ref);
 static Lisp_Object lambda_arity (Lisp_Object);
@@ -2645,6 +2651,11 @@ unbind_guile (void *data)
   /* Decrement specpdl_ptr to remove the tracking entry.  */
   specpdl_ptr--;
 
+  /* Dual-write to Scheme binding registry.  */
+  if (scm_is_false (pop_binding_fn))
+    pop_binding_fn = scm_c_public_ref ("emacs bindings", "pop-binding!");
+  scm_call_0 (pop_binding_fn);
+
   switch (kind)
     {
     case BINDING_KIND_LET:
@@ -2759,6 +2770,11 @@ specbind_guile (Lisp_Object symbol, Lisp_Object value)
   else
     specpdl_ptr->let.where.kbd = NULL;
   grow_specpdl ();
+
+  /* Dual-write to Scheme binding registry.  */
+  if (scm_is_false (push_binding_fn))
+    push_binding_fn = scm_c_public_ref ("emacs bindings", "push-binding!");
+  scm_call_4 (push_binding_fn, symbol, old_value, scm_from_int (kind), where);
 
   /* Set the new value.  */
   switch (kind)

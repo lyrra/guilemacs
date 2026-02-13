@@ -11,6 +11,8 @@
                 #:select (lookup-language))
   #:use-module ((language tree-il)
                 #:select (unparse-tree-il parse-tree-il))
+  #:use-module ((emacs bindings)
+                #:select (push-binding! pop-binding!))
   #:export (nil-value
             t-value
             catch-all
@@ -486,21 +488,27 @@ value-slot-module, function-slot-module, or plist-slot-module."
 (define %specpdl-track-binding-fn #f)
 (define (specpdl-track-binding sym old-value kind)
   "Track a binding in specpdl for introspection.
-KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT."
+KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT.
+Dual-write: calls both C specpdl and Scheme binding registry."
   (let ((fn (or %specpdl-track-binding-fn
                 (let ((f (symbol-function 'specpdl-track-binding)))
                   (set! %specpdl-track-binding-fn f)
                   f))))
-    (fn sym old-value kind)))
+    (fn sym old-value kind))
+  ;; Dual-write to Scheme binding registry for Phase 2 validation
+  (push-binding! sym old-value kind #f))
 
 (define %specpdl-untrack-binding-fn #f)
 (define (specpdl-untrack-binding)
-  "Untrack the most recent binding from specpdl."
+  "Untrack the most recent binding from specpdl.
+Dual-write: calls both C specpdl and Scheme binding registry."
   (let ((fn (or %specpdl-untrack-binding-fn
                 (let ((f (symbol-function 'specpdl-untrack-binding)))
                   (set! %specpdl-untrack-binding-fn f)
                   f))))
-    (fn)))
+    (fn))
+  ;; Dual-write to Scheme binding registry for Phase 2 validation
+  (pop-binding!))
 
 ;; Phase 5: Scheme accessors for per-buffer hash table.
 ;; Available to all Scheme code (mod/emacs/buffer-locals.scm etc.).
@@ -575,8 +583,10 @@ KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT."
     (dynamic-wind
       (lambda ()
         ;; Track in specpdl for introspection (default-toplevel-value etc.)
+        ;; Dual-write: call both C specpdl and Scheme binding registry
         (if (symbol-fbound? 'specpdl-track-binding)
             ((symbol-function 'specpdl-track-binding) symbol old kind))
+        (push-binding! symbol old kind #f)
         (cond
           (fast         (vector-set! desc 4 value))
           (buf-local?   (hashq-set! hash symbol value))
@@ -585,8 +595,10 @@ KIND: 0 = LET, 1 = LET_LOCAL, 2 = LET_DEFAULT."
       thunk
       (lambda ()
         ;; Untrack from specpdl
+        ;; Dual-write: call both C specpdl and Scheme binding registry
         (if (symbol-fbound? 'specpdl-untrack-binding)
             ((symbol-function 'specpdl-untrack-binding)))
+        (pop-binding!)
         (cond
           ;; Fast path: re-check that the variable is still PLAINVAL +
           ;; untrapped.  If make-local-variable was called during the
@@ -648,8 +660,10 @@ Called as dynamic-wind winder."
         (old (vector-ref ctx 0))
         (kind (vector-ref ctx 1)))
     ;; Track in specpdl for introspection (default-toplevel-value etc.)
+    ;; Dual-write: call both C specpdl and Scheme binding registry
     (if (symbol-fbound? 'specpdl-track-binding)
         ((symbol-function 'specpdl-track-binding) symbol old kind))
+    (push-binding! symbol old kind #f)
     ;; Set new value via appropriate path
     (cond
       (buf-local?   (hashq-set! hash symbol value))
@@ -665,8 +679,10 @@ Called as dynamic-wind unwinder."
         (hash (vector-ref ctx 2))
         (old (vector-ref ctx 0)))
     ;; Untrack from specpdl
+    ;; Dual-write: call both C specpdl and Scheme binding registry
     (if (symbol-fbound? 'specpdl-untrack-binding)
         ((symbol-function 'specpdl-untrack-binding)))
+    (pop-binding!)
     ;; Restore old value via appropriate path
     (cond
       (buf-local?   (hashq-set! hash symbol old))
