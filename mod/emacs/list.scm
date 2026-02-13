@@ -158,7 +158,6 @@ The value is actually the tail of LIST whose car is ELT."
   "initialize primordial elisp functionality"
   ;; Register non-inlined primitives
   (for-each (lambda (sym-fun)
-              (format (current-error-port) "-- registering ~s~%" sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((delq ,elisp-delq)
               (remq ,elisp-remq)

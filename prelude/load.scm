@@ -119,6 +119,7 @@
 
 ;; Load core emacs functionallity
 (use-modules (emacs boot))
+(use-modules (emacs bindings))  ;; Binding registry for specpdl replacement
 (use-modules (emacs list))
 (use-modules (emacs types))
 (use-modules (emacs numbers))
