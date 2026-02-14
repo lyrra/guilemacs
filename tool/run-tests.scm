@@ -65,18 +65,11 @@
   )
 (group
   "test/src/eval-tests.el"
-  )
-(group
   "test/src/timefns-tests.el"
-  )
-(group
   "test/src/fns-tests.el"
-  )
-(group
   "test/src/floatfns-tests.el"
-  )
-(group
   "test/lisp/sort-tests.el"
+  "test/src/data-tests.el"
   )
 ;; in the following group, all of the test files works with guilemacs
 (group
