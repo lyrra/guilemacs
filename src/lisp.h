@@ -3303,169 +3303,22 @@ extern void defvar_kboard (struct Lisp_Kboard_Objfwd const *, char const *);
   } while (false)
 
 
-/* Elisp uses multiple stacks:
-   - The C stack.
-   - The specpdl stack keeps track of backtraces, unwind-protects and
-     dynamic let-bindings.  It is allocated from the 'specpdl' array,
-     a manually managed stack.
-   - The handler stack keeps track of active catch tags and condition-case
-     handlers.  It is allocated in a manually managed stack implemented by a
-     doubly-linked list allocated via xmalloc and never freed.  */
-
-/* Structure for recording Lisp call stack for backtrace purposes.  */
-
-/* The special binding stack holds the outer values of variables while
-   they are bound by a function application or a let form, stores the
-   code to be executed for unwind-protect forms.
-
-   NOTE: The specbinding union is defined here, because SPECPDL_INDEX is
-   used all over the place, needs to be fast, and needs to know the size of
-   union specbinding.  But only eval.c should access it.  */
-
-enum specbind_tag {
-  SPECPDL_NOP,			/* A filler.  */
-  SPECPDL_LET,			/* A plain and simple dynamic let-binding.  */
-  /* Tags greater than SPECPDL_LET must be "subkinds" of LET.  */
-  SPECPDL_LET_LOCAL,		/* A buffer-local let-binding.  */
-  SPECPDL_LET_DEFAULT		/* A global binding for a localized var.  */
-};
+/* Binding stack removed - now managed in Scheme (emacs bindings).
+   Dynamic bindings use Guile's dynamic-wind via specbind_guile/bind-symbol.
+   Unwind-protect uses Guile's dynwind via record_unwind_protect.
+   Catch/throw and condition-case use Guile's exception system.  */
 
 /* struct kboard is defined in keyboard.h.  */
 typedef struct kboard KBOARD;
 
-union specbinding
-  {
-    /* Aligning similar members consistently might help efficiency slightly
-       (Bug#31996#25).  */
-    ENUM_BF (specbind_tag) kind : CHAR_BIT;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-    } frame;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool wind_explicitly;
-      void (*func) (Lisp_Object);
-      Lisp_Object arg;
-      EMACS_INT eval_depth;
-    } unwind;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      ptrdiff_t nelts;
-      Lisp_Object *array;
-    } unwind_array;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool wind_explicitly;
-      void (*func) (void *);	/* Unwind function.  */
-      void *arg;
-      void (*mark) (void *);	/* GC mark function (if non-null).  */
-    } unwind_ptr;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool wind_explicitly;
-      void (*func) (int);
-      int arg;
-    } unwind_int;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      void (*func) (intmax_t);
-      intmax_t arg;
-    } unwind_intmax;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool wind_explicitly;
-      void (*func) (void);
-    } unwind_void;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      /* `where' is not used in the case of SPECPDL_LET,
-	 unless the symbol is forwarded to a KBOARD.  */
-      Lisp_Object symbol, old_value;
-      union {
-	/* KBOARD object to which SYMBOL forwards, in the case of
-	   SPECPDL_LET.  */
-	KBOARD *kbd;
-
-	/* Buffer otherwise.  */
-	Lisp_Object buf;
-      } where;
-    } let;
-    struct {
-      ENUM_BF (specbind_tag) kind : CHAR_BIT;
-      bool_bf debug_on_exit : 1;
-      Lisp_Object function;
-      Lisp_Object *args;
-      ptrdiff_t nargs;
-    } bt;
-  };
-
-/* We use 64-bit platforms as a proxy for ones with ABIs that treat
-   small structs efficiently.  */
-#if SIZE_MAX > 0xffffffff
-#define WRAP_SPECPDL_REF 1
-#endif
-
-/* Abstract reference to a specpdl entry.
-   The number is always a multiple of sizeof (union specbinding).  */
-#ifdef WRAP_SPECPDL_REF
-/* Use a proper type for specpdl_ref if it does not make the code slower,
-   since the type checking is quite useful.  */
-typedef struct { ptrdiff_t bytes; } specpdl_ref;
-#else
+/* specpdl_ref is kept for compatibility with legacy code that declares
+   variables of this type.  SPECPDL_INDEX returns 0 (dummy value).  */
 typedef ptrdiff_t specpdl_ref;
-#endif
-
-/* Internal use only.  */
-INLINE specpdl_ref
-wrap_specpdl_ref (ptrdiff_t bytes)
-{
-#ifdef WRAP_SPECPDL_REF
-  return (specpdl_ref){.bytes = bytes};
-#else
-  return bytes;
-#endif
-}
-
-/* Internal use only.  */
-INLINE ptrdiff_t
-unwrap_specpdl_ref (specpdl_ref ref)
-{
-#ifdef WRAP_SPECPDL_REF
-  return ref.bytes;
-#else
-  return ref;
-#endif
-}
-
-INLINE bool
-specpdl_ref_valid_p (specpdl_ref ref)
-{
-  return unwrap_specpdl_ref (ref) >= 0;
-}
-
-INLINE specpdl_ref
-make_invalid_specpdl_ref (void)
-{
-  return wrap_specpdl_ref (-1);
-}
-
-/* Return a reference that is `delta' steps more recent than `ref'.
-   `delta' may be negative or zero.  */
-INLINE specpdl_ref
-specpdl_ref_add (specpdl_ref ref, ptrdiff_t delta)
-{
-  return wrap_specpdl_ref (unwrap_specpdl_ref (ref)
-			   + delta * sizeof (union specbinding));
-}
-
-/* Binding stack is now managed in Scheme (emacs bindings).
-   SPECPDL_INDEX now returns a dummy value for compatibility with
-   legacy code that still declares specpdl_ref variables.  */
 
 INLINE specpdl_ref
 SPECPDL_INDEX (void)
 {
-  return wrap_specpdl_ref (0);
+  return 0;
 }
 
 /* Nonlocal exit type - used by internal_catch_all and callers.
