@@ -73,7 +73,8 @@
             symbol-simple-forward-p
             prepare-complex-binding
             do-complex-bind
-            do-complex-unbind)
+            do-complex-unbind
+            pop-and-restore-value)
   #:export-syntax (defspecial prim))
 
 ;;; This module provides runtime support for the Elisp front-end.
@@ -655,6 +656,16 @@ Called as dynamic-wind unwinder."
         (buf-local?   (hashq-set! hash symbol restore-val))
         (let-default? ((set-default-fn) symbol restore-val))
         (else         (set-symbol-value! symbol restore-val))))))
+
+(define (pop-and-restore-value fallback)
+  "Pop binding from registry and return the old-value to restore.
+Uses FALLBACK if the binding stack is empty.  This allows
+set-default-toplevel-value to modify the value that will be restored
+when a let binding exits."
+  (let ((entry (pop-binding!)))
+    (if entry
+        (vector-ref entry 1)
+        fallback)))
 
 (define (makunbound! symbol)
   (if (module-bound? value-slot-module symbol)

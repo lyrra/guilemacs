@@ -2514,13 +2514,21 @@ unbind_guile (void *data)
 
   EMACS_INT kind = XFIXNUM (AREF (binding, 0));
   Lisp_Object symbol = AREF (binding, 1);
-  Lisp_Object old_value = AREF (binding, 2);
   Lisp_Object where = AREF (binding, 3);
 
-  /* Pop from Scheme binding registry (Phase 4: specpdl writes removed).  */
+  /* Pop from Scheme binding registry and read old_value from it.
+     This allows set-default-toplevel-value to modify the restored value.
+     Registry entry format: #(symbol old-value kind where)  */
   if (scm_is_false (pop_binding_fn))
     pop_binding_fn = scm_c_public_ref ("emacs bindings", "pop-binding!");
-  scm_call_0 (pop_binding_fn);
+  SCM entry = scm_call_0 (pop_binding_fn);
+
+  /* Use old_value from registry entry, fall back to captured value.  */
+  Lisp_Object old_value;
+  if (scm_is_true (entry) && scm_is_vector (entry))
+    old_value = scm_c_vector_ref (entry, 1);
+  else
+    old_value = AREF (binding, 2);
 
   switch (kind)
     {

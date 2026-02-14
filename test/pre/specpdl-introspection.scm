@@ -97,3 +97,28 @@
       (error
        (princ nil)))
       (princ t))))
+
+;; Test 8: set-default-toplevel-value only affects outermost binding
+;; Intermediate bindings should be unaffected.
+(deftest test-set-default-toplevel-intermediate (200)
+  (el-expr `(progn
+    (defvar test-set-intermediate 100)
+    (let ((test-set-intermediate 200))
+      (let ((test-set-intermediate 300))
+        ;; Modify toplevel - should NOT affect intermediate (200)
+        (set-default-toplevel-value 'test-set-intermediate 999))
+      ;; After inner let, should see intermediate value (200)
+      (princ test-set-intermediate)))))
+
+;; Test 9: set-default-toplevel-value should affect final restored value
+;; unbind reads old_value from Scheme binding registry via
+;; pop-and-restore-value, allowing set-default-toplevel-value to modify
+;; the value that gets restored on unbind.
+(deftest test-set-default-toplevel-value (999)
+  (el-expr `(progn
+    (defvar test-set-toplevel-var 100)
+    (let ((test-set-toplevel-var 200))
+      ;; Modify the toplevel value while inside let binding
+      (set-default-toplevel-value 'test-set-toplevel-var 999))
+    ;; After ALL lets exit, should be 999 (the modified toplevel)
+    (princ test-set-toplevel-var))))

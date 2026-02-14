@@ -412,27 +412,30 @@ so that introspection functions like default-toplevel-value work correctly."
                 ;; unwinder: restore old value and untrack from specpdl
                 ;; Must re-check redirect because make-local-variable during
                 ;; body can change PLAINVAL to LOCALIZED.
-                (make-lambda src '()
-                  (make-lambda-case src '() #f #f #f '() '()
-                    (make-seq src
-                      (make-conditional src
-                        (call-primitive src 'eq?
-                          (call-primitive src 'vector-ref
+                ;; Pop from registry FIRST to get possibly-modified old value
+                ;; (for set-default-toplevel-value support).
+                (let ((restore-sym (gensym "restore")))
+                  (make-lambda src '()
+                    (make-lambda-case src '() #f #f #f '() '()
+                      (make-let src '(restore-val) (list restore-sym)
+                        (list (make-runtime-call src 'pop-and-restore-value
+                                (list (make-lexical-ref src 'old old-sym))))
+                        (make-conditional src
+                          (call-primitive src 'eq?
+                            (call-primitive src 'vector-ref
+                              (make-lexical-ref src 'desc desc-sym)
+                              (make-const src 1))
+                            (make-const src 4))  ; still PLAINVAL?
+                          ;; Still PLAINVAL: vector-set! desc 4 restore-val
+                          (call-primitive src 'vector-set!
                             (make-lexical-ref src 'desc desc-sym)
-                            (make-const src 1))
-                          (make-const src 4))  ; still PLAINVAL?
-                        ;; Still PLAINVAL: vector-set! desc 4 old
-                        (call-primitive src 'vector-set!
-                          (make-lexical-ref src 'desc desc-sym)
-                          (make-const src 4)
-                          (make-lexical-ref src 'old old-sym))
-                        ;; Changed to LOCALIZED: use set-default
-                        (make-runtime-call src 'set-symbol-default-value!
-                          (list (make-lexical-ref src 'fluid fluid-sym)
-                                (make-lexical-ref src 'old old-sym))))
-                      ;; Pop from Scheme binding registry (Phase 4: C specpdl removed)
-                      (make-runtime-call src 'pop-binding! '()))
-                    #f))))
+                            (make-const src 4)
+                            (make-lexical-ref src 'restore-val restore-sym))
+                          ;; Changed to LOCALIZED: use set-default
+                          (make-runtime-call src 'set-symbol-default-value!
+                            (list (make-lexical-ref src 'fluid fluid-sym)
+                                  (make-lexical-ref src 'restore-val restore-sym)))))
+                      #f)))))
             ;; non-PLAINVAL: check if simple FORWARDED
             (make-let src '(simple-fwd?) (list simple-fwd-sym)
               (list (make-runtime-call src 'symbol-simple-forward-p
@@ -460,16 +463,19 @@ so that introspection functions like default-toplevel-value work correctly."
                         #f))
                     ;; thunk: reference the shared thunk variable
                     (make-lexical-ref src 'thunk thunk-sym)
-                    ;; unwinder: restore old value via set-symbol-value! and untrack
-                    (make-lambda src '()
-                      (make-lambda-case src '() #f #f #f '() '()
-                        (make-seq src
-                          (make-runtime-call src 'set-symbol-value!
-                            (list (make-lexical-ref src 'fluid fluid-sym)
-                                  (make-lexical-ref src 'old old-sym)))
-                          ;; Pop from Scheme binding registry (Phase 4: C specpdl removed)
-                          (make-runtime-call src 'pop-binding! '()))
-                        #f))))
+                    ;; unwinder: restore old value via set-symbol-value!
+                    ;; Pop from registry FIRST to get possibly-modified old value
+                    ;; (for set-default-toplevel-value support).
+                    (let ((restore-sym (gensym "restore")))
+                      (make-lambda src '()
+                        (make-lambda-case src '() #f #f #f '() '()
+                          (make-let src '(restore-val) (list restore-sym)
+                            (list (make-runtime-call src 'pop-and-restore-value
+                                    (list (make-lexical-ref src 'old old-sym))))
+                            (make-runtime-call src 'set-symbol-value!
+                              (list (make-lexical-ref src 'fluid fluid-sym)
+                                    (make-lexical-ref src 'restore-val restore-sym))))
+                          #f)))))
                 ;; Complex: buffer-local, kboard, LOCALIZED, VARALIAS
                 ;; inline dynamic-wind with context functions
                 ;; Body is transparent to peval; winder/unwinder are opaque but that's OK
