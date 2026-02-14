@@ -4079,7 +4079,6 @@ by calling `format-decode', which see.  */)
       if (! giveup_match_end)
 	{
 	  ptrdiff_t temp;
-          specpdl_ref this_count = SPECPDL_INDEX ();
 
 	  /* We win!  We can handle REPLACE the optimized way.  */
 

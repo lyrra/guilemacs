@@ -2342,9 +2342,6 @@ delete_frame (Lisp_Object frame, Lisp_Object force)
   int is_tooltip_frame;
   bool nochild = !FRAME_PARENT_FRAME (f);
   Lisp_Object minibuffer_child_frame = Qnil;
-#ifdef HAVE_X_WINDOWS
-  specpdl_ref ref;
-#endif
 
   if (!FRAME_LIVE_P (f))
     return Qnil;

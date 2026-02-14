@@ -2929,7 +2929,6 @@ x_dnd_free_toplevels (bool display_alive)
   ptrdiff_t n_windows, i, buffer_size;
   Window *destroy_windows UNINIT;
   unsigned long *prev_masks UNINIT;
-  specpdl_ref count;
   Display *dpy UNINIT;
 
   if (!x_dnd_toplevels)
@@ -12533,7 +12532,6 @@ x_next_event_from_any_display (XEvent *event)
 static void
 x_handle_pending_selection_requests_1 (struct x_selection_request_event *tem)
 {
-  specpdl_ref count;
   struct selection_input_event se;
 
   dynwind_begin ();

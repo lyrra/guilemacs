@@ -6078,7 +6078,6 @@ realize_default_face (struct frame *f)
      trigger redisplay.  But we are in the process of realizing
      the default face, and therefore are not ready to do display.  */
   dynwind_begin ();
-  specpdl_ref count = SPECPDL_INDEX ();
   specbind_guile (Qinhibit_redisplay, Qt);
   struct face *face = realize_face (c, attrs, DEFAULT_FACE_ID);
   dynwind_end ();

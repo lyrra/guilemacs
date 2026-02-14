@@ -3731,7 +3731,6 @@ tty_menu_show (struct frame *f, int x, int y, int menuflags,
   int dispwidth, dispheight;
   int i, j, lines, maxlines;
   int maxwidth;
-  specpdl_ref specpdl_count;
 
   eassert (FRAME_TERMCAP_P (f));
 

@@ -1124,7 +1124,6 @@ x_popup_menu_1 (Lisp_Object position, Lisp_Object menu)
   Lisp_Object x, y, window;
   int menuflags = 0;
   dynwind_begin ();
-  specpdl_ref specpdl_count2;
 
   if (NILP (position))
     /* This is an obsolete call, which wants us to precompute the

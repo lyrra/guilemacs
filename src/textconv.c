@@ -1129,7 +1129,6 @@ locate_and_save_position_in_field (struct frame *f, struct window *w,
 				   bool notify_compose)
 {
   Lisp_Object pos, window, c1, c2;
-  specpdl_ref count;
   ptrdiff_t beg, end, cstart, cend, newstart, newend;
 
   /* Set the current buffer to W's.  */

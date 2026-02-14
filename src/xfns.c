@@ -8874,7 +8874,7 @@ x_hide_tip (bool delete)
     {
       Lisp_Object was_open = Qnil;
 
-      specpdl_ref count = SPECPDL_INDEX ();
+      dynwind_begin ();
       specbind_guile (Qinhibit_redisplay, Qt);
       specbind_guile (Qinhibit_quit, Qt);
 

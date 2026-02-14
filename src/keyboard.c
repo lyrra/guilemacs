@@ -10269,7 +10269,6 @@ access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
 			Lisp_Object *keybuf)
 {
   Lisp_Object next;
-  specpdl_ref count;
 
   next = access_keymap (map, key, 1, 0, 1);
 
