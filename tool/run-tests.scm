@@ -62,6 +62,11 @@
   "test/pre/string-char.scm"
   ;; emacs -- as an editor
   "test/pre/miscvar.scm"
+  ;; uncategorized LLM generated tests
+  "test/pre/bitwise-comprehensive.scm"
+  "test/pre/core-comprehensive.scm"
+  "test/pre/float-comprehensive.scm"
+  "test/pre/type-predicates.scm"
   )
 (group
   "test/src/eval-tests.el"
