@@ -1166,8 +1166,13 @@ have been replaced by constants."
       (setq form (cadr (cadr form))))
     ;; expand any macros directly into the form.  This is done so that
     ;; we can modify any `let' forms to evaluate only once.
-    (if (macrop (car form))
-        (let ((exp (copy-tree (macroexpand form))))
+    ;; NOTE: Use macroexpand-1 (not macroexpand) to avoid recursively
+    ;; expanding catch/condition-case into Guile-specific forms.
+    ;; These forms have special handling below.
+    (if (and (macrop (car form))
+             (not (memq (car form) '(catch condition-case eshell-condition-case
+                                     unwind-protect))))
+        (let ((exp (copy-tree (macroexpand-1 form))))
           (eshell-manipulate form
               (format-message "expanding macro `%s'" (symbol-name (car form)))
 	    (setcar form (car exp))
@@ -1281,7 +1286,7 @@ have been replaced by constants."
             ;; If we get here, there was no `eshell-defer' thrown, so
             ;; just return the `let' body's result.
             result)))
-       ((memq (car form) '(catch condition-case))
+       ((memq (car form) '(catch condition-case eshell-condition-case))
         ;; `catch' and `condition-case' have to be handled specially,
         ;; because we only want to call `eshell-do-eval' on their
         ;; second forms.
