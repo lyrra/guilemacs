@@ -1182,7 +1182,7 @@ command_loop_2 (Lisp_Object ignore)
   register Lisp_Object val;
 
   do
-    val = internal_condition_case (command_loop_1, Qerror, cmd_error);
+    val = internal_condition_case (command_loop_1, Qt, cmd_error);
   while (!NILP (val));
 
   return Qnil;
@@ -1216,7 +1216,7 @@ top_level_1 (Lisp_Object ignore)
 {
   /* On entry to the outer level, run the startup file.  */
   if (!NILP (Vtop_level))
-    internal_condition_case (top_level_2, Qerror, cmd_error);
+    internal_condition_case (top_level_2, Qt, cmd_error);
   else if (!NILP (Vpurify_flag))
     message1 ("Bare impure Emacs (standard Lisp code not loaded)");
   else
