@@ -1589,15 +1589,10 @@ scm_eval_error_handler (void *data, SCM key, SCM args)
       /* scm_throw doesn't return */
     }
 
-  /* If this is an uncaught elisp throw, convert to no-catch error.  */
+  /* If this is an elisp throw, re-throw it to propagate to outer catch.  */
   if (scm_is_eq (key, elisp_throw_sym))
     {
-      /* args is (tag value) */
-      Lisp_Object thrown_tag = scm_car (args);
-      Lisp_Object thrown_value = scm_cadr (args);
-      /* Convert to elisp no-catch error */
-      scm_throw (elisp_condition_sym,
-                 scm_list_2 (Qno_catch, list2 (thrown_tag, thrown_value)));
+      scm_throw (key, args);
       /* scm_throw doesn't return */
     }
 

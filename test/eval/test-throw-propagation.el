@@ -89,12 +89,10 @@
                        nil))))
 
 ;;; ============================================
-;;; Section 3: Throw propagation through eval (XFAIL)
+;;; Section 3: Throw propagation through eval
 ;;; ============================================
 
-;; Test 12: throw inside eval - XFAIL
-;; BUG: throw inside eval doesn't propagate to outer catch
-(test-expect-fail)
+;; Test 12: throw inside eval propagates to outer catch
 (test-equal "throw-inside-eval-propagates"
             'caught
             (condition-case err
@@ -102,8 +100,7 @@
                   (eval '(throw 'test 'caught)))
               (error 'error-not-caught)))
 
-;; Test 13: throw inside eval with nested catch - XFAIL
-(test-expect-fail)
+;; Test 13: throw inside eval with nested catch
 (test-equal "throw-inside-eval-nested"
             'caught
             (condition-case err
@@ -112,8 +109,7 @@
                     (eval '(throw 'test 'caught))))
               (error 'error-not-caught)))
 
-;; Test 14: throw from lambda through eval - XFAIL
-(test-expect-fail)
+;; Test 14: throw from lambda through eval
 (let ((thrower (lambda () (throw 'test 'caught))))
   (test-equal "throw-lambda-through-eval"
               'caught
@@ -165,16 +161,16 @@
                cleanup-ran))
 
 ;;; ============================================
-;;; Section 6: Quit signal to top level (XFAIL)
+;;; Section 6: Quit signal hierarchy
 ;;; ============================================
 
-;; In standard Emacs, quit signals propagate to the command loop
-;; which catches them and prints "Quit". In guilemacs, quit becomes
-;; an uncaught Guile exception.
+;; Note: quit-to-toplevel behavior can't be tested in batch mode
+;; (no command loop). For interactive testing, see test-quit-interactive.el.
 ;;
-;; This can't be tested in batch mode since there's no command loop,
-;; but we can test that quit is NOT a subtype of error (which explains
-;; why the command loop's error handler doesn't catch it).
+;; The command loop must use Qt (all conditions), not Qerror, because
+;; quit is not a subtype of error. Fixed in keyboard.c:
+;;   internal_condition_case(..., Qt, cmd_error)
+;; instead of Qerror.
 
 ;; Test 19: quit is not under error hierarchy
 (test-assert "quit-not-subtype-of-error"
