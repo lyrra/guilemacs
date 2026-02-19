@@ -164,4 +164,31 @@
   (test-assert "unwind-cleanup-on-error"
                cleanup-ran))
 
+;;; ============================================
+;;; Section 6: Quit signal to top level (XFAIL)
+;;; ============================================
+
+;; In standard Emacs, quit signals propagate to the command loop
+;; which catches them and prints "Quit". In guilemacs, quit becomes
+;; an uncaught Guile exception.
+;;
+;; This can't be tested in batch mode since there's no command loop,
+;; but we can test that quit is NOT a subtype of error (which explains
+;; why the command loop's error handler doesn't catch it).
+
+;; Test 19: quit is not under error hierarchy
+(test-assert "quit-not-subtype-of-error"
+             (not (memq 'error (get 'quit 'error-conditions))))
+
+;; Test 20: error IS under error hierarchy (sanity check)
+(test-assert "error-is-under-error"
+             (memq 'error (get 'error 'error-conditions)))
+
+;; Test 21: quit can be caught with condition-case when explicitly listed
+(test-equal "quit-caught-when-explicit"
+            'caught
+            (condition-case err
+                (signal 'quit '("test"))
+              (quit 'caught)))
+
 (test-end)
