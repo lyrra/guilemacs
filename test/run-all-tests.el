@@ -99,6 +99,18 @@
 (load-file "test/buffer/test-buffer-locals.el")
 (message "")
 
+(message "")
+(message "========================================")
+(message "EVAL TEST SUITE")
+(message "========================================")
+(message "")
+
+;; Use eval-buffer instead of load-file to avoid Guile compilation issues
+(with-temp-buffer
+  (insert-file-contents "test/eval/test-throw-propagation.el")
+  (eval-buffer))
+(message "")
+
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")
