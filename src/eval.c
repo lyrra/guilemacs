@@ -64,8 +64,6 @@ static SCM elisp_throw_sym = SCM_BOOL_F;
 /* Scheme binding registry functions */
 static SCM push_binding_fn = SCM_BOOL_F;
 static SCM pop_binding_fn = SCM_BOOL_F;
-static SCM find_toplevel_binding_fn = SCM_BOOL_F;
-static SCM set_toplevel_binding_fn = SCM_BOOL_F;
 static SCM symbol_lexbound_fn = SCM_BOOL_F;
 static SCM let_shadows_buffer_binding_fn = SCM_BOOL_F;
 static SCM symbol_has_binding_fn = SCM_BOOL_F;
@@ -422,51 +420,8 @@ lexbound_p (Lisp_Object symbol)
   return !scm_is_false (scm_call_1 (symbol_lexbound_fn, symbol));
 }
 
-DEFUN ("default-toplevel-value", Fdefault_toplevel_value, Sdefault_toplevel_value, 1, 1, 0,
-       doc: /* Return SYMBOL's toplevel default value.
-"Toplevel" means outside of any let binding.  */)
-  (Lisp_Object symbol)
-{
-  /* Use Scheme binding registry for introspection.  */
-  if (scm_is_false (find_toplevel_binding_fn))
-    find_toplevel_binding_fn = scm_c_public_ref ("emacs bindings", "find-toplevel-binding");
-  Lisp_Object value = scm_call_1 (find_toplevel_binding_fn, symbol);
-
-  /* If no binding found in registry, fall back to default-value.  */
-  if (scm_is_false (value))
-    value = Fdefault_value (symbol);
-
-  if (!BASE_EQ (value, Qunbound))
-    return value;
-  xsignal1 (Qvoid_variable, symbol);
-}
-
-DEFUN ("set-default-toplevel-value", Fset_default_toplevel_value,
-       Sset_default_toplevel_value, 2, 2, 0,
-       doc: /* Set SYMBOL's toplevel default value to VALUE.
-"Toplevel" means outside of any let binding.  */)
-     (Lisp_Object symbol, Lisp_Object value)
-{
-  /*
-     1. Update the Scheme binding registry (for interpreted code)
-     2. Set the default value directly (for unbound case and compiled code)
-
-     For interpreted code, bind-symbol's unwinder reads old-value from
-     the binding registry, so updating it affects the restored value.
-     For compiled code, old values are captured in closures so this
-     won't affect them (known limitation).  */
-
-  /* Update Scheme binding registry.  */
-  if (scm_is_false (set_toplevel_binding_fn))
-    set_toplevel_binding_fn = scm_c_public_ref ("emacs bindings", "set-toplevel-binding!");
-  SCM result = scm_call_2 (set_toplevel_binding_fn, symbol, value);
-
-  /* If no binding exists in registry, set the default directly.  */
-  if (scm_is_false (result))
-    Fset_default (symbol, value);
-
-  return Qnil;
-}
+DEFUNWRAP1(Fdefault_toplevel_value, "default-toplevel-value")
+DEFUNWRAP1(Fset_default_toplevel_value, "set-default-toplevel-value")
 
 DEFUN ("internal--define-uninitialized-variable",
        Finternal__define_uninitialized_variable,

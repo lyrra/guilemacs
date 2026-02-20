@@ -140,6 +140,7 @@
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
+(init-bindings-registrations)
 (init-list-registrations)
 (init-types-registrations)
 (init-numbers-registrations)

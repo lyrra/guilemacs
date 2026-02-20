@@ -2113,6 +2113,9 @@ extern Lisp_Object Fassq (Lisp_Object, Lisp_Object);
 extern Lisp_Object Fmemq (Lisp_Object, Lisp_Object);
 extern Lisp_Object Fmemql (Lisp_Object, Lisp_Object);
 extern Lisp_Object Fmember (Lisp_Object, Lisp_Object);
+extern Lisp_Object Fdefault_toplevel_value (Lisp_Object);
+extern Lisp_Object Fset_default_toplevel_value (Lisp_Object);
+
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)

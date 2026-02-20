@@ -9,6 +9,7 @@
 
 (define-module (emacs bindings)
   #:use-module (ice-9 match)
+  #:use-module (emacs-elisp runtime)
   #:export (;; Core operations
             push-binding!
             pop-binding!
@@ -30,7 +31,12 @@
             ;; Constants for binding kinds
             BINDING-LET
             BINDING-LET-LOCAL
-            BINDING-LET-DEFAULT))
+            BINDING-LET-DEFAULT
+
+            ;; Elisp-callable functions
+            elisp-default-toplevel-value
+            elisp-set-default-toplevel-value!
+            init-bindings-registrations))
 
 ;;; ==========================================================================
 ;;; Binding Kind Constants
@@ -118,6 +124,19 @@ This is used by `default-toplevel-value' to find the value before any let bindin
               (loop (cdr stack) (vector-ref entry 1))
               (loop (cdr stack) found))))))
 
+(define (elisp-default-toplevel-value symbol)
+  "Return SYMBOL's toplevel default value.
+Toplevel means outside of any let binding.
+Signals void-variable if the symbol has no value."
+  (let ((value (find-toplevel-binding symbol)))
+    (if value
+        value
+        ;; No binding in registry - fall back to default-value
+        (let ((default ((@@ (elisp-functions) default-value) symbol)))
+          (if (eq? default (@ (emacs-elisp runtime) unbound))
+              ((@@ (elisp-functions) signal) 'void-variable (list symbol))
+              default)))))
+
 (define (set-toplevel-binding! symbol value)
   "Set the old-value of the toplevel (outermost) binding for SYMBOL.
 Returns #t if a binding was found and modified, #f otherwise.
@@ -137,6 +156,18 @@ This is used by `set-default-toplevel-value' to modify the toplevel value."
               ;; looking for an even older binding
               (loop (cdr stack) entry)
               (loop (cdr stack) found-entry))))))
+
+(define (elisp-set-default-toplevel-value! symbol value)
+  "Set SYMBOL's toplevel default value to VALUE.
+Toplevel means outside of any let binding.
+Returns nil."
+  ;; 1. Update the Scheme binding registry (for interpreted code)
+  ;; 2. Set the default value directly (for unbound case and compiled code)
+  (let ((found (set-toplevel-binding! symbol value)))
+    ;; If no binding exists in registry, set the default directly
+    (unless found
+      ((@@ (elisp-functions) set-default) symbol value)))
+  #nil)
 
 (define (find-all-bindings symbol)
   "Find all bindings for SYMBOL on the stack.
@@ -215,3 +246,9 @@ Returns #t if SYMBOL has a LET-LOCAL binding for BUFFER on the stack."
   (for-each (lambda (entry)
               (format #t "  ~a~%" (binding-entry->string entry)))
             (*binding-stack*)))
+
+(define (init-bindings-registrations)
+  (for-each (lambda (sym-fun)
+              (set-symbol-function! (car sym-fun) (cadr sym-fun)))
+            `((default-toplevel-value ,elisp-default-toplevel-value)
+              (set-default-toplevel-value ,elisp-set-default-toplevel-value!))))
