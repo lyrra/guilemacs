@@ -489,6 +489,103 @@
 (defun backtrace ()
   (guile-backtrace))
 
+(defun mapbacktrace (function &optional base)
+  "Call FUNCTION for each frame in backtrace.
+If BASE is non-nil, it should be a function and iteration will start
+from its nearest activation frame.
+FUNCTION is called with 4 arguments: EVALD, FUNC, ARGS, and FLAGS.
+EVALD is t if args were evaluated, nil otherwise (always t for Guile frames).
+FUNC is the procedure name or lambda.
+ARGS is the list of arguments.
+FLAGS is a plist (currently empty in GuilEmacs).
+`mapbacktrace' always returns nil."
+  (let* ((stack (funcall (@ (guile) make-stack) t))
+         (len (funcall (@ (guile) stack-length) stack))
+         (start-idx 0)
+         (base-found (null base))  ; If no base, we start from beginning
+         (base-name (and base
+                         (condition-case nil
+                             (if (symbolp base) base
+                               (funcall (@ (guile) procedure-name) base))
+                           (error nil)))))
+    ;; Skip frames until we find base function (if specified)
+    (when base-name
+      (let ((idx 0))
+        (while (and (< idx len) (not base-found))
+          (let* ((frame (funcall (@ (guile) stack-ref) stack idx))
+                 (pname (condition-case nil
+                            (funcall (@ (guile) frame-procedure-name) frame)
+                          (error nil))))
+            (when (eq pname base-name)
+              (setq base-found t)
+              (setq start-idx (1+ idx))))
+          (setq idx (1+ idx)))))
+    ;; Only iterate if base was found (or no base specified)
+    (when base-found
+      (let ((idx start-idx))
+        (while (< idx len)
+          (let* ((frame (funcall (@ (guile) stack-ref) stack idx))
+                 (pname (condition-case nil
+                            (funcall (@ (guile) frame-procedure-name) frame)
+                          (error nil)))
+                 (args (condition-case nil
+                           (funcall (@ (guile) frame-arguments) frame)
+                         (error nil))))
+            ;; Call function with: evald=t, func=pname, args=args, flags=nil
+            ;; In Guile, we always have evaluated arguments
+            (funcall function t pname (if (listp args) args (list args)) nil))
+          (setq idx (1+ idx)))))
+    nil))
+
+(defun backtrace--locals (nframes &optional base)
+  "Return names and values of local variables of a stack frame.
+NFRAMES and BASE specify the activation frame to use, as in `backtrace-frame'.
+Note: In GuilEmacs, this returns an empty list as local variable introspection
+from Guile frames is not yet implemented."
+  ;; TODO: Implement using Guile's frame-local-ref and frame-local-set!
+  ;; For now, return empty list to allow ERT and other backtrace users to work
+  nil)
+
+(defun backtrace-frame--internal (function nframes base)
+  "Call FUNCTION on stack frame NFRAMES away from BASE.
+Return the result of FUNCTION, or nil if no matching frame could be found."
+  (let* ((stack (funcall (@ (guile) make-stack) t))
+         (len (funcall (@ (guile) stack-length) stack))
+         (start-idx 0)
+         (base-found (null base))  ; If no base, we start from beginning
+         (base-name (and base
+                         (condition-case nil
+                             (if (symbolp base) base
+                               (funcall (@ (guile) procedure-name) base))
+                           (error nil)))))
+    ;; Find the base frame
+    (when base-name
+      (let ((idx 0))
+        (while (and (< idx len) (not base-found))
+          (let* ((frame (funcall (@ (guile) stack-ref) stack idx))
+                 (pname (condition-case nil
+                            (funcall (@ (guile) frame-procedure-name) frame)
+                          (error nil))))
+            (when (eq pname base-name)
+              (setq base-found t)
+              (setq start-idx (1+ idx))))
+          (setq idx (1+ idx)))))
+    ;; Only proceed if base was found (or no base specified)
+    (if (not base-found)
+        nil  ; Base not found, return nil silently
+      ;; Get the frame at nframes offset
+      (let ((target-idx (+ start-idx nframes)))
+        (if (< target-idx len)
+            (let* ((frame (funcall (@ (guile) stack-ref) stack target-idx))
+                   (pname (condition-case nil
+                              (funcall (@ (guile) frame-procedure-name) frame)
+                            (error nil)))
+                   (args (condition-case nil
+                             (funcall (@ (guile) frame-arguments) frame)
+                           (error nil))))
+              (funcall function t pname (if (listp args) args (list args)) nil))
+          nil)))))
+
 (defun %set-eager-macroexpansion-mode (ignore)
   nil)
 
