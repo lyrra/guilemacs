@@ -13,6 +13,7 @@
   #:export (
     custom-elisp-read
     init-reader
+    elisp-read-from-port
     elisp-complete-file-load-from-port
     elisp-compute-found-effective
     elisp-convert-guile-object

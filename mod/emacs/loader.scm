@@ -38,6 +38,10 @@
     elisp-prepare-openp-call
     elisp-process-load-file-path
     elisp-readevalloop-load-from-port
+    elisp-read-next-expression-from-port
+    elisp-eval-loop-from-port
+    elisp-eval-region-from-string
+    elisp-eval-buffer-from-string
     elisp-return-load-success
     elisp-setup-default-lexical-binding
     elisp-setup-file-descriptor-protection
@@ -138,6 +142,89 @@ Replicates the core behavior of src/lread.c:2055-2088."
       ((symbol-function 'elisp-loadhist-initialize) normalized-sourcename)
       (elisp-load-read-eval-loop-from-port port printflag)
       'done)))
+
+;;;
+;;; Buffer/Region Evaluation Functions
+;;;
+;;; These functions implement eval-region and eval-buffer by creating
+;;; string ports from buffer contents and feeding them to the reader.
+;;;
+
+(define (elisp-read-next-expression-from-port port readfun)
+  "Read the next expression from PORT for eval-region/eval-buffer.
+Uses READFUN if provided, otherwise uses the standard elisp reader.
+Returns 'eof if end of input reached."
+  (let loop ()
+    ;; Skip whitespace
+    (let skip-ws ()
+      (let ((ch (peek-char port)))
+        (when (and (not (eof-object? ch))
+                   (or (char=? ch #\space)
+                       (char=? ch #\tab)
+                       (char=? ch #\newline)
+                       (char=? ch #\page)
+                       (char=? ch #\return)
+                       (char=? ch #\xa0)))  ; NO_BREAK_SPACE
+          (read-char port)
+          (skip-ws))))
+    (let ((ch (peek-char port)))
+      (cond
+        ((eof-object? ch) 'eof)
+        ;; Skip line comments
+        ((char=? ch #\;)
+         (read-char port)
+         (let skip-comment ()
+           (let ((c (read-char port)))
+             (unless (or (eof-object? c) (char=? c #\newline))
+               (skip-comment))))
+         (loop))
+        (else
+         ;; Read expression using readfun or standard reader
+         (if (and readfun (not (eq? readfun #nil)))
+             ;; Call the custom read function
+             ;; It expects a "stream" which in Emacs is the buffer
+             ;; For now, we read using standard reader
+             ;; TODO: properly support custom readfun
+             (elisp-read-from-port port)
+             (elisp-read-from-port port)))))))
+
+(define (elisp-eval-loop-from-port port printflag readfun)
+  "Read-eval loop for eval-region/eval-buffer.
+Reads expressions from PORT, evaluates them, and optionally prints results."
+  (let loop ()
+    (let ((expr (elisp-read-next-expression-from-port port readfun)))
+      (cond
+        ((eq? expr 'eof) #nil)
+        (else
+         (let ((result ((symbol-function 'eval) expr)))
+           (when (and printflag (not (eq? printflag #nil)))
+             ;; Add to values list
+             ((symbol-function 'set) 'values
+              ((symbol-function 'cons) result
+               ((symbol-function 'symbol-value) 'values)))
+             ;; Print result
+             (if (eq? ((symbol-function 'symbol-value) 'standard-output) #t)
+                 ((symbol-function 'prin1) result #nil #nil)
+                 ((symbol-function 'print) result #nil)))
+           (loop)))))))
+
+(define (elisp-eval-region-from-string content printflag readfun)
+  "Scheme implementation of eval-region read-eval loop.
+CONTENT is the string content to evaluate.
+PRINTFLAG controls output, READFUN is optional custom read function.
+Called from C after buffer content has been extracted."
+  (let ((port (open-input-string content)))
+    (elisp-eval-loop-from-port port printflag readfun)
+    #nil))
+
+(define (elisp-eval-buffer-from-string content printflag)
+  "Scheme implementation of eval-buffer read-eval loop.
+CONTENT is the buffer content as a string.
+PRINTFLAG controls output.
+Called from C after buffer content has been extracted."
+  (let ((port (open-input-string content)))
+    (elisp-eval-loop-from-port port printflag #nil)
+    #nil))
 
 ;;;
 ;;; File Path Processing

@@ -195,9 +195,6 @@ static ptrdiff_t read_from_string_limit;
 
 static Lisp_Object Vloads_in_progress;
 
-static void readevalloop (Lisp_Object, Lisp_Object, bool,
-                          Lisp_Object, Lisp_Object,
-                          Lisp_Object, Lisp_Object);
 static void readevalloop_load (SCM port, Lisp_Object sourcename);
 
 /* Load-specific helper function declarations */
@@ -1417,193 +1414,9 @@ end_of_file_error (void)
   xsignal0 (Qend_of_file);
 }
 
-/* GuilEmacs: All strings are UTF-8, unibyte parameter is ignored.
-   READFUN, if non-nil, is used instead of `read'.
-
-   START, END specify region to read in current buffer (from eval-region).
-   If the input is not from a buffer, they must be nil.  */
-
-static void
-readevalloop (Lisp_Object readcharfun,
-	      Lisp_Object sourcename,
-	      bool printflag,
-	      Lisp_Object unibyte, /* Ignored - kept for API compatibility */
-	      Lisp_Object readfun,
-	      Lisp_Object start, Lisp_Object end)
-{
-  int c;
-  Lisp_Object val;
-  dynwind_begin ();
-  struct buffer *b = 0;
-  bool continue_reading_p;
-  Lisp_Object lex_bound;
-  /* True if reading an entire buffer.  */
-  bool whole_buffer = 0;
-  /* True on the first time around.  */
-  bool first_sexp = 1;
-
-  if (!NILP (sourcename))
-    CHECK_STRING (sourcename);
-
-  Lisp_Object compile_fn = 0;
-
-  if (MARKERP (readcharfun))
-    {
-      if (NILP (start))
-	start = readcharfun;
-    }
-
-  if (BUFFERP (readcharfun))
-    b = XBUFFER (readcharfun);
-  else if (MARKERP (readcharfun))
-    b = XMARKER (readcharfun)->buffer;
-
-  /* We assume START is nil when input is not from a buffer.  */
-  if (! NILP (start) && !b)
-    emacs_abort ();
-
-  specbind_guile (Qstandard_input, readcharfun);
-  /* Note: load_convert_to_unibyte logic removed - pure UTF-8 strings only */
-
-  /* If lexical binding is active (either because it was specified in
-     the file's header, or via a buffer-local variable), create an empty
-     lexical environment, otherwise, turn off lexical binding.  */
-  lex_bound = find_symbol_value (Qlexical_binding);
-  specbind_guile (Qinternal_interpreter_environment,
-	    (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
-	     ? Qnil : list1 (Qt)));
-  specbind_guile (Qmacroexp__dynvars, Vmacroexp__dynvars);
-
-  /* Ensure sourcename is absolute, except whilst preloading.  */
-  if (!NILP (sourcename) && !NILP (Ffile_name_absolute_p (sourcename)))
-    sourcename = Fexpand_file_name (sourcename, Qnil);
-
-  loadhist_initialize (sourcename);
-
-  continue_reading_p = 1;
-  while (continue_reading_p)
-    {
-      dynwind_begin ();
-
-      if (b != 0 && !BUFFER_LIVE_P (b))
-	error ("Reading from killed buffer");
-
-      if (!NILP (start))
-	{
-	  /* Switch to the buffer we are reading from.  */
-	  record_unwind_protect_excursion ();
-	  set_buffer_internal (b);
-
-	  /* Save point in it.  */
-	  record_unwind_protect_excursion ();
-	  /* Save ZV in it.  */
-	  record_unwind_protect (save_restriction_restore, save_restriction_save ());
-	  labeled_restrictions_remove_in_current_buffer ();
-	  /* Those get unbound after we read one expression.  */
-
-	  /* Set point and ZV around stuff to be read.  */
-	  Fgoto_char (start);
-	  if (!NILP (end))
-	    Fnarrow_to_region (make_fixnum (BEGV), end);
-
-	  /* Just for cleanliness, convert END to a marker
-	     if it is an integer.  */
-	  if (FIXNUMP (end))
-	    end = Fpoint_max_marker ();
-	}
-
-      /* On the first cycle, we can easily test here
-	 whether we are reading the whole buffer.  */
-      if (b && first_sexp)
-	whole_buffer = (BUF_PT (b) == BUF_BEG (b) && BUF_ZV (b) == BUF_Z (b));
-
-    read_next:
-      c = READCHAR;
-      if (c == ';')
-	{
-	  while ((c = READCHAR) != '\n' && c != -1);
-	  goto read_next;
-	}
-      if (c < 0)
-	{
-	  dynwind_end ();
-	  break;
-	}
-
-      /* Ignore whitespace here, so we can detect eof.  */
-      if (c == ' ' || c == '\t' || c == '\n' || c == '\f' || c == '\r'
-	  || c == NO_BREAK_SPACE)
-	goto read_next;
-      UNREAD (c);
-
-      if (! HASH_TABLE_P (read_objects_map)
-	  || XHASH_TABLE (read_objects_map)->count)
-	read_objects_map
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (! HASH_TABLE_P (read_objects_completed)
-	  || XHASH_TABLE (read_objects_completed)->count)
-	read_objects_completed
-	  = make_hash_table (&hashtest_eq, DEFAULT_HASH_SIZE, Weak_None, false);
-      if (!NILP (Vpurify_flag) && c == '(')
-	val = read0 (readcharfun, false);
-      else
-	{
-	  if (!NILP (readfun))
-	    {
-	      val = call1 (readfun, readcharfun);
-
-	      /* If READCHARFUN has set point to ZV, we should
-	         stop reading, even if the form read sets point
-		 to a different value when evaluated.  */
-	      if (BUFFERP (readcharfun))
-		{
-		  struct buffer *buf = XBUFFER (readcharfun);
-		  if (BUF_PT (buf) == BUF_ZV (buf))
-		    continue_reading_p = 0;
-		}
-	    }
-	  else if (! NILP (Vload_read_function))
-	    val = call1 (Vload_read_function, readcharfun);
-	  else
-            {
-	      val = read_internal_start (readcharfun, Qnil, Qnil, false);
-            }
-	}
-      /* Empty hashes can be reused; otherwise, reset on next call.  */
-      if (HASH_TABLE_P (read_objects_map)
-	  && XHASH_TABLE (read_objects_map)->count > 0)
-	read_objects_map = Qnil;
-      if (HASH_TABLE_P (read_objects_completed)
-	  && XHASH_TABLE (read_objects_completed)->count > 0)
-	read_objects_completed = Qnil;
-
-      if (!NILP (start) && continue_reading_p)
-	start = Fpoint_marker ();
-
-      /* Restore saved point and BEGV.  */
-      dynwind_end ();
-
-      val = eval_sub (val);
-
-      if (printflag)
-	{
-	  Vvalues = Fcons (val, Vvalues);
-	  if (EQ (Vstandard_output, Qt))
-	    Fprin1 (val, Qnil, Qnil);
-	  else
-	    Fprint (val, Qnil);
-	}
-    }
-
-
-  dynwind_end ();
-}
-
 /* File-specific version of readevalloop, used by LOAD (from file) only.
-
-   ARCHITECTURAL SPLIT:
-   - readevalloop(): General reading from any source (strings, buffers, functions)
-   - readevalloop_load(): File-specific reading, isolated for future SCM port migration
+   Uses Scheme-based reader for file loading.
+   eval-region and eval-buffer now use separate Scheme implementations.
 
    This function uses fread_internal_start() which provides the isolation point
    for Phase 2 migration to SCM ports.
@@ -1776,6 +1589,76 @@ readevalloop_load (SCM port, Lisp_Object sourcename)
   SCM_CALL_2 (readevalloop_load_func, port, sourcename);
 }
 
+/* Scheme-based implementation for eval-region.
+   Extracts buffer content and calls Scheme read-eval loop. */
+static void
+eval_region_scheme (Lisp_Object start, Lisp_Object end, bool printflag, Lisp_Object readfun)
+{
+  /* Validate and coerce START and END to buffer positions */
+  struct buffer *buf = current_buffer;
+  ptrdiff_t b, e;
+
+  if (NILP (start))
+    b = BEGV;
+  else
+    {
+      CHECK_FIXNUM_COERCE_MARKER (start);
+      b = XFIXNUM (start);
+    }
+
+  if (NILP (end))
+    e = ZV;
+  else
+    {
+      CHECK_FIXNUM_COERCE_MARKER (end);
+      e = XFIXNUM (end);
+    }
+
+  if (b > e)
+    {
+      ptrdiff_t temp = b;
+      b = e;
+      e = temp;
+    }
+
+  if (b < BEGV || e > ZV)
+    args_out_of_range (start, end);
+
+  /* Extract buffer content as string */
+  Lisp_Object content = make_buffer_string (b, e, 0);
+
+  /* Call Scheme implementation */
+  SCM eval_func = scm_c_private_ref ("emacs-elisp runtime",
+                                     "elisp-eval-region-from-string");
+  SCM_CALL_3 (eval_func, content, printflag ? SCM_BOOL_T : SCM_BOOL_F, readfun);
+}
+
+/* Scheme-based implementation for eval-buffer.
+   Extracts buffer content and calls Scheme read-eval loop. */
+static void
+eval_buffer_scheme (Lisp_Object buf, bool printflag)
+{
+  struct buffer *b = XBUFFER (buf);
+
+  /* Get buffer content - from BEGV to ZV (respects narrowing) */
+  ptrdiff_t start = BUF_BEGV (b);
+  ptrdiff_t end = BUF_ZV (b);
+
+  /* Temporarily switch to the buffer to extract content */
+  dynwind_begin ();
+  record_unwind_current_buffer ();
+  set_buffer_internal (b);
+
+  Lisp_Object content = make_buffer_string (start, end, 0);
+
+  dynwind_end ();
+
+  /* Call Scheme implementation */
+  SCM eval_func = scm_c_private_ref ("emacs-elisp runtime",
+                                     "elisp-eval-buffer-from-string");
+  SCM_CALL_2 (eval_func, content, printflag ? SCM_BOOL_T : SCM_BOOL_F);
+}
+
 DEFUN ("eval-buffer", Feval_buffer, Seval_buffer, 0, 5, "",
        doc: /* Execute the accessible portion of current buffer as Lisp code.
 You can use \\[narrow-to-region] to limit the part of buffer to be evaluated.
@@ -1825,11 +1708,23 @@ This function preserves the position of point.  */)
   specbind_guile (Qstandard_output, tem);
   record_unwind_protect_excursion ();
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
+
+  /* Set up lexical binding based on buffer cookie */
   specbind_guile (Qlexical_binding,
-	    lisp_file_lexical_cookie (buf) == Cookie_Lex ? Qt : Qnil);
-  BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
-  readevalloop (buf, filename,
-		!NILP (printflag), unibyte, Qnil, Qnil, Qnil);
+            lisp_file_lexical_cookie (buf) == Cookie_Lex ? Qt : Qnil);
+
+  /* Set up lexical environment */
+  Lisp_Object lex_bound = find_symbol_value (Qlexical_binding);
+  specbind_guile (Qinternal_interpreter_environment,
+            (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
+             ? Qnil : list1 (Qt)));
+
+  /* Initialize load history */
+  loadhist_initialize (filename);
+
+  /* Use Scheme-based implementation */
+  eval_buffer_scheme (buf, !NILP (printflag));
+
   dynwind_end ();
 
   return Qnil;
@@ -1863,10 +1758,17 @@ This function does not move point.  */)
   specbind_guile (Qstandard_output, tem);
   specbind_guile (Qeval_buffer_list, Fcons (cbuf, Veval_buffer_list));
 
-  /* `readevalloop' calls functions which check the type of start and end.  */
-  readevalloop (cbuf, BVAR (XBUFFER (cbuf), filename),
-		!NILP (printflag), Qnil, read_function,
-		start, end);
+  /* Set up lexical binding environment */
+  Lisp_Object lex_bound = find_symbol_value (Qlexical_binding);
+  specbind_guile (Qinternal_interpreter_environment,
+            (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
+             ? Qnil : list1 (Qt)));
+
+  /* Initialize load history */
+  loadhist_initialize (BVAR (XBUFFER (cbuf), filename));
+
+  /* Use Scheme-based implementation */
+  eval_region_scheme (start, end, !NILP (printflag), read_function);
 
   dynwind_end ();
   return Qnil;
