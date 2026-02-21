@@ -591,17 +591,125 @@ Returns the appropriate parsed structure for the given quote-like character."
 
 (define (elisp-parse-string-literal-from-port port)
   "Parse a string literal from PORT.
-C has already consumed the opening quote, so we read the complete string.
+The opening quote has been put back, so we consume it and parse the string
+with proper Elisp escape sequence handling.
 Returns: the parsed string"
-  ;; Use Guile's built-in string reader
-  (read port))
+  ;; Consume the opening quote
+  (let ((open-quote (read-char port)))
+    (unless (and (char? open-quote) (char=? open-quote #\"))
+      (error "Expected opening quote for string literal"))
+    ;; Parse string contents character by character
+    (let loop ((chars '()))
+      (let ((ch (read-char port)))
+        (cond
+          ((eof-object? ch)
+           (error "Unexpected EOF in string literal"))
+          ;; Closing quote - done
+          ((char=? ch #\")
+           (list->string (reverse chars)))
+          ;; Escape sequence
+          ((char=? ch #\\)
+           (let ((escape-ch (read-char port)))
+             (cond
+               ((eof-object? escape-ch)
+                (error "Unexpected EOF after backslash in string"))
+               ;; Standard escape sequences
+               ((char=? escape-ch #\n) (loop (cons #\newline chars)))
+               ((char=? escape-ch #\t) (loop (cons #\tab chars)))
+               ((char=? escape-ch #\r) (loop (cons #\return chars)))
+               ((char=? escape-ch #\f) (loop (cons (integer->char 12) chars))) ; form feed
+               ((char=? escape-ch #\b) (loop (cons #\backspace chars)))
+               ((char=? escape-ch #\a) (loop (cons (integer->char 7) chars)))  ; bell
+               ((char=? escape-ch #\v) (loop (cons (integer->char 11) chars))) ; vertical tab
+               ((char=? escape-ch #\e) (loop (cons (integer->char 27) chars))) ; ESC
+               ((char=? escape-ch #\s) (loop (cons #\space chars)))
+               ((char=? escape-ch #\d) (loop (cons (integer->char 127) chars))) ; delete
+               ((char=? escape-ch #\\) (loop (cons #\\ chars)))
+               ((char=? escape-ch #\") (loop (cons #\" chars)))
+               ((char=? escape-ch #\newline)
+                ;; Backslash-newline: skip both and continue
+                (loop chars))
+               ;; Octal escape \NNN
+               ((and (char>=? escape-ch #\0) (char<=? escape-ch #\7))
+                (let ((octal-val (- (char->integer escape-ch) (char->integer #\0))))
+                  (let octal-loop ((val octal-val) (count 1))
+                    (if (>= count 3)
+                        (loop (cons (integer->char val) chars))
+                        (let ((next (peek-char port)))
+                          (if (and (not (eof-object? next))
+                                   (char>=? next #\0) (char<=? next #\7))
+                              (begin
+                                (read-char port)
+                                (octal-loop (+ (* val 8) (- (char->integer next) (char->integer #\0)))
+                                            (+ count 1)))
+                              (loop (cons (integer->char val) chars))))))))
+               ;; Hex escape \xNN
+               ((char=? escape-ch #\x)
+                (let hex-loop ((val 0) (count 0))
+                  (let ((next (peek-char port)))
+                    (cond
+                      ((eof-object? next)
+                       (loop (cons (integer->char val) chars)))
+                      ((or (and (char>=? next #\0) (char<=? next #\9))
+                           (and (char>=? next #\a) (char<=? next #\f))
+                           (and (char>=? next #\A) (char<=? next #\F)))
+                       (read-char port)
+                       (let ((digit (cond
+                                      ((char<=? next #\9) (- (char->integer next) (char->integer #\0)))
+                                      ((char<=? next #\F) (+ 10 (- (char->integer next) (char->integer #\A))))
+                                      (else (+ 10 (- (char->integer next) (char->integer #\a)))))))
+                         (hex-loop (+ (* val 16) digit) (+ count 1))))
+                      (else
+                       (loop (cons (integer->char val) chars)))))))
+               ;; Unicode escape \uNNNN
+               ((char=? escape-ch #\u)
+                (let uni-loop ((val 0) (count 0))
+                  (if (>= count 4)
+                      (loop (cons (integer->char val) chars))
+                      (let ((next (read-char port)))
+                        (cond
+                          ((eof-object? next)
+                           (error "Unexpected EOF in unicode escape"))
+                          ((or (and (char>=? next #\0) (char<=? next #\9))
+                               (and (char>=? next #\a) (char<=? next #\f))
+                               (and (char>=? next #\A) (char<=? next #\F)))
+                           (let ((digit (cond
+                                          ((char<=? next #\9) (- (char->integer next) (char->integer #\0)))
+                                          ((char<=? next #\F) (+ 10 (- (char->integer next) (char->integer #\A))))
+                                          (else (+ 10 (- (char->integer next) (char->integer #\a)))))))
+                             (uni-loop (+ (* val 16) digit) (+ count 1))))
+                          (else
+                           (error "Invalid hex digit in unicode escape")))))))
+               ;; Unicode escape \UNNNNNNNN
+               ((char=? escape-ch #\U)
+                (let uni-loop ((val 0) (count 0))
+                  (if (>= count 8)
+                      (loop (cons (integer->char val) chars))
+                      (let ((next (read-char port)))
+                        (cond
+                          ((eof-object? next)
+                           (error "Unexpected EOF in unicode escape"))
+                          ((or (and (char>=? next #\0) (char<=? next #\9))
+                               (and (char>=? next #\a) (char<=? next #\f))
+                               (and (char>=? next #\A) (char<=? next #\F)))
+                           (let ((digit (cond
+                                          ((char<=? next #\9) (- (char->integer next) (char->integer #\0)))
+                                          ((char<=? next #\F) (+ 10 (- (char->integer next) (char->integer #\A))))
+                                          (else (+ 10 (- (char->integer next) (char->integer #\a)))))))
+                             (uni-loop (+ (* val 16) digit) (+ count 1))))
+                          (else
+                           (error "Invalid hex digit in unicode escape")))))))
+               ;; Default: return the escaped character literally
+               (else (loop (cons escape-ch chars))))))
+          ;; Regular character
+          (else (loop (cons ch chars))))))))
 
 (define (elisp-parse-string-literal-from-port-enhanced port)
   "Parse a string literal from PORT with enhanced quote handling.
 This version handles the case where C has consumed the opening quote.
 Returns: the parsed string with proper type validation in Scheme"
-  ;; C puts back the quote, so we can use normal read
-  (let ((result (read port)))
+  ;; Use our proper Elisp string parser that handles \e and other escape sequences
+  (let ((result (elisp-parse-string-literal-from-port port)))
     (cond
       ((eof-object? result)
        (error "Unexpected EOF while reading string"))
