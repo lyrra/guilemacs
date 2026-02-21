@@ -1841,11 +1841,18 @@ a substring of STRING from which to read;  they default to 0 and
 the end of STRING.  */)
   (Lisp_Object string, Lisp_Object start, Lisp_Object end)
 {
-  Lisp_Object ret;
   CHECK_STRING (string);
-  /* `read_internal_start' sets `read_from_string_index'.  */
-  ret = read_internal_start (string, start, end, false);
-  return Fcons (ret, make_fixnum (read_from_string_index));
+
+  /* Default START to 0, END to string length */
+  ptrdiff_t len = SCHARS (string);
+  ptrdiff_t start_val = NILP (start) ? 0 : XFIXNUM (start);
+  ptrdiff_t end_val = NILP (end) ? len : XFIXNUM (end);
+
+  /* Call Scheme implementation which returns (object . position) */
+  SCM read_func = scm_c_private_ref ("emacs-elisp runtime",
+                                     "elisp-read-from-string-with-position");
+  return SCM_CALL_3 (read_func, string,
+                     make_fixnum (start_val), make_fixnum (end_val));
 }
 
 /* File-specific error handling functions */

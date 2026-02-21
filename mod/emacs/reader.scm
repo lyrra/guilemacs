@@ -14,6 +14,10 @@
     custom-elisp-read
     init-reader
     elisp-read-from-port
+    elisp-read-from-string-with-position
+    elisp-parse-hash-s-from-port
+    elisp-hash-table-from-plist
+    elisp-record-from-list
     elisp-complete-file-load-from-port
     elisp-compute-found-effective
     elisp-convert-guile-object
@@ -96,6 +100,24 @@
   "Main entry point for reading Elisp expressions from PORT.
 This is the primary reader function used throughout the codebase."
   (elisp-fread0-complete port))
+
+(define (elisp-read-from-string-with-position str start end)
+  "Read one Elisp expression from STR between START and END.
+Returns a cons (OBJECT . FINAL-POSITION) where FINAL-POSITION is the
+index of the next character after the expression that was read.
+This is used by read-from-string and for reading from string streams."
+  (let* ((len (string-length str))
+         ;; Handle negative indices like Emacs does
+         (real-start (if (< start 0) (+ len start) start))
+         (real-end (if (< end 0) (+ len end) end))
+         ;; Extract substring and create port
+         (substr (substring str real-start real-end))
+         (port (open-input-string substr)))
+    ;; Read the expression
+    (let ((obj (elisp-read-from-port port)))
+      ;; Get final position using ftell
+      (let ((chars-read (ftell port)))
+        (cons obj (+ real-start chars-read))))))
 
 ;;;
 ;;; List Parsing Functions
@@ -438,6 +460,78 @@ Returns: the parsed string with proper type validation in Scheme"
       (else
        (error "String parser returned non-string")))))
 
+(define (elisp-parse-hash-s-from-port port)
+  "Parse #s(...) syntax for hash-tables and records.
+The 's' has already been consumed. Expects '(' followed by elements."
+  (let ((ch (read-char port)))
+    (unless (and (char? ch) (char=? ch #\())
+      (error "Expected '(' after #s"))
+    ;; Read the list contents
+    (let ((elems (elisp-parse-list-from-port port)))
+      (cond
+        ((or (null? elems) (eq? elems #nil))
+         (error "Empty #s() syntax"))
+        ;; If first element is 'hash-table, create hash table from plist
+        ((eq? (car elems) 'hash-table)
+         (elisp-hash-table-from-plist (cdr elems)))
+        ;; Otherwise create a record
+        (else
+         (elisp-record-from-list elems))))))
+
+(define (elisp-hash-table-from-plist plist)
+  "Create a hash table from a property list.
+PLIST is a list of alternating keys and values.
+Uses Elisp make-hash-table and puthash for proper Emacs hash tables."
+  (let ((elisp-make-hash-table (symbol-function 'make-hash-table))
+        (elisp-puthash (symbol-function 'puthash))
+        (test-param #nil)
+        (size-param #nil)
+        (weakness-param #nil)
+        (data-list #nil))
+    ;; First pass: extract all parameters
+    (let param-loop ((rest plist))
+      (cond
+        ((or (null? rest) (eq? rest #nil)) #t)
+        ((or (null? (cdr rest)) (eq? (cdr rest) #nil))
+         (error "Odd number of elements in hash-table plist"))
+        (else
+         (let ((key (car rest))
+               (val (cadr rest)))
+           (cond
+             ((eq? key 'test) (set! test-param val))
+             ((eq? key 'size) (set! size-param val))
+             ((eq? key 'weakness) (set! weakness-param val))
+             ((eq? key 'data) (set! data-list val)))
+           (param-loop (cddr rest))))))
+    ;; Create hash table - just create empty one for now (keywords need interning)
+    (let ((ht (elisp-make-hash-table)))
+      ;; Fill in the data
+      (let data-loop ((data data-list))
+        (cond
+          ((or (null? data) (eq? data #nil)) #t)
+          ((or (null? (cdr data)) (eq? (cdr data) #nil))
+           (error "Odd number of elements in hash-table data"))
+          (else
+           (elisp-puthash (car data) (cadr data) ht)
+           (data-loop (cddr data)))))
+      ht)))
+
+(define (elisp-record-from-list elems)
+  "Create a record from a list. First element is type, rest are slots."
+  ;; For now, return as a vector with a type marker
+  ;; Records are implemented as vectors in Emacs
+  (let* ((type (car elems))
+         (slots (cdr elems))
+         (len (length slots))
+         (rec (make-vector (+ len 1) #nil)))
+    (vector-set! rec 0 type)
+    (let loop ((i 1) (rest slots))
+      (cond
+        ((or (null? rest) (eq? rest #nil)) rec)
+        (else
+         (vector-set! rec i (car rest))
+         (loop (+ i 1) (cdr rest)))))))
+
 (define (elisp-parse-bool-vector-from-port port)
   "Parse a bool vector (#&LENGTH\"DATA\") from PORT.
 C has already consumed '#&', now we need to parse length and string data.
@@ -591,9 +685,9 @@ Returns: appropriate Lisp object based on hash syntax"
       ((char-numeric? ch)
        (elisp-parse-hash-number-from-port port ch))
 
-      ;; Unsupported syntax - consistent error messages
+      ;; #s(...) - hash-table or record syntax
       ((char=? ch #\s)
-       (error "Hash-table/record syntax (#s) not supported"))
+       (elisp-parse-hash-s-from-port port))
       ((char=? ch #\^)
        (error "Char-table syntax (#^) not supported"))
       ((char=? ch #\()

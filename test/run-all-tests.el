@@ -4,6 +4,15 @@
 
 (message "")
 (message "========================================")
+(message "READER TEST SUITE")
+(message "========================================")
+(message "")
+
+(load-file "test/reader/test-hash-syntax.el")
+(message "")
+
+(message "")
+(message "========================================")
 (message "ELISP EVAL CLOSURE TEST SUITE")
 (message "========================================")
 (message "")
