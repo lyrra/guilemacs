@@ -119,6 +119,27 @@ This is used by read-from-string and for reading from string streams."
       (let ((chars-read (ftell port)))
         (cons obj (+ real-start chars-read))))))
 
+;; Register read-from-string as an Elisp function
+;; This replaces the C DEFUN in lread.c
+(define (elisp-read-from-string string . rest)
+  "Read one Lisp expression which is represented as text by STRING.
+Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
+FINAL-STRING-INDEX is an integer giving the position of the next
+remaining character in STRING.  START and END optionally delimit
+a substring of STRING from which to read; they default to 0 and
+\(length STRING) respectively.  Negative values are counted from
+the end of STRING."
+  (let* ((start (if (null? rest) 0
+                    (let ((s (car rest)))
+                      (if (eq? s #nil) 0 s))))
+         (end (if (or (null? rest) (null? (cdr rest)))
+                  (string-length string)
+                  (let ((e (cadr rest)))
+                    (if (eq? e #nil) (string-length string) e)))))
+    (elisp-read-from-string-with-position string start end)))
+
+(set-symbol-function! 'read-from-string elisp-read-from-string)
+
 ;;;
 ;;; List Parsing Functions
 ;;;

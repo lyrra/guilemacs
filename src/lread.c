@@ -1831,29 +1831,8 @@ STREAM or the value of `standard-input' may be:
   return read_internal_start (stream, Qnil, Qnil, true);
 }
 
-DEFUN ("read-from-string", Fread_from_string, Sread_from_string, 1, 3, 0,
-       doc: /* Read one Lisp expression which is represented as text by STRING.
-Returns a cons: (OBJECT-READ . FINAL-STRING-INDEX).
-FINAL-STRING-INDEX is an integer giving the position of the next
-remaining character in STRING.  START and END optionally delimit
-a substring of STRING from which to read;  they default to 0 and
-\(length STRING) respectively.  Negative values are counted from
-the end of STRING.  */)
-  (Lisp_Object string, Lisp_Object start, Lisp_Object end)
-{
-  CHECK_STRING (string);
-
-  /* Default START to 0, END to string length */
-  ptrdiff_t len = SCHARS (string);
-  ptrdiff_t start_val = NILP (start) ? 0 : XFIXNUM (start);
-  ptrdiff_t end_val = NILP (end) ? len : XFIXNUM (end);
-
-  /* Call Scheme implementation which returns (object . position) */
-  SCM read_func = scm_c_private_ref ("emacs-elisp runtime",
-                                     "elisp-read-from-string-with-position");
-  return SCM_CALL_3 (read_func, string,
-                     make_fixnum (start_val), make_fixnum (end_val));
-}
+/* read-from-string is now implemented in Scheme (mod/emacs/reader.scm) */
+DEFUNWRAP3(Fread_from_string, "read-from-string")
 
 /* File-specific error handling functions */
 static AVOID
