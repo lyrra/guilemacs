@@ -110,13 +110,15 @@
               (error 'error-not-caught)))
 
 ;; Test 14: throw from lambda through eval
-(let ((thrower (lambda () (throw 'test 'caught))))
-  (test-equal "throw-lambda-through-eval"
-              'caught
-              (condition-case err
-                  (catch 'test
-                    (eval '(funcall thrower)))
-                (error 'error-not-caught))))
+;; With lexical binding, we use a dynamically-scoped variable for the thrower
+(defvar test-thrower nil)
+(setq test-thrower (lambda () (throw 'test 'caught)))
+(test-equal "throw-lambda-through-eval"
+            'caught
+            (condition-case err
+                (catch 'test
+                  (eval '(funcall test-thrower)))
+              (error 'error-not-caught)))
 
 ;;; ============================================
 ;;; Section 4: Signal propagation through eval
@@ -143,22 +145,26 @@
 ;;; ============================================
 
 ;; Test 17: unwind-protect cleanup runs on normal exit through eval
-(let ((cleanup-ran nil))
-  (eval '(unwind-protect
-             'body
-           (setq cleanup-ran t)))
-  (test-assert "unwind-cleanup-normal-exit"
-               cleanup-ran))
+;; With lexical binding, we use a dynamically-scoped variable
+(defvar test-cleanup-ran-1 nil)
+(setq test-cleanup-ran-1 nil)
+(eval '(unwind-protect
+           'body
+         (setq test-cleanup-ran-1 t)))
+(test-assert "unwind-cleanup-normal-exit"
+             test-cleanup-ran-1)
 
 ;; Test 18: unwind-protect cleanup runs on error through eval
-(let ((cleanup-ran nil))
-  (condition-case err
-      (eval '(unwind-protect
-                 (signal 'error '("test"))
-               (setq cleanup-ran t)))
-    (error nil))
-  (test-assert "unwind-cleanup-on-error"
-               cleanup-ran))
+;; With lexical binding, we use a dynamically-scoped variable
+(defvar test-cleanup-ran-2 nil)
+(setq test-cleanup-ran-2 nil)
+(condition-case err
+    (eval '(unwind-protect
+               (signal 'error '("test"))
+             (setq test-cleanup-ran-2 t)))
+  (error nil))
+(test-assert "unwind-cleanup-on-error"
+             test-cleanup-ran-2)
 
 ;;; ============================================
 ;;; Section 6: Quit signal hierarchy

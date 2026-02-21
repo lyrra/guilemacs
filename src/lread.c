@@ -1491,11 +1491,7 @@ DO-ALLOW-PRINT, if non-nil, specifies that output functions in the
  evaluated code should work normally even if PRINTFLAG is nil, in
  which case the output is displayed in the echo area.
 
-This function ignores the current value of the `lexical-binding'
-variable.  Instead it will heed any
-  -*- lexical-binding: t -*-
-settings in the buffer, and if there is no such setting, the buffer
-will be evaluated without lexical binding.
+The buffer will always be evaluated with lexical binding.
 
 This function preserves the position of point.  */)
   (Lisp_Object buffer, Lisp_Object printflag, Lisp_Object filename,
@@ -1525,14 +1521,11 @@ This function preserves the position of point.  */)
   BUF_TEMP_SET_PT (XBUFFER (buf), BUF_BEGV (XBUFFER (buf)));
 
   /* Set up lexical binding based on buffer cookie */
-  specbind_guile (Qlexical_binding,
-            lisp_file_lexical_cookie (buf) == Cookie_Lex ? Qt : Qnil);
+  specbind_guile (Qlexical_binding, /* always lexical binding */ Qt);
 
   /* Set up lexical environment */
   Lisp_Object lex_bound = find_symbol_value (Qlexical_binding);
-  specbind_guile (Qinternal_interpreter_environment,
-            (NILP (lex_bound) || BASE_EQ (lex_bound, Qunbound)
-             ? Qnil : list1 (Qt)));
+  specbind_guile (Qinternal_interpreter_environment, /* always lexical binding */ list1 (Qt));
 
   /* Initialize load history */
   loadhist_initialize (filename);
