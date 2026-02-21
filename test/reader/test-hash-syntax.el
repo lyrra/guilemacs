@@ -97,4 +97,33 @@
 (let ((result (read-from-string "#s(rec x y z) foo")))
   (test-equal "record-position" 13 (cdr result)))
 
+;;; ============================================================
+;;; read function with different stream types
+;;; ============================================================
+
+;; read from string
+(test-eq "read-from-string-stream" 'hello (read "hello"))
+(test-equal "read-number-from-string-stream" 42 (read "42"))
+(test-equal "read-list-from-string-stream" '(a b c) (read "(a b c)"))
+
+;; read from buffer
+(with-temp-buffer
+  (insert "symbol-in-buffer")
+  (goto-char (point-min))
+  (test-eq "read-from-buffer" 'symbol-in-buffer (read (current-buffer)))
+  (test-equal "read-from-buffer-advances-point" 17 (point)))
+
+(with-temp-buffer
+  (insert "(list 1 2 3) extra")
+  (goto-char (point-min))
+  (test-equal "read-list-from-buffer" '(list 1 2 3) (read (current-buffer)))
+  (test-equal "read-from-buffer-stops-after-sexp" 13 (point)))
+
+;; read from marker
+(with-temp-buffer
+  (insert "first second third")
+  (let ((m (copy-marker 7)))  ; points to "second"
+    (test-eq "read-from-marker" 'second (read m))
+    (test-equal "read-from-marker-advances" 13 (marker-position m))))
+
 (test-end)

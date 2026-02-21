@@ -140,6 +140,113 @@ the end of STRING."
 
 (set-symbol-function! 'read-from-string elisp-read-from-string)
 
+;; Register read as an Elisp function
+;; This replaces the C DEFUN in lread.c
+(define (elisp-read . rest)
+  "Read one Lisp expression as text from STREAM, return as Lisp object.
+If STREAM is nil, use the value of `standard-input' (which see).
+STREAM or the value of `standard-input' may be:
+ a buffer (read from point and advance it)
+ a marker (read from where it points and advance it)
+ a function (call it with no arguments for each character,
+     call it with a char as argument to push a char back)
+ a string (takes text from string, starting at the beginning)
+ t (read text line using minibuffer and use it, or read from
+    standard input in batch mode)."
+  (let ((stream (if (null? rest) #nil (car rest))))
+    ;; If stream is nil, use standard-input
+    (let ((stream (if (eq? stream #nil)
+                      ((symbol-function 'symbol-value) 'standard-input)
+                      stream)))
+      (cond
+        ;; t means read from minibuffer
+        ((eq? stream 't)
+         ((symbol-function 'read-minibuffer) "Lisp expression: "))
+        ;; read-char symbol also means minibuffer
+        ((eq? stream 'read-char)
+         ((symbol-function 'read-minibuffer) "Lisp expression: "))
+        ;; String: use read-from-string, return just the object
+        ((string? stream)
+         (car (elisp-read-from-string stream)))
+        ;; Buffer: read from point, advance point
+        ((let ((bufferp (symbol-function 'bufferp)))
+           (bufferp stream))
+         (elisp-read-from-buffer stream))
+        ;; Marker: read from marker position, advance marker
+        ((let ((markerp (symbol-function 'markerp)))
+           (markerp stream))
+         (elisp-read-from-marker stream))
+        ;; Function: create port and read
+        ((procedure? stream)
+         (elisp-read-from-function stream))
+        ;; Unknown stream type
+        (else
+         (error "Invalid stream for read" stream))))))
+
+(define (elisp-read-from-buffer buffer)
+  "Read from BUFFER at point, advance point."
+  (let ((save-current ((symbol-function 'current-buffer))))
+    ((symbol-function 'set-buffer) buffer)
+    (let* ((pt ((symbol-function 'point)))
+           (pt-max ((symbol-function 'point-max)))
+           ;; Get text from point to end
+           (text ((symbol-function 'buffer-substring-no-properties) pt pt-max))
+           ;; Read from the string
+           (result (elisp-read-from-string text))
+           (obj (car result))
+           (chars-read (cdr result)))
+      ;; Advance point
+      ((symbol-function 'goto-char) (+ pt chars-read))
+      ;; Restore original buffer
+      ((symbol-function 'set-buffer) save-current)
+      obj)))
+
+(define (elisp-read-from-marker marker)
+  "Read from MARKER position, advance marker."
+  (let* ((buffer ((symbol-function 'marker-buffer) marker))
+         (pos ((symbol-function 'marker-position) marker))
+         (save-current ((symbol-function 'current-buffer))))
+    ((symbol-function 'set-buffer) buffer)
+    (let* ((pt-max ((symbol-function 'point-max)))
+           ;; Get text from marker to end
+           (text ((symbol-function 'buffer-substring-no-properties) pos pt-max))
+           ;; Read from the string
+           (result (elisp-read-from-string text))
+           (obj (car result))
+           (chars-read (cdr result)))
+      ;; Advance marker
+      ((symbol-function 'set-marker) marker (+ pos chars-read) buffer)
+      ;; Restore original buffer
+      ((symbol-function 'set-buffer) save-current)
+      obj)))
+
+(define (elisp-read-from-function fn)
+  "Read using FN as character source.
+FN is called with no args to get next char, or with a char to push back."
+  ;; Create a soft port that uses fn for reading
+  (let* ((pushed-back #f)
+         (read-char-proc
+          (lambda ()
+            (if pushed-back
+                (let ((c pushed-back))
+                  (set! pushed-back #f)
+                  c)
+                (let ((result (fn)))
+                  (if (eq? result #nil)
+                      the-eof-object
+                      (integer->char result))))))
+         (port (make-soft-port
+                (vector
+                 #f  ; write-char
+                 #f  ; write-string
+                 #f  ; flush
+                 read-char-proc  ; read-char
+                 #f)  ; close
+                "r")))
+    (elisp-read-from-port port)))
+
+(set-symbol-function! 'read elisp-read)
+
 ;;;
 ;;; List Parsing Functions
 ;;;

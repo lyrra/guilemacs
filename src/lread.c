@@ -1775,33 +1775,8 @@ This function does not move point.  */)
 }
 
 
-DEFUN ("read", Fread, Sread, 0, 1, 0,
-       doc: /* Read one Lisp expression as text from STREAM, return as Lisp object.
-If STREAM is nil, use the value of `standard-input' (which see).
-STREAM or the value of `standard-input' may be:
- a buffer (read from point and advance it)
- a marker (read from where it points and advance it)
- a function (call it with no arguments for each character,
-     call it with a char as argument to push a char back)
- a string (takes text from string, starting at the beginning)
- t (read text line using minibuffer and use it, or read from
-    standard input in batch mode).  */)
-  (Lisp_Object stream)
-{
-  if (NILP (stream))
-    stream = Vstandard_input;
-  if (EQ (stream, Qt))
-    stream = Qread_char;
-  if (EQ (stream, Qread_char))
-    /* FIXME: ?! This is used when the reader is called from the
-       minibuffer without a stream, as in (read).  But is this feature
-       ever used, and if so, why?  IOW, will anything break if this
-       feature is removed !?  */
-    return call1 (Qread_minibuffer,
-		  build_string ("Lisp expression: "));
-
-  return read_internal_start (stream, Qnil, Qnil, false);
-}
+/* read is now implemented in Scheme (mod/emacs/reader.scm) */
+DEFUNWRAP1(Fread, "read")
 
 DEFUN ("read-positioning-symbols", Fread_positioning_symbols,
        Sread_positioning_symbols, 0, 1, 0,
