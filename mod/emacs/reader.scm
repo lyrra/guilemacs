@@ -247,6 +247,27 @@ FN is called with no args to get next char, or with a char to push back."
 
 (set-symbol-function! 'read elisp-read)
 
+;; read-positioning-symbols - same as read but with position tracking
+;; Position tracking for symbols is not yet implemented in GuilEmacs,
+;; so this is currently just an alias for read.
+(define (elisp-read-positioning-symbols . rest)
+  "Read one Lisp expression as text from STREAM, return as Lisp object.
+Convert each occurrence of a symbol into a \"symbol with pos\" object.
+
+If STREAM is nil, use the value of `standard-input' (which see).
+STREAM or the value of `standard-input' may be:
+ a buffer (read from point and advance it)
+ a marker (read from where it points and advance it)
+ a function (call it with no arguments for each character,
+     call it with a char as argument to push a char back)
+ a string (takes text from string, starting at the beginning)
+ t (read text line using minibuffer and use it, or read from
+    standard input in batch mode)."
+  ;; For now, just delegate to read since symbol positions aren't tracked
+  (apply elisp-read rest))
+
+(set-symbol-function! 'read-positioning-symbols elisp-read-positioning-symbols)
+
 ;;;
 ;;; List Parsing Functions
 ;;;

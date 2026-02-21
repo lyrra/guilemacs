@@ -126,4 +126,8 @@
     (test-eq "read-from-marker" 'second (read m))
     (test-equal "read-from-marker-advances" 13 (marker-position m))))
 
+;; read-positioning-symbols (same as read for now)
+(test-eq "read-positioning-symbols-string" 'test (read-positioning-symbols "test"))
+(test-equal "read-positioning-symbols-list" '(a b) (read-positioning-symbols "(a b)"))
+
 (test-end)

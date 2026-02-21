@@ -2117,6 +2117,7 @@ extern Lisp_Object Fdefault_toplevel_value (Lisp_Object);
 extern Lisp_Object Fset_default_toplevel_value (Lisp_Object);
 extern Lisp_Object Fread_from_string (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object Fread (Lisp_Object);
+extern Lisp_Object Fread_positioning_symbols (Lisp_Object);
 
 
 INLINE Lisp_Object
@@ -3222,6 +3223,20 @@ extern uint64_t scheme_to_c_crossings;
         scm_permanent_object (fn); \
       } \
     return scm_call_3 (fn, a, b, c); \
+  }
+
+/* For functions with 0-1 optional arguments */
+#define DEFUNWRAP_OPT1(cfn, lfn) \
+  Lisp_Object cfn (Lisp_Object a) \
+  { \
+    static Lisp_Object fn; \
+    if (!fn) \
+      { \
+        Lisp_Object sym = intern_c_string (lfn); \
+        fn = indirect_function (sym); \
+        scm_permanent_object (fn); \
+      } \
+    return scm_call_1 (fn, a); \
   }
 
 /* defsubr (Sname);

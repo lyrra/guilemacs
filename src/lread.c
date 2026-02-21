@@ -1775,39 +1775,9 @@ This function does not move point.  */)
 }
 
 
-/* read is now implemented in Scheme (mod/emacs/reader.scm) */
-DEFUNWRAP1(Fread, "read")
-
-DEFUN ("read-positioning-symbols", Fread_positioning_symbols,
-       Sread_positioning_symbols, 0, 1, 0,
-       doc: /* Read one Lisp expression as text from STREAM, return as Lisp object.
-Convert each occurrence of a symbol into a "symbol with pos" object.
-
-If STREAM is nil, use the value of `standard-input' (which see).
-STREAM or the value of `standard-input' may be:
- a buffer (read from point and advance it)
- a marker (read from where it points and advance it)
- a function (call it with no arguments for each character,
-     call it with a char as argument to push a char back)
- a string (takes text from string, starting at the beginning)
- t (read text line using minibuffer and use it, or read from
-    standard input in batch mode).  */)
-  (Lisp_Object stream)
-{
-  if (NILP (stream))
-    stream = Vstandard_input;
-  if (EQ (stream, Qt))
-    stream = Qread_char;
-  if (EQ (stream, Qread_char))
-    /* FIXME: ?! When is this used !?  */
-    return call1 (Qread_minibuffer,
-		  build_string ("Lisp expression: "));
-
-  return read_internal_start (stream, Qnil, Qnil, true);
-}
-
-/* read-from-string is now implemented in Scheme (mod/emacs/reader.scm) */
-DEFUNWRAP3(Fread_from_string, "read-from-string")
+DEFUNWRAP1(Fread, "read") // mod/emacs/reader.scm
+DEFUNWRAP1(Fread_positioning_symbols, "read-positioning-symbols") // mod/emacs/reader.scm
+DEFUNWRAP3(Fread_from_string, "read-from-string") // mod/emacs/reader.scm
 
 /* File-specific error handling functions */
 static AVOID
