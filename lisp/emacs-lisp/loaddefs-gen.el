@@ -618,6 +618,7 @@ instead of just updating them with the new/changed autoloads."
            (file-attribute-modification-time (file-attributes output-file)))
           (file-count 0))
       (dolist (file files)
+        (message "Scraping: %s" file)
         (progress-reporter-update progress (setq file-count (1+ file-count)))
         (when (or (not updating)
                   (time-less-p output-time
