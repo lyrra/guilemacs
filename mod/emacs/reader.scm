@@ -1217,119 +1217,138 @@ Returns: appropriate Elisp symbol with keyword self-evaluation"
             (else
              (elisp-parse-colon-prefixed-symbol-and-intern port)))))))
 
+(define (elisp-symbol-terminator? ch)
+  "Return #t if CH is a symbol terminator character."
+  (or (eof-object? ch)
+      (char<=? ch #\space)
+      (char=? ch #\()
+      (char=? ch #\))
+      (char=? ch #\[)
+      (char=? ch #\])
+      (char=? ch #\")
+      (char=? ch #\')
+      (char=? ch #\`)
+      (char=? ch #\,)
+      (char=? ch #\;)
+      (char=? ch #\#)))
+
 (define (elisp-parse-colon-prefixed-symbol port)
   "Parse a colon-prefixed symbol like :keyword from PORT.
-Assumes the colon has already been consumed and we're reading the rest."
-  (let ((name ":"))  ; Start with colon
-    (let loop ()
-      (let ((ch (peek-char port)))
-        (cond
-          ;; EOF or terminator character - done reading symbol
-          ((or (eof-object? ch)
-               (char<=? ch #\space)
-               (char=? ch #\")
-               (char=? ch #\')
-               (char=? ch #\;)
-               (char=? ch #\()
-               (char=? ch #\))
-               (char=? ch #\[)
-               (char=? ch #\])
-               (char=? ch #\#)
-               (char=? ch #\?)
-               (char=? ch #\`)
-               (char=? ch #\,)
-               (char=? ch #\.))
-           ;; Done - create the symbol
-           (string->symbol name))
+Assumes the colon has already been consumed and we're reading the rest.
+Handles backslash escapes."
+  (let loop ((chars '(#\:)))  ; Start with colon
+    (let ((ch (peek-char port)))
+      (cond
+        ;; EOF or terminator character - done reading symbol
+        ((elisp-symbol-terminator? ch)
+         ;; Done - create the symbol
+         (string->symbol (list->string (reverse chars))))
 
-          ;; Regular symbol character - add to name and continue
-          (else
-           (read-char port) ; consume the character
-           (set! name (string-append name (string ch)))
-           (loop)))))))
+        ;; Backslash - escape next character (include it literally)
+        ((char=? ch #\\)
+         (read-char port)  ; consume backslash
+         (let ((escaped (read-char port)))
+           (if (eof-object? escaped)
+               (error "Unexpected EOF after backslash in symbol")
+               (loop (cons escaped chars)))))
+
+        ;; Regular symbol character - add to name and continue
+        (else
+         (read-char port)
+         (loop (cons ch chars)))))))
 
 (define (elisp-parse-symbol-from-port port)
-  "Parse symbol or number from PORT with comprehensive Elisp conversion.
+  "Parse symbol or number from PORT with Elisp backslash escape handling.
 Called from C fread0() when alphabetic character is encountered.
-Handles special symbol identity mapping, keyword conversion, and uninterned symbols.
+Handles backslash escapes (e.g., \\; for literal semicolon in symbol names),
+special symbol identity mapping, keyword conversion, and uninterned symbols.
 Returns the parsed object with proper Elisp semantics."
-  ;; Let Guile's read function handle the complete parsing
-  (let ((result (read port)))
-    (cond
-      ;; Handle EOF
-      ((eof-object? result)
-       (error "Unexpected EOF while reading symbol"))
+  ;; Manually read characters with backslash escape handling
+  (let loop ((chars '()))
+    (let ((ch (peek-char port)))
+      (cond
+        ;; EOF or terminator - done reading symbol
+        ((elisp-symbol-terminator? ch)
+         (if (null? chars)
+             (error "Unexpected EOF while reading symbol")
+             (let ((sym-str (list->string (reverse chars))))
+               (elisp-intern-symbol-string sym-str))))
 
-      ;; Handle symbols with special identity mapping
-      ((symbol? result)
-       (let ((sym-str (symbol->string result)))
-         (cond
-           ;; Reader macro symbols - map to canonical Elisp symbols
-           ((or (string=? sym-str "`") (string=? sym-str "\\`"))
-            ;; Backquote symbol - use existing Qbackquote
-            ((symbol-function 'intern) "`" #nil))
-           ((or (string=? sym-str ",") (string=? sym-str "\\,"))
-            ;; Unquote symbol - use existing Qcomma
-            ((symbol-function 'intern) "," #nil))
-           ((or (string=? sym-str ",@") (string=? sym-str "\\,@"))
-            ;; Unquote-splicing symbol - use existing Qcomma_at
-            ((symbol-function 'intern) ",@" #nil))
+        ;; Backslash - escape next character (include it literally)
+        ((char=? ch #\\)
+         (read-char port)  ; consume backslash
+         (let ((escaped (read-char port)))
+           (if (eof-object? escaped)
+               (error "Unexpected EOF after backslash in symbol")
+               (loop (cons escaped chars)))))
 
-           ;; Special Elisp symbols - use canonical values
-           ((string=? sym-str "nil")
-            ;; Return canonical Elisp nil (#nil in Guile)
-            #nil)
-           ((string=? sym-str "t")
-            ;; Return canonical Elisp t (#t in Guile)
-            #t)
-           ((string=? sym-str "and")
-            ;; Map to canonical interned symbol
-            ((symbol-function 'intern) "and" #nil))
-           ((string=? sym-str ":")
-            ;; Map colon to canonical interned symbol
-            ((symbol-function 'intern) ":" #nil))
+        ;; Regular character - add to symbol name
+        (else
+         (read-char port)
+         (loop (cons ch chars)))))))
 
-           ;; Regular symbols - intern normally
-           (else
-            ((symbol-function 'intern) sym-str #nil)))))
+(define (elisp-intern-symbol-string sym-str)
+  "Intern SYM-STR as an Elisp symbol with proper special case handling."
+  (cond
+    ;; Special Elisp symbols - use canonical values
+    ((string=? sym-str "nil")
+     #nil)
+    ((string=? sym-str "t")
+     #t)
 
-      ;; Handle Guile keywords - convert to Elisp colon symbols
-      ((keyword? result)
-       (let* ((keyword-symbol (keyword->symbol result))
-              (base-name (symbol->string keyword-symbol))
-              (colon-name (string-append ":" base-name)))
-         ;; Create Elisp symbol with colon prefix
-         (let ((elisp-symbol ((symbol-function 'intern) colon-name #nil)))
-           ;; Make it self-evaluating (keywords evaluate to themselves)
-           ((symbol-function 'set) elisp-symbol elisp-symbol)
-           elisp-symbol)))
+    ;; Reader macro symbols - map to canonical Elisp symbols
+    ((string=? sym-str "`")
+     ((symbol-function 'intern) "`" #nil))
+    ((string=? sym-str ",")
+     ((symbol-function 'intern) "," #nil))
+    ((string=? sym-str ",@")
+     ((symbol-function 'intern) ",@" #nil))
 
-      ;; Numbers and other types pass through directly
-      (else result))))
+    ;; Keyword symbols (start with :) - make self-evaluating
+    ((and (> (string-length sym-str) 0)
+          (char=? (string-ref sym-str 0) #\:))
+     (let ((elisp-symbol ((symbol-function 'intern) sym-str #nil)))
+       ((symbol-function 'set) elisp-symbol elisp-symbol)
+       elisp-symbol))
+
+    ;; Regular symbols - intern normally
+    (else
+     ((symbol-function 'intern) sym-str #nil))))
 
 (define (elisp-parse-number-from-port port)
-  "Parse number from PORT using Guile's read with proper error handling.
+  "Parse number or symbol from PORT with Elisp backslash escape handling.
 Called from C fread0() when numeric character is encountered.
 Returns the parsed number or symbol with proper Elisp semantics."
-  ;; Let Guile's read function handle the complete parsing
-  (let ((result (read port)))
-    (cond
-      ;; Handle EOF
-      ((eof-object? result)
-       (error "Unexpected EOF while reading number"))
+  ;; Manually read characters with backslash escape handling
+  (let loop ((chars '()) (has-escape #f))
+    (let ((ch (peek-char port)))
+      (cond
+        ;; EOF or terminator - done reading
+        ((elisp-symbol-terminator? ch)
+         (if (null? chars)
+             (error "Unexpected EOF while reading number")
+             (let ((token-str (list->string (reverse chars))))
+               ;; If we had escapes, it's definitely a symbol
+               ;; Otherwise try to parse as number first
+               (if has-escape
+                   (elisp-intern-symbol-string token-str)
+                   (let ((num (string->number token-str)))
+                     (if num
+                         num
+                         (elisp-intern-symbol-string token-str)))))))
 
-      ;; Numbers pass through directly - Guile's parsing is authoritative
-      ((number? result)
-       result)
+        ;; Backslash - escape next character (include it literally)
+        ((char=? ch #\\)
+         (read-char port)  ; consume backslash
+         (let ((escaped (read-char port)))
+           (if (eof-object? escaped)
+               (error "Unexpected EOF after backslash")
+               (loop (cons escaped chars) #t))))  ; mark that we had an escape
 
-      ;; If not a number, it might be a symbol that looks numeric (like +foo, -bar, .symbol)
-      ;; Use the symbol parsing logic
-      ((symbol? result)
-       (let ((sym-str (symbol->string result)))
-         ((symbol-function 'intern) sym-str #nil)))
-
-      ;; Other types pass through (shouldn't happen in practice)
-      (else result))))
+        ;; Regular character - add to token
+        (else
+         (read-char port)
+         (loop (cons ch chars) has-escape))))))
 
 (define (elisp-intern-and-make-keyword str)
   "Intern STR as Elisp symbol and make it self-evaluating if it's a keyword."
@@ -1341,34 +1360,27 @@ Returns the parsed number or symbol with proper Elisp semantics."
 
 (define (elisp-parse-colon-prefixed-symbol-and-intern port)
   "Parse a colon-prefixed symbol from PORT and return proper Elisp symbol.
-Assumes the colon has already been consumed."
-  (let ((name ":"))  ; Start with colon
-    (let loop ()
-      (let ((ch (peek-char port)))
-        (cond
-          ;; EOF or terminator character - done reading symbol
-          ((or (eof-object? ch)
-               (char<=? ch #\space)
-               (char=? ch #\")
-               (char=? ch #\')
-               (char=? ch #\;)
-               (char=? ch #\()
-               (char=? ch #\))
-               (char=? ch #\[)
-               (char=? ch #\])
-               (char=? ch #\#)
-               (char=? ch #\?)
-               (char=? ch #\`)
-               (char=? ch #\,)
-               (char=? ch #\.))
-           ;; Done - intern as Elisp symbol with keyword self-evaluation
-           (elisp-intern-and-make-keyword name))
+Assumes the colon has already been consumed. Handles backslash escapes."
+  (let loop ((chars '(#\:)))  ; Start with colon
+    (let ((ch (peek-char port)))
+      (cond
+        ;; EOF or terminator character - done reading symbol
+        ((elisp-symbol-terminator? ch)
+         ;; Done - intern as Elisp symbol with keyword self-evaluation
+         (elisp-intern-and-make-keyword (list->string (reverse chars))))
 
-          ;; Regular symbol character - add to name and continue
-          (else
-           (read-char port) ; consume the character
-           (set! name (string-append name (string ch)))
-           (loop)))))))
+        ;; Backslash - escape next character (include it literally)
+        ((char=? ch #\\)
+         (read-char port)  ; consume backslash
+         (let ((escaped (read-char port)))
+           (if (eof-object? escaped)
+               (error "Unexpected EOF after backslash in keyword")
+               (loop (cons escaped chars)))))
+
+        ;; Regular symbol character - add to name and continue
+        (else
+         (read-char port)
+         (loop (cons ch chars)))))))
 
 (define (elisp-convert-guile-object obj)
   "Convert Guile object to Elisp with proper semantics, eliminating C conversions.
