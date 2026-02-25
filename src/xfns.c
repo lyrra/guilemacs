@@ -9065,7 +9065,11 @@ Text larger than the specified size is clipped.  */)
         }
 
       unblock_input ();
-      if (ok) goto start_timer;
+      if (ok)
+	{
+	  dynwind_end ();  /* Close outer dynwind frame before goto */
+	  goto start_timer;
+	}
     }
 #endif /* USE_GTK */
 
@@ -9092,6 +9096,7 @@ Text larger than the specified size is clipped.  */)
 		       root_x, root_y);
 	  unblock_input ();
 
+	  dynwind_end ();  /* Close outer dynwind frame before goto */
 	  goto start_timer;
 	}
       else if (tooltip_reuse_hidden_frame && BASE_EQ (frame, tip_last_frame))
@@ -9304,7 +9309,8 @@ Text larger than the specified size is clipped.  */)
   unblock_input ();
 
   set_buffer_internal_1 (old_buffer);
-  dynwind_end ();
+  dynwind_end ();  /* Close inner dynwind frame */
+  dynwind_end ();  /* Close outer dynwind frame */
   windows_or_buffers_changed = old_windows_or_buffers_changed;
 
  start_timer:
