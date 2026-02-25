@@ -364,6 +364,10 @@
              ;; Binary number #b1010
              (let ((number (charcode-escape port 2 #f #t)))
                (return 'integer number)))
+            ((#\$)
+             ;; #$ - load-file-name reference (returns current file being loaded)
+             ;; Return as a special symbol that evaluates to load-file-name at runtime
+             (return 'symbol 'load-file-name))
             (else
              (lexer-error port "invalid # syntax" c)))))
         ;; Parentheses and other special-meaning single characters.
