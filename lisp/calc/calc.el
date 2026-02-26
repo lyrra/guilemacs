@@ -1104,7 +1104,7 @@ Used by `calc-user-invocation'.")
       (if calc-scan-for-dels
           (append (where-is-internal 'delete-forward-char global-map)
                   '((kbd "C-d")))
-        '((kbd "C-d")))
+        '((kbd "C-d"))))
 
 (defvar calc-dispatch-map
   (let ((map (make-keymap)))
