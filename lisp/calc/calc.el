@@ -204,6 +204,13 @@
 (declare-function math-comp-width "calccomp" (c))
 (declare-function math-composition-to-string "calccomp" (c &optional width))
 (declare-function math-stack-value-offset-fancy "calccomp" (c))
+
+;; Autoloads for calccomp functions used before calc-ext is loaded
+(eval-and-compile
+  (autoload 'math-composition-to-string "calccomp")
+  (autoload 'math-compose-expr "calccomp")
+  (autoload 'math-comp-width "calccomp")
+  (autoload 'math-stack-value-offset-fancy "calccomp"))
 (declare-function math-format-flat-expr-fancy "calc-ext" (a prec))
 (declare-function math-adjust-fraction "calc-ext" (a))
 (declare-function math-format-binary "calc-bin" (a))
