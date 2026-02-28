@@ -61,6 +61,7 @@
   "test/pre/ensure-empty-lines-arithmetic.scm"
   "test/pre/string-print-utf8.scm"
   "test/pre/string-char.scm"
+  "test/pre/text-property-navigation.scm"
   ;; emacs -- as an editor
   "test/pre/miscvar.scm"
   ;; uncategorized LLM generated tests
