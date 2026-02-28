@@ -550,6 +550,7 @@
           (cond
            ((equal? 0 (string-contains line "loading ")) #f) ; load messages
            ((equal? 0 (string-contains line ";;; ")) #f) ; guile notes and warnings
+           ((equal? 0 (string-contains line ";; ")) #f) ; guile notes and warnings
            ((string-contains line "Symbol's elisp-function definition is void") #f)
            ((and (string-contains line "Loading ")
                  (string-contains line "(source)"))
