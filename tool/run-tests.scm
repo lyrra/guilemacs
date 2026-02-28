@@ -45,6 +45,7 @@
   "test/pre/predicate-simple.scm"
   "test/pre/predicate-comprehensive.scm"
   "test/pre/stringp.scm"
+  "test/pre/string-funs.scm"
   "test/pre/natnump.scm"
   "test/pre/integer-or-marker-p.scm"
   "test/pre/number-or-marker-p.scm"
@@ -395,8 +396,24 @@
 (define %total-passed-gen-tests '())
 (define %total-passed-ert-tests '())
 
-(define (el-expr str)
-  (format (current-output-port) "~a" str))
+(define (elfmt-walk form)
+  (cond
+   ((and (pair? form) (eq? 'raw (car form)))
+    (format #f "~a" (cdr form)))
+   ((pair? form)
+    (cons (elfmt-walk (car form)) (elfmt-walk (cdr form))))
+   ((string? form)
+    (format #f "~s" form))
+   (else
+    form)))
+
+(define (elfmt form)
+  (display (elfmt-walk form)
+           (current-output-port))
+  (newline (current-output-port)))
+
+(define (el-expr form)
+  (format (current-output-port) "~a" form))
 
 (define (el-str str)
   (format #f "~a" str))
