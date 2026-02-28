@@ -18,6 +18,7 @@
   #:use-module (rnrs bytevectors)
   #:use-module (emacs-elisp runtime)
   #:use-module (rnrs bytevectors)
+  #:use-module (emacs text-properties)
   #:export (
     ;; Scheme implementation functions
     elisp-char-to-string
@@ -246,12 +247,20 @@ In Guilemacs, all strings are UTF-8, so this always returns nil."
 
 
 
+(define (to-plain-string obj)
+  "Convert OBJ to a plain Guile string.
+Handles symbols, emacs-string wrappers, and plain strings."
+  (cond
+    ((symbol? obj) (symbol->string obj))
+    ((emacs-string? obj) (emacs-string-content obj))
+    (else obj)))
+
 (define (elisp-string-equal-ignore-case string1 string2)
   "Return t if two strings are equal ignoring case.
 Symbols are also allowed; their print names are used instead.
 Uses native Guile case-insensitive comparison."
-  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
-        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+  (let ((s1 (to-plain-string string1))
+        (s2 (to-plain-string string2)))
     (if (string-ci=? s1 s2) #t #nil)))
 
 
@@ -259,17 +268,17 @@ Uses native Guile case-insensitive comparison."
 (define (elisp-string-lessp-ignore-case string1 string2)
   "Return t if STRING1 is less than STRING2 ignoring case.
 Uses native Guile case-insensitive comparison."
-  (let ((s1 (if (symbol? string1) (symbol->string string1) string1))
-        (s2 (if (symbol? string2) (symbol->string string2) string2)))
+  (let ((s1 (to-plain-string string1))
+        (s2 (to-plain-string string2)))
     (if (string-ci<? s1 s2) #t #nil)))
 
 
 
-(define (elisp-string-prefix-p prefix string ignore-case)
+(define* (elisp-string-prefix-p prefix string #:optional ignore-case)
   "Return non-nil if PREFIX is a prefix of STRING.
 If IGNORE-CASE is non-nil, the comparison is case-insensitive."
-  (let ((prefix-str (if (symbol? prefix) (symbol->string prefix) prefix))
-        (string-str (if (symbol? string) (symbol->string string) string)))
+  (let ((prefix-str (to-plain-string prefix))
+        (string-str (to-plain-string string)))
     (let ((prefix-len (string-length prefix-str))
           (string-len (string-length string-str)))
       (if (> prefix-len string-len)
@@ -285,19 +294,19 @@ If IGNORE-CASE is non-nil, the comparison is case-insensitive."
   "Search for NEEDLE in HAYSTACK starting at START-POS.
 Returns the position of the first match, or nil if not found.
 Uses Guile's efficient string search with automatic memory management."
-  (let ((needle-str (if (symbol? needle) (symbol->string needle) needle))
-        (haystack-str (if (symbol? haystack) (symbol->string haystack) haystack))
+  (let ((needle-str (to-plain-string needle))
+        (haystack-str (to-plain-string haystack))
         (start (if start-pos start-pos 0)))
     (let ((pos (string-contains haystack-str needle-str start)))
       (if pos pos #nil))))
 
 
 
-(define (elisp-string-suffix-p suffix string ignore-case)
+(define* (elisp-string-suffix-p suffix string #:optional ignore-case)
   "Return non-nil if SUFFIX is a suffix of STRING.
 If IGNORE-CASE is non-nil, the comparison is case-insensitive."
-  (let ((suffix-str (if (symbol? suffix) (symbol->string suffix) suffix))
-        (string-str (if (symbol? string) (symbol->string string) string)))
+  (let ((suffix-str (to-plain-string suffix))
+        (string-str (to-plain-string string)))
     (let ((suffix-len (string-length suffix-str))
           (string-len (string-length string-str)))
       (if (> suffix-len string-len)

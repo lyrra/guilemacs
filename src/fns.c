@@ -6208,11 +6208,15 @@ Case is always significant and text properties are ignored. */)
   CHECK_STRING (needle);
   CHECK_STRING (haystack);
 
+  /* Unwrap emacs-string wrappers - Guile's string-contains doesn't know about them */
+  Lisp_Object raw_needle = unwrap_emacs_string (needle);
+  Lisp_Object raw_haystack = unwrap_emacs_string (haystack);
+
   Lisp_Object res;
   if (NILP (start_pos))
-    res = scm_string_contains (haystack, needle, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
+    res = scm_string_contains (raw_haystack, raw_needle, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
   else
-    res = scm_string_contains (haystack, needle, start_pos , SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
+    res = scm_string_contains (raw_haystack, raw_needle, start_pos , SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED);
 
   if (res == SCM_BOOL_F)
     return Qnil;

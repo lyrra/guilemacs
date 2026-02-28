@@ -1226,7 +1226,10 @@ Uses binary search for O(log n) initial lookup."
                                #nil))
                          #nil)))
     ;; Start from idx (or 0 if no interval found)
-    (let loop ((i (or idx 0)))
+    ;; effective-pos tracks our position for bounds checking. When continuing
+    ;; through contiguous intervals with same value, we update it to be inside
+    ;; the next interval so the bounds checking works correctly.
+    (let loop ((i (or idx 0)) (effective-pos position))
       (if (>= i len)
           ;; No more intervals
           (or limit #nil)
@@ -1235,26 +1238,26 @@ Uses binary search for O(log n) initial lookup."
                  (int-end (interval-end int))
                  (int-val (plist-get (interval-plist int) prop)))
             (cond
-             ;; Interval ends at or before position - skip
-             ((<= int-end position)
-              (loop (+ i 1)))
+             ;; Interval ends at or before effective position - skip
+             ((<= int-end effective-pos)
+              (loop (+ i 1) effective-pos))
 
              ;; Check limit
              ((and actual-limit (>= int-start actual-limit))
               (or limit #nil))
 
-             ;; Position is before this interval (in a gap)
-             ((< position int-start)
+             ;; Effective position is before this interval (in a gap)
+             ((< effective-pos int-start)
               (if (eq? current-val #nil)
                   ;; We're in nil region - change is at int-start if prop is non-nil there
                   (if (eq? int-val #nil)
-                      (loop (+ i 1))  ; Same value, keep looking
+                      (loop (+ i 1) effective-pos)  ; Same value, keep looking
                       int-start)       ; Property becomes non-nil here
-                  ;; We have a value but we're in a gap? That's inconsistent, return start
+                  ;; We have a value but we're in a gap - property changed to nil
                   int-start))
 
-             ;; Position is inside this interval
-             ((< position int-end)
+             ;; Effective position is inside this interval
+             ((< effective-pos int-end)
               (if (equal? int-val current-val)
                   ;; Same value - check what comes next
                   (let ((next-i (+ i 1)))
@@ -1280,16 +1283,17 @@ Uses binary search for O(log n) initial lookup."
                             (if (and actual-limit (>= int-end actual-limit))
                                 (or limit #nil)
                                 int-end))
-                           ;; Same value, keep searching
+                           ;; Same value in contiguous interval - continue with
+                           ;; effective position inside the next interval
                            (else
-                            (loop next-i))))))
+                            (loop next-i next-start))))))
                   ;; Different value - this shouldn't happen if we computed current-val correctly
                   ;; But handle it: the change was at int-start
                   int-start))
 
              ;; Should not reach here
              (else
-              (loop (+ i 1)))))))))
+              (loop (+ i 1) effective-pos))))))))
 
 (define (previous-single-property-change position prop obj limit)
   "Find previous position where PROP changes in OBJ before POSITION."

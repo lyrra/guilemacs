@@ -16,6 +16,7 @@
 
 (define-module (emacs sequences)
   #:use-module (emacs-elisp runtime)
+  #:use-module (emacs text-properties)
   #:export (
     ;; Scheme implementation functions
     elisp-nth elisp-nthcdr
@@ -313,6 +314,8 @@ This is a useful building block for higher-order functions."
                 (loop (cdr seq) (+ count 1)))))))))
     ((vector? sequence) (vector-length sequence))
     ((string? sequence) (string-length sequence))
+    ;; Handle emacs-string wrappers (propertized strings)
+    ((emacs-string? sequence) (string-length (emacs-string-content sequence)))
     (else (error "Wrong type argument: sequencep" sequence))))
 
 
