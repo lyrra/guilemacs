@@ -400,7 +400,7 @@
 (define (elfmt-walk form)
   (cond
    ((and (pair? form) (eq? 'raw (car form)))
-    (format #f "~a" (cdr form)))
+    (format #f "~a" (cadr form)))
    ((pair? form)
     (cons (elfmt-walk (car form)) (elfmt-walk (cdr form))))
    ((string? form)
