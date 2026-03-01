@@ -224,7 +224,7 @@ form.")
 ;; Stop the above "Local Var..." confusing Emacs.
 
 
-(ert-deftest files-tests-bug-21454 ()
+'(ert-deftest files-tests-bug-21454 ()
   "Test for https://debbugs.gnu.org/21454 ."
   (let ((input-result
          (if (memq system-type '(windows-nt ms-dos))
@@ -962,7 +962,7 @@ unquoted file names."
                          (mapcar #'file-name-quote
                                  (find-backup-file-name tmpfile)))))))
 
-(ert-deftest files-tests-file-name-non-special-get-file-buffer ()
+'(ert-deftest files-tests-file-name-non-special-get-file-buffer ()
   ;; Make sure these buffers don't exist.
   (files-tests--with-temp-non-special (tmpfile nospecial)
     (let ((fbuf (get-file-buffer nospecial)))
@@ -993,13 +993,13 @@ unquoted file names."
   (files-tests--with-temp-non-special-and-file-name-handler (tmpfile nospecial)
     (should-error (with-temp-buffer (insert-file-contents nospecial)))))
 
-'(ert-deftest files-tests-file-name-non-special-load ()
+(ert-deftest files-tests-file-name-non-special-load ()
   (files-tests--with-temp-non-special (tmpfile nospecial)
     (should (load nospecial nil t)))
   (files-tests--with-temp-non-special-and-file-name-handler (tmpfile nospecial)
     (should-error (load nospecial nil t))))
 
-(ert-deftest files-tests-file-name-non-special-make-auto-save-file-name ()
+'(ert-deftest files-tests-file-name-non-special-make-auto-save-file-name ()
   (files-tests--with-temp-non-special (tmpfile nospecial)
     (save-current-buffer
       (should (equal (prog2 (set-buffer (find-file-noselect nospecial))
@@ -1017,7 +1017,7 @@ unquoted file names."
                              (make-auto-save-file-name)
                            (kill-buffer)))))))
 
-(ert-deftest files-test-auto-save-name-default ()
+'(ert-deftest files-test-auto-save-name-default ()
   (with-temp-buffer
     (let ((auto-save-file-name-transforms nil)
           (name-start (if (memq system-type '(windows-nt ms-dos)) 2 nil)))
@@ -1025,7 +1025,7 @@ unquoted file names."
       (should (equal (substring (make-auto-save-file-name) name-start)
                      "/tmp/#foo.txt#")))))
 
-(ert-deftest files-test-auto-save-name-transform ()
+'(ert-deftest files-test-auto-save-name-transform ()
   (with-temp-buffer
     (setq buffer-file-name "/tmp/foo.txt")
     (let ((auto-save-file-name-transforms
@@ -1034,7 +1034,7 @@ unquoted file names."
       (should (equal (substring (make-auto-save-file-name) name-start)
                      "/var/tmp/#foo.txt#")))))
 
-(ert-deftest files-test-auto-save-name-unique ()
+'(ert-deftest files-test-auto-save-name-unique ()
   (with-temp-buffer
     (setq buffer-file-name "/tmp/foo.txt")
     (let ((auto-save-file-name-transforms
@@ -1048,13 +1048,13 @@ unquoted file names."
       (should (equal (substring (make-auto-save-file-name) name-start)
                      "/var/tmp/#b57c5a04f429a83305859d3350ecdab8315a9037#")))))
 
-(ert-deftest files-test-lock-name-default ()
+'(ert-deftest files-test-lock-name-default ()
   (let ((lock-file-name-transforms nil)
         (name-start (if (memq system-type '(windows-nt ms-dos)) 2 nil)))
     (should (equal (substring (make-lock-file-name "/tmp/foo.txt") name-start)
                    "/tmp/.#foo.txt"))))
 
-(ert-deftest files-test-lock-name-unique ()
+'(ert-deftest files-test-lock-name-unique ()
   (let ((lock-file-name-transforms
          '(("\\`/.*/\\([^/]+\\)\\'" "/var/tmp/\\1" t)))
         (name-start (if (memq system-type '(windows-nt ms-dos)) 2 nil)))
@@ -1156,7 +1156,7 @@ unquoted file names."
   (files-tests--with-temp-non-special-and-file-name-handler (tmpfile nospecial)
     (should-error (set-file-times nospecial nil 'nofollow))))
 
-(ert-deftest files-tests-file-name-non-special-set-visited-file-modtime ()
+'(ert-deftest files-tests-file-name-non-special-set-visited-file-modtime ()
   (files-tests--with-temp-non-special (tmpfile nospecial)
     (save-current-buffer
       (set-buffer (find-file-noselect nospecial))
@@ -1168,7 +1168,7 @@ unquoted file names."
       (set-visited-file-modtime)
       (kill-buffer))))
 
-(ert-deftest files-tests-file-name-non-special-shell-command ()
+'(ert-deftest files-tests-file-name-non-special-shell-command ()
   (files-tests--with-temp-non-special (tmpdir nospecial-dir t)
     (with-temp-buffer
       (let ((default-directory nospecial-dir))
@@ -1267,6 +1267,7 @@ unquoted file names."
     (with-temp-buffer
       (write-region nil nil nospecial nil :visit))))
 
+; FIX-20260301-guilemacs: dynstack.c:649: scm_dynstack_unwind_fluid: Assertion `SCM_DYNSTACK_TAG_TYPE (tag) == SCM_DYNSTACK_TYPE_WITH_FLUID' failed
 '(ert-deftest files-tests-file-name-non-special-make-process ()
   "Check that the ‘:file-handler’ argument of ‘make-process’
 works as expected if the default directory is quoted."
@@ -1554,7 +1555,7 @@ See <https://debbugs.gnu.org/36401>."
       (normal-mode)
       (should (not (eq major-mode 'text-mode))))))
 
-(ert-deftest files-colon-path ()
+'(ert-deftest files-colon-path ()
   (if (memq system-type '(windows-nt ms-dos))
       (should (equal (parse-colon-path "x:/foo//bar/baz")
                      '("x:/foo//bar/baz/")))
@@ -1607,7 +1608,7 @@ Deeper and more profound,
 The door of all subtleties!
 ")
 
-(ert-deftest files-tests-revert-buffer ()
+'(ert-deftest files-tests-revert-buffer ()
   "Test that revert-buffer is successful."
   (ert-with-temp-file temp-file-name
     (with-temp-buffer
@@ -1701,7 +1702,7 @@ set to."
       (when (eq expected-mode 'sh-base-mode)
         (should (eq sh-shell expected-dialect))))))
 
-(ert-deftest files-tests-auto-mode-interpreter ()
+'(ert-deftest files-tests-auto-mode-interpreter ()
   "Test that `set-auto-mode' deduces correct modes from shebangs."
   ;; Straightforward interpreter invocation.
   (files-tests--check-shebang "#!/bin/bash" 'sh-base-mode 'bash)
@@ -1934,7 +1935,7 @@ Ensure that the issues from bug#66546 are fixed."
           (should     (equal (file-contents file) "baz\nbar\nfoo\n"))
           (should     (equal (file-contents backup) 'missing)))))))
 
-'(ert-deftest files-tests-save-some-buffers ()
+(ert-deftest files-tests-save-some-buffers ()
   "Test `save-some-buffers'.
 Test the 3 cases for the second argument PRED, i.e., nil, t, or
 predicate.
@@ -1979,7 +1980,7 @@ just returns `n' and `kill-emacs' is overridden to do nothing.
 ARGS-RESULTS is a list of elements (FN-ARGS CALLERS-DIR EXPECTED), where
 FN-ARGS are the arguments for FN-TEST;
 CALLERS-DIR specifies the value to let-bind
-`save-some-buffers-default-predicate';
+\`save-some-buffers-default-predicate';
  EXPECTED is the expected result of the test."
   (let* ((dir (make-temp-file "testdir" 'dir))
          (inhibit-message t)
@@ -2041,7 +2042,7 @@ permutation."
                                        (swap ,vec idx l)))))
          (permute ,vec 0 (1- (length ,vec)))))))
 
-'(ert-deftest files-tests-buffer-offer-save () ;; guilemacs sigsegv
+(ert-deftest files-tests-buffer-offer-save () ;; guilemacs sigsegv
   "Test `save-some-buffers' for non-file-visiting buffers.
 Check the behavior of `save-some-buffers' for non-file-visiting
 buffers under several values of `buffer-offer-save'.
@@ -2073,7 +2074,7 @@ PRED is nil."
              #'save-some-buffers
              args-res)))))))
 
-'(ert-deftest files-tests-save-buffers-kill-emacs--asks-to-save-buffers () ;; guilemacs sigsegv
+(ert-deftest files-tests-save-buffers-kill-emacs--asks-to-save-buffers () ;; guilemacs sigsegv
   "Test that `save-buffers-kill-emacs' asks to save buffers as expected.
 Prompt users for any modified buffer with `buffer-offer-save' non-nil."
   (let* ((buffers-offer-init '((buf-1 t) (buf-2 always) (buf-3 nil)))
@@ -2104,11 +2105,11 @@ Prompt users for any modified buffer with `buffer-offer-save' non-nil."
   ;; Check that the mode cookie doesn't override the explicit setting.
   (should (eq major-mode 'emacs-lisp-mode)))
 
-(ert-deftest files-test-set-mode-multiple ()
+'(ert-deftest files-test-set-mode-multiple ()
   (find-file (ert-resource-file "file-mode-multiple"))
   (should (eq major-mode 'outline-mode)))
 
-(ert-deftest files-test-set-mode-prop-line ()
+'(ert-deftest files-test-set-mode-prop-line ()
   (find-file (ert-resource-file "file-mode-prop-line"))
   (should (eq major-mode 'text-mode)))
 

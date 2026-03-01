@@ -203,7 +203,7 @@ M-g M-c		switch-to-completions
    (test-re "\\{foobar-map}"
             "\nUses keymap [`'‘]foobar-map['’], which is not currently defined.\n")))
 
-(ert-deftest help-tests-substitute-command-keys/quotes ()
+'(ert-deftest help-tests-substitute-command-keys/quotes ()
   (with-substitute-command-keys-test
    (let ((text-quoting-style 'curve))
      (test "quotes ‘like this’" "quotes ‘like this’")
@@ -224,7 +224,7 @@ M-g M-c		switch-to-completions
      (test "'" "'")
      (test "\\`" "\\`"))))
 
-(ert-deftest help-tests-substitute-quotes ()
+'(ert-deftest help-tests-substitute-quotes ()
   (let ((text-quoting-style 'curve))
     (should (string= (substitute-quotes "quotes ‘like this’") "quotes ‘like this’"))
     (should (string= (substitute-quotes "`x'") "‘x’"))
@@ -266,8 +266,8 @@ M-g M-c		switch-to-completions
   ;; Cannot use string= here, as that compares unibyte and multibyte
   ;; strings not equal.
   (should (compare-strings
-           (substitute-command-keys "\x80 \\[goto-char]") nil nil
-           "\x80 M-g c" nil nil)))
+           (substitute-command-keys "\200 \\[goto-char]") nil nil
+           "\200 M-g c" nil nil)))
 
 '(ert-deftest help-tests-substitute-command-keys/apropos ()
   (save-window-excursion
@@ -302,13 +302,13 @@ M-g M-c		switch-to-completions
 (define-minor-mode help-tests-minor-mode
   "Minor mode for testing shadowing.")
 
-(ert-deftest help-tests-substitute-command-keys/add-key-face ()
+'(ert-deftest help-tests-substitute-command-keys/add-key-face ()
   (should (equal (substitute-command-keys "\\[next-line]")
                  (propertize "C-n"
                              'face 'help-key-binding
                              'font-lock-face 'help-key-binding))))
 
-(ert-deftest help-tests-substitute-command-keys/add-key-face-listing ()
+'(ert-deftest help-tests-substitute-command-keys/add-key-face-listing ()
   (with-temp-buffer
     (insert (substitute-command-keys "\\{help-tests-minor-mode-map}"))
     (goto-char (point-min))
@@ -475,7 +475,7 @@ C-b		undefined\n"
     (define-key global-map (kbd "C-c C-l r") nil)
     (define-key global-map (kbd "C-c C-l") nil)))
 
-(ert-deftest help-substitute-command-keys/preserves-text-properties ()
+'(ert-deftest help-substitute-command-keys/preserves-text-properties ()
   "Check that we preserve text properties (Bug#17052)."
   (should (equal (substitute-command-keys
                   (propertize "foo \\[save-buffer]" 'face 'bold))

@@ -44,7 +44,7 @@
       (should (member "backup-buffer" comps))
       (should-not (member "backup-inhibited" comps)))))
 
-'(ert-deftest elisp-completes-variables ()
+(ert-deftest elisp-completes-variables ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(foo ba")
@@ -64,7 +64,7 @@
         (should (member "backup-buffer" comps))
         (should (member "backup" comps))))))
 
-'(ert-deftest elisp-completes-variables-unquoted ()
+(ert-deftest elisp-completes-variables-unquoted ()
   (dolist (text '("`(foo ,ba" "`(,(foo ba" "`(,ba"))
     (with-temp-buffer
       (emacs-lisp-mode)
@@ -91,7 +91,7 @@
         (should (member "backup-buffer" comps))
         (should-not (member "backup-inhibited" comps))))))
 
-'(ert-deftest elisp-completes-local-variables ()
+(ert-deftest elisp-completes-local-variables ()
   (with-temp-buffer
     (emacs-lisp-mode)
     (insert "(let ((bar 1) baz) (foo ba")
@@ -143,7 +143,7 @@
       (call-interactively #'eval-last-sexp)
       (should (equal (current-message) "t")))))
 
-'(ert-deftest eval-last-sexp-print-format-small-int ()
+(ert-deftest eval-last-sexp-print-format-small-int ()
   (with-temp-buffer
     (let ((current-prefix-arg '(4)))
       (erase-buffer) (insert "?A")
@@ -162,7 +162,7 @@
       (call-interactively #'eval-last-sexp)
       (should (equal (current-message) "65 (#o101, #x41, ?A)")))))
 
-'(ert-deftest eval-last-sexp-print-format-large-int ()
+(ert-deftest eval-last-sexp-print-format-large-int ()
   (with-temp-buffer
     (let ((eval-expression-print-maximum-character ?A))
       (let ((current-prefix-arg '(4)))
@@ -389,10 +389,8 @@ to (xref-elisp-test-descr-to-target xref)."
 ;; `xref-elisp-test-run'.
 (defvar emacs-test-dir
   (funcall (if xref--case-insensitive 'downcase 'identity)
-           "."
-           ;(file-truename (file-name-directory
-           ;                (or load-file-name (buffer-file-name))))
-           ))
+           (file-truename (file-name-directory
+                           (or load-file-name (buffer-file-name))))))
 
 
 ;; alphabetical by test name
@@ -881,7 +879,7 @@ to (xref-elisp-test-descr-to-target xref)."
     (and (re-search-forward search nil t)
          (get-text-property (match-beginning 1) 'face))))
 
-'(ert-deftest test-elisp-font-keywords-1 ()
+(ert-deftest test-elisp-font-keywords-1 ()
   ;; Special form.
   (should (eq (test--font '(if foo bar) "(\\(if\\)")
               'font-lock-keyword-face))
@@ -899,7 +897,7 @@ to (xref-elisp-test-descr-to-target xref)."
                           "(\\(when\\)")
               'nil)))
 
-'(ert-deftest test-elisp-font-keywords-2 ()
+(ert-deftest test-elisp-font-keywords-2 ()
   (should (eq (test--font '(condition-case nil
                                (foo)
                              (error (when a b)))
@@ -959,8 +957,7 @@ evaluation of BODY."
            (insert ,text)
            (let ,bindings . ,body))))))
 
-; FIX: :guilemacs-strings: disabled, causes regexp error in compile_pattern_1 (called from Fstring_match)
-'(ert-deftest elisp-mode-with-buffer ()
+(ert-deftest elisp-mode-with-buffer ()
   ;; Sanity test of macro, also demonstrating how it works.
   (elisp-mode-test--with-buffer
       "{a}123{b}45{c}6"
@@ -969,8 +966,7 @@ evaluation of BODY."
     (should (equal c 6))
     (should (equal (buffer-string) "123456"))))
 
-; FIX: :guilemacs-strings: disabled, causes regexp error in compile_pattern_1 (called from Fstring_match)
-'(ert-deftest elisp-mode-infer-namespace ()
+(ert-deftest elisp-mode-infer-namespace ()
   (elisp-mode-test--with-buffer
       (concat " ({p1}alphaX {p2}beta {p3}gamma '{p4}delta\n"
               "    #'{p5}epsilon `{p6}zeta `(,{p7}eta ,@{p8}theta))\n")
@@ -1139,9 +1135,9 @@ evaluation of BODY."
                              (buffer-string)))))))
     (should (equal observed expected-longhand-form))))
 
-(ert-deftest elisp-mode-test-indentation ()
-  (ert-test-erts-file "lisp/progmodes/elisp-mode-resources/elisp-indents.erts")
-  (ert-test-erts-file "lisp/progmodes/elisp-mode-resources/flet.erts"
+'(ert-deftest elisp-mode-test-indentation ()
+  (ert-test-erts-file (ert-resource-file "elisp-indents.erts"))
+  (ert-test-erts-file (ert-resource-file "flet.erts")
                       (lambda ()
                         (emacs-lisp-mode)
                         (indent-region (point-min) (point-max)))))

@@ -34,16 +34,16 @@
     ("Hello World" "Hello World")
 
     ;; window title
-    ("Buffer \x1b]2;A window title\x1b\\content" "Buffer content")
+    ("Buffer \e]2;A window title\e\\content" "Buffer content")
 
     ;; window title
-    ("Unfinished \x1b]2;window title" "Unfinished \x1b]2;window title")
+    ("Unfinished \e]2;window title" "Unfinished \e]2;window title")
 
     ;; current directory
-    ("\x1b]7;file://127.0.0.1/tmp\x1b\\user@host$ " "user@host$ ")
+    ("\e]7;file://127.0.0.1/tmp\e\\user@host$ " "user@host$ ")
 
     ;; hyperlink
-    ("\x1b]8;;http://example.com\x1b\\This is a link\x1b]8;;\x1b\\" "This is a link")
+    ("\e]8;;http://example.com\e\\This is a link\e]8;;\e\\" "This is a link")
     ))
 ;; Don't output those strings to stdout since they may have
 ;; side-effects on the environment

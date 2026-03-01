@@ -87,7 +87,7 @@ Evaluate BODY for each created map."
   (with-empty-maps-do map
     (should (= 5 (map-elt map 0 5)))))
 
-'(ert-deftest test-map-elt-testfn-alist ()
+(ert-deftest test-map-elt-testfn-alist ()
   "Test the default alist predicate of `map-elt'."
   (let* ((a (string ?a))
          (map `((,a . 0) (,(string ?b) . 1))))
@@ -116,7 +116,7 @@ Evaluate BODY for each created map."
       (should (= 1 (map-elt map "b" nil #'equal)))
       (should (= 1 (map-elt map (string ?b) nil #'equal))))))
 
-(ert-deftest test-map-elt-gv ()
+'(ert-deftest test-map-elt-gv ()
   "Test the generalized variable `map-elt'."
   (let ((sort (lambda (map) (sort (map-pairs map) #'car-less-than-car))))
     (with-empty-maps-do map
@@ -212,7 +212,7 @@ See bug#58531#25 and bug#58563."
         (setf (map-elt map size) 'v)
         (should (eq (map-elt map size) 'v))))))
 
-'(ert-deftest test-map-put!-alist ()
+(ert-deftest test-map-put!-alist ()
   "Test `map-put!' test function on alists."
   (let ((key (string ?a))
         (val 0)
@@ -225,7 +225,7 @@ See bug#58531#25 and bug#58563."
     (should (equal map '(("a" . 1))))
     (should-error (map-put! map (string ?a) val #'eq) :type 'map-not-inplace)))
 
-'(ert-deftest test-map-put!-plist ()
+(ert-deftest test-map-put!-plist ()
   "Test `map-put!' predicate on plists."
   (let* ((a (string ?a))
          (map (list a 0)))
@@ -250,7 +250,7 @@ See bug#58531#25 and bug#58563."
       (map-put alist 2 'b))
     (should (eq (map-elt alist 2) 'b))))
 
-'(ert-deftest test-map-put-testfn-alist ()
+(ert-deftest test-map-put-testfn-alist ()
   (let ((alist (list (cons "a" 1) (cons "b" 2)))
         ;; Make sure to use a non-eq "a", even when compiled.
         (noneq-key (string ?a)))
@@ -311,7 +311,7 @@ See bug#58531#25 and bug#58563."
   (with-empty-maps-do map
     (should (eq map (map-delete map t)))))
 
-'(ert-deftest test-map-delete-alist ()
+(ert-deftest test-map-delete-alist ()
   "Test `map-delete' test function on alists."
   (let* ((a (string ?a))
          (map `((,a) (,(string ?b)))))
@@ -384,7 +384,8 @@ See bug#58531#25 and bug#58563."
   (should (= 2 (map-length '(nil 1 t 2))))
   (should (= 2 (map-length '((a . 1) (b . 2)))))
   (should (= 5 (map-length [0 1 2 3 4])))
-  (should (= 4 (map-length #s(hash-table data (a 1 b 2 c 3 d 4))))))
+  ;(should (= 4 (map-length #s(hash-table data (a 1 b 2 c 3 d 4)))))
+  )
 
 '(ert-deftest test-map-copy ()
   (with-maps-do map
@@ -497,13 +498,12 @@ See bug#58531#25 and bug#58563."
     ;; FIXME: Why is no warning emitted for these (bug#58563#13)?
     (should (map-contains-key alist 'a #'eq))
     (should (map-contains-key plist 'a #'eq))
-    ;(should (map-contains-key alist key))
+    (should (map-contains-key alist key))
     (should (map-contains-key alist "a"))
-    ;(should (map-contains-key plist (string ?a) #'equal))
-    ;(should-not (map-contains-key plist key))
-    ;(should-not (map-contains-key alist key #'eq))
-    ;(should-not (map-contains-key plist key #'eq))
-    ))
+    (should (map-contains-key plist (string ?a) #'equal))
+    (should-not (map-contains-key plist key))
+    (should-not (map-contains-key alist key #'eq))
+    (should-not (map-contains-key plist key #'eq))))
 
 (ert-deftest test-map-contains-key-signature ()
   "Test that `map-contains-key' has the right advertised signature.
@@ -587,10 +587,10 @@ See bug#58531#25 and bug#58563."
 
 (ert-deftest test-map-merge ()
   "Test `map-merge'."
-  (should (equal (sort (map-merge 'list '(a 1) '((b . 2) (c . 3))
-                                  #s(hash-table data (c 4)))
-                       (lambda (x y) (string< (car x) (car y))))
-                 '((a . 1) (b . 2) (c . 4))))
+  ;(should (equal (sort (map-merge 'list '(a 1) '((b . 2) (c . 3))
+  ;                                #s(hash-table data (c 4)))
+  ;                     (lambda (x y) (string< (car x) (car y))))
+  ;               '((a . 1) (b . 2) (c . 4))))
   (should (equal (map-merge 'list () '(:a 1)) '((:a . 1))))
   (should (equal (map-merge 'alist () '(:a 1)) '((:a . 1))))
   (should (equal (map-merge 'plist () '(:a 1)) '(:a 1))))

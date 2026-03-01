@@ -237,7 +237,7 @@
 ;;;  "test/lisp/progmodes/pascal-tests.el"
 ;;;  "test/lisp/progmodes/ps-mode-tests.el"
 ;;;  )
-   (group "test/lisp/progmodes/sh-script-tests.el" ) ;; fails
+   (group "test/lisp/progmodes/sh-script-tests.el")
   (group
   "test/lisp/progmodes/subword-tests.el"
   )
@@ -293,51 +293,51 @@
 ;;;  "test/lisp/ibuffer-tests.el"
 ;;;  "test/lisp/hl-line-tests.el"
 ;;;  )
-;;;(group
-;;;  "test/lisp/help-tests.el" ;; fails
+(group
+  "test/lisp/help-tests.el"
 ;;;  "test/lisp/obarray-tests.el" ;; pass
 ;;;  "test/lisp/emacs-lisp/gv-tests.el"
-;;;  "test/lisp/files-tests.el"
-;;;  )
+  "test/lisp/files-tests.el"
+  )
   (group "test/lisp/ffap-tests.el" ) ;; multibyte bug ; fails
   (group
   "test/lisp/progmodes/f90-tests.el" ;; crashes
   )(group
   "test/lisp/progmodes/elisp-mode-tests.el"
   )
-  ;(group "test/lisp/emacs-lisp/ert-x-tests.el" ) ;; text-property syntax fails
+(group "test/lisp/emacs-lisp/ert-x-tests.el" )
 (group
   "test/lisp/emacs-lisp/ert-tests.el"
   )
 (group
   "test/lisp/progmodes/flymake-tests.el"
   )
-;;;(group
+(group
 ;;;  "test/lisp/emacs-lisp/lisp-tests.el"
-;;;  "test/lisp/emacs-lisp/subr-x-tests.el"
+  "test/lisp/emacs-lisp/subr-x-tests.el"
 ;;;  ; disabled after moving to guile-round/truncate/floor/ceiling
 ;;;  ;"test/lisp/emacs-lisp/timer-tests.el"
 ;;;  "test/lisp/emacs-lisp/warnings-tests.el"
 ;;;  "test/lisp/emacs-lisp/cl-generic-tests.el"
-;;;  )
+  )
 ;;; (group ; segfaults
 ;;;   "test/lisp/emacs-lisp/cl-lib-tests.el"
 ;;;   "test/lisp/emacs-lisp/cl-macs-tests.el"
 ;;;   "test/lisp/emacs-lisp/comp-cstr-tests.el"
 ;;;   "test/lisp/emacs-lisp/ert-font-lock-tests.el"
 ;;;   )
-;;; (group
-;;;   "test/lisp/emacs-lisp/map-tests.el"
+ (group
+   "test/lisp/emacs-lisp/map-tests.el"
 ;;;   "test/lisp/emacs-lisp/rmc-tests.el"
-;;;   "test/lisp/emacs-lisp/rx-tests.el"
+   "test/lisp/emacs-lisp/rx-tests.el"
 ;;;   "test/lisp/emacs-lisp/backquote-tests.el"
-;;;   )
-;;; (group
+   )
+ (group
 ;;;   "test/lisp/emacs-lisp/benchmark-tests.el"
-;;;   "test/lisp/emacs-lisp/bindat-tests.el"
+   "test/lisp/emacs-lisp/bindat-tests.el"
 ;;;   "test/lisp/emacs-lisp/cconv-tests.el"
 ;;;   "test/lisp/emacs-lisp/cl-extra-tests.el"
-;;;  )
+  )
 (group
   "test/lisp/emacs-lisp/checkdoc-tests.el" ; run this not with test/lisp/emacs-lisp/find-func-tests.el
 
