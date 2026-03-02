@@ -259,20 +259,20 @@
   ;; these doesn't want to play with others
    "test/lisp/emacs-lisp/find-func-tests.el" ; doesn't like test/lisp/emacs-lisp/checkdoc-tests.el fails
 ;  "test/lisp/help-mode-tests.el" ; fails
-  ; "test/lisp/help-fns-tests.el" ; fails
+   "test/lisp/help-fns-tests.el" ; fails
   )
-;;;(group
-;;;  "test/lisp/dired-tests.el"
-;;;  "test/lisp/progmodes/compile-tests.el"
+(group
+  "test/lisp/dired-tests.el"
+  "test/lisp/progmodes/compile-tests.el"
 ;;;  "test/lisp/progmodes/js-tests.el"
-;;;  "test/lisp/simple-tests.el"
-;;;  )
-;;;(group ;; hangs
-;;;  "test/lisp/emacs-lisp/pcase-tests.el"
+  "test/lisp/simple-tests.el"
+  )
+(group ;; hangs
+  "test/lisp/emacs-lisp/pcase-tests.el"
 ;;;  "test/lisp/emacs-lisp/package-tests.el"
-;;;  "test/lisp/replace-tests.el"
+  "test/lisp/replace-tests.el"
 ;;;  "test/lisp/international/mule-tests.el"
-;;;  )
+  )
 ;;;(group
 ;;; "test/lisp/mouse-tests.el"
   ; "test/lisp/auth-source-tests.el" ; fails
@@ -283,20 +283,20 @@
   "test/lisp/ls-lisp-tests.el"
   ; "test/lisp/loadhist-tests.el" ; fails
   )
-;(group
+(group
   ;"test/lisp/abbrev-tests.el" ;; hangs (or group)
-  ; "test/lisp/emacs-lisp/let-alist-tests.el" ; fails
-;  )
-;;;(group
-;;;  "test/lisp/info-xref-tests.el"
+   "test/lisp/emacs-lisp/let-alist-tests.el" ; fails
+  )
+(group
+  "test/lisp/info-xref-tests.el"
 ;;;  "test/lisp/image-tests.el"
 ;;;  "test/lisp/ibuffer-tests.el"
-;;;  "test/lisp/hl-line-tests.el"
-;;;  )
+  "test/lisp/hl-line-tests.el"
+  )
 (group
   "test/lisp/help-tests.el"
 ;;;  "test/lisp/obarray-tests.el" ;; pass
-;;;  "test/lisp/emacs-lisp/gv-tests.el"
+  "test/lisp/emacs-lisp/gv-tests.el"
   "test/lisp/files-tests.el"
   )
   (group "test/lisp/ffap-tests.el" ) ;; multibyte bug ; fails
@@ -313,30 +313,29 @@
   "test/lisp/progmodes/flymake-tests.el"
   )
 (group
-;;;  "test/lisp/emacs-lisp/lisp-tests.el"
+  "test/lisp/emacs-lisp/lisp-tests.el"
   "test/lisp/emacs-lisp/subr-x-tests.el"
-;;;  ; disabled after moving to guile-round/truncate/floor/ceiling
-;;;  ;"test/lisp/emacs-lisp/timer-tests.el"
-;;;  "test/lisp/emacs-lisp/warnings-tests.el"
+  "test/lisp/emacs-lisp/timer-tests.el"
+  "test/lisp/emacs-lisp/warnings-tests.el"
 ;;;  "test/lisp/emacs-lisp/cl-generic-tests.el"
   )
-;;; (group ; segfaults
-;;;   "test/lisp/emacs-lisp/cl-lib-tests.el"
-;;;   "test/lisp/emacs-lisp/cl-macs-tests.el"
-;;;   "test/lisp/emacs-lisp/comp-cstr-tests.el"
+ (group ; segfaults
+   "test/lisp/emacs-lisp/cl-lib-tests.el"
+   "test/lisp/emacs-lisp/cl-macs-tests.el"
+   "test/lisp/emacs-lisp/comp-cstr-tests.el"
 ;;;   "test/lisp/emacs-lisp/ert-font-lock-tests.el"
-;;;   )
+   )
  (group
    "test/lisp/emacs-lisp/map-tests.el"
 ;;;   "test/lisp/emacs-lisp/rmc-tests.el"
    "test/lisp/emacs-lisp/rx-tests.el"
-;;;   "test/lisp/emacs-lisp/backquote-tests.el"
+   "test/lisp/emacs-lisp/backquote-tests.el"
    )
  (group
 ;;;   "test/lisp/emacs-lisp/benchmark-tests.el"
    "test/lisp/emacs-lisp/bindat-tests.el"
 ;;;   "test/lisp/emacs-lisp/cconv-tests.el"
-;;;   "test/lisp/emacs-lisp/cl-extra-tests.el"
+   "test/lisp/emacs-lisp/cl-extra-tests.el"
   )
 (group
   "test/lisp/emacs-lisp/checkdoc-tests.el" ; run this not with test/lisp/emacs-lisp/find-func-tests.el

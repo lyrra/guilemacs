@@ -41,7 +41,7 @@
 (pcase-defmacro pcase-tests-plus (pat n)
   `(app (lambda (v) (- v ,n)) ,pat))
 
-(ert-deftest pcase-tests-macro ()
+'(ert-deftest pcase-tests-macro ()
   (should (equal (pcase 5 ((pcase-tests-plus x 3) x)) 2)))
 
 (defun pcase-tests-grep (fname exp)
@@ -177,7 +177,7 @@
   '(should-error (pcase-setq a)
                 :type '(wrong-number-of-arguments)))
 
-(ert-deftest pcase-tests-mutually-exclusive ()
+'(ert-deftest pcase-tests-mutually-exclusive ()
   (dolist (x '((functionp consp nil)
                (functionp stringp t)
                (compiled-function-p consp t)

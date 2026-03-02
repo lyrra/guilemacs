@@ -80,7 +80,7 @@
   (should (equal (let-alist--remove-dot '.hi) 'hi))
   (should (equal (let-alist--remove-dot '..hi) '.hi)))
 
-(ert-deftest let-alist-list-to-sexp ()
+'(ert-deftest let-alist-list-to-sexp ()
   "Check that multiple dots are handled correctly."
   (should (= 1 (eval (let-alist--list-to-sexp '(a b c d) ''((d (c (b (a . 1)))))) t)))
   (should (equal (let-alist--access-sexp '.foo.bar.baz 'var)

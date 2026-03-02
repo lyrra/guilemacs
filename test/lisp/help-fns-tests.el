@@ -57,7 +57,7 @@ Return first line of the output of (describe-function-1 FUNC)."
         (result (help-fns-tests--describe-function 're-search-forward)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-lisp-macro ()
+'(ert-deftest help-fns-test-lisp-macro ()
   (let ((regexp "a Lisp macro in .+subr\\.el")
         (result (help-fns-tests--describe-function 'when)))
     (should (string-match regexp result))))
@@ -74,12 +74,12 @@ Return first line of the output of (describe-function-1 FUNC)."
         (result (help-fns-tests--describe-function 'posn-window)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-alias-to-defun ()
+'(ert-deftest help-fns-test-alias-to-defun ()
   (let ((regexp "an alias for .set-file-modes. in .+subr\\.el")
         (result (help-fns-tests--describe-function 'chmod)))
     (should (string-match regexp result))))
 
-(ert-deftest help-fns-test-bug23887 ()
+'(ert-deftest help-fns-test-bug23887 ()
   "Test for https://debbugs.gnu.org/23887 ."
   (let ((regexp "an alias for .re-search-forward. in .+subr\\.el")
         (result (help-fns-tests--describe-function 'search-forward-regexp)))

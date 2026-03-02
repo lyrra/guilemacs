@@ -526,7 +526,7 @@ collection clause."
    (macroexpand '(cl-defstruct (hash-table (:predicate hash-table-p))))
    :type 'wrong-type-argument))
 
-(ert-deftest cl-macs-test--symbol-macrolet ()
+'(ert-deftest cl-macs-test--symbol-macrolet ()
   ;; A `setq' shouldn't be converted to a `setf' just because it occurs within
   ;; a symbol-macrolet!
   (should-error

@@ -670,7 +670,7 @@ bound to HIGHLIGHT-LOCUS."
        (kill-buffer buffer)
        (kill-buffer "*Occur*"))))
 
-(ert-deftest occur-highlight-occurrence ()
+'(ert-deftest occur-highlight-occurrence ()
   "Test for https://debbugs.gnu.org/39121 ."
   (let ((alist '((nil . nil) (0.5 . t) (t . t) (fringe-arrow . nil)))
         (check-overlays

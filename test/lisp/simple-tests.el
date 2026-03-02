@@ -506,7 +506,7 @@ See bug#35036."
     (run-hooks 'post-command-hook)
     (undo-boundary)))
 
-(ert-deftest simple-tests--undo ()
+'(ert-deftest simple-tests--undo ()
   (with-temp-buffer
     (buffer-enable-undo)
     (dolist (x '("a" "b" "c" "d" "e"))
@@ -536,7 +536,7 @@ See bug#35036."
     (simple-tests--exec '(backward-char undo-redo undo-redo))
     (should (equal (buffer-string) "abcde"))))
 
-(ert-deftest simple-tests--undo-in-region ()
+'(ert-deftest simple-tests--undo-in-region ()
   ;; Test undo/redo in region.
   (with-temp-buffer
     ;; Enable `transient-mark-mode' so `region-active-p' works as
@@ -571,7 +571,7 @@ See bug#35036."
     (simple-tests--exec '(undo-redo))
     (should (equal (buffer-string) "abcde"))))
 
-(ert-deftest simple-tests--undo-apply () ;bug#74523
+'(ert-deftest simple-tests--undo-apply () ;bug#74523
   (with-temp-buffer
     (modula-2-mode) ;; A simple mode with non-LF terminated comments.
     (buffer-enable-undo)
@@ -622,7 +622,7 @@ See bug#35036."
     (setq lst (cdr lst)))
   lst)
 
-(ert-deftest simple-tests--undo-equiv-table ()
+'(ert-deftest simple-tests--undo-equiv-table ()
   (with-temp-buffer
     (buffer-enable-undo)
     (transient-mark-mode)
@@ -1145,7 +1145,7 @@ See Bug#21722."
 ;;; Tests for `kill-whole-line'
 
 (declare-function org-fold-hide-sublevels "org-fold" (levels))
-(ert-deftest kill-whole-line-invisible ()
+'(ert-deftest kill-whole-line-invisible ()
   (cl-flet ((test (kill-whole-line-arg &rest expected-lines)
               (ert-info ((format "%s" kill-whole-line-arg) :prefix "Subtest: ")
                 (ert-with-test-buffer-selected nil

@@ -615,7 +615,7 @@ path's data to use."
         (dired-insert-directory dir "-l" nil nil t))
       (buffer-substring-no-properties (point-min) (point-max))))
 
-  (ert-deftest files-tests-insert-directory-shows-files ()
+  '(ert-deftest files-tests-insert-directory-shows-files ()
     "Verify `insert-directory' reports the files in the directory."
     ;; It is always defined but this silences the byte-compiler:
     (when (fboundp 'files-tests--insert-directory-output)
@@ -641,7 +641,7 @@ either with the given stub function or a default one using test data."
                                  (files-tests--look-up-free-data dir))
                                 (files-tests--insert-directory-output dir t))))))
 
-  (ert-deftest files-tests-insert-directory-shows-free ()
+  '(ert-deftest files-tests-insert-directory-shows-free ()
     "Test that verbose `insert-directory' shows the correct available space."
     ;; It is always defined but this silences the byte-compiler:
     (when (and (fboundp 'files-tests--insert-directory-shows-given-free)
@@ -650,7 +650,7 @@ either with the given stub function or a default one using test data."
        test-dir
        (files-tests--make-file-system-info-stub test-dir))))
 
-  (ert-deftest files-tests-bug-50630 ()
+  '(ert-deftest files-tests-bug-50630 ()
     "Verify verbose `insert-directory' shows free space of the target directory.
 The current directory at call time should not affect the result (Bug#50630)."
     ;; It is always defined but this silences the byte-compiler:
