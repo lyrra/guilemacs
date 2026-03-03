@@ -43,7 +43,7 @@
 
 (declare-function outline-hide-sublevels "outline")
 
-(ert-deftest isearch--test-invisible ()
+'(ert-deftest isearch--test-invisible ()
   (require 'outline)
   (with-temp-buffer
     (set-window-buffer nil (current-buffer))

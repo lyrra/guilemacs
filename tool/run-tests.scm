@@ -97,12 +97,12 @@
    (group "test/lisp/buff-menu-tests.el") ;; fails
    (group "test/lisp/button-tests.el" ) ;; fails
 
-;;;  (group
+(group
 ;;;  "test/lisp/calculator-tests.el"
-;;;  "test/lisp/cedet/cedet-files-tests.el"
-;;;  "test/lisp/cedet/semantic-utest-c.el"
-;;;  "test/lisp/cedet/semantic/bovine/gcc-tests.el"
-;;;  )
+  "test/lisp/cedet/cedet-files-tests.el"
+  "test/lisp/cedet/semantic-utest-c.el"
+  "test/lisp/cedet/semantic/bovine/gcc-tests.el"
+  )
 (group
   "test/lisp/cedet/semantic/fw-tests.el"
   )
@@ -131,12 +131,12 @@
   "test/lisp/emacs-lisp/cl-preloaded-tests.el"
   )
    (group "test/lisp/emacs-lisp/cl-print-tests.el" ) ;; fails
-;;;  (group
+(group
 ;;;  "test/lisp/emacs-lisp/cl-seq-tests.el"
-;;;  "test/lisp/emacs-lisp/copyright-tests.el"
-;;;  "test/lisp/emacs-lisp/derived-tests.el"
+  "test/lisp/emacs-lisp/copyright-tests.el"
+  "test/lisp/emacs-lisp/derived-tests.el"
 ;;;  "test/lisp/emacs-lisp/easy-mmode-tests.el"
-;;;  )
+  )
    ; faceup uses syntax for string text-property #("ABC") but guile reader doesn't support  that
    ;(group "test/lisp/emacs-lisp/faceup-tests/faceup-test-files.el") ;; fails
    ;(group "test/lisp/emacs-lisp/faceup-tests/faceup-test-basics.el" ) ; fails
@@ -150,12 +150,12 @@
   ; "test/lisp/emacs-lisp/lisp-mnt-tests.el" ; fails
   ;"test/lisp/emacs-lisp/memory-report-tests.el" ; fails
   )
-;;;(group ;; fails
+(group ;; fails
 ;;;  "test/lisp/emacs-lisp/pp-tests.el"
 ;;;  "test/lisp/emacs-lisp/range-tests.el"
-;;;  "test/lisp/emacs-lisp/regexp-opt-tests.el"
-;;;  "test/lisp/emacs-lisp/ring-tests.el"
-;;;  )
+  "test/lisp/emacs-lisp/regexp-opt-tests.el"
+  "test/lisp/emacs-lisp/ring-tests.el"
+  )
 (group
   "test/lisp/emacs-lisp/seq-tests.el" ;; pass
   )
@@ -164,33 +164,34 @@
   )
 (group
   "test/lisp/emacs-lisp/syntax-tests.el" ;; pass
-  ;"test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
+  "test/lisp/emacs-lisp/tabulated-list-tests.el" ;; fails -- depends on text-properties
  )
   (group "test/lisp/emacs-lisp/text-property-search-tests.el" ) ;; fails
   (group
   "test/lisp/emacs-lisp/thunk-tests.el"
+  ;"test/lisp/emacs-lisp/unsafep-tests.el" ;; fail
   )
-  ; "test/lisp/emacs-lisp/unsafep-tests.el" ;; fail
   (group
   "test/lisp/emacs-lisp/vtable-tests.el"
   )(group
   "test/lisp/faces-tests.el" ;; fails
   )(group
   "test/lisp/env-tests.el"
-  ; "test/lisp/find-cmd-tests.el" ; fails
-  ;"test/lisp/font-lock-tests.el" ; fails
+  ;"test/lisp/find-cmd-tests.el" ; fails
+  "test/lisp/font-lock-tests.el" ; fails
   )
-;;;  (group
+(group
 ;;;  "test/lisp/format-spec-tests.el"
-;;;  "test/lisp/hfy-cmap-tests.el"
+  "test/lisp/hfy-cmap-tests.el"
 ;;;  "test/lisp/hi-lock-tests.el"
 ;;;  "test/lisp/htmlfontify-tests.el"
-;;;  )
+  )
   (group
   "test/lisp/ido-tests.el" ;; fails
   )
-;;;  )(group
+  ;(group
   ; "test/lisp/image-file-tests.el" ; fails
+  ; )
   (group
   "test/lisp/imenu-tests.el"
   )
@@ -198,18 +199,15 @@
   "test/lisp/info-tests.el"
   )
   ; (group "test/lisp/international/mule-util-tests.el" ) ;; fails
-;  (group
-;  ; "test/lisp/isearch-tests.el" ; fails
-;  ; "test/lisp/jit-lock-tests.el" ; fails
-;  ;"test/lisp/json-tests.el" ; fails
-;  )
+  (group
+   "test/lisp/isearch-tests.el" ; fails
+   "test/lisp/jit-lock-tests.el" ; fails
+   ;"test/lisp/json-tests.el" ; fails
+  )
   (group
   "test/lisp/misc-tests.el" ;; fails
-  )(group
   "test/lisp/lpr-tests.el"
-  )(group
   "test/lisp/md4-tests.el"
-  )(group
   "test/lisp/mwheel-tests.el"
   )
    ;(group "test/lisp/nxml/nxml-mode-tests.el" ) ;; fails
@@ -344,32 +342,32 @@
   "test/lisp/shell-tests.el"
   "test/lisp/international/ccl-tests.el"
   )
-;;;  (group
-;;;  "test/lisp/minibuffer-tests.el"
+(group
+  "test/lisp/minibuffer-tests.el"
 ;;;  "test/lisp/align-tests.el"
-;;;  "test/lisp/allout-tests.el"
-;;;  "test/lisp/arc-mode-tests.el"
-;;;  )
-;;;  (group
+  "test/lisp/allout-tests.el"
+  "test/lisp/arc-mode-tests.el"
+  "test/lisp/descr-text-tests.el"
+  )
+(group
 ;;;  "test/lisp/bookmark-tests.el"
 ;;;  "test/lisp/completion-preview-tests.el"
 ;;;  "test/lisp/custom-tests.el"
-;;;  "test/lisp/descr-text-tests.el"
-;;;  )
-;;;  (group
+  )
+  (group
 ;;;  "test/lisp/dired-aux-tests.el"
-;;;  "test/lisp/dired-x-tests.el"
+  "test/lisp/dired-x-tests.el"
 ;;;  "test/lisp/dnd-tests.el"
-;;;  "test/lisp/dom-tests.el"
-;;;  )
+  "test/lisp/dom-tests.el"
+  )
 ;;;  (group
 ;;;  "test/lisp/progmodes/cperl-mode-tests.el"
 ;;;  "test/lisp/progmodes/csharp-mode-tests.el"
 ;;;  "test/lisp/progmodes/project-tests.el"
 ;;;  )
-;;; (group
-;;;  "test/lisp/progmodes/ruby-mode-tests.el"
-;;;  )
+ (group
+  "test/lisp/progmodes/ruby-mode-tests.el"
+  )
 ;;;(group
 ;;;  "test/lisp/progmodes/scheme-tests.el"
 ;;;  )

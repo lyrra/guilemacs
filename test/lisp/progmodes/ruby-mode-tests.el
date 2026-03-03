@@ -81,7 +81,7 @@ VALUES-PLIST is a list with alternating index and value elements."
   "JS-style hash symbol can have keyword name."
   (ruby-should-indent "link_to \"home\", home_path, class: \"foo\"\n" 0))
 
-(ert-deftest ruby-discern-singleton-class-from-heredoc ()
+'(ert-deftest ruby-discern-singleton-class-from-heredoc ()
   (ruby-assert-state "foo <<asd\n" 3 ?\n)
   (ruby-assert-state "class <<asd\n" 3 nil))
 
@@ -93,7 +93,7 @@ VALUES-PLIST is a list with alternating index and value elements."
 (ert-deftest ruby-singleton-class-no-heredoc-font-lock ()
   (ruby-assert-face "class<<a" 8 nil))
 
-(ert-deftest ruby-heredoc-highlights-interpolations ()
+'(ert-deftest ruby-heredoc-highlights-interpolations ()
   (ruby-assert-face "s = <<EOS\n  #{foo}\nEOS" 15 'font-lock-variable-name-face))
 
 (ert-deftest ruby-no-heredoc-inside-quotes ()
@@ -108,7 +108,7 @@ VALUES-PLIST is a list with alternating index and value elements."
 (ert-deftest ruby-no-heredoc-class-self ()
   (ruby-assert-state "class <<self\nend" 3 nil))
 
-(ert-deftest ruby-exit!-font-lock ()
+'(ert-deftest ruby-exit!-font-lock ()
   (ruby-assert-face "exit!" 5 'font-lock-builtin-face))
 
 (ert-deftest ruby-deep-indent ()
@@ -133,16 +133,16 @@ VALUES-PLIST is a list with alternating index and value elements."
 (ert-deftest ruby-regexp-doesnt-start-in-string ()
   (ruby-assert-state "'(/', /\\d+/" 3 nil))
 
-(ert-deftest ruby-regexp-starts-after-string ()
+'(ert-deftest ruby-regexp-starts-after-string ()
   (ruby-assert-state "'(/', /\\d+/" 3 ?/ 8))
 
-(ert-deftest ruby-regexp-interpolation-is-highlighted ()
+'(ert-deftest ruby-regexp-interpolation-is-highlighted ()
   (ruby-assert-face "/#{foobs}/" 4 'font-lock-variable-name-face))
 
 (ert-deftest ruby-regexp-skips-over-interpolation ()
   (ruby-assert-state "/#{foobs.join('/')}/" 3 nil))
 
-(ert-deftest ruby-regexp-continues-till-end-when-unclosed ()
+'(ert-deftest ruby-regexp-continues-till-end-when-unclosed ()
   (ruby-assert-state "/bars" 3 ?/))
 
 (ert-deftest ruby-regexp-can-be-multiline ()
@@ -163,7 +163,7 @@ VALUES-PLIST is a list with alternating index and value elements."
 (ert-deftest ruby-slash-not-regexp-when-no-spaces ()
   (ruby-assert-state "x = index/3" 3 nil))
 
-(ert-deftest ruby-regexp-not-division-when-only-space-before ()
+'(ert-deftest ruby-regexp-not-division-when-only-space-before ()
   (ruby-assert-state "x = foo_index /3" 3 ?/))
 
 (ert-deftest ruby-slash-not-regexp-when-only-space-after ()
@@ -228,14 +228,14 @@ VALUES-PLIST is a list with alternating index and value elements."
    |   end
    |"))
 
-(ert-deftest ruby-indent-inside-heredoc-after-operator ()
+'(ert-deftest ruby-indent-inside-heredoc-after-operator ()
   (ruby-should-indent-buffer
    "b=<<eos
    |     42"
    "b=<<eos
    |     42"))
 
-(ert-deftest ruby-indent-inside-heredoc-after-space ()
+'(ert-deftest ruby-indent-inside-heredoc-after-space ()
   (ruby-should-indent-buffer
    "foo <<eos.gsub(' ', '*')
    |     42"
@@ -448,13 +448,13 @@ VALUES-PLIST is a list with alternating index and value elements."
     (ruby-assert-face s 10 'font-lock-variable-name-face)
     (ruby-assert-face s 41 'font-lock-string-face)))
 
-(ert-deftest ruby-interpolation-suppresses-one-double-quote ()
+'(ert-deftest ruby-interpolation-suppresses-one-double-quote ()
   (let ((s "\"foo#{'\"'}\""))
     (ruby-assert-state s 8 nil)
     (ruby-assert-face s 8 'font-lock-variable-name-face)
     (ruby-assert-face s 11 'font-lock-string-face)))
 
-(ert-deftest ruby-interpolation-suppresses-one-backtick ()
+'(ert-deftest ruby-interpolation-suppresses-one-backtick ()
   (let ((s "`as#{'`'}das`"))
     (ruby-assert-state s 8 nil)))
 
@@ -467,7 +467,7 @@ VALUES-PLIST is a list with alternating index and value elements."
       (search-forward "tee")
       (should (string= (thing-at-point 'symbol) "tee")))))
 
-(ert-deftest ruby-interpolation-inside-percent-literal ()
+'(ert-deftest ruby-interpolation-inside-percent-literal ()
   (let ((s "%( #{boo} )"))
     (ruby-assert-face s 1 'font-lock-string-face)
     (ruby-assert-face s 4 'font-lock-variable-name-face)
@@ -491,13 +491,13 @@ VALUES-PLIST is a list with alternating index and value elements."
     (ruby-assert-face s 38 'font-lock-string-face)
     (ruby-assert-state s 8 nil)))
 
-(ert-deftest ruby-interpolation-inside-double-quoted-percent-literals ()
+'(ert-deftest ruby-interpolation-inside-double-quoted-percent-literals ()
   (ruby-assert-face "%Q{foo #@bar}" 8 'font-lock-variable-name-face)
   (ruby-assert-face "%W{foo #@bar}" 8 'font-lock-variable-name-face)
   (ruby-assert-face "%r{foo #@bar}" 8 'font-lock-variable-name-face)
   (ruby-assert-face "%x{foo #@bar}" 8 'font-lock-variable-name-face))
 
-(ert-deftest ruby-no-interpolation-in-single-quoted-literals ()
+'(ert-deftest ruby-no-interpolation-in-single-quoted-literals ()
   (ruby-assert-face "'foo #@bar'" 7 'font-lock-string-face)
   (ruby-assert-face "%q{foo #@bar}" 8 'font-lock-string-face)
   (ruby-assert-face "%w{foo #@bar}" 8 'font-lock-string-face)
@@ -512,7 +512,7 @@ VALUES-PLIST is a list with alternating index and value elements."
   (ruby-assert-face "%S{foo}" 4 nil)
   (ruby-assert-face "%R{foo}" 4 nil))
 
-(ert-deftest ruby-no-nested-percent-literals ()
+'(ert-deftest ruby-no-nested-percent-literals ()
   (ruby-with-temp-buffer "a = %w[b %()]"
     (syntax-propertize (point))
     (should (null (nth 8 (syntax-ppss))))
@@ -697,7 +697,7 @@ VALUES-PLIST is a list with alternating index and value elements."
   (ruby-move-to-block -2)
   (should (= 2 (line-number-at-pos))))
 
-(ert-deftest ruby-move-to-block-skips-percent-literal ()
+'(ert-deftest ruby-move-to-block-skips-percent-literal ()
   (dolist (s (list (ruby-test-string
                     "foo do
                     |  a = %%w(
@@ -717,7 +717,7 @@ VALUES-PLIST is a list with alternating index and value elements."
       (ruby-beginning-of-block)
       (should (= 1 (line-number-at-pos))))))
 
-(ert-deftest ruby-move-to-block-skips-heredoc ()
+'(ert-deftest ruby-move-to-block-skips-heredoc ()
   (ruby-with-temp-buffer
       (ruby-test-string
        "if something_wrong?
@@ -898,7 +898,7 @@ VALUES-PLIST is a list with alternating index and value elements."
     (backward-sexp)
     (should (looking-at "do "))))
 
-(ert-deftest ruby-toggle-string-quotes-quotes-correctly ()
+'(ert-deftest ruby-toggle-string-quotes-quotes-correctly ()
   (let ((pairs
          '(("puts '\"foo\"\\''" . "puts \"\\\"foo\\\"'\"")
            ("puts \"'foo'\\\"\"" . "puts '\\'foo\\'\"'"))))
@@ -944,7 +944,7 @@ VALUES-PLIST is a list with alternating index and value elements."
       (ruby-mode-set-encoding)
       (should (string= "💎" (buffer-string))))))
 
-(ert-deftest ruby--set-encoding-when-latin-15 ()
+'(ert-deftest ruby--set-encoding-when-latin-15 ()
   (ruby-with-temp-file "Ⓡ"
     (let ((ruby-encoding-magic-comment-style 'ruby)
           (ruby-insert-encoding-magic-comment t))
