@@ -1506,26 +1506,6 @@ an error is signaled.  */)
   return ret;
 }
 
-DEFUN ("string-to-scheme", Fstring_to_scheme, Sstring_to_scheme, 1, 1, 0, 0)
-  (Lisp_Object string)
-{
-  CHECK_STRING (string);
-  return string;  /* String is already a Guile string - no conversion needed */
-}
-
-DEFUN ("string-from-scheme", Fstring_from_scheme, Sstring_from_scheme, 1, 1, 0, 0)
-  (Lisp_Object string)
-{
-  char *s;
-  size_t lenp;
-
-  CHECK_STRING (string);
-  s = scm_to_utf8_stringn (string, &lenp);
-  Lisp_Object result = make_string (s, lenp);
-  free (s);
-  return result;
-}
-
 DEFUN ("copy-alist", Fcopy_alist, Scopy_alist, 1, 1, 0,
        doc: /* Return a copy of ALIST.
 This is an alist which represents the same mapping from objects to objects,

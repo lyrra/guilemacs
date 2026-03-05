@@ -1147,9 +1147,6 @@ CDR_SAFE (Lisp_Object c)
   return CONSP (c) ? XCDR (c) : Qnil;
 }
 
-Lisp_Object string_from_scheme (Lisp_Object scheme_string);
-Lisp_Object string_to_scheme (Lisp_Object string);
-
 /* In a string or vector, the sign bit of u.s.size is the gc mark bit.  */
 
 struct Lisp_String

@@ -52,8 +52,6 @@
             eval-elisp
             compile-elisp
             local-eval-elisp
-            %make-lisp-string
-            make-lisp-string
             %debugflag
             debugflag
             set-debugflag!
@@ -231,15 +229,11 @@ toplevel refs via MOD's import chain."
                 ;; If handler returns, with-throw-handler re-raises
                 (handler (cons error-symbol error-data)))))))))
 
-(define make-lisp-string identity)
 (define lisp-string? string?)
 
 (define %lisp-string
   (lambda (str)
     ((module-ref (resolve-module '(emacs-elisp runtime)) 'lisp-string?) str)))
-(define %make-lisp-string
-  (lambda (str)
-    ((module-ref (resolve-module '(emacs-elisp runtime)) 'make-lisp-string) str)))
 ;;; Modules for the binding slots.
 ;;; Note: Naming those value-slot and/or function-slot clashes with the
 ;;; submodules of these names!

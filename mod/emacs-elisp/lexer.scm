@@ -320,8 +320,7 @@
              (case cur
                ((#\")
                 (return 'string
-                        (%make-lisp-string
-                         (list->string (reverse result-chars)))))
+                        (list->string (reverse result-chars))))
                ((#\\)
                 (let ((escaped (read-char port)))
                   (case escaped

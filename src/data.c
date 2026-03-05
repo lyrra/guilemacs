@@ -2624,24 +2624,7 @@ If the base used is not 10, STRING is always parsed as an integer.  */)
   return ((IEEE_FLOATING_POINT ? NILP (val) : !NUMBERP (val))
 	  ? make_fixnum (0) : val);
 }
-Lisp_Object
-string_from_scheme (Lisp_Object scheme_string)
-{
-  emacs_abort ();
-  size_t nbytes;
-  char *c_string = scm_to_utf8_stringn (scheme_string, &nbytes);
-  Lisp_Object result = make_string_from_bytes (c_string,
-                                               scm_c_string_length (scheme_string),
-                                               nbytes);
-  free (c_string);
-  return result;
-}
-Lisp_Object
-string_to_scheme (Lisp_Object string)
-{
-  return string;  /* String is already a Guile string - no conversion needed */
-}
-
+
 /* Because we round up the bool vector allocate size to word_size
    units, we can safely read past the "end" of the vector in the
    operations below.  These extra bits are always zero.  */

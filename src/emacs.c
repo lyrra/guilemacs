@@ -1021,16 +1021,6 @@ void load_guile_prelude ()
   emacs_abort ();
 }
 
-void
-install_emacs_strings ()
-{
-    SCM module = scm_c_resolve_module ("emacs-elisp runtime");
-    scm_c_module_define (module, "make-lisp-string",
-                         scm_c_make_gsubr ("make-lisp-string", 1, 0, 0,
-                                           string_from_scheme));
-    /* HOISTED TO SCHEME: stringp is now defined in prelude/load.scm */
-}
-
 Lisp_Object xsymbol_fn;
 Lisp_Object symbol_function_fn;
 
@@ -1637,10 +1627,6 @@ main2 (void *ignore, int argc, char **argv)
 
   if (!initialized)
     {
-      /* scm_c_module_define (scm_c_resolve_module ("emacs-elisp lexer"), */
-      /*                      "make-lisp-string", */
-      /*                      scm_c_make_gsubr ("make-lisp-string", 1, 0, 0, */
-      /*                                        string_from_scheme)); */
       (void *) scm_c_resolve_module ("emacs-elisp spec");
       symbol_module = scm_c_resolve_module ("elisp-symbols");
       function_module = scm_c_resolve_module ("elisp-functions");
@@ -1648,8 +1634,6 @@ main2 (void *ignore, int argc, char **argv)
       scm_set_current_module (scm_c_resolve_module ("guile-user"));
 
       init_alloc_once ();
-
-      //install_emacs_strings ();
 
       xsymbol_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-desc");
       symbol_function_fn = scm_c_public_ref ("emacs-elisp runtime", "symbol-function");
