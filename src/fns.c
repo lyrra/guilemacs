@@ -149,7 +149,7 @@ efficient.  */)
     val = MAX_CHAR;
   else if (BOOL_VECTOR_P (sequence))
     val = bool_vector_size (sequence);
-  else if (CLOSUREP (sequence) || RECORDP (sequence))
+  else if (RECORDP (sequence))
     val = PVSIZE (sequence);
   else
     wrong_type_argument (Qsequencep, sequence);
@@ -1052,7 +1052,7 @@ concat_to_list (ptrdiff_t nargs, Lisp_Object *args, Lisp_Object last_tail)
 	      last = node;
 	    }
 	}
-      else if (VECTOR_OR_PSEUDOVECTORP (arg) || CLOSUREP (arg))
+      else if (VECTOR_OR_PSEUDOVECTORP (arg))
 	{
 	  ptrdiff_t arglen = XFIXNUM (Flength (arg));
 
@@ -1089,7 +1089,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
     {
       Lisp_Object arg = args[i];
       if (!((VECTOR_OR_PSEUDOVECTORP (arg)) || CONSP (arg) || NILP (arg) || STRINGP (arg)
-            || BOOL_VECTOR_P (arg) || CLOSUREP (arg)))
+            || BOOL_VECTOR_P (arg)))
         wrong_type_argument (Qsequencep, arg);
       EMACS_INT len = XFIXNAT (Flength (arg));
       result_len += len;
@@ -1154,10 +1154,7 @@ concat_to_vector (ptrdiff_t nargs, Lisp_Object *args)
 	}
       else
 	{
-	  eassert (CLOSUREP (arg));
-	  ptrdiff_t size = PVSIZE (arg);
-	  for (ptrdiff_t j = 0; j < size; j++)
-	    GASET (result, dst_idx++, AREF (arg, j));
+          emacs_abort(); // was a closurep
 	}
     }
   eassert (dst_idx == result_len);
@@ -2775,7 +2772,7 @@ vectorlike_equal_p (SCM o1, SCM o2)
   if (size & PSEUDOVECTOR_FLAG)
     {
       if (((size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS)
-          < PVEC_CLOSURE)
+          < PVEC_CHAR_TABLE)
         return SCM_BOOL_F;
       size &= PSEUDOVECTOR_SIZE_MASK;
     }
@@ -3172,7 +3169,7 @@ mapcar1 (EMACS_INT leni, Lisp_Object *vals, Lisp_Object fn, Lisp_Object seq)
 	  tail = XCDR (tail);
 	}
     }
-  else if (VECTOR_OR_PSEUDOVECTORP (seq) || CLOSUREP (seq))
+  else if (VECTOR_OR_PSEUDOVECTORP (seq))
     {
       for (ptrdiff_t i = 0; i < leni; i++)
 	{

@@ -739,7 +739,6 @@ enum pvec_type
   PVEC_SQLITE,
 
   /* These should be last, for internal_equal and sxhash_obj.  */
-  PVEC_CLOSURE,
   PVEC_CHAR_TABLE,
   PVEC_SUB_CHAR_TABLE,
   PVEC_RECORD,
@@ -2876,18 +2875,6 @@ INLINE bool
 #define IEEE_FLOATING_POINT (FLT_RADIX == 2 && FLT_MANT_DIG == 24 \
 			     && FLT_MIN_EXP == -125 && FLT_MAX_EXP == 128)
 
-/* Meanings of slots in a Lisp_Closure:  */
-
-enum Lisp_Closure
-  {
-    CLOSURE_ARGLIST = 0,
-    CLOSURE_CODE = 1,
-    CLOSURE_CONSTANTS = 2,
-    CLOSURE_STACK_DEPTH = 3,
-    CLOSURE_DOC_STRING = 4,
-    CLOSURE_INTERACTIVE = 5
-  };
-
 /* Flag bits in a character.  These also get used in termhooks.h.
    Emacs needs 22 bits for the character value itself, see MAX_CHAR,
    so we shouldn't use any bits lower than 0x0400000.  */
@@ -2954,12 +2941,6 @@ INLINE bool
 WINDOW_CONFIGURATIONP (Lisp_Object a)
 {
   return PSEUDOVECTORP (a, PVEC_WINDOW_CONFIGURATION);
-}
-
-INLINE bool
-CLOSUREP (Lisp_Object a)
-{
-  return PSEUDOVECTORP (a, PVEC_CLOSURE);
 }
 
 INLINE bool

@@ -110,6 +110,8 @@
        ,@body
        ,temp)))
 
+(defun closurep (x) nil) ; dummy interpreter-closure doesn't exist
+
 (defun interactive (&optional arg)
   nil)
 

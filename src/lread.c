@@ -2032,7 +2032,7 @@ substitute_object_recurse (struct subst *subst, Lisp_Object subtree)
 	if (BOOL_VECTOR_P (subtree))
 	  return subtree;		/* No sub-objects anyway.  */
 	else if (CHAR_TABLE_P (subtree) || SUB_CHAR_TABLE_P (subtree)
-		 || CLOSUREP (subtree) || HASH_TABLE_P (subtree)
+		 || HASH_TABLE_P (subtree)
 		 || RECORDP (subtree))
 	  length = PVSIZE (subtree);
 	else if (PLAIN_VECTORP (subtree))

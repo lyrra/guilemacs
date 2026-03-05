@@ -213,104 +213,6 @@ prog_ignore (Lisp_Object body)
   Fprogn (body);
 }
 
-DEFUN ("make-interpreted-closure", Fmake_interpreted_closure,
-       Smake_interpreted_closure, 3, 5, 0,
-       doc: /* Make an interpreted closure.
-ARGS should be the list of formal arguments.
-BODY should be a non-empty list of forms.
-ENV should be a lexical environment, like the second argument of `eval'.
-IFORM if non-nil should be of the form (interactive ...).  */)
-  (Lisp_Object args, Lisp_Object body, Lisp_Object env,
-   Lisp_Object docstring, Lisp_Object iform)
-{
-  Lisp_Object ifcdr, value, slots[6];
-
-  CHECK_CONS (body);          /* Make sure it's not confused with byte-code! */
-  CHECK_LIST (args);
-  CHECK_LIST (iform);
-  ifcdr = CDR (iform);
-  if (NILP (CDR (ifcdr)))
-    value = CAR (ifcdr);
-  else
-    value = CALLN (Fvector, XCAR (ifcdr), XCDR (ifcdr));
-  slots[0] = args;
-  slots[1] = body;
-  slots[2] = env;
-  slots[3] = Qnil;
-  slots[4] = docstring;
-  slots[5] = value;
-  /* Adjusting the size is indispensable since, as for byte-code objects,
-     we distinguish interactive functions by the presence or absence of the
-     iform slot.  */
-  Lisp_Object val
-    = Fvector (!NILP (iform) ? 6 : !NILP (docstring) ? 5 : 3, slots);
-  XSETPVECTYPE (XVECTOR (val), PVEC_CLOSURE);
-  return val;
-}
-
-Lisp_Object
-Ffunction (Lisp_Object args)
-{
-  Lisp_Object quoted = XCAR (args);
-
-  if (!NILP (XCDR (args)))
-    xsignal2 (Qwrong_number_of_arguments, Qfunction, Flength (args));
-
-  if (CONSP (quoted)
-      && EQ (XCAR (quoted), Qlambda))
-    { /* This is a lambda expression within a lexical environment;
-	 return an interpreted closure instead of a simple lambda.  */
-      Lisp_Object cdr = XCDR (quoted);
-      Lisp_Object args = Fcar (cdr);
-      cdr = Fcdr (cdr);
-      Lisp_Object docstring = Qnil, iform = Qnil;
-      if (CONSP (cdr))
-        {
-          docstring = XCAR (cdr);
-          if (STRINGP (docstring))
-            {
-              Lisp_Object tmp = XCDR (cdr);
-              if (!NILP (tmp))
-                cdr = tmp;
-              else     /* It's not a docstring, it's a return value.  */
-                docstring = Qnil;
-            }
-          /* Handle the special (:documentation <form>) to build the docstring
-	     dynamically.  */
-          else if (CONSP (docstring)
-                   && EQ (QCdocumentation, XCAR (docstring))
-                   && (docstring = eval_sub (Fcar (XCDR (docstring))),
-                       true))
-            cdr = XCDR (cdr);
-          else
-            docstring = Qnil;   /* Not a docstring after all.  */
-        }
-      if (CONSP (cdr))
-        {
-          iform = XCAR (cdr);
-          if (CONSP (iform)
-              && EQ (Qinteractive, XCAR (iform)))
-            cdr = XCDR (cdr);
-          else
-            iform = Qnil;   /* Not an interactive-form after all.  */
-        }
-      if (NILP (cdr))
-        cdr = Fcons (Qnil, Qnil); /* Make sure the body is never empty! */
-
-      if (NILP (Vinternal_interpreter_environment)
-          || NILP (Vinternal_make_interpreted_closure_function))
-        return Fmake_interpreted_closure
-            (args, cdr, Vinternal_interpreter_environment, docstring, iform);
-      else
-        return call5 (Vinternal_make_interpreted_closure_function,
-                      args, cdr, Vinternal_interpreter_environment,
-                      docstring, iform);
-    }
-  else
-    /* Simply quote the argument.  */
-    return quoted;
-}
-
 DEFUN ("defvaralias", Fdefvaralias, Sdefvaralias, 2, 3, 0,
        doc: /* Make NEW-ALIAS a variable alias for symbol BASE-VARIABLE.
 Aliased variables always have the same value; setting one sets the other.
@@ -1317,21 +1219,6 @@ then strings and vectors are not accepted.  */)
                                    scm_procedure_properties (fun)))
             ? Qt : Qnil);
 
-  /* Bytecode objects are interactive if they are long enough to
-     have an element whose index is CLOSURE_INTERACTIVE, which is
-     where the interactive spec is stored.  */
-  else if (CLOSUREP (fun))
-    {
-      if (PVSIZE (fun) > CLOSURE_INTERACTIVE)
-        return Qt;
-      else if (PVSIZE (fun) > CLOSURE_DOC_STRING)
-        {
-          Lisp_Object doc = AREF (fun, CLOSURE_DOC_STRING);
-          /* An invalid "docstring" is a sign that we have an OClosure.  */
-          genfun = !(NILP (doc) || VALID_DOCSTRING_P (doc));
-        }
-    }
-
 #ifdef HAVE_MODULES
   /* Module functions are interactive if their `interactive_form'
      field is non-nil. */
@@ -1960,7 +1847,7 @@ FUNCTIONP (Lisp_Object object)
 
   if (scm_is_true (scm_procedure_p (object)))
     return 1;
-  else if (CLOSUREP (object) || MODULE_FUNCTIONP (object))
+  else if (MODULE_FUNCTIONP (object))
     return true;
   else if (CONSP (object))
     {
@@ -2072,8 +1959,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
                           NULL, NULL);
     }
 
-  else if (CLOSUREP (fun)
-	   || NATIVE_COMP_FUNCTION_DYNP (fun)
+  else if (NATIVE_COMP_FUNCTION_DYNP (fun)
 	   || MODULE_FUNCTIONP (fun))
     return funcall_lambda (fun, numargs, args);
   else
@@ -2335,8 +2221,6 @@ function with `&rest' args, or `unevalled' for a special form.  */)
   if (CONSP (function) && EQ (XCAR (function), Qmacro))
     function = XCDR (function);
 
-  else if (CLOSUREP (function))
-    result = lambda_arity (function);
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (function))
     result = module_function_arity (XMODULE_FUNCTION (function));
@@ -2391,12 +2275,6 @@ lambda_arity (Lisp_Object fun)
 	syms_left = XCAR (syms_left);
       else
 	xsignal1 (Qinvalid_function, fun);
-    }
-  else if (CLOSUREP (fun))
-    {
-      syms_left = AREF (fun, CLOSURE_ARGLIST);
-      //if (FIXNUMP (syms_left))
-      //  return get_byte_code_arity (syms_left);
     }
   else
     emacs_abort ();

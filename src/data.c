@@ -239,9 +239,6 @@ a fixed set of types.  */)
         case PVEC_WINDOW_CONFIGURATION: return Qwindow_configuration;
         case PVEC_PROCESS: return Qprocess;
         case PVEC_WINDOW: return Qwindow;
-        case PVEC_CLOSURE:
-          return CONSP (AREF (object, CLOSURE_CODE))
-                 ? Qinterpreted_function : Qbyte_code_function;
         case PVEC_BUFFER: return Qbuffer;
         case PVEC_CHAR_TABLE: return Qchar_table;
         case PVEC_BOOL_VECTOR: return Qbool_vector;
@@ -466,23 +463,11 @@ See also `primitive-function-p' and `native-comp-function-p'.  */)
   return Qnil;
 }
 
-DEFUN ("closurep", Fclosurep, Sclosurep,
-       1, 1, 0,
-       doc: /* Return t if OBJECT is a function of type `closure'.  */)
-  (Lisp_Object object)
-{
-  if (CLOSUREP (object))
-    return Qt;
-  return Qnil;
-}
-
 DEFUN ("byte-code-function-p", Fbyte_code_function_p, Sbyte_code_function_p,
        1, 1, 0,
        doc: /* Return t if OBJECT is a byte-compiled function object.  */)
   (Lisp_Object object)
 {
-  if (CLOSUREP (object) && STRINGP (AREF (object, CLOSURE_CODE)))
-    return Qt;
   return Qnil;
 }
 
@@ -491,8 +476,6 @@ DEFUN ("interpreted-function-p", Finterpreted_function_p,
        doc: /* Return t if OBJECT is a function of type `interpreted-function'.  */)
   (Lisp_Object object)
 {
-  if (CLOSUREP (object) && CONSP (AREF (object, CLOSURE_CODE)))
-    return Qt;
   return Qnil;
 }
 
@@ -880,12 +863,7 @@ Value, if non-nil, is a list (interactive SPEC).  */)
 	fun = Fsymbol_function (fun);
     }
 
-  if (CLOSUREP (fun))
-    {
-      if ((ASIZE (fun) & PSEUDOVECTOR_SIZE_MASK) > CLOSURE_INTERACTIVE)
-	return list2 (Qinteractive, AREF (fun, CLOSURE_INTERACTIVE));
-    }
-  else if (scm_is_true (scm_procedure_p (fun)))
+  if (scm_is_true (scm_procedure_p (fun)))
     {
       Lisp_Object tem = scm_assq (Qinteractive_form,
                                   scm_procedure_properties (fun));
@@ -950,18 +928,6 @@ The value, if non-nil, is a list of mode name symbols.  */)
   if (scm_is_true (scm_procedure_p (fun)))
     {
       return Qnil;
-    }
-  else if (CLOSUREP (fun))
-    {
-      if (PVSIZE (fun) <= CLOSURE_INTERACTIVE)
-	return Qnil;
-      Lisp_Object form = AREF (fun, CLOSURE_INTERACTIVE);
-      if (VECTOR_OR_PSEUDOVECTORP (form))
-	/* New form -- the second element is the command modes. */
-	return AREF (form, 1);
-      else
-	/* Old .elc file -- no command modes. */
-	return Qnil;
     }
 #ifdef HAVE_MODULES
   else if (MODULE_FUNCTIONP (fun))
@@ -2282,7 +2248,7 @@ or a byte-code object.  IDX starts at 0.  */)
   else
     {
       ptrdiff_t size;
-      if (CLOSUREP (array) || RECORDP (array))
+      if (RECORDP (array))
 	size = PVSIZE (array);
       else if (PLAIN_VECTORP (array))
 	size = ASIZE (array);
