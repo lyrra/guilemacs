@@ -1053,41 +1053,10 @@ android_emacs_init (int argc, char **argv, char *dump_file)
   scm_boot_guile (argc, argv, main2, NULL);
 }
 
-/* Forward declaration for elisp_read_from_port function from lread.c */
-extern Lisp_Object elisp_read_from_port (Lisp_Object);
-extern Lisp_Object elisp_read_integer_from_c (Lisp_Object, Lisp_Object);
-
-static Lisp_Object
-elisp_nil (void) {
-  return Qnil;
-}
-
-static Lisp_Object
-elisp_t (void) {
-  return Qt;
-}
-
-static void
-guilemacs_init (void *_)
-{
-  scm_c_define_gsubr ("elisp-nil", 0, 0, 0, elisp_nil);
-  scm_c_export ("elisp-nil", NULL);
-
-  scm_c_define_gsubr ("elisp-t", 0, 0, 0, elisp_t);
-  scm_c_export ("elisp-t", NULL);
-
-  scm_c_define_gsubr ("check-number-coerce-marker", 1, 0, 0, check_number_coerce_marker);
-  scm_c_export ("check-number-coerce-marker", NULL);
-
-  scm_c_define_gsubr ("elisp-read-from-port", 1, 0, 0, elisp_read_from_port);
-  scm_c_export ("elisp-read-from-port", NULL);
-}
-
 /* ARGSUSED */
 static int
 main2 (void *ignore, int argc, char **argv)
 {
-  scm_c_define_module ("language elisp emacs", guilemacs_init, NULL);
   load_guile_prelude ();
 
   int old_argc;

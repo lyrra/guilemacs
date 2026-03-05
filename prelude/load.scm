@@ -96,8 +96,7 @@
              (system base language)
              (ice-9 ftw)  ; for stat etc.
              (emacs-elisp runtime)
-             (emacs-elisp compile-tree-il)
-             (language elisp emacs))
+             (emacs-elisp compile-tree-il))
 
 ;; Map Emacs-specific encodings to Guile-compatible ones
 ;; Guile doesn't recognize "UTF-8-EMACS" but it's essentially UTF-8
