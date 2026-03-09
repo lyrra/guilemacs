@@ -29,6 +29,7 @@
 ;;; Code:
 
 (eval-when-compile
+  (require 'gv)
   (require 'pcase)
   (require 'easy-mmode)) ; For `define-minor-mode'.
 
