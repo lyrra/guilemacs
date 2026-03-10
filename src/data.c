@@ -244,7 +244,6 @@ a fixed set of types.  */)
     {
       switch (PSEUDOVECTOR_TYPE (XVECTOR (object)))
         {
-        case PVEC_NORMAL_VECTOR: return Qvector;
 	case PVEC_MARKER: return Qmarker;
 	case PVEC_OVERLAY: return Qoverlay;
 	case PVEC_FINALIZER: return Qfinalizer;

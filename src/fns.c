@@ -2911,21 +2911,6 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	  if (ta == tb)
 	    switch (ta)
 	      {
-	      case PVEC_NORMAL_VECTOR:
-		{
-		  ptrdiff_t len_a = ASIZE (a);
-		  ptrdiff_t len_b = ASIZE (b);
-		  ptrdiff_t len_min = min (len_a, len_b);
-		  for (ptrdiff_t i = 0; i < len_min; i++)
-		    {
-		      int cmp = value_cmp (AREF (a, i), AREF (b, i),
-					   maxdepth - 1);
-		      if (cmp != 0)
-			return cmp;
-		    }
-		  return len_a < len_b ? -1 : len_a > len_b;
-		}
-
 	      case PVEC_BOOL_VECTOR:
 		return bool_vector_cmp (a, b);
 

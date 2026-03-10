@@ -73,7 +73,6 @@ class Lisp_Object:
         "PVEC_CHAR_TABLE": "struct Lisp_Vector",
         "PVEC_SUB_CHAR_TABLE": "struct Lisp_Sub_Char_Table",
         "PVEC_FONT": "struct font",
-        "PVEC_NORMAL_VECTOR": "struct Lisp_Vector",
         "PVEC_TS_NODE": "struct Lisp_TS_Node",
         "PVEC_TS_PARSER": "struct Lisp_TS_Parser",
         "PVEC_TS_COMPILED_QUERY": "struct Lisp_TS_Query",
@@ -107,7 +106,6 @@ class Lisp_Object:
         self.lisp_type = self.tag_name(self.unsigned
                                        & ((1 << GCTYPEBITS) - 1))
         if self.lisp_type == "Lisp_Vectorlike":
-            self.pvec_type = "PVEC_NORMAL_VECTOR"
             vector = self.get_lisp_pointer("struct Lisp_Vector")
             size = vector.GetValueForExpressionPath("->header.size")
             size = size.GetValueAsUnsigned()

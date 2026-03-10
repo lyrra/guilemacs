@@ -2129,7 +2129,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
       }
 
     /* Types handled earlier.  */
-    case PVEC_NORMAL_VECTOR:
     case PVEC_CHAR_TABLE:
     case PVEC_SUB_CHAR_TABLE:
     case PVEC_HASH_TABLE:
@@ -2633,10 +2632,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
       /* First do all the vectorlike types that have a readable syntax.  */
       switch (PSEUDOVECTOR_TYPE (XVECTOR (obj)))
 	{
-	case PVEC_NORMAL_VECTOR:
-	  print_stack_push_vector ("[", "]", obj, 0, ASIZE (obj),
-				   printcharfun);
-	  goto next_obj;
 	case PVEC_CHAR_TABLE:
 	  print_stack_push_vector ("#^[", "]", obj, 0, PVSIZE (obj),
 				   printcharfun);

@@ -709,7 +709,6 @@ DEFINE_GDB_SYMBOL_END (PSEUDOVECTOR_FLAG)
    with PVEC_TYPE_MASK to indicate the actual type.  */
 enum pvec_type
 {
-  PVEC_NORMAL_VECTOR,	/* Should be first, for sxhash_obj.  */
   PVEC_FREE,
   PVEC_MARKER,
   PVEC_OVERLAY,
@@ -1508,10 +1507,9 @@ PSEUDOVECTOR_TYPE (const struct Lisp_Vector *v)
   ptrdiff_t size = v->header.size;
   return (size & PSEUDOVECTOR_FLAG
           ? (size & PVEC_TYPE_MASK) >> PSEUDOVECTOR_AREA_BITS
-          : PVEC_NORMAL_VECTOR);
+          : emacs_abort ());
 }
 
-/* Can't be used with PVEC_NORMAL_VECTOR.  */
 INLINE bool
 PSEUDOVECTOR_TYPEP (const struct vectorlike_header *a, enum pvec_type code)
 {
