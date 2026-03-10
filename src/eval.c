@@ -1536,13 +1536,6 @@ usage: (multiple-value-call FUNCTION-FORM FORM)  */)
                      values);
   return apply1 (function_form, Fnreverse (values));
 }
-
-DEFUN ("values", Fvalues, Svalues, 0, MANY, 0,
-       doc: /* Return multiple values. */)
-  (ptrdiff_t nargs, Lisp_Object *args)
-{
-  return scm_c_values (args, nargs);
-}
 
 Lisp_Object
 Fapply (ptrdiff_t nargs, Lisp_Object *args)

@@ -119,6 +119,7 @@
 ;; Load core emacs functionallity
 (use-modules (emacs boot))
 (use-modules (emacs bindings))  ;; Binding registry for specpdl replacement
+(use-modules (emacs eval))
 (use-modules (emacs list))
 (use-modules (emacs symbol))
 (use-modules (emacs types))
@@ -142,6 +143,7 @@
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
 (init-bindings-registrations)
+(init-eval-registrations)
 (init-symbol-registrations)
 (init-list-registrations)
 (init-types-registrations)
