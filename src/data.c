@@ -191,6 +191,19 @@ circular_list (Lisp_Object list)
 
 DEFUNWRAP2(Feq, "eq")
 
+DEFUNWRAP1(Frecord_length, "record-length")
+DEFUNWRAP1(Frecord_type, "record-type")
+DEFUNWRAP2(Frecord_ref, "record-ref")
+DEFUNWRAP3(Frecord_set, "record-set")
+DEFUNWRAP1(Frecordp, "recordp")
+DEFUNWRAP1(Frecord_copy, "record-copy")
+DEFUNWRAP1(Frecord_slots, "record-slots")
+bool
+RECORDP (Lisp_Object a)
+{
+  return !NILP (Frecordp (a));
+}
+
 DEFUN ("type-of", Ftype_of, Stype_of, 1, 1, 0,
        doc: /* Return a symbol representing the type of OBJECT.
 The symbol returned names the object's basic type;
@@ -258,15 +271,6 @@ a fixed set of types.  */)
         case PVEC_MUTEX: return Qmutex;
         case PVEC_CONDVAR: return Qcondition_variable;
         case PVEC_TERMINAL: return Qterminal;
-        case PVEC_RECORD:
-          {
-            Lisp_Object t = AREF (object, 0);
-            if (RECORDP (t) && 1 < PVSIZE (t))
-              /* Return the type name field of the class!  */
-              return AREF (t, 1);
-            else
-              return t;
-          }
         case PVEC_MODULE_FUNCTION:
           return Qmodule_function;
 	case PVEC_NATIVE_COMP_UNIT:
@@ -299,7 +303,22 @@ a fixed set of types.  */)
   else if (! NILP (Fsubrp (object)))
     return Qsubr;
   else
-    return Qt;
+    {
+      Lisp_Object x = Frecordp (object);
+      if (! NILP (x))
+        {
+          Lisp_Object t = AREF (object, 0);
+          if ((! NILP (Frecordp (t))) && 1 < XFIXNUM (Frecord_length (t)))
+            {
+              // Return the type name field of the class!
+              return AREF (t, 1);
+            }
+          else
+            return t;
+        }
+      else
+        return Qt;
+    }
 }
 
 DEFUNWRAP1(Flistp, "listp")
@@ -336,17 +355,6 @@ DEFUN ("vectorp", Fvectorp, Svectorp, 1, 1, 0,
   (Lisp_Object object)
 {
   if (VECTOR_OR_PSEUDOVECTORP (object))
-    return Qt;
-  return Qnil;
-}
-
-/* MIGRATED TO GUILE: recordp
-   This function has been moved to prelude/load.scm as elisp-recordp. */
-DEFUN ("recordp", Frecordp, Srecordp, 1, 1, 0,
-       doc: /* Return t if OBJECT is a record.  */)
-  (Lisp_Object object)
-{
-  if (RECORDP (object))
     return Qt;
   return Qnil;
 }
@@ -2245,12 +2253,17 @@ or a byte-code object.  IDX starts at 0.  */)
       CHECK_CHARACTER (idx);
       return CHAR_TABLE_REF (array, idxval);
     }
+  else if (RECORDP (array))
+    {
+      Lisp_Object size = Frecord_length (array);
+      if (idxval < 0 || idxval >= XFIXNUM (size))
+	args_out_of_range (array, idx);
+      return Frecord_ref (array, idx);
+    }
   else
     {
       ptrdiff_t size;
-      if (RECORDP (array))
-	size = PVSIZE (array);
-      else if (PLAIN_VECTORP (array))
+      if (PLAIN_VECTORP (array))
 	size = ASIZE (array);
       else
 	wrong_type_argument (Qarrayp, array);
@@ -2278,9 +2291,10 @@ bool-vector.  IDX starts at 0.  */)
   if (RECORDP (array))
     {
       CHECK_IMPURE (array, XVECTOR (array));
-      if (idxval < 0 || idxval >= PVSIZE (array))
+      Lisp_Object size = Frecord_length (array);
+      if (idxval < 0 || idxval >= XFIXNUM (size))
 	args_out_of_range (array, idx);
-      ASET (array, idxval, newelt);
+      return Frecord_set (array, idx, newelt);
     }
   else if (PLAIN_VECTORP (array))
     {

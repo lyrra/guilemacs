@@ -99,34 +99,6 @@
   (el-expr `(print (symbolp (intern "\"\"")))))
 
 ;; =============================================================================
-;; RECORDP COMPREHENSIVE TESTS
-;; =============================================================================
-
-;; Basic recordp tests (should return nil for now as per implementation)
-(deftest recordp-nil (nil)
-  (el-expr `(print (recordp nil))))
-
-(deftest recordp-symbol (nil)
-  (el-expr `(print (recordp 'test))))
-
-(deftest recordp-vector (nil)
-  (el-expr `(print (recordp "[1 2 3]"))))
-
-(deftest recordp-list (nil)
-  (el-expr `(print (recordp '(1 2 3)))))
-
-(deftest recordp-string (nil)
-  (el-expr `(print (recordp "\"hello\""))))
-
-(deftest recordp-number (nil)
-  (el-expr `(print (recordp 42))))
-
-;; Future record type tests (when records are implemented)
-;; These will need to be updated when record support is added
-(deftest recordp-hash-table (nil)
-  (el-expr `(print (recordp (make-hash-table)))))
-
-;; =============================================================================
 ;; MARKERP COMPREHENSIVE TESTS
 ;; =============================================================================
 

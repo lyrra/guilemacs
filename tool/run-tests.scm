@@ -47,6 +47,7 @@
   "test/pre/stringp.scm"
   "test/pre/string-funs.scm"
   "test/pre/natnump.scm"
+  "test/pre/record.scm"
   "test/pre/integer-or-marker-p.scm"
   "test/pre/number-or-marker-p.scm"
   "test/pre/fns.scm"

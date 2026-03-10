@@ -741,7 +741,6 @@ enum pvec_type
   /* These should be last, for internal_equal and sxhash_obj.  */
   PVEC_CHAR_TABLE,
   PVEC_SUB_CHAR_TABLE,
-  PVEC_RECORD,
   PVEC_EXCURSION,
   PVEC_FONT,
   PVEC_TAG_MAX = PVEC_FONT  /* Keep this equal to the highest member.  */
@@ -1696,6 +1695,14 @@ bool_vector_set (Lisp_Object a, EMACS_INT i, bool b)
     *addr &= ~ (1 << (i % BOOL_VECTOR_BITS_PER_CHAR));
 }
 
+bool RECORDP (Lisp_Object a);
+extern Lisp_Object Frecordp (Lisp_Object);
+extern Lisp_Object Frecord_type (Lisp_Object);
+extern Lisp_Object Frecord_ref (Lisp_Object, Lisp_Object);
+extern Lisp_Object Frecord_set (Lisp_Object, Lisp_Object, Lisp_Object);
+extern Lisp_Object Frecord_copy (Lisp_Object);
+extern Lisp_Object Frecord_slots (Lisp_Object);
+
 /* Conveniences for dealing with Lisp arrays.  */
 
 INLINE Lisp_Object
@@ -1710,6 +1717,10 @@ AREF (Lisp_Object array, ptrdiff_t idx)
   else if (GVECTORP (array))
     {
       return GAREF (array, idx);
+    }
+  else if (RECORDP (array))
+    {
+      return Frecord_ref (array, make_fixnum (idx));
     }
   else
     {
@@ -1744,6 +1755,10 @@ ASET (Lisp_Object array, ptrdiff_t idx, Lisp_Object val)
   else if (GVECTORP (array))
     {
       GASET (array, idx, val);
+    }
+  else if (RECORDP (array))
+    {
+      return Frecord_set (array, make_fixnum (idx), val);
     }
   else
     {
@@ -2114,7 +2129,6 @@ extern Lisp_Object Fset_default_toplevel_value (Lisp_Object);
 extern Lisp_Object Fread_from_string (Lisp_Object, Lisp_Object, Lisp_Object);
 extern Lisp_Object Fread (Lisp_Object);
 extern Lisp_Object Fread_positioning_symbols (Lisp_Object);
-
 
 INLINE Lisp_Object
 SYMBOL_FUNCTION (Lisp_Object sym)
@@ -2947,12 +2961,6 @@ INLINE bool
 FRAMEP (Lisp_Object a)
 {
   return PSEUDOVECTORP (a, PVEC_FRAME);
-}
-
-INLINE bool
-RECORDP (Lisp_Object a)
-{
-  return PSEUDOVECTORP (a, PVEC_RECORD);
 }
 
 INLINE void

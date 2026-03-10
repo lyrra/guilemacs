@@ -72,7 +72,6 @@ class Lisp_Object:
         "PVEC_CLOSURE": "struct Lisp_Vector",
         "PVEC_CHAR_TABLE": "struct Lisp_Vector",
         "PVEC_SUB_CHAR_TABLE": "struct Lisp_Sub_Char_Table",
-        "PVEC_RECORD": "struct Lisp_Vector",
         "PVEC_FONT": "struct font",
         "PVEC_NORMAL_VECTOR": "struct Lisp_Vector",
         "PVEC_TS_NODE": "struct Lisp_TS_Node",

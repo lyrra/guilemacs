@@ -39,7 +39,6 @@
     elisp-hash-table-p
     elisp-integer-or-marker-p
     elisp-mutexp
-    elisp-recordp
     elisp-symbol-with-pos-p
     elisp-threadp
     elisp-user-ptrp
@@ -455,11 +454,6 @@ of strings.  (`equal' ignores text properties.)"
   ;; Mutexes are Emacs-specific, return nil for now
   #nil)
 
-(define (elisp-recordp object)
-  "Return t if OBJECT is a record."
-  ;; Records are Emacs-specific structures, return nil for now
-  #nil)
-
 (define (elisp-symbol-with-pos-p object)
   "Return t if OBJECT is a symbol together with position."
   ;; In Guile implementation, symbols don't have position information
@@ -507,7 +501,6 @@ This is more efficient than string comparison of symbol names."
               (hash-table-p           ,elisp-hash-table-p)
               ;(integer-or-marker-p    ,elisp-integer-or-marker-p)
               (mutexp                 ,elisp-mutexp)
-              (recordp                ,elisp-recordp)
               (symbol-with-pos-p      ,elisp-symbol-with-pos-p)
               (threadp                ,elisp-threadp)
               (user-ptrp              ,elisp-user-ptrp)

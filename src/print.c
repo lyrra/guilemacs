@@ -2130,7 +2130,6 @@ print_vectorlike_unreadable (Lisp_Object obj, Lisp_Object printcharfun,
 
     /* Types handled earlier.  */
     case PVEC_NORMAL_VECTOR:
-    case PVEC_RECORD:
     case PVEC_CHAR_TABLE:
     case PVEC_SUB_CHAR_TABLE:
     case PVEC_HASH_TABLE:
@@ -2599,6 +2598,21 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 
     case Lisp_Other:
       {
+        if (RECORDP (obj))
+          {
+            ptrdiff_t len = XFIXNUM (Frecord_length (obj));
+            Lisp_Object slots = Frecord_slots (obj);
+            print_c_string ("#s(", printcharfun);
+            for (int i = 0; i < len; i++) {
+              if (i > 0)
+                print_c_string (" ", printcharfun);
+              Lisp_Object x = AREF (slots, i);
+              print_object (x, printcharfun, escapeflag);
+            }
+            print_c_string (")", printcharfun);
+            goto next_obj;
+          }
+
         static SCM prefix;
         SCM port = scm_open_output_string ();
         if (SCM_UNLIKELY (!prefix))
@@ -2621,10 +2635,6 @@ print_object (Lisp_Object obj, Lisp_Object printcharfun, bool escapeflag)
 	{
 	case PVEC_NORMAL_VECTOR:
 	  print_stack_push_vector ("[", "]", obj, 0, ASIZE (obj),
-				   printcharfun);
-	  goto next_obj;
-	case PVEC_RECORD:
-	  print_stack_push_vector ("#s(", ")", obj, 0, PVSIZE (obj),
 				   printcharfun);
 	  goto next_obj;
 	case PVEC_CHAR_TABLE:

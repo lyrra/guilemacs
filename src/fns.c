@@ -150,7 +150,7 @@ efficient.  */)
   else if (BOOL_VECTOR_P (sequence))
     val = bool_vector_size (sequence);
   else if (RECORDP (sequence))
-    val = PVSIZE (sequence);
+    val = XFIXNUM (Frecord_length (sequence));
   else
     wrong_type_argument (Qsequencep, sequence);
 
@@ -755,15 +755,7 @@ the same empty object instead of its copy.  */)
 
   if (RECORDP (arg))
     {
-      /* FIX-guilemacs: Records are not vectors in guilemacs, removed VECTORP check */
-      ptrdiff_t n = PVSIZE (arg);
-      USE_SAFE_ALLOCA;
-      Lisp_Object *args = SAFE_ALLOCA (n * sizeof *args);
-      for (ptrdiff_t i = 0; i < n; i++)
-        args[i] = AREF (arg, i);
-      Lisp_Object record = Frecord (n, args);
-      SAFE_FREE ();
-      return record;
+      return Frecord_copy (arg);
     }
 
   if (CHAR_TABLE_P (arg))
@@ -2920,15 +2912,9 @@ value_cmp (Lisp_Object a, Lisp_Object b, int maxdepth)
 	    switch (ta)
 	      {
 	      case PVEC_NORMAL_VECTOR:
-	      case PVEC_RECORD:
 		{
 		  ptrdiff_t len_a = ASIZE (a);
 		  ptrdiff_t len_b = ASIZE (b);
-		  if (ta == PVEC_RECORD)
-		    {
-		      len_a &= PSEUDOVECTOR_SIZE_MASK;
-		      len_b &= PSEUDOVECTOR_SIZE_MASK;
-		    }
 		  ptrdiff_t len_min = min (len_a, len_b);
 		  for (ptrdiff_t i = 0; i < len_min; i++)
 		    {
