@@ -2832,13 +2832,6 @@ alist of active lexical bindings.  */);
   staticpro (&Vsignaling_function);
   Vsignaling_function = Qnil;
 
-  staticpro (&Qcatch_all_memory_full);
-  /* Make sure Qcatch_all_memory_full is a unique object.  We could
-     also use something like Fcons (Qnil, Qnil), but json.c treats any
-     cons cell as error data, so use an uninterned symbol instead.  */
-  Qcatch_all_memory_full
-    = Fmake_symbol (build_pure_c_string ("catch-all-memory-full"));
-
   staticpro (&list_of_t);
   list_of_t = list1 (Qt);
 

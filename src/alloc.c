@@ -1182,20 +1182,6 @@ usage: (vector &rest OBJECTS)  */)
 			   Symbol Allocation
  ***********************************************************************/
 
-DEFUN ("make-symbol", Fmake_symbol, Smake_symbol, 1, 1, 0,
-       doc: /* Return a newly allocated uninterned symbol whose name is NAME.
-Its value is void, and its function definition and property list are nil.  */)
-  (Lisp_Object name)
-{
-  Lisp_Object val;
-  CHECK_STRING (name);
-
-  val = scm_make_symbol (name);
-  return val;
-}
-
-
-
 Lisp_Object
 make_misc_ptr (void *a)
 {
