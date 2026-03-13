@@ -34,11 +34,6 @@ top_builddir = @top_builddir@
 abs_top_srcdir=@abs_top_srcdir@
 VPATH = $(srcdir)
 
-# Set these to 'not-set' when they are not set from top-level to please
-# 'load--fixup-all-elns' (bug#70842).
-ELN_DESTDIR=not-set
-BIN_DESTDIR=not-set
-
 # This is not empty if this is a Makefile that will be copied to
 # cross/src.
 XCONFIGURE = @XCONFIGURE@
@@ -76,8 +71,6 @@ lwlibdir = ../lwlib
 
 # Configuration files for .o files to depend on.
 config_h = config.h $(srcdir)/conf_post.h
-
-HAVE_NATIVE_COMP = @HAVE_NATIVE_COMP@
 
 ## ns-app if NS self contained app, else empty.
 OTHER_FILES = @OTHER_FILES@
@@ -520,9 +513,6 @@ all: emacs$(EXEEXT) $(OTHER_FILES)
 else
 all: Emacs $(OTHER_FILES)
 endif
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
-all: ../native-lisp
-endif
 .PHONY: all
 
 AUTO_DEPEND = @AUTO_DEPEND@
@@ -826,59 +816,6 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 .PHONY: tags
-
-ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
-## The following rules are used only when building a source tarball
-## for the first time, when the native-lisp/ directory doesn't yet
-## exist and needs to be created and populated with the preloaded
-## *.eln files.
-
-## List of *.eln files we need to produce in addition to the preloaded
-## ones in $(lisp).
-elnlisp := \
-	emacs-lisp/byte-opt.eln \
-	emacs-lisp/bytecomp.eln \
-	emacs-lisp/cconv.eln \
-	international/charscript.eln \
-	emacs-lisp/comp.eln \
-	emacs-lisp/comp-cstr.eln \
-	emacs-lisp/comp-common.eln \
-	emacs-lisp/comp-run.eln \
-	international/emoji-zwj.eln
-elnlisp := $(addprefix ${lispsource}/,${elnlisp}) $(lisp:.elc=.eln)
-
-%.eln: %.el | emacs$(EXEEXT)
-	@$(MAKE) $(AM_V_NO_PD) -C ../lisp EMACS="../src/emacs$(EXEEXT)"\
-		THEFILE=$< $<n
-
-## FIXME: this is fragile!  We lie to Make about the files produced by
-## this rule, and we rely on the absence of the native-lisp directory
-## to trigger it.  This means that if anything goes wrong during
-## native compilation, the only way to trigger it again is to remove
-## the directory and re-native-compile everything.  The main
-## underlying problem is that the name of the subdirectory of
-## native-lisp where the *.eln files will be produced, and the exact
-## names of those *.eln files, cannot be known in advance; we must ask
-## Emacs to produce them.
-## If AOT native compilation is requested, we additionally
-## native-compile all the *.el files in ../lisp that need to be
-## compiled and haven't yet been compiled.  ELDONE holds the list
-## of *.el files that were already native-compiled.
-NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
-../native-lisp:
-	@if test ! -d $@; then \
-	  mkdir $@ && $(MAKE) $(AM_V_NO_PD) $(elnlisp); \
-	  if test $(SYSTEM_TYPE) = cygwin; then \
-	    find $@ -name '*.eln' | rebase -v -O -T -; \
-	  fi; \
-	  LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) -l loadup \
-		--bin-dest '$(BIN_DESTDIR)' --eln-dest '$(ELN_DESTDIR)' \
-	  && cp -f emacs$(EXEEXT) \
-	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
-	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot EMACS="../src/emacs$(EXEEXT)" ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
-	  fi; \
-	fi
-endif
 
 ifneq ($(XCONFIGURE),android)
 $(lispsource)/loaddefs.el: | temacs$(EXEEXT)
