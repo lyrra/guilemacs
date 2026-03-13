@@ -377,7 +377,7 @@
 
  ))
 
-(define %emacs-exec "../src/bootstrap-emacs")
+(define %emacs-exec "../src/temacs")
 
 ;; keep track manually of which tests are expensive or unstable
 (define %skipped-tests '(

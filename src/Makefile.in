@@ -413,8 +413,6 @@ DO_CODESIGN=$(patsubst aarch64-apple-darwin%,yes,@configuration@)
 
 -include ${top_builddir}/src/verbose.mk
 
-bootstrap_exe = ../src/bootstrap-emacs$(EXEEXT)
-
 GUILE_SNARF=@GUILE_SNARF@
 
 # Flags that might be in WARN_CFLAGS but are not valid for Objective C.
@@ -603,13 +601,13 @@ LIBES = $(LIBS) $(GUILE_LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BA
    $(ANDROID_LIBS)
 
 ## FORCE it so that admin/unidata can decide whether this file is
-## up-to-date.  Although since charprop depends on bootstrap-emacs,
+## up-to-date.  Although since charprop depends on emacs,
 ## and emacs depends on charprop, in practice this rule was always run
 ## anyway.
 ifneq ($(XCONFIGURE),android)
 $(lispsource)/international/charprop.el: \
-  FORCE | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	$(MAKE) -C ../admin/unidata all EMACS="../$(bootstrap_exe)"
+  FORCE | ../src/temacs$(EXEEXT) $(bootstrap_pdmp)
+	$(MAKE) -C ../admin/unidata all EMACS="../src/temacs$(EXEEXT)"
 endif
 
 ## We require charprop.el to exist before ucs-normalize.el is
@@ -638,14 +636,12 @@ ${lispintdir}/characters.elc: ${charscript:.el=.elc} ${emoji-zwj:.el=.elc}
 
 SYSTEM_TYPE = @SYSTEM_TYPE@
 
-## The dumped Emacs is as functional and more efficient than
-## bootstrap-emacs, so we replace the latter with the former.
 ## Strictly speaking, emacs does not depend directly on all of $lisp,
 ## since not all pieces are used on all platforms.  But DOC depends
 ## on all of $lisp, and emacs depends on DOC, so it is ok to use $lisp here.
 emacs$(EXEEXT): temacs$(EXEEXT) \
-                $(abs_top_builddir)/src/lisp.mk $(lisp) \
-                $(lispsource)/international/charprop.el ${charsets}
+                $(abs_top_builddir)/src/lisp.mk $(lisp)
+	$(MAKE) -C ../lisp update-subdirs
 ifeq ($(SYSTEM_TYPE),cygwin)
 	find ${top_builddir} -name '*.eln' | rebase -v -O -T -
 endif
@@ -654,7 +650,6 @@ ifeq ($(DUMPING),unexec)
   ifneq ($(PAXCTL_dumped),)
 	      $(PAXCTL_dumped) emacs$(EXEEXT)
   endif
-	cp -f $@ bootstrap-emacs$(EXEEXT)
 else
 	rm -f $@ && cp -f temacs$(EXEEXT) $@
 endif
@@ -727,6 +722,7 @@ else
 	  $(ALLOBJS) $(LIBEGNU_ARCHIVE) $(W32_RES_LINK) $(LIBES)
 endif
 	$(AM_V_at)mv $@.tmp $@
+	cp $@ emacs${EXEEXT}
 	$(MKDIR_P) $(etc)
 
 ifeq ($(XCONFIGURE),android)
@@ -793,7 +789,7 @@ emacs.res: FORCE
 ns-app: emacs$(EXEEXT) $(pdmp)
 	$(MAKE) -C ../nextstep all
 
-.PHONY: mostlyclean clean bootstrap-clean distclean maintainer-clean
+.PHONY: mostlyclean clean distclean maintainer-clean
 .PHONY: versionclean
 
 mostlyclean:
@@ -803,7 +799,7 @@ mostlyclean:
 	rm -f emacs.pdmp
 	rm -f *.x
 	rm -f ../etc/DOC
-	rm -f bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
+	rm -f $(bootstrap_pdmp)
 	rm -f emacs-$(version)$(EXEEXT)
 	rm -f buildobj.h
 	rm -f globals.h gl-stamp
@@ -814,18 +810,7 @@ versionclean:
 clean: mostlyclean versionclean
 	rm -f $(DEPDIR)/*
 
-## bootstrap-clean is used to clean up just before a bootstrap.
-## It should remove all files generated during a compilation/bootstrap,
-## but not things like config.status or TAGS.
-bootstrap-clean: clean
-	rm -f emacs-module.h epaths.h config.h config.stamp
-	if test -f ./.gdbinit; then \
-	  mv ./.gdbinit ./.gdbinit.save; \
-	  if test -f "$(srcdir)/.gdbinit"; then rm -f ./.gdbinit.save; \
-	  else mv ./.gdbinit.save ./.gdbinit; fi; \
-	fi
-
-distclean: bootstrap-clean
+distclean:
 	rm -f Makefile lisp.mk verbose.mk
 	rm -fr $(DEPDIR)
 
@@ -867,31 +852,6 @@ TAGS: ${ETAGS} $(ctagsfiles1) $(ctagsfiles2)
 
 tags: TAGS ../lisp/TAGS $(lwlibdir)/TAGS $(lib)/TAGS
 .PHONY: tags
-
-
-### Bootstrapping.
-
-## Bootstrapping right is difficult because of the circular dependencies.
-## Furthermore, we have to deal with the fact that many compilation targets
-## such as loaddefs.el or *.elc can typically be produced by any old
-## Emacs executable, so we would like to avoid rebuilding them whenever
-## we build a new Emacs executable.
-##
-## (In other words, changing a single file src/foo.c would force
-## dumping a new bootstrap-emacs, then re-byte-compiling all preloaded
-## elisp files, and only then dump the actual src/emacs, which is not
-## wrong, but is overkill in 99.99% of the cases.)
-##
-## To solve the circularity, we use 2 different Emacs executables,
-## "emacs" is the main target and "bootstrap-emacs" is the one used
-## to build the *.elc and loaddefs.el files.
-## To solve the freshness issue, in the past we tried various clever tricks,
-## but now that we require GNU make, we can simply specify
-## bootstrap-emacs$(EXEEXT) as an order-only prerequisite.
-##
-## bootstrap-emacs doesn't have to be built when cross-compiling
-## libemacs.so for Android, however, as the Lisp files have already
-## been compiled by the top level `src' Makefile.
 
 ifeq ($(HAVE_NATIVE_COMP):$(NATIVE_DISABLED),yes:)
 ## The following rules are used only when building a source tarball
@@ -939,7 +899,7 @@ NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
 	  fi; \
 	  LC_ALL=C $(RUN_TEMACS) -batch $(BUILD_DETAILS) -l loadup --temacs=pdump \
 		--bin-dest '$(BIN_DESTDIR)' --eln-dest '$(ELN_DESTDIR)' \
-	  && cp -f emacs$(EXEEXT) bootstrap-emacs$(EXEEXT) \
+	  && cp -f emacs$(EXEEXT) \
 	  && cp -f $(pdmp) $(bootstrap_pdmp); \
 	  if test $(NATIVE_COMPILATION_AOT) = yes; then \
 	    $(MAKE) $(AM_V_NO_PD) -C ../lisp compile-eln-aot EMACS="../src/emacs$(EXEEXT)" ELNDONE="$(addprefix %,$(notdir $(elnlisp))))"; \
@@ -948,8 +908,8 @@ NATIVE_COMPILATION_AOT = @NATIVE_COMPILATION_AOT@
 endif
 
 ifneq ($(XCONFIGURE),android)
-$(lispsource)/loaddefs.el: | bootstrap-emacs$(EXEEXT) $(bootstrap_pdmp)
-	$(MAKE) -C ../lisp autoloads EMACS="$(bootstrap_exe)"
+$(lispsource)/loaddefs.el: | temacs$(EXEEXT) $(bootstrap_pdmp)
+	$(MAKE) -C ../lisp autoloads EMACS="../src/emacs$(EXEEXT)"
 endif
 
 ## Dump an Emacs executable named bootstrap-emacs containing the
