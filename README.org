@@ -13,34 +13,20 @@ emacs compatibility.
  This branch of guile-emacs tries to explore a few of the vast plethora of features
  that are possible when the underlying elisp engine is driven by guile.
 
-* News
-
-- guilemacs runs on vanilla guile (brings its own copy of language/elisp)
-- guile can compile elisp files. This is enabled because:
+* Latest News
+** 20260124 guilemacs runs on vanilla guile (brings its own copy of language/elisp)
+** guile can compile elisp files. This is enabled because:
 - all strings are now guile-strings (no more elisp strings)
 - text-properties are hoisted to its own structure (not as a feature of strings)
 - guilemacs is utf-8 only
 - elisp reader is moved to scheme
-- alot of bootstrap unentangling (pcase, gv, cl-struct, oclosure)
-- vectors are moved to scheme
+** alot of bootstrap unentangling (pcase, gv, cl-struct, oclosure)
+** vectors are moved to scheme
 
 * Getting Started
+Since guilemacs is using libguile, guile needs to be configured, compiled and installed.
 
-Since guilemacs is using libguile, guile
- needs to be configured, compiled and installed. And since guilemacs is using
-some extended features of guile, a special flavor of guile is needed.
-
-After guile has been installed, guilemacs can be
- configured and built. It is not necessery to install guilemacs, it's possible
-to run it directly from the source directory (convenient for development).
-
-** Install special flavor of Guile
-
-First, install a version of guile that includes specific Elisp fixes:
-  - Repository: https://codeberg.org/lyrra/guile
-  - Original upstream: https://git.savannah.gnu.org/gitweb/?p=guile.git;a=shortlog;h=refs/heads/wip-elisp-rebased
-
-After that, it is possible to proceed with configuring and building Guilemacs.
+After guile has been installed, guilemacs can be configured and built. It is not necessery to install guilemacs, it's possible to run it directly from the source directory (convenient for development).
 
 ** setup environment variables
 
@@ -977,41 +963,6 @@ by guile-elisp.
     remove the files installed by guile's build system (make install), eg, rm -rf /t/ge/g3, where /t/ge/g3 is the
     path you've used for the "configure --prefix=<PATH>" step in configuring guile.
 
-* History
-The idea of a guile-based emacs, is around 25 years old.
-See https://www.mit.edu/~raeburn/guilemacs/ for some history.
-Also some primordial thoughts https://web.archive.org/web/20000824101731/https://sanpietro.red-bean.com/guile/guile/old/3114.html
-
-Guilemacs is one of those “it should have changed everything, but didn’t” stories — and the reasons are much more social, political, and architectural than technical. In fact, Guilemacs failed despite being a technically superior design.
-
-Guilemacs never became mainstream, and to understand why, we need to connects the dots between Emacs culture, Guile’s design, and the realities of maintaining a 40‑year‑old editor.
-
-Emacs is stuck in the 80's and 90's. Because alot of packages was written in those times
-and relied on quirks.
-Therefore the the Emacs community was deeply conservative about breaking changes.
-
-The maintainers were (understandably) terrified of breaking anything.
-Guilemacs was a big bang change, whereas Emacs prefers incremental changes.
-
-This cultural mismatch alone killed momentum.
-
-Also Guile itself was not stable enough at the time (2010-2015), so Emacs maintainers were reluctant to tie Emacs to a moving target.
-Although Guile is much more mature today — the window of opportunity passed.
-
-** original work
- - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
-   also branch rebased wip-elisp: https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp-rebased
- - Robin's orig repo: https://git.hcoop.net/bpt/guile.git
-
- - Robin's orig emacs repo: https://git.hcoop.net/bpt/emacs.git
-
- - https://lists.gnu.org/archive/html/emacs-devel/2015-10/msg01538.html
-
-  Canonical test cases (tetris, org-mode, dunnet, mixed elisp/guile-scheme evalutation):
-  - https://news.slashdot.org/story/12/04/02/197221/guile-scheme-emacs-lisp-compatibility-matures
-  - http://dustycloud.org/tmp/guile-emacs-20150513.png
-  - http://dustycloud.org/tmp/guilemacs.png
-
 * FAQ
 ** How can I help?
   - testing what currently works:
@@ -1164,9 +1115,31 @@ this could be hoisted to startup
   alist = Fcopy_sequence (alist);
 
 * guilemacs design
-
 * ramblings
+=blow-off-steam-area=
+
 Please read only for amusement. High possibility of wasting your time.
+** History
+The idea of a guile-based emacs, is around 25 years old.
+See https://www.mit.edu/~raeburn/guilemacs/ for some history.
+Also some primordial thoughts https://web.archive.org/web/20000824101731/https://sanpietro.red-bean.com/guile/guile/old/3114.html
+
+Guilemacs is one of those “it should have changed everything, but didn’t” stories — and the reasons are much more social, political, and architectural than technical. In fact, Guilemacs failed despite being a technically superior design.
+
+Guilemacs never became mainstream, and to understand why, we need to connects the dots between Emacs culture, Guile’s design, and the realities of maintaining a 40‑year‑old editor.
+
+Emacs is stuck in the 80's and 90's. Because alot of packages was written in those times
+and relied on quirks.
+Therefore the the Emacs community was deeply conservative about breaking changes.
+
+The maintainers were (understandably) terrified of breaking anything.
+Guilemacs was a big bang change, whereas Emacs prefers incremental changes.
+
+This cultural mismatch alone killed momentum.
+
+Also Guile itself was not stable enough at the time (2010-2015), so Emacs maintainers were reluctant to tie Emacs to a moving target.
+Although Guile is much more mature today — the window of opportunity passed.
+
 ** where are we at 2024
 
   The long-term vision of using Guile as an Elisp engine has eroded
@@ -1271,6 +1244,10 @@ Please read only for amusement. High possibility of wasting your time.
 
   - alot of circular development due to brownian-motion like design. Eg, see d468cf91
 
+** step towards GNU/subjugation
+  [[https://lists.gnu.org/archive/html/emacs-devel/2026-03/msg00809.html][AI will never be accepted]] by GNU which is extremly ironic, given its birth.
+  Today’s Emacs maintenance team lacks [[https://lists.gnu.org/archive/html/emacs-devel/2026-03/msg00425.html][agency]] [[https://lists.gnu.org/archive/html/emacs-devel/2026-03/msg00554.html][(2)]] and [[https://lists.gnu.org/archive/html/emacs-devel/2026-03/msg00533.html][independence]] [[https://lists.gnu.org/archive/html/emacs-devel/2026-03/msg00598.html][(2)]] (ie, corner stones of development freedom) which prevents any kind of substantial development overhaul. By [[https://en.wikipedia.org/wiki/Argument_from_authority][appeal to authority]] they are strictly governed by the GNU project. See [[https://www.fsf.org/blogs/licensing/2026-anthropic-settlement][anthropic lawsuit]] for when relying on authority goes wrong. LLM-based tools have more or less revolutionized software development and are becoming a critical necessity for understanding any sufficiently large codebase. The recent upspringing number of Emacs forks is, in part, an acknowledgement of this.
+
 ** Emacs features that needs to be removed:
    - Emacs intentionally restricts user freedom by not having a proper FFI,
      users are redirected to use C "modules".
@@ -1353,7 +1330,21 @@ Please read only for amusement. High possibility of wasting your time.
     the git rebase "pick-list", is still named same.
   - in magit-revision collapse all files
 
-* AI ramblings
+** original work
+ - branch wip-elisp of https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp
+   also branch rebased wip-elisp: https://git.savannah.gnu.org/cgit/guile.git/log/?h=wip-elisp-rebased
+ - Robin's orig repo: https://git.hcoop.net/bpt/guile.git
+
+ - Robin's orig emacs repo: https://git.hcoop.net/bpt/emacs.git
+
+ - https://lists.gnu.org/archive/html/emacs-devel/2015-10/msg01538.html
+
+  Canonical test cases (tetris, org-mode, dunnet, mixed elisp/guile-scheme evalutation):
+  - https://news.slashdot.org/story/12/04/02/197221/guile-scheme-emacs-lisp-compatibility-matures
+  - http://dustycloud.org/tmp/guile-emacs-20150513.png
+  - http://dustycloud.org/tmp/guilemacs.png
+
+** AI ramblings
   - 20250815
     "The stack trace shows we're deep in Guile VM execution."
   - 20251015
@@ -1364,7 +1355,75 @@ Please read only for amusement. High possibility of wasting your time.
   - https://aartaka.me/guile-optimization
   - https://mail.gnu.org/archive/html/guile-devel/2009-08/msg00206.html
   - fibers https://www.youtube.com/watch?app=desktop&v=7IcI6sl5oBc
-* Latest News
+* News
+** 20250201 Regression tests
+  A regression test program has been written
+  that can both run primordial guile-elisp + emacs-core tests.
+  And also run the full ERT framework suite.
+  This is good news since it makes us more confident in
+  doing more aggressive refactoring.
+** 20240906 load-order: try-completion
+  alot of load-order problems is caused by
+  missing try-completion, that in emacs
+  was in c-core, but in guilemacs is found
+  in `minibuffer.el'. And that file is loaded
+  too late.
+
+** 20240903 use Fcopy_sequence
+  see commit note for [[use an enum to select concat target type]]
+** 20240807
+  merge gone wrong!
+  During a merge conflict resolve, what was merged without conflict made no sense.
+  The function allocate_vectorlike looks butched.
+  - File: alloc.c
+  - head: 3de046c9
+  - old base commit: 7e9f62c0
+  - new base commit: c8431a06
+
+** 20240809
+  rebased from 27.0.50-20191008.
+  rebased beyond introduction of new pdumper
+  went almost smoothly, only:
+  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
+  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
+
+** 20240810
+  emacs-devel partially has:
+  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
+  at commit 10527fca66e39d7067986904161fa33741abcd26
+
+** 20240822
+  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
+  - mapbacktrace is missing, it is used by (seemingly redundant functions)
+  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
+  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
+  it will cause an error that prints backtraces (thought backtraces was broken)!
+  This is seen around 1d43c1854.
+  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
+  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!)
+
+** 20240823
+  - make doesn't exit on failure
+#+BEGIN_SRC
+  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
+  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
+  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
+  Fatal error 11: Segmentation fault
+  Backtrace:
+  ...
+  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
+  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
+  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
+  make[1]: Leaving directory '/t/ge/emacs/src'
+  make: *** [Makefile:409: src] Error 2
+#+END_SRC
+
+** 20240824
+  Freshly built guilemacs with a jit-enabled guile:
+  tag r291-d0fa569b (6bce86b5),
+  has been built from scratch and tested with
+  jit-enabled guile (wip-elisp-rebased 4b9b8277).
+
 ** 20240710
   in git diff 5761a2ecb..da4a31b1b1a
   search-slow-speed has been moved
@@ -1442,72 +1501,3 @@ Please read only for amusement. High possibility of wasting your time.
   probably only partial is needed, ablate testing needed
 
   Test if this is still needed in later rebases
-
-** 20240807
-  merge gone wrong!
-  During a merge conflict resolve, what was merged without conflict made no sense.
-  The function allocate_vectorlike looks butched.
-  - File: alloc.c
-  - head: 3de046c9
-  - old base commit: 7e9f62c0
-  - new base commit: c8431a06
-
-** 20240809
-  rebased from 27.0.50-20191008.
-  rebased beyond introduction of new pdumper
-  went almost smoothly, only:
-  missing malloc/xmalloc conversion in grow_specbind() causing bdwgc to sigsegv
-  due to unknown memory pointer when trying to xprealloc (set header GC_DEBUG).
-
-** 20240810
-  emacs-devel partially has:
-  "restructure read_char quit handling" save_getcjmp/restore_getcjmp
-  at commit 10527fca66e39d7067986904161fa33741abcd26
-
-** 20240822
-  - bb57f527 7467dc4f ge28 recently rebases sigsegvs sometimes during build
-  - mapbacktrace is missing, it is used by (seemingly redundant functions)
-  lisp/subr.el:backtrace-frames and lisp/emacs-lisp/backtrace.el:backtrace-get-frames,
-  if the whole function backtrace-get-frames is elided (just put a quote) and is triggered
-  it will cause an error that prints backtraces (thought backtraces was broken)!
-  This is seen around 1d43c1854.
-  Also, the backtrace commits for guilemacs got butched a while ago.. see earlier rebase.
-  (20240914: at tag r370 (1c99cb07) backtraces from guile ARE printed!)
-
-** 20240823
-  - make doesn't exit on failure
-#+BEGIN_SRC
-  [ ! -f ../../lisp/international/uni-uppercase.el ] || chmod +w ../../lisp/international/uni-uppercase.el
-  "../../src/bootstrap-emacs" -batch --no-site-file --no-site-lisp -L . -l unidata-gen \
-  -f unidata-gen-file ../../lisp/international/uni-uppercase.el .
-  Fatal error 11: Segmentation fault
-  Backtrace:
-  ...
-  make[2]: *** [Makefile:68: ../../lisp/international/uni-uppercase.el] Segmentation fault
-  make[2]: Leaving directory '/t/ge/emacs/admin/unidata'
-  make[1]: *** [Makefile:535: ../lisp/international/charprop.el] Error 2
-  make[1]: Leaving directory '/t/ge/emacs/src'
-  make: *** [Makefile:409: src] Error 2
-#+END_SRC
-
-** 20240824
-  Freshly built guilemacs with a jit-enabled guile:
-  tag r291-d0fa569b (6bce86b5),
-  has been built from scratch and tested with
-  jit-enabled guile (wip-elisp-rebased 4b9b8277).
-
-** 20250201 Regression tests
-  A regression test program has been written
-  that can both run primordial guile-elisp + emacs-core tests.
-  And also run the full ERT framework suite.
-  This is good news since it makes us more confident in
-  doing more aggressive refactoring.
-** 20240906 load-order: try-completion
-  alot of load-order problems is caused by
-  missing try-completion, that in emacs
-  was in c-core, but in guilemacs is found
-  in `minibuffer.el'. And that file is loaded
-  too late.
-
-** 20240903 use Fcopy_sequence
-  see commit note for [[use an enum to select concat target type]]
