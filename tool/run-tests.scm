@@ -100,7 +100,7 @@
    (group "test/lisp/button-tests.el" ) ;; fails
 
 (group
-;;;  "test/lisp/calculator-tests.el"
+  "test/lisp/calculator-tests.el"
   "test/lisp/cedet/cedet-files-tests.el"
   "test/lisp/cedet/semantic-utest-c.el"
   "test/lisp/cedet/semantic/bovine/gcc-tests.el"
@@ -134,7 +134,7 @@
   )
    (group "test/lisp/emacs-lisp/cl-print-tests.el" ) ;; fails
 (group
-;;;  "test/lisp/emacs-lisp/cl-seq-tests.el"
+  "test/lisp/emacs-lisp/cl-seq-tests.el"
   "test/lisp/emacs-lisp/copyright-tests.el"
   "test/lisp/emacs-lisp/derived-tests.el"
 ;;;  "test/lisp/emacs-lisp/easy-mmode-tests.el"
