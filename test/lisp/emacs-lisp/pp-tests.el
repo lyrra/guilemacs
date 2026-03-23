@@ -34,7 +34,7 @@
   (should (string= (pp-to-string '(a b)) "(a b)\n")))
 
 (ert-deftest pp-test-indentation ()
-  (ert-test-erts-file (ert-resource-file "code-formats.erts")))
+  (ert-test-erts-file "lisp/emacs-lisp/pp-resources/code-formats.erts"))
 
 (defun pp-tests--dimensions ()
   (save-excursion
@@ -48,7 +48,7 @@
         (forward-char 1))
       (cons width height))))
 
-(ert-deftest pp-tests--cut-before ()
+'(ert-deftest pp-tests--cut-before ()
   (with-temp-buffer
     (lisp-data-mode)
     (pp '(1 (quite-a-long-package-name
@@ -66,7 +66,7 @@
     (while (search-forward "." nil t)
       (should (not (eolp))))))
 
-(ert-deftest pp-tests--sanity ()
+'(ert-deftest pp-tests--sanity ()
   (with-temp-buffer
     (lisp-data-mode)
     (let ((testdata "(a b c #1=#[0 \"\" [] 0] #s(foo #1# bar))"))

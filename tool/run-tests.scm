@@ -121,12 +121,9 @@
   (group
   "test/lisp/delim-col-tests.el"
   "test/lisp/desktop-tests.el"
-  ;
-  ;
-  ;"test/lisp/elide-head-tests.el"
-  ;
+  "test/lisp/elide-head-tests.el"
   )
-   (group "test/lisp/edmacro-tests.el") ;; fails
+  (group "test/lisp/edmacro-tests.el") ;; fails
   (group
   "test/lisp/emacs-lisp/byte-run-tests.el"
   "test/lisp/emacs-lisp/check-declare-tests.el"
@@ -153,7 +150,7 @@
   ;"test/lisp/emacs-lisp/memory-report-tests.el" ; fails
   )
 (group ;; fails
-;;;  "test/lisp/emacs-lisp/pp-tests.el"
+  "test/lisp/emacs-lisp/pp-tests.el"
 ;;;  "test/lisp/emacs-lisp/range-tests.el"
   "test/lisp/emacs-lisp/regexp-opt-tests.el"
   "test/lisp/emacs-lisp/ring-tests.el"
@@ -183,9 +180,9 @@
   "test/lisp/font-lock-tests.el" ; fails
   )
 (group
-;;;  "test/lisp/format-spec-tests.el"
+  "test/lisp/format-spec-tests.el"
   "test/lisp/hfy-cmap-tests.el"
-;;;  "test/lisp/hi-lock-tests.el"
+  "test/lisp/hi-lock-tests.el"
 ;;;  "test/lisp/htmlfontify-tests.el"
   )
   (group
@@ -204,7 +201,7 @@
   (group
    "test/lisp/isearch-tests.el" ; fails
    "test/lisp/jit-lock-tests.el" ; fails
-   ;"test/lisp/json-tests.el" ; fails
+   "test/lisp/json-tests.el" ; fails
   )
   (group
   "test/lisp/misc-tests.el" ;; fails

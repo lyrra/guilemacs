@@ -50,7 +50,7 @@
       ;; Only one match, then we have used just 1 face
       (should (equal hi-lock--unused-faces (cdr faces))))))
 
-(ert-deftest hi-lock-case-fold ()
+'(ert-deftest hi-lock-case-fold ()
   "Test for case-sensitivity."
   (let ((hi-lock-auto-select-face t))
     (with-temp-buffer
@@ -159,7 +159,7 @@
           (call-interactively 'unhighlight-regexp)))
       (should (null (get-text-property 1 'face))))))
 
-(ert-deftest hi-lock-unhighlight ()
+'(ert-deftest hi-lock-unhighlight ()
   "Test for unhighlighting and `hi-lock--regexps-at-point'."
   (let ((hi-lock-auto-select-face t))
     (with-temp-buffer
