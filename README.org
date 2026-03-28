@@ -697,6 +697,47 @@ Now gdb can hit the real error:
   #6  base64_encode_string_1 (string=0x7fffcc324fc0, line_break=<optimized out>, pad=pad@entry=true, base64url=base64url@entry=false) at fns.c:4091
   #7  0x000000000059a1c7 in Fbase64_encode_string (string=<optimized out>, no_line_break=<optimized out>) at fns.c:4052
 #+END_SRC
+** disassemble
+The scheme module [[mod/emacs/debug.scm][~(emacs debug)~]] contains functions:
+- disassemble-elisp
+  Prints disassembly of an elisp function to stdout.
+  Example us from elisp: ~(disassemble-elisp 'foo)~
+
+- disassemble-elisp-to-string
+  Returns disassembly as a string (useful for capturing output):
+  ~(princ (disassemble-elisp-to-string 'foo))~
+
+- elisp-procedure-info
+  Returns an alist with procedure metadata (useful for programmatic inspection):
+  ~(elisp-procedure-info 'foo)~
+
+*** disassemble-elisp
+Say you have a simple elisp function in ~foo.el~:
+#+BEGIN_SRC lisp
+(defun bar () 'helloworld)
+#+END_SRC
+
+Now from the command line you can disassemble the ~bar~ elisp function:
+#+BEGIN_SRC sh
+src/emacs -Q --batch -l foo.el --eval '(princ (disassemble-elisp-to-string (quote bar)))'
+#+END_SRC
+
+Similarly just disassembling some built in function like ~gensym~ in subr.el:
+#+BEGIN_SRC sh
+src/emacs -Q --batch --eval '(princ (disassemble-elisp-to-string (quote gensym)))'
+#+END_SRC
+
+To get the same disassembly but in s-expr:
+#+BEGIN_SRC sh
+src/emacs -Q --batch -l x.el --eval '(pp (disassemble-elisp-sexp (quote foo)))'
+#+END_SRC
+
+*** elisp-procedure-info
+Note, this can be used on both a function and macro:
+#+BEGIN_SRC sh
+src/emacs -Q --batch --eval '(princ (elisp-procedure-info (quote dotimes)))'
+#+END_SRC
+
 * bugs
 ** faults
 
