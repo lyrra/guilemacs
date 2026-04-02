@@ -24,7 +24,7 @@
 (require 'ert)
 (require 'pcomplete)
 
-'(ert-deftest pcomplete-test-parse-gpg-help ()
+(ert-deftest pcomplete-test-parse-gpg-help ()
   (cl-letf ((pcomplete-from-help (make-hash-table :test #'equal))
             ((symbol-function 'call-process)
              (lambda (&rest _) (insert "\
