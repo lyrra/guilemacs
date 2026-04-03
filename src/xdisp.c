@@ -12545,6 +12545,9 @@ message3_nolog (Lisp_Object m)
      toss it.  */
   else if (INTERACTIVE && sf->glyphs_initialized_p)
     {
+      /* Also log to stderr for debugging during startup.  */
+      message_to_stderr (m);
+
       /* Get the frame containing the mini-buffer
 	 that the selected frame is using.  */
       Lisp_Object mini_window = FRAME_MINIBUF_WINDOW (sf);
