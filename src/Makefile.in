@@ -866,6 +866,7 @@ image.o: image.x
 indent.o: indent.x
 inotify.o: inotify.x
 insdel.o: insdel.x
+json.o: json.x
 keyboard.o: keyboard.x
 keymap.o: keymap.x
 lread.o: lread.x

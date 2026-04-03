@@ -1787,6 +1787,8 @@ usage: (json-parse-buffer &rest args) */)
 void
 syms_of_json (void)
 {
+#include "json.x"
+
   DEFSYM (QCnull, ":null");
   DEFSYM (QCfalse, ":false");
 
