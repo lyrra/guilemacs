@@ -553,6 +553,8 @@ json_out_something (json_out_t *jo, Lisp_Object obj)
     json_out_object_hash (jo, obj);
   else if (PLAIN_VECTORP (obj))
     json_out_array (jo, obj);
+  else if (GVECTORP (obj))
+    json_out_array (jo, obj);
   else if (GUILEBIGNUMP (obj))
     json_out_bignum (jo, obj);
   else
@@ -1452,7 +1454,7 @@ json_parse_array (struct json_parser *parser)
       {
 	size_t number_of_elements
 	  = parser->object_workspace_current - first;
-	result = make_elisp_vector (number_of_elements, Qnil);
+	result = make_nil_vector (number_of_elements);
 	for (size_t i = 0; i < number_of_elements; i++)
 	  {
 	    rarely_quit (i);

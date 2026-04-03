@@ -204,6 +204,9 @@
    "test/lisp/json-tests.el" ; fails
   )
   (group
+   "test/src/json-tests.el"
+   )
+  (group
   "test/lisp/misc-tests.el" ;; fails
   "test/lisp/lpr-tests.el"
   "test/lisp/md4-tests.el"
