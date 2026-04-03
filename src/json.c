@@ -620,6 +620,7 @@ usage: (json-serialize OBJECT &rest ARGS)  */)
   json_out_t jo;
   json_serialize (&jo, args[0], nargs - 1, args + 1);
   Lisp_Object tem = make_unibyte_string (jo.buf, jo.size);
+  dynwind_end ();
   return tem;
 }
 
