@@ -244,6 +244,10 @@
       (((interactive ,x) . ,tail)
        (guard lambda? (not intspec))
        (loop tail decls (cons 'interactive-form x) doc))
+      ;; Handle (:documentation EXPR) form - Emacs 28+ feature for computed docstrings
+      (((#{:documentation}# ,x) . ,tail)
+       (guard lambda? (not doc))
+       (loop tail decls intspec x))
       ((,x . ,tail)
        (guard lambda? (or (string? x) (%lisp-string x)) (not doc) (not (null? tail)))
        (loop tail decls intspec x))

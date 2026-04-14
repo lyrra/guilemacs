@@ -24,6 +24,7 @@
 (define %tests '(
 (group (prelude)
   ;; emacs-elisp -- core language
+  "test/pre/parse.scm"
   "test/pre/dynamic-binding.scm"
   "test/pre/forwarded-binding.scm"
   "test/pre/condition-case.scm"
