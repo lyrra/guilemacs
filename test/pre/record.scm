@@ -31,3 +31,12 @@
   (elfmt `(print (aref (record 's6) 0))))
 (deftest record-aref-1 (0)
   (elfmt `(print (aref (record 's7 0) 1))))
+
+;; aset on record must return the set value (not #<unspecified>)
+;; This was a bug where elisp-record-set! returned unspecified from vector-set!
+(deftest record-aset-returns-value (42)
+  (elfmt `(print (aset (record 's8 0) 1 42))))
+(deftest record-aset-returns-value-symbol (hello)
+  (elfmt `(print (aset (record 's9 nil) 1 'hello))))
+(deftest record-aset-returns-value-string ("test")
+  (elfmt `(print (aset (record 's10 nil) 1 "test"))))

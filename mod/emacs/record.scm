@@ -47,7 +47,8 @@
 (define (elisp-record-set! rec idx val)
   (vector-set! (%elisp-record-accessor-slots rec)
                idx
-               val))
+               val)
+  val)
 
 (define (elisp-record-copy rec)
   (%elisp-record-constructor (%elisp-record-accessor-type rec)
