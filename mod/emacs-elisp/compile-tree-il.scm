@@ -529,16 +529,33 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
           (sanitize-uninterned-symbols (cdr expr) replacements)))
    (else expr)))
 
+(define %uninterned-rename-counter 0)
+
 (define (find-uninterned-symbols expr)
-  "Find all uninterned symbols in an expression and create interned replacements."
+  "Find all uninterned symbols in an expression and create interned
+replacements.  FIX-20260504-guilemacs: each uninterned symbol must map
+to a UNIQUE interned name; using just (string->symbol (symbol->string e))
+would collide with any existing interned symbol of the same name.  E.g.
+cl--self-tco emits  (lambda (#:n) ... (let ((n #:n)) ... (setq #:n V)))
+where the lambda param is uninterned `#:n' and the wrapper let's LHS is
+interned `n'.  Mapping #:n -> n shadows the lambda param, making setq
+modify the let-local — the loop never makes progress (manifests as a
+hang in any tail-recursive cl-labels via cl--self-tco)."
   (let ((uninterned '()))
     (let walk ((e expr))
       (cond
        ((symbol? e)
         (when (and (not ((@ (guile) symbol-interned?) e))
                    (not (assq e uninterned)))
-          (set! uninterned (cons (cons e (string->symbol (symbol->string e)))
-                                uninterned))))
+          (set! %uninterned-rename-counter (+ 1 %uninterned-rename-counter))
+          (set! uninterned
+                (cons (cons e
+                            (string->symbol
+                             (string-append (symbol->string e)
+                                            "--uninterned-"
+                                            (number->string
+                                             %uninterned-rename-counter))))
+                      uninterned))))
        ((pair? e)
         (walk (car e))
         (walk (cdr e)))))
@@ -1390,15 +1407,7 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
   (let* ((replacements (find-uninterned-symbols expr))
          (sanitized-expr (if (null? replacements)
                              expr
-                             (begin
-                               (format #t "[sanitize] Found ~a uninterned symbols in expr, replacing...~%" (length replacements))
-                               (for-each (lambda (pair)
-                                          (let ((sym-name (symbol->string (car pair))))
-                                            (when (string-contains sym-name "--cl-")
-                                              (format #t "  *** Found --cl- symbol: ~S -> ~S~%" (car pair) (cdr pair)))
-                                            (format #t "  ~S -> ~S~%" (car pair) (cdr pair))))
-                                        replacements)
-                               (sanitize-uninterned-symbols expr replacements))))
+                             (sanitize-uninterned-symbols expr replacements)))
          (tree-il (with-fluids ((bindings-data (make-bindings))
                                 (toplevel? #t)
                                 (compile-time-too? #f))
