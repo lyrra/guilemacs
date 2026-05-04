@@ -1258,7 +1258,11 @@ Uses binary search for O(log n) initial lookup."
 
              ;; Effective position is inside this interval
              ((< effective-pos int-end)
-              (if (equal? int-val current-val)
+              ;; FIX-20260427-guilemacs: per docstring at textprop.c:1295,
+              ;; property values must be compared with `eq', not `equal'.
+              ;; Using `equal?' on records with #<program> slots recurses
+              ;; into Guile closure internals and overflows the stack.
+              (if (eq? int-val current-val)
                   ;; Same value - check what comes next
                   (let ((next-i (+ i 1)))
                     (if (>= next-i len)
@@ -1279,7 +1283,7 @@ Uses binary search for O(log n) initial lookup."
                                 (or limit #nil)
                                 int-end))
                            ;; Next interval has different value
-                           ((not (equal? next-val current-val))
+                           ((not (eq? next-val current-val))
                             (if (and actual-limit (>= int-end actual-limit))
                                 (or limit #nil)
                                 int-end))

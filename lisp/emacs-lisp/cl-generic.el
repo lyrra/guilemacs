@@ -771,7 +771,12 @@ You might need to add: %S"
             (while (and dispatches
                         (let ((x (nth 1 (car dispatches))))
                           ;; No need to dispatch for t specializers.
-                          (or (null x) (equal x cl--generic-t-generalizer))))
+                          ;; FIX-20260423-guilemacs: `equal' on a record
+                          ;; containing #<program> slots recurses into
+                          ;; Guile closure internals and overflows the
+                          ;; stack.  `cl--generic-t-generalizer' is a
+                          ;; defconst singleton, so `eq' is sufficient.
+                          (or (null x) (eq x cl--generic-t-generalizer))))
               (setq dispatches (cdr dispatches)))
             (pop dispatches))))
     (if (not (and dispatch
