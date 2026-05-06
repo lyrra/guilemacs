@@ -93,10 +93,12 @@
                         (%funcall (@ (guile) number->string) %gensym-counter))))
   (defun gensym (&optional prefix)
     (intern-gensym (if prefix prefix "g")))
-  ;; make-symbol should create interned symbols to avoid Guile serialization errors
+  ;; `make-symbol' returns a true uninterned symbol (vanilla elisp
+  ;; contract).  (symbol-name (make-symbol "x")) MUST return "x" — user
+  ;; code such as json-serialize relies on it.  Uninterned symbols that
+  ;; reach compiled output are caught by sanitize-uninterned-symbols.
   (defun make-symbol (name)
-    (%funcall (@ (guile) make-symbol) name)
-    )
+    (%funcall (@ (guile) make-symbol) name))
   (defun signal (error-symbol data)
     (%funcall (@ (guile) throw) 'elisp-condition error-symbol data)))
 

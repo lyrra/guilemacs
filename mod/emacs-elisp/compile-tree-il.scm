@@ -531,6 +531,31 @@ REPLACEMENTS is an alist mapping uninterned symbols to their interned versions."
 
 (define %uninterned-rename-counter 0)
 
+;; FIX-20260506-guilemacs: shared replacement map for the duration of one
+;; compile-tree-il call.  Macro expansions (handled lazily inside
+;; compile-expr-1) introduce uninterned symbols AFTER the initial
+;; find-uninterned-symbols scan; sanitize-shared lets every site that
+;; encounters one map it consistently to the same interned replacement,
+;; so e.g. `(catch ',done ... (throw ',done ...))' still pairs up after
+;; sanitization.
+(define %sanitize-shared-fluid (make-fluid '()))
+
+(define (sanitize-shared val)
+  "Return VAL with all uninterned symbols replaced by unique interned
+ones, sharing the rename map (fluid) across the whole compile pass."
+  (let ((new (find-uninterned-symbols val)))
+    (when (not (null? new))
+      ;; Merge with any already-seen mappings; keep first occurrence
+      ;; per uninterned symbol.
+      (fluid-set! %sanitize-shared-fluid
+                  (let merge ((xs new) (acc (fluid-ref %sanitize-shared-fluid)))
+                    (cond
+                     ((null? xs) acc)
+                     ((assq (caar xs) acc) (merge (cdr xs) acc))
+                     (else (merge (cdr xs) (cons (car xs) acc)))))))
+    (let ((map (fluid-ref %sanitize-shared-fluid)))
+      (if (null? map) val (sanitize-uninterned-symbols val map)))))
+
 (define (find-uninterned-symbols expr)
   "Find all uninterned symbols in an expression and create interned
 replacements.  FIX-20260504-guilemacs: each uninterned symbol must map
@@ -563,12 +588,11 @@ hang in any tail-recursive cl-labels via cl--self-tco)."
 
 (define (compile-lambda loc meta args body)
   ;; Find and replace all uninterned symbols in the lambda expression
-  ;; This is needed because Guile can't serialize uninterned symbols to .go files
-  (let* ((full-expr (cons args body))
-         (replacements (find-uninterned-symbols full-expr))
-         (sanitized (if (null? replacements)
-                        full-expr
-                        (sanitize-uninterned-symbols full-expr replacements)))
+  ;; This is needed because Guile can't serialize uninterned symbols to .go files.
+  ;; Use sanitize-shared so the same uninterned symbol gets the same
+  ;; interned replacement everywhere it appears in this compile pass
+  ;; (including subsequent quote forms, catch/throw tags, etc.).
+  (let* ((sanitized (sanitize-shared (cons args body)))
          (sanitized-args (car sanitized))
          (sanitized-body (cdr sanitized)))
     (receive (valid? req-ids opts rest-id)
@@ -1065,7 +1089,15 @@ hang in any tail-recursive cl-labels via cl--self-tco)."
 (defspecial quote (loc args)
   (pmatch args
     ((,val)
-     (make-const loc val))
+     ;; FIX-20260506-guilemacs: macro expansions can produce (quote #:sym)
+     ;; where #:sym was made by `make-symbol' (e.g. evil's hygienic-loop
+     ;; templates).  Such symbols are introduced after compile-tree-il's
+     ;; top-level sanitize and would otherwise reach Guile's .go writer
+     ;; ("uninterned symbol cannot be saved to object file").
+     ;; Sanitize on the fly using the COMPILE-WIDE replacement fluid so
+     ;; the same uninterned symbol gets the same interned replacement
+     ;; everywhere it appears (preserves catch/throw tag matching).
+     (make-const loc (sanitize-shared val)))
     (else (report-error loc "bad quote" args))))
 
 (defspecial %funcall (loc args)
@@ -1339,14 +1371,21 @@ hang in any tail-recursive cl-labels via cl--self-tco)."
            (special-operator-function loc arguments)))
      ((find-operator operator 'macro)
       => (lambda (macro-function)
-           (compile-expr-1 (apply macro-function arguments))))
+           ;; FIX-20260506-guilemacs: macros may inject uninterned symbols
+           ;; (e.g. evil's hygienic-loop pattern uses `make-symbol' for
+           ;; loop tag/var names).  Sanitize the expansion through the
+           ;; shared fluid so uninterned symbols become unique interned
+           ;; replacements consistently across catch/throw, let-binding
+           ;; LHS, and free-variable references.
+           (compile-expr-1 (sanitize-shared
+                            (apply macro-function arguments)))))
      ((and (symbol? operator)
            (eget operator '%compiler-macro))
       => (lambda (compiler-macro-function)
            (let ((new (compiler-macro-function expr)))
              (if (eq? new expr)
                  (compile-expr `(%funcall (%function ,operator) ,@arguments))
-                 (compile-expr-1 new)))))
+                 (compile-expr-1 (sanitize-shared new))))))
      ((and (symbol? operator)
            (get-primcall-emitter operator))
       => (lambda (emitter)
@@ -1408,9 +1447,12 @@ hang in any tail-recursive cl-labels via cl--self-tco)."
          (sanitized-expr (if (null? replacements)
                              expr
                              (sanitize-uninterned-symbols expr replacements)))
+         ;; Seed the shared rename fluid so any per-quote sanitize calls
+         ;; during compile-expr-1 see and extend the same map.
          (tree-il (with-fluids ((bindings-data (make-bindings))
                                 (toplevel? #t)
-                                (compile-time-too? #f))
+                                (compile-time-too? #f)
+                                (%sanitize-shared-fluid replacements))
                     (compile-expr-1 sanitized-expr))))
     (when (logbit? 16 %debugflag)
       (format (current-error-port) "---------------------------------------------------------------~%")

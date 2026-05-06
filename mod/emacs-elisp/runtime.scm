@@ -286,11 +286,12 @@ value-slot-module, function-slot-module, or plist-slot-module."
   (set! %intern-gensym-counter (+ 1 %intern-gensym-counter))
   (string->symbol (string-concatenate (list prefix "_" (number->string %intern-gensym-counter)))))
 
-;; make-symbol should create interned symbols to avoid Guile serialization errors
-;; Uninterned symbols cannot be saved to .go files
-;; Use Guile's native make-symbol to create uninterned symbols
+;; make-symbol returns a true uninterned symbol (vanilla elisp contract).
+;; (symbol-name (make-symbol "x")) MUST return "x" — user code such as
+;; json-serialize relies on it.  Uninterned symbols that survive into
+;; compiled output are caught by sanitize-uninterned-symbols in the
+;; tree-il compiler.
 (define (make-symbol name)
-  ;(intern-gensym name)
   ((@ (guile) make-symbol) name))
 
 ;; unbound marker - now using interned symbol
