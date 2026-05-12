@@ -139,6 +139,7 @@
 (use-modules (emacs symbol-operations))
 (use-modules (emacs character-predicates))
 (use-modules (emacs buffer-locals))
+(use-modules (emacs keyboard-stub))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -158,6 +159,7 @@
 (init-loader %prelude-directory)
 (init-lookup-functions)
 (init-buffer-locals-registrations)
+(init-keyboard-stub-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)

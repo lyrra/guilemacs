@@ -120,6 +120,15 @@
   (eval-buffer))
 (message "")
 
+(message "")
+(message "========================================")
+(message "KEYBOARD PORT TEST SUITE")
+(message "========================================")
+(message "")
+
+(load "test/keyboard/test-stub.el")
+(message "")
+
 (message "========================================")
 (message "ALL TESTS COMPLETE")
 (message "========================================")
