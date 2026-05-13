@@ -11388,6 +11388,78 @@ update_recent_keys (int new_size, int kept_keys)
 
 }
 
+/* M3 — primitives exposed to (emacs recent-keys).  The recent_keys
+   ring stays C-owned; the Scheme module reads its state through these
+   subrs.  See docs/keyboard.org §M3.  */
+
+DEFUN ("--recent-keys-ring", Frecent_keys_ring, Srecent_keys_ring, 0, 0, 0,
+       doc: /* Internal: return the raw recent-keys ring vector.  */)
+  (void)
+{
+  return recent_keys;
+}
+
+DEFUN ("--recent-keys-index", Frecent_keys_index, Srecent_keys_index, 0, 0, 0,
+       doc: /* Internal: return the next-write index into the recent-keys ring.  */)
+  (void)
+{
+  return make_fixnum (recent_keys_index);
+}
+
+DEFUN ("--total-keys", Ftotal_keys, Stotal_keys, 0, 0, 0,
+       doc: /* Internal: return the count of keys recorded since startup
+(capped at the ring size).  */)
+  (void)
+{
+  return make_fixnum (total_keys);
+}
+
+DEFUN ("--lossage-limit", Flossage_limit, Slossage_limit, 0, 0, 0,
+       doc: /* Internal: return the current recent-keys ring size.  */)
+  (void)
+{
+  return make_fixnum (lossage_limit);
+}
+
+DEFUN ("--min-num-recent-keys", Fmin_num_recent_keys, Smin_num_recent_keys, 0, 0, 0,
+       doc: /* Internal: lower bound on the recent-keys ring size.  */)
+  (void)
+{
+  return make_fixnum (MIN_NUM_RECENT_KEYS);
+}
+
+DEFUN ("--max-num-recent-keys", Fmax_num_recent_keys, Smax_num_recent_keys, 0, 0, 0,
+       doc: /* Internal: upper bound on the recent-keys ring size.  */)
+  (void)
+{
+  return make_fixnum (MAX_NUM_RECENT_KEYS);
+}
+
+DEFUN ("--update-recent-keys", Fupdate_recent_keys, Supdate_recent_keys,
+       2, 2, 0,
+       doc: /* Internal: resize the recent-keys ring to NEW-SIZE keeping
+KEPT-KEYS entries; mirrors C update_recent_keys.  */)
+  (Lisp_Object new_size, Lisp_Object kept_keys)
+{
+  CHECK_FIXNAT (new_size);
+  CHECK_FIXNAT (kept_keys);
+  update_recent_keys (XFIXNAT (new_size), XFIXNAT (kept_keys));
+  return Qnil;
+}
+
+DEFUN ("--make-event-array-from-vector", Fmake_event_array_from_vector,
+       Smake_event_array_from_vector, 3, 3, 0,
+       doc: /* Internal: extract COUNT elements starting at START from VEC
+and return as a string (if all events are simple characters) or a vector.
+Mirrors C make_event_array_from_vector.  */)
+  (Lisp_Object vec, Lisp_Object start, Lisp_Object count)
+{
+  CHECK_VECTOR (vec);
+  CHECK_FIXNAT (start);
+  CHECK_FIXNAT (count);
+  return make_event_array_from_vector (vec, XFIXNAT (start), XFIXNAT (count));
+}
+
 DEFUN ("lossage-size", Flossage_size, Slossage_size, 0, 1,
        "(list (read-number \"Set maximum keystrokes to: \" (lossage-size)))",
        doc: /* Return or set the maximum number of keystrokes to save.
@@ -11397,35 +11469,11 @@ Otherwise, return the current limit.
 The saved keystrokes are shown by `view-lossage'.  */)
   (Lisp_Object arg)
 {
-  if (NILP(arg))
-    return make_fixnum (lossage_limit);
-
-  if (!FIXNATP (arg))
-    user_error ("Value must be a positive integer");
-  ptrdiff_t osize = ASIZE (recent_keys);
-  eassert (lossage_limit == osize);
-  int min_size = MIN_NUM_RECENT_KEYS;
-  EMACS_INT new_size = XFIXNAT (arg);
-
-  if (new_size == osize)
-    return make_fixnum (lossage_limit);
-
-  if (new_size < min_size)
-    {
-      AUTO_STRING (fmt, "Value must be >= %d");
-      Fsignal (Quser_error, list1 (CALLN (Fformat, fmt, make_fixnum (min_size))));
-    }
-  if (new_size > MAX_NUM_RECENT_KEYS)
-    {
-      AUTO_STRING (fmt, "Value must be <= %d");
-      Fsignal (Quser_error, list1 (CALLN (Fformat, fmt,
-					  make_fixnum (MAX_NUM_RECENT_KEYS))));
-    }
-
-  int kept_keys = new_size > osize ? total_keys : min (new_size, total_keys);
-  update_recent_keys (new_size, kept_keys);
-
-  return make_fixnum (lossage_limit);
+  /* M3: dispatch to (emacs recent-keys) — see docs/keyboard.org §M3. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recent-keys", "lossage-size");
+  return SCM_CALL_1 (proc, arg);
 }
 
 DEFUN ("recent-keys", Frecent_keys, Srecent_keys, 0, 1, 0,
@@ -11434,30 +11482,11 @@ If INCLUDE-CMDS is non-nil, include the commands that were run,
 represented as pseudo-events of the form (nil . COMMAND).  */)
   (Lisp_Object include_cmds)
 {
-  CHECK_TYPE (PLAIN_VECTORP (recent_keys), Qvectorp, recent_keys);
-
-  bool cmds = !NILP (include_cmds);
-
-  if (!total_keys
-      || (cmds && total_keys < lossage_limit))
-    return make_event_array_from_vector (recent_keys, 0, total_keys);
-  else
-    {
-      Lisp_Object es = Qnil;
-      int i = (total_keys < lossage_limit
-	       ? 0 : recent_keys_index);
-      eassert (recent_keys_index < lossage_limit);
-      do
-	{
-	  Lisp_Object e = AREF (recent_keys, i);
-	  if (cmds || !CONSP (e) || !NILP (XCAR (e)))
-	    es = Fcons (e, es);
-	  if (++i >= lossage_limit)
-	    i = 0;
-	} while (i != recent_keys_index);
-      es = Fnreverse (es);
-      return Fvconcat (1, &es);
-    }
+  /* M3: dispatch to (emacs recent-keys) — see docs/keyboard.org §M3. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recent-keys", "recent-keys");
+  return SCM_CALL_1 (proc, include_cmds);
 }
 
 DEFUN ("this-command-keys", Fthis_command_keys, Sthis_command_keys, 0, 0, 0,

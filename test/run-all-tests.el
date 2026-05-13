@@ -129,6 +129,7 @@
 (load "test/keyboard/test-stub.el")             ; M0
 (load "test/keyboard/test-event-modifiers.el")   ; M1
 (load "test/keyboard/test-kboard.el")            ; M2
+(load "test/keyboard/test-recent-keys.el")       ; M3
 (message "")
 
 (message "========================================")
