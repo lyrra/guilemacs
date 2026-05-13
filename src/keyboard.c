@@ -7171,254 +7171,28 @@ make_lispy_focus_out (Lisp_Object frame)
   return list2 (Qfocus_out, frame);
 }
 
-/* Manipulating modifiers.  */
+/* Manipulating modifiers.
 
-/* Parse the name of SYMBOL, and return the set of modifiers it contains.
-
-   If MODIFIER_END is non-zero, set *MODIFIER_END to the position in
-   SYMBOL's name of the end of the modifiers; the string from this
-   position is the unmodified symbol name.
-
-   This doesn't use any caches.  */
-
-static int
-parse_modifiers_uncached (Lisp_Object symbol, ptrdiff_t *modifier_end)
-{
-  Lisp_Object name;
-  ptrdiff_t i;
-  int modifiers;
-
-  CHECK_SYMBOL (symbol);
-
-  modifiers = 0;
-  name = SYMBOL_NAME (symbol);
-
-  for (i = 0; i < SBYTES (name) - 1; )
-    {
-      ptrdiff_t this_mod_end = 0;
-      int this_mod = 0;
-
-      /* See if the name continues with a modifier word.
-	 Check that the word appears, but don't check what follows it.
-	 Set this_mod and this_mod_end to record what we find.  */
-
-      switch (SREF (name, i))
-	{
-#define SINGLE_LETTER_MOD(BIT)				\
-	  (this_mod_end = i + 1, this_mod = BIT)
-
-	case 'A':
-	  SINGLE_LETTER_MOD (alt_modifier);
-	  break;
-
-	case 'C':
-	  SINGLE_LETTER_MOD (ctrl_modifier);
-	  break;
-
-	case 'H':
-	  SINGLE_LETTER_MOD (hyper_modifier);
-	  break;
-
-	case 'M':
-	  SINGLE_LETTER_MOD (meta_modifier);
-	  break;
-
-	case 'S':
-	  SINGLE_LETTER_MOD (shift_modifier);
-	  break;
-
-	case 's':
-	  SINGLE_LETTER_MOD (super_modifier);
-	  break;
-
-#undef SINGLE_LETTER_MOD
-
-#define MULTI_LETTER_MOD(BIT, NAME, LEN)			\
-	  if (i + LEN + 1 <= SBYTES (name)			\
-	      && ! memcmp (SDATA (name) + i, NAME, LEN))	\
-	    {							\
-	      this_mod_end = i + LEN;				\
-	      this_mod = BIT;					\
-	    }
-
-	case 'd':
-	  MULTI_LETTER_MOD (drag_modifier, "drag", 4);
-	  MULTI_LETTER_MOD (down_modifier, "down", 4);
-	  MULTI_LETTER_MOD (double_modifier, "double", 6);
-	  break;
-
-	case 't':
-	  MULTI_LETTER_MOD (triple_modifier, "triple", 6);
-	  break;
-
-	case 'u':
-	  MULTI_LETTER_MOD (up_modifier, "up", 2);
-	  break;
-#undef MULTI_LETTER_MOD
-
-	}
-
-      /* If we found no modifier, stop looking for them.  */
-      if (this_mod_end == 0)
-	break;
-
-      /* Check there is a dash after the modifier, so that it
-	 really is a modifier.  */
-      if (this_mod_end >= SBYTES (name)
-	  || SREF (name, this_mod_end) != '-')
-	break;
-
-      /* This modifier is real; look for another.  */
-      modifiers |= this_mod;
-      i = this_mod_end + 1;
-    }
-
-  /* Should we include the `click' modifier?  */
-  if (! (modifiers & (down_modifier | drag_modifier
-		      | double_modifier | triple_modifier))
-      && i + 7 == SBYTES (name)
-      && memcmp (SDATA (name) + i, "mouse-", 6) == 0
-      && ('0' <= SREF (name, i + 6) && SREF (name, i + 6) <= '9'))
-    modifiers |= click_modifier;
-
-  if (! (modifiers & (double_modifier | triple_modifier))
-      && i + 6 < SBYTES (name)
-      && memcmp (SDATA (name) + i, "wheel-", 6) == 0)
-    modifiers |= click_modifier;
-
-  if (modifier_end)
-    *modifier_end = i;
-
-  return modifiers;
-}
-
-/* Return a symbol whose name is the modifier prefixes for MODIFIERS
-   prepended to the string BASE[0..BASE_LEN-1].
-   This doesn't use any caches.  */
-static Lisp_Object
-apply_modifiers_uncached (int modifiers, char *base, int base_len, int base_len_byte)
-{
-  /* Since BASE could contain nulls, we can't use intern here; we have
-     to use Fintern, which expects a genuine Lisp_String, and keeps a
-     reference to it.  */
-  char new_mods[sizeof "A-C-H-M-S-s-up-down-drag-double-triple-"];
-  int mod_len;
-
-  {
-    char *p = new_mods;
-
-    /* Mouse events should not exhibit the `up' modifier once they
-       leave the event queue only accessible to C code; `up' will
-       always be turned into a click or drag event before being
-       presented to lisp code.  But since lisp events can be
-       synthesized bypassing the event queue and pushed into
-       `unread-command-events' or its companions, it's better to just
-       deal with unexpected modifier combinations. */
-
-    if (modifiers & alt_modifier)   { *p++ = 'A'; *p++ = '-'; }
-    if (modifiers & ctrl_modifier)  { *p++ = 'C'; *p++ = '-'; }
-    if (modifiers & hyper_modifier) { *p++ = 'H'; *p++ = '-'; }
-    if (modifiers & meta_modifier)  { *p++ = 'M'; *p++ = '-'; }
-    if (modifiers & shift_modifier) { *p++ = 'S'; *p++ = '-'; }
-    if (modifiers & super_modifier) { *p++ = 's'; *p++ = '-'; }
-    if (modifiers & double_modifier) p = stpcpy (p, "double-");
-    if (modifiers & triple_modifier) p = stpcpy (p, "triple-");
-    if (modifiers & up_modifier) p = stpcpy (p, "up-");
-    if (modifiers & down_modifier) p = stpcpy (p, "down-");
-    if (modifiers & drag_modifier) p = stpcpy (p, "drag-");
-    /* The click modifier is denoted by the absence of other modifiers.  */
-
-    *p = '\0';
-
-    mod_len = p - new_mods;
-  }
-
-  {
-    Lisp_Object new_name = scm_string_append (list2 (build_string (new_mods),
-                                                     build_string (base)));
-    return Fintern (new_name, Qnil);
-  }
-}
-
-
-static const char *const modifier_names[] =
-{
-  "up", "down", "drag", "click", "double", "triple", 0, 0,
-  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-  0, 0, "alt", "super", "hyper", "shift", "control", "meta"
-};
-#define NUM_MOD_NAMES ARRAYELTS (modifier_names)
-
-static Lisp_Object modifier_symbols;
-
-/* Return the list of modifier symbols corresponding to the mask MODIFIERS.  */
-static Lisp_Object
-lispy_modifier_list (int modifiers)
-{
-  Lisp_Object modifier_list;
-  int i;
-
-  modifier_list = Qnil;
-  for (i = 0; (1<<i) <= modifiers && i < NUM_MOD_NAMES; i++)
-    if (modifiers & (1<<i))
-      modifier_list = Fcons (AREF (modifier_symbols, i),
-			     modifier_list);
-
-  return modifier_list;
-}
-
-
-/* Parse the modifiers on SYMBOL, and return a list like (UNMODIFIED MASK),
-   where UNMODIFIED is the unmodified form of SYMBOL,
-   MASK is the set of modifiers present in SYMBOL's name.
-   This is similar to parse_modifiers_uncached, but uses the cache in
-   SYMBOL's Qevent_symbol_element_mask property, and maintains the
-   Qevent_symbol_elements property.  */
+   The modifier-parsing functions below dispatch to
+   mod/emacs/event-modifiers.scm.  See docs/keyboard.org §M1.  The
+   former C bodies (parse_modifiers_uncached, apply_modifiers_uncached,
+   lispy_modifier_list, modifier_names[], modifier_symbols) and their
+   syms_of_keyboard init block were removed when M1 landed since
+   nothing outside the now-shimmed functions referenced them.  */
 
 #define KEY_TO_CHAR(k) (XFIXNUM (k) & ((1 << CHARACTERBITS) - 1))
+
+/* Parse the modifiers on SYMBOL, returning (UNMODIFIED MASK).
+   Caches on SYMBOL's Qevent_symbol_element_mask plist property and
+   maintains the Qevent_symbol_elements property.  */
 
 Lisp_Object
 parse_modifiers (Lisp_Object symbol)
 {
-  Lisp_Object elements;
-
-  if (FIXNUMP (symbol))
-    return list2i (KEY_TO_CHAR (symbol), XFIXNUM (symbol) & CHAR_MODIFIER_MASK);
-  else if (!SYMBOLP (symbol))
-    return Qnil;
-
-  elements = Fget (symbol, Qevent_symbol_element_mask);
-  if (CONSP (elements))
-    return elements;
-  else
-    {
-      ptrdiff_t end;
-      int modifiers = parse_modifiers_uncached (symbol, &end);
-      Lisp_Object unmodified;
-      Lisp_Object mask;
-
-      unmodified = Fintern (make_string (SSDATA (SYMBOL_NAME (symbol)) + end,
-					 SBYTES (SYMBOL_NAME (symbol)) - end),
-			    Qnil);
-
-      if (modifiers & ~INTMASK)
-	emacs_abort ();
-      XSETFASTINT (mask, modifiers);
-      elements = list2 (unmodified, mask);
-
-      /* Cache the parsing results on SYMBOL.  */
-      Fput (symbol, Qevent_symbol_element_mask,
-	    elements);
-      Fput (symbol, Qevent_symbol_elements,
-	    Fcons (unmodified, lispy_modifier_list (modifiers)));
-
-      /* Since we know that SYMBOL is modifiers applied to unmodified,
-	 it would be nice to put that in unmodified's cache.
-	 But we can't, since we're not sure that parse_modifiers is
-	 canonical.  */
-
-      return elements;
-    }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "parse-modifiers");
+  return SCM_CALL_1 (proc, symbol);
 }
 
 DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,
@@ -7426,12 +7200,10 @@ DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,
        doc: /* Parse the event symbol.  For internal use.  */)
   (Lisp_Object symbol)
 {
-  /* Fill the cache if needed.  */
-  parse_modifiers (symbol);
-  /* Ignore the result (which is stored on Qevent_symbol_element_mask)
-     and use the Lispier representation stored on Qevent_symbol_elements
-     instead.  */
-  return Fget (symbol, Qevent_symbol_elements);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "event-symbol-parse-modifiers");
+  return SCM_CALL_1 (proc, symbol);
 }
 
 /* Apply the modifiers MODIFIERS to the symbol BASE.
@@ -7445,61 +7217,10 @@ DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,
 static Lisp_Object
 apply_modifiers (int modifiers, Lisp_Object base)
 {
-  Lisp_Object cache, idx, entry, new_symbol;
-
-  /* Mask out upper bits.  We don't know where this value's been.  */
-  modifiers &= INTMASK;
-
-  if (FIXNUMP (base))
-    return make_fixnum (XFIXNUM (base) | modifiers);
-
-  /* The click modifier never figures into cache indices.  */
-  cache = Fget (base, Qmodifier_cache);
-  XSETFASTINT (idx, (modifiers & ~click_modifier));
-  entry = assq_no_quit (idx, cache);
-
-  if (CONSP (entry))
-    new_symbol = XCDR (entry);
-  else
-    {
-      /* We have to create the symbol ourselves.  */
-      new_symbol = apply_modifiers_uncached (modifiers,
-					     SSDATA (SYMBOL_NAME (base)),
-					     SCHARS (SYMBOL_NAME (base)),
-					     SBYTES (SYMBOL_NAME (base)));
-
-      /* Add the new symbol to the base's cache.  */
-      entry = Fcons (idx, new_symbol);
-      Fput (base, Qmodifier_cache, Fcons (entry, cache));
-
-      /* We have the parsing info now for free, so we could add it to
-	 the caches:
-         XSETFASTINT (idx, modifiers);
-         Fput (new_symbol, Qevent_symbol_element_mask,
-               list2 (base, idx));
-         Fput (new_symbol, Qevent_symbol_elements,
-               Fcons (base, lispy_modifier_list (modifiers)));
-	 Sadly, this is only correct if `base' is indeed a base event,
-	 which is not necessarily the case.  -stef  */
-    }
-
-  /* Make sure this symbol is of the same kind as BASE.
-
-     You'd think we could just set this once and for all when we
-     intern the symbol above, but reorder_modifiers may call us when
-     BASE's property isn't set right; we can't assume that just
-     because it has a Qmodifier_cache property it must have its
-     Qevent_kind set right as well.  */
-  if (NILP (Fget (new_symbol, Qevent_kind)))
-    {
-      Lisp_Object kind;
-
-      kind = Fget (base, Qevent_kind);
-      if (! NILP (kind))
-	Fput (new_symbol, Qevent_kind, kind);
-    }
-
-  return new_symbol;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "apply-modifiers");
+  return SCM_CALL_2 (proc, scm_from_int (modifiers), base);
 }
 
 
@@ -7514,13 +7235,10 @@ apply_modifiers (int modifiers, Lisp_Object base)
 Lisp_Object
 reorder_modifiers (Lisp_Object symbol)
 {
-  /* It's hopefully okay to write the code this way, since everything
-     will soon be in caches, and no consing will be done at all.  */
-  Lisp_Object parsed;
-
-  parsed = parse_modifiers (symbol);
-  return apply_modifiers (XFIXNAT (XCAR (XCDR (parsed))),
-			  XCAR (parsed));
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "reorder-modifiers");
+  return SCM_CALL_1 (proc, symbol);
 }
 
 
@@ -7656,51 +7374,10 @@ essentially the same base event type and all the specified modifiers.
 character, are not returned verbatim.)  */)
   (Lisp_Object event_desc)
 {
-  Lisp_Object base = Qnil;
-  int modifiers = 0;
-
-  FOR_EACH_TAIL_SAFE (event_desc)
-    {
-      Lisp_Object elt = XCAR (event_desc);
-      int this = 0;
-
-      /* Given a symbol, see if it is a modifier name.  */
-      if (SYMBOLP (elt) && CONSP (XCDR (event_desc)))
-	this = parse_solitary_modifier (elt);
-
-      if (this != 0)
-	modifiers |= this;
-      else if (!NILP (base))
-	error ("Two bases given in one event");
-      else
-	base = elt;
-    }
-
-  /* Let the symbol A refer to the character A.  */
-  if (SYMBOLP (base) && SCHARS (SYMBOL_NAME (base)) == 1)
-    XSETINT (base, SREF (SYMBOL_NAME (base), 0));
-
-  if (FIXNUMP (base))
-    {
-      /* Turn (shift a) into A.  */
-      if ((modifiers & shift_modifier) != 0
-	  && (XFIXNUM (base) >= 'a' && XFIXNUM (base) <= 'z'))
-	{
-	  XSETINT (base, XFIXNUM (base) - ('a' - 'A'));
-	  modifiers &= ~shift_modifier;
-	}
-
-      /* Turn (control a) into C-a.  */
-      if (modifiers & ctrl_modifier)
-	return make_fixnum ((modifiers & ~ctrl_modifier)
-			    | make_ctrl_char (XFIXNUM (base)));
-      else
-	return make_fixnum (modifiers | XFIXNUM (base));
-    }
-  else if (SYMBOLP (base))
-    return apply_modifiers (modifiers, base);
-  else
-    error ("Invalid base event");
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "event-convert-list");
+  return SCM_CALL_1 (proc, event_desc);
 }
 
 DEFUN ("internal-handle-focus-in", Finternal_handle_focus_in,
@@ -7734,87 +7411,10 @@ This function potentially generates an artificial switch-frame event.  */)
 int
 parse_solitary_modifier (Lisp_Object symbol)
 {
-  Lisp_Object name;
-
-  if (!SYMBOLP (symbol))
-    return 0;
-
-  name = SYMBOL_NAME (symbol);
-
-  switch (SREF (name, 0))
-    {
-#define SINGLE_LETTER_MOD(BIT)				\
-      if (guile_string_single_char (name))			\
-	return BIT;
-
-#define MULTI_LETTER_MOD(BIT, NAME, LEN)		\
-      if (LEN == SBYTES (name)				\
-	  && ! memcmp (SDATA (name), NAME, LEN))	\
-	return BIT;
-
-    case 'A':
-      SINGLE_LETTER_MOD (alt_modifier);
-      break;
-
-    case 'a':
-      MULTI_LETTER_MOD (alt_modifier, "alt", 3);
-      break;
-
-    case 'C':
-      SINGLE_LETTER_MOD (ctrl_modifier);
-      break;
-
-    case 'c':
-      MULTI_LETTER_MOD (ctrl_modifier, "ctrl", 4);
-      MULTI_LETTER_MOD (ctrl_modifier, "control", 7);
-      MULTI_LETTER_MOD (click_modifier, "click", 5);
-      break;
-
-    case 'H':
-      SINGLE_LETTER_MOD (hyper_modifier);
-      break;
-
-    case 'h':
-      MULTI_LETTER_MOD (hyper_modifier, "hyper", 5);
-      break;
-
-    case 'M':
-      SINGLE_LETTER_MOD (meta_modifier);
-      break;
-
-    case 'm':
-      MULTI_LETTER_MOD (meta_modifier, "meta", 4);
-      break;
-
-    case 'S':
-      SINGLE_LETTER_MOD (shift_modifier);
-      break;
-
-    case 's':
-      MULTI_LETTER_MOD (shift_modifier, "shift", 5);
-      MULTI_LETTER_MOD (super_modifier, "super", 5);
-      SINGLE_LETTER_MOD (super_modifier);
-      break;
-
-    case 'd':
-      MULTI_LETTER_MOD (drag_modifier, "drag", 4);
-      MULTI_LETTER_MOD (down_modifier, "down", 4);
-      MULTI_LETTER_MOD (double_modifier, "double", 6);
-      break;
-
-    case 't':
-      MULTI_LETTER_MOD (triple_modifier, "triple", 6);
-      break;
-
-    case 'u':
-      MULTI_LETTER_MOD (up_modifier, "up", 2);
-      break;
-
-#undef SINGLE_LETTER_MOD
-#undef MULTI_LETTER_MOD
-    }
-
-  return 0;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "parse-solitary-modifier");
+  return scm_to_int (SCM_CALL_1 (proc, symbol));
 }
 
 /* Return true if EVENT is a list whose elements are all integers or symbols.
@@ -13083,16 +12683,8 @@ syms_of_keyboard (void)
   wheel_syms = make_nil_elisp_vector (ARRAYELTS (lispy_wheel_names));
   staticpro (&wheel_syms);
 
-  {
-    int i;
-    int len = ARRAYELTS (modifier_names);
-
-    modifier_symbols = make_nil_elisp_vector (len);
-    for (i = 0; i < len; i++)
-      if (modifier_names[i])
-	ASET (modifier_symbols, i, intern_c_string (modifier_names[i]));
-    staticpro (&modifier_symbols);
-  }
+  /* modifier_symbols / modifier_names[] were removed at M1 — the
+     modifier-name list now lives in mod/emacs/event-modifiers.scm.  */
 
   recent_keys = make_nil_elisp_vector (lossage_limit);
   staticpro (&recent_keys);

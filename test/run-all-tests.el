@@ -126,7 +126,8 @@
 (message "========================================")
 (message "")
 
-(load "test/keyboard/test-stub.el")
+(load "test/keyboard/test-stub.el")             ; M0
+(load "test/keyboard/test-event-modifiers.el")   ; M1
 (message "")
 
 (message "========================================")

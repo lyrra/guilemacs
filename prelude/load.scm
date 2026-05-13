@@ -140,6 +140,7 @@
 (use-modules (emacs character-predicates))
 (use-modules (emacs buffer-locals))
 (use-modules (emacs keyboard-stub))
+(use-modules (emacs event-modifiers))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -160,6 +161,7 @@
 (init-lookup-functions)
 (init-buffer-locals-registrations)
 (init-keyboard-stub-registrations)
+(init-event-modifiers-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)

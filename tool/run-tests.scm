@@ -73,8 +73,9 @@
   "test/pre/float-comprehensive.scm"
   "test/pre/type-predicates.scm"
   )
-(group ; keyboard.c → Guile port scaffolding (see docs/keyboard.org)
-  "test/keyboard/ertest-stub.el"
+(group ; keyboard.c → Guile port (see docs/keyboard.org)
+  "test/keyboard/ertest-stub.el"            ; M0
+  "test/keyboard/ertest-event-modifiers.el" ; M1
   )
 (group
   "test/src/eval-tests.el"
