@@ -79,6 +79,7 @@
   "test/keyboard/ertest-kboard.el"          ; M2
   "test/keyboard/ertest-recent-keys.el"     ; M3
   "test/keyboard/ertest-recursive-edit.el"  ; M4
+  "test/keyboard/ertest-this-command-keys.el" ; M5
   )
 (group
   "test/src/eval-tests.el"

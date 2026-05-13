@@ -11515,6 +11515,85 @@ represented as pseudo-events of the form (nil . COMMAND).  */)
   return SCM_CALL_1 (proc, include_cmds);
 }
 
+/* M5 — primitives exposed to (emacs this-command-keys).  The
+   this-command-keys vector and raw_keybuf stay C-owned; the Scheme
+   module reads their state through these `--' subrs.  See
+   docs/keyboard.org §M5.  */
+
+DEFUN ("--this-command-keys", Fc_this_command_keys, Sc_this_command_keys, 0, 0, 0,
+       doc: /* Internal: return the raw this_command_keys vector.  */)
+  (void)
+{
+  return this_command_keys;
+}
+
+DEFUN ("--this-command-key-count", Fc_this_command_key_count, Sc_this_command_key_count, 0, 0, 0,
+       doc: /* Internal: return this_command_key_count.  */)
+  (void)
+{
+  return make_fixnum (this_command_key_count);
+}
+
+DEFUN ("--raw-keybuf", Fc_raw_keybuf, Sc_raw_keybuf, 0, 0, 0,
+       doc: /* Internal: return the raw_keybuf vector.  */)
+  (void)
+{
+  return raw_keybuf;
+}
+
+DEFUN ("--raw-keybuf-count", Fc_raw_keybuf_count, Sc_raw_keybuf_count, 0, 0, 0,
+       doc: /* Internal: return raw_keybuf_count.  */)
+  (void)
+{
+  return make_fixnum (raw_keybuf_count);
+}
+
+DEFUN ("--this-single-command-key-start", Fc_this_single_command_key_start,
+       Sc_this_single_command_key_start, 0, 0, 0,
+       doc: /* Internal: return this_single_command_key_start.  */)
+  (void)
+{
+  return make_fixnum (this_single_command_key_start);
+}
+
+DEFUN ("--reset-this-command-keys", Fc_reset_this_command_keys,
+       Sc_reset_this_command_keys, 0, 0, 0,
+       doc: /* Internal: reset this_command_keys to a fresh 40-slot
+vector and zero this_command_key_count.  Used by (emacs
+this-command-keys) when it detects the post-GC string-corruption case
+in this-command-keys-vector.  */)
+  (void)
+{
+  this_command_keys = make_nil_elisp_vector (40);
+  this_command_key_count = 0;
+  return Qnil;
+}
+
+DEFUN ("--set-this-command-key-count", Fc_set_this_command_key_count,
+       Sc_set_this_command_key_count, 1, 1, 0,
+       doc: /* Internal: set this_command_key_count to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  this_command_key_count = XFIXNAT (n);
+  return Qnil;
+}
+
+DEFUN ("--clear-recent-keys-ring", Fc_clear_recent_keys_ring,
+       Sc_clear_recent_keys_ring, 0, 0, 0,
+       doc: /* Internal: zero out the recent_keys ring and reset
+total_keys / recent_keys_index.  Used by
+(emacs this-command-keys) clear-this-command-keys when KEEP-RECORD is
+nil.  Mirrors the inner loop of the original C Fclear_this_command_keys.  */)
+  (void)
+{
+  for (ptrdiff_t i = 0; i < ASIZE (recent_keys); ++i)
+    ASET (recent_keys, i, Qnil);
+  total_keys = 0;
+  recent_keys_index = 0;
+  return Qnil;
+}
+
 DEFUN ("this-command-keys", Fthis_command_keys, Sthis_command_keys, 0, 0, 0,
        doc: /* Return the key sequence that invoked this command.
 However, if the command has called `read-key-sequence', it returns
@@ -11524,9 +11603,11 @@ The value is a string or a vector.
 See also `this-command-keys-vector'.  */)
   (void)
 {
-  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
-
-  return make_event_array_from_vector (this_command_keys, 0, this_command_key_count);
+  /* M5: dispatch to (emacs this-command-keys) — see docs/keyboard.org §M5. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "this-command-keys");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("set--this-command-keys", Fset__this_command_keys,
@@ -11570,24 +11651,13 @@ the last key sequence that has been read.
 See also `this-command-keys'.  */)
   (void)
 {
-  /* FIX: Guile-Emacs - somehow this_command_keys can become an empty string.
-     This appears to be a GC or binding issue. As a workaround, if we detect
-     this_command_keys is a string (which should never happen), reset it to
-     an empty vector. */
-  if (STRINGP(this_command_keys))
-    {
-      fprintf(stderr, "\nWARNING Fthis_command_keys_vector: this_command_keys was corrupted to a string! Resetting to vector.\n");
-      fprintf(stderr, "  String length: %ld, this_command_key_count: %d\n",
-              (long)SCHARS(this_command_keys), (int)this_command_key_count);
-
-      /* Reset to an empty vector */
-      this_command_keys = make_nil_elisp_vector (40);
-      this_command_key_count = 0;
-    }
-
-  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
-
-  return make_event_array_from_vector (this_command_keys, 0, this_command_key_count);
+  /* M5: dispatch to (emacs this-command-keys) — see docs/keyboard.org §M5.
+     The Guile-Emacs string-corruption workaround moved into the Scheme
+     module (which uses --reset-this-command-keys to recover).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "this-command-keys-vector");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("this-single-command-keys", Fthis_single_command_keys,
@@ -11598,11 +11668,10 @@ the command loop or by `read-key-sequence'.
 The value is always a vector.  */)
   (void)
 {
-  CHECK_TYPE (PLAIN_VECTORP (this_command_keys), Qvectorp, this_command_keys);
-
-  ptrdiff_t nkeys = this_command_key_count - this_single_command_key_start;
-  return make_event_array_from_vector (this_command_keys, this_single_command_key_start,
-				       nkeys < 0 ? 0 : nkeys);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "this-single-command-keys");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,
@@ -11615,8 +11684,10 @@ shows the events before all translations (except for input methods).
 The value is always a vector.  */)
   (void)
 {
-  CHECK_TYPE (PLAIN_VECTORP (raw_keybuf), Qvectorp, raw_keybuf);
-  return make_event_array_from_vector (raw_keybuf, 0, raw_keybuf_count);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "this-single-command-raw-keys");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("clear-this-command-keys", Fclear_this_command_keys,
@@ -11626,18 +11697,10 @@ Also clear the record of the last 300 input events, unless optional arg
 KEEP-RECORD is non-nil.  */)
   (Lisp_Object keep_record)
 {
-  int i;
-
-  this_command_key_count = 0;
-
-  if (NILP (keep_record))
-    {
-      for (i = 0; i < ASIZE (recent_keys); ++i)
-	ASET (recent_keys, i, Qnil);
-      total_keys = 0;
-      recent_keys_index = 0;
-    }
-  return Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "clear-this-command-keys");
+  return SCM_CALL_1 (proc, keep_record);
 }
 
 DEFUN ("recursion-depth", Frecursion_depth, Srecursion_depth, 0, 0, 0,

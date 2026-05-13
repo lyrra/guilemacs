@@ -144,6 +144,7 @@
 (use-modules (emacs kboard))
 (use-modules (emacs recent-keys))
 (use-modules (emacs recursive-edit))
+(use-modules (emacs this-command-keys))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -168,6 +169,7 @@
 (init-kboard-registrations)
 (init-recent-keys-registrations)
 (init-recursive-edit-registrations)
+(init-this-command-keys-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
