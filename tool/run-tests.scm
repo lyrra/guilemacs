@@ -78,6 +78,7 @@
   "test/keyboard/ertest-event-modifiers.el" ; M1
   "test/keyboard/ertest-kboard.el"          ; M2
   "test/keyboard/ertest-recent-keys.el"     ; M3
+  "test/keyboard/ertest-recursive-edit.el"  ; M4
   )
 (group
   "test/src/eval-tests.el"

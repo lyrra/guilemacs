@@ -130,6 +130,7 @@
 (load "test/keyboard/test-event-modifiers.el")   ; M1
 (load "test/keyboard/test-kboard.el")            ; M2
 (load "test/keyboard/test-recent-keys.el")       ; M3
+(load "test/keyboard/test-recursive-edit.el")    ; M4
 (message "")
 
 (message "========================================")

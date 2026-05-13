@@ -1340,15 +1340,39 @@ user_error (const char *msg)
   xsignal1 (Quser_error, build_string (msg));
 }
 
+/* M4 — accessor subrs for the C-side counters used by (emacs
+   recursive-edit).  Frecursive_edit and its unwind-protect stay C
+   for now; only the three trivial DEFUNs (exit/abort/recursion-depth)
+   ported.  See docs/keyboard.org §M4.  */
+
+DEFUN ("--command-loop-level", Fcommand_loop_level, Scommand_loop_level, 0, 0, 0,
+       doc: /* Internal: current depth in recursive edits.
+-1 means not yet inside any command loop.  Modified only by
+Frecursive_edit and recursive_edit_unwind in keyboard.c.  */)
+  (void)
+{
+  return make_fixnum (command_loop_level);
+}
+
+DEFUN ("--minibuf-level", Fminibuf_level_, Sminibuf_level_, 0, 0, 0,
+       doc: /* Internal: current minibuffer-recursion depth from
+minibuf.c.  */)
+  (void)
+{
+  return make_fixnum (minibuf_level);
+}
+
 DEFUN ("exit-recursive-edit", Fexit_recursive_edit, Sexit_recursive_edit, 0, 0, "",
        doc: /* Exit from the innermost recursive edit or minibuffer.  */
        attributes: noreturn)
   (void)
 {
-  if (command_loop_level > 0 || minibuf_level > 0)
-    Fthrow (Qexit, Qnil);
-
-  user_error ("No recursive edit is in progress");
+  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "exit-recursive-edit");
+  SCM_CALL_0 (proc);
+  emacs_abort ();  /* unreachable: exit-recursive-edit must throw */
 }
 
 DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 0, "",
@@ -1356,10 +1380,12 @@ DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 
        attributes: noreturn)
   (void)
 {
-  if (command_loop_level > 0 || minibuf_level > 0)
-    Fthrow (Qexit, Qt);
-
-  user_error ("No recursive edit is in progress");
+  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "abort-recursive-edit");
+  SCM_CALL_0 (proc);
+  emacs_abort ();  /* unreachable: abort-recursive-edit must throw */
 }
 
 /* Restore mouse tracking enablement.  See Finternal_track_mouse for
@@ -11618,9 +11644,11 @@ DEFUN ("recursion-depth", Frecursion_depth, Srecursion_depth, 0, 0, 0,
        doc: /* Return the current depth in recursive edits.  */)
   (void)
 {
-  EMACS_INT sum;
-  ckd_add (&sum, command_loop_level, minibuf_level);
-  return make_fixnum (sum);
+  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "recursion-depth");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("open-dribble-file", Fopen_dribble_file, Sopen_dribble_file, 1, 1,
