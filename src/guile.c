@@ -24,6 +24,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 struct elisp_functions_ptr elisp_functions_ptr;
 
 scm_t_bits c_closure_tag;
+scm_t_bits kboard_tag;
 
 typedef SCM (*c_closure_0_t) (void *);
 typedef SCM (*c_closure_1_t) (void *, SCM);
@@ -102,6 +103,13 @@ init_guile (void)
   init_elisp_functions();
   c_closure_tag = scm_make_smob_type ("c-closure", 0);
   scm_set_smob_apply (c_closure_tag, apply_c_closure, 0, 0, 1);
+
+  /* M2: foreign-object wrapper around KBOARD*.  See
+     mod/emacs/kboard.scm and docs/keyboard.org §M2.  The smob holds an
+     opaque KBOARD* in SMOB_DATA; the C-side kboard struct remains
+     owned by all_kboards and freed by delete_kboard, so no finalizer
+     is needed.  */
+  kboard_tag = scm_make_smob_type ("kboard", 0);
 }
 
 /*

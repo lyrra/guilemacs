@@ -1,6 +1,10 @@
 SCM make_c_closure (SCM (*) (), void *, int, int);
 void init_guile (void);
 
+/* M2: smob type tag for KBOARD foreign-object wrapping.
+   Defined in guile.c, initialized in init_guile. */
+extern scm_t_bits kboard_tag;
+
 struct elisp_functions_ptr {
   SCM f_car;
   SCM f_cdr;

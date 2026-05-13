@@ -861,6 +861,105 @@ recursive_edit_unwind (Lisp_Object buffer)
 
 
 
+/* M2 — Foreign-object wrapping for KBOARD*.
+
+   The smob holds a bare KBOARD* in SMOB_DATA.  Ownership stays with
+   all_kboards / delete_kboard, so the smob has no finalizer: dropping
+   a Scheme handle does not free the underlying struct.  Multiple
+   handles can wrap the same pointer — use kboard-eq when identity
+   matters.
+
+   See mod/emacs/kboard.scm and docs/keyboard.org §M2.  */
+
+static SCM
+make_kboard_smob (KBOARD *kb)
+{
+  SCM smob;
+  SCM_NEWSMOB (smob, kboard_tag, kb);
+  return smob;
+}
+
+#define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
+#define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
+#define CHECK_KBOARD(x) \
+  do { if (!KBOARDP (x)) wrong_type_argument (Qkboardp, x); } while (0)
+
+DEFUN ("kboardp", Fkboardp, Skboardp, 1, 1, 0,
+       doc: /* Return t if OBJECT is a kboard handle.  */)
+  (Lisp_Object object)
+{
+  return KBOARDP (object) ? Qt : Qnil;
+}
+
+DEFUN ("kboard-eq", Fkboard_eq, Skboard_eq, 2, 2, 0,
+       doc: /* Return t if A and B wrap the same underlying KBOARD.  */)
+  (Lisp_Object a, Lisp_Object b)
+{
+  CHECK_KBOARD (a);
+  CHECK_KBOARD (b);
+  return (XKBOARD (a) == XKBOARD (b)) ? Qt : Qnil;
+}
+
+DEFUN ("current-kboard", Fcurrent_kboard, Scurrent_kboard, 0, 0, 0,
+       doc: /* Return the active KBOARD as a foreign-object handle.  */)
+  (void)
+{
+  return make_kboard_smob (current_kboard);
+}
+
+DEFUN ("set-current-kboard", Fset_current_kboard, Sset_current_kboard, 1, 1, 0,
+       doc: /* Set the active KBOARD to the one wrapped by KB.  */)
+  (Lisp_Object kb)
+{
+  CHECK_KBOARD (kb);
+  current_kboard = XKBOARD (kb);
+  return kb;
+}
+
+/* Macro generating one getter/setter DEFUN pair per Lisp_Object field
+   of struct kboard.  The struct member name is FIELD_; the elisp
+   symbol uses LNAME (a string) so we get hyphenated names.  */
+
+#define KBOARD_LISP_FIELD(LNAME, FIELD)                                  \
+  DEFUN ("kboard-" LNAME, Fkboard_##FIELD, Skboard_##FIELD, 1, 1, 0,     \
+         doc: /* Return KB's FIELD slot.  */)                            \
+    (Lisp_Object kb)                                                     \
+  {                                                                      \
+    CHECK_KBOARD (kb);                                                   \
+    return XKBOARD (kb)->FIELD##_;                                       \
+  }                                                                      \
+  DEFUN ("set-kboard-" LNAME, Fset_kboard_##FIELD, Sset_kboard_##FIELD,  \
+         2, 2, 0,                                                        \
+         doc: /* Set KB's FIELD slot to VAL.  */)                        \
+    (Lisp_Object kb, Lisp_Object val)                                    \
+  {                                                                      \
+    CHECK_KBOARD (kb);                                                   \
+    XKBOARD (kb)->FIELD##_ = val;                                        \
+    return val;                                                          \
+  }
+
+KBOARD_LISP_FIELD ("overriding-terminal-local-map", Voverriding_terminal_local_map)
+KBOARD_LISP_FIELD ("last-command",                  Vlast_command)
+KBOARD_LISP_FIELD ("real-last-command",             Vreal_last_command)
+KBOARD_LISP_FIELD ("keyboard-translate-table",      Vkeyboard_translate_table)
+KBOARD_LISP_FIELD ("last-repeatable-command",       Vlast_repeatable_command)
+KBOARD_LISP_FIELD ("prefix-arg",                    Vprefix_arg)
+KBOARD_LISP_FIELD ("last-prefix-arg",               Vlast_prefix_arg)
+KBOARD_LISP_FIELD ("kbd-queue",                     kbd_queue)
+KBOARD_LISP_FIELD ("defining-kbd-macro",            defining_kbd_macro)
+KBOARD_LISP_FIELD ("last-kbd-macro",                Vlast_kbd_macro)
+KBOARD_LISP_FIELD ("system-key-alist",              Vsystem_key_alist)
+KBOARD_LISP_FIELD ("system-key-syms",               system_key_syms)
+KBOARD_LISP_FIELD ("window-system",                 Vwindow_system)
+KBOARD_LISP_FIELD ("local-function-key-map",        Vlocal_function_key_map)
+KBOARD_LISP_FIELD ("input-decode-map",              Vinput_decode_map)
+KBOARD_LISP_FIELD ("default-minibuffer-frame",      Vdefault_minibuffer_frame)
+KBOARD_LISP_FIELD ("echo-string",                   echo_string)
+KBOARD_LISP_FIELD ("echo-prompt",                   echo_prompt)
+
+#undef KBOARD_LISP_FIELD
+
+
 /* If we're in single_kboard state for kboard KBOARD,
    get out of it.  */
 
@@ -12472,6 +12571,9 @@ syms_of_keyboard (void)
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
   Vinternal__top_level_message = regular_top_level_message;
+
+  /* M2 — predicate symbol for the kboard smob type.  */
+  DEFSYM (Qkboardp, "kboardp");
 
   /* Tool-bars.  */
   DEFSYM (QCimage, ":image");

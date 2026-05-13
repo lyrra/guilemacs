@@ -141,6 +141,7 @@
 (use-modules (emacs buffer-locals))
 (use-modules (emacs keyboard-stub))
 (use-modules (emacs event-modifiers))
+(use-modules (emacs kboard))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -162,6 +163,7 @@
 (init-buffer-locals-registrations)
 (init-keyboard-stub-registrations)
 (init-event-modifiers-registrations)
+(init-kboard-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
