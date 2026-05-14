@@ -287,6 +287,54 @@
   (should (= 0 (--this-command-key-count)))
   (should (= 0 (--this-single-command-key-start))))
 
+;;;; M7b4 — mark/region
+
+(ert-deftest m7b4-iter-mark-region/exists ()
+  (should (fboundp '--command-loop-1-iter-mark-region)))
+
+(ert-deftest m7b4-helpers/exist ()
+  (should (fboundp '--current-buffer-mark-active-p))
+  (should (fboundp '--current-buffer-mark-has-buffer-p))
+  (should (fboundp '--cl1-prev-buffer-current-p))
+  (should (fboundp '--cl1-prev-modiff-current-p)))
+
+(ert-deftest m7b4-helper/mark-active-default-nil ()
+  ;; Default state at batch startup: mark not active.
+  (with-temp-buffer
+    (should (eq nil (--current-buffer-mark-active-p)))))
+
+(ert-deftest m7b4-iter-mark-region/no-op-when-mark-inactive ()
+  ;; The whole block is gated on mark-active.  When mark is not active,
+  ;; calling iter-mark-region must NOT touch transient-mark-mode etc.
+  (with-temp-buffer
+    (let ((saved-tmm transient-mark-mode))
+      (setq transient-mark-mode 'identity)
+      (--command-loop-1-iter-mark-region)
+      ;; The Emacs-22 rotation only fires when mark-active; since it's
+      ;; nil here, transient-mark-mode is unchanged.
+      (should (eq 'identity transient-mark-mode))
+      (setq transient-mark-mode saved-tmm))))
+
+(ert-deftest m7b4-iter-mark-region/rotates-transient-mark-only ()
+  ;; When mark is active and transient-mark-mode is `only', rotate it
+  ;; to `identity'.
+  (with-temp-buffer
+    (insert "hello world")
+    (push-mark 1)
+    (setq transient-mark-mode 'only)
+    (--command-loop-1-iter-mark-region)
+    (should (eq 'identity transient-mark-mode))
+    (setq transient-mark-mode nil)))
+
+(ert-deftest m7b4-iter-mark-region/rotates-transient-mark-identity ()
+  ;; When mark is active and transient-mark-mode is `identity', clear it.
+  (with-temp-buffer
+    (insert "hello world")
+    (push-mark 1)
+    (setq transient-mark-mode 'identity)
+    (--command-loop-1-iter-mark-region)
+    (should (eq nil transient-mark-mode))))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here

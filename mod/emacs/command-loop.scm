@@ -5,6 +5,7 @@
             command-loop-1-iter-pre-read
             command-loop-1-iter-dispatch
             command-loop-1-iter-post-dispatch
+            command-loop-1-iter-mark-region
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -334,6 +335,77 @@ docs/keyboard.org §M7b3."
         ((force %cancel-echoing)))))
 
 ;;;;
+;;;; M7b4 — mark/region block
+;;;;
+
+(define %current-buffer-mark-active-p       (delay (%c '--current-buffer-mark-active-p)))
+(define %current-buffer-mark-has-buffer-p   (delay (%c '--current-buffer-mark-has-buffer-p)))
+(define %cl1-prev-buffer-current-p          (delay (%c '--cl1-prev-buffer-current-p)))
+(define %cl1-prev-modiff-current-p          (delay (%c '--cl1-prev-modiff-current-p)))
+
+(define (command-loop-1-iter-mark-region)
+  "Mark/region block of one iteration of command_loop_1's while-loop.
+Runs only when current-buffer's mark-active is non-nil and run-hooks
+is fboundp (startup guard).  Adjusts transient-mark-mode (the obsolete
+`only' / `identity' rotation), either dispatches deactivate-mark or
+synchronizes the PRIMARY selection + runs post-select-region-hook
+based on select-active-regions, and conditionally runs
+activate-mark-hook when the command changed the buffer or modified
+its contents.
+
+Mirrors lines 1916-1967 of the original C command_loop_1 body.  See
+docs/keyboard.org §M7b4."
+  (when (and (not (%nilp ((force %current-buffer-mark-active-p))))
+             ((%c 'fboundp) 'run-hooks))
+    ;; Emacs 22 compatibility: rotate transient-mark-mode's `only' /
+    ;; `identity' values.
+    (let ((tmm (symbol-value 'transient-mark-mode)))
+      (cond
+       ((eq? tmm 'identity) (set-symbol-value! 'transient-mark-mode #nil))
+       ((eq? tmm 'only)     (set-symbol-value! 'transient-mark-mode 'identity))))
+
+    (if (not (%nilp (symbol-value 'deactivate-mark)))
+        ;; If `select-active-regions' is non-nil this also sets PRIMARY.
+        ((%c 'deactivate-mark))
+        ;; Otherwise, optionally sync PRIMARY + run activate-mark-hook.
+        (let* ((window-system-p
+                (not (%nilp ((%c 'window-system) #nil))))
+               (tty-active-regions
+                (and (symbol-bound? 'tty-select-active-regions)
+                     (not (%nilp (symbol-value 'tty-select-active-regions)))))
+               (xterm-set-selection-p
+                (and tty-active-regions
+                     (not (%nilp ((%c 'terminal-parameter)
+                                  #nil 'xterm--set-selection)))))
+               (sar-trigger?
+                (let ((sar (symbol-value 'select-active-regions))
+                      (tmm (symbol-value 'transient-mark-mode)))
+                  (if (eq sar 'only)
+                      (eq (if (pair? tmm) (car tmm) #nil) 'only)
+                      (and (not (%nilp sar)) (not (%nilp tmm))))))
+               (inhibit-update?
+                (not (%nilp ((%c 'memq) (symbol-value 'this-command)
+                             (symbol-value 'selection-inhibit-update-commands))))))
+          (when (and (or window-system-p xterm-set-selection-p)
+                     ;; Even if mark-active is non-nil, the underlying
+                     ;; marker may not yet have a buffer (Bug#7044).
+                     (not (%nilp ((force %current-buffer-mark-has-buffer-p))))
+                     sar-trigger?
+                     (not inhibit-update?))
+            (let ((txt ((symbol-value 'region-extract-function) #nil)))
+              (when (> ((%c 'length) txt) 0)
+                ;; Don't set empty selections.
+                ((%c 'gui-set-selection) 'PRIMARY txt))
+              ((%c 'run-hook-with-args) 'post-select-region-hook txt)))
+          ;; activate-mark-hook fires only when the command changed
+          ;; buffer-state visible to the redisplay logic.
+          (when (or (%nilp ((force %cl1-prev-buffer-current-p)))
+                    (%nilp ((force %cl1-prev-modiff-current-p))))
+            ((%c 'run-hooks) 'activate-mark-hook))))
+
+    (set-symbol-value! 'saved-region-selection #nil)))
+
+;;;;
 ;;;; Registration
 ;;;;
 
@@ -347,4 +419,5 @@ command_loop_1_iter_pre_read."
             `((--command-loop-1-prologue           ,command-loop-1-prologue)
               (--command-loop-1-iter-pre-read      ,command-loop-1-iter-pre-read)
               (--command-loop-1-iter-dispatch      ,command-loop-1-iter-dispatch)
-              (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch))))
+              (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch)
+              (--command-loop-1-iter-mark-region   ,command-loop-1-iter-mark-region))))

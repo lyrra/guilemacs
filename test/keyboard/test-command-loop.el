@@ -211,4 +211,40 @@
 (test-equal "m7b3/zeros-this-command-key-count" 0 (--this-command-key-count))
 (test-equal "m7b3/zeros-single-key-start"       0 (--this-single-command-key-start))
 
+;;;; M7b4
+
+(test-assert "iter-mark-region/exists" (fboundp '--command-loop-1-iter-mark-region))
+
+(test-assert "m7b4-helper/mark-active-p"     (fboundp '--current-buffer-mark-active-p))
+(test-assert "m7b4-helper/mark-has-buffer-p" (fboundp '--current-buffer-mark-has-buffer-p))
+(test-assert "m7b4-helper/cl1-prev-buffer-current-p"
+             (fboundp '--cl1-prev-buffer-current-p))
+(test-assert "m7b4-helper/cl1-prev-modiff-current-p"
+             (fboundp '--cl1-prev-modiff-current-p))
+
+(with-temp-buffer
+  (test-eq "m7b4/mark-active-default-nil" nil (--current-buffer-mark-active-p)))
+
+(with-temp-buffer
+  (let ((saved transient-mark-mode))
+    (setq transient-mark-mode 'identity)
+    (--command-loop-1-iter-mark-region)
+    (test-eq "m7b4/no-op-when-mark-inactive" 'identity transient-mark-mode)
+    (setq transient-mark-mode saved)))
+
+(with-temp-buffer
+  (insert "hello world")
+  (push-mark 1)
+  (setq transient-mark-mode 'only)
+  (--command-loop-1-iter-mark-region)
+  (test-eq "m7b4/rotates-only-to-identity" 'identity transient-mark-mode)
+  (setq transient-mark-mode nil))
+
+(with-temp-buffer
+  (insert "hello world")
+  (push-mark 1)
+  (setq transient-mark-mode 'identity)
+  (--command-loop-1-iter-mark-region)
+  (test-eq "m7b4/rotates-identity-to-nil" nil transient-mark-mode))
+
 (test-end)

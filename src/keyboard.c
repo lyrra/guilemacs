@@ -1896,6 +1896,62 @@ command_loop_1_iter_post_dispatch (void)
   SCM_CALL_0 (proc);
 }
 
+/* M7b4 — primitives exposed to (emacs command-loop) for the
+   mark/region block.  See docs/keyboard.org §M7b4.  */
+
+DEFUN ("--current-buffer-mark-active-p", Fc_current_buffer_mark_active_p,
+       Sc_current_buffer_mark_active_p, 0, 0, 0,
+       doc: /* Internal: read BVAR (current_buffer, mark_active) as a
+non-nil predicate.  The buffer-local `mark-active' variable.  */)
+  (void)
+{
+  return NILP (BVAR (current_buffer, mark_active)) ? Qnil : Qt;
+}
+
+DEFUN ("--current-buffer-mark-has-buffer-p",
+       Fc_current_buffer_mark_has_buffer_p,
+       Sc_current_buffer_mark_has_buffer_p, 0, 0, 0,
+       doc: /* Internal: t if XMARKER (BVAR (current_buffer, mark))->buffer
+is non-NULL.  Mark-active can be t even when the underlying marker has
+no buffer (Bug#7044 guard).  */)
+  (void)
+{
+  return XMARKER (BVAR (current_buffer, mark))->buffer ? Qt : Qnil;
+}
+
+DEFUN ("--cl1-prev-buffer-current-p", Fc_cl1_prev_buffer_current_p,
+       Sc_cl1_prev_buffer_current_p, 0, 0, 0,
+       doc: /* Internal: t if the file-static cl1_prev_buffer (snapshot
+captured at the start of this iteration's dispatch) equals
+current_buffer.  False ⇒ the command changed buffer.  */)
+  (void)
+{
+  return current_buffer == cl1_prev_buffer ? Qt : Qnil;
+}
+
+DEFUN ("--cl1-prev-modiff-current-p", Fc_cl1_prev_modiff_current_p,
+       Sc_cl1_prev_modiff_current_p, 0, 0, 0,
+       doc: /* Internal: t if the file-static cl1_prev_modiff equals
+MODIFF on the current buffer.  False ⇒ the command modified the buffer.  */)
+  (void)
+{
+  return MODIFF == cl1_prev_modiff ? Qt : Qnil;
+}
+
+/* M7b4 — mark/region block of command_loop_1's while-loop body.
+   Runs the transient-mark-mode adjustments, deactivate-mark dispatch,
+   primary-selection sync, post-select-region-hook, and
+   activate-mark-hook.  See docs/keyboard.org §M7b4.  */
+static void
+command_loop_1_iter_mark_region (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop",
+                             "command-loop-1-iter-mark-region");
+  SCM_CALL_0 (proc);
+}
+
 static Lisp_Object
 command_loop_1 (void)
 {
@@ -1913,58 +1969,7 @@ command_loop_1 (void)
 
       command_loop_1_iter_post_dispatch ();
 
-      if (!NILP (BVAR (current_buffer, mark_active))
-	  && !NILP (Vrun_hooks))
-	{
-	  /* In Emacs 22, setting transient-mark-mode to `only' was a
-	     way of turning it on for just one command.  This usage is
-	     obsolete, but support it anyway.  */
-	  if (EQ (Vtransient_mark_mode, Qidentity))
-	    Vtransient_mark_mode = Qnil;
-	  else if (EQ (Vtransient_mark_mode, Qonly))
-	    Vtransient_mark_mode = Qidentity;
-
-	  if (!NILP (Vdeactivate_mark))
-	    /* If `select-active-regions' is non-nil, this call to
-	       `deactivate-mark' also sets the PRIMARY selection.  */
-	    call0 (Qdeactivate_mark);
-	  else
-	    {
-	      Lisp_Object symval;
-	      /* Even if not deactivating the mark, set PRIMARY if
-		 `select-active-regions' is non-nil.  */
-	      if ((!NILP (Fwindow_system (Qnil))
-		   || ((symval =
-			find_symbol_value (Qtty_select_active_regions),
-			(!BASE_EQ (symval, Qunbound) && !NILP (symval)))
-		       && !NILP (Fterminal_parameter (Qnil,
-						      Qxterm__set_selection))))
-		  /* Even if mark_active is non-nil, the actual buffer
-		     marker may not have been set yet (Bug#7044).  */
-		  && XMARKER (BVAR (current_buffer, mark))->buffer
-		  && (EQ (Vselect_active_regions, Qonly)
-		      ? EQ (CAR_SAFE (Vtransient_mark_mode), Qonly)
-		      : (!NILP (Vselect_active_regions)
-			 && !NILP (Vtransient_mark_mode)))
-		  && NILP (Fmemq (Vthis_command,
-				  Vselection_inhibit_update_commands)))
-		{
-		  Lisp_Object txt
-		    = call1 (Vregion_extract_function, Qnil);
-
-		  if (XFIXNUM (Flength (txt)) > 0)
-		    /* Don't set empty selections.  */
-		    call2 (Qgui_set_selection, QPRIMARY, txt);
-
-		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
-		}
-
-	      if (current_buffer != cl1_prev_buffer || MODIFF != cl1_prev_modiff)
-		run_hook (Qactivate_mark_hook);
-	    }
-
-	  Vsaved_region_selection = Qnil;
-	}
+      command_loop_1_iter_mark_region ();
 
     finalize:
 
