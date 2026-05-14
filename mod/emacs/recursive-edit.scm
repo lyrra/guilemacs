@@ -4,6 +4,7 @@
   #:export (exit-recursive-edit
             abort-recursive-edit
             recursion-depth
+            top-level
             init-recursive-edit-registrations))
 
 ;;; M4 — Three user-facing recursive-edit DEFUNs ported from
@@ -52,10 +53,23 @@ Mirrors the C body of Frecursion_depth."
   (+ ((%c '--command-loop-level))
      ((%c '--minibuf-level))))
 
+(define (top-level)
+  "Exit all recursive editing levels and active minibuffers by
+throwing to the `top-level' tag.  Mirrors C Ftop_level.
+
+Drops any held interrupt-input nesting first (a no-op in batch but
+important when redisplay traps with input blocked during a tool-bar
+update on a window system).  The HAVE_WINDOW_SYSTEM hourglass-cancel
+that the C version did is deferred until M7 (it lives in xdisp.c
+and is irrelevant in batch and TTY)."
+  ((%c '--totally-unblock-input))
+  ((%c 'throw) 'top-level #nil))
+
 (define (init-recursive-edit-registrations)
-  "Register the three user-facing DEFUNs against their elisp symbols."
+  "Register the user-facing DEFUNs against their elisp symbols."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((exit-recursive-edit  ,exit-recursive-edit)
               (abort-recursive-edit ,abort-recursive-edit)
-              (recursion-depth      ,recursion-depth))))
+              (recursion-depth      ,recursion-depth)
+              (top-level            ,top-level))))

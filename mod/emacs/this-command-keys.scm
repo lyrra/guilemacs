@@ -1,11 +1,13 @@
 (define-module (emacs this-command-keys)
   #:use-module (emacs-elisp runtime)
+  #:use-module ((emacs event-modifiers) #:select (modifier-bit))
   #:declarative? #t
   #:export (this-command-keys
             this-command-keys-vector
             this-single-command-keys
             this-single-command-raw-keys
             clear-this-command-keys
+            set--this-command-keys
             init-this-command-keys-registrations))
 
 ;;; M5 — Read-side DEFUNs for the this-command-keys subsystem,
@@ -90,15 +92,59 @@ Fclear_this_command_keys."
     #nil))
 
 ;;;;
+;;;; set--this-command-keys (internal: novice.el M-x dispatch)
+;;;;
+
+(define %meta-bit (modifier-bit 'meta))
+
+(define (%normalize-char c)
+  "If C is a byte-8 raw char, fold to its byte representation; else
+return C unchanged.  Mirrors the CHAR_BYTE8_P / CHAR_TO_BYTE8 guard
+that wraps each fetch_string_char_advance call in the C body."
+  (let ((byte-8-p  (%c 'char-byte-8-p))
+        (to-byte-8 (%c 'char-to-byte-8)))
+    (if (and (not (eq? byte-8-p  #nil))
+             (not (eq? (byte-8-p c) #nil)))
+        (to-byte-8 c)
+        c)))
+
+(define (set--this-command-keys keys)
+  "Set the vector returned by `this-command-keys' to be made up of the
+characters of KEYS (a string).  Mirrors C Fset__this_command_keys —
+internal use only (called from novice.el during M-x dispatch).
+
+Preserves the 248 (\\370 = \"Meta-x\") kludge: when the first character
+is 248, the inserted event is the integer (logior ?x meta-modifier)
+rather than 248 itself."
+  (unless ((%c 'stringp) keys)
+    ((%c 'signal) 'wrong-type-argument (list 'stringp keys)))
+  ((%c '--set-this-command-key-count) 0)
+  ((%c '--set-this-single-command-key-start) 0)
+  (let ((len ((%c 'length) keys))
+        (aref (%c 'aref)))
+    (when (> len 0)
+      (let ((key0 (%normalize-char (aref keys 0))))
+        (if (= key0 248)
+            ((%c '--add-command-key) (logior (char->integer #\x) %meta-bit))
+            ((%c '--add-command-key) key0)))
+      (let loop ((i 1))
+        (when (< i len)
+          (let ((key-i (%normalize-char (aref keys i))))
+            ((%c '--add-command-key) key-i)
+            (loop (+ i 1)))))))
+  #nil)
+
+;;;;
 ;;;; Registration
 ;;;;
 
 (define (init-this-command-keys-registrations)
-  "Register the five user-facing DEFUNs against their elisp symbols."
+  "Register the user-facing DEFUNs against their elisp symbols."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((this-command-keys            ,this-command-keys)
               (this-command-keys-vector     ,this-command-keys-vector)
               (this-single-command-keys     ,this-single-command-keys)
               (this-single-command-raw-keys ,this-single-command-raw-keys)
-              (clear-this-command-keys      ,clear-this-command-keys))))
+              (clear-this-command-keys      ,clear-this-command-keys)
+              (set--this-command-keys       ,set--this-command-keys))))

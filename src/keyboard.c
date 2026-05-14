@@ -1316,22 +1316,35 @@ top_level_1 (Lisp_Object ignore)
   return Qnil;
 }
 
+/* Consolidation: helper used by top-level in (emacs recursive-edit).  */
+DEFUN ("--totally-unblock-input", Fc_totally_unblock_input,
+       Sc_totally_unblock_input, 0, 0, 0,
+       doc: /* Internal: drop the interrupt-input-blocked nesting to zero.
+Used by top-level when it enters with input still blocked
+(e.g. redisplay trap during tool-bar update).  */)
+  (void)
+{
+  totally_unblock_input ();
+  return Qnil;
+}
+
 DEFUN ("top-level", Ftop_level, Stop_level, 0, 0, "",
        doc: /* Exit all recursive editing levels.
 This also exits all active minibuffers.  */
        attributes: noreturn)
   (void)
 {
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
-#endif
-
-  /* Unblock input if we enter with input blocked.  This may happen if
-     redisplay traps e.g. during tool-bar update with input blocked.  */
-  totally_unblock_input ();
-
-  Fthrow (Qtop_level, Qnil);
+  /* Consolidation: dispatch to (emacs recursive-edit) — see docs/keyboard.org
+     §Consolidation.  The HAVE_WINDOW_SYSTEM hourglass-cancel and the
+     totally_unblock_input call both happen on the Scheme side via
+     --totally-unblock-input (the hourglass-cancel is a no-op in batch
+     and only needed for X/W32; deferred until M7 since it lives in
+     xdisp.c).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "top-level");
+  SCM_CALL_0 (proc);
+  emacs_abort ();  /* unreachable: top-level must throw */
 }
 
 static AVOID
@@ -11594,6 +11607,29 @@ nil.  Mirrors the inner loop of the original C Fclear_this_command_keys.  */)
   return Qnil;
 }
 
+/* Consolidation: helpers used by set--this-command-keys in
+   (emacs this-command-keys) when porting the M-x kludge from C.  */
+
+DEFUN ("--add-command-key", Fc_add_command_key, Sc_add_command_key, 1, 1, 0,
+       doc: /* Internal: append KEY to this_command_keys via the C
+add_command_key helper.  Same defensive corruption check as the C
+hot-path callers (read_char_1, read_key_sequence, set--this-command-keys).  */)
+  (Lisp_Object key)
+{
+  add_command_key (key);
+  return Qnil;
+}
+
+DEFUN ("--set-this-single-command-key-start", Fc_set_this_single_command_key_start,
+       Sc_set_this_single_command_key_start, 1, 1, 0,
+       doc: /* Internal: set this_single_command_key_start to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  this_single_command_key_start = XFIXNAT (n);
+  return Qnil;
+}
+
 DEFUN ("this-command-keys", Fthis_command_keys, Sthis_command_keys, 0, 0, 0,
        doc: /* Return the key sequence that invoked this command.
 However, if the command has called `read-key-sequence', it returns
@@ -11617,30 +11653,13 @@ The argument KEYS must be a string.
 Internal use only.  */)
   (Lisp_Object keys)
 {
-  CHECK_STRING (keys);
-
-  this_command_key_count = 0;
-  this_single_command_key_start = 0;
-
-  ptrdiff_t charidx = 0, byteidx = 0;
-  int key0 = fetch_string_char_advance (keys, &charidx, &byteidx);
-  if (CHAR_BYTE8_P (key0))
-    key0 = CHAR_TO_BYTE8 (key0);
-
-  /* Kludge alert: this makes M-x be in the form expected by
-     novice.el.  (248 is \370, a.k.a. "Meta-x".)  Any better ideas?  */
-  if (key0 == 248)
-    add_command_key (make_fixnum ('x' | meta_modifier));
-  else
-    add_command_key (make_fixnum (key0));
-  for (ptrdiff_t i = 1; i < SCHARS (keys); i++)
-    {
-      int key_i = fetch_string_char_advance (keys, &charidx, &byteidx);
-      if (CHAR_BYTE8_P (key_i))
-	key_i = CHAR_TO_BYTE8 (key_i);
-      add_command_key (make_fixnum (key_i));
-    }
-  return Qnil;
+  /* Consolidation: dispatch to (emacs this-command-keys) — see
+     docs/keyboard.org §Consolidation.  The byte-8 normalization, the
+     M-x kludge (248 → meta-x), and the iteration all live in Scheme.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "set--this-command-keys");
+  return SCM_CALL_1 (proc, keys);
 }
 
 DEFUN ("this-command-keys-vector", Fthis_command_keys_vector, Sthis_command_keys_vector, 0, 0, 0,
