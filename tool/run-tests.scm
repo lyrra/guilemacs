@@ -81,6 +81,7 @@
   "test/keyboard/ertest-recursive-edit.el"  ; M4
   "test/keyboard/ertest-this-command-keys.el" ; M5
   "test/keyboard/ertest-consolidation.el"   ; Consolidation
+  "test/keyboard/ertest-command-loop.el"    ; M7a
   )
 (group
   "test/src/eval-tests.el"

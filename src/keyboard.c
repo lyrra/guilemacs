@@ -1474,46 +1474,86 @@ static int read_key_sequence (Lisp_Object *, Lisp_Object,
                               bool, bool, bool, bool, bool);
 static void adjust_point_for_property (ptrdiff_t, bool);
 
+/* M7a — primitives exposed to (emacs command-loop) for the
+   command_loop_1 prologue port.  See docs/keyboard.org §M7a.  */
+
+DEFUN ("--cancel-echoing", Fc_cancel_echoing, Sc_cancel_echoing, 0, 0, 0,
+       doc: /* Internal: clear echo state on current_kboard.
+Wraps the C cancel_echoing helper used by command_loop_1's prologue.  */)
+  (void)
+{
+  cancel_echoing ();
+  return Qnil;
+}
+
+DEFUN ("--safe-run-hooks", Fc_safe_run_hooks, Sc_safe_run_hooks, 1, 1, 0,
+       doc: /* Internal: run HOOK under specbind inhibit-quit=t,
+without resizing or narrowing.  Wraps C safe_run_hooks.  */)
+  (Lisp_Object hook)
+{
+  safe_run_hooks (hook);
+  return Qnil;
+}
+
+DEFUN ("--safe-run-hooks-maybe-narrowed-selected",
+       Fc_safe_run_hooks_maybe_narrowed_selected,
+       Sc_safe_run_hooks_maybe_narrowed_selected, 1, 1, 0,
+       doc: /* Internal: run HOOK under specbind inhibit-quit=t with
+maybe-narrowing applied against XWINDOW (selected_window).  Wraps C
+safe_run_hooks_maybe_narrowed.  */)
+  (Lisp_Object hook)
+{
+  safe_run_hooks_maybe_narrowed (hook, XWINDOW (selected_window));
+  return Qnil;
+}
+
+DEFUN ("--resize-echo-area-exactly", Fc_resize_echo_area_exactly,
+       Sc_resize_echo_area_exactly, 0, 0, 0,
+       doc: /* Internal: resize the echo-area window to fit its current
+message.  Wraps xdisp.c resize_echo_area_exactly.  */)
+  (void)
+{
+  resize_echo_area_exactly ();
+  return Qnil;
+}
+
+DEFUN ("--echo-area-buffer-0-non-empty-p", Fc_echo_area_buffer_0_non_empty_p,
+       Sc_echo_area_buffer_0_non_empty_p, 0, 0, 0,
+       doc: /* Internal: return t if echo_area_buffer[0] is non-nil.  */)
+  (void)
+{
+  return NILP (echo_area_buffer[0]) ? Qnil : Qt;
+}
+
+DEFUN ("--clear-waiting-for-input", Fc_clear_waiting_for_input,
+       Sc_clear_waiting_for_input, 0, 0, 0,
+       doc: /* Internal: clear the C waiting_for_input flag.  */)
+  (void)
+{
+  waiting_for_input = false;
+  return Qnil;
+}
+
+static void
+command_loop_1_prologue (void)
+{
+  /* M7a: dispatch to (emacs command-loop) — see docs/keyboard.org §M7a.
+     The Scheme implementation lives in mod/emacs/command-loop.scm and
+     mirrors the original C body bit-for-bit; verified by the keyboard
+     regression suite plus an interactive smoke under -Q.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-prologue");
+  SCM_CALL_0 (proc);
+}
+
 static Lisp_Object
 command_loop_1 (void)
 {
   modiff_count prev_modiff = 0;
   struct buffer *prev_buffer = NULL;
 
-  kset_prefix_arg (current_kboard, Qnil);
-  kset_last_prefix_arg (current_kboard, Qnil);
-  Vdeactivate_mark = Qnil;
-  waiting_for_input = false;
-  cancel_echoing ();
-
-  this_command_key_count = 0;
-  this_single_command_key_start = 0;
-
-  if (NILP (Vmemory_full))
-    {
-      /* Make sure this hook runs after commands that get errors and
-	 throw to top level.  */
-      /* Note that the value cell will never directly contain nil
-	 if the symbol is a local variable.  */
-      if (!NILP (Vpost_command_hook) && !NILP (Vrun_hooks))
-	safe_run_hooks_maybe_narrowed (Qpost_command_hook,
-				       XWINDOW (selected_window));
-
-      /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  */
-      if (!NILP (echo_area_buffer[0]))
-	resize_echo_area_exactly ();
-
-      /* If there are warnings waiting, process them.  */
-      if (!NILP (Vdelayed_warnings_list))
-        safe_run_hooks (Qdelayed_warnings_hook);
-    }
-
-  /* Do this after running Vpost_command_hook, for consistency.  */
-  kset_last_command (current_kboard, Vthis_command);
-  kset_real_last_command (current_kboard, Vreal_this_command);
-  if (!CONSP (last_command_event))
-    kset_last_repeatable_command (current_kboard, Vreal_this_command);
+  command_loop_1_prologue ();
 
   while (true)
     {

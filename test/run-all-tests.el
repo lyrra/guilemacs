@@ -133,6 +133,7 @@
 (load "test/keyboard/test-recursive-edit.el")    ; M4
 (load "test/keyboard/test-this-command-keys.el") ; M5
 (load "test/keyboard/test-consolidation.el")     ; Consolidation
+(load "test/keyboard/test-command-loop.el")      ; M7a
 (message "")
 
 (message "========================================")
