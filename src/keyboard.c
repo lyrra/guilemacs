@@ -1547,216 +1547,313 @@ command_loop_1_prologue (void)
   SCM_CALL_0 (proc);
 }
 
+/* M7b1 — primitives exposed to (emacs command-loop) for the
+   pre-read portion of command_loop_1's main loop body.  See
+   docs/keyboard.org §M7b1.  */
+
+DEFUN ("--selected-frame-live-p", Fc_selected_frame_live_p,
+       Sc_selected_frame_live_p, 0, 0, 0,
+       doc: /* Internal: t if the selected frame is still live.  */)
+  (void)
+{
+  return FRAME_LIVE_P (XFRAME (selected_frame)) ? Qt : Qnil;
+}
+
+DEFUN ("--set-buffer-from-selected-window", Fc_set_buffer_from_selected_window,
+       Sc_set_buffer_from_selected_window, 0, 0, 0,
+       doc: /* Internal: switch current_buffer to the selected window's buffer.
+Mirrors the `set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents))'
+calls at top and bottom of command_loop_1's iteration.  */)
+  (void)
+{
+  set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
+  return Qnil;
+}
+
+DEFUN ("--display-pending-malloc-warnings-loop", Fc_display_pending_malloc_warnings_loop,
+       Sc_display_pending_malloc_warnings_loop, 0, 0, 0,
+       doc: /* Internal: drain pending_malloc_warning, calling
+display_malloc_warning until clear.  */)
+  (void)
+{
+  while (pending_malloc_warning)
+    display_malloc_warning ();
+  return Qnil;
+}
+
+DEFUN ("--clear-ignore-mouse-drag", Fc_clear_ignore_mouse_drag,
+       Sc_clear_ignore_mouse_drag, 0, 0, 0,
+       doc: /* Internal: clear the C ignore_mouse_drag_p flag.  */)
+  (void)
+{
+  ignore_mouse_drag_p = false;
+  return Qnil;
+}
+
+DEFUN ("--minibuf-and-echo-area-aligned-p", Fc_minibuf_and_echo_area_aligned_p,
+       Sc_minibuf_and_echo_area_aligned_p, 0, 0, 0,
+       doc: /* Internal: t when all four conditions hold for the
+minibuffer-message timing dance at the top of command_loop_1's iter:
+  minibuf_level > 0
+  && echo_area_buffer[0] non-nil
+  && minibuf_window == echo_area_window
+  && Vminibuffer_message_timeout is a number.  */)
+  (void)
+{
+  return (minibuf_level
+          && !NILP (echo_area_buffer[0])
+          && BASE_EQ (minibuf_window, echo_area_window)
+          && NUMBERP (Vminibuffer_message_timeout))
+    ? Qt : Qnil;
+}
+
+DEFUN ("--resize-mini-window-minibuf-non-shrink",
+       Fc_resize_mini_window_minibuf_non_shrink,
+       Sc_resize_mini_window_minibuf_non_shrink, 0, 0, 0,
+       doc: /* Internal: resize_mini_window (XWINDOW (minibuf_window), false).  */)
+  (void)
+{
+  resize_mini_window (XWINDOW (minibuf_window), false);
+  return Qnil;
+}
+
+DEFUN ("--quit-char", Fc_quit_char_, Sc_quit_char_, 0, 0, 0,
+       doc: /* Internal: return the current C quit_char as a fixnum
+(default 7, ASCII C-g).  Used by command_loop_1's minibuffer-timeout
+branch when re-queueing a C-g into unread-command-events.  */)
+  (void)
+{
+  return make_fixnum (quit_char);
+}
+
+DEFUN ("--set-raw-keybuf-count", Fc_set_raw_keybuf_count, Sc_set_raw_keybuf_count, 1, 1, 0,
+       doc: /* Internal: set raw_keybuf_count to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  raw_keybuf_count = XFIXNAT (n);
+  return Qnil;
+}
+
+DEFUN ("--read-key-sequence", Fc_read_key_sequence_, Sc_read_key_sequence_, 0, 0, 0,
+       doc: /* Internal: read the next key sequence from the active input source.
+Wraps the C read_key_sequence(keybuf, Qnil, false, true, true, false, false)
+call used by command_loop_1.  Side effects: read_key_sequence_cmd /
+read_key_sequence_remapped get set, raw_keybuf is populated.  When the
+returned length is > 0 this subr also sets last_command_event to the
+last key in the sequence; on EOF (0) or menu-reject (-1) it leaves
+last_command_event alone.  Returns the integer length.  */)
+  (void)
+{
+  Lisp_Object keybuf[READ_KEY_ELTS];
+  int i = read_key_sequence (keybuf, Qnil, false, true, true, false, false);
+  if (i > 0)
+    last_command_event = keybuf[i - 1];
+  return make_fixnum (i);
+}
+
+DEFUN ("--inc-num-input-keys", Fc_inc_num_input_keys, Sc_inc_num_input_keys, 0, 0, 0,
+       doc: /* Internal: increment num_input_keys.  */)
+  (void)
+{
+  ++num_input_keys;
+  return Qnil;
+}
+
+/* M7b1 — pre-read portion of command_loop_1's while-loop body.
+   Dispatches to (emacs command-loop).  Returns:
+     0 — OK, continue iteration with `last_command_event' set.
+     1 — EOF (caller should return Qnil from command_loop_1).
+     2 — Menu rejected (caller should goto finalize).
+   See docs/keyboard.org §M7b1.  */
+static int
+command_loop_1_iter_pre_read (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-iter-pre-read");
+  return scm_to_int (SCM_CALL_0 (proc));
+}
+
+/* M7b2 — dispatch portion of command_loop_1's while-loop body, including
+   pre-command-hook and the command-execute call.  Shared state
+   (`prev_buffer', `prev_modiff') was promoted from command_loop_1 locals
+   to file-static here so M7b3/M7c can still read them once they move to
+   Scheme too.  See docs/keyboard.org §M7b2.  */
+
+static modiff_count cl1_prev_modiff = 0;
+static struct buffer *cl1_prev_buffer = NULL;
+
+DEFUN ("--clear-force-start-and-flush-buffer-unchanged",
+       Fc_clear_force_start_and_flush_buffer_unchanged,
+       Sc_clear_force_start_and_flush_buffer_unchanged, 0, 0, 0,
+       doc: /* Internal: if the selected window has force_start set, clear it
+and zero BUF_BEG_UNCHANGED/BUF_END_UNCHANGED on its buffer.  No-op
+otherwise.  */)
+  (void)
+{
+  if (XWINDOW (selected_window)->force_start)
+    {
+      struct buffer *b;
+      XWINDOW (selected_window)->force_start = 0;
+      b = XBUFFER (XWINDOW (selected_window)->contents);
+      BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
+    }
+  return Qnil;
+}
+
+DEFUN ("--read-key-sequence-cmd", Fc_read_key_sequence_cmd,
+       Sc_read_key_sequence_cmd, 0, 0, 0,
+       doc: /* Internal: return the C-side read_key_sequence_cmd
+(the command symbol the last read_key_sequence call resolved to).  */)
+  (void)
+{
+  return read_key_sequence_cmd;
+}
+
+DEFUN ("--read-key-sequence-remapped", Fc_read_key_sequence_remapped,
+       Sc_read_key_sequence_remapped, 0, 0, 0,
+       doc: /* Internal: return the C-side read_key_sequence_remapped
+(the post-remap target if `read_key_sequence' followed `command-remapping').  */)
+  (void)
+{
+  return read_key_sequence_remapped;
+}
+
+DEFUN ("--maybe-quit", Fc_maybe_quit, Sc_maybe_quit, 0, 0, 0,
+       doc: /* Internal: call C maybe_quit().  Signals quit if Vquit_flag is set
+and inhibit-quit is nil.  */)
+  (void)
+{
+  maybe_quit ();
+  return Qnil;
+}
+
+DEFUN ("--save-state-for-redisplay-get-pt",
+       Fc_save_state_for_redisplay_get_pt,
+       Sc_save_state_for_redisplay_get_pt, 0, 0, 0,
+       doc: /* Internal: set cl1_prev_buffer = current_buffer,
+cl1_prev_modiff = MODIFF, last_point_position = PT.  Return PT as a
+fixnum (caller saves it as `last_pt' to restore after command-execute).  */)
+  (void)
+{
+  cl1_prev_buffer = current_buffer;
+  cl1_prev_modiff = MODIFF;
+  last_point_position = PT;
+  return make_fixnum (PT);
+}
+
+DEFUN ("--restore-last-point-position", Fc_restore_last_point_position,
+       Sc_restore_last_point_position, 1, 1, 0,
+       doc: /* Internal: set last_point_position to N.  Used after
+command-execute to restore the pre-command PT (which may have been
+clobbered by a recursive-edit inside the command).  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  last_point_position = XFIXNAT (n);
+  return Qnil;
+}
+
+DEFUN ("--record-recent-keys-cmd-pseudo-event",
+       Fc_record_recent_keys_cmd_pseudo_event,
+       Sc_record_recent_keys_cmd_pseudo_event, 1, 1, 0,
+       doc: /* Internal: push the (nil . CMD) pseudo-event into the
+recent_keys ring, with lossage rotation.  Mirrors the inline block in
+command_loop_1 dispatch.  */)
+  (Lisp_Object cmd)
+{
+  total_keys += total_keys < lossage_limit;
+  ASET (recent_keys, recent_keys_index, Fcons (Qnil, cmd));
+  if (++recent_keys_index >= lossage_limit)
+    recent_keys_index = 0;
+  return Qnil;
+}
+
+DEFUN ("--with-hourglass-protection", Fc_with_hourglass_protection,
+       Sc_with_hourglass_protection, 1, 1, 0,
+       doc: /* Internal: invoke THUNK inside a dynwind frame that
+records cancel_hourglass as the unwind handler and calls start_hourglass
+on the way in — but only when HAVE_WINDOW_SYSTEM, display_hourglass_p,
+and not inside a kbd macro.  In batch / tty it is a plain
+funcall-the-thunk.  Returns whatever THUNK returns.  */)
+  (Lisp_Object thunk)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  dynwind_begin ();
+  if (display_hourglass_p && NILP (Vexecuting_kbd_macro))
+    {
+      record_unwind_protect_void (cancel_hourglass);
+      start_hourglass ();
+    }
+  Lisp_Object r = call0 (thunk);
+  dynwind_end ();
+  return r;
+#else
+  return call0 (thunk);
+#endif
+}
+
+DEFUN ("--save-point-before-last-command-or-undo",
+       Fc_save_point_before_last_command_or_undo,
+       Sc_save_point_before_last_command_or_undo, 0, 0, 0,
+       doc: /* Internal: snapshot point_before_last_command_or_undo = PT
+and buffer_before_last_command_or_undo = current_buffer.  Used by undo
+machinery to put point into the undo information if needed.  */)
+  (void)
+{
+  point_before_last_command_or_undo = PT;
+  buffer_before_last_command_or_undo = current_buffer;
+  return Qnil;
+}
+
+DEFUN ("--reset-redisplay-tick-state", Fc_reset_redisplay_tick_state,
+       Sc_reset_redisplay_tick_state, 0, 0, 0,
+       doc: /* Internal: update_redisplay_ticks (0, NULL) +
+display_working_on_window_p = false.  Run before command-execute so the
+new command isn't charged for the previous command's redisplay cost.  */)
+  (void)
+{
+  update_redisplay_ticks (0, NULL);
+  display_working_on_window_p = false;
+  return Qnil;
+}
+
+DEFUN ("--clear-display-working-on-window-p",
+       Fc_clear_display_working_on_window_p,
+       Sc_clear_display_working_on_window_p, 0, 0, 0,
+       doc: /* Internal: display_working_on_window_p = false.  Called
+again after command-execute returns.  */)
+  (void)
+{
+  display_working_on_window_p = false;
+  return Qnil;
+}
+
+static void
+command_loop_1_iter_dispatch (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-iter-dispatch");
+  SCM_CALL_0 (proc);
+}
+
 static Lisp_Object
 command_loop_1 (void)
 {
-  modiff_count prev_modiff = 0;
-  struct buffer *prev_buffer = NULL;
-
   command_loop_1_prologue ();
 
   while (true)
     {
-      Lisp_Object cmd;
-
-      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil, Qnil);
-
-      /* Make sure the current window's buffer is selected.  */
-      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
-
-      /* Display any malloc warning that just came out.  Use while because
-	 displaying one warning can cause another.  */
-
-      while (pending_malloc_warning)
-	display_malloc_warning ();
-
-      Vdeactivate_mark = Qnil;
-
-      /* Don't ignore mouse movements for more than a single command
-	 loop.  (This flag is set in xdisp.c whenever the tool bar is
-	 resized, because the resize moves text up or down, and would
-	 generate false mouse drag events if we don't ignore them.)  */
-      ignore_mouse_drag_p = false;
-
-      /* If minibuffer on and echo area in use,
-	 wait a short time and redraw minibuffer.  */
-
-      if (minibuf_level
-	  && !NILP (echo_area_buffer[0])
-	  && BASE_EQ (minibuf_window, echo_area_window)
-	  && NUMBERP (Vminibuffer_message_timeout))
-	{
-	  /* Bind inhibit-quit to t so that C-g gets read in
-	     rather than quitting back to the minibuffer.  */
-          dynwind_begin ();
-	  specbind_guile (Qinhibit_quit, Qt);
-
-	  sit_for (Vminibuffer_message_timeout, 0, 2);
-
-	  /* Clear the echo area.  */
-	  message1 (0);
-	  safe_run_hooks (Qecho_area_clear_hook);
-
-	  /* We cleared the echo area, and the minibuffer will now
-	     show, so resize the mini-window in case the minibuffer
-	     needs more or less space than the echo area.  */
-	  resize_mini_window (XWINDOW (minibuf_window), false);
-
-	  dynwind_end ();
-
-	  /* If a C-g came in before, treat it as input now.  */
-	  if (!NILP (Vquit_flag))
-	    {
-	      Vquit_flag = Qnil;
-	      Vunread_command_events = list1i (quit_char);
-	    }
-	}
-
-      Vthis_command = Qnil;
-      Vreal_this_command = Qnil;
-      Vthis_original_command = Qnil;
-      Vthis_command_keys_shift_translated = Qnil;
-
-      /* Read next key sequence; i gets its length.  */
-      raw_keybuf_count = 0;
-      Lisp_Object keybuf[READ_KEY_ELTS];
-      int i = read_key_sequence (keybuf, Qnil, false, true, true, false,
-				 false);
-
-      /* A filter may have run while we were reading the input.  */
-      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-	Fkill_emacs (Qnil, Qnil);
-      set_buffer_internal (XBUFFER (XWINDOW (selected_window)->contents));
-
-      ++num_input_keys;
-
-      /* Now we have read a key sequence of length I,
-	 or else I is 0 and we found end of file.  */
-
-      if (i == 0)		/* End of file -- happens only in */
-	return Qnil;		/* a kbd macro, at the end.  */
-      /* -1 means read_key_sequence got a menu that was rejected.
-	 Just loop around and read another command.  */
-      if (i == -1)
-	{
-	  cancel_echoing ();
-	  this_command_key_count = 0;
-	  this_single_command_key_start = 0;
-	  goto finalize;
-	}
-
-      last_command_event = keybuf[i - 1];
-
-      /* If the previous command tried to force a specific window-start,
-	 forget about that, in case this command moves point far away
-	 from that position.  But also throw away beg_unchanged and
-	 end_unchanged information in that case, so that redisplay will
-	 update the whole window properly.  */
-      if (XWINDOW (selected_window)->force_start)
-	{
-	  struct buffer *b;
-	  XWINDOW (selected_window)->force_start = 0;
-	  b = XBUFFER (XWINDOW (selected_window)->contents);
-	  BUF_BEG_UNCHANGED (b) = BUF_END_UNCHANGED (b) = 0;
-	}
-
-      cmd = read_key_sequence_cmd;
-      if (!NILP (Vexecuting_kbd_macro))
-	{
-	  if (!NILP (Vquit_flag))
-	    {
-	      Vexecuting_kbd_macro = Qt;
-	      maybe_quit ();	/* Make some noise.  */
-				/* Will return since macro now empty.  */
-	    }
-	}
-
-      /* Do redisplay processing after this command except in special
-	 cases identified below.  */
-      prev_buffer = current_buffer;
-      prev_modiff = MODIFF;
-      last_point_position = PT;
-      ptrdiff_t last_pt = PT;
-
-      /* By default, we adjust point to a boundary of a region that
-         has such a property that should be treated intangible
-         (e.g. composition, display).  But, some commands will set
-         this variable differently.  */
-      Vdisable_point_adjustment = Qnil;
-
-      /* Process filters and timers may have messed with deactivate-mark.
-	 reset it before we execute the command.  */
-      Vdeactivate_mark = Qnil;
-
-      /* Remap command through active keymaps.  */
-      Vthis_original_command = cmd;
-      if (!NILP (read_key_sequence_remapped))
-	cmd = read_key_sequence_remapped;
-
-      /* Execute the command.  */
-
       {
-	total_keys += total_keys < lossage_limit;
-	ASET (recent_keys, recent_keys_index,
-	      Fcons (Qnil, cmd));
-	if (++recent_keys_index >= lossage_limit)
-	  recent_keys_index = 0;
+	int outcome = command_loop_1_iter_pre_read ();
+	if (outcome == 1) return Qnil;
+	if (outcome == 2) goto finalize;
       }
-      Vthis_command = cmd;
-      Vreal_this_command = cmd;
 
-      safe_run_hooks_maybe_narrowed (Qpre_command_hook,
-				     XWINDOW (selected_window));
+      command_loop_1_iter_dispatch ();
 
-      if (NILP (Vthis_command))
-	/* nil means key is undefined.  */
-	call0 (Qundefined);
-      else
-	{
-	  /* Here for a command that isn't executed directly.  */
-
-#ifdef HAVE_WINDOW_SYSTEM
-            dynwind_begin ();
-
-            if (display_hourglass_p
-                && NILP (Vexecuting_kbd_macro))
-              {
-                record_unwind_protect_void (cancel_hourglass);
-                start_hourglass ();
-              }
-#endif
-
-            /* Ensure that we have added appropriate undo-boundaries as a
-               result of changes from the last command. */
-            call0 (Qundo_auto__add_boundary);
-
-            /* Record point and buffer, so we can put point into the undo
-               information if necessary. */
-            point_before_last_command_or_undo = PT;
-            buffer_before_last_command_or_undo = current_buffer;
-
-	    /* Restart our counting of redisplay ticks before
-	       executing the command, so that we don't blame the new
-	       command for the sins of the previous one.  */
-	    update_redisplay_ticks (0, NULL);
-	    display_working_on_window_p = false;
-
-            call1 (Qcommand_execute, Vthis_command);
-	    display_working_on_window_p = false;
-
-#ifdef HAVE_WINDOW_SYSTEM
-	  /* Do not check display_hourglass_p here, because
-	     `command-execute' could change it, but we should cancel
-	     hourglass cursor anyway.
-	     But don't cancel the hourglass within a macro
-	     just because a command in the macro finishes.  */
-            dynwind_end ();
-#endif
-          }
-      /* Restore last PT position value, possibly clobbered by
-         recursive-edit invoked by the command we just executed.  */
-      last_point_position = last_pt;
       kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
 
       safe_run_hooks_maybe_narrowed (Qpost_command_hook,
@@ -1839,7 +1936,7 @@ command_loop_1 (void)
 		  CALLN (Frun_hook_with_args, Qpost_select_region_hook, txt);
 		}
 
-	      if (current_buffer != prev_buffer || MODIFF != prev_modiff)
+	      if (current_buffer != cl1_prev_buffer || MODIFF != cl1_prev_modiff)
 		run_hook (Qactivate_mark_hook);
 	    }
 
@@ -1848,7 +1945,7 @@ command_loop_1 (void)
 
     finalize:
 
-      if (current_buffer == prev_buffer
+      if (current_buffer == cl1_prev_buffer
 	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
 	  && last_point_position != PT)
 	{
@@ -1867,7 +1964,7 @@ command_loop_1 (void)
 		   display.  */
 		windows_or_buffers_changed = 21;
 	      adjust_point_for_property (last_point_position,
-					 MODIFF != prev_modiff);
+					 MODIFF != cl1_prev_modiff);
 	    }
 	  else if (PT > BEGV && PT < ZV
 		   && (composition_adjust_point (last_point_position, PT)

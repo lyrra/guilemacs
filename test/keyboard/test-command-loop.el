@@ -81,4 +81,95 @@
   (remove-hook 'post-command-hook hook)
   (setq memory-full nil))
 
+;;;; M7b1
+
+(test-assert "iter-pre-read/exists" (fboundp '--command-loop-1-iter-pre-read))
+
+(test-assert "m7b1-helper/selected-frame-live-p" (fboundp '--selected-frame-live-p))
+(test-assert "m7b1-helper/set-buffer-from-selected-window"
+             (fboundp '--set-buffer-from-selected-window))
+(test-assert "m7b1-helper/display-pending-malloc"
+             (fboundp '--display-pending-malloc-warnings-loop))
+(test-assert "m7b1-helper/clear-ignore-mouse-drag"
+             (fboundp '--clear-ignore-mouse-drag))
+(test-assert "m7b1-helper/minibuf-echo-aligned"
+             (fboundp '--minibuf-and-echo-area-aligned-p))
+(test-assert "m7b1-helper/resize-mini-window"
+             (fboundp '--resize-mini-window-minibuf-non-shrink))
+(test-assert "m7b1-helper/quit-char" (fboundp '--quit-char))
+(test-assert "m7b1-helper/set-raw-keybuf-count"
+             (fboundp '--set-raw-keybuf-count))
+(test-assert "m7b1-helper/read-key-sequence" (fboundp '--read-key-sequence))
+(test-assert "m7b1-helper/inc-num-input-keys" (fboundp '--inc-num-input-keys))
+
+(test-eq "m7b1-helper/selected-frame-live-p-batch" t (--selected-frame-live-p))
+(test-eq "m7b1-helper/minibuf-aligned-batch"     nil (--minibuf-and-echo-area-aligned-p))
+(test-equal "m7b1-helper/quit-char-default"        7 (--quit-char))
+
+(setq this-command 'X real-this-command 'Y this-original-command 'Z
+      this-command-keys-shift-translated t
+      unread-command-events (list ?a))
+(let ((outcome (--command-loop-1-iter-pre-read)))
+  (test-equal "iter-pre-read/ok-outcome" 0 outcome))
+(test-eq "iter-pre-read/clears-this-original-command" nil this-original-command)
+(test-eq "iter-pre-read/clears-shift-translated"      nil this-command-keys-shift-translated)
+(test-eq "iter-pre-read/clears-deactivate-mark"       nil deactivate-mark)
+(setq this-command nil real-this-command nil
+      this-original-command nil
+      this-command-keys-shift-translated nil
+      unread-command-events nil)
+
+(setq unread-command-events (list ?x))
+(--command-loop-1-iter-pre-read)
+(test-equal "iter-pre-read/sets-last-command-event" ?x last-command-event)
+(setq unread-command-events nil last-command-event nil)
+
+;; EOF branch (i==0) is not directly testable in batch — see ERT suite
+;; for the reason.  Real EOF is reached only via kbd-macro replay.
+
+;;;; M7b2
+
+(test-assert "iter-dispatch/exists"  (fboundp '--command-loop-1-iter-dispatch))
+
+(test-assert "m7b2-helper/clear-force-start"
+             (fboundp '--clear-force-start-and-flush-buffer-unchanged))
+(test-assert "m7b2-helper/read-key-sequence-cmd"
+             (fboundp '--read-key-sequence-cmd))
+(test-assert "m7b2-helper/read-key-sequence-remapped"
+             (fboundp '--read-key-sequence-remapped))
+(test-assert "m7b2-helper/maybe-quit" (fboundp '--maybe-quit))
+(test-assert "m7b2-helper/save-state-for-redisplay"
+             (fboundp '--save-state-for-redisplay-get-pt))
+(test-assert "m7b2-helper/restore-last-point-position"
+             (fboundp '--restore-last-point-position))
+(test-assert "m7b2-helper/record-recent-keys-cmd"
+             (fboundp '--record-recent-keys-cmd-pseudo-event))
+(test-assert "m7b2-helper/with-hourglass" (fboundp '--with-hourglass-protection))
+(test-assert "m7b2-helper/save-point-before-last-command"
+             (fboundp '--save-point-before-last-command-or-undo))
+(test-assert "m7b2-helper/reset-redisplay-tick-state"
+             (fboundp '--reset-redisplay-tick-state))
+(test-assert "m7b2-helper/clear-display-working-on-window-p"
+             (fboundp '--clear-display-working-on-window-p))
+
+(with-temp-buffer
+  (insert "abc")
+  (goto-char 2)
+  (test-equal "save-state/returns-pt" 2 (--save-state-for-redisplay-get-pt)))
+
+(let ((sentinel 'unset))
+  (--with-hourglass-protection (lambda () (setq sentinel 'ran)))
+  (test-eq "with-hourglass-protection/runs-thunk" 'ran sentinel))
+
+(clear-this-command-keys)
+(--record-recent-keys-cmd-pseudo-event 'srfi-sentinel-cmd)
+(let ((rk (recent-keys t))
+      (found nil))
+  (dotimes (i (length rk))
+    (let ((e (aref rk i)))
+      (when (and (consp e) (eq (cdr e) 'srfi-sentinel-cmd))
+        (setq found t))))
+  (test-assert "record-recent-keys-cmd-pushes-pseudo-event" found))
+(clear-this-command-keys)
+
 (test-end)
