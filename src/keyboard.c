@@ -1226,6 +1226,27 @@ Default value of `command-error-function'.  */)
 static Lisp_Object command_loop_1 (void);
 static Lisp_Object top_level_1 (Lisp_Object);
 
+/* M7e — primitives exposed to (emacs command-loop) for the outer
+   drivers (command_loop_2 / top_level_1 / top_level_2).  See
+   docs/keyboard.org §M7e.  */
+
+DEFUN ("--cmd-error", Fc_cmd_error, Sc_cmd_error, 1, 1, 0,
+       doc: /* Internal: invoke the C cmd_error handler with DATA (a
+cons of error-symbol and error-data).  Returns 0 — the loop checks
+that the return is non-nil and keeps iterating.  */)
+  (Lisp_Object data)
+{
+  return cmd_error (data);
+}
+
+DEFUN ("--eval-top-level", Fc_eval_top_level, Sc_eval_top_level, 0, 0, 0,
+       doc: /* Internal: call Feval (Vtop_level, Qt).  Runs the startup
+expression installed at top level — see top_level_2_body in C.  */)
+  (void)
+{
+  return Feval (Vtop_level, Qt);
+}
+
 /* Entry to editor-command-loop.
    This level has the catches for exiting/returning to editor command loop.
    It returns nil to exit recursive edit, t to abort it.  */
@@ -1275,45 +1296,28 @@ command_loop (void)
    returned due to end of file (or end of kbd macro).  HANDLERS is a
    list of condition names, passed to internal_condition_case.  */
 
+/* M7e — C wrapper around (emacs command-loop) command-loop-2.  Body
+   lives in Scheme; the C signature stays for the function pointer
+   that command_loop passes to internal_catch.  See
+   docs/keyboard.org §M7e.  */
 Lisp_Object
 command_loop_2 (Lisp_Object ignore)
 {
-  register Lisp_Object val;
-
-  do
-    val = internal_condition_case (command_loop_1, Qt, cmd_error);
-  while (!NILP (val));
-
-  return Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-2");
+  return SCM_CALL_0 (proc);
 }
 
-static Lisp_Object
-top_level_2_body (void *ignore)
-{
-  /* If we're in batch mode, print a backtrace unconditionally when
-     encountering an error, to help with debugging.
-     TODO: handler-bind is currently a no-op, implement using Guile's
-     with-exception-handler when available.  */
-  return Feval (Vtop_level, Qt);
-}
-
-static Lisp_Object
-top_level_2 (void)
-{
-  return top_level_2_body (NULL);
-}
-
+/* M7e — C wrapper around (emacs command-loop) top-level-1.  See
+   docs/keyboard.org §M7e.  */
 static Lisp_Object
 top_level_1 (Lisp_Object ignore)
 {
-  /* On entry to the outer level, run the startup file.  */
-  if (!NILP (Vtop_level))
-    internal_condition_case (top_level_2, Qt, cmd_error);
-  else if (!NILP (Vpurify_flag))
-    message1 ("Bare impure Emacs (standard Lisp code not loaded)");
-  else
-    message1 ("Bare Emacs (standard Lisp code not loaded)");
-  return Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "top-level-1");
+  return SCM_CALL_0 (proc);
 }
 
 /* Consolidation: helper used by top-level in (emacs recursive-edit).  */

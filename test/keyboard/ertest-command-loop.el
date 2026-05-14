@@ -409,6 +409,20 @@
   ;; Exposed to elisp as `--command-loop-1' for symmetry with siblings.
   (should (fboundp '--command-loop-1)))
 
+;;;; M7e — command_loop_2 / top_level_1 outer drivers in Scheme
+
+(ert-deftest m7e-command-loop-2/exists ()
+  (should (fboundp '--command-loop-2)))
+
+(ert-deftest m7e-top-level-1/exists ()
+  (should (fboundp '--top-level-1)))
+
+(ert-deftest m7e-helpers/exist ()
+  ;; --cmd-error wraps the C cmd_error handler; --eval-top-level
+  ;; bundles Feval (Vtop_level, Qt).
+  (should (fboundp '--cmd-error))
+  (should (fboundp '--eval-top-level)))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here

@@ -8,6 +8,8 @@
             command-loop-1-iter-mark-region
             command-loop-1-finalize
             command-loop-1
+            command-loop-2
+            top-level-1
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -511,6 +513,47 @@ the original command_loop_1 body verbatim.  See docs/keyboard.org §M7d."
         (loop))))))
 
 ;;;;
+;;;; M7e — command_loop_2 / top_level_1 outer drivers
+;;;;
+
+(define %cmd-error       (delay (%c '--cmd-error)))
+(define %eval-top-level  (delay (%c '--eval-top-level)))
+
+(define (%catch-cmd-error thunk)
+  "Run THUNK; if it throws an elisp-condition, route the (error-sym .
+error-data) cons to --cmd-error and return its result (a fixnum 0).
+Mirrors internal_condition_case (..., Qt, cmd_error)."
+  (catch 'elisp-condition
+    thunk
+    (lambda (key err-sym err-data)
+      ((force %cmd-error) (cons err-sym err-data)))))
+
+(define (command-loop-2)
+  "C command_loop_2's body in Scheme.  Loops command-loop-1 inside a
+catch on 'elisp-condition (handler = cmd-error).  Exits when
+command-loop-1 returns nil — end of file in -batch, or end of
+kbd-macro replay.  Mirrors src/keyboard.c command_loop_2 (lines
+1278-1288)."
+  (let loop ()
+    (let ((val (%catch-cmd-error (lambda () (command-loop-1)))))
+      (when (not (%nilp val)) (loop))))
+  #nil)
+
+(define (top-level-1)
+  "C top_level_1's body in Scheme.  Runs the startup expression
+installed in `top-level' under cmd-error handling; if no startup
+expression is set, displays one of the two `Bare Emacs' messages.
+Mirrors src/keyboard.c top_level_1 (lines 1306-1317)."
+  (cond
+   ((not (%nilp (symbol-value 'top-level)))
+    (%catch-cmd-error (force %eval-top-level)))
+   ((not (%nilp (symbol-value 'purify-flag)))
+    ((%c 'message) "Bare impure Emacs (standard Lisp code not loaded)"))
+   (else
+    ((%c 'message) "Bare Emacs (standard Lisp code not loaded)")))
+  #nil)
+
+;;;;
 ;;;; Registration
 ;;;;
 
@@ -527,4 +570,6 @@ command_loop_1_iter_pre_read."
               (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch)
               (--command-loop-1-iter-mark-region   ,command-loop-1-iter-mark-region)
               (--command-loop-1-finalize           ,command-loop-1-finalize)
-              (--command-loop-1                    ,command-loop-1))))
+              (--command-loop-1                    ,command-loop-1)
+              (--command-loop-2                    ,command-loop-2)
+              (--top-level-1                       ,top-level-1))))

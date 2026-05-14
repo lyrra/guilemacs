@@ -312,4 +312,11 @@
 
 (test-assert "m7d/command-loop-1-exists" (fboundp '--command-loop-1))
 
+;;;; M7e
+
+(test-assert "m7e/command-loop-2-exists" (fboundp '--command-loop-2))
+(test-assert "m7e/top-level-1-exists"    (fboundp '--top-level-1))
+(test-assert "m7e/cmd-error-exists"      (fboundp '--cmd-error))
+(test-assert "m7e/eval-top-level-exists" (fboundp '--eval-top-level))
+
 (test-end)
