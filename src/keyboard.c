@@ -1952,6 +1952,138 @@ command_loop_1_iter_mark_region (void)
   SCM_CALL_0 (proc);
 }
 
+/* M7c — primitives exposed to (emacs command-loop) for the finalize
+   block (point adjustment + kbd-macro chars install).  See
+   docs/keyboard.org §M7c.  */
+
+DEFUN ("--selected-window-buffer-current-p",
+       Fc_selected_window_buffer_current_p,
+       Sc_selected_window_buffer_current_p, 0, 0, 0,
+       doc: /* Internal: t if XBUFFER (XWINDOW (selected_window)->contents)
+equals current_buffer.  False ⇒ the command changed the selected
+window's buffer out from under us.  */)
+  (void)
+{
+  return XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
+    ? Qt : Qnil;
+}
+
+DEFUN ("--last-point-position-ne-pt-p",
+       Fc_last_point_position_ne_pt_p,
+       Sc_last_point_position_ne_pt_p, 0, 0, 0,
+       doc: /* Internal: t if the snapshot last_point_position (captured
+at the start of dispatch) differs from current PT.  */)
+  (void)
+{
+  return last_point_position != PT ? Qt : Qnil;
+}
+
+DEFUN ("--composition-break-at-point-p",
+       Fc_composition_break_at_point_p,
+       Sc_composition_break_at_point_p, 0, 0, 0,
+       doc: /* Internal: t if the C global composition_break_at_point is
+non-zero.  Bound to the elisp `composition-break-at-point' user
+option.  */)
+  (void)
+{
+  return composition_break_at_point ? Qt : Qnil;
+}
+
+DEFUN ("--last-point-position-in-accessible-p",
+       Fc_last_point_position_in_accessible_p,
+       Sc_last_point_position_in_accessible_p, 0, 0, 0,
+       doc: /* Internal: t if BEGV < last_point_position < ZV in the
+current buffer.  */)
+  (void)
+{
+  return (last_point_position > BEGV && last_point_position < ZV)
+    ? Qt : Qnil;
+}
+
+DEFUN ("--pt-in-accessible-p", Fc_pt_in_accessible_p,
+       Sc_pt_in_accessible_p, 0, 0, 0,
+       doc: /* Internal: t if BEGV < PT < ZV in the current buffer.  */)
+  (void)
+{
+  return (PT > BEGV && PT < ZV) ? Qt : Qnil;
+}
+
+DEFUN ("--composition-adjust-point-lpp-changes-p",
+       Fc_composition_adjust_point_lpp_changes_p,
+       Sc_composition_adjust_point_lpp_changes_p, 0, 0, 0,
+       doc: /* Internal: t if composition_adjust_point (last_point_position,
+last_point_position) differs from last_point_position.  Indicates
+the last point landed inside a grapheme cluster — display must be
+invalidated to recover automatic composition.  */)
+  (void)
+{
+  return (composition_adjust_point (last_point_position, last_point_position)
+	  != last_point_position) ? Qt : Qnil;
+}
+
+DEFUN ("--composition-adjust-point-pt-changes-p",
+       Fc_composition_adjust_point_pt_changes_p,
+       Sc_composition_adjust_point_pt_changes_p, 0, 0, 0,
+       doc: /* Internal: t if composition_adjust_point (last_point_position,
+PT) differs from PT.  Indicates the current point lies inside a
+grapheme cluster — display must be invalidated.  */)
+  (void)
+{
+  return (composition_adjust_point (last_point_position, PT) != PT)
+    ? Qt : Qnil;
+}
+
+DEFUN ("--adjust-point-for-property-cl1",
+       Fc_adjust_point_for_property_cl1,
+       Sc_adjust_point_for_property_cl1, 0, 0, 0,
+       doc: /* Internal: call adjust_point_for_property (last_point_position,
+MODIFF != cl1_prev_modiff).  Pulls the modified-flag from the
+file-static cl1_prev_modiff snapshot so Scheme doesn't have to
+plumb it.  */)
+  (void)
+{
+  adjust_point_for_property (last_point_position, MODIFF != cl1_prev_modiff);
+  return Qnil;
+}
+
+DEFUN ("--set-windows-or-buffers-changed",
+       Fc_set_windows_or_buffers_changed,
+       Sc_set_windows_or_buffers_changed, 1, 1, 0,
+       doc: /* Internal: set the C global windows_or_buffers_changed to N
+(a small integer; only 21 and 39 are used from the finalize
+block).  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  windows_or_buffers_changed = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--finalize-kbd-macro-chars", Fc_finalize_kbd_macro_chars,
+       Sc_finalize_kbd_macro_chars, 0, 0, 0,
+       doc: /* Internal: invoke the C finalize_kbd_macro_chars helper that
+installs chars successfully executed in the current kbd-macro
+recording.  */)
+  (void)
+{
+  finalize_kbd_macro_chars ();
+  return Qnil;
+}
+
+/* M7c — finalize block of command_loop_1's while-loop body.  Adjusts
+   point for grapheme-cluster boundaries and installs successfully
+   executed chars into the kbd-macro buffer.  See docs/keyboard.org
+   §M7c.  */
+static void
+command_loop_1_finalize (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop",
+                             "command-loop-1-finalize");
+  SCM_CALL_0 (proc);
+}
+
 static Lisp_Object
 command_loop_1 (void)
 {
@@ -1973,41 +2105,7 @@ command_loop_1 (void)
 
     finalize:
 
-      if (current_buffer == cl1_prev_buffer
-	  && XBUFFER (XWINDOW (selected_window)->contents) == current_buffer
-	  && last_point_position != PT)
-	{
-	  if (NILP (Vdisable_point_adjustment)
-	      && NILP (Vglobal_disable_point_adjustment)
-	      && !composition_break_at_point)
-	    {
-	      if (last_point_position > BEGV
-		  && last_point_position < ZV
-		  && (composition_adjust_point (last_point_position,
-						last_point_position)
-		      != last_point_position))
-		/* The last point was temporarily set within a grapheme
-		   cluster to prevent automatic composition.  To recover
-		   the automatic composition, we must update the
-		   display.  */
-		windows_or_buffers_changed = 21;
-	      adjust_point_for_property (last_point_position,
-					 MODIFF != cl1_prev_modiff);
-	    }
-	  else if (PT > BEGV && PT < ZV
-		   && (composition_adjust_point (last_point_position, PT)
-		       != PT))
-	    /* Now point is within a grapheme cluster.  We must update
-	       the display so that this cluster is de-composed on the
-	       screen and the cursor is correctly placed at point.  */
-	    windows_or_buffers_changed = 39;
-	}
-
-      /* Install chars successfully executed in kbd macro.  */
-
-      if (!NILP (KVAR (current_kboard, defining_kbd_macro))
-	  && NILP (KVAR (current_kboard, Vprefix_arg)))
-	finalize_kbd_macro_chars ();
+      command_loop_1_finalize ();
     }
 }
 

@@ -247,4 +247,65 @@
   (--command-loop-1-iter-mark-region)
   (test-eq "m7b4/rotates-identity-to-nil" nil transient-mark-mode))
 
+;;;; M7c
+
+(test-assert "finalize/exists" (fboundp '--command-loop-1-finalize))
+
+(test-assert "m7c-helper/selected-window-buffer-current-p"
+             (fboundp '--selected-window-buffer-current-p))
+(test-assert "m7c-helper/last-point-position-ne-pt-p"
+             (fboundp '--last-point-position-ne-pt-p))
+(test-assert "m7c-helper/composition-break-at-point-p"
+             (fboundp '--composition-break-at-point-p))
+(test-assert "m7c-helper/last-point-position-in-accessible-p"
+             (fboundp '--last-point-position-in-accessible-p))
+(test-assert "m7c-helper/pt-in-accessible-p"
+             (fboundp '--pt-in-accessible-p))
+(test-assert "m7c-helper/composition-adjust-point-lpp-changes-p"
+             (fboundp '--composition-adjust-point-lpp-changes-p))
+(test-assert "m7c-helper/composition-adjust-point-pt-changes-p"
+             (fboundp '--composition-adjust-point-pt-changes-p))
+(test-assert "m7c-helper/adjust-point-for-property-cl1"
+             (fboundp '--adjust-point-for-property-cl1))
+(test-assert "m7c-helper/set-windows-or-buffers-changed"
+             (fboundp '--set-windows-or-buffers-changed))
+(test-assert "m7c-helper/finalize-kbd-macro-chars"
+             (fboundp '--finalize-kbd-macro-chars))
+
+(test-eq "m7c/composition-break-at-point-defaults-nil"
+         nil (--composition-break-at-point-p))
+
+(with-temp-buffer
+  (test-eq "m7c/pt-in-accessible/empty-buffer-nil" nil (--pt-in-accessible-p))
+  (insert "hello world")
+  (goto-char 3)
+  (test-eq "m7c/pt-in-accessible/mid-t" t (--pt-in-accessible-p))
+  (goto-char 1)
+  (test-eq "m7c/pt-in-accessible/begv-nil"   nil (--pt-in-accessible-p))
+  (goto-char (point-max))
+  (test-eq "m7c/pt-in-accessible/zv-nil"     nil (--pt-in-accessible-p)))
+
+(with-temp-buffer
+  (insert "abc")
+  (goto-char 2)
+  (--save-state-for-redisplay-get-pt)
+  (test-eq "m7c/last-pt-ne-pt/equal-nil" nil (--last-point-position-ne-pt-p))
+  (goto-char 3)
+  (test-eq "m7c/last-pt-ne-pt/moved-t"   t   (--last-point-position-ne-pt-p)))
+
+(with-current-buffer (window-buffer (selected-window))
+  (test-eq "m7c/selected-window-buffer-current-p"
+           t (--selected-window-buffer-current-p)))
+
+(test-eq "m7c/set-windows-or-buffers-changed-21" nil (--set-windows-or-buffers-changed 21))
+(test-eq "m7c/set-windows-or-buffers-changed-39" nil (--set-windows-or-buffers-changed 39))
+
+(with-current-buffer (window-buffer (selected-window))
+  (--save-state-for-redisplay-get-pt)
+  (let ((kb (current-kboard)))
+    (set-kboard-defining-kbd-macro kb nil)
+    (set-kboard-prefix-arg          kb nil)
+    (--command-loop-1-finalize)
+    (test-assert "m7c/finalize/no-op-when-pt-unchanged" t)))
+
 (test-end)

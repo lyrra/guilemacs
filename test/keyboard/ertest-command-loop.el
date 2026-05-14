@@ -335,6 +335,73 @@
     (--command-loop-1-iter-mark-region)
     (should (eq nil transient-mark-mode))))
 
+;;;; M7c — finalize (point adjustment + kbd-macro chars install)
+
+(ert-deftest m7c-finalize/exists ()
+  (should (fboundp '--command-loop-1-finalize)))
+
+(ert-deftest m7c-helpers/exist ()
+  (should (fboundp '--selected-window-buffer-current-p))
+  (should (fboundp '--last-point-position-ne-pt-p))
+  (should (fboundp '--composition-break-at-point-p))
+  (should (fboundp '--last-point-position-in-accessible-p))
+  (should (fboundp '--pt-in-accessible-p))
+  (should (fboundp '--composition-adjust-point-lpp-changes-p))
+  (should (fboundp '--composition-adjust-point-pt-changes-p))
+  (should (fboundp '--adjust-point-for-property-cl1))
+  (should (fboundp '--set-windows-or-buffers-changed))
+  (should (fboundp '--finalize-kbd-macro-chars)))
+
+(ert-deftest m7c-helper/composition-break-at-point-defaults-nil ()
+  ;; `composition-break-at-point' defaults nil.
+  (should (eq nil (--composition-break-at-point-p))))
+
+(ert-deftest m7c-helper/pt-in-accessible-p ()
+  ;; In an empty buffer PT == BEGV == ZV, so PT is not strictly between.
+  (with-temp-buffer
+    (should (eq nil (--pt-in-accessible-p)))
+    (insert "hello world")
+    (goto-char 3)   ; somewhere in the middle of "hello"
+    (should (eq t (--pt-in-accessible-p)))
+    (goto-char 1)
+    (should (eq nil (--pt-in-accessible-p)))
+    (goto-char (point-max))
+    (should (eq nil (--pt-in-accessible-p)))))
+
+(ert-deftest m7c-helper/last-point-position-ne-pt-p ()
+  ;; After `--save-state-for-redisplay-get-pt' the snapshot equals PT.
+  (with-temp-buffer
+    (insert "abc")
+    (goto-char 2)
+    (--save-state-for-redisplay-get-pt)  ; resets last_point_position to PT
+    (should (eq nil (--last-point-position-ne-pt-p)))
+    (goto-char 3)
+    (should (eq t (--last-point-position-ne-pt-p)))))
+
+(ert-deftest m7c-helper/selected-window-buffer-current-p ()
+  ;; In batch the selected-window's buffer is *scratch*; sync via
+  ;; with-current-buffer to confirm both sides agree.
+  (with-current-buffer (window-buffer (selected-window))
+    (should (eq t (--selected-window-buffer-current-p)))))
+
+(ert-deftest m7c-helper/set-windows-or-buffers-changed-accepts-fixnum ()
+  ;; No reader subr — just verify it does not error on the two values
+  ;; the finalize block actually uses.
+  (should (eq nil (--set-windows-or-buffers-changed 21)))
+  (should (eq nil (--set-windows-or-buffers-changed 39)))
+  (should (eq nil (--set-windows-or-buffers-changed 0))))
+
+(ert-deftest m7c-finalize/no-op-when-pt-unchanged ()
+  ;; Steady state: no point movement, not defining a kbd-macro.
+  ;; --command-loop-1-finalize must run to completion without error.
+  (with-current-buffer (window-buffer (selected-window))
+    (--save-state-for-redisplay-get-pt)
+    (let ((kb (current-kboard)))
+      (set-kboard-defining-kbd-macro kb nil)
+      (set-kboard-prefix-arg          kb nil)
+      (--command-loop-1-finalize)
+      (should t))))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here

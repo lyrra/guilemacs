@@ -6,6 +6,7 @@
             command-loop-1-iter-dispatch
             command-loop-1-iter-post-dispatch
             command-loop-1-iter-mark-region
+            command-loop-1-finalize
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -406,6 +407,78 @@ docs/keyboard.org §M7b4."
     (set-symbol-value! 'saved-region-selection #nil)))
 
 ;;;;
+;;;; M7c — finalize block (point adjustment + kbd-macro chars install)
+;;;;
+
+(define %selected-window-buffer-current-p
+  (delay (%c '--selected-window-buffer-current-p)))
+(define %last-point-position-ne-pt-p
+  (delay (%c '--last-point-position-ne-pt-p)))
+(define %composition-break-at-point-p
+  (delay (%c '--composition-break-at-point-p)))
+(define %last-point-position-in-accessible-p
+  (delay (%c '--last-point-position-in-accessible-p)))
+(define %pt-in-accessible-p
+  (delay (%c '--pt-in-accessible-p)))
+(define %composition-adjust-point-lpp-changes-p
+  (delay (%c '--composition-adjust-point-lpp-changes-p)))
+(define %composition-adjust-point-pt-changes-p
+  (delay (%c '--composition-adjust-point-pt-changes-p)))
+(define %adjust-point-for-property-cl1
+  (delay (%c '--adjust-point-for-property-cl1)))
+(define %set-windows-or-buffers-changed
+  (delay (%c '--set-windows-or-buffers-changed)))
+(define %finalize-kbd-macro-chars
+  (delay (%c '--finalize-kbd-macro-chars)))
+(define %kboard-defining-kbd-macro (delay (%c 'kboard-defining-kbd-macro)))
+(define %kboard-prefix-arg         (delay (%c 'kboard-prefix-arg)))
+
+(define (command-loop-1-finalize)
+  "Finalize block of one iteration of command_loop_1's while-loop.
+Two responsibilities:
+
+  1. Adjust point for grapheme-cluster boundaries when the buffer
+     and selected-window buffer are unchanged but PT moved.  If
+     point-adjustment is enabled and composition-break-at-point is
+     off, possibly invalidate the display (windows_or_buffers_changed
+     = 21) and call adjust_point_for_property.  Otherwise — if
+     point-adjustment is disabled but PT is now inside a grapheme
+     cluster — set windows_or_buffers_changed = 39.
+
+  2. Install chars successfully executed in the current kbd-macro
+     recording (when defining-kbd-macro is set and no prefix-arg is
+     pending).
+
+Mirrors lines 1976-2010 of the original C command_loop_1 body.  See
+docs/keyboard.org §M7c."
+  (when (and (not (%nilp ((force %cl1-prev-buffer-current-p))))
+             (not (%nilp ((force %selected-window-buffer-current-p))))
+             (not (%nilp ((force %last-point-position-ne-pt-p)))))
+    (cond
+     ((and (%nilp (symbol-value 'disable-point-adjustment))
+           (%nilp (symbol-value 'global-disable-point-adjustment))
+           (%nilp ((force %composition-break-at-point-p))))
+      (when (and (not (%nilp ((force %last-point-position-in-accessible-p))))
+                 (not (%nilp ((force %composition-adjust-point-lpp-changes-p)))))
+        ;; The last point was temporarily set within a grapheme
+        ;; cluster to prevent automatic composition.  Invalidate
+        ;; the display to recover the automatic composition.
+        ((force %set-windows-or-buffers-changed) 21))
+      ((force %adjust-point-for-property-cl1)))
+     ((and (not (%nilp ((force %pt-in-accessible-p))))
+           (not (%nilp ((force %composition-adjust-point-pt-changes-p)))))
+      ;; Now point is within a grapheme cluster.  Invalidate the
+      ;; display so the cluster is de-composed and the cursor is
+      ;; correctly placed at point.
+      ((force %set-windows-or-buffers-changed) 39))))
+
+  ;; Install chars successfully executed in kbd macro.
+  (let ((kb ((force %current-kboard))))
+    (when (and (not (%nilp ((force %kboard-defining-kbd-macro) kb)))
+               (%nilp ((force %kboard-prefix-arg) kb)))
+      ((force %finalize-kbd-macro-chars)))))
+
+;;;;
 ;;;; Registration
 ;;;;
 
@@ -420,4 +493,5 @@ command_loop_1_iter_pre_read."
               (--command-loop-1-iter-pre-read      ,command-loop-1-iter-pre-read)
               (--command-loop-1-iter-dispatch      ,command-loop-1-iter-dispatch)
               (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch)
-              (--command-loop-1-iter-mark-region   ,command-loop-1-iter-mark-region))))
+              (--command-loop-1-iter-mark-region   ,command-loop-1-iter-mark-region)
+              (--command-loop-1-finalize           ,command-loop-1-finalize))))
