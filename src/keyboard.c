@@ -1839,6 +1839,63 @@ command_loop_1_iter_dispatch (void)
   SCM_CALL_0 (proc);
 }
 
+/* M7b3 — primitives exposed to (emacs command-loop) for the
+   post-dispatch portion of command_loop_1.  See docs/keyboard.org §M7b3.  */
+
+DEFUN ("--echo-area-window-eq-selected-frame-minibuf-p",
+       Fc_echo_area_window_eq_selected_frame_minibuf_p,
+       Sc_echo_area_window_eq_selected_frame_minibuf_p, 0, 0, 0,
+       doc: /* Internal: t iff `echo_area_window' is the same as
+FRAME_MINIBUF_WINDOW (selected_frame).  Used by command_loop_1's
+post-dispatch echo-area-resize guard (Bug#34317).  */)
+  (void)
+{
+  return EQ (echo_area_window,
+             FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))
+    ? Qt : Qnil;
+}
+
+DEFUN ("--current-kboard-immediate-echo-p",
+       Fc_current_kboard_immediate_echo_p,
+       Sc_current_kboard_immediate_echo_p, 0, 0, 0,
+       doc: /* Internal: read current_kboard->immediate_echo (bit field
+not covered by the M2 KBOARD_LISP_FIELD generator).  */)
+  (void)
+{
+  return current_kboard->immediate_echo ? Qt : Qnil;
+}
+
+DEFUN ("--clear-current-kboard-immediate-echo",
+       Fc_clear_current_kboard_immediate_echo,
+       Sc_clear_current_kboard_immediate_echo, 0, 0, 0,
+       doc: /* Internal: set current_kboard->immediate_echo to false.  */)
+  (void)
+{
+  current_kboard->immediate_echo = false;
+  return Qnil;
+}
+
+DEFUN ("--echo-now", Fc_echo_now, Sc_echo_now, 0, 0, 0,
+       doc: /* Internal: call C echo_now() to refresh the echo display
+on current_kboard.  */)
+  (void)
+{
+  echo_now ();
+  return Qnil;
+}
+
+/* M7b3 — post-dispatch portion of command_loop_1's while-loop body.
+   Dispatches to (emacs command-loop).  See docs/keyboard.org §M7b3.  */
+static void
+command_loop_1_iter_post_dispatch (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop",
+                             "command-loop-1-iter-post-dispatch");
+  SCM_CALL_0 (proc);
+}
+
 static Lisp_Object
 command_loop_1 (void)
 {
@@ -1854,41 +1911,7 @@ command_loop_1 (void)
 
       command_loop_1_iter_dispatch ();
 
-      kset_last_prefix_arg (current_kboard, Vcurrent_prefix_arg);
-
-      safe_run_hooks_maybe_narrowed (Qpost_command_hook,
-				     XWINDOW (selected_window));
-
-      /* If displaying a message, resize the echo area window to fit
-	 that message's size exactly.  Do this only if the echo area
-	 window is the minibuffer window of the selected frame.  See
-	 Bug#34317.  */
-      if (!NILP (echo_area_buffer[0])
-	  && (EQ (echo_area_window,
-		  FRAME_MINIBUF_WINDOW (XFRAME (selected_frame)))))
-	resize_echo_area_exactly ();
-
-      /* If there are warnings waiting, process them.  */
-      if (!NILP (Vdelayed_warnings_list))
-        safe_run_hooks (Qdelayed_warnings_hook);
-
-      kset_last_command (current_kboard, Vthis_command);
-      kset_real_last_command (current_kboard, Vreal_this_command);
-      if (!CONSP (last_command_event))
-	kset_last_repeatable_command (current_kboard, Vreal_this_command);
-
-      this_command_key_count = 0;
-      this_single_command_key_start = 0;
-
-      if (current_kboard->immediate_echo
-	  && !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
-	{
-	  current_kboard->immediate_echo = false;
-	  /* Refresh the echo message.  */
-	  echo_now ();
-	}
-      else
-	cancel_echoing ();
+      command_loop_1_iter_post_dispatch ();
 
       if (!NILP (BVAR (current_buffer, mark_active))
 	  && !NILP (Vrun_hooks))

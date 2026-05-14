@@ -172,4 +172,43 @@
   (test-assert "record-recent-keys-cmd-pushes-pseudo-event" found))
 (clear-this-command-keys)
 
+;;;; M7b3
+
+(test-assert "iter-post-dispatch/exists" (fboundp '--command-loop-1-iter-post-dispatch))
+
+(test-assert "m7b3-helper/echo-area-window-eq-minibuf"
+             (fboundp '--echo-area-window-eq-selected-frame-minibuf-p))
+(test-assert "m7b3-helper/current-kboard-immediate-echo-p"
+             (fboundp '--current-kboard-immediate-echo-p))
+(test-assert "m7b3-helper/clear-current-kboard-immediate-echo"
+             (fboundp '--clear-current-kboard-immediate-echo))
+(test-assert "m7b3-helper/echo-now" (fboundp '--echo-now))
+
+(test-eq "m7b3/immediate-echo-defaults-nil" nil (--current-kboard-immediate-echo-p))
+
+(let ((kb (current-kboard)))
+  (set-kboard-last-prefix-arg kb nil)
+  (setq current-prefix-arg '(16))
+  (--command-loop-1-iter-post-dispatch)
+  (test-equal "m7b3/saves-last-prefix-arg" '(16) (kboard-last-prefix-arg kb))
+  (set-kboard-last-prefix-arg kb nil)
+  (setq current-prefix-arg nil))
+
+(let ((kb (current-kboard)))
+  (setq this-command 'srfi-m7b3-tc real-this-command 'srfi-m7b3-rtc
+        last-command-event ?z)
+  (--command-loop-1-iter-post-dispatch)
+  (test-eq "m7b3/saves-last-command"           'srfi-m7b3-tc  (kboard-last-command           kb))
+  (test-eq "m7b3/saves-real-last-command"      'srfi-m7b3-rtc (kboard-real-last-command      kb))
+  (test-eq "m7b3/saves-last-repeatable-command" 'srfi-m7b3-rtc (kboard-last-repeatable-command kb))
+  (setq this-command nil real-this-command nil last-command-event nil)
+  (set-kboard-last-command kb nil)
+  (set-kboard-real-last-command kb nil)
+  (set-kboard-last-repeatable-command kb nil))
+
+(set--this-command-keys "abcde")
+(--command-loop-1-iter-post-dispatch)
+(test-equal "m7b3/zeros-this-command-key-count" 0 (--this-command-key-count))
+(test-equal "m7b3/zeros-single-key-start"       0 (--this-single-command-key-start))
+
 (test-end)

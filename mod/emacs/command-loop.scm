@@ -4,6 +4,7 @@
   #:export (command-loop-1-prologue
             command-loop-1-iter-pre-read
             command-loop-1-iter-dispatch
+            command-loop-1-iter-post-dispatch
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -277,6 +278,62 @@ docs/keyboard.org §M7b2."
       ((force %restore-last-point-position) last-pt))))
 
 ;;;;
+;;;; M7b3 — post-dispatch portion (post-command-hook, last-command save, echo refresh)
+;;;;
+
+(define %echo-area-window-eq-selected-frame-minibuf-p (delay (%c '--echo-area-window-eq-selected-frame-minibuf-p)))
+(define %current-kboard-immediate-echo-p              (delay (%c '--current-kboard-immediate-echo-p)))
+(define %clear-current-kboard-immediate-echo          (delay (%c '--clear-current-kboard-immediate-echo)))
+(define %echo-now                                     (delay (%c '--echo-now)))
+
+(define (command-loop-1-iter-post-dispatch)
+  "Post-dispatch portion of one iteration of command_loop_1's while-loop.
+Saves Vcurrent_prefix_arg into the kboard's last-prefix-arg slot,
+runs the trailing post-command-hook + delayed-warnings-hook for the
+command we just dispatched, refreshes/resizes the echo area, saves
+this-command / real-this-command / last-repeatable-command into the
+kboard, zeroes the per-command key counters, and refreshes or cancels
+the echo display depending on the kboard's immediate-echo bit-field.
+
+Mirrors lines 1805-1858 of the original C command_loop_1 body.  See
+docs/keyboard.org §M7b3."
+  (let ((kboard ((force %current-kboard))))
+    ((force %set-kboard-last-prefix-arg) kboard (symbol-value 'current-prefix-arg))
+
+    ((force %safe-run-hooks-maybe-narrowed) 'post-command-hook)
+
+    ;; Resize echo area if the displayed message is on the selected
+    ;; frame's minibuffer (Bug#34317 guard).
+    (when (and (not (%nilp ((force %echo-area-buffer-0-non-empty-p))))
+               (not (%nilp ((force %echo-area-window-eq-selected-frame-minibuf-p)))))
+      ((force %resize-echo-area-exactly)))
+
+    (when (not (%nilp (symbol-value 'delayed-warnings-list)))
+      ((force %safe-run-hooks) 'delayed-warnings-hook))
+
+    ;; Save final this-command / real-this-command / last-repeatable.
+    ((force %set-kboard-last-command)      kboard (symbol-value 'this-command))
+    ((force %set-kboard-real-last-command) kboard (symbol-value 'real-this-command))
+    (let ((lce (symbol-value 'last-command-event)))
+      (unless (pair? lce)
+        ((force %set-kboard-last-repeatable-command)
+         kboard (symbol-value 'real-this-command))))
+
+    ;; Zero per-command key counters.
+    ((force %set-this-command-key-count)        0)
+    ((force %set-this-single-command-key-start) 0)
+
+    ;; Immediate-echo refresh path.  If echoes are still in flight and
+    ;; internal-echo-keystrokes-prefix returns non-nil, redraw; else
+    ;; cancel.
+    (if (and (not (%nilp ((force %current-kboard-immediate-echo-p))))
+             (not (%nilp ((%c 'internal-echo-keystrokes-prefix)))))
+        (begin
+          ((force %clear-current-kboard-immediate-echo))
+          ((force %echo-now)))
+        ((force %cancel-echoing)))))
+
+;;;;
 ;;;; Registration
 ;;;;
 
@@ -287,6 +344,7 @@ code reaches them through the C dispatch in command_loop_1_prologue /
 command_loop_1_iter_pre_read."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
-            `((--command-loop-1-prologue       ,command-loop-1-prologue)
-              (--command-loop-1-iter-pre-read  ,command-loop-1-iter-pre-read)
-              (--command-loop-1-iter-dispatch  ,command-loop-1-iter-dispatch))))
+            `((--command-loop-1-prologue           ,command-loop-1-prologue)
+              (--command-loop-1-iter-pre-read      ,command-loop-1-iter-pre-read)
+              (--command-loop-1-iter-dispatch      ,command-loop-1-iter-dispatch)
+              (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch))))

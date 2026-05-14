@@ -234,6 +234,59 @@
     ;; No observable change in PT (we restore last_point_position only).
     (should (= 2 (point)))))
 
+;;;; M7b3 — post-dispatch
+
+(ert-deftest m7b3-iter-post-dispatch/exists ()
+  (should (fboundp '--command-loop-1-iter-post-dispatch)))
+
+(ert-deftest m7b3-helpers/exist ()
+  (should (fboundp '--echo-area-window-eq-selected-frame-minibuf-p))
+  (should (fboundp '--current-kboard-immediate-echo-p))
+  (should (fboundp '--clear-current-kboard-immediate-echo))
+  (should (fboundp '--echo-now)))
+
+(ert-deftest m7b3-helper/current-kboard-immediate-echo-defaults-nil ()
+  ;; Default state at batch startup: immediate-echo off.
+  (should (eq nil (--current-kboard-immediate-echo-p))))
+
+(ert-deftest m7b3-iter-post-dispatch/saves-last-prefix-arg ()
+  ;; The first thing the post-dispatch helper does is save
+  ;; Vcurrent_prefix_arg into the kboard's last-prefix-arg slot.
+  (let ((kb (current-kboard)))
+    (set-kboard-last-prefix-arg kb nil)
+    (setq current-prefix-arg '(16))
+    (--command-loop-1-iter-post-dispatch)
+    (should (equal '(16) (kboard-last-prefix-arg kb)))
+    ;; Cleanup
+    (set-kboard-last-prefix-arg kb nil)
+    (setq current-prefix-arg nil)))
+
+(ert-deftest m7b3-iter-post-dispatch/saves-this-command-into-last-command ()
+  ;; Mirrors the M7a save behavior but for the trailing path: after
+  ;; dispatch, this-command / real-this-command get committed to the
+  ;; kboard.  Use sentinels distinct from the M7a values.
+  (let ((kb (current-kboard)))
+    (setq this-command       'm7b3-sentinel-tc)
+    (setq real-this-command  'm7b3-sentinel-rtc)
+    (setq last-command-event ?z)  ; non-cons → last-repeatable updates
+    (--command-loop-1-iter-post-dispatch)
+    (should (eq 'm7b3-sentinel-tc  (kboard-last-command           kb)))
+    (should (eq 'm7b3-sentinel-rtc (kboard-real-last-command      kb)))
+    (should (eq 'm7b3-sentinel-rtc (kboard-last-repeatable-command kb)))
+    ;; Cleanup
+    (setq this-command nil real-this-command nil last-command-event nil)
+    (set-kboard-last-command           kb nil)
+    (set-kboard-real-last-command      kb nil)
+    (set-kboard-last-repeatable-command kb nil)))
+
+(ert-deftest m7b3-iter-post-dispatch/zeros-key-counters ()
+  ;; After post-dispatch, both per-command key counters are 0.
+  (set--this-command-keys "abcde")
+  (should (= 5 (--this-command-key-count)))
+  (--command-loop-1-iter-post-dispatch)
+  (should (= 0 (--this-command-key-count)))
+  (should (= 0 (--this-single-command-key-start))))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here
