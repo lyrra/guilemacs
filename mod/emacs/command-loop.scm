@@ -7,6 +7,7 @@
             command-loop-1-iter-post-dispatch
             command-loop-1-iter-mark-region
             command-loop-1-finalize
+            command-loop-1
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -479,6 +480,37 @@ docs/keyboard.org §M7c."
       ((force %finalize-kbd-macro-chars)))))
 
 ;;;;
+;;;; M7d — command_loop_1 entry point
+;;;;
+
+(define (command-loop-1)
+  "Top-level command-loop body, called by C `command_loop_1' via
+`internal_condition_case'.  Runs the prologue once, then iterates:
+
+  pre-read → dispatch → post-dispatch → mark-region → finalize
+
+with two early-exit paths from pre-read:
+  outcome 1 (EOF, end of kbd-macro replay) — return nil to C.
+  outcome 2 (menu rejected) — skip dispatch, jump straight to finalize.
+
+The Scheme tail-call loop replaces the C while/goto control flow of
+the original command_loop_1 body verbatim.  See docs/keyboard.org §M7d."
+  (command-loop-1-prologue)
+  (let loop ()
+    (let ((outcome (command-loop-1-iter-pre-read)))
+      (cond
+       ((= outcome 1) #nil)                ; EOF
+       ((= outcome 2)                      ; goto finalize
+        (command-loop-1-finalize)
+        (loop))
+       (else
+        (command-loop-1-iter-dispatch)
+        (command-loop-1-iter-post-dispatch)
+        (command-loop-1-iter-mark-region)
+        (command-loop-1-finalize)
+        (loop))))))
+
+;;;;
 ;;;; Registration
 ;;;;
 
@@ -494,4 +526,5 @@ command_loop_1_iter_pre_read."
               (--command-loop-1-iter-dispatch      ,command-loop-1-iter-dispatch)
               (--command-loop-1-iter-post-dispatch ,command-loop-1-iter-post-dispatch)
               (--command-loop-1-iter-mark-region   ,command-loop-1-iter-mark-region)
-              (--command-loop-1-finalize           ,command-loop-1-finalize))))
+              (--command-loop-1-finalize           ,command-loop-1-finalize)
+              (--command-loop-1                    ,command-loop-1))))

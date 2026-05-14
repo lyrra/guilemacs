@@ -402,6 +402,13 @@
       (--command-loop-1-finalize)
       (should t))))
 
+;;;; M7d — command_loop_1 entry point in Scheme
+
+(ert-deftest m7d-command-loop-1/exists ()
+  ;; The full while-loop is now (emacs command-loop) command-loop-1.
+  ;; Exposed to elisp as `--command-loop-1' for symmetry with siblings.
+  (should (fboundp '--command-loop-1)))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here

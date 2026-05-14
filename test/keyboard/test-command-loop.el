@@ -308,4 +308,8 @@
     (--command-loop-1-finalize)
     (test-assert "m7c/finalize/no-op-when-pt-unchanged" t)))
 
+;;;; M7d
+
+(test-assert "m7d/command-loop-1-exists" (fboundp '--command-loop-1))
+
 (test-end)

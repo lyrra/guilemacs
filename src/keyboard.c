@@ -1534,19 +1534,6 @@ DEFUN ("--clear-waiting-for-input", Fc_clear_waiting_for_input,
   return Qnil;
 }
 
-static void
-command_loop_1_prologue (void)
-{
-  /* M7a: dispatch to (emacs command-loop) — see docs/keyboard.org §M7a.
-     The Scheme implementation lives in mod/emacs/command-loop.scm and
-     mirrors the original C body bit-for-bit; verified by the keyboard
-     regression suite plus an interactive smoke under -Q.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-prologue");
-  SCM_CALL_0 (proc);
-}
-
 /* M7b1 — primitives exposed to (emacs command-loop) for the
    pre-read portion of command_loop_1's main loop body.  See
    docs/keyboard.org §M7b1.  */
@@ -1658,21 +1645,6 @@ DEFUN ("--inc-num-input-keys", Fc_inc_num_input_keys, Sc_inc_num_input_keys, 0, 
 {
   ++num_input_keys;
   return Qnil;
-}
-
-/* M7b1 — pre-read portion of command_loop_1's while-loop body.
-   Dispatches to (emacs command-loop).  Returns:
-     0 — OK, continue iteration with `last_command_event' set.
-     1 — EOF (caller should return Qnil from command_loop_1).
-     2 — Menu rejected (caller should goto finalize).
-   See docs/keyboard.org §M7b1.  */
-static int
-command_loop_1_iter_pre_read (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-iter-pre-read");
-  return scm_to_int (SCM_CALL_0 (proc));
 }
 
 /* M7b2 — dispatch portion of command_loop_1's while-loop body, including
@@ -1830,15 +1802,6 @@ again after command-execute returns.  */)
   return Qnil;
 }
 
-static void
-command_loop_1_iter_dispatch (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1-iter-dispatch");
-  SCM_CALL_0 (proc);
-}
-
 /* M7b3 — primitives exposed to (emacs command-loop) for the
    post-dispatch portion of command_loop_1.  See docs/keyboard.org §M7b3.  */
 
@@ -1884,18 +1847,6 @@ on current_kboard.  */)
   return Qnil;
 }
 
-/* M7b3 — post-dispatch portion of command_loop_1's while-loop body.
-   Dispatches to (emacs command-loop).  See docs/keyboard.org §M7b3.  */
-static void
-command_loop_1_iter_post_dispatch (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop",
-                             "command-loop-1-iter-post-dispatch");
-  SCM_CALL_0 (proc);
-}
-
 /* M7b4 — primitives exposed to (emacs command-loop) for the
    mark/region block.  See docs/keyboard.org §M7b4.  */
 
@@ -1936,20 +1887,6 @@ MODIFF on the current buffer.  False ⇒ the command modified the buffer.  */)
   (void)
 {
   return MODIFF == cl1_prev_modiff ? Qt : Qnil;
-}
-
-/* M7b4 — mark/region block of command_loop_1's while-loop body.
-   Runs the transient-mark-mode adjustments, deactivate-mark dispatch,
-   primary-selection sync, post-select-region-hook, and
-   activate-mark-hook.  See docs/keyboard.org §M7b4.  */
-static void
-command_loop_1_iter_mark_region (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop",
-                             "command-loop-1-iter-mark-region");
-  SCM_CALL_0 (proc);
 }
 
 /* M7c — primitives exposed to (emacs command-loop) for the finalize
@@ -2070,43 +2007,18 @@ recording.  */)
   return Qnil;
 }
 
-/* M7c — finalize block of command_loop_1's while-loop body.  Adjusts
-   point for grapheme-cluster boundaries and installs successfully
-   executed chars into the kbd-macro buffer.  See docs/keyboard.org
-   §M7c.  */
-static void
-command_loop_1_finalize (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop",
-                             "command-loop-1-finalize");
-  SCM_CALL_0 (proc);
-}
-
+/* M7d — command_loop_1 entry point.  The entire while-loop body
+   (prologue + per-iter dispatch + finalize, plus the EOF / menu-
+   rejected control flow) lives in (emacs command-loop) as
+   command-loop-1.  This C wrapper exists so internal_condition_case
+   can still take a C function pointer.  See docs/keyboard.org §M7d.  */
 static Lisp_Object
 command_loop_1 (void)
 {
-  command_loop_1_prologue ();
-
-  while (true)
-    {
-      {
-	int outcome = command_loop_1_iter_pre_read ();
-	if (outcome == 1) return Qnil;
-	if (outcome == 2) goto finalize;
-      }
-
-      command_loop_1_iter_dispatch ();
-
-      command_loop_1_iter_post_dispatch ();
-
-      command_loop_1_iter_mark_region ();
-
-    finalize:
-
-      command_loop_1_finalize ();
-    }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1");
+  return SCM_CALL_0 (proc);
 }
 
 Lisp_Object
