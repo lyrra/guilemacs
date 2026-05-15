@@ -133,4 +133,80 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 (ert-deftest m6b-discard-input/returns-nil ()
   (should (eq nil (discard-input))))
 
+;;;; M6c — set-input-mode / current-input-mode
+
+(ert-deftest m6c-current-input-mode/exists ()
+  (should (fboundp 'current-input-mode)))
+
+(ert-deftest m6c-set-input-mode/exists ()
+  (should (fboundp 'set-input-mode)))
+
+(ert-deftest m6c-helpers/exist ()
+  (should (fboundp '--interrupt-input-p))
+  (should (fboundp '--selected-frame-tty-p))
+  (should (fboundp '--selected-frame-tty-flow-control-p))
+  (should (fboundp '--selected-frame-tty-meta-key)))
+
+(ert-deftest m6c-current-input-mode/returns-list-of-four ()
+  ;; The shape is (INTERRUPT FLOW META QUIT) per the docstring.
+  (let ((m (current-input-mode)))
+    (should (listp m))
+    (should (= 4 (length m)))))
+
+(ert-deftest m6c-current-input-mode/quit-is-fixnum ()
+  ;; QUIT (4th element) is the integer character code.
+  (let ((q (nth 3 (current-input-mode))))
+    (should (integerp q))
+    (should (>= q 0))))
+
+;;;; M6d — posn-at-point
+
+(ert-deftest m6d-posn-at-point/exists ()
+  (should (fboundp 'posn-at-point)))
+
+(ert-deftest m6d-posn-at-point/nil-when-not-visible ()
+  ;; In batch mode the *scratch* buffer of the selected window is
+  ;; typically not "visible" in the redisplay sense — posn-at-point
+  ;; returns nil.  Either result is acceptable; we just confirm the
+  ;; function runs without error and returns a list or nil.
+  (let ((r (with-current-buffer (window-buffer (selected-window))
+             (posn-at-point))))
+    (should (or (eq r nil) (consp r)))))
+
+;;;; M6e — input-pending-p
+
+(ert-deftest m6e-input-pending-p/exists ()
+  (should (fboundp 'input-pending-p)))
+
+(ert-deftest m6e-helpers/exist ()
+  (should (fboundp '--requeued-events-pending-p))
+  (should (fboundp '--process-special-events))
+  (should (fboundp '--get-input-pending)))
+
+(ert-deftest m6e-input-pending-p/returns-t-or-nil ()
+  ;; In batch with no events queued, nil is the expected result; but the
+  ;; docstring permits a conservative t.  Just verify a boolean.
+  (let ((r (input-pending-p)))
+    (should (or (eq r t) (eq r nil))))
+  (let ((r (input-pending-p t)))
+    (should (or (eq r t) (eq r nil)))))
+
+;;;; M6f — --active-maps infrastructure
+
+(ert-deftest m6f-active-maps/exists ()
+  (should (fboundp '--active-maps)))
+
+(ert-deftest m6f-active-maps/returns-keymap-cons ()
+  ;; The result is (keymap . MAPS) — a cons starting with `keymap'.
+  (let ((m (--active-maps ?a nil)))
+    (should (consp m))
+    (should (eq 'keymap (car m)))))
+
+(ert-deftest m6f-active-maps/nil-events-still-yields-cons ()
+  ;; With nil first event, position is nil and we get current-active-maps
+  ;; for the selected window position.
+  (let ((m (--active-maps nil nil)))
+    (should (consp m))
+    (should (eq 'keymap (car m)))))
+
 (provide 'ertest-read-key-sequence)

@@ -10181,6 +10181,23 @@ active_maps (Lisp_Object first_event, Lisp_Object second_event)
   return Fcons (Qkeymap, Fcurrent_active_maps (Qt, position));
 }
 
+/* M6f — primitive exposed to (emacs read-key-sequence) for the
+   future state-machine port.  See docs/keyboard.org §M6f.  */
+
+DEFUN ("--active-maps", Fc_active_maps, Sc_active_maps, 2, 2, 0,
+       doc: /* Internal: build the keymap stack for FIRST-EVENT (and
+SECOND-EVENT, which can carry the click position when FIRST-EVENT is a
+fake prefix key like `mode-line').  Returns a cons (keymap . MAPS)
+where MAPS is the result of `current-active-maps' applied at the
+position derived from the events.
+
+This is the same `active_maps' helper that read_key_sequence uses
+internally to initialize its `current_binding'.  */)
+  (Lisp_Object first_event, Lisp_Object second_event)
+{
+  return active_maps (first_event, second_event);
+}
+
 /* Structure used to keep track of partial application of key remapping
    such as Vfunction_key_map and Vkey_translation_map.  */
 typedef struct keyremap
@@ -11579,6 +11596,39 @@ requeued_events_pending_p (void)
 	  || !NILP (Vunread_input_method_events));
 }
 
+/* M6e — primitives exposed to (emacs read-key-sequence) for the
+   input-pending-p port.  See docs/keyboard.org §M6e.  */
+
+DEFUN ("--requeued-events-pending-p", Fc_requeued_events_pending_p,
+       Sc_requeued_events_pending_p, 0, 0, 0,
+       doc: /* Internal: t if any events have been requeued (waiting
+in `unread-command-events' and friends).  */)
+  (void)
+{
+  return requeued_events_pending_p () ? Qt : Qnil;
+}
+
+DEFUN ("--process-special-events", Fc_process_special_events,
+       Sc_process_special_events, 0, 0, 0,
+       doc: /* Internal: process non-user-visible events queued in the
+input buffer (Bug#10195).  */)
+  (void)
+{
+  process_special_events ();
+  return Qnil;
+}
+
+DEFUN ("--get-input-pending", Fc_get_input_pending,
+       Sc_get_input_pending, 1, 1, 0,
+       doc: /* Internal: t if get_input_pending (FLAGS) reports a pending
+event.  FLAGS is a fixnum bitmask (1 = DO_TIMERS_NOW, 2 = FILTER_EVENTS,
+4 = IGNORE_SQUEEZABLES).  */)
+  (Lisp_Object flags)
+{
+  CHECK_FIXNUM (flags);
+  return get_input_pending (XFIXNUM (flags)) ? Qt : Qnil;
+}
+
 DEFUN ("input-pending-p", Finput_pending_p, Sinput_pending_p, 0, 1, 0,
        doc: /* Return t if command input is currently available with no wait.
 Actually, the value is nil only if we can be sure that no input is available;
@@ -11587,16 +11637,11 @@ if there is a doubt, the value is t.
 If CHECK-TIMERS is non-nil, timers that are ready to run will do so.  */)
   (Lisp_Object check_timers)
 {
-  if (requeued_events_pending_p ())
-    return (Qt);
-
-  /* Process non-user-visible events (Bug#10195).  */
-  process_special_events ();
-
-  return (get_input_pending ((NILP (check_timers)
-                              ? 0 : READABLE_EVENTS_DO_TIMERS_NOW)
-			     | READABLE_EVENTS_FILTER_EVENTS)
-	  ? Qt : Qnil);
+  /* M6e: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6e.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "input-pending-p");
+  return SCM_CALL_1 (proc, check_timers);
 }
 
 /* Reallocate recent_keys copying the recorded keystrokes
@@ -12522,12 +12567,55 @@ Optional fourth arg QUIT if non-nil specifies character to use for quitting.
 See also `current-input-mode'.  */)
   (Lisp_Object interrupt, Lisp_Object flow, Lisp_Object meta, Lisp_Object quit)
 {
-  Fset_input_interrupt_mode (interrupt);
-  Fset_output_flow_control (flow, Qnil);
-  Fset_input_meta_mode (meta, Qnil);
-  if (!NILP (quit))
-    Fset_quit_char (quit);
-  return Qnil;
+  /* M6c: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6c.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "set-input-mode");
+  return SCM_CALL_4 (proc, interrupt, flow, meta, quit);
+}
+
+/* M6c — primitives exposed to (emacs read-key-sequence) for the
+   current-input-mode port.  See docs/keyboard.org §M6c.  */
+
+DEFUN ("--interrupt-input-p", Fc_interrupt_input_p, Sc_interrupt_input_p,
+       0, 0, 0,
+       doc: /* Internal: t if the C global `interrupt_input' is non-zero
+(Emacs is using interrupt-driven input rather than CBREAK mode).  */)
+  (void)
+{
+  return interrupt_input ? Qt : Qnil;
+}
+
+DEFUN ("--selected-frame-tty-p", Fc_selected_frame_tty_p,
+       Sc_selected_frame_tty_p, 0, 0, 0,
+       doc: /* Internal: t if the selected frame is a TTY frame (termcap
+or msdos output-method).  */)
+  (void)
+{
+  struct frame *sf = XFRAME (selected_frame);
+  return (FRAME_TERMCAP_P (sf) || FRAME_MSDOS_P (sf)) ? Qt : Qnil;
+}
+
+DEFUN ("--selected-frame-tty-flow-control-p",
+       Fc_selected_frame_tty_flow_control_p,
+       Sc_selected_frame_tty_flow_control_p, 0, 0, 0,
+       doc: /* Internal: t if FRAME_TTY (selected_frame)->flow_control is
+non-zero.  Caller must verify --selected-frame-tty-p first; this
+subr dereferences FRAME_TTY unconditionally.  */)
+  (void)
+{
+  return FRAME_TTY (XFRAME (selected_frame))->flow_control ? Qt : Qnil;
+}
+
+DEFUN ("--selected-frame-tty-meta-key",
+       Fc_selected_frame_tty_meta_key,
+       Sc_selected_frame_tty_meta_key, 0, 0, 0,
+       doc: /* Internal: return FRAME_TTY (selected_frame)->meta_key as
+a small integer (0..3).  Caller must verify --selected-frame-tty-p
+first; this subr dereferences FRAME_TTY unconditionally.  */)
+  (void)
+{
+  return make_fixnum (FRAME_TTY (XFRAME (selected_frame))->meta_key);
 }
 
 DEFUN ("current-input-mode", Fcurrent_input_mode, Scurrent_input_mode, 0, 0, 0,
@@ -12549,27 +12637,11 @@ The elements of this list correspond to the arguments of
 `set-input-mode'.  */)
   (void)
 {
-  struct frame *sf = XFRAME (selected_frame);
-
-  Lisp_Object interrupt = interrupt_input ? Qt : Qnil;
-  Lisp_Object flow, meta;
-  if (FRAME_TERMCAP_P (sf) || FRAME_MSDOS_P (sf))
-    {
-      flow = FRAME_TTY (sf)->flow_control ? Qt : Qnil;
-      meta = (FRAME_TTY (sf)->meta_key == 2
-	      ? make_fixnum (0)
-	      : (CURTTY ()->meta_key == 1
-		 ? Qt
-		 : (CURTTY ()->meta_key == 3 ? Qencoded : Qnil)));
-    }
-  else
-    {
-      flow = Qnil;
-      meta = Qt;
-    }
-  Lisp_Object quit = make_fixnum (quit_char);
-
-  return list4 (interrupt, flow, meta, quit);
+  /* M6c: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6c.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "current-input-mode");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("posn-at-x-y", Fposn_at_x_y, Sposn_at_x_y, 2, 4, 0,
@@ -12631,33 +12703,11 @@ to POS:
 The `posn-' functions access elements of such lists.  */)
   (Lisp_Object pos, Lisp_Object window)
 {
-  Lisp_Object tem;
-
-  if (NILP (window))
-    window = selected_window;
-
-  tem = Fpos_visible_in_window_p (pos, window, Qt);
-  if (!NILP (tem))
-    {
-      Lisp_Object x = XCAR (tem);
-      Lisp_Object y = XCAR (XCDR (tem));
-      Lisp_Object aux_info = XCDR (XCDR (tem));
-      int y_coord = XFIXNUM (y);
-
-      /* Point invisible due to hscrolling?  X can be -1 when a
-	 newline in a R2L line overflows into the left fringe.  */
-      if (XFIXNUM (x) < -1)
-	return Qnil;
-      if (!NILP (aux_info) && y_coord < 0)
-	{
-	  int rtop = XFIXNUM (XCAR (aux_info));
-
-	  y = make_fixnum (y_coord + rtop);
-	}
-      tem = Fposn_at_x_y (x, y, window, Qnil);
-    }
-
-  return tem;
+  /* M6d: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6d.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "posn-at-point");
+  return SCM_CALL_2 (proc, pos, window);
 }
 
 /* Set up a new kboard object with reasonable initial values.

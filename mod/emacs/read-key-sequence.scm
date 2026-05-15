@@ -5,6 +5,10 @@
             read-key-sequence-vs-string
             read-key-sequence-vs-vector
             discard-input
+            set-input-mode
+            current-input-mode
+            posn-at-point
+            input-pending-p
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -147,6 +151,108 @@ kbd macro being defined.  Mirrors src/keyboard.c Fdiscard_input."
   ((force %reset-kbd-ring-and-pending))
   #nil)
 
+;;;;
+;;;; M6c — set-input-mode / current-input-mode.
+;;;;
+
+(define %interrupt-input-p           (delay (%c '--interrupt-input-p)))
+(define %selected-frame-tty-p        (delay (%c '--selected-frame-tty-p)))
+(define %selected-frame-tty-flow-control-p
+  (delay (%c '--selected-frame-tty-flow-control-p)))
+(define %selected-frame-tty-meta-key
+  (delay (%c '--selected-frame-tty-meta-key)))
+(define %quit-char                   (delay (%c '--quit-char)))
+
+(define (set-input-mode interrupt flow meta quit)
+  "Set the keyboard-input mode.  Wraps the four underlying elisp
+DEFUNs (set-input-interrupt-mode, set-output-flow-control,
+set-input-meta-mode, set-quit-char).  Mirrors src/keyboard.c
+Fset_input_mode."
+  ((%c 'set-input-interrupt-mode) interrupt)
+  ((%c 'set-output-flow-control) flow #nil)
+  ((%c 'set-input-meta-mode) meta #nil)
+  (when (not (%nilp quit))
+    ((%c 'set-quit-char) quit))
+  #nil)
+
+(define (current-input-mode)
+  "Return (INTERRUPT FLOW META QUIT) describing the current keyboard
+input mode.  Mirrors src/keyboard.c Fcurrent_input_mode."
+  (let* ((interrupt (if (not (%nilp ((force %interrupt-input-p)))) #t #nil))
+         (tty?      (not (%nilp ((force %selected-frame-tty-p)))))
+         (flow      (if tty?
+                        (if (not (%nilp ((force %selected-frame-tty-flow-control-p))))
+                            #t #nil)
+                        #nil))
+         (meta      (if tty?
+                        (let ((mk ((force %selected-frame-tty-meta-key))))
+                          (cond
+                           ((= mk 2) 0)
+                           ((= mk 1) #t)
+                           ((= mk 3) 'encoded)
+                           (else     #nil)))
+                        #t))
+         (quit      ((force %quit-char))))
+    (list interrupt flow meta quit)))
+
+;;;;
+;;;; M6d — posn-at-point.
+;;;;
+
+(define (posn-at-point pos window)
+  "Return position information for buffer position POS in WINDOW.
+POS defaults to point in WINDOW; WINDOW defaults to the selected
+window.  Returns nil when POS is not visible in WINDOW.  Mirrors
+src/keyboard.c Fposn_at_point."
+  (let* ((win (if (%nilp window)
+                  ((%c 'selected-window))
+                  window))
+         (tem ((%c 'pos-visible-in-window-p) pos win #t)))
+    (cond
+     ((%nilp tem) #nil)
+     (else
+      (let* ((x ((%c 'car) tem))
+             (y ((%c 'car) ((%c 'cdr) tem)))
+             (aux-info ((%c 'cdr) ((%c 'cdr) tem)))
+             (y-coord y))
+        (cond
+         ;; Point invisible due to hscrolling? X = -1 means newline
+         ;; in a R2L line overflowed into the left fringe — still
+         ;; considered visible.  X < -1 means actually invisible.
+         ((< x -1) #nil)
+         (else
+          (let ((y* (if (and (not (%nilp aux-info)) (< y-coord 0))
+                        (+ y-coord ((%c 'car) aux-info))
+                        y)))
+            ((%c 'posn-at-x-y) x y* win #nil)))))))))
+
+;;;;
+;;;; M6e — input-pending-p.
+;;;;
+;;;; READABLE_EVENTS flags (see src/keyboard.c lines 381-383):
+;;;;   1 = DO_TIMERS_NOW
+;;;;   2 = FILTER_EVENTS
+;;;;   4 = IGNORE_SQUEEZABLES
+
+(define %requeued-events-pending-p
+  (delay (%c '--requeued-events-pending-p)))
+(define %process-special-events
+  (delay (%c '--process-special-events)))
+(define %get-input-pending
+  (delay (%c '--get-input-pending)))
+
+(define (input-pending-p check-timers)
+  "Return t if command input is currently available with no wait.
+If CHECK-TIMERS is non-nil, ready timers fire first.  Mirrors
+src/keyboard.c Finput_pending_p."
+  (cond
+   ((not (%nilp ((force %requeued-events-pending-p)))) #t)
+   (else
+    ;; Process non-user-visible events (Bug#10195) before checking.
+    ((force %process-special-events))
+    (let ((flags (+ (if (%nilp check-timers) 0 1) 2)))
+      (if (not (%nilp ((force %get-input-pending) flags))) #t #nil)))))
+
 (define (init-read-key-sequence-registrations)
   "Expose the M6a wrapper as an elisp symbol so tests can call it
 directly bypassing the C DEFUNs.  The production callers go through
@@ -155,4 +261,8 @@ cached-dispatch into here."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((--read-key-sequence-vs ,read-key-sequence-vs)
-              (--discard-input         ,discard-input))))
+              (--discard-input         ,discard-input)
+              (--set-input-mode        ,set-input-mode)
+              (--current-input-mode    ,current-input-mode)
+              (--posn-at-point         ,posn-at-point)
+              (--input-pending-p       ,input-pending-p))))

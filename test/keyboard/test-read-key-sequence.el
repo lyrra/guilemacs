@@ -69,4 +69,51 @@
 
 (test-eq "m6b/returns-nil" nil (discard-input))
 
+;;;; M6c
+
+(test-assert "m6c/current-input-mode-exists" (fboundp 'current-input-mode))
+(test-assert "m6c/set-input-mode-exists"     (fboundp 'set-input-mode))
+(test-assert "m6c-helper/interrupt-input-p"  (fboundp '--interrupt-input-p))
+(test-assert "m6c-helper/selected-frame-tty-p"
+             (fboundp '--selected-frame-tty-p))
+(test-assert "m6c-helper/selected-frame-tty-flow-control-p"
+             (fboundp '--selected-frame-tty-flow-control-p))
+(test-assert "m6c-helper/selected-frame-tty-meta-key"
+             (fboundp '--selected-frame-tty-meta-key))
+
+(let ((m (current-input-mode)))
+  (test-assert "m6c/current-input-mode-is-list" (listp m))
+  (test-equal  "m6c/current-input-mode-length"  4 (length m))
+  (test-assert "m6c/quit-is-integer" (integerp (nth 3 m))))
+
+;;;; M6d
+
+(test-assert "m6d/posn-at-point-exists" (fboundp 'posn-at-point))
+
+(let ((r (with-current-buffer (window-buffer (selected-window))
+           (posn-at-point))))
+  (test-assert "m6d/posn-at-point-runs" (or (eq r nil) (consp r))))
+
+;;;; M6e
+
+(test-assert "m6e/input-pending-p-exists" (fboundp 'input-pending-p))
+(test-assert "m6e-helper/requeued-events-pending-p"
+             (fboundp '--requeued-events-pending-p))
+(test-assert "m6e-helper/process-special-events"
+             (fboundp '--process-special-events))
+(test-assert "m6e-helper/get-input-pending"
+             (fboundp '--get-input-pending))
+
+(let ((r (input-pending-p)))
+  (test-assert "m6e/input-pending-p-boolean"
+               (or (eq r t) (eq r nil))))
+
+;;;; M6f
+
+(test-assert "m6f/active-maps-exists" (fboundp '--active-maps))
+
+(let ((m (--active-maps ?a nil)))
+  (test-assert "m6f/active-maps-consp" (consp m))
+  (test-eq    "m6f/active-maps-car-keymap" 'keymap (car m)))
+
 (test-end)
