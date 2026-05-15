@@ -52,4 +52,21 @@
                                         (--this-single-command-key-start)))
                    [])))
 
+;;;; M6b
+
+(test-assert "m6b/discard-input-exists" (fboundp 'discard-input))
+(test-assert "m6b/dispatch-shim-exists" (fboundp '--discard-input))
+(test-assert "m6b-helper/end-kbd-macro" (fboundp '--end-kbd-macro))
+(test-assert "m6b-helper/discard-tty-input" (fboundp '--discard-tty-input))
+(test-assert "m6b-helper/reset-kbd-ring-and-pending"
+             (fboundp '--reset-kbd-ring-and-pending))
+
+(let ((saved unread-command-events))
+  (setq unread-command-events '(?a ?b ?c))
+  (discard-input)
+  (test-eq "m6b/clears-unread-command-events" nil unread-command-events)
+  (setq unread-command-events saved))
+
+(test-eq "m6b/returns-nil" nil (discard-input))
+
 (test-end)

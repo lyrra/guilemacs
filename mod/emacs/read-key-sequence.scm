@@ -4,6 +4,7 @@
   #:export (read-key-sequence-vs
             read-key-sequence-vs-string
             read-key-sequence-vs-vector
+            discard-input
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -121,6 +122,31 @@ Mirrors src/keyboard.c read_key_sequence_vs (lines 11402-11454)."
                         can-return-switch-frame cmd-loop
                         #nil disable-text-conversion))
 
+;;;;
+;;;; M6b — discard-input (ported from C Fdiscard_input).
+;;;;
+
+(define %end-kbd-macro            (delay (%c '--end-kbd-macro)))
+(define %discard-tty-input        (delay (%c '--discard-tty-input)))
+(define %reset-kbd-ring-and-pending
+  (delay (%c '--reset-kbd-ring-and-pending)))
+(define %kboard-defining-kbd-macro (delay (%c 'kboard-defining-kbd-macro)))
+(define %current-kboard           (delay (%c 'current-kboard)))
+
+(define (discard-input)
+  "Discard the contents of the terminal input buffer.  Also end any
+kbd macro being defined.  Mirrors src/keyboard.c Fdiscard_input."
+  (let ((kb ((force %current-kboard))))
+    (when (not (%nilp ((force %kboard-defining-kbd-macro) kb)))
+      ;; Discard the last command from the macro, then end it.
+      ((%c 'cancel-kbd-macro-events))
+      ((force %end-kbd-macro))))
+
+  (set-symbol-value! 'unread-command-events #nil)
+  ((force %discard-tty-input))
+  ((force %reset-kbd-ring-and-pending))
+  #nil)
+
 (define (init-read-key-sequence-registrations)
   "Expose the M6a wrapper as an elisp symbol so tests can call it
 directly bypassing the C DEFUNs.  The production callers go through
@@ -128,4 +154,5 @@ the C `read-key-sequence' / `read-key-sequence-vector' DEFUNs which
 cached-dispatch into here."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
-            `((--read-key-sequence-vs ,read-key-sequence-vs))))
+            `((--read-key-sequence-vs ,read-key-sequence-vs)
+              (--discard-input         ,discard-input))))

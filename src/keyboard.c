@@ -11970,26 +11970,48 @@ This may include sensitive information such as passwords.  */)
   return Qnil;
 }
 
+/* M6b — primitives exposed to (emacs read-key-sequence) for the
+   discard-input port.  See docs/keyboard.org §M6b.  */
+
+DEFUN ("--end-kbd-macro", Fc_end_kbd_macro, Sc_end_kbd_macro, 0, 0, 0,
+       doc: /* Internal: invoke the C end_kbd_macro helper that finalizes
+the current kbd-macro recording.  */)
+  (void)
+{
+  end_kbd_macro ();
+  return Qnil;
+}
+
+DEFUN ("--discard-tty-input", Fc_discard_tty_input, Sc_discard_tty_input,
+       0, 0, 0,
+       doc: /* Internal: drain any unread bytes from the TTY input buffer.  */)
+  (void)
+{
+  discard_tty_input ();
+  return Qnil;
+}
+
+DEFUN ("--reset-kbd-ring-and-pending", Fc_reset_kbd_ring_and_pending,
+       Sc_reset_kbd_ring_and_pending, 0, 0, 0,
+       doc: /* Internal: set kbd_fetch_ptr = kbd_store_ptr (empty the
+queued-event ring) and clear input_pending.  */)
+  (void)
+{
+  kbd_fetch_ptr = kbd_store_ptr;
+  input_pending = false;
+  return Qnil;
+}
+
 DEFUN ("discard-input", Fdiscard_input, Sdiscard_input, 0, 0, 0,
        doc: /* Discard the contents of the terminal input buffer.
 Also end any kbd macro being defined.  */)
   (void)
 {
-  if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
-    {
-      /* Discard the last command from the macro.  */
-      Fcancel_kbd_macro_events ();
-      end_kbd_macro ();
-    }
-
-  Vunread_command_events = Qnil;
-
-  discard_tty_input ();
-
-  kbd_fetch_ptr =  kbd_store_ptr;
-  input_pending = false;
-
-  return Qnil;
+  /* M6b: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6b.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "discard-input");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("suspend-emacs", Fsuspend_emacs, Ssuspend_emacs, 0, 1, "",

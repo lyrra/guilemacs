@@ -109,4 +109,28 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
     (should (vectorp result))
     (should (= 3 (length result)))))
 
+;;;; M6b — discard-input
+
+(ert-deftest m6b-discard-input/exists ()
+  (should (fboundp 'discard-input))
+  (should (fboundp '--discard-input)))
+
+(ert-deftest m6b-helpers/exist ()
+  (should (fboundp '--end-kbd-macro))
+  (should (fboundp '--discard-tty-input))
+  (should (fboundp '--reset-kbd-ring-and-pending)))
+
+(ert-deftest m6b-discard-input/clears-unread-command-events ()
+  ;; discard-input always sets unread-command-events to nil.
+  (let ((saved unread-command-events))
+    (unwind-protect
+        (progn
+          (setq unread-command-events '(?a ?b ?c))
+          (discard-input)
+          (should (eq nil unread-command-events)))
+      (setq unread-command-events saved))))
+
+(ert-deftest m6b-discard-input/returns-nil ()
+  (should (eq nil (discard-input))))
+
 (provide 'ertest-read-key-sequence)
