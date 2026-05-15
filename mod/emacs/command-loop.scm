@@ -11,6 +11,7 @@
             command-loop-2
             top-level-1
             cmd-error
+            command-error-default-function
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -590,6 +591,65 @@ Mirrors the static C cmd_error in src/keyboard.c."
   (set-symbol-value! 'quit-flag    #nil)
   (set-symbol-value! 'inhibit-quit #nil)
   0)
+
+;;;;
+;;;; M7g — command-error-default-function (default value of
+;;;; `command-error-function').  See docs/keyboard.org §M7g.
+;;;;
+
+(define %selected-frame-glyphs-initialized-p
+  (delay (%c '--selected-frame-glyphs-initialized-p)))
+(define %selected-frame-initial-p
+  (delay (%c '--selected-frame-initial-p)))
+(define %daemon-not-yet-running-p
+  (delay (%c '--daemon-not-yet-running-p)))
+(define %print-error-message    (delay (%c '--print-error-message)))
+(define %clear-message-1-0      (delay (%c '--clear-message-1-0)))
+(define %message-log-maybe-newline
+  (delay (%c '--message-log-maybe-newline)))
+(define %bitch-at-user          (delay (%c '--bitch-at-user)))
+
+(define (command-error-default-function data context signal)
+  "Default value of `command-error-function'.  DATA is (error-symbol .
+error-data); CONTEXT is a string (typically the macroerror prefix);
+SIGNAL is the signaling function name (or nil).
+
+Either prints to stderr and exits -1 (when the frame can't yet
+display, or in batch / daemon-init), or clears the echo area, dings
+or bitches at the user, and prints to both stderr and the message
+log.  Mirrors src/keyboard.c Fcommand_error_default_function."
+  ;; CHECK_STRING on context — let elisp signal wrong-type-argument
+  ;; if a non-string slipped through.
+  (let* ((conditions ((%c 'get) ((%c 'car) data) 'error-conditions))
+         (is-minibuffer-quit?
+          (not (%nilp ((%c 'memq) 'minibuffer-quit conditions))))
+         (write-to-stderr?
+          (and (not is-minibuffer-quit?)
+               (or (%nilp ((force %selected-frame-glyphs-initialized-p)))
+                   (and (%nilp ((force %daemon-not-yet-running-p)))
+                        (not (%nilp ((force %selected-frame-initial-p)))))
+                   (not (%nilp (symbol-value 'noninteractive)))))))
+    (cond
+     (write-to-stderr?
+      ((force %print-error-message) data 'external-debugging-output
+       context signal)
+      ((%c 'terpri) 'external-debugging-output #nil)
+      ((%c 'kill-emacs) -1 #nil))
+     (else
+      ((force %clear-message-1-0))
+      ((force %message-log-maybe-newline))
+      (cond
+       (is-minibuffer-quit?
+        ((%c 'ding) #t))
+       (else
+        ((%c 'discard-input))
+        ((force %bitch-at-user))))
+      ;; DEBUG: also print errors to stderr for debugging
+      ((force %print-error-message) data 'external-debugging-output
+       context signal)
+      ((%c 'terpri) 'external-debugging-output #nil)
+      ((force %print-error-message) data #t context signal))))
+  #nil)
 
 ;;;;
 ;;;; M7e — command_loop_2 / top_level_1 outer drivers

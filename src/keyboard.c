@@ -1109,59 +1109,12 @@ DEFUN ("command-error-default-function", Fcommand_error_default_function,
 Default value of `command-error-function'.  */)
   (Lisp_Object data, Lisp_Object context, Lisp_Object signal)
 {
-  struct frame *sf = SELECTED_FRAME ();
-  Lisp_Object conditions = Fget (XCAR (data), Qerror_conditions);
-  int is_minibuffer_quit = !NILP (Fmemq (Qminibuffer_quit, conditions));
-
-  CHECK_STRING (context);
-
-  /* If the window system or terminal frame hasn't been initialized
-     yet, or we're not interactive, write the message to stderr and exit.
-     Don't do this for the minibuffer-quit condition.  */
-  if (!is_minibuffer_quit
-      && (!sf->glyphs_initialized_p
-	  /* The initial frame is a special non-displaying frame. It
-	     will be current in daemon mode when there are no frames
-	     to display, and in non-daemon mode before the real frame
-	     has finished initializing.  If an error is thrown in the
-	     latter case while creating the frame, then the frame
-	     will never be displayed, so the safest thing to do is
-	     write to stderr and quit.  In daemon mode, there are
-	     many other potential errors that do not prevent frames
-	     from being created, so continuing as normal is better in
-	     that case, as long as the daemon has actually finished
-	     initialization. */
-	  || (!(IS_DAEMON && !DAEMON_RUNNING) && FRAME_INITIAL_P (sf))
-	  || noninteractive))
-    {
-      print_error_message (data, Qexternal_debugging_output,
-			   SSDATA (context), signal);
-      Fterpri (Qexternal_debugging_output, Qnil);
-      Fkill_emacs (make_fixnum (-1), Qnil);
-    }
-  else
-    {
-      clear_message (1, 0);
-      message_log_maybe_newline ();
-
-      if (is_minibuffer_quit)
-	{
-	  Fding (Qt);
-	}
-      else
-	{
-	  Fdiscard_input ();
-	  bitch_at_user ();
-	}
-
-      /* DEBUG: Also print errors to stderr for debugging */
-      print_error_message (data, Qexternal_debugging_output,
-			   SSDATA (context), signal);
-      Fterpri (Qexternal_debugging_output, Qnil);
-
-      print_error_message (data, Qt, SSDATA (context), signal);
-    }
-  return Qnil;
+  /* M7g: dispatch to (emacs command-loop) — see docs/keyboard.org §M7g.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop",
+                             "command-error-default-function");
+  return scm_call_3 (proc, data, context, signal);
 }
 
 static Lisp_Object command_loop_1 (void);
@@ -1177,6 +1130,78 @@ expression installed at top level — see top_level_2_body in C.  */)
   (void)
 {
   return Feval (Vtop_level, Qt);
+}
+
+/* M7g — primitives exposed to (emacs command-loop) for the default
+   command-error-function port.  See docs/keyboard.org §M7g.  */
+
+DEFUN ("--selected-frame-glyphs-initialized-p",
+       Fc_selected_frame_glyphs_initialized_p,
+       Sc_selected_frame_glyphs_initialized_p, 0, 0, 0,
+       doc: /* Internal: SELECTED_FRAME ()->glyphs_initialized_p as a
+predicate.  False before redisplay has run on the selected frame.  */)
+  (void)
+{
+  return SELECTED_FRAME ()->glyphs_initialized_p ? Qt : Qnil;
+}
+
+DEFUN ("--selected-frame-initial-p", Fc_selected_frame_initial_p,
+       Sc_selected_frame_initial_p, 0, 0, 0,
+       doc: /* Internal: FRAME_INITIAL_P (SELECTED_FRAME ()).  True for the
+non-displaying bootstrap frame.  */)
+  (void)
+{
+  return FRAME_INITIAL_P (SELECTED_FRAME ()) ? Qt : Qnil;
+}
+
+DEFUN ("--daemon-not-yet-running-p", Fc_daemon_not_yet_running_p,
+       Sc_daemon_not_yet_running_p, 0, 0, 0,
+       doc: /* Internal: t when (IS_DAEMON && !DAEMON_RUNNING) — daemon
+mode is configured but the daemon socket isn't accepting yet.  */)
+  (void)
+{
+  return (IS_DAEMON && !DAEMON_RUNNING) ? Qt : Qnil;
+}
+
+DEFUN ("--print-error-message", Fc_print_error_message,
+       Sc_print_error_message, 4, 4, 0,
+       doc: /* Internal: invoke C print_error_message (DATA, STREAM,
+CONTEXT, SIGNAL).  DATA is (error-symbol . error-data); STREAM is the
+output spec (typically t or `external-debugging-output'); CONTEXT is
+a string; SIGNAL is the signaling-function symbol (or nil).  */)
+  (Lisp_Object data, Lisp_Object stream, Lisp_Object context,
+   Lisp_Object signal)
+{
+  CHECK_STRING (context);
+  print_error_message (data, stream, SSDATA (context), signal);
+  return Qnil;
+}
+
+DEFUN ("--clear-message-1-0", Fc_clear_message_1_0,
+       Sc_clear_message_1_0, 0, 0, 0,
+       doc: /* Internal: clear_message (1, 0) — clear the echo area and
+the *Messages* tail.  */)
+  (void)
+{
+  clear_message (1, 0);
+  return Qnil;
+}
+
+DEFUN ("--message-log-maybe-newline", Fc_message_log_maybe_newline,
+       Sc_message_log_maybe_newline, 0, 0, 0,
+       doc: /* Internal: invoke message_log_maybe_newline.  */)
+  (void)
+{
+  message_log_maybe_newline ();
+  return Qnil;
+}
+
+DEFUN ("--bitch-at-user", Fc_bitch_at_user, Sc_bitch_at_user, 0, 0, 0,
+       doc: /* Internal: invoke bitch_at_user.  */)
+  (void)
+{
+  bitch_at_user ();
+  return Qnil;
 }
 
 /* M7f — primitives exposed to (emacs command-loop) for the cmd-error

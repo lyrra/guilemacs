@@ -349,4 +349,26 @@
               0 (--cmd-error (cons 'my-test-error (list "data"))))
   (setq command-error-function saved-error-fn))
 
+;;;; M7g
+
+(test-assert "m7g-helper/selected-frame-glyphs-initialized-p"
+             (fboundp '--selected-frame-glyphs-initialized-p))
+(test-assert "m7g-helper/selected-frame-initial-p"
+             (fboundp '--selected-frame-initial-p))
+(test-assert "m7g-helper/daemon-not-yet-running-p"
+             (fboundp '--daemon-not-yet-running-p))
+(test-assert "m7g-helper/print-error-message"
+             (fboundp '--print-error-message))
+(test-assert "m7g-helper/clear-message-1-0"
+             (fboundp '--clear-message-1-0))
+(test-assert "m7g-helper/message-log-maybe-newline"
+             (fboundp '--message-log-maybe-newline))
+(test-assert "m7g-helper/bitch-at-user" (fboundp '--bitch-at-user))
+
+(test-eq "m7g/daemon-not-yet-running-defaults-nil"
+         nil (--daemon-not-yet-running-p))
+
+(test-assert "m7g/command-error-default-function-bound"
+             (fboundp 'command-error-default-function))
+
 (test-end)

@@ -460,6 +460,26 @@
           (should (= 0 (--cmd-error (cons 'my-test-error (list "data"))))))
       (setq command-error-function Vcommand_error_function-saved))))
 
+;;;; M7g — command-error-default-function in Scheme
+
+(ert-deftest m7g-helpers/exist ()
+  (should (fboundp '--selected-frame-glyphs-initialized-p))
+  (should (fboundp '--selected-frame-initial-p))
+  (should (fboundp '--daemon-not-yet-running-p))
+  (should (fboundp '--print-error-message))
+  (should (fboundp '--clear-message-1-0))
+  (should (fboundp '--message-log-maybe-newline))
+  (should (fboundp '--bitch-at-user)))
+
+(ert-deftest m7g-helper/daemon-not-yet-running-defaults-nil ()
+  ;; The test harness doesn't run in daemon mode.
+  (should (eq nil (--daemon-not-yet-running-p))))
+
+(ert-deftest m7g-default-function/exists ()
+  ;; The C DEFUN survives as a thin cached-SCM dispatch — its elisp
+  ;; binding still resolves to the function.
+  (should (fboundp 'command-error-default-function)))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here
