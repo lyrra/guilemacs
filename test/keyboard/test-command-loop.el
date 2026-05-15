@@ -319,4 +319,34 @@
 (test-assert "m7e/cmd-error-exists"      (fboundp '--cmd-error))
 (test-assert "m7e/eval-top-level-exists" (fboundp '--eval-top-level))
 
+;;;; M7f
+
+(test-assert "m7f-helper/executing-kbd-macro-c-p"
+             (fboundp '--executing-kbd-macro-c-p))
+(test-assert "m7f-helper/clear-executing-kbd-macro"
+             (fboundp '--clear-executing-kbd-macro))
+(test-assert "m7f-helper/executing-kbd-macro-iterations"
+             (fboundp '--executing-kbd-macro-iterations))
+(test-assert "m7f-helper/display-hourglass-p"
+             (fboundp '--display-hourglass-p))
+(test-assert "m7f-helper/cancel-hourglass"
+             (fboundp '--cancel-hourglass))
+(test-assert "m7f-helper/cmd-error-internal"
+             (fboundp '--cmd-error-internal))
+
+(test-eq "m7f/executing-kbd-macro-c-defaults-nil"
+         nil (--executing-kbd-macro-c-p))
+(let ((v (--display-hourglass-p)))
+  (test-assert "m7f/display-hourglass-returns-bool"
+               (or (eq v t) (eq v nil))))
+
+(--cancel-hourglass)
+(test-assert "m7f/cancel-hourglass-no-op-in-batch" t)
+
+(let ((saved-error-fn command-error-function))
+  (setq command-error-function (lambda (data ctx sig) nil))
+  (test-equal "m7f/cmd-error-returns-0"
+              0 (--cmd-error (cons 'my-test-error (list "data"))))
+  (setq command-error-function saved-error-fn))
+
 (test-end)

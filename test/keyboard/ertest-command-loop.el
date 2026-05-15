@@ -423,6 +423,43 @@
   (should (fboundp '--cmd-error))
   (should (fboundp '--eval-top-level)))
 
+;;;; M7f — cmd-error in Scheme
+
+(ert-deftest m7f-helpers/exist ()
+  (should (fboundp '--executing-kbd-macro-c-p))
+  (should (fboundp '--clear-executing-kbd-macro))
+  (should (fboundp '--executing-kbd-macro-iterations))
+  (should (fboundp '--display-hourglass-p))
+  (should (fboundp '--cancel-hourglass))
+  (should (fboundp '--cmd-error-internal)))
+
+(ert-deftest m7f-helper/executing-kbd-macro-c-defaults-nil ()
+  ;; At batch startup, no kbd-macro is replaying.
+  (should (eq nil (--executing-kbd-macro-c-p))))
+
+(ert-deftest m7f-helper/display-hourglass-returns-bool ()
+  ;; --display-hourglass-p returns t or nil.  Actual value depends on
+  ;; the build (window-system vs. TTY) — defvar default is t.
+  (let ((v (--display-hourglass-p)))
+    (should (or (eq v t) (eq v nil)))))
+
+(ert-deftest m7f-helper/cancel-hourglass-no-op-in-batch ()
+  ;; Must run cleanly even when there's no hourglass to cancel.
+  (--cancel-hourglass)
+  (should t))
+
+(ert-deftest m7f-cmd-error/returns-fixnum-0 ()
+  ;; cmd-error always returns 0 — the loop in command-loop-2 / top-level-1
+  ;; treats 0 (non-nil) as "keep iterating".  Synthetic invocation.
+  (let ((Vcommand_error_function-saved command-error-function))
+    (unwind-protect
+        (progn
+          ;; Suppress side effects: empty error-function so we don't
+          ;; spew "After 0 kbd macro iterations:" into test output.
+          (setq command-error-function (lambda (data ctx sig) nil))
+          (should (= 0 (--cmd-error (cons 'my-test-error (list "data"))))))
+      (setq command-error-function Vcommand_error_function-saved))))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here

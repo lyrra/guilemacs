@@ -1072,67 +1072,8 @@ restore_kboard_configuration (int was_locked)
 }
 
 
-/* Handle errors that are not handled at inner levels
-   by printing an error message and returning to the editor command loop.  */
-
-static Lisp_Object
-cmd_error (Lisp_Object data)
-{
-  Lisp_Object old_level, old_length;
-  Lisp_Object conditions;
-  char macroerror[sizeof "After..kbd macro iterations: "
-		  + INT_STRLEN_BOUND (EMACS_INT)];
-
-  dynwind_begin ();
-
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
-#endif
-
-  if (!NILP (executing_kbd_macro))
-    {
-      if (executing_kbd_macro_iterations == 1)
-	sprintf (macroerror, "After 1 kbd macro iteration: ");
-      else
-	sprintf (macroerror, "After %"pI"d kbd macro iterations: ",
-		 executing_kbd_macro_iterations);
-    }
-  else
-    *macroerror = 0;
-
-  conditions = Fget (XCAR (data), Qerror_conditions);
-  if (NILP (Fmemq (Qminibuffer_quit, conditions)))
-    {
-      Vexecuting_kbd_macro = Qnil;
-      executing_kbd_macro = Qnil;
-    }
-  else if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
-    /* An `M-x' command that signals a `minibuffer-quit' condition
-       that's part of a kbd macro.  */
-    finalize_kbd_macro_chars ();
-
-  specbind_guile (Qstandard_output, Qt);
-  specbind_guile (Qstandard_input, Qt);
-  kset_prefix_arg (current_kboard, Qnil);
-  kset_last_prefix_arg (current_kboard, Qnil);
-  cancel_echoing ();
-
-  /* Avoid unquittable loop if data contains a circular list.  */
-  old_level = Vprint_level;
-  old_length = Vprint_length;
-  XSETFASTINT (Vprint_level, 10);
-  XSETFASTINT (Vprint_length, 10);
-  cmd_error_internal (data, macroerror);
-  Vprint_level = old_level;
-  Vprint_length = old_length;
-
-  Vquit_flag = Qnil;
-  Vinhibit_quit = Qnil;
-
-  dynwind_end ();
-  return make_fixnum (0);
-}
+/* M7f — cmd_error ported to (emacs command-loop) cmd-error.  See
+   docs/keyboard.org §M7f.  */
 
 /* Take actions on handling an error.  DATA is the data that describes
    the error.
@@ -1230,21 +1171,85 @@ static Lisp_Object top_level_1 (Lisp_Object);
    drivers (command_loop_2 / top_level_1 / top_level_2).  See
    docs/keyboard.org §M7e.  */
 
-DEFUN ("--cmd-error", Fc_cmd_error, Sc_cmd_error, 1, 1, 0,
-       doc: /* Internal: invoke the C cmd_error handler with DATA (a
-cons of error-symbol and error-data).  Returns 0 — the loop checks
-that the return is non-nil and keeps iterating.  */)
-  (Lisp_Object data)
-{
-  return cmd_error (data);
-}
-
 DEFUN ("--eval-top-level", Fc_eval_top_level, Sc_eval_top_level, 0, 0, 0,
        doc: /* Internal: call Feval (Vtop_level, Qt).  Runs the startup
 expression installed at top level — see top_level_2_body in C.  */)
   (void)
 {
   return Feval (Vtop_level, Qt);
+}
+
+/* M7f — primitives exposed to (emacs command-loop) for the cmd-error
+   port.  See docs/keyboard.org §M7f.  */
+
+DEFUN ("--executing-kbd-macro-c-p", Fc_executing_kbd_macro_c_p,
+       Sc_executing_kbd_macro_c_p, 0, 0, 0,
+       doc: /* Internal: t if the C-side `executing_kbd_macro' shadow
+of `Vexecuting_kbd_macro' is non-nil.  Used by cmd-error to detect
+in-progress kbd-macro replay.  */)
+  (void)
+{
+  return NILP (executing_kbd_macro) ? Qnil : Qt;
+}
+
+DEFUN ("--clear-executing-kbd-macro", Fc_clear_executing_kbd_macro,
+       Sc_clear_executing_kbd_macro, 0, 0, 0,
+       doc: /* Internal: set both the C-side `executing_kbd_macro' and
+the elisp `Vexecuting_kbd_macro' to nil.  Called by cmd-error when
+the error is not minibuffer-quit.  */)
+  (void)
+{
+  Vexecuting_kbd_macro = Qnil;
+  executing_kbd_macro = Qnil;
+  return Qnil;
+}
+
+DEFUN ("--executing-kbd-macro-iterations",
+       Fc_executing_kbd_macro_iterations,
+       Sc_executing_kbd_macro_iterations, 0, 0, 0,
+       doc: /* Internal: return the C global `executing_kbd_macro_iterations'
+as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (executing_kbd_macro_iterations);
+}
+
+DEFUN ("--display-hourglass-p", Fc_display_hourglass_p,
+       Sc_display_hourglass_p, 0, 0, 0,
+       doc: /* Internal: t if the C-side `display_hourglass_p' bit is
+set (window-system builds only).  No-op false on TTY builds.  */)
+  (void)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  return display_hourglass_p ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--cancel-hourglass", Fc_cancel_hourglass,
+       Sc_cancel_hourglass, 0, 0, 0,
+       doc: /* Internal: invoke `cancel_hourglass' on window-system builds;
+no-op on TTY builds.  */)
+  (void)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  cancel_hourglass ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--cmd-error-internal", Fc_cmd_error_internal,
+       Sc_cmd_error_internal, 2, 2, 0,
+       doc: /* Internal: invoke the C cmd_error_internal helper.
+DATA is a cons of error-symbol and error-data; CONTEXT is a string
+prepended to the message (e.g. "After 3 kbd macro iterations: ").
+An empty CONTEXT string is passed through verbatim.  */)
+  (Lisp_Object data, Lisp_Object context)
+{
+  CHECK_STRING (context);
+  cmd_error_internal (data, SSDATA (context));
+  return Qnil;
 }
 
 /* Entry to editor-command-loop.

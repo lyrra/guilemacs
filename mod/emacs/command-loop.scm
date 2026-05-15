@@ -10,6 +10,7 @@
             command-loop-1
             command-loop-2
             top-level-1
+            cmd-error
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -513,20 +514,97 @@ the original command_loop_1 body verbatim.  See docs/keyboard.org §M7d."
         (loop))))))
 
 ;;;;
+;;;; M7f — cmd-error (ported from static C cmd_error)
+;;;;
+
+(define %executing-kbd-macro-c-p
+  (delay (%c '--executing-kbd-macro-c-p)))
+(define %clear-executing-kbd-macro
+  (delay (%c '--clear-executing-kbd-macro)))
+(define %executing-kbd-macro-iterations
+  (delay (%c '--executing-kbd-macro-iterations)))
+(define %display-hourglass-p (delay (%c '--display-hourglass-p)))
+(define %cancel-hourglass    (delay (%c '--cancel-hourglass)))
+(define %cmd-error-internal  (delay (%c '--cmd-error-internal)))
+
+(define (cmd-error data)
+  "Top-of-command-loop error handler.  DATA is (error-symbol .
+error-data).  Cancels hourglass and kbd-macro replay (or finalizes
+chars if the macro is being recorded and got a minibuffer-quit),
+binds standard-output / standard-input / print-level / print-length
+for safe error display, calls cmd-error-internal, then clears
+quit-flag and inhibit-quit.  Returns 0 (fixnum) so the loop in
+command-loop-2 / top-level-1 treats it as non-nil and continues
+iterating.
+
+Mirrors the static C cmd_error in src/keyboard.c."
+  ;; Hourglass — no-op in batch / TTY.
+  (when (not (%nilp ((force %display-hourglass-p))))
+    ((force %cancel-hourglass)))
+
+  ;; Build kbd-macro iteration prefix.
+  (let* ((kbd-macro-active? (not (%nilp ((force %executing-kbd-macro-c-p)))))
+         (macroerror
+          (cond
+           ((not kbd-macro-active?) "")
+           ((= ((force %executing-kbd-macro-iterations)) 1)
+            "After 1 kbd macro iteration: ")
+           (else
+            (format #f "After ~a kbd macro iterations: "
+                    ((force %executing-kbd-macro-iterations))))))
+         (conditions
+          ((%c 'get) ((%c 'car) data) 'error-conditions)))
+
+    (if (%nilp ((%c 'memq) 'minibuffer-quit conditions))
+        ;; Not a minibuffer-quit: abort any macro replay.
+        ((force %clear-executing-kbd-macro))
+        ;; Else, if M-x command signaled minibuffer-quit while a kbd
+        ;; macro is being defined, finalize the chars buffered so far.
+        (let ((kb ((force %current-kboard))))
+          (when (not (%nilp ((force %kboard-defining-kbd-macro) kb)))
+            ((force %finalize-kbd-macro-chars)))))
+
+    ;; specbind on the elisp side (these vars used to be C specpdl).
+    (let ((saved-output (symbol-value 'standard-output))
+          (saved-input  (symbol-value 'standard-input))
+          (saved-level  (symbol-value 'print-level))
+          (saved-length (symbol-value 'print-length))
+          (kb           ((force %current-kboard))))
+      (dynamic-wind
+        (lambda ()
+          (set-symbol-value! 'standard-output #t)
+          (set-symbol-value! 'standard-input  #t)
+          (set-symbol-value! 'print-level     10)
+          (set-symbol-value! 'print-length    10))
+        (lambda ()
+          ((force %set-kboard-prefix-arg)      kb #nil)
+          ((force %set-kboard-last-prefix-arg) kb #nil)
+          ((force %cancel-echoing))
+          ((force %cmd-error-internal) data macroerror))
+        (lambda ()
+          (set-symbol-value! 'standard-output saved-output)
+          (set-symbol-value! 'standard-input  saved-input)
+          (set-symbol-value! 'print-level     saved-level)
+          (set-symbol-value! 'print-length    saved-length)))))
+
+  (set-symbol-value! 'quit-flag    #nil)
+  (set-symbol-value! 'inhibit-quit #nil)
+  0)
+
+;;;;
 ;;;; M7e — command_loop_2 / top_level_1 outer drivers
 ;;;;
 
-(define %cmd-error       (delay (%c '--cmd-error)))
 (define %eval-top-level  (delay (%c '--eval-top-level)))
 
 (define (%catch-cmd-error thunk)
   "Run THUNK; if it throws an elisp-condition, route the (error-sym .
-error-data) cons to --cmd-error and return its result (a fixnum 0).
+error-data) cons to cmd-error and return its result (a fixnum 0).
 Mirrors internal_condition_case (..., Qt, cmd_error)."
   (catch 'elisp-condition
     thunk
     (lambda (key err-sym err-data)
-      ((force %cmd-error) (cons err-sym err-data)))))
+      (cmd-error (cons err-sym err-data)))))
 
 (define (command-loop-2)
   "C command_loop_2's body in Scheme.  Loops command-loop-1 inside a
@@ -572,4 +650,5 @@ command_loop_1_iter_pre_read."
               (--command-loop-1-finalize           ,command-loop-1-finalize)
               (--command-loop-1                    ,command-loop-1)
               (--command-loop-2                    ,command-loop-2)
-              (--top-level-1                       ,top-level-1))))
+              (--top-level-1                       ,top-level-1)
+              (--cmd-error                         ,cmd-error))))
