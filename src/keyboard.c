@@ -11399,58 +11399,38 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   return t;
 }
 
-static Lisp_Object
-read_key_sequence_vs (Lisp_Object prompt, Lisp_Object continue_echo,
-		      Lisp_Object dont_downcase_last,
-		      Lisp_Object can_return_switch_frame,
-		      Lisp_Object cmd_loop, bool allow_string,
-		      bool disable_text_conversion)
-{
-  dynwind_begin ();
+/* M6a — primitives exposed to (emacs read-key-sequence) for the
+   outer wrapper port.  The state machine (read_key_sequence above)
+   stays C; M6b–M6f will incrementally move parts of it to Scheme.
+   See docs/keyboard.org §M6a.  */
 
+DEFUN ("--read-key-sequence-and-vector",
+       Fc_read_key_sequence_and_vector,
+       Sc_read_key_sequence_and_vector, 4, 4, 0,
+       doc: /* Internal: invoke the C read_key_sequence state machine with
+PROMPT, DONT-DOWNCASE-LAST, CAN-RETURN-SWITCH-FRAME, DISABLE-TEXT-CONVERSION.
+Returns the read keys as a Lisp vector of length i, or the fixnum -1
+on quit (i == -1).  The caller is responsible for the specbind
+housekeeping (input-method-exit-on-first-char,
+input-method-use-echo-area) and any quit handling.  */)
+  (Lisp_Object prompt, Lisp_Object dont_downcase_last,
+   Lisp_Object can_return_switch_frame,
+   Lisp_Object disable_text_conversion)
+{
   if (!NILP (prompt))
     CHECK_STRING (prompt);
-  maybe_quit ();
-
-  specbind_guile (Qinput_method_exit_on_first_char,
-	    (NILP (cmd_loop) ? Qt : Qnil));
-  specbind_guile (Qinput_method_use_echo_area,
-	    (NILP (cmd_loop) ? Qt : Qnil));
-
-  if (NILP (continue_echo))
-    {
-      this_command_key_count = 0;
-      this_single_command_key_start = 0;
-    }
-
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    cancel_hourglass ();
-#endif
-
-  raw_keybuf_count = 0;
   Lisp_Object keybuf[READ_KEY_ELTS];
-  int i = read_key_sequence (keybuf, prompt, ! NILP (dont_downcase_last),
-			     ! NILP (can_return_switch_frame), false, false,
-			     disable_text_conversion);
-
-#if 0  /* The following is fine for code reading a key sequence and
-	  then proceeding with a lengthy computation, but it's not good
-	  for code reading keys in a loop, like an input method.  */
-#ifdef HAVE_WINDOW_SYSTEM
-  if (display_hourglass_p)
-    start_hourglass ();
-#endif
-#endif
-
+  int i = read_key_sequence (keybuf, prompt,
+                             !NILP (dont_downcase_last),
+                             !NILP (can_return_switch_frame),
+                             false, false,
+                             !NILP (disable_text_conversion));
   if (i == -1)
-    {
-      Vquit_flag = Qt;
-      maybe_quit ();
-    }
-  Lisp_Object tem0 = ((allow_string ? make_event_array : Fvector) (i, keybuf));
-  dynwind_end ();
-  return tem0;
+    return make_fixnum (-1);
+  Lisp_Object result = scm_c_make_vector (i, Qnil);
+  for (ptrdiff_t j = 0; j < i; j++)
+    GASET (result, j, keybuf[j]);
+  return result;
 }
 
 DEFUN ("read-key-sequence", Fread_key_sequence, Sread_key_sequence, 1, 6, 0,
@@ -11509,9 +11489,14 @@ being sent.  */)
    Lisp_Object can_return_switch_frame, Lisp_Object cmd_loop,
    Lisp_Object disable_text_conversion)
 {
-  return read_key_sequence_vs (prompt, continue_echo, dont_downcase_last,
-			       can_return_switch_frame, cmd_loop, true,
-			       !NILP (disable_text_conversion));
+  /* M6a: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6a.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "read-key-sequence-vs-string");
+  SCM args[6] = { prompt, continue_echo, dont_downcase_last,
+                  can_return_switch_frame, cmd_loop,
+                  disable_text_conversion };
+  return SCM_CALL_N (proc, args, 6);
 }
 
 DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,
@@ -11521,9 +11506,14 @@ DEFUN ("read-key-sequence-vector", Fread_key_sequence_vector,
    Lisp_Object can_return_switch_frame, Lisp_Object cmd_loop,
    Lisp_Object disable_text_conversion)
 {
-  return read_key_sequence_vs (prompt, continue_echo, dont_downcase_last,
-			       can_return_switch_frame, cmd_loop, false,
-			       !NILP (disable_text_conversion));
+  /* M6a: dispatch to (emacs read-key-sequence) — see docs/keyboard.org §M6a.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "read-key-sequence-vs-vector");
+  SCM args[6] = { prompt, continue_echo, dont_downcase_last,
+                  can_return_switch_frame, cmd_loop,
+                  disable_text_conversion };
+  return SCM_CALL_N (proc, args, 6);
 }
 
 /* Return true if input events are pending.  */

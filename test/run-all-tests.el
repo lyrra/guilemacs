@@ -134,6 +134,7 @@
 (load "test/keyboard/test-this-command-keys.el") ; M5
 (load "test/keyboard/test-consolidation.el")     ; Consolidation
 (load "test/keyboard/test-command-loop.el")      ; M7a
+(load "test/keyboard/test-read-key-sequence.el") ; M6a
 (message "")
 
 (message "========================================")
