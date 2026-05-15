@@ -1118,7 +1118,6 @@ Default value of `command-error-function'.  */)
 }
 
 static Lisp_Object command_loop_1 (void);
-static Lisp_Object top_level_1 (Lisp_Object);
 
 /* M7e — primitives exposed to (emacs command-loop) for the outer
    drivers (command_loop_2 / top_level_1 / top_level_2).  See
@@ -1277,9 +1276,32 @@ An empty CONTEXT string is passed through verbatim.  */)
   return Qnil;
 }
 
+/* M7h — primitive exposed to (emacs command-loop) for command-loop-main.
+   See docs/keyboard.org §M7h.  */
+
+DEFUN ("--clear-executing-kbd-macro-c-only",
+       Fc_clear_executing_kbd_macro_c_only,
+       Sc_clear_executing_kbd_macro_c_only, 0, 0, 0,
+       doc: /* Internal: clear ONLY the C-side `executing_kbd_macro' shadow;
+leaves `Vexecuting_kbd_macro' (the elisp defvar) alone.  Matches the
+asymmetric behavior of the C command_loop body (which clears the C
+shadow but not the elisp var on each loop iteration).  See
+docs/keyboard.org §M7h.  */)
+  (void)
+{
+  executing_kbd_macro = Qnil;
+  return Qnil;
+}
+
 /* Entry to editor-command-loop.
    This level has the catches for exiting/returning to editor command loop.
-   It returns nil to exit recursive edit, t to abort it.  */
+   It returns nil to exit recursive edit, t to abort it.
+
+   M7h: post-sigsetjmp body lives in (emacs command-loop) as
+   command-loop-main.  The sigsetjmp + Vinternal__top_level_message
+   setup stays here — it's OS-level signal-mask handling and a
+   longjmp target for stack-overflow recovery (see handle_sigsegv in
+   sysdep.c and stack_overflow_handler in w32fns.c).  */
 
 Lisp_Object
 command_loop (void)
@@ -1288,8 +1310,6 @@ command_loop (void)
   /* At least on GNU/Linux, saving signal mask is important here.  */
   if (sigsetjmp (return_to_command_loop, 1) != 0)
     {
-      /* Comes here from handle_sigsegv (see sysdep.c) and
-	 stack_overflow_handler (see w32fns.c).  */
 #ifdef WINDOWSNT
       w32_reset_stack_overflow_guard ();
 #endif
@@ -1299,24 +1319,11 @@ command_loop (void)
   else
     Vinternal__top_level_message = regular_top_level_message;
 #endif /* HAVE_STACK_OVERFLOW_HANDLING */
-  if (command_loop_level > 0 || minibuf_level > 0)
-    {
-      Lisp_Object val;
-      val = internal_catch (Qexit, command_loop_2, Qerror);
-      executing_kbd_macro = Qnil;
-      return val;
-    }
-  else
-    while (1)
-      {
-	internal_catch (Qtop_level, top_level_1, Qnil);
-	internal_catch (Qtop_level, command_loop_2, Qerror);
-	executing_kbd_macro = Qnil;
 
-	/* End of file in -batch run causes exit here.  */
-	if (noninteractive)
-	  Fkill_emacs (Qt, Qnil);
-      }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "command-loop-main");
+  return SCM_CALL_0 (proc);
 }
 
 /* Here we catch errors in execution of commands within the
@@ -1327,26 +1334,16 @@ command_loop (void)
    list of condition names, passed to internal_condition_case.  */
 
 /* M7e — C wrapper around (emacs command-loop) command-loop-2.  Body
-   lives in Scheme; the C signature stays for the function pointer
-   that command_loop passes to internal_catch.  See
-   docs/keyboard.org §M7e.  */
+   lives in Scheme.  Kept as a C function because macros.c (kbd-macro
+   execution) calls it directly with a list1 (Qminibuffer_quit) arg —
+   the arg itself is ignored, but the function pointer must remain a
+   valid C symbol.  See docs/keyboard.org §M7e.  */
 Lisp_Object
 command_loop_2 (Lisp_Object ignore)
 {
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs command-loop", "command-loop-2");
-  return SCM_CALL_0 (proc);
-}
-
-/* M7e — C wrapper around (emacs command-loop) top-level-1.  See
-   docs/keyboard.org §M7e.  */
-static Lisp_Object
-top_level_1 (Lisp_Object ignore)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "top-level-1");
   return SCM_CALL_0 (proc);
 }
 

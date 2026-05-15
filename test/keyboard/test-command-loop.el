@@ -371,4 +371,20 @@
 (test-assert "m7g/command-error-default-function-bound"
              (fboundp 'command-error-default-function))
 
+;;;; M7h
+
+(test-assert "m7h/command-loop-main-exists"
+             (fboundp '--command-loop-main))
+(test-assert "m7h-helper/clear-executing-kbd-macro-c-only"
+             (fboundp '--clear-executing-kbd-macro-c-only))
+
+(let ((saved-vekm executing-kbd-macro))
+  (setq executing-kbd-macro 'sentinel-value)
+  (--clear-executing-kbd-macro-c-only)
+  (test-eq "m7h/c-only-leaves-elisp-defvar"
+           'sentinel-value executing-kbd-macro)
+  (test-eq "m7h/c-only-clears-c-shadow"
+           nil (--executing-kbd-macro-c-p))
+  (setq executing-kbd-macro saved-vekm))
+
 (test-end)

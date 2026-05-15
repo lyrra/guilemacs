@@ -10,6 +10,7 @@
             command-loop-1
             command-loop-2
             top-level-1
+            command-loop-main
             cmd-error
             command-error-default-function
             init-command-loop-registrations))
@@ -677,6 +678,45 @@ kbd-macro replay.  Mirrors src/keyboard.c command_loop_2 (lines
       (when (not (%nilp val)) (loop))))
   #nil)
 
+(define %command-loop-level (delay (%c '--command-loop-level)))
+(define %minibuffer-depth   (delay (%c 'minibuffer-depth)))
+(define %call-with-catch    (delay (%c 'call-with-catch)))
+(define %clear-executing-kbd-macro-c-only
+  (delay (%c '--clear-executing-kbd-macro-c-only)))
+
+(define (command-loop-main)
+  "Body of `command_loop' after the C-side sigsetjmp / stack-overflow
+recovery setup.  Two cases:
+
+  (recursive)  command-loop-level > 0 OR minibuffer-depth > 0
+               Run command-loop-2 once under a `catch on `exit',
+               clear the C-only executing-kbd-macro shadow, return
+               whatever command-loop-2 yielded.  This is the
+               recursive-edit path.
+
+  (top-level)  Otherwise run forever, alternating top-level-1 and
+               command-loop-2 under separate `catch'es on `top-level'.
+               In -batch mode the inner kill-emacs exits the loop.
+
+Mirrors src/keyboard.c command_loop (lines 1302-1319).  See
+docs/keyboard.org §M7h."
+  (if (or (> ((force %command-loop-level)) 0)
+          (> ((force %minibuffer-depth)) 0))
+      (let ((val ((force %call-with-catch) 'exit
+                  (lambda () (command-loop-2)))))
+        ((force %clear-executing-kbd-macro-c-only))
+        val)
+      (let loop ()
+        ((force %call-with-catch) 'top-level
+         (lambda () (top-level-1)))
+        ((force %call-with-catch) 'top-level
+         (lambda () (command-loop-2)))
+        ((force %clear-executing-kbd-macro-c-only))
+        ;; End of file in -batch run causes exit here.
+        (when (not (%nilp (symbol-value 'noninteractive)))
+          ((%c 'kill-emacs) #t #nil))
+        (loop))))
+
 (define (top-level-1)
   "C top_level_1's body in Scheme.  Runs the startup expression
 installed in `top-level' under cmd-error handling; if no startup
@@ -711,4 +751,5 @@ command_loop_1_iter_pre_read."
               (--command-loop-1                    ,command-loop-1)
               (--command-loop-2                    ,command-loop-2)
               (--top-level-1                       ,top-level-1)
+              (--command-loop-main                 ,command-loop-main)
               (--cmd-error                         ,cmd-error))))

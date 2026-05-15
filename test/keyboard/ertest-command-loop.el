@@ -480,6 +480,27 @@
   ;; binding still resolves to the function.
   (should (fboundp 'command-error-default-function)))
 
+;;;; M7h — command-loop-main (the post-sigsetjmp body of command_loop)
+
+(ert-deftest m7h-command-loop-main/exists ()
+  (should (fboundp '--command-loop-main)))
+
+(ert-deftest m7h-helper/clear-executing-kbd-macro-c-only ()
+  ;; The C-only setter must clear executing_kbd_macro shadow without
+  ;; touching Vexecuting_kbd_macro (preserves the asymmetry of the
+  ;; original C command_loop body).
+  (should (fboundp '--clear-executing-kbd-macro-c-only))
+  (let ((Vexecuting_kbd_macro-saved executing-kbd-macro))
+    (unwind-protect
+        (progn
+          (setq executing-kbd-macro 'sentinel-value)
+          (--clear-executing-kbd-macro-c-only)
+          ;; The elisp defvar is untouched.
+          (should (eq 'sentinel-value executing-kbd-macro))
+          ;; The C-shadow predicate now reports nil.
+          (should (eq nil (--executing-kbd-macro-c-p))))
+      (setq executing-kbd-macro Vexecuting_kbd_macro-saved))))
+
 (provide 'ertest-command-loop)
 
 ;;; ertest-command-loop.el ends here
