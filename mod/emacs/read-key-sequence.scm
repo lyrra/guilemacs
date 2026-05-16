@@ -25,6 +25,10 @@
             make-rks-state rks-state?
             rks-setup-prompt!
             rks-setup-initial-keys-state!
+            rks-setup-initial-state-c!
+            rks-setup-replay-entire-sequence!
+            rks-setup-replay-entire-sequence-c!
+            rks-setup-replay-sequence!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -444,6 +448,25 @@ read_key_sequence lines 10504-10526:
            (not (%nilp ((force %echo-keystrokes-p)))))
       ((force %echo-dash))))))
 
+(define %set-rks-echo-start (delay (%c '--set-rks-echo-start)))
+(define %set-rks-keys-start (delay (%c '--set-rks-keys-start)))
+
+(define (rks-setup-initial-state-c!)
+  "Runtime initial-state capture for read_key_sequence.  Writes the
+file-static C globals rks_echo_start and rks_keys_start (the
+promoted shadows of the former `echo_start' / `keys_start' locals)
+and updates this-single-command-key-start.  Mirrors the C inline
+block at lines 10578-10581 (pre-M6j).
+
+Used at runtime via the cached-SCM dispatch in read_key_sequence.
+For the rks-state record-writing variant used by tests, see
+`rks-setup-initial-keys-state!'."
+  (let ((kc ((force %this-command-key-count))))
+    (when (%nilp (symbol-value 'noninteractive))
+      ((force %set-rks-echo-start) ((force %echo-length))))
+    ((force %set-rks-keys-start) kc)
+    ((force %set-this-single-command-key-start-2) kc)))
+
 (define (rks-setup-initial-keys-state! state)
   "Capture the initial echo length + this-command-key-count into the
 rks-state record.  Mirrors src/keyboard.c lines 10528-10535:
@@ -456,6 +479,67 @@ rks-state record.  Mirrors src/keyboard.c lines 10528-10535:
   (let ((kc ((force %this-command-key-count))))
     (set-rks-state-keys-start! state kc)
     ((force %set-this-single-command-key-start-2) kc)))
+
+;;;;
+;;;; M6k — replay-phase setup procedures.
+;;;;
+;;;; Parallel Scheme implementations of the two label-bodies inside
+;;;; read_key_sequence: `replay_entire_sequence' (resets the three
+;;;; keyremap maps from current-kboard) and `replay_sequence' (caches
+;;;; starting buffer, first_unbound, builds current-binding from
+;;;; active_maps).  These operate on an rks-state record.  NOT yet
+;;;; wired into the C state machine; the wire-in waits until the
+;;;; keyremap locals are promoted to file-static (a bigger refactor).
+
+(define %kboard-input-decode-map
+  (delay (%c 'kboard-input-decode-map)))
+(define %kboard-local-function-key-map
+  (delay (%c 'kboard-local-function-key-map)))
+(define %active-maps           (delay (%c '--active-maps)))
+
+(define %rks-init-keyremaps    (delay (%c '--rks-init-keyremaps)))
+
+(define (rks-setup-replay-entire-sequence! state)
+  "Reset the three keyremaps in STATE from current-kboard's translation
+maps and the global `key-translation-map'.  Mirrors the C block at
+the `replay_entire_sequence:' label (src/keyboard.c lines
+10635-10640)."
+  (let ((kb ((force %current-kboard))))
+    (keyremap-rebase! (rks-state-indec state)
+                      ((force %kboard-input-decode-map) kb))
+    (keyremap-rebase! (rks-state-fkey state)
+                      ((force %kboard-local-function-key-map) kb))
+    (keyremap-rebase! (rks-state-keytran state)
+                      (symbol-value 'key-translation-map))))
+
+(define (rks-setup-replay-entire-sequence-c!)
+  "Runtime variant of `rks-setup-replay-entire-sequence!': writes the
+file-static C-side keyremap shadows (rks_indec, rks_fkey,
+rks_keytran) via `--rks-init-keyremaps'.  Called from
+read_key_sequence's `replay_entire_sequence:' label via the
+cached-SCM dispatch."
+  (let ((kb ((force %current-kboard))))
+    ((force %rks-init-keyremaps)
+     ((force %kboard-input-decode-map) kb)
+     ((force %kboard-local-function-key-map) kb)
+     (symbol-value 'key-translation-map))))
+
+(define READ-KEY-ELTS-PLUS-1 (+ READ-KEY-ELTS 1))
+
+(define (rks-setup-replay-sequence! state)
+  "Capture per-replay state: zeroes key-count, sets first-unbound to
+its sentinel value, computes the initial current-binding from
+keybuf[0]/keybuf[1] (where mock-input permits) via the C
+`--active-maps' helper.  Mirrors src/keyboard.c lines 10649-10661
+(the `replay_sequence:' label body)."
+  (let* ((mock-input (rks-state-mock-input state))
+         (keybuf    (rks-state-keybuf state))
+         (first-event  (if (> mock-input 0) (vector-ref keybuf 0) #nil))
+         (second-event (if (> mock-input 1) (vector-ref keybuf 1) #nil)))
+    (set-rks-state-first-unbound! state READ-KEY-ELTS-PLUS-1)
+    (set-rks-state-current-binding! state
+                                    ((force %active-maps) first-event second-event))
+    (set-rks-state-key-count! state 0)))
 
 (define (init-read-key-sequence-registrations)
   "Expose the M6a wrapper as an elisp symbol so tests can call it
@@ -480,4 +564,13 @@ cached-dispatch into here."
               (--make-rks-state        ,make-rks-state)
               ;; M6h — setup-phase procedures (not yet wired into runtime)
               (--rks-setup-prompt!     ,rks-setup-prompt!)
-              (--rks-setup-initial-keys-state! ,rks-setup-initial-keys-state!))))
+              (--rks-setup-initial-keys-state! ,rks-setup-initial-keys-state!)
+              (--rks-setup-initial-state-c!    ,rks-setup-initial-state-c!)
+              ;; M6k — replay-phase procedures (parallel, not yet wired)
+              (--rks-setup-replay-entire-sequence!
+               ,rks-setup-replay-entire-sequence!)
+              (--rks-setup-replay-sequence!
+               ,rks-setup-replay-sequence!)
+              ;; M6l — runtime variant (writes C-side shadows)
+              (--rks-setup-replay-entire-sequence-c!
+               ,rks-setup-replay-entire-sequence-c!))))

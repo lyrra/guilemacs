@@ -10181,6 +10181,38 @@ active_maps (Lisp_Object first_event, Lisp_Object second_event)
   return Fcons (Qkeymap, Fcurrent_active_maps (Qt, position));
 }
 
+/* M6j — file-static shadows of the former read_key_sequence locals
+   `echo_start' and `keys_start'.  Scheme `rks-setup-initial-state-c!'
+   writes them via `--set-rks-echo-start' / `--set-rks-keys-start';
+   the C state machine continues to read them at the two existing
+   sites (this_command_key_count restore on replay, echo_truncate
+   on replay_key).  Single-threaded use, same lifetime as a
+   read_key_sequence call, so file-static is safe.  */
+static ptrdiff_t rks_echo_start = 0;
+static ptrdiff_t rks_keys_start = 0;
+
+DEFUN ("--set-rks-echo-start", Fc_set_rks_echo_start,
+       Sc_set_rks_echo_start, 1, 1, 0,
+       doc: /* Internal: store N into the file-static rks_echo_start
+shadow of read_key_sequence's former `echo_start' local.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  rks_echo_start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-keys-start", Fc_set_rks_keys_start,
+       Sc_set_rks_keys_start, 1, 1, 0,
+       doc: /* Internal: store N into the file-static rks_keys_start
+shadow of read_key_sequence's former `keys_start' local.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  rks_keys_start = XFIXNUM (n);
+  return Qnil;
+}
+
 /* M6h — primitives exposed to (emacs read-key-sequence) for the
    future setup-phase port (kicked off by M6g infrastructure).  See
    docs/keyboard.org §M6h.  */
@@ -10275,6 +10307,33 @@ typedef struct keyremap
      if PARENT maps them into a key sequence.  */
   int start, end;
 } keyremap;
+
+/* M6l — promote read_key_sequence's `fkey', `keytran', `indec' from
+   locals to file-static so the Scheme rks-setup-replay-entire-sequence!
+   can write them at the `replay_entire_sequence:' label.  Inside
+   read_key_sequence the original names are aliased back via #define
+   (see the function for the alias block); access sites elsewhere in
+   the file are unaffected because none exist.  Single-threaded use
+   (one in-flight read_key_sequence per Emacs).  */
+static keyremap rks_fkey, rks_keytran, rks_indec;
+
+DEFUN ("--rks-init-keyremaps", Fc_rks_init_keyremaps, Sc_rks_init_keyremaps,
+       3, 3, 0,
+       doc: /* Internal: initialize the three keyremap shadows
+(rks_indec, rks_fkey, rks_keytran) with the given INDEC-MAP,
+FKEY-MAP, KEYTRAN-MAP respectively.  Each keyremap is set so
+parent == map == MAP and start == end == 0.  Mirrors the C
+`replay_entire_sequence:' inline block.  */)
+  (Lisp_Object indec_map, Lisp_Object fkey_map, Lisp_Object keytran_map)
+{
+  rks_indec.parent   = rks_indec.map   = indec_map;
+  rks_fkey.parent    = rks_fkey.map    = fkey_map;
+  rks_keytran.parent = rks_keytran.map = keytran_map;
+  rks_indec.start   = rks_indec.end   = 0;
+  rks_fkey.start    = rks_fkey.end    = 0;
+  rks_keytran.start = rks_keytran.end = 0;
+  return Qnil;
+}
 
 /* Lookup KEY in MAP.
    MAP is a keymap mapping keys to key vectors or functions.
@@ -10488,8 +10547,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* The length of the echo buffer when we started reading, and
      the length of this_command_keys when we started reading.  */
-  ptrdiff_t echo_start UNINIT;
-  ptrdiff_t keys_start;
+  /* M6j: echo_start and keys_start were locals here; promoted to
+     the file-static rks_echo_start / rks_keys_start (declared below)
+     so the Scheme rks-setup-initial-state-c! can write them and the
+     C state machine continues to read them.  See docs/keyboard.org §M6j.  */
 
   Lisp_Object current_binding = Qnil;
 
@@ -10522,11 +10583,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      These might be > t, indicating that all function key scanning
      should hold off until t reaches them.  We do this when we've just
      recognized a function key, to avoid searching for the function
-     key's again in Vfunction_key_map.  */
-  keyremap fkey;
+     key's again in Vfunction_key_map.
 
-  /* Likewise, for key_translation_map and input-decode-map.  */
-  keyremap keytran, indec;
+     M6l: these three locals are now aliased to file-static shadows
+     (rks_fkey / rks_keytran / rks_indec) so the Scheme runtime can
+     write them via --rks-init-keyremaps.  The aliases keep the
+     existing 77 access sites in this function unchanged.  */
+#define fkey    rks_fkey
+#define keytran rks_keytran
+#define indec   rks_indec
 
   /* True if we are trying to map a key by changing an upper-case
      letter to lower case, or a shifted function key to an unshifted
@@ -10573,12 +10638,16 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM_CALL_1 (rks_setup_prompt_proc, prompt);
   }
 
-  /* Record the initial state of the echo area and this_command_keys;
-     we will need to restore them if we replay a key sequence.  */
-  if (INTERACTIVE)
-    echo_start = echo_length ();
-  keys_start = this_command_key_count;
-  this_single_command_key_start = keys_start;
+  /* M6j: initial-state capture ported to (emacs read-key-sequence)
+     rks-setup-initial-state-c! — writes the file-static
+     rks_echo_start and rks_keys_start.  See docs/keyboard.org §M6j.  */
+  {
+    static SCM rks_setup_initial_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_setup_initial_proc))
+      rks_setup_initial_proc = scm_c_public_ref ("emacs read-key-sequence",
+                                                 "rks-setup-initial-state-c!");
+    SCM_CALL_0 (rks_setup_initial_proc);
+  }
 
 #ifdef HAVE_TEXT_CONVERSION
   /* Set `reading_key_sequence' to true.  This variable is used by
@@ -10591,15 +10660,20 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #endif /* HAVE_TEXT_CONVERSION */
 
   /* We jump here when we need to reinitialize fkey and keytran; this
-     happens if we switch keyboards between rescans.  */
- replay_entire_sequence:
+     happens if we switch keyboards between rescans.
 
-  indec.map = indec.parent = KVAR (current_kboard, Vinput_decode_map);
-  fkey.map = fkey.parent = KVAR (current_kboard, Vlocal_function_key_map);
-  keytran.map = keytran.parent = Vkey_translation_map;
-  indec.start = indec.end = 0;
-  fkey.start = fkey.end = 0;
-  keytran.start = keytran.end = 0;
+     M6l: the inline init is now an --rks-init-keyremaps subr call
+     made by the Scheme rks-setup-replay-entire-sequence!.  See
+     docs/keyboard.org §M6l.  */
+ replay_entire_sequence:
+  {
+    static SCM rks_replay_entire_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_replay_entire_proc))
+      rks_replay_entire_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-setup-replay-entire-sequence-c!");
+    SCM_CALL_0 (rks_replay_entire_proc);
+  }
 
   /* We jump here when the key sequence has been thoroughly changed, and
      we need to rescan it starting from the beginning.  When we jump here,
@@ -10623,10 +10697,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   last_nonmenu_event = Qnil;
 
   /* These are no-ops the first time through, but if we restart, they
-     revert the echo area and this_command_keys to their original state.  */
-  this_command_key_count = keys_start;
+     revert the echo area and this_command_keys to their original state.
+     M6j: keys_start / echo_start moved to file-static rks_keys_start /
+     rks_echo_start; see top of file.  */
+  this_command_key_count = rks_keys_start;
   if (INTERACTIVE && t < mock_input)
-    echo_truncate (echo_start);
+    echo_truncate (rks_echo_start);
 
   /* If text conversion is supposed to be disabled immediately, do it
      now.  */
@@ -11463,6 +11539,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   return t;
 }
+
+#undef fkey
+#undef keytran
+#undef indec
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)

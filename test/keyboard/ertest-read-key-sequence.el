@@ -283,4 +283,69 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
     (--rks-setup-initial-keys-state! s)
     (should (= 4 (--this-single-command-key-start)))))
 
+;;;; M6j — runtime initial-state capture (writes C file-static shadows)
+
+(ert-deftest m6j-helpers/exist ()
+  (should (fboundp '--set-rks-echo-start))
+  (should (fboundp '--set-rks-keys-start))
+  (should (fboundp '--rks-setup-initial-state-c!)))
+
+(ert-deftest m6j-setup-initial-state-c/sets-single-cmd-key-start ()
+  ;; Runtime variant also synchronizes this-single-command-key-start
+  ;; with this-command-key-count (same as the rks-state variant).
+  (--set-this-command-key-count        6)
+  (--set-this-single-command-key-start 0)
+  (--rks-setup-initial-state-c!)
+  (should (= 6 (--this-single-command-key-start))))
+
+(ert-deftest m6j-setters/accept-fixnums ()
+  ;; The two C-shadow setters take non-negative fixnums.  Just verify
+  ;; they don't error.
+  (should (eq nil (--set-rks-echo-start 0)))
+  (should (eq nil (--set-rks-keys-start 0)))
+  (should (eq nil (--set-rks-echo-start 42)))
+  (should (eq nil (--set-rks-keys-start 7))))
+
+;;;; M6k — parallel replay-phase procedures
+
+(ert-deftest m6k-replay-entire-sequence/exists ()
+  (should (fboundp '--rks-setup-replay-entire-sequence!)))
+
+(ert-deftest m6k-replay-sequence/exists ()
+  (should (fboundp '--rks-setup-replay-sequence!)))
+
+(ert-deftest m6k-replay-entire-sequence/runs-without-error ()
+  ;; Operates on a fresh state.  All three keyremaps get rebased to
+  ;; current-kboard maps + the global key-translation-map.
+  (let ((s (--make-rks-state)))
+    (--rks-setup-replay-entire-sequence! s)
+    (should t)))
+
+(ert-deftest m6k-replay-sequence/runs-without-error ()
+  ;; replay_sequence reads keybuf[0..1] (gated by mock-input), so
+  ;; calling it on a fresh state (mock-input = 0) just yields nil
+  ;; events.  active-maps then produces the keymap stack at the
+  ;; selected window's position.
+  (let ((s (--make-rks-state)))
+    (--rks-setup-replay-sequence! s)
+    (should t)))
+
+;;;; M6l — runtime replay-entire-sequence wire-in
+
+(ert-deftest m6l-helpers/exist ()
+  (should (fboundp '--rks-init-keyremaps))
+  (should (fboundp '--rks-setup-replay-entire-sequence-c!)))
+
+(ert-deftest m6l-rks-init-keyremaps/returns-nil ()
+  ;; The bulk-init subr always returns nil; just verify it accepts
+  ;; three arbitrary Lisp values.
+  (should (eq nil (--rks-init-keyremaps nil nil nil))))
+
+(ert-deftest m6l-runtime-variant/runs-without-error ()
+  ;; The runtime variant reads from current-kboard and writes the
+  ;; file-static C shadows.  No record argument — operates entirely
+  ;; on C state.
+  (--rks-setup-replay-entire-sequence-c!)
+  (should t))
+
 (provide 'ertest-read-key-sequence)

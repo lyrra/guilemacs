@@ -166,4 +166,48 @@
   (--rks-setup-initial-keys-state! s)
   (test-equal "m6h/setup-copies-key-count" 4 (--this-single-command-key-start)))
 
+;;;; M6j
+
+(test-assert "m6j-helper/set-rks-echo-start"   (fboundp '--set-rks-echo-start))
+(test-assert "m6j-helper/set-rks-keys-start"   (fboundp '--set-rks-keys-start))
+(test-assert "m6j/setup-initial-state-c-exists"
+             (fboundp '--rks-setup-initial-state-c!))
+
+(--set-this-command-key-count        6)
+(--set-this-single-command-key-start 0)
+(--rks-setup-initial-state-c!)
+(test-equal "m6j/setup-sets-single-cmd-key-start"
+            6 (--this-single-command-key-start))
+
+(test-eq "m6j/set-rks-echo-start-returns-nil"  nil (--set-rks-echo-start 42))
+(test-eq "m6j/set-rks-keys-start-returns-nil"  nil (--set-rks-keys-start 7))
+
+;;;; M6k
+
+(test-assert "m6k/replay-entire-sequence-exists"
+             (fboundp '--rks-setup-replay-entire-sequence!))
+(test-assert "m6k/replay-sequence-exists"
+             (fboundp '--rks-setup-replay-sequence!))
+
+(let ((s (--make-rks-state)))
+  (--rks-setup-replay-entire-sequence! s)
+  (test-assert "m6k/replay-entire-sequence-runs" t))
+
+(let ((s (--make-rks-state)))
+  (--rks-setup-replay-sequence! s)
+  (test-assert "m6k/replay-sequence-runs" t))
+
+;;;; M6l
+
+(test-assert "m6l-helper/rks-init-keyremaps"
+             (fboundp '--rks-init-keyremaps))
+(test-assert "m6l/runtime-variant-exists"
+             (fboundp '--rks-setup-replay-entire-sequence-c!))
+
+(test-eq "m6l/init-keyremaps-returns-nil"
+         nil (--rks-init-keyremaps nil nil nil))
+
+(--rks-setup-replay-entire-sequence-c!)
+(test-assert "m6l/runtime-variant-runs" t)
+
 (test-end)
