@@ -29,6 +29,7 @@
             rks-setup-replay-entire-sequence!
             rks-setup-replay-entire-sequence-c!
             rks-setup-replay-sequence!
+            rks-setup-replay-sequence-c!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -526,6 +527,20 @@ cached-SCM dispatch."
 
 (define READ-KEY-ELTS-PLUS-1 (+ READ-KEY-ELTS 1))
 
+(define %rks-replay-sequence-init-rest
+  (delay (%c '--rks-replay-sequence-init-rest)))
+
+(define (rks-setup-replay-sequence-c! keybuf0 keybuf1)
+  "Runtime variant for the `replay_sequence:' label.  Called by C
+read_key_sequence with KEYBUF0 = (mock_input > 0 ? keybuf[0] : nil)
+and KEYBUF1 = (mock_input > 1 ? keybuf[1] : nil).  Computes
+current_binding via `--active-maps' and writes the five promoted
+file-statics (rks_starting_buffer, rks_first_unbound,
+rks_current_binding, rks_t, last_nonmenu_event) via
+`--rks-replay-sequence-init-rest'."
+  ((force %rks-replay-sequence-init-rest)
+   ((force %active-maps) keybuf0 keybuf1)))
+
 (define (rks-setup-replay-sequence! state)
   "Capture per-replay state: zeroes key-count, sets first-unbound to
 its sentinel value, computes the initial current-binding from
@@ -573,4 +588,7 @@ cached-dispatch into here."
                ,rks-setup-replay-sequence!)
               ;; M6l — runtime variant (writes C-side shadows)
               (--rks-setup-replay-entire-sequence-c!
-               ,rks-setup-replay-entire-sequence-c!))))
+               ,rks-setup-replay-entire-sequence-c!)
+              ;; M6m — runtime variant for replay_sequence
+              (--rks-setup-replay-sequence-c!
+               ,rks-setup-replay-sequence-c!))))

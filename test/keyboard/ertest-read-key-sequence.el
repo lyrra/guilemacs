@@ -348,4 +348,21 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (--rks-setup-replay-entire-sequence-c!)
   (should t))
 
+;;;; M6m — runtime replay_sequence wire-in
+
+(ert-deftest m6m-helpers/exist ()
+  (should (fboundp '--rks-replay-sequence-init-rest))
+  (should (fboundp '--rks-setup-replay-sequence-c!)))
+
+(ert-deftest m6m-init-rest/returns-nil ()
+  ;; The subr writes file-statics and returns nil.
+  (should (eq nil (--rks-replay-sequence-init-rest nil))))
+
+(ert-deftest m6m-runtime-variant/runs-without-error ()
+  ;; Two-arg runtime variant: simulates the call read_key_sequence
+  ;; makes at the replay_sequence: label with mock_input == 0
+  ;; (both keybuf elements nil).
+  (--rks-setup-replay-sequence-c! nil nil)
+  (should t))
+
 (provide 'ertest-read-key-sequence)

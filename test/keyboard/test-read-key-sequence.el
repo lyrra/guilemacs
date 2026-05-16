@@ -210,4 +210,17 @@
 (--rks-setup-replay-entire-sequence-c!)
 (test-assert "m6l/runtime-variant-runs" t)
 
+;;;; M6m
+
+(test-assert "m6m-helper/rks-replay-sequence-init-rest"
+             (fboundp '--rks-replay-sequence-init-rest))
+(test-assert "m6m/runtime-variant-exists"
+             (fboundp '--rks-setup-replay-sequence-c!))
+
+(test-eq "m6m/init-rest-returns-nil"
+         nil (--rks-replay-sequence-init-rest nil))
+
+(--rks-setup-replay-sequence-c! nil nil)
+(test-assert "m6m/runtime-variant-runs" t)
+
 (test-end)

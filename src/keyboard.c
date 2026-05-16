@@ -10317,6 +10317,35 @@ typedef struct keyremap
    (one in-flight read_key_sequence per Emacs).  */
 static keyremap rks_fkey, rks_keytran, rks_indec;
 
+/* M6m — promote five more read_key_sequence locals (the ones written
+   by the `replay_sequence:' label).  Same #define alias trick as
+   M6l.  See docs/keyboard.org §M6m.  */
+static int             rks_t;
+static int             rks_mock_input;
+static Lisp_Object     rks_current_binding;
+static int             rks_first_unbound;
+static struct buffer  *rks_starting_buffer;
+
+DEFUN ("--rks-replay-sequence-init-rest",
+       Fc_rks_replay_sequence_init_rest,
+       Sc_rks_replay_sequence_init_rest, 1, 1, 0,
+       doc: /* Internal: complete the `replay_sequence:' init given a
+pre-computed CURRENT-BINDING (from `--active-maps').  Sets the
+file-static rks_starting_buffer = current_buffer, rks_first_unbound
+= READ_KEY_ELTS + 1, rks_current_binding = CURRENT-BINDING,
+rks_t = 0, and clears last_nonmenu_event.  Mirrors src/keyboard.c
+lines 10678-10688 (the body of the replay_sequence: label minus
+the active_maps call, which the Scheme caller performs).  */)
+  (Lisp_Object current_binding)
+{
+  rks_starting_buffer = current_buffer;
+  rks_first_unbound   = READ_KEY_ELTS + 1;
+  rks_current_binding = current_binding;
+  rks_t               = 0;
+  last_nonmenu_event  = Qnil;
+  return Qnil;
+}
+
 DEFUN ("--rks-init-keyremaps", Fc_rks_init_keyremaps, Sc_rks_init_keyremaps,
        3, 3, 0,
        doc: /* Internal: initialize the three keyremap shadows
@@ -10542,8 +10571,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		   bool fix_current_buffer, bool prevent_redisplay,
 		   bool disable_text_conversion_p)
 {
-  /* How many keys there are in the current key sequence.  */
-  int t;
+  /* How many keys there are in the current key sequence.
+     M6m: promoted to file-static rks_t, aliased here.  */
+#define t rks_t
 
   /* The length of the echo buffer when we started reading, and
      the length of this_command_keys when we started reading.  */
@@ -10552,11 +10582,13 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      so the Scheme rks-setup-initial-state-c! can write them and the
      C state machine continues to read them.  See docs/keyboard.org §M6j.  */
 
-  Lisp_Object current_binding = Qnil;
+  /* M6m: current_binding promoted to file-static rks_current_binding.  */
+#define current_binding rks_current_binding
 
   /* Index of the first key that has no binding.
-     It is useless to try fkey.start larger than that.  */
-  int first_unbound;
+     It is useless to try fkey.start larger than that.
+     M6m: promoted to file-static rks_first_unbound.  */
+#define first_unbound rks_first_unbound
 
   /* If t < mock_input, then KEYBUF[t] should be read as the next
      input key.
@@ -10570,8 +10602,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      this situation, we set mock_input to t, set t to 0, and jump to
      restart_sequence; the loop will read keys from keybuf up until
      mock_input, thus rebuilding the state; and then it will resume
-     reading characters from the keyboard.  */
-  int mock_input = 0;
+     reading characters from the keyboard.
+     M6m: promoted to file-static rks_mock_input.  */
+#define mock_input rks_mock_input
 
   /* Whether each event in the mocked input came from a mouse menu.  */
   bool used_mouse_menu_history[READ_KEY_ELTS] = {0};
@@ -10613,7 +10646,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   disabled_conversion = false;
 #endif /* HAVE_TEXT_CONVERSION */
 
-  struct buffer *starting_buffer;
+  /* M6m: starting_buffer promoted to file-static rks_starting_buffer.  */
+#define starting_buffer rks_starting_buffer
 
   /* List of events for which a fake prefix key has been generated.  */
   Lisp_Object fake_prefixed_keys = Qnil;
@@ -10625,6 +10659,20 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* raw_keybuf_count = 0; */
 
   delayed_switch_frame = Qnil;
+
+  /* M6m: explicit init for the promoted file-statics that were
+     previously initialized at their (now-removed) local declaration.
+     The other promoted vars (t, first_unbound, starting_buffer) are
+     written at the replay_sequence: label before being read.  */
+  current_binding = Qnil;
+  mock_input      = 0;
+
+  /* M6m: `first_event' used to be declared inside the
+     replay_sequence: block; promoted here so the rest of the
+     function (line 11046ff) can still reference it after the
+     replay_sequence dispatch.  It is RE-assigned right after the
+     dispatch from `keybuf[0]' / Qnil based on mock_input.  */
+  Lisp_Object first_event = Qnil;
 
   dynwind_begin ();
 
@@ -10677,24 +10725,28 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* We jump here when the key sequence has been thoroughly changed, and
      we need to rescan it starting from the beginning.  When we jump here,
-     keybuf[0..mock_input] holds the sequence we should reread.  */
+     keybuf[0..mock_input] holds the sequence we should reread.
+
+     M6m: inline init replaced by cached-SCM dispatch to
+     `rks-setup-replay-sequence-c!'.  The Scheme side computes
+     current_binding via --active-maps and then writes the five
+     promoted file-statics via --rks-replay-sequence-init-rest.
+     See docs/keyboard.org §M6m.  */
  replay_sequence:
-
-  starting_buffer = current_buffer;
-  first_unbound = READ_KEY_ELTS + 1;
-  Lisp_Object first_event = mock_input > 0 ? keybuf[0] : Qnil;
-  Lisp_Object second_event = mock_input > 1 ? keybuf[1] : Qnil;
-
-  /* Build our list of keymaps.
-     If we recognize a function key and replace its escape sequence in
-     keybuf with its symbol, or if the sequence starts with a mouse
-     click and we need to switch buffers, we jump back here to rebuild
-     the initial keymaps from the current buffer.  */
-  current_binding = active_maps (first_event, second_event);
-
-  /* Start from the beginning in keybuf.  */
-  t = 0;
-  last_nonmenu_event = Qnil;
+  {
+    static SCM rks_replay_sequence_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_replay_sequence_proc))
+      rks_replay_sequence_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-setup-replay-sequence-c!");
+    SCM_CALL_2 (rks_replay_sequence_proc,
+                mock_input > 0 ? keybuf[0] : Qnil,
+                mock_input > 1 ? keybuf[1] : Qnil);
+  }
+  /* M6m: keep the C-local first_event in sync with what the Scheme
+     just computed.  Used later (line ~11046) by the recompute-maps
+     branch when first_event is still nil.  */
+  first_event = mock_input > 0 ? keybuf[0] : Qnil;
 
   /* These are no-ops the first time through, but if we restart, they
      revert the echo area and this_command_keys to their original state.
@@ -11543,6 +11595,11 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef fkey
 #undef keytran
 #undef indec
+#undef t
+#undef mock_input
+#undef current_binding
+#undef first_unbound
+#undef starting_buffer
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
