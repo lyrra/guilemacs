@@ -122,7 +122,10 @@ prologue (keyboard.c command_loop_1_prologue) verbatim:
 (define %set-raw-keybuf-count                   (delay (%c '--set-raw-keybuf-count)))
 (define %read-key-sequence                      (delay (%c '--read-key-sequence)))
 (define %inc-num-input-keys                     (delay (%c '--inc-num-input-keys)))
-(define %message1-clear                         (delay (lambda () (message #nil))))
+(define %message1-clear
+  ;; The wrapped thunk does `(message nil)` via elisp symbol-function
+  ;; lookup; bare `message' is not a Scheme binding.
+  (delay (lambda () ((%c 'message) #nil))))
 
 (define (command-loop-1-iter-pre-read)
   "Pre-read portion of one iteration of command_loop_1's while-loop.
@@ -388,8 +391,10 @@ docs/keyboard.org §M7b4."
                (sar-trigger?
                 (let ((sar (symbol-value 'select-active-regions))
                       (tmm (symbol-value 'transient-mark-mode)))
-                  (if (eq sar 'only)
-                      (eq (if (pair? tmm) (car tmm) #nil) 'only)
+                  ;; `eq?' here (Scheme), not elisp `eq' — the latter is
+                  ;; not a Scheme binding inside this module.
+                  (if (eq? sar 'only)
+                      (eq? (if (pair? tmm) (car tmm) #nil) 'only)
                       (and (not (%nilp sar)) (not (%nilp tmm))))))
                (inhibit-update?
                 (not (%nilp ((%c 'memq) (symbol-value 'this-command)

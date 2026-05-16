@@ -81,6 +81,16 @@
   (remove-hook 'post-command-hook hook)
   (setq memory-full nil))
 
+;; Regression for bare (fboundp 'run-hooks) in Scheme module —
+;; fired "Unbound variable: fboundp" at interactive startup.
+(let ((sentinel nil)
+      (hook (lambda () (setq sentinel 'ran))))
+  (add-hook 'post-command-hook hook)
+  (setq memory-full nil)
+  (--command-loop-1-prologue)
+  (test-eq "prologue/runs-hook-when-fboundp-resolves" 'ran sentinel)
+  (remove-hook 'post-command-hook hook))
+
 ;;;; M7b1
 
 (test-assert "iter-pre-read/exists" (fboundp '--command-loop-1-iter-pre-read))

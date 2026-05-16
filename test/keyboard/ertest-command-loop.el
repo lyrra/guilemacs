@@ -107,6 +107,24 @@
       (remove-hook 'post-command-hook hook)
       (setq memory-full nil))))
 
+(ert-deftest m7a-prologue/runs-post-command-hook-when-bound ()
+  ;; Regression: bare `(fboundp 'run-hooks)' in the Scheme module
+  ;; fired "Unbound variable: fboundp" at interactive startup.
+  ;; Tests prior to this one set memory-full=t to skip the hook
+  ;; block entirely; this test exercises the branch where
+  ;; memory-full is nil and `run-hooks' is bound, so the fboundp
+  ;; lookup actually fires.
+  (let ((sentinel nil)
+        (hook (lambda () (setq sentinel 'ran))))
+    (unwind-protect
+        (progn
+          (add-hook 'post-command-hook hook)
+          (setq memory-full nil)
+          ;; Should not error; should run the hook.
+          (--command-loop-1-prologue)
+          (should (eq sentinel 'ran)))
+      (remove-hook 'post-command-hook hook))))
+
 ;;;; M7b1 — pre-read iteration
 
 (ert-deftest m7b1-iter-pre-read/exists ()
