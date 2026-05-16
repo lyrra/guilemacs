@@ -1723,6 +1723,18 @@ DEFUN ("--read-key-sequence-remapped", Fc_read_key_sequence_remapped,
   return read_key_sequence_remapped;
 }
 
+DEFUN ("--set-read-key-sequence-remapped",
+       Fc_set_read_key_sequence_remapped,
+       Sc_set_read_key_sequence_remapped, 1, 1, 0,
+       doc: /* Internal: set the C-side `read_key_sequence_remapped'
+to X.  Called by the Scheme done:-block port to install the result
+of `command-remapping' on read_key_sequence_cmd.  */)
+  (Lisp_Object x)
+{
+  read_key_sequence_remapped = x;
+  return Qnil;
+}
+
 DEFUN ("--maybe-quit", Fc_maybe_quit, Sc_maybe_quit, 0, 0, 0,
        doc: /* Internal: call C maybe_quit().  Signals quit if Vquit_flag is set
 and inhibit-quit is nil.  */)
@@ -10326,6 +10338,20 @@ static Lisp_Object     rks_current_binding;
 static int             rks_first_unbound;
 static struct buffer  *rks_starting_buffer;
 
+/* M6o — promote `shift_translated' (the done:-block install splice
+   reads it).  See docs/keyboard.org §M6o.  */
+static bool rks_shift_translated;
+
+DEFUN ("--rks-shift-translated-p", Fc_rks_shift_translated_p,
+       Sc_rks_shift_translated_p, 0, 0, 0,
+       doc: /* Internal: read the file-static `rks_shift_translated'
+shadow as a non-nil predicate.  Mirrors the C check `if
+(shift_translated) ...' near the end of read_key_sequence.  */)
+  (void)
+{
+  return rks_shift_translated ? Qt : Qnil;
+}
+
 DEFUN ("--rks-replay-sequence-init-rest",
        Fc_rks_replay_sequence_init_rest,
        Sc_rks_replay_sequence_init_rest, 1, 1, 0,
@@ -10628,8 +10654,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* True if we are trying to map a key by changing an upper-case
      letter to lower case, or a shifted function key to an unshifted
-     one.  */
-  bool shift_translated = false;
+     one.
+     M6o: promoted to file-static rks_shift_translated.  */
+#define shift_translated rks_shift_translated
+  shift_translated = false;
 
   /* If we receive a `switch-frame' or `select-window' event in the middle of
      a key sequence, we put it off for later.
@@ -11552,13 +11580,18 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   read_key_sequence_cmd = current_binding;
 
   done:
-  read_key_sequence_remapped
-    /* Remap command through active keymaps.
-       Do the remapping here, before the unbind_to so it uses the keymaps
-       of the appropriate buffer.  */
-    = SYMBOLP (read_key_sequence_cmd)
-    ? Fcommand_remapping (read_key_sequence_cmd, Qnil, Qnil)
-    : Qnil;
+  /* M6n: remapping computation ported to (emacs read-key-sequence)
+     rks-done-compute-remapped!  Does this here (before dynwind_end) so
+     `command-remapping' sees the right keymap stack.  See
+     docs/keyboard.org §M6n.  */
+  {
+    static SCM rks_done_remapped_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_remapped_proc))
+      rks_done_remapped_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-done-compute-remapped!");
+    SCM_CALL_0 (rks_done_remapped_proc);
+  }
 
   unread_switch_frame = delayed_switch_frame;
   dynwind_end ();
@@ -11573,8 +11606,16 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
       shift_translated = false;
     }
 
-  if (shift_translated)
-    Vthis_command_keys_shift_translated = Qt;
+  /* M6o: shift-translated install ported to (emacs read-key-sequence)
+     rks-done-install-shift-translated!.  See docs/keyboard.org §M6o.  */
+  {
+    static SCM rks_done_shift_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_shift_proc))
+      rks_done_shift_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-done-install-shift-translated!");
+    SCM_CALL_0 (rks_done_shift_proc);
+  }
 
   /* Occasionally we fabricate events, perhaps by expanding something
      according to function-key-map, or by adding a prefix symbol to a
@@ -11600,6 +11641,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef current_binding
 #undef first_unbound
 #undef starting_buffer
+#undef shift_translated
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)

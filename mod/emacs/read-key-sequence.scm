@@ -30,6 +30,8 @@
             rks-setup-replay-entire-sequence-c!
             rks-setup-replay-sequence!
             rks-setup-replay-sequence-c!
+            rks-done-compute-remapped!
+            rks-done-install-shift-translated!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -556,6 +558,42 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
                                     ((force %active-maps) first-event second-event))
     (set-rks-state-key-count! state 0)))
 
+;;;;
+;;;; M6n — done:-block remapped computation.
+;;;;
+
+(define %read-key-sequence-cmd
+  (delay (%c '--read-key-sequence-cmd)))
+(define %set-read-key-sequence-remapped
+  (delay (%c '--set-read-key-sequence-remapped)))
+
+(define %rks-shift-translated-p
+  (delay (%c '--rks-shift-translated-p)))
+
+(define (rks-done-install-shift-translated!)
+  "If the C-side `rks_shift_translated' is non-zero, set the elisp
+defvar `this-command-keys-shift-translated' to t.  Mirrors the
+2-line C block near the end of read_key_sequence (just after the
+downcase-undo, before the fabricated-events finalize loop).  See
+docs/keyboard.org §M6o."
+  (when (not (%nilp ((force %rks-shift-translated-p))))
+    (set-symbol-value! 'this-command-keys-shift-translated #t)))
+
+(define (rks-done-compute-remapped!)
+  "Read read_key_sequence_cmd and, if it is a symbol, write the
+result of `command-remapping' (looked up in the current active
+keymaps) into read_key_sequence_remapped.  Else write nil.
+
+Mirrors the C 3-line block at the top of the `done:' label
+(src/keyboard.c lines 11554-11561 pre-M6n).  Runs before
+dynwind_end so `command-remapping' resolves against the right
+keymap stack."
+  (let ((cmd ((force %read-key-sequence-cmd))))
+    ((force %set-read-key-sequence-remapped)
+     (if (and (not (%nilp cmd)) (symbol? cmd))
+         ((%c 'command-remapping) cmd #nil #nil)
+         #nil))))
+
 (define (init-read-key-sequence-registrations)
   "Expose the M6a wrapper as an elisp symbol so tests can call it
 directly bypassing the C DEFUNs.  The production callers go through
@@ -591,4 +629,10 @@ cached-dispatch into here."
                ,rks-setup-replay-entire-sequence-c!)
               ;; M6m — runtime variant for replay_sequence
               (--rks-setup-replay-sequence-c!
-               ,rks-setup-replay-sequence-c!))))
+               ,rks-setup-replay-sequence-c!)
+              ;; M6n — done:-block remapped computation
+              (--rks-done-compute-remapped!
+               ,rks-done-compute-remapped!)
+              ;; M6o — done:-block shift-translated install
+              (--rks-done-install-shift-translated!
+               ,rks-done-install-shift-translated!))))

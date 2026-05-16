@@ -223,4 +223,31 @@
 (--rks-setup-replay-sequence-c! nil nil)
 (test-assert "m6m/runtime-variant-runs" t)
 
+;;;; M6n
+
+(test-assert "m6n-helper/set-read-key-sequence-remapped"
+             (fboundp '--set-read-key-sequence-remapped))
+(test-assert "m6n/compute-remapped-exists"
+             (fboundp '--rks-done-compute-remapped!))
+
+(test-eq "m6n/set-remapped-returns-nil"
+         nil (--set-read-key-sequence-remapped nil))
+
+(--rks-done-compute-remapped!)
+(test-assert "m6n/compute-remapped-runs" t)
+
+;;;; M6o
+
+(test-assert "m6o-helper/shift-translated-p"
+             (fboundp '--rks-shift-translated-p))
+(test-assert "m6o/install-exists"
+             (fboundp '--rks-done-install-shift-translated!))
+
+(let ((v (--rks-shift-translated-p)))
+  (test-assert "m6o/shift-translated-p-boolean"
+               (or (eq v t) (eq v nil))))
+
+(--rks-done-install-shift-translated!)
+(test-assert "m6o/install-runs" t)
+
 (test-end)

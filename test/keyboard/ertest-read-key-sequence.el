@@ -365,4 +365,34 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (--rks-setup-replay-sequence-c! nil nil)
   (should t))
 
+;;;; M6n — done:-block remapped computation
+
+(ert-deftest m6n-helpers/exist ()
+  (should (fboundp '--set-read-key-sequence-remapped))
+  (should (fboundp '--rks-done-compute-remapped!)))
+
+(ert-deftest m6n-set-remapped/returns-nil ()
+  (should (eq nil (--set-read-key-sequence-remapped nil)))
+  (should (eq nil (--set-read-key-sequence-remapped t))))
+
+(ert-deftest m6n-compute-remapped/runs-without-error ()
+  ;; Whatever read_key_sequence_cmd happens to be, the call should
+  ;; not error.
+  (--rks-done-compute-remapped!)
+  (should t))
+
+;;;; M6o — shift-translated install
+
+(ert-deftest m6o-helpers/exist ()
+  (should (fboundp '--rks-shift-translated-p))
+  (should (fboundp '--rks-done-install-shift-translated!)))
+
+(ert-deftest m6o-shift-translated-p/returns-boolean ()
+  (let ((v (--rks-shift-translated-p)))
+    (should (or (eq v t) (eq v nil)))))
+
+(ert-deftest m6o-install/runs-without-error ()
+  (--rks-done-install-shift-translated!)
+  (should t))
+
 (provide 'ertest-read-key-sequence)
