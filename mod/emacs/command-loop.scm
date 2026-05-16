@@ -87,9 +87,10 @@ prologue (keyboard.c command_loop_1_prologue) verbatim:
       ;; startup window before eval.c registers the run-hooks symbol.
       ;; In Scheme we check `fboundp' instead — by the time this prologue
       ;; runs the function is set, but keeping the guard preserves the
-      ;; original safety.
+      ;; original safety.  Use elisp symbol-function lookup (bare
+      ;; `fboundp' is not a Scheme binding).
       (when (and (not (%nilp (symbol-value 'post-command-hook)))
-                 (fboundp 'run-hooks))
+                 ((%c 'fboundp) 'run-hooks))
         ((force %safe-run-hooks-maybe-narrowed) 'post-command-hook))
 
       (when (not (%nilp ((force %echo-area-buffer-0-non-empty-p))))
