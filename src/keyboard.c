@@ -10181,6 +10181,68 @@ active_maps (Lisp_Object first_event, Lisp_Object second_event)
   return Fcons (Qkeymap, Fcurrent_active_maps (Qt, position));
 }
 
+/* M6h — primitives exposed to (emacs read-key-sequence) for the
+   future setup-phase port (kicked off by M6g infrastructure).  See
+   docs/keyboard.org §M6h.  */
+
+DEFUN ("--echo-length", Fc_echo_length, Sc_echo_length, 0, 0, 0,
+       doc: /* Internal: current length (in characters) of the echo
+buffer on the current kboard.  Captured into the rks-state's
+echo-start at the start of read_key_sequence and used by
+echo_truncate when replaying a key sequence.  */)
+  (void)
+{
+  return make_fixnum (echo_length ());
+}
+
+DEFUN ("--echo-truncate", Fc_echo_truncate, Sc_echo_truncate, 1, 1, 0,
+       doc: /* Internal: truncate the echo buffer to NCHARS characters.  */)
+  (Lisp_Object nchars)
+{
+  CHECK_FIXNAT (nchars);
+  echo_truncate (XFIXNUM (nchars));
+  return Qnil;
+}
+
+DEFUN ("--echo-dash", Fc_echo_dash, Sc_echo_dash, 0, 0, 0,
+       doc: /* Internal: append a `-' separator to the echo buffer (only
+when the buffer is non-empty).  */)
+  (void)
+{
+  echo_dash ();
+  return Qnil;
+}
+
+DEFUN ("--echo-keystrokes-p", Fc_echo_keystrokes_p, Sc_echo_keystrokes_p,
+       0, 0, 0,
+       doc: /* Internal: t if `echo-keystrokes' is a positive float or
+fixnum (i.e. echo is enabled).  */)
+  (void)
+{
+  return echo_keystrokes_p () ? Qt : Qnil;
+}
+
+DEFUN ("--cursor-in-echo-area-p", Fc_cursor_in_echo_area_p,
+       Sc_cursor_in_echo_area_p, 0, 0, 0,
+       doc: /* Internal: read the C global `cursor_in_echo_area' bit
+as a predicate.  */)
+  (void)
+{
+  return cursor_in_echo_area ? Qt : Qnil;
+}
+
+DEFUN ("--set-current-kboard-immediate-echo",
+       Fc_set_current_kboard_immediate_echo,
+       Sc_set_current_kboard_immediate_echo, 1, 1, 0,
+       doc: /* Internal: set the current kboard's `immediate_echo'
+bit-field to non-zero iff VAL is non-nil.  Counterpart to
+`--clear-current-kboard-immediate-echo' (which always clears).  */)
+  (Lisp_Object val)
+{
+  current_kboard->immediate_echo = !NILP (val);
+  return Qnil;
+}
+
 /* M6f — primitive exposed to (emacs read-key-sequence) for the
    future state-machine port.  See docs/keyboard.org §M6f.  */
 
@@ -10501,29 +10563,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   dynwind_begin ();
 
-  if (INTERACTIVE)
-    {
-      if (!NILP (prompt))
-	{
-	  /* Install the string PROMPT as the beginning of the string
-	     of echoing, so that it serves as a prompt for the next
-	     character.  */
-	  kset_echo_prompt (current_kboard, prompt);
-          /* FIXME: This use of echo_now doesn't look quite right and is ugly
-             since it forces us to fiddle with current_kboard->immediate_echo
-             before and after.  */
-	  current_kboard->immediate_echo = false;
-	  echo_now ();
-          if (!echo_keystrokes_p ())
-	    current_kboard->immediate_echo = false;
-	}
-      else if (cursor_in_echo_area /* FIXME: Not sure why we test this here,
-                                      maybe we should just drop this test.  */
-	       && echo_keystrokes_p ())
-	/* This doesn't put in a dash if the echo buffer is empty, so
-	   you don't always see a dash hanging out in the minibuffer.  */
-	echo_dash ();
-    }
+  /* M6i: prompt + echo setup ported to (emacs read-key-sequence)
+     rks-setup-prompt! — see docs/keyboard.org §M6i.  */
+  {
+    static SCM rks_setup_prompt_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_setup_prompt_proc))
+      rks_setup_prompt_proc = scm_c_public_ref ("emacs read-key-sequence",
+                                                "rks-setup-prompt!");
+    SCM_CALL_1 (rks_setup_prompt_proc, prompt);
+  }
 
   /* Record the initial state of the echo area and this_command_keys;
      we will need to restore them if we replay a key sequence.  */

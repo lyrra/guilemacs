@@ -209,4 +209,78 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
     (should (consp m))
     (should (eq 'keymap (car m)))))
 
+;;;; M6g — state-machine record types
+
+(ert-deftest m6g-record-types/elisp-bindings-exist ()
+  (should (fboundp '--make-keyremap))
+  (should (fboundp '--keyremap-empty-p))
+  (should (fboundp '--keyremap-reset!))
+  (should (fboundp '--keyremap-rebase!))
+  (should (fboundp '--make-rks-state)))
+
+(ert-deftest m6g-keyremap/fresh-is-empty ()
+  ;; A freshly-constructed keyremap has start == end == 0.
+  (let ((kr (--make-keyremap nil)))
+    (should (eq t (--keyremap-empty-p kr)))))
+
+(ert-deftest m6g-keyremap/rebase-preserves-empty ()
+  ;; Rebasing to a new parent zeroes the indices, so empty-p still holds.
+  (let ((kr (--make-keyremap 0)))
+    (--keyremap-rebase! kr 99)
+    (should (eq t (--keyremap-empty-p kr)))))
+
+(ert-deftest m6g-keyremap/reset-preserves-empty ()
+  ;; Resetting a fresh keyremap is a no-op.
+  (let ((kr (--make-keyremap 0)))
+    (--keyremap-reset! kr)
+    (should (eq t (--keyremap-empty-p kr)))))
+
+(ert-deftest m6g-rks-state/constructs-non-nil ()
+  (let ((s (--make-rks-state)))
+    (should (not (null s)))))
+
+;;;; M6h — setup-phase helpers
+
+(ert-deftest m6h-helpers/exist ()
+  (should (fboundp '--echo-length))
+  (should (fboundp '--echo-truncate))
+  (should (fboundp '--echo-dash))
+  (should (fboundp '--echo-keystrokes-p))
+  (should (fboundp '--cursor-in-echo-area-p))
+  (should (fboundp '--set-current-kboard-immediate-echo)))
+
+(ert-deftest m6h-helper/echo-length-fixnum ()
+  ;; --echo-length returns a non-negative integer.
+  (let ((n (--echo-length)))
+    (should (integerp n))
+    (should (>= n 0))))
+
+(ert-deftest m6h-helper/echo-keystrokes-p-boolean ()
+  (let ((v (--echo-keystrokes-p)))
+    (should (or (eq v t) (eq v nil)))))
+
+(ert-deftest m6h-helper/cursor-in-echo-area-p-boolean ()
+  (let ((v (--cursor-in-echo-area-p)))
+    (should (or (eq v t) (eq v nil)))))
+
+(ert-deftest m6h-setup-prompt/exists ()
+  (should (fboundp '--rks-setup-prompt!)))
+
+(ert-deftest m6h-setup-prompt/nil-prompt-runs ()
+  ;; In batch mode noninteractive is t, so the wrapper does nothing.
+  (--rks-setup-prompt! nil)
+  (should t))
+
+(ert-deftest m6h-setup-initial-keys/exists ()
+  (should (fboundp '--rks-setup-initial-keys-state!)))
+
+(ert-deftest m6h-setup-initial-keys/copies-key-count ()
+  ;; After setup, this-single-command-key-start should equal
+  ;; this-command-key-count (which is 0 unless prior state).
+  (--set-this-command-key-count        4)
+  (--set-this-single-command-key-start 2)
+  (let ((s (--make-rks-state)))
+    (--rks-setup-initial-keys-state! s)
+    (should (= 4 (--this-single-command-key-start)))))
+
 (provide 'ertest-read-key-sequence)

@@ -116,4 +116,54 @@
   (test-assert "m6f/active-maps-consp" (consp m))
   (test-eq    "m6f/active-maps-car-keymap" 'keymap (car m)))
 
+;;;; M6g — state-machine record types
+
+(test-assert "m6g/make-keyremap-exists"   (fboundp '--make-keyremap))
+(test-assert "m6g/keyremap-empty-p-exists" (fboundp '--keyremap-empty-p))
+(test-assert "m6g/keyremap-reset!-exists"  (fboundp '--keyremap-reset!))
+(test-assert "m6g/keyremap-rebase!-exists" (fboundp '--keyremap-rebase!))
+(test-assert "m6g/make-rks-state-exists"   (fboundp '--make-rks-state))
+
+(let ((kr (--make-keyremap nil)))
+  (test-eq "m6g/fresh-keyremap-empty" t (--keyremap-empty-p kr)))
+
+(let ((kr (--make-keyremap 0)))
+  (--keyremap-rebase! kr 99)
+  (test-eq "m6g/keyremap-rebase-preserves-empty" t (--keyremap-empty-p kr)))
+
+(let ((kr (--make-keyremap 0)))
+  (--keyremap-reset! kr)
+  (test-eq "m6g/keyremap-reset-preserves-empty" t (--keyremap-empty-p kr)))
+
+(let ((s (--make-rks-state)))
+  (test-assert "m6g/make-rks-state-nonnil" (not (null s))))
+
+;;;; M6h
+
+(test-assert "m6h-helper/echo-length"     (fboundp '--echo-length))
+(test-assert "m6h-helper/echo-truncate"   (fboundp '--echo-truncate))
+(test-assert "m6h-helper/echo-dash"       (fboundp '--echo-dash))
+(test-assert "m6h-helper/echo-keystrokes-p" (fboundp '--echo-keystrokes-p))
+(test-assert "m6h-helper/cursor-in-echo-area-p"
+             (fboundp '--cursor-in-echo-area-p))
+(test-assert "m6h-helper/set-current-kboard-immediate-echo"
+             (fboundp '--set-current-kboard-immediate-echo))
+
+(let ((n (--echo-length)))
+  (test-assert "m6h/echo-length-fixnum" (and (integerp n) (>= n 0))))
+
+(test-assert "m6h/setup-prompt-exists"
+             (fboundp '--rks-setup-prompt!))
+(--rks-setup-prompt! nil)
+(test-assert "m6h/setup-prompt-nil-runs" t)
+
+(test-assert "m6h/setup-initial-keys-exists"
+             (fboundp '--rks-setup-initial-keys-state!))
+
+(--set-this-command-key-count        4)
+(--set-this-single-command-key-start 2)
+(let ((s (--make-rks-state)))
+  (--rks-setup-initial-keys-state! s)
+  (test-equal "m6h/setup-copies-key-count" 4 (--this-single-command-key-start)))
+
 (test-end)

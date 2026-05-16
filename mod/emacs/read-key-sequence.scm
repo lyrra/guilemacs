@@ -1,5 +1,6 @@
 (define-module (emacs read-key-sequence)
   #:use-module (emacs-elisp runtime)
+  #:use-module (srfi srfi-9)            ; define-record-type
   #:declarative? #t
   #:export (read-key-sequence-vs
             read-key-sequence-vs-string
@@ -9,6 +10,21 @@
             current-input-mode
             posn-at-point
             input-pending-p
+            ;; M6g — state-machine record types and helpers.
+            ;; Note: srfi-9 auto-generates the field accessors / setters
+            ;; as syntax-transformers in this Guile build, so they are
+            ;; not first-class callable from elisp.  Scheme code in this
+            ;; module uses them fine.  Future state-machine slices
+            ;; should add explicit wrapper procedures (or expose via
+            ;; `--rks-state-...' DEFUNs) for any field that needs to be
+            ;; reachable from elisp tests.
+            make-keyremap keyremap?
+            keyremap-empty-p
+            keyremap-reset!
+            keyremap-rebase!
+            make-rks-state rks-state?
+            rks-setup-prompt!
+            rks-setup-initial-keys-state!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -32,6 +48,134 @@
 (define (%nilp x)
   ;; Recognize all three nil-equivalents that show up in Guile-elisp.
   (or (null? x) (not x)))
+
+;;;;
+;;;; M6g — state-machine data infrastructure.
+;;;;
+;;;; Two record types that mirror the C-side state of read_key_sequence:
+;;;;
+;;;;   `keyremap'   ←→  C struct keyremap   (src/keyboard.c:10202)
+;;;;   `rks-state'  ←→  read_key_sequence locals (src/keyboard.c:10424–10500)
+;;;;
+;;;; These are the *substrate* for future M6h–M6j slices that will
+;;;; move pieces of the state machine into Scheme.  They are NOT yet
+;;;; wired into production code — the C state machine continues to
+;;;; run during read-key-sequence-vs.  See docs/keyboard.org §M6g.
+
+;;; The keyremap record models the partial application of one
+;;; translation map (function-key-map, key-translation-map, or
+;;; input-decode-map).  Semantics:
+;;;
+;;;   parent   — the original map specified for this slot.
+;;;   map      — a submap reached by looking up, in PARENT, the
+;;;              events from START to END.  Reset to PARENT after a
+;;;              successful translation.
+;;;   start    — position in keybuf where this map began scanning.
+;;;   end      — exclusive end of the scan.  start == end means no
+;;;              active scan.  Both indices CAN be > t (the
+;;;              sequence length) when scanning is held off after a
+;;;              just-resolved translation, to avoid re-scanning.
+
+(define-record-type <keyremap>
+  (%make-keyremap parent map start end)
+  keyremap?
+  (parent keyremap-parent set-keyremap-parent!)
+  (map    keyremap-map    set-keyremap-map!)
+  (start  keyremap-start  set-keyremap-start!)
+  (end    keyremap-end    set-keyremap-end!))
+
+(define (make-keyremap parent-map)
+  "Create a fresh keyremap with PARENT-MAP as both parent and map and
+both indices set to zero."
+  (%make-keyremap parent-map parent-map 0 0))
+
+(define (keyremap-empty-p kr)
+  "True iff the keyremap has no scan in progress (start == end).
+The corresponding C check is `kr.start == kr.end'."
+  (= (keyremap-start kr) (keyremap-end kr)))
+
+(define (keyremap-reset! kr)
+  "Reset KR to its initial state: map ← parent, start = end = 0.
+Used after a translation map fires and the recognized prefix has
+been consumed."
+  (set-keyremap-map!   kr (keyremap-parent kr))
+  (set-keyremap-start! kr 0)
+  (set-keyremap-end!   kr 0))
+
+(define (keyremap-rebase! kr new-parent)
+  "Repoint KR to a new PARENT map (also setting map) and zero the
+scan indices.  Used at the top of `replay_entire_sequence' to
+reinitialize from current-kboard / Vkey_translation_map."
+  (set-keyremap-parent! kr new-parent)
+  (set-keyremap-map!    kr new-parent)
+  (set-keyremap-start!  kr 0)
+  (set-keyremap-end!    kr 0))
+
+;;; The rks-state record bundles every local variable of
+;;; read_key_sequence that flows through the state machine.  Slots
+;;; mirror the C declarations (src/keyboard.c:10424-10500) one-to-one.
+;;;
+;;; `keybuf' is a Scheme vector of length READ-KEY-ELTS (= 30 in C);
+;;; treat it as the analogue of the Lisp_Object keybuf[READ_KEY_ELTS]
+;;; array.  Per-position mutation via `vector-set!'.
+
+(define READ-KEY-ELTS 30)               ; matches C enum at keyboard.c:1503
+
+(define-record-type <rks-state>
+  (%make-rks-state key-count mock-input keybuf
+                   keys-start echo-start
+                   current-binding first-unbound
+                   fkey keytran indec
+                   shift-translated
+                   delayed-switch-frame
+                   original-uppercase original-uppercase-position
+                   fake-prefixed-keys)
+  rks-state?
+  ;; `key-count' = the C local `t' (terse name avoided in Scheme).
+  (key-count            rks-state-key-count            set-rks-state-key-count!)
+  (mock-input           rks-state-mock-input           set-rks-state-mock-input!)
+  (keybuf               rks-state-keybuf)              ; vector — mutate in place
+  (keys-start           rks-state-keys-start           set-rks-state-keys-start!)
+  (echo-start           rks-state-echo-start           set-rks-state-echo-start!)
+  (current-binding      rks-state-current-binding      set-rks-state-current-binding!)
+  (first-unbound        rks-state-first-unbound        set-rks-state-first-unbound!)
+  (fkey                 rks-state-fkey)                ; <keyremap>
+  (keytran              rks-state-keytran)             ; <keyremap>
+  (indec                rks-state-indec)               ; <keyremap>
+  (shift-translated     rks-state-shift-translated
+                        set-rks-state-shift-translated!)
+  (delayed-switch-frame rks-state-delayed-switch-frame
+                        set-rks-state-delayed-switch-frame!)
+  (original-uppercase   rks-state-original-uppercase
+                        set-rks-state-original-uppercase!)
+  (original-uppercase-position
+                        rks-state-original-uppercase-position
+                        set-rks-state-original-uppercase-position!)
+  (fake-prefixed-keys   rks-state-fake-prefixed-keys
+                        set-rks-state-fake-prefixed-keys!))
+
+(define (make-rks-state)
+  "Create a fresh rks-state with the same defaults as read_key_sequence
+on entry.  The three keyremap slots start with their respective
+parent maps set to nil; callers should `keyremap-rebase!' them once
+current-kboard has been queried (this matches the C
+`replay_entire_sequence:' setup, not the local-decl defaults)."
+  (%make-rks-state
+   0                                    ; t
+   0                                    ; mock-input
+   (make-vector READ-KEY-ELTS #nil)     ; keybuf
+   0                                    ; keys-start
+   0                                    ; echo-start
+   #nil                                 ; current-binding
+   (+ READ-KEY-ELTS 1)                  ; first-unbound  (matches C init)
+   (make-keyremap #nil)                 ; fkey
+   (make-keyremap #nil)                 ; keytran
+   (make-keyremap #nil)                 ; indec
+   #nil                                 ; shift-translated
+   #nil                                 ; delayed-switch-frame
+   #nil                                 ; original-uppercase
+   -1                                   ; original-uppercase-position
+   #nil))                               ; fake-prefixed-keys
 
 ;; `--read-key-sequence-and-vector' is looked up per call (see body) so
 ;; tests can stub it.  The other helpers are stable across calls.
@@ -253,6 +397,66 @@ src/keyboard.c Finput_pending_p."
     (let ((flags (+ (if (%nilp check-timers) 0 1) 2)))
       (if (not (%nilp ((force %get-input-pending) flags))) #t #nil)))))
 
+;;;;
+;;;; M6h — setup-phase procedures (called BEFORE the C state-machine
+;;;; while-loop).  Not yet wired into runtime — the C function still
+;;;; performs all of this work inline.  These procedures are tested
+;;;; in isolation; future slices (M6i+) will wire them in.
+;;;;
+
+(define %echo-length           (delay (%c '--echo-length)))
+(define %echo-truncate         (delay (%c '--echo-truncate)))
+(define %echo-dash             (delay (%c '--echo-dash)))
+(define %echo-keystrokes-p     (delay (%c '--echo-keystrokes-p)))
+(define %cursor-in-echo-area-p (delay (%c '--cursor-in-echo-area-p)))
+(define %set-current-kboard-immediate-echo
+  (delay (%c '--set-current-kboard-immediate-echo)))
+(define %echo-now-2            (delay (%c '--echo-now)))
+(define %this-command-key-count
+  (delay (%c '--this-command-key-count)))
+(define %set-this-single-command-key-start-2
+  (delay (%c '--set-this-single-command-key-start)))
+(define %set-kboard-echo-prompt
+  (delay (%c 'set-kboard-echo-prompt)))
+
+(define (rks-setup-prompt! prompt)
+  "Initial prompt + echo setup for read_key_sequence.  Runs only when
+interactive (i.e. `noninteractive' is nil).  Mirrors the C body of
+read_key_sequence lines 10504-10526:
+
+  if PROMPT is non-nil → install it on the current kboard's
+    echo-prompt, force-redisplay via echo_now (with immediate-echo
+    juggling), then re-clear immediate-echo when keystroke echo is
+    disabled.
+  else if cursor is in echo area AND keystrokes are echoed →
+    append a dash to the echo buffer so the user sees a hanging
+    prefix prompt."
+  (when (%nilp (symbol-value 'noninteractive))
+    (cond
+     ((not (%nilp prompt))
+      (let ((kb ((force %current-kboard))))
+        ((force %set-kboard-echo-prompt) kb prompt)
+        ((force %set-current-kboard-immediate-echo) #nil)
+        ((force %echo-now-2))
+        (when (%nilp ((force %echo-keystrokes-p)))
+          ((force %set-current-kboard-immediate-echo) #nil))))
+     ((and (not (%nilp ((force %cursor-in-echo-area-p))))
+           (not (%nilp ((force %echo-keystrokes-p)))))
+      ((force %echo-dash))))))
+
+(define (rks-setup-initial-keys-state! state)
+  "Capture the initial echo length + this-command-key-count into the
+rks-state record.  Mirrors src/keyboard.c lines 10528-10535:
+
+  echo_start             = echo_length () [interactive only]
+  keys_start             = this_command_key_count
+  this_single_command_key_start = keys_start"
+  (when (%nilp (symbol-value 'noninteractive))
+    (set-rks-state-echo-start! state ((force %echo-length))))
+  (let ((kc ((force %this-command-key-count))))
+    (set-rks-state-keys-start! state kc)
+    ((force %set-this-single-command-key-start-2) kc)))
+
 (define (init-read-key-sequence-registrations)
   "Expose the M6a wrapper as an elisp symbol so tests can call it
 directly bypassing the C DEFUNs.  The production callers go through
@@ -265,4 +469,15 @@ cached-dispatch into here."
               (--set-input-mode        ,set-input-mode)
               (--current-input-mode    ,current-input-mode)
               (--posn-at-point         ,posn-at-point)
-              (--input-pending-p       ,input-pending-p))))
+              (--input-pending-p       ,input-pending-p)
+              ;; M6g — state-machine record types (elisp-visible
+              ;; constructors / regular-define helpers only; srfi-9
+              ;; accessors/setters are Scheme-internal).
+              (--make-keyremap         ,make-keyremap)
+              (--keyremap-empty-p      ,keyremap-empty-p)
+              (--keyremap-reset!       ,keyremap-reset!)
+              (--keyremap-rebase!      ,keyremap-rebase!)
+              (--make-rks-state        ,make-rks-state)
+              ;; M6h — setup-phase procedures (not yet wired into runtime)
+              (--rks-setup-prompt!     ,rks-setup-prompt!)
+              (--rks-setup-initial-keys-state! ,rks-setup-initial-keys-state!))))
