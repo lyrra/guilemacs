@@ -10352,6 +10352,39 @@ shadow as a non-nil predicate.  Mirrors the C check `if
   return rks_shift_translated ? Qt : Qnil;
 }
 
+/* M6p — promote `delayed_switch_frame' (8 uses inside read_key_sequence
+   + 1 final install into the unread_switch_frame global at done:).
+   See docs/keyboard.org §M6p.
+
+   Initialized at staticpro-time (see syms_of_keyboard) so reads
+   before read_key_sequence has ever run (e.g. from elisp tests)
+   return Qnil rather than the BSS zero, which is not a valid
+   Lisp_Object.  */
+static Lisp_Object rks_delayed_switch_frame;
+
+DEFUN ("--rks-delayed-switch-frame", Fc_rks_delayed_switch_frame,
+       Sc_rks_delayed_switch_frame, 0, 0, 0,
+       doc: /* Internal: read the file-static rks_delayed_switch_frame
+shadow of read_key_sequence's former `delayed_switch_frame' local.
+Holds a deferred switch-frame / select-window event while a key
+sequence is mid-read.  */)
+  (void)
+{
+  return rks_delayed_switch_frame;
+}
+
+DEFUN ("--set-unread-switch-frame", Fc_set_unread_switch_frame,
+       Sc_set_unread_switch_frame, 1, 1, 0,
+       doc: /* Internal: write the C global `unread_switch_frame'.
+Called by the Scheme done:-block port to install
+rks_delayed_switch_frame into the post-read-key-sequence pending
+queue.  */)
+  (Lisp_Object x)
+{
+  unread_switch_frame = x;
+  return Qnil;
+}
+
 DEFUN ("--rks-replay-sequence-init-rest",
        Fc_rks_replay_sequence_init_rest,
        Sc_rks_replay_sequence_init_rest, 1, 1, 0,
@@ -10661,8 +10694,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* If we receive a `switch-frame' or `select-window' event in the middle of
      a key sequence, we put it off for later.
-     While we're reading, we keep the event here.  */
-  Lisp_Object delayed_switch_frame;
+     While we're reading, we keep the event here.
+     M6p: promoted to file-static rks_delayed_switch_frame.  */
+#define delayed_switch_frame rks_delayed_switch_frame
 
   Lisp_Object original_uppercase UNINIT;
   int original_uppercase_position = -1;
@@ -11593,7 +11627,18 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM_CALL_0 (rks_done_remapped_proc);
   }
 
-  unread_switch_frame = delayed_switch_frame;
+  /* M6p: unread_switch_frame install ported to (emacs read-key-sequence)
+     rks-done-install-unread-switch-frame!.  Runs before dynwind_end
+     so it sees the same dynwind context as the original.  See
+     docs/keyboard.org §M6p.  */
+  {
+    static SCM rks_done_unread_sf_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_unread_sf_proc))
+      rks_done_unread_sf_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-done-install-unread-switch-frame!");
+    SCM_CALL_0 (rks_done_unread_sf_proc);
+  }
   dynwind_end ();
 
   /* Don't downcase the last character if the caller says don't.
@@ -11642,6 +11687,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef first_unbound
 #undef starting_buffer
 #undef shift_translated
+#undef delayed_switch_frame
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
@@ -13191,6 +13237,24 @@ syms_of_keyboard (void)
 
   pending_funcalls = Qnil;
   staticpro (&pending_funcalls);
+
+  /* M6 — initialize and protect the read_key_sequence file-static
+     Lisp_Object shadows.  These are Qnil at startup so the elisp
+     getter subrs return a valid value even before read_key_sequence
+     has ever been entered.  See docs/keyboard.org §M6.  */
+  rks_current_binding      = Qnil;
+  staticpro (&rks_current_binding);
+  rks_delayed_switch_frame = Qnil;
+  staticpro (&rks_delayed_switch_frame);
+  rks_fkey.parent    = rks_fkey.map    = Qnil;
+  rks_keytran.parent = rks_keytran.map = Qnil;
+  rks_indec.parent   = rks_indec.map   = Qnil;
+  staticpro (&rks_fkey.parent);
+  staticpro (&rks_fkey.map);
+  staticpro (&rks_keytran.parent);
+  staticpro (&rks_keytran.map);
+  staticpro (&rks_indec.parent);
+  staticpro (&rks_indec.map);
 
   Vlispy_mouse_stem = build_pure_c_string ("mouse");
   staticpro (&Vlispy_mouse_stem);

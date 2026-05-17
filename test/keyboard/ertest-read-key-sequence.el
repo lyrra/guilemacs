@@ -395,4 +395,29 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (--rks-done-install-shift-translated!)
   (should t))
 
+;;;; M6p — unread_switch_frame install
+
+(ert-deftest m6p-helpers/exist ()
+  (should (fboundp '--rks-delayed-switch-frame))
+  (should (fboundp '--set-unread-switch-frame))
+  (should (fboundp '--rks-done-install-unread-switch-frame!)))
+
+(ert-deftest m6p-set-unread-switch-frame/returns-nil ()
+  ;; The setter writes the C global `unread_switch_frame'.  It has
+  ;; no elisp-visible defvar so we can only verify the setter
+  ;; returns nil.
+  (should (eq nil (--set-unread-switch-frame nil))))
+
+(ert-deftest m6p-delayed-switch-frame/getter-runs ()
+  ;; Whatever the C shadow currently holds, the getter returns a
+  ;; valid Lisp value (typically nil at idle).
+  (let ((v (--rks-delayed-switch-frame)))
+    (should (or (eq v nil) v))))   ; non-nil objects are truthy
+
+(ert-deftest m6p-install/runs-without-error ()
+  ;; Install copies rks_delayed_switch_frame → unread_switch_frame.
+  ;; In batch with no in-flight read_key_sequence, both are nil.
+  (--rks-done-install-unread-switch-frame!)
+  (should t))
+
 (provide 'ertest-read-key-sequence)

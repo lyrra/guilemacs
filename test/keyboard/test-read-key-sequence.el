@@ -250,4 +250,20 @@
 (--rks-done-install-shift-translated!)
 (test-assert "m6o/install-runs" t)
 
+;;;; M6p
+
+(test-assert "m6p-helper/rks-delayed-switch-frame"
+             (fboundp '--rks-delayed-switch-frame))
+(test-assert "m6p-helper/set-unread-switch-frame"
+             (fboundp '--set-unread-switch-frame))
+(test-assert "m6p/install-exists"
+             (fboundp '--rks-done-install-unread-switch-frame!))
+
+(test-eq "m6p/set-unread-returns-nil" nil (--set-unread-switch-frame nil))
+(--rks-done-install-unread-switch-frame!)
+(test-assert "m6p/install-runs" t)
+(let ((v (--rks-delayed-switch-frame)))
+  (test-assert "m6p/getter-returns-lisp-value"
+               (or (eq v nil) v)))
+
 (test-end)

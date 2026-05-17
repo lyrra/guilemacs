@@ -32,6 +32,7 @@
             rks-setup-replay-sequence-c!
             rks-done-compute-remapped!
             rks-done-install-shift-translated!
+            rks-done-install-unread-switch-frame!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -569,6 +570,18 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 
 (define %rks-shift-translated-p
   (delay (%c '--rks-shift-translated-p)))
+(define %rks-delayed-switch-frame
+  (delay (%c '--rks-delayed-switch-frame)))
+(define %set-unread-switch-frame
+  (delay (%c '--set-unread-switch-frame)))
+
+(define (rks-done-install-unread-switch-frame!)
+  "Copy the C-side rks_delayed_switch_frame into the global
+unread_switch_frame.  Mirrors the C line at the done: block
+(src/keyboard.c lines 11596 pre-M6p).  Runs before dynwind_end
+to match the original behavior.  See docs/keyboard.org §M6p."
+  ((force %set-unread-switch-frame)
+   ((force %rks-delayed-switch-frame))))
 
 (define (rks-done-install-shift-translated!)
   "If the C-side `rks_shift_translated' is non-zero, set the elisp
@@ -635,4 +648,7 @@ cached-dispatch into here."
                ,rks-done-compute-remapped!)
               ;; M6o — done:-block shift-translated install
               (--rks-done-install-shift-translated!
-               ,rks-done-install-shift-translated!))))
+               ,rks-done-install-shift-translated!)
+              ;; M6p — done:-block unread-switch-frame install
+              (--rks-done-install-unread-switch-frame!
+               ,rks-done-install-unread-switch-frame!))))
