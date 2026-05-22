@@ -36,6 +36,7 @@
             rks-done-downcase-undo!
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
+            rks-try-shift-translation-simple!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -599,6 +600,24 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
 (define %rks-keyremaps-shrink-by (delay (%c '--rks-keyremaps-shrink-by)))
 
+(define %rks-try-shift-translation-simple
+  (delay (%c '--rks-try-shift-translation-simple)))
+
+(define (rks-try-shift-translation-simple! key)
+  "Try the simple upper→lower case shift-translation for KEY.  When
+applicable (current_binding is nil, no pending translation in
+keytran, KEY is a fixnum with shift_modifier or an uppercase
+character, and translate-upper-case-key-bindings is enabled),
+mutates the file-static rks_keybuf[rks_t - 1] / original-uppercase
+/ mock-input / shift-translated and returns t (caller should
+goto replay_sequence).  Otherwise returns nil (fall through).
+
+The whole transition runs in the C subr (atomic; no partial
+state).  This Scheme wrapper exists so future M6 slices that wrap
+or compose the translation step (e.g. logging, advice) have a
+clean Scheme-level handle.  See docs/keyboard.org §M6u."
+  ((force %rks-try-shift-translation-simple) key))
+
 (define (rks-first-unbound-short-circuit!)
   "If the prefix up to rks_first_unbound has no binding and no
 translation left to do, shift it off keybuf and rebase the
@@ -748,4 +767,7 @@ cached-dispatch into here."
                ,rks-done-fabricated-events!)
               ;; M6t — first_unbound short-circuit branch
               (--rks-first-unbound-short-circuit!
-               ,rks-first-unbound-short-circuit!))))
+               ,rks-first-unbound-short-circuit!)
+              ;; M6u — simple shift-translation (upper→lower case)
+              (--rks-try-shift-translation-simple!
+               ,rks-try-shift-translation-simple!))))

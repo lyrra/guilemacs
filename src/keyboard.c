@@ -10580,6 +10580,55 @@ DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
   return make_fixnum (rks_first_unbound);
 }
 
+/* M6u — shift-translation fallback (simple upper→lower case).
+   See docs/keyboard.org §M6u.  */
+DEFUN ("--rks-try-shift-translation-simple",
+       Fc_rks_try_shift_translation_simple,
+       Sc_rks_try_shift_translation_simple, 1, 1, 0,
+       doc: /* Internal: try the simple shift-translation for KEY (a
+fixnum with the shift modifier, or an uppercase character).  When it
+fires, replace keybuf[rks_t - 1] with the down-translated key and
+mutate the file-static rks_original_uppercase / -_position /
+rks_mock_input / rks_shift_translated; the C caller observes the
+return value t and goes to replay_sequence.  Returns nil when no
+translation applies (fall through to the next block in the C
+while-loop iteration).  Mirrors the C block at lines 11750-11781
+pre-M6u.  */)
+  (Lisp_Object key)
+{
+  if (!NILP (rks_current_binding)
+      || rks_keytran.start < rks_t
+      || !FIXNUMP (key)
+      || !translate_upper_case_key_bindings)
+    return Qnil;
+
+  Lisp_Object new_key;
+  EMACS_INT k = XFIXNUM (key);
+
+  if (k & shift_modifier)
+    XSETINT (new_key, k & ~shift_modifier);
+  else if (CHARACTERP (make_fixnum (k & ~CHAR_MODIFIER_MASK)))
+    {
+      int dc = downcase (k & ~CHAR_MODIFIER_MASK);
+      if (dc == (k & ~CHAR_MODIFIER_MASK))
+        return Qnil;
+      XSETINT (new_key, dc | (k & CHAR_MODIFIER_MASK));
+    }
+  else
+    return Qnil;
+
+  rks_original_uppercase          = key;
+  rks_original_uppercase_position = rks_t - 1;
+
+  if (rks_keybuf_depth > 0)
+    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t - 1] = new_key;
+  if (rks_t > rks_mock_input)
+    rks_mock_input = rks_t;
+  rks_shift_translated = true;
+
+  return Qt;
+}
+
 DEFUN ("--rks-delayed-switch-frame", Fc_rks_delayed_switch_frame,
        Sc_rks_delayed_switch_frame, 0, 0, 0,
        doc: /* Internal: read the file-static rks_delayed_switch_frame
@@ -11743,44 +11792,24 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    }
 	}
 
-      /* If KEY is not defined in any of the keymaps,
-	 and cannot be part of a function key or translation,
-	 and is an upper case letter
-	 use the corresponding lower-case letter instead.  */
-      if (NILP (current_binding)
-	  && /* indec.start >= t && fkey.start >= t && */ keytran.start >= t
-	  && FIXNUMP (key)
-	  && translate_upper_case_key_bindings)
-	{
-	  Lisp_Object new_key;
-	  EMACS_INT k = XFIXNUM (key);
-
-	  if (k & shift_modifier)
-	    XSETINT (new_key, k & ~shift_modifier);
-	  else if (CHARACTERP (make_fixnum (k & ~CHAR_MODIFIER_MASK)))
-	    {
-	      int dc = downcase (k & ~CHAR_MODIFIER_MASK);
-	      if (dc == (k & ~CHAR_MODIFIER_MASK))
-		goto not_upcase;
-	      XSETINT (new_key, dc | (k & CHAR_MODIFIER_MASK));
-	    }
-	  else
-	    goto not_upcase;
-
-	  original_uppercase = key;
-	  original_uppercase_position = t - 1;
-
-	  /* We have to do this unconditionally, regardless of whether
-	     the lower-case char is defined in the keymaps, because they
-	     might get translated through function-key-map.  */
-	  keybuf[t - 1] = new_key;
-	  mock_input = max (t, mock_input);
-	  shift_translated = true;
-
+      /* M6u: simple shift-translation (upper-case → lower-case, or
+	 strip shift_modifier) ported to Scheme
+	 `rks-try-shift-translation-simple!'.  Returns t iff a
+	 translation fired; caller goes to replay_sequence in that
+	 case.  See docs/keyboard.org §M6u.  */
+      {
+	static SCM rks_simple_shift_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_simple_shift_proc))
+	  rks_simple_shift_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-try-shift-translation-simple!");
+	if (!NILP (SCM_CALL_1 (rks_simple_shift_proc, key)))
 	  goto replay_sequence;
-	}
+      }
 
-    not_upcase:
+      /* M6u: `not_upcase:' label removed — the M6u splice no longer
+	 has `goto not_upcase' exits.  Block B (help-char check)
+	 falls through naturally from the splice.  */
       if (NILP (current_binding)
 	  && help_char_p (EVENT_HEAD (key)) && t > 1)
 	    {

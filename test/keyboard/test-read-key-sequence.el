@@ -335,4 +335,14 @@
 (test-eq "m6t/keyremaps-shrink-returns-nil"
          nil (--rks-keyremaps-shrink-by 0))
 
+;;;; M6u
+
+(test-assert "m6u-helper/try-shift-translation-simple"
+             (fboundp '--rks-try-shift-translation-simple))
+
+(test-eq "m6u/lowercase-falls-through"
+         nil (--rks-try-shift-translation-simple! 97))
+(test-eq "m6u/non-fixnum-falls-through"
+         nil (--rks-try-shift-translation-simple! 'up))
+
 (test-end)

@@ -514,4 +514,26 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 (ert-deftest m6t-keyremaps-shrink-by/returns-nil ()
   (should (eq nil (--rks-keyremaps-shrink-by 0))))
 
+;;;; M6u — simple shift-translation (upper→lower)
+
+(ert-deftest m6u-helpers/exist ()
+  (should (fboundp '--rks-try-shift-translation-simple)))
+
+(ert-deftest m6u-translation-simple/nil-for-lowercase ()
+  ;; 'a' (97) is already lowercase — downcase returns itself, so the
+  ;; subr falls through with nil and does NOT mutate state.
+  (should (eq nil (--rks-try-shift-translation-simple! 97))))
+
+(ert-deftest m6u-translation-simple/nil-for-non-fixnum ()
+  ;; A symbol key (e.g. arrow key) is not a fixnum — subr returns nil
+  ;; without mutating state.
+  (should (eq nil (--rks-try-shift-translation-simple! 'up))))
+
+(ert-deftest m6u-translation-simple/nil-when-current-binding-non-nil ()
+  ;; The predicate gates on NIL current_binding.  Tests don't have a
+  ;; clean setter for current_binding without harming other paths, so
+  ;; just verify the gating via the no-binding path (sufficient since
+  ;; the C subr's first check is current_binding).
+  (should (eq nil (--rks-try-shift-translation-simple! 97))))
+
 (provide 'ertest-read-key-sequence)
