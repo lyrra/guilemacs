@@ -536,4 +536,30 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; the C subr's first check is current_binding).
   (should (eq nil (--rks-try-shift-translation-simple! 97))))
 
+;;;; M6v — help-char check
+
+(ert-deftest m6v-helpers/exist ()
+  (should (fboundp '--rks-try-help-char)))
+
+(ert-deftest m6v-help-char/nil-when-rks-t-le-1 ()
+  ;; The predicate gates on rks_t > 1.  At idle rks_t == 0, so any
+  ;; KEY returns nil.
+  (should (eq nil (--rks-try-help-char! 8)))   ;; ?\C-h is the typical help char
+  (should (eq nil (--rks-try-help-char! ?a)))  ;; ordinary char
+  (should (eq nil (--rks-try-help-char! 'foo))))
+
+;;;; M6w — shifted-function-key shift-translation
+
+(ert-deftest m6w-helpers/exist ()
+  (should (fboundp '--rks-try-shift-translation-fn-key)))
+
+(ert-deftest m6w-fn-key/nil-for-symbol-without-shift ()
+  ;; A symbol key like `up' has no shift modifier and isn't an
+  ;; uppercase fixnum — subr returns nil.
+  (should (eq nil (--rks-try-shift-translation-fn-key! 'up))))
+
+(ert-deftest m6w-fn-key/nil-for-lowercase ()
+  ;; Lowercase char 'a' — not shifted, not uppercase — nil.
+  (should (eq nil (--rks-try-shift-translation-fn-key! ?a))))
+
 (provide 'ertest-read-key-sequence)

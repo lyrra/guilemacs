@@ -10580,6 +10580,85 @@ DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
   return make_fixnum (rks_first_unbound);
 }
 
+/* M6w — shifted-function-key shift-translation (block C at the
+   while-loop iteration tail).  See docs/keyboard.org §M6w.  */
+DEFUN ("--rks-try-shift-translation-fn-key",
+       Fc_rks_try_shift_translation_fn_key,
+       Sc_rks_try_shift_translation_fn_key, 1, 1, 0,
+       doc: /* Internal: try the shifted-function-key shift-translation
+for KEY.  Gates on rks_current_binding nil and rks_keytran.start
+>= rks_t.  Decomposes KEY via `parse_modifiers'.  If
+translate-upper-case-key-bindings is set AND the modifiers include
+shift (or KEY is a fixnum upper-case character), computes a
+strip-shift / downcased replacement, writes it into keybuf[rks_t -
+1], snapshots original_uppercase + position, sets mock_input =
+max(rks_t, rks_mock_input), zeroes rks_fkey + rks_keytran start /
+end (so function-key-map re-applies on the replacement),
+sets rks_shift_translated, and returns t (caller goto
+replay_sequence).  Otherwise nil.  Mirrors C lines 11791-11822
+pre-M6w.  */)
+  (Lisp_Object key)
+{
+  if (!NILP (rks_current_binding) || rks_keytran.start < rks_t)
+    return Qnil;
+
+  Lisp_Object breakdown = parse_modifiers (key);
+  int modifiers
+    = CONSP (breakdown) ? (XFIXNUM (XCAR (XCDR (breakdown)))) : 0;
+
+  bool uppercase_fixnum
+    = (FIXNUMP (key)
+       && (KEY_TO_CHAR (key)
+           < XCHAR_TABLE (BVAR (current_buffer,
+                                downcase_table))->header.size)
+       && uppercasep (KEY_TO_CHAR (key)));
+
+  if (!translate_upper_case_key_bindings
+      || (!(modifiers & shift_modifier) && !uppercase_fixnum))
+    return Qnil;
+
+  Lisp_Object new_key
+    = (modifiers & shift_modifier
+       ? apply_modifiers (modifiers & ~shift_modifier, XCAR (breakdown))
+       : make_fixnum (downcase (KEY_TO_CHAR (key)) | modifiers));
+
+  rks_original_uppercase          = key;
+  rks_original_uppercase_position = rks_t - 1;
+
+  if (rks_keybuf_depth > 0)
+    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t - 1] = new_key;
+  if (rks_t > rks_mock_input)
+    rks_mock_input = rks_t;
+  /* Reset fkey + keytran scans so function-key-map re-applies on
+     the down-translated key.  input-decode-map keeps its scan.  */
+  rks_fkey.start    = rks_fkey.end    = 0;
+  rks_keytran.start = rks_keytran.end = 0;
+  rks_shift_translated = true;
+
+  return Qt;
+}
+
+/* M6v — help-char prefix check at while-loop iteration tail.
+   See docs/keyboard.org §M6v.  */
+DEFUN ("--rks-try-help-char", Fc_rks_try_help_char,
+       Sc_rks_try_help_char, 1, 1, 0,
+       doc: /* Internal: if rks_current_binding is nil, KEY's event-head
+is the user's help character, and at least one prior key has
+been read (rks_t > 1), install `prefix-help-command' as the
+final read_key_sequence_cmd and return t (caller should goto
+done).  Returns nil otherwise.  Mirrors src/keyboard.c lines
+11812-11819 pre-M6v.  */)
+  (Lisp_Object key)
+{
+  if (NILP (rks_current_binding)
+      && help_char_p (EVENT_HEAD (key)) && rks_t > 1)
+    {
+      read_key_sequence_cmd = Vprefix_help_command;
+      return Qt;
+    }
+  return Qnil;
+}
+
 /* M6u — shift-translation fallback (simple upper→lower case).
    See docs/keyboard.org §M6u.  */
 DEFUN ("--rks-try-shift-translation-simple",
@@ -11807,61 +11886,32 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  goto replay_sequence;
       }
 
-      /* M6u: `not_upcase:' label removed — the M6u splice no longer
-	 has `goto not_upcase' exits.  Block B (help-char check)
-	 falls through naturally from the splice.  */
-      if (NILP (current_binding)
-	  && help_char_p (EVENT_HEAD (key)) && t > 1)
-	    {
-	      read_key_sequence_cmd = Vprefix_help_command;
-	      goto done;
-	    }
+      /* M6v: help-char check ported to Scheme `rks-try-help-char!'.
+	 Returns t iff `prefix-help-command' was installed; C goes to
+	 done in that case.  See docs/keyboard.org §M6v.  */
+      {
+	static SCM rks_help_char_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_help_char_proc))
+	  rks_help_char_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-try-help-char!");
+	if (!NILP (SCM_CALL_1 (rks_help_char_proc, key)))
+	  goto done;
+      }
 
-      /* If KEY is not defined in any of the keymaps,
-	 and cannot be part of a function key or translation,
-	 and is a shifted function key,
-	 use the corresponding unshifted function key instead.  */
-      if (NILP (current_binding)
-	  && /* indec.start >= t && fkey.start >= t && */ keytran.start >= t)
-	{
-	  Lisp_Object breakdown = parse_modifiers (key);
-	  int modifiers
-	    = CONSP (breakdown) ? (XFIXNUM (XCAR (XCDR (breakdown)))) : 0;
-
-	  if (translate_upper_case_key_bindings
-	      && (modifiers & shift_modifier
-		  /* Treat uppercase keys as shifted.  */
-		  || (FIXNUMP (key)
-		      && (KEY_TO_CHAR (key)
-			  < XCHAR_TABLE (BVAR (current_buffer,
-					       downcase_table))->header.size)
-		      && uppercasep (KEY_TO_CHAR (key)))))
-	    {
-	      Lisp_Object new_key
-		= (modifiers & shift_modifier
-		   ? apply_modifiers (modifiers & ~shift_modifier,
-				      XCAR (breakdown))
-		   : make_fixnum (downcase (KEY_TO_CHAR (key)) | modifiers));
-
-	      original_uppercase = key;
-	      original_uppercase_position = t - 1;
-
-	      /* We have to do this unconditionally, regardless of whether
-		 the lower-case char is defined in the keymaps, because they
-		 might get translated through function-key-map.  */
-	      keybuf[t - 1] = new_key;
-	      mock_input = max (t, mock_input);
-	      /* Reset fkey (and consequently keytran) to apply
-		 function-key-map on the result, so that S-backspace is
-		 correctly mapped to DEL (via backspace).  OTOH,
-		 input-decode-map doesn't need to go through it again.  */
-	      fkey.start = fkey.end = 0;
-	      keytran.start = keytran.end = 0;
-	      shift_translated = true;
-
-	      goto replay_sequence;
-	    }
-	}
+      /* M6w: shifted-function-key shift-translation ported to Scheme
+	 `rks-try-shift-translation-fn-key!'.  Returns t iff a
+	 translation fired; caller goes to replay_sequence.  See
+	 docs/keyboard.org §M6w.  */
+      {
+	static SCM rks_shift_fnkey_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_shift_fnkey_proc))
+	  rks_shift_fnkey_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-try-shift-translation-fn-key!");
+	if (!NILP (SCM_CALL_1 (rks_shift_fnkey_proc, key)))
+	  goto replay_sequence;
+      }
     }
   read_key_sequence_cmd = current_binding;
 

@@ -345,4 +345,22 @@
 (test-eq "m6u/non-fixnum-falls-through"
          nil (--rks-try-shift-translation-simple! 'up))
 
+;;;; M6v
+
+(test-assert "m6v-helper/try-help-char"
+             (fboundp '--rks-try-help-char))
+(test-eq "m6v/help-char-nil-at-idle"
+         nil (--rks-try-help-char! 8))
+(test-eq "m6v/help-char-nil-for-symbol"
+         nil (--rks-try-help-char! 'foo))
+
+;;;; M6w
+
+(test-assert "m6w-helper/try-shift-translation-fn-key"
+             (fboundp '--rks-try-shift-translation-fn-key))
+(test-eq "m6w/fn-key-nil-for-symbol"
+         nil (--rks-try-shift-translation-fn-key! 'up))
+(test-eq "m6w/fn-key-nil-for-lowercase"
+         nil (--rks-try-shift-translation-fn-key! ?a))
+
 (test-end)

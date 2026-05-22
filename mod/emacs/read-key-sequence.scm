@@ -37,6 +37,8 @@
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
             rks-try-shift-translation-simple!
+            rks-try-help-char!
+            rks-try-shift-translation-fn-key!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -600,6 +602,27 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
 (define %rks-keyremaps-shrink-by (delay (%c '--rks-keyremaps-shrink-by)))
 
+(define %rks-try-shift-translation-fn-key
+  (delay (%c '--rks-try-shift-translation-fn-key)))
+
+(define (rks-try-shift-translation-fn-key! key)
+  "Try the shifted-function-key shift-translation for KEY (e.g.
+S-backspace → backspace, then function-key-map re-maps to DEL).
+Resets the function-key-map and key-translation-map scans so the
+new key gets re-mapped from scratch; input-decode-map keeps its
+scan.  Returns t iff a translation fired (caller goto
+replay_sequence), nil otherwise.  See docs/keyboard.org §M6w."
+  ((force %rks-try-shift-translation-fn-key) key))
+
+(define %rks-try-help-char (delay (%c '--rks-try-help-char)))
+
+(define (rks-try-help-char! key)
+  "If the iteration ended with current_binding nil and KEY is the
+help-character (and at least one prior key has been read), install
+`prefix-help-command' as the resolved command and return t (caller
+should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
+  ((force %rks-try-help-char) key))
+
 (define %rks-try-shift-translation-simple
   (delay (%c '--rks-try-shift-translation-simple)))
 
@@ -770,4 +793,10 @@ cached-dispatch into here."
                ,rks-first-unbound-short-circuit!)
               ;; M6u — simple shift-translation (upper→lower case)
               (--rks-try-shift-translation-simple!
-               ,rks-try-shift-translation-simple!))))
+               ,rks-try-shift-translation-simple!)
+              ;; M6v — help-char prefix check
+              (--rks-try-help-char!
+               ,rks-try-help-char!)
+              ;; M6w — shifted-function-key shift-translation
+              (--rks-try-shift-translation-fn-key!
+               ,rks-try-shift-translation-fn-key!))))
