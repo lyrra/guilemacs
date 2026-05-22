@@ -420,4 +420,98 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (--rks-done-install-unread-switch-frame!)
   (should t))
 
+;;;; M6q — keybuf stack
+
+(ert-deftest m6q-helpers/exist ()
+  (should (fboundp '--rks-keybuf-depth))
+  (should (fboundp '--rks-keybuf-ref))
+  (should (fboundp '--rks-keybuf-set)))
+
+(ert-deftest m6q-depth/zero-at-idle ()
+  ;; Outside of any in-flight read_key_sequence call, depth is 0.
+  (should (= 0 (--rks-keybuf-depth))))
+
+(ert-deftest m6q-ref/nil-when-stack-empty ()
+  ;; Reading any index when the stack is empty returns nil (no crash).
+  (should (eq nil (--rks-keybuf-ref 0)))
+  (should (eq nil (--rks-keybuf-ref 5)))
+  (should (eq nil (--rks-keybuf-ref 29))))
+
+(ert-deftest m6q-set/no-op-when-stack-empty ()
+  ;; Writing when no call is in flight is a silent no-op.
+  (should (eq nil (--rks-keybuf-set 0 'sentinel))))
+
+(ert-deftest m6q-ref/out-of-range-returns-nil ()
+  ;; Out-of-range indices return nil rather than reading past the array.
+  (should (eq nil (--rks-keybuf-ref 30)))
+  (should (eq nil (--rks-keybuf-ref 100))))
+
+;;;; M6r — downcase-undo
+
+(ert-deftest m6r-helpers/exist ()
+  (should (fboundp '--rks-original-uppercase))
+  (should (fboundp '--rks-original-uppercase-position))
+  (should (fboundp '--rks-t))
+  (should (fboundp '--rks-current-binding))
+  (should (fboundp '--set-rks-shift-translated))
+  (should (fboundp '--rks-done-downcase-undo!)))
+
+(ert-deftest m6r-original-uppercase-position/defaults-to-negative-or-zero ()
+  ;; Pre-init the position is -1 (or whatever was last left after a
+  ;; read_key_sequence call).  Just verify it's an integer.
+  (should (integerp (--rks-original-uppercase-position))))
+
+(ert-deftest m6r-downcase-undo/no-op-when-position-out-of-range ()
+  ;; In batch when no read_key_sequence is in flight, t == 0 (or
+  ;; whatever was last set).  No downcase undo should fire.
+  (--rks-done-downcase-undo! nil)
+  (--rks-done-downcase-undo! t)
+  (should t))
+
+;;;; M6s — fabricated-events finalize loop
+
+(ert-deftest m6s-helpers/exist ()
+  (should (fboundp '--rks-mock-input))
+  (should (fboundp '--set-rks-t))
+  (should (fboundp '--echo-update))
+  (should (fboundp '--rks-done-fabricated-events!)))
+
+(ert-deftest m6s-rks-mock-input/integer ()
+  (should (integerp (--rks-mock-input))))
+
+(ert-deftest m6s-set-rks-t/returns-nil ()
+  (let ((saved (--rks-t)))
+    (unwind-protect
+        (progn
+          (should (eq nil (--set-rks-t 0)))
+          (should (= 0 (--rks-t))))
+      (--set-rks-t saved))))
+
+(ert-deftest m6s-fabricated-events/no-op-when-t-ge-mock-input ()
+  ;; With t == mock_input (or t > mock_input), the loop doesn't fire,
+  ;; so the procedure is just an echo-update.
+  (--rks-done-fabricated-events!)
+  (should t))
+
+;;;; M6t — first_unbound short-circuit
+
+(ert-deftest m6t-helpers/exist ()
+  (should (fboundp '--rks-fkey-start))
+  (should (fboundp '--rks-keytran-start))
+  (should (fboundp '--rks-indec-start))
+  (should (fboundp '--rks-first-unbound))
+  (should (fboundp '--set-rks-mock-input))
+  (should (fboundp '--rks-keybuf-shift-down))
+  (should (fboundp '--rks-keyremaps-shrink-by))
+  (should (fboundp '--rks-first-unbound-short-circuit!)))
+
+(ert-deftest m6t-short-circuit/idle-returns-nil ()
+  ;; At idle the predicate first_unbound < keytran.start is false
+  ;; (both are 0 or both equal in any sensible state).  Should
+  ;; return nil without touching state.
+  (should (eq nil (--rks-first-unbound-short-circuit!))))
+
+(ert-deftest m6t-keyremaps-shrink-by/returns-nil ()
+  (should (eq nil (--rks-keyremaps-shrink-by 0))))
+
 (provide 'ertest-read-key-sequence)

@@ -10352,6 +10352,59 @@ shadow as a non-nil predicate.  Mirrors the C check `if
   return rks_shift_translated ? Qt : Qnil;
 }
 
+/* M6q — keybuf stack.  `keybuf' is a `Lisp_Object[READ_KEY_ELTS]'
+   array allocated by each caller of read_key_sequence.  To let
+   Scheme code read/write the current keybuf we maintain a small
+   stack of pointers, pushed at function entry and popped on dynwind
+   unwind (via record_unwind_protect_int).  The stack accommodates
+   the recursive call that mouse-menu handling triggers (the outer
+   call has its keybuf on the stack at depth 0 while the inner call
+   uses depth 1; on inner return, the unwind pops depth back to 0
+   and Scheme accesses see the outer call's buffer again).  See
+   docs/keyboard.org §M6q.  */
+enum { RKS_KEYBUF_STACK_MAX = 8 };
+static Lisp_Object *rks_keybuf_stack[RKS_KEYBUF_STACK_MAX];
+static int          rks_keybuf_depth;
+
+static void
+restore_rks_keybuf_depth (int saved)
+{
+  rks_keybuf_depth = saved;
+}
+
+DEFUN ("--rks-keybuf-depth", Fc_rks_keybuf_depth, Sc_rks_keybuf_depth,
+       0, 0, 0,
+       doc: /* Internal: current depth of the keybuf stack.  Zero means
+no read_key_sequence call is in flight.  */)
+  (void)
+{
+  return make_fixnum (rks_keybuf_depth);
+}
+
+DEFUN ("--rks-keybuf-ref", Fc_rks_keybuf_ref, Sc_rks_keybuf_ref, 1, 1, 0,
+       doc: /* Internal: read keybuf[I] from the current (top-of-stack)
+read_key_sequence call.  Returns nil when no call is in flight.  */)
+  (Lisp_Object i)
+{
+  CHECK_FIXNAT (i);
+  EMACS_INT idx = XFIXNUM (i);
+  if (rks_keybuf_depth == 0 || idx < 0 || idx >= READ_KEY_ELTS)
+    return Qnil;
+  return rks_keybuf_stack[rks_keybuf_depth - 1][idx];
+}
+
+DEFUN ("--rks-keybuf-set", Fc_rks_keybuf_set, Sc_rks_keybuf_set, 2, 2, 0,
+       doc: /* Internal: write keybuf[I] = X in the current
+read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
+  (Lisp_Object i, Lisp_Object x)
+{
+  CHECK_FIXNAT (i);
+  EMACS_INT idx = XFIXNUM (i);
+  if (rks_keybuf_depth > 0 && idx >= 0 && idx < READ_KEY_ELTS)
+    rks_keybuf_stack[rks_keybuf_depth - 1][idx] = x;
+  return Qnil;
+}
+
 /* M6p — promote `delayed_switch_frame' (8 uses inside read_key_sequence
    + 1 final install into the unread_switch_frame global at done:).
    See docs/keyboard.org §M6p.
@@ -10361,6 +10414,171 @@ shadow as a non-nil predicate.  Mirrors the C check `if
    return Qnil rather than the BSS zero, which is not a valid
    Lisp_Object.  */
 static Lisp_Object rks_delayed_switch_frame;
+
+/* M6r — promote original_uppercase + position (5 uses).  Used by
+   the shift-translation fallback (writes) and the done:-block
+   downcase-undo splice (reads).  See docs/keyboard.org §M6r.  */
+static Lisp_Object rks_original_uppercase;
+static int         rks_original_uppercase_position;
+
+DEFUN ("--rks-original-uppercase", Fc_rks_original_uppercase,
+       Sc_rks_original_uppercase, 0, 0, 0,
+       doc: /* Internal: read the file-static rks_original_uppercase
+shadow (last upper-case key that got downcased during shift
+translation).  */)
+  (void)
+{
+  return rks_original_uppercase;
+}
+
+DEFUN ("--rks-original-uppercase-position",
+       Fc_rks_original_uppercase_position,
+       Sc_rks_original_uppercase_position, 0, 0, 0,
+       doc: /* Internal: read the file-static
+rks_original_uppercase_position shadow.  Either -1 (no shift
+translation happened) or the keybuf index of the most-recent
+downcased key.  */)
+  (void)
+{
+  return make_fixnum (rks_original_uppercase_position);
+}
+
+DEFUN ("--rks-t", Fc_rks_t, Sc_rks_t, 0, 0, 0,
+       doc: /* Internal: read the file-static rks_t (the C `t' local
+of read_key_sequence — current key-sequence length).  */)
+  (void)
+{
+  return make_fixnum (rks_t);
+}
+
+DEFUN ("--rks-current-binding", Fc_rks_current_binding,
+       Sc_rks_current_binding, 0, 0, 0,
+       doc: /* Internal: read the file-static rks_current_binding
+shadow.  */)
+  (void)
+{
+  return rks_current_binding;
+}
+
+DEFUN ("--set-rks-shift-translated", Fc_set_rks_shift_translated,
+       Sc_set_rks_shift_translated, 1, 1, 0,
+       doc: /* Internal: write rks_shift_translated.  Non-nil VAL
+sets it to true; nil sets it to false.  */)
+  (Lisp_Object val)
+{
+  rks_shift_translated = !NILP (val);
+  return Qnil;
+}
+
+DEFUN ("--rks-mock-input", Fc_rks_mock_input, Sc_rks_mock_input,
+       0, 0, 0,
+       doc: /* Internal: read the file-static rks_mock_input shadow.  */)
+  (void)
+{
+  return make_fixnum (rks_mock_input);
+}
+
+DEFUN ("--set-rks-t", Fc_set_rks_t, Sc_set_rks_t, 1, 1, 0,
+       doc: /* Internal: write the file-static rks_t (the C `t' of
+read_key_sequence).  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_t = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--echo-update", Fc_echo_update, Sc_echo_update, 0, 0, 0,
+       doc: /* Internal: invoke the C echo_update helper that refreshes
+the echo-area buffer from the current kboard state.  */)
+  (void)
+{
+  echo_update ();
+  return Qnil;
+}
+
+/* M6t — primitives exposed to (emacs read-key-sequence) for the
+   first_unbound short-circuit branch.  See docs/keyboard.org §M6t.  */
+
+DEFUN ("--rks-fkey-start", Fc_rks_fkey_start, Sc_rks_fkey_start, 0, 0, 0,
+       doc: /* Internal: read rks_fkey.start.  */)
+  (void)
+{
+  return make_fixnum (rks_fkey.start);
+}
+
+DEFUN ("--rks-keytran-start", Fc_rks_keytran_start, Sc_rks_keytran_start,
+       0, 0, 0,
+       doc: /* Internal: read rks_keytran.start.  */)
+  (void)
+{
+  return make_fixnum (rks_keytran.start);
+}
+
+DEFUN ("--rks-indec-start", Fc_rks_indec_start, Sc_rks_indec_start,
+       0, 0, 0,
+       doc: /* Internal: read rks_indec.start.  */)
+  (void)
+{
+  return make_fixnum (rks_indec.start);
+}
+
+DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,
+       Sc_set_rks_mock_input, 1, 1, 0,
+       doc: /* Internal: write rks_mock_input.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_mock_input = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--rks-keybuf-shift-down", Fc_rks_keybuf_shift_down,
+       Sc_rks_keybuf_shift_down, 1, 1, 0,
+       doc: /* Internal: shift keybuf[N..rks_t-1] down to keybuf[0..rks_t-N-1].
+N must be a non-negative fixnum.  No-op when no read_key_sequence
+call is in flight.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  if (rks_keybuf_depth == 0)
+    return Qnil;
+  Lisp_Object *kb = rks_keybuf_stack[rks_keybuf_depth - 1];
+  EMACS_INT shift = XFIXNUM (n);
+  for (int i = shift; i < rks_t; i++)
+    kb[i - shift] = kb[i];
+  return Qnil;
+}
+
+DEFUN ("--rks-keyremaps-shrink-by",
+       Fc_rks_keyremaps_shrink_by, Sc_rks_keyremaps_shrink_by, 1, 1, 0,
+       doc: /* Internal: for each of rks_indec, rks_fkey, rks_keytran,
+subtract N from start, set end = start, and set map = parent.
+Mirrors the inner adjustment of the first_unbound short-circuit
+branch (src/keyboard.c lines 10823-10828 pre-M6t).  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  EMACS_INT amount = XFIXNUM (n);
+  rks_indec.start   -= amount;
+  rks_indec.end     = rks_indec.start;
+  rks_indec.map     = rks_indec.parent;
+  rks_fkey.start    -= amount;
+  rks_fkey.end      = rks_fkey.start;
+  rks_fkey.map      = rks_fkey.parent;
+  rks_keytran.start -= amount;
+  rks_keytran.end   = rks_keytran.start;
+  rks_keytran.map   = rks_keytran.parent;
+  return Qnil;
+}
+
+DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
+       Sc_rks_first_unbound, 0, 0, 0,
+       doc: /* Internal: read rks_first_unbound.  */)
+  (void)
+{
+  return make_fixnum (rks_first_unbound);
+}
 
 DEFUN ("--rks-delayed-switch-frame", Fc_rks_delayed_switch_frame,
        Sc_rks_delayed_switch_frame, 0, 0, 0,
@@ -10698,8 +10916,11 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      M6p: promoted to file-static rks_delayed_switch_frame.  */
 #define delayed_switch_frame rks_delayed_switch_frame
 
-  Lisp_Object original_uppercase UNINIT;
-  int original_uppercase_position = -1;
+  /* M6r: original_uppercase + position promoted to file-static
+     rks_original_uppercase / rks_original_uppercase_position.  */
+#define original_uppercase           rks_original_uppercase
+#define original_uppercase_position  rks_original_uppercase_position
+  original_uppercase_position = -1;
 
 #ifdef HAVE_TEXT_CONVERSION
   bool disabled_conversion;
@@ -10737,6 +10958,14 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   Lisp_Object first_event = Qnil;
 
   dynwind_begin ();
+
+  /* M6q: push our keybuf onto the rks_keybuf_stack so the elisp
+     accessor subrs (`--rks-keybuf-ref' / `--rks-keybuf-set') see
+     it.  Pop on dynwind unwind so recursive (mouse-menu) calls
+     restore the caller's keybuf cleanly.  See docs/keyboard.org §M6q.  */
+  eassert (rks_keybuf_depth < RKS_KEYBUF_STACK_MAX);
+  record_unwind_protect_int (restore_rks_keybuf_depth, rks_keybuf_depth);
+  rks_keybuf_stack[rks_keybuf_depth++] = keybuf;
 
   /* M6i: prompt + echo setup ported to (emacs read-key-sequence)
      rks-setup-prompt! — see docs/keyboard.org §M6i.  */
@@ -10870,25 +11099,19 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
       eassert (fkey.end <= indec.start);
       eassert (keytran.end <= fkey.start);
 
-      if (/* first_unbound < indec.start && first_unbound < fkey.start && */
-	  first_unbound < keytran.start)
-	{ /* The prefix up to first_unbound has no binding and has
-	     no translation left to do either, so we know it's unbound.
-	     If we don't stop now, we risk staying here indefinitely
-	     (if the user keeps entering fkey or keytran prefixes
-	     like C-c ESC ESC ESC ESC ...)  */
-	  int i;
-	  for (i = first_unbound + 1; i < t; i++)
-	    keybuf[i - first_unbound - 1] = keybuf[i];
-	  mock_input = t - first_unbound - 1;
-	  indec.end = indec.start -= first_unbound + 1;
-	  indec.map = indec.parent;
-	  fkey.end = fkey.start -= first_unbound + 1;
-	  fkey.map = fkey.parent;
-	  keytran.end = keytran.start -= first_unbound + 1;
-	  keytran.map = keytran.parent;
+      /* M6t: first_unbound short-circuit ported to (emacs read-key-sequence)
+	 rks-first-unbound-short-circuit!.  Scheme returns t iff the
+	 branch fired (caller should goto replay_sequence).  See
+	 docs/keyboard.org §M6t.  */
+      {
+	static SCM rks_fu_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_fu_proc))
+	  rks_fu_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-first-unbound-short-circuit!");
+	if (!NILP (SCM_CALL_0 (rks_fu_proc)))
 	  goto replay_sequence;
-	}
+      }
 
       if (t >= READ_KEY_ELTS)
 	error ("Key sequence too long");
@@ -11641,15 +11864,19 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   }
   dynwind_end ();
 
-  /* Don't downcase the last character if the caller says don't.
-     Don't downcase it if the result is undefined, either.  */
-  if ((dont_downcase_last || NILP (current_binding))
-      && t > 0
-      && t - 1 == original_uppercase_position)
-    {
-      keybuf[t - 1] = original_uppercase;
-      shift_translated = false;
-    }
+  /* M6r: don't-downcase undo ported to (emacs read-key-sequence)
+     rks-done-downcase-undo!.  Restores the upper-case key in keybuf
+     and clears the shift-translated flag when the caller asked for
+     no downcasing OR the result is undefined.  See docs/keyboard.org §M6r.  */
+  {
+    static SCM rks_done_downcase_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_downcase_proc))
+      rks_done_downcase_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-done-downcase-undo!");
+    SCM_CALL_1 (rks_done_downcase_proc,
+                dont_downcase_last ? Qt : Qnil);
+  }
 
   /* M6o: shift-translated install ported to (emacs read-key-sequence)
      rks-done-install-shift-translated!.  See docs/keyboard.org §M6o.  */
@@ -11664,16 +11891,24 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* Occasionally we fabricate events, perhaps by expanding something
      according to function-key-map, or by adding a prefix symbol to a
-     mouse click in the scroll bar or modeline.  In this cases, return
+     mouse click in the scroll bar or modeline.  In these cases, return
      the entire generated key sequence, even if we hit an unbound
      prefix or a definition before the end.  This means that you will
      be able to push back the event properly, and also means that
      read-key-sequence will always return a logical unit.
 
-     Better ideas?  */
-  for (; t < mock_input; t++)
-    add_command_key (keybuf[t]);
-  echo_update ();
+     M6s: fabricated-events loop + echo_update ported to Scheme
+     rks-done-fabricated-events!.  Updates rks_t in place to the
+     final loop value (max of starting t and mock_input).  See
+     docs/keyboard.org §M6s.  */
+  {
+    static SCM rks_done_fab_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_fab_proc))
+      rks_done_fab_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-done-fabricated-events!");
+    SCM_CALL_0 (rks_done_fab_proc);
+  }
 
   return t;
 }
@@ -11688,6 +11923,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef starting_buffer
 #undef shift_translated
 #undef delayed_switch_frame
+#undef original_uppercase
+#undef original_uppercase_position
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
@@ -13246,6 +13483,8 @@ syms_of_keyboard (void)
   staticpro (&rks_current_binding);
   rks_delayed_switch_frame = Qnil;
   staticpro (&rks_delayed_switch_frame);
+  rks_original_uppercase   = Qnil;
+  staticpro (&rks_original_uppercase);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;

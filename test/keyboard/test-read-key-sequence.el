@@ -266,4 +266,73 @@
   (test-assert "m6p/getter-returns-lisp-value"
                (or (eq v nil) v)))
 
+;;;; M6q
+
+(test-assert "m6q-helper/keybuf-depth"      (fboundp '--rks-keybuf-depth))
+(test-assert "m6q-helper/keybuf-ref"        (fboundp '--rks-keybuf-ref))
+(test-assert "m6q-helper/keybuf-set"        (fboundp '--rks-keybuf-set))
+
+(test-equal "m6q/depth-zero-at-idle" 0 (--rks-keybuf-depth))
+(test-eq    "m6q/ref-nil-when-empty"  nil (--rks-keybuf-ref 0))
+(test-eq    "m6q/set-no-op-when-empty" nil (--rks-keybuf-set 0 'x))
+(test-eq    "m6q/ref-out-of-range" nil (--rks-keybuf-ref 100))
+
+;;;; M6r
+
+(test-assert "m6r-helper/original-uppercase"
+             (fboundp '--rks-original-uppercase))
+(test-assert "m6r-helper/original-uppercase-position"
+             (fboundp '--rks-original-uppercase-position))
+(test-assert "m6r-helper/rks-t"             (fboundp '--rks-t))
+(test-assert "m6r-helper/rks-current-binding"
+             (fboundp '--rks-current-binding))
+(test-assert "m6r-helper/set-rks-shift-translated"
+             (fboundp '--set-rks-shift-translated))
+(test-assert "m6r/downcase-undo-exists"
+             (fboundp '--rks-done-downcase-undo!))
+
+(test-assert "m6r/original-uppercase-position-integer"
+             (integerp (--rks-original-uppercase-position)))
+
+(--rks-done-downcase-undo! nil)
+(--rks-done-downcase-undo! t)
+(test-assert "m6r/downcase-undo-runs" t)
+
+;;;; M6s
+
+(test-assert "m6s-helper/rks-mock-input"   (fboundp '--rks-mock-input))
+(test-assert "m6s-helper/set-rks-t"        (fboundp '--set-rks-t))
+(test-assert "m6s-helper/echo-update"      (fboundp '--echo-update))
+(test-assert "m6s/fabricated-events-exists"
+             (fboundp '--rks-done-fabricated-events!))
+
+(test-assert "m6s/rks-mock-input-integer" (integerp (--rks-mock-input)))
+
+(let ((saved (--rks-t)))
+  (--set-rks-t 0)
+  (test-equal "m6s/set-rks-t-roundtrip" 0 (--rks-t))
+  (--set-rks-t saved))
+
+(--rks-done-fabricated-events!)
+(test-assert "m6s/fabricated-events-runs" t)
+
+;;;; M6t
+
+(test-assert "m6t-helper/fkey-start"      (fboundp '--rks-fkey-start))
+(test-assert "m6t-helper/keytran-start"   (fboundp '--rks-keytran-start))
+(test-assert "m6t-helper/indec-start"     (fboundp '--rks-indec-start))
+(test-assert "m6t-helper/first-unbound"   (fboundp '--rks-first-unbound))
+(test-assert "m6t-helper/set-mock-input"  (fboundp '--set-rks-mock-input))
+(test-assert "m6t-helper/keybuf-shift-down"
+             (fboundp '--rks-keybuf-shift-down))
+(test-assert "m6t-helper/keyremaps-shrink-by"
+             (fboundp '--rks-keyremaps-shrink-by))
+(test-assert "m6t/short-circuit-exists"
+             (fboundp '--rks-first-unbound-short-circuit!))
+
+(test-eq "m6t/short-circuit-idle-nil"
+         nil (--rks-first-unbound-short-circuit!))
+(test-eq "m6t/keyremaps-shrink-returns-nil"
+         nil (--rks-keyremaps-shrink-by 0))
+
 (test-end)

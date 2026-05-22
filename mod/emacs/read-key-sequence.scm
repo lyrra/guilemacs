@@ -33,6 +33,9 @@
             rks-done-compute-remapped!
             rks-done-install-shift-translated!
             rks-done-install-unread-switch-frame!
+            rks-done-downcase-undo!
+            rks-done-fabricated-events!
+            rks-first-unbound-short-circuit!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -575,6 +578,91 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %set-unread-switch-frame
   (delay (%c '--set-unread-switch-frame)))
 
+(define %rks-t                       (delay (%c '--rks-t)))
+(define %rks-current-binding         (delay (%c '--rks-current-binding)))
+(define %rks-original-uppercase      (delay (%c '--rks-original-uppercase)))
+(define %rks-original-uppercase-position
+  (delay (%c '--rks-original-uppercase-position)))
+(define %set-rks-shift-translated
+  (delay (%c '--set-rks-shift-translated)))
+(define %rks-keybuf-set              (delay (%c '--rks-keybuf-set)))
+
+(define %rks-mock-input  (delay (%c '--rks-mock-input)))
+(define %set-rks-t       (delay (%c '--set-rks-t)))
+(define %echo-update     (delay (%c '--echo-update)))
+(define %add-command-key (delay (%c '--add-command-key)))
+(define %rks-keybuf-ref  (delay (%c '--rks-keybuf-ref)))
+
+(define %rks-first-unbound       (delay (%c '--rks-first-unbound)))
+(define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
+(define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
+(define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
+(define %rks-keyremaps-shrink-by (delay (%c '--rks-keyremaps-shrink-by)))
+
+(define (rks-first-unbound-short-circuit!)
+  "If the prefix up to rks_first_unbound has no binding and no
+translation left to do, shift it off keybuf and rebase the
+keyremap scans.  Returns t iff the short-circuit fired (caller
+should goto replay_sequence), nil otherwise.
+
+Mirrors the C 17-line block at the top of the read_key_sequence
+while-loop body (src/keyboard.c lines 11102-11119 pre-M6t)."
+  (let* ((fu  ((force %rks-first-unbound)))
+         (kts ((force %rks-keytran-start))))
+    (cond
+     ((< fu kts)
+      (let ((shift (+ fu 1)))
+        ;; Shift keybuf[shift..t-1] down to keybuf[0..t-shift-1].
+        ((force %rks-keybuf-shift-down) shift)
+        ;; mock_input = t - shift.
+        ((force %set-rks-mock-input) (- ((force %rks-t)) shift))
+        ;; For each keyremap: start -= shift, end = start, map = parent.
+        ((force %rks-keyremaps-shrink-by) shift))
+      #t)
+     (else #nil))))
+
+(define (rks-done-fabricated-events!)
+  "Push any fabricated events in keybuf[t..mock_input-1] onto the
+this-command-keys ring, then refresh the echo area.  After the
+loop, update rks_t to the final value (= max of starting t and
+mock_input) so the C `return t' yields the right key-sequence
+length.  Mirrors the C body at lines 11824-11826 pre-M6s."
+  (let* ((start ((force %rks-t)))
+         (mi    ((force %rks-mock-input))))
+    (let loop ((cur start))
+      (cond
+       ((< cur mi)
+        ((force %add-command-key) ((force %rks-keybuf-ref) cur))
+        (loop (+ cur 1)))
+       (else
+        ;; Sync rks_t to the post-loop value (only changed when start < mi).
+        (when (> cur start)
+          ((force %set-rks-t) cur))))))
+  ((force %echo-update)))
+
+(define (rks-done-downcase-undo! dont-downcase-last)
+  "Restore the upper-case key in keybuf when the caller asked for
+no downcasing OR the resolved binding is nil (undefined).  Mirrors
+the C 5-line block:
+
+  if ((dont_downcase_last || NILP (current_binding))
+      && t > 0
+      && t - 1 == original_uppercase_position)
+    {
+      keybuf[t - 1] = original_uppercase;
+      shift_translated = false;
+    }
+
+See docs/keyboard.org §M6r."
+  (let ((t-val   ((force %rks-t)))
+        (cb      ((force %rks-current-binding)))
+        (oup-pos ((force %rks-original-uppercase-position))))
+    (when (and (or (not (%nilp dont-downcase-last)) (%nilp cb))
+               (> t-val 0)
+               (= (- t-val 1) oup-pos))
+      ((force %rks-keybuf-set) (- t-val 1) ((force %rks-original-uppercase)))
+      ((force %set-rks-shift-translated) #nil))))
+
 (define (rks-done-install-unread-switch-frame!)
   "Copy the C-side rks_delayed_switch_frame into the global
 unread_switch_frame.  Mirrors the C line at the done: block
@@ -651,4 +739,13 @@ cached-dispatch into here."
                ,rks-done-install-shift-translated!)
               ;; M6p — done:-block unread-switch-frame install
               (--rks-done-install-unread-switch-frame!
-               ,rks-done-install-unread-switch-frame!))))
+               ,rks-done-install-unread-switch-frame!)
+              ;; M6r — done:-block downcase-undo
+              (--rks-done-downcase-undo!
+               ,rks-done-downcase-undo!)
+              ;; M6s — done:-block fabricated-events finalize loop
+              (--rks-done-fabricated-events!
+               ,rks-done-fabricated-events!)
+              ;; M6t — first_unbound short-circuit branch
+              (--rks-first-unbound-short-circuit!
+               ,rks-first-unbound-short-circuit!))))
