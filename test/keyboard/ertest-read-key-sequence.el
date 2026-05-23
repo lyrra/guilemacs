@@ -562,4 +562,70 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; Lowercase char 'a' — not shifted, not uppercase — nil.
   (should (eq nil (--rks-try-shift-translation-fn-key! ?a))))
 
+;;;; M6x — translation-map walks
+
+(ert-deftest m6x-helpers/exist ()
+  (should (fboundp '--rks-walk-translation-maps)))
+
+(ert-deftest m6x-walk/nil-at-idle ()
+  ;; At idle the keyremap structs are all at start == end == 0 (or
+  ;; whatever the last call left), and rks_keybuf_depth == 0 so the
+  ;; subr short-circuits to nil.
+  (should (eq nil (--rks-walk-translation-maps! nil)))
+  (should (eq nil (--rks-walk-translation-maps! "P> "))))
+
+;;;; M6y — per-iteration setup + replay_key restore
+
+(ert-deftest m6y-helpers/exist ()
+  (should (fboundp '--rks-iter-setup-capture))
+  (should (fboundp '--rks-iter-replay-restore))
+  (should (fboundp '--rks-echo-local-start))
+  (should (fboundp '--rks-set-echo-local-start))
+  (should (fboundp '--rks-keys-local-start))
+  (should (fboundp '--rks-set-keys-local-start))
+  (should (fboundp '--rks-set-last-real-key-start)))
+
+(ert-deftest m6y-echo-local-start/roundtrip ()
+  (let ((saved (--rks-echo-local-start)))
+    (unwind-protect
+        (progn
+          (--rks-set-echo-local-start 42)
+          (should (= 42 (--rks-echo-local-start))))
+      (--rks-set-echo-local-start saved))))
+
+(ert-deftest m6y-keys-local-start/roundtrip ()
+  (let ((saved (--rks-keys-local-start)))
+    (unwind-protect
+        (progn
+          (--rks-set-keys-local-start 7)
+          (should (= 7 (--rks-keys-local-start))))
+      (--rks-set-keys-local-start saved))))
+
+(ert-deftest m6y-setup-capture/runs-at-rks-t-below-limit ()
+  ;; rks_t is 0 (or small) at idle — well below READ_KEY_ELTS (30).
+  ;; Should run without error.
+  (--rks-iter-setup-capture!)
+  (should t))
+
+(ert-deftest m6y-replay-restore/runs ()
+  (--rks-iter-replay-restore!)
+  (should t))
+
+;;;; M6z — mock-input + end-of-macro cascade
+
+(ert-deftest m6z-helpers/exist ()
+  (should (fboundp '--rks-key))
+  (should (fboundp '--rks-used-mouse-menu-p))
+  (should (fboundp '--rks-iter-pre-read-cascade)))
+
+(ert-deftest m6z-cascade/read-char-at-idle ()
+  ;; At idle: rks_t == 0, rks_mock_input == 0 — not less than, so
+  ;; branch 1 doesn't fire.  Vexecuting_kbd_macro is nil — branch 2
+  ;; doesn't fire.  Cascade falls through to 'read-char.
+  (should (eq 'read-char (--rks-iter-pre-read-cascade!))))
+
+(ert-deftest m6z-used-mouse-menu-p/boolean ()
+  (let ((v (--rks-used-mouse-menu-p)))
+    (should (or (eq v t) (eq v nil)))))
+
 (provide 'ertest-read-key-sequence)

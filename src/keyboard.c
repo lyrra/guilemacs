@@ -10421,6 +10421,166 @@ static Lisp_Object rks_delayed_switch_frame;
 static Lisp_Object rks_original_uppercase;
 static int         rks_original_uppercase_position;
 
+/* M6y — promote the three inner-block locals of the while-loop
+   iteration: echo_local_start (echo-buffer length captured before
+   the per-key read, restored on replay_key), keys_local_start
+   (this_command_key_count snapshot, same pattern), and
+   last_real_key_start (backtrack target inside the iteration).
+   See docs/keyboard.org §M6y.  */
+static ptrdiff_t rks_echo_local_start;
+static int       rks_keys_local_start;
+static int       rks_last_real_key_start;
+
+/* M6z — promote the per-iteration key + used_mouse_menu locals and
+   the used_mouse_menu_history array.  `rks_key' is the current event
+   being processed; `rks_used_mouse_menu' tracks whether the event
+   came from a menu; `rks_used_mouse_menu_history' is the per-keybuf-
+   position snapshot needed for replay through mock_input.  See
+   docs/keyboard.org §M6z.  */
+static Lisp_Object rks_key;
+static bool        rks_used_mouse_menu;
+static bool        rks_used_mouse_menu_history[READ_KEY_ELTS];
+
+DEFUN ("--rks-key", Fc_rks_key, Sc_rks_key, 0, 0, 0,
+       doc: /* Internal: read rks_key (the current event being
+processed by the read_key_sequence iteration body).  */)
+  (void)
+{
+  return rks_key;
+}
+
+DEFUN ("--rks-used-mouse-menu-p", Fc_rks_used_mouse_menu_p,
+       Sc_rks_used_mouse_menu_p, 0, 0, 0,
+       doc: /* Internal: read rks_used_mouse_menu as a predicate.  */)
+  (void)
+{
+  return rks_used_mouse_menu ? Qt : Qnil;
+}
+
+/* M6z — atomic splice of the mock-input / end-of-macro cascade.
+   Returns one of:
+     `mock' — branch 1 fired (rks_t < rks_mock_input).  rks_key,
+              rks_used_mouse_menu have been set from the buffer.
+              Caller continues with the per-key dispatch.
+     `done' — branch 2 fired (executing kbd-macro at end with no
+              requeued events).  rks_t has been set to 0.  Caller
+              goes to `done:'.
+     `read-char' — neither branch applied; caller must do the
+                   inline read_char (deferred to M8).
+   See docs/keyboard.org §M6z.  */
+DEFUN ("--rks-iter-pre-read-cascade",
+       Fc_rks_iter_pre_read_cascade, Sc_rks_iter_pre_read_cascade,
+       0, 0, 0,
+       doc: /* Internal: dispatches the per-iteration key-source
+cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
+  (void)
+{
+  if (rks_t < rks_mock_input)
+    {
+      Lisp_Object *kb = rks_keybuf_stack[rks_keybuf_depth - 1];
+      rks_key = kb[rks_t];
+      add_command_key (rks_key);
+      if (current_kboard->immediate_echo)
+        {
+          current_kboard->immediate_echo = false;
+          echo_now ();
+        }
+      rks_used_mouse_menu = rks_used_mouse_menu_history[rks_t];
+      return intern ("mock");
+    }
+  if (!NILP (Vexecuting_kbd_macro)
+      && at_end_of_macro_p ()
+      && !requeued_events_pending_p ())
+    {
+      rks_t = 0;
+      return intern ("done");
+    }
+  return intern ("read-char");
+}
+
+DEFUN ("--rks-set-echo-local-start", Fc_rks_set_echo_local_start,
+       Sc_rks_set_echo_local_start, 1, 1, 0,
+       doc: /* Internal: write rks_echo_local_start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  rks_echo_local_start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--rks-echo-local-start", Fc_rks_echo_local_start,
+       Sc_rks_echo_local_start, 0, 0, 0,
+       doc: /* Internal: read rks_echo_local_start.  */)
+  (void)
+{
+  return make_fixnum (rks_echo_local_start);
+}
+
+DEFUN ("--rks-set-keys-local-start", Fc_rks_set_keys_local_start,
+       Sc_rks_set_keys_local_start, 1, 1, 0,
+       doc: /* Internal: write rks_keys_local_start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  rks_keys_local_start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--rks-keys-local-start", Fc_rks_keys_local_start,
+       Sc_rks_keys_local_start, 0, 0, 0,
+       doc: /* Internal: read rks_keys_local_start.  */)
+  (void)
+{
+  return make_fixnum (rks_keys_local_start);
+}
+
+DEFUN ("--rks-set-last-real-key-start", Fc_rks_set_last_real_key_start,
+       Sc_rks_set_last_real_key_start, 1, 1, 0,
+       doc: /* Internal: write rks_last_real_key_start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_last_real_key_start = XFIXNUM (n);
+  return Qnil;
+}
+
+/* M6y — atomic iteration-setup splice: the `t >= READ_KEY_ELTS'
+   error check + echo / keys-start capture.  See docs/keyboard.org §M6y.  */
+DEFUN ("--rks-iter-setup-capture",
+       Fc_rks_iter_setup_capture, Sc_rks_iter_setup_capture, 0, 0, 0,
+       doc: /* Internal: error if rks_t exceeds READ_KEY_ELTS, then
+capture echo_length into rks_echo_local_start (only when
+interactive) and this_command_key_count into
+rks_keys_local_start.  Mirrors src/keyboard.c lines 11354-11359
+pre-M6y.  */)
+  (void)
+{
+  if (rks_t >= READ_KEY_ELTS)
+    error ("Key sequence too long");
+  if (!noninteractive)
+    rks_echo_local_start = echo_length ();
+  rks_keys_local_start = this_command_key_count;
+  return Qnil;
+}
+
+/* M6y — atomic replay_key-restore splice: echo + keys restore +
+   last_real_key_start = rks_t.  See docs/keyboard.org §M6y.  */
+DEFUN ("--rks-iter-replay-restore",
+       Fc_rks_iter_replay_restore, Sc_rks_iter_replay_restore, 0, 0, 0,
+       doc: /* Internal: if interactive and rks_t < rks_mock_input, call
+echo_truncate (rks_echo_local_start).  Then write
+this_command_key_count = rks_keys_local_start and
+rks_last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
+11403-11408 pre-M6y.  */)
+  (void)
+{
+  if (!noninteractive && rks_t < rks_mock_input)
+    echo_truncate (rks_echo_local_start);
+  this_command_key_count  = rks_keys_local_start;
+  rks_last_real_key_start = rks_t;
+  return Qnil;
+}
+
 DEFUN ("--rks-original-uppercase", Fc_rks_original_uppercase,
        Sc_rks_original_uppercase, 0, 0, 0,
        doc: /* Internal: read the file-static rks_original_uppercase
@@ -10578,6 +10738,116 @@ DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
   (void)
 {
   return make_fixnum (rks_first_unbound);
+}
+
+/* M6x — three translation-map walks (input-decode-map, function-
+   key-map, key-translation-map) plus the in-between fkey-shortcut.
+   See docs/keyboard.org §M6x.
+
+   Forward declarations needed: keyremap_step and test_undefined are
+   defined further down in this file.  */
+static bool keyremap_step (Lisp_Object *, volatile keyremap *, int,
+                           bool, int *, Lisp_Object);
+static bool test_undefined (Lisp_Object);
+
+DEFUN ("--rks-walk-translation-maps",
+       Fc_rks_walk_translation_maps,
+       Sc_rks_walk_translation_maps, 1, 1, 0,
+       doc: /* Internal: run all three translation-map walks
+sequentially on the current keybuf.  In order:
+
+  1. Walk rks_indec from indec.end < rks_t.  If a step completes,
+     mutate rks_mock_input and return t (caller goto replay_sequence).
+  2. If rks_current_binding is a bound non-keymap and
+     rks_indec.start >= rks_t, advance rks_fkey to rks_t (fkey
+     shortcut).  Otherwise walk rks_fkey from fkey.end < indec.start;
+     on completion, mutate mock_input + indec counters and return t.
+  3. Walk rks_keytran from keytran.end < fkey.start; on completion,
+     mutate mock_input + indec + fkey counters and return t.
+
+Returns nil when all three loops exhaust without a hit (caller
+falls through to the shift-translation / help-char fallbacks).
+
+Mirrors src/keyboard.c lines 11795-11872 pre-M6x.  PROMPT is the
+read_key_sequence prompt argument (passed through to keyremap_step
+for echo handling during in-progress translations).  */)
+  (Lisp_Object prompt)
+{
+  if (rks_keybuf_depth == 0)
+    return Qnil;
+  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
+
+  /* Walk 1: input-decode-map.  */
+  while (rks_indec.end < rks_t)
+    {
+      int diff;
+      bool done = keyremap_step (keybuf, &rks_indec,
+                                 max (rks_t, rks_mock_input),
+                                 true, &diff, prompt);
+      if (done)
+        {
+          rks_mock_input = diff + max (rks_t, rks_mock_input);
+          return Qt;
+        }
+    }
+
+  /* Fkey shortcut OR fkey walk.  */
+  if (!KEYMAPP (rks_current_binding)
+      && !test_undefined (rks_current_binding)
+      && rks_indec.start >= rks_t)
+    {
+      /* There is a non-prefix binding (and no input-decode-map
+         pending) — advance fkey past the sequence so keytran can
+         still scan it.  */
+      if (rks_fkey.start < rks_t)
+        {
+          rks_fkey.start = rks_fkey.end = rks_t;
+          rks_fkey.map = rks_fkey.parent;
+        }
+    }
+  else
+    {
+      /* Walk 2: function-key-map.  */
+      while (rks_fkey.end < rks_indec.start)
+        {
+          int diff;
+          bool done = keyremap_step (keybuf, &rks_fkey,
+                                     max (rks_t, rks_mock_input),
+                                     /* If we have a binding, skip
+                                        the final mapping (preserves
+                                        bound function keys).  */
+                                     (rks_fkey.end + 1 == rks_t
+                                      && test_undefined (rks_current_binding)),
+                                     &diff, prompt);
+          if (done)
+            {
+              rks_mock_input = diff + max (rks_t, rks_mock_input);
+              rks_indec.end   += diff;
+              rks_indec.start += diff;
+              return Qt;
+            }
+        }
+    }
+
+  /* Walk 3: key-translation-map.  */
+  while (rks_keytran.end < rks_fkey.start)
+    {
+      int diff;
+      bool done = keyremap_step (keybuf, &rks_keytran,
+                                 max (rks_t, rks_mock_input),
+                                 true, &diff, prompt);
+      if (done)
+        {
+          rks_mock_input  = diff + max (rks_t, rks_mock_input);
+          rks_indec.end   += diff;
+          rks_indec.start += diff;
+          rks_fkey.end    += diff;
+          rks_fkey.start  += diff;
+          return Qt;
+        }
+    }
+
+  return Qnil;
 }
 
 /* M6w — shifted-function-key shift-translation (block C at the
@@ -11011,8 +11281,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      M6m: promoted to file-static rks_mock_input.  */
 #define mock_input rks_mock_input
 
-  /* Whether each event in the mocked input came from a mouse menu.  */
-  bool used_mouse_menu_history[READ_KEY_ELTS] = {0};
+  /* Whether each event in the mocked input came from a mouse menu.
+     M6z: promoted to file-static rks_used_mouse_menu_history.  Reset
+     to all-false at function entry (the original local-array
+     `= {0}' initializer).  */
+#define used_mouse_menu_history rks_used_mouse_menu_history
+  memset (used_mouse_menu_history, 0, sizeof (used_mouse_menu_history));
 
   /* If the sequence is unbound in submaps[], then
      keybuf[fkey.start..fkey.end-1] is a prefix in Vfunction_key_map,
@@ -11200,22 +11474,28 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    so that we can translate ESC O plus the next character.  */
 	 : (/* indec.start < t || fkey.start < t || */ keytran.start < t))
     {
-      Lisp_Object key;
-      bool used_mouse_menu = false;
+      /* M6z: `key' + `used_mouse_menu' promoted to file-static
+         `rks_key' / `rks_used_mouse_menu'.  */
+#define key             rks_key
+#define used_mouse_menu rks_used_mouse_menu
+      used_mouse_menu = false;
 
       /* Where the last real key started.  If we need to throw away a
          key that has expanded into more than one element of keybuf
          (say, a mouse click on the mode line which is being treated
          as [mode-line (mouse-...)], then we backtrack to this point
-         of keybuf.  */
-      int last_real_key_start;
+         of keybuf.
+         M6y: promoted to file-static rks_last_real_key_start.  */
+#define last_real_key_start rks_last_real_key_start
 
       /* These variables are analogous to echo_start and keys_start;
 	 while those allow us to restart the entire key sequence,
 	 echo_local_start and keys_local_start allow us to throw away
-	 just one key.  */
-      ptrdiff_t echo_local_start UNINIT;
-      int keys_local_start;
+	 just one key.
+         M6y: promoted to file-static rks_echo_local_start /
+         rks_keys_local_start.  */
+#define echo_local_start rks_echo_local_start
+#define keys_local_start rks_keys_local_start
       Lisp_Object new_binding;
 
       eassert (indec.end == t || (indec.end > t && indec.end <= mock_input));
@@ -11241,12 +11521,17 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  goto replay_sequence;
       }
 
-      if (t >= READ_KEY_ELTS)
-	error ("Key sequence too long");
-
-      if (INTERACTIVE)
-	echo_local_start = echo_length ();
-      keys_local_start = this_command_key_count;
+      /* M6y: iteration-setup capture ported to Scheme
+	 `rks-iter-setup-capture!'.  Does the length-check error and
+	 echo / keys-start capture.  See docs/keyboard.org §M6y.  */
+      {
+	static SCM rks_setup_capture_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_setup_capture_proc))
+	  rks_setup_capture_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-setup-capture!");
+	SCM_CALL_0 (rks_setup_capture_proc);
+      }
 
 #ifdef HAVE_TEXT_CONVERSION
       /* When reading a key sequence while text conversion is in
@@ -11286,43 +11571,40 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #endif
 
     replay_key:
-      /* These are no-ops, unless we throw away a keystroke below and
-	 jumped back up to replay_key; in that case, these restore the
-	 variables to their original state, allowing us to replay the
-	 loop.  */
-      if (INTERACTIVE && t < mock_input)
-	echo_truncate (echo_local_start);
-      this_command_key_count = keys_local_start;
+      /* M6y: replay_key-restore ported to Scheme
+	 `rks-iter-replay-restore!'.  Restores echo + keys to their
+	 capture values (no-op the first time through), then sets
+	 last_real_key_start = rks_t.  See docs/keyboard.org §M6y.  */
+      {
+	static SCM rks_replay_restore_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_replay_restore_proc))
+	  rks_replay_restore_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-replay-restore!");
+	SCM_CALL_0 (rks_replay_restore_proc);
+      }
 
-      /* By default, assume each event is "real".  */
-      last_real_key_start = t;
-
-      /* Does mock_input indicate that we are re-reading a key sequence?  */
-      if (t < mock_input)
-	{
-	  key = keybuf[t];
-	  add_command_key (key);
-	  if (current_kboard->immediate_echo)
-	    {
-	      /* Set immediate_echo to false so as to force echo_now to
-		 redisplay (it will set immediate_echo right back to true).  */
-	      current_kboard->immediate_echo = false;
-	      echo_now ();
-	    }
-	  used_mouse_menu = used_mouse_menu_history[t];
-	}
-      /* If we're at the end of a macro, exit it by returning 0,
-	 unless there are unread events pending.  */
-      else if (!NILP (Vexecuting_kbd_macro)
-	  && at_end_of_macro_p ()
-	  && !requeued_events_pending_p ())
-	{
-	  t = 0;
+      /* M6z: mock-input + end-of-macro cascade ported to Scheme
+	 `rks-iter-pre-read-cascade!'.  Returns `mock' (rks_key has
+	 been set from keybuf), `done' (caller goto done), or
+	 `read-char' (caller does the inline read_char block below).
+	 See docs/keyboard.org §M6z.  */
+      {
+	static SCM rks_pre_read_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_pre_read_proc))
+	  rks_pre_read_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-pre-read-cascade!");
+	SCM result = SCM_CALL_0 (rks_pre_read_proc);
+	if (scm_is_eq (result, intern ("done")))
 	  goto done;
-	}
+	if (scm_is_eq (result, intern ("mock")))
+	  goto have_key;
+	/* else: `read-char' — fall through to inline read_char.  */
+      }
+
       /* Otherwise, we should actually read a character.  */
-      else
-	{
+      {
 	  {
 	    KBOARD *interrupted_kboard = current_kboard;
 	    struct frame *interrupted_frame = SELECTED_FRAME ();
@@ -11490,6 +11772,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
                 CONSP (key) ? Fcopy_sequence (key) : key);
 	  raw_keybuf_count++;
 	}
+
+    have_key:
+      /* M6z: control reaches here either by falling through the
+	 read_char branch above OR by `goto have_key' from the
+	 cached-SCM dispatch when its return was `mock'.  rks_key
+	 and rks_used_mouse_menu are valid at this point.  */
 
       /* Clicks in non-text areas get prefixed by the symbol
 	 in their CHAR-ADDRESS field.  For example, a click on
@@ -11792,84 +12080,20 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
       if (this_single_command_key_start < 0)
 	this_single_command_key_start = 0;
 
-      /* Look for this sequence in input-decode-map.
-	 Scan from indec.end until we find a bound suffix.  */
-      while (indec.end < t)
-	{
-	  bool done;
-	  int diff;
-
-	  done = keyremap_step (keybuf, &indec, max (t, mock_input),
-				true, &diff, prompt);
-	  if (done)
-	    {
-	      mock_input = diff + max (t, mock_input);
-	      goto replay_sequence;
-	    }
-	}
-
-      if (!KEYMAPP (current_binding)
-	  && !test_undefined (current_binding)
-	  && indec.start >= t)
-	/* There is a binding and it's not a prefix.
-	   (and it doesn't have any input-decode-map translation pending).
-	   There is thus no function-key in this sequence.
-	   Moving fkey.start is important in this case to allow keytran.start
-	   to go over the sequence before we return (since we keep the
-	   invariant that keytran.end <= fkey.start).  */
-	{
-	  if (fkey.start < t)
-	    (fkey.start = fkey.end = t, fkey.map = fkey.parent);
-	}
-      else
-	/* If the sequence is unbound, see if we can hang a function key
-	   off the end of it.  */
-	/* Continue scan from fkey.end until we find a bound suffix.  */
-	while (fkey.end < indec.start)
-	  {
-	    bool done;
-	    int diff;
-
-	    done = keyremap_step (keybuf, &fkey,
-				  max (t, mock_input),
-				  /* If there's a binding (i.e.
-				     first_binding >= nmaps) we don't want
-				     to apply this function-key-mapping.  */
-				  (fkey.end + 1 == t
-				   && test_undefined (current_binding)),
-				  &diff, prompt);
-	    if (done)
-	      {
-		mock_input = diff + max (t, mock_input);
-		/* Adjust the input-decode-map counters.  */
-		indec.end += diff;
-		indec.start += diff;
-
-		goto replay_sequence;
-	      }
-	  }
-
-      /* Look for this sequence in key-translation-map.
-	 Scan from keytran.end until we find a bound suffix.  */
-      while (keytran.end < fkey.start)
-	{
-	  bool done;
-	  int diff;
-
-	  done = keyremap_step (keybuf, &keytran, max (t, mock_input),
-				true, &diff, prompt);
-	  if (done)
-	    {
-	      mock_input = diff + max (t, mock_input);
-	      /* Adjust the function-key-map and input-decode-map counters.  */
-	      indec.end += diff;
-	      indec.start += diff;
-	      fkey.end += diff;
-	      fkey.start += diff;
-
-	      goto replay_sequence;
-	    }
-	}
+      /* M6x: three translation-map walks (input-decode-map, fkey,
+	 keytran) plus the fkey-shortcut, ported to Scheme
+	 `rks-walk-translation-maps!'.  Returns t iff any walk found
+	 a binding; caller goes to replay_sequence in that case.  See
+	 docs/keyboard.org §M6x.  */
+      {
+	static SCM rks_walk_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_walk_proc))
+	  rks_walk_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-walk-translation-maps!");
+	if (!NILP (SCM_CALL_1 (rks_walk_proc, prompt)))
+	  goto replay_sequence;
+      }
 
       /* M6u: simple shift-translation (upper-case → lower-case, or
 	 strip shift_modifier) ported to Scheme
@@ -12004,6 +12228,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef delayed_switch_frame
 #undef original_uppercase
 #undef original_uppercase_position
+#undef echo_local_start
+#undef keys_local_start
+#undef last_real_key_start
+#undef key
+#undef used_mouse_menu
+#undef used_mouse_menu_history
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
@@ -13564,6 +13794,8 @@ syms_of_keyboard (void)
   staticpro (&rks_delayed_switch_frame);
   rks_original_uppercase   = Qnil;
   staticpro (&rks_original_uppercase);
+  rks_key                  = Qnil;
+  staticpro (&rks_key);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;

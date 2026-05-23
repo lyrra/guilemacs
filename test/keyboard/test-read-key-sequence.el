@@ -363,4 +363,52 @@
 (test-eq "m6w/fn-key-nil-for-lowercase"
          nil (--rks-try-shift-translation-fn-key! ?a))
 
+;;;; M6x
+
+(test-assert "m6x-helper/walk-translation-maps"
+             (fboundp '--rks-walk-translation-maps))
+(test-eq "m6x/walk-nil-at-idle"
+         nil (--rks-walk-translation-maps! nil))
+(test-eq "m6x/walk-nil-with-prompt"
+         nil (--rks-walk-translation-maps! "P> "))
+
+;;;; M6y
+
+(test-assert "m6y-helper/iter-setup-capture"
+             (fboundp '--rks-iter-setup-capture))
+(test-assert "m6y-helper/iter-replay-restore"
+             (fboundp '--rks-iter-replay-restore))
+(test-assert "m6y-helper/echo-local-start"
+             (fboundp '--rks-echo-local-start))
+(test-assert "m6y-helper/keys-local-start"
+             (fboundp '--rks-keys-local-start))
+
+(let ((saved-e (--rks-echo-local-start))
+      (saved-k (--rks-keys-local-start)))
+  (--rks-set-echo-local-start 42)
+  (--rks-set-keys-local-start 7)
+  (test-equal "m6y/echo-local-start-roundtrip" 42 (--rks-echo-local-start))
+  (test-equal "m6y/keys-local-start-roundtrip" 7  (--rks-keys-local-start))
+  (--rks-set-echo-local-start saved-e)
+  (--rks-set-keys-local-start saved-k))
+
+(--rks-iter-setup-capture!)
+(test-assert "m6y/setup-capture-runs" t)
+(--rks-iter-replay-restore!)
+(test-assert "m6y/replay-restore-runs" t)
+
+;;;; M6z
+
+(test-assert "m6z-helper/rks-key"      (fboundp '--rks-key))
+(test-assert "m6z-helper/used-mouse-menu-p"
+             (fboundp '--rks-used-mouse-menu-p))
+(test-assert "m6z-helper/cascade"
+             (fboundp '--rks-iter-pre-read-cascade))
+
+(test-eq "m6z/cascade-read-char-at-idle"
+         'read-char (--rks-iter-pre-read-cascade!))
+(let ((v (--rks-used-mouse-menu-p)))
+  (test-assert "m6z/used-mouse-menu-boolean"
+               (or (eq v t) (eq v nil))))
+
 (test-end)

@@ -39,6 +39,10 @@
             rks-try-shift-translation-simple!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
+            rks-walk-translation-maps!
+            rks-iter-setup-capture!
+            rks-iter-replay-restore!
+            rks-iter-pre-read-cascade!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -602,6 +606,69 @@ keybuf[0]/keybuf[1] (where mock-input permits) via the C
 (define %rks-keybuf-shift-down   (delay (%c '--rks-keybuf-shift-down)))
 (define %rks-keyremaps-shrink-by (delay (%c '--rks-keyremaps-shrink-by)))
 
+(define %rks-iter-setup-capture
+  (delay (%c '--rks-iter-setup-capture)))
+(define %rks-iter-replay-restore
+  (delay (%c '--rks-iter-replay-restore)))
+
+(define (rks-iter-setup-capture!)
+  "Per-iteration setup at the top of the while-loop body, after the
+M6t first_unbound short-circuit.  Errors if rks_t exceeds
+READ_KEY_ELTS; otherwise captures echo-length and
+this-command-key-count into the file-static rks_echo_local_start
+/ rks_keys_local_start so the replay_key restore below can revert
+to them.  See docs/keyboard.org §M6y."
+  ((force %rks-iter-setup-capture)))
+
+(define %rks-iter-pre-read-cascade
+  (delay (%c '--rks-iter-pre-read-cascade)))
+
+(define (rks-iter-pre-read-cascade!)
+  "Dispatch the per-iteration key-source cascade.  Returns one of:
+
+  `mock'      — branch 1 fired (rks_t < rks_mock_input).  rks_key
+                + rks_used_mouse_menu set from keybuf;
+                rks-add-command-key + echo refresh have run.
+                Caller continues to the per-key dispatch.
+  `done'      — branch 2 fired (executing kbd-macro at end with
+                no requeued events).  rks_t has been set to 0.
+                Caller goto done.
+  `read-char' — neither branch applied.  Caller must do the
+                inline read_char (M8 territory).
+
+See docs/keyboard.org §M6z."
+  ((force %rks-iter-pre-read-cascade)))
+
+(define (rks-iter-replay-restore!)
+  "replay_key:-target restore.  On every iteration (and after the
+text-conversion-disable jump), restore the echo buffer and
+this-command-key-count to the values captured by
+`rks-iter-setup-capture!', then snapshot rks_t as
+rks_last_real_key_start so the per-key dispatch can backtrack
+into the buffer if a mouse-click expands into multiple keybuf
+elements.  See docs/keyboard.org §M6y."
+  ((force %rks-iter-replay-restore)))
+
+(define %rks-walk-translation-maps
+  (delay (%c '--rks-walk-translation-maps)))
+
+(define (rks-walk-translation-maps! prompt)
+  "Walk the three translation maps (input-decode-map, then
+function-key-map, then key-translation-map) over the current
+keybuf, in that order.  Each walk consumes pending unbound
+prefixes from its respective scan; the fkey walk is skipped
+entirely when current-binding is a non-keymap bound non-undefined
+value AND no input-decode-map scan is pending (the `fkey-shortcut'
+that advances rks_fkey to rks_t to keep the
+`keytran.end <= fkey.start' invariant).
+
+Returns t iff one of the three walks completed a translation —
+caller should goto replay_sequence in that case.  Returns nil if
+all three loops exhausted without a hit.
+
+See docs/keyboard.org §M6x."
+  ((force %rks-walk-translation-maps) prompt))
+
 (define %rks-try-shift-translation-fn-key
   (delay (%c '--rks-try-shift-translation-fn-key)))
 
@@ -799,4 +866,15 @@ cached-dispatch into here."
                ,rks-try-help-char!)
               ;; M6w — shifted-function-key shift-translation
               (--rks-try-shift-translation-fn-key!
-               ,rks-try-shift-translation-fn-key!))))
+               ,rks-try-shift-translation-fn-key!)
+              ;; M6x — three translation-map walks
+              (--rks-walk-translation-maps!
+               ,rks-walk-translation-maps!)
+              ;; M6y — per-iteration setup + replay_key restore
+              (--rks-iter-setup-capture!
+               ,rks-iter-setup-capture!)
+              (--rks-iter-replay-restore!
+               ,rks-iter-replay-restore!)
+              ;; M6z — mock-input + end-of-macro cascade
+              (--rks-iter-pre-read-cascade!
+               ,rks-iter-pre-read-cascade!))))
