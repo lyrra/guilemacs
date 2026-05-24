@@ -143,4 +143,14 @@
   ;; `fall-through' before touching read_decoded_event_from_main_queue.
   (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!))))
 
+;;;; M8k — BUFFERP + special-event-map dispatch
+
+(ert-deftest m8k-helpers/exist ()
+  (should (fboundp '--rc-bufferp-and-special-event-map)))
+
+(ert-deftest m8k-bufp-special/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching state.
+  (should (eq 'fall-through (--rc-bufferp-and-special-event-map!))))
+
 (provide 'ertest-read-char)

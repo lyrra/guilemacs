@@ -2987,6 +2987,81 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8k — bulk splice of BUFFERP early-exit + special-event-map
+   dispatch (the two blocks immediately after the M8j non_reread
+   loop).  See docs/keyboard.org §M8k.  */
+DEFUN ("--rc-bufferp-and-special-event-map",
+       Fc_rc_bufferp_and_special_event_map,
+       Sc_rc_bufferp_and_special_event_map, 0, 0, 0,
+       doc: /* Internal: BUFFERP early-exit + special-event-map dispatch.
+
+  Block 1: if BUFFERP(state->c), return `goto-exit' (buffer-switch
+    events are internal wakeups; caller returns state->c as-is).
+
+  Block 2: look up state->c in Vspecial_event_map (with Vquit_flag
+    saved/cleared around the lookup).  On hit, set last_input_event
+    and call4 Qcommand_execute with a 1-vector of state->c.
+    Post-call: maybe timer_resume_idle (for while-no-input ignore
+    events).  On HAVE_NS, latch input_was_pending for
+    Qns_unput_working_text.  If current_buffer changed, set
+    state->c = -2 and return `goto-exit'; otherwise return
+    `goto-retry' (re-enter the prologue).
+
+  Returns `goto-exit', `goto-retry', or `fall-through'.  Mirrors
+  src/keyboard.c lines 3888-3929 pre-M8k.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: BUFFERP early-exit.  */
+  if (BUFFERP (state->c))
+    return intern ("goto-exit");
+
+  /* Block 2: special-event-map dispatch.  */
+  Lisp_Object save = Vquit_flag;
+  Vquit_flag = Qnil;
+  Lisp_Object tem = access_keymap (get_keymap (Vspecial_event_map, 0, 1),
+                                   state->c, 0, 0, 1);
+  Vquit_flag = save;
+
+  if (!NILP (tem))
+    {
+      struct buffer *prev_buffer = current_buffer;
+      last_input_event = state->c;
+
+      call4 (Qcommand_execute, tem, Qnil,
+             Fvector (1, &last_input_event), Qt);
+
+      if (CONSP (state->c)
+          && !NILP (Fmemq (XCAR (state->c), Vwhile_no_input_ignore_events))
+          && !state->end_time)
+        /* We stopped being idle for this event; undo that.  */
+        timer_resume_idle ();
+
+#ifdef HAVE_NS
+      if (CONSP (state->c)
+          && EQ (XCAR (state->c), Qns_unput_working_text))
+        input_was_pending = input_pending;
+#endif
+
+      if (current_buffer != prev_buffer)
+        {
+          /* The command may have changed the keymaps.  Pretend
+             there is input in another keyboard and return.  This
+             will recalculate keymaps.  */
+          state->c = make_fixnum (-2);
+          return intern ("goto-exit");
+        }
+      else
+        return intern ("goto-retry");
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8j — bulk splice of the wrong_kboard: + non_reread: blocks.
    Internally loops the blocking read + redisplay-on-nil sequence
    so the original `goto wrong_kboard;' becomes a `continue'.
@@ -3724,7 +3799,7 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define orig_kboard state->orig_kboard
 #define save_getcjmp(x) (x = getctag)
 #define restore_getcjmp(x) (getctag = x)
-  Lisp_Object tem, save;
+  Lisp_Object tem;
 
   if (jump)
     goto non_reread;
@@ -3882,51 +3957,24 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — state->c is non-nil, continue.  */
   }
 
-  /* Buffer switch events are only for internal wakeups
-     so don't show them to the user.
-     Also, don't record a key if we already did.  */
-  if (BUFFERP (c))
-    goto exit;
-
-  /* Process special events within read_char
-     and loop around to read another event.  */
-  save = Vquit_flag;
-  Vquit_flag = Qnil;
-  tem = access_keymap (get_keymap (Vspecial_event_map, 0, 1), c, 0, 0, 1);
-  Vquit_flag = save;
-
-  if (!NILP (tem))
-    {
-      struct buffer *prev_buffer = current_buffer;
-      last_input_event = c;
-
-      call4 (Qcommand_execute, tem, Qnil, Fvector (1, &last_input_event), Qt);
-
-      if (CONSP (c) && !NILP (Fmemq (XCAR (c), Vwhile_no_input_ignore_events))
-	  && !end_time)
-	/* We stopped being idle for this event; undo that.  This
-	   prevents automatic window selection (under
-	   mouse-autoselect-window) from acting as a real input event, for
-	   example banishing the mouse under mouse-avoidance-mode.  */
-	timer_resume_idle ();
-
-#ifdef HAVE_NS
-      if (CONSP (c)
-          && (EQ (XCAR (c), Qns_unput_working_text)))
-        input_was_pending = input_pending;
-#endif
-
-      if (current_buffer != prev_buffer)
-	{
-	  /* The command may have changed the keymaps.  Pretend there
-	     is input in another keyboard and return.  This will
-	     recalculate keymaps.  */
-	  c = make_fixnum (-2);
-	  goto exit;
-	}
-      else
-	goto retry;
-    }
+  /* M8k: BUFFERP early-exit + special-event-map dispatch ported
+     to Scheme `rc-bufferp-and-special-event-map!'.  Returns
+     `goto-exit' (BUFFERP or current_buffer changed), `goto-retry'
+     (special command fired without buffer change), or
+     `fall-through'.  See docs/keyboard.org §M8k.  */
+  {
+    static SCM rc_bufp_special_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_bufp_special_proc))
+      rc_bufp_special_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-bufferp-and-special-event-map!");
+    SCM result = SCM_CALL_0 (rc_bufp_special_proc);
+    if (scm_is_eq (result, intern ("goto-exit")))
+      goto exit;
+    if (scm_is_eq (result, intern ("goto-retry")))
+      goto retry;
+    /* else: `fall-through' — continue.  */
+  }
 
   /* Handle things that only apply to characters.  */
   if (FIXNUMP (c))

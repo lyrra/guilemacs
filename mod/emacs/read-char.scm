@@ -14,6 +14,7 @@
             rc-prologue-xmenu-and-idle-gc!
             rc-prologue-kboard-and-queues!
             rc-wrong-kboard-and-non-reread!
+            rc-bufferp-and-special-event-map!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -150,6 +151,19 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-bufferp-and-special-event-map
+  (delay (%c '--rc-bufferp-and-special-event-map)))
+
+(define (rc-bufferp-and-special-event-map!)
+  "BUFFERP early-exit + special-event-map dispatch.  If state->c
+is a buffer, return `goto-exit'.  Otherwise look up state->c in
+Vspecial_event_map; on hit, execute the bound command via
+call4 Qcommand_execute and return `goto-exit' (when
+current_buffer changed; state->c is reset to -2 first) or
+`goto-retry' (otherwise).  Returns `fall-through' when no
+special command matched.  See docs/keyboard.org §M8k."
+  ((force %rc-bufferp-and-special-event-map)))
+
 (define %rc-wrong-kboard-and-non-reread
   (delay (%c '--rc-wrong-kboard-and-non-reread)))
 
@@ -283,4 +297,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-kboard-and-queues!)
               ;; M8j — wrong_kboard + non_reread loop
               (--rc-wrong-kboard-and-non-reread!
-                                       ,rc-wrong-kboard-and-non-reread!))))
+                                       ,rc-wrong-kboard-and-non-reread!)
+              ;; M8k — BUFFERP + special-event-map dispatch
+              (--rc-bufferp-and-special-event-map!
+                                       ,rc-bufferp-and-special-event-map!))))

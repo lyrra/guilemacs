@@ -95,4 +95,11 @@
 (test-eq "wkbd-nr/fall-through-at-idle"
          'fall-through (--rc-wrong-kboard-and-non-reread!))
 
+;;;; M8k
+
+(test-assert "helpers/rc-bufferp-and-special-event-map"
+             (fboundp '--rc-bufferp-and-special-event-map))
+(test-eq "bufp-special/fall-through-at-idle"
+         'fall-through (--rc-bufferp-and-special-event-map!))
+
 (test-end)
