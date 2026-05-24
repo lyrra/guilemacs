@@ -104,4 +104,13 @@
   ;; `fall-through' before touching anything.
   (should (eq 'fall-through (--rc-prologue-echo-and-menu!))))
 
+;;;; M8g — idle-timer + immediate-echo + auto-save
+
+(ert-deftest m8g-helpers/exist ()
+  (should (fboundp '--rc-prologue-idle-echo-autosave)))
+
+(ert-deftest m8g-idle-echo-autosave/no-op-when-stack-empty ()
+  ;; Outside any in-flight read_char, the subr early-returns nil.
+  (should (eq nil (--rc-prologue-idle-echo-autosave!))))
+
 (provide 'ertest-read-char)

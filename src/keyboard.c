@@ -2987,6 +2987,78 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8g — bulk splice of three sequential pre-blocking-read blocks
+   (idle-timer start, immediate-echo, auto-save).  See
+   docs/keyboard.org §M8g.  */
+DEFUN ("--rc-prologue-idle-echo-autosave",
+       Fc_rc_prologue_idle_echo_autosave,
+       Sc_rc_prologue_idle_echo_autosave, 0, 0, 0,
+       doc: /* Internal: three pure-side-effect blocks before the
+blocking input wait:
+
+  1. timer_start_idle when state->end_time is NULL.
+  2. Maybe start echoing keystrokes (gated on minibuf_level == 0,
+     not in a timed read, no immediate-echo already, etc.).  For
+     mouse-event prev_event: echo immediately.  Otherwise sit_for
+     `echo-keystrokes' seconds then echo if no input arrived.
+  3. Maybe auto-save when commandflag != 0 / -2 and the keystroke
+     counter has crossed the auto-save interval.
+
+Always returns nil; caller falls through.  Mirrors src/keyboard.c
+lines 3483-3538 pre-M8g.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: idle-timer start.  */
+  if (!state->end_time)
+    timer_start_idle ();
+
+  /* Block 2: immediate echo.  */
+  if (minibuf_level == 0
+      && !state->end_time
+      && !current_kboard->immediate_echo
+      && (this_command_key_count > 0
+          || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
+      && !noninteractive
+      && echo_keystrokes_p ()
+      && (NILP (echo_area_buffer[0])
+          || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
+              == BUF_Z (XBUFFER (echo_area_buffer[0])))
+          || (echo_kboard && ok_to_echo_at_next_pause == echo_kboard)
+          || (!echo_kboard && ok_to_echo_at_next_pause)))
+    {
+      /* After a mouse event, start echoing right away.  */
+      if (EVENT_HAS_PARAMETERS (state->prev_event))
+        echo_now ();
+      else
+        {
+          Lisp_Object save_tag = getctag;
+          Lisp_Object tem0 = sit_for (Vecho_keystrokes, 1, 1);
+          if (EQ (tem0, Qt) && !CONSP (Vunread_command_events))
+            echo_now ();
+          getctag = save_tag;
+        }
+    }
+
+  /* Block 3: auto-save by keystroke count.  */
+  if (state->commandflag != 0 && state->commandflag != -2
+      && auto_save_interval > 0
+      && (num_nonmacro_input_events - last_auto_save
+          > max (auto_save_interval, 20))
+      && !detect_input_pending_run_timers (0))
+    {
+      Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
+      /* Hooks may modify buffers during auto-save.  */
+      redisplay ();
+    }
+
+  return Qnil;
+}
+
 /* M8f — bulk splice of the echo-cancel-or-dash + minibuf-menu-prompt
    blocks that follow M8e.  See docs/keyboard.org §M8f.  */
 DEFUN ("--rc-prologue-echo-and-menu",
@@ -3480,62 +3552,17 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — continue.  */
   }
 
-  /* Start idle timers if no time limit is supplied.  We don't do it
-     if a time limit is supplied to avoid an infinite recursion in the
-     situation where an idle timer calls `sit-for'.  */
-
-  if (!end_time)
-    timer_start_idle ();
-
-  /* If in middle of key sequence and minibuffer not active,
-     start echoing if enough time elapses.  */
-
-  if (minibuf_level == 0
-      && !end_time
-      && !current_kboard->immediate_echo
-      && (this_command_key_count > 0
-	  || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
-      && ! noninteractive
-      && echo_keystrokes_p ()
-      && (/* No message.  */
-	  NILP (echo_area_buffer[0])
-	  /* Or empty message.  */
-	  || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
-	      == BUF_Z (XBUFFER (echo_area_buffer[0])))
-	  /* Or already echoing from same kboard.  */
-	  || (echo_kboard && ok_to_echo_at_next_pause == echo_kboard)
-	  /* Or not echoing before and echoing allowed.  */
-	  || (!echo_kboard && ok_to_echo_at_next_pause)))
-    {
-      /* After a mouse event, start echoing right away.
-	 This is because we are probably about to display a menu,
-	 and we don't want to delay before doing so.  */
-      if (EVENT_HAS_PARAMETERS (prev_event))
-	echo_now ();
-      else
-	{
-	  Lisp_Object tem0;
-          Lisp_Object save_tag = Qnil;
-          save_tag = getctag;
-	  tem0 = sit_for (Vecho_keystrokes, 1, 1);
-	  if (EQ (tem0, Qt)
-	      && ! CONSP (Vunread_command_events))
-	    echo_now ();
-          getctag = save_tag;
-	}
-    }
-
-  /* Maybe auto save due to number of keystrokes.  */
-
-  if (commandflag != 0 && commandflag != -2
-      && auto_save_interval > 0
-      && num_nonmacro_input_events - last_auto_save > max (auto_save_interval, 20)
-      && !detect_input_pending_run_timers (0))
-    {
-      Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
-      /* Hooks can actually change some buffers in auto save.  */
-      redisplay ();
-    }
+  /* M8g: idle-timer + immediate-echo + auto-save ported to Scheme
+     `rc-prologue-idle-echo-autosave!'.  All three blocks are pure
+     side effects with fall-through.  See docs/keyboard.org §M8g.  */
+  {
+    static SCM rc_idle_echo_autosave_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_idle_echo_autosave_proc))
+      rc_idle_echo_autosave_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-prologue-idle-echo-autosave!");
+    SCM_CALL_0 (rc_idle_echo_autosave_proc);
+  }
 
   /* Try reading using an X menu.
      This is never confused with reading using the minibuf

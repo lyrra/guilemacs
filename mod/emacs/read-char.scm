@@ -10,6 +10,7 @@
             rc-prologue-macro-or-switch-frame!
             rc-prologue-redisplay!
             rc-prologue-echo-and-menu!
+            rc-prologue-idle-echo-autosave!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -146,6 +147,16 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-prologue-idle-echo-autosave
+  (delay (%c '--rc-prologue-idle-echo-autosave)))
+
+(define (rc-prologue-idle-echo-autosave!)
+  "Three pure-side-effect blocks before the blocking input wait:
+idle-timer start, immediate-echo start (with sit_for delay for
+non-mouse events), and auto-save by keystroke count.  Always
+returns nil — caller falls through.  See docs/keyboard.org §M8g."
+  ((force %rc-prologue-idle-echo-autosave)))
+
 (define %rc-prologue-echo-and-menu
   (delay (%c '--rc-prologue-echo-and-menu)))
 
@@ -217,4 +228,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-redisplay!)
               ;; M8f — echo-cancel + minibuf-menu-prompt
               (--rc-prologue-echo-and-menu!
-                                       ,rc-prologue-echo-and-menu!))))
+                                       ,rc-prologue-echo-and-menu!)
+              ;; M8g — idle-timer + immediate-echo + auto-save
+              (--rc-prologue-idle-echo-autosave!
+                                       ,rc-prologue-idle-echo-autosave!))))

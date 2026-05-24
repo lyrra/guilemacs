@@ -67,4 +67,11 @@
 (test-eq "echo-menu/fall-through-at-idle"
          'fall-through (--rc-prologue-echo-and-menu!))
 
+;;;; M8g
+
+(test-assert "helpers/rc-prologue-idle-echo-autosave"
+             (fboundp '--rc-prologue-idle-echo-autosave))
+(test-eq "idle-echo-autosave/no-op-when-stack-empty"
+         nil (--rc-prologue-idle-echo-autosave!))
+
 (test-end)
