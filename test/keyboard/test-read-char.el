@@ -74,4 +74,11 @@
 (test-eq "idle-echo-autosave/no-op-when-stack-empty"
          nil (--rc-prologue-idle-echo-autosave!))
 
+;;;; M8h
+
+(test-assert "helpers/rc-prologue-xmenu-and-idle-gc"
+             (fboundp '--rc-prologue-xmenu-and-idle-gc))
+(test-eq "xmenu-and-idle-gc/fall-through-at-idle"
+         'fall-through (--rc-prologue-xmenu-and-idle-gc!))
+
 (test-end)

@@ -11,6 +11,7 @@
             rc-prologue-redisplay!
             rc-prologue-echo-and-menu!
             rc-prologue-idle-echo-autosave!
+            rc-prologue-xmenu-and-idle-gc!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -147,6 +148,21 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-prologue-xmenu-and-idle-gc
+  (delay (%c '--rc-prologue-xmenu-and-idle-gc)))
+
+(define (rc-prologue-xmenu-and-idle-gc!)
+  "X-menu read + auto-save-by-idle-timeout + GC blocks after M8g.
+Block 1: when KEYMAPP(map) && INTERACTIVE && prev-event has
+parameters && head not menu/tab/tool-bar && no unread events,
+install state->c from read_char_x_menu_prompt, stop the idle
+timer if not timed, return `goto-exit'.  Block 2: pure fall-
+through — buffer-size-scaled sit_for + Fdo_auto_save + redisplay
+when the auto-save threshold is crossed, then GC_collect_a_little
+if no input pending.  Returns `goto-exit' or `fall-through'.  See
+docs/keyboard.org §M8h."
+  ((force %rc-prologue-xmenu-and-idle-gc)))
+
 (define %rc-prologue-idle-echo-autosave
   (delay (%c '--rc-prologue-idle-echo-autosave)))
 
@@ -231,4 +247,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-echo-and-menu!)
               ;; M8g — idle-timer + immediate-echo + auto-save
               (--rc-prologue-idle-echo-autosave!
-                                       ,rc-prologue-idle-echo-autosave!))))
+                                       ,rc-prologue-idle-echo-autosave!)
+              ;; M8h — X-menu + auto-save-by-idle-timeout + GC
+              (--rc-prologue-xmenu-and-idle-gc!
+                                       ,rc-prologue-xmenu-and-idle-gc!))))

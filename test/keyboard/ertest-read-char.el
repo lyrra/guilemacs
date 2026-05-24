@@ -113,4 +113,14 @@
   ;; Outside any in-flight read_char, the subr early-returns nil.
   (should (eq nil (--rc-prologue-idle-echo-autosave!))))
 
+;;;; M8h — X-menu + auto-save-by-idle-timeout + GC
+
+(ert-deftest m8h-helpers/exist ()
+  (should (fboundp '--rc-prologue-xmenu-and-idle-gc)))
+
+(ert-deftest m8h-xmenu-idle-gc/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching anything.
+  (should (eq 'fall-through (--rc-prologue-xmenu-and-idle-gc!))))
+
 (provide 'ertest-read-char)

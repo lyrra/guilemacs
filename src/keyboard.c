@@ -2987,6 +2987,105 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8h — bulk splice of the X-menu reading block + auto-save-by-
+   idle-timeout + GC blocks that follow M8g.  See
+   docs/keyboard.org §M8h.  */
+DEFUN ("--rc-prologue-xmenu-and-idle-gc",
+       Fc_rc_prologue_xmenu_and_idle_gc,
+       Sc_rc_prologue_xmenu_and_idle_gc, 0, 0, 0,
+       doc: /* Internal: two sequential prologue blocks after M8g.
+
+  Block 1: X-menu read.  When KEYMAPP(map) && INTERACTIVE &&
+    prev_event is non-nil with parameters && head not menu/tab/
+    tool-bar && no unread events: call read_char_x_menu_prompt to
+    install state->c, stop the idle timer if not in a timed read,
+    and return `goto-exit'.
+
+  Block 2: Maybe auto-save and/or GC due to idleness.  When
+    INTERACTIVE && state->c is nil: compute a buffer-size-scaled
+    delay_level, then if commandflag != 0/-2 and the auto-save
+    threshold is crossed with positive Vauto_save_timeout, sit_for
+    that many seconds and on timeout fire Fdo_auto_save + redisplay.
+    Then GC_collect_a_little if no input is pending.  Always falls
+    through.
+
+  Returns `goto-exit' (X-menu fired) or `fall-through'.  Mirrors
+  src/keyboard.c lines 3567-3635 pre-M8h.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: X-menu read.  */
+  if (KEYMAPP (state->map) && INTERACTIVE
+      && !NILP (state->prev_event)
+      && EVENT_HAS_PARAMETERS (state->prev_event)
+      && !EQ (XCAR (state->prev_event), Qmenu_bar)
+      && !EQ (XCAR (state->prev_event), Qtab_bar)
+      && !EQ (XCAR (state->prev_event), Qtool_bar)
+      /* Don't bring up a menu if we already have another event.  */
+      && !CONSP (Vunread_command_events))
+    {
+      state->c = read_char_x_menu_prompt (state->map, state->prev_event,
+                                          state->used_mouse_menu);
+      /* Now that we have read an event, Emacs is not idle.  */
+      if (!state->end_time)
+        timer_stop_idle ();
+      return intern ("goto-exit");
+    }
+
+  /* Block 2: maybe autosave and/or GC due to idleness.  */
+  if (INTERACTIVE && NILP (state->c))
+    {
+      int delay_level;
+      ptrdiff_t buffer_size;
+
+      /* Slow down auto saves logarithmically in size of current buffer,
+         and garbage collect while we're at it.  */
+      if (! MINI_WINDOW_P (XWINDOW (selected_window)))
+        last_non_minibuf_size = Z - BEG;
+      buffer_size = (last_non_minibuf_size >> 8) + 1;
+      delay_level = 0;
+      while (buffer_size > 64)
+        delay_level++, buffer_size -= buffer_size >> 2;
+      if (delay_level < 4) delay_level = 4;
+      /* delay_level is 4 for files under around 50k, 7 at 100k,
+         9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
+
+      /* Auto save if enough time goes by without input.  */
+      if (state->commandflag != 0 && state->commandflag != -2
+          && num_nonmacro_input_events > last_auto_save
+          && FIXNUMP (Vauto_save_timeout)
+          && XFIXNUM (Vauto_save_timeout) > 0)
+        {
+          Lisp_Object tem0;
+          Lisp_Object save_tag = Qnil;
+          EMACS_INT timeout = XFIXNAT (Vauto_save_timeout);
+
+          timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
+          timeout = delay_level * timeout / 4;
+          save_tag = getctag;
+          tem0 = sit_for (make_fixnum (timeout), 1, 1);
+
+          if (EQ (tem0, Qt)
+              && ! CONSP (Vunread_command_events))
+            {
+              Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
+              /* Hooks may modify buffers during auto-save.  */
+              redisplay ();
+            }
+        }
+
+      /* If there is still no input available, ask for GC.  */
+      if (!detect_input_pending_run_timers (0))
+        GC_collect_a_little ();
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8g — bulk splice of three sequential pre-blocking-read blocks
    (idle-timer start, immediate-echo, auto-save).  See
    docs/keyboard.org §M8g.  */
@@ -3564,75 +3663,21 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     SCM_CALL_0 (rc_idle_echo_autosave_proc);
   }
 
-  /* Try reading using an X menu.
-     This is never confused with reading using the minibuf
-     because the recursive call of read_char in read_char_minibuf_menu_prompt
-     does not pass on any keymaps.  */
-
-  if (KEYMAPP (map) && INTERACTIVE
-      && !NILP (prev_event)
-      && EVENT_HAS_PARAMETERS (prev_event)
-      && !EQ (XCAR (prev_event), Qmenu_bar)
-      && !EQ (XCAR (prev_event), Qtab_bar)
-      && !EQ (XCAR (prev_event), Qtool_bar)
-      /* Don't bring up a menu if we already have another event.  */
-      && !CONSP (Vunread_command_events))
-    {
-      c = read_char_x_menu_prompt (map, prev_event, used_mouse_menu);
-
-      /* Now that we have read an event, Emacs is not idle.  */
-      if (!end_time)
-	timer_stop_idle ();
-
+  /* M8h: X-menu reading block + auto-save-by-idle-timeout + GC
+     blocks ported to Scheme `rc-prologue-xmenu-and-idle-gc!'.
+     Returns `goto-exit' (X-menu fired) or `fall-through'.  See
+     docs/keyboard.org §M8h.  */
+  {
+    static SCM rc_xmenu_idle_gc_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_xmenu_idle_gc_proc))
+      rc_xmenu_idle_gc_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-prologue-xmenu-and-idle-gc!");
+    SCM result = SCM_CALL_0 (rc_xmenu_idle_gc_proc);
+    if (scm_is_eq (result, intern ("goto-exit")))
       goto exit;
-    }
-
-  /* Maybe autosave and/or garbage collect due to idleness.  */
-
-  if (INTERACTIVE && NILP (c))
-    {
-      int delay_level;
-      ptrdiff_t buffer_size;
-
-      /* Slow down auto saves logarithmically in size of current buffer,
-	 and garbage collect while we're at it.  */
-      if (! MINI_WINDOW_P (XWINDOW (selected_window)))
-	last_non_minibuf_size = Z - BEG;
-      buffer_size = (last_non_minibuf_size >> 8) + 1;
-      delay_level = 0;
-      while (buffer_size > 64)
-	delay_level++, buffer_size -= buffer_size >> 2;
-      if (delay_level < 4) delay_level = 4;
-      /* delay_level is 4 for files under around 50k, 7 at 100k,
-	 9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
-
-      /* Auto save if enough time goes by without input.  */
-      if (commandflag != 0 && commandflag != -2
-	  && num_nonmacro_input_events > last_auto_save
-	  && FIXNUMP (Vauto_save_timeout)
-	  && XFIXNUM (Vauto_save_timeout) > 0)
-	{
-	  Lisp_Object tem0;
-          Lisp_Object save_tag = Qnil;
-	  EMACS_INT timeout = XFIXNAT (Vauto_save_timeout);
-
-	  timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
-	  timeout = delay_level * timeout / 4;
-          save_tag = getctag;
-	  tem0 = sit_for (make_fixnum (timeout), 1, 1);
-
-	  if (EQ (tem0, Qt)
-	      && ! CONSP (Vunread_command_events))
-	    {
-	      Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
-	      redisplay ();
-	    }
-	}
-
-      /* If there is still no input available, ask for GC.  */
-      if (!detect_input_pending_run_timers (0))
-	GC_collect_a_little ();
-    }
+    /* else: `fall-through' — continue.  */
+  }
 
   /* Notify the caller if an autosave hook, or a timer, sentinel or
      filter in the sit_for calls above have changed the current
