@@ -664,4 +664,14 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (let ((v (--rks-new-binding)))
     (should (or (eq v nil) v))))
 
+;;;; M6ac — mouse-click prefix expansion
+
+(ert-deftest m6ac-helpers/exist ()
+  (should (fboundp '--rks-iter-mouse-click-prefix)))
+
+(ert-deftest m6ac-mouse-click/fall-through-at-idle ()
+  ;; rks_key is nil at idle (no in-flight read).  No mouse-event
+  ;; parameters present — subr returns `fall-through'.
+  (should (eq 'fall-through (--rks-iter-mouse-click-prefix!))))
+
 (provide 'ertest-read-key-sequence)

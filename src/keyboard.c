@@ -10446,6 +10446,137 @@ static bool        rks_used_mouse_menu_history[READ_KEY_ELTS];
    step.  See docs/keyboard.org §M6ab.  */
 static Lisp_Object rks_new_binding;
 
+/* M6ac — promote fake_prefixed_keys (list of keys for which we
+   generated a fake prefix like `mode-line').  Reset to Qnil at
+   read_key_sequence entry.  See docs/keyboard.org §M6ac.  */
+static Lisp_Object rks_fake_prefixed_keys;
+
+/* M6ac — bulk splice of the mouse-click prefix expansion (and
+   menu-bar / tab-bar / tool-bar prefix insertion).  Returns one of:
+     `replay-sequence' — buffer-switch or menu-bar fake prefix.
+                         Caller goto replay_sequence.
+     `replay-key' — mode-line / scroll-bar fake prefix.
+                    Caller goto replay_key.
+     `fall-through' — no decoration applied.  Caller continues to
+                      the follow_key dispatch.
+   See docs/keyboard.org §M6ac.  */
+DEFUN ("--rks-iter-mouse-click-prefix",
+       Fc_rks_iter_mouse_click_prefix,
+       Sc_rks_iter_mouse_click_prefix, 0, 0, 0,
+       doc: /* Internal: mouse-click prefix expansion for the
+read_key_sequence iteration body.  See M6ac.  */)
+  (void)
+{
+  if (!EVENT_HAS_PARAMETERS (rks_key))
+    return intern ("fall-through");
+
+  Lisp_Object *keybuf = rks_keybuf_depth > 0
+    ? rks_keybuf_stack[rks_keybuf_depth - 1] : NULL;
+
+  Lisp_Object kind = EVENT_HEAD_KIND (EVENT_HEAD (rks_key));
+  if (EQ (kind, Qmouse_click) || EQ (kind, Qtouchscreen))
+    {
+      Lisp_Object window = POSN_WINDOW (EVENT_START (rks_key));
+      Lisp_Object posn   = POSN_POSN (EVENT_START (rks_key));
+
+      if (CONSP (posn)
+          || (!NILP (rks_fake_prefixed_keys)
+              && !NILP (Fmemq (rks_key, rks_fake_prefixed_keys))))
+        {
+          /* We're looking a second time at an event for which we
+             generated a fake prefix key.  Set last_real_key_start.  */
+          if (rks_t > 0)
+            rks_last_real_key_start = rks_t - 1;
+        }
+
+      if (rks_last_real_key_start == 0)
+        {
+          /* Key sequences beginning with mouse clicks are read using
+             the keymaps in the buffer clicked on.  Switch buffers if
+             we're at the beginning of a key sequence.  */
+          if (WINDOWP (window)
+              && BUFFERP (XWINDOW (window)->contents)
+              && XBUFFER (XWINDOW (window)->contents) != current_buffer)
+            {
+              if (keybuf)
+                keybuf[rks_t] = rks_key;
+              rks_mock_input = rks_t + 1;
+
+              record_unwind_current_buffer ();
+
+              if (! FRAME_LIVE_P (XFRAME (selected_frame)))
+                Fkill_emacs (Qnil, Qnil);
+              set_buffer_internal (XBUFFER (XWINDOW (window)->contents));
+              return intern ("replay-sequence");
+            }
+        }
+
+      /* Expand mode-line and scroll-bar events into two events:
+         use posn as a fake prefix key.  */
+      if (SYMBOLP (posn)
+          && (NILP (rks_fake_prefixed_keys)
+              || NILP (Fmemq (rks_key, rks_fake_prefixed_keys))))
+        {
+          if (READ_KEY_ELTS - rks_t <= 1)
+            error ("Key sequence too long");
+
+          if (keybuf)
+            {
+              keybuf[rks_t]     = posn;
+              keybuf[rks_t + 1] = rks_key;
+            }
+          rks_mock_input = rks_t + 2;
+
+          /* Record that a fake prefix key has been generated for KEY.
+             Don't modify the event; this would prevent proper action
+             when the event is pushed back into unread-command-events.  */
+          rks_fake_prefixed_keys = Fcons (rks_key, rks_fake_prefixed_keys);
+          return intern ("replay-key");
+        }
+    }
+  else if (CONSP (XCDR (rks_key))
+           && CONSP (xevent_start (rks_key))
+           && CONSP (XCDR (xevent_start (rks_key))))
+    {
+      Lisp_Object posn = POSN_POSN (xevent_start (rks_key));
+      /* Handle menu-bar events: insert the dummy prefix event
+         `menu-bar' / `tab-bar' / `tool-bar'.  */
+      if ((EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
+           || EQ (posn, Qtool_bar))
+          /* Only insert the prefix key if the event comes directly
+             from the keyboard buffer.  Key translation functions
+             might return events with a `posn-area' of tool-bar or
+             tab-bar without intending for these prefix events to
+             be generated.  */
+          && (rks_mock_input <= rks_t))
+        {
+          if (READ_KEY_ELTS - rks_t <= 1)
+            error ("Key sequence too long");
+          if (keybuf)
+            {
+              keybuf[rks_t]     = posn;
+              keybuf[rks_t + 1] = rks_key;
+            }
+
+          /* Zap the position in key, so we know that we've expanded
+             it, and don't try to do so again.  */
+          POSN_SET_POSN (xevent_start (rks_key), list1 (posn));
+
+          rks_mock_input = rks_t + 2;
+          return intern ("replay-sequence");
+        }
+      else if (CONSP (posn))
+        {
+          /* We're looking at the second event of a sequence which we
+             expanded before.  Set last_real_key_start.  */
+          if (rks_last_real_key_start == rks_t && rks_t > 0)
+            rks_last_real_key_start = rks_t - 1;
+        }
+    }
+
+  return intern ("fall-through");
+}
+
 DEFUN ("--rks-follow-key-and-update-first-unbound",
        Fc_rks_follow_key_and_update_first_unbound,
        Sc_rks_follow_key_and_update_first_unbound, 0, 0, 0,
@@ -11395,7 +11526,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #define starting_buffer rks_starting_buffer
 
   /* List of events for which a fake prefix key has been generated.  */
-  Lisp_Object fake_prefixed_keys = Qnil;
+  /* M6ac: fake_prefixed_keys promoted to file-static rks_fake_prefixed_keys.
+     Reset to Qnil at function entry (the original local initialization).  */
+#define fake_prefixed_keys rks_fake_prefixed_keys
+  fake_prefixed_keys = Qnil;
 
   /* raw_keybuf_count is now initialized in (most of) the callers of
      read_key_sequence.  This is so that in a recursive call (for
@@ -11840,133 +11974,26 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	 cached-SCM dispatch when its return was `mock'.  rks_key
 	 and rks_used_mouse_menu are valid at this point.  */
 
-      /* Clicks in non-text areas get prefixed by the symbol
-	 in their CHAR-ADDRESS field.  For example, a click on
-	 the mode line is prefixed by the symbol `mode-line'.
-
-	 Furthermore, key sequences beginning with mouse clicks
-	 are read using the keymaps of the buffer clicked on, not
-	 the current buffer.  So we may have to switch the buffer
-	 here.
-
-	 When we turn one event into two events, we must make sure
-	 that neither of the two looks like the original--so that,
-	 if we replay the events, they won't be expanded again.
-	 If not for this, such reexpansion could happen either here
-	 or when user programs play with this-command-keys.  */
-      if (EVENT_HAS_PARAMETERS (key))
-	{
-	  Lisp_Object kind = EVENT_HEAD_KIND (EVENT_HEAD (key));
-	  if (EQ (kind, Qmouse_click) || EQ (kind, Qtouchscreen))
-	    {
-	      Lisp_Object window = POSN_WINDOW (EVENT_START (key));
-	      Lisp_Object posn = POSN_POSN (EVENT_START (key));
-
-	      if (CONSP (posn)
-		  || (!NILP (fake_prefixed_keys)
-		      && !NILP (Fmemq (key, fake_prefixed_keys))))
-		{
-		  /* We're looking a second time at an event for which
-		     we generated a fake prefix key.  Set
-		     last_real_key_start appropriately.  */
-		  if (t > 0)
-		    last_real_key_start = t - 1;
-		}
-
-	      if (last_real_key_start == 0)
-		{
-		  /* Key sequences beginning with mouse clicks are
-		     read using the keymaps in the buffer clicked on,
-		     not the current buffer.  If we're at the
-		     beginning of a key sequence, switch buffers.  */
-		  if (WINDOWP (window)
-		      && BUFFERP (XWINDOW (window)->contents)
-		      && XBUFFER (XWINDOW (window)->contents) != current_buffer)
-		    {
-		      keybuf[t] = key;
-		      mock_input = t + 1;
-
-		      /* Arrange to go back to the original buffer once we're
-			 done reading the key sequence.  Note that we can't
-			 use save_excursion_{save,restore} here, because they
-			 save point as well as the current buffer; we don't
-			 want to save point, because redisplay may change it,
-			 to accommodate a Fset_window_start or something.  We
-			 don't want to do this at the top of the function,
-			 because we may get input from a subprocess which
-			 wants to change the selected window and stuff (say,
-			 emacsclient).  */
-		      record_unwind_current_buffer ();
-
-		      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-			Fkill_emacs (Qnil, Qnil);
-		      set_buffer_internal (XBUFFER (XWINDOW (window)->contents));
-		      goto replay_sequence;
-		    }
-		}
-
-	      /* Expand mode-line and scroll-bar events into two events:
-		 use posn as a fake prefix key.  */
-	      if (SYMBOLP (posn)
-		  && (NILP (fake_prefixed_keys)
-		      || NILP (Fmemq (key, fake_prefixed_keys))))
-		{
-		  if (READ_KEY_ELTS - t <= 1)
-		    error ("Key sequence too long");
-
-		  keybuf[t]     = posn;
-		  keybuf[t + 1] = key;
-		  mock_input    = t + 2;
-
-		  /* Record that a fake prefix key has been generated
-		     for KEY.  Don't modify the event; this would
-		     prevent proper action when the event is pushed
-		     back into unread-command-events.  */
-		  fake_prefixed_keys = Fcons (key, fake_prefixed_keys);
-		  goto replay_key;
-		}
-	    }
-	  else if (CONSP (XCDR (key))
-		   && CONSP (xevent_start (key))
-		   && CONSP (XCDR (xevent_start (key))))
-	    {
-	      Lisp_Object posn;
-
-	      posn = POSN_POSN (xevent_start (key));
-	      /* Handle menu-bar events:
-		 insert the dummy prefix event `menu-bar'.  */
-	      if ((EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
-		   || EQ (posn, Qtool_bar))
-		  /* Only insert the prefix key if the event comes
-		     directly from the keyboard buffer.  Key
-		     translation functions might return events with a
-		     `posn-area' of tool-bar or tab-bar without
-		     intending for these prefix events to be
-		     generated.  */
-		  && (mock_input <= t))
-		{
-		  if (READ_KEY_ELTS - t <= 1)
-		    error ("Key sequence too long");
-		  keybuf[t] = posn;
-		  keybuf[t + 1] = key;
-
-		  /* Zap the position in key, so we know that we've
-		     expanded it, and don't try to do so again.  */
-		  POSN_SET_POSN (xevent_start (key), list1 (posn));
-
-		  mock_input = t + 2;
-		  goto replay_sequence;
-		}
-	      else if (CONSP (posn))
-		{
-		  /* We're looking at the second event of a
-		     sequence which we expanded before.  Set
-		     last_real_key_start appropriately.  */
-		  if (last_real_key_start == t && t > 0)
-		    last_real_key_start = t - 1;
-		}
-	    }
-	}
+      /* M6ac: mouse-click prefix expansion ported to Scheme
+	 `rks-iter-mouse-click-prefix!'.  Decorates rks_key with
+	 mode-line / menu-bar / tab-bar / tool-bar / scroll-bar
+	 prefixes, handles buffer-switch for clicks at sequence
+	 start.  Returns one of `replay-sequence' / `replay-key' /
+	 `fall-through' for 3-way control flow.  See
+	 docs/keyboard.org §M6ac.  */
+      {
+	static SCM rks_mouse_click_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_mouse_click_proc))
+	  rks_mouse_click_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-mouse-click-prefix!");
+	SCM result = SCM_CALL_0 (rks_mouse_click_proc);
+	if (scm_is_eq (result, intern ("replay-sequence")))
+	  goto replay_sequence;
+	if (scm_is_eq (result, intern ("replay-key")))
+	  goto replay_key;
+	/* else: `fall-through' — continue to follow_key dispatch.  */
+      }
 
       /* M6ab: follow_key + first_unbound update ported to Scheme
 	 `rks-follow-key-and-update-first-unbound!'.  Returns t iff
@@ -12286,6 +12313,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef used_mouse_menu
 #undef used_mouse_menu_history
 #undef new_binding
+#undef fake_prefixed_keys
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
@@ -13850,6 +13878,8 @@ syms_of_keyboard (void)
   staticpro (&rks_key);
   rks_new_binding          = Qnil;
   staticpro (&rks_new_binding);
+  rks_fake_prefixed_keys   = Qnil;
+  staticpro (&rks_fake_prefixed_keys);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;

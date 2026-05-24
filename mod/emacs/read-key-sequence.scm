@@ -45,6 +45,7 @@
             rks-iter-pre-read-cascade!
             rks-iter-install-binding!
             rks-follow-key-and-update-first-unbound!
+            rks-iter-mouse-click-prefix!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -622,6 +623,18 @@ this-command-key-count into the file-static rks_echo_local_start
 to them.  See docs/keyboard.org §M6y."
   ((force %rks-iter-setup-capture)))
 
+(define %rks-iter-mouse-click-prefix
+  (delay (%c '--rks-iter-mouse-click-prefix)))
+
+(define (rks-iter-mouse-click-prefix!)
+  "Decorate rks_key with mouse-click prefix events when applicable:
+mode-line / scroll-bar fake prefix (with replay_key follow-up),
+menu-bar / tab-bar / tool-bar prefix insertion, or buffer-switch
+for clicks at the start of a key sequence.  Returns one of
+`replay-sequence', `replay-key', or `fall-through' for 3-way
+C control flow.  See docs/keyboard.org §M6ac."
+  ((force %rks-iter-mouse-click-prefix)))
+
 (define %rks-follow-key-and-update-first-unbound
   (delay (%c '--rks-follow-key-and-update-first-unbound)))
 
@@ -907,4 +920,7 @@ cached-dispatch into here."
                ,rks-iter-install-binding!)
               ;; M6ab — follow_key + first_unbound update
               (--rks-follow-key-and-update-first-unbound!
-               ,rks-follow-key-and-update-first-unbound!))))
+               ,rks-follow-key-and-update-first-unbound!)
+              ;; M6ac — mouse-click prefix expansion
+              (--rks-iter-mouse-click-prefix!
+               ,rks-iter-mouse-click-prefix!))))

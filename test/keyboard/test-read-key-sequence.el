@@ -435,4 +435,11 @@
 (test-eq "m6ab/follow-key-nil-at-idle"
          nil (--rks-follow-key-and-update-first-unbound))
 
+;;;; M6ac
+
+(test-assert "m6ac-helper/mouse-click-prefix"
+             (fboundp '--rks-iter-mouse-click-prefix))
+(test-eq "m6ac/fall-through-at-idle"
+         'fall-through (--rks-iter-mouse-click-prefix!))
+
 (test-end)
