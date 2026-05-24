@@ -84,4 +84,14 @@
   ;; startup; subr returns `fall-through'.
   (should (eq 'fall-through (--rc-prologue-macro-or-switch-frame!))))
 
+;;;; M8e — redisplay loop
+
+(ert-deftest m8e-helpers/exist ()
+  (should (fboundp '--rc-prologue-redisplay)))
+
+(ert-deftest m8e-redisplay/no-op-when-stack-empty ()
+  ;; Outside any in-flight read_char, the subr early-returns nil
+  ;; without touching the redisplay machinery.
+  (should (eq nil (--rc-prologue-redisplay!))))
+
 (provide 'ertest-read-char)

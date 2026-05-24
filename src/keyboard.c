@@ -2987,6 +2987,62 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8e — bulk splice of the `if (commandflag >= 0)' redisplay block
+   that follows M8d.  Always returns nil (no control transfer);
+   caller falls through to the next inline block.  See
+   docs/keyboard.org §M8e.  */
+DEFUN ("--rc-prologue-redisplay",
+       Fc_rc_prologue_redisplay, Sc_rc_prologue_redisplay, 0, 0, 0,
+       doc: /* Internal: redisplay loop in the read_char_1 prologue.
+When state->commandflag >= 0: swallow non-user-visible events,
+redisplay up to convergence (input_pending && input_was_pending),
+and pin echo_message_buffer to the current echo-area when called
+from `read-event' (commandflag == 0).  Mirrors src/keyboard.c
+lines 3316-3351 pre-M8e.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  if (state->commandflag < 0)
+    return Qnil;
+
+  bool echo_current = EQ (echo_message_buffer, echo_area_buffer[0]);
+
+  /* If there is pending input, process any events which are not
+     user-visible, such as X selection_request events.  */
+  if (input_pending || detect_input_pending_run_timers (0))
+    swallow_events (false);                       /* May clear input_pending.  */
+
+  /* Redisplay if no pending input.  */
+  while (!(input_pending && input_was_pending))
+    {
+      input_was_pending = input_pending;
+      if (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
+        redisplay_preserve_echo_area (5);
+      else
+        redisplay ();
+
+      if (!input_pending)
+        /* Normal case: no input arrived during redisplay.  */
+        break;
+
+      /* Input arrived and pre-empted redisplay.
+         Process any events which are not user-visible.  */
+      swallow_events (false);
+      /* If that cleared input_pending, try again to redisplay.  */
+    }
+
+  /* Prevent the redisplay we just did from messing up echoing of the
+     input after the prompt.  */
+  if (state->commandflag == 0 && echo_current)
+    echo_message_buffer = echo_area_buffer[0];
+
+  return Qnil;
+}
+
 /* M8d — bulk splice of the kbd-macro + unread-switch-frame
    early-exit blocks that follow the M8c drain.  See
    docs/keyboard.org §M8d.  */
@@ -3313,42 +3369,16 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — continue.  */
   }
 
-  /* If redisplay was requested.  */
-  if (commandflag >= 0)
-    {
-      bool echo_current = EQ (echo_message_buffer, echo_area_buffer[0]);
-
-	/* If there is pending input, process any events which are not
-	   user-visible, such as X selection_request events.  */
-      if (input_pending
-	  || detect_input_pending_run_timers (0))
-	swallow_events (false);		/* May clear input_pending.  */
-
-      /* Redisplay if no pending input.  */
-      while (!(input_pending && input_was_pending))
-	{
-	  input_was_pending = input_pending;
-	  if (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
-	    redisplay_preserve_echo_area (5);
-	  else
-	    redisplay ();
-
-	  if (!input_pending)
-	    /* Normal case: no input arrived during redisplay.  */
-	    break;
-
-	  /* Input arrived and pre-empted redisplay.
-	     Process any events which are not user-visible.  */
-	  swallow_events (false);
-	  /* If that cleared input_pending, try again to redisplay.  */
-	}
-
-      /* Prevent the redisplay we just did
-	 from messing up echoing of the input after the prompt.  */
-      if (commandflag == 0 && echo_current)
-	echo_message_buffer = echo_area_buffer[0];
-
-    }
+  /* M8e: redisplay loop ported to Scheme `rc-prologue-redisplay!'.
+     Always returns nil; caller falls through.  See
+     docs/keyboard.org §M8e.  */
+  {
+    static SCM rc_redisplay_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_redisplay_proc))
+      rc_redisplay_proc = scm_c_public_ref ("emacs read-char",
+                                            "rc-prologue-redisplay!");
+    SCM_CALL_0 (rc_redisplay_proc);
+  }
 
   /* Message turns off echoing unless more keystrokes turn it on again.
 

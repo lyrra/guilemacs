@@ -53,4 +53,11 @@
 (test-eq "macro-sf/fall-through-at-idle"
          'fall-through (--rc-prologue-macro-or-switch-frame!))
 
+;;;; M8e
+
+(test-assert "helpers/rc-prologue-redisplay"
+             (fboundp '--rc-prologue-redisplay))
+(test-eq "redisplay/no-op-when-stack-empty"
+         nil (--rc-prologue-redisplay!))
+
 (test-end)

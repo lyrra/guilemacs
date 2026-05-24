@@ -8,6 +8,7 @@
             ;; M8c — read_char_1 splices
             rc-prologue-drain-unread!
             rc-prologue-macro-or-switch-frame!
+            rc-prologue-redisplay!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -144,6 +145,17 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-prologue-redisplay
+  (delay (%c '--rc-prologue-redisplay)))
+
+(define (rc-prologue-redisplay!)
+  "Redisplay loop in the read_char_1 prologue.  When the current
+read_char's commandflag is >= 0, swallow non-user-visible events
+and redisplay until convergence, then pin echo_message_buffer
+when commandflag == 0.  Always returns nil — caller falls
+through.  See docs/keyboard.org §M8e."
+  ((force %rc-prologue-redisplay)))
+
 (define %rc-prologue-macro-or-switch-frame
   (delay (%c '--rc-prologue-macro-or-switch-frame)))
 
@@ -186,4 +198,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-drain-unread!)
               ;; M8d — kbd-macro / switch-frame early-exit
               (--rc-prologue-macro-or-switch-frame!
-                                       ,rc-prologue-macro-or-switch-frame!))))
+                                       ,rc-prologue-macro-or-switch-frame!)
+              ;; M8e — redisplay loop
+              (--rc-prologue-redisplay!
+                                       ,rc-prologue-redisplay!))))
