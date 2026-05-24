@@ -123,4 +123,24 @@
   ;; `fall-through' before touching anything.
   (should (eq 'fall-through (--rc-prologue-xmenu-and-idle-gc!))))
 
+;;;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard
+
+(ert-deftest m8i-helpers/exist ()
+  (should (fboundp '--rc-prologue-kboard-and-queues)))
+
+(ert-deftest m8i-kboard-queues/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' without touching kboard or queue state.
+  (should (eq 'fall-through (--rc-prologue-kboard-and-queues!))))
+
+;;;; M8j — wrong_kboard + non_reread loop
+
+(ert-deftest m8j-helpers/exist ()
+  (should (fboundp '--rc-wrong-kboard-and-non-reread)))
+
+(ert-deftest m8j-wkbd-nr/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching read_decoded_event_from_main_queue.
+  (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!))))
+
 (provide 'ertest-read-char)

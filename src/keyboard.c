@@ -2987,6 +2987,172 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8j — bulk splice of the wrong_kboard: + non_reread: blocks.
+   Internally loops the blocking read + redisplay-on-nil sequence
+   so the original `goto wrong_kboard;' becomes a `continue'.
+   See docs/keyboard.org §M8j.  */
+DEFUN ("--rc-wrong-kboard-and-non-reread",
+       Fc_rc_wrong_kboard_and_non_reread,
+       Sc_rc_wrong_kboard_and_non_reread, 0, 0, 0,
+       doc: /* Internal: blocking read + non-reread fixup loop.
+
+  Block A (wrong_kboard:): when NILP(state->c), call
+    read_decoded_event_from_main_queue.  On NILP + end_time
+    expired, return `goto-exit'.  On result == -2 fixnum,
+    return `return-wrong-kboard'.  Otherwise peel Qt /
+    Qno_record wrappers, setting state->recorded as needed.
+
+  Block B (non_reread:): if state->end_time is NULL,
+    timer_stop_idle.  If state->c is still nil and
+    commandflag >= 0 with no input pending, redisplay and
+    loop back to Block A.
+
+  Returns `goto-exit', `return-wrong-kboard', or `fall-through'
+  (state->c is non-nil on fall-through).  Mirrors src/keyboard.c
+  lines 3792-3828 pre-M8j.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  while (true)
+    {
+      /* Block A — wrong_kboard label position.  */
+      if (NILP (state->c))
+        {
+          state->c = read_decoded_event_from_main_queue (state->end_time,
+                                                         state->local_tag,
+                                                         state->prev_event,
+                                                         state->used_mouse_menu);
+          if (NILP (state->c) && state->end_time
+              && timespec_cmp (*state->end_time, current_timespec ()) <= 0)
+            return intern ("goto-exit");
+
+          if (BASE_EQ (state->c, make_fixnum (-2)))
+            return intern ("return-wrong-kboard");
+
+          if (CONSP (state->c) && EQ (XCAR (state->c), Qt))
+            state->c = XCDR (state->c);
+          else if (CONSP (state->c) && EQ (XCAR (state->c), Qno_record))
+            {
+              state->c = XCDR (state->c);
+              state->recorded = true;
+            }
+        }
+
+      /* Block B — non_reread label position.  */
+      if (!state->end_time)
+        timer_stop_idle ();
+
+      if (NILP (state->c))
+        {
+          if (state->commandflag >= 0
+              && !input_pending && !detect_input_pending_run_timers (0))
+            redisplay ();
+
+          continue;  /* original: goto wrong_kboard;  */
+        }
+
+      return intern ("fall-through");
+    }
+}
+
+/* M8i — bulk splice of the four post-M8h blocks: wrong-kboard
+   detection, Vunread_command_events drain, current-kboard side
+   queue read, and other-kboard scan.  See docs/keyboard.org §M8i.  */
+DEFUN ("--rc-prologue-kboard-and-queues",
+       Fc_rc_prologue_kboard_and_queues,
+       Sc_rc_prologue_kboard_and_queues, 0, 0, 0,
+       doc: /* Internal: four sequential prologue blocks after M8h.
+
+  Block 1: wrong-kboard detection.  When NILP(state->c) &&
+    current_kboard != state->orig_kboard, return
+    `return-wrong-kboard' so the caller returns -2.
+
+  Block 2: drain Vunread_command_events.  If CONSP, install
+    XCAR into state->c (peeling Qt / Qno_record wrappers, setting
+    state->recorded / state->reread accordingly).
+
+  Block 3: read from current KBOARD's side queue when NILP(state->c)
+    and kbd_queue_has_data.  Updates kbd_queue, input_pending, and
+    tracks Qswitch_frame into Vlast_event_frame.
+
+  Block 4: scan other kboards when NILP(state->c) && !single_kboard.
+    If any has kbd_queue_has_data, switch current_kboard to it
+    and return `return-wrong-kboard'.
+
+  Returns `return-wrong-kboard' or `fall-through'.  Mirrors
+  src/keyboard.c lines 3682-3750 pre-M8i.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: wrong-kboard detection.  */
+  if (NILP (state->c) && current_kboard != state->orig_kboard)
+    return intern ("return-wrong-kboard");
+
+  /* Block 2: drain Vunread_command_events.  */
+  if (CONSP (Vunread_command_events))
+    {
+      Lisp_Object c0 = XCAR (Vunread_command_events);
+      Vunread_command_events = XCDR (Vunread_command_events);
+
+      if (CONSP (c0) && EQ (XCAR (c0), Qt))
+        c0 = XCDR (c0);
+      else
+        {
+          if (CONSP (c0) && EQ (XCAR (c0), Qno_record))
+            {
+              c0 = XCDR (c0);
+              state->recorded = true;
+            }
+          state->reread = true;
+        }
+      state->c = c0;
+    }
+
+  /* Block 3: read from current KBOARD's side queue, if possible.  */
+  if (NILP (state->c))
+    {
+      if (current_kboard->kbd_queue_has_data)
+        {
+          Lisp_Object c0;
+          if (!CONSP (KVAR (current_kboard, kbd_queue)))
+            emacs_abort ();
+          c0 = XCAR (KVAR (current_kboard, kbd_queue));
+          kset_kbd_queue (current_kboard,
+                          XCDR (KVAR (current_kboard, kbd_queue)));
+          if (NILP (KVAR (current_kboard, kbd_queue)))
+            current_kboard->kbd_queue_has_data = false;
+          input_pending = readable_events (0);
+          if (EVENT_HAS_PARAMETERS (c0)
+              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c0)), Qswitch_frame))
+            internal_last_event_frame = XCAR (XCDR (c0));
+          Vlast_event_frame = internal_last_event_frame;
+          state->c = c0;
+        }
+    }
+
+  /* Block 4: scan other kboards if current's side queue is empty.  */
+  if (NILP (state->c) && !single_kboard)
+    {
+      KBOARD *kb;
+      for (kb = all_kboards; kb; kb = kb->next_kboard)
+        if (kb->kbd_queue_has_data)
+          {
+            current_kboard = kb;
+            return intern ("return-wrong-kboard");
+          }
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8h — bulk splice of the X-menu reading block + auto-save-by-
    idle-timeout + GC blocks that follow M8g.  See
    docs/keyboard.org §M8h.  */
@@ -3679,113 +3845,42 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — continue.  */
   }
 
-  /* Notify the caller if an autosave hook, or a timer, sentinel or
-     filter in the sit_for calls above have changed the current
-     kboard.  This could happen if they use the minibuffer or start a
-     recursive edit, like the fancy splash screen in server.el's
-     filter.  If this longjmp wasn't here, read_key_sequence would
-     interpret the next key sequence using the wrong translation
-     tables and function keymaps.  */
-  if (NILP (c) && current_kboard != orig_kboard)
-    return make_fixnum (-2);  /* wrong_kboard_jmpbuf */
-
-  /* If this has become non-nil here, it has been set by a timer
-     or sentinel or filter.  */
-  if (CONSP (Vunread_command_events))
-    {
-      c = XCAR (Vunread_command_events);
-      Vunread_command_events = XCDR (Vunread_command_events);
-
-      if (CONSP (c) && EQ (XCAR (c), Qt))
-	c = XCDR (c);
-      else
-	{
-	  if (CONSP (c) && EQ (XCAR (c), Qno_record))
-	    {
-	      c = XCDR (c);
-	      recorded = true;
-	    }
-	  reread = true;
-	}
-    }
-
-  /* Read something from current KBOARD's side queue, if possible.  */
-
-  if (NILP (c))
-    {
-      if (current_kboard->kbd_queue_has_data)
-	{
-	  if (!CONSP (KVAR (current_kboard, kbd_queue)))
-	    emacs_abort ();
-	  c = XCAR (KVAR (current_kboard, kbd_queue));
-	  kset_kbd_queue (current_kboard,
-			  XCDR (KVAR (current_kboard, kbd_queue)));
-	  if (NILP (KVAR (current_kboard, kbd_queue)))
-	    current_kboard->kbd_queue_has_data = false;
-	  input_pending = readable_events (0);
-	  if (EVENT_HAS_PARAMETERS (c)
-	      && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qswitch_frame))
-	    internal_last_event_frame = XCAR (XCDR (c));
-	  Vlast_event_frame = internal_last_event_frame;
-	}
-    }
-
-  /* If current_kboard's side queue is empty check the other kboards.
-     If one of them has data that we have not yet seen here,
-     switch to it and process the data waiting for it.
-
-     Note: if the events queued up for another kboard
-     have already been seen here, and therefore are not a complete command,
-     the kbd_queue_has_data field is 0, so we skip that kboard here.
-     That's to avoid an infinite loop switching between kboards here.  */
-  if (NILP (c) && !single_kboard)
-    {
-      KBOARD *kb;
-      for (kb = all_kboards; kb; kb = kb->next_kboard)
-	if (kb->kbd_queue_has_data)
-	  {
-	    current_kboard = kb;
-            return make_fixnum (-2); /* wrong_kboard_jmpbuf */
-	  }
-    }
-
- wrong_kboard:
-
-  if (NILP (c))
-    {
-      c = read_decoded_event_from_main_queue (end_time, local_getcjmp,
-                                              prev_event, used_mouse_menu);
-      if (NILP (c) && end_time
-	  && timespec_cmp (*end_time, current_timespec ()) <= 0)
-        {
-          goto exit;
-        }
-
-      if (BASE_EQ (c, make_fixnum (-2)))
-	return c;
-
-      if (CONSP (c) && EQ (XCAR (c), Qt))
-	c = XCDR (c);
-      else if (CONSP (c) && EQ (XCAR (c), Qno_record))
-	{
-	  c = XCDR (c);
-	  recorded = true;
-	}
+  /* M8i: wrong-kboard detection + Vunread_command_events drain +
+     kbd_queue read + other-kboard scan, ported to Scheme
+     `rc-prologue-kboard-and-queues!'.  Returns `return-wrong-kboard'
+     or `fall-through'.  See docs/keyboard.org §M8i.  */
+  {
+    static SCM rc_kboard_queues_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_kboard_queues_proc))
+      rc_kboard_queues_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-prologue-kboard-and-queues!");
+    SCM result = SCM_CALL_0 (rc_kboard_queues_proc);
+    if (scm_is_eq (result, intern ("return-wrong-kboard")))
+      return make_fixnum (-2);  /* wrong_kboard_jmpbuf */
+    /* else: `fall-through' — continue.  */
   }
 
  non_reread:
 
-  if (!end_time)
-    timer_stop_idle ();
-
-  if (NILP (c))
-    {
-      if (commandflag >= 0
-	  && !input_pending && !detect_input_pending_run_timers (0))
-	redisplay ();
-
-      goto wrong_kboard;
-    }
+  /* M8j: wrong_kboard + non_reread loop ported to Scheme
+     `rc-wrong-kboard-and-non-reread!'.  Internally loops the
+     blocking-read + redisplay-on-nil so the original
+     `goto wrong_kboard;' becomes a `continue' inside the subr.
+     Returns `goto-exit', `return-wrong-kboard', or `fall-through'.
+     See docs/keyboard.org §M8j.  */
+  {
+    static SCM rc_wkbd_nr_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_wkbd_nr_proc))
+      rc_wkbd_nr_proc = scm_c_public_ref ("emacs read-char",
+                                          "rc-wrong-kboard-and-non-reread!");
+    SCM result = SCM_CALL_0 (rc_wkbd_nr_proc);
+    if (scm_is_eq (result, intern ("goto-exit")))
+      goto exit;
+    if (scm_is_eq (result, intern ("return-wrong-kboard")))
+      return make_fixnum (-2);
+    /* else: `fall-through' — state->c is non-nil, continue.  */
+  }
 
   /* Buffer switch events are only for internal wakeups
      so don't show them to the user.

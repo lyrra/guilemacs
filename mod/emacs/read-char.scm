@@ -12,6 +12,8 @@
             rc-prologue-echo-and-menu!
             rc-prologue-idle-echo-autosave!
             rc-prologue-xmenu-and-idle-gc!
+            rc-prologue-kboard-and-queues!
+            rc-wrong-kboard-and-non-reread!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -148,6 +150,31 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-wrong-kboard-and-non-reread
+  (delay (%c '--rc-wrong-kboard-and-non-reread)))
+
+(define (rc-wrong-kboard-and-non-reread!)
+  "Blocking-read + non-reread fixup loop.  Calls
+read_decoded_event_from_main_queue to drive state->c, peels Qt /
+Qno_record wrappers, and loops back to retry the blocking read
+when c is still nil after a redisplay.  Returns `goto-exit'
+(end_time expired), `return-wrong-kboard' (caller returns -2),
+or `fall-through' (state->c is non-nil).  See docs/keyboard.org
+§M8j."
+  ((force %rc-wrong-kboard-and-non-reread)))
+
+(define %rc-prologue-kboard-and-queues
+  (delay (%c '--rc-prologue-kboard-and-queues)))
+
+(define (rc-prologue-kboard-and-queues!)
+  "Four blocks after M8h: wrong-kboard detection, Vunread_command_events
+drain, current-kboard side-queue read, and other-kboard scan.  Mutates
+state->c / state->recorded / state->reread / current_kboard /
+Vunread_command_events / input_pending / Vlast_event_frame in place.
+Returns `return-wrong-kboard' (caller returns -2) or `fall-through'.
+See docs/keyboard.org §M8i."
+  ((force %rc-prologue-kboard-and-queues)))
+
 (define %rc-prologue-xmenu-and-idle-gc
   (delay (%c '--rc-prologue-xmenu-and-idle-gc)))
 
@@ -250,4 +277,10 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-idle-echo-autosave!)
               ;; M8h — X-menu + auto-save-by-idle-timeout + GC
               (--rc-prologue-xmenu-and-idle-gc!
-                                       ,rc-prologue-xmenu-and-idle-gc!))))
+                                       ,rc-prologue-xmenu-and-idle-gc!)
+              ;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard
+              (--rc-prologue-kboard-and-queues!
+                                       ,rc-prologue-kboard-and-queues!)
+              ;; M8j — wrong_kboard + non_reread loop
+              (--rc-wrong-kboard-and-non-reread!
+                                       ,rc-wrong-kboard-and-non-reread!))))

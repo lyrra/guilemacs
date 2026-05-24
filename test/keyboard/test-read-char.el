@@ -81,4 +81,18 @@
 (test-eq "xmenu-and-idle-gc/fall-through-at-idle"
          'fall-through (--rc-prologue-xmenu-and-idle-gc!))
 
+;;;; M8i
+
+(test-assert "helpers/rc-prologue-kboard-and-queues"
+             (fboundp '--rc-prologue-kboard-and-queues))
+(test-eq "kboard-and-queues/fall-through-at-idle"
+         'fall-through (--rc-prologue-kboard-and-queues!))
+
+;;;; M8j
+
+(test-assert "helpers/rc-wrong-kboard-and-non-reread"
+             (fboundp '--rc-wrong-kboard-and-non-reread))
+(test-eq "wkbd-nr/fall-through-at-idle"
+         'fall-through (--rc-wrong-kboard-and-non-reread!))
+
 (test-end)
