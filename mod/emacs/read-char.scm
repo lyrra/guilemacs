@@ -16,6 +16,8 @@
             rc-wrong-kboard-and-non-reread!
             rc-bufferp-and-special-event-map!
             rc-event-translate-and-record!
+            rc-input-method-dispatch!
+            rc-help-echo-and-help-form!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -151,6 +153,36 @@ test setup when the same rc-state is reused across calls."
 ;;;;
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
+
+(define %rc-help-echo-and-help-form
+  (delay (%c '--rc-help-echo-and-help-form)))
+
+(define (rc-help-echo-and-help-form!)
+  "Final read_char_1 tail.  Block 1: if state->c is a (help-echo
+FRAME HELP WINDOW OBJECT POS), call show_help_echo and return
+`goto-retry'.  Block 2: add state->c to this_command_keys (and
+state->also_record) under the !reread / first-key / !timed gate,
+update last_input_event + num_input_events.  Block 3: when
+Vhelp_form and help_char_p match, recursively read_char until
+non-BUFFERP under a dynwind that saves window configuration,
+then repeat the read if state->c == fixnum 040 (space).  Returns
+`goto-retry' or `fall-through'.  See docs/keyboard.org §M8n."
+  ((force %rc-help-echo-and-help-form)))
+
+(define %rc-input-method-dispatch
+  (delay (%c '--rc-input-method-dispatch)))
+
+(define (rc-input-method-dispatch!)
+  "Input-method dispatch + record-if-unread.  Block 1: when
+state->c is a printable ASCII fixnum, Vinput_method_function is
+set, and we're at the first event of a key sequence, run the IM
+inside a dynwind with this_command_keys / echo state save and
+restore.  Returns `goto-retry' when IM consumed input without
+producing events; otherwise installs new c and concats remaining
+events onto Vunread_post_input_method_events.  Block 2: if
+!state->recorded, record_char + state->recorded = true.  Returns
+`goto-retry' or `fall-through'.  See docs/keyboard.org §M8m."
+  ((force %rc-input-method-dispatch)))
 
 (define %rc-event-translate-and-record
   (delay (%c '--rc-event-translate-and-record)))
@@ -318,4 +350,10 @@ See docs/keyboard.org §M8c."
                                        ,rc-bufferp-and-special-event-map!)
               ;; M8l — translate + menu-bar + record + echo-wipe
               (--rc-event-translate-and-record!
-                                       ,rc-event-translate-and-record!))))
+                                       ,rc-event-translate-and-record!)
+              ;; M8m — input-method dispatch + record-if-unread
+              (--rc-input-method-dispatch!
+                                       ,rc-input-method-dispatch!)
+              ;; M8n — help-echo + this-command-keys + help-form
+              (--rc-help-echo-and-help-form!
+                                       ,rc-help-echo-and-help-form!))))

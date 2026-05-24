@@ -2987,6 +2987,245 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8n — bulk splice of help-echo display + add-to-this_command_keys
+   + last_input_event + help_form recursive read (the three blocks
+   between `reread_first:' and `exit:').  See docs/keyboard.org
+   §M8n.  */
+DEFUN ("--rc-help-echo-and-help-form",
+       Fc_rc_help_echo_and_help_form,
+       Sc_rc_help_echo_and_help_form, 0, 0, 0,
+       doc: /* Internal: help-echo + this-command-keys + help-form.
+
+  Block 1: if state->c is (help-echo FRAME HELP WINDOW OBJECT POS),
+    call show_help_echo with the parsed parts, then
+    timer_resume_idle when not in a timed read, and return
+    `goto-retry'.
+
+  Block 2: when (!state->reread || this_command_key_count == 0)
+    && !state->end_time: set ok_to_echo_at_next_pause to
+    current_kboard for non-mouse-motion events, add_command_key
+    for state->c (and state->also_record when set), echo_update.
+    Then last_input_event = state->c; num_input_events++.
+
+  Block 3: if Vhelp_form && help_char_p(state->c): inside a
+    dynwind, push current window-configuration onto
+    help_form_saved_window_configs with an unwind-protect to
+    read_char_help_form_unwind, call Qhelp_form_show, then in
+    a do/while loop call read_char until non-BUFFERP.  After
+    dynwind_end + redisplay: if state->c == fixnum 040 (space),
+    repeat the cancel_echoing + read_char-until-non-BUFFERP
+    loop a second time.
+
+  Returns `goto-retry' (Block 1 fired) or `fall-through'.
+  Mirrors src/keyboard.c lines 4264-4340 pre-M8n.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: help-echo display.  */
+  if (CONSP (state->c) && EQ (XCAR (state->c), Qhelp_echo))
+    {
+      /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
+      Lisp_Object help, object, position, window, htem;
+
+      htem = Fcdr (XCDR (state->c));
+      help = Fcar (htem);
+      htem = Fcdr (htem);
+      window = Fcar (htem);
+      htem = Fcdr (htem);
+      object = Fcar (htem);
+      htem = Fcdr (htem);
+      position = Fcar (htem);
+
+      show_help_echo (help, window, object, position);
+
+      /* We stopped being idle for this event; undo that.  */
+      if (!state->end_time)
+        timer_resume_idle ();
+      return intern ("goto-retry");
+    }
+
+  /* Block 2: add to this_command_keys + echo + last_input_event.  */
+  if ((!state->reread || this_command_key_count == 0)
+      && !state->end_time)
+    {
+      /* Don't echo mouse motion events.  */
+      if (!(EVENT_HAS_PARAMETERS (state->c)
+            && EQ (EVENT_HEAD_KIND (EVENT_HEAD (state->c)), Qmouse_movement)))
+        /* Once we reread a character, echoing can happen
+           the next time we pause to read a new one.  */
+        ok_to_echo_at_next_pause = current_kboard;
+
+      /* Record this character as part of the current key.  */
+      add_command_key (state->c);
+      if (!NILP (state->also_record))
+        add_command_key (state->also_record);
+
+      echo_update ();
+    }
+
+  last_input_event = state->c;
+  num_input_events++;
+
+  /* Block 3: help_form recursive read.  */
+  if (!NILP (Vhelp_form) && help_char_p (state->c))
+    {
+      dynwind_begin ();
+
+      help_form_saved_window_configs
+        = Fcons (Fcurrent_window_configuration (Qnil),
+                 help_form_saved_window_configs);
+      record_unwind_protect_void (read_char_help_form_unwind);
+      call0 (Qhelp_form_show);
+
+      cancel_echoing ();
+      do
+        {
+          state->c = read_char (0, Qnil, Qnil, 0, NULL);
+          if (EVENT_HAS_PARAMETERS (state->c)
+              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (state->c)), Qmouse_click))
+            XSETCAR (help_form_saved_window_configs, Qnil);
+        }
+      while (BUFFERP (state->c));
+      /* Remove the help from the frame.  */
+      dynwind_end ();
+
+      redisplay ();
+      if (BASE_EQ (state->c, make_fixnum (040)))
+        {
+          cancel_echoing ();
+          do
+            state->c = read_char (0, Qnil, Qnil, 0, NULL);
+          while (BUFFERP (state->c));
+        }
+    }
+
+  return intern ("fall-through");
+}
+
+/* M8m — bulk splice of input-method dispatch + record-if-unread
+   (the two blocks after the `reread_for_input_method:' /
+   `from_macro:' labels).  See docs/keyboard.org §M8m.  */
+DEFUN ("--rc-input-method-dispatch",
+       Fc_rc_input_method_dispatch,
+       Sc_rc_input_method_dispatch, 0, 0, 0,
+       doc: /* Internal: input-method dispatch + record-if-unread.
+
+  Block 1: if state->c is a printable ASCII fixnum (' '..255
+    excluding 127) and Vinput_method_function is set and
+    state->prev_event is nil (i.e., we're at the first event of
+    a key sequence): wipe echo, save this_command_keys and echo
+    state, optionally specbind `input-method-use-echo-area' to t
+    when not reading a key sequence (KEYMAPP(map)), then
+    call1(Vinput_method_function, state->c) inside a dynwind.
+    On no events returned, restore previous echo message and
+    return `goto-retry'.  Otherwise install XCAR(tem) into
+    state->c and nconc XCDR(tem) onto Vunread_post_input_method_events.
+
+  Block 2: if !state->recorded (we consumed an event from an
+    unread-*-events list that bypassed the record code earlier):
+    record_char(state->c); state->recorded = true.
+
+  Returns `goto-retry' (input method consumed input without
+  producing events) or `fall-through'.  Mirrors src/keyboard.c
+  lines 4128-4212 pre-M8m.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: input-method dispatch.  */
+  if (FIXNUMP (state->c)
+      && !NILP (Vinput_method_function)
+      /* Don't run the input method within a key sequence,
+         after the first event of the key sequence.  */
+      && NILP (state->prev_event)
+      && ' ' <= XFIXNUM (state->c) && XFIXNUM (state->c) < 256
+      && XFIXNUM (state->c) != 127)
+    {
+      Lisp_Object keys;
+      ptrdiff_t key_count;
+      ptrdiff_t command_key_start;
+
+      /* Save the echo status.  */
+      bool saved_immediate_echo = current_kboard->immediate_echo;
+      struct kboard *saved_ok_to_echo = ok_to_echo_at_next_pause;
+      Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
+      Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
+
+      dynwind_begin ();
+      /* Save the this_command_keys status.  */
+      key_count = this_command_key_count;
+      command_key_start = this_single_command_key_start;
+
+      if (key_count > 0)
+        keys = Fcopy_sequence (this_command_keys);
+      else
+        keys = Qnil;
+
+      /* Clear out this_command_keys.  */
+      this_command_key_count = 0;
+      this_single_command_key_start = 0;
+
+      /* Now wipe the echo area.  */
+      if (!NILP (echo_area_buffer[0]))
+        safe_run_hooks (Qecho_area_clear_hook);
+      clear_message (1, 0);
+      echo_truncate (0);
+
+      /* If we are not reading a key sequence,
+         never use the echo area.  */
+      if (!KEYMAPP (state->map))
+        specbind_guile (Qinput_method_use_echo_area, Qt);
+
+      /* Call the input method.  */
+      Lisp_Object tem = call1 (Vinput_method_function, state->c);
+
+      dynwind_end ();
+
+      /* Restore the saved echoing state
+         and this_command_keys state.  */
+      this_command_key_count = key_count;
+      this_single_command_key_start = command_key_start;
+      if (key_count > 0)
+        this_command_keys = keys;
+
+      cancel_echoing ();
+      ok_to_echo_at_next_pause = saved_ok_to_echo;
+      kset_echo_string (current_kboard, saved_echo_string);
+      kset_echo_prompt (current_kboard, saved_echo_prompt);
+      if (saved_immediate_echo)
+        echo_now ();
+
+      /* The input method can return no events.  */
+      if (!CONSP (tem))
+        {
+          /* Bring back the previous message, if any.  */
+          if (!NILP (state->previous_echo_area_message))
+            message_with_string ("%s", state->previous_echo_area_message, 0);
+          return intern ("goto-retry");
+        }
+      /* It returned one event or more.  */
+      state->c = XCAR (tem);
+      Vunread_post_input_method_events
+        = nconc2 (XCDR (tem), Vunread_post_input_method_events);
+    }
+
+  /* Block 2: record if the event bypassed the M8l recording path.  */
+  if (!state->recorded)
+    {
+      record_char (state->c);
+      state->recorded = true;
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8l — bulk splice of FIXNUMP/keyboard-translate-table +
    menu-bar synthesis + record_char + echo-area wipe (the three
    sequential blocks after M8k).  See docs/keyboard.org §M8l.  */
@@ -3929,8 +4168,6 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 #define orig_kboard state->orig_kboard
 #define save_getcjmp(x) (x = getctag)
 #define restore_getcjmp(x) (getctag = x)
-  Lisp_Object tem;
-
   if (jump)
     goto non_reread;
 
@@ -4125,171 +4362,40 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
 
  reread_for_input_method:
  from_macro:
-  /* Pass this to the input method, if appropriate.  */
-  if (FIXNUMP (c)
-      && ! NILP (Vinput_method_function)
-      /* Don't run the input method within a key sequence,
-	 after the first event of the key sequence.  */
-      && NILP (prev_event)
-      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256 && XFIXNUM (c) != 127)
-    {
-      Lisp_Object keys;
-      ptrdiff_t key_count;
-      ptrdiff_t command_key_start;
-
-      /* Save the echo status.  */
-      bool saved_immediate_echo = current_kboard->immediate_echo;
-      struct kboard *saved_ok_to_echo = ok_to_echo_at_next_pause;
-      Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
-      Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
-
-      dynwind_begin ();
-      /* Save the this_command_keys status.  */
-      key_count = this_command_key_count;
-      command_key_start = this_single_command_key_start;
-
-      if (key_count > 0)
-	keys = Fcopy_sequence (this_command_keys);
-      else
-	keys = Qnil;
-
-      /* Clear out this_command_keys.  */
-      this_command_key_count = 0;
-      this_single_command_key_start = 0;
-
-      /* Now wipe the echo area.  */
-      if (!NILP (echo_area_buffer[0]))
-	safe_run_hooks (Qecho_area_clear_hook);
-      clear_message (1, 0);
-      echo_truncate (0);
-
-      /* If we are not reading a key sequence,
-	 never use the echo area.  */
-      if (!KEYMAPP (map))
-	{
-	  specbind_guile (Qinput_method_use_echo_area, Qt);
-	}
-
-      /* Call the input method.  */
-      tem = call1 (Vinput_method_function, c);
-
-      dynwind_end ();
-
-      /* Restore the saved echoing state
-	 and this_command_keys state.  */
-      this_command_key_count = key_count;
-      this_single_command_key_start = command_key_start;
-      if (key_count > 0)
-	this_command_keys = keys;
-
-      cancel_echoing ();
-      ok_to_echo_at_next_pause = saved_ok_to_echo;
-      kset_echo_string (current_kboard, saved_echo_string);
-      kset_echo_prompt (current_kboard, saved_echo_prompt);
-      if (saved_immediate_echo)
-	echo_now ();
-
-      /* The input method can return no events.  */
-      if (! CONSP (tem))
-	{
-	  /* Bring back the previous message, if any.  */
-	  if (! NILP (previous_echo_area_message))
-	    message_with_string ("%s", previous_echo_area_message, 0);
-	  goto retry;
-	}
-      /* It returned one event or more.  */
-      c = XCAR (tem);
-      Vunread_post_input_method_events
-	= nconc2 (XCDR (tem), Vunread_post_input_method_events);
-    }
-  /* When we consume events from the various unread-*-events lists, we
-     bypass the code that records input, so record these events now if
-     they were not recorded already.  */
-  if (!recorded)
-    {
-      record_char (c);
-      recorded = true;
-    }
+  /* M8m: input-method dispatch + record-if-unread ported to
+     Scheme `rc-input-method-dispatch!'.  Returns `goto-retry'
+     (input method consumed input without producing events) or
+     `fall-through'.  See docs/keyboard.org §M8m.  */
+  {
+    static SCM rc_input_method_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_input_method_proc))
+      rc_input_method_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-input-method-dispatch!");
+    SCM result = SCM_CALL_0 (rc_input_method_proc);
+    if (scm_is_eq (result, intern ("goto-retry")))
+      goto retry;
+    /* else: `fall-through' — continue.  */
+  }
 
  reread_first:
 
-  /* Display help if not echoing.  */
-  if (CONSP (c) && EQ (XCAR (c), Qhelp_echo))
-    {
-      /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
-      Lisp_Object help, object, position, window, htem;
-
-      htem = Fcdr (XCDR (c));
-      help = Fcar (htem);
-      htem = Fcdr (htem);
-      window = Fcar (htem);
-      htem = Fcdr (htem);
-      object = Fcar (htem);
-      htem = Fcdr (htem);
-      position = Fcar (htem);
-
-      show_help_echo (help, window, object, position);
-
-      /* We stopped being idle for this event; undo that.  */
-      if (!end_time)
-	timer_resume_idle ();
+  /* M8n: help-echo display + add-to-this_command_keys +
+     last_input_event + help_form recursive read, ported to
+     Scheme `rc-help-echo-and-help-form!'.  Returns `goto-retry'
+     (help-echo path) or `fall-through'.  See docs/keyboard.org
+     §M8n.  */
+  {
+    static SCM rc_help_echo_form_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_help_echo_form_proc))
+      rc_help_echo_form_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-help-echo-and-help-form!");
+    SCM result = SCM_CALL_0 (rc_help_echo_form_proc);
+    if (scm_is_eq (result, intern ("goto-retry")))
       goto retry;
-    }
-
-  if ((! reread || this_command_key_count == 0)
-      && !end_time)
-    {
-
-      /* Don't echo mouse motion events.  */
-      if (! (EVENT_HAS_PARAMETERS (c)
-	     && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
-	/* Once we reread a character, echoing can happen
-	   the next time we pause to read a new one.  */
-	ok_to_echo_at_next_pause = current_kboard;
-
-      /* Record this character as part of the current key.  */
-      add_command_key (c);
-      if (! NILP (also_record))
-	add_command_key (also_record);
-
-      echo_update ();
-    }
-
-  last_input_event = c;
-  num_input_events++;
-
-  /* Process the help character specially if enabled.  */
-  if (!NILP (Vhelp_form) && help_char_p (c))
-    {
-      dynwind_begin ();
-
-      help_form_saved_window_configs
-	= Fcons (Fcurrent_window_configuration (Qnil),
-		 help_form_saved_window_configs);
-      record_unwind_protect_void (read_char_help_form_unwind);
-      call0 (Qhelp_form_show);
-
-      cancel_echoing ();
-      do
-	{
-	  c = read_char (0, Qnil, Qnil, 0, NULL);
-	  if (EVENT_HAS_PARAMETERS (c)
-	      && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_click))
-	    XSETCAR (help_form_saved_window_configs, Qnil);
-	}
-      while (BUFFERP (c));
-      /* Remove the help from the frame.  */
-      dynwind_end ();
-
-      redisplay ();
-      if (BASE_EQ (c, make_fixnum (040)))
-	{
-	  cancel_echoing ();
-	  do
-	    c = read_char (0, Qnil, Qnil, 0, NULL);
-	  while (BUFFERP (c));
-	}
-    }
+    /* else: `fall-through' — continue to exit.  */
+  }
 
  exit:
   input_was_pending = input_pending;

@@ -163,4 +163,25 @@
   ;; `fall-through' before touching record_char / echo state.
   (should (eq 'fall-through (--rc-event-translate-and-record!))))
 
+;;;; M8m — input-method dispatch + record-if-unread
+
+(ert-deftest m8m-helpers/exist ()
+  (should (fboundp '--rc-input-method-dispatch)))
+
+(ert-deftest m8m-input-method/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching Vinput_method_function or
+  ;; this_command_keys.
+  (should (eq 'fall-through (--rc-input-method-dispatch!))))
+
+;;;; M8n — help-echo + this-command-keys + help-form
+
+(ert-deftest m8n-helpers/exist ()
+  (should (fboundp '--rc-help-echo-and-help-form)))
+
+(ert-deftest m8n-help-echo-form/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching show_help_echo or help_form.
+  (should (eq 'fall-through (--rc-help-echo-and-help-form!))))
+
 (provide 'ertest-read-char)

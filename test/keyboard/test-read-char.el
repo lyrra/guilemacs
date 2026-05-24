@@ -109,4 +109,18 @@
 (test-eq "translate-record/fall-through-at-idle"
          'fall-through (--rc-event-translate-and-record!))
 
+;;;; M8m
+
+(test-assert "helpers/rc-input-method-dispatch"
+             (fboundp '--rc-input-method-dispatch))
+(test-eq "input-method/fall-through-at-idle"
+         'fall-through (--rc-input-method-dispatch!))
+
+;;;; M8n
+
+(test-assert "helpers/rc-help-echo-and-help-form"
+             (fboundp '--rc-help-echo-and-help-form))
+(test-eq "help-echo-form/fall-through-at-idle"
+         'fall-through (--rc-help-echo-and-help-form!))
+
 (test-end)
