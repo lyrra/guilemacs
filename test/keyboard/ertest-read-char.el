@@ -94,4 +94,14 @@
   ;; without touching the redisplay machinery.
   (should (eq nil (--rc-prologue-redisplay!))))
 
+;;;; M8f — echo + minibuf-menu
+
+(ert-deftest m8f-helpers/exist ()
+  (should (fboundp '--rc-prologue-echo-and-menu)))
+
+(ert-deftest m8f-echo-menu/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching anything.
+  (should (eq 'fall-through (--rc-prologue-echo-and-menu!))))
+
 (provide 'ertest-read-char)

@@ -60,4 +60,11 @@
 (test-eq "redisplay/no-op-when-stack-empty"
          nil (--rc-prologue-redisplay!))
 
+;;;; M8f
+
+(test-assert "helpers/rc-prologue-echo-and-menu"
+             (fboundp '--rc-prologue-echo-and-menu))
+(test-eq "echo-menu/fall-through-at-idle"
+         'fall-through (--rc-prologue-echo-and-menu!))
+
 (test-end)

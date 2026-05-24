@@ -9,6 +9,7 @@
             rc-prologue-drain-unread!
             rc-prologue-macro-or-switch-frame!
             rc-prologue-redisplay!
+            rc-prologue-echo-and-menu!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -145,6 +146,18 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-prologue-echo-and-menu
+  (delay (%c '--rc-prologue-echo-and-menu)))
+
+(define (rc-prologue-echo-and-menu!)
+  "Echo-cancel-or-dash + minibuf-menu-prompt blocks before the
+blocking read.  Returns one of `return-wrong-kboard' (caller
+returns -2 from read_char_1 — the wrong_kboard_jmpbuf code),
+`goto-exit' (caller goto exit; state->c installed), or
+`fall-through' (caller continues to the next block).  See
+docs/keyboard.org §M8f."
+  ((force %rc-prologue-echo-and-menu)))
+
 (define %rc-prologue-redisplay
   (delay (%c '--rc-prologue-redisplay)))
 
@@ -201,4 +214,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-prologue-macro-or-switch-frame!)
               ;; M8e — redisplay loop
               (--rc-prologue-redisplay!
-                                       ,rc-prologue-redisplay!))))
+                                       ,rc-prologue-redisplay!)
+              ;; M8f — echo-cancel + minibuf-menu-prompt
+              (--rc-prologue-echo-and-menu!
+                                       ,rc-prologue-echo-and-menu!))))

@@ -2987,6 +2987,64 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8f — bulk splice of the echo-cancel-or-dash + minibuf-menu-prompt
+   blocks that follow M8e.  See docs/keyboard.org §M8f.  */
+DEFUN ("--rc-prologue-echo-and-menu",
+       Fc_rc_prologue_echo_and_menu, Sc_rc_prologue_echo_and_menu, 0, 0, 0,
+       doc: /* Internal: two sequential prologue blocks.
+
+  Block 1: if the echo area has content from a different kboard
+    OR `ok_to_echo_at_next_pause' is NULL, cancel echoing;
+    otherwise append a `-' separator via echo_dash.
+
+  Block 2: zero state->c, then try the minibuf menu prompt if
+    KEYMAPP(map) && INTERACTIVE && prev_event is non-nil &&
+    prev_event has no parameters && no unread events && no
+    pending input.  On read_char_minibuf_menu_prompt success
+    (non-nil result), install into state->c and return
+    `goto-exit'.  On wrong_kboard_jmpbuf (result == -2 fixnum),
+    return `return-wrong-kboard' so the caller returns -2 itself.
+    Otherwise return `fall-through'.
+
+Mirrors src/keyboard.c lines 3408-3437 pre-M8f.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: cancel echoing or append dash.  */
+  if (!NILP (echo_area_buffer[0])
+      && (echo_kboard != current_kboard
+          || ok_to_echo_at_next_pause == NULL))
+    cancel_echoing ();
+  else
+    echo_dash ();
+
+  /* Block 2: try minibuf menu prompt.  */
+  state->c = Qnil;
+  if (KEYMAPP (state->map) && !noninteractive
+      && !NILP (state->prev_event) && !EVENT_HAS_PARAMETERS (state->prev_event)
+      && !CONSP (Vunread_command_events)
+      && !detect_input_pending_run_timers (0))
+    {
+      Lisp_Object c
+        = read_char_minibuf_menu_prompt (state->commandflag, state->map);
+
+      if (FIXNUMP (c) && XFIXNUM (c) == -2)
+        return intern ("return-wrong-kboard");
+
+      if (!NILP (c))
+        {
+          state->c = c;
+          return intern ("goto-exit");
+        }
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8e — bulk splice of the `if (commandflag >= 0)' redisplay block
    that follows M8d.  Always returns nil (no control transfer);
    caller falls through to the next inline block.  See
@@ -3405,36 +3463,22 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
      all, or it's from echoing from a different kboard than the
      current one.  */
 
-  if (/* There currently is something in the echo area.  */
-      !NILP (echo_area_buffer[0])
-      && (/* It's an echo from a different kboard.  */
-	  echo_kboard != current_kboard
-	  /* Or we explicitly allow overwriting whatever there is.  */
-	  || ok_to_echo_at_next_pause == NULL))
-    cancel_echoing ();
-  else
-    echo_dash ();
-
-  /* Try reading a character via menu prompting in the minibuf.
-     Try this before the sit-for, because the sit-for
-     would do the wrong thing if we are supposed to do
-     menu prompting. If EVENT_HAS_PARAMETERS then we are reading
-     after a mouse event so don't try a minibuf menu.  */
-  c = Qnil;
-  if (KEYMAPP (map) && INTERACTIVE
-      && !NILP (prev_event) && ! EVENT_HAS_PARAMETERS (prev_event)
-      /* Don't bring up a menu if we already have another event.  */
-      && !CONSP (Vunread_command_events)
-      && !detect_input_pending_run_timers (0))
-    {
-      c = read_char_minibuf_menu_prompt (commandflag, map);
-
-      if (FIXNUMP (c) && XFIXNUM (c) == -2)
-        return c;               /* wrong_kboard_jmpbuf */
-
-      if (! NILP (c))
-	goto exit;
-    }
+  /* M8f: echo-cancel-or-dash + minibuf-menu-prompt blocks ported
+     to Scheme `rc-prologue-echo-and-menu!'.  Returns one of
+     `return-wrong-kboard' / `goto-exit' / `fall-through'.  See
+     docs/keyboard.org §M8f.  */
+  {
+    static SCM rc_echo_menu_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_echo_menu_proc))
+      rc_echo_menu_proc = scm_c_public_ref ("emacs read-char",
+                                            "rc-prologue-echo-and-menu!");
+    SCM result = SCM_CALL_0 (rc_echo_menu_proc);
+    if (scm_is_eq (result, intern ("return-wrong-kboard")))
+      return make_fixnum (-2);
+    if (scm_is_eq (result, intern ("goto-exit")))
+      goto exit;
+    /* else: `fall-through' — continue.  */
+  }
 
   /* Start idle timers if no time limit is supplied.  We don't do it
      if a time limit is supplied to avoid an infinite recursion in the
