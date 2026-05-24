@@ -2987,6 +2987,26 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8final — terminal subr for read-char-main's exit path.  Runs the
+   two-line `exit:' tail of the original read_char_1: latch input
+   pending into input_was_pending, then return state->c.  See
+   docs/keyboard.org §M8final.  */
+DEFUN ("--rc-exit", Fc_rc_exit, Sc_rc_exit, 0, 0, 0,
+       doc: /* Internal: read_char_1's `exit:' tail.
+Sets input_was_pending = input_pending and returns state->c
+(the resolved event).  At idle (empty rc_state_stack) this
+returns nil and does nothing — but in production it is only
+called via read-char-main during an in-flight read_char.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+  input_was_pending = input_pending;
+  return state->c;
+}
+
 /* M8n — bulk splice of help-echo display + add-to-this_command_keys
    + last_input_event + help_form recursive read (the three blocks
    between `reread_first:' and `exit:').  See docs/keyboard.org
@@ -4151,272 +4171,17 @@ read_char (int commandflag, Lisp_Object map,
 static Lisp_Object
 read_char_1 (bool jump, volatile struct read_char_state *state)
 {
-#define commandflag state->commandflag
-#define map state->map
-#define prev_event state->prev_event
-#define used_mouse_menu state->used_mouse_menu
-#define end_time state->end_time
-#define c state->c
-#define jmpcount state->jmpcount
-#define local_getcjmp state->local_tag
-#define save_jump state->save_tag
-#define previous_echo_area_message state->previous_echo_area_message
-#define also_record state->also_record
-#define recorded state->recorded
-#define reread state->reread
-#define polling_stopped_here state->polling_stopped_here
-#define orig_kboard state->orig_kboard
-#define save_getcjmp(x) (x = getctag)
-#define restore_getcjmp(x) (getctag = x)
-  if (jump)
-    goto non_reread;
-
- retry:
-  /* M8c: unread-events drain ported to Scheme
-     `rc-prologue-drain-unread!'.  Returns one of `reread-first',
-     `reread-for-input-method', or `fall-through' for 3-way C
-     control flow.  See docs/keyboard.org §M8c.  */
-  {
-    static SCM rc_drain_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_drain_proc))
-      rc_drain_proc = scm_c_public_ref ("emacs read-char",
-                                        "rc-prologue-drain-unread!");
-    SCM result = SCM_CALL_0 (rc_drain_proc);
-    if (scm_is_eq (result, intern ("reread-first")))
-      goto reread_first;
-    if (scm_is_eq (result, intern ("reread-for-input-method")))
-      goto reread_for_input_method;
-    /* else: `fall-through' — continue below.  */
-  }
-
-  /* M8d: kbd-macro + unread-switch-frame early-exit checks ported
-     to Scheme `rc-prologue-macro-or-switch-frame!'.  Returns one
-     of `from-macro' / `reread-first' / `fall-through' for 3-way
-     C control flow.  See docs/keyboard.org §M8d.  */
-  {
-    static SCM rc_macro_sf_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_macro_sf_proc))
-      rc_macro_sf_proc = scm_c_public_ref ("emacs read-char",
-                                           "rc-prologue-macro-or-switch-frame!");
-    SCM result = SCM_CALL_0 (rc_macro_sf_proc);
-    if (scm_is_eq (result, intern ("from-macro")))
-      goto from_macro;
-    if (scm_is_eq (result, intern ("reread-first")))
-      goto reread_first;
-    /* else: `fall-through' — continue.  */
-  }
-
-  /* M8e: redisplay loop ported to Scheme `rc-prologue-redisplay!'.
-     Always returns nil; caller falls through.  See
-     docs/keyboard.org §M8e.  */
-  {
-    static SCM rc_redisplay_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_redisplay_proc))
-      rc_redisplay_proc = scm_c_public_ref ("emacs read-char",
-                                            "rc-prologue-redisplay!");
-    SCM_CALL_0 (rc_redisplay_proc);
-  }
-
-  /* Message turns off echoing unless more keystrokes turn it on again.
-
-     The code in 20.x for the condition was
-
-     1. echo_area_glyphs && *echo_area_glyphs
-     2. && echo_area_glyphs != current_kboard->echobuf
-     3. && ok_to_echo_at_next_pause != echo_area_glyphs
-
-     (1) means there's a current message displayed
-
-     (2) means it's not the message from echoing from the current
-     kboard.
-
-     (3) There's only one place in 20.x where ok_to_echo_at_next_pause
-     is set to a non-null value.  This is done in read_char and it is
-     set to echo_area_glyphs.  That means
-     ok_to_echo_at_next_pause is either null or
-     current_kboard->echobuf with the appropriate current_kboard at
-     that time.
-
-     So, condition (3) means in clear text ok_to_echo_at_next_pause
-     must be either null, or the current message isn't from echoing at
-     all, or it's from echoing from a different kboard than the
-     current one.  */
-
-  /* M8f: echo-cancel-or-dash + minibuf-menu-prompt blocks ported
-     to Scheme `rc-prologue-echo-and-menu!'.  Returns one of
-     `return-wrong-kboard' / `goto-exit' / `fall-through'.  See
-     docs/keyboard.org §M8f.  */
-  {
-    static SCM rc_echo_menu_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_echo_menu_proc))
-      rc_echo_menu_proc = scm_c_public_ref ("emacs read-char",
-                                            "rc-prologue-echo-and-menu!");
-    SCM result = SCM_CALL_0 (rc_echo_menu_proc);
-    if (scm_is_eq (result, intern ("return-wrong-kboard")))
-      return make_fixnum (-2);
-    if (scm_is_eq (result, intern ("goto-exit")))
-      goto exit;
-    /* else: `fall-through' — continue.  */
-  }
-
-  /* M8g: idle-timer + immediate-echo + auto-save ported to Scheme
-     `rc-prologue-idle-echo-autosave!'.  All three blocks are pure
-     side effects with fall-through.  See docs/keyboard.org §M8g.  */
-  {
-    static SCM rc_idle_echo_autosave_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_idle_echo_autosave_proc))
-      rc_idle_echo_autosave_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-prologue-idle-echo-autosave!");
-    SCM_CALL_0 (rc_idle_echo_autosave_proc);
-  }
-
-  /* M8h: X-menu reading block + auto-save-by-idle-timeout + GC
-     blocks ported to Scheme `rc-prologue-xmenu-and-idle-gc!'.
-     Returns `goto-exit' (X-menu fired) or `fall-through'.  See
-     docs/keyboard.org §M8h.  */
-  {
-    static SCM rc_xmenu_idle_gc_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_xmenu_idle_gc_proc))
-      rc_xmenu_idle_gc_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-prologue-xmenu-and-idle-gc!");
-    SCM result = SCM_CALL_0 (rc_xmenu_idle_gc_proc);
-    if (scm_is_eq (result, intern ("goto-exit")))
-      goto exit;
-    /* else: `fall-through' — continue.  */
-  }
-
-  /* M8i: wrong-kboard detection + Vunread_command_events drain +
-     kbd_queue read + other-kboard scan, ported to Scheme
-     `rc-prologue-kboard-and-queues!'.  Returns `return-wrong-kboard'
-     or `fall-through'.  See docs/keyboard.org §M8i.  */
-  {
-    static SCM rc_kboard_queues_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_kboard_queues_proc))
-      rc_kboard_queues_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-prologue-kboard-and-queues!");
-    SCM result = SCM_CALL_0 (rc_kboard_queues_proc);
-    if (scm_is_eq (result, intern ("return-wrong-kboard")))
-      return make_fixnum (-2);  /* wrong_kboard_jmpbuf */
-    /* else: `fall-through' — continue.  */
-  }
-
- non_reread:
-
-  /* M8j: wrong_kboard + non_reread loop ported to Scheme
-     `rc-wrong-kboard-and-non-reread!'.  Internally loops the
-     blocking-read + redisplay-on-nil so the original
-     `goto wrong_kboard;' becomes a `continue' inside the subr.
-     Returns `goto-exit', `return-wrong-kboard', or `fall-through'.
-     See docs/keyboard.org §M8j.  */
-  {
-    static SCM rc_wkbd_nr_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_wkbd_nr_proc))
-      rc_wkbd_nr_proc = scm_c_public_ref ("emacs read-char",
-                                          "rc-wrong-kboard-and-non-reread!");
-    SCM result = SCM_CALL_0 (rc_wkbd_nr_proc);
-    if (scm_is_eq (result, intern ("goto-exit")))
-      goto exit;
-    if (scm_is_eq (result, intern ("return-wrong-kboard")))
-      return make_fixnum (-2);
-    /* else: `fall-through' — state->c is non-nil, continue.  */
-  }
-
-  /* M8k: BUFFERP early-exit + special-event-map dispatch ported
-     to Scheme `rc-bufferp-and-special-event-map!'.  Returns
-     `goto-exit' (BUFFERP or current_buffer changed), `goto-retry'
-     (special command fired without buffer change), or
-     `fall-through'.  See docs/keyboard.org §M8k.  */
-  {
-    static SCM rc_bufp_special_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_bufp_special_proc))
-      rc_bufp_special_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-bufferp-and-special-event-map!");
-    SCM result = SCM_CALL_0 (rc_bufp_special_proc);
-    if (scm_is_eq (result, intern ("goto-exit")))
-      goto exit;
-    if (scm_is_eq (result, intern ("goto-retry")))
-      goto retry;
-    /* else: `fall-through' — continue.  */
-  }
-
-  /* M8l: FIXNUMP/keyboard-translate-table + menu-bar synthesis +
-     record_char + echo-area wipe ported to Scheme
-     `rc-event-translate-and-record!'.  Returns `goto-exit'
-     (FIXNUMP EOF path: c == -1) or `fall-through'.  See
-     docs/keyboard.org §M8l.  */
-  {
-    static SCM rc_translate_record_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_translate_record_proc))
-      rc_translate_record_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-event-translate-and-record!");
-    SCM result = SCM_CALL_0 (rc_translate_record_proc);
-    if (scm_is_eq (result, intern ("goto-exit")))
-      goto exit;
-    /* else: `fall-through' — continue.  */
-  }
-
- reread_for_input_method:
- from_macro:
-  /* M8m: input-method dispatch + record-if-unread ported to
-     Scheme `rc-input-method-dispatch!'.  Returns `goto-retry'
-     (input method consumed input without producing events) or
-     `fall-through'.  See docs/keyboard.org §M8m.  */
-  {
-    static SCM rc_input_method_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_input_method_proc))
-      rc_input_method_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-input-method-dispatch!");
-    SCM result = SCM_CALL_0 (rc_input_method_proc);
-    if (scm_is_eq (result, intern ("goto-retry")))
-      goto retry;
-    /* else: `fall-through' — continue.  */
-  }
-
- reread_first:
-
-  /* M8n: help-echo display + add-to-this_command_keys +
-     last_input_event + help_form recursive read, ported to
-     Scheme `rc-help-echo-and-help-form!'.  Returns `goto-retry'
-     (help-echo path) or `fall-through'.  See docs/keyboard.org
-     §M8n.  */
-  {
-    static SCM rc_help_echo_form_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rc_help_echo_form_proc))
-      rc_help_echo_form_proc
-        = scm_c_public_ref ("emacs read-char",
-                            "rc-help-echo-and-help-form!");
-    SCM result = SCM_CALL_0 (rc_help_echo_form_proc);
-    if (scm_is_eq (result, intern ("goto-retry")))
-      goto retry;
-    /* else: `fall-through' — continue to exit.  */
-  }
-
- exit:
-  input_was_pending = input_pending;
-  return c;
-#undef commandflag
-#undef map
-#undef prev_event
-#undef used_mouse_menu
-#undef end_time
-#undef c
-#undef jmpcount
-#undef local_getcjmp
-#undef save_jump
-#undef previous_echo_area_message
-#undef also_record
-#undef recorded
-#undef reread
-#undef polling_stopped_here
-#undef orig_kboard
-#undef save_getcjmp
-#undef restore_getcjmp
+  /* M8final: read_char_1's body is now a Scheme dispatcher
+     `read-char-main' in (emacs read-char).  It drives the
+     M8c..M8n bulk subrs in sequence, with `goto retry' /
+     `goto exit' implemented as tail calls between named
+     sections.  Returns either state->c (via --rc-exit) or
+     -2 (return-wrong-kboard).  See docs/keyboard.org §M8final.  */
+  static SCM rc_main_proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (rc_main_proc))
+    rc_main_proc = scm_c_public_ref ("emacs read-char",
+                                     "read-char-main");
+  return SCM_CALL_1 (rc_main_proc, jump ? Qt : Qnil);
 }
 /* {{coccinelle:skip_end}} */
 

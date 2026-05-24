@@ -184,4 +184,15 @@
   ;; `fall-through' before touching show_help_echo or help_form.
   (should (eq 'fall-through (--rc-help-echo-and-help-form!))))
 
+;;;; M8final — exit tail + hoisted dispatcher
+
+(ert-deftest m8final-helpers/exist ()
+  (should (fboundp '--rc-exit))
+  (should (fboundp '--read-char-main)))
+
+(ert-deftest m8final-rc-exit/nil-at-idle ()
+  ;; --rc-exit returns nil when rc_state_stack is empty (no
+  ;; in-flight read_char to read state->c from).
+  (should (eq nil (--rc-exit!))))
+
 (provide 'ertest-read-char)

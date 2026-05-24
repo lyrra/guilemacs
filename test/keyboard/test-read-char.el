@@ -123,4 +123,10 @@
 (test-eq "help-echo-form/fall-through-at-idle"
          'fall-through (--rc-help-echo-and-help-form!))
 
+;;;; M8final
+
+(test-assert "helpers/rc-exit"         (fboundp '--rc-exit))
+(test-assert "helpers/read-char-main"  (fboundp '--read-char-main))
+(test-eq "rc-exit/nil-at-idle" nil (--rc-exit!))
+
 (test-end)

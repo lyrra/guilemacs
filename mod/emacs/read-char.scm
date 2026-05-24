@@ -18,6 +18,8 @@
             rc-event-translate-and-record!
             rc-input-method-dispatch!
             rc-help-echo-and-help-form!
+            rc-exit!
+            read-char-main
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -153,6 +155,15 @@ test setup when the same rc-state is reused across calls."
 ;;;;
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
+
+(define %rc-exit
+  (delay (%c '--rc-exit)))
+
+(define (rc-exit!)
+  "Final tail of read_char_1: latch input_was_pending = input_pending
+and return state->c (the resolved event).  See docs/keyboard.org
+§M8final."
+  ((force %rc-exit)))
 
 (define %rc-help-echo-and-help-form
   (delay (%c '--rc-help-echo-and-help-form)))
@@ -308,6 +319,110 @@ See docs/keyboard.org §M8c."
   ((force %rc-prologue-drain-unread)))
 
 ;;;;
+;;;; M8final — hoisted body of read_char_1.
+;;;;
+;;;; Drives the M8c..M8n bulk subrs in sequence.  Each named
+;;;; sub-section either tail-calls the next section, jumps via
+;;;; tail-call to one of the labelled sections (retry-section,
+;;;; non-reread-section, reread-for-input-method-section,
+;;;; reread-first-section, exit-section), or returns -2 for the
+;;;; `wrong_kboard_jmpbuf' path.  Guile's TCO means `goto retry'
+;;;; cycles do not grow the C stack.
+
+(define (read-char-main jump?)
+  "Hoisted body of read_char_1.  JUMP? is t when called after a
+quit-handler longjmp re-entry (mirrors the C `if (jump) goto
+non_reread').  Drives the M8c..M8n bulk subrs in sequence;
+returns state->c (via --rc-exit) or -2 (for wrong-kboard exits).
+See docs/keyboard.org §M8final."
+  (define (retry-section)
+    ;; M8c — drain unread events.
+    (let ((r (rc-prologue-drain-unread!)))
+      (cond
+       ((eq? r 'reread-first)            (reread-first-section))
+       ((eq? r 'reread-for-input-method) (reread-for-input-method-section))
+       (else                             (after-drain)))))
+
+  (define (after-drain)
+    ;; M8d — kbd-macro + unread-switch-frame early exits.
+    (let ((r (rc-prologue-macro-or-switch-frame!)))
+      (cond
+       ((eq? r 'from-macro)    (reread-for-input-method-section))
+       ((eq? r 'reread-first)  (reread-first-section))
+       (else                   (after-macro-sf)))))
+
+  (define (after-macro-sf)
+    ;; M8e — redisplay loop (always fall-through).
+    (rc-prologue-redisplay!)
+    ;; M8f — echo cancel/dash + minibuf-menu prompt.
+    (let ((r (rc-prologue-echo-and-menu!)))
+      (cond
+       ((eq? r 'return-wrong-kboard) -2)
+       ((eq? r 'goto-exit)           (exit-section))
+       (else                         (after-echo-menu)))))
+
+  (define (after-echo-menu)
+    ;; M8g — idle / immediate-echo / auto-save by keystroke (fall-through).
+    (rc-prologue-idle-echo-autosave!)
+    ;; M8h — X-menu + auto-save-by-timeout + GC.
+    (let ((r (rc-prologue-xmenu-and-idle-gc!)))
+      (cond
+       ((eq? r 'goto-exit)  (exit-section))
+       (else                (after-xmenu)))))
+
+  (define (after-xmenu)
+    ;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard.
+    (let ((r (rc-prologue-kboard-and-queues!)))
+      (cond
+       ((eq? r 'return-wrong-kboard) -2)
+       (else                         (non-reread-section)))))
+
+  (define (non-reread-section)
+    ;; M8j — wrong_kboard + non_reread loop (the blocking-read entry).
+    (let ((r (rc-wrong-kboard-and-non-reread!)))
+      (cond
+       ((eq? r 'goto-exit)           (exit-section))
+       ((eq? r 'return-wrong-kboard) -2)
+       (else                         (after-non-reread)))))
+
+  (define (after-non-reread)
+    ;; M8k — BUFFERP early-exit + special-event-map dispatch.
+    (let ((r (rc-bufferp-and-special-event-map!)))
+      (cond
+       ((eq? r 'goto-exit)  (exit-section))
+       ((eq? r 'goto-retry) (retry-section))
+       (else                (after-bufp-special)))))
+
+  (define (after-bufp-special)
+    ;; M8l — FIXNUMP/translate + menu-bar synthesis + record + echo-wipe.
+    (let ((r (rc-event-translate-and-record!)))
+      (cond
+       ((eq? r 'goto-exit) (exit-section))
+       (else               (reread-for-input-method-section)))))
+
+  (define (reread-for-input-method-section)
+    ;; M8m — input-method dispatch + record-if-unread.
+    (let ((r (rc-input-method-dispatch!)))
+      (cond
+       ((eq? r 'goto-retry) (retry-section))
+       (else                (reread-first-section)))))
+
+  (define (reread-first-section)
+    ;; M8n — help-echo + this-command-keys + last_input_event + help-form.
+    (let ((r (rc-help-echo-and-help-form!)))
+      (cond
+       ((eq? r 'goto-retry) (retry-section))
+       (else                (exit-section)))))
+
+  (define (exit-section)
+    ;; --rc-exit: input_was_pending = input_pending; return state->c.
+    (rc-exit!))
+
+  (if (%nilp jump?)
+      (retry-section)
+      (non-reread-section)))
+
+;;;;
 ;;;; Registration
 ;;;;
 ;;;; srfi-9 accessors are syntax-transformers in this Guile build
@@ -356,4 +471,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-input-method-dispatch!)
               ;; M8n — help-echo + this-command-keys + help-form
               (--rc-help-echo-and-help-form!
-                                       ,rc-help-echo-and-help-form!))))
+                                       ,rc-help-echo-and-help-form!)
+              ;; M8final — exit tail + hoisted dispatcher
+              (--rc-exit!              ,rc-exit!)
+              (--read-char-main        ,read-char-main))))
