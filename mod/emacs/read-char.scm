@@ -15,6 +15,7 @@
             rc-prologue-kboard-and-queues!
             rc-wrong-kboard-and-non-reread!
             rc-bufferp-and-special-event-map!
+            rc-event-translate-and-record!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -150,6 +151,20 @@ test setup when the same rc-state is reused across calls."
 ;;;;
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
+
+(define %rc-event-translate-and-record
+  (delay (%c '--rc-event-translate-and-record)))
+
+(define (rc-event-translate-and-record!)
+  "Post-special-event translate + record + wipe.  Block 1: FIXNUMP
+EOF check (returns `goto-exit' for c == -1) then keyboard-translate-
+table lookup; Block 2: menu-bar/tab-bar/tool-bar synthesis (push
+original onto Vunread_command_events, set state->c to the bare posn
+symbol); Block 3: record_char + also_record, save echo-area for
+input-method when appropriate, wipe echo area unless state->c is a
+help-echo / switch-frame / select-window event.  Returns `goto-exit'
+or `fall-through'.  See docs/keyboard.org §M8l."
+  ((force %rc-event-translate-and-record)))
 
 (define %rc-bufferp-and-special-event-map
   (delay (%c '--rc-bufferp-and-special-event-map)))
@@ -300,4 +315,7 @@ See docs/keyboard.org §M8c."
                                        ,rc-wrong-kboard-and-non-reread!)
               ;; M8k — BUFFERP + special-event-map dispatch
               (--rc-bufferp-and-special-event-map!
-                                       ,rc-bufferp-and-special-event-map!))))
+                                       ,rc-bufferp-and-special-event-map!)
+              ;; M8l — translate + menu-bar + record + echo-wipe
+              (--rc-event-translate-and-record!
+                                       ,rc-event-translate-and-record!))))

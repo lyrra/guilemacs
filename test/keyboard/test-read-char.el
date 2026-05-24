@@ -102,4 +102,11 @@
 (test-eq "bufp-special/fall-through-at-idle"
          'fall-through (--rc-bufferp-and-special-event-map!))
 
+;;;; M8l
+
+(test-assert "helpers/rc-event-translate-and-record"
+             (fboundp '--rc-event-translate-and-record))
+(test-eq "translate-record/fall-through-at-idle"
+         'fall-through (--rc-event-translate-and-record!))
+
 (test-end)

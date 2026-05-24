@@ -153,4 +153,14 @@
   ;; `fall-through' before touching state.
   (should (eq 'fall-through (--rc-bufferp-and-special-event-map!))))
 
+;;;; M8l — translate + menu-bar + record + echo-wipe
+
+(ert-deftest m8l-helpers/exist ()
+  (should (fboundp '--rc-event-translate-and-record)))
+
+(ert-deftest m8l-translate-record/fall-through-at-idle ()
+  ;; Outside any in-flight read_char, the subr early-returns
+  ;; `fall-through' before touching record_char / echo state.
+  (should (eq 'fall-through (--rc-event-translate-and-record!))))
+
 (provide 'ertest-read-char)

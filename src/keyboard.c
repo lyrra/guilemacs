@@ -2987,6 +2987,136 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8l — bulk splice of FIXNUMP/keyboard-translate-table +
+   menu-bar synthesis + record_char + echo-area wipe (the three
+   sequential blocks after M8k).  See docs/keyboard.org §M8l.  */
+DEFUN ("--rc-event-translate-and-record",
+       Fc_rc_event_translate_and_record,
+       Sc_rc_event_translate_and_record, 0, 0, 0,
+       doc: /* Internal: post-special-event translate + record + wipe.
+
+  Block 1: if FIXNUMP(state->c) — when XFIXNUM == -1 (EOF from
+    kbd_buffer_get_event), return `goto-exit'.  Otherwise apply
+    keyboard-translate-table when in range; replace state->c
+    with the translation if non-nil.
+
+  Block 2: menu-bar synthesis.  If state->c is a mouse-position
+    event with posn in {Qmenu_bar, Qtab_bar, Qtool_bar}, rewrite
+    the posn to (list posn), push the original onto
+    Vunread_command_events (wrapped in (Qt . c) when timed,
+    plain otherwise with also_record set), and replace
+    state->c with the bare posn symbol.
+
+  Block 3: record_char(state->c); state->recorded = true.  Also
+    record state->also_record if set.  If state->c is a printable
+    ASCII character and Vinput_method_function is set, save
+    previous-echo-area-message + Vinput_method_previous_message.
+    Wipe the echo area unless state->c is a help-echo /
+    switch-frame / select-window event; on wipe, run
+    Qecho_area_clear_hook + clear_message, possibly resize the
+    mini-window.
+
+  Returns `goto-exit' (only Block 1's EOF path) or `fall-through'.
+  Mirrors src/keyboard.c lines 3979-4086 pre-M8l.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: FIXNUMP + keyboard-translate-table.  */
+  if (FIXNUMP (state->c))
+    {
+      /* If kbd_buffer_get_event gave us an EOF, return that.  */
+      if (XFIXNUM (state->c) == -1)
+        return intern ("goto-exit");
+
+      if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
+           && XFIXNAT (state->c) < SCHARS (KVAR (current_kboard,
+                                                 Vkeyboard_translate_table)))
+          || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard,
+                                             Vkeyboard_translate_table))
+              && XFIXNAT (state->c) < ASIZE (KVAR (current_kboard,
+                                                   Vkeyboard_translate_table)))
+          || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
+              && CHARACTERP (state->c)))
+        {
+          Lisp_Object d
+            = Faref (KVAR (current_kboard, Vkeyboard_translate_table),
+                     state->c);
+          /* nil in keyboard-translate-table means no translation.  */
+          if (!NILP (d))
+            state->c = d;
+        }
+    }
+
+  /* Block 2: menu-bar synthesis.  */
+  if (EVENT_HAS_PARAMETERS (state->c)
+      && CONSP (XCDR (state->c))
+      && CONSP (xevent_start (state->c))
+      && CONSP (XCDR (xevent_start (state->c))))
+    {
+      Lisp_Object posn = POSN_POSN (xevent_start (state->c));
+      if (EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
+          || EQ (posn, Qtool_bar))
+        {
+          /* Change menu-bar to (menu-bar) as the event "position".  */
+          POSN_SET_POSN (xevent_start (state->c), list1 (posn));
+
+          if (state->end_time)
+            Vunread_command_events = Fcons (Fcons (Qt, state->c),
+                                            Vunread_command_events);
+          else
+            {
+              state->also_record = state->c;
+              Vunread_command_events = Fcons (state->c,
+                                              Vunread_command_events);
+            }
+          state->c = posn;
+        }
+    }
+
+  /* Block 3a: record_char + also_record.  */
+  record_char (state->c);
+  state->recorded = true;
+  if (!NILP (state->also_record))
+    record_char (state->also_record);
+
+  /* Block 3b: pre-input-method echo-area save.  */
+  if (FIXNUMP (state->c)
+      && !NILP (Vinput_method_function)
+      && ' ' <= XFIXNUM (state->c) && XFIXNUM (state->c) < 256
+      && XFIXNUM (state->c) != 127)
+    {
+      state->previous_echo_area_message = Fcurrent_message ();
+      Vinput_method_previous_message = state->previous_echo_area_message;
+    }
+
+  /* Block 3c: echo-area wipe (unless help/switch/select-window).  */
+  if (!CONSP (state->c)
+      || (!EQ (Qhelp_echo, XCAR (state->c))
+          && !EQ (Qswitch_frame, XCAR (state->c))
+          && !EQ (Qselect_window, XCAR (state->c))))
+    {
+      if (!NILP (echo_area_buffer[0]))
+        {
+          safe_run_hooks (Qecho_area_clear_hook);
+          clear_message (1, 0);
+          /* If we were showing the echo-area message on top of an
+             active minibuffer, resize the mini-window.  */
+          if (minibuf_level
+              && EQ (minibuf_window, echo_area_window)
+              && !NUMBERP (Vminibuffer_message_timeout))
+            resize_mini_window (XWINDOW (minibuf_window), false);
+        }
+      else if (FUNCTIONP (Vclear_message_function))
+        clear_message (1, 0);
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8k — bulk splice of BUFFERP early-exit + special-event-map
    dispatch (the two blocks immediately after the M8j non_reread
    loop).  See docs/keyboard.org §M8k.  */
@@ -3976,114 +4106,22 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — continue.  */
   }
 
-  /* Handle things that only apply to characters.  */
-  if (FIXNUMP (c))
-    {
-      /* If kbd_buffer_get_event gave us an EOF, return that.  */
-      if (XFIXNUM (c) == -1)
-	goto exit;
-
-      if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
-	   && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
-					  Vkeyboard_translate_table)))
-	  || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard, Vkeyboard_translate_table))
-	      && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
-					    Vkeyboard_translate_table)))
-	  || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
-	      && CHARACTERP (c)))
-	{
-	  Lisp_Object d;
-	  d = Faref (KVAR (current_kboard, Vkeyboard_translate_table), c);
-	  /* nil in keyboard-translate-table means no translation.  */
-	  if (!NILP (d))
-	    c = d;
-	}
-    }
-
-  /* If this event is a mouse click in the menu bar,
-     return just menu-bar for now.  Modify the mouse click event
-     so we won't do this twice, then queue it up.  */
-  if (EVENT_HAS_PARAMETERS (c)
-      && CONSP (XCDR (c))
-      && CONSP (xevent_start (c))
-      && CONSP (XCDR (xevent_start (c))))
-    {
-      Lisp_Object posn;
-
-      posn = POSN_POSN (xevent_start (c));
-      /* Handle menu-bar events:
-	 insert the dummy prefix event `menu-bar'.  */
-      if (EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar) || EQ (posn, Qtool_bar))
-	{
-	  /* Change menu-bar to (menu-bar) as the event "position".  */
-	  POSN_SET_POSN (xevent_start (c), list1 (posn));
-
-	  /* Should a command call `sit-for', or another command that
-	     provides a timespec to Fread_event and co., the original
-	     event will not subsequently be entered into
-	     this_command_keys unless Qt be specified below.
-
-	     The same is the case in a number of other scenarios where
-	     reread is true, but if so, event recording is to be
-	     suppressed anyway.  */
-
-	  if (end_time)
-	    Vunread_command_events = Fcons (Fcons (Qt, c),
-					    Vunread_command_events);
-	  else
-	    {
-	      also_record = c;
-	      Vunread_command_events = Fcons (c, Vunread_command_events);
-	    }
-	  c = posn;
-	}
-    }
-
-  /* Store these characters into recent_keys, the dribble file if any,
-     and the keyboard macro being defined, if any.  */
-  record_char (c);
-  recorded = true;
-  if (! NILP (also_record))
-    record_char (also_record);
-
-  /* Wipe the echo area.
-     But first, if we are about to use an input method,
-     save the echo area contents for it to refer to.  */
-  if (FIXNUMP (c)
-      && ! NILP (Vinput_method_function)
-      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256 && XFIXNUM (c) != 127)
-    {
-      previous_echo_area_message = Fcurrent_message ();
-      Vinput_method_previous_message = previous_echo_area_message;
-    }
-
-  /* Now wipe the echo area, except for help events which do their
-     own stuff with the echo area.  */
-  if (!CONSP (c)
-      || (!(EQ (Qhelp_echo, XCAR (c)))
-	  && !(EQ (Qswitch_frame, XCAR (c)))
-	  /* Don't wipe echo area for select window events: These might
-	     get delayed via `mouse-autoselect-window' (Bug#11304).  */
-	  && !(EQ (Qselect_window, XCAR (c)))))
-    {
-      if (!NILP (echo_area_buffer[0]))
-	{
-	  safe_run_hooks (Qecho_area_clear_hook);
-	  clear_message (1, 0);
-	  /* If we were showing the echo-area message on top of an
-	     active minibuffer, resize the mini-window, since the
-	     minibuffer may need more or less space than the echo area
-	     we've just wiped.  */
-	  if (minibuf_level
-	      && EQ (minibuf_window, echo_area_window)
-	      /* The case where minibuffer-message-timeout is a number
-		 was already handled near the beginning of command_loop_1.  */
-	      && !NUMBERP (Vminibuffer_message_timeout))
-	    resize_mini_window (XWINDOW (minibuf_window), false);
-	}
-      else if (FUNCTIONP (Vclear_message_function))
-        clear_message (1, 0);
-    }
+  /* M8l: FIXNUMP/keyboard-translate-table + menu-bar synthesis +
+     record_char + echo-area wipe ported to Scheme
+     `rc-event-translate-and-record!'.  Returns `goto-exit'
+     (FIXNUMP EOF path: c == -1) or `fall-through'.  See
+     docs/keyboard.org §M8l.  */
+  {
+    static SCM rc_translate_record_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_translate_record_proc))
+      rc_translate_record_proc
+        = scm_c_public_ref ("emacs read-char",
+                            "rc-event-translate-and-record!");
+    SCM result = SCM_CALL_0 (rc_translate_record_proc);
+    if (scm_is_eq (result, intern ("goto-exit")))
+      goto exit;
+    /* else: `fall-through' — continue.  */
+  }
 
  reread_for_input_method:
  from_macro:
