@@ -46,4 +46,11 @@
 (test-eq "drain/fall-through-at-idle"
          'fall-through (--rc-prologue-drain-unread!))
 
+;;;; M8d
+
+(test-assert "helpers/rc-prologue-macro-or-switch-frame"
+             (fboundp '--rc-prologue-macro-or-switch-frame))
+(test-eq "macro-sf/fall-through-at-idle"
+         'fall-through (--rc-prologue-macro-or-switch-frame!))
+
 (test-end)

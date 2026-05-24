@@ -2987,6 +2987,64 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
   return Qnil;
 }
 
+/* M8d — bulk splice of the kbd-macro + unread-switch-frame
+   early-exit blocks that follow the M8c drain.  See
+   docs/keyboard.org §M8d.  */
+DEFUN ("--rc-prologue-macro-or-switch-frame",
+       Fc_rc_prologue_macro_or_switch_frame,
+       Sc_rc_prologue_macro_or_switch_frame, 0, 0, 0,
+       doc: /* Internal: after the unread-events drain (M8c), check
+the two next early-exit paths in read_char_1:
+
+  Block 1: if `executing-kbd-macro' is non-nil and not at its end,
+    pull the next char/event from the macro buffer (decoding meta-
+    bit for STRINGP macros), bump `executing_kbd_macro_index',
+    pin internal_last_event_frame to Qmacro, install the event
+    into state->c, return `from-macro' (caller goto from_macro).
+  Block 2: if `unread_switch_frame' is non-nil, install it into
+    state->c, clear unread_switch_frame, return `reread-first'
+    (caller goto reread_first).
+  Otherwise: return `fall-through' (caller continues).
+
+Mirrors src/keyboard.c lines 3242-3274 pre-M8d.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  /* Block 1: executing kbd-macro.  */
+  if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
+    {
+      /* Set this to Qmacro so nobody tries to switch frames; events
+         read from a macro must never cause a new frame to be selected.  */
+      Vlast_event_frame = internal_last_event_frame = Qmacro;
+
+      Lisp_Object c
+        = Faref (Vexecuting_kbd_macro, make_int (executing_kbd_macro_index));
+      if (STRINGP (Vexecuting_kbd_macro)
+          && (XFIXNAT (c) & 0x80) && (XFIXNAT (c) <= 0xff))
+        XSETFASTINT (c, CHAR_META | (XFIXNAT (c) & ~0x80));
+
+      executing_kbd_macro_index++;
+      state->c = c;
+      return intern ("from-macro");
+    }
+
+  /* Block 2: delayed switch-frame event.  */
+  if (!NILP (unread_switch_frame))
+    {
+      state->c = unread_switch_frame;
+      unread_switch_frame = Qnil;
+      /* This event should make it into this_command_keys and get
+         echoed again, so we do NOT set `reread'.  */
+      return intern ("reread-first");
+    }
+
+  return intern ("fall-through");
+}
+
 /* M8c — bulk splice of read_char_1's `retry:' prologue: drain the
    three unread-events queues atomically.  See docs/keyboard.org §M8c.  */
 DEFUN ("--rc-prologue-drain-unread",
@@ -3238,40 +3296,22 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     /* else: `fall-through' — continue below.  */
   }
 
-  /* If we're executing a macro, process it unless we are at its end. */
-  if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
-    {
-      /* We set this to Qmacro; since that's not a frame, nobody will
-	 try to switch frames on us, and the selected window will
-	 remain unchanged.
-
-         Since this event came from a macro, it would be misleading to
-	 leave internal_last_event_frame set to wherever the last
-	 real event came from.  Normally, a switch-frame event selects
-	 internal_last_event_frame after each command is read, but
-	 events read from a macro should never cause a new frame to be
-	 selected.  */
-      Vlast_event_frame = internal_last_event_frame = Qmacro;
-
-      c = Faref (Vexecuting_kbd_macro, make_int (executing_kbd_macro_index));
-      if (STRINGP (Vexecuting_kbd_macro)
-	  && (XFIXNAT (c) & 0x80) && (XFIXNAT (c) <= 0xff))
-	XSETFASTINT (c, CHAR_META | (XFIXNAT (c) & ~0x80));
-
-      executing_kbd_macro_index++;
-
+  /* M8d: kbd-macro + unread-switch-frame early-exit checks ported
+     to Scheme `rc-prologue-macro-or-switch-frame!'.  Returns one
+     of `from-macro' / `reread-first' / `fall-through' for 3-way
+     C control flow.  See docs/keyboard.org §M8d.  */
+  {
+    static SCM rc_macro_sf_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_macro_sf_proc))
+      rc_macro_sf_proc = scm_c_public_ref ("emacs read-char",
+                                           "rc-prologue-macro-or-switch-frame!");
+    SCM result = SCM_CALL_0 (rc_macro_sf_proc);
+    if (scm_is_eq (result, intern ("from-macro")))
       goto from_macro;
-    }
-
-  if (!NILP (unread_switch_frame))
-    {
-      c = unread_switch_frame;
-      unread_switch_frame = Qnil;
-
-      /* This event should make it into this_command_keys, and get echoed
-	 again, so we do not set `reread'.  */
+    if (scm_is_eq (result, intern ("reread-first")))
       goto reread_first;
-    }
+    /* else: `fall-through' — continue.  */
+  }
 
   /* If redisplay was requested.  */
   if (commandflag >= 0)

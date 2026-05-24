@@ -7,6 +7,7 @@
             rc-state-fresh!
             ;; M8c — read_char_1 splices
             rc-prologue-drain-unread!
+            rc-prologue-macro-or-switch-frame!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -143,6 +144,16 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
+(define %rc-prologue-macro-or-switch-frame
+  (delay (%c '--rc-prologue-macro-or-switch-frame)))
+
+(define (rc-prologue-macro-or-switch-frame!)
+  "Two early-exit blocks after the unread-events drain:
+in-progress kbd-macro replay, and pending switch-frame event.
+Returns `from-macro', `reread-first', or `fall-through' for
+3-way C control flow.  See docs/keyboard.org §M8d."
+  ((force %rc-prologue-macro-or-switch-frame)))
+
 (define %rc-prologue-drain-unread
   (delay (%c '--rc-prologue-drain-unread)))
 
@@ -172,4 +183,7 @@ See docs/keyboard.org §M8c."
               (--rc-state-fresh!       ,rc-state-fresh!)
               ;; M8c — prologue dispatch
               (--rc-prologue-drain-unread!
-                                       ,rc-prologue-drain-unread!))))
+                                       ,rc-prologue-drain-unread!)
+              ;; M8d — kbd-macro / switch-frame early-exit
+              (--rc-prologue-macro-or-switch-frame!
+                                       ,rc-prologue-macro-or-switch-frame!))))

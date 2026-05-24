@@ -74,4 +74,14 @@
   ;; subr early-returns `fall-through' before touching anything.
   (should (eq 'fall-through (--rc-prologue-drain-unread!))))
 
+;;;; M8d — kbd-macro + unread-switch-frame early exits
+
+(ert-deftest m8d-helpers/exist ()
+  (should (fboundp '--rc-prologue-macro-or-switch-frame)))
+
+(ert-deftest m8d-macro-sf/fall-through-at-idle ()
+  ;; No kbd-macro running and no unread-switch-frame at batch
+  ;; startup; subr returns `fall-through'.
+  (should (eq 'fall-through (--rc-prologue-macro-or-switch-frame!))))
+
 (provide 'ertest-read-char)
