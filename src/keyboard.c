@@ -10441,6 +10441,41 @@ static Lisp_Object rks_key;
 static bool        rks_used_mouse_menu;
 static bool        rks_used_mouse_menu_history[READ_KEY_ELTS];
 
+/* M6ab — promote new_binding.  Written by follow_key + the
+   unbound-event reduction's inner loop; read by M6aa's install
+   step.  See docs/keyboard.org §M6ab.  */
+static Lisp_Object rks_new_binding;
+
+DEFUN ("--rks-follow-key-and-update-first-unbound",
+       Fc_rks_follow_key_and_update_first_unbound,
+       Sc_rks_follow_key_and_update_first_unbound, 0, 0, 0,
+       doc: /* Internal: compute rks_new_binding = follow_key
+(rks_current_binding, rks_key).  If non-nil, also update
+rks_first_unbound = max (rks_t + 1, rks_first_unbound) and return
+t (caller skips the unbound-event reduction).  Returns nil
+otherwise (caller falls through to the reduction block).
+Mirrors src/keyboard.c lines 11937-11941 pre-M6ab.  */)
+  (void)
+{
+  rks_new_binding = follow_key (rks_current_binding, rks_key);
+  if (!NILP (rks_new_binding))
+    {
+      int candidate = rks_t + 1;
+      if (candidate > rks_first_unbound)
+        rks_first_unbound = candidate;
+      return Qt;
+    }
+  return Qnil;
+}
+
+DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
+       0, 0, 0,
+       doc: /* Internal: read rks_new_binding.  */)
+  (void)
+{
+  return rks_new_binding;
+}
+
 DEFUN ("--rks-key", Fc_rks_key, Sc_rks_key, 0, 0, 0,
        doc: /* Internal: read rks_key (the current event being
 processed by the read_key_sequence iteration body).  */)
@@ -10455,6 +10490,31 @@ DEFUN ("--rks-used-mouse-menu-p", Fc_rks_used_mouse_menu_p,
   (void)
 {
   return rks_used_mouse_menu ? Qt : Qnil;
+}
+
+/* M6aa — bulk splice of the final binding-install + per-key
+   bookkeeping (post-dispatch).  NEW-BINDING is the resolved
+   binding from the keymap dispatch above.  See
+   docs/keyboard.org §M6aa.  */
+DEFUN ("--rks-iter-install-binding",
+       Fc_rks_iter_install_binding, Sc_rks_iter_install_binding, 1, 1, 0,
+       doc: /* Internal: install NEW-BINDING as the resolved
+rks_current_binding for this iteration.  Writes rks_key into
+keybuf[rks_t] and advances rks_t.  Updates last_nonmenu_event
+unless the key came from a mouse menu.  Recomputes
+this_single_command_key_start (clamped to >= 0; see Bug#20223).
+Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
+  (Lisp_Object new_binding)
+{
+  rks_current_binding = new_binding;
+  if (rks_keybuf_depth > 0)
+    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t] = rks_key;
+  rks_t++;
+  if (!rks_used_mouse_menu)
+    last_nonmenu_event = rks_key;
+  ptrdiff_t single = this_command_key_count - rks_t;
+  this_single_command_key_start = single < 0 ? 0 : single;
+  return Qnil;
 }
 
 /* M6z — atomic splice of the mock-input / end-of-macro cascade.
@@ -11496,7 +11556,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
          rks_keys_local_start.  */
 #define echo_local_start rks_echo_local_start
 #define keys_local_start rks_keys_local_start
-      Lisp_Object new_binding;
+      /* M6ab: new_binding promoted to file-static rks_new_binding.  */
+#define new_binding rks_new_binding
 
       eassert (indec.end == t || (indec.end > t && indec.end <= mock_input));
       eassert (indec.start <= indec.end);
@@ -11907,20 +11968,17 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    }
 	}
 
-      /* We have finally decided that KEY is something we might want
-	 to look up.  */
-      new_binding = follow_key (current_binding, key);
-
-      /* If KEY wasn't bound, we'll try some fallbacks.  */
-      if (!NILP (new_binding))
-	/* This is needed for the following scenario:
-	   event 0: a down-event that gets dropped by calling replay_key.
-	   event 1: some normal prefix like C-h.
-	   After event 0, first_unbound is 0, after event 1 indec.start,
-	   fkey.start, and keytran.start are all 1, so when we see that
-	   C-h is bound, we need to update first_unbound.  */
-	first_unbound = max (t + 1, first_unbound);
-      else
+      /* M6ab: follow_key + first_unbound update ported to Scheme
+	 `rks-follow-key-and-update-first-unbound!'.  Returns t iff
+	 KEY was bound (caller skips the unbound-event reduction
+	 cascade in the `else' branch).  See docs/keyboard.org §M6ab.  */
+      {
+	static SCM rks_follow_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_follow_proc))
+	  rks_follow_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-follow-key-and-update-first-unbound!");
+	if (NILP (SCM_CALL_0 (rks_follow_proc)))
 	{
 	  Lisp_Object head;
 
@@ -12055,30 +12113,23 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		}
 	    }
 	}
-      current_binding = new_binding;
+      }   /* M6ab: close the dispatch outer block (opened above the
+	     `if (NILP (SCM_CALL_0 (rks_follow_proc)))') */
 
-      keybuf[t++] = key;
-      /* Normally, last_nonmenu_event gets the previous key we read.
-	 But when a mouse popup menu is being used,
-	 we don't update last_nonmenu_event; it continues to hold the mouse
-	 event that preceded the first level of menu.  */
-      if (!used_mouse_menu)
-	last_nonmenu_event = key;
-
-      /* Record what part of this_command_keys is the current key sequence.  */
-      this_single_command_key_start = this_command_key_count - t;
-      /* When 'input-method-function' called above causes events to be
-	 put on 'unread-post-input-method-events', and as result
-	 'reread' is set to 'true', the value of 't' can become larger
-	 than 'this_command_key_count', because 'add_command_key' is
-	 not called to update 'this_command_key_count'.  If this
-	 happens, 'this_single_command_key_start' will become negative
-	 above, and any call to 'this-single-command-keys' will return
-	 a garbled vector.  See bug #20223 for one such situation.
-	 Here we force 'this_single_command_key_start' to never become
-	 negative, to avoid that.  */
-      if (this_single_command_key_start < 0)
-	this_single_command_key_start = 0;
+      /* M6aa: final binding-install + per-key bookkeeping ported to
+	 Scheme `rks-iter-install-binding!'.  Writes new_binding into
+	 rks_current_binding, advances rks_t with the new keybuf
+	 element, updates last_nonmenu_event when the key didn't come
+	 from a mouse menu, and clamps this_single_command_key_start.
+	 See docs/keyboard.org §M6aa.  */
+      {
+	static SCM rks_install_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_install_proc))
+	  rks_install_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-install-binding!");
+	SCM_CALL_1 (rks_install_proc, new_binding);
+      }
 
       /* M6x: three translation-map walks (input-decode-map, fkey,
 	 keytran) plus the fkey-shortcut, ported to Scheme
@@ -12234,6 +12285,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef key
 #undef used_mouse_menu
 #undef used_mouse_menu_history
+#undef new_binding
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
@@ -13796,6 +13848,8 @@ syms_of_keyboard (void)
   staticpro (&rks_original_uppercase);
   rks_key                  = Qnil;
   staticpro (&rks_key);
+  rks_new_binding          = Qnil;
+  staticpro (&rks_new_binding);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;

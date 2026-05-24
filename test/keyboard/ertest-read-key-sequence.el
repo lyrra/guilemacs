@@ -628,4 +628,40 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (let ((v (--rks-used-mouse-menu-p)))
     (should (or (eq v t) (eq v nil)))))
 
+;;;; M6aa — final binding-install + per-key bookkeeping
+
+(ert-deftest m6aa-helpers/exist ()
+  (should (fboundp '--rks-iter-install-binding)))
+
+(ert-deftest m6aa-install/returns-nil ()
+  ;; Call with nil new-binding outside of a read_key_sequence call.
+  ;; rks_keybuf_depth == 0 means the keybuf-write is a no-op; we
+  ;; just verify the subr runs without error.  It DOES mutate
+  ;; rks_t, rks_current_binding, last_nonmenu_event, and
+  ;; this_single_command_key_start — so save and restore those.
+  (let ((saved-t (--rks-t))
+        (saved-cb (--rks-current-binding))
+        (saved-lne last-nonmenu-event)
+        (saved-tsckcs (--this-single-command-key-start)))
+    (unwind-protect
+        (should (eq nil (--rks-iter-install-binding nil)))
+      (--set-rks-t saved-t)
+      (setq last-nonmenu-event saved-lne)
+      (--set-this-single-command-key-start saved-tsckcs))))
+
+;;;; M6ab — follow_key + first_unbound update
+
+(ert-deftest m6ab-helpers/exist ()
+  (should (fboundp '--rks-follow-key-and-update-first-unbound))
+  (should (fboundp '--rks-new-binding)))
+
+(ert-deftest m6ab-follow-key/nil-at-idle ()
+  ;; At idle, rks_current_binding is nil and rks_key is nil.
+  ;; follow_key(nil, nil) returns nil (no binding).  Subr returns nil.
+  (should (eq nil (--rks-follow-key-and-update-first-unbound))))
+
+(ert-deftest m6ab-new-binding/getter-runs ()
+  (let ((v (--rks-new-binding)))
+    (should (or (eq v nil) v))))
+
 (provide 'ertest-read-key-sequence)

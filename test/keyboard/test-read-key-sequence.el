@@ -411,4 +411,28 @@
   (test-assert "m6z/used-mouse-menu-boolean"
                (or (eq v t) (eq v nil))))
 
+;;;; M6aa
+
+(test-assert "m6aa-helper/install-binding"
+             (fboundp '--rks-iter-install-binding))
+
+(let ((saved-t (--rks-t))
+      (saved-lne last-nonmenu-event)
+      (saved-tsckcs (--this-single-command-key-start)))
+  (test-eq "m6aa/install-binding-returns-nil"
+           nil (--rks-iter-install-binding nil))
+  (--set-rks-t saved-t)
+  (setq last-nonmenu-event saved-lne)
+  (--set-this-single-command-key-start saved-tsckcs))
+
+;;;; M6ab
+
+(test-assert "m6ab-helper/follow-key-update-first-unbound"
+             (fboundp '--rks-follow-key-and-update-first-unbound))
+(test-assert "m6ab-helper/new-binding"
+             (fboundp '--rks-new-binding))
+
+(test-eq "m6ab/follow-key-nil-at-idle"
+         nil (--rks-follow-key-and-update-first-unbound))
+
 (test-end)

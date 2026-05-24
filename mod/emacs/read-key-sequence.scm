@@ -43,6 +43,8 @@
             rks-iter-setup-capture!
             rks-iter-replay-restore!
             rks-iter-pre-read-cascade!
+            rks-iter-install-binding!
+            rks-follow-key-and-update-first-unbound!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -620,6 +622,28 @@ this-command-key-count into the file-static rks_echo_local_start
 to them.  See docs/keyboard.org §M6y."
   ((force %rks-iter-setup-capture)))
 
+(define %rks-follow-key-and-update-first-unbound
+  (delay (%c '--rks-follow-key-and-update-first-unbound)))
+
+(define (rks-follow-key-and-update-first-unbound!)
+  "Compute rks_new_binding = follow_key (rks_current_binding, rks_key)
+and, when non-nil, update first_unbound = max(rks_t + 1,
+first_unbound).  Returns t if KEY was bound (caller skips the
+unbound-event reduction cascade), nil otherwise.  See
+docs/keyboard.org §M6ab."
+  ((force %rks-follow-key-and-update-first-unbound)))
+
+(define %rks-iter-install-binding
+  (delay (%c '--rks-iter-install-binding)))
+
+(define (rks-iter-install-binding! new-binding)
+  "Install NEW-BINDING as the resolved rks_current_binding for this
+iteration.  Advances rks_t with the new keybuf element, updates
+last_nonmenu_event unless the key came from a mouse menu, and
+clamps this_single_command_key_start to >= 0 (Bug#20223).  See
+docs/keyboard.org §M6aa."
+  ((force %rks-iter-install-binding) new-binding))
+
 (define %rks-iter-pre-read-cascade
   (delay (%c '--rks-iter-pre-read-cascade)))
 
@@ -877,4 +901,10 @@ cached-dispatch into here."
                ,rks-iter-replay-restore!)
               ;; M6z — mock-input + end-of-macro cascade
               (--rks-iter-pre-read-cascade!
-               ,rks-iter-pre-read-cascade!))))
+               ,rks-iter-pre-read-cascade!)
+              ;; M6aa — final binding install + per-key bookkeeping
+              (--rks-iter-install-binding!
+               ,rks-iter-install-binding!)
+              ;; M6ab — follow_key + first_unbound update
+              (--rks-follow-key-and-update-first-unbound!
+               ,rks-follow-key-and-update-first-unbound!))))
