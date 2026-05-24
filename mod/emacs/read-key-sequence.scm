@@ -47,6 +47,7 @@
             rks-follow-key-and-update-first-unbound!
             rks-iter-mouse-click-prefix!
             rks-iter-unbound-event-reduction!
+            rks-iter-maybe-disable-text-conversion!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -624,6 +625,18 @@ this-command-key-count into the file-static rks_echo_local_start
 to them.  See docs/keyboard.org §M6y."
   ((force %rks-iter-setup-capture)))
 
+(define %rks-iter-maybe-disable-text-conversion
+  (delay (%c '--rks-iter-maybe-disable-text-conversion)))
+
+(define (rks-iter-maybe-disable-text-conversion!)
+  "On HAVE_TEXT_CONVERSION builds: after the first key is read and
+no mouse menu was used, scan the first up-to-10 keybuf elements
+for a NUMBERP or function-key SYMBOL.  If found, disable text
+conversion + install a resume-on-unwind, then mark the per-call
+flag so this only happens once.  On non-HAVE_TEXT_CONVERSION
+builds, no-op.  See docs/keyboard.org §M6ae."
+  ((force %rks-iter-maybe-disable-text-conversion)))
+
 (define %rks-iter-unbound-event-reduction
   (delay (%c '--rks-iter-unbound-event-reduction)))
 
@@ -940,4 +953,7 @@ cached-dispatch into here."
                ,rks-iter-mouse-click-prefix!)
               ;; M6ad — unbound-event reduction cascade
               (--rks-iter-unbound-event-reduction!
-               ,rks-iter-unbound-event-reduction!))))
+               ,rks-iter-unbound-event-reduction!)
+              ;; M6ae — text-conversion-disable check
+              (--rks-iter-maybe-disable-text-conversion!
+               ,rks-iter-maybe-disable-text-conversion!))))

@@ -24,4 +24,26 @@
   (--rc-state-fresh! s)
   (test-assert "rc-state-fresh/runs" t))
 
+;;;; M8b
+
+(test-assert "helpers/rc-c"              (fboundp '--rc-c))
+(test-assert "helpers/set-rc-c"          (fboundp '--set-rc-c))
+(test-assert "helpers/rc-recorded-p"     (fboundp '--rc-recorded-p))
+(test-assert "helpers/set-rc-recorded"   (fboundp '--set-rc-recorded))
+(test-assert "helpers/set-rc-reread"     (fboundp '--set-rc-reread))
+(test-assert "helpers/rc-set-used-mouse-menu"
+             (fboundp '--rc-set-used-mouse-menu))
+
+(test-eq "setters/no-op-when-stack-empty-c"        nil (--set-rc-c 'x))
+(test-eq "setters/no-op-when-stack-empty-recorded" nil (--set-rc-recorded t))
+(test-eq "setters/no-op-when-stack-empty-reread"   nil (--set-rc-reread t))
+(test-eq "setters/no-op-when-stack-empty-ump"      nil (--rc-set-used-mouse-menu t))
+
+;;;; M8c
+
+(test-assert "helpers/rc-prologue-drain-unread"
+             (fboundp '--rc-prologue-drain-unread))
+(test-eq "drain/fall-through-at-idle"
+         'fall-through (--rc-prologue-drain-unread!))
+
 (test-end)

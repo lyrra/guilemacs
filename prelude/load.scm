@@ -147,6 +147,7 @@
 (use-modules (emacs this-command-keys))
 (use-modules (emacs command-loop))
 (use-modules (emacs read-key-sequence))
+(use-modules (emacs read-char))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -174,6 +175,7 @@
 (init-this-command-keys-registrations)
 (init-command-loop-registrations)
 (init-read-key-sequence-registrations)
+(init-read-char-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)

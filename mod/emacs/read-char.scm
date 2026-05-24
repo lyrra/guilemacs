@@ -5,6 +5,8 @@
   #:export (;; M8a — data substrate
             make-rc-state rc-state?
             rc-state-fresh!
+            ;; M8c — read_char_1 splices
+            rc-prologue-drain-unread!
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -138,6 +140,23 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-orig-kboard!                state #nil))
 
 ;;;;
+;;;; M8c — read_char_1 prologue splices.
+;;;;
+
+(define %rc-prologue-drain-unread
+  (delay (%c '--rc-prologue-drain-unread)))
+
+(define (rc-prologue-drain-unread!)
+  "Drain the three unread-events queues at the top of read_char_1.
+The current (top-of-stack) read_char invocation's state is mutated
+in place (c / reread / recorded / *used_mouse_menu).  Returns one
+of `reread-first', `reread-for-input-method', or `fall-through' to
+control the C caller's goto.
+
+See docs/keyboard.org §M8c."
+  ((force %rc-prologue-drain-unread)))
+
+;;;;
 ;;;; Registration
 ;;;;
 ;;;; srfi-9 accessors are syntax-transformers in this Guile build
@@ -150,4 +169,7 @@ test setup when the same rc-state is reused across calls."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((--make-rc-state         ,make-rc-state)
-              (--rc-state-fresh!       ,rc-state-fresh!))))
+              (--rc-state-fresh!       ,rc-state-fresh!)
+              ;; M8c — prologue dispatch
+              (--rc-prologue-drain-unread!
+                                       ,rc-prologue-drain-unread!))))

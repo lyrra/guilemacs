@@ -2853,10 +2853,266 @@ struct read_char_state
 
 static Lisp_Object read_char_1 (bool, volatile struct read_char_state *);
 
+/* M8a — depth-tracked stack of read_char_state pointers.  read_char
+   recursion happens during mouse-menu prompts, recursive minibuffers,
+   and `read-event' calls inside elisp.  The stack lets Scheme code
+   read fields of the current (top-of-stack) read_char invocation's
+   state via the `--rc-*' accessor subrs without each subr needing a
+   state-pointer argument.  Mirrors M6q's keybuf-stack pattern.  See
+   docs/keyboard.org §M8a.  */
+enum { RC_STATE_STACK_MAX = 8 };
+static struct read_char_state *rc_state_stack[RC_STATE_STACK_MAX];
+static int                     rc_state_depth;
+
+static void
+restore_rc_state_depth (int saved)
+{
+  rc_state_depth = saved;
+}
+
+DEFUN ("--rc-state-depth", Fc_rc_state_depth, Sc_rc_state_depth,
+       0, 0, 0,
+       doc: /* Internal: current depth of the read_char_state stack.
+Zero means no read_char invocation is in flight.  */)
+  (void)
+{
+  return make_fixnum (rc_state_depth);
+}
+
+DEFUN ("--rc-commandflag", Fc_rc_commandflag, Sc_rc_commandflag,
+       0, 0, 0,
+       doc: /* Internal: read state->commandflag of the current
+(top-of-stack) read_char invocation.  Returns 0 when no call is in
+flight.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return make_fixnum (0);
+  return make_fixnum (rc_state_stack[rc_state_depth - 1]->commandflag);
+}
+
+DEFUN ("--rc-map", Fc_rc_map, Sc_rc_map, 0, 0, 0,
+       doc: /* Internal: read state->map of the current read_char
+invocation.  Returns nil when no call is in flight.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->map;
+}
+
+DEFUN ("--rc-prev-event", Fc_rc_prev_event, Sc_rc_prev_event, 0, 0, 0,
+       doc: /* Internal: read state->prev_event of the current
+read_char invocation.  Returns nil when no call is in flight.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->prev_event;
+}
+
+DEFUN ("--rc-reread-p", Fc_rc_reread_p, Sc_rc_reread_p, 0, 0, 0,
+       doc: /* Internal: read state->reread of the current read_char
+invocation as a non-nil predicate.  Returns nil when no call is in
+flight.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->reread ? Qt : Qnil;
+}
+
+/* M8b — extended accessors for the prologue splice (M8c).  Setters
+   write the top-of-stack state's fields; getters read them.  See
+   docs/keyboard.org §M8b.  */
+
+DEFUN ("--rc-c", Fc_rc_c, Sc_rc_c, 0, 0, 0,
+       doc: /* Internal: read state->c (the output slot).  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->c;
+}
+
+DEFUN ("--set-rc-c", Fc_set_rc_c, Sc_set_rc_c, 1, 1, 0,
+       doc: /* Internal: write state->c.  No-op when stack empty.  */)
+  (Lisp_Object val)
+{
+  if (rc_state_depth > 0)
+    rc_state_stack[rc_state_depth - 1]->c = val;
+  return Qnil;
+}
+
+DEFUN ("--rc-recorded-p", Fc_rc_recorded_p, Sc_rc_recorded_p, 0, 0, 0,
+       doc: /* Internal: read state->recorded as a predicate.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->recorded ? Qt : Qnil;
+}
+
+DEFUN ("--set-rc-recorded", Fc_set_rc_recorded, Sc_set_rc_recorded, 1, 1, 0,
+       doc: /* Internal: write state->recorded.  */)
+  (Lisp_Object val)
+{
+  if (rc_state_depth > 0)
+    rc_state_stack[rc_state_depth - 1]->recorded = !NILP (val);
+  return Qnil;
+}
+
+DEFUN ("--set-rc-reread", Fc_set_rc_reread, Sc_set_rc_reread, 1, 1, 0,
+       doc: /* Internal: write state->reread.  */)
+  (Lisp_Object val)
+{
+  if (rc_state_depth > 0)
+    rc_state_stack[rc_state_depth - 1]->reread = !NILP (val);
+  return Qnil;
+}
+
+DEFUN ("--rc-set-used-mouse-menu", Fc_rc_set_used_mouse_menu,
+       Sc_rc_set_used_mouse_menu, 1, 1, 0,
+       doc: /* Internal: if state->used_mouse_menu is non-NULL, write
+*state->used_mouse_menu = (non-nil VAL).  No-op otherwise.  Mirrors
+the C `*used_mouse_menu = true' writes inside the prologue.  */)
+  (Lisp_Object val)
+{
+  if (rc_state_depth > 0)
+    {
+      bool *p = rc_state_stack[rc_state_depth - 1]->used_mouse_menu;
+      if (p)
+        *p = !NILP (val);
+    }
+  return Qnil;
+}
+
+/* M8c — bulk splice of read_char_1's `retry:' prologue: drain the
+   three unread-events queues atomically.  See docs/keyboard.org §M8c.  */
+DEFUN ("--rc-prologue-drain-unread",
+       Fc_rc_prologue_drain_unread, Sc_rc_prologue_drain_unread, 0, 0, 0,
+       doc: /* Internal: drain the three unread-events queues in the
+read_char_1 prologue.  Sets the top-of-stack state's c / reread /
+recorded fields and writes *used_mouse_menu when applicable.
+Returns one of:
+  `reread-first'          — first queue produced an event; caller
+                            should goto reread_first.
+  `reread-for-input-method' — second or third queue produced an event;
+                            caller should goto reread_for_input_method.
+  `fall-through'          — no queue had anything; caller continues
+                            to the rest of the iteration (recorded
+                            and reread have been reset to false).
+
+Mirrors src/keyboard.c lines 3038-3118 pre-M8c (the body of the
+`retry:' label up to but not including the kbd-macro execution
+check).  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("fall-through");
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+
+  state->recorded = false;
+
+  /* Block 1: Vunread_post_input_method_events.  */
+  if (CONSP (Vunread_post_input_method_events))
+    {
+      Lisp_Object c = XCAR (Vunread_post_input_method_events);
+      Vunread_post_input_method_events
+        = XCDR (Vunread_post_input_method_events);
+
+      /* Undo what read_char_x_menu_prompt did when it unread
+         additional keys returned by Fx_popup_menu.  */
+      if (CONSP (c)
+          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
+          && NILP (XCDR (c)))
+        c = XCAR (c);
+
+      state->c = c;
+      state->reread = true;
+      return intern ("reread-first");
+    }
+  state->reread = false;
+
+  Vlast_event_device = Qnil;
+
+  /* Block 2: Vunread_command_events.  */
+  if (CONSP (Vunread_command_events))
+    {
+      bool was_disabled = false;
+      Lisp_Object c = XCAR (Vunread_command_events);
+      Vunread_command_events = XCDR (Vunread_command_events);
+
+      /* Undo what sit-for did when it unread additional keys
+         inside universal-argument.  */
+      if (CONSP (c) && EQ (XCAR (c), Qt))
+        c = XCDR (c);
+      else
+        {
+          if (CONSP (c) && EQ (XCAR (c), Qno_record))
+            {
+              c = XCDR (c);
+              state->recorded = true;
+            }
+          state->reread = true;
+        }
+
+      /* Undo what read_char_x_menu_prompt did when it unread
+         additional keys returned by Fx_popup_menu.  */
+      if (CONSP (c)
+          && EQ (XCDR (c), Qdisabled)
+          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c))))
+        {
+          was_disabled = true;
+          c = XCAR (c);
+        }
+
+      /* If the queued event used the mouse, set used_mouse_menu.  */
+      if (state->used_mouse_menu
+          && (EQ (c, Qtool_bar) || EQ (c, Qtab_bar) || EQ (c, Qmenu_bar)
+              || was_disabled))
+        *state->used_mouse_menu = true;
+
+      state->c = c;
+      return intern ("reread-for-input-method");
+    }
+
+  /* Block 3: Vunread_input_method_events.  */
+  if (CONSP (Vunread_input_method_events))
+    {
+      Lisp_Object c = XCAR (Vunread_input_method_events);
+      Vunread_input_method_events = XCDR (Vunread_input_method_events);
+
+      /* Undo what read_char_x_menu_prompt did when it unread
+         additional keys returned by Fx_popup_menu.  */
+      if (CONSP (c)
+          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
+          && NILP (XCDR (c)))
+        c = XCAR (c);
+
+      state->c = c;
+      state->reread = true;
+      return intern ("reread-for-input-method");
+    }
+
+  return intern ("fall-through");
+}
+
 static Lisp_Object
 read_char_thunk (void *data)
 {
-  return read_char_1 (false, data);
+  /* M8b: push state on rc_state_stack so Scheme accessors can read
+     the current read_char invocation's fields.  The unwind-protect
+     pops on any exit, including abort_to_prompt that unwinds back
+     to read_char_handle_quit.  See docs/keyboard.org §M8b.  */
+  dynwind_begin ();
+  eassert (rc_state_depth < RC_STATE_STACK_MAX);
+  record_unwind_protect_int (restore_rc_state_depth, rc_state_depth);
+  rc_state_stack[rc_state_depth++] = data;
+  Lisp_Object result = read_char_1 (false, data);
+  dynwind_end ();
+  return result;
 }
 
 static Lisp_Object
@@ -2965,88 +3221,22 @@ read_char_1 (bool jump, volatile struct read_char_state *state)
     goto non_reread;
 
  retry:
-
-  recorded = false;
-
-  if (CONSP (Vunread_post_input_method_events))
-    {
-      c = XCAR (Vunread_post_input_method_events);
-      Vunread_post_input_method_events
-	= XCDR (Vunread_post_input_method_events);
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-	 additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-	  && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
-	  && NILP (XCDR (c)))
-	c = XCAR (c);
-
-      reread = true;
+  /* M8c: unread-events drain ported to Scheme
+     `rc-prologue-drain-unread!'.  Returns one of `reread-first',
+     `reread-for-input-method', or `fall-through' for 3-way C
+     control flow.  See docs/keyboard.org §M8c.  */
+  {
+    static SCM rc_drain_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rc_drain_proc))
+      rc_drain_proc = scm_c_public_ref ("emacs read-char",
+                                        "rc-prologue-drain-unread!");
+    SCM result = SCM_CALL_0 (rc_drain_proc);
+    if (scm_is_eq (result, intern ("reread-first")))
       goto reread_first;
-    }
-  else
-    reread = false;
-
-  Vlast_event_device = Qnil;
-
-  if (CONSP (Vunread_command_events))
-    {
-      bool was_disabled = false;
-
-      c = XCAR (Vunread_command_events);
-      Vunread_command_events = XCDR (Vunread_command_events);
-
-      /* Undo what sit-for did when it unread additional keys
-	 inside universal-argument.  */
-
-      if (CONSP (c) && EQ (XCAR (c), Qt))
-	c = XCDR (c);
-      else
-	{
-	  if (CONSP (c) && EQ (XCAR (c), Qno_record))
-	    {
-	      c = XCDR (c);
-	      recorded = true;
-	    }
-	  reread = true;
-	}
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-	 additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-	  && EQ (XCDR (c), Qdisabled)
-	  && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c))))
-	{
-	  was_disabled = true;
-	  c = XCAR (c);
-	}
-
-      /* If the queued event is something that used the mouse,
-         set used_mouse_menu accordingly.  */
-      if (used_mouse_menu
-	  /* Also check was_disabled so last-nonmenu-event won't return
-	     a bad value when submenus are involved.  (Bug#447)  */
-	  && (EQ (c, Qtool_bar) || EQ (c, Qtab_bar) || EQ (c, Qmenu_bar)
-	      || was_disabled))
-	*used_mouse_menu = true;
-
+    if (scm_is_eq (result, intern ("reread-for-input-method")))
       goto reread_for_input_method;
-    }
-
-  if (CONSP (Vunread_input_method_events))
-    {
-      c = XCAR (Vunread_input_method_events);
-      Vunread_input_method_events = XCDR (Vunread_input_method_events);
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-	 additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-	  && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
-	  && NILP (XCDR (c)))
-	c = XCAR (c);
-      reread = true;
-      goto reread_for_input_method;
-    }
+    /* else: `fall-through' — continue below.  */
+  }
 
   /* If we're executing a macro, process it unless we are at its end. */
   if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
@@ -10451,6 +10641,57 @@ static Lisp_Object rks_new_binding;
    read_key_sequence entry.  See docs/keyboard.org §M6ac.  */
 static Lisp_Object rks_fake_prefixed_keys;
 
+/* M6ae — promote disabled_conversion (HAVE_TEXT_CONVERSION only;
+   on TTY/window-system-only builds the symbol is still declared
+   but never read).  See docs/keyboard.org §M6ae.  */
+#ifdef HAVE_TEXT_CONVERSION
+static bool rks_disabled_conversion;
+#endif
+
+DEFUN ("--rks-iter-maybe-disable-text-conversion",
+       Fc_rks_iter_maybe_disable_text_conversion,
+       Sc_rks_iter_maybe_disable_text_conversion, 0, 0, 0,
+       doc: /* Internal: if HAVE_TEXT_CONVERSION is enabled and the
+predicate holds (not already disabled, at least one key read,
+no mouse menu, not inhibited), scan the first up-to-10 keybuf
+elements for a NUMBERP or function-key SYMBOL; if found, call
+disable_text_conversion + record_unwind_protect_void to install
+the resume-on-unwind, and flip rks_disabled_conversion.  Always
+returns nil — the C caller continues to replay_key regardless.
+Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
+  (void)
+{
+#ifdef HAVE_TEXT_CONVERSION
+  if (rks_disabled_conversion || rks_t == 0 || rks_used_mouse_menu
+      || disable_inhibit_text_conversion)
+    return Qnil;
+
+  if (rks_keybuf_depth == 0)
+    return Qnil;
+  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
+
+  bool hit = false;
+  int n = rks_t < 10 ? rks_t : 10;
+  for (int i = 0; i < n; i++)
+    {
+      if (NUMBERP (keybuf[i])
+          || (SYMBOLP (keybuf[i])
+              && EQ (Fget (keybuf[i], Qevent_kind), Qfunction_key)))
+        {
+          hit = true;
+          break;
+        }
+    }
+  if (hit)
+    {
+      disable_text_conversion ();
+      record_unwind_protect_void (resume_text_conversion);
+      rks_disabled_conversion = true;
+    }
+#endif
+  return Qnil;
+}
+
 /* M6ad — unbound-event reduction loop.  Reduces an unbound mouse
    event to a simpler bound one:
      Drags          → clicks.
@@ -11623,9 +11864,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   original_uppercase_position = -1;
 
 #ifdef HAVE_TEXT_CONVERSION
-  bool disabled_conversion;
-
-  /* Whether or not text conversion has already been disabled.  */
+  /* M6ae: disabled_conversion promoted to file-static rks_disabled_conversion.
+     Initialized to false at function entry (the original local-init).  */
+#define disabled_conversion rks_disabled_conversion
   disabled_conversion = false;
 #endif /* HAVE_TEXT_CONVERSION */
 
@@ -11835,42 +12076,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	SCM_CALL_0 (rks_setup_capture_proc);
       }
 
-#ifdef HAVE_TEXT_CONVERSION
-      /* When reading a key sequence while text conversion is in
-	 effect, turn it off after the first actual character read.
-	 This makes input methods send actual key events instead.
-
-         Make sure only to do this once.  Also, disabling text
-         conversion seems to interact badly with menus, so don't
-         disable text conversion if a menu was displayed.  */
-
-      if (!disabled_conversion && t && !used_mouse_menu
-	  && !disable_inhibit_text_conversion)
-	{
-	  int i;
-
-	  /* used_mouse_menu isn't set if a menu bar prefix key has
-	     just been stored.  It appears necessary to look for a
-	     prefix key itself.  Don't look through too many keys for
-	     efficiency reasons.  */
-
-	  for (i = 0; i < min (t, 10); ++i)
-	    {
-	      if (NUMBERP (keybuf[i])
-		  || (SYMBOLP (keybuf[i])
-		      && EQ (Fget (keybuf[i], Qevent_kind),
-			     Qfunction_key)))
-		goto disable_text_conversion;
-	    }
-
-	  goto replay_key;
-
-	disable_text_conversion:
-	  disable_text_conversion ();
-	  record_unwind_protect_void (resume_text_conversion);
-	  disabled_conversion = true;
-	}
-#endif
+      /* M6ae: text-conversion-disable check ported to Scheme
+	 `rks-iter-maybe-disable-text-conversion!'.  Unconditionally
+	 dispatches — the subr body is `#ifdef HAVE_TEXT_CONVERSION'-
+	 guarded on the C side.  No control transfer needed: both the
+	 original `goto replay_key' and the fall-through end up at
+	 the next statement (the `replay_key:' label below).  See
+	 docs/keyboard.org §M6ae.  */
+      {
+	static SCM rks_maybe_disable_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_maybe_disable_proc))
+	  rks_maybe_disable_proc =
+	    scm_c_public_ref ("emacs read-key-sequence",
+			      "rks-iter-maybe-disable-text-conversion!");
+	SCM_CALL_0 (rks_maybe_disable_proc);
+      }
 
     replay_key:
       /* M6y: replay_key-restore ported to Scheme
@@ -12304,6 +12524,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef used_mouse_menu_history
 #undef new_binding
 #undef fake_prefixed_keys
+#ifdef HAVE_TEXT_CONVERSION
+#undef disabled_conversion
+#endif
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)

@@ -449,4 +449,11 @@
 (test-eq "m6ad/fall-through-at-idle"
          'fall-through (--rks-iter-unbound-event-reduction!))
 
+;;;; M6ae
+
+(test-assert "m6ae-helper/maybe-disable-text-conversion"
+             (fboundp '--rks-iter-maybe-disable-text-conversion))
+(test-eq "m6ae/runs-without-error"
+         nil (--rks-iter-maybe-disable-text-conversion!))
+
 (test-end)

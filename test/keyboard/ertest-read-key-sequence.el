@@ -685,4 +685,16 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; state.
   (should (eq 'fall-through (--rks-iter-unbound-event-reduction!))))
 
+;;;; M6ae — text-conversion-disable check
+
+(ert-deftest m6ae-helpers/exist ()
+  (should (fboundp '--rks-iter-maybe-disable-text-conversion)))
+
+(ert-deftest m6ae-disable-text-conversion/runs-without-error ()
+  ;; On builds without HAVE_TEXT_CONVERSION the subr is a no-op.
+  ;; On HAVE_TEXT_CONVERSION builds the predicate gates on rks_t > 0;
+  ;; at idle rks_t == 0 so the inner work is skipped.  Either way
+  ;; the call runs cleanly and returns nil.
+  (should (eq nil (--rks-iter-maybe-disable-text-conversion!))))
+
 (provide 'ertest-read-key-sequence)

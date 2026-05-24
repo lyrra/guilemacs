@@ -83,6 +83,7 @@
   "test/keyboard/ertest-consolidation.el"   ; Consolidation
   "test/keyboard/ertest-command-loop.el"    ; M7a
   "test/keyboard/ertest-read-key-sequence.el" ; M6a
+  "test/keyboard/ertest-read-char.el"         ; M8a
   )
 (group
   "test/src/eval-tests.el"
