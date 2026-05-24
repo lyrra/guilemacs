@@ -674,4 +674,15 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; parameters present — subr returns `fall-through'.
   (should (eq 'fall-through (--rks-iter-mouse-click-prefix!))))
 
+;;;; M6ad — unbound-event reduction
+
+(ert-deftest m6ad-helpers/exist ()
+  (should (fboundp '--rks-iter-unbound-event-reduction)))
+
+(ert-deftest m6ad-reduction/fall-through-at-idle ()
+  ;; At idle rks_key is nil — EVENT_HEAD/parse_modifiers yields no
+  ;; reducer modifiers, so the subr falls through without mutating
+  ;; state.
+  (should (eq 'fall-through (--rks-iter-unbound-event-reduction!))))
+
 (provide 'ertest-read-key-sequence)

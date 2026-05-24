@@ -1,0 +1,153 @@
+(define-module (emacs read-char)
+  #:use-module (emacs-elisp runtime)
+  #:use-module (srfi srfi-9)            ; define-record-type
+  #:declarative? #t
+  #:export (;; M8a — data substrate
+            make-rc-state rc-state?
+            rc-state-fresh!
+            init-read-char-registrations))
+
+;;; M8 — read_char / read_char_1 port.
+;;;
+;;; read_char (src/keyboard.c:2978) is the entry wrapper that
+;;; heap-allocates a `struct read_char_state' and dispatches via
+;;; Guile's `call_with_prompt' to `read_char_1' (the ~820-line
+;;; state machine).
+;;;
+;;; Architecture inherited from C:
+;;;   - State lives in a heap-allocated struct (read_char_state).
+;;;   - read_char_1 uses `#define commandflag state->commandflag'
+;;;     etc. to make struct-field access look like locals.
+;;;     This is exactly the M6 #define-alias pattern, applied to
+;;;     a struct rather than file-static globals.
+;;;   - Guile delimited continuations handle the longjmp-style
+;;;     quit path (no setjmp/longjmp needed).
+;;;
+;;; M8 plan (after M6 close):
+;;;   M8a — this module skeleton + <rc-state> record + state-pointer
+;;;         stack + first 3-4 trivial accessor subrs.  No splices.
+;;;   M8b-M8d — field-accessor subrs for the remaining struct fields.
+;;;   M8e — splice the prologue (unread-events / quit-flag /
+;;;         help_char_p).
+;;;   M8f+ — successive translation-map / dispatch / blocking-wait
+;;;          splices, following the M6 atomic-bulk-subr pattern.
+;;;
+;;; See docs/keyboard.org §M8 for the full revised plan.
+
+(define (%c name) (symbol-function name))
+
+(define (%nilp x)
+  (or (null? x) (not x)))
+
+;;;;
+;;;; M8a — <rc-state> Scheme record type.
+;;;;
+;;;; Mirrors `struct read_char_state' (src/keyboard.c:2835-2852)
+;;;; one field per slot.  Used by future M8 slices for testable
+;;;; in-Scheme state representation.  Not yet wired into the
+;;;; runtime — read_char_1 still keeps its state as a C struct.
+;;;;
+;;;; Field semantics (mirror the C struct):
+;;;;   commandflag      — -1 = inhibit redisplay,
+;;;;                      0  = called via read-event,
+;;;;                      1  = called from command loop,
+;;;;                      -2 = read_char called with prevent_redisplay.
+;;;;   map              — keymap stack (the FOLLOW arg from read_char).
+;;;;   prev-event       — last-command-event the caller saw.
+;;;;   used-mouse-menu  — set true if the read produced a menu choice.
+;;;;   end-time         — deadline for timed reads (#nil = no timeout).
+;;;;   c                — the resulting event (output slot).
+;;;;   tag, local-tag, save-tag
+;;;;                    — Guile-prompt tags used for quit handling.
+;;;;   previous-echo-area-message
+;;;;                    — saved echo-area state for restoration.
+;;;;   also-record      — secondary event to add_command_key when set.
+;;;;   recorded         — true once add_command_key has been called
+;;;;                      for this iteration.
+;;;;   reread           — true when re-reading from unread-events.
+;;;;   polling-stopped-here
+;;;;                    — true when poll_for_input was stopped by us.
+;;;;   orig-kboard      — current_kboard snapshot at entry (for
+;;;;                      detecting kboard switches mid-read).
+
+(define-record-type <rc-state>
+  (%make-rc-state commandflag map prev-event used-mouse-menu end-time
+                  c tag local-tag save-tag
+                  previous-echo-area-message also-record
+                  recorded reread polling-stopped-here
+                  orig-kboard)
+  rc-state?
+  (commandflag       rc-state-commandflag       set-rc-state-commandflag!)
+  (map               rc-state-map               set-rc-state-map!)
+  (prev-event        rc-state-prev-event        set-rc-state-prev-event!)
+  (used-mouse-menu   rc-state-used-mouse-menu   set-rc-state-used-mouse-menu!)
+  (end-time          rc-state-end-time          set-rc-state-end-time!)
+  (c                 rc-state-c                 set-rc-state-c!)
+  (tag               rc-state-tag               set-rc-state-tag!)
+  (local-tag         rc-state-local-tag         set-rc-state-local-tag!)
+  (save-tag          rc-state-save-tag          set-rc-state-save-tag!)
+  (previous-echo-area-message
+                     rc-state-previous-echo-area-message
+                     set-rc-state-previous-echo-area-message!)
+  (also-record       rc-state-also-record       set-rc-state-also-record!)
+  (recorded          rc-state-recorded          set-rc-state-recorded!)
+  (reread            rc-state-reread            set-rc-state-reread!)
+  (polling-stopped-here
+                     rc-state-polling-stopped-here
+                     set-rc-state-polling-stopped-here!)
+  (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!))
+
+(define (make-rc-state)
+  "Create a fresh rc-state with C-struct defaults (everything nil
+or false, commandflag = 0).  Mirrors the read_char entry's
+explicit zeroing (src/keyboard.c:2915-2927)."
+  (%make-rc-state
+   0      ; commandflag
+   #nil   ; map
+   #nil   ; prev-event
+   #nil   ; used-mouse-menu (bool)
+   #nil   ; end-time
+   #nil   ; c
+   #nil   ; tag
+   #nil   ; local-tag
+   #nil   ; save-tag
+   #nil   ; previous-echo-area-message
+   #nil   ; also-record
+   #nil   ; recorded (bool)
+   #nil   ; reread (bool)
+   #nil   ; polling-stopped-here (bool)
+   #nil)) ; orig-kboard
+
+(define (rc-state-fresh! state)
+  "Reset STATE in-place to the C-struct defaults.  Useful for
+test setup when the same rc-state is reused across calls."
+  (set-rc-state-commandflag!                state 0)
+  (set-rc-state-map!                        state #nil)
+  (set-rc-state-prev-event!                 state #nil)
+  (set-rc-state-used-mouse-menu!            state #nil)
+  (set-rc-state-end-time!                   state #nil)
+  (set-rc-state-c!                          state #nil)
+  (set-rc-state-tag!                        state #nil)
+  (set-rc-state-local-tag!                  state #nil)
+  (set-rc-state-save-tag!                   state #nil)
+  (set-rc-state-previous-echo-area-message! state #nil)
+  (set-rc-state-also-record!                state #nil)
+  (set-rc-state-recorded!                   state #nil)
+  (set-rc-state-reread!                     state #nil)
+  (set-rc-state-polling-stopped-here!       state #nil)
+  (set-rc-state-orig-kboard!                state #nil))
+
+;;;;
+;;;; Registration
+;;;;
+;;;; srfi-9 accessors are syntax-transformers in this Guile build
+;;;; (see feedback_scheme_module_elisp_calls.md note from M6g),
+;;;; so we expose only constructors / predicates and the
+;;;; regular-define helpers as elisp-callable shims.
+
+(define (init-read-char-registrations)
+  "Wire the elisp-visible (emacs read-char) handles."
+  (for-each (lambda (sym-fun)
+              (set-symbol-function! (car sym-fun) (cadr sym-fun)))
+            `((--make-rc-state         ,make-rc-state)
+              (--rc-state-fresh!       ,rc-state-fresh!))))

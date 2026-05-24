@@ -442,4 +442,11 @@
 (test-eq "m6ac/fall-through-at-idle"
          'fall-through (--rks-iter-mouse-click-prefix!))
 
+;;;; M6ad
+
+(test-assert "m6ad-helper/unbound-event-reduction"
+             (fboundp '--rks-iter-unbound-event-reduction))
+(test-eq "m6ad/fall-through-at-idle"
+         'fall-through (--rks-iter-unbound-event-reduction!))
+
 (test-end)

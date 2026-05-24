@@ -46,6 +46,7 @@
             rks-iter-install-binding!
             rks-follow-key-and-update-first-unbound!
             rks-iter-mouse-click-prefix!
+            rks-iter-unbound-event-reduction!
             init-read-key-sequence-registrations))
 
 ;;; M6a — read_key_sequence outer wrapper, ported from C
@@ -623,6 +624,19 @@ this-command-key-count into the file-static rks_echo_local_start
 to them.  See docs/keyboard.org §M6y."
   ((force %rks-iter-setup-capture)))
 
+(define %rks-iter-unbound-event-reduction
+  (delay (%c '--rks-iter-unbound-event-reduction)))
+
+(define (rks-iter-unbound-event-reduction!)
+  "Drag/click/double/triple-click reduction cascade for an unbound
+mouse event.  Walks down the modifier list (triple → double →
+single, drag → click, etc.) trying each reduced form against
+current-active-maps; bails out via replay_key/replay_sequence
+if reduced to an unbound up/down event.  Returns one of
+`replay-key', `replay-sequence', or `fall-through'.  See
+docs/keyboard.org §M6ad."
+  ((force %rks-iter-unbound-event-reduction)))
+
 (define %rks-iter-mouse-click-prefix
   (delay (%c '--rks-iter-mouse-click-prefix)))
 
@@ -923,4 +937,7 @@ cached-dispatch into here."
                ,rks-follow-key-and-update-first-unbound!)
               ;; M6ac — mouse-click prefix expansion
               (--rks-iter-mouse-click-prefix!
-               ,rks-iter-mouse-click-prefix!))))
+               ,rks-iter-mouse-click-prefix!)
+              ;; M6ad — unbound-event reduction cascade
+              (--rks-iter-unbound-event-reduction!
+               ,rks-iter-unbound-event-reduction!))))

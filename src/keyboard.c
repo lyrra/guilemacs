@@ -10451,6 +10451,113 @@ static Lisp_Object rks_new_binding;
    read_key_sequence entry.  See docs/keyboard.org §M6ac.  */
 static Lisp_Object rks_fake_prefixed_keys;
 
+/* M6ad — unbound-event reduction loop.  Reduces an unbound mouse
+   event to a simpler bound one:
+     Drags          → clicks.
+     Double-clicks  → clicks.
+     Triple-clicks  → double-clicks, then to clicks.
+     Up/Down-clicks → eliminated.
+     Double-downs   → downs, then eliminated.
+     Triple-downs   → double-downs, then to downs, then eliminated.
+   Returns one of:
+     `replay-key'      — bail out via mock_input = 0 + replay_key.
+     `replay-sequence' — bail out via mock_input = last_real_key_start
+                         + replay_sequence.
+     `fall-through'    — reduction either found a binding (current_binding
+                         + key updated) or the loop completed without one;
+                         caller continues to M6aa install.
+   See docs/keyboard.org §M6ad.  */
+DEFUN ("--rks-iter-unbound-event-reduction",
+       Fc_rks_iter_unbound_event_reduction,
+       Sc_rks_iter_unbound_event_reduction, 0, 0, 0,
+       doc: /* Internal: drag/click/double/triple reduction cascade.
+See M6ad.  */)
+  (void)
+{
+  /* Caller already verified rks_new_binding is nil (M6ab returned nil).
+     `first_unbound = min (t, first_unbound)' before EVENT_HEAD work.  */
+  if (rks_t < rks_first_unbound)
+    rks_first_unbound = rks_t;
+
+  Lisp_Object head = EVENT_HEAD (rks_key);
+  if (!SYMBOLP (head))
+    return intern ("fall-through");
+
+  Lisp_Object breakdown = parse_modifiers (head);
+  int modifiers = XFIXNUM (XCAR (XCDR (breakdown)));
+  int reducer_mask = up_modifier | down_modifier | drag_modifier
+                     | double_modifier | triple_modifier;
+  if (!(modifiers & reducer_mask))
+    return intern ("fall-through");
+
+  while (modifiers & reducer_mask)
+    {
+      if (modifiers & triple_modifier)
+        modifiers ^= (double_modifier | triple_modifier);
+      else if (modifiers & double_modifier)
+        modifiers &= ~double_modifier;
+      else if (modifiers & drag_modifier)
+        modifiers &= ~drag_modifier;
+      else
+        {
+          /* Unbound up/down event — dispose of it.  Adjust the
+             keyremap counters back to last_real_key_start, then
+             jump back to replay_key (with mock_input zeroed) or
+             replay_sequence (with mock_input = last_real_key_start).  */
+          if (rks_indec.end > rks_last_real_key_start)
+            {
+              int new_indec
+                = rks_last_real_key_start < rks_indec.start
+                  ? rks_last_real_key_start : rks_indec.start;
+              rks_indec.end = rks_indec.start = new_indec;
+              rks_indec.map = rks_indec.parent;
+              if (rks_fkey.end > rks_last_real_key_start)
+                {
+                  int new_fkey
+                    = rks_last_real_key_start < rks_fkey.start
+                      ? rks_last_real_key_start : rks_fkey.start;
+                  rks_fkey.end = rks_fkey.start = new_fkey;
+                  rks_fkey.map = rks_fkey.parent;
+                  if (rks_keytran.end > rks_last_real_key_start)
+                    {
+                      int new_keytran
+                        = rks_last_real_key_start < rks_keytran.start
+                          ? rks_last_real_key_start : rks_keytran.start;
+                      rks_keytran.end = rks_keytran.start = new_keytran;
+                      rks_keytran.map = rks_keytran.parent;
+                    }
+                }
+            }
+          if (rks_t == rks_last_real_key_start)
+            {
+              rks_mock_input = 0;
+              return intern ("replay-key");
+            }
+          else
+            {
+              rks_mock_input = rks_last_real_key_start;
+              return intern ("replay-sequence");
+            }
+        }
+
+      Lisp_Object new_head = apply_modifiers (modifiers, XCAR (breakdown));
+      Lisp_Object new_click = list2 (new_head, EVENT_START (rks_key));
+
+      /* Look for a binding for this new key.  */
+      rks_new_binding = follow_key (rks_current_binding, new_click);
+
+      if (!NILP (rks_new_binding))
+        {
+          rks_current_binding = rks_new_binding;
+          rks_key             = new_click;
+          break;
+        }
+      /* Otherwise, leave rks_key set to the drag event.  */
+    }
+
+  return intern ("fall-through");
+}
+
 /* M6ac — bulk splice of the mouse-click prefix expansion (and
    menu-bar / tab-bar / tool-bar prefix insertion).  Returns one of:
      `replay-sequence' — buffer-switch or menu-bar fake prefix.
@@ -12007,138 +12114,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 			      "rks-follow-key-and-update-first-unbound!");
 	if (NILP (SCM_CALL_0 (rks_follow_proc)))
 	{
-	  Lisp_Object head;
-
-	  /* Remember the position to put an upper bound on indec.start.  */
-	  first_unbound = min (t, first_unbound);
-
-	  head = EVENT_HEAD (key);
-
-	  if (SYMBOLP (head))
-	    {
-	      Lisp_Object breakdown;
-	      int modifiers;
-
-	      breakdown = parse_modifiers (head);
-	      modifiers = XFIXNUM (XCAR (XCDR (breakdown)));
-	      /* Attempt to reduce an unbound mouse event to a simpler
-		 event that is bound:
-		   Drags reduce to clicks.
-		   Double-clicks reduce to clicks.
-		   Triple-clicks reduce to double-clicks, then to clicks.
-		   Up/Down-clicks are eliminated.
-		   Double-downs reduce to downs, then are eliminated.
-		   Triple-downs reduce to double-downs, then to downs,
-		     then are eliminated.  */
-	      if (modifiers & (up_modifier | down_modifier
-			       | drag_modifier
-			       | double_modifier | triple_modifier))
-		{
-		  while (modifiers & (up_modifier | down_modifier
-				      | drag_modifier
-				      | double_modifier | triple_modifier))
-		    {
-		      Lisp_Object new_head, new_click;
-		      if (modifiers & triple_modifier)
-			modifiers ^= (double_modifier | triple_modifier);
-		      else if (modifiers & double_modifier)
-			modifiers &= ~double_modifier;
-		      else if (modifiers & drag_modifier)
-			modifiers &= ~drag_modifier;
-		      else
-			{
-			  /* Dispose of this `up/down' event by simply jumping
-			     back to replay_key, to get another event.
-
-			     Note that if this event came from mock input,
-			     then just jumping back to replay_key will just
-			     hand it to us again.  So we have to wipe out any
-			     mock input.
-
-			     We could delete keybuf[t] and shift everything
-			     after that to the left by one spot, but we'd also
-			     have to fix up any variable that points into
-			     keybuf, and shifting isn't really necessary
-			     anyway.
-
-			     Adding prefixes for non-textual mouse clicks
-			     creates two characters of mock input, and both
-			     must be thrown away.  If we're only looking at
-			     the prefix now, we can just jump back to
-			     replay_key.  On the other hand, if we've already
-			     processed the prefix, and now the actual click
-			     itself is giving us trouble, then we've lost the
-			     state of the keymaps we want to backtrack to, and
-			     we need to replay the whole sequence to rebuild
-			     it.
-
-			     Beyond that, only function key expansion could
-			     create more than two keys, but that should never
-			     generate mouse events, so it's okay to zero
-			     mock_input in that case too.
-
-			     FIXME: The above paragraph seems just plain
-			     wrong, if you consider things like
-			     xterm-mouse-mode.  -stef
-
-			     Isn't this just the most wonderful code ever?  */
-
-			  /* If mock_input > t + 1, the above simplification
-			     will actually end up dropping keys on the floor.
-			     This is probably OK for now, but even
-			     if mock_input <= t + 1, we need to adjust indec,
-			     fkey, and keytran.
-			     Typical case [header-line down-mouse-N]:
-			     mock_input = 2, t = 1, fkey.end = 1,
-			     last_real_key_start = 0.  */
-			  if (indec.end > last_real_key_start)
-			    {
-			      indec.end = indec.start
-				= min (last_real_key_start, indec.start);
-			      indec.map = indec.parent;
-			      if (fkey.end > last_real_key_start)
-				{
-				  fkey.end = fkey.start
-				    = min (last_real_key_start, fkey.start);
-				  fkey.map = fkey.parent;
-				  if (keytran.end > last_real_key_start)
-				    {
-				      keytran.end = keytran.start
-					= min (last_real_key_start, keytran.start);
-				      keytran.map = keytran.parent;
-				    }
-				}
-			    }
-			  if (t == last_real_key_start)
-			    {
-			      mock_input = 0;
-			      goto replay_key;
-			    }
-			  else
-			    {
-			      mock_input = last_real_key_start;
-			      goto replay_sequence;
-			    }
-			}
-
-		      new_head
-			= apply_modifiers (modifiers, XCAR (breakdown));
-		      new_click = list2 (new_head, EVENT_START (key));
-
-		      /* Look for a binding for this new key.  */
-		      new_binding = follow_key (current_binding, new_click);
-
-		      /* If that click is bound, go for it.  */
-		      if (!NILP (new_binding))
-			{
-			  current_binding = new_binding;
-			  key = new_click;
-			  break;
-			}
-		      /* Otherwise, we'll leave key set to the drag event.  */
-		    }
-		}
-	    }
+	  /* M6ad: unbound-event reduction cascade ported to Scheme
+	     `rks-iter-unbound-event-reduction!'.  Returns one of
+	     `replay-key', `replay-sequence', or `fall-through'.
+	     See docs/keyboard.org §M6ad.  */
+	  static SCM rks_reduce_proc = SCM_UNDEFINED;
+	  if (SCM_UNBNDP (rks_reduce_proc))
+	    rks_reduce_proc =
+	      scm_c_public_ref ("emacs read-key-sequence",
+				"rks-iter-unbound-event-reduction!");
+	  SCM result = SCM_CALL_0 (rks_reduce_proc);
+	  if (scm_is_eq (result, intern ("replay-key")))
+	    goto replay_key;
+	  if (scm_is_eq (result, intern ("replay-sequence")))
+	    goto replay_sequence;
+	  /* else: `fall-through' — continue to M6aa install.  */
 	}
       }   /* M6ab: close the dispatch outer block (opened above the
 	     `if (NILP (SCM_CALL_0 (rks_follow_proc)))') */
