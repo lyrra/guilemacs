@@ -108,13 +108,4 @@
 (test-assert "helpers/rc-record" (fboundp '--rc-record))
 (test-eq "rc-record/nil-at-idle" nil (--rc-record))
 
-;;;; Step 2-A — sync subrs
-
-(test-assert "helpers/rc-sync-to-record"
-             (fboundp '--rc-sync-to-record))
-(test-assert "helpers/rc-sync-from-record"
-             (fboundp '--rc-sync-from-record))
-(test-eq "sync-to-record/nil-at-idle"   nil (--rc-sync-to-record))
-(test-eq "sync-from-record/nil-at-idle" nil (--rc-sync-from-record))
-
 (test-end)

@@ -2832,209 +2832,99 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 
    Value is t if we showed a menu and the user rejected it.  */
 
-struct read_char_state
-{
-  int commandflag;
-  Lisp_Object map;
-  Lisp_Object prev_event;
-  bool *used_mouse_menu;
-  struct timespec *end_time;
-  Lisp_Object c;
-  Lisp_Object tag;
-  Lisp_Object local_tag;
-  Lisp_Object save_tag;
-  Lisp_Object previous_echo_area_message;
-  Lisp_Object also_record;
-  bool recorded;
-  bool reread;
-  struct kboard *orig_kboard;
-  /* Step 1 of the state-to-record migration: a Scheme record
-     mirroring this struct, allocated at read_char entry.  Both
-     representations coexist; production code still reads/writes
-     this C struct directly, while migrated subrs (one per step)
-     will switch to the record via --rc-record + --rc-sync-*.  */
-  SCM scm_record;
+/* Step 2-C: the read_char state is now a Scheme <rc-state> record
+   (defined in mod/emacs/read-char.scm) plus a tiny C-side companion
+   for the caller-owned pointer fields (used_mouse_menu, end_time)
+   that the record can't carry directly.  Slot indices below match
+   the record's constructor order; they're read/written via Guile's
+   low-level scm_struct_ref / scm_struct_set_x (the srfi-9 accessors
+   themselves are syntax-transformers and uncallable from C — see
+   feedback_srfi9_accessors.md).  */
+
+enum rc_slot {
+  RC_SLOT_COMMANDFLAG                 = 0,
+  RC_SLOT_MAP                         = 1,
+  RC_SLOT_PREV_EVENT                  = 2,
+  RC_SLOT_USED_MOUSE_MENU             = 3,  /* placeholder: real ptr in rc_ptr_stack */
+  RC_SLOT_END_TIME                    = 4,  /* placeholder: real ptr in rc_ptr_stack */
+  RC_SLOT_C                           = 5,
+  RC_SLOT_TAG                         = 6,
+  RC_SLOT_LOCAL_TAG                   = 7,
+  RC_SLOT_SAVE_TAG                    = 8,
+  RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE  = 9,
+  RC_SLOT_ALSO_RECORD                 = 10,
+  RC_SLOT_RECORDED                    = 11,
+  RC_SLOT_REREAD                      = 12,
+  RC_SLOT_ORIG_KBOARD                 = 13  /* kboard SMOB */
 };
 
-static Lisp_Object read_char_1 (bool, volatile struct read_char_state *);
+struct rc_ptrs
+{
+  bool *used_mouse_menu;
+  struct timespec *end_time;
+};
 
-/* M8a — depth-tracked stack of read_char_state pointers.  read_char
-   recursion happens during mouse-menu prompts, recursive minibuffers,
-   and `read-event' calls inside elisp.  The stack lets Scheme code
-   read fields of the current (top-of-stack) read_char invocation's
-   state via the `--rc-*' accessor subrs without each subr needing a
-   state-pointer argument.  Mirrors M6q's keybuf-stack pattern.  See
-   docs/keyboard.org §M8a.  */
 enum { RC_STATE_STACK_MAX = 8 };
-static struct read_char_state *rc_state_stack[RC_STATE_STACK_MAX];
-static int                     rc_state_depth;
+static SCM             rc_record_stack[RC_STATE_STACK_MAX];
+static struct rc_ptrs  rc_ptr_stack[RC_STATE_STACK_MAX];
+static int             rc_state_depth;
+
+static Lisp_Object read_char_1 (bool jump);
+
+static inline Lisp_Object
+rc_get (SCM rec, int slot)
+{
+  return scm_struct_ref (rec, scm_from_int (slot));
+}
+
+static inline void
+rc_set (SCM rec, int slot, Lisp_Object val)
+{
+  scm_struct_set_x (rec, scm_from_int (slot), val);
+}
 
 static void
 restore_rc_state_depth (int saved)
 {
-  rc_state_depth = saved;
+  while (rc_state_depth > saved)
+    rc_record_stack[--rc_state_depth] = SCM_UNDEFINED;
 }
 
-/* Step 2-B: the per-field accessor DEFUNs (--rc-state-depth,
-   --rc-commandflag, --rc-map, --rc-prev-event, --rc-reread-p,
-   --rc-c, --set-rc-c, --rc-recorded-p, --set-rc-recorded,
-   --set-rc-reread, --rc-set-used-mouse-menu) were removed here.
-   They were only used by tests; production bulk subrs (M8c..M8n)
-   reach state directly via `rc_state_stack[depth-1]->FIELD'.  Tests
-   now go through --rc-record + --rc-sync-to-record and read the
-   <rc-state> record via Scheme's struct-ref.  See
-   docs/keyboard.org §M8 closeout: state-to-record migration.  */
-
-/* Step 1 of the state-to-record migration.  The <rc-state> Scheme
-   record is allocated at read_char entry and stored in
-   state->scm_record.  --rc-record returns it; sync subrs to bridge
-   between the C struct and the record are added incrementally in
-   step 2, as each bulk subr migrates (so we only add the field
-   readers/writers each migration actually needs).  */
+/* Step 2-B removed the per-field accessor DEFUNs (--rc-c, etc.) —
+   tests now go through --rc-record + struct-ref.
+   Step 2-C collapsed `struct read_char_state' into the <rc-state>
+   record itself; bulk subrs reach state via rc_record_stack +
+   rc_get / rc_set (and rc_ptr_stack for the two caller-owned C
+   pointers).  See docs/keyboard.org §M8 closeout.  */
 
 DEFUN ("--rc-record", Fc_rc_record, Sc_rc_record, 0, 0, 0,
        doc: /* Internal: return the <rc-state> Scheme record for the
 top-of-stack read_char invocation, or nil when no read_char is in
-flight.  The record is allocated by read_char() at entry and stored
-in state->scm_record.  */)
+flight.  The record is allocated and pushed by read_char() at entry.
+*/)
   (void)
 {
   if (rc_state_depth == 0)
     return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->scm_record;
-}
-
-/* Step 2-A: sync subrs between the C struct and its companion
-   Scheme record.  We bypass srfi-9 accessors (which expand to
-   syntax-transformers in this Guile build and so are uncallable
-   from C, see feedback_srfi9_accessors.md) by using Guile's
-   low-level scm_struct_ref / scm_struct_set_x, addressing slots
-   by index.  Slot order follows the <rc-state> constructor:
-
-     0  commandflag                  7  local-tag
-     1  map                          8  save-tag
-     2  prev-event                   9  previous-echo-area-message
-     3  used-mouse-menu             10  also-record
-     4  end-time                    11  recorded
-     5  c                           12  reread
-     6  tag                         13  orig-kboard
-
-   Pointer-typed slots (used-mouse-menu, end-time, orig-kboard)
-   carry compact placeholders for now: a #t/#nil for the bool
-   value of *used_mouse_menu, #t/#nil for non-NULL end_time, and
-   a kboard SMOB wrapping orig_kboard.  */
-
-static SCM scm_from_int_cached (int i)
-{
-  return scm_from_int (i);
-}
-
-DEFUN ("--rc-sync-to-record", Fc_rc_sync_to_record,
-       Sc_rc_sync_to_record, 0, 0, 0,
-       doc: /* Internal: mirror the top-of-stack C struct into its
-companion <rc-state> Scheme record.  Returns the record, or nil
-at idle.  Pointer fields are mirrored as compact placeholders
-(see the rc-sync source for the encoding).  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
-  SCM rec = state->scm_record;
-
-  scm_struct_set_x (rec, scm_from_int_cached (0),
-                    make_fixnum (state->commandflag));
-  scm_struct_set_x (rec, scm_from_int_cached (1),  state->map);
-  scm_struct_set_x (rec, scm_from_int_cached (2),  state->prev_event);
-  scm_struct_set_x (rec, scm_from_int_cached (3),
-                    state->used_mouse_menu
-                    ? (*state->used_mouse_menu ? Qt : Qnil)
-                    : Qnil);
-  scm_struct_set_x (rec, scm_from_int_cached (4),
-                    state->end_time ? Qt : Qnil);
-  scm_struct_set_x (rec, scm_from_int_cached (5),  state->c);
-  scm_struct_set_x (rec, scm_from_int_cached (6),  state->tag);
-  scm_struct_set_x (rec, scm_from_int_cached (7),  state->local_tag);
-  scm_struct_set_x (rec, scm_from_int_cached (8),  state->save_tag);
-  scm_struct_set_x (rec, scm_from_int_cached (9),
-                    state->previous_echo_area_message);
-  scm_struct_set_x (rec, scm_from_int_cached (10), state->also_record);
-  scm_struct_set_x (rec, scm_from_int_cached (11),
-                    state->recorded ? Qt : Qnil);
-  scm_struct_set_x (rec, scm_from_int_cached (12),
-                    state->reread ? Qt : Qnil);
-  scm_struct_set_x (rec, scm_from_int_cached (13),
-                    state->orig_kboard
-                    ? make_kboard_smob (state->orig_kboard)
-                    : Qnil);
-  return rec;
-}
-
-DEFUN ("--rc-sync-from-record", Fc_rc_sync_from_record,
-       Sc_rc_sync_from_record, 0, 0, 0,
-       doc: /* Internal: write the <rc-state> record back into its
-companion C struct (Lisp_Object + scalar fields).  Pointer fields
-are NOT written back from the record — the C-side pointer values
-are caller-owned and remain the source of truth for those slots.
-Returns nil.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
-  SCM rec = state->scm_record;
-
-  state->commandflag
-    = XFIXNUM (scm_struct_ref (rec, scm_from_int_cached (0)));
-  state->map        = scm_struct_ref (rec, scm_from_int_cached (1));
-  state->prev_event = scm_struct_ref (rec, scm_from_int_cached (2));
-  /* Slot 3 (used-mouse-menu): if record holds non-nil and the C
-     pointer is non-NULL, write *p = true.  If record holds nil,
-     don't clobber a previously-set true (the C pointer is the
-     callee's "I observed a mouse menu" out-flag, monotonic).  */
-  {
-    SCM v = scm_struct_ref (rec, scm_from_int_cached (3));
-    if (!NILP (v) && state->used_mouse_menu)
-      *state->used_mouse_menu = true;
-  }
-  /* Slot 4 (end-time): caller-owned read-only pointer; nothing
-     to write back.  */
-  state->c          = scm_struct_ref (rec, scm_from_int_cached (5));
-  state->tag        = scm_struct_ref (rec, scm_from_int_cached (6));
-  state->local_tag  = scm_struct_ref (rec, scm_from_int_cached (7));
-  state->save_tag   = scm_struct_ref (rec, scm_from_int_cached (8));
-  state->previous_echo_area_message
-                    = scm_struct_ref (rec, scm_from_int_cached (9));
-  state->also_record
-                    = scm_struct_ref (rec, scm_from_int_cached (10));
-  state->recorded   = !NILP (scm_struct_ref (rec, scm_from_int_cached (11)));
-  state->reread     = !NILP (scm_struct_ref (rec, scm_from_int_cached (12)));
-  /* Slot 13 (orig-kboard): read-only from inside read_char; the
-     C pointer is the wrong_kboard_jmpbuf reference and must not
-     be reassigned mid-call.  */
-  return Qnil;
+  return rc_record_stack[rc_state_depth - 1];
 }
 
 /* M8final — terminal subr for read-char-main's exit path.  Runs the
    two-line `exit:' tail of the original read_char_1: latch input
-   pending into input_was_pending, then return state->c.  See
-   docs/keyboard.org §M8final.  */
+   pending into input_was_pending, then return the resolved event
+   (the record's C slot).  See docs/keyboard.org §M8final.  */
 DEFUN ("--rc-exit", Fc_rc_exit, Sc_rc_exit, 0, 0, 0,
        doc: /* Internal: read_char_1's `exit:' tail.
-Sets input_was_pending = input_pending and returns state->c
-(the resolved event).  At idle (empty rc_state_stack) this
-returns nil and does nothing — but in production it is only
-called via read-char-main during an in-flight read_char.  */)
+Sets input_was_pending = input_pending and returns the resolved
+event.  At idle (empty rc_state_stack) returns nil and does
+nothing — in production this is only called via read-char-main
+during an in-flight read_char.  */)
   (void)
 {
   if (rc_state_depth == 0)
     return Qnil;
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
   input_was_pending = input_pending;
-  return state->c;
+  return rc_get (rc_record_stack[rc_state_depth - 1], RC_SLOT_C);
 }
 
 /* M8n — bulk splice of help-echo display + add-to-this_command_keys
@@ -3072,16 +2962,17 @@ DEFUN ("--rc-help-echo-and-help-form",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: help-echo display.  */
-  if (CONSP (state->c) && EQ (XCAR (state->c), Qhelp_echo))
+  if (CONSP (c) && EQ (XCAR (c), Qhelp_echo))
     {
       /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
       Lisp_Object help, object, position, window, htem;
 
-      htem = Fcdr (XCDR (state->c));
+      htem = Fcdr (XCDR (c));
       help = Fcar (htem);
       htem = Fcdr (htem);
       window = Fcar (htem);
@@ -3093,35 +2984,36 @@ DEFUN ("--rc-help-echo-and-help-form",
       show_help_echo (help, window, object, position);
 
       /* We stopped being idle for this event; undo that.  */
-      if (!state->end_time)
+      if (!end_time)
         timer_resume_idle ();
       return intern ("goto-retry");
     }
 
   /* Block 2: add to this_command_keys + echo + last_input_event.  */
-  if ((!state->reread || this_command_key_count == 0)
-      && !state->end_time)
+  if ((NILP (rc_get (rec, RC_SLOT_REREAD)) || this_command_key_count == 0)
+      && !end_time)
     {
       /* Don't echo mouse motion events.  */
-      if (!(EVENT_HAS_PARAMETERS (state->c)
-            && EQ (EVENT_HEAD_KIND (EVENT_HEAD (state->c)), Qmouse_movement)))
+      if (!(EVENT_HAS_PARAMETERS (c)
+            && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
         /* Once we reread a character, echoing can happen
            the next time we pause to read a new one.  */
         ok_to_echo_at_next_pause = current_kboard;
 
       /* Record this character as part of the current key.  */
-      add_command_key (state->c);
-      if (!NILP (state->also_record))
-        add_command_key (state->also_record);
+      add_command_key (c);
+      Lisp_Object also_record = rc_get (rec, RC_SLOT_ALSO_RECORD);
+      if (!NILP (also_record))
+        add_command_key (also_record);
 
       echo_update ();
     }
 
-  last_input_event = state->c;
+  last_input_event = c;
   num_input_events++;
 
   /* Block 3: help_form recursive read.  */
-  if (!NILP (Vhelp_form) && help_char_p (state->c))
+  if (!NILP (Vhelp_form) && help_char_p (c))
     {
       dynwind_begin ();
 
@@ -3134,23 +3026,25 @@ DEFUN ("--rc-help-echo-and-help-form",
       cancel_echoing ();
       do
         {
-          state->c = read_char (0, Qnil, Qnil, 0, NULL);
-          if (EVENT_HAS_PARAMETERS (state->c)
-              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (state->c)), Qmouse_click))
+          c = read_char (0, Qnil, Qnil, 0, NULL);
+          if (EVENT_HAS_PARAMETERS (c)
+              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_click))
             XSETCAR (help_form_saved_window_configs, Qnil);
         }
-      while (BUFFERP (state->c));
+      while (BUFFERP (c));
       /* Remove the help from the frame.  */
       dynwind_end ();
 
       redisplay ();
-      if (BASE_EQ (state->c, make_fixnum (040)))
+      if (BASE_EQ (c, make_fixnum (040)))
         {
           cancel_echoing ();
           do
-            state->c = read_char (0, Qnil, Qnil, 0, NULL);
-          while (BUFFERP (state->c));
+            c = read_char (0, Qnil, Qnil, 0, NULL);
+          while (BUFFERP (c));
         }
+      /* Write back the final c value to the record.  */
+      rc_set (rec, RC_SLOT_C, c);
     }
 
   return intern ("fall-through");
@@ -3186,17 +3080,17 @@ DEFUN ("--rc-input-method-dispatch",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: input-method dispatch.  */
-  if (FIXNUMP (state->c)
+  if (FIXNUMP (c)
       && !NILP (Vinput_method_function)
       /* Don't run the input method within a key sequence,
          after the first event of the key sequence.  */
-      && NILP (state->prev_event)
-      && ' ' <= XFIXNUM (state->c) && XFIXNUM (state->c) < 256
-      && XFIXNUM (state->c) != 127)
+      && NILP (rc_get (rec, RC_SLOT_PREV_EVENT))
+      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256
+      && XFIXNUM (c) != 127)
     {
       Lisp_Object keys;
       ptrdiff_t key_count;
@@ -3230,11 +3124,11 @@ DEFUN ("--rc-input-method-dispatch",
 
       /* If we are not reading a key sequence,
          never use the echo area.  */
-      if (!KEYMAPP (state->map))
+      if (!KEYMAPP (rc_get (rec, RC_SLOT_MAP)))
         specbind_guile (Qinput_method_use_echo_area, Qt);
 
       /* Call the input method.  */
-      Lisp_Object tem = call1 (Vinput_method_function, state->c);
+      Lisp_Object tem = call1 (Vinput_method_function, c);
 
       dynwind_end ();
 
@@ -3256,21 +3150,23 @@ DEFUN ("--rc-input-method-dispatch",
       if (!CONSP (tem))
         {
           /* Bring back the previous message, if any.  */
-          if (!NILP (state->previous_echo_area_message))
-            message_with_string ("%s", state->previous_echo_area_message, 0);
+          Lisp_Object prev_msg = rc_get (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE);
+          if (!NILP (prev_msg))
+            message_with_string ("%s", prev_msg, 0);
           return intern ("goto-retry");
         }
       /* It returned one event or more.  */
-      state->c = XCAR (tem);
+      c = XCAR (tem);
+      rc_set (rec, RC_SLOT_C, c);
       Vunread_post_input_method_events
         = nconc2 (XCDR (tem), Vunread_post_input_method_events);
     }
 
   /* Block 2: record if the event bypassed the M8l recording path.  */
-  if (!state->recorded)
+  if (NILP (rc_get (rec, RC_SLOT_RECORDED)))
     {
-      record_char (state->c);
-      state->recorded = true;
+      record_char (c);
+      rc_set (rec, RC_SLOT_RECORDED, Qt);
     }
 
   return intern ("fall-through");
@@ -3311,82 +3207,87 @@ DEFUN ("--rc-event-translate-and-record",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: FIXNUMP + keyboard-translate-table.  */
-  if (FIXNUMP (state->c))
+  if (FIXNUMP (c))
     {
       /* If kbd_buffer_get_event gave us an EOF, return that.  */
-      if (XFIXNUM (state->c) == -1)
+      if (XFIXNUM (c) == -1)
         return intern ("goto-exit");
 
       if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
-           && XFIXNAT (state->c) < SCHARS (KVAR (current_kboard,
-                                                 Vkeyboard_translate_table)))
+           && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
+                                          Vkeyboard_translate_table)))
           || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard,
                                              Vkeyboard_translate_table))
-              && XFIXNAT (state->c) < ASIZE (KVAR (current_kboard,
-                                                   Vkeyboard_translate_table)))
+              && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
+                                            Vkeyboard_translate_table)))
           || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
-              && CHARACTERP (state->c)))
+              && CHARACTERP (c)))
         {
           Lisp_Object d
-            = Faref (KVAR (current_kboard, Vkeyboard_translate_table),
-                     state->c);
+            = Faref (KVAR (current_kboard, Vkeyboard_translate_table), c);
           /* nil in keyboard-translate-table means no translation.  */
           if (!NILP (d))
-            state->c = d;
+            {
+              c = d;
+              rc_set (rec, RC_SLOT_C, c);
+            }
         }
     }
 
   /* Block 2: menu-bar synthesis.  */
-  if (EVENT_HAS_PARAMETERS (state->c)
-      && CONSP (XCDR (state->c))
-      && CONSP (xevent_start (state->c))
-      && CONSP (XCDR (xevent_start (state->c))))
+  if (EVENT_HAS_PARAMETERS (c)
+      && CONSP (XCDR (c))
+      && CONSP (xevent_start (c))
+      && CONSP (XCDR (xevent_start (c))))
     {
-      Lisp_Object posn = POSN_POSN (xevent_start (state->c));
+      Lisp_Object posn = POSN_POSN (xevent_start (c));
       if (EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
           || EQ (posn, Qtool_bar))
         {
           /* Change menu-bar to (menu-bar) as the event "position".  */
-          POSN_SET_POSN (xevent_start (state->c), list1 (posn));
+          POSN_SET_POSN (xevent_start (c), list1 (posn));
 
-          if (state->end_time)
-            Vunread_command_events = Fcons (Fcons (Qt, state->c),
+          if (end_time)
+            Vunread_command_events = Fcons (Fcons (Qt, c),
                                             Vunread_command_events);
           else
             {
-              state->also_record = state->c;
-              Vunread_command_events = Fcons (state->c,
-                                              Vunread_command_events);
+              rc_set (rec, RC_SLOT_ALSO_RECORD, c);
+              Vunread_command_events = Fcons (c, Vunread_command_events);
             }
-          state->c = posn;
+          c = posn;
+          rc_set (rec, RC_SLOT_C, c);
         }
     }
 
   /* Block 3a: record_char + also_record.  */
-  record_char (state->c);
-  state->recorded = true;
-  if (!NILP (state->also_record))
-    record_char (state->also_record);
+  record_char (c);
+  rc_set (rec, RC_SLOT_RECORDED, Qt);
+  Lisp_Object also_record = rc_get (rec, RC_SLOT_ALSO_RECORD);
+  if (!NILP (also_record))
+    record_char (also_record);
 
   /* Block 3b: pre-input-method echo-area save.  */
-  if (FIXNUMP (state->c)
+  if (FIXNUMP (c)
       && !NILP (Vinput_method_function)
-      && ' ' <= XFIXNUM (state->c) && XFIXNUM (state->c) < 256
-      && XFIXNUM (state->c) != 127)
+      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256
+      && XFIXNUM (c) != 127)
     {
-      state->previous_echo_area_message = Fcurrent_message ();
-      Vinput_method_previous_message = state->previous_echo_area_message;
+      Lisp_Object cur = Fcurrent_message ();
+      rc_set (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE, cur);
+      Vinput_method_previous_message = cur;
     }
 
   /* Block 3c: echo-area wipe (unless help/switch/select-window).  */
-  if (!CONSP (state->c)
-      || (!EQ (Qhelp_echo, XCAR (state->c))
-          && !EQ (Qswitch_frame, XCAR (state->c))
-          && !EQ (Qselect_window, XCAR (state->c))))
+  if (!CONSP (c)
+      || (!EQ (Qhelp_echo, XCAR (c))
+          && !EQ (Qswitch_frame, XCAR (c))
+          && !EQ (Qselect_window, XCAR (c))))
     {
       if (!NILP (echo_area_buffer[0]))
         {
@@ -3432,37 +3333,38 @@ DEFUN ("--rc-bufferp-and-special-event-map",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: BUFFERP early-exit.  */
-  if (BUFFERP (state->c))
+  if (BUFFERP (c))
     return intern ("goto-exit");
 
   /* Block 2: special-event-map dispatch.  */
   Lisp_Object save = Vquit_flag;
   Vquit_flag = Qnil;
   Lisp_Object tem = access_keymap (get_keymap (Vspecial_event_map, 0, 1),
-                                   state->c, 0, 0, 1);
+                                   c, 0, 0, 1);
   Vquit_flag = save;
 
   if (!NILP (tem))
     {
       struct buffer *prev_buffer = current_buffer;
-      last_input_event = state->c;
+      last_input_event = c;
 
       call4 (Qcommand_execute, tem, Qnil,
              Fvector (1, &last_input_event), Qt);
 
-      if (CONSP (state->c)
-          && !NILP (Fmemq (XCAR (state->c), Vwhile_no_input_ignore_events))
-          && !state->end_time)
+      if (CONSP (c)
+          && !NILP (Fmemq (XCAR (c), Vwhile_no_input_ignore_events))
+          && !end_time)
         /* We stopped being idle for this event; undo that.  */
         timer_resume_idle ();
 
 #ifdef HAVE_NS
-      if (CONSP (state->c)
-          && EQ (XCAR (state->c), Qns_unput_working_text))
+      if (CONSP (c)
+          && EQ (XCAR (c), Qns_unput_working_text))
         input_was_pending = input_pending;
 #endif
 
@@ -3471,7 +3373,7 @@ DEFUN ("--rc-bufferp-and-special-event-map",
           /* The command may have changed the keymaps.  Pretend
              there is input in another keyboard and return.  This
              will recalculate keymaps.  */
-          state->c = make_fixnum (-2);
+          rc_set (rec, RC_SLOT_C, make_fixnum (-2));
           return intern ("goto-exit");
         }
       else
@@ -3508,41 +3410,50 @@ DEFUN ("--rc-wrong-kboard-and-non-reread",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct rc_ptrs *ptrs = &rc_ptr_stack[rc_state_depth - 1];
 
   while (true)
     {
+      Lisp_Object c = rc_get (rec, RC_SLOT_C);
+
       /* Block A — wrong_kboard label position.  */
-      if (NILP (state->c))
+      if (NILP (c))
         {
-          state->c = read_decoded_event_from_main_queue (state->end_time,
-                                                         state->local_tag,
-                                                         state->prev_event,
-                                                         state->used_mouse_menu);
-          if (NILP (state->c) && state->end_time
-              && timespec_cmp (*state->end_time, current_timespec ()) <= 0)
-            return intern ("goto-exit");
-
-          if (BASE_EQ (state->c, make_fixnum (-2)))
-            return intern ("return-wrong-kboard");
-
-          if (CONSP (state->c) && EQ (XCAR (state->c), Qt))
-            state->c = XCDR (state->c);
-          else if (CONSP (state->c) && EQ (XCAR (state->c), Qno_record))
+          c = read_decoded_event_from_main_queue (ptrs->end_time,
+                                                  rc_get (rec, RC_SLOT_LOCAL_TAG),
+                                                  rc_get (rec, RC_SLOT_PREV_EVENT),
+                                                  ptrs->used_mouse_menu);
+          if (NILP (c) && ptrs->end_time
+              && timespec_cmp (*ptrs->end_time, current_timespec ()) <= 0)
             {
-              state->c = XCDR (state->c);
-              state->recorded = true;
+              rc_set (rec, RC_SLOT_C, c);
+              return intern ("goto-exit");
             }
+
+          if (BASE_EQ (c, make_fixnum (-2)))
+            {
+              rc_set (rec, RC_SLOT_C, c);
+              return intern ("return-wrong-kboard");
+            }
+
+          if (CONSP (c) && EQ (XCAR (c), Qt))
+            c = XCDR (c);
+          else if (CONSP (c) && EQ (XCAR (c), Qno_record))
+            {
+              c = XCDR (c);
+              rc_set (rec, RC_SLOT_RECORDED, Qt);
+            }
+          rc_set (rec, RC_SLOT_C, c);
         }
 
       /* Block B — non_reread label position.  */
-      if (!state->end_time)
+      if (!ptrs->end_time)
         timer_stop_idle ();
 
-      if (NILP (state->c))
+      if (NILP (c))
         {
-          if (state->commandflag >= 0
+          if (XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG)) >= 0
               && !input_pending && !detect_input_pending_run_timers (0))
             redisplay ();
 
@@ -3583,11 +3494,14 @@ DEFUN ("--rc-prologue-kboard-and-queues",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
+  /* orig-kboard is stored in the record as a kboard SMOB; unwrap.  */
+  SCM orig_kb_scm = rc_get (rec, RC_SLOT_ORIG_KBOARD);
+  KBOARD *orig_kboard = NILP (orig_kb_scm) ? NULL : XKBOARD (orig_kb_scm);
 
   /* Block 1: wrong-kboard detection.  */
-  if (NILP (state->c) && current_kboard != state->orig_kboard)
+  if (NILP (c) && current_kboard != orig_kboard)
     return intern ("return-wrong-kboard");
 
   /* Block 2: drain Vunread_command_events.  */
@@ -3603,15 +3517,16 @@ DEFUN ("--rc-prologue-kboard-and-queues",
           if (CONSP (c0) && EQ (XCAR (c0), Qno_record))
             {
               c0 = XCDR (c0);
-              state->recorded = true;
+              rc_set (rec, RC_SLOT_RECORDED, Qt);
             }
-          state->reread = true;
+          rc_set (rec, RC_SLOT_REREAD, Qt);
         }
-      state->c = c0;
+      c = c0;
+      rc_set (rec, RC_SLOT_C, c);
     }
 
   /* Block 3: read from current KBOARD's side queue, if possible.  */
-  if (NILP (state->c))
+  if (NILP (c))
     {
       if (current_kboard->kbd_queue_has_data)
         {
@@ -3628,12 +3543,13 @@ DEFUN ("--rc-prologue-kboard-and-queues",
               && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c0)), Qswitch_frame))
             internal_last_event_frame = XCAR (XCDR (c0));
           Vlast_event_frame = internal_last_event_frame;
-          state->c = c0;
+          c = c0;
+          rc_set (rec, RC_SLOT_C, c);
         }
     }
 
   /* Block 4: scan other kboards if current's side queue is empty.  */
-  if (NILP (state->c) && !single_kboard)
+  if (NILP (c) && !single_kboard)
     {
       KBOARD *kb;
       for (kb = all_kboards; kb; kb = kb->next_kboard)
@@ -3675,32 +3591,36 @@ DEFUN ("--rc-prologue-xmenu-and-idle-gc",
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct rc_ptrs *ptrs = &rc_ptr_stack[rc_state_depth - 1];
+  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
+  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
 
   /* Block 1: X-menu read.  */
-  if (KEYMAPP (state->map) && INTERACTIVE
-      && !NILP (state->prev_event)
-      && EVENT_HAS_PARAMETERS (state->prev_event)
-      && !EQ (XCAR (state->prev_event), Qmenu_bar)
-      && !EQ (XCAR (state->prev_event), Qtab_bar)
-      && !EQ (XCAR (state->prev_event), Qtool_bar)
+  if (KEYMAPP (map) && INTERACTIVE
+      && !NILP (prev_event)
+      && EVENT_HAS_PARAMETERS (prev_event)
+      && !EQ (XCAR (prev_event), Qmenu_bar)
+      && !EQ (XCAR (prev_event), Qtab_bar)
+      && !EQ (XCAR (prev_event), Qtool_bar)
       /* Don't bring up a menu if we already have another event.  */
       && !CONSP (Vunread_command_events))
     {
-      state->c = read_char_x_menu_prompt (state->map, state->prev_event,
-                                          state->used_mouse_menu);
+      rc_set (rec, RC_SLOT_C,
+              read_char_x_menu_prompt (map, prev_event,
+                                       ptrs->used_mouse_menu));
       /* Now that we have read an event, Emacs is not idle.  */
-      if (!state->end_time)
+      if (!ptrs->end_time)
         timer_stop_idle ();
       return intern ("goto-exit");
     }
 
   /* Block 2: maybe autosave and/or GC due to idleness.  */
-  if (INTERACTIVE && NILP (state->c))
+  if (INTERACTIVE && NILP (rc_get (rec, RC_SLOT_C)))
     {
       int delay_level;
       ptrdiff_t buffer_size;
+      int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
 
       /* Slow down auto saves logarithmically in size of current buffer,
          and garbage collect while we're at it.  */
@@ -3715,7 +3635,7 @@ DEFUN ("--rc-prologue-xmenu-and-idle-gc",
          9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
 
       /* Auto save if enough time goes by without input.  */
-      if (state->commandflag != 0 && state->commandflag != -2
+      if (commandflag != 0 && commandflag != -2
           && num_nonmacro_input_events > last_auto_save
           && FIXNUMP (Vauto_save_timeout)
           && XFIXNUM (Vauto_save_timeout) > 0)
@@ -3769,16 +3689,17 @@ lines 3483-3538 pre-M8g.  */)
 {
   if (rc_state_depth == 0)
     return Qnil;
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
 
   /* Block 1: idle-timer start.  */
-  if (!state->end_time)
+  if (!end_time)
     timer_start_idle ();
 
   /* Block 2: immediate echo.  */
   if (minibuf_level == 0
-      && !state->end_time
+      && !end_time
       && !current_kboard->immediate_echo
       && (this_command_key_count > 0
           || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
@@ -3791,7 +3712,7 @@ lines 3483-3538 pre-M8g.  */)
           || (!echo_kboard && ok_to_echo_at_next_pause)))
     {
       /* After a mouse event, start echoing right away.  */
-      if (EVENT_HAS_PARAMETERS (state->prev_event))
+      if (EVENT_HAS_PARAMETERS (rc_get (rec, RC_SLOT_PREV_EVENT)))
         echo_now ();
       else
         {
@@ -3804,7 +3725,7 @@ lines 3483-3538 pre-M8g.  */)
     }
 
   /* Block 3: auto-save by keystroke count.  */
-  if (state->commandflag != 0 && state->commandflag != -2
+  if (commandflag != 0 && commandflag != -2
       && auto_save_interval > 0
       && (num_nonmacro_input_events - last_auto_save
           > max (auto_save_interval, 20))
@@ -3842,8 +3763,9 @@ Mirrors src/keyboard.c lines 3408-3437 pre-M8f.  */)
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
+  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
 
   /* Block 1: cancel echoing or append dash.  */
   if (!NILP (echo_area_buffer[0])
@@ -3854,21 +3776,22 @@ Mirrors src/keyboard.c lines 3408-3437 pre-M8f.  */)
     echo_dash ();
 
   /* Block 2: try minibuf menu prompt.  */
-  state->c = Qnil;
-  if (KEYMAPP (state->map) && !noninteractive
-      && !NILP (state->prev_event) && !EVENT_HAS_PARAMETERS (state->prev_event)
+  rc_set (rec, RC_SLOT_C, Qnil);
+  if (KEYMAPP (map) && !noninteractive
+      && !NILP (prev_event) && !EVENT_HAS_PARAMETERS (prev_event)
       && !CONSP (Vunread_command_events)
       && !detect_input_pending_run_timers (0))
     {
       Lisp_Object c
-        = read_char_minibuf_menu_prompt (state->commandflag, state->map);
+        = read_char_minibuf_menu_prompt (XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG)),
+                                         map);
 
       if (FIXNUMP (c) && XFIXNUM (c) == -2)
         return intern ("return-wrong-kboard");
 
       if (!NILP (c))
         {
-          state->c = c;
+          rc_set (rec, RC_SLOT_C, c);
           return intern ("goto-exit");
         }
     }
@@ -3892,10 +3815,10 @@ lines 3316-3351 pre-M8e.  */)
 {
   if (rc_state_depth == 0)
     return Qnil;
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
 
-  if (state->commandflag < 0)
+  if (commandflag < 0)
     return Qnil;
 
   bool echo_current = EQ (echo_message_buffer, echo_area_buffer[0]);
@@ -3926,7 +3849,7 @@ lines 3316-3351 pre-M8e.  */)
 
   /* Prevent the redisplay we just did from messing up echoing of the
      input after the prompt.  */
-  if (state->commandflag == 0 && echo_current)
+  if (commandflag == 0 && echo_current)
     echo_message_buffer = echo_area_buffer[0];
 
   return Qnil;
@@ -3956,8 +3879,7 @@ Mirrors src/keyboard.c lines 3242-3274 pre-M8d.  */)
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
 
   /* Block 1: executing kbd-macro.  */
   if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
@@ -3973,14 +3895,14 @@ Mirrors src/keyboard.c lines 3242-3274 pre-M8d.  */)
         XSETFASTINT (c, CHAR_META | (XFIXNAT (c) & ~0x80));
 
       executing_kbd_macro_index++;
-      state->c = c;
+      rc_set (rec, RC_SLOT_C, c);
       return intern ("from-macro");
     }
 
   /* Block 2: delayed switch-frame event.  */
   if (!NILP (unread_switch_frame))
     {
-      state->c = unread_switch_frame;
+      rc_set (rec, RC_SLOT_C, unread_switch_frame);
       unread_switch_frame = Qnil;
       /* This event should make it into this_command_keys and get
          echoed again, so we do NOT set `reread'.  */
@@ -4013,10 +3935,10 @@ check).  */)
 {
   if (rc_state_depth == 0)
     return intern ("fall-through");
-  volatile struct read_char_state *state
-    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  bool *used_mouse_menu = rc_ptr_stack[rc_state_depth - 1].used_mouse_menu;
 
-  state->recorded = false;
+  rc_set (rec, RC_SLOT_RECORDED, Qnil);
 
   /* Block 1: Vunread_post_input_method_events.  */
   if (CONSP (Vunread_post_input_method_events))
@@ -4032,11 +3954,11 @@ check).  */)
           && NILP (XCDR (c)))
         c = XCAR (c);
 
-      state->c = c;
-      state->reread = true;
+      rc_set (rec, RC_SLOT_C, c);
+      rc_set (rec, RC_SLOT_REREAD, Qt);
       return intern ("reread-first");
     }
-  state->reread = false;
+  rc_set (rec, RC_SLOT_REREAD, Qnil);
 
   Vlast_event_device = Qnil;
 
@@ -4056,9 +3978,9 @@ check).  */)
           if (CONSP (c) && EQ (XCAR (c), Qno_record))
             {
               c = XCDR (c);
-              state->recorded = true;
+              rc_set (rec, RC_SLOT_RECORDED, Qt);
             }
-          state->reread = true;
+          rc_set (rec, RC_SLOT_REREAD, Qt);
         }
 
       /* Undo what read_char_x_menu_prompt did when it unread
@@ -4072,12 +3994,12 @@ check).  */)
         }
 
       /* If the queued event used the mouse, set used_mouse_menu.  */
-      if (state->used_mouse_menu
+      if (used_mouse_menu
           && (EQ (c, Qtool_bar) || EQ (c, Qtab_bar) || EQ (c, Qmenu_bar)
               || was_disabled))
-        *state->used_mouse_menu = true;
+        *used_mouse_menu = true;
 
-      state->c = c;
+      rc_set (rec, RC_SLOT_C, c);
       return intern ("reread-for-input-method");
     }
 
@@ -4094,26 +4016,44 @@ check).  */)
           && NILP (XCDR (c)))
         c = XCAR (c);
 
-      state->c = c;
-      state->reread = true;
+      rc_set (rec, RC_SLOT_C, c);
+      rc_set (rec, RC_SLOT_REREAD, Qt);
       return intern ("reread-for-input-method");
     }
 
   return intern ("fall-through");
 }
 
+/* Step 2-C: A heap-allocated holder for the SCM record + pointer
+   companion that read_char passes through call_with_prompt's data
+   slot to read_char_thunk / read_char_handle_quit.  BDW
+   conservatively scans through this allocation, so the SCM record
+   stays reachable between read_char() and the thunk pushing it
+   onto rc_record_stack.  Intentionally not freed — the original
+   read_char_state xmalloc was likewise lifetime-leaked.  */
+struct rc_push_data
+{
+  SCM            record;
+  bool          *used_mouse_menu;
+  struct timespec *end_time;
+};
+
 static Lisp_Object
 read_char_thunk (void *data)
 {
-  /* M8b: push state on rc_state_stack so Scheme accessors can read
-     the current read_char invocation's fields.  The unwind-protect
-     pops on any exit, including abort_to_prompt that unwinds back
-     to read_char_handle_quit.  See docs/keyboard.org §M8b.  */
+  /* Push record + pointers onto the parallel stacks so the bulk
+     subrs and read-char-main can reach the current invocation's
+     state.  The unwind-protect pops on any exit, including
+     abort_to_prompt that unwinds back to read_char_handle_quit.  */
+  struct rc_push_data *d = data;
   dynwind_begin ();
   eassert (rc_state_depth < RC_STATE_STACK_MAX);
   record_unwind_protect_int (restore_rc_state_depth, rc_state_depth);
-  rc_state_stack[rc_state_depth++] = data;
-  Lisp_Object result = read_char_1 (false, data);
+  rc_record_stack[rc_state_depth] = d->record;
+  rc_ptr_stack[rc_state_depth].used_mouse_menu = d->used_mouse_menu;
+  rc_ptr_stack[rc_state_depth].end_time        = d->end_time;
+  rc_state_depth++;
+  Lisp_Object result = read_char_1 (false);
   dynwind_end ();
   return result;
 }
@@ -4121,12 +4061,13 @@ read_char_thunk (void *data)
 static Lisp_Object
 read_char_handle_quit (void *data, Lisp_Object k)
 {
-  struct read_char_state *state = data;
+  struct rc_push_data *d = data;
+  SCM rec = d->record;
   /* Handle quits while reading the keyboard.  */
   /* We must have saved the outer value of getcjmp here,
      so restore it now.  */
-  getctag = state->save_tag;
-  XSETINT (state->c, quit_char);
+  getctag = rc_get (rec, RC_SLOT_SAVE_TAG);
+  rc_set (rec, RC_SLOT_C, make_fixnum (quit_char));
   internal_last_event_frame = selected_frame;
   Vlast_event_frame = internal_last_event_frame;
   /* If we report the quit char as an event,
@@ -4149,10 +4090,11 @@ read_char_handle_quit (void *data, Lisp_Object k)
             if (!NILP (XCDR (last)))
               emacs_abort ();
           }
+        Lisp_Object qc = rc_get (rec, RC_SLOT_C);
         if (!CONSP (last))
-          kset_kbd_queue (kb, list1 (state->c));
+          kset_kbd_queue (kb, list1 (qc));
         else
-          XSETCDR (last, list1 (state->c));
+          XSETCDR (last, list1 (qc));
         kb->kbd_queue_has_data = 1;
         current_kboard = kb;
         /* This is going to exit from read_char
@@ -4160,7 +4102,7 @@ read_char_handle_quit (void *data, Lisp_Object k)
         return make_fixnum (-2); /* wrong_kboard_jmpbuf */
       }
   }
-  return read_char_1 (true, state);
+  return read_char_1 (true);
 }
 
 /* {{coccinelle:skip_start}} */
@@ -4169,54 +4111,54 @@ read_char (int commandflag, Lisp_Object map,
 	   Lisp_Object prev_event,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
-  struct read_char_state *state = xmalloc (sizeof *state);
+  /* Allocate the <rc-state> Scheme record and populate it.  The
+     two caller-owned pointers (used_mouse_menu, end_time) plus the
+     record are stashed in a heap-allocated rc_push_data struct that
+     rides through call_with_prompt to the thunk / quit handler.  */
+  static SCM make_proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (make_proc))
+    make_proc = scm_c_public_ref ("emacs read-char", "make-rc-state");
+  SCM rec = SCM_CALL_0 (make_proc);
 
-  state->commandflag = commandflag;
-  state->map = map;
-  state->prev_event = prev_event;
-  state->used_mouse_menu = used_mouse_menu;
-  state->end_time = end_time;
-  state->c = Qnil;
-  state->local_tag = Qnil;
-  state->save_tag = Qnil;
-  state->previous_echo_area_message = Qnil;
-  state->also_record = Qnil;
-  state->recorded = false;
-  state->reread = false;
-  state->orig_kboard = current_kboard;
+  rc_set (rec, RC_SLOT_COMMANDFLAG, make_fixnum (commandflag));
+  rc_set (rec, RC_SLOT_MAP, map);
+  rc_set (rec, RC_SLOT_PREV_EVENT, prev_event);
+  rc_set (rec, RC_SLOT_C, Qnil);
+  rc_set (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE, Qnil);
+  rc_set (rec, RC_SLOT_ALSO_RECORD, Qnil);
+  rc_set (rec, RC_SLOT_RECORDED, Qnil);
+  rc_set (rec, RC_SLOT_REREAD, Qnil);
+  rc_set (rec, RC_SLOT_ORIG_KBOARD, make_kboard_smob (current_kboard));
 
-  /* Make a longjmp point for quits to use, but don't alter getcjmp just yet.
-     We will do that below, temporarily for short sections of code,
-     when appropriate.  local_getcjmp must be in effect
-     around any call to sit_for or kbd_buffer_get_event;
+  /* Make a longjmp point for quits to use, but don't alter getcjmp
+     just yet.  We will do that below, temporarily for short
+     sections of code, when appropriate.  local_getcjmp must be in
+     effect around any call to sit_for or kbd_buffer_get_event;
      it *must not* be in effect when we call redisplay.  */
+  Lisp_Object tag = make_prompt_tag ();
+  rc_set (rec, RC_SLOT_TAG, tag);
+  rc_set (rec, RC_SLOT_LOCAL_TAG, tag);
+  rc_set (rec, RC_SLOT_SAVE_TAG, Qnil);
 
-  state->tag = state->local_tag = make_prompt_tag ();
+  struct rc_push_data *d = xmalloc (sizeof *d);
+  d->record           = rec;
+  d->used_mouse_menu  = used_mouse_menu;
+  d->end_time         = end_time;
 
-  /* Step 1 of state-to-record migration: allocate the companion
-     <rc-state> Scheme record now.  Subsequent --rc-sync-to-record
-     calls (one per migrated subr) refresh it from the C struct.  */
-  {
-    static SCM make_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (make_proc))
-      make_proc = scm_c_public_ref ("emacs read-char", "make-rc-state");
-    state->scm_record = SCM_CALL_0 (make_proc);
-  }
-
-  return call_with_prompt (state->tag,
-                           make_c_closure (read_char_thunk, state, 0, 0),
-                           make_c_closure (read_char_handle_quit, state, 1, 0));
+  return call_with_prompt (tag,
+                           make_c_closure (read_char_thunk, d, 0, 0),
+                           make_c_closure (read_char_handle_quit, d, 1, 0));
 }
 
 static Lisp_Object
-read_char_1 (bool jump, volatile struct read_char_state *state)
+read_char_1 (bool jump)
 {
-  /* M8final: read_char_1's body is now a Scheme dispatcher
+  /* M8final: read_char_1's body is a Scheme dispatcher
      `read-char-main' in (emacs read-char).  It drives the
      M8c..M8n bulk subrs in sequence, with `goto retry' /
      `goto exit' implemented as tail calls between named
-     sections.  Returns either state->c (via --rc-exit) or
-     -2 (return-wrong-kboard).  See docs/keyboard.org §M8final.  */
+     sections.  Returns either the record's c slot (via --rc-exit)
+     or -2 (return-wrong-kboard).  See docs/keyboard.org §M8final.  */
   static SCM rc_main_proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (rc_main_proc))
     rc_main_proc = scm_c_public_ref ("emacs read-char",
