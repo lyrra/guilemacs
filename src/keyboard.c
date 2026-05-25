@@ -2875,122 +2875,15 @@ restore_rc_state_depth (int saved)
   rc_state_depth = saved;
 }
 
-DEFUN ("--rc-state-depth", Fc_rc_state_depth, Sc_rc_state_depth,
-       0, 0, 0,
-       doc: /* Internal: current depth of the read_char_state stack.
-Zero means no read_char invocation is in flight.  */)
-  (void)
-{
-  return make_fixnum (rc_state_depth);
-}
-
-DEFUN ("--rc-commandflag", Fc_rc_commandflag, Sc_rc_commandflag,
-       0, 0, 0,
-       doc: /* Internal: read state->commandflag of the current
-(top-of-stack) read_char invocation.  Returns 0 when no call is in
-flight.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return make_fixnum (0);
-  return make_fixnum (rc_state_stack[rc_state_depth - 1]->commandflag);
-}
-
-DEFUN ("--rc-map", Fc_rc_map, Sc_rc_map, 0, 0, 0,
-       doc: /* Internal: read state->map of the current read_char
-invocation.  Returns nil when no call is in flight.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->map;
-}
-
-DEFUN ("--rc-prev-event", Fc_rc_prev_event, Sc_rc_prev_event, 0, 0, 0,
-       doc: /* Internal: read state->prev_event of the current
-read_char invocation.  Returns nil when no call is in flight.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->prev_event;
-}
-
-DEFUN ("--rc-reread-p", Fc_rc_reread_p, Sc_rc_reread_p, 0, 0, 0,
-       doc: /* Internal: read state->reread of the current read_char
-invocation as a non-nil predicate.  Returns nil when no call is in
-flight.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->reread ? Qt : Qnil;
-}
-
-/* M8b — extended accessors for the prologue splice (M8c).  Setters
-   write the top-of-stack state's fields; getters read them.  See
-   docs/keyboard.org §M8b.  */
-
-DEFUN ("--rc-c", Fc_rc_c, Sc_rc_c, 0, 0, 0,
-       doc: /* Internal: read state->c (the output slot).  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->c;
-}
-
-DEFUN ("--set-rc-c", Fc_set_rc_c, Sc_set_rc_c, 1, 1, 0,
-       doc: /* Internal: write state->c.  No-op when stack empty.  */)
-  (Lisp_Object val)
-{
-  if (rc_state_depth > 0)
-    rc_state_stack[rc_state_depth - 1]->c = val;
-  return Qnil;
-}
-
-DEFUN ("--rc-recorded-p", Fc_rc_recorded_p, Sc_rc_recorded_p, 0, 0, 0,
-       doc: /* Internal: read state->recorded as a predicate.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  return rc_state_stack[rc_state_depth - 1]->recorded ? Qt : Qnil;
-}
-
-DEFUN ("--set-rc-recorded", Fc_set_rc_recorded, Sc_set_rc_recorded, 1, 1, 0,
-       doc: /* Internal: write state->recorded.  */)
-  (Lisp_Object val)
-{
-  if (rc_state_depth > 0)
-    rc_state_stack[rc_state_depth - 1]->recorded = !NILP (val);
-  return Qnil;
-}
-
-DEFUN ("--set-rc-reread", Fc_set_rc_reread, Sc_set_rc_reread, 1, 1, 0,
-       doc: /* Internal: write state->reread.  */)
-  (Lisp_Object val)
-{
-  if (rc_state_depth > 0)
-    rc_state_stack[rc_state_depth - 1]->reread = !NILP (val);
-  return Qnil;
-}
-
-DEFUN ("--rc-set-used-mouse-menu", Fc_rc_set_used_mouse_menu,
-       Sc_rc_set_used_mouse_menu, 1, 1, 0,
-       doc: /* Internal: if state->used_mouse_menu is non-NULL, write
-*state->used_mouse_menu = (non-nil VAL).  No-op otherwise.  Mirrors
-the C `*used_mouse_menu = true' writes inside the prologue.  */)
-  (Lisp_Object val)
-{
-  if (rc_state_depth > 0)
-    {
-      bool *p = rc_state_stack[rc_state_depth - 1]->used_mouse_menu;
-      if (p)
-        *p = !NILP (val);
-    }
-  return Qnil;
-}
+/* Step 2-B: the per-field accessor DEFUNs (--rc-state-depth,
+   --rc-commandflag, --rc-map, --rc-prev-event, --rc-reread-p,
+   --rc-c, --set-rc-c, --rc-recorded-p, --set-rc-recorded,
+   --set-rc-reread, --rc-set-used-mouse-menu) were removed here.
+   They were only used by tests; production bulk subrs (M8c..M8n)
+   reach state directly via `rc_state_stack[depth-1]->FIELD'.  Tests
+   now go through --rc-record + --rc-sync-to-record and read the
+   <rc-state> record via Scheme's struct-ref.  See
+   docs/keyboard.org §M8 closeout: state-to-record migration.  */
 
 /* Step 1 of the state-to-record migration.  The <rc-state> Scheme
    record is allocated at read_char entry and stored in
