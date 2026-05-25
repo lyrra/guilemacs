@@ -3011,6 +3011,119 @@ in state->scm_record.  */)
   return rc_state_stack[rc_state_depth - 1]->scm_record;
 }
 
+/* Step 2-A: sync subrs between the C struct and its companion
+   Scheme record.  We bypass srfi-9 accessors (which expand to
+   syntax-transformers in this Guile build and so are uncallable
+   from C, see feedback_srfi9_accessors.md) by using Guile's
+   low-level scm_struct_ref / scm_struct_set_x, addressing slots
+   by index.  Slot order follows the <rc-state> constructor:
+
+     0  commandflag                  7  local-tag
+     1  map                          8  save-tag
+     2  prev-event                   9  previous-echo-area-message
+     3  used-mouse-menu             10  also-record
+     4  end-time                    11  recorded
+     5  c                           12  reread
+     6  tag                         13  orig-kboard
+
+   Pointer-typed slots (used-mouse-menu, end-time, orig-kboard)
+   carry compact placeholders for now: a #t/#nil for the bool
+   value of *used_mouse_menu, #t/#nil for non-NULL end_time, and
+   a kboard SMOB wrapping orig_kboard.  */
+
+static SCM scm_from_int_cached (int i)
+{
+  return scm_from_int (i);
+}
+
+DEFUN ("--rc-sync-to-record", Fc_rc_sync_to_record,
+       Sc_rc_sync_to_record, 0, 0, 0,
+       doc: /* Internal: mirror the top-of-stack C struct into its
+companion <rc-state> Scheme record.  Returns the record, or nil
+at idle.  Pointer fields are mirrored as compact placeholders
+(see the rc-sync source for the encoding).  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = state->scm_record;
+
+  scm_struct_set_x (rec, scm_from_int_cached (0),
+                    make_fixnum (state->commandflag));
+  scm_struct_set_x (rec, scm_from_int_cached (1),  state->map);
+  scm_struct_set_x (rec, scm_from_int_cached (2),  state->prev_event);
+  scm_struct_set_x (rec, scm_from_int_cached (3),
+                    state->used_mouse_menu
+                    ? (*state->used_mouse_menu ? Qt : Qnil)
+                    : Qnil);
+  scm_struct_set_x (rec, scm_from_int_cached (4),
+                    state->end_time ? Qt : Qnil);
+  scm_struct_set_x (rec, scm_from_int_cached (5),  state->c);
+  scm_struct_set_x (rec, scm_from_int_cached (6),  state->tag);
+  scm_struct_set_x (rec, scm_from_int_cached (7),  state->local_tag);
+  scm_struct_set_x (rec, scm_from_int_cached (8),  state->save_tag);
+  scm_struct_set_x (rec, scm_from_int_cached (9),
+                    state->previous_echo_area_message);
+  scm_struct_set_x (rec, scm_from_int_cached (10), state->also_record);
+  scm_struct_set_x (rec, scm_from_int_cached (11),
+                    state->recorded ? Qt : Qnil);
+  scm_struct_set_x (rec, scm_from_int_cached (12),
+                    state->reread ? Qt : Qnil);
+  scm_struct_set_x (rec, scm_from_int_cached (13),
+                    state->orig_kboard
+                    ? make_kboard_smob (state->orig_kboard)
+                    : Qnil);
+  return rec;
+}
+
+DEFUN ("--rc-sync-from-record", Fc_rc_sync_from_record,
+       Sc_rc_sync_from_record, 0, 0, 0,
+       doc: /* Internal: write the <rc-state> record back into its
+companion C struct (Lisp_Object + scalar fields).  Pointer fields
+are NOT written back from the record — the C-side pointer values
+are caller-owned and remain the source of truth for those slots.
+Returns nil.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  volatile struct read_char_state *state
+    = rc_state_stack[rc_state_depth - 1];
+  SCM rec = state->scm_record;
+
+  state->commandflag
+    = XFIXNUM (scm_struct_ref (rec, scm_from_int_cached (0)));
+  state->map        = scm_struct_ref (rec, scm_from_int_cached (1));
+  state->prev_event = scm_struct_ref (rec, scm_from_int_cached (2));
+  /* Slot 3 (used-mouse-menu): if record holds non-nil and the C
+     pointer is non-NULL, write *p = true.  If record holds nil,
+     don't clobber a previously-set true (the C pointer is the
+     callee's "I observed a mouse menu" out-flag, monotonic).  */
+  {
+    SCM v = scm_struct_ref (rec, scm_from_int_cached (3));
+    if (!NILP (v) && state->used_mouse_menu)
+      *state->used_mouse_menu = true;
+  }
+  /* Slot 4 (end-time): caller-owned read-only pointer; nothing
+     to write back.  */
+  state->c          = scm_struct_ref (rec, scm_from_int_cached (5));
+  state->tag        = scm_struct_ref (rec, scm_from_int_cached (6));
+  state->local_tag  = scm_struct_ref (rec, scm_from_int_cached (7));
+  state->save_tag   = scm_struct_ref (rec, scm_from_int_cached (8));
+  state->previous_echo_area_message
+                    = scm_struct_ref (rec, scm_from_int_cached (9));
+  state->also_record
+                    = scm_struct_ref (rec, scm_from_int_cached (10));
+  state->recorded   = !NILP (scm_struct_ref (rec, scm_from_int_cached (11)));
+  state->reread     = !NILP (scm_struct_ref (rec, scm_from_int_cached (12)));
+  /* Slot 13 (orig-kboard): read-only from inside read_char; the
+     C pointer is the wrong_kboard_jmpbuf reference and must not
+     be reassigned mid-call.  */
+  return Qnil;
+}
+
 /* M8final — terminal subr for read-char-main's exit path.  Runs the
    two-line `exit:' tail of the original read_char_1: latch input
    pending into input_was_pending, then return state->c.  See

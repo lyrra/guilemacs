@@ -204,4 +204,19 @@
   ;; Outside any in-flight read_char, no SCM record is allocated.
   (should (eq nil (--rc-record))))
 
+;;;; Step 2-A — sync subrs (C struct <-> Scheme record)
+
+(ert-deftest step2a-helpers/exist ()
+  (should (fboundp '--rc-sync-to-record))
+  (should (fboundp '--rc-sync-from-record)))
+
+(ert-deftest step2a-sync-to-record/nil-at-idle ()
+  ;; With no in-flight read_char, sync-to-record finds no state
+  ;; and returns nil (no record to populate).
+  (should (eq nil (--rc-sync-to-record))))
+
+(ert-deftest step2a-sync-from-record/nil-at-idle ()
+  ;; With no in-flight read_char, sync-from-record is a no-op.
+  (should (eq nil (--rc-sync-from-record))))
+
 (provide 'ertest-read-char)
