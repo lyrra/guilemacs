@@ -17046,7 +17046,6 @@ redisplay_internal (void)
   struct text_pos tlbufpos, tlendpos;
   int number_of_visible_frames;
   struct frame *sf;
-  bool polling_stopped_here = false;
   Lisp_Object tail, frame;
 
   /* Set a limit to the number of retries we perform due to horizontal

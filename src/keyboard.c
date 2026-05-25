@@ -2847,7 +2847,6 @@ struct read_char_state
   Lisp_Object also_record;
   bool recorded;
   bool reread;
-  bool polling_stopped_here;
   struct kboard *orig_kboard;
 };
 
@@ -4152,7 +4151,6 @@ read_char (int commandflag, Lisp_Object map,
   state->previous_echo_area_message = Qnil;
   state->also_record = Qnil;
   state->reread = false;
-  state->polling_stopped_here = false;
   state->orig_kboard = current_kboard;
 
   /* Make a longjmp point for quits to use, but don't alter getcjmp just yet.
