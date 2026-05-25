@@ -195,4 +195,13 @@
   ;; in-flight read_char to read state->c from).
   (should (eq nil (--rc-exit!))))
 
+;;;; Step 1 of state-to-record migration — companion Scheme record
+
+(ert-deftest step1-helpers/exist ()
+  (should (fboundp '--rc-record)))
+
+(ert-deftest step1-rc-record/nil-at-idle ()
+  ;; Outside any in-flight read_char, no SCM record is allocated.
+  (should (eq nil (--rc-record))))
+
 (provide 'ertest-read-char)

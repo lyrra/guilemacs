@@ -2848,6 +2848,12 @@ struct read_char_state
   bool recorded;
   bool reread;
   struct kboard *orig_kboard;
+  /* Step 1 of the state-to-record migration: a Scheme record
+     mirroring this struct, allocated at read_char entry.  Both
+     representations coexist; production code still reads/writes
+     this C struct directly, while migrated subrs (one per step)
+     will switch to the record via --rc-record + --rc-sync-*.  */
+  SCM scm_record;
 };
 
 static Lisp_Object read_char_1 (bool, volatile struct read_char_state *);
@@ -2984,6 +2990,25 @@ the C `*used_mouse_menu = true' writes inside the prologue.  */)
         *p = !NILP (val);
     }
   return Qnil;
+}
+
+/* Step 1 of the state-to-record migration.  The <rc-state> Scheme
+   record is allocated at read_char entry and stored in
+   state->scm_record.  --rc-record returns it; sync subrs to bridge
+   between the C struct and the record are added incrementally in
+   step 2, as each bulk subr migrates (so we only add the field
+   readers/writers each migration actually needs).  */
+
+DEFUN ("--rc-record", Fc_rc_record, Sc_rc_record, 0, 0, 0,
+       doc: /* Internal: return the <rc-state> Scheme record for the
+top-of-stack read_char invocation, or nil when no read_char is in
+flight.  The record is allocated by read_char() at entry and stored
+in state->scm_record.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  return rc_state_stack[rc_state_depth - 1]->scm_record;
 }
 
 /* M8final — terminal subr for read-char-main's exit path.  Runs the
@@ -4150,6 +4175,7 @@ read_char (int commandflag, Lisp_Object map,
   state->save_tag = Qnil;
   state->previous_echo_area_message = Qnil;
   state->also_record = Qnil;
+  state->recorded = false;
   state->reread = false;
   state->orig_kboard = current_kboard;
 
@@ -4160,6 +4186,16 @@ read_char (int commandflag, Lisp_Object map,
      it *must not* be in effect when we call redisplay.  */
 
   state->tag = state->local_tag = make_prompt_tag ();
+
+  /* Step 1 of state-to-record migration: allocate the companion
+     <rc-state> Scheme record now.  Subsequent --rc-sync-to-record
+     calls (one per migrated subr) refresh it from the C struct.  */
+  {
+    static SCM make_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (make_proc))
+      make_proc = scm_c_public_ref ("emacs read-char", "make-rc-state");
+    state->scm_record = SCM_CALL_0 (make_proc);
+  }
 
   return call_with_prompt (state->tag,
                            make_c_closure (read_char_thunk, state, 0, 0),

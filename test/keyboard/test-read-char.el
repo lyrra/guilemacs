@@ -129,4 +129,9 @@
 (test-assert "helpers/read-char-main"  (fboundp '--read-char-main))
 (test-eq "rc-exit/nil-at-idle" nil (--rc-exit!))
 
+;;;; Step 1 of state-to-record migration
+
+(test-assert "helpers/rc-record" (fboundp '--rc-record))
+(test-eq "rc-record/nil-at-idle" nil (--rc-record))
+
 (test-end)

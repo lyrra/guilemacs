@@ -80,8 +80,6 @@
 ;;;;   recorded         — true once add_command_key has been called
 ;;;;                      for this iteration.
 ;;;;   reread           — true when re-reading from unread-events.
-;;;;   polling-stopped-here
-;;;;                    — true when poll_for_input was stopped by us.
 ;;;;   orig-kboard      — current_kboard snapshot at entry (for
 ;;;;                      detecting kboard switches mid-read).
 
@@ -89,7 +87,7 @@
   (%make-rc-state commandflag map prev-event used-mouse-menu end-time
                   c tag local-tag save-tag
                   previous-echo-area-message also-record
-                  recorded reread polling-stopped-here
+                  recorded reread
                   orig-kboard)
   rc-state?
   (commandflag       rc-state-commandflag       set-rc-state-commandflag!)
@@ -107,15 +105,12 @@
   (also-record       rc-state-also-record       set-rc-state-also-record!)
   (recorded          rc-state-recorded          set-rc-state-recorded!)
   (reread            rc-state-reread            set-rc-state-reread!)
-  (polling-stopped-here
-                     rc-state-polling-stopped-here
-                     set-rc-state-polling-stopped-here!)
   (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!))
 
 (define (make-rc-state)
   "Create a fresh rc-state with C-struct defaults (everything nil
 or false, commandflag = 0).  Mirrors the read_char entry's
-explicit zeroing (src/keyboard.c:2915-2927)."
+explicit zeroing in src/keyboard.c."
   (%make-rc-state
    0      ; commandflag
    #nil   ; map
@@ -130,7 +125,6 @@ explicit zeroing (src/keyboard.c:2915-2927)."
    #nil   ; also-record
    #nil   ; recorded (bool)
    #nil   ; reread (bool)
-   #nil   ; polling-stopped-here (bool)
    #nil)) ; orig-kboard
 
 (define (rc-state-fresh! state)
@@ -149,7 +143,6 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-also-record!                state #nil)
   (set-rc-state-recorded!                   state #nil)
   (set-rc-state-reread!                     state #nil)
-  (set-rc-state-polling-stopped-here!       state #nil)
   (set-rc-state-orig-kboard!                state #nil))
 
 ;;;;
