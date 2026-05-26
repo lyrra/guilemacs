@@ -2832,21 +2832,23 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
 
    Value is t if we showed a menu and the user rejected it.  */
 
-/* Step 2-C: the read_char state is now a Scheme <rc-state> record
-   (defined in mod/emacs/read-char.scm) plus a tiny C-side companion
-   for the caller-owned pointer fields (used_mouse_menu, end_time)
-   that the record can't carry directly.  Slot indices below match
-   the record's constructor order; they're read/written via Guile's
-   low-level scm_struct_ref / scm_struct_set_x (the srfi-9 accessors
-   themselves are syntax-transformers and uncallable from C — see
-   feedback_srfi9_accessors.md).  */
+/* Step 2-C/D: the read_char state is the Scheme <rc-state> record
+   (defined in mod/emacs/read-char.scm) — single source of truth.
+   Slot indices below match the record's constructor order; they're
+   read/written via Guile's low-level scm_struct_ref / scm_struct_set_x
+   (the srfi-9 accessors themselves are syntax-transformers and
+   uncallable from C — see feedback_srfi9_accessors.md).
+
+   Slots 3 and 4 hold the two caller-owned C pointers as Guile
+   foreign-pointer SCMs (or Qnil when NULL); they round-trip through
+   read_char() entry and the bulk subrs that need them.  */
 
 enum rc_slot {
   RC_SLOT_COMMANDFLAG                 = 0,
   RC_SLOT_MAP                         = 1,
   RC_SLOT_PREV_EVENT                  = 2,
-  RC_SLOT_USED_MOUSE_MENU             = 3,  /* placeholder: real ptr in rc_ptr_stack */
-  RC_SLOT_END_TIME                    = 4,  /* placeholder: real ptr in rc_ptr_stack */
+  RC_SLOT_USED_MOUSE_MENU             = 3,  /* foreign-ptr to bool, or Qnil */
+  RC_SLOT_END_TIME                    = 4,  /* foreign-ptr to struct timespec, or Qnil */
   RC_SLOT_C                           = 5,
   RC_SLOT_TAG                         = 6,
   RC_SLOT_LOCAL_TAG                   = 7,
@@ -2858,16 +2860,9 @@ enum rc_slot {
   RC_SLOT_ORIG_KBOARD                 = 13  /* kboard SMOB */
 };
 
-struct rc_ptrs
-{
-  bool *used_mouse_menu;
-  struct timespec *end_time;
-};
-
 enum { RC_STATE_STACK_MAX = 8 };
-static SCM             rc_record_stack[RC_STATE_STACK_MAX];
-static struct rc_ptrs  rc_ptr_stack[RC_STATE_STACK_MAX];
-static int             rc_state_depth;
+static SCM rc_record_stack[RC_STATE_STACK_MAX];
+static int rc_state_depth;
 
 static Lisp_Object read_char_1 (bool jump);
 
@@ -2883,6 +2878,21 @@ rc_set (SCM rec, int slot, Lisp_Object val)
   scm_struct_set_x (rec, scm_from_int (slot), val);
 }
 
+/* Wrap a C pointer as a Guile foreign-pointer SCM (or Qnil for NULL).  */
+static inline SCM
+rc_wrap_ptr (void *p)
+{
+  return p ? scm_from_pointer (p, NULL) : Qnil;
+}
+
+/* Unwrap a foreign-pointer SCM slot back to a C pointer (NULL when nil).  */
+static inline void *
+rc_unwrap_ptr (SCM rec, int slot)
+{
+  SCM s = rc_get (rec, slot);
+  return NILP (s) ? NULL : scm_to_pointer (s);
+}
+
 static void
 restore_rc_state_depth (int saved)
 {
@@ -2894,8 +2904,10 @@ restore_rc_state_depth (int saved)
    tests now go through --rc-record + struct-ref.
    Step 2-C collapsed `struct read_char_state' into the <rc-state>
    record itself; bulk subrs reach state via rc_record_stack +
-   rc_get / rc_set (and rc_ptr_stack for the two caller-owned C
-   pointers).  See docs/keyboard.org §M8 closeout.  */
+   rc_get / rc_set.  Step 2-D folded the caller-owned C pointers
+   (used_mouse_menu, end_time) into record slots 3 and 4 as
+   foreign-pointer SCMs, eliminating the rc_ptr_stack companion.
+   See docs/keyboard.org §M8 closeout.  */
 
 DEFUN ("--rc-record", Fc_rc_record, Sc_rc_record, 0, 0, 0,
        doc: /* Internal: return the <rc-state> Scheme record for the
@@ -2963,7 +2975,7 @@ DEFUN ("--rc-help-echo-and-help-form",
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: help-echo display.  */
@@ -3208,7 +3220,7 @@ DEFUN ("--rc-event-translate-and-record",
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: FIXNUMP + keyboard-translate-table.  */
@@ -3334,7 +3346,7 @@ DEFUN ("--rc-bufferp-and-special-event-map",
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
   /* Block 1: BUFFERP early-exit.  */
@@ -3411,7 +3423,8 @@ DEFUN ("--rc-wrong-kboard-and-non-reread",
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct rc_ptrs *ptrs = &rc_ptr_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
+  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
 
   while (true)
     {
@@ -3420,12 +3433,12 @@ DEFUN ("--rc-wrong-kboard-and-non-reread",
       /* Block A — wrong_kboard label position.  */
       if (NILP (c))
         {
-          c = read_decoded_event_from_main_queue (ptrs->end_time,
+          c = read_decoded_event_from_main_queue (end_time,
                                                   rc_get (rec, RC_SLOT_LOCAL_TAG),
                                                   rc_get (rec, RC_SLOT_PREV_EVENT),
-                                                  ptrs->used_mouse_menu);
-          if (NILP (c) && ptrs->end_time
-              && timespec_cmp (*ptrs->end_time, current_timespec ()) <= 0)
+                                                  used_mouse_menu);
+          if (NILP (c) && end_time
+              && timespec_cmp (*end_time, current_timespec ()) <= 0)
             {
               rc_set (rec, RC_SLOT_C, c);
               return intern ("goto-exit");
@@ -3448,7 +3461,7 @@ DEFUN ("--rc-wrong-kboard-and-non-reread",
         }
 
       /* Block B — non_reread label position.  */
-      if (!ptrs->end_time)
+      if (!end_time)
         timer_stop_idle ();
 
       if (NILP (c))
@@ -3592,7 +3605,8 @@ DEFUN ("--rc-prologue-xmenu-and-idle-gc",
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct rc_ptrs *ptrs = &rc_ptr_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
+  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
   Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
   Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
 
@@ -3607,10 +3621,9 @@ DEFUN ("--rc-prologue-xmenu-and-idle-gc",
       && !CONSP (Vunread_command_events))
     {
       rc_set (rec, RC_SLOT_C,
-              read_char_x_menu_prompt (map, prev_event,
-                                       ptrs->used_mouse_menu));
+              read_char_x_menu_prompt (map, prev_event, used_mouse_menu));
       /* Now that we have read an event, Emacs is not idle.  */
-      if (!ptrs->end_time)
+      if (!end_time)
         timer_stop_idle ();
       return intern ("goto-exit");
     }
@@ -3690,7 +3703,7 @@ lines 3483-3538 pre-M8g.  */)
   if (rc_state_depth == 0)
     return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_ptr_stack[rc_state_depth - 1].end_time;
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
 
   /* Block 1: idle-timer start.  */
@@ -3936,7 +3949,7 @@ check).  */)
   if (rc_state_depth == 0)
     return intern ("fall-through");
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  bool *used_mouse_menu = rc_ptr_stack[rc_state_depth - 1].used_mouse_menu;
+  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
 
   rc_set (rec, RC_SLOT_RECORDED, Qnil);
 
@@ -4024,35 +4037,19 @@ check).  */)
   return intern ("fall-through");
 }
 
-/* Step 2-C: A heap-allocated holder for the SCM record + pointer
-   companion that read_char passes through call_with_prompt's data
-   slot to read_char_thunk / read_char_handle_quit.  BDW
-   conservatively scans through this allocation, so the SCM record
-   stays reachable between read_char() and the thunk pushing it
-   onto rc_record_stack.  Intentionally not freed — the original
-   read_char_state xmalloc was likewise lifetime-leaked.  */
-struct rc_push_data
-{
-  SCM            record;
-  bool          *used_mouse_menu;
-  struct timespec *end_time;
-};
-
 static Lisp_Object
 read_char_thunk (void *data)
 {
-  /* Push record + pointers onto the parallel stacks so the bulk
-     subrs and read-char-main can reach the current invocation's
-     state.  The unwind-protect pops on any exit, including
-     abort_to_prompt that unwinds back to read_char_handle_quit.  */
-  struct rc_push_data *d = data;
+  /* Push the record onto rc_record_stack so the bulk subrs and
+     read-char-main can reach the current invocation's state.  The
+     unwind-protect pops on any exit, including abort_to_prompt
+     that unwinds back to read_char_handle_quit.  `data' is a raw
+     SCM_PACK'd record; BDW conservatively scans it.  */
+  SCM rec = SCM_PACK ((scm_t_bits) data);
   dynwind_begin ();
   eassert (rc_state_depth < RC_STATE_STACK_MAX);
   record_unwind_protect_int (restore_rc_state_depth, rc_state_depth);
-  rc_record_stack[rc_state_depth] = d->record;
-  rc_ptr_stack[rc_state_depth].used_mouse_menu = d->used_mouse_menu;
-  rc_ptr_stack[rc_state_depth].end_time        = d->end_time;
-  rc_state_depth++;
+  rc_record_stack[rc_state_depth++] = rec;
   Lisp_Object result = read_char_1 (false);
   dynwind_end ();
   return result;
@@ -4061,8 +4058,7 @@ read_char_thunk (void *data)
 static Lisp_Object
 read_char_handle_quit (void *data, Lisp_Object k)
 {
-  struct rc_push_data *d = data;
-  SCM rec = d->record;
+  SCM rec = SCM_PACK ((scm_t_bits) data);
   /* Handle quits while reading the keyboard.  */
   /* We must have saved the outer value of getcjmp here,
      so restore it now.  */
@@ -4112,9 +4108,8 @@ read_char (int commandflag, Lisp_Object map,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
   /* Allocate the <rc-state> Scheme record and populate it.  The
-     two caller-owned pointers (used_mouse_menu, end_time) plus the
-     record are stashed in a heap-allocated rc_push_data struct that
-     rides through call_with_prompt to the thunk / quit handler.  */
+     two caller-owned pointers (used_mouse_menu, end_time) ride
+     through as foreign-pointer SCMs in slots 3 and 4.  */
   static SCM make_proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (make_proc))
     make_proc = scm_c_public_ref ("emacs read-char", "make-rc-state");
@@ -4123,6 +4118,8 @@ read_char (int commandflag, Lisp_Object map,
   rc_set (rec, RC_SLOT_COMMANDFLAG, make_fixnum (commandflag));
   rc_set (rec, RC_SLOT_MAP, map);
   rc_set (rec, RC_SLOT_PREV_EVENT, prev_event);
+  rc_set (rec, RC_SLOT_USED_MOUSE_MENU, rc_wrap_ptr (used_mouse_menu));
+  rc_set (rec, RC_SLOT_END_TIME, rc_wrap_ptr (end_time));
   rc_set (rec, RC_SLOT_C, Qnil);
   rc_set (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE, Qnil);
   rc_set (rec, RC_SLOT_ALSO_RECORD, Qnil);
@@ -4140,14 +4137,14 @@ read_char (int commandflag, Lisp_Object map,
   rc_set (rec, RC_SLOT_LOCAL_TAG, tag);
   rc_set (rec, RC_SLOT_SAVE_TAG, Qnil);
 
-  struct rc_push_data *d = xmalloc (sizeof *d);
-  d->record           = rec;
-  d->used_mouse_menu  = used_mouse_menu;
-  d->end_time         = end_time;
-
+  /* Pass the record through the closures as an opaque scm_t_bits
+     value cast to void*.  BDW conservatively scans the closure's
+     data field, keeping the record alive until the thunk pushes
+     it onto rc_record_stack.  */
+  void *data = (void *) SCM_UNPACK (rec);
   return call_with_prompt (tag,
-                           make_c_closure (read_char_thunk, d, 0, 0),
-                           make_c_closure (read_char_handle_quit, d, 1, 0));
+                           make_c_closure (read_char_thunk, data, 0, 0),
+                           make_c_closure (read_char_handle_quit, data, 1, 0));
 }
 
 static Lisp_Object
