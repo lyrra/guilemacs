@@ -72,8 +72,8 @@
 ;;;;   used-mouse-menu  — set true if the read produced a menu choice.
 ;;;;   end-time         — deadline for timed reads (#nil = no timeout).
 ;;;;   c                — the resulting event (output slot).
-;;;;   tag, local-tag, save-tag
-;;;;                    — Guile-prompt tags used for quit handling.
+;;;;   local-tag        — Guile-prompt tag passed as local_getcjmp to
+;;;;                      read_decoded_event_from_main_queue (M8j).
 ;;;;   previous-echo-area-message
 ;;;;                    — saved echo-area state for restoration.
 ;;;;   also-record      — secondary event to add_command_key when set.
@@ -85,7 +85,7 @@
 
 (define-record-type <rc-state>
   (%make-rc-state commandflag map prev-event used-mouse-menu end-time
-                  c tag local-tag save-tag
+                  c local-tag
                   previous-echo-area-message also-record
                   recorded reread
                   orig-kboard)
@@ -96,9 +96,7 @@
   (used-mouse-menu   rc-state-used-mouse-menu   set-rc-state-used-mouse-menu!)
   (end-time          rc-state-end-time          set-rc-state-end-time!)
   (c                 rc-state-c                 set-rc-state-c!)
-  (tag               rc-state-tag               set-rc-state-tag!)
   (local-tag         rc-state-local-tag         set-rc-state-local-tag!)
-  (save-tag          rc-state-save-tag          set-rc-state-save-tag!)
   (previous-echo-area-message
                      rc-state-previous-echo-area-message
                      set-rc-state-previous-echo-area-message!)
@@ -115,12 +113,10 @@ explicit zeroing in src/keyboard.c."
    0      ; commandflag
    #nil   ; map
    #nil   ; prev-event
-   #nil   ; used-mouse-menu (bool)
-   #nil   ; end-time
+   #nil   ; used-mouse-menu (foreign-ptr or #nil)
+   #nil   ; end-time        (foreign-ptr or #nil)
    #nil   ; c
-   #nil   ; tag
    #nil   ; local-tag
-   #nil   ; save-tag
    #nil   ; previous-echo-area-message
    #nil   ; also-record
    #nil   ; recorded (bool)
@@ -136,9 +132,7 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-used-mouse-menu!            state #nil)
   (set-rc-state-end-time!                   state #nil)
   (set-rc-state-c!                          state #nil)
-  (set-rc-state-tag!                        state #nil)
   (set-rc-state-local-tag!                  state #nil)
-  (set-rc-state-save-tag!                   state #nil)
   (set-rc-state-previous-echo-area-message! state #nil)
   (set-rc-state-also-record!                state #nil)
   (set-rc-state-recorded!                   state #nil)

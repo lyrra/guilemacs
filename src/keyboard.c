@@ -2850,14 +2850,12 @@ enum rc_slot {
   RC_SLOT_USED_MOUSE_MENU             = 3,  /* foreign-ptr to bool, or Qnil */
   RC_SLOT_END_TIME                    = 4,  /* foreign-ptr to struct timespec, or Qnil */
   RC_SLOT_C                           = 5,
-  RC_SLOT_TAG                         = 6,
-  RC_SLOT_LOCAL_TAG                   = 7,
-  RC_SLOT_SAVE_TAG                    = 8,
-  RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE  = 9,
-  RC_SLOT_ALSO_RECORD                 = 10,
-  RC_SLOT_RECORDED                    = 11,
-  RC_SLOT_REREAD                      = 12,
-  RC_SLOT_ORIG_KBOARD                 = 13  /* kboard SMOB */
+  RC_SLOT_LOCAL_TAG                   = 6,
+  RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE  = 7,
+  RC_SLOT_ALSO_RECORD                 = 8,
+  RC_SLOT_RECORDED                    = 9,
+  RC_SLOT_REREAD                      = 10,
+  RC_SLOT_ORIG_KBOARD                 = 11  /* kboard SMOB */
 };
 
 enum { RC_STATE_STACK_MAX = 8 };
@@ -4060,9 +4058,10 @@ read_char_handle_quit (void *data, Lisp_Object k)
 {
   SCM rec = SCM_PACK ((scm_t_bits) data);
   /* Handle quits while reading the keyboard.  */
-  /* We must have saved the outer value of getcjmp here,
-     so restore it now.  */
-  getctag = rc_get (rec, RC_SLOT_SAVE_TAG);
+  /* Quit clears the prompt-tag context (the original C did this
+     via `getctag = state->save_tag' where save_tag was always
+     Qnil — the save-step was lost in an earlier adaptation).  */
+  getctag = Qnil;
   rc_set (rec, RC_SLOT_C, make_fixnum (quit_char));
   internal_last_event_frame = selected_frame;
   Vlast_event_frame = internal_last_event_frame;
@@ -4133,9 +4132,7 @@ read_char (int commandflag, Lisp_Object map,
      effect around any call to sit_for or kbd_buffer_get_event;
      it *must not* be in effect when we call redisplay.  */
   Lisp_Object tag = make_prompt_tag ();
-  rc_set (rec, RC_SLOT_TAG, tag);
   rc_set (rec, RC_SLOT_LOCAL_TAG, tag);
-  rc_set (rec, RC_SLOT_SAVE_TAG, Qnil);
 
   /* Pass the record through the closures as an opaque scm_t_bits
      value cast to void*.  BDW conservatively scans the closure's
