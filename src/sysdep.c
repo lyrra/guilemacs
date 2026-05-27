@@ -1876,9 +1876,6 @@ handle_sigsegv (int sig, siginfo_t *siginfo, void *arg)
     fatal = true;
 #endif
 
-  if (!fatal && stack_overflow (siginfo))
-    siglongjmp (return_to_command_loop, 1);
-
 #if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
   /* Tombstones (crash reports with stack traces) won't be generated on
      Android unless the original SIGSEGV handler is installed and the

@@ -73,10 +73,6 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
 #include "syssignal.h"
 
-#if defined HAVE_STACK_OVERFLOW_HANDLING && !defined WINDOWSNT
-#include <setjmp.h>
-#endif
-
 #include <sys/types.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -162,16 +158,6 @@ static int raw_keybuf_count;
 /* Number of elements of this_command_keys
    that precede this key sequence.  */
 static ptrdiff_t this_single_command_key_start;
-
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-
-/* For longjmp to recover from C stack overflow.  */
-sigjmp_buf return_to_command_loop;
-
-/* Message displayed by Vtop_level when recovering from C stack overflow.  */
-static Lisp_Object recover_top_level_message;
-
-#endif /* HAVE_STACK_OVERFLOW_HANDLING */
 
 /* Message normally displayed by Vtop_level.  */
 static Lisp_Object regular_top_level_message;
@@ -1306,20 +1292,6 @@ docs/keyboard.org §M7h.  */)
 Lisp_Object
 command_loop (void)
 {
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-  /* At least on GNU/Linux, saving signal mask is important here.  */
-  if (sigsetjmp (return_to_command_loop, 1) != 0)
-    {
-#ifdef WINDOWSNT
-      w32_reset_stack_overflow_guard ();
-#endif
-      init_eval ();
-      Vinternal__top_level_message = recover_top_level_message;
-    }
-  else
-    Vinternal__top_level_message = regular_top_level_message;
-#endif /* HAVE_STACK_OVERFLOW_HANDLING */
-
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs command-loop", "command-loop-main");
@@ -14322,11 +14294,6 @@ syms_of_keyboard (void)
 
   regular_top_level_message = build_pure_c_string ("Back to top level");
   staticpro (&regular_top_level_message);
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-  recover_top_level_message
-    = build_pure_c_string ("Re-entering top level after C stack overflow");
-  staticpro (&recover_top_level_message);
-#endif
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
   Vinternal__top_level_message = regular_top_level_message;

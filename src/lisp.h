@@ -4611,9 +4611,6 @@ extern Lisp_Object echo_message_buffer;
 extern struct kboard *echo_kboard;
 extern void cancel_echoing (void);
 extern bool input_pending;
-#ifdef HAVE_STACK_OVERFLOW_HANDLING
-extern sigjmp_buf return_to_command_loop;
-#endif
 extern Lisp_Object menu_bar_items (Lisp_Object);
 extern Lisp_Object tab_bar_items (Lisp_Object, int *);
 extern Lisp_Object tool_bar_items (Lisp_Object, int *);
