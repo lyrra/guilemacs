@@ -2424,44 +2424,18 @@ bind_polling_period (int n)
 #endif
 }
 
-/* Apply the control modifier to CHARACTER.  */
+/* Apply the control modifier to CHARACTER.  Body lives in
+   (emacs event-modifiers) as `make-ctrl-char'; this is the C
+   dispatch shim for non-Scheme callers (still used in keyboard.c
+   and w32fns.c).  */
 
 int
 make_ctrl_char (int c)
 {
-  /* Save the upper bits here.  */
-  int upper = c & ~0177;
-
-  if (! ASCII_CHAR_P (c))
-    return c |= ctrl_modifier;
-
-  c &= 0177;
-
-  /* Everything in the columns containing the upper-case letters
-     denotes a control character.  */
-  if (c >= 0100 && c < 0140)
-    {
-      int oc = c;
-      c &= ~0140;
-      /* Set the shift modifier for a control char
-	 made from a shifted letter.  But only for letters!  */
-      if (oc >= 'A' && oc <= 'Z')
-	c |= shift_modifier;
-    }
-
-  /* The lower-case letters denote control characters too.  */
-  else if (c >= 'a' && c <= 'z')
-    c &= ~0140;
-
-  /* Include the bits for control and shift
-     only if the basic ASCII code can't indicate them.  */
-  else if (c >= ' ')
-    c |= ctrl_modifier;
-
-  /* Replace the high bits.  */
-  c |= (upper & ~ctrl_modifier);
-
-  return c;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs event-modifiers", "make-ctrl-char");
+  return scm_to_int (SCM_CALL_1 (proc, scm_from_int (c)));
 }
 
 /* Substitute key descriptions and quotes in HELP, unless its first
