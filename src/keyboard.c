@@ -1108,7 +1108,6 @@ Default value of `command-error-function'.  */)
   return scm_call_3 (proc, data, context, signal);
 }
 
-static Lisp_Object command_loop_1 (void);
 
 /* M7e — primitives exposed to (emacs command-loop) for the outer
    drivers (command_loop_2 / top_level_1 / top_level_2).  See
@@ -2006,20 +2005,6 @@ recording.  */)
 {
   finalize_kbd_macro_chars ();
   return Qnil;
-}
-
-/* M7d — command_loop_1 entry point.  The entire while-loop body
-   (prologue + per-iter dispatch + finalize, plus the EOF / menu-
-   rejected control flow) lives in (emacs command-loop) as
-   command-loop-1.  This C wrapper exists so internal_condition_case
-   can still take a C function pointer.  See docs/keyboard.org §M7d.  */
-static Lisp_Object
-command_loop_1 (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-1");
-  return SCM_CALL_0 (proc);
 }
 
 Lisp_Object
