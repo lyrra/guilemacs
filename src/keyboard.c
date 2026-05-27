@@ -2820,7 +2820,12 @@ enum { RC_STATE_STACK_MAX = 8 };
 static SCM rc_record_stack[RC_STATE_STACK_MAX];
 static int rc_state_depth;
 
-static Lisp_Object read_char_1 (bool jump);
+/* Cached dispatch to (emacs read-char) read-char-main — the body
+   of what used to be read_char_1 (M8final), inlined now into its
+   two callers (read_char_thunk passes Qnil, read_char_handle_quit
+   passes Qt).  Initialized to SCM_UNDEFINED so SCM_UNBNDP() works
+   pre-first-call (BSS-zero is not a valid SCM tag).  */
+static SCM rc_main_proc = SCM_UNDEFINED;
 
 static inline Lisp_Object
 rc_get (SCM rec, int slot)
@@ -4006,7 +4011,9 @@ read_char_thunk (void *data)
   eassert (rc_state_depth < RC_STATE_STACK_MAX);
   record_unwind_protect_int (restore_rc_state_depth, rc_state_depth);
   rc_record_stack[rc_state_depth++] = rec;
-  Lisp_Object result = read_char_1 (false);
+  if (SCM_UNBNDP (rc_main_proc))
+    rc_main_proc = scm_c_public_ref ("emacs read-char", "read-char-main");
+  Lisp_Object result = SCM_CALL_1 (rc_main_proc, Qnil);
   dynwind_end ();
   return result;
 }
@@ -4055,7 +4062,9 @@ read_char_handle_quit (void *data, Lisp_Object k)
         return make_fixnum (-2); /* wrong_kboard_jmpbuf */
       }
   }
-  return read_char_1 (true);
+  if (SCM_UNBNDP (rc_main_proc))
+    rc_main_proc = scm_c_public_ref ("emacs read-char", "read-char-main");
+  return SCM_CALL_1 (rc_main_proc, Qt);
 }
 
 /* {{coccinelle:skip_start}} */
@@ -4102,21 +4111,6 @@ read_char (int commandflag, Lisp_Object map,
                            make_c_closure (read_char_handle_quit, data, 1, 0));
 }
 
-static Lisp_Object
-read_char_1 (bool jump)
-{
-  /* M8final: read_char_1's body is a Scheme dispatcher
-     `read-char-main' in (emacs read-char).  It drives the
-     M8c..M8n bulk subrs in sequence, with `goto retry' /
-     `goto exit' implemented as tail calls between named
-     sections.  Returns either the record's c slot (via --rc-exit)
-     or -2 (return-wrong-kboard).  See docs/keyboard.org §M8final.  */
-  static SCM rc_main_proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (rc_main_proc))
-    rc_main_proc = scm_c_public_ref ("emacs read-char",
-                                     "read-char-main");
-  return SCM_CALL_1 (rc_main_proc, jump ? Qt : Qnil);
-}
 /* {{coccinelle:skip_end}} */
 
 /* Record a key that came from a mouse menu.
