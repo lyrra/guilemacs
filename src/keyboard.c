@@ -321,7 +321,6 @@ union buffered_input_event *kbd_store_ptr;
    dequeuing functions?  The code is a bit simpler this way.  */
 
 static void recursive_edit_unwind (Lisp_Object buffer);
-static Lisp_Object command_loop (void);
 
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
@@ -744,7 +743,13 @@ recursive_edit_1 (void)
   */
   specbind_guile (Qundo_auto__undoably_changed_buffers, Qnil);
 
-  val = command_loop ();
+  /* M7h: the editor command loop body lives in Scheme as
+     (emacs command-loop)/command-loop-main.  */
+  static SCM cmdloop_proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (cmdloop_proc))
+    cmdloop_proc = scm_c_public_ref ("emacs command-loop",
+                                     "command-loop-main");
+  val = SCM_CALL_0 (cmdloop_proc);
   if (EQ (val, Qt))
     quit ();
   /* Handle throw from read_minibuf when using minibuffer
@@ -1277,25 +1282,6 @@ docs/keyboard.org §M7h.  */)
 {
   executing_kbd_macro = Qnil;
   return Qnil;
-}
-
-/* Entry to editor-command-loop.
-   This level has the catches for exiting/returning to editor command loop.
-   It returns nil to exit recursive edit, t to abort it.
-
-   M7h: post-sigsetjmp body lives in (emacs command-loop) as
-   command-loop-main.  The sigsetjmp + Vinternal__top_level_message
-   setup stays here — it's OS-level signal-mask handling and a
-   longjmp target for stack-overflow recovery (see handle_sigsegv in
-   sysdep.c and stack_overflow_handler in w32fns.c).  */
-
-Lisp_Object
-command_loop (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-main");
-  return SCM_CALL_0 (proc);
 }
 
 /* Here we catch errors in execution of commands within the
