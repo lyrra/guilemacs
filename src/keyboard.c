@@ -155,9 +155,13 @@ static int raw_keybuf_count;
  if (raw_keybuf_count == ASIZE (raw_keybuf))				\
    raw_keybuf = larger_vector (raw_keybuf, 1, -1)
 
-/* Number of elements of this_command_keys
-   that precede this key sequence.  */
-static ptrdiff_t this_single_command_key_start;
+/* this_single_command_key_start (the number of elements of
+   this_command_keys that precede this key sequence) was a C
+   file-static; storage now lives in Scheme as a (define)
+   variable in (emacs this-command-keys).  Access from C goes
+   through the --this-single-command-key-start /
+   --set-this-single-command-key-start DEFUN shims, whose bodies
+   dispatch into Scheme.  */
 
 /* For longjmp to where kbd input is being done.  */
 
@@ -3020,7 +3024,7 @@ DEFUN ("--rc-input-method-dispatch",
       dynwind_begin ();
       /* Save the this_command_keys status.  */
       key_count = this_command_key_count;
-      command_key_start = this_single_command_key_start;
+      command_key_start = XFIXNUM (Fc_this_single_command_key_start ());
 
       if (key_count > 0)
         keys = Fcopy_sequence (this_command_keys);
@@ -3029,7 +3033,7 @@ DEFUN ("--rc-input-method-dispatch",
 
       /* Clear out this_command_keys.  */
       this_command_key_count = 0;
-      this_single_command_key_start = 0;
+      Fc_set_this_single_command_key_start (make_fixnum (0));
 
       /* Now wipe the echo area.  */
       if (!NILP (echo_area_buffer[0]))
@@ -3050,7 +3054,7 @@ DEFUN ("--rc-input-method-dispatch",
       /* Restore the saved echoing state
          and this_command_keys state.  */
       this_command_key_count = key_count;
-      this_single_command_key_start = command_key_start;
+      Fc_set_this_single_command_key_start (make_fixnum (command_key_start));
       if (key_count > 0)
         this_command_keys = keys;
 
@@ -11081,7 +11085,7 @@ Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
   if (!rks_used_mouse_menu)
     last_nonmenu_event = rks_key;
   ptrdiff_t single = this_command_key_count - rks_t;
-  this_single_command_key_start = single < 0 ? 0 : single;
+  Fc_set_this_single_command_key_start (make_fixnum (single < 0 ? 0 : single));
   return Qnil;
 }
 
@@ -13005,10 +13009,16 @@ DEFUN ("--raw-keybuf-count", Fc_raw_keybuf_count, Sc_raw_keybuf_count, 0, 0, 0,
 
 DEFUN ("--this-single-command-key-start", Fc_this_single_command_key_start,
        Sc_this_single_command_key_start, 0, 0, 0,
-       doc: /* Internal: return this_single_command_key_start.  */)
+       doc: /* Internal: return this_single_command_key_start.  Storage
+lives in Scheme; this dispatches into (emacs this-command-keys)
+this-single-command-key-start-get.  */)
   (void)
 {
-  return make_fixnum (this_single_command_key_start);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys",
+                             "this-single-command-key-start-get");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("--reset-this-command-keys", Fc_reset_this_command_keys,
@@ -13064,12 +13074,17 @@ hot-path callers (read_char_1, read_key_sequence, set--this-command-keys).  */)
 
 DEFUN ("--set-this-single-command-key-start", Fc_set_this_single_command_key_start,
        Sc_set_this_single_command_key_start, 1, 1, 0,
-       doc: /* Internal: set this_single_command_key_start to N.  */)
+       doc: /* Internal: set this_single_command_key_start to N.
+Storage lives in Scheme; this dispatches into (emacs this-command-keys)
+this-single-command-key-start-set!.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
-  this_single_command_key_start = XFIXNAT (n);
-  return Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys",
+                             "this-single-command-key-start-set!");
+  return SCM_CALL_1 (proc, n);
 }
 
 DEFUN ("this-command-keys", Fthis_command_keys, Sthis_command_keys, 0, 0, 0,

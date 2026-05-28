@@ -8,6 +8,9 @@
             this-single-command-raw-keys
             clear-this-command-keys
             set--this-command-keys
+            ;; Migrated storage (from C):
+            this-single-command-key-start-get
+            this-single-command-key-start-set!
             init-this-command-keys-registrations))
 
 ;;; M5 — Read-side DEFUNs for the this-command-keys subsystem,
@@ -32,6 +35,22 @@
 ;;;   --make-event-array-from-vector (defined by M3).
 
 (define (%c name) (symbol-function name))
+
+;;;;
+;;;; Storage migrated from C (was: static ptrdiff_t in keyboard.c).
+;;;; The corresponding `--this-single-command-key-start' and
+;;;; `--set-this-single-command-key-start' C DEFUNs are now thin
+;;;; dispatch shims into these accessors.
+;;;;
+
+(define this-single-command-key-start 0)
+
+(define (this-single-command-key-start-get)
+  this-single-command-key-start)
+
+(define (this-single-command-key-start-set! n)
+  (set! this-single-command-key-start n)
+  #nil)
 
 ;;;;
 ;;;; Read DEFUNs
