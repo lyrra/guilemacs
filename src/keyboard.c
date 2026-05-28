@@ -2779,13 +2779,6 @@ enum { RC_STATE_STACK_MAX = 8 };
 static SCM rc_record_stack[RC_STATE_STACK_MAX];
 static int rc_state_depth;
 
-/* Cached dispatch to (emacs read-char) read-char-main — the body
-   of what used to be read_char_1 (M8final), inlined now into its
-   two callers (read_char_thunk passes Qnil, read_char_handle_quit
-   passes Qt).  Initialized to SCM_UNDEFINED so SCM_UNBNDP() works
-   pre-first-call (BSS-zero is not a valid SCM tag).  */
-static SCM rc_main_proc = SCM_UNDEFINED;
-
 static inline Lisp_Object
 rc_get (SCM rec, int slot)
 {
@@ -3957,31 +3950,41 @@ check).  */)
   return intern ("fall-through");
 }
 
-static Lisp_Object
-read_char_thunk (void *data)
+/* Tiny shims that let the Scheme `read-char-entry' driver manage
+   the rc_record_stack from inside its `call-with-prompt' thunk.  */
+
+DEFUN ("--rc-record-stack-push", Fc_rc_record_stack_push,
+       Sc_rc_record_stack_push, 1, 1, 0,
+       doc: /* Internal: push REC onto rc_record_stack.  */)
+  (Lisp_Object rec)
 {
-  /* Push the record onto rc_record_stack so the bulk subrs and
-     read-char-main can reach the current invocation's state.  The
-     unwind-protect pops on any exit, including abort_to_prompt
-     that unwinds back to read_char_handle_quit.  `data' is a raw
-     SCM_PACK'd record; BDW conservatively scans it.  */
-  SCM rec = SCM_PACK ((scm_t_bits) data);
-  dynwind_begin ();
   eassert (rc_state_depth < RC_STATE_STACK_MAX);
-  record_unwind_protect_int (restore_rc_state_depth, rc_state_depth);
   rc_record_stack[rc_state_depth++] = rec;
-  if (SCM_UNBNDP (rc_main_proc))
-    rc_main_proc = scm_c_public_ref ("emacs read-char", "read-char-main");
-  Lisp_Object result = SCM_CALL_1 (rc_main_proc, Qnil);
-  dynwind_end ();
-  return result;
+  return Qnil;
 }
 
-static Lisp_Object
-read_char_handle_quit (void *data, Lisp_Object k)
+DEFUN ("--rc-record-stack-pop", Fc_rc_record_stack_pop,
+       Sc_rc_record_stack_pop, 0, 0, 0,
+       doc: /* Internal: pop the top of rc_record_stack.  */)
+  (void)
 {
-  SCM rec = SCM_PACK ((scm_t_bits) data);
-  /* Handle quits while reading the keyboard.  */
+  if (rc_state_depth > 0)
+    rc_record_stack[--rc_state_depth] = SCM_UNDEFINED;
+  return Qnil;
+}
+
+/* C-side preamble of the read_char quit handler: stash quit_char in
+   the record's c slot, latch the event frame, clear the quit flag,
+   and requeue to a different kboard if focus has moved.  Returns
+   nil if the caller should re-enter read-char-main with jump=#t,
+   or fixnum -2 if the kboard switched (caller returns that).  */
+DEFUN ("--read-char-handle-quit-preamble",
+       Fc_read_char_handle_quit_preamble,
+       Sc_read_char_handle_quit_preamble, 1, 1, 0,
+       doc: /* Internal helper for Scheme `read-char-entry'.  See
+docs/keyboard.org §read_char hoist.  */)
+  (Lisp_Object rec)
+{
   /* Quit clears the prompt-tag context (the original C did this
      via `getctag = state->save_tag' where save_tag was always
      Qnil — the save-step was lost in an earlier adaptation).  */
@@ -3994,36 +3997,32 @@ read_char_handle_quit (void *data, Lisp_Object k)
   if (!NILP (Vinhibit_quit))
     Vquit_flag = Qnil;
 
-  {
-    KBOARD *kb = FRAME_KBOARD (XFRAME (selected_frame));
-    if (kb != current_kboard)
-      {
-        Lisp_Object last = KVAR (kb, kbd_queue);
-        /* We shouldn't get here if we were in single-kboard mode!  */
-        if (single_kboard)
-          emacs_abort ();
-        if (CONSP (last))
-          {
-            while (CONSP (XCDR (last)))
-              last = XCDR (last);
-            if (!NILP (XCDR (last)))
-              emacs_abort ();
-          }
-        Lisp_Object qc = rc_get (rec, RC_SLOT_C);
-        if (!CONSP (last))
-          kset_kbd_queue (kb, list1 (qc));
-        else
-          XSETCDR (last, list1 (qc));
-        kb->kbd_queue_has_data = 1;
-        current_kboard = kb;
-        /* This is going to exit from read_char
-           so we had better get rid of this frame's stuff.  */
-        return make_fixnum (-2); /* wrong_kboard_jmpbuf */
-      }
-  }
-  if (SCM_UNBNDP (rc_main_proc))
-    rc_main_proc = scm_c_public_ref ("emacs read-char", "read-char-main");
-  return SCM_CALL_1 (rc_main_proc, Qt);
+  KBOARD *kb = FRAME_KBOARD (XFRAME (selected_frame));
+  if (kb != current_kboard)
+    {
+      Lisp_Object last = KVAR (kb, kbd_queue);
+      /* We shouldn't get here if we were in single-kboard mode!  */
+      if (single_kboard)
+        emacs_abort ();
+      if (CONSP (last))
+        {
+          while (CONSP (XCDR (last)))
+            last = XCDR (last);
+          if (!NILP (XCDR (last)))
+            emacs_abort ();
+        }
+      Lisp_Object qc = rc_get (rec, RC_SLOT_C);
+      if (!CONSP (last))
+        kset_kbd_queue (kb, list1 (qc));
+      else
+        XSETCDR (last, list1 (qc));
+      kb->kbd_queue_has_data = 1;
+      current_kboard = kb;
+      /* This is going to exit from read_char
+         so we had better get rid of this frame's stuff.  */
+      return make_fixnum (-2); /* wrong_kboard_jmpbuf */
+    }
+  return Qnil;  /* Caller should re-enter read-char-main(jump=t).  */
 }
 
 /* {{coccinelle:skip_start}} */
@@ -4032,31 +4031,19 @@ read_char (int commandflag, Lisp_Object map,
 	   Lisp_Object prev_event,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
-  /* Build the <rc-state> record + prompt tag in Scheme.  The C
-     caller-owned pointers ride as foreign-pointer SCMs.  Returns
-     (rec . tag).  */
-  static SCM init_proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (init_proc))
-    init_proc = scm_c_public_ref ("emacs read-char", "read-char-init-state");
-  SCM rec_and_tag = scm_call_6 (init_proc,
-                                make_fixnum (commandflag),
-                                map, prev_event,
-                                rc_wrap_ptr (used_mouse_menu),
-                                rc_wrap_ptr (end_time),
-                                make_kboard_smob (current_kboard));
-  SCM rec = scm_car (rec_and_tag);
-  SCM tag = scm_cdr (rec_and_tag);
-
-  /* Pass the record through the closures as an opaque scm_t_bits
-     value cast to void*.  BDW conservatively scans the closure's
-     data field, keeping the record alive until the thunk pushes
-     it onto rc_record_stack.  */
-  void *data = (void *) SCM_UNPACK (rec);
-  return call_with_prompt (tag,
-                           make_c_closure (read_char_thunk, data, 0, 0),
-                           make_c_closure (read_char_handle_quit, data, 1, 0));
+  /* The full read_char body (record allocation, call_with_prompt
+     with body and quit-handler closures) lives in Scheme as
+     `read-char-entry' in (emacs read-char).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-char", "read-char-entry");
+  return scm_call_6 (proc,
+                     make_fixnum (commandflag),
+                     map, prev_event,
+                     rc_wrap_ptr (used_mouse_menu),
+                     rc_wrap_ptr (end_time),
+                     make_kboard_smob (current_kboard));
 }
-
 /* {{coccinelle:skip_end}} */
 
 /* Record a key that came from a mouse menu.

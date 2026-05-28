@@ -6,6 +6,7 @@
             make-rc-state rc-state?
             rc-state-fresh!
             read-char-init-state
+            read-char-entry
             ;; M8c — read_char_1 splices
             rc-prologue-drain-unread!
             rc-prologue-macro-or-switch-frame!
@@ -128,7 +129,7 @@ explicit zeroing in src/keyboard.c."
                               used-mouse-menu end-time orig-kboard)
   "Allocate the <rc-state> Scheme record for a read_char entry,
 populate it from the caller's args, mint a fresh prompt-tag for
-local-tag, and return (REC . TAG).  Called from C read_char().
+local-tag, and return (REC . TAG).  Called from `read-char-entry'.
 Caller-owned pointer args USED-MOUSE-MENU and END-TIME arrive
 already wrapped as Guile foreign-pointer SCMs (or nil)."
   (let* ((tag (make-prompt-tag))
@@ -142,6 +143,40 @@ already wrapped as Guile foreign-pointer SCMs (or nil)."
                               #nil          ; reread
                               orig-kboard)))
     (cons rec tag)))
+
+(define %rc-record-stack-push (delay (%c '--rc-record-stack-push)))
+(define %rc-record-stack-pop  (delay (%c '--rc-record-stack-pop)))
+(define %read-char-handle-quit-preamble
+  (delay (%c '--read-char-handle-quit-preamble)))
+
+(define (read-char-entry commandflag map prev-event
+                         used-mouse-menu end-time orig-kboard)
+  "Body of C `read_char': build the <rc-state> record, set up the
+Guile prompt, dispatch into `read-char-main' under both the normal
+(thunk) and quit-handler closures.  Called from C read_char().
+Returns either the resolved event (via --rc-exit inside
+read-char-main) or fixnum -2 (wrong_kboard_jmpbuf)."
+  (let* ((rec-and-tag (read-char-init-state commandflag map prev-event
+                                            used-mouse-menu end-time
+                                            orig-kboard))
+         (rec (car rec-and-tag))
+         (tag (cdr rec-and-tag)))
+    (call-with-prompt
+     tag
+     (lambda ()
+       ((force %rc-record-stack-push) rec)
+       (dynamic-wind
+         (lambda () #f)
+         (lambda () (read-char-main #nil))
+         (lambda () ((force %rc-record-stack-pop)))))
+     (lambda (k . _)
+       ;; Quit handler: stash quit_char and maybe requeue to another
+       ;; kboard.  Returns nil if we should re-enter with jump=t, or
+       ;; fixnum -2 for wrong_kboard_jmpbuf.
+       (let ((preamble-result ((force %read-char-handle-quit-preamble) rec)))
+         (if (%nilp preamble-result)
+             (read-char-main #t)
+             preamble-result))))))
 
 (define (rc-state-fresh! state)
   "Reset STATE in-place to the C-struct defaults.  Useful for
