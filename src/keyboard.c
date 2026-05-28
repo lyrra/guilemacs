@@ -4032,33 +4032,20 @@ read_char (int commandflag, Lisp_Object map,
 	   Lisp_Object prev_event,
 	   bool *used_mouse_menu, struct timespec *end_time)
 {
-  /* Allocate the <rc-state> Scheme record and populate it.  The
-     two caller-owned pointers (used_mouse_menu, end_time) ride
-     through as foreign-pointer SCMs in slots 3 and 4.  */
-  static SCM make_proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (make_proc))
-    make_proc = scm_c_public_ref ("emacs read-char", "make-rc-state");
-  SCM rec = SCM_CALL_0 (make_proc);
-
-  rc_set (rec, RC_SLOT_COMMANDFLAG, make_fixnum (commandflag));
-  rc_set (rec, RC_SLOT_MAP, map);
-  rc_set (rec, RC_SLOT_PREV_EVENT, prev_event);
-  rc_set (rec, RC_SLOT_USED_MOUSE_MENU, rc_wrap_ptr (used_mouse_menu));
-  rc_set (rec, RC_SLOT_END_TIME, rc_wrap_ptr (end_time));
-  rc_set (rec, RC_SLOT_C, Qnil);
-  rc_set (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE, Qnil);
-  rc_set (rec, RC_SLOT_ALSO_RECORD, Qnil);
-  rc_set (rec, RC_SLOT_RECORDED, Qnil);
-  rc_set (rec, RC_SLOT_REREAD, Qnil);
-  rc_set (rec, RC_SLOT_ORIG_KBOARD, make_kboard_smob (current_kboard));
-
-  /* Make a longjmp point for quits to use, but don't alter getcjmp
-     just yet.  We will do that below, temporarily for short
-     sections of code, when appropriate.  local_getcjmp must be in
-     effect around any call to sit_for or kbd_buffer_get_event;
-     it *must not* be in effect when we call redisplay.  */
-  Lisp_Object tag = make_prompt_tag ();
-  rc_set (rec, RC_SLOT_LOCAL_TAG, tag);
+  /* Build the <rc-state> record + prompt tag in Scheme.  The C
+     caller-owned pointers ride as foreign-pointer SCMs.  Returns
+     (rec . tag).  */
+  static SCM init_proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (init_proc))
+    init_proc = scm_c_public_ref ("emacs read-char", "read-char-init-state");
+  SCM rec_and_tag = scm_call_6 (init_proc,
+                                make_fixnum (commandflag),
+                                map, prev_event,
+                                rc_wrap_ptr (used_mouse_menu),
+                                rc_wrap_ptr (end_time),
+                                make_kboard_smob (current_kboard));
+  SCM rec = scm_car (rec_and_tag);
+  SCM tag = scm_cdr (rec_and_tag);
 
   /* Pass the record through the closures as an opaque scm_t_bits
      value cast to void*.  BDW conservatively scans the closure's

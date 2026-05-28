@@ -5,6 +5,7 @@
   #:export (;; M8a — data substrate
             make-rc-state rc-state?
             rc-state-fresh!
+            read-char-init-state
             ;; M8c — read_char_1 splices
             rc-prologue-drain-unread!
             rc-prologue-macro-or-switch-frame!
@@ -122,6 +123,25 @@ explicit zeroing in src/keyboard.c."
    #nil   ; recorded (bool)
    #nil   ; reread (bool)
    #nil)) ; orig-kboard
+
+(define (read-char-init-state commandflag map prev-event
+                              used-mouse-menu end-time orig-kboard)
+  "Allocate the <rc-state> Scheme record for a read_char entry,
+populate it from the caller's args, mint a fresh prompt-tag for
+local-tag, and return (REC . TAG).  Called from C read_char().
+Caller-owned pointer args USED-MOUSE-MENU and END-TIME arrive
+already wrapped as Guile foreign-pointer SCMs (or nil)."
+  (let* ((tag (make-prompt-tag))
+         (rec (%make-rc-state commandflag map prev-event
+                              used-mouse-menu end-time
+                              #nil          ; c
+                              tag           ; local-tag
+                              #nil          ; previous-echo-area-message
+                              #nil          ; also-record
+                              #nil          ; recorded
+                              #nil          ; reread
+                              orig-kboard)))
+    (cons rec tag)))
 
 (define (rc-state-fresh! state)
   "Reset STATE in-place to the C-struct defaults.  Useful for
