@@ -159,9 +159,6 @@ static int raw_keybuf_count;
    that precede this key sequence.  */
 static ptrdiff_t this_single_command_key_start;
 
-/* Message normally displayed by Vtop_level.  */
-static Lisp_Object regular_top_level_message;
-
 /* For longjmp to where kbd input is being done.  */
 
 static Lisp_Object getctag;
@@ -2804,13 +2801,6 @@ rc_unwrap_ptr (SCM rec, int slot)
 {
   SCM s = rc_get (rec, slot);
   return NILP (s) ? NULL : scm_to_pointer (s);
-}
-
-static void
-restore_rc_state_depth (int saved)
-{
-  while (rc_state_depth > saved)
-    rc_record_stack[--rc_state_depth] = SCM_UNDEFINED;
 }
 
 /* Step 2-B removed the per-field accessor DEFUNs (--rc-c, etc.) —
@@ -14205,11 +14195,9 @@ syms_of_keyboard (void)
   Vlispy_mouse_stem = build_pure_c_string ("mouse");
   staticpro (&Vlispy_mouse_stem);
 
-  regular_top_level_message = build_pure_c_string ("Back to top level");
-  staticpro (&regular_top_level_message);
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
-  Vinternal__top_level_message = regular_top_level_message;
+  Vinternal__top_level_message = build_pure_c_string ("Back to top level");
 
   /* M2 — predicate symbol for the kboard smob type.  */
   DEFSYM (Qkboardp, "kboardp");
