@@ -337,15 +337,10 @@ when commandflag == 0.  Always returns nil — caller falls
 through.  See docs/keyboard.org §M8e."
   ((force %rc-prologue-redisplay)))
 
-(define %rc-prologue-macro-or-switch-frame
-  (delay (%c '--rc-prologue-macro-or-switch-frame)))
-
-(define (rc-prologue-macro-or-switch-frame!)
-  "Two early-exit blocks after the unread-events drain:
-in-progress kbd-macro replay, and pending switch-frame event.
-Returns `from-macro', `reread-first', or `fall-through' for
-3-way C control flow.  See docs/keyboard.org §M8d."
-  ((force %rc-prologue-macro-or-switch-frame)))
+(define %rc-pin-event-frame-to-macro
+  (delay (%c '--rc-pin-event-frame-to-macro)))
+(define %rc-take-unread-switch-frame
+  (delay (%c '--rc-take-unread-switch-frame)))
 
 (define %rc-record-current   (delay (%c '--rc-record)))
 (define %rc-mark-used-mouse-menu-true
@@ -408,6 +403,65 @@ through to block 3 if the queue is empty."
               ((force %rc-mark-used-mouse-menu-true) rec))
             (set-rc-state-c! rec c2)
             'reread-for-input-method)))))
+
+(define (%at-end-of-macro?)
+  "Scheme port of at_end_of_macro_p (src/macros.c).  Caller must
+ensure executing-kbd-macro is non-nil."
+  (let ((m (symbol-value 'executing-kbd-macro)))
+    (or (eq? m #t)
+        (>= (symbol-value 'executing-kbd-macro-index)
+            ((%c 'length) m)))))
+
+(define %char-meta-bit #x8000000)        ; CHAR_META, src/lisp.h:2900
+
+(define (%try-kbd-macro-block rec)
+  "Block 1 of M8d: pull the next char/event from the executing
+macro buffer, decoding the meta high-bit for STRINGP macros."
+  ((force %rc-pin-event-frame-to-macro))
+  (let* ((macro (symbol-value 'executing-kbd-macro))
+         (idx   (symbol-value 'executing-kbd-macro-index))
+         (c     ((%c 'aref) macro idx))
+         (c2    (if (and ((%c 'stringp) macro)
+                         (integer? c)
+                         (not (zero? (logand c #x80)))
+                         (<= c #xff))
+                    (logior %char-meta-bit (logand c #x7f))
+                    c)))
+    (set-symbol-value! 'executing-kbd-macro-index (+ idx 1))
+    (set-rc-state-c! rec c2)
+    'from-macro))
+
+(define (%try-switch-frame-block rec)
+  "Block 2 of M8d: take the C-side unread_switch_frame; if set,
+install it into state->c and return reread-first."
+  (let ((sf ((force %rc-take-unread-switch-frame))))
+    (cond
+     ((%nilp sf) 'fall-through)
+     (else
+      (set-rc-state-c! rec sf)
+      ;; This event should make it into this_command_keys and get
+      ;; echoed again, so we do NOT set `reread'.
+      'reread-first))))
+
+(define (rc-prologue-macro-or-switch-frame!)
+  "Two early-exit blocks after the unread-events drain:
+in-progress kbd-macro replay, and pending switch-frame event.
+Returns `from-macro', `reread-first', or `fall-through' for
+3-way C control flow.  See docs/keyboard.org §M8d.
+
+Migrated from C 2026-05-29: body lives here; the two C shims
+--rc-pin-event-frame-to-macro and --rc-take-unread-switch-frame
+give Scheme write/take access to the C-side state."
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let ((macro (symbol-value 'executing-kbd-macro)))
+        (cond
+         ((and (not (%nilp macro)) (not (%at-end-of-macro?)))
+          (%try-kbd-macro-block rec))
+         (else
+          (%try-switch-frame-block rec))))))))
 
 (define (rc-prologue-drain-unread!)
   "Drain the three unread-events queues at the top of read_char_1.
@@ -562,6 +616,8 @@ See docs/keyboard.org §M8final."
                                        ,rc-prologue-drain-unread!)
               ;; M8d — kbd-macro / switch-frame early-exit
               (--rc-prologue-macro-or-switch-frame!
+                                       ,rc-prologue-macro-or-switch-frame!)
+              (--rc-prologue-macro-or-switch-frame
                                        ,rc-prologue-macro-or-switch-frame!)
               ;; M8e — redisplay loop
               (--rc-prologue-redisplay!

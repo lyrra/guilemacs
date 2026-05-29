@@ -3740,61 +3740,35 @@ lines 3316-3351 pre-M8e.  */)
   return Qnil;
 }
 
-/* M8d — bulk splice of the kbd-macro + unread-switch-frame
-   early-exit blocks that follow the M8c drain.  See
-   docs/keyboard.org §M8d.  */
-DEFUN ("--rc-prologue-macro-or-switch-frame",
-       Fc_rc_prologue_macro_or_switch_frame,
-       Sc_rc_prologue_macro_or_switch_frame, 0, 0, 0,
-       doc: /* Internal: after the unread-events drain (M8c), check
-the two next early-exit paths in read_char_1:
+/* M8d — kbd-macro + unread-switch-frame early-exits.  Body lives
+   in (emacs read-char) since 2026-05-29; the two tiny shims below
+   give Scheme write-access to the C-side state internal_last_event_frame
+   and the file-static unread_switch_frame.  See docs/keyboard.org §M8d.  */
 
-  Block 1: if `executing-kbd-macro' is non-nil and not at its end,
-    pull the next char/event from the macro buffer (decoding meta-
-    bit for STRINGP macros), bump `executing_kbd_macro_index',
-    pin internal_last_event_frame to Qmacro, install the event
-    into state->c, return `from-macro' (caller goto from_macro).
-  Block 2: if `unread_switch_frame' is non-nil, install it into
-    state->c, clear unread_switch_frame, return `reread-first'
-    (caller goto reread_first).
-  Otherwise: return `fall-through' (caller continues).
-
-Mirrors src/keyboard.c lines 3242-3274 pre-M8d.  */)
+DEFUN ("--rc-pin-event-frame-to-macro",
+       Fc_rc_pin_event_frame_to_macro,
+       Sc_rc_pin_event_frame_to_macro, 0, 0, 0,
+       doc: /* Internal: pin both Vlast_event_frame and the C-side
+internal_last_event_frame to Qmacro.  Used by the Scheme M8d body
+when replaying an in-progress keyboard macro — events read from a
+macro must never cause a new frame to be selected.  */)
   (void)
 {
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
+  Vlast_event_frame = internal_last_event_frame = Qmacro;
+  return Qnil;
+}
 
-  /* Block 1: executing kbd-macro.  */
-  if (!NILP (Vexecuting_kbd_macro) && !at_end_of_macro_p ())
-    {
-      /* Set this to Qmacro so nobody tries to switch frames; events
-         read from a macro must never cause a new frame to be selected.  */
-      Vlast_event_frame = internal_last_event_frame = Qmacro;
-
-      Lisp_Object c
-        = Faref (Vexecuting_kbd_macro, make_int (executing_kbd_macro_index));
-      if (STRINGP (Vexecuting_kbd_macro)
-          && (XFIXNAT (c) & 0x80) && (XFIXNAT (c) <= 0xff))
-        XSETFASTINT (c, CHAR_META | (XFIXNAT (c) & ~0x80));
-
-      executing_kbd_macro_index++;
-      rc_set (rec, RC_SLOT_C, c);
-      return intern ("from-macro");
-    }
-
-  /* Block 2: delayed switch-frame event.  */
-  if (!NILP (unread_switch_frame))
-    {
-      rc_set (rec, RC_SLOT_C, unread_switch_frame);
-      unread_switch_frame = Qnil;
-      /* This event should make it into this_command_keys and get
-         echoed again, so we do NOT set `reread'.  */
-      return intern ("reread-first");
-    }
-
-  return intern ("fall-through");
+DEFUN ("--rc-take-unread-switch-frame",
+       Fc_rc_take_unread_switch_frame,
+       Sc_rc_take_unread_switch_frame, 0, 0, 0,
+       doc: /* Internal: read-and-clear the file-static
+unread_switch_frame.  Returns its previous value (nil if it was
+already nil).  Used by the Scheme M8d body.  */)
+  (void)
+{
+  Lisp_Object v = unread_switch_frame;
+  unread_switch_frame = Qnil;
+  return v;
 }
 
 /* Tiny shims that let the Scheme `read-char-entry' driver manage
