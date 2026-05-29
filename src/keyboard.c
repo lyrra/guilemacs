@@ -3621,35 +3621,16 @@ lines 3483-3538 pre-M8g.  */)
   return Qnil;
 }
 
-/* M8f — bulk splice of the echo-cancel-or-dash + minibuf-menu-prompt
-   blocks that follow M8e.  See docs/keyboard.org §M8f.  */
-DEFUN ("--rc-prologue-echo-and-menu",
-       Fc_rc_prologue_echo_and_menu, Sc_rc_prologue_echo_and_menu, 0, 0, 0,
-       doc: /* Internal: two sequential prologue blocks.
+/* M8f — tiny C shims for the Scheme-owned echo/menu prologue.
+   Scheme owns the control flow; C still owns the echo globals and
+   the file-static read_char_minibuf_menu_prompt helper.  */
 
-  Block 1: if the echo area has content from a different kboard
-    OR `ok_to_echo_at_next_pause' is NULL, cancel echoing;
-    otherwise append a `-' separator via echo_dash.
-
-  Block 2: zero state->c, then try the minibuf menu prompt if
-    KEYMAPP(map) && INTERACTIVE && prev_event is non-nil &&
-    prev_event has no parameters && no unread events && no
-    pending input.  On read_char_minibuf_menu_prompt success
-    (non-nil result), install into state->c and return
-    `goto-exit'.  On wrong_kboard_jmpbuf (result == -2 fixnum),
-    return `return-wrong-kboard' so the caller returns -2 itself.
-    Otherwise return `fall-through'.
-
-Mirrors src/keyboard.c lines 3408-3437 pre-M8f.  */)
+DEFUN ("--rc-echo-cancel-or-dash",
+       Fc_rc_echo_cancel_or_dash, Sc_rc_echo_cancel_or_dash, 0, 0, 0,
+       doc: /* Internal: cancel echoing or append a dash separator.
+Used by Scheme rc-prologue-echo-and-menu!.  */)
   (void)
 {
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
-  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
-
-  /* Block 1: cancel echoing or append dash.  */
   if (!NILP (echo_area_buffer[0])
       && (echo_kboard != current_kboard
           || ok_to_echo_at_next_pause == NULL))
@@ -3657,28 +3638,29 @@ Mirrors src/keyboard.c lines 3408-3437 pre-M8f.  */)
   else
     echo_dash ();
 
-  /* Block 2: try minibuf menu prompt.  */
-  rc_set (rec, RC_SLOT_C, Qnil);
-  if (KEYMAPP (map) && !noninteractive
-      && !NILP (prev_event) && !EVENT_HAS_PARAMETERS (prev_event)
-      && !CONSP (Vunread_command_events)
-      && !detect_input_pending_run_timers (0))
-    {
-      Lisp_Object c
-        = read_char_minibuf_menu_prompt (XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG)),
-                                         map);
+  return Qnil;
+}
 
-      if (FIXNUMP (c) && XFIXNUM (c) == -2)
-        return intern ("return-wrong-kboard");
+DEFUN ("--rc-read-char-minibuf-menu-prompt",
+       Fc_rc_read_char_minibuf_menu_prompt,
+       Sc_rc_read_char_minibuf_menu_prompt, 2, 2, 0,
+       doc: /* Internal: call read_char_minibuf_menu_prompt.
+COMMANDFLAG must be a fixnum.  MAP is the keymap candidate.
+Used by Scheme rc-prologue-echo-and-menu!.  */)
+  (Lisp_Object commandflag, Lisp_Object map)
+{
+  CHECK_FIXNUM (commandflag);
+  return read_char_minibuf_menu_prompt (XFIXNUM (commandflag), map);
+}
 
-      if (!NILP (c))
-        {
-          rc_set (rec, RC_SLOT_C, c);
-          return intern ("goto-exit");
-        }
-    }
-
-  return intern ("fall-through");
+DEFUN ("--rc-detect-input-pending-run-timers",
+       Fc_rc_detect_input_pending_run_timers,
+       Sc_rc_detect_input_pending_run_timers, 0, 0, 0,
+       doc: /* Internal: t if detect_input_pending_run_timers (0).
+Used by Scheme rc-prologue-echo-and-menu!.  */)
+  (void)
+{
+  return detect_input_pending_run_timers (0) ? Qt : Qnil;
 }
 
 /* M8e — bulk splice of the `if (commandflag >= 0)' redisplay block

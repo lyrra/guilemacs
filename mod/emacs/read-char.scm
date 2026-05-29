@@ -320,8 +320,14 @@ non-mouse events), and auto-save by keystroke count.  Always
 returns nil — caller falls through.  See docs/keyboard.org §M8g."
   ((force %rc-prologue-idle-echo-autosave)))
 
-(define %rc-prologue-echo-and-menu
-  (delay (%c '--rc-prologue-echo-and-menu)))
+(define %rc-echo-cancel-or-dash
+  (delay (%c '--rc-echo-cancel-or-dash)))
+(define %rc-read-char-minibuf-menu-prompt
+  (delay (%c '--rc-read-char-minibuf-menu-prompt)))
+(define %rc-detect-input-pending-run-timers
+  (delay (%c '--rc-detect-input-pending-run-timers)))
+(define %keymapp
+  (delay (%c 'keymapp)))
 
 (define (rc-prologue-echo-and-menu!)
   "Echo-cancel-or-dash + minibuf-menu-prompt blocks before the
@@ -330,7 +336,30 @@ returns -2 from read_char_1 — the wrong_kboard_jmpbuf code),
 `goto-exit' (caller goto exit; state->c installed), or
 `fall-through' (caller continues to the next block).  See
 docs/keyboard.org §M8f."
-  ((force %rc-prologue-echo-and-menu)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      ((force %rc-echo-cancel-or-dash))
+      (set-rc-state-c! rec #nil)
+      (let ((map (rc-state-map rec))
+            (prev-event (rc-state-prev-event rec)))
+        (if (and (not (%nilp ((force %keymapp) map)))
+                 (%nilp (symbol-value 'noninteractive))
+                 (not (%nilp prev-event))
+                 (not (pair? prev-event))
+                 (not (pair? (symbol-value 'unread-command-events)))
+                 (%nilp ((force %rc-detect-input-pending-run-timers))))
+            (let ((c ((force %rc-read-char-minibuf-menu-prompt)
+                      (rc-state-commandflag rec)
+                      map)))
+              (cond
+               ((and (integer? c) (= c -2)) 'return-wrong-kboard)
+               ((%nilp c) 'fall-through)
+               (else
+                (set-rc-state-c! rec c)
+                'goto-exit)))
+            'fall-through))))))
 
 (define %rc-prologue-redisplay
   (delay (%c '--rc-prologue-redisplay)))
@@ -664,6 +693,8 @@ See docs/keyboard.org §M8final."
                                        ,rc-prologue-redisplay!)
               ;; M8f — echo-cancel + minibuf-menu-prompt
               (--rc-prologue-echo-and-menu!
+                                       ,rc-prologue-echo-and-menu!)
+              (--rc-prologue-echo-and-menu
                                        ,rc-prologue-echo-and-menu!)
               ;; M8g — idle-timer + immediate-echo + auto-save
               (--rc-prologue-idle-echo-autosave!
