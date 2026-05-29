@@ -758,4 +758,6 @@ command_loop_1_iter_pre_read."
               (--command-loop-2                    ,command-loop-2)
               (--top-level-1                       ,top-level-1)
               (--command-loop-main                 ,command-loop-main)
-              (--cmd-error                         ,cmd-error))))
+              (--cmd-error                         ,cmd-error)
+              ;; Hoisted from C (was Fcommand_error_default_function).
+              (command-error-default-function      ,command-error-default-function))))

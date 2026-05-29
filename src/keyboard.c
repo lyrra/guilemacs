@@ -1095,20 +1095,11 @@ cmd_error_internal (Lisp_Object data, const char *context)
   Vsignaling_function = Qnil;
 }
 
-DEFUN ("command-error-default-function", Fcommand_error_default_function,
-       Scommand_error_default_function, 3, 3, 0,
-       doc: /* Produce default output for unhandled error message.
-Default value of `command-error-function'.  */)
-  (Lisp_Object data, Lisp_Object context, Lisp_Object signal)
-{
-  /* M7g: dispatch to (emacs command-loop) — see docs/keyboard.org §M7g.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop",
-                             "command-error-default-function");
-  return scm_call_3 (proc, data, context, signal);
-}
-
+/* `command-error-default-function' (the default value of
+   `command-error-function') is provided entirely by Scheme — see
+   (emacs command-loop) command-error-default-function.  It is
+   registered against its elisp symbol by init-command-loop-
+   registrations at prelude/load.scm startup time.  */
 
 /* M7e — primitives exposed to (emacs command-loop) for the outer
    drivers (command_loop_2 / top_level_1 / top_level_2).  See
@@ -1323,12 +1314,6 @@ This also exits all active minibuffers.  */
        attributes: noreturn)
   (void)
 {
-  /* Consolidation: dispatch to (emacs recursive-edit) — see docs/keyboard.org
-     §Consolidation.  The HAVE_WINDOW_SYSTEM hourglass-cancel and the
-     totally_unblock_input call both happen on the Scheme side via
-     --totally-unblock-input (the hourglass-cancel is a no-op in batch
-     and only needed for X/W32; deferred until M7 since it lives in
-     xdisp.c).  */
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs recursive-edit", "top-level");
@@ -1364,31 +1349,11 @@ minibuf.c.  */)
   return make_fixnum (minibuf_level);
 }
 
-DEFUN ("exit-recursive-edit", Fexit_recursive_edit, Sexit_recursive_edit, 0, 0, "",
-       doc: /* Exit from the innermost recursive edit or minibuffer.  */
-       attributes: noreturn)
-  (void)
-{
-  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs recursive-edit", "exit-recursive-edit");
-  SCM_CALL_0 (proc);
-  emacs_abort ();  /* unreachable: exit-recursive-edit must throw */
-}
-
-DEFUN ("abort-recursive-edit", Fabort_recursive_edit, Sabort_recursive_edit, 0, 0, "",
-       doc: /* Abort the command that requested this recursive edit or minibuffer input.  */
-       attributes: noreturn)
-  (void)
-{
-  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs recursive-edit", "abort-recursive-edit");
-  SCM_CALL_0 (proc);
-  emacs_abort ();  /* unreachable: abort-recursive-edit must throw */
-}
+/* `exit-recursive-edit' and `abort-recursive-edit' are provided
+   entirely by Scheme — see (emacs recursive-edit).  They are
+   registered against their elisp symbols by
+   init-recursive-edit-registrations at prelude/load.scm startup
+   time.  */
 
 /* Restore mouse tracking enablement.  See Finternal_track_mouse for
    the only use of this function.  */
@@ -7834,16 +7799,6 @@ parse_modifiers (Lisp_Object symbol)
   return SCM_CALL_1 (proc, symbol);
 }
 
-DEFUN ("internal-event-symbol-parse-modifiers", Fevent_symbol_parse_modifiers,
-       Sevent_symbol_parse_modifiers, 1, 1, 0,
-       doc: /* Parse the event symbol.  For internal use.  */)
-  (Lisp_Object symbol)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs event-modifiers", "event-symbol-parse-modifiers");
-  return SCM_CALL_1 (proc, symbol);
-}
 
 /* Apply the modifiers MODIFIERS to the symbol BASE.
    BASE must be unmodified.
@@ -13021,6 +12976,20 @@ this-single-command-key-start-get.  */)
   return SCM_CALL_0 (proc);
 }
 
+DEFUN ("this-command-keys-vector", Fthis_command_keys_vector, Sthis_command_keys_vector, 0, 0, 0,
+       doc: /* Return the key sequence that invoked this command, as a vector.
+However, if the command has called `read-key-sequence', it returns
+the last key sequence that has been read.
+
+See also `this-command-keys'.  */)
+  (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs this-command-keys", "this-command-keys-vector");
+  return SCM_CALL_0 (proc);
+}
+
 DEFUN ("--reset-this-command-keys", Fc_reset_this_command_keys,
        Sc_reset_this_command_keys, 0, 0, 0,
        doc: /* Internal: reset this_command_keys to a fresh 40-slot
@@ -13087,108 +13056,12 @@ this-single-command-key-start-set!.  */)
   return SCM_CALL_1 (proc, n);
 }
 
-DEFUN ("this-command-keys", Fthis_command_keys, Sthis_command_keys, 0, 0, 0,
-       doc: /* Return the key sequence that invoked this command.
-However, if the command has called `read-key-sequence', it returns
-the last key sequence that has been read.
-The value is a string or a vector.
 
-See also `this-command-keys-vector'.  */)
-  (void)
-{
-  /* M5: dispatch to (emacs this-command-keys) — see docs/keyboard.org §M5. */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "this-command-keys");
-  return SCM_CALL_0 (proc);
-}
 
-DEFUN ("set--this-command-keys", Fset__this_command_keys,
-       Sset__this_command_keys, 1, 1, 0,
-       doc: /* Set the vector to be returned by `this-command-keys'.
-The argument KEYS must be a string.
-Internal use only.  */)
-  (Lisp_Object keys)
-{
-  /* Consolidation: dispatch to (emacs this-command-keys) — see
-     docs/keyboard.org §Consolidation.  The byte-8 normalization, the
-     M-x kludge (248 → meta-x), and the iteration all live in Scheme.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "set--this-command-keys");
-  return SCM_CALL_1 (proc, keys);
-}
 
-DEFUN ("this-command-keys-vector", Fthis_command_keys_vector, Sthis_command_keys_vector, 0, 0, 0,
-       doc: /* Return the key sequence that invoked this command, as a vector.
-However, if the command has called `read-key-sequence', it returns
-the last key sequence that has been read.
 
-See also `this-command-keys'.  */)
-  (void)
-{
-  /* M5: dispatch to (emacs this-command-keys) — see docs/keyboard.org §M5.
-     The Guile-Emacs string-corruption workaround moved into the Scheme
-     module (which uses --reset-this-command-keys to recover).  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "this-command-keys-vector");
-  return SCM_CALL_0 (proc);
-}
 
-DEFUN ("this-single-command-keys", Fthis_single_command_keys,
-       Sthis_single_command_keys, 0, 0, 0,
-       doc: /* Return the key sequence that invoked this command.
-More generally, it returns the last key sequence read, either by
-the command loop or by `read-key-sequence'.
-The value is always a vector.  */)
-  (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "this-single-command-keys");
-  return SCM_CALL_0 (proc);
-}
 
-DEFUN ("this-single-command-raw-keys", Fthis_single_command_raw_keys,
-       Sthis_single_command_raw_keys, 0, 0, 0,
-       doc: /* Return the raw events that were read for this command.
-More generally, it returns the last key sequence read, either by
-the command loop or by `read-key-sequence'.
-Unlike `this-single-command-keys', this function's value
-shows the events before all translations (except for input methods).
-The value is always a vector.  */)
-  (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "this-single-command-raw-keys");
-  return SCM_CALL_0 (proc);
-}
-
-DEFUN ("clear-this-command-keys", Fclear_this_command_keys,
-       Sclear_this_command_keys, 0, 1, 0,
-       doc: /* Clear out the vector that `this-command-keys' returns.
-Also clear the record of the last 300 input events, unless optional arg
-KEEP-RECORD is non-nil.  */)
-  (Lisp_Object keep_record)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs this-command-keys", "clear-this-command-keys");
-  return SCM_CALL_1 (proc, keep_record);
-}
-
-DEFUN ("recursion-depth", Frecursion_depth, Srecursion_depth, 0, 0, 0,
-       doc: /* Return the current depth in recursive edits.  */)
-  (void)
-{
-  /* M4: dispatch to (emacs recursive-edit) — see docs/keyboard.org §M4. */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs recursive-edit", "recursion-depth");
-  return SCM_CALL_0 (proc);
-}
 
 DEFUN ("open-dribble-file", Fopen_dribble_file, Sopen_dribble_file, 1, 1,
        "FOpen dribble file: ",
