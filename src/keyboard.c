@@ -2793,22 +2793,19 @@ flight.  The record is allocated and pushed by read_char() at entry.
   return rc_record_stack[rc_state_depth - 1];
 }
 
-/* M8final — terminal subr for read-char-main's exit path.  Runs the
-   two-line `exit:' tail of the original read_char_1: latch input
-   pending into input_was_pending, then return the resolved event
-   (the record's C slot).  See docs/keyboard.org §M8final.  */
-DEFUN ("--rc-exit", Fc_rc_exit, Sc_rc_exit, 0, 0, 0,
-       doc: /* Internal: read_char_1's `exit:' tail.
-Sets input_was_pending = input_pending and returns the resolved
-event.  At idle (empty rc_state_stack) returns nil and does
-nothing — in production this is only called via read-char-main
-during an in-flight read_char.  */)
+/* M8final — tiny C shim for the Scheme-owned read_char_1 exit tail.
+   The resolved event lives in the <rc-state> record and is returned
+   by (emacs read-char) rc-exit!.  C only owns the input_pending /
+   input_was_pending globals, so expose the latch as a small primitive.  */
+DEFUN ("--rc-latch-input-was-pending",
+       Fc_rc_latch_input_was_pending,
+       Sc_rc_latch_input_was_pending, 0, 0, 0,
+       doc: /* Internal: set input_was_pending = input_pending.
+Returns nil.  Used by Scheme rc-exit!.  */)
   (void)
 {
-  if (rc_state_depth == 0)
-    return Qnil;
   input_was_pending = input_pending;
-  return rc_get (rc_record_stack[rc_state_depth - 1], RC_SLOT_C);
+  return Qnil;
 }
 
 /* M8n — bulk splice of help-echo display + add-to-this_command_keys

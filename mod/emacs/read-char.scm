@@ -199,14 +199,19 @@ test setup when the same rc-state is reused across calls."
 ;;;; M8c — read_char_1 prologue splices.
 ;;;;
 
-(define %rc-exit
-  (delay (%c '--rc-exit)))
+(define %rc-latch-input-was-pending
+  (delay (%c '--rc-latch-input-was-pending)))
 
 (define (rc-exit!)
   "Final tail of read_char_1: latch input_was_pending = input_pending
 and return state->c (the resolved event).  See docs/keyboard.org
 §M8final."
-  ((force %rc-exit)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) #nil)
+     (else
+      ((force %rc-latch-input-was-pending))
+      (rc-state-c rec)))))
 
 (define %rc-help-echo-and-help-form
   (delay (%c '--rc-help-echo-and-help-form)))
@@ -686,6 +691,7 @@ See docs/keyboard.org §M8final."
                                        ,rc-help-echo-and-help-form!)
               ;; M8final — exit tail + hoisted dispatcher
               (--rc-exit!              ,rc-exit!)
+              (--rc-exit               ,rc-exit!)
               (--read-char-main        ,read-char-main)
               ;; Hoisted from C DEFUN: artificial switch-frame on focus-in.
               (internal-handle-focus-in
