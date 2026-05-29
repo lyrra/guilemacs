@@ -3797,118 +3797,6 @@ Mirrors src/keyboard.c lines 3242-3274 pre-M8d.  */)
   return intern ("fall-through");
 }
 
-/* M8c — bulk splice of read_char_1's `retry:' prologue: drain the
-   three unread-events queues atomically.  See docs/keyboard.org §M8c.  */
-DEFUN ("--rc-prologue-drain-unread",
-       Fc_rc_prologue_drain_unread, Sc_rc_prologue_drain_unread, 0, 0, 0,
-       doc: /* Internal: drain the three unread-events queues in the
-read_char_1 prologue.  Sets the top-of-stack state's c / reread /
-recorded fields and writes *used_mouse_menu when applicable.
-Returns one of:
-  `reread-first'          — first queue produced an event; caller
-                            should goto reread_first.
-  `reread-for-input-method' — second or third queue produced an event;
-                            caller should goto reread_for_input_method.
-  `fall-through'          — no queue had anything; caller continues
-                            to the rest of the iteration (recorded
-                            and reread have been reset to false).
-
-Mirrors src/keyboard.c lines 3038-3118 pre-M8c (the body of the
-`retry:' label up to but not including the kbd-macro execution
-check).  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
-
-  rc_set (rec, RC_SLOT_RECORDED, Qnil);
-
-  /* Block 1: Vunread_post_input_method_events.  */
-  if (CONSP (Vunread_post_input_method_events))
-    {
-      Lisp_Object c = XCAR (Vunread_post_input_method_events);
-      Vunread_post_input_method_events
-        = XCDR (Vunread_post_input_method_events);
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-         additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
-          && NILP (XCDR (c)))
-        c = XCAR (c);
-
-      rc_set (rec, RC_SLOT_C, c);
-      rc_set (rec, RC_SLOT_REREAD, Qt);
-      return intern ("reread-first");
-    }
-  rc_set (rec, RC_SLOT_REREAD, Qnil);
-
-  Vlast_event_device = Qnil;
-
-  /* Block 2: Vunread_command_events.  */
-  if (CONSP (Vunread_command_events))
-    {
-      bool was_disabled = false;
-      Lisp_Object c = XCAR (Vunread_command_events);
-      Vunread_command_events = XCDR (Vunread_command_events);
-
-      /* Undo what sit-for did when it unread additional keys
-         inside universal-argument.  */
-      if (CONSP (c) && EQ (XCAR (c), Qt))
-        c = XCDR (c);
-      else
-        {
-          if (CONSP (c) && EQ (XCAR (c), Qno_record))
-            {
-              c = XCDR (c);
-              rc_set (rec, RC_SLOT_RECORDED, Qt);
-            }
-          rc_set (rec, RC_SLOT_REREAD, Qt);
-        }
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-         additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-          && EQ (XCDR (c), Qdisabled)
-          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c))))
-        {
-          was_disabled = true;
-          c = XCAR (c);
-        }
-
-      /* If the queued event used the mouse, set used_mouse_menu.  */
-      if (used_mouse_menu
-          && (EQ (c, Qtool_bar) || EQ (c, Qtab_bar) || EQ (c, Qmenu_bar)
-              || was_disabled))
-        *used_mouse_menu = true;
-
-      rc_set (rec, RC_SLOT_C, c);
-      return intern ("reread-for-input-method");
-    }
-
-  /* Block 3: Vunread_input_method_events.  */
-  if (CONSP (Vunread_input_method_events))
-    {
-      Lisp_Object c = XCAR (Vunread_input_method_events);
-      Vunread_input_method_events = XCDR (Vunread_input_method_events);
-
-      /* Undo what read_char_x_menu_prompt did when it unread
-         additional keys returned by Fx_popup_menu.  */
-      if (CONSP (c)
-          && (SYMBOLP (XCAR (c)) || FIXNUMP (XCAR (c)))
-          && NILP (XCDR (c)))
-        c = XCAR (c);
-
-      rc_set (rec, RC_SLOT_C, c);
-      rc_set (rec, RC_SLOT_REREAD, Qt);
-      return intern ("reread-for-input-method");
-    }
-
-  return intern ("fall-through");
-}
-
 /* Tiny shims that let the Scheme `read-char-entry' driver manage
    the rc_record_stack from inside its `call-with-prompt' thunk.  */
 
@@ -3919,6 +3807,21 @@ DEFUN ("--rc-record-stack-push", Fc_rc_record_stack_push,
 {
   eassert (rc_state_depth < RC_STATE_STACK_MAX);
   rc_record_stack[rc_state_depth++] = rec;
+  return Qnil;
+}
+
+DEFUN ("--rc-mark-used-mouse-menu-true",
+       Fc_rc_mark_used_mouse_menu_true,
+       Sc_rc_mark_used_mouse_menu_true, 1, 1, 0,
+       doc: /* Internal: write through the caller-owned bool*
+in REC's used-mouse-menu slot (foreign-pointer), setting *p = true.
+No-op if the slot is nil.  Used by the Scheme M8c body where elisp
+record accessors can't deref the foreign pointer directly.  */)
+  (Lisp_Object rec)
+{
+  bool *p = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
+  if (p)
+    *p = true;
   return Qnil;
 }
 

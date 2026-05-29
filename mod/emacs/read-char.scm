@@ -347,18 +347,95 @@ Returns `from-macro', `reread-first', or `fall-through' for
 3-way C control flow.  See docs/keyboard.org §M8d."
   ((force %rc-prologue-macro-or-switch-frame)))
 
-(define %rc-prologue-drain-unread
-  (delay (%c '--rc-prologue-drain-unread)))
+(define %rc-record-current   (delay (%c '--rc-record)))
+(define %rc-mark-used-mouse-menu-true
+  (delay (%c '--rc-mark-used-mouse-menu-true)))
+
+(define (%peel-popup-menu-cons c)
+  "Undo Fx_popup_menu's nested-cons unread of (sym/fixnum . nil) —
+return its car, otherwise C unchanged."
+  (if (and (pair? c)
+           (or (symbol? (car c)) (integer? (car c)))
+           (%nilp (cdr c)))
+      (car c)
+      c))
+
+(define (%drain-block-3 rec)
+  "Try Vunread_input_method_events.  Returns the dispatch symbol."
+  (let ((q (symbol-value 'unread-input-method-events)))
+    (if (pair? q)
+        (begin
+          (set-symbol-value! 'unread-input-method-events (cdr q))
+          (set-rc-state-c! rec (%peel-popup-menu-cons (car q)))
+          (set-rc-state-reread! rec #t)
+          'reread-for-input-method)
+        'fall-through)))
+
+(define (%drain-block-2 rec)
+  "Try Vunread_command_events.  Returns the dispatch symbol; falls
+through to block 3 if the queue is empty."
+  (let ((q (symbol-value 'unread-command-events)))
+    (if (not (pair? q))
+        (%drain-block-3 rec)
+        (begin
+          (set-symbol-value! 'unread-command-events (cdr q))
+          (let* ((c0 (car q))
+                 ;; sit-for's (t . event) marker peels here;
+                 ;; otherwise no-record / reread bookkeeping.
+                 (c1 (cond
+                      ((and (pair? c0) (eq? (car c0) 't))
+                       (cdr c0))
+                      (else
+                       (let ((c (if (and (pair? c0)
+                                         (eq? (car c0) 'no-record))
+                                    (begin
+                                      (set-rc-state-recorded! rec #t)
+                                      (cdr c0))
+                                    c0)))
+                         (set-rc-state-reread! rec #t)
+                         c))))
+                 ;; Fx_popup_menu wraps disabled menu items as
+                 ;; (SYM . disabled); peel and remember.
+                 (was-disabled (and (pair? c1)
+                                    (eq? (cdr c1) 'disabled)
+                                    (or (symbol? (car c1))
+                                        (integer? (car c1)))))
+                 (c2 (if was-disabled (car c1) c1)))
+            (when (or was-disabled
+                      (eq? c2 'tool-bar)
+                      (eq? c2 'tab-bar)
+                      (eq? c2 'menu-bar))
+              ((force %rc-mark-used-mouse-menu-true) rec))
+            (set-rc-state-c! rec c2)
+            'reread-for-input-method)))))
 
 (define (rc-prologue-drain-unread!)
   "Drain the three unread-events queues at the top of read_char_1.
 The current (top-of-stack) read_char invocation's state is mutated
 in place (c / reread / recorded / *used_mouse_menu).  Returns one
 of `reread-first', `reread-for-input-method', or `fall-through' to
-control the C caller's goto.
+control the read-char-main caller's goto.  See docs/keyboard.org §M8c.
 
-See docs/keyboard.org §M8c."
-  ((force %rc-prologue-drain-unread)))
+Migrated from C 2026-05-29: body lives here; rc-set on the record
+uses srfi-9 setters; the foreign-pointer write for used_mouse_menu
+goes through the small --rc-mark-used-mouse-menu-true C helper."
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (set-rc-state-recorded! rec #nil)
+      ;; Block 1: unread-post-input-method-events.
+      (let ((q (symbol-value 'unread-post-input-method-events)))
+        (cond
+         ((pair? q)
+          (set-symbol-value! 'unread-post-input-method-events (cdr q))
+          (set-rc-state-c! rec (%peel-popup-menu-cons (car q)))
+          (set-rc-state-reread! rec #t)
+          'reread-first)
+         (else
+          (set-rc-state-reread! rec #nil)
+          (set-symbol-value! 'last-event-device #nil)
+          (%drain-block-2 rec))))))))
 
 ;;;;
 ;;;; M8final — hoisted body of read_char_1.
@@ -480,6 +557,8 @@ See docs/keyboard.org §M8final."
               (--rc-state-fresh!       ,rc-state-fresh!)
               ;; M8c — prologue dispatch
               (--rc-prologue-drain-unread!
+                                       ,rc-prologue-drain-unread!)
+              (--rc-prologue-drain-unread
                                        ,rc-prologue-drain-unread!)
               ;; M8d — kbd-macro / switch-frame early-exit
               (--rc-prologue-macro-or-switch-frame!
