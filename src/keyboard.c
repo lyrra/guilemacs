@@ -7851,29 +7851,43 @@ character, are not returned verbatim.)  */)
   return SCM_CALL_1 (proc, event_desc);
 }
 
-DEFUN ("internal-handle-focus-in", Finternal_handle_focus_in,
-       Sinternal_handle_focus_in, 1, 1, 0,
-       doc: /* Internally handle focus-in events.
-This function potentially generates an artificial switch-frame event.  */)
-     (Lisp_Object event)
+/* Tiny shims that let the Scheme (emacs read-char) port of
+   internal-handle-focus-in read/write the C-side state it relies
+   on.  The Scheme implementation reads --get-internal-last-event-frame,
+   compares it to FRAME, then writes back via --set-internal-last-event-frame.
+   For unread_switch_frame, the existing --set-unread-switch-frame
+   handles writes; --get-unread-switch-frame reads it without clearing
+   (unlike the read-and-clear --rc-take-unread-switch-frame).  */
+
+DEFUN ("--get-internal-last-event-frame",
+       Fc_get_internal_last_event_frame,
+       Sc_get_internal_last_event_frame, 0, 0, 0,
+       doc: /* Internal: return the C global `internal_last_event_frame'.  */)
+  (void)
 {
-  Lisp_Object frame;
-  if (!EQ (CAR_SAFE (event), Qfocus_in) ||
-      !CONSP (XCDR (event)) ||
-      !FRAMEP ((frame = XCAR (XCDR (event)))))
-    error ("Invalid focus-in event");
+  return internal_last_event_frame;
+}
 
-  /* Conceptually, the concept of window manager focus on a particular
-     frame and the Emacs selected frame shouldn't be related, but for
-     a long time, we automatically switched the selected frame in
-     response to focus events, so let's keep doing that.  */
-  bool switching = (!EQ (frame, internal_last_event_frame)
-                    && !EQ (frame, selected_frame));
-  internal_last_event_frame = frame;
-  if (switching || !NILP (unread_switch_frame))
-    unread_switch_frame = make_lispy_switch_frame (frame);
-
+DEFUN ("--set-internal-last-event-frame",
+       Fc_set_internal_last_event_frame,
+       Sc_set_internal_last_event_frame, 1, 1, 0,
+       doc: /* Internal: write the C global `internal_last_event_frame'.
+Returns nil.  */)
+  (Lisp_Object f)
+{
+  internal_last_event_frame = f;
   return Qnil;
+}
+
+DEFUN ("--get-unread-switch-frame",
+       Fc_get_unread_switch_frame,
+       Sc_get_unread_switch_frame, 0, 0, 0,
+       doc: /* Internal: return the C global `unread_switch_frame'
+without clearing it.  See --rc-take-unread-switch-frame for the
+read-and-clear variant.  */)
+  (void)
+{
+  return unread_switch_frame;
 }
 
 /* Try to recognize SYMBOL as a modifier name.

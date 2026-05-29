@@ -22,6 +22,7 @@
             rc-help-echo-and-help-form!
             rc-exit!
             read-char-main
+            internal-handle-focus-in
             init-read-char-registrations))
 
 ;;; M8 — read_char / read_char_1 port.
@@ -341,6 +342,16 @@ through.  See docs/keyboard.org §M8e."
   (delay (%c '--rc-pin-event-frame-to-macro)))
 (define %rc-take-unread-switch-frame
   (delay (%c '--rc-take-unread-switch-frame)))
+(define %get-internal-last-event-frame
+  (delay (%c '--get-internal-last-event-frame)))
+(define %set-internal-last-event-frame!
+  (delay (%c '--set-internal-last-event-frame)))
+(define %get-unread-switch-frame
+  (delay (%c '--get-unread-switch-frame)))
+(define %set-unread-switch-frame!
+  (delay (%c '--set-unread-switch-frame)))
+(define %selected-frame
+  (delay (%c 'selected-frame)))
 
 (define %rc-record-current   (delay (%c '--rc-record)))
 (define %rc-mark-used-mouse-menu-true
@@ -403,6 +414,30 @@ through to block 3 if the queue is empty."
               ((force %rc-mark-used-mouse-menu-true) rec))
             (set-rc-state-c! rec c2)
             'reread-for-input-method)))))
+
+(define (internal-handle-focus-in event)
+  "Internally handle focus-in events.  May generate an artificial
+switch-frame event.  EVENT is `(focus-in FRAME)'.  Ported from C
+DEFUN internal-handle-focus-in 2026-05-29."
+  (let* ((tail (and (pair? event)
+                    (eq? (car event) 'focus-in)
+                    (cdr event)))
+         (frame (and (pair? tail) (car tail))))
+    (unless (and frame ((%c 'framep) frame))
+      ((%c 'error) "Invalid focus-in event"))
+    ;; Conceptually, the concept of window-manager focus on a
+    ;; particular frame and the Emacs selected frame shouldn't be
+    ;; related, but for a long time, we automatically switched the
+    ;; selected frame in response to focus events, so keep doing that.
+    (let* ((old ((force %get-internal-last-event-frame)))
+           (sel ((force %selected-frame)))
+           (switching (and (not (eq? frame old))
+                           (not (eq? frame sel)))))
+      ((force %set-internal-last-event-frame!) frame)
+      (when (or switching
+                (not (%nilp ((force %get-unread-switch-frame)))))
+        ((force %set-unread-switch-frame!) (list 'switch-frame frame)))
+      #nil)))
 
 (define (%at-end-of-macro?)
   "Scheme port of at_end_of_macro_p (src/macros.c).  Caller must
@@ -651,4 +686,7 @@ See docs/keyboard.org §M8final."
                                        ,rc-help-echo-and-help-form!)
               ;; M8final — exit tail + hoisted dispatcher
               (--rc-exit!              ,rc-exit!)
-              (--read-char-main        ,read-char-main))))
+              (--read-char-main        ,read-char-main)
+              ;; Hoisted from C DEFUN: artificial switch-frame on focus-in.
+              (internal-handle-focus-in
+                                       ,internal-handle-focus-in))))
