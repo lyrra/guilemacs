@@ -3269,60 +3269,47 @@ rc-prologue-xmenu-and-idle-gc! and rc-wrong-kboard-and-non-reread.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-auto-save-by-timeout-and-gc",
-       Fc_rc_auto_save_by_timeout_and_gc,
-       Sc_rc_auto_save_by_timeout_and_gc, 1, 1, 0,
-       doc: /* Internal: Block 2 of M8h.  COMMANDFLAG is the rec's
-commandflag slot (a fixnum).  Computes the buffer-size-scaled
-delay_level, optionally sit_for + Fdo_auto_save + redisplay if the
-auto-save timeout is reached, then GC_collect_a_little when no
-input is pending.  Used by Scheme rc-prologue-xmenu-and-idle-gc!
-after the c-is-nil + INTERACTIVE gate.  */)
-  (Lisp_Object commandflag)
+DEFUN ("--rc-auto-save-delay-level",
+       Fc_rc_auto_save_delay_level,
+       Sc_rc_auto_save_delay_level, 0, 0, 0,
+       doc: /* Internal: refresh `last_non_minibuf_size' from the
+selected window (when it is not a minibuffer) and return the
+buffer-size-scaled auto-save delay level.  The level is 4 for
+files under ~50k, 7 at 100k, 9 at 200k, 11 at 300k, 12 at 500k,
+and 15 at 1 meg.  Used by Scheme rc-auto-save-by-timeout-and-gc!.  */)
+  (void)
 {
-  int cf = XFIXNUM (commandflag);
-  int delay_level;
-  ptrdiff_t buffer_size;
-
   /* Slow down auto saves logarithmically in size of current buffer,
      and garbage collect while we're at it.  */
   if (! MINI_WINDOW_P (XWINDOW (selected_window)))
     last_non_minibuf_size = Z - BEG;
-  buffer_size = (last_non_minibuf_size >> 8) + 1;
-  delay_level = 0;
+  ptrdiff_t buffer_size = (last_non_minibuf_size >> 8) + 1;
+  int delay_level = 0;
   while (buffer_size > 64)
     delay_level++, buffer_size -= buffer_size >> 2;
   if (delay_level < 4) delay_level = 4;
-  /* delay_level is 4 for files under around 50k, 7 at 100k,
-     9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
+  return make_int (delay_level);
+}
 
-  /* Auto save if enough time goes by without input.  */
-  if (cf != 0 && cf != -2
-      && num_nonmacro_input_events > last_auto_save
-      && FIXNUMP (Vauto_save_timeout)
-      && XFIXNUM (Vauto_save_timeout) > 0)
-    {
-      Lisp_Object tem0;
-      Lisp_Object save_tag = Qnil;
-      EMACS_INT timeout = XFIXNAT (Vauto_save_timeout);
+DEFUN ("--rc-sit-for-timeout",
+       Fc_rc_sit_for_timeout, Sc_rc_sit_for_timeout, 1, 1, 0,
+       doc: /* Internal: sit_for (TIMEOUT, 1, 1) — pause display
+for TIMEOUT seconds, returning t when no input arrived.  Used by
+Scheme rc-auto-save-by-timeout-and-gc! for the auto-save delay
+wait.  */)
+  (Lisp_Object timeout)
+{
+  return sit_for (timeout, 1, 1);
+}
 
-      timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
-      timeout = delay_level * timeout / 4;
-      save_tag = getctag;
-      tem0 = sit_for (make_fixnum (timeout), 1, 1);
-
-      if (EQ (tem0, Qt)
-          && ! CONSP (Vunread_command_events))
-        {
-          Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
-          /* Hooks may modify buffers during auto-save.  */
-          redisplay ();
-        }
-    }
-
-  /* If there is still no input available, ask for GC.  */
-  if (!detect_input_pending_run_timers (0))
-    GC_collect_a_little ();
+DEFUN ("--rc-gc-collect-a-little",
+       Fc_rc_gc_collect_a_little,
+       Sc_rc_gc_collect_a_little, 0, 0, 0,
+       doc: /* Internal: GC_collect_a_little ().  Used by Scheme
+rc-auto-save-by-timeout-and-gc! when no input is pending.  */)
+  (void)
+{
+  GC_collect_a_little ();
   return Qnil;
 }
 

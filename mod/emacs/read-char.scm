@@ -692,13 +692,54 @@ See docs/keyboard.org §M8i."
   (delay (%c '--rc-read-char-x-menu-prompt)))
 (define %rc-timer-stop-idle
   (delay (%c '--rc-timer-stop-idle)))
-(define %rc-auto-save-by-timeout-and-gc
-  (delay (%c '--rc-auto-save-by-timeout-and-gc)))
+(define %rc-auto-save-delay-level
+  (delay (%c '--rc-auto-save-delay-level)))
+(define %rc-sit-for-timeout
+  (delay (%c '--rc-sit-for-timeout)))
+(define %rc-gc-collect-a-little
+  (delay (%c '--rc-gc-collect-a-little)))
 
 (define (%interactive?)
   "Scheme port of the commands.h INTERACTIVE macro."
   (and (%nilp (symbol-value 'executing-kbd-macro))
        (%nilp (symbol-value 'noninteractive))))
+
+(define (rc-auto-save-by-timeout-and-gc! commandflag)
+  "M8h Block 2 in Scheme: when enough idle time elapses, fire
+do-auto-save + redisplay; either way, GC_collect_a_little when no
+input is pending.  Caller has already checked INTERACTIVE and
+c-is-nil.  C exposes only the buffer-size-scaled delay-level, the
+sit_for primitive, and the GC trigger; everything else
+(`auto-save-timeout', `most-positive-fixnum', `do-auto-save',
+`auto-save-no-message', `num-nonmacro-input-events', and the
+detect-input/redisplay primitives) is reachable from Scheme."
+  (let ((cf commandflag)
+        (delay-level ((force %rc-auto-save-delay-level)))
+        (ast (symbol-value 'auto-save-timeout)))
+    ;; Auto save if enough time goes by without input.
+    (when (and (not (= cf 0))
+               (not (= cf -2))
+               (> (symbol-value 'num-nonmacro-input-events)
+                  ((force %rc-last-auto-save)))
+               (integer? ast)
+               (> ast 0))
+      ;; Mirror the C: cap timeout to (MOST_POSITIVE_FIXNUM / delay_level) * 4,
+      ;; then scale by delay_level / 4.
+      (let* ((mpf (symbol-value 'most-positive-fixnum))
+             (capped (min ast (* (quotient mpf delay-level) 4)))
+             (timeout (quotient (* delay-level capped) 4))
+             (tem0 ((force %rc-sit-for-timeout) timeout)))
+        (when (and (%elisp-t? tem0)
+                   (not (pair? (symbol-value 'unread-command-events))))
+          ((force %do-auto-save)
+           (if (%nilp (symbol-value 'auto-save-no-message)) #nil #t)
+           #nil)
+          ;; Hooks may modify buffers during auto-save.
+          ((force %rc-redisplay)))))
+    ;; If there is still no input available, ask for GC.
+    (when (%nilp ((force %rc-detect-input-pending-run-timers)))
+      ((force %rc-gc-collect-a-little))))
+  #nil)
 
 (define (rc-prologue-xmenu-and-idle-gc!)
   "X-menu read + auto-save-by-idle-timeout + GC blocks after M8g.
@@ -734,7 +775,7 @@ docs/keyboard.org §M8h."
          (else
           ;; Block 2: maybe autosave and/or GC due to idleness.
           (when (and (%interactive?) (%nilp (rc-state-c rec)))
-            ((force %rc-auto-save-by-timeout-and-gc)
+            (rc-auto-save-by-timeout-and-gc!
              (rc-state-commandflag rec)))
           'fall-through)))))))
 
@@ -1246,6 +1287,10 @@ See docs/keyboard.org §M8final."
                                        ,rc-prologue-xmenu-and-idle-gc!)
               (--rc-prologue-xmenu-and-idle-gc
                                        ,rc-prologue-xmenu-and-idle-gc!)
+              (--rc-auto-save-by-timeout-and-gc!
+                                       ,rc-auto-save-by-timeout-and-gc!)
+              (--rc-auto-save-by-timeout-and-gc
+                                       ,rc-auto-save-by-timeout-and-gc!)
               ;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard
               (--rc-prologue-kboard-and-queues!
                                        ,rc-prologue-kboard-and-queues!)
