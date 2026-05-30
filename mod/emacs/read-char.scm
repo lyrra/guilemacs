@@ -57,6 +57,9 @@
 (define (%nilp x)
   (or (null? x) (not x)))
 
+(define (%elisp-t? x)
+  (or (eq? x #t) (eq? x 't)))
+
 ;;;;
 ;;;; M8a — <rc-state> Scheme record type.
 ;;;;
@@ -194,6 +197,48 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-recorded!                   state #nil)
   (set-rc-state-reread!                     state #nil)
   (set-rc-state-orig-kboard!                state #nil))
+
+;; Internal test harness: srfi-9 accessors are not elisp-callable in
+;; this build, so branch tests go through these narrow field helpers.
+(define (%rc-test-state-ref rec field)
+  (case field
+    ((commandflag)                (rc-state-commandflag rec))
+    ((map)                        (rc-state-map rec))
+    ((prev-event)                 (rc-state-prev-event rec))
+    ((used-mouse-menu)            (rc-state-used-mouse-menu rec))
+    ((end-time)                   (rc-state-end-time rec))
+    ((c)                          (rc-state-c rec))
+    ((local-tag)                  (rc-state-local-tag rec))
+    ((previous-echo-area-message) (rc-state-previous-echo-area-message rec))
+    ((also-record)                (rc-state-also-record rec))
+    ((recorded)                   (rc-state-recorded rec))
+    ((reread)                     (rc-state-reread rec))
+    ((orig-kboard)                (rc-state-orig-kboard rec))
+    (else ((%c 'error) "Unknown rc-state test field: %S" field))))
+
+(define (%rc-test-state-set! rec field value)
+  (case field
+    ((commandflag)                (set-rc-state-commandflag! rec value))
+    ((map)                        (set-rc-state-map! rec value))
+    ((prev-event)                 (set-rc-state-prev-event! rec value))
+    ((used-mouse-menu)            (set-rc-state-used-mouse-menu! rec value))
+    ((end-time)                   (set-rc-state-end-time! rec value))
+    ((c)                          (set-rc-state-c! rec value))
+    ((local-tag)                  (set-rc-state-local-tag! rec value))
+    ((previous-echo-area-message) (set-rc-state-previous-echo-area-message! rec value))
+    ((also-record)                (set-rc-state-also-record! rec value))
+    ((recorded)                   (set-rc-state-recorded! rec value))
+    ((reread)                     (set-rc-state-reread! rec value))
+    ((orig-kboard)                (set-rc-state-orig-kboard! rec value))
+    (else ((%c 'error) "Unknown rc-state test field: %S" field)))
+  #nil)
+
+(define (%rc-test-with-state rec thunk)
+  ((force %rc-record-stack-push) rec)
+  (dynamic-wind
+    (lambda () #f)
+    (lambda () ((%c 'funcall) thunk))
+    (lambda () ((force %rc-record-stack-pop)))))
 
 ;;;;
 ;;;; M8c — read_char_1 prologue splices.
@@ -471,7 +516,7 @@ c value (which may be nil if the queue was empty)."
       (set-symbol-value! 'unread-command-events (cdr q))
       (let ((c0 (car q)))
         (let ((c1 (cond
-                   ((and (pair? c0) (eq? (car c0) 't))
+                   ((and (pair? c0) (%elisp-t? (car c0)))
                     (cdr c0))
                    (else
                     (let ((c2 (if (and (pair? c0)
@@ -738,7 +783,7 @@ through to block 3 if the queue is empty."
                  ;; sit-for's (t . event) marker peels here;
                  ;; otherwise no-record / reread bookkeeping.
                  (c1 (cond
-                      ((and (pair? c0) (eq? (car c0) 't))
+                      ((and (pair? c0) (%elisp-t? (car c0)))
                        (cdr c0))
                       (else
                        (let ((c (if (and (pair? c0)
@@ -993,6 +1038,9 @@ See docs/keyboard.org §M8final."
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((--make-rc-state         ,make-rc-state)
               (--rc-state-fresh!       ,rc-state-fresh!)
+              (--rc-test-state-ref     ,%rc-test-state-ref)
+              (--rc-test-state-set!    ,%rc-test-state-set!)
+              (--rc-test-with-state    ,%rc-test-with-state)
               ;; M8c — prologue dispatch
               (--rc-prologue-drain-unread!
                                        ,rc-prologue-drain-unread!)

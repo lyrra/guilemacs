@@ -10,9 +10,29 @@
 
 ;;;; <rc-state> Scheme record + factory
 
+(defvar m8--test-rec nil)
+(defvar m8-test-special-observed nil)
+
+(defun m8-test-state-ref (field)
+  (--rc-test-state-ref m8--test-rec field))
+
+(defun m8-with-rc-state (bindings thunk)
+  (let ((m8--test-rec (--make-rc-state)))
+    (--rc-state-fresh! m8--test-rec)
+    (dolist (binding bindings)
+      (--rc-test-state-set! m8--test-rec (car binding) (cdr binding)))
+    (--rc-test-with-state m8--test-rec thunk)))
+
+(defun m8-test-special-command ()
+  (interactive)
+  (setq m8-test-special-observed last-input-event))
+
 (ert-deftest m8a-helpers/exist ()
   (should (fboundp '--make-rc-state))
-  (should (fboundp '--rc-state-fresh!)))
+  (should (fboundp '--rc-state-fresh!))
+  (should (fboundp '--rc-test-state-ref))
+  (should (fboundp '--rc-test-state-set!))
+  (should (fboundp '--rc-test-with-state)))
 
 (ert-deftest m8a-rc-state/constructs-non-nil ()
   (let ((s (--make-rc-state)))
@@ -35,6 +55,32 @@
   ;; subr early-returns `fall-through' before touching anything.
   (should (eq 'fall-through (--rc-prologue-drain-unread!))))
 
+(ert-deftest m8c-drain/unread-post-input-method-first ()
+  (let ((unread-post-input-method-events (list ?p))
+        (unread-command-events nil)
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-first (--rc-prologue-drain-unread!)))
+       (should (eq ?p (m8-test-state-ref 'c)))
+       (should (eq t (m8-test-state-ref 'reread)))
+       (should (null unread-post-input-method-events))))))
+
+(ert-deftest m8c-drain/no-record-command-event ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list (cons 'no-record ?n)))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq ?n (m8-test-state-ref 'c)))
+       (should (eq t (m8-test-state-ref 'recorded)))
+       (should (eq t (m8-test-state-ref 'reread)))
+       (should (null unread-command-events))))))
+
 ;;;; M8d — kbd-macro + unread-switch-frame early exits
 
 (ert-deftest m8d-helpers/exist ()
@@ -44,6 +90,16 @@
   ;; No kbd-macro running and no unread-switch-frame at batch
   ;; startup; subr returns `fall-through'.
   (should (eq 'fall-through (--rc-prologue-macro-or-switch-frame!))))
+
+(ert-deftest m8d-macro/replays-next-string-event ()
+  (let ((executing-kbd-macro "a")
+        (executing-kbd-macro-index 0))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'from-macro (--rc-prologue-macro-or-switch-frame!)))
+       (should (eq ?a (m8-test-state-ref 'c)))
+       (should (eq 1 executing-kbd-macro-index))))))
 
 ;;;; M8e — redisplay loop
 
@@ -94,6 +150,35 @@
   ;; `fall-through' without touching kboard or queue state.
   (should (eq 'fall-through (--rc-prologue-kboard-and-queues!))))
 
+(ert-deftest m8i-kboard-queues/wrong-kboard-when-origin-missing ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'return-wrong-kboard
+                 (--rc-prologue-kboard-and-queues!))))))
+
+(ert-deftest m8i-kboard-queues/drains-no-record-command-event ()
+  (let ((unread-command-events (list (cons 'no-record ?u))))
+    (m8-with-rc-state
+     `((orig-kboard . ,(current-kboard)))
+     (lambda ()
+       (should (eq 'fall-through (--rc-prologue-kboard-and-queues!)))
+       (should (eq ?u (m8-test-state-ref 'c)))
+       (should (eq t (m8-test-state-ref 'recorded)))
+       (should (eq t (m8-test-state-ref 'reread)))
+       (should (null unread-command-events))))))
+
+(ert-deftest m8i-kboard-queues/qt-wrapper-does-not-mark-reread ()
+  (let ((unread-command-events (list (cons t ?q))))
+    (m8-with-rc-state
+     `((orig-kboard . ,(current-kboard)))
+     (lambda ()
+       (should (eq 'fall-through (--rc-prologue-kboard-and-queues!)))
+       (should (eq ?q (m8-test-state-ref 'c)))
+       (should (null (m8-test-state-ref 'recorded)))
+       (should (null (m8-test-state-ref 'reread)))
+       (should (null unread-command-events))))))
+
 ;;;; M8j — wrong_kboard + non_reread loop
 
 (ert-deftest m8j-helpers/exist ()
@@ -114,6 +199,27 @@
   ;; `fall-through' before touching state.
   (should (eq 'fall-through (--rc-bufferp-and-special-event-map!))))
 
+(ert-deftest m8k-bufp-special/buffer-event-goes-to-exit ()
+  (m8-with-rc-state
+   `((c . ,(current-buffer)))
+   (lambda ()
+     (should (eq 'goto-exit (--rc-bufferp-and-special-event-map!))))))
+
+(ert-deftest m8k-bufp-special/dispatches-special-event ()
+  (let ((special-event-map (make-sparse-keymap))
+        (while-no-input-ignore-events nil)
+        (last-input-event nil)
+        (m8-test-special-observed nil))
+    (define-key special-event-map [m8-test-special]
+      'm8-test-special-command)
+    (m8-with-rc-state
+     '((c . m8-test-special))
+     (lambda ()
+       (should (eq 'goto-retry (--rc-bufferp-and-special-event-map!)))
+       (should (eq 'm8-test-special m8-test-special-observed))
+       (should (eq 'm8-test-special last-input-event))
+       (should (eq 'm8-test-special (m8-test-state-ref 'c)))))))
+
 ;;;; M8l — translate + menu-bar + record + echo-wipe
 
 (ert-deftest m8l-helpers/exist ()
@@ -123,6 +229,23 @@
   ;; Outside any in-flight read_char, the subr early-returns
   ;; `fall-through' before touching record_char / echo state.
   (should (eq 'fall-through (--rc-event-translate-and-record!))))
+
+(ert-deftest m8l-translate-record/eof-goes-to-exit ()
+  (m8-with-rc-state
+   '((c . -1))
+   (lambda ()
+     (should (eq 'goto-exit (--rc-event-translate-and-record!))))))
+
+(ert-deftest m8l-translate-record/records-printable-input-method-event ()
+  (let ((input-method-function #'ignore)
+        (input-method-previous-message nil))
+    (m8-with-rc-state
+     '((c . ?z))
+     (lambda ()
+       (should (eq 'fall-through
+                   (--rc-event-translate-and-record!)))
+       (should (eq t (m8-test-state-ref 'recorded)))
+       (should (eq ?z (m8-test-state-ref 'c)))))))
 
 ;;;; M8m — input-method dispatch + record-if-unread
 
@@ -135,6 +258,17 @@
   ;; this_command_keys.
   (should (eq 'fall-through (--rc-input-method-dispatch!))))
 
+(ert-deftest m8m-input-method/installs-returned-events ()
+  (let ((input-method-function (lambda (_c) (list ?x ?y ?z)))
+        (unread-post-input-method-events nil))
+    (m8-with-rc-state
+     '((c . ?a))
+     (lambda ()
+       (should (eq 'fall-through (--rc-input-method-dispatch!)))
+       (should (eq ?x (m8-test-state-ref 'c)))
+       (should (equal (list ?y ?z) unread-post-input-method-events))
+       (should (eq t (m8-test-state-ref 'recorded)))))))
+
 ;;;; M8n — help-echo + this-command-keys + help-form
 
 (ert-deftest m8n-helpers/exist ()
@@ -144,6 +278,21 @@
   ;; Outside any in-flight read_char, the subr early-returns
   ;; `fall-through' before touching show_help_echo or help_form.
   (should (eq 'fall-through (--rc-help-echo-and-help-form!))))
+
+(ert-deftest m8n-help-echo-form/records-command-key ()
+  (let ((help-form nil)
+        (last-input-event nil))
+    (unwind-protect
+        (progn
+          (clear-this-command-keys)
+          (m8-with-rc-state
+           '((c . ?r))
+           (lambda ()
+             (should (eq 'fall-through
+                         (--rc-help-echo-and-help-form!)))
+             (should (eq ?r last-input-event))
+             (should (equal "r" (this-command-keys-vector))))))
+      (clear-this-command-keys))))
 
 ;;;; M8final — exit tail + hoisted dispatcher
 
