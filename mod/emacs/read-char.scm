@@ -783,8 +783,21 @@ docs/keyboard.org §M8h."
   (delay (%c '--rc-timer-start-idle)))
 (define %rc-should-immediate-echo-p
   (delay (%c '--rc-should-immediate-echo-p)))
-(define %rc-sit-for-and-maybe-echo
-  (delay (%c '--rc-sit-for-and-maybe-echo)))
+(define %rc-sit-for-echo-keystrokes
+  (delay (%c '--rc-sit-for-echo-keystrokes)))
+
+(define (rc-sit-for-and-maybe-echo!)
+  "M8g Block 2 non-mouse path in Scheme: sit_for `echo-keystrokes'
+seconds (with getctag saved/restored atomically by the C primitive),
+then echo_now when no input arrived and the unread-command-events
+queue is empty.  The save/restore stays in C so a non-local exit
+through sit_for can't leak getctag back to the caller; the result-
+predicate and conditional echo move out to Scheme."
+  (let ((tem0 ((force %rc-sit-for-echo-keystrokes))))
+    (when (and (%elisp-t? tem0)
+               (not (pair? (symbol-value 'unread-command-events))))
+      ((force %echo-now))))
+  #nil)
 (define %rc-last-auto-save
   (delay (%c '--rc-last-auto-save)))
 (define %do-auto-save
@@ -832,7 +845,7 @@ returns nil — caller falls through.  See docs/keyboard.org §M8g."
           (if (pair? (rc-state-prev-event rec))
               ;; After a mouse event, start echoing right away.
               ((force %echo-now))
-              ((force %rc-sit-for-and-maybe-echo))))
+              (rc-sit-for-and-maybe-echo!)))
         ;; Block 3: auto-save by keystroke count.
         (let ((cf (rc-state-commandflag rec)))
           (when (and (not (= cf 0)) (not (= cf -2)))
@@ -1282,6 +1295,10 @@ See docs/keyboard.org §M8final."
                                        ,rc-maybe-auto-save-by-keystroke!)
               (--rc-maybe-auto-save-by-keystroke
                                        ,rc-maybe-auto-save-by-keystroke!)
+              (--rc-sit-for-and-maybe-echo!
+                                       ,rc-sit-for-and-maybe-echo!)
+              (--rc-sit-for-and-maybe-echo
+                                       ,rc-sit-for-and-maybe-echo!)
               ;; M8h — X-menu + auto-save-by-idle-timeout + GC
               (--rc-prologue-xmenu-and-idle-gc!
                                        ,rc-prologue-xmenu-and-idle-gc!)

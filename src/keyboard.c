@@ -3358,21 +3358,22 @@ rc-prologue-idle-echo-autosave!.  */)
   return ok ? Qt : Qnil;
 }
 
-DEFUN ("--rc-sit-for-and-maybe-echo",
-       Fc_rc_sit_for_and_maybe_echo,
-       Sc_rc_sit_for_and_maybe_echo, 0, 0, 0,
+DEFUN ("--rc-sit-for-echo-keystrokes",
+       Fc_rc_sit_for_echo_keystrokes,
+       Sc_rc_sit_for_echo_keystrokes, 0, 0, 0,
        doc: /* Internal: save getctag, sit_for `echo-keystrokes' seconds
-with display+input flags, restore getctag.  If sit_for returned t
-and Vunread_command_events is empty, also echo_now.  Used by Scheme
-rc-prologue-idle-echo-autosave! for Block 2's non-mouse path.  */)
+with display + input flags, restore getctag.  Returns sit_for's
+result (t when no input arrived).  Used by Scheme
+rc-prologue-idle-echo-autosave! Block 2's non-mouse path; the
+caller decides whether to echo_now based on the result.  The
+save/restore stays atomic in C so a non-local exit through sit_for
+can't leak the getctag clobber back to the caller.  */)
   (void)
 {
   Lisp_Object save_tag = getctag;
   Lisp_Object tem0 = sit_for (Vecho_keystrokes, 1, 1);
-  if (EQ (tem0, Qt) && !CONSP (Vunread_command_events))
-    echo_now ();
   getctag = save_tag;
-  return Qnil;
+  return tem0;
 }
 
 DEFUN ("--rc-last-auto-save",
