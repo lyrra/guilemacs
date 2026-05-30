@@ -282,8 +282,14 @@
 
 (test-assert "helpers/rc-wrong-kboard-and-non-reread"
              (fboundp '--rc-wrong-kboard-and-non-reread))
+(test-assert "helpers/rc-maybe-redisplay-when-no-input"
+             (fboundp '--rc-maybe-redisplay-when-no-input))
 (test-eq "wkbd-nr/fall-through-at-idle"
          'fall-through (--rc-wrong-kboard-and-non-reread!))
+(test-eq "wkbd-nr/maybe-redisplay-negative"
+         nil (--rc-maybe-redisplay-when-no-input -1))
+(test-eq "wkbd-nr/maybe-redisplay-zero"
+         nil (--rc-maybe-redisplay-when-no-input 0))
 
 (m8-with-rc-state
  '((c . ?j))

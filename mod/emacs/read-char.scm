@@ -458,8 +458,16 @@ special command matched.  See docs/keyboard.org §M8k."
 
 (define %rc-read-and-install-event
   (delay (%c '--rc-read-and-install-event)))
-(define %rc-maybe-redisplay-when-no-input
-  (delay (%c '--rc-maybe-redisplay-when-no-input)))
+
+(define (rc-maybe-redisplay-when-no-input! commandflag)
+  "Redisplay when COMMANDFLAG allows it and no input is pending.
+Hoisted from the M8j C helper; C now exposes only the raw input
+flags, timer-aware input probe, and redisplay action."
+  (when (and (>= commandflag 0)
+             (%nilp ((force %rc-input-pending)))
+             (%nilp ((force %rc-detect-input-pending-run-timers))))
+    ((force %rc-redisplay)))
+  #nil)
 
 (define (rc-wrong-kboard-and-non-reread!)
   "Blocking-read + non-reread fixup loop.  Calls
@@ -487,7 +495,7 @@ or `fall-through' (state->c is non-nil).  See docs/keyboard.org
               ((force %rc-timer-stop-idle)))
             (cond
              ((%nilp (rc-state-c rec))
-              ((force %rc-maybe-redisplay-when-no-input)
+              (rc-maybe-redisplay-when-no-input!
                (rc-state-commandflag rec))
               (loop))
              (else 'fall-through))))))))))
@@ -1112,6 +1120,10 @@ See docs/keyboard.org §M8final."
               (--rc-prologue-kboard-and-queues
                                        ,rc-prologue-kboard-and-queues!)
               ;; M8j — wrong_kboard + non_reread loop
+              (--rc-maybe-redisplay-when-no-input!
+                                       ,rc-maybe-redisplay-when-no-input!)
+              (--rc-maybe-redisplay-when-no-input
+                                       ,rc-maybe-redisplay-when-no-input!)
               (--rc-wrong-kboard-and-non-reread!
                                        ,rc-wrong-kboard-and-non-reread!)
               (--rc-wrong-kboard-and-non-reread

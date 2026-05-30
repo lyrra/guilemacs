@@ -273,12 +273,17 @@
 ;;;; M8j — wrong_kboard + non_reread loop
 
 (ert-deftest m8j-helpers/exist ()
-  (should (fboundp '--rc-wrong-kboard-and-non-reread)))
+  (should (fboundp '--rc-wrong-kboard-and-non-reread))
+  (should (fboundp '--rc-maybe-redisplay-when-no-input)))
 
 (ert-deftest m8j-wkbd-nr/fall-through-at-idle ()
   ;; Outside any in-flight read_char, the subr early-returns
   ;; `fall-through' before touching read_decoded_event_from_main_queue.
   (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!))))
+
+(ert-deftest m8j-wkbd-nr/maybe-redisplay-helper-returns-nil ()
+  (should (eq nil (--rc-maybe-redisplay-when-no-input -1)))
+  (should (eq nil (--rc-maybe-redisplay-when-no-input 0))))
 
 (ert-deftest m8j-wkbd-nr/preset-c-falls-through ()
   (m8-with-rc-state

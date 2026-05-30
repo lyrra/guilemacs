@@ -3177,8 +3177,7 @@ while-no-input-ignore events.  */)
 
 /* M8j — tiny C shims for the Scheme-owned blocking-read + non-reread
    loop.  Scheme owns the iteration and the timer-stop / c-is-nil
-   gates; C still owns the blocking read_decoded_event_from_main_queue
-   plus the redisplay primitive guarded by input_pending.  */
+   gates; C still owns the blocking read_decoded_event_from_main_queue.  */
 
 DEFUN ("--rc-read-and-install-event",
        Fc_rc_read_and_install_event,
@@ -3225,21 +3224,6 @@ returned nil but no timeout; caller proceeds to Block B).  */)
     }
   rc_set (rec, RC_SLOT_C, c);
   return intern ("continue");
-}
-
-DEFUN ("--rc-maybe-redisplay-when-no-input",
-       Fc_rc_maybe_redisplay_when_no_input,
-       Sc_rc_maybe_redisplay_when_no_input, 1, 1, 0,
-       doc: /* Internal: redisplay() when COMMANDFLAG >= 0 and no
-input is pending (neither the input_pending C global nor
-detect_input_pending_run_timers (0)).  Used by Scheme
-rc-wrong-kboard-and-non-reread! as the Block B redisplay action.  */)
-  (Lisp_Object commandflag)
-{
-  if (XFIXNUM (commandflag) >= 0
-      && !input_pending && !detect_input_pending_run_timers (0))
-    redisplay ();
-  return Qnil;
 }
 
 /* M8i — bulk splice of the four post-M8h blocks: wrong-kboard
