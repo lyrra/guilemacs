@@ -366,8 +366,37 @@ events onto Vunread_post_input_method_events.  Block 2: if
             (set-rc-state-recorded! rec #t))
           'fall-through)))))))
 
-(define %rc-translate-kbd-table
-  (delay (%c '--rc-translate-kbd-table)))
+(define %stringp       (delay (%c 'stringp)))
+(define %char-table-p  (delay (%c 'char-table-p)))
+(define %characterp    (delay (%c 'characterp)))
+(define %aref          (delay (%c 'aref)))
+(define %length        (delay (%c 'length)))
+
+(define (rc-translate-kbd-table c)
+  "M8l Block 1 in Scheme: apply current_kboard's
+keyboard-translate-table (a DEFVAR_KBOARD, accessible via
+symbol-value) to fixnum C when in range for the table's type
+(string, vector/pseudovector, or char-table).  Returns the
+translated value, or C unchanged when no translation applies.
+nil entries in the table mean no translation (the aref result
+is returned only when non-nil)."
+  (let ((table (symbol-value 'keyboard-translate-table)))
+    (cond
+     ((%nilp table) c)
+     (((force %stringp) table)
+      (if (< c ((force %length) table))
+          (or ((force %aref) table c) c)
+          c))
+     (((force %char-table-p) table)
+      (if ((force %characterp) c)
+          (or ((force %aref) table c) c)
+          c))
+     (else
+      ;; VECTOR_OR_PSEUDOVECTORP: anything with a length that isn't
+      ;; nil, a string, or a char-table.
+      (if (< c ((force %length) table))
+          (or ((force %aref) table c) c)
+          c)))))
 (define %rc-record-char
   (delay (%c '--rc-record-char)))
 (define %rc-echo-area-wipe
@@ -450,7 +479,7 @@ or `fall-through'.  See docs/keyboard.org §M8l."
          (else
           (let ((c (cond
                     ((integer? c)
-                     (let ((d ((force %rc-translate-kbd-table) c)))
+                     (let ((d (rc-translate-kbd-table c)))
                        (when (not (eq? c d))
                          (set-rc-state-c! rec d))
                        d))

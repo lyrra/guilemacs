@@ -3019,38 +3019,10 @@ return nil.  Caller has already verified the Block 1 gate.  */)
 
 /* M8l — tiny C shims for the Scheme-owned translate + menu-bar +
    record + echo-wipe block.  Scheme orchestrates the 3 blocks; C
-   owns the per-kboard keyboard-translate-table check, the
-   menu-bar event POSN_SET_POSN rewrite, the C record_char path,
-   and the echo-area / mini-window cleanup primitives.  */
-
-DEFUN ("--rc-translate-kbd-table",
-       Fc_rc_translate_kbd_table,
-       Sc_rc_translate_kbd_table, 1, 1, 0,
-       doc: /* Internal: apply current_kboard's Vkeyboard_translate_table
-to fixnum C when in range (string / vector / char-table cases).
-Returns the translated value (a fixnum or other Lisp object), or C
-unchanged when no translation applies.  Used by Scheme
-rc-event-translate-and-record! Block 1.  */)
-  (Lisp_Object c)
-{
-  if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
-       && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
-                                      Vkeyboard_translate_table)))
-      || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard,
-                                         Vkeyboard_translate_table))
-          && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
-                                        Vkeyboard_translate_table)))
-      || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
-          && CHARACTERP (c)))
-    {
-      Lisp_Object d
-        = Faref (KVAR (current_kboard, Vkeyboard_translate_table), c);
-      /* nil in keyboard-translate-table means no translation.  */
-      if (!NILP (d))
-        return d;
-    }
-  return c;
-}
+   owns the menu-bar event POSN_SET_POSN rewrite, the C record_char
+   path, and the echo-area / mini-window cleanup primitives.
+   The keyboard-translate-table lookup is now fully in Scheme
+   (rc-translate-kbd-table).  */
 
 DEFUN ("--rc-record-char",
        Fc_rc_record_char,
