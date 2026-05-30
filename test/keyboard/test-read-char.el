@@ -25,6 +25,9 @@
 (defun m8-test-input-method-consumes (_c)
   nil)
 
+(defun m8-clear-unread-switch-frame ()
+  (--set-unread-switch-frame nil))
+
 (test-assert "helpers/make-rc-state"    (fboundp '--make-rc-state))
 (test-assert "helpers/rc-state-fresh!"  (fboundp '--rc-state-fresh!))
 (test-assert "helpers/rc-test-state-ref" (fboundp '--rc-test-state-ref))
@@ -76,6 +79,40 @@
      (test-nil "drain/no-record command queue"
                unread-command-events))))
 
+(let ((unread-post-input-method-events nil)
+      (unread-command-events nil)
+      (unread-input-method-events (list (cons ?i nil))))
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (test-eq "drain/unread-input-method result"
+              'reread-for-input-method
+              (--rc-prologue-drain-unread!))
+     (test-eq "drain/unread-input-method c"
+              ?i (m8-test-state-ref 'c))
+     (test-eq "drain/unread-input-method reread"
+              t (m8-test-state-ref 'reread))
+     (test-nil "drain/unread-input-method queue"
+               unread-input-method-events))))
+
+(let ((unread-post-input-method-events nil)
+      (unread-command-events (list (cons 'm8-disabled 'disabled)))
+      (unread-input-method-events nil))
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (test-eq "drain/disabled command result"
+              'reread-for-input-method
+              (--rc-prologue-drain-unread!))
+     (test-eq "drain/disabled command c"
+              'm8-disabled (m8-test-state-ref 'c))
+     (test-nil "drain/disabled command recorded"
+               (m8-test-state-ref 'recorded))
+     (test-eq "drain/disabled command reread"
+              t (m8-test-state-ref 'reread))
+     (test-nil "drain/disabled command queue"
+               unread-command-events))))
+
 ;;;; M8d
 
 (test-assert "helpers/rc-prologue-macro-or-switch-frame"
@@ -95,6 +132,34 @@
      (test-eq "macro/replays-next-string-event index"
               1 executing-kbd-macro-index))))
 
+(let ((executing-kbd-macro (string #x80))
+      (executing-kbd-macro-index 0))
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (test-eq "macro/decodes-meta-bit result"
+              'from-macro (--rc-prologue-macro-or-switch-frame!))
+     (test-eq "macro/decodes-meta-bit c"
+              #x8000000 (m8-test-state-ref 'c))
+     (test-eq "macro/decodes-meta-bit index"
+              1 executing-kbd-macro-index))))
+
+(let ((event (list 'switch-frame (selected-frame))))
+  (unwind-protect
+      (progn
+        (--set-unread-switch-frame event)
+        (m8-with-rc-state
+         nil
+         (lambda ()
+           (test-eq "switch-frame/takes-pending-event result"
+                    'reread-first
+                    (--rc-prologue-macro-or-switch-frame!))
+           (test-eq "switch-frame/takes-pending-event c"
+                    event (m8-test-state-ref 'c))
+           (test-nil "switch-frame/takes-pending-event clears"
+                     (--get-unread-switch-frame)))))
+    (m8-clear-unread-switch-frame)))
+
 ;;;; M8e
 
 (test-assert "helpers/rc-prologue-redisplay"
@@ -108,6 +173,14 @@
              (fboundp '--rc-prologue-echo-and-menu))
 (test-eq "echo-menu/fall-through-at-idle"
          'fall-through (--rc-prologue-echo-and-menu!))
+
+(m8-with-rc-state
+ '((c . ?x))
+ (lambda ()
+   (test-eq "echo-menu/live-fall-through result"
+            'fall-through (--rc-prologue-echo-and-menu!))
+   (test-nil "echo-menu/live-fall-through clears-c"
+             (m8-test-state-ref 'c))))
 
 ;;;; M8g
 
@@ -173,6 +246,14 @@
              (fboundp '--rc-wrong-kboard-and-non-reread))
 (test-eq "wkbd-nr/fall-through-at-idle"
          'fall-through (--rc-wrong-kboard-and-non-reread!))
+
+(m8-with-rc-state
+ '((c . ?j))
+ (lambda ()
+   (test-eq "wkbd-nr/preset-c result"
+            'fall-through (--rc-wrong-kboard-and-non-reread!))
+   (test-eq "wkbd-nr/preset-c c"
+            ?j (m8-test-state-ref 'c))))
 
 ;;;; M8k
 
@@ -293,6 +374,58 @@
 (test-assert "helpers/rc-exit"         (fboundp '--rc-exit))
 (test-assert "helpers/read-char-main"  (fboundp '--read-char-main))
 (test-eq "rc-exit/nil-at-idle" nil (--rc-exit!))
+
+(m8-with-rc-state
+ '((c . ?e))
+ (lambda ()
+   (test-eq "rc-exit/returns-live-state-c" ?e (--rc-exit!))))
+
+;;;; Hoisted focus-in helper
+
+(test-assert "helpers/internal-handle-focus-in"
+             (fboundp 'internal-handle-focus-in))
+(test-assert "helpers/get-internal-last-event-frame"
+             (fboundp '--get-internal-last-event-frame))
+(test-assert "helpers/set-internal-last-event-frame"
+             (fboundp '--set-internal-last-event-frame))
+(test-assert "helpers/get-unread-switch-frame"
+             (fboundp '--get-unread-switch-frame))
+(test-assert "helpers/set-unread-switch-frame"
+             (fboundp '--set-unread-switch-frame))
+
+(test-assert "focus-in/rejects-invalid-event"
+             (condition-case nil
+                 (progn
+                   (internal-handle-focus-in '(focus-in not-a-frame))
+                   nil)
+               (error t)))
+
+(let ((frame (selected-frame)))
+  (unwind-protect
+      (progn
+        (--set-internal-last-event-frame nil)
+        (m8-clear-unread-switch-frame)
+        (test-nil "focus-in/updates returns nil"
+                  (internal-handle-focus-in (list 'focus-in frame)))
+        (test-eq "focus-in/updates last-event-frame"
+                 frame (--get-internal-last-event-frame))
+        (test-nil "focus-in/updates leaves switch-frame nil"
+                  (--get-unread-switch-frame)))
+    (m8-clear-unread-switch-frame)))
+
+(let ((frame (selected-frame)))
+  (unwind-protect
+      (progn
+        (--set-internal-last-event-frame frame)
+        (--set-unread-switch-frame 'pending-switch)
+        (test-nil "focus-in/pending returns nil"
+                  (internal-handle-focus-in (list 'focus-in frame)))
+        (let ((event (--get-unread-switch-frame)))
+          (test-eq "focus-in/pending event tag"
+                   'switch-frame (car event))
+          (test-eq "focus-in/pending event frame"
+                   frame (cadr event))))
+    (m8-clear-unread-switch-frame)))
 
 ;;;; Step 1 of state-to-record migration
 

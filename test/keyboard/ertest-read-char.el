@@ -27,6 +27,9 @@
   (interactive)
   (setq m8-test-special-observed last-input-event))
 
+(defun m8-clear-unread-switch-frame ()
+  (--set-unread-switch-frame nil))
+
 (ert-deftest m8a-helpers/exist ()
   (should (fboundp '--make-rc-state))
   (should (fboundp '--rc-state-fresh!))
@@ -81,6 +84,33 @@
        (should (eq t (m8-test-state-ref 'reread)))
        (should (null unread-command-events))))))
 
+(ert-deftest m8c-drain/unread-input-method-peels-popup-cons ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events nil)
+        (unread-input-method-events (list (cons ?i nil))))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq ?i (m8-test-state-ref 'c)))
+       (should (eq t (m8-test-state-ref 'reread)))
+       (should (null unread-input-method-events))))))
+
+(ert-deftest m8c-drain/disabled-command-event-peels-to-head ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list (cons 'm8-disabled 'disabled)))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq 'm8-disabled (m8-test-state-ref 'c)))
+       (should (null (m8-test-state-ref 'recorded)))
+       (should (eq t (m8-test-state-ref 'reread)))
+       (should (null unread-command-events))))))
+
 ;;;; M8d — kbd-macro + unread-switch-frame early exits
 
 (ert-deftest m8d-helpers/exist ()
@@ -101,6 +131,30 @@
        (should (eq ?a (m8-test-state-ref 'c)))
        (should (eq 1 executing-kbd-macro-index))))))
 
+(ert-deftest m8d-macro/decodes-meta-bit-from-string ()
+  (let ((executing-kbd-macro (string #x80))
+        (executing-kbd-macro-index 0))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'from-macro (--rc-prologue-macro-or-switch-frame!)))
+       (should (eq #x8000000 (m8-test-state-ref 'c)))
+       (should (eq 1 executing-kbd-macro-index))))))
+
+(ert-deftest m8d-switch-frame/takes-pending-event ()
+  (let ((event (list 'switch-frame (selected-frame))))
+    (unwind-protect
+        (progn
+          (--set-unread-switch-frame event)
+          (m8-with-rc-state
+           nil
+           (lambda ()
+             (should (eq 'reread-first
+                         (--rc-prologue-macro-or-switch-frame!)))
+             (should (eq event (m8-test-state-ref 'c)))
+             (should (null (--get-unread-switch-frame))))))
+      (m8-clear-unread-switch-frame))))
+
 ;;;; M8e — redisplay loop
 
 (ert-deftest m8e-helpers/exist ()
@@ -120,6 +174,13 @@
   ;; Outside any in-flight read_char, the subr early-returns
   ;; `fall-through' before touching anything.
   (should (eq 'fall-through (--rc-prologue-echo-and-menu!))))
+
+(ert-deftest m8f-echo-menu/live-fall-through-clears-c ()
+  (m8-with-rc-state
+   '((c . ?x))
+   (lambda ()
+     (should (eq 'fall-through (--rc-prologue-echo-and-menu!)))
+     (should (null (m8-test-state-ref 'c))))))
 
 ;;;; M8g — idle-timer + immediate-echo + auto-save
 
@@ -188,6 +249,13 @@
   ;; Outside any in-flight read_char, the subr early-returns
   ;; `fall-through' before touching read_decoded_event_from_main_queue.
   (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!))))
+
+(ert-deftest m8j-wkbd-nr/preset-c-falls-through ()
+  (m8-with-rc-state
+   '((c . ?j))
+   (lambda ()
+     (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!)))
+     (should (eq ?j (m8-test-state-ref 'c))))))
 
 ;;;; M8k — BUFFERP + special-event-map dispatch
 
@@ -304,6 +372,47 @@
   ;; --rc-exit returns nil when rc_state_stack is empty (no
   ;; in-flight read_char to read state->c from).
   (should (eq nil (--rc-exit!))))
+
+(ert-deftest m8final-rc-exit/returns-live-state-c ()
+  (m8-with-rc-state
+   '((c . ?e))
+   (lambda ()
+     (should (eq ?e (--rc-exit!))))))
+
+;;;; Hoisted focus-in helper
+
+(ert-deftest focus-in-helpers/exist ()
+  (should (fboundp 'internal-handle-focus-in))
+  (should (fboundp '--get-internal-last-event-frame))
+  (should (fboundp '--set-internal-last-event-frame))
+  (should (fboundp '--get-unread-switch-frame))
+  (should (fboundp '--set-unread-switch-frame)))
+
+(ert-deftest focus-in/rejects-invalid-event ()
+  (should-error (internal-handle-focus-in '(focus-in not-a-frame))))
+
+(ert-deftest focus-in/updates-internal-last-event-frame ()
+  (let ((frame (selected-frame)))
+    (unwind-protect
+        (progn
+          (--set-internal-last-event-frame nil)
+          (m8-clear-unread-switch-frame)
+          (should (null (internal-handle-focus-in (list 'focus-in frame))))
+          (should (eq frame (--get-internal-last-event-frame)))
+          (should (null (--get-unread-switch-frame))))
+      (m8-clear-unread-switch-frame))))
+
+(ert-deftest focus-in/preserves-pending-switch-frame ()
+  (let ((frame (selected-frame)))
+    (unwind-protect
+        (progn
+          (--set-internal-last-event-frame frame)
+          (--set-unread-switch-frame 'pending-switch)
+          (should (null (internal-handle-focus-in (list 'focus-in frame))))
+          (let ((event (--get-unread-switch-frame)))
+            (should (eq 'switch-frame (car event)))
+            (should (eq frame (cadr event)))))
+      (m8-clear-unread-switch-frame))))
 
 ;;;; Step 1 of state-to-record migration — companion Scheme record
 
