@@ -213,8 +213,16 @@ and return state->c (the resolved event).  See docs/keyboard.org
       ((force %rc-latch-input-was-pending))
       (rc-state-c rec)))))
 
-(define %rc-help-echo-and-help-form
-  (delay (%c '--rc-help-echo-and-help-form)))
+(define %rc-show-help-echo-from-event
+  (delay (%c '--rc-show-help-echo-from-event)))
+(define %rc-add-command-keys-and-echo
+  (delay (%c '--rc-add-command-keys-and-echo)))
+(define %rc-inc-num-input-events
+  (delay (%c '--rc-inc-num-input-events)))
+(define %rc-maybe-help-form-recursive-read
+  (delay (%c '--rc-maybe-help-form-recursive-read)))
+(define %this-command-key-count
+  (delay (%c '--this-command-key-count)))
 
 (define (rc-help-echo-and-help-form!)
   "Final read_char_1 tail.  Block 1: if state->c is a (help-echo
@@ -226,10 +234,34 @@ Vhelp_form and help_char_p match, recursively read_char until
 non-BUFFERP under a dynwind that saves window configuration,
 then repeat the read if state->c == fixnum 040 (space).  Returns
 `goto-retry' or `fall-through'.  See docs/keyboard.org §M8n."
-  ((force %rc-help-echo-and-help-form)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let ((c (rc-state-c rec)))
+        (cond
+         ;; Block 1: help-echo display.
+         ((and (pair? c) (eq? (car c) 'help-echo))
+          ((force %rc-show-help-echo-from-event) c)
+          ;; We stopped being idle for this event; undo that.
+          (when (%nilp (rc-state-end-time rec))
+            ((force %rc-timer-resume-idle)))
+          'goto-retry)
+         (else
+          ;; Block 2: add to this_command_keys + echo + last-input-event.
+          (when (and (or (%nilp (rc-state-reread rec))
+                         (= ((force %this-command-key-count)) 0))
+                     (%nilp (rc-state-end-time rec)))
+            ((force %rc-add-command-keys-and-echo)
+             c (rc-state-also-record rec)))
+          (set-symbol-value! 'last-input-event c)
+          ((force %rc-inc-num-input-events))
+          ;; Block 3: help_form recursive read.
+          ((force %rc-maybe-help-form-recursive-read))
+          'fall-through)))))))
 
-(define %rc-input-method-dispatch
-  (delay (%c '--rc-input-method-dispatch)))
+(define %rc-input-method-call-and-handle
+  (delay (%c '--rc-input-method-call-and-handle)))
 
 (define (rc-input-method-dispatch!)
   "Input-method dispatch + record-if-unread.  Block 1: when
@@ -241,10 +273,44 @@ producing events; otherwise installs new c and concats remaining
 events onto Vunread_post_input_method_events.  Block 2: if
 !state->recorded, record_char + state->recorded = true.  Returns
 `goto-retry' or `fall-through'.  See docs/keyboard.org §M8m."
-  ((force %rc-input-method-dispatch)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let* ((c (rc-state-c rec))
+             ;; Block 1 gate.
+             (b1 (cond
+                  ((and (%printable-ascii? c)
+                        (not (%nilp (symbol-value 'input-method-function)))
+                        (%nilp (rc-state-prev-event rec)))
+                   ((force %rc-input-method-call-and-handle)))
+                  (else #nil))))
+        (cond
+         ((eq? b1 'goto-retry) 'goto-retry)
+         (else
+          ;; Block 2: record if the event bypassed the M8l record path.
+          (when (%nilp (rc-state-recorded rec))
+            ((force %rc-record-char) (rc-state-c rec))
+            (set-rc-state-recorded! rec #t))
+          'fall-through)))))))
 
-(define %rc-event-translate-and-record
-  (delay (%c '--rc-event-translate-and-record)))
+(define %rc-translate-kbd-table
+  (delay (%c '--rc-translate-kbd-table)))
+(define %rc-maybe-synthesize-menu-bar-event
+  (delay (%c '--rc-maybe-synthesize-menu-bar-event)))
+(define %rc-record-char
+  (delay (%c '--rc-record-char)))
+(define %rc-echo-area-wipe
+  (delay (%c '--rc-echo-area-wipe)))
+(define %current-message (delay (%c 'current-message)))
+
+(define (%printable-ascii? c)
+  "True when C is a fixnum in the printable ASCII range used by
+the input-method echo-area save (space..255, not 127)."
+  (and (integer? c)
+       (<= 32 c)
+       (< c 256)
+       (not (= c 127))))
 
 (define (rc-event-translate-and-record!)
   "Post-special-event translate + record + wipe.  Block 1: FIXNUMP
@@ -255,10 +321,55 @@ symbol); Block 3: record_char + also_record, save echo-area for
 input-method when appropriate, wipe echo area unless state->c is a
 help-echo / switch-frame / select-window event.  Returns `goto-exit'
 or `fall-through'.  See docs/keyboard.org §M8l."
-  ((force %rc-event-translate-and-record)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let ((c (rc-state-c rec)))
+        ;; Block 1: FIXNUMP + keyboard-translate-table.
+        (cond
+         ((and (integer? c) (= c -1)) 'goto-exit)
+         (else
+          (let ((c (cond
+                    ((integer? c)
+                     (let ((d ((force %rc-translate-kbd-table) c)))
+                       (when (not (eq? c d))
+                         (set-rc-state-c! rec d))
+                       d))
+                    (else c))))
+            ;; Block 2: menu-bar synthesis.
+            (let* ((maybe-posn ((force %rc-maybe-synthesize-menu-bar-event)))
+                   (c (if (%nilp maybe-posn) c maybe-posn)))
+              ;; Block 3a: record_char + also_record.
+              ((force %rc-record-char) c)
+              (set-rc-state-recorded! rec #t)
+              (let ((also-record (rc-state-also-record rec)))
+                (when (not (%nilp also-record))
+                  ((force %rc-record-char) also-record)))
+              ;; Block 3b: pre-input-method echo-area save.
+              (when (and (%printable-ascii? c)
+                         (not (%nilp (symbol-value 'input-method-function))))
+                (let ((cur ((force %current-message))))
+                  (set-rc-state-previous-echo-area-message! rec cur)
+                  (set-symbol-value! 'input-method-previous-message cur)))
+              ;; Block 3c: echo-area wipe.
+              (when (or (not (pair? c))
+                        (and (not (eq? (car c) 'help-echo))
+                             (not (eq? (car c) 'switch-frame))
+                             (not (eq? (car c) 'select-window))))
+                ((force %rc-echo-area-wipe)))
+              'fall-through)))))))))
 
-(define %rc-bufferp-and-special-event-map
-  (delay (%c '--rc-bufferp-and-special-event-map)))
+(define %rc-special-event-map-lookup
+  (delay (%c '--rc-special-event-map-lookup)))
+(define %rc-timer-resume-idle
+  (delay (%c '--rc-timer-resume-idle)))
+(define %rc-latch-input-was-pending
+  (delay (%c '--rc-latch-input-was-pending)))
+(define %bufferp (delay (%c 'bufferp)))
+(define %current-buffer (delay (%c 'current-buffer)))
+(define %command-execute (delay (%c 'command-execute)))
+(define %memq (delay (%c 'memq)))
 
 (define (rc-bufferp-and-special-event-map!)
   "BUFFERP early-exit + special-event-map dispatch.  If state->c
@@ -268,10 +379,44 @@ call4 Qcommand_execute and return `goto-exit' (when
 current_buffer changed; state->c is reset to -2 first) or
 `goto-retry' (otherwise).  Returns `fall-through' when no
 special command matched.  See docs/keyboard.org §M8k."
-  ((force %rc-bufferp-and-special-event-map)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let ((c (rc-state-c rec)))
+        (cond
+         ;; Block 1: BUFFERP early-exit.
+         ((not (%nilp ((force %bufferp) c))) 'goto-exit)
+         (else
+          ;; Block 2: special-event-map dispatch.
+          (let ((tem ((force %rc-special-event-map-lookup) c)))
+            (cond
+             ((%nilp tem) 'fall-through)
+             (else
+              (let ((prev-buffer ((force %current-buffer))))
+                (set-symbol-value! 'last-input-event c)
+                ((force %command-execute) tem #nil (vector c) #t)
+                (when (and (pair? c)
+                           (not (%nilp ((force %memq) (car c)
+                                        (symbol-value 'while-no-input-ignore-events))))
+                           (%nilp (rc-state-end-time rec)))
+                  ;; We stopped being idle for this event; undo that.
+                  ((force %rc-timer-resume-idle)))
+                ;; HAVE_NS: latch input_was_pending for ns-unput-working-text.
+                (when (and (pair? c) (eq? (car c) 'ns-unput-working-text))
+                  ((force %rc-latch-input-was-pending)))
+                (cond
+                 ((not (eq? prev-buffer ((force %current-buffer))))
+                  ;; The command may have changed the keymaps.  Pretend
+                  ;; there is input in another keyboard and return.
+                  (set-rc-state-c! rec -2)
+                  'goto-exit)
+                 (else 'goto-retry)))))))))))))
 
-(define %rc-wrong-kboard-and-non-reread
-  (delay (%c '--rc-wrong-kboard-and-non-reread)))
+(define %rc-read-and-install-event
+  (delay (%c '--rc-read-and-install-event)))
+(define %rc-maybe-redisplay-when-no-input
+  (delay (%c '--rc-maybe-redisplay-when-no-input)))
 
 (define (rc-wrong-kboard-and-non-reread!)
   "Blocking-read + non-reread fixup loop.  Calls
@@ -281,10 +426,78 @@ when c is still nil after a redisplay.  Returns `goto-exit'
 (end_time expired), `return-wrong-kboard' (caller returns -2),
 or `fall-through' (state->c is non-nil).  See docs/keyboard.org
 §M8j."
-  ((force %rc-wrong-kboard-and-non-reread)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let loop ()
+        ;; Block A — wrong_kboard label position.
+        (let ((r (if (%nilp (rc-state-c rec))
+                     ((force %rc-read-and-install-event))
+                     'continue)))
+          (cond
+           ((eq? r 'goto-exit) 'goto-exit)
+           ((eq? r 'return-wrong-kboard) 'return-wrong-kboard)
+           (else
+            ;; Block B — non_reread label position.
+            (when (%nilp (rc-state-end-time rec))
+              ((force %rc-timer-stop-idle)))
+            (cond
+             ((%nilp (rc-state-c rec))
+              ((force %rc-maybe-redisplay-when-no-input)
+               (rc-state-commandflag rec))
+              (loop))
+             (else 'fall-through))))))))))
 
-(define %rc-prologue-kboard-and-queues
-  (delay (%c '--rc-prologue-kboard-and-queues)))
+(define %rc-pop-current-kboard-queue
+  (delay (%c '--rc-pop-current-kboard-queue)))
+(define %rc-find-other-kboard-with-data
+  (delay (%c '--rc-find-other-kboard-with-data)))
+(define %current-kboard
+  (delay (%c 'current-kboard)))
+(define %kboard-eq
+  (delay (%c 'kboard-eq)))
+
+(define (%drain-unread-command-events! rec)
+  "Block 2 of M8i: pop one event from Vunread_command_events,
+peeling the (Qt . event) and (Qno_record . event) wrappers and
+setting rec's recorded/reread bits accordingly.  Returns the new
+c value (which may be nil if the queue was empty)."
+  (let ((q (symbol-value 'unread-command-events)))
+    (cond
+     ((not (pair? q))
+      (rc-state-c rec))
+     (else
+      (set-symbol-value! 'unread-command-events (cdr q))
+      (let ((c0 (car q)))
+        (let ((c1 (cond
+                   ((and (pair? c0) (eq? (car c0) 't))
+                    (cdr c0))
+                   (else
+                    (let ((c2 (if (and (pair? c0)
+                                       (eq? (car c0) 'no-record))
+                                  (begin
+                                    (set-rc-state-recorded! rec #t)
+                                    (cdr c0))
+                                  c0)))
+                      (set-rc-state-reread! rec #t)
+                      c2)))))
+          (set-rc-state-c! rec c1)
+          c1))))))
+
+(define (%maybe-pop-current-kboard-queue! rec c)
+  "Block 3 of M8i: when c is nil, try to dequeue from the current
+KBOARD's side queue; if data was popped, install it into rec.c and
+return it.  Returns the (possibly unchanged) c value."
+  (cond
+   ((not (%nilp c)) c)
+   (else
+    (let ((c0 ((force %rc-pop-current-kboard-queue))))
+      (cond
+       ((%nilp c0) c)
+       (else
+        (set-rc-state-c! rec c0)
+        c0))))))
 
 (define (rc-prologue-kboard-and-queues!)
   "Four blocks after M8h: wrong-kboard detection, Vunread_command_events
@@ -293,10 +506,43 @@ state->c / state->recorded / state->reread / current_kboard /
 Vunread_command_events / input_pending / Vlast_event_frame in place.
 Returns `return-wrong-kboard' (caller returns -2) or `fall-through'.
 See docs/keyboard.org §M8i."
-  ((force %rc-prologue-kboard-and-queues)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let* ((c0 (rc-state-c rec))
+             (orig (rc-state-orig-kboard rec))
+             ;; Block 1: wrong-kboard detection.
+             (wrong-kboard? (and (%nilp c0)
+                                 (or (%nilp orig)
+                                     (%nilp ((force %kboard-eq)
+                                             ((force %current-kboard))
+                                             orig))))))
+        (cond
+         (wrong-kboard? 'return-wrong-kboard)
+         (else
+          ;; Block 2: drain Vunread_command_events.
+          (let* ((c1 (%drain-unread-command-events! rec))
+                 ;; Block 3: read from current KBOARD's side queue.
+                 (c2 (%maybe-pop-current-kboard-queue! rec c1)))
+            ;; Block 4: scan other kboards.
+            (cond
+             ((and (%nilp c2)
+                   (not (%nilp ((force %rc-find-other-kboard-with-data)))))
+              'return-wrong-kboard)
+             (else 'fall-through))))))))))
 
-(define %rc-prologue-xmenu-and-idle-gc
-  (delay (%c '--rc-prologue-xmenu-and-idle-gc)))
+(define %rc-read-char-x-menu-prompt
+  (delay (%c '--rc-read-char-x-menu-prompt)))
+(define %rc-timer-stop-idle
+  (delay (%c '--rc-timer-stop-idle)))
+(define %rc-auto-save-by-timeout-and-gc
+  (delay (%c '--rc-auto-save-by-timeout-and-gc)))
+
+(define (%interactive?)
+  "Scheme port of the commands.h INTERACTIVE macro."
+  (and (%nilp (symbol-value 'executing-kbd-macro))
+       (%nilp (symbol-value 'noninteractive))))
 
 (define (rc-prologue-xmenu-and-idle-gc!)
   "X-menu read + auto-save-by-idle-timeout + GC blocks after M8g.
@@ -308,17 +554,70 @@ through — buffer-size-scaled sit_for + Fdo_auto_save + redisplay
 when the auto-save threshold is crossed, then GC_collect_a_little
 if no input pending.  Returns `goto-exit' or `fall-through'.  See
 docs/keyboard.org §M8h."
-  ((force %rc-prologue-xmenu-and-idle-gc)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'fall-through)
+     (else
+      (let ((map (rc-state-map rec))
+            (prev-event (rc-state-prev-event rec)))
+        (cond
+         ;; Block 1: X-menu read.
+         ((and (not (%nilp ((force %keymapp) map)))
+               (%interactive?)
+               (not (%nilp prev-event))
+               (pair? prev-event)
+               (not (eq? (car prev-event) 'menu-bar))
+               (not (eq? (car prev-event) 'tab-bar))
+               (not (eq? (car prev-event) 'tool-bar))
+               (not (pair? (symbol-value 'unread-command-events))))
+          (set-rc-state-c! rec ((force %rc-read-char-x-menu-prompt)))
+          ;; Now that we have read an event, Emacs is not idle.
+          (when (%nilp (rc-state-end-time rec))
+            ((force %rc-timer-stop-idle)))
+          'goto-exit)
+         (else
+          ;; Block 2: maybe autosave and/or GC due to idleness.
+          (when (and (%interactive?) (%nilp (rc-state-c rec)))
+            ((force %rc-auto-save-by-timeout-and-gc)
+             (rc-state-commandflag rec)))
+          'fall-through)))))))
 
-(define %rc-prologue-idle-echo-autosave
-  (delay (%c '--rc-prologue-idle-echo-autosave)))
+(define %rc-timer-start-idle
+  (delay (%c '--rc-timer-start-idle)))
+(define %rc-should-immediate-echo-p
+  (delay (%c '--rc-should-immediate-echo-p)))
+(define %rc-sit-for-and-maybe-echo
+  (delay (%c '--rc-sit-for-and-maybe-echo)))
+(define %rc-maybe-auto-save-by-keystroke
+  (delay (%c '--rc-maybe-auto-save-by-keystroke)))
+(define %echo-now
+  (delay (%c '--echo-now)))
 
 (define (rc-prologue-idle-echo-autosave!)
   "Three pure-side-effect blocks before the blocking input wait:
 idle-timer start, immediate-echo start (with sit_for delay for
 non-mouse events), and auto-save by keystroke count.  Always
 returns nil — caller falls through.  See docs/keyboard.org §M8g."
-  ((force %rc-prologue-idle-echo-autosave)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) #nil)
+     (else
+      (let ((end-time-nil? (%nilp (rc-state-end-time rec))))
+        ;; Block 1: idle-timer start.
+        (when end-time-nil?
+          ((force %rc-timer-start-idle)))
+        ;; Block 2: immediate echo.
+        (when (and end-time-nil?
+                   (not (%nilp ((force %rc-should-immediate-echo-p)))))
+          (if (pair? (rc-state-prev-event rec))
+              ;; After a mouse event, start echoing right away.
+              ((force %echo-now))
+              ((force %rc-sit-for-and-maybe-echo))))
+        ;; Block 3: auto-save by keystroke count.
+        (let ((cf (rc-state-commandflag rec)))
+          (when (and (not (= cf 0)) (not (= cf -2)))
+            ((force %rc-maybe-auto-save-by-keystroke))))
+        #nil)))))
 
 (define %rc-echo-cancel-or-dash
   (delay (%c '--rc-echo-cancel-or-dash)))
@@ -361,8 +660,12 @@ docs/keyboard.org §M8f."
                 'goto-exit)))
             'fall-through))))))
 
-(define %rc-prologue-redisplay
-  (delay (%c '--rc-prologue-redisplay)))
+(define %rc-echo-message-buffer-is-current
+  (delay (%c '--rc-echo-message-buffer-is-current)))
+(define %rc-pin-echo-message-buffer-to-current
+  (delay (%c '--rc-pin-echo-message-buffer-to-current)))
+(define %rc-redisplay-and-wait-block
+  (delay (%c '--rc-redisplay-and-wait-block)))
 
 (define (rc-prologue-redisplay!)
   "Redisplay loop in the read_char_1 prologue.  When the current
@@ -370,7 +673,19 @@ read_char's commandflag is >= 0, swallow non-user-visible events
 and redisplay until convergence, then pin echo_message_buffer
 when commandflag == 0.  Always returns nil — caller falls
 through.  See docs/keyboard.org §M8e."
-  ((force %rc-prologue-redisplay)))
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) #nil)
+     (else
+      (let ((cf (rc-state-commandflag rec)))
+        (cond
+         ((< cf 0) #nil)
+         (else
+          (let ((echo-current ((force %rc-echo-message-buffer-is-current))))
+            ((force %rc-redisplay-and-wait-block))
+            (when (and (= cf 0) (not (%nilp echo-current)))
+              ((force %rc-pin-echo-message-buffer-to-current)))
+            #nil))))))))
 
 (define %rc-pin-event-frame-to-macro
   (delay (%c '--rc-pin-event-frame-to-macro)))
@@ -691,6 +1006,8 @@ See docs/keyboard.org §M8final."
               ;; M8e — redisplay loop
               (--rc-prologue-redisplay!
                                        ,rc-prologue-redisplay!)
+              (--rc-prologue-redisplay
+                                       ,rc-prologue-redisplay!)
               ;; M8f — echo-cancel + minibuf-menu-prompt
               (--rc-prologue-echo-and-menu!
                                        ,rc-prologue-echo-and-menu!)
@@ -699,26 +1016,42 @@ See docs/keyboard.org §M8final."
               ;; M8g — idle-timer + immediate-echo + auto-save
               (--rc-prologue-idle-echo-autosave!
                                        ,rc-prologue-idle-echo-autosave!)
+              (--rc-prologue-idle-echo-autosave
+                                       ,rc-prologue-idle-echo-autosave!)
               ;; M8h — X-menu + auto-save-by-idle-timeout + GC
               (--rc-prologue-xmenu-and-idle-gc!
+                                       ,rc-prologue-xmenu-and-idle-gc!)
+              (--rc-prologue-xmenu-and-idle-gc
                                        ,rc-prologue-xmenu-and-idle-gc!)
               ;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard
               (--rc-prologue-kboard-and-queues!
                                        ,rc-prologue-kboard-and-queues!)
+              (--rc-prologue-kboard-and-queues
+                                       ,rc-prologue-kboard-and-queues!)
               ;; M8j — wrong_kboard + non_reread loop
               (--rc-wrong-kboard-and-non-reread!
+                                       ,rc-wrong-kboard-and-non-reread!)
+              (--rc-wrong-kboard-and-non-reread
                                        ,rc-wrong-kboard-and-non-reread!)
               ;; M8k — BUFFERP + special-event-map dispatch
               (--rc-bufferp-and-special-event-map!
                                        ,rc-bufferp-and-special-event-map!)
+              (--rc-bufferp-and-special-event-map
+                                       ,rc-bufferp-and-special-event-map!)
               ;; M8l — translate + menu-bar + record + echo-wipe
               (--rc-event-translate-and-record!
+                                       ,rc-event-translate-and-record!)
+              (--rc-event-translate-and-record
                                        ,rc-event-translate-and-record!)
               ;; M8m — input-method dispatch + record-if-unread
               (--rc-input-method-dispatch!
                                        ,rc-input-method-dispatch!)
+              (--rc-input-method-dispatch
+                                       ,rc-input-method-dispatch!)
               ;; M8n — help-echo + this-command-keys + help-form
               (--rc-help-echo-and-help-form!
+                                       ,rc-help-echo-and-help-form!)
+              (--rc-help-echo-and-help-form
                                        ,rc-help-echo-and-help-form!)
               ;; M8final — exit tail + hoisted dispatcher
               (--rc-exit!              ,rc-exit!)

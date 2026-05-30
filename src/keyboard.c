@@ -2808,807 +2808,664 @@ Returns nil.  Used by Scheme rc-exit!.  */)
   return Qnil;
 }
 
-/* M8n — bulk splice of help-echo display + add-to-this_command_keys
-   + last_input_event + help_form recursive read (the three blocks
-   between `reread_first:' and `exit:').  See docs/keyboard.org
-   §M8n.  */
-DEFUN ("--rc-help-echo-and-help-form",
-       Fc_rc_help_echo_and_help_form,
-       Sc_rc_help_echo_and_help_form, 0, 0, 0,
-       doc: /* Internal: help-echo + this-command-keys + help-form.
+/* M8n — tiny C shims for the Scheme-owned help-echo / command-keys
+   / help-form epilogue.  Scheme owns the 3-block control flow plus
+   the last-input-event update; C still owns show_help_echo, the
+   block-2 ok-to-echo / add-command-key / echo-update sequence, the
+   num_input_events counter, and the Block 3 recursive read_char
+   loop with its dynwind / help-form-saved-window-configs machinery.  */
 
-  Block 1: if state->c is (help-echo FRAME HELP WINDOW OBJECT POS),
-    call show_help_echo with the parsed parts, then
-    timer_resume_idle when not in a timed read, and return
-    `goto-retry'.
+DEFUN ("--rc-show-help-echo-from-event",
+       Fc_rc_show_help_echo_from_event,
+       Sc_rc_show_help_echo_from_event, 1, 1, 0,
+       doc: /* Internal: Block 1 of M8n.  C is a (help-echo FRAME HELP
+WINDOW OBJECT POS) cons; calls show_help_echo with the parsed parts.
+Used by Scheme rc-help-echo-and-help-form!.  */)
+  (Lisp_Object c)
+{
+  /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
+  Lisp_Object help, object, position, window, htem;
 
-  Block 2: when (!state->reread || this_command_key_count == 0)
-    && !state->end_time: set ok_to_echo_at_next_pause to
-    current_kboard for non-mouse-motion events, add_command_key
-    for state->c (and state->also_record when set), echo_update.
-    Then last_input_event = state->c; num_input_events++.
+  htem = Fcdr (XCDR (c));
+  help = Fcar (htem);
+  htem = Fcdr (htem);
+  window = Fcar (htem);
+  htem = Fcdr (htem);
+  object = Fcar (htem);
+  htem = Fcdr (htem);
+  position = Fcar (htem);
 
-  Block 3: if Vhelp_form && help_char_p(state->c): inside a
-    dynwind, push current window-configuration onto
-    help_form_saved_window_configs with an unwind-protect to
-    read_char_help_form_unwind, call Qhelp_form_show, then in
-    a do/while loop call read_char until non-BUFFERP.  After
-    dynwind_end + redisplay: if state->c == fixnum 040 (space),
-    repeat the cancel_echoing + read_char-until-non-BUFFERP
-    loop a second time.
+  show_help_echo (help, window, object, position);
+  return Qnil;
+}
 
-  Returns `goto-retry' (Block 1 fired) or `fall-through'.
-  Mirrors src/keyboard.c lines 4264-4340 pre-M8n.  */)
+DEFUN ("--rc-add-command-keys-and-echo",
+       Fc_rc_add_command_keys_and_echo,
+       Sc_rc_add_command_keys_and_echo, 2, 2, 0,
+       doc: /* Internal: Block 2 of M8n's if-true body.  When C is
+not a mouse-motion event, set ok_to_echo_at_next_pause to
+current_kboard.  add_command_key(C); add_command_key(ALSO-RECORD)
+when non-nil; echo_update.  Used by Scheme rc-help-echo-and-help-form!.  */)
+  (Lisp_Object c, Lisp_Object also_record)
+{
+  /* Don't echo mouse motion events.  */
+  if (!(EVENT_HAS_PARAMETERS (c)
+        && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
+    /* Once we reread a character, echoing can happen
+       the next time we pause to read a new one.  */
+    ok_to_echo_at_next_pause = current_kboard;
+
+  /* Record this character as part of the current key.  */
+  add_command_key (c);
+  if (!NILP (also_record))
+    add_command_key (also_record);
+
+  echo_update ();
+  return Qnil;
+}
+
+DEFUN ("--rc-inc-num-input-events",
+       Fc_rc_inc_num_input_events,
+       Sc_rc_inc_num_input_events, 0, 0, 0,
+       doc: /* Internal: ++num_input_events.  Used by Scheme
+rc-help-echo-and-help-form! to mirror the M8n tail counter
+increment.  */)
+  (void)
+{
+  num_input_events++;
+  return Qnil;
+}
+
+DEFUN ("--rc-maybe-help-form-recursive-read",
+       Fc_rc_maybe_help_form_recursive_read,
+       Sc_rc_maybe_help_form_recursive_read, 0, 0, 0,
+       doc: /* Internal: Block 3 of M8n.  When Vhelp_form is set and
+the top-of-stack rec's c is the help char, push the current
+window-configuration onto help_form_saved_window_configs (with an
+unwind-protect to read_char_help_form_unwind), show the help form
+via Qhelp_form_show, then loop read_char until a non-BUFFERP event
+is returned.  If the user typed SPACE, repeat the loop once more
+to dismiss.  Writes the final event back to rec.c.  Returns nil.  */)
   (void)
 {
   if (rc_state_depth == 0)
-    return intern ("fall-through");
+    return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
-  /* Block 1: help-echo display.  */
-  if (CONSP (c) && EQ (XCAR (c), Qhelp_echo))
+  if (NILP (Vhelp_form) || !help_char_p (c))
+    return Qnil;
+
+  dynwind_begin ();
+
+  help_form_saved_window_configs
+    = Fcons (Fcurrent_window_configuration (Qnil),
+             help_form_saved_window_configs);
+  record_unwind_protect_void (read_char_help_form_unwind);
+  call0 (Qhelp_form_show);
+
+  cancel_echoing ();
+  do
     {
-      /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
-      Lisp_Object help, object, position, window, htem;
-
-      htem = Fcdr (XCDR (c));
-      help = Fcar (htem);
-      htem = Fcdr (htem);
-      window = Fcar (htem);
-      htem = Fcdr (htem);
-      object = Fcar (htem);
-      htem = Fcdr (htem);
-      position = Fcar (htem);
-
-      show_help_echo (help, window, object, position);
-
-      /* We stopped being idle for this event; undo that.  */
-      if (!end_time)
-        timer_resume_idle ();
-      return intern ("goto-retry");
+      c = read_char (0, Qnil, Qnil, 0, NULL);
+      if (EVENT_HAS_PARAMETERS (c)
+          && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_click))
+        XSETCAR (help_form_saved_window_configs, Qnil);
     }
+  while (BUFFERP (c));
+  /* Remove the help from the frame.  */
+  dynwind_end ();
 
-  /* Block 2: add to this_command_keys + echo + last_input_event.  */
-  if ((NILP (rc_get (rec, RC_SLOT_REREAD)) || this_command_key_count == 0)
-      && !end_time)
+  redisplay ();
+  if (BASE_EQ (c, make_fixnum (040)))
     {
-      /* Don't echo mouse motion events.  */
-      if (!(EVENT_HAS_PARAMETERS (c)
-            && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
-        /* Once we reread a character, echoing can happen
-           the next time we pause to read a new one.  */
-        ok_to_echo_at_next_pause = current_kboard;
-
-      /* Record this character as part of the current key.  */
-      add_command_key (c);
-      Lisp_Object also_record = rc_get (rec, RC_SLOT_ALSO_RECORD);
-      if (!NILP (also_record))
-        add_command_key (also_record);
-
-      echo_update ();
-    }
-
-  last_input_event = c;
-  num_input_events++;
-
-  /* Block 3: help_form recursive read.  */
-  if (!NILP (Vhelp_form) && help_char_p (c))
-    {
-      dynwind_begin ();
-
-      help_form_saved_window_configs
-        = Fcons (Fcurrent_window_configuration (Qnil),
-                 help_form_saved_window_configs);
-      record_unwind_protect_void (read_char_help_form_unwind);
-      call0 (Qhelp_form_show);
-
       cancel_echoing ();
       do
-        {
-          c = read_char (0, Qnil, Qnil, 0, NULL);
-          if (EVENT_HAS_PARAMETERS (c)
-              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_click))
-            XSETCAR (help_form_saved_window_configs, Qnil);
-        }
+        c = read_char (0, Qnil, Qnil, 0, NULL);
       while (BUFFERP (c));
-      /* Remove the help from the frame.  */
-      dynwind_end ();
-
-      redisplay ();
-      if (BASE_EQ (c, make_fixnum (040)))
-        {
-          cancel_echoing ();
-          do
-            c = read_char (0, Qnil, Qnil, 0, NULL);
-          while (BUFFERP (c));
-        }
-      /* Write back the final c value to the record.  */
-      rc_set (rec, RC_SLOT_C, c);
     }
-
-  return intern ("fall-through");
+  /* Write back the final c value to the record.  */
+  rc_set (rec, RC_SLOT_C, c);
+  return Qnil;
 }
 
-/* M8m — bulk splice of input-method dispatch + record-if-unread
-   (the two blocks after the `reread_for_input_method:' /
-   `from_macro:' labels).  See docs/keyboard.org §M8m.  */
-DEFUN ("--rc-input-method-dispatch",
-       Fc_rc_input_method_dispatch,
-       Sc_rc_input_method_dispatch, 0, 0, 0,
-       doc: /* Internal: input-method dispatch + record-if-unread.
+/* M8m — tiny C shim for the Scheme-owned input-method dispatch.
+   Scheme owns the Block 1 gate (FIXNUMP/printable-ASCII + range +
+   Vinput_method_function + prev-event-nil) and the trivial Block 2
+   record-if-unread tail; the body of Block 1 — the save/restore-
+   around-call1 transaction including the dynwind/specbind — stays
+   atomic in C.  */
 
-  Block 1: if state->c is a printable ASCII fixnum (' '..255
-    excluding 127) and Vinput_method_function is set and
-    state->prev_event is nil (i.e., we're at the first event of
-    a key sequence): wipe echo, save this_command_keys and echo
-    state, optionally specbind `input-method-use-echo-area' to t
-    when not reading a key sequence (KEYMAPP(map)), then
-    call1(Vinput_method_function, state->c) inside a dynwind.
-    On no events returned, restore previous echo message and
-    return `goto-retry'.  Otherwise install XCAR(tem) into
-    state->c and nconc XCDR(tem) onto Vunread_post_input_method_events.
-
-  Block 2: if !state->recorded (we consumed an event from an
-    unread-*-events list that bypassed the record code earlier):
-    record_char(state->c); state->recorded = true.
-
-  Returns `goto-retry' (input method consumed input without
-  producing events) or `fall-through'.  Mirrors src/keyboard.c
-  lines 4128-4212 pre-M8m.  */)
+DEFUN ("--rc-input-method-call-and-handle",
+       Fc_rc_input_method_call_and_handle,
+       Sc_rc_input_method_call_and_handle, 0, 0, 0,
+       doc: /* Internal: Block 1 of M8m.  Save echo + this_command_keys
+state, dynwind-begin, optionally specbind input-method-use-echo-area
+when not reading a key sequence, call1(Vinput_method_function, state->c),
+dynwind-end, restore.  On no events, restore the previous-echo-area-
+message and return `goto-retry'.  On events, install XCAR(tem) into
+state->c, nconc XCDR(tem) onto Vunread_post_input_method_events and
+return nil.  Caller has already verified the Block 1 gate.  */)
   (void)
 {
   if (rc_state_depth == 0)
-    return intern ("fall-through");
+    return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
   Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
-  /* Block 1: input-method dispatch.  */
-  if (FIXNUMP (c)
-      && !NILP (Vinput_method_function)
-      /* Don't run the input method within a key sequence,
-         after the first event of the key sequence.  */
-      && NILP (rc_get (rec, RC_SLOT_PREV_EVENT))
-      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256
-      && XFIXNUM (c) != 127)
+  Lisp_Object keys;
+  ptrdiff_t key_count;
+  ptrdiff_t command_key_start;
+
+  /* Save the echo status.  */
+  bool saved_immediate_echo = current_kboard->immediate_echo;
+  struct kboard *saved_ok_to_echo = ok_to_echo_at_next_pause;
+  Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
+  Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
+
+  dynwind_begin ();
+  /* Save the this_command_keys status.  */
+  key_count = this_command_key_count;
+  command_key_start = XFIXNUM (Fc_this_single_command_key_start ());
+
+  if (key_count > 0)
+    keys = Fcopy_sequence (this_command_keys);
+  else
+    keys = Qnil;
+
+  /* Clear out this_command_keys.  */
+  this_command_key_count = 0;
+  Fc_set_this_single_command_key_start (make_fixnum (0));
+
+  /* Now wipe the echo area.  */
+  if (!NILP (echo_area_buffer[0]))
+    safe_run_hooks (Qecho_area_clear_hook);
+  clear_message (1, 0);
+  echo_truncate (0);
+
+  /* If we are not reading a key sequence,
+     never use the echo area.  */
+  if (!KEYMAPP (rc_get (rec, RC_SLOT_MAP)))
+    specbind_guile (Qinput_method_use_echo_area, Qt);
+
+  /* Call the input method.  */
+  Lisp_Object tem = call1 (Vinput_method_function, c);
+
+  dynwind_end ();
+
+  /* Restore the saved echoing state
+     and this_command_keys state.  */
+  this_command_key_count = key_count;
+  Fc_set_this_single_command_key_start (make_fixnum (command_key_start));
+  if (key_count > 0)
+    this_command_keys = keys;
+
+  cancel_echoing ();
+  ok_to_echo_at_next_pause = saved_ok_to_echo;
+  kset_echo_string (current_kboard, saved_echo_string);
+  kset_echo_prompt (current_kboard, saved_echo_prompt);
+  if (saved_immediate_echo)
+    echo_now ();
+
+  /* The input method can return no events.  */
+  if (!CONSP (tem))
     {
-      Lisp_Object keys;
-      ptrdiff_t key_count;
-      ptrdiff_t command_key_start;
-
-      /* Save the echo status.  */
-      bool saved_immediate_echo = current_kboard->immediate_echo;
-      struct kboard *saved_ok_to_echo = ok_to_echo_at_next_pause;
-      Lisp_Object saved_echo_string = KVAR (current_kboard, echo_string);
-      Lisp_Object saved_echo_prompt = KVAR (current_kboard, echo_prompt);
-
-      dynwind_begin ();
-      /* Save the this_command_keys status.  */
-      key_count = this_command_key_count;
-      command_key_start = XFIXNUM (Fc_this_single_command_key_start ());
-
-      if (key_count > 0)
-        keys = Fcopy_sequence (this_command_keys);
-      else
-        keys = Qnil;
-
-      /* Clear out this_command_keys.  */
-      this_command_key_count = 0;
-      Fc_set_this_single_command_key_start (make_fixnum (0));
-
-      /* Now wipe the echo area.  */
-      if (!NILP (echo_area_buffer[0]))
-        safe_run_hooks (Qecho_area_clear_hook);
-      clear_message (1, 0);
-      echo_truncate (0);
-
-      /* If we are not reading a key sequence,
-         never use the echo area.  */
-      if (!KEYMAPP (rc_get (rec, RC_SLOT_MAP)))
-        specbind_guile (Qinput_method_use_echo_area, Qt);
-
-      /* Call the input method.  */
-      Lisp_Object tem = call1 (Vinput_method_function, c);
-
-      dynwind_end ();
-
-      /* Restore the saved echoing state
-         and this_command_keys state.  */
-      this_command_key_count = key_count;
-      Fc_set_this_single_command_key_start (make_fixnum (command_key_start));
-      if (key_count > 0)
-        this_command_keys = keys;
-
-      cancel_echoing ();
-      ok_to_echo_at_next_pause = saved_ok_to_echo;
-      kset_echo_string (current_kboard, saved_echo_string);
-      kset_echo_prompt (current_kboard, saved_echo_prompt);
-      if (saved_immediate_echo)
-        echo_now ();
-
-      /* The input method can return no events.  */
-      if (!CONSP (tem))
-        {
-          /* Bring back the previous message, if any.  */
-          Lisp_Object prev_msg = rc_get (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE);
-          if (!NILP (prev_msg))
-            message_with_string ("%s", prev_msg, 0);
-          return intern ("goto-retry");
-        }
-      /* It returned one event or more.  */
-      c = XCAR (tem);
-      rc_set (rec, RC_SLOT_C, c);
-      Vunread_post_input_method_events
-        = nconc2 (XCDR (tem), Vunread_post_input_method_events);
+      /* Bring back the previous message, if any.  */
+      Lisp_Object prev_msg = rc_get (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE);
+      if (!NILP (prev_msg))
+        message_with_string ("%s", prev_msg, 0);
+      return intern ("goto-retry");
     }
-
-  /* Block 2: record if the event bypassed the M8l recording path.  */
-  if (NILP (rc_get (rec, RC_SLOT_RECORDED)))
-    {
-      record_char (c);
-      rc_set (rec, RC_SLOT_RECORDED, Qt);
-    }
-
-  return intern ("fall-through");
+  /* It returned one event or more.  */
+  c = XCAR (tem);
+  rc_set (rec, RC_SLOT_C, c);
+  Vunread_post_input_method_events
+    = nconc2 (XCDR (tem), Vunread_post_input_method_events);
+  return Qnil;
 }
 
-/* M8l — bulk splice of FIXNUMP/keyboard-translate-table +
-   menu-bar synthesis + record_char + echo-area wipe (the three
-   sequential blocks after M8k).  See docs/keyboard.org §M8l.  */
-DEFUN ("--rc-event-translate-and-record",
-       Fc_rc_event_translate_and_record,
-       Sc_rc_event_translate_and_record, 0, 0, 0,
-       doc: /* Internal: post-special-event translate + record + wipe.
+/* M8l — tiny C shims for the Scheme-owned translate + menu-bar +
+   record + echo-wipe block.  Scheme orchestrates the 3 blocks; C
+   owns the per-kboard keyboard-translate-table check, the
+   menu-bar event POSN_SET_POSN rewrite, the C record_char path,
+   and the echo-area / mini-window cleanup primitives.  */
 
-  Block 1: if FIXNUMP(state->c) — when XFIXNUM == -1 (EOF from
-    kbd_buffer_get_event), return `goto-exit'.  Otherwise apply
-    keyboard-translate-table when in range; replace state->c
-    with the translation if non-nil.
-
-  Block 2: menu-bar synthesis.  If state->c is a mouse-position
-    event with posn in {Qmenu_bar, Qtab_bar, Qtool_bar}, rewrite
-    the posn to (list posn), push the original onto
-    Vunread_command_events (wrapped in (Qt . c) when timed,
-    plain otherwise with also_record set), and replace
-    state->c with the bare posn symbol.
-
-  Block 3: record_char(state->c); state->recorded = true.  Also
-    record state->also_record if set.  If state->c is a printable
-    ASCII character and Vinput_method_function is set, save
-    previous-echo-area-message + Vinput_method_previous_message.
-    Wipe the echo area unless state->c is a help-echo /
-    switch-frame / select-window event; on wipe, run
-    Qecho_area_clear_hook + clear_message, possibly resize the
-    mini-window.
-
-  Returns `goto-exit' (only Block 1's EOF path) or `fall-through'.
-  Mirrors src/keyboard.c lines 3979-4086 pre-M8l.  */)
-  (void)
+DEFUN ("--rc-translate-kbd-table",
+       Fc_rc_translate_kbd_table,
+       Sc_rc_translate_kbd_table, 1, 1, 0,
+       doc: /* Internal: apply current_kboard's Vkeyboard_translate_table
+to fixnum C when in range (string / vector / char-table cases).
+Returns the translated value (a fixnum or other Lisp object), or C
+unchanged when no translation applies.  Used by Scheme
+rc-event-translate-and-record! Block 1.  */)
+  (Lisp_Object c)
 {
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  Lisp_Object c = rc_get (rec, RC_SLOT_C);
-
-  /* Block 1: FIXNUMP + keyboard-translate-table.  */
-  if (FIXNUMP (c))
+  if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
+       && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
+                                      Vkeyboard_translate_table)))
+      || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard,
+                                         Vkeyboard_translate_table))
+          && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
+                                        Vkeyboard_translate_table)))
+      || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
+          && CHARACTERP (c)))
     {
-      /* If kbd_buffer_get_event gave us an EOF, return that.  */
-      if (XFIXNUM (c) == -1)
-        return intern ("goto-exit");
-
-      if ((STRINGP (KVAR (current_kboard, Vkeyboard_translate_table))
-           && XFIXNAT (c) < SCHARS (KVAR (current_kboard,
-                                          Vkeyboard_translate_table)))
-          || (VECTOR_OR_PSEUDOVECTORP (KVAR (current_kboard,
-                                             Vkeyboard_translate_table))
-              && XFIXNAT (c) < ASIZE (KVAR (current_kboard,
-                                            Vkeyboard_translate_table)))
-          || (CHAR_TABLE_P (KVAR (current_kboard, Vkeyboard_translate_table))
-              && CHARACTERP (c)))
-        {
-          Lisp_Object d
-            = Faref (KVAR (current_kboard, Vkeyboard_translate_table), c);
-          /* nil in keyboard-translate-table means no translation.  */
-          if (!NILP (d))
-            {
-              c = d;
-              rc_set (rec, RC_SLOT_C, c);
-            }
-        }
+      Lisp_Object d
+        = Faref (KVAR (current_kboard, Vkeyboard_translate_table), c);
+      /* nil in keyboard-translate-table means no translation.  */
+      if (!NILP (d))
+        return d;
     }
-
-  /* Block 2: menu-bar synthesis.  */
-  if (EVENT_HAS_PARAMETERS (c)
-      && CONSP (XCDR (c))
-      && CONSP (xevent_start (c))
-      && CONSP (XCDR (xevent_start (c))))
-    {
-      Lisp_Object posn = POSN_POSN (xevent_start (c));
-      if (EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
-          || EQ (posn, Qtool_bar))
-        {
-          /* Change menu-bar to (menu-bar) as the event "position".  */
-          POSN_SET_POSN (xevent_start (c), list1 (posn));
-
-          if (end_time)
-            Vunread_command_events = Fcons (Fcons (Qt, c),
-                                            Vunread_command_events);
-          else
-            {
-              rc_set (rec, RC_SLOT_ALSO_RECORD, c);
-              Vunread_command_events = Fcons (c, Vunread_command_events);
-            }
-          c = posn;
-          rc_set (rec, RC_SLOT_C, c);
-        }
-    }
-
-  /* Block 3a: record_char + also_record.  */
-  record_char (c);
-  rc_set (rec, RC_SLOT_RECORDED, Qt);
-  Lisp_Object also_record = rc_get (rec, RC_SLOT_ALSO_RECORD);
-  if (!NILP (also_record))
-    record_char (also_record);
-
-  /* Block 3b: pre-input-method echo-area save.  */
-  if (FIXNUMP (c)
-      && !NILP (Vinput_method_function)
-      && ' ' <= XFIXNUM (c) && XFIXNUM (c) < 256
-      && XFIXNUM (c) != 127)
-    {
-      Lisp_Object cur = Fcurrent_message ();
-      rc_set (rec, RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE, cur);
-      Vinput_method_previous_message = cur;
-    }
-
-  /* Block 3c: echo-area wipe (unless help/switch/select-window).  */
-  if (!CONSP (c)
-      || (!EQ (Qhelp_echo, XCAR (c))
-          && !EQ (Qswitch_frame, XCAR (c))
-          && !EQ (Qselect_window, XCAR (c))))
-    {
-      if (!NILP (echo_area_buffer[0]))
-        {
-          safe_run_hooks (Qecho_area_clear_hook);
-          clear_message (1, 0);
-          /* If we were showing the echo-area message on top of an
-             active minibuffer, resize the mini-window.  */
-          if (minibuf_level
-              && EQ (minibuf_window, echo_area_window)
-              && !NUMBERP (Vminibuffer_message_timeout))
-            resize_mini_window (XWINDOW (minibuf_window), false);
-        }
-      else if (FUNCTIONP (Vclear_message_function))
-        clear_message (1, 0);
-    }
-
-  return intern ("fall-through");
+  return c;
 }
 
-/* M8k — bulk splice of BUFFERP early-exit + special-event-map
-   dispatch (the two blocks immediately after the M8j non_reread
-   loop).  See docs/keyboard.org §M8k.  */
-DEFUN ("--rc-bufferp-and-special-event-map",
-       Fc_rc_bufferp_and_special_event_map,
-       Sc_rc_bufferp_and_special_event_map, 0, 0, 0,
-       doc: /* Internal: BUFFERP early-exit + special-event-map dispatch.
-
-  Block 1: if BUFFERP(state->c), return `goto-exit' (buffer-switch
-    events are internal wakeups; caller returns state->c as-is).
-
-  Block 2: look up state->c in Vspecial_event_map (with Vquit_flag
-    saved/cleared around the lookup).  On hit, set last_input_event
-    and call4 Qcommand_execute with a 1-vector of state->c.
-    Post-call: maybe timer_resume_idle (for while-no-input ignore
-    events).  On HAVE_NS, latch input_was_pending for
-    Qns_unput_working_text.  If current_buffer changed, set
-    state->c = -2 and return `goto-exit'; otherwise return
-    `goto-retry' (re-enter the prologue).
-
-  Returns `goto-exit', `goto-retry', or `fall-through'.  Mirrors
-  src/keyboard.c lines 3888-3929 pre-M8k.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  Lisp_Object c = rc_get (rec, RC_SLOT_C);
-
-  /* Block 1: BUFFERP early-exit.  */
-  if (BUFFERP (c))
-    return intern ("goto-exit");
-
-  /* Block 2: special-event-map dispatch.  */
-  Lisp_Object save = Vquit_flag;
-  Vquit_flag = Qnil;
-  Lisp_Object tem = access_keymap (get_keymap (Vspecial_event_map, 0, 1),
-                                   c, 0, 0, 1);
-  Vquit_flag = save;
-
-  if (!NILP (tem))
-    {
-      struct buffer *prev_buffer = current_buffer;
-      last_input_event = c;
-
-      call4 (Qcommand_execute, tem, Qnil,
-             Fvector (1, &last_input_event), Qt);
-
-      if (CONSP (c)
-          && !NILP (Fmemq (XCAR (c), Vwhile_no_input_ignore_events))
-          && !end_time)
-        /* We stopped being idle for this event; undo that.  */
-        timer_resume_idle ();
-
-#ifdef HAVE_NS
-      if (CONSP (c)
-          && EQ (XCAR (c), Qns_unput_working_text))
-        input_was_pending = input_pending;
-#endif
-
-      if (current_buffer != prev_buffer)
-        {
-          /* The command may have changed the keymaps.  Pretend
-             there is input in another keyboard and return.  This
-             will recalculate keymaps.  */
-          rc_set (rec, RC_SLOT_C, make_fixnum (-2));
-          return intern ("goto-exit");
-        }
-      else
-        return intern ("goto-retry");
-    }
-
-  return intern ("fall-through");
-}
-
-/* M8j — bulk splice of the wrong_kboard: + non_reread: blocks.
-   Internally loops the blocking read + redisplay-on-nil sequence
-   so the original `goto wrong_kboard;' becomes a `continue'.
-   See docs/keyboard.org §M8j.  */
-DEFUN ("--rc-wrong-kboard-and-non-reread",
-       Fc_rc_wrong_kboard_and_non_reread,
-       Sc_rc_wrong_kboard_and_non_reread, 0, 0, 0,
-       doc: /* Internal: blocking read + non-reread fixup loop.
-
-  Block A (wrong_kboard:): when NILP(state->c), call
-    read_decoded_event_from_main_queue.  On NILP + end_time
-    expired, return `goto-exit'.  On result == -2 fixnum,
-    return `return-wrong-kboard'.  Otherwise peel Qt /
-    Qno_record wrappers, setting state->recorded as needed.
-
-  Block B (non_reread:): if state->end_time is NULL,
-    timer_stop_idle.  If state->c is still nil and
-    commandflag >= 0 with no input pending, redisplay and
-    loop back to Block A.
-
-  Returns `goto-exit', `return-wrong-kboard', or `fall-through'
-  (state->c is non-nil on fall-through).  Mirrors src/keyboard.c
-  lines 3792-3828 pre-M8j.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
-
-  while (true)
-    {
-      Lisp_Object c = rc_get (rec, RC_SLOT_C);
-
-      /* Block A — wrong_kboard label position.  */
-      if (NILP (c))
-        {
-          c = read_decoded_event_from_main_queue (end_time,
-                                                  rc_get (rec, RC_SLOT_LOCAL_TAG),
-                                                  rc_get (rec, RC_SLOT_PREV_EVENT),
-                                                  used_mouse_menu);
-          if (NILP (c) && end_time
-              && timespec_cmp (*end_time, current_timespec ()) <= 0)
-            {
-              rc_set (rec, RC_SLOT_C, c);
-              return intern ("goto-exit");
-            }
-
-          if (BASE_EQ (c, make_fixnum (-2)))
-            {
-              rc_set (rec, RC_SLOT_C, c);
-              return intern ("return-wrong-kboard");
-            }
-
-          if (CONSP (c) && EQ (XCAR (c), Qt))
-            c = XCDR (c);
-          else if (CONSP (c) && EQ (XCAR (c), Qno_record))
-            {
-              c = XCDR (c);
-              rc_set (rec, RC_SLOT_RECORDED, Qt);
-            }
-          rc_set (rec, RC_SLOT_C, c);
-        }
-
-      /* Block B — non_reread label position.  */
-      if (!end_time)
-        timer_stop_idle ();
-
-      if (NILP (c))
-        {
-          if (XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG)) >= 0
-              && !input_pending && !detect_input_pending_run_timers (0))
-            redisplay ();
-
-          continue;  /* original: goto wrong_kboard;  */
-        }
-
-      return intern ("fall-through");
-    }
-}
-
-/* M8i — bulk splice of the four post-M8h blocks: wrong-kboard
-   detection, Vunread_command_events drain, current-kboard side
-   queue read, and other-kboard scan.  See docs/keyboard.org §M8i.  */
-DEFUN ("--rc-prologue-kboard-and-queues",
-       Fc_rc_prologue_kboard_and_queues,
-       Sc_rc_prologue_kboard_and_queues, 0, 0, 0,
-       doc: /* Internal: four sequential prologue blocks after M8h.
-
-  Block 1: wrong-kboard detection.  When NILP(state->c) &&
-    current_kboard != state->orig_kboard, return
-    `return-wrong-kboard' so the caller returns -2.
-
-  Block 2: drain Vunread_command_events.  If CONSP, install
-    XCAR into state->c (peeling Qt / Qno_record wrappers, setting
-    state->recorded / state->reread accordingly).
-
-  Block 3: read from current KBOARD's side queue when NILP(state->c)
-    and kbd_queue_has_data.  Updates kbd_queue, input_pending, and
-    tracks Qswitch_frame into Vlast_event_frame.
-
-  Block 4: scan other kboards when NILP(state->c) && !single_kboard.
-    If any has kbd_queue_has_data, switch current_kboard to it
-    and return `return-wrong-kboard'.
-
-  Returns `return-wrong-kboard' or `fall-through'.  Mirrors
-  src/keyboard.c lines 3682-3750 pre-M8i.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  Lisp_Object c = rc_get (rec, RC_SLOT_C);
-  /* orig-kboard is stored in the record as a kboard SMOB; unwrap.  */
-  SCM orig_kb_scm = rc_get (rec, RC_SLOT_ORIG_KBOARD);
-  KBOARD *orig_kboard = NILP (orig_kb_scm) ? NULL : XKBOARD (orig_kb_scm);
-
-  /* Block 1: wrong-kboard detection.  */
-  if (NILP (c) && current_kboard != orig_kboard)
-    return intern ("return-wrong-kboard");
-
-  /* Block 2: drain Vunread_command_events.  */
-  if (CONSP (Vunread_command_events))
-    {
-      Lisp_Object c0 = XCAR (Vunread_command_events);
-      Vunread_command_events = XCDR (Vunread_command_events);
-
-      if (CONSP (c0) && EQ (XCAR (c0), Qt))
-        c0 = XCDR (c0);
-      else
-        {
-          if (CONSP (c0) && EQ (XCAR (c0), Qno_record))
-            {
-              c0 = XCDR (c0);
-              rc_set (rec, RC_SLOT_RECORDED, Qt);
-            }
-          rc_set (rec, RC_SLOT_REREAD, Qt);
-        }
-      c = c0;
-      rc_set (rec, RC_SLOT_C, c);
-    }
-
-  /* Block 3: read from current KBOARD's side queue, if possible.  */
-  if (NILP (c))
-    {
-      if (current_kboard->kbd_queue_has_data)
-        {
-          Lisp_Object c0;
-          if (!CONSP (KVAR (current_kboard, kbd_queue)))
-            emacs_abort ();
-          c0 = XCAR (KVAR (current_kboard, kbd_queue));
-          kset_kbd_queue (current_kboard,
-                          XCDR (KVAR (current_kboard, kbd_queue)));
-          if (NILP (KVAR (current_kboard, kbd_queue)))
-            current_kboard->kbd_queue_has_data = false;
-          input_pending = readable_events (0);
-          if (EVENT_HAS_PARAMETERS (c0)
-              && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c0)), Qswitch_frame))
-            internal_last_event_frame = XCAR (XCDR (c0));
-          Vlast_event_frame = internal_last_event_frame;
-          c = c0;
-          rc_set (rec, RC_SLOT_C, c);
-        }
-    }
-
-  /* Block 4: scan other kboards if current's side queue is empty.  */
-  if (NILP (c) && !single_kboard)
-    {
-      KBOARD *kb;
-      for (kb = all_kboards; kb; kb = kb->next_kboard)
-        if (kb->kbd_queue_has_data)
-          {
-            current_kboard = kb;
-            return intern ("return-wrong-kboard");
-          }
-    }
-
-  return intern ("fall-through");
-}
-
-/* M8h — bulk splice of the X-menu reading block + auto-save-by-
-   idle-timeout + GC blocks that follow M8g.  See
-   docs/keyboard.org §M8h.  */
-DEFUN ("--rc-prologue-xmenu-and-idle-gc",
-       Fc_rc_prologue_xmenu_and_idle_gc,
-       Sc_rc_prologue_xmenu_and_idle_gc, 0, 0, 0,
-       doc: /* Internal: two sequential prologue blocks after M8g.
-
-  Block 1: X-menu read.  When KEYMAPP(map) && INTERACTIVE &&
-    prev_event is non-nil with parameters && head not menu/tab/
-    tool-bar && no unread events: call read_char_x_menu_prompt to
-    install state->c, stop the idle timer if not in a timed read,
-    and return `goto-exit'.
-
-  Block 2: Maybe auto-save and/or GC due to idleness.  When
-    INTERACTIVE && state->c is nil: compute a buffer-size-scaled
-    delay_level, then if commandflag != 0/-2 and the auto-save
-    threshold is crossed with positive Vauto_save_timeout, sit_for
-    that many seconds and on timeout fire Fdo_auto_save + redisplay.
-    Then GC_collect_a_little if no input is pending.  Always falls
-    through.
-
-  Returns `goto-exit' (X-menu fired) or `fall-through'.  Mirrors
-  src/keyboard.c lines 3567-3635 pre-M8h.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return intern ("fall-through");
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
-  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
-  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
-
-  /* Block 1: X-menu read.  */
-  if (KEYMAPP (map) && INTERACTIVE
-      && !NILP (prev_event)
-      && EVENT_HAS_PARAMETERS (prev_event)
-      && !EQ (XCAR (prev_event), Qmenu_bar)
-      && !EQ (XCAR (prev_event), Qtab_bar)
-      && !EQ (XCAR (prev_event), Qtool_bar)
-      /* Don't bring up a menu if we already have another event.  */
-      && !CONSP (Vunread_command_events))
-    {
-      rc_set (rec, RC_SLOT_C,
-              read_char_x_menu_prompt (map, prev_event, used_mouse_menu));
-      /* Now that we have read an event, Emacs is not idle.  */
-      if (!end_time)
-        timer_stop_idle ();
-      return intern ("goto-exit");
-    }
-
-  /* Block 2: maybe autosave and/or GC due to idleness.  */
-  if (INTERACTIVE && NILP (rc_get (rec, RC_SLOT_C)))
-    {
-      int delay_level;
-      ptrdiff_t buffer_size;
-      int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
-
-      /* Slow down auto saves logarithmically in size of current buffer,
-         and garbage collect while we're at it.  */
-      if (! MINI_WINDOW_P (XWINDOW (selected_window)))
-        last_non_minibuf_size = Z - BEG;
-      buffer_size = (last_non_minibuf_size >> 8) + 1;
-      delay_level = 0;
-      while (buffer_size > 64)
-        delay_level++, buffer_size -= buffer_size >> 2;
-      if (delay_level < 4) delay_level = 4;
-      /* delay_level is 4 for files under around 50k, 7 at 100k,
-         9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
-
-      /* Auto save if enough time goes by without input.  */
-      if (commandflag != 0 && commandflag != -2
-          && num_nonmacro_input_events > last_auto_save
-          && FIXNUMP (Vauto_save_timeout)
-          && XFIXNUM (Vauto_save_timeout) > 0)
-        {
-          Lisp_Object tem0;
-          Lisp_Object save_tag = Qnil;
-          EMACS_INT timeout = XFIXNAT (Vauto_save_timeout);
-
-          timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
-          timeout = delay_level * timeout / 4;
-          save_tag = getctag;
-          tem0 = sit_for (make_fixnum (timeout), 1, 1);
-
-          if (EQ (tem0, Qt)
-              && ! CONSP (Vunread_command_events))
-            {
-              Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
-              /* Hooks may modify buffers during auto-save.  */
-              redisplay ();
-            }
-        }
-
-      /* If there is still no input available, ask for GC.  */
-      if (!detect_input_pending_run_timers (0))
-        GC_collect_a_little ();
-    }
-
-  return intern ("fall-through");
-}
-
-/* M8g — bulk splice of three sequential pre-blocking-read blocks
-   (idle-timer start, immediate-echo, auto-save).  See
-   docs/keyboard.org §M8g.  */
-DEFUN ("--rc-prologue-idle-echo-autosave",
-       Fc_rc_prologue_idle_echo_autosave,
-       Sc_rc_prologue_idle_echo_autosave, 0, 0, 0,
-       doc: /* Internal: three pure-side-effect blocks before the
-blocking input wait:
-
-  1. timer_start_idle when state->end_time is NULL.
-  2. Maybe start echoing keystrokes (gated on minibuf_level == 0,
-     not in a timed read, no immediate-echo already, etc.).  For
-     mouse-event prev_event: echo immediately.  Otherwise sit_for
-     `echo-keystrokes' seconds then echo if no input arrived.
-  3. Maybe auto-save when commandflag != 0 / -2 and the keystroke
-     counter has crossed the auto-save interval.
-
-Always returns nil; caller falls through.  Mirrors src/keyboard.c
-lines 3483-3538 pre-M8g.  */)
+DEFUN ("--rc-maybe-synthesize-menu-bar-event",
+       Fc_rc_maybe_synthesize_menu_bar_event,
+       Sc_rc_maybe_synthesize_menu_bar_event, 0, 0, 0,
+       doc: /* Internal: Block 2 of M8l.  Looks at the top-of-stack
+rec's c slot; if it's a mouse-position event whose posn is
+menu-bar / tab-bar / tool-bar, rewrites the event's posn to (list
+posn), pushes the original onto Vunread_command_events (with the
+(Qt . c) wrap when end_time is set, plain otherwise with
+also_record), installs the bare posn symbol into rec.c, and
+returns the bare posn (or nil when no synthesis happened).  */)
   (void)
 {
   if (rc_state_depth == 0)
     return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
   struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
+  Lisp_Object c = rc_get (rec, RC_SLOT_C);
 
-  /* Block 1: idle-timer start.  */
-  if (!end_time)
-    timer_start_idle ();
+  if (!(EVENT_HAS_PARAMETERS (c)
+        && CONSP (XCDR (c))
+        && CONSP (xevent_start (c))
+        && CONSP (XCDR (xevent_start (c)))))
+    return Qnil;
 
-  /* Block 2: immediate echo.  */
-  if (minibuf_level == 0
-      && !end_time
-      && !current_kboard->immediate_echo
-      && (this_command_key_count > 0
-          || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
-      && !noninteractive
-      && echo_keystrokes_p ()
-      && (NILP (echo_area_buffer[0])
-          || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
-              == BUF_Z (XBUFFER (echo_area_buffer[0])))
-          || (echo_kboard && ok_to_echo_at_next_pause == echo_kboard)
-          || (!echo_kboard && ok_to_echo_at_next_pause)))
+  Lisp_Object posn = POSN_POSN (xevent_start (c));
+  if (!(EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
+        || EQ (posn, Qtool_bar)))
+    return Qnil;
+
+  /* Change menu-bar to (menu-bar) as the event "position".  */
+  POSN_SET_POSN (xevent_start (c), list1 (posn));
+
+  if (end_time)
+    Vunread_command_events = Fcons (Fcons (Qt, c),
+                                    Vunread_command_events);
+  else
     {
-      /* After a mouse event, start echoing right away.  */
-      if (EVENT_HAS_PARAMETERS (rc_get (rec, RC_SLOT_PREV_EVENT)))
-        echo_now ();
-      else
+      rc_set (rec, RC_SLOT_ALSO_RECORD, c);
+      Vunread_command_events = Fcons (c, Vunread_command_events);
+    }
+  rc_set (rec, RC_SLOT_C, posn);
+  return posn;
+}
+
+DEFUN ("--rc-record-char",
+       Fc_rc_record_char,
+       Sc_rc_record_char, 1, 1, 0,
+       doc: /* Internal: call C record_char(C).  Used by Scheme
+rc-event-translate-and-record! and rc-input-method-dispatch!.  */)
+  (Lisp_Object c)
+{
+  record_char (c);
+  return Qnil;
+}
+
+DEFUN ("--rc-echo-area-wipe",
+       Fc_rc_echo_area_wipe,
+       Sc_rc_echo_area_wipe, 0, 0, 0,
+       doc: /* Internal: Block 3c of M8l.  When the echo area has
+content, run Qecho_area_clear_hook + clear_message(1,0) and resize
+the mini-window if it was overlapping; otherwise call
+clear_message(1,0) when Vclear_message_function is a function.
+Used by Scheme rc-event-translate-and-record!.  */)
+  (void)
+{
+  if (!NILP (echo_area_buffer[0]))
+    {
+      safe_run_hooks (Qecho_area_clear_hook);
+      clear_message (1, 0);
+      /* If we were showing the echo-area message on top of an
+         active minibuffer, resize the mini-window.  */
+      if (minibuf_level
+          && EQ (minibuf_window, echo_area_window)
+          && !NUMBERP (Vminibuffer_message_timeout))
+        resize_mini_window (XWINDOW (minibuf_window), false);
+    }
+  else if (FUNCTIONP (Vclear_message_function))
+    clear_message (1, 0);
+  return Qnil;
+}
+
+/* M8k — tiny C shims for the Scheme-owned BUFFERP + special-event-map
+   dispatch.  Scheme owns the control flow and the last-input-event /
+   command-execute call; C still owns the exact access_keymap +
+   get_keymap composition (and its quit-flag save/restore wrapper)
+   plus timer_resume_idle.  */
+
+DEFUN ("--rc-special-event-map-lookup",
+       Fc_rc_special_event_map_lookup,
+       Sc_rc_special_event_map_lookup, 1, 1, 0,
+       doc: /* Internal: look up C in Vspecial_event_map with
+Vquit_flag saved-cleared-restored around the lookup.  Returns the
+binding (or nil if none).  Used by Scheme rc-bufferp-and-special-event-map!
+Block 2.  */)
+  (Lisp_Object c)
+{
+  Lisp_Object save = Vquit_flag;
+  Vquit_flag = Qnil;
+  Lisp_Object tem = access_keymap (get_keymap (Vspecial_event_map, 0, 1),
+                                   c, 0, 0, 1);
+  Vquit_flag = save;
+  return tem;
+}
+
+DEFUN ("--rc-timer-resume-idle",
+       Fc_rc_timer_resume_idle,
+       Sc_rc_timer_resume_idle, 0, 0, 0,
+       doc: /* Internal: call C timer_resume_idle().  Used by Scheme
+rc-bufferp-and-special-event-map! to undo the idle-timer stop for
+while-no-input-ignore events.  */)
+  (void)
+{
+  timer_resume_idle ();
+  return Qnil;
+}
+
+/* M8j — tiny C shims for the Scheme-owned blocking-read + non-reread
+   loop.  Scheme owns the iteration and the timer-stop / c-is-nil
+   gates; C still owns the blocking read_decoded_event_from_main_queue
+   plus the redisplay primitive guarded by input_pending.  */
+
+DEFUN ("--rc-read-and-install-event",
+       Fc_rc_read_and_install_event,
+       Sc_rc_read_and_install_event, 0, 0, 0,
+       doc: /* Internal: Block A of M8j.  Calls
+read_decoded_event_from_main_queue using the top-of-stack rec's
+end-time / local-tag / prev-event / used-mouse-menu, then peels
+Qt / Qno_record wrappers and writes the result back to rec.c.
+Returns one of `goto-exit' (timeout reached), `return-wrong-kboard'
+(reader requested -2), or `continue' (event installed or read
+returned nil but no timeout; caller proceeds to Block B).  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return intern ("continue");
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
+  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
+
+  Lisp_Object c
+    = read_decoded_event_from_main_queue (end_time,
+                                          rc_get (rec, RC_SLOT_LOCAL_TAG),
+                                          rc_get (rec, RC_SLOT_PREV_EVENT),
+                                          used_mouse_menu);
+  if (NILP (c) && end_time
+      && timespec_cmp (*end_time, current_timespec ()) <= 0)
+    {
+      rc_set (rec, RC_SLOT_C, c);
+      return intern ("goto-exit");
+    }
+
+  if (BASE_EQ (c, make_fixnum (-2)))
+    {
+      rc_set (rec, RC_SLOT_C, c);
+      return intern ("return-wrong-kboard");
+    }
+
+  if (CONSP (c) && EQ (XCAR (c), Qt))
+    c = XCDR (c);
+  else if (CONSP (c) && EQ (XCAR (c), Qno_record))
+    {
+      c = XCDR (c);
+      rc_set (rec, RC_SLOT_RECORDED, Qt);
+    }
+  rc_set (rec, RC_SLOT_C, c);
+  return intern ("continue");
+}
+
+DEFUN ("--rc-maybe-redisplay-when-no-input",
+       Fc_rc_maybe_redisplay_when_no_input,
+       Sc_rc_maybe_redisplay_when_no_input, 1, 1, 0,
+       doc: /* Internal: redisplay() when COMMANDFLAG >= 0 and no
+input is pending (neither the input_pending C global nor
+detect_input_pending_run_timers (0)).  Used by Scheme
+rc-wrong-kboard-and-non-reread! as the Block B redisplay action.  */)
+  (Lisp_Object commandflag)
+{
+  if (XFIXNUM (commandflag) >= 0
+      && !input_pending && !detect_input_pending_run_timers (0))
+    redisplay ();
+  return Qnil;
+}
+
+/* M8i — bulk splice of the four post-M8h blocks: wrong-kboard
+   detection, Vunread_command_events drain, current-kboard side
+   queue read, and other-kboard scan.  See docs/keyboard.org §M8i.  */
+/* M8i — tiny C shims for the Scheme-owned 4-block kboard / queue
+   prologue.  Scheme handles Block 1 (wrong-kboard detection via
+   the existing kboard-eq / current-kboard primitives) and Block 2
+   (Lisp-level Vunread_command_events drain).  C still owns the
+   KBOARD struct internals for Block 3 (current kboard's side
+   queue) and Block 4 (scan all_kboards).  */
+
+DEFUN ("--rc-pop-current-kboard-queue",
+       Fc_rc_pop_current_kboard_queue,
+       Sc_rc_pop_current_kboard_queue, 0, 0, 0,
+       doc: /* Internal: Block 3 of M8i.  When the current KBOARD has
+queued input, dequeue the head event and return it (also updates
+input_pending, internal_last_event_frame for switch-frame events,
+and clears kbd_queue_has_data when the queue empties).  Returns
+nil if no data was available.  Used by Scheme
+rc-prologue-kboard-and-queues!.  */)
+  (void)
+{
+  if (!current_kboard->kbd_queue_has_data)
+    return Qnil;
+  if (!CONSP (KVAR (current_kboard, kbd_queue)))
+    emacs_abort ();
+  Lisp_Object c0 = XCAR (KVAR (current_kboard, kbd_queue));
+  kset_kbd_queue (current_kboard,
+                  XCDR (KVAR (current_kboard, kbd_queue)));
+  if (NILP (KVAR (current_kboard, kbd_queue)))
+    current_kboard->kbd_queue_has_data = false;
+  input_pending = readable_events (0);
+  if (EVENT_HAS_PARAMETERS (c0)
+      && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c0)), Qswitch_frame))
+    internal_last_event_frame = XCAR (XCDR (c0));
+  Vlast_event_frame = internal_last_event_frame;
+  return c0;
+}
+
+DEFUN ("--rc-find-other-kboard-with-data",
+       Fc_rc_find_other_kboard_with_data,
+       Sc_rc_find_other_kboard_with_data, 0, 0, 0,
+       doc: /* Internal: Block 4 of M8i.  When not in single_kboard
+mode, scan all_kboards for one with queued data; if found, switch
+current_kboard to it and return t.  Returns nil otherwise.  Used by
+Scheme rc-prologue-kboard-and-queues! to detect when a wrong-kboard
+exit is needed.  */)
+  (void)
+{
+  if (single_kboard)
+    return Qnil;
+  for (KBOARD *kb = all_kboards; kb; kb = kb->next_kboard)
+    if (kb->kbd_queue_has_data)
+      {
+        current_kboard = kb;
+        return Qt;
+      }
+  return Qnil;
+}
+
+/* M8h — tiny C shims for the Scheme-owned X-menu / auto-save-by-
+   timeout / GC-on-idle prologue.  Scheme owns the per-block gate
+   logic and dispatch; C still owns the read_char_x_menu_prompt
+   helper, the idle-timer machinery, and the buffer-size-scaled
+   auto-save / GC block which is dense C-internal arithmetic.  */
+
+DEFUN ("--rc-read-char-x-menu-prompt",
+       Fc_rc_read_char_x_menu_prompt,
+       Sc_rc_read_char_x_menu_prompt, 0, 0, 0,
+       doc: /* Internal: call C read_char_x_menu_prompt with the
+top-of-stack rec's map / prev-event / used-mouse-menu slots.
+Returns the resulting event.  Used by Scheme rc-prologue-xmenu-and-idle-gc!
+Block 1.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
+  Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
+  Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
+  return read_char_x_menu_prompt (map, prev_event, used_mouse_menu);
+}
+
+DEFUN ("--rc-timer-stop-idle",
+       Fc_rc_timer_stop_idle,
+       Sc_rc_timer_stop_idle, 0, 0, 0,
+       doc: /* Internal: call C timer_stop_idle().  Used by Scheme
+rc-prologue-xmenu-and-idle-gc! and rc-wrong-kboard-and-non-reread.  */)
+  (void)
+{
+  timer_stop_idle ();
+  return Qnil;
+}
+
+DEFUN ("--rc-auto-save-by-timeout-and-gc",
+       Fc_rc_auto_save_by_timeout_and_gc,
+       Sc_rc_auto_save_by_timeout_and_gc, 1, 1, 0,
+       doc: /* Internal: Block 2 of M8h.  COMMANDFLAG is the rec's
+commandflag slot (a fixnum).  Computes the buffer-size-scaled
+delay_level, optionally sit_for + Fdo_auto_save + redisplay if the
+auto-save timeout is reached, then GC_collect_a_little when no
+input is pending.  Used by Scheme rc-prologue-xmenu-and-idle-gc!
+after the c-is-nil + INTERACTIVE gate.  */)
+  (Lisp_Object commandflag)
+{
+  int cf = XFIXNUM (commandflag);
+  int delay_level;
+  ptrdiff_t buffer_size;
+
+  /* Slow down auto saves logarithmically in size of current buffer,
+     and garbage collect while we're at it.  */
+  if (! MINI_WINDOW_P (XWINDOW (selected_window)))
+    last_non_minibuf_size = Z - BEG;
+  buffer_size = (last_non_minibuf_size >> 8) + 1;
+  delay_level = 0;
+  while (buffer_size > 64)
+    delay_level++, buffer_size -= buffer_size >> 2;
+  if (delay_level < 4) delay_level = 4;
+  /* delay_level is 4 for files under around 50k, 7 at 100k,
+     9 at 200k, 11 at 300k, and 12 at 500k.  It is 15 at 1 meg.  */
+
+  /* Auto save if enough time goes by without input.  */
+  if (cf != 0 && cf != -2
+      && num_nonmacro_input_events > last_auto_save
+      && FIXNUMP (Vauto_save_timeout)
+      && XFIXNUM (Vauto_save_timeout) > 0)
+    {
+      Lisp_Object tem0;
+      Lisp_Object save_tag = Qnil;
+      EMACS_INT timeout = XFIXNAT (Vauto_save_timeout);
+
+      timeout = min (timeout, MOST_POSITIVE_FIXNUM / delay_level * 4);
+      timeout = delay_level * timeout / 4;
+      save_tag = getctag;
+      tem0 = sit_for (make_fixnum (timeout), 1, 1);
+
+      if (EQ (tem0, Qt)
+          && ! CONSP (Vunread_command_events))
         {
-          Lisp_Object save_tag = getctag;
-          Lisp_Object tem0 = sit_for (Vecho_keystrokes, 1, 1);
-          if (EQ (tem0, Qt) && !CONSP (Vunread_command_events))
-            echo_now ();
-          getctag = save_tag;
+          Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
+          /* Hooks may modify buffers during auto-save.  */
+          redisplay ();
         }
     }
 
-  /* Block 3: auto-save by keystroke count.  */
-  if (commandflag != 0 && commandflag != -2
-      && auto_save_interval > 0
+  /* If there is still no input available, ask for GC.  */
+  if (!detect_input_pending_run_timers (0))
+    GC_collect_a_little ();
+  return Qnil;
+}
+
+/* M8g — tiny C shims for the Scheme-owned idle/echo/auto-save
+   prologue.  Scheme orchestrates the 3 sequential blocks; C owns
+   the timer / echo / auto-save primitives.  */
+
+DEFUN ("--rc-timer-start-idle",
+       Fc_rc_timer_start_idle,
+       Sc_rc_timer_start_idle, 0, 0, 0,
+       doc: /* Internal: call C timer_start_idle().  Used by Scheme
+rc-prologue-idle-echo-autosave! for Block 1.  */)
+  (void)
+{
+  timer_start_idle ();
+  return Qnil;
+}
+
+DEFUN ("--rc-should-immediate-echo-p",
+       Fc_rc_should_immediate_echo_p,
+       Sc_rc_should_immediate_echo_p, 0, 0, 0,
+       doc: /* Internal: combined gate for Block 2 of M8g.  Returns t
+when all of minibuf_level == 0, end_time NULL, immediate_echo off,
+key-count or echo-prefix non-empty, !noninteractive, echo_keystrokes_p,
+and the echo area is in a usable state.  Used by Scheme
+rc-prologue-idle-echo-autosave!.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
+
+  bool ok = (minibuf_level == 0
+             && !end_time
+             && !current_kboard->immediate_echo
+             && (this_command_key_count > 0
+                 || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
+             && !noninteractive
+             && echo_keystrokes_p ()
+             && (NILP (echo_area_buffer[0])
+                 || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
+                     == BUF_Z (XBUFFER (echo_area_buffer[0])))
+                 || (echo_kboard && ok_to_echo_at_next_pause == echo_kboard)
+                 || (!echo_kboard && ok_to_echo_at_next_pause)));
+  return ok ? Qt : Qnil;
+}
+
+DEFUN ("--rc-sit-for-and-maybe-echo",
+       Fc_rc_sit_for_and_maybe_echo,
+       Sc_rc_sit_for_and_maybe_echo, 0, 0, 0,
+       doc: /* Internal: save getctag, sit_for `echo-keystrokes' seconds
+with display+input flags, restore getctag.  If sit_for returned t
+and Vunread_command_events is empty, also echo_now.  Used by Scheme
+rc-prologue-idle-echo-autosave! for Block 2's non-mouse path.  */)
+  (void)
+{
+  Lisp_Object save_tag = getctag;
+  Lisp_Object tem0 = sit_for (Vecho_keystrokes, 1, 1);
+  if (EQ (tem0, Qt) && !CONSP (Vunread_command_events))
+    echo_now ();
+  getctag = save_tag;
+  return Qnil;
+}
+
+DEFUN ("--rc-maybe-auto-save-by-keystroke",
+       Fc_rc_maybe_auto_save_by_keystroke,
+       Sc_rc_maybe_auto_save_by_keystroke, 0, 0, 0,
+       doc: /* Internal: gate (auto_save_interval > 0, keystroke-
+counter crossed the interval, no pending input) and on success call
+Fdo_auto_save + redisplay.  Scheme caller has already checked
+commandflag != 0 / -2.  Used by rc-prologue-idle-echo-autosave!
+Block 3.  */)
+  (void)
+{
+  if (auto_save_interval > 0
       && (num_nonmacro_input_events - last_auto_save
           > max (auto_save_interval, 20))
       && !detect_input_pending_run_timers (0))
@@ -3617,7 +3474,6 @@ lines 3483-3538 pre-M8g.  */)
       /* Hooks may modify buffers during auto-save.  */
       redisplay ();
     }
-
   return Qnil;
 }
 
@@ -3667,26 +3523,47 @@ Used by Scheme rc-prologue-echo-and-menu!.  */)
    that follows M8d.  Always returns nil (no control transfer);
    caller falls through to the next inline block.  See
    docs/keyboard.org §M8e.  */
-DEFUN ("--rc-prologue-redisplay",
-       Fc_rc_prologue_redisplay, Sc_rc_prologue_redisplay, 0, 0, 0,
-       doc: /* Internal: redisplay loop in the read_char_1 prologue.
-When state->commandflag >= 0: swallow non-user-visible events,
-redisplay up to convergence (input_pending && input_was_pending),
-and pin echo_message_buffer to the current echo-area when called
-from `read-event' (commandflag == 0).  Mirrors src/keyboard.c
-lines 3316-3351 pre-M8e.  */)
+/* M8e — tiny C shims for the Scheme-owned redisplay-loop prologue.
+   Scheme owns the commandflag guard and the echo-buffer bookkeeping;
+   C still owns the input_pending / input_was_pending / echo_message_buffer
+   globals and the redisplay machinery, so the inner wait-loop stays
+   as a single primitive.  */
+
+DEFUN ("--rc-echo-message-buffer-is-current",
+       Fc_rc_echo_message_buffer_is_current,
+       Sc_rc_echo_message_buffer_is_current, 0, 0, 0,
+       doc: /* Internal: t if echo_message_buffer EQ echo_area_buffer[0].
+Used by Scheme rc-prologue-redisplay! to snapshot the echo state
+before the redisplay loop.  */)
   (void)
 {
-  if (rc_state_depth == 0)
-    return Qnil;
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  int commandflag = XFIXNUM (rc_get (rec, RC_SLOT_COMMANDFLAG));
+  return EQ (echo_message_buffer, echo_area_buffer[0]) ? Qt : Qnil;
+}
 
-  if (commandflag < 0)
-    return Qnil;
+DEFUN ("--rc-pin-echo-message-buffer-to-current",
+       Fc_rc_pin_echo_message_buffer_to_current,
+       Sc_rc_pin_echo_message_buffer_to_current, 0, 0, 0,
+       doc: /* Internal: set echo_message_buffer = echo_area_buffer[0].
+Used by Scheme rc-prologue-redisplay! after the redisplay loop, to
+prevent the just-done redisplay from messing up echoing of the
+input after the prompt.  */)
+  (void)
+{
+  echo_message_buffer = echo_area_buffer[0];
+  return Qnil;
+}
 
-  bool echo_current = EQ (echo_message_buffer, echo_area_buffer[0]);
-
+DEFUN ("--rc-redisplay-and-wait-block",
+       Fc_rc_redisplay_and_wait_block,
+       Sc_rc_redisplay_and_wait_block, 0, 0, 0,
+       doc: /* Internal: the swallow_events + redisplay convergence loop
+in the middle of the read_char_1 prologue.  Wraps the tight C loop
+that touches input_pending / input_was_pending / help_echo_showing_p
+/ selected_window / minibuf_window and calls swallow_events,
+redisplay, redisplay_preserve_echo_area.  Used by Scheme
+rc-prologue-redisplay!.  */)
+  (void)
+{
   /* If there is pending input, process any events which are not
      user-visible, such as X selection_request events.  */
   if (input_pending || detect_input_pending_run_timers (0))
@@ -3710,11 +3587,6 @@ lines 3316-3351 pre-M8e.  */)
       swallow_events (false);
       /* If that cleared input_pending, try again to redisplay.  */
     }
-
-  /* Prevent the redisplay we just did from messing up echoing of the
-     input after the prompt.  */
-  if (commandflag == 0 && echo_current)
-    echo_message_buffer = echo_area_buffer[0];
 
   return Qnil;
 }
