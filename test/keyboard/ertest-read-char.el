@@ -158,12 +158,42 @@
 ;;;; M8e — redisplay loop
 
 (ert-deftest m8e-helpers/exist ()
-  (should (fboundp '--rc-prologue-redisplay)))
+  (should (fboundp '--rc-prologue-redisplay))
+  (should (fboundp '--rc-redisplay-and-wait-block))
+  (should (fboundp '--rc-input-pending))
+  (should (fboundp '--rc-input-was-pending))
+  (should (fboundp '--rc-swallow-events))
+  (should (fboundp '--rc-help-echo-redisplay-preserve-p))
+  (should (fboundp '--rc-redisplay-preserve-echo-area))
+  (should (fboundp '--rc-redisplay)))
 
 (ert-deftest m8e-redisplay/no-op-when-stack-empty ()
   ;; Outside any in-flight read_char, the subr early-returns nil
   ;; without touching the redisplay machinery.
   (should (eq nil (--rc-prologue-redisplay!))))
+
+(ert-deftest m8e-redisplay/raw-input-flags-are-booleans ()
+  (should (memq (--rc-input-pending) '(nil t)))
+  (should (memq (--rc-input-was-pending) '(nil t))))
+
+(ert-deftest m8e-redisplay/direct-wait-block-returns-nil ()
+  (should (eq nil (--rc-redisplay-and-wait-block))))
+
+(ert-deftest m8e-redisplay/skips-negative-commandflag ()
+  (m8-with-rc-state
+   '((commandflag . -1)
+     (c . ?r))
+   (lambda ()
+     (should (eq nil (--rc-prologue-redisplay!)))
+     (should (eq ?r (m8-test-state-ref 'c))))))
+
+(ert-deftest m8e-redisplay/live-commandflag-zero-falls-through ()
+  (m8-with-rc-state
+   '((commandflag . 0)
+     (c . ?r))
+   (lambda ()
+     (should (eq nil (--rc-prologue-redisplay!)))
+     (should (eq ?r (m8-test-state-ref 'c))))))
 
 ;;;; M8f — echo + minibuf-menu
 

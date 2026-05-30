@@ -3519,15 +3519,10 @@ Used by Scheme rc-prologue-echo-and-menu!.  */)
   return detect_input_pending_run_timers (0) ? Qt : Qnil;
 }
 
-/* M8e — bulk splice of the `if (commandflag >= 0)' redisplay block
-   that follows M8d.  Always returns nil (no control transfer);
-   caller falls through to the next inline block.  See
-   docs/keyboard.org §M8e.  */
 /* M8e — tiny C shims for the Scheme-owned redisplay-loop prologue.
    Scheme owns the commandflag guard and the echo-buffer bookkeeping;
    C still owns the input_pending / input_was_pending / echo_message_buffer
-   globals and the redisplay machinery, so the inner wait-loop stays
-   as a single primitive.  */
+   globals plus the redisplay machinery.  */
 
 DEFUN ("--rc-echo-message-buffer-is-current",
        Fc_rc_echo_message_buffer_is_current,
@@ -3553,41 +3548,63 @@ input after the prompt.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-redisplay-and-wait-block",
-       Fc_rc_redisplay_and_wait_block,
-       Sc_rc_redisplay_and_wait_block, 0, 0, 0,
-       doc: /* Internal: the swallow_events + redisplay convergence loop
-in the middle of the read_char_1 prologue.  Wraps the tight C loop
-that touches input_pending / input_was_pending / help_echo_showing_p
-/ selected_window / minibuf_window and calls swallow_events,
-redisplay, redisplay_preserve_echo_area.  Used by Scheme
-rc-prologue-redisplay!.  */)
+DEFUN ("--rc-input-pending",
+       Fc_rc_input_pending, Sc_rc_input_pending, 0, 0, 0,
+       doc: /* Internal: t if input_pending is set.
+Used by Scheme rc-redisplay-and-wait-block!.  */)
   (void)
 {
-  /* If there is pending input, process any events which are not
-     user-visible, such as X selection_request events.  */
-  if (input_pending || detect_input_pending_run_timers (0))
-    swallow_events (false);                       /* May clear input_pending.  */
+  return input_pending ? Qt : Qnil;
+}
 
-  /* Redisplay if no pending input.  */
-  while (!(input_pending && input_was_pending))
-    {
-      input_was_pending = input_pending;
-      if (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
-        redisplay_preserve_echo_area (5);
-      else
-        redisplay ();
+DEFUN ("--rc-input-was-pending",
+       Fc_rc_input_was_pending, Sc_rc_input_was_pending, 0, 0, 0,
+       doc: /* Internal: t if input_was_pending is set.
+Used by Scheme rc-redisplay-and-wait-block!.  */)
+  (void)
+{
+  return input_was_pending ? Qt : Qnil;
+}
 
-      if (!input_pending)
-        /* Normal case: no input arrived during redisplay.  */
-        break;
+DEFUN ("--rc-swallow-events",
+       Fc_rc_swallow_events, Sc_rc_swallow_events, 0, 0, 0,
+       doc: /* Internal: call swallow_events (false).
+Used by Scheme rc-redisplay-and-wait-block!.  */)
+  (void)
+{
+  swallow_events (false);
+  return Qnil;
+}
 
-      /* Input arrived and pre-empted redisplay.
-         Process any events which are not user-visible.  */
-      swallow_events (false);
-      /* If that cleared input_pending, try again to redisplay.  */
-    }
+DEFUN ("--rc-help-echo-redisplay-preserve-p",
+       Fc_rc_help_echo_redisplay_preserve_p,
+       Sc_rc_help_echo_redisplay_preserve_p, 0, 0, 0,
+       doc: /* Internal: t when help echo should preserve the echo area
+during the read_char redisplay loop.  */)
+  (void)
+{
+  return (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
+    ? Qt : Qnil;
+}
 
+DEFUN ("--rc-redisplay-preserve-echo-area",
+       Fc_rc_redisplay_preserve_echo_area,
+       Sc_rc_redisplay_preserve_echo_area, 0, 0, 0,
+       doc: /* Internal: call redisplay_preserve_echo_area (5).
+Used by Scheme rc-redisplay-and-wait-block!.  */)
+  (void)
+{
+  redisplay_preserve_echo_area (5);
+  return Qnil;
+}
+
+DEFUN ("--rc-redisplay",
+       Fc_rc_redisplay, Sc_rc_redisplay, 0, 0, 0,
+       doc: /* Internal: call redisplay ().
+Used by Scheme rc-redisplay-and-wait-block!.  */)
+  (void)
+{
+  redisplay ();
   return Qnil;
 }
 

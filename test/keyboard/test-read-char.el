@@ -164,8 +164,46 @@
 
 (test-assert "helpers/rc-prologue-redisplay"
              (fboundp '--rc-prologue-redisplay))
+(test-assert "helpers/rc-redisplay-and-wait-block"
+             (fboundp '--rc-redisplay-and-wait-block))
+(test-assert "helpers/rc-input-pending"
+             (fboundp '--rc-input-pending))
+(test-assert "helpers/rc-input-was-pending"
+             (fboundp '--rc-input-was-pending))
+(test-assert "helpers/rc-swallow-events"
+             (fboundp '--rc-swallow-events))
+(test-assert "helpers/rc-help-echo-redisplay-preserve-p"
+             (fboundp '--rc-help-echo-redisplay-preserve-p))
+(test-assert "helpers/rc-redisplay-preserve-echo-area"
+             (fboundp '--rc-redisplay-preserve-echo-area))
+(test-assert "helpers/rc-redisplay"
+             (fboundp '--rc-redisplay))
 (test-eq "redisplay/no-op-when-stack-empty"
          nil (--rc-prologue-redisplay!))
+(test-assert "redisplay/raw-input-pending-boolean"
+             (memq (--rc-input-pending) '(nil t)))
+(test-assert "redisplay/raw-input-was-pending-boolean"
+             (memq (--rc-input-was-pending) '(nil t)))
+(test-eq "redisplay/direct-wait-block"
+         nil (--rc-redisplay-and-wait-block))
+
+(m8-with-rc-state
+ '((commandflag . -1)
+   (c . ?r))
+ (lambda ()
+   (test-eq "redisplay/skips-negative-commandflag result"
+            nil (--rc-prologue-redisplay!))
+   (test-eq "redisplay/skips-negative-commandflag c"
+            ?r (m8-test-state-ref 'c))))
+
+(m8-with-rc-state
+ '((commandflag . 0)
+   (c . ?r))
+ (lambda ()
+   (test-eq "redisplay/live-commandflag-zero result"
+            nil (--rc-prologue-redisplay!))
+   (test-eq "redisplay/live-commandflag-zero c"
+            ?r (m8-test-state-ref 'c))))
 
 ;;;; M8f
 

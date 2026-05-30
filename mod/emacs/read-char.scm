@@ -409,8 +409,6 @@ or `fall-through'.  See docs/keyboard.org §M8l."
   (delay (%c '--rc-special-event-map-lookup)))
 (define %rc-timer-resume-idle
   (delay (%c '--rc-timer-resume-idle)))
-(define %rc-latch-input-was-pending
-  (delay (%c '--rc-latch-input-was-pending)))
 (define %bufferp (delay (%c 'bufferp)))
 (define %current-buffer (delay (%c 'current-buffer)))
 (define %command-execute (delay (%c 'command-execute)))
@@ -709,8 +707,41 @@ docs/keyboard.org §M8f."
   (delay (%c '--rc-echo-message-buffer-is-current)))
 (define %rc-pin-echo-message-buffer-to-current
   (delay (%c '--rc-pin-echo-message-buffer-to-current)))
-(define %rc-redisplay-and-wait-block
-  (delay (%c '--rc-redisplay-and-wait-block)))
+(define %rc-input-pending
+  (delay (%c '--rc-input-pending)))
+(define %rc-input-was-pending
+  (delay (%c '--rc-input-was-pending)))
+(define %rc-swallow-events
+  (delay (%c '--rc-swallow-events)))
+(define %rc-help-echo-redisplay-preserve-p
+  (delay (%c '--rc-help-echo-redisplay-preserve-p)))
+(define %rc-redisplay-preserve-echo-area
+  (delay (%c '--rc-redisplay-preserve-echo-area)))
+(define %rc-redisplay
+  (delay (%c '--rc-redisplay)))
+
+(define (rc-redisplay-and-wait-block!)
+  "Swallow non-user-visible events, then redisplay until input state
+converges.  Hoisted from the M8e C helper; C still exposes only the
+raw input flags and redisplay actions."
+  ;; If there is pending input, process any events which are not
+  ;; user-visible, such as X selection_request events.
+  (when (or (not (%nilp ((force %rc-input-pending))))
+            (not (%nilp ((force %rc-detect-input-pending-run-timers)))))
+    ((force %rc-swallow-events)))
+  ;; Redisplay if no pending input, mirroring the original C loop:
+  ;; while (!(input_pending && input_was_pending)) { ... }.
+  (let loop ()
+    (when (not (and (not (%nilp ((force %rc-input-pending))))
+                    (not (%nilp ((force %rc-input-was-pending))))))
+      ((force %rc-latch-input-was-pending))
+      (if (not (%nilp ((force %rc-help-echo-redisplay-preserve-p))))
+          ((force %rc-redisplay-preserve-echo-area))
+          ((force %rc-redisplay)))
+      (when (not (%nilp ((force %rc-input-pending))))
+        ((force %rc-swallow-events))
+        (loop))))
+  #nil)
 
 (define (rc-prologue-redisplay!)
   "Redisplay loop in the read_char_1 prologue.  When the current
@@ -727,7 +758,7 @@ through.  See docs/keyboard.org §M8e."
          ((< cf 0) #nil)
          (else
           (let ((echo-current ((force %rc-echo-message-buffer-is-current))))
-            ((force %rc-redisplay-and-wait-block))
+            (rc-redisplay-and-wait-block!)
             (when (and (= cf 0) (not (%nilp echo-current)))
               ((force %rc-pin-echo-message-buffer-to-current)))
             #nil))))))))
@@ -1052,6 +1083,10 @@ See docs/keyboard.org §M8final."
               (--rc-prologue-macro-or-switch-frame
                                        ,rc-prologue-macro-or-switch-frame!)
               ;; M8e — redisplay loop
+              (--rc-redisplay-and-wait-block!
+                                       ,rc-redisplay-and-wait-block!)
+              (--rc-redisplay-and-wait-block
+                                       ,rc-redisplay-and-wait-block!)
               (--rc-prologue-redisplay!
                                        ,rc-prologue-redisplay!)
               (--rc-prologue-redisplay
