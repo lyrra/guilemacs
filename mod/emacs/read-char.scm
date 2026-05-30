@@ -744,10 +744,33 @@ docs/keyboard.org §M8h."
   (delay (%c '--rc-should-immediate-echo-p)))
 (define %rc-sit-for-and-maybe-echo
   (delay (%c '--rc-sit-for-and-maybe-echo)))
-(define %rc-maybe-auto-save-by-keystroke
-  (delay (%c '--rc-maybe-auto-save-by-keystroke)))
+(define %rc-last-auto-save
+  (delay (%c '--rc-last-auto-save)))
+(define %do-auto-save
+  (delay (%c 'do-auto-save)))
 (define %echo-now
   (delay (%c '--echo-now)))
+
+(define (rc-maybe-auto-save-by-keystroke!)
+  "M8g Block 3 in Scheme: when the keystroke counter has crossed
+the auto-save threshold and no input is pending, fire do-auto-save
++ redisplay.  Caller has already checked that commandflag is
+neither 0 nor -2.  C now exposes only the file-static last-auto-save
+counter; `auto-save-interval' / `num-nonmacro-input-events' /
+`auto-save-no-message' are DEFVAR_INT or DEFVAR_BOOL and reachable
+via symbol-value."
+  (let ((interval (symbol-value 'auto-save-interval)))
+    (when (and (> interval 0)
+               (> (- (symbol-value 'num-nonmacro-input-events)
+                     ((force %rc-last-auto-save)))
+                  (max interval 20))
+               (%nilp ((force %rc-detect-input-pending-run-timers))))
+      ((force %do-auto-save)
+       (if (%nilp (symbol-value 'auto-save-no-message)) #nil #t)
+       #nil)
+      ;; Hooks may modify buffers during auto-save.
+      ((force %rc-redisplay))))
+  #nil)
 
 (define (rc-prologue-idle-echo-autosave!)
   "Three pure-side-effect blocks before the blocking input wait:
@@ -772,7 +795,7 @@ returns nil — caller falls through.  See docs/keyboard.org §M8g."
         ;; Block 3: auto-save by keystroke count.
         (let ((cf (rc-state-commandflag rec)))
           (when (and (not (= cf 0)) (not (= cf -2)))
-            ((force %rc-maybe-auto-save-by-keystroke))))
+            (rc-maybe-auto-save-by-keystroke!)))
         #nil)))))
 
 (define %rc-echo-cancel-or-dash
@@ -1214,6 +1237,10 @@ See docs/keyboard.org §M8final."
                                        ,rc-prologue-idle-echo-autosave!)
               (--rc-prologue-idle-echo-autosave
                                        ,rc-prologue-idle-echo-autosave!)
+              (--rc-maybe-auto-save-by-keystroke!
+                                       ,rc-maybe-auto-save-by-keystroke!)
+              (--rc-maybe-auto-save-by-keystroke
+                                       ,rc-maybe-auto-save-by-keystroke!)
               ;; M8h — X-menu + auto-save-by-idle-timeout + GC
               (--rc-prologue-xmenu-and-idle-gc!
                                        ,rc-prologue-xmenu-and-idle-gc!)

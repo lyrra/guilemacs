@@ -3388,26 +3388,16 @@ rc-prologue-idle-echo-autosave! for Block 2's non-mouse path.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-maybe-auto-save-by-keystroke",
-       Fc_rc_maybe_auto_save_by_keystroke,
-       Sc_rc_maybe_auto_save_by_keystroke, 0, 0, 0,
-       doc: /* Internal: gate (auto_save_interval > 0, keystroke-
-counter crossed the interval, no pending input) and on success call
-Fdo_auto_save + redisplay.  Scheme caller has already checked
-commandflag != 0 / -2.  Used by rc-prologue-idle-echo-autosave!
-Block 3.  */)
+DEFUN ("--rc-last-auto-save",
+       Fc_rc_last_auto_save, Sc_rc_last_auto_save, 0, 0, 0,
+       doc: /* Internal: read the file-static last_auto_save counter
+(the value of num_nonmacro_input_events at the previous auto-save).
+The lisp-side `auto-save-interval' and `num-nonmacro-input-events'
+are already DEFVAR_INT and reachable via symbol-value, so this is
+the only C-private piece M8g Block 3 needs from Scheme.  */)
   (void)
 {
-  if (auto_save_interval > 0
-      && (num_nonmacro_input_events - last_auto_save
-          > max (auto_save_interval, 20))
-      && !detect_input_pending_run_timers (0))
-    {
-      Fdo_auto_save (auto_save_no_message ? Qt : Qnil, Qnil);
-      /* Hooks may modify buffers during auto-save.  */
-      redisplay ();
-    }
-  return Qnil;
+  return make_int (last_auto_save);
 }
 
 /* M8f — tiny C shims for the Scheme-owned echo/menu prologue.
