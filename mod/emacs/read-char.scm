@@ -359,13 +359,59 @@ events onto Vunread_post_input_method_events.  Block 2: if
 
 (define %rc-translate-kbd-table
   (delay (%c '--rc-translate-kbd-table)))
-(define %rc-maybe-synthesize-menu-bar-event
-  (delay (%c '--rc-maybe-synthesize-menu-bar-event)))
 (define %rc-record-char
   (delay (%c '--rc-record-char)))
 (define %rc-echo-area-wipe
   (delay (%c '--rc-echo-area-wipe)))
+(define %setcar (delay (%c 'setcar)))
 (define %current-message (delay (%c 'current-message)))
+
+(define (rc-maybe-synthesize-menu-bar-event!)
+  "M8l Block 2 in Scheme.  When state->c is a mouse-position event
+whose posn is menu-bar / tab-bar / tool-bar, rewrites the event's
+posn to (list posn), pushes the original onto unread-command-events
+(wrapped in (t . c) when end-time is set, plain otherwise with
+also-record set), installs the bare posn symbol into rec.c, and
+returns the bare posn.  Returns nil when no synthesis happened.
+
+The C macros xevent_start / POSN_POSN / POSN_SET_POSN are pure
+Lisp data ops — cadr, cadr-of-cadr, and setcar-on-cdr — so the
+body needs no C primitive beyond elisp setcar."
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) #nil)
+     (else
+      (let ((c (rc-state-c rec)))
+        (cond
+         ;; EVENT_HAS_PARAMETERS + nested-CONSP gate on xevent_start.
+         ((not (and (pair? c)
+                    (pair? (cdr c))
+                    (pair? (cadr c))
+                    (pair? (cdr (cadr c)))))
+          #nil)
+         (else
+          (let ((posn (cadr (cadr c))))
+            (cond
+             ((not (or (eq? posn 'menu-bar)
+                       (eq? posn 'tab-bar)
+                       (eq? posn 'tool-bar)))
+              #nil)
+             (else
+              ;; Change menu-bar to (menu-bar) as the event "position".
+              ((force %setcar) (cdr (cadr c)) (list posn))
+              (cond
+               ((not (%nilp (rc-state-end-time rec)))
+                (set-symbol-value!
+                 'unread-command-events
+                 (cons (cons 't c)
+                       (symbol-value 'unread-command-events))))
+               (else
+                (set-rc-state-also-record! rec c)
+                (set-symbol-value!
+                 'unread-command-events
+                 (cons c (symbol-value 'unread-command-events)))))
+              (set-rc-state-c! rec posn)
+              posn))))))))))
 
 (define (%printable-ascii? c)
   "True when C is a fixnum in the printable ASCII range used by
@@ -401,7 +447,7 @@ or `fall-through'.  See docs/keyboard.org §M8l."
                        d))
                     (else c))))
             ;; Block 2: menu-bar synthesis.
-            (let* ((maybe-posn ((force %rc-maybe-synthesize-menu-bar-event)))
+            (let* ((maybe-posn (rc-maybe-synthesize-menu-bar-event!))
                    (c (if (%nilp maybe-posn) c maybe-posn)))
               ;; Block 3a: record_char + also_record.
               ((force %rc-record-char) c)
@@ -1203,6 +1249,10 @@ See docs/keyboard.org §M8final."
                                        ,rc-event-translate-and-record!)
               (--rc-event-translate-and-record
                                        ,rc-event-translate-and-record!)
+              (--rc-maybe-synthesize-menu-bar-event!
+                                       ,rc-maybe-synthesize-menu-bar-event!)
+              (--rc-maybe-synthesize-menu-bar-event
+                                       ,rc-maybe-synthesize-menu-bar-event!)
               ;; M8m — input-method dispatch + record-if-unread
               (--rc-input-method-dispatch!
                                        ,rc-input-method-dispatch!)

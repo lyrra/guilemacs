@@ -3061,50 +3061,6 @@ rc-event-translate-and-record! Block 1.  */)
   return c;
 }
 
-DEFUN ("--rc-maybe-synthesize-menu-bar-event",
-       Fc_rc_maybe_synthesize_menu_bar_event,
-       Sc_rc_maybe_synthesize_menu_bar_event, 0, 0, 0,
-       doc: /* Internal: Block 2 of M8l.  Looks at the top-of-stack
-rec's c slot; if it's a mouse-position event whose posn is
-menu-bar / tab-bar / tool-bar, rewrites the event's posn to (list
-posn), pushes the original onto Vunread_command_events (with the
-(Qt . c) wrap when end_time is set, plain otherwise with
-also_record), installs the bare posn symbol into rec.c, and
-returns the bare posn (or nil when no synthesis happened).  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  Lisp_Object c = rc_get (rec, RC_SLOT_C);
-
-  if (!(EVENT_HAS_PARAMETERS (c)
-        && CONSP (XCDR (c))
-        && CONSP (xevent_start (c))
-        && CONSP (XCDR (xevent_start (c)))))
-    return Qnil;
-
-  Lisp_Object posn = POSN_POSN (xevent_start (c));
-  if (!(EQ (posn, Qmenu_bar) || EQ (posn, Qtab_bar)
-        || EQ (posn, Qtool_bar)))
-    return Qnil;
-
-  /* Change menu-bar to (menu-bar) as the event "position".  */
-  POSN_SET_POSN (xevent_start (c), list1 (posn));
-
-  if (end_time)
-    Vunread_command_events = Fcons (Fcons (Qt, c),
-                                    Vunread_command_events);
-  else
-    {
-      rc_set (rec, RC_SLOT_ALSO_RECORD, c);
-      Vunread_command_events = Fcons (c, Vunread_command_events);
-    }
-  rc_set (rec, RC_SLOT_C, posn);
-  return posn;
-}
-
 DEFUN ("--rc-record-char",
        Fc_rc_record_char,
        Sc_rc_record_char, 1, 1, 0,
