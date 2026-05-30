@@ -3328,33 +3328,23 @@ rc-prologue-idle-echo-autosave! for Block 1.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-should-immediate-echo-p",
-       Fc_rc_should_immediate_echo_p,
-       Sc_rc_should_immediate_echo_p, 0, 0, 0,
-       doc: /* Internal: combined gate for Block 2 of M8g.  Returns t
-when all of minibuf_level == 0, end_time NULL, immediate_echo off,
-key-count or echo-prefix non-empty, !noninteractive, echo_keystrokes_p,
-and the echo area is in a usable state.  Used by Scheme
-rc-prologue-idle-echo-autosave!.  */)
+DEFUN ("--rc-echo-area-usable-for-echo-p",
+       Fc_rc_echo_area_usable_for_echo_p,
+       Sc_rc_echo_area_usable_for_echo_p, 0, 0, 0,
+       doc: /* Internal: t when the echo area is in a usable state
+for showing keystrokes — either echo_area_buffer[0] is nil, the
+buffer is empty (BEG == Z), or ok_to_echo_at_next_pause matches
+the appropriate echo_kboard.  Used by Scheme
+rc-should-immediate-echo-p.  */)
   (void)
 {
-  if (rc_state_depth == 0)
-    return Qnil;
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-
-  bool ok = (minibuf_level == 0
-             && !end_time
-             && !current_kboard->immediate_echo
-             && (this_command_key_count > 0
-                 || !NILP (call0 (Qinternal_echo_keystrokes_prefix)))
-             && !noninteractive
-             && echo_keystrokes_p ()
-             && (NILP (echo_area_buffer[0])
-                 || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
-                     == BUF_Z (XBUFFER (echo_area_buffer[0])))
-                 || (echo_kboard && ok_to_echo_at_next_pause == echo_kboard)
-                 || (!echo_kboard && ok_to_echo_at_next_pause)));
+  bool ok = (NILP (echo_area_buffer[0])
+             || (BUF_BEG (XBUFFER (echo_area_buffer[0]))
+                 == BUF_Z (XBUFFER (echo_area_buffer[0])))
+             || (echo_kboard
+                 && ok_to_echo_at_next_pause == echo_kboard)
+             || (!echo_kboard
+                 && ok_to_echo_at_next_pause));
   return ok ? Qt : Qnil;
 }
 

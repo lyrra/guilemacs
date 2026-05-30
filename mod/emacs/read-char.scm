@@ -781,8 +781,30 @@ docs/keyboard.org §M8h."
 
 (define %rc-timer-start-idle
   (delay (%c '--rc-timer-start-idle)))
-(define %rc-should-immediate-echo-p
-  (delay (%c '--rc-should-immediate-echo-p)))
+(define %rc-minibuf-level
+  (delay (%c '--minibuf-level)))
+(define %rc-current-kboard-immediate-echo-p
+  (delay (%c '--current-kboard-immediate-echo-p)))
+(define %rc-echo-keystrokes-p
+  (delay (%c '--echo-keystrokes-p)))
+(define %rc-echo-area-usable-for-echo-p
+  (delay (%c '--rc-echo-area-usable-for-echo-p)))
+
+(define (rc-should-immediate-echo-p rec)
+  "M8g Block 2 gate in Scheme.  Returns #t when all of:
+ minibuf_level 0, end_time nil, immediate_echo off, key-count
+ >0 or keystrokes prefix non-empty, !noninteractive,
+ echo_keystrokes_p, and echo area usable.  The echo-area
+ liveness sub-predicate delegates to the C primitive
+ --rc-echo-area-usable-for-echo-p."
+  (and (= ((force %rc-minibuf-level)) 0)
+       (%nilp (rc-state-end-time rec))
+       (%nilp ((force %rc-current-kboard-immediate-echo-p)))
+       (or (> ((force %this-command-key-count)) 0)
+           (not (%nilp ((%c 'internal-echo-keystrokes-prefix)))))
+       (%nilp (symbol-value 'noninteractive))
+       (not (%nilp ((force %rc-echo-keystrokes-p))))
+       (not (%nilp ((force %rc-echo-area-usable-for-echo-p))))))
 (define %rc-sit-for-echo-keystrokes
   (delay (%c '--rc-sit-for-echo-keystrokes)))
 
@@ -840,8 +862,7 @@ returns nil — caller falls through.  See docs/keyboard.org §M8g."
         (when end-time-nil?
           ((force %rc-timer-start-idle)))
         ;; Block 2: immediate echo.
-        (when (and end-time-nil?
-                   (not (%nilp ((force %rc-should-immediate-echo-p)))))
+        (when (rc-should-immediate-echo-p rec)
           (if (pair? (rc-state-prev-event rec))
               ;; After a mouse event, start echoing right away.
               ((force %echo-now))
@@ -1299,6 +1320,8 @@ See docs/keyboard.org §M8final."
                                        ,rc-sit-for-and-maybe-echo!)
               (--rc-sit-for-and-maybe-echo
                                        ,rc-sit-for-and-maybe-echo!)
+              (--rc-should-immediate-echo-p
+                                       ,rc-should-immediate-echo-p)
               ;; M8h — X-menu + auto-save-by-idle-timeout + GC
               (--rc-prologue-xmenu-and-idle-gc!
                                        ,rc-prologue-xmenu-and-idle-gc!)
