@@ -458,6 +458,12 @@
 
 (test-assert "helpers/rc-help-echo-and-help-form"
              (fboundp '--rc-help-echo-and-help-form))
+(test-assert "helpers/rc-add-command-keys-and-echo"
+             (fboundp '--rc-add-command-keys-and-echo))
+(test-assert "helpers/rc-mouse-movement-event-p"
+             (fboundp '--rc-mouse-movement-event-p))
+(test-assert "helpers/rc-allow-echo-at-next-pause"
+             (fboundp '--rc-allow-echo-at-next-pause))
 (test-eq "help-echo-form/fall-through-at-idle"
          'fall-through (--rc-help-echo-and-help-form!))
 
@@ -475,6 +481,56 @@
                     ?r last-input-event)
            (test-equal "help-echo-form/records-command-key vector"
                        "r" (this-command-keys-vector)))))
+    (clear-this-command-keys)))
+
+(unwind-protect
+    (progn
+      (clear-this-command-keys)
+      (test-eq "command-keys/direct-adds result"
+               nil (--rc-add-command-keys-and-echo ?a ?b))
+      (test-equal "command-keys/direct-adds vector"
+                  "ab" (this-command-keys-vector)))
+  (clear-this-command-keys))
+
+(let ((event (list 'mouse-movement (posn-at-point))))
+  (test-eq "command-keys/mouse-movement predicate true"
+           t (--rc-mouse-movement-event-p event))
+  (test-eq "command-keys/mouse-movement predicate nil"
+           nil (--rc-mouse-movement-event-p ?x)))
+
+(let ((help-form nil)
+      (last-input-event nil))
+  (unwind-protect
+      (progn
+        (clear-this-command-keys)
+        (--add-command-key ?x)
+        (m8-with-rc-state
+         '((c . ?s)
+           (reread . t))
+         (lambda ()
+           (test-eq "help-echo-form/reread-skip result"
+                    'fall-through (--rc-help-echo-and-help-form!))
+           (test-eq "help-echo-form/reread-skip last-input-event"
+                    ?s last-input-event)
+           (test-equal "help-echo-form/reread-skip vector"
+                       "x" (this-command-keys-vector)))))
+    (clear-this-command-keys)))
+
+(let ((help-form nil)
+      (last-input-event nil))
+  (unwind-protect
+      (progn
+        (clear-this-command-keys)
+        (m8-with-rc-state
+         '((c . ?t)
+           (end-time . t))
+         (lambda ()
+           (test-eq "help-echo-form/timed-read-skip result"
+                    'fall-through (--rc-help-echo-and-help-form!))
+           (test-eq "help-echo-form/timed-read-skip last-input-event"
+                    ?t last-input-event)
+           (test-equal "help-echo-form/timed-read-skip vector"
+                       "" (this-command-keys-vector)))))
     (clear-this-command-keys)))
 
 ;;;; M8final

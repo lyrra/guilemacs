@@ -2809,11 +2809,12 @@ Returns nil.  Used by Scheme rc-exit!.  */)
 }
 
 /* M8n — tiny C shims for the Scheme-owned help-echo / command-keys
-   / help-form epilogue.  Scheme owns the 3-block control flow plus
-   the last-input-event update; C still owns show_help_echo, the
-   block-2 ok-to-echo / add-command-key / echo-update sequence, the
-   num_input_events counter, and the Block 3 recursive read_char
-   loop with its dynwind / help-form-saved-window-configs machinery.  */
+   / help-form epilogue.  Scheme owns the 3-block control flow, the
+   last-input-event update, and the block-2 add-command-key / echo
+   sequence.  C still owns show_help_echo, the mouse-movement event
+   predicate, the ok_to_echo_at_next_pause global write, the
+   num_input_events counter, and the Block 3 recursive read_char loop
+   with its dynwind / help-form-saved-window-configs machinery.  */
 
 DEFUN ("--rc-show-help-echo-from-event",
        Fc_rc_show_help_echo_from_event,
@@ -2839,28 +2840,29 @@ Used by Scheme rc-help-echo-and-help-form!.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-add-command-keys-and-echo",
-       Fc_rc_add_command_keys_and_echo,
-       Sc_rc_add_command_keys_and_echo, 2, 2, 0,
-       doc: /* Internal: Block 2 of M8n's if-true body.  When C is
-not a mouse-motion event, set ok_to_echo_at_next_pause to
-current_kboard.  add_command_key(C); add_command_key(ALSO-RECORD)
-when non-nil; echo_update.  Used by Scheme rc-help-echo-and-help-form!.  */)
-  (Lisp_Object c, Lisp_Object also_record)
+DEFUN ("--rc-mouse-movement-event-p",
+       Fc_rc_mouse_movement_event_p,
+       Sc_rc_mouse_movement_event_p, 1, 1, 0,
+       doc: /* Internal: t if C is a mouse-motion event.  Used by
+Scheme rc-add-command-keys-and-echo! to keep the C event-kind
+predicate narrow while Scheme owns M8n Block 2 sequencing.  */)
+  (Lisp_Object c)
 {
-  /* Don't echo mouse motion events.  */
-  if (!(EVENT_HAS_PARAMETERS (c)
-        && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
-    /* Once we reread a character, echoing can happen
-       the next time we pause to read a new one.  */
-    ok_to_echo_at_next_pause = current_kboard;
+  return (EVENT_HAS_PARAMETERS (c)
+          && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement))
+    ? Qt : Qnil;
+}
 
-  /* Record this character as part of the current key.  */
-  add_command_key (c);
-  if (!NILP (also_record))
-    add_command_key (also_record);
+DEFUN ("--rc-allow-echo-at-next-pause",
+       Fc_rc_allow_echo_at_next_pause,
+       Sc_rc_allow_echo_at_next_pause, 0, 0, 0,
+       doc: /* Internal: set ok_to_echo_at_next_pause = current_kboard.
+Used by Scheme rc-add-command-keys-and-echo! when the event is not
+mouse motion.  */)
+  (void)
+{
+  ok_to_echo_at_next_pause = current_kboard;
 
-  echo_update ();
   return Qnil;
 }
 

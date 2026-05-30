@@ -425,7 +425,10 @@
 ;;;; M8n — help-echo + this-command-keys + help-form
 
 (ert-deftest m8n-helpers/exist ()
-  (should (fboundp '--rc-help-echo-and-help-form)))
+  (should (fboundp '--rc-help-echo-and-help-form))
+  (should (fboundp '--rc-add-command-keys-and-echo))
+  (should (fboundp '--rc-mouse-movement-event-p))
+  (should (fboundp '--rc-allow-echo-at-next-pause)))
 
 (ert-deftest m8n-help-echo-form/fall-through-at-idle ()
   ;; Outside any in-flight read_char, the subr early-returns
@@ -445,6 +448,52 @@
                          (--rc-help-echo-and-help-form!)))
              (should (eq ?r last-input-event))
              (should (equal "r" (this-command-keys-vector))))))
+      (clear-this-command-keys))))
+
+(ert-deftest m8n-command-keys/direct-adds-event-and-also-record ()
+  (unwind-protect
+      (progn
+        (clear-this-command-keys)
+        (should (eq nil (--rc-add-command-keys-and-echo ?a ?b)))
+        (should (equal "ab" (this-command-keys-vector))))
+    (clear-this-command-keys)))
+
+(ert-deftest m8n-command-keys/mouse-movement-predicate ()
+  (let ((event (list 'mouse-movement (posn-at-point))))
+    (should (eq t (--rc-mouse-movement-event-p event)))
+    (should (eq nil (--rc-mouse-movement-event-p ?x)))))
+
+(ert-deftest m8n-help-echo-form/reread-with-existing-key-skips-recording ()
+  (let ((help-form nil)
+        (last-input-event nil))
+    (unwind-protect
+        (progn
+          (clear-this-command-keys)
+          (--add-command-key ?x)
+          (m8-with-rc-state
+           '((c . ?s)
+             (reread . t))
+           (lambda ()
+             (should (eq 'fall-through
+                         (--rc-help-echo-and-help-form!)))
+             (should (eq ?s last-input-event))
+             (should (equal "x" (this-command-keys-vector))))))
+      (clear-this-command-keys))))
+
+(ert-deftest m8n-help-echo-form/timed-read-skips-recording ()
+  (let ((help-form nil)
+        (last-input-event nil))
+    (unwind-protect
+        (progn
+          (clear-this-command-keys)
+          (m8-with-rc-state
+           '((c . ?t)
+             (end-time . t))
+           (lambda ()
+             (should (eq 'fall-through
+                         (--rc-help-echo-and-help-form!)))
+             (should (eq ?t last-input-event))
+             (should (equal "" (this-command-keys-vector))))))
       (clear-this-command-keys))))
 
 ;;;; M8final — exit tail + hoisted dispatcher

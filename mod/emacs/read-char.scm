@@ -260,14 +260,32 @@ and return state->c (the resolved event).  See docs/keyboard.org
 
 (define %rc-show-help-echo-from-event
   (delay (%c '--rc-show-help-echo-from-event)))
-(define %rc-add-command-keys-and-echo
-  (delay (%c '--rc-add-command-keys-and-echo)))
+(define %rc-mouse-movement-event-p
+  (delay (%c '--rc-mouse-movement-event-p)))
+(define %rc-allow-echo-at-next-pause
+  (delay (%c '--rc-allow-echo-at-next-pause)))
+(define %add-command-key
+  (delay (%c '--add-command-key)))
+(define %echo-update
+  (delay (%c '--echo-update)))
 (define %rc-inc-num-input-events
   (delay (%c '--rc-inc-num-input-events)))
 (define %rc-maybe-help-form-recursive-read
   (delay (%c '--rc-maybe-help-form-recursive-read)))
 (define %this-command-key-count
   (delay (%c '--this-command-key-count)))
+
+(define (rc-add-command-keys-and-echo! c also-record)
+  "Add C and ALSO-RECORD to this-command-keys, then refresh echo state."
+  (when (%nilp ((force %rc-mouse-movement-event-p) c))
+    ;; Once we reread a character, echoing can happen the next time
+    ;; we pause to read a new one.
+    ((force %rc-allow-echo-at-next-pause)))
+  ((force %add-command-key) c)
+  (when (not (%nilp also-record))
+    ((force %add-command-key) also-record))
+  ((force %echo-update))
+  #nil)
 
 (define (rc-help-echo-and-help-form!)
   "Final read_char_1 tail.  Block 1: if state->c is a (help-echo
@@ -297,7 +315,7 @@ then repeat the read if state->c == fixnum 040 (space).  Returns
           (when (and (or (%nilp (rc-state-reread rec))
                          (= ((force %this-command-key-count)) 0))
                      (%nilp (rc-state-end-time rec)))
-            ((force %rc-add-command-keys-and-echo)
+            (rc-add-command-keys-and-echo!
              c (rc-state-also-record rec)))
           (set-symbol-value! 'last-input-event c)
           ((force %rc-inc-num-input-events))
@@ -1191,6 +1209,10 @@ See docs/keyboard.org §M8final."
               (--rc-input-method-dispatch
                                        ,rc-input-method-dispatch!)
               ;; M8n — help-echo + this-command-keys + help-form
+              (--rc-add-command-keys-and-echo!
+                                       ,rc-add-command-keys-and-echo!)
+              (--rc-add-command-keys-and-echo
+                                       ,rc-add-command-keys-and-echo!)
               (--rc-help-echo-and-help-form!
                                        ,rc-help-echo-and-help-form!)
               (--rc-help-echo-and-help-form
