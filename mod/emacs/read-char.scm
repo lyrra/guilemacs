@@ -258,8 +258,8 @@ and return state->c (the resolved event).  See docs/keyboard.org
       ((force %rc-latch-input-was-pending))
       (rc-state-c rec)))))
 
-(define %rc-show-help-echo-from-event
-  (delay (%c '--rc-show-help-echo-from-event)))
+(define %rc-show-help-echo
+  (delay (%c '--rc-show-help-echo)))
 (define %rc-mouse-movement-event-p
   (delay (%c '--rc-mouse-movement-event-p)))
 (define %rc-allow-echo-at-next-pause
@@ -305,7 +305,16 @@ then repeat the read if state->c == fixnum 040 (space).  Returns
         (cond
          ;; Block 1: help-echo display.
          ((and (pair? c) (eq? (car c) 'help-echo))
-          ((force %rc-show-help-echo-from-event) c)
+          ;; c is (help-echo FRAME HELP WINDOW OBJECT POS).
+          (let* ((htem (cddr c))
+                 (help (car htem))
+                 (htem (cdr htem))
+                 (window (car htem))
+                 (htem (cdr htem))
+                 (object (car htem))
+                 (htem (cdr htem))
+                 (position (car htem)))
+            ((force %rc-show-help-echo) help window object position))
           ;; We stopped being idle for this event; undo that.
           (when (%nilp (rc-state-end-time rec))
             ((force %rc-timer-resume-idle)))

@@ -2816,26 +2816,17 @@ Returns nil.  Used by Scheme rc-exit!.  */)
    num_input_events counter, and the Block 3 recursive read_char loop
    with its dynwind / help-form-saved-window-configs machinery.  */
 
-DEFUN ("--rc-show-help-echo-from-event",
-       Fc_rc_show_help_echo_from_event,
-       Sc_rc_show_help_echo_from_event, 1, 1, 0,
-       doc: /* Internal: Block 1 of M8n.  C is a (help-echo FRAME HELP
-WINDOW OBJECT POS) cons; calls show_help_echo with the parsed parts.
-Used by Scheme rc-help-echo-and-help-form!.  */)
-  (Lisp_Object c)
+DEFUN ("--rc-show-help-echo",
+       Fc_rc_show_help_echo,
+       Sc_rc_show_help_echo, 4, 4, 0,
+       doc: /* Internal: thin wrapper around C show_help_echo.
+HELP is the help string, WINDOW the window, OBJECT the object,
+POSITION the position within the help.  Used by Scheme
+rc-help-echo-and-help-form! after destructuring the
+(help-echo FRAME HELP WINDOW OBJECT POS) event cons.  */)
+  (Lisp_Object help, Lisp_Object window,
+   Lisp_Object object, Lisp_Object position)
 {
-  /* (help-echo FRAME HELP WINDOW OBJECT POS).  */
-  Lisp_Object help, object, position, window, htem;
-
-  htem = Fcdr (XCDR (c));
-  help = Fcar (htem);
-  htem = Fcdr (htem);
-  window = Fcar (htem);
-  htem = Fcdr (htem);
-  object = Fcar (htem);
-  htem = Fcdr (htem);
-  position = Fcar (htem);
-
   show_help_echo (help, window, object, position);
   return Qnil;
 }
