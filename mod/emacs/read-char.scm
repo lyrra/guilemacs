@@ -701,8 +701,22 @@ See docs/keyboard.org §M8i."
   (delay (%c '--rc-read-char-x-menu-prompt)))
 (define %rc-timer-stop-idle
   (delay (%c '--rc-timer-stop-idle)))
-(define %rc-auto-save-delay-level
-  (delay (%c '--rc-auto-save-delay-level)))
+(define %rc-refresh-last-non-minibuf-size
+  (delay (%c '--rc-refresh-last-non-minibuf-size)))
+
+(define (rc-auto-save-delay-level)
+  "M8h helper in Scheme: refresh `last_non_minibuf_size' via the C
+shim --rc-refresh-last-non-minibuf-size (MINI_WINDOW_P guard +
+Z - BEG assignment), then compute the buffer-size-scaled auto-save
+delay level.  The level is 4 for files under ~50k, 7 at 100k, 9 at
+200k, 11 at 300k, 12 at 500k, and 15 at 1 meg."
+  (let* ((buf-size ((force %rc-refresh-last-non-minibuf-size)))
+         (buffer-size (+ (ash buf-size -8) 1))
+         (dl (let loop ((dl 0) (bs buffer-size))
+               (if (<= bs 64)
+                   dl
+                   (loop (+ dl 1) (- bs (ash bs -2)))))))
+    (max dl 4)))
 (define %rc-sit-for-timeout
   (delay (%c '--rc-sit-for-timeout)))
 (define %rc-gc-collect-a-little
@@ -723,7 +737,7 @@ sit_for primitive, and the GC trigger; everything else
 `auto-save-no-message', `num-nonmacro-input-events', and the
 detect-input/redisplay primitives) is reachable from Scheme."
   (let ((cf commandflag)
-        (delay-level ((force %rc-auto-save-delay-level)))
+        (delay-level (rc-auto-save-delay-level))
         (ast (symbol-value 'auto-save-timeout)))
     ;; Auto save if enough time goes by without input.
     (when (and (not (= cf 0))
@@ -882,8 +896,19 @@ returns nil — caller falls through.  See docs/keyboard.org §M8g."
             (rc-maybe-auto-save-by-keystroke!)))
         #nil)))))
 
-(define %rc-echo-cancel-or-dash
-  (delay (%c '--rc-echo-cancel-or-dash)))
+(define %rc-echo-area-has-wrong-kboard-p
+  (delay (%c '--rc-echo-area-has-wrong-kboard-p)))
+(define %rc-cancel-echoing
+  (delay (%c '--cancel-echoing)))
+(define %rc-echo-dash
+  (delay (%c '--echo-dash)))
+
+(define (rc-echo-cancel-or-dash)
+  "M8f helper in Scheme: cancel echoing when the echo area belongs
+to a different kboard, otherwise append a dash separator."
+  (if (not (%nilp ((force %rc-echo-area-has-wrong-kboard-p))))
+      ((force %rc-cancel-echoing))
+      ((force %rc-echo-dash))))
 (define %rc-read-char-minibuf-menu-prompt
   (delay (%c '--rc-read-char-minibuf-menu-prompt)))
 (define %rc-detect-input-pending-run-timers
@@ -902,7 +927,7 @@ docs/keyboard.org §M8f."
     (cond
      ((%nilp rec) 'fall-through)
      (else
-      ((force %rc-echo-cancel-or-dash))
+      (rc-echo-cancel-or-dash)
       (set-rc-state-c! rec #nil)
       (let ((map (rc-state-map rec))
             (prev-event (rc-state-prev-event rec)))

@@ -3260,26 +3260,18 @@ rc-prologue-xmenu-and-idle-gc! and rc-wrong-kboard-and-non-reread.  */)
   return Qnil;
 }
 
-DEFUN ("--rc-auto-save-delay-level",
-       Fc_rc_auto_save_delay_level,
-       Sc_rc_auto_save_delay_level, 0, 0, 0,
-       doc: /* Internal: refresh `last_non_minibuf_size' from the
-selected window (when it is not a minibuffer) and return the
-buffer-size-scaled auto-save delay level.  The level is 4 for
-files under ~50k, 7 at 100k, 9 at 200k, 11 at 300k, 12 at 500k,
-and 15 at 1 meg.  Used by Scheme rc-auto-save-by-timeout-and-gc!.  */)
+DEFUN ("--rc-refresh-last-non-minibuf-size",
+       Fc_rc_refresh_last_non_minibuf_size,
+       Sc_rc_refresh_last_non_minibuf_size, 0, 0, 0,
+       doc: /* Internal: update the file-static `last_non_minibuf_size'
+from Z - BEG of the current buffer when the selected window is not a
+minibuffer, and return the new value as a fixnum.  Used by Scheme
+rc-auto-save-delay-level.  */)
   (void)
 {
-  /* Slow down auto saves logarithmically in size of current buffer,
-     and garbage collect while we're at it.  */
   if (! MINI_WINDOW_P (XWINDOW (selected_window)))
     last_non_minibuf_size = Z - BEG;
-  ptrdiff_t buffer_size = (last_non_minibuf_size >> 8) + 1;
-  int delay_level = 0;
-  while (buffer_size > 64)
-    delay_level++, buffer_size -= buffer_size >> 2;
-  if (delay_level < 4) delay_level = 4;
-  return make_int (delay_level);
+  return make_int (last_non_minibuf_size);
 }
 
 DEFUN ("--rc-sit-for-timeout",
@@ -3373,20 +3365,18 @@ the only C-private piece M8g Block 3 needs from Scheme.  */)
    Scheme owns the control flow; C still owns the echo globals and
    the file-static read_char_minibuf_menu_prompt helper.  */
 
-DEFUN ("--rc-echo-cancel-or-dash",
-       Fc_rc_echo_cancel_or_dash, Sc_rc_echo_cancel_or_dash, 0, 0, 0,
-       doc: /* Internal: cancel echoing or append a dash separator.
-Used by Scheme rc-prologue-echo-and-menu!.  */)
+DEFUN ("--rc-echo-area-has-wrong-kboard-p",
+       Fc_rc_echo_area_has_wrong_kboard_p,
+       Sc_rc_echo_area_has_wrong_kboard_p, 0, 0, 0,
+       doc: /* Internal: t when the echo area is showing a message
+from a different kboard or when ok_to_echo_at_next_pause is NULL.
+Used by Scheme rc-echo-cancel-or-dash.  */)
   (void)
 {
-  if (!NILP (echo_area_buffer[0])
-      && (echo_kboard != current_kboard
-          || ok_to_echo_at_next_pause == NULL))
-    cancel_echoing ();
-  else
-    echo_dash ();
-
-  return Qnil;
+  bool wrong = (!NILP (echo_area_buffer[0])
+                && (echo_kboard != current_kboard
+                    || ok_to_echo_at_next_pause == NULL));
+  return wrong ? Qt : Qnil;
 }
 
 DEFUN ("--rc-read-char-minibuf-menu-prompt",
