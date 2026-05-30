@@ -456,8 +456,10 @@ special command matched.  See docs/keyboard.org §M8k."
                   'goto-exit)
                  (else 'goto-retry)))))))))))))
 
-(define %rc-read-and-install-event
-  (delay (%c '--rc-read-and-install-event)))
+(define %rc-read-decoded-event-from-main-queue
+  (delay (%c '--rc-read-decoded-event-from-main-queue)))
+(define %rc-end-time-expired-p
+  (delay (%c '--rc-end-time-expired-p)))
 
 (define (rc-maybe-redisplay-when-no-input! commandflag)
   "Redisplay when COMMANDFLAG allows it and no input is pending.
@@ -468,6 +470,45 @@ flags, timer-aware input probe, and redisplay action."
              (%nilp ((force %rc-detect-input-pending-run-timers))))
     ((force %rc-redisplay)))
   #nil)
+
+(define (rc-install-read-event! rec c)
+  "Install raw M8j read event C into REC and return the loop control symbol."
+  (cond
+   ((and (%nilp c)
+         (not (%nilp (rc-state-end-time rec)))
+         (not (%nilp ((force %rc-end-time-expired-p)))))
+    (set-rc-state-c! rec c)
+    'goto-exit)
+   ((and (integer? c) (= c -2))
+    (set-rc-state-c! rec c)
+    'return-wrong-kboard)
+   (else
+    (let ((c (cond
+              ((and (pair? c) (%elisp-t? (car c)))
+               (cdr c))
+              ((and (pair? c) (eq? (car c) 'no-record))
+               (set-rc-state-recorded! rec #t)
+               (cdr c))
+              (else c))))
+      (set-rc-state-c! rec c)
+      'continue))))
+
+(define (rc-read-and-install-event!)
+  "Read one raw M8j event, peel wrappers, and install it into the current state."
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'continue)
+     (else
+      (rc-install-read-event!
+       rec
+       ((force %rc-read-decoded-event-from-main-queue)))))))
+
+(define (%rc-test-install-read-event c)
+  "Test-only entry for Scheme M8j postprocessing without blocking for input."
+  (let ((rec ((force %rc-record-current))))
+    (cond
+     ((%nilp rec) 'continue)
+     (else (rc-install-read-event! rec c)))))
 
 (define (rc-wrong-kboard-and-non-reread!)
   "Blocking-read + non-reread fixup loop.  Calls
@@ -484,7 +525,7 @@ or `fall-through' (state->c is non-nil).  See docs/keyboard.org
       (let loop ()
         ;; Block A — wrong_kboard label position.
         (let ((r (if (%nilp (rc-state-c rec))
-                     ((force %rc-read-and-install-event))
+                     (rc-read-and-install-event!)
                      'continue)))
           (cond
            ((eq? r 'goto-exit) 'goto-exit)
@@ -1124,6 +1165,12 @@ See docs/keyboard.org §M8final."
                                        ,rc-maybe-redisplay-when-no-input!)
               (--rc-maybe-redisplay-when-no-input
                                        ,rc-maybe-redisplay-when-no-input!)
+              (--rc-read-and-install-event!
+                                       ,rc-read-and-install-event!)
+              (--rc-read-and-install-event
+                                       ,rc-read-and-install-event!)
+              (--rc-test-install-read-event
+                                       ,%rc-test-install-read-event)
               (--rc-wrong-kboard-and-non-reread!
                                        ,rc-wrong-kboard-and-non-reread!)
               (--rc-wrong-kboard-and-non-reread

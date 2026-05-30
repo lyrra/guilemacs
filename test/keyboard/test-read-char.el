@@ -284,12 +284,26 @@
              (fboundp '--rc-wrong-kboard-and-non-reread))
 (test-assert "helpers/rc-maybe-redisplay-when-no-input"
              (fboundp '--rc-maybe-redisplay-when-no-input))
+(test-assert "helpers/rc-read-and-install-event"
+             (fboundp '--rc-read-and-install-event))
+(test-assert "helpers/rc-read-decoded-event-from-main-queue"
+             (fboundp '--rc-read-decoded-event-from-main-queue))
+(test-assert "helpers/rc-end-time-expired-p"
+             (fboundp '--rc-end-time-expired-p))
+(test-assert "helpers/rc-test-install-read-event"
+             (fboundp '--rc-test-install-read-event))
 (test-eq "wkbd-nr/fall-through-at-idle"
          'fall-through (--rc-wrong-kboard-and-non-reread!))
 (test-eq "wkbd-nr/maybe-redisplay-negative"
          nil (--rc-maybe-redisplay-when-no-input -1))
 (test-eq "wkbd-nr/maybe-redisplay-zero"
          nil (--rc-maybe-redisplay-when-no-input 0))
+(test-eq "wkbd-nr/read-install-idle"
+         'continue (--rc-read-and-install-event))
+(test-eq "wkbd-nr/read-decoded-idle"
+         nil (--rc-read-decoded-event-from-main-queue))
+(test-eq "wkbd-nr/end-time-expired-idle"
+         nil (--rc-end-time-expired-p))
 
 (m8-with-rc-state
  '((c . ?j))
@@ -298,6 +312,56 @@
             'fall-through (--rc-wrong-kboard-and-non-reread!))
    (test-eq "wkbd-nr/preset-c c"
             ?j (m8-test-state-ref 'c))))
+
+(m8-with-rc-state
+ nil
+ (lambda ()
+   (test-eq "read-install/raw-event result"
+            'continue (--rc-test-install-read-event ?x))
+   (test-eq "read-install/raw-event c"
+            ?x (m8-test-state-ref 'c))
+   (test-nil "read-install/raw-event recorded"
+             (m8-test-state-ref 'recorded))))
+
+(m8-with-rc-state
+ nil
+ (lambda ()
+   (test-eq "read-install/wrong-kboard result"
+            'return-wrong-kboard
+            (--rc-test-install-read-event -2))
+   (test-eq "read-install/wrong-kboard c"
+            -2 (m8-test-state-ref 'c))
+   (test-nil "read-install/wrong-kboard recorded"
+             (m8-test-state-ref 'recorded))))
+
+(m8-with-rc-state
+ nil
+ (lambda ()
+   (test-eq "read-install/qt-wrapper result"
+            'continue (--rc-test-install-read-event (cons t ?q)))
+   (test-eq "read-install/qt-wrapper c"
+            ?q (m8-test-state-ref 'c))
+   (test-nil "read-install/qt-wrapper recorded"
+             (m8-test-state-ref 'recorded))))
+
+(m8-with-rc-state
+ nil
+ (lambda ()
+   (test-eq "read-install/no-record result"
+            'continue
+            (--rc-test-install-read-event (cons 'no-record ?n)))
+   (test-eq "read-install/no-record c"
+            ?n (m8-test-state-ref 'c))
+   (test-eq "read-install/no-record recorded"
+            t (m8-test-state-ref 'recorded))))
+
+(m8-with-rc-state
+ nil
+ (lambda ()
+   (test-eq "read-install/nil-without-end-time result"
+            'continue (--rc-test-install-read-event nil))
+   (test-nil "read-install/nil-without-end-time c"
+             (m8-test-state-ref 'c))))
 
 ;;;; M8k
 

@@ -3179,51 +3179,42 @@ while-no-input-ignore events.  */)
    loop.  Scheme owns the iteration and the timer-stop / c-is-nil
    gates; C still owns the blocking read_decoded_event_from_main_queue.  */
 
-DEFUN ("--rc-read-and-install-event",
-       Fc_rc_read_and_install_event,
-       Sc_rc_read_and_install_event, 0, 0, 0,
-       doc: /* Internal: Block A of M8j.  Calls
-read_decoded_event_from_main_queue using the top-of-stack rec's
-end-time / local-tag / prev-event / used-mouse-menu, then peels
-Qt / Qno_record wrappers and writes the result back to rec.c.
-Returns one of `goto-exit' (timeout reached), `return-wrong-kboard'
-(reader requested -2), or `continue' (event installed or read
-returned nil but no timeout; caller proceeds to Block B).  */)
+DEFUN ("--rc-read-decoded-event-from-main-queue",
+       Fc_rc_read_decoded_event_from_main_queue,
+       Sc_rc_read_decoded_event_from_main_queue, 0, 0, 0,
+       doc: /* Internal: call read_decoded_event_from_main_queue
+using the top-of-stack rec's end-time / local-tag / prev-event /
+used-mouse-menu slots.  Returns the raw event; Scheme owns the
+timeout / -2 / Qt / Qno_record postprocessing.  */)
   (void)
 {
   if (rc_state_depth == 0)
-    return intern ("continue");
+    return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
   struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
   bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
 
-  Lisp_Object c
-    = read_decoded_event_from_main_queue (end_time,
-                                          rc_get (rec, RC_SLOT_LOCAL_TAG),
-                                          rc_get (rec, RC_SLOT_PREV_EVENT),
-                                          used_mouse_menu);
-  if (NILP (c) && end_time
-      && timespec_cmp (*end_time, current_timespec ()) <= 0)
-    {
-      rc_set (rec, RC_SLOT_C, c);
-      return intern ("goto-exit");
-    }
+  return read_decoded_event_from_main_queue (end_time,
+                                             rc_get (rec, RC_SLOT_LOCAL_TAG),
+                                             rc_get (rec, RC_SLOT_PREV_EVENT),
+                                             used_mouse_menu);
+}
 
-  if (BASE_EQ (c, make_fixnum (-2)))
-    {
-      rc_set (rec, RC_SLOT_C, c);
-      return intern ("return-wrong-kboard");
-    }
+DEFUN ("--rc-end-time-expired-p",
+       Fc_rc_end_time_expired_p,
+       Sc_rc_end_time_expired_p, 0, 0, 0,
+       doc: /* Internal: t if the top-of-stack rec has a non-null
+end-time pointer and that deadline is <= current_timespec ().
+Used by Scheme rc-read-and-install-event!.  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
 
-  if (CONSP (c) && EQ (XCAR (c), Qt))
-    c = XCDR (c);
-  else if (CONSP (c) && EQ (XCAR (c), Qno_record))
-    {
-      c = XCDR (c);
-      rc_set (rec, RC_SLOT_RECORDED, Qt);
-    }
-  rc_set (rec, RC_SLOT_C, c);
-  return intern ("continue");
+  return (end_time && timespec_cmp (*end_time, current_timespec ()) <= 0)
+    ? Qt : Qnil;
 }
 
 /* M8i — bulk splice of the four post-M8h blocks: wrong-kboard

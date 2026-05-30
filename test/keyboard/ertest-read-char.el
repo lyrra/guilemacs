@@ -274,7 +274,11 @@
 
 (ert-deftest m8j-helpers/exist ()
   (should (fboundp '--rc-wrong-kboard-and-non-reread))
-  (should (fboundp '--rc-maybe-redisplay-when-no-input)))
+  (should (fboundp '--rc-maybe-redisplay-when-no-input))
+  (should (fboundp '--rc-read-and-install-event))
+  (should (fboundp '--rc-read-decoded-event-from-main-queue))
+  (should (fboundp '--rc-end-time-expired-p))
+  (should (fboundp '--rc-test-install-read-event)))
 
 (ert-deftest m8j-wkbd-nr/fall-through-at-idle ()
   ;; Outside any in-flight read_char, the subr early-returns
@@ -285,12 +289,58 @@
   (should (eq nil (--rc-maybe-redisplay-when-no-input -1)))
   (should (eq nil (--rc-maybe-redisplay-when-no-input 0))))
 
+(ert-deftest m8j-wkbd-nr/read-install-idle-continues ()
+  (should (eq 'continue (--rc-read-and-install-event)))
+  (should (eq nil (--rc-read-decoded-event-from-main-queue)))
+  (should (eq nil (--rc-end-time-expired-p))))
+
 (ert-deftest m8j-wkbd-nr/preset-c-falls-through ()
   (m8-with-rc-state
    '((c . ?j))
    (lambda ()
      (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!)))
      (should (eq ?j (m8-test-state-ref 'c))))))
+
+(ert-deftest m8j-read-install/raw-event-continues ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'continue (--rc-test-install-read-event ?x)))
+     (should (eq ?x (m8-test-state-ref 'c)))
+     (should (null (m8-test-state-ref 'recorded))))))
+
+(ert-deftest m8j-read-install/wrong-kboard-sentinel ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'return-wrong-kboard
+                 (--rc-test-install-read-event -2)))
+     (should (eq -2 (m8-test-state-ref 'c)))
+     (should (null (m8-test-state-ref 'recorded))))))
+
+(ert-deftest m8j-read-install/qt-wrapper-peeled ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'continue (--rc-test-install-read-event (cons t ?q))))
+     (should (eq ?q (m8-test-state-ref 'c)))
+     (should (null (m8-test-state-ref 'recorded))))))
+
+(ert-deftest m8j-read-install/no-record-wrapper-peeled-and-recorded ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'continue
+                 (--rc-test-install-read-event (cons 'no-record ?n))))
+     (should (eq ?n (m8-test-state-ref 'c)))
+     (should (eq t (m8-test-state-ref 'recorded))))))
+
+(ert-deftest m8j-read-install/nil-without-end-time-continues ()
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (should (eq 'continue (--rc-test-install-read-event nil)))
+     (should (null (m8-test-state-ref 'c))))))
 
 ;;;; M8k — BUFFERP + special-event-map dispatch
 
