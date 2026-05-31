@@ -11555,6 +11555,20 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		   bool fix_current_buffer, bool prevent_redisplay,
 		   bool disable_text_conversion_p)
 {
+  /* M6 Step B: push a fresh <rks-state> record so the Scheme side
+     can inspect state during the call (via --rks-state-current) and
+     the exit sync captures final field values.  See docs/m6-plan.org
+     Step B.  */
+  {
+    static SCM rks_make_state_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_make_state_proc))
+      rks_make_state_proc
+        = scm_c_public_ref ("emacs read-key-sequence", "make-rks-state");
+    SCM rec = SCM_CALL_0 (rks_make_state_proc);
+    eassert (rks_state_depth < RKS_STATE_STACK_MAX);
+    rks_state_stack[rks_state_depth++] = rec;
+  }
+
   /* How many keys there are in the current key sequence.
      M6m: promoted to file-static rks_t, aliased here.  */
 #define t rks_t
@@ -12269,6 +12283,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
         scm_c_public_ref ("emacs read-key-sequence",
                           "rks-done-fabricated-events!");
     SCM_CALL_0 (rks_done_fab_proc);
+  }
+
+  /* M6 Step B: sync file-statics → record so the record captures
+     final state.  The getter DEFUNs still read the file-statics
+     directly until Step D migrates the iteration-locals.  */
+  {
+    SCM rec = rks_state_stack[rks_state_depth - 1];
+    rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
+    rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
+    rc_set (rec, RKS_SLOT_CURRENT_BINDING, rks_current_binding);
+    rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
+    rks_set_bool (rec, RKS_SLOT_SHIFT_TRANSLATED, rks_shift_translated);
+    rks_set_int (rec, RKS_SLOT_ECHO_START, rks_echo_start);
+    rks_set_int (rec, RKS_SLOT_KEYS_START, rks_keys_start);
+    rks_state_stack[--rks_state_depth] = SCM_UNDEFINED;
   }
 
   return t;
