@@ -517,7 +517,7 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6u — simple shift-translation (upper→lower)
 
 (ert-deftest m6u-helpers/exist ()
-  (should (fboundp '--rks-try-shift-translation-simple)))
+  (should (fboundp '--rks-shift-translate-key)))
 
 (ert-deftest m6u-translation-simple/nil-for-lowercase ()
   ;; 'a' (97) is already lowercase — downcase returns itself, so the

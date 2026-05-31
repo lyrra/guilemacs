@@ -10912,6 +10912,31 @@ downcased key.  */)
   return make_fixnum (rks_original_uppercase_position);
 }
 
+DEFUN ("--set-rks-original-uppercase",
+       Fc_set_rks_original_uppercase,
+       Sc_set_rks_original_uppercase, 1, 1, 0,
+       doc: /* Internal: write the file-static
+rks_original_uppercase shadow.  Used by Scheme
+rks-try-shift-translation-simple!.  */)
+  (Lisp_Object val)
+{
+  rks_original_uppercase = val;
+  return Qnil;
+}
+
+DEFUN ("--set-rks-original-uppercase-position",
+       Fc_set_rks_original_uppercase_position,
+       Sc_set_rks_original_uppercase_position, 1, 1, 0,
+       doc: /* Internal: write the file-static
+rks_original_uppercase_position shadow.  Used by Scheme
+rks-try-shift-translation-simple!.  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  rks_original_uppercase_position = XFIXNUM (val);
+  return Qnil;
+}
+
 DEFUN ("--rks-t", Fc_rks_t, Sc_rks_t, 0, 0, 0,
        doc: /* Internal: read the file-static rks_t (the C `t' local
 of read_key_sequence — current key-sequence length).  */)
@@ -11240,28 +11265,18 @@ done).  Returns nil otherwise.  Mirrors src/keyboard.c lines
 
 /* M6u — shift-translation fallback (simple upper→lower case).
    See docs/keyboard.org §M6u.  */
-DEFUN ("--rks-try-shift-translation-simple",
-       Fc_rks_try_shift_translation_simple,
-       Sc_rks_try_shift_translation_simple, 1, 1, 0,
-       doc: /* Internal: try the simple shift-translation for KEY (a
-fixnum with the shift modifier, or an uppercase character).  When it
-fires, replace keybuf[rks_t - 1] with the down-translated key and
-mutate the file-static rks_original_uppercase / -_position /
-rks_mock_input / rks_shift_translated; the C caller observes the
-return value t and goes to replay_sequence.  Returns nil when no
-translation applies (fall through to the next block in the C
-while-loop iteration).  Mirrors the C block at lines 11750-11781
-pre-M6u.  */)
+DEFUN ("--rks-shift-translate-key",
+       Fc_rks_shift_translate_key,
+       Sc_rks_shift_translate_key, 1, 1, 0,
+       doc: /* Internal: attempt simple shift-translation for KEY (a
+fixnum).  Returns the down-translated fixnum, or nil when no
+translation applies.  Scheme owns the gate-check and side-effect
+logic (rks-try-shift-translation-simple!).  */)
   (Lisp_Object key)
 {
-  if (!NILP (rks_current_binding)
-      || rks_keytran.start < rks_t
-      || !FIXNUMP (key)
-      || !translate_upper_case_key_bindings)
-    return Qnil;
-
-  Lisp_Object new_key;
+  CHECK_FIXNUM (key);
   EMACS_INT k = XFIXNUM (key);
+  Lisp_Object new_key;
 
   if (k & shift_modifier)
     XSETINT (new_key, k & ~shift_modifier);
@@ -11275,16 +11290,7 @@ pre-M6u.  */)
   else
     return Qnil;
 
-  rks_original_uppercase          = key;
-  rks_original_uppercase_position = rks_t - 1;
-
-  if (rks_keybuf_depth > 0)
-    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t - 1] = new_key;
-  if (rks_t > rks_mock_input)
-    rks_mock_input = rks_t;
-  rks_shift_translated = true;
-
-  return Qt;
+  return new_key;
 }
 
 DEFUN ("--rks-delayed-switch-frame", Fc_rks_delayed_switch_frame,
@@ -12297,6 +12303,35 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     rks_set_bool (rec, RKS_SLOT_SHIFT_TRANSLATED, rks_shift_translated);
     rks_set_int (rec, RKS_SLOT_ECHO_START, rks_echo_start);
     rks_set_int (rec, RKS_SLOT_KEYS_START, rks_keys_start);
+    /* Step C: sync the 3 keyremap C structs to their <keyremap>
+       record slots.  Each keyremap has parent, map (Lisp_Object)
+       and start, end (int).  */
+    {
+      SCM km;
+      km = scm_struct_ref (rec, scm_from_int (RKS_SLOT_FKEY));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_PARENT), rks_fkey.parent);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_MAP),    rks_fkey.map);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_START),
+                        make_fixnum (rks_fkey.start));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_END),
+                        make_fixnum (rks_fkey.end));
+
+      km = scm_struct_ref (rec, scm_from_int (RKS_SLOT_KEYTRAN));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_PARENT), rks_keytran.parent);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_MAP),    rks_keytran.map);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_START),
+                        make_fixnum (rks_keytran.start));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_END),
+                        make_fixnum (rks_keytran.end));
+
+      km = scm_struct_ref (rec, scm_from_int (RKS_SLOT_INDEC));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_PARENT), rks_indec.parent);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_MAP),    rks_indec.map);
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_START),
+                        make_fixnum (rks_indec.start));
+      scm_struct_set_x (km, scm_from_int (KM_SLOT_END),
+                        make_fixnum (rks_indec.end));
+    }
     rks_state_stack[--rks_state_depth] = SCM_UNDEFINED;
   }
 

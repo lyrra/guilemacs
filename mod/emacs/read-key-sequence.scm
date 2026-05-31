@@ -754,23 +754,50 @@ help-character (and at least one prior key has been read), install
 should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
   ((force %rks-try-help-char) key))
 
-(define %rks-try-shift-translation-simple
-  (delay (%c '--rks-try-shift-translation-simple)))
+(define %rks-shift-translate-key
+  (delay (%c '--rks-shift-translate-key)))
+
+(define %rks-current-binding     (delay (%c '--rks-current-binding)))
+(define %rks-keytran-start       (delay (%c '--rks-keytran-start)))
+(define %rks-t                   (delay (%c '--rks-t)))
+(define %rks-mock-input          (delay (%c '--rks-mock-input)))
+(define %rks-shift-translated-p  (delay (%c '--rks-shift-translated-p)))
+(define %set-rks-shift-translated
+  (delay (%c '--set-rks-shift-translated)))
+(define %set-rks-mock-input      (delay (%c '--set-rks-mock-input)))
+(define %set-rks-original-uppercase
+  (delay (%c '--set-rks-original-uppercase)))
+(define %set-rks-original-uppercase-position
+  (delay (%c '--set-rks-original-uppercase-position)))
+(define %rks-keybuf-set          (delay (%c '--rks-keybuf-set)))
 
 (define (rks-try-shift-translation-simple! key)
-  "Try the simple upper→lower case shift-translation for KEY.  When
-applicable (current_binding is nil, no pending translation in
-keytran, KEY is a fixnum with shift_modifier or an uppercase
-character, and translate-upper-case-key-bindings is enabled),
-mutates the file-static rks_keybuf[rks_t - 1] / original-uppercase
-/ mock-input / shift-translated and returns t (caller should
-goto replay_sequence).  Otherwise returns nil (fall through).
+  "M6 Step E1: shift-translation for KEY, decomposed from C to
+Scheme.  Only the shift/downcase arithmetic stays in C
+(--rks-shift-translate-key); everything else (gate check, keybuf
+write, mock-input bump, shift-translated flag, original-uppercase
+save) is Scheme logic calling thin C primitives.
 
-The whole transition runs in the C subr (atomic; no partial
-state).  This Scheme wrapper exists so future M6 slices that wrap
-or compose the translation step (e.g. logging, advice) have a
-clean Scheme-level handle.  See docs/keyboard.org §M6u."
-  ((force %rks-try-shift-translation-simple) key))
+Returns t (caller goto replay_sequence) or nil (fall through)."
+  (if (or (not (%nilp ((force %rks-current-binding))))
+          (< ((force %rks-keytran-start)) ((force %rks-t)))
+          (not (integer? key))
+          (not (symbol-value 'translate-upper-case-key-bindings)))
+      #nil
+      (let ((new-key ((force %rks-shift-translate-key) key)))
+        (if (%nilp new-key)
+            #nil
+            (begin
+              ((force %set-rks-original-uppercase) key)
+              ((force %set-rks-original-uppercase-position)
+               (- ((force %rks-t)) 1))
+              ((force %rks-keybuf-set)
+               (- ((force %rks-t)) 1)
+               new-key)
+              (when (> ((force %rks-t)) ((force %rks-mock-input)))
+                ((force %set-rks-mock-input) ((force %rks-t))))
+              ((force %set-rks-shift-translated) #t)
+              #t)))))
 
 (define (rks-first-unbound-short-circuit!)
   "If the prefix up to rks_first_unbound has no binding and no
