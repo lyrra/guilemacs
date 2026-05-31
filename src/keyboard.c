@@ -2741,6 +2741,80 @@ enum rc_slot {
   RC_SLOT_ORIG_KBOARD                 = 11  /* kboard SMOB */
 };
 
+/* M6 infrastructure — slot enums for <keyremap> and <rks-state>
+   Scheme records, matching the srfi-9 slot order in
+   mod/emacs/read-key-sequence.scm.  Used by the M6 state-machine
+   migration (Steps A–F); dormant until Step B activates them.  */
+
+/* <keyremap> record slots (srfi-9 order).  */
+enum {
+  KM_SLOT_PARENT  = 0,
+  KM_SLOT_MAP     = 1,
+  KM_SLOT_START   = 2,
+  KM_SLOT_END     = 3
+};
+
+/* <rks-state> record slots (srfi-9 order).  */
+enum {
+  RKS_SLOT_KEY_COUNT                    = 0,
+  RKS_SLOT_MOCK_INPUT                   = 1,
+  RKS_SLOT_KEYBUF                       = 2,
+  RKS_SLOT_KEYS_START                   = 3,
+  RKS_SLOT_ECHO_START                   = 4,
+  RKS_SLOT_CURRENT_BINDING              = 5,
+  RKS_SLOT_FIRST_UNBOUND                = 6,
+  RKS_SLOT_FKEY                         = 7,
+  RKS_SLOT_KEYTRAN                      = 8,
+  RKS_SLOT_INDEC                        = 9,
+  RKS_SLOT_SHIFT_TRANSLATED             = 10,
+  RKS_SLOT_DELAYED_SWITCH_FRAME         = 11,
+  RKS_SLOT_ORIGINAL_UPPERCASE           = 12,
+  RKS_SLOT_ORIGINAL_UPPERCASE_POSITION  = 13,
+  RKS_SLOT_FAKE_PREFIXED_KEYS           = 14
+};
+
+/* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
+   add int / bool unboxing so bulk-subr entry caches don't need inline
+   casts.  */
+
+static inline int
+rks_get_int (SCM rec, int slot)
+{
+  return XFIXNUM (scm_struct_ref (rec, scm_from_int (slot)));
+}
+
+static inline void
+rks_set_int (SCM rec, int slot, int val)
+{
+  scm_struct_set_x (rec, scm_from_int (slot), make_fixnum (val));
+}
+
+static inline bool
+rks_get_bool (SCM rec, int slot)
+{
+  return NILP (scm_struct_ref (rec, scm_from_int (slot))) ? false : true;
+}
+
+static inline void
+rks_set_bool (SCM rec, int slot, bool val)
+{
+  scm_struct_set_x (rec, scm_from_int (slot), val ? Qt : Qnil);
+}
+
+/* M6 state stack.  Currently unused — rks_state_depth stays at 0
+   until Step B starts pushing records.  Depth is 8, matching the
+   M8 rc_record_stack budget (every read_key_sequence call chains
+   through read_char, so M6 nesting ≤ M8 nesting).  */
+enum { RKS_STATE_STACK_MAX = 8 };
+static SCM rks_state_stack[RKS_STATE_STACK_MAX];
+static int rks_state_depth;
+
+/* LOAD_STATE_FROM_SLOTS / SAVE_STATE_TO_SLOTS are defined as no-ops
+   initially.  Step B expands them to cache migrated scalars into C
+   locals.  See docs/m6-plan.org §"The #define alias cost model".  */
+#define LOAD_STATE_FROM_SLOTS(rec)  ((void)0)
+#define SAVE_STATE_TO_SLOTS(rec)    ((void)0)
+
 enum { RC_STATE_STACK_MAX = 8 };
 static SCM rc_record_stack[RC_STATE_STACK_MAX];
 static int rc_state_depth;
@@ -3529,6 +3603,41 @@ DEFUN ("--rc-record-stack-pop", Fc_rc_record_stack_pop,
   if (rc_state_depth > 0)
     rc_record_stack[--rc_state_depth] = SCM_UNDEFINED;
   return Qnil;
+}
+
+/* M6 state-stack push/pop (Step A infrastructure, dormant until
+   Step B activates the stack).  Mirrors the rc_record_stack pattern.  */
+
+DEFUN ("--rks-state-stack-push", Fc_rks_state_stack_push,
+       Sc_rks_state_stack_push, 1, 1, 0,
+       doc: /* Internal: push an <rks-state> Scheme record onto
+rks_state_stack.  See docs/m6-plan.org Step A.  */)
+  (Lisp_Object rec)
+{
+  eassert (rks_state_depth < RKS_STATE_STACK_MAX);
+  rks_state_stack[rks_state_depth++] = rec;
+  return Qnil;
+}
+
+DEFUN ("--rks-state-stack-pop", Fc_rks_state_stack_pop,
+       Sc_rks_state_stack_pop, 0, 0, 0,
+       doc: /* Internal: pop the top of rks_state_stack.  */)
+  (void)
+{
+  if (rks_state_depth > 0)
+    rks_state_stack[--rks_state_depth] = SCM_UNDEFINED;
+  return Qnil;
+}
+
+DEFUN ("--rks-state-current", Fc_rks_state_current,
+       Sc_rks_state_current, 0, 0, 0,
+       doc: /* Internal: return the top <rks-state> on the stack,
+or nil when no read_key_sequence is in flight.  */)
+  (void)
+{
+  if (rks_state_depth == 0)
+    return Qnil;
+  return rks_state_stack[rks_state_depth - 1];
 }
 
 /* C-side preamble of the read_char quit handler: stash quit_char in
