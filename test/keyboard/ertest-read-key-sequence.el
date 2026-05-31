@@ -677,7 +677,7 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6ad — unbound-event reduction
 
 (ert-deftest m6ad-helpers/exist ()
-  (should (fboundp '--rks-iter-unbound-event-reduction)))
+  (should (fboundp '--rks-reduce-mouse-event-loop)))
 
 (ert-deftest m6ad-reduction/fall-through-at-idle ()
   ;; At idle rks_key is nil — EVENT_HEAD/parse_modifiers yields no

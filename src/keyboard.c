@@ -10478,18 +10478,15 @@ Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
                          + key updated) or the loop completed without one;
                          caller continues to M6aa install.
    See docs/keyboard.org §M6ad.  */
-DEFUN ("--rks-iter-unbound-event-reduction",
-       Fc_rks_iter_unbound_event_reduction,
-       Sc_rks_iter_unbound_event_reduction, 0, 0, 0,
-       doc: /* Internal: drag/click/double/triple reduction cascade.
-See M6ad.  */)
+DEFUN ("--rks-reduce-mouse-event-loop",
+       Fc_rks_reduce_mouse_event_loop,
+       Sc_rks_reduce_mouse_event_loop, 0, 0, 0,
+       doc: /* Internal: drag/click/double/triple reduction cascade
+for rks_key.  Returns `fall-through', `replay-key', or
+`replay-sequence'.  Scheme handles the first_unbound = min(t,
+first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
   (void)
 {
-  /* Caller already verified rks_new_binding is nil (M6ab returned nil).
-     `first_unbound = min (t, first_unbound)' before EVENT_HEAD work.  */
-  if (rks_t < rks_first_unbound)
-    rks_first_unbound = rks_t;
-
   Lisp_Object head = EVENT_HEAD (rks_key);
   if (!SYMBOLP (head))
     return intern ("fall-through");

@@ -637,18 +637,20 @@ flag so this only happens once.  On non-HAVE_TEXT_CONVERSION
 builds, no-op.  See docs/keyboard.org §M6ae."
   ((force %rks-iter-maybe-disable-text-conversion)))
 
-(define %rks-iter-unbound-event-reduction
-  (delay (%c '--rks-iter-unbound-event-reduction)))
+(define %rks-reduce-mouse-event-loop
+  (delay (%c '--rks-reduce-mouse-event-loop)))
 
 (define (rks-iter-unbound-event-reduction!)
-  "Drag/click/double/triple-click reduction cascade for an unbound
-mouse event.  Walks down the modifier list (triple → double →
-single, drag → click, etc.) trying each reduced form against
-current-active-maps; bails out via replay_key/replay_sequence
-if reduced to an unbound up/down event.  Returns one of
-`replay-key', `replay-sequence', or `fall-through'.  See
-docs/keyboard.org §M6ad."
-  ((force %rks-iter-unbound-event-reduction)))
+  "M6 Step E4: unbound-event modifier-reduction cascade, partially
+decomposed.  The first_unbound = min(t, first_unbound) update moved
+to Scheme; the modifier-reduction while-loop + keyremap-reset logic
+stays in C (--rks-reduce-mouse-event-loop).  Returns `replay-key',
+`replay-sequence', or `fall-through'."
+  (let ((t ((force %rks-t)))
+        (fu ((force %rks-first-unbound))))
+    (when (< t fu)
+      ((force %set-rks-first-unbound) t)))
+  ((force %rks-reduce-mouse-event-loop)))
 
 (define %rks-iter-mouse-click-prefix
   (delay (%c '--rks-iter-mouse-click-prefix)))
