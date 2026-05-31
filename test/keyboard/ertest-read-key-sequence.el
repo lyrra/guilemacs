@@ -551,7 +551,7 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6w — shifted-function-key shift-translation
 
 (ert-deftest m6w-helpers/exist ()
-  (should (fboundp '--rks-try-shift-translation-fn-key)))
+  (should (fboundp '--rks-fn-key-shift-translate)))
 
 (ert-deftest m6w-fn-key/nil-for-symbol-without-shift ()
   ;; A symbol key like `up' has no shift modifier and isn't an

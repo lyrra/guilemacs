@@ -11186,61 +11186,62 @@ for echo handling during in-progress translations).  */)
 
 /* M6w — shifted-function-key shift-translation (block C at the
    while-loop iteration tail).  See docs/keyboard.org §M6w.  */
-DEFUN ("--rks-try-shift-translation-fn-key",
-       Fc_rks_try_shift_translation_fn_key,
-       Sc_rks_try_shift_translation_fn_key, 1, 1, 0,
-       doc: /* Internal: try the shifted-function-key shift-translation
-for KEY.  Gates on rks_current_binding nil and rks_keytran.start
->= rks_t.  Decomposes KEY via `parse_modifiers'.  If
-translate-upper-case-key-bindings is set AND the modifiers include
-shift (or KEY is a fixnum upper-case character), computes a
-strip-shift / downcased replacement, writes it into keybuf[rks_t -
-1], snapshots original_uppercase + position, sets mock_input =
-max(rks_t, rks_mock_input), zeroes rks_fkey + rks_keytran start /
-end (so function-key-map re-applies on the replacement),
-sets rks_shift_translated, and returns t (caller goto
-replay_sequence).  Otherwise nil.  Mirrors C lines 11791-11822
-pre-M6w.  */)
-  (Lisp_Object key)
+DEFUN ("--rks-fn-key-shift-translate",
+       Fc_rks_fn_key_shift_translate,
+       Sc_rks_fn_key_shift_translate, 3, 3, 0,
+       doc: /* Internal: attempt the fn-key shift-translation.
+KEY is the raw event; MODS is the modifier int from parse_modifiers;
+TRANSLATE-ENABLED is translate-upper-case-key-bindings (t or nil).
+Returns the translated key or nil.  Scheme owns the gate check and
+side effects.  */)
+  (Lisp_Object key, Lisp_Object mods, Lisp_Object translate_enabled)
 {
-  if (!NILP (rks_current_binding) || rks_keytran.start < rks_t)
+  CHECK_FIXNUM (mods);
+  int m = XFIXNUM (mods);
+
+  if (NILP (translate_enabled))
     return Qnil;
 
-  Lisp_Object breakdown = parse_modifiers (key);
-  int modifiers
-    = CONSP (breakdown) ? (XFIXNUM (XCAR (XCDR (breakdown)))) : 0;
+  if (m & shift_modifier)
+    {
+      /* Strip shift from parsed modifiers, re-apply the rest.  */
+      Lisp_Object breakdown = parse_modifiers (key);
+      if (!CONSP (breakdown))
+        return Qnil;
+      return apply_modifiers (m & ~shift_modifier, XCAR (breakdown));
+    }
+  else
+    {
+      /* Check uppercase-fixnum case.  */
+      if (!FIXNUMP (key))
+        return Qnil;
+      int ch = KEY_TO_CHAR (key);
+      if (ch >= XCHAR_TABLE (BVAR (current_buffer,
+                                   downcase_table))->header.size)
+        return Qnil;
+      if (!uppercasep (ch))
+        return Qnil;
+      return make_fixnum (downcase (ch) | m);
+    }
+}
 
-  bool uppercase_fixnum
-    = (FIXNUMP (key)
-       && (KEY_TO_CHAR (key)
-           < XCHAR_TABLE (BVAR (current_buffer,
-                                downcase_table))->header.size)
-       && uppercasep (KEY_TO_CHAR (key)));
-
-  if (!translate_upper_case_key_bindings
-      || (!(modifiers & shift_modifier) && !uppercase_fixnum))
-    return Qnil;
-
-  Lisp_Object new_key
-    = (modifiers & shift_modifier
-       ? apply_modifiers (modifiers & ~shift_modifier, XCAR (breakdown))
-       : make_fixnum (downcase (KEY_TO_CHAR (key)) | modifiers));
-
-  rks_original_uppercase          = key;
-  rks_original_uppercase_position = rks_t - 1;
-
-  if (rks_keybuf_depth > 0)
-    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t - 1] = new_key;
-  if (rks_t > rks_mock_input)
-    rks_mock_input = rks_t;
-  /* Reset fkey + keytran scans so function-key-map re-applies on
-     the down-translated key.  input-decode-map keeps its scan.  */
+DEFUN ("--rks-reset-fkey-and-keytran-scans",
+       Fc_rks_reset_fkey_and_keytran_scans,
+       Sc_rks_reset_fkey_and_keytran_scans, 0, 0, 0,
+       doc: /* Internal: reset fkey and keytran start/end to 0
+so function-key-map re-applies on the replacement key after
+shift-translation.  Used by Scheme
+rks-try-shift-translation-fn-key!.  */)
+  (void)
+{
   rks_fkey.start    = rks_fkey.end    = 0;
   rks_keytran.start = rks_keytran.end = 0;
-  rks_shift_translated = true;
-
-  return Qt;
+  return Qnil;
 }
+
+/* M6w — former --rks-try-shift-translation-fn-key bulk subr (40
+   lines), decomposed into the two shims above + Scheme logic in
+   rks-try-shift-translation-fn-key!.  See docs/m6-plan.org E2.  */
 
 /* M6v — help-char prefix check at while-loop iteration tail.
    See docs/keyboard.org §M6v.  */
