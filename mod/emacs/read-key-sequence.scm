@@ -662,16 +662,31 @@ for clicks at the start of a key sequence.  Returns one of
 C control flow.  See docs/keyboard.org §M6ac."
   ((force %rks-iter-mouse-click-prefix)))
 
-(define %rks-follow-key-and-update-first-unbound
-  (delay (%c '--rks-follow-key-and-update-first-unbound)))
+(define %rks-follow-key  (delay (%c '--rks-follow-key)))
+(define %rks-key          (delay (%c '--rks-key)))
+(define %rks-first-unbound
+  (delay (%c '--rks-first-unbound)))
+(define %set-rks-new-binding
+  (delay (%c '--set-rks-new-binding)))
+(define %set-rks-first-unbound
+  (delay (%c '--set-rks-first-unbound)))
 
 (define (rks-follow-key-and-update-first-unbound!)
-  "Compute rks_new_binding = follow_key (rks_current_binding, rks_key)
-and, when non-nil, update first_unbound = max(rks_t + 1,
-first_unbound).  Returns t if KEY was bound (caller skips the
-unbound-event reduction cascade), nil otherwise.  See
-docs/keyboard.org §M6ab."
-  ((force %rks-follow-key-and-update-first-unbound)))
+  "M6 Step E3: follow_key + first_unbound update, decomposed from C.
+Only follow_key stays in C (--rks-follow-key); the nil check and
+first_unbound update are Scheme logic.  Returns t if key was bound
+(caller skips unbound-event reduction), nil otherwise."
+  (let* ((cb  ((force %rks-current-binding)))
+         (key ((force %rks-key)))
+         (new-binding ((force %rks-follow-key) cb key)))
+    (if (%nilp new-binding)
+        #nil
+        (begin
+          ((force %set-rks-new-binding) new-binding)
+          (let ((candidate (1+ ((force %rks-t)))))
+            (when (> candidate ((force %rks-first-unbound)))
+              ((force %set-rks-first-unbound) candidate)))
+          #t))))
 
 (define %rks-iter-install-binding
   (delay (%c '--rks-iter-install-binding)))
@@ -999,6 +1014,8 @@ cached-dispatch into here."
                ,rks-iter-install-binding!)
               ;; M6ab — follow_key + first_unbound update
               (--rks-follow-key-and-update-first-unbound!
+               ,rks-follow-key-and-update-first-unbound!)
+              (--rks-follow-key-and-update-first-unbound
                ,rks-follow-key-and-update-first-unbound!)
               ;; M6ac — mouse-click prefix expansion
               (--rks-iter-mouse-click-prefix!

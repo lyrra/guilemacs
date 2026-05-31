@@ -10695,27 +10695,21 @@ read_key_sequence iteration body.  See M6ac.  */)
   return intern ("fall-through");
 }
 
-DEFUN ("--rks-follow-key-and-update-first-unbound",
-       Fc_rks_follow_key_and_update_first_unbound,
-       Sc_rks_follow_key_and_update_first_unbound, 0, 0, 0,
-       doc: /* Internal: compute rks_new_binding = follow_key
-(rks_current_binding, rks_key).  If non-nil, also update
-rks_first_unbound = max (rks_t + 1, rks_first_unbound) and return
-t (caller skips the unbound-event reduction).  Returns nil
-otherwise (caller falls through to the reduction block).
-Mirrors src/keyboard.c lines 11937-11941 pre-M6ab.  */)
-  (void)
+DEFUN ("--rks-follow-key",
+       Fc_rks_follow_key,
+       Sc_rks_follow_key, 2, 2, 0,
+       doc: /* Internal: call C follow_key (CURRENT-BINDING, KEY).
+Returns the binding or nil.  Scheme owns the first_unbound update
+logic in rks-follow-key-and-update-first-unbound!.  */)
+  (Lisp_Object current_binding, Lisp_Object key)
 {
-  rks_new_binding = follow_key (rks_current_binding, rks_key);
-  if (!NILP (rks_new_binding))
-    {
-      int candidate = rks_t + 1;
-      if (candidate > rks_first_unbound)
-        rks_first_unbound = candidate;
-      return Qt;
-    }
-  return Qnil;
+  return follow_key (current_binding, key);
 }
+
+/* M6ab — former --rks-follow-key-and-update-first-unbound bulk subr
+   (17 lines), decomposed into --rks-follow-key shim + Scheme logic
+   in rks-follow-key-and-update-first-unbound!.  See docs/m6-plan.org
+   Step E3.  */
 
 DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
        0, 0, 0,
@@ -10723,6 +10717,25 @@ DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
   (void)
 {
   return rks_new_binding;
+}
+
+DEFUN ("--set-rks-new-binding", Fc_set_rks_new_binding,
+       Sc_set_rks_new_binding, 1, 1, 0,
+       doc: /* Internal: write rks_new_binding.  */)
+  (Lisp_Object val)
+{
+  rks_new_binding = val;
+  return Qnil;
+}
+
+DEFUN ("--set-rks-first-unbound", Fc_set_rks_first_unbound,
+       Sc_set_rks_first_unbound, 1, 1, 0,
+       doc: /* Internal: write rks_first_unbound.  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  rks_first_unbound = XFIXNUM (val);
+  return Qnil;
 }
 
 DEFUN ("--rks-key", Fc_rks_key, Sc_rks_key, 0, 0, 0,

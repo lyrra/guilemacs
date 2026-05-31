@@ -652,7 +652,7 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6ab — follow_key + first_unbound update
 
 (ert-deftest m6ab-helpers/exist ()
-  (should (fboundp '--rks-follow-key-and-update-first-unbound))
+  (should (fboundp '--rks-follow-key))
   (should (fboundp '--rks-new-binding)))
 
 (ert-deftest m6ab-follow-key/nil-at-idle ()
