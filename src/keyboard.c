@@ -11038,6 +11038,18 @@ DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,
   return Qnil;
 }
 
+DEFUN ("--rks-starting-buffer", Fc_rks_starting_buffer,
+       Sc_rks_starting_buffer, 0, 0, 0,
+       doc: /* Internal: return the buffer that was current when
+read_key_sequence was entered (the `starting_buffer' local promoted
+to file-static rks_starting_buffer).  Returns nil when no
+read_key_sequence call is in flight.  */)
+  (void)
+{
+  return rks_starting_buffer
+    ? make_lisp_ptr (rks_starting_buffer, Lisp_Vectorlike) : Qnil;
+}
+
 DEFUN ("--rks-keybuf-shift-down", Fc_rks_keybuf_shift_down,
        Sc_rks_keybuf_shift_down, 1, 1, 0,
        doc: /* Internal: shift keybuf[N..rks_t-1] down to keybuf[0..rks_t-N-1].
