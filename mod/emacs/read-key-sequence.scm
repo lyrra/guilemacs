@@ -652,17 +652,19 @@ stays in C (--rks-reduce-mouse-event-loop).  Returns `replay-key',
       ((force %set-rks-first-unbound) t)))
   ((force %rks-reduce-mouse-event-loop)))
 
-(define %rks-iter-mouse-click-prefix
-  (delay (%c '--rks-iter-mouse-click-prefix)))
+(define %rks-mouse-click-prefix-body
+  (delay (%c '--rks-mouse-click-prefix-body)))
 
 (define (rks-iter-mouse-click-prefix!)
-  "Decorate rks_key with mouse-click prefix events when applicable:
-mode-line / scroll-bar fake prefix (with replay_key follow-up),
-menu-bar / tab-bar / tool-bar prefix insertion, or buffer-switch
-for clicks at the start of a key sequence.  Returns one of
-`replay-sequence', `replay-key', or `fall-through' for 3-way
-C control flow.  See docs/keyboard.org §M6ac."
-  ((force %rks-iter-mouse-click-prefix)))
+  "M6 Step E6: mouse-click prefix expansion, partially decomposed.
+The EVENT_HAS_PARAMETERS gate check moved to Scheme; the body
+(buffer-switch, mode-line/scroll-bar/tool-bar prefix insertion,
+keybuf writes) stays in C (--rks-mouse-click-prefix-body).
+Returns `replay-sequence', `replay-key', or `fall-through'."
+  (let ((key ((force %rks-key))))
+    (if (and (pair? key) (symbol? (car key)))
+        ((force %rks-mouse-click-prefix-body))
+        'fall-through)))
 
 (define %rks-follow-key  (delay (%c '--rks-follow-key)))
 (define %rks-key          (delay (%c '--rks-key)))
@@ -730,25 +732,25 @@ into the buffer if a mouse-click expands into multiple keybuf
 elements.  See docs/keyboard.org §M6y."
   ((force %rks-iter-replay-restore)))
 
-(define %rks-walk-translation-maps
-  (delay (%c '--rks-walk-translation-maps)))
+(define %rks-walk-indec          (delay (%c '--rks-walk-indec)))
+(define %rks-fkey-shortcut-or-walk
+  (delay (%c '--rks-fkey-shortcut-or-walk)))
+(define %rks-walk-keytran        (delay (%c '--rks-walk-keytran)))
 
 (define (rks-walk-translation-maps! prompt)
-  "Walk the three translation maps (input-decode-map, then
-function-key-map, then key-translation-map) over the current
-keybuf, in that order.  Each walk consumes pending unbound
-prefixes from its respective scan; the fkey walk is skipped
-entirely when current-binding is a non-keymap bound non-undefined
-value AND no input-decode-map scan is pending (the `fkey-shortcut'
-that advances rks_fkey to rks_t to keep the
-`keytran.end <= fkey.start' invariant).
+  "M6 Step E5: three-map translation walk, decomposed from a single
+99-line C bulk subr into three per-map shims orchestrated by Scheme.
 
-Returns t iff one of the three walks completed a translation —
-caller should goto replay_sequence in that case.  Returns nil if
-all three loops exhausted without a hit.
+  1. Walk indec (input-decode-map).  If hit → #t.
+  2. Fkey shortcut-or-walk (function-key-map).  If hit → #t.
+  3. Walk keytran (key-translation-map).  If hit → #t.
+  4. Nil — all three exhausted without a hit.
 
-See docs/keyboard.org §M6x."
-  ((force %rks-walk-translation-maps) prompt))
+Returns t (caller goto replay_sequence) or nil."
+  (or (not (%nilp ((force %rks-walk-indec) prompt)))
+      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
+      (not (%nilp ((force %rks-walk-keytran) prompt)))
+      #nil))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))
@@ -1002,6 +1004,8 @@ cached-dispatch into here."
                ,rks-try-shift-translation-fn-key!)
               ;; M6x — three translation-map walks
               (--rks-walk-translation-maps!
+               ,rks-walk-translation-maps!)
+              (--rks-walk-translation-maps
                ,rks-walk-translation-maps!)
               ;; M6y — per-iteration setup + replay_key restore
               (--rks-iter-setup-capture!

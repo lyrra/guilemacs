@@ -10575,15 +10575,16 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
      `fall-through' — no decoration applied.  Caller continues to
                       the follow_key dispatch.
    See docs/keyboard.org §M6ac.  */
-DEFUN ("--rks-iter-mouse-click-prefix",
-       Fc_rks_iter_mouse_click_prefix,
-       Sc_rks_iter_mouse_click_prefix, 0, 0, 0,
-       doc: /* Internal: mouse-click prefix expansion for the
-read_key_sequence iteration body.  See M6ac.  */)
+DEFUN ("--rks-mouse-click-prefix-body",
+       Fc_rks_mouse_click_prefix_body,
+       Sc_rks_mouse_click_prefix_body, 0, 0, 0,
+       doc: /* Internal: mouse-click prefix expansion body.  Caller
+(Scheme rks-iter-mouse-click-prefix!) must verify
+EVENT_HAS_PARAMETERS(rks_key) before calling.  Returns
+`replay-sequence', `replay-key', or `fall-through'.
+See M6ac / Step E6.  */)
   (void)
 {
-  if (!EVENT_HAS_PARAMETERS (rks_key))
-    return intern ("fall-through");
 
   Lisp_Object *keybuf = rks_keybuf_depth > 0
     ? rks_keybuf_stack[rks_keybuf_depth - 1] : NULL;
@@ -11094,34 +11095,19 @@ static bool keyremap_step (Lisp_Object *, volatile keyremap *, int,
                            bool, int *, Lisp_Object);
 static bool test_undefined (Lisp_Object);
 
-DEFUN ("--rks-walk-translation-maps",
-       Fc_rks_walk_translation_maps,
-       Sc_rks_walk_translation_maps, 1, 1, 0,
-       doc: /* Internal: run all three translation-map walks
-sequentially on the current keybuf.  In order:
-
-  1. Walk rks_indec from indec.end < rks_t.  If a step completes,
-     mutate rks_mock_input and return t (caller goto replay_sequence).
-  2. If rks_current_binding is a bound non-keymap and
-     rks_indec.start >= rks_t, advance rks_fkey to rks_t (fkey
-     shortcut).  Otherwise walk rks_fkey from fkey.end < indec.start;
-     on completion, mutate mock_input + indec counters and return t.
-  3. Walk rks_keytran from keytran.end < fkey.start; on completion,
-     mutate mock_input + indec + fkey counters and return t.
-
-Returns nil when all three loops exhaust without a hit (caller
-falls through to the shift-translation / help-char fallbacks).
-
-Mirrors src/keyboard.c lines 11795-11872 pre-M6x.  PROMPT is the
-read_key_sequence prompt argument (passed through to keyremap_step
-for echo handling during in-progress translations).  */)
+DEFUN ("--rks-walk-indec",
+       Fc_rks_walk_indec,
+       Sc_rks_walk_indec, 1, 1, 0,
+       doc: /* Internal: walk the input-decode-map (indec) over
+the current keybuf.  Returns t when a step completes (mock_input
+updated), nil when the walk is exhausted.  PROMPT is the
+read_key_sequence prompt for echo handling.  */)
   (Lisp_Object prompt)
 {
   if (rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
 
-  /* Walk 1: input-decode-map.  */
   while (rks_indec.end < rks_t)
     {
       int diff;
@@ -11134,46 +11120,68 @@ for echo handling during in-progress translations).  */)
           return Qt;
         }
     }
+  return Qnil;
+}
 
-  /* Fkey shortcut OR fkey walk.  */
+DEFUN ("--rks-fkey-shortcut-or-walk",
+       Fc_rks_fkey_shortcut_or_walk,
+       Sc_rks_fkey_shortcut_or_walk, 1, 1, 0,
+       doc: /* Internal: fkey (function-key-map) shortcut or walk.
+When current_binding is a bound non-keymap and no indec scan is
+pending, advance fkey past rks_t so keytran can still scan.
+Otherwise walk fkey from fkey.end < indec.start.  Returns t when
+a hit is found (mock_input + indec counters updated), nil when
+exhausted.  PROMPT is the read_key_sequence prompt.  */)
+  (Lisp_Object prompt)
+{
+  if (rks_keybuf_depth == 0)
+    return Qnil;
+  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
+
   if (!KEYMAPP (rks_current_binding)
       && !test_undefined (rks_current_binding)
       && rks_indec.start >= rks_t)
     {
-      /* There is a non-prefix binding (and no input-decode-map
-         pending) — advance fkey past the sequence so keytran can
-         still scan it.  */
       if (rks_fkey.start < rks_t)
         {
           rks_fkey.start = rks_fkey.end = rks_t;
           rks_fkey.map = rks_fkey.parent;
         }
-    }
-  else
-    {
-      /* Walk 2: function-key-map.  */
-      while (rks_fkey.end < rks_indec.start)
-        {
-          int diff;
-          bool done = keyremap_step (keybuf, &rks_fkey,
-                                     max (rks_t, rks_mock_input),
-                                     /* If we have a binding, skip
-                                        the final mapping (preserves
-                                        bound function keys).  */
-                                     (rks_fkey.end + 1 == rks_t
-                                      && test_undefined (rks_current_binding)),
-                                     &diff, prompt);
-          if (done)
-            {
-              rks_mock_input = diff + max (rks_t, rks_mock_input);
-              rks_indec.end   += diff;
-              rks_indec.start += diff;
-              return Qt;
-            }
-        }
+      return Qnil;
     }
 
-  /* Walk 3: key-translation-map.  */
+  while (rks_fkey.end < rks_indec.start)
+    {
+      int diff;
+      bool done = keyremap_step (keybuf, &rks_fkey,
+                                 max (rks_t, rks_mock_input),
+                                 (rks_fkey.end + 1 == rks_t
+                                  && test_undefined (rks_current_binding)),
+                                 &diff, prompt);
+      if (done)
+        {
+          rks_mock_input = diff + max (rks_t, rks_mock_input);
+          rks_indec.end   += diff;
+          rks_indec.start += diff;
+          return Qt;
+        }
+    }
+  return Qnil;
+}
+
+DEFUN ("--rks-walk-keytran",
+       Fc_rks_walk_keytran,
+       Sc_rks_walk_keytran, 1, 1, 0,
+       doc: /* Internal: walk the key-translation-map (keytran)
+over the current keybuf.  Returns t when a hit is found
+(mock_input + indec + fkey counters updated), nil when
+exhausted.  PROMPT is the read_key_sequence prompt.  */)
+  (Lisp_Object prompt)
+{
+  if (rks_keybuf_depth == 0)
+    return Qnil;
+  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
+
   while (rks_keytran.end < rks_fkey.start)
     {
       int diff;
@@ -11190,9 +11198,12 @@ for echo handling during in-progress translations).  */)
           return Qt;
         }
     }
-
   return Qnil;
 }
+
+/* M6x — former --rks-walk-translation-maps bulk subr (99 lines),
+   decomposed into three per-map walk shims + Scheme orchestration
+   in rks-walk-translation-maps!.  See docs/m6-plan.org Step E5.  */
 
 /* M6w — shifted-function-key shift-translation (block C at the
    while-loop iteration tail).  See docs/keyboard.org §M6w.  */

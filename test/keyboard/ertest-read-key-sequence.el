@@ -565,7 +565,9 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6x — translation-map walks
 
 (ert-deftest m6x-helpers/exist ()
-  (should (fboundp '--rks-walk-translation-maps)))
+  (should (fboundp '--rks-walk-indec))
+  (should (fboundp '--rks-fkey-shortcut-or-walk))
+  (should (fboundp '--rks-walk-keytran)))
 
 (ert-deftest m6x-walk/nil-at-idle ()
   ;; At idle the keyremap structs are all at start == end == 0 (or
@@ -667,7 +669,7 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6ac — mouse-click prefix expansion
 
 (ert-deftest m6ac-helpers/exist ()
-  (should (fboundp '--rks-iter-mouse-click-prefix)))
+  (should (fboundp '--rks-mouse-click-prefix-body)))
 
 (ert-deftest m6ac-mouse-click/fall-through-at-idle ()
   ;; rks_key is nil at idle (no in-flight read).  No mouse-event
