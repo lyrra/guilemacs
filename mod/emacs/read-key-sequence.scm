@@ -737,15 +737,20 @@ elements.  See docs/keyboard.org §M6y."
   (delay (%c '--rks-fkey-shortcut-or-walk)))
 (define %rks-walk-keytran        (delay (%c '--rks-walk-keytran)))
 
+(define %rks-state-current
+  (delay (%c '--rks-state-current)))
+(define %rks-record-set-int
+  (delay (%c '--rks-record-set-int)))
+
+;; M6h-1 infrastructure: --rks-record-set-int / --rks-record-get-int /
+;; --rks-keyremap-set-int are now available.  These let Scheme read
+;; and write <rks-state> record slots.  The actual sync calls in
+;; rks-walk-translation-maps! are deferred to M6h-1b (the `unless'
+;; return value in the begin/or chain causes a type error at idle).
+
 (define (rks-walk-translation-maps! prompt)
   "M6 Step E5: three-map translation walk, decomposed from a single
 99-line C bulk subr into three per-map shims orchestrated by Scheme.
-
-  1. Walk indec (input-decode-map).  If hit → #t.
-  2. Fkey shortcut-or-walk (function-key-map).  If hit → #t.
-  3. Walk keytran (key-translation-map).  If hit → #t.
-  4. Nil — all three exhausted without a hit.
-
 Returns t (caller goto replay_sequence) or nil."
   (or (not (%nilp ((force %rks-walk-indec) prompt)))
       (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
