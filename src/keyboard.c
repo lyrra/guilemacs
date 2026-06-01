@@ -11232,11 +11232,32 @@ DEFUN ("--rks-walk-indec",
        Fc_rks_walk_indec,
        Sc_rks_walk_indec, 1, 1, 0,
        doc: /* Internal: walk the input-decode-map (indec) over
-the current keybuf.  Returns t when a step completes (mock_input
-updated), nil when the walk is exhausted.  PROMPT is the
-read_key_sequence prompt for echo handling.  */)
+the current keybuf.  M6h-2: loads state from <rks-state> record
+before the walk and saves back after.  Returns t when a step
+completes (mock_input updated), nil when exhausted.  */)
   (Lisp_Object prompt)
 {
+  /* M6h-2: load state from record before walk.  */
+  SCM rec = SCM_UNDEFINED;
+  if (rks_state_depth > 0)
+    rec = rks_state_stack[rks_state_depth - 1];
+
+  if (!SCM_UNBNDP (rec) && !NILP (rec))
+    {
+      rks_t = rks_get_int (rec, RKS_SLOT_KEY_COUNT);
+      rks_mock_input = rks_get_int (rec, RKS_SLOT_MOCK_INPUT);
+      SCM indec_rec = scm_struct_ref (rec, scm_from_int (RKS_SLOT_INDEC));
+      if (!NILP (indec_rec))
+        {
+          rks_indec.start = rks_get_int (indec_rec, KM_SLOT_START);
+          rks_indec.end   = rks_get_int (indec_rec, KM_SLOT_END);
+          rks_indec.map    = scm_struct_ref (indec_rec,
+                                             scm_from_int (KM_SLOT_MAP));
+          rks_indec.parent = scm_struct_ref (indec_rec,
+                                             scm_from_int (KM_SLOT_PARENT));
+        }
+    }
+
   if (rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
@@ -11250,9 +11271,46 @@ read_key_sequence prompt for echo handling.  */)
       if (done)
         {
           rks_mock_input = diff + max (rks_t, rks_mock_input);
+          /* M6h-2: save state to record on early return.  */
+          if (!SCM_UNBNDP (rec) && !NILP (rec))
+            {
+              rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
+              SCM indec_rec = scm_struct_ref (rec,
+                                              scm_from_int (RKS_SLOT_INDEC));
+              if (!NILP (indec_rec))
+                {
+                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_START),
+                                    make_fixnum (rks_indec.start));
+                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_END),
+                                    make_fixnum (rks_indec.end));
+                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_MAP),
+                                    rks_indec.map);
+                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_PARENT),
+                                    rks_indec.parent);
+                }
+            }
           return Qt;
         }
     }
+
+  /* M6h-2: save state to record on normal return.  */
+  if (!SCM_UNBNDP (rec) && !NILP (rec))
+    {
+      rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
+      SCM indec_rec = scm_struct_ref (rec, scm_from_int (RKS_SLOT_INDEC));
+      if (!NILP (indec_rec))
+        {
+          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_START),
+                            make_fixnum (rks_indec.start));
+          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_END),
+                            make_fixnum (rks_indec.end));
+          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_MAP),
+                            rks_indec.map);
+          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_PARENT),
+                            rks_indec.parent);
+        }
+    }
+
   return Qnil;
 }
 

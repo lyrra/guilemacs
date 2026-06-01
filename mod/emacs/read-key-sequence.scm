@@ -794,15 +794,13 @@ START and END are the km slot indices (KM_SLOT_START=2, KM_SLOT_END=3)."
     #nil))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6 Step E5 + M6h-1: three-map translation walk with record↔file-static
-sync before/after each walk.  See docs/m6-plan.org §M6h."
-  ;; Wrap each walk in a let to avoid begin-inside-or type issues.
-  (let ((r1 (begin   ;; indec walk
-              (rks-sync-record->file-statics RKS-SLOT-INDEC 2 3)
-              ((force %rks-walk-indec) prompt)
-              (rks-sync-file-statics->record))))
+  "M6 Step E5 + M6h-2: three-map translation walk.  The indec walk
+loads/saves state from the <rks-state> record internally (M6h-2);
+fkey and keytran walks still use M6h-1 Scheme-side sync until
+M6h-4/M6h-6.  See docs/m6-plan.org §M6h."
+  (let ((r1 ((force %rks-walk-indec) prompt)))  ;; M6h-2: C-side sync
     (or (not (%nilp r1))
-        (let ((r2 (begin   ;; fkey walk
+        (let ((r2 (begin   ;; fkey walk (M6h-1 sync)
                     (rks-sync-record->file-statics RKS-SLOT-FKEY 2 3)
                     ((force %rks-fkey-shortcut-or-walk) prompt)
                     (rks-sync-file-statics->record))))
