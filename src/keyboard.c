@@ -11048,6 +11048,13 @@ DEFUN ("--rks-fkey-start", Fc_rks_fkey_start, Sc_rks_fkey_start, 0, 0, 0,
   return make_fixnum (rks_fkey.start);
 }
 
+DEFUN ("--rks-fkey-end", Fc_rks_fkey_end, Sc_rks_fkey_end, 0, 0, 0,
+       doc: /* Internal: read rks_fkey.end.  */)
+  (void)
+{
+  return make_fixnum (rks_fkey.end);
+}
+
 DEFUN ("--rks-keytran-start", Fc_rks_keytran_start, Sc_rks_keytran_start,
        0, 0, 0,
        doc: /* Internal: read rks_keytran.start.  */)
@@ -11062,6 +11069,84 @@ DEFUN ("--rks-indec-start", Fc_rks_indec_start, Sc_rks_indec_start,
   (void)
 {
   return make_fixnum (rks_indec.start);
+}
+
+DEFUN ("--rks-keytran-end", Fc_rks_keytran_end, Sc_rks_keytran_end,
+       0, 0, 0,
+       doc: /* Internal: read rks_keytran.end.  */)
+  (void)
+{
+  return make_fixnum (rks_keytran.end);
+}
+
+DEFUN ("--rks-indec-end", Fc_rks_indec_end, Sc_rks_indec_end,
+       0, 0, 0,
+       doc: /* Internal: read rks_indec.end.  */)
+  (void)
+{
+  return make_fixnum (rks_indec.end);
+}
+
+/* Keyremap field setters — added for M6h-1 Scheme-side sync.  */
+
+DEFUN ("--set-rks-fkey-start", Fc_set_rks_fkey_start,
+       Sc_set_rks_fkey_start, 1, 1, 0,
+       doc: /* Internal: write rks_fkey.start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_fkey.start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-fkey-end", Fc_set_rks_fkey_end,
+       Sc_set_rks_fkey_end, 1, 1, 0,
+       doc: /* Internal: write rks_fkey.end.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_fkey.end = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-keytran-start", Fc_set_rks_keytran_start,
+       Sc_set_rks_keytran_start, 1, 1, 0,
+       doc: /* Internal: write rks_keytran.start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_keytran.start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-keytran-end", Fc_set_rks_keytran_end,
+       Sc_set_rks_keytran_end, 1, 1, 0,
+       doc: /* Internal: write rks_keytran.end.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_keytran.end = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-indec-start", Fc_set_rks_indec_start,
+       Sc_set_rks_indec_start, 1, 1, 0,
+       doc: /* Internal: write rks_indec.start.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_indec.start = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--set-rks-indec-end", Fc_set_rks_indec_end,
+       Sc_set_rks_indec_end, 1, 1, 0,
+       doc: /* Internal: write rks_indec.end.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  rks_indec.end = XFIXNUM (n);
+  return Qnil;
 }
 
 DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,

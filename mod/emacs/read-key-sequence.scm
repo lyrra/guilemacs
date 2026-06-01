@@ -739,23 +739,76 @@ elements.  See docs/keyboard.org §M6y."
 
 (define %rks-state-current
   (delay (%c '--rks-state-current)))
+(define %rks-record-get-int
+  (delay (%c '--rks-record-get-int)))
 (define %rks-record-set-int
   (delay (%c '--rks-record-set-int)))
 
-;; M6h-1 infrastructure: --rks-record-set-int / --rks-record-get-int /
-;; --rks-keyremap-set-int are now available.  These let Scheme read
-;; and write <rks-state> record slots.  The actual sync calls in
-;; rks-walk-translation-maps! are deferred to M6h-1b (the `unless'
-;; return value in the begin/or chain causes a type error at idle).
+;; M6h-1 keyremap getter/setter delays
+(define %rks-fkey-start     (delay (%c '--rks-fkey-start)))
+(define %rks-fkey-end       (delay (%c '--rks-fkey-end)))
+(define %rks-keytran-start  (delay (%c '--rks-keytran-start)))
+(define %rks-keytran-end    (delay (%c '--rks-keytran-end)))
+(define %rks-indec-start    (delay (%c '--rks-indec-start)))
+(define %rks-indec-end      (delay (%c '--rks-indec-end)))
+(define %set-rks-fkey-start    (delay (%c '--set-rks-fkey-start)))
+(define %set-rks-fkey-end      (delay (%c '--set-rks-fkey-end)))
+(define %set-rks-keytran-start (delay (%c '--set-rks-keytran-start)))
+(define %set-rks-keytran-end   (delay (%c '--set-rks-keytran-end)))
+(define %set-rks-indec-start   (delay (%c '--set-rks-indec-start)))
+(define %set-rks-indec-end     (delay (%c '--set-rks-indec-end)))
+(define %set-rks-t          (delay (%c '--set-rks-t)))
+
+;; RKS_SLOT_* values (must match C enum in src/keyboard.c)
+(define RKS-SLOT-KEY-COUNT         0)
+(define RKS-SLOT-MOCK-INPUT        1)
+(define RKS-SLOT-KEYBUF            2)
+(define RKS-SLOT-KEYS-START        3)
+(define RKS-SLOT-ECHO-START        4)
+(define RKS-SLOT-CURRENT-BINDING   5)
+(define RKS-SLOT-FIRST-UNBOUND     6)
+(define RKS-SLOT-FKEY              7)
+(define RKS-SLOT-KEYTRAN           8)
+(define RKS-SLOT-INDEC             9)
+(define RKS-SLOT-SHIFT-TRANSLATED 10)
+
+(define (rks-sync-record->file-statics keyremap-slot start end)
+  "M6h-1: sync 4 scalar fields FROM record TO C file-statics before
+a walk call.  KEYREMAP-SLOT is RKS-SLOT-FKEY/KEYTRAN/INDEC;
+START and END are the km slot indices (KM_SLOT_START=2, KM_SLOT_END=3)."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      ((force %set-rks-t)
+       ((force %rks-record-get-int) rec RKS-SLOT-KEY-COUNT))
+      ((force %set-rks-mock-input)
+       ((force %rks-record-get-int) rec RKS-SLOT-MOCK-INPUT))
+      ;; Keyremap sync deferred to M6h-2.
+      #nil)))
+
+(define (rks-sync-file-statics->record)
+  "M6h-1: sync mock_input FROM C file-statics TO record.  Always returns #nil."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      ((force %rks-record-set-int)
+       rec RKS-SLOT-MOCK-INPUT ((force %rks-mock-input))))
+    #nil))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6 Step E5: three-map translation walk, decomposed from a single
-99-line C bulk subr into three per-map shims orchestrated by Scheme.
-Returns t (caller goto replay_sequence) or nil."
-  (or (not (%nilp ((force %rks-walk-indec) prompt)))
-      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
-      (not (%nilp ((force %rks-walk-keytran) prompt)))
-      #nil))
+  "M6 Step E5 + M6h-1: three-map translation walk with record↔file-static
+sync before/after each walk.  See docs/m6-plan.org §M6h."
+  ;; Wrap each walk in a let to avoid begin-inside-or type issues.
+  (let ((r1 (begin   ;; indec walk
+              (rks-sync-record->file-statics RKS-SLOT-INDEC 2 3)
+              ((force %rks-walk-indec) prompt)
+              (rks-sync-file-statics->record))))
+    (or (not (%nilp r1))
+        (let ((r2 (begin   ;; fkey walk
+                    (rks-sync-record->file-statics RKS-SLOT-FKEY 2 3)
+                    ((force %rks-fkey-shortcut-or-walk) prompt)
+                    (rks-sync-file-statics->record))))
+          (or (not (%nilp r2))
+              ((force %rks-walk-keytran) prompt)
+              #nil)))))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))
