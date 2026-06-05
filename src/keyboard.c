@@ -10806,6 +10806,10 @@ Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
   if (rks_keybuf_depth > 0)
     rks_keybuf_stack[rks_keybuf_depth - 1][rks_t] = rks_key;
   rks_t++;
+  /* M6i-1: keep the record slot current after increment.  */
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_KEY_COUNT, rks_t);
   if (!rks_used_mouse_menu)
     last_nonmenu_event = rks_key;
   ptrdiff_t single = this_command_key_count - rks_t;
@@ -11237,27 +11241,6 @@ before the walk and saves back after.  Returns t when a step
 completes (mock_input updated), nil when exhausted.  */)
   (Lisp_Object prompt)
 {
-  /* M6h-2: load state from record before walk.  */
-  SCM rec = SCM_UNDEFINED;
-  if (rks_state_depth > 0)
-    rec = rks_state_stack[rks_state_depth - 1];
-
-  if (!SCM_UNBNDP (rec) && !NILP (rec))
-    {
-      rks_t = rks_get_int (rec, RKS_SLOT_KEY_COUNT);
-      rks_mock_input = rks_get_int (rec, RKS_SLOT_MOCK_INPUT);
-      SCM indec_rec = scm_struct_ref (rec, scm_from_int (RKS_SLOT_INDEC));
-      if (!NILP (indec_rec))
-        {
-          rks_indec.start = rks_get_int (indec_rec, KM_SLOT_START);
-          rks_indec.end   = rks_get_int (indec_rec, KM_SLOT_END);
-          rks_indec.map    = scm_struct_ref (indec_rec,
-                                             scm_from_int (KM_SLOT_MAP));
-          rks_indec.parent = scm_struct_ref (indec_rec,
-                                             scm_from_int (KM_SLOT_PARENT));
-        }
-    }
-
   if (rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
@@ -11271,43 +11254,7 @@ completes (mock_input updated), nil when exhausted.  */)
       if (done)
         {
           rks_mock_input = diff + max (rks_t, rks_mock_input);
-          /* M6h-2: save state to record on early return.  */
-          if (!SCM_UNBNDP (rec) && !NILP (rec))
-            {
-              rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
-              SCM indec_rec = scm_struct_ref (rec,
-                                              scm_from_int (RKS_SLOT_INDEC));
-              if (!NILP (indec_rec))
-                {
-                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_START),
-                                    make_fixnum (rks_indec.start));
-                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_END),
-                                    make_fixnum (rks_indec.end));
-                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_MAP),
-                                    rks_indec.map);
-                  scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_PARENT),
-                                    rks_indec.parent);
-                }
-            }
           return Qt;
-        }
-    }
-
-  /* M6h-2: save state to record on normal return.  */
-  if (!SCM_UNBNDP (rec) && !NILP (rec))
-    {
-      rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
-      SCM indec_rec = scm_struct_ref (rec, scm_from_int (RKS_SLOT_INDEC));
-      if (!NILP (indec_rec))
-        {
-          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_START),
-                            make_fixnum (rks_indec.start));
-          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_END),
-                            make_fixnum (rks_indec.end));
-          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_MAP),
-                            rks_indec.map);
-          scm_struct_set_x (indec_rec, scm_from_int (KM_SLOT_PARENT),
-                            rks_indec.parent);
         }
     }
 
@@ -11786,6 +11733,18 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM rec = SCM_CALL_0 (rks_make_state_proc);
     eassert (rks_state_depth < RKS_STATE_STACK_MAX);
     rks_state_stack[rks_state_depth++] = rec;
+    /* M6i: load all 7 migrated scalars from the record at entry.
+       For the outermost call the record defaults (0/nil/false)
+       match the static zero-init.  For nested calls (recursive
+       edit), this restores the saved state.  */
+    rks_t = rks_get_int (rec, RKS_SLOT_KEY_COUNT);
+    rks_mock_input = rks_get_int (rec, RKS_SLOT_MOCK_INPUT);
+    rks_current_binding = scm_struct_ref (rec,
+                             scm_from_int (RKS_SLOT_CURRENT_BINDING));
+    rks_first_unbound = rks_get_int (rec, RKS_SLOT_FIRST_UNBOUND);
+    rks_shift_translated = rks_get_bool (rec, RKS_SLOT_SHIFT_TRANSLATED);
+    rks_echo_start = rks_get_int (rec, RKS_SLOT_ECHO_START);
+    rks_keys_start = rks_get_int (rec, RKS_SLOT_KEYS_START);
   }
 
   /* How many keys there are in the current key sequence.

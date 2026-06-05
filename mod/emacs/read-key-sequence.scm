@@ -772,41 +772,105 @@ elements.  See docs/keyboard.org §M6y."
 (define RKS-SLOT-INDEC             9)
 (define RKS-SLOT-SHIFT-TRANSLATED 10)
 
-(define (rks-sync-record->file-statics keyremap-slot start end)
-  "M6h-1: sync 4 scalar fields FROM record TO C file-statics before
-a walk call.  KEYREMAP-SLOT is RKS-SLOT-FKEY/KEYTRAN/INDEC;
-START and END are the km slot indices (KM_SLOT_START=2, KM_SLOT_END=3)."
-  (let ((rec ((force %rks-state-current))))
-    (when (not (%nilp rec))
-      ((force %set-rks-t)
-       ((force %rks-record-get-int) rec RKS-SLOT-KEY-COUNT))
-      ((force %set-rks-mock-input)
-       ((force %rks-record-get-int) rec RKS-SLOT-MOCK-INPUT))
-      ;; Keyremap sync deferred to M6h-2.
-      #nil)))
+;; M6h — Scheme-side record↔file-static sync infrastructure.
+;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch
+;; helpers.  See docs/m6-plan-revised.org.
+;;
+;; Currently supported fields: `t', `mock-input'.  Keyremap fields
+;; (indec/fkey/keytran .start/.end/.map/.parent) are intentionally
+;; NOT synced through the record — the walks read and mutate them
+;; via C file-statics directly, same as the pre-M6 C bulk subr.
+;; The required record-side accessors (--rks-record-get-slot,
+;; --rks-keyremap-get-int) don't exist yet; they'll be added when
+;; M6i actually retires the keyremap file-statics.
 
-(define (rks-sync-file-statics->record)
-  "M6h-1: sync mock_input FROM C file-statics TO record.  Always returns #nil."
-  (let ((rec ((force %rks-state-current))))
-    (when (not (%nilp rec))
-      ((force %rks-record-set-int)
-       rec RKS-SLOT-MOCK-INPUT ((force %rks-mock-input))))
-    #nil))
+(define (rks-sync-read rec field)
+  "Sync one field FROM record TO C file-static.  Returns #nil."
+  (case field
+    ((t)          ((force %set-rks-t)
+                   ((force %rks-record-get-int) rec RKS-SLOT-KEY-COUNT)))
+    ((mock-input) ((force %set-rks-mock-input)
+                   ((force %rks-record-get-int) rec RKS-SLOT-MOCK-INPUT)))
+    (else (error "rks-sync-read: unknown field" field)))
+  #nil)
+
+(define (rks-sync-write rec field)
+  "Sync one field FROM C file-static TO record.  Returns #nil."
+  (case field
+    ((mock-input) ((force %rks-record-set-int)
+                   rec RKS-SLOT-MOCK-INPUT ((force %rks-mock-input))))
+    ((t)          ((force %rks-record-set-int)
+                   rec RKS-SLOT-KEY-COUNT ((force %rks-t))))
+    (else (error "rks-sync-write: unknown field" field)))
+  #nil)
+
+;; M6h — Scheme-side record↔file-static sync macro.
+;;
+;; Wraps a C shim call with:
+;;   1. Pre-sync: read each read-field from record into C file-static.
+;;   2. Body: the C shim call.
+;;   3. Post-sync via dynamic-wind: write each write-field from C
+;;      file-static back to record.  Runs on normal return AND on
+;;      non-local exit (exception / prompt-abort), so the record
+;;      can never lag the file-statics across a fault.
+;;
+;; When no record is active (rks_state_depth == 0), the syncs are
+;; no-ops and the body runs unchanged.
+
+(define-syntax with-rks-sync
+  (syntax-rules ()
+    "Wrap BODY with record↔file-static sync.  READ-FIELDS synced from
+record to C before BODY; WRITE-FIELDS from C to record after,
+including on non-local exit.
+
+Note: dynamic-wind is used for the post-sync to guarantee it runs
+on exception / prompt-abort.  In Guilemacs, read_char uses
+call_with_prompt for quit handling — if the prompt traverses this
+sync boundary, the after-thunk will fire on each crossing.  The
+post-sync is idempotent (read file-static, write record), so
+multiple firings are safe."
+    ((_ (read read-fields ...) (write write-fields ...) body ...)
+     (let ((rec ((force %rks-state-current))))
+       (when (not (%nilp rec))
+         (rks-sync-read rec 'read-fields) ...)
+       (dynamic-wind
+         (lambda () #f)
+         (lambda () (begin body ...))
+         (lambda ()
+           (when (not (%nilp rec))
+             (rks-sync-write rec 'write-fields) ...)))))))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6 Step E5 + M6h-2: three-map translation walk.  The indec walk
-loads/saves state from the <rks-state> record internally (M6h-2);
-fkey and keytran walks still use M6h-1 Scheme-side sync until
-M6h-4/M6h-6.  See docs/m6-plan.org §M6h."
-  (let ((r1 ((force %rks-walk-indec) prompt)))  ;; M6h-2: C-side sync
-    (or (not (%nilp r1))
-        (let ((r2 (begin   ;; fkey walk (M6h-1 sync)
-                    (rks-sync-record->file-statics RKS-SLOT-FKEY 2 3)
-                    ((force %rks-fkey-shortcut-or-walk) prompt)
-                    (rks-sync-file-statics->record))))
-          (or (not (%nilp r2))
-              ((force %rks-walk-keytran) prompt)
-              #nil)))))
+  "M6 Step E5: three-map translation walk, decomposed from a single
+99-line C bulk subr into three per-map shims orchestrated by Scheme.
+Returns t (caller goto replay_sequence) or nil.
+
+M6h-r* (Scheme-side record↔file-static sync): NOT applied here.
+The proposed sync clobbers state — see analysis below.  The walks
+share `rks_t' / `rks_mock_input' / `rks_indec' / `rks_fkey' /
+`rks_keytran' via C file-statics directly, same shape as the
+pre-M6 C bulk subr.
+
+Why no sync:
+  - The C side advances `rks_t++' in the outer read_key_sequence
+    loop but never writes the advanced value back to the record's
+    slot.  So the record's t stays at 0 (the make-rks-state init).
+  - A pre-sync that reads t from record into the file-static would
+    clobber the live, advancing rks_t back to 0 every iteration —
+    the state machine never makes progress, m7b1 tests see EOF.
+  - The sync would also provide bookkeeping for a Scheme consumer
+    of the record between bulk-subr calls, but no such consumer
+    exists yet.
+
+When M6i actually retires a file-static (e.g. rks_t → record-slot
++ C local), the sync logic for that field is added in the SAME
+commit, scoped to the field being retired.  Until then the
+infrastructure (with-rks-sync macro, rks-sync-read/write) is in
+place but not wired into the hot path.  See docs/m6-plan-revised.org."
+  (or (not (%nilp ((force %rks-walk-indec) prompt)))
+      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
+      (not (%nilp ((force %rks-walk-keytran) prompt)))
+      #nil))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))
