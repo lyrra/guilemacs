@@ -841,36 +841,19 @@ multiple firings are safe."
              (rks-sync-write rec 'write-fields) ...)))))))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6 Step E5: three-map translation walk, decomposed from a single
-99-line C bulk subr into three per-map shims orchestrated by Scheme.
-Returns t (caller goto replay_sequence) or nil.
-
-M6h-r* (Scheme-side record↔file-static sync): NOT applied here.
-The proposed sync clobbers state — see analysis below.  The walks
-share `rks_t' / `rks_mock_input' / `rks_indec' / `rks_fkey' /
-`rks_keytran' via C file-statics directly, same shape as the
-pre-M6 C bulk subr.
-
-Why no sync:
-  - The C side advances `rks_t++' in the outer read_key_sequence
-    loop but never writes the advanced value back to the record's
-    slot.  So the record's t stays at 0 (the make-rks-state init).
-  - A pre-sync that reads t from record into the file-static would
-    clobber the live, advancing rks_t back to 0 every iteration —
-    the state machine never makes progress, m7b1 tests see EOF.
-  - The sync would also provide bookkeeping for a Scheme consumer
-    of the record between bulk-subr calls, but no such consumer
-    exists yet.
-
-When M6i actually retires a file-static (e.g. rks_t → record-slot
-+ C local), the sync logic for that field is added in the SAME
-commit, scoped to the field being retired.  Until then the
-infrastructure (with-rks-sync macro, rks-sync-read/write) is in
-place but not wired into the hot path.  See docs/m6-plan-revised.org."
-  (or (not (%nilp ((force %rks-walk-indec) prompt)))
-      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
-      (not (%nilp ((force %rks-walk-keytran) prompt)))
-      #nil))
+  "M6h-r7: three-map translation walk with Scheme-side sync.
+Pre-syncs t and mock_input from the record (now kept current by
+M6i-1/2 entry loads + install-binding write-back); post-syncs
+mock_input back.  Keyremap field sync deferred to M6i-keyremap."
+  (with-rks-sync (read t mock-input) (write mock-input)
+    (let ((r1 ((force %rks-walk-indec) prompt)))
+      (or (not (%nilp r1))
+          (with-rks-sync (read t mock-input) (write mock-input)
+            (let ((r2 ((force %rks-fkey-shortcut-or-walk) prompt)))
+              (or (not (%nilp r2))
+                  (with-rks-sync (read t mock-input) (write mock-input)
+                    ((force %rks-walk-keytran) prompt))
+                  #nil)))))))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))
