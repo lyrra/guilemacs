@@ -12367,42 +12367,23 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	}
 
     have_key:
-      /* Wave B: upper have_key cascade (mouse-click, follow-key,
-	 unbound-reduction, install-binding) folded into one Scheme
-	 dispatch.  */
+      /* Wave B: full have_key: body in a single Scheme orchestrator
+	 call.  Returns `replay-sequence', `replay-key', `done',
+	 or `fall-through'.  */
       {
-	static SCM rks_dispatch_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_dispatch_proc))
-	  rks_dispatch_proc =
+	static SCM rks_orch_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_orch_proc))
+	  rks_orch_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-have-key-dispatch!");
-	SCM result = SCM_CALL_0 (rks_dispatch_proc);
+			      "rks-have-key-orchestrator!");
+	SCM result = SCM_CALL_2 (rks_orch_proc, key, prompt);
 	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
 	if (scm_is_eq (result, intern ("replay-key")))
 	  goto replay_key;
-	/* else: `fall-through' — continue to cascade.  */
-      }
-
-      /* M6x: three translation-map walks (input-decode-map, fkey,
-	 keytran) plus the fkey-shortcut, ported to Scheme
-	 `rks-walk-translation-maps!'.  Returns t iff any walk found
-	 a binding; caller goes to replay_sequence in that case.  See
-	 docs/keyboard.org §M6x.  */
-      /* Wave B: walks + shift + help-char + fn-key folded into one
-	 Scheme cascade dispatch.  */
-      {
-	static SCM rks_cascade_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_cascade_proc))
-	  rks_cascade_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-have-key-cascade!");
-	SCM result = SCM_CALL_2 (rks_cascade_proc, key, prompt);
-	if (scm_is_eq (result, intern ("replay-sequence")))
-	  goto replay_sequence;
 	if (scm_is_eq (result, intern ("done")))
 	  goto done;
-	/* else: `fall-through' — continue to next block.  */
+	/* else: `fall-through'.  */
       }
     }
   read_key_sequence_cmd = current_binding;

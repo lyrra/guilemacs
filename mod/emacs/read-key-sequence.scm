@@ -37,8 +37,7 @@
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
             rks-try-shift-translation-simple!
-            rks-have-key-dispatch!
-            rks-have-key-cascade!
+            rks-have-key-orchestrator!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
             rks-walk-translation-maps!
@@ -971,9 +970,9 @@ shape compiles cleanly."
 ;; return symbols.  Called from read_key_sequence's have_key:
 ;; cascade; C dispatches goto based on the symbol.
 
-(define (rks-have-key-dispatch!)
-  "Wave B — mouse-click + follow-key + unbound-reduction + install.
-Returns `replay-sequence', `replay-key', or `fall-through'."
+(define (rks-have-key-orchestrator! key prompt)
+  "Wave B — full have_key: body folded into one Scheme call.
+Returns `replay-sequence', `replay-key', `done', or `fall-through'."
   (let ((mc (rks-iter-mouse-click-prefix!)))
     (cond
      ((eq? mc 'replay-sequence) 'replay-sequence)
@@ -984,7 +983,17 @@ Returns `replay-sequence', `replay-key', or `fall-through'."
             (begin
               (rks-iter-install-binding!
                ((force %rks-new-binding)))
-              'fall-through)
+              ;; fall through to cascade below
+              (cond
+               ((not (%nilp (rks-walk-translation-maps! prompt)))
+                'replay-sequence)
+               ((not (%nilp (rks-try-shift-translation-simple! key)))
+                'replay-sequence)
+               ((not (%nilp (rks-try-help-char! key)))
+                'done)
+               ((not (%nilp (rks-try-shift-translation-fn-key! key)))
+                'replay-sequence)
+               (else 'fall-through)))
             (let ((reduction (rks-iter-unbound-event-reduction!)))
               (cond
                ((eq? reduction 'replay-key)      'replay-key)
@@ -992,22 +1001,17 @@ Returns `replay-sequence', `replay-key', or `fall-through'."
                (else
                 (rks-iter-install-binding!
                  ((force %rks-new-binding)))
-                'fall-through)))))))))
-
-(define (rks-have-key-cascade! key prompt)
-  "Wave B — translation walks + shift-translation + help-char cascade.
-Returns `replay-sequence', `done', or `fall-through'."
-  (cond
-   ((not (%nilp (rks-walk-translation-maps! prompt)))
-    'replay-sequence)
-   ((not (%nilp (rks-try-shift-translation-simple! key)))
-    'replay-sequence)
-   ((not (%nilp (rks-try-help-char! key)))
-    'done)
-   ((not (%nilp (rks-try-shift-translation-fn-key! key)))
-    'replay-sequence)
-   (else
-    'fall-through)))
+                ;; fall through to cascade
+                (cond
+                 ((not (%nilp (rks-walk-translation-maps! prompt)))
+                  'replay-sequence)
+                 ((not (%nilp (rks-try-shift-translation-simple! key)))
+                  'replay-sequence)
+                 ((not (%nilp (rks-try-help-char! key)))
+                  'done)
+                 ((not (%nilp (rks-try-shift-translation-fn-key! key)))
+                  'replay-sequence)
+                 (else 'fall-through)))))))))))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
@@ -1245,6 +1249,9 @@ cached-dispatch into here."
                ,rks-follow-key-and-update-first-unbound!)
               (--rks-follow-key-and-update-first-unbound
                ,rks-follow-key-and-update-first-unbound!)
+              ;; Wave B — have_key: orchestrator
+              (--rks-have-key-orchestrator!
+               ,rks-have-key-orchestrator!)
               ;; M6ac — mouse-click prefix expansion
               (--rks-iter-mouse-click-prefix!
                ,rks-iter-mouse-click-prefix!)
