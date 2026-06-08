@@ -37,6 +37,7 @@
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
             rks-try-shift-translation-simple!
+            rks-have-key-dispatch!
             rks-have-key-cascade!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
@@ -680,6 +681,8 @@ remain bare file-static reads."
 (define %rks-key          (delay (%c '--rks-key)))
 (define %rks-first-unbound
   (delay (%c '--rks-first-unbound)))
+(define %rks-new-binding
+  (delay (%c '--rks-new-binding)))
 (define %set-rks-new-binding
   (delay (%c '--set-rks-new-binding)))
 (define %set-rks-first-unbound
@@ -964,9 +967,32 @@ shape compiles cleanly."
                   (rks-sync-write rec 'shift-translated))
                 #t))))))
 
-;; Wave B: dispatch-wrapper that folds the call+goto decision into a
-;; single return symbol.  Called from read_key_sequence's have_key:
-;; cascade; the return symbol tells C which label to jump to.
+;; Wave B: dispatch wrappers that fold call+goto decisions into
+;; return symbols.  Called from read_key_sequence's have_key:
+;; cascade; C dispatches goto based on the symbol.
+
+(define (rks-have-key-dispatch!)
+  "Wave B — mouse-click + follow-key + unbound-reduction + install.
+Returns `replay-sequence', `replay-key', or `fall-through'."
+  (let ((mc (rks-iter-mouse-click-prefix!)))
+    (cond
+     ((eq? mc 'replay-sequence) 'replay-sequence)
+     ((eq? mc 'replay-key)      'replay-key)
+     (else
+      (let ((bound (rks-follow-key-and-update-first-unbound!)))
+        (if (not (%nilp bound))
+            (begin
+              (rks-iter-install-binding!
+               ((force %rks-new-binding)))
+              'fall-through)
+            (let ((reduction (rks-iter-unbound-event-reduction!)))
+              (cond
+               ((eq? reduction 'replay-key)      'replay-key)
+               ((eq? reduction 'replay-sequence) 'replay-sequence)
+               (else
+                (rks-iter-install-binding!
+                 ((force %rks-new-binding)))
+                'fall-through)))))))))
 
 (define (rks-have-key-cascade! key prompt)
   "Wave B — translation walks + shift-translation + help-char cascade.

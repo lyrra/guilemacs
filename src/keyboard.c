@@ -12367,76 +12367,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	}
 
     have_key:
-      /* M6z: control reaches here either by falling through the
-	 read_char branch above OR by `goto have_key' from the
-	 cached-SCM dispatch when its return was `mock'.  rks_key
-	 and rks_used_mouse_menu are valid at this point.  */
-
-      /* M6ac: mouse-click prefix expansion ported to Scheme
-	 `rks-iter-mouse-click-prefix!'.  Decorates rks_key with
-	 mode-line / menu-bar / tab-bar / tool-bar / scroll-bar
-	 prefixes, handles buffer-switch for clicks at sequence
-	 start.  Returns one of `replay-sequence' / `replay-key' /
-	 `fall-through' for 3-way control flow.  See
-	 docs/keyboard.org §M6ac.  */
+      /* Wave B: upper have_key cascade (mouse-click, follow-key,
+	 unbound-reduction, install-binding) folded into one Scheme
+	 dispatch.  */
       {
-	static SCM rks_mouse_click_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_mouse_click_proc))
-	  rks_mouse_click_proc =
+	static SCM rks_dispatch_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_dispatch_proc))
+	  rks_dispatch_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-mouse-click-prefix!");
-	SCM result = SCM_CALL_0 (rks_mouse_click_proc);
+			      "rks-have-key-dispatch!");
+	SCM result = SCM_CALL_0 (rks_dispatch_proc);
 	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
 	if (scm_is_eq (result, intern ("replay-key")))
 	  goto replay_key;
-	/* else: `fall-through' — continue to follow_key dispatch.  */
-      }
-
-      /* M6ab: follow_key + first_unbound update ported to Scheme
-	 `rks-follow-key-and-update-first-unbound!'.  Returns t iff
-	 KEY was bound (caller skips the unbound-event reduction
-	 cascade in the `else' branch).  See docs/keyboard.org §M6ab.  */
-      {
-	static SCM rks_follow_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_follow_proc))
-	  rks_follow_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-follow-key-and-update-first-unbound!");
-	if (NILP (SCM_CALL_0 (rks_follow_proc)))
-	{
-	  /* M6ad: unbound-event reduction cascade ported to Scheme
-	     `rks-iter-unbound-event-reduction!'.  Returns one of
-	     `replay-key', `replay-sequence', or `fall-through'.
-	     See docs/keyboard.org §M6ad.  */
-	  static SCM rks_reduce_proc = SCM_UNDEFINED;
-	  if (SCM_UNBNDP (rks_reduce_proc))
-	    rks_reduce_proc =
-	      scm_c_public_ref ("emacs read-key-sequence",
-				"rks-iter-unbound-event-reduction!");
-	  SCM result = SCM_CALL_0 (rks_reduce_proc);
-	  if (scm_is_eq (result, intern ("replay-key")))
-	    goto replay_key;
-	  if (scm_is_eq (result, intern ("replay-sequence")))
-	    goto replay_sequence;
-	  /* else: `fall-through' — continue to M6aa install.  */
-	}
-      }   /* M6ab: close the dispatch outer block (opened above the
-	     `if (NILP (SCM_CALL_0 (rks_follow_proc)))') */
-
-      /* M6aa: final binding-install + per-key bookkeeping ported to
-	 Scheme `rks-iter-install-binding!'.  Writes new_binding into
-	 rks_current_binding, advances rks_t with the new keybuf
-	 element, updates last_nonmenu_event when the key didn't come
-	 from a mouse menu, and clamps this_single_command_key_start.
-	 See docs/keyboard.org §M6aa.  */
-      {
-	static SCM rks_install_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_install_proc))
-	  rks_install_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-install-binding!");
-	SCM_CALL_1 (rks_install_proc, new_binding);
+	/* else: `fall-through' — continue to cascade.  */
       }
 
       /* M6x: three translation-map walks (input-decode-map, fkey,
