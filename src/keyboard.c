@@ -10790,6 +10790,9 @@ DEFUN ("--set-rks-first-unbound", Fc_set_rks_first_unbound,
 {
   CHECK_FIXNUM (val);
   rks_first_unbound = XFIXNUM (val);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
   return Qnil;
 }
 
@@ -10832,6 +10835,11 @@ Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
   (Lisp_Object new_binding)
 {
   rks_current_binding = new_binding;
+  /* M6i wave A: write current_binding back to record.  */
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_CURRENT_BINDING),
+                      rks_current_binding);
   if (rks_keybuf_depth > 0)
     rks_keybuf_stack[rks_keybuf_depth - 1][rks_t] = rks_key;
   rks_t++;
@@ -11292,6 +11300,9 @@ completes (mock_input updated), nil when exhausted.  */)
       if (done)
         {
           rks_mock_input = diff + max (rks_t, rks_mock_input);
+          if (rks_state_depth > 0)
+            rks_set_int (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
           return Qt;
         }
     }
@@ -11339,6 +11350,9 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
           rks_mock_input = diff + max (rks_t, rks_mock_input);
           rks_indec.end   += diff;
           rks_indec.start += diff;
+          if (rks_state_depth > 0)
+            rks_set_int (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
           return Qt;
         }
     }
@@ -11371,6 +11385,9 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
           rks_indec.start += diff;
           rks_fkey.end    += diff;
           rks_fkey.start  += diff;
+          if (rks_state_depth > 0)
+            rks_set_int (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
           return Qt;
         }
     }
