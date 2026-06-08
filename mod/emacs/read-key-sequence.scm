@@ -659,15 +659,21 @@ builds, no-op.  See docs/keyboard.org §M6ae."
   (delay (%c '--rks-mouse-click-prefix-body)))
 
 (define (rks-iter-mouse-click-prefix!)
-  "M6 Step E6: mouse-click prefix expansion, partially decomposed.
-The EVENT_HAS_PARAMETERS gate check moved to Scheme; the body
-(buffer-switch, mode-line/scroll-bar/tool-bar prefix insertion,
-keybuf writes) stays in C (--rks-mouse-click-prefix-body).
-Returns `replay-sequence', `replay-key', or `fall-through'."
-  (let ((key ((force %rks-key))))
-    (if (and (pair? key) (symbol? (car key)))
-        ((force %rks-mouse-click-prefix-body))
-        'fall-through)))
+  "M6h-r5: mouse-click prefix expansion with inline record sync.
+Syncs record-resident fields (key-count, mock-input) only;
+iteration-locals (key, last_real_key_start, fake_prefixed_keys)
+remain bare file-static reads."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'mock-input))
+    (let ((key ((force %rks-key))))
+      (if (and (pair? key) (symbol? (car key)))
+          (let ((result ((force %rks-mouse-click-prefix-body))))
+            (when (not (%nilp rec))
+              (rks-sync-write rec 'mock-input))
+            result)
+          'fall-through))))
 
 (define %rks-follow-key  (delay (%c '--rks-follow-key)))
 (define %rks-key          (delay (%c '--rks-key)))
