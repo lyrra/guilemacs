@@ -703,12 +703,15 @@ Returns `replay-sequence', `replay-key', or `fall-through'."
   (delay (%c '--rks-iter-install-binding)))
 
 (define (rks-iter-install-binding! new-binding)
-  "Install NEW-BINDING as the resolved rks_current_binding for this
-iteration.  Advances rks_t with the new keybuf element, updates
-last_nonmenu_event unless the key came from a mouse menu, and
-clamps this_single_command_key_start to >= 0 (Bug#20223).  See
-docs/keyboard.org §M6aa."
-  ((force %rks-iter-install-binding) new-binding))
+  "M6h-r4: install binding with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'current-binding))
+    ((force %rks-iter-install-binding) new-binding)
+    (when (not (%nilp rec))
+      (rks-sync-write rec 'key-count)
+      (rks-sync-write rec 'current-binding))))
 
 (define %rks-iter-pre-read-cascade
   (delay (%c '--rks-iter-pre-read-cascade)))
