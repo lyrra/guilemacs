@@ -676,10 +676,11 @@ Returns `replay-sequence', `replay-key', or `fall-through'."
   (delay (%c '--set-rks-first-unbound)))
 
 (define (rks-follow-key-and-update-first-unbound!)
-  "M6 Step E3: follow_key + first_unbound update, decomposed from C.
-Only follow_key stays in C (--rks-follow-key); the nil check and
-first_unbound update are Scheme logic.  Returns t if key was bound
-(caller skips unbound-event reduction), nil otherwise."
+  "M6 Step E3: follow_key + first_unbound update.  Bare body, no
+record↔file-static sync wrapper.  Mid-function writebacks
+(Wave-A) keep the record current for any external consumer; this
+procedure reads file-statics directly via the existing --rks-*
+getters and doesn't need wrapper-boundary sync."
   (let* ((cb  ((force %rks-current-binding)))
          (key ((force %rks-key)))
          (new-binding ((force %rks-follow-key) cb key)))
@@ -743,6 +744,12 @@ elements.  See docs/keyboard.org §M6y."
   (delay (%c '--rks-record-get-int)))
 (define %rks-record-set-int
   (delay (%c '--rks-record-set-int)))
+(define %rks-record-get
+  (delay (%c '--rks-record-get)))
+(define %rks-record-set
+  (delay (%c '--rks-record-set)))
+(define %set-rks-current-binding
+  (delay (%c '--set-rks-current-binding)))
 
 ;; M6h-1 keyremap getter/setter delays
 (define %rks-fkey-start     (delay (%c '--rks-fkey-start)))
@@ -787,20 +794,36 @@ elements.  See docs/keyboard.org §M6y."
 (define (rks-sync-read rec field)
   "Sync one field FROM record TO C file-static.  Returns #nil."
   (case field
-    ((t)          ((force %set-rks-t)
-                   ((force %rks-record-get-int) rec RKS-SLOT-KEY-COUNT)))
-    ((mock-input) ((force %set-rks-mock-input)
-                   ((force %rks-record-get-int) rec RKS-SLOT-MOCK-INPUT)))
+    ((key-count)       ((force %set-rks-t)
+                        ((force %rks-record-get-int)
+                         rec RKS-SLOT-KEY-COUNT)))
+    ((mock-input)      ((force %set-rks-mock-input)
+                        ((force %rks-record-get-int)
+                         rec RKS-SLOT-MOCK-INPUT)))
+    ((current-binding) ((force %set-rks-current-binding)
+                        ((force %rks-record-get)
+                         rec RKS-SLOT-CURRENT-BINDING)))
+    ((first-unbound)   ((force %set-rks-first-unbound)
+                        ((force %rks-record-get-int)
+                         rec RKS-SLOT-FIRST-UNBOUND)))
     (else (error "rks-sync-read: unknown field" field)))
   #nil)
 
 (define (rks-sync-write rec field)
   "Sync one field FROM C file-static TO record.  Returns #nil."
   (case field
-    ((mock-input) ((force %rks-record-set-int)
-                   rec RKS-SLOT-MOCK-INPUT ((force %rks-mock-input))))
-    ((t)          ((force %rks-record-set-int)
-                   rec RKS-SLOT-KEY-COUNT ((force %rks-t))))
+    ((mock-input)      ((force %rks-record-set-int)
+                        rec RKS-SLOT-MOCK-INPUT
+                        ((force %rks-mock-input))))
+    ((key-count)       ((force %rks-record-set-int)
+                        rec RKS-SLOT-KEY-COUNT
+                        ((force %rks-t))))
+    ((current-binding) ((force %rks-record-set)
+                        rec RKS-SLOT-CURRENT-BINDING
+                        ((force %rks-current-binding))))
+    ((first-unbound)   ((force %rks-record-set-int)
+                        rec RKS-SLOT-FIRST-UNBOUND
+                        ((force %rks-first-unbound))))
     (else (error "rks-sync-write: unknown field" field)))
   #nil)
 
@@ -817,6 +840,14 @@ elements.  See docs/keyboard.org §M6y."
 ;; When no record is active (rks_state_depth == 0), the syncs are
 ;; no-ops and the body runs unchanged.
 
+(define (rks--sync-read-fields rec fields)
+  "Run rks-sync-read for each field in FIELDS list."
+  (for-each (lambda (f) (rks-sync-read rec f)) fields))
+
+(define (rks--sync-write-fields rec fields)
+  "Run rks-sync-write for each field in FIELDS list."
+  (for-each (lambda (f) (rks-sync-write rec f)) fields))
+
 (define-syntax with-rks-sync
   (syntax-rules ()
     "Wrap BODY with record↔file-static sync.  READ-FIELDS synced from
@@ -828,32 +859,38 @@ on exception / prompt-abort.  In Guilemacs, read_char uses
 call_with_prompt for quit handling — if the prompt traverses this
 sync boundary, the after-thunk will fire on each crossing.  The
 post-sync is idempotent (read file-static, write record), so
-multiple firings are safe."
+multiple firings are safe.
+
+Implementation note: the field lists are built as quoted lists
+(=(list 'read-fields ...)=) and dispatched via a helper procedure
+rather than as macro-template repetitions of =(quote read-fields)
+...=.  The latter shape produced an \"Unbound variable: key-count\"
+error in the Guilemacs syntax-rules expander; the helper-procedure
+shape compiles cleanly."
     ((_ (read read-fields ...) (write write-fields ...) body ...)
      (let ((rec ((force %rks-state-current))))
        (when (not (%nilp rec))
-         (rks-sync-read rec 'read-fields) ...)
+         (rks--sync-read-fields rec (list 'read-fields ...)))
        (dynamic-wind
          (lambda () #f)
          (lambda () (begin body ...))
          (lambda ()
            (when (not (%nilp rec))
-             (rks-sync-write rec 'write-fields) ...)))))))
+             (rks--sync-write-fields rec (list 'write-fields ...)))))))))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6h-r7: three-map translation walk with Scheme-side sync.
-Pre-syncs t and mock_input from the record (now kept current by
-M6i-1/2 entry loads + install-binding write-back); post-syncs
-mock_input back.  Keyremap field sync deferred to M6i-keyremap."
-  (with-rks-sync (read t mock-input) (write mock-input)
-    (let ((r1 ((force %rks-walk-indec) prompt)))
-      (or (not (%nilp r1))
-          (with-rks-sync (read t mock-input) (write mock-input)
-            (let ((r2 ((force %rks-fkey-shortcut-or-walk) prompt)))
-              (or (not (%nilp r2))
-                  (with-rks-sync (read t mock-input) (write mock-input)
-                    ((force %rks-walk-keytran) prompt))
-                  #nil)))))))
+  "M6 Step E5: three-map translation walk.  Bare or-chain; no
+record↔file-static sync wrapper.  The walks share `rks_t' /
+`rks_mock_input' via C file-statics directly, same shape as the
+pre-M6h C bulk subr.  Mid-function writebacks (M6i-1 / Wave-A) keep
+the record current for any external consumer; nothing in this
+dispatch path reads from the record between walks, so wrapper-
+boundary sync is unnecessary and provoked the m7b1 abort when
+mock-input was pre-synced from a stale record slot."
+  (or (not (%nilp ((force %rks-walk-indec) prompt)))
+      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
+      (not (%nilp ((force %rks-walk-keytran) prompt)))
+      #nil))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))

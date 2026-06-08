@@ -3651,6 +3651,27 @@ DEFUN ("--rks-record-get-int", Fc_rks_record_get_int,
   return make_fixnum (rks_get_int (rec, XFIXNUM (slot)));
 }
 
+DEFUN ("--rks-record-get", Fc_rks_record_get,
+       Sc_rks_record_get, 2, 2, 0,
+       doc: /* Internal: read any Lisp_Object from slot SLOT of the
+<rks-state> record REC.  */)
+  (Lisp_Object rec, Lisp_Object slot)
+{
+  CHECK_FIXNUM (slot);
+  return scm_struct_ref (rec, scm_from_int (XFIXNUM (slot)));
+}
+
+DEFUN ("--rks-record-set", Fc_rks_record_set,
+       Sc_rks_record_set, 3, 3, 0,
+       doc: /* Internal: write any Lisp_Object VAL to slot SLOT of
+the <rks-state> record REC.  */)
+  (Lisp_Object rec, Lisp_Object slot, Lisp_Object val)
+{
+  CHECK_FIXNUM (slot);
+  scm_struct_set_x (rec, scm_from_int (XFIXNUM (slot)), val);
+  return Qnil;
+}
+
 DEFUN ("--rks-keyremap-set-int",
        Fc_rks_keyremap_set_int,
        Sc_rks_keyremap_set_int, 3, 3, 0,
@@ -10780,6 +10801,14 @@ processed by the read_key_sequence iteration body).  */)
   return rks_key;
 }
 
+DEFUN ("--set-rks-key", Fc_set_rks_key, Sc_set_rks_key, 1, 1, 0,
+       doc: /* Internal: write rks_key.  */)
+  (Lisp_Object val)
+{
+  rks_key = val;
+  return Qnil;
+}
+
 DEFUN ("--rks-used-mouse-menu-p", Fc_rks_used_mouse_menu_p,
        Sc_rks_used_mouse_menu_p, 0, 0, 0,
        doc: /* Internal: read rks_used_mouse_menu as a predicate.  */)
@@ -11003,6 +11032,15 @@ shadow.  */)
   (void)
 {
   return rks_current_binding;
+}
+
+DEFUN ("--set-rks-current-binding", Fc_set_rks_current_binding,
+       Sc_set_rks_current_binding, 1, 1, 0,
+       doc: /* Internal: write rks_current_binding.  */)
+  (Lisp_Object val)
+{
+  rks_current_binding = val;
+  return Qnil;
 }
 
 DEFUN ("--set-rks-shift-translated", Fc_set_rks_shift_translated,
