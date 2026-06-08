@@ -809,6 +809,9 @@ elements.  See docs/keyboard.org §M6y."
     ((first-unbound)   ((force %set-rks-first-unbound)
                         ((force %rks-record-get-int)
                          rec RKS-SLOT-FIRST-UNBOUND)))
+    ((keytran-start)   ((force %set-rks-keytran-start)
+                        ((force %rks-record-get-int)
+                         (force %rks-keytran-start))))  ;; FIXME: read from record
     (else (error "rks-sync-read: unknown field" field)))
   #nil)
 
@@ -824,9 +827,12 @@ elements.  See docs/keyboard.org §M6y."
     ((current-binding) ((force %rks-record-set)
                         rec RKS-SLOT-CURRENT-BINDING
                         ((force %rks-current-binding))))
-    ((first-unbound)   ((force %rks-record-set-int)
-                        rec RKS-SLOT-FIRST-UNBOUND
-                        ((force %rks-first-unbound))))
+    ((first-unbound)    ((force %rks-record-set-int)
+                         rec RKS-SLOT-FIRST-UNBOUND
+                         ((force %rks-first-unbound))))
+    ((shift-translated) ((force %rks-record-set-int)
+                         rec RKS-SLOT-SHIFT-TRANSLATED
+                         (if ((force %rks-shift-translated-p)) 1 0)))
     (else (error "rks-sync-write: unknown field" field)))
   #nil)
 
@@ -966,32 +972,34 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
 (define %rks-keybuf-set          (delay (%c '--rks-keybuf-set)))
 
 (define (rks-try-shift-translation-simple! key)
-  "M6 Step E1: shift-translation for KEY, decomposed from C to
-Scheme.  Only the shift/downcase arithmetic stays in C
-(--rks-shift-translate-key); everything else (gate check, keybuf
-write, mock-input bump, shift-translated flag, original-uppercase
-save) is Scheme logic calling thin C primitives.
-
-Returns t (caller goto replay_sequence) or nil (fall through)."
-  (if (or (not (%nilp ((force %rks-current-binding))))
-          (< ((force %rks-keytran-start)) ((force %rks-t)))
-          (not (integer? key))
-          (not (symbol-value 'translate-upper-case-key-bindings)))
-      #nil
-      (let ((new-key ((force %rks-shift-translate-key) key)))
-        (if (%nilp new-key)
-            #nil
-            (begin
-              ((force %set-rks-original-uppercase) key)
-              ((force %set-rks-original-uppercase-position)
-               (- ((force %rks-t)) 1))
-              ((force %rks-keybuf-set)
-               (- ((force %rks-t)) 1)
-               new-key)
-              (when (> ((force %rks-t)) ((force %rks-mock-input)))
-                ((force %set-rks-mock-input) ((force %rks-t))))
-              ((force %set-rks-shift-translated) #t)
-              #t)))))
+  "M6h-r2: shift-translation with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'mock-input)
+      (rks-sync-read rec 'current-binding))
+    (if (or (not (%nilp ((force %rks-current-binding))))
+            (< ((force %rks-keytran-start)) ((force %rks-t)))
+            (not (integer? key))
+            (not (symbol-value 'translate-upper-case-key-bindings)))
+        #nil
+        (let ((new-key ((force %rks-shift-translate-key) key)))
+          (if (%nilp new-key)
+              #nil
+              (begin
+                ((force %set-rks-original-uppercase) key)
+                ((force %set-rks-original-uppercase-position)
+                 (- ((force %rks-t)) 1))
+                ((force %rks-keybuf-set)
+                 (- ((force %rks-t)) 1)
+                 new-key)
+                (when (> ((force %rks-t)) ((force %rks-mock-input)))
+                  ((force %set-rks-mock-input) ((force %rks-t))))
+                ((force %set-rks-shift-translated) #t)
+                (when (not (%nilp rec))
+                  (rks-sync-write rec 'mock-input)
+                  (rks-sync-write rec 'shift-translated))
+                #t))))))
 
 (define (rks-first-unbound-short-circuit!)
   "If the prefix up to rks_first_unbound has no binding and no

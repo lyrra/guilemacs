@@ -11081,6 +11081,9 @@ sets it to true; nil sets it to false.  */)
   (Lisp_Object val)
 {
   rks_shift_translated = !NILP (val);
+  if (rks_state_depth > 0)
+    rks_set_bool (rks_state_stack[rks_state_depth - 1],
+                  RKS_SLOT_SHIFT_TRANSLATED, rks_shift_translated);
   return Qnil;
 }
 
