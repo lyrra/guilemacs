@@ -12454,19 +12454,18 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  goto replay_sequence;
       }
 
-      /* M6u: simple shift-translation (upper-case → lower-case, or
-	 strip shift_modifier) ported to Scheme
-	 `rks-try-shift-translation-simple!'.  Returns t iff a
-	 translation fired; caller goes to replay_sequence in that
-	 case.  See docs/keyboard.org §M6u.  */
+      /* Wave B: simple shift-translation folded into Scheme dispatch
+	 wrapper (call+goto decision → return symbol).  */
       {
-	static SCM rks_simple_shift_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_simple_shift_proc))
-	  rks_simple_shift_proc =
+	static SCM rks_have_key_shift_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_have_key_shift_proc))
+	  rks_have_key_shift_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-try-shift-translation-simple!");
-	if (!NILP (SCM_CALL_1 (rks_simple_shift_proc, key)))
+			      "rks-have-key-shift-translation!");
+	SCM result = SCM_CALL_1 (rks_have_key_shift_proc, key);
+	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
+	/* else: `fall-through' — continue to next block.  */
       }
 
       /* M6v: help-char check ported to Scheme `rks-try-help-char!'.

@@ -37,6 +37,7 @@
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
             rks-try-shift-translation-simple!
+            rks-have-key-shift-translation!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
             rks-walk-translation-maps!
@@ -962,6 +963,18 @@ shape compiles cleanly."
                   (rks-sync-write rec 'mock-input)
                   (rks-sync-write rec 'shift-translated))
                 #t))))))
+
+;; Wave B: dispatch-wrapper that folds the call+goto decision into a
+;; single return symbol.  Called from read_key_sequence's have_key:
+;; cascade; the return symbol tells C which label to jump to.
+
+(define (rks-have-key-shift-translation! key)
+  "Wave B — simple shift-translation call + dispatch decision.
+Returns `replay-sequence' if shift-translation fired, `fall-through'
+otherwise."
+  (if (not (%nilp (rks-try-shift-translation-simple! key)))
+      'replay-sequence
+      'fall-through))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
