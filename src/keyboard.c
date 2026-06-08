@@ -3641,6 +3641,17 @@ DEFUN ("--rks-record-set-int", Fc_rks_record_set_int,
   return Qnil;
 }
 
+DEFUN ("--rks-record-set-bool", Fc_rks_record_set_bool,
+       Sc_rks_record_set_bool, 3, 3, 0,
+       doc: /* Internal: write bool VAL (non-nil = true) to slot SLOT
+of the <rks-state> record REC.  */)
+  (Lisp_Object rec, Lisp_Object slot, Lisp_Object val)
+{
+  CHECK_FIXNUM (slot);
+  rks_set_bool (rec, XFIXNUM (slot), !NILP (val));
+  return Qnil;
+}
+
 DEFUN ("--rks-record-get-int", Fc_rks_record_get_int,
        Sc_rks_record_get_int, 2, 2, 0,
        doc: /* Internal: read fixnum from slot SLOT of the
@@ -10228,6 +10239,9 @@ shadow of read_key_sequence's former `echo_start' local.  */)
 {
   CHECK_FIXNAT (n);
   rks_echo_start = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_ECHO_START, rks_echo_start);
   return Qnil;
 }
 
@@ -10239,6 +10253,9 @@ shadow of read_key_sequence's former `keys_start' local.  */)
 {
   CHECK_FIXNAT (n);
   rks_keys_start = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_KEYS_START, rks_keys_start);
   return Qnil;
 }
 

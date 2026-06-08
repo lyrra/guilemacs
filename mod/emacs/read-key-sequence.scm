@@ -759,6 +759,8 @@ elements.  See docs/keyboard.org §M6y."
   (delay (%c '--rks-record-get-int)))
 (define %rks-record-set-int
   (delay (%c '--rks-record-set-int)))
+(define %rks-record-set-bool
+  (delay (%c '--rks-record-set-bool)))
 (define %rks-record-get
   (delay (%c '--rks-record-get)))
 (define %rks-record-set
@@ -842,9 +844,9 @@ elements.  See docs/keyboard.org §M6y."
     ((first-unbound)    ((force %rks-record-set-int)
                          rec RKS-SLOT-FIRST-UNBOUND
                          ((force %rks-first-unbound))))
-    ((shift-translated) ((force %rks-record-set-int)
+    ((shift-translated) ((force %rks-record-set-bool)
                          rec RKS-SLOT-SHIFT-TRANSLATED
-                         (if ((force %rks-shift-translated-p)) 1 0)))
+                         (if ((force %rks-shift-translated-p)) #t #nil)))
     (else (error "rks-sync-write: unknown field" field)))
   #nil)
 
