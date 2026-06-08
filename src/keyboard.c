@@ -12444,45 +12444,20 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	 `rks-walk-translation-maps!'.  Returns t iff any walk found
 	 a binding; caller goes to replay_sequence in that case.  See
 	 docs/keyboard.org §M6x.  */
+      /* Wave B: walks + shift + help-char + fn-key folded into one
+	 Scheme cascade dispatch.  */
       {
-	static SCM rks_walk_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_walk_proc))
-	  rks_walk_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-walk-translation-maps!");
-	if (!NILP (SCM_CALL_1 (rks_walk_proc, prompt)))
-	  goto replay_sequence;
-      }
-
-      /* Wave B: shift-translation + help-char cascade folded into one
-	 Scheme dispatch.  Returns `replay-sequence', `done', or
-	 `fall-through'.  */
-      {
-	static SCM rks_have_key_cascade_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_have_key_cascade_proc))
-	  rks_have_key_cascade_proc =
+	static SCM rks_cascade_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_cascade_proc))
+	  rks_cascade_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
 			      "rks-have-key-cascade!");
-	SCM result = SCM_CALL_1 (rks_have_key_cascade_proc, key);
+	SCM result = SCM_CALL_2 (rks_cascade_proc, key, prompt);
 	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
 	if (scm_is_eq (result, intern ("done")))
 	  goto done;
 	/* else: `fall-through' — continue to next block.  */
-      }
-
-      /* M6w: shifted-function-key shift-translation ported to Scheme
-	 `rks-try-shift-translation-fn-key!'.  Returns t iff a
-	 translation fired; caller goes to replay_sequence.  See
-	 docs/keyboard.org §M6w.  */
-      {
-	static SCM rks_shift_fnkey_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_shift_fnkey_proc))
-	  rks_shift_fnkey_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-try-shift-translation-fn-key!");
-	if (!NILP (SCM_CALL_1 (rks_shift_fnkey_proc, key)))
-	  goto replay_sequence;
       }
     }
   read_key_sequence_cmd = current_binding;

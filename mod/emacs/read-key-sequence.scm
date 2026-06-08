@@ -968,15 +968,18 @@ shape compiles cleanly."
 ;; single return symbol.  Called from read_key_sequence's have_key:
 ;; cascade; the return symbol tells C which label to jump to.
 
-(define (rks-have-key-cascade! key)
-  "Wave B — adjacent dispatch cascade: shift-translation, then
-help-char check.  Returns `replay-sequence', `done', or
-`fall-through'."
+(define (rks-have-key-cascade! key prompt)
+  "Wave B — translation walks + shift-translation + help-char cascade.
+Returns `replay-sequence', `done', or `fall-through'."
   (cond
+   ((not (%nilp (rks-walk-translation-maps! prompt)))
+    'replay-sequence)
    ((not (%nilp (rks-try-shift-translation-simple! key)))
     'replay-sequence)
    ((not (%nilp (rks-try-help-char! key)))
     'done)
+   ((not (%nilp (rks-try-shift-translation-fn-key! key)))
+    'replay-sequence)
    (else
     'fall-through)))
 
