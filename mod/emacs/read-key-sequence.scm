@@ -641,16 +641,19 @@ builds, no-op.  See docs/keyboard.org §M6ae."
   (delay (%c '--rks-reduce-mouse-event-loop)))
 
 (define (rks-iter-unbound-event-reduction!)
-  "M6 Step E4: unbound-event modifier-reduction cascade, partially
-decomposed.  The first_unbound = min(t, first_unbound) update moved
-to Scheme; the modifier-reduction while-loop + keyremap-reset logic
-stays in C (--rks-reduce-mouse-event-loop).  Returns `replay-key',
-`replay-sequence', or `fall-through'."
-  (let ((t ((force %rks-t)))
-        (fu ((force %rks-first-unbound))))
-    (when (< t fu)
-      ((force %set-rks-first-unbound) t)))
-  ((force %rks-reduce-mouse-event-loop)))
+  "M6h-r6: unbound-event reduction with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'first-unbound))
+    (let ((t ((force %rks-t)))
+          (fu ((force %rks-first-unbound))))
+      (when (< t fu)
+        ((force %set-rks-first-unbound) t)))
+    (let ((result ((force %rks-reduce-mouse-event-loop))))
+      (when (not (%nilp rec))
+        (rks-sync-write rec 'first-unbound))
+      result)))
 
 (define %rks-mouse-click-prefix-body
   (delay (%c '--rks-mouse-click-prefix-body)))
@@ -914,36 +917,40 @@ shape compiles cleanly."
   (delay (%c '--rks-reset-fkey-and-keytran-scans)))
 
 (define (rks-try-shift-translation-fn-key! key)
-  "M6 Step E2: shifted-function-key shift-translation, decomposed
-from C to Scheme.  Only the modifier arithmetic (strip-shift /
-downcase-via-downcase-table) stays in C (--rks-fn-key-shift-translate);
-the gate check, parse_modifiers call, and side effects are Scheme
-logic.  Returns t (caller goto replay_sequence) or nil."
-  (if (or (not (%nilp ((force %rks-current-binding))))
-          (< ((force %rks-keytran-start)) ((force %rks-t))))
-      #nil
-      (let* ((breakdown ((%c 'parse-modifiers) key))
-             (mods (if (pair? breakdown)
-                       (cadr (cadr breakdown))
-                       0))
-             (translate? (symbol-value
-                          'translate-upper-case-key-bindings))
-             (new-key ((force %rks-fn-key-shift-translate)
-                       key mods translate?)))
-        (if (%nilp new-key)
-            #nil
-            (begin
-              ((force %set-rks-original-uppercase) key)
-              ((force %set-rks-original-uppercase-position)
-               (- ((force %rks-t)) 1))
-              ((force %rks-keybuf-set)
-               (- ((force %rks-t)) 1)
-               new-key)
-              (when (> ((force %rks-t)) ((force %rks-mock-input)))
-                ((force %set-rks-mock-input) ((force %rks-t))))
-              ((force %rks-reset-fkey-and-keytran-scans))
-              ((force %set-rks-shift-translated) #t)
-              #t)))))
+  "M6h-r3: fn-key shift-translation with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'mock-input)
+      (rks-sync-read rec 'current-binding))
+    (if (or (not (%nilp ((force %rks-current-binding))))
+            (< ((force %rks-keytran-start)) ((force %rks-t))))
+        #nil
+        (let* ((breakdown ((%c 'parse-modifiers) key))
+               (mods (if (pair? breakdown)
+                         (cadr (cadr breakdown))
+                         0))
+               (translate? (symbol-value
+                            'translate-upper-case-key-bindings))
+               (new-key ((force %rks-fn-key-shift-translate)
+                         key mods translate?)))
+          (if (%nilp new-key)
+              #nil
+              (begin
+                ((force %set-rks-original-uppercase) key)
+                ((force %set-rks-original-uppercase-position)
+                 (- ((force %rks-t)) 1))
+                ((force %rks-keybuf-set)
+                 (- ((force %rks-t)) 1)
+                 new-key)
+                (when (> ((force %rks-t)) ((force %rks-mock-input)))
+                  ((force %set-rks-mock-input) ((force %rks-t))))
+                ((force %rks-reset-fkey-and-keytran-scans))
+                ((force %set-rks-shift-translated) #t)
+                (when (not (%nilp rec))
+                  (rks-sync-write rec 'mock-input)
+                  (rks-sync-write rec 'shift-translated))
+                #t))))))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
