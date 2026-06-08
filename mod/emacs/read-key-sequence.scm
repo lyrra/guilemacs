@@ -676,22 +676,25 @@ Returns `replay-sequence', `replay-key', or `fall-through'."
   (delay (%c '--set-rks-first-unbound)))
 
 (define (rks-follow-key-and-update-first-unbound!)
-  "M6 Step E3: follow_key + first_unbound update.  Bare body, no
-record↔file-static sync wrapper.  Mid-function writebacks
-(Wave-A) keep the record current for any external consumer; this
-procedure reads file-statics directly via the existing --rks-*
-getters and doesn't need wrapper-boundary sync."
-  (let* ((cb  ((force %rks-current-binding)))
-         (key ((force %rks-key)))
-         (new-binding ((force %rks-follow-key) cb key)))
-    (if (%nilp new-binding)
-        #nil
-        (begin
-          ((force %set-rks-new-binding) new-binding)
-          (let ((candidate (1+ ((force %rks-t)))))
-            (when (> candidate ((force %rks-first-unbound)))
-              ((force %set-rks-first-unbound) candidate)))
-          #t))))
+  "M6h-r1: follow_key + first_unbound update with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'current-binding)
+      (rks-sync-read rec 'first-unbound))
+    (let* ((cb  ((force %rks-current-binding)))
+           (key ((force %rks-key)))
+           (new-binding ((force %rks-follow-key) cb key)))
+      (if (%nilp new-binding)
+          #nil
+          (begin
+            ((force %set-rks-new-binding) new-binding)
+            (let ((candidate (1+ ((force %rks-t)))))
+              (when (> candidate ((force %rks-first-unbound)))
+                ((force %set-rks-first-unbound) candidate)))
+            (when (not (%nilp rec))
+              (rks-sync-write rec 'first-unbound))
+            #t)))))
 
 (define %rks-iter-install-binding
   (delay (%c '--rks-iter-install-binding)))
@@ -879,18 +882,25 @@ shape compiles cleanly."
              (rks--sync-write-fields rec (list 'write-fields ...)))))))))
 
 (define (rks-walk-translation-maps! prompt)
-  "M6 Step E5: three-map translation walk.  Bare or-chain; no
-record↔file-static sync wrapper.  The walks share `rks_t' /
-`rks_mock_input' via C file-statics directly, same shape as the
-pre-M6h C bulk subr.  Mid-function writebacks (M6i-1 / Wave-A) keep
-the record current for any external consumer; nothing in this
-dispatch path reads from the record between walks, so wrapper-
-boundary sync is unnecessary and provoked the m7b1 abort when
-mock-input was pre-synced from a stale record slot."
-  (or (not (%nilp ((force %rks-walk-indec) prompt)))
-      (not (%nilp ((force %rks-fkey-shortcut-or-walk) prompt)))
-      (not (%nilp ((force %rks-walk-keytran) prompt)))
-      #nil))
+  "M6h-r7: three-map translation walk with inline record sync."
+  (let ((rec ((force %rks-state-current))))
+    (when (not (%nilp rec))
+      (rks-sync-read rec 'key-count)
+      (rks-sync-read rec 'mock-input))
+    (let ((r1 ((force %rks-walk-indec) prompt)))
+      (when (not (%nilp rec))
+        (rks-sync-write rec 'mock-input))
+      (or (not (%nilp r1))
+          (let ((rec ((force %rks-state-current))))
+            (when (not (%nilp rec))
+              (rks-sync-read rec 'key-count)
+              (rks-sync-read rec 'mock-input))
+            (let ((r2 ((force %rks-fkey-shortcut-or-walk) prompt)))
+              (when (not (%nilp rec))
+                (rks-sync-write rec 'mock-input))
+              (or (not (%nilp r2))
+                  ((force %rks-walk-keytran) prompt)
+                  #nil)))))))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))

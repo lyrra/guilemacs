@@ -10596,11 +10596,17 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
           if (rks_t == rks_last_real_key_start)
             {
               rks_mock_input = 0;
+              if (rks_state_depth > 0)
+                rks_set_int (rks_state_stack[rks_state_depth - 1],
+                             RKS_SLOT_MOCK_INPUT, 0);
               return intern ("replay-key");
             }
           else
             {
               rks_mock_input = rks_last_real_key_start;
+              if (rks_state_depth > 0)
+                rks_set_int (rks_state_stack[rks_state_depth - 1],
+                             RKS_SLOT_MOCK_INPUT, rks_mock_input);
               return intern ("replay-sequence");
             }
         }
@@ -10614,6 +10620,10 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
       if (!NILP (rks_new_binding))
         {
           rks_current_binding = rks_new_binding;
+          if (rks_state_depth > 0)
+            scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                              scm_from_int (RKS_SLOT_CURRENT_BINDING),
+                              rks_current_binding);
           rks_key             = new_click;
           break;
         }
@@ -10674,6 +10684,9 @@ See M6ac / Step E6.  */)
               if (keybuf)
                 keybuf[rks_t] = rks_key;
               rks_mock_input = rks_t + 1;
+              if (rks_state_depth > 0)
+                rks_set_int (rks_state_stack[rks_state_depth - 1],
+                             RKS_SLOT_MOCK_INPUT, rks_mock_input);
 
               record_unwind_current_buffer ();
 
@@ -10699,6 +10712,9 @@ See M6ac / Step E6.  */)
               keybuf[rks_t + 1] = rks_key;
             }
           rks_mock_input = rks_t + 2;
+          if (rks_state_depth > 0)
+            rks_set_int (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
 
           /* Record that a fake prefix key has been generated for KEY.
              Don't modify the event; this would prevent proper action
@@ -10736,6 +10752,9 @@ See M6ac / Step E6.  */)
           POSN_SET_POSN (xevent_start (rks_key), list1 (posn));
 
           rks_mock_input = rks_t + 2;
+          if (rks_state_depth > 0)
+            rks_set_int (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
           return intern ("replay-sequence");
         }
       else if (CONSP (posn))
@@ -11048,6 +11067,10 @@ DEFUN ("--set-rks-current-binding", Fc_set_rks_current_binding,
   (Lisp_Object val)
 {
   rks_current_binding = val;
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_CURRENT_BINDING),
+                      rks_current_binding);
   return Qnil;
 }
 
@@ -11206,6 +11229,9 @@ DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,
 {
   CHECK_FIXNUM (n);
   rks_mock_input = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_MOCK_INPUT, rks_mock_input);
   return Qnil;
 }
 
@@ -11548,6 +11574,14 @@ the active_maps call, which the Scheme caller performs).  */)
   rks_current_binding = current_binding;
   rks_t               = 0;
   last_nonmenu_event  = Qnil;
+  if (rks_state_depth > 0)
+    {
+      SCM rec = rks_state_stack[rks_state_depth - 1];
+      rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
+      scm_struct_set_x (rec, scm_from_int (RKS_SLOT_CURRENT_BINDING),
+                        rks_current_binding);
+      rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
+    }
   return Qnil;
 }
 
