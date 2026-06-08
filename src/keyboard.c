@@ -12454,31 +12454,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  goto replay_sequence;
       }
 
-      /* Wave B: simple shift-translation folded into Scheme dispatch
-	 wrapper (call+goto decision → return symbol).  */
+      /* Wave B: shift-translation + help-char cascade folded into one
+	 Scheme dispatch.  Returns `replay-sequence', `done', or
+	 `fall-through'.  */
       {
-	static SCM rks_have_key_shift_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_have_key_shift_proc))
-	  rks_have_key_shift_proc =
+	static SCM rks_have_key_cascade_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_have_key_cascade_proc))
+	  rks_have_key_cascade_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-have-key-shift-translation!");
-	SCM result = SCM_CALL_1 (rks_have_key_shift_proc, key);
+			      "rks-have-key-cascade!");
+	SCM result = SCM_CALL_1 (rks_have_key_cascade_proc, key);
 	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
-	/* else: `fall-through' — continue to next block.  */
-      }
-
-      /* M6v: help-char check ported to Scheme `rks-try-help-char!'.
-	 Returns t iff `prefix-help-command' was installed; C goes to
-	 done in that case.  See docs/keyboard.org §M6v.  */
-      {
-	static SCM rks_help_char_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_help_char_proc))
-	  rks_help_char_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-try-help-char!");
-	if (!NILP (SCM_CALL_1 (rks_help_char_proc, key)))
+	if (scm_is_eq (result, intern ("done")))
 	  goto done;
+	/* else: `fall-through' — continue to next block.  */
       }
 
       /* M6w: shifted-function-key shift-translation ported to Scheme
