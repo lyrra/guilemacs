@@ -12377,12 +12377,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    scm_c_public_ref ("emacs read-key-sequence",
 			      "rks-have-key-orchestrator!");
 	SCM result = SCM_CALL_2 (rks_orch_proc, key, prompt);
-	if (scm_is_eq (result, intern ("replay-sequence")))
-	  goto replay_sequence;
 	if (scm_is_eq (result, intern ("done")))
 	  goto done;
-	/* `replay-key' and `fall-through' handled in Scheme;
-	   C continues to next iteration.  */
+	/* `replay-sequence', `replay-key', and `fall-through'
+	   handled in Scheme; C continues to next iteration.  */
       }
     }
   read_key_sequence_cmd = current_binding;

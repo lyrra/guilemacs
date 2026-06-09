@@ -995,7 +995,12 @@ Returns `replay-sequence', `replay-key', `done', or `fall-through'."
      ((eq? mc 'replay-key)  (rks-iter-replay-restore!)
                              (rks-iter-pre-read-cascade!)
                              'continue)
-     ((eq? mc 'replay-sequence) 'replay-sequence)
+     ((eq? mc 'replay-sequence)
+      (let ((mock ((force %rks-mock-input))))
+        (rks-setup-replay-sequence-c!
+         (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
+         (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
+      'continue)
      (else
       (let ((bound (rks-follow-key-and-update-first-unbound!)))
         (if (not (%nilp bound))
@@ -1005,7 +1010,12 @@ Returns `replay-sequence', `replay-key', `done', or `fall-through'."
                ((eq? reduction 'replay-key)  (rks-iter-replay-restore!)
                                              (rks-iter-pre-read-cascade!)
                                              'continue)
-               ((eq? reduction 'replay-sequence) 'replay-sequence)
+               ((eq? reduction 'replay-sequence)
+                (let ((mock ((force %rks-mock-input))))
+                  (rks-setup-replay-sequence-c!
+                   (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
+                   (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
+                'continue)
                (else (install-and-cascade))))))))))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
