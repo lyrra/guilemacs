@@ -976,23 +976,22 @@ Returns one of `done', `continue', or `fall-through'.  C dispatches
 `done' to its goto target; all other outcomes (the `replay_key:' and
 `replay_sequence:' bodies were hoisted) let the loop continue
 without taking a C goto."
+  (define (replay-sequence-continue)
+    (let ((mock ((force %rks-mock-input))))
+      (rks-setup-replay-sequence-c!
+       (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
+       (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
+    'continue)
   (define (cascade)
-    ;; Translation walks + shift-simple + help-char + shift-fn-key.
-    ;; Run after a successful install-binding, in either the
-    ;; follow-key-bound or the unbound-reduction fall-through arm.
-    ;; Cascade-internal 'replay-sequence returns are left as symbols
-    ;; (not hoisted via replay-sequence-continue) to preserve the
-    ;; pre-dedup behaviour exactly; the hoist of these paths is a
-    ;; separate semantic change to evaluate.
     (cond
      ((not (%nilp (rks-walk-translation-maps! prompt)))
-      'replay-sequence)
+      (replay-sequence-continue))
      ((not (%nilp (rks-try-shift-translation-simple! key)))
-      'replay-sequence)
+      (replay-sequence-continue))
      ((not (%nilp (rks-try-help-char! key)))
       'done)
      ((not (%nilp (rks-try-shift-translation-fn-key! key)))
-      'replay-sequence)
+      (replay-sequence-continue))
      (else 'fall-through)))
   (define (install-and-cascade)
     (rks-iter-install-binding! ((force %rks-new-binding)))
@@ -1001,13 +1000,6 @@ without taking a C goto."
     ;; Hoisted body of C `replay_key:' label.
     (rks-iter-replay-restore!)
     (rks-iter-pre-read-cascade!)
-    'continue)
-  (define (replay-sequence-continue)
-    ;; Hoisted body of C `replay_sequence:' label.
-    (let ((mock ((force %rks-mock-input))))
-      (rks-setup-replay-sequence-c!
-       (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
-       (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
     'continue)
   (let ((mc (rks-iter-mouse-click-prefix!)))
     (cond
