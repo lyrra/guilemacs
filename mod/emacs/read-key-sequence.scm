@@ -973,45 +973,40 @@ shape compiles cleanly."
 (define (rks-have-key-orchestrator! key prompt)
   "Wave B — full have_key: body folded into one Scheme call.
 Returns `replay-sequence', `replay-key', `done', or `fall-through'."
+  (define (cascade)
+    ;; Translation walks + shift-simple + help-char + shift-fn-key.
+    ;; Run after a successful install-binding, in either the
+    ;; follow-key-bound or the unbound-reduction fall-through arm.
+    (cond
+     ((not (%nilp (rks-walk-translation-maps! prompt)))
+      'replay-sequence)
+     ((not (%nilp (rks-try-shift-translation-simple! key)))
+      'replay-sequence)
+     ((not (%nilp (rks-try-help-char! key)))
+      'done)
+     ((not (%nilp (rks-try-shift-translation-fn-key! key)))
+      'replay-sequence)
+     (else 'fall-through)))
+  (define (install-and-cascade)
+    (rks-iter-install-binding! ((force %rks-new-binding)))
+    (cascade))
   (let ((mc (rks-iter-mouse-click-prefix!)))
     (cond
+     ((eq? mc 'replay-key)  (rks-iter-replay-restore!)
+                             (rks-iter-pre-read-cascade!)
+                             'continue)
      ((eq? mc 'replay-sequence) 'replay-sequence)
-     ((eq? mc 'replay-key)      'replay-key)
      (else
       (let ((bound (rks-follow-key-and-update-first-unbound!)))
         (if (not (%nilp bound))
-            (begin
-              (rks-iter-install-binding!
-               ((force %rks-new-binding)))
-              ;; fall through to cascade below
-              (cond
-               ((not (%nilp (rks-walk-translation-maps! prompt)))
-                'replay-sequence)
-               ((not (%nilp (rks-try-shift-translation-simple! key)))
-                'replay-sequence)
-               ((not (%nilp (rks-try-help-char! key)))
-                'done)
-               ((not (%nilp (rks-try-shift-translation-fn-key! key)))
-                'replay-sequence)
-               (else 'fall-through)))
+            (install-and-cascade)
             (let ((reduction (rks-iter-unbound-event-reduction!)))
               (cond
-               ((eq? reduction 'replay-key)      'replay-key)
+               ((eq? reduction 'replay-key)  (rks-iter-replay-restore!)
+                                             (rks-iter-pre-read-cascade!)
+                                             'continue)
                ((eq? reduction 'replay-sequence) 'replay-sequence)
-               (else
-                (rks-iter-install-binding!
-                 ((force %rks-new-binding)))
-                ;; fall through to cascade
-                (cond
-                 ((not (%nilp (rks-walk-translation-maps! prompt)))
-                  'replay-sequence)
-                 ((not (%nilp (rks-try-shift-translation-simple! key)))
-                  'replay-sequence)
-                 ((not (%nilp (rks-try-help-char! key)))
-                  'done)
-                 ((not (%nilp (rks-try-shift-translation-fn-key! key)))
-                  'replay-sequence)
-                 (else 'fall-through)))))))))))
+               (else (install-and-cascade))))))))))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
