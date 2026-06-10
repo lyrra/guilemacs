@@ -12019,15 +12019,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      M6l: the inline init is now an --rks-init-keyremaps subr call
      made by the Scheme rks-setup-replay-entire-sequence!.  See
      docs/keyboard.org §M6l.  */
- replay_entire_sequence:
-  {
-    static SCM rks_replay_entire_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_replay_entire_proc))
-      rks_replay_entire_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-setup-replay-entire-sequence-c!");
-    SCM_CALL_0 (rks_replay_entire_proc);
-  }
+  /* (replay_entire_sequence: body hoisted — callsites now inline the
+     rks-setup-replay-entire-sequence-c! call + goto replay_sequence.)  */
 
   /* We jump here when the key sequence has been thoroughly changed, and
      we need to rescan it starting from the beginning.  When we jump here,
@@ -12227,7 +12220,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		    /* Don't touch interrupted_kboard when it's been
 		       deleted.  */
 		    delayed_switch_frame = Qnil;
-		    goto replay_entire_sequence;
+		    {
+		      static SCM rks_replay_entire_proc = SCM_UNDEFINED;
+		      if (SCM_UNBNDP (rks_replay_entire_proc))
+			rks_replay_entire_proc =
+			  scm_c_public_ref ("emacs read-key-sequence",
+					    "rks-setup-replay-entire-sequence-c!");
+		      SCM_CALL_0 (rks_replay_entire_proc);
+		    }
+		    goto replay_sequence;
 		  }
 
 		if (!NILP (delayed_switch_frame))
@@ -12275,7 +12276,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
                        mock_input = 0;
                      }
 		  }
-		goto replay_entire_sequence;
+		{
+		  static SCM rks_replay_entire_proc = SCM_UNDEFINED;
+		  if (SCM_UNBNDP (rks_replay_entire_proc))
+		    rks_replay_entire_proc =
+		      scm_c_public_ref ("emacs read-key-sequence",
+					"rks-setup-replay-entire-sequence-c!");
+		  SCM_CALL_0 (rks_replay_entire_proc);
+		}
+		goto replay_sequence;
 	      }
 	  }
 
