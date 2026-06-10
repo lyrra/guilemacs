@@ -11559,13 +11559,27 @@ logic (rks-try-shift-translation-simple!).  */)
 
 DEFUN ("--rks-delayed-switch-frame", Fc_rks_delayed_switch_frame,
        Sc_rks_delayed_switch_frame, 0, 0, 0,
-       doc: /* Internal: read the file-static rks_delayed_switch_frame
-shadow of read_key_sequence's former `delayed_switch_frame' local.
-Holds a deferred switch-frame / select-window event while a key
-sequence is mid-read.  */)
+       doc: /* Internal: read delayed_switch_frame from <rks-state>
+record slot.  */)
   (void)
 {
-  return rks_delayed_switch_frame;
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_DELAYED_SWITCH_FRAME));
+  return Qnil;
+}
+
+DEFUN ("--set-rks-delayed-switch-frame",
+       Fc_set_rks_delayed_switch_frame,
+       Sc_set_rks_delayed_switch_frame, 1, 1, 0,
+       doc: /* Internal: write delayed_switch_frame to <rks-state>
+record slot.  */)
+  (Lisp_Object val)
+{
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_DELAYED_SWITCH_FRAME), val);
+  return Qnil;
 }
 
 DEFUN ("--set-unread-switch-frame", Fc_set_unread_switch_frame,
@@ -12143,7 +12157,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		  {
 		    /* Don't touch interrupted_kboard when it's been
 		       deleted.  */
-		    delayed_switch_frame = Qnil;
+		    Fc_set_rks_delayed_switch_frame (Qnil);
 		    {
 		      static SCM rks_replay_entire_proc = SCM_UNDEFINED;
 		      if (SCM_UNBNDP (rks_replay_entire_proc))
