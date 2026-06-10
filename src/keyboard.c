@@ -12127,66 +12127,24 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	  goto replay_sequence;
       }
 
-      /* M6y: iteration-setup capture ported to Scheme
-	 `rks-iter-setup-capture!'.  Does the length-check error and
-	 echo / keys-start capture.  See docs/keyboard.org §M6y.  */
+      /* Wave B: setup-capture + maybe-disable + replay-restore +
+	 pre-read-cascade folded into one Scheme call.  Returns
+	 `mock', `done', or `read-char'.  */
       {
-	static SCM rks_setup_capture_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_setup_capture_proc))
-	  rks_setup_capture_proc =
+	static SCM rks_iter_prepare_proc = SCM_UNDEFINED;
+	if (SCM_UNBNDP (rks_iter_prepare_proc))
+	  rks_iter_prepare_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-setup-capture!");
-	SCM_CALL_0 (rks_setup_capture_proc);
-      }
-
-      /* M6ae: text-conversion-disable check ported to Scheme
-	 `rks-iter-maybe-disable-text-conversion!'.  Unconditionally
-	 dispatches — the subr body is `#ifdef HAVE_TEXT_CONVERSION'-
-	 guarded on the C side.  No control transfer needed: both the
-	 original `goto replay_key' and the fall-through end up at
-	 the next statement (the `replay_key:' label below).  See
-	 docs/keyboard.org §M6ae.  */
-      {
-	static SCM rks_maybe_disable_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_maybe_disable_proc))
-	  rks_maybe_disable_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-maybe-disable-text-conversion!");
-	SCM_CALL_0 (rks_maybe_disable_proc);
-      }
-
-    replay_key:
-      /* M6y: replay_key-restore ported to Scheme
-	 `rks-iter-replay-restore!'.  Restores echo + keys to their
-	 capture values (no-op the first time through), then sets
-	 last_real_key_start = rks_t.  See docs/keyboard.org §M6y.  */
-      {
-	static SCM rks_replay_restore_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_replay_restore_proc))
-	  rks_replay_restore_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-replay-restore!");
-	SCM_CALL_0 (rks_replay_restore_proc);
-      }
-
-      /* M6z: mock-input + end-of-macro cascade ported to Scheme
-	 `rks-iter-pre-read-cascade!'.  Returns `mock' (rks_key has
-	 been set from keybuf), `done' (caller goto done), or
-	 `read-char' (caller does the inline read_char block below).
-	 See docs/keyboard.org §M6z.  */
-      {
-	static SCM rks_pre_read_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_pre_read_proc))
-	  rks_pre_read_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iter-pre-read-cascade!");
-	SCM result = SCM_CALL_0 (rks_pre_read_proc);
+			      "rks-iteration-prepare!");
+	SCM result = SCM_CALL_0 (rks_iter_prepare_proc);
 	if (scm_is_eq (result, intern ("done")))
 	  goto done;
 	if (scm_is_eq (result, intern ("mock")))
 	  goto have_key;
 	/* else: `read-char' — fall through to inline read_char.  */
       }
+
+      /* (replay_key: label folded into rks-iteration-prepare! above.)  */
 
       /* Otherwise, we should actually read a character.  */
       {
@@ -12346,7 +12304,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      if (t > 0 || !can_return_switch_frame)
 		{
 		  delayed_switch_frame = key;
-		  goto replay_key;
+		  {
+		    static SCM rks_rk_proc = SCM_UNDEFINED;
+		    if (SCM_UNBNDP (rks_rk_proc))
+		      rks_rk_proc =
+			scm_c_public_ref ("emacs read-key-sequence",
+					  "replay-key-continue");
+		    SCM_CALL_0 (rks_rk_proc);
+		  }
+		  continue;
 		}
 	    }
 

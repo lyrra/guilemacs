@@ -43,6 +43,7 @@
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
             rks-walk-translation-maps!
+            rks-iteration-prepare!
             rks-iter-setup-capture!
             rks-iter-replay-restore!
             rks-iter-pre-read-cascade!
@@ -985,6 +986,15 @@ and snapshots last_real_key_start.  Returns `continue'."
   (rks-iter-replay-restore!)
   (rks-iter-pre-read-cascade!)
   'continue)
+
+(define (rks-iteration-prepare!)
+  "Wave B: fold setup-capture + maybe-disable + replay-restore +
+pre-read-cascade into one call.  Returns `mock', `done', or
+`read-char' (the pre-read-cascade result)."
+  (rks-iter-setup-capture!)
+  (rks-iter-maybe-disable-text-conversion!)
+  (rks-iter-replay-restore!)
+  (rks-iter-pre-read-cascade!))
 
 (define (rks-have-key-orchestrator! key prompt)
   "Wave B — full have_key: body folded into one Scheme call.
