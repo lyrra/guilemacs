@@ -12114,17 +12114,16 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
       eassert (fkey.end <= indec.start);
       eassert (keytran.end <= fkey.start);
 
-      /* M6t: first_unbound short-circuit ported to (emacs read-key-sequence)
-	 rks-first-unbound-short-circuit!.  Scheme returns t iff the
-	 branch fired (caller should goto replay_sequence).  See
-	 docs/keyboard.org §M6t.  */
+      /* M6t: first_unbound short-circuit — Scheme handles the
+	 goto replay_sequence decision internally.  */
       {
 	static SCM rks_fu_proc = SCM_UNDEFINED;
 	if (SCM_UNBNDP (rks_fu_proc))
 	  rks_fu_proc =
 	    scm_c_public_ref ("emacs read-key-sequence",
 			      "rks-first-unbound-short-circuit!");
-	if (!NILP (SCM_CALL_0 (rks_fu_proc)))
+	SCM result = SCM_CALL_0 (rks_fu_proc);
+	if (scm_is_eq (result, intern ("replay-sequence")))
 	  goto replay_sequence;
       }
 

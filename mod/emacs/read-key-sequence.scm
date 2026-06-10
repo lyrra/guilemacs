@@ -37,6 +37,8 @@
             rks-done-fabricated-events!
             rks-first-unbound-short-circuit!
             rks-try-shift-translation-simple!
+            replay-sequence-continue
+            replay-key-continue
             rks-have-key-orchestrator!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
@@ -966,9 +968,23 @@ shape compiles cleanly."
                   (rks-sync-write rec 'shift-translated))
                 #t))))))
 
-;; Wave B: dispatch wrappers that fold call+goto decisions into
-;; return symbols.  Called from read_key_sequence's have_key:
-;; cascade; C dispatches goto based on the symbol.
+;; Wave B: hoisted label bodies, callable from any Scheme wrapper.
+
+(define (replay-sequence-continue)
+  "Hoisted body of C `replay_sequence:' label.  Resets state and
+recomputes the initial key binding from keybuf.  Returns `continue'."
+  (let ((mock ((force %rks-mock-input))))
+    (rks-setup-replay-sequence-c!
+     (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
+     (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
+  'continue)
+
+(define (replay-key-continue)
+  "Hoisted body of C `replay_key:' label.  Restores echo/keys state
+and snapshots last_real_key_start.  Returns `continue'."
+  (rks-iter-replay-restore!)
+  (rks-iter-pre-read-cascade!)
+  'continue)
 
 (define (rks-have-key-orchestrator! key prompt)
   "Wave B — full have_key: body folded into one Scheme call.
@@ -976,12 +992,6 @@ Returns one of `done', `continue', or `fall-through'.  C dispatches
 `done' to its goto target; all other outcomes (the `replay_key:' and
 `replay_sequence:' bodies were hoisted) let the loop continue
 without taking a C goto."
-  (define (replay-sequence-continue)
-    (let ((mock ((force %rks-mock-input))))
-      (rks-setup-replay-sequence-c!
-       (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
-       (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
-    'continue)
   (define (cascade)
     (cond
      ((not (%nilp (rks-walk-translation-maps! prompt)))
@@ -996,11 +1006,6 @@ without taking a C goto."
   (define (install-and-cascade)
     (rks-iter-install-binding! ((force %rks-new-binding)))
     (cascade))
-  (define (replay-key-continue)
-    ;; Hoisted body of C `replay_key:' label.
-    (rks-iter-replay-restore!)
-    (rks-iter-pre-read-cascade!)
-    'continue)
   (let ((mc (rks-iter-mouse-click-prefix!)))
     (cond
      ((eq? mc 'replay-key)      (replay-key-continue))
@@ -1072,25 +1077,19 @@ should goto done).  Otherwise nil.  See docs/keyboard.org §M6v."
                 #t))))))
 
 (define (rks-first-unbound-short-circuit!)
-  "If the prefix up to rks_first_unbound has no binding and no
-translation left to do, shift it off keybuf and rebase the
-keyremap scans.  Returns t iff the short-circuit fired (caller
-should goto replay_sequence), nil otherwise.
-
-Mirrors the C 17-line block at the top of the read_key_sequence
-while-loop body (src/keyboard.c lines 11102-11119 pre-M6t)."
+  "Shrink the keybuf when a prefix has no binding.  If fired, calls
+replay-sequence-continue and returns `replay-sequence'; otherwise
+nil.  Wave B: the C goto replay_sequence is folded into this call."
   (let* ((fu  ((force %rks-first-unbound)))
          (kts ((force %rks-keytran-start))))
     (cond
      ((< fu kts)
       (let ((shift (+ fu 1)))
-        ;; Shift keybuf[shift..t-1] down to keybuf[0..t-shift-1].
         ((force %rks-keybuf-shift-down) shift)
-        ;; mock_input = t - shift.
         ((force %set-rks-mock-input) (- ((force %rks-t)) shift))
-        ;; For each keyremap: start -= shift, end = start, map = parent.
         ((force %rks-keyremaps-shrink-by) shift))
-      #t)
+      (replay-sequence-continue)
+      'replay-sequence)
      (else #nil))))
 
 (define (rks-done-fabricated-events!)
