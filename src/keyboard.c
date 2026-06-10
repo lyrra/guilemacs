@@ -10444,7 +10444,7 @@ read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
    before read_key_sequence has ever run (e.g. from elisp tests)
    return Qnil rather than the BSS zero, which is not a valid
    Lisp_Object.  */
-static Lisp_Object rks_delayed_switch_frame;
+/* M6p: delayed_switch_frame retired — uses record via getter/setter.  */
 
 /* M6r — promote original_uppercase + position (5 uses).  Used by
    the shift-translation fallback (writes) and the done:-block
@@ -11932,8 +11932,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* If we receive a `switch-frame' or `select-window' event in the middle of
      a key sequence, we put it off for later.
      While we're reading, we keep the event here.
-     M6p: promoted to file-static rks_delayed_switch_frame.  */
-#define delayed_switch_frame rks_delayed_switch_frame
+     M6p/Wave C: retired — setter writes to record.  */
 
   /* M6r: original_uppercase + position promoted to file-static
      rks_original_uppercase / rks_original_uppercase_position.  */
@@ -11961,7 +11960,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      of raw_keybuf created by the outer call.  */
   /* raw_keybuf_count = 0; */
 
-  delayed_switch_frame = Qnil;
+  Fc_set_rks_delayed_switch_frame (Qnil);
 
   /* M6m: explicit init for the promoted file-statics that were
      previously initialized at their (now-removed) local declaration.
@@ -12169,13 +12168,13 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		    goto replay_sequence;
 		  }
 
-		if (!NILP (delayed_switch_frame))
+		if (!NILP (Fc_rks_delayed_switch_frame ()))
 		  {
 		    kset_kbd_queue
 		      (interrupted_kboard,
-		       Fcons (delayed_switch_frame,
+		       Fcons (Fc_rks_delayed_switch_frame (),
 			      KVAR (interrupted_kboard, kbd_queue)));
-		    delayed_switch_frame = Qnil;
+		    Fc_set_rks_delayed_switch_frame (Qnil);
 		  }
 
 		while (t > 0)
@@ -12284,7 +12283,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		 in the midst of a key sequence, delay it until the end.  */
 	      if (t > 0 || !can_return_switch_frame)
 		{
-		  delayed_switch_frame = key;
+		  Fc_set_rks_delayed_switch_frame (key);
 		  {
 		    static SCM rks_rk_proc = SCM_UNDEFINED;
 		    if (SCM_UNBNDP (rks_rk_proc))
@@ -12430,7 +12429,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef mock_input
 #undef current_binding
 #undef starting_buffer
-#undef delayed_switch_frame
 #undef echo_local_start
 #undef keys_local_start
 #undef last_real_key_start
@@ -13927,9 +13925,6 @@ syms_of_keyboard (void)
      has ever been entered.  See docs/keyboard.org §M6.  */
   rks_current_binding      = Qnil;
   staticpro (&rks_current_binding);
-  rks_delayed_switch_frame = Qnil;
-  staticpro (&rks_delayed_switch_frame);
-  rks_key                  = Qnil;
   staticpro (&rks_key);
   rks_new_binding          = Qnil;
   staticpro (&rks_new_binding);
