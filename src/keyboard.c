@@ -10449,8 +10449,7 @@ static Lisp_Object rks_delayed_switch_frame;
 /* M6r — promote original_uppercase + position (5 uses).  Used by
    the shift-translation fallback (writes) and the done:-block
    downcase-undo splice (reads).  See docs/keyboard.org §M6r.  */
-static Lisp_Object rks_original_uppercase;
-static int         rks_original_uppercase_position;
+/* M6r: original_uppercase + position retired — record-backed.  */
 
 /* M6y — promote the three inner-block locals of the while-loop
    iteration: echo_local_start (echo-buffer length captured before
@@ -11012,48 +11011,53 @@ rks_last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
 
 DEFUN ("--rks-original-uppercase", Fc_rks_original_uppercase,
        Sc_rks_original_uppercase, 0, 0, 0,
-       doc: /* Internal: read the file-static rks_original_uppercase
-shadow (last upper-case key that got downcased during shift
-translation).  */)
+       doc: /* Internal: read original_uppercase from <rks-state>
+record slot.  Returns nil when no call is in flight.  */)
   (void)
 {
-  return rks_original_uppercase;
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_ORIGINAL_UPPERCASE));
+  return Qnil;
 }
 
 DEFUN ("--rks-original-uppercase-position",
        Fc_rks_original_uppercase_position,
        Sc_rks_original_uppercase_position, 0, 0, 0,
-       doc: /* Internal: read the file-static
-rks_original_uppercase_position shadow.  Either -1 (no shift
-translation happened) or the keybuf index of the most-recent
-downcased key.  */)
+       doc: /* Internal: read original_uppercase_position from
+<rks-state> record slot.  Returns -1 when no call in flight.  */)
   (void)
 {
-  return make_fixnum (rks_original_uppercase_position);
+  if (rks_state_depth > 0)
+    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                     RKS_SLOT_ORIGINAL_UPPERCASE_POSITION));
+  return make_fixnum (-1);
 }
 
 DEFUN ("--set-rks-original-uppercase",
        Fc_set_rks_original_uppercase,
        Sc_set_rks_original_uppercase, 1, 1, 0,
-       doc: /* Internal: write the file-static
-rks_original_uppercase shadow.  Used by Scheme
-rks-try-shift-translation-simple!.  */)
+       doc: /* Internal: write original_uppercase to <rks-state>
+record slot.  */)
   (Lisp_Object val)
 {
-  rks_original_uppercase = val;
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_ORIGINAL_UPPERCASE), val);
   return Qnil;
 }
 
 DEFUN ("--set-rks-original-uppercase-position",
        Fc_set_rks_original_uppercase_position,
        Sc_set_rks_original_uppercase_position, 1, 1, 0,
-       doc: /* Internal: write the file-static
-rks_original_uppercase_position shadow.  Used by Scheme
-rks-try-shift-translation-simple!.  */)
+       doc: /* Internal: write original_uppercase_position to
+<rks-state> record slot.  */)
   (Lisp_Object val)
 {
   CHECK_FIXNUM (val);
-  rks_original_uppercase_position = XFIXNUM (val);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_ORIGINAL_UPPERCASE_POSITION, XFIXNUM (val));
   return Qnil;
 }
 
@@ -11919,9 +11923,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* M6r: original_uppercase + position promoted to file-static
      rks_original_uppercase / rks_original_uppercase_position.  */
-#define original_uppercase           rks_original_uppercase
-#define original_uppercase_position  rks_original_uppercase_position
-  original_uppercase_position = -1;
+/* (Retired — getter/setter use record.)  */
 
 #ifdef HAVE_TEXT_CONVERSION
   /* M6ae: disabled_conversion promoted to file-static rks_disabled_conversion.
@@ -12415,8 +12417,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef current_binding
 #undef starting_buffer
 #undef delayed_switch_frame
-#undef original_uppercase
-#undef original_uppercase_position
 #undef echo_local_start
 #undef keys_local_start
 #undef last_real_key_start
@@ -13915,8 +13915,6 @@ syms_of_keyboard (void)
   staticpro (&rks_current_binding);
   rks_delayed_switch_frame = Qnil;
   staticpro (&rks_delayed_switch_frame);
-  rks_original_uppercase   = Qnil;
-  staticpro (&rks_original_uppercase);
   rks_key                  = Qnil;
   staticpro (&rks_key);
   rks_new_binding          = Qnil;
