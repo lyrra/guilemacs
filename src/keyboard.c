@@ -11992,48 +11992,25 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM_CALL_1 (rks_setup_prompt_proc, prompt);
   }
 
-  /* M6j: initial-state capture ported to (emacs read-key-sequence)
-     rks-setup-initial-state-c! — writes the file-static
-     rks_echo_start and rks_keys_start.  See docs/keyboard.org §M6j.  */
+  /* Wave B: pre-loop initial-state capture folded into Scheme.  */
   {
-    static SCM rks_setup_initial_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_setup_initial_proc))
-      rks_setup_initial_proc = scm_c_public_ref ("emacs read-key-sequence",
-                                                 "rks-setup-initial-state-c!");
-    SCM_CALL_0 (rks_setup_initial_proc);
+    static SCM rks_setup_pre_loop_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_setup_pre_loop_proc))
+      rks_setup_pre_loop_proc =
+        scm_c_public_ref ("emacs read-key-sequence",
+                          "rks-setup-pre-loop!");
+    SCM_CALL_0 (rks_setup_pre_loop_proc);
   }
 
 #ifdef HAVE_TEXT_CONVERSION
-  /* Set `reading_key_sequence' to true.  This variable is used by
-     Fset_text_conversion_style to determine if it should postpone
-     resetting the input method until this function completes.  */
-
   record_unwind_protect_int (restore_reading_key_sequence,
 			     reading_key_sequence);
   reading_key_sequence = true;
-#endif /* HAVE_TEXT_CONVERSION */
+#endif
 
-  /* We jump here when we need to reinitialize fkey and keytran; this
-     happens if we switch keyboards between rescans.
-
-     M6l: the inline init is now an --rks-init-keyremaps subr call
-     made by the Scheme rks-setup-replay-entire-sequence!.  See
-     docs/keyboard.org §M6l.  */
-  /* (replay_entire_sequence: body hoisted — callsites now inline the
-     rks-setup-replay-entire-sequence-c! call + goto replay_sequence.)  */
-
-  /* We jump here when the key sequence has been thoroughly changed, and
-     we need to rescan it starting from the beginning.  When we jump here,
-     keybuf[0..mock_input] holds the sequence we should reread.
-
-     M6m: inline init replaced by cached-SCM dispatch to
-     `rks-setup-replay-sequence-c!'.  The Scheme side computes
-     current_binding via --active-maps and then writes the five
-     promoted file-statics via --rks-replay-sequence-init-rest.
-     See docs/keyboard.org §M6m.  */
  replay_sequence:
-  /* Wave B: replay_sequence body hoisted into replay-sequence-continue.
-     first_event allowed to stay nil — recompute-maps branch handles it.  */
+  /* Wave B: replay_sequence body folded into replay-sequence-continue.
+     Still needed as a goto target from the read_char branch.  */
   {
     static SCM rks_rsc_proc = SCM_UNDEFINED;
     if (SCM_UNBNDP (rks_rsc_proc))

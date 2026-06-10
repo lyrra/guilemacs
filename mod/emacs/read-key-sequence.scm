@@ -26,6 +26,7 @@
             rks-setup-prompt!
             rks-setup-initial-keys-state!
             rks-setup-initial-state-c!
+            rks-setup-pre-loop!
             rks-setup-replay-entire-sequence!
             rks-setup-replay-entire-sequence-c!
             rks-setup-replay-sequence!
@@ -971,6 +972,12 @@ shape compiles cleanly."
                 #t))))))
 
 ;; Wave B: hoisted label bodies, callable from any Scheme wrapper.
+
+(define (rks-setup-pre-loop!)
+  "Wave B: thin wrapper for the pre-loop initial-state capture.
+(The replay-sequence-continue logic runs at the replay_sequence:
+label, which follows this call in the C flow.)"
+  (rks-setup-initial-state-c!))
 
 (define (replay-sequence-continue)
   "Hoisted body of C `replay_sequence:' label.  Resets state and
