@@ -12387,50 +12387,16 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   }
   dynwind_end ();
 
-  /* M6r: don't-downcase undo ported to (emacs read-key-sequence)
-     rks-done-downcase-undo!.  Restores the upper-case key in keybuf
-     and clears the shift-translated flag when the caller asked for
-     no downcasing OR the result is undefined.  See docs/keyboard.org §M6r.  */
+  /* Wave B: post-dynwind done: body (downcase-undo, shift-translated,
+     fabricated-events) folded into one Scheme call.  */
   {
-    static SCM rks_done_downcase_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_downcase_proc))
-      rks_done_downcase_proc =
+    static SCM rks_done_post_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_done_post_proc))
+      rks_done_post_proc =
         scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-downcase-undo!");
-    SCM_CALL_1 (rks_done_downcase_proc,
+                          "rks-done-post-dynwind!");
+    SCM_CALL_1 (rks_done_post_proc,
                 dont_downcase_last ? Qt : Qnil);
-  }
-
-  /* M6o: shift-translated install ported to (emacs read-key-sequence)
-     rks-done-install-shift-translated!.  See docs/keyboard.org §M6o.  */
-  {
-    static SCM rks_done_shift_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_shift_proc))
-      rks_done_shift_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-install-shift-translated!");
-    SCM_CALL_0 (rks_done_shift_proc);
-  }
-
-  /* Occasionally we fabricate events, perhaps by expanding something
-     according to function-key-map, or by adding a prefix symbol to a
-     mouse click in the scroll bar or modeline.  In these cases, return
-     the entire generated key sequence, even if we hit an unbound
-     prefix or a definition before the end.  This means that you will
-     be able to push back the event properly, and also means that
-     read-key-sequence will always return a logical unit.
-
-     M6s: fabricated-events loop + echo_update ported to Scheme
-     rks-done-fabricated-events!.  Updates rks_t in place to the
-     final loop value (max of starting t and mock_input).  See
-     docs/keyboard.org §M6s.  */
-  {
-    static SCM rks_done_fab_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_fab_proc))
-      rks_done_fab_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-fabricated-events!");
-    SCM_CALL_0 (rks_done_fab_proc);
   }
 
   /* M6 Step B: sync file-statics → record so the record captures

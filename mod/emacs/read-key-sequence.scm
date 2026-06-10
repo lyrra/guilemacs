@@ -30,6 +30,7 @@
             rks-setup-replay-entire-sequence-c!
             rks-setup-replay-sequence!
             rks-setup-replay-sequence-c!
+            rks-done-post-dynwind!
             rks-done-compute-remapped!
             rks-done-install-shift-translated!
             rks-done-install-unread-switch-frame!
@@ -996,6 +997,13 @@ pre-read-cascade into one call.  Returns `mock', `done', or
   (rks-iter-replay-restore!)
   (rks-iter-pre-read-cascade!))
 
+(define (rks-done-post-dynwind! dont-downcase-last)
+  "Wave B: fold the post-dynwind done: body (downcase-undo,
+shift-translated, fabricated-events) into one Scheme call."
+  (rks-done-downcase-undo! dont-downcase-last)
+  (rks-done-install-shift-translated!)
+  (rks-done-fabricated-events!))
+
 (define (rks-have-key-orchestrator! key prompt)
   "Wave B — full have_key: body folded into one Scheme call.
 Returns one of `done', `continue', or `fall-through'.  C dispatches
@@ -1227,6 +1235,8 @@ cached-dispatch into here."
               ;; M6s — done:-block fabricated-events finalize loop
               (--rks-done-fabricated-events!
                ,rks-done-fabricated-events!)
+              (--rks-done-post-dynwind!
+               ,rks-done-post-dynwind!)
               ;; M6t — first_unbound short-circuit branch
               (--rks-first-unbound-short-circuit!
                ,rks-first-unbound-short-circuit!)
