@@ -10479,7 +10479,7 @@ static Lisp_Object rks_new_binding;
 /* M6ac — promote fake_prefixed_keys (list of keys for which we
    generated a fake prefix like `mode-line').  Reset to Qnil at
    read_key_sequence entry.  See docs/keyboard.org §M6ac.  */
-static Lisp_Object rks_fake_prefixed_keys;
+/* M6ac: fake_prefixed_keys retired — getter/setter use record.  */
 
 /* M6ae — promote disabled_conversion (HAVE_TEXT_CONVERSION only;
    on TTY/window-system-only builds the symbol is still declared
@@ -10676,8 +10676,8 @@ See M6ac / Step E6.  */)
       Lisp_Object posn   = POSN_POSN (EVENT_START (rks_key));
 
       if (CONSP (posn)
-          || (!NILP (rks_fake_prefixed_keys)
-              && !NILP (Fmemq (rks_key, rks_fake_prefixed_keys))))
+          || (!NILP (Fc_rks_fake_prefixed_keys ())
+              && !NILP (Fmemq (rks_key, Fc_rks_fake_prefixed_keys ()))))
         {
           /* We're looking a second time at an event for which we
              generated a fake prefix key.  Set last_real_key_start.  */
@@ -10713,8 +10713,8 @@ See M6ac / Step E6.  */)
       /* Expand mode-line and scroll-bar events into two events:
          use posn as a fake prefix key.  */
       if (SYMBOLP (posn)
-          && (NILP (rks_fake_prefixed_keys)
-              || NILP (Fmemq (rks_key, rks_fake_prefixed_keys))))
+          && (NILP (Fc_rks_fake_prefixed_keys ())
+              || NILP (Fmemq (rks_key, Fc_rks_fake_prefixed_keys ()))))
         {
           if (READ_KEY_ELTS - rks_t <= 1)
             error ("Key sequence too long");
@@ -10732,7 +10732,8 @@ See M6ac / Step E6.  */)
           /* Record that a fake prefix key has been generated for KEY.
              Don't modify the event; this would prevent proper action
              when the event is pushed back into unread-command-events.  */
-          rks_fake_prefixed_keys = Fcons (rks_key, rks_fake_prefixed_keys);
+          Fc_set_rks_fake_prefixed_keys
+	    (Fcons (rks_key, Fc_rks_fake_prefixed_keys ()));
           return intern ("replay-key");
         }
     }
@@ -11582,6 +11583,30 @@ record slot.  */)
   return Qnil;
 }
 
+DEFUN ("--rks-fake-prefixed-keys", Fc_rks_fake_prefixed_keys,
+       Sc_rks_fake_prefixed_keys, 0, 0, 0,
+       doc: /* Internal: read fake_prefixed_keys from <rks-state>
+record slot.  Returns nil when no call in flight.  */)
+  (void)
+{
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_FAKE_PREFIXED_KEYS));
+  return Qnil;
+}
+
+DEFUN ("--set-rks-fake-prefixed-keys", Fc_set_rks_fake_prefixed_keys,
+       Sc_set_rks_fake_prefixed_keys, 1, 1, 0,
+       doc: /* Internal: write fake_prefixed_keys to <rks-state>
+record slot.  */)
+  (Lisp_Object val)
+{
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_FAKE_PREFIXED_KEYS), val);
+  return Qnil;
+}
+
 DEFUN ("--set-unread-switch-frame", Fc_set_unread_switch_frame,
        Sc_set_unread_switch_frame, 1, 1, 0,
        doc: /* Internal: write the C global `unread_switch_frame'.
@@ -11949,10 +11974,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #define starting_buffer rks_starting_buffer
 
   /* List of events for which a fake prefix key has been generated.  */
-  /* M6ac: fake_prefixed_keys promoted to file-static rks_fake_prefixed_keys.
-     Reset to Qnil at function entry (the original local initialization).  */
-#define fake_prefixed_keys rks_fake_prefixed_keys
-  fake_prefixed_keys = Qnil;
+  /* M6ac/Wave C: fake_prefixed_keys retired — getter/setter use record.  */
+  Fc_set_rks_fake_prefixed_keys (Qnil);
 
   /* raw_keybuf_count is now initialized in (most of) the callers of
      read_key_sequence.  This is so that in a recursive call (for
@@ -12436,7 +12459,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef used_mouse_menu
 #undef used_mouse_menu_history
 #undef new_binding
-#undef fake_prefixed_keys
 #ifdef HAVE_TEXT_CONVERSION
 #undef disabled_conversion
 #endif
@@ -13928,8 +13950,6 @@ syms_of_keyboard (void)
   staticpro (&rks_key);
   rks_new_binding          = Qnil;
   staticpro (&rks_new_binding);
-  rks_fake_prefixed_keys   = Qnil;
-  staticpro (&rks_fake_prefixed_keys);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;
