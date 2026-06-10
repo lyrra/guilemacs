@@ -10228,34 +10228,29 @@ active_maps (Lisp_Object first_event, Lisp_Object second_event)
    sites (this_command_key_count restore on replay, echo_truncate
    on replay_key).  Single-threaded use, same lifetime as a
    read_key_sequence call, so file-static is safe.  */
-static ptrdiff_t rks_echo_start = 0;
-static ptrdiff_t rks_keys_start = 0;
+/* M6j: echo_start / keys_start retired — setters write to record.  */
 
 DEFUN ("--set-rks-echo-start", Fc_set_rks_echo_start,
        Sc_set_rks_echo_start, 1, 1, 0,
-       doc: /* Internal: store N into the file-static rks_echo_start
-shadow of read_key_sequence's former `echo_start' local.  */)
+       doc: /* Internal: write echo_start to the <rks-state> record.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
-  rks_echo_start = XFIXNUM (n);
   if (rks_state_depth > 0)
     rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_ECHO_START, rks_echo_start);
+                 RKS_SLOT_ECHO_START, XFIXNUM (n));
   return Qnil;
 }
 
 DEFUN ("--set-rks-keys-start", Fc_set_rks_keys_start,
        Sc_set_rks_keys_start, 1, 1, 0,
-       doc: /* Internal: store N into the file-static rks_keys_start
-shadow of read_key_sequence's former `keys_start' local.  */)
+       doc: /* Internal: write keys_start to the <rks-state> record.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
-  rks_keys_start = XFIXNUM (n);
   if (rks_state_depth > 0)
     rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_KEYS_START, rks_keys_start);
+                 RKS_SLOT_KEYS_START, XFIXNUM (n));
   return Qnil;
 }
 
@@ -10369,7 +10364,7 @@ static keyremap rks_fkey, rks_keytran, rks_indec;
 static int             rks_t;
 static int             rks_mock_input;
 static Lisp_Object     rks_current_binding;
-static int             rks_first_unbound;
+/* M6m: rks_first_unbound retired — reads go through the record.  */
 static struct buffer  *rks_starting_buffer;
 
 /* M6o — promote `shift_translated' (the done:-block install splice
@@ -10823,14 +10818,13 @@ DEFUN ("--set-rks-new-binding", Fc_set_rks_new_binding,
 
 DEFUN ("--set-rks-first-unbound", Fc_set_rks_first_unbound,
        Sc_set_rks_first_unbound, 1, 1, 0,
-       doc: /* Internal: write rks_first_unbound.  */)
+       doc: /* Internal: write first_unbound to <rks-state> record.  */)
   (Lisp_Object val)
 {
   CHECK_FIXNUM (val);
-  rks_first_unbound = XFIXNUM (val);
   if (rks_state_depth > 0)
     rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
+                 RKS_SLOT_FIRST_UNBOUND, XFIXNUM (val));
   return Qnil;
 }
 
@@ -11309,10 +11303,14 @@ branch (src/keyboard.c lines 10823-10828 pre-M6t).  */)
 
 DEFUN ("--rks-first-unbound", Fc_rks_first_unbound,
        Sc_rks_first_unbound, 0, 0, 0,
-       doc: /* Internal: read rks_first_unbound.  */)
+       doc: /* Internal: read first_unbound from <rks-state> record.
+Returns 0 when no call is in flight.  */)
   (void)
 {
-  return make_fixnum (rks_first_unbound);
+  if (rks_state_depth > 0)
+    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                     RKS_SLOT_FIRST_UNBOUND));
+  return make_fixnum (0);
 }
 
 /* M6x — three translation-map walks (input-decode-map, function-
@@ -11591,14 +11589,13 @@ the active_maps call, which the Scheme caller performs).  */)
   (Lisp_Object current_binding)
 {
   rks_starting_buffer = current_buffer;
-  rks_first_unbound   = READ_KEY_ELTS + 1;
   rks_current_binding = current_binding;
   rks_t               = 0;
   last_nonmenu_event  = Qnil;
   if (rks_state_depth > 0)
     {
       SCM rec = rks_state_stack[rks_state_depth - 1];
-      rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
+      rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, READ_KEY_ELTS + 1);
       scm_struct_set_x (rec, scm_from_int (RKS_SLOT_CURRENT_BINDING),
                         rks_current_binding);
       rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
@@ -11851,9 +11848,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     rks_mock_input = rks_get_int (rec, RKS_SLOT_MOCK_INPUT);
     rks_current_binding = scm_struct_ref (rec,
                              scm_from_int (RKS_SLOT_CURRENT_BINDING));
-    rks_first_unbound = rks_get_int (rec, RKS_SLOT_FIRST_UNBOUND);
-    rks_echo_start = rks_get_int (rec, RKS_SLOT_ECHO_START);
-    rks_keys_start = rks_get_int (rec, RKS_SLOT_KEYS_START);
   }
 
   /* How many keys there are in the current key sequence.
@@ -11872,8 +11866,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* Index of the first key that has no binding.
      It is useless to try fkey.start larger than that.
-     M6m: promoted to file-static rks_first_unbound.  */
-#define first_unbound rks_first_unbound
+     M6m/Wave C: retired — reads from record slot.  */
 
   /* If t < mock_input, then KEYBUF[t] should be read as the next
      input key.
@@ -12018,11 +12011,14 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
   /* These are no-ops the first time through, but if we restart, they
      revert the echo area and this_command_keys to their original state.
-     M6j: keys_start / echo_start moved to file-static rks_keys_start /
-     rks_echo_start; see top of file.  */
-  this_command_key_count = rks_keys_start;
-  if (INTERACTIVE && t < mock_input)
-    echo_truncate (rks_echo_start);
+     M6j/Wave C: keys_start / echo_start retired — read from record.  */
+  if (rks_state_depth > 0)
+    {
+      SCM rec = rks_state_stack[rks_state_depth - 1];
+      this_command_key_count = rks_get_int (rec, RKS_SLOT_KEYS_START);
+      if (INTERACTIVE && t < mock_input)
+        echo_truncate (rks_get_int (rec, RKS_SLOT_ECHO_START));
+    }
 
   /* If text conversion is supposed to be disabled immediately, do it
      now.  */
@@ -12376,9 +12372,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
     rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
     rc_set (rec, RKS_SLOT_CURRENT_BINDING, rks_current_binding);
-    rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
-    rks_set_int (rec, RKS_SLOT_ECHO_START, rks_echo_start);
-    rks_set_int (rec, RKS_SLOT_KEYS_START, rks_keys_start);
     /* Step C: sync the 3 keyremap C structs to their <keyremap>
        record slots.  Each keyremap has parent, map (Lisp_Object)
        and start, end (int).  */
@@ -12420,7 +12413,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef t
 #undef mock_input
 #undef current_binding
-#undef first_unbound
 #undef starting_buffer
 #undef delayed_switch_frame
 #undef original_uppercase
