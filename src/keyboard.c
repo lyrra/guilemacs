@@ -12032,20 +12032,16 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      promoted file-statics via --rks-replay-sequence-init-rest.
      See docs/keyboard.org §M6m.  */
  replay_sequence:
+  /* Wave B: replay_sequence body hoisted into replay-sequence-continue.
+     first_event allowed to stay nil — recompute-maps branch handles it.  */
   {
-    static SCM rks_replay_sequence_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_replay_sequence_proc))
-      rks_replay_sequence_proc =
+    static SCM rks_rsc_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_rsc_proc))
+      rks_rsc_proc =
         scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-setup-replay-sequence-c!");
-    SCM_CALL_2 (rks_replay_sequence_proc,
-                mock_input > 0 ? keybuf[0] : Qnil,
-                mock_input > 1 ? keybuf[1] : Qnil);
+                          "replay-sequence-continue");
+    SCM_CALL_0 (rks_rsc_proc);
   }
-  /* M6m: keep the C-local first_event in sync with what the Scheme
-     just computed.  Used later (line ~11046) by the recompute-maps
-     branch when first_event is still nil.  */
-  first_event = mock_input > 0 ? keybuf[0] : Qnil;
 
   /* These are no-ops the first time through, but if we restart, they
      revert the echo area and this_command_keys to their original state.
