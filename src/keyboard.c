@@ -10374,16 +10374,18 @@ static struct buffer  *rks_starting_buffer;
 
 /* M6o — promote `shift_translated' (the done:-block install splice
    reads it).  See docs/keyboard.org §M6o.  */
-static bool rks_shift_translated;
+/* M6o: rks_shift_translated retired — reads go through the record.  */
 
 DEFUN ("--rks-shift-translated-p", Fc_rks_shift_translated_p,
        Sc_rks_shift_translated_p, 0, 0, 0,
-       doc: /* Internal: read the file-static `rks_shift_translated'
-shadow as a non-nil predicate.  Mirrors the C check `if
-(shift_translated) ...' near the end of read_key_sequence.  */)
+       doc: /* Internal: read shift_translated from the <rks-state>
+record (slot RKS_SLOT_SHIFT_TRANSLATED).  Returns Qt / Qnil.  */)
   (void)
 {
-  return rks_shift_translated ? Qt : Qnil;
+  if (rks_state_depth > 0)
+    return rks_get_bool (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_SHIFT_TRANSLATED) ? Qt : Qnil;
+  return Qnil;
 }
 
 /* M6q — keybuf stack.  `keybuf' is a `Lisp_Object[READ_KEY_ELTS]'
@@ -11093,14 +11095,13 @@ DEFUN ("--set-rks-current-binding", Fc_set_rks_current_binding,
 
 DEFUN ("--set-rks-shift-translated", Fc_set_rks_shift_translated,
        Sc_set_rks_shift_translated, 1, 1, 0,
-       doc: /* Internal: write rks_shift_translated.  Non-nil VAL
-sets it to true; nil sets it to false.  */)
+       doc: /* Internal: write shift_translated to the <rks-state>
+record slot.  Non-nil VAL → true.  */)
   (Lisp_Object val)
 {
-  rks_shift_translated = !NILP (val);
   if (rks_state_depth > 0)
     rks_set_bool (rks_state_stack[rks_state_depth - 1],
-                  RKS_SLOT_SHIFT_TRANSLATED, rks_shift_translated);
+                  RKS_SLOT_SHIFT_TRANSLATED, !NILP (val));
   return Qnil;
 }
 
@@ -11851,7 +11852,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     rks_current_binding = scm_struct_ref (rec,
                              scm_from_int (RKS_SLOT_CURRENT_BINDING));
     rks_first_unbound = rks_get_int (rec, RKS_SLOT_FIRST_UNBOUND);
-    rks_shift_translated = rks_get_bool (rec, RKS_SLOT_SHIFT_TRANSLATED);
     rks_echo_start = rks_get_int (rec, RKS_SLOT_ECHO_START);
     rks_keys_start = rks_get_int (rec, RKS_SLOT_KEYS_START);
   }
@@ -11915,12 +11915,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #define keytran rks_keytran
 #define indec   rks_indec
 
-  /* True if we are trying to map a key by changing an upper-case
-     letter to lower case, or a shifted function key to an unshifted
-     one.
-     M6o: promoted to file-static rks_shift_translated.  */
-#define shift_translated rks_shift_translated
-  shift_translated = false;
+  /* (shift_translated retired — reads go through the record via
+     --rks-shift-translated-p / --set-rks-shift-translated.)  */
 
   /* If we receive a `switch-frame' or `select-window' event in the middle of
      a key sequence, we put it off for later.
@@ -12381,7 +12377,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
     rc_set (rec, RKS_SLOT_CURRENT_BINDING, rks_current_binding);
     rks_set_int (rec, RKS_SLOT_FIRST_UNBOUND, rks_first_unbound);
-    rks_set_bool (rec, RKS_SLOT_SHIFT_TRANSLATED, rks_shift_translated);
     rks_set_int (rec, RKS_SLOT_ECHO_START, rks_echo_start);
     rks_set_int (rec, RKS_SLOT_KEYS_START, rks_keys_start);
     /* Step C: sync the 3 keyremap C structs to their <keyremap>
@@ -12427,7 +12422,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef current_binding
 #undef first_unbound
 #undef starting_buffer
-#undef shift_translated
 #undef delayed_switch_frame
 #undef original_uppercase
 #undef original_uppercase_position
