@@ -2772,7 +2772,8 @@ enum {
   RKS_SLOT_ORIGINAL_UPPERCASE_POSITION  = 13,
   RKS_SLOT_FAKE_PREFIXED_KEYS           = 14,
   RKS_SLOT_STARTING_BUFFER              = 15,
-  RKS_SLOT_DISABLED_CONVERSION          = 16
+  RKS_SLOT_DISABLED_CONVERSION          = 16,
+  RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10471,7 +10472,7 @@ static int       rks_last_real_key_start;
    docs/keyboard.org §M6z.  */
 static Lisp_Object rks_key;
 static bool        rks_used_mouse_menu;
-static bool        rks_used_mouse_menu_history[READ_KEY_ELTS];
+/* M6z: used_mouse_menu_history retired — bitmask in record slot 17.  */
 
 /* M6ab — promote new_binding.  Written by follow_key + the
    unbound-event reduction's inner loop; read by M6aa's install
@@ -10917,7 +10918,10 @@ cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
           current_kboard->immediate_echo = false;
           echo_now ();
         }
-      rks_used_mouse_menu = rks_used_mouse_menu_history[rks_t];
+      if (rks_state_depth > 0)
+	rks_used_mouse_menu
+	  = (rks_get_int (rks_state_stack[rks_state_depth - 1],
+			  RKS_SLOT_USED_MOUSE_MENU_HISTORY) >> rks_t) & 1;
       return intern ("mock");
     }
   if (!NILP (Vexecuting_kbd_macro)
@@ -11972,8 +11976,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      M6z: promoted to file-static rks_used_mouse_menu_history.  Reset
      to all-false at function entry (the original local-array
      `= {0}' initializer).  */
-#define used_mouse_menu_history rks_used_mouse_menu_history
-  memset (used_mouse_menu_history, 0, sizeof (used_mouse_menu_history));
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+		 RKS_SLOT_USED_MOUSE_MENU_HISTORY, 0);
 
   /* If the sequence is unbound in submaps[], then
      keybuf[fkey.start..fkey.end-1] is a prefix in Vfunction_key_map,
@@ -12197,7 +12202,17 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    key = read_char (prevent_redisplay ? -2 : NILP (prompt),
 		             current_binding, last_nonmenu_event,
                              &used_mouse_menu, NULL);
-	    used_mouse_menu_history[t] = used_mouse_menu;
+	    if (rks_state_depth > 0)
+	      {
+		int bitmask = rks_get_int (rks_state_stack[rks_state_depth - 1],
+					  RKS_SLOT_USED_MOUSE_MENU_HISTORY);
+		if (used_mouse_menu)
+		  bitmask |= (1 << t);
+		else
+		  bitmask &= ~(1 << t);
+		rks_set_int (rks_state_stack[rks_state_depth - 1],
+			     RKS_SLOT_USED_MOUSE_MENU_HISTORY, bitmask);
+	      }
 	    if ((FIXNUMP (key) && XFIXNUM (key) == -2) /* wrong_kboard_jmpbuf */
 		/* When switching to a new tty (with a new keyboard),
 		   read_char returns the new buffer, rather than -2
@@ -12495,7 +12510,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef last_real_key_start
 #undef key
 #undef used_mouse_menu
-#undef used_mouse_menu_history
 #undef new_binding
 #ifdef HAVE_TEXT_CONVERSION
 #endif
