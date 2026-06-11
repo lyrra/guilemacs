@@ -2774,7 +2774,8 @@ enum {
   RKS_SLOT_STARTING_BUFFER              = 15,
   RKS_SLOT_DISABLED_CONVERSION          = 16,
   RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17,
-  RKS_SLOT_ECHO_LOCAL_START             = 18
+  RKS_SLOT_ECHO_LOCAL_START             = 18,
+  RKS_SLOT_KEYS_LOCAL_START             = 19
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10462,7 +10463,6 @@ read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
    last_real_key_start (backtrack target inside the iteration).
    See docs/keyboard.org §M6y.  */
 /* M6y: echo_local_start retired — getter/setter use record.  */
-static int       rks_keys_local_start;
 static int       rks_last_real_key_start;
 
 /* M6z — promote the per-iteration key + used_mouse_menu locals and
@@ -10962,20 +10962,26 @@ record slot.  Returns 0 when no call in flight.  */)
 
 DEFUN ("--rks-set-keys-local-start", Fc_rks_set_keys_local_start,
        Sc_rks_set_keys_local_start, 1, 1, 0,
-       doc: /* Internal: write rks_keys_local_start.  */)
+       doc: /* Internal: write keys_local_start to <rks-state> record.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
-  rks_keys_local_start = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_KEYS_LOCAL_START, XFIXNUM (n));
   return Qnil;
 }
 
 DEFUN ("--rks-keys-local-start", Fc_rks_keys_local_start,
        Sc_rks_keys_local_start, 0, 0, 0,
-       doc: /* Internal: read rks_keys_local_start.  */)
+       doc: /* Internal: read keys_local_start from <rks-state>
+record.  Returns 0 when no call in flight.  */)
   (void)
 {
-  return make_fixnum (rks_keys_local_start);
+  if (rks_state_depth > 0)
+    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                     RKS_SLOT_KEYS_LOCAL_START));
+  return make_fixnum (0);
 }
 
 DEFUN ("--rks-set-last-real-key-start", Fc_rks_set_last_real_key_start,
@@ -11003,7 +11009,7 @@ pre-M6y.  */)
     error ("Key sequence too long");
   if (!noninteractive)
     Fc_rks_set_echo_local_start (make_fixnum (echo_length ()));
-  rks_keys_local_start = this_command_key_count;
+  Fc_rks_set_keys_local_start (make_fixnum (this_command_key_count));
   return Qnil;
 }
 
@@ -11020,7 +11026,7 @@ rks_last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
 {
   if (!noninteractive && rks_t < rks_mock_input)
     echo_truncate (XFIXNUM (Fc_rks_echo_local_start ()));
-  this_command_key_count  = rks_keys_local_start;
+  this_command_key_count  = XFIXNUM (Fc_rks_keys_local_start ());
   rks_last_real_key_start = rks_t;
   return Qnil;
 }
@@ -12513,7 +12519,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef t
 #undef mock_input
 #undef current_binding
-#undef keys_local_start
 #undef last_real_key_start
 #undef key
 #undef used_mouse_menu

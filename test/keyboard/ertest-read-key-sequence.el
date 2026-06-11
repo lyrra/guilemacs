@@ -598,12 +598,14 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
       (--rks-state-stack-pop))))
 
 (ert-deftest m6y-keys-local-start/roundtrip ()
-  (let ((saved (--rks-keys-local-start)))
+  (let ((rec (--make-rks-state)))
+    (--rks-state-stack-push rec)
     (unwind-protect
         (progn
           (--rks-set-keys-local-start 7)
           (should (= 7 (--rks-keys-local-start))))
-      (--rks-set-keys-local-start saved))))
+      (--rks-set-keys-local-start 0)
+      (--rks-state-stack-pop))))
 
 (ert-deftest m6y-setup-capture/runs-at-rks-t-below-limit ()
   ;; rks_t is 0 (or small) at idle — well below READ_KEY_ELTS (30).
