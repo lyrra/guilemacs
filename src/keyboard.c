@@ -2771,7 +2771,8 @@ enum {
   RKS_SLOT_ORIGINAL_UPPERCASE           = 12,
   RKS_SLOT_ORIGINAL_UPPERCASE_POSITION  = 13,
   RKS_SLOT_FAKE_PREFIXED_KEYS           = 14,
-  RKS_SLOT_STARTING_BUFFER              = 15
+  RKS_SLOT_STARTING_BUFFER              = 15,
+  RKS_SLOT_DISABLED_CONVERSION          = 16
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10486,7 +10487,7 @@ static Lisp_Object rks_new_binding;
    on TTY/window-system-only builds the symbol is still declared
    but never read).  See docs/keyboard.org §M6ae.  */
 #ifdef HAVE_TEXT_CONVERSION
-static bool rks_disabled_conversion;
+/* M6ae: rks_disabled_conversion retired — getter/setter use record.  */
 #endif
 
 DEFUN ("--rks-iter-maybe-disable-text-conversion",
@@ -10503,7 +10504,8 @@ Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
   (void)
 {
 #ifdef HAVE_TEXT_CONVERSION
-  if (rks_disabled_conversion || rks_t == 0 || rks_used_mouse_menu
+  if (!NILP (Fc_rks_disabled_conversion_p ()) || rks_t == 0
+      || rks_used_mouse_menu
       || disable_inhibit_text_conversion)
     return Qnil;
 
@@ -10527,7 +10529,7 @@ Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
     {
       disable_text_conversion ();
       record_unwind_protect_void (resume_text_conversion);
-      rks_disabled_conversion = true;
+      Fc_set_rks_disabled_conversion (Qt);
     }
 #endif
   return Qnil;
@@ -11281,6 +11283,31 @@ record slot.  VAL should be a Lisp buffer object.  */)
   return Qnil;
 }
 
+DEFUN ("--rks-disabled-conversion-p", Fc_rks_disabled_conversion_p,
+       Sc_rks_disabled_conversion_p, 0, 0, 0,
+       doc: /* Internal: read disabled_conversion from <rks-state>
+record slot.  Returns nil (false) when no call in flight.  */)
+  (void)
+{
+  if (rks_state_depth > 0)
+    return rks_get_bool (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_DISABLED_CONVERSION) ? Qt : Qnil;
+  return Qnil;
+}
+
+DEFUN ("--set-rks-disabled-conversion",
+       Fc_set_rks_disabled_conversion,
+       Sc_set_rks_disabled_conversion, 1, 1, 0,
+       doc: /* Internal: write disabled_conversion to <rks-state>
+record slot.  Non-nil VAL → true.  */)
+  (Lisp_Object val)
+{
+  if (rks_state_depth > 0)
+    rks_set_bool (rks_state_stack[rks_state_depth - 1],
+                  RKS_SLOT_DISABLED_CONVERSION, !NILP (val));
+  return Qnil;
+}
+
 DEFUN ("--rks-keybuf-shift-down", Fc_rks_keybuf_shift_down,
        Sc_rks_keybuf_shift_down, 1, 1, 0,
        doc: /* Internal: shift keybuf[N..rks_t-1] down to keybuf[0..rks_t-N-1].
@@ -11980,8 +12007,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #ifdef HAVE_TEXT_CONVERSION
   /* M6ae: disabled_conversion promoted to file-static rks_disabled_conversion.
      Initialized to false at function entry (the original local-init).  */
-#define disabled_conversion rks_disabled_conversion
-  disabled_conversion = false;
+  Fc_set_rks_disabled_conversion (Qnil);
 #endif /* HAVE_TEXT_CONVERSION */
 
   /* M6m: starting_buffer promoted to file-static rks_starting_buffer.  */
@@ -12078,7 +12104,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     {
       disable_text_conversion ();
       record_unwind_protect_void (resume_text_conversion);
-      disabled_conversion = true;
+      Fc_set_rks_disabled_conversion (Qt);
     }
 #endif /* HAVE_TEXT_CONVERSION */
 
@@ -12472,7 +12498,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef used_mouse_menu_history
 #undef new_binding
 #ifdef HAVE_TEXT_CONVERSION
-#undef disabled_conversion
 #endif
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
@@ -13959,6 +13984,7 @@ syms_of_keyboard (void)
      has ever been entered.  See docs/keyboard.org §M6.  */
   rks_current_binding      = Qnil;
   staticpro (&rks_current_binding);
+  rks_key                  = Qnil;
   staticpro (&rks_key);
   rks_new_binding          = Qnil;
   staticpro (&rks_new_binding);
