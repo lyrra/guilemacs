@@ -588,12 +588,14 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   (should (fboundp '--rks-set-last-real-key-start)))
 
 (ert-deftest m6y-echo-local-start/roundtrip ()
-  (let ((saved (--rks-echo-local-start)))
+  (let ((rec (--make-rks-state)))
+    (--rks-state-stack-push rec)
     (unwind-protect
         (progn
           (--rks-set-echo-local-start 42)
           (should (= 42 (--rks-echo-local-start))))
-      (--rks-set-echo-local-start saved))))
+      (--rks-set-echo-local-start 0)
+      (--rks-state-stack-pop))))
 
 (ert-deftest m6y-keys-local-start/roundtrip ()
   (let ((saved (--rks-keys-local-start)))

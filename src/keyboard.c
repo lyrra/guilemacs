@@ -2773,7 +2773,8 @@ enum {
   RKS_SLOT_FAKE_PREFIXED_KEYS           = 14,
   RKS_SLOT_STARTING_BUFFER              = 15,
   RKS_SLOT_DISABLED_CONVERSION          = 16,
-  RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17
+  RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17,
+  RKS_SLOT_ECHO_LOCAL_START             = 18
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10460,7 +10461,7 @@ read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
    (this_command_key_count snapshot, same pattern), and
    last_real_key_start (backtrack target inside the iteration).
    See docs/keyboard.org §M6y.  */
-static ptrdiff_t rks_echo_local_start;
+/* M6y: echo_local_start retired — getter/setter use record.  */
 static int       rks_keys_local_start;
 static int       rks_last_real_key_start;
 
@@ -10936,20 +10937,27 @@ cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
 
 DEFUN ("--rks-set-echo-local-start", Fc_rks_set_echo_local_start,
        Sc_rks_set_echo_local_start, 1, 1, 0,
-       doc: /* Internal: write rks_echo_local_start.  */)
+       doc: /* Internal: write echo_local_start to <rks-state>
+record slot.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
-  rks_echo_local_start = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_ECHO_LOCAL_START, XFIXNUM (n));
   return Qnil;
 }
 
 DEFUN ("--rks-echo-local-start", Fc_rks_echo_local_start,
        Sc_rks_echo_local_start, 0, 0, 0,
-       doc: /* Internal: read rks_echo_local_start.  */)
+       doc: /* Internal: read echo_local_start from <rks-state>
+record slot.  Returns 0 when no call in flight.  */)
   (void)
 {
-  return make_fixnum (rks_echo_local_start);
+  if (rks_state_depth > 0)
+    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                     RKS_SLOT_ECHO_LOCAL_START));
+  return make_fixnum (0);
 }
 
 DEFUN ("--rks-set-keys-local-start", Fc_rks_set_keys_local_start,
@@ -10994,7 +11002,7 @@ pre-M6y.  */)
   if (rks_t >= READ_KEY_ELTS)
     error ("Key sequence too long");
   if (!noninteractive)
-    rks_echo_local_start = echo_length ();
+    Fc_rks_set_echo_local_start (make_fixnum (echo_length ()));
   rks_keys_local_start = this_command_key_count;
   return Qnil;
 }
@@ -11011,7 +11019,7 @@ rks_last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
   (void)
 {
   if (!noninteractive && rks_t < rks_mock_input)
-    echo_truncate (rks_echo_local_start);
+    echo_truncate (XFIXNUM (Fc_rks_echo_local_start ()));
   this_command_key_count  = rks_keys_local_start;
   rks_last_real_key_start = rks_t;
   return Qnil;
@@ -12505,7 +12513,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef t
 #undef mock_input
 #undef current_binding
-#undef echo_local_start
 #undef keys_local_start
 #undef last_real_key_start
 #undef key
