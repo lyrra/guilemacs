@@ -158,7 +158,8 @@ reinitialize from current-kboard / Vkey_translation_map."
                    shift-translated
                    delayed-switch-frame
                    original-uppercase original-uppercase-position
-                   fake-prefixed-keys)
+                   fake-prefixed-keys
+                   starting-buffer)
   rks-state?
   ;; `key-count' = the C local `t' (terse name avoided in Scheme).
   (key-count            rks-state-key-count            set-rks-state-key-count!)
@@ -181,7 +182,9 @@ reinitialize from current-kboard / Vkey_translation_map."
                         rks-state-original-uppercase-position
                         set-rks-state-original-uppercase-position!)
   (fake-prefixed-keys   rks-state-fake-prefixed-keys
-                        set-rks-state-fake-prefixed-keys!))
+                        set-rks-state-fake-prefixed-keys!)
+  (starting-buffer      rks-state-starting-buffer
+                        set-rks-state-starting-buffer!))
 
 (define (make-rks-state)
   "Create a fresh rks-state with the same defaults as read_key_sequence
@@ -204,7 +207,8 @@ current-kboard has been queried (this matches the C
    #nil                                 ; delayed-switch-frame
    #nil                                 ; original-uppercase
    -1                                   ; original-uppercase-position
-   #nil))                               ; fake-prefixed-keys
+   #nil                                ; fake-prefixed-keys
+   #nil))                              ; starting-buffer
 
 ;; `--read-key-sequence-and-vector' is looked up per call (see body) so
 ;; tests can stub it.  The other helpers are stable across calls.
@@ -802,7 +806,12 @@ elements.  See docs/keyboard.org §M6y."
 (define RKS-SLOT-FKEY              7)
 (define RKS-SLOT-KEYTRAN           8)
 (define RKS-SLOT-INDEC             9)
-(define RKS-SLOT-SHIFT-TRANSLATED 10)
+(define RKS-SLOT-SHIFT-TRANSLATED     10)
+(define RKS-SLOT-DELAYED-SWITCH-FRAME  11)
+(define RKS-SLOT-ORIGINAL-UPPERCASE    12)
+(define RKS-SLOT-ORIGINAL-UPPERCASE-POSITION 13)
+(define RKS-SLOT-FAKE-PREFIXED-KEYS    14)
+(define RKS-SLOT-STARTING-BUFFER       15)
 
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch

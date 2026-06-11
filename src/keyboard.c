@@ -2770,7 +2770,8 @@ enum {
   RKS_SLOT_DELAYED_SWITCH_FRAME         = 11,
   RKS_SLOT_ORIGINAL_UPPERCASE           = 12,
   RKS_SLOT_ORIGINAL_UPPERCASE_POSITION  = 13,
-  RKS_SLOT_FAKE_PREFIXED_KEYS           = 14
+  RKS_SLOT_FAKE_PREFIXED_KEYS           = 14,
+  RKS_SLOT_STARTING_BUFFER              = 15
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10365,7 +10366,7 @@ static int             rks_t;
 static int             rks_mock_input;
 static Lisp_Object     rks_current_binding;
 /* M6m: rks_first_unbound retired — reads go through the record.  */
-static struct buffer  *rks_starting_buffer;
+/* M6m: rks_starting_buffer retired — getter/setter use record. */
 
 /* M6o — promote `shift_translated' (the done:-block install splice
    reads it).  See docs/keyboard.org §M6o.  */
@@ -11257,14 +11258,27 @@ DEFUN ("--set-rks-mock-input", Fc_set_rks_mock_input,
 
 DEFUN ("--rks-starting-buffer", Fc_rks_starting_buffer,
        Sc_rks_starting_buffer, 0, 0, 0,
-       doc: /* Internal: return the buffer that was current when
-read_key_sequence was entered (the `starting_buffer' local promoted
-to file-static rks_starting_buffer).  Returns nil when no
-read_key_sequence call is in flight.  */)
+       doc: /* Internal: read starting_buffer from <rks-state>
+record slot (a Lisp buffer object).  Returns nil when no call
+in flight.  */)
   (void)
 {
-  return rks_starting_buffer
-    ? make_lisp_ptr (rks_starting_buffer, Lisp_Vectorlike) : Qnil;
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_STARTING_BUFFER));
+  return Qnil;
+}
+
+DEFUN ("--set-rks-starting-buffer", Fc_set_rks_starting_buffer,
+       Sc_set_rks_starting_buffer, 1, 1, 0,
+       doc: /* Internal: write starting_buffer to <rks-state>
+record slot.  VAL should be a Lisp buffer object.  */)
+  (Lisp_Object val)
+{
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_STARTING_BUFFER), val);
+  return Qnil;
 }
 
 DEFUN ("--rks-keybuf-shift-down", Fc_rks_keybuf_shift_down,
@@ -11631,7 +11645,7 @@ lines 10678-10688 (the body of the replay_sequence: label minus
 the active_maps call, which the Scheme caller performs).  */)
   (Lisp_Object current_binding)
 {
-  rks_starting_buffer = current_buffer;
+  Fc_set_rks_starting_buffer (Fcurrent_buffer ());
   rks_current_binding = current_binding;
   rks_t               = 0;
   last_nonmenu_event  = Qnil;
@@ -11971,8 +11985,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #endif /* HAVE_TEXT_CONVERSION */
 
   /* M6m: starting_buffer promoted to file-static rks_starting_buffer.  */
-#define starting_buffer rks_starting_buffer
-
   /* List of events for which a fake prefix key has been generated.  */
   /* M6ac/Wave C: fake_prefixed_keys retired — getter/setter use record.  */
   Fc_set_rks_fake_prefixed_keys (Qnil);
@@ -12284,7 +12296,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	     replay to get the right keymap.  */
 	  if (FIXNUMP (key)
 	      && XFIXNUM (key) == quit_char
-	      && current_buffer != starting_buffer)
+	      && !BASE_EQ (Fcurrent_buffer (),
+			   Fc_rks_starting_buffer ()))
 	    {
 	      GROW_RAW_KEYBUF;
 	      ASET (raw_keybuf, raw_keybuf_count, key);
@@ -12451,7 +12464,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef t
 #undef mock_input
 #undef current_binding
-#undef starting_buffer
 #undef echo_local_start
 #undef keys_local_start
 #undef last_real_key_start
