@@ -2775,7 +2775,8 @@ enum {
   RKS_SLOT_DISABLED_CONVERSION          = 16,
   RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17,
   RKS_SLOT_ECHO_LOCAL_START             = 18,
-  RKS_SLOT_KEYS_LOCAL_START             = 19
+  RKS_SLOT_KEYS_LOCAL_START             = 19,
+  RKS_SLOT_LAST_REAL_KEY_START          = 20
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10463,7 +10464,6 @@ read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
    last_real_key_start (backtrack target inside the iteration).
    See docs/keyboard.org §M6y.  */
 /* M6y: echo_local_start retired — getter/setter use record.  */
-static int       rks_last_real_key_start;
 
 /* M6z — promote the per-iteration key + used_mouse_menu locals and
    the used_mouse_menu_history array.  `rks_key' is the current event
@@ -10587,31 +10587,31 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
              keyremap counters back to last_real_key_start, then
              jump back to replay_key (with mock_input zeroed) or
              replay_sequence (with mock_input = last_real_key_start).  */
-          if (rks_indec.end > rks_last_real_key_start)
+          if (rks_indec.end > XFIXNUM (Fc_rks_last_real_key_start ()))
             {
               int new_indec
-                = rks_last_real_key_start < rks_indec.start
-                  ? rks_last_real_key_start : rks_indec.start;
+                = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_indec.start
+                  ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_indec.start;
               rks_indec.end = rks_indec.start = new_indec;
               rks_indec.map = rks_indec.parent;
-              if (rks_fkey.end > rks_last_real_key_start)
+              if (rks_fkey.end > XFIXNUM (Fc_rks_last_real_key_start ()))
                 {
                   int new_fkey
-                    = rks_last_real_key_start < rks_fkey.start
-                      ? rks_last_real_key_start : rks_fkey.start;
+                    = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_fkey.start
+                      ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_fkey.start;
                   rks_fkey.end = rks_fkey.start = new_fkey;
                   rks_fkey.map = rks_fkey.parent;
-                  if (rks_keytran.end > rks_last_real_key_start)
+                  if (rks_keytran.end > XFIXNUM (Fc_rks_last_real_key_start ()))
                     {
                       int new_keytran
-                        = rks_last_real_key_start < rks_keytran.start
-                          ? rks_last_real_key_start : rks_keytran.start;
+                        = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_keytran.start
+                          ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_keytran.start;
                       rks_keytran.end = rks_keytran.start = new_keytran;
                       rks_keytran.map = rks_keytran.parent;
                     }
                 }
             }
-          if (rks_t == rks_last_real_key_start)
+          if (rks_t == XFIXNUM (Fc_rks_last_real_key_start ()))
             {
               rks_mock_input = 0;
               if (rks_state_depth > 0)
@@ -10621,7 +10621,7 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
             }
           else
             {
-              rks_mock_input = rks_last_real_key_start;
+              rks_mock_input = XFIXNUM (Fc_rks_last_real_key_start ());
               if (rks_state_depth > 0)
                 rks_set_int (rks_state_stack[rks_state_depth - 1],
                              RKS_SLOT_MOCK_INPUT, rks_mock_input);
@@ -10687,10 +10687,10 @@ See M6ac / Step E6.  */)
           /* We're looking a second time at an event for which we
              generated a fake prefix key.  Set last_real_key_start.  */
           if (rks_t > 0)
-            rks_last_real_key_start = rks_t - 1;
+            Fc_rks_set_last_real_key_start (make_fixnum (rks_t - 1));
         }
 
-      if (rks_last_real_key_start == 0)
+      if (XFIXNUM (Fc_rks_last_real_key_start ()) == 0)
         {
           /* Key sequences beginning with mouse clicks are read using
              the keymaps in the buffer clicked on.  Switch buffers if
@@ -10780,8 +10780,8 @@ See M6ac / Step E6.  */)
         {
           /* We're looking at the second event of a sequence which we
              expanded before.  Set last_real_key_start.  */
-          if (rks_last_real_key_start == rks_t && rks_t > 0)
-            rks_last_real_key_start = rks_t - 1;
+          if (XFIXNUM (Fc_rks_last_real_key_start ()) == rks_t && rks_t > 0)
+            Fc_rks_set_last_real_key_start (make_fixnum (rks_t - 1));
         }
     }
 
@@ -10984,13 +10984,28 @@ record.  Returns 0 when no call in flight.  */)
   return make_fixnum (0);
 }
 
+DEFUN ("--rks-last-real-key-start", Fc_rks_last_real_key_start,
+       Sc_rks_last_real_key_start, 0, 0, 0,
+       doc: /* Internal: read last_real_key_start from <rks-state>
+record.  Returns 0 when no call in flight.  */)
+  (void)
+{
+  if (rks_state_depth > 0)
+    return make_fixnum (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                     RKS_SLOT_LAST_REAL_KEY_START));
+  return make_fixnum (0);
+}
+
 DEFUN ("--rks-set-last-real-key-start", Fc_rks_set_last_real_key_start,
        Sc_rks_set_last_real_key_start, 1, 1, 0,
-       doc: /* Internal: write rks_last_real_key_start.  */)
+       doc: /* Internal: write last_real_key_start to <rks-state>
+record.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNUM (n);
-  rks_last_real_key_start = XFIXNUM (n);
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_LAST_REAL_KEY_START, XFIXNUM (n));
   return Qnil;
 }
 
@@ -11018,16 +11033,16 @@ pre-M6y.  */)
 DEFUN ("--rks-iter-replay-restore",
        Fc_rks_iter_replay_restore, Sc_rks_iter_replay_restore, 0, 0, 0,
        doc: /* Internal: if interactive and rks_t < rks_mock_input, call
-echo_truncate (rks_echo_local_start).  Then write
-this_command_key_count = rks_keys_local_start and
-rks_last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
+echo_truncate (echo_local_start).  Then write
+this_command_key_count = keys_local_start and
+last_real_key_start = rks_t.  Mirrors src/keyboard.c lines
 11403-11408 pre-M6y.  */)
   (void)
 {
   if (!noninteractive && rks_t < rks_mock_input)
     echo_truncate (XFIXNUM (Fc_rks_echo_local_start ()));
   this_command_key_count  = XFIXNUM (Fc_rks_keys_local_start ());
-  rks_last_real_key_start = rks_t;
+  Fc_rks_set_last_real_key_start (make_fixnum (rks_t));
   return Qnil;
 }
 
@@ -12151,8 +12166,10 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
          (say, a mouse click on the mode line which is being treated
          as [mode-line (mouse-...)], then we backtrack to this point
          of keybuf.
-         M6y: promoted to file-static rks_last_real_key_start.  */
-#define last_real_key_start rks_last_real_key_start
+         M6y: retired to <rks-state> record slot 20.  Bulk subr body
+         no longer references the alias; reads/writes go through
+         Fc_rks_last_real_key_start / Fc_rks_set_last_real_key_start
+         in the extracted DEFUNs.  */
 
       /* These variables are analogous to echo_start and keys_start;
 	 while those allow us to restart the entire key sequence,
@@ -12519,7 +12536,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef t
 #undef mock_input
 #undef current_binding
-#undef last_real_key_start
 #undef key
 #undef used_mouse_menu
 #undef new_binding
