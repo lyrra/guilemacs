@@ -2776,7 +2776,8 @@ enum {
   RKS_SLOT_USED_MOUSE_MENU_HISTORY      = 17,
   RKS_SLOT_ECHO_LOCAL_START             = 18,
   RKS_SLOT_KEYS_LOCAL_START             = 19,
-  RKS_SLOT_LAST_REAL_KEY_START          = 20
+  RKS_SLOT_LAST_REAL_KEY_START          = 20,
+  RKS_SLOT_NEW_BINDING                  = 21
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10478,7 +10479,6 @@ static bool        rks_used_mouse_menu;
 /* M6ab — promote new_binding.  Written by follow_key + the
    unbound-event reduction's inner loop; read by M6aa's install
    step.  See docs/keyboard.org §M6ab.  */
-static Lisp_Object rks_new_binding;
 
 /* M6ac — promote fake_prefixed_keys (list of keys for which we
    generated a fake prefix like `mode-line').  Reset to Qnil at
@@ -10633,11 +10633,12 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
       Lisp_Object new_click = list2 (new_head, EVENT_START (rks_key));
 
       /* Look for a binding for this new key.  */
-      rks_new_binding = follow_key (rks_current_binding, new_click);
+      Lisp_Object new_bind = follow_key (rks_current_binding, new_click);
+      Fc_set_rks_new_binding (new_bind);
 
-      if (!NILP (rks_new_binding))
+      if (!NILP (new_bind))
         {
-          rks_current_binding = rks_new_binding;
+          rks_current_binding = new_bind;
           if (rks_state_depth > 0)
             scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
                               scm_from_int (RKS_SLOT_CURRENT_BINDING),
@@ -10806,18 +10807,23 @@ logic in rks-follow-key-and-update-first-unbound!.  */)
 
 DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
        0, 0, 0,
-       doc: /* Internal: read rks_new_binding.  */)
+       doc: /* Internal: read new_binding from <rks-state> record.  */)
   (void)
 {
-  return rks_new_binding;
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_NEW_BINDING));
+  return Qnil;
 }
 
 DEFUN ("--set-rks-new-binding", Fc_set_rks_new_binding,
        Sc_set_rks_new_binding, 1, 1, 0,
-       doc: /* Internal: write rks_new_binding.  */)
+       doc: /* Internal: write new_binding to <rks-state> record.  */)
   (Lisp_Object val)
 {
-  rks_new_binding = val;
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_NEW_BINDING), val);
   return Qnil;
 }
 
@@ -12180,7 +12186,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #define echo_local_start rks_echo_local_start
 #define keys_local_start rks_keys_local_start
       /* M6ab: new_binding promoted to file-static rks_new_binding.  */
-#define new_binding rks_new_binding
 
       eassert (indec.end == t || (indec.end > t && indec.end <= mock_input));
       eassert (indec.start <= indec.end);
@@ -12538,7 +12543,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #undef current_binding
 #undef key
 #undef used_mouse_menu
-#undef new_binding
 #ifdef HAVE_TEXT_CONVERSION
 #endif
 
@@ -14028,8 +14032,6 @@ syms_of_keyboard (void)
   staticpro (&rks_current_binding);
   rks_key                  = Qnil;
   staticpro (&rks_key);
-  rks_new_binding          = Qnil;
-  staticpro (&rks_new_binding);
   rks_fkey.parent    = rks_fkey.map    = Qnil;
   rks_keytran.parent = rks_keytran.map = Qnil;
   rks_indec.parent   = rks_indec.map   = Qnil;
