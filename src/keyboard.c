@@ -10508,7 +10508,7 @@ Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
 {
 #ifdef HAVE_TEXT_CONVERSION
   if (!NILP (Fc_rks_disabled_conversion_p ()) || rks_t == 0
-      || rks_used_mouse_menu
+      || !NILP (Fc_rks_used_mouse_menu_p ())
       || disable_inhibit_text_conversion)
     return Qnil;
 
@@ -10907,7 +10907,7 @@ Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
   if (rks_state_depth > 0)
     rks_set_int (rks_state_stack[rks_state_depth - 1],
                  RKS_SLOT_KEY_COUNT, rks_t);
-  if (!rks_used_mouse_menu)
+  if (NILP (Fc_rks_used_mouse_menu_p ()))
     last_nonmenu_event = rks_key;
   ptrdiff_t single = this_command_key_count - rks_t;
   Fc_set_this_single_command_key_start (make_fixnum (single < 0 ? 0 : single));
@@ -10943,9 +10943,13 @@ cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
           echo_now ();
         }
       if (rks_state_depth > 0)
-	rks_used_mouse_menu
-	  = (rks_get_int (rks_state_stack[rks_state_depth - 1],
-			  RKS_SLOT_USED_MOUSE_MENU_HISTORY) >> rks_t) & 1;
+	{
+	  rks_used_mouse_menu
+	    = (rks_get_int (rks_state_stack[rks_state_depth - 1],
+			    RKS_SLOT_USED_MOUSE_MENU_HISTORY) >> rks_t) & 1;
+	  rks_set_bool (rks_state_stack[rks_state_depth - 1],
+			RKS_SLOT_USED_MOUSE_MENU, rks_used_mouse_menu);
+	}
       return intern ("mock");
     }
   if (!NILP (Vexecuting_kbd_macro)
@@ -12183,6 +12187,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 #define key             rks_key
 #define used_mouse_menu rks_used_mouse_menu
       used_mouse_menu = false;
+      Fc_set_rks_used_mouse_menu (Qnil);
 
       /* Where the last real key started.  If we need to throw away a
          key that has expanded into more than one element of keybuf
@@ -12265,6 +12270,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		  bitmask &= ~(1 << t);
 		rks_set_int (rks_state_stack[rks_state_depth - 1],
 			     RKS_SLOT_USED_MOUSE_MENU_HISTORY, bitmask);
+		rks_set_bool (rks_state_stack[rks_state_depth - 1],
+			      RKS_SLOT_USED_MOUSE_MENU, used_mouse_menu);
 	      }
 	    if ((FIXNUMP (key) && XFIXNUM (key) == -2) /* wrong_kboard_jmpbuf */
 		/* When switching to a new tty (with a new keyboard),
