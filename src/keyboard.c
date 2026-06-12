@@ -3691,6 +3691,17 @@ the <rks-state> record REC.  */)
   return Qnil;
 }
 
+DEFUN ("--rks-keyremap-get-int",
+       Fc_rks_keyremap_get_int,
+       Sc_rks_keyremap_get_int, 2, 2, 0,
+       doc: /* Internal: read fixnum from slot SLOT of a <keyremap>
+record KM (e.g. start, end).  */)
+  (Lisp_Object km, Lisp_Object slot)
+{
+  CHECK_FIXNUM (slot);
+  return make_fixnum (rks_get_int (km, XFIXNUM (slot)));
+}
+
 DEFUN ("--rks-keyremap-set-int",
        Fc_rks_keyremap_set_int,
        Sc_rks_keyremap_set_int, 3, 3, 0,
