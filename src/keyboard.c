@@ -2777,7 +2777,8 @@ enum {
   RKS_SLOT_ECHO_LOCAL_START             = 18,
   RKS_SLOT_KEYS_LOCAL_START             = 19,
   RKS_SLOT_LAST_REAL_KEY_START          = 20,
-  RKS_SLOT_NEW_BINDING                  = 21
+  RKS_SLOT_NEW_BINDING                  = 21,
+  RKS_SLOT_USED_MOUSE_MENU              = 22
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10857,10 +10858,26 @@ DEFUN ("--set-rks-key", Fc_set_rks_key, Sc_set_rks_key, 1, 1, 0,
 
 DEFUN ("--rks-used-mouse-menu-p", Fc_rks_used_mouse_menu_p,
        Sc_rks_used_mouse_menu_p, 0, 0, 0,
-       doc: /* Internal: read rks_used_mouse_menu as a predicate.  */)
+       doc: /* Internal: read used_mouse_menu from <rks-state>
+record.  Returns nil (false) when no call in flight.  */)
   (void)
 {
-  return rks_used_mouse_menu ? Qt : Qnil;
+  if (rks_state_depth > 0)
+    return rks_get_bool (rks_state_stack[rks_state_depth - 1],
+                         RKS_SLOT_USED_MOUSE_MENU) ? Qt : Qnil;
+  return Qnil;
+}
+
+DEFUN ("--set-rks-used-mouse-menu", Fc_set_rks_used_mouse_menu,
+       Sc_set_rks_used_mouse_menu, 1, 1, 0,
+       doc: /* Internal: write used_mouse_menu to <rks-state>
+record.  Non-nil VAL → true.  */)
+  (Lisp_Object val)
+{
+  if (rks_state_depth > 0)
+    rks_set_bool (rks_state_stack[rks_state_depth - 1],
+                  RKS_SLOT_USED_MOUSE_MENU, !NILP (val));
+  return Qnil;
 }
 
 /* M6aa — bulk splice of the final binding-install + per-key
