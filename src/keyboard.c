@@ -10641,6 +10641,9 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
                     }
                 }
             }
+          RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
+          RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+          RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
           if (rks_t == XFIXNUM (Fc_rks_last_real_key_start ()))
             {
               rks_mock_input = 0;
@@ -11281,6 +11284,7 @@ DEFUN ("--set-rks-fkey-start", Fc_set_rks_fkey_start,
 {
   CHECK_FIXNUM (n);
   rks_fkey.start = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
   return Qnil;
 }
 
@@ -11291,6 +11295,7 @@ DEFUN ("--set-rks-fkey-end", Fc_set_rks_fkey_end,
 {
   CHECK_FIXNUM (n);
   rks_fkey.end = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
   return Qnil;
 }
 
@@ -11301,6 +11306,7 @@ DEFUN ("--set-rks-keytran-start", Fc_set_rks_keytran_start,
 {
   CHECK_FIXNUM (n);
   rks_keytran.start = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
   return Qnil;
 }
 
@@ -11311,6 +11317,7 @@ DEFUN ("--set-rks-keytran-end", Fc_set_rks_keytran_end,
 {
   CHECK_FIXNUM (n);
   rks_keytran.end = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
   return Qnil;
 }
 
@@ -11321,6 +11328,7 @@ DEFUN ("--set-rks-indec-start", Fc_set_rks_indec_start,
 {
   CHECK_FIXNUM (n);
   rks_indec.start = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
   return Qnil;
 }
 
@@ -11331,6 +11339,7 @@ DEFUN ("--set-rks-indec-end", Fc_set_rks_indec_end,
 {
   CHECK_FIXNUM (n);
   rks_indec.end = XFIXNUM (n);
+  RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
   return Qnil;
 }
 
@@ -11433,6 +11442,9 @@ branch (src/keyboard.c lines 10823-10828 pre-M6t).  */)
   rks_keytran.start -= amount;
   rks_keytran.end   = rks_keytran.start;
   rks_keytran.map   = rks_keytran.parent;
+  RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
+  RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
   return Qnil;
 }
 
@@ -11516,6 +11528,7 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
         {
           rks_fkey.start = rks_fkey.end = rks_t;
           rks_fkey.map = rks_fkey.parent;
+          RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
         }
       return Qnil;
     }
@@ -11534,8 +11547,12 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
           rks_indec.end   += diff;
           rks_indec.start += diff;
           if (rks_state_depth > 0)
-            rks_set_int (rks_state_stack[rks_state_depth - 1],
-                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
+            {
+              rks_set_int (rks_state_stack[rks_state_depth - 1],
+                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
+              RKS_KEYREMAP_WRITEBACK (rks_fkey,  RKS_SLOT_FKEY);
+              RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
+            }
           return Qt;
         }
     }
@@ -11569,8 +11586,13 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
           rks_fkey.end    += diff;
           rks_fkey.start  += diff;
           if (rks_state_depth > 0)
-            rks_set_int (rks_state_stack[rks_state_depth - 1],
-                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
+            {
+              rks_set_int (rks_state_stack[rks_state_depth - 1],
+                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
+              RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
+              RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+              RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
+            }
           return Qt;
         }
     }
@@ -11633,6 +11655,8 @@ rks-try-shift-translation-fn-key!.  */)
 {
   rks_fkey.start    = rks_fkey.end    = 0;
   rks_keytran.start = rks_keytran.end = 0;
+  RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
   return Qnil;
 }
 
@@ -11794,6 +11818,9 @@ parent == map == MAP and start == end == 0.  Mirrors the C
   rks_indec.start   = rks_indec.end   = 0;
   rks_fkey.start    = rks_fkey.end    = 0;
   rks_keytran.start = rks_keytran.end = 0;
+  RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
+  RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
   return Qnil;
 }
 
