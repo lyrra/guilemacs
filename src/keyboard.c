@@ -2823,6 +2823,24 @@ static int rks_state_depth;
 #define LOAD_STATE_FROM_SLOTS(rec)  ((void)0)
 #define SAVE_STATE_TO_SLOTS(rec)    ((void)0)
 
+/* C-9a: keyremap mid-function writeback.  Call after any mutation
+   to rks_indec / rks_fkey / rks_keytran fields to mirror the C
+   struct values into the <keyremap> sub-records inside <rks-state>.  */
+#define RKS_KEYREMAP_WRITEBACK(km, SLOT) do {                           \
+    if (rks_state_depth > 0) {                                          \
+      SCM _km = scm_struct_ref (rks_state_stack[rks_state_depth - 1],  \
+                                scm_from_int (SLOT));                   \
+      if (!NILP (_km)) {                                                \
+        scm_struct_set_x (_km, scm_from_int (KM_SLOT_START),            \
+                          make_fixnum (km.start));                       \
+        scm_struct_set_x (_km, scm_from_int (KM_SLOT_END),              \
+                          make_fixnum (km.end));                         \
+        scm_struct_set_x (_km, scm_from_int (KM_SLOT_MAP), km.map);    \
+        scm_struct_set_x (_km, scm_from_int (KM_SLOT_PARENT), km.parent); \
+      }                                                                 \
+    }                                                                   \
+  } while (0)
+
 enum { RC_STATE_STACK_MAX = 8 };
 static SCM rc_record_stack[RC_STATE_STACK_MAX];
 static int rc_state_depth;
@@ -11463,8 +11481,11 @@ completes (mock_input updated), nil when exhausted.  */)
         {
           rks_mock_input = diff + max (rks_t, rks_mock_input);
           if (rks_state_depth > 0)
-            rks_set_int (rks_state_stack[rks_state_depth - 1],
-                         RKS_SLOT_MOCK_INPUT, rks_mock_input);
+            {
+              rks_set_int (rks_state_stack[rks_state_depth - 1],
+                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
+              RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
+            }
           return Qt;
         }
     }
