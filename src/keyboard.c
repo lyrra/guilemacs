@@ -2778,7 +2778,8 @@ enum {
   RKS_SLOT_KEYS_LOCAL_START             = 19,
   RKS_SLOT_LAST_REAL_KEY_START          = 20,
   RKS_SLOT_NEW_BINDING                  = 21,
-  RKS_SLOT_USED_MOUSE_MENU              = 22
+  RKS_SLOT_USED_MOUSE_MENU              = 22,
+  RKS_SLOT_FIRST_EVENT                  = 23
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -12160,13 +12161,6 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   current_binding = Qnil;
   mock_input      = 0;
 
-  /* M6m: `first_event' used to be declared inside the
-     replay_sequence: block; promoted here so the rest of the
-     function (line 11046ff) can still reference it after the
-     replay_sequence dispatch.  It is RE-assigned right after the
-     dispatch from `keybuf[0]' / Qnil based on mock_input.  */
-  Lisp_Object first_event = Qnil;
-
   dynwind_begin ();
 
   /* M6q: push our keybuf onto the rks_keybuf_stack so the elisp
@@ -12495,21 +12489,21 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
 	  /* switch-frame handled by Scheme classifier dispatch above.  */
 
-	  if (NILP (first_event))
-	    {
-	      first_event = key;
-	      /* Even if first_event does not specify a particular
-		 window/position, it's important to recompute the maps here
-		 since a long time might have passed since we entered
-		 read_key_sequence, and a timer (or process-filter or
-		 special-event-map, ...) might have switched the current buffer
-		 or the selected window from under us in the mean time.  */
-	      if (fix_current_buffer
-		  && (XBUFFER (XWINDOW (selected_window)->contents)
-		      != current_buffer))
-		Fset_buffer (XWINDOW (selected_window)->contents);
-	      current_binding = active_maps (first_event, Qnil);
-	    }
+	  /* Wave C/Phase 3: first_event promoted to record slot 23.  */
+	  {
+	    SCM rec = rks_state_stack[rks_state_depth - 1];
+	    SCM fe = scm_struct_ref (rec, scm_from_int (RKS_SLOT_FIRST_EVENT));
+	    if (NILP (fe))
+	      {
+		scm_struct_set_x (rec, scm_from_int (RKS_SLOT_FIRST_EVENT),
+				  key);
+		if (fix_current_buffer
+		    && (XBUFFER (XWINDOW (selected_window)->contents)
+			!= current_buffer))
+		  Fset_buffer (XWINDOW (selected_window)->contents);
+		current_binding = active_maps (key, Qnil);
+	      }
+	  }
 
 	  GROW_RAW_KEYBUF;
 	  ASET (raw_keybuf, raw_keybuf_count,

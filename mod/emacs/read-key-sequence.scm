@@ -167,7 +167,8 @@ reinitialize from current-kboard / Vkey_translation_map."
                    keys-local-start
                    last-real-key-start
                    new-binding
-                   used-mouse-menu)
+                   used-mouse-menu
+                   first-event)
   rks-state?
   ;; `key-count' = the C local `t' (terse name avoided in Scheme).
   (key-count            rks-state-key-count            set-rks-state-key-count!)
@@ -206,7 +207,9 @@ reinitialize from current-kboard / Vkey_translation_map."
   (new-binding           rks-state-new-binding
                           set-rks-state-new-binding!)
   (used-mouse-menu       rks-state-used-mouse-menu
-                          set-rks-state-used-mouse-menu!))
+                          set-rks-state-used-mouse-menu!)
+  (first-event           rks-state-first-event
+                          set-rks-state-first-event!))
 
 (define (make-rks-state)
   "Create a fresh rks-state with the same defaults as read_key_sequence
@@ -237,7 +240,8 @@ current-kboard has been queried (this matches the C
    0                                    ; keys-local-start
    0                                    ; last-real-key-start
    #nil                                 ; new-binding
-   #nil))                               ; used-mouse-menu
+   #nil                                 ; used-mouse-menu
+   #nil))                               ; first-event
 
 ;; `--read-key-sequence-and-vector' is looked up per call (see body) so
 ;; tests can stub it.  The other helpers are stable across calls.
@@ -850,6 +854,7 @@ elements.  See docs/keyboard.org §M6y."
 (define RKS-SLOT-LAST-REAL-KEY-START    20)
 (define RKS-SLOT-NEW-BINDING            21)
 (define RKS-SLOT-USED-MOUSE-MENU        22)
+(define RKS-SLOT-FIRST-EVENT            23)
 
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch
