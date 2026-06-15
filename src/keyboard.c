@@ -12420,53 +12420,48 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      }
 	  }
 
-	  /* read_char returns t when it shows a menu and the user rejects it.
-	     Just return -1.  */
-	  if (EQ (key, Qt))
-	    {
-              dynwind_end ();
-	      return -1;
-	    }
-
-	  /* If the current buffer has been changed from under us, the
-	     keymap may have changed, so replay the sequence.  */
-	  if (BUFFERP (key))
-	    {
-	      timer_resume_idle ();
-
-	      mock_input = t;
-	      /* Reset the current buffer from the selected window
-		 in case something changed the former and not the latter.
-		 This is to be more consistent with the behavior
-		 of the command_loop_1.  */
-	      if (fix_current_buffer)
-		{
-		  if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-		    Fkill_emacs (Qnil, Qnil);
-		  if (XBUFFER (XWINDOW (selected_window)->contents)
-		      != current_buffer)
+	  /* Phase 1: classify the key in Scheme (C-macro-free branches
+	     only — menu-reject, buffer-switched, quit-in-other-frame).
+	     Runs after wrong_kboard so wrong_kboard's goto replay_sequence
+	     wins when both could fire.  C still handles switch-frame.  */
+	  {
+	    static SCM rks_classify_simple_proc = SCM_UNDEFINED;
+	    if (SCM_UNBNDP (rks_classify_simple_proc))
+	      rks_classify_simple_proc
+		= scm_c_public_ref ("emacs read-key-sequence",
+				    "rks-classify-event-simple!");
+	    SCM cls = SCM_CALL_0 (rks_classify_simple_proc);
+	    if (scm_is_eq (cls, intern ("menu-reject")))
+	      {
+		dynwind_end ();
+		return make_fixnum (-1);
+	      }
+	    if (scm_is_eq (cls, intern ("buffer-switched")))
+	      {
+		timer_resume_idle ();
+		mock_input = t;
+		if (fix_current_buffer
+		    && (XBUFFER (XWINDOW (selected_window)->contents)
+			!= current_buffer))
+		  {
+		    if (! FRAME_LIVE_P (XFRAME (selected_frame)))
+		      Fkill_emacs (Qnil, Qnil);
 		    Fset_buffer (XWINDOW (selected_window)->contents);
-		}
-
-	      goto replay_sequence;
-	    }
-
-	  /* If we have a quit that was typed in another frame, and
-	     quit_throw_to_read_char switched buffers,
-	     replay to get the right keymap.  */
-	  if (FIXNUMP (key)
-	      && XFIXNUM (key) == quit_char
-	      && !BASE_EQ (Fcurrent_buffer (),
-			   Fc_rks_starting_buffer ()))
-	    {
-	      GROW_RAW_KEYBUF;
-	      ASET (raw_keybuf, raw_keybuf_count, key);
-	      raw_keybuf_count++;
-	      keybuf[t++] = key;
-	      mock_input = t;
-	      Vquit_flag = Qnil;
-	      goto replay_sequence;
-	    }
+		  }
+		goto replay_sequence;
+	      }
+	    if (scm_is_eq (cls, intern ("quit-in-other-frame")))
+	      {
+		GROW_RAW_KEYBUF;
+		ASET (raw_keybuf, raw_keybuf_count, key);
+		raw_keybuf_count++;
+		keybuf[t++] = key;
+		mock_input = t;
+		Vquit_flag = Qnil;
+		goto replay_sequence;
+	      }
+	    /* else: `fall-through' — continue to C classification.  */
+	  }
 
 	  Vquit_flag = Qnil;
 

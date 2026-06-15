@@ -41,6 +41,7 @@
             rks-try-shift-translation-simple!
             replay-sequence-continue
             replay-key-continue
+            rks-classify-event-simple!
             rks-have-key-orchestrator!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
@@ -367,6 +368,8 @@ kbd macro being defined.  Mirrors src/keyboard.c Fdiscard_input."
 (define %selected-frame-tty-meta-key
   (delay (%c '--selected-frame-tty-meta-key)))
 (define %quit-char                   (delay (%c '--quit-char)))
+(define %current-buffer              (delay (%c 'current-buffer)))
+(define %rks-starting-buffer         (delay (%c '--rks-starting-buffer)))
 
 (define (set-input-mode interrupt flow meta quit)
   "Set the keyboard-input mode.  Wraps the four underlying elisp
@@ -1023,6 +1026,25 @@ shape compiles cleanly."
 label, which follows this call in the C flow.)"
   (rks-setup-initial-state-c!))
 
+;; Phase 1 (Option 3): post-read_char event classification.
+;; Predicates only — C performs the side effects.
+
+(define (rks-classify-event-simple!)
+  "Classify the post-read_char key using C-macro-free predicates.
+Returns a symbol: `menu-reject', `buffer-switched', `quit-in-other-frame',
+or `fall-through' (C handles switch-frame etc.)."
+  (let ((key ((force %rks-key)))
+        (quit-char ((force %quit-char))))
+    (cond
+     ((eq? key #t)                                 'menu-reject)
+     ((and (integer? key) (integer? quit-char)
+           (= key quit-char)
+           (not (eq? ((force %current-buffer))
+                     ((force %rks-starting-buffer)))))
+      'quit-in-other-frame)
+     (((%c 'bufferp) key)                          'buffer-switched)
+     (else                                         'fall-through))))
+
 (define (replay-sequence-continue)
   "Hoisted body of C `replay_sequence:' label.  Resets state and
 recomputes the initial key binding from keybuf.  Returns `continue'."
@@ -1324,6 +1346,8 @@ cached-dispatch into here."
               ;; Wave B — have_key: orchestrator
               (--rks-have-key-orchestrator!
                ,rks-have-key-orchestrator!)
+              (--rks-classify-event-simple!
+               ,rks-classify-event-simple!)
               ;; M6ac — mouse-click prefix expansion
               (--rks-iter-mouse-click-prefix!
                ,rks-iter-mouse-click-prefix!)
