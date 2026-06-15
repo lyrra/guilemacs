@@ -2779,7 +2779,8 @@ enum {
   RKS_SLOT_LAST_REAL_KEY_START          = 20,
   RKS_SLOT_NEW_BINDING                  = 21,
   RKS_SLOT_USED_MOUSE_MENU              = 22,
-  RKS_SLOT_FIRST_EVENT                  = 23
+  RKS_SLOT_FIRST_EVENT                  = 23,
+  RKS_SLOT_KEY                          = 24
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -10874,10 +10875,13 @@ DEFUN ("--set-rks-first-unbound", Fc_set_rks_first_unbound,
 }
 
 DEFUN ("--rks-key", Fc_rks_key, Sc_rks_key, 0, 0, 0,
-       doc: /* Internal: read rks_key (the current event being
-processed by the read_key_sequence iteration body).  */)
+       doc: /* Internal: read the current key from <rks-state> record
+slot 24.  Falls back to file-static rks_key when no call in flight.  */)
   (void)
 {
+  if (rks_state_depth > 0)
+    return scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                           scm_from_int (RKS_SLOT_KEY));
   return rks_key;
 }
 
@@ -10886,6 +10890,9 @@ DEFUN ("--set-rks-key", Fc_set_rks_key, Sc_set_rks_key, 1, 1, 0,
   (Lisp_Object val)
 {
   rks_key = val;
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_KEY), val);
   return Qnil;
 }
 
@@ -10969,6 +10976,9 @@ cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
     {
       Lisp_Object *kb = rks_keybuf_stack[rks_keybuf_depth - 1];
       rks_key = kb[rks_t];
+      if (rks_state_depth > 0)
+	scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+			  scm_from_int (RKS_SLOT_KEY), rks_key);
       add_command_key (rks_key);
       if (current_kboard->immediate_echo)
         {
@@ -12335,6 +12345,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 			     RKS_SLOT_USED_MOUSE_MENU_HISTORY, bitmask);
 		rks_set_bool (rks_state_stack[rks_state_depth - 1],
 			      RKS_SLOT_USED_MOUSE_MENU, used_mouse_menu);
+		scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+				  scm_from_int (RKS_SLOT_KEY), key);
 	      }
 	    if ((FIXNUMP (key) && XFIXNUM (key) == -2) /* wrong_kboard_jmpbuf */
 		/* When switching to a new tty (with a new keyboard),
@@ -12384,7 +12396,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		/* If the side queue is non-empty, ensure it begins with a
 		   switch-frame, so we'll replay it in the right context.  */
 		if (CONSP (KVAR (interrupted_kboard, kbd_queue))
-		    && (key = XCAR (KVAR (interrupted_kboard, kbd_queue)),
+		    && (Fc_set_rks_key (XCAR (KVAR (interrupted_kboard, kbd_queue))),
 			!(EVENT_HAS_PARAMETERS (key)
 			  && EQ (EVENT_HEAD_KIND (EVENT_HEAD (key)),
 				 Qswitch_frame))))
