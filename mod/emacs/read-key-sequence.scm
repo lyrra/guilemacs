@@ -169,7 +169,9 @@ reinitialize from current-kboard / Vkey_translation_map."
                    new-binding
                    used-mouse-menu
                    first-event
-                   key)
+                   key
+                   raw-keybuf
+                   raw-keybuf-count)
   rks-state?
   ;; `key-count' = the C local `t' (terse name avoided in Scheme).
   (key-count            rks-state-key-count            set-rks-state-key-count!)
@@ -212,7 +214,11 @@ reinitialize from current-kboard / Vkey_translation_map."
   (first-event           rks-state-first-event
                           set-rks-state-first-event!)
   (key                   rks-state-key
-                          set-rks-state-key!))
+                          set-rks-state-key!)
+  (raw-keybuf            rks-state-raw-keybuf
+                          set-rks-state-raw-keybuf!)
+  (raw-keybuf-count      rks-state-raw-keybuf-count
+                          set-rks-state-raw-keybuf-count!))
 
 (define (make-rks-state)
   "Create a fresh rks-state with the same defaults as read_key_sequence
@@ -245,7 +251,9 @@ current-kboard has been queried (this matches the C
    #nil                                 ; new-binding
    #nil                                 ; used-mouse-menu
    #nil                                 ; first-event
-   #nil))                               ; key
+   #nil                                 ; key
+   #nil                                 ; raw-keybuf (populated on first writeback)
+   0))                                   ; raw-keybuf-count
 
 ;; `--read-key-sequence-and-vector' is looked up per call (see body) so
 ;; tests can stub it.  The other helpers are stable across calls.
@@ -860,6 +868,8 @@ elements.  See docs/keyboard.org §M6y."
 (define RKS-SLOT-USED-MOUSE-MENU        22)
 (define RKS-SLOT-FIRST-EVENT            23)
 (define RKS-SLOT-KEY                    24)
+(define RKS-SLOT-RAW-KEYBUF             25)
+(define RKS-SLOT-RAW-KEYBUF-COUNT       26)
 
 ;; M6h — Scheme-side record↔file-static sync infrastructure.
 ;; `with-rks-sync' macro + `rks-sync-read'/`rks-sync-write' dispatch

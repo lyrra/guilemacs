@@ -1568,7 +1568,9 @@ branch when re-queueing a C-g into unread-command-events.  */)
 }
 
 DEFUN ("--set-raw-keybuf-count", Fc_set_raw_keybuf_count, Sc_set_raw_keybuf_count, 1, 1, 0,
-       doc: /* Internal: set raw_keybuf_count to N.  */)
+       doc: /* Internal: set raw_keybuf_count to N.  Callers run
+before the read_key_sequence record-stack push (rks_state_depth==0),
+so no <rks-state> mirror is needed here.  */)
   (Lisp_Object n)
 {
   CHECK_FIXNAT (n);
@@ -2780,7 +2782,9 @@ enum {
   RKS_SLOT_NEW_BINDING                  = 21,
   RKS_SLOT_USED_MOUSE_MENU              = 22,
   RKS_SLOT_FIRST_EVENT                  = 23,
-  RKS_SLOT_KEY                          = 24
+  RKS_SLOT_KEY                          = 24,
+  RKS_SLOT_RAW_KEYBUF                   = 25,
+  RKS_SLOT_RAW_KEYBUF_COUNT             = 26
 };
 
 /* Typed slot accessors.  rc_get / rc_set handle Lisp_Object; these
@@ -2824,6 +2828,16 @@ static int rks_state_depth;
    locals.  See docs/m6-plan.org §"The #define alias cost model".  */
 #define LOAD_STATE_FROM_SLOTS(rec)  ((void)0)
 #define SAVE_STATE_TO_SLOTS(rec)    ((void)0)
+
+/* Phase 4: raw_keybuf writeback after any mutation.  */
+#define RKS_RAW_KEYBUF_WRITEBACK do {                                   \
+    if (rks_state_depth > 0) {                                          \
+      SCM _rec = rks_state_stack[rks_state_depth - 1];                   \
+      scm_struct_set_x (_rec, scm_from_int (RKS_SLOT_RAW_KEYBUF),       \
+                        raw_keybuf);                                     \
+      rks_set_int (_rec, RKS_SLOT_RAW_KEYBUF_COUNT, raw_keybuf_count);  \
+    }                                                                   \
+  } while (0)
 
 /* C-9a: keyremap mid-function writeback.  Call after any mutation
    to rks_indec / rks_fkey / rks_keytran fields to mirror the C
@@ -12471,6 +12485,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		GROW_RAW_KEYBUF;
 		ASET (raw_keybuf, raw_keybuf_count, key);
 		raw_keybuf_count++;
+		RKS_RAW_KEYBUF_WRITEBACK;
 		keybuf[t++] = key;
 		mock_input = t;
 		Vquit_flag = Qnil;
@@ -12523,6 +12538,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
                    by some remapping function (bug#30955).  */
                 CONSP (key) ? Fcopy_sequence (key) : key);
 	  raw_keybuf_count++;
+	  RKS_RAW_KEYBUF_WRITEBACK;
 	}
 
     have_key:
