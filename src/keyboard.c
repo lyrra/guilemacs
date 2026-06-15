@@ -11727,6 +11727,16 @@ record slot.  */)
   return Qnil;
 }
 
+DEFUN ("--rks-switch-frame-event-p", Fc_rks_switch_frame_event_p,
+       Sc_rks_switch_frame_event_p, 1, 1, 0,
+       doc: /* Internal: t if KEY is a switch-frame event.  */)
+  (Lisp_Object key)
+{
+  return (EVENT_HAS_PARAMETERS (key)
+          && EQ (EVENT_HEAD_KIND (EVENT_HEAD (key)), Qswitch_frame))
+    ? Qt : Qnil;
+}
+
 DEFUN ("--set-rks-delayed-switch-frame",
        Fc_set_rks_delayed_switch_frame,
        Sc_set_rks_delayed_switch_frame, 1, 1, 0,
@@ -12460,32 +12470,30 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 		Vquit_flag = Qnil;
 		goto replay_sequence;
 	      }
+	    if (scm_is_eq (cls, intern ("switch-frame")))
+	      {
+		if (t > 0 || !can_return_switch_frame)
+		  {
+		    Vquit_flag = Qnil;
+		    Fc_set_rks_delayed_switch_frame (key);
+		    {
+		      static SCM rks_rk_proc = SCM_UNDEFINED;
+		      if (SCM_UNBNDP (rks_rk_proc))
+			rks_rk_proc
+			  = scm_c_public_ref ("emacs read-key-sequence",
+					      "replay-key-continue");
+		      SCM_CALL_0 (rks_rk_proc);
+		    }
+		    continue;
+		  }
+		/* else: fall-through to first_event handling.  */
+	      }
 	    /* else: `fall-through' — continue to C classification.  */
 	  }
 
 	  Vquit_flag = Qnil;
 
-	  if (EVENT_HAS_PARAMETERS (key)
-	      /* Either a `switch-frame' or a `select-window' event.  */
-	      && EQ (EVENT_HEAD_KIND (EVENT_HEAD (key)), Qswitch_frame))
-	    {
-	      /* If we're at the beginning of a key sequence, and the caller
-		 says it's okay, go ahead and return this event.  If we're
-		 in the midst of a key sequence, delay it until the end.  */
-	      if (t > 0 || !can_return_switch_frame)
-		{
-		  Fc_set_rks_delayed_switch_frame (key);
-		  {
-		    static SCM rks_rk_proc = SCM_UNDEFINED;
-		    if (SCM_UNBNDP (rks_rk_proc))
-		      rks_rk_proc =
-			scm_c_public_ref ("emacs read-key-sequence",
-					  "replay-key-continue");
-		    SCM_CALL_0 (rks_rk_proc);
-		  }
-		  continue;
-		}
-	    }
+	  /* switch-frame handled by Scheme classifier dispatch above.  */
 
 	  if (NILP (first_event))
 	    {

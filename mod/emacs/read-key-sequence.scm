@@ -1029,10 +1029,13 @@ label, which follows this call in the C flow.)"
 ;; Phase 1 (Option 3): post-read_char event classification.
 ;; Predicates only — C performs the side effects.
 
+(define %switch-frame-event-p
+  (delay (%c '--rks-switch-frame-event-p)))
+
 (define (rks-classify-event-simple!)
-  "Classify the post-read_char key using C-macro-free predicates.
-Returns a symbol: `menu-reject', `buffer-switched', `quit-in-other-frame',
-or `fall-through' (C handles switch-frame etc.)."
+  "Classify the post-read_char key.  Returns a symbol:
+  `menu-reject', `buffer-switched', `quit-in-other-frame',
+  `switch-frame', or `fall-through'."
   (let ((key ((force %rks-key)))
         (quit-char ((force %quit-char))))
     (cond
@@ -1043,6 +1046,8 @@ or `fall-through' (C handles switch-frame etc.)."
                      ((force %rks-starting-buffer)))))
       'quit-in-other-frame)
      (((%c 'bufferp) key)                          'buffer-switched)
+     ((not (%nilp ((force %switch-frame-event-p) key)))
+      'switch-frame)
      (else                                         'fall-through))))
 
 (define (replay-sequence-continue)
