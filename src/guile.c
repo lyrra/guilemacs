@@ -25,6 +25,7 @@ struct elisp_functions_ptr elisp_functions_ptr;
 
 scm_t_bits c_closure_tag;
 scm_t_bits kboard_tag;
+scm_t_bits ie_tag;
 
 typedef SCM (*c_closure_0_t) (void *);
 typedef SCM (*c_closure_1_t) (void *, SCM);
@@ -110,6 +111,12 @@ init_guile (void)
      owned by all_kboards and freed by delete_kboard, so no finalizer
      is needed.  */
   kboard_tag = scm_make_smob_type ("kboard", 0);
+
+  /* M9: foreign-object wrapper around struct input_event *.  See
+     docs/m9-plan.org §imp-1.1.  The smob holds an opaque struct
+     input_event * in SMOB_DATA.  Ownership stays with kbd_buffer.
+     Mark/free/print hooks and wrap/unwrap live in keyboard.c.  */
+  ie_tag = scm_make_smob_type ("input-event", 0);
 }
 
 /*

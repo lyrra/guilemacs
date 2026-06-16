@@ -5,6 +5,11 @@ void init_guile (void);
    Defined in guile.c, initialized in init_guile. */
 extern scm_t_bits kboard_tag;
 
+/* M9: smob type tag for struct input_event * foreign-object wrapping.
+   Defined in guile.c, initialized in init_guile.
+   See docs/m9-plan.org §imp-1.1.  */
+extern scm_t_bits ie_tag;
+
 struct elisp_functions_ptr {
   SCM f_car;
   SCM f_cdr;

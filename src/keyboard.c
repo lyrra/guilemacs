@@ -871,6 +871,77 @@ make_kboard_smob (KBOARD *kb)
   return smob;
 }
 
+
+/* M9 — ie-smob: foreign-object wrapping for struct input_event *.
+
+   The smob holds a bare struct input_event * in SMOB_DATA.  Ownership
+   stays with kbd_buffer / stack temporaries; the smob has no finalizer.
+
+   Retention guard: make_lispy_event sets SMOB_DATA to NULL after
+   SCM_CALL_1 returns; accessors abort on NULL.  The free hook is a
+   no-op since the smob owns no heap memory.
+
+   See docs/m9-plan.org §imp-1.1.  */
+
+static SCM
+ie_mark (SCM smob)
+{
+  struct input_event *ev = (struct input_event *) SCM_SMOB_DATA (smob);
+  if (ev == NULL)
+    return SCM_BOOL_F;
+  scm_gc_mark (ev->x);
+  scm_gc_mark (ev->y);
+  scm_gc_mark (ev->frame_or_window);
+  scm_gc_mark (ev->arg);
+  return ev->device;
+}
+
+static size_t
+ie_free (SCM smob)
+{
+  /* The smob owns no heap memory — SMOB_DATA points into the C event
+     queue (or a stack temporary).  Retention violations are caught by
+     the NULL-guard in accessors, not here.  */
+  return 0;
+}
+
+static int
+ie_print (SCM smob, SCM port, scm_print_state *pstate)
+{
+  struct input_event *ev = (struct input_event *) SCM_SMOB_DATA (smob);
+  if (ev == NULL)
+    {
+      scm_puts ("#<input-event (invalidated)>", port);
+      return 1;
+    }
+  scm_puts ("#<input-event ", port);
+  scm_uintprint ((scm_t_bits) ev->kind, 10, port);
+  scm_putc ('>', port);
+  return 1;
+}
+
+static SCM
+ie_wrap (struct input_event *event)
+{
+  SCM smob;
+  SCM_NEWSMOB (smob, ie_tag, event);
+  return smob;
+}
+
+static struct input_event *
+ie_unwrap (SCM smob)
+{
+  struct input_event *ev = (struct input_event *) SCM_SMOB_DATA (smob);
+  if (ev == NULL)
+    emacs_abort ();            /* SMOB used after make_lispy_event returned */
+  return ev;
+}
+
+#define XIE(scm)    ((struct input_event *) SCM_SMOB_DATA (scm))
+#define IEP(scm)    (SCM_SMOB_PREDICATE (ie_tag, (scm)))
+#define CHECK_IE(x) \
+  do { if (!IEP (x)) wrong_type_argument (Qiep, x); } while (0)
+
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
 #define CHECK_KBOARD(x) \
@@ -14169,6 +14240,12 @@ syms_of_keyboard (void)
 
   /* M2 — predicate symbol for the kboard smob type.  */
   DEFSYM (Qkboardp, "kboardp");
+
+  /* M9 — register ie-smob hooks and predicate symbol.  */
+  scm_set_smob_mark (ie_tag, ie_mark);
+  scm_set_smob_free (ie_tag, ie_free);
+  scm_set_smob_print (ie_tag, ie_print);
+  DEFSYM (Qiep, "iep");
 
   /* Tool-bars.  */
   DEFSYM (QCimage, ":image");
