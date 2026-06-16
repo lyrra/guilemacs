@@ -12524,24 +12524,15 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   reading_key_sequence = true;
 #endif
 
- replay_sequence:
-  /* Wave B: replay_sequence body folded into replay-sequence-continue.
-     Still needed as a goto target from the read_char branch.  */
-  {
-    static SCM rks_rsc_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_rsc_proc))
-      rks_rsc_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "replay-sequence-continue");
-    SCM_CALL_0 (rks_rsc_proc);
-  }
+  /* Phase 4 Step 3b-proper.2: the replay_sequence: label + the C
+     while-loop + the done: label are subsumed by the Scheme
+     rks-state-machine call below.  The state machine's entry
+     invokes replay-sequence-continue itself; each internal
+     replay-sequence dispatch re-invokes it.  */
 
-  /* Echo/keys restore now lives in Scheme replay-sequence-continue
-     via --rks-replay-sequence-restore (Step 3b-prep).  */
-
-  /* If text conversion is supposed to be disabled immediately, do it
-     now.  */
-
+  /* If text conversion is supposed to be disabled immediately, do
+     it now.  Idempotent (the slot stays Qt and disable_text_conversion
+     is no-op once set), so one-time entry is sufficient.  */
 #ifdef HAVE_TEXT_CONVERSION
   if (disable_text_conversion_p)
     {
@@ -12551,193 +12542,33 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     }
 #endif /* HAVE_TEXT_CONVERSION */
 
-  /* If the best binding for the current key sequence is a keymap, or
-     we may be looking at a function key's escape sequence, keep on
-     reading.  */
-  while (!NILP (current_binding)
-	 /* Keep reading as long as there's a prefix binding.  */
-	 ? KEYMAPP (current_binding)
-	 /* Don't return in the middle of a possible function key sequence,
-	    if the only bindings we found were via case conversion.
-	    Thus, if ESC O a has a function-key-map translation
-	    and ESC o has a binding, don't return after ESC O,
-	    so that we can translate ESC O plus the next character.  */
-	 : (/* indec.start < t || fkey.start < t || */ keytran.start < t))
-    {
-      /* M6z: `key' + `used_mouse_menu' promoted to file-static
-         `rks_key' / `rks_used_mouse_menu'.  */
-#define key             rks_key
-#define used_mouse_menu rks_used_mouse_menu
-      used_mouse_menu = false;
-      Fc_set_rks_used_mouse_menu (Qnil);
-
-      /* Where the last real key started.  If we need to throw away a
-         key that has expanded into more than one element of keybuf
-         (say, a mouse click on the mode line which is being treated
-         as [mode-line (mouse-...)], then we backtrack to this point
-         of keybuf.
-         M6y: retired to <rks-state> record slot 20.  Bulk subr body
-         no longer references the alias; reads/writes go through
-         Fc_rks_last_real_key_start / Fc_rks_set_last_real_key_start
-         in the extracted DEFUNs.  */
-
-      /* These variables are analogous to echo_start and keys_start;
-	 while those allow us to restart the entire key sequence,
-	 echo_local_start and keys_local_start allow us to throw away
-	 just one key.
-         M6y: promoted to file-static rks_echo_local_start /
-         rks_keys_local_start.  */
-#define echo_local_start rks_echo_local_start
-#define keys_local_start rks_keys_local_start
-      /* M6ab: new_binding promoted to file-static rks_new_binding.  */
-
-      eassert (indec.end == t || (indec.end > t && indec.end <= mock_input));
-      eassert (indec.start <= indec.end);
-      eassert (fkey.start <= fkey.end);
-      eassert (keytran.start <= keytran.end);
-      /* key-translation-map is applied *after* function-key-map
-	 which is itself applied *after* input-decode-map.  */
-      eassert (fkey.end <= indec.start);
-      eassert (keytran.end <= fkey.start);
-
-      /* M6t: first_unbound short-circuit — Scheme handles the
-	 goto replay_sequence decision internally.  */
+  /* Hand off to the Scheme state machine.  Returns -1 (menu-reject)
+     or the symbol `done'.  read_key_sequence_cmd is set only on the
+     break-equivalent path (rks_t > 0); the goto-done-equivalent
+     path (rks-iteration-prepare! 'done with rks_t = 0) skipped the
+     assignment in the C original.  */
+  {
+    static SCM rks_sm_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_sm_proc))
+      rks_sm_proc = scm_c_public_ref ("emacs read-key-sequence",
+                                      "rks-state-machine");
+    SCM sm_result = scm_call_4 (rks_sm_proc,
+                                prompt,
+                                can_return_switch_frame ? Qt : Qnil,
+                                prevent_redisplay ? Qt : Qnil,
+                                fix_current_buffer ? Qt : Qnil);
+    if (FIXNUMP (sm_result) && XFIXNUM (sm_result) == -1)
       {
-	static SCM rks_fu_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_fu_proc))
-	  rks_fu_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-first-unbound-short-circuit!");
-	SCM result = SCM_CALL_0 (rks_fu_proc);
-	if (scm_is_eq (result, intern ("replay-sequence")))
-	  goto replay_sequence;
+        dynwind_end ();
+        return -1;
       }
+    if (rks_t > 0)
+      read_key_sequence_cmd = current_binding;
+  }
 
-      /* Wave B: setup-capture + maybe-disable + replay-restore +
-	 pre-read-cascade folded into one Scheme call.  Returns
-	 `mock', `done', or `read-char'.  */
-      {
-	static SCM rks_iter_prepare_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_iter_prepare_proc))
-	  rks_iter_prepare_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-iteration-prepare!");
-	SCM result = SCM_CALL_0 (rks_iter_prepare_proc);
-	if (scm_is_eq (result, intern ("done")))
-	  goto done;
-	if (scm_is_eq (result, intern ("mock")))
-	  goto have_key;
-	/* else: `read-char' — fall through to inline read_char.  */
-      }
-
-      /* (replay_key: label folded into rks-iteration-prepare! above.)  */
-
-      /* Otherwise, we should actually read a character.  */
-      {
-	  SCM result
-	    = Fc_rks_read_char_and_kboard (prevent_redisplay ? Qt : Qnil,
-					   prompt,
-					   current_binding,
-					   last_nonmenu_event);
-	  if (scm_is_eq (result, intern ("replay-sequence")))
-	    goto replay_sequence;
-	  /* else 'continue — fall through to classifier */
-
-	  /* Phase 1: classify the key in Scheme (C-macro-free branches
-	     only — menu-reject, buffer-switched, quit-in-other-frame).
-	     Runs after wrong_kboard so wrong_kboard's goto replay_sequence
-	     wins when both could fire.  C still handles switch-frame.  */
-	  {
-	    static SCM rks_classify_simple_proc = SCM_UNDEFINED;
-	    if (SCM_UNBNDP (rks_classify_simple_proc))
-	      rks_classify_simple_proc
-		= scm_c_public_ref ("emacs read-key-sequence",
-				    "rks-classify-event-simple!");
-	    SCM cls = SCM_CALL_0 (rks_classify_simple_proc);
-	    if (scm_is_eq (cls, intern ("menu-reject")))
-	      {
-		dynwind_end ();
-		return make_fixnum (-1);
-	      }
-	    if (scm_is_eq (cls, intern ("buffer-switched")))
-	      {
-		timer_resume_idle ();
-		mock_input = t;
-		if (fix_current_buffer
-		    && (XBUFFER (XWINDOW (selected_window)->contents)
-			!= current_buffer))
-		  {
-		    if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-		      Fkill_emacs (Qnil, Qnil);
-		    Fset_buffer (XWINDOW (selected_window)->contents);
-		  }
-		goto replay_sequence;
-	      }
-	    if (scm_is_eq (cls, intern ("quit-in-other-frame")))
-	      {
-		/* Inline rather than Fc_rks_raw_keybuf_push (): the
-		   DEFUN deep-copies CONSP keys (bug#30955), but the
-		   quit path historically pushes `key' as-is.  Two
-		   sites with diverging copy semantics.  */
-		GROW_RAW_KEYBUF;
-		ASET (raw_keybuf, raw_keybuf_count, key);
-		raw_keybuf_count++;
-		RKS_RAW_KEYBUF_WRITEBACK;
-		keybuf[t++] = key;
-		mock_input = t;
-		Fc_rks_vquit_flag_clear ();
-		goto replay_sequence;
-	      }
-	    if (scm_is_eq (cls, intern ("switch-frame")))
-	      {
-		if (t > 0 || !can_return_switch_frame)
-		  {
-		    Vquit_flag = Qnil;
-		    Fc_set_rks_delayed_switch_frame (key);
-		    {
-		      static SCM rks_rk_proc = SCM_UNDEFINED;
-		      if (SCM_UNBNDP (rks_rk_proc))
-			rks_rk_proc
-			  = scm_c_public_ref ("emacs read-key-sequence",
-					      "replay-key-continue");
-		      SCM_CALL_0 (rks_rk_proc);
-		    }
-		    continue;
-		  }
-		/* else: fall-through to first_event handling.  */
-	      }
-	    /* else: `fall-through' — continue to C classification.  */
-	  }
-
-	  Fc_rks_vquit_flag_clear ();
-
-	  /* switch-frame handled by Scheme classifier dispatch above.  */
-
-	  Fc_rks_first_event_init (fix_current_buffer ? Qt : Qnil);
-
-	  Fc_rks_raw_keybuf_push (key);
-	}
-
-    have_key:
-      /* Wave B: full have_key: body in a single Scheme orchestrator
-	 call.  Returns `replay-sequence', `replay-key', `done',
-	 or `fall-through'.  */
-      {
-	static SCM rks_orch_proc = SCM_UNDEFINED;
-	if (SCM_UNBNDP (rks_orch_proc))
-	  rks_orch_proc =
-	    scm_c_public_ref ("emacs read-key-sequence",
-			      "rks-have-key-orchestrator!");
-	SCM result = SCM_CALL_2 (rks_orch_proc, key, prompt);
-	if (scm_is_eq (result, intern ("done")))
-	  break;
-	/* `replay-sequence', `replay-key', and `fall-through'
-	   handled in Scheme; C continues to next iteration.  */
-      }
-    }
-  read_key_sequence_cmd = current_binding;
-
-  done:
+  /* (C while-loop + replay_sequence: + have_key: + done: labels
+     deleted in Step 3b-proper.2 — all subsumed by the Scheme state
+     machine call above.)  */
   /* M6n: remapping computation ported to (emacs read-key-sequence)
      rks-done-compute-remapped!  Does this here (before dynwind_end) so
      `command-remapping' sees the right keymap stack.  See
