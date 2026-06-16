@@ -10523,6 +10523,82 @@ parameter and is idempotent, so it stays one-time C-side at entry.  */)
   return Qnil;
 }
 
+/* Phase 4 Step 3b-proper.1: helpers for the Scheme state machine to
+   faithfully port the C while-loop condition and the
+   `buffer-switched' / `quit-in-other-frame' side effects.  */
+
+DEFUN ("--rks-loop-continue-p", Fc_rks_loop_continue_p,
+       Sc_rks_loop_continue_p, 0, 0, 0,
+       doc: /* Internal: t if the read_key_sequence iteration should
+continue (mirrors the C while-loop condition).  When current_binding
+is non-nil, continue iff it is a keymap (prefix binding); when nil,
+continue iff rks_keytran.start < rks_t.  */)
+  (void)
+{
+  if (!NILP (rks_current_binding))
+    return KEYMAPP (rks_current_binding) ? Qt : Qnil;
+  return rks_keytran.start < rks_t ? Qt : Qnil;
+}
+
+DEFUN ("--rks-buffer-switched-handler", Fc_rks_buffer_switched_handler,
+       Sc_rks_buffer_switched_handler, 1, 1, 0,
+       doc: /* Internal: side effects for the `buffer-switched'
+classify branch.  Calls timer_resume_idle, sets rks_mock_input
+= rks_t, and if FIX-CURRENT-BUFFER-P is non-nil and the selected
+window's buffer differs from current_buffer, calls Fset_buffer
+(after a frame-live check).  Called from Scheme before
+replay-sequence-continue.  */)
+  (Lisp_Object fix_current_buffer_p)
+{
+  timer_resume_idle ();
+  rks_mock_input = rks_t;
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_MOCK_INPUT, rks_mock_input);
+  if (!NILP (fix_current_buffer_p)
+      && (XBUFFER (XWINDOW (selected_window)->contents) != current_buffer))
+    {
+      if (! FRAME_LIVE_P (XFRAME (selected_frame)))
+        Fkill_emacs (Qnil, Qnil);
+      Fset_buffer (XWINDOW (selected_window)->contents);
+    }
+  return Qnil;
+}
+
+DEFUN ("--rks-quit-in-other-frame-handler",
+       Fc_rks_quit_in_other_frame_handler,
+       Sc_rks_quit_in_other_frame_handler, 0, 0, 0,
+       doc: /* Internal: side effects for the `quit-in-other-frame'
+classify branch.  Pushes rks_key onto raw_keybuf (no copy — matches
+the original divergence from --rks-raw-keybuf-push's deep-copy
+semantics) and onto keybuf[rks_t], increments rks_t, sets
+mock_input = rks_t, clears Vquit_flag.  Called from Scheme before
+replay-sequence-continue.  Reads rks_key via record slot 24 (the
+file-static is declared later in the file).  */)
+  (void)
+{
+  Lisp_Object key = Qnil;
+  if (rks_state_depth > 0)
+    key = scm_struct_ref (rks_state_stack[rks_state_depth - 1],
+                          scm_from_int (RKS_SLOT_KEY));
+  GROW_RAW_KEYBUF;
+  ASET (raw_keybuf, raw_keybuf_count, key);
+  raw_keybuf_count++;
+  RKS_RAW_KEYBUF_WRITEBACK;
+  if (rks_keybuf_depth > 0)
+    rks_keybuf_stack[rks_keybuf_depth - 1][rks_t++] = key;
+  if (rks_state_depth > 0)
+    {
+      rks_set_int (rks_state_stack[rks_state_depth - 1],
+                   RKS_SLOT_KEY_COUNT, rks_t);
+      rks_mock_input = rks_t;
+      rks_set_int (rks_state_stack[rks_state_depth - 1],
+                   RKS_SLOT_MOCK_INPUT, rks_mock_input);
+    }
+  Vquit_flag = Qnil;
+  return Qnil;
+}
+
 DEFUN ("--rks-first-event-init", Fc_rks_first_event_init,
        Sc_rks_first_event_init, 1, 1, 0,
        doc: /* Internal: if first_event slot is nil, set it to rks_key,

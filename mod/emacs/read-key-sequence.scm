@@ -1157,6 +1157,13 @@ without taking a C goto."
   (delay (%c '--rks-raw-keybuf-push)))
 (define %rks-read-char-and-kboard
   (delay (%c '--rks-read-char-and-kboard)))
+;; Step 3b-proper.1 helpers.
+(define %rks-loop-continue-p
+  (delay (%c '--rks-loop-continue-p)))
+(define %rks-buffer-switched-handler
+  (delay (%c '--rks-buffer-switched-handler)))
+(define %rks-quit-in-other-frame-handler
+  (delay (%c '--rks-quit-in-other-frame-handler)))
 
 (define (rks-state-machine prompt
                            can-return-switch-frame
@@ -1192,8 +1199,14 @@ state-record push, setup-prompt!, setup-pre-loop!."
   (define (classify-step)
     (case (rks-classify-event-simple!)
       ((menu-reject)         -1)
-      ((buffer-switched)     (replay-sequence-continue) (loop))
-      ((quit-in-other-frame) (replay-sequence-continue) (loop))
+      ((buffer-switched)
+       ((force %rks-buffer-switched-handler) fix-current-buffer)
+       (replay-sequence-continue)
+       (loop))
+      ((quit-in-other-frame)
+       ((force %rks-quit-in-other-frame-handler))
+       (replay-sequence-continue)
+       (loop))
       ((switch-frame)
        (if (or (> ((force %rks-t)) 0)
                (%nilp can-return-switch-frame))
@@ -1207,21 +1220,24 @@ state-record push, setup-prompt!, setup-pre-loop!."
       (else           (fall-through-step))))
 
   (define (loop)
-    (if (eq? (rks-first-unbound-short-circuit!) 'replay-sequence)
-        (begin (replay-sequence-continue) (loop))
-        (case (rks-iteration-prepare!)
-          ((done)      'done)
-          ((mock)      (have-key-step))
-          ((read-char)
-           (case ((force %rks-read-char-and-kboard)
-                  prevent-redisplay
-                  prompt
-                  ((force %rks-current-binding))
-                  (symbol-value 'last-nonmenu-event))
-             ((replay-sequence) (replay-sequence-continue) (loop))
-             ((continue)        (classify-step))
-             (else              (loop))))
-          (else        (loop)))))
+    ;; Mirror the C while-loop's exit condition.
+    (if (%nilp ((force %rks-loop-continue-p)))
+        'done
+        (if (eq? (rks-first-unbound-short-circuit!) 'replay-sequence)
+            (begin (replay-sequence-continue) (loop))
+            (case (rks-iteration-prepare!)
+              ((done)      'done)
+              ((mock)      (have-key-step))
+              ((read-char)
+               (case ((force %rks-read-char-and-kboard)
+                      prevent-redisplay
+                      prompt
+                      ((force %rks-current-binding))
+                      (symbol-value 'last-nonmenu-event))
+                 ((replay-sequence) (replay-sequence-continue) (loop))
+                 ((continue)        (classify-step))
+                 (else              (loop))))
+              (else        (loop))))))
 
   ;; Entry point — equivalent to falling through to replay_sequence:.
   (replay-sequence-continue)
