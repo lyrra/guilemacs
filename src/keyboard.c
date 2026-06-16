@@ -10522,6 +10522,7 @@ via active_maps.  FIX-CURRENT-BUFFER-P is Qt/Qnil.  */)
   return Qnil;
 }
 
+
 DEFUN ("--rks-raw-keybuf-push", Fc_rks_raw_keybuf_push,
        Sc_rks_raw_keybuf_push, 1, 1, 0,
        doc: /* Internal: GROW_RAW_KEYBUF + ASET(key) + count++ +
@@ -10982,6 +10983,159 @@ record.  Non-nil VAL → true.  */)
     rks_set_bool (rks_state_stack[rks_state_depth - 1],
                   RKS_SLOT_USED_MOUSE_MENU, !NILP (val));
   return Qnil;
+}
+
+/* Phase 4 Step 2 #4: wrap read_char + bitmask + wrong_kboard in one
+   DEFUN.  Returns `continue' (proceed to classifier) or
+   `replay-sequence' (wrong_kboard fired — caller does replay setup
+   and iterates).  */
+DEFUN ("--rks-read-char-and-kboard",
+       Fc_rks_read_char_and_kboard,
+       Sc_rks_read_char_and_kboard, 4, 4, 0,
+       doc: /* Internal: read_char + used_mouse_menu bitmask +
+wrong_kboard handling.  Args: PREVENT-REDISPLAY (Qt/Qnil), PROMPT,
+CUR-BINDING (current_binding for read_char), LNE (last_nonmenu_event).
+Returns `continue' or `replay-sequence'.  */)
+  (Lisp_Object prevent_redisplay, Lisp_Object prompt,
+   Lisp_Object cur_binding, Lisp_Object lne)
+{
+  KBOARD *interrupted_kboard = current_kboard;
+  struct frame *interrupted_frame = SELECTED_FRAME ();
+  bool used_mouse_menu = false;
+  Lisp_Object key;
+
+  /* Calling read_char with COMMANDFLAG = -2 avoids redisplay in
+     read_char and its subroutines.  */
+  key = read_char (!NILP (prevent_redisplay) ? -2 : NILP (prompt),
+                   cur_binding, lne, &used_mouse_menu, NULL);
+  rks_key = key;
+  rks_used_mouse_menu = used_mouse_menu;
+  if (rks_state_depth > 0)
+    {
+      int bitmask = rks_get_int (rks_state_stack[rks_state_depth - 1],
+                                 RKS_SLOT_USED_MOUSE_MENU_HISTORY);
+      if (used_mouse_menu)
+        bitmask |= (1 << rks_t);
+      else
+        bitmask &= ~(1 << rks_t);
+      rks_set_int (rks_state_stack[rks_state_depth - 1],
+                   RKS_SLOT_USED_MOUSE_MENU_HISTORY, bitmask);
+      rks_set_bool (rks_state_stack[rks_state_depth - 1],
+                    RKS_SLOT_USED_MOUSE_MENU, used_mouse_menu);
+      scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                        scm_from_int (RKS_SLOT_KEY), key);
+    }
+
+  /* wrong_kboard check.  Also covers Bug#5095 (read_char returns
+     a buffer when terminal-init-xterm eats the wrong_kboard_jmpbuf
+     return).  */
+  if ((FIXNUMP (key) && XFIXNUM (key) == -2)
+      || (interrupted_kboard != current_kboard))
+    {
+      bool found = false;
+      struct kboard *k;
+
+      for (k = all_kboards; k; k = k->next_kboard)
+        if (k == interrupted_kboard)
+          found = true;
+
+      if (!found)
+        {
+          /* Don't touch interrupted_kboard when it's been deleted.  */
+          Fc_set_rks_delayed_switch_frame (Qnil);
+          {
+            static SCM rks_replay_entire_proc = SCM_UNDEFINED;
+            if (SCM_UNBNDP (rks_replay_entire_proc))
+              rks_replay_entire_proc
+                = scm_c_public_ref ("emacs read-key-sequence",
+                                    "rks-setup-replay-entire-sequence-c!");
+            SCM_CALL_0 (rks_replay_entire_proc);
+          }
+          return intern ("replay-sequence");
+        }
+
+      if (!NILP (Fc_rks_delayed_switch_frame ()))
+        {
+          kset_kbd_queue
+            (interrupted_kboard,
+             Fcons (Fc_rks_delayed_switch_frame (),
+                    KVAR (interrupted_kboard, kbd_queue)));
+          Fc_set_rks_delayed_switch_frame (Qnil);
+        }
+
+      {
+        Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
+
+        /* Drain keybuf into the interrupted_kboard's queue.  */
+        while (rks_t > 0)
+          kset_kbd_queue
+            (interrupted_kboard,
+             Fcons (keybuf[--rks_t],
+                    KVAR (interrupted_kboard, kbd_queue)));
+
+        /* If the side queue is non-empty, ensure it begins with a
+           switch-frame, so we'll replay it in the right context.  */
+        if (CONSP (KVAR (interrupted_kboard, kbd_queue)))
+          {
+            Lisp_Object head = XCAR (KVAR (interrupted_kboard, kbd_queue));
+            /* Mirror head as the next key (matches the original
+               `key = XCAR(...)' assignment via Fc_set_rks_key).  */
+            Fc_set_rks_key (head);
+            if (!(EVENT_HAS_PARAMETERS (head)
+                  && EQ (EVENT_HEAD_KIND (EVENT_HEAD (head)),
+                         Qswitch_frame)))
+              {
+                Lisp_Object frame;
+                XSETFRAME (frame, interrupted_frame);
+                kset_kbd_queue
+                  (interrupted_kboard,
+                   Fcons (make_lispy_switch_frame (frame),
+                          KVAR (interrupted_kboard, kbd_queue)));
+                rks_mock_input = 0;
+              }
+            else
+              {
+                /* Head IS a switch-frame event.  */
+                if (FIXNUMP (head) && XFIXNUM (head) != -2)
+                  {
+                    /* If interrupted while initializing terminal, we
+                       need to replay the interrupting key.  See
+                       Bug#5095 and Bug#37782.  */
+                    rks_mock_input = 1;
+                    keybuf[0] = head;
+                  }
+                else
+                  {
+                    rks_mock_input = 0;
+                  }
+              }
+          }
+        else
+          {
+            /* Side queue is empty: fall back to the read_char
+               return value.  */
+            if (FIXNUMP (key) && XFIXNUM (key) != -2)
+              {
+                rks_mock_input = 1;
+                keybuf[0] = key;
+              }
+            else
+              {
+                rks_mock_input = 0;
+              }
+          }
+      }
+      {
+        static SCM rks_replay_entire_proc = SCM_UNDEFINED;
+        if (SCM_UNBNDP (rks_replay_entire_proc))
+          rks_replay_entire_proc
+            = scm_c_public_ref ("emacs read-key-sequence",
+                                "rks-setup-replay-entire-sequence-c!");
+        SCM_CALL_0 (rks_replay_entire_proc);
+      }
+      return intern ("replay-sequence");
+    }
+  return intern ("continue");
 }
 
 /* M6aa — bulk splice of the final binding-install + per-key
