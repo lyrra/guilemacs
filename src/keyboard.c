@@ -10500,6 +10500,29 @@ DEFUN ("--rks-vquit-flag-clear", Fc_rks_vquit_flag_clear,
   return Qnil;
 }
 
+DEFUN ("--rks-replay-sequence-restore", Fc_rks_replay_sequence_restore,
+       Sc_rks_replay_sequence_restore, 0, 0, 0,
+       doc: /* Internal: echo/keys restore that runs at every
+`replay_sequence:' entry.  Restores this_command_key_count from
+RKS_SLOT_KEYS_START and (if interactive and rks_t < rks_mock_input)
+echo_truncate from RKS_SLOT_ECHO_START.  Called from Scheme
+replay-sequence-continue after rks-setup-replay-sequence-c!.
+
+Note: text-conversion gating is intentionally NOT included here.
+It depends on read_key_sequence's `disable_text_conversion_p'
+parameter and is idempotent, so it stays one-time C-side at entry.  */)
+  (void)
+{
+  if (rks_state_depth > 0)
+    {
+      SCM rec = rks_state_stack[rks_state_depth - 1];
+      this_command_key_count = rks_get_int (rec, RKS_SLOT_KEYS_START);
+      if (INTERACTIVE && rks_t < rks_mock_input)
+        echo_truncate (rks_get_int (rec, RKS_SLOT_ECHO_START));
+    }
+  return Qnil;
+}
+
 DEFUN ("--rks-first-event-init", Fc_rks_first_event_init,
        Sc_rks_first_event_init, 1, 1, 0,
        doc: /* Internal: if first_event slot is nil, set it to rks_key,
@@ -12437,16 +12460,8 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM_CALL_0 (rks_rsc_proc);
   }
 
-  /* These are no-ops the first time through, but if we restart, they
-     revert the echo area and this_command_keys to their original state.
-     M6j/Wave C: keys_start / echo_start retired — read from record.  */
-  if (rks_state_depth > 0)
-    {
-      SCM rec = rks_state_stack[rks_state_depth - 1];
-      this_command_key_count = rks_get_int (rec, RKS_SLOT_KEYS_START);
-      if (INTERACTIVE && t < mock_input)
-        echo_truncate (rks_get_int (rec, RKS_SLOT_ECHO_START));
-    }
+  /* Echo/keys restore now lives in Scheme replay-sequence-continue
+     via --rks-replay-sequence-restore (Step 3b-prep).  */
 
   /* If text conversion is supposed to be disabled immediately, do it
      now.  */

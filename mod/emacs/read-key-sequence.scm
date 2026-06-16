@@ -1071,13 +1071,19 @@ label, which follows this call in the C flow.)"
       'switch-frame)
      (else                                         'fall-through))))
 
+(define %rks-replay-sequence-restore
+  (delay (%c '--rks-replay-sequence-restore)))
+
 (define (replay-sequence-continue)
   "Hoisted body of C `replay_sequence:' label.  Resets state and
-recomputes the initial key binding from keybuf.  Returns `continue'."
+recomputes the initial key binding from keybuf, then restores
+this_command_key_count + echo from record slots via the C-side
+helper.  Returns `continue'."
   (let ((mock ((force %rks-mock-input))))
     (rks-setup-replay-sequence-c!
      (if (> mock 0) ((force %rks-keybuf-ref) 0) #nil)
      (if (> mock 1) ((force %rks-keybuf-ref) 1) #nil)))
+  ((force %rks-replay-sequence-restore))
   'continue)
 
 (define (replay-key-continue)
