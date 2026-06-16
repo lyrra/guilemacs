@@ -10500,6 +10500,28 @@ DEFUN ("--rks-vquit-flag-clear", Fc_rks_vquit_flag_clear,
   return Qnil;
 }
 
+DEFUN ("--rks-first-event-init", Fc_rks_first_event_init,
+       Sc_rks_first_event_init, 1, 1, 0,
+       doc: /* Internal: if first_event slot is nil, set it to rks_key,
+optionally fix the current buffer, and recompute current_binding
+via active_maps.  FIX-CURRENT-BUFFER-P is Qt/Qnil.  */)
+  (Lisp_Object fix_current_buffer_p)
+{
+  if (rks_state_depth == 0)
+    return Qnil;
+  SCM rec = rks_state_stack[rks_state_depth - 1];
+  SCM fe = scm_struct_ref (rec, scm_from_int (RKS_SLOT_FIRST_EVENT));
+  if (!NILP (fe))
+    return Qnil;
+  Lisp_Object key = scm_struct_ref (rec, scm_from_int (RKS_SLOT_KEY));
+  scm_struct_set_x (rec, scm_from_int (RKS_SLOT_FIRST_EVENT), key);
+  if (!NILP (fix_current_buffer_p)
+      && (XBUFFER (XWINDOW (selected_window)->contents) != current_buffer))
+    Fset_buffer (XWINDOW (selected_window)->contents);
+  Fc_set_rks_current_binding (active_maps (key, Qnil));
+  return Qnil;
+}
+
 DEFUN ("--rks-raw-keybuf-push", Fc_rks_raw_keybuf_push,
        Sc_rks_raw_keybuf_push, 1, 1, 0,
        doc: /* Internal: GROW_RAW_KEYBUF + ASET(key) + count++ +
@@ -12548,21 +12570,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
 	  /* switch-frame handled by Scheme classifier dispatch above.  */
 
-	  /* Wave C/Phase 3: first_event promoted to record slot 23.  */
-	  {
-	    SCM rec = rks_state_stack[rks_state_depth - 1];
-	    SCM fe = scm_struct_ref (rec, scm_from_int (RKS_SLOT_FIRST_EVENT));
-	    if (NILP (fe))
-	      {
-		scm_struct_set_x (rec, scm_from_int (RKS_SLOT_FIRST_EVENT),
-				  key);
-		if (fix_current_buffer
-		    && (XBUFFER (XWINDOW (selected_window)->contents)
-			!= current_buffer))
-		  Fset_buffer (XWINDOW (selected_window)->contents);
-		current_binding = active_maps (key, Qnil);
-	      }
-	  }
+	  Fc_rks_first_event_init (fix_current_buffer ? Qt : Qnil);
 
 	  Fc_rks_raw_keybuf_push (key);
 	}
