@@ -10489,6 +10489,34 @@ read_key_sequence call's keybuf.  No-op when no call is in flight.  */)
   return Qnil;
 }
 
+/* Phase 4 Step 2: C-only block wrappers.  */
+
+DEFUN ("--rks-vquit-flag-clear", Fc_rks_vquit_flag_clear,
+       Sc_rks_vquit_flag_clear, 0, 0, 0,
+       doc: /* Internal: Vquit_flag = Qnil.  */)
+  (void)
+{
+  Vquit_flag = Qnil;
+  return Qnil;
+}
+
+DEFUN ("--rks-raw-keybuf-push", Fc_rks_raw_keybuf_push,
+       Sc_rks_raw_keybuf_push, 1, 1, 0,
+       doc: /* Internal: GROW_RAW_KEYBUF + ASET(key) + count++ +
+record writeback.  KEY is the event to record.  CONSP keys are
+deep-copied (see body comment).  */)
+  (Lisp_Object key)
+{
+  GROW_RAW_KEYBUF;
+  ASET (raw_keybuf, raw_keybuf_count,
+        /* Copy the event, in case it gets modified by side-effect
+           by some remapping function (bug#30955).  */
+        CONSP (key) ? Fcopy_sequence (key) : key);
+  raw_keybuf_count++;
+  RKS_RAW_KEYBUF_WRITEBACK;
+  return Qnil;
+}
+
 /* M6p — promote `delayed_switch_frame' (8 uses inside read_key_sequence
    + 1 final install into the unread_switch_frame global at done:).
    See docs/keyboard.org §M6p.
@@ -12482,13 +12510,17 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      }
 	    if (scm_is_eq (cls, intern ("quit-in-other-frame")))
 	      {
+		/* Inline rather than Fc_rks_raw_keybuf_push (): the
+		   DEFUN deep-copies CONSP keys (bug#30955), but the
+		   quit path historically pushes `key' as-is.  Two
+		   sites with diverging copy semantics.  */
 		GROW_RAW_KEYBUF;
 		ASET (raw_keybuf, raw_keybuf_count, key);
 		raw_keybuf_count++;
 		RKS_RAW_KEYBUF_WRITEBACK;
 		keybuf[t++] = key;
 		mock_input = t;
-		Vquit_flag = Qnil;
+		Fc_rks_vquit_flag_clear ();
 		goto replay_sequence;
 	      }
 	    if (scm_is_eq (cls, intern ("switch-frame")))
@@ -12512,7 +12544,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	    /* else: `fall-through' — continue to C classification.  */
 	  }
 
-	  Vquit_flag = Qnil;
+	  Fc_rks_vquit_flag_clear ();
 
 	  /* switch-frame handled by Scheme classifier dispatch above.  */
 
@@ -12532,13 +12564,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 	      }
 	  }
 
-	  GROW_RAW_KEYBUF;
-	  ASET (raw_keybuf, raw_keybuf_count,
-                /* Copy the event, in case it gets modified by side-effect
-                   by some remapping function (bug#30955).  */
-                CONSP (key) ? Fcopy_sequence (key) : key);
-	  raw_keybuf_count++;
-	  RKS_RAW_KEYBUF_WRITEBACK;
+	  Fc_rks_raw_keybuf_push (key);
 	}
 
     have_key:
