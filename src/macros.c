@@ -24,6 +24,7 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 #include "macros.h"
 #include "window.h"
 #include "keyboard.h"
+#include "guile.h"
 
 /* Number of successful iterations so far
    for innermost keyboard macro.
@@ -372,7 +373,12 @@ buffer before the macro is executed.  */)
 	    break;
 	}
 
-      command_loop_2 (list1 (Qminibuffer_quit));
+      {
+        static SCM proc = SCM_UNDEFINED;
+        if (SCM_UNBNDP (proc))
+          proc = scm_c_public_ref ("emacs command-loop", "command-loop-2");
+        SCM_CALL_0 (proc);
+      }
 
       executing_kbd_macro_iterations = ++success_count;
 

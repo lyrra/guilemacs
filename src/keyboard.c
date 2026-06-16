@@ -1282,20 +1282,6 @@ docs/keyboard.org §M7h.  */)
    returned due to end of file (or end of kbd macro).  HANDLERS is a
    list of condition names, passed to internal_condition_case.  */
 
-/* M7e — C wrapper around (emacs command-loop) command-loop-2.  Body
-   lives in Scheme.  Kept as a C function because macros.c (kbd-macro
-   execution) calls it directly with a list1 (Qminibuffer_quit) arg —
-   the arg itself is ignored, but the function pointer must remain a
-   valid C symbol.  See docs/keyboard.org §M7e.  */
-Lisp_Object
-command_loop_2 (Lisp_Object ignore)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs command-loop", "command-loop-2");
-  return SCM_CALL_0 (proc);
-}
-
 /* Consolidation: helper used by top-level in (emacs recursive-edit).  */
 DEFUN ("--totally-unblock-input", Fc_totally_unblock_input,
        Sc_totally_unblock_input, 0, 0, 0,
