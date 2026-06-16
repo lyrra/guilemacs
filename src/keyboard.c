@@ -12442,13 +12442,11 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
      recognized a function key, to avoid searching for the function
      key's again in Vfunction_key_map.
 
-     M6l: these three locals are now aliased to file-static shadows
-     (rks_fkey / rks_keytran / rks_indec) so the Scheme runtime can
-     write them via --rks-init-keyremaps.  The aliases keep the
-     existing 77 access sites in this function unchanged.  */
-#define fkey    rks_fkey
-#define keytran rks_keytran
-#define indec   rks_indec
+     M6l: these three locals are file-static shadows
+     (rks_fkey / rks_keytran / rks_indec) written by Scheme via
+     --rks-init-keyremaps.  Phase 4 Step 3b-proper.2 deleted the
+     in-function access sites; the post-done sync block below uses
+     the rks_* names directly.  */
 
   /* (shift_translated retired — reads go through the record via
      --rks-shift-translated-p / --set-rks-shift-translated.)  */
@@ -12651,16 +12649,9 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   return t;
 }
 
-#undef fkey
-#undef keytran
-#undef indec
 #undef t
 #undef mock_input
 #undef current_binding
-#undef key
-#undef used_mouse_menu
-#ifdef HAVE_TEXT_CONVERSION
-#endif
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)
