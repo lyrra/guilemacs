@@ -42,6 +42,7 @@
             replay-sequence-continue
             replay-key-continue
             rks-classify-event-simple!
+            rks-state-machine
             rks-have-key-orchestrator!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
@@ -1136,6 +1137,90 @@ without taking a C goto."
                ((eq? reduction 'replay-sequence) (replay-sequence-continue))
                (else (install-and-cascade))))))))))
 
+;; Phase 4 Step 3a — top-level state machine for read_key_sequence.
+;; Hoists the C while-loop into a tail-recursive Scheme loop.  Not
+;; yet wired into the C bulk subr; lands as plumbing first.
+
+(define %set-rks-delayed-switch-frame
+  (delay (%c '--set-rks-delayed-switch-frame)))
+(define %rks-vquit-flag-clear
+  (delay (%c '--rks-vquit-flag-clear)))
+(define %rks-first-event-init
+  (delay (%c '--rks-first-event-init)))
+(define %rks-raw-keybuf-push
+  (delay (%c '--rks-raw-keybuf-push)))
+(define %rks-read-char-and-kboard
+  (delay (%c '--rks-read-char-and-kboard)))
+
+(define (rks-state-machine prompt
+                           can-return-switch-frame
+                           prevent-redisplay
+                           fix-current-buffer)
+  "Phase 4 Step 3: hoisted read_key_sequence state machine.
+
+PROMPT — read_char prompt string (or nil).
+CAN-RETURN-SWITCH-FRAME / PREVENT-REDISPLAY / FIX-CURRENT-BUFFER —
+Qt/Qnil booleans mirroring the C function-parameter args.
+
+Returns:
+  -1 (fixnum) — menu rejected; caller returns -1 from read_key_sequence.
+  `done       — caller runs post-loop done-* dispatch and returns rks_t.
+
+Entry assumes C has already done: dynwind_begin, keybuf-stack push,
+state-record push, setup-prompt!, setup-pre-loop!."
+
+  (define (have-key-step)
+    (case (rks-have-key-orchestrator! ((force %rks-key)) prompt)
+      ((done)            'done)
+      ((replay-sequence) (replay-sequence-continue) (loop))
+      ((replay-key)      (replay-key-continue) (loop))
+      ((fall-through)    (loop))
+      (else              (loop))))
+
+  (define (fall-through-step)
+    ((force %rks-vquit-flag-clear))
+    ((force %rks-first-event-init) fix-current-buffer)
+    ((force %rks-raw-keybuf-push) ((force %rks-key)))
+    (have-key-step))
+
+  (define (classify-step)
+    (case (rks-classify-event-simple!)
+      ((menu-reject)         -1)
+      ((buffer-switched)     (replay-sequence-continue) (loop))
+      ((quit-in-other-frame) (replay-sequence-continue) (loop))
+      ((switch-frame)
+       (if (or (> ((force %rks-t)) 0)
+               (%nilp can-return-switch-frame))
+           (begin
+             ((force %rks-vquit-flag-clear))
+             ((force %set-rks-delayed-switch-frame) ((force %rks-key)))
+             (replay-key-continue)
+             (loop))
+           (fall-through-step)))
+      ((fall-through) (fall-through-step))
+      (else           (fall-through-step))))
+
+  (define (loop)
+    (if (eq? (rks-first-unbound-short-circuit!) 'replay-sequence)
+        (begin (replay-sequence-continue) (loop))
+        (case (rks-iteration-prepare!)
+          ((done)      'done)
+          ((mock)      (have-key-step))
+          ((read-char)
+           (case ((force %rks-read-char-and-kboard)
+                  prevent-redisplay
+                  prompt
+                  ((force %rks-current-binding))
+                  (symbol-value 'last-nonmenu-event))
+             ((replay-sequence) (replay-sequence-continue) (loop))
+             ((continue)        (classify-step))
+             (else              (loop))))
+          (else        (loop)))))
+
+  ;; Entry point — equivalent to falling through to replay_sequence:.
+  (replay-sequence-continue)
+  (loop))
+
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
 (define (rks-try-help-char! key)
@@ -1373,6 +1458,9 @@ cached-dispatch into here."
                ,rks-have-key-orchestrator!)
               (--rks-classify-event-simple!
                ,rks-classify-event-simple!)
+              ;; Phase 4 Step 3 — top-level state machine
+              (--rks-state-machine
+               ,rks-state-machine)
               ;; M6ac — mouse-click prefix expansion
               (--rks-iter-mouse-click-prefix!
                ,rks-iter-mouse-click-prefix!)
