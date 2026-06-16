@@ -10565,18 +10565,30 @@ replay-sequence-continue.  */)
   return Qnil;
 }
 
+/* Shared helper — set rks_mock_input and mirror to record slot.
+   Used by --rks-quit-in-other-frame-handler below and by the
+   --rks-mouse-click-prefix-body / --rks-reduce-mouse-event-loop
+   helpers further down.  */
+static void
+rks_mock_input_set_and_mirror (int n)
+{
+  rks_mock_input = n;
+  if (rks_state_depth > 0)
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_MOCK_INPUT, rks_mock_input);
+}
+
 DEFUN ("--rks-quit-in-other-frame-handler",
        Fc_rks_quit_in_other_frame_handler,
        Sc_rks_quit_in_other_frame_handler, 0, 0, 0,
        doc: /* Internal: side effects for the `quit-in-other-frame'
 classify branch.  Pushes rks_key onto raw_keybuf (no copy — matches
-the original divergence from --rks-raw-keybuf-push's deep-copy
-semantics) and onto keybuf[rks_t], increments rks_t, sets
+the original quit-path semantics) and keybuf[rks_t++], sets
 mock_input = rks_t, clears Vquit_flag.  Called from Scheme before
-replay-sequence-continue.  Reads rks_key via record slot 24 (the
-file-static is declared later in the file).  */)
+replay-sequence-continue.  */)
   (void)
 {
+  /* Reads rks_key via record slot 24 — file-static declared later.  */
   Lisp_Object key = Qnil;
   if (rks_state_depth > 0)
     key = scm_struct_ref (rks_state_stack[rks_state_depth - 1],
@@ -10588,13 +10600,9 @@ file-static is declared later in the file).  */)
   if (rks_keybuf_depth > 0)
     rks_keybuf_stack[rks_keybuf_depth - 1][rks_t++] = key;
   if (rks_state_depth > 0)
-    {
-      rks_set_int (rks_state_stack[rks_state_depth - 1],
-                   RKS_SLOT_KEY_COUNT, rks_t);
-      rks_mock_input = rks_t;
-      rks_set_int (rks_state_stack[rks_state_depth - 1],
-                   RKS_SLOT_MOCK_INPUT, rks_mock_input);
-    }
+    rks_set_int (rks_state_stack[rks_state_depth - 1],
+                 RKS_SLOT_KEY_COUNT, rks_t);
+  rks_mock_input_set_and_mirror (rks_t);
   Vquit_flag = Qnil;
   return Qnil;
 }
@@ -10688,42 +10696,42 @@ static bool        rks_used_mouse_menu;
 /* M6ae: rks_disabled_conversion retired — getter/setter use record.  */
 #endif
 
+#ifdef HAVE_TEXT_CONVERSION
+/* Criterion-2: helper for --rks-iter-maybe-disable-text-conversion.
+   Scans the first up-to-10 keybuf elements for NUMBERP or
+   function-key SYMBOL.  */
+static bool
+rks_text_conversion_keybuf_has_function_key (Lisp_Object *keybuf)
+{
+  int n = rks_t < 10 ? rks_t : 10;
+  for (int i = 0; i < n; i++)
+    if (NUMBERP (keybuf[i])
+        || (SYMBOLP (keybuf[i])
+            && EQ (Fget (keybuf[i], Qevent_kind), Qfunction_key)))
+      return true;
+  return false;
+}
+#endif
+
 DEFUN ("--rks-iter-maybe-disable-text-conversion",
        Fc_rks_iter_maybe_disable_text_conversion,
        Sc_rks_iter_maybe_disable_text_conversion, 0, 0, 0,
        doc: /* Internal: if HAVE_TEXT_CONVERSION is enabled and the
-predicate holds (not already disabled, at least one key read,
-no mouse menu, not inhibited), scan the first up-to-10 keybuf
-elements for a NUMBERP or function-key SYMBOL; if found, call
-disable_text_conversion + record_unwind_protect_void to install
-the resume-on-unwind, and flip rks_disabled_conversion.  Always
-returns nil — the C caller continues to replay_key regardless.
-Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
+predicate holds (not already disabled, at least one key read, no
+mouse menu, not inhibited), scan the first up-to-10 keybuf elements
+for a NUMBERP or function-key SYMBOL; if found, disable_text_conversion
++ record_unwind_protect_void + flip rks_disabled_conversion.  Always
+returns nil.  */)
   (void)
 {
 #ifdef HAVE_TEXT_CONVERSION
   if (!NILP (Fc_rks_disabled_conversion_p ()) || rks_t == 0
       || !NILP (Fc_rks_used_mouse_menu_p ())
-      || disable_inhibit_text_conversion)
-    return Qnil;
-
-  if (rks_keybuf_depth == 0)
+      || disable_inhibit_text_conversion
+      || rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-
-  bool hit = false;
-  int n = rks_t < 10 ? rks_t : 10;
-  for (int i = 0; i < n; i++)
-    {
-      if (NUMBERP (keybuf[i])
-          || (SYMBOLP (keybuf[i])
-              && EQ (Fget (keybuf[i], Qevent_kind), Qfunction_key)))
-        {
-          hit = true;
-          break;
-        }
-    }
-  if (hit)
+  if (rks_text_conversion_keybuf_has_function_key (keybuf))
     {
       disable_text_conversion ();
       record_unwind_protect_void (resume_text_conversion);
@@ -10749,106 +10757,108 @@ Mirrors src/keyboard.c lines 11838-11873 pre-M6ae.  */)
                          + key updated) or the loop completed without one;
                          caller continues to M6aa install.
    See docs/keyboard.org §M6ad.  */
+/* Criterion-2: factor --rks-reduce-mouse-event-loop's loop body
+   (modifier-strip + dispose-unbound + try-new-binding) into helpers.
+   Shared rks_mock_input_set_and_mirror is defined earlier.  */
+
+static void
+rks_reduce_rewind_one_keyremap (keyremap *km, int last_real)
+{
+  if (km->end <= last_real) return;
+  int new_pos = last_real < km->start ? last_real : km->start;
+  km->end = km->start = new_pos;
+  km->map = km->parent;
+}
+
+static void
+rks_reduce_rewind_keyremaps_to_last_real (void)
+{
+  int last_real = XFIXNUM (Fc_rks_last_real_key_start ());
+  /* Nested: rewind indec; if it rewound, fkey; if that, keytran.  */
+  if (rks_indec.end > last_real)
+    {
+      rks_reduce_rewind_one_keyremap (&rks_indec, last_real);
+      if (rks_fkey.end > last_real)
+        {
+          rks_reduce_rewind_one_keyremap (&rks_fkey, last_real);
+          if (rks_keytran.end > last_real)
+            rks_reduce_rewind_one_keyremap (&rks_keytran, last_real);
+        }
+    }
+  RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
+  RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+  RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
+}
+
+static SCM
+rks_reduce_dispose_unbound_up_down (void)
+{
+  /* Unbound up/down event — dispose of it.  Adjust the keyremap
+     counters back to last_real_key_start, then jump back to
+     replay_key (mock_input = 0) or replay_sequence
+     (mock_input = last_real_key_start).  */
+  rks_reduce_rewind_keyremaps_to_last_real ();
+  int last_real = XFIXNUM (Fc_rks_last_real_key_start ());
+  rks_mock_input_set_and_mirror (rks_t == last_real ? 0 : last_real);
+  return intern (rks_t == last_real ? "replay-key" : "replay-sequence");
+}
+
+/* Try a follow_key for the modifier-reduced event.  Returns true if
+   a binding was found (caller breaks the loop).  Mutates rks_key,
+   rks_current_binding, and rks_new_binding.  */
+static bool
+rks_reduce_try_new_binding (int modifiers, Lisp_Object breakdown)
+{
+  Lisp_Object new_head  = apply_modifiers (modifiers, XCAR (breakdown));
+  Lisp_Object new_click = list2 (new_head, EVENT_START (rks_key));
+  Lisp_Object new_bind  = follow_key (rks_current_binding, new_click);
+  Fc_set_rks_new_binding (new_bind);
+  if (NILP (new_bind))
+    return false;
+  rks_current_binding = new_bind;
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_CURRENT_BINDING),
+                      rks_current_binding);
+  rks_key = new_click;
+  return true;
+}
+
+static SCM
+rks_reduce_strip_loop (Lisp_Object breakdown, int modifiers, int reducer_mask)
+{
+  while (modifiers & reducer_mask)
+    {
+      if      (modifiers & triple_modifier) modifiers ^= (double_modifier | triple_modifier);
+      else if (modifiers & double_modifier) modifiers &= ~double_modifier;
+      else if (modifiers & drag_modifier)   modifiers &= ~drag_modifier;
+      else
+        return rks_reduce_dispose_unbound_up_down ();
+      if (rks_reduce_try_new_binding (modifiers, breakdown))
+        return intern ("fall-through");
+      /* Otherwise leave rks_key set to the drag event; loop again.  */
+    }
+  return intern ("fall-through");
+}
+
 DEFUN ("--rks-reduce-mouse-event-loop",
        Fc_rks_reduce_mouse_event_loop,
        Sc_rks_reduce_mouse_event_loop, 0, 0, 0,
        doc: /* Internal: drag/click/double/triple reduction cascade
 for rks_key.  Returns `fall-through', `replay-key', or
-`replay-sequence'.  Scheme handles the first_unbound = min(t,
-first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
+`replay-sequence'.  See M6ad / Step E4.  */)
   (void)
 {
   Lisp_Object head = EVENT_HEAD (rks_key);
   if (!SYMBOLP (head))
     return intern ("fall-through");
-
   Lisp_Object breakdown = parse_modifiers (head);
   int modifiers = XFIXNUM (XCAR (XCDR (breakdown)));
   int reducer_mask = up_modifier | down_modifier | drag_modifier
                      | double_modifier | triple_modifier;
   if (!(modifiers & reducer_mask))
     return intern ("fall-through");
-
-  while (modifiers & reducer_mask)
-    {
-      if (modifiers & triple_modifier)
-        modifiers ^= (double_modifier | triple_modifier);
-      else if (modifiers & double_modifier)
-        modifiers &= ~double_modifier;
-      else if (modifiers & drag_modifier)
-        modifiers &= ~drag_modifier;
-      else
-        {
-          /* Unbound up/down event — dispose of it.  Adjust the
-             keyremap counters back to last_real_key_start, then
-             jump back to replay_key (with mock_input zeroed) or
-             replay_sequence (with mock_input = last_real_key_start).  */
-          if (rks_indec.end > XFIXNUM (Fc_rks_last_real_key_start ()))
-            {
-              int new_indec
-                = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_indec.start
-                  ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_indec.start;
-              rks_indec.end = rks_indec.start = new_indec;
-              rks_indec.map = rks_indec.parent;
-              if (rks_fkey.end > XFIXNUM (Fc_rks_last_real_key_start ()))
-                {
-                  int new_fkey
-                    = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_fkey.start
-                      ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_fkey.start;
-                  rks_fkey.end = rks_fkey.start = new_fkey;
-                  rks_fkey.map = rks_fkey.parent;
-                  if (rks_keytran.end > XFIXNUM (Fc_rks_last_real_key_start ()))
-                    {
-                      int new_keytran
-                        = XFIXNUM (Fc_rks_last_real_key_start ()) < rks_keytran.start
-                          ? XFIXNUM (Fc_rks_last_real_key_start ()) : rks_keytran.start;
-                      rks_keytran.end = rks_keytran.start = new_keytran;
-                      rks_keytran.map = rks_keytran.parent;
-                    }
-                }
-            }
-          RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
-          RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
-          RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
-          if (rks_t == XFIXNUM (Fc_rks_last_real_key_start ()))
-            {
-              rks_mock_input = 0;
-              if (rks_state_depth > 0)
-                rks_set_int (rks_state_stack[rks_state_depth - 1],
-                             RKS_SLOT_MOCK_INPUT, 0);
-              return intern ("replay-key");
-            }
-          else
-            {
-              rks_mock_input = XFIXNUM (Fc_rks_last_real_key_start ());
-              if (rks_state_depth > 0)
-                rks_set_int (rks_state_stack[rks_state_depth - 1],
-                             RKS_SLOT_MOCK_INPUT, rks_mock_input);
-              return intern ("replay-sequence");
-            }
-        }
-
-      Lisp_Object new_head = apply_modifiers (modifiers, XCAR (breakdown));
-      Lisp_Object new_click = list2 (new_head, EVENT_START (rks_key));
-
-      /* Look for a binding for this new key.  */
-      Lisp_Object new_bind = follow_key (rks_current_binding, new_click);
-      Fc_set_rks_new_binding (new_bind);
-
-      if (!NILP (new_bind))
-        {
-          rks_current_binding = new_bind;
-          if (rks_state_depth > 0)
-            scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-                              scm_from_int (RKS_SLOT_CURRENT_BINDING),
-                              rks_current_binding);
-          rks_key             = new_click;
-          break;
-        }
-      /* Otherwise, leave rks_key set to the drag event.  */
-    }
-
-  return intern ("fall-through");
+  return rks_reduce_strip_loop (breakdown, modifiers, reducer_mask);
 }
 
 /* M6ac — bulk splice of the mouse-click prefix expansion (and
@@ -10862,16 +10872,9 @@ first_unbound) update before calling this shim.  See M6ad / Step E4.  */)
    See docs/keyboard.org §M6ac.  */
 /* Criterion-2: factor --rks-mouse-click-prefix-body's three event-kind
    branches (mouse-click / touchscreen, menu-bar / tab-bar / tool-bar,
-   fall-through) into focused helpers.  */
-
-static void
-rks_mock_input_set_and_mirror (int n)
-{
-  rks_mock_input = n;
-  if (rks_state_depth > 0)
-    rks_set_int (rks_state_stack[rks_state_depth - 1],
-                 RKS_SLOT_MOCK_INPUT, rks_mock_input);
-}
+   fall-through) into focused helpers.  Shared helper
+   rks_mock_input_set_and_mirror is defined earlier (used by the
+   reduce-mouse-event-loop helpers above).  */
 
 static SCM
 rks_mouse_click_first_key_buffer_switch (Lisp_Object window,
@@ -11289,6 +11292,32 @@ Mirrors src/keyboard.c lines 12058-12081 pre-M6aa.  */)
      `read-char' — neither branch applied; caller must do the
                    inline read_char (deferred to M8).
    See docs/keyboard.org §M6z.  */
+/* Criterion-2: extract --rks-iter-pre-read-cascade's mock branch.  */
+static SCM
+rks_pre_read_cascade_mock_branch (void)
+{
+  Lisp_Object *kb = rks_keybuf_stack[rks_keybuf_depth - 1];
+  rks_key = kb[rks_t];
+  if (rks_state_depth > 0)
+    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
+                      scm_from_int (RKS_SLOT_KEY), rks_key);
+  add_command_key (rks_key);
+  if (current_kboard->immediate_echo)
+    {
+      current_kboard->immediate_echo = false;
+      echo_now ();
+    }
+  if (rks_state_depth > 0)
+    {
+      rks_used_mouse_menu
+        = (rks_get_int (rks_state_stack[rks_state_depth - 1],
+                        RKS_SLOT_USED_MOUSE_MENU_HISTORY) >> rks_t) & 1;
+      rks_set_bool (rks_state_stack[rks_state_depth - 1],
+                    RKS_SLOT_USED_MOUSE_MENU, rks_used_mouse_menu);
+    }
+  return intern ("mock");
+}
+
 DEFUN ("--rks-iter-pre-read-cascade",
        Fc_rks_iter_pre_read_cascade, Sc_rks_iter_pre_read_cascade,
        0, 0, 0,
@@ -11297,28 +11326,7 @@ cascade.  See M6z.  Returns `mock', `done', or `read-char'.  */)
   (void)
 {
   if (rks_t < rks_mock_input)
-    {
-      Lisp_Object *kb = rks_keybuf_stack[rks_keybuf_depth - 1];
-      rks_key = kb[rks_t];
-      if (rks_state_depth > 0)
-	scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-			  scm_from_int (RKS_SLOT_KEY), rks_key);
-      add_command_key (rks_key);
-      if (current_kboard->immediate_echo)
-        {
-          current_kboard->immediate_echo = false;
-          echo_now ();
-        }
-      if (rks_state_depth > 0)
-	{
-	  rks_used_mouse_menu
-	    = (rks_get_int (rks_state_stack[rks_state_depth - 1],
-			    RKS_SLOT_USED_MOUSE_MENU_HISTORY) >> rks_t) & 1;
-	  rks_set_bool (rks_state_stack[rks_state_depth - 1],
-			RKS_SLOT_USED_MOUSE_MENU, rks_used_mouse_menu);
-	}
-      return intern ("mock");
-    }
+    return rks_pre_read_cascade_mock_branch ();
   if (!NILP (Vexecuting_kbd_macro)
       && at_end_of_macro_p ()
       && !requeued_events_pending_p ())
@@ -11805,38 +11813,84 @@ static bool keyremap_step (Lisp_Object *, volatile keyremap *, int,
                            bool, int *, Lisp_Object);
 static bool test_undefined (Lisp_Object);
 
+/* Criterion-2: helper for --rks-walk-indec's on-hit side effects.  */
+static void
+rks_indec_apply_hit (int diff)
+{
+  rks_mock_input = diff + max (rks_t, rks_mock_input);
+  if (rks_state_depth > 0)
+    {
+      rks_set_int (rks_state_stack[rks_state_depth - 1],
+                   RKS_SLOT_MOCK_INPUT, rks_mock_input);
+      RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
+    }
+}
+
 DEFUN ("--rks-walk-indec",
        Fc_rks_walk_indec,
        Sc_rks_walk_indec, 1, 1, 0,
        doc: /* Internal: walk the input-decode-map (indec) over
-the current keybuf.  M6h-2: loads state from <rks-state> record
-before the walk and saves back after.  Returns t when a step
-completes (mock_input updated), nil when exhausted.  */)
+the current keybuf.  Returns t when a step completes (mock_input
+updated), nil when exhausted.  */)
   (Lisp_Object prompt)
 {
   if (rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-
   while (rks_indec.end < rks_t)
     {
       int diff;
       bool done = keyremap_step (keybuf, &rks_indec,
                                  max (rks_t, rks_mock_input),
                                  true, &diff, prompt);
-      if (done)
-        {
-          rks_mock_input = diff + max (rks_t, rks_mock_input);
-          if (rks_state_depth > 0)
-            {
-              rks_set_int (rks_state_stack[rks_state_depth - 1],
-                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
-              RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
-            }
-          return Qt;
-        }
+      if (!done) continue;
+      rks_indec_apply_hit (diff);
+      return Qt;
     }
+  return Qnil;
+}
 
+/* Criterion-2: split --rks-fkey-shortcut-or-walk's two branches into
+   helpers.  */
+
+static Lisp_Object
+rks_fkey_shortcut_advance (void)
+{
+  /* Bound non-keymap + no indec scan pending — advance fkey past
+     rks_t so keytran can still scan.  */
+  if (rks_fkey.start < rks_t)
+    {
+      rks_fkey.start = rks_fkey.end = rks_t;
+      rks_fkey.map = rks_fkey.parent;
+      RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
+    }
+  return Qnil;
+}
+
+static Lisp_Object
+rks_fkey_walk (Lisp_Object *keybuf, Lisp_Object prompt)
+{
+  while (rks_fkey.end < rks_indec.start)
+    {
+      int diff;
+      bool done = keyremap_step (keybuf, &rks_fkey,
+                                 max (rks_t, rks_mock_input),
+                                 (rks_fkey.end + 1 == rks_t
+                                  && test_undefined (rks_current_binding)),
+                                 &diff, prompt);
+      if (!done) continue;
+      rks_mock_input = diff + max (rks_t, rks_mock_input);
+      rks_indec.end   += diff;
+      rks_indec.start += diff;
+      if (rks_state_depth > 0)
+        {
+          rks_set_int (rks_state_stack[rks_state_depth - 1],
+                       RKS_SLOT_MOCK_INPUT, rks_mock_input);
+          RKS_KEYREMAP_WRITEBACK (rks_fkey,  RKS_SLOT_FKEY);
+          RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
+        }
+      return Qt;
+    }
   return Qnil;
 }
 
@@ -11858,78 +11912,49 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
   if (!KEYMAPP (rks_current_binding)
       && !test_undefined (rks_current_binding)
       && rks_indec.start >= rks_t)
-    {
-      if (rks_fkey.start < rks_t)
-        {
-          rks_fkey.start = rks_fkey.end = rks_t;
-          rks_fkey.map = rks_fkey.parent;
-          RKS_KEYREMAP_WRITEBACK (rks_fkey, RKS_SLOT_FKEY);
-        }
-      return Qnil;
-    }
+    return rks_fkey_shortcut_advance ();
+  return rks_fkey_walk (keybuf, prompt);
+}
 
-  while (rks_fkey.end < rks_indec.start)
+/* Criterion-2: helper for --rks-walk-keytran's on-hit side effects.  */
+static void
+rks_keytran_apply_hit (int diff)
+{
+  rks_mock_input  = diff + max (rks_t, rks_mock_input);
+  rks_indec.end   += diff;
+  rks_indec.start += diff;
+  rks_fkey.end    += diff;
+  rks_fkey.start  += diff;
+  if (rks_state_depth > 0)
     {
-      int diff;
-      bool done = keyremap_step (keybuf, &rks_fkey,
-                                 max (rks_t, rks_mock_input),
-                                 (rks_fkey.end + 1 == rks_t
-                                  && test_undefined (rks_current_binding)),
-                                 &diff, prompt);
-      if (done)
-        {
-          rks_mock_input = diff + max (rks_t, rks_mock_input);
-          rks_indec.end   += diff;
-          rks_indec.start += diff;
-          if (rks_state_depth > 0)
-            {
-              rks_set_int (rks_state_stack[rks_state_depth - 1],
-                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
-              RKS_KEYREMAP_WRITEBACK (rks_fkey,  RKS_SLOT_FKEY);
-              RKS_KEYREMAP_WRITEBACK (rks_indec, RKS_SLOT_INDEC);
-            }
-          return Qt;
-        }
+      rks_set_int (rks_state_stack[rks_state_depth - 1],
+                   RKS_SLOT_MOCK_INPUT, rks_mock_input);
+      RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
+      RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
+      RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
     }
-  return Qnil;
 }
 
 DEFUN ("--rks-walk-keytran",
        Fc_rks_walk_keytran,
        Sc_rks_walk_keytran, 1, 1, 0,
-       doc: /* Internal: walk the key-translation-map (keytran)
-over the current keybuf.  Returns t when a hit is found
-(mock_input + indec + fkey counters updated), nil when
-exhausted.  PROMPT is the read_key_sequence prompt.  */)
+       doc: /* Internal: walk the key-translation-map (keytran) over
+the current keybuf.  Returns t on a hit (mock_input + indec + fkey
+updated), nil when exhausted.  */)
   (Lisp_Object prompt)
 {
   if (rks_keybuf_depth == 0)
     return Qnil;
   Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-
   while (rks_keytran.end < rks_fkey.start)
     {
       int diff;
       bool done = keyremap_step (keybuf, &rks_keytran,
                                  max (rks_t, rks_mock_input),
                                  true, &diff, prompt);
-      if (done)
-        {
-          rks_mock_input  = diff + max (rks_t, rks_mock_input);
-          rks_indec.end   += diff;
-          rks_indec.start += diff;
-          rks_fkey.end    += diff;
-          rks_fkey.start  += diff;
-          if (rks_state_depth > 0)
-            {
-              rks_set_int (rks_state_stack[rks_state_depth - 1],
-                           RKS_SLOT_MOCK_INPUT, rks_mock_input);
-              RKS_KEYREMAP_WRITEBACK (rks_keytran, RKS_SLOT_KEYTRAN);
-              RKS_KEYREMAP_WRITEBACK (rks_fkey,    RKS_SLOT_FKEY);
-              RKS_KEYREMAP_WRITEBACK (rks_indec,   RKS_SLOT_INDEC);
-            }
-          return Qt;
-        }
+      if (!done) continue;
+      rks_keytran_apply_hit (diff);
+      return Qt;
     }
   return Qnil;
 }
@@ -11940,43 +11965,48 @@ exhausted.  PROMPT is the read_key_sequence prompt.  */)
 
 /* M6w — shifted-function-key shift-translation (block C at the
    while-loop iteration tail).  See docs/keyboard.org §M6w.  */
+/* Criterion-2: helpers for --rks-fn-key-shift-translate.  */
+
+static Lisp_Object
+rks_strip_shift_modifier (Lisp_Object key, int m)
+{
+  /* Strip shift from parsed modifiers, re-apply the rest.  */
+  Lisp_Object breakdown = parse_modifiers (key);
+  if (!CONSP (breakdown))
+    return Qnil;
+  return apply_modifiers (m & ~shift_modifier, XCAR (breakdown));
+}
+
+static Lisp_Object
+rks_downcase_uppercase_char (Lisp_Object key, int m)
+{
+  if (!FIXNUMP (key))
+    return Qnil;
+  int ch = KEY_TO_CHAR (key);
+  if (ch >= XCHAR_TABLE (BVAR (current_buffer,
+                               downcase_table))->header.size)
+    return Qnil;
+  if (!uppercasep (ch))
+    return Qnil;
+  return make_fixnum (downcase (ch) | m);
+}
+
 DEFUN ("--rks-fn-key-shift-translate",
        Fc_rks_fn_key_shift_translate,
        Sc_rks_fn_key_shift_translate, 3, 3, 0,
        doc: /* Internal: attempt the fn-key shift-translation.
 KEY is the raw event; MODS is the modifier int from parse_modifiers;
 TRANSLATE-ENABLED is translate-upper-case-key-bindings (t or nil).
-Returns the translated key or nil.  Scheme owns the gate check and
-side effects.  */)
+Returns the translated key or nil.  */)
   (Lisp_Object key, Lisp_Object mods, Lisp_Object translate_enabled)
 {
   CHECK_FIXNUM (mods);
   int m = XFIXNUM (mods);
-
   if (NILP (translate_enabled))
     return Qnil;
-
-  if (m & shift_modifier)
-    {
-      /* Strip shift from parsed modifiers, re-apply the rest.  */
-      Lisp_Object breakdown = parse_modifiers (key);
-      if (!CONSP (breakdown))
-        return Qnil;
-      return apply_modifiers (m & ~shift_modifier, XCAR (breakdown));
-    }
-  else
-    {
-      /* Check uppercase-fixnum case.  */
-      if (!FIXNUMP (key))
-        return Qnil;
-      int ch = KEY_TO_CHAR (key);
-      if (ch >= XCHAR_TABLE (BVAR (current_buffer,
-                                   downcase_table))->header.size)
-        return Qnil;
-      if (!uppercasep (ch))
-        return Qnil;
-      return make_fixnum (downcase (ch) | m);
-    }
+  return (m & shift_modifier)
+    ? rks_strip_shift_modifier (key, m)
+    : rks_downcase_uppercase_char (key, m);
 }
 
 DEFUN ("--rks-reset-fkey-and-keytran-scans",
