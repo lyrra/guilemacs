@@ -12543,116 +12543,14 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
 
       /* Otherwise, we should actually read a character.  */
       {
-	  {
-	    KBOARD *interrupted_kboard = current_kboard;
-	    struct frame *interrupted_frame = SELECTED_FRAME ();
-	    /* Calling read_char with COMMANDFLAG = -2 avoids
-	       redisplay in read_char and its subroutines.  */
-	    key = read_char (prevent_redisplay ? -2 : NILP (prompt),
-		             current_binding, last_nonmenu_event,
-                             &used_mouse_menu, NULL);
-	    if (rks_state_depth > 0)
-	      {
-		int bitmask = rks_get_int (rks_state_stack[rks_state_depth - 1],
-					  RKS_SLOT_USED_MOUSE_MENU_HISTORY);
-		if (used_mouse_menu)
-		  bitmask |= (1 << t);
-		else
-		  bitmask &= ~(1 << t);
-		rks_set_int (rks_state_stack[rks_state_depth - 1],
-			     RKS_SLOT_USED_MOUSE_MENU_HISTORY, bitmask);
-		rks_set_bool (rks_state_stack[rks_state_depth - 1],
-			      RKS_SLOT_USED_MOUSE_MENU, used_mouse_menu);
-		scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-				  scm_from_int (RKS_SLOT_KEY), key);
-	      }
-	    if ((FIXNUMP (key) && XFIXNUM (key) == -2) /* wrong_kboard_jmpbuf */
-		/* When switching to a new tty (with a new keyboard),
-		   read_char returns the new buffer, rather than -2
-		   (Bug#5095).  This is because `terminal-init-xterm'
-		   calls read-char, which eats the wrong_kboard_jmpbuf
-		   return.  Any better way to fix this? -- cyd  */
-		|| (interrupted_kboard != current_kboard))
-	      {
-		bool found = false;
-		struct kboard *k;
-
-		for (k = all_kboards; k; k = k->next_kboard)
-		  if (k == interrupted_kboard)
-		    found = true;
-
-		if (!found)
-		  {
-		    /* Don't touch interrupted_kboard when it's been
-		       deleted.  */
-		    Fc_set_rks_delayed_switch_frame (Qnil);
-		    {
-		      static SCM rks_replay_entire_proc = SCM_UNDEFINED;
-		      if (SCM_UNBNDP (rks_replay_entire_proc))
-			rks_replay_entire_proc =
-			  scm_c_public_ref ("emacs read-key-sequence",
-					    "rks-setup-replay-entire-sequence-c!");
-		      SCM_CALL_0 (rks_replay_entire_proc);
-		    }
-		    goto replay_sequence;
-		  }
-
-		if (!NILP (Fc_rks_delayed_switch_frame ()))
-		  {
-		    kset_kbd_queue
-		      (interrupted_kboard,
-		       Fcons (Fc_rks_delayed_switch_frame (),
-			      KVAR (interrupted_kboard, kbd_queue)));
-		    Fc_set_rks_delayed_switch_frame (Qnil);
-		  }
-
-		while (t > 0)
-		  kset_kbd_queue
-		    (interrupted_kboard,
-		     Fcons (keybuf[--t], KVAR (interrupted_kboard, kbd_queue)));
-
-		/* If the side queue is non-empty, ensure it begins with a
-		   switch-frame, so we'll replay it in the right context.  */
-		if (CONSP (KVAR (interrupted_kboard, kbd_queue))
-		    && (Fc_set_rks_key (XCAR (KVAR (interrupted_kboard, kbd_queue))),
-			!(EVENT_HAS_PARAMETERS (key)
-			  && EQ (EVENT_HEAD_KIND (EVENT_HEAD (key)),
-				 Qswitch_frame))))
-		  {
-		    Lisp_Object frame;
-		    XSETFRAME (frame, interrupted_frame);
-		    kset_kbd_queue
-		      (interrupted_kboard,
-		       Fcons (make_lispy_switch_frame (frame),
-			      KVAR (interrupted_kboard, kbd_queue)));
-                   mock_input = 0;
-                 }
-               else
-                 {
-                   if (FIXNUMP (key) && XFIXNUM (key) != -2)
-                     {
-                       /* If interrupted while initializing terminal, we
-                          need to replay the interrupting key.  See
-                          Bug#5095 and Bug#37782.  */
-                       mock_input = 1;
-                       keybuf[0] = key;
-                     }
-                   else
-                     {
-                       mock_input = 0;
-                     }
-		  }
-		{
-		  static SCM rks_replay_entire_proc = SCM_UNDEFINED;
-		  if (SCM_UNBNDP (rks_replay_entire_proc))
-		    rks_replay_entire_proc =
-		      scm_c_public_ref ("emacs read-key-sequence",
-					"rks-setup-replay-entire-sequence-c!");
-		  SCM_CALL_0 (rks_replay_entire_proc);
-		}
-		goto replay_sequence;
-	      }
-	  }
+	  SCM result
+	    = Fc_rks_read_char_and_kboard (prevent_redisplay ? Qt : Qnil,
+					   prompt,
+					   current_binding,
+					   last_nonmenu_event);
+	  if (scm_is_eq (result, intern ("replay-sequence")))
+	    goto replay_sequence;
+	  /* else 'continue — fall through to classifier */
 
 	  /* Phase 1: classify the key in Scheme (C-macro-free branches
 	     only — menu-reject, buffer-switched, quit-in-other-frame).
