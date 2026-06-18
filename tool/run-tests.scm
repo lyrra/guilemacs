@@ -72,6 +72,7 @@
   "test/pre/core-comprehensive.scm"
   "test/pre/float-comprehensive.scm"
   "test/pre/type-predicates.scm"
+  "test/pre/ie-accessors.scm"
   )
 (group ; keyboard.c → Guile port (see docs/keyboard.org)
   "test/keyboard/ertest-stub.el"            ; M0

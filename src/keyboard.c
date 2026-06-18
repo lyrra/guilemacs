@@ -941,6 +941,19 @@ ie_unwrap (SCM smob)
 #define IEP(scm)    (SCM_SMOB_PREDICATE (ie_tag, (scm)))
 #define CHECK_IE(x) \
   do { if (!IEP (x)) wrong_type_argument (Qiep, x); } while (0)
+
+DEFUN ("--ie-kind", Fie_kind, Sie_kind, 1, 1, 0,
+       doc: /* Return the event_kind integer of input-event handle IE.
+
+This is the first field-accessor for struct input_event; every
+ported make-lispy-event kind-procedure dispatches on this value.
+The SMOB must still be live — calling this after the SMOB was
+invalidated will abort.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return make_fixnum (XIE (ie)->kind);
+}
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
