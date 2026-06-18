@@ -940,7 +940,8 @@ ie_unwrap (SCM smob)
 #define XIE(scm)    ((struct input_event *) SCM_SMOB_DATA (scm))
 #define IEP(scm)    (SCM_SMOB_PREDICATE (ie_tag, (scm)))
 #define CHECK_IE(x) \
-  do { if (!IEP (x)) wrong_type_argument (Qiep, x); } while (0)
+  do { if (!IEP (x)) wrong_type_argument (Qiep, x); \
+       if (!SCM_SMOB_DATA (x)) emacs_abort (); } while (0)
 
 DEFUN ("--ie-kind", Fie_kind, Sie_kind, 1, 1, 0,
        doc: /* Return the event_kind integer of input-event handle IE.
