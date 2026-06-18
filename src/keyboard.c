@@ -1049,6 +1049,33 @@ values beyond fixnum range still round-trip correctly.  */)
   return INT_TO_INTEGER (XIE (ie)->timestamp);
 }
 
+/* Mutators — imp-1.3.  */
+
+DEFUN ("--set-ie-modifiers", Fset_ie_modifiers, Sset_ie_modifiers, 2, 2, 0,
+       doc: /* Set the modifiers bitmask of input-event handle IE to VAL.
+
+Plain write; the caller is responsible for computing the desired
+value (e.g. via `logior' in Scheme).  Returns VAL.  */)
+  (Lisp_Object ie, Lisp_Object val)
+{
+  CHECK_IE (ie);
+  CHECK_FIXNAT (val);
+  XIE (ie)->modifiers = XFIXNUM (val);
+  return val;
+}
+
+DEFUN ("--ie-clear", Fie_clear, Sie_clear, 1, 1, 0,
+       doc: /* Clear input-event handle IE by setting kind = NO_EVENT.
+
+Mirrors clear_event() (keyboard.c:4529): sets kind to NO_EVENT
+only — does not nil the Lisp_Object fields.  Returns IE.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  XIE (ie)->kind = NO_EVENT;
+  return ie;
+}
+
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
 #define CHECK_KBOARD(x) \
