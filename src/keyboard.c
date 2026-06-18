@@ -986,6 +986,56 @@ Used in scroll-bar click events.  Unsigned bitfield → fixnum.  */)
   CHECK_IE (ie);
   return make_fixnum (XIE (ie)->part);
 }
+
+DEFUN ("--ie-x", Fie_x, Sie_x, 1, 1, 0,
+       doc: /* Return the x field of input-event handle IE.
+
+Lisp_Object — mouse position (pixel or character coords) or HELP_EVENT window.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return XIE (ie)->x;
+}
+
+DEFUN ("--ie-y", Fie_y, Sie_y, 1, 1, 0,
+       doc: /* Return the y field of input-event handle IE.
+
+Lisp_Object — mouse position (pixel or character coords) or HELP_EVENT help form.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return XIE (ie)->y;
+}
+
+DEFUN ("--ie-frame-or-window", Fie_frame_or_window, Sie_frame_or_window, 1, 1, 0,
+       doc: /* Return the frame_or_window field of input-event handle IE.
+
+Lisp_Object — the frame or window associated with this event.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return XIE (ie)->frame_or_window;
+}
+
+DEFUN ("--ie-arg", Fie_arg, Sie_arg, 1, 1, 0,
+       doc: /* Return the arg field of input-event handle IE.
+
+Lisp_Object — auxiliary event data (DBUS arg, XWIDGET arg, etc.).  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return XIE (ie)->arg;
+}
+
+DEFUN ("--ie-device", Fie_device, Sie_device, 1, 1, 0,
+       doc: /* Return the device field of input-event handle IE.
+
+Lisp_Object — device name (string) or Qt.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return XIE (ie)->device;
+}
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))

@@ -47,3 +47,58 @@
   (el-expr `(print (condition-case err
                        (progn (--ie-part nil) 'no-signal)
                      (error (car err))))))
+
+(deftest ie-x-fboundp (t)
+  (el-expr `(print (fboundp '--ie-x))))
+
+(deftest ie-x-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-x)))))
+
+(deftest ie-x-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-x nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-y-fboundp (t)
+  (el-expr `(print (fboundp '--ie-y))))
+
+(deftest ie-y-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-y)))))
+
+(deftest ie-y-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-y nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-frame-or-window-fboundp (t)
+  (el-expr `(print (fboundp '--ie-frame-or-window))))
+
+(deftest ie-frame-or-window-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-frame-or-window)))))
+
+(deftest ie-frame-or-window-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-frame-or-window nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-arg-fboundp (t)
+  (el-expr `(print (fboundp '--ie-arg))))
+
+(deftest ie-arg-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-arg)))))
+
+(deftest ie-arg-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-arg nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-device-fboundp (t)
+  (el-expr `(print (fboundp '--ie-device))))
+
+(deftest ie-device-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-device)))))
+
+(deftest ie-device-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-device nil) 'no-signal)
+                     (error (car err))))))
