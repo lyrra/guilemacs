@@ -102,3 +102,14 @@
   (el-expr `(print (condition-case err
                        (progn (--ie-device nil) 'no-signal)
                      (error (car err))))))
+
+(deftest ie-timestamp-fboundp (t)
+  (el-expr `(print (fboundp '--ie-timestamp))))
+
+(deftest ie-timestamp-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-timestamp)))))
+
+(deftest ie-timestamp-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-timestamp nil) 'no-signal)
+                     (error (car err))))))

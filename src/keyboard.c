@@ -1036,6 +1036,17 @@ Lisp_Object — device name (string) or Qt.  */)
   CHECK_IE (ie);
   return XIE (ie)->device;
 }
+
+DEFUN ("--ie-timestamp", Fie_timestamp, Sie_timestamp, 1, 1, 0,
+       doc: /* Return the timestamp field of input-event handle IE.
+
+Time (int64, milliseconds) → integer.  Uses INT_TO_INTEGER so
+values beyond fixnum range still round-trip correctly.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return INT_TO_INTEGER (XIE (ie)->timestamp);
+}
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
