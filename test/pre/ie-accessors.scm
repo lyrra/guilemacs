@@ -14,3 +14,36 @@
   (el-expr `(print (condition-case err
                        (progn (--ie-kind nil) 'no-signal)
                      (error (car err))))))
+
+(deftest ie-code-fboundp (t)
+  (el-expr `(print (fboundp '--ie-code))))
+
+(deftest ie-code-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-code)))))
+
+(deftest ie-code-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-code nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-modifiers-fboundp (t)
+  (el-expr `(print (fboundp '--ie-modifiers))))
+
+(deftest ie-modifiers-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-modifiers)))))
+
+(deftest ie-modifiers-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-modifiers nil) 'no-signal)
+                     (error (car err))))))
+
+(deftest ie-part-fboundp (t)
+  (el-expr `(print (fboundp '--ie-part))))
+
+(deftest ie-part-subrp (t)
+  (el-expr `(print (subrp (symbol-function '--ie-part)))))
+
+(deftest ie-part-rejects-non-smob (wrong-type-argument)
+  (el-expr `(print (condition-case err
+                       (progn (--ie-part nil) 'no-signal)
+                     (error (car err))))))

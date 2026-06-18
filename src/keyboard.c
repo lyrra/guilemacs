@@ -954,6 +954,38 @@ invalidated will abort.  */)
   CHECK_IE (ie);
   return make_fixnum (XIE (ie)->kind);
 }
+
+DEFUN ("--ie-code", Fie_code, Sie_code, 1, 1, 0,
+       doc: /* Return the code field of input-event handle IE.
+
+For keystroke events this is the character or keysym code; for
+mouse events it is the button number.  Unsigned int → fixnum.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return make_fixnum (XIE (ie)->code);
+}
+
+DEFUN ("--ie-modifiers", Fie_modifiers, Sie_modifiers, 1, 1, 0,
+       doc: /* Return the modifiers bitmask of input-event handle IE.
+
+Unsigned int → fixnum.  Use --set-ie-modifiers to mutate (needed
+by MOUSE_CLICK double-click promotion).  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return make_fixnum (XIE (ie)->modifiers);
+}
+
+DEFUN ("--ie-part", Fie_part, Sie_part, 1, 1, 0,
+       doc: /* Return the scroll-bar-part enum of input-event handle IE.
+
+Used in scroll-bar click events.  Unsigned bitfield → fixnum.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return make_fixnum (XIE (ie)->part);
+}
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
