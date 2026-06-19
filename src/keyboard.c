@@ -6651,8 +6651,13 @@ line_number_mode_hscroll (Lisp_Object start_pos, Lisp_Object end_pos)
    are received; this function stores the location of button presses
    in order to build drag events when the button is released.  */
 
+/* old make_lispy_event body renamed to
+   make_lispy_event_c.  It is now called through the
+   --make-lispy-event-c DEFUN (see below), which is the fallback
+   in the Scheme out-of-table fallback  */
+
 static Lisp_Object
-make_lispy_event (struct input_event *event)
+make_lispy_event_c (struct input_event *event)
 {
   int i;
 
@@ -7734,6 +7739,45 @@ make_lispy_event (struct input_event *event)
     default:
       emacs_abort ();
     }
+}
+
+/* old make_lispy_event body exposed as a DEFUN for
+   the Scheme orchestrator's fallback path.  The orchestrator at
+   (emacs lispy-event) make-lispy-event calls this for any event
+   kind whose Scheme port hasn't been registered yet.  */
+DEFUN ("--make-lispy-event-c", Fmake_lispy_event_c, Smake_lispy_event_c,
+       1, 1, 0,
+       doc: /* Transform an input-event SMOB into a Lisp event form.
+
+This is the original C make_lispy_event body, exposed as a DEFUN
+so the Scheme orchestrator can fall through to it for event kinds
+not yet ported.  Once all 37 kinds are ported (M9 exit criterion 1),
+this DEFUN becomes dead code and is removed.  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  return make_lispy_event_c (ie_unwrap (ie));
+}
+
+/* thin SCM_CALL_1 wrapper that replaces the old
+   make_lispy_event body.  Every kbd_buffer_get_event call that
+   previously entered the C switch now goes through the Scheme
+   orchestrator in (emacs lispy-event) make-lispy-event.
+
+   Lifetime contract: the ie-smob is invalidated (data → NULL)
+   immediately after SCM_CALL_1 returns.  Scheme procedures MUST
+   NOT retain the smob beyond the call.  Any post-return access
+   aborts via CHECK_IE's NULL guard.  */
+static Lisp_Object
+make_lispy_event (struct input_event *event)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-event", "make-lispy-event");
+  SCM smob = ie_wrap (event);
+  Lisp_Object result = SCM_CALL_1 (proc, smob);
+  SCM_SET_SMOB_DATA (smob, NULL);
+  return result;
 }
 
 static Lisp_Object
