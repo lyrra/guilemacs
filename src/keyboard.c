@@ -1099,8 +1099,36 @@ without hard-coding enum values in Scheme.  Each event symbol
   if (EQ (name, Qfile_notify)) return make_fixnum (FILE_NOTIFY_EVENT);
 #endif
 
+  /* Simple-list group  */
+  if (EQ (name, Qselect_window)) return make_fixnum (SELECT_WINDOW_EVENT);
+  if (EQ (name, Qsave_session)) return make_fixnum (SAVE_SESSION_EVENT);
+  if (EQ (name, Qconfig_changed_event)) return make_fixnum (CONFIG_CHANGED_EVENT);
+  if (EQ (name, Qpreedit_text)) return make_fixnum (PREEDIT_TEXT_EVENT);
+#ifdef HAVE_NTGUI
+  if (EQ (name, Qend_session)) return make_fixnum (END_SESSION_EVENT);
+  if (EQ (name, Qlanguage_change)) return make_fixnum (LANGUAGE_CHANGE_EVENT);
+#endif
+  if (EQ (name, Quser_signal_event))
+    return make_fixnum (USER_SIGNAL_EVENT);
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
+}
+
+DEFUN ("--user-signal-name", Fuser_signal_name, Suser_signal_name,
+       1, 1, 0,
+       doc: /* Return the interned symbol for user-signal code C.
+
+Wraps find_user_signal_name + intern for the Scheme port of
+USER_SIGNAL_EVENT.  Aborts if C is not a registered
+user-signal code — matches the original C assertion at
+make_lispy_event's USER_SIGNAL_EVENT case.  */)
+  (Lisp_Object code)
+{
+  char *name = find_user_signal_name (XFIXNUM (code));
+  if (!name)
+    emacs_abort ();
+  return intern (name);
 }
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
@@ -14519,6 +14547,7 @@ syms_of_keyboard (void)
   DEFSYM (Qdrag_n_drop, "drag-n-drop");
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
+  DEFSYM (Quser_signal_event, "user-signal-event");
 
   /* Menu and tool bar item parts.  */
   DEFSYM (Qmenu_enable, "menu-enable");

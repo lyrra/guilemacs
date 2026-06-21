@@ -39,10 +39,13 @@
 (define (%c name) (symbol-function name))
 
 (define %--ie-kind              (delay (%c '--ie-kind)))
+(define %--ie-code              (delay (%c '--ie-code)))
+(define %--ie-modifiers         (delay (%c '--ie-modifiers)))
 (define %--ie-arg               (delay (%c '--ie-arg)))
 (define %--ie-frame-or-window   (delay (%c '--ie-frame-or-window)))
 (define %--make-lispy-event-c   (delay (%c '--make-lispy-event-c)))
 (define %--ie-kind-from-name    (delay (%c '--ie-kind-from-name)))
+(define %--user-signal-name     (delay (%c '--user-signal-name)))
 
 ;;; Helper: register a per-kind handler in the dispatch table.
 ;;; Uses --ie-kind-from-name to convert a symbol (e.g. 'dbus-event)
@@ -99,3 +102,41 @@ make_lispy_event body."
 (register-kind! 'xwidget-event mle-xwidget-event)
 (register-kind! 'xwidget-display-event mle-xwidget-display-event)
 (register-kind! 'file-notify mle-file-notify-event)
+
+\f
+;;; imp-3.3 — simple-list group.
+
+(define (mle-select-window-event ie)
+  (list 'select-window (list ((force %--ie-frame-or-window) ie))))
+
+(define (mle-save-session-event ie)
+  (list 'save-session ((force %--ie-arg) ie)))
+
+(define (mle-config-changed-event ie)
+  (list 'config-changed-event
+        ((force %--ie-arg) ie)
+        ((force %--ie-frame-or-window) ie)))
+
+(define (mle-preedit-text-event ie)
+  (list 'preedit-text ((force %--ie-arg) ie)))
+
+(define (mle-end-session-event ie)
+  (list 'end-session))
+
+(define (mle-language-change-event ie)
+  (list 'language-change
+        ((force %--ie-frame-or-window) ie)
+        ((force %--ie-code) ie)
+        ((force %--ie-modifiers) ie)))
+
+(define (mle-user-signal-event ie)
+  ;; find_user_signal_name(code) → intern → bare symbol.
+  ((force %--user-signal-name) ((force %--ie-code) ie)))
+
+(register-kind! 'select-window mle-select-window-event)
+(register-kind! 'save-session mle-save-session-event)
+(register-kind! 'config-changed-event mle-config-changed-event)
+(register-kind! 'preedit-text mle-preedit-text-event)
+(register-kind! 'end-session mle-end-session-event)
+(register-kind! 'language-change mle-language-change-event)
+(register-kind! 'user-signal-event mle-user-signal-event)
