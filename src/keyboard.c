@@ -6921,17 +6921,6 @@ make_lispy_event_c (struct input_event *event)
 				  PTRDIFF_MAX);
 
 #ifdef HAVE_NTGUI
-    case END_SESSION_EVENT:
-      /* Make an event (end-session).  */
-      return list1 (Qend_session);
-
-    case LANGUAGE_CHANGE_EVENT:
-      /* Make an event (language-change FRAME CODEPAGE LANGUAGE-ID).  */
-      return list4 (Qlanguage_change,
-		    event->frame_or_window,
-		    make_fixnum (event->code),
-		    make_fixnum (event->modifiers));
-
     case MULTIMEDIA_KEY_EVENT:
       if (event->code < ARRAYELTS (lispy_multimedia_keys)
           && event->code > 0 && lispy_multimedia_keys[event->code])
@@ -7746,10 +7735,6 @@ make_lispy_event_c (struct input_event *event)
       return event->arg;
 #endif
 
-    case SELECT_WINDOW_EVENT:
-      /* Make an event (select-window (WINDOW)).  */
-      return list2 (Qselect_window, list1 (event->frame_or_window));
-
     case TAB_BAR_EVENT:
     case TOOL_BAR_EVENT:
       {
@@ -7759,53 +7744,6 @@ make_lispy_event_c (struct input_event *event)
 	if (SYMBOLP (res)) res = apply_modifiers (event->modifiers, res);
 	return list2 (res, list2 (event->frame_or_window, location));
       }
-
-    case USER_SIGNAL_EVENT:
-      /* A user signal.  */
-      {
-	char *name = find_user_signal_name (event->code);
-	if (!name)
-	  emacs_abort ();
-	return intern (name);
-      }
-
-    case SAVE_SESSION_EVENT:
-      return list2 (Qsave_session, event->arg);
-
-#ifdef HAVE_DBUS
-    case DBUS_EVENT:
-      return Fcons (Qdbus_event, event->arg);
-#endif /* HAVE_DBUS */
-
-#ifdef THREADS_ENABLED
-    case THREAD_EVENT:
-      return Fcons (Qthread_event, event->arg);
-#endif /* THREADS_ENABLED */
-
-#ifdef HAVE_XWIDGETS
-    case XWIDGET_EVENT:
-      return Fcons (Qxwidget_event, event->arg);
-
-    case XWIDGET_DISPLAY_EVENT:
-      return Fcons (Qxwidget_display_event, event->arg);
-#endif
-
-#ifdef USE_FILE_NOTIFY
-    case FILE_NOTIFY_EVENT:
-#ifdef HAVE_W32NOTIFY
-      /* Make an event (file-notify (DESCRIPTOR ACTION FILE) CALLBACK).  */
-      return list3 (Qfile_notify, event->arg, event->frame_or_window);
-#else
-      return Fcons (Qfile_notify, event->arg);
-#endif
-#endif /* USE_FILE_NOTIFY */
-
-    case CONFIG_CHANGED_EVENT:
-	return list3 (Qconfig_changed_event,
-		      event->arg, event->frame_or_window);
-
-    case PREEDIT_TEXT_EVENT:
-      return list2 (Qpreedit_text, event->arg);
 
       /* The 'kind' field of the event is something we don't recognize.  */
     default:
