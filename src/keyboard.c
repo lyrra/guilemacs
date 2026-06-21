@@ -385,8 +385,6 @@ static Lisp_Object modify_event_symbol (ptrdiff_t, int, Lisp_Object,
                                         Lisp_Object, const char *const *,
                                         Lisp_Object *, ptrdiff_t);
 static Lisp_Object make_lispy_switch_frame (Lisp_Object);
-static Lisp_Object make_lispy_focus_in (Lisp_Object);
-static Lisp_Object make_lispy_focus_out (Lisp_Object);
 static bool help_char_p (Lisp_Object);
 static Lisp_Object apply_modifiers (int, Lisp_Object);
 static void restore_kboard_configuration (int);
@@ -1119,6 +1117,23 @@ without hard-coding enum values in Scheme.  Each event symbol
 #endif
   if (EQ (name, Quser_signal_event))
     return make_fixnum (USER_SIGNAL_EVENT);
+
+  /* Simple-helper group (imp-4).  */
+  if (EQ (name, Qhelp_echo)) return make_fixnum (HELP_EVENT);
+  if (EQ (name, Qfocus_in)) return make_fixnum (FOCUS_IN_EVENT);
+  if (EQ (name, Qfocus_out)) return make_fixnum (FOCUS_OUT_EVENT);
+  if (EQ (name, Qtab_bar)) return make_fixnum (TAB_BAR_EVENT);
+  if (EQ (name, Qtool_bar)) return make_fixnum (TOOL_BAR_EVENT);
+  if (EQ (name, Qdrag_n_drop)) return make_fixnum (DRAG_N_DROP_EVENT);
+#ifdef HAVE_EXT_MENU_BAR
+  if (EQ (name, Qmenu_bar)) return make_fixnum (MENU_BAR_EVENT);
+#endif
+#ifdef USE_TOOLKIT_SCROLL_BARS
+  if (EQ (name, Qscroll_bar_click_toolkit))
+    return make_fixnum (SCROLL_BAR_CLICK_EVENT);
+  if (EQ (name, Qhorizontal_scroll_bar_click_toolkit))
+    return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
+#endif
 
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
@@ -4529,6 +4544,18 @@ Time_to_position (Time encoded_pos)
   return -1 - notpos;
 }
 
+DEFUN ("--time-to-position", Ftime_to_position, Stime_to_position,
+       1, 1, 0,
+       doc: /* Decode timestamp ENCODED_POS into a buffer position fixnum.
+
+Wraps the C Time_to_position helper used by HELP_EVENT.
+Uses scm_to_intmax to handle bignum timestamps (wall-clock ms
+can overflow fixnum range on 32-bit unsigned-fixnum builds).  */)
+  (Lisp_Object encoded_pos)
+{
+  return make_fixnum (Time_to_position (scm_to_intmax (encoded_pos)));
+}
+
 /* Generate a HELP_EVENT input_event and store it in the keyboard
    buffer.
 
@@ -6730,28 +6757,6 @@ make_lispy_event_c (struct input_event *event)
   switch (event->kind)
     {
 
-    case HELP_EVENT:
-      {
-	Lisp_Object frame = event->frame_or_window;
-	Lisp_Object object = event->arg;
-	Lisp_Object position
-          = make_fixnum (Time_to_position (event->timestamp));
-	Lisp_Object window = event->x;
-	Lisp_Object help = event->y;
-	clear_event (event);
-
-	if (!WINDOWP (window))
-	  window = Qnil;
-	return Fcons (Qhelp_echo,
-		      list5 (frame, help, window, object, position));
-      }
-
-    case FOCUS_IN_EVENT:
-        return make_lispy_focus_in (event->frame_or_window);
-
-    case FOCUS_OUT_EVENT:
-        return make_lispy_focus_out (event->frame_or_window);
-
     /* A simple keystroke.  */
     case ASCII_KEYSTROKE_EVENT:
     case MULTIBYTE_CHAR_KEYSTROKE_EVENT:
@@ -7596,121 +7601,6 @@ make_lispy_event_c (struct input_event *event)
 	return list2 (Qtouchscreen_update, evt);
       }
 
-#ifdef USE_TOOLKIT_SCROLL_BARS
-
-      /* We don't have down and up events if using toolkit scroll bars,
-	 so make this always a click event.  Store in the `part' of
-	 the Lisp event a symbol which maps to the following actions:
-
-	 `above_handle'		page up
-	 `below_handle'		page down
-	 `up'			line up
-	 `down'			line down
-	 `top'			top of buffer
-	 `bottom'		bottom of buffer
-	 `handle'		thumb has been dragged.
-	 `end-scroll'		end of interaction with scroll bar
-
-	 The incoming input_event contains in its `part' member an
-	 index of type `enum scroll_bar_part' which we can use as an
-	 index in scroll_bar_parts to get the appropriate symbol.  */
-
-    case SCROLL_BAR_CLICK_EVENT:
-      {
-	Lisp_Object position, head;
-
-	position = make_scroll_bar_position (event, Qvertical_scroll_bar);
-
-	/* Always treat scroll bar events as clicks.  */
-	event->modifiers |= click_modifier;
-	event->modifiers &= ~up_modifier;
-
-	if (event->code >= ASIZE (mouse_syms))
-          mouse_syms = larger_vector (mouse_syms,
-				      event->code - ASIZE (mouse_syms) + 1,
-				      -1);
-
-	/* Get the symbol we should use for the mouse click.  */
-	head = modify_event_symbol (event->code,
-				    event->modifiers,
-				    Qmouse_click,
-				    Vlispy_mouse_stem,
-				    NULL, &mouse_syms,
-				    ASIZE (mouse_syms));
-	return list2 (head, position);
-      }
-
-    case HORIZONTAL_SCROLL_BAR_CLICK_EVENT:
-      {
-	Lisp_Object position, head;
-
-	position = make_scroll_bar_position (event, Qhorizontal_scroll_bar);
-
-	/* Always treat scroll bar events as clicks.  */
-	event->modifiers |= click_modifier;
-	event->modifiers &= ~up_modifier;
-
-	if (event->code >= ASIZE (mouse_syms))
-          mouse_syms = larger_vector (mouse_syms,
-				      event->code - ASIZE (mouse_syms) + 1,
-				      -1);
-
-	/* Get the symbol we should use for the mouse click.  */
-	head = modify_event_symbol (event->code,
-				    event->modifiers,
-				    Qmouse_click,
-				    Vlispy_mouse_stem,
-				    NULL, &mouse_syms,
-				    ASIZE (mouse_syms));
-	return list2 (head, position);
-      }
-
-#endif /* USE_TOOLKIT_SCROLL_BARS */
-
-    case DRAG_N_DROP_EVENT:
-      {
-	struct frame *f;
-	Lisp_Object head, position;
-	Lisp_Object files;
-
-	f = XFRAME (event->frame_or_window);
-	files = event->arg;
-
-	/* Ignore mouse events that were made on frames that
-	   have been deleted.  */
-	if (! FRAME_LIVE_P (f))
-	  return Qnil;
-
-	position = make_lispy_position (f, event->x, event->y,
-					event->timestamp);
-
-	head = modify_event_symbol (0, event->modifiers,
-				    Qdrag_n_drop, Qnil,
-				    lispy_drag_n_drop_names,
-				    &drag_n_drop_syms, 1);
-	return list3 (head, position, files);
-      }
-
-#ifdef HAVE_EXT_MENU_BAR
-    case MENU_BAR_EVENT:
-      if (EQ (event->arg, event->frame_or_window))
-	/* This is the prefix key.  We translate this to
-	   `(menu_bar)' because the code in keyboard.c for menu
-	   events, which we use, relies on this.  */
-	return list1 (Qmenu_bar);
-      return event->arg;
-#endif
-
-    case TAB_BAR_EVENT:
-    case TOOL_BAR_EVENT:
-      {
-	Lisp_Object res = event->arg;
-	Lisp_Object location
-	  = event->kind == TAB_BAR_EVENT ? Qtab_bar : Qtool_bar;
-	if (SYMBOLP (res)) res = apply_modifiers (event->modifiers, res);
-	return list2 (res, list2 (event->frame_or_window, location));
-      }
-
       /* The 'kind' field of the event is something we don't recognize.  */
     default:
       emacs_abort ();
@@ -7733,6 +7623,71 @@ this DEFUN becomes dead code and is removed.  */)
 {
   CHECK_IE (ie);
   return make_lispy_event_c (ie_unwrap (ie));
+}
+
+DEFUN ("--make-lispy-position", Fmake_lispy_position, Smake_lispy_position,
+       4, 4, 0,
+       doc: /* Build a mouse-click position list for frame-or-window FOW,
+pixel coords X and Y, and timestamp T.  T arrives from
+--ie-timestamp (INT_TO_INTEGER) and may be a bignum on 32-bit
+fixnum builds.  Calls the existing C make_lispy_position.  */)
+  (Lisp_Object fow, Lisp_Object x, Lisp_Object y, Lisp_Object t)
+{
+  struct frame *f = XFRAME (fow);
+  return make_lispy_position (f, x, y, scm_to_intmax (t));
+}
+
+DEFUN ("--drag-n-drop-head", Fdrag_n_drop_head, Sdrag_n_drop_head,
+       1, 1, 0,
+       doc: /* Return the drag-n-drop event head symbol for MODIFIERS.
+
+Wraps modify_event_symbol with the drag-n-drop name table and
+file-static symbol cache.  */)
+  (Lisp_Object modifiers)
+{
+  return modify_event_symbol (0, XFIXNUM (modifiers),
+			      Qdrag_n_drop, Qnil,
+			      lispy_drag_n_drop_names,
+			      &drag_n_drop_syms, 1);
+}
+
+DEFUN ("--make-scroll-bar-position", Fmake_scroll_bar_position,
+       Smake_scroll_bar_position, 6, 6, 0,
+       doc: /* Build a scroll-bar position list.
+
+FOW is the frame-or-window.  X, Y are pixel coords.  TIMESTAMP and
+PART are Lisp_Objects from the input-event accessors (already
+INT_TO_INTEGER'd by --ie-timestamp / --ie-part).  TYPE is the scroll
+bar type symbol, e.g. `vertical-scroll-bar'.  */)
+  (Lisp_Object fow, Lisp_Object x, Lisp_Object y,
+   Lisp_Object timestamp, Lisp_Object part, Lisp_Object type)
+{
+  return list5 (fow, type, Fcons (x, y),
+		timestamp,
+		builtin_lisp_symbol (scroll_bar_parts[XFIXNUM (part)]));
+}
+
+DEFUN ("--scroll-bar-click-head", Fscroll_bar_click_head,
+       Sscroll_bar_click_head, 2, 2, 0,
+       doc: /* Return the mouse-click head symbol for a toolkit scroll-bar event.
+
+CODE and MODIFIERS are the event code and modifier bitmask.
+Resizes mouse_syms if needed (file-static, wraps larger_vector).
+Delegates to modify_event_symbol with mouse_click tables.  */)
+  (Lisp_Object code, Lisp_Object modifiers)
+{
+  int c = XFIXNUM (code);
+  int mods = XFIXNUM (modifiers);
+
+  if (c >= ASIZE (mouse_syms))
+    mouse_syms = larger_vector (mouse_syms,
+				c - ASIZE (mouse_syms) + 1,
+				-1);
+  return modify_event_symbol (c, mods,
+			      Qmouse_click,
+			      Vlispy_mouse_stem,
+			      NULL, &mouse_syms,
+			      ASIZE (mouse_syms));
 }
 
 /* thin SCM_CALL_1 wrapper that replaces the old
@@ -7789,14 +7744,18 @@ make_lispy_switch_frame (Lisp_Object frame)
   return list2 (Qswitch_frame, frame);
 }
 
-static Lisp_Object
-make_lispy_focus_in (Lisp_Object frame)
+DEFUN ("--make-lispy-focus-in", Fmake_lispy_focus_in, Smake_lispy_focus_in,
+       1, 1, 0,
+       doc: /* Return (focus-in FRAME).  Scheme-callable wrapper.  */)
+  (Lisp_Object frame)
 {
   return list2 (Qfocus_in, frame);
 }
 
-static Lisp_Object
-make_lispy_focus_out (Lisp_Object frame)
+DEFUN ("--make-lispy-focus-out", Fmake_lispy_focus_out, Smake_lispy_focus_out,
+       1, 1, 0,
+       doc: /* Return (focus-out FRAME).  Scheme-callable wrapper.  */)
+  (Lisp_Object frame)
 {
   return list2 (Qfocus_out, frame);
 }
@@ -14449,6 +14408,11 @@ syms_of_keyboard (void)
   DEFSYM (Qmouse_click, "mouse-click");
 
   DEFSYM (Qdrag_n_drop, "drag-n-drop");
+#ifdef USE_TOOLKIT_SCROLL_BARS
+  DEFSYM (Qscroll_bar_click_toolkit, "scroll-bar-click-toolkit");
+  DEFSYM (Qhorizontal_scroll_bar_click_toolkit,
+          "horizontal-scroll-bar-click-toolkit");
+#endif
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
   DEFSYM (Quser_signal_event, "user-signal-event");
