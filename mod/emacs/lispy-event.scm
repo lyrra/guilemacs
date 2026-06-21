@@ -39,9 +39,20 @@
 (define (%c name) (symbol-function name))
 
 (define %--ie-kind              (delay (%c '--ie-kind)))
+(define %--ie-arg               (delay (%c '--ie-arg)))
+(define %--ie-frame-or-window   (delay (%c '--ie-frame-or-window)))
 (define %--make-lispy-event-c   (delay (%c '--make-lispy-event-c)))
+(define %--ie-kind-from-name    (delay (%c '--ie-kind-from-name)))
 
-\f
+;;; Helper: register a per-kind handler in the dispatch table.
+;;; Uses --ie-kind-from-name to convert a symbol (e.g. 'dbus-event)
+;;; into its event_kind integer, then stores PROC under that key.
+
+(define (register-kind! name-symbol proc)
+  (let ((k ((force %--ie-kind-from-name) name-symbol)))
+    (when (>= k 0)
+      (hashv-set! make-lispy-event-dispatch k proc))))
+
 ;;; Orchestrator.
 
 (define (make-lispy-event ie)
@@ -56,3 +67,35 @@ make_lispy_event body."
     (if proc
         (proc ie)
         ((force %--make-lispy-event-c) ie))))
+
+;;; Per-kind handlers — imp-3 (trivial cases).
+
+;;; Each handler: (cons <event-symbol> (--ie-arg ie))
+
+(define (mle-dbus-event ie)
+  (cons 'dbus-event ((force %--ie-arg) ie)))
+
+(define (mle-thread-event ie)
+  (cons 'thread-event ((force %--ie-arg) ie)))
+
+(define (mle-xwidget-event ie)
+  (cons 'xwidget-event ((force %--ie-arg) ie)))
+
+(define (mle-xwidget-display-event ie)
+  (cons 'xwidget-display-event ((force %--ie-arg) ie)))
+
+(define (mle-file-notify-event ie)
+  ;; FIX-WIN32: On W32 this would be
+  ;; (file-notify DESCRIPTOR-ACTION-FILE CALLBACK)
+  (cons 'file-notify ((force %--ie-arg) ie)))
+
+;;; Dispatch table registration.
+;;; Each register-kind! call maps a Lisp event symbol to its handler.
+;;; When --ie-kind-from-name returns -1 the feature isn't compiled in
+;;; and registration is silently skipped.
+
+(register-kind! 'dbus-event mle-dbus-event)
+(register-kind! 'thread-event mle-thread-event)
+(register-kind! 'xwidget-event mle-xwidget-event)
+(register-kind! 'xwidget-display-event mle-xwidget-display-event)
+(register-kind! 'file-notify mle-file-notify-event)

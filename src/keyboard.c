@@ -1075,6 +1075,33 @@ only — does not nil the Lisp_Object fields.  Returns IE.  */)
   XIE (ie)->kind = NO_EVENT;
   return ie;
 }
+
+DEFUN ("--ie-kind-from-name", Fie_kind_from_name, Sie_kind_from_name,
+       1, 1, 0,
+       doc: /* Return the event_kind integer for event symbol NAME, or -1.
+
+Used by (emacs lispy-event) to register per-kind dispatch entries
+without hard-coding enum values in Scheme.  Each event symbol
+(e.g. `dbus-event') maps to its enum value (e.g. DBUS_EVENT).  */)
+  (Lisp_Object name)
+{
+#ifdef HAVE_DBUS
+  if (EQ (name, Qdbus_event)) return make_fixnum (DBUS_EVENT);
+#endif
+#ifdef THREADS_ENABLED
+  if (EQ (name, Qthread_event)) return make_fixnum (THREAD_EVENT);
+#endif
+#ifdef HAVE_XWIDGETS
+  if (EQ (name, Qxwidget_event)) return make_fixnum (XWIDGET_EVENT);
+  if (EQ (name, Qxwidget_display_event)) return make_fixnum (XWIDGET_DISPLAY_EVENT);
+#endif
+#ifdef USE_FILE_NOTIFY
+  if (EQ (name, Qfile_notify)) return make_fixnum (FILE_NOTIFY_EVENT);
+#endif
+
+  /* More entries added as additional kind groups are ported.  */
+  return make_fixnum (-1);
+}
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
 #define KBOARDP(scm)    (SCM_SMOB_PREDICATE (kboard_tag, (scm)))
