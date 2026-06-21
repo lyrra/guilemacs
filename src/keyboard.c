@@ -7690,6 +7690,120 @@ Delegates to modify_event_symbol with mouse_click tables.  */)
 			      ASIZE (mouse_syms));
 }
 
+/* Key-name table exporters — imp-5.1.
+  *
+  * Each DEFUN builds a Scheme vector from a static C key-name
+  * table.  NULL slots become #f.  All tables exist at file scope
+  * regardless of #ifdef; the Scheme caller-side silent-skip
+  * pattern gates per-platform registration.
+  */
+
+DEFUN ("--lispy-accent-codes", Flispy_accent_codes, Slispy_accent_codes,
+       0, 0, 0,
+       doc: /* Return a vector of accent keysym codes from lispy_accent_codes.  */)
+  (void)
+{
+  int n = ARRAYELTS (lispy_accent_codes);
+  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
+  int i;
+  for (i = 0; i < n; i++)
+    scm_c_vector_set_x (vec, i, scm_from_int (lispy_accent_codes[i]));
+  return vec;
+}
+
+DEFUN ("--lispy-accent-keys", Flispy_accent_keys, Slispy_accent_keys,
+       0, 0, 0,
+       doc: /* Return a vector of accent key name strings (or #f).  */)
+  (void)
+{
+  int n = ARRAYELTS (lispy_accent_keys);
+  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
+  int i;
+  for (i = 0; i < n; i++)
+    {
+      const char *s = lispy_accent_keys[i];
+      if (s)
+	scm_c_vector_set_x (vec, i, scm_from_utf8_string (s));
+    }
+  return vec;
+}
+
+DEFUN ("--function-key-offset", Ffunction_key_offset, Sfunction_key_offset,
+       0, 0, 0,
+       doc: /* Return FUNCTION_KEY_OFFSET as a fixnum.
+
+The value is build-specific: 0xff00 on X window systems, 0 on
+Android/NS/terminal-only builds.  Used by the Scheme keystroke
+handler to compute the index into lispy_function_keys.  */)
+  (void)
+{
+  return make_fixnum (FUNCTION_KEY_OFFSET);
+}
+
+DEFUN ("--lispy-function-keys", Flispy_function_keys, Slispy_function_keys,
+       0, 0, 0,
+       doc: /* Return a vector of function-key name strings (or #f).
+
+Callers should memoize the returned vector — each call reconstructs
+it from the C table.  */)
+  (void)
+{
+  int n = ARRAYELTS (lispy_function_keys);
+  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
+  int i;
+  for (i = 0; i < n; i++)
+    {
+      const char *s = lispy_function_keys[i];
+      if (s)
+	scm_c_vector_set_x (vec, i, scm_from_utf8_string (s));
+    }
+  return vec;
+}
+
+DEFUN ("--iso-lispy-function-keys", Fiso_lispy_function_keys,
+       Siso_lispy_function_keys, 0, 0, 0,
+       doc: /* Return a vector of ISO function-key name strings (or #f).
+
+Callers should memoize the returned vector.  */)
+  (void)
+{
+  int n = ARRAYELTS (iso_lispy_function_keys);
+  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
+  int i;
+  for (i = 0; i < n; i++)
+    {
+      const char *s = iso_lispy_function_keys[i];
+      if (s)
+	scm_c_vector_set_x (vec, i, scm_from_utf8_string (s));
+    }
+  return vec;
+}
+
+DEFUN ("--lispy-multimedia-keys", Flispy_multimedia_keys,
+       Slispy_multimedia_keys, 0, 0, 0,
+       doc: /* Return a vector of multimedia key name strings (or #f).
+
+Callers should memoize the returned vector.
+Returns an empty vector on non-NTGUI builds where
+MULTIMEDIA_KEY_EVENT can't fire.  */)
+  (void)
+{
+#ifdef HAVE_NTGUI
+  int n = ARRAYELTS (lispy_multimedia_keys);
+  SCM vec = scm_c_make_vector (n, SCM_BOOL_F);
+  int i;
+  for (i = 0; i < n; i++)
+    {
+      const char *s = lispy_multimedia_keys[i];
+      if (s)
+	scm_c_vector_set_x (vec, i, scm_from_utf8_string (s));
+    }
+  return vec;
+#else
+  return scm_c_make_vector (0, SCM_BOOL_F);
+#endif
+}
+
 /* thin SCM_CALL_1 wrapper that replaces the old
    make_lispy_event body.  Every kbd_buffer_get_event call that
    previously entered the C switch now goes through the Scheme

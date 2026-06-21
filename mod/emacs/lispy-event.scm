@@ -64,6 +64,14 @@
 (define %frame-live-p           (delay (%c 'frame-live-p)))
 (define %windowp                (delay (%c 'windowp)))
 
+;;; Key-name tables — imp-5.1 (exposed as Scheme vectors).
+(define %lispy-accent-codes     (delay (%c '--lispy-accent-codes)))
+(define %lispy-accent-keys      (delay (%c '--lispy-accent-keys)))
+(define %function-key-offset    (delay (%c '--function-key-offset)))
+(define %lispy-function-keys    (delay (%c '--lispy-function-keys)))
+(define %iso-lispy-function-keys (delay (%c '--iso-lispy-function-keys)))
+(define %lispy-multimedia-keys  (delay (%c '--lispy-multimedia-keys)))
+
 ;;; Helper: register a per-kind handler in the dispatch table.
 ;;; Uses --ie-kind-from-name to convert a symbol (e.g. 'dbus-event)
 ;;; into its event_kind integer, then stores PROC under that key.
