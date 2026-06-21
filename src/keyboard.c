@@ -1099,7 +1099,16 @@ without hard-coding enum values in Scheme.  Each event symbol
   if (EQ (name, Qfile_notify)) return make_fixnum (FILE_NOTIFY_EVENT);
 #endif
 
-  /* Simple-list group  */
+  /* Trivial-frame group  */
+  if (EQ (name, Qno_event)) return make_fixnum (NO_EVENT);
+#ifdef HAVE_WINDOW_SYSTEM
+  if (EQ (name, Qdelete_frame)) return make_fixnum (DELETE_WINDOW_EVENT);
+  if (EQ (name, Qiconify_frame)) return make_fixnum (ICONIFY_EVENT);
+  if (EQ (name, Qmake_frame_visible)) return make_fixnum (DEICONIFY_EVENT);
+  if (EQ (name, Qmove_frame)) return make_fixnum (MOVE_FRAME_EVENT);
+#endif
+
+  /* Simple-list group (imp-3.3).  */
   if (EQ (name, Qselect_window)) return make_fixnum (SELECT_WINDOW_EVENT);
   if (EQ (name, Qsave_session)) return make_fixnum (SAVE_SESSION_EVENT);
   if (EQ (name, Qconfig_changed_event)) return make_fixnum (CONFIG_CHANGED_EVENT);
@@ -6706,47 +6715,12 @@ line_number_mode_hscroll (Lisp_Object start_pos, Lisp_Object end_pos)
    are received; this function stores the location of button presses
    in order to build drag events when the button is released.  */
 
-/* per-kind static helpers for the trivial-frame group.
-   Extracted mechanically from make_lispy_event_c  */
-
-#ifdef HAVE_WINDOW_SYSTEM
-static Lisp_Object
-mle_delete_window_event (struct input_event *event)
-{
-  return list2 (Qdelete_frame, list1 (event->frame_or_window));
-}
-static Lisp_Object
-mle_iconify_event (struct input_event *event)
-{
-  return list2 (Qiconify_frame, list1 (event->frame_or_window));
-}
-static Lisp_Object
-mle_deiconify_event (struct input_event *event)
-{
-  return list2 (Qmake_frame_visible, list1 (event->frame_or_window));
-}
-static Lisp_Object
-mle_move_frame_event (struct input_event *event)
-{
-  return list2 (Qmove_frame, list1 (event->frame_or_window));
-}
-#endif
-
-/* Just discard these, by returning nil.
-   With MULTI_KBOARD, these events are used as placeholders
-   when we need to randomly delete events from the queue.
-   (They shouldn't otherwise be found in the buffer,
-   but on some machines it appears they do show up
-   even without MULTI_KBOARD.)  */
-static Lisp_Object
-mle_no_event (struct input_event *event)
-{
-  return Qnil;
-}
-
 /* Old make_lispy_event body renamed to make_lispy_event_c.
    It is now called through the --make-lispy-event-c DEFUN
-   (see below), which is the fallback in the Scheme orchestrator.  */
+   (see below), which is the fallback in the Scheme orchestrator.
+
+   Trivial-frame group (DELETE_WINDOW, ICONIFY, DEICONIFY,
+   MOVE_FRAME, NO_EVENT) ported to Scheme — imp-3.1.  */
 
 static Lisp_Object
 make_lispy_event_c (struct input_event *event)
@@ -6755,14 +6729,6 @@ make_lispy_event_c (struct input_event *event)
 
   switch (event->kind)
     {
-#ifdef HAVE_WINDOW_SYSTEM
-    case DELETE_WINDOW_EVENT: return mle_delete_window_event (event);
-    case ICONIFY_EVENT:       return mle_iconify_event (event);
-    case DEICONIFY_EVENT:     return mle_deiconify_event (event);
-    case MOVE_FRAME_EVENT:    return mle_move_frame_event (event);
-#endif
-    /* NO_EVENT is discarded (placeholder / extraneous-mouse-event).  */
-    case NO_EVENT:            return mle_no_event (event);
 
     case HELP_EVENT:
       {
@@ -14618,6 +14584,7 @@ syms_of_keyboard (void)
   DEFSYM (Qdelete_frame, "delete-frame");
   DEFSYM (Qiconify_frame, "iconify-frame");
   DEFSYM (Qmake_frame_visible, "make-frame-visible");
+  DEFSYM (Qno_event, "no-event");
   DEFSYM (Qselect_window, "select-window");
   DEFSYM (Qselection_request, "selection-request");
   DEFSYM (Qwindow_edges, "window-edges");

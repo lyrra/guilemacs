@@ -92,6 +92,29 @@ make_lispy_event body."
   ;; (file-notify DESCRIPTOR-ACTION-FILE CALLBACK)
   (cons 'file-notify ((force %--ie-arg) ie)))
 
+;;; trivial-frame group
+
+(define (mle-delete-window-event ie)
+  (list 'delete-frame (list ((force %--ie-frame-or-window) ie))))
+
+(define (mle-iconify-event ie)
+  (list 'iconify-frame (list ((force %--ie-frame-or-window) ie))))
+
+(define (mle-deiconify-event ie)
+  (list 'make-frame-visible (list ((force %--ie-frame-or-window) ie))))
+
+(define (mle-move-frame-event ie)
+  (list 'move-frame (list ((force %--ie-frame-or-window) ie))))
+
+(define (mle-no-event ie)
+  ;; With MULTI_KBOARD, NO_EVENT acts as a placeholder used when
+  ;; randomly deleting events from the queue.  (They shouldn't
+  ;; otherwise be found in the buffer, but on some machines they
+  ;; do show up even without MULTI_KBOARD.)  On Windows NT/9X,
+  ;; NO_EVENT is also used to delete extraneous mouse events
+  ;; during a popup-menu call.  Discard by returning nil.
+  #nil)
+
 ;;; Dispatch table registration.
 ;;; Each register-kind! call maps a Lisp event symbol to its handler.
 ;;; When --ie-kind-from-name returns -1 the feature isn't compiled in
@@ -102,6 +125,12 @@ make_lispy_event body."
 (register-kind! 'xwidget-event mle-xwidget-event)
 (register-kind! 'xwidget-display-event mle-xwidget-display-event)
 (register-kind! 'file-notify mle-file-notify-event)
+
+(register-kind! 'delete-frame mle-delete-window-event)
+(register-kind! 'iconify-frame mle-iconify-event)
+(register-kind! 'make-frame-visible mle-deiconify-event)
+(register-kind! 'move-frame mle-move-frame-event)
+(register-kind! 'no-event mle-no-event)
 
 \f
 ;;; imp-3.3 — simple-list group.
