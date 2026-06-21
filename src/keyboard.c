@@ -6651,10 +6651,47 @@ line_number_mode_hscroll (Lisp_Object start_pos, Lisp_Object end_pos)
    are received; this function stores the location of button presses
    in order to build drag events when the button is released.  */
 
-/* old make_lispy_event body renamed to
-   make_lispy_event_c.  It is now called through the
-   --make-lispy-event-c DEFUN (see below), which is the fallback
-   in the Scheme out-of-table fallback  */
+/* per-kind static helpers for the trivial-frame group.
+   Extracted mechanically from make_lispy_event_c  */
+
+#ifdef HAVE_WINDOW_SYSTEM
+static Lisp_Object
+mle_delete_window_event (struct input_event *event)
+{
+  return list2 (Qdelete_frame, list1 (event->frame_or_window));
+}
+static Lisp_Object
+mle_iconify_event (struct input_event *event)
+{
+  return list2 (Qiconify_frame, list1 (event->frame_or_window));
+}
+static Lisp_Object
+mle_deiconify_event (struct input_event *event)
+{
+  return list2 (Qmake_frame_visible, list1 (event->frame_or_window));
+}
+static Lisp_Object
+mle_move_frame_event (struct input_event *event)
+{
+  return list2 (Qmove_frame, list1 (event->frame_or_window));
+}
+#endif
+
+/* Just discard these, by returning nil.
+   With MULTI_KBOARD, these events are used as placeholders
+   when we need to randomly delete events from the queue.
+   (They shouldn't otherwise be found in the buffer,
+   but on some machines it appears they do show up
+   even without MULTI_KBOARD.)  */
+static Lisp_Object
+mle_no_event (struct input_event *event)
+{
+  return Qnil;
+}
+
+/* Old make_lispy_event body renamed to make_lispy_event_c.
+   It is now called through the --make-lispy-event-c DEFUN
+   (see below), which is the fallback in the Scheme orchestrator.  */
 
 static Lisp_Object
 make_lispy_event_c (struct input_event *event)
@@ -6664,33 +6701,13 @@ make_lispy_event_c (struct input_event *event)
   switch (event->kind)
     {
 #ifdef HAVE_WINDOW_SYSTEM
-    case DELETE_WINDOW_EVENT:
-      /* Make an event (delete-frame (FRAME)).  */
-      return list2 (Qdelete_frame, list1 (event->frame_or_window));
-
-    case ICONIFY_EVENT:
-      /* Make an event (iconify-frame (FRAME)).  */
-      return list2 (Qiconify_frame, list1 (event->frame_or_window));
-
-    case DEICONIFY_EVENT:
-      /* Make an event (make-frame-visible (FRAME)).  */
-      return list2 (Qmake_frame_visible, list1 (event->frame_or_window));
-
-    case MOVE_FRAME_EVENT:
-      /* Make an event (move-frame (FRAME)).  */
-      return list2 (Qmove_frame, list1 (event->frame_or_window));
+    case DELETE_WINDOW_EVENT: return mle_delete_window_event (event);
+    case ICONIFY_EVENT:       return mle_iconify_event (event);
+    case DEICONIFY_EVENT:     return mle_deiconify_event (event);
+    case MOVE_FRAME_EVENT:    return mle_move_frame_event (event);
 #endif
-
-    /* Just discard these, by returning nil.
-       With MULTI_KBOARD, these events are used as placeholders
-       when we need to randomly delete events from the queue.
-       (They shouldn't otherwise be found in the buffer,
-       but on some machines it appears they do show up
-       even without MULTI_KBOARD.)  */
-    /* On Windows NT/9X, NO_EVENT is used to delete extraneous
-       mouse events during a popup-menu call.  */
-    case NO_EVENT:
-      return Qnil;
+    /* NO_EVENT is discarded (placeholder / extraneous-mouse-event).  */
+    case NO_EVENT:            return mle_no_event (event);
 
     case HELP_EVENT:
       {
