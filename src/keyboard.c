@@ -1140,6 +1140,16 @@ without hard-coding enum values in Scheme.  Each event symbol
     return make_fixnum (ASCII_KEYSTROKE_EVENT);
   if (EQ (name, Qmultibyte_char_keystroke))
     return make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+  if (EQ (name, Qnon_ascii_keystroke))
+    return make_fixnum (NON_ASCII_KEYSTROKE_EVENT);
+#ifdef HAVE_NS
+  if (EQ (name, Qns_nonkey))
+    return make_fixnum (NS_NONKEY_EVENT);
+#endif
+#ifdef HAVE_NTGUI
+  if (EQ (name, Qmultimedia_key))
+    return make_fixnum (MULTIMEDIA_KEY_EVENT);
+#endif
 
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
@@ -7651,6 +7661,113 @@ Delegates to modify_event_symbol with mouse_click tables.  */)
 			      Vlispy_mouse_stem,
 			      NULL, &mouse_syms,
 			      ASIZE (mouse_syms));
+}
+
+/* modify_event_symbol wrappers — imp-5.3.
+ *
+ * Thin DEFUNs that call the static modify_event_symbol with the
+ * correct cache pointer for each key-name table.  The Scheme
+ * keystroke handlers use these until imp-8.1 ports the full
+ * modify_event_symbol body to Scheme.
+ *
+ * TABLE_TAG for --modify-event-symbol-func is one of:
+ *   'function     → lispy_function_keys
+ *   'iso-function → iso_lispy_function_keys
+ *   'multimedia   → lispy_multimedia_keys
+ * All three share the func_key_syms cache.  */
+
+DEFUN ("--modify-event-symbol-accent", Fmodify_event_symbol_accent,
+       Smodify_event_symbol_accent, 2, 2, 0,
+       doc: /* Accent-key lookup through modify_event_symbol.
+
+SYMBOL_NUM is the index into lispy_accent_keys.  MODIFIERS is the
+event modifier bitmask.  Uses the accent_key_syms file-static cache.  */)
+  (Lisp_Object symbol_num, Lisp_Object modifiers)
+{
+  return modify_event_symbol (XFIXNUM (symbol_num),
+			      XFIXNUM (modifiers),
+			      Qfunction_key, Qnil,
+			      lispy_accent_keys,
+			      &accent_key_syms,
+			      ARRAYELTS (lispy_accent_keys));
+}
+
+DEFUN ("--modify-event-symbol-func", Fmodify_event_symbol_func,
+       Smodify_event_symbol_func, 3, 3, 0,
+       doc: /* Function-key lookup through modify_event_symbol.
+
+SYMBOL_NUM is the table index (already offset-adjusted by the caller).
+MODIFIERS is the event modifier bitmask.  TABLE_TAG selects the
+name table as a fixnum: 0 = function keys, 1 = ISO function keys,
+2 = multimedia keys.  All three share the func_key_syms cache.  */)
+  (Lisp_Object symbol_num, Lisp_Object modifiers, Lisp_Object table_tag)
+{
+  const char *const *name_table;
+  ptrdiff_t table_size;
+  int tag = XFIXNUM (table_tag);
+
+  if (tag == 0)
+    {
+      name_table = lispy_function_keys;
+      table_size = ARRAYELTS (lispy_function_keys);
+    }
+  else if (tag == 1)
+    {
+      name_table = iso_lispy_function_keys;
+      table_size = ARRAYELTS (iso_lispy_function_keys);
+    }
+  else if (tag == 2)
+    {
+#ifdef HAVE_NTGUI
+      name_table = lispy_multimedia_keys;
+      table_size = ARRAYELTS (lispy_multimedia_keys);
+#else
+      return Qnil;
+#endif
+    }
+  else
+    return Qnil;
+
+  return modify_event_symbol (XFIXNUM (symbol_num),
+			      XFIXNUM (modifiers),
+			      Qfunction_key, Qnil,
+			      name_table,
+			      &func_key_syms,
+			      table_size);
+}
+
+DEFUN ("--modify-event-symbol-system", Fmodify_event_symbol_system,
+       Smodify_event_symbol_system, 2, 2, 0,
+       doc: /* System-key fallthrough through modify_event_symbol.
+
+SYMBOL_NUM is the raw event code.  MODIFIERS is the event modifier
+bitmask.  Uses the per-kboard system_key_syms cache and
+Vsystem_key_alist for name resolution.  */)
+  (Lisp_Object symbol_num, Lisp_Object modifiers)
+{
+  /* Lazy-init the system-key alist cache, matching the C original
+     at keyboard.c:6858-6865.  Without this the first call
+     passes a nil cache pointer to modify_event_symbol.  */
+  if (NILP (KVAR (current_kboard, system_key_syms)))
+    kset_system_key_syms (current_kboard, Fcons (Qnil, Qnil));
+  return modify_event_symbol (XFIXNUM (symbol_num),
+			      XFIXNUM (modifiers),
+			      Qfunction_key,
+			      KVAR (current_kboard, Vsystem_key_alist),
+			      NULL,
+			      &KVAR (current_kboard, system_key_syms),
+			      PTRDIFF_MAX);
+}
+
+DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
+       Siso_function_key_offset, 0, 0, 0,
+       doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
+
+Used by the Scheme keystroke handler to detect ISO 9995 function
+keys (code >= ISO_FUNCTION_KEY_OFFSET && code < FUNCTION_KEY_OFFSET).  */)
+  (void)
+{
+  return make_fixnum (ISO_FUNCTION_KEY_OFFSET);
 }
 
 /* Key-name table exporters — imp-5.1.
@@ -14494,6 +14611,13 @@ syms_of_keyboard (void)
   /* Keystroke event-kind keys (imp-5).  */
   DEFSYM (Qascii_keystroke, "ascii-keystroke");
   DEFSYM (Qmultibyte_char_keystroke, "multibyte-char-keystroke");
+  DEFSYM (Qnon_ascii_keystroke, "non-ascii-keystroke");
+#ifdef HAVE_NS
+  DEFSYM (Qns_nonkey, "ns-nonkey");
+#endif
+#ifdef HAVE_NTGUI
+  DEFSYM (Qmultimedia_key, "multimedia-key");
+#endif
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
   DEFSYM (Quser_signal_event, "user-signal-event");

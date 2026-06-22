@@ -70,9 +70,19 @@
 (define %lispy-accent-codes     (delay (%c '--lispy-accent-codes)))
 (define %lispy-accent-keys      (delay (%c '--lispy-accent-keys)))
 (define %function-key-offset    (delay (%c '--function-key-offset)))
+(define %iso-function-key-offset (delay (%c '--iso-function-key-offset)))
 (define %lispy-function-keys    (delay (%c '--lispy-function-keys)))
 (define %iso-lispy-function-keys (delay (%c '--iso-lispy-function-keys)))
 (define %lispy-multimedia-keys  (delay (%c '--lispy-multimedia-keys)))
+
+;;; Memoized key-table vectors and offsets — imp-5.3 perf.
+;;; Each DEFUN reconstructs the vector from the C array on every call.
+;;; Wrapping in a second delay calls the DEFUN once and caches the result.
+(define +lispy-accent-codes+     (delay ((force %lispy-accent-codes))))
+(define +function-key-offset+    (delay ((force %function-key-offset))))
+(define +lispy-function-keys+    (delay ((force %lispy-function-keys))))
+(define +iso-function-key-offset+ (delay ((force %iso-function-key-offset))))
+(define +lispy-multimedia-keys+  (delay ((force %lispy-multimedia-keys))))
 
 ;;; Helper: register a per-kind handler in the dispatch table.
 ;;; Uses --ie-kind-from-name to convert a symbol (e.g. 'dbus-event)
@@ -407,3 +417,101 @@ make_lispy_event body."
 
 (register-kind! 'ascii-keystroke mle-ascii-keystroke)
 (register-kind! 'multibyte-char-keystroke mle-multibyte-char-keystroke)
+
+;;; 5.3 NON_ASCII_KEYSTROKE_EVENT / NS_NONKEY_EVENT / MULTIMEDIA_KEY_EVENT.
+;;;
+;;; Same sequence as the C switch body in make_lispy_event:
+;;;   1. Search lispy_accent_codes for a match → modify_event_symbol with
+;;;      accent_key_syms cache.
+;;;   2. ISO function key range check → modify_event_symbol with
+;;;      func_key_syms cache.
+;;;   3. Function key range check (FUNCTION_KEY_OFFSET) → ditto.
+;;;   4. Fall through to system-key lookup.
+;;;
+;;; MULTIMEDIA_KEY_EVENT is a separate handler (HAVE_NTGUI only); its
+;;; registration silently skips on non-NTGUI builds.
+;;;
+;;; button_down_time = 0 is intentionally skipped — the double-click
+;;; file-statics get proper Scheme mirroring under imp-7.1.
+
+;;; C-side modify_event_symbol wrappers (imp-5.3).
+(define %modify-event-symbol-accent
+  (delay (%c '--modify-event-symbol-accent)))
+(define %modify-event-symbol-func
+  (delay (%c '--modify-event-symbol-func)))
+(define %modify-event-symbol-system
+  (delay (%c '--modify-event-symbol-system)))
+
+;;; Accent-key linear scan.  Returns the result of modify_event_symbol
+;;; on first match, or #f if no accent code matched.
+
+(define (accent-lookup code mods)
+  (let ((codes (force +lispy-accent-codes+)))
+    (let loop ((i 0))
+      (and (< i (vector-length codes))
+           (if (= code (vector-ref codes i))
+               ((force %modify-event-symbol-accent) i mods)
+               (loop (+ i 1)))))))
+
+;;; ISO function key lookup.  ISO_FUNCTION_KEY_OFFSET ≤ code < FUNCTION_KEY_OFFSET.
+
+(define (iso-function-lookup code mods)
+  (let ((iso-offset (force +iso-function-key-offset+)))
+    (and (>= code iso-offset)
+         (< code (force +function-key-offset+))
+         ((force %modify-event-symbol-func)
+          (- code iso-offset) mods 1))))  ; tag 1 = iso-function
+
+;;; Function key lookup.  code − FUNCTION_KEY_OFFSET must be a valid
+;;; index with a non-#f entry.
+
+(define (function-key-lookup code mods)
+  (let* ((fk-offset (force +function-key-offset+))
+         (fk-keys (force +lispy-function-keys+))
+         (idx (- code fk-offset)))
+    (and (>= idx 0)
+         (< idx (vector-length fk-keys))
+         (vector-ref fk-keys idx)         ; non-#f slot?
+         ((force %modify-event-symbol-func) idx mods 0))))  ; tag 0 = function
+
+;;; System-key fallthrough.  Passes code directly; modify_event_symbol
+;;; handles the system_key_syms cache and Vsystem_key_alist lookup.
+
+(define (system-key-lookup code mods)
+  ((force %modify-event-symbol-system) code mods))
+
+;;; Main NON_ASCII_KEYSTROKE_EVENT handler.  Chains the four lookups;
+;;; the first non-#f result wins (matching the C return-early pattern).
+
+(define (mle-non-ascii-keystroke ie)
+  (let ((code ((force %--ie-code) ie))
+        (mods ((force %--ie-modifiers) ie)))
+    (or (accent-lookup code mods)
+        (iso-function-lookup code mods)
+        (function-key-lookup code mods)
+        (system-key-lookup code mods))))
+
+;;; NS_NONKEY_EVENT shares the same body (C: fallthrough from NS_NONKEY
+;;; to NON_ASCII_KEYSTROKE_EVENT).  Registration silently skipped on
+;;; non-NS builds (--ie-kind-from-name returns -1).
+
+(define mle-ns-nonkey mle-non-ascii-keystroke)
+
+;;; MULTIMEDIA_KEY_EVENT.  Single-table lookup via lispy_multimedia_keys
+;;; and the func_key_syms cache (tag 2).  Returns nil on unrecognized code
+;;; or empty mm-keys vector (matching the C).  Registration silently
+;;; skipped on non-NTGUI builds.
+
+(define (mle-multimedia-key ie)
+  (let ((code ((force %--ie-code) ie))
+        (mods ((force %--ie-modifiers) ie))
+        (mm-keys (force +lispy-multimedia-keys+)))
+    (if (and (> code 0)
+             (< code (vector-length mm-keys))
+             (vector-ref mm-keys code))
+        ((force %modify-event-symbol-func) code mods 2)  ; tag 2 = multimedia
+        #nil)))
+
+(register-kind! 'non-ascii-keystroke mle-non-ascii-keystroke)
+(register-kind! 'ns-nonkey mle-ns-nonkey)
+(register-kind! 'multimedia-key mle-multimedia-key)
