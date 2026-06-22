@@ -515,3 +515,16 @@ make_lispy_event body."
 (register-kind! 'non-ascii-keystroke mle-non-ascii-keystroke)
 (register-kind! 'ns-nonkey mle-ns-nonkey)
 (register-kind! 'multimedia-key mle-multimedia-key)
+
+;;; 5.4 NS_TEXT_EVENT.
+;;;
+;;; Single DEFUN wrapper avoids the magic-number trap (KEY_NS_PUT_WORKING_TEXT
+;;; = 12345).  C side does the intern; Scheme just wraps in list1.
+
+(define %--ns-text-event-symbol
+  (delay (%c '--ns-text-event-symbol)))
+
+(define (mle-ns-text-event ie)
+  (list ((force %--ns-text-event-symbol) ((force %--ie-code) ie))))
+
+(register-kind! 'ns-text-event mle-ns-text-event)

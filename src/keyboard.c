@@ -1145,6 +1145,8 @@ without hard-coding enum values in Scheme.  Each event symbol
 #ifdef HAVE_NS
   if (EQ (name, Qns_nonkey))
     return make_fixnum (NS_NONKEY_EVENT);
+  if (EQ (name, Qns_text_event))
+    return make_fixnum (NS_TEXT_EVENT);
 #endif
 #ifdef HAVE_NTGUI
   if (EQ (name, Qmultimedia_key))
@@ -1170,6 +1172,22 @@ make_lispy_event's USER_SIGNAL_EVENT case.  */)
     emacs_abort ();
   return intern (name);
 }
+
+#ifdef HAVE_NS
+DEFUN ("--ns-text-event-symbol", Fns_text_event_symbol,
+       Sns_text_event_symbol, 1, 1, 0,
+       doc: /* Return the interned symbol for NS text event code C.
+
+Wraps KEY_NS_PUT_WORKING_TEXT / KEY_NS_UNPUT_WORKING_TEXT so the
+Scheme handler doesn't need the magic-number constants.  Returns
+`ns-put-working-text' or `ns-unput-working-text'.  */)
+  (Lisp_Object code)
+{
+  return intern (XFIXNUM (code) == KEY_NS_PUT_WORKING_TEXT
+		 ? "ns-put-working-text"
+		 : "ns-unput-working-text");
+}
+#endif
 
 DEFUN ("--uppercasep", Fuppercasep, Suppercasep, 1, 1, 0,
        doc: /* Return t if character C is upper case.
@@ -6796,86 +6814,6 @@ make_lispy_event_c (struct input_event *event)
 
   switch (event->kind)
     {
-
-#ifdef HAVE_NS
-    case NS_TEXT_EVENT:
-      return list1 (intern (event->code == KEY_NS_PUT_WORKING_TEXT
-                            ? "ns-put-working-text"
-                            : "ns-unput-working-text"));
-
-      /* NS_NONKEY_EVENTs are just like NON_ASCII_KEYSTROKE_EVENTs,
-	 except that they are non-key events (last-nonmenu-event is nil).  */
-    case NS_NONKEY_EVENT:
-#endif
-
-      /* A function key.  The symbol may need to have modifier prefixes
-	 tacked onto it.  */
-    case NON_ASCII_KEYSTROKE_EVENT:
-      button_down_time = 0;
-
-      for (i = 0; i < ARRAYELTS (lispy_accent_codes); i++)
-	if (event->code == lispy_accent_codes[i])
-	  return modify_event_symbol (i,
-				      event->modifiers,
-				      Qfunction_key, Qnil,
-				      lispy_accent_keys, &accent_key_syms,
-                                      ARRAYELTS (lispy_accent_keys));
-
-#if 0
-#ifdef XK_kana_A
-      if (event->code >= 0x400 && event->code < 0x500)
-	return modify_event_symbol (event->code - 0x400,
-				    event->modifiers & ~shift_modifier,
-				    Qfunction_key, Qnil,
-				    lispy_kana_keys, &func_key_syms,
-                                    ARRAYELTS (lispy_kana_keys));
-#endif /* XK_kana_A */
-#endif /* 0 */
-
-#ifdef ISO_FUNCTION_KEY_OFFSET
-      if (event->code < FUNCTION_KEY_OFFSET
-	  && event->code >= ISO_FUNCTION_KEY_OFFSET)
-	return modify_event_symbol (event->code - ISO_FUNCTION_KEY_OFFSET,
-				    event->modifiers,
-				    Qfunction_key, Qnil,
-				    iso_lispy_function_keys, &func_key_syms,
-                                    ARRAYELTS (iso_lispy_function_keys));
-#endif
-
-      if ((FUNCTION_KEY_OFFSET <= event->code
-	   && (event->code
-	       < FUNCTION_KEY_OFFSET + ARRAYELTS (lispy_function_keys)))
-	  && lispy_function_keys[event->code - FUNCTION_KEY_OFFSET])
-	return modify_event_symbol (event->code - FUNCTION_KEY_OFFSET,
-				    event->modifiers,
-				    Qfunction_key, Qnil,
-				    lispy_function_keys, &func_key_syms,
-				    ARRAYELTS (lispy_function_keys));
-
-      /* Handle system-specific or unknown keysyms.
-	 We need to use an alist rather than a vector as the cache
-	 since we can't make a vector long enough.  */
-      if (NILP (KVAR (current_kboard, system_key_syms)))
-	kset_system_key_syms (current_kboard, Fcons (Qnil, Qnil));
-      return modify_event_symbol (event->code,
-				  event->modifiers,
-				  Qfunction_key,
-				  KVAR (current_kboard, Vsystem_key_alist),
-				  0, &KVAR (current_kboard, system_key_syms),
-				  PTRDIFF_MAX);
-
-#ifdef HAVE_NTGUI
-    case MULTIMEDIA_KEY_EVENT:
-      if (event->code < ARRAYELTS (lispy_multimedia_keys)
-          && event->code > 0 && lispy_multimedia_keys[event->code])
-        {
-          return modify_event_symbol (event->code, event->modifiers,
-                                      Qfunction_key, Qnil,
-                                      lispy_multimedia_keys, &func_key_syms,
-                                      ARRAYELTS (lispy_multimedia_keys));
-        }
-      return Qnil;
-#endif
 
       /* A mouse click.  Figure out where it is, decide whether it's
          a press, click or drag, and build the appropriate structure.  */
@@ -14614,6 +14552,7 @@ syms_of_keyboard (void)
   DEFSYM (Qnon_ascii_keystroke, "non-ascii-keystroke");
 #ifdef HAVE_NS
   DEFSYM (Qns_nonkey, "ns-nonkey");
+  DEFSYM (Qns_text_event, "ns-text-event");
 #endif
 #ifdef HAVE_NTGUI
   DEFSYM (Qmultimedia_key, "multimedia-key");
