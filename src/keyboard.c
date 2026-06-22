@@ -6356,6 +6356,27 @@ static Time button_down_time;
 
 static int double_click_count;
 
+/* If F is a GUI frame with internal borders and POSN hasn't been
+   claimed yet, check whether (X, Y) falls on an internal border
+   part.  Returns the border-part symbol on hit, or POSN unchanged.  */
+static Lisp_Object
+mlp_internal_border (struct frame *f, int x, int y, Lisp_Object posn)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  if (FRAME_WINDOW_P (f)
+      && FRAME_LIVE_P (f)
+      && NILP (posn)
+      && FRAME_INTERNAL_BORDER_WIDTH (f) > 0
+      && !NILP (get_frame_param (f, Qdrag_internal_border)))
+    {
+      enum internal_border_part part
+	= frame_internal_border_part (f, x, y);
+      return builtin_lisp_symbol (internal_border_parts[part]);
+    }
+#endif
+  return posn;
+}
+
 /* X and Y are frame-relative coordinates for a click or wheel event.
    Return a Lisp-style event list.  */
 
@@ -6636,20 +6657,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       XSETFRAME (window_or_frame, f);
       xret = mx;
       yret = my;
-
-#ifdef HAVE_WINDOW_SYSTEM
-      if (FRAME_WINDOW_P (f)
-	  && FRAME_LIVE_P (f)
-	  && NILP (posn)
-	  && FRAME_INTERNAL_BORDER_WIDTH (f) > 0
-	  && !NILP (get_frame_param (f, Qdrag_internal_border)))
-	{
-	  enum internal_border_part part
-	    = frame_internal_border_part (f, xret, yret);
-
-	  posn = builtin_lisp_symbol (internal_border_parts[part]);
-	}
-#endif
+      posn = mlp_internal_border (f, xret, yret, posn);
     }
   else
     {
