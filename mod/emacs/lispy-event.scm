@@ -63,6 +63,8 @@
 ;;; Elisp predicates — not Scheme bindings; go through %c.
 (define %frame-live-p           (delay (%c 'frame-live-p)))
 (define %windowp                (delay (%c 'windowp)))
+(define %upcase                 (delay (%c 'upcase)))
+(define %downcase               (delay (%c 'downcase)))
 
 ;;; Key-name tables — imp-5.1 (exposed as Scheme vectors).
 (define %lispy-accent-codes     (delay (%c '--lispy-accent-codes)))
@@ -340,3 +342,68 @@ make_lispy_event body."
 (register-kind! 'scroll-bar-click-toolkit mle-scroll-bar-click-toolkit)
 (register-kind! 'horizontal-scroll-bar-click-toolkit
                 mle-horizontal-scroll-bar-click-toolkit)
+
+\f
+;;; imp-5 — keystroke cases.
+
+;;; 5.2 ASCII_KEYSTROKE_EVENT / MULTIBYTE_CHAR_KEYSTROKE_EVENT.
+;;; Caps-lock correction + ctrl-char folding + modifier-OR.
+;;;
+;;; button_down_time reset is intentionally skipped here — the
+;;; double-click file-statics get proper Scheme mirroring under
+;;; imp-7.1.  Until then the C fallback path for mouse events
+;;; handles the reset.
+
+;;; Character predicates — imp-5.2 cleanup: --uppercasep / --lowercasep
+;;; are single-crossing DEFUNs wrapping the C inline functions from
+;;; src/buffer.h.  The prior approach chained upcase/downcase DEFUN calls
+;;; (up to 3 crossings per keystroke); this cuts it to 1 per predicate.
+
+(define %uppercasep            (delay (%c '--uppercasep)))
+(define %lowercasep            (delay (%c '--lowercasep)))
+
+(define (keystroke-impl ie is-ascii)
+  ;; Shared ASCII / MULTIBYTE_CHAR body.  is-ascii is #t for
+  ;; ASCII_KEYSTROKE_EVENT, #f for MULTIBYTE_CHAR_KEYSTROKE_EVENT.
+  (let* ((raw-code ((force %--ie-code) ie))
+         (mods ((force %--ie-modifiers) ie))
+         ;; ASCII: mask to 7 bits (C: c &= 0377).
+         (c (if is-ascii
+                (let ((masked (logand raw-code #o377)))
+                  ;; eassert (c == event->code) — the original C
+                  ;; assertion that the 7-bit mask is a no-op for
+                  ;; valid ASCII input.  Violation means a non-ASCII
+                  ;; code landed in ASCII_KEYSTROKE_EVENT.
+                  (unless (= masked raw-code)
+                    (error "ASCII keystroke code overflows 7 bits:" raw-code))
+                  masked)
+                raw-code)))
+    ;; Caps-lock correction: if a non-shift modifier is pressed,
+    ;; fix case mismatch (caps-lock inverted the letter).
+    (when (not (zero? (logand mods (lognot shift-modifier))))
+      (cond
+       ((and ((force %uppercasep) c) (zero? (logand mods shift-modifier)))
+        (set! c ((force %downcase) c)))
+       ((and ((force %lowercasep) c) (not (zero? (logand mods shift-modifier))))
+        (set! c ((force %upcase) c)))))
+    ;; Ctrl-char folding (ASCII only): turn ctrl-letter into control char.
+    (when (and is-ascii (not (zero? (logand mods ctrl-modifier))))
+      (set! c (make-ctrl-char c))
+      (set! mods (logand mods (lognot ctrl-modifier))))
+    ;; OR in the remaining modifier bits (meta, alt, hyper, super, ctrl).
+    (set! c (logior c (logand mods (logior meta-modifier alt-modifier
+                                            hyper-modifier super-modifier
+                                            ctrl-modifier))))
+    ;; Distinguish Shift-SPC from SPC.
+    (when (and (= raw-code #o40) (not (zero? (logand mods shift-modifier))))
+      (set! c (logior c shift-modifier)))
+    c))
+
+(define (mle-ascii-keystroke ie)
+  (keystroke-impl ie #t))
+
+(define (mle-multibyte-char-keystroke ie)
+  (keystroke-impl ie #f))
+
+(register-kind! 'ascii-keystroke mle-ascii-keystroke)
+(register-kind! 'multibyte-char-keystroke mle-multibyte-char-keystroke)

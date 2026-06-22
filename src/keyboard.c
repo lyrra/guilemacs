@@ -1135,6 +1135,12 @@ without hard-coding enum values in Scheme.  Each event symbol
     return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
 #endif
 
+  /* Keystroke group (imp-5).  */
+  if (EQ (name, Qascii_keystroke))
+    return make_fixnum (ASCII_KEYSTROKE_EVENT);
+  if (EQ (name, Qmultibyte_char_keystroke))
+    return make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT);
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }
@@ -1153,6 +1159,30 @@ make_lispy_event's USER_SIGNAL_EVENT case.  */)
   if (!name)
     emacs_abort ();
   return intern (name);
+}
+
+DEFUN ("--uppercasep", Fuppercasep, Suppercasep, 1, 1, 0,
+       doc: /* Return t if character C is upper case.
+
+Uses the current buffer's case tables — thin wrapper around the
+uppercasep() inline (src/buffer.h:1563) so Scheme keystroke ports
+avoid chaining upcase/downcase DEFUN calls.  */)
+  (Lisp_Object c)
+{
+  CHECK_FIXNUM (c);
+  return uppercasep (XFIXNUM (c)) ? Qt : Qnil;
+}
+
+DEFUN ("--lowercasep", Flowercasep, Slowercasep, 1, 1, 0,
+       doc: /* Return t if character C is lower case.
+
+Uses the current buffer's case tables — thin wrapper around the
+lowercasep() inline (src/buffer.h:1571) so Scheme keystroke ports
+avoid chaining upcase/downcase DEFUN calls.  */)
+  (Lisp_Object c)
+{
+  CHECK_FIXNUM (c);
+  return lowercasep (XFIXNUM (c)) ? Qt : Qnil;
 }
 
 #define XKBOARD(scm)    ((KBOARD *) SCM_SMOB_DATA (scm))
@@ -6756,73 +6786,6 @@ make_lispy_event_c (struct input_event *event)
 
   switch (event->kind)
     {
-
-    /* A simple keystroke.  */
-    case ASCII_KEYSTROKE_EVENT:
-    case MULTIBYTE_CHAR_KEYSTROKE_EVENT:
-      {
-	Lisp_Object lispy_c;
-	EMACS_INT c = event->code;
-	if (event->kind == ASCII_KEYSTROKE_EVENT)
-	  {
-	    c &= 0377;
-	    eassert (c == event->code);
-          }
-
-        /* Caps-lock shouldn't affect interpretation of key chords:
-           Control+s should produce C-s whether caps-lock is on or
-           not.  And Control+Shift+s should produce C-S-s whether
-           caps-lock is on or not.  */
-        if (event->modifiers & ~shift_modifier)
-	  {
-            /* This is a key chord: some non-shift modifier is
-               depressed.  */
-
-            if (uppercasep (c) &&
-                !(event->modifiers & shift_modifier))
-	      {
-                /* Got a capital letter without a shift.  The caps
-                   lock is on.   Un-capitalize the letter.  */
-                c = downcase (c);
-	      }
-            else if (lowercasep (c) &&
-                     (event->modifiers & shift_modifier))
-	      {
-                /* Got a lower-case letter even though shift is
-                   depressed.  The caps lock is on.  Capitalize the
-                   letter.  */
-                c = upcase (c);
-	      }
-	  }
-
-	if (event->kind == ASCII_KEYSTROKE_EVENT)
-	  {
-	    /* Turn ASCII characters into control characters
-	       when proper.  */
-	    if (event->modifiers & ctrl_modifier)
-	      {
-		c = make_ctrl_char (c);
-		event->modifiers &= ~ctrl_modifier;
-	      }
-	  }
-
-	/* Add in the other modifier bits.  The shift key was taken care
-	   of by the X code.  */
-	/* DEBUG: print modifiers */
-	if (event->modifiers & super_modifier)
-	  fprintf (stderr, "DEBUG: super_modifier set! modifiers=0x%x code=%d\n",
-	           event->modifiers, (int)event->code);
-	c |= (event->modifiers
-	      & (meta_modifier | alt_modifier
-		 | hyper_modifier | super_modifier | ctrl_modifier));
-	/* Distinguish Shift-SPC from SPC.  */
-	if ((event->code) == 040
-	    && event->modifiers & shift_modifier)
-	  c |= shift_modifier;
-	button_down_time = 0;
-	XSETFASTINT (lispy_c, c);
-	return lispy_c;
-      }
 
 #ifdef HAVE_NS
     case NS_TEXT_EVENT:
@@ -14527,6 +14490,10 @@ syms_of_keyboard (void)
   DEFSYM (Qhorizontal_scroll_bar_click_toolkit,
           "horizontal-scroll-bar-click-toolkit");
 #endif
+
+  /* Keystroke event-kind keys (imp-5).  */
+  DEFSYM (Qascii_keystroke, "ascii-keystroke");
+  DEFSYM (Qmultibyte_char_keystroke, "multibyte-char-keystroke");
   DEFSYM (Qsave_session, "save-session");
   DEFSYM (Qconfig_changed_event, "config-changed-event");
   DEFSYM (Quser_signal_event, "user-signal-event");
