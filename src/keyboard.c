@@ -6356,6 +6356,202 @@ static Time button_down_time;
 
 static int double_click_count;
 
+/* If OBJECT is an image with a :map property, check whether (DX, DY)
+   falls on a hotspot.  Returns the hotspot id on hit, or POSN unchanged.  */
+static Lisp_Object
+mlp_image_hotspot_check (Lisp_Object object, int dx, int dy, Lisp_Object posn)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  if (IMAGEP (object))
+    {
+      Lisp_Object image_map, hotspot;
+      if ((image_map = plist_get (XCDR (object), QCmap),
+	   !NILP (image_map))
+	  && (hotspot = find_hot_spot (image_map, dx, dy),
+	      CONSP (hotspot))
+	  && (hotspot = XCDR (hotspot), CONSP (hotspot)))
+	return XCAR (hotspot);
+    }
+#endif
+  return posn;
+}
+
+/* Mode-line, header-line, or tab-line click.  Fills in posn, object,
+   string_info, col/row (character positions), dx/dy/width/height, and
+   xret/yret from the window's mode/header/tab line at (WX, WY).  */
+static void
+mlp_mode_header_line (struct window *w, enum window_part part,
+		      int wx, int wy,
+		      Lisp_Object *posn, Lisp_Object *object,
+		      Lisp_Object *string_info,
+		      int *col, int *row,
+		      int *dx, int *dy, int *width, int *height,
+		      int *xret, int *yret)
+{
+  Lisp_Object string;
+  ptrdiff_t charpos;
+
+  *posn = (part == ON_MODE_LINE ? Qmode_line
+	   : (part == ON_TAB_LINE ? Qtab_line
+	      : Qheader_line));
+
+  /* mode_line_string takes COL, ROW as pixels and converts
+     them to characters.  */
+  *col = wx;
+  *row = wy;
+  string = mode_line_string (w, part, col, row, &charpos,
+			     object, dx, dy, width, height);
+  if (STRINGP (string))
+    *string_info = Fcons (string, make_fixnum (charpos));
+  *xret = wx;
+  *yret = wy;
+}
+
+/* Scroll-bar, border, and divider clicks.  Dispatches on PART
+   (ON_VERTICAL_BORDER, ON_VERTICAL_SCROLL_BAR, ON_HORIZONTAL_SCROLL_BAR,
+   ON_RIGHT_DIVIDER, ON_BOTTOM_DIVIDER).  Fills in posn, width, dx,
+   xret, dy, yret.  */
+static void
+mlp_scroll_border (struct window *w, enum window_part part, int wx, int wy,
+		   Lisp_Object *posn, int *width, int *dx,
+		   int *xret, int *dy, int *yret)
+{
+  if (part == ON_VERTICAL_BORDER)
+    {
+      *posn = Qvertical_line;
+      *width = 1;
+      *dx = 0;
+      *xret = wx;
+      *dy = *yret = wy;
+    }
+  else if (part == ON_VERTICAL_SCROLL_BAR)
+    {
+      *posn = Qvertical_scroll_bar;
+      *width = WINDOW_SCROLL_BAR_AREA_WIDTH (w);
+      *dx = *xret = wx;
+      *dy = *yret = wy;
+    }
+  else if (part == ON_HORIZONTAL_SCROLL_BAR)
+    {
+      *posn = Qhorizontal_scroll_bar;
+      *width = WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
+      *dx = *xret = wx;
+      *dy = *yret = wy;
+    }
+  else if (part == ON_RIGHT_DIVIDER)
+    {
+      *posn = Qright_divider;
+      *width = WINDOW_RIGHT_DIVIDER_WIDTH (w);
+      *dx = *xret = wx;
+      *dy = *yret = wy;
+    }
+  else /* ON_BOTTOM_DIVIDER */
+    {
+      *posn = Qbottom_divider;
+      *width = WINDOW_BOTTOM_DIVIDER_WIDTH (w);
+      *dx = *xret = wx;
+      *dy = *yret = wy;
+    }
+}
+
+/* Left or right fringe click.  LEFT_P selects the fringe side.
+   Fills in posn, col, dx, dy, xret, yret.  */
+static void
+mlp_fringes (struct window *w, bool left_p, int wx, int wy,
+	     Lisp_Object *posn, int *col, int *dx, int *dy,
+	     int *xret, int *yret)
+{
+  *posn = left_p ? Qleft_fringe : Qright_fringe;
+  *col = 0;
+  *xret = wx;
+  if (left_p)
+    *dx = wx - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
+		? 0 : window_box_width (w, LEFT_MARGIN_AREA));
+  else
+    *dx = wx
+      - window_box_width (w, LEFT_MARGIN_AREA)
+      - window_box_width (w, TEXT_AREA)
+      - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
+	 ? window_box_width (w, RIGHT_MARGIN_AREA)
+	 : 0);
+  *dy = *yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+}
+
+/* Post-dispatch buffer-position pass.  Called after region handlers
+   for clicks in the text area, fringes, margins, or vertical scroll
+   bar.  Fills in textpos, posn, object, string_info, col, row, dx,
+   dy, width, height from buffer_posn_from_coords.  */
+static void
+mlp_buffer_posn_pass (struct window *w, enum window_part part,
+		      int mx, int wy, int xret,
+		      ptrdiff_t *textpos,
+		      int *col, int *row,
+		      int *dx, int *dy, int *width, int *height,
+		      Lisp_Object *posn, Lisp_Object *string_info,
+		      Lisp_Object *object)
+{
+  Lisp_Object string2, object2 = Qnil;
+  struct display_pos p;
+  int dx2, dy2;
+  int width2, height2;
+  int x2
+    = (part == ON_TEXT) ? xret
+    : (part == ON_RIGHT_FRINGE || part == ON_RIGHT_MARGIN
+       || (part == ON_VERTICAL_SCROLL_BAR
+	   && WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (w)))
+    ? (mx - window_box_left (w, TEXT_AREA))
+    : 0;
+  int y2 = wy;
+
+  string2 = buffer_posn_from_coords (w, &x2, &y2, &p,
+				     &object2, &dx2, &dy2,
+				     &width2, &height2);
+  *textpos = CHARPOS (p.pos);
+  if (*col < 0) *col = x2;
+  if (*row < 0) *row = y2;
+  if (*dx < 0) *dx = dx2;
+  if (*dy < 0) *dy = dy2;
+  if (*width < 0) *width = width2;
+  if (*height < 0) *height = height2;
+
+  if (NILP (*posn))
+    {
+      *posn = make_fixnum (*textpos);
+      if (STRINGP (string2))
+	*string_info = Fcons (string2,
+			      make_fixnum (CHARPOS (p.string_pos)));
+    }
+  if (NILP (*object))
+    *object = object2;
+}
+
+/* Left/right margin click.  Fills in posn, object, string_info,
+   col, row, dx, dy, width, height, xret, yret from the window's
+   margin area at pixel coordinates (WX, WY) relative to the window
+   corner.  */
+static void
+mlp_margins (struct window *w, enum window_part part,
+	     int wx, int wy,
+	     Lisp_Object *posn, Lisp_Object *object,
+	     Lisp_Object *string_info,
+	     int *col, int *row,
+	     int *dx, int *dy, int *width, int *height,
+	     int *xret, int *yret)
+{
+  Lisp_Object string;
+  ptrdiff_t charpos;
+
+  *posn = (part == ON_LEFT_MARGIN) ? Qleft_margin : Qright_margin;
+  *col = wx;
+  *row = wy;
+  string = marginal_area_string (w, part, col, row, &charpos,
+				 object, dx, dy, width, height);
+  if (STRINGP (string))
+    *string_info = Fcons (string, make_fixnum (charpos));
+  *xret = wx;
+  *yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
+}
+
 /* If F is a GUI frame with internal borders and POSN hasn't been
    claimed yet, check whether (X, Y) falls on an internal border
    part.  Returns the border-part symbol on hit, or POSN unchanged.  */
@@ -6377,71 +6573,51 @@ mlp_internal_border (struct frame *f, int x, int y, Lisp_Object posn)
   return posn;
 }
 
-/* X and Y are frame-relative coordinates for a click or wheel event.
-   Return a Lisp-style event list.  */
-
-static Lisp_Object
-make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
-		     Time t)
+/* Frame preamble: window_from_coordinates + tab/tool/menu-bar detection.
+   Determines window_or_frame, part, and initial posn (set to a bar symbol
+   if the click is on a tab-bar, tool-bar, or menu-bar).  TRACK_MOUSE is
+   the global — passed explicitly so imp-6.3 Scheme ports don't need
+   implicit C-global access.  */
+static void
+mlp_frame_preamble (struct frame *f, int mx, int my,
+		    Lisp_Object track_mouse_val,
+		    Lisp_Object *window_or_frame,
+		    enum window_part *part,
+		    Lisp_Object *posn)
 {
-  enum window_part part;
-  Lisp_Object posn = Qnil;
-  Lisp_Object extra_info = Qnil;
-  int mx = XFIXNUM (x), my = XFIXNUM (y);
-  /* Coordinate pixel positions to return.  */
-  int xret = 0, yret = 0;
-  /* The window or frame under frame pixel coordinates (x,y)  */
-  Lisp_Object window_or_frame = (f != NULL
-				 ? window_from_coordinates (f, mx, my, &part,
-							    false, true, true)
-				 : Qnil);
+  *window_or_frame = (f != NULL
+		      ? window_from_coordinates (f, mx, my, part,
+						 false, true, true)
+		      : Qnil);
+  *posn = Qnil;
+
 #ifdef HAVE_WINDOW_SYSTEM
   bool tool_bar_p = false;
   bool menu_bar_p = false;
 
-  /* Report mouse events on the tab bar and (on GUI frames) on the
-     tool bar.  */
   if (f && ((WINDOWP (f->tab_bar_window)
-	     && EQ (window_or_frame, f->tab_bar_window))
+	     && EQ (*window_or_frame, f->tab_bar_window))
 #ifndef HAVE_EXT_TOOL_BAR
 	    || (WINDOWP (f->tool_bar_window)
-		&& EQ (window_or_frame, f->tool_bar_window))
+		&& EQ (*window_or_frame, f->tool_bar_window))
 #endif
 	    ))
     {
-      /* While 'track-mouse' is neither nil nor t, do not report this
-	 event as something that happened on the tool or tab bar since
-	 that would break mouse drag operations that originate from an
-	 ordinary window beneath that bar and expect the window to
-	 auto-scroll as soon as the mouse cursor appears above or
-	 beneath it (Bug#50993).  We do allow reports for t, because
-	 applications may have set 'track-mouse' to t and still expect a
-	 click on the tool or tab bar to get through (Bug#51794).
-
-	 FIXME: This is a preliminary fix for the bugs cited above and
-	 awaits a solution that includes a convention for all special
-	 values of 'track-mouse' and their documentation in the Elisp
-	 manual.  */
-      if (NILP (track_mouse) || EQ (track_mouse, Qt))
-	posn = EQ (window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
-      /* Kludge alert: for mouse events on the tab bar and tool bar,
-	 keyboard.c wants the frame, not the special-purpose window
-	 we use to display those, and it wants frame-relative
-	 coordinates.  FIXME!  */
-      window_or_frame = Qnil;
+      if (NILP (track_mouse_val) || EQ (track_mouse_val, Qt))
+	*posn = EQ (*window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
+      *window_or_frame = Qnil;
     }
 
   if (f && FRAME_TERMINAL (f)->toolkit_position_hook)
     {
       FRAME_TERMINAL (f)->toolkit_position_hook (f, mx, my, &menu_bar_p,
 						 &tool_bar_p);
-
-      if (NILP (track_mouse) || EQ (track_mouse, Qt))
+      if (NILP (track_mouse_val) || EQ (track_mouse_val, Qt))
 	{
 	  if (menu_bar_p)
-	    posn = Qmenu_bar;
+	    *posn = Qmenu_bar;
 	  else if (tool_bar_p)
-	    posn = Qtool_bar;
+	    *posn = Qtool_bar;
 	}
     }
 #endif
@@ -6451,9 +6627,28 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       && my >= FRAME_MENU_BAR_LINES (f)
       && my < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
     {
-      posn = Qtab_bar;
-      window_or_frame = Qnil;	/* see above */
+      *posn = Qtab_bar;
+      *window_or_frame = Qnil;
     }
+}
+
+/* X and Y are frame-relative coordinates for a click or wheel event.
+   Return a Lisp-style event list.  */
+
+static Lisp_Object
+make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
+		     Time t)
+{
+  enum window_part part;
+  Lisp_Object posn;
+  Lisp_Object extra_info = Qnil;
+  int mx = XFIXNUM (x), my = XFIXNUM (y);
+  /* Coordinate pixel positions to return.  */
+  int xret = 0, yret = 0;
+  Lisp_Object window_or_frame;
+
+  mlp_frame_preamble (f, mx, my, track_mouse,
+		      &window_or_frame, &part, &posn);
 
   if (WINDOWP (window_or_frame))
     {
@@ -6484,159 +6679,41 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
       else if (part == ON_MODE_LINE || part == ON_TAB_LINE
 	       || part == ON_HEADER_LINE)
 	{
-	  Lisp_Object string;
-	  ptrdiff_t charpos;
-
-	  posn = (part == ON_MODE_LINE ? Qmode_line
-		  : (part == ON_TAB_LINE ? Qtab_line
-		     : Qheader_line));
-
-	  /* Note that mode_line_string takes COL, ROW as pixels and
-	     converts them to characters.  */
-	  col = wx;
-	  row = wy;
-	  string = mode_line_string (w, part, &col, &row, &charpos,
-				     &object, &dx, &dy, &width, &height);
-	  if (STRINGP (string))
-	    string_info = Fcons (string, make_fixnum (charpos));
+	  mlp_mode_header_line (w, part, wx, wy,
+				&posn, &object, &string_info,
+				&col, &row, &dx, &dy, &width, &height,
+				&xret, &yret);
 	  textpos = -1;
-
-	  xret = wx;
-	  yret = wy;
 	}
       /* For fringes and margins, Y is relative to the area's (and the
 	 window's) top edge, while X is meaningless.  */
       else if (part == ON_LEFT_MARGIN || part == ON_RIGHT_MARGIN)
-	{
-	  Lisp_Object string;
-	  ptrdiff_t charpos;
-
-	  posn = (part == ON_LEFT_MARGIN) ? Qleft_margin : Qright_margin;
-	  col = wx;
-	  row = wy;
-	  string = marginal_area_string (w, part, &col, &row, &charpos,
-					 &object, &dx, &dy, &width, &height);
-	  if (STRINGP (string))
-	    string_info = Fcons (string, make_fixnum (charpos));
-	  xret = wx;
-	  yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-	}
+	mlp_margins (w, part, wx, wy,
+		     &posn, &object, &string_info,
+		     &col, &row, &dx, &dy, &width, &height,
+		     &xret, &yret);
       else if (part == ON_LEFT_FRINGE)
-	{
-	  posn = Qleft_fringe;
-	  col = 0;
-	  xret = wx;
-	  dx = wx
-	    - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
-	       ? 0 : window_box_width (w, LEFT_MARGIN_AREA));
-	  dy = yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-	}
+	mlp_fringes (w, true,  wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
       else if (part == ON_RIGHT_FRINGE)
-	{
-	  posn = Qright_fringe;
-	  col = 0;
-	  xret = wx;
-	  dx = wx
-	    - window_box_width (w, LEFT_MARGIN_AREA)
-	    - window_box_width (w, TEXT_AREA)
-	    - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
-	       ? window_box_width (w, RIGHT_MARGIN_AREA)
-	       : 0);
-	  dy = yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-	}
-      else if (part == ON_VERTICAL_BORDER)
-	{
-	  posn = Qvertical_line;
-	  width = 1;
-	  dx = 0;
-	  xret = wx;
-	  dy = yret = wy;
-	}
-      else if (part == ON_VERTICAL_SCROLL_BAR)
-	{
-	  posn = Qvertical_scroll_bar;
-	  width = WINDOW_SCROLL_BAR_AREA_WIDTH (w);
-	  dx = xret = wx;
-	  dy = yret = wy;
-	}
-      else if (part == ON_HORIZONTAL_SCROLL_BAR)
-	{
-	  posn = Qhorizontal_scroll_bar;
-	  width = WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
-	  dx = xret = wx;
-	  dy = yret = wy;
-	}
-      else if (part == ON_RIGHT_DIVIDER)
-	{
-	  posn = Qright_divider;
-	  width = WINDOW_RIGHT_DIVIDER_WIDTH (w);
-	  dx = xret = wx;
-	  dy = yret = wy;
-	}
-      else if (part == ON_BOTTOM_DIVIDER)
-	{
-	  posn = Qbottom_divider;
-	  width = WINDOW_BOTTOM_DIVIDER_WIDTH (w);
-	  dx = xret = wx;
-	  dy = yret = wy;
-	}
+	mlp_fringes (w, false, wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
+      else if (part == ON_VERTICAL_BORDER
+	       || part == ON_VERTICAL_SCROLL_BAR
+	       || part == ON_HORIZONTAL_SCROLL_BAR
+	       || part == ON_RIGHT_DIVIDER
+	       || part == ON_BOTTOM_DIVIDER)
+	mlp_scroll_border (w, part, wx, wy, &posn, &width, &dx,
+			   &xret, &dy, &yret);
 
       /* For clicks in the text area, fringes, margins, or vertical
 	 scroll bar, call buffer_posn_from_coords to extract TEXTPOS,
 	 the buffer position nearest to the click.  */
       if (!textpos)
-	{
-	  Lisp_Object string2, object2 = Qnil;
-	  struct display_pos p;
-	  int dx2, dy2;
-	  int width2, height2;
-	  /* The pixel X coordinate passed to buffer_posn_from_coords
-	     is the X coordinate relative to the text area for clicks
-	     in text-area, right-margin/fringe and right-side vertical
-	     scroll bar, zero otherwise.  */
-	  int x2
-	    = (part == ON_TEXT) ? xret
-	    : (part == ON_RIGHT_FRINGE || part == ON_RIGHT_MARGIN
-	       || (part == ON_VERTICAL_SCROLL_BAR
-		   && WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (w)))
-	    ? (mx - window_box_left (w, TEXT_AREA))
-	    : 0;
-	  int y2 = wy;
+	mlp_buffer_posn_pass (w, part, mx, wy, xret,
+			      &textpos, &col, &row,
+			      &dx, &dy, &width, &height,
+			      &posn, &string_info, &object);
 
-	  string2 = buffer_posn_from_coords (w, &x2, &y2, &p,
-					     &object2, &dx2, &dy2,
-					     &width2, &height2);
-	  textpos = CHARPOS (p.pos);
-	  if (col < 0) col = x2;
-	  if (row < 0) row = y2;
-	  if (dx < 0) dx = dx2;
-	  if (dy < 0) dy = dy2;
-	  if (width < 0) width = width2;
-	  if (height < 0) height = height2;
-
-	  if (NILP (posn))
-	    {
-	      posn = make_fixnum (textpos);
-	      if (STRINGP (string2))
-		string_info = Fcons (string2,
-				     make_fixnum (CHARPOS (p.string_pos)));
-	    }
-	  if (NILP (object))
-	    object = object2;
-	}
-
-#ifdef HAVE_WINDOW_SYSTEM
-      if (IMAGEP (object))
-	{
-	  Lisp_Object image_map, hotspot;
-	  if ((image_map = plist_get (XCDR (object), QCmap),
-	       !NILP (image_map))
-	      && (hotspot = find_hot_spot (image_map, dx, dy),
-		  CONSP (hotspot))
-	      && (hotspot = XCDR (hotspot), CONSP (hotspot)))
-	    posn = XCAR (hotspot);
-	}
-#endif
+      posn = mlp_image_hotspot_check (object, dx, dy, posn);
 
       /* Object info.  */
       extra_info
