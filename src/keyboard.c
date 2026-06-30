@@ -6639,120 +6639,20 @@ static Lisp_Object
 make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 		     Time t)
 {
-  enum window_part part;
-  Lisp_Object posn;
-  Lisp_Object extra_info = Qnil;
-  int mx = XFIXNUM (x), my = XFIXNUM (y);
-  /* Coordinate pixel positions to return.  */
-  int xret = 0, yret = 0;
-  Lisp_Object window_or_frame;
-
-  mlp_frame_preamble (f, mx, my, track_mouse,
-		      &window_or_frame, &part, &posn);
-
-  if (WINDOWP (window_or_frame))
-    {
-      /* It's a click in window WINDOW at frame coordinates (X,Y)  */
-      struct window *w = XWINDOW (window_or_frame);
-      Lisp_Object string_info = Qnil;
-      ptrdiff_t textpos = 0;
-      int col = -1, row = -1;
-      int dx  = -1, dy  = -1;
-      int width = -1, height = -1;
-      Lisp_Object object = Qnil;
-
-      /* Pixel coordinates relative to the window corner.  */
-      int wx = mx - WINDOW_LEFT_EDGE_X (w);
-      int wy = my - WINDOW_TOP_EDGE_Y (w);
-
-      /* For text area clicks, return X, Y relative to the corner of
-	 this text area.  Note that dX, dY etc are set below, by
-	 buffer_posn_from_coords.  */
-      if (part == ON_TEXT)
-	{
-	  xret = mx - window_box_left (w, TEXT_AREA);
-	  yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-	}
-      /* For mode line and header line clicks, return X, Y relative to
-	 the left window edge.  Use mode_line_string to look for a
-	 string on the click position.  */
-      else if (part == ON_MODE_LINE || part == ON_TAB_LINE
-	       || part == ON_HEADER_LINE)
-	{
-	  mlp_mode_header_line (w, part, wx, wy,
-				&posn, &object, &string_info,
-				&col, &row, &dx, &dy, &width, &height,
-				&xret, &yret);
-	  textpos = -1;
-	}
-      /* For fringes and margins, Y is relative to the area's (and the
-	 window's) top edge, while X is meaningless.  */
-      else if (part == ON_LEFT_MARGIN || part == ON_RIGHT_MARGIN)
-	mlp_margins (w, part, wx, wy,
-		     &posn, &object, &string_info,
-		     &col, &row, &dx, &dy, &width, &height,
-		     &xret, &yret);
-      else if (part == ON_LEFT_FRINGE)
-	mlp_fringes (w, true,  wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
-      else if (part == ON_RIGHT_FRINGE)
-	mlp_fringes (w, false, wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
-      else if (part == ON_VERTICAL_BORDER
-	       || part == ON_VERTICAL_SCROLL_BAR
-	       || part == ON_HORIZONTAL_SCROLL_BAR
-	       || part == ON_RIGHT_DIVIDER
-	       || part == ON_BOTTOM_DIVIDER)
-	mlp_scroll_border (w, part, wx, wy, &posn, &width, &dx,
-			   &xret, &dy, &yret);
-
-      /* For clicks in the text area, fringes, margins, or vertical
-	 scroll bar, call buffer_posn_from_coords to extract TEXTPOS,
-	 the buffer position nearest to the click.  */
-      if (!textpos)
-	mlp_buffer_posn_pass (w, part, mx, wy, xret,
-			      &textpos, &col, &row,
-			      &dx, &dy, &width, &height,
-			      &posn, &string_info, &object);
-
-      posn = mlp_image_hotspot_check (object, dx, dy, posn);
-
-      /* Object info.  */
-      extra_info
-	= list3 (object,
-		 Fcons (make_fixnum (dx), make_fixnum (dy)),
-		 Fcons (make_fixnum (width), make_fixnum (height)));
-
-      /* String info.  */
-      extra_info = Fcons (string_info,
-			  Fcons (textpos < 0 ? Qnil : make_fixnum (textpos),
-				 Fcons (Fcons (make_fixnum (col),
-					       make_fixnum (row)),
-					extra_info)));
-    }
-  else if (f)
-    {
-      /* Return mouse pixel coordinates here.  */
-      XSETFRAME (window_or_frame, f);
-      xret = mx;
-      yret = my;
-      posn = mlp_internal_border (f, xret, yret, posn);
-    }
+  /* imp-6.4 — C body replaced by SCM_CALL_4 into the Scheme
+     orchestrator in (emacs lispy-position) make-lispy-position.
+     The mlp_* helpers remain as C code called by the adapter
+     DEFUNs (--mlp-*), which the Scheme orchestrator uses.  */
+  static SCM proc = SCM_UNDEFINED;
+  Lisp_Object frame_obj;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+			     "make-lispy-position");
+  if (f)
+    XSETFRAME (frame_obj, f);
   else
-    {
-      if (EQ (track_mouse, Qdrag_source))
-	{
-	  xret = mx;
-	  yret = my;
-	}
-
-      window_or_frame = Qnil;
-    }
-
-  return Fcons (window_or_frame,
-		Fcons (posn,
-		       Fcons (Fcons (make_fixnum (xret),
-				     make_fixnum (yret)),
-			      Fcons (INT_TO_INTEGER (t),
-				     extra_info))));
+    frame_obj = Qnil;
+  return SCM_CALL_4 (proc, frame_obj, x, y, INT_TO_INTEGER (t));
 }
 
 /* Return non-zero if F is a GUI frame that uses some toolkit-managed
@@ -7626,7 +7526,7 @@ DEFUN ("--make-lispy-position", Fmake_lispy_position, Smake_lispy_position,
        doc: /* Build a mouse-click position list for frame-or-window FOW,
 pixel coords X and Y, and timestamp T.  T arrives from
 --ie-timestamp (INT_TO_INTEGER) and may be a bignum on 32-bit
-fixnum builds.  Calls the existing C make_lispy_position.  */)
+fixnum builds.  Delegates to (emacs lispy-position).  */)
   (Lisp_Object fow, Lisp_Object x, Lisp_Object y, Lisp_Object t)
 {
   struct frame *f = XFRAME (fow);
