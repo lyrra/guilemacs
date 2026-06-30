@@ -1,6 +1,7 @@
 (define-module (emacs lispy-event)
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs event-modifiers)
+  #:use-module (emacs lispy-position)
   #:declarative? #t
   #:export (make-lispy-event-dispatch
             make-lispy-event))
@@ -52,7 +53,7 @@
 (define %--make-lispy-event-c   (delay (%c '--make-lispy-event-c)))
 (define %--make-lispy-focus-in  (delay (%c '--make-lispy-focus-in)))
 (define %--make-lispy-focus-out (delay (%c '--make-lispy-focus-out)))
-(define %--make-lispy-position  (delay (%c '--make-lispy-position)))
+;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
 (define %--drag-n-drop-head     (delay (%c '--drag-n-drop-head)))
 (define %--time-to-position      (delay (%c '--time-to-position)))
 (define %--make-scroll-bar-pos    (delay (%c '--make-scroll-bar-position)))
@@ -247,7 +248,7 @@ make_lispy_event body."
          (files ((force %--ie-arg) ie)))
     (if (not ((force %frame-live-p) fow))
         #nil
-        (let ((position ((force %--make-lispy-position)
+        (let ((position (make-lispy-position
                          fow
                          ((force %--ie-x) ie)
                          ((force %--ie-y) ie)
