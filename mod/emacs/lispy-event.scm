@@ -752,3 +752,41 @@ make_lispy_event body."
 (register-kind! 'touchscreen-begin mle-touchscreen-begin-event)
 (register-kind! 'touchscreen-end mle-touchscreen-end-event)
 (register-kind! 'touchscreen-update mle-touchscreen-update-event)
+
+\f
+;;; imp-7.5 — MOUSE_CLICK + non-toolkit SCROLL_BAR_CLICK.
+;;;
+;;; ~300-line C body → decomposed into sub-helpers.
+;;; imp-7.5.1: menu-bar intercept (this leaf) — stub that
+;;; tries menu-bar first, then falls through to C fallback
+;;; until the full handler is built out in 7.5.2+.
+
+(define %--ensure-button-down-location-size
+  (delay (%c '--ensure-button-down-location-size)))
+(define %--mouse-click-menu-bar-intercept
+  (delay (%c '--mouse-click-menu-bar-intercept)))
+
+(define (mle-mouse-click-event ie)
+  ;; Stub — menu-bar intercept only; falls through to C for the rest.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let ((mb-event
+               ((force %--mouse-click-menu-bar-intercept)
+                fow
+                ((force %--ie-x) ie)
+                ((force %--ie-y) ie)
+                ((force %--ie-modifiers) ie)
+                ((force %--ie-timestamp) ie)
+                fow)))
+          (if mb-event
+              mb-event
+              ;; Fall through to C until 7.5.2+ builds out the
+              ;; double-click + drag/release logic.  Transient
+              ;; double-eval: the C fallback re-runs menu-bar
+              ;; intercept for non-menu-bar clicks.  Evaporates
+              ;; when the full handler replaces the fallback.
+              ((force %--make-lispy-event-c) ie)))))))
+
+;; Registration deferred until handler is behavior-complete.
+;; (register-kind! 'mouse-click-event mle-mouse-click-event)

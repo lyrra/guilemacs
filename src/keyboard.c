@@ -1173,6 +1173,16 @@ without hard-coding enum values in Scheme.  Each event symbol
   if (EQ (name, Qtouchscreen_update))
     return make_fixnum (TOUCHSCREEN_UPDATE_EVENT);
 
+  /* imp-7.5 — mouse click + non-toolkit scroll-bar click.  */
+  if (EQ (name, Qmouse_click_event))
+    return make_fixnum (MOUSE_CLICK_EVENT);
+#ifndef USE_TOOLKIT_SCROLL_BARS
+  if (EQ (name, Qscroll_bar_click_event))
+    return make_fixnum (SCROLL_BAR_CLICK_EVENT);
+  if (EQ (name, Qhorizontal_scroll_bar_click_event))
+    return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
+#endif
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }
@@ -8231,6 +8241,121 @@ DEFUN ("--set-double-click-count", Fset_double_click_count,
   return Qnil;
 }
 
+DEFUN ("--ensure-button-down-location-size",
+       Fensure_button_down_location_size,
+       Sensure_button_down_location_size, 1, 1, 0,
+       doc: /* Grow button_down_location to hold index N if needed.
+
+If N is >= the current vector size, resizes via larger_vector
+(which fills new slots with nil).  Also resizes mouse_syms in
+lockstep (same C pattern at keyboard.c:6946-6948).  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  int button = XFIXNUM (n);
+  if (button >= ASIZE (button_down_location))
+    {
+      ptrdiff_t incr = button - ASIZE (button_down_location) + 1;
+      button_down_location = larger_vector (button_down_location,
+					    incr, -1);
+      mouse_syms = larger_vector (mouse_syms, incr, -1);
+    }
+  return Qnil;
+}
+
+DEFUN ("--mouse-click-menu-bar-intercept",
+       Fmouse_click_menu_bar_intercept,
+       Smouse_click_menu_bar_intercept, 6, 6, 0,
+       doc: /* If the click at frame-relative (X, Y) on FRAME is on
+the menu bar (non-toolkit build), return the menu-bar item
+event (ITEM . POSITION).  Returns nil otherwise.
+
+FRAME is a live frame.  X and Y are fixnum pixel coords.
+MODIFIERS is the event modifier bitmask (must have down_modifier
+for menu-bar activation).  TIMESTAMP is the event timestamp
+(already INT_TO_INTEGER'd).  FOW is event->frame_or_window.
+
+Encapsulates toolkit_menubar_in_use, coords_in_menu_bar_window,
+pixel_to_glyph_coords / x_y_to_hpos_vpos, and FRAME_MENU_BAR_ITEMS
+iteration.  On toolkit builds, always returns nil.  */)
+  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
+   Lisp_Object modifiers, Lisp_Object timestamp, Lisp_Object fow)
+{
+  struct frame *f = XFRAME (frame);
+  int ix, iy, row, column;
+
+  CHECK_LIVE_FRAME (frame);
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  CHECK_FIXNUM (modifiers);
+  ix = XFIXNUM (x);
+  iy = XFIXNUM (y);
+
+  /* Toolkit builds handle menu bar internally — no intercept.  */
+  if (toolkit_menubar_in_use (f))
+    return Qnil;
+
+  /* Must have down_modifier for menu-bar activation.  */
+  if (!(XFIXNUM (modifiers) & down_modifier))
+    return Qnil;
+
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  /* On window-system frames: check coords_in_menu_bar_window,
+     convert to window-relative coords, use x_y_to_hpos_vpos.  */
+  if (FRAME_WINDOW_P (f))
+    {
+      if (!coords_in_menu_bar_window (f, ix, iy))
+	return Qnil;
+
+      {
+	struct window *menu_w = XWINDOW (f->menu_bar_window);
+	int wx, wy, dummy;
+	wx = FRAME_TO_WINDOW_PIXEL_X (menu_w, ix);
+	wy = FRAME_TO_WINDOW_PIXEL_Y (menu_w, iy);
+	x_y_to_hpos_vpos (menu_w, wx, wy, &column, &row,
+			  NULL, NULL, &dummy);
+      }
+    }
+  else
+#endif
+    /* Non-window frames: use pixel_to_glyph_coords.  */
+    pixel_to_glyph_coords (f, ix, iy, &column, &row, NULL, 1);
+
+  /* Check row is within the menu bar.  */
+  if (row < 0 || row >= FRAME_MENU_BAR_LINES (f))
+    return Qnil;
+
+  {
+    Lisp_Object items = FRAME_MENU_BAR_ITEMS (f);
+    Lisp_Object item = Qnil;
+    int i;
+    for (i = 0; i < ASIZE (items); i += 4)
+      {
+	Lisp_Object str = AREF (items, i + 1);
+	Lisp_Object pos = AREF (items, i + 3);
+	if (NILP (str))
+	  break;
+	if (column >= XFIXNUM (pos)
+	    && column < XFIXNUM (pos) + SCHARS (str))
+	  {
+	    item = AREF (items, i);
+	    break;
+	  }
+      }
+
+    if (!NILP (item))
+      {
+	Lisp_Object position
+	  = list4 (fow, Qmenu_bar,
+		   Fcons (x, y),
+		   timestamp);
+	return list2 (item, position);
+      }
+  }
+
+  return Qnil;
+}
+
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
        Siso_function_key_offset, 0, 0, 0,
        doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
@@ -15080,6 +15205,14 @@ syms_of_keyboard (void)
   DEFSYM (Qscroll_bar_click_toolkit, "scroll-bar-click-toolkit");
   DEFSYM (Qhorizontal_scroll_bar_click_toolkit,
           "horizontal-scroll-bar-click-toolkit");
+#endif
+
+  /* Mouse + scroll-bar event-kind keys (imp-7.5).  */
+  DEFSYM (Qmouse_click_event, "mouse-click-event");
+#ifndef USE_TOOLKIT_SCROLL_BARS
+  DEFSYM (Qscroll_bar_click_event, "scroll-bar-click-event");
+  DEFSYM (Qhorizontal_scroll_bar_click_event,
+          "horizontal-scroll-bar-click-event");
 #endif
 
   /* Keystroke event-kind keys (imp-5).  */
