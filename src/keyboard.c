@@ -8419,6 +8419,19 @@ and stores it in down_mouse_line_number_width.  */)
   return Qnil;
 }
 
+DEFUN ("--line-number-mode-hscroll", Fline_number_mode_hscroll,
+       Sline_number_mode_hscroll, 2, 2, 0,
+       doc: /* Return t if the position change from START-POS to END-POS
+is likely due to line-number-mode hscroll redisplay.
+
+Wraps line_number_mode_hscroll (keyboard.c:6771).  Used by the
+mouse-click drag/click resolution to avoid spurious drag events
+when line-number display width changes between down and up.  */)
+  (Lisp_Object start_pos, Lisp_Object end_pos)
+{
+  return line_number_mode_hscroll (start_pos, end_pos) ? Qt : Qnil;
+}
+
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
        Siso_function_key_offset, 0, 0, 0,
        doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
