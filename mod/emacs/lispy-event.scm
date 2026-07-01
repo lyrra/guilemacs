@@ -529,3 +529,88 @@ make_lispy_event body."
   (list ((force %--ns-text-event-symbol) ((force %--ie-code) ie))))
 
 (register-kind! 'ns-text-event mle-ns-text-event)
+
+\f
+;;; imp-7.2 — WHEEL_EVENT / HORIZ_WHEEL_EVENT.
+;;;
+;;; C body (keyboard.c:7115–7225): frame-live check,
+;;; make_lispy_position, wheel-direction → symbol_num, fuzz
+;;; computation, double-click detection (reads/mutates 5
+;;; file-statics), head-symbol via modify_event_symbol with
+;;; lispy_wheel_names / wheel_syms, list-shape dispatch on
+;;; event->arg + modifiers.
+;;;
+;;; Double-click detection intentionally skipped — needs
+;;; imp-7.1 file-static mirror.  Every wheel event gets
+;;; click_modifier only.  The C fallback (--make-lispy-event-c)
+;;; retains full double-click behavior for unported kinds.
+
+(define %--modify-event-symbol-mouse-click
+  (delay (%c '--modify-event-symbol-mouse-click)))
+
+(define (mle-wheel-event ie horiz?)
+  ;; Shared body for WHEEL_EVENT and HORIZ_WHEEL_EVENT.
+  ;; horiz? is #t for HORIZ_WHEEL_EVENT, #f for WHEEL_EVENT.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+
+    ;; Frame live check — return nil for deleted frames.
+    (if (not ((force %frame-live-p) fow))
+        #nil
+
+        ;; Build position via Scheme make-lispy-position (imp-6.4).
+        (let* ((position (make-lispy-position
+                          fow
+                          ((force %--ie-x) ie)
+                          ((force %--ie-y) ie)
+                          ((force %--ie-timestamp) ie)))
+
+               ;; Wheel direction — symbol_num 0=up, 1=down,
+               ;; +2 for horizontal (2=left, 3=right).
+               (mods ((force %--ie-modifiers) ie))
+               (symbol-num
+                (cond
+                 ((not (zero? (logand mods up-modifier)))
+                  (set! mods (logand mods (lognot up-modifier)))
+                  0)
+                 ((not (zero? (logand mods down-modifier)))
+                  (set! mods (logand mods (lognot down-modifier)))
+                  1)
+                 (else
+                  (error "wheel event without up/down modifier")))))
+
+          (when horiz?
+            (set! symbol-num (+ symbol-num 2)))
+
+          ;; Double-click detection + fuzz skipped — needs
+          ;; imp-7.1 mirror.  Always emit click_modifier.
+          (set! mods (logior mods click-modifier))
+
+          ;; Head symbol via modify_event_symbol with wheel tables.
+          (let* ((head ((force %--modify-event-symbol-mouse-click)
+                        symbol-num mods))
+                 (arg ((force %--ie-arg) ie)))
+
+            ;; Return shape dispatch — matches C list2/list4/list5.
+            ;; list3 branch (double/triple modifier) unreachable
+            ;; until imp-7.1 enables double-click promotion.
+            (cond
+             ((pair? arg)
+              (list head position 1 (car arg)
+                    (if (and (pair? (cdr arg)) (pair? (cddr arg)))
+                        (cons (cadr arg) (caddr arg))
+                        #nil)))
+             ((number? arg)
+              (list head position 1 arg))
+             (else
+              (list head position))))))))
+
+(define (mle-vert-wheel-event ie)
+  (mle-wheel-event ie #f))
+
+(define (mle-horiz-wheel-event ie)
+  (mle-wheel-event ie #t))
+
+(register-kind! 'wheel-event mle-vert-wheel-event)
+;; HORIZ_WHEEL_EVENT silently skipped on builds without it
+;; (--ie-kind-from-name returns -1, register-kind! is a no-op).
+(register-kind! 'horizontal-wheel-event mle-horiz-wheel-event)

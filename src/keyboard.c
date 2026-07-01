@@ -1153,6 +1153,12 @@ without hard-coding enum values in Scheme.  Each event symbol
     return make_fixnum (MULTIMEDIA_KEY_EVENT);
 #endif
 
+  /* imp-7.2 — wheel events (always compiled in).  */
+  if (EQ (name, Qwheel_event))
+    return make_fixnum (WHEEL_EVENT);
+  if (EQ (name, Qhorizontal_wheel_event))
+    return make_fixnum (HORIZ_WHEEL_EVENT);
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }
@@ -7838,6 +7844,25 @@ Vsystem_key_alist for name resolution.  */)
 			      NULL,
 			      &KVAR (current_kboard, system_key_syms),
 			      PTRDIFF_MAX);
+}
+
+DEFUN ("--modify-event-symbol-mouse-click",
+       Fmodify_event_symbol_mouse_click,
+       Smodify_event_symbol_mouse_click, 2, 2, 0,
+       doc: /* Mouse-click / wheel head-symbol lookup through modify_event_symbol.
+
+SYMBOL_NUM is the wheel-name index (0=wheel-up, 1=wheel-down,
+2=wheel-left, 3=wheel-right) or mouse button number.
+MODIFIERS is the event modifier bitmask.  Uses the wheel_syms
+file-static cache and lispy_wheel_names table.  */)
+  (Lisp_Object symbol_num, Lisp_Object modifiers)
+{
+  return modify_event_symbol (XFIXNUM (symbol_num),
+			      XFIXNUM (modifiers),
+			      Qmouse_click, Qnil,
+			      lispy_wheel_names,
+			      &wheel_syms,
+			      ASIZE (wheel_syms));
 }
 
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
@@ -14681,6 +14706,8 @@ syms_of_keyboard (void)
 
   /* The values of Qevent_kind properties.  */
   DEFSYM (Qmouse_click, "mouse-click");
+  DEFSYM (Qwheel_event, "wheel-event");
+  DEFSYM (Qhorizontal_wheel_event, "horizontal-wheel-event");
 
   DEFSYM (Qdrag_n_drop, "drag-n-drop");
 #ifdef USE_TOOLKIT_SCROLL_BARS
