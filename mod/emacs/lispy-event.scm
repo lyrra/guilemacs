@@ -1005,5 +1005,110 @@ make_lispy_event body."
                               (else triple-modifier)))))
         (values mods position))))
 
-;; Registration deferred until handler is behavior-complete.
-;; (register-kind! 'mouse-click-event mle-mouse-click-event)
+\f
+;;; imp-7.5.5 — top-level mouse-click + scroll-bar-click handler.
+;;; Assembles imp-7.5.1–7.5.4 plus scroll-bar position fallback.
+
+(define %--make-scroll-bar-position
+  (delay (%c '--make-scroll-bar-position)))
+(define %nconc2 (delay (%c 'nconc2)))
+
+(define (mle-mouse-click-impl ie kind-tag)
+  ;; kind-tag: 'mouse for MOUSE_CLICK_EVENT,
+  ;;           'vertical-scroll-bar for SCROLL_BAR_CLICK_EVENT,
+  ;;           'horizontal-scroll-bar for HORIZONTAL_SCROLL_BAR_CLICK_EVENT.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let* ((x ((force %--ie-x) ie))
+               (y ((force %--ie-y) ie))
+               (ts ((force %--ie-timestamp) ie))
+               (mods ((force %--ie-modifiers) ie))
+               (code ((force %--ie-code) ie)))
+
+          ;; Step 1: menu-bar intercept (mouse-kind only).
+          (if (eq? kind-tag 'mouse)
+              (let ((mb-event
+                     ((force %--mouse-click-menu-bar-intercept)
+                      fow x y mods ts fow)))
+                (if mb-event mb-event
+                    ;; Not on menu bar — continue.
+                    (mouse-click-body fow code x y ts mods ie)))
+              ;; Scroll-bar: build position via C helper, skip
+              ;; menu-bar + tab-bar logic.
+              (let ((position
+                     ((force %--make-scroll-bar-position)
+                      fow x y ts
+                      ((force %--ie-part) ie)
+                      kind-tag)))
+                (call-with-values
+                    (lambda ()
+                      (mouse-button-down-bookkeep!
+                       fow code x y ts mods position))
+                  (lambda (mods start-pos)
+                    (call-with-values
+                        (lambda ()
+                          (if (not (zero? (logand mods up-modifier)))
+                              (mouse-up-resolve!
+                               fow x y ts mods start-pos position)
+                              (values mods position)))
+                      (lambda (mods position)
+                        (mouse-click-return
+                         mods code start-pos position)))))))))))
+
+(define (mouse-click-body fow code x y ts mods ie)
+  ;; Shared body for mouse-click after menu-bar intercept passes.
+  (let* ((position (make-lispy-position fow x y ts))
+         (arg ((force %--ie-arg) ie))
+         ;; Tab-bar enrichment (C:6936-6938).
+         (position (if (and (pair? arg) (eq? (car arg) 'tab-bar))
+                       ((force %nconc2) position
+                                        (cons (cdr arg) #nil))
+                       position)))
+    (call-with-values
+        (lambda ()
+          (mouse-button-down-bookkeep!
+           fow code x y ts mods position))
+      (lambda (mods start-pos)
+        (call-with-values
+            (lambda ()
+              (if (not (zero? (logand mods up-modifier)))
+                  (mouse-up-resolve!
+                   fow x y ts mods start-pos position)
+                  (values mods position)))
+          (lambda (mods position)
+            (mouse-click-return
+             mods code start-pos position)))))))
+
+(define (mouse-click-return mods code start-pos position)
+  ;; Build head symbol + return appropriate list shape
+  ;; (keyboard.c:7119-7132).  Uses --scroll-bar-click-head
+  ;; because it wraps modify_event_symbol with mouse_syms and
+  ;; Vlispy_mouse_stem — exact match for mouse-click heads.
+  (let ((head ((force %--scroll-bar-click-head) code mods)))
+    (cond
+     ((not (zero? (logand mods drag-modifier)))
+      (list head start-pos position))
+     ((not (zero? (logand mods (logior double-modifier
+                                       triple-modifier))))
+      (list head position ((force %--double-click-count))))
+     (else
+      (list head position)))))
+
+(define (mle-mouse-click-event ie)
+  (mle-mouse-click-impl ie 'mouse))
+
+(define (mle-scroll-bar-click-event ie)
+  ;; Deviates from C:6950 which passes Qvertical_scroll_bar even
+  ;; for HORIZONTAL_SCROLL_BAR_CLICK_EVENT — likely a C bug.
+  (mle-mouse-click-impl ie 'vertical-scroll-bar))
+
+(define (mle-horizontal-scroll-bar-click-event ie)
+  (mle-mouse-click-impl ie 'horizontal-scroll-bar))
+
+(register-kind! 'mouse-click-event mle-mouse-click-event)
+;; Non-toolkit scroll-bar kinds: registration silently skipped
+;; on toolkit builds (--ie-kind-from-name returns -1).
+(register-kind! 'scroll-bar-click-event mle-scroll-bar-click-event)
+(register-kind! 'horizontal-scroll-bar-click-event
+                mle-horizontal-scroll-bar-click-event)
