@@ -1159,6 +1159,12 @@ without hard-coding enum values in Scheme.  Each event symbol
   if (EQ (name, Qhorizontal_wheel_event))
     return make_fixnum (HORIZ_WHEEL_EVENT);
 
+  /* imp-7.3 — touch/pinch (always compiled in).  */
+  if (EQ (name, Qtouch_end))
+    return make_fixnum (TOUCH_END_EVENT);
+  if (EQ (name, Qpinch))
+    return make_fixnum (PINCH_EVENT);
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }
@@ -7863,6 +7869,23 @@ file-static cache and lispy_wheel_names table.  */)
 			      lispy_wheel_names,
 			      &wheel_syms,
 			      ASIZE (wheel_syms));
+}
+
+DEFUN ("--modify-event-symbol-pinch",
+       Fmodify_event_symbol_pinch,
+       Smodify_event_symbol_pinch, 1, 1, 0,
+       doc: /* Pinch event head-symbol lookup through modify_event_symbol.
+
+MODIFIERS is the event modifier bitmask.  Uses the pinch_syms
+file-static cache with the single-entry {"pinch"} name table.  */)
+  (Lisp_Object modifiers)
+{
+  return modify_event_symbol (0,
+			      XFIXNUM (modifiers),
+			      Qpinch, Qnil,
+			      (const char *[]){"pinch"},
+			      &pinch_syms,
+			      1);
 }
 
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,

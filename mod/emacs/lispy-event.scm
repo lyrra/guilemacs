@@ -611,6 +611,48 @@ make_lispy_event body."
   (mle-wheel-event ie #t))
 
 (register-kind! 'wheel-event mle-vert-wheel-event)
-;; HORIZ_WHEEL_EVENT silently skipped on builds without it
-;; (--ie-kind-from-name returns -1, register-kind! is a no-op).
 (register-kind! 'horizontal-wheel-event mle-horiz-wheel-event)
+
+;;; imp-7.3 — TOUCH_END_EVENT / PINCH_EVENT.
+;;;
+;;; Structurally different events that share no body.
+;;; Both use make-lispy-position for the position list.
+;;; No file-static mutations — clean single-event handlers
+;;; that don't need imp-7.1's mirror.
+
+(define %--modify-event-symbol-pinch
+  (delay (%c '--modify-event-symbol-pinch)))
+
+(define (mle-touch-end-event ie)
+  ;; C body (keyboard.c:7238–7252): frame-live check,
+  ;; make_lispy_position, list2(Qtouch_end, position).
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let ((position (make-lispy-position
+                         fow
+                         ((force %--ie-x) ie)
+                         ((force %--ie-y) ie)
+                         ((force %--ie-timestamp) ie))))
+          (list 'touch-end position)))))
+
+(define (mle-pinch-event ie)
+  ;; C body (keyboard.c:7457–7471): no explicit FRAME_LIVE_P
+  ;; guard in the original, but added here for consistency.
+  ;; make_lispy_position + modify_event_symbol(pinch) +
+  ;; cons-chain returning (head position . arg-elements).
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let* ((x ((force %--ie-x) ie))
+               (y ((force %--ie-y) ie))
+               (position (make-lispy-position
+                          fow x y
+                          ((force %--ie-timestamp) ie)))
+               (head ((force %--modify-event-symbol-pinch)
+                      ((force %--ie-modifiers) ie)))
+               (arg ((force %--ie-arg) ie)))
+          (cons head (cons position arg))))))
+
+(register-kind! 'touch-end mle-touch-end-event)
+(register-kind! 'pinch mle-pinch-event)
