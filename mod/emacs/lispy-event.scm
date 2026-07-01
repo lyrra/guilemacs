@@ -811,6 +811,82 @@ make_lispy_event body."
                   (> dbl-time 0)
                   (< (- timestamp down-time) dbl-time))))))
 
+\f
+;;; imp-7.5.3 — button-down bookkeeping (first writes to imp-7.1
+;;; setters).  Reads button_down_location slot (saving old value),
+;;; writes all 5 file-statics + ignore_mouse_drag_p.
+
+(define %--set-last-mouse-button
+  (delay (%c '--set-last-mouse-button)))
+(define %--set-last-mouse-x
+  (delay (%c '--set-last-mouse-x)))
+(define %--set-last-mouse-y
+  (delay (%c '--set-last-mouse-y)))
+(define %--double-click-count
+  (delay (%c '--double-click-count)))
+(define %--set-double-click-count
+  (delay (%c '--set-double-click-count)))
+(define %--set-button-down-time
+  (delay (%c '--set-button-down-time)))
+(define %--set-frame-relative-event-pos
+  (delay (%c '--set-frame-relative-event-pos)))
+(define %--ignore-mouse-drag-p
+  (delay (%c '--ignore-mouse-drag-p)))
+(define %--set-ignore-mouse-drag-p
+  (delay (%c '--set-ignore-mouse-drag-p)))
+(define %--button-down-location-aref
+  (delay (%c '--button-down-location-aref)))
+(define %--button-down-location-aset
+  (delay (%c '--button-down-location-aset)))
+(define %--save-line-number-display-width
+  (delay (%c '--save-line-number-display-width)))
+(define %copy-alist               (delay (%c 'copy-alist)))
+
+(define (mouse-button-down-bookkeep! fow code x y timestamp mods position)
+  ;; Button-press bookkeeping (keyboard.c:6963-7006).
+  ;; Reads old start_pos from button_down_location[code],
+  ;; computes is_dbl using OLD last_mouse_* values, THEN
+  ;; updates last_mouse_*, double_click_count, button_down_time,
+  ;; button_down_location, frame_relative_event_pos,
+  ;; ignore_mouse_drag_p.  Returns (values mods start-pos)
+  ;; where mods may be mutated (double/triple promotion) and
+  ;; start-pos is the old slot value for drag detection.
+
+  ((force %--ensure-button-down-location-size) code)
+  (let ((start-pos ((force %--button-down-location-aref) code)))
+    ((force %--button-down-location-aset) code #nil)
+
+    ;; is-dbl uses OLD last_mouse_* values (C:6984).
+    ;; Must compute BEFORE updating last_mouse_* below.
+    (let ((is-dbl (and (not (zero? (logand mods down-modifier)))
+                       (mouse-double-click-p fow code x y timestamp))))
+
+      ;; Now safe to update last_mouse_* (C:6987-6989).
+      ((force %--set-last-mouse-button) code)
+      ((force %--set-last-mouse-x) x)
+      ((force %--set-last-mouse-y) y)
+
+      (when (not (zero? (logand mods down-modifier)))
+        (let ((dbl-count ((force %--double-click-count))))
+          (if is-dbl
+              (begin
+                (set! dbl-count (+ dbl-count 1))
+                (set! mods (logior mods
+                                   (if (> dbl-count 2)
+                                       triple-modifier
+                                       double-modifier))))
+              (set! dbl-count 1))
+          ((force %--set-double-click-count) dbl-count)
+          ((force %--set-button-down-time) timestamp)
+          ((force %--button-down-location-aset) code
+           ((force %copy-alist) position))
+          ((force %--set-frame-relative-event-pos)
+           (cons x y))
+          ((force %--set-ignore-mouse-drag-p) #nil)
+          ((force %--save-line-number-display-width) fow)))
+
+      (values mods start-pos))))
+
 (define (mle-mouse-click-event ie)
   ;; Stub — menu-bar intercept only; falls through to C for the rest.
   (let* ((fow ((force %--ie-frame-or-window) ie)))

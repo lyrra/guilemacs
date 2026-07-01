@@ -8356,6 +8356,69 @@ iteration.  On toolkit builds, always returns nil.  */)
   return Qnil;
 }
 
+DEFUN ("--ignore-mouse-drag-p", Fignore_mouse_drag_p,
+       Signore_mouse_drag_p, 0, 0, 0,
+       doc: /* Return the value of ignore_mouse_drag_p (C bool).
+
+When non-zero, implicit mouse-movement events are discarded
+during drag tracking (keyboard.c:1761).  */)
+  (void)
+{
+  return ignore_mouse_drag_p ? Qt : Qnil;
+}
+
+DEFUN ("--set-ignore-mouse-drag-p", Fset_ignore_mouse_drag_p,
+       Sset_ignore_mouse_drag_p, 1, 1, 0,
+       doc: /* Set ignore_mouse_drag_p to (VAL != nil).  */)
+  (Lisp_Object val)
+{
+  ignore_mouse_drag_p = !NILP (val);
+  return Qnil;
+}
+
+DEFUN ("--button-down-location-aref", Fbutton_down_location_aref,
+       Sbutton_down_location_aref, 1, 1, 0,
+       doc: /* Return button_down_location[INDEX].  */)
+  (Lisp_Object index)
+{
+  CHECK_FIXNUM (index);
+  return AREF (button_down_location, XFIXNUM (index));
+}
+
+DEFUN ("--button-down-location-aset", Fbutton_down_location_aset,
+       Sbutton_down_location_aset, 2, 2, 0,
+       doc: /* Set button_down_location[INDEX] = VAL.  */)
+  (Lisp_Object index, Lisp_Object val)
+{
+  CHECK_FIXNUM (index);
+  ASET (button_down_location, XFIXNUM (index), val);
+  return Qnil;
+}
+
+DEFUN ("--save-line-number-display-width",
+       Fsave_line_number_display_width,
+       Ssave_line_number_display_width, 1, 1, 0,
+       doc: /* Save the line-number display width for FOW.
+
+FOW is event->frame_or_window (a frame, window, or nil).
+Computes line_number_display_width for the corresponding window
+and stores it in down_mouse_line_number_width.  */)
+  (Lisp_Object fow)
+{
+  struct window *w;
+
+  if (WINDOWP (fow))
+    w = XWINDOW (fow);
+  else if (FRAMEP (fow))
+    w = XWINDOW (XFRAME (fow)->selected_window);
+  else
+    w = XWINDOW (selected_window);
+
+  int pixel_width;
+  line_number_display_width (w, &down_mouse_line_number_width, &pixel_width);
+  return Qnil;
+}
+
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
        Siso_function_key_offset, 0, 0, 0,
        doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
