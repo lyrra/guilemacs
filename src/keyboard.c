@@ -7896,6 +7896,179 @@ file-static cache with the single-entry {"pinch"} name table.  */)
 			      1);
 }
 
+DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,
+       0, 0, 0,
+       doc: /* Return the current value of menu_bar_touch_id.
+
+This is the file-static Lisp_Object mutated by TOUCHSCREEN_BEGIN
+(to store the touch ID that landed on the menu bar) and read by
+TOUCHSCREEN_UPDATE (to filter those touches) and TOUCHSCREEN_END
+(to activate the menu-bar item on release).  */)
+  (void)
+{
+  return menu_bar_touch_id;
+}
+
+DEFUN ("--set-menu-bar-touch-id", Fset_menu_bar_touch_id,
+       Sset_menu_bar_touch_id, 1, 1, 0,
+       doc: /* Set menu_bar_touch_id to VAL.  See --menu-bar-touch-id.  */)
+  (Lisp_Object val)
+{
+  menu_bar_touch_id = val;
+  return Qnil;
+}
+
+DEFUN ("--coords-in-menu-bar-window", Fcoords_in_menu_bar_window,
+       Scoords_in_menu_bar_window, 3, 3, 0,
+       doc: /* Return t if frame-relative (X, Y) lies inside FRAME's
+menu-bar window.
+
+FRAME must be a live frame.  X and Y are fixnums (pixel coords).
+Returns nil on platforms without a non-toolkit menu bar
+(e.g. toolkit builds, no-X builds).  */)
+  (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
+{
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  CHECK_LIVE_FRAME (frame);
+  return coords_in_menu_bar_window (XFRAME (frame),
+				    XFIXNUM (x), XFIXNUM (y))
+    ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--tab-bar-enrich-position", Ftab_bar_enrich_position,
+       Stab_bar_enrich_position, 4, 4, 0,
+       doc: /* If frame-relative (X, Y) falls inside FRAME's tab bar,
+enrich POSITION with the tab-bar item's propertized string.
+
+FRAME must be a live frame.  X and Y are fixnums (pixel coords).
+POSITION is the result of make-lispy-position.  Returns the enriched
+position (with propertized-string object appended) if a tab-bar
+item exists at (X, Y); returns POSITION unchanged otherwise.
+
+On builds without HAVE_WINDOW_SYSTEM, always returns POSITION
+unchanged.  */)
+  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
+   Lisp_Object position)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  struct frame *f = XFRAME (frame);
+  int ix = XFIXNUM (x), iy = XFIXNUM (y);
+  int tab_bar_item;
+  bool close;
+
+  CHECK_LIVE_FRAME (frame);
+
+  if (coords_in_tab_bar_window (f, ix, iy)
+      && get_tab_bar_item_kbd (f, ix, iy, &tab_bar_item, &close) >= 0)
+    {
+      Lisp_Object caption
+	= Fcopy_sequence (AREF (f->tab_bar_items,
+				tab_bar_item + TAB_BAR_ITEM_CAPTION));
+      AUTO_LIST2 (props, Qmenu_item,
+		  list3 (AREF (f->tab_bar_items,
+			       tab_bar_item + TAB_BAR_ITEM_KEY),
+			 AREF (f->tab_bar_items,
+			       tab_bar_item + TAB_BAR_ITEM_BINDING),
+			 close ? Qt : Qnil));
+      Fadd_text_properties (make_fixnum (0),
+			    make_fixnum (SCHARS (caption)),
+			    props, caption);
+      caption = Fcons (caption, make_fixnum (0));
+      return nconc2 (position, Fcons (caption, Qnil));
+    }
+#endif
+  return position;
+}
+
+DEFUN ("--menu-bar-touch-consume-p", Fmenu_bar_touch_consume_p,
+       Smenu_bar_touch_consume_p, 1, 1, 0,
+       doc: /* Return t if TOUCH-ID matches menu_bar_touch_id,
+clearing the stored ID as a side effect.  Returns nil otherwise.
+
+The caller must short-circuit: if this returns t, the touch
+has been consumed (menu_bar_touch_id is now nil) and the
+caller should either emit a menu-bar activation event or
+return nil — but must NOT fall through to a normal end event.
+If this returns nil, the caller proceeds with the normal
+touch-end path.
+
+On platforms without a non-toolkit menu bar, always returns nil.  */)
+  (Lisp_Object touch_id)
+{
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  if (EQ (menu_bar_touch_id, touch_id))
+    {
+      menu_bar_touch_id = Qnil;
+      return Qt;
+    }
+#endif
+  return Qnil;
+}
+
+DEFUN ("--menu-bar-touch-activate", Fmenu_bar_touch_activate,
+       Smenu_bar_touch_activate, 5, 5, 0,
+       doc: /* Activate the menu-bar item at frame-relative (X, Y)
+on FRAME and return the event (ITEM . POSITION).
+
+Call only after --menu-bar-touch-consume-p returned t.
+FRAME is a live frame.  X and Y are fixnum pixel coords.
+FOW is the original event->frame_or_window (for position building).
+TIMESTAMP is the event timestamp (already INT_TO_INTEGER'd).
+
+Returns nil if no menu-bar item is found at (X, Y)
+(e.g. finger slid off, menu-bar hidden between BEGIN and END).
+On non-menu-bar platforms, always returns nil.  */)
+  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
+   Lisp_Object fow, Lisp_Object timestamp)
+{
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  struct frame *f = XFRAME (frame);
+  int ix = XFIXNUM (x), iy = XFIXNUM (y);
+  int column, row, dummy;
+
+  CHECK_LIVE_FRAME (frame);
+
+  if (NILP (f->menu_bar_window))
+    return Qnil;
+
+  x_y_to_hpos_vpos (XWINDOW (f->menu_bar_window), ix, iy,
+		    &column, &row, NULL, NULL, &dummy);
+
+  if (row >= 0 && row < FRAME_MENU_BAR_LINES (f))
+    {
+      Lisp_Object items = FRAME_MENU_BAR_ITEMS (f);
+      Lisp_Object item = Qnil;
+      int i;
+      for (i = 0; i < ASIZE (items); i += 4)
+	{
+	  Lisp_Object str = AREF (items, i + 1);
+	  Lisp_Object pos = AREF (items, i + 3);
+	  if (NILP (str))
+	    break;
+	  if (column >= XFIXNUM (pos)
+	      && column < XFIXNUM (pos) + SCHARS (str))
+	    {
+	      item = AREF (items, i);
+	      break;
+	    }
+	}
+
+      if (!NILP (item))
+	{
+	  Lisp_Object position
+	    = list4 (fow, Qmenu_bar,
+		     Fcons (x, y),
+		     timestamp);
+	  return list2 (item, position);
+	}
+    }
+#endif
+  return Qnil;
+}
+
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
        Siso_function_key_offset, 0, 0, 0,
        doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
