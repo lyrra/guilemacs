@@ -8069,6 +8069,168 @@ On non-menu-bar platforms, always returns nil.  */)
   return Qnil;
 }
 
+/* imp-7.1 — file-static getter/setter DEFUNs for double-click
+   and drag state.  8 statics, 16 DEFUNs.  C retains ownership;
+   Scheme reads/writes through these wrappers (no Scheme-side
+   mirror record).  Used by imp-7.2 wheel double-click detection
+   and imp-7.5 MOUSE_CLICK port.  */
+
+DEFUN ("--button-down-location", Fbutton_down_location,
+       Sbutton_down_location, 0, 0, 0,
+       doc: /* Return the value of button_down_location.
+
+A Lisp_Object vector recording the position of the most recent
+mouse-press event.  Used for drag-event position computation.  */)
+  (void)
+{
+  return button_down_location;
+}
+
+DEFUN ("--set-button-down-location", Fset_button_down_location,
+       Sset_button_down_location, 1, 1, 0,
+       doc: /* Set button_down_location to VAL.  */)
+  (Lisp_Object val)
+{
+  button_down_location = val;
+  return Qnil;
+}
+
+DEFUN ("--frame-relative-event-pos", Fframe_relative_event_pos,
+       Sframe_relative_event_pos, 0, 0, 0,
+       doc: /* Return the value of frame_relative_event_pos.
+
+A cons (X . Y) recording the original frame-relative coordinates
+of the most recent mouse-down event.  */)
+  (void)
+{
+  return frame_relative_event_pos;
+}
+
+DEFUN ("--set-frame-relative-event-pos", Fset_frame_relative_event_pos,
+       Sset_frame_relative_event_pos, 1, 1, 0,
+       doc: /* Set frame_relative_event_pos to VAL.  */)
+  (Lisp_Object val)
+{
+  frame_relative_event_pos = val;
+  return Qnil;
+}
+
+DEFUN ("--down-mouse-line-number-width", Fdown_mouse_line_number_width,
+       Sdown_mouse_line_number_width, 0, 0, 0,
+       doc: /* Return down_mouse_line_number_width as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (down_mouse_line_number_width);
+}
+
+DEFUN ("--set-down-mouse-line-number-width",
+       Fset_down_mouse_line_number_width,
+       Sset_down_mouse_line_number_width, 1, 1, 0,
+       doc: /* Set down_mouse_line_number_width to VAL (a fixnum).  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  down_mouse_line_number_width = XFIXNUM (val);
+  return Qnil;
+}
+
+DEFUN ("--last-mouse-button", Flast_mouse_button,
+       Slast_mouse_button, 0, 0, 0,
+       doc: /* Return last_mouse_button as a fixnum.
+
+Distinguishes wheel from mouse button by negative values
+(wheel: -(1 + symbol_num)).  */)
+  (void)
+{
+  return make_fixnum (last_mouse_button);
+}
+
+DEFUN ("--set-last-mouse-button", Fset_last_mouse_button,
+       Sset_last_mouse_button, 1, 1, 0,
+       doc: /* Set last_mouse_button to VAL (a fixnum).  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  last_mouse_button = XFIXNUM (val);
+  return Qnil;
+}
+
+DEFUN ("--last-mouse-x", Flast_mouse_x,
+       Slast_mouse_x, 0, 0, 0,
+       doc: /* Return last_mouse_x as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (last_mouse_x);
+}
+
+DEFUN ("--set-last-mouse-x", Fset_last_mouse_x,
+       Sset_last_mouse_x, 1, 1, 0,
+       doc: /* Set last_mouse_x to VAL (a fixnum).  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  last_mouse_x = XFIXNUM (val);
+  return Qnil;
+}
+
+DEFUN ("--last-mouse-y", Flast_mouse_y,
+       Slast_mouse_y, 0, 0, 0,
+       doc: /* Return last_mouse_y as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (last_mouse_y);
+}
+
+DEFUN ("--set-last-mouse-y", Fset_last_mouse_y,
+       Sset_last_mouse_y, 1, 1, 0,
+       doc: /* Set last_mouse_y to VAL (a fixnum).  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  last_mouse_y = XFIXNUM (val);
+  return Qnil;
+}
+
+DEFUN ("--button-down-time", Fbutton_down_time,
+       Sbutton_down_time, 0, 0, 0,
+       doc: /* Return button_down_time as a Lisp integer.
+
+May be a bignum on 32-bit fixnum builds (Time is int64).  */)
+  (void)
+{
+  return INT_TO_INTEGER (button_down_time);
+}
+
+DEFUN ("--set-button-down-time", Fset_button_down_time,
+       Sset_button_down_time, 1, 1, 0,
+       doc: /* Set button_down_time to VAL.
+
+VAL is a Lisp integer (fixnum or bignum).  Converts via
+scm_to_intmax to match Time (int64 or unsigned long).  */)
+  (Lisp_Object val)
+{
+  button_down_time = scm_to_intmax (val);
+  return Qnil;
+}
+
+DEFUN ("--double-click-count", Fdouble_click_count,
+       Sdouble_click_count, 0, 0, 0,
+       doc: /* Return double_click_count as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (double_click_count);
+}
+
+DEFUN ("--set-double-click-count", Fset_double_click_count,
+       Sset_double_click_count, 1, 1, 0,
+       doc: /* Set double_click_count to VAL (a fixnum).  */)
+  (Lisp_Object val)
+{
+  CHECK_FIXNUM (val);
+  double_click_count = XFIXNUM (val);
+  return Qnil;
+}
+
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
        Siso_function_key_offset, 0, 0, 0,
        doc: /* Return ISO_FUNCTION_KEY_OFFSET (0xfe00) as a fixnum.
