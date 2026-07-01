@@ -766,6 +766,51 @@ make_lispy_event body."
 (define %--mouse-click-menu-bar-intercept
   (delay (%c '--mouse-click-menu-bar-intercept)))
 
+;;; imp-7.5.2 — double-click detection (pure read, no mutations).
+;;;
+;;; Reads imp-7.1 file-statics (last_mouse_button, last_mouse_x,
+;;; last_mouse_y, button_down_time) via getter DEFUNs, plus
+;;; double-click-fuzz and double-click-time via %symbol-value.
+;;; Returns #t if this event is a double-click, #f otherwise.
+;;; No writes to file-statics — that's imp-7.5.3.
+
+(define %symbol-value             (delay (%c 'symbol-value)))
+(define %double-click-fuzz        (delay ((force %symbol-value)
+                                         'double-click-fuzz)))
+(define %double-click-time        (delay ((force %symbol-value)
+                                         'double-click-time)))
+(define %--last-mouse-button    (delay (%c '--last-mouse-button)))
+(define %--last-mouse-x         (delay (%c '--last-mouse-x)))
+(define %--last-mouse-y         (delay (%c '--last-mouse-y)))
+(define %--button-down-time     (delay (%c '--button-down-time)))
+(define %window-system          (delay (%c 'window-system)))
+(define %window-frame           (delay (%c 'window-frame)))
+
+(define (mouse-double-click-p fow code x y timestamp)
+  ;; Compute is_double for mouse events.
+  ;; Matches keyboard.c:6953-6971.  Also usable by wheel
+  ;; handler (keyboard.c:7135-7160) — same shape.
+  (let* ((frame (if ((force %windowp) fow)
+                   ((force %window-frame) fow)
+                   fow))
+         (fuzz-raw ((force %double-click-fuzz)))
+         (fuzz (if ((force %window-system) frame)
+                   fuzz-raw
+                   (/ fuzz-raw 8)))
+         (last-btn ((force %--last-mouse-button)))
+         (last-x   ((force %--last-mouse-x)))
+         (last-y   ((force %--last-mouse-y)))
+         (down-time ((force %--button-down-time)))
+         (dbl-time ((force %double-click-time))))
+    (and (= code last-btn)
+         (<= (abs (- x last-x)) fuzz)
+         (<= (abs (- y last-y)) fuzz)
+         (not (zero? down-time))
+         (or (eq? dbl-time #t)  ; Qt = always double-click
+             (and (integer? dbl-time)
+                  (> dbl-time 0)
+                  (< (- timestamp down-time) dbl-time))))))
+
 (define (mle-mouse-click-event ie)
   ;; Stub — menu-bar intercept only; falls through to C for the rest.
   (let* ((fow ((force %--ie-frame-or-window) ie)))
