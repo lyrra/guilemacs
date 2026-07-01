@@ -1165,6 +1165,14 @@ without hard-coding enum values in Scheme.  Each event symbol
   if (EQ (name, Qpinch))
     return make_fixnum (PINCH_EVENT);
 
+  /* imp-7.4 — touchscreen group (always compiled in).  */
+  if (EQ (name, Qtouchscreen_begin))
+    return make_fixnum (TOUCHSCREEN_BEGIN_EVENT);
+  if (EQ (name, Qtouchscreen_end))
+    return make_fixnum (TOUCHSCREEN_END_EVENT);
+  if (EQ (name, Qtouchscreen_update))
+    return make_fixnum (TOUCHSCREEN_UPDATE_EVENT);
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }

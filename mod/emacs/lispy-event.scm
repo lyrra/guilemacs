@@ -656,3 +656,88 @@ make_lispy_event body."
 
 (register-kind! 'touch-end mle-touch-end-event)
 (register-kind! 'pinch mle-pinch-event)
+
+\f
+;;; imp-7.4 — touchscreen group.
+;;;
+;;; Three structurally different events.  All use
+;;; make-lispy-position; none need new C DEFUNs.
+;;;
+;;; Deferred (needs imp-7.4.1 mirror):
+;;; - menu_bar_touch_id read/write (BEGIN + UPDATE + END)
+;;; - Tab-bar item interaction in BEGIN (coords_in_tab_bar_window,
+;;;   get_tab_bar_item_kbd, f->tab_bar_items, nconc2)
+;;; - Menu-bar activation in END (coords_in_menu_bar_window,
+;;;   menu_bar_touch_id, x_y_to_hpos_vpos, FRAME_MENU_BAR_ITEMS)
+;;;
+;;; Without these, touch events produce correct position lists
+;;; but lack tab-bar object enrichment and menu-bar integration.
+
+(define (mle-touchscreen-begin-event ie)
+  ;; C body (keyboard.c:7260–7335): frame-live →
+  ;; make_lispy_position → (touchscreen-begin (id . position)).
+  ;; Tab-bar + menu-bar blocks skipped — need imp-7.4.1 mirror.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let* ((id ((force %--ie-arg) ie))
+               (position (make-lispy-position
+                          fow
+                          ((force %--ie-x) ie)
+                          ((force %--ie-y) ie)
+                          ((force %--ie-timestamp) ie))))
+          (list 'touchscreen-begin (cons id position))))))
+
+(define (mle-touchscreen-end-event ie)
+  ;; C body (keyboard.c:7337–7458): frame-live →
+  ;; make_lispy_position →
+  ;; (touchscreen-end (id . position) CANCELED).
+  ;; CANCELED is #t when modifiers != 0, #nil otherwise.
+  ;; Menu-bar + tab-bar blocks skipped — need imp-7.4.1 mirror.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let* ((id ((force %--ie-arg) ie))
+               (position (make-lispy-position
+                          fow
+                          ((force %--ie-x) ie)
+                          ((force %--ie-y) ie)
+                          ((force %--ie-timestamp) ie))))
+          (list 'touchscreen-end (cons id position)
+                (if (not (zero? ((force %--ie-modifiers) ie)))
+                    #t
+                    #nil))))))
+
+(define (mle-touchscreen-update-event ie)
+  ;; C body (keyboard.c:7480–7500): frame-live → loop over
+  ;; event->arg triples (x y id) → make_lispy_position for each
+  ;; → accumulate (id . position) → (touchscreen-update evt).
+  ;; menu_bar_touch_id skip in loop — needs imp-7.4.1 mirror.
+  (let* ((fow ((force %--ie-frame-or-window) ie)))
+    (if (not ((force %frame-live-p) fow))
+        #nil
+        (let loop ((tem ((force %--ie-arg) ie))
+                   (evt '()))
+          (if (not (pair? tem))
+              (if (null? evt) #nil (list 'touchscreen-update evt))
+              (let* ((it (car tem))
+                     (x (car it))
+                     (y (cadr it))
+                     (id (caddr it))
+                     ;; menu_bar_touch_id skip here — imp-7.4.1
+                     (position (make-lispy-position
+                                fow x y
+                                ((force %--ie-timestamp) ie))))
+                (loop (cdr tem)
+                      (cons (cons id position) evt))))))))
+
+;; Registrations deferred until imp-7.4.1 (menu_bar_touch_id mirror)
+;; and imp-7.4.2 (tab-bar helper DEFUNs) are done.  Without them,
+;; menu-bar and tab-bar touch interactions are broken on touch
+;; platforms — a real behavioral regression, unlike imp-7.2's
+;; minor double-click-promotion deferral.  Until then, touchscreen
+;; events fall through to --make-lispy-event-c (full C behavior).
+;;
+;; (register-kind! 'touchscreen-begin mle-touchscreen-begin-event)
+;; (register-kind! 'touchscreen-end mle-touchscreen-end-event)
+;; (register-kind! 'touchscreen-update mle-touchscreen-update-event)
