@@ -29,7 +29,6 @@
 (define %track-mouse              (delay (%c 'track-mouse)))
 (define %windowp                  (delay (%c 'windowp)))
 
-\f
 ;;; Per-region helpers — each calls one adapter DEFUN and destructures
 ;;; the packed list return.
 
@@ -91,7 +90,6 @@
             (elt res 6) (elt res 7)               ; dx dy
             (elt res 8) (elt res 9))))             ; width height
 
-\f
 ;;; 6.3.9 Orchestrator — replaces the C make_lispy_position body.
 ;;;
 ;;; Window-part enum values (must match src/keyboard.c):

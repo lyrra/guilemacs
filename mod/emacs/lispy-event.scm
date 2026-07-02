@@ -34,7 +34,6 @@
   ;; cases are ported (imp-3 → imp-7).
   (make-hash-table))
 
-\f
 ;;; Lazy C-primitive references.  Resolved at first call so module
 ;;; load order is not sensitive to DEFUN registration order.
 
@@ -170,7 +169,6 @@ make_lispy_event body."
 (register-kind! 'move-frame mle-move-frame-event)
 (register-kind! 'no-event mle-no-event)
 
-\f
 ;;; imp-3.3 — simple-list group.
 
 (define (mle-select-window-event ie)
@@ -208,7 +206,6 @@ make_lispy_event body."
 (register-kind! 'language-change mle-language-change-event)
 (register-kind! 'user-signal-event mle-user-signal-event)
 
-\f
 ;;; imp-4 — simple-helper cases.
 ;;; Each handler calls one helper C primitive or mutator.
 
@@ -354,7 +351,6 @@ make_lispy_event body."
 (register-kind! 'horizontal-scroll-bar-click-toolkit
                 mle-horizontal-scroll-bar-click-toolkit)
 
-\f
 ;;; imp-5 — keystroke cases.
 
 ;;; 5.2 ASCII_KEYSTROKE_EVENT / MULTIBYTE_CHAR_KEYSTROKE_EVENT.
@@ -530,7 +526,6 @@ make_lispy_event body."
 
 (register-kind! 'ns-text-event mle-ns-text-event)
 
-\f
 ;;; imp-7.2 — WHEEL_EVENT / HORIZ_WHEEL_EVENT.
 ;;;
 ;;; C body (keyboard.c:7115–7225): frame-live check,
@@ -657,7 +652,6 @@ make_lispy_event body."
 (register-kind! 'touch-end mle-touch-end-event)
 (register-kind! 'pinch mle-pinch-event)
 
-\f
 ;;; imp-7.4 — touchscreen group.
 ;;;
 ;;; Three structurally different events using imp-7.4.1 DEFUNs
@@ -753,7 +747,6 @@ make_lispy_event body."
 (register-kind! 'touchscreen-end mle-touchscreen-end-event)
 (register-kind! 'touchscreen-update mle-touchscreen-update-event)
 
-\f
 ;;; imp-7.5 — MOUSE_CLICK + non-toolkit SCROLL_BAR_CLICK.
 ;;;
 ;;; ~300-line C body → decomposed into sub-helpers.
@@ -811,7 +804,6 @@ make_lispy_event body."
                   (> dbl-time 0)
                   (< (- timestamp down-time) dbl-time))))))
 
-\f
 ;;; imp-7.5.3 — button-down bookkeeping (first writes to imp-7.1
 ;;; setters).  Reads button_down_location slot (saving old value),
 ;;; writes all 5 file-statics + ignore_mouse_drag_p.
@@ -909,7 +901,6 @@ make_lispy_event body."
               ;; when the full handler replaces the fallback.
               ((force %--make-lispy-event-c) ie)))))))
 
-\f
 ;;; imp-7.5.4 — button-up drag/click resolution (keyboard.c:7011–7117).
 ;;; The biggest block in imp-7.5.  Decides whether a button release
 ;;; is a click or a drag by comparing up-event coordinates against
@@ -1005,7 +996,6 @@ make_lispy_event body."
                               (else triple-modifier)))))
         (values mods position))))
 
-\f
 ;;; imp-7.5.5 — top-level mouse-click + scroll-bar-click handler.
 ;;; Assembles imp-7.5.1–7.5.4 plus scroll-bar position fallback.
 
