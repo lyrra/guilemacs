@@ -26,7 +26,10 @@
 (define %--mlp-text-area-offset    (delay (%c '--mlp-text-area-offset)))
 
 ;;; Elisp globals / predicates.
-(define %track-mouse              (delay (%c 'track-mouse)))
+(define %symbol-value             (delay (%c 'symbol-value)))
+;; track-mouse is a dynamic variable — read fresh each call.
+(define (track-mouse-value)
+  ((force %symbol-value) 'track-mouse))
 (define %windowp                  (delay (%c 'windowp)))
 
 ;;; Per-region helpers — each calls one adapter DEFUN and destructures
@@ -44,7 +47,7 @@
 
 (define (frame-preamble f mx my)
   ((force %--mlp-frame-preamble) (or f #nil) mx my
-   ((force %track-mouse))))
+   (track-mouse-value)))
 
 ;;; 6.3.4 Fringes — (posn col dx dy xret yret).
 
@@ -211,7 +214,7 @@
               (list f posn (cons xret yret) t #nil))
             ;; No-frame / drag-source path.
             (begin
-              (when (eq? ((force %track-mouse)) 'drag-source)
+              (when (eq? (track-mouse-value) 'drag-source)
                 (set! xret mx)
                 (set! yret my))
               (list #nil posn (cons xret yret) t #nil))))))
