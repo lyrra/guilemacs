@@ -768,10 +768,12 @@ make_lispy_event body."
 ;;; No writes to file-statics — that's imp-7.5.3.
 
 (define %symbol-value             (delay (%c 'symbol-value)))
-(define %double-click-fuzz        (delay ((force %symbol-value)
-                                         'double-click-fuzz)))
-(define %double-click-time        (delay ((force %symbol-value)
-                                         'double-click-time)))
+;; NOT delays — variables can change (customize, let-binding).
+;; Delays would cache the first value forever.
+(define (double-click-fuzz)
+  ((force %symbol-value) 'double-click-fuzz))
+(define (double-click-time)
+  ((force %symbol-value) 'double-click-time))
 (define %--last-mouse-button    (delay (%c '--last-mouse-button)))
 (define %--last-mouse-x         (delay (%c '--last-mouse-x)))
 (define %--last-mouse-y         (delay (%c '--last-mouse-y)))
@@ -786,7 +788,7 @@ make_lispy_event body."
   (let* ((frame (if ((force %windowp) fow)
                    ((force %window-frame) fow)
                    fow))
-         (fuzz-raw ((force %double-click-fuzz)))
+         (fuzz-raw (double-click-fuzz))
          (fuzz (if ((force %window-system) frame)
                    fuzz-raw
                    (/ fuzz-raw 8)))
@@ -794,7 +796,7 @@ make_lispy_event body."
          (last-x   ((force %--last-mouse-x)))
          (last-y   ((force %--last-mouse-y)))
          (down-time ((force %--button-down-time)))
-         (dbl-time ((force %double-click-time))))
+         (dbl-time (double-click-time)))
     (and (= code last-btn)
          (<= (abs (- x last-x)) fuzz)
          (<= (abs (- y last-y)) fuzz)
@@ -932,7 +934,7 @@ make_lispy_event body."
         (if (not (eq? #nil ((force %--ignore-mouse-drag-p))))
             ((force %--set-ignore-mouse-drag-p) #nil)
             ;; Drag detection: compare up coords against down coords.
-            (let* ((fuzz ((force %double-click-fuzz)))
+            (let* ((fuzz (double-click-fuzz))
                    (frel ((force %--frame-relative-event-pos)))
                    (xdiff (- x (car frel)))
                    (ydiff (- y (cdr frel))))
