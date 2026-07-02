@@ -17,6 +17,8 @@
             ;; Modifier bit constants (used by (emacs lispy-event)).
             shift-modifier ctrl-modifier meta-modifier
             alt-modifier hyper-modifier super-modifier
+            up-modifier down-modifier drag-modifier
+            click-modifier double-modifier triple-modifier
             ;; Wiring.
             init-event-modifiers-registrations))
 
