@@ -199,11 +199,12 @@
                   (cons (or string-info #nil)
                         (cons (if (< textpos 0) #nil textpos)
                               (cons (cons col row) extra))))
-            (list window-or-frame
-                  posn
-                  (cons xret yret)
-                  t
-                  extra)))
+            ;; cons-chain so extra_info splices into the tail
+            ;; (matches C: Fcons(W, Fcons(P, Fcons((xy), Fcons(t, extra))))).
+            (cons window-or-frame
+                  (cons posn
+                        (cons (cons xret yret)
+                              (cons t extra))))))
 
         ;; Frame path (not inside a window).
         (if f
@@ -211,10 +212,12 @@
               (set! xret mx)
               (set! yret my)
               (set! posn (internal-border f mx my posn))
-              (list f posn (cons xret yret) t #nil))
+              ;; Frame path — extra_info is Qnil, so 4-element list.
+              (list f posn (cons xret yret) t))
             ;; No-frame / drag-source path.
             (begin
               (when (eq? (track-mouse-value) 'drag-source)
                 (set! xret mx)
                 (set! yret my))
-              (list #nil posn (cons xret yret) t #nil))))))
+              ;; No-frame / drag-source — extra_info is Qnil, 4-element list.
+              (list #nil posn (cons xret yret) t))))))
