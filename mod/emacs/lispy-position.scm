@@ -53,45 +53,45 @@
 
 (define (fringes w left? mx my)
   (let ((res ((force %--mlp-fringes) w (if left? #t #nil) mx my #nil)))
-    (values (elt res 0) (elt res 1) (elt res 2)
-            (elt res 3) (elt res 4) (elt res 5))))
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
+            (list-ref res 3) (list-ref res 4) (list-ref res 5))))
 
 ;;; 6.3.5 Scroll/border — (posn width dx xret dy yret).
 
 (define (scroll-border w part mx my)
   (let ((res ((force %--mlp-scroll-border) w part mx my)))
-    (values (elt res 0) (elt res 1) (elt res 2)
-            (elt res 3) (elt res 4) (elt res 5))))
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
+            (list-ref res 3) (list-ref res 4) (list-ref res 5))))
 
 ;;; 6.3.6 Mode/header/tab line — 10 elements.
 
 (define (mode-header-line w part mx my)
   (let ((res ((force %--mlp-mode-header-line) w part mx my)))
-    (values (elt res 0) (elt res 1) (elt res 2)  ; posn object string-info
-            (elt res 3) (elt res 4)               ; col row
-            (elt res 5) (elt res 6)               ; dx dy
-            (elt res 7) (elt res 8)               ; width height
-            (elt res 9))))                         ; xret
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; posn object string-info
+            (list-ref res 3) (list-ref res 4)               ; col row
+            (list-ref res 5) (list-ref res 6)               ; dx dy
+            (list-ref res 7) (list-ref res 8)               ; width height
+            (list-ref res 9))))                         ; xret
 
 ;;; 6.3.7 Margins — 10 elements, includes yret at index 10.
 
 (define (margins w part mx my)
   (let ((res ((force %--mlp-margins) w part mx my)))
-    (values (elt res 0) (elt res 1) (elt res 2)  ; posn object string-info
-            (elt res 3) (elt res 4)               ; col row
-            (elt res 5) (elt res 6)               ; dx dy
-            (elt res 7) (elt res 8)               ; width height
-            (elt res 9) (elt res 10))))            ; xret yret
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; posn object string-info
+            (list-ref res 3) (list-ref res 4)               ; col row
+            (list-ref res 5) (list-ref res 6)               ; dx dy
+            (list-ref res 7) (list-ref res 8)               ; width height
+            (list-ref res 9) (list-ref res 10))))            ; xret yret
 
 ;;; 6.3.8 Buffer-posn pass — 10 elements.
 
 (define (buffer-posn-pass w part mx my xret posn)
   (let ((res ((force %--mlp-buffer-posn-pass) w part mx my xret posn)))
-    (values (elt res 0) (elt res 1) (elt res 2)  ; textpos posn object
-            (elt res 3)                           ; string-info
-            (elt res 4) (elt res 5)               ; col row
-            (elt res 6) (elt res 7)               ; dx dy
-            (elt res 8) (elt res 9))))             ; width height
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; textpos posn object
+            (list-ref res 3)                           ; string-info
+            (list-ref res 4) (list-ref res 5)               ; col row
+            (list-ref res 6) (list-ref res 7)               ; dx dy
+            (list-ref res 8) (list-ref res 9))))             ; width height
 
 ;;; 6.3.9 Orchestrator — replaces the C make_lispy_position body.
 ;;;
@@ -105,9 +105,9 @@
 (define (make-lispy-position f x y t)
   (let* ((mx x) (my y)                     ; frame-relative coords
          (pre (frame-preamble f mx my))
-         (window-or-frame (elt pre 0))
-         (part (elt pre 1))
-         (posn (elt pre 2))
+         (window-or-frame (list-ref pre 0))
+         (part (list-ref pre 1))
+         (posn (list-ref pre 2))
          ;; Shared locals matching C defaults.
          (object #nil) (string-info #nil)
          (textpos 0)
