@@ -1003,7 +1003,6 @@ make_lispy_event body."
 
 (define %--make-scroll-bar-position
   (delay (%c '--make-scroll-bar-position)))
-(define %nconc2 (delay (%c 'nconc2)))
 
 (define (mle-mouse-click-impl ie kind-tag)
   ;; kind-tag: 'mouse for MOUSE_CLICK_EVENT,
@@ -1053,9 +1052,11 @@ make_lispy_event body."
   (let* ((position (make-lispy-position fow x y ts))
          (arg ((force %--ie-arg) ie))
          ;; Tab-bar enrichment (C:6936-6938).
+         ;; nconc2 is a C internal, not a Lisp function —
+         ;; use append (non-destructive, functionally equivalent
+         ;; since position is freshly constructed).
          (position (if (and (pair? arg) (eq? (car arg) 'tab-bar))
-                       ((force %nconc2) position
-                                        (cons (cdr arg) #nil))
+                       (append position (list (cdr arg)))
                        position)))
     (call-with-values
         (lambda ()
