@@ -685,7 +685,7 @@ make_lispy_event body."
                            ((force %--ie-timestamp) ie)))
                      (pos ((force %--tab-bar-enrich-position)
                            fow x y pos)))
-                (list 'touchscreen-begin (cons id pos)))))))))
+                (list 'touchscreen-begin (cons id pos))))))))
 
 (define (mle-touchscreen-end-event ie)
   ;; C body (keyboard.c:7337–7458): frame-live → menu-bar
@@ -716,7 +716,7 @@ make_lispy_event body."
                 (list 'touchscreen-end (cons id pos)
                       (if (not (zero? ((force %--ie-modifiers) ie)))
                           #t
-                          #nil))))))))))
+                          #nil))))))))
 
 (define (mle-touchscreen-update-event ie)
   ;; C body (keyboard.c:7480–7500): frame-live → loop over
@@ -741,7 +741,7 @@ make_lispy_event body."
                                        fow x y
                                        ((force %--ie-timestamp) ie))))
                         (loop (cdr tem)
-                              (cons (cons id position) evt))))))))))))
+                              (cons (cons id position) evt)))))))))))
 
 (register-kind! 'touchscreen-begin mle-touchscreen-begin-event)
 (register-kind! 'touchscreen-end mle-touchscreen-end-event)
@@ -899,7 +899,7 @@ make_lispy_event body."
               ;; double-eval: the C fallback re-runs menu-bar
               ;; intercept for non-menu-bar clicks.  Evaporates
               ;; when the full handler replaces the fallback.
-              ((force %--make-lispy-event-c) ie)))))))
+              ((force %--make-lispy-event-c) ie))))))
 
 ;;; imp-7.5.4 — button-up drag/click resolution (keyboard.c:7011–7117).
 ;;; The biggest block in imp-7.5.  Decides whether a button release
