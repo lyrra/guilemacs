@@ -1,6 +1,7 @@
 (define-module (emacs read-key-sequence)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-9)            ; define-record-type
+  #:use-module ((emacs event-modifiers) #:select (parse-modifiers))
   #:declarative? #t
   #:export (read-key-sequence-vs
             read-key-sequence-vs-string
@@ -1013,7 +1014,7 @@ shape compiles cleanly."
     (if (or (not (%nilp ((force %rks-current-binding))))
             (< ((force %rks-keytran-start)) ((force %rks-t))))
         #nil
-        (let* ((breakdown ((%c 'parse-modifiers) key))
+        (let* ((breakdown (parse-modifiers key))
                (mods (if (pair? breakdown)
                          (cadr (cadr breakdown))
                          0))
