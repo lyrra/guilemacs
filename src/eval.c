@@ -1415,6 +1415,30 @@ scm_eval_body (void *data)
   return SCM_CALL_1 (eval_fn, edata->form);
 }
 
+/* Pre-unwind handler for eval-time Guile exceptions.  Runs BEFORE the
+   stack is unwound, so `make-stack #t` here captures the actual frames
+   where the throw happened.  Only fires for non-elisp keys: elisp
+   condition-case / catch/throw traffic through elisp-condition-sym and
+   elisp-throw-sym and we don't want backtrace noise there.  */
+static SCM
+scm_eval_pre_unwind (void *data, SCM key, SCM args)
+{
+  if (scm_is_eq (key, elisp_condition_sym)
+      || scm_is_eq (key, elisp_throw_sym))
+    return SCM_UNSPECIFIED;
+
+  SCM port = scm_current_error_port ();
+  scm_puts (";; Guile pre-unwind backtrace for ", port);
+  scm_display (key, port);
+  scm_puts (" ", port);
+  scm_display (args, port);
+  scm_newline (port);
+  SCM stack = scm_make_stack (SCM_BOOL_T, SCM_EOL);
+  scm_display_backtrace (stack, port, SCM_BOOL_F, SCM_BOOL_F);
+  scm_force_output (port);
+  return SCM_UNSPECIFIED;
+}
+
 /* Error handler for Guile exceptions during eval.
    This converts Guile exceptions to elisp signals by throwing directly
    to 'elisp-condition.  We can't use xsignal here because throwing from
@@ -1505,7 +1529,7 @@ eval_sub_1 (Lisp_Object form)
   return scm_c_catch (SCM_BOOL_T,
                       scm_eval_body, &edata,
                       scm_eval_error_handler, &edata,
-                      NULL, NULL);
+                      scm_eval_pre_unwind, NULL);
 }
 
 Lisp_Object
@@ -1949,7 +1973,7 @@ funcall_general (Lisp_Object fun, ptrdiff_t numargs, Lisp_Object *args)
       return scm_c_catch (SCM_BOOL_T,
                           scm_funcall_body, &fdata,
                           scm_funcall_error_handler, &fdata,
-                          NULL, NULL);
+                          scm_eval_pre_unwind, NULL);
     }
 
   else if (NATIVE_COMP_FUNCTION_DYNP (fun)
