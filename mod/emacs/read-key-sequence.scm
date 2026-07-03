@@ -1016,7 +1016,7 @@ shape compiles cleanly."
         #nil
         (let* ((breakdown (parse-modifiers key))
                (mods (if (pair? breakdown)
-                         (cadr (cadr breakdown))
+                         (cadr breakdown)
                          0))
                (translate? (symbol-value
                             'translate-upper-case-key-bindings))
