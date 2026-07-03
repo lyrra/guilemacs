@@ -49,13 +49,13 @@
 (define %--ie-timestamp         (delay (%c '--ie-timestamp)))
 (define %--ie-part              (delay (%c '--ie-part)))
 (define %--ie-clear             (delay (%c '--ie-clear)))
+(define %--set-ie-modifiers     (delay (%c '--set-ie-modifiers)))
 (define %--make-lispy-event-c   (delay (%c '--make-lispy-event-c)))
 (define %--make-lispy-focus-in  (delay (%c '--make-lispy-focus-in)))
 (define %--make-lispy-focus-out (delay (%c '--make-lispy-focus-out)))
 ;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
 (define %--drag-n-drop-head     (delay (%c '--drag-n-drop-head)))
 (define %--time-to-position      (delay (%c '--time-to-position)))
-(define %--make-scroll-bar-pos    (delay (%c '--make-scroll-bar-position)))
 (define %--scroll-bar-click-head  (delay (%c '--scroll-bar-click-head)))
 (define %--ie-kind-from-name    (delay (%c '--ie-kind-from-name)))
 (define %--user-signal-name     (delay (%c '--user-signal-name)))
@@ -320,7 +320,7 @@ make_lispy_event body."
   (let* ((mods ((force %--ie-modifiers) ie))
          ;; Strip up_modifier (=1), add click_modifier (=8).
          (new-mods (logior (logand mods (lognot 1)) 8))
-         (position ((force %--make-scroll-bar-pos)
+         (position ((force %--make-scroll-bar-position)
                     ((force %--ie-frame-or-window) ie)
                     ((force %--ie-x) ie)
                     ((force %--ie-y) ie)
@@ -335,7 +335,7 @@ make_lispy_event body."
 (define (mle-horizontal-scroll-bar-click-toolkit ie)
   (let* ((mods ((force %--ie-modifiers) ie))
          (new-mods (logior (logand mods (lognot 1)) 8))
-         (position ((force %--make-scroll-bar-pos)
+         (position ((force %--make-scroll-bar-position)
                     ((force %--ie-frame-or-window) ie)
                     ((force %--ie-x) ie)
                     ((force %--ie-y) ie)
@@ -836,7 +836,7 @@ make_lispy_event body."
   (delay (%c '--save-line-number-display-width)))
 (define %copy-alist               (delay (%c 'copy-alist)))
 
-(define (mouse-button-down-bookkeep! fow code x y timestamp mods position)
+(define (mouse-button-down-bookkeep! ie fow code x y timestamp mods position)
   ;; Button-press bookkeeping (keyboard.c:6963-7006).
   ;; Reads old start_pos from button_down_location[code],
   ;; computes is_dbl using OLD last_mouse_* values, THEN
@@ -868,7 +868,10 @@ make_lispy_event body."
                 (set! mods (logior mods
                                    (if (> dbl-count 2)
                                        triple-modifier
-                                       double-modifier))))
+                                       double-modifier)))
+                ;; Mid-case mutation: write back to C struct
+                ;; (M6 Wave-A pattern — imp-7.5).
+                ((force %--set-ie-modifiers) ie mods))
               (set! dbl-count 1))
           ((force %--set-double-click-count) dbl-count)
           ((force %--set-button-down-time) timestamp)
@@ -880,28 +883,6 @@ make_lispy_event body."
           ((force %--save-line-number-display-width) fow)))
 
       (values mods start-pos))))
-
-(define (mle-mouse-click-event ie)
-  ;; Stub — menu-bar intercept only; falls through to C for the rest.
-  (let* ((fow ((force %--ie-frame-or-window) ie)))
-    (if (not ((force %frame-live-p) fow))
-        #nil
-        (let ((mb-event
-               ((force %--mouse-click-menu-bar-intercept)
-                fow
-                ((force %--ie-x) ie)
-                ((force %--ie-y) ie)
-                ((force %--ie-modifiers) ie)
-                ((force %--ie-timestamp) ie)
-                fow)))
-          (if mb-event
-              mb-event
-              ;; Fall through to C until 7.5.2+ builds out the
-              ;; double-click + drag/release logic.  Transient
-              ;; double-eval: the C fallback re-runs menu-bar
-              ;; intercept for non-menu-bar clicks.  Evaporates
-              ;; when the full handler replaces the fallback.
-              ((force %--make-lispy-event-c) ie))))))
 
 ;;; imp-7.5.4 — button-up drag/click resolution (keyboard.c:7011–7117).
 ;;; The biggest block in imp-7.5.  Decides whether a button release
@@ -1035,7 +1016,7 @@ make_lispy_event body."
                 (call-with-values
                     (lambda ()
                       (mouse-button-down-bookkeep!
-                       fow code x y ts mods position))
+                       ie fow code x y ts mods position))
                   (lambda (mods start-pos)
                     (call-with-values
                         (lambda ()
@@ -1061,7 +1042,7 @@ make_lispy_event body."
     (call-with-values
         (lambda ()
           (mouse-button-down-bookkeep!
-           fow code x y ts mods position))
+           ie fow code x y ts mods position))
       (lambda (mods start-pos)
         (call-with-values
             (lambda ()
