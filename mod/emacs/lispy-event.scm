@@ -2,6 +2,7 @@
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs event-modifiers)
   #:use-module (emacs lispy-position)
+  #:use-module (emacs modify-event-symbol)
   #:declarative? #t
   #:export (make-lispy-event-dispatch
             make-lispy-event))
@@ -79,8 +80,10 @@
 ;;; Each DEFUN reconstructs the vector from the C array on every call.
 ;;; Wrapping in a second delay calls the DEFUN once and caches the result.
 (define +lispy-accent-codes+     (delay ((force %lispy-accent-codes))))
+(define +lispy-accent-keys+      (delay ((force %lispy-accent-keys))))
 (define +function-key-offset+    (delay ((force %function-key-offset))))
 (define +lispy-function-keys+    (delay ((force %lispy-function-keys))))
+(define +iso-lispy-function-keys+ (delay ((force %iso-lispy-function-keys))))
 (define +iso-function-key-offset+ (delay ((force %iso-function-key-offset))))
 (define +lispy-multimedia-keys+  (delay ((force %lispy-multimedia-keys))))
 
@@ -431,33 +434,38 @@ make_lispy_event body."
 ;;; button_down_time = 0 is intentionally skipped — the double-click
 ;;; file-statics get proper Scheme mirroring under imp-7.1.
 
-;;; C-side modify_event_symbol wrappers (imp-5.3).
-(define %modify-event-symbol-accent
-  (delay (%c '--modify-event-symbol-accent)))
-(define %modify-event-symbol-func
-  (delay (%c '--modify-event-symbol-func)))
-(define %modify-event-symbol-system
-  (delay (%c '--modify-event-symbol-system)))
+;;; imp-8.1.4 — direct modify-event-symbol calls.
+;;; The old C wrapper DEFUNs (--modify-event-symbol-*) are now
+;;; thin SCM_CALL_7 stubs; these handlers call into Scheme directly.
+
+;;; System-key-alist — read from the elisp variable (DEFVAR_LISP).
+(define %system-key-alist (delay ((%c 'symbol-value) 'system-key-alist)))
 
 ;;; Accent-key linear scan.  Returns the result of modify_event_symbol
 ;;; on first match, or #f if no accent code matched.
 
 (define (accent-lookup code mods)
-  (let ((codes (force +lispy-accent-codes+)))
+  (let* ((codes (force +lispy-accent-codes+))
+         (keys (force +lispy-accent-keys+))
+         (sz (vector-length keys)))
     (let loop ((i 0))
       (and (< i (vector-length codes))
            (if (= code (vector-ref codes i))
-               ((force %modify-event-symbol-accent) i mods)
+               (modify-event-symbol i mods 'function-key
+                                    #nil keys cache-accent sz)
                (loop (+ i 1)))))))
 
 ;;; ISO function key lookup.  ISO_FUNCTION_KEY_OFFSET ≤ code < FUNCTION_KEY_OFFSET.
 
 (define (iso-function-lookup code mods)
-  (let ((iso-offset (force +iso-function-key-offset+)))
+  (let* ((iso-offset (force +iso-function-key-offset+))
+         (fk-offset (force +function-key-offset+))
+         (keys (force +iso-lispy-function-keys+))
+         (sz (vector-length keys)))
     (and (>= code iso-offset)
-         (< code (force +function-key-offset+))
-         ((force %modify-event-symbol-func)
-          (- code iso-offset) mods 1))))  ; tag 1 = iso-function
+         (< code fk-offset)
+         (modify-event-symbol (- code iso-offset) mods 'function-key
+                              #nil keys cache-func sz))))
 
 ;;; Function key lookup.  code − FUNCTION_KEY_OFFSET must be a valid
 ;;; index with a non-#f entry.
@@ -465,17 +473,22 @@ make_lispy_event body."
 (define (function-key-lookup code mods)
   (let* ((fk-offset (force +function-key-offset+))
          (fk-keys (force +lispy-function-keys+))
-         (idx (- code fk-offset)))
+         (idx (- code fk-offset))
+         (sz (vector-length fk-keys)))
     (and (>= idx 0)
-         (< idx (vector-length fk-keys))
+         (< idx sz)
          (vector-ref fk-keys idx)         ; non-#f slot?
-         ((force %modify-event-symbol-func) idx mods 0))))  ; tag 0 = function
+         (modify-event-symbol idx mods 'function-key
+                              #nil fk-keys cache-func sz))))
 
 ;;; System-key fallthrough.  Passes code directly; modify_event_symbol
 ;;; handles the system_key_syms cache and Vsystem_key_alist lookup.
+;;; TABLE-SIZE = most-positive-fixnum (equivalent to C's PTRDIFF_MAX).
 
 (define (system-key-lookup code mods)
-  ((force %modify-event-symbol-system) code mods))
+  (modify-event-symbol code mods 'function-key
+                       (force %system-key-alist)
+                       #nil cache-system most-positive-fixnum))
 
 ;;; Main NON_ASCII_KEYSTROKE_EVENT handler.  Chains the four lookups;
 ;;; the first non-#f result wins (matching the C return-early pattern).
@@ -506,7 +519,9 @@ make_lispy_event body."
     (if (and (> code 0)
              (< code (vector-length mm-keys))
              (vector-ref mm-keys code))
-        ((force %modify-event-symbol-func) code mods 2)  ; tag 2 = multimedia
+        (modify-event-symbol code mods 'function-key
+                             #nil mm-keys cache-func
+                             (vector-length mm-keys))
         #nil)))
 
 (register-kind! 'non-ascii-keystroke mle-non-ascii-keystroke)

@@ -381,9 +381,6 @@ static Lisp_Object make_lispy_movement (struct frame *, Lisp_Object,
                                         enum scroll_bar_part,
                                         Lisp_Object, Lisp_Object,
 					Time);
-static Lisp_Object modify_event_symbol (ptrdiff_t, int, Lisp_Object,
-                                        Lisp_Object, const char *const *,
-                                        Lisp_Object *, ptrdiff_t);
 static Lisp_Object make_lispy_switch_frame (Lisp_Object);
 static bool help_char_p (Lisp_Object);
 static Lisp_Object apply_modifiers (int, Lisp_Object);
@@ -5679,7 +5676,7 @@ is a multiple of the system clock resolution.  */)
   return Qnil;
 }
 
-/* Caches for modify_event_symbol.  */
+/* Caches for modify_event_symbol — backing store for --mes-cache-get/set.  */
 static Lisp_Object accent_key_syms;
 static Lisp_Object func_key_syms;
 static Lisp_Object mouse_syms;
@@ -6864,18 +6861,146 @@ fixnum builds.  Delegates to (emacs lispy-position).  */)
   return make_lispy_position (f, x, y, scm_to_intmax (t));
 }
 
+/* imp-8.1.1 — Cache-slot accessors for modify_event_symbol Scheme port.
+ *
+ * CACHE-ID is a fixnum selecting one of 7 cache slots:
+ *   0 = accent_key_syms    1 = func_key_syms     2 = mouse_syms
+ *   3 = wheel_syms          4 = drag_n_drop_syms  5 = pinch_syms
+ *   6 = system_key_syms (per-kboard KVAR)
+ */
+
+enum mes_cache_id {
+  MES_CACHE_ACCENT = 0,
+  MES_CACHE_FUNC,
+  MES_CACHE_MOUSE,
+  MES_CACHE_WHEEL,
+  MES_CACHE_DRAG_N_DROP,
+  MES_CACHE_PINCH,
+  MES_CACHE_SYSTEM
+};
+
+/* Helper: convert a C string-array + count to a Scheme vector.  */
+static SCM
+c_name_table_to_scm_vector (const char *const *names, ptrdiff_t count)
+{
+  SCM vec = scm_c_make_vector (count, SCM_BOOL_F);
+  for (ptrdiff_t i = 0; i < count; i++)
+    if (names[i])
+      SCM_SIMPLE_VECTOR_SET (vec, i, scm_from_utf8_string (names[i]));
+  return vec;
+}
+
+/* Helper: get the SCM procedure for (emacs modify-event-symbol).  */
+static SCM
+mes_proc (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs modify-event-symbol",
+			     "modify-event-symbol");
+  return proc;
+}
+
+/* Helper: SCM_CALL_7 into modify-event-symbol.  */
+static Lisp_Object
+call_mes (ptrdiff_t symbol_num, int modifiers, Lisp_Object kind,
+	  Lisp_Object name_alist_or_stem, SCM name_vec,
+	  int cache_id, ptrdiff_t table_size)
+{
+  SCM proc = mes_proc ();
+  return SCM_CALL_7 (proc,
+		     scm_from_ptrdiff_t (symbol_num),
+		     scm_from_int (modifiers),
+		     kind,
+		     name_alist_or_stem,
+		     name_vec,
+		     scm_from_int (cache_id),
+		     scm_from_ptrdiff_t (table_size));
+}
+
+DEFUN ("--mes-cache-get", Fmes_cache_get, Smes_cache_get, 1, 1, 0,
+       doc: /* Return the Lisp_Object stored in the modify-event-symbol
+cache slot identified by CACHE-ID (fixnum 0–6).  */)
+  (Lisp_Object cache_id)
+{
+  switch (XFIXNUM (cache_id))
+    {
+    case MES_CACHE_ACCENT:      return accent_key_syms;
+    case MES_CACHE_FUNC:        return func_key_syms;
+    case MES_CACHE_MOUSE:       return mouse_syms;
+    case MES_CACHE_WHEEL:       return wheel_syms;
+    case MES_CACHE_DRAG_N_DROP: return drag_n_drop_syms;
+    case MES_CACHE_PINCH:       return pinch_syms;
+    case MES_CACHE_SYSTEM:
+      {
+	Lisp_Object *sys = &KVAR (current_kboard, system_key_syms);
+	if (NILP (*sys))
+	  *sys = Fcons (Qnil, Qnil);
+	return *sys;
+      }
+    default:
+      return Qnil;
+    }
+}
+
+DEFUN ("--mes-cache-set", Fmes_cache_set, Smes_cache_set, 2, 2, 0,
+       doc: /* Write VALUE into the modify-event-symbol cache slot
+identified by CACHE-ID (fixnum 0–6).  Returns nil.  */)
+  (Lisp_Object cache_id, Lisp_Object value)
+{
+  switch (XFIXNUM (cache_id))
+    {
+    case MES_CACHE_ACCENT:      accent_key_syms = value;      break;
+    case MES_CACHE_FUNC:        func_key_syms = value;        break;
+    case MES_CACHE_MOUSE:       mouse_syms = value;           break;
+    case MES_CACHE_WHEEL:       wheel_syms = value;           break;
+    case MES_CACHE_DRAG_N_DROP: drag_n_drop_syms = value;     break;
+    case MES_CACHE_PINCH:       pinch_syms = value;           break;
+    case MES_CACHE_SYSTEM:
+      kset_system_key_syms (current_kboard, value);
+      break;
+    default:
+      break;
+    }
+  return Qnil;
+}
+
+/* imp-8.1.3 — get_keysym_name DEFUN.
+ *
+ * Wraps the X11 get_keysym_name (src/xterm.c) for the Scheme
+ * modify-event-symbol body's NILP(value) fallback clause.
+ * Returns a string on X11/W32/NS, Qnil otherwise.  */
+
+DEFUN ("--get-keysym-name", Fget_keysym_name, Sget_keysym_name, 1, 1, 0,
+       doc: /* Return the keysym name string for SYMBOL-NUM, or nil.
+
+Wraps get_keysym_name from X11 / W32 / NS.  Returns nil on
+non-windowing builds.  */)
+  (Lisp_Object symbol_num)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  char *name = get_keysym_name (XFIXNUM (symbol_num));
+  if (name)
+    return build_string (name);
+#endif
+  return Qnil;
+}
+
+/* imp-8.1.2 — modify_event_symbol wrappers, now SCM_CALL_7 stubs.  */
+
 DEFUN ("--drag-n-drop-head", Fdrag_n_drop_head, Sdrag_n_drop_head,
        1, 1, 0,
        doc: /* Return the drag-n-drop event head symbol for MODIFIERS.
 
-Wraps modify_event_symbol with the drag-n-drop name table and
-file-static symbol cache.  */)
+Delegates to (emacs modify-event-symbol) via SCM_CALL_7.  */)
   (Lisp_Object modifiers)
 {
-  return modify_event_symbol (0, XFIXNUM (modifiers),
-			      Qdrag_n_drop, Qnil,
-			      lispy_drag_n_drop_names,
-			      &drag_n_drop_syms, 1);
+  static SCM name_vec = SCM_UNDEFINED;
+  if (SCM_UNBNDP (name_vec))
+    name_vec = c_name_table_to_scm_vector (lispy_drag_n_drop_names, 1);
+  return call_mes (0, XFIXNUM (modifiers),
+		   Qdrag_n_drop, Qnil, name_vec,
+		   MES_CACHE_DRAG_N_DROP, 1);
 }
 
 DEFUN ("--make-scroll-bar-position", Fmake_scroll_bar_position,
@@ -6896,25 +7021,26 @@ bar type symbol, e.g. `vertical-scroll-bar'.  */)
 
 DEFUN ("--scroll-bar-click-head", Fscroll_bar_click_head,
        Sscroll_bar_click_head, 2, 2, 0,
-       doc: /* Return the mouse-click head symbol for a toolkit scroll-bar event.
+       doc: /* Return the mouse-click head symbol for a scroll-bar event.
 
 CODE and MODIFIERS are the event code and modifier bitmask.
-Resizes mouse_syms if needed (file-static, wraps larger_vector).
-Delegates to modify_event_symbol with mouse_click tables.  */)
+Resizes mouse_syms if needed, then delegates to
+(emacs modify-event-symbol) via SCM_CALL_7.  */)
   (Lisp_Object code, Lisp_Object modifiers)
 {
   int c = XFIXNUM (code);
-  int mods = XFIXNUM (modifiers);
 
+  /* Pre-process: resize the mouse_syms cache if needed.
+     The cache is the file-static backing --mes-cache-get/set slot 2.  */
   if (c >= ASIZE (mouse_syms))
     mouse_syms = larger_vector (mouse_syms,
 				c - ASIZE (mouse_syms) + 1,
 				-1);
-  return modify_event_symbol (c, mods,
-			      Qmouse_click,
-			      Vlispy_mouse_stem,
-			      NULL, &mouse_syms,
-			      ASIZE (mouse_syms));
+  return call_mes (c, XFIXNUM (modifiers),
+		   Qmouse_click, Vlispy_mouse_stem,
+		   SCM_BOOL_F,  /* name-vec = #nil; stem in name_alist_or_stem */
+		   MES_CACHE_MOUSE,
+		   ASIZE (mouse_syms));
 }
 
 /* mlp_* adapter DEFUNs — imp-6.3.
@@ -7090,121 +7216,103 @@ Returns 10-element list (textpos posn object string-info col row dx dy width hei
 
 DEFUN ("--modify-event-symbol-accent", Fmodify_event_symbol_accent,
        Smodify_event_symbol_accent, 2, 2, 0,
-       doc: /* Accent-key lookup through modify_event_symbol.
-
-SYMBOL_NUM is the index into lispy_accent_keys.  MODIFIERS is the
-event modifier bitmask.  Uses the accent_key_syms file-static cache.  */)
+       doc: /* Accent-key lookup through modify-event-symbol (Scheme port).  */)
   (Lisp_Object symbol_num, Lisp_Object modifiers)
 {
-  return modify_event_symbol (XFIXNUM (symbol_num),
-			      XFIXNUM (modifiers),
-			      Qfunction_key, Qnil,
-			      lispy_accent_keys,
-			      &accent_key_syms,
-			      ARRAYELTS (lispy_accent_keys));
+  static SCM name_vec = SCM_UNDEFINED;
+  if (SCM_UNBNDP (name_vec))
+    name_vec = c_name_table_to_scm_vector (lispy_accent_keys,
+					   ARRAYELTS (lispy_accent_keys));
+  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
+		   Qfunction_key, Qnil, name_vec,
+		   MES_CACHE_ACCENT, ARRAYELTS (lispy_accent_keys));
 }
 
 DEFUN ("--modify-event-symbol-func", Fmodify_event_symbol_func,
        Smodify_event_symbol_func, 3, 3, 0,
-       doc: /* Function-key lookup through modify_event_symbol.
+       doc: /* Function-key lookup through modify-event-symbol (Scheme port).
 
-SYMBOL_NUM is the table index (already offset-adjusted by the caller).
-MODIFIERS is the event modifier bitmask.  TABLE_TAG selects the
-name table as a fixnum: 0 = function keys, 1 = ISO function keys,
-2 = multimedia keys.  All three share the func_key_syms cache.  */)
+TABLE_TAG: 0 = function keys, 1 = ISO function keys, 2 = multimedia.  */)
   (Lisp_Object symbol_num, Lisp_Object modifiers, Lisp_Object table_tag)
 {
-  const char *const *name_table;
-  ptrdiff_t table_size;
+  static SCM name_vec[3] = {SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED};
+  static ptrdiff_t sizes[3];
   int tag = XFIXNUM (table_tag);
 
-  if (tag == 0)
-    {
-      name_table = lispy_function_keys;
-      table_size = ARRAYELTS (lispy_function_keys);
-    }
-  else if (tag == 1)
-    {
-      name_table = iso_lispy_function_keys;
-      table_size = ARRAYELTS (iso_lispy_function_keys);
-    }
-  else if (tag == 2)
-    {
-#ifdef HAVE_NTGUI
-      name_table = lispy_multimedia_keys;
-      table_size = ARRAYELTS (lispy_multimedia_keys);
-#else
-      return Qnil;
-#endif
-    }
-  else
+  if (tag < 0 || tag > 2)
     return Qnil;
 
-  return modify_event_symbol (XFIXNUM (symbol_num),
-			      XFIXNUM (modifiers),
-			      Qfunction_key, Qnil,
-			      name_table,
-			      &func_key_syms,
-			      table_size);
+  if (SCM_UNBNDP (name_vec[tag]))
+    {
+      const char *const *names;
+      ptrdiff_t sz;
+      if (tag == 0)
+	{ names = lispy_function_keys; sz = ARRAYELTS (lispy_function_keys); }
+      else if (tag == 1)
+	{ names = iso_lispy_function_keys; sz = ARRAYELTS (iso_lispy_function_keys); }
+      else
+	{
+#ifdef HAVE_NTGUI
+	  names = lispy_multimedia_keys; sz = ARRAYELTS (lispy_multimedia_keys);
+#else
+	  return Qnil;
+#endif
+	}
+      name_vec[tag] = c_name_table_to_scm_vector (names, sz);
+      sizes[tag] = sz;
+    }
+
+  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
+		   Qfunction_key, Qnil, name_vec[tag],
+		   MES_CACHE_FUNC, sizes[tag]);
 }
 
 DEFUN ("--modify-event-symbol-system", Fmodify_event_symbol_system,
        Smodify_event_symbol_system, 2, 2, 0,
-       doc: /* System-key fallthrough through modify_event_symbol.
-
-SYMBOL_NUM is the raw event code.  MODIFIERS is the event modifier
-bitmask.  Uses the per-kboard system_key_syms cache and
-Vsystem_key_alist for name resolution.  */)
+       doc: /* System-key fallthrough through modify-event-symbol (Scheme port).  */)
   (Lisp_Object symbol_num, Lisp_Object modifiers)
 {
-  /* Lazy-init the system-key alist cache, matching the C original
-     at keyboard.c:6858-6865.  Without this the first call
-     passes a nil cache pointer to modify_event_symbol.  */
-  if (NILP (KVAR (current_kboard, system_key_syms)))
-    kset_system_key_syms (current_kboard, Fcons (Qnil, Qnil));
-  return modify_event_symbol (XFIXNUM (symbol_num),
-			      XFIXNUM (modifiers),
-			      Qfunction_key,
-			      KVAR (current_kboard, Vsystem_key_alist),
-			      NULL,
-			      &KVAR (current_kboard, system_key_syms),
-			      PTRDIFF_MAX);
+  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
+		   Qfunction_key,
+		   KVAR (current_kboard, Vsystem_key_alist),
+		   SCM_BOOL_F,   /* name-vec = #nil; alist lookup via name_alist_or_stem */
+		   MES_CACHE_SYSTEM,
+		   PTRDIFF_MAX);
 }
 
 DEFUN ("--modify-event-symbol-mouse-click",
        Fmodify_event_symbol_mouse_click,
        Smodify_event_symbol_mouse_click, 2, 2, 0,
-       doc: /* Mouse-click / wheel head-symbol lookup through modify_event_symbol.
-
-SYMBOL_NUM is the wheel-name index (0=wheel-up, 1=wheel-down,
-2=wheel-left, 3=wheel-right) or mouse button number.
-MODIFIERS is the event modifier bitmask.  Uses the wheel_syms
-file-static cache and lispy_wheel_names table.  */)
+       doc: /* Mouse-click / wheel head-symbol lookup (Scheme port).  */)
   (Lisp_Object symbol_num, Lisp_Object modifiers)
 {
-  return modify_event_symbol (XFIXNUM (symbol_num),
-			      XFIXNUM (modifiers),
-			      Qmouse_click, Qnil,
-			      lispy_wheel_names,
-			      &wheel_syms,
-			      ASIZE (wheel_syms));
+  static SCM name_vec = SCM_UNDEFINED;
+  static ptrdiff_t sz;
+  if (SCM_UNBNDP (name_vec))
+    {
+      sz = ARRAYELTS (lispy_wheel_names);
+      name_vec = c_name_table_to_scm_vector (lispy_wheel_names, sz);
+    }
+  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
+		   Qmouse_click, Qnil, name_vec,
+		   MES_CACHE_WHEEL, sz);
 }
 
 DEFUN ("--modify-event-symbol-pinch",
        Fmodify_event_symbol_pinch,
        Smodify_event_symbol_pinch, 1, 1, 0,
-       doc: /* Pinch event head-symbol lookup through modify_event_symbol.
-
-MODIFIERS is the event modifier bitmask.  Uses the pinch_syms
-file-static cache with the single-entry {"pinch"} name table.  */)
+       doc: /* Pinch event head-symbol lookup (Scheme port).  */)
   (Lisp_Object modifiers)
 {
-  return modify_event_symbol (0,
-			      XFIXNUM (modifiers),
-			      Qpinch, Qnil,
-			      (const char *[]){"pinch"},
-			      &pinch_syms,
-			      1);
+  static SCM name_vec = SCM_UNDEFINED;
+  if (SCM_UNBNDP (name_vec))
+    {
+      const char *pinch_names[] = {"pinch"};
+      name_vec = c_name_table_to_scm_vector (pinch_names, 1);
+    }
+  return call_mes (0, XFIXNUM (modifiers),
+		   Qpinch, Qnil, name_vec,
+		   MES_CACHE_PINCH, 1);
 }
 
 DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,
@@ -7989,121 +8097,8 @@ reorder_modifiers (Lisp_Object symbol)
 }
 
 
-/* For handling events, we often want to produce a symbol whose name
-   is a series of modifier key prefixes ("M-", "C-", etcetera) attached
-   to some base, like the name of a function key or mouse button.
-   modify_event_symbol produces symbols of this sort.
-
-   NAME_TABLE should point to an array of strings, such that NAME_TABLE[i]
-   is the name of the i'th symbol.  TABLE_SIZE is the number of elements
-   in the table.
-
-   Alternatively, NAME_ALIST_OR_STEM is either an alist mapping codes
-   into symbol names, or a string specifying a name stem used to
-   construct a symbol name or the form `STEM-N', where N is the decimal
-   representation of SYMBOL_NUM.  NAME_ALIST_OR_STEM is used if it is
-   non-nil; otherwise NAME_TABLE is used.
-
-   SYMBOL_TABLE should be a pointer to a Lisp_Object whose value will
-   persist between calls to modify_event_symbol that it can use to
-   store a cache of the symbols it's generated for this NAME_TABLE
-   before.  The object stored there may be a vector or an alist.
-
-   SYMBOL_NUM is the number of the base name we want from NAME_TABLE.
-
-   MODIFIERS is a set of modifier bits (as given in struct input_events)
-   whose prefixes should be applied to the symbol name.
-
-   SYMBOL_KIND is the value to be placed in the event_kind property of
-   the returned symbol.
-
-   The symbols we create are supposed to have an
-   `event-symbol-elements' property, which lists the modifiers present
-   in the symbol's name.  */
-
-static Lisp_Object
-modify_event_symbol (ptrdiff_t symbol_num, int modifiers, Lisp_Object symbol_kind,
-		     Lisp_Object name_alist_or_stem, const char *const *name_table,
-		     Lisp_Object *symbol_table, ptrdiff_t table_size)
-{
-  Lisp_Object value;
-  Lisp_Object symbol_int;
-
-  /* Get rid of the "vendor-specific" bit here.  */
-  XSETINT (symbol_int, symbol_num & 0xffffff);
-
-  /* Is this a request for a valid symbol?  */
-  if (symbol_num < 0 || symbol_num >= table_size)
-    return Qnil;
-
-  if (CONSP (*symbol_table))
-    value = Fcdr (assq_no_quit (symbol_int, *symbol_table));
-
-  /* If *symbol_table doesn't seem to be initialized properly, fix that.
-     *symbol_table should be a lisp vector TABLE_SIZE elements long,
-     where the Nth element is the symbol for NAME_TABLE[N], or nil if
-     we've never used that symbol before.  */
-  else
-    {
-      if (! ((VECTOR_OR_PSEUDOVECTORP (*symbol_table))
-             && ASIZE (*symbol_table) == table_size))
-        *symbol_table = make_nil_elisp_vector (table_size);
-
-      value = AREF (*symbol_table, symbol_num);
-    }
-
-  /* Have we already used this symbol before?  */
-  if (NILP (value))
-    {
-      /* No; let's create it.  */
-      if (CONSP (name_alist_or_stem))
-	value = Fcdr_safe (Fassq (symbol_int, name_alist_or_stem));
-      else if (STRINGP (name_alist_or_stem))
-	{
-	  char *buf;
-	  ptrdiff_t len = (SBYTES (name_alist_or_stem)
-			   + sizeof "-" + INT_STRLEN_BOUND (EMACS_INT));
-	  USE_SAFE_ALLOCA;
-	  buf = SAFE_ALLOCA (len);
-	  esprintf (buf, "%s-%"pI"d", SDATA (name_alist_or_stem),
-		    XFIXNUM (symbol_int) + 1);
-	  value = intern (buf);
-	  SAFE_FREE ();
-	}
-      else if (name_table != 0 && name_table[symbol_num])
-	value = intern (name_table[symbol_num]);
-
-#ifdef HAVE_WINDOW_SYSTEM
-      if (NILP (value))
-	{
-	  char *name = get_keysym_name (symbol_num);
-	  if (name)
-	    value = intern (name);
-	}
-#endif
-
-      if (NILP (value))
-	{
-	  char buf[sizeof "key-" + INT_STRLEN_BOUND (EMACS_INT)];
-	  sprintf (buf, "key-%"pD"d", symbol_num);
-	  value = intern (buf);
-	}
-
-      if (CONSP (*symbol_table))
-        *symbol_table = Fcons (Fcons (symbol_int, value), *symbol_table);
-      else
-	ASET (*symbol_table, symbol_num, value);
-
-      /* Fill in the cache entries for this symbol; this also
-	 builds the Qevent_symbol_elements property, which the user
-	 cares about.  */
-      apply_modifiers (modifiers & click_modifier, value);
-      Fput (value, Qevent_kind, symbol_kind);
-    }
-
-  /* Apply modifiers to that symbol.  */
-  return apply_modifiers (modifiers, value);
-}
+/* Ported to (emacs modify-event-symbol) modify-event-symbol — imp-8.1.2.
+   The 7 call sites now route through SCM_CALL_7 wrappers above.  */
 
 /* Convert a list that represents an event type,
    such as (ctrl meta backspace), into the usual representation of that
