@@ -12916,6 +12916,13 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM_CALL_0 (rks_setup_pre_loop_proc);
   }
 
+  /* Initialize fkey/indec/keytran from current-kboard's translation
+     maps + key-translation-map.  Vanilla emacs did this at the
+     `replay_entire_sequence:' label which ran once on entry.  Without
+     this, the three maps stay Qnil and `local-function-key-map'
+     translations (like <return> -> RET) never fire.  */
+  rks_call_setup_replay_entire_sequence ();
+
 #ifdef HAVE_TEXT_CONVERSION
   record_unwind_protect_int (restore_reading_key_sequence,
 			     reading_key_sequence);
