@@ -6812,43 +6812,6 @@ line_number_mode_hscroll (Lisp_Object start_pos, Lisp_Object end_pos)
    are received; this function stores the location of button presses
    in order to build drag events when the button is released.  */
 
-/* Old make_lispy_event body renamed to make_lispy_event_c.
-   Called through --make-lispy-event-c as the fallback when a
-   kind doesn't have a Scheme handler registered.
-
-   All 37 event kinds are now ported to (emacs lispy-event).
-   The switch body is empty — only the default: abort remains
-   as a safety net for unrecognized kinds.  */
-
-static Lisp_Object
-make_lispy_event_c (struct input_event *event)
-{
-  switch (event->kind)
-    {
-      /* All kinds handled by the Scheme orchestrator.
-         Unrecognized kinds abort — indicates a new kind was
-         added to the enum without a corresponding Scheme handler.  */
-    default:
-      emacs_abort ();
-    }
-}
-
-/* Fallback: called by the Scheme orchestrator for any event
-   kind whose Scheme port hasn't been registered yet.  All 37
-   kinds are now ported (M9 exit criterion 1); this DEFUN is
-   retained as a safety net for unrecognized kinds.  */
-DEFUN ("--make-lispy-event-c", Fmake_lispy_event_c, Smake_lispy_event_c,
-       1, 1, 0,
-       doc: /* Transform an input-event SMOB into a Lisp event form.
-
-All 37 event kinds are ported to (emacs lispy-event); this
-DEFUN is the safety-net fallback.  Unrecognized kinds abort.  */)
-  (Lisp_Object ie)
-{
-  CHECK_IE (ie);
-  return make_lispy_event_c (ie_unwrap (ie));
-}
-
 DEFUN ("--make-lispy-position", Fmake_lispy_position, Smake_lispy_position,
        4, 4, 0,
        doc: /* Build a mouse-click position list for frame-or-window FOW,

@@ -24,8 +24,8 @@
 ;;; The module's dispatch table is keyed by event_kind int; each
 ;;; entry is a Scheme procedure that takes an ie-smob and returns
 ;;; a Lisp event form.  The orchestrator looks up the kind and
-;;; calls the registered procedure, falling through to C's
-;;; --make-lispy-event-c for kinds not yet ported.
+;;; calls the registered procedure.  All 37 event kinds are ported;
+;;; unrecognized kinds raise an error.
 ;;;
 ;;; See docs/m9-plan.org for the full implementation DAG.
 
@@ -51,7 +51,6 @@
 (define %--ie-part              (delay (%c '--ie-part)))
 (define %--ie-clear             (delay (%c '--ie-clear)))
 (define %--set-ie-modifiers     (delay (%c '--set-ie-modifiers)))
-(define %--make-lispy-event-c   (delay (%c '--make-lispy-event-c)))
 (define %--make-lispy-focus-in  (delay (%c '--make-lispy-focus-in)))
 (define %--make-lispy-focus-out (delay (%c '--make-lispy-focus-out)))
 ;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
@@ -101,15 +100,14 @@
 (define (make-lispy-event ie)
   "Transform an input-event SMOB into a Lisp event form.
 
-Looks up (--ie-kind IE) in the dispatch table.  When a Scheme
-procedure is registered for that kind, calls it with IE; otherwise
-falls through to C's --make-lispy-event-c, which runs the original
-make_lispy_event body."
+Looks up (--ie-kind IE) in the dispatch table.  All 37 event
+kinds are now ported to Scheme (M9 exit criterion 1); an
+unrecognized kind aborts."
   (let* ((kind ((force %--ie-kind) ie))
          (proc (hashv-ref make-lispy-event-dispatch kind)))
     (if proc
         (proc ie)
-        ((force %--make-lispy-event-c) ie))))
+        (error "make-lispy-event: unrecognized event kind" kind))))
 
 ;;; Per-kind handlers — imp-3 (trivial cases).
 
