@@ -1,4 +1,5 @@
 (define-module (emacs lispy-position)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (make-lispy-position))
@@ -13,24 +14,23 @@
 ;;; them together.
 
 ;;; Lazy C-primitive references.
-(define (%c name) (symbol-function name))
 
-(define %--mlp-internal-border    (delay (%c '--mlp-internal-border)))
-(define %--mlp-image-hotspot-check (delay (%c '--mlp-image-hotspot-check)))
-(define %--mlp-frame-preamble     (delay (%c '--mlp-frame-preamble)))
-(define %--mlp-fringes            (delay (%c '--mlp-fringes)))
-(define %--mlp-scroll-border      (delay (%c '--mlp-scroll-border)))
-(define %--mlp-mode-header-line   (delay (%c '--mlp-mode-header-line)))
-(define %--mlp-margins            (delay (%c '--mlp-margins)))
-(define %--mlp-buffer-posn-pass   (delay (%c '--mlp-buffer-posn-pass)))
-(define %--mlp-text-area-offset    (delay (%c '--mlp-text-area-offset)))
+(defelisp %--mlp-internal-border --mlp-internal-border)
+(defelisp %--mlp-image-hotspot-check --mlp-image-hotspot-check)
+(defelisp %--mlp-frame-preamble --mlp-frame-preamble)
+(defelisp %--mlp-fringes --mlp-fringes)
+(defelisp %--mlp-scroll-border --mlp-scroll-border)
+(defelisp %--mlp-mode-header-line --mlp-mode-header-line)
+(defelisp %--mlp-margins --mlp-margins)
+(defelisp %--mlp-buffer-posn-pass --mlp-buffer-posn-pass)
+(defelisp %--mlp-text-area-offset --mlp-text-area-offset)
 
 ;;; Elisp globals / predicates.
-(define %symbol-value             (delay (%c 'symbol-value)))
+(defelisp %symbol-value symbol-value)
 ;; track-mouse is a dynamic variable — read fresh each call.
 (define (track-mouse-value)
   ((force %symbol-value) 'track-mouse))
-(define %windowp                  (delay (%c 'windowp)))
+(defelisp %windowp windowp)
 
 ;;; Per-region helpers — each calls one adapter DEFUN and destructures
 ;;; the packed list return.

@@ -1,4 +1,5 @@
 (define-module (emacs command-loop)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (command-loop-1-prologue
@@ -32,7 +33,6 @@
 ;;;
 ;;; See docs/keyboard.org §"M7a — command_loop_1 prologue".
 
-(define (%c name) (symbol-function name))
 
 ;; Cache lookups for the C-side primitives used per command-loop entry.
 (define %cancel-echoing                       (delay (%c '--cancel-echoing)))

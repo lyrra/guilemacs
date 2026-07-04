@@ -1,4 +1,5 @@
 (define-module (emacs modify-event-symbol)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs event-modifiers)
   #:declarative? #t
@@ -26,10 +27,8 @@
 ;;;     on fixnums ≤ most-positive-fixnum.
 ;;;   - system_key_syms is lazy-inited inside --mes-cache-get (C side).
 
-(define (%c name) (symbol-function name))
-
-(define %--mes-cache-get  (delay (%c '--mes-cache-get)))
-(define %--mes-cache-set  (delay (%c '--mes-cache-set)))
+(defelisp %--mes-cache-get --mes-cache-get)
+(defelisp %--mes-cache-set --mes-cache-set)
 
 ;;; Cache-ID constants — must match enum mes_cache_id in keyboard.c.
 (define cache-accent      0)
@@ -40,9 +39,9 @@
 (define cache-pinch       5)
 (define cache-system      6)
 
-(define %--get-keysym-name (delay (%c '--get-keysym-name)))
-(define %intern           (delay (%c 'intern)))
-(define %put              (delay (%c 'put)))
+(defelisp %--get-keysym-name --get-keysym-name)
+(defelisp %intern intern)
+(defelisp %put put)
 
 (define (modify-event-symbol symbol-num modifiers kind
                              name-alist-or-stem name-vec

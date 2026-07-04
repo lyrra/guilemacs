@@ -1,4 +1,5 @@
 (define-module (emacs recent-keys)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (recent-keys
@@ -19,7 +20,6 @@
 ;;;   --lossage-limit, --min-num-recent-keys, --max-num-recent-keys,
 ;;;   --update-recent-keys, --make-event-array-from-vector.
 
-(define (%c name) (symbol-function name))
 
 (define (%user-error msg)
   ;; Elisp `signal' isn't bound in Scheme top-level — go through the

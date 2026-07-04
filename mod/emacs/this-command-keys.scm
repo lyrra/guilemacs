@@ -1,4 +1,5 @@
 (define-module (emacs this-command-keys)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module ((emacs event-modifiers) #:select (modifier-bit))
   #:declarative? #t
@@ -34,7 +35,6 @@
 ;;;   --clear-recent-keys-ring,
 ;;;   --make-event-array-from-vector (defined by M3).
 
-(define (%c name) (symbol-function name))
 
 ;;;;
 ;;;; Storage migrated from C (was: static ptrdiff_t in keyboard.c).

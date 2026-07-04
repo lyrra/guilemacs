@@ -1,4 +1,5 @@
 (define-module (emacs recursive-edit)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
   #:export (exit-recursive-edit
@@ -20,7 +21,6 @@
 ;;; recursive edit, and throw to the elisp `exit' tag (caught by
 ;;; the C-side internal_catch in command_loop).
 
-(define (%c name) (symbol-function name))
 
 (define (%user-error msg)
   ;; Elisp `signal' isn't bound in Scheme top-level — resolve via the

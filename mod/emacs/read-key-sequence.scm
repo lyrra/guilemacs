@@ -1,4 +1,5 @@
 (define-module (emacs read-key-sequence)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-9)            ; define-record-type
   #:use-module ((emacs event-modifiers) #:select (parse-modifiers))
@@ -75,7 +76,6 @@
 ;;;
 ;;; See docs/keyboard.org §M6a.
 
-(define (%c name) (symbol-function name))
 
 (define (%nilp x)
   ;; Recognize all three nil-equivalents that show up in Guile-elisp.

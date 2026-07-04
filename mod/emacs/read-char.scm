@@ -1,4 +1,5 @@
 (define-module (emacs read-char)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-9)            ; define-record-type
   #:declarative? #t
@@ -52,7 +53,6 @@
 ;;;
 ;;; See docs/keyboard.org §M8 for the full revised plan.
 
-(define (%c name) (symbol-function name))
 
 (define (%nilp x)
   (or (null? x) (not x)))

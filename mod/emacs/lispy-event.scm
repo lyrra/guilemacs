@@ -1,4 +1,5 @@
 (define-module (emacs lispy-event)
+  #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs event-modifiers)
   #:use-module (emacs lispy-position)
@@ -38,41 +39,39 @@
 ;;; Lazy C-primitive references.  Resolved at first call so module
 ;;; load order is not sensitive to DEFUN registration order.
 
-(define (%c name) (symbol-function name))
-
-(define %--ie-kind              (delay (%c '--ie-kind)))
-(define %--ie-code              (delay (%c '--ie-code)))
-(define %--ie-modifiers         (delay (%c '--ie-modifiers)))
-(define %--ie-arg               (delay (%c '--ie-arg)))
-(define %--ie-frame-or-window   (delay (%c '--ie-frame-or-window)))
-(define %--ie-x                 (delay (%c '--ie-x)))
-(define %--ie-y                 (delay (%c '--ie-y)))
-(define %--ie-timestamp         (delay (%c '--ie-timestamp)))
-(define %--ie-part              (delay (%c '--ie-part)))
-(define %--ie-clear             (delay (%c '--ie-clear)))
-(define %--set-ie-modifiers     (delay (%c '--set-ie-modifiers)))
-(define %--make-lispy-focus-in  (delay (%c '--make-lispy-focus-in)))
-(define %--make-lispy-focus-out (delay (%c '--make-lispy-focus-out)))
+(defelisp %--ie-kind --ie-kind)
+(defelisp %--ie-code --ie-code)
+(defelisp %--ie-modifiers --ie-modifiers)
+(defelisp %--ie-arg --ie-arg)
+(defelisp %--ie-frame-or-window --ie-frame-or-window)
+(defelisp %--ie-x --ie-x)
+(defelisp %--ie-y --ie-y)
+(defelisp %--ie-timestamp --ie-timestamp)
+(defelisp %--ie-part --ie-part)
+(defelisp %--ie-clear --ie-clear)
+(defelisp %--set-ie-modifiers --set-ie-modifiers)
+(defelisp %--make-lispy-focus-in --make-lispy-focus-in)
+(defelisp %--make-lispy-focus-out --make-lispy-focus-out)
 ;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
-(define %--time-to-position      (delay (%c '--time-to-position)))
-(define %--ensure-mouse-syms-size (delay (%c '--ensure-mouse-syms-size)))
-(define %--ie-kind-from-name    (delay (%c '--ie-kind-from-name)))
-(define %--user-signal-name     (delay (%c '--user-signal-name)))
+(defelisp %--time-to-position --time-to-position)
+(defelisp %--ensure-mouse-syms-size --ensure-mouse-syms-size)
+(defelisp %--ie-kind-from-name --ie-kind-from-name)
+(defelisp %--user-signal-name --user-signal-name)
 
 ;;; Elisp predicates — not Scheme bindings; go through %c.
-(define %frame-live-p           (delay (%c 'frame-live-p)))
-(define %windowp                (delay (%c 'windowp)))
-(define %upcase                 (delay (%c 'upcase)))
-(define %downcase               (delay (%c 'downcase)))
+(defelisp %frame-live-p frame-live-p)
+(defelisp %windowp windowp)
+(defelisp %upcase upcase)
+(defelisp %downcase downcase)
 
 ;;; Key-name tables — imp-5.1 (exposed as Scheme vectors).
-(define %lispy-accent-codes     (delay (%c '--lispy-accent-codes)))
-(define %lispy-accent-keys      (delay (%c '--lispy-accent-keys)))
-(define %function-key-offset    (delay (%c '--function-key-offset)))
-(define %iso-function-key-offset (delay (%c '--iso-function-key-offset)))
-(define %lispy-function-keys    (delay (%c '--lispy-function-keys)))
-(define %iso-lispy-function-keys (delay (%c '--iso-lispy-function-keys)))
-(define %lispy-multimedia-keys  (delay (%c '--lispy-multimedia-keys)))
+(defelisp %lispy-accent-codes --lispy-accent-codes)
+(defelisp %lispy-accent-keys --lispy-accent-keys)
+(defelisp %function-key-offset --function-key-offset)
+(defelisp %iso-function-key-offset --iso-function-key-offset)
+(defelisp %lispy-function-keys --lispy-function-keys)
+(defelisp %iso-lispy-function-keys --iso-lispy-function-keys)
+(defelisp %lispy-multimedia-keys --lispy-multimedia-keys)
 
 ;;; Memoized key-table vectors and offsets — imp-5.3 perf.
 ;;; Each DEFUN reconstructs the vector from the C array on every call.
@@ -370,8 +369,8 @@ unrecognized kind aborts."
 ;;; src/buffer.h.  The prior approach chained upcase/downcase DEFUN calls
 ;;; (up to 3 crossings per keystroke); this cuts it to 1 per predicate.
 
-(define %uppercasep            (delay (%c '--uppercasep)))
-(define %lowercasep            (delay (%c '--lowercasep)))
+(defelisp %uppercasep --uppercasep)
+(defelisp %lowercasep --lowercasep)
 
 (define (keystroke-impl ie is-ascii)
   ;; Shared ASCII / MULTIBYTE_CHAR body.  is-ascii is #t for
@@ -676,12 +675,12 @@ unrecognized kind aborts."
 ;;; Three structurally different events using imp-7.4.1 DEFUNs
 ;;; for menu-bar / tab-bar integration.
 
-(define %--menu-bar-touch-id          (delay (%c '--menu-bar-touch-id)))
-(define %--set-menu-bar-touch-id      (delay (%c '--set-menu-bar-touch-id)))
-(define %--coords-in-menu-bar-window  (delay (%c '--coords-in-menu-bar-window)))
-(define %--tab-bar-enrich-position    (delay (%c '--tab-bar-enrich-position)))
-(define %--menu-bar-touch-consume-p   (delay (%c '--menu-bar-touch-consume-p)))
-(define %--menu-bar-touch-activate    (delay (%c '--menu-bar-touch-activate)))
+(defelisp %--menu-bar-touch-id --menu-bar-touch-id)
+(defelisp %--set-menu-bar-touch-id --set-menu-bar-touch-id)
+(defelisp %--coords-in-menu-bar-window --coords-in-menu-bar-window)
+(defelisp %--tab-bar-enrich-position --tab-bar-enrich-position)
+(defelisp %--menu-bar-touch-consume-p --menu-bar-touch-consume-p)
+(defelisp %--menu-bar-touch-activate --menu-bar-touch-activate)
 
 (define (mle-touchscreen-begin-event ie)
   ;; C body (keyboard.c:7260–7335): frame-live → menu-bar
@@ -786,19 +785,19 @@ unrecognized kind aborts."
 ;;; Returns #t if this event is a double-click, #f otherwise.
 ;;; No writes to file-statics — that's imp-7.5.3.
 
-(define %symbol-value             (delay (%c 'symbol-value)))
+(defelisp %symbol-value symbol-value)
 ;; NOT delays — variables can change (customize, let-binding).
 ;; Delays would cache the first value forever.
 (define (double-click-fuzz)
   ((force %symbol-value) 'double-click-fuzz))
 (define (double-click-time)
   ((force %symbol-value) 'double-click-time))
-(define %--last-mouse-button    (delay (%c '--last-mouse-button)))
-(define %--last-mouse-x         (delay (%c '--last-mouse-x)))
-(define %--last-mouse-y         (delay (%c '--last-mouse-y)))
-(define %--button-down-time     (delay (%c '--button-down-time)))
-(define %window-system          (delay (%c 'window-system)))
-(define %window-frame           (delay (%c 'window-frame)))
+(defelisp %--last-mouse-button --last-mouse-button)
+(defelisp %--last-mouse-x --last-mouse-x)
+(defelisp %--last-mouse-y --last-mouse-y)
+(defelisp %--button-down-time --button-down-time)
+(defelisp %window-system window-system)
+(defelisp %window-frame window-frame)
 
 (define (mouse-double-click-p fow code x y timestamp)
   ;; Compute is_double for mouse events.
@@ -853,7 +852,7 @@ unrecognized kind aborts."
   (delay (%c '--button-down-location-aset)))
 (define %--save-line-number-display-width
   (delay (%c '--save-line-number-display-width)))
-(define %copy-alist               (delay (%c 'copy-alist)))
+(defelisp %copy-alist copy-alist)
 
 (define (mouse-button-down-bookkeep! ie fow code x y timestamp mods position)
   ;; Button-press bookkeeping (keyboard.c:6963-7006).
@@ -914,9 +913,9 @@ unrecognized kind aborts."
   (delay (%c '--frame-relative-event-pos)))
 (define %--set-down-mouse-line-number-width
   (delay (%c '--set-down-mouse-line-number-width)))
-(define %window-live-p            (delay (%c 'window-live-p)))
-(define %fboundp                  (delay (%c 'fboundp)))
-(define %window-edges             (delay (%c 'window-edges)))
+(defelisp %window-live-p window-live-p)
+(defelisp %fboundp fboundp)
+(defelisp %window-edges window-edges)
 
 (define (mouse-up-resolve! fow x y timestamp mods start-pos position)
   ;; Button-up drag/click resolution (keyboard.c:7011–7117).
