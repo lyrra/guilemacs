@@ -6842,45 +6842,6 @@ enum mes_cache_id {
   MES_CACHE_SYSTEM
 };
 
-/* Helper: convert a C string-array + count to a Scheme vector.  */
-static SCM
-c_name_table_to_scm_vector (const char *const *names, ptrdiff_t count)
-{
-  SCM vec = scm_c_make_vector (count, SCM_BOOL_F);
-  for (ptrdiff_t i = 0; i < count; i++)
-    if (names[i])
-      SCM_SIMPLE_VECTOR_SET (vec, i, scm_from_utf8_string (names[i]));
-  return vec;
-}
-
-/* Helper: get the SCM procedure for (emacs modify-event-symbol).  */
-static SCM
-mes_proc (void)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs modify-event-symbol",
-			     "modify-event-symbol");
-  return proc;
-}
-
-/* Helper: SCM_CALL_7 into modify-event-symbol.  */
-static Lisp_Object
-call_mes (ptrdiff_t symbol_num, int modifiers, Lisp_Object kind,
-	  Lisp_Object name_alist_or_stem, SCM name_vec,
-	  int cache_id, ptrdiff_t table_size)
-{
-  SCM proc = mes_proc ();
-  return SCM_CALL_7 (proc,
-		     scm_from_ptrdiff_t (symbol_num),
-		     scm_from_int (modifiers),
-		     kind,
-		     name_alist_or_stem,
-		     name_vec,
-		     scm_from_int (cache_id),
-		     scm_from_ptrdiff_t (table_size));
-}
-
 DEFUN ("--mes-cache-get", Fmes_cache_get, Smes_cache_get, 1, 1, 0,
        doc: /* Return the Lisp_Object stored in the modify-event-symbol
 cache slot identified by CACHE-ID (fixnum 0–6).  */)
@@ -6949,23 +6910,6 @@ non-windowing builds.  */)
   return Qnil;
 }
 
-/* imp-8.1.2 — modify_event_symbol wrappers, now SCM_CALL_7 stubs.  */
-
-DEFUN ("--drag-n-drop-head", Fdrag_n_drop_head, Sdrag_n_drop_head,
-       1, 1, 0,
-       doc: /* Return the drag-n-drop event head symbol for MODIFIERS.
-
-Delegates to (emacs modify-event-symbol) via SCM_CALL_7.  */)
-  (Lisp_Object modifiers)
-{
-  static SCM name_vec = SCM_UNDEFINED;
-  if (SCM_UNBNDP (name_vec))
-    name_vec = c_name_table_to_scm_vector (lispy_drag_n_drop_names, 1);
-  return call_mes (0, XFIXNUM (modifiers),
-		   Qdrag_n_drop, Qnil, name_vec,
-		   MES_CACHE_DRAG_N_DROP, 1);
-}
-
 DEFUN ("--make-scroll-bar-position", Fmake_scroll_bar_position,
        Smake_scroll_bar_position, 6, 6, 0,
        doc: /* Build a scroll-bar position list.
@@ -6982,28 +6926,20 @@ bar type symbol, e.g. `vertical-scroll-bar'.  */)
 		builtin_lisp_symbol (scroll_bar_parts[XFIXNUM (part)]));
 }
 
-DEFUN ("--scroll-bar-click-head", Fscroll_bar_click_head,
-       Sscroll_bar_click_head, 2, 2, 0,
-       doc: /* Return the mouse-click head symbol for a scroll-bar event.
+DEFUN ("--ensure-mouse-syms-size", Fensure_mouse_syms_size,
+       Sensure_mouse_syms_size, 1, 1, 0,
+       doc: /* Ensure mouse_syms has at least N entries.
 
-CODE and MODIFIERS are the event code and modifier bitmask.
-Resizes mouse_syms if needed, then delegates to
-(emacs modify-event-symbol) via SCM_CALL_7.  */)
-  (Lisp_Object code, Lisp_Object modifiers)
+Resizes the mouse_syms cache vector if needed.  Called from Scheme
+before modify-event-symbol to guarantee the cache slot is sized.  */)
+  (Lisp_Object n)
 {
-  int c = XFIXNUM (code);
-
-  /* Pre-process: resize the mouse_syms cache if needed.
-     The cache is the file-static backing --mes-cache-get/set slot 2.  */
+  int c = XFIXNUM (n);
   if (c >= ASIZE (mouse_syms))
     mouse_syms = larger_vector (mouse_syms,
 				c - ASIZE (mouse_syms) + 1,
 				-1);
-  return call_mes (c, XFIXNUM (modifiers),
-		   Qmouse_click, Vlispy_mouse_stem,
-		   SCM_BOOL_F,  /* name-vec = #nil; stem in name_alist_or_stem */
-		   MES_CACHE_MOUSE,
-		   ASIZE (mouse_syms));
+  return make_fixnum (ASIZE (mouse_syms));
 }
 
 /* mlp_* adapter DEFUNs — imp-6.3.
@@ -7162,120 +7098,6 @@ Returns 10-element list (textpos posn object string-info col row dx dy width hei
 		make_fixnum (col), make_fixnum (row),
 		make_fixnum (dx), make_fixnum (dy),
 		make_fixnum (width), make_fixnum (height));
-}
-
-/* modify_event_symbol wrappers — imp-5.3.
- *
- * Thin DEFUNs that call the static modify_event_symbol with the
- * correct cache pointer for each key-name table.  The Scheme
- * keystroke handlers use these until imp-8.1 ports the full
- * modify_event_symbol body to Scheme.
- *
- * TABLE_TAG for --modify-event-symbol-func is one of:
- *   'function     → lispy_function_keys
- *   'iso-function → iso_lispy_function_keys
- *   'multimedia   → lispy_multimedia_keys
- * All three share the func_key_syms cache.  */
-
-DEFUN ("--modify-event-symbol-accent", Fmodify_event_symbol_accent,
-       Smodify_event_symbol_accent, 2, 2, 0,
-       doc: /* Accent-key lookup through modify-event-symbol (Scheme port).  */)
-  (Lisp_Object symbol_num, Lisp_Object modifiers)
-{
-  static SCM name_vec = SCM_UNDEFINED;
-  if (SCM_UNBNDP (name_vec))
-    name_vec = c_name_table_to_scm_vector (lispy_accent_keys,
-					   ARRAYELTS (lispy_accent_keys));
-  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
-		   Qfunction_key, Qnil, name_vec,
-		   MES_CACHE_ACCENT, ARRAYELTS (lispy_accent_keys));
-}
-
-DEFUN ("--modify-event-symbol-func", Fmodify_event_symbol_func,
-       Smodify_event_symbol_func, 3, 3, 0,
-       doc: /* Function-key lookup through modify-event-symbol (Scheme port).
-
-TABLE_TAG: 0 = function keys, 1 = ISO function keys, 2 = multimedia.  */)
-  (Lisp_Object symbol_num, Lisp_Object modifiers, Lisp_Object table_tag)
-{
-  static SCM name_vec[3] = {SCM_UNDEFINED, SCM_UNDEFINED, SCM_UNDEFINED};
-  static ptrdiff_t sizes[3];
-  int tag = XFIXNUM (table_tag);
-
-  if (tag < 0 || tag > 2)
-    return Qnil;
-
-  if (SCM_UNBNDP (name_vec[tag]))
-    {
-      const char *const *names;
-      ptrdiff_t sz;
-      if (tag == 0)
-	{ names = lispy_function_keys; sz = ARRAYELTS (lispy_function_keys); }
-      else if (tag == 1)
-	{ names = iso_lispy_function_keys; sz = ARRAYELTS (iso_lispy_function_keys); }
-      else
-	{
-#ifdef HAVE_NTGUI
-	  names = lispy_multimedia_keys; sz = ARRAYELTS (lispy_multimedia_keys);
-#else
-	  return Qnil;
-#endif
-	}
-      name_vec[tag] = c_name_table_to_scm_vector (names, sz);
-      sizes[tag] = sz;
-    }
-
-  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
-		   Qfunction_key, Qnil, name_vec[tag],
-		   MES_CACHE_FUNC, sizes[tag]);
-}
-
-DEFUN ("--modify-event-symbol-system", Fmodify_event_symbol_system,
-       Smodify_event_symbol_system, 2, 2, 0,
-       doc: /* System-key fallthrough through modify-event-symbol (Scheme port).  */)
-  (Lisp_Object symbol_num, Lisp_Object modifiers)
-{
-  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
-		   Qfunction_key,
-		   KVAR (current_kboard, Vsystem_key_alist),
-		   SCM_BOOL_F,   /* name-vec = #nil; alist lookup via name_alist_or_stem */
-		   MES_CACHE_SYSTEM,
-		   PTRDIFF_MAX);
-}
-
-DEFUN ("--modify-event-symbol-mouse-click",
-       Fmodify_event_symbol_mouse_click,
-       Smodify_event_symbol_mouse_click, 2, 2, 0,
-       doc: /* Mouse-click / wheel head-symbol lookup (Scheme port).  */)
-  (Lisp_Object symbol_num, Lisp_Object modifiers)
-{
-  static SCM name_vec = SCM_UNDEFINED;
-  static ptrdiff_t sz;
-  if (SCM_UNBNDP (name_vec))
-    {
-      sz = ARRAYELTS (lispy_wheel_names);
-      name_vec = c_name_table_to_scm_vector (lispy_wheel_names, sz);
-    }
-  return call_mes (XFIXNUM (symbol_num), XFIXNUM (modifiers),
-		   Qmouse_click, Qnil, name_vec,
-		   MES_CACHE_WHEEL, sz);
-}
-
-DEFUN ("--modify-event-symbol-pinch",
-       Fmodify_event_symbol_pinch,
-       Smodify_event_symbol_pinch, 1, 1, 0,
-       doc: /* Pinch event head-symbol lookup (Scheme port).  */)
-  (Lisp_Object modifiers)
-{
-  static SCM name_vec = SCM_UNDEFINED;
-  if (SCM_UNBNDP (name_vec))
-    {
-      const char *pinch_names[] = {"pinch"};
-      name_vec = c_name_table_to_scm_vector (pinch_names, 1);
-    }
-  return call_mes (0, XFIXNUM (modifiers),
-		   Qpinch, Qnil, name_vec,
-		   MES_CACHE_PINCH, 1);
 }
 
 DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,

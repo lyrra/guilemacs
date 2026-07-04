@@ -54,9 +54,8 @@
 (define %--make-lispy-focus-in  (delay (%c '--make-lispy-focus-in)))
 (define %--make-lispy-focus-out (delay (%c '--make-lispy-focus-out)))
 ;; make-lispy-position imported from (emacs lispy-position) — imp-6.3.
-(define %--drag-n-drop-head     (delay (%c '--drag-n-drop-head)))
 (define %--time-to-position      (delay (%c '--time-to-position)))
-(define %--scroll-bar-click-head  (delay (%c '--scroll-bar-click-head)))
+(define %--ensure-mouse-syms-size (delay (%c '--ensure-mouse-syms-size)))
 (define %--ie-kind-from-name    (delay (%c '--ie-kind-from-name)))
 (define %--user-signal-name     (delay (%c '--user-signal-name)))
 
@@ -237,9 +236,11 @@ unrecognized kind aborts."
 (register-kind! 'focus-in mle-focus-in-event)
 (register-kind! 'focus-out mle-focus-out-event)
 
+;;; Drag-n-drop name vector — matches C {"drag-n-drop"}.
+(define drag-n-drop-names #("drag-n-drop"))
+
 ;;; 4.5 DRAG_N_DROP_EVENT.
-;;; Builds position (via --make-lispy-position) and head symbol
-;;; (via --drag-n-drop-head), returns (head position files).
+;;; Builds position and head symbol via modify-event-symbol.
 
 (define (mle-drag-n-drop-event ie)
   (let* ((fow ((force %--ie-frame-or-window) ie))
@@ -251,8 +252,9 @@ unrecognized kind aborts."
                          ((force %--ie-x) ie)
                          ((force %--ie-y) ie)
                          ((force %--ie-timestamp) ie)))
-              (head ((force %--drag-n-drop-head)
-                     ((force %--ie-modifiers) ie))))
+              (head (modify-event-symbol
+                     0 ((force %--ie-modifiers) ie) 'drag-n-drop
+                     #nil drag-n-drop-names cache-drag-n-drop 1)))
           (list head position files)))))
 
 (register-kind! 'drag-n-drop mle-drag-n-drop-event)
@@ -310,15 +312,11 @@ unrecognized kind aborts."
 ;;; values; see src/termhooks.h:428 (up_modifier=1), :435
 ;;; (click_modifier=8).
 
-;; We deliberately skip --set-ie-modifiers here — the smob is
-;; invalidated (data → NULL) by make_lispy_event right after
-;; SCM_CALL_1 returns, so writing back would be a no-op.  The
-;; computed new-mods is passed to --scroll-bar-click-head directly,
-;; which is functionally equivalent to the C pattern of mutating
-;; event->modifiers before calling modify_event_symbol.
+;; The computed new-mods is passed directly to modify-event-symbol.
 
 (define (mle-scroll-bar-click-toolkit ie)
-  (let* ((mods ((force %--ie-modifiers) ie))
+  (let* ((code ((force %--ie-code) ie))
+         (mods ((force %--ie-modifiers) ie))
          ;; Strip up_modifier (=1), add click_modifier (=8).
          (new-mods (logior (logand mods (lognot 1)) 8))
          (position ((force %--make-scroll-bar-position)
@@ -327,14 +325,17 @@ unrecognized kind aborts."
                     ((force %--ie-y) ie)
                     ((force %--ie-timestamp) ie)
                     ((force %--ie-part) ie)
-                    'vertical-scroll-bar))
-         (head ((force %--scroll-bar-click-head)
-                ((force %--ie-code) ie)
-                new-mods)))
-    (list head position)))
+                    'vertical-scroll-bar)))
+    (let ((sz ((force %--ensure-mouse-syms-size) code)))
+      (let ((head (modify-event-symbol
+                   code new-mods 'mouse-click
+                   (force %lispy-mouse-stem)
+                   #nil cache-mouse sz)))
+        (list head position)))))
 
 (define (mle-horizontal-scroll-bar-click-toolkit ie)
-  (let* ((mods ((force %--ie-modifiers) ie))
+  (let* ((code ((force %--ie-code) ie))
+         (mods ((force %--ie-modifiers) ie))
          (new-mods (logior (logand mods (lognot 1)) 8))
          (position ((force %--make-scroll-bar-position)
                     ((force %--ie-frame-or-window) ie)
@@ -342,11 +343,13 @@ unrecognized kind aborts."
                     ((force %--ie-y) ie)
                     ((force %--ie-timestamp) ie)
                     ((force %--ie-part) ie)
-                    'horizontal-scroll-bar))
-         (head ((force %--scroll-bar-click-head)
-                ((force %--ie-code) ie)
-                new-mods)))
-    (list head position)))
+                    'horizontal-scroll-bar)))
+    (let ((sz ((force %--ensure-mouse-syms-size) code)))
+      (let ((head (modify-event-symbol
+                   code new-mods 'mouse-click
+                   (force %lispy-mouse-stem)
+                   #nil cache-mouse sz)))
+        (list head position)))))
 
 (register-kind! 'scroll-bar-click-toolkit mle-scroll-bar-click-toolkit)
 (register-kind! 'horizontal-scroll-bar-click-toolkit
@@ -553,8 +556,8 @@ unrecognized kind aborts."
 ;;; click_modifier only.  The C fallback (--make-lispy-event-c)
 ;;; retains full double-click behavior for unported kinds.
 
-(define %--modify-event-symbol-mouse-click
-  (delay (%c '--modify-event-symbol-mouse-click)))
+;;; Wheel name vector — matches C lispy_wheel_names.
+(define wheel-names #("wheel-up" "wheel-down" "wheel-left" "wheel-right"))
 
 (define (mle-wheel-event ie horiz?)
   ;; Shared body for WHEEL_EVENT and HORIZ_WHEEL_EVENT.
@@ -593,9 +596,11 @@ unrecognized kind aborts."
           ;; imp-7.1 mirror.  Always emit click_modifier.
           (set! mods (logior mods click-modifier))
 
-          ;; Head symbol via modify_event_symbol with wheel tables.
-          (let* ((head ((force %--modify-event-symbol-mouse-click)
-                        symbol-num mods))
+          ;; Head symbol via modify-event-symbol (Scheme port, imp-8.1).
+          (let* ((head (modify-event-symbol
+                        symbol-num mods 'mouse-click
+                        #nil wheel-names cache-wheel
+                        (vector-length wheel-names)))
                  (arg ((force %--ie-arg) ie)))
 
             ;; Return shape dispatch — matches C list2/list4/list5.
@@ -628,8 +633,8 @@ unrecognized kind aborts."
 ;;; No file-static mutations — clean single-event handlers
 ;;; that don't need imp-7.1's mirror.
 
-(define %--modify-event-symbol-pinch
-  (delay (%c '--modify-event-symbol-pinch)))
+;;; Pinch name vector — matches C {"pinch"}.
+(define pinch-names #("pinch"))
 
 (define (mle-touch-end-event ie)
   ;; C body (keyboard.c:7238–7252): frame-live check,
@@ -657,8 +662,9 @@ unrecognized kind aborts."
                (position (make-lispy-position
                           fow x y
                           ((force %--ie-timestamp) ie)))
-               (head ((force %--modify-event-symbol-pinch)
-                      ((force %--ie-modifiers) ie)))
+               (head (modify-event-symbol
+                      0 ((force %--ie-modifiers) ie) 'pinch
+                      #nil pinch-names cache-pinch 1))
                (arg ((force %--ie-arg) ie)))
           (cons head (cons position arg))))))
 
@@ -1067,12 +1073,18 @@ unrecognized kind aborts."
             (mouse-click-return
              mods code start-pos position)))))))
 
+;;; Mouse-click stem — read from elisp variable (DEFVAR_LISP).
+(define %lispy-mouse-stem (delay ((%c 'symbol-value) 'lispy-mouse-stem)))
+
 (define (mouse-click-return mods code start-pos position)
   ;; Build head symbol + return appropriate list shape
-  ;; (keyboard.c:7119-7132).  Uses --scroll-bar-click-head
-  ;; because it wraps modify_event_symbol with mouse_syms and
-  ;; Vlispy_mouse_stem — exact match for mouse-click heads.
-  (let ((head ((force %--scroll-bar-click-head) code mods)))
+  ;; (keyboard.c:7119-7132).  Resize mouse_syms cache, then
+  ;; call modify-event-symbol with Vlispy_mouse_stem as stem.
+  (let ((sz ((force %--ensure-mouse-syms-size) code)))
+    (let ((head (modify-event-symbol
+                 code mods 'mouse-click
+                 (force %lispy-mouse-stem)
+                 #nil cache-mouse sz)))
     (cond
      ((not (zero? (logand mods drag-modifier)))
       (list head start-pos position))
@@ -1080,7 +1092,7 @@ unrecognized kind aborts."
                                        triple-modifier))))
       (list head position ((force %--double-click-count))))
      (else
-      (list head position)))))
+      (list head position))))))
 
 (define (mle-mouse-click-event ie)
   (mle-mouse-click-impl ie 'mouse))
