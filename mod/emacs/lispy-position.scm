@@ -15,15 +15,7 @@
 
 ;;; Lazy C-primitive references.
 
-(defelisp %--mlp-internal-border --mlp-internal-border)
-(defelisp %--mlp-image-hotspot-check --mlp-image-hotspot-check)
-(defelisp %--mlp-frame-preamble --mlp-frame-preamble)
-(defelisp %--mlp-fringes --mlp-fringes)
-(defelisp %--mlp-scroll-border --mlp-scroll-border)
-(defelisp %--mlp-mode-header-line --mlp-mode-header-line)
-(defelisp %--mlp-margins --mlp-margins)
-(defelisp %--mlp-buffer-posn-pass --mlp-buffer-posn-pass)
-(defelisp %--mlp-text-area-offset --mlp-text-area-offset)
+(defelisp %--mlp-dispatch --mlp-dispatch)
 
 ;;; Elisp globals / predicates.
 (defelisp %symbol-value symbol-value)
@@ -32,66 +24,50 @@
   ((force %symbol-value) 'track-mouse))
 (defelisp %windowp windowp)
 
-;;; Per-region helpers — each calls one adapter DEFUN and destructures
-;;; the packed list return.
-
-;;; 6.3.1–6.3.2 Value-return helpers (no destructuring needed).
+;;; Per-region helpers — each calls (--mlp-dispatch region-id . args).
 
 (define (image-hotspot-check object dx dy posn)
-  ((force %--mlp-image-hotspot-check) object dx dy posn))
+  ((force %--mlp-dispatch) 2 object dx dy posn #nil #nil))
 
 (define (internal-border f x y posn)
-  ((force %--mlp-internal-border) f x y posn))
-
-;;; 6.3.3 Frame preamble — returns (window_or_frame part posn).
+  ((force %--mlp-dispatch) 1 f x y posn #nil #nil))
 
 (define (frame-preamble f mx my)
-  ((force %--mlp-frame-preamble) (or f #nil) mx my
-   (track-mouse-value)))
-
-;;; 6.3.4 Fringes — (posn col dx dy xret yret).
+  ((force %--mlp-dispatch) 3 (or f #nil) mx my (track-mouse-value) #nil #nil))
 
 (define (fringes w left? mx my)
-  (let ((res ((force %--mlp-fringes) w (if left? #t #nil) mx my #nil)))
+  (let ((res ((force %--mlp-dispatch) 4 w (if left? #t #nil) mx my #nil #nil)))
     (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
             (list-ref res 3) (list-ref res 4) (list-ref res 5))))
-
-;;; 6.3.5 Scroll/border — (posn width dx xret dy yret).
 
 (define (scroll-border w part mx my)
-  (let ((res ((force %--mlp-scroll-border) w part mx my)))
+  (let ((res ((force %--mlp-dispatch) 5 w part mx my #nil #nil)))
     (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
             (list-ref res 3) (list-ref res 4) (list-ref res 5))))
 
-;;; 6.3.6 Mode/header/tab line — 10 elements.
-
 (define (mode-header-line w part mx my)
-  (let ((res ((force %--mlp-mode-header-line) w part mx my)))
-    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; posn object string-info
-            (list-ref res 3) (list-ref res 4)               ; col row
-            (list-ref res 5) (list-ref res 6)               ; dx dy
-            (list-ref res 7) (list-ref res 8)               ; width height
-            (list-ref res 9))))                         ; xret
-
-;;; 6.3.7 Margins — 10 elements, includes yret at index 10.
+  (let ((res ((force %--mlp-dispatch) 6 w part mx my #nil #nil)))
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
+            (list-ref res 3) (list-ref res 4)
+            (list-ref res 5) (list-ref res 6)
+            (list-ref res 7) (list-ref res 8)
+            (list-ref res 9))))
 
 (define (margins w part mx my)
-  (let ((res ((force %--mlp-margins) w part mx my)))
-    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; posn object string-info
-            (list-ref res 3) (list-ref res 4)               ; col row
-            (list-ref res 5) (list-ref res 6)               ; dx dy
-            (list-ref res 7) (list-ref res 8)               ; width height
-            (list-ref res 9) (list-ref res 10))))            ; xret yret
-
-;;; 6.3.8 Buffer-posn pass — 10 elements.
+  (let ((res ((force %--mlp-dispatch) 7 w part mx my #nil #nil)))
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
+            (list-ref res 3) (list-ref res 4)
+            (list-ref res 5) (list-ref res 6)
+            (list-ref res 7) (list-ref res 8)
+            (list-ref res 9) (list-ref res 10))))
 
 (define (buffer-posn-pass w part mx my xret posn)
-  (let ((res ((force %--mlp-buffer-posn-pass) w part mx my xret posn)))
-    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)  ; textpos posn object
-            (list-ref res 3)                           ; string-info
-            (list-ref res 4) (list-ref res 5)               ; col row
-            (list-ref res 6) (list-ref res 7)               ; dx dy
-            (list-ref res 8) (list-ref res 9))))             ; width height
+  (let ((res ((force %--mlp-dispatch) 8 w part mx my xret posn #nil)))
+    (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
+            (list-ref res 3)
+            (list-ref res 4) (list-ref res 5)
+            (list-ref res 6) (list-ref res 7)
+            (list-ref res 8) (list-ref res 9))))
 
 ;;; 6.3.9 Orchestrator — replaces the C make_lispy_position body.
 ;;;
@@ -121,7 +97,7 @@
         (let ((w window-or-frame))
           (cond
            ((= part 1)  ; ON_TEXT
-            (let ((xy ((force %--mlp-text-area-offset) w mx my)))
+            (let ((xy ((force %--mlp-dispatch) 0 w mx my #nil #nil #nil)))
               (set! xret (car xy))
               (set! yret (cdr xy))))
 

@@ -6950,154 +6950,118 @@ before modify-event-symbol to guarantee the cache slot is sized.  */)
  * image-hotspot) pass through directly; multi-out helpers use a list
  * of (posn object string-info col row dx dy width height xret yret).  */
 
-DEFUN ("--mlp-text-area-offset", Fmlp_text_area_offset,
-       Smlp_text_area_offset, 3, 3, 0,
-       doc: /* Compute text-area-relative (XRET, YRET) for WINDOW at (MX,MY).
-Returns (xret . yret) — the ON_TEXT position in make_lispy_position.  */)
-  (Lisp_Object window, Lisp_Object mx, Lisp_Object my)
-{
-  struct window *w = XWINDOW (window);
-  int xret = XFIXNUM (mx) - window_box_left (w, TEXT_AREA);
-  int yret = (XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w)
-	      - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
-  return Fcons (make_fixnum (xret), make_fixnum (yret));
-}
+/* imp-9 — consolidated mlp adapter.  Region-id 0–8 dispatches to the
+   corresponding mlp_* C helper.  Takes up to 6 payload args after
+   region-id; unused slots are #nil and ignored.  */
+DEFUN ("--mlp-dispatch", Fmlp_dispatch, Smlp_dispatch, 7, 7, 0,
+       doc: /* Dispatch to mlp_* helper for REGION (fixnum 0–8).
 
-DEFUN ("--mlp-internal-border", Fmlp_internal_border,
-       Smlp_internal_border, 4, 4, 0,
-       doc: /* Check frame F at (X,Y) for an internal-border hit.
-Returns the border-part symbol on hit, or POSN unchanged.  */)
-  (Lisp_Object f, Lisp_Object x, Lisp_Object y, Lisp_Object posn)
-{
-  return mlp_internal_border (XFRAME (f), XFIXNUM (x), XFIXNUM (y), posn);
-}
+REGION: 0=text-area-offset 1=internal-border 2=image-hotspot
+        3=frame-preamble  4=fringes  5=scroll-border
+        6=mode-header-line 7=margins 8=buffer-posn-pass
 
-DEFUN ("--mlp-image-hotspot-check", Fmlp_image_hotspot_check,
-       Smlp_image_hotspot_check, 4, 4, 0,
-       doc: /* If OBJECT is an image with a :map, check whether (DX,DY)
-falls on a hotspot.  Returns the hotspot id on hit, or POSN unchanged.  */)
-  (Lisp_Object object, Lisp_Object dx, Lisp_Object dy, Lisp_Object posn)
+A1–A6 are the payload args.  Unused slots are ignored.  */)
+  (Lisp_Object region, Lisp_Object a1, Lisp_Object a2,
+   Lisp_Object a3, Lisp_Object a4, Lisp_Object a5,
+   Lisp_Object a6)
 {
-  return mlp_image_hotspot_check (object, XFIXNUM (dx), XFIXNUM (dy), posn);
-}
-
-DEFUN ("--mlp-frame-preamble", Fmlp_frame_preamble,
-       Smlp_frame_preamble, 4, 4, 0,
-       doc: /* Frame preamble: window_from_coordinates + bar detection.
-Returns (window_or_frame part posn).  TRACK-MOUSE is the global value.  */)
-  (Lisp_Object f_or_nil, Lisp_Object x, Lisp_Object y,
-   Lisp_Object track_mouse_val)
-{
-  struct frame *f = NILP (f_or_nil) ? NULL : XFRAME (f_or_nil);
-  Lisp_Object window_or_frame, posn;
-  enum window_part part;
-  mlp_frame_preamble (f, XFIXNUM (x), XFIXNUM (y), track_mouse_val,
-		      &window_or_frame, &part, &posn);
-  return list3 (window_or_frame, make_fixnum (part), posn);
-}
-
-DEFUN ("--mlp-fringes", Fmlp_fringes, Smlp_fringes, 5, 5, 0,
-       doc: /* Left or right fringe click in WINDOW at frame coords (MX,MY).
-LEFT-P is t for left fringe, nil for right.
-Returns (posn col dx dy xret yret).  */)
-  (Lisp_Object window, Lisp_Object left_p, Lisp_Object mx, Lisp_Object my,
-   Lisp_Object posn_in)
-{
-  struct window *w = XWINDOW (window);
-  int wx = XFIXNUM (mx) - WINDOW_LEFT_EDGE_X (w);
-  int wy = XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w);
-  Lisp_Object posn = posn_in;
-  int col, dx, dy, xret, yret;
-  mlp_fringes (w, !NILP (left_p), wx, wy,
-	       &posn, &col, &dx, &dy, &xret, &yret);
-  return listn (6, posn, make_fixnum (col), make_fixnum (dx), make_fixnum (dy),
-		make_fixnum (xret), make_fixnum (yret));
-}
-
-DEFUN ("--mlp-scroll-border", Fmlp_scroll_border, Smlp_scroll_border,
-       4, 4, 0,
-       doc: /* Scroll-bar, border, or divider click in WINDOW at (MX,MY).
-PART is the enum window_part value.
-Returns (posn width dx xret dy yret).  */)
-  (Lisp_Object window, Lisp_Object part, Lisp_Object mx, Lisp_Object my)
-{
-  struct window *w = XWINDOW (window);
-  int wx = XFIXNUM (mx) - WINDOW_LEFT_EDGE_X (w);
-  int wy = XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w);
-  Lisp_Object posn;
-  int width, dx, xret, dy, yret;
-  mlp_scroll_border (w, XFIXNUM (part), wx, wy,
-		     &posn, &width, &dx, &xret, &dy, &yret);
-  return listn (6, posn, make_fixnum (width), make_fixnum (dx),
-		make_fixnum (xret), make_fixnum (dy), make_fixnum (yret));
-}
-
-DEFUN ("--mlp-mode-header-line", Fmlp_mode_header_line,
-       Smlp_mode_header_line, 4, 4, 0,
-       doc: /* Mode/header/tab-line click in WINDOW at (MX,MY).
-PART is the enum window_part value.
-Returns 10-element list (posn object string-info col row dx dy width height xret yret).  */)
-  (Lisp_Object window, Lisp_Object part, Lisp_Object mx, Lisp_Object my)
-{
-  struct window *w = XWINDOW (window);
-  int wx = XFIXNUM (mx) - WINDOW_LEFT_EDGE_X (w);
-  int wy = XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w);
-  Lisp_Object posn, object = Qnil, string_info = Qnil;
-  int col, row, dx, dy, width, height, xret, yret;
-  mlp_mode_header_line (w, XFIXNUM (part), wx, wy,
-			&posn, &object, &string_info,
-			&col, &row, &dx, &dy, &width, &height, &xret, &yret);
-  return listn (10, posn, object, string_info,
-		make_fixnum (col), make_fixnum (row),
-		make_fixnum (dx), make_fixnum (dy),
-		make_fixnum (width), make_fixnum (height),
-		make_fixnum (xret), make_fixnum (yret));
-}
-
-DEFUN ("--mlp-margins", Fmlp_margins, Smlp_margins, 4, 4, 0,
-       doc: /* Left/right margin click in WINDOW at (MX,MY).
-PART is the enum window_part value.
-Returns 10-element list (posn object string-info col row dx dy width height xret yret).  */)
-  (Lisp_Object window, Lisp_Object part, Lisp_Object mx, Lisp_Object my)
-{
-  struct window *w = XWINDOW (window);
-  int wx = XFIXNUM (mx) - WINDOW_LEFT_EDGE_X (w);
-  int wy = XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w);
-  Lisp_Object posn, object = Qnil, string_info = Qnil;
-  int col, row, dx, dy, width, height, xret, yret;
-  mlp_margins (w, XFIXNUM (part), wx, wy,
-	       &posn, &object, &string_info,
-	       &col, &row, &dx, &dy, &width, &height, &xret, &yret);
-  return listn (10, posn, object, string_info,
-		make_fixnum (col), make_fixnum (row),
-		make_fixnum (dx), make_fixnum (dy),
-		make_fixnum (width), make_fixnum (height),
-		make_fixnum (xret), make_fixnum (yret));
-}
-
-DEFUN ("--mlp-buffer-posn-pass", Fmlp_buffer_posn_pass,
-       Smlp_buffer_posn_pass, 6, 6, 0,
-       doc: /* Post-dispatch buffer-position pass for WINDOW.
-MX, MY are frame-relative pixel coords.  XRET is the current xret.
-PART is the enum window_part.
-Returns 10-element list (textpos posn object string-info col row dx dy width height).  */)
-  (Lisp_Object window, Lisp_Object part,
-   Lisp_Object mx, Lisp_Object my, Lisp_Object xret,
-   Lisp_Object posn_in)
-{
-  struct window *w = XWINDOW (window);
-  int wy = XFIXNUM (my) - WINDOW_TOP_EDGE_Y (w);
-  ptrdiff_t textpos = 0;
-  int col = -1, row = -1, dx = -1, dy = -1, width = -1, height = -1;
-  Lisp_Object posn = posn_in, object = Qnil, string_info = Qnil;
-  mlp_buffer_posn_pass (w, XFIXNUM (part), XFIXNUM (mx), wy,
-			XFIXNUM (xret),
-			&textpos, &col, &row, &dx, &dy, &width, &height,
-			&posn, &string_info, &object);
-  return listn (10, make_fixnum (textpos), posn, object, string_info,
-		make_fixnum (col), make_fixnum (row),
-		make_fixnum (dx), make_fixnum (dy),
-		make_fixnum (width), make_fixnum (height));
+  switch (XFIXNUM (region))
+    {
+    case 0:  /* text-area-offset: w mx my */
+      {
+	struct window *w = XWINDOW (a1);
+	int xret = XFIXNUM (a2) - window_box_left (w, TEXT_AREA);
+	int yret = (XFIXNUM (a3) - WINDOW_TOP_EDGE_Y (w)
+		    - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
+	return Fcons (make_fixnum (xret), make_fixnum (yret));
+      }
+    case 1:  /* internal-border: f x y posn */
+      return mlp_internal_border (XFRAME (a1), XFIXNUM (a2), XFIXNUM (a3), a4);
+    case 2:  /* image-hotspot: object dx dy posn */
+      return mlp_image_hotspot_check (a1, XFIXNUM (a2), XFIXNUM (a3), a4);
+    case 3:  /* frame-preamble: f_or_nil x y track_mouse */
+      {
+	struct frame *f = NILP (a1) ? NULL : XFRAME (a1);
+	Lisp_Object window_or_frame, posn;
+	enum window_part part;
+	mlp_frame_preamble (f, XFIXNUM (a2), XFIXNUM (a3), a4,
+			    &window_or_frame, &part, &posn);
+	return list3 (window_or_frame, make_fixnum (part), posn);
+      }
+    case 4:  /* fringes: w left? mx my posn */
+      {
+	struct window *w = XWINDOW (a1);
+	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
+	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
+	Lisp_Object posn = a5;
+	int col, dx, dy, xret, yret;
+	mlp_fringes (w, !NILP (a2), wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
+	return listn (6, posn, make_fixnum (col), make_fixnum (dx),
+		      make_fixnum (dy), make_fixnum (xret), make_fixnum (yret));
+      }
+    case 5:  /* scroll-border: w part mx my */
+      {
+	struct window *w = XWINDOW (a1);
+	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
+	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
+	Lisp_Object posn;
+	int width, dx, xret, dy, yret;
+	mlp_scroll_border (w, XFIXNUM (a2), wx, wy,
+			   &posn, &width, &dx, &xret, &dy, &yret);
+	return listn (6, posn, make_fixnum (width), make_fixnum (dx),
+		      make_fixnum (xret), make_fixnum (dy), make_fixnum (yret));
+      }
+    case 6:  /* mode-header-line: w part mx my */
+      {
+	struct window *w = XWINDOW (a1);
+	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
+	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
+	Lisp_Object posn, object = Qnil, string_info = Qnil;
+	int col, row, dx, dy, width, height, xret, yret;
+	mlp_mode_header_line (w, XFIXNUM (a2), wx, wy,
+			      &posn, &object, &string_info,
+			      &col, &row, &dx, &dy, &width, &height, &xret, &yret);
+	return listn (10, posn, object, string_info,
+		      make_fixnum (col), make_fixnum (row),
+		      make_fixnum (dx), make_fixnum (dy),
+		      make_fixnum (width), make_fixnum (height),
+		      make_fixnum (xret), make_fixnum (yret));
+      }
+    case 7:  /* margins: w part mx my */
+      {
+	struct window *w = XWINDOW (a1);
+	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
+	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
+	Lisp_Object posn, object = Qnil, string_info = Qnil;
+	int col, row, dx, dy, width, height, xret, yret;
+	mlp_margins (w, XFIXNUM (a2), wx, wy,
+		     &posn, &object, &string_info,
+		     &col, &row, &dx, &dy, &width, &height, &xret, &yret);
+	return listn (11, posn, object, string_info,
+		      make_fixnum (col), make_fixnum (row),
+		      make_fixnum (dx), make_fixnum (dy),
+		      make_fixnum (width), make_fixnum (height),
+		      make_fixnum (xret), make_fixnum (yret));
+      }
+    case 8:  /* buffer-posn-pass: w part mx my xret posn */
+      {
+	struct window *w = XWINDOW (a1);
+	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
+	ptrdiff_t textpos = 0;
+	int col = -1, row = -1, dx = -1, dy = -1, width = -1, height = -1;
+	Lisp_Object posn = a6, object = Qnil, string_info = Qnil;
+	mlp_buffer_posn_pass (w, XFIXNUM (a2), XFIXNUM (a3), wy,
+			      XFIXNUM (a5),
+			      &textpos, &col, &row, &dx, &dy, &width, &height,
+			      &posn, &string_info, &object);
+	return listn (10, make_fixnum (textpos), posn, object, string_info,
+		      make_fixnum (col), make_fixnum (row),
+		      make_fixnum (dx), make_fixnum (dy),
+		      make_fixnum (width), make_fixnum (height));
+      }
+    default:
+      return Qnil;
+    }
 }
 
 DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,
