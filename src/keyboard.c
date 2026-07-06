@@ -8806,6 +8806,29 @@ menu_item_eval_property (Lisp_Object sexpr)
   return val;
 }
 
+DEFUN ("--menu-item-eval-property", Fmenu_item_eval_property,
+       Smenu_item_eval_property, 1, 1, 0,
+       doc: /* Signal-safe eval of SEXPR for menu-item property forms.
+Returns nil on error.  Delegates to C menu_item_eval_property, which
+uses internal_condition_case_1 + specbind_guile inside a dynwind frame
+to swallow errors and re-raise quit signals.  */)
+  (Lisp_Object sexpr)
+{
+  return menu_item_eval_property (sexpr);
+}
+
+DEFUN ("--item-properties-vector", Fitem_properties_vector,
+       Sitem_properties_vector, 0, 0, 0,
+       doc: /* Return the staticpro'd item_properties vector, lazy-inited
+to a nil-filled vector of ITEM_PROPERTY_MAX+1 slots on first call.  */)
+  (void)
+{
+  ensure_item_properties_vector ();
+  if (NILP (item_properties))
+    item_properties = make_nil_elisp_vector (ITEM_PROPERTY_MAX + 1);
+  return item_properties;
+}
+
 /* This function parses a menu item and leaves the result in the
    vector item_properties.
    ITEM is a key binding, a possible menu item.
