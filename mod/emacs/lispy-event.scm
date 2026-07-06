@@ -917,85 +917,88 @@ unrecognized kind aborts."
 (defelisp %fboundp fboundp)
 (defelisp %window-edges window-edges)
 
+(define (mur-adjust-for-window-change fow start-pos timestamp)
+  ;; Window-edges redisplay edge case (C:7067-7096).  Clamps the
+  ;; up-event coords into the old window's bounds, then rebuilds
+  ;; a fresh position.  Returns the adjusted position.
+  (let* ((frel ((force %--frame-relative-event-pos)))
+         (edges ((force %window-edges) (car start-pos) #t #nil #t))
+         (new-x (car frel)) (new-y (cdr frel))
+         (left (car edges)) (right (caddr edges))
+         (top (cadr edges)) (bottom (car (cdddr edges))))
+    (if (< new-x left) (set! new-x left)
+        (when (>= new-x right) (set! new-x (- right 1))))
+    (if (< new-y top) (set! new-y top)
+        (when (>= new-y bottom) (set! new-y (- bottom 1))))
+    (make-lispy-position fow new-x new-y timestamp)))
+
+(define (mur-mouse-stayed? x y fuzz start-pos position)
+  ;; True iff the up-event coords are within fuzz of the down coords
+  ;; AND the C or-clause (buffer-pos same, or line-num hscrolled,
+  ;; or window differs) holds — i.e. this is a click, not a drag.
+  (let* ((frel ((force %--frame-relative-event-pos)))
+         (xdiff (- x (car frel)))
+         (ydiff (- y (cdr frel))))
+    (and (> fuzz 0)
+         (< (- fuzz) xdiff) (< xdiff fuzz)
+         (< (- fuzz) ydiff) (< ydiff fuzz)
+         (or (eq? (cadr start-pos) (cadr position))
+             ((force %--line-number-mode-hscroll) start-pos position)
+             (not (eq? (car start-pos) (car position)))))))
+
+(define (mur-window-change-detected? start-pos position)
+  ;; True iff the down and up events landed in different windows AND
+  ;; window-edges is available — triggers the position-adjust path.
+  (and (or (not (eq? (car start-pos) (car position)))
+           (not (eq? (cadr start-pos) (cadr position))))
+       (integer? (cadr start-pos))
+       ((force %window-live-p) (car start-pos))
+       (not (eq? #nil ((force %fboundp) 'window-edges)))))
+
+(define (mur-classify-move fow x y timestamp start-pos position)
+  ;; Classify the up-event into click / drag / click-with-adjust.
+  ;; Returns (values click-or-drag position) — position updated iff
+  ;; the window-change adjust branch fires.
+  (cond
+   ;; ignore-mouse-drag-p short-circuit: consume flag, treat as click.
+   ((not (eq? #nil ((force %--ignore-mouse-drag-p))))
+    ((force %--set-ignore-mouse-drag-p) #nil)
+    (values click-modifier position))
+   ;; Mouse didn't move → click; maybe adjust for window change.
+   ((mur-mouse-stayed? x y (double-click-fuzz) start-pos position)
+    (if (mur-window-change-detected? start-pos position)
+        (values click-modifier
+                (mur-adjust-for-window-change fow start-pos timestamp))
+        (values click-modifier position)))
+   ;; Mouse moved enough → drag; clear state.
+   (else
+    ((force %--set-button-down-time) 0)
+    ((force %--set-down-mouse-line-number-width) -1)
+    (values drag-modifier position))))
+
+(define (mur-apply-final-modifiers mods click-or-drag)
+  ;; Strip up_modifier, OR in click/drag + double/triple bits.
+  (let ((dbl-count ((force %--double-click-count))))
+    (logior (logand mods (lognot up-modifier))
+            click-or-drag
+            (cond
+             ((< dbl-count 2) 0)
+             ((= dbl-count 2) double-modifier)
+             (else triple-modifier)))))
+
 (define (mouse-up-resolve! fow x y timestamp mods start-pos position)
   ;; Button-up drag/click resolution (keyboard.c:7011–7117).
   ;; Returns (values mods position) where mods has the final
   ;; click/drag/double modifier bits and position may be
   ;; recomputed (window-edges edge case).
-
   (if (not start-pos)
-      ;; No prior down event — ignore this up (C:7028-7029).
       (values mods position)
-
-      (let ((click-or-drag click-modifier))
-
-        ;; Check ignore_mouse_drag_p first (C:7032-7035).
-        (if (not (eq? #nil ((force %--ignore-mouse-drag-p))))
-            ((force %--set-ignore-mouse-drag-p) #nil)
-            ;; Drag detection: compare up coords against down coords.
-            (let* ((fuzz (double-click-fuzz))
-                   (frel ((force %--frame-relative-event-pos)))
-                   (xdiff (- x (car frel)))
-                   (ydiff (- y (cdr frel))))
-
-              (if (and (> fuzz 0)
-                       (< (- fuzz) xdiff) (< xdiff fuzz)
-                       (< (- fuzz) ydiff) (< ydiff fuzz)
-                       (or (eq? (cadr start-pos) (cadr position))
-                           ((force %--line-number-mode-hscroll)
-                            start-pos position)
-                           (not (eq? (car start-pos)
-                                     (car position)))))
-                  ;; Mouse hasn't moved enough — it's a click.
-                  ;; Check for window-change redisplay edge case
-                  ;; (C:7067-7096).
-                  (if (and (or (not (eq? (car start-pos)
-                                          (car position)))
-                               (not (eq? (cadr start-pos)
-                                          (cadr position))))
-                           (integer? (cadr start-pos))
-                           ((force %window-live-p) (car start-pos))
-                           (not (eq? #nil
-                                     ((force %fboundp)
-                                      'window-edges))))
-                      ;; Window changed — adjust position into
-                      ;; old window bounds to avoid spurious drag.
-                      (let* ((edges ((force %window-edges)
-                                     (car start-pos) #t #nil #t))
-                             (new-x (car frel))
-                             (new-y (cdr frel))
-                             (left (car edges))
-                             (right (caddr edges))
-                             (top (cadr edges))
-                             (bottom (car (cdddr edges))))
-                        (if (< new-x left)
-                            (set! new-x left)
-                            (when (>= new-x right)
-                              (set! new-x (- right 1))))
-                        (if (< new-y top)
-                            (set! new-y top)
-                            (when (>= new-y bottom)
-                              (set! new-y (- bottom 1))))
-                        (set! position
-                              (make-lispy-position
-                               fow new-x new-y timestamp))))
-                  ;; Mouse moved enough — it's a drag (C:7050-7057).
-                  (begin
-                    ((force %--set-button-down-time) 0)
-                    (set! click-or-drag drag-modifier)
-                    ((force %--set-down-mouse-line-number-width) -1)))))
-
-        ;; Build final modifiers (C:7107-7114): strip up_modifier,
-        ;; OR in click_or_drag_modifier + double/triple from
-        ;; double_click_count (already set by bookkeep!).
-        (let ((dbl-count ((force %--double-click-count))))
-          (set! mods (logior (logand mods (lognot up-modifier))
-                             click-or-drag
-                             (cond
-                              ((< dbl-count 2) 0)
-                              ((= dbl-count 2) double-modifier)
-                              (else triple-modifier)))))
-        (values mods position))))
+      (call-with-values
+          (lambda ()
+            (mur-classify-move fow x y timestamp start-pos position))
+        (lambda (click-or-drag position)
+          (values (mur-apply-final-modifiers mods click-or-drag)
+                  position)))))
 
 ;;; imp-7.5.5 — top-level mouse-click + scroll-bar-click handler.
 ;;; Assembles imp-7.5.1–7.5.4 plus scroll-bar position fallback.

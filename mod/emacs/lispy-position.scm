@@ -78,122 +78,110 @@
 ;;;   ON_VERTICAL_SCROLL_BAR = 10, ON_HORIZONTAL_SCROLL_BAR = 11,
 ;;;   ON_RIGHT_DIVIDER = 12, ON_BOTTOM_DIVIDER = 13.
 
+;;; Per-region dispatch — mirrors C-side imp-6.2 mlp_* decomposition.
+;;; Each returns (values posn object string-info col row
+;;;                    dx dy width height xret yret textpos).
+
+(define (ml-dispatch-text-line-margin w part mx my)
+  "Dispatch for parts 1-6 (ON_TEXT, mode/header/tab, margins)."
+  (cond
+   ((= part 1)  ; ON_TEXT — just the text-area offset.
+    (let ((xy ((force %--mlp-dispatch) 0 w mx my #nil #nil #nil)))
+      (values #nil #nil #nil -1 -1 -1 -1 -1 -1
+              (car xy) (cdr xy) 0)))
+   ((or (= part 2) (= part 3) (= part 4))  ; mode/header/tab line
+    (call-with-values
+        (lambda () (mode-header-line w part mx my))
+      (lambda (p obj si c r dxv dyv wv hv xrv)
+        (values p obj si c r dxv dyv wv hv xrv 0 -1))))
+   (else  ; parts 5,6: margins
+    (call-with-values
+        (lambda () (margins w part mx my))
+      (lambda (p obj si c r dxv dyv wv hv xrv yrv)
+        (values p obj si c r dxv dyv wv hv xrv yrv 0))))))
+
+(define (ml-dispatch-fringe-scroll w part mx my)
+  "Dispatch for parts 7+ (fringes, scroll-bar/border/dividers)."
+  (cond
+   ((= part 7)  ; left fringe
+    (call-with-values
+        (lambda () (fringes w #t mx my))
+      (lambda (p c dxv dyv xrv yrv)
+        (values p #nil #nil c -1 dxv dyv -1 -1 xrv yrv 0))))
+   ((= part 8)  ; right fringe
+    (call-with-values
+        (lambda () (fringes w #f mx my))
+      (lambda (p c dxv dyv xrv yrv)
+        (values p #nil #nil c -1 dxv dyv -1 -1 xrv yrv 0))))
+   (else  ; part >= 9: scroll-bar/border/dividers
+    (call-with-values
+        (lambda () (scroll-border w part mx my))
+      (lambda (p wv dxv xrv dyv yrv)
+        (values p #nil #nil -1 -1 dxv dyv wv -1 xrv yrv 0))))))
+
+(define (ml-dispatch-window-part w part mx my)
+  "Top-level window-part dispatcher."
+  (if (<= part 6)
+      (ml-dispatch-text-line-margin w part mx my)
+      (ml-dispatch-fringe-scroll w part mx my)))
+
+(define (ml-finish-window-position w part mx my xret yret posn object string-info
+                                   textpos col row dx dy width height
+                                   window-or-frame t)
+  "Buffer-posn pass + image-hotspot + result assembly."
+  (when (= textpos 0)
+    (call-with-values
+        (lambda () (buffer-posn-pass w part mx my xret posn))
+      (lambda (tp p obj si c r dxv dyv wv hv)
+        (set! textpos tp) (set! posn p)
+        (when (eq? object #nil) (set! object obj))
+        (set! string-info si)
+        (when (< col 0)  (set! col c))
+        (when (< row 0)  (set! row r))
+        (when (< dx 0)   (set! dx dxv)  (set! dy dyv))
+        (when (< width 0)  (set! width wv)  (set! height hv)))))
+  (ml-assemble-position window-or-frame posn xret yret t
+                        object string-info textpos col row dx dy
+                        width height))
+
+(define (ml-assemble-position window-or-frame posn xret yret t
+                              object string-info textpos col row dx dy
+                              width height)
+  "Image-hotspot check + cons-chain result assembly."
+  (set! posn (image-hotspot-check object dx dy posn))
+  (let ((extra (cons (or string-info #nil)
+                     (cons (if (< textpos 0) #nil textpos)
+                           (cons (cons col row)
+                                 (list (or object #nil)
+                                       (cons dx dy)
+                                       (cons width height)))))))
+    (cons window-or-frame
+          (cons posn
+                (cons (cons xret yret)
+                      (cons t extra))))))
+
 (define (make-lispy-position f x y t)
-  (let* ((mx x) (my y)                     ; frame-relative coords
+  "Build a mouse-click position list from FRAME F and pixel coords X, Y.
+See src/keyboard.c:6363–6667 (C original) and imp-6.3 decomposition."
+  (let* ((mx x) (my y)
          (pre (frame-preamble f mx my))
          (window-or-frame (list-ref pre 0))
          (part (list-ref pre 1))
-         (posn (list-ref pre 2))
-         ;; Shared locals matching C defaults.
-         (object #nil) (string-info #nil)
-         (textpos 0)
-         (col -1) (row -1)
-         (dx -1) (dy -1)
-         (width -1) (height -1)
-         (xret 0) (yret 0))
-
+         (posn (list-ref pre 2)))
     (if ((force %windowp) window-or-frame)
-        ;; Click inside a window — dispatch on part.
-        (let ((w window-or-frame))
-          (cond
-           ((= part 1)  ; ON_TEXT
-            (let ((xy ((force %--mlp-dispatch) 0 w mx my #nil #nil #nil)))
-              (set! xret (car xy))
-              (set! yret (cdr xy))))
-
-           ((or (= part 2) (= part 3) (= part 4))  ; mode/header/tab line
-            (call-with-values
-                (lambda () (mode-header-line w part mx my))
-              (lambda (p obj si c r dxv dyv wv hv xrv)
-                (set! posn p)     (set! object obj)
-                (set! string-info si)
-                (set! col c)      (set! row r)
-                (set! dx dxv)     (set! dy dyv)
-                (set! width wv)   (set! height hv)
-                (set! xret xrv)))
-            (set! textpos -1))
-
-           ((or (= part 5) (= part 6))  ; margins
-            (call-with-values
-                (lambda () (margins w part mx my))
-              (lambda (p obj si c r dxv dyv wv hv xrv yrv)
-                (set! posn p)     (set! object obj)
-                (set! string-info si)
-                (set! col c)      (set! row r)
-                (set! dx dxv)     (set! dy dyv)
-                (set! width wv)   (set! height hv)
-                (set! xret xrv)   (set! yret yrv))))
-
-           ((= part 7)  ; left fringe
-            (call-with-values
-                (lambda () (fringes w #t mx my))
-              (lambda (p c dxv dyv xrv yrv)
-                (set! posn p)     (set! col c)
-                (set! dx dxv)     (set! dy dyv)
-                (set! xret xrv)   (set! yret yrv))))
-
-           ((= part 8)  ; right fringe
-            (call-with-values
-                (lambda () (fringes w #f mx my))
-              (lambda (p c dxv dyv xrv yrv)
-                (set! posn p)     (set! col c)
-                (set! dx dxv)     (set! dy dyv)
-                (set! xret xrv)   (set! yret yrv))))
-
-           ((>= part 9)  ; scroll-bar/border/dividers
-            (call-with-values
-                (lambda () (scroll-border w part mx my))
-              (lambda (p wv dxv xrv dyv yrv)
-                (set! posn p)     (set! width wv)
-                (set! dx dxv)     (set! xret xrv)
-                (set! dy dyv)     (set! yret yrv)))))
-
-          ;; Post-dispatch buffer-posn pass.
-          (when (= textpos 0)
-            (call-with-values
-                (lambda () (buffer-posn-pass w part mx my xret posn))
-              (lambda (tp p obj si c r dxv dyv wv hv)
-                (set! textpos tp)
-                (set! posn p)
-                (when (eq? object #nil) (set! object obj))
-                (set! string-info si)
-                (when (< col 0)  (set! col c))
-                (when (< row 0)  (set! row r))
-                (when (< dx 0)   (set! dx dxv))
-                (when (< dy 0)   (set! dy dyv))
-                (when (< width 0)  (set! width wv))
-                (when (< height 0) (set! height hv)))))
-
-          ;; Image hotspot check.
-          (set! posn (image-hotspot-check object dx dy posn))
-
-          ;; Assemble result.
-          (let ((extra (list (or object #nil)
-                             (cons dx dy)
-                             (cons width height))))
-            (set! extra
-                  (cons (or string-info #nil)
-                        (cons (if (< textpos 0) #nil textpos)
-                              (cons (cons col row) extra))))
-            ;; cons-chain so extra_info splices into the tail
-            ;; (matches C: Fcons(W, Fcons(P, Fcons((xy), Fcons(t, extra))))).
-            (cons window-or-frame
-                  (cons posn
-                        (cons (cons xret yret)
-                              (cons t extra))))))
-
-        ;; Frame path (not inside a window).
+        ;; Window click — dispatch on part, then finish.
+        (call-with-values
+            (lambda ()
+              (ml-dispatch-window-part window-or-frame part mx my))
+          (lambda (posn object string-info col row
+                         dx dy width height xret yret textpos)
+            (ml-finish-window-position
+             window-or-frame part mx my xret yret posn object string-info
+             textpos col row dx dy width height
+             window-or-frame t)))
+        ;; Frame / no-frame path — window-part dispatch not needed.
         (if f
-            (begin
-              (set! xret mx)
-              (set! yret my)
-              (set! posn (internal-border f mx my posn))
-              ;; Frame path — extra_info is Qnil, so 4-element list.
-              (list f posn (cons xret yret) t))
-            ;; No-frame / drag-source path.
-            (begin
-              (when (eq? (track-mouse-value) 'drag-source)
-                (set! xret mx)
-                (set! yret my))
-              ;; No-frame / drag-source — extra_info is Qnil, 4-element list.
+            (list f (internal-border f mx my posn) (cons mx my) t)
+            (let ((xret (if (eq? (track-mouse-value) 'drag-source) mx 0))
+                  (yret (if (eq? (track-mouse-value) 'drag-source) my 0)))
               (list #nil posn (cons xret yret) t))))))
