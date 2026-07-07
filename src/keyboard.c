@@ -8829,6 +8829,19 @@ to a nil-filled vector of ITEM_PROPERTY_MAX+1 slots on first call.  */)
   return item_properties;
 }
 
+DEFUN ("--get-keymap", Fget_keymap, Sget_keymap, 1, 3, 0,
+       doc: /* Thin shim over C get_keymap.
+Return the keymap (or nil) that OBJECT refers to.
+Optional second arg ERROR-IF-NOT-KEYMAP: if non-nil, signal
+wrong-type-argument instead of returning nil.
+Optional third arg AUTOLOAD: if non-nil, autoload keymaps.  */)
+  (Lisp_Object object, Lisp_Object error_if_not_keymap, Lisp_Object autoload)
+{
+  return get_keymap (object,
+                     !NILP (error_if_not_keymap),
+                     !NILP (autoload));
+}
+
 /* This function parses a menu item and leaves the result in the
    vector item_properties.
    ITEM is a key binding, a possible menu item.
