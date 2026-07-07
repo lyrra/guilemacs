@@ -338,7 +338,7 @@
 ;;;; M6u
 
 (test-assert "m6u-helper/try-shift-translation-simple"
-             (fboundp '--rks-try-shift-translation-simple))
+             (fboundp '--rks-shift-translate-key))
 
 (test-eq "m6u/lowercase-falls-through"
          nil (--rks-try-shift-translation-simple! 97))
@@ -357,7 +357,7 @@
 ;;;; M6w
 
 (test-assert "m6w-helper/try-shift-translation-fn-key"
-             (fboundp '--rks-try-shift-translation-fn-key))
+             (fboundp '--rks-fn-key-shift-translate))
 (test-eq "m6w/fn-key-nil-for-symbol"
          nil (--rks-try-shift-translation-fn-key! 'up))
 (test-eq "m6w/fn-key-nil-for-lowercase"
@@ -374,6 +374,12 @@
 
 ;;;; M6y
 
+(defun m6-with-rks-state (thunk)
+  (let ((s (--make-rks-state)))
+    (--rks-state-stack-push s)
+    (unwind-protect (funcall thunk)
+      (--rks-state-stack-pop))))
+
 (test-assert "m6y-helper/iter-setup-capture"
              (fboundp '--rks-iter-setup-capture))
 (test-assert "m6y-helper/iter-replay-restore"
@@ -383,14 +389,16 @@
 (test-assert "m6y-helper/keys-local-start"
              (fboundp '--rks-keys-local-start))
 
-(let ((saved-e (--rks-echo-local-start))
-      (saved-k (--rks-keys-local-start)))
-  (--rks-set-echo-local-start 42)
-  (--rks-set-keys-local-start 7)
-  (test-equal "m6y/echo-local-start-roundtrip" 42 (--rks-echo-local-start))
-  (test-equal "m6y/keys-local-start-roundtrip" 7  (--rks-keys-local-start))
-  (--rks-set-echo-local-start saved-e)
-  (--rks-set-keys-local-start saved-k))
+(m6-with-rks-state
+  (lambda ()
+    (let ((saved-e (--rks-echo-local-start))
+          (saved-k (--rks-keys-local-start)))
+      (--rks-set-echo-local-start 42)
+      (--rks-set-keys-local-start 7)
+      (test-equal "m6y/echo-local-start-roundtrip" 42 (--rks-echo-local-start))
+      (test-equal "m6y/keys-local-start-roundtrip" 7  (--rks-keys-local-start))
+      (--rks-set-echo-local-start saved-e)
+      (--rks-set-keys-local-start saved-k))))
 
 (--rks-iter-setup-capture!)
 (test-assert "m6y/setup-capture-runs" t)
@@ -438,14 +446,14 @@
 ;;;; M6ac
 
 (test-assert "m6ac-helper/mouse-click-prefix"
-             (fboundp '--rks-iter-mouse-click-prefix))
+             (fboundp '--rks-mouse-click-prefix-body))
 (test-eq "m6ac/fall-through-at-idle"
          'fall-through (--rks-iter-mouse-click-prefix!))
 
 ;;;; M6ad
 
 (test-assert "m6ad-helper/unbound-event-reduction"
-             (fboundp '--rks-iter-unbound-event-reduction))
+             (fboundp '--rks-reduce-mouse-event-loop))
 (test-eq "m6ad/fall-through-at-idle"
          'fall-through (--rks-iter-unbound-event-reduction!))
 
