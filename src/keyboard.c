@@ -8893,6 +8893,71 @@ static bool parse_tab_bar_item (Lisp_Object, Lisp_Object);
 static void append_tab_bar_item (void);
 
 
+/* Infrastructure DEFUNs exposing tab-bar internals to Scheme.
+   These let the Scheme side own tab_bar_items() while C still
+   manages the static vectors (GC-protected via staticpro).  */
+
+DEFUN ("--tab-bar-items-vector", Ftab_bar_items_vector,
+       Stab_bar_items_vector, 0, 0, 0,
+       doc: /* Return the tab-bar items vector, lazy-initializing to 64 slots if nil.  */)
+  (void)
+{
+  if (NILP (tab_bar_items_vector))
+    tab_bar_items_vector = make_nil_elisp_vector (64);
+  return tab_bar_items_vector;
+}
+
+DEFUN ("--set-tab-bar-items-vector", Fset_tab_bar_items_vector,
+       Sset_tab_bar_items_vector, 1, 1, 0,
+       doc: /* Set the tab-bar items vector to VEC.
+Used by Scheme to write back a resized vector after larger-vector.  */)
+  (Lisp_Object vec)
+{
+  tab_bar_items_vector = vec;
+  return Qnil;
+}
+
+DEFUN ("--tab-bar-item-properties-vector", Ftab_bar_item_properties_vector,
+       Stab_bar_item_properties_vector, 0, 0, 0,
+       doc: /* Return the tab-bar item properties vector, lazy-initializing to NSLOTS if nil.  */)
+  (void)
+{
+  if (NILP (tab_bar_item_properties))
+    tab_bar_item_properties = make_nil_elisp_vector (TAB_BAR_ITEM_NSLOTS);
+  return tab_bar_item_properties;
+}
+
+DEFUN ("--tab-bar-items-count", Ftab_bar_items_count,
+       Stab_bar_items_count, 0, 0, 0,
+       doc: /* Return the number of entries currently in the tab-bar items vector.  */)
+  (void)
+{
+  return make_fixnum (ntab_bar_items);
+}
+
+DEFUN ("--set-tab-bar-items-count", Fset_tab_bar_items_count,
+       Sset_tab_bar_items_count, 1, 1, 0,
+       doc: /* Set the tab-bar items count to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  ntab_bar_items = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--larger-vector", Flarger_vector,
+       Slarger_vector, 3, 3, 0,
+       doc: /* Return a copy of VEC with room for at least INCR-MIN more elements.
+If NITEMS-MAX is not -1, the new vector will not exceed that size.
+New slots are filled with nil.  */)
+  (Lisp_Object vec, Lisp_Object incr_min, Lisp_Object nitems_max)
+{
+  CHECK_FIXNUM (incr_min);
+  CHECK_FIXNUM (nitems_max);
+  return larger_vector (vec, XFIXNUM (incr_min), XFIXNUM (nitems_max));
+}
+
+
 /* Return a vector of tab bar items for keymaps currently in effect.
    Reuse vector REUSE if non-nil.  Return in *NITEMS the number of
    tab bar items found.  */
