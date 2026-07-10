@@ -133,8 +133,9 @@
 ;;; --- tab-bar-items end-to-end -----------------------------------------
 
 ;; tab-bar-items with fresh allocation (reuse = nil)
-(call-with-values (lambda () (tab-bar-items #nil))
-  (lambda (vec nitems)
+(let ((result (tab-bar-items #nil)))
+  (let ((vec (car result))
+        (nitems (cdr result)))
     (check "tab-bar-items-returns-vector" #t
            (not (eq? #nil ((symbol-function 'vectorp) vec))))
     (check "tab-bar-items-nitems-nonnegative" #t
