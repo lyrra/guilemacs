@@ -8,7 +8,10 @@
             ITEM-PROPERTY-ITEM ITEM-PROPERTY-NAME ITEM-PROPERTY-DEF
             ITEM-PROPERTY-MAP ITEM-PROPERTY-TYPE ITEM-PROPERTY-KEYEQ
             ITEM-PROPERTY-SELECTED ITEM-PROPERTY-HELP
-            ITEM-PROPERTY-ENABLE ITEM-PROPERTY-MAX))
+            ITEM-PROPERTY-ENABLE ITEM-PROPERTY-MAX
+            ;; Keyword literals shared with tab-bar-items
+            QCenable QCvisible QChelp QCfilter QCbutton
+            QCtoggle QCradio))
 
 ;;; M10 imp-1.3 — complete Scheme parse-menu-item port.
 ;;; Coexists with C parse_menu_item (keyboard.c:8836+), which is

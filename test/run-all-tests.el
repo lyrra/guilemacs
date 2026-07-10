@@ -137,6 +137,7 @@
 (load "test/keyboard/test-read-key-sequence.el") ; M6a
 (load "test/keyboard/test-read-char.el")         ; M8a
 (load "test/keyboard/test-menu-item-parse.el")   ; M10 imp-1.3
+(load "test/keyboard/test-tab-bar-items.el")    ; M10 imp-2.2
 (message "")
 
 (message "========================================")
