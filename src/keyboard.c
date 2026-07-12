@@ -8987,14 +8987,58 @@ static Lisp_Object tool_bar_item_properties;
 
 static int ntool_bar_items;
 
-/* Function prototypes.  */
+/* Infrastructure DEFUNs exposing tool-bar internals to Scheme.
+   These let the Scheme side own tool_bar_items() while C still
+   manages the static vectors (GC-protected via staticpro).  */
 
-static void init_tool_bar_items (Lisp_Object);
-static void process_tool_bar_item (Lisp_Object, Lisp_Object, Lisp_Object,
-				   void *);
-static bool parse_tool_bar_item (Lisp_Object, Lisp_Object);
-static void append_tool_bar_item (void);
+DEFUN ("--tool-bar-items-vector", Ftool_bar_items_vector,
+       Stool_bar_items_vector, 0, 0, 0,
+       doc: /* Return the tool-bar items vector, lazy-initializing to 64 slots if nil.  */)
+  (void)
+{
+  if (NILP (tool_bar_items_vector))
+    tool_bar_items_vector = make_nil_elisp_vector (64);
+  return tool_bar_items_vector;
+}
 
+DEFUN ("--set-tool-bar-items-vector", Fset_tool_bar_items_vector,
+       Sset_tool_bar_items_vector, 1, 1, 0,
+       doc: /* Set the tool-bar items vector to VEC.
+Used by Scheme to write back a resized vector after larger-vector.  */)
+  (Lisp_Object vec)
+{
+  tool_bar_items_vector = vec;
+  return Qnil;
+}
+
+DEFUN ("--tool-bar-item-properties-vector", Ftool_bar_item_properties_vector,
+       Stool_bar_item_properties_vector, 0, 0, 0,
+       doc: /* Return the tool-bar item properties vector, lazy-initializing to NSLOTS if nil.  */)
+  (void)
+{
+  if (NILP (tool_bar_item_properties))
+    tool_bar_item_properties
+      = make_nil_elisp_vector (TOOL_BAR_ITEM_NSLOTS);
+  return tool_bar_item_properties;
+}
+
+DEFUN ("--tool-bar-items-count", Ftool_bar_items_count,
+       Stool_bar_items_count, 0, 0, 0,
+       doc: /* Return the number of entries currently in the tool-bar items vector.  */)
+  (void)
+{
+  return make_fixnum (ntool_bar_items);
+}
+
+DEFUN ("--set-tool-bar-items-count", Fset_tool_bar_items_count,
+       Sset_tool_bar_items_count, 1, 1, 0,
+       doc: /* Set the tool-bar items count to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  ntool_bar_items = XFIXNUM (n);
+  return Qnil;
+}
 
 /* Return a vector of tool bar items for keymaps currently in effect.
    Reuse vector REUSE if non-nil.  Return in *NITEMS the number of
@@ -9003,86 +9047,17 @@ static void append_tool_bar_item (void);
 Lisp_Object
 tool_bar_items (Lisp_Object reuse, int *nitems)
 {
-  Lisp_Object *maps;
-  Lisp_Object mapsbuf[3];
-  ptrdiff_t nmaps, i;
-  Lisp_Object oquit;
-  Lisp_Object *tmaps;
-  USE_SAFE_ALLOCA;
-
-  *nitems = 0;
-
-  /* In order to build the menus, we need to call the keymap
-     accessors.  They all call maybe_quit.  But this function is called
-     during redisplay, during which a quit is fatal.  So inhibit
-     quitting while building the menus.  We do this instead of
-     specbind because (1) errors will clear it anyway and (2) this
-     avoids risk of specpdl overflow.  */
-  oquit = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-
-  /* Initialize tool_bar_items_vector and protect it from GC.  */
-  init_tool_bar_items (reuse);
-
-  /* Build list of keymaps in maps.  Set nmaps to the number of maps
-     to process.  */
-
-  /* Should overriding-terminal-local-map and overriding-local-map apply?  */
-  if (!NILP (Voverriding_local_map_menu_flag)
-      && !NILP (Voverriding_local_map))
-    {
-      /* Yes, use them (if non-nil) as well as the global map.  */
-      maps = mapsbuf;
-      nmaps = 0;
-      if (!NILP (KVAR (current_kboard, Voverriding_terminal_local_map)))
-	maps[nmaps++] = KVAR (current_kboard, Voverriding_terminal_local_map);
-      if (!NILP (Voverriding_local_map))
-	maps[nmaps++] = Voverriding_local_map;
-    }
-  else
-    {
-      /* No, so use major and minor mode keymaps and keymap property.
-	 Note that tool-bar bindings in the local-map and keymap
-	 properties may not work reliably, as they are only
-	 recognized when the tool-bar (or mode-line) is updated,
-	 which does not normally happen after every command.  */
-      ptrdiff_t nminor = current_minor_maps (NULL, &tmaps);
-      SAFE_NALLOCA (maps, 1, nminor + 4);
-      nmaps = 0;
-      Lisp_Object tem = KVAR (current_kboard, Voverriding_terminal_local_map);
-      if (!NILP (tem) && !NILP (Voverriding_local_map_menu_flag))
-	maps[nmaps++] = tem;
-      if (tem = get_local_map (PT, current_buffer, Qkeymap), !NILP (tem))
-	maps[nmaps++] = tem;
-      if (nminor != 0)
-	{
-	  memcpy (maps + nmaps, tmaps, nminor * sizeof (maps[0]));
-	  nmaps += nminor;
-	}
-      maps[nmaps++] = get_local_map (PT, current_buffer, Qlocal_map);
-    }
-
-  /* Add global keymap at the end.  */
-  maps[nmaps++] = current_global_map;
-
-  /* Process maps in reverse order and look up in each map the prefix
-     key `tool-bar'.  */
-  for (i = nmaps - 1; i >= 0; --i)
-    if (!NILP (maps[i]))
-      {
-	Lisp_Object keymap;
-
-	keymap = get_keymap (access_keymap (maps[i], Qtool_bar, 1, 0, 1), 0, 1);
-	if (CONSP (keymap))
-	  map_keymap (keymap, process_tool_bar_item, Qnil, NULL, 1);
-      }
-
-  Vinhibit_quit = oquit;
-  *nitems = ntool_bar_items / TOOL_BAR_ITEM_NSLOTS;
-  SAFE_FREE ();
-  return tool_bar_items_vector;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs tool-bar-items", "tool-bar-items");
+  /* Scheme returns (cons vector nitems).  Unpack. */
+  Lisp_Object result = SCM_CALL_1 (proc, reuse);
+  *nitems = XFIXNUM (XCDR (result));
+  return XCAR (result);
 }
 
+#if 0  /* M10 imp-3.1: ported to Scheme (mod/emacs/tool-bar-items.scm).
+          Dead C body retained for reference until imp-3.4 retires it.  */
 
 /* Process the definition of KEY which is DEF.  */
 
@@ -9490,6 +9465,7 @@ append_tool_bar_item (void)
   ntool_bar_items += TOOL_BAR_ITEM_NSLOTS;
 }
 
+#endif /* M10 imp-3.1 dead C body */
 
 
 
