@@ -188,3 +188,189 @@
 
 ;; Cleanup
 ((symbol-function '--set-tab-bar-items-count) 0)
+
+;;; --- imp-2.4 round-trip gate -------------------------------------------
+;;; Round-trip tests: build keymaps in elisp, feed through the full
+;;; pipeline (map-keymap → process-tab-bar-item), read back vector
+;;; and count directly via the imp-2.1 DEFUNs.
+;;;
+;;; We read the vector/count directly rather than calling tab-bar-items,
+;;; which would rebuild from current-active-maps and discard our manual
+;;; keymap walk.
+;;;
+;;; Traps (same as imp-1.3):
+;;;   - Elisp colon-symbols cross FFI as Guile keywords (#:enable, not ':enable)
+;;;   - Use aref/aset for elisp vectors (Guile vector-ref doesn't work)
+;;;   - Use #nil for elisp nil, not '() (they are distinct across FFI)
+;;;   - Vinhibit_quit: FIX-20260710-guilemacs — should use dynamic-wind,
+;;;     currently plain save/restore (see tab-bar-items.scm for rationale)
+
+(let ((make-km    (symbol-function 'make-sparse-keymap))
+      (define-k   (symbol-function 'define-key))
+      (lookup-k   (symbol-function 'lookup-key))
+      (keymapp-f  (symbol-function 'keymapp))
+      (map-km     (symbol-function 'map-keymap))
+      (aref-f     (symbol-function 'aref))
+      (get-vec    (symbol-function '--tab-bar-items-vector))
+      (get-cnt    (symbol-function '--tab-bar-items-count))
+      (set-cnt    (symbol-function '--set-tab-bar-items-count))
+      (vectorp-f  (symbol-function 'vectorp)))
+
+  ;; --- RT1: Single item round-trip ---
+  ;; Build a keymap with one tab-bar entry, walk it, verify vector.
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'test-item)
+              (list 'menu-item "TestItem" 'test-cmd #:help "Test help"))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-single-count" 1 cnt)
+        (check "roundtrip-caption" "TestItem"
+               (aref-f vec TAB-BAR-ITEM-CAPTION))
+        (check "roundtrip-binding" 'test-cmd
+               (aref-f vec TAB-BAR-ITEM-BINDING))
+        (check "roundtrip-help" "Test help"
+               (aref-f vec TAB-BAR-ITEM-HELP)))))
+
+  ;; --- RT2: Two items, verify both present (order-independent) ---
+  ;; map-keymap may iterate bindings in reverse-key or definition
+  ;; order; we only assert that both items ended up in the vector.
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'item1)
+              (list 'menu-item "Item1" 'cmd1))
+    (define-k inner (vector 'item2)
+              (list 'menu-item "Item2" 'cmd2))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-two-items-count" 2 cnt)
+        ;; Collect captions from both slots and verify as a set.
+        (let ((caps (list (aref-f vec TAB-BAR-ITEM-CAPTION)
+                          (aref-f vec (+ TAB-BAR-ITEM-NSLOTS
+                                         TAB-BAR-ITEM-CAPTION))))
+              (binds (list (aref-f vec TAB-BAR-ITEM-BINDING)
+                           (aref-f vec (+ TAB-BAR-ITEM-NSLOTS
+                                          TAB-BAR-ITEM-BINDING)))))
+          (check "roundtrip-both-captions" '(#t #t)
+                 (list (or (equal? "Item1" (car caps))
+                           (equal? "Item1" (cadr caps)))
+                       (or (equal? "Item2" (car caps))
+                           (equal? "Item2" (cadr caps)))))
+          (check "roundtrip-both-bindings" '(#t #t)
+                 (list (or (equal? 'cmd1 (car binds))
+                           (equal? 'cmd1 (cadr binds)))
+                       (or (equal? 'cmd2 (car binds))
+                           (equal? 'cmd2 (cadr binds)))))))))
+
+  ;; --- RT3: :visible nil skips item ---
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'always)
+              (list 'menu-item "Always" 'always-cmd))
+    (define-k inner (vector 'hidden)
+              (list 'menu-item "Hidden" 'hidden-cmd #:visible #nil))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let ((cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-visible-filter-count" 1 cnt))))
+
+  ;; --- RT4: Separator item survives ---
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'sep)
+              (list "--" ))  ;; old-style separator
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-separator-count" 1 cnt)
+        (check "roundtrip-sep-enabled-nil" #nil
+               (aref-f vec TAB-BAR-ITEM-ENABLED-P))
+        (check "roundtrip-sep-caption-nil" #nil
+               (aref-f vec TAB-BAR-ITEM-CAPTION)))))
+
+  ;; --- RT5: :enable nil stored, evaluated later ---
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'disabled-item)
+              (list 'menu-item "Disabled" 'disabled-cmd #:enable #nil))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-enable-nil-count" 1 cnt)
+        (check "roundtrip-enable-is-nil" #nil
+               (aref-f vec TAB-BAR-ITEM-ENABLED-P)))))
+
+  ;; --- RT6: :filter transforms binding ---
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'filtered)
+              (list 'menu-item "Filtered" 'raw #:filter 'identity))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-filter-count" 1 cnt)
+        (check "roundtrip-filter-binding" 'raw
+               (aref-f vec TAB-BAR-ITEM-BINDING)))))
+
+  ;; --- RT7: Return shape is proper (cons vector fixnum) ---
+  ;; This one DOES call tab-bar-items to verify the public API shape.
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k inner (vector 'shape-test)
+              (list 'menu-item "Shape" 'shape-cmd))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      ;; After manual walk, verify the vector/count are consistent
+      ;; and that tab-bar-items returns a proper cons shape from
+      ;; current-active-maps (which may or may not include our item).
+      (let* ((result (tab-bar-items #nil))
+             (vec    (car result))
+             (nitems (cdr result)))
+        (check "roundtrip-cons-car-vectorp" #t
+               (not (eq? #nil (vectorp-f vec))))
+        (check "roundtrip-cons-cdr-fixnump" #t
+               (integer? nitems))
+        (check "roundtrip-cons-cdr-positive" #t
+               (>= nitems 0)))))
+
+  ;; --- RT8: Empty keymap returns zero items ---
+  (let* ((inner (make-km))
+         (outer (make-km)))
+    (define-k outer (vector 'tab-bar) inner)
+    (set-cnt 0)
+    (let ((binding (lookup-k outer #(tab-bar))))
+      (when (not (eq? #nil (keymapp-f binding)))
+        (map-km process-tab-bar-item binding))
+      (let* ((vec (get-vec))
+             (cnt (/ (get-cnt) TAB-BAR-ITEM-NSLOTS)))
+        (check "roundtrip-empty-keymap-count" 0 cnt)
+        (check "roundtrip-empty-returns-vector" #t
+               (not (eq? #nil (vectorp-f vec))))))))
