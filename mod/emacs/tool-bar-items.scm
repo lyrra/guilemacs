@@ -73,6 +73,9 @@
 (defelisp %length            length)
 (defelisp %vectorp           vectorp)
 (defelisp %upcase-initials   upcase-initials)
+(defelisp %where-is-internal  where-is-internal)
+(defelisp %key-description    key-description)
+(defelisp %concat             concat)
 
 ;;; --- Reused from (emacs menu-item-parse) ------------------------------
 ;;; menu-item-eval-property — the safe-eval helper (authoritative in that module).
@@ -199,6 +202,12 @@
                ((force %aset) props TOOL-BAR-ITEM-ENABLED-P #nil)
                ((force %aset) props TOOL-BAR-ITEM-SELECTED-P #nil)
                ((force %aset) props TOOL-BAR-ITEM-CAPTION #nil)
+               ;; imp-3.2: Separator IMAGES slot — C sets
+               ;; TOOL_BAR_ITEM_IMAGES from
+               ;; menu_item_eval_property(Vtool_bar_separator_image_expression).
+               ((force %aset) props TOOL-BAR-ITEM-IMAGES
+                (menu-item-eval-property
+                 ((force %symbol-value) 'tool-bar-separator-image-expression)))
                (return 1))
              (return 0)))
 
@@ -303,6 +312,20 @@
                        ((force %keymapp)
                         ((force %aref) props TOOL-BAR-ITEM-BINDING))))
          (return 0))
+
+       ;; imp-3.2: Help augmentation with keybinding (C order:
+       ;; after keymapp check, before enable-eval).  Appends
+       ;; "  (KEY-DESC)" to HELP slot so tooltips show the shortcut.
+       (let* ((binding ((force %aref) props TOOL-BAR-ITEM-BINDING))
+              (keys    ((force %where-is-internal) binding #nil #t #nil #nil)))
+         (unless (eq? keys #nil)
+           (let* ((orig ((force %aref) props TOOL-BAR-ITEM-HELP))
+                  (orig (if (eq? orig #nil)
+                            ((force %aref) props TOOL-BAR-ITEM-CAPTION)
+                            orig))
+                  (desc ((force %key-description) keys #nil)))
+             ((force %aset) props TOOL-BAR-ITEM-HELP
+              ((force %concat) orig "  (" desc ")")))))
 
        ;; If wrap item, disable it.
        (when is-wrap

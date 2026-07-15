@@ -380,4 +380,58 @@
          (nitems (cdr result)))
     (check "rt7-cons-car-vectorp" #t (not (eq? #nil (vectorp-f vec))))
     (check "rt7-cons-cdr-fixnump" #t (integer? nitems))
-    (check "rt7-cons-cdr-nonnegative" #t (>= nitems 0))))
+    (check "rt7-cons-cdr-nonnegative" #t (>= nitems 0)))
+
+  ;; --- imp-3.2: Separator IMAGES slot ---
+  ;; Verifies that parse-tool-bar-item fills TOOL-BAR-ITEM-IMAGES
+  ;; from tool-bar-separator-image-expression for separator items.
+  (let* ((sym-val   (symbol-function 'symbol-value))
+         (old-img   (sym-val 'tool-bar-separator-image-expression))
+         ;; Use a quoted form that menu-item-eval-property can
+         ;; evaluate safely: '(sep-test-image) → (sep-test-image).
+         (test-img  (list 'quote '(sep-test-image))))
+    ;; Set a known separator image expression.
+    ((symbol-function 'set) 'tool-bar-separator-image-expression test-img)
+    ;; Parse a separator — parse-tool-bar-item mutates the shared
+    ;; properties vector, so read the IMAGES slot directly.
+    (let ((result (parse-tool-bar-item (list "--") 'imp32-sep-key)))
+      ;; The evaluated result should be (sep-test-image) — the
+      ;; unquoted form of what we set.
+      (check "imp32-separator-images" '(sep-test-image)
+             ((symbol-function 'aref)
+              ((symbol-function '--tool-bar-item-properties-vector))
+              TOOL-BAR-ITEM-IMAGES)))
+    ;; Restore original value.
+    ((symbol-function 'set) 'tool-bar-separator-image-expression old-img))
+
+  ;; --- imp-3.2: Help augmentation with keybinding ---
+  ;; Verifies that parse-tool-bar-item appends "  (KEY-DESC)" to
+  ;; the HELP slot when the binding has a key in current-global-map.
+  (let* ((global-map  (symbol-function 'current-global-map))
+         (define-k    (symbol-function 'define-key))
+         (lookup-k    (symbol-function 'lookup-key))
+         (f12-vec     (vector 'f12))
+         ;; Save the old binding for [f12] so we can restore it.
+         (old-binding (lookup-k (global-map) f12-vec)))
+    (define-k (global-map) f12-vec 'imp32-test-cmd)
+    ;; Parse an item whose binding is imp32-test-cmd, with a known
+    ;; help string.
+    (let ((result (parse-tool-bar-item
+                   (list 'menu-item "Imp32Help"
+                         'imp32-test-cmd #:help "Do the thing")
+                   'imp32-help-key)))
+      (check "imp32-help-augment-returns-1" 1 result)
+      (let ((help-slot
+             ((symbol-function 'aref)
+              ((symbol-function '--tool-bar-item-properties-vector))
+              TOOL-BAR-ITEM-HELP)))
+        ;; HELP should be "Do the thing  (<f12>)" — the original help
+        ;; with the keybinding appended.
+        (check "imp32-help-has-key-suffix" #t
+               (and (string? help-slot)
+                    (> (string-length help-slot)
+                       (string-length "Do the thing"))))))
+    ;; Restore the old binding (or undefine if there was none).
+    (if (eq? old-binding #nil)
+        (define-k (global-map) f12-vec 'undefined)
+        (define-k (global-map) f12-vec old-binding))))
