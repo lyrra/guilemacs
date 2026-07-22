@@ -62,7 +62,7 @@
             (list-ref res 9) (list-ref res 10))))
 
 (define (buffer-posn-pass w part mx my xret posn)
-  (let ((res ((force %--mlp-dispatch) 8 w part mx my xret posn #nil)))
+  (let ((res ((force %--mlp-dispatch) 8 w part mx my xret posn)))
     (values (list-ref res 0) (list-ref res 1) (list-ref res 2)
             (list-ref res 3)
             (list-ref res 4) (list-ref res 5)
