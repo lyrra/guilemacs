@@ -1075,8 +1075,13 @@ unrecognized kind aborts."
             (mouse-click-return
              mods code start-pos position)))))))
 
-;;; Mouse-click stem — read from elisp variable (DEFVAR_LISP).
-(define %lispy-mouse-stem (delay ((%c 'symbol-value) 'lispy-mouse-stem)))
+;;; Mouse-click stem.  C keeps a `Vlispy_mouse_stem' static
+;;; (src/keyboard.c:6313) initialised to the literal "mouse" and
+;;; never mutated, but it's not DEFVAR_LISP'd — nothing binds the
+;;; elisp symbol `lispy-mouse-stem'.  Inline the literal here to
+;;; avoid the void-variable error; the delay wrapper stays so the
+;;; four call sites don't need to change.
+(define %lispy-mouse-stem (delay "mouse"))
 
 (define (mouse-click-return mods code start-pos position)
   ;; Build head symbol + return appropriate list shape

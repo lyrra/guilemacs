@@ -6310,8 +6310,6 @@ static const char *const iso_lispy_function_keys[] =
 
 #endif /* not HAVE_NTGUI */
 
-static Lisp_Object Vlispy_mouse_stem;
-
 static const char *const lispy_wheel_names[] =
 {
   "wheel-up", "wheel-down", "wheel-left", "wheel-right"
@@ -13306,9 +13304,6 @@ syms_of_keyboard (void)
   rks_key                  = Qnil;
   staticpro (&rks_key);
   /* C-9b: rks_fkey/keytran/indec staticpro retired with the structs.  */
-
-  Vlispy_mouse_stem = build_pure_c_string ("mouse");
-  staticpro (&Vlispy_mouse_stem);
 
   DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
 	       doc: /* Message displayed by `normal-top-level'.  */);
