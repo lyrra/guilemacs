@@ -48,7 +48,12 @@
 ;;; --- imp-1.3: Elisp DEFUN references ----------------------------------
 
 (defelisp %get                    get)
-(defelisp %concat2                concat2)
+;; Bind %concat2 to elisp `concat' (variadic), not the C-only
+;; `concat2' helper — the latter is not registered as a DEFUN, so
+;; defelisp would silently resolve it to #nil and application would
+;; crash with "Wrong type to apply: #nil" the first time redisplay
+;; hits the keyeq branch (see feedback_c_helper_scheme_proc_trap.md).
+(defelisp %concat2                concat)
 (defelisp %get-text-property      get-text-property)
 (defelisp %substitute-command-keys substitute-command-keys)
 (defelisp %key-binding            key-binding)
