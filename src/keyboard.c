@@ -8486,6 +8486,49 @@ static Lisp_Object menu_bar_one_keymap_changed_items;
 static Lisp_Object menu_bar_items_vector;
 static int menu_bar_items_index;
 
+/* Infrastructure DEFUNs exposing menu-bar internals to Scheme.
+   These let the Scheme side own menu_bar_items() while C still
+   manages the static vectors (GC-protected via staticpro).  */
+
+DEFUN ("--menu-bar-items-vector", Fmenu_bar_items_vector,
+       Smenu_bar_items_vector, 0, 0, 0,
+       doc: /* Return the menu-bar items vector, lazy-initializing to 24 slots if nil.  */)
+  (void)
+{
+  if (NILP (menu_bar_items_vector))
+    menu_bar_items_vector = make_nil_elisp_vector (24);
+  return menu_bar_items_vector;
+}
+
+DEFUN ("--set-menu-bar-items-vector", Fset_menu_bar_items_vector,
+       Sset_menu_bar_items_vector, 1, 1, 0,
+       doc: /* Set the menu-bar items vector to VEC.
+Used by Scheme to write back a resized vector after larger-vector.  */)
+  (Lisp_Object vec)
+{
+  menu_bar_items_vector = vec;
+  return Qnil;
+}
+
+DEFUN ("--menu-bar-items-index", Fmenu_bar_items_index,
+       Smenu_bar_items_index, 0, 0, 0,
+       doc: /* Return the current fill index in the menu-bar items vector.
+This is the slot count, not item count (÷4 for item count).  */)
+  (void)
+{
+  return make_fixnum (menu_bar_items_index);
+}
+
+DEFUN ("--set-menu-bar-items-index", Fset_menu_bar_items_index,
+       Sset_menu_bar_items_index, 1, 1, 0,
+       doc: /* Set the menu-bar items index to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  menu_bar_items_index = XFIXNUM (n);
+  return Qnil;
+}
+
 
 static const char *separator_names[] = {
   "space",
