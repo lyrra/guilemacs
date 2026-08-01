@@ -61,29 +61,28 @@
   (idx-setter 0)
   (check "idx-reset-to-zero" 0 (idx-getter)))
 
-;;; --- menu-bar-items on empty keymaps -----------------------------------
-;;; With no [menu-bar] keymap binding in current-active-maps, the walk
-;;; produces zero items.  We still get the sentinel appended (4 nils)
-;;; and the vector returned directly (no nitems — unlike tab/tool-bar).
+;;; --- menu-bar-items end-to-end (live env) ------------------------------
+;;; With the callback ported (imp-4.3), a bare-batch startup DOES have a
+;;; populated [menu-bar] keymap in global-map (File, Edit, Options, …
+;;; from loadup).  The walk parses them and appends the sentinel.  We
+;;; can't assert exact contents (loadup evolves), but we can assert the
+;;; invariants: vector returned, index is a positive multiple of 4, and
+;;; the last 4 slots are the sentinel (all nil).
 
-(let* ((mb-items     menu-bar-items)
-       (aref-f       (symbol-function 'aref))
-       (length-f     (symbol-function 'length))
-       (vectorp-f    (symbol-function 'vectorp))
-       (idx-getter   (symbol-function '--menu-bar-items-index))
-       (vec-getter   (symbol-function '--menu-bar-items-vector))
-       ;; Call menu-bar-items with nil to force fresh allocation.
-       (result (mb-items #nil)))
-
-  ;; menu-bar-items returns a vector directly (not a cons).
-  (check "empty-returns-vector" #t (not (eq? #nil (vectorp-f result))))
-  ;; The index should be 4 (sentinel appended).
-  (check "empty-index-is-4" 4 (idx-getter))
-  ;; The first 4 slots should all be nil (the sentinel).
-  (check "empty-slot-0-nil" #nil (aref-f result 0))
-  (check "empty-slot-1-nil" #nil (aref-f result 1))
-  (check "empty-slot-2-nil" #nil (aref-f result 2))
-  (check "empty-slot-3-nil" #nil (aref-f result 3)))
+(let* ((mb-items   menu-bar-items)
+       (aref-f     (symbol-function 'aref))
+       (vectorp-f  (symbol-function 'vectorp))
+       (idx-getter (symbol-function '--menu-bar-items-index))
+       (result     (mb-items #nil))
+       (idx        (idx-getter)))
+  (check "walk-returns-vector"      #t (not (eq? #nil (vectorp-f result))))
+  (check "walk-index-positive"      #t (> idx 0))
+  (check "walk-index-multiple-of-4" 0 (modulo idx 4))
+  ;; Sentinel occupies slots (idx-4) .. (idx-1).
+  (check "walk-sentinel-key"    #nil (aref-f result (- idx 4)))
+  (check "walk-sentinel-string" #nil (aref-f result (- idx 3)))
+  (check "walk-sentinel-def"    #nil (aref-f result (- idx 2)))
+  (check "walk-sentinel-hpos"   #nil (aref-f result (- idx 1))))
 
 ;;; --- Manual single-item setup ------------------------------------------
 ;;; Simulate what the inner callback would do: ASET 4 values, bump index
@@ -140,6 +139,96 @@
     (check "single-sentinel-1" #nil  (aref-f v 5))
     (check "single-sentinel-2" #nil  (aref-f v 6))
     (check "single-sentinel-3" #nil  (aref-f v 7))))
+
+;;; --- process-menu-bar-item round-trip ----------------------------------
+;;; Drive the callback directly with synthetic (menu-item …) forms and
+;;; verify vector state.  Each sub-test calls `reset!' first, which zeros
+;;; the index and clears the per-map dedup list — the state the outer
+;;; walk establishes before each map-keymap-canonical call.
+
+(let* ((aref-f       (symbol-function 'aref))
+       (vec-getter   (symbol-function '--menu-bar-items-vector))
+       (idx-getter   (symbol-function '--menu-bar-items-index))
+       (idx-setter   (symbol-function '--set-menu-bar-items-index))
+       (dedup-setter (symbol-function '--set-menu-bar-one-keymap-changed-items))
+       (car-f        (symbol-function 'car))
+       (cdr-f        (symbol-function 'cdr))
+       (make-km      (symbol-function 'make-sparse-keymap))
+       (reset!       (lambda () (idx-setter 0) (dedup-setter #nil))))
+
+  ;; --- RT1: single item appended ---------------------------------------
+  (reset!)
+  (process-menu-bar-item 'k1 (list 'menu-item "One" 'cmd1))
+  (let ((v (vec-getter)))
+    (check "rt1-index-is-4" 4 (idx-getter))
+    (check "rt1-key"        'k1   (aref-f v MENU-BAR-ITEM-KEY))
+    (check "rt1-string"     "One" (aref-f v MENU-BAR-ITEM-STRING))
+    ;; DEF slot is an elisp list of one element: (cmd1).
+    (check "rt1-map-car"    'cmd1 (car-f (aref-f v MENU-BAR-ITEM-DEF)))
+    (check "rt1-map-cdr"    #nil  (cdr-f (aref-f v MENU-BAR-ITEM-DEF)))
+    (check "rt1-hpos"       0     (aref-f v MENU-BAR-ITEM-HPOS)))
+
+  ;; --- RT2: nil def is dropped -----------------------------------------
+  (reset!)
+  (process-menu-bar-item 'k2 #nil)
+  (check "rt2-nil-def-no-add" 0 (idx-getter))
+
+  ;; --- RT3: dedup guard within one map ---------------------------------
+  ;; Second call for the same KEY (with dedup list unchanged) is
+  ;; suppressed — index stays at 4, first STRING wins.
+  (reset!)
+  (process-menu-bar-item 'k3 (list 'menu-item "First"  'cmdA))
+  (process-menu-bar-item 'k3 (list 'menu-item "Second" 'cmdB))
+  (let ((v (vec-getter)))
+    (check "rt3-dedup-index"  4       (idx-getter))
+    (check "rt3-dedup-string" "First" (aref-f v MENU-BAR-ITEM-STRING))
+    (check "rt3-dedup-car"    'cmdA   (car-f (aref-f v MENU-BAR-ITEM-DEF))))
+
+  ;; --- RT4: same key across maps, non-keymap defs → replace map list --
+  ;; Simulate a map boundary by clearing the dedup list between calls.
+  ;; Neither cmd is a keymap, so C:8813 gives (cons new nil).
+  (reset!)
+  (process-menu-bar-item 'k4 (list 'menu-item "First"  'cmdA))
+  (dedup-setter #nil)
+  (process-menu-bar-item 'k4 (list 'menu-item "Second" 'cmdB))
+  (let* ((v (vec-getter))
+         (m (aref-f v MENU-BAR-ITEM-DEF)))
+    (check "rt4-merge-index" 4    (idx-getter))
+    (check "rt4-merge-car"   'cmdB (car-f m))
+    (check "rt4-merge-cdr"   #nil  (cdr-f m)))
+
+  ;; --- RT5: same key across maps, both keymap defs → chain --------------
+  ;; Both DEFs are keymaps, so C:8813 gives (cons new old) — the old
+  ;; map list is preserved and extended.
+  (reset!)
+  (let ((km1 (make-km))
+        (km2 (make-km)))
+    (process-menu-bar-item 'k5 (list 'menu-item "First"  km1))
+    (dedup-setter #nil)
+    (process-menu-bar-item 'k5 (list 'menu-item "Second" km2))
+    (let* ((v (vec-getter))
+           (m (aref-f v MENU-BAR-ITEM-DEF)))
+      (check "rt5-chain-index" 4  (idx-getter))
+      ;; m should be (km2 km1) — km2 consed onto the existing (km1) list.
+      (check "rt5-chain-car"    km2  (car-f m))
+      (check "rt5-chain-cadr"   km1  (car-f (cdr-f m)))
+      (check "rt5-chain-cddr"   #nil (cdr-f (cdr-f m)))))
+
+  ;; --- RT6: 'undefined splices out prior item -------------------------
+  ;; Add two items, then a third call with def='undefined for the first
+  ;; key.  The item shifts down; only the second item remains.
+  (reset!)
+  (process-menu-bar-item 'k6a (list 'menu-item "A" 'cmdA))
+  (process-menu-bar-item 'k6b (list 'menu-item "B" 'cmdB))
+  ;; Clear dedup so k6a can be re-processed with 'undefined.
+  (dedup-setter #nil)
+  (process-menu-bar-item 'k6a 'undefined)
+  (let ((v (vec-getter)))
+    (check "rt6-undef-index" 4 (idx-getter))
+    ;; The surviving item (k6b) shifted from slots 4-7 down to 0-3.
+    (check "rt6-undef-remaining-key"    'k6b  (aref-f v MENU-BAR-ITEM-KEY))
+    (check "rt6-undef-remaining-string" "B"   (aref-f v MENU-BAR-ITEM-STRING))
+    (check "rt6-undef-remaining-car"    'cmdB (car-f (aref-f v MENU-BAR-ITEM-DEF)))))
 
 ;;; --- final-items-rotate! -----------------------------------------------
 ;;; Set up 2 items (8 slots), put item-b in menu-bar-final-items,

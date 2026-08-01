@@ -8529,6 +8529,28 @@ DEFUN ("--set-menu-bar-items-index", Fset_menu_bar_items_index,
   return Qnil;
 }
 
+DEFUN ("--menu-bar-one-keymap-changed-items",
+       Fmenu_bar_one_keymap_changed_items,
+       Smenu_bar_one_keymap_changed_items, 0, 0, 0,
+       doc: /* Return the per-keymap dedup list for menu-bar item construction.
+Scheme consults this via `memq' before processing a binding to avoid
+duplicate contributions from the same keymap.  */)
+  (void)
+{
+  return menu_bar_one_keymap_changed_items;
+}
+
+DEFUN ("--set-menu-bar-one-keymap-changed-items",
+       Fset_menu_bar_one_keymap_changed_items,
+       Sset_menu_bar_one_keymap_changed_items, 1, 1, 0,
+       doc: /* Set the per-keymap dedup list to LST.
+Reset to nil before each per-map --map-keymap-canonical call.  */)
+  (Lisp_Object lst)
+{
+  menu_bar_one_keymap_changed_items = lst;
+  return Qnil;
+}
+
 
 static const char *separator_names[] = {
   "space",
