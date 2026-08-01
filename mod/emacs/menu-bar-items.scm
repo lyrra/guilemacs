@@ -55,8 +55,7 @@
 (defelisp %set               set)
 (defelisp %length            length)
 (defelisp %vectorp           vectorp)
-(defelisp %map-keymap-internal map-keymap-internal)
-(defelisp %keymap-canonicalize keymap-canonicalize)
+(defelisp %--map-keymap-canonical --map-keymap-canonical)
 
 ;;; --- Reused from (emacs menu-item-parse) ------------------------------
 ;;; menu-item-eval-property — the safe-eval helper (authoritative in that module).
@@ -67,7 +66,7 @@
 
 ;;; --- process-menu-bar-item (stub — imp-4.3 fills this in) --------------
 ;;; Port of C menu_bar_item (keyboard.c:8741+).
-;;; Callback for map-keymap-internal.  KEY is the event, DEF is the binding.
+;;; Callback for --map-keymap-canonical.  KEY is the event, DEF is the binding.
 ;;;
 ;;; The real implementation will:
 ;;;   1. Parse the item via parse-menu-item.
@@ -81,7 +80,7 @@
   ;; no-op (not an error): menu-bar-items is called end-to-end by the
   ;; test suite, and any real [menu-bar] keymap in current-active-maps
   ;; (global-map has one after loadup) drives this callback via
-  ;; map-keymap-internal.  A throw would abort startup.
+  ;; --map-keymap-canonical.  A throw would abort startup.
   #nil)
 
 ;;; --- final-items-rotate! -----------------------------------------------
@@ -151,10 +150,9 @@
               (unless (eq? keymap #nil)
                 (let ((binding ((force %lookup-key) keymap #(menu-bar))))
                   (when (not (eq? #nil ((force %keymapp) binding)))
-                    ;; map-keymap-canonical = keymap-canonicalize + map-keymap-internal
-                    ((force %map-keymap-internal)
+                    ((force %--map-keymap-canonical)
                      process-menu-bar-item
-                     ((force %keymap-canonicalize) binding)))))))))
+                     binding))))))))
       ;; 5. Restore inhibit-quit.
       (lambda ()
         ((force %set) 'inhibit-quit oquit))))

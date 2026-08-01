@@ -637,6 +637,23 @@ If KEYMAP has a parent, this function returns it without processing it.  */)
   return keymap;
 }
 
+DEFUN ("--map-keymap-canonical", F__map_keymap_canonical,
+       S__map_keymap_canonical, 2, 2, 0,
+       doc: /* Call FUNCTION once for each event binding in KEYMAP,
+after canonicalizing it with `keymap-canonicalize' to resolve
+inheritance and redefinitions.  Does NOT follow parents (canonical
+maps have none by construction).
+
+FUNCTION is called with two arguments: the event that is bound, and
+the definition it is bound to.  The event may be a character range.  */)
+  (Lisp_Object function, Lisp_Object keymap)
+{
+  keymap = safe_calln (Qkeymap_canonicalize, keymap);
+  keymap = get_keymap (keymap, 1, 1);
+  keymap = map_keymap_internal (keymap, map_keymap_call, function, NULL);
+  return keymap;
+}
+
 DEFUN ("map-keymap", Fmap_keymap, Smap_keymap, 2, 3, 0,
        doc: /* Call FUNCTION once for each event binding in KEYMAP.
 FUNCTION is called with two arguments: the event that is bound, and
