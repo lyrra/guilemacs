@@ -8477,7 +8477,6 @@ store_user_signal_events (void)
 }
 
 
-static void menu_bar_item (Lisp_Object, Lisp_Object, Lisp_Object, void *);
 static Lisp_Object menu_bar_one_keymap_changed_items;
 
 /* These variables hold the vector under construction within
@@ -8599,160 +8598,18 @@ menu_separator_name_p (const char *label)
 }
 
 
-/* Return a vector of menu items for a menu bar, appropriate
-   to the current buffer.  Each item has three elements in the vector:
-   KEY STRING MAPLIST.
-
-   OLD is an old vector we can optionally reuse, or nil.  */
-
 Lisp_Object
 menu_bar_items (Lisp_Object old)
 {
-  /* The number of keymaps we're scanning right now, and the number of
-     keymaps we have allocated space for.  */
-  ptrdiff_t nmaps;
-
-  /* maps[0..nmaps-1] are the prefix definitions of KEYBUF[0..t-1]
-     in the current keymaps, or nil where it is not a prefix.  */
-  Lisp_Object *maps;
-
-  Lisp_Object mapsbuf[3];
-  Lisp_Object def;
-
-  ptrdiff_t mapno;
-  Lisp_Object oquit;
-
-  USE_SAFE_ALLOCA;
-
-  /* In order to build the menus, we need to call the keymap
-     accessors.  They all call maybe_quit.  But this function is called
-     during redisplay, during which a quit is fatal.  So inhibit
-     quitting while building the menus.
-     We do this instead of specbind because (1) errors will clear it anyway
-     and (2) this avoids risk of specpdl overflow.  */
-  oquit = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-
-  if (!NILP (old))
-    {
-      CHECK_TYPE (PLAIN_VECTORP (old), Qvectorp, old);
-      menu_bar_items_vector = old;
-    }
-  else
-    menu_bar_items_vector = make_nil_elisp_vector (24);
-  menu_bar_items_index = 0;
-
-  /* Build our list of keymaps.
-     If we recognize a function key and replace its escape sequence in
-     keybuf with its symbol, or if the sequence starts with a mouse
-     click and we need to switch buffers, we jump back here to rebuild
-     the initial keymaps from the current buffer.  */
-  {
-    Lisp_Object *tmaps;
-
-    /* Should overriding-terminal-local-map and overriding-local-map apply?  */
-    if (!NILP (Voverriding_local_map_menu_flag)
-	&& !NILP (Voverriding_local_map))
-      {
-	/* Yes, use them (if non-nil) as well as the global map.  */
-	maps = mapsbuf;
-	nmaps = 0;
-	if (!NILP (KVAR (current_kboard, Voverriding_terminal_local_map)))
-	  maps[nmaps++] = KVAR (current_kboard, Voverriding_terminal_local_map);
-	if (!NILP (Voverriding_local_map))
-	  maps[nmaps++] = Voverriding_local_map;
-      }
-    else
-      {
-	/* No, so use major and minor mode keymaps and keymap property.
-	   Note that menu-bar bindings in the local-map and keymap
-	   properties may not work reliable, as they are only
-	   recognized when the menu-bar (or mode-line) is updated,
-	   which does not normally happen after every command.  */
-	ptrdiff_t nminor = current_minor_maps (NULL, &tmaps);
-	SAFE_NALLOCA (maps, 1, nminor + 4);
-	nmaps = 0;
-	Lisp_Object tem = KVAR (current_kboard, Voverriding_terminal_local_map);
-	if (!NILP (tem) && !NILP (Voverriding_local_map_menu_flag))
-	  maps[nmaps++] = tem;
-	if (tem = get_local_map (PT, current_buffer, Qkeymap), !NILP (tem))
-	  maps[nmaps++] = tem;
-	if (nminor != 0)
-	  {
-	    memcpy (maps + nmaps, tmaps, nminor * sizeof (maps[0]));
-	    nmaps += nminor;
-	  }
-	maps[nmaps++] = get_local_map (PT, current_buffer, Qlocal_map);
-      }
-    maps[nmaps++] = current_global_map;
-  }
-
-  /* Look up in each map the dummy prefix key `menu-bar'.  */
-
-  for (mapno = nmaps - 1; mapno >= 0; mapno--)
-    if (!NILP (maps[mapno]))
-      {
-	def = get_keymap (access_keymap (maps[mapno], Qmenu_bar, 1, 0, 1),
-			  0, 1);
-	if (CONSP (def))
-	  {
-	    menu_bar_one_keymap_changed_items = Qnil;
-	    map_keymap_canonical (def, menu_bar_item, Qnil, NULL);
-	  }
-      }
-
-  /* Move to the end those items that should be at the end.  */
-
-  Lisp_Object tail = Vmenu_bar_final_items;
-  FOR_EACH_TAIL (tail)
-    {
-      int end = menu_bar_items_index;
-
-      for (int i = 0; i < end; i += 4)
-	if (EQ (XCAR (tail), AREF (menu_bar_items_vector, i)))
-	  {
-	    Lisp_Object tem0, tem1, tem2, tem3;
-	    /* Move the item at index I to the end,
-	       shifting all the others forward.  */
-	    tem0 = AREF (menu_bar_items_vector, i + 0);
-	    tem1 = AREF (menu_bar_items_vector, i + 1);
-	    tem2 = AREF (menu_bar_items_vector, i + 2);
-	    tem3 = AREF (menu_bar_items_vector, i + 3);
-	    /* Forward copy is safe since dest (i) < source (i+4) */
-	    if (end > i + 4)
-	      for (ptrdiff_t j = i; j < end - 4; j++)
-		ASET (menu_bar_items_vector, j,
-		      AREF (menu_bar_items_vector, j + 4));
-	    ASET (menu_bar_items_vector, end - 4, tem0);
-	    ASET (menu_bar_items_vector, end - 3, tem1);
-	    ASET (menu_bar_items_vector, end - 2, tem2);
-	    ASET (menu_bar_items_vector, end - 1, tem3);
-	    break;
-	  }
-    }
-
-  /* Add nil, nil, nil, nil at the end.  */
-  {
-    int i = menu_bar_items_index;
-    if (i + 4 > ASIZE (menu_bar_items_vector))
-      menu_bar_items_vector
-	= larger_vector (menu_bar_items_vector, 4, -1);
-    /* Add this item.  */
-    ASET (menu_bar_items_vector, i, Qnil); i++;
-    ASET (menu_bar_items_vector, i, Qnil); i++;
-    ASET (menu_bar_items_vector, i, Qnil); i++;
-    ASET (menu_bar_items_vector, i, Qnil); i++;
-    menu_bar_items_index = i;
-  }
-
-  Vinhibit_quit = oquit;
-  SAFE_FREE ();
-  return menu_bar_items_vector;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu-bar-items", "menu-bar-items");
+  /* Scheme returns the vector directly (unlike tab/tool-bar which
+     return a cons — menu-bar has no nitems out-param, downstream
+     scans for the nil sentinel).  */
+  return SCM_CALL_1 (proc, old);
 }
 
-/* Add one item to menu_bar_items_vector, for KEY, ITEM_STRING and DEF.
-   If there's already an item for KEY, add this DEF to it.  */
-
 Lisp_Object item_properties;
 
 static void
@@ -8763,79 +8620,7 @@ ensure_item_properties_vector (void)
 }
 
 
-static void
-menu_bar_item (Lisp_Object key, Lisp_Object item, Lisp_Object dummy1, void *dummy2)
-{
-  ensure_item_properties_vector ();
-  int i;
-  bool parsed;
-  Lisp_Object tem;
 
-  if (EQ (item, Qundefined))
-    {
-      /* If a map has an explicit `undefined' as definition,
-	 discard any previously made menu bar item.  */
-
-      for (i = 0; i < menu_bar_items_index; i += 4)
-	if (EQ (key, AREF (menu_bar_items_vector, i)))
-	  {
-	    /* Forward copy is safe since dest (i) < source (i+4) */
-	    if (menu_bar_items_index > i + 4)
-	      for (ptrdiff_t j = i; j < menu_bar_items_index - 4; j++)
-		ASET (menu_bar_items_vector, j,
-		      AREF (menu_bar_items_vector, j + 4));
-	    menu_bar_items_index -= 4;
-	  }
-    }
-
-  /* If this keymap has already contributed to this KEY,
-     don't contribute to it a second time.  */
-  tem = Fmemq (key, menu_bar_one_keymap_changed_items);
-  if (!NILP (tem) || NILP (item))
-    return;
-
-  menu_bar_one_keymap_changed_items
-    = Fcons (key, menu_bar_one_keymap_changed_items);
-
-  /* We add to menu_bar_one_keymap_changed_items before doing the
-     parse_menu_item, so that if it turns out it wasn't a menu item,
-     it still correctly hides any further menu item.  */
-  parsed = parse_menu_item (item, 1);
-  if (!parsed)
-    return;
-
-  item = AREF (item_properties, ITEM_PROPERTY_DEF);
-
-  /* Find any existing item for this KEY.  */
-  for (i = 0; i < menu_bar_items_index; i += 4)
-    if (EQ (key, AREF (menu_bar_items_vector, i)))
-      break;
-
-  /* If we did not find this KEY, add it at the end.  */
-  if (i == menu_bar_items_index)
-    {
-      /* If vector is too small, get a bigger one.  */
-      if (i + 4 > ASIZE (menu_bar_items_vector))
-	menu_bar_items_vector = larger_vector (menu_bar_items_vector, 4, -1);
-      /* Add this item.  */
-      ASET (menu_bar_items_vector, i, key); i++;
-      ASET (menu_bar_items_vector, i,
-	    AREF (item_properties, ITEM_PROPERTY_NAME)); i++;
-      ASET (menu_bar_items_vector, i, list1 (item)); i++;
-      ASET (menu_bar_items_vector, i, make_fixnum (0)); i++;
-      menu_bar_items_index = i;
-    }
-  /* We did find an item for this KEY.  Add ITEM to its list of maps.  */
-  else
-    {
-      Lisp_Object old;
-      old = AREF (menu_bar_items_vector, i + 2);
-      /* If the new and the old items are not both keymaps,
-	 the lookup will only find `item'.  */
-      item = Fcons (item, KEYMAPP (item) && KEYMAPP (XCAR (old)) ? old : Qnil);
-      ASET (menu_bar_items_vector, i + 2, item);
-    }
-}
 
  /* This is used as the handler when calling menu_item_eval_property.  */
 static Lisp_Object
