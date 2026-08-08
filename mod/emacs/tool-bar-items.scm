@@ -100,36 +100,8 @@
 (define (enable-disabled-menus-and-buttons)
   ((force %symbol-value) 'enable-disabled-menus-and-buttons))
 
-;;; Port of C menu_separator_name_p (keyboard.c:8512-8530).
-;;; Returns #t if LABEL is a recognized menu separator name.
-(define menu-separator-names
-  '("space" "no-line" "single-line" "double-line"
-    "single-dashed-line" "double-dashed-line"
-    "shadow-etched-in" "shadow-etched-out"
-    "shadow-etched-in-dash" "shadow-etched-out-dash"))
-
-(define (menu-separator-name? label)
-  (and (string? label)
-       (let ((len (string-length label)))
-         (cond
-          ;; Case 1: "--SUFFIX" format (>=4 chars, starts with "--",
-          ;; 3rd char not '-', and SUFFIX matches a known name)
-          ((and (>= len 4)
-                (char=? (string-ref label 0) #\-)
-                (char=? (string-ref label 1) #\-)
-                (not (char=? (string-ref label 2) #\-)))
-           (let ((suffix (substring label 2)))
-             (let loop ((rest menu-separator-names))
-               (and (pair? rest)
-                    (or (string=? suffix (car rest))
-                        (loop (cdr rest)))))))
-          ;; Case 2: all dashes
-          (else
-           (let loop ((i 0))
-             (if (= i len)
-                 (> len 0)         ; at least one dash
-                 (and (char=? (string-ref label i) #\-)
-                      (loop (1+ i))))))))))
+;;; menu-separator-name? and menu-separator-names are imported from
+;;; (emacs menu-item-parse) — factored out to dedup with tab-bar-items.
 
 ;;; Tool bar item properties vector accessor.  Returns the shared
 ;;; tool_bar_item_properties scratch vector (GC-protected by C staticpro).

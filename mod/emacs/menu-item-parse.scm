@@ -11,7 +11,10 @@
             ITEM-PROPERTY-ENABLE ITEM-PROPERTY-MAX
             ;; Keyword literals shared with tab-bar-items
             QCenable QCvisible QChelp QCfilter QCbutton
-            QCtoggle QCradio))
+            QCtoggle QCradio
+            ;; Separator predicate shared with tab-bar-items and
+            ;; tool-bar-items.
+            menu-separator-names menu-separator-name?))
 
 ;;; M10 imp-1.3 — complete Scheme parse-menu-item port.
 ;;; Coexists with C parse_menu_item (keyboard.c:8836+), which is
@@ -44,6 +47,45 @@
 ;;; elisp vector, not a Guile vector, so vector-ref / vector-set! don't work).
 (define (item-properties)
   ((force %--item-properties-vector)))
+
+;;; Port of C menu_separator_name_p (keyboard.c:8575).  Returns #t if
+;;; LABEL is a recognized menu separator name.  Matches:
+;;;   1. Exactly 4+ chars: "--" followed by a separator-name suffix
+;;;      (space, no-line, single-line, double-line, single-dashed-line,
+;;;       double-dashed-line, shadow-etched-in, shadow-etched-out,
+;;;       shadow-etched-in-dash, shadow-etched-out-dash)
+;;;   2. Any string consisting solely of dashes ("--", "---", etc.)
+;;;
+;;; C copy at keyboard.c:8575 stays for native GUI callers
+;;; (androidmenu.c, w32menu.c, haikumenu.c, gtkutil.c, xdisp.c).
+(define menu-separator-names
+  '("space" "no-line" "single-line" "double-line"
+    "single-dashed-line" "double-dashed-line"
+    "shadow-etched-in" "shadow-etched-out"
+    "shadow-etched-in-dash" "shadow-etched-out-dash"))
+
+(define (menu-separator-name? label)
+  (and (string? label)
+       (let ((len (string-length label)))
+         (cond
+          ;; Case 1: "--SUFFIX" format (>=4 chars, starts with "--",
+          ;; 3rd char not '-', and SUFFIX matches a known name)
+          ((and (>= len 4)
+                (char=? (string-ref label 0) #\-)
+                (char=? (string-ref label 1) #\-)
+                (not (char=? (string-ref label 2) #\-)))
+           (let ((suffix (substring label 2)))
+             (let loop ((rest menu-separator-names))
+               (and (pair? rest)
+                    (or (string=? suffix (car rest))
+                        (loop (cdr rest)))))))
+          ;; Case 2: all dashes
+          (else
+           (let loop ((i 0))
+             (if (= i len)
+                 (> len 0)         ; at least one dash
+                 (and (char=? (string-ref label i) #\-)
+                      (loop (1+ i))))))))))
 
 ;;; --- imp-1.3: Elisp DEFUN references ----------------------------------
 
