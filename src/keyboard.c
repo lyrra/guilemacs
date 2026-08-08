@@ -1184,6 +1184,137 @@ without hard-coding enum values in Scheme.  Each event symbol
   return make_fixnum (-1);
 }
 
+/* M11 imp-1.1 — kbd_buffer queue accessors for Scheme ring-buffer walking.
+   See docs/m11-plan.org §imp-1.1.  */
+
+static struct frame *some_mouse_moved (void);
+
+DEFUN ("--kbd-fetch-ptr-index", Fkbd_fetch_ptr_index, Skbd_fetch_ptr_index, 0, 0, 0,
+       doc: /* Return the current kbd_fetch_ptr index (0..KBD_BUFFER_SIZE-1).
+
+This is the integer offset into kbd_buffer where the next dequeue
+will read.  Together with --kbd-store-ptr-index, Scheme can detect
+whether the queue is empty (indices equal) without walking pointers.  */)
+  (void)
+{
+  return make_fixnum (kbd_fetch_ptr - kbd_buffer);
+}
+
+DEFUN ("--kbd-store-ptr-index", Fkbd_store_ptr_index, Skbd_store_ptr_index, 0, 0, 0,
+       doc: /* Return the current kbd_store_ptr index (0..KBD_BUFFER_SIZE-1).
+
+The position where the next event will be enqueued (producer cursor).  */)
+  (void)
+{
+  return make_fixnum (kbd_store_ptr - kbd_buffer);
+}
+
+DEFUN ("--kbd-buffer-nr-stored", Fkbd_buffer_nr_stored, Skbd_buffer_nr_stored, 0, 0, 0,
+       doc: /* Return the number of events currently in kbd_buffer.
+
+Wraps kbd_buffer_nr_stored().  Returns 0 when fetch == store.
+Handles wrap-around (kbd_store_ptr may have wrapped past KBD_BUFFER_SIZE).  */)
+  (void)
+{
+  ptrdiff_t n = kbd_store_ptr - kbd_fetch_ptr;
+  return make_fixnum (n + (n < 0 ? KBD_BUFFER_SIZE : 0));
+}
+
+DEFUN ("--some-mouse-moved", Fsome_mouse_moved, Ssome_mouse_moved, 0, 0, 0,
+       doc: /* Return the frame that has pending mouse movement, or nil.
+
+Wraps some_mouse_moved().  Returns a frame Lisp_Object or nil.
+Scheme uses this in the wait loop to detect mouse-motion fallback.  */)
+  (void)
+{
+  struct frame *f = some_mouse_moved ();
+  return f ? make_lisp_ptr (f, Lisp_Vectorlike) : Qnil;
+}
+
+DEFUN ("--kbd-event-kind", Fkbd_event_kind, Skbd_event_kind, 1, 1, 0,
+       doc: /* Return the event_kind at kbd_buffer index N (0-based fixnum).
+
+Reads kbd_buffer[N].kind directly without minting an ie-smob.
+Scheme uses this for peek-ahead during pinch coalescing and
+for the outer dispatch switch before committing to --kbd-event-ie.
+
+No bounds check — caller must ensure 0 <= N < KBD_BUFFER_SIZE.  */)
+  (Lisp_Object n)
+{
+  EMACS_INT idx = XFIXNUM (n);
+  eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
+  return make_fixnum (kbd_buffer[idx].kind);
+}
+
+DEFUN ("--kbd-event-ie", Fkbd_event_ie, Skbd_event_ie, 1, 1, 0,
+       doc: /* Return a fresh ie-smob wrapping &kbd_buffer[N].ie.
+
+Lifetime contract (M9): the smob is invalidated when the enclosing
+DEFUN call returns.  Scheme MUST extract all needed fields (via
+--ie-kind, --ie-arg, etc.) BEFORE any operation that might advance
+kbd_fetch_ptr.  The smob wraps a live pointer into the ring buffer —
+advancing fetch_ptr may overwrite that slot.
+
+No bounds check — caller must ensure 0 <= N < KBD_BUFFER_SIZE.  */)
+  (Lisp_Object n)
+{
+  EMACS_INT idx = XFIXNUM (n);
+  eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
+  return ie_wrap (&kbd_buffer[idx].ie);
+}
+
+DEFUN ("--kbd-advance-fetch-ptr", Fkbd_advance_fetch_ptr, Skbd_advance_fetch_ptr, 0, 0, 0,
+       doc: /* Advance kbd_fetch_ptr past the current event.
+
+Equivalent to `kbd_fetch_ptr = next_kbd_event(kbd_fetch_ptr)'.
+Does NOT update input_pending — the C code sets it at the end of
+kbd_buffer_get_event via readable_events() (keyboard.c:5294), which is
+a heavier check than pointer comparison.  Scheme queries input_pending
+via --get-input-pending when needed.  Returns nil.
+
+Caller MUST ensure all ie-smobs from the old fetch position have been
+extracted and dropped — this may overwrite the slot with new input.  */)
+  (void)
+{
+  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+  return Qnil;
+}
+
+DEFUN ("--kbd-set-fetch-ptr-index", Fkbd_set_fetch_ptr_index, Skbd_set_fetch_ptr_index, 1, 1, 0,
+       doc: /* Set kbd_fetch_ptr to kbd_buffer[N].
+
+Used by pinch coalescing to skip past coalesced events.
+Caller must ensure 0 <= N < KBD_BUFFER_SIZE.  Returns nil.  */)
+  (Lisp_Object n)
+{
+  EMACS_INT idx = XFIXNUM (n);
+  eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
+  kbd_fetch_ptr = &kbd_buffer[idx];
+  return Qnil;
+}
+
+DEFUN ("--kbd-dequeue-event", Fkbd_dequeue_event, Skbd_dequeue_event, 0, 0, 0,
+       doc: /* Dequeue the event at kbd_fetch_ptr and return (kind . ie-smob).
+
+Atomically reads the current event's kind, wraps its ie as an ie-smob,
+advances kbd_fetch_ptr, and returns a cons cell (KIND . IE-SMOB).
+
+Scheme MUST extract all fields from the ie-smob before any subsequent
+FFI call — the smob points into kbd_buffer and may be overwritten.
+
+Returns nil if the queue is empty (kbd_fetch_ptr == kbd_store_ptr).  */)
+  (void)
+{
+  if (kbd_fetch_ptr == kbd_store_ptr)
+    return Qnil;
+
+  Lisp_Object kind = make_fixnum (kbd_fetch_ptr->kind);
+  SCM smob = ie_wrap (&kbd_fetch_ptr->ie);
+  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+
+  return Fcons (kind, smob);
+}
+
 DEFUN ("--user-signal-name", Fuser_signal_name, Suser_signal_name,
        1, 1, 0,
        doc: /* Return the interned symbol for user-signal code C.
