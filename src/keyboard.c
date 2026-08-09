@@ -1315,6 +1315,74 @@ Returns nil if the queue is empty (kbd_fetch_ptr == kbd_store_ptr).  */)
   return Fcons (kind, smob);
 }
 
+DEFUN ("--kbd-handle-selection-event", Fkbd_handle_selection_event,
+       Skbd_handle_selection_event, 0, 0, 0,
+       doc: /* Handle a selection event at the current kbd_fetch_ptr
+position.
+
+If the event at kbd_fetch_ptr is SELECTION_REQUEST_EVENT or
+SELECTION_CLEAR_EVENT, handle it via the platform-specific handler,
+advance kbd_fetch_ptr, update input_pending, and return t.
+
+If the event at the fetch position is NOT a selection event, return
+nil and leave the queue state unchanged.
+
+Selection events do not produce a Lisp event — they are swallowed by
+the C-side handler.  The Scheme wait loop calls this before other
+event dispatch; on t, it loops back to wait for the next event.
+
+Platform routing is internal:
+  X11:   x_handle_selection_event   (struct selection_input_event *)
+  PGTK:  pgtk_handle_selection_event (same)
+  Haiku: haiku_handle_selection_clear (struct input_event *)
+         — REQUEST case aborts (matches C:5103)
+  Otherwise: emacs_abort ().  */)
+  (void)
+{
+  if (kbd_fetch_ptr == kbd_store_ptr)
+    return Qnil;
+
+  switch (kbd_fetch_ptr->kind)
+    {
+#ifndef HAVE_HAIKU
+    case SELECTION_REQUEST_EVENT:
+    case SELECTION_CLEAR_EVENT:
+      {
+# if defined HAVE_X11 || defined HAVE_PGTK
+        /* Remove it from the buffer before processing it, since
+           otherwise swallow_events will see it and process it
+           again.  */
+        struct selection_input_event copy = kbd_fetch_ptr->sie;
+        kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+        input_pending = readable_events (0);
+#  ifdef HAVE_X11
+        x_handle_selection_event (&copy);
+#  else
+        pgtk_handle_selection_event (&copy);
+#  endif
+        return Qt;
+# else
+        emacs_abort ();
+# endif
+      }
+#else  /* HAVE_HAIKU */
+    case SELECTION_REQUEST_EVENT:
+      emacs_abort ();
+
+    case SELECTION_CLEAR_EVENT:
+      {
+        struct input_event copy = kbd_fetch_ptr->ie;
+        kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+        input_pending = readable_events (0);
+        haiku_handle_selection_clear (&copy);
+        return Qt;
+      }
+#endif
+    default:
+      return Qnil;
+    }
+}
+
 DEFUN ("--user-signal-name", Fuser_signal_name, Suser_signal_name,
        1, 1, 0,
        doc: /* Return the interned symbol for user-signal code C.
