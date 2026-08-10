@@ -3294,7 +3294,8 @@ enum rc_slot {
   RC_SLOT_ALSO_RECORD                 = 8,
   RC_SLOT_RECORDED                    = 9,
   RC_SLOT_REREAD                      = 10,
-  RC_SLOT_ORIG_KBOARD                 = 11  /* kboard SMOB */
+  RC_SLOT_ORIG_KBOARD                 = 11, /* kboard SMOB */
+  RC_SLOT_KBP                         = 12  /* foreign-ptr to KBOARD ** (kbd_buffer_get_event kbp), or Qnil */
 };
 
 /* M6 infrastructure — slot enums for <keyremap> and <rks-state>
@@ -5496,6 +5497,258 @@ kbd_buffer_get_event (KBOARD **kbp,
 
 /* Process any non-user-visible events (currently X selection events),
    without reading any user-visible events.  */
+
+/* M11 imp-1.3 — C-escape shims for the kbd_buffer_get_event port.
+   Thin wrappers over non-portable / non-Scheme-callable C functions;
+   no behaviour change.  Platform gating lives inside each DEFUN body
+   (#ifdef discipline); Scheme calls these blind, without featurep
+   guards.  See docs/m11-plan.org §imp-1.3.  */
+
+DEFUN ("--quit-throw-to-read-char",
+       Fc_quit_throw_to_read_char,
+       Sc_quit_throw_to_read_char, 0, 0, 0,
+       doc: /* Internal: throw to the read-char wait point, exactly as
+   the C wait loop does when Vquit_flag is set
+   (quit_throw_to_read_char (0)).  Never returns — longjmps to the
+   waiting read-char; the caller must treat this as a non-local exit.  */)
+  (void)
+{
+  quit_throw_to_read_char (0);
+  return Qnil;   /* Not reached.  */
+}
+
+DEFUN ("--wait-reading-process-output",
+       Fc_wait_reading_process_output,
+       Sc_wait_reading_process_output, 4, 4, 0,
+       doc: /* Internal: call C wait_reading_process_output (SEC, NSEC,
+   READ_KBD, DO_DISPLAY, nil, NULL, 0).  SEC is clamped to
+   WAIT_READING_MAX (20 s) inside, mirroring the kbd_buffer_get_event
+   wait-loop call sites exactly.  Returns nil; the caller re-checks
+   the event queues after the sleep.  */)
+  (Lisp_Object sec, Lisp_Object nsec, Lisp_Object read_kbd,
+   Lisp_Object do_display)
+{
+  CHECK_FIXNUM (sec);
+  CHECK_FIXNUM (nsec);
+  CHECK_FIXNUM (read_kbd);
+  wait_reading_process_output (min (XFIXNUM (sec), WAIT_READING_MAX),
+			       XFIXNUM (nsec),
+			       XFIXNUM (read_kbd),
+			       !NILP (do_display),
+			       Qnil, NULL, 0);
+  return Qnil;
+}
+
+DEFUN ("--activate-menubar-hook",
+       Fc_activate_menubar_hook,
+       Sc_activate_menubar_hook, 1, 1, 0,
+       doc: /* Internal: call the FRAME terminal's activate_menubar_hook
+   with FRAME.  Returns nil; also nil (no-op) when FRAME is not a frame
+   or when the terminal has no such hook (e.g. termcap builds).  Scheme
+   checks FRAME_LIVE_P before calling.  */)
+  (Lisp_Object frame)
+{
+  if (!FRAMEP (frame))
+    return Qnil;
+#ifdef HAVE_EXT_MENU_BAR
+  struct frame *f = XFRAME (frame);
+  if (FRAME_TERMINAL (f)->activate_menubar_hook)
+    FRAME_TERMINAL (f)->activate_menubar_hook (f);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--kbd-decode-multibyte-string",
+       Fc_kbd_decode_multibyte_string,
+       Sc_kbd_decode_multibyte_string, 1, 1, 0,
+       doc: /* Internal: run STR through the C multibyte-decode path
+   (internal_condition_case_1 (kbd_buffer_get_event_1, STR, Qt,
+   kbd_buffer_get_event_2)).  Returns the raw result — nil (use the
+   original string), an empty string (drop the event), or the decoded
+   string.  Signals `wrong-type-argument' on a non-string STR.  */)
+  (Lisp_Object str)
+{
+  CHECK_STRING (str);
+  return internal_condition_case_1 (kbd_buffer_get_event_1, str, Qt,
+				    kbd_buffer_get_event_2);
+}
+
+DEFUN ("--kbd-noninteractive-getchar",
+       Fc_kbd_noninteractive_getchar,
+       Sc_kbd_noninteractive_getchar, 0, 0, 0,
+       doc: /* Internal: batch fast path — read one raw char from stdin
+   (getchar ()) and return it as a fixnum; EOF returns -1, exactly like
+   the C kbd_buffer_get_event noninteractive branch.  Returns nil on
+   builds compiled with DBus / file-notify / threads (no fast path);
+   Scheme gates the call on noninteractive / daemon predicates.  */)
+  (void)
+{
+#if !defined (HAVE_DBUS) && !defined (USE_FILE_NOTIFY) && !defined (THREADS_ENABLED)
+  return make_fixnum (getchar ());
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--mouse-position-hook",
+       Fc_mouse_position_hook,
+       Sc_mouse_position_hook, 1, 1, 0,
+       doc: /* Internal: call the FRAME terminal's mouse_position_hook
+   and return (BAR-WINDOW PART X Y TIME) — PART and TIME as fixnums.
+   Returns nil when FRAME is not a frame or the terminal has no such
+   hook (termcap builds).  Used by imp-4 mouse-motion synthesis.  */)
+  (Lisp_Object frame)
+{
+  if (!FRAMEP (frame))
+    return Qnil;
+  struct frame *f = XFRAME (frame);
+  Lisp_Object bar_window;
+  enum scroll_bar_part part;
+  Lisp_Object x, y;
+  Time t;
+  if (!FRAME_TERMINAL (f)->mouse_position_hook)
+    return Qnil;
+  (*FRAME_TERMINAL (f)->mouse_position_hook) (&f, 0, &bar_window, &part,
+					      &x, &y, &t);
+  return list5 (bar_window, make_fixnum (part), x, y, make_fixnum (t));
+}
+
+DEFUN ("--detect-conversion-events",
+       Fc_detect_conversion_events,
+       Sc_detect_conversion_events, 0, 0, 0,
+       doc: /* Internal: t when text-conversion events are pending
+   (detect_conversion_events ()), nil otherwise; nil on builds without
+   HAVE_TEXT_CONVERSION.  */)
+  (void)
+{
+#ifdef HAVE_TEXT_CONVERSION
+  return detect_conversion_events () ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--handle-pending-conversion-events",
+       Fc_handle_pending_conversion_events,
+       Sc_handle_pending_conversion_events, 0, 0, 0,
+       doc: /* Internal: process pending text-conversion events
+   (handle_pending_conversion_events ()).  Returns nil; no-op on
+   builds without HAVE_TEXT_CONVERSION.  */)
+  (void)
+{
+#ifdef HAVE_TEXT_CONVERSION
+  handle_pending_conversion_events ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--conversion-disabled-p",
+       Fc_conversion_disabled_p,
+       Sc_conversion_disabled_p, 0, 0, 0,
+       doc: /* Internal: t when text conversion is disabled
+   (conversion_disabled_p ()), nil otherwise; nil on builds without
+   HAVE_TEXT_CONVERSION.  */)
+  (void)
+{
+#ifdef HAVE_TEXT_CONVERSION
+  return conversion_disabled_p () ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--unhold-keyboard-input",
+       Fc_unhold_keyboard_input,
+       Sc_unhold_keyboard_input, 0, 0, 0,
+       doc: /* Internal: resume accepting keyboard input after it was
+   held (unhold_keyboard_input ()).  Returns nil; no-op on builds
+   without subprocesses.  */)
+  (void)
+{
+#ifdef subprocesses
+  unhold_keyboard_input ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--kbd-on-hold-p",
+       Fc_kbd_on_hold_p,
+       Sc_kbd_on_hold_p, 0, 0, 0,
+       doc: /* Internal: t when keyboard input is currently held
+   (kbd_on_hold_p ()), nil otherwise; nil on builds without
+   subprocesses.  imp-2a unholds when the queue drains below a quarter
+   of KBD_BUFFER_SIZE.  */)
+  (void)
+{
+#ifdef subprocesses
+  return kbd_on_hold_p () ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--x-detect-pending-selection-requests",
+       Fc_x_detect_pending_selection_requests,
+       Sc_x_detect_pending_selection_requests, 0, 0, 0,
+       doc: /* Internal: t when X selection requests are pending
+   (x_detect_pending_selection_requests ()), nil otherwise; nil on
+   builds without HAVE_X_WINDOWS.  Called by the Scheme wait loop.  */)
+  (void)
+{
+#ifdef HAVE_X_WINDOWS
+  return x_detect_pending_selection_requests () ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--x-handle-pending-selection-requests",
+       Fc_x_handle_pending_selection_requests,
+       Sc_x_handle_pending_selection_requests, 0, 0, 0,
+       doc: /* Internal: process pending X selection requests
+   (x_handle_pending_selection_requests ()).  Returns nil; no-op on
+   builds without HAVE_X_WINDOWS.  Called by the Scheme wait loop
+   post-wait when --x-detect-pending-selection-requests was true.  */)
+  (void)
+{
+#ifdef HAVE_X_WINDOWS
+  x_handle_pending_selection_requests ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--rc-write-kbp",
+       Fc_rc_write_kbp,
+       Sc_rc_write_kbp, 1, 1, 0,
+       doc: /* Internal: write the KBOARD wrapped by KBOARD-SMOB back
+   through rc-record slot RC_SLOT_KBP.  That slot holds the
+   kbd_buffer_get_event local `kbp' (KBOARD **) wrapped as a foreign
+   pointer at shim entry (imp-5), exactly as used_mouse_menu / end_time
+   already round-trip (slots 3/4); Scheme writes the smob back here
+   after switching kboards.  Returns nil; a no-op when no read-char /
+   kbd-buffer call is in flight.  */)
+  (Lisp_Object kb)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  CHECK_KBOARD (kb);
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  KBOARD **kbp = (KBOARD **) rc_unwrap_ptr (rec, RC_SLOT_KBP);
+  if (kbp)
+    *kbp = XKBOARD (kb);
+  return Qnil;
+}
+
+DEFUN ("--gobble-input",
+       Fc_gobble_input,
+       Sc_gobble_input, 0, 0, 0,
+       doc: /* Internal: call gobble_input () and return the number of
+   events read as a fixnum (-1 when input is blocked).  Scheme calls it
+   for side effect only — the wait loop ignores the value.  */)
+  (void)
+{
+  return make_fixnum (gobble_input ());
+}
 
 static void
 process_special_events (void)
