@@ -586,7 +586,7 @@ LIBES = $(LIBS) $(GUILE_LIBS) $(W32_LIBS) $(LIBS_GNUSTEP) $(PGTK_LIBS) $(LIBX_BA
 ifneq ($(XCONFIGURE),android)
 $(lispsource)/international/charprop.el: \
   FORCE | ../src/temacs$(EXEEXT)
-	$(MAKE) -C ../admin/unidata all EMACS="../src/temacs$(EXEEXT)"
+	$(MAKE) -C ../admin/unidata all EMACS="../../src/temacs$(EXEEXT)"
 endif
 
 ## We require charprop.el to exist before ucs-normalize.el is
