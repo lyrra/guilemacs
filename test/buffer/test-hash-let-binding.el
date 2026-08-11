@@ -27,7 +27,8 @@
   (kill-buffer buf)
   (message "Test 1 PASS: let-binding reads/writes via hash"))
 
-;; Test 2: buffer-local hash diverges from struct during let-binding
+;; Test 2: buffer-local hash stays in sync with struct during let-binding
+;; (write-through to the C slot mirror; see buffer-local-let-set!)
 (let ((buf (get-buffer-create "p4-test2")))
   (with-current-buffer buf
     (setq-local fill-column 42)
@@ -36,16 +37,16 @@
       (unless (= m 0)
         (error "Test 2a FAIL: expected 0 mismatches before let, got %d" m)))
     (let ((fill-column 99))
-      ;; During let: hash has 99, struct has 42 -> mismatch expected
+      ;; During let: hash AND struct both have 99 -> in sync
       (let ((m (validate-buffer-local-hash buf)))
-        (unless (> m 0)
-          (error "Test 2b FAIL: expected mismatches during let, got %d" m))))
+        (unless (= m 0)
+          (error "Test 2b FAIL: expected 0 mismatches during let, got %d" m))))
     ;; After let: should be back in sync
     (let ((m (validate-buffer-local-hash buf)))
       (unless (= m 0)
         (error "Test 2c FAIL: expected 0 mismatches after let, got %d" m))))
   (kill-buffer buf)
-  (message "Test 2 PASS: hash/struct diverge during let, sync after"))
+  (message "Test 2 PASS: hash/struct in sync during and after let"))
 
 ;; Test 3: buffer-local-hash returns the hash table object
 (let ((buf (get-buffer-create "p4-test3")))
@@ -208,3 +209,24 @@
   (message "Test 11 PASS: 50 buffers let-binding stress test"))
 
 (message "All Phase 4 tests passed!")
+
+;; Test 12: regression - let-bound DEFVAR_PER_BUFFER value survives
+;; kill-all-local-variables (custom-make-dependencies / cus-load.el bug)
+(let ((buf (get-buffer-create "p4-kill-let")))
+  (with-current-buffer buf
+    (let ((default-directory "/definitely/not/a/real/dir/"))
+      (kill-all-local-variables)
+      (unless (equal default-directory "/definitely/not/a/real/dir/")
+        (error "Test 12a FAIL: let-bound default-directory lost after kill, got %S"
+               default-directory))))
+  (kill-buffer buf)
+  (message "Test 12 PASS: let-bound default-directory survives kill-all-local-variables"))
+
+;; Test 13: regression - let body killing its own buffer must not error on unwind
+(let ((buf (get-buffer-create "p4-kill-body")))
+  (condition-case nil
+      (with-current-buffer buf
+        (let ((default-directory "/definitely/not/a/real/dir/"))
+          (kill-buffer (current-buffer))))
+    (error (error "Test 13 FAIL: killing bind buffer inside let errored on unwind")))
+  (message "Test 13 PASS: killed bind buffer inside let unwinds cleanly"))

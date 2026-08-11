@@ -487,6 +487,63 @@ value-slot-module, function-slot-module, or plist-slot-module."
   "Set SYM's value in BUF's per-buffer hash table."
   (hashq-set! ((buffer-local-hash-fn) buf) sym val))
 
+;; True if SYMBOL is a C per-buffer slot variable (DEFVAR_PER_BUFFER,
+;; i.e. SYMBOL_FORWARDED with a BUFFER_OBJFWD forward).  These have a C
+;; slot mirror in struct buffer that `populate_buffer_local_hash'
+;; re-reads after `kill-all-local-variables', so let-bindings must keep
+;; that mirror in sync (see buffer-local-let-set!).  Note this also
+;; matches kboard forwards (redirect 3, non-simple); harmless, since
+;; only DEFVAR_PER_BUFFER slots land in the per-buffer hash.
+(define (per-buffer-forwarded? sym)
+  (and (= (vector-ref (symbol-desc sym) 1) 3)  ; SYMBOL_FORWARDED
+       (not (symbol-simple-forward-p sym))))
+
+;; Lazily-cached handle for buffer-live-p.
+(define %buffer-live-p-fn #f)
+(define (buffer-live-p buf)
+  (let ((fn (or %buffer-live-p-fn
+                (let ((f (symbol-function 'buffer-live-p)))
+                  (set! %buffer-live-p-fn f)
+                  f))))
+    (not (eq? #nil (fn buf)))))
+
+;; Lazily-cached handle for current-buffer.
+(define %current-buffer-fn #f)
+(define (current-buffer-fn)
+  (or %current-buffer-fn
+      (let ((f (symbol-function 'current-buffer)))
+        (set! %current-buffer-fn f)
+        f)))
+
+(define (buffer-local-let-set! hash buffer symbol value)
+  "Write a let-bound buffer-local value, keeping both stores consistent.
+HASH is the bind-time buffer's per-buffer hash; BUFFER the bind-time
+buffer; SYMBOL the variable being bound.
+
+For C per-buffer slot variables (DEFVAR_PER_BUFFER, e.g.
+`default-directory'), write through the C `set' path so the C slot
+mirror is updated too: `kill-all-local-variables' re-populates the
+per-buffer hash from those C slots (populate_buffer_local_hash), and
+vanilla's reset_buffer_local_variables skips idx == -1 slots such as
+default-directory, so the let-bound value must live in the slot to
+survive a kill-all-local-variables in the body.  (`set-symbol-value!'
+reaches C `set' after emacs! replaces the pure-Scheme version.)
+
+If the bind-time buffer was killed inside the body, skip the C slot
+write and fall back to the hash only (mirroring vanilla's
+\"If restoring in a dead buffer, do nothing\"; the old hashq-set!
+path was immune to killed buffers).
+
+For hash-only locals (make-local-variable), the hash is the store."
+  (if (and (per-buffer-forwarded? symbol)
+           (buffer-live-p buffer))
+      (let* ((set-buffer-fn (symbol-function 'set-buffer))
+             (save ((current-buffer-fn))))
+        (set-buffer-fn buffer)
+        (set-symbol-value! symbol value)
+        (set-buffer-fn save))
+      (hashq-set! hash symbol value)))
+
 ;; bind-symbol: dynamically bind SYMBOL to VALUE during THUNK.
 ;;
 ;; Four paths (conditional is inside the winder/unwinder so THUNK
@@ -537,6 +594,9 @@ value-slot-module, function-slot-module, or plist-slot-module."
                             (not buf-local?)
                             (not has-local?)
                             (local-variable-if-set-p symbol)))
+         ;; Bind-time buffer: needed to keep the C slot mirror in sync
+         ;; for DEFVAR_PER_BUFFER variables (see buffer-local-let-set!).
+         (buf (and (not fast) ((current-buffer-fn))))
          (old (cond
                 (fast         (vector-ref desc 4))
                 (buf-local?   hash-val)
@@ -553,7 +613,7 @@ value-slot-module, function-slot-module, or plist-slot-module."
         (push-binding! symbol old kind #f)
         (cond
           (fast         (vector-set! desc 4 value))
-          (buf-local?   (hashq-set! hash symbol value))
+          (buf-local?   (buffer-local-let-set! hash buf symbol value))
           (let-default? ((set-default-fn) symbol value))
           (else         (set-symbol-value! symbol value))))
       thunk
@@ -579,7 +639,7 @@ value-slot-module, function-slot-module, or plist-slot-module."
             (fast
              ;; Was PLAINVAL at bind-time but changed since.
              ((set-default-fn) symbol restore-val))
-            (buf-local?   (hashq-set! hash symbol restore-val))
+            (buf-local?   (buffer-local-let-set! hash buf symbol restore-val))
             (let-default? ((set-default-fn) symbol restore-val))
             (else         (set-symbol-value! symbol restore-val))))))))
 
@@ -594,6 +654,7 @@ value-slot-module, function-slot-module, or plist-slot-module."
 ;; [3] symbol
 ;; [4] buf-local? flag
 ;; [5] let-default? flag
+;; [6] bind-time buffer (for C slot mirror sync, see buffer-local-let-set!)
 
 (define (prepare-complex-binding symbol)
   "Prepare for binding a complex (buffer-local, kboard, etc.) variable.
@@ -614,7 +675,8 @@ Called before dynamic-wind; captures current buffer's hash table."
          (kind (cond (buf-local?   1)
                      (let-default? 2)
                      (else         0))))
-    (vector old kind hash symbol buf-local? let-default?)))
+    (vector old kind hash symbol buf-local? let-default?
+            ((current-buffer-fn)))))
 
 (define (do-complex-bind ctx value)
   "Set new value using context from prepare-complex-binding.
@@ -623,13 +685,14 @@ Called as dynamic-wind winder."
         (buf-local? (vector-ref ctx 4))
         (let-default? (vector-ref ctx 5))
         (hash (vector-ref ctx 2))
+        (buf (vector-ref ctx 6))
         (old (vector-ref ctx 0))
         (kind (vector-ref ctx 1)))
     ;; Track in Scheme binding registry (Phase 4: C specpdl removed)
     (push-binding! symbol old kind #f)
     ;; Set new value via appropriate path
     (cond
-      (buf-local?   (hashq-set! hash symbol value))
+      (buf-local?   (buffer-local-let-set! hash buf symbol value))
       (let-default? ((set-default-fn) symbol value))
       (else         (set-symbol-value! symbol value)))))
 
@@ -640,6 +703,7 @@ Called as dynamic-wind unwinder."
         (buf-local? (vector-ref ctx 4))
         (let-default? (vector-ref ctx 5))
         (hash (vector-ref ctx 2))
+        (buf (vector-ref ctx 6))
         (ctx-old (vector-ref ctx 0)))
     ;; Pop binding and get the old value from registry (Phase 4: C specpdl removed).
     ;; This allows set-default-toplevel-value to modify the old value
@@ -648,7 +712,7 @@ Called as dynamic-wind unwinder."
            (restore-val (if entry (vector-ref entry 1) ctx-old)))
       ;; Restore old value via appropriate path
       (cond
-        (buf-local?   (hashq-set! hash symbol restore-val))
+        (buf-local?   (buffer-local-let-set! hash buf symbol restore-val))
         (let-default? ((set-default-fn) symbol restore-val))
         (else         (set-symbol-value! symbol restore-val))))))
 
