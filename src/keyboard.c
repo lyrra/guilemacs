@@ -5739,6 +5739,38 @@ DEFUN ("--rc-write-kbp",
   return Qnil;
 }
 
+/* M11 imp-1.3 — test-only storage for the --rc-write-kbp round-trip.
+   kbd_buffer_get_event's `kbp' (KBOARD **) lives in the caller's
+   stack frame, which a Scheme test cannot allocate; this static
+   provides writable storage so the depth > 0 write-through path is
+   observable from Scheme.  Initialised to NULL — the corpus asserts
+   nil before the write and the written kboard after, proving the
+   write-through happened (see test/keyboard/test-kbd-escape-shims.scm).  */
+
+static KBOARD *rc_test_kbp_storage;
+
+DEFUN ("--rc-test-kbp-storage-ptr",
+       Fc_rc_test_kbp_storage_ptr,
+       Sc_rc_test_kbp_storage_ptr, 0, 0, 0,
+       doc: /* Internal test helper: return a foreign pointer to the
+   KBOARD ** backing the --rc-write-kbp round-trip test, for storing
+   in an rc-record's RC_SLOT_KBP slot.  */)
+  (void)
+{
+  return rc_wrap_ptr (&rc_test_kbp_storage);
+}
+
+DEFUN ("--rc-test-kbp-storage-value",
+       Fc_rc_test_kbp_storage_value,
+       Sc_rc_test_kbp_storage_value, 0, 0, 0,
+       doc: /* Internal test helper: return the KBOARD currently
+   pointed at by the --rc-write-kbp round-trip storage as a kboard
+   smob (nil when NULL).  */)
+  (void)
+{
+  return rc_test_kbp_storage ? make_kboard_smob (rc_test_kbp_storage) : Qnil;
+}
+
 DEFUN ("--gobble-input",
        Fc_gobble_input,
        Sc_gobble_input, 0, 0, 0,

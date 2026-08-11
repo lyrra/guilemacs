@@ -88,13 +88,18 @@
 ;;;;   reread           — true when re-reading from unread-events.
 ;;;;   orig-kboard      — current_kboard snapshot at entry (for
 ;;;;                      detecting kboard switches mid-read).
+;;;;   kbp              — kbd_buffer_get_event's `kbp' (KBOARD **),
+;;;;                      wrapped as a foreign pointer at shim entry
+;;;;                      (M11 imp-1.3 / imp-5), written back via
+;;;;                      --rc-write-kbp.  #nil outside a kbd-buffer
+;;;;                      call.
 
 (define-record-type <rc-state>
   (%make-rc-state commandflag map prev-event used-mouse-menu end-time
                   c local-tag
                   previous-echo-area-message also-record
                   recorded reread
-                  orig-kboard)
+                  orig-kboard kbp)
   rc-state?
   (commandflag       rc-state-commandflag       set-rc-state-commandflag!)
   (map               rc-state-map               set-rc-state-map!)
@@ -109,7 +114,8 @@
   (also-record       rc-state-also-record       set-rc-state-also-record!)
   (recorded          rc-state-recorded          set-rc-state-recorded!)
   (reread            rc-state-reread            set-rc-state-reread!)
-  (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!))
+  (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!)
+  (kbp               rc-state-kbp               set-rc-state-kbp!))
 
 (define (make-rc-state)
   "Create a fresh rc-state with C-struct defaults (everything nil
@@ -127,7 +133,8 @@ explicit zeroing in src/keyboard.c."
    #nil   ; also-record
    #nil   ; recorded (bool)
    #nil   ; reread (bool)
-   #nil)) ; orig-kboard
+   #nil   ; orig-kboard
+   #nil)) ; kbp (foreign-ptr or #nil; kbd_buffer_get_event only)
 
 (define (read-char-init-state commandflag map prev-event
                               used-mouse-menu end-time orig-kboard)
@@ -145,7 +152,8 @@ already wrapped as Guile foreign-pointer SCMs (or nil)."
                               #nil          ; also-record
                               #nil          ; recorded
                               #nil          ; reread
-                              orig-kboard)))
+                              orig-kboard
+                              #nil)))       ; kbp (kbd_buffer_get_event only)
     (cons rec tag)))
 
 (define %rc-record-stack-push (delay (%c '--rc-record-stack-push)))
@@ -196,7 +204,8 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-also-record!                state #nil)
   (set-rc-state-recorded!                   state #nil)
   (set-rc-state-reread!                     state #nil)
-  (set-rc-state-orig-kboard!                state #nil))
+  (set-rc-state-orig-kboard!                state #nil)
+  (set-rc-state-kbp!                        state #nil))
 
 ;; Internal test harness: srfi-9 accessors are not elisp-callable in
 ;; this build, so branch tests go through these narrow field helpers.
@@ -214,6 +223,7 @@ test setup when the same rc-state is reused across calls."
     ((recorded)                   (rc-state-recorded rec))
     ((reread)                     (rc-state-reread rec))
     ((orig-kboard)                (rc-state-orig-kboard rec))
+    ((kbp)                        (rc-state-kbp rec))
     (else ((%c 'error) "Unknown rc-state test field: %S" field))))
 
 (define (%rc-test-state-set! rec field value)
@@ -230,6 +240,7 @@ test setup when the same rc-state is reused across calls."
     ((recorded)                   (set-rc-state-recorded! rec value))
     ((reread)                     (set-rc-state-reread! rec value))
     ((orig-kboard)                (set-rc-state-orig-kboard! rec value))
+    ((kbp)                        (set-rc-state-kbp! rec value))
     (else ((%c 'error) "Unknown rc-state test field: %S" field)))
   #nil)
 
