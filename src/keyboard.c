@@ -5782,6 +5782,119 @@ DEFUN ("--gobble-input",
   return make_fixnum (gobble_input ());
 }
 
+/* M11 imp-2 — additions beyond the imp-1.3 inventory (recorded in
+   docs/m11-plan.org §imp-2): the timed-branch deadline helper, the
+   untimed-branch tty-menu display gate, the imp-1.4 queue-stuffing
+   helper pulled forward, and the test-only end-time storage pointers.  */
+
+DEFUN ("--rc-end-time-remaining",
+       Fc_rc_end_time_remaining,
+       Sc_rc_end_time_remaining, 0, 0, 0,
+       doc: /* Internal: return (SEC . NSEC), the fixnum seconds and
+   nanoseconds remaining until the top-of-stack rec's end-time deadline
+   (timespec_sub (*END_TIME, current_timespec ())).  Returns nil when
+   no rec is current, its end-time slot is nil, or the deadline has
+   already passed.  The caller checks --rc-end-time-expired-p first, so
+   SEC > 0 here; the WAIT_READING_MAX clamp lives inside
+   --wait-reading-process-output (Scheme passes raw seconds).  */)
+  (void)
+{
+  if (rc_state_depth == 0)
+    return Qnil;
+  SCM rec = rc_record_stack[rc_state_depth - 1];
+  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
+  if (!end_time)
+    return Qnil;
+  struct timespec now = current_timespec ();
+  if (timespec_cmp (*end_time, now) <= 0)
+    return Qnil;
+  struct timespec duration = timespec_sub (*end_time, now);
+  return Fcons (make_fixnum (duration.tv_sec), make_fixnum (duration.tv_nsec));
+}
+
+DEFUN ("--kbd-wait-do-display-p",
+       Fc_kbd_wait_do_display_p,
+       Sc_kbd_wait_do_display_p, 0, 0, 0,
+       doc: /* Internal: t when the wait loop may redisplay while
+   waiting for input (the DO_DISPLAY argument of
+   --wait-reading-process-output in kbd_buffer_get_event's untimed
+   branch).  Returns nil only when the selected frame is a termcap
+   frame whose TTY is showing a menu — the exact C condition
+   !(FRAME_TERMCAP_P (SELECTED_FRAME ()) && CURTTY ()->showing_menu).
+   Non-termcap builds always return t.  */)
+  (void)
+{
+  return (FRAME_TERMCAP_P (SELECTED_FRAME ()) && CURTTY ()->showing_menu)
+    ? Qnil : Qt;
+}
+
+DEFUN ("--kbd-buffer-store-fake-event",
+       Fc_kbd_buffer_store_fake_event,
+       Sc_kbd_buffer_store_fake_event, 1, 2, 0,
+       doc: /* Internal test helper: store a synthetic event of KIND at
+   kbd_store_ptr, bypassing kbd_buffer_store_event's signal path (no
+   SIGIO handlers, no hold/quit special-casing).  KIND is a fixnum
+   event_kind (see enum event_kind in src/termhooks.h); optional ARG is
+   stored in the event's arg field (default nil).  code/modifiers/
+   part/x/y/timestamp are zeroed; frame_or_window defaults to the
+   selected frame; device to Qt.  Returns nil, or nil with no store
+   when the buffer is full (the last slot is never filled).  Only for
+   imp-2/imp-6 queue-exit and round-trip tests — not production API.  */)
+  (Lisp_Object kind, Lisp_Object arg)
+{
+  CHECK_FIXNUM (kind);
+  union buffered_input_event *next_slot = next_kbd_event (kbd_store_ptr);
+  if (kbd_fetch_ptr == next_slot)
+    return Qnil;              /* buffer full — discard, like C.  */
+  union buffered_input_event ev;
+  memset (&ev, 0, sizeof ev);
+  ev.ie.kind = (enum event_kind) XFIXNUM (kind);
+  ev.ie.frame_or_window = selected_frame;
+  ev.ie.arg = NILP (arg) ? Qnil : arg;
+  ev.ie.device = Qt;
+  *kbd_store_ptr = ev;
+  kbd_store_ptr = next_slot;
+  return Qnil;
+}
+
+/* M11 imp-2 — test-only end-time storage pointers for the timed
+   branch.  Mirror the --rc-test-kbp-storage-ptr pattern: a static
+   timespec whose address is handed to Scheme as a foreign pointer to
+   store in an rc-record's RC_SLOT_END_TIME slot.  The expired one is
+   initialised to the epoch (always <= now), so the wait loop's
+   "expired → return nil, no sleep" arm is testable without blocking;
+   the far-future one (year ~2038) exercises the (SEC . NSEC) shape
+   without tripping the expired arm.  */
+
+static struct timespec rc_test_expired_end_time = { 0, 0 };
+static struct timespec rc_test_far_future_end_time = { (time_t) 0x7fffffff, 0 };
+
+DEFUN ("--rc-test-expired-end-time-ptr",
+       Fc_rc_test_expired_end_time_ptr,
+       Sc_rc_test_expired_end_time_ptr, 0, 0, 0,
+       doc: /* Internal test helper: return a foreign pointer to a
+   static timespec initialised to {0, 0} (the epoch — always already
+   expired), for storing in an rc-record's end-time slot to exercise
+   the timed wait-loop branch's expired arm without sleeping.  */)
+  (void)
+{
+  return rc_wrap_ptr (&rc_test_expired_end_time);
+}
+
+DEFUN ("--rc-test-far-future-end-time-ptr",
+       Fc_rc_test_far_future_end_time_ptr,
+       Sc_rc_test_far_future_end_time_ptr, 0, 0, 0,
+       doc: /* Internal test helper: return a foreign pointer to a
+   static timespec in the far future (tv_sec = INT32_MAX), for
+   storing in an rc-record's end-time slot to check the
+   --rc-end-time-remaining (SEC . NSEC) shape.  Do NOT call
+   kbd-buffer-get-event with this pointer — the untimed-wait would
+   sleep until year 2038.  */)
+  (void)
+{
+  return rc_wrap_ptr (&rc_test_far_future_end_time);
+}
+
 static void
 process_special_events (void)
 {

@@ -6,6 +6,10 @@
   #:export (;; M8a — data substrate
             make-rc-state rc-state?
             rc-state-fresh!
+            ;; kbp / end-time slot accessors — imported by (emacs
+            ;; kbd-buffer) for the imp-2 entry-sync (M11 imp-2).
+            rc-state-kbp set-rc-state-kbp!
+            rc-state-end-time set-rc-state-end-time!
             read-char-init-state
             read-char-entry
             ;; M8c — read_char_1 splices
