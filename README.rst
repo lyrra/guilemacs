@@ -7,12 +7,17 @@ Some additional work is also done. More info on this is needed.
 Branch information
 ==================
 
-* main
+* main-2024
 
-  Use this branch if you want to try it out!
+  Use this branch if you want to try it out! See the README.org in that branch for instructions.
   This branch has the latest effort of Guile-Emacs.
 
   This branch is just a pointer to the most recent rebase branch.
+
+
+* main
+
+  old main branch, going to swap with main-2024 soon.
 
   Currently this branch tracks branch e28.2
 
