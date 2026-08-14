@@ -212,14 +212,19 @@
 
 ;; Stuff one event via --kbd-buffer-store-fake-event (imp-1.4, pulled
 ;; forward into imp-2 prep), then the loop breaks on fetch ≠ store at
-;; the first check and reaches the imp-3 dispatch seam, which throws
-;; not-implemented.  The event is NOT dequeued (dequeue is imp-3's
-;; job), so fetch ≠ store still holds after the throw.
+;; the first check and reaches the imp-3 dispatch.  An ASCII keystroke
+;; is NOT a pass-through kind — it goes through default-path!
+;; (switch-frame check + device tracking + make-lispy-event + cleanup),
+;; which returns the char code 0 here and advances the fetch ptr,
+;; draining the queue.  (A fuller dispatch test corpus lands with
+;; test-kbd-dispatch; this only keeps §6 honest now that the stub
+;; throws are gone.)
 (with-noninteractive-nil
   (lambda ()
     (set-symbol-value! 'unread-command-events #nil)
     ;; ASCII_KEYSTROKE_EVENT = 1 (enum event_kind, src/termhooks.h —
-    ;; stable, precedes the #ifdef'd entries).
+    ;; stable, precedes the #ifdef'd entries).  code/modifiers are
+    ;; zeroed by the store helper, so the event is the char code 0.
     ((%sym '--kbd-buffer-store-fake-event) 1 'fake-arg)
     (check "queue-exit/queue-nonempty" #t
            (not (= ((%sym '--kbd-fetch-ptr-index))
@@ -227,12 +232,11 @@
     (let ((r (catch 'not-implemented
                (lambda () (kbd-buffer-get-event #nil #nil #nil))
                (lambda (k . args) (cons k args)))))
-      (check "queue-exit/dispatch-seam-throws" 'not-implemented (car r))
-      (check "queue-exit/dispatch-seam-message" "imp-3/imp-4"
-             (if (pair? (cdr r)) (cadr r) #nil)))
-    (check "queue-exit/event-not-dequeued" #t
-           (not (= ((%sym '--kbd-fetch-ptr-index))
-                   ((%sym '--kbd-store-ptr-index)))))))
+      (check "queue-exit/dispatch-no-throw" #t (not (pair? r)))
+      (check "queue-exit/dispatch-returns-event" 0 r))
+    (check "queue-exit/event-dequeued" #t
+           (= ((%sym '--kbd-fetch-ptr-index))
+              ((%sym '--kbd-store-ptr-index))))))
 
 ;;; --- 7. --rc-end-time-remaining shape ---------------------------------
 

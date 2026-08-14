@@ -86,6 +86,7 @@
   "test/keyboard/ertest-read-key-sequence.el" ; M6a
   "test/keyboard/ertest-read-char.el"         ; M8a
   "test/keyboard/test-kbd-wait-loop.el"       ; M11 imp-2 (corpus prints PASS/FAIL)
+  "test/keyboard/test-kbd-dispatch.el"        ; M11 imp-3 (corpus prints PASS/FAIL)
   )
 (group
   "test/src/eval-tests.el"

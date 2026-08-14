@@ -304,6 +304,14 @@ bool input_was_pending;
 
 /* Circular buffer for pre-read keyboard input.  */
 
+/* FIX-20260814-guilemacs: the Scheme imp-3 dispatch port
+   (mod/emacs/kbd-buffer.scm dispatch-event!) mutates event->ie.arg in
+   place (elisp setcar) during pinch coalescing while the event is in
+   the queue.  Safe: kbd_buffer is a C global, so the conservative GC
+   (Fgarbage_collect → GC_gcollect, alloc.c) treats the whole array as
+   a root and the Lisp_Objects inside it stay reachable — the same
+   guarantee mark_kboards used to provide before the emacs mark-and-
+   sweep GC was retired.  */
 union buffered_input_event kbd_buffer[KBD_BUFFER_SIZE];
 
 /* Pointer to next available character in kbd_buffer.
@@ -1059,6 +1067,49 @@ value (e.g. via `logior' in Scheme).  Returns VAL.  */)
   return val;
 }
 
+DEFUN ("--set-ie-arg", Fset_ie_arg, Sset_ie_arg, 2, 2, 0,
+       doc: /* Set the arg field of input-event handle IE to VAL.
+
+Plain write; the caller is responsible for the value's lifetime (the
+multibyte-decode path wraps the decoded string in a fresh cons).  Used
+by the imp-3 dispatch port to install `(0 . DECODED)' into the queue
+entry.  Returns VAL.  */)
+  (Lisp_Object ie, Lisp_Object val)
+{
+  CHECK_IE (ie);
+  XIE (ie)->arg = val;
+  return val;
+}
+
+DEFUN ("--set-ie-code", Fset_ie_code, Sset_ie_code, 2, 2, 0,
+       doc: /* Set the code field of input-event handle IE to VAL.
+
+Used by the multibyte-incremental path of the imp-3 dispatch port to
+install the next character code.  Unsigned int ← fixnum.  Returns
+VAL.  */)
+  (Lisp_Object ie, Lisp_Object val)
+{
+  CHECK_IE (ie);
+  CHECK_FIXNAT (val);
+  XIE (ie)->code = XFIXNUM (val);
+  return val;
+}
+
+DEFUN ("--set-ie-frame-or-window", Fset_ie_frame_or_window,
+       Sset_ie_frame_or_window, 2, 2, 0,
+       doc: /* Set the frame_or_window field of input-event handle IE to VAL.
+
+Plain write; used by the imp-3 dispatch unit tests to fabricate a
+switch-frame source or a non-live pinch frame, since the test-only
+--kbd-buffer-store-fake-event always stores the selected frame.  Returns
+VAL.  */)
+  (Lisp_Object ie, Lisp_Object val)
+{
+  CHECK_IE (ie);
+  XIE (ie)->frame_or_window = val;
+  return val;
+}
+
 DEFUN ("--ie-clear", Fie_clear, Sie_clear, 1, 1, 0,
        doc: /* Clear input-event handle IE by setting kind = NO_EVENT.
 
@@ -1180,6 +1231,21 @@ without hard-coding enum values in Scheme.  Each event symbol
     return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
 #endif
 
+  /* Swallowed kinds — imp-3 dispatch switch (never produce a Lisp
+     event: handled and looped back to wait).  */
+  if (EQ (name, Qselection_request_event))
+    return make_fixnum (SELECTION_REQUEST_EVENT);
+  if (EQ (name, Qselection_clear_event))
+    return make_fixnum (SELECTION_CLEAR_EVENT);
+  if (EQ (name, Qmonitors_changed))
+    return make_fixnum (MONITORS_CHANGED_EVENT);
+  if (EQ (name, Qmenu_bar_activate_event))
+    return make_fixnum (MENU_BAR_ACTIVATE_EVENT);
+#ifdef HAVE_ANDROID
+  if (EQ (name, Qnotification_event))
+    return make_fixnum (NOTIFICATION_EVENT);
+#endif
+
   /* More entries added as additional kind groups are ported.  */
   return make_fixnum (-1);
 }
@@ -1268,7 +1334,7 @@ DEFUN ("--kbd-advance-fetch-ptr", Fkbd_advance_fetch_ptr, Skbd_advance_fetch_ptr
 
 Equivalent to `kbd_fetch_ptr = next_kbd_event(kbd_fetch_ptr)'.
 Does NOT update input_pending — the C code sets it at the end of
-kbd_buffer_get_event via readable_events() (keyboard.c:5294), which is
+kbd_buffer_get_event via readable_events() (keyboard.c:5542), which is
 a heavier check than pointer comparison.  Scheme queries input_pending
 via --get-input-pending when needed.  Returns nil.
 
@@ -1277,6 +1343,22 @@ extracted and dropped — this may overwrite the slot with new input.  */)
   (void)
 {
   kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+  return Qnil;
+}
+
+DEFUN ("--update-input-pending", Fupdate_input_pending,
+       Supdate_input_pending, 0, 0, 0,
+       doc: /* Recompute the C global `input_pending' via readable_events (0).
+
+Mirrors the `input_pending = readable_events (0)' statement the C
+switch executes after advancing past a swallowed event kind
+(keyboard.c:5207/5230/5239/5252/5263).  --kbd-advance-fetch-ptr does
+NOT do this (see its docstring), so the imp-3 dispatch port calls this
+after advancing for the swallowed kinds whose C handlers update
+input_pending.  Returns nil.  */)
+  (void)
+{
+  input_pending = readable_events (0);
   return Qnil;
 }
 
@@ -5537,6 +5619,19 @@ DEFUN ("--wait-reading-process-output",
 			       !NILP (do_display),
 			       Qnil, NULL, 0);
   return Qnil;
+}
+
+DEFUN ("--frame-focus-frame", Fc_frame_focus_frame, Sc_frame_focus_frame, 1, 1, 0,
+       doc: /* Internal: return the focus-frame of FRAME, or nil.
+
+Wraps FRAME_FOCUS_FRAME (f->focus_frame).  Returns nil when FRAME is
+not a frame, so the imp-3 switch-frame synthesis can pass event
+frame_or_window values through without XFRAME aborts.  */)
+  (Lisp_Object frame)
+{
+  if (!FRAMEP (frame))
+    return Qnil;
+  return FRAME_FOCUS_FRAME (XFRAME (frame));
 }
 
 DEFUN ("--activate-menubar-hook",
@@ -14393,6 +14488,15 @@ See also `pre-command-hook'.  */);
   DEFSYM (Qpinch, "pinch");
   DEFSYM (Qdisplay_monitors_changed_functions,
 	  "display-monitors-changed-functions");
+
+  /* Event-kind keys for the imp-3 dispatch switch (--ie-kind-from-name).  */
+  DEFSYM (Qselection_request_event, "selection-request-event");
+  DEFSYM (Qselection_clear_event, "selection-clear-event");
+  DEFSYM (Qmonitors_changed, "monitors-changed");
+  DEFSYM (Qmenu_bar_activate_event, "menu-bar-activate-event");
+#ifdef HAVE_ANDROID
+  DEFSYM (Qnotification_event, "notification-event");
+#endif
 
   DEFSYM (Qcoding, "coding");
   DEFSYM (Qtouchscreen, "touchscreen");

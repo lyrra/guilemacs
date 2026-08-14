@@ -1,10 +1,12 @@
-;;; kbd-buffer.scm --- M11 imp-2: Scheme wait-loop port (kbd_buffer_get_event)
+;;; kbd-buffer.scm --- M11 imp-2/imp-3: Scheme wait-loop + event-kind
+;;;                    dispatch port (kbd_buffer_get_event)
 ;;;
-;;; Ports the prelude + for(;;) wait loop + post-wait prologue of C
-;;; kbd_buffer_get_event (src/keyboard.c:4965-5127) as the entry
+;;; Ports the prelude + for(;;) wait loop + post-wait prologue (imp-2)
+;;; and the switch (event->kind) dispatch block (imp-3) of C
+;;; kbd_buffer_get_event (src/keyboard.c:5016-5547) as the entry
 ;;; procedure `kbd-buffer-get-event'.  Pure transliteration — no
 ;;; algorithmic change; the C body stays callable until the imp-5
-;;; cutover.  See docs/m11-plan.org §imp-2.
+;;; cutover.  See docs/m11-plan.org §imp-2/§imp-3.
 ;;;
 ;;; Conventions (identical to M9/M10): defelisp delayed references for
 ;;; every C DEFUN ((force %--foo)); elisp variables via symbol-value /
@@ -12,11 +14,19 @@
 ;;; No module-level mutable state (Risk 3 — re-entrancy): every flag
 ;;; is a let-local of the single invocation; the only shared state is
 ;;; the C ring buffer itself.
+;;;
+;;; ie-smob lifetime (Risk 2 — hard rule): make-lispy-event invalidates
+;;; its ie-smob on return (the M9 shim NULLs SMOB_DATA), so any field
+;;; needed AFTER that call (kind, frame-or-window, arg, used-mouse-menu
+;;; classification) is extracted into a local BEFORE it.  Preamble
+;;; reads (switch-frame detection, pinch coalescing, multibyte decode)
+;;; may stay smob-sourced.
 
 (define-module (emacs kbd-buffer)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs read-char)      ; rc-state-kbp / set-rc-state-kbp! etc.
+  #:use-module (emacs lispy-event)    ; make-lispy-event (M9)
   #:declarative? #t
   #:export (kbd-buffer-get-event
             noninteractive-fast-path?))
@@ -27,6 +37,15 @@
 ;; is KBD_BUFFER_SIZE / 4 = 1024.  Hardcoded with a comment — there is
 ;; no DEFUN for it, and this silently diverges if C changes it.
 (define KBD-BUFFER-SIZE/4 1024)
+;; The full size — ring-buffer index arithmetic wraps modulo this
+;; (next_kbd_event, keyboard.c:409).
+(define KBD-BUFFER-SIZE 4096)
+
+;;; Virtual-core device names.  static Lisp_Object strings in C
+;;; (keyboard.c:13690-13691) with no DEFUN/DEFVAR — hardcoded here with
+;;; a comment; the values silently diverge only if C changes them.
+(define VIRTUAL-CORE-KEYBOARD-NAME "Virtual core keyboard")
+(define VIRTUAL-CORE-POINTER-NAME  "Virtual core pointer")
 
 ;;; --- C DEFUN references ---------------------------------------------
 
@@ -57,6 +76,44 @@
 (defelisp %daemonp                      daemonp)
 (defelisp %--daemon-not-yet-running-p   --daemon-not-yet-running-p)
 (defelisp %current-kboard               current-kboard)
+;; imp-3 — dispatch-switch infrastructure (see the DEFUN table in
+;; brief.org).  Kinds / ie accessors / advance points.
+(defelisp %--kbd-event-kind             --kbd-event-kind)
+(defelisp %--kbd-event-ie               --kbd-event-ie)
+(defelisp %--kbd-advance-fetch-ptr      --kbd-advance-fetch-ptr)
+(defelisp %--update-input-pending       --update-input-pending)
+(defelisp %--kbd-set-fetch-ptr-index    --kbd-set-fetch-ptr-index)
+(defelisp %--kbd-handle-selection-event --kbd-handle-selection-event)
+(defelisp %--activate-menubar-hook      --activate-menubar-hook)
+(defelisp %--kbd-decode-multibyte-string
+          --kbd-decode-multibyte-string)
+(defelisp %--rc-mark-used-mouse-menu-true --rc-mark-used-mouse-menu-true)
+(defelisp %--get-internal-last-event-frame
+          --get-internal-last-event-frame)
+(defelisp %--set-internal-last-event-frame
+          --set-internal-last-event-frame)
+(defelisp %--ie-kind                    --ie-kind)
+(defelisp %--ie-code                    --ie-code)
+(defelisp %--ie-modifiers               --ie-modifiers)
+(defelisp %--ie-arg                     --ie-arg)
+(defelisp %--ie-frame-or-window         --ie-frame-or-window)
+(defelisp %--ie-device                  --ie-device)
+(defelisp %--ie-clear                   --ie-clear)
+(defelisp %--set-ie-arg                 --set-ie-arg)
+(defelisp %--set-ie-code                --set-ie-code)
+(defelisp %--ie-kind-from-name          --ie-kind-from-name)
+(defelisp %--frame-focus-frame          --frame-focus-frame)
+;; Elisp primitives (Scheme-backed or C DEFUNs) via %c.
+(defelisp %setcar                       setcar)
+(defelisp %aref                         aref)
+(defelisp %length                       length)
+(defelisp %apply                        apply)
+(defelisp %stringp                      stringp)
+(defelisp %windowp                      windowp)
+(defelisp %window-frame                 window-frame)
+(defelisp %frame-live-p                 frame-live-p)
+(defelisp %selected-frame               selected-frame)
+(defelisp %run-hook-with-args           run-hook-with-args)
 
 ;;; --- Helpers ---------------------------------------------------------
 
@@ -67,7 +124,7 @@
 (define (noninteractive-fast-path?)
   "t when the C noninteractive/daemon fast path applies, i.e. the
 exact C boolean `noninteractive || (IS_DAEMON && DAEMON_RUNNING)'
-(keyboard.c:4991-4994).  Scheme gate for the
+(keyboard.c:5042-5045).  Scheme gate for the
 --kbd-noninteractive-getchar branch.  Note that a t here does NOT
 guarantee the fast path returns: --kbd-noninteractive-getchar returns
 nil (fall through to the wait loop) on builds compiled with DBus /
@@ -94,7 +151,7 @@ same pointers."
       (set-rc-state-end-time! rec end-time))))
 
 (define (prelude-unhold)
-  "C 4982-4987: start reading input again once the queue has drained
+  "C 5032-5039: start reading input again once the queue has drained
 below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 (--kbd-on-hold-p nil on builds without subprocesses)."
   (when (and (truthy? ((force %--kbd-on-hold-p)))
@@ -103,27 +160,344 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 
 ;;; --- imp-2 → imp-3/imp-4 seam ----------------------------------------
 
-;;; The C post-wait hands off to the event-kind dispatch switch (imp-3)
-;;; when the queue is non-empty, or mouse-motion synthesis (imp-4)
-;;; otherwise.  imp-2 leaves both as clearly-throwing stubs; imp-3/4
-;;; replace them in-module.  imp-2's tests never legitimately reach
-;;; them (a stuffed queue needs imp-1.4 — pulled forward — and the
-;;; dispatch itself needs imp-3), so the throws are honest and safe.
+;;; The C post-wait hands off to the event-kind dispatch switch (imp-3,
+;;; implemented below) when the queue is non-empty, or mouse-motion
+;;; synthesis (imp-4) otherwise.  imp-4 remains a clearly-throwing stub;
+;;; imp-2's tests never legitimately reach it.
+
+;;; --- Event-kind constants (imp-3) ------------------------------------
+
+;;; Event-kind integers via --ie-kind-from-name — the same mechanism
+;;; (emacs lispy-event) register-kind! uses.  Bound unconditionally:
+;;; kinds not compiled into C resolve to -1 and their case arms are
+;;; dead, matching the C #ifdef discipline (such kinds never reach the
+;;; buffer).  All immutable — no module-level mutable state (Risk 3).
+(define SELECTION-REQUEST-EVENT     ((force %--ie-kind-from-name) 'selection-request-event))
+(define SELECTION-CLEAR-EVENT       ((force %--ie-kind-from-name) 'selection-clear-event))
+(define MONITORS-CHANGED-EVENT      ((force %--ie-kind-from-name) 'monitors-changed))
+(define MENU-BAR-ACTIVATE-EVENT     ((force %--ie-kind-from-name) 'menu-bar-activate-event))
+(define NOTIFICATION-EVENT          ((force %--ie-kind-from-name) 'notification-event))
+(define NS-TEXT-EVENT               ((force %--ie-kind-from-name) 'ns-text-event))
+(define PREEDIT-TEXT-EVENT          ((force %--ie-kind-from-name) 'preedit-text))
+(define END-SESSION-EVENT           ((force %--ie-kind-from-name) 'end-session))
+(define LANGUAGE-CHANGE-EVENT       ((force %--ie-kind-from-name) 'language-change))
+(define DELETE-WINDOW-EVENT         ((force %--ie-kind-from-name) 'delete-frame))
+(define ICONIFY-EVENT               ((force %--ie-kind-from-name) 'iconify-frame))
+(define DEICONIFY-EVENT             ((force %--ie-kind-from-name) 'make-frame-visible))
+(define MOVE-FRAME-EVENT            ((force %--ie-kind-from-name) 'move-frame))
+(define FILE-NOTIFY-EVENT           ((force %--ie-kind-from-name) 'file-notify))
+(define DBUS-EVENT                  ((force %--ie-kind-from-name) 'dbus-event))
+(define THREAD-EVENT                ((force %--ie-kind-from-name) 'thread-event))
+(define XWIDGET-EVENT               ((force %--ie-kind-from-name) 'xwidget-event))
+(define XWIDGET-DISPLAY-EVENT       ((force %--ie-kind-from-name) 'xwidget-display-event))
+(define SAVE-SESSION-EVENT          ((force %--ie-kind-from-name) 'save-session))
+(define NO-EVENT                    ((force %--ie-kind-from-name) 'no-event))
+(define HELP-EVENT                  ((force %--ie-kind-from-name) 'help-echo))
+(define FOCUS-IN-EVENT              ((force %--ie-kind-from-name) 'focus-in))
+(define CONFIG-CHANGED-EVENT        ((force %--ie-kind-from-name) 'config-changed-event))
+(define FOCUS-OUT-EVENT             ((force %--ie-kind-from-name) 'focus-out))
+(define SELECT-WINDOW-EVENT         ((force %--ie-kind-from-name) 'select-window))
+(define ASCII-KEYSTROKE-EVENT       ((force %--ie-kind-from-name) 'ascii-keystroke))
+(define MULTIBYTE-CHAR-KEYSTROKE-EVENT
+  ((force %--ie-kind-from-name) 'multibyte-char-keystroke))
+(define NON-ASCII-KEYSTROKE-EVENT   ((force %--ie-kind-from-name) 'non-ascii-keystroke))
+(define PINCH-EVENT                 ((force %--ie-kind-from-name) 'pinch))
+(define MENU-BAR-EVENT              ((force %--ie-kind-from-name) 'menu-bar))
+(define TAB-BAR-EVENT               ((force %--ie-kind-from-name) 'tab-bar))
+(define TOOL-BAR-EVENT              ((force %--ie-kind-from-name) 'tool-bar))
+(define NS-NONKEY-EVENT             ((force %--ie-kind-from-name) 'ns-nonkey))
+
+;;; --- imp-3 helpers ----------------------------------------------------
+
+(define (elisp-t? x)
+  "t when X is elisp t (C EQ (x, Qt)).  The runtime bridges Qt to
+Scheme #t; the defensive 't check mirrors buffer-locals.scm:358."
+  (or (eq? x #t) (eq? x 't)))
+
+(define (fmod x y)
+  "C fmod (libm): X - Y*trunc (X/Y) — the remainder with the sign of X.
+Guile/elisp `mod' differ on negative angles (euclidean), so compute
+fmod directly.  Used for the pinch-angle wrap (C:5398)."
+  (- x (* y (truncate (/ x y)))))
+
+;;; --- dispatch-event! (imp-3) -----------------------------------------
 
 (define (dispatch-event!)
-  "imp-3 seam: the switch (event->kind) dispatch of
-kbd_buffer_get_event.  Not implemented in imp-2."
-  (throw 'not-implemented "imp-3/imp-4"))
+  "Port of the C switch (event->kind) dispatch block of
+kbd_buffer_get_event (src/keyboard.c:5195-5480).  Reads the event at
+the current fetch index — peek, not dequeue: the C does not advance
+uniformly (switch-frame and unfinished multibyte-incremental leave the
+event in the queue; pinch jumps past a whole run), so the fetch ptr is
+advanced explicitly at exactly the C advance points.  Returns the Lisp
+event, or 'wait to re-enter the wait loop for swallowed kinds.  The
+caller (kbd-buffer-get-event) guarantees a non-empty queue."
+  (let* ((rec ((force %--rc-record)))
+         (idx ((force %--kbd-fetch-ptr-index)))
+         (kind ((force %--kbd-event-kind) idx))
+         (ie ((force %--kbd-event-ie) idx)))
+
+    ;; C: if (used_mouse_menu) *used_mouse_menu = true.  The rec's
+    ;; used-mouse-menu slot holds the same bool*; the DEFUN is a no-op
+    ;; when the slot is nil (no rec / no pointer).
+    (define (mark-used-mouse-menu!)
+      (when (not (eq? rec #nil))
+        ((force %--rc-mark-used-mouse-menu-true) rec)))
+
+    ;; Pass-through kinds: obj = make_lispy_event, then advance.
+    ;; make-lispy-event invalidates IE on return (Risk 2), which is
+    ;; fine — the result is the event; only the advance follows.
+    (define (pass-through!)
+      (let ((ev (make-lispy-event ie)))
+        ((force %--kbd-advance-fetch-ptr))
+        ev))
+
+    ;; C 5320-5324: resolve event->frame_or_window to a frame — CONSP →
+    ;; car, WINDOWP → window-frame, else as-is.
+    (define (frame-or-window->frame fo-w)
+      (cond
+       ((pair? fo-w) (car fo-w))
+       (((force %windowp) fo-w) ((force %window-frame) fo-w))
+       (else fo-w)))
+
+    ;; C 5361-5364: PINCH_EVENT arg is (DX DY <ignored> ANGLE); the
+    ;; start of a gesture (all three zero) is never coalesced.
+    (define (pinch-start? a)
+      (and (= (car a) 0.0)
+           (= (car (cdr a)) 0.0)
+           (= (car (cdr (cdr (cdr a)))) 0.0)))
+
+    ;; C 5356-5404.  Returns the index of the last coalesced event
+    ;; (= the C `event' pointer after the loop), or IDX unchanged when
+    ;; no coalescing applies.  Writes the running totals into each
+    ;; skipped event's arg and tracks Vlast_event_device.
+    ;;
+    ;; GC-safety of the in-place setcar writes (Risk 1): kbd_buffer is
+    ;; a C global, so the conservative GC (Fgarbage_collect →
+    ;; GC_gcollect, alloc.c) treats the whole ring as a root — the
+    ;; conses in ie.arg stay reachable while the event is queued, and
+    ;; setcar goes through XSETCAR exactly as the C does
+    ;; (keyboard.c:5394-5398).
+    (define (pinch-coalesce! idx frame-or-window modifiers arg store)
+      (if (or (not (= kind PINCH-EVENT))
+              (pinch-start? arg))
+          idx
+          (let ((cur idx)
+                (maybe (modulo (+ idx 1) KBD-BUFFER-SIZE))
+                (dx (car arg))
+                (dy (car (cdr arg)))
+                (angle (car (cdr (cdr (cdr arg))))))
+            (let loop ()
+              (when (and (not (= maybe store))
+                         (= ((force %--kbd-event-kind) maybe) PINCH-EVENT))
+                (let* ((mie ((force %--kbd-event-ie) maybe))
+                       (ma ((force %--ie-arg) mie)))
+                  (when (and (= ((force %--ie-modifiers) mie) modifiers)
+                             (eq? ((force %--ie-frame-or-window) mie)
+                                  frame-or-window)
+                             (not (pinch-start? ma)))
+                    (set! dx (+ dx (car ma)))
+                    (set! dy (+ dy (car (cdr ma))))
+                    (set! angle (+ angle (car (cdr (cdr (cdr ma))))))
+                    ;; Accumulated totals → this event's arg; angle
+                    ;; wrapped with fmod (C:5394-5398).
+                    ((force %setcar) ma dx)
+                    ((force %setcar) (cdr ma) dy)
+                    ((force %setcar) (cdr (cdr (cdr ma)))
+                     (fmod angle 360.0))
+                    ;; C:5400 — if (!EQ (device, Qt))
+                    ;; Vlast_event_device = device.
+                    (let ((d ((force %--ie-device) mie)))
+                      (when (not (elisp-t? d))
+                        (set-symbol-value! 'last-event-device d)))
+                    (set! cur maybe)
+                    (set! maybe (modulo (+ maybe 1) KBD-BUFFER-SIZE))
+                    (loop)))))
+            cur)))
+
+    ;; C 5407-5431.  Returns 'wait when the decoded string is empty
+    ;; (event dropped — advance + loop back), else the arg to feed the
+    ;; incremental step (the original arg, or a fresh (0 . DECODED)).
+    (define (multibyte-decode! arg)
+      (if (and (= kind MULTIBYTE-CHAR-KEYSTROKE-EVENT)
+               ((force %stringp) arg))
+          (let ((s ((force %--kbd-decode-multibyte-string) arg)))
+            ;; Decoding failed → keep the original, where at least
+            ;; ASCII text will work (C:5417-5418).
+            (if (eq? s #nil)
+                (set! s arg))
+            (if (= ((force %length) s) 0)
+                (begin
+                  ;; C:5420-5425 — empty decoded string: advance,
+                  ;; obj = nil → loop back to wait.
+                  ((force %--kbd-advance-fetch-ptr))
+                  'wait)
+                (let ((a (cons 0 s)))
+                  ;; car = index of the next character to send, cdr =
+                  ;; the string itself (C:5430).
+                  ((force %--set-ie-arg) ie a)
+                  a)))
+          arg))
+
+    ;; The C 5312-5480 default arm — the "real event" path.
+    (define (default-path!)
+      (let* ((frame-or-window ((force %--ie-frame-or-window) ie))
+             (device ((force %--ie-device) ie))
+             (arg ((force %--ie-arg) ie))
+             (modifiers ((force %--ie-modifiers) ie))
+             ;; (a) switch-frame synthesis (C:5317-5333).
+             (frame (frame-or-window->frame frame-or-window))
+             ;; F6: --frame-focus-frame returns nil for non-frames
+             ;; (benign deviation from C's unconditional XFRAME abort);
+             ;; a non-frame frame_or_window therefore flows through as-is.
+             (focus ((force %--frame-focus-frame) frame))
+             (frame (if (eq? focus #nil) frame focus))
+             (obj (if (and (not (eq? frame ((force %--get-internal-last-event-frame))))
+                           (not (eq? frame ((force %selected-frame)))))
+                      (list 'switch-frame frame)
+                      #nil)))
+        ;; Continuous-record-currency (Risk 5): write
+        ;; internal_last_event_frame at the mutation site (C:5333),
+        ;; never batched at procedure return.
+        ((force %--set-internal-last-event-frame) frame)
+        ;; (b) device tracking (C:5335-5342).
+        (set-symbol-value! 'last-event-device
+                           (if (elisp-t? device)
+                               (if (memv kind (list ASCII-KEYSTROKE-EVENT
+                                                    MULTIBYTE-CHAR-KEYSTROKE-EVENT
+                                                    NON-ASCII-KEYSTROKE-EVENT))
+                                   VIRTUAL-CORE-KEYBOARD-NAME
+                                   VIRTUAL-CORE-POINTER-NAME)
+                               device))
+        (if (not (eq? obj #nil))
+            ;; (c) a switch-frame was generated — leave the event in
+            ;; the queue for next time, return the switch-frame now.
+            obj
+            (let ((idx (pinch-coalesce! idx frame-or-window modifiers arg
+                                        ((force %--kbd-store-ptr-index)))))
+              ;; Re-wrap at the current index: the C calls
+              ;; make_lispy_event on the LAST coalesced event, whose
+              ;; arg holds the accumulated totals (Risk 2 — the
+              ;; original smob must not outlive the wrap).
+              (set! ie ((force %--kbd-event-ie) idx))
+              (set! arg ((force %--ie-arg) ie))
+              (let ((arg (multibyte-decode! arg)))
+                (if (eq? arg 'wait)
+                    'wait
+                    (begin
+                      ;; (c3) multibyte incremental (C:5433-5446):
+                      ;; install the next character, bump the index.
+                      (when (and (= kind MULTIBYTE-CHAR-KEYSTROKE-EVENT)
+                                 (pair? arg))
+                        (let ((str (cdr arg))
+                              (i (car arg)))
+                          ((force %--set-ie-code) ie
+                           ((force %aref) str i))
+                          ((force %setcar) arg (+ i 1))))
+                      ;; (d) build the event (C:5448).
+                      (let ((ev (make-lispy-event ie)))
+                        ;; (e) used_mouse_menu (C:5450-5468) — the
+                        ;; guards use locals extracted BEFORE
+                        ;; make-lispy-event (it invalidates IE — Risk
+                        ;; 2).  The !EQ (frame_or_window, arg) guard is
+                        ;; only on the menu-bar group (C:5456-5461);
+                        ;; NS_NONKEY_EVENT has none.
+                        (when (not (eq? rec #nil))
+                          (when (or (and (not (eq? frame-or-window arg))
+                                         (memv kind (list MENU-BAR-EVENT
+                                                          TAB-BAR-EVENT
+                                                          TOOL-BAR-EVENT)))
+                                    (= kind NS-NONKEY-EVENT))
+                            ((force %--rc-mark-used-mouse-menu-true) rec)))
+                        ;; (f) cleanup (C:5470-5478): clear + advance,
+                        ;; unless a multibyte incremental still has
+                        ;; characters left (leave it in the queue).
+                        (if (or (not (= kind MULTIBYTE-CHAR-KEYSTROKE-EVENT))
+                                (not (pair? arg))
+                                (>= (car arg) ((force %length) (cdr arg))))
+                            (begin
+                              ;; Wipe out this event, to catch bugs
+                              ;; (clear_event).  Re-wrap: the smob was
+                              ;; invalidated by make-lispy-event above.
+                              ((force %--ie-clear)
+                               ((force %--kbd-event-ie) idx))
+                              ;; Advance past the (possibly coalesced)
+                              ;; event — C: kbd_fetch_ptr =
+                              ;; next_kbd_event (event).  Peek-first
+                              ;; means the ptr still sits at the
+                              ;; ORIGINAL index, so position it
+                              ;; explicitly; modulo wraps the ring.
+                              ((force %--kbd-set-fetch-ptr-index)
+                               (modulo (+ idx 1) KBD-BUFFER-SIZE)))
+                            #nil)
+                        ev))))))))
+
+    (cond
+     ;; --- Swallowed kinds (C:5197-5269): run the side effect, loop
+     ;; back to wait — they never produce a Lisp event.  The C
+     ;; returns Qnil and read_char's retry re-enters; 'wait re-enters
+     ;; our wait loop directly.
+     ;; FIX-imp5-guilemacs: imp-5 must reconcile the 'wait loop-back
+     ;; with the C return-nil semantics so timers / quit-flag are not
+     ;; starved between dispatches.
+     ;; NB: `cond' + memv/=/kind, not `case' — Guile's `case' quotes
+     ;; its clause datums (ice-9/boot-9.scm:496), so `((,KIND) ...)'
+     ;; keys would never match.
+     ((memv kind (list SELECTION-REQUEST-EVENT SELECTION-CLEAR-EVENT))
+      ;; --kbd-handle-selection-event advances fetch-ptr itself
+      ;; (keyboard.c:1407) — no explicit advance here.
+      ((force %--kbd-handle-selection-event))
+      'wait)
+     ((= kind MONITORS-CHANGED-EVENT)
+      ((force %--kbd-advance-fetch-ptr))
+      ((force %--update-input-pending))
+      ((force %run-hook-with-args) 'display-monitors-changed-functions
+       ((force %--ie-arg) ie))
+      'wait)
+     ((= kind MENU-BAR-ACTIVATE-EVENT)
+      ;; C 5258-5269 uses a bare XFRAME (no cons/window coercion) —
+      ;; pass frame_or_window straight through; frame-live-p and the
+      ;; DEFUN no-op on non-frames.
+      (let ((frame ((force %--ie-frame-or-window) ie)))
+        ((force %--kbd-advance-fetch-ptr))
+        ((force %--update-input-pending))
+        (when ((force %frame-live-p) frame)
+          ((force %--activate-menubar-hook) frame)))
+      'wait)
+     ((= kind NOTIFICATION-EVENT)
+      (let ((arg ((force %--ie-arg) ie)))
+        ((force %--kbd-advance-fetch-ptr))
+        ((force %--update-input-pending))
+        ((force %apply) (car arg) (cdr arg)))
+      'wait)
+     ;; --- NS_TEXT_EVENT: set used_mouse_menu first, then fall
+     ;; through to the PREEDIT_TEXT_EVENT handling — no Scheme
+     ;; FALLTHROUGH, so call the shared pass-through directly.
+     ((= kind NS-TEXT-EVENT)
+      (mark-used-mouse-menu!)
+      (pass-through!))
+     ;; --- The pass-through kinds (C:5276-5311): obj =
+     ;; make_lispy_event, advance.
+     ((memv kind (list PREEDIT-TEXT-EVENT END-SESSION-EVENT
+                       LANGUAGE-CHANGE-EVENT DELETE-WINDOW-EVENT
+                       ICONIFY-EVENT DEICONIFY-EVENT MOVE-FRAME-EVENT
+                       FILE-NOTIFY-EVENT DBUS-EVENT THREAD-EVENT
+                       XWIDGET-EVENT XWIDGET-DISPLAY-EVENT
+                       SAVE-SESSION-EVENT NO-EVENT HELP-EVENT
+                       FOCUS-IN-EVENT CONFIG-CHANGED-EVENT
+                       FOCUS-OUT-EVENT SELECT-WINDOW-EVENT))
+      (pass-through!))
+     (else
+      (default-path!)))))
 
 (define (mouse-motion-synthesize!)
   "imp-4 seam: the some_mouse_moved () fallback (make_lispy_movement).
-Not implemented in imp-2."
-  (throw 'not-implemented "imp-3/imp-4"))
+Not implemented in imp-2/imp-3."
+  (throw 'not-implemented "imp-4"))
 
 ;;; --- kbd-buffer-get-event --------------------------------------------
 
 (define (kbd-buffer-get-event kbp used-mouse-menu end-time)
-  "Port of C kbd_buffer_get_event (keyboard.c:4965-5127): entry sync,
+  "Port of C kbd_buffer_get_event (keyboard.c:5016-5182): entry sync,
 hold/unhold prelude, noninteractive/daemon fast path, *kbp =
 current_kboard, the for(;;) wait loop, and the post-wait prologue
 (selection handling → Vunread drain → text-conversion preamble →
@@ -136,12 +510,12 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
     (let ((had-sel #f)
           (had-conv #f))
 
-      ;; C 5003: *kbp = current_kboard (no-op when no rec is on the
+      ;; C 5054: *kbp = current_kboard (no-op when no rec is on the
       ;; stack — --rc-write-kbp is a guarded no-op at rc depth 0).
       (define (write-kbp!)
         ((force %--rc-write-kbp) ((force %current-kboard))))
 
-      ;; C 5011-5035 — top-of-loop checks.  Each break yields an exit
+      ;; C 5062-5086 — top-of-loop checks.  Each break yields an exit
       ;; symbol; the quit branch never returns (longjmp to the
       ;; read-char wait point — nothing after it is relied upon).
       (define (first-check)
@@ -158,7 +532,7 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
           ((force %--quit-throw-to-read-char)))   ; never returns
          (else #f)))
 
-      ;; C 5044-5053 — post-gobble re-checks (selection requests join).
+      ;; C 5095-5104 — post-gobble re-checks (selection requests join).
       (define (second-check)
         (cond
          ((not (= ((force %--kbd-fetch-ptr-index))
@@ -170,7 +544,7 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
           'sel)
          (else #f)))
 
-      ;; C 5055-5085 — timed vs untimed wait.  The timed branch only
+      ;; C 5106-5136 — timed vs untimed wait.  The timed branch only
       ;; applies when a rec is current AND an end-time arg was passed;
       ;; outside a rec end-time is treated as unset (matching
       ;; --rc-end-time-expired-p's depth-0 nil behavior).  Returns #t
@@ -200,7 +574,7 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
                0 0 -1 ((force %--kbd-wait-do-display-p)))
               #f)))
 
-      ;; C 5087-5088 — CBREAK mode: gobble after the wait, but only if
+      ;; C 5138-5139 — CBREAK mode: gobble after the wait, but only if
       ;; the queue is still empty (the wait may have stuffed events).
       (define (cbreak-gobble!)
         (when (and (eq? ((force %--interrupt-input-p)) #nil)
@@ -208,7 +582,7 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
                       ((force %--kbd-store-ptr-index))))
           ((force %--gobble-input))))
 
-      ;; C 5091-5127 — post-wait prologue.  Order is exact: selection
+      ;; C 5142-5182 — post-wait prologue.  Order is exact: selection
       ;; handling, then the Vunread drain (outranks everything — a
       ;; 'conv exit with a non-empty Vunread returns the Vunread
       ;; event), then the text-conversion preamble (returns
@@ -240,23 +614,30 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
         (let loop ()
           (let ((exit (first-check)))
             (if exit
-                (post-wait)
+                (let ((r (post-wait)))
+                  ;; imp-3: dispatch-event! returns 'wait for swallowed
+                  ;; events — re-enter the wait loop instead of
+                  ;; returning it as an event (C returns nil and
+                  ;; read_char's retry re-enters; see the FIX-imp5
+                  ;; comment in dispatch-event!).
+                  (if (eq? r 'wait) (loop) r))
                 (begin
-                  ;; C 5041 — gobble unconditionally (gobble_input is
+                  ;; C 5092 — gobble unconditionally (gobble_input is
                   ;; compiled unconditionally in this tree; the C
                   ;; USABLE_SIGIO/SIGPOLL #ifdef is a
                   ;; micro-optimization).
                   ((force %--gobble-input))
                   (let ((exit (second-check)))
                     (if exit
-                        (post-wait)
+                        (let ((r (post-wait)))
+                          (if (eq? r 'wait) (loop) r))
                         (if (deadline-wait!)
                             #nil
                             (begin
                               (cbreak-gobble!)
                               (loop))))))))))
 
-      ;; Fast path — C 4990-5001.  The #nil trap: on builds compiled
+      ;; Fast path — C 5041-5052.  The #nil trap: on builds compiled
       ;; with DBus / file-notify / threads, --kbd-noninteractive-getchar
       ;; returns nil and the proc must NOT return that nil as an event —
       ;; it falls through to the wait loop (C compiles the whole block
