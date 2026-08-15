@@ -103,6 +103,12 @@
 (defelisp %--set-ie-code                --set-ie-code)
 (defelisp %--ie-kind-from-name          --ie-kind-from-name)
 (defelisp %--frame-focus-frame          --frame-focus-frame)
+;; imp-4 — mouse-motion fallback shims (see brief.org §imp-4).
+(defelisp %--mouse-position-hook        --mouse-position-hook)
+(defelisp %--make-lispy-position        --make-lispy-position)
+(defelisp %--make-scroll-bar-position   --make-scroll-bar-position)
+(defelisp %--frame-last-mouse-device    --frame-last-mouse-device)
+(defelisp %--kbd-abort                  --kbd-abort)
 ;; Elisp primitives (Scheme-backed or C DEFUNs) via %c.
 (defelisp %setcar                       setcar)
 (defelisp %aref                         aref)
@@ -162,8 +168,9 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 
 ;;; The C post-wait hands off to the event-kind dispatch switch (imp-3,
 ;;; implemented below) when the queue is non-empty, or mouse-motion
-;;; synthesis (imp-4) otherwise.  imp-4 remains a clearly-throwing stub;
-;;; imp-2's tests never legitimately reach it.
+;;; synthesis (imp-4, mouse-motion-synthesize!) otherwise — except on X
+;;; builds, where a pending selection request with an empty queue returns
+;;; nil (C 5564-5567) rather than synthesizing or aborting.
 
 ;;; --- Event-kind constants (imp-3) ------------------------------------
 
@@ -490,9 +497,83 @@ caller (kbd-buffer-get-event) guarantees a non-empty queue."
       (default-path!)))))
 
 (define (mouse-motion-synthesize!)
-  "imp-4 seam: the some_mouse_moved () fallback (make_lispy_movement).
-Not implemented in imp-2/imp-3."
-  (throw 'not-implemented "imp-4"))
+  "imp-4: port of the some_mouse_moved () fallback branch of C
+kbd_buffer_get_event (src/keyboard.c:5514-5563).  Called when the event
+queue is empty but a frame has pending mouse movement; synthesizes a
+switch-frame or mouse-movement event without touching the ring buffer.
+Returns the event list; aborts (--kbd-abort, the C shared else's
+emacs_abort) when no frame has pending movement.  That nil-frame path is
+the C 5568-5571 emacs_abort invariant: post-wait (C 5515 / 5564-5571)
+only routes to #nil when some_mouse_moved is nil AND a selection request
+is pending, so a nil movement-frame here means neither condition held —
+the impossible state C dumps core on.
+Does NOT advance the fetch pointer or update
+input_pending (the shared C epilogue, imp-2/imp-5 tail)."
+  (let ((movement-frame ((force %--some-mouse-moved))))
+    ;; C 5515 / 5568-5571: post-wait calls us when the queue is empty
+    ;; and (some_mouse_moved OR not had-sel); a nil movement-frame here
+    ;; means both are false, the impossible invariant C dumps core on
+    ;; via the shared else.
+    (when (eq? movement-frame #nil)
+      ((force %--kbd-abort)))
+    (let* ((hook ((force %--mouse-position-hook) movement-frame))
+           ;; C 5531-5533: the hook takes &f and may rewrite it (pointer
+           ;; under another frame, or NULL outside all frames during a
+           ;; drag).  Returns (F BAR-WINDOW PART X Y T), or nil
+           ;; (non-frame / termcap build with no hook).  Normalize nil
+           ;; to a 6-#nil list so the field bindings below are uniform.
+           (hook* (if (eq? hook #nil)
+                      (list #nil #nil #nil #nil #nil #nil)
+                      hook))
+           (f (car hook*))
+           (bar-window (cadr hook*))
+           (part (caddr hook*))
+           (x (cadddr hook*))
+           (y (car (cddddr hook*)))
+           (t (cadr (cddddr hook*)))
+           (obj #nil))
+      ;; C 5537-5552: switch-frame synthesis, guarded by x && f (C:5540).
+      ;; NOTE x and f do NOT always coincide: XTmouse_position can leave
+      ;; f == NULL with x/y still set (pointer outside all frames during a
+      ;; drag, xterm.c:15265), so the f guard here is required, not a
+      ;; redundant re-check of x.
+      (when (and (truthy? x) (truthy? f))
+        (let* ((focus ((force %--frame-focus-frame) f))
+               (focus (if (eq? focus #nil) f focus)))
+          (when (and (not (eq? focus
+                               ((force %--get-internal-last-event-frame))))
+                     (not (eq? focus ((force %selected-frame)))))
+            (set! obj (list 'switch-frame focus)))
+          ;; Continuous-record-currency (Risk 5): writeback at the
+          ;; mutation site (C:5551), same as default-path!.
+          ((force %--set-internal-last-event-frame) focus)))
+      ;; C 5554-5557: movement synthesis — scroll-bar (bar-window
+      ;; non-nil) vs ordinary.  make_lispy_movement /
+      ;; make_lispy_switch_frame are static C, so inlined in Scheme
+      ;; (imp-0 Design change #1).
+      (when (and (truthy? x) (eq? obj #nil))
+        (set! obj
+              (if (truthy? bar-window)
+                  (list 'scroll-bar-movement
+                        ((force %--make-scroll-bar-position)
+                         bar-window x y t part 'vertical-scroll-bar))
+                  ;; C 5556-5557: the ordinary arm passes the UPDATED f,
+                  ;; which may be nil when x is set but the pointer is
+                  ;; outside every frame.  --make-lispy-position is
+                  ;; nil-tolerant (mirrors C make_lispy_position's
+                  ;; `if (f) ... else Qnil').
+                  (list 'mouse-movement
+                        ((force %--make-lispy-position) f x y t)))))
+      ;; C 5559-5562: device tracking — the ORIGINAL movement_frame's
+      ;; last_mouse_device (not the possibly-updated f), else the
+      ;; virtual-core pointer name.
+      (when (not (eq? obj #nil))
+        (let ((d ((force %--frame-last-mouse-device) movement-frame)))
+          (set-symbol-value! 'last-event-device
+                             (if ((force %stringp) d)
+                                 d
+                                 VIRTUAL-CORE-POINTER-NAME))))
+      obj)))
 
 ;;; --- kbd-buffer-get-event --------------------------------------------
 
@@ -608,7 +689,18 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
                   (if (not (= ((force %--kbd-fetch-ptr-index))
                               ((force %--kbd-store-ptr-index))))
                       (dispatch-event!)
-                      (mouse-motion-synthesize!))))))
+                      ;; C 5515 / 5564-5571: the mouse-motion branch
+                      ;; outranks the X pending-selection branch.  Only
+                      ;; when some_mouse_moved is nil AND a selection
+                      ;; request is pending (had-sel) does C return Qnil
+                      ;; (read_char retries); with neither, the shared
+                      ;; else aborts.  mouse-motion-synthesize! itself
+                      ;; re-checks some_mouse_moved and aborts when no
+                      ;; frame has pending movement (C 5568-5571).
+                      (if (or (truthy? ((force %--some-mouse-moved)))
+                              (not had-sel))
+                          (mouse-motion-synthesize!)
+                          #nil))))))
 
       (define (wait-loop)
         (let loop ()

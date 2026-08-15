@@ -143,6 +143,7 @@
 (load "test/keyboard/test-kbd-escape-shims.el")   ; M11 imp-1.3
 (load "test/keyboard/test-kbd-wait-loop.el")      ; M11 imp-2
 (load "test/keyboard/test-kbd-dispatch.el")       ; M11 imp-3
+(load "test/keyboard/test-kbd-mouse-motion.el")   ; M11 imp-4
 (message "")
 
 (message "========================================")

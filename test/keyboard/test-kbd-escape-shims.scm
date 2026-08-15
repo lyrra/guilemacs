@@ -106,11 +106,12 @@
        ((%sym '--activate-menubar-hook) ((%sym 'selected-frame))))
 
 ;; --mouse-position-hook on the live selected frame: nil (termcap:
-;; hook NULL) or a 5-element list (window-system builds).
+;; hook NULL) or a 6-element list (window-system builds) — imp-4
+;; extended the shape to (F BAR-WINDOW PART X Y T).
 (let ((r ((%sym '--mouse-position-hook) ((%sym 'selected-frame)))))
   (check "mouse-position-hook-shape" #t
          (or (eq? r #nil)
-             (and (list? r) (= 5 (length r))))))
+             (and (list? r) (= 6 (length r))))))
 
 ;;; --- --wait-reading-process-output ------------------------------------
 

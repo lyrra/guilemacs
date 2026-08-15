@@ -5599,6 +5599,18 @@ DEFUN ("--quit-throw-to-read-char",
   return Qnil;   /* Not reached.  */
 }
 
+DEFUN ("--kbd-abort", Fkbd_abort, Skbd_abort, 0, 0, 0,
+       doc: /* Internal: abort exactly as the C kbd_buffer_get_event
+   shared `else' does when the event queue is empty yet no frame has
+   pending mouse movement (emacs_abort ()).  This "impossible"
+   invariant dumps core in C; imp-4 calls it from Scheme for the same
+   fatal semantics.  Never returns.  */)
+  (void)
+{
+  emacs_abort ();
+  return Qnil;   /* Not reached.  */
+}
+
 DEFUN ("--wait-reading-process-output",
        Fc_wait_reading_process_output,
        Sc_wait_reading_process_output, 4, 4, 0,
@@ -5632,6 +5644,20 @@ frame_or_window values through without XFRAME aborts.  */)
   if (!FRAMEP (frame))
     return Qnil;
   return FRAME_FOCUS_FRAME (XFRAME (frame));
+}
+
+DEFUN ("--frame-last-mouse-device", Fc_frame_last_mouse_device,
+       Sc_frame_last_mouse_device, 1, 1, 0,
+       doc: /* Internal: return FRAME's last_mouse_device — the string
+   name of the last input device to move over FRAME, or nil/other when
+   it is the virtual core pointer.  Returns nil when FRAME is not a
+   frame.  Used by imp-4 device tracking (the STRINGP test against
+   virtual_core_pointer_name).  */)
+  (Lisp_Object frame)
+{
+  if (!FRAMEP (frame))
+    return Qnil;
+  return XFRAME (frame)->last_mouse_device;
 }
 
 DEFUN ("--activate-menubar-hook",
@@ -5689,9 +5715,13 @@ DEFUN ("--mouse-position-hook",
        Fc_mouse_position_hook,
        Sc_mouse_position_hook, 1, 1, 0,
        doc: /* Internal: call the FRAME terminal's mouse_position_hook
-   and return (BAR-WINDOW PART X Y TIME) — PART and TIME as fixnums.
-   Returns nil when FRAME is not a frame or the terminal has no such
-   hook (termcap builds).  Used by imp-4 mouse-motion synthesis.  */)
+   and return (F BAR-WINDOW PART X Y TIME) — PART and TIME as fixnums,
+   F the (possibly updated) frame under the pointer (the hook takes
+   &f and may rewrite it — XTmouse_position sets *fp to the frame
+   actually under the pointer, or NULL when the pointer is outside all
+   frames during a drag).  Returns nil when FRAME is not a frame or
+   the terminal has no such hook (termcap builds).  Used by imp-4
+   mouse-motion synthesis.  */)
   (Lisp_Object frame)
 {
   if (!FRAMEP (frame))
@@ -5705,7 +5735,9 @@ DEFUN ("--mouse-position-hook",
     return Qnil;
   (*FRAME_TERMINAL (f)->mouse_position_hook) (&f, 0, &bar_window, &part,
 					      &x, &y, &t);
-  return list5 (bar_window, make_fixnum (part), x, y, make_fixnum (t));
+  return listn (6,
+		f ? make_lisp_ptr (f, Lisp_Vectorlike) : Qnil,
+		bar_window, make_fixnum (part), x, y, make_fixnum (t));
 }
 
 DEFUN ("--detect-conversion-events",
@@ -7507,10 +7539,12 @@ DEFUN ("--make-lispy-position", Fmake_lispy_position, Smake_lispy_position,
        doc: /* Build a mouse-click position list for frame-or-window FOW,
 pixel coords X and Y, and timestamp T.  T arrives from
 --ie-timestamp (INT_TO_INTEGER) and may be a bignum on 32-bit
-fixnum builds.  Delegates to (emacs lispy-position).  */)
+fixnum builds.  Delegates to (emacs lispy-position).  FOW may be
+nil (the pointer can be outside every frame during a drag), which
+make_lispy_position handles by passing a nil frame.  */)
   (Lisp_Object fow, Lisp_Object x, Lisp_Object y, Lisp_Object t)
 {
-  struct frame *f = XFRAME (fow);
+  struct frame *f = NILP (fow) ? NULL : XFRAME (fow);
   return make_lispy_position (f, x, y, scm_to_intmax (t));
 }
 
