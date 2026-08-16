@@ -1,0 +1,84 @@
+;;; kbd-pipeline-bench.scm --- M11 pre-imp-5 latency baseline
+;;;
+;;; Measures the kbd_buffer_get_event pipeline: for N synthetic ASCII
+;;; keystroke events, store one via --kbd-buffer-store-fake-event and
+;;; time the read via --rc-read-decoded-event-from-main-queue (the
+;;; thinnest public wrapper that calls kbd_buffer_get_event, through
+;;; read_decoded_event_from_main_queue).  imp-5 replaces the C body of
+;;; kbd_buffer_get_event with an SCM_CALL_3 shim into
+;;; (emacs kbd-buffer) kbd-buffer-get-event; this same script is the
+;;; before/after measurement point.  The store is outside the timed
+;;; region (it is unchanged by imp-5).
+;;;
+;;; Sourced by bench/kbd-pipeline-bench.el via eval-scheme; the
+;;; summary is read back from `bench-summary' (Scheme format output
+;;; does not reach emacs --batch stdout).
+
+(use-modules (srfi srfi-19))
+
+(define %sym symbol-function)
+
+(define (now-ns)
+  (let ((t (current-time time-monotonic)))
+    (+ (* 1000000000 (time-second t)) (time-nanosecond t))))
+
+(define N 100000)
+(define WARMUP 2000)
+
+(define (store-fake!)
+  ((%sym '--kbd-buffer-store-fake-event) 1 #nil))   ; ASCII_KEYSTROKE_EVENT
+
+(define (read-event)
+  ((%sym '--rc-read-decoded-event-from-main-queue)))
+
+;; One rc-record on the stack for the whole run (--rc-read-decoded-
+;; event-from-main-queue requires rc_state_depth > 0).
+(define bench-rec ((%sym '--make-rc-state)))
+((%sym '--rc-record-stack-push) bench-rec)
+
+;; Warm-up: prime caches / first-touch allocations.
+(let loop ((i 0))
+  (when (< i WARMUP)
+    (store-fake!)
+    (read-event)
+    (loop (+ i 1))))
+
+;; Sanity: one non-timed read must return the char code 0 (ASCII
+;; keystroke, code/modifiers zeroed) — proves the synthetic event is
+;; actually going through the pipeline, not being swallowed/nil.
+(store-fake!)
+(define bench-sanity (read-event))
+
+;; Timed samples (nanoseconds per read).
+(define samples (make-vector N 0))
+(let loop ((i 0))
+  (when (< i N)
+    (store-fake!)
+    (let ((t0 (now-ns)))
+      (read-event)
+      (vector-set! samples i (- (now-ns) t0)))
+    (loop (+ i 1))))
+
+((%sym '--rc-record-stack-pop))
+
+(define sorted-ns (sort (vector->list samples) <))
+
+(define bench-total-ns
+  (let sum ((l sorted-ns) (acc 0))
+    (if (null? l) acc (sum (cdr l) (+ acc (car l))))))
+
+(define (percentile lst p)
+  ;; p in [0,1); nearest-rank index of the p-th quantile.
+  (list-ref lst (min (- (length lst) 1)
+                     (inexact->exact (floor (* p (length lst)))))))
+
+(define bench-median-ns
+  (quotient (+ (list-ref sorted-ns (quotient N 2))
+               (list-ref sorted-ns (- (quotient N 2) 1)))
+            2))
+(define bench-p99-ns (percentile sorted-ns 0.99))
+(define bench-mean-ns (quotient bench-total-ns N))
+
+;; (N median-ns p99-ns mean-ns total-ns) — all fixnums.
+(define bench-summary
+  (list N bench-median-ns bench-p99-ns bench-mean-ns bench-total-ns))
