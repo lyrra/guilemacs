@@ -385,10 +385,6 @@ static Lisp_Object read_char_x_menu_prompt (Lisp_Object,
                                             Lisp_Object, bool *);
 static Lisp_Object read_char_minibuf_menu_prompt (int, Lisp_Object);
 static Lisp_Object make_lispy_event (struct input_event *);
-static Lisp_Object make_lispy_movement (struct frame *, Lisp_Object,
-                                        enum scroll_bar_part,
-                                        Lisp_Object, Lisp_Object,
-					Time);
 static Lisp_Object make_lispy_switch_frame (Lisp_Object);
 static bool help_char_p (Lisp_Object);
 static Lisp_Object apply_modifiers (int, Lisp_Object);
@@ -4751,6 +4747,24 @@ event_to_kboard (struct input_event *event)
     }
 }
 
+DEFUN ("--ie-kboard", Fie_kboard, Sie_kboard, 1, 1, 0,
+       doc: /* Return the KBOARD that owns input-event handle IE, as a
+   kboard smob, or nil when the event resolves to no live frame's
+   kboard (event_to_kboard returns NULL for the two selection kinds,
+   dead frames, and non-frame frame_or_window values).
+
+   Exposes the deleted C queue-event prologue
+   `*kbp = event_to_kboard (&event->ie); if (*kbp == 0) *kbp =
+   current_kboard;` so the Scheme dispatch port can reproduce the
+   event-kboard write-back.  The nil→current_kboard fallback lives in
+   Scheme (mod/emacs/kbd-buffer.scm dispatch-event!).  */)
+  (Lisp_Object ie)
+{
+  CHECK_IE (ie);
+  KBOARD *kb = event_to_kboard (XIE (ie));
+  return kb ? make_kboard_smob (kb) : Qnil;
+}
+
 #ifdef subprocesses
 /* Return the number of slots occupied in kbd_buffer.  */
 
@@ -5041,540 +5055,43 @@ kbd_buffer_get_event_2 (Lisp_Object val)
    The value is a Lisp object representing the event.
    The value is nil for an event that should be ignored,
    or that was handled here.
-   We always read and discard one event.  */
+   We always read and discard one event.
+
+   M11 imp-5: the C body (wait loop, event-kind dispatch, and
+   mouse-motion fallback) is replaced by a thin shim delegating to
+   (emacs kbd-buffer) kbd-buffer-get-event.  The three caller-owned
+   pointers ride the top-of-stack rc-record slots so the Scheme-side
+   write-back DEFUNs (--rc-write-kbp, --rc-end-time-*,
+   --rc-mark-used-mouse-menu-true) operate on this call's stack frame;
+   the raw return value is the event obj.  */
 
 static Lisp_Object
 kbd_buffer_get_event (KBOARD **kbp,
                       bool *used_mouse_menu,
                       struct timespec *end_time)
 {
-  Lisp_Object obj, str;
-#ifdef HAVE_X_WINDOWS
-  bool had_pending_selection_requests;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-get-event");
 
-  had_pending_selection_requests = false;
-#endif
-#ifdef HAVE_TEXT_CONVERSION
-  bool had_pending_conversion_events;
-
-  had_pending_conversion_events = false;
-#endif
-
-#ifdef subprocesses
-  if (kbd_on_hold_p () && kbd_buffer_nr_stored () < KBD_BUFFER_SIZE / 4)
+  /* Populate the pointer slots fresh on every entry.  Scheme's
+     entry-sync only fills nil slots, so a second kbd_buffer_get_event
+     within one read_char (the non-reread loop) would otherwise leave a
+     stale *kbp and --rc-write-kbp would write to a dead stack frame.
+     Guarded: depth 0 means no read_char is in flight, matching the
+     DEFUNs' no-op behaviour.  */
+  if (rc_state_depth > 0)
     {
-      /* Start reading input again because we have processed enough to
-         be able to accept new events again.  */
-      unhold_keyboard_input ();
-    }
-#endif	/* subprocesses */
-
-#if !defined HAVE_DBUS && !defined USE_FILE_NOTIFY && !defined THREADS_ENABLED
-  if (noninteractive
-      /* In case we are running as a daemon, only do this before
-	 detaching from the terminal.  */
-      || (IS_DAEMON && DAEMON_RUNNING))
-    {
-      int c = getchar ();
-      XSETINT (obj, c);
-      *kbp = current_kboard;
-      return obj;
-    }
-#endif	/* !defined HAVE_DBUS && !defined USE_FILE_NOTIFY && !defined THREADS_ENABLED  */
-
-  *kbp = current_kboard;
-
-  /* Wait until there is input available.  */
-  for (;;)
-    {
-      /* Break loop if there's an unread command event.  Needed in
-	 moused window autoselection which uses a timer to insert such
-	 events.  */
-      if (CONSP (Vunread_command_events))
-	break;
-
-#ifdef HAVE_TEXT_CONVERSION
-      /* That text conversion events take priority over keyboard
-	 events, since input methods frequently send them immediately
-	 after edits, with the assumption that this order of events
-	 will be observed.  */
-
-      if (detect_conversion_events ())
-	{
-	  had_pending_conversion_events = true;
-	  break;
-	}
-#endif /* HAVE_TEXT_CONVERSION */
-
-      if (kbd_fetch_ptr != kbd_store_ptr)
-	break;
-      if (some_mouse_moved ())
-	break;
-
-      /* If the quit flag is set, then read_char will return
-	 quit_char, so that counts as "available input."  */
-      if (!NILP (Vquit_flag))
-	quit_throw_to_read_char (0);
-
-      /* One way or another, wait until input is available; then, if
-	 interrupt handlers have not read it, read it now.  */
-
-#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-      gobble_input ();
-#endif
-
-      if (kbd_fetch_ptr != kbd_store_ptr)
-	break;
-      if (some_mouse_moved ())
-	break;
-#ifdef HAVE_X_WINDOWS
-      if (x_detect_pending_selection_requests ())
-	{
-	  had_pending_selection_requests = true;
-	  break;
-	}
-#endif
-      if (end_time)
-	{
-	  struct timespec now = current_timespec ();
-	  if (timespec_cmp (*end_time, now) <= 0)
-	    return Qnil;	/* Finished waiting.  */
-	  else
-	    {
-	      struct timespec duration = timespec_sub (*end_time, now);
-	      wait_reading_process_output (min (duration.tv_sec,
-						WAIT_READING_MAX),
-					   duration.tv_nsec,
-					   -1, 1, Qnil, NULL, 0);
-	    }
-	}
-      else
-	{
-	  bool do_display = true;
-
-	  if (FRAME_TERMCAP_P (SELECTED_FRAME ()))
-	    {
-	      struct tty_display_info *tty = CURTTY ();
-
-	      /* When this TTY is displaying a menu, we must prevent
-		 any redisplay, because we modify the frame's glyph
-		 matrix behind the back of the display engine.  */
-	      if (tty->showing_menu)
-		do_display = false;
-	    }
-
-	  wait_reading_process_output (0, 0, -1, do_display, Qnil, NULL, 0);
-	}
-
-      if (!interrupt_input && kbd_fetch_ptr == kbd_store_ptr)
-	gobble_input ();
+      SCM rec = rc_record_stack[rc_state_depth - 1];
+      rc_set (rec, RC_SLOT_KBP, rc_wrap_ptr (kbp));
+      rc_set (rec, RC_SLOT_USED_MOUSE_MENU, rc_wrap_ptr (used_mouse_menu));
+      rc_set (rec, RC_SLOT_END_TIME, rc_wrap_ptr (end_time));
     }
 
-#ifdef HAVE_X_WINDOWS
-  /* Handle pending selection requests.  This can happen if Emacs
-     enters a recursive edit inside a nested event loop (probably
-     because the debugger opened) or someone called
-     `read-char'.  */
-
-  if (had_pending_selection_requests)
-    x_handle_pending_selection_requests ();
-#endif
-
-  if (CONSP (Vunread_command_events))
-    {
-      Lisp_Object first;
-      first = XCAR (Vunread_command_events);
-      Vunread_command_events = XCDR (Vunread_command_events);
-      *kbp = current_kboard;
-      return first;
-    }
-
-#ifdef HAVE_TEXT_CONVERSION
-  /* There are pending text conversion operations.  Text conversion
-     events should be generated before processing any other keyboard
-     input.  */
-  if (had_pending_conversion_events)
-    {
-      handle_pending_conversion_events ();
-      obj = Qtext_conversion;
-
-      /* See the comment in handle_pending_conversion_events_1.
-         Note that in addition, text conversion events are not
-         generated if no edits were actually made.  */
-      if (conversion_disabled_p ()
-	  || NILP (Vtext_conversion_edits))
-	obj = Qnil;
-    }
-  else
-#endif
-  /* At this point, we know that there is a readable event available
-     somewhere.  If the event queue is empty, then there must be a
-     mouse movement enabled and available.  */
-  if (kbd_fetch_ptr != kbd_store_ptr)
-    {
-      union buffered_input_event *event = kbd_fetch_ptr;
-
-      *kbp = event_to_kboard (&event->ie);
-      if (*kbp == 0)
-	*kbp = current_kboard;  /* Better than returning null ptr?  */
-
-      obj = Qnil;
-
-      /* These two kinds of events get special handling
-	 and don't actually appear to the command loop.
-	 We return nil for them.  */
-      switch (event->kind)
-      {
-#ifndef HAVE_HAIKU
-      case SELECTION_REQUEST_EVENT:
-      case SELECTION_CLEAR_EVENT:
-	{
-#if defined HAVE_X11 || HAVE_PGTK
-	  /* Remove it from the buffer before processing it,
-	     since otherwise swallow_events will see it
-	     and process it again.  */
-	  struct selection_input_event copy = event->sie;
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-
-#ifdef HAVE_X11
-	  x_handle_selection_event (&copy);
-#else
-	  pgtk_handle_selection_event (&copy);
-#endif
-#else
-	  /* We're getting selection request events, but we don't have
-             a window system.  */
-	  emacs_abort ();
-#endif
-	}
-        break;
-#else
-      case SELECTION_REQUEST_EVENT:
-	emacs_abort ();
-
-      case SELECTION_CLEAR_EVENT:
-	{
-	  struct input_event copy = event->ie;
-
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-	  haiku_handle_selection_clear (&copy);
-	}
-	break;
-#endif
-
-      case MONITORS_CHANGED_EVENT:
-	{
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-
-	  CALLN (Frun_hook_with_args,
-		 Qdisplay_monitors_changed_functions,
-		 event->ie.arg);
-
-	  break;
-	}
-
-#ifdef HAVE_ANDROID
-      case NOTIFICATION_EVENT:
-        {
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-	  CALLN (Fapply, XCAR (event->ie.arg), XCDR (event->ie.arg));
-	  break;
-	}
-#endif /* HAVE_ANDROID */
-
-#ifdef HAVE_EXT_MENU_BAR
-      case MENU_BAR_ACTIVATE_EVENT:
-	{
-          struct frame *f;
-	  kbd_fetch_ptr = next_kbd_event (event);
-	  input_pending = readable_events (0);
-          f = (XFRAME (event->ie.frame_or_window));
-	  if (FRAME_LIVE_P (f) && FRAME_TERMINAL (f)->activate_menubar_hook)
-	    FRAME_TERMINAL (f)->activate_menubar_hook (f);
-	}
-        break;
-#endif
-#if defined (HAVE_NS)
-      case NS_TEXT_EVENT:
-	if (used_mouse_menu)
-	  *used_mouse_menu = true;
-	FALLTHROUGH;
-#endif
-      case PREEDIT_TEXT_EVENT:
-#ifdef HAVE_NTGUI
-      case END_SESSION_EVENT:
-      case LANGUAGE_CHANGE_EVENT:
-#endif
-#ifdef HAVE_WINDOW_SYSTEM
-      case DELETE_WINDOW_EVENT:
-      case ICONIFY_EVENT:
-      case DEICONIFY_EVENT:
-      case MOVE_FRAME_EVENT:
-#endif
-#ifdef USE_FILE_NOTIFY
-      case FILE_NOTIFY_EVENT:
-#endif
-#ifdef HAVE_DBUS
-      case DBUS_EVENT:
-#endif
-#ifdef THREADS_ENABLED
-      case THREAD_EVENT:
-#endif
-#ifdef HAVE_XWIDGETS
-      case XWIDGET_EVENT:
-      case XWIDGET_DISPLAY_EVENT:
-#endif
-      case SAVE_SESSION_EVENT:
-      case NO_EVENT:
-      case HELP_EVENT:
-      case FOCUS_IN_EVENT:
-      case CONFIG_CHANGED_EVENT:
-      case FOCUS_OUT_EVENT:
-      case SELECT_WINDOW_EVENT:
-        {
-          obj = make_lispy_event (&event->ie);
-          kbd_fetch_ptr = next_kbd_event (event);
-        }
-        break;
-      default:
-	{
-	  /* If this event is on a different frame, return a
-	     switch-frame this time, and leave the event in the queue
-	     for next time.  */
-	  Lisp_Object frame;
-	  Lisp_Object focus;
-
-	  frame = event->ie.frame_or_window;
-	  if (CONSP (frame))
-	    frame = XCAR (frame);
-	  else if (WINDOWP (frame))
-	    frame = WINDOW_FRAME (XWINDOW (frame));
-
-	  focus = FRAME_FOCUS_FRAME (XFRAME (frame));
-	  if (! NILP (focus))
-	    frame = focus;
-
-	  if (!EQ (frame, internal_last_event_frame)
-	      && !EQ (frame, selected_frame))
-	    obj = make_lispy_switch_frame (frame);
-	  internal_last_event_frame = frame;
-
-	  if (EQ (event->ie.device, Qt))
-	    Vlast_event_device = ((event->ie.kind == ASCII_KEYSTROKE_EVENT
-				   || event->ie.kind == MULTIBYTE_CHAR_KEYSTROKE_EVENT
-				   || event->ie.kind == NON_ASCII_KEYSTROKE_EVENT)
-				  ? virtual_core_keyboard_name
-				  : virtual_core_pointer_name);
-	  else
-	    Vlast_event_device = event->ie.device;
-
-	  /* If we didn't decide to make a switch-frame event, go ahead
-	     and build a real event from the queue entry.  */
-	  if (NILP (obj))
-	    {
-	      double pinch_dx, pinch_dy, pinch_angle;
-
-	      /* Pinch events are often sent in rapid succession, so
-		 large amounts of such events have the potential to
-		 queue up inside the keyboard buffer.  In that case,
-		 find the last pinch event in succession on the same
-		 frame with the same modifiers, and send that instead.  */
-
-	      if (event->ie.kind == PINCH_EVENT
-		  /* Ignore if this is the start of a pinch sequence.
-		     These events should always be sent so that we
-		     never miss a sequence starting, and they don't
-		     have the potential to queue up.  */
-		  && ((pinch_dx
-		       = XFLOAT_DATA (XCAR (event->ie.arg))) != 0.0
-		      || XFLOAT_DATA (XCAR (XCDR (event->ie.arg))) != 0.0
-		      || XFLOAT_DATA (Fnth (make_fixnum (3), event->ie.arg)) != 0.0))
-		{
-		  union buffered_input_event *maybe_event = next_kbd_event (event);
-
-		  pinch_dy = XFLOAT_DATA (XCAR (XCDR (event->ie.arg)));
-		  pinch_angle = XFLOAT_DATA (Fnth (make_fixnum (3), event->ie.arg));
-
-		  while (maybe_event != kbd_store_ptr
-			 && maybe_event->ie.kind == PINCH_EVENT
-			 /* Make sure we never miss an event that has
-			    different modifiers.  */
-			 && maybe_event->ie.modifiers == event->ie.modifiers
-			 /* Make sure that the event is for the same
-			    frame.  */
-			 && EQ (maybe_event->ie.frame_or_window,
-				event->ie.frame_or_window)
-			 /* Make sure that the event isn't the start
-			    of a new pinch gesture sequence.  */
-			 && (XFLOAT_DATA (XCAR (maybe_event->ie.arg)) != 0.0
-			     || XFLOAT_DATA (XCAR (XCDR (maybe_event->ie.arg))) != 0.0
-			     || XFLOAT_DATA (Fnth (make_fixnum (3),
-						   maybe_event->ie.arg)) != 0.0))
-		    {
-		      event = maybe_event;
-		      /* Add up relative deltas inside events we skip.  */
-		      pinch_dx += XFLOAT_DATA (XCAR (maybe_event->ie.arg));
-		      pinch_dy += XFLOAT_DATA (XCAR (XCDR (maybe_event->ie.arg)));
-		      pinch_angle += XFLOAT_DATA (Fnth (make_fixnum (3),
-							maybe_event->ie.arg));
-
-		      XSETCAR (maybe_event->ie.arg, make_float (pinch_dx));
-		      XSETCAR (XCDR (maybe_event->ie.arg), make_float (pinch_dy));
-		      XSETCAR (Fnthcdr (make_fixnum (3),
-					maybe_event->ie.arg),
-			       make_float (fmod (pinch_angle, 360.0)));
-
-		      if (!EQ (maybe_event->ie.device, Qt))
-			Vlast_event_device = maybe_event->ie.device;
-
-		      maybe_event = next_kbd_event (event);
-		    }
-		}
-
-	      if (event->kind == MULTIBYTE_CHAR_KEYSTROKE_EVENT
-		  /* This string has to be decoded.  */
-		  && STRINGP (event->ie.arg))
-		{
-		  str = internal_condition_case_1 (kbd_buffer_get_event_1,
-						   event->ie.arg, Qt,
-						   kbd_buffer_get_event_2);
-
-		  /* Decoding the string failed, so use the original,
-		     where at least ASCII text will work.  */
-		  if (NILP (str))
-		    str = event->ie.arg;
-
-		  if (!SCHARS (str))
-		    {
-		      kbd_fetch_ptr = next_kbd_event (event);
-		      obj = Qnil;
-		      break;
-		    }
-
-		  /* car is the index of the next character in the
-		     string that will be sent and cdr is the string
-		     itself.  */
-		  event->ie.arg = Fcons (make_fixnum (0), str);
-		}
-
-	      if (event->kind == MULTIBYTE_CHAR_KEYSTROKE_EVENT
-		  && CONSP (event->ie.arg))
-		{
-		  eassert (FIXNUMP (XCAR (event->ie.arg)));
-		  eassert (STRINGP (XCDR (event->ie.arg)));
-		  eassert (XFIXNUM (XCAR (event->ie.arg))
-			   < SCHARS (XCDR (event->ie.arg)));
-
-		  event->ie.code = XFIXNUM (Faref (XCDR (event->ie.arg),
-						   XCAR (event->ie.arg)));
-
-		  XSETCAR (event->ie.arg,
-			   make_fixnum (XFIXNUM (XCAR (event->ie.arg)) + 1));
-		}
-
-	      obj = make_lispy_event (&event->ie);
-
-#ifdef HAVE_EXT_MENU_BAR
-	      /* If this was a menu selection, then set the flag to inhibit
-		 writing to last_nonmenu_event.  Don't do this if the event
-		 we're returning is (menu-bar), though; that indicates the
-		 beginning of the menu sequence, and we might as well leave
-		 that as the `event with parameters' for this selection.  */
-	      if (used_mouse_menu
-		  && !EQ (event->ie.frame_or_window, event->ie.arg)
-		  && (event->kind == MENU_BAR_EVENT
-		      || event->kind == TAB_BAR_EVENT
-		      || event->kind == TOOL_BAR_EVENT))
-		*used_mouse_menu = true;
-#endif
-#ifdef HAVE_NS
-	      /* Certain system events are non-key events.  */
-	      if (used_mouse_menu
-                  && event->kind == NS_NONKEY_EVENT)
-		*used_mouse_menu = true;
-#endif
-
-	      if (event->kind != MULTIBYTE_CHAR_KEYSTROKE_EVENT
-		  || !CONSP (event->ie.arg)
-		  || (XFIXNUM (XCAR (event->ie.arg))
-		      >= SCHARS (XCDR (event->ie.arg))))
-		{
-		  /* Wipe out this event, to catch bugs.  */
-		  clear_event (&event->ie);
-		  kbd_fetch_ptr = next_kbd_event (event);
-		}
-	    }
-	}
-      }
-    }
-  /* Try generating a mouse motion event.  */
-  else if (some_mouse_moved ())
-    {
-      struct frame *f, *movement_frame = some_mouse_moved ();
-      Lisp_Object bar_window;
-      enum scroll_bar_part part;
-      Lisp_Object x, y;
-      Time t;
-
-      f = movement_frame;
-      *kbp = current_kboard;
-      /* Note that this uses F to determine which terminal to look at.
-	 If there is no valid info, it does not store anything
-	 so x remains nil.  */
-      x = Qnil;
-
-      /* XXX Can f or mouse_position_hook be NULL here?  */
-      if (f && FRAME_TERMINAL (f)->mouse_position_hook)
-        (*FRAME_TERMINAL (f)->mouse_position_hook) (&f, 0, &bar_window,
-                                                    &part, &x, &y, &t);
-
-      obj = Qnil;
-
-      /* Decide if we should generate a switch-frame event.  Don't
-	 generate switch-frame events for motion outside of all Emacs
-	 frames.  */
-      if (!NILP (x) && f)
-	{
-	  Lisp_Object frame;
-
-	  frame = FRAME_FOCUS_FRAME (f);
-	  if (NILP (frame))
-	    XSETFRAME (frame, f);
-
-	  if (!EQ (frame, internal_last_event_frame)
-	      && !EQ (frame, selected_frame))
-	    obj = make_lispy_switch_frame (frame);
-	  internal_last_event_frame = frame;
-	}
-
-      /* If we didn't decide to make a switch-frame event, go ahead and
-	 return a mouse-motion event.  */
-      if (!NILP (x) && NILP (obj))
-	obj = make_lispy_movement (f, bar_window, part, x, y, t);
-
-      if (!NILP (obj))
-	Vlast_event_device = (STRINGP (movement_frame->last_mouse_device)
-			      ? movement_frame->last_mouse_device
-			      : virtual_core_pointer_name);
-    }
-#ifdef HAVE_X_WINDOWS
-  else if (had_pending_selection_requests)
-    obj = Qnil;
-#endif
-  else
-    /* We were promised by the above while loop that there was
-       something for us to read!  */
-    emacs_abort ();
-
-  input_pending = readable_events (0);
-
-  Vlast_event_frame = internal_last_event_frame;
-
-  return (obj);
+  return SCM_CALL_3 (proc,
+                     rc_wrap_ptr (kbp),
+                     rc_wrap_ptr (used_mouse_menu),
+                     rc_wrap_ptr (end_time));
 }
 
 /* Process any non-user-visible events (currently X selection events),
@@ -5896,6 +5413,18 @@ DEFUN ("--rc-test-kbp-storage-value",
   (void)
 {
   return rc_test_kbp_storage ? make_kboard_smob (rc_test_kbp_storage) : Qnil;
+}
+
+DEFUN ("--rc-test-kbp-storage-reset",
+       Fc_rc_test_kbp_storage_reset,
+       Sc_rc_test_kbp_storage_reset, 0, 0, 0,
+       doc: /* Internal test helper: reset the --rc-write-kbp
+   round-trip storage to NULL so a subsequent write-through can be
+   observed from a known-null start.  */)
+  (void)
+{
+  rc_test_kbp_storage = NULL;
+  return Qnil;
 }
 
 DEFUN ("--gobble-input",
@@ -8458,32 +7987,6 @@ make_lispy_event (struct input_event *event)
   Lisp_Object result = SCM_CALL_1 (proc, smob);
   SCM_SET_SMOB_DATA (smob, NULL);
   return result;
-}
-
-static Lisp_Object
-make_lispy_movement (struct frame *frame, Lisp_Object bar_window, enum scroll_bar_part part,
-		     Lisp_Object x, Lisp_Object y, Time t)
-{
-  /* Is it a scroll bar movement?  */
-  if (frame && ! NILP (bar_window))
-    {
-      Lisp_Object part_sym;
-
-      part_sym = builtin_lisp_symbol (scroll_bar_parts[part]);
-      return list2 (Qscroll_bar_movement,
-		    list5 (bar_window,
-			   Qvertical_scroll_bar,
-			   Fcons (x, y),
-			   make_fixnum (t),
-			   part_sym));
-    }
-  /* Or is it an ordinary mouse movement?  */
-  else
-    {
-      Lisp_Object position;
-      position = make_lispy_position (frame, x, y, t);
-      return list2 (Qmouse_movement, position);
-    }
 }
 
 /* Construct a switch frame event.  */

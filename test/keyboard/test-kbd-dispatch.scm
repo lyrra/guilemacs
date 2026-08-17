@@ -10,7 +10,8 @@
 ;;; block (src/keyboard.c:5195-5480): pass-through kinds, the
 ;;; default-path (ASCII keystroke), the swallowed kinds (selection /
 ;;; monitors-changed / menu-bar-activate), multibyte decode +
-;;; incremental, pinch coalescing, and switch-frame synthesis.
+;;; incremental, pinch coalescing, switch-frame synthesis, and the
+;;; imp-5 F1 event-kboard write-back (--ie-kboard + dispatch).
 ;;;
 ;;; Events are stuffed via --kbd-buffer-store-fake-event (kind [arg]);
 ;;; it always stores frame_or_window = selected frame and device = Qt.
@@ -188,3 +189,60 @@
       (check "switch-frame/re-read-real-event" 0 (dispatch-event!))
       (check "switch-frame/re-read-dequeued" #t (queue-empty?)))
     (lambda () (set-last-event-frame! saved-last-frame))))
+
+;;; --- 8. F1: event-kboard write-back (--ie-kboard + dispatch) --------
+
+;; --ie-kboard (event_to_kboard wrapper) shape: a live-frame event
+;; resolves to a kboard smob; the selection kinds resolve to nil (the C
+;; event_to_kboard NULL special-case for SELECTION_*_EVENT).
+(drain-queue!)
+(store-fake! (kind 'ascii-keystroke))
+(let ((ie ((%sym '--kbd-event-ie) ((%sym '--kbd-fetch-ptr-index)))))
+  (check "ie-kboard/live-frame-is-kboard" #t
+         (not (eq? ((%sym 'kboardp) ((%sym '--ie-kboard) ie)) #nil))))
+(drain-queue!)
+
+(drain-queue!)
+(store-fake! (kind 'selection-clear-event))
+(let ((ie ((%sym '--kbd-event-ie) ((%sym '--kbd-fetch-ptr-index)))))
+  (check "ie-kboard/selection-clear-nil" #nil
+         ((%sym '--ie-kboard) ie)))
+(drain-queue!)
+
+;; dispatch-event! must write *kbp = event_to_kboard (ie) on the queue
+;; path, falling back to current_kboard when event_to_kboard returns
+;; nil — exactly the deleted C prologue before the switch.  A real
+;; KBOARD ** backs the rc-slot via the test-only storage; the reset
+;; helper gives a known-null start so the write-through is observable.
+(let* ((kb      ((%sym 'current-kboard)))
+       (rec     ((%sym '--make-rc-state)))
+       (push-f  (%sym '--rc-record-stack-push))
+       (pop-f   (%sym '--rc-record-stack-pop))
+       (set-f   (%sym '--rc-test-state-set!))
+       (ptr-f   (%sym '--rc-test-kbp-storage-ptr))
+       (val-f   (%sym '--rc-test-kbp-storage-value))
+       (reset-f (%sym '--rc-test-kbp-storage-reset)))
+  (set-f rec 'kbp (ptr-f))
+  (push-f rec)
+  (dynamic-wind
+    (lambda () #f)
+    (lambda ()
+      ;; Live-frame event: event_to_kboard resolves the selected frame
+      ;; to its kboard == current_kboard (single-kboard batch build).
+      (reset-f)
+      (check "dispatch/write-kbp-live-frame/initial-null" #nil (val-f))
+      (drain-queue!)
+      (store-fake! (kind 'ascii-keystroke))
+      (dispatch-event!)
+      (check "dispatch/write-kbp-live-frame/writes-through" #t
+             (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil)))
+      ;; Selection event: event_to_kboard returns nil, so the Scheme
+      ;; fallback must still write current_kboard, not leave *kbp null.
+      (reset-f)
+      (check "dispatch/write-kbp-selection/initial-null" #nil (val-f))
+      (drain-queue!)
+      (store-fake! (kind 'selection-clear-event))
+      (dispatch-event!)
+      (check "dispatch/write-kbp-selection/fallback-writes-through" #t
+             (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil))))
+    (lambda () (pop-f))))

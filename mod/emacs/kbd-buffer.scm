@@ -97,6 +97,7 @@
 (defelisp %--ie-modifiers               --ie-modifiers)
 (defelisp %--ie-arg                     --ie-arg)
 (defelisp %--ie-frame-or-window         --ie-frame-or-window)
+(defelisp %--ie-kboard                  --ie-kboard)
 (defelisp %--ie-device                  --ie-device)
 (defelisp %--ie-clear                   --ie-clear)
 (defelisp %--set-ie-arg                 --set-ie-arg)
@@ -140,14 +141,20 @@ file-notify / threads, where C compiles the whole block out."
            (not (truthy? ((force %--daemon-not-yet-running-p)))))))
 
 (define (entry-sync rec kbp end-time)
-  "imp-2 entry sync: if a rec is current (REC non-nil) and its
-kbp / end-time slots are #nil while the corresponding arg is a non-nil
-foreign pointer, copy the arg into the slot (set-rc-state-kbp! /
+  "Direct-invocation entry sync: when a rec is current (REC non-nil)
+and its kbp / end-time slots are #nil while the corresponding arg is a
+non-nil foreign pointer, copy the arg into the slot (set-rc-state-kbp! /
 set-rc-state-end-time!).  This makes the rec-based write-back DEFUNs
 (--rc-write-kbp, --rc-end-time-expired-p, --rc-end-time-remaining)
-work during imp-2, before imp-5 wires RC_SLOT_KBP.  Production
-equivalence holds because the rec slots and the shim args carry the
-same pointers."
+work when the proc is invoked directly from Scheme (the imp-6 harness),
+where the shim does not pre-fill the slots.
+
+The imp-5 C shim now pre-fills RC_SLOT_KBP / RC_SLOT_USED_MOUSE_MENU /
+RC_SLOT_END_TIME on every entry, so on the production path the 'only
+fill nil slots' condition is already false and this is a no-op.  That
+condition is what makes it safe to keep: the rec slots and the shim
+args carry the same pointers, so filling from the args is idempotent."
+
   (when (not (eq? rec #nil))
     (when (and (eq? (rc-state-kbp rec) #nil)
                (not (eq? kbp #nil)))
@@ -438,14 +445,30 @@ caller (kbd-buffer-get-event) guarantees a non-empty queue."
                             #nil)
                         ev))))))))
 
+    ;; F1 (cr.org): mirror the deleted C queue-event prologue
+    ;;   *kbp = event_to_kboard (&event->ie);
+    ;;   if (*kbp == 0) *kbp = current_kboard;
+    ;; for EVERY queue event, before the switch.  --ie-kboard returns
+    ;; nil exactly when event_to_kboard returned NULL, so the nil arm
+    ;; reproduces the current_kboard fallback.  Reads the ORIGINAL ie
+    ;; (default-path! re-wraps it for pinch coalescing).  --rc-write-kbp
+    ;; is a guarded no-op when no read-char/kbd-buffer call is in flight.
+    (let ((kb ((force %--ie-kboard) ie)))
+      ((force %--rc-write-kbp)
+       (if (eq? kb #nil) ((force %current-kboard)) kb)))
+
     (cond
      ;; --- Swallowed kinds (C:5197-5269): run the side effect, loop
      ;; back to wait — they never produce a Lisp event.  The C
      ;; returns Qnil and read_char's retry re-enters; 'wait re-enters
      ;; our wait loop directly.
-     ;; FIX-imp5-guilemacs: imp-5 must reconcile the 'wait loop-back
-     ;; with the C return-nil semantics so timers / quit-flag are not
-     ;; starved between dispatches.
+     ;; Resolved (imp-5, was FIX-imp5-guilemacs): the 'wait loop-back
+     ;; is semantically faithful to the C for(;;) re-iteration, so it
+     ;; cannot starve timers / quit-flag any worse than vanilla C.
+     ;; first-check re-tests quit-flag and the queue on every re-entry,
+     ;; and wait_reading_process_output (the timer pump) is reached
+     ;; exactly when C reached it — whenever both checks report no
+     ;; input.
      ;; NB: `cond' + memv/=/kind, not `case' — Guile's `case' quotes
      ;; its clause datums (ice-9/boot-9.scm:496), so `((,KIND) ...)'
      ;; keys would never match.
@@ -670,6 +693,17 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
       ;; Qtext_conversion or nil, bypassing dispatch), then the
       ;; dispatch hand-off decided by the re-checked queue state (as
       ;; C does, not by the exit symbol).
+      ;; C 5534-5537 shared tail: recompute input_pending and sync
+      ;; Vlast_event_frame to internal_last_event_frame, then return
+      ;; OBJ.  The Vunread drain (C 5155-5160) and the timed-wait
+      ;; deadline return (C 5106-5110) are the two early returns that
+      ;; skip this tail in C.
+      (define (epilogue! obj)
+        ((force %--update-input-pending))
+        (set-symbol-value! 'last-event-frame
+                           ((force %--get-internal-last-event-frame)))
+        obj)
+
       (define (post-wait)
         (when had-sel
           ((force %--x-handle-pending-selection-requests)))
@@ -678,29 +712,38 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
               (let ((first (car v)))
                 (set-symbol-value! 'unread-command-events (cdr v))
                 (write-kbp!)
-                first)
-              (if had-conv
-                  (begin
-                    ((force %--handle-pending-conversion-events))
-                    (if (or (truthy? ((force %--conversion-disabled-p)))
-                            (eq? (symbol-value 'text-conversion-edits) #nil))
-                        #nil
-                        'text-conversion))
-                  (if (not (= ((force %--kbd-fetch-ptr-index))
-                              ((force %--kbd-store-ptr-index))))
-                      (dispatch-event!)
-                      ;; C 5515 / 5564-5571: the mouse-motion branch
-                      ;; outranks the X pending-selection branch.  Only
-                      ;; when some_mouse_moved is nil AND a selection
-                      ;; request is pending (had-sel) does C return Qnil
-                      ;; (read_char retries); with neither, the shared
-                      ;; else aborts.  mouse-motion-synthesize! itself
-                      ;; re-checks some_mouse_moved and aborts when no
-                      ;; frame has pending movement (C 5568-5571).
-                      (if (or (truthy? ((force %--some-mouse-moved)))
-                              (not had-sel))
-                          (mouse-motion-synthesize!)
-                          #nil))))))
+                first)                    ; C 5155-5160: early return, no tail
+              (epilogue!
+               (if had-conv
+                   (begin
+                     ((force %--handle-pending-conversion-events))
+                     (if (or (truthy? ((force %--conversion-disabled-p)))
+                             (eq? (symbol-value 'text-conversion-edits) #nil))
+                         #nil
+                         'text-conversion))
+                   (if (not (= ((force %--kbd-fetch-ptr-index))
+                               ((force %--kbd-store-ptr-index))))
+                       (dispatch-event!)
+                       ;; C 5515 / 5564-5571: the mouse-motion branch
+                       ;; outranks the X pending-selection branch.  Only
+                       ;; when some_mouse_moved is nil AND a selection
+                       ;; request is pending (had-sel) does C return Qnil
+                       ;; (read_char retries); with neither, the shared
+                       ;; else aborts.  mouse-motion-synthesize! itself
+                       ;; re-checks some_mouse_moved and aborts when no
+                       ;; frame has pending movement (C 5568-5571).
+                       (if (or (truthy? ((force %--some-mouse-moved)))
+                               (not had-sel))
+                           ;; F2 (cr.org): C 5524 sets *kbp = current_kboard
+                           ;; inside the mouse-motion branch before the hook
+                           ;; call.  The internal wait loop re-enters without
+                           ;; re-running the entry write-kbp!, so a swallowed
+                           ;; event's F1 write (event_to_kboard) would
+                           ;; otherwise leak into the synthesized event.
+                           (begin
+                             (write-kbp!)
+                             (mouse-motion-synthesize!))
+                           #nil)))))))
 
       (define (wait-loop)
         (let loop ()
