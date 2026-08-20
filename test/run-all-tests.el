@@ -144,6 +144,7 @@
 (load "test/keyboard/test-kbd-wait-loop.el")      ; M11 imp-2
 (load "test/keyboard/test-kbd-dispatch.el")       ; M11 imp-3
 (load "test/keyboard/test-kbd-mouse-motion.el")   ; M11 imp-4
+(load "test/keyboard/test-m12-shims.el")          ; M12 imp-1
 (message "")
 
 (message "========================================")

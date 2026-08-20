@@ -3207,6 +3207,13 @@ read_event_from_main_queue (struct timespec *end_time,
 
 
 
+/* Maximum number of bytes in an encoded keyboard input sequence that
+   read_decoded_event_from_main_queue buffers before decoding.  File
+   scope (not function-local) so the M12 imp-1 tty decode shim below
+   uses the same bound without depending on a scoped #define leaking
+   out of the decode loop.  */
+#define MAX_ENCODED_BYTES 16
+
 /* Like `read_event_from_main_queue' but applies keyboard-coding-system
    to tty input.  */
 static Lisp_Object
@@ -3216,7 +3223,6 @@ read_decoded_event_from_main_queue (struct timespec *end_time,
                                     bool *used_mouse_menu)
 {
 #ifndef WINDOWSNT
-#define MAX_ENCODED_BYTES 16
   Lisp_Object events[MAX_ENCODED_BYTES];
   int n = 0;
 #endif
@@ -5092,6 +5098,196 @@ kbd_buffer_get_event (KBOARD **kbp,
                      rc_wrap_ptr (kbp),
                      rc_wrap_ptr (used_mouse_menu),
                      rc_wrap_ptr (end_time));
+}
+
+/* M12 imp-1 — C shim DEFUNs for the main-queue port.
+
+   Expose the C-internal operations the (emacs main-queue) Scheme
+   procedures need: the getctag prompt-tag globals, the single-kboard
+   flag, the kboard side-queue tail-append, the end-time deadline
+   check, and the tty keyboard-coding decode core.  Each is thin; the
+   tty decode shim is the only non-trivial one.  Scheme gates every
+   tty call behind --selected-frame-tty-p at runtime; the tty shims
+   are #ifdef-gated internally (nil on WINDOWSNT) to match the C
+   decode loop.  See docs/m12-plan.org §imp-1.  */
+
+/* imp-1.1 — getctag save/set + single-kboard reflection.  */
+
+DEFUN ("--get-ctag", Fc_get_ctag, Sc_get_ctag, 0, 0, 0,
+       doc: /* Internal: return the current getctag prompt tag (nil
+when unset).  getctag is the static Lisp_Object that
+quit_throw_to_read_char unwinds to via abort_to_prompt; the Scheme
+read loop saves/restores it around the blocking read.  */)
+  (void)
+{
+  return getctag;
+}
+
+DEFUN ("--set-ctag", Fc_set_ctag, Sc_set_ctag, 1, 1, 0,
+       doc: /* Internal: set getctag to TAG and return TAG.  Mirrors
+set-current-kboard returning its argument.  */)
+  (Lisp_Object tag)
+{
+  getctag = tag;
+  return tag;
+}
+
+DEFUN ("--kbd-single-kboard-p", Fc_kbd_single_kboard_p,
+       Sc_kbd_single_kboard_p, 0, 0, 0,
+       doc: /* Internal: t when the C static single_kboard flag is set.  */)
+  (void)
+{
+  return single_kboard ? Qt : Qnil;
+}
+
+/* imp-1.2 — kboard side-queue append.  Compound on purpose: the
+   tail-walk + append + abort-check + flag must be atomic in C, so
+   Scheme never set-cdr!s C-owned cons cells across the FFI.  */
+
+DEFUN ("--kbd-enqueue-side-queue", Fc_kbd_enqueue_side_queue,
+       Sc_kbd_enqueue_side_queue, 2, 2, 0,
+       doc: /* Internal: append (list EVENT) to KB's kbd_queue side
+queue and set KB's kbd_queue_has_data flag, exactly like the C
+read_event_from_main_queue routing block.  Aborts if the tail
+invariant is broken.  Returns nil.  */)
+  (Lisp_Object kb, Lisp_Object event)
+{
+  CHECK_KBOARD (kb);
+  KBOARD *k = XKBOARD (kb);
+  Lisp_Object last = KVAR (k, kbd_queue);
+  if (CONSP (last))
+    {
+      while (CONSP (XCDR (last)))
+	last = XCDR (last);
+      if (!NILP (XCDR (last)))
+	emacs_abort ();
+    }
+  if (!CONSP (last))
+    kset_kbd_queue (k, list1 (event));
+  else
+    XSETCDR (last, list1 (event));
+  k->kbd_queue_has_data = true;
+  return Qnil;
+}
+
+/* imp-1.3 — rec-free end-time deadline check.  */
+
+DEFUN ("--timespec-expired-p", Fc_timespec_expired_p,
+       Sc_timespec_expired_p, 1, 1, 0,
+       doc: /* Internal: t when PTR is a non-nil foreign pointer to a
+timespec whose deadline is <= current_timespec (); nil otherwise
+(including a nil PTR).  Rec-free companion to --rc-end-time-expired-p:
+the Scheme main-queue procedures pass the end-time pointer explicitly
+so they stay testable without an rc-record on the stack.  */)
+  (Lisp_Object ptr)
+{
+  if (NILP (ptr))
+    return Qnil;
+  struct timespec *end_time = scm_to_pointer (ptr);
+  return (timespec_cmp (*end_time, current_timespec ()) <= 0) ? Qt : Qnil;
+}
+
+/* imp-1.4 — tty keyboard-coding decode shims.  #ifdef-gated internally
+   to match the C decode loop's #ifndef WINDOWSNT boundary; Scheme gates
+   every call behind --selected-frame-tty-p at runtime (see Risk 4:
+   these shims deref FRAME_TTY unguarded on non-WINDOWSNT builds).
+   MAX_ENCODED_BYTES (16) is a file-scope #define above the decode
+   loop.  */
+
+DEFUN ("--tty-keyboard-coding-requires-decoding-p",
+       Fc_tty_keyboard_coding_requires_decoding_p,
+       Sc_tty_keyboard_coding_requires_decoding_p, 0, 0, 0,
+       doc: /* Internal: t when the selected frame's terminal keyboard
+coding has CODING_REQUIRE_DECODING_MASK set.  Caller must verify
+--selected-frame-tty-p first; nil on WINDOWSNT.  */)
+  (void)
+{
+#ifndef WINDOWSNT
+  struct frame *frame = XFRAME (selected_frame);
+  struct terminal *terminal = frame->terminal;
+  return (TERMINAL_KEYBOARD_CODING (terminal)->common_flags
+	  & CODING_REQUIRE_DECODING_MASK) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--tty-keyboard-coding-raw-text-p",
+       Fc_tty_keyboard_coding_raw_text_p,
+       Sc_tty_keyboard_coding_raw_text_p, 0, 0, 0,
+       doc: /* Internal: t when the selected frame's terminal keyboard
+coding is a raw-text coding system.  Caller must verify
+--selected-frame-tty-p first; nil on WINDOWSNT.  */)
+  (void)
+{
+#ifndef WINDOWSNT
+  struct frame *frame = XFRAME (selected_frame);
+  struct terminal *terminal = frame->terminal;
+  return raw_text_coding_system_p (TERMINAL_KEYBOARD_CODING (terminal))
+    ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--tty-decode-keyboard-bytes", Fc_tty_decode_keyboard_bytes,
+       Sc_tty_decode_keyboard_bytes, 1, 1, 0,
+       doc: /* Internal: decode BYTE-VECTOR through the selected
+frame's terminal keyboard coding and return the decoded characters as
+a list of fixnums, or nil when the sequence is incomplete
+(produced_char == 0).  The raw-text high-bit strip stays in Scheme;
+Scheme tracks n and treats nil as continue (n < MAX_ENCODED_BYTES) or
+flush (n == MAX_ENCODED_BYTES).  Caller must verify
+--selected-frame-tty-p first; nil on WINDOWSNT.  */)
+  (Lisp_Object bytevector)
+{
+#ifndef WINDOWSNT
+  if (!scm_is_bytevector (bytevector))
+    return Qnil;
+  ptrdiff_t n = scm_c_bytevector_length (bytevector);
+  const unsigned char *bytes
+    = (const unsigned char *) SCM_BYTEVECTOR_CONTENTS (bytevector);
+  if (n <= 0 || n > MAX_ENCODED_BYTES)
+    return Qnil;
+
+  struct frame *frame = XFRAME (selected_frame);
+  struct terminal *terminal = frame->terminal;
+  struct coding_system *coding = TERMINAL_KEYBOARD_CODING (terminal);
+  int meta_key = FRAME_TTY (frame)->meta_key;
+
+  unsigned char src[MAX_ENCODED_BYTES];
+  unsigned char dest[MAX_ENCODED_BYTES * MAX_MULTIBYTE_LENGTH];
+  int i;
+  for (i = 0; i < n; i++)
+    src[i] = bytes[i];
+  if (meta_key < 2)		/* input-meta-mode is t or nil */
+    for (i = 0; i < n; i++)
+      src[i] &= ~0x80;
+  coding->destination = dest;
+  coding->dst_bytes = sizeof dest;
+  decode_coding_c_string (coding, src, n, Qnil);
+  eassert (coding->produced_char <= n);
+  if (coding->produced_char == 0)
+    return Qnil;		/* incomplete sequence */
+
+  const unsigned char *p = coding->destination;
+  eassert (coding->carryover_bytes == 0);
+  Lisp_Object result = Qnil;
+  int produced = coding->produced_char;
+  for (i = 0; i < produced; i++)
+    {
+      int c = string_char_advance (&p);
+      if (meta_key == 3)
+	{
+	  int modifier = (c < 0x100 && (c & 0x80) ? meta_modifier : 0);
+	  c = (c & ~0x80) | modifier;
+	}
+      result = Fcons (make_fixnum (c), result);
+    }
+  return Fnreverse (result);
+#else
+  return Qnil;
+#endif
 }
 
 /* Process any non-user-visible events (currently X selection events),
@@ -13211,6 +13407,11 @@ init_keyboard (void)
   command_loop_level = -1;
   quit_char = Ctl ('g');
   Vunread_command_events = Qnil;
+  /* getctag is a static Lisp_Object: zero-init leaves it the invalid
+     SCM 0, not Qnil (guilemacs Qnil is non-nil).  Initialize it so
+     --get-ctag and read_event_from_main_queue's save/restore see the
+     elisp nil sentinel when no read is in flight.  */
+  getctag = Qnil;
   last_command_event = Qnil;
   last_nonmenu_event = Qnil;
   last_input_event = Qnil;
