@@ -276,13 +276,12 @@
   (should (fboundp '--rc-wrong-kboard-and-non-reread))
   (should (fboundp '--rc-maybe-redisplay-when-no-input))
   (should (fboundp '--rc-read-and-install-event))
-  (should (fboundp '--rc-read-decoded-event-from-main-queue))
   (should (fboundp '--rc-end-time-expired-p))
   (should (fboundp '--rc-test-install-read-event)))
 
 (ert-deftest m8j-wkbd-nr/fall-through-at-idle ()
   ;; Outside any in-flight read_char, the subr early-returns
-  ;; `fall-through' before touching read_decoded_event_from_main_queue.
+  ;; `fall-through' before touching the main-queue read.
   (should (eq 'fall-through (--rc-wrong-kboard-and-non-reread!))))
 
 (ert-deftest m8j-wkbd-nr/maybe-redisplay-helper-returns-nil ()
@@ -291,8 +290,31 @@
 
 (ert-deftest m8j-wkbd-nr/read-install-idle-continues ()
   (should (eq 'continue (--rc-read-and-install-event)))
-  (should (eq nil (--rc-read-decoded-event-from-main-queue)))
   (should (eq nil (--rc-end-time-expired-p))))
+
+(ert-deftest m8j-read-install/decodes-event-from-main-queue ()
+  ;; M12 imp-5 rewire: rc-read-and-install-event! pulls the event
+  ;; through the Scheme (emacs main-queue) port (no C seam).  With a
+  ;; live rec and a Vunread break, the raw fixnum lands in state->c
+  ;; and the queue is drained.
+  (let ((unread-command-events (list ?z)))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'continue (--rc-read-and-install-event!)))
+       (should (eq ?z (m8-test-state-ref 'c)))
+       (should (null unread-command-events))))))
+
+(ert-deftest m8j-read-install/decodes-symbol-event-from-main-queue ()
+  ;; A non-fixnum event survives the decode port unchanged (the
+  ;; non-integer branch of read-event-from-main-queue).
+  (let ((unread-command-events (list 'menu-bar)))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'continue (--rc-read-and-install-event!)))
+       (should (eq 'menu-bar (m8-test-state-ref 'c)))
+       (should (null unread-command-events))))))
 
 (ert-deftest m8j-wkbd-nr/preset-c-falls-through ()
   (m8-with-rc-state

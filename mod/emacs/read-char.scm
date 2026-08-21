@@ -6,9 +6,8 @@
   #:export (;; M8a — data substrate
             make-rc-state rc-state?
             rc-state-fresh!
-            ;; kbp / end-time slot accessors — imported by (emacs
+            ;; end-time slot accessors — imported by (emacs
             ;; kbd-buffer) for the imp-2 entry-sync (M11 imp-2).
-            rc-state-kbp set-rc-state-kbp!
             rc-state-end-time set-rc-state-end-time!
             read-char-init-state
             read-char-entry
@@ -79,11 +78,16 @@
 ;;;;                      -2 = read_char called with prevent_redisplay.
 ;;;;   map              — keymap stack (the FOLLOW arg from read_char).
 ;;;;   prev-event       — last-command-event the caller saw.
-;;;;   used-mouse-menu  — set true if the read produced a menu choice.
+;;;;   used-mouse-menu  — foreign-ptr to the caller-owned C bool (or
+;;;;                      #nil); C consumers set *p true when the read
+;;;;                      produced a menu choice.  NOT a Scheme flag —
+;;;;                      threading it as a value is brief.org sub-task
+;;;;                      B (deferred).
 ;;;;   end-time         — deadline for timed reads (#nil = no timeout).
 ;;;;   c                — the resulting event (output slot).
 ;;;;   local-tag        — Guile-prompt tag passed as local_getcjmp to
-;;;;                      read_decoded_event_from_main_queue (M8j).
+;;;;                      read-decoded-event-from-main-queue (M8j / M12
+;;;;                      imp-5 rewire).
 ;;;;   previous-echo-area-message
 ;;;;                    — saved echo-area state for restoration.
 ;;;;   also-record      — secondary event to add_command_key when set.
@@ -92,18 +96,13 @@
 ;;;;   reread           — true when re-reading from unread-events.
 ;;;;   orig-kboard      — current_kboard snapshot at entry (for
 ;;;;                      detecting kboard switches mid-read).
-;;;;   kbp              — kbd_buffer_get_event's `kbp' (KBOARD **),
-;;;;                      wrapped as a foreign pointer at shim entry
-;;;;                      (M11 imp-1.3 / imp-5), written back via
-;;;;                      --rc-write-kbp.  #nil outside a kbd-buffer
-;;;;                      call.
 
 (define-record-type <rc-state>
   (%make-rc-state commandflag map prev-event used-mouse-menu end-time
                   c local-tag
                   previous-echo-area-message also-record
                   recorded reread
-                  orig-kboard kbp)
+                  orig-kboard)
   rc-state?
   (commandflag       rc-state-commandflag       set-rc-state-commandflag!)
   (map               rc-state-map               set-rc-state-map!)
@@ -118,8 +117,7 @@
   (also-record       rc-state-also-record       set-rc-state-also-record!)
   (recorded          rc-state-recorded          set-rc-state-recorded!)
   (reread            rc-state-reread            set-rc-state-reread!)
-  (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!)
-  (kbp               rc-state-kbp               set-rc-state-kbp!))
+  (orig-kboard       rc-state-orig-kboard       set-rc-state-orig-kboard!))
 
 (define (make-rc-state)
   "Create a fresh rc-state with C-struct defaults (everything nil
@@ -137,8 +135,7 @@ explicit zeroing in src/keyboard.c."
    #nil   ; also-record
    #nil   ; recorded (bool)
    #nil   ; reread (bool)
-   #nil   ; orig-kboard
-   #nil)) ; kbp (foreign-ptr or #nil; kbd_buffer_get_event only)
+   #nil)) ; orig-kboard
 
 (define (read-char-init-state commandflag map prev-event
                               used-mouse-menu end-time orig-kboard)
@@ -156,8 +153,7 @@ already wrapped as Guile foreign-pointer SCMs (or nil)."
                               #nil          ; also-record
                               #nil          ; recorded
                               #nil          ; reread
-                              orig-kboard
-                              #nil)))       ; kbp (kbd_buffer_get_event only)
+                              orig-kboard)))
     (cons rec tag)))
 
 (define %rc-record-stack-push (delay (%c '--rc-record-stack-push)))
@@ -208,8 +204,7 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-also-record!                state #nil)
   (set-rc-state-recorded!                   state #nil)
   (set-rc-state-reread!                     state #nil)
-  (set-rc-state-orig-kboard!                state #nil)
-  (set-rc-state-kbp!                        state #nil))
+  (set-rc-state-orig-kboard!                state #nil))
 
 ;; Internal test harness: srfi-9 accessors are not elisp-callable in
 ;; this build, so branch tests go through these narrow field helpers.
@@ -227,7 +222,6 @@ test setup when the same rc-state is reused across calls."
     ((recorded)                   (rc-state-recorded rec))
     ((reread)                     (rc-state-reread rec))
     ((orig-kboard)                (rc-state-orig-kboard rec))
-    ((kbp)                        (rc-state-kbp rec))
     (else ((%c 'error) "Unknown rc-state test field: %S" field))))
 
 (define (%rc-test-state-set! rec field value)
@@ -244,7 +238,6 @@ test setup when the same rc-state is reused across calls."
     ((recorded)                   (set-rc-state-recorded! rec value))
     ((reread)                     (set-rc-state-reread! rec value))
     ((orig-kboard)                (set-rc-state-orig-kboard! rec value))
-    ((kbp)                        (set-rc-state-kbp! rec value))
     (else ((%c 'error) "Unknown rc-state test field: %S" field)))
   #nil)
 
@@ -573,10 +566,22 @@ special command matched.  See docs/keyboard.org §M8k."
                   'goto-exit)
                  (else 'goto-retry)))))))))))))
 
-(define %rc-read-decoded-event-from-main-queue
-  (delay (%c '--rc-read-decoded-event-from-main-queue)))
 (define %rc-end-time-expired-p
   (delay (%c '--rc-end-time-expired-p)))
+
+;;; Lazy reference to the Scheme (emacs main-queue) port (M12 imp-3).
+;;; Deliberately NOT a #:use-module: read-char is loaded by the prelude
+;;; (prelude/load.scm) BEFORE syms_of_keyboard registers the C DEFUNs,
+;;; and (emacs main-queue) pulls in (emacs kbd-buffer) → (emacs
+;;; lispy-event), whose top-level forms force C DEFUNs at load time.
+;;; The delay defers the module load to the first read — at runtime,
+;;; after syms_of_keyboard — matching how kbd-buffer itself is loaded
+;;; via scm_c_public_ref (the m12-plan's "same as kbd-buffer today"
+;;; claim assumed lazy loading; an eager use-module here breaks the
+;;; prelude, see FIX-20260821-guilemacs).
+(define %read-decoded-event-from-main-queue
+  (delay (module-ref (resolve-module '(emacs main-queue) #:ensure #t)
+                     'read-decoded-event-from-main-queue)))
 
 (define (rc-maybe-redisplay-when-no-input! commandflag)
   "Redisplay when COMMANDFLAG allows it and no input is pending.
@@ -611,14 +616,27 @@ flags, timer-aware input probe, and redisplay action."
       'continue))))
 
 (define (rc-read-and-install-event!)
-  "Read one raw M8j event, peel wrappers, and install it into the current state."
+  "Read one raw M8j event, peel wrappers, and install it into the current state.
+M12 imp-5: calls the Scheme (emacs main-queue) port directly — the
+C seam it replaces was deleted by imp-4."
   (let ((rec ((force %rc-record-current))))
     (cond
      ((%nilp rec) 'continue)
      (else
-      (rc-install-read-event!
-       rec
-       ((force %rc-read-decoded-event-from-main-queue)))))))
+      (call-with-values
+        (lambda ()
+          ((force %read-decoded-event-from-main-queue)
+           (rc-state-end-time rec)
+           (rc-state-local-tag rec)
+           (rc-state-prev-event rec)))
+        (lambda (event used-mouse-menu)
+          ;; Consume the returned used-mouse-menu through the caller's
+          ;; bool pointer (RC_SLOT_USED_MOUSE_MENU) exactly as the
+          ;; deleted C seam did (imp-4).  --rc-mark-used-mouse-menu-true
+          ;; is kept (deferrable imp-5 half).
+          (when (not (%nilp used-mouse-menu))
+            ((force %rc-mark-used-mouse-menu-true) rec))
+          (rc-install-read-event! rec event)))))))
 
 (define (%rc-test-install-read-event c)
   "Test-only entry for Scheme M8j postprocessing without blocking for input."
@@ -629,12 +647,12 @@ flags, timer-aware input probe, and redisplay action."
 
 (define (rc-wrong-kboard-and-non-reread!)
   "Blocking-read + non-reread fixup loop.  Calls
-read_decoded_event_from_main_queue to drive state->c, peels Qt /
-Qno_record wrappers, and loops back to retry the blocking read
-when c is still nil after a redisplay.  Returns `goto-exit'
-(end_time expired), `return-wrong-kboard' (caller returns -2),
-or `fall-through' (state->c is non-nil).  See docs/keyboard.org
-§M8j."
+rc-read-and-install-event! (which drives state->c through the Scheme
+(emacs main-queue) port, M12 imp-5), peels Qt / Qno_record wrappers,
+and loops back to retry the blocking read when c is still nil after a
+redisplay.  Returns `goto-exit' (end_time expired),
+`return-wrong-kboard' (caller returns -2), or `fall-through' (state->c
+is non-nil).  See docs/keyboard.org §M8j."
   (let ((rec ((force %rc-record-current))))
     (cond
      ((%nilp rec) 'fall-through)

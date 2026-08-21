@@ -4,14 +4,13 @@
 ;;; Ports the two keyboard.c callers that sit between `(emacs read-char)`
 ;;; and the M11 kbd-buffer-get-event into Scheme (docs/m12-plan.org
 ;;; §imp-3; brief.org).  Pure transliteration of the C bodies — no
-;;; algorithmic change, no C deletion (that is imp-4).  The C bodies
-;;; (src/keyboard.c:3140-3206 / :3213-3323) and the live
-;;; --rc-read-decoded-event-from-main-queue seam (:3844) stay callable
-;;; until the imp-4/imp-5 cutover; nothing here is wired into
-;;; read-char.scm yet (imp-5).
+;;; algorithmic change.  The C bodies (src/keyboard.c:3140-3206 /
+;;; :3213-3323) and the --rc-read-decoded-event-from-main-queue seam
+;;; were deleted by imp-4; read-char.scm (imp-5 rewire, landed with
+;;; imp-4) calls this port directly.
 ;;;
-;;;     read-decoded-event-from-main-queue   (C :3213)
-;;;       └─ read-event-from-main-queue      (C :3140)
+;;;     read-decoded-event-from-main-queue
+;;;       └─ read-event-from-main-queue
 ;;;            └─ kbd-buffer-get-event       (values event kboard used-mouse-menu)
 ;;;
 ;;; Both return (values event used-mouse-menu).  KBOARD is consumed
@@ -46,7 +45,8 @@
 ;;;   `(null? #nil)' is #t, but the explicit check pins the contract
 ;;;   (review cr.org F1).
 ;;;
-;;; See src/keyboard.c:3140-3323 for the C being mirrored.
+;;; The C bodies being mirrored were src/keyboard.c:3140-3323 (deleted
+;;; by imp-4); see the M12 imp-3 commit for the original.
 
 (define-module (emacs main-queue)
   #:use-module (emacs elisp-ref)      ; %c, defelisp

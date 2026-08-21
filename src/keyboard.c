@@ -1371,28 +1371,6 @@ Caller must ensure 0 <= N < KBD_BUFFER_SIZE.  Returns nil.  */)
   return Qnil;
 }
 
-DEFUN ("--kbd-dequeue-event", Fkbd_dequeue_event, Skbd_dequeue_event, 0, 0, 0,
-       doc: /* Dequeue the event at kbd_fetch_ptr and return (kind . ie-smob).
-
-Atomically reads the current event's kind, wraps its ie as an ie-smob,
-advances kbd_fetch_ptr, and returns a cons cell (KIND . IE-SMOB).
-
-Scheme MUST extract all fields from the ie-smob before any subsequent
-FFI call — the smob points into kbd_buffer and may be overwritten.
-
-Returns nil if the queue is empty (kbd_fetch_ptr == kbd_store_ptr).  */)
-  (void)
-{
-  if (kbd_fetch_ptr == kbd_store_ptr)
-    return Qnil;
-
-  Lisp_Object kind = make_fixnum (kbd_fetch_ptr->kind);
-  SCM smob = ie_wrap (&kbd_fetch_ptr->ie);
-  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-
-  return Fcons (kind, smob);
-}
-
 DEFUN ("--kbd-handle-selection-event", Fkbd_handle_selection_event,
        Skbd_handle_selection_event, 0, 0, 0,
        doc: /* Handle a selection event at the current kbd_fetch_ptr
@@ -3122,8 +3100,6 @@ show_help_echo (Lisp_Object help, Lisp_Object window, Lisp_Object object,
 
 /* Input of single characters from keyboard.  */
 
-static Lisp_Object kbd_buffer_get_event (KBOARD **kbp, bool *used_mouse_menu,
-					 struct timespec *end_time);
 static void record_char (Lisp_Object c);
 
 static Lisp_Object help_form_saved_window_configs;
@@ -3136,74 +3112,7 @@ read_char_help_form_unwind (void)
     Fset_window_configuration (window_config, Qnil, Qnil);
 }
 
-static Lisp_Object
-read_event_from_main_queue (struct timespec *end_time,
-                            Lisp_Object local_tag,
-                            bool *used_mouse_menu)
-{
-  Lisp_Object c = Qnil;
-  Lisp_Object save_tag = Qnil;
-  sys_jmp_buf *save_jump = xmalloc (sizeof *save_jump);
-  KBOARD *kb;
 
- start:
-
-  /* Read from the main queue, and if that gives us something we can't use yet,
-     we put it on the appropriate side queue and try again.  */
-
-  if (end_time && timespec_cmp (*end_time, current_timespec ()) <= 0)
-    return c;
-
-  /* Actually read a character, waiting if necessary.  */
-  save_tag = getctag;
-  getctag = local_tag;
-  if (!end_time)
-    timer_start_idle ();
-  c = kbd_buffer_get_event (&kb, used_mouse_menu, end_time);
-  getctag = save_tag;
-
-  if (! NILP (c) && (kb != current_kboard))
-    {
-      Lisp_Object last = KVAR (kb, kbd_queue);
-      if (CONSP (last))
-        {
-          while (CONSP (XCDR (last)))
-	    last = XCDR (last);
-          if (!NILP (XCDR (last)))
-	    emacs_abort ();
-        }
-      if (!CONSP (last))
-        kset_kbd_queue (kb, list1 (c));
-      else
-        XSETCDR (last, list1 (c));
-      kb->kbd_queue_has_data = true;
-      c = Qnil;
-      if (single_kboard)
-        goto start;
-      current_kboard = kb;
-      return make_fixnum (-2);
-    }
-
-  /* Terminate Emacs in batch mode if at eof.  */
-  if (noninteractive && FIXNUMP (c) && XFIXNUM (c) < 0)
-    Fkill_emacs (make_fixnum (1), Qnil);
-
-  if (FIXNUMP (c))
-    {
-      /* Add in any extra modifiers, where appropriate.  */
-      if ((extra_keyboard_modifiers & CHAR_CTL)
-	  || ((extra_keyboard_modifiers & 0177) < ' '
-	      && (extra_keyboard_modifiers & 0177) != 0))
-	XSETINT (c, make_ctrl_char (XFIXNUM (c)));
-
-      /* Transfer any other modifier bits directly from
-	 extra_keyboard_modifiers to c.  Ignore the actual character code
-	 in the low 16 bits of extra_keyboard_modifiers.  */
-      XSETINT (c, XFIXNUM (c) | (extra_keyboard_modifiers & ~0xff7f & ~CHAR_CTL));
-    }
-
-  return c;
-}
 
 
 
@@ -3213,120 +3122,6 @@ read_event_from_main_queue (struct timespec *end_time,
    uses the same bound without depending on a scoped #define leaking
    out of the decode loop.  */
 #define MAX_ENCODED_BYTES 16
-
-/* Like `read_event_from_main_queue' but applies keyboard-coding-system
-   to tty input.  */
-static Lisp_Object
-read_decoded_event_from_main_queue (struct timespec *end_time,
-                                    Lisp_Object local_getcjmp,
-                                    Lisp_Object prev_event,
-                                    bool *used_mouse_menu)
-{
-#ifndef WINDOWSNT
-  Lisp_Object events[MAX_ENCODED_BYTES];
-  int n = 0;
-#endif
-  while (true)
-    {
-      Lisp_Object nextevt
-        = read_event_from_main_queue (end_time, local_getcjmp,
-                                      used_mouse_menu);
-#ifdef WINDOWSNT
-      /* w32_console already returns decoded events.  It either reads
-	 Unicode characters from the Windows keyboard input, or
-	 converts characters encoded in the current codepage into
-	 Unicode.  See w32inevt.c:key_event, near its end.  */
-      return nextevt;
-#else
-      struct frame *frame = XFRAME (selected_frame);
-      struct terminal *terminal = frame->terminal;
-      if (!((FRAME_TERMCAP_P (frame) || FRAME_MSDOS_P (frame))
-            /* Don't apply decoding if we're just reading a raw event
-               (e.g. reading bytes sent by the xterm to specify the position
-               of a mouse click).  */
-            && (!EQ (prev_event, Qt))
-	    && (TERMINAL_KEYBOARD_CODING (terminal)->common_flags
-		& CODING_REQUIRE_DECODING_MASK)))
-	return nextevt;		/* No decoding needed.  */
-      else
-	{
-	  int meta_key = terminal->display_info.tty->meta_key;
-	  eassert (n < MAX_ENCODED_BYTES);
-	  events[n++] = nextevt;
-	  if (FIXNATP (nextevt)
-	      && XFIXNUM (nextevt) < (meta_key == 1 ? 0x80 : 0x100))
-	    { /* An encoded byte sequence, let's try to decode it.  */
-	      struct coding_system *coding
-		= TERMINAL_KEYBOARD_CODING (terminal);
-
-	      if (raw_text_coding_system_p (coding))
-		{
-		  int i;
-		  if (meta_key != 2)
-		    {
-		      for (i = 0; i < n; i++)
-			{
-			  int c = XFIXNUM (events[i]);
-			  int modifier =
-			    (meta_key == 3 && c < 0x100 && (c & 0x80))
-			    ? meta_modifier
-			    : 0;
-			  events[i] = make_fixnum ((c & ~0x80) | modifier);
-			}
-		    }
-		}
-	      else
-		{
-		  unsigned char src[MAX_ENCODED_BYTES];
-		  unsigned char dest[MAX_ENCODED_BYTES * MAX_MULTIBYTE_LENGTH];
-		  int i;
-		  for (i = 0; i < n; i++)
-		    src[i] = XFIXNUM (events[i]);
-		  if (meta_key < 2) /* input-meta-mode is t or nil */
-		    for (i = 0; i < n; i++)
-		      src[i] &= ~0x80;
-		  coding->destination = dest;
-		  coding->dst_bytes = sizeof dest;
-		  decode_coding_c_string (coding, src, n, Qnil);
-		  eassert (coding->produced_char <= n);
-		  if (coding->produced_char == 0)
-		    { /* The encoded sequence is incomplete.  */
-		      if (n < MAX_ENCODED_BYTES) /* Avoid buffer overflow.  */
-			continue;		     /* Read on!  */
-		    }
-		  else
-		    {
-		      const unsigned char *p = coding->destination;
-		      eassert (coding->carryover_bytes == 0);
-		      n = 0;
-		      while (n < coding->produced_char)
-			{
-			  int c = string_char_advance (&p);
-			  if (meta_key == 3)
-			    {
-			      int modifier
-				= (c < 0x100 && (c & 0x80)
-				   ? meta_modifier
-				   : 0);
-			      c = (c & ~0x80) | modifier;
-			    }
-			  events[n++] = make_fixnum (c);
-			}
-		    }
-		}
-	    }
-	  /* Now `events' should hold decoded events.
-	     Normally, n should be equal to 1, but better not rely on it.
-	     We can only return one event here, so return the first we
-	     had and keep the others (if any) for later.  */
-	  while (n > 1)
-	    Vunread_command_events
-	      = Fcons (events[--n], Vunread_command_events);
-	  return events[0];
-	}
-#endif
-    }
-}
 
 /* Read a character from the keyboard; call the redisplay if needed.  */
 /* commandflag 0 means do not autosave, but do redisplay.
@@ -3379,7 +3174,6 @@ enum rc_slot {
   RC_SLOT_RECORDED                    = 9,
   RC_SLOT_REREAD                      = 10,
   RC_SLOT_ORIG_KBOARD                 = 11, /* kboard SMOB */
-  RC_SLOT_KBP                         = 12  /* foreign-ptr to KBOARD ** (kbd_buffer_get_event kbp), or Qnil */
 };
 
 /* M6 infrastructure — slot enums for <keyremap> and <rks-state>
@@ -3835,31 +3629,6 @@ while-no-input-ignore events.  */)
 {
   timer_resume_idle ();
   return Qnil;
-}
-
-/* M8j — tiny C shims for the Scheme-owned blocking-read + non-reread
-   loop.  Scheme owns the iteration and the timer-stop / c-is-nil
-   gates; C still owns the blocking read_decoded_event_from_main_queue.  */
-
-DEFUN ("--rc-read-decoded-event-from-main-queue",
-       Fc_rc_read_decoded_event_from_main_queue,
-       Sc_rc_read_decoded_event_from_main_queue, 0, 0, 0,
-       doc: /* Internal: call read_decoded_event_from_main_queue
-using the top-of-stack rec's end-time / local-tag / prev-event /
-used-mouse-menu slots.  Returns the raw event; Scheme owns the
-timeout / -2 / Qt / Qno_record postprocessing.  */)
-  (void)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  struct timespec *end_time = rc_unwrap_ptr (rec, RC_SLOT_END_TIME);
-  bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
-
-  return read_decoded_event_from_main_queue (end_time,
-                                             rc_get (rec, RC_SLOT_LOCAL_TAG),
-                                             rc_get (rec, RC_SLOT_PREV_EVENT),
-                                             used_mouse_menu);
 }
 
 DEFUN ("--rc-end-time-expired-p",
@@ -5063,48 +4832,13 @@ kbd_buffer_get_event_2 (Lisp_Object val)
    or that was handled here.
    We always read and discard one event.
 
-   M11 imp-5: the C body (wait loop, event-kind dispatch, and
-   mouse-motion fallback) is replaced by a thin shim delegating to
-   (emacs kbd-buffer).  M12 imp-2: the Scheme entry now RETURNS
-   (values event kboard used-mouse-menu); this shim keeps its old
-   3-arg, single-return contract through the temporary
-   kbd-buffer-get-event-write-back adapter, which re-materialises the
-   *kbp / *used_mouse_menu pointer write-backs from the returned
-   values.  The three caller-owned pointers ride the top-of-stack
-   rc-record slots so the Scheme-side write-back DEFUNs
-   (--rc-write-kbp, --rc-end-time-*, --rc-mark-used-mouse-menu-true)
-   operate on this call's stack frame; the raw return value is the
-   event obj.  Imp-4 deletes the adapter together with this shim.  */
-
-static Lisp_Object
-kbd_buffer_get_event (KBOARD **kbp,
-                      bool *used_mouse_menu,
-                      struct timespec *end_time)
-{
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs kbd-buffer",
-                             "kbd-buffer-get-event-write-back");
-
-  /* Populate the pointer slots fresh on every entry.  Scheme's
-     entry-sync only fills nil slots, so a second kbd_buffer_get_event
-     within one read_char (the non-reread loop) would otherwise leave a
-     stale *kbp and --rc-write-kbp would write to a dead stack frame.
-     Guarded: depth 0 means no read_char is in flight, matching the
-     DEFUNs' no-op behaviour.  */
-  if (rc_state_depth > 0)
-    {
-      SCM rec = rc_record_stack[rc_state_depth - 1];
-      rc_set (rec, RC_SLOT_KBP, rc_wrap_ptr (kbp));
-      rc_set (rec, RC_SLOT_USED_MOUSE_MENU, rc_wrap_ptr (used_mouse_menu));
-      rc_set (rec, RC_SLOT_END_TIME, rc_wrap_ptr (end_time));
-    }
-
-  return SCM_CALL_3 (proc,
-                     rc_wrap_ptr (kbp),
-                     rc_wrap_ptr (used_mouse_menu),
-                     rc_wrap_ptr (end_time));
-}
+   M11 imp-5 replaced the C body (wait loop, event-kind dispatch, and
+   mouse-motion fallback) with a shim delegating to (emacs kbd-buffer);
+   M12 imp-2 made the Scheme entry return (values event kboard
+   used-mouse-menu) and served this shim through the temporary
+   kbd-buffer-get-event-write-back adapter.  M12 imp-4 deleted the
+   shim together with the adapter: (emacs main-queue) now calls
+   kbd-buffer-get-event directly.  */
 
 /* M12 imp-1 — C shim DEFUNs for the main-queue port.
 
@@ -5153,8 +4887,8 @@ DEFUN ("--kbd-single-kboard-p", Fc_kbd_single_kboard_p,
 DEFUN ("--kbd-enqueue-side-queue", Fc_kbd_enqueue_side_queue,
        Sc_kbd_enqueue_side_queue, 2, 2, 0,
        doc: /* Internal: append (list EVENT) to KB's kbd_queue side
-queue and set KB's kbd_queue_has_data flag, exactly like the C
-read_event_from_main_queue routing block.  Aborts if the tail
+queue and set KB's kbd_queue_has_data flag, exactly like the deleted
+C main-queue routing block.  Aborts if the tail
 invariant is broken.  Returns nil.  */)
   (Lisp_Object kb, Lisp_Object event)
 {
@@ -5563,72 +5297,6 @@ DEFUN ("--x-handle-pending-selection-requests",
   return Qnil;
 }
 
-DEFUN ("--rc-write-kbp",
-       Fc_rc_write_kbp,
-       Sc_rc_write_kbp, 1, 1, 0,
-       doc: /* Internal: write the KBOARD wrapped by KBOARD-SMOB back
-   through rc-record slot RC_SLOT_KBP.  That slot holds the
-   kbd_buffer_get_event local `kbp' (KBOARD **) wrapped as a foreign
-   pointer at shim entry (imp-5), exactly as used_mouse_menu / end_time
-   already round-trip (slots 3/4); Scheme writes the smob back here
-   after switching kboards.  Returns nil; a no-op when no read-char /
-   kbd-buffer call is in flight.  */)
-  (Lisp_Object kb)
-{
-  if (rc_state_depth == 0)
-    return Qnil;
-  CHECK_KBOARD (kb);
-  SCM rec = rc_record_stack[rc_state_depth - 1];
-  KBOARD **kbp = (KBOARD **) rc_unwrap_ptr (rec, RC_SLOT_KBP);
-  if (kbp)
-    *kbp = XKBOARD (kb);
-  return Qnil;
-}
-
-/* M11 imp-1.3 — test-only storage for the --rc-write-kbp round-trip.
-   kbd_buffer_get_event's `kbp' (KBOARD **) lives in the caller's
-   stack frame, which a Scheme test cannot allocate; this static
-   provides writable storage so the depth > 0 write-through path is
-   observable from Scheme.  Initialised to NULL — the corpus asserts
-   nil before the write and the written kboard after, proving the
-   write-through happened (see test/keyboard/test-kbd-escape-shims.scm).  */
-
-static KBOARD *rc_test_kbp_storage;
-
-DEFUN ("--rc-test-kbp-storage-ptr",
-       Fc_rc_test_kbp_storage_ptr,
-       Sc_rc_test_kbp_storage_ptr, 0, 0, 0,
-       doc: /* Internal test helper: return a foreign pointer to the
-   KBOARD ** backing the --rc-write-kbp round-trip test, for storing
-   in an rc-record's RC_SLOT_KBP slot.  */)
-  (void)
-{
-  return rc_wrap_ptr (&rc_test_kbp_storage);
-}
-
-DEFUN ("--rc-test-kbp-storage-value",
-       Fc_rc_test_kbp_storage_value,
-       Sc_rc_test_kbp_storage_value, 0, 0, 0,
-       doc: /* Internal test helper: return the KBOARD currently
-   pointed at by the --rc-write-kbp round-trip storage as a kboard
-   smob (nil when NULL).  */)
-  (void)
-{
-  return rc_test_kbp_storage ? make_kboard_smob (rc_test_kbp_storage) : Qnil;
-}
-
-DEFUN ("--rc-test-kbp-storage-reset",
-       Fc_rc_test_kbp_storage_reset,
-       Sc_rc_test_kbp_storage_reset, 0, 0, 0,
-       doc: /* Internal test helper: reset the --rc-write-kbp
-   round-trip storage to NULL so a subsequent write-through can be
-   observed from a known-null start.  */)
-  (void)
-{
-  rc_test_kbp_storage = NULL;
-  return Qnil;
-}
-
 DEFUN ("--gobble-input",
        Fc_gobble_input,
        Sc_gobble_input, 0, 0, 0,
@@ -5716,13 +5384,14 @@ DEFUN ("--kbd-buffer-store-fake-event",
 }
 
 /* M11 imp-2 — test-only end-time storage pointers for the timed
-   branch.  Mirror the --rc-test-kbp-storage-ptr pattern: a static
-   timespec whose address is handed to Scheme as a foreign pointer to
-   store in an rc-record's RC_SLOT_END_TIME slot.  The expired one is
-   initialised to the epoch (always <= now), so the wait loop's
-   "expired → return nil, no sleep" arm is testable without blocking;
-   the far-future one (year ~2038) exercises the (SEC . NSEC) shape
-   without tripping the expired arm.  */
+   branch.  Mirrors the deleted M11 imp-1.3 --rc-test-kbp-storage-ptr
+   pattern (see the M12 imp-4 diff): a static timespec whose address is
+   handed to Scheme as a foreign pointer to store in an rc-record's
+   RC_SLOT_END_TIME slot.  The expired one is initialised to the epoch
+   (always <= now), so the wait loop's "expired → return nil, no
+   sleep" arm is testable without blocking; the far-future one (year
+   ~2038) exercises the (SEC . NSEC) shape without tripping the
+   expired arm.  */
 
 static struct timespec rc_test_expired_end_time = { 0, 0 };
 static struct timespec rc_test_far_future_end_time = { (time_t) 0x7fffffff, 0 };
@@ -13415,8 +13084,8 @@ init_keyboard (void)
   Vunread_command_events = Qnil;
   /* getctag is a static Lisp_Object: zero-init leaves it the invalid
      SCM 0, not Qnil (guilemacs Qnil is non-nil).  Initialize it so
-     --get-ctag and read_event_from_main_queue's save/restore see the
-     elisp nil sentinel when no read is in flight.  */
+     --get-ctag and the deleted C main-queue read see the elisp nil
+     sentinel when no read is in flight.  */
   getctag = Qnil;
   last_command_event = Qnil;
   last_nonmenu_event = Qnil;

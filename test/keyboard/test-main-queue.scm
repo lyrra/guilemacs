@@ -530,3 +530,17 @@
                          (symbol-value 'unread-command-events))))))
           (report "decode/utf8-skip-meta-key-lt-2" 'PASS)))
     (report "decode/utf8-skip-non-tty" 'PASS))
+
+;;; --- 12. imp-5 rewire: (emacs read-char) calls this port ------------
+
+;; The imp-5 rewire replaced the C seam --rc-read-decoded-event-from-
+;; main-queue with a direct call into this module.  read-char.scm holds
+;; the port behind a delayed resolve-module reference (FIX-20260821-
+;; guilemacs); forcing it must yield EXACTLY this module's procedure —
+;; not a C DEFUN, not a copy.
+(let* ((rc-mod (resolve-module '(emacs read-char)))
+       (rewired (force (module-ref rc-mod
+                                   '%read-decoded-event-from-main-queue))))
+  (check "rewire/resolves-to-procedure" #t (procedure? rewired))
+  (check "rewire/is-the-main-queue-port" #t
+         (eq? rewired read-decoded-event-from-main-queue)))

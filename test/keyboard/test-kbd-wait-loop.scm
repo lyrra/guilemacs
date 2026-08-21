@@ -53,8 +53,8 @@
 
 ;; Push a fresh <rc-state> rec (with optional FIELD→VALUE settings)
 ;; for the duration of THUNK, so the rec-based write-back DEFUNs
-;; (--rc-write-kbp / --rc-end-time-expired-p / --rc-end-time-remaining)
-;; see rc_state_depth > 0.
+;; (--rc-end-time-expired-p / --rc-end-time-remaining) see
+;; rc_state_depth > 0.
 (define (with-rc-rec field-vals thunk)
   (let* ((rec ((%sym '--make-rc-state)))
          (set-f (%sym '--rc-test-state-set!)))

@@ -28,7 +28,7 @@
   (symbol-function name))
 
 ;;; --- Registration ---------------------------------------------------
-;;; All 15 shims must be registered as DEFUNs (syms_of_keyboard).
+;;; All 14 shims must be registered as DEFUNs (syms_of_keyboard).
 
 (define shim-names
   '(--quit-throw-to-read-char
@@ -44,7 +44,6 @@
     --kbd-on-hold-p
     --x-detect-pending-selection-requests
     --x-handle-pending-selection-requests
-    --rc-write-kbp
     --gobble-input))
 
 (for-each (lambda (n)
@@ -135,42 +134,3 @@
           ((%sym 'string-make-multibyte) "héllo"))))
   (check "kbd-decode-multibyte-string-shape" #t
          (or (eq? r #nil) (string? r))))
-
-;;; --- --rc-write-kbp ----------------------------------------------------
-
-;; Valid kboard smob, no read-char/kbd-buffer call in flight:
-;; no-op returning nil (rc_state_depth == 0 guard).
-(let ((kb ((%sym 'current-kboard))))
-  (check "rc-write-kbp-current-kboard-noop" #nil
-         ((%sym '--rc-write-kbp) kb)))
-
-;; Depth > 0: a rec on the stack whose kbp slot wraps a real KBOARD **
-;; must be written through.  Regression: RC_SLOT_KBP = 12 was out of
-;; range for the 12-field <rc-state> record, so scm_struct_ref (rec,
-;; 12) aborted the moment a rec was pushed (the imp-5 cutover would
-;; have hit this on the first kboard switch).  The test-only storage
-;; starts NULL, so the post-write value proves the write-through.
-(let* ((kb     ((%sym 'current-kboard)))
-       (rec    ((%sym '--make-rc-state)))
-       (push-f (%sym '--rc-record-stack-push))
-       (pop-f  (%sym '--rc-record-stack-pop))
-       (set-f  (%sym '--rc-test-state-set!))
-       (ptr-f  (%sym '--rc-test-kbp-storage-ptr))
-       (val-f  (%sym '--rc-test-kbp-storage-value)))
-  (check "rc-write-kbp-depth/initial-storage-null" #nil (val-f))
-  (set-f rec 'kbp (ptr-f))
-  (push-f rec)
-  (dynamic-wind
-    (lambda () #f)
-    (lambda ()
-      ;; Write through the top-of-stack rec's kbp slot, returning nil.
-      (check "rc-write-kbp-depth/returns-nil" #nil
-             ((%sym '--rc-write-kbp) kb))
-      ;; *kbp now points at the written kboard (kboard-eq compares
-      ;; the underlying KBOARD*, not smob identity).
-      (check "rc-write-kbp-depth/writes-through" #t
-             (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil))))
-    (lambda () (pop-f)))
-  ;; After the pop the write-through is still observable.
-  (check "rc-write-kbp-depth/persists-after-pop" #t
-         (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil))))

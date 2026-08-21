@@ -2,11 +2,11 @@
 ;;; kbd-buffer C-escape shims
 ;;;
 ;;; Wraps test/keyboard/test-kbd-escape-shims.scm — the Scheme test
-;;; corpus for the 15 imp-1.3 C-escape shims (quit/read-char,
+;;; corpus for the 14 imp-1.3 C-escape shims (quit/read-char,
 ;;; wait-reading-process-output, activate-menubar-hook, multibyte
 ;;; decode, noninteractive-getchar, mouse-position-hook,
 ;;; text-conversion trio, keyboard-hold pair, X selection-request
-;;; pair, rc kbp write-back, gobble-input).  See
+;;; pair, gobble-input).  See
 ;;; docs/m11-plan.org §imp-1.3 for context.
 ;;;
 ;;; Loads the Scheme file via eval-scheme, then reads back
@@ -16,9 +16,13 @@
 (princ "=== kbd-escape-shims test suite ===\n")
 
 ;; Run the Scheme test corpus.  Populates test-results in the
-;; (guile-user) module.
-(eval-scheme
- "(primitive-load \"test/keyboard/test-kbd-escape-shims.scm\")")
+;; (guile-user) module.  Resolve the corpus path from load-file-name so
+;; it works both from the repo root (run-all-tests.el) and from the
+;; harness, which loads this file with CWD=test/.
+(let* ((dir (file-name-directory (or load-file-name default-directory)))
+       (corpus (expand-file-name "test-kbd-escape-shims.scm" dir)))
+  (eval-scheme
+   (format "(primitive-load %S)" corpus)))
 
 ;; Read each result back and report PASS/FAIL.
 (let ((results (eval-scheme "(reverse test-results)"))

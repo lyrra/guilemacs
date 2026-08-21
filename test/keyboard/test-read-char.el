@@ -286,8 +286,6 @@
              (fboundp '--rc-maybe-redisplay-when-no-input))
 (test-assert "helpers/rc-read-and-install-event"
              (fboundp '--rc-read-and-install-event))
-(test-assert "helpers/rc-read-decoded-event-from-main-queue"
-             (fboundp '--rc-read-decoded-event-from-main-queue))
 (test-assert "helpers/rc-end-time-expired-p"
              (fboundp '--rc-end-time-expired-p))
 (test-assert "helpers/rc-test-install-read-event"
@@ -300,10 +298,30 @@
          nil (--rc-maybe-redisplay-when-no-input 0))
 (test-eq "wkbd-nr/read-install-idle"
          'continue (--rc-read-and-install-event))
-(test-eq "wkbd-nr/read-decoded-idle"
-         nil (--rc-read-decoded-event-from-main-queue))
 (test-eq "wkbd-nr/end-time-expired-idle"
          nil (--rc-end-time-expired-p))
+
+(let ((unread-command-events (list ?z)))
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (test-eq "read-install/decodes-from-main-queue result"
+              'continue (--rc-read-and-install-event!))
+     (test-eq "read-install/decodes-from-main-queue c"
+              ?z (m8-test-state-ref 'c))
+     (test-nil "read-install/decodes-from-main-queue drained"
+               unread-command-events))))
+
+(let ((unread-command-events (list 'menu-bar)))
+  (m8-with-rc-state
+   nil
+   (lambda ()
+     (test-eq "read-install/decodes-symbol-from-main-queue result"
+              'continue (--rc-read-and-install-event!))
+     (test-eq "read-install/decodes-symbol-from-main-queue c"
+              'menu-bar (m8-test-state-ref 'c))
+     (test-nil "read-install/decodes-symbol-from-main-queue drained"
+               unread-command-events))))
 
 (m8-with-rc-state
  '((c . ?j))

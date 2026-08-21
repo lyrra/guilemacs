@@ -2,19 +2,20 @@
 ;;;
 ;;; Measures the kbd_buffer_get_event pipeline: for N synthetic ASCII
 ;;; keystroke events, store one via --kbd-buffer-store-fake-event and
-;;; time the read via --rc-read-decoded-event-from-main-queue (the
-;;; thinnest public wrapper that calls kbd_buffer_get_event, through
-;;; read_decoded_event_from_main_queue).  imp-5 replaces the C body of
-;;; kbd_buffer_get_event with an SCM_CALL_3 shim into
-;;; (emacs kbd-buffer) kbd-buffer-get-event; this same script is the
-;;; before/after measurement point.  The store is outside the timed
-;;; region (it is unchanged by imp-5).
+;;; time the read via the (emacs main-queue)
+;;; read-decoded-event-from-main-queue Scheme port (M12 imp-3), which
+;;; calls kbd-buffer-get-event directly.  Before imp-4 the timed entry
+;;; was the --rc-read-decoded-event-from-main-queue C seam; the rewire
+;;; (M12 imp-5, landed with imp-4) makes the Scheme port the thinnest
+;;; wrapper, so this same script is the before/after measurement
+;;; point.  The store is outside the timed region (it is unchanged).
 ;;;
 ;;; Sourced by bench/kbd-pipeline-bench.el via eval-scheme; the
 ;;; summary is read back from `bench-summary' (Scheme format output
 ;;; does not reach emacs --batch stdout).
 
 (use-modules (srfi srfi-19))
+(use-modules (emacs main-queue))
 
 (define %sym symbol-function)
 
@@ -28,13 +29,9 @@
 (define (store-fake!)
   ((%sym '--kbd-buffer-store-fake-event) 1 #nil))   ; ASCII_KEYSTROKE_EVENT
 
+;; Untimed (end-time #nil); tag/prev-event are inert for the bench.
 (define (read-event)
-  ((%sym '--rc-read-decoded-event-from-main-queue)))
-
-;; One rc-record on the stack for the whole run (--rc-read-decoded-
-;; event-from-main-queue requires rc_state_depth > 0).
-(define bench-rec ((%sym '--make-rc-state)))
-((%sym '--rc-record-stack-push) bench-rec)
+  (read-decoded-event-from-main-queue #nil 'bench-tag #nil))
 
 ;; Warm-up: prime caches / first-touch allocations.
 (let loop ((i 0))
@@ -58,8 +55,6 @@
       (read-event)
       (vector-set! samples i (- (now-ns) t0)))
     (loop (+ i 1))))
-
-((%sym '--rc-record-stack-pop))
 
 (define sorted-ns (sort (vector->list samples) <))
 

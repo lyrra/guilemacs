@@ -8,14 +8,14 @@
 ;;; algorithmic change; the C body stays callable until the imp-5
 ;;; cutover.  See docs/m11-plan.org §imp-2/§imp-3.
 ;;;
-;;; M12 imp-2: `kbd-buffer-get-event' now RETURNS
+;;; M12 imp-2: `kbd-buffer-get-event' RETURNS
 ;;; (values event kboard used-mouse-menu) instead of writing *kbp /
-;;; *used_mouse_menu through caller pointers.  The still-live M11 C
-;;; shim (src/keyboard.c:5075-5100) is served by the temporary
-;;; `kbd-buffer-get-event-write-back' adapter, which re-materialises the
-;;; pointer write-backs from the returned values; imp-4 deletes the
-;;; adapter together with the shim, its C caller, and the write-back
-;;; DEFUNs.  See docs/m12-plan.org §imp-2.
+;;; *used_mouse_menu through caller pointers.  M12 imp-4 deleted the
+;;; temporary `kbd-buffer-get-event-write-back' adapter together with
+;;; the C shim it served (src/keyboard.c kbd_buffer_get_event), the
+;;; --rc-write-kbp DEFUN, and the RC_SLOT_KBP slot; the (emacs
+;;; main-queue) port now calls kbd-buffer-get-event directly.  See
+;;; docs/m12-plan.org §imp-2/§imp-4.
 ;;;
 ;;; Conventions (identical to M9/M10): defelisp delayed references for
 ;;; every C DEFUN ((force %--foo)); elisp variables via symbol-value /
@@ -38,7 +38,6 @@
   #:use-module (emacs lispy-event)    ; make-lispy-event (M9)
   #:declarative? #t
   #:export (kbd-buffer-get-event
-            kbd-buffer-get-event-write-back
             noninteractive-fast-path?))
 
 ;;; --- Constants ------------------------------------------------------
@@ -63,7 +62,6 @@
 (defelisp %--kbd-buffer-nr-stored       --kbd-buffer-nr-stored)
 (defelisp %--unhold-keyboard-input      --unhold-keyboard-input)
 (defelisp %--kbd-noninteractive-getchar --kbd-noninteractive-getchar)
-(defelisp %--rc-write-kbp               --rc-write-kbp)
 (defelisp %--rc-record                  --rc-record)
 (defelisp %--rc-end-time-expired-p      --rc-end-time-expired-p)
 (defelisp %--rc-end-time-remaining      --rc-end-time-remaining)
@@ -629,8 +627,9 @@ F1 = event-to-kboard on the dispatched event, F2 = current-kboard);
 USED-MOUSE-MENU is #t when a menu-bar / tab-bar / tool-bar / NS-nonkey
 event was dispatched.  END-TIME is a pointer-smob (or #nil); its
 rec-slot sync (entry-sync-end-time) and the deadline-wait! timed branch
-are unchanged from M11.  The still-live C shim calls this through the
-temporary kbd-buffer-get-event-write-back adapter (M12 imp-2)."
+are unchanged from M11.  The (emacs main-queue) port calls this
+directly since imp-4 (the temporary kbd-buffer-get-event-write-back
+adapter is gone)."
   (let ((rec ((force %--rc-record))))
     (entry-sync-end-time rec end-time)
     (prelude-unhold)
@@ -837,28 +836,3 @@ temporary kbd-buffer-get-event-write-back adapter (M12 imp-2)."
                        (values c kboard used-mouse-menu))))
           (begin (set! kboard ((force %current-kboard)))
                  (wait-loop))))))
-
-;;; --- Temporary values→write-back adapter (M12 imp-2) -----------------
-
-;;; The M11 C shim kbd_buffer_get_event (src/keyboard.c:5075-5100)
-;;; keeps its 3-arg, single-return contract until imp-4: it calls this
-;;; adapter, which calls the values-returning kbd-buffer-get-event,
-;;; writes the returned kboard / used-mouse-menu back through the
-;;; rc-record slots the shim pre-fills (RC_SLOT_KBP /
-;;; RC_SLOT_USED_MOUSE_MENU / RC_SLOT_END_TIME, keyboard.c:5089-5095),
-;;; and returns the event.  KBP / USED-MOUSE-MENU pointer args are
-;;; unused — the write-back DEFUNs read the rec slots, not the args.
-;;; The shim only runs inside read_char (rc_state_depth > 0), so
-;;; --rc-record is non-nil whenever the used-mouse-menu write fires.
-;;; imp-4 deletes this adapter together with the shim, its C caller,
-;;; and the write-back DEFUNs.
-(define (kbd-buffer-get-event-write-back kbp used-mouse-menu end-time)
-  (call-with-values (lambda () (kbd-buffer-get-event end-time))
-    (lambda (event kboard umm)
-      (when (not (eq? kboard #nil))
-        ((force %--rc-write-kbp) kboard))
-      (when (truthy? umm)
-        ;; No rec guard: the shim only calls this adapter inside
-        ;; read_char (rc_state_depth > 0), so --rc-record is non-nil.
-        ((force %--rc-mark-used-mouse-menu-true) ((force %--rc-record))))
-      event)))
