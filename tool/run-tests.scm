@@ -89,6 +89,7 @@
   "test/keyboard/test-kbd-dispatch.el"        ; M11 imp-3 (corpus prints PASS/FAIL)
   "test/keyboard/test-kbd-mouse-motion.el"    ; M11 imp-4 (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-shims.el"           ; M12 imp-1 (corpus prints PASS/FAIL)
+  "test/keyboard/test-main-queue.el"          ; M12 imp-3 (corpus prints PASS/FAIL)
   )
 (group
   "test/src/eval-tests.el"
