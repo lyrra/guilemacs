@@ -119,94 +119,73 @@
 
 ;;; --- 3. Vunread break + drain -----------------------------------------
 
-;; Push a rec (kbp write-back needs rc depth > 0), set
-;; unread-command-events, call the proc with the wait loop reached
-;; (noninteractive bound to nil).  The loop's first check breaks on the
-;; Vunread list; the drain pops it, writes back *kbp, and returns the
-;; raw car (no (Qt . e) / (Qno_record . e) peeling — that is M8i's job
-;; in read-char.scm).
+;; Set unread-command-events and call the proc with the wait loop
+;; reached (noninteractive bound to nil).  The loop's first check breaks
+;; on the Vunread list; the drain pops it and returns the raw car (no
+;; (Qt . e) / (Qno_record . e) peeling — that is M8i's job in
+;; read-char.scm).  The proc returns (values event kboard
+;; used-mouse-menu): kboard = current-kboard (the entry value, C 5054),
+;; umm #nil.
 (let ((kb ((%sym 'current-kboard))))
-  (with-rc-rec `((kbp . ,((%sym '--rc-test-kbp-storage-ptr))))
+  (with-noninteractive-nil
     (lambda ()
-      (with-noninteractive-nil
-        (lambda ()
-          (set-symbol-value! 'unread-command-events (cons 'x #nil))
-          (let ((r (kbd-buffer-get-event #nil #nil #nil)))
-            (check "vunread/returns-first" 'x r)
-            (check "vunread/drained" #nil (symbol-value 'unread-command-events))
-            (check "vunread/kbp-written" #t
-                   (not (eq? ((%sym 'kboard-eq)
-                              ((%sym '--rc-test-kbp-storage-value)) kb)
-                             #nil)))))))))
-
-;; kbp entry-sync: rec with a nil kbp slot, pointer passed as the 1st
-;; arg — entry-sync copies it in, so the write-back still lands.
-(let ((kb ((%sym 'current-kboard))))
-  (with-rc-rec '()
-    (lambda ()
-      (with-noninteractive-nil
-        (lambda ()
-          (set-symbol-value! 'unread-command-events (cons 'z #nil))
-          (check "vunread/entry-sync-returns" 'z
-                 (kbd-buffer-get-event ((%sym '--rc-test-kbp-storage-ptr))
-                                       #nil #nil))
-          (check "vunread/entry-sync-kbp-written" #t
-                 (not (eq? ((%sym 'kboard-eq)
-                            ((%sym '--rc-test-kbp-storage-value)) kb)
-                           #nil))))))))
+      (set-symbol-value! 'unread-command-events (cons 'x #nil))
+      (call-with-values (lambda () (kbd-buffer-get-event #nil))
+        (lambda (event kboard umm)
+          (check "vunread/returns-first" 'x event)
+          (check "vunread/drained" #nil (symbol-value 'unread-command-events))
+          (check "vunread/kboard-returned" #t
+                 (not (eq? ((%sym 'kboard-eq) kboard kb) #nil)))
+          (check "vunread/umm-nil" #nil umm))))))
 
 ;;; --- 4. Fast path in batch --------------------------------------------
 
 ;; Batch (noninteractive t, stdin EOF in CI).  Shape-adaptive because
 ;; of the #nil trap: on builds WITH the fast path,
 ;; --kbd-noninteractive-getchar returns a fixnum (EOF ⇒ -1) and the
-;; proc returns exactly that without blocking, writing back *kbp.  On
-;; builds compiled with DBus / file-notify / threads (like this one)
-;; the DEFUN returns nil and the proc must NOT return that nil as an
-;; event — it falls through to the wait loop, observable via a Vunread
-;; break.
+;; proc returns exactly that without blocking.  On builds compiled with
+;; DBus / file-notify / threads (like this one) the DEFUN returns nil
+;; and the proc must NOT return that nil as an event — it falls through
+;; to the wait loop, observable via a Vunread break.  Either way the
+;; returned kboard = current-kboard (the entry *kbp = current_kboard,
+;; C 5054, covers the fast-path exits).
 (let* ((kb ((%sym 'current-kboard)))
        (c ((%sym '--kbd-noninteractive-getchar))))
   (if (eq? c #nil)
-      (with-rc-rec `((kbp . ,((%sym '--rc-test-kbp-storage-ptr))))
-        (lambda ()
-          (set-symbol-value! 'unread-command-events (cons 'y #nil))
-          (check "fast-path/no-fast-path/falls-through" 'y
-                 (kbd-buffer-get-event #nil #nil #nil))
-          (check "fast-path/no-fast-path/kbp-written" #t
-                 (not (eq? ((%sym 'kboard-eq)
-                            ((%sym '--rc-test-kbp-storage-value)) kb)
-                           #nil)))))
-      (with-rc-rec `((kbp . ,((%sym '--rc-test-kbp-storage-ptr))))
-        (lambda ()
-          (check "fast-path/returns-getchar" c
-                 (kbd-buffer-get-event #nil #nil #nil))
-          (check "fast-path/kbp-written" #t
-                 (not (eq? ((%sym 'kboard-eq)
-                            ((%sym '--rc-test-kbp-storage-value)) kb)
-                           #nil)))))))
+      (begin
+        (set-symbol-value! 'unread-command-events (cons 'y #nil))
+        (call-with-values (lambda () (kbd-buffer-get-event #nil))
+          (lambda (event kboard umm)
+            (check "fast-path/no-fast-path/falls-through" 'y event)
+            (check "fast-path/no-fast-path/kboard-returned" #t
+                   (not (eq? ((%sym 'kboard-eq) kboard kb) #nil))))))
+      (call-with-values (lambda () (kbd-buffer-get-event #nil))
+        (lambda (event kboard umm)
+          (check "fast-path/returns-getchar" c event)
+          (check "fast-path/kboard-returned" #t
+                 (not (eq? ((%sym 'kboard-eq) kboard kb) #nil)))))))
 
 ;;; --- 5. End-time expiry (timed branch, expired arm) -------------------
 
 ;; With the rec's end-time slot holding the expired pointer and the
-;; same pointer passed as the 3rd arg, the timed branch sees the
+;; same pointer passed as the arg, the timed branch sees the
 ;; expired deadline and returns nil immediately (no sleep).  Two
 ;; forms: (a) slot pre-set, (b) slot nil with the pointer passed as
-;; the arg — entry-sync copies it into the slot, which is what makes
-;; --rc-end-time-expired-p see it.
+;; the arg — entry-sync-end-time copies it into the slot, which is
+;; what makes --rc-end-time-expired-p see it.
 (let ((expired-ptr ((%sym '--rc-test-expired-end-time-ptr))))
   (with-rc-rec `((end-time . ,expired-ptr))
     (lambda ()
       (with-noninteractive-nil
         (lambda ()
           (check "end-time-expiry/slot-set" #nil
-                 (kbd-buffer-get-event #nil #nil expired-ptr))))))
+                 (kbd-buffer-get-event expired-ptr))))))
   (with-rc-rec '()
     (lambda ()
       (with-noninteractive-nil
         (lambda ()
           (check "end-time-expiry/entry-sync" #nil
-                 (kbd-buffer-get-event #nil #nil expired-ptr)))))))
+                 (kbd-buffer-get-event expired-ptr)))))))
 
 ;;; --- 6. Queue exit → dispatch seam ------------------------------------
 
@@ -230,13 +209,33 @@
            (not (= ((%sym '--kbd-fetch-ptr-index))
                    ((%sym '--kbd-store-ptr-index)))))
     (let ((r (catch 'not-implemented
-               (lambda () (kbd-buffer-get-event #nil #nil #nil))
+               (lambda () (kbd-buffer-get-event #nil))
                (lambda (k . args) (cons k args)))))
       (check "queue-exit/dispatch-no-throw" #t (not (pair? r)))
       (check "queue-exit/dispatch-returns-event" 0 r))
     (check "queue-exit/event-dequeued" #t
            (= ((%sym '--kbd-fetch-ptr-index))
               ((%sym '--kbd-store-ptr-index))))))
+
+;;; --- 6b. Values shape: exactly (values event kboard umm) -------------
+
+;; A queue event returns exactly three values with the right types:
+;; the event (char code 0), the F1 kboard (a kboard smob —
+;; event-to-kboard on the selected frame, which is current-kboard in
+;; this single-kboard batch build), and a boolean used-mouse-menu flag
+;; (#nil for an ASCII keystroke — no menu-bar classification).
+(with-noninteractive-nil
+  (lambda ()
+    (set-symbol-value! 'unread-command-events #nil)
+    ((%sym '--kbd-buffer-store-fake-event) 1 'fake-arg)
+    (let ((vals (call-with-values
+                 (lambda () (kbd-buffer-get-event #nil))
+                 list)))
+      (check "values-shape/arity" 3 (length vals))
+      (check "values-shape/event" 0 (car vals))
+      (check "values-shape/kboard-smob" #t
+             (not (eq? ((%sym 'kboardp) (cadr vals)) #nil)))
+      (check "values-shape/umm-boolean" #nil (caddr vals)))))
 
 ;;; --- 7. --rc-end-time-remaining shape ---------------------------------
 

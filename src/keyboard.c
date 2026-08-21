@@ -5065,11 +5065,16 @@ kbd_buffer_get_event_2 (Lisp_Object val)
 
    M11 imp-5: the C body (wait loop, event-kind dispatch, and
    mouse-motion fallback) is replaced by a thin shim delegating to
-   (emacs kbd-buffer) kbd-buffer-get-event.  The three caller-owned
-   pointers ride the top-of-stack rc-record slots so the Scheme-side
-   write-back DEFUNs (--rc-write-kbp, --rc-end-time-*,
-   --rc-mark-used-mouse-menu-true) operate on this call's stack frame;
-   the raw return value is the event obj.  */
+   (emacs kbd-buffer).  M12 imp-2: the Scheme entry now RETURNS
+   (values event kboard used-mouse-menu); this shim keeps its old
+   3-arg, single-return contract through the temporary
+   kbd-buffer-get-event-write-back adapter, which re-materialises the
+   *kbp / *used_mouse_menu pointer write-backs from the returned
+   values.  The three caller-owned pointers ride the top-of-stack
+   rc-record slots so the Scheme-side write-back DEFUNs
+   (--rc-write-kbp, --rc-end-time-*, --rc-mark-used-mouse-menu-true)
+   operate on this call's stack frame; the raw return value is the
+   event obj.  Imp-4 deletes the adapter together with this shim.  */
 
 static Lisp_Object
 kbd_buffer_get_event (KBOARD **kbp,
@@ -5078,7 +5083,8 @@ kbd_buffer_get_event (KBOARD **kbp,
 {
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-get-event");
+    proc = scm_c_public_ref ("emacs kbd-buffer",
+                             "kbd-buffer-get-event-write-back");
 
   /* Populate the pointer slots fresh on every entry.  Scheme's
      entry-sync only fills nil slots, so a second kbd_buffer_get_event

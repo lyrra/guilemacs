@@ -43,6 +43,14 @@
 ;; as test-kbd-wait-loop.scm's %daemonp rebinding).
 (define dispatch-event! (@@ (emacs kbd-buffer) dispatch-event!))
 
+;; dispatch-event! returns (values event kboard used-mouse-menu); the
+;; single-value call sites below consume only the event (Guile takes
+;; the first value in a single-value context).  This explicit wrapper
+;; keeps the multi-value return visible instead of silently discarding
+;; the kboard / used-mouse-menu values.
+(define (dispatch-event-first!)
+  (call-with-values dispatch-event! (lambda (ev . rest) ev)))
+
 ;;; --- Helpers ----------------------------------------------------------
 
 (define KBD-SIZE 4096)
@@ -87,14 +95,14 @@
 (drain-queue!)
 (store-fake! (kind 'save-session) 7)
 (check "pass-through/save-session-event" (list 'save-session 7)
-       (dispatch-event!))
+       (dispatch-event-first!))
 (check "pass-through/save-session-dequeued" #t (queue-empty?))
 
 ;;; --- 3. default-path ASCII keystroke (NOT pass-through) ---------------
 
 (drain-queue!)
 (store-fake! (kind 'ascii-keystroke))
-(check "default/ascii-returns-code" 0 (dispatch-event!))
+(check "default/ascii-returns-code" 0 (dispatch-event-first!))
 (check "default/ascii-dequeued" #t (queue-empty?))
 
 ;;; --- 4. Swallowed kinds (return 'wait, drain the queue) ---------------
@@ -102,19 +110,19 @@
 ;; Selection clear: --kbd-handle-selection-event advances itself.
 (drain-queue!)
 (store-fake! (kind 'selection-clear-event))
-(check "swallow/selection-clear-returns-wait" 'wait (dispatch-event!))
+(check "swallow/selection-clear-returns-wait" 'wait (dispatch-event-first!))
 (check "swallow/selection-clear-advanced" #t (queue-empty?))
 
 ;; Monitors changed: advance + run display-monitors-changed-functions.
 (drain-queue!)
 (store-fake! (kind 'monitors-changed) 'terminal-arg)
-(check "swallow/monitors-changed-returns-wait" 'wait (dispatch-event!))
+(check "swallow/monitors-changed-returns-wait" 'wait (dispatch-event-first!))
 (check "swallow/monitors-changed-advanced" #t (queue-empty?))
 
 ;; Menu-bar activate: advance + --activate-menubar-hook (termcap no-op).
 (drain-queue!)
 (store-fake! (kind 'menu-bar-activate-event))
-(check "swallow/menu-bar-activate-returns-wait" 'wait (dispatch-event!))
+(check "swallow/menu-bar-activate-returns-wait" 'wait (dispatch-event-first!))
 (check "swallow/menu-bar-activate-advanced" #t (queue-empty?))
 
 ;;; --- 5. Multibyte decode + incremental --------------------------------
@@ -124,9 +132,9 @@
 ;; second pop returns the next character and drains the queue.
 (drain-queue!)
 (store-fake! (kind 'multibyte-char-keystroke) "ab")
-(check "multibyte/first-char" 97 (dispatch-event!))
+(check "multibyte/first-char" 97 (dispatch-event-first!))
 (check "multibyte/first-char-not-dequeued" #f (queue-empty?))
-(check "multibyte/second-char" 98 (dispatch-event!))
+(check "multibyte/second-char" 98 (dispatch-event-first!))
 (check "multibyte/second-char-dequeued" #t (queue-empty?))
 
 ;;; --- 6. Pinch coalescing ----------------------------------------------
@@ -152,7 +160,7 @@
                   (set-frame-or-window!
                    (modulo (+ i0 off) KBD-SIZE) sentinel))
                 '(0 1 2))
-      (check "pinch/returns-nil" #nil (dispatch-event!))
+      (check "pinch/returns-nil" #nil (dispatch-event-first!))
       (check "pinch/collapsed-to-empty" #t (queue-empty?))
       ;; The coalesced totals are written into the last event's arg
       ;; (--ie-clear only resets kind, not arg): dx 1+3+5=9, dy
@@ -180,17 +188,17 @@
       (store-fake! (kind 'ascii-keystroke))
       (set-frame-or-window! (modulo i0 KBD-SIZE) sentinel)
       (check "switch-frame/synthesized" (list 'switch-frame sentinel)
-             (dispatch-event!))
+             (dispatch-event-first!))
       (check "switch-frame/not-dequeued" #f (queue-empty?))
       (check "switch-frame/last-event-frame-written" sentinel
              (get-last-event-frame))
       ;; Re-read: frame now equals internal_last_event_frame, so the
       ;; real ASCII event (code 0) comes through and drains the queue.
-      (check "switch-frame/re-read-real-event" 0 (dispatch-event!))
+      (check "switch-frame/re-read-real-event" 0 (dispatch-event-first!))
       (check "switch-frame/re-read-dequeued" #t (queue-empty?)))
     (lambda () (set-last-event-frame! saved-last-frame))))
 
-;;; --- 8. F1: event-kboard write-back (--ie-kboard + dispatch) --------
+;;; --- 8. F1: returned event-kboard (--ie-kboard + dispatch) ----------
 
 ;; --ie-kboard (event_to_kboard wrapper) shape: a live-frame event
 ;; resolves to a kboard smob; the selection kinds resolve to nil (the C
@@ -209,40 +217,36 @@
          ((%sym '--ie-kboard) ie)))
 (drain-queue!)
 
-;; dispatch-event! must write *kbp = event_to_kboard (ie) on the queue
-;; path, falling back to current_kboard when event_to_kboard returns
-;; nil — exactly the deleted C prologue before the switch.  A real
-;; KBOARD ** backs the rc-slot via the test-only storage; the reset
-;; helper gives a known-null start so the write-through is observable.
-(let* ((kb      ((%sym 'current-kboard)))
-       (rec     ((%sym '--make-rc-state)))
-       (push-f  (%sym '--rc-record-stack-push))
-       (pop-f   (%sym '--rc-record-stack-pop))
-       (set-f   (%sym '--rc-test-state-set!))
-       (ptr-f   (%sym '--rc-test-kbp-storage-ptr))
-       (val-f   (%sym '--rc-test-kbp-storage-value))
-       (reset-f (%sym '--rc-test-kbp-storage-reset)))
-  (set-f rec 'kbp (ptr-f))
-  (push-f rec)
-  (dynamic-wind
-    (lambda () #f)
-    (lambda ()
-      ;; Live-frame event: event_to_kboard resolves the selected frame
-      ;; to its kboard == current_kboard (single-kboard batch build).
-      (reset-f)
-      (check "dispatch/write-kbp-live-frame/initial-null" #nil (val-f))
-      (drain-queue!)
-      (store-fake! (kind 'ascii-keystroke))
-      (dispatch-event!)
-      (check "dispatch/write-kbp-live-frame/writes-through" #t
-             (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil)))
-      ;; Selection event: event_to_kboard returns nil, so the Scheme
-      ;; fallback must still write current_kboard, not leave *kbp null.
-      (reset-f)
-      (check "dispatch/write-kbp-selection/initial-null" #nil (val-f))
-      (drain-queue!)
-      (store-fake! (kind 'selection-clear-event))
-      (dispatch-event!)
-      (check "dispatch/write-kbp-selection/fallback-writes-through" #t
-             (not (eq? ((%sym 'kboard-eq) (val-f) kb) #nil))))
-    (lambda () (pop-f))))
+;; dispatch-event! must return (values event kboard used-mouse-menu):
+;; kboard = event_to_kboard (ie), falling back to current_kboard when
+;; event_to_kboard returns nil — exactly the deleted C prologue before
+;; the switch, as a return value instead of a *kbp write.
+(let ((kb ((%sym 'current-kboard)))
+      (dispatch dispatch-event!))
+  ;; Live-frame event: event_to_kboard resolves the selected frame to
+  ;; its kboard == current_kboard (single-kboard batch build).
+  (drain-queue!)
+  (store-fake! (kind 'ascii-keystroke))
+  (call-with-values (lambda () (dispatch))
+    (lambda (event kboard umm)
+      (check "dispatch/kboard-live-frame" #t
+             (not (eq? ((%sym 'kboard-eq) kboard kb) #nil)))
+      (check "dispatch/umm-nil" #nil umm)))
+  ;; Selection event: event_to_kboard returns nil, so the fallback must
+  ;; still return current_kboard.
+  (drain-queue!)
+  (store-fake! (kind 'selection-clear-event))
+  (call-with-values (lambda () (dispatch))
+    (lambda (event kboard umm)
+      (check "dispatch/kboard-selection-fallback" #t
+             (not (eq? ((%sym 'kboard-eq) kboard kb) #nil)))))
+  ;; Menu-bar event with a non-frame arg: frame_or_window (selected
+  ;; frame) != arg, so the C used_mouse_menu guard (keyboard.c:5456-5461)
+  ;; sets the flag, and make-lispy-event passes the arg through unchanged
+  ;; (mle-menu-bar-event).  Verifies the #t branch of the third value.
+  (drain-queue!)
+  (store-fake! (kind 'menu-bar) 'fake-arg)
+  (call-with-values (lambda () (dispatch))
+    (lambda (event kboard umm)
+      (check "dispatch/menu-bar-passes-arg" 'fake-arg event)
+      (check "dispatch/umm-true" #t umm))))

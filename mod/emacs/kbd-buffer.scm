@@ -8,6 +8,15 @@
 ;;; algorithmic change; the C body stays callable until the imp-5
 ;;; cutover.  See docs/m11-plan.org §imp-2/§imp-3.
 ;;;
+;;; M12 imp-2: `kbd-buffer-get-event' now RETURNS
+;;; (values event kboard used-mouse-menu) instead of writing *kbp /
+;;; *used_mouse_menu through caller pointers.  The still-live M11 C
+;;; shim (src/keyboard.c:5075-5100) is served by the temporary
+;;; `kbd-buffer-get-event-write-back' adapter, which re-materialises the
+;;; pointer write-backs from the returned values; imp-4 deletes the
+;;; adapter together with the shim, its C caller, and the write-back
+;;; DEFUNs.  See docs/m12-plan.org §imp-2.
+;;;
 ;;; Conventions (identical to M9/M10): defelisp delayed references for
 ;;; every C DEFUN ((force %--foo)); elisp variables via symbol-value /
 ;;; set-symbol-value! (C-backed at runtime); #nil is elisp nil.
@@ -25,10 +34,11 @@
 (define-module (emacs kbd-buffer)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
-  #:use-module (emacs read-char)      ; rc-state-kbp / set-rc-state-kbp! etc.
+  #:use-module (emacs read-char)      ; rc-state-end-time / set-rc-state-end-time!
   #:use-module (emacs lispy-event)    ; make-lispy-event (M9)
   #:declarative? #t
   #:export (kbd-buffer-get-event
+            kbd-buffer-get-event-write-back
             noninteractive-fast-path?))
 
 ;;; --- Constants ------------------------------------------------------
@@ -140,25 +150,22 @@ file-notify / threads, where C compiles the whole block out."
       (and (truthy? ((force %daemonp)))
            (not (truthy? ((force %--daemon-not-yet-running-p)))))))
 
-(define (entry-sync rec kbp end-time)
-  "Direct-invocation entry sync: when a rec is current (REC non-nil)
-and its kbp / end-time slots are #nil while the corresponding arg is a
-non-nil foreign pointer, copy the arg into the slot (set-rc-state-kbp! /
-set-rc-state-end-time!).  This makes the rec-based write-back DEFUNs
-(--rc-write-kbp, --rc-end-time-expired-p, --rc-end-time-remaining)
-work when the proc is invoked directly from Scheme (the imp-6 harness),
-where the shim does not pre-fill the slots.
+(define (entry-sync-end-time rec end-time)
+  "Direct-invocation entry sync (M12 imp-2: end-time half only; the
+kbp half died with the pointer parameters): when a rec is current (REC
+non-nil) and its end-time slot is #nil while END-TIME is a non-nil
+foreign pointer, copy the arg into the slot (set-rc-state-end-time!).
+This makes the rec-based end-time DEFUNs (--rc-end-time-expired-p,
+--rc-end-time-remaining) work when the proc is invoked directly from
+Scheme (the test harness), where the C shim does not pre-fill the slot.
 
-The imp-5 C shim now pre-fills RC_SLOT_KBP / RC_SLOT_USED_MOUSE_MENU /
-RC_SLOT_END_TIME on every entry, so on the production path the 'only
-fill nil slots' condition is already false and this is a no-op.  That
-condition is what makes it safe to keep: the rec slots and the shim
-args carry the same pointers, so filling from the args is idempotent."
+The M11 C shim now pre-fills RC_SLOT_END_TIME on every entry, so on
+the production path the 'only fill nil slots' condition is already
+false and this is a no-op.  That condition is what makes it safe to
+keep: the rec slot and the shim arg carry the same pointer, so filling
+from the arg is idempotent."
 
   (when (not (eq? rec #nil))
-    (when (and (eq? (rc-state-kbp rec) #nil)
-               (not (eq? kbp #nil)))
-      (set-rc-state-kbp! rec kbp))
     (when (and (eq? (rc-state-end-time rec) #nil)
                (not (eq? end-time #nil)))
       (set-rc-state-end-time! rec end-time))))
@@ -242,20 +249,24 @@ kbd_buffer_get_event (src/keyboard.c:5195-5480).  Reads the event at
 the current fetch index — peek, not dequeue: the C does not advance
 uniformly (switch-frame and unfinished multibyte-incremental leave the
 event in the queue; pinch jumps past a whole run), so the fetch ptr is
-advanced explicitly at exactly the C advance points.  Returns the Lisp
-event, or 'wait to re-enter the wait loop for swallowed kinds.  The
+advanced explicitly at exactly the C advance points.  Returns
+(values event kboard used-mouse-menu): the Lisp event, or 'wait to
+re-enter the wait loop for swallowed kinds; KBOARD is the F1 kboard
+(--ie-kboard ie, current-kboard fallback — the deleted C queue-event
+prologue as a value, cr.org); USED-MOUSE-MENU is #t when a
+menu-bar / tab-bar / tool-bar / NS-nonkey event was dispatched.  The
 caller (kbd-buffer-get-event) guarantees a non-empty queue."
-  (let* ((rec ((force %--rc-record)))
-         (idx ((force %--kbd-fetch-ptr-index)))
+  (let* ((idx ((force %--kbd-fetch-ptr-index)))
          (kind ((force %--kbd-event-kind) idx))
-         (ie ((force %--kbd-event-ie) idx)))
+         (ie ((force %--kbd-event-ie) idx))
+         ;; The C *used_mouse_menu bool, accumulated locally: C sets it
+         ;; inside the switch (keyboard.c:5450-5468 + the NS_TEXT arm);
+         ;; with no pointer, the flag is returned as the third value.
+         (umm #nil))
 
-    ;; C: if (used_mouse_menu) *used_mouse_menu = true.  The rec's
-    ;; used-mouse-menu slot holds the same bool*; the DEFUN is a no-op
-    ;; when the slot is nil (no rec / no pointer).
+    ;; C: if (used_mouse_menu) *used_mouse_menu = true.
     (define (mark-used-mouse-menu!)
-      (when (not (eq? rec #nil))
-        ((force %--rc-mark-used-mouse-menu-true) rec)))
+      (set! umm #t))
 
     ;; Pass-through kinds: obj = make_lispy_event, then advance.
     ;; make-lispy-event invalidates IE on return (Risk 2), which is
@@ -415,13 +426,12 @@ caller (kbd-buffer-get-event) guarantees a non-empty queue."
                         ;; 2).  The !EQ (frame_or_window, arg) guard is
                         ;; only on the menu-bar group (C:5456-5461);
                         ;; NS_NONKEY_EVENT has none.
-                        (when (not (eq? rec #nil))
-                          (when (or (and (not (eq? frame-or-window arg))
-                                         (memv kind (list MENU-BAR-EVENT
-                                                          TAB-BAR-EVENT
-                                                          TOOL-BAR-EVENT)))
-                                    (= kind NS-NONKEY-EVENT))
-                            ((force %--rc-mark-used-mouse-menu-true) rec)))
+                        (when (or (and (not (eq? frame-or-window arg))
+                                       (memv kind (list MENU-BAR-EVENT
+                                                        TAB-BAR-EVENT
+                                                        TOOL-BAR-EVENT)))
+                                  (= kind NS-NONKEY-EVENT))
+                          (set! umm #t))
                         ;; (f) cleanup (C:5470-5478): clear + advance,
                         ;; unless a multibyte incremental still has
                         ;; characters left (leave it in the queue).
@@ -445,19 +455,18 @@ caller (kbd-buffer-get-event) guarantees a non-empty queue."
                             #nil)
                         ev))))))))
 
-    ;; F1 (cr.org): mirror the deleted C queue-event prologue
+    ;; F1 (cr.org): the deleted C queue-event prologue
     ;;   *kbp = event_to_kboard (&event->ie);
     ;;   if (*kbp == 0) *kbp = current_kboard;
-    ;; for EVERY queue event, before the switch.  --ie-kboard returns
-    ;; nil exactly when event_to_kboard returned NULL, so the nil arm
-    ;; reproduces the current_kboard fallback.  Reads the ORIGINAL ie
-    ;; (default-path! re-wraps it for pinch coalescing).  --rc-write-kbp
-    ;; is a guarded no-op when no read-char/kbd-buffer call is in flight.
-    (let ((kb ((force %--ie-kboard) ie)))
-      ((force %--rc-write-kbp)
-       (if (eq? kb #nil) ((force %current-kboard)) kb)))
-
-    (cond
+    ;; ran for EVERY queue event, before the switch.  --ie-kboard
+    ;; returns nil exactly when event_to_kboard returned NULL, so the
+    ;; nil arm reproduces the current_kboard fallback.  Reads the
+    ;; ORIGINAL ie (default-path! re-wraps it for pinch coalescing);
+    ;; the kboard is RETURNED as the second value instead of written
+    ;; through *kbp — computed before the switch, so swallowed kinds
+    ;; still surface it (C wrote *kbp even when it then looped back).
+    (define (dispatch!)
+      (cond
      ;; --- Swallowed kinds (C:5197-5269): run the side effect, loop
      ;; back to wait — they never produce a Lisp event.  The C
      ;; returns Qnil and read_char's retry re-enters; 'wait re-enters
@@ -517,7 +526,16 @@ caller (kbd-buffer-get-event) guarantees a non-empty queue."
                        FOCUS-OUT-EVENT SELECT-WINDOW-EVENT))
       (pass-through!))
      (else
-      (default-path!)))))
+      (default-path!))))
+
+    ;; F1 as a value: the event's kboard, returned with the dispatch
+    ;; result (computed above the switch — see the F1 comment on the
+    ;; dispatch! define).
+    (let ((kb (let ((e ((force %--ie-kboard) ie)))
+                (if (eq? e #nil) ((force %current-kboard)) e))))
+      (call-with-values (lambda () (dispatch!))
+        (lambda (ev)
+          (values ev kb umm))))))
 
 (define (mouse-motion-synthesize!)
   "imp-4: port of the some_mouse_moved () fallback branch of C
@@ -600,24 +618,34 @@ input_pending (the shared C epilogue, imp-2/imp-5 tail)."
 
 ;;; --- kbd-buffer-get-event --------------------------------------------
 
-(define (kbd-buffer-get-event kbp used-mouse-menu end-time)
+(define (kbd-buffer-get-event end-time)
   "Port of C kbd_buffer_get_event (keyboard.c:5016-5182): entry sync,
 hold/unhold prelude, noninteractive/daemon fast path, *kbp =
 current_kboard, the for(;;) wait loop, and the post-wait prologue
 (selection handling → Vunread drain → text-conversion preamble →
-dispatch hand-off).  KBP and END-TIME are pointer-smobs (or #nil),
-matching the planned imp-5 SCM_CALL_3 shim; USED-MOUSE-MENU is unused
-by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
+dispatch hand-off).  Returns (values event kboard used-mouse-menu):
+KBOARD is the kboard the event belongs to (entry = current-kboard,
+F1 = event-to-kboard on the dispatched event, F2 = current-kboard);
+USED-MOUSE-MENU is #t when a menu-bar / tab-bar / tool-bar / NS-nonkey
+event was dispatched.  END-TIME is a pointer-smob (or #nil); its
+rec-slot sync (entry-sync-end-time) and the deadline-wait! timed branch
+are unchanged from M11.  The still-live C shim calls this through the
+temporary kbd-buffer-get-event-write-back adapter (M12 imp-2)."
   (let ((rec ((force %--rc-record))))
-    (entry-sync rec kbp end-time)
+    (entry-sync-end-time rec end-time)
     (prelude-unhold)
     (let ((had-sel #f)
-          (had-conv #f))
-
-      ;; C 5054: *kbp = current_kboard (no-op when no rec is on the
-      ;; stack — --rc-write-kbp is a guarded no-op at rc depth 0).
-      (define (write-kbp!)
-        ((force %--rc-write-kbp) ((force %current-kboard))))
+          (had-conv #f)
+          ;; C 5054: *kbp = current_kboard — the initial KBOARD return
+          ;; value; F1 (dispatch-event!) / F2 (mouse-motion) overwrite
+          ;; it (see dispatch-event! / post-wait).
+          (kboard ((force %current-kboard)))
+          ;; The C *used_mouse_menu bool, accumulated per invocation.
+          ;; C sets it only on the non-swallowed menu-bar / tab-bar /
+          ;; tool-bar / NS paths, which always produce the returned
+          ;; event; swallowed kinds never set it, so the local simply
+          ;; mirrors the dispatched event's third value.
+          (used-mouse-menu #nil))
 
       ;; C 5062-5086 — top-of-loop checks.  Each break yields an exit
       ;; symbol; the quit branch never returns (longjmp to the
@@ -711,39 +739,53 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
           (if (pair? v)
               (let ((first (car v)))
                 (set-symbol-value! 'unread-command-events (cdr v))
-                (write-kbp!)
-                first)                    ; C 5155-5160: early return, no tail
-              (epilogue!
-               (if had-conv
-                   (begin
-                     ((force %--handle-pending-conversion-events))
-                     (if (or (truthy? ((force %--conversion-disabled-p)))
-                             (eq? (symbol-value 'text-conversion-edits) #nil))
-                         #nil
-                         'text-conversion))
-                   (if (not (= ((force %--kbd-fetch-ptr-index))
-                               ((force %--kbd-store-ptr-index))))
-                       (dispatch-event!)
-                       ;; C 5515 / 5564-5571: the mouse-motion branch
-                       ;; outranks the X pending-selection branch.  Only
-                       ;; when some_mouse_moved is nil AND a selection
-                       ;; request is pending (had-sel) does C return Qnil
-                       ;; (read_char retries); with neither, the shared
-                       ;; else aborts.  mouse-motion-synthesize! itself
-                       ;; re-checks some_mouse_moved and aborts when no
-                       ;; frame has pending movement (C 5568-5571).
-                       (if (or (truthy? ((force %--some-mouse-moved)))
-                               (not had-sel))
-                           ;; F2 (cr.org): C 5524 sets *kbp = current_kboard
-                           ;; inside the mouse-motion branch before the hook
-                           ;; call.  The internal wait loop re-enters without
-                           ;; re-running the entry write-kbp!, so a swallowed
-                           ;; event's F1 write (event_to_kboard) would
-                           ;; otherwise leak into the synthesized event.
-                           (begin
-                             (write-kbp!)
-                             (mouse-motion-synthesize!))
-                           #nil)))))))
+                ;; C 5155-5160: early return, no tail — the entry
+                ;; *kbp = current_kboard (C 5054) still applies to this
+                ;; exit, so re-derive KBOARD from current-kboard.
+                (set! kboard ((force %current-kboard)))
+                (values first kboard used-mouse-menu))
+              (values
+               (epilogue!
+                (if had-conv
+                    (begin
+                      ((force %--handle-pending-conversion-events))
+                      (if (or (truthy? ((force %--conversion-disabled-p)))
+                              (eq? (symbol-value 'text-conversion-edits) #nil))
+                          #nil
+                          'text-conversion))
+                    (if (not (= ((force %--kbd-fetch-ptr-index))
+                                ((force %--kbd-store-ptr-index))))
+                        (call-with-values (lambda () (dispatch-event!))
+                          (lambda (ev kb umm)
+                            ;; F1: adopt the dispatched event's kboard;
+                            ;; accumulate the used-mouse-menu flag (the
+                            ;; C bool* persists across loop-backs).
+                            (set! kboard kb)
+                            (when (truthy? umm)
+                              (set! used-mouse-menu #t))
+                            ev))
+                        ;; C 5515 / 5564-5571: the mouse-motion branch
+                        ;; outranks the X pending-selection branch.  Only
+                        ;; when some_mouse_moved is nil AND a selection
+                        ;; request is pending (had-sel) does C return Qnil
+                        ;; (read_char retries); with neither, the shared
+                        ;; else aborts.  mouse-motion-synthesize! itself
+                        ;; re-checks some_mouse_moved and aborts when no
+                        ;; frame has pending movement (C 5568-5571).
+                        (if (or (truthy? ((force %--some-mouse-moved)))
+                                (not had-sel))
+                            ;; F2 (cr.org): C 5524 sets *kbp = current_kboard
+                            ;; inside the mouse-motion branch before the hook
+                            ;; call.  The internal wait loop re-enters without
+                            ;; re-running the entry binding, so a swallowed
+                            ;; event's F1 kboard (event_to_kboard) would
+                            ;; otherwise leak into the synthesized event's
+                            ;; return value.
+                            (begin
+                              (set! kboard ((force %current-kboard)))
+                              (mouse-motion-synthesize!))
+                            #nil))))
+               kboard used-mouse-menu))))
 
       (define (wait-loop)
         (let loop ()
@@ -753,9 +795,12 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
                   ;; imp-3: dispatch-event! returns 'wait for swallowed
                   ;; events — re-enter the wait loop instead of
                   ;; returning it as an event (C returns nil and
-                  ;; read_char's retry re-enters; see the FIX-imp5
-                  ;; comment in dispatch-event!).
-                  (if (eq? r 'wait) (loop) r))
+                  ;; read_char's retry re-enters; see the comment on
+                  ;; dispatch!).  post-wait adopted KBOARD /
+                  ;; USED-MOUSE-MENU into the locals on its way out.
+                  (if (eq? r 'wait)
+                      (loop)
+                      (values r kboard used-mouse-menu)))
                 (begin
                   ;; C 5092 — gobble unconditionally (gobble_input is
                   ;; compiled unconditionally in this tree; the C
@@ -765,9 +810,14 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
                   (let ((exit (second-check)))
                     (if exit
                         (let ((r (post-wait)))
-                          (if (eq? r 'wait) (loop) r))
+                          (if (eq? r 'wait)
+                              (loop)
+                              (values r kboard used-mouse-menu)))
                         (if (deadline-wait!)
-                            #nil
+                            ;; C 5106-5110: timed-wait expiry returns
+                            ;; Qnil (the second early return that skips
+                            ;; the shared tail).
+                            (values #nil kboard used-mouse-menu)
                             (begin
                               (cbreak-gobble!)
                               (loop))))))))))
@@ -776,10 +826,39 @@ by imp-2 (imp-3 writes it via --rc-mark-used-mouse-menu-true)."
       ;; with DBus / file-notify / threads, --kbd-noninteractive-getchar
       ;; returns nil and the proc must NOT return that nil as an event —
       ;; it falls through to the wait loop (C compiles the whole block
-      ;; out on such builds).
+      ;; out on such builds).  The entry *kbp = current_kboard applies
+      ;; to the fast-path exits (C 5054).
       (if (noninteractive-fast-path?)
           (let ((c ((force %--kbd-noninteractive-getchar))))
             (if (eq? c #nil)
-                (begin (write-kbp!) (wait-loop))
-                (begin (write-kbp!) c)))
-          (begin (write-kbp!) (wait-loop))))))
+                (begin (set! kboard ((force %current-kboard)))
+                       (wait-loop))
+                (begin (set! kboard ((force %current-kboard)))
+                       (values c kboard used-mouse-menu))))
+          (begin (set! kboard ((force %current-kboard)))
+                 (wait-loop))))))
+
+;;; --- Temporary values→write-back adapter (M12 imp-2) -----------------
+
+;;; The M11 C shim kbd_buffer_get_event (src/keyboard.c:5075-5100)
+;;; keeps its 3-arg, single-return contract until imp-4: it calls this
+;;; adapter, which calls the values-returning kbd-buffer-get-event,
+;;; writes the returned kboard / used-mouse-menu back through the
+;;; rc-record slots the shim pre-fills (RC_SLOT_KBP /
+;;; RC_SLOT_USED_MOUSE_MENU / RC_SLOT_END_TIME, keyboard.c:5089-5095),
+;;; and returns the event.  KBP / USED-MOUSE-MENU pointer args are
+;;; unused — the write-back DEFUNs read the rec slots, not the args.
+;;; The shim only runs inside read_char (rc_state_depth > 0), so
+;;; --rc-record is non-nil whenever the used-mouse-menu write fires.
+;;; imp-4 deletes this adapter together with the shim, its C caller,
+;;; and the write-back DEFUNs.
+(define (kbd-buffer-get-event-write-back kbp used-mouse-menu end-time)
+  (call-with-values (lambda () (kbd-buffer-get-event end-time))
+    (lambda (event kboard umm)
+      (when (not (eq? kboard #nil))
+        ((force %--rc-write-kbp) kboard))
+      (when (truthy? umm)
+        ;; No rec guard: the shim only calls this adapter inside
+        ;; read_char (rc_state_depth > 0), so --rc-record is non-nil.
+        ((force %--rc-mark-used-mouse-menu-true) ((force %--rc-record))))
+      event)))
