@@ -3157,23 +3157,26 @@ read_char_help_form_unwind (void)
    (the srfi-9 accessors themselves are syntax-transformers and
    uncallable from C — see feedback_srfi9_accessors.md).
 
-   Slots 3 and 4 hold the two caller-owned C pointers as Guile
+   Slots 3 and 5 hold the two caller-owned C pointers as Guile
    foreign-pointer SCMs (or Qnil when NULL); they round-trip through
-   read_char() entry and the bulk subrs that need them.  */
+   read_char() entry and the bulk subrs that need them.  Slot 4 is the
+   plain Scheme used-mouse-menu flag (M12 imp-1), which tracks slot 3's
+   write.  */
 
 enum rc_slot {
   RC_SLOT_COMMANDFLAG                 = 0,
   RC_SLOT_MAP                         = 1,
   RC_SLOT_PREV_EVENT                  = 2,
   RC_SLOT_USED_MOUSE_MENU             = 3,  /* foreign-ptr to bool, or Qnil */
-  RC_SLOT_END_TIME                    = 4,  /* foreign-ptr to struct timespec, or Qnil */
-  RC_SLOT_C                           = 5,
-  RC_SLOT_LOCAL_TAG                   = 6,
-  RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE  = 7,
-  RC_SLOT_ALSO_RECORD                 = 8,
-  RC_SLOT_RECORDED                    = 9,
-  RC_SLOT_REREAD                      = 10,
-  RC_SLOT_ORIG_KBOARD                 = 11, /* kboard SMOB */
+  RC_SLOT_USED_MOUSE_MENU_FLAG        = 4,  /* plain Scheme boolean (imp-1) */
+  RC_SLOT_END_TIME                    = 5,  /* foreign-ptr to struct timespec, or Qnil */
+  RC_SLOT_C                           = 6,
+  RC_SLOT_LOCAL_TAG                   = 7,
+  RC_SLOT_PREVIOUS_ECHO_AREA_MESSAGE  = 8,
+  RC_SLOT_ALSO_RECORD                 = 9,
+  RC_SLOT_RECORDED                    = 10,
+  RC_SLOT_REREAD                      = 11,
+  RC_SLOT_ORIG_KBOARD                 = 12, /* kboard SMOB */
 };
 
 /* M6 infrastructure — slot enums for <keyremap> and <rks-state>
@@ -3718,8 +3721,10 @@ DEFUN ("--rc-read-char-x-menu-prompt",
        Sc_rc_read_char_x_menu_prompt, 0, 0, 0,
        doc: /* Internal: call C read_char_x_menu_prompt with the
 top-of-stack rec's map / prev-event / used-mouse-menu slots.
-Returns the resulting event.  Used by Scheme rc-prologue-xmenu-and-idle-gc!
-Block 1.  */)
+Returns two values: the resulting event, and a boolean that is
+true exactly when the read produced a menu choice (the caller's
+used-mouse-menu bool, read back; false when the rec has no such
+pointer).  Used by Scheme rc-prologue-xmenu-and-idle-gc! Block 1.  */)
   (void)
 {
   if (rc_state_depth == 0)
@@ -3728,7 +3733,10 @@ Block 1.  */)
   bool *used_mouse_menu = rc_unwrap_ptr (rec, RC_SLOT_USED_MOUSE_MENU);
   Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
   Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
-  return read_char_x_menu_prompt (map, prev_event, used_mouse_menu);
+  Lisp_Object event = read_char_x_menu_prompt (map, prev_event,
+					       used_mouse_menu);
+  bool used_mouse_menu_p = used_mouse_menu ? *used_mouse_menu : false;
+  return scm_values (scm_list_2 (event, scm_from_bool (used_mouse_menu_p)));
 }
 
 DEFUN ("--rc-timer-stop-idle",
@@ -4219,12 +4227,27 @@ read_char (int commandflag, Lisp_Object map,
   static SCM proc = SCM_UNDEFINED;
   if (SCM_UNBNDP (proc))
     proc = scm_c_public_ref ("emacs read-char", "read-char-entry");
-  return scm_call_6 (proc,
-                     make_fixnum (commandflag),
-                     map, prev_event,
-                     rc_wrap_ptr (used_mouse_menu),
-                     rc_wrap_ptr (end_time),
-                     make_kboard_smob (current_kboard));
+  SCM result = scm_call_6 (proc,
+                           make_fixnum (commandflag),
+                           map, prev_event,
+                           rc_wrap_ptr (used_mouse_menu),
+                           rc_wrap_ptr (end_time),
+                           make_kboard_smob (current_kboard));
+  /* M12 imp-2: read-char-entry returns two values — the resolved
+     event and the used-mouse-menu flag (plain Scheme boolean).
+     Read both back with scm_c_value_ref (a non-values result is a
+     single value, itself) and write the flag through the pointer,
+     next to the old pointer-path write.  The eassert catches any
+     divergence between the two paths; it fires only in
+     --enable-internal-debug builds.  */
+  Lisp_Object event = scm_c_value_ref (result, 0);
+  bool flag = scm_is_true (scm_c_value_ref (result, 1));
+  if (used_mouse_menu)
+    {
+      eassert (*used_mouse_menu == flag);
+      *used_mouse_menu = flag;
+    }
+  return event;
 }
 /* {{coccinelle:skip_end}} */
 
@@ -5420,6 +5443,30 @@ DEFUN ("--rc-test-far-future-end-time-ptr",
   (void)
 {
   return rc_wrap_ptr (&rc_test_far_future_end_time);
+}
+
+/* M12 imp-1 — test-only used-mouse-menu pointer for the
+   --rc-read-char-x-menu-prompt two-value contract.  Mirrors the
+   end-time test-pointer pattern above: a static bool, wrapped with
+   rc_wrap_ptr, to store in an rc-record's RC_SLOT_USED_MOUSE_MENU
+   slot so the DEFUN's non-NULL read-back branch is exercised from a
+   Scheme corpus.  read_char_x_menu_prompt resets *p to false at entry
+   and never sets it without a real menu choice, so the read-back is
+   false in batch — the test proves the pointer path (unwrap +
+   write-through + read-back) runs.  */
+
+static bool rc_test_used_mouse_menu_true = true;
+
+DEFUN ("--rc-test-used-mouse-menu-true-ptr",
+       Fc_rc_test_used_mouse_menu_true_ptr,
+       Sc_rc_test_used_mouse_menu_true_ptr, 0, 0, 0,
+       doc: /* Internal test helper: return a foreign pointer to a
+   static bool initialised to true, for storing in an rc-record's
+   used-mouse-menu slot to exercise the --rc-read-char-x-menu-prompt
+   non-NULL read-back branch.  */)
+  (void)
+{
+  return rc_wrap_ptr (&rc_test_used_mouse_menu_true);
 }
 
 static void

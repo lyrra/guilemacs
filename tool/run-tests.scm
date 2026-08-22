@@ -91,6 +91,7 @@
   "test/keyboard/test-kbd-mouse-motion.el"    ; M11 imp-4 (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-shims.el"           ; M12 imp-1 (corpus prints PASS/FAIL)
   "test/keyboard/test-main-queue.el"          ; M12 imp-3 (corpus prints PASS/FAIL)
+  "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
   "test/src/eval-tests.el"

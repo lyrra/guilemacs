@@ -48,6 +48,13 @@
     (--rc-state-fresh! s)
     (should t)))
 
+(ert-deftest m8a-rc-state/used-mouse-menu-flag-defaults-false ()
+  ;; M12 imp-1: the new plain-Scheme flag defaults to false and is
+  ;; reachable through the test-field helpers.
+  (let ((s (--make-rc-state)))
+    (--rc-state-fresh! s)
+    (should (null (--rc-test-state-ref s 'used-mouse-menu-flag)))))
+
 ;;;; M8c — prologue drain
 
 (ert-deftest m8c-helpers/exist ()
@@ -110,6 +117,65 @@
        (should (null (m8-test-state-ref 'recorded)))
        (should (eq t (m8-test-state-ref 'reread)))
        (should (null unread-command-events))))))
+
+;;;; M12 imp-1 — used-mouse-menu-flag tracks the pointer write
+
+(ert-deftest m12-umm/drain-disabled-event-sets-flag ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list (cons 'm8-disabled 'disabled)))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq t (m8-test-state-ref 'used-mouse-menu-flag)))))))
+
+(ert-deftest m12-umm/drain-menu-bar-sets-flag ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list 'menu-bar))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq t (m8-test-state-ref 'used-mouse-menu-flag)))))))
+
+(ert-deftest m12-umm/drain-tab-bar-sets-flag ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list 'tab-bar))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq t (m8-test-state-ref 'used-mouse-menu-flag)))))))
+
+(ert-deftest m12-umm/drain-tool-bar-sets-flag ()
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list 'tool-bar))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (eq t (m8-test-state-ref 'used-mouse-menu-flag)))))))
+
+(ert-deftest m12-umm/drain-plain-char-keeps-flag-false ()
+  ;; Negative case: the pointer path is NOT written for an ordinary
+  ;; character re-read, so the flag must stay false.
+  (let ((unread-post-input-method-events nil)
+        (unread-command-events (list ?a))
+        (unread-input-method-events nil))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'reread-for-input-method
+                   (--rc-prologue-drain-unread!)))
+       (should (null (m8-test-state-ref 'used-mouse-menu-flag)))))))
 
 ;;;; M8d — kbd-macro + unread-switch-frame early exits
 
@@ -363,6 +429,18 @@
    (lambda ()
      (should (eq 'continue (--rc-test-install-read-event nil)))
      (should (null (m8-test-state-ref 'c))))))
+
+(ert-deftest m12-umm/main-queue-plain-event-keeps-flag-false ()
+  ;; M12 imp-1 negative case for the main-queue path: a Vunread-driven
+  ;; ordinary read returns used-mouse-menu = nil, so the pointer path
+  ;; never fires and the flag must stay false.
+  (let ((unread-command-events (list ?z)))
+    (m8-with-rc-state
+     nil
+     (lambda ()
+       (should (eq 'continue (--rc-read-and-install-event!)))
+       (should (eq ?z (m8-test-state-ref 'c)))
+       (should (null (m8-test-state-ref 'used-mouse-menu-flag)))))))
 
 ;;;; M8k — BUFFERP + special-event-map dispatch
 

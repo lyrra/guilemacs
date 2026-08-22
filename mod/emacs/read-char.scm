@@ -80,9 +80,27 @@
 ;;;;   prev-event       — last-command-event the caller saw.
 ;;;;   used-mouse-menu  — foreign-ptr to the caller-owned C bool (or
 ;;;;                      #nil); C consumers set *p true when the read
-;;;;                      produced a menu choice.  NOT a Scheme flag —
-;;;;                      threading it as a value is brief.org sub-task
-;;;;                      B (deferred).
+;;;;                      produced a menu choice.  brief.org sub-task B
+;;;;                      part 1: the pointer field stays for imp-3 to
+;;;;                      remove; the used-mouse-menu-flag field below
+;;;;                      is the value-return path.  Both paths run
+;;;;                      side by side and must agree.
+;;;;   used-mouse-menu-flag
+;;;;                      — plain Scheme boolean, false value is #f.
+;;;;                      DELIBERATELY NOT #nil: C read_char reads it
+;;;;                      back with scm_is_true, and scm_is_true(#nil)
+;;;;                      is true — a #nil false value would trip the
+;;;;                      imp-2 eassert on every ordinary read.  See
+;;;;                      docs/arch.org "used-mouse-menu-flag false
+;;;;                      value".  Set to #t exactly when the
+;;;;                      used-mouse-menu pointer write fires (menu
+;;;;                      choice / disabled re-read).
+;;;;                      Sub-task B part 2 done: rc-exit!, all three
+;;;;                      wrong-kboard -2 exits, and the quit-handler
+;;;;                      branch return the flag as the second value,
+;;;;                      and C read_char writes it through
+;;;;                      used_mouse_menu under an eassert divergence
+;;;;                      check (M12 imp-2).
 ;;;;   end-time         — deadline for timed reads (#nil = no timeout).
 ;;;;   c                — the resulting event (output slot).
 ;;;;   local-tag        — Guile-prompt tag passed as local_getcjmp to
@@ -98,7 +116,8 @@
 ;;;;                      detecting kboard switches mid-read).
 
 (define-record-type <rc-state>
-  (%make-rc-state commandflag map prev-event used-mouse-menu end-time
+  (%make-rc-state commandflag map prev-event used-mouse-menu
+                  used-mouse-menu-flag end-time
                   c local-tag
                   previous-echo-area-message also-record
                   recorded reread
@@ -108,6 +127,9 @@
   (map               rc-state-map               set-rc-state-map!)
   (prev-event        rc-state-prev-event        set-rc-state-prev-event!)
   (used-mouse-menu   rc-state-used-mouse-menu   set-rc-state-used-mouse-menu!)
+  (used-mouse-menu-flag
+                     rc-state-used-mouse-menu-flag
+                     set-rc-state-used-mouse-menu-flag!)
   (end-time          rc-state-end-time          set-rc-state-end-time!)
   (c                 rc-state-c                 set-rc-state-c!)
   (local-tag         rc-state-local-tag         set-rc-state-local-tag!)
@@ -128,6 +150,7 @@ explicit zeroing in src/keyboard.c."
    #nil   ; map
    #nil   ; prev-event
    #nil   ; used-mouse-menu (foreign-ptr or #nil)
+   #f     ; used-mouse-menu-flag (plain Scheme boolean)
    #nil   ; end-time        (foreign-ptr or #nil)
    #nil   ; c
    #nil   ; local-tag
@@ -146,7 +169,9 @@ Caller-owned pointer args USED-MOUSE-MENU and END-TIME arrive
 already wrapped as Guile foreign-pointer SCMs (or nil)."
   (let* ((tag (make-prompt-tag))
          (rec (%make-rc-state commandflag map prev-event
-                              used-mouse-menu end-time
+                              used-mouse-menu
+                              #f            ; used-mouse-menu-flag
+                              end-time
                               #nil          ; c
                               tag           ; local-tag
                               #nil          ; previous-echo-area-message
@@ -166,8 +191,10 @@ already wrapped as Guile foreign-pointer SCMs (or nil)."
   "Body of C `read_char': build the <rc-state> record, set up the
 Guile prompt, dispatch into `read-char-main' under both the normal
 (thunk) and quit-handler closures.  Called from C read_char().
-Returns either the resolved event (via --rc-exit inside
-read-char-main) or fixnum -2 (wrong_kboard_jmpbuf)."
+Returns two values: the resolved event (via --rc-exit inside
+read-char-main) or fixnum -2 (wrong_kboard_jmpbuf), and the
+used-mouse-menu flag (plain Scheme boolean, #t when the read
+produced a menu choice)."
   (let* ((rec-and-tag (read-char-init-state commandflag map prev-event
                                             used-mouse-menu end-time
                                             orig-kboard))
@@ -183,12 +210,13 @@ read-char-main) or fixnum -2 (wrong_kboard_jmpbuf)."
          (lambda () ((force %rc-record-stack-pop)))))
      (lambda (k . _)
        ;; Quit handler: stash quit_char and maybe requeue to another
-       ;; kboard.  Returns nil if we should re-enter with jump=t, or
-       ;; fixnum -2 for wrong_kboard_jmpbuf.
+       ;; kboard.  Returns two values like every other exit: nil (rec
+       ;; read again with jump=t) or fixnum -2, each paired with the
+       ;; used-mouse-menu flag.
        (let ((preamble-result ((force %read-char-handle-quit-preamble) rec)))
          (if (%nilp preamble-result)
              (read-char-main #t)
-             preamble-result))))))
+             (values preamble-result (rc-state-used-mouse-menu-flag rec))))))))
 
 (define (rc-state-fresh! state)
   "Reset STATE in-place to the C-struct defaults.  Useful for
@@ -197,6 +225,7 @@ test setup when the same rc-state is reused across calls."
   (set-rc-state-map!                        state #nil)
   (set-rc-state-prev-event!                 state #nil)
   (set-rc-state-used-mouse-menu!            state #nil)
+  (set-rc-state-used-mouse-menu-flag!       state #f)  ; #f, not #nil — see field comment above
   (set-rc-state-end-time!                   state #nil)
   (set-rc-state-c!                          state #nil)
   (set-rc-state-local-tag!                  state #nil)
@@ -214,6 +243,7 @@ test setup when the same rc-state is reused across calls."
     ((map)                        (rc-state-map rec))
     ((prev-event)                 (rc-state-prev-event rec))
     ((used-mouse-menu)            (rc-state-used-mouse-menu rec))
+    ((used-mouse-menu-flag)       (rc-state-used-mouse-menu-flag rec))
     ((end-time)                   (rc-state-end-time rec))
     ((c)                          (rc-state-c rec))
     ((local-tag)                  (rc-state-local-tag rec))
@@ -230,6 +260,7 @@ test setup when the same rc-state is reused across calls."
     ((map)                        (set-rc-state-map! rec value))
     ((prev-event)                 (set-rc-state-prev-event! rec value))
     ((used-mouse-menu)            (set-rc-state-used-mouse-menu! rec value))
+    ((used-mouse-menu-flag)       (set-rc-state-used-mouse-menu-flag! rec value))
     ((end-time)                   (set-rc-state-end-time! rec value))
     ((c)                          (set-rc-state-c! rec value))
     ((local-tag)                  (set-rc-state-local-tag! rec value))
@@ -257,14 +288,15 @@ test setup when the same rc-state is reused across calls."
 
 (define (rc-exit!)
   "Final tail of read_char_1: latch input_was_pending = input_pending
-and return state->c (the resolved event).  See docs/keyboard.org
-§M8final."
+and return two values: state->c (the resolved event) and the
+used-mouse-menu flag (M12 imp-2).  A nil rec (no state pushed)
+yields (#nil #f).  See docs/keyboard.org §M8final."
   (let ((rec ((force %rc-record-current))))
     (cond
-     ((%nilp rec) #nil)
+     ((%nilp rec) (values #nil #f))
      (else
       ((force %rc-latch-input-was-pending))
-      (rc-state-c rec)))))
+      (values (rc-state-c rec) (rc-state-used-mouse-menu-flag rec))))))
 
 (define %rc-show-help-echo
   (delay (%c '--rc-show-help-echo)))
@@ -635,7 +667,8 @@ C seam it replaces was deleted by imp-4."
           ;; deleted C seam did (imp-4).  --rc-mark-used-mouse-menu-true
           ;; is kept (deferrable imp-5 half).
           (when (not (%nilp used-mouse-menu))
-            ((force %rc-mark-used-mouse-menu-true) rec))
+            ((force %rc-mark-used-mouse-menu-true) rec)
+            (set-rc-state-used-mouse-menu-flag! rec #t))
           (rc-install-read-event! rec event)))))))
 
 (define (%rc-test-install-read-event c)
@@ -852,7 +885,12 @@ docs/keyboard.org §M8h."
                (not (eq? (car prev-event) 'tab-bar))
                (not (eq? (car prev-event) 'tool-bar))
                (not (pair? (symbol-value 'unread-command-events))))
-          (set-rc-state-c! rec ((force %rc-read-char-x-menu-prompt)))
+          (call-with-values
+            (lambda () ((force %rc-read-char-x-menu-prompt)))
+            (lambda (event used-mouse-menu-p)
+              (set-rc-state-c! rec event)
+              (when used-mouse-menu-p
+                (set-rc-state-used-mouse-menu-flag! rec #t))))
           ;; Now that we have read an event, Emacs is not idle.
           (when (%nilp (rc-state-end-time rec))
             ((force %rc-timer-stop-idle)))
@@ -1143,7 +1181,8 @@ through to block 3 if the queue is empty."
                       (eq? c2 'tool-bar)
                       (eq? c2 'tab-bar)
                       (eq? c2 'menu-bar))
-              ((force %rc-mark-used-mouse-menu-true) rec))
+              ((force %rc-mark-used-mouse-menu-true) rec)
+              (set-rc-state-used-mouse-menu-flag! rec #t))
             (set-rc-state-c! rec c2)
             'reread-for-input-method)))))
 
@@ -1273,7 +1312,8 @@ goes through the small --rc-mark-used-mouse-menu-true C helper."
   "Hoisted body of read_char_1.  JUMP? is t when called after a
 quit-handler longjmp re-entry (mirrors the C `if (jump) goto
 non_reread').  Drives the M8c..M8n bulk subrs in sequence;
-returns state->c (via --rc-exit) or -2 (for wrong-kboard exits).
+returns two values: the event (via --rc-exit) or -2 (for
+wrong-kboard exits), and the used-mouse-menu flag.
 See docs/keyboard.org §M8final."
   (define (retry-section)
     ;; M8c — drain unread events.
@@ -1297,7 +1337,9 @@ See docs/keyboard.org §M8final."
     ;; M8f — echo cancel/dash + minibuf-menu prompt.
     (let ((r (rc-prologue-echo-and-menu!)))
       (cond
-       ((eq? r 'return-wrong-kboard) -2)
+       ((eq? r 'return-wrong-kboard)
+        (let ((rec ((force %rc-record-current))))
+          (values -2 (rc-state-used-mouse-menu-flag rec))))
        ((eq? r 'goto-exit)           (exit-section))
        (else                         (after-echo-menu)))))
 
@@ -1314,7 +1356,9 @@ See docs/keyboard.org §M8final."
     ;; M8i — wrong-kboard + unread-events + kbd-queue + other-kboard.
     (let ((r (rc-prologue-kboard-and-queues!)))
       (cond
-       ((eq? r 'return-wrong-kboard) -2)
+       ((eq? r 'return-wrong-kboard)
+        (let ((rec ((force %rc-record-current))))
+          (values -2 (rc-state-used-mouse-menu-flag rec))))
        (else                         (non-reread-section)))))
 
   (define (non-reread-section)
@@ -1322,7 +1366,9 @@ See docs/keyboard.org §M8final."
     (let ((r (rc-wrong-kboard-and-non-reread!)))
       (cond
        ((eq? r 'goto-exit)           (exit-section))
-       ((eq? r 'return-wrong-kboard) -2)
+       ((eq? r 'return-wrong-kboard)
+        (let ((rec ((force %rc-record-current))))
+          (values -2 (rc-state-used-mouse-menu-flag rec))))
        (else                         (after-non-reread)))))
 
   (define (after-non-reread)
