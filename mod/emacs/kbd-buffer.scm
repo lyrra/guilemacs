@@ -95,7 +95,6 @@
 (defelisp %--activate-menubar-hook      --activate-menubar-hook)
 (defelisp %--kbd-decode-multibyte-string
           --kbd-decode-multibyte-string)
-(defelisp %--rc-mark-used-mouse-menu-true --rc-mark-used-mouse-menu-true)
 (defelisp %--get-internal-last-event-frame
           --get-internal-last-event-frame)
 (defelisp %--set-internal-last-event-frame

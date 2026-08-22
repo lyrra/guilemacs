@@ -15,8 +15,9 @@
 ;;;   - the C DEFUN --rc-read-char-x-menu-prompt two-value contract:
 ;;;     with a live rec and a nil prev-event (read_char_x_menu_prompt
 ;;;     returns Qnil without blocking), it must return exactly two
-;;;     values with the flag read back as #f (both with a NULL pointer
-;;;     slot and with a real non-NULL bool pointer).
+;;;     values with the flag read back as #f (M12 imp-3 deleted the
+;;;     used-mouse-menu pointer slot, so only the local-bool path is
+;;;     left).
 ;;; Plus the M12 imp-2 two-value contract:
 ;;;   - rc-exit! returns (EVENT FLAG) / (#nil #f) on an empty stack.
 ;;;   - all three wrong-kboard -2 exits of read-char-main return
@@ -174,47 +175,23 @@
 
 ;;; --- 3. --rc-read-char-x-menu-prompt two-value contract ------------
 
-;; Live rec, nil used-mouse-menu slot (NULL pointer) and nil prev-event
-;; (read_char_x_menu_prompt returns Qnil without blocking): the DEFUN
-;; must return exactly two values, the flag read back as #f.
+;; Live rec and nil prev-event (read_char_x_menu_prompt returns Qnil
+;; without blocking): the DEFUN must return exactly two values, the
+;; flag read back from its local bool as #f (M12 imp-3 — the rec's
+;; used-mouse-menu pointer field is gone).
 (run-section
- "xmenu-defun/null-pointer"
+ "xmenu-defun/two-values"
  (lambda ()
    (let ((rec (make-test-rec)))
      ((%c '--rc-test-state-set!) rec 'prev-event #nil)
-     ((%c '--rc-test-state-set!) rec 'used-mouse-menu #nil)
      ((%c '--rc-test-with-state)
       rec
       (lambda ()
         (call-with-values
             (lambda () ((%c '--rc-read-char-x-menu-prompt)))
           (lambda args
-            (check "xmenu-defun/two-values-null-ptr" 2 (length args))
-            (check "xmenu-defun/flag-false-null-ptr" #f (cadr args)))))))))
-
-;; Live rec with a REAL non-NULL bool pointer in the used-mouse-menu
-;; slot (--rc-test-used-mouse-menu-true-ptr wraps a static true bool,
-;; exactly like the runtime rc_wrap_ptr): read_char_x_menu_prompt
-;; resets *p to false at entry and does not set it (no menu choice in
-;; batch), so the read-back must be #f and the DEFUN must still return
-;; two values.  Exercises the non-NULL read-back branch of the DEFUN
-;; (brief.org: "read the pointed-to bool back ... Only when the
-;; pointer is non-NULL").
-(run-section
- "xmenu-defun/non-null-pointer"
- (lambda ()
-   (let ((rec (make-test-rec)))
-     ((%c '--rc-test-state-set!) rec 'prev-event #nil)
-     ((%c '--rc-test-state-set!) rec 'used-mouse-menu
-         ((%c '--rc-test-used-mouse-menu-true-ptr)))
-     ((%c '--rc-test-with-state)
-      rec
-      (lambda ()
-        (call-with-values
-            (lambda () ((%c '--rc-read-char-x-menu-prompt)))
-          (lambda args
-            (check "xmenu-defun/two-values-non-null-ptr" 2 (length args))
-            (check "xmenu-defun/flag-false-non-null-ptr" #f (cadr args)))))))))
+            (check "xmenu-defun/two-values" 2 (length args))
+            (check "xmenu-defun/flag-false" #f (cadr args)))))))))
 
 ;;; --- 4. rc-exit! two-value contract (M12 imp-2) --------------------
 
@@ -312,3 +289,35 @@
              (rc-prologue-kboard-and-queues! . ,(lambda () 'fall-through))
              (rc-wrong-kboard-and-non-reread! . ,(lambda () 'return-wrong-kboard))))))
      (check "wrong-kboard/non-reread-two-values" '(-2 #t) result))))
+
+;;; --- 6. M12 imp-3: the pointer field is gone -----------------------
+
+;; %rc-test-state-ref / %rc-test-state-set! fall through to their else
+;; branch (an elisp error) for the deleted used-mouse-menu pointer
+;; field, while the surviving -flag field still round-trips.  This
+;; guards brief.org Step 3: the pointer field and its accessors must
+;; stay deleted (M12 imp-3; the flag is the only path).
+(run-section
+ "imp3/pointer-field-gone"
+ (lambda ()
+   (let ((rec (make-test-rec)))
+     (check "imp3/ref-errors-on-pointer-field"
+            #t
+            (catch #t
+              (lambda ()
+                ((%c '--rc-test-state-ref) rec 'used-mouse-menu)
+                #f)
+              (lambda (k . args) #t)))
+     (check "imp3/set-errors-on-pointer-field"
+            #t
+            (catch #t
+              (lambda ()
+                ((%c '--rc-test-state-set!) rec 'used-mouse-menu #t)
+                #f)
+              (lambda (k . args) #t)))
+     (check "imp3/flag-round-trips"
+            #t
+            (begin
+              ((%c '--rc-test-state-set!) rec 'used-mouse-menu-flag #t)
+              (truthy?
+               ((%c '--rc-test-state-ref) rec 'used-mouse-menu-flag)))))))

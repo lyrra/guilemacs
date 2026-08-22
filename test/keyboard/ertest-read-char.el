@@ -118,7 +118,7 @@
        (should (eq t (m8-test-state-ref 'reread)))
        (should (null unread-command-events))))))
 
-;;;; M12 imp-1 — used-mouse-menu-flag tracks the pointer write
+;;;; M12 imp-1 — used-mouse-menu-flag set on menu-choice re-reads
 
 (ert-deftest m12-umm/drain-disabled-event-sets-flag ()
   (let ((unread-post-input-method-events nil)
@@ -165,7 +165,7 @@
        (should (eq t (m8-test-state-ref 'used-mouse-menu-flag)))))))
 
 (ert-deftest m12-umm/drain-plain-char-keeps-flag-false ()
-  ;; Negative case: the pointer path is NOT written for an ordinary
+  ;; Negative case: the flag path is NOT written for an ordinary
   ;; character re-read, so the flag must stay false.
   (let ((unread-post-input-method-events nil)
         (unread-command-events (list ?a))
@@ -432,8 +432,8 @@
 
 (ert-deftest m12-umm/main-queue-plain-event-keeps-flag-false ()
   ;; M12 imp-1 negative case for the main-queue path: a Vunread-driven
-  ;; ordinary read returns used-mouse-menu = nil, so the pointer path
-  ;; never fires and the flag must stay false.
+  ;; ordinary read returns used-mouse-menu = nil, so the flag is never
+  ;; set and must stay false.
   (let ((unread-command-events (list ?z)))
     (m8-with-rc-state
      nil
