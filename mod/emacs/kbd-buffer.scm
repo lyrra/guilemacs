@@ -42,7 +42,12 @@
   #:declarative? #t
   #:export (kbd-buffer-get-event
             noninteractive-fast-path?
-            kbd-buffer-store-event!))
+            kbd-buffer-store-event!
+            kbd-buffer-readable-events
+            kbd-buffer-process-special-events!
+            kbd-buffer-swallow-events!
+            kbd-buffer-discard-mouse-events!
+            kbd-buffer-events-waiting))
 
 ;;; --- Constants ------------------------------------------------------
 
@@ -131,6 +136,22 @@
 (defelisp %kboard-eq                    kboard-eq)
 (defelisp %set-kboard-kbd-queue         set-kboard-kbd-queue)
 (defelisp %--set-ie-frame-or-window     --set-ie-frame-or-window)
+;; M14 imp-2 — readable/special-event/drainer shims.  The 3 pre-existing
+;; shims (--get-input-pending, --rc-input-pending, --ie-part) are from
+;; earlier milestones, not new imp-1 work — imported here, not added to
+;; src/keyboard.c.
+(defelisp %--timer-check                --timer-check)
+(defelisp %--toolkit-scroll-bars-p      --toolkit-scroll-bars-p)
+(defelisp %--kbd-queue-has-data         --kbd-queue-has-data)
+(defelisp %--any-kbd-queue-has-data     --any-kbd-queue-has-data)
+(defelisp %--kbd-excise-selection-event-at!
+          --kbd-excise-selection-event-at!)
+(defelisp %--redisplay-preserve-echo-area
+          --redisplay-preserve-echo-area)
+(defelisp %--timers-run                 --timers-run)
+(defelisp %--get-input-pending          --get-input-pending)
+(defelisp %--rc-input-pending           --rc-input-pending)
+(defelisp %--ie-part                    --ie-part)
 ;; imp-4 — mouse-motion fallback shims (see brief.org §imp-4).
 (defelisp %--mouse-position-hook        --mouse-position-hook)
 (defelisp %--make-lispy-position        --make-lispy-position)
@@ -245,6 +266,44 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 (define TAB-BAR-EVENT               ((force %--ie-kind-from-name) 'tab-bar))
 (define TOOL-BAR-EVENT              ((force %--ie-kind-from-name) 'tool-bar))
 (define NS-NONKEY-EVENT             ((force %--ie-kind-from-name) 'ns-nonkey))
+;; M14 imp-2 — readable/special-event/drainer kinds.  Naming rule (see
+;; the block comment above): the constant follows the *C enum* name, the
+;; symbol arg follows the *DEFSYM lisp name*, and these two spellings do
+;; not always match.  The two scroll-bar pairs map to the *same* C enum
+;; value through two mutually-exclusive lisp symbols
+;; (src/keyboard.c --ie-kind-from-name, :1189-1242): exactly one of each
+;; pair resolves to a real fixnum in any one build; the other is dead
+;; (-1).  kbd-buffer-discard-mouse-events! needs both members of each
+;; pair (the C body is build-independent); kbd-buffer-readable-events
+;; needs only the =-TOOLKIT= members (that filter only runs when
+;; --toolkit-scroll-bars-p is true).
+(define MOUSE-CLICK-EVENT                ((force %--ie-kind-from-name) 'mouse-click-event))
+(define WHEEL-EVENT                      ((force %--ie-kind-from-name) 'wheel-event))
+(define HORIZ-WHEEL-EVENT                ((force %--ie-kind-from-name) 'horizontal-wheel-event))
+(define SCROLL-BAR-CLICK-EVENT           ((force %--ie-kind-from-name) 'scroll-bar-click-event))
+(define SCROLL-BAR-CLICK-TOOLKIT         ((force %--ie-kind-from-name) 'scroll-bar-click-toolkit))
+(define HORIZONTAL-SCROLL-BAR-CLICK-EVENT
+  ((force %--ie-kind-from-name) 'horizontal-scroll-bar-click-event))
+(define HORIZONTAL-SCROLL-BAR-CLICK-TOOLKIT
+  ((force %--ie-kind-from-name) 'horizontal-scroll-bar-click-toolkit))
+;; M14 imp-2 — readable_events flag-mask constants, hardcoded matching C
+;; keyboard.c:375-377.  SCROLL-BAR-HANDLE-PART is the scroll_bar_handle
+;; enum value (src/termhooks.h:38) with no DEFUN — hardcoded, same
+;; style as KBD-BUFFER-SIZE.
+(define READABLE-EVENTS-DO-TIMERS-NOW 1)
+(define FILTER-EVENTS                  2)
+(define IGNORE-SQUEEZABLES             4)
+(define SCROLL-BAR-HANDLE-PART         2)
+;; The 7 mouse kinds discarded by kbd-buffer-discard-mouse-events! (C
+;; discard_mouse_events, keyboard.c:4789-4803).  Both scroll-bar members
+;; of each pair appear because the C enum SCROLL_BAR_CLICK_EVENT /
+;; HORIZONTAL_SCROLL_BAR_CLICK_EVENT is build-independent while the two
+;; lisp symbols that resolve to it are mutually exclusive per build.
+(define MOUSE-EVENT-KINDS
+  (list MOUSE-CLICK-EVENT WHEEL-EVENT HORIZ-WHEEL-EVENT
+        SCROLL-BAR-CLICK-EVENT SCROLL-BAR-CLICK-TOOLKIT
+        HORIZONTAL-SCROLL-BAR-CLICK-EVENT
+        HORIZONTAL-SCROLL-BAR-CLICK-TOOLKIT))
 
 ;;; M13 imp-2 — while-no-input ignore table.  This is NOT derived from
 ;;; --ie-kind-from-name on the ignore-event symbols: C is_ignored_event
@@ -265,6 +324,20 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
         (cons SELECTION-REQUEST-EVENT  'selection-request)
         (cons FILE-NOTIFY-EVENT        'file-notify)
         (cons DBUS-EVENT               'dbus-event)))
+
+;;; --- M14 imp-2: ignored? (hoisted from kbd-buffer-store-event!) -------
+;;; Hoisted to module scope (brief.org step 3) because
+;;; kbd-buffer-readable-events phase 2 needs the same lookup.  Argument
+;;; is a raw KIND fixnum (not an ie-smob): phase 2 walks by index via
+;;; --kbd-event-kind and should not mint an ie-smob just to read a kind.
+(define (ignored? kind)
+  "t (the memq tail) when KIND is in while-no-input-ignore-events.
+Looks the kind up in WHILE-NO-INPUT-IGNORE-KINDS (the is_ignored_event
+symbol table, hand-written — see the constant comment) and memq-s the
+result (or #f) against while-no-input-ignore-events."
+  ((force %memq)
+   (assv-ref WHILE-NO-INPUT-IGNORE-KINDS kind)
+   (symbol-value 'while-no-input-ignore-events)))
 
 ;;; --- imp-3 helpers ----------------------------------------------------
 
@@ -668,15 +741,6 @@ already-holding guard discards immediately; an ASCII keystroke is
 modifier-folded then checked for quit / stop; any other event (or an
 unmatched keystroke) falls through to ring-append!, which also runs
 the while-no-input quit-flag check unconditionally."
-  (define (ignored? ie)
-    "t (the memq tail) when IE's kind is in while-no-input-ignore-events.
-Looks the kind up in WHILE-NO-INPUT-IGNORE-KINDS (the is_ignored_event
-symbol table, hand-written — see the constant comment) and memq-s the
-result (or #f) against while-no-input-ignore-events."
-    ((force %memq)
-     (assv-ref WHILE-NO-INPUT-IGNORE-KINDS ((force %--ie-kind) ie))
-     (symbol-value 'while-no-input-ignore-events)))
-
   (define (ring-append! ie)
     "C 4688-4701: phases 4+5.  Append IE to the ring unless it would
 fill the last slot (silent drop); then, unconditionally, set quit-flag
@@ -690,7 +754,7 @@ ignored."
         ((force %--kbd-set-store-ptr-index) next)
         ((force %--kbd-maybe-hold-keyboard-input)))
       (when (and (truthy? (symbol-value 'throw-on-input))
-                 (not (truthy? (ignored? ie))))
+                 (not (truthy? (ignored? ((force %--ie-kind) ie)))))
         (set-symbol-value! 'quit-flag (symbol-value 'throw-on-input)))))
 
   (define (fold-c ie)
@@ -998,3 +1062,153 @@ adapter is gone)."
                        (values c kboard used-mouse-menu))))
           (begin (set! kboard ((force %current-kboard)))
                  (wait-loop))))))
+
+;;; --- M14 imp-2: kbd-buffer ring predicates & drainers ----------------
+;;; Ports of C readable_events, process_special_events, swallow_events,
+;;; discard_mouse_events and kbd_buffer_events_waiting
+;;; (src/keyboard.c:4532-4608, 5633-5710, 5716-5727, 4789-4803,
+;;; 4812-4822 — current HEAD line numbers).  Scheme-only, coexistence:
+;;; no C caller is wired to them yet (imp-3).  ie-smob lifetime (Risk 2):
+;;; --kbd-event-ie is only minted when a field read (--ie-part,
+;;; --ie-modifiers) is actually needed, and used immediately.
+
+(define (kbd-buffer-readable-events flags)
+  "Port of C readable_events (src/keyboard.c:4532-4608).  Returns #t/#nil
+matching the C int 1/0 used as a boolean by every caller.  7 phases, in
+order; the first phase that finds a readable condition returns #t
+immediately.  Phase 2 walks the ring by index and only reads an ie-smob
+via --kbd-event-ie when --ie-part / --ie-modifiers is actually needed
+(the dead scroll-bar toolkit members sit at -1 and can never match, so
+no build-specific branch is needed)."
+  ;; Phase 1 — READABLE_EVENTS_DO_TIMERS_NOW.
+  (when (logtest flags READABLE-EVENTS-DO-TIMERS-NOW)
+    ((force %--timer-check)))
+  ;; Feature-test result cannot change mid-call — read once (avoids a
+  ;; Guile→elisp round trip per ring-slot visit).
+  (let ((toolkit-scroll-bars-p ((force %--toolkit-scroll-bars-p))))
+    (let ((tail
+         ;; Phases 3-7.  Phase 6 is the last phase, so its own truth
+         ;; value is already the function's return value — no separate
+         ;; final #f.
+         (lambda ()
+           (cond
+            ((truthy? ((force %--x-detect-pending-selection-requests))) #t)
+            ((truthy? ((force %--detect-conversion-events))) #t)
+            ((and (not (logtest flags IGNORE-SQUEEZABLES))
+                  (truthy? ((force %--some-mouse-moved))))
+             #t)
+            ((truthy? ((force %--kbd-single-kboard-p)))
+             ;; --kbd-queue-has-data returns Qt/Qnil directly.
+             ((force %--kbd-queue-has-data) ((force %current-kboard))))
+            (else
+             ((force %--any-kbd-queue-has-data)))))))
+    ;; Phase 2 — ring walk.
+    (if (not (= ((force %--kbd-fetch-ptr-index))
+                ((force %--kbd-store-ptr-index))))
+        (let ((filter-active
+               (or (logtest flags FILTER-EVENTS)
+                   (and toolkit-scroll-bars-p
+                        (logtest flags IGNORE-SQUEEZABLES)))))
+          (if (not filter-active)
+              ;; C's `else return 1'.
+              #t
+              (let walk ((idx ((force %--kbd-fetch-ptr-index))))
+                (if (= idx ((force %--kbd-store-ptr-index)))
+                    ;; Loop fell out with no non-skipped slot: fall
+                    ;; through to phase 3, do NOT return #f here.
+                    (tail)
+                    (let* ((kind ((force %--kbd-event-kind) idx))
+                           (cond-a
+                            (and (logtest flags FILTER-EVENTS)
+                                 (if (not (truthy?
+                                           (symbol-value
+                                            'input-pending-p-filter-events)))
+                                     (or (= kind FOCUS-IN-EVENT)
+                                         (= kind FOCUS-OUT-EVENT))
+                                     (truthy? (ignored? kind)))))
+                           (cond-b
+                            (and toolkit-scroll-bars-p
+                                 (logtest flags IGNORE-SQUEEZABLES)
+                                 (or (= kind SCROLL-BAR-CLICK-TOOLKIT)
+                                     (= kind
+                                        HORIZONTAL-SCROLL-BAR-CLICK-TOOLKIT))
+                                 ;; Only mint the ie-smob when the kind
+                                 ;; already matched (short-circuit).
+                                 (let ((ie ((force %--kbd-event-ie) idx)))
+                                   (and (= ((force %--ie-part) ie)
+                                           SCROLL-BAR-HANDLE-PART)
+                                        (= ((force %--ie-modifiers) ie) 0))))))
+                      (if (not (or cond-a cond-b))
+                          #t
+                          (walk (modulo (+ idx 1) KBD-BUFFER-SIZE))))))))
+        (tail)))))
+
+(define (kbd-buffer-process-special-events!)
+  "Port of C process_special_events (src/keyboard.c:5633-5710) using the
+simpler scan-excise-rescan algorithm the plan settled on (the C
+physical-pointer loop does not translate meaningfully to cyclic
+indices).  Scan from fetch to store, excise the first selection event,
+then rescan — --kbd-excise-selection-event-at! already does the copy +
+two-arm memmove-shift + fetch-bump + input_pending update and aborts on
+unsupported platforms, so no abort branch is added here."
+  (let loop ()
+    (let ((fetch ((force %--kbd-fetch-ptr-index)))
+          (store ((force %--kbd-store-ptr-index))))
+      (let scan ((idx fetch))
+        (if (= idx store)
+            #f
+            (let ((kind ((force %--kbd-event-kind) idx)))
+              (if (or (= kind SELECTION-REQUEST-EVENT)
+                      (= kind SELECTION-CLEAR-EVENT))
+                  (begin
+                    ((force %--kbd-excise-selection-event-at!) idx)
+                    (loop))
+                  (scan (modulo (+ idx 1) KBD-BUFFER-SIZE)))))))))
+
+(define (kbd-buffer-swallow-events! do-display)
+  "Port of C swallow_events (src/keyboard.c:5716-5727).  4 steps:
+process special events, snapshot timers-run, call get-input-pending (for
+its side effect on the C global input_pending — the return value is
+ignored), and redisplay-preserve-echo-area 7 when the C condition
+holds.  Reads the pending flag via --rc-input-pending (the C global),
+not via step 3's return value, exactly as C does."
+  (kbd-buffer-process-special-events!)
+  (let ((snapshot ((force %--timers-run))))
+    ;; Side effect only — sets the C global input_pending.
+    ((force %--get-input-pending) READABLE-EVENTS-DO-TIMERS-NOW)
+    (when (and (not (truthy? ((force %--rc-input-pending))))
+               (not (= ((force %--timers-run)) snapshot))
+               do-display)
+      ((force %--redisplay-preserve-echo-area) 7))))
+
+(define (kbd-buffer-discard-mouse-events!)
+  "Port of C discard_mouse_events (src/keyboard.c:4789-4803).  Single
+pass, no cursor mutation, so one snapshot of fetch/store is enough (do
+not re-read cursors mid-walk — nothing here moves them).  Blanks each
+mouse kind in MOUSE-EVENT-KINDS to NO_EVENT via --ie-clear.  memv (not
+case — Guile's case quotes its datums)."
+  (let ((fetch ((force %--kbd-fetch-ptr-index)))
+        (store ((force %--kbd-store-ptr-index))))
+    (let walk ((idx fetch))
+      (when (not (= idx store))
+        (when (memv ((force %--kbd-event-kind) idx) MOUSE-EVENT-KINDS)
+          ((force %--ie-clear) ((force %--kbd-event-ie) idx)))
+        (walk (modulo (+ idx 1) KBD-BUFFER-SIZE))))))
+
+(define (kbd-buffer-events-waiting)
+  "Port of C kbd_buffer_events_waiting (src/keyboard.c:4812-4822).  Keeps
+the side effect — this is a drainer, not a pure predicate: walk from
+fetch stepping by next_kbd_event until idx = store OR kind != NO_EVENT,
+then always set the fetch-ptr to idx (even when idx = store; term.c
+relies on this advance).  Returns #t/#nil."
+  (let loop ((idx ((force %--kbd-fetch-ptr-index))))
+    (let ((store ((force %--kbd-store-ptr-index))))
+      (if (or (= idx store)
+              (not (= ((force %--kbd-event-kind) idx) NO-EVENT)))
+          (begin
+            ((force %--kbd-set-fetch-ptr-index) idx)
+            (if (and (not (= idx store))
+                     (not (= ((force %--kbd-event-kind) idx) NO-EVENT)))
+                #t
+                #nil))
+          (loop (modulo (+ idx 1) KBD-BUFFER-SIZE))))))

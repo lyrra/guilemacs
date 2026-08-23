@@ -149,6 +149,7 @@
 (load "test/keyboard/test-m13-shims.el")          ; M13 imp-1
 (load "test/keyboard/test-m13-store.el")          ; M13 imp-2
 (load "test/keyboard/test-m14-shims.el")          ; M14 imp-1
+(load "test/keyboard/test-m14-bodies.el")         ; M14 imp-2
 (message "")
 
 (message "========================================")
