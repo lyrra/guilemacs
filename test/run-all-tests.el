@@ -151,6 +151,7 @@
 (load "test/keyboard/test-m14-shims.el")          ; M14 imp-1
 (load "test/keyboard/test-m14-bodies.el")         ; M14 imp-2
 (load "test/keyboard/test-m14-predicates.el")     ; M14 imp-4
+(load "test/keyboard/test-m15-shims.el")          ; M15 imp-1
 (message "")
 
 (message "========================================")

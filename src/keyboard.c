@@ -4941,6 +4941,144 @@ nil.  */)
   return Qnil;
 }
 
+/* M15 imp-1 — timer firing core shims.  Each shim wraps one piece of
+   the C timer firing core for Scheme, leaving every C function body
+   unchanged.  decode_timer and timer_check_2 are static and defined
+   later in this file, so declare them up front; their slot 0/1/2/3/8
+   checks run verbatim inside the shims.  The three-way
+   {invalid | {0,0} | wait} return contract survives the FFI as
+   {nil | t | (SEC . NSEC)} — the same encoding every M15 shim and the
+   imp-2 Scheme body share (see docs/m15-plan.org risk 3).  */
+
+static struct timespec decode_timer (Lisp_Object);
+static struct timespec timer_check_2 (Lisp_Object, Lisp_Object);
+
+DEFUN ("--timer-check-2", Fc_timer_check_2, Sc_timer_check_2, 2, 2, 0,
+       doc: /* Internal: run C's timer_check_2 on TIMER-LIST and
+IDLE-TIMER-LIST and decode its three-way return.
+
+The three-way contract survives the FFI as:
+- nil            -> invalid (no ordinary or idle timer is active)
+- t              -> the {0,0} "a timer fired, call again" result
+- (SEC . NSEC)   -> the fixnum seconds and nanoseconds to wait for the
+                    next timer to become ripe
+
+All five M15 shims and the imp-2 Scheme body share this encoding.  */)
+  (Lisp_Object timer_list, Lisp_Object idle_timer_list)
+{
+  struct timespec r = timer_check_2 (timer_list, idle_timer_list);
+  if (! timespec_valid_p (r))
+    return Qnil;
+  if (r.tv_sec == 0 && r.tv_nsec == 0)
+    return Qt;
+  return Fcons (make_fixnum (r.tv_sec), make_fixnum (r.tv_nsec));
+}
+
+DEFUN ("--timer-get-pending-funcalls-drain!",
+       Fc_timer_get_pending_funcalls_drain,
+       Sc_timer_get_pending_funcalls_drain, 0, 0, 0,
+       doc: /* Internal: pop and run every entry in C's
+pending_funcalls, one at a time, via safe_calln (Qapply, ...) — the
+same loop timer_check_2 runs at its top.  Returns nil.  */)
+  (void)
+{
+  while (CONSP (pending_funcalls))
+    {
+      Lisp_Object funcall = XCAR (pending_funcalls);
+      pending_funcalls = XCDR (pending_funcalls);
+      safe_calln (Qapply, XCAR (funcall), XCDR (funcall));
+    }
+  return Qnil;
+}
+
+/* M15 imp-1 — test-support accessors for pending_funcalls.  These two
+   are NOT part of the 5-shim set (brief.org) and carry no production
+   logic: the C writers in frame.c/terminal.c are the only live writers
+   during a real run.  The brief's drain test spec ("write one entry to
+   pending_funcalls, call the drain shim, confirm it runs once and the
+   queue is empty") cannot be met from Scheme otherwise — no existing
+   shim touches the cell.  get/set let the corpus seed and then read
+   back the queue.  */
+
+DEFUN ("--timer-pending-funcalls",
+       Fc_timer_pending_funcalls,
+       Sc_timer_pending_funcalls, 0, 0, 0,
+       doc: /* Internal (test support): return C's pending_funcalls as
+a list of (FUN . ARGS) entries.  */)
+  (void)
+{
+  return pending_funcalls;
+}
+
+DEFUN ("--timer-pending-funcalls-set!",
+       Fc_timer_pending_funcalls_set,
+       Sc_timer_pending_funcalls_set, 1, 1, 0,
+       doc: /* Internal (test support): replace C's pending_funcalls
+with LIST of (FUN . ARGS) entries.  Lets the drain test seed the queue
+that --timer-get-pending-funcalls-drain! and timer_check_2 consume.
+Returns nil.  */)
+  (Lisp_Object list)
+{
+  pending_funcalls = list;
+  return Qnil;
+}
+
+DEFUN ("--timer-fire-ripe", Fc_timer_fire_ripe, Sc_timer_fire_ripe, 1, 1, 0,
+       doc: /* Internal: run the ripe-timer fire sequence for TIMER as
+one compound, in the exact C order from timer_check_2: mark slot 0 = t
+first, bind inhibit-quit to t, call the timer handler once, restore
+Vdeactivate-mark, then bump timers_run.  Returns nil.  */)
+  (Lisp_Object timer)
+{
+  dynwind_begin ();
+  Lisp_Object old_deactivate_mark = Vdeactivate_mark;
+  ASET (timer, 0, Qt);
+  specbind_guile (Qinhibit_quit, Qt);
+  call1 (Qtimer_event_handler, timer);
+  Vdeactivate_mark = old_deactivate_mark;
+  timers_run++;
+  dynwind_end ();
+  return Qnil;
+}
+
+DEFUN ("--timer-copy-window", Fc_timer_copy_window, Sc_timer_copy_window,
+       0, 0, 0,
+       doc: /* Internal: snapshot both timer lists in one atomic window
+against atimer callbacks, exactly as timer_check does: save and set
+inhibit-quit to t, block input, turn atimers off, copy Vtimer-list and
+Vtimer-idle-list, turn atimers back on, unblock input, then restore
+inhibit-quit.  Returns the two copies as a pair (TIMERS . IDLE-TIMERS);
+the idle copy is nil when Emacs is not idle.  */)
+  (void)
+{
+  Lisp_Object tem = Vinhibit_quit;
+  Vinhibit_quit = Qt;
+  block_input ();
+  turn_on_atimers (false);
+  Lisp_Object timers = Fcopy_sequence (Vtimer_list);
+  Lisp_Object idle_timers
+    = (timespec_valid_p (timer_idleness_start_time)
+       ? Fcopy_sequence (Vtimer_idle_list)
+       : Qnil);
+  turn_on_atimers (true);
+  unblock_input ();
+  Vinhibit_quit = tem;
+  return Fcons (timers, idle_timers);
+}
+
+DEFUN ("--timespec-diff-to-now", Fc_timespec_diff_to_now,
+       Sc_timespec_diff_to_now, 1, 1, 0,
+       doc: /* Internal: return timespec_sub (current_timespec (),
+decode_timer (TIMER)) as (SEC . NSEC).  Negative when TIMER's fire time
+is still in the future; positive when it is overdue.  decode_timer's
+slot 0/1/2/3/8 checks run verbatim.  */)
+  (Lisp_Object timer)
+{
+  struct timespec diff = timespec_sub (current_timespec (),
+				       decode_timer (timer));
+  return Fcons (make_fixnum (diff.tv_sec), make_fixnum (diff.tv_nsec));
+}
+
 /* imp-1.3 — rec-free end-time deadline check.  */
 
 DEFUN ("--timespec-expired-p", Fc_timespec_expired_p,
