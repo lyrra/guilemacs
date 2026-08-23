@@ -148,6 +148,7 @@
 (load "test/keyboard/test-main-queue.el")         ; M12 imp-3
 (load "test/keyboard/test-m13-shims.el")          ; M13 imp-1
 (load "test/keyboard/test-m13-store.el")          ; M13 imp-2
+(load "test/keyboard/test-m14-shims.el")          ; M14 imp-1
 (message "")
 
 (message "========================================")

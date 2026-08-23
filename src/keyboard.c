@@ -1467,6 +1467,62 @@ Platform routing is internal:
     }
 }
 
+DEFUN ("--kbd-excise-selection-event-at!",
+       Fc_kbd_excise_selection_event_at,
+       Sc_kbd_excise_selection_event_at, 1, 1, 0,
+       doc: /* Internal: if kbd_buffer[N]'s kind is
+SELECTION_REQUEST_EVENT or SELECTION_CLEAR_EVENT, excise it from the
+ring's middle (two-arm cyclic memmove, copy taken first as a
+re-entrancy guard), dispatch the platform handler on the copy,
+update input_pending, and return t.  Otherwise return nil and leave
+the ring untouched.
+
+Caller must ensure 0 <= N < KBD_BUFFER_SIZE.  The Scheme walk in
+kbd-buffer-process-special-events! finds N by scanning kind fields
+between the fetch and store cursors, then re-reads both cursors
+after each excise (this shim moves them).  Aborts on builds without
+HAVE_X11 or HAVE_PGTK, matching process_special_events' no-window
+arm.  HAVE_HAIKU is not ported (dropped platform).  */)
+  (Lisp_Object n)
+{
+  EMACS_INT idx = XFIXNUM (n);
+  eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
+  union buffered_input_event *event = &kbd_buffer[idx];
+
+  if (event->kind != SELECTION_REQUEST_EVENT
+      && event->kind != SELECTION_CLEAR_EVENT)
+    return Qnil;
+
+#if defined HAVE_X11 || defined HAVE_PGTK
+  struct selection_input_event copy = event->sie;
+  int moved_events;
+
+  if (event < kbd_fetch_ptr)
+    {
+      memmove (kbd_buffer + 1, kbd_buffer,
+               (event - kbd_buffer) * sizeof *kbd_buffer);
+      kbd_buffer[0] = kbd_buffer[KBD_BUFFER_SIZE - 1];
+      moved_events = kbd_buffer + KBD_BUFFER_SIZE - 1 - kbd_fetch_ptr;
+    }
+  else
+    moved_events = event - kbd_fetch_ptr;
+
+  memmove (kbd_fetch_ptr + 1, kbd_fetch_ptr,
+           moved_events * sizeof *kbd_fetch_ptr);
+  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
+  input_pending = readable_events (0);
+
+#ifdef HAVE_X11
+  x_handle_selection_event (&copy);
+#else
+  pgtk_handle_selection_event (&copy);
+#endif
+  return Qt;
+#else
+  emacs_abort ();
+#endif
+}
+
 DEFUN ("--user-signal-name", Fuser_signal_name, Suser_signal_name,
        1, 1, 0,
        doc: /* Return the interned symbol for user-signal code C.
@@ -3997,6 +4053,29 @@ Used by Scheme rc-redisplay-and-wait-block!.  */)
   return Qnil;
 }
 
+DEFUN ("--redisplay-preserve-echo-area", Fc_redisplay_preserve_echo_area,
+       Sc_redisplay_preserve_echo_area, 1, 1, 0,
+       doc: /* Internal: call redisplay_preserve_echo_area (N).
+
+Generalizes --rc-redisplay-preserve-echo-area's hardcoded 5 so
+kbd-buffer-swallow-events! can pass swallow_events' 7.  Returns
+nil.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  redisplay_preserve_echo_area (XFIXNUM (n));
+  return Qnil;
+}
+
+DEFUN ("--timers-run", Fc_timers_run, Sc_timers_run, 0, 0, 0,
+       doc: /* Internal: return the C timers_run counter as a
+fixnum.  Used by kbd-buffer-swallow-events! to snapshot and compare
+timers_run around get_input_pending; shared with M15.  */)
+  (void)
+{
+  return make_fixnum (timers_run);
+}
+
 DEFUN ("--rc-redisplay",
        Fc_rc_redisplay, Sc_rc_redisplay, 0, 0, 0,
        doc: /* Internal: call redisplay ().
@@ -4826,6 +4905,31 @@ DEFUN ("--kbd-single-kboard-p", Fc_kbd_single_kboard_p,
   return single_kboard ? Qt : Qnil;
 }
 
+DEFUN ("--kbd-queue-has-data", Fc_kbd_queue_has_data,
+       Sc_kbd_queue_has_data, 1, 1, 0,
+       doc: /* Internal: t when KB's kbd_queue_has_data flag is set,
+nil otherwise.  Getter companion to
+--set-kboard-kbd-queue-has-data; no generic accessor covers this
+plain C bitfield.  */)
+  (Lisp_Object kb)
+{
+  CHECK_KBOARD (kb);
+  return XKBOARD (kb)->kbd_queue_has_data ? Qt : Qnil;
+}
+
+DEFUN ("--any-kbd-queue-has-data", Fc_any_kbd_queue_has_data,
+       Sc_any_kbd_queue_has_data, 0, 0, 0,
+       doc: /* Internal: t when any KBOARD in all_kboards has its
+kbd_queue_has_data flag set, nil otherwise.  readable_events' phase-6
+non-single-kboard branch.  */)
+  (void)
+{
+  for (KBOARD *kb = all_kboards; kb; kb = kb->next_kboard)
+    if (kb->kbd_queue_has_data)
+      return Qt;
+  return Qnil;
+}
+
 /* imp-1.2 — kboard side-queue append.  Compound on purpose: the
    tail-walk + append + abort-check + flag must be atomic in C, so
    Scheme never set-cdr!s C-owned cons cells across the FFI.  */
@@ -4904,6 +5008,19 @@ a C function until M26 ports it.  Returns nil.  */)
   (void)
 {
   handle_interrupt (false);
+  return Qnil;
+}
+
+DEFUN ("--timer-check", Fc_timer_check, Sc_timer_check, 0, 0, 0,
+       doc: /* TEMPORARY: call C's timer_check ().
+
+This shim is a thin call-through to C's timer_check, which stays a
+C function until M15 ports it (same "call the C one via shim until
+then" pattern --handle-interrupt-normal used for M26).  Returns
+nil.  */)
+  (void)
+{
+  timer_check ();
   return Qnil;
 }
 
@@ -5188,6 +5305,21 @@ DEFUN ("--mouse-position-hook",
   return listn (6,
 		f ? make_lisp_ptr (f, Lisp_Vectorlike) : Qnil,
 		bar_window, make_fixnum (part), x, y, make_fixnum (t));
+}
+
+DEFUN ("--toolkit-scroll-bars-p", Fc_toolkit_scroll_bars_p,
+       Sc_toolkit_scroll_bars_p, 0, 0, 0,
+       doc: /* Internal: t when built with USE_TOOLKIT_SCROLL_BARS,
+nil otherwise.  Feature predicate for readable_events' squeezable
+filter (mirrors --detect-conversion-events' nil-when-absent
+convention).  */)
+  (void)
+{
+#ifdef USE_TOOLKIT_SCROLL_BARS
+  return Qt;
+#else
+  return Qnil;
+#endif
 }
 
 DEFUN ("--detect-conversion-events",
