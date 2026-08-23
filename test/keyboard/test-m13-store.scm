@@ -301,3 +301,42 @@
       (check "no-event/abort-invoked" #t aborted))
     (lambda () (set-symbol-function! '--kbd-abort saved-abort)
                ((%sym '--kbd-set-store-ptr-index) ptr))))
+
+;;; --- 11. Dispatcher round-trip through the C entry point (imp-3) ----
+;;;
+;;; kbd_buffer_store_buffered_event's body now only keeps the NO_EVENT
+;;; guard, wraps event + hold_quit as ie-smobs, and dispatches to
+;;; kbd-buffer-store-event!.  These cases drive the REAL C entry via
+;;; the --kbd-store-buffered-event test shim, so the dispatcher wiring
+;;; (guard + wrap + SCM_CALL_2) is under test, not only the Scheme body.
+
+;; 11a. Plain ASCII keystroke lands in the ring.
+(let* ((ptr ((%sym '--kbd-store-ptr-index)))
+       (ie ((%sym '--ie-test-event) ASCII-KEYSTROKE-EVENT 120 0 #nil)))
+  (dynamic-wind
+    (lambda () #f)
+    (lambda ()
+      ((%sym '--kbd-store-buffered-event) ie #nil)
+      (let ((stored ((%sym '--kbd-event-ie) ptr)))
+        (check "roundtrip/ptr-advances" (modulo (+ ptr 1) KBD-BUFFER-SIZE)
+               ((%sym '--kbd-store-ptr-index)))
+        (check "roundtrip/kind" ASCII-KEYSTROKE-EVENT
+               ((%sym '--ie-kind) stored))
+        (check "roundtrip/code" 120 ((%sym '--ie-code) stored))))
+    (lambda () ((%sym '--kbd-set-store-ptr-index) ptr))))
+
+;; 11b. Quit-char with hold-quit: folded via the dispatcher, copies into
+;; hold_quit, ring not appended.
+(let* ((ptr ((%sym '--kbd-store-ptr-index)))
+       (hq ((%sym '--ie-test-hold-quit)))
+       (qc ((%sym '--quit-char)))
+       (ie ((%sym '--ie-test-event) ASCII-KEYSTROKE-EVENT qc 0 #nil)))
+  (dynamic-wind
+    (lambda () #f)
+    (lambda ()
+      ((%sym '--kbd-store-buffered-event) ie hq)
+      (check "roundtrip/hold-quit-kind" ASCII-KEYSTROKE-EVENT
+             ((%sym '--ie-kind) hq))
+      (check "roundtrip/hold-quit-code" qc ((%sym '--ie-code) hq))
+      (check "roundtrip/ring-not-appended" ptr ((%sym '--kbd-store-ptr-index))))
+    (lambda () ((%sym '--kbd-set-store-ptr-index) ptr))))

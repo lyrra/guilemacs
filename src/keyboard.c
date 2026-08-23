@@ -4589,13 +4589,11 @@ kbd_buffer_store_event (register struct input_event *event)
 
 /* Store EVENT obtained at interrupt level into kbd_buffer, fifo.
 
-   If HOLD_QUIT is 0, just stuff EVENT into the fifo.
-   Else, if HOLD_QUIT.kind != NO_EVENT, discard EVENT.
-   Else, if EVENT is a quit event, store the quit event
-   in HOLD_QUIT, and return (thus ignoring further events).
-
-   This is used to postpone the processing of the quit event until all
-   subsequent input events have been parsed (and discarded).  */
+   The phase-by-phase logic now lives in Scheme in
+   (emacs kbd-buffer) `kbd-buffer-store-event!' (mod/emacs/kbd-buffer.scm);
+   this C entry keeps the extern signature so other C files can call
+   it by name, keeps the single NO_EVENT guard, then dispatches (M13
+   imp-3).  */
 
 void
 kbd_buffer_store_buffered_event (union buffered_input_event *event,
@@ -4604,100 +4602,18 @@ kbd_buffer_store_buffered_event (union buffered_input_event *event,
   if (event->kind == NO_EVENT)
     emacs_abort ();
 
-  if (hold_quit && hold_quit->kind != NO_EVENT)
-    return;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-store-event!");
 
-  if (event->kind == ASCII_KEYSTROKE_EVENT)
-    {
-      int c = event->ie.code & 0377;
+  SCM ie_smob = ie_wrap (&event->ie);
+  SCM hold_quit_smob = hold_quit ? ie_wrap (hold_quit) : SCM_BOOL_F;
+  SCM_CALL_2 (proc, ie_smob, hold_quit_smob);
 
-      if (event->ie.modifiers & ctrl_modifier)
-	c = make_ctrl_char (c);
-
-      c |= (event->ie.modifiers
-	    & (meta_modifier | alt_modifier
-	       | hyper_modifier | super_modifier));
-
-      if (c == quit_char)
-	{
-	  KBOARD *kb = FRAME_KBOARD (XFRAME (event->ie.frame_or_window));
-
-	  if (single_kboard && kb != current_kboard)
-	    {
-	      kset_kbd_queue
-		(kb, list2 (make_lispy_switch_frame (event->ie.frame_or_window),
-			    make_fixnum (c)));
-	      kb->kbd_queue_has_data = true;
-
-	      for (union buffered_input_event *sp = kbd_fetch_ptr;
-		   sp != kbd_store_ptr; sp = next_kbd_event (sp))
-		{
-		  if (event_to_kboard (&sp->ie) == kb)
-		    {
-		      sp->ie.kind = NO_EVENT;
-		      sp->ie.frame_or_window = Qnil;
-		      sp->ie.arg = Qnil;
-		    }
-		}
-	      return;
-	    }
-
-	  if (hold_quit)
-	    {
-	      *hold_quit = event->ie;
-	      return;
-	    }
-
-	  /* If this results in a quit_char being returned to Emacs as
-	     input, set Vlast_event_frame properly.  If this doesn't
-	     get returned to Emacs as an event, the next event read
-	     will set Vlast_event_frame again, so this is safe to do.  */
-	  {
-	    Lisp_Object focus;
-
-	    focus = FRAME_FOCUS_FRAME (XFRAME (event->ie.frame_or_window));
-	    if (NILP (focus))
-	      focus = event->ie.frame_or_window;
-	    internal_last_event_frame = focus;
-	    Vlast_event_frame = focus;
-	  }
-
-	  handle_interrupt (0);
-	  return;
-	}
-
-      if (c && c == stop_character)
-	{
-	  sys_suspend ();
-	  return;
-	}
-    }
-
-  /* Don't let the very last slot in the buffer become full,
-     since that would make the two pointers equal,
-     and that is indistinguishable from an empty buffer.
-     Discard the event if it would fill the last slot.  */
-  union buffered_input_event *next_slot = next_kbd_event (kbd_store_ptr);
-  if (kbd_fetch_ptr != next_slot)
-    {
-      *kbd_store_ptr = *event;
-      kbd_store_ptr = next_slot;
-#ifdef subprocesses
-      if (kbd_buffer_nr_stored () > KBD_BUFFER_SIZE / 2
-	  && ! kbd_on_hold_p ())
-        {
-          /* Don't read keyboard input until we have processed kbd_buffer.
-             This happens when pasting text longer than KBD_BUFFER_SIZE/2.  */
-          hold_keyboard_input ();
-        }
-#endif	/* subprocesses */
-    }
-
-  /* If we're inside while-no-input, and this event qualifies
-     as input, set quit-flag to cause an interrupt.  */
-  if (!NILP (Vthrow_on_input)
-      && !is_ignored_event (event))
-    Vquit_flag = Vthrow_on_input;
+  /* M9 ie-smob lifetime contract: invalidate right after the call.  */
+  SCM_SET_SMOB_DATA (ie_smob, NULL);
+  if (hold_quit)
+    SCM_SET_SMOB_DATA (hold_quit_smob, NULL);
 }
 
 /* Limit help event positions to this range, to avoid overflow problems.  */
@@ -5563,6 +5479,22 @@ DEFUN ("--ie-test-hold-quit", Fie_test_hold_quit, Sie_test_hold_quit, 0, 0, 0,
   ie_test_hold_quit_storage.arg = Qnil;
   ie_test_hold_quit_storage.device = Qt;
   return ie_wrap (&ie_test_hold_quit_storage);
+}
+
+DEFUN ("--kbd-store-buffered-event", Fkbd_store_buffered_event,
+       Skbd_store_buffered_event, 2, 2, 0,
+       doc: /* Internal test helper: call the real C
+   kbd_buffer_store_buffered_event with IE (an ie-smob) and HOLD-QUIT
+   (an ie-smob, or nil for NULL).  M13 imp-3 round-trip: exercises the
+   dispatcher wiring (C guard + ie_wrap + SCM_CALL_2) through the real
+   entry point, not just kbd-buffer-store-event! directly.  Only for
+   M13 imp-3 tests — not production API.  */)
+  (Lisp_Object ie, Lisp_Object hold_quit)
+{
+  struct input_event *ev = ie_unwrap (ie);
+  struct input_event *hq = NILP (hold_quit) ? NULL : ie_unwrap (hold_quit);
+  kbd_buffer_store_buffered_event ((union buffered_input_event *) ev, hq);
+  return Qnil;
 }
 
 static void
