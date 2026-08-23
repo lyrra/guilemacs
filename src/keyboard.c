@@ -4931,10 +4931,10 @@ a C function until M26 ports it.  Returns nil.  */)
 DEFUN ("--timer-check", Fc_timer_check, Sc_timer_check, 0, 0, 0,
        doc: /* TEMPORARY: call C's timer_check ().
 
-This shim is a thin call-through to C's timer_check, which stays a
-C function until M15 ports it (same "call the C one via shim until
-then" pattern --handle-interrupt-normal used for M26).  Returns
-nil.  */)
+This shim is a thin call-through to C's timer_check, which since M15
+imp-3 is itself a thin Scheme dispatcher into (emacs timers)
+timer-check.  This shim still calls it for kbd-buffer.scm's
+DO_TIMERS_NOW arm.  Returns nil.  */)
   (void)
 {
   timer_check ();
@@ -5963,37 +5963,13 @@ timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
 struct timespec
 timer_check (void)
 {
-  struct timespec nexttime;
-  Lisp_Object timers, idle_timers;
-
-  Lisp_Object tem = Vinhibit_quit;
-  Vinhibit_quit = Qt;
-  block_input ();
-  turn_on_atimers (false);
-
-  /* We use copies of the timers' lists to allow a timer to add itself
-     again, without locking up Emacs if the newly added timer is
-     already ripe when added.  */
-
-  /* Always consider the ordinary timers.  */
-  timers = Fcopy_sequence (Vtimer_list);
-  /* Consider the idle timers only if Emacs is idle.  */
-  if (timespec_valid_p (timer_idleness_start_time))
-    idle_timers = Fcopy_sequence (Vtimer_idle_list);
-  else
-    idle_timers = Qnil;
-
-  turn_on_atimers (true);
-  unblock_input ();
-  Vinhibit_quit = tem;
-
-  do
-    {
-      nexttime = timer_check_2 (timers, idle_timers);
-    }
-  while (nexttime.tv_sec == 0 && nexttime.tv_nsec == 0);
-
-  return nexttime;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs timers", "timer-check");
+  SCM result = SCM_CALL_0 (proc);
+  if (NILP (result))
+    return invalid_timespec ();
+  return make_timespec (XFIXNUM (XCAR (result)), XFIXNUM (XCDR (result)));
 }
 
 DEFUN ("current-idle-time", Fcurrent_idle_time, Scurrent_idle_time, 0, 0, 0,
@@ -6007,11 +5983,10 @@ If the value is a list of four integers (HIGH LOW USEC PSEC), then PSEC
 is a multiple of the system clock resolution.  */)
   (void)
 {
-  if (timespec_valid_p (timer_idleness_start_time))
-    return make_lisp_time (timespec_sub (current_timespec (),
-					 timer_idleness_start_time));
-
-  return Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs timers", "current-idle-time");
+  return SCM_CALL_0 (proc);
 }
 
 /* Caches for modify_event_symbol — backing store for --mes-cache-get/set.  */
