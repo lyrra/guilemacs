@@ -43,11 +43,11 @@
           high        ; slot1 high-secs
           low         ; slot2 low-secs
           usec        ; slot3 usecs
-          psec        ; slot4 psecs (semantic)
+          #nil        ; slot4 repeat-delay (nil = non-repeating timer)
           #nil        ; slot5 function
           #nil        ; slot6 args
           #nil        ; slot7 idle-delay
-          psec        ; slot8 repeat-delay (read as PSEC by decode_timer)
+          psec        ; slot8 psecs (read as PSEC by decode_timer)
           #nil))      ; slot9 next
 
 ;;; --- 0. Registration: the 5 shims + 2 test-support accessors -------

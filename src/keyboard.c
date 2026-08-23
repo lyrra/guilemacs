@@ -5079,6 +5079,34 @@ slot 0/1/2/3/8 checks run verbatim.  */)
   return Fcons (make_fixnum (diff.tv_sec), make_fixnum (diff.tv_nsec));
 }
 
+/* M15 imp-2 — addendum to the imp-1 shim set (brief.org Gap 1).  The
+   idle branch of timer_check_2 and the current-idle-time DEFUN both
+   need the *elapsed idle* duration (current_timespec() minus
+   timer_idleness_start_time), which no imp-1 shim exposed.  One small
+   getter gives both call sites a single clock read and a single
+   implementation.  */
+
+DEFUN ("--timer-idleness-now", Fc_timer_idleness_now,
+       Sc_timer_idleness_now, 0, 0, 0,
+       doc: /* Internal: return the current elapsed idle duration, or
+nil if Emacs is not idle.
+
+"Elapsed idle" is timespec_sub (current_timespec (),
+timer_idleness_start_time) — the same "idleness now" value C's
+timer_check_2 derives for its idle-timer branch and current-idle-time
+returns.  Returns (SEC . NSEC); nil when timer_idleness_start_time is
+invalid (not idle).  M15 imp-2 addendum to the imp-1 shim set.  */)
+  (void)
+{
+  if (timespec_valid_p (timer_idleness_start_time))
+    {
+      struct timespec idle
+        = timespec_sub (current_timespec (), timer_idleness_start_time);
+      return Fcons (make_fixnum (idle.tv_sec), make_fixnum (idle.tv_nsec));
+    }
+  return Qnil;
+}
+
 /* imp-1.3 — rec-free end-time deadline check.  */
 
 DEFUN ("--timespec-expired-p", Fc_timespec_expired_p,
