@@ -36,9 +36,13 @@
   #:use-module (emacs-elisp runtime)
   #:use-module (emacs read-char)      ; rc-state-end-time / set-rc-state-end-time!
   #:use-module (emacs lispy-event)    ; make-lispy-event (M9)
+  #:use-module ((emacs event-modifiers)
+                #:select (make-ctrl-char ctrl-modifier meta-modifier
+                          alt-modifier hyper-modifier super-modifier))
   #:declarative? #t
   #:export (kbd-buffer-get-event
-            noninteractive-fast-path?))
+            noninteractive-fast-path?
+            kbd-buffer-store-event!))
 
 ;;; --- Constants ------------------------------------------------------
 
@@ -111,6 +115,22 @@
 (defelisp %--set-ie-code                --set-ie-code)
 (defelisp %--ie-kind-from-name          --ie-kind-from-name)
 (defelisp %--frame-focus-frame          --frame-focus-frame)
+;; M13 imp-2 — store-side shims (imp-1 C DEFUNs plus the pre-existing
+;; M2/M11/M12 set; see brief.org).  Names carry no trailing ! in C.
+(defelisp %--ie-copy                    --ie-copy)
+(defelisp %--kbd-set-store-ptr-index    --kbd-set-store-ptr-index)
+(defelisp %--kbd-maybe-hold-keyboard-input
+          --kbd-maybe-hold-keyboard-input)
+(defelisp %--set-kboard-kbd-queue-has-data
+          --set-kboard-kbd-queue-has-data)
+(defelisp %--stop-character             --stop-character)
+(defelisp %--sys-suspend                --sys-suspend)
+(defelisp %--handle-interrupt-normal    --handle-interrupt-normal)
+(defelisp %--quit-char                  --quit-char)
+(defelisp %--kbd-single-kboard-p        --kbd-single-kboard-p)
+(defelisp %kboard-eq                    kboard-eq)
+(defelisp %set-kboard-kbd-queue         set-kboard-kbd-queue)
+(defelisp %--set-ie-frame-or-window     --set-ie-frame-or-window)
 ;; imp-4 — mouse-motion fallback shims (see brief.org §imp-4).
 (defelisp %--mouse-position-hook        --mouse-position-hook)
 (defelisp %--make-lispy-position        --make-lispy-position)
@@ -128,6 +148,7 @@
 (defelisp %frame-live-p                 frame-live-p)
 (defelisp %selected-frame               selected-frame)
 (defelisp %run-hook-with-args           run-hook-with-args)
+(defelisp %memq                         memq)
 
 ;;; --- Helpers ---------------------------------------------------------
 
@@ -224,6 +245,26 @@ below a quarter of KBD_BUFFER_SIZE.  No-op when input is not held
 (define TAB-BAR-EVENT               ((force %--ie-kind-from-name) 'tab-bar))
 (define TOOL-BAR-EVENT              ((force %--ie-kind-from-name) 'tool-bar))
 (define NS-NONKEY-EVENT             ((force %--ie-kind-from-name) 'ns-nonkey))
+
+;;; M13 imp-2 — while-no-input ignore table.  This is NOT derived from
+;;; --ie-kind-from-name on the ignore-event symbols: C is_ignored_event
+;;; (src/keyboard.c:13364) maps SELECTION_REQUEST_EVENT to the elisp
+;;; symbol `selection-request' (no -event suffix), which is a different
+;;; symbol than the one --ie-kind-from-name uses to look the kind up in
+;;; the other direction.  So the alist pairs the existing kind constants
+;;; above with the is_ignored_event symbols directly.  Kinds not
+;;; compiled into this build sit at -1 and can never equal a real event's
+;;; kind, so no #ifdef filtering is needed (dead-entry discipline, same
+;;; as the kind constants above).
+(define WHILE-NO-INPUT-IGNORE-KINDS
+  (list (cons FOCUS-IN-EVENT           'focus-in)
+        (cons FOCUS-OUT-EVENT          'focus-out)
+        (cons HELP-EVENT               'help-echo)
+        (cons ICONIFY-EVENT            'iconify-frame)
+        (cons DEICONIFY-EVENT          'make-frame-visible)
+        (cons SELECTION-REQUEST-EVENT  'selection-request)
+        (cons FILE-NOTIFY-EVENT        'file-notify)
+        (cons DBUS-EVENT               'dbus-event)))
 
 ;;; --- imp-3 helpers ----------------------------------------------------
 
@@ -612,6 +653,128 @@ input_pending (the shared C epilogue, imp-2/imp-5 tail)."
                                  d
                                  VIRTUAL-CORE-POINTER-NAME))))
       obj)))
+
+;;; --- kbd-buffer-store-event! (M13 imp-2) ------------------------------
+
+(define (kbd-buffer-store-event! ie hold-quit)
+  "Port of C kbd_buffer_store_buffered_event (src/keyboard.c:4601-4701).
+Stores input-event handle IE into the C ring, honoring HOLD-QUIT (an
+ie-smob or #f).  Pure transliteration — no algorithmic change; the C
+body stays callable until the imp-3 cutover.  Returns nothing
+meaningful (C returns void).  See docs/m13-plan.org §imp-2.
+
+Control flow mirrors C: the NO_EVENT abort discards immediately; the
+already-holding guard discards immediately; an ASCII keystroke is
+modifier-folded then checked for quit / stop; any other event (or an
+unmatched keystroke) falls through to ring-append!, which also runs
+the while-no-input quit-flag check unconditionally."
+  (define (ignored? ie)
+    "t (the memq tail) when IE's kind is in while-no-input-ignore-events.
+Looks the kind up in WHILE-NO-INPUT-IGNORE-KINDS (the is_ignored_event
+symbol table, hand-written — see the constant comment) and memq-s the
+result (or #f) against while-no-input-ignore-events."
+    ((force %memq)
+     (assv-ref WHILE-NO-INPUT-IGNORE-KINDS ((force %--ie-kind) ie))
+     (symbol-value 'while-no-input-ignore-events)))
+
+  (define (ring-append! ie)
+    "C 4688-4701: phases 4+5.  Append IE to the ring unless it would
+fill the last slot (silent drop); then, unconditionally, set quit-flag
+from throw-on-input when inside while-no-input and the event is not
+ignored."
+    (let* ((store ((force %--kbd-store-ptr-index)))
+           (next (modulo (+ store 1) KBD-BUFFER-SIZE)))
+      (when (not (= next ((force %--kbd-fetch-ptr-index))))
+        ((force %--ie-copy)
+         ((force %--kbd-event-ie) store) ie)
+        ((force %--kbd-set-store-ptr-index) next)
+        ((force %--kbd-maybe-hold-keyboard-input)))
+      (when (and (truthy? (symbol-value 'throw-on-input))
+                 (not (truthy? (ignored? ie))))
+        (set-symbol-value! 'quit-flag (symbol-value 'throw-on-input)))))
+
+  (define (fold-c ie)
+    "C 4613-4621: the ASCII-keystroke modifier fold into c."
+    (let* ((code ((force %--ie-code) ie))
+           (mods ((force %--ie-modifiers) ie))
+           (c (logand code #o377)))
+      (let ((c (if (not (= 0 (logand mods ctrl-modifier)))
+                   (make-ctrl-char c)
+                   c)))
+        (logior c (logand mods (logior meta-modifier alt-modifier
+                                       hyper-modifier super-modifier))))))
+
+  (define (quit-char-branch frame kb)
+    "C 4623-4676: the quit-char branch.  Always handles the event (one
+of three sub-paths — single-kboard reroute, hold-quit copy, or
+focus + handle_interrupt); never ring-appends.  Returns #t."
+    (cond
+     ((and (truthy? ((force %--kbd-single-kboard-p)))
+           (not (truthy? ((force %kboard-eq) kb
+                          ((force %current-kboard))))))
+      ;; C 4627-4658 — single_kboard reroute: replace (not append) the
+      ;; queue with (switch-frame frame) + c, set the has-data flag, then
+      ;; blank every ring event on the same kboard (all three fields).
+      ((force %set-kboard-kbd-queue) kb
+       (list (list 'switch-frame frame) ((force %--quit-char))))
+      ((force %--set-kboard-kbd-queue-has-data) kb #t)
+      (let loop ((idx ((force %--kbd-fetch-ptr-index))))
+        (when (not (= idx ((force %--kbd-store-ptr-index))))
+          (let ((slot ((force %--kbd-event-ie) idx)))
+            (when (truthy? ((force %kboard-eq)
+                            ((force %--ie-kboard) slot) kb))
+              ((force %--ie-clear) slot)
+              ((force %--set-ie-frame-or-window) slot #nil)
+              ((force %--set-ie-arg) slot #nil)))
+          (loop (modulo (+ idx 1) KBD-BUFFER-SIZE))))
+      #t)
+     (hold-quit
+      ;; C 4659-4662 — store the event in hold_quit and return.
+      ((force %--ie-copy) hold-quit ie)
+      #t)
+     (else
+      ;; C 4664-4675 — set Vlast_event_frame / internal_last_event_frame
+      ;; then handle_interrupt.  Two separate writes: internal via the C
+      ;; DEFUN, the elisp variable via set-symbol-value! (missing the
+      ;; second is a silent divergence).
+      (let ((focus ((force %--frame-focus-frame) frame)))
+        (when (eq? focus #nil) (set! focus frame))
+        ((force %--set-internal-last-event-frame) focus)
+        (set-symbol-value! 'last-event-frame focus)
+        ((force %--handle-interrupt-normal)))
+      #t)))
+
+  ;; C 4604-4605 — NO_EVENT is the impossible kind; C emacs_abort ()s the
+  ;; whole process.  Port that invariant via --kbd-abort (same primitive
+  ;; mouse-motion-synthesize! uses for its impossible state).  Never
+  ;; returns; the guard below is unreachable in the normal flow.
+  (when (= ((force %--ie-kind) ie) NO-EVENT)
+    ((force %--kbd-abort)))
+  (if (and hold-quit
+           (not (= ((force %--ie-kind) hold-quit) NO-EVENT)))
+      ;; C 4605-4606 — already holding: discard, nothing else runs.
+      #t
+      (if (not (= ((force %--ie-kind) ie) ASCII-KEYSTROKE-EVENT))
+          ;; C 4687 — non-keystroke: skip the whole fold/quit/stop block.
+          (ring-append! ie)
+          (let ((c (fold-c ie)))
+            (cond
+             ((= c ((force %--quit-char)))
+              (let ((kb ((force %--ie-kboard) ie)))
+                ;; --ie-kboard returns nil for a non-frame / dead-frame
+                ;; frame_or_window (see its docstring); nil-guard to
+                ;; current-kboard the same way dispatch-event! does, else
+                ;; kboard-eq's CHECK_KBOARD would signal
+                ;; wrong-type-argument (review finding 2).
+                (quit-char-branch ((force %--ie-frame-or-window) ie)
+                                  (if (eq? kb #nil)
+                                      ((force %current-kboard))
+                                      kb))))
+             ((and (not (= c 0)) (= c ((force %--stop-character))))
+              ;; C 4677-4681 — stop-character: genuine sys_suspend ().
+              ((force %--sys-suspend)))
+             (else
+              (ring-append! ie)))))))
 
 ;;; --- kbd-buffer-get-event --------------------------------------------
 
