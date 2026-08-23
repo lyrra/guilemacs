@@ -1118,6 +1118,20 @@ only — does not nil the Lisp_Object fields.  Returns IE.  */)
   return ie;
 }
 
+DEFUN ("--ie-copy", Fie_copy, Sie_copy, 2, 2, 0,
+       doc: /* Copy input-event handle SRC onto DST, field by field.
+
+Full struct assignment: copies every struct input_event field,
+including x, y, part, timestamp, and device — none of which have
+individual Scheme setters today.  Returns DST.  */)
+  (Lisp_Object dst, Lisp_Object src)
+{
+  CHECK_IE (dst);
+  CHECK_IE (src);
+  *ie_unwrap (dst) = *ie_unwrap (src);
+  return dst;
+}
+
 DEFUN ("--ie-kind-from-name", Fie_kind_from_name, Sie_kind_from_name,
        1, 1, 0,
        doc: /* Return the event_kind integer for event symbol NAME, or -1.
@@ -1368,6 +1382,20 @@ Caller must ensure 0 <= N < KBD_BUFFER_SIZE.  Returns nil.  */)
   EMACS_INT idx = XFIXNUM (n);
   eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
   kbd_fetch_ptr = &kbd_buffer[idx];
+  return Qnil;
+}
+
+DEFUN ("--kbd-set-store-ptr-index", Fkbd_set_store_ptr_index, Skbd_set_store_ptr_index, 1, 1, 0,
+       doc: /* Set kbd_store_ptr to kbd_buffer[N].
+
+Used by the M13 store-side port to position the producer cursor
+before storing an event.  Caller must ensure 0 <= N < KBD_BUFFER_SIZE.
+Returns nil.  */)
+  (Lisp_Object n)
+{
+  EMACS_INT idx = XFIXNUM (n);
+  eassert (idx >= 0 && idx < KBD_BUFFER_SIZE);
+  kbd_store_ptr = &kbd_buffer[idx];
   return Qnil;
 }
 
@@ -4912,6 +4940,57 @@ invariant is broken.  Returns nil.  */)
   return Qnil;
 }
 
+/* imp-1 (M13) — store-side port shims.  One block keeps every M13
+   imp-1 addition in one place for review.  */
+
+DEFUN ("--set-kboard-kbd-queue-has-data",
+       Fc_set_kboard_kbd_queue_has_data,
+       Sc_set_kboard_kbd_queue_has_data, 2, 2, 0,
+       doc: /* Internal: set KB's kbd_queue_has_data flag to (not VAL
+   nil) and return VAL.  The flag is a plain C bitfield, not a
+   Lisp_Object, so KBOARD_LISP_FIELD cannot cover it — this setter is
+   the only way Scheme can drive it.  No getter DEFUN exists; tests
+   read the flag back via --rc-pop-current-kboard-queue.  */)
+  (Lisp_Object kb, Lisp_Object val)
+{
+  CHECK_KBOARD (kb);
+  XKBOARD (kb)->kbd_queue_has_data = !NILP (val);
+  return val;
+}
+
+DEFUN ("--stop-character", Fc_stop_character_, Sc_stop_character_, 0, 0, 0,
+       doc: /* Internal: return the current C stop_character as a fixnum.
+
+Reads the C global stop_character back at call time — do not assume a
+specific value in callers.  */)
+  (void)
+{
+  return make_fixnum (stop_character);
+}
+
+DEFUN ("--sys-suspend", Fc_sys_suspend_, Sc_sys_suspend_, 0, 0, 0,
+       doc: /* Internal: suspend the whole process via sys_suspend ().
+
+Real SIGTSTP-class suspend — only smoke-tested, never exercised in the
+test suite (it would stop the runner).  */)
+  (void)
+{
+  sys_suspend ();
+  return Qnil;
+}
+
+DEFUN ("--handle-interrupt-normal", Fc_handle_interrupt_normal,
+       Sc_handle_interrupt_normal, 0, 0, 0,
+       doc: /* TEMPORARY: call C's handle_interrupt (false).
+
+This shim is a thin call-through to C's handle_interrupt, which stays
+a C function until M26 ports it.  Returns nil.  */)
+  (void)
+{
+  handle_interrupt (false);
+  return Qnil;
+}
+
 /* imp-1.3 — rec-free end-time deadline check.  */
 
 DEFUN ("--timespec-expired-p", Fc_timespec_expired_p,
@@ -5269,6 +5348,22 @@ DEFUN ("--kbd-on-hold-p",
 #endif
 }
 
+DEFUN ("--kbd-maybe-hold-keyboard-input",
+       Fc_kbd_maybe_hold_keyboard_input,
+       Sc_kbd_maybe_hold_keyboard_input, 0, 0, 0,
+       doc: /* Internal: hold keyboard input when the ring is more
+   than half full and not already held (hold_keyboard_input ()).
+   Returns nil; no-op on builds without subprocesses.  Called by the
+   M13 store-side port when the queue backs up.  */)
+  (void)
+{
+#ifdef subprocesses
+  if (kbd_buffer_nr_stored () > KBD_BUFFER_SIZE / 2 && !kbd_on_hold_p ())
+    hold_keyboard_input ();
+#endif
+  return Qnil;
+}
+
 DEFUN ("--x-detect-pending-selection-requests",
        Fc_x_detect_pending_selection_requests,
        Sc_x_detect_pending_selection_requests, 0, 0, 0,
@@ -5422,6 +5517,52 @@ DEFUN ("--rc-test-far-future-end-time-ptr",
   (void)
 {
   return rc_wrap_ptr (&rc_test_far_future_end_time);
+}
+
+/* M13 imp-1 — test-only synthetic event constructors.  Fill style
+   mirrors --kbd-buffer-store-fake-event: memset the whole struct to
+   zero first, set the named fields explicitly, leave x/y zeroed.  */
+
+static struct input_event ie_test_event_storage;
+static struct input_event ie_test_hold_quit_storage;
+
+DEFUN ("--ie-test-event", Fie_test_event, Sie_test_event, 4, 4, 0,
+       doc: /* Internal test helper: fill a static struct input_event
+   and return an ie-smob wrapping it.  KIND, CODE, MODIFIERS, and
+   FRAME-OR-WINDOW are stored as given; arg is set to nil, device to
+   Qt, and x/y are left zeroed (like --kbd-buffer-store-fake-event).
+   Only for M13 imp-2/imp-4 tests — not production API.  */)
+  (Lisp_Object kind, Lisp_Object code, Lisp_Object modifiers,
+   Lisp_Object frame_or_window)
+{
+  CHECK_FIXNUM (kind);
+  CHECK_FIXNUM (code);
+  CHECK_FIXNUM (modifiers);
+  memset (&ie_test_event_storage, 0, sizeof ie_test_event_storage);
+  ie_test_event_storage.kind = (enum event_kind) XFIXNUM (kind);
+  ie_test_event_storage.code = XFIXNUM (code);
+  ie_test_event_storage.modifiers = XFIXNUM (modifiers);
+  ie_test_event_storage.frame_or_window = frame_or_window;
+  ie_test_event_storage.arg = Qnil;
+  ie_test_event_storage.device = Qt;
+  return ie_wrap (&ie_test_event_storage);
+}
+
+DEFUN ("--ie-test-hold-quit", Fie_test_hold_quit, Sie_test_hold_quit, 0, 0, 0,
+       doc: /* Internal test helper: reset the static hold_quit
+   struct and return an ie-smob wrapping it.  Every call resets kind
+   to NO_EVENT first, then frame_or_window and arg to nil and device
+   to Qt — imp-2's already-holding guard and imp-4's tests both depend
+   on a fresh hold_quit starting at NO_EVENT.  Only for M13 imp-2/imp-4
+   tests — not production API.  */)
+  (void)
+{
+  memset (&ie_test_hold_quit_storage, 0, sizeof ie_test_hold_quit_storage);
+  ie_test_hold_quit_storage.kind = NO_EVENT;
+  ie_test_hold_quit_storage.frame_or_window = Qnil;
+  ie_test_hold_quit_storage.arg = Qnil;
+  ie_test_hold_quit_storage.device = Qt;
+  return ie_wrap (&ie_test_hold_quit_storage);
 }
 
 static void

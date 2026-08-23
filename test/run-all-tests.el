@@ -146,6 +146,7 @@
 (load "test/keyboard/test-kbd-mouse-motion.el")   ; M11 imp-4
 (load "test/keyboard/test-m12-shims.el")          ; M12 imp-1
 (load "test/keyboard/test-main-queue.el")         ; M12 imp-3
+(load "test/keyboard/test-m13-shims.el")          ; M13 imp-1
 (message "")
 
 (message "========================================")
