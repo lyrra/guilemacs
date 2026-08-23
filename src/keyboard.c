@@ -397,7 +397,6 @@ static void timer_resume_idle (void);
 static void deliver_user_signal (int);
 static char *find_user_signal_name (int);
 static void store_user_signal_events (void);
-static bool is_ignored_event (union buffered_input_event *);
 
 /* Advance or retreat a buffered input event pointer.  */
 
@@ -4531,81 +4530,10 @@ record_char (Lisp_Object c)
 static bool
 readable_events (int flags)
 {
-  if (flags & READABLE_EVENTS_DO_TIMERS_NOW)
-    timer_check ();
-
-  /* READABLE_EVENTS_FILTER_EVENTS is meant to be used only by
-     input-pending-p and similar callers, which aren't interested in
-     some input events.  If this flag is set, and
-     input-pending-p-filter-events is non-nil, ignore events in
-     while-no-input-ignore-events.  If the flag is set and
-     input-pending-p-filter-events is nil, ignore only
-     FOCUS_IN/OUT_EVENT events.  */
-  if (kbd_fetch_ptr != kbd_store_ptr)
-    {
-      /* See https://lists.gnu.org/r/emacs-devel/2005-05/msg00297.html
-	 for why we treat toolkit scroll-bar events specially here.  */
-      if (flags & (READABLE_EVENTS_FILTER_EVENTS
-#ifdef USE_TOOLKIT_SCROLL_BARS
-		   | READABLE_EVENTS_IGNORE_SQUEEZABLES
-#endif
-		   ))
-        {
-          union buffered_input_event *event = kbd_fetch_ptr;
-
-	  do
-	    {
-	      if (!(
-#ifdef USE_TOOLKIT_SCROLL_BARS
-		    (flags & READABLE_EVENTS_FILTER_EVENTS) &&
-#endif
-		    ((!input_pending_p_filter_events
-		      && (event->kind == FOCUS_IN_EVENT
-			  || event->kind == FOCUS_OUT_EVENT))
-		     || (input_pending_p_filter_events
-			 && is_ignored_event (event))))
-#ifdef USE_TOOLKIT_SCROLL_BARS
-		  && !((flags & READABLE_EVENTS_IGNORE_SQUEEZABLES)
-		       && (event->kind == SCROLL_BAR_CLICK_EVENT
-			   || event->kind == HORIZONTAL_SCROLL_BAR_CLICK_EVENT)
-		       && event->ie.part == scroll_bar_handle
-		       && event->ie.modifiers == 0)
-#endif
-		 )
-		return 1;
-	      event = next_kbd_event (event);
-	    }
-	  while (event != kbd_store_ptr);
-        }
-      else
-	return 1;
-    }
-
-#ifdef HAVE_X_WINDOWS
-  if (x_detect_pending_selection_requests ())
-    return 1;
-#endif
-
-#ifdef HAVE_TEXT_CONVERSION
-  if (detect_conversion_events ())
-    return 1;
-#endif
-
-  if (!(flags & READABLE_EVENTS_IGNORE_SQUEEZABLES) && some_mouse_moved ())
-    return 1;
-  if (single_kboard)
-    {
-      if (current_kboard->kbd_queue_has_data)
-	return 1;
-    }
-  else
-    {
-      KBOARD *kb;
-      for (kb = all_kboards; kb; kb = kb->next_kboard)
-	if (kb->kbd_queue_has_data)
-	  return 1;
-    }
-  return 0;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-readable-events");
+  return scm_is_true (SCM_CALL_1 (proc, scm_from_int (flags)));
 }
 
 /* Set this for debugging, to have a way to get out */
@@ -4788,18 +4716,10 @@ kbd_buffer_store_help_event (Lisp_Object frame, Lisp_Object help)
 void
 discard_mouse_events (void)
 {
-  for (union buffered_input_event *sp = kbd_fetch_ptr;
-       sp != kbd_store_ptr; sp = next_kbd_event (sp))
-    {
-      if (sp->kind == MOUSE_CLICK_EVENT
-	  || sp->kind == WHEEL_EVENT
-          || sp->kind == HORIZ_WHEEL_EVENT
-	  || sp->kind == SCROLL_BAR_CLICK_EVENT
-	  || sp->kind == HORIZONTAL_SCROLL_BAR_CLICK_EVENT)
-	{
-	  sp->kind = NO_EVENT;
-	}
-    }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-discard-mouse-events!");
+  SCM_CALL_0 (proc);
 }
 
 
@@ -4812,13 +4732,10 @@ discard_mouse_events (void)
 bool
 kbd_buffer_events_waiting (void)
 {
-  for (union buffered_input_event *sp = kbd_fetch_ptr;
-       ; sp = next_kbd_event (sp))
-    if (sp == kbd_store_ptr || sp->kind != NO_EVENT)
-      {
-	kbd_fetch_ptr = sp;
-	return sp != kbd_store_ptr && sp->kind != NO_EVENT;
-      }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-events-waiting");
+  return scm_is_true (SCM_CALL_0 (proc));
 }
 
 
@@ -5632,81 +5549,10 @@ DEFUN ("--kbd-store-buffered-event", Fkbd_store_buffered_event,
 static void
 process_special_events (void)
 {
-  union buffered_input_event *event;
-#if defined HAVE_X11 || defined HAVE_PGTK || defined HAVE_HAIKU
-#ifndef HAVE_HAIKU
-  struct selection_input_event copy;
-#else
-  struct input_event copy;
-#endif
-  int moved_events;
-#endif
-
-  for (event = kbd_fetch_ptr;  event != kbd_store_ptr;
-       event = next_kbd_event (event))
-    {
-      /* If we find a stored X selection request, handle it now.  */
-      if (event->kind == SELECTION_REQUEST_EVENT
-	  || event->kind == SELECTION_CLEAR_EVENT)
-	{
-#if defined HAVE_X11 || defined HAVE_PGTK
-
-	  /* Remove the event from the fifo buffer before processing;
-	     otherwise swallow_events called recursively could see it
-	     and process it again.  To do this, we move the events
-	     between kbd_fetch_ptr and EVENT one slot to the right,
-	     cyclically.  */
-
-	  copy = event->sie;
-
-	  if (event < kbd_fetch_ptr)
-	    {
-	      memmove (kbd_buffer + 1, kbd_buffer,
-		       (event - kbd_buffer) * sizeof *kbd_buffer);
-	      kbd_buffer[0] = kbd_buffer[KBD_BUFFER_SIZE - 1];
-	      moved_events = kbd_buffer + KBD_BUFFER_SIZE - 1 - kbd_fetch_ptr;
-	    }
-	  else
-	    moved_events = event - kbd_fetch_ptr;
-
-	  memmove (kbd_fetch_ptr + 1, kbd_fetch_ptr,
-		   moved_events * sizeof *kbd_fetch_ptr);
-	  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-	  input_pending = readable_events (0);
-
-#ifdef HAVE_X11
-	  x_handle_selection_event (&copy);
-#else
-	  pgtk_handle_selection_event (&copy);
-#endif
-#elif defined HAVE_HAIKU
-	  if (event->ie.kind != SELECTION_CLEAR_EVENT)
-	    emacs_abort ();
-
-	  copy = event->ie;
-
-	  if (event < kbd_fetch_ptr)
-	    {
-	      memmove (kbd_buffer + 1, kbd_buffer,
-		       (event - kbd_buffer) * sizeof *kbd_buffer);
-	      kbd_buffer[0] = kbd_buffer[KBD_BUFFER_SIZE - 1];
-	      moved_events = kbd_buffer + KBD_BUFFER_SIZE - 1 - kbd_fetch_ptr;
-	    }
-	  else
-	    moved_events = event - kbd_fetch_ptr;
-
-	  memmove (kbd_fetch_ptr + 1, kbd_fetch_ptr,
-		   moved_events * sizeof *kbd_fetch_ptr);
-	  kbd_fetch_ptr = next_kbd_event (kbd_fetch_ptr);
-	  input_pending = readable_events (0);
-	  haiku_handle_selection_clear (&copy);
-#else
-	  /* We're getting selection request events, but we don't have
-             a window system.  */
-	  emacs_abort ();
-#endif
-	}
-    }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-process-special-events!");
+  SCM_CALL_0 (proc);
 }
 
 /* Process any events that are not user-visible, run timer events that
@@ -5715,15 +5561,10 @@ process_special_events (void)
 void
 swallow_events (bool do_display)
 {
-  unsigned old_timers_run;
-
-  process_special_events ();
-
-  old_timers_run = timers_run;
-  get_input_pending (READABLE_EVENTS_DO_TIMERS_NOW);
-
-  if (!input_pending && timers_run != old_timers_run && do_display)
-    redisplay_preserve_echo_area (7);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "kbd-buffer-swallow-events!");
+  SCM_CALL_1 (proc, do_display ? Qt : Qnil);
 }
 
 /* Record the start of when Emacs is idle,
@@ -13422,31 +13263,6 @@ init_while_no_input_ignore_events (void)
 #endif
 
   return events;
-}
-
-static bool
-is_ignored_event (union buffered_input_event *event)
-{
-  Lisp_Object ignore_event;
-
-  switch (event->kind)
-    {
-    case FOCUS_IN_EVENT: ignore_event = Qfocus_in; break;
-    case FOCUS_OUT_EVENT: ignore_event = Qfocus_out; break;
-    case HELP_EVENT: ignore_event = Qhelp_echo; break;
-    case ICONIFY_EVENT: ignore_event = Qiconify_frame; break;
-    case DEICONIFY_EVENT: ignore_event = Qmake_frame_visible; break;
-    case SELECTION_REQUEST_EVENT: ignore_event = Qselection_request; break;
-#ifdef USE_FILE_NOTIFY
-    case FILE_NOTIFY_EVENT: ignore_event = Qfile_notify; break;
-#endif
-#ifdef HAVE_DBUS
-    case DBUS_EVENT: ignore_event = Qdbus_event; break;
-#endif
-    default: ignore_event = Qnil; break;
-    }
-
-  return !NILP (Fmemq (ignore_event, Vwhile_no_input_ignore_events));
 }
 
 void
