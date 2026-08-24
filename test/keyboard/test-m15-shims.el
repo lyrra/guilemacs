@@ -2,10 +2,9 @@
 ;;; shim DEFUNs
 ;;;
 ;;; Wraps test/keyboard/test-m15-shims.scm — the Scheme test corpus
-;;; for the 5 imp-1 C shims in src/keyboard.c (--timer-check-2,
-;;; --timer-get-pending-funcalls-drain!, --timer-fire-ripe,
-;;; --timer-copy-window, --timespec-diff-to-now) plus the two
-;;; test-support pending_funcalls accessors used to seed the drain.
+;;; for the 4 imp-1 C shims in src/keyboard.c (--timer-get-pending-funcalls-drain!,
+;;; --timer-fire-ripe, --timer-copy-window, --timespec-diff-to-now) plus
+;;; the two test-support pending_funcalls accessors used to seed the drain.
 ;;; See docs/m15-plan.org §imp-1 and brief.org.
 ;;;
 ;;; Loads the Scheme file via eval-scheme, then reads back

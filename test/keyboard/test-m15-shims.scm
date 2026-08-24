@@ -1,8 +1,8 @@
 ;;; test-m15-shims.scm --- M15 imp-1 test corpus for the C timer-fire
-;;; shim DEFUNs in src/keyboard.c: --timer-check-2,
-;;; --timer-get-pending-funcalls-drain!, --timer-fire-ripe,
-;;; --timer-copy-window, and --timespec-diff-to-now (plus the two
-;;; test-support pending_funcalls accessors used to seed the drain).
+;;; shim DEFUNs in src/keyboard.c: --timer-get-pending-funcalls-drain!,
+;;; --timer-fire-ripe, --timer-copy-window, and --timespec-diff-to-now
+;;; (plus the two test-support pending_funcalls accessors used to seed
+;;; the drain).
 ;;;
 ;;; Sourced by test/keyboard/test-m15-shims.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback
@@ -50,9 +50,9 @@
           psec        ; slot8 psecs (read as PSEC by decode_timer)
           #nil))      ; slot9 next
 
-;;; --- 0. Registration: the 5 shims + 2 test-support accessors -------
+;;; --- 0. Registration: the 4 shims + 2 test-support accessors -------
 (define shim-names
-  '(--timer-check-2 --timer-get-pending-funcalls-drain!
+  '(--timer-get-pending-funcalls-drain!
     --timer-fire-ripe --timer-copy-window --timespec-diff-to-now
     --timer-pending-funcalls --timer-pending-funcalls-set!))
 (for-each
@@ -61,29 +61,7 @@
           #t (not (eq? (%sym n) #nil))))
  shim-names)
 
-;;; --- 1. --timer-check-2 three-way decode ---------------------------
-;;; Contract: nil = invalid, t = {0,0} "fired, call again",
-;;; (SEC . NSEC) = wait until the next timer is ripe.
-
-;;; invalid: no ordinary or idle timer active.
-(check "check-2/invalid" #nil
-       ((%sym '--timer-check-2) #nil #nil))
-
-;;; ripe: a timer whose time is already in the past (epoch) is fired.
-(let* ((past (make-timer 0 0 0 0)))
-  (check "check-2/ripe-again" #t
-         ((%sym '--timer-check-2) (elist past) #nil))
-  (check "check-2/ripe-marked" #t (truthy? (vector-ref past 0))))
-
-;;; wait: a timer whose time is in the future returns (SEC . NSEC),
-;;; positive, and is left unfired.
-(let* ((future (make-timer 0 4102444800 0 0)))  ; year 2100
-  (let* ((r ((%sym '--timer-check-2) (elist future) #nil)))
-    (check "check-2/wait-pair" #t (pair? r))
-    (check "check-2/wait-positive" #t (> (car r) 0))
-    (check "check-2/wait-not-fired" #nil (vector-ref future 0))))
-
-;;; --- 2. drain shim: seed pending_funcalls, drain, verify empty ------
+;;; --- 1. drain shim: seed pending_funcalls, drain, verify empty ------
 ;;; The drain runs each entry via elisp (apply FUN ARGS...), so FUN
 ;;; must be a symbol whose elisp function cell holds a callable
 ;;; procedure — bind one via set-symbol-function!.
@@ -97,7 +75,7 @@
   (check "drain/queue-empty" #nil
          ((%sym '--timer-pending-funcalls))))
 
-;;; --- 3. fire shim: handler runs, slot0 = t, timers_run bumps --------
+;;; --- 2. fire shim: handler runs, slot0 = t, timers_run bumps --------
 ;;; timer-event-handler records the last-run timer in timer-event-last
 ;;; before anything else, so we can observe that the handler was
 ;;; invoked without needing the timer registered in timer-list.
@@ -108,7 +86,7 @@
   (check "fire/slot0-t" #t (truthy? (vector-ref timer 0)))
   (check "fire/timers-run-bumped" (1+ before) ((%sym '--timers-run))))
 
-;;; --- 4. copy-window shim: returns the two lists unchanged ----------
+;;; --- 3. copy-window shim: returns the two lists unchanged ----------
 ;;; Snapshot Vtimer-list/Vtimer-idle-list at call time.  The ordinary
 ;;; copy must equal the live Vtimer-list value; the idle copy is nil
 ;;; when not idle (the usual test state).  Read-only: we do not mutate
@@ -121,7 +99,7 @@
   (check "copy-window/idle-nil-or-list"
          #t (or (eq? idle #nil) (pair? idle))))
 
-;;; --- 5. --timespec-diff-to-now: (SEC . NSEC), sign by ripeness ------
+;;; --- 4. --timespec-diff-to-now: (SEC . NSEC), sign by ripeness ------
 ;;; A past timer decodes to a past instant, so the diff is positive.
 (let* ((past (make-timer 0 0 0 0))
        (r ((%sym '--timespec-diff-to-now) past)))

@@ -4943,43 +4943,22 @@ DO_TIMERS_NOW arm.  Returns nil.  */)
 
 /* M15 imp-1 — timer firing core shims.  Each shim wraps one piece of
    the C timer firing core for Scheme, leaving every C function body
-   unchanged.  decode_timer and timer_check_2 are static and defined
-   later in this file, so declare them up front; their slot 0/1/2/3/8
-   checks run verbatim inside the shims.  The three-way
-   {invalid | {0,0} | wait} return contract survives the FFI as
-   {nil | t | (SEC . NSEC)} — the same encoding every M15 shim and the
-   imp-2 Scheme body share (see docs/m15-plan.org risk 3).  */
+   unchanged.  decode_timer is static and defined later in this file,
+   so declare it up front; its slot 0/1/2/3/8 checks run verbatim
+   inside the shims.  The three-way {invalid | {0,0} | wait} return
+   contract survives the FFI as {nil | t | (SEC . NSEC)} — the same
+   encoding every M15 shim and the imp-2 Scheme body share (see
+   docs/m15-plan.org risk 3).  */
 
 static struct timespec decode_timer (Lisp_Object);
-static struct timespec timer_check_2 (Lisp_Object, Lisp_Object);
-
-DEFUN ("--timer-check-2", Fc_timer_check_2, Sc_timer_check_2, 2, 2, 0,
-       doc: /* Internal: run C's timer_check_2 on TIMER-LIST and
-IDLE-TIMER-LIST and decode its three-way return.
-
-The three-way contract survives the FFI as:
-- nil            -> invalid (no ordinary or idle timer is active)
-- t              -> the {0,0} "a timer fired, call again" result
-- (SEC . NSEC)   -> the fixnum seconds and nanoseconds to wait for the
-                    next timer to become ripe
-
-All five M15 shims and the imp-2 Scheme body share this encoding.  */)
-  (Lisp_Object timer_list, Lisp_Object idle_timer_list)
-{
-  struct timespec r = timer_check_2 (timer_list, idle_timer_list);
-  if (! timespec_valid_p (r))
-    return Qnil;
-  if (r.tv_sec == 0 && r.tv_nsec == 0)
-    return Qt;
-  return Fcons (make_fixnum (r.tv_sec), make_fixnum (r.tv_nsec));
-}
 
 DEFUN ("--timer-get-pending-funcalls-drain!",
        Fc_timer_get_pending_funcalls_drain,
        Sc_timer_get_pending_funcalls_drain, 0, 0, 0,
        doc: /* Internal: pop and run every entry in C's
 pending_funcalls, one at a time, via safe_calln (Qapply, ...) — the
-same loop timer_check_2 runs at its top.  Returns nil.  */)
+same delayed-funcall drain the timer firing core runs at its
+top.  Returns nil.  */)
   (void)
 {
   while (CONSP (pending_funcalls))
@@ -5015,7 +4994,7 @@ DEFUN ("--timer-pending-funcalls-set!",
        Sc_timer_pending_funcalls_set, 1, 1, 0,
        doc: /* Internal (test support): replace C's pending_funcalls
 with LIST of (FUN . ARGS) entries.  Lets the drain test seed the queue
-that --timer-get-pending-funcalls-drain! and timer_check_2 consume.
+that --timer-get-pending-funcalls-drain! consumes.
 Returns nil.  */)
   (Lisp_Object list)
 {
@@ -5025,7 +5004,7 @@ Returns nil.  */)
 
 DEFUN ("--timer-fire-ripe", Fc_timer_fire_ripe, Sc_timer_fire_ripe, 1, 1, 0,
        doc: /* Internal: run the ripe-timer fire sequence for TIMER as
-one compound, in the exact C order from timer_check_2: mark slot 0 = t
+one compound, in the exact C fire order: mark slot 0 = t
 first, bind inhibit-quit to t, call the timer handler once, restore
 Vdeactivate-mark, then bump timers_run.  Returns nil.  */)
   (Lisp_Object timer)
@@ -5080,7 +5059,7 @@ slot 0/1/2/3/8 checks run verbatim.  */)
 }
 
 /* M15 imp-2 — addendum to the imp-1 shim set (brief.org Gap 1).  The
-   idle branch of timer_check_2 and the current-idle-time DEFUN both
+   idle branch of the Scheme timer-check-2 and the current-idle-time DEFUN both
    need the *elapsed idle* duration (current_timespec() minus
    timer_idleness_start_time), which no imp-1 shim exposed.  One small
    getter gives both call sites a single clock read and a single
@@ -5092,8 +5071,8 @@ DEFUN ("--timer-idleness-now", Fc_timer_idleness_now,
 nil if Emacs is not idle.
 
 "Elapsed idle" is timespec_sub (current_timespec (),
-timer_idleness_start_time) — the same "idleness now" value C's
-timer_check_2 derives for its idle-timer branch and current-idle-time
+timer_idleness_start_time) — the same "idleness now" value the timer
+firing core derives for its idle-timer branch and current-idle-time
 returns.  Returns (SEC . NSEC); nil when timer_idleness_start_time is
 invalid (not idle).  M15 imp-2 addendum to the imp-1 shim set.  */)
   (void)
@@ -5794,160 +5773,6 @@ decode_timer (Lisp_Object timer)
   Lisp_Object slot3 = AREF (timer, 3);
   Lisp_Object slot8 = AREF (timer, 8);
   return list4_to_timespec (slot1, slot2, slot3, slot8);
-}
-
-
-/* Check whether a timer has fired.  To prevent larger problems we simply
-   disregard elements that are not proper timers.  Do not make a circular
-   timer list for the time being.
-
-   Returns the time to wait until the next timer fires.  If a
-   timer is triggering now, return zero.
-   If no timer is active, return -1.
-
-   If a timer is ripe, we run it, with quitting turned off.
-   In that case we return 0 to indicate that a new timer_check_2 call
-   should be done.  */
-
-static struct timespec
-timer_check_2 (Lisp_Object timers, Lisp_Object idle_timers)
-{
-  /* First run the code that was delayed.  */
-  while (CONSP (pending_funcalls))
-    {
-      Lisp_Object funcall = XCAR (pending_funcalls);
-      pending_funcalls = XCDR (pending_funcalls);
-      safe_calln (Qapply, XCAR (funcall), XCDR (funcall));
-    }
-
-  if (! (CONSP (timers) || CONSP (idle_timers)))
-    return invalid_timespec ();
-
-  struct timespec
-    now = current_timespec (),
-    idleness_now = (timespec_valid_p (timer_idleness_start_time)
-		    ? timespec_sub (now, timer_idleness_start_time)
-		    : make_timespec (0, 0));
-
-  do
-    {
-      Lisp_Object chosen_timer, timer = Qnil, idle_timer = Qnil;
-      struct timespec difference;
-      struct timespec timer_difference = invalid_timespec ();
-      struct timespec idle_timer_difference = invalid_timespec ();
-      bool ripe, timer_ripe = 0, idle_timer_ripe = 0;
-
-      /* Set TIMER and TIMER_DIFFERENCE
-	 based on the next ordinary timer.
-	 TIMER_DIFFERENCE is the distance in time from NOW to when
-	 this timer becomes ripe.
-         Skip past invalid timers and timers already handled.  */
-      if (CONSP (timers))
-	{
-	  timer = XCAR (timers);
-	  struct timespec timer_time = decode_timer (timer);
-	  if (! timespec_valid_p (timer_time))
-	    {
-	      timers = XCDR (timers);
-	      continue;
-	    }
-
-	  timer_ripe = timespec_cmp (timer_time, now) <= 0;
-	  timer_difference = (timer_ripe
-			      ? timespec_sub (now, timer_time)
-			      : timespec_sub (timer_time, now));
-	}
-
-      /* Likewise for IDLE_TIMER and IDLE_TIMER_DIFFERENCE
-	 based on the next idle timer.  */
-      if (CONSP (idle_timers))
-	{
-	  idle_timer = XCAR (idle_timers);
-	  struct timespec idle_timer_time = decode_timer (idle_timer);
-	  if (! timespec_valid_p (idle_timer_time))
-	    {
-	      idle_timers = XCDR (idle_timers);
-	      continue;
-	    }
-
-	  idle_timer_ripe = timespec_cmp (idle_timer_time, idleness_now) <= 0;
-	  idle_timer_difference
-	    = (idle_timer_ripe
-	       ? timespec_sub (idleness_now, idle_timer_time)
-	       : timespec_sub (idle_timer_time, idleness_now));
-	}
-
-      /* Decide which timer is the next timer,
-	 and set CHOSEN_TIMER, DIFFERENCE, and RIPE accordingly.
-	 Also step down the list where we found that timer.  */
-
-      if (timespec_valid_p (timer_difference)
-	  && (! timespec_valid_p (idle_timer_difference)
-	      || idle_timer_ripe < timer_ripe
-	      || (idle_timer_ripe == timer_ripe
-		  && ((timer_ripe
-		       ? timespec_cmp (idle_timer_difference,
-				       timer_difference)
-		       : timespec_cmp (timer_difference,
-				       idle_timer_difference))
-		      < 0))))
-	{
-	  chosen_timer = timer;
-	  timers = XCDR (timers);
-	  difference = timer_difference;
-	  ripe = timer_ripe;
-	}
-      else
-	{
-	  chosen_timer = idle_timer;
-	  idle_timers = XCDR (idle_timers);
-	  difference = idle_timer_difference;
-	  ripe = idle_timer_ripe;
-	}
-
-      /* If timer is ripe, run it if it hasn't been run.  */
-      if (ripe)
-	{
-	  /* If we got here, presumably `decode_timer` has checked
-             that this timer has not yet been triggered.  */
-	  eassert (NILP (AREF (chosen_timer, 0)));
-	  /* In a production build, where assertions compile to
-	     nothing, we still want to play it safe here.  */
-	  if (NILP (AREF (chosen_timer, 0)))
-	    {
-	      dynwind_begin ();
-	      Lisp_Object old_deactivate_mark = Vdeactivate_mark;
-
-	      /* Mark the timer as triggered to prevent problems if the lisp
-		 code fails to reschedule it right.  */
-	      ASET (chosen_timer, 0, Qt);
-
-	      specbind_guile (Qinhibit_quit, Qt);
-
-	      call1 (Qtimer_event_handler, chosen_timer);
-	      Vdeactivate_mark = old_deactivate_mark;
-	      timers_run++;
-	      dynwind_end ();
-
-	      /* Since we have handled the event,
-		 we don't need to tell the caller to wake up and do it.  */
-	      /* But the caller must still wait for the next timer, so
-		 return 0 to indicate that.  */
-	    }
-
-	  return make_timespec (0, 0);
-	}
-      else
-	/* When we encounter a timer that is still waiting,
-	   return the amount of time to wait before it is ripe.  */
-	{
-	  return difference;
-	}
-    }
-  while (CONSP (timers) || CONSP (idle_timers));
-
-  /* No timers are pending in the future.  */
-  return invalid_timespec ();
 }
 
 
