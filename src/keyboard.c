@@ -1306,6 +1306,22 @@ Scheme uses this in the wait loop to detect mouse-motion fallback.  */)
   return f ? make_lisp_ptr (f, Lisp_Vectorlike) : Qnil;
 }
 
+DEFUN ("--frame-set-mouse-moved!", Fframe_set_mouse_moved,
+       Sframe_set_mouse_moved, 1, 1, 0,
+       doc: /* Internal: set FRAME's mouse_moved flag to true.
+
+Restore side of show_help_echo's save/restore around the
+mouse-fixup-help-message call: the Lisp call can reset mouse_moved as
+a side effect, so the flag saved by --some-mouse-moved is restored
+here afterward.  Always sets true — there is no false-setting call
+site.  */)
+  (Lisp_Object frame)
+{
+  CHECK_FRAME (frame);
+  XFRAME (frame)->mouse_moved = true;
+  return Qnil;
+}
+
 DEFUN ("--kbd-event-kind", Fkbd_event_kind, Skbd_event_kind, 1, 1, 0,
        doc: /* Return the event_kind at kbd_buffer index N (0-based fixnum).
 
@@ -3451,6 +3467,24 @@ rc-help-echo-and-help-form! after destructuring the
   return Qnil;
 }
 
+DEFUN ("--safe-calln-or-eval", Fsafe_calln_or_eval, Ssafe_calln_or_eval,
+       4, 4, 0,
+       doc: /* Internal: resolve untrusted HELP for show-help-echo.
+
+If HELP is a function, call it with WINDOW OBJECT POS via safe_calln
+(errors are caught, logged, and muted — never signaled to the
+caller).  Otherwise evaluate HELP as a form via safe_eval, same error
+containment.  Returns whatever the safe call/eval produces — the
+Scheme caller is responsible for checking it is a string before use,
+matching C's own STRINGP re-check after this call.  */)
+  (Lisp_Object help, Lisp_Object window, Lisp_Object object, Lisp_Object pos)
+{
+  if (FUNCTIONP (help))
+    return safe_calln (help, window, object, pos);
+  else
+    return safe_eval (help);
+}
+
 DEFUN ("--rc-mouse-movement-event-p",
        Fc_rc_mouse_movement_event_p,
        Sc_rc_mouse_movement_event_p, 1, 1, 0,
@@ -4039,6 +4073,20 @@ during the read_char redisplay loop.  */)
 {
   return (help_echo_showing_p && !BASE_EQ (selected_window, minibuf_window))
     ? Qt : Qnil;
+}
+
+DEFUN ("--rc-help-echo-showing-set!",
+       Frc_help_echo_showing_set,
+       Src_help_echo_showing_set, 1, 1, 0,
+       doc: /* Internal: set the shared help_echo_showing_p flag.
+
+Single write path for the cell xdisp.c reads (xdisp.c:13450, :38606)
+and --rc-help-echo-redisplay-preserve-p reads.  Do not shadow this
+with a Scheme-local copy — xdisp would desync.  */)
+  (Lisp_Object flag)
+{
+  help_echo_showing_p = !NILP (flag);
+  return Qnil;
 }
 
 DEFUN ("--rc-redisplay-preserve-echo-area",
@@ -4663,6 +4711,22 @@ can overflow fixnum range on 32-bit unsigned-fixnum builds).  */)
   (Lisp_Object encoded_pos)
 {
   return make_fixnum (Time_to_position (scm_to_intmax (encoded_pos)));
+}
+
+DEFUN ("--position-to-time", Fposition_to_time, Sposition_to_time,
+       1, 1, 0,
+       doc: /* Encode buffer position POS as a Time fixnum.
+
+Wraps the C position_to_Time helper used by HELP_EVENT.  Range-checks
+POS into INPUT_EVENT_POS_MIN/MAX first, since callers cross the FFI
+boundary where eassert may be compiled out.  */)
+  (Lisp_Object pos)
+{
+  CHECK_FIXNUM (pos);
+  ptrdiff_t p = XFIXNUM (pos);
+  if (p < INPUT_EVENT_POS_MIN || p > INPUT_EVENT_POS_MAX)
+    args_out_of_range (pos, pos);
+  return make_fixnum (position_to_Time (p));
 }
 
 /* Generate a HELP_EVENT input_event and store it in the keyboard
@@ -5656,6 +5720,30 @@ DEFUN ("--ie-test-event", Fie_test_event, Sie_test_event, 4, 4, 0,
   ie_test_event_storage.arg = Qnil;
   ie_test_event_storage.device = Qt;
   return ie_wrap (&ie_test_event_storage);
+}
+
+static struct input_event ie_help_event_storage;
+
+DEFUN ("--ie-help-event", Fie_help_event, Sie_help_event, 5, 5, 0,
+       doc: /* Internal: build a HELP_EVENT input_event and return an
+ie-smob wrapping it.  FRAME-OR-WINDOW, ARG, X, Y, TIMESTAMP fill the
+matching fields; kind is always HELP_EVENT.  X is passed as already
+resolved by the caller (Scheme decides window-vs-frame, see
+gen-help-event) — this shim does no branching, only field fill.
+Caller must pass the returned smob to kbd-buffer-store-event! in the
+same call, per the M9 ie-smob lifetime rule.  */)
+  (Lisp_Object frame_or_window, Lisp_Object arg, Lisp_Object x,
+   Lisp_Object y, Lisp_Object timestamp)
+{
+  memset (&ie_help_event_storage, 0, sizeof ie_help_event_storage);
+  ie_help_event_storage.kind = HELP_EVENT;
+  ie_help_event_storage.frame_or_window = frame_or_window;
+  ie_help_event_storage.arg = arg;
+  ie_help_event_storage.x = x;
+  ie_help_event_storage.y = y;
+  ie_help_event_storage.timestamp = scm_to_intmax (timestamp);
+  ie_help_event_storage.device = Qt;
+  return ie_wrap (&ie_help_event_storage);
 }
 
 DEFUN ("--ie-test-hold-quit", Fie_test_hold_quit, Sie_test_hold_quit, 0, 0, 0,
