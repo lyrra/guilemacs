@@ -102,6 +102,7 @@
   "test/keyboard/test-m16-shims.el"           ; M16 imp-1 (corpus prints PASS/FAIL)
   "test/keyboard/test-m16-bodies.el"          ; M16 imp-2 (corpus prints PASS/FAIL)
   "test/keyboard/test-m16-help-echo.el"       ; M16 imp-3 (corpus prints PASS/FAIL)
+  "test/keyboard/test-m17-shims.el"           ; M17 imp-1 (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

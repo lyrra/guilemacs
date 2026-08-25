@@ -12098,6 +12098,29 @@ DEFUN ("--total-keys", Ftotal_keys, Stotal_keys, 0, 0, 0,
   return make_fixnum (total_keys);
 }
 
+DEFUN ("--recent-keys-index-set!", Frecent_keys_index_set, Srecent_keys_index_set,
+       1, 1, 0,
+       doc: /* Internal: set the next-write index into the recent-keys ring.
+Raw setter for the int global recent_keys_index, for the Scheme record-char
+port (M17).  Caller owns the wrap-around arithmetic.  Returns nil.  */)
+  (Lisp_Object index)
+{
+  CHECK_FIXNAT (index);
+  recent_keys_index = XFIXNAT (index);
+  return Qnil;
+}
+
+DEFUN ("--total-keys-set!", Ftotal_keys_set, Stotal_keys_set, 1, 1, 0,
+       doc: /* Internal: set the recorded-key count (capped at the ring size).
+Raw setter for the int global total_keys, for the Scheme record-char port
+(M17).  Caller owns the increment/decrement arithmetic.  Returns nil.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  total_keys = XFIXNAT (n);
+  return Qnil;
+}
+
 DEFUN ("--lossage-limit", Flossage_limit, Slossage_limit, 0, 0, 0,
        doc: /* Internal: return the current recent-keys ring size.  */)
   (void)
@@ -12306,6 +12329,55 @@ this-single-command-key-start-set!.  */)
 
 
 
+
+DEFUN ("--dribble-open-p", Fdribble_open_p, Sdribble_open_p, 0, 0, 0,
+       doc: /* Internal: return non-nil when a dribble file is currently open.
+Reads the static FILE *dribble (src/keyboard.c:252) for the Scheme
+record-char / open-dribble-file port (M17).  */)
+  (void)
+{
+  return dribble ? Qt : Qnil;
+}
+
+DEFUN ("--dribble-write-event", Fdribble_write_event, Sdribble_write_event,
+       1, 1, 0,
+       doc: /* Internal: write the input event C to the open dribble file,
+mirroring the tail of C record_char (src/keyboard.c, the `if (dribble ...)'
+block).  If no dribble file is open, or a kbd macro is executing, this is a
+no-op.  The FILE* itself stays C-owned.  Returns nil.  */)
+  (Lisp_Object c)
+{
+  if (dribble && NILP (Vexecuting_kbd_macro))
+    {
+      block_input ();
+      if (FIXNUMP (c))
+	{
+	  if (XUFIXNUM (c) < 0x100)
+	    putc (XUFIXNUM (c), dribble);
+	  else
+	    fprintf (dribble, " 0x%"pI"x", XUFIXNUM (c));
+	}
+      else
+	{
+	  Lisp_Object dribblee;
+
+	  /* If it's a structured event, take the event header.  */
+	  dribblee = EVENT_HEAD (c);
+
+	  if (SYMBOLP (dribblee))
+	    {
+	      putc ('<', dribble);
+	      fwrite (SDATA (SYMBOL_NAME (dribblee)), sizeof (char),
+		      SBYTES (SYMBOL_NAME (dribblee)), dribble);
+	      putc ('>', dribble);
+	    }
+	}
+
+      fflush (dribble);
+      unblock_input ();
+    }
+  return Qnil;
+}
 
 DEFUN ("open-dribble-file", Fopen_dribble_file, Sopen_dribble_file, 1, 1,
        "FOpen dribble file: ",

@@ -8,9 +8,11 @@
 
 ;;; M3 — recent-keys / lossage-size ported from keyboard.c.
 ;;;
-;;; The recent-keys ring stays C-owned in keyboard.c (recent_keys
-;;; vector, recent_keys_index, total_keys, lossage_limit).  Updating
-;;; the ring from C record_char remains the per-keystroke hot path.
+;;; The recent-keys ring is C-owned in keyboard.c (recent_keys vector,
+;;; recent_keys_index, total_keys, lossage_limit).  M17 ports the
+;;; per-keystroke record_char body into this module — the roadmap's M17
+;;; entry drops the old "record_char stays C" note; the whole body
+;;; moves, and performance is deferred to M28 (no benchmark gate).
 ;;; The two user-facing DEFUNs ported here only run on `M-x recent-keys'
 ;;; and `M-x lossage-size' — fine for an FFI hop.
 ;;;
@@ -19,6 +21,8 @@
 ;;;   --recent-keys-ring, --recent-keys-index, --total-keys,
 ;;;   --lossage-limit, --min-num-recent-keys, --max-num-recent-keys,
 ;;;   --update-recent-keys, --make-event-array-from-vector.
+;;; M17 adds the record-char shims: --recent-keys-index-set!,
+;;; --total-keys-set!, --dribble-open-p, --dribble-write-event.
 
 
 (define (%user-error msg)
