@@ -2197,6 +2197,42 @@ DEFUN ("--clear-waiting-for-input", Fc_clear_waiting_for_input,
   return Qnil;
 }
 
+DEFUN ("--set-echoing!", Fc_set_echoing, Sc_set_echoing, 1, 1, 0,
+       doc: /* Internal: set the C echoing flag to VAL.  */)
+  (Lisp_Object val)
+{
+  echoing = !NILP (val);
+  return Qnil;
+}
+
+DEFUN ("--waiting-for-input-p", Fc_waiting_for_input_p,
+       Sc_waiting_for_input_p, 0, 0, 0,
+       doc: /* Internal: t if the C waiting_for_input flag is set.  */)
+  (void)
+{
+  return waiting_for_input ? Qt : Qnil;
+}
+
+DEFUN ("--message3-nolog", Fc_message3_nolog, Sc_message3_nolog, 1, 1, 0,
+       doc: /* Internal: display MSG in the echo area, no log entry.
+Wraps xdisp.c message3_nolog.  */)
+  (Lisp_Object msg)
+{
+  message3_nolog (msg);
+  return Qnil;
+}
+
+DEFUN ("--truncate-echo-area", Fc_truncate_echo_area,
+       Sc_truncate_echo_area, 1, 1, 0,
+       doc: /* Internal: truncate the echo area to N columns.
+Wraps xdisp.c truncate_echo_area.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  truncate_echo_area (XFIXNUM (n));
+  return Qnil;
+}
+
 /* M7b1 — primitives exposed to (emacs command-loop) for the
    pre-read portion of command_loop_1's main loop body.  See
    docs/keyboard.org §M7b1.  */
@@ -3994,6 +4030,19 @@ input after the prompt.  */)
   (void)
 {
   echo_message_buffer = echo_area_buffer[0];
+  return Qnil;
+}
+
+DEFUN ("--rc-pin-echo-kboard-to-current",
+       Fc_rc_pin_echo_kboard_to_current,
+       Sc_rc_pin_echo_kboard_to_current, 0, 0, 0,
+       doc: /* Internal: set echo_kboard = current_kboard.
+Used by Scheme rc-prologue-redisplay! after the redisplay loop, so
+that a current echo-area message is attributed to the current
+kboard (see echo_kboard's declaration).  */)
+  (void)
+{
+  echo_kboard = current_kboard;
   return Qnil;
 }
 
