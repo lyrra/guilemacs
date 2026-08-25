@@ -3115,22 +3115,6 @@ make_ctrl_char (int c)
   return scm_to_int (SCM_CALL_1 (proc, scm_from_int (c)));
 }
 
-/* Substitute key descriptions and quotes in HELP, unless its first
-   character has a non-nil help-echo-inhibit-substitution property.  */
-
-static Lisp_Object
-help_echo_substitute_command_keys (Lisp_Object help)
-{
-  if (STRINGP (help)
-      && SCHARS (help) > 0
-      && !NILP (Fget_text_property (make_fixnum (0),
-                                    Qhelp_echo_inhibit_substitution,
-                                    help)))
-    return help;
-
-  return call1 (Qsubstitute_command_keys, help);
-}
-
 /* Display the help-echo property of the character after the mouse pointer.
    Either show it in the echo area, or call show-help-function to display
    it by other means (maybe in a tooltip).
@@ -3162,37 +3146,12 @@ void
 show_help_echo (Lisp_Object help, Lisp_Object window, Lisp_Object object,
 		Lisp_Object pos)
 {
-  if (!NILP (help) && !STRINGP (help))
-    {
-      if (FUNCTIONP (help))
-	help = safe_calln (help, window, object, pos);
-      else
-	help = safe_eval (help);
-
-      if (!STRINGP (help))
-	return;
-    }
-
-  if (!noninteractive && STRINGP (help))
-    {
-      /* The mouse-fixup-help-message Lisp function can call
-	 mouse_position_hook, which resets the mouse_moved flags.
-	 This causes trouble if we are trying to read a mouse motion
-	 event (i.e., if we are inside a `track-mouse' form), so we
-	 restore the mouse_moved flag.  */
-      struct frame *f = some_mouse_moved ();
-
-      help = call1 (Qmouse_fixup_help_message, help);
-      if (f)
-	f->mouse_moved = true;
-    }
-
-  if (STRINGP (help) || NILP (help))
-    {
-      if (!NILP (Vshow_help_function))
-	call1 (Vshow_help_function, help_echo_substitute_command_keys (help));
-      help_echo_showing_p = STRINGP (help);
-    }
+  /* M16 imp-3 — C body replaced by a SCM_CALL_4 into the Scheme
+     procedure in (emacs help-echo) show-help-echo.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs help-echo", "show-help-echo");
+  SCM_CALL_4 (proc, help, window, object, pos);
 }
 
 
@@ -4744,16 +4703,12 @@ void
 gen_help_event (Lisp_Object help, Lisp_Object frame, Lisp_Object window,
 		Lisp_Object object, ptrdiff_t pos)
 {
-  struct input_event event;
-  EVENT_INIT (event);
-
-  event.kind = HELP_EVENT;
-  event.frame_or_window = frame;
-  event.arg = object;
-  event.x = WINDOWP (window) ? window : frame;
-  event.y = help;
-  event.timestamp = position_to_Time (pos);
-  kbd_buffer_store_event (&event);
+  /* M16 imp-3 — C body replaced by a SCM_CALL_5 into the Scheme
+     procedure in (emacs help-echo) gen-help-event.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs help-echo", "gen-help-event");
+  SCM_CALL_5 (proc, help, frame, window, object, INT_TO_INTEGER (pos));
 }
 
 
@@ -4762,16 +4717,12 @@ gen_help_event (Lisp_Object help, Lisp_Object frame, Lisp_Object window,
 void
 kbd_buffer_store_help_event (Lisp_Object frame, Lisp_Object help)
 {
-  struct input_event event;
-  EVENT_INIT (event);
-
-  event.kind = HELP_EVENT;
-  event.frame_or_window = frame;
-  event.arg = Qnil;
-  event.x = Qnil;
-  event.y = help;
-  event.timestamp = 0;
-  kbd_buffer_store_event (&event);
+  /* M16 imp-3 — C body replaced by a SCM_CALL_2 into the Scheme
+     procedure in (emacs help-echo) store-help-event.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs help-echo", "store-help-event");
+  SCM_CALL_2 (proc, frame, help);
 }
 
 
