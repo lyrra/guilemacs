@@ -14,7 +14,9 @@
             QCtoggle QCradio
             ;; Separator predicate shared with tab-bar-items and
             ;; tool-bar-items.
-            menu-separator-names menu-separator-name?))
+            menu-separator-names menu-separator-name?
+            ;; Shared with (emacs help-echo) — M16 imp-2 (brief.org).
+            help-echo-substitute-command-keys))
 
 ;;; M10 imp-1.3 — complete Scheme parse-menu-item port.
 ;;; Coexists with C parse_menu_item (keyboard.c:8836+), which is
