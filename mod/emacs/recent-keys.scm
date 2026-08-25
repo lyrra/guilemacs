@@ -4,6 +4,7 @@
   #:declarative? #t
   #:export (recent-keys
             lossage-size
+            record-char
             init-recent-keys-registrations))
 
 ;;; M3 — recent-keys / lossage-size ported from keyboard.c.
@@ -29,6 +30,12 @@
   ;; Elisp `signal' isn't bound in Scheme top-level — go through the
   ;; elisp symbol table.  Same shape as `(user-error MSG)' from elisp.
   ((%c 'signal) 'user-error (list msg)))
+
+;;; --- Helpers --------------------------------------------------------
+
+(define (truthy? x)
+  "Elisp truthiness: everything except #nil is true."
+  (not (eq? x #nil)))
 
 ;;;;
 ;;;; lossage-size
@@ -100,6 +107,152 @@ of the form (nil . COMMAND).  Mirrors C Frecent_keys."
                            (j (if (>= (+ i 1) limit) 0 (+ i 1))))
                       (loop j acc #f)))))))
           (list->vector (reverse acc))))))))
+
+;;;;
+;;;; record-char
+;;;;
+
+;;; Private helper for record-char.  C is a cons whose car is help-echo
+;;; or mouse-movement.  Walk back from IDX0 to read the previous ring
+;;; slots and compute the `recorded' code (0, 1, -1, -2), performing the
+;;; mouse-movement in-place ring replace as a side effect.  ev1/ev2/ev3
+;;; may be any Lisp object (nil or a non-pair); every later read uses
+;;; car-safe/cdr-safe, or a pair? check guards it earlier in the same
+;;; `and'.
+(define (record-char-recorded c ring idx0 limit)
+  (let* ((ix1 (let ((i (- idx0 1))) (if (< i 0) (- limit 1) i)))
+         (ev1 ((%c 'aref) ring ix1))
+         (ix2 (let ((i (- ix1 1))) (if (< i 0) (- limit 1) i)))
+         (ev2 ((%c 'aref) ring ix2))
+         (ix3 (let ((i (- ix2 1))) (if (< i 0) (- limit 1) i)))
+         (ev3 ((%c 'aref) ring ix3)))
+    (cond
+     ((eq? (car c) 'help-echo)
+      ;; Don't record help-echo unless it shows a help message different
+      ;; from the previously recorded one.
+      (let ((help ((%c 'car-safe) ((%c 'cdr-safe) (cdr c)))))
+        (cond
+         ((not (string? help)) 1)
+         ((and (pair? ev1)
+               (eq? (car ev1) 'help-echo)
+               (eq? ((%c 'car-safe) ((%c 'cdr-safe) (cdr ev1))) help))
+          1)
+         ((and (pair? ev1)
+               (eq? (car ev1) 'mouse-movement)
+               (pair? ev2)
+               (eq? (car ev2) 'help-echo)
+               (eq? ((%c 'car-safe) ((%c 'cdr-safe) (cdr ev2))) help))
+          -1)
+         ((and (pair? ev1)
+               (eq? (car ev1) 'mouse-movement)
+               (pair? ev2)
+               (eq? (car ev2) 'mouse-movement)
+               (pair? ev3)
+               (eq? (car ev3) 'help-echo)
+               (eq? ((%c 'car-safe) ((%c 'cdr-safe) (cdr ev3))) help))
+          -2)
+         (else 0))))
+     ((eq? (car c) 'mouse-movement)
+      ;; Only record one pair of mouse-movement on a window; further
+      ;; movement on the same window replaces the last element.
+      (let ((window ((%c 'car-safe) ((%c 'car-safe) (cdr c)))))
+        (if (and (pair? ev1)
+                 (eq? (car ev1) 'mouse-movement)
+                 (eq? ((%c 'car-safe) ((%c 'car-safe) (cdr ev1))) window)
+                 (pair? ev2)
+                 (eq? (car ev2) 'mouse-movement)
+                 (eq? ((%c 'car-safe) ((%c 'car-safe) (cdr ev2))) window))
+            ;; Not macro-gated: C does this in-place replace even during
+            ;; macro playback.
+            (begin
+              ((%c 'aset) ring ix1 c)
+              1)
+            0)))
+     (else 0))))
+
+;;; Private helper for record-char.  Compute the final (idx . total)
+;;; to write back after `recorded' is known, performing the ring side
+;;; effects: the recorded=0 append (copied event) and the recorded<0
+;;; pop loop.  Returns a cons (IDX . TOTAL).  Avoids `let-values'
+;;; (unbound in the interpreted guile-emacs environment).
+(define (record-char-write-back recorded idx0 total0 limit c ring)
+  (cond
+   ((= recorded 0)
+    (let ((total (if (< total0 limit) (+ total0 1) total0)))
+      ;; Copy the event in case some remapping modifies it by side effect
+      ;; (bug#30955).
+      ((%c 'aset) ring idx0 (if (pair? c) ((%c 'copy-sequence) c) c))
+      (cons (if (>= (+ idx0 1) limit) 0 (+ idx0 1)) total)))
+   ((= recorded 1)
+    ;; No ring write here: the mouse-movement replace already wrote
+    ;; ring[ix1] in the dispatch above, and the help-echo dup writes
+    ;; nothing.
+    (cons idx0 total0))
+   (else
+    ;; recorded < 0: remove one or two events by putting nil at them and
+    ;; moving the index backwards.
+    (let loop ((rec recorded) (idx idx0) (total total0))
+      (if (and (< rec 0) (> total 0))
+          (let* ((total' (if (< total limit) (- total 1) total))
+                 (idx'  (if (< (- idx 1) 0) (- limit 1) (- idx 1))))
+            ((%c 'aset) ring idx' #nil)
+            (loop (+ rec 1) idx' total'))
+          (cons idx total))))))
+
+(define (record-char c)
+  "Port of C record_char (src/keyboard.c:4386-4529).
+
+Append the input event C to the recent-keys ring, filtering repeated
+help-echo and mouse-movement events, and mirror the dribble-file write.
+Coexistence-only (M17 imp-2): nothing calls this yet; the C record_char
+body stays live until imp-3 cuts over.  Returns an unspecified value."
+  ;; Guard: subr.el/read-passwd binds inhibit--record-char to avoid
+  ;; recording passwords.  When not recording all keys and recording is
+  ;; inhibited, do nothing at all — no ring write, no dribble write.
+  (unless (and (not (truthy? (symbol-value 'record-all-keys)))
+               (truthy? (symbol-value 'inhibit--record-char)))
+    ;; Read the C globals once each and keep them as locals.  C re-reads
+    ;; the globals on every access, but nothing in this body mutates them
+    ;; in between, so one read each is equivalent — a deliberate
+    ;; simplification, not a behavior change.
+    (let* ((ring    ((%c '--recent-keys-ring)))
+           (limit   ((%c '--lossage-limit)))
+           (idx0    ((%c '--recent-keys-index)))
+           (total0  ((%c '--total-keys)))
+           ;; macro? is #t exactly when a kbd macro IS executing (i.e.
+           ;; Vexecuting_kbd_macro is non-nil).  C names its guards with a
+           ;; double negative (NILP (Vexecuting_kbd_macro)); pick a name
+           ;; that reads correctly at each call site to avoid inverting it.
+           (macro?  (truthy? (symbol-value 'executing-kbd-macro))))
+      ;; Compute `recorded'.  For a plain (non help-echo/mouse-movement)
+      ;; event this mirrors C's `else if (NILP (Vexecuting_kbd_macro))
+      ;; store_kbd_macro_char (c);' — only fires for such plain events and
+      ;; is itself macro-gated (unlike the mouse-movement ring write).
+      (let ((recorded
+             (if (and (pair? c)
+                      (or (eq? (car c) 'help-echo)
+                          (eq? (car c) 'mouse-movement)))
+                 (record-char-recorded c ring idx0 limit)
+                 (begin
+                   (unless macro?
+                     ((%c 'store-kbd-macro-event) c))
+                   0))))
+        ;; Final index/total write-back + counter bump.  Skipped entirely
+        ;; during macro playback, matching C's `if (NILP (Vexecuting_kbd_macro))'
+        ;; wrapping this whole section.
+        (unless macro?
+          (let* ((idx-total (record-char-write-back recorded idx0 total0 limit c ring))
+                 (idx (car idx-total))
+                 (total (cdr idx-total)))
+            ((%c '--recent-keys-index-set!) idx)
+            ((%c '--total-keys-set!) total)
+            (set-symbol-value! 'num-nonmacro-input-events
+                               (+ 1 (symbol-value 'num-nonmacro-input-events))))))
+      ;; Dribble tail.  Unconditional on macro? here — the shim re-checks
+      ;; both dribble-open and macro state internally; --dribble-open-p is
+      ;; only a cheap pre-check to skip the call.
+      (when (truthy? ((%c '--dribble-open-p)))
+        ((%c '--dribble-write-event) c)))))
 
 ;;;;
 ;;;; Registration
