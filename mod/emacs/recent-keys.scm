@@ -5,6 +5,7 @@
   #:export (recent-keys
             lossage-size
             record-char
+            record-cmd-pseudo-event!
             init-recent-keys-registrations))
 
 ;;; M3 — recent-keys / lossage-size ported from keyboard.c.
@@ -179,9 +180,13 @@ of the form (nil . COMMAND).  Mirrors C Frecent_keys."
   (cond
    ((= recorded 0)
     (let ((total (if (< total0 limit) (+ total0 1) total0)))
-      ;; Copy the event in case some remapping modifies it by side effect
-      ;; (bug#30955).
-      ((%c 'aset) ring idx0 (if (pair? c) ((%c 'copy-sequence) c) c))
+      ;; Copy proper-list events in case some remapping modifies them by
+      ;; side effect (bug#30955) — mirrors C `CONSP (c) ? Fcopy_sequence
+      ;; (c) : c`.  A dotted pair (the (nil . CMD) pseudo-event) is freshly
+      ;; consed by its writer, so nothing can mutate it; store it as-is
+      ;; (guilemacs copy-sequence only accepts proper lists).
+      ((%c 'aset) ring idx0
+           (if (and (pair? c) (list? c)) ((%c 'copy-sequence) c) c))
       (cons (if (>= (+ idx0 1) limit) 0 (+ idx0 1)) total)))
    ((= recorded 1)
     ;; No ring write here: the mouse-movement replace already wrote
@@ -204,8 +209,9 @@ of the form (nil . COMMAND).  Mirrors C Frecent_keys."
 
 Append the input event C to the recent-keys ring, filtering repeated
 help-echo and mouse-movement events, and mirror the dribble-file write.
-Coexistence-only (M17 imp-2): nothing calls this yet; the C record_char
-body stays live until imp-3 cuts over.  Returns an unspecified value."
+C record_char now dispatches into this procedure (M17 imp-3);
+record_menu_key and --rc-record-char reach it through record_char
+unchanged.  Returns an unspecified value."
   ;; Guard: subr.el/read-passwd binds inhibit--record-char to avoid
   ;; recording passwords.  When not recording all keys and recording is
   ;; inhibited, do nothing at all — no ring write, no dribble write.
@@ -253,6 +259,26 @@ body stays live until imp-3 cuts over.  Returns an unspecified value."
       ;; only a cheap pre-check to skip the call.
       (when (truthy? ((%c '--dribble-open-p)))
         ((%c '--dribble-write-event) c)))))
+
+;;;;
+;;;; record-cmd-pseudo-event!
+;;;;
+
+(define (record-cmd-pseudo-event! cmd)
+  "Push the (nil . CMD) pseudo-event into the recent-keys ring,
+rotating the ring when it is full.  C --record-recent-keys-cmd-pseudo-event
+(M17 imp-3) dispatches into this procedure.  Reuses
+record-char-write-back's append logic (recorded fixed at 0) so the ring
+has one writer, not two — mirroring the C pseudo-event append exactly,
+including that it does NOT bump num-nonmacro-input-events."
+  (let* ((ring      ((%c '--recent-keys-ring)))
+         (limit     ((%c '--lossage-limit)))
+         (idx0      ((%c '--recent-keys-index)))
+         (total0    ((%c '--total-keys)))
+         (idx-total (record-char-write-back 0 idx0 total0 limit
+                                            (cons #nil cmd) ring)))
+    ((%c '--recent-keys-index-set!) (car idx-total))
+    ((%c '--total-keys-set!) (cdr idx-total))))
 
 ;;;;
 ;;;; Registration

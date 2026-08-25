@@ -2408,14 +2408,16 @@ DEFUN ("--record-recent-keys-cmd-pseudo-event",
        Fc_record_recent_keys_cmd_pseudo_event,
        Sc_record_recent_keys_cmd_pseudo_event, 1, 1, 0,
        doc: /* Internal: push the (nil . CMD) pseudo-event into the
-recent_keys ring, with lossage rotation.  Mirrors the inline block in
-command_loop_1 dispatch.  */)
+recent_keys ring, with lossage rotation.  Dispatches into
+record-cmd-pseudo-event!.  */)
   (Lisp_Object cmd)
 {
-  total_keys += total_keys < lossage_limit;
-  ASET (recent_keys, recent_keys_index, Fcons (Qnil, cmd));
-  if (++recent_keys_index >= lossage_limit)
-    recent_keys_index = 0;
+  /* M17 imp-3 — repoint the pseudo-event writer at the same Scheme
+     helper record_char uses, so the ring has one writer.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recent-keys", "record-cmd-pseudo-event!");
+  SCM_CALL_1 (proc, cmd);
   return Qnil;
 }
 
@@ -4386,146 +4388,12 @@ help_char_p (Lisp_Object c)
 static void
 record_char (Lisp_Object c)
 {
-  /* subr.el/read-passwd binds inhibit_record_char to avoid recording
-     passwords.  */
-  if (!record_all_keys && inhibit_record_char)
-    return;
-
-  int recorded = 0;
-
-  if (CONSP (c) && (EQ (XCAR (c), Qhelp_echo) || EQ (XCAR (c), Qmouse_movement)))
-    {
-      /* To avoid filling recent_keys with help-echo and mouse-movement
-	 events, we filter out repeated help-echo events, only store the
-	 first and last in a series of mouse-movement events, and don't
-	 store repeated help-echo events which are only separated by
-	 mouse-movement events.  */
-
-      Lisp_Object ev1, ev2, ev3;
-      int ix1, ix2, ix3;
-
-      if ((ix1 = recent_keys_index - 1) < 0)
-	ix1 = lossage_limit - 1;
-      ev1 = AREF (recent_keys, ix1);
-
-      if ((ix2 = ix1 - 1) < 0)
-	ix2 = lossage_limit - 1;
-      ev2 = AREF (recent_keys, ix2);
-
-      if ((ix3 = ix2 - 1) < 0)
-	ix3 = lossage_limit - 1;
-      ev3 = AREF (recent_keys, ix3);
-
-      if (EQ (XCAR (c), Qhelp_echo))
-	{
-	  /* Don't record `help-echo' in recent_keys unless it shows some help
-	     message, and a different help than the previously recorded
-	     event.  */
-	  Lisp_Object help, last_help;
-
-	  help = Fcar_safe (Fcdr_safe (XCDR (c)));
-	  if (!STRINGP (help))
-	    recorded = 1;
-	  else if (CONSP (ev1) && EQ (XCAR (ev1), Qhelp_echo)
-		   && (last_help = Fcar_safe (Fcdr_safe (XCDR (ev1))), EQ (last_help, help)))
-	    recorded = 1;
-	  else if (CONSP (ev1) && EQ (XCAR (ev1), Qmouse_movement)
-		   && CONSP (ev2) && EQ (XCAR (ev2), Qhelp_echo)
-		   && (last_help = Fcar_safe (Fcdr_safe (XCDR (ev2))), EQ (last_help, help)))
-	    recorded = -1;
-	  else if (CONSP (ev1) && EQ (XCAR (ev1), Qmouse_movement)
-		   && CONSP (ev2) && EQ (XCAR (ev2), Qmouse_movement)
-		   && CONSP (ev3) && EQ (XCAR (ev3), Qhelp_echo)
-		   && (last_help = Fcar_safe (Fcdr_safe (XCDR (ev3))), EQ (last_help, help)))
-	    recorded = -2;
-	}
-      else if (EQ (XCAR (c), Qmouse_movement))
-	{
-	  /* Only record one pair of `mouse-movement' on a window in recent_keys.
-	     So additional mouse movement events replace the last element.  */
-	  Lisp_Object last_window, window;
-
-	  window = Fcar_safe (Fcar_safe (XCDR (c)));
-	  if (CONSP (ev1) && EQ (XCAR (ev1), Qmouse_movement)
-	      && (last_window = Fcar_safe (Fcar_safe (XCDR (ev1))), EQ (last_window, window))
-	      && CONSP (ev2) && EQ (XCAR (ev2), Qmouse_movement)
-	      && (last_window = Fcar_safe (Fcar_safe (XCDR (ev2))), EQ (last_window, window)))
-	    {
-	      ASET (recent_keys, ix1, c);
-	      recorded = 1;
-	    }
-	}
-    }
-  else if (NILP (Vexecuting_kbd_macro))
-    store_kbd_macro_char (c);
-
-  /* recent_keys should not include events from keyboard macros.  */
-  if (NILP (Vexecuting_kbd_macro))
-    {
-      if (!recorded)
-	{
-	  total_keys += total_keys < lossage_limit;
-	  ASET (recent_keys, recent_keys_index,
-                /* Copy the event, in case it gets modified by side-effect
-                   by some remapping function (bug#30955).  */
-                CONSP (c) ? Fcopy_sequence (c) : c);
-	  if (++recent_keys_index >= lossage_limit)
-	    recent_keys_index = 0;
-	}
-      else if (recorded < 0)
-	{
-	  /* We need to remove one or two events from recent_keys.
-	     To do this, we simply put nil at those events and move the
-	     recent_keys_index backwards over those events.  Usually,
-	     users will never see those nil events, as they will be
-	     overwritten by the command keys entered to see recent_keys
-	     (e.g. C-h l).  */
-
-	  while (recorded++ < 0 && total_keys > 0)
-	    {
-	      if (total_keys < lossage_limit)
-		total_keys--;
-	      if (--recent_keys_index < 0)
-		recent_keys_index = lossage_limit - 1;
-	      ASET (recent_keys, recent_keys_index, Qnil);
-	    }
-	}
-
-      num_nonmacro_input_events++;
-    }
-
-  /* Write c to the dribble file.  If c is a lispy event, write
-     the event's symbol to the dribble file, in <brackets>.  Bleaugh.
-     If you, dear reader, have a better idea, you've got the source.  :-) */
-  if (dribble && NILP (Vexecuting_kbd_macro))
-    {
-      block_input ();
-      if (FIXNUMP (c))
-	{
-	  if (XUFIXNUM (c) < 0x100)
-	    putc (XUFIXNUM (c), dribble);
-	  else
-	    fprintf (dribble, " 0x%"pI"x", XUFIXNUM (c));
-	}
-      else
-	{
-	  Lisp_Object dribblee;
-
-	  /* If it's a structured event, take the event header.  */
-	  dribblee = EVENT_HEAD (c);
-
-	  if (SYMBOLP (dribblee))
-	    {
-	      putc ('<', dribble);
-	      fwrite (SDATA (SYMBOL_NAME (dribblee)), sizeof (char),
-		      SBYTES (SYMBOL_NAME (dribblee)), dribble);
-	      putc ('>', dribble);
-	    }
-	}
-
-      fflush (dribble);
-      unblock_input ();
-    }
+  /* M17 imp-3 — C body replaced by a SCM_CALL_1 into the Scheme
+     procedure in (emacs recent-keys) record-char.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recent-keys", "record-char");
+  SCM_CALL_1 (proc, c);
 }
 
 /* Low level keyboard/mouse input.
