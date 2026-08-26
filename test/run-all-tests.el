@@ -162,6 +162,7 @@
 (load "test/keyboard/test-m17-record-char.el")    ; M17 imp-3
 (load "test/keyboard/test-m18-shims.el")          ; M18 imp-1
 (load "test/keyboard/test-m18-bodies.el")         ; M18 imp-2
+(load "test/keyboard/test-m18-echo.el")           ; M18 imp-3
 (message "")
 
 (message "========================================")

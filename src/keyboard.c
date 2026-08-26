@@ -471,9 +471,11 @@ kset_system_key_syms (struct kboard *kb, Lisp_Object val)
 static bool
 echo_keystrokes_p (void)
 {
-  return (FLOATP (Vecho_keystrokes) ? XFLOAT_DATA (Vecho_keystrokes) > 0.0
-	  : FIXNUMP (Vecho_keystrokes) ? XFIXNUM (Vecho_keystrokes) > 0
-          : false);
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-keystrokes-p");
+  return scm_is_true (SCM_CALL_0 (proc));
 }
 
 /* Add C to the echo string, without echoing it immediately.  C can be
@@ -483,53 +485,11 @@ echo_keystrokes_p (void)
 static void
 echo_add_key (Lisp_Object c)
 {
-  char initbuf[KEY_DESCRIPTION_SIZE + 100];
-  ptrdiff_t size = sizeof initbuf;
-  char *buffer = initbuf;
-  char *ptr = buffer;
-  Lisp_Object echo_string = KVAR (current_kboard, echo_string);
-  USE_SAFE_ALLOCA;
-
-  if (STRINGP (echo_string) && SCHARS (echo_string) > 0)
-    /* Add a space at the end as a separator between keys.  */
-    ptr++[0] = ' ';
-
-  /* If someone has passed us a composite event, use its head symbol.  */
-  c = EVENT_HEAD (c);
-
-  if (FIXNUMP (c))
-    ptr = push_key_description (XFIXNUM (c), ptr);
-  else if (SYMBOLP (c))
-    {
-      Lisp_Object name = SYMBOL_NAME (c);
-      ptrdiff_t nbytes = SBYTES (name);
-
-      if (size - (ptr - buffer) < nbytes)
-	{
-	  ptrdiff_t offset = ptr - buffer;
-	  size = max (2 * size, size + nbytes);
-	  buffer = SAFE_ALLOCA (size);
-	  ptr = buffer + offset;
-	}
-
-      ptr += copy_text (SDATA (name), (unsigned char *) ptr, nbytes,
-			STRING_MULTIBYTE (name), 1);
-    }
-
-  Lisp_Object new_string = make_string (buffer, ptr - buffer);
-  if ((NILP (echo_string) || SCHARS (echo_string) == 0)
-      && help_char_p (c))
-    {
-      AUTO_STRING (str, " (Type ? for further options, C-q for quick help)");
-      AUTO_LIST2 (props, Qface, Qhelp_key_binding);
-      Fadd_text_properties (make_fixnum (7), make_fixnum (8), props, str);
-      Fadd_text_properties (make_fixnum (30), make_fixnum (33), props, str);
-      new_string = concat2 (new_string, str);
-    }
-
-  kset_echo_string (current_kboard,
-		    concat2 (echo_string, new_string));
-  SAFE_FREE ();
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-add-key");
+  SCM_CALL_1 (proc, c);
 }
 
 /* Temporarily add a dash to the end of the echo string if it's not
@@ -539,77 +499,21 @@ echo_add_key (Lisp_Object c)
 static void
 echo_dash (void)
 {
-  /* Do nothing if not echoing at all.  */
-  if (NILP (KVAR (current_kboard, echo_string)))
-    return;
-
-  if (!current_kboard->immediate_echo
-      && SCHARS (KVAR (current_kboard, echo_string)) == 0)
-    return;
-
-  /* Do nothing if we just printed a prompt.  */
-  if (STRINGP (KVAR (current_kboard, echo_prompt))
-      && (SCHARS (KVAR (current_kboard, echo_prompt))
-	  == SCHARS (KVAR (current_kboard, echo_string))))
-    return;
-
-  /* Do nothing if we have already put a dash at the end.  */
-  if (SCHARS (KVAR (current_kboard, echo_string)) > 1)
-    {
-      Lisp_Object last_char, prev_char, idx;
-
-      idx = make_fixnum (SCHARS (KVAR (current_kboard, echo_string)) - 2);
-      prev_char = Faref (KVAR (current_kboard, echo_string), idx);
-
-      idx = make_fixnum (SCHARS (KVAR (current_kboard, echo_string)) - 1);
-      last_char = Faref (KVAR (current_kboard, echo_string), idx);
-
-      if ((XFIXNUM (last_char) == '-' && XFIXNUM (prev_char) != ' ')
-	  /* Or a keystroke help message.  */
-	  || (echo_keystrokes_help
-	      && XFIXNUM (last_char) == ')' && XFIXNUM (prev_char) == 'p'))
-	return;
-    }
-
-  /* Put a dash at the end of the buffer temporarily,
-     but make it go away when the next character is added.  */
-  AUTO_STRING (dash, "-");
-  kset_echo_string (current_kboard,
-		    concat2 (KVAR (current_kboard, echo_string), dash));
-
-  if (echo_keystrokes_help)
-    kset_echo_string (current_kboard,
-		      calln (Qhelp__append_keystrokes_help,
-			     KVAR (current_kboard, echo_string)));
-
-  echo_now ();
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-dash");
+  SCM_CALL_0 (proc);
 }
 
 static void
 echo_update (void)
 {
-  if (current_kboard->immediate_echo)
-    {
-      ptrdiff_t i;
-      Lisp_Object prompt = KVAR (current_kboard, echo_prompt);
-      Lisp_Object prefix = call0 (Qinternal_echo_keystrokes_prefix);
-      kset_echo_string (current_kboard,
-			NILP (prompt) ? prefix
-			: NILP (prefix) ? prompt
-			: concat2 (prompt, prefix));
-
-      for (i = 0; i < this_command_key_count; i++)
-	{
-	  Lisp_Object c;
-
-	  c = AREF (this_command_keys, i);
-	  if (! (EVENT_HAS_PARAMETERS (c)
-		 && EQ (EVENT_HEAD_KIND (EVENT_HEAD (c)), Qmouse_movement)))
-	    echo_add_key (c);
-	}
-
-      echo_now ();
-    }
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-update");
+  SCM_CALL_0 (proc);
 }
 
 /* Display the current echo string, and begin echoing if not already
@@ -618,27 +522,11 @@ echo_update (void)
 static void
 echo_now (void)
 {
-  if (!current_kboard->immediate_echo
-      /* This test breaks calls that use `echo_now' to display the echo_prompt.
-         && echo_keystrokes_p () */)
-    {
-      current_kboard->immediate_echo = true;
-      echo_update ();
-      /* Put a dash at the end to invite the user to type more.  */
-      echo_dash ();
-    }
-
-  echoing = true;
-  /* FIXME: Use call (Qmessage) so it can be advised (e.g. emacspeak).  */
-  message3_nolog (KVAR (current_kboard, echo_string));
-  echoing = false;
-
-  /* Record in what buffer we echoed, and from which kboard.  */
-  echo_message_buffer = echo_area_buffer[0];
-  echo_kboard = current_kboard;
-
-  if (waiting_for_input && !NILP (Vquit_flag))
-    quit_throw_to_read_char (0);
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-now");
+  SCM_CALL_0 (proc);
 }
 
 /* Turn off echoing, for the start of a new command.  */
@@ -659,9 +547,11 @@ cancel_echoing (void)
 static ptrdiff_t
 echo_length (void)
 {
-  return (STRINGP (KVAR (current_kboard, echo_string))
-	  ? SCHARS (KVAR (current_kboard, echo_string))
-	  : 0);
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-length");
+  return XFIXNUM (SCM_CALL_0 (proc));
 }
 
 /* Truncate the current echo message to its first LEN chars.
@@ -671,12 +561,11 @@ echo_length (void)
 static void
 echo_truncate (ptrdiff_t nchars)
 {
-  Lisp_Object es = KVAR (current_kboard, echo_string);
-  if (STRINGP (es) && SCHARS (es) > nchars)
-    kset_echo_string (current_kboard,
-		      Fsubstring (KVAR (current_kboard, echo_string),
-				  make_fixnum (0), make_fixnum (nchars)));
-  truncate_echo_area (nchars);
+  /* M18 imp-3 — C body replaced by a SCM_CALL_* into (emacs echo). */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs echo", "echo-truncate");
+  SCM_CALL_1 (proc, INT_TO_INTEGER (nchars));
 }
 
 
