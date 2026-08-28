@@ -58,7 +58,7 @@
   (let ((vtype (list-ref ((force %--window-scroll-bars) w) 2)))
     (if (eq? vtype 'right)
         #t
-        (if (eq? vtype 't)
+        (if (eq? vtype #t)
             (let ((ftype ((force %--frame-parameter)
                           ((force %--window-frame) w) 'vertical-scroll-bars)))
               (eq? ftype 'right))
@@ -242,49 +242,52 @@ stays here; only the matrix walk is in --buffer-posn-from-coords."
 
 ;;; 6.3.9 Orchestrator — replaces the C make_lispy_position body.
 ;;;
-;;; Window-part enum values (must match src/keyboard.c):
-;;;   ON_TEXT = 1, ON_MODE_LINE = 2, ON_HEADER_LINE = 3, ON_TAB_LINE = 4,
-;;;   ON_LEFT_MARGIN = 5, ON_RIGHT_MARGIN = 6, ON_LEFT_FRINGE = 7,
-;;;   ON_RIGHT_FRINGE = 8, ON_VERTICAL_BORDER = 9,
-;;;   ON_VERTICAL_SCROLL_BAR = 10, ON_HORIZONTAL_SCROLL_BAR = 11,
-;;;   ON_RIGHT_DIVIDER = 12, ON_BOTTOM_DIVIDER = 13.
+;;; Window-part enum values (must match src/dispextern.h:216):
+;;;   ON_NOTHING = 0, ON_TEXT = 1, ON_MODE_LINE = 2,
+;;;   ON_VERTICAL_BORDER = 3, ON_HEADER_LINE = 4, ON_TAB_LINE = 5,
+;;;   ON_LEFT_FRINGE = 6, ON_RIGHT_FRINGE = 7, ON_LEFT_MARGIN = 8,
+;;;   ON_RIGHT_MARGIN = 9, ON_VERTICAL_SCROLL_BAR = 10,
+;;;   ON_HORIZONTAL_SCROLL_BAR = 11, ON_RIGHT_DIVIDER = 12,
+;;;   ON_BOTTOM_DIVIDER = 13.
 
 ;;; Per-region dispatch — mirrors C-side imp-6.2 mlp_* decomposition.
 ;;; Each returns (values posn object string-info col row
 ;;;                    dx dy width height xret yret textpos).
 
 (define (ml-dispatch-text-line-margin w part mx my)
-  "Dispatch for parts 1-6 (ON_TEXT, mode/header/tab, margins)."
+  "Dispatch for text-area (1), mode/header/tab-line (2/4/5), and
+margin (8/9) clicks."
   (cond
    ((= part 1)  ; ON_TEXT — just the text-area offset.
     (let ((xy ((force %--mlp-dispatch) 0 w mx my #nil #nil #nil)))
       (values #nil #nil #nil -1 -1 -1 -1 -1 -1
               (car xy) (cdr xy) 0)))
-   ((or (= part 2) (= part 3) (= part 4))  ; mode/header/tab line
+   ((or (= part 2) (= part 4) (= part 5))  ; ON_MODE_LINE / ON_HEADER_LINE / ON_TAB_LINE
     (call-with-values
         (lambda () (mode-header-line w part mx my))
       (lambda (p obj si c r dxv dyv wv hv xrv)
         (values p obj si c r dxv dyv wv hv xrv 0 -1))))
-   (else  ; parts 5,6: margins
+   (else  ; parts 8,9: margins
     (call-with-values
         (lambda () (margins w part mx my))
       (lambda (p obj si c r dxv dyv wv hv xrv yrv)
         (values p obj si c r dxv dyv wv hv xrv yrv 0))))))
 
 (define (ml-dispatch-fringe-scroll w part mx my)
-  "Dispatch for parts 7+ (fringes, scroll-bar/border/dividers)."
+  "Dispatch for fringe (6/7) and border/scroll-bar/divider (3/10-13)
+clicks."
   (cond
-   ((= part 7)  ; left fringe
+   ((= part 6)  ; ON_LEFT_FRINGE
     (call-with-values
         (lambda () (fringes w #t mx my))
       (lambda (p c dxv dyv xrv yrv)
         (values p #nil #nil c -1 dxv dyv -1 -1 xrv yrv 0))))
-   ((= part 8)  ; right fringe
+   ((= part 7)  ; ON_RIGHT_FRINGE
     (call-with-values
         (lambda () (fringes w #f mx my))
       (lambda (p c dxv dyv xrv yrv)
         (values p #nil #nil c -1 dxv dyv -1 -1 xrv yrv 0))))
-   (else  ; part >= 9: scroll-bar/border/dividers
+   (else  ; parts 3,10,11,12,13: border/scroll-bar/dividers
     (call-with-values
         (lambda () (scroll-border w part mx my))
       (lambda (p wv dxv xrv dyv yrv)
@@ -292,9 +295,9 @@ stays here; only the matrix walk is in --buffer-posn-from-coords."
 
 (define (ml-dispatch-window-part w part mx my)
   "Top-level window-part dispatcher."
-  (if (<= part 6)
-      (ml-dispatch-text-line-margin w part mx my)
-      (ml-dispatch-fringe-scroll w part mx my)))
+  (if (or (= part 3) (= part 6) (= part 7) (>= part 10))
+      (ml-dispatch-fringe-scroll w part mx my)
+      (ml-dispatch-text-line-margin w part mx my)))
 
 (define (ml-finish-window-position w part mx my xret yret posn object string-info
                                    textpos col row dx dy width height
