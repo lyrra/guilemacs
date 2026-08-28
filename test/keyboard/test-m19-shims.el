@@ -1,38 +1,34 @@
-;;; test-m19-bodies.el --- M19 imp-1 test suite for the Scheme mlp_*
-;;; geometry-body ports
+;;; test-m19-shims.el --- M19 imp-2 test suite for the menu/tab-bar/
+;;; hscroll helper ports and shims in (emacs lispy-position)
 ;;;
-;;; Wraps test/keyboard/test-m19-bodies.scm — the Scheme test corpus
-;;; for the (emacs lispy-position) procedures, native Scheme ports of
-;;; the C mlp_* bodies in src/keyboard.c (mlp_image_hotspot_check,
-;;; mlp_mode_header_line, mlp_scroll_border, mlp_fringes,
-;;; mlp_buffer_posn_pass, mlp_margins, mlp_internal_border,
-;;; mlp_frame_preamble).  See docs/m19-plan.org §imp-1 and brief.org.
+;;; Wraps test/keyboard/test-m19-shims.scm — the Scheme test corpus for
+;;; the 9 new imp-2 C shims in src/keyboard.c and the exported helper
+;;; ports (coords-in-menu-bar-window?, line-number-mode-hscroll?,
+;;; mouse-click-menu-bar-intercept, tab-bar-enrich-position,
+;;; posn-at-x-y), plus the --mlp-dispatch retirement checks.  See
+;;; docs/m19-plan.org §imp-2 and brief.org.
 ;;;
 ;;; Loads the Scheme file via eval-scheme, then reads back
 ;;; `test-results` (list of (NAME STATUS) pairs) and reports each via
-;;; princ.  Each check verifies that a Scheme per-region port returns
-;;; the correct value-arity and the deterministic posn symbol for its
-;;; window_part across representative window/frame states.  (The
-;;; original oracle — the C --mlp-dispatch path — was deleted in M19
-;;; imp-2, so the corpus no longer compares against C.)
+;;; princ.  Same harness as test-m18-shims.el.
 
-(princ "=== m19-bodies test suite ===\n")
+(princ "=== m19-shims test suite ===\n")
 
 ;; Run the Scheme test corpus.  Populates test-results in the
 ;; (guile-user) module.  Resolve the corpus path from load-file-name so
 ;; it works both from the repo root (run-all-tests.el) and from the
 ;; harness, which loads this file with CWD=test/.
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
-       (corpus (expand-file-name "test-m19-bodies.scm" dir)))
+       (corpus (expand-file-name "test-m19-shims.scm" dir)))
   (condition-case err
       (eval-scheme
        (format "(primitive-load %S)" corpus))
-    (error (princ (format "M19B-CORPUS-LOAD-ERROR: %S\n" err)))))
+    (error (princ (format "M19S-CORPUS-LOAD-ERROR: %S\n" err)))))
 
 ;; Read each result back and report PASS/FAIL.
 (let ((results (condition-case e
                    (eval-scheme "(reverse test-results)")
-                 (error (princ (format "M19B-READBACK-ERROR: %S\n" e)) '())))
+                 (error (princ (format "M19S-READBACK-ERROR: %S\n" e)) '())))
       (pass 0)
       (fail 0))
   (dolist (result results)

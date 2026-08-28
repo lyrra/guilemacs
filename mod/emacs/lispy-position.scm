@@ -1,8 +1,14 @@
 (define-module (emacs lispy-position)
   #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
+  #:use-module (emacs event-modifiers) ; down-modifier bit constant
   #:declarative? #t
-  #:export (make-lispy-position))
+  #:export (make-lispy-position
+            coords-in-menu-bar-window?
+            line-number-mode-hscroll?
+            mouse-click-menu-bar-intercept
+            tab-bar-enrich-position
+            posn-at-x-y))
 
 ;;; M9 imp-6.3 — per-region Scheme port of make_lispy_position.
 ;;;
@@ -11,11 +17,23 @@
 ;;; decomposed into mlp_* helpers (imp-6.2); imp-6.3 adds thin adapter
 ;;; DEFUNs that compute wx/wy internally from frame-relative mx/my and
 ;;; pack out-params into single list returns.  This module stitches
-;;; them together.
+;;; them together.  M19 imp-1 ported the 8 mlp_* geometry bodies; M19
+;;; imp-2 (this commit) ports the non-mlp_* helpers and retires the C
+;;; mlp_* bodies and --mlp-dispatch.
 
 ;;; Lazy C-primitive references.
 
-(defelisp %--mlp-dispatch --mlp-dispatch)
+(defelisp %--have-ext-menu-bar-p            --have-ext-menu-bar-p)
+(defelisp %--frame-menu-bar-window          --frame-menu-bar-window)
+(defelisp %--frame-tab-bar-window           --frame-tab-bar-window)
+(defelisp %--line-number-display-width-for-window
+          --line-number-display-width-for-window)
+(defelisp %--frame-menu-bar-items           --frame-menu-bar-items)
+(defelisp %--frame-tab-bar-items            --frame-tab-bar-items)
+(defelisp %--get-tab-bar-item-kbd           --get-tab-bar-item-kbd)
+(defelisp %--menu-bar-hpos-vpos             --menu-bar-hpos-vpos)
+(defelisp %--menu-pixel-to-glyph-coords     --menu-pixel-to-glyph-coords)
+(defelisp %--down-mouse-line-number-width   --down-mouse-line-number-width)
 
 ;;; M19 imp-1 — thin C shim references.  These wrap the heavyweight C
 ;;; geometry/matrix functions the mlp_* bodies call; each is marked
@@ -43,6 +61,17 @@
 (defelisp %--window-frame             window-frame)
 (defelisp %--frame-parameter          frame-parameter)
 (defelisp %--window-system            window-system)
+
+;;; Elisp accessors reused directly — M19 imp-2 (no new shim).
+(defelisp %window-edges               window-edges)
+(defelisp %frame-internal-border-width frame-internal-border-width)
+(defelisp %window-valid-p             window-valid-p)
+(defelisp %selected-window            selected-window)
+(defelisp %add-text-properties        add-text-properties)
+(defelisp %copy-sequence              copy-sequence)
+(defelisp %nconc                      nconc)
+(defelisp %length                     length)
+(defelisp %aref                       aref)
 
 ;;; Elisp globals / predicates.
 (defelisp %symbol-value symbol-value)
@@ -259,9 +288,12 @@ stays here; only the matrix walk is in --buffer-posn-from-coords."
 margin (8/9) clicks."
   (cond
    ((= part 1)  ; ON_TEXT — just the text-area offset.
-    (let ((xy ((force %--mlp-dispatch) 0 w mx my #nil #nil #nil)))
-      (values #nil #nil #nil -1 -1 -1 -1 -1 -1
-              (car xy) (cdr xy) 0)))
+    (let* ((origin ((force %--window-frame-origin) w))
+           (xret (- mx ((force %--window-box-left) w 1)))  ; TEXT_AREA
+           (yret (- my (cdr origin)
+                     ((force %--window-tab-line-height) w)
+                     ((force %--window-header-line-height) w))))
+      (values #nil #nil #nil -1 -1 -1 -1 -1 -1 xret yret 0)))
    ((or (= part 2) (= part 4) (= part 5))  ; ON_MODE_LINE / ON_HEADER_LINE / ON_TAB_LINE
     (call-with-values
         (lambda () (mode-header-line w part mx my))
@@ -359,3 +391,184 @@ See src/keyboard.c:6363–6667 (C original) and imp-6.3 decomposition."
             (let ((xret (if (eq? (track-mouse-value) 'drag-source) mx 0))
                   (yret (if (eq? (track-mouse-value) 'drag-source) my 0)))
               (list #nil posn (cons xret yret) t))))))
+
+;;; =====================================================================
+;;; M19 imp-2 — non-mlp_* helpers ported from src/keyboard.c, plus the
+;;; cutover bodies for --coords-in-menu-bar-window,
+;;; --tab-bar-enrich-position, --line-number-mode-hscroll,
+;;; --mouse-click-menu-bar-intercept, and posn-at-x-y.
+;;;
+;;; NB on return values: the two boolean helpers (coords-in-menu-bar-window?
+;;; and line-number-mode-hscroll?) return plain Scheme #t/#f, NOT #nil.
+;;; Their C DEFUN wrappers read them back with scm_is_true, and
+;;; scm_is_true(#nil) is true — a #nil "false" would be misread as set.
+
+(define (toolkit-menubar-in-use? f)
+  "True if F is a GUI frame using a toolkit-managed menu bar.
+See toolkit_menubar_in_use (src/keyboard.c).  Equivalent to
+(HAVE_EXT_MENU_BAR && FRAME_WINDOW_P(f)); FRAME_WINDOW_P is the
+window-system idiom used elsewhere in this file."
+  (and (eq? ((force %--have-ext-menu-bar-p)) #t)
+       (not (eq? ((force %--window-system) f) #nil))))
+
+(define (window-box-hits? frame w x y)
+  "True if frame-relative (X, Y) lies inside the box of WINDOW W on
+FRAME, matching the C box test (WINDOW_TOP_EDGE_Y / LEFT / BOTTOM /
+RIGHT, inclusive).
+
+window-edges in PIXELWISE mode (lisp/window.el:3812-3825) computes
+left/top as pixel-edge + internal-border-width, for every window.  The
+C WINDOW_LEFT_EDGE_X / WINDOW_RIGHT_EDGE_X always add the border
+(src/window.h:755-763), so the X values already match and must NOT be
+corrected.  WINDOW_TOP_EDGE_Y / WINDOW_BOTTOM_EDGE_Y add the border
+only for non-menu/tab/tool-bar windows (src/window.h:794-803); W is
+always a menu-bar or tab-bar window here, so the C Y values exclude the
+border while window-edges includes it — subtract border from top/bottom
+only."
+  (let* ((edges ((force %window-edges) w #nil #nil #t))
+         (border ((force %frame-internal-border-width) frame))
+         (left (list-ref edges 0))
+         (top (- (list-ref edges 1) border))
+         (right (list-ref edges 2))
+         (bottom (- (list-ref edges 3) border)))
+    (and (>= y top) (>= x left) (<= y bottom) (<= x right))))
+
+(define (coords-in-tab-bar-window? f x y)
+  "True if frame-relative (X, Y) lies inside FRAME F's tab-bar window.
+See coords_in_tab_bar_window (src/keyboard.c).  Returns #f when F has
+no tab-bar window."
+  (let ((w ((force %--frame-tab-bar-window) f)))
+    (if (eq? w #nil) #f (window-box-hits? f w x y))))
+
+(define (coords-in-menu-bar-window? frame x y)
+  "True if frame-relative (X, Y) lies inside FRAME's menu-bar window.
+See coords_in_menu_bar_window (src/keyboard.c).  Returns #f when FRAME
+has no non-toolkit menu-bar window.  Exported; the C DEFUN
+--coords-in-menu-bar-window dispatches here (only on builds where the
+non-toolkit menu-bar window exists)."
+  (let ((w ((force %--frame-menu-bar-window) frame)))
+    (if (eq? w #nil) #f (window-box-hits? frame w x y))))
+
+(define (line-number-mode-hscroll? start-pos end-pos)
+  "True if the position change from START-POS to END-POS is likely the
+effect of line-number-mode hscroll redisplay.  See
+line_number_mode_hscroll (src/keyboard.c)."
+  (if (or (not (eq? (car start-pos) (car end-pos)))  ; different window
+          (< (length start-pos) 7)                   ; no COL/ROW info
+          (< (length end-pos) 7))
+      #f
+      (let* ((start-col-row (list-ref start-pos 6))
+             (end-col-row (list-ref end-pos 6))
+             (window (car end-pos))
+             ;; C: if (!WINDOW_VALID_P(window)) window = selected_window.
+             ;; The inner WINDOW_LIVE_P branch is unreachable (live
+             ;; windows are a subset of valid ones), so it is dropped
+             ;; here — behavior-preserving simplification.
+             (window (if (eq? ((force %window-valid-p) window) #nil)
+                         ((force %selected-window))
+                         window))
+             (col-width ((force %--line-number-display-width-for-window)
+                         window))
+             (start-col (car start-col-row))
+             (end-col (car end-col-row))
+             (saved ((force %--down-mouse-line-number-width))))
+        (and (eq? start-col end-col)
+             (>= saved 0)
+             (not (= col-width saved))))))
+
+(define (menu-bar-item-for-column frame column)
+  "Return the menu-bar item KEY of FRAME whose position column-range
+contains COLUMN, or nil.  Walks FRAME_MENU_BAR_ITEMS 4 slots at a time
+(MENU-BAR-ITEM-KEY/STRING/DEF/HPOS layout, src/frame.h), matching the
+C intercept loop stride and offsets."
+  (let* ((items ((force %--frame-menu-bar-items) frame))
+         (n ((force %length) items)))
+    (let loop ((i 0))
+      (if (>= i n)
+          #nil
+          (let ((str ((force %aref) items (+ i 1)))
+                (pos ((force %aref) items (+ i 3))))
+            (if (eq? str #nil)
+                #nil
+                (if (and (>= column pos)
+                         (< column (+ pos ((force %length) str))))
+                    ((force %aref) items i)
+                    (loop (+ i 4)))))))))
+
+(define (mouse-click-menu-bar-intercept frame x y modifiers timestamp fow)
+  "If the click at frame-relative (X, Y) on FRAME is on the menu bar
+(non-toolkit build), return the menu-bar item event (ITEM . POSITION);
+else nil.  Port of the C --mouse-click-menu-bar-intercept body
+(keyboard.c:7626-7714)."
+  (if (toolkit-menubar-in-use? frame)
+      #nil
+      (if (zero? (logand modifiers down-modifier))
+          #nil
+          (let* ((window-p (not (eq? ((force %--window-system) frame) #nil)))
+                 (column-row
+                  (if (not window-p)
+                      ;; Non-window frames: pixel_to_glyph_coords.
+                      ((force %--menu-pixel-to-glyph-coords) frame x y)
+                      ;; Window-system frames: coords-in-menu-bar-window
+                      ;; box test, then x_y_to_hpos_vpos.
+                      (if (coords-in-menu-bar-window? frame x y)
+                          (let ((menu-w ((force %--frame-menu-bar-window)
+                                         frame)))
+                            ((force %--menu-bar-hpos-vpos) menu-w x y))
+                          #nil))))
+            (if (eq? column-row #nil)
+                #nil
+                (let ((column (car column-row))
+                      (row (cdr column-row)))
+                  ;; Row must be within the menu bar.
+                  (if (or (< row 0)
+                          (>= row ((force %--frame-parameter)
+                                   frame 'menu-bar-lines)))
+                      #nil
+                      (let ((item (menu-bar-item-for-column frame column)))
+                        (if (eq? item #nil)
+                            #nil
+                            (list item
+                                  (list fow 'menu-bar (cons x y) timestamp)))))))))))
+
+(define (tab-bar-enrich-position frame x y position)
+  "If frame-relative (X, Y) falls inside FRAME's tab bar, enrich
+POSITION with the tab-bar item's propertized string; else return
+POSITION unchanged.  Port of the C --tab-bar-enrich-position body
+(keyboard.c:7311-7353)."
+  (if (coords-in-tab-bar-window? frame x y)
+      (let ((hit ((force %--get-tab-bar-item-kbd) frame x y)))
+        (if (eq? hit #nil)
+            position
+            (let* ((prop-idx (car hit))
+                   (close-p (eq? (cdr hit) #t))
+                   (items ((force %--frame-tab-bar-items) frame))
+                   ;; enum tab_bar_item_idx (src/dispextern.h:3370):
+                   ;; KEY=0, CAPTION=3, BINDING=4.
+                   (caption ((force %copy-sequence)
+                             ((force %aref) items (+ prop-idx 3))))
+                   (props (list 'menu-item
+                                (list ((force %aref) items (+ prop-idx 0))
+                                      ((force %aref) items (+ prop-idx 4))
+                                      (if close-p #t #nil))))
+                   (capt (begin
+                           ((force %add-text-properties)
+                            0 ((force %length) caption) props caption)
+                           (cons caption 0))))
+              ((force %nconc) position (list capt)))))
+      position))
+
+(define (posn-at-x-y frame window x y whole)
+  "Position info for pixel X, Y.  FRAME is a live frame; WINDOW is the
+window or nil (frame case).  See posn-at-x-y (src/keyboard.c:13077).
+Uses the window_box_left / WINDOW_LEFT_EDGE algebra reduction so no new
+C shim is needed: for a window, NEW-Y = Y + TOP_EDGE and NEW-X = X +
+window_box_left(w,TEXT_AREA) when WHOLE is nil else X + LEFT_EDGE."
+  (if (eq? window #nil)
+      (make-lispy-position frame x y 0)
+      (let* ((origin ((force %--window-frame-origin) window))
+             (new-x (+ x (if (eq? whole #nil)
+                             ((force %--window-box-left) window 1)  ; TEXT_AREA
+                             (car origin))))
+             (new-y (+ y (cdr origin))))
+        (make-lispy-position frame new-x new-y 0))))

@@ -10,8 +10,9 @@
 ;;;   * Finding 2 — the orchestrator (ml-dispatch-text-line-margin,
 ;;;     ml-dispatch-fringe-scroll, ml-dispatch-window-part) routed on a
 ;;;     wrong window_part enum table.  We assert each part routes to the
-;;;     same leaf (same posn symbol) as the known-good C --mlp-dispatch
-;;;     path.
+;;;     same leaf (same posn symbol) as the retired C mlp_* body.  (The
+;;;     --mlp-dispatch C oracle was deleted in M19 imp-2, so the
+;;;     expected symbol is hardcoded here.)
 ;;;
 ;;; Sourced by test/keyboard/test-m19-fixes.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results`.
@@ -77,17 +78,18 @@ VERTICAL-SCROLL-BARS FTYPE."
 
 ;;; --- Finding 2: orchestrator routing -------------------------------
 ;;; For each representative part, the orchestrator must produce the same
-;;; posn symbol as the known-good C --mlp-dispatch leaf for that part.
-(define (c-posn w part mx my)
-  "Posn symbol from the C --mlp-dispatch path for PART."
-  (car (cond
-         ((= part 3) ((%sym '--mlp-dispatch) 5 w 3 mx my #nil #nil))  ; vertical border
-         ((= part 5) ((%sym '--mlp-dispatch) 6 w 5 mx my #nil #nil))  ; tab line
-         ((= part 6) ((%sym '--mlp-dispatch) 4 w #t mx my #nil #nil)) ; left fringe
-         ((= part 7) ((%sym '--mlp-dispatch) 4 w #f mx my #nil #nil)) ; right fringe
-         ((= part 8) ((%sym '--mlp-dispatch) 7 w 8 mx my #nil #nil))  ; left margin
-         ((= part 9) ((%sym '--mlp-dispatch) 7 w 9 mx my #nil #nil))  ; right margin
-         (else #f))))
+;;; posn symbol as the (now-retired) C --mlp-dispatch leaf for that part.
+;;; With --mlp-dispatch deleted in imp-2, the expected symbol is
+;;; hardcoded from the mlp_* bodies (see test-m19-bodies.scm header).
+(define (expected-posn part)
+  "Expected posn symbol for PART, from the retired mlp_* C bodies."
+  (cond ((= part 3) 'vertical-line)   ; mlp_scroll_border ON_VERTICAL_BORDER
+        ((= part 5) 'tab-line)        ; mlp_mode_header_line ON_TAB_LINE
+        ((= part 6) 'left-fringe)     ; mlp_fringes left
+        ((= part 7) 'right-fringe)    ; mlp_fringes right
+        ((= part 8) 'left-margin)     ; mlp_margins ON_LEFT_MARGIN
+        ((= part 9) 'right-margin)    ; mlp_margins ON_RIGHT_MARGIN
+        (else #f)))
 
 (define (orch-posn w part mx my)
   "Posn symbol produced by the Scheme orchestrator for PART."
@@ -100,7 +102,7 @@ VERTICAL-SCROLL-BARS FTYPE."
        (mx 10) (my 5))
   (for-each
    (lambda (part)
-     (let ((expected (c-posn w part mx my))
+     (let ((expected (expected-posn part))
            (got (orch-posn w part mx my)))
        (report (string-append "route/part" (number->string part))
                (if (equal? expected got)

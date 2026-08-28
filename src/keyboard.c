@@ -6364,281 +6364,6 @@ static Time button_down_time;
 
 static int double_click_count;
 
-/* If OBJECT is an image with a :map property, check whether (DX, DY)
-   falls on a hotspot.  Returns the hotspot id on hit, or POSN unchanged.  */
-static Lisp_Object
-mlp_image_hotspot_check (Lisp_Object object, int dx, int dy, Lisp_Object posn)
-{
-#ifdef HAVE_WINDOW_SYSTEM
-  if (IMAGEP (object))
-    {
-      Lisp_Object image_map, hotspot;
-      if ((image_map = plist_get (XCDR (object), QCmap),
-	   !NILP (image_map))
-	  && (hotspot = find_hot_spot (image_map, dx, dy),
-	      CONSP (hotspot))
-	  && (hotspot = XCDR (hotspot), CONSP (hotspot)))
-	return XCAR (hotspot);
-    }
-#endif
-  return posn;
-}
-
-/* Mode-line, header-line, or tab-line click.  Fills in posn, object,
-   string_info, col/row (character positions), dx/dy/width/height, and
-   xret/yret from the window's mode/header/tab line at (WX, WY).  */
-static void
-mlp_mode_header_line (struct window *w, enum window_part part,
-		      int wx, int wy,
-		      Lisp_Object *posn, Lisp_Object *object,
-		      Lisp_Object *string_info,
-		      int *col, int *row,
-		      int *dx, int *dy, int *width, int *height,
-		      int *xret, int *yret)
-{
-  Lisp_Object string;
-  ptrdiff_t charpos;
-
-  *posn = (part == ON_MODE_LINE ? Qmode_line
-	   : (part == ON_TAB_LINE ? Qtab_line
-	      : Qheader_line));
-
-  /* mode_line_string takes COL, ROW as pixels and converts
-     them to characters.  */
-  *col = wx;
-  *row = wy;
-  string = mode_line_string (w, part, col, row, &charpos,
-			     object, dx, dy, width, height);
-  if (STRINGP (string))
-    *string_info = Fcons (string, make_fixnum (charpos));
-  *xret = wx;
-  *yret = wy;
-}
-
-/* Scroll-bar, border, and divider clicks.  Dispatches on PART
-   (ON_VERTICAL_BORDER, ON_VERTICAL_SCROLL_BAR, ON_HORIZONTAL_SCROLL_BAR,
-   ON_RIGHT_DIVIDER, ON_BOTTOM_DIVIDER).  Fills in posn, width, dx,
-   xret, dy, yret.  */
-static void
-mlp_scroll_border (struct window *w, enum window_part part, int wx, int wy,
-		   Lisp_Object *posn, int *width, int *dx,
-		   int *xret, int *dy, int *yret)
-{
-  if (part == ON_VERTICAL_BORDER)
-    {
-      *posn = Qvertical_line;
-      *width = 1;
-      *dx = 0;
-      *xret = wx;
-      *dy = *yret = wy;
-    }
-  else if (part == ON_VERTICAL_SCROLL_BAR)
-    {
-      *posn = Qvertical_scroll_bar;
-      *width = WINDOW_SCROLL_BAR_AREA_WIDTH (w);
-      *dx = *xret = wx;
-      *dy = *yret = wy;
-    }
-  else if (part == ON_HORIZONTAL_SCROLL_BAR)
-    {
-      *posn = Qhorizontal_scroll_bar;
-      *width = WINDOW_SCROLL_BAR_AREA_HEIGHT (w);
-      *dx = *xret = wx;
-      *dy = *yret = wy;
-    }
-  else if (part == ON_RIGHT_DIVIDER)
-    {
-      *posn = Qright_divider;
-      *width = WINDOW_RIGHT_DIVIDER_WIDTH (w);
-      *dx = *xret = wx;
-      *dy = *yret = wy;
-    }
-  else /* ON_BOTTOM_DIVIDER */
-    {
-      *posn = Qbottom_divider;
-      *width = WINDOW_BOTTOM_DIVIDER_WIDTH (w);
-      *dx = *xret = wx;
-      *dy = *yret = wy;
-    }
-}
-
-/* Left or right fringe click.  LEFT_P selects the fringe side.
-   Fills in posn, col, dx, dy, xret, yret.  */
-static void
-mlp_fringes (struct window *w, bool left_p, int wx, int wy,
-	     Lisp_Object *posn, int *col, int *dx, int *dy,
-	     int *xret, int *yret)
-{
-  *posn = left_p ? Qleft_fringe : Qright_fringe;
-  *col = 0;
-  *xret = wx;
-  if (left_p)
-    *dx = wx - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
-		? 0 : window_box_width (w, LEFT_MARGIN_AREA));
-  else
-    *dx = wx
-      - window_box_width (w, LEFT_MARGIN_AREA)
-      - window_box_width (w, TEXT_AREA)
-      - (WINDOW_HAS_FRINGES_OUTSIDE_MARGINS (w)
-	 ? window_box_width (w, RIGHT_MARGIN_AREA)
-	 : 0);
-  *dy = *yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-}
-
-/* Post-dispatch buffer-position pass.  Called after region handlers
-   for clicks in the text area, fringes, margins, or vertical scroll
-   bar.  Fills in textpos, posn, object, string_info, col, row, dx,
-   dy, width, height from buffer_posn_from_coords.  */
-static void
-mlp_buffer_posn_pass (struct window *w, enum window_part part,
-		      int mx, int wy, int xret,
-		      ptrdiff_t *textpos,
-		      int *col, int *row,
-		      int *dx, int *dy, int *width, int *height,
-		      Lisp_Object *posn, Lisp_Object *string_info,
-		      Lisp_Object *object)
-{
-  Lisp_Object string2, object2 = Qnil;
-  struct display_pos p;
-  int dx2, dy2;
-  int width2, height2;
-  int x2
-    = (part == ON_TEXT) ? xret
-    : (part == ON_RIGHT_FRINGE || part == ON_RIGHT_MARGIN
-       || (part == ON_VERTICAL_SCROLL_BAR
-	   && WINDOW_HAS_VERTICAL_SCROLL_BAR_ON_RIGHT (w)))
-    ? (mx - window_box_left (w, TEXT_AREA))
-    : 0;
-  int y2 = wy;
-
-  string2 = buffer_posn_from_coords (w, &x2, &y2, &p,
-				     &object2, &dx2, &dy2,
-				     &width2, &height2);
-  *textpos = CHARPOS (p.pos);
-  if (*col < 0) *col = x2;
-  if (*row < 0) *row = y2;
-  if (*dx < 0) *dx = dx2;
-  if (*dy < 0) *dy = dy2;
-  if (*width < 0) *width = width2;
-  if (*height < 0) *height = height2;
-
-  if (NILP (*posn))
-    {
-      *posn = make_fixnum (*textpos);
-      if (STRINGP (string2))
-	*string_info = Fcons (string2,
-			      make_fixnum (CHARPOS (p.string_pos)));
-    }
-  if (NILP (*object))
-    *object = object2;
-}
-
-/* Left/right margin click.  Fills in posn, object, string_info,
-   col, row, dx, dy, width, height, xret, yret from the window's
-   margin area at pixel coordinates (WX, WY) relative to the window
-   corner.  */
-static void
-mlp_margins (struct window *w, enum window_part part,
-	     int wx, int wy,
-	     Lisp_Object *posn, Lisp_Object *object,
-	     Lisp_Object *string_info,
-	     int *col, int *row,
-	     int *dx, int *dy, int *width, int *height,
-	     int *xret, int *yret)
-{
-  Lisp_Object string;
-  ptrdiff_t charpos;
-
-  *posn = (part == ON_LEFT_MARGIN) ? Qleft_margin : Qright_margin;
-  *col = wx;
-  *row = wy;
-  string = marginal_area_string (w, part, col, row, &charpos,
-				 object, dx, dy, width, height);
-  if (STRINGP (string))
-    *string_info = Fcons (string, make_fixnum (charpos));
-  *xret = wx;
-  *yret = wy - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w);
-}
-
-/* If F is a GUI frame with internal borders and POSN hasn't been
-   claimed yet, check whether (X, Y) falls on an internal border
-   part.  Returns the border-part symbol on hit, or POSN unchanged.  */
-static Lisp_Object
-mlp_internal_border (struct frame *f, int x, int y, Lisp_Object posn)
-{
-#ifdef HAVE_WINDOW_SYSTEM
-  if (FRAME_WINDOW_P (f)
-      && FRAME_LIVE_P (f)
-      && NILP (posn)
-      && FRAME_INTERNAL_BORDER_WIDTH (f) > 0
-      && !NILP (get_frame_param (f, Qdrag_internal_border)))
-    {
-      enum internal_border_part part
-	= frame_internal_border_part (f, x, y);
-      return builtin_lisp_symbol (internal_border_parts[part]);
-    }
-#endif
-  return posn;
-}
-
-/* Frame preamble: window_from_coordinates + tab/tool/menu-bar detection.
-   Determines window_or_frame, part, and initial posn (set to a bar symbol
-   if the click is on a tab-bar, tool-bar, or menu-bar).  TRACK_MOUSE is
-   the global — passed explicitly so imp-6.3 Scheme ports don't need
-   implicit C-global access.  */
-static void
-mlp_frame_preamble (struct frame *f, int mx, int my,
-		    Lisp_Object track_mouse_val,
-		    Lisp_Object *window_or_frame,
-		    enum window_part *part,
-		    Lisp_Object *posn)
-{
-  *window_or_frame = (f != NULL
-		      ? window_from_coordinates (f, mx, my, part,
-						 false, true, true)
-		      : Qnil);
-  *posn = Qnil;
-
-#ifdef HAVE_WINDOW_SYSTEM
-  bool tool_bar_p = false;
-  bool menu_bar_p = false;
-
-  if (f && ((WINDOWP (f->tab_bar_window)
-	     && EQ (*window_or_frame, f->tab_bar_window))
-#ifndef HAVE_EXT_TOOL_BAR
-	    || (WINDOWP (f->tool_bar_window)
-		&& EQ (*window_or_frame, f->tool_bar_window))
-#endif
-	    ))
-    {
-      if (NILP (track_mouse_val) || EQ (track_mouse_val, Qt))
-	*posn = EQ (*window_or_frame, f->tab_bar_window) ? Qtab_bar : Qtool_bar;
-      *window_or_frame = Qnil;
-    }
-
-  if (f && FRAME_TERMINAL (f)->toolkit_position_hook)
-    {
-      FRAME_TERMINAL (f)->toolkit_position_hook (f, mx, my, &menu_bar_p,
-						 &tool_bar_p);
-      if (NILP (track_mouse_val) || EQ (track_mouse_val, Qt))
-	{
-	  if (menu_bar_p)
-	    *posn = Qmenu_bar;
-	  else if (tool_bar_p)
-	    *posn = Qtool_bar;
-	}
-    }
-#endif
-  if (f
-      && !FRAME_WINDOW_P (f)
-      && FRAME_TAB_BAR_LINES (f) > 0
-      && my >= FRAME_MENU_BAR_LINES (f)
-      && my < FRAME_MENU_BAR_LINES (f) + FRAME_TAB_BAR_LINES (f))
-    {
-      *posn = Qtab_bar;
-      *window_or_frame = Qnil;
-    }
-}
 
 /* X and Y are frame-relative coordinates for a click or wheel event.
    Return a Lisp-style event list.  */
@@ -6648,9 +6373,7 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
 		     Time t)
 {
   /* imp-6.4 — C body replaced by SCM_CALL_4 into the Scheme
-     orchestrator in (emacs lispy-position) make-lispy-position.
-     The mlp_* helpers remain as C code called by the adapter
-     DEFUNs (--mlp-*), which the Scheme orchestrator uses.  */
+     orchestrator in (emacs lispy-position) make-lispy-position.  */
   static SCM proc = SCM_UNDEFINED;
   Lisp_Object frame_obj;
   if (SCM_UNBNDP (proc))
@@ -6661,128 +6384,6 @@ make_lispy_position (struct frame *f, Lisp_Object x, Lisp_Object y,
   else
     frame_obj = Qnil;
   return SCM_CALL_4 (proc, frame_obj, x, y, INT_TO_INTEGER (t));
-}
-
-/* Return non-zero if F is a GUI frame that uses some toolkit-managed
-   menu bar.  This really means that Emacs draws and manages the menu
-   bar as part of its normal display, and therefore can compute its
-   geometry.  */
-static bool
-toolkit_menubar_in_use (struct frame *f)
-{
-#ifdef HAVE_EXT_MENU_BAR
-  return !(!FRAME_WINDOW_P (f));
-#else
-  return false;
-#endif
-}
-
-/* Build the part of Lisp event which represents scroll bar state from
-   EV.  TYPE is one of Qvertical_scroll_bar or Qhorizontal_scroll_bar.  */
-
-static Lisp_Object
-make_scroll_bar_position (struct input_event *ev, Lisp_Object type)
-{
-  return list5 (ev->frame_or_window, type, Fcons (ev->x, ev->y),
-		INT_TO_INTEGER (ev->timestamp),
-		builtin_lisp_symbol (scroll_bar_parts[ev->part]));
-}
-
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-
-/* Return whether or not the coordinates X and Y are inside the
-   box of the menu-bar window of frame F.  */
-
-static bool
-coords_in_menu_bar_window (struct frame *f, int x, int y)
-{
-  struct window *window;
-
-  if (!WINDOWP (f->menu_bar_window))
-    return false;
-
-  window = XWINDOW (f->menu_bar_window);
-
-  return (y >= WINDOW_TOP_EDGE_Y (window)
-	  && x >= WINDOW_LEFT_EDGE_X (window)
-	  && y <= WINDOW_BOTTOM_EDGE_Y (window)
-	  && x <= WINDOW_RIGHT_EDGE_X (window));
-}
-
-#endif
-
-#ifdef HAVE_WINDOW_SYSTEM
-
-/* Return whether or not the coordinates X and Y are inside the
-   tab-bar window of the given frame F.  */
-
-static bool
-coords_in_tab_bar_window (struct frame *f, int x, int y)
-{
-  struct window *window;
-
-  if (!WINDOWP (f->tab_bar_window))
-    return false;
-
-  window = XWINDOW (f->tab_bar_window);
-
-  return (y >= WINDOW_TOP_EDGE_Y (window)
-	  && x >= WINDOW_LEFT_EDGE_X (window)
-	  && y <= WINDOW_BOTTOM_EDGE_Y (window)
-	  && x <= WINDOW_RIGHT_EDGE_X (window));
-}
-
-#endif /* HAVE_WINDOW_SYSTEM */
-
-static void
-save_line_number_display_width (struct input_event *event)
-{
-  struct window *w;
-  int pixel_width;
-
-  if (WINDOWP (event->frame_or_window))
-    w = XWINDOW (event->frame_or_window);
-  else if (FRAMEP (event->frame_or_window))
-    w = XWINDOW (XFRAME (event->frame_or_window)->selected_window);
-  else
-    w = XWINDOW (selected_window);
-  line_number_display_width (w, &down_mouse_line_number_width, &pixel_width);
-}
-
-/* Return non-zero if the change of position from START_POS to END_POS
-   is likely to be the effect of horizontal scrolling due to a change
-   in line-number width produced by redisplay between two mouse
-   events, like mouse-down followed by mouse-up, at those positions.
-   This is used to decide whether to converts mouse-down followed by
-   mouse-up event into a mouse-drag event.  */
-static bool
-line_number_mode_hscroll (Lisp_Object start_pos, Lisp_Object end_pos)
-{
-  if (!EQ (Fcar (start_pos), Fcar (end_pos)) /* different window */
-      || list_length (start_pos) < 7	     /* no COL/ROW info */
-      || list_length (end_pos) < 7)
-    return false;
-
-  Lisp_Object start_col_row = Fnth (make_fixnum (6), start_pos);
-  Lisp_Object end_col_row = Fnth (make_fixnum (6), end_pos);
-  Lisp_Object window = Fcar (end_pos);
-  int col_width, pixel_width;
-  Lisp_Object start_col, end_col;
-  struct window *w;
-  if (!WINDOW_VALID_P (window))
-    {
-      if (WINDOW_LIVE_P (window))
-	window = XFRAME (window)->selected_window;
-      else
-	window = selected_window;
-    }
-  w = XWINDOW (window);
-  line_number_display_width (w, &col_width, &pixel_width);
-  start_col = Fcar (start_col_row);
-  end_col = Fcar (end_col_row);
-  return EQ (start_col, end_col)
-	 && down_mouse_line_number_width >= 0
-	 && col_width != down_mouse_line_number_width;
 }
 
 /* Given a struct input_event, build the lisp event which represents
@@ -6925,134 +6526,9 @@ before modify-event-symbol to guarantee the cache slot is sized.  */)
   return make_fixnum (ASIZE (mouse_syms));
 }
 
-/* mlp_* adapter DEFUNs — imp-6.3.
- *
- * Each wraps one decomposed mlp_* C helper, packing out-params into a
- * single Lisp list return so Scheme handlers get clean
- * single-value-call interfaces.  Value-return helpers (internal-border,
- * image-hotspot) pass through directly; multi-out helpers use a list
- * of (posn object string-info col row dx dy width height xret yret).  */
-
-/* imp-9 — consolidated mlp adapter.  Region-id 0–8 dispatches to the
-   corresponding mlp_* C helper.  Takes up to 6 payload args after
-   region-id; unused slots are #nil and ignored.  */
-DEFUN ("--mlp-dispatch", Fmlp_dispatch, Smlp_dispatch, 7, 7, 0,
-       doc: /* Dispatch to mlp_* helper for REGION (fixnum 0–8).
-
-REGION: 0=text-area-offset 1=internal-border 2=image-hotspot
-        3=frame-preamble  4=fringes  5=scroll-border
-        6=mode-header-line 7=margins 8=buffer-posn-pass
-
-A1–A6 are the payload args.  Unused slots are ignored.  */)
-  (Lisp_Object region, Lisp_Object a1, Lisp_Object a2,
-   Lisp_Object a3, Lisp_Object a4, Lisp_Object a5,
-   Lisp_Object a6)
-{
-  switch (XFIXNUM (region))
-    {
-    case 0:  /* text-area-offset: w mx my */
-      {
-	struct window *w = XWINDOW (a1);
-	int xret = XFIXNUM (a2) - window_box_left (w, TEXT_AREA);
-	int yret = (XFIXNUM (a3) - WINDOW_TOP_EDGE_Y (w)
-		    - WINDOW_TAB_LINE_HEIGHT (w) - WINDOW_HEADER_LINE_HEIGHT (w));
-	return Fcons (make_fixnum (xret), make_fixnum (yret));
-      }
-    case 1:  /* internal-border: f x y posn */
-      return mlp_internal_border (XFRAME (a1), XFIXNUM (a2), XFIXNUM (a3), a4);
-    case 2:  /* image-hotspot: object dx dy posn */
-      return mlp_image_hotspot_check (a1, XFIXNUM (a2), XFIXNUM (a3), a4);
-    case 3:  /* frame-preamble: f_or_nil x y track_mouse */
-      {
-	struct frame *f = NILP (a1) ? NULL : XFRAME (a1);
-	Lisp_Object window_or_frame, posn;
-	enum window_part part;
-	mlp_frame_preamble (f, XFIXNUM (a2), XFIXNUM (a3), a4,
-			    &window_or_frame, &part, &posn);
-	return list3 (window_or_frame, make_fixnum (part), posn);
-      }
-    case 4:  /* fringes: w left? mx my posn */
-      {
-	struct window *w = XWINDOW (a1);
-	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
-	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
-	Lisp_Object posn = a5;
-	int col, dx, dy, xret, yret;
-	mlp_fringes (w, !NILP (a2), wx, wy, &posn, &col, &dx, &dy, &xret, &yret);
-	return listn (6, posn, make_fixnum (col), make_fixnum (dx),
-		      make_fixnum (dy), make_fixnum (xret), make_fixnum (yret));
-      }
-    case 5:  /* scroll-border: w part mx my */
-      {
-	struct window *w = XWINDOW (a1);
-	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
-	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
-	Lisp_Object posn;
-	int width, dx, xret, dy, yret;
-	mlp_scroll_border (w, XFIXNUM (a2), wx, wy,
-			   &posn, &width, &dx, &xret, &dy, &yret);
-	return listn (6, posn, make_fixnum (width), make_fixnum (dx),
-		      make_fixnum (xret), make_fixnum (dy), make_fixnum (yret));
-      }
-    case 6:  /* mode-header-line: w part mx my */
-      {
-	struct window *w = XWINDOW (a1);
-	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
-	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
-	Lisp_Object posn, object = Qnil, string_info = Qnil;
-	int col, row, dx, dy, width, height, xret, yret;
-	mlp_mode_header_line (w, XFIXNUM (a2), wx, wy,
-			      &posn, &object, &string_info,
-			      &col, &row, &dx, &dy, &width, &height, &xret, &yret);
-	return listn (10, posn, object, string_info,
-		      make_fixnum (col), make_fixnum (row),
-		      make_fixnum (dx), make_fixnum (dy),
-		      make_fixnum (width), make_fixnum (height),
-		      make_fixnum (xret), make_fixnum (yret));
-      }
-    case 7:  /* margins: w part mx my */
-      {
-	struct window *w = XWINDOW (a1);
-	int wx = XFIXNUM (a3) - WINDOW_LEFT_EDGE_X (w);
-	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
-	Lisp_Object posn, object = Qnil, string_info = Qnil;
-	int col, row, dx, dy, width, height, xret, yret;
-	mlp_margins (w, XFIXNUM (a2), wx, wy,
-		     &posn, &object, &string_info,
-		     &col, &row, &dx, &dy, &width, &height, &xret, &yret);
-	return listn (11, posn, object, string_info,
-		      make_fixnum (col), make_fixnum (row),
-		      make_fixnum (dx), make_fixnum (dy),
-		      make_fixnum (width), make_fixnum (height),
-		      make_fixnum (xret), make_fixnum (yret));
-      }
-    case 8:  /* buffer-posn-pass: w part mx my xret posn */
-      {
-	struct window *w = XWINDOW (a1);
-	int wy = XFIXNUM (a4) - WINDOW_TOP_EDGE_Y (w);
-	ptrdiff_t textpos = 0;
-	int col = -1, row = -1, dx = -1, dy = -1, width = -1, height = -1;
-	Lisp_Object posn = a6, object = Qnil, string_info = Qnil;
-	mlp_buffer_posn_pass (w, XFIXNUM (a2), XFIXNUM (a3), wy,
-			      XFIXNUM (a5),
-			      &textpos, &col, &row, &dx, &dy, &width, &height,
-			      &posn, &string_info, &object);
-	return listn (10, make_fixnum (textpos), posn, object, string_info,
-		      make_fixnum (col), make_fixnum (row),
-		      make_fixnum (dx), make_fixnum (dy),
-		      make_fixnum (width), make_fixnum (height));
-      }
-    default:
-      return Qnil;
-    }
-}
-
 /* FIX-20260828-guilemacs: M19 imp-1 — thin C shims that wrap the
-   heavyweight C geometry/matrix functions the mlp_* bodies call.
-   The Scheme port in (emacs lispy-position) calls these instead of
-   --mlp-dispatch.  Each stays small and single-purpose; the mlp_*
-   bodies and --mlp-dispatch remain untouched and callable (cutover is
-   imp-2).  */
+   heavyweight C geometry/matrix functions the Scheme port in
+   (emacs lispy-position) calls.  Each stays small and single-purpose.  */
 
 DEFUN ("--find-hot-spot", Ffind_hot_spot_shim, Sfind_hot_spot_shim,
        3, 3, 0,
@@ -7219,9 +6695,9 @@ DEFUN ("--window-from-coordinates", Fwindow_from_coordinates_shim,
 
 Wraps window.c window_from_coordinates.  BAR-KIND is 'tab-bar,
 'tool-bar, or nil, encoding whether WINDOW is FRAME's tab-bar or
-tool-bar window (the part of mlp_frame_preamble's guarded body that
-needs f->tab_bar_window / f->tool_bar_window, which Scheme cannot
-reach).  On a build without a window system BAR-KIND is always nil.  */)
+tool-bar window (the guarded body that needs f->tab_bar_window /
+f->tool_bar_window, which Scheme cannot reach).  On a build without a
+window system BAR-KIND is always nil.  */)
   (Lisp_Object f, Lisp_Object mx, Lisp_Object my)
 {
   struct frame *fr = XFRAME (f);
@@ -7266,6 +6742,134 @@ is returned.  */)
   return Qnil;
 }
 
+/* FIX-20260828-guilemacs: M19 imp-2 — thin C shims for the menu-bar /
+   tab-bar / line-number-hscroll helpers ported to (emacs lispy-position).
+   Each wraps a build-time macro, a frame-internal field, or a heavyweight
+   C geometry function that Scheme cannot see directly.  */
+
+DEFUN ("--have-ext-menu-bar-p", Fhave_ext_menu_bar_p, Shave_ext_menu_bar_p,
+       0, 0, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return t if this build
+uses an external (toolkit-provided) menu bar, else nil.  Exposes the
+build-time HAVE_EXT_MENU_BAR macro to Scheme.  */)
+  (void)
+{
+#ifdef HAVE_EXT_MENU_BAR
+  return Qt;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--frame-menu-bar-window", Fframe_menu_bar_window_shim,
+       Sframe_menu_bar_window_shim, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return FRAME's menu-bar
+window (a dummy window on non-toolkit X builds), or nil if it is not a
+window or this build has no non-toolkit menu-bar window.  */)
+  (Lisp_Object frame)
+{
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  struct frame *f = XFRAME (frame);
+  return WINDOWP (f->menu_bar_window) ? f->menu_bar_window : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--frame-tab-bar-window", Fframe_tab_bar_window_shim,
+       Sframe_tab_bar_window_shim, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return FRAME's tab-bar
+window, or nil if it is not a window or this build has no tab-bar
+window.  */)
+  (Lisp_Object frame)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  struct frame *f = XFRAME (frame);
+  return WINDOWP (f->tab_bar_window) ? f->tab_bar_window : Qnil;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--line-number-display-width-for-window",
+       Fline_number_display_width_for_window,
+       Sline_number_display_width_for_window, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the column width
+of the line-number display for WINDOW as a fixnum.  Unlike the existing
+line-number-display-width, this takes an arbitrary window.  */)
+  (Lisp_Object window)
+{
+  int width, pixel_width;
+  line_number_display_width (XWINDOW (window), &width, &pixel_width);
+  return make_fixnum (width);
+}
+
+DEFUN ("--frame-menu-bar-items", Fframe_menu_bar_items_shim,
+       Sframe_menu_bar_items_shim, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the raw
+menu-bar-items vector for FRAME (FRAME_MENU_BAR_ITEMS).  */)
+  (Lisp_Object frame)
+{
+  return FRAME_MENU_BAR_ITEMS (XFRAME (frame));
+}
+
+DEFUN ("--frame-tab-bar-items", Fframe_tab_bar_items_shim,
+       Sframe_tab_bar_items_shim, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the raw
+tab-bar-items vector for FRAME (f->tab_bar_items).  */)
+  (Lisp_Object frame)
+{
+  return XFRAME (frame)->tab_bar_items;
+}
+
+DEFUN ("--get-tab-bar-item-kbd", Fget_tab_bar_item_kbd_shim,
+       Sget_tab_bar_item_kbd_shim, 3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return (PROP-IDX .
+CLOSE-P) for the tab-bar item of FRAME at frame-relative pixel (X, Y),
+or nil if no item is there.  Wraps get_tab_bar_item_kbd.  */)
+  (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  int prop_idx;
+  bool close_p;
+  if (get_tab_bar_item_kbd (XFRAME (frame), XFIXNUM (x), XFIXNUM (y),
+			    &prop_idx, &close_p) >= 0)
+    return Fcons (make_fixnum (prop_idx), close_p ? Qt : Qnil);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--menu-bar-hpos-vpos", Fmenu_bar_hpos_vpos_shim,
+       Smenu_bar_hpos_vpos_shim, 3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return (COLUMN . ROW)
+for the menu-bar WINDOW at frame-relative pixel (IX, IY).  Wraps
+x_y_to_hpos_vpos after FRAME_TO_WINDOW_PIXEL conversion.  */)
+  (Lisp_Object window, Lisp_Object ix, Lisp_Object iy)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  struct window *w = XWINDOW (window);
+  int wx = FRAME_TO_WINDOW_PIXEL_X (w, XFIXNUM (ix));
+  int wy = FRAME_TO_WINDOW_PIXEL_Y (w, XFIXNUM (iy));
+  int column, row, dummy;
+  x_y_to_hpos_vpos (w, wx, wy, &column, &row, NULL, NULL, &dummy);
+  return Fcons (make_fixnum (column), make_fixnum (row));
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--menu-pixel-to-glyph-coords", Fmenu_pixel_to_glyph_coords_shim,
+       Smenu_pixel_to_glyph_coords_shim, 3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return (COLUMN . ROW)
+for FRAME at frame-relative pixel (IX, IY) via pixel_to_glyph_coords.  */)
+  (Lisp_Object frame, Lisp_Object ix, Lisp_Object iy)
+{
+  int column, row;
+  pixel_to_glyph_coords (XFRAME (frame), XFIXNUM (ix), XFIXNUM (iy),
+			 &column, &row, NULL, 1);
+  return Fcons (make_fixnum (column), make_fixnum (row));
+}
+
 DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,
        0, 0, 0,
        doc: /* Return the current value of menu_bar_touch_id.
@@ -7299,10 +6903,12 @@ Returns nil on platforms without a non-toolkit menu bar
   (Lisp_Object frame, Lisp_Object x, Lisp_Object y)
 {
 #if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  static SCM proc = SCM_UNDEFINED;
   CHECK_LIVE_FRAME (frame);
-  return coords_in_menu_bar_window (XFRAME (frame),
-				    XFIXNUM (x), XFIXNUM (y))
-    ? Qt : Qnil;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+			     "coords-in-menu-bar-window?");
+  return scm_is_true (SCM_CALL_3 (proc, frame, x, y)) ? Qt : Qnil;
 #else
   return Qnil;
 #endif
@@ -7324,33 +6930,15 @@ unchanged.  */)
    Lisp_Object position)
 {
 #ifdef HAVE_WINDOW_SYSTEM
-  struct frame *f = XFRAME (frame);
-  int ix = XFIXNUM (x), iy = XFIXNUM (y);
-  int tab_bar_item;
-  bool close;
-
+  static SCM proc = SCM_UNDEFINED;
   CHECK_LIVE_FRAME (frame);
-
-  if (coords_in_tab_bar_window (f, ix, iy)
-      && get_tab_bar_item_kbd (f, ix, iy, &tab_bar_item, &close) >= 0)
-    {
-      Lisp_Object caption
-	= Fcopy_sequence (AREF (f->tab_bar_items,
-				tab_bar_item + TAB_BAR_ITEM_CAPTION));
-      AUTO_LIST2 (props, Qmenu_item,
-		  list3 (AREF (f->tab_bar_items,
-			       tab_bar_item + TAB_BAR_ITEM_KEY),
-			 AREF (f->tab_bar_items,
-			       tab_bar_item + TAB_BAR_ITEM_BINDING),
-			 close ? Qt : Qnil));
-      Fadd_text_properties (make_fixnum (0),
-			    make_fixnum (SCHARS (caption)),
-			    props, caption);
-      caption = Fcons (caption, make_fixnum (0));
-      return nconc2 (position, Fcons (caption, Qnil));
-    }
-#endif
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+			     "tab-bar-enrich-position");
+  return SCM_CALL_4 (proc, frame, x, y, position);
+#else
   return position;
+#endif
 }
 
 DEFUN ("--menu-bar-touch-consume-p", Fmenu_bar_touch_consume_p,
@@ -7635,85 +7223,25 @@ MODIFIERS is the event modifier bitmask (must have down_modifier
 for menu-bar activation).  TIMESTAMP is the event timestamp
 (already INT_TO_INTEGER'd).  FOW is event->frame_or_window.
 
-Encapsulates toolkit_menubar_in_use, coords_in_menu_bar_window,
-pixel_to_glyph_coords / x_y_to_hpos_vpos, and FRAME_MENU_BAR_ITEMS
-iteration.  On toolkit builds, always returns nil.  */)
+Encapsulates the whole non-toolkit menu-bar intercept (toolkit check,
+down-modifier check, coordinate conversion, and menu-bar item
+iteration), which now lives in (emacs lispy-position)
+mouse-click-menu-bar-intercept.  On toolkit builds, returns nil.  */)
   (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
    Lisp_Object modifiers, Lisp_Object timestamp, Lisp_Object fow)
 {
-  struct frame *f = XFRAME (frame);
-  int ix, iy, row, column;
-
+  static SCM proc = SCM_UNDEFINED;
   CHECK_LIVE_FRAME (frame);
   CHECK_FIXNUM (x);
   CHECK_FIXNUM (y);
   CHECK_FIXNUM (modifiers);
-  ix = XFIXNUM (x);
-  iy = XFIXNUM (y);
-
-  /* Toolkit builds handle menu bar internally — no intercept.  */
-  if (toolkit_menubar_in_use (f))
-    return Qnil;
-
-  /* Must have down_modifier for menu-bar activation.  */
-  if (!(XFIXNUM (modifiers) & down_modifier))
-    return Qnil;
-
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  /* On window-system frames: check coords_in_menu_bar_window,
-     convert to window-relative coords, use x_y_to_hpos_vpos.  */
-  if (FRAME_WINDOW_P (f))
-    {
-      if (!coords_in_menu_bar_window (f, ix, iy))
-	return Qnil;
-
-      {
-	struct window *menu_w = XWINDOW (f->menu_bar_window);
-	int wx, wy, dummy;
-	wx = FRAME_TO_WINDOW_PIXEL_X (menu_w, ix);
-	wy = FRAME_TO_WINDOW_PIXEL_Y (menu_w, iy);
-	x_y_to_hpos_vpos (menu_w, wx, wy, &column, &row,
-			  NULL, NULL, &dummy);
-      }
-    }
-  else
-#endif
-    /* Non-window frames: use pixel_to_glyph_coords.  */
-    pixel_to_glyph_coords (f, ix, iy, &column, &row, NULL, 1);
-
-  /* Check row is within the menu bar.  */
-  if (row < 0 || row >= FRAME_MENU_BAR_LINES (f))
-    return Qnil;
-
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+			     "mouse-click-menu-bar-intercept");
   {
-    Lisp_Object items = FRAME_MENU_BAR_ITEMS (f);
-    Lisp_Object item = Qnil;
-    int i;
-    for (i = 0; i < ASIZE (items); i += 4)
-      {
-	Lisp_Object str = AREF (items, i + 1);
-	Lisp_Object pos = AREF (items, i + 3);
-	if (NILP (str))
-	  break;
-	if (column >= XFIXNUM (pos)
-	    && column < XFIXNUM (pos) + SCHARS (str))
-	  {
-	    item = AREF (items, i);
-	    break;
-	  }
-      }
-
-    if (!NILP (item))
-      {
-	Lisp_Object position
-	  = list4 (fow, Qmenu_bar,
-		   Fcons (x, y),
-		   timestamp);
-	return list2 (item, position);
-      }
+    SCM argv[6] = { frame, x, y, modifiers, timestamp, fow };
+    return SCM_CALL_N (proc, argv, 6);
   }
-
-  return Qnil;
 }
 
 DEFUN ("--ignore-mouse-drag-p", Fignore_mouse_drag_p,
@@ -7789,7 +7317,11 @@ mouse-click drag/click resolution to avoid spurious drag events
 when line-number display width changes between down and up.  */)
   (Lisp_Object start_pos, Lisp_Object end_pos)
 {
-  return line_number_mode_hscroll (start_pos, end_pos) ? Qt : Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+			     "line-number-mode-hscroll?");
+  return scm_is_true (SCM_CALL_2 (proc, start_pos, end_pos)) ? Qt : Qnil;
 }
 
 DEFUN ("--iso-function-key-offset", Fiso_function_key_offset,
@@ -13089,6 +12621,8 @@ The return value is similar to a mouse click position:
 The `posn-' functions access elements of such lists.  */)
   (Lisp_Object x, Lisp_Object y, Lisp_Object frame_or_window, Lisp_Object whole)
 {
+  static SCM proc = SCM_UNDEFINED;
+  Lisp_Object frame_obj, window_or_nil;
   CHECK_FIXNUM (x);
   /* We allow X of -1, for the newline in a R2L line that overflowed
      into the left fringe.  */
@@ -13102,19 +12636,19 @@ The `posn-' functions access elements of such lists.  */)
   if (WINDOWP (frame_or_window))
     {
       struct window *w = decode_live_window (frame_or_window);
-
-      XSETINT (x, (XFIXNUM (x)
-		   + WINDOW_LEFT_EDGE_X (w)
-		   + (NILP (whole)
-		      ? window_box_left_offset (w, TEXT_AREA)
-		      : 0)));
-      XSETINT (y, WINDOW_TO_FRAME_PIXEL_Y (w, XFIXNUM (y)));
-      frame_or_window = w->frame;
+      window_or_nil = frame_or_window;
+      frame_obj = w->frame;
+    }
+  else
+    {
+      CHECK_LIVE_FRAME (frame_or_window);
+      frame_obj = frame_or_window;
+      window_or_nil = Qnil;
     }
 
-  CHECK_LIVE_FRAME (frame_or_window);
-
-  return make_lispy_position (XFRAME (frame_or_window), x, y, 0);
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position", "posn-at-x-y");
+  return SCM_CALL_5 (proc, frame_obj, window_or_nil, x, y, whole);
 }
 
 DEFUN ("posn-at-point", Fposn_at_point, Sposn_at_point, 0, 2, 0,
