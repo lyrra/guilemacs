@@ -7047,6 +7047,225 @@ A1–A6 are the payload args.  Unused slots are ignored.  */)
     }
 }
 
+/* FIX-20260828-guilemacs: M19 imp-1 — thin C shims that wrap the
+   heavyweight C geometry/matrix functions the mlp_* bodies call.
+   The Scheme port in (emacs lispy-position) calls these instead of
+   --mlp-dispatch.  Each stays small and single-purpose; the mlp_*
+   bodies and --mlp-dispatch remain untouched and callable (cutover is
+   imp-2).  */
+
+DEFUN ("--find-hot-spot", Ffind_hot_spot_shim, Sfind_hot_spot_shim,
+       3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return hotspot id of
+OBJECT's :map under pixel (DX, DY), or nil.
+
+Wraps xdisp.c find_hot_spot.  On a build without a window system the
+whole guarded body is absent and nil is returned, so Scheme can treat
+nil uniformly as "no hit".  */)
+  (Lisp_Object object, Lisp_Object dx, Lisp_Object dy)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  Lisp_Object image_map, hotspot;
+  if (IMAGEP (object)
+      && (image_map = plist_get (XCDR (object), QCmap), !NILP (image_map))
+      && (hotspot = find_hot_spot (image_map, XFIXNUM (dx), XFIXNUM (dy)),
+	  CONSP (hotspot))
+      && (hotspot = XCDR (hotspot), CONSP (hotspot)))
+    return XCAR (hotspot);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--frame-internal-border-part", Fframe_internal_border_part_shim,
+       Sframe_internal_border_part_shim, 4, 4, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the symbol for
+the internal-border part of live frame F at pixel (X, Y), or nil.
+
+Wraps frame.c frame_internal_border_part and folds in the
+internal_border_parts symbol lookup so Scheme never sees the raw enum.
+The whole original guarded body (FRAME_WINDOW_P / FRAME_LIVE_P / nilp
+POSN / border width / drag-internal-border param) lives here because
+Scheme cannot see the #ifdef HAVE_WINDOW_SYSTEM; on a build without a
+window system the guarded body is absent and nil is returned, so
+Scheme treats nil as "no hit".  */)
+  (Lisp_Object f, Lisp_Object x, Lisp_Object y, Lisp_Object posn)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  struct frame *fr = XFRAME (f);
+  if (FRAME_WINDOW_P (fr)
+      && FRAME_LIVE_P (fr)
+      && NILP (posn)
+      && FRAME_INTERNAL_BORDER_WIDTH (fr) > 0
+      && !NILP (get_frame_param (fr, Qdrag_internal_border)))
+    {
+      enum internal_border_part part
+	= frame_internal_border_part (fr, XFIXNUM (x), XFIXNUM (y));
+      if (part != INTERNAL_BORDER_NONE)
+	return builtin_lisp_symbol (internal_border_parts[part]);
+    }
+#endif
+  return Qnil;
+}
+
+DEFUN ("--window-box-left", Fwindow_box_left_shim, Swindow_box_left_shim,
+       2, 2, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the X pixel
+coordinate of the left edge of WINDOW's AREA glyph row area.  */)
+  (Lisp_Object w, Lisp_Object area)
+{
+  return make_fixnum (window_box_left (XWINDOW (w),
+				       (enum glyph_row_area) XFIXNUM (area)));
+}
+
+DEFUN ("--window-box-width", Fwindow_box_width_shim, Swindow_box_width_shim,
+       2, 2, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the width in
+pixels of WINDOW's AREA glyph row area.  */)
+  (Lisp_Object w, Lisp_Object area)
+{
+  return make_fixnum (window_box_width (XWINDOW (w),
+					(enum glyph_row_area) XFIXNUM (area)));
+}
+
+DEFUN ("--window-frame-origin", Fwindow_frame_origin_shim,
+       Swindow_frame_origin_shim, 1, 1, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return (X . Y), the
+frame-relative pixel coordinates of WINDOW's top-left corner
+(WINDOW_LEFT_EDGE_X / WINDOW_TOP_EDGE_Y).  */)
+  (Lisp_Object w)
+{
+  struct window *win = XWINDOW (w);
+  return Fcons (make_fixnum (WINDOW_LEFT_EDGE_X (win)),
+		make_fixnum (WINDOW_TOP_EDGE_Y (win)));
+}
+
+DEFUN ("--mode-line-string", Fmode_line_string_shim, Smode_line_string_shim,
+       4, 4, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the string at
+(WX, WY) in WINDOW's mode/header/tab line for PART, packed as
+(STRING CHARPOS OBJECT COL ROW DX DY WIDTH HEIGHT).
+
+COL/ROW are pixel positions in, character positions out.  Wraps
+dispnew.c mode_line_string.  */)
+  (Lisp_Object w, Lisp_Object part, Lisp_Object wx, Lisp_Object wy)
+{
+  struct window *win = XWINDOW (w);
+  int col = XFIXNUM (wx), row = XFIXNUM (wy);
+  ptrdiff_t charpos = 0;
+  Lisp_Object object = Qnil;
+  int dx, dy, width, height;
+  Lisp_Object string = mode_line_string (win, (enum window_part) XFIXNUM (part),
+					 &col, &row, &charpos, &object,
+					 &dx, &dy, &width, &height);
+  return listn (9, string, make_fixnum (charpos), object,
+		make_fixnum (col), make_fixnum (row),
+		make_fixnum (dx), make_fixnum (dy),
+		make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("--marginal-area-string", Fmarginal_area_string_shim,
+       Smarginal_area_string_shim, 4, 4, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return the string at
+(WX, WY) in WINDOW's margin area for PART, packed as
+(STRING CHARPOS OBJECT COL ROW DX DY WIDTH HEIGHT).
+
+COL/ROW are pixel positions in, character positions out.  Wraps
+dispnew.c marginal_area_string.  */)
+  (Lisp_Object w, Lisp_Object part, Lisp_Object wx, Lisp_Object wy)
+{
+  struct window *win = XWINDOW (w);
+  int col = XFIXNUM (wx), row = XFIXNUM (wy);
+  ptrdiff_t charpos = 0;
+  Lisp_Object object = Qnil;
+  int dx, dy, width, height;
+  Lisp_Object string = marginal_area_string (win, (enum window_part) XFIXNUM (part),
+					     &col, &row, &charpos, &object,
+					     &dx, &dy, &width, &height);
+  return listn (9, string, make_fixnum (charpos), object,
+		make_fixnum (col), make_fixnum (row),
+		make_fixnum (dx), make_fixnum (dy),
+		make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("--buffer-posn-from-coords", Fbuffer_posn_from_coords_shim,
+       Sbuffer_posn_from_coords_shim, 3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: matrix walk for the
+window-relative pixel coords (X2, Y2) in WINDOW, packed as
+(STRING TEXT-POS STRING-POS OBJECT COL ROW DX DY WIDTH HEIGHT).
+
+COL/ROW are the character positions (x2/y2 out).  Wraps dispnew.c
+buffer_posn_from_coords.  */)
+  (Lisp_Object w, Lisp_Object x2, Lisp_Object y2)
+{
+  struct window *win = XWINDOW (w);
+  int col = XFIXNUM (x2), row = XFIXNUM (y2);
+  struct display_pos p;
+  Lisp_Object object = Qnil;
+  int dx, dy, width, height;
+  Lisp_Object string = buffer_posn_from_coords (win, &col, &row, &p, &object,
+						&dx, &dy, &width, &height);
+  return listn (10, string, make_fixnum (CHARPOS (p.pos)),
+		make_fixnum (STRINGP (string) ? CHARPOS (p.string_pos) : 0),
+		object,
+		make_fixnum (col), make_fixnum (row),
+		make_fixnum (dx), make_fixnum (dy),
+		make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("--window-from-coordinates", Fwindow_from_coordinates_shim,
+       Swindow_from_coordinates_shim, 3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return
+(WINDOW PART BAR-KIND) for pixel (MX, MY) in FRAME.
+
+Wraps window.c window_from_coordinates.  BAR-KIND is 'tab-bar,
+'tool-bar, or nil, encoding whether WINDOW is FRAME's tab-bar or
+tool-bar window (the part of mlp_frame_preamble's guarded body that
+needs f->tab_bar_window / f->tool_bar_window, which Scheme cannot
+reach).  On a build without a window system BAR-KIND is always nil.  */)
+  (Lisp_Object f, Lisp_Object mx, Lisp_Object my)
+{
+  struct frame *fr = XFRAME (f);
+  enum window_part part;
+  Lisp_Object window = window_from_coordinates (fr,
+						XFIXNUM (mx), XFIXNUM (my),
+						&part, false, true, true);
+  Lisp_Object bar_kind = Qnil;
+#ifdef HAVE_WINDOW_SYSTEM
+  if (WINDOWP (fr->tab_bar_window) && EQ (window, fr->tab_bar_window))
+    bar_kind = Qtab_bar;
+#ifndef HAVE_EXT_TOOL_BAR
+  else if (WINDOWP (fr->tool_bar_window) && EQ (window, fr->tool_bar_window))
+    bar_kind = Qtool_bar;
+#endif
+#endif
+  return list3 (window, make_fixnum (part), bar_kind);
+}
+
+DEFUN ("--toolkit-position", Ftoolkit_position_shim, Stoolkit_position_shim,
+       3, 3, 0,
+       doc: /* FIX-20260828-guilemacs: internal: return (MENU-BAR-P
+TOOL-BAR-P) for pixel (MX, MY) in FRAME from the terminal's toolkit
+position hook, or nil if the hook is absent.
+
+On a build without a window system the guarded body is absent and nil
+is returned.  */)
+  (Lisp_Object f, Lisp_Object mx, Lisp_Object my)
+{
+#ifdef HAVE_WINDOW_SYSTEM
+  struct frame *fr = XFRAME (f);
+  bool menu_bar_p = false, tool_bar_p = false;
+  if (fr && FRAME_TERMINAL (fr)->toolkit_position_hook)
+    {
+      FRAME_TERMINAL (fr)->toolkit_position_hook (fr, XFIXNUM (mx),
+						  XFIXNUM (my),
+						  &menu_bar_p, &tool_bar_p);
+      return Fcons (menu_bar_p ? Qt : Qnil,
+		    tool_bar_p ? Qt : Qnil);
+    }
+#endif
+  return Qnil;
+}
+
 DEFUN ("--menu-bar-touch-id", Fmenu_bar_touch_id, Smenu_bar_touch_id,
        0, 0, 0,
        doc: /* Return the current value of menu_bar_touch_id.
