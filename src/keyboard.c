@@ -2612,6 +2612,18 @@ recording.  */)
   return Qnil;
 }
 
+DEFUN ("--store-kbd-macro-char", Fc_store_kbd_macro_char,
+       Sc_store_kbd_macro_char, 1, 1, 0,
+       doc: /* FIX-20260829-guilemacs: internal: thin shim over C
+store_kbd_macro_char.  Appends C to the kbd macro being defined, if
+one is being defined.  Used by the Scheme
+read-char-minibuf-menu-prompt port (M20).  */)
+  (Lisp_Object c)
+{
+  store_kbd_macro_char (c);
+  return Qnil;
+}
+
 Lisp_Object
 read_menu_command (void)
 {
@@ -3396,6 +3408,31 @@ mouse motion.  */)
   ok_to_echo_at_next_pause = current_kboard;
 
   return Qnil;
+}
+
+DEFUN ("--rc-clear-echo-at-next-pause",
+       Fc_rc_clear_echo_at_next_pause,
+       Sc_rc_clear_echo_at_next_pause, 0, 0, 0,
+       doc: /* FIX-20260829-guilemacs: internal: set
+ok_to_echo_at_next_pause = NULL.  Used by the Scheme
+record-menu-key port (M20).  */)
+  (void)
+{
+  ok_to_echo_at_next_pause = NULL;
+
+  return Qnil;
+}
+
+DEFUN ("--rc-ok-to-echo-at-next-pause-p",
+       Fc_rc_ok_to_echo_at_next_pause_p,
+       Sc_rc_ok_to_echo_at_next_pause_p, 0, 0, 0,
+       doc: /* FIX-20260829-guilemacs: internal: t when
+ok_to_echo_at_next_pause is non-NULL.  Raw reader for the
+--rc-allow/--rc-clear-echo-at-next-pause pair, so Scheme tests can
+assert the field state.  */)
+  (void)
+{
+  return ok_to_echo_at_next_pause ? Qt : Qnil;
 }
 
 DEFUN ("--rc-inc-num-input-events",
@@ -6807,6 +6844,29 @@ x_y_to_hpos_vpos after FRAME_TO_WINDOW_PIXEL conversion.  */)
 #endif
 }
 
+DEFUN ("--menu-bar-hpos-vpos-raw", Fmenu_bar_hpos_vpos_raw_shim,
+       Smenu_bar_hpos_vpos_raw_shim, 3, 3, 0,
+       doc: /* FIX-20260829-guilemacs: internal: return (COLUMN . ROW)
+for the menu-bar WINDOW at frame-relative pixel (IX, IY), with NO
+FRAME_TO_WINDOW_PIXEL conversion.  Matches the raw call in the C
+--menu-bar-touch-activate body: same compile guard and same
+NILP (menu_bar_window) short-circuit.  Used by the Scheme
+menu-bar-touch-activate port (M20, imp-4).  */)
+  (Lisp_Object window, Lisp_Object ix, Lisp_Object iy)
+{
+#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
+  if (NILP (window))
+    return Qnil;
+  struct window *w = XWINDOW (window);
+  int column, row, dummy;
+  x_y_to_hpos_vpos (w, XFIXNUM (ix), XFIXNUM (iy), &column, &row,
+		    NULL, NULL, &dummy);
+  return Fcons (make_fixnum (column), make_fixnum (row));
+#else
+  return Qnil;
+#endif
+}
+
 DEFUN ("--menu-pixel-to-glyph-coords", Fmenu_pixel_to_glyph_coords_shim,
        Smenu_pixel_to_glyph_coords_shim, 3, 3, 0,
        doc: /* FIX-20260828-guilemacs: internal: return (COLUMN . ROW)
@@ -8347,6 +8407,17 @@ Optional third arg AUTOLOAD: if non-nil, autoload keymaps.  */)
   return get_keymap (object,
                      !NILP (error_if_not_keymap),
                      !NILP (autoload));
+}
+
+DEFUN ("--x-popup-menu-1", Fx_popup_menu_1_shim,
+       Sx_popup_menu_1_shim, 2, 2, 0,
+       doc: /* FIX-20260829-guilemacs: internal: thin shim over C
+x_popup_menu_1.  Unlike `x-popup-menu', does NOT call
+init_raw_keybuf_count.  Used by the Scheme read-char-x-menu-prompt
+port (M20).  */)
+  (Lisp_Object position, Lisp_Object menu)
+{
+  return x_popup_menu_1 (position, menu);
 }
 
 /* This function parses a menu item and leaves the result in the
