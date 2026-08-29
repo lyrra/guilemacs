@@ -112,6 +112,7 @@
   "test/keyboard/test-m19-fixes.el"           ; M19 cr.org findings (corpus prints PASS/FAIL)
   "test/keyboard/test-m19-shims.el"           ; M19 imp-2 (corpus prints PASS/FAIL)
   "test/keyboard/test-m19-kind.el"            ; M19 imp-3 (corpus prints PASS/FAIL)
+  "test/keyboard/test-m19-tables.el"          ; M19 imp-4 (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

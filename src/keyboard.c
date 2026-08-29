@@ -1041,8 +1041,9 @@ without hard-coding enum values in Scheme.  Each event symbol
 DEFUN ("--ie-kind-alist", Fie_kind_alist, Sie_kind_alist, 0, 0, 0,
        doc: /* Return an alist mapping each event symbol to its event_kind integer.
 
-Each entry is (SYMBOL . INTEGER), in declaration order.  The integer
-is the value of the C enum `event_kind' member for this exact build.
+Each entry is (SYMBOL . INTEGER), in reverse declaration order.  The
+integer is the value of the C enum `event_kind' member for this exact
+build.
 Because the enum has #ifdef-guarded members, these numbers depend on
 the build configuration; they are not portable across builds.
 
@@ -6138,46 +6139,6 @@ static const char *const lispy_multimedia_keys[] =
 
 #else /* not HAVE_NTGUI */
 
-/* This should be dealt with in XTread_socket now, and that doesn't
-   depend on the client system having the Kana syms defined.  See also
-   the XK_kana_A case below.  */
-#if 0
-#ifdef XK_kana_A
-static const char *const lispy_kana_keys[] =
-  {
-    /* X Keysym value */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x400 .. 0x40f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x410 .. 0x41f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x420 .. 0x42f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x430 .. 0x43f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x440 .. 0x44f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x450 .. 0x45f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x460 .. 0x46f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,"overline",0,
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x480 .. 0x48f */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x490 .. 0x49f */
-    0, "kana-fullstop", "kana-openingbracket", "kana-closingbracket",
-    "kana-comma", "kana-conjunctive", "kana-WO", "kana-a",
-    "kana-i", "kana-u", "kana-e", "kana-o",
-    "kana-ya", "kana-yu", "kana-yo", "kana-tsu",
-    "prolongedsound", "kana-A", "kana-I", "kana-U",
-    "kana-E", "kana-O", "kana-KA", "kana-KI",
-    "kana-KU", "kana-KE", "kana-KO", "kana-SA",
-    "kana-SHI", "kana-SU", "kana-SE", "kana-SO",
-    "kana-TA", "kana-CHI", "kana-TSU", "kana-TE",
-    "kana-TO", "kana-NA", "kana-NI", "kana-NU",
-    "kana-NE", "kana-NO", "kana-HA", "kana-HI",
-    "kana-FU", "kana-HE", "kana-HO", "kana-MA",
-    "kana-MI", "kana-MU", "kana-ME", "kana-MO",
-    "kana-YA", "kana-YU", "kana-YO", "kana-RA",
-    "kana-RI", "kana-RU", "kana-RE", "kana-RO",
-    "kana-WA", "kana-N", "voicedsound", "semivoicedsound",
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x4e0 .. 0x4ef */
-    0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,	/* 0x4f0 .. 0x4ff */
-  };
-#endif /* XK_kana_A */
-#endif /* 0 */
-
 #define FUNCTION_KEY_OFFSET 0xff00
 
 /* You'll notice that this table is arranged to be conveniently
@@ -6292,18 +6253,6 @@ static const char *const iso_lispy_function_keys[] =
   };
 
 #endif /* not HAVE_NTGUI */
-
-static const char *const lispy_wheel_names[] =
-{
-  "wheel-up", "wheel-down", "wheel-left", "wheel-right"
-};
-
-/* drag-n-drop events are generated when a set of selected files are
-   dragged from another application and dropped onto an Emacs window.  */
-static const char *const lispy_drag_n_drop_names[] =
-{
-  "drag-n-drop"
-};
 
 /* An array of symbol indexes of scroll bar parts, indexed by an enum
    scroll_bar_part value.  Note that Qnil corresponds to
@@ -13168,7 +13117,8 @@ syms_of_keyboard (void)
   staticpro (&frame_relative_event_pos);
   mouse_syms = make_nil_elisp_vector (5);
   staticpro (&mouse_syms);
-  wheel_syms = make_nil_elisp_vector (ARRAYELTS (lispy_wheel_names));
+  /* 4 wheel event names; matches (emacs lispy-event)'s wheel-names vector. */
+  wheel_syms = make_nil_elisp_vector (4);
   staticpro (&wheel_syms);
 
   /* modifier_symbols / modifier_names[] were removed at M1 — the
