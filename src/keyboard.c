@@ -11431,6 +11431,33 @@ input-method-use-echo-area) and any quit handling.  */)
   return result;
 }
 
+/* FIX-20260829-guilemacs: internal shim for the M20 Scheme
+   read-menu-command port.  The existing --read-key-sequence-and-vector
+   hardcodes fix_current_buffer/prevent_redisplay = false, but C
+   read_menu_command (keyboard.c:2627) needs true for both; reusing it
+   would silently change TTY menu-navigation buffer/redisplay behavior.  */
+DEFUN ("--rc-read-key-sequence-menu", Fc_rc_read_key_sequence_menu,
+       Sc_rc_read_key_sequence_menu, 0, 0, 0,
+       doc: /* FIX-20260829-guilemacs: internal: invoke the C
+read_key_sequence state machine with the exact fixed flags
+read_menu_command uses (prompt nil, dont-downcase-last nil,
+can-return-switch-frame t, fix-current-buffer t, prevent-redisplay t,
+disable-text-conversion nil).  Returns the read keys as a Lisp vector
+of length i, or the fixnum -1 on quit (i == -1).  Used by the Scheme
+read-menu-command port (M20).  */)
+  (void)
+{
+  Lisp_Object keybuf[READ_KEY_ELTS];
+  int i = read_key_sequence (keybuf, Qnil, false, true, true, true,
+                             false);
+  if (i == -1)
+    return make_fixnum (-1);
+  Lisp_Object result = scm_c_make_vector (i, Qnil);
+  for (ptrdiff_t j = 0; j < i; j++)
+    GASET (result, j, keybuf[j]);
+  return result;
+}
+
 DEFUN ("read-key-sequence", Fread_key_sequence, Sread_key_sequence, 1, 6, 0,
        doc: /* Read a sequence of keystrokes and return as a string or vector.
 The sequence is sufficient to specify a non-prefix command in the

@@ -1,6 +1,10 @@
-;;; test-m20-menu-prompt.el --- M20 imp-1 test suite for the four new
-;;; C shims in src/keyboard.c (--rc-clear-echo-at-next-pause,
-;;; --x-popup-menu-1, --store-kbd-macro-char, --menu-bar-hpos-vpos-raw).
+;;; test-m20-menu-prompt.el --- M20 imp-1 + imp-2 test suite.
+;;;
+;;; imp-1: the four new C shims in src/keyboard.c
+;;; (--rc-clear-echo-at-next-pause, --x-popup-menu-1,
+;;; --store-kbd-macro-char, --menu-bar-hpos-vpos-raw).  imp-2: the
+;;; Scheme bodies in (emacs menu-prompt) — record-menu-key,
+;;; read-menu-command, read-char-x-menu-prompt.
 ;;;
 ;;; Wraps test/keyboard/test-m20-menu-prompt.scm — the Scheme test
 ;;; corpus.  Loads the Scheme file via eval-scheme, then reads back

@@ -1,8 +1,15 @@
-;;; test-m20-menu-prompt.scm --- M20 imp-1 test corpus for the four new
-;;; C shims in src/keyboard.c that the Scheme menu-prompt port (M20)
-;;; will call: --rc-clear-echo-at-next-pause, --x-popup-menu-1,
-;;; --store-kbd-macro-char, --menu-bar-hpos-vpos-raw (plus the
-;;; --rc-ok-to-echo-at-next-pause-p reader added to test the first).
+;;; test-m20-menu-prompt.scm --- M20 imp-1 + imp-2 test corpus.
+;;;
+;;; imp-1 tests the four new C shims in src/keyboard.c that the Scheme
+;;; menu-prompt port (M20) will call: --rc-clear-echo-at-next-pause,
+;;; --x-popup-menu-1, --store-kbd-macro-char, --menu-bar-hpos-vpos-raw
+;;; (plus the --rc-ok-to-echo-at-next-pause-p reader added to test the
+;;; first).
+;;;
+;;; imp-2 tests the Scheme bodies in (emacs menu-prompt):
+;;; record-menu-key, read-menu-command, read-char-x-menu-prompt (1:1
+;;; ports of record_menu_key, read_menu_command, read_char_x_menu_prompt).
+;;;
 ;;;
 ;;; Sourced by test/keyboard/test-m20-menu-prompt.el via eval-scheme.
 ;;; Accumulates PASS/FAIL entries into `test-results` for readback from
@@ -18,6 +25,7 @@
 
 (use-modules (emacs elisp-ref))
 (use-modules (emacs-elisp runtime))
+(use-modules (emacs menu-prompt))
 
 (define test-results '())
 
@@ -143,3 +151,198 @@
     ;; No window-system frame with a live menu-bar window: skip, per
     ;; brief.org "Tests" (skip when the test frame cannot set one).
     (report "raw-hpos-vpos/agrees-with-cooked@0border" 'PASS))
+
+;;; =====================================================================
+;;; M20 imp-2 — Scheme bodies in (emacs menu-prompt)
+;;; =====================================================================
+;;; Save/restore the elisp globals that the ported bodies mutate, so
+;;; nothing leaks into later corpora in the shared loadup-ERT process.
+(define (saved-values . names)
+  (map (lambda (n) (symbol-value n)) names))
+
+(define (restore-values! names vals)
+  (for-each (lambda (n v) (set-symbol-value! n v)) names vals))
+
+(define %menu-state-names
+  '(echo-keystrokes last-input-event unread-command-events))
+
+(define (with-mp-state thunk)
+  (let ((saved (apply saved-values %menu-state-names)))
+    (dynamic-wind
+      (lambda () #t)
+      thunk
+      (lambda () (restore-values! %menu-state-names saved)))))
+
+;;; --- 5. record-menu-key ----------------------------------------------
+;;; Port of C record_menu_key (keyboard.c:4327-4346).  Wipes the echo
+;;; area, records the char, clears ok_to_echo_at_next_pause, adds to the
+;;; current key, echoes, sets last-input-event, and increments
+;;; num-input-events.  With the imp-1 --rc-ok-to-echo-at-next-pause-p
+;;; reader, assert the field cleared; assert last-input-event updated.
+;;;
+;;; To make ok_to_echo_at_next_pause non-NULL first we use
+;;; --rc-allow-echo-at-next-pause (also an imp-1 shim).  echo-update is
+;;; C-owned but only acts when immediate-echo is set, so in a batch
+;;; build it is a no-op; the add-command-key side effect is observable
+;;; via --this-command-key-count.
+(define (record-menu-key-clear-field?)
+  ;; Returns #t if calling record-menu-key clears the echo-at-next-pause
+  ;; field.  The field must first be set non-NULL.
+  (let ((saved-echo ((%sym '--rc-ok-to-echo-at-next-pause-p))))
+    (dynamic-wind
+      (lambda () ((%sym '--rc-allow-echo-at-next-pause)))
+      (lambda ()
+        ((@ (emacs menu-prompt) record-menu-key) 97)
+        (eq? ((%sym '--rc-ok-to-echo-at-next-pause-p)) #nil))
+      (lambda ()
+        (if (eq? saved-echo #t)
+            ((%sym '--rc-allow-echo-at-next-pause))
+            ((%sym '--rc-clear-echo-at-next-pause)))))))
+
+(with-mp-state
+ (lambda ()
+   (let ((saved-lie (symbol-value 'last-input-event)))
+     (dynamic-wind
+       (lambda () #t)
+       (lambda ()
+         ;; clear-field? itself calls record-menu-key once; capture the count
+         ;; right after it so the direct call below is the only counted one.
+         (check "record-menu-key/clears-echo-at-next-pause" #t
+                (record-menu-key-clear-field?))
+         (let ((before ((%sym '--this-command-key-count))))
+           ((@ (emacs menu-prompt) record-menu-key) 97)
+           (check "record-menu-key/sets-last-input-event" 97
+                  (symbol-value 'last-input-event))
+           (check "record-menu-key/advances-key-count" (+ before 1)
+                  ((%sym '--this-command-key-count)))))
+       (lambda ()
+         (set-symbol-value! 'last-input-event saved-lie))))))
+
+;;; --- 6. read-menu-command --------------------------------------------
+;;; Port of C read_menu_command (keyboard.c:2627-2648).  Do NOT drive a
+;;; real interactive read in batch mode.  Stub the C engine shim
+;;; --rc-read-key-sequence-menu with fset, mirroring
+;;; ertest-read-key-sequence.el's stubbing of --read-key-sequence-and-vector.
+;;; Cover: a zero-length vector and fixnum -1 both → #t; a non-empty
+;;; vector → the current read-key-sequence-cmd value; and echo-keystrokes
+;;; is 0 during the call and restored after even when the stub signals.
+(define %rcrksm '--rc-read-key-sequence-menu)
+(define (with-rcrksm-stub stub thunk)
+  (let ((saved (symbol-function %rcrksm)))
+    (dynamic-wind
+      (lambda () ((%c 'fset) %rcrksm stub))
+      thunk
+      (lambda () ((%c 'fset) %rcrksm saved)))))
+
+(with-mp-state
+ (lambda ()
+   ;; zero-length vector → #t
+   (with-rcrksm-stub (lambda () (vector))
+     (lambda ()
+       (check "read-menu-command/empty-vector-t" #t
+              (eq? ((@ (emacs menu-prompt) read-menu-command)) #t))))
+   ;; fixnum -1 → #t
+   (with-rcrksm-stub (lambda () -1)
+     (lambda ()
+       (check "read-menu-command/fixnum--1-t" #t
+              (eq? ((@ (emacs menu-prompt) read-menu-command)) #t))))
+   ;; non-empty vector → current read-key-sequence-cmd
+   (let ((saved-ek (symbol-value 'echo-keystrokes)))
+     (with-rcrksm-stub (lambda () (vector 97))
+       (lambda ()
+         (let ((res ((@ (emacs menu-prompt) read-menu-command))))
+           (check "read-menu-command/nonempty->read-key-sequence-cmd" #t
+                  (equal? res ((%c '--read-key-sequence-cmd)))))))
+     ;; echo-keystrokes restored even after the read (it should be back to
+     ;; the saved value by the time read-menu-command returns).
+     (check "read-menu-command/echo-restored" saved-ek
+            (symbol-value 'echo-keystrokes)))
+   ;; echo-keystrokes is 0 during the read, and restored after the stub
+   ;; signals.
+   (let ((saved-ek (symbol-value 'echo-keystrokes))
+         (observed #f))
+     (with-rcrksm-stub (lambda ()
+                         (set! observed (symbol-value 'echo-keystrokes))
+                         (error "boom"))
+       (lambda ()
+         (catch #t
+           (lambda () ((@ (emacs menu-prompt) read-menu-command)) #f)
+           (lambda (k . args) #t))))
+     (check "read-menu-command/echo-0-during-signal" 0 observed)
+     (check "read-menu-command/echo-restored-after-signal" saved-ek
+            (symbol-value 'echo-keystrokes)))))
+
+;;; --- 7. read-char-x-menu-prompt --------------------------------------
+;;; Port of C read_char_x_menu_prompt (keyboard.c:8659-8718).  Two-value
+;;; return (event, used-mouse-menu).  Cover: menu-prompting nil →
+;;; (#nil #f); prev-event whose car is menu-bar → (#nil #f) (excluded);
+;;; stub --x-popup-menu-1 with fset to return a canned list of symbols
+;;; and fixnums, call with a qualifying mouse-click prev-event, and
+;;; assert the first element is the primary value with flag #t, the
+;;; remaining elements are pushed onto unread-command-events (each
+;;; wrapped (SYM . disabled) when symbol/fixnum), and last-input-event is
+;;; left at the last recorded element.
+(define %xpopup '--x-popup-menu-1)
+(define (with-xpopup-stub stub thunk)
+  (let ((saved (symbol-function %xpopup)))
+    (dynamic-wind
+      (lambda () ((%c 'fset) %xpopup stub))
+      thunk
+      (lambda () ((%c 'fset) %xpopup saved)))))
+
+(define (call-rcxmp map prev)
+  (call-with-values (lambda () ((@ (emacs menu-prompt) read-char-x-menu-prompt) map prev))
+    (lambda (v flag) (list v flag))))
+
+(with-mp-state
+ (lambda ()
+   ;; menu-prompting nil → (#nil #f)
+   (let ((saved-mp (symbol-value 'menu-prompting)))
+     (dynamic-wind
+       (lambda () (set-symbol-value! 'menu-prompting #nil))
+       (lambda ()
+         (check "read-char-x-menu-prompt/nil-menu-prompting" #t
+                (equal? (call-rcxmp #nil '(menu-bar (0 . 0)))
+                        (list #nil #f))))
+       (lambda () (set-symbol-value! 'menu-prompting saved-mp))))
+   ;; prev-event car = menu-bar → (#nil #f), regardless of menu-prompting.
+   (let ((saved-mp (symbol-value 'menu-prompting)))
+     (dynamic-wind
+       (lambda () (set-symbol-value! 'menu-prompting #t))
+       (lambda ()
+         (check "read-char-x-menu-prompt/menu-bar-car-excluded" #t
+                (equal? (call-rcxmp #nil '(menu-bar (0 . 0)))
+                        (list #nil #f))))
+       (lambda () (set-symbol-value! 'menu-prompting saved-mp))))
+   ;; Canned popup: qualifying mouse-click prev-event, stub returns
+   ;; (sym-a 42 sym-b).  First element → primary value; (42 . disabled)
+   ;; and (sym-b . disabled) pushed onto unread-command-events;
+   ;; last-input-event left at the last recorded element (sym-b).
+   (let ((saved-mp (symbol-value 'menu-prompting))
+         (saved-uce (symbol-value 'unread-command-events))
+         (saved-lie (symbol-value 'last-input-event)))
+     (dynamic-wind
+       (lambda () (set-symbol-value! 'menu-prompting #t))
+       (lambda ()
+         (with-xpopup-stub (lambda (pos menu) '(sym-a 42 sym-b))
+           (lambda ()
+             (let* ((saved-uce2 (symbol-value 'unread-command-events))
+                    (res (call-rcxmp #nil '(mouse-1 (0 . 0))))
+                    (after (symbol-value 'unread-command-events))
+                    (pushed (let loop ((acc '()) (tail after))
+                              (if (equal? tail saved-uce2)
+                                  (reverse acc)
+                                  (if (pair? tail)
+                                      (loop (cons (car tail) acc) (cdr tail))
+                                      acc)))))
+               (check "read-char-x-menu-prompt/primary-value" 'sym-a (car res))
+               (check "read-char-x-menu-prompt/used-mouse-menu" #t (cadr res))
+               (check "read-char-x-menu-prompt/pushed-disabled-cons" #t
+                      (equal? (list '(42 . disabled) '(sym-b . disabled))
+                              pushed))
+               (check "read-char-x-menu-prompt/last-input-event" 'sym-b
+                      (symbol-value 'last-input-event))))))
+       (lambda ()
+         (set-symbol-value! 'menu-prompting saved-mp)
+         (set-symbol-value! 'unread-command-events saved-uce)
+         (set-symbol-value! 'last-input-event saved-lie))))))
