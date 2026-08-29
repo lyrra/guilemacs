@@ -164,7 +164,7 @@
   (for-each (lambda (n v) (set-symbol-value! n v)) names vals))
 
 (define %menu-state-names
-  '(echo-keystrokes last-input-event unread-command-events))
+  '(echo-keystrokes last-input-event unread-command-events menu-prompting))
 
 (define (with-mp-state thunk)
   (let ((saved (apply saved-values %menu-state-names)))
@@ -346,3 +346,128 @@
          (set-symbol-value! 'menu-prompting saved-mp)
          (set-symbol-value! 'unread-command-events saved-uce)
          (set-symbol-value! 'last-input-event saved-lie))))))
+
+;;; =====================================================================
+;;; M20 imp-3 — read-char-minibuf-menu-prompt
+;;; =====================================================================
+;;; Port of C read_char_minibuf_menu_prompt (keyboard.c:8720-8939).
+;;; Reads one key, paging on menu-prompt-more-char, with kbd-macro
+;;; suppression around the read.  Every case stubs --message3-nolog with
+;;; fset (no minibuffer output in batch) and restores it.  with-mp-state
+;;; now also saves/restores menu-prompting and unread-command-events.
+;;; Calls use char code 97 (?#\a) / 98 (?#\b) in unread-command-events.
+(define %msg3 '--message3-nolog)
+(define (with-msg3-stub thunk)
+  (let ((saved (symbol-function %msg3)))
+    (dynamic-wind
+      (lambda () ((%c 'fset) %msg3 (lambda (str) #nil)))
+      thunk
+      (lambda () ((%c 'fset) %msg3 saved)))))
+
+(define %store '--store-kbd-macro-char)
+(define (with-store-stub record! thunk)
+  (let ((saved (symbol-function %store)))
+    (dynamic-wind
+      (lambda () ((%c 'fset) %store (lambda (c) (record! c) #nil)))
+      thunk
+      (lambda () ((%c 'fset) %store saved)))))
+
+;;; Bind the live kboard's defining-kbd-macro field to #t, run THUNK,
+;;; then restore the original value.
+(define (with-kbd-macro-t thunk)
+  (let* ((kb ((%c 'current-kboard)))
+         (orig ((%c 'kboard-defining-kbd-macro) kb)))
+    (dynamic-wind
+      (lambda () ((%c 'set-kboard-defining-kbd-macro) kb #t))
+      thunk
+      (lambda () ((%c 'set-kboard-defining-kbd-macro) kb orig)))))
+
+(define (test-keymap)
+  (let ((m ((%c 'make-sparse-keymap) "Test")))
+    ((%c 'define-key) m "a" (list 'menu-item "Alpha" 'ignore))
+    ((%c 'define-key) m "b" (list 'menu-item "Beta" 'ignore))
+    m))
+
+;; 1. menu-prompting nil → returns nil immediately, no read (seeded
+;;    unread-command-events untouched).
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #nil)
+      (let ((saved-uce (symbol-value 'unread-command-events)))
+        (let ((res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 (test-keymap))))
+          (check "minibuf-menu-prompt/nil-menu-prompting" #t (eq? res #nil))
+          (check "minibuf-menu-prompt/nil-menu-prompting-no-read" saved-uce
+                 (symbol-value 'unread-command-events))))))))
+
+;; 2. A keymap with no prompt string → returns nil, no read.
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #t)
+      (let ((m ((%c 'make-sparse-keymap))))
+        ((%c 'define-key) m "a" (list 'menu-item "Alpha" 'ignore))
+        (let ((saved-uce (symbol-value 'unread-command-events)))
+          (let ((res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 m)))
+            (check "minibuf-menu-prompt/no-prompt-keymap" #t (eq? res #nil))
+            (check "minibuf-menu-prompt/no-prompt-no-read" saved-uce
+                   (symbol-value 'unread-command-events)))))))))
+
+;; 3. Normal read: seed (97) → returns 97.
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #t)
+      (set-symbol-value! 'unread-command-events (list 97))
+      (check "minibuf-menu-prompt/normal-read" 97
+             ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 (test-keymap)))))))
+
+;; 4. Paging: seed (more-char 98) → first read is the help char, so the
+;;    outer loop reads again and returns 98 (proves two reads).
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #t)
+      (set-symbol-value! 'unread-command-events
+                         (list (symbol-value 'menu-prompt-more-char) 98))
+      (check "minibuf-menu-prompt/paging" 98
+             ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 (test-keymap)))))))
+
+;; 5. Kbd-macro suppression + store: with defining-kbd-macro #t, the
+;;    read is suppressed during the read (restored to #t afterwards) and
+;;    the chosen char is stored once via --store-kbd-macro-char.
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #t)
+      (let ((calls '()))
+        (with-kbd-macro-t
+         (lambda ()
+           (with-store-stub (lambda (c) (set! calls (cons c calls)))
+             (lambda ()
+               (set-symbol-value! 'unread-command-events (list 97))
+               (let ((res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 (test-keymap))))
+                 (check "minibuf-menu-prompt/kbd-macro-returns" 97 res)
+                 (check "minibuf-menu-prompt/kbd-macro-store-once" (list 97)
+                        (reverse calls))
+                 (check "minibuf-menu-prompt/kbd-macro-restored" #t
+                        (eq? ((%c 'kboard-defining-kbd-macro) ((%c 'current-kboard))) #t))))))))))))
+
+;; 6. Coexistence: the Scheme function and the still-live C shim
+;;    --rc-read-char-minibuf-menu-prompt agree on the same keymap/seed.
+(with-mp-state
+ (lambda ()
+   (with-msg3-stub
+    (lambda ()
+      (set-symbol-value! 'menu-prompting #t)
+      (let ((keymap (test-keymap)))
+        (set-symbol-value! 'unread-command-events (list 97))
+        (let ((scheme-res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 keymap)))
+          (set-symbol-value! 'unread-command-events (list 97))
+          (let ((c-res ((%c '--rc-read-char-minibuf-menu-prompt) 0 keymap)))
+            (check "minibuf-menu-prompt/coexists-with-c-shim" scheme-res c-res))))))))
