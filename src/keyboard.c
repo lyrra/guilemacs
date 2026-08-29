@@ -7261,8 +7261,8 @@ DEFUN ("--line-number-mode-hscroll", Fline_number_mode_hscroll,
        doc: /* Return t if the position change from START-POS to END-POS
 is likely due to line-number-mode hscroll redisplay.
 
-Wraps line_number_mode_hscroll (keyboard.c:6771).  Used by the
-mouse-click drag/click resolution to avoid spurious drag events
+Calls into (emacs lispy-position) line-number-mode-hscroll?.  Used by
+the mouse-click drag/click resolution to avoid spurious drag events
 when line-number display width changes between down and up.  */)
   (Lisp_Object start_pos, Lisp_Object end_pos)
 {
