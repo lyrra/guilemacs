@@ -8,7 +8,8 @@
             line-number-mode-hscroll?
             mouse-click-menu-bar-intercept
             tab-bar-enrich-position
-            posn-at-x-y))
+            posn-at-x-y
+            ie-kind-from-name))
 
 ;;; M9 imp-6.3 — per-region Scheme port of make_lispy_position.
 ;;;
@@ -34,6 +35,31 @@
 (defelisp %--menu-bar-hpos-vpos             --menu-bar-hpos-vpos)
 (defelisp %--menu-pixel-to-glyph-coords     --menu-pixel-to-glyph-coords)
 (defelisp %--down-mouse-line-number-width   --down-mouse-line-number-width)
+(defelisp %--ie-kind-alist                  --ie-kind-alist)
+
+;;; M19 imp-3 — event-kind lookup.
+;;;
+;;; --ie-kind-alist exposes the build-correct symbol→integer mapping.
+;;; The integers are C enum `event_kind' values, which shift when
+;;; #ifdef-guarded members are absent, so they must never be hardcoded
+;;; here — they only ever come from C.  This table mirrors the
+;;; memoization style of +lispy-function-keys+ and siblings: a delay
+;;; that builds the hash table once on first use.
+(define +ie-kind-table+
+  (delay
+    (let ((table (make-hash-table)))
+      (for-each (lambda (entry)
+                  (hashq-set! table (car entry) (cdr entry)))
+                ((force %--ie-kind-alist)))
+      table)))
+
+(define (ie-kind-from-name name)
+  "Return the event_kind integer for event symbol NAME, or -1.
+
+NAME comes from C enum values via --ie-kind-alist; a symbol with no
+compiled-in entry (or a non-symbol) resolves to -1, matching the old
+C --ie-kind-from-name body."
+  (hashq-ref (force +ie-kind-table+) name -1))
 
 ;;; M19 imp-1 — thin C shim references.  These wrap the heavyweight C
 ;;; geometry/matrix functions the mlp_* bodies call; each is marked

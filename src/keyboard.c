@@ -1029,123 +1029,123 @@ without hard-coding enum values in Scheme.  Each event symbol
 (e.g. `dbus-event') maps to its enum value (e.g. DBUS_EVENT).  */)
   (Lisp_Object name)
 {
+  /* Thin dispatcher.  The symbol→integer lookup now lives in
+     (emacs lispy-position) ie-kind-from-name, backed by a hash table
+     built once from --ie-kind-alist.  See docs/m19-plan.org §imp-3.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position", "ie-kind-from-name");
+  return SCM_CALL_1 (proc, name);
+}
+
+DEFUN ("--ie-kind-alist", Fie_kind_alist, Sie_kind_alist, 0, 0, 0,
+       doc: /* Return an alist mapping each event symbol to its event_kind integer.
+
+Each entry is (SYMBOL . INTEGER), in declaration order.  The integer
+is the value of the C enum `event_kind' member for this exact build.
+Because the enum has #ifdef-guarded members, these numbers depend on
+the build configuration; they are not portable across builds.
+
+Scheme must treat this as opaque build data: it consumes the list for
+lookup but must never hard-code any returned integer.  Used by
+(emacs lispy-position) to build its --ie-kind-from-name dispatch
+table.  */)
+  (void)
+{
+  Lisp_Object result = Qnil;
 #ifdef HAVE_DBUS
-  if (EQ (name, Qdbus_event)) return make_fixnum (DBUS_EVENT);
+  result = Fcons (Fcons (Qdbus_event, make_fixnum (DBUS_EVENT)), result);
 #endif
 #ifdef THREADS_ENABLED
-  if (EQ (name, Qthread_event)) return make_fixnum (THREAD_EVENT);
+  result = Fcons (Fcons (Qthread_event, make_fixnum (THREAD_EVENT)), result);
 #endif
 #ifdef HAVE_XWIDGETS
-  if (EQ (name, Qxwidget_event)) return make_fixnum (XWIDGET_EVENT);
-  if (EQ (name, Qxwidget_display_event)) return make_fixnum (XWIDGET_DISPLAY_EVENT);
+  result = Fcons (Fcons (Qxwidget_event, make_fixnum (XWIDGET_EVENT)), result);
+  result = Fcons (Fcons (Qxwidget_display_event, make_fixnum (XWIDGET_DISPLAY_EVENT)), result);
 #endif
 #ifdef USE_FILE_NOTIFY
-  if (EQ (name, Qfile_notify)) return make_fixnum (FILE_NOTIFY_EVENT);
+  result = Fcons (Fcons (Qfile_notify, make_fixnum (FILE_NOTIFY_EVENT)), result);
 #endif
 
   /* Trivial-frame group  */
-  if (EQ (name, Qno_event)) return make_fixnum (NO_EVENT);
+  result = Fcons (Fcons (Qno_event, make_fixnum (NO_EVENT)), result);
 #ifdef HAVE_WINDOW_SYSTEM
-  if (EQ (name, Qdelete_frame)) return make_fixnum (DELETE_WINDOW_EVENT);
-  if (EQ (name, Qiconify_frame)) return make_fixnum (ICONIFY_EVENT);
-  if (EQ (name, Qmake_frame_visible)) return make_fixnum (DEICONIFY_EVENT);
-  if (EQ (name, Qmove_frame)) return make_fixnum (MOVE_FRAME_EVENT);
+  result = Fcons (Fcons (Qdelete_frame, make_fixnum (DELETE_WINDOW_EVENT)), result);
+  result = Fcons (Fcons (Qiconify_frame, make_fixnum (ICONIFY_EVENT)), result);
+  result = Fcons (Fcons (Qmake_frame_visible, make_fixnum (DEICONIFY_EVENT)), result);
+  result = Fcons (Fcons (Qmove_frame, make_fixnum (MOVE_FRAME_EVENT)), result);
 #endif
 
   /* Simple-list group (imp-3.3).  */
-  if (EQ (name, Qselect_window)) return make_fixnum (SELECT_WINDOW_EVENT);
-  if (EQ (name, Qsave_session)) return make_fixnum (SAVE_SESSION_EVENT);
-  if (EQ (name, Qconfig_changed_event)) return make_fixnum (CONFIG_CHANGED_EVENT);
-  if (EQ (name, Qpreedit_text)) return make_fixnum (PREEDIT_TEXT_EVENT);
+  result = Fcons (Fcons (Qselect_window, make_fixnum (SELECT_WINDOW_EVENT)), result);
+  result = Fcons (Fcons (Qsave_session, make_fixnum (SAVE_SESSION_EVENT)), result);
+  result = Fcons (Fcons (Qconfig_changed_event, make_fixnum (CONFIG_CHANGED_EVENT)), result);
+  result = Fcons (Fcons (Qpreedit_text, make_fixnum (PREEDIT_TEXT_EVENT)), result);
 #ifdef HAVE_NTGUI
-  if (EQ (name, Qend_session)) return make_fixnum (END_SESSION_EVENT);
-  if (EQ (name, Qlanguage_change)) return make_fixnum (LANGUAGE_CHANGE_EVENT);
+  result = Fcons (Fcons (Qend_session, make_fixnum (END_SESSION_EVENT)), result);
+  result = Fcons (Fcons (Qlanguage_change, make_fixnum (LANGUAGE_CHANGE_EVENT)), result);
 #endif
-  if (EQ (name, Quser_signal_event))
-    return make_fixnum (USER_SIGNAL_EVENT);
+  result = Fcons (Fcons (Quser_signal_event, make_fixnum (USER_SIGNAL_EVENT)), result);
 
   /* Simple-helper group (imp-4).  */
-  if (EQ (name, Qhelp_echo)) return make_fixnum (HELP_EVENT);
-  if (EQ (name, Qfocus_in)) return make_fixnum (FOCUS_IN_EVENT);
-  if (EQ (name, Qfocus_out)) return make_fixnum (FOCUS_OUT_EVENT);
-  if (EQ (name, Qtab_bar)) return make_fixnum (TAB_BAR_EVENT);
-  if (EQ (name, Qtool_bar)) return make_fixnum (TOOL_BAR_EVENT);
-  if (EQ (name, Qdrag_n_drop)) return make_fixnum (DRAG_N_DROP_EVENT);
+  result = Fcons (Fcons (Qhelp_echo, make_fixnum (HELP_EVENT)), result);
+  result = Fcons (Fcons (Qfocus_in, make_fixnum (FOCUS_IN_EVENT)), result);
+  result = Fcons (Fcons (Qfocus_out, make_fixnum (FOCUS_OUT_EVENT)), result);
+  result = Fcons (Fcons (Qtab_bar, make_fixnum (TAB_BAR_EVENT)), result);
+  result = Fcons (Fcons (Qtool_bar, make_fixnum (TOOL_BAR_EVENT)), result);
+  result = Fcons (Fcons (Qdrag_n_drop, make_fixnum (DRAG_N_DROP_EVENT)), result);
 #ifdef HAVE_EXT_MENU_BAR
-  if (EQ (name, Qmenu_bar)) return make_fixnum (MENU_BAR_EVENT);
+  result = Fcons (Fcons (Qmenu_bar, make_fixnum (MENU_BAR_EVENT)), result);
 #endif
 #ifdef USE_TOOLKIT_SCROLL_BARS
-  if (EQ (name, Qscroll_bar_click_toolkit))
-    return make_fixnum (SCROLL_BAR_CLICK_EVENT);
-  if (EQ (name, Qhorizontal_scroll_bar_click_toolkit))
-    return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
+  result = Fcons (Fcons (Qscroll_bar_click_toolkit, make_fixnum (SCROLL_BAR_CLICK_EVENT)), result);
+  result = Fcons (Fcons (Qhorizontal_scroll_bar_click_toolkit, make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT)), result);
 #endif
 
   /* Keystroke group (imp-5).  */
-  if (EQ (name, Qascii_keystroke))
-    return make_fixnum (ASCII_KEYSTROKE_EVENT);
-  if (EQ (name, Qmultibyte_char_keystroke))
-    return make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT);
-  if (EQ (name, Qnon_ascii_keystroke))
-    return make_fixnum (NON_ASCII_KEYSTROKE_EVENT);
+  result = Fcons (Fcons (Qascii_keystroke, make_fixnum (ASCII_KEYSTROKE_EVENT)), result);
+  result = Fcons (Fcons (Qmultibyte_char_keystroke, make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT)), result);
+  result = Fcons (Fcons (Qnon_ascii_keystroke, make_fixnum (NON_ASCII_KEYSTROKE_EVENT)), result);
 #ifdef HAVE_NS
-  if (EQ (name, Qns_nonkey))
-    return make_fixnum (NS_NONKEY_EVENT);
-  if (EQ (name, Qns_text_event))
-    return make_fixnum (NS_TEXT_EVENT);
+  result = Fcons (Fcons (Qns_nonkey, make_fixnum (NS_NONKEY_EVENT)), result);
+  result = Fcons (Fcons (Qns_text_event, make_fixnum (NS_TEXT_EVENT)), result);
 #endif
 #ifdef HAVE_NTGUI
-  if (EQ (name, Qmultimedia_key))
-    return make_fixnum (MULTIMEDIA_KEY_EVENT);
+  result = Fcons (Fcons (Qmultimedia_key, make_fixnum (MULTIMEDIA_KEY_EVENT)), result);
 #endif
 
   /* imp-7.2 — wheel events (always compiled in).  */
-  if (EQ (name, Qwheel_event))
-    return make_fixnum (WHEEL_EVENT);
-  if (EQ (name, Qhorizontal_wheel_event))
-    return make_fixnum (HORIZ_WHEEL_EVENT);
+  result = Fcons (Fcons (Qwheel_event, make_fixnum (WHEEL_EVENT)), result);
+  result = Fcons (Fcons (Qhorizontal_wheel_event, make_fixnum (HORIZ_WHEEL_EVENT)), result);
 
   /* imp-7.3 — touch/pinch (always compiled in).  */
-  if (EQ (name, Qtouch_end))
-    return make_fixnum (TOUCH_END_EVENT);
-  if (EQ (name, Qpinch))
-    return make_fixnum (PINCH_EVENT);
+  result = Fcons (Fcons (Qtouch_end, make_fixnum (TOUCH_END_EVENT)), result);
+  result = Fcons (Fcons (Qpinch, make_fixnum (PINCH_EVENT)), result);
 
   /* imp-7.4 — touchscreen group (always compiled in).  */
-  if (EQ (name, Qtouchscreen_begin))
-    return make_fixnum (TOUCHSCREEN_BEGIN_EVENT);
-  if (EQ (name, Qtouchscreen_end))
-    return make_fixnum (TOUCHSCREEN_END_EVENT);
-  if (EQ (name, Qtouchscreen_update))
-    return make_fixnum (TOUCHSCREEN_UPDATE_EVENT);
+  result = Fcons (Fcons (Qtouchscreen_begin, make_fixnum (TOUCHSCREEN_BEGIN_EVENT)), result);
+  result = Fcons (Fcons (Qtouchscreen_end, make_fixnum (TOUCHSCREEN_END_EVENT)), result);
+  result = Fcons (Fcons (Qtouchscreen_update, make_fixnum (TOUCHSCREEN_UPDATE_EVENT)), result);
 
   /* imp-7.5 — mouse click + non-toolkit scroll-bar click.  */
-  if (EQ (name, Qmouse_click_event))
-    return make_fixnum (MOUSE_CLICK_EVENT);
+  result = Fcons (Fcons (Qmouse_click_event, make_fixnum (MOUSE_CLICK_EVENT)), result);
 #ifndef USE_TOOLKIT_SCROLL_BARS
-  if (EQ (name, Qscroll_bar_click_event))
-    return make_fixnum (SCROLL_BAR_CLICK_EVENT);
-  if (EQ (name, Qhorizontal_scroll_bar_click_event))
-    return make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT);
+  result = Fcons (Fcons (Qscroll_bar_click_event, make_fixnum (SCROLL_BAR_CLICK_EVENT)), result);
+  result = Fcons (Fcons (Qhorizontal_scroll_bar_click_event, make_fixnum (HORIZONTAL_SCROLL_BAR_CLICK_EVENT)), result);
 #endif
 
   /* Swallowed kinds — imp-3 dispatch switch (never produce a Lisp
      event: handled and looped back to wait).  */
-  if (EQ (name, Qselection_request_event))
-    return make_fixnum (SELECTION_REQUEST_EVENT);
-  if (EQ (name, Qselection_clear_event))
-    return make_fixnum (SELECTION_CLEAR_EVENT);
-  if (EQ (name, Qmonitors_changed))
-    return make_fixnum (MONITORS_CHANGED_EVENT);
-  if (EQ (name, Qmenu_bar_activate_event))
-    return make_fixnum (MENU_BAR_ACTIVATE_EVENT);
+  result = Fcons (Fcons (Qselection_request_event, make_fixnum (SELECTION_REQUEST_EVENT)), result);
+  result = Fcons (Fcons (Qselection_clear_event, make_fixnum (SELECTION_CLEAR_EVENT)), result);
+  result = Fcons (Fcons (Qmonitors_changed, make_fixnum (MONITORS_CHANGED_EVENT)), result);
+  result = Fcons (Fcons (Qmenu_bar_activate_event, make_fixnum (MENU_BAR_ACTIVATE_EVENT)), result);
 #ifdef HAVE_ANDROID
-  if (EQ (name, Qnotification_event))
-    return make_fixnum (NOTIFICATION_EVENT);
+  result = Fcons (Fcons (Qnotification_event, make_fixnum (NOTIFICATION_EVENT)), result);
 #endif
 
   /* More entries added as additional kind groups are ported.  */
-  return make_fixnum (-1);
+  return result;
 }
 
 /* M11 imp-1.1 — kbd_buffer queue accessors for Scheme ring-buffer walking.

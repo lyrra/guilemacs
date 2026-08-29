@@ -166,6 +166,7 @@
 (load "test/keyboard/test-m19-bodies.el")         ; M19 imp-1
 (load "test/keyboard/test-m19-fixes.el")          ; M19 cr.org findings
 (load "test/keyboard/test-m19-shims.el")          ; M19 imp-2
+(load "test/keyboard/test-m19-kind.el")           ; M19 imp-3
 (message "")
 
 (message "========================================")
