@@ -203,6 +203,49 @@
           (if (eq? ((modfn 'tab-bar-enrich-position)
                     ((%sym 'selected-frame)) 0 0 pos) pos) 'PASS 'FAIL)))
 
+;;; --- 5b. menu-bar-touch-activate (M20 imp-4) -----------------------
+;;; Port of the C --menu-bar-touch-activate body (keyboard.c:6978-7037),
+;;; reusing menu-bar-item-for-column.  Mock the menu-bar window, the raw
+;;; hpos/vpos shim, the frame menu-bar-lines parameter, and
+;;; FRAME_MENU_BAR_ITEMS so the hit test is deterministic on a GTK batch
+;;; build (which has no live non-toolkit menu-bar window).
+(let ((old-fmw (module-ref mod '%--frame-menu-bar-window))
+      (old-hv  (module-ref mod '%--menu-bar-hpos-vpos-raw))
+      (old-fp  (module-ref mod '%--frame-parameter))
+      (old-fmi (module-ref mod '%--frame-menu-bar-items)))
+  (module-set! mod '%--frame-menu-bar-window (delay (lambda (f) 'w)))
+  (module-set! mod '%--menu-bar-hpos-vpos-raw (delay (lambda (w x y) (cons 3 0))))
+  (module-set! mod '%--frame-parameter
+                 (delay (lambda (f k) (if (eq? k 'menu-bar-lines) 1 #nil))))
+  ;; FRAME_MENU_BAR_ITEMS: 4-slot rows (KEY STR DEF HPOS); column 3 hits
+  ;; the 4-char "File" string (HPOS 0, length 4) → KEY 'file.
+  (module-set! mod '%--frame-menu-bar-items
+                 (delay (lambda (f) (vector 'file "File" 'file-menu 0))))
+  ;; Hit: column 3, row 0 within the single menu-bar line.
+  (report "touch-activate/hit"
+          (if (equal? ((modfn 'menu-bar-touch-activate) 'frame 0 0 'fow 9)
+                      (list 'file (list 'fow 'menu-bar '(0 . 0) 9)))
+              'PASS 'FAIL))
+  ;; Column 20 misses every item → nil.
+  (module-set! mod '%--menu-bar-hpos-vpos-raw (delay (lambda (w x y) (cons 20 0))))
+  (report "touch-activate/column-miss"
+          (if (eq? ((modfn 'menu-bar-touch-activate) 'frame 0 0 'fow 9) #nil)
+              'PASS 'FAIL))
+  ;; Row 5 out of range (only 1 line) → nil.
+  (module-set! mod '%--menu-bar-hpos-vpos-raw (delay (lambda (w x y) (cons 3 5))))
+  (report "touch-activate/row-out-of-range"
+          (if (eq? ((modfn 'menu-bar-touch-activate) 'frame 0 0 'fow 9) #nil)
+              'PASS 'FAIL))
+  ;; No menu-bar window → nil.
+  (module-set! mod '%--frame-menu-bar-window (delay (lambda (f) #nil)))
+  (report "touch-activate/no-window"
+          (if (eq? ((modfn 'menu-bar-touch-activate) 'frame 0 0 'fow 9) #nil)
+              'PASS 'FAIL))
+  (module-set! mod '%--frame-menu-bar-window old-fmw)
+  (module-set! mod '%--menu-bar-hpos-vpos-raw old-hv)
+  (module-set! mod '%--frame-parameter old-fp)
+  (module-set! mod '%--frame-menu-bar-items old-fmi))
+
 ;;; --- 6. --mlp-dispatch retirement -----------------------------------
 ;;; The binding and the C DEFUN must be gone; the inlined ON_TEXT
 ;;; offset arithmetic must still agree with the shims.

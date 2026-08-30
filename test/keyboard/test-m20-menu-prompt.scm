@@ -458,8 +458,10 @@
                  (check "minibuf-menu-prompt/kbd-macro-restored" #t
                         (eq? ((%c 'kboard-defining-kbd-macro) ((%c 'current-kboard))) #t))))))))))))
 
-;; 6. Coexistence: the Scheme function and the still-live C shim
-;;    --rc-read-char-minibuf-menu-prompt agree on the same keymap/seed.
+;; 6. Repoint: after imp-4 the --rc-read-char-minibuf-menu-prompt shim
+;;    forwards to the same (emacs menu-prompt) Scheme body (the C body is
+;;    deleted), so it must agree with a direct read-char-minibuf-menu-prompt
+;;    call on the same keymap/seed.
 (with-mp-state
  (lambda ()
    (with-msg3-stub
@@ -470,4 +472,59 @@
         (let ((scheme-res ((@ (emacs menu-prompt) read-char-minibuf-menu-prompt) 0 keymap)))
           (set-symbol-value! 'unread-command-events (list 97))
           (let ((c-res ((%c '--rc-read-char-minibuf-menu-prompt) 0 keymap)))
-            (check "minibuf-menu-prompt/coexists-with-c-shim" scheme-res c-res))))))))
+            (check "minibuf-menu-prompt/repoints-to-scheme" scheme-res c-res))))))))
+
+;;; =====================================================================
+;;; M20 imp-4 — cutover checks
+;;; =====================================================================
+;;; The C bodies for read_menu_command, read_char_x_menu_prompt and
+;;; read_char_minibuf_menu_prompt are deleted; all four call sites now
+;;; dispatch to Scheme.  The two --rc-* shims and the (emacs menu-prompt)
+;;; bodies they forward to are exercised directly above; here we prove the
+;;; forwarding works and that the C entry points resolve the Scheme procs.
+
+;; --- 8. --rc-read-char-x-menu-prompt repoints to Scheme ------------
+;; Drive the shim through the rc_record_stack (it reads the top-of-stack
+;; rec's map / prev-event slots) with a live rec whose slots are set, and
+;; confirm it returns the same (event . used-mouse-menu) as a direct
+;; read-char-x-menu-prompt call under the same stubbed --x-popup-menu-1.
+(define (make-test-rec)
+  (let ((rec ((%c '--make-rc-state))))
+    ((%c '--rc-state-fresh!) rec)
+    rec))
+
+(define (call-xmenu-shim map prev)
+  (let ((rec (make-test-rec)))
+    ((%c '--rc-test-state-set!) rec 'map map)
+    ((%c '--rc-test-state-set!) rec 'prev-event prev)
+    ((%c '--rc-record-stack-push) rec)
+    (dynamic-wind
+      (lambda () #t)
+      (lambda ()
+        (call-with-values
+            (lambda () ((%c '--rc-read-char-x-menu-prompt)))
+          (lambda (v flag) (list v flag))))
+      (lambda () ((%c '--rc-record-stack-pop))))))
+
+(with-mp-state
+ (lambda ()
+   (let ((saved-mp (symbol-value 'menu-prompting)))
+     (dynamic-wind
+       (lambda () (set-symbol-value! 'menu-prompting #t))
+       (lambda ()
+         (with-xpopup-stub (lambda (pos menu) '(sym-a 42 sym-b))
+           (lambda ()
+             (check "rc-xmenu/repoints-to-scheme"
+                    (call-rcxmp #nil '(mouse-1 (0 . 0)))
+                    (call-xmenu-shim #nil '(mouse-1 (0 . 0)))))))
+       (lambda () (set-symbol-value! 'menu-prompting saved-mp))))))
+
+;; --- 9. read-menu-command C entry point resolves the Scheme proc -----
+;; The C read_menu_command (called directly from src/term.c, no DEFUN
+;; wrapper) dispatches via scm_c_public_ref ("emacs menu-prompt",
+;; "read-menu-command").  Verify that public ref resolves to the exported
+;; procedure (the body itself is exercised in section 6 above).
+(check "read-menu-command/c-entry-resolves" #t
+       (let ((proc (module-ref (resolve-interface '(emacs menu-prompt))
+                               'read-menu-command)))
+         (procedure? proc)))

@@ -7,6 +7,7 @@
             coords-in-menu-bar-window?
             line-number-mode-hscroll?
             mouse-click-menu-bar-intercept
+            menu-bar-touch-activate
             tab-bar-enrich-position
             posn-at-x-y
             ie-kind-from-name))
@@ -33,6 +34,7 @@
 (defelisp %--frame-tab-bar-items            --frame-tab-bar-items)
 (defelisp %--get-tab-bar-item-kbd           --get-tab-bar-item-kbd)
 (defelisp %--menu-bar-hpos-vpos             --menu-bar-hpos-vpos)
+(defelisp %--menu-bar-hpos-vpos-raw         --menu-bar-hpos-vpos-raw)
 (defelisp %--menu-pixel-to-glyph-coords     --menu-pixel-to-glyph-coords)
 (defelisp %--down-mouse-line-number-width   --down-mouse-line-number-width)
 (defelisp %--ie-kind-alist                  --ie-kind-alist)
@@ -556,6 +558,30 @@ else nil.  Port of the C --mouse-click-menu-bar-intercept body
                             #nil
                             (list item
                                   (list fow 'menu-bar (cons x y) timestamp)))))))))))
+
+(define (menu-bar-touch-activate frame x y fow timestamp)
+  "Activate the menu-bar item at frame-relative (X, Y) on FRAME and
+return the event (ITEM . POSITION), or nil if no item is found there.
+Port of the C --menu-bar-touch-activate body (keyboard.c:6978-7037),
+reusing menu-bar-item-for-column for the FRAME_MENU_BAR_ITEMS walk.
+Called only after --menu-bar-touch-consume-p returned t (so no toolkit /
+down-modifier / box-hit gates here).  FRAME is a live frame; X and Y
+are fixnum pixel coords; FOW is event->frame_or_window; TIMESTAMP is
+the (INT_TO_INTEGER'd) event timestamp."
+  (let ((window ((force %--frame-menu-bar-window) frame)))
+    (if (eq? window #nil)
+        #nil
+        (let* ((column-row ((force %--menu-bar-hpos-vpos-raw) window x y))
+               (column (car column-row))
+               (row (cdr column-row)))
+          (if (or (< row 0)
+                  (>= row ((force %--frame-parameter) frame 'menu-bar-lines)))
+              #nil
+              (let ((item (menu-bar-item-for-column frame column)))
+                (if (eq? item #nil)
+                    #nil
+                    (list item
+                          (list fow 'menu-bar (cons x y) timestamp)))))))))
 
 (define (tab-bar-enrich-position frame x y position)
   "If frame-relative (X, Y) falls inside FRAME's tab bar, enrich

@@ -381,9 +381,6 @@ static void (*keyboard_init_hook) (void);
 
 static bool get_input_pending (int);
 static bool readable_events (int);
-static Lisp_Object read_char_x_menu_prompt (Lisp_Object,
-                                            Lisp_Object, bool *);
-static Lisp_Object read_char_minibuf_menu_prompt (int, Lisp_Object);
 static Lisp_Object make_lispy_event (struct input_event *);
 static Lisp_Object make_lispy_switch_frame (Lisp_Object);
 static bool help_char_p (Lisp_Object);
@@ -2627,24 +2624,15 @@ read-char-minibuf-menu-prompt port (M20).  */)
 Lisp_Object
 read_menu_command (void)
 {
-  dynwind_begin ();
-
-  /* We don't want to echo the keystrokes while navigating the
-     menus.  */
-  specbind_guile (Qecho_keystrokes, make_fixnum (0));
-
-  Lisp_Object keybuf[READ_KEY_ELTS];
-  int i = read_key_sequence (keybuf, Qnil, false, true, true, true,
-			     false);
-
-  dynwind_end ();
-
-  if (! FRAME_LIVE_P (XFRAME (selected_frame)))
-    Fkill_emacs (Qnil, Qnil);
-  if (i == 0 || i == -1)
-    return Qt;
-
-  return read_key_sequence_cmd;
+  /* M20 imp-4 — C body (dynwind/specbind/read_key_sequence/FRAME_LIVE_P
+     logic) replaced by a SCM_CALL into (emacs menu-prompt)
+     read-menu-command, which reproduces the echo-keystrokes save/restore
+     and FRAME_LIVE_P / kill-emacs check internally.  Keep signature and
+     non-static linkage: src/term.c:3265 calls this directly.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu-prompt", "read-menu-command");
+  return SCM_CALL_0 (proc);
 }
 
 /* Adjust point to a boundary of a region that has such a property
@@ -3771,11 +3759,19 @@ Block 1.  */)
   if (rc_state_depth == 0)
     return Qnil;
   SCM rec = rc_record_stack[rc_state_depth - 1];
-  bool used_mouse_menu = false;
   Lisp_Object map = rc_get (rec, RC_SLOT_MAP);
   Lisp_Object prev_event = rc_get (rec, RC_SLOT_PREV_EVENT);
-  Lisp_Object event = read_char_x_menu_prompt (map, prev_event,
-					       &used_mouse_menu);
+  /* M20 imp-4 — the C read_char_x_menu_prompt body is deleted; forward
+     to (emacs menu-prompt) read-char-x-menu-prompt, which keeps the same
+     two-value contract (event, used-mouse-menu-flag).  Re-wrap into
+     scm_values so the Scheme caller (rc-prologue-xmenu-and-idle-gc! Block 1)
+     needs no change.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu-prompt", "read-char-x-menu-prompt");
+  SCM result = scm_call_2 (proc, map, prev_event);
+  Lisp_Object event = scm_c_value_ref (result, 0);
+  bool used_mouse_menu = scm_is_true (scm_c_value_ref (result, 1));
   return scm_values (scm_list_2 (event, scm_from_bool (used_mouse_menu)));
 }
 
@@ -3918,7 +3914,15 @@ Used by Scheme rc-prologue-echo-and-menu!.  */)
   (Lisp_Object commandflag, Lisp_Object map)
 {
   CHECK_FIXNUM (commandflag);
-  return read_char_minibuf_menu_prompt (XFIXNUM (commandflag), map);
+  /* M20 imp-4 — the C read_char_minibuf_menu_prompt body is deleted;
+     forward to (emacs menu-prompt) read-char-minibuf-menu-prompt, which
+     takes COMMANDFLAG as a Lisp fixnum object (not a raw int).  Single
+     return value; 1:1 forward, no value unpacking.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs menu-prompt",
+                             "read-char-minibuf-menu-prompt");
+  return SCM_CALL_2 (proc, commandflag, map);
 }
 
 DEFUN ("--rc-detect-input-pending-run-timers",
@@ -4320,30 +4324,6 @@ read_char (int commandflag, Lisp_Object map,
   return event;
 }
 /* {{coccinelle:skip_end}} */
-
-/* Record a key that came from a mouse menu.
-   Record it for echoing, for this-command-keys, and so on.  */
-
-static void
-record_menu_key (Lisp_Object c)
-{
-  /* Wipe the echo area.  */
-  clear_message (1, 0);
-
-  record_char (c);
-
-  /* Once we reread a character, echoing can happen
-     the next time we pause to read a new one.  */
-  ok_to_echo_at_next_pause = NULL;
-
-  /* Record this character as part of the current key.  */
-  add_command_key (c);
-  echo_update ();
-
-  /* Re-reading in the middle of a command.  */
-  last_input_event = c;
-  num_input_events++;
-}
 
 /* Return true if should recognize C as "the help character".  */
 
@@ -6992,48 +6972,18 @@ On non-menu-bar platforms, always returns nil.  */)
    Lisp_Object fow, Lisp_Object timestamp)
 {
 #if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  struct frame *f = XFRAME (frame);
-  int ix = XFIXNUM (x), iy = XFIXNUM (y);
-  int column, row, dummy;
-
+  static SCM proc = SCM_UNDEFINED;
   CHECK_LIVE_FRAME (frame);
-
-  if (NILP (f->menu_bar_window))
-    return Qnil;
-
-  x_y_to_hpos_vpos (XWINDOW (f->menu_bar_window), ix, iy,
-		    &column, &row, NULL, NULL, &dummy);
-
-  if (row >= 0 && row < FRAME_MENU_BAR_LINES (f))
-    {
-      Lisp_Object items = FRAME_MENU_BAR_ITEMS (f);
-      Lisp_Object item = Qnil;
-      int i;
-      for (i = 0; i < ASIZE (items); i += 4)
-	{
-	  Lisp_Object str = AREF (items, i + 1);
-	  Lisp_Object pos = AREF (items, i + 3);
-	  if (NILP (str))
-	    break;
-	  if (column >= XFIXNUM (pos)
-	      && column < XFIXNUM (pos) + SCHARS (str))
-	    {
-	      item = AREF (items, i);
-	      break;
-	    }
-	}
-
-      if (!NILP (item))
-	{
-	  Lisp_Object position
-	    = list4 (fow, Qmenu_bar,
-		     Fcons (x, y),
-		     timestamp);
-	  return list2 (item, position);
-	}
-    }
-#endif
+  CHECK_FIXNUM (x);
+  CHECK_FIXNUM (y);
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs lispy-position",
+                             "menu-bar-touch-activate");
+  SCM argv[5] = { frame, x, y, fow, timestamp };
+  return SCM_CALL_N (proc, argv, 5);
+#else
   return Qnil;
+#endif
 }
 
 /* imp-7.1 — file-static getter/setter DEFUNs for double-click
@@ -8635,308 +8585,6 @@ tool_bar_items (Lisp_Object reuse, int *nitems)
 }
 
 
-
-/* Read a character using menus based on the keymap MAP.
-   Return nil if there are no menus in the maps.
-   Return t if we displayed a menu but the user rejected it.
-
-   PREV_EVENT is the previous input event, or nil if we are reading
-   the first event of a key sequence.
-
-   If USED_MOUSE_MENU is non-null, set *USED_MOUSE_MENU to true
-   if we used a mouse menu to read the input, or false otherwise.  If
-   USED_MOUSE_MENU is null, don't dereference it.
-
-   The prompting is done based on the prompt-string of the map
-   and the strings associated with various map elements.
-
-   This can be done with X menus or with menus put in the minibuf.
-   These are done in different ways, depending on how the input will be read.
-   Menus using X are done after auto-saving in read-char, getting the input
-   event from Fx_popup_menu; menus using the minibuf use read_char recursively
-   and do auto-saving in the inner call of read_char.  */
-
-static Lisp_Object
-read_char_x_menu_prompt (Lisp_Object map,
-			 Lisp_Object prev_event, bool *used_mouse_menu)
-{
-  if (used_mouse_menu)
-    *used_mouse_menu = false;
-
-  /* Use local over global Menu maps.  */
-
-  if (! menu_prompting)
-    return Qnil;
-
-  /* If we got to this point via a mouse click,
-     use a real menu for mouse selection.  */
-  if (EVENT_HAS_PARAMETERS (prev_event)
-      && !EQ (XCAR (prev_event), Qmenu_bar)
-      && !EQ (XCAR (prev_event), Qtab_bar)
-      && !EQ (XCAR (prev_event), Qtool_bar))
-    {
-      /* Display the menu and get the selection.  */
-      Lisp_Object value;
-
-      value = x_popup_menu_1 (prev_event, get_keymap (map, 0, 1));
-      if (CONSP (value))
-	{
-	  Lisp_Object tem;
-
-	  record_menu_key (XCAR (value));
-
-	  /* If we got multiple events, unread all but
-	     the first.
-	     There is no way to prevent those unread events
-	     from showing up later in last_nonmenu_event.
-	     So turn symbol and integer events into lists,
-	     to indicate that they came from a mouse menu,
-	     so that when present in last_nonmenu_event
-	     they won't confuse things.  */
-	  for (tem = XCDR (value); CONSP (tem); tem = XCDR (tem))
-	    {
-	      record_menu_key (XCAR (tem));
-	      if (SYMBOLP (XCAR (tem))
-		  || FIXNUMP (XCAR (tem)))
-		XSETCAR (tem, Fcons (XCAR (tem), Qdisabled));
-	    }
-
-	  /* If we got more than one event, put all but the first
-	     onto this list to be read later.
-	     Return just the first event now.  */
-	  Vunread_command_events
-	    = nconc2 (XCDR (value), Vunread_command_events);
-	  value = XCAR (value);
-	}
-      else if (NILP (value))
-	value = Qt;
-      if (used_mouse_menu)
-	*used_mouse_menu = true;
-      return value;
-    }
-  return Qnil ;
-}
-
-static Lisp_Object
-read_char_minibuf_menu_prompt (int commandflag,
-			       Lisp_Object map)
-{
-  Lisp_Object name;
-  ptrdiff_t nlength;
-  /* FIXME: Use the minibuffer's frame width.  */
-  ptrdiff_t width = FRAME_COLS (SELECTED_FRAME ()) - 4;
-  ptrdiff_t idx = -1;
-  bool nobindings = true;
-  Lisp_Object rest, vector;
-  Lisp_Object prompt_strings = Qnil;
-
-  vector = Qnil;
-
-  if (! menu_prompting)
-    return Qnil;
-
-  map = get_keymap (map, 0, 1);
-  name = Fkeymap_prompt (map);
-
-  /* If we don't have any menus, just read a character normally.  */
-  if (!STRINGP (name))
-    return Qnil;
-
-#define PUSH_C_STR(str, listvar) \
-  listvar = Fcons (build_unibyte_string (str), listvar)
-
-  /* Prompt string always starts with map's prompt, and a space.  */
-  prompt_strings = Fcons (name, prompt_strings);
-  PUSH_C_STR (": ", prompt_strings);
-  nlength = SCHARS (name) + 2;
-
-  rest = map;
-
-  /* Present the documented bindings, a line at a time.  */
-  while (1)
-    {
-      bool notfirst = false;
-      Lisp_Object menu_strings = prompt_strings;
-      ptrdiff_t i = nlength;
-      Lisp_Object obj;
-      Lisp_Object orig_defn_macro;
-
-      /* Loop over elements of map.  */
-      while (i < width)
-	{
-	  Lisp_Object elt;
-
-	  /* FIXME: Use map_keymap to handle new keymap formats.  */
-
-	  /* At end of map, wrap around if just starting,
-	     or end this line if already have something on it.  */
-	  if (NILP (rest))
-	    {
-	      if (notfirst || nobindings)
-		break;
-	      else
-		rest = map;
-	    }
-
-	  /* Look at the next element of the map.  */
-	  if (idx >= 0)
-	    elt = AREF (vector, idx);
-	  else
-	    elt = Fcar_safe (rest);
-
-	  if (idx < 0 && (VECTOR_OR_PSEUDOVECTORP (elt)))
-	    {
-	      /* If we found a dense table in the keymap,
-		 advanced past it, but start scanning its contents.  */
-	      rest = Fcdr_safe (rest);
-	      vector = elt;
-	      idx = 0;
-	    }
-	  else
-	    {
-	      /* An ordinary element.  */
-	      Lisp_Object event, tem;
-
-	      if (idx < 0)
-		{
-		  event = Fcar_safe (elt); /* alist */
-		  elt = Fcdr_safe (elt);
-		}
-	      else
-		{
-		  XSETINT (event, idx); /* vector */
-		}
-
-	      /* Ignore the element if it has no prompt string.  */
-	      if (FIXNUMP (event) && parse_menu_item (elt, -1))
-		{
-		  /* True if the char to type matches the string.  */
-		  bool char_matches;
-		  Lisp_Object upcased_event, downcased_event;
-		  Lisp_Object desc = Qnil;
-		  Lisp_Object s
-		    = AREF (item_properties, ITEM_PROPERTY_NAME);
-
-		  upcased_event = Fupcase (event);
-		  downcased_event = Fdowncase (event);
-		  char_matches = (XFIXNUM (upcased_event) == SREF (s, 0)
-				  || XFIXNUM (downcased_event) == SREF (s, 0));
-		  if (! char_matches)
-		    desc = Fsingle_key_description (event, Qnil);
-
-#if 0  /* It is redundant to list the equivalent key bindings because
-	  the prefix is what the user has already typed.  */
-		  tem
-		    = XVECTOR (item_properties)->contents[ITEM_PROPERTY_KEYEQ];
-		  if (!NILP (tem))
-		    /* Insert equivalent keybinding.  */
-		    s = concat2 (s, tem);
-#endif
-		  tem
-		    = AREF (item_properties, ITEM_PROPERTY_TYPE);
-		  if (EQ (tem, QCradio) || EQ (tem, QCtoggle))
-		    {
-		      /* Insert button prefix.  */
-		      Lisp_Object selected
-			= AREF (item_properties, ITEM_PROPERTY_SELECTED);
-		      AUTO_STRING (radio_yes, "(*) ");
-		      AUTO_STRING (radio_no , "( ) ");
-		      AUTO_STRING (check_yes, "[X] ");
-		      AUTO_STRING (check_no , "[ ] ");
-		      if (EQ (tem, QCradio))
-			tem = NILP (selected) ? radio_yes : radio_no;
-		      else
-			tem = NILP (selected) ? check_yes : check_no;
-		      s = concat2 (tem, s);
-		    }
-
-
-		  /* If we have room for the prompt string, add it to this line.
-		     If this is the first on the line, always add it.  */
-		  if ((SCHARS (s) + i + 2
-		       + (char_matches ? 0 : SCHARS (desc) + 3))
-		      < width
-		      || !notfirst)
-		    {
-		      ptrdiff_t thiswidth;
-
-		      /* Punctuate between strings.  */
-		      if (notfirst)
-			{
-			  PUSH_C_STR (", ", menu_strings);
-			  i += 2;
-			}
-		      notfirst = true;
-		      nobindings = false;
-
-		      /* If the char to type doesn't match the string's
-			 first char, explicitly show what char to type.  */
-		      if (! char_matches)
-			{
-			  /* Add as much of string as fits.  */
-			  thiswidth = min (SCHARS (desc), width - i);
-			  menu_strings
-			    = Fcons (Fsubstring (desc, make_fixnum (0),
-						 make_fixnum (thiswidth)),
-				     menu_strings);
-			  i += thiswidth;
-			  PUSH_C_STR (" = ", menu_strings);
-			  i += 3;
-			}
-
-		      /* Add as much of string as fits.  */
-		      thiswidth = min (SCHARS (s), width - i);
-		      menu_strings
-			= Fcons (Fsubstring (s, make_fixnum (0),
-					     make_fixnum (thiswidth)),
-				 menu_strings);
-		      i += thiswidth;
-		    }
-		  else
-		    {
-		      /* If this element does not fit, end the line now,
-			 and save the element for the next line.  */
-		      PUSH_C_STR ("...", menu_strings);
-		      break;
-		    }
-		}
-
-	      /* Move past this element.  */
-	      if (idx >= 0 && idx + 1 >= ASIZE (vector))
-		/* Handle reaching end of dense table.  */
-		idx = -1;
-	      if (idx >= 0)
-		idx++;
-	      else
-		rest = Fcdr_safe (rest);
-	    }
-	}
-
-      /* Prompt with that and read response.  */
-      message3_nolog (apply1 (Qconcat, Fnreverse (menu_strings)));
-
-      /* Make believe it's not a keyboard macro in case the help char
-	 is pressed.  Help characters are not recorded because menu prompting
-	 is not used on replay.  */
-      orig_defn_macro = KVAR (current_kboard, defining_kbd_macro);
-      kset_defining_kbd_macro (current_kboard, Qnil);
-      do
-	obj = read_char (commandflag, Qnil, Qt, 0, NULL);
-      while (BUFFERP (obj));
-      kset_defining_kbd_macro (current_kboard, orig_defn_macro);
-
-      if (!FIXNUMP (obj) || XFIXNUM (obj) == -2
-	  || (! EQ (obj, menu_prompt_more_char)
-	      && (!FIXNUMP (menu_prompt_more_char)
-		  || ! BASE_EQ (obj, make_fixnum (Ctl (XFIXNUM (menu_prompt_more_char)))))))
-	{
-	  if (!NILP (KVAR (current_kboard, defining_kbd_macro)))
-	    store_kbd_macro_char (obj);
-	  return obj;
-	}
-      /* Help char - go round again.  */
-    }
-}
 
 /* Reading key sequences.  */
 
