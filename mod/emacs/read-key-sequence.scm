@@ -2,7 +2,11 @@
   #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
   #:use-module (srfi srfi-9)            ; define-record-type
-  #:use-module ((emacs event-modifiers) #:select (parse-modifiers))
+  #:use-module ((emacs event-modifiers)
+                #:select (parse-modifiers
+                          apply-modifiers
+                          up-modifier down-modifier drag-modifier
+                          double-modifier triple-modifier))
   #:declarative? #t
   #:export (read-key-sequence-vs
             read-key-sequence-vs-string
@@ -148,10 +152,10 @@ reinitialize from current-kboard / Vkey_translation_map."
 ;;;; M6h — rks-keyremap-step!: port of C keyremap_step +
 ;;;; access_keymap_keyremap (src/keyboard.c:10601-10715).
 ;;;;
-;;;; This is imp-2.  It is NOT wired into the live code path yet: the
-;;;; three C walk DEFUNs still call the C keyremap_step.  The cutover
-;;;; is imp-3.  Callers of rks-keyremap-step! are Scheme test code and
-;;;; (later) rks-walk-translation-maps!.
+;;;; imp-3 wired rks-keyremap-step! into the live walk: it is now
+;;;; driven by rks-walk-translation-maps! over the state's keyremap
+;;;; records (see the M6h-r7 section below).  The C keyremap_step /
+;;;; access_keymap_keyremap bodies were deleted.
 
 (define %rks-access-keymap (delay (%c '--access-keymap)))
 (define %rks-get-keymap    (delay (%c '--get-keymap)))
@@ -839,8 +843,122 @@ flag so this only happens once.  On non-HAVE_TEXT_CONVERSION
 builds, no-op.  See docs/keyboard.org §M6ae."
   ((force %rks-iter-maybe-disable-text-conversion)))
 
-(define %rks-reduce-mouse-event-loop
-  (delay (%c '--rks-reduce-mouse-event-loop)))
+;;; M6ad — unbound-event reduction cascade, ported from C
+;;; (src/keyboard.c:9168-9270, deleted in imp-3).  Reduces an unbound
+;;; mouse up/down/drag/double/triple event: strips modifiers trying to
+;;; find a real binding, else disposes the event (rewinding the
+;;; keyremap counters) and returns `replay-key' / `replay-sequence'.
+
+(define (rks-event-head event)
+  "EVENT_HEAD macro (src/keyboard.h:407): for a composite (CONSP)
+event the car, else the event itself."
+  (if (pair? event) (car event) event))
+
+(define (rks-event-start event)
+  "EVENT_START macro (src/keyboard.h:414): the position of a
+composite event; touchscreen events take a different slot."
+  (let ((head (rks-event-head event)))
+    (if (or (eq? head 'touchscreen-begin)
+            (eq? head 'touchscreen-end))
+        ((%c 'cdr-safe) ((%c 'car-safe) ((%c 'cdr-safe) event)))
+        ((%c 'car-safe) ((%c 'cdr-safe) event)))))
+
+(define (rks-reduce-rewind-one-keyremap! km last-real)
+  "Port of rks_reduce_rewind_one_keyremap (src/keyboard.c:9168-9175)."
+  (when (> (keyremap-end km) last-real)
+    (let ((new-pos (if (< last-real (keyremap-start km))
+                       last-real
+                       (keyremap-start km))))
+      (set-keyremap-end! km new-pos)
+      (set-keyremap-start! km new-pos)
+      (set-keyremap-map! km (keyremap-parent km)))))
+
+(define (rks-reduce-rewind-keyremaps-to-last-real! indec fkey keytran)
+  "Port of rks_reduce_rewind_keyremaps_to_last_real
+(src/keyboard.c:9177-9199): nested rewind of indec, then fkey, then
+keytran."
+  (let ((last-real ((force %rks-last-real-key-start))))
+    (when (> (keyremap-end indec) last-real)
+      (rks-reduce-rewind-one-keyremap! indec last-real)
+      (when (> (keyremap-end fkey) last-real)
+        (rks-reduce-rewind-one-keyremap! fkey last-real)
+        (when (> (keyremap-end keytran) last-real)
+          (rks-reduce-rewind-one-keyremap! keytran last-real))))))
+
+(define (rks-reduce-dispose-unbound-up-down! indec fkey keytran)
+  "Port of rks_reduce_dispose_unbound_up_down (src/keyboard.c:9201-9212).
+Rewinds the keyremap counters to last-real-key-start, sets mock-input
+to 0 (replay-key) or last-real-key-start (replay-sequence), and returns
+the matching symbol."
+  (rks-reduce-rewind-keyremaps-to-last-real! indec fkey keytran)
+  (let ((t ((force %rks-t)))
+        (last-real ((force %rks-last-real-key-start))))
+    ((force %set-rks-mock-input) (if (= t last-real) 0 last-real))
+    (if (= t last-real) 'replay-key 'replay-sequence)))
+
+(define (rks-reduce-try-new-binding! modifiers breakdown)
+  "Port of rks_reduce_try_new_binding (src/keyboard.c:9217-9233).
+Looks up the modifier-reduced click; on a hit, updates
+current-binding, new-binding and rks-key and returns #t."
+  (let* ((new-head  (apply-modifiers modifiers (car breakdown)))
+         (new-click (list new-head (rks-event-start ((force %rks-key)))))
+         (new-bind  (rks-follow-key ((force %rks-current-binding))
+                                    new-click)))
+    ((force %set-rks-new-binding) new-bind)
+    (if (%nilp new-bind)
+        #f
+        (begin
+          ((force %set-rks-current-binding) new-bind)
+          ((force %set-rks-key) new-click)
+          #t))))
+
+(define (rks-reduce-strip-loop! breakdown modifiers reducer-mask
+                               indec fkey keytran)
+  "Port of rks_reduce_strip_loop (src/keyboard.c:9235-9250).  Strips
+one modifier level at a time (triple → double → drag), trying
+rks-reduce-try-new-binding! after each; falls to
+rks-reduce-dispose-unbound-up-down! when only up/down remain."
+  (let loop ((modifiers modifiers))
+    (if (zero? (logand modifiers reducer-mask))
+        'fall-through
+        (cond
+         ((not (zero? (logand modifiers triple-modifier)))
+          (let ((nm (logxor modifiers
+                           (logior double-modifier triple-modifier))))
+            (if (rks-reduce-try-new-binding! nm breakdown)
+                'fall-through
+                (loop nm))))
+         ((not (zero? (logand modifiers double-modifier)))
+          (let ((nm (logand modifiers (lognot double-modifier))))
+            (if (rks-reduce-try-new-binding! nm breakdown)
+                'fall-through
+                (loop nm))))
+         ((not (zero? (logand modifiers drag-modifier)))
+          (let ((nm (logand modifiers (lognot drag-modifier))))
+            (if (rks-reduce-try-new-binding! nm breakdown)
+                'fall-through
+                (loop nm))))
+         (else
+          (rks-reduce-dispose-unbound-up-down! indec fkey keytran))))))
+
+(define (rks-reduce-mouse-event-loop! indec fkey keytran)
+  "Port of the --rks-reduce-mouse-event-loop DEFUN (src/keyboard.c:9252-9270).
+Returns `fall-through', `replay-key', or `replay-sequence'."
+  (let ((head (rks-event-head ((force %rks-key)))))
+    (if (not (symbol? head))
+        'fall-through
+        (let ((breakdown (parse-modifiers head)))
+          (if (not (pair? breakdown))
+              'fall-through
+              (let ((modifiers (cadr breakdown))
+                    (reducer-mask (logior up-modifier down-modifier
+                                          drag-modifier double-modifier
+                                          triple-modifier)))
+                (if (zero? (logand modifiers reducer-mask))
+                    'fall-through
+                    (rks-reduce-strip-loop!
+                     breakdown modifiers reducer-mask
+                     indec fkey keytran))))))))
 
 (define (rks-iter-unbound-event-reduction!)
   "M6h-r6: unbound-event reduction with inline record sync."
@@ -852,7 +970,13 @@ builds, no-op.  See docs/keyboard.org §M6ae."
           (fu ((force %rks-first-unbound))))
       (when (< t fu)
         ((force %set-rks-first-unbound) t)))
-    (let ((result ((force %rks-reduce-mouse-event-loop))))
+    (let ((result
+           (if (%nilp rec)
+               'fall-through
+               (rks-reduce-mouse-event-loop!
+                (rks-state-indec rec)
+                (rks-state-fkey rec)
+                (rks-state-keytran rec)))))
       (when (not (%nilp rec))
         (rks-sync-write rec 'first-unbound))
       result)))
@@ -877,8 +1001,11 @@ remain bare file-static reads."
             result)
           'fall-through))))
 
-(define %rks-follow-key  (delay (%c '--rks-follow-key)))
 (define %rks-key          (delay (%c '--rks-key)))
+(define %set-rks-key      (delay (%c '--set-rks-key)))
+(define %rks-last-real-key-start
+  (delay (%c '--rks-last-real-key-start)))
+(define %rks-keybuf-depth (delay (%c '--rks-keybuf-depth)))
 (define %rks-first-unbound
   (delay (%c '--rks-first-unbound)))
 (define %rks-new-binding
@@ -887,6 +1014,30 @@ remain bare file-static reads."
   (delay (%c '--set-rks-new-binding)))
 (define %set-rks-first-unbound
   (delay (%c '--set-rks-first-unbound)))
+
+;;; Port of follow_key (src/keyboard.c:8603-8608).
+;;; KEYMAP is a keymap (or keymap-designating object); KEY is the event
+;;; to look up.  Returns the binding, or nil when unbound.  The two
+;;; --get-keymap booleans are (error-if-not-keymap, autoload) per the
+;;; --get-keymap doc (src/keyboard.c:8350); C follow_key calls
+;;; get_keymap (keymap, 0, 1) i.e. error=#nil, autoload=#t.  The inner
+;;; access_keymap is access_keymap (map, key, 1, 0, 1) — t_ok=1,
+;;; noinherit=0, autoload=1, exactly what --access-keymap hardcodes.
+(define (rks-follow-key keymap key)
+  ((force %rks-access-keymap)
+   ((force %rks-get-keymap) keymap #nil #t)
+   key))
+
+;;; Port of test_undefined (src/keyboard.c:10717-10724).
+;;; A binding counts as "undefined" when it is nil, is the symbol
+;;; `undefined', or (for a symbol) command-remapping resolves to
+;;; `undefined'.
+(define (rks-test-undefined? binding)
+  (or (%nilp binding)
+      (eq? binding 'undefined)
+      (and (symbol? binding)
+           (eq? ((%c 'command-remapping) binding #nil #nil)
+                'undefined))))
 
 (define (rks-follow-key-and-update-first-unbound!)
   "M6h-r1: follow_key + first_unbound update with inline record sync."
@@ -897,7 +1048,7 @@ remain bare file-static reads."
       (rks-sync-read rec 'first-unbound))
     (let* ((cb  ((force %rks-current-binding)))
            (key ((force %rks-key)))
-           (new-binding ((force %rks-follow-key) cb key)))
+           (new-binding (rks-follow-key cb key)))
       (if (%nilp new-binding)
           #nil
           (begin
@@ -951,11 +1102,6 @@ rks_last_real_key_start so the per-key dispatch can backtrack
 into the buffer if a mouse-click expands into multiple keybuf
 elements.  See docs/keyboard.org §M6y."
   ((force %rks-iter-replay-restore)))
-
-(define %rks-walk-indec          (delay (%c '--rks-walk-indec)))
-(define %rks-fkey-shortcut-or-walk
-  (delay (%c '--rks-fkey-shortcut-or-walk)))
-(define %rks-walk-keytran        (delay (%c '--rks-walk-keytran)))
 
 (define %rks-state-current
   (delay (%c '--rks-state-current)))
@@ -1121,26 +1267,160 @@ shape compiles cleanly."
            (when (not (%nilp rec))
              (rks--sync-write-fields rec (list 'write-fields ...)))))))))
 
+;;; M6h-r7 — three translation-map walks, ported from the C DEFUNs
+;;; --rks-walk-indec / --rks-fkey-shortcut-or-walk / --rks-walk-keytran
+;;; (src/keyboard.c:10215-10354, deleted in imp-3).  Each drives
+;;; rks-keyremap-step! over the state's own fkey/keytran/indec
+;;; <keyremap> records (mutated in place) and mirrors the live C
+;;; keybuf into the state's keybuf vector so the walk sees (and writes
+;;; back) the caller-owned keybuf array.  When no keybuf is on the C
+;;; stack (the pure-record / test path) the record's own keybuf vector
+;;; is authoritative.
+
+(define (rks-keybuf-c-to-record! keybuf n)
+  "Copy the live C keybuf into the record's KEYBUF vector so the walk
+sees the caller-owned buffer, and zero (nil) the slots the walk may
+touch beyond the live sequence.
+
+Only the first N slots of the C keybuf are read: N = max (rks_t,
+mock_input) is the walk's input bound, and those slots are the only
+ones guaranteed to hold initialized Lisp objects.  Reading the
+uninitialized C slots beyond them into this GC-scanned Scheme vector
+would crash the collector, so they are set to nil instead (writing
+nil back to them is harmless — the C code never reads past mock).
+When no keybuf is on the C stack (the pure-record / test path) the
+caller's own KEYBUF slots [0, N) are preserved and only the tail is
+nilled."
+  (let ((n (min n READ-KEY-ELTS)))
+    (if (> ((force %rks-keybuf-depth)) 0)
+        (let loop ((i 0))
+          (if (< i n)
+              (begin
+                (vector-set! keybuf i ((force %rks-keybuf-ref) i))
+                (loop (+ i 1)))
+              (begin
+                (when (< i READ-KEY-ELTS)
+                  (vector-set! keybuf i #nil)
+                  (loop (+ i 1))))))
+        (let loop ((i n))
+          (when (< i READ-KEY-ELTS)
+            (vector-set! keybuf i #nil)
+            (loop (+ i 1)))))))
+
+(define (rks-keybuf-record-to-c! keybuf)
+  "Write the record's KEYBUF vector back into the live C keybuf.
+No-op when no keybuf is on the C stack."
+  (when (> ((force %rks-keybuf-depth)) 0)
+    (let loop ((i 0))
+      (when (< i READ-KEY-ELTS)
+        ((force %rks-keybuf-set) i (vector-ref keybuf i))
+        (loop (+ i 1))))))
+
+;; Port of the C --rks-walk-indec loop (src/keyboard.c:10229-10244):
+;; while (indec.end < rks_t) with doit = true, input = max(rks_t, mock).
+;; Returns the new mock on a translation, #f when exhausted.
+(define (rks-walk-indec-scheme! indec keybuf prompt t mock)
+  (let loop ((mock mock))
+    (if (>= (keyremap-end indec) t)
+        #f
+        (let ((diff (rks-keyremap-step! indec keybuf
+                                        (max t mock) #t prompt)))
+          (if diff
+              (+ diff (max t mock))
+              (loop mock))))))
+
+;; Port of rks_fkey_shortcut_advance (src/keyboard.c:10250-10264):
+;; advance fkey past rks_t so keytran can still scan.  Returns #f
+;; (never reports a hit).
+(define (rks-fkey-shortcut-advance-scheme! fkey t)
+  (when (< (keyremap-start fkey) t)
+    (set-keyremap-start! fkey t)
+    (set-keyremap-end! fkey t)
+    (set-keyremap-map! fkey (keyremap-parent fkey)))
+  #f)
+
+;; Port of rks_fkey_walk (src/keyboard.c:10267-10293):
+;; while (fkey.end < indec.start); doit? for this walk is
+;; (and (= (+ (keyremap-end fkey) 1) t) (rks-test-undefined? cb)).
+;; On a hit, also adds diff to indec.start and indec.end.
+(define (rks-fkey-walk-scheme! fkey indec keybuf prompt t mock
+                               current-binding)
+  (let loop ((mock mock))
+    (if (>= (keyremap-end fkey) (keyremap-start indec))
+        #f
+        (let ((diff (rks-keyremap-step!
+                     fkey keybuf (max t mock)
+                     (and (= (+ (keyremap-end fkey) 1) t)
+                          (rks-test-undefined? current-binding))
+                     prompt)))
+          (if diff
+              (let ((new-mock (+ diff (max t mock))))
+                (set-keyremap-end! indec (+ (keyremap-end indec) diff))
+                (set-keyremap-start! indec (+ (keyremap-start indec) diff))
+                new-mock)
+              (loop mock))))))
+
+;; Port of --rks-fkey-shortcut-or-walk (src/keyboard.c:10295-10314):
+;; the shortcut branch when current-binding is a bound non-keymap that
+;; is not `undefined' and indec.start >= rks_t; otherwise the fkey walk.
+(define (rks-fkey-shortcut-or-walk-scheme! fkey indec keybuf prompt
+                                          t mock current-binding)
+  (if (and (%nilp ((force %rks-keymapp) current-binding))
+           (not (rks-test-undefined? current-binding))
+           (>= (keyremap-start indec) t))
+      (rks-fkey-shortcut-advance-scheme! fkey t)
+      (rks-fkey-walk-scheme! fkey indec keybuf prompt t mock
+                             current-binding)))
+
+;; Port of the C --rks-walk-keytran loop (src/keyboard.c:10332-10353):
+;; while (keytran.end < fkey.start) with doit = true.  On a hit, adds
+;; diff to indec.start/end AND fkey.start/end.
+(define (rks-walk-keytran-scheme! keytran fkey indec keybuf prompt t mock)
+  (let loop ((mock mock))
+    (if (>= (keyremap-end keytran) (keyremap-start fkey))
+        #f
+        (let ((diff (rks-keyremap-step! keytran keybuf (max t mock)
+                                        #t prompt)))
+          (if diff
+              (let ((new-mock (+ diff (max t mock))))
+                (set-keyremap-end! indec (+ (keyremap-end indec) diff))
+                (set-keyremap-start! indec (+ (keyremap-start indec) diff))
+                (set-keyremap-end! fkey (+ (keyremap-end fkey) diff))
+                (set-keyremap-start! fkey (+ (keyremap-start fkey) diff))
+                new-mock)
+              (loop mock))))))
+
 (define (rks-walk-translation-maps! prompt)
-  "M6h-r7: three-map translation walk with inline record sync."
+  "M6h-r7: three-map translation walk with inline record sync.
+Drives rks-keyremap-step! over the state's own fkey/keytran/indec
+records.  Returns t when any of the three walks completes a
+translation (mock-input updated), nil when exhausted.  Replaces the
+deleted C --rks-walk-indec / --rks-fkey-shortcut-or-walk /
+--rks-walk-keytran DEFUNs."
   (let ((rec ((force %rks-state-current))))
     (when (not (%nilp rec))
       (rks-sync-read rec 'key-count)
       (rks-sync-read rec 'mock-input))
-    (let ((r1 ((force %rks-walk-indec) prompt)))
-      (when (not (%nilp rec))
-        (rks-sync-write rec 'mock-input))
-      (or (not (%nilp r1))
-          (let ((rec ((force %rks-state-current))))
-            (when (not (%nilp rec))
-              (rks-sync-read rec 'key-count)
-              (rks-sync-read rec 'mock-input))
-            (let ((r2 ((force %rks-fkey-shortcut-or-walk) prompt)))
-              (when (not (%nilp rec))
-                (rks-sync-write rec 'mock-input))
-              (or (not (%nilp r2))
-                  ((force %rks-walk-keytran) prompt)
-                  #nil)))))))
+    (if (%nilp rec)
+        #nil
+        (let* ((tval ((force %rks-t)))
+               (mock ((force %rks-mock-input)))
+               (keybuf  (rks-state-keybuf rec))
+               (fkey    (rks-state-fkey rec))
+               (keytran (rks-state-keytran rec))
+               (indec   (rks-state-indec rec))
+               (cb      ((force %rks-current-binding))))
+          (rks-keybuf-c-to-record! keybuf (max tval mock))
+          (let ((result
+                 (or (rks-walk-indec-scheme! indec keybuf prompt tval mock)
+                     (rks-fkey-shortcut-or-walk-scheme!
+                      fkey indec keybuf prompt tval mock cb)
+                     (rks-walk-keytran-scheme!
+                      keytran fkey indec keybuf prompt tval mock))))
+            (rks-keybuf-record-to-c! keybuf)
+            ((force %set-rks-mock-input) (if result result mock))
+            (rks-sync-write rec 'mock-input)
+            (if result #t #nil))))))
 
 (define %rks-fn-key-shift-translate
   (delay (%c '--rks-fn-key-shift-translate)))

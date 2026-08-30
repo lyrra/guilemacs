@@ -453,7 +453,7 @@
 ;;;; M6ad
 
 (test-assert "m6ad-helper/unbound-event-reduction"
-             (fboundp '--rks-reduce-mouse-event-loop))
+             (fboundp '--rks-iter-unbound-event-reduction!))
 (test-eq "m6ad/fall-through-at-idle"
          'fall-through (--rks-iter-unbound-event-reduction!))
 

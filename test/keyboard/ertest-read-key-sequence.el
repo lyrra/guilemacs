@@ -565,9 +565,11 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6x — translation-map walks
 
 (ert-deftest m6x-helpers/exist ()
-  (should (fboundp '--rks-walk-indec))
-  (should (fboundp '--rks-fkey-shortcut-or-walk))
-  (should (fboundp '--rks-walk-keytran)))
+  ;; imp-3 cut over the three per-map C walk DEFUNs to Scheme
+  ;; (rks-walk-translation-maps!); only the composite entry point
+  ;; remains Lisp-visible.
+  (should (fboundp '--rks-walk-translation-maps!))
+  (should (fboundp '--rks-walk-translation-maps)))
 
 (ert-deftest m6x-walk/nil-at-idle ()
   ;; At idle the keyremap structs are all at start == end == 0 (or
@@ -658,7 +660,10 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6ab — follow_key + first_unbound update
 
 (ert-deftest m6ab-helpers/exist ()
-  (should (fboundp '--rks-follow-key))
+  ;; imp-3 ported follow_key to Scheme (rks-follow-key) and deleted the
+  ;; --rks-follow-key C shim; the caller wrapper and new-binding remain.
+  (should (fboundp '--rks-follow-key-and-update-first-unbound!))
+  (should (fboundp '--rks-follow-key-and-update-first-unbound))
   (should (fboundp '--rks-new-binding)))
 
 (ert-deftest m6ab-follow-key/nil-at-idle ()
@@ -683,7 +688,10 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
 ;;;; M6ad — unbound-event reduction
 
 (ert-deftest m6ad-helpers/exist ()
-  (should (fboundp '--rks-reduce-mouse-event-loop)))
+  ;; imp-3 ported the reduction cascade to Scheme
+  ;; (rks-reduce-mouse-event-loop!); the --rks-reduce-mouse-event-loop
+  ;; C shim was deleted.
+  (should (fboundp '--rks-iter-unbound-event-reduction!)))
 
 (ert-deftest m6ad-reduction/fall-through-at-idle ()
   ;; At idle rks_key is nil — EVENT_HEAD/parse_modifiers yields no

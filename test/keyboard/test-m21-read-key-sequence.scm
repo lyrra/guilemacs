@@ -35,6 +35,10 @@
 (define rks-state-fkey    (@@rk rks-state-fkey))
 (define rks-state-keytran (@@rk rks-state-keytran))
 (define rks-state-indec   (@@rk rks-state-indec))
+(define rks-state-keybuf  (@@rk rks-state-keybuf))
+(define rks-state-mock-input (@@rk rks-state-mock-input))
+(define set-rks-state-key-count! (@@rk set-rks-state-key-count!))
+(define rks-follow-key    (@@rk rks-follow-key))
 (define keyremap-parent   (@@rk keyremap-parent))
 (define keyremap-map      (@@rk keyremap-map))
 (define keyremap-start    (@@rk keyremap-start))
@@ -461,3 +465,107 @@
     (check "m21/walk/unbound/mock-unchanged" 0 (cadr r))
     (check "m21/walk/unbound/start-end"
            '(1 1) (list (keyremap-start fkey) (keyremap-end fkey)))))
+
+;;; --- 3.13 end-to-end rks-walk-translation-maps! through a <rks-state>
+;;; imp-3.  Drives the full three-map walk (indec → fkey → keytran) on a
+;;; pushed <rks-state> and confirms the composed walk matches what the
+;;; section 3.11 scheme-walk-indec fixture already predicts for the
+;;; indec-only case (Open decision 2).  No keybuf is on the C stack here,
+;;; so rks-walk-translation-maps! uses the state record's own keybuf
+;;; vector and mutates the record's keyremap records in place.
+(define (fill-keybuf! state events)
+  (let ((kb (rks-state-keybuf state)))
+    (let loop ((i 0) (ev events))
+      (unless (null? ev)
+        (vector-set! kb i (car ev))
+        (loop (+ i 1) (cdr ev))))))
+
+(let* ((m  (make-stub-map 'walk-end-root))
+       (m2 (make-stub-map 'walk-end-child))
+       (state (make-rks-state)))
+  ((%sym 'define-key) m (vector (char->integer #\a)) m2)
+  ((%sym 'define-key) m2 (vector (char->integer #\b))
+        (vector (char->integer #\x) (char->integer #\y) (char->integer #\z)))
+  (keyremap-rebase! (rks-state-indec state) m)
+  (fill-keybuf! state (list (char->integer #\a) (char->integer #\b)))
+  (set-rks-state-key-count! state 2)
+  ((force %push) state)
+  (let ((r (rks-walk-translation-maps! #nil)))
+    (check "m21/walk-translation-maps/hit" #t (eq? r #t))
+    (check "m21/walk-translation-maps/mock"
+           3 (rks-state-mock-input state))
+    (check "m21/walk-translation-maps/keybuf"
+           (vector (char->integer #\x) (char->integer #\y)
+                   (char->integer #\z))
+           (front-vector (rks-state-keybuf state) 3))
+    (check "m21/walk-translation-maps/indec-start-end"
+           '(3 3) (list (keyremap-start (rks-state-indec state))
+                        (keyremap-end (rks-state-indec state)))))
+  ((force %pop)))
+
+;;; --- 3.14 follow_key port: plain bound lookup ------------------------
+;;; imp-3.  rks-follow-key is the Scheme port of C follow_key:
+;;; access_keymap(get_keymap(keymap, 0, 1), key, 1, 0, 1).  A plain
+;;; bound lookup must match the old --rks-follow-key result.
+(let* ((m  (make-stub-map 'follow-key-map))
+       (cmd (make-symbol "follow-key-cmd")))
+  ((%sym 'define-key) m (vector (char->integer #\z)) cmd)
+  (check "m21/follow-key/bound"
+         cmd (rks-follow-key m (char->integer #\z)))
+  (check "m21/follow-key/unbound-nil" #t
+         (or (null? (rks-follow-key m (char->integer #\q)))
+             (not (rks-follow-key m (char->integer #\q))))))
+
+;;; --- 3.15 mouse-reduction cascade ------------------------------------
+;;; imp-3.  rks-iter-unbound-event-reduction! now runs the Scheme port
+;;; (rks-reduce-mouse-event-loop!).  Two cases:
+;;;   * a bound drag-click that strips the drag modifier and reduces to
+;;;     a real binding via the try-new-binding path (current-binding +
+;;;     key updated, returns `fall-through');
+;;;   * an unbound up/down event that disposes (returns `replay-key' /
+;;;     `replay-sequence' depending on whether rks-t equals
+;;;     last-real-key-start).
+(define %set-rks-last-real-key-start
+  (delay (%sym '--rks-set-last-real-key-start)))
+(define %set-rks-key2       (delay (%sym '--set-rks-key)))
+(define %set-rks-current-binding2 (delay (%sym '--set-rks-current-binding)))
+(define %get-rks-key        (delay (%sym '--rks-key)))
+(define %get-rks-current-binding (delay (%sym '--rks-current-binding)))
+
+(let* ((m  (make-stub-map 'reduction-map))
+       (cmd (make-symbol "reduction-cmd"))
+       (state (make-rks-state)))
+  ((%sym 'define-key) m (vector 'mouse-1) cmd)
+  ((force %push) state)
+  ((force %set-rks-current-binding2) m)
+  ((force %set-rks-key2) '(drag-mouse-1 (10 20)))
+  (let ((r ((%sym '--rks-iter-unbound-event-reduction!))))
+    (check "m21/reduce/drag-bound/result" 'fall-through r)
+    (check "m21/reduce/drag-bound/current-binding"
+           cmd ((force %get-rks-current-binding)))
+    (check "m21/reduce/drag-bound/key"
+           '(mouse-1 (10 20)) ((force %get-rks-key))))
+  ((force %pop)))
+
+;; Unbound down-mouse-1 with rks-t == last-real-key-start → replay-key.
+(let ((state (make-rks-state)))
+  (set-rks-state-key-count! state 2)
+  ((force %push) state)
+  ((force %set-rks-current-binding2) #nil)
+  ((force %set-rks-key2) '(down-mouse-1 (10 20)))
+  ((force %set-rks-last-real-key-start) 2)
+  (let ((r ((%sym '--rks-iter-unbound-event-reduction!))))
+    (check "m21/reduce/down-dispose/eq-replay-key" 'replay-key r))
+  ((force %pop)))
+
+;; Unbound down-mouse-1 with rks-t != last-real-key-start → replay-sequence.
+(let ((state (make-rks-state)))
+  (set-rks-state-key-count! state 2)
+  ((force %push) state)
+  ((force %set-rks-current-binding2) #nil)
+  ((force %set-rks-key2) '(down-mouse-1 (10 20)))
+  ((force %set-rks-last-real-key-start) 1)
+  (let ((r ((%sym '--rks-iter-unbound-event-reduction!))))
+    (check "m21/reduce/down-dispose/neq-replay-sequence"
+           'replay-sequence r))
+  ((force %pop)))

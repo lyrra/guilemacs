@@ -8601,13 +8601,6 @@ keymap lookup: `lookup-key' has different prefix/t_ok semantics.  */)
 }
 
 static Lisp_Object
-follow_key (Lisp_Object keymap, Lisp_Object key)
-{
-  return access_keymap (get_keymap (keymap, 0, 1),
-			key, 1, 0, 1);
-}
-
-static Lisp_Object
 active_maps (Lisp_Object first_event, Lisp_Object second_event)
 {
   Lisp_Object position
@@ -9161,113 +9154,12 @@ returns nil.  */)
                          + key updated) or the loop completed without one;
                          caller continues to M6aa install.
    See docs/keyboard.org §M6ad.  */
-/* Criterion-2: factor --rks-reduce-mouse-event-loop's loop body
-   (modifier-strip + dispose-unbound + try-new-binding) into helpers.
-   Shared rks_mock_input_set_and_mirror is defined earlier.  */
-
-static void
-rks_reduce_rewind_one_keyremap (keyremap *km, int last_real)
-{
-  if (km->end <= last_real) return;
-  int new_pos = last_real < km->start ? last_real : km->start;
-  km->end = km->start = new_pos;
-  km->map = km->parent;
-}
-
-static void
-rks_reduce_rewind_keyremaps_to_last_real (void)
-{
-  int last_real = XFIXNUM (Fc_rks_last_real_key_start ());
-  keyremap indec, fkey, keytran;
-  rks_keyremap_load (RKS_SLOT_INDEC,   &indec);
-  rks_keyremap_load (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_load (RKS_SLOT_KEYTRAN, &keytran);
-  /* Nested: rewind indec; if it rewound, fkey; if that, keytran.  */
-  if (indec.end > last_real)
-    {
-      rks_reduce_rewind_one_keyremap (&indec, last_real);
-      if (fkey.end > last_real)
-        {
-          rks_reduce_rewind_one_keyremap (&fkey, last_real);
-          if (keytran.end > last_real)
-            rks_reduce_rewind_one_keyremap (&keytran, last_real);
-        }
-    }
-  rks_keyremap_store (RKS_SLOT_INDEC,   &indec);
-  rks_keyremap_store (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_store (RKS_SLOT_KEYTRAN, &keytran);
-}
-
-static SCM
-rks_reduce_dispose_unbound_up_down (void)
-{
-  /* Unbound up/down event — dispose of it.  Adjust the keyremap
-     counters back to last_real_key_start, then jump back to
-     replay_key (mock_input = 0) or replay_sequence
-     (mock_input = last_real_key_start).  */
-  rks_reduce_rewind_keyremaps_to_last_real ();
-  int last_real = XFIXNUM (Fc_rks_last_real_key_start ());
-  rks_mock_input_set_and_mirror (rks_t == last_real ? 0 : last_real);
-  return intern (rks_t == last_real ? "replay-key" : "replay-sequence");
-}
-
-/* Try a follow_key for the modifier-reduced event.  Returns true if
-   a binding was found (caller breaks the loop).  Mutates rks_key,
-   rks_current_binding, and rks_new_binding.  */
-static bool
-rks_reduce_try_new_binding (int modifiers, Lisp_Object breakdown)
-{
-  Lisp_Object new_head  = apply_modifiers (modifiers, XCAR (breakdown));
-  Lisp_Object new_click = list2 (new_head, EVENT_START (rks_key));
-  Lisp_Object new_bind  = follow_key (rks_current_binding, new_click);
-  Fc_set_rks_new_binding (new_bind);
-  if (NILP (new_bind))
-    return false;
-  rks_current_binding = new_bind;
-  if (rks_state_depth > 0)
-    scm_struct_set_x (rks_state_stack[rks_state_depth - 1],
-                      scm_from_int (RKS_SLOT_CURRENT_BINDING),
-                      rks_current_binding);
-  rks_key = new_click;
-  return true;
-}
-
-static SCM
-rks_reduce_strip_loop (Lisp_Object breakdown, int modifiers, int reducer_mask)
-{
-  while (modifiers & reducer_mask)
-    {
-      if      (modifiers & triple_modifier) modifiers ^= (double_modifier | triple_modifier);
-      else if (modifiers & double_modifier) modifiers &= ~double_modifier;
-      else if (modifiers & drag_modifier)   modifiers &= ~drag_modifier;
-      else
-        return rks_reduce_dispose_unbound_up_down ();
-      if (rks_reduce_try_new_binding (modifiers, breakdown))
-        return intern ("fall-through");
-      /* Otherwise leave rks_key set to the drag event; loop again.  */
-    }
-  return intern ("fall-through");
-}
-
-DEFUN ("--rks-reduce-mouse-event-loop",
-       Fc_rks_reduce_mouse_event_loop,
-       Sc_rks_reduce_mouse_event_loop, 0, 0, 0,
-       doc: /* Internal: drag/click/double/triple reduction cascade
-for rks_key.  Returns `fall-through', `replay-key', or
-`replay-sequence'.  See M6ad / Step E4.  */)
-  (void)
-{
-  Lisp_Object head = EVENT_HEAD (rks_key);
-  if (!SYMBOLP (head))
-    return intern ("fall-through");
-  Lisp_Object breakdown = parse_modifiers (head);
-  int modifiers = XFIXNUM (XCAR (XCDR (breakdown)));
-  int reducer_mask = up_modifier | down_modifier | drag_modifier
-                     | double_modifier | triple_modifier;
-  if (!(modifiers & reducer_mask))
-    return intern ("fall-through");
-  return rks_reduce_strip_loop (breakdown, modifiers, reducer_mask);
-}
+/* imp-3: the reduction cascade (rks_reduce_rewind_one_keyremap /
+   rks_reduce_rewind_keyremaps_to_last_real /
+   rks_reduce_dispose_unbound_up_down / rks_reduce_try_new_binding /
+   rks_reduce_strip_loop / --rks-reduce-mouse-event-loop) was ported to
+   Scheme as rks-reduce-mouse-event-loop! in (emacs read-key-sequence);
+   the C bodies are deleted.  See docs/keyboard.org §M6ad.  */
 
 /* M6ac — bulk splice of the mouse-click prefix expansion (and
    menu-bar / tab-bar / tool-bar prefix insertion).  Returns one of:
@@ -9404,21 +9296,11 @@ See M6ac / Step E6.  */)
   return intern ("fall-through");
 }
 
-DEFUN ("--rks-follow-key",
-       Fc_rks_follow_key,
-       Sc_rks_follow_key, 2, 2, 0,
-       doc: /* Internal: call C follow_key (CURRENT-BINDING, KEY).
-Returns the binding or nil.  Scheme owns the first_unbound update
-logic in rks-follow-key-and-update-first-unbound!.  */)
-  (Lisp_Object current_binding, Lisp_Object key)
-{
-  return follow_key (current_binding, key);
-}
-
 /* M6ab — former --rks-follow-key-and-update-first-unbound bulk subr
    (17 lines), decomposed into --rks-follow-key shim + Scheme logic
-   in rks-follow-key-and-update-first-unbound!.  See docs/m6-plan.org
-   Step E3.  */
+   in rks-follow-key-and-update-first-unbound!.  imp-3 deleted the
+   --rks-follow-key shim; rks-follow-key is now pure Scheme.
+   See docs/m6-plan.org Step E3.  */
 
 DEFUN ("--rks-new-binding", Fc_rks_new_binding, Sc_rks_new_binding,
        0, 0, 0,
@@ -10202,160 +10084,16 @@ Returns 0 when no call is in flight.  */)
   return make_fixnum (0);
 }
 
-/* M6x — three translation-map walks (input-decode-map, function-
-   key-map, key-translation-map) plus the in-between fkey-shortcut.
-   See docs/keyboard.org §M6x.
-
-   Forward declarations needed: keyremap_step and test_undefined are
-   defined further down in this file.  */
-static bool keyremap_step (Lisp_Object *, volatile keyremap *, int,
-                           bool, int *, Lisp_Object);
-static bool test_undefined (Lisp_Object);
-
-DEFUN ("--rks-walk-indec",
-       Fc_rks_walk_indec,
-       Sc_rks_walk_indec, 1, 1, 0,
-       doc: /* Internal: walk the input-decode-map (indec) over
-the current keybuf.  Returns t when a step completes (mock_input
-updated), nil when exhausted.  */)
-  (Lisp_Object prompt)
-{
-  if (rks_keybuf_depth == 0)
-    return Qnil;
-  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-  /* C-9b: load keyremap from record into local; mutate; store back.  */
-  keyremap indec;
-  rks_keyremap_load (RKS_SLOT_INDEC, &indec);
-  while (indec.end < rks_t)
-    {
-      int diff;
-      bool done = keyremap_step (keybuf, &indec,
-                                 max (rks_t, rks_mock_input),
-                                 true, &diff, prompt);
-      if (!done) continue;
-      rks_mock_input = diff + max (rks_t, rks_mock_input);
-      if (rks_state_depth > 0)
-        rks_set_int (rks_state_stack[rks_state_depth - 1],
-                     RKS_SLOT_MOCK_INPUT, rks_mock_input);
-      rks_keyremap_store (RKS_SLOT_INDEC, &indec);
-      return Qt;
-    }
-  rks_keyremap_store (RKS_SLOT_INDEC, &indec);
-  return Qnil;
-}
-
-/* C-9b: --rks-fkey-shortcut-or-walk decomposed.  Both branches go
-   through record-backed load/store now.  */
-
-static Lisp_Object
-rks_fkey_shortcut_advance (void)
-{
-  /* Bound non-keymap + no indec scan pending — advance fkey past
-     rks_t so keytran can still scan.  */
-  keyremap fkey;
-  rks_keyremap_load (RKS_SLOT_FKEY, &fkey);
-  if (fkey.start < rks_t)
-    {
-      fkey.start = fkey.end = rks_t;
-      fkey.map = fkey.parent;
-      rks_keyremap_store (RKS_SLOT_FKEY, &fkey);
-    }
-  return Qnil;
-}
-
-static Lisp_Object
-rks_fkey_walk (Lisp_Object *keybuf, Lisp_Object prompt)
-{
-  keyremap fkey, indec;
-  rks_keyremap_load (RKS_SLOT_FKEY,  &fkey);
-  rks_keyremap_load (RKS_SLOT_INDEC, &indec);
-  while (fkey.end < indec.start)
-    {
-      int diff;
-      bool done = keyremap_step (keybuf, &fkey,
-                                 max (rks_t, rks_mock_input),
-                                 (fkey.end + 1 == rks_t
-                                  && test_undefined (rks_current_binding)),
-                                 &diff, prompt);
-      if (!done) continue;
-      rks_mock_input = diff + max (rks_t, rks_mock_input);
-      indec.end   += diff;
-      indec.start += diff;
-      if (rks_state_depth > 0)
-        rks_set_int (rks_state_stack[rks_state_depth - 1],
-                     RKS_SLOT_MOCK_INPUT, rks_mock_input);
-      rks_keyremap_store (RKS_SLOT_FKEY,  &fkey);
-      rks_keyremap_store (RKS_SLOT_INDEC, &indec);
-      return Qt;
-    }
-  rks_keyremap_store (RKS_SLOT_FKEY, &fkey);
-  return Qnil;
-}
-
-DEFUN ("--rks-fkey-shortcut-or-walk",
-       Fc_rks_fkey_shortcut_or_walk,
-       Sc_rks_fkey_shortcut_or_walk, 1, 1, 0,
-       doc: /* Internal: fkey (function-key-map) shortcut or walk.
-When current_binding is a bound non-keymap and no indec scan is
-pending, advance fkey past rks_t so keytran can still scan.
-Otherwise walk fkey from fkey.end < indec.start.  Returns t when
-a hit is found (mock_input + indec counters updated), nil when
-exhausted.  */)
-  (Lisp_Object prompt)
-{
-  if (rks_keybuf_depth == 0)
-    return Qnil;
-  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-  if (!KEYMAPP (rks_current_binding)
-      && !test_undefined (rks_current_binding)
-      && rks_keyremap_field_int (RKS_SLOT_INDEC, KM_SLOT_START) >= rks_t)
-    return rks_fkey_shortcut_advance ();
-  return rks_fkey_walk (keybuf, prompt);
-}
-
-DEFUN ("--rks-walk-keytran",
-       Fc_rks_walk_keytran,
-       Sc_rks_walk_keytran, 1, 1, 0,
-       doc: /* Internal: walk the key-translation-map (keytran) over
-the current keybuf.  Returns t on a hit (mock_input + indec + fkey
-updated), nil when exhausted.  */)
-  (Lisp_Object prompt)
-{
-  if (rks_keybuf_depth == 0)
-    return Qnil;
-  Lisp_Object *keybuf = rks_keybuf_stack[rks_keybuf_depth - 1];
-  /* C-9b: load keytran, fkey, indec from record.  */
-  keyremap keytran, fkey, indec;
-  rks_keyremap_load (RKS_SLOT_KEYTRAN, &keytran);
-  rks_keyremap_load (RKS_SLOT_FKEY,    &fkey);
-  rks_keyremap_load (RKS_SLOT_INDEC,   &indec);
-  while (keytran.end < fkey.start)
-    {
-      int diff;
-      bool done = keyremap_step (keybuf, &keytran,
-                                 max (rks_t, rks_mock_input),
-                                 true, &diff, prompt);
-      if (!done) continue;
-      rks_mock_input = diff + max (rks_t, rks_mock_input);
-      indec.end   += diff;
-      indec.start += diff;
-      fkey.end    += diff;
-      fkey.start  += diff;
-      if (rks_state_depth > 0)
-        rks_set_int (rks_state_stack[rks_state_depth - 1],
-                     RKS_SLOT_MOCK_INPUT, rks_mock_input);
-      rks_keyremap_store (RKS_SLOT_KEYTRAN, &keytran);
-      rks_keyremap_store (RKS_SLOT_FKEY,    &fkey);
-      rks_keyremap_store (RKS_SLOT_INDEC,   &indec);
-      return Qt;
-    }
-  rks_keyremap_store (RKS_SLOT_KEYTRAN, &keytran);
-  return Qnil;
-}
-
-/* M6x — former --rks-walk-translation-maps bulk subr (99 lines),
-   decomposed into three per-map walk shims + Scheme orchestration
-   in rks-walk-translation-maps!.  See docs/m6-plan.org Step E5.  */
+/* M6x — the three translation-map walks (input-decode-map,
+   function-key-map, key-translation-map) plus the in-between
+   fkey-shortcut were ported to Scheme in imp-3: rks-walk-translation-maps!
+   (and its rks-walk-indec-scheme! / rks-fkey-shortcut-or-walk-scheme! /
+   rks-walk-keytran-scheme! helpers) in (emacs read-key-sequence) drive
+   rks-keyremap-step! over the state's keyremap records.  The C DEFUNs
+   --rks-walk-indec / --rks-fkey-shortcut-or-walk / --rks-walk-keytran,
+   their helpers rks_fkey_shortcut_advance / rks_fkey_walk, and the
+   keyremap_step / test_undefined forward declarations are deleted.
+   See docs/keyboard.org §M6x.  */
 
 /* M6w — shifted-function-key shift-translation (block C at the
    while-loop iteration tail).  See docs/keyboard.org §M6w.  */
@@ -10588,140 +10326,12 @@ Mirrors the C `replay_entire_sequence:' inline block.  */)
   return Qnil;
 }
 
-/* Lookup KEY in MAP.
-   MAP is a keymap mapping keys to key vectors or functions.
-   If the mapping is a function and DO_FUNCALL is true,
-   the function is called with PROMPT as parameter and its return
-   value is used as the return value of this function (after checking
-   that it is indeed a vector).
-
-   START and END are the indices of the first and last key of the
-   sequence being remapped within the keyboard buffer KEYBUF.  */
-
-static Lisp_Object
-access_keymap_keyremap (Lisp_Object map, Lisp_Object key, Lisp_Object prompt,
-			bool do_funcall, unsigned int start, unsigned int end,
-			Lisp_Object *keybuf)
-{
-  Lisp_Object next;
-
-  next = access_keymap (map, key, 1, 0, 1);
-
-  /* Handle a symbol whose function definition is a keymap
-     or an array.  */
-  if (SYMBOLP (next) && !NILP (Ffboundp (next))
-      && (ARRAYP (SYMBOL_FUNCTION (next))
-	  || KEYMAPP (SYMBOL_FUNCTION (next))))
-    next = Fautoload_do_load (SYMBOL_FUNCTION (next),
-                                              next, Qnil);
-
-  /* If the keymap gives a function, not an
-     array, then call the function with one arg and use
-     its value instead.  */
-  if (do_funcall && FUNCTIONP (next))
-    {
-      Lisp_Object tem, remap;
-      tem = next;
-
-      /* Build Vcurrent_key_remap_sequence.  */
-      remap = Fvector (end - start + 1, keybuf + start);
-
-      /* Bind `current-key-remap-sequence' to the key sequence being
-	 remapped.  */
-      dynwind_begin ();
-      specbind_guile (Qcurrent_key_remap_sequence, remap);
-      next = call1 (next, prompt);
-      dynwind_end ();
-
-      /* If the function returned something invalid,
-	 barf--don't ignore it.  */
-      if (! (NILP (next) || VECTOR_OR_PSEUDOVECTORP (next) || STRINGP (next)))
-	signal_error ("Function returns invalid key sequence", tem);
-    }
-  return next;
-}
-
-/* Do one step of the key remapping used for function-key-map and
-   key-translation-map:
-   KEYBUF is the READ_KEY_ELTS-size buffer holding the input events.
-   FKEY is a pointer to the keyremap structure to use.
-   INPUT is the index of the last element in KEYBUF.
-   DOIT if true says that the remapping can actually take place.
-   DIFF is used to return the number of keys added/removed by the remapping.
-   PARENT is the root of the keymap.
-   PROMPT is the prompt to use if the remapping happens through a function.
-   Return true if the remapping actually took place.  */
-
-static bool
-keyremap_step (Lisp_Object *keybuf, volatile keyremap *fkey,
-	       int input, bool doit, int *diff, Lisp_Object prompt)
-{
-  Lisp_Object next, key;
-  ptrdiff_t buf_start, buf_end;
-
-  /* Save the key sequence being translated.  */
-  buf_start = fkey->start;
-  buf_end = fkey->end;
-
-  key = keybuf[fkey->end++];
-
-  if (KEYMAPP (fkey->parent))
-    next = access_keymap_keyremap (fkey->map, key, prompt, doit,
-				   buf_start, buf_end, keybuf);
-  else
-    next = Qnil;
-
-  /* If keybuf[fkey->start..fkey->end] is bound in the
-     map and we're in a position to do the key remapping, replace it with
-     the binding and restart with fkey->start at the end.  */
-  if ((VECTOR_OR_PSEUDOVECTORP (next) || STRINGP (next)) && doit)
-    {
-      int len = XFIXNAT (Flength (next));
-      int i;
-
-      *diff = len - (fkey->end - fkey->start);
-
-      if (READ_KEY_ELTS - input <= *diff)
-	error ("Key sequence too long");
-
-      /* Shift the keys that follow fkey->end.  */
-      if (*diff < 0)
-	for (i = fkey->end; i < input; i++)
-	  keybuf[i + *diff] = keybuf[i];
-      else if (*diff > 0)
-	for (i = input - 1; i >= fkey->end; i--)
-	  keybuf[i + *diff] = keybuf[i];
-      /* Overwrite the old keys with the new ones.  */
-      for (i = 0; i < len; i++)
-	keybuf[fkey->start + i]
-	  = Faref (next, make_fixnum (i));
-
-      fkey->start = fkey->end += *diff;
-      fkey->map = fkey->parent;
-
-      return 1;
-    }
-
-  fkey->map = get_keymap (next, 0, 1);
-
-  /* If we no longer have a bound suffix, try a new position for
-     fkey->start.  */
-  if (!CONSP (fkey->map))
-    {
-      fkey->end = ++fkey->start;
-      fkey->map = fkey->parent;
-    }
-  return 0;
-}
-
-static bool
-test_undefined (Lisp_Object binding)
-{
-  return (NILP (binding)
-	  || EQ (binding, Qundefined)
-	  || (SYMBOLP (binding)
-	      && EQ (Fcommand_remapping (binding, Qnil, Qnil), Qundefined)));
-}
+/* imp-3: keyremap_step and access_keymap_keyremap were ported to
+   Scheme as rks-keyremap-step! / rks-access-keymap-keyremap in
+   (emacs read-key-sequence) and their C bodies deleted (their only
+   remaining caller was the walk DEFUNs, also deleted in imp-3).
+   test_undefined was ported as rks-test-undefined?.  See
+   docs/keyboard.org §M6h/§M6x.  */
 
 void init_raw_keybuf_count (void)
 {
