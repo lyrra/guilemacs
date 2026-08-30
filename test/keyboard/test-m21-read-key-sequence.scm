@@ -1,4 +1,4 @@
-;;; test-m21-read-key-sequence.scm --- M21 imp-1 parity corpus.
+;;; test-m21-read-key-sequence.scm --- M21 imp-1 + imp-2 parity corpus.
 ;;;
 ;;; Proves that the two setup functions for the three keyremaps
 ;;; (indec / fkey / keytran) at the start of a key-sequence read are
@@ -307,6 +307,29 @@
          (vector (char->integer #\b) (char->integer #\c))
          (front-vector kb 2)))
 
+;;; --- 3.5b funcall branch: lambda reads current-key-remap-sequence -----
+;;; Review Finding 1.  Inside the funcall, current-key-remap-sequence is
+;;; bound to the slice keybuf[start..end] (inclusive) that was looked
+;;; up.  For this single-key case that slice is the one-element vector
+;;; #(a).  The lambda echoes the slice's first element (proving it read
+;;; the *bound* slice, not stale data) plus one more key; the resulting
+;;; remap [a c] proves the bind content too.
+(let* ((m   (make-stub-map 'funcall-read-remap))
+       (fkey (make-keyremap m))
+       (kb   (make-keybuf (char->integer #\a)))
+       (fn   (list 'lambda '(prompt)
+                   (list 'vector
+                         (list 'aref 'current-key-remap-sequence 0)
+                         (char->integer #\c)))))
+  ((%sym 'define-key) m (vector (char->integer #\a)) fn)
+  ;; [a] slice → remap [a c] (len 2): diff = 2 - (1 - 0) = 1.
+  (check "m21/step/funcall-read-remap/returns-diff"
+         1 (rks-keyremap-step! fkey kb 1 #t "prompt"))
+  ;; The leading 'a' in the result can only come from the bound slice.
+  (check "m21/step/funcall-read-remap/overwrites"
+         (vector (char->integer #\a) (char->integer #\c))
+         (front-vector kb 2)))
+
 ;;; --- 3.6 funcall branch: invalid return value signals an error ------
 (let* ((m   (make-stub-map 'funcall-invalid))
        (fkey (make-keyremap m))
@@ -315,9 +338,9 @@
   ((%sym 'define-key) m (vector (char->integer #\a)) fn)
   (check "m21/step/funcall-invalid/error" #t
          (not (eq? 'no-error
-                   (car (caught-error
-                         (lambda ()
-                           (rks-keyremap-step! fkey kb 1 #t "prompt"))))))))
+                   (caught-error
+                    (lambda ()
+                      (rks-keyremap-step! fkey kb 1 #t "prompt")))))))
 
 ;;; --- 3.7 "Key sequence too long" error ------------------------------
 ;;; input close to READ-KEY-ELTS plus a translation whose diff would
@@ -332,9 +355,9 @@
   ;; READ-KEY-ELTS - input = 1 <= 2 → error.
   (check "m21/step/too-long/error" #t
          (not (eq? 'no-error
-                   (car (caught-error
-                         (lambda ()
-                           (rks-keyremap-step! fkey kb (- READ-KEY-ELTS 1) #t "prompt"))))))))
+                   (caught-error
+                    (lambda ()
+                      (rks-keyremap-step! fkey kb (- READ-KEY-ELTS 1) #t "prompt")))))))
 
 ;;; --- 3.8 buffer shift: expansion shifts a trailing event up ---------
 ;;; 'a' → [c d] (len 2, diff +1) with a trailing event at index 1:

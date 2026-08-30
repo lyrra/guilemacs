@@ -169,7 +169,7 @@
 (load "test/keyboard/test-m19-kind.el")           ; M19 imp-3
 (load "test/keyboard/test-m19-tables.el")         ; M19 imp-4
 (load "test/keyboard/test-m20-menu-prompt.el")    ; M20 imp-1 + imp-2
-(load "test/keyboard/test-m21-read-key-sequence.el") ; M21 imp-1
+(load "test/keyboard/test-m21-read-key-sequence.el") ; M21 imp-1 + imp-2
 (message "")
 
 (message "========================================")
