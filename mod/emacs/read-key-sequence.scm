@@ -49,6 +49,7 @@
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
             rks-walk-translation-maps!
+            rks-keyremap-step!
             rks-iteration-prepare!
             rks-iter-setup-capture!
             rks-iter-replay-restore!
@@ -142,6 +143,148 @@ reinitialize from current-kboard / Vkey_translation_map."
   (set-keyremap-map!    kr new-parent)
   (set-keyremap-start!  kr 0)
   (set-keyremap-end!    kr 0))
+
+;;;;
+;;;; M6h — rks-keyremap-step!: port of C keyremap_step +
+;;;; access_keymap_keyremap (src/keyboard.c:10601-10715).
+;;;;
+;;;; This is imp-2.  It is NOT wired into the live code path yet: the
+;;;; three C walk DEFUNs still call the C keyremap_step.  The cutover
+;;;; is imp-3.  Callers of rks-keyremap-step! are Scheme test code and
+;;;; (later) rks-walk-translation-maps!.
+
+(define %rks-access-keymap (delay (%c '--access-keymap)))
+(define %rks-get-keymap    (delay (%c '--get-keymap)))
+(define %rks-funcall       (delay (%c 'funcall)))
+(define %rks-aref          (delay (%c 'aref)))
+(define %rks-length        (delay (%c 'length)))
+(define %rks-error         (delay (%c 'error)))
+(define %rks-signal        (delay (%c 'signal)))
+(define %rks-vectorp       (delay (%c 'vectorp)))
+(define %rks-stringp       (delay (%c 'stringp)))
+(define %rks-keymapp       (delay (%c 'keymapp)))
+(define %rks-functionp     (delay (%c 'functionp)))
+(define %rks-symbolp       (delay (%c 'symbolp)))
+(define %rks-fboundp       (delay (%c 'fboundp)))
+(define %rks-autoload-do-load (delay (%c 'autoload-do-load)))
+
+;;; Port of access_keymap_keyremap (src/keyboard.c:10601-10642).
+;;; Looks up KEY in MAP; handles the autoload-shaped branch (symbol
+;;; whose function cell is a keymap or an array) and the funcall branch
+;;; (keymap entry is a function, called with PROMPT).  START/END are
+;;; the keybuf indices of the sequence being remapped; KEYBUF holds the
+;;; events.  Returns the remap value (vector/string/function result, or
+;;; nil when MAP has no usable binding for KEY).
+(define (rks-access-keymap-keyremap map key prompt do-funcall start end keybuf)
+  (let ((next ((force %rks-access-keymap) map key)))
+    ;; Symbol whose function definition is a keymap or an array.  C:
+    ;; SYMBOLP && !NILP(Ffboundp) && (ARRAYP(SYMBOL_FUNCTION) ||
+    ;; KEYMAPP(SYMBOL_FUNCTION)) -- here ARRAYP is the practical
+    ;; vectorp|stringp subset (see brief.org Open decision 1).  A plain
+    ;; defalias to a keymap-valued symbol takes the same path as a real
+    ;; autoload, because the branch only checks fboundp plus the cell's
+    ;; type.
+    (when (and ((force %rks-symbolp) next)
+               (not (%nilp ((force %rks-fboundp) next))))
+      (let ((fn (symbol-function next)))
+        (when (or ((force %rks-keymapp) fn)
+                  ((force %rks-vectorp) fn)
+                  ((force %rks-stringp) fn))
+          (set! next ((force %rks-autoload-do-load) fn next #nil)))))
+    ;; If the keymap gives a function, call it with PROMPT and use its
+    ;; return value instead of the function object.
+    (when (and do-funcall
+               (not (%nilp ((force %rks-functionp) next))))
+      ;; Build Vcurrent_key_remap_sequence from keybuf[start..end]
+      ;; (inclusive) and specbind it around the call (dynamic-wind, the
+      ;; same idiom read-key-sequence-vs uses for its specbinds).
+      (let* ((remap (list->vector
+                     (let loop ((i end) (acc '()))
+                       (if (< i start)
+                           acc
+                           (loop (- i 1) (cons (vector-ref keybuf i) acc))))))
+             (tem  next)
+             (saved (symbol-value 'current-key-remap-sequence)))
+        (dynamic-wind
+          (lambda () (set-symbol-value! 'current-key-remap-sequence remap))
+          (lambda ()
+            (set! next ((force %rks-funcall) tem prompt)))
+          (lambda () (set-symbol-value! 'current-key-remap-sequence saved)))
+        ;; Barf on an invalid return value, exactly like C's
+        ;; signal_error ("Function returns invalid key sequence", tem).
+        (unless (or (%nilp next)
+                    ((force %rks-vectorp) next)
+                    ((force %rks-stringp) next))
+          ((force %rks-signal) 'error
+           (list "Function returns invalid key sequence" tem)))))
+    next))
+
+;;; Port of keyremap_step (src/keyboard.c:10655-10715).
+;;; FKEY is a <keyremap> record, mutated in place.  KEYBUF is the
+;;; state's keybuf vector (rks-state-keybuf).  INPUT is the index of
+;;; the last element in KEYBUF.  DOIT? says whether a translation may
+;;; actually take place.  Returns the diff (an integer, possibly 0)
+;;; when a translation happened, or #f when it did not.  The Scheme
+;;; return convention packs C's (bool done, int* diff) into one value:
+;;; 0 is truthy in Scheme, so a zero-length diff is not confused with
+;;; "no translation".
+(define (rks-keyremap-step! fkey keybuf input doit? prompt)
+  (let* ((buf-start (keyremap-start fkey))
+         (buf-end   (keyremap-end fkey))
+         (key       (vector-ref keybuf (keyremap-end fkey))))
+    (set-keyremap-end! fkey (+ (keyremap-end fkey) 1))
+    (let ((next (if (not (%nilp ((force %rks-keymapp) (keyremap-parent fkey))))
+                    (rks-access-keymap-keyremap
+                     (keyremap-map fkey) key prompt doit?
+                     buf-start buf-end keybuf)
+                    #nil)))
+      (if (and doit?
+               (or ((force %rks-vectorp) next)
+                   ((force %rks-stringp) next)))
+          ;; keybuf[start..end] is bound in the map: replace it.
+          (let* ((len  ((force %rks-length) next))
+                 (diff (- len (- (keyremap-end fkey) (keyremap-start fkey)))))
+            (when (<= (- READ-KEY-ELTS input) diff)
+              ((force %rks-error) "Key sequence too long"))
+            ;; Shift keybuf entries between fkey->end and input by DIFF
+            ;; slots.  Negative diff shifts down from the low end;
+            ;; positive shifts up from the high end (so as not to
+            ;; overwrite not-yet-moved data).
+            (if (< diff 0)
+                (let loop ((i (keyremap-end fkey)))
+                  (when (< i input)
+                    (vector-set! keybuf (+ i diff) (vector-ref keybuf i))
+                    (loop (+ i 1))))
+                (when (> diff 0)
+                  (let loop ((i (- input 1)))
+                    (when (>= i (keyremap-end fkey))
+                      (vector-set! keybuf (+ i diff) (vector-ref keybuf i))
+                      (loop (- i 1))))))
+            ;; Overwrite the old keys with the new ones.  Faref, not
+            ;; vector-ref, because NEXT may be a string or a vector.
+            (let loop ((i 0))
+              (when (< i len)
+                (vector-set! keybuf (+ (keyremap-start fkey) i)
+                             ((force %rks-aref) next i))
+                (loop (+ i 1))))
+            ;; fkey->start = fkey->end += diff  (order matters: end is
+            ;; incremented first, then start is set to the new end).
+            (set-keyremap-end! fkey (+ (keyremap-end fkey) diff))
+            (set-keyremap-start! fkey (keyremap-end fkey))
+            (set-keyremap-map! fkey (keyremap-parent fkey))
+            diff)
+          ;; No usable binding (or doit? is false): follow into the
+          ;; submap, resetting the scan if there is no bound suffix.
+          (begin
+            (set-keyremap-map! fkey
+                               ((force %rks-get-keymap) next #nil #t))
+            (when (not (pair? (keyremap-map fkey)))
+              ;; C: fkey->end = ++fkey->start; both become start+1.
+              (let ((s (keyremap-start fkey)))
+                (set-keyremap-start! fkey (+ s 1))
+                (set-keyremap-end! fkey (keyremap-start fkey)))
+              (set-keyremap-map! fkey (keyremap-parent fkey)))
+            #f)))))
 
 ;;; The rks-state record bundles every local variable of
 ;;; read_key_sequence that flows through the state machine.  Slots
