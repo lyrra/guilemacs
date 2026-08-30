@@ -8589,6 +8589,17 @@ tool_bar_items (Lisp_Object reuse, int *nitems)
 
 /* Reading key sequences.  */
 
+DEFUN ("--access-keymap", Faccess_keymap, Saccess_keymap, 2, 2, 0,
+       doc: /* FIX-20260830-guilemacs: internal: thin shim over C
+access_keymap.  Look up KEY in MAP with the fixed flags t_ok=1,
+noinherit=0, autoload=1 -- the flags used by both current C callers,
+`follow_key' and `access_keymap_keyremap'.  Not a general-purpose
+keymap lookup: `lookup-key' has different prefix/t_ok semantics.  */)
+  (Lisp_Object map, Lisp_Object key)
+{
+  return access_keymap (map, key, 1, 0, 1);
+}
+
 static Lisp_Object
 follow_key (Lisp_Object keymap, Lisp_Object key)
 {

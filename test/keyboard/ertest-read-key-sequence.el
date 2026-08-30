@@ -703,4 +703,43 @@ replaced by STUB.  Restore afterwards regardless of how THUNK exits."
   ;; the call runs cleanly and returns nil.
   (should (eq nil (--rks-iter-maybe-disable-text-conversion!))))
 
+;;;; M21 imp-1 — --access-keymap shim
+;;;; Look up KEY in MAP with fixed flags t_ok=1, noinherit=0, autoload=1
+;;;; (the flags used by both C callers, follow_key and
+;;;; access_keymap_keyremap).  Keymap built with the
+;;;; make-sparse-keymap/define-key idiom.  Keep in sync with
+;;;; test-read-key-sequence.el.
+
+(ert-deftest access-keymap/exists ()
+  (should (fboundp '--access-keymap)))
+
+(ert-deftest access-keymap/direct-command ()
+  (let ((m (make-sparse-keymap)))
+    (define-key m [?a] 'cmd1)
+    (should (eq 'cmd1 (--access-keymap m ?a)))))
+
+(ert-deftest access-keymap/submap-routing ()
+  (let ((m (make-sparse-keymap))
+        (sub (make-sparse-keymap)))
+    (define-key sub [?x] 'cmdx)
+    (define-key m [?b] sub)
+    (should (keymapp (--access-keymap m ?b)))
+    (should (eq 'cmdx (--access-keymap (--access-keymap m ?b) ?x)))))
+
+(ert-deftest access-keymap/unbound-nil ()
+  (let ((m (make-sparse-keymap)))
+    (define-key m [?a] 'cmd1)
+    (should (eq nil (--access-keymap m ?z)))))
+
+(ert-deftest access-keymap/fall-through-default ()
+  ;; A default binding is the literal (t . DEFAULT) cons in the keymap.
+  ;; NB: (define-key m [t] ...) does NOT produce it here — define-key
+  ;; stores a symbol named "t" that is not eq to C's Qt (the t_ok
+  ;; fall-through checks EQ(key, Qt)); append the cons directly.
+  (let ((m (make-sparse-keymap)))
+    (define-key m [?a] 'cmd1)
+    (setcdr m (cons (cons 't 'default-cmd) (cdr m)))
+    (should (eq 'default-cmd (--access-keymap m ?z)))
+    (should (eq 'cmd1 (--access-keymap m ?a)))))
+
 (provide 'ertest-read-key-sequence)

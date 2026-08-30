@@ -464,4 +464,41 @@
 (test-eq "m6ae/runs-without-error"
          nil (--rks-iter-maybe-disable-text-conversion!))
 
+;;;; M21 imp-1 -- --access-keymap shim
+;;;; Look up KEY in MAP with fixed flags t_ok=1, noinherit=0, autoload=1
+;;;; (the flags used by both C callers, follow_key and
+;;;; access_keymap_keyremap).  Keymap built with the
+;;;; make-sparse-keymap/define-key idiom (see
+;;;; test-event-modifiers.el:50-53).
+
+(let ((m (make-sparse-keymap)))
+  ;; directly bound command
+  (define-key m [?a] 'cmd1)
+  (test-eq "access-keymap/direct-command" 'cmd1 (--access-keymap m ?a))
+  ;; submap binding returned as a keymap
+  (let ((sub (make-sparse-keymap)))
+    (define-key sub [?x] 'cmdx)
+    (define-key m [?b] sub)
+    (test-assert "access-keymap/submap-is-keymap"
+                 (keymapp (--access-keymap m ?b)))
+    (test-eq "access-keymap/submap-routing" 'cmdx
+             (--access-keymap (--access-keymap m ?b) ?x)))
+  ;; unbound key with no default returns nil
+  (test-eq "access-keymap/unbound-nil" nil (--access-keymap m ?z)))
+
+;; unbound key falls through to a (t . DEFAULT) entry when present.
+;; A default binding is the literal (t . DEFAULT) cons in the keymap.
+;; NB: (define-key m [t] ...) does NOT produce it here — define-key
+;; stores a symbol whose name is "t" but which is not eq to C's Qt
+;; (the t_ok fall-through checks EQ(key, Qt)); append the cons
+;; directly so the fall-through is genuinely exercised.
+(let ((m (make-sparse-keymap)))
+  (define-key m [?a] 'cmd1)
+  (setcdr m (cons (cons 't 'default-cmd) (cdr m)))
+  (test-eq "access-keymap/fall-through-default" 'default-cmd
+           (--access-keymap m ?z))
+  ;; but a directly-bound key still wins over the default
+  (test-eq "access-keymap/direct-beats-default" 'cmd1
+           (--access-keymap m ?a)))
+
 (test-end)
