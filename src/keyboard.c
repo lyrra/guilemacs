@@ -3740,16 +3740,17 @@ exit is needed.  */)
 
 /* M8h — tiny C shims for the Scheme-owned X-menu / auto-save-by-
    timeout / GC-on-idle prologue.  Scheme owns the per-block gate
-   logic and dispatch; C still owns the read_char_x_menu_prompt
-   helper, the idle-timer machinery, and the buffer-size-scaled
-   auto-save / GC block which is dense C-internal arithmetic.  */
+   logic and dispatch; the X-menu step calls into (emacs menu-prompt)
+   read-char-x-menu-prompt; C still owns the idle-timer machinery,
+   and the buffer-size-scaled auto-save / GC block which is dense
+   C-internal arithmetic.  */
 
 DEFUN ("--rc-read-char-x-menu-prompt",
        Fc_rc_read_char_x_menu_prompt,
        Sc_rc_read_char_x_menu_prompt, 0, 0, 0,
-       doc: /* Internal: call C read_char_x_menu_prompt with the
-top-of-stack rec's map / prev-event slots and a local on-stack bool.
-Returns two values: the resulting event, and a boolean that is
+       doc: /* Internal: take the top-of-stack rec's MAP and PREV-EVENT
+slots, forward them to (emacs menu-prompt) read-char-x-menu-prompt,
+and read the two-value result: the event, and a boolean that is
 true exactly when the read produced a menu choice (M12 imp-3: the
 caller-owned used-mouse-menu pointer is gone; the flag travels as
 this plain boolean).  Used by Scheme rc-prologue-xmenu-and-idle-gc!
@@ -3888,8 +3889,7 @@ the only C-private piece M8g Block 3 needs from Scheme.  */)
 }
 
 /* M8f — tiny C shims for the Scheme-owned echo/menu prologue.
-   Scheme owns the control flow; C still owns the echo globals and
-   the file-static read_char_minibuf_menu_prompt helper.  */
+   Scheme owns the control flow; C still owns the echo globals.  */
 
 DEFUN ("--rc-echo-area-has-wrong-kboard-p",
        Fc_rc_echo_area_has_wrong_kboard_p,
@@ -3908,8 +3908,9 @@ Used by Scheme rc-echo-cancel-or-dash.  */)
 DEFUN ("--rc-read-char-minibuf-menu-prompt",
        Fc_rc_read_char_minibuf_menu_prompt,
        Sc_rc_read_char_minibuf_menu_prompt, 2, 2, 0,
-       doc: /* Internal: call read_char_minibuf_menu_prompt.
-COMMANDFLAG must be a fixnum.  MAP is the keymap candidate.
+       doc: /* Internal: forward COMMANDFLAG and MAP to (emacs menu-prompt)
+read-char-minibuf-menu-prompt.  COMMANDFLAG must be a fixnum.
+MAP is the keymap candidate.
 Used by Scheme rc-prologue-echo-and-menu!.  */)
   (Lisp_Object commandflag, Lisp_Object map)
 {
