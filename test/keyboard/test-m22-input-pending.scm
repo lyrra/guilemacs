@@ -176,67 +176,94 @@
     ((force %total-set!) osize)
     ((force %idx-set!) 0)))
 
-;; 3a. Grow: 300 -> 500.  All 300 recorded keys keep their order; new
-;; slots 300..499 are nil; index = 300 % 500 = 300.
-(setup-ring 300)
-(let ((ret (lossage-size 500)))
-  (check "m22/lossage/grow/returns" 500 ret)
-  (let ((ring ((force %ring))))
-    (check "m22/lossage/grow/size" 500 (vector-length ring))
-    (check "m22/lossage/grow/first" 0 (vector-ref ring 0))
-    (check "m22/lossage/grow/last-kept" 299 (vector-ref ring 299))
-    (check "m22/lossage/grow/new-first-slot" #nil (vector-ref ring 300))
-    (check "m22/lossage/grow/new-last-slot" #nil (vector-ref ring 499))
-    (check "m22/lossage/grow/index" 300 ((force %idx)))
-    (check "m22/lossage/grow/limit" 500 ((force %limit)))))
+;; §3 mutates C-owned recent-keys ring state (ring vector, index, total,
+;; limit).  Snapshot all four once and restore them in the dynamic-wind's
+;; after thunk, so §3 leaves the shared Guile process exactly as it found
+;; it — regardless of random test-file load order and even if a check
+;; throws (cr.org Finding 1: the old code left --total-keys at 300, which
+;; broke the pre-existing m3-recent-keys tests whenever this file loaded
+;; last in the keyboard group).
+(define %ring-saved  ((force %ring)))
+(define %idx-saved   ((force %idx)))
+(define %total-saved ((force %total)))
+(define %limit-saved ((force %limit)))
 
-;; 3b. Shrink: 300 -> 100.  Only the newest 100 (slots 200..299) survive,
-;; in order.  idx = 100 % 100 = 0.
-(setup-ring 300)
-(let ((ret (lossage-size 100)))
-  (check "m22/lossage/shrink/returns" 100 ret)
-  (let ((ring ((force %ring))))
-    (check "m22/lossage/shrink/size" 100 (vector-length ring))
-    (check "m22/lossage/shrink/oldest-kept" 200 (vector-ref ring 0))
-    (check "m22/lossage/shrink/newest-kept" 299 (vector-ref ring 99))
-    (check "m22/lossage/shrink/index" 0 ((force %idx)))
-    (check "m22/lossage/shrink/limit" 100 ((force %limit)))))
+(dynamic-wind
+  (lambda () #f)
+  (lambda ()
+    ;; 3a. Grow: 300 -> 500.  All 300 recorded keys keep their order; new
+    ;; slots 300..499 are nil; index = 300 % 500 = 300.
+    (setup-ring 300)
+    (let ((ret (lossage-size 500)))
+      (check "m22/lossage/grow/returns" 500 ret)
+      (let ((ring ((force %ring))))
+        (check "m22/lossage/grow/size" 500 (vector-length ring))
+        (check "m22/lossage/grow/first" 0 (vector-ref ring 0))
+        (check "m22/lossage/grow/last-kept" 299 (vector-ref ring 299))
+        (check "m22/lossage/grow/new-first-slot" #nil (vector-ref ring 300))
+        (check "m22/lossage/grow/new-last-slot" #nil (vector-ref ring 499))
+        (check "m22/lossage/grow/index" 300 ((force %idx)))
+        (check "m22/lossage/grow/limit" 500 ((force %limit)))))
 
-;; 3c. Grow from a non-zero index: recent_keys_index is the next-write
-;; slot, so order must wrap.  Ring 300 full, index 100 (newest = slot
-;; 99, oldest = slot 100).  Grow to 500 keeps all 300 in order.
-(let ((v (make-vector 300 #nil)))
-  (let loop ((i 0))
-    (when (< i 300)
-      (vector-set! v i i)
-      (loop (+ i 1))))
-  ((force %ring-set!) v)
-  ((force %total-set!) 300)
-  ((force %idx-set!) 100))
-(let ((ret (lossage-size 500)))
-  (check "m22/lossage/grow-wrap/returns" 500 ret)
-  (let ((ring ((force %ring))))
-    ;; kept = total = 300.  C loop: idx = 100 - 300 + i = i - 200, wrapped
-    ;; by +300 when negative.  i=0..199 -> idx 100..299 (values 100..299,
-    ;; oldest first); i=200..299 -> idx 0..99 (values 0..99).  So v[0]=100,
-    ;; v[199]=299, v[200]=0, v[299]=99.
-    (check "m22/lossage/grow-wrap/oldest" 100 (vector-ref ring 0))
-    (check "m22/lossage/grow-wrap/mid" 299 (vector-ref ring 199))
-    (check "m22/lossage/grow-wrap/wrap" 0 (vector-ref ring 200))
-    (check "m22/lossage/grow-wrap/newest" 99 (vector-ref ring 299))
-    (check "m22/lossage/grow-wrap/new-first-slot" #nil (vector-ref ring 300))
-    (check "m22/lossage/grow-wrap/index" 300 ((force %idx)))))
+    ;; 3b. Shrink: 300 -> 100.  Only the newest 100 (slots 200..299)
+    ;; survive, in order.  idx = 100 % 100 = 0.
+    (setup-ring 300)
+    (let ((ret (lossage-size 100)))
+      (check "m22/lossage/shrink/returns" 100 ret)
+      (let ((ring ((force %ring))))
+        (check "m22/lossage/shrink/size" 100 (vector-length ring))
+        (check "m22/lossage/shrink/oldest-kept" 200 (vector-ref ring 0))
+        (check "m22/lossage/shrink/newest-kept" 299 (vector-ref ring 99))
+        (check "m22/lossage/shrink/index" 0 ((force %idx)))
+        (check "m22/lossage/shrink/limit" 100 ((force %limit)))))
 
-;; 3d. Identity: lossage-size on the current size returns it unchanged.
-((force %limit-set!) 300)
-(setup-ring 300)
-(check "m22/lossage/identity" 300 (lossage-size 300))
+    ;; 3c. Grow from a non-zero index: recent_keys_index is the next-write
+    ;; slot, so order must wrap.  Ring 300 full, index 100 (newest = slot
+    ;; 99, oldest = slot 100).  Grow to 500 keeps all 300 in order.
+    (let ((v (make-vector 300 #nil)))
+      (let loop ((i 0))
+        (when (< i 300)
+          (vector-set! v i i)
+          (loop (+ i 1))))
+      ((force %ring-set!) v)
+      ((force %total-set!) 300)
+      ((force %idx-set!) 100))
+    (let ((ret (lossage-size 500)))
+      (check "m22/lossage/grow-wrap/returns" 500 ret)
+      (let ((ring ((force %ring))))
+        ;; kept = total = 300.  C loop: idx = 100 - 300 + i = i - 200,
+        ;; wrapped by +300 when negative.  i=0..199 -> idx 100..299
+        ;; (values 100..299, oldest first); i=200..299 -> idx 0..99
+        ;; (values 0..99).  So v[0]=100, v[199]=299, v[200]=0, v[299]=99.
+        (check "m22/lossage/grow-wrap/oldest" 100 (vector-ref ring 0))
+        (check "m22/lossage/grow-wrap/mid" 299 (vector-ref ring 199))
+        (check "m22/lossage/grow-wrap/wrap" 0 (vector-ref ring 200))
+        (check "m22/lossage/grow-wrap/newest" 99 (vector-ref ring 299))
+        (check "m22/lossage/grow-wrap/new-first-slot" #nil (vector-ref ring 300))
+        (check "m22/lossage/grow-wrap/index" 300 ((force %idx)))))
 
-;; 3e. Bound guard: below the min is rejected (signals user-error).
-((force %limit-set!) 300)
-(setup-ring 300)
-(let ((raised #f))
-  (catch #t
-    (lambda () (lossage-size (- ((force %min)) 1)))
-    (lambda (key . args) (set! raised #t)))
-  (check "m22/lossage/below-min-rejected" #t raised))
+    ;; 3d. Identity: lossage-size on the current size returns it unchanged.
+    ((force %limit-set!) 300)
+    (setup-ring 300)
+    (check "m22/lossage/identity" 300 (lossage-size 300))
+
+    ;; 3e. Bound guard: below the min is rejected (signals user-error).
+    ((force %limit-set!) 300)
+    (setup-ring 300)
+    (let ((raised #f))
+      (catch #t
+        (lambda () (lossage-size (- ((force %min)) 1)))
+        (lambda (key . args) (set! raised #t)))
+      (check "m22/lossage/below-min-rejected" #t raised)))
+  (lambda () ((force %ring-set!) %ring-saved)
+             ((force %total-set!) %total-saved)
+             ((force %idx-set!) %idx-saved)
+             ((force %limit-set!) %limit-saved)))
+
+;; After-restore check: §3 must leave the C-owned ring state exactly as it
+;; found it (ring vector, index, total, limit).  This pins the Finding-1
+;; fix — the old §3 left --total-keys at 300 and polluted the shared
+;; process for whatever test file loaded next.
+(check "m22/lossage/state-restored"
+       (list %ring-saved %idx-saved %total-saved %limit-saved)
+       (list ((force %ring)) ((force %idx)) ((force %total)) ((force %limit))))
