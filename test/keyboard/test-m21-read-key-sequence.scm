@@ -1,4 +1,4 @@
-;;; test-m21-read-key-sequence.scm --- M21 imp-1 + imp-2 + imp-3 parity corpus.
+;;; test-m21-read-key-sequence.scm --- M21 imp-1 + imp-2 + imp-3 + imp-4 parity corpus.
 ;;;
 ;;; Proves that the two setup functions for the three keyremaps
 ;;; (indec / fkey / keytran) at the start of a key-sequence read are
@@ -18,6 +18,12 @@
 ;;; rks-walk-translation-maps! walk (3.13), the follow_key port
 ;;; rks-follow-key (3.14), and the mouse-reduction cascade (3.15) — on a
 ;;; pushed <rks-state> with no C keybuf (the record-only branch).
+;;;
+;;; imp-4: section 4 covers the outer read_key_sequence hoist — the new
+;;; Scheme entry points rks-read-key-sequence-start! / -run! / -finish! and the
+;;; with-rks-sync record↔file-static sync they use.  The true end-to-end
+;;; unmocked read-key-sequence and the menu-reject pop live in
+;;; test-m21-read-key-sequence.el (elisp, drives the live C body).
 ;;;
 ;;; Reaches unexported bindings with Guile's @@ (rks-state-fkey/-keytran/-indec,
 ;;; keyremap-parent/-map/-start/-end are deliberately not exported — the module
@@ -190,16 +196,18 @@
 ;;; point to compare against (both C functions are static), so we check
 ;;; the documented C semantics directly.
 ;;;
-;;; Live loop-level parity against the C --rks-walk-indec DEFUN is
-;;; deferred to imp-3 (brief.org Open decision 2, item 1).  At imp-2 it
-;;; is infeasible: --rks-walk-indec and --rks-keybuf-set both no-op
-;;; unless a keybuf is pushed on the internal C rks_keybuf_stack, and the
-;;; only code that pushes one is read_key_sequence itself
-;;; (src/keyboard.c:10923) — imp-2 forbids adding a C push shim.  Instead
-;;; section 3.11 runs a Scheme walk loop that mirrors the C --rks-walk-indec
-;;; loop (`while (indec.end < rks_t)`) over rks-keyremap-step!, so the
-;;; composed walk (submap descend + translate, mock_input accumulation,
-;;; exhaustion) is exercised end to end.  See docs/m21-plan.org imp-2.
+;;; Live loop-level parity against the C --rks-walk-indec DEFUN was
+;;; deferred from imp-2 to imp-3 and is now closed: imp-3's section
+;;; 3.13 drives the composed Scheme walk rks-walk-translation-maps!
+;;; end to end on a pushed <rks-state> (see the section-3 header and
+;;; docs/m21-plan.org imp-3).  At imp-2 it was infeasible:
+;;; --rks-walk-indec and --rks-keybuf-set both no-op unless a keybuf is
+;;; pushed on the internal C rks_keybuf_stack, and the only code that
+;;; pushes one is read_key_sequence itself (src/keyboard.c:10923) — imp-2
+;;; forbade adding a C push shim.  Instead section 3.11 ran a Scheme walk
+;;; loop mirroring the C loop (`while (indec.end < rks_t)`) over
+;;; rks-keyremap-step!, so the composed walk (submap descend + translate,
+;;; mock_input accumulation, exhaustion) is exercised end to end.
 (define READ-KEY-ELTS (@@rk READ-KEY-ELTS))
 
 (define (make-keybuf . events)
@@ -435,7 +443,8 @@
 ;;; drives keyremap_step, so the composed walk — descend submap, then
 ;;; translate, then accumulate mock — is exercised end to end rather
 ;;; than one isolated step at a time.  (Live parity against the C DEFUN
-;;; is deferred to imp-3; see the section-3 header comment.)
+;;; is now covered by imp-3's section 3.13; see the section-3 header
+;;; comment.)
 (let* ((m   (make-stub-map 'walk-root))
        (m2  (make-stub-map 'walk-child))
        (fkey (make-keyremap m))
@@ -574,3 +583,54 @@
     (check "m21/reduce/down-dispose/neq-replay-sequence"
            'replay-sequence r))
   ((force %pop)))
+
+;;; --- 4. imp-4: outer read_key_sequence hoist + with-rks-sync --------
+;;; imp-4 moves the outer read_key_sequence skeleton (entry resets,
+;;; 3-scalar load, setup-prompt!/setup-pre-loop!/replay, state machine,
+;;; pre-dynwind-end done-* dispatch) into the Scheme entry points
+;;; rks-read-key-sequence-start! / -run! / -finish!.  The C
+;;; body keeps the record push, dynwind/keybuf/text-conversion
+;;; scaffolding, and calls --rks-state-stack-pop on the menu-reject path
+;;; (Finding D).  The entry points sync the 3 scalars through the
+;;; with-rks-sync primitive (M6h) — its first real call sites — so these
+;;; checks give that primitive direct coverage.  (The true end-to-end,
+;;; unmocked read-key-sequence — which exercises the live C body and the
+;;; entry points together, plus the menu-reject pop — lives in the elisp
+;;; wrapper.)
+(define rks-state-key-count (@@rk rks-state-key-count))
+(define set-rks-state-mock-input! (@@rk set-rks-state-mock-input!))
+(define %get-rks-t2          (delay (%sym '--rks-t)))
+(define %set-rks-t2          (delay (%sym '--set-rks-t)))
+(define %get-rks-mock-input2 (delay (%sym '--rks-mock-input)))
+
+;;; 4.1 with-rks-sync read-sync: record → C file-static.
+;;; A pushed state's key-count / mock-input must land in the C
+;;; file-statics rks_t / rks_mock_input before the body runs.
+(let ((state (make-rks-state)))
+  (set-rks-state-key-count! state 7)
+  (set-rks-state-mock-input! state 3)
+  ((force %push) state)
+  (with-rks-sync (read key-count mock-input) (write)
+    (check "m21/imp4/sync/read/key-count" 7 ((force %get-rks-t2)))
+    (check "m21/imp4/sync/read/mock-input" 3 ((force %get-rks-mock-input2))))
+  ((force %pop)))
+
+;;; 4.2 with-rks-sync write-sync: C file-static → record.
+;;; --set-rks-t writes only the C file-static (not the record slot), so
+;;; a write-sync is the only path that lands that value back in the
+;;; record — a clean one-way check of the write direction.
+(let ((state (make-rks-state)))
+  ((force %push) state)
+  ((force %set-rks-t2) 9)
+  (with-rks-sync (read) (write key-count)
+    #nil)
+  (check "m21/imp4/sync/write/key-count" 9 (rks-state-key-count state))
+  ((force %pop)))
+
+;;; 4.3 the three entry points are exported and callable.
+(check "m21/imp4/entry/start-bound"
+       #t (procedure? rks-read-key-sequence-start!))
+(check "m21/imp4/entry/run-bound"
+       #t (procedure? rks-read-key-sequence-run!))
+(check "m21/imp4/entry/finish-bound"
+       #t (procedure? rks-read-key-sequence-finish!))

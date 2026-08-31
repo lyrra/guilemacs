@@ -10408,7 +10408,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   /* M6 Step B: push a fresh <rks-state> record so the Scheme side
      can inspect state during the call (via --rks-state-current) and
      the exit sync captures final field values.  See docs/m6-plan.org
-     Step B.  */
+     Step B.  This must precede the HAVE_TEXT_CONVERSION block below,
+     which writes the record's disabled-conversion slot and therefore
+     needs the record live (M21 imp-4 keeps the push in C for this
+     reason; the entry-time resets and 3-scalar load moved into the
+     rks-read-key-sequence-start! Scheme call, which resolves the
+     record through --rks-state-current).  */
   {
     static SCM rks_make_state_proc = SCM_UNDEFINED;
     if (SCM_UNBNDP (rks_make_state_proc))
@@ -10417,110 +10422,7 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     SCM rec = SCM_CALL_0 (rks_make_state_proc);
     eassert (rks_state_depth < RKS_STATE_STACK_MAX);
     rks_state_stack[rks_state_depth++] = rec;
-    /* M6i: load all 7 migrated scalars from the record at entry.
-       For the outermost call the record defaults (0/nil/false)
-       match the static zero-init.  For nested calls (recursive
-       edit), this restores the saved state.  */
-    rks_t = rks_get_int (rec, RKS_SLOT_KEY_COUNT);
-    rks_mock_input = rks_get_int (rec, RKS_SLOT_MOCK_INPUT);
-    rks_current_binding = scm_struct_ref (rec,
-                             scm_from_int (RKS_SLOT_CURRENT_BINDING));
   }
-
-  /* How many keys there are in the current key sequence.
-     M6m: promoted to file-static rks_t, aliased here.  */
-#define t rks_t
-
-  /* The length of the echo buffer when we started reading, and
-     the length of this_command_keys when we started reading.  */
-  /* M6j: echo_start and keys_start were locals here; promoted to
-     the file-static rks_echo_start / rks_keys_start (declared below)
-     so the Scheme rks-setup-initial-state-c! can write them and the
-     C state machine continues to read them.  See docs/keyboard.org §M6j.  */
-
-  /* M6m: current_binding promoted to file-static rks_current_binding.  */
-#define current_binding rks_current_binding
-
-  /* Index of the first key that has no binding.
-     It is useless to try fkey.start larger than that.
-     M6m/Wave C: retired — reads from record slot.  */
-
-  /* If t < mock_input, then KEYBUF[t] should be read as the next
-     input key.
-
-     We use this to recover after recognizing a function key.  Once we
-     realize that a suffix of the current key sequence is actually a
-     function key's escape sequence, we replace the suffix with the
-     function key's binding from Vfunction_key_map.  Now keybuf
-     contains a new and different key sequence, so the echo area,
-     this_command_keys, and the submaps and defs arrays are wrong.  In
-     this situation, we set mock_input to t, set t to 0, and jump to
-     restart_sequence; the loop will read keys from keybuf up until
-     mock_input, thus rebuilding the state; and then it will resume
-     reading characters from the keyboard.
-     M6m: promoted to file-static rks_mock_input.  */
-#define mock_input rks_mock_input
-
-  /* Whether each event in the mocked input came from a mouse menu.
-     M6z: promoted to file-static rks_used_mouse_menu_history.  Reset
-     to all-false at function entry (the original local-array
-     `= {0}' initializer).  */
-  if (rks_state_depth > 0)
-    rks_set_int (rks_state_stack[rks_state_depth - 1],
-		 RKS_SLOT_USED_MOUSE_MENU_HISTORY, 0);
-
-  /* If the sequence is unbound in submaps[], then
-     keybuf[fkey.start..fkey.end-1] is a prefix in Vfunction_key_map,
-     and fkey.map is its binding.
-
-     These might be > t, indicating that all function key scanning
-     should hold off until t reaches them.  We do this when we've just
-     recognized a function key, to avoid searching for the function
-     key's again in Vfunction_key_map.
-
-     M6l: these three locals are file-static shadows
-     (rks_fkey / rks_keytran / rks_indec) written by Scheme via
-     --rks-init-keyremaps.  Phase 4 Step 3b-proper.2 deleted the
-     in-function access sites; the post-done sync block below uses
-     the rks_* names directly.  */
-
-  /* (shift_translated retired — reads go through the record via
-     --rks-shift-translated-p / --set-rks-shift-translated.)  */
-
-  /* If we receive a `switch-frame' or `select-window' event in the middle of
-     a key sequence, we put it off for later.
-     While we're reading, we keep the event here.
-     M6p/Wave C: retired — setter writes to record.  */
-
-  /* M6r: original_uppercase + position promoted to file-static
-     rks_original_uppercase / rks_original_uppercase_position.  */
-/* (Retired — getter/setter use record.)  */
-
-#ifdef HAVE_TEXT_CONVERSION
-  /* M6ae: disabled_conversion promoted to file-static rks_disabled_conversion.
-     Initialized to false at function entry (the original local-init).  */
-  Fc_set_rks_disabled_conversion (Qnil);
-#endif /* HAVE_TEXT_CONVERSION */
-
-  /* M6m: starting_buffer promoted to file-static rks_starting_buffer.  */
-  /* List of events for which a fake prefix key has been generated.  */
-  /* M6ac/Wave C: fake_prefixed_keys retired — getter/setter use record.  */
-  Fc_set_rks_fake_prefixed_keys (Qnil);
-
-  /* raw_keybuf_count is now initialized in (most of) the callers of
-     read_key_sequence.  This is so that in a recursive call (for
-     mouse menus) a spurious initialization doesn't erase the contents
-     of raw_keybuf created by the outer call.  */
-  /* raw_keybuf_count = 0; */
-
-  Fc_set_rks_delayed_switch_frame (Qnil);
-
-  /* M6m: explicit init for the promoted file-statics that were
-     previously initialized at their (now-removed) local declaration.
-     The other promoted vars (t, first_unbound, starting_buffer) are
-     written at the replay_sequence: label before being read.  */
-  current_binding = Qnil;
-  mock_input      = 0;
 
   dynwind_begin ();
 
@@ -10532,49 +10434,26 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
   record_unwind_protect_int (restore_rks_keybuf_depth, rks_keybuf_depth);
   rks_keybuf_stack[rks_keybuf_depth++] = keybuf;
 
-  /* M6i: prompt + echo setup ported to (emacs read-key-sequence)
-     rks-setup-prompt! — see docs/keyboard.org §M6i.  */
+  /* Hand off the setup half to Scheme: 3-scalar load, prompt / pre-loop
+     / replay-entire-sequence setup.  The record push above must precede
+     this (the load resolves the record through --rks-state-current).  */
   {
-    static SCM rks_setup_prompt_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_setup_prompt_proc))
-      rks_setup_prompt_proc = scm_c_public_ref ("emacs read-key-sequence",
-                                                "rks-setup-prompt!");
-    SCM_CALL_1 (rks_setup_prompt_proc, prompt);
+    static SCM rks_start_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_start_proc))
+      rks_start_proc
+        = scm_c_public_ref ("emacs read-key-sequence",
+                            "rks-read-key-sequence-start!");
+    scm_call_1 (rks_start_proc, prompt);
   }
-
-  /* Wave B: pre-loop initial-state capture folded into Scheme.  */
-  {
-    static SCM rks_setup_pre_loop_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_setup_pre_loop_proc))
-      rks_setup_pre_loop_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-setup-pre-loop!");
-    SCM_CALL_0 (rks_setup_pre_loop_proc);
-  }
-
-  /* Initialize fkey/indec/keytran from current-kboard's translation
-     maps + key-translation-map.  Vanilla emacs did this at the
-     `replay_entire_sequence:' label which ran once on entry.  Without
-     this, the three maps stay Qnil and `local-function-key-map'
-     translations (like <return> -> RET) never fire.  */
-  rks_call_setup_replay_entire_sequence ();
 
 #ifdef HAVE_TEXT_CONVERSION
   record_unwind_protect_int (restore_reading_key_sequence,
 			     reading_key_sequence);
   reading_key_sequence = true;
-#endif
-
-  /* Phase 4 Step 3b-proper.2: the replay_sequence: label + the C
-     while-loop + the done: label are subsumed by the Scheme
-     rks-state-machine call below.  The state machine's entry
-     invokes replay-sequence-continue itself; each internal
-     replay-sequence dispatch re-invokes it.  */
 
   /* If text conversion is supposed to be disabled immediately, do
      it now.  Idempotent (the slot stays Qt and disable_text_conversion
      is no-op once set), so one-time entry is sufficient.  */
-#ifdef HAVE_TEXT_CONVERSION
   if (disable_text_conversion_p)
     {
       disable_text_conversion ();
@@ -10583,89 +10462,53 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
     }
 #endif /* HAVE_TEXT_CONVERSION */
 
-  /* Hand off to the Scheme state machine.  Returns -1 (menu-reject)
-     or the symbol `done'.  read_key_sequence_cmd is set only on the
-     break-equivalent path (rks_t > 0); the goto-done-equivalent
-     path (rks-iteration-prepare! 'done with rks_t = 0) skipped the
-     assignment in the C original.  */
+  /* Hand off the state-machine / done orchestration to the Scheme
+     state-machine half.  This runs *after* the text-conversion block
+     above, restoring the pre-hoist ordering (prompt/pre-loop/replay
+     setup, then reading_key_sequence/disable, then the state machine —
+     see cr.org Finding 1).  Returns -1 (menu-reject) or the symbol
+     `done'.  read_key_sequence_cmd is set only on the non-reject
+     path (rks_t > 0), matching the pre-hoist ordering.  */
   {
-    static SCM rks_sm_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_sm_proc))
-      rks_sm_proc = scm_c_public_ref ("emacs read-key-sequence",
-                                      "rks-state-machine");
-    SCM sm_result = scm_call_4 (rks_sm_proc,
+    static SCM rks_run_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_run_proc))
+      rks_run_proc
+        = scm_c_public_ref ("emacs read-key-sequence",
+                            "rks-read-key-sequence-run!");
+    SCM sm_result = scm_call_4 (rks_run_proc,
                                 prompt,
                                 can_return_switch_frame ? Qt : Qnil,
                                 prevent_redisplay ? Qt : Qnil,
                                 fix_current_buffer ? Qt : Qnil);
     if (FIXNUMP (sm_result) && XFIXNUM (sm_result) == -1)
       {
-        dynwind_end ();
-        return -1;
+	/* Menu-reject: pop the state record too.  Pre-existing leak
+	   fixed at M21 imp-4 (Finding D) — the old body returned
+	   without popping on this path.  */
+	Fc_rks_state_stack_pop ();
+	dynwind_end ();
+	return -1;
       }
     if (rks_t > 0)
-      read_key_sequence_cmd = current_binding;
-  }
-
-  /* (C while-loop + replay_sequence: + have_key: + done: labels
-     deleted in Step 3b-proper.2 — all subsumed by the Scheme state
-     machine call above.)  */
-  /* M6n: remapping computation ported to (emacs read-key-sequence)
-     rks-done-compute-remapped!  Does this here (before dynwind_end) so
-     `command-remapping' sees the right keymap stack.  See
-     docs/keyboard.org §M6n.  */
-  {
-    static SCM rks_done_remapped_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_remapped_proc))
-      rks_done_remapped_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-compute-remapped!");
-    SCM_CALL_0 (rks_done_remapped_proc);
-  }
-
-  /* M6p: unread_switch_frame install ported to (emacs read-key-sequence)
-     rks-done-install-unread-switch-frame!.  Runs before dynwind_end
-     so it sees the same dynwind context as the original.  See
-     docs/keyboard.org §M6p.  */
-  {
-    static SCM rks_done_unread_sf_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_unread_sf_proc))
-      rks_done_unread_sf_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-install-unread-switch-frame!");
-    SCM_CALL_0 (rks_done_unread_sf_proc);
+      read_key_sequence_cmd = rks_current_binding;
   }
   dynwind_end ();
 
-  /* Wave B: post-dynwind done: body (downcase-undo, shift-translated,
-     fabricated-events) folded into one Scheme call.  */
+  /* Scheme finish-half (only reached on the non-reject path):
+     post-dynwind done body, 3-scalar store-back, record pop.  It
+     returns the final key count, which we return directly.  */
   {
-    static SCM rks_done_post_proc = SCM_UNDEFINED;
-    if (SCM_UNBNDP (rks_done_post_proc))
-      rks_done_post_proc =
-        scm_c_public_ref ("emacs read-key-sequence",
-                          "rks-done-post-dynwind!");
-    SCM_CALL_1 (rks_done_post_proc,
-                dont_downcase_last ? Qt : Qnil);
+    static SCM rks_finish_proc = SCM_UNDEFINED;
+    if (SCM_UNBNDP (rks_finish_proc))
+      rks_finish_proc
+        = scm_c_public_ref ("emacs read-key-sequence",
+                            "rks-read-key-sequence-finish!");
+    SCM result = scm_call_1 (rks_finish_proc,
+                             dont_downcase_last ? Qt : Qnil);
+    return XFIXNUM (result);
   }
-
-  /* M6 Step B: sync iteration-local file-statics → record so the
-     record captures final state.  C-9b deleted the keyremap sync
-     here — keyremap state is record-authoritative.  */
-  {
-    SCM rec = rks_state_stack[rks_state_depth - 1];
-    rks_set_int (rec, RKS_SLOT_KEY_COUNT, rks_t);
-    rks_set_int (rec, RKS_SLOT_MOCK_INPUT, rks_mock_input);
-    rc_set (rec, RKS_SLOT_CURRENT_BINDING, rks_current_binding);
-    rks_state_stack[--rks_state_depth] = SCM_UNDEFINED;
-  }
-
-  return t;
 }
 
-#undef t
-#undef mock_input
-#undef current_binding
 
 /* M6a — primitives exposed to (emacs read-key-sequence) for the
    outer wrapper port.  The state machine (read_key_sequence above)

@@ -49,6 +49,10 @@
             replay-key-continue
             rks-classify-event-simple!
             rks-state-machine
+            rks-read-key-sequence-start!
+            rks-read-key-sequence-run!
+            rks-read-key-sequence-finish!
+            with-rks-sync
             rks-have-key-orchestrator!
             rks-try-help-char!
             rks-try-shift-translation-fn-key!
@@ -1105,6 +1109,10 @@ elements.  See docs/keyboard.org §M6y."
 
 (define %rks-state-current
   (delay (%c '--rks-state-current)))
+(define %rks-state-stack-push
+  (delay (%c '--rks-state-stack-push)))
+(define %rks-state-stack-pop
+  (delay (%c '--rks-state-stack-pop)))
 (define %rks-record-get-int
   (delay (%c '--rks-record-get-int)))
 (define %rks-record-set-int
@@ -1666,6 +1674,81 @@ state-record push, setup-prompt!, setup-pre-loop!."
   ;; Entry point — equivalent to falling through to replay_sequence:.
   (replay-sequence-continue)
   (loop))
+
+(define (rks-read-key-sequence-start! prompt)
+  "Hoisted setup-half of the outer C `read_key_sequence' body
+(M21 imp-4).  C has already: pushed a fresh <rks-state> record (from
+`make-rks-state') onto the state stack, opened the Guile dynwind
+region, and pushed the caller's keybuf.  This call takes over the
+setup that must precede the HAVE_TEXT_CONVERSION block (which stays in
+C, restoring the pre-hoist ordering — cr.org Finding 1):
+
+  * load the 3 scalars (key-count / mock-input / current-binding)
+    from the record into the C file-statics (entry-time resets are the
+    fresh-record defaults produced by `make-rks-state');
+  * rks-setup-prompt! / rks-setup-pre-loop! / the replay-entire-sequence
+    keyremap setup.
+
+C then runs the text-conversion block (reading-key-sequence flag /
+one-time disable) and hands off to rks-read-key-sequence-run! for the
+state machine.  Returns #t."
+  (let ((rec ((force %rks-state-current))))
+    ;; Entry-time resets are the `make-rks-state' defaults: key-count=0,
+    ;; mock-input=0, current-binding=nil, used-mouse-menu-history=0,
+    ;; disabled-conversion/fake-prefixed-keys/delayed-switch-frame=nil.
+    (rks-sync-read rec 'key-count)
+    (rks-sync-read rec 'mock-input)
+    (rks-sync-read rec 'current-binding)
+    (rks-setup-prompt! prompt)
+    (rks-setup-pre-loop!)
+    (rks-setup-replay-entire-sequence! rec))
+  #t)
+
+(define (rks-read-key-sequence-run! prompt
+                                    can-return-switch-frame
+                                    prevent-redisplay
+                                    fix-current-buffer)
+  "Hoisted state-machine half of the outer C `read_key_sequence' body
+(M21 imp-4).  Runs *after* the HAVE_TEXT_CONVERSION block (which C
+places between this and rks-read-key-sequence-start!), matching the
+pre-hoist ordering:
+
+  * run rks-state-machine;
+  * on `done', run the pre-dynwind-end rks-done-compute-remapped! and
+    rks-done-install-unread-switch-frame!.
+
+Returns the state-machine result: fixnum -1 (menu-reject) or the
+symbol `done'.  On -1 the caller pops the record itself (Finding D);
+on `done' the caller calls rks-read-key-sequence-finish! after
+dynwind_end."
+  (let ((sm (rks-state-machine prompt can-return-switch-frame
+                               prevent-redisplay fix-current-buffer)))
+    (if (and (integer? sm) (= sm -1))
+        -1
+        (begin
+          (rks-done-compute-remapped!)
+          (rks-done-install-unread-switch-frame!)
+          'done))))
+
+(define (rks-read-key-sequence-finish! dont-downcase-last)
+  "Hoisted finish-half of the outer C `read_key_sequence' body
+(M21 imp-4).  Runs *after* dynwind_end (the name matches
+rks-done-post-dynwind!).  Only reached on the non-reject path.
+
+  * rks-done-post-dynwind! (downcase-undo, shift-translated,
+    fabricated-events side effects);
+  * store the 3 scalars back from the C file-statics to the record;
+  * pop the record off the state stack.
+
+Returns the final key count (rks_t, as a fixnum) which C returns
+directly."
+  (rks-done-post-dynwind! dont-downcase-last)
+  (let ((rec ((force %rks-state-current))))
+    (rks-sync-write rec 'key-count)
+    (rks-sync-write rec 'mock-input)
+    (rks-sync-write rec 'current-binding))
+  ((force %rks-state-stack-pop))
+  ((force %rks-t)))
 
 (define %rks-try-help-char (delay (%c '--rks-try-help-char)))
 
