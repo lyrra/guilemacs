@@ -4207,31 +4207,6 @@ the <rks-state> record REC.  */)
   return Qnil;
 }
 
-DEFUN ("--rks-keyremap-get-int",
-       Fc_rks_keyremap_get_int,
-       Sc_rks_keyremap_get_int, 2, 2, 0,
-       doc: /* Internal: read fixnum from slot SLOT of a <keyremap>
-record KM (e.g. start, end).  */)
-  (Lisp_Object km, Lisp_Object slot)
-{
-  CHECK_FIXNUM (slot);
-  return make_fixnum (rks_get_int (km, XFIXNUM (slot)));
-}
-
-DEFUN ("--rks-keyremap-set-int",
-       Fc_rks_keyremap_set_int,
-       Sc_rks_keyremap_set_int, 3, 3, 0,
-       doc: /* Internal: write fixnum VAL to slot SLOT of the
-<keyremap> record KM.  */)
-  (Lisp_Object km, Lisp_Object slot, Lisp_Object val)
-{
-  CHECK_FIXNUM (slot);
-  CHECK_FIXNUM (val);
-  scm_struct_set_x (km, scm_from_int (XFIXNUM (slot)),
-                    make_fixnum (XFIXNUM (val)));
-  return Qnil;
-}
-
 DEFUN ("--rks-state-current", Fc_rks_state_current,
        Sc_rks_state_current, 0, 0, 0,
        doc: /* Internal: return the top <rks-state> on the stack,
@@ -10484,7 +10459,12 @@ read_key_sequence (Lisp_Object *keybuf, Lisp_Object prompt,
       {
 	/* Menu-reject: pop the state record too.  Pre-existing leak
 	   fixed at M21 imp-4 (Finding D) — the old body returned
-	   without popping on this path.  */
+	   without popping on this path.  The pop happens here, before
+	   dynwind_end — unlike the finish! path, which pops after
+	   dynwind_end.  This asymmetry is safe: none of the unwind
+	   handlers registered between dynwind_begin and dynwind_end
+	   (restore_rks_keybuf_depth / restore_reading_key_sequence /
+	   resume_text_conversion) read or write the state record.  */
 	Fc_rks_state_stack_pop ();
 	dynwind_end ();
 	return -1;

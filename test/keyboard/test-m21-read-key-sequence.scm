@@ -21,7 +21,8 @@
 ;;;
 ;;; imp-4: section 4 covers the outer read_key_sequence hoist — the new
 ;;; Scheme entry points rks-read-key-sequence-start! / -run! / -finish! and the
-;;; with-rks-sync record↔file-static sync they use.  The true end-to-end
+;;; rks-sync-read / rks-sync-write scalar sync they use (the with-rks-sync
+;;; macro is exercised separately in 4.1/4.2).  The true end-to-end
 ;;; unmocked read-key-sequence and the menu-reject pop live in
 ;;; test-m21-read-key-sequence.el (elisp, drives the live C body).
 ;;;
@@ -591,12 +592,14 @@
 ;;; rks-read-key-sequence-start! / -run! / -finish!.  The C
 ;;; body keeps the record push, dynwind/keybuf/text-conversion
 ;;; scaffolding, and calls --rks-state-stack-pop on the menu-reject path
-;;; (Finding D).  The entry points sync the 3 scalars through the
-;;; with-rks-sync primitive (M6h) — its first real call sites — so these
-;;; checks give that primitive direct coverage.  (The true end-to-end,
-;;; unmocked read-key-sequence — which exercises the live C body and the
-;;; entry points together, plus the menu-reject pop — lives in the elisp
-;;; wrapper.)
+;;; (Finding D).  start! loads the 3 scalars via rks-sync-read and
+;;; finish! stores them via rks-sync-write — the entry points call
+;;; those lower-level functions directly, not the with-rks-sync macro —
+;;; so these checks give the sync functions direct coverage.
+;;; with-rks-sync itself is exercised separately in 4.1/4.2.  (The true
+;;; end-to-end, unmocked read-key-sequence — which exercises the live C
+;;; body and the entry points together, plus the menu-reject pop — lives
+;;; in the elisp wrapper.)
 (define rks-state-key-count (@@rk rks-state-key-count))
 (define set-rks-state-mock-input! (@@rk set-rks-state-mock-input!))
 (define %get-rks-t2          (delay (%sym '--rks-t)))
