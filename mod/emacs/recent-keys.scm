@@ -22,7 +22,8 @@
 ;;; live in src/keyboard.c with the `--' prefix:
 ;;;   --recent-keys-ring, --recent-keys-index, --total-keys,
 ;;;   --lossage-limit, --min-num-recent-keys, --max-num-recent-keys,
-;;;   --update-recent-keys, --make-event-array-from-vector.
+;;;   --recent-keys-ring-set!, --lossage-limit-set!,
+;;;   --make-event-array-from-vector.
 ;;; M17 adds the record-char shims: --recent-keys-index-set!,
 ;;; --total-keys-set!, --dribble-open-p, --dribble-write-event.
 
@@ -65,9 +66,28 @@ Mirrors C Flossage_size; signals user-error on invalid input."
           (%user-error (format #f "Value must be <= ~a" maxsz)))
          (else
           (let* ((total ((%c '--total-keys)))
-                 (kept  (if (> arg osize) total (min arg total))))
-            ((%c '--update-recent-keys) arg kept)
-            ((%c '--lossage-limit))))))))))
+                 (ring  ((%c '--recent-keys-ring)))
+                 (rsize (vector-length ring))
+                 (kept  (if (> arg rsize) total (min arg total)))
+                 (idx   ((%c '--recent-keys-index)))
+                 (v     (make-vector arg #nil)))
+            ;; Port of C update_recent_keys (deleted in M22 imp-1): copy
+            ;; the newest KEPT entries out of the old ring in order, walk
+            ;; the index backward modulo the old size (modulo is already
+            ;; non-negative in Scheme for a positive divisor).  The old
+            ;; ring size is taken from the live vector, not from
+            ;; lossage_limit, so the copy stays correct even if the two
+            ;; ever diverge.
+            (let loop ((i 0))
+              (when (< i kept)
+                (vector-set! v i (vector-ref ring (modulo (+ (- idx kept) i)
+                                                          rsize)))
+                (loop (+ i 1))))
+            ((%c '--recent-keys-ring-set!) v)
+            ((%c '--total-keys-set!) kept)
+            ((%c '--recent-keys-index-set!) (modulo kept arg))
+            ((%c '--lossage-limit-set!) arg)
+            arg))))))))
 
 ;;;;
 ;;;; recent-keys

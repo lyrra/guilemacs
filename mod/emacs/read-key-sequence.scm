@@ -16,6 +16,7 @@
             current-input-mode
             posn-at-point
             input-pending-p
+            get-input-pending!
             ;; M6g — state-machine record types and helpers.
             ;; Note: srfi-9 auto-generates the field accessors / setters
             ;; as syntax-transformers in this Guile build, so they are
@@ -629,6 +630,38 @@ src/keyboard.c Finput_pending_p."
     ((force %process-special-events))
     (let ((flags (+ (if (%nilp check-timers) 0 1) 2)))
       (if (not (%nilp ((force %get-input-pending) flags))) #t #nil)))))
+
+(define (truthy? x)
+  "Elisp truthiness: everything except #nil is true."
+  (not (eq? x #nil)))
+
+(define %interrupts-deferred-p (delay (%c '--interrupts-deferred-p)))
+(define %gobble-input          (delay (%c '--gobble-input)))
+
+;; kbd-buffer-readable-events lives in (emacs kbd-buffer).  We resolve it
+;; lazily at call time instead of importing the module: an eager
+;; #:use-module makes read-key-sequence.scm depend on the whole kbd-buffer
+;; import chain (lispy-event -> lispy-position) at compile time, which fails
+;; in the isolated test harness when lispy-position is not yet loaded
+;; (see cr.org Finding 1 + the m22 test note).  The C readable_events uses
+;; the same public ref.
+(define %kbd-buffer-readable-events
+  (delay (module-ref (resolve-module '(emacs kbd-buffer))
+                     'kbd-buffer-readable-events)))
+
+(define (get-input-pending! flags)
+  "Port of C get_input_pending (src/keyboard.c:7614-7629).  The caller
+stores the return value into the C global `input_pending' itself."
+  (define (quit-or-readable?)
+    (or (truthy? (symbol-value 'quit-flag))
+        (truthy? ((force %kbd-buffer-readable-events) flags))))
+  (cond
+   ((quit-or-readable?) #t)
+   ((or (not (truthy? ((force %interrupt-input-p))))
+        (truthy? ((force %interrupts-deferred-p))))
+    ((force %gobble-input))
+    (if (quit-or-readable?) #t #nil))
+   (else #nil)))
 
 ;;;;
 ;;;; M6h — setup-phase procedures (called BEFORE the C state-machine

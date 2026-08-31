@@ -7614,17 +7614,13 @@ lucid_event_type_list_p (Lisp_Object object)
 static bool
 get_input_pending (int flags)
 {
-  /* First of all, have we already counted some input?  */
-  input_pending = (!NILP (Vquit_flag) || readable_events (flags));
-
-  /* If input is being read as it arrives, and we have none, there is none.  */
-  if (!input_pending && (!interrupt_input || interrupts_deferred))
-    {
-      /* Try to read some input and see how much we get.  */
-      gobble_input ();
-      input_pending = (!NILP (Vquit_flag) || readable_events (flags));
-    }
-
+  /* M22 imp-1: the decision logic moved to Scheme
+     (emacs read-key-sequence) get-input-pending!.  The C global
+     `input_pending' stays C-owned; only the decision moves.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "get-input-pending!");
+  input_pending = scm_is_true (SCM_CALL_1 (proc, scm_from_int (flags)));
   return input_pending;
 }
 
@@ -10745,30 +10741,6 @@ If CHECK-TIMERS is non-nil, timers that are ready to run will do so.  */)
   return SCM_CALL_1 (proc, check_timers);
 }
 
-/* Reallocate recent_keys copying the recorded keystrokes
-   in the right order.  */
-static void
-update_recent_keys (int new_size, int kept_keys)
-{
-  int osize = ASIZE (recent_keys);
-  eassert (recent_keys_index < osize);
-  eassert (kept_keys <= min (osize, new_size));
-  Lisp_Object v = make_nil_elisp_vector (new_size);
-  int i, idx;
-  for (i = 0; i < kept_keys; ++i)
-    {
-      idx = recent_keys_index - kept_keys + i;
-      while (idx < 0)
-        idx += osize;
-      ASET (v, i, AREF (recent_keys, idx));
-    }
-  recent_keys = v;
-  total_keys = kept_keys;
-  recent_keys_index = total_keys % new_size;
-  lossage_limit = new_size;
-
-}
-
 /* M3 — primitives exposed to (emacs recent-keys).  The recent_keys
    ring stays C-owned; the Scheme module reads its state through these
    subrs.  See docs/keyboard.org §M3.  */
@@ -10839,15 +10811,28 @@ DEFUN ("--max-num-recent-keys", Fmax_num_recent_keys, Smax_num_recent_keys, 0, 0
   return make_fixnum (MAX_NUM_RECENT_KEYS);
 }
 
-DEFUN ("--update-recent-keys", Fupdate_recent_keys, Supdate_recent_keys,
-       2, 2, 0,
-       doc: /* Internal: resize the recent-keys ring to NEW-SIZE keeping
-KEPT-KEYS entries; mirrors C update_recent_keys.  */)
-  (Lisp_Object new_size, Lisp_Object kept_keys)
+DEFUN ("--recent-keys-ring-set!", Frecent_keys_ring_set, Srecent_keys_ring_set,
+       1, 1, 0,
+       doc: /* Internal: replace the raw recent-keys ring vector.
+FIX-20260831-guilemacs: raw setter for the Scheme lossage-size ring
+resize (M22 imp-1).  Caller owns building the replacement vector.
+Returns nil.  */)
+  (Lisp_Object vec)
 {
-  CHECK_FIXNAT (new_size);
-  CHECK_FIXNAT (kept_keys);
-  update_recent_keys (XFIXNAT (new_size), XFIXNAT (kept_keys));
+  CHECK_VECTOR (vec);
+  recent_keys = vec;
+  return Qnil;
+}
+
+DEFUN ("--lossage-limit-set!", Flossage_limit_set, Slossage_limit_set,
+       1, 1, 0,
+       doc: /* Internal: set the recent-keys ring size.
+FIX-20260831-guilemacs: raw setter for the Scheme lossage-size ring
+resize (M22 imp-1).  Returns nil.  */)
+  (Lisp_Object size)
+{
+  CHECK_FIXNAT (size);
+  lossage_limit = XFIXNAT (size);
   return Qnil;
 }
 
@@ -11686,6 +11671,15 @@ DEFUN ("--interrupt-input-p", Fc_interrupt_input_p, Sc_interrupt_input_p,
   (void)
 {
   return interrupt_input ? Qt : Qnil;
+}
+
+DEFUN ("--interrupts-deferred-p", Fc_interrupts_deferred_p,
+       Sc_interrupts_deferred_p, 0, 0, 0,
+       doc: /* Internal: t if the C global `interrupts_deferred' is
+non-zero.  */)
+  (void)
+{
+  return interrupts_deferred ? Qt : Qnil;
 }
 
 DEFUN ("--selected-frame-tty-p", Fc_selected_frame_tty_p,
