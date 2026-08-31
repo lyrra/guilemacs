@@ -1,4 +1,4 @@
-;;; test-m21-read-key-sequence.el --- M21 imp-1 + imp-2 parity test suite.
+;;; test-m21-read-key-sequence.el --- M21 imp-1 + imp-2 + imp-3 parity test suite.
 ;;;
 ;;; imp-1: the --access-keymap shim (Task 1, covered in
 ;;; test-read-key-sequence.el) plus the parity check that
@@ -9,8 +9,13 @@
 ;;; imp-2: direct unit checks (section 3 of the Scheme corpus) on the
 ;;; Scheme port rks-keyremap-step! of C keyremap_step +
 ;;; access_keymap_keyremap (src/keyboard.c:10601-10715), plus loop-level
-;;; walk checks.  Live parity against the C --rks-walk-indec DEFUN is
-;;; deferred to imp-3 (brief.org Open decision 2).
+;;; walk checks.
+;;;
+;;; imp-3: cut the three keyremap-walk shims, follow_key, and the
+;;; mouse-event reduction cascade to Scheme, then delete the dead C
+;;; bodies.  Sections 3.13-3.15 exercise the composed Scheme walk
+;;; (rks-walk-translation-maps!), the follow_key port (rks-follow-key),
+;;; and the mouse-reduction cascade on a pushed <rks-state>.
 ;;;
 ;;; Wraps test/keyboard/test-m21-read-key-sequence.scm — the Scheme test
 ;;; corpus.  Loads the Scheme file via eval-scheme, then reads back

@@ -1,4 +1,4 @@
-;;; test-m21-read-key-sequence.scm --- M21 imp-1 + imp-2 parity corpus.
+;;; test-m21-read-key-sequence.scm --- M21 imp-1 + imp-2 + imp-3 parity corpus.
 ;;;
 ;;; Proves that the two setup functions for the three keyremaps
 ;;; (indec / fkey / keytran) at the start of a key-sequence read are
@@ -13,6 +13,11 @@
 ;;; anything when a state is pushed onto rks_state_stack (rks_keyremap_store
 ;;; returns early when rks_state_depth is 0), so we push a state with
 ;;; --rks-state-stack-push first, else the check would compare two no-ops.
+;;;
+;;; imp-3: sections 3.13-3.15 exercise the cut-over — the composed
+;;; rks-walk-translation-maps! walk (3.13), the follow_key port
+;;; rks-follow-key (3.14), and the mouse-reduction cascade (3.15) — on a
+;;; pushed <rks-state> with no C keybuf (the record-only branch).
 ;;;
 ;;; Reaches unexported bindings with Guile's @@ (rks-state-fkey/-keytran/-indec,
 ;;; keyremap-parent/-map/-start/-end are deliberately not exported — the module

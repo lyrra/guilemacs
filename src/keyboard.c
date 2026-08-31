@@ -8592,8 +8592,8 @@ tool_bar_items (Lisp_Object reuse, int *nitems)
 DEFUN ("--access-keymap", Faccess_keymap, Saccess_keymap, 2, 2, 0,
        doc: /* FIX-20260830-guilemacs: internal: thin shim over C
 access_keymap.  Look up KEY in MAP with the fixed flags t_ok=1,
-noinherit=0, autoload=1 -- the flags used by both current C callers,
-`follow_key' and `access_keymap_keyremap'.  Not a general-purpose
+noinherit=0, autoload=1 -- the flags used by the Scheme callers
+`rks-follow-key' and `rks-keyremap-step!'.  Not a general-purpose
 keymap lookup: `lookup-key' has different prefix/t_ok semantics.  */)
   (Lisp_Object map, Lisp_Object key)
 {
@@ -9077,8 +9077,8 @@ static Lisp_Object rks_key;
 static bool        rks_used_mouse_menu;
 /* M6z: used_mouse_menu_history retired — bitmask in record slot 17.  */
 
-/* M6ab — promote new_binding.  Written by follow_key + the
-   unbound-event reduction's inner loop; read by M6aa's install
+/* M6ab — promote new_binding.  Written by rks-follow-key + the
+   rks-reduce-try-new-binding! inner loop; read by M6aa's install
    step.  See docs/keyboard.org §M6ab.  */
 
 /* M6ac — promote fake_prefixed_keys (list of keys for which we
@@ -9168,7 +9168,7 @@ returns nil.  */)
      `replay-key' — mode-line / scroll-bar fake prefix.
                     Caller goto replay_key.
      `fall-through' — no decoration applied.  Caller continues to
-                      the follow_key dispatch.
+                      the rks-follow-key dispatch.
    See docs/keyboard.org §M6ac.  */
 /* Criterion-2: factor --rks-mouse-click-prefix-body's three event-kind
    branches (mouse-click / touchscreen, menu-bar / tab-bar / tool-bar,
