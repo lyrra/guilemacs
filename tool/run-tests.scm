@@ -116,6 +116,7 @@
   "test/keyboard/test-m20-menu-prompt.el"     ; M20 imp-1 + imp-2 (corpus prints PASS/FAIL)
   "test/keyboard/test-m21-read-key-sequence.el" ; M21 imp-1 + imp-2 + imp-3 (corpus prints PASS/FAIL)
   "test/keyboard/test-m22-input-pending.el"     ; M22 imp-1 (corpus prints PASS/FAIL)
+  "test/keyboard/test-m22-recursive-edit.el"    ; M22 imp-2 (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

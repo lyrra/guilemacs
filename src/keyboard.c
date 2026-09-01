@@ -329,8 +329,6 @@ union buffered_input_event *kbd_store_ptr;
    Why not just have a flag set and cleared by the enqueuing and
    dequeuing functions?  The code is a bit simpler this way.  */
 
-static void recursive_edit_unwind (Lisp_Object buffer);
-
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
 
@@ -586,69 +584,6 @@ add_command_key (Lisp_Object key)
 }
 
 
-Lisp_Object
-recursive_edit_1 (void)
-{
-  dynwind_begin ();
-  Lisp_Object val;
-
-  if (command_loop_level > 0)
-    {
-      specbind_guile (Qstandard_output, Qt);
-      specbind_guile (Qstandard_input, Qt);
-      specbind_guile (Qsymbols_with_pos_enabled, Qnil);
-      specbind_guile (Qprint_symbols_bare, Qnil);
-    }
-
-#ifdef HAVE_WINDOW_SYSTEM
-  /* The command loop has started an hourglass timer, so we have to
-     cancel it here, otherwise it will fire because the recursive edit
-     can take some time.  Do not check for display_hourglass_p here,
-     because it could already be nil.  */
-    cancel_hourglass ();
-#endif
-
-  /* This function may have been called from a debugger called from
-     within redisplay, for instance by Edebugging a function called
-     from fontification-functions.  We want to allow redisplay in
-     the debugging session.
-
-     The recursive edit is left with a `(throw exit ...)'.  The `exit'
-     tag is not caught anywhere in redisplay, i.e. when we leave the
-     recursive edit, the original redisplay leading to the recursive
-     edit will be unwound.  The outcome should therefore be safe.  */
-  specbind_guile (Qinhibit_redisplay, Qnil);
-  redisplaying_p = 0;
-
-  /* This variable stores buffers that have changed so that an undo
-     boundary can be added. specbind this so that changes in the
-     recursive edit will not result in undo boundaries in buffers
-     changed before we entered there recursive edit.
-     See Bug #23632.
-  */
-  specbind_guile (Qundo_auto__undoably_changed_buffers, Qnil);
-
-  /* M7h: the editor command loop body lives in Scheme as
-     (emacs command-loop)/command-loop-main.  */
-  static SCM cmdloop_proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (cmdloop_proc))
-    cmdloop_proc = scm_c_public_ref ("emacs command-loop",
-                                     "command-loop-main");
-  val = SCM_CALL_0 (cmdloop_proc);
-  if (EQ (val, Qt))
-    quit ();
-  /* Handle throw from read_minibuf when using minibuffer
-     while it's active but we're in another window.  */
-  if (STRINGP (val))
-    xsignal1 (Qerror, val);
-
-  if (FUNCTIONP (val))
-    call0 (val);
-
-  dynwind_end ();
-  return Qnil;
-}
-
 /* When an auto-save happens, record the "time", and don't do again soon.  */
 
 void
@@ -666,6 +601,21 @@ force_auto_save_soon (void)
   last_auto_save = - auto_save_interval - 1;
 }
 #endif
+/* M22 imp-2: thin dispatcher.  The recursive_edit_1 body (prologue +
+   command-loop-main + throw-value tail) lives in Scheme as
+   (emacs recursive-edit)/recursive-edit-1.  Called directly by
+   read_minibuf (minibuf.c), which runs the edit loop without the
+   Frecursive_edit command_loop_level increment / kboard switch.  */
+Lisp_Object
+recursive_edit_1 (void)
+{
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "recursive-edit-1");
+  SCM_CALL_0 (proc);
+  return Qnil;
+}
+
 
 DEFUN ("recursive-edit", Frecursive_edit, Srecursive_edit, 0, 0, "",
        doc: /* Invoke the editor command loop recursively.
@@ -690,49 +640,19 @@ throwing to \\='exit:
 This function is called by the editor initialization to begin editing.  */)
   (void)
 {
+  /* M22 imp-2: thin dispatcher.  The whole body lives in Scheme as
+     (emacs recursive-edit)/recursive-edit.  The dynwind bracket is kept
+     (unlike Ftop_level, which never registers an unwind action) so that
+     temporarily_switch_to_single_kboard's internal record_unwind_protect_int
+     still fires at dynwind_end below — after the whole Scheme call and its
+     dynamic-wind after-thunk have returned.  */
   dynwind_begin ();
-  Lisp_Object buffer;
-
-  /* If we enter while input is blocked, don't lock up here.
-     This may happen through the debugger during redisplay.  */
-  if (input_blocked_p ()) {
-    dynwind_end ();
-    return Qnil;
-  }
-
-  if (command_loop_level >= 0
-      && current_buffer != XBUFFER (XWINDOW (selected_window)->contents))
-    buffer = Fcurrent_buffer ();
-  else
-    buffer = Qnil;
-
-  /* Don't do anything interesting between the increment and the
-     record_unwind_protect!  Otherwise, we could get distracted and
-     never decrement the counter again.  */
-  command_loop_level++;
-  update_mode_lines = 17;
-  record_unwind_protect (recursive_edit_unwind, buffer);
-
-  /* If we leave recursive_edit_1 below with a `throw' for instance,
-     like it is done in the splash screen display, we have to
-     make sure that we restore single_kboard as command_loop_1
-     would have done if it were left normally.  */
-  if (command_loop_level > 0)
-    temporarily_switch_to_single_kboard (SELECTED_FRAME ());
-
-  recursive_edit_1 ();
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs recursive-edit", "recursive-edit");
+  SCM_CALL_0 (proc);
   dynwind_end ();
   return Qnil;
-}
-
-void
-recursive_edit_unwind (Lisp_Object buffer)
-{
-  if (BUFFERP (buffer))
-    Fset_buffer (buffer);
-
-  command_loop_level--;
-  update_mode_lines = 18;
 }
 
 
@@ -1688,21 +1608,14 @@ restore_kboard_configuration (int was_locked)
 void
 cmd_error_internal (Lisp_Object data, const char *context)
 {
-  /* The immediate context is not interesting for Quits,
-     since they are asynchronous.  */
-  if (signal_quit_p (data))
-    Vsignaling_function = Qnil;
-
-  Vquit_flag = Qnil;
-  Vinhibit_quit = Qt;
-
-  /* Use user's specified output function if any.  */
-  if (!NILP (Vcommand_error_function))
-    call3 (Vcommand_error_function, data,
-	   context ? build_string (context) : empty_unibyte_string,
-	   Vsignaling_function);
-
-  Vsignaling_function = Qnil;
+  /* M22 imp-2: thin dispatcher.  The body lives in Scheme as
+     (emacs command-loop)/cmd-error-internal!.  Keep this C signature so
+     the two process.c call sites need no change.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "cmd-error-internal!");
+  SCM_CALL_2 (proc, data,
+              context ? build_string (context) : empty_unibyte_string);
 }
 
 /* `command-error-default-function' (the default value of
@@ -1855,19 +1768,6 @@ no-op on TTY builds.  */)
   return Qnil;
 }
 
-DEFUN ("--cmd-error-internal", Fc_cmd_error_internal,
-       Sc_cmd_error_internal, 2, 2, 0,
-       doc: /* Internal: invoke the C cmd_error_internal helper.
-DATA is a cons of error-symbol and error-data; CONTEXT is a string
-prepended to the message (e.g. "After 3 kbd macro iterations: ").
-An empty CONTEXT string is passed through verbatim.  */)
-  (Lisp_Object data, Lisp_Object context)
-{
-  CHECK_STRING (context);
-  cmd_error_internal (data, SSDATA (context));
-  return Qnil;
-}
-
 /* M7h — primitive exposed to (emacs command-loop) for command-loop-main.
    See docs/keyboard.org §M7h.  */
 
@@ -1924,14 +1824,15 @@ user_error (const char *msg)
 }
 
 /* M4 — accessor subrs for the C-side counters used by (emacs
-   recursive-edit).  Frecursive_edit and its unwind-protect stay C
-   for now; only the three trivial DEFUNs (exit/abort/recursion-depth)
-   ported.  See docs/keyboard.org §M4.  */
+   recursive-edit).  Since M22 imp-2 the recursive-edit body and its
+   unwind (buffer/level restore) live entirely in Scheme, so the
+   level is read and stepped via these accessors.  See
+   docs/keyboard.org §M4.  */
 
 DEFUN ("--command-loop-level", Fcommand_loop_level, Scommand_loop_level, 0, 0, 0,
        doc: /* Internal: current depth in recursive edits.
--1 means not yet inside any command loop.  Modified only by
-Frecursive_edit and recursive_edit_unwind in keyboard.c.  */)
+-1 means not yet inside any command loop.  Stepped by
+recursive-edit in Scheme (emacs recursive-edit).  */)
   (void)
 {
   return make_fixnum (command_loop_level);
@@ -1943,6 +1844,106 @@ minibuf.c.  */)
   (void)
 {
   return make_fixnum (minibuf_level);
+}
+
+/* M22 imp-2 — one-purpose accessors for C-only recursive-edit state.
+   Permanent accessors (not workarounds): the wrapped state is either a
+   plain C global/function with no Lisp-visible name, or a one-way
+   step.  Follows the --recent-keys-ring-set! precedent from M22 imp-1.  */
+
+DEFUN ("--input-blocked-p", Fc_input_blocked_p, Sc_input_blocked_p, 0, 0, 0,
+       doc: /* Internal: t if input is currently blocked
+(input_blocked_p ()).  recursive-edit returns early when true.  */)
+  (void)
+{
+  return input_blocked_p () ? Qt : Qnil;
+}
+
+DEFUN ("--command-loop-level-increment!", Fc_command_loop_level_increment,
+       Sc_command_loop_level_increment, 0, 0, 0,
+       doc: /* Internal: increment command_loop_level and return the new
+value as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (++command_loop_level);
+}
+
+DEFUN ("--command-loop-level-decrement!", Fc_command_loop_level_decrement,
+       Sc_command_loop_level_decrement, 0, 0, 0,
+       doc: /* Internal: decrement command_loop_level and return the new
+value as a fixnum.  */)
+  (void)
+{
+  return make_fixnum (--command_loop_level);
+}
+
+DEFUN ("--update-mode-lines-set!", Fc_update_mode_lines_set,
+       Sc_update_mode_lines_set, 1, 1, 0,
+       doc: /* Internal: set the C global update_mode_lines to N (a
+fixnum).  recursive-edit sets it to 17 on entry and 18 on exit.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  update_mode_lines = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--redisplaying-p-clear!", Fc_redisplaying_p_clear,
+       Sc_redisplaying_p_clear, 0, 0, 0,
+       doc: /* Internal: set the C bool global redisplaying_p to false.
+Lets redisplay run inside a recursive edit entered from within
+redisplay (e.g. Edebugging a fontification-functions call).  */)
+  (void)
+{
+  redisplaying_p = false;
+  return Qnil;
+}
+
+DEFUN ("--temporarily-switch-to-single-kboard!",
+       Fc_temporarily_switch_to_single_kboard,
+       Sc_temporarily_switch_to_single_kboard, 0, 0, 0,
+       doc: /* Internal: call temporarily_switch_to_single_kboard on the
+selected frame (M27-owned, kept C).  */)
+  (void)
+{
+  temporarily_switch_to_single_kboard (SELECTED_FRAME ());
+  return Qnil;
+}
+
+DEFUN ("--recursive-edit-quit!", Fc_recursive_edit_quit,
+       Sc_recursive_edit_quit, 0, 0, 0,
+       doc: /* Internal: call the real C quit (void).  Not the same as
+elisp (signal 'quit nil): quit calls signal_or_quit with
+continuable = true.  recursive-edit tail calls this when the
+command loop returns t.  */)
+  (void)
+{
+  quit ();
+  return Qnil;
+}
+
+DEFUN ("--signal-quit-p", Fc_signal_quit_p, Sc_signal_quit_p, 1, 1, 0,
+       doc: /* Internal: t if DATA is a quit-condition (signal_quit_p).  */)
+  (Lisp_Object data)
+{
+  return signal_quit_p (data) ? Qt : Qnil;
+}
+
+DEFUN ("--signaling-function", Fc_signaling_function,
+       Sc_signaling_function, 0, 0, 0,
+       doc: /* Internal: return the C global Vsignaling_function.  */)
+  (void)
+{
+  return Vsignaling_function;
+}
+
+DEFUN ("--signaling-function-set!", Fc_signaling_function_set,
+       Sc_signaling_function_set, 1, 1, 0,
+       doc: /* Internal: set the C global Vsignaling_function to N.  */)
+  (Lisp_Object n)
+{
+  Vsignaling_function = n;
+  return Qnil;
 }
 
 /* `exit-recursive-edit' and `abort-recursive-edit' are provided

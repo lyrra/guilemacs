@@ -13,6 +13,7 @@
             top-level-1
             command-loop-main
             cmd-error
+            cmd-error-internal!
             command-error-default-function
             init-command-loop-registrations))
 
@@ -56,6 +57,30 @@
   ;; Scheme #f.  `null?' in Guile catches both #nil and '() in this
   ;; build; `not' catches #f.
   (or (null? x) (not x)))
+
+;;; ---------------------------------------------------------------------
+;;; M22 imp-2 — cmd_error_internal ported to Scheme.  The C function is
+;;; now a thin dispatcher to this procedure; the two process.c call sites
+;;; are unchanged.  DATA is (error-symbol . error-data); CONTEXT is a
+;;; (possibly empty) ASCII string.
+
+(define (cmd-error-internal! data context)
+  "Take actions on handling an error.  DATA is the error data; CONTEXT
+is an ASCII string describing the context.  Clears signaling-function
+and quit-flag, binds inhibit-quit, and calls command-error-function
+with (DATA CONTEXT SIGNALING-FUNCTION) if it is set.  Mirrors the old
+C cmd_error_internal."
+  ;; The immediate context is not interesting for Quits, since they are
+  ;; asynchronous.
+  (when (not (%nilp ((force %signal-quit-p) data)))
+    ((force %signaling-function-set!) #nil))
+  (set-symbol-value! 'quit-flag    #nil)
+  (set-symbol-value! 'inhibit-quit #t)
+  ;; Use the user's specified output function if any.
+  (when (not (%nilp (symbol-value 'command-error-function)))
+    ((%c 'funcall) (symbol-value 'command-error-function)
+     data context ((force %signaling-function))))
+  ((force %signaling-function-set!) #nil))
 
 (define (command-loop-1-prologue)
   "Per-entry initialization for command_loop_1.  Mirrors the C
@@ -533,7 +558,9 @@ the original command_loop_1 body verbatim.  See docs/keyboard.org §M7d."
   (delay (%c '--executing-kbd-macro-iterations)))
 (define %display-hourglass-p (delay (%c '--display-hourglass-p)))
 (define %cancel-hourglass    (delay (%c '--cancel-hourglass)))
-(define %cmd-error-internal  (delay (%c '--cmd-error-internal)))
+(define %signal-quit-p       (delay (%c '--signal-quit-p)))
+(define %signaling-function  (delay (%c '--signaling-function)))
+(define %signaling-function-set! (delay (%c '--signaling-function-set!)))
 
 (define (cmd-error data)
   "Top-of-command-loop error handler.  DATA is (error-symbol .
@@ -588,7 +615,7 @@ Mirrors the static C cmd_error in src/keyboard.c."
           ((force %set-kboard-prefix-arg)      kb #nil)
           ((force %set-kboard-last-prefix-arg) kb #nil)
           ((force %cancel-echoing))
-          ((force %cmd-error-internal) data macroerror))
+          (cmd-error-internal! data macroerror))
         (lambda ()
           (set-symbol-value! 'standard-output saved-output)
           (set-symbol-value! 'standard-input  saved-input)

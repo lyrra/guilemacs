@@ -341,8 +341,12 @@
              (fboundp '--display-hourglass-p))
 (test-assert "m7f-helper/cancel-hourglass"
              (fboundp '--cancel-hourglass))
-(test-assert "m7f-helper/cmd-error-internal"
-             (fboundp '--cmd-error-internal))
+(test-assert "m22/cmd-error-internal/signal-quit-p"
+             (fboundp '--signal-quit-p))
+(test-assert "m22/cmd-error-internal/signaling-function"
+             (fboundp '--signaling-function))
+(test-assert "m22/cmd-error-internal/signaling-function-set!"
+             (fboundp '--signaling-function-set!))
 
 (test-eq "m7f/executing-kbd-macro-c-defaults-nil"
          nil (--executing-kbd-macro-c-p))

@@ -449,7 +449,9 @@
   (should (fboundp '--executing-kbd-macro-iterations))
   (should (fboundp '--display-hourglass-p))
   (should (fboundp '--cancel-hourglass))
-  (should (fboundp '--cmd-error-internal)))
+  (should (fboundp '--signal-quit-p))
+  (should (fboundp '--signaling-function))
+  (should (fboundp '--signaling-function-set!)))
 
 (ert-deftest m7f-helper/executing-kbd-macro-c-defaults-nil ()
   ;; At batch startup, no kbd-macro is replaying.
