@@ -47,7 +47,8 @@
             kbd-buffer-process-special-events!
             kbd-buffer-swallow-events!
             kbd-buffer-discard-mouse-events!
-            kbd-buffer-events-waiting))
+            kbd-buffer-events-waiting
+            stuff-buffered-input))
 
 ;;; --- Constants ------------------------------------------------------
 
@@ -1212,3 +1213,40 @@ relies on this advance).  Returns #t/#nil."
                 #t
                 #nil))
           (loop (modulo (+ idx 1) KBD-BUFFER-SIZE))))))
+
+;;; --- M22 imp-3: stuff-buffered-input --------------------------------
+;;; Port of C stuff_buffered_input (src/keyboard.c).  Stuff
+;;; STUFFSTRING's bytes plus a trailing newline into the raw tty input
+;;; queue, then drain every event between fetch and store: stuff the
+;;; code of each ASCII_KEYSTROKE_EVENT into the tty queue and blank each
+;;; drained slot.  Finally set fetch = store and force input_pending
+;;; false.  The #ifdef SIGTSTP guard is absorbed entirely on the C side:
+;;; the --stuff-char / --stuff-string shims no-op without SIGTSTP, AND
+;;; the C stuff_buffered_input dispatcher only calls this function under
+;;; #ifdef SIGTSTP — so on a !SIGTSTP build the whole operation (drain
+;;; included) is a no-op, matching the old C body.  See
+;;; docs/m22-plan.org §imp-3 (Finding D).
+
+(defelisp %--stuff-char            --stuff-char)
+(defelisp %--stuff-string          --stuff-string)
+(defelisp %--input-pending-set!    --input-pending-set!)
+
+(define (stuff-buffered-input stuffstring)
+  (when (truthy? ((force %stringp) stuffstring))
+    ;; --stuff-string mirrors the C SDATA/SBYTES loop + trailing '\n'.
+    ((force %--stuff-string) stuffstring))
+  (let walk ((idx ((force %--kbd-fetch-ptr-index))))
+    (when (not (= idx ((force %--kbd-store-ptr-index))))
+      (let ((ie ((force %--kbd-event-ie) idx)))
+        (when (= ((force %--kbd-event-kind) idx) ASCII-KEYSTROKE-EVENT)
+          ((force %--stuff-char) ((force %--ie-code) ie)))
+        ;; Wipe out this event, to catch bugs (clear_event).
+        ((force %--ie-clear) ie))
+      (walk (modulo (+ idx 1) KBD-BUFFER-SIZE))))
+  ;; C drains every event: fetch ends equal to store.  Reposition the
+  ;; fetch-ptr to store; each slot was blanked above.
+  ((force %--kbd-set-fetch-ptr-index) ((force %--kbd-store-ptr-index)))
+  ;; C hard-sets input_pending = false (not recomputed — see
+  ;; --input-pending-set!).
+  ((force %--input-pending-set!) #nil)
+  #nil)

@@ -1,6 +1,7 @@
 (define-module (emacs command-loop)
   #:use-module (emacs elisp-ref)
   #:use-module (emacs-elisp runtime)
+  #:use-module (srfi srfi-11)          ; let*-values (adjust-point-for-property)
   #:declarative? #t
   #:export (command-loop-1-prologue
             command-loop-1-iter-pre-read
@@ -8,6 +9,7 @@
             command-loop-1-iter-post-dispatch
             command-loop-1-iter-mark-region
             command-loop-1-finalize
+            adjust-point-for-property
             command-loop-1
             command-loop-2
             top-level-1
@@ -515,6 +517,199 @@ docs/keyboard.org §M7c."
                (%nilp ((force %kboard-prefix-arg) kb)))
       ((force %finalize-kbd-macro-chars)))))
 
+;;;;
+;;;; M7c-adj — adjust-point-for-property (ported from static C
+;;;; adjust_point_for_property, src/keyboard.c).  Called from the C
+;;;; --adjust-point-for-property-cl1 dispatcher.  See
+;;;; docs/m22-plan.org §imp-3 (Finding E).
+;;;;
+
+(define %composition-adjust-point   (delay (%c '--composition-adjust-point)))
+(define %display-prop-intangible-p  (delay (%c '--display-prop-intangible-p)))
+
+;; FIX-20260901-guilemacs: the C TEXT_PROP_MEANS_INVISIBLE macro always
+;; examines its argument as a raw property VALUE (via invisible_prop,
+;; src/xdisp.c:29616).  The Lisp-visible `invisible-p' DEFUN instead
+;; dispatches FIXNATP/MARKER arguments as buffer POSITIONS
+;; (src/xdisp.c:29666-29670) before falling through to the same value check.
+;; Every call site here passes a raw property value, never a position, so the
+;; substitution matches C for all normal values (symbols, t, lists).  It
+;; diverges only for a plain non-negative-integer property VALUE, which
+;; invisible_prop treats as not-invisible while `invisible-p' would re-read
+;; the property at that position.  No real invisible-property user sets plain
+;; integers, so this is left as a documented gap rather than a full Scheme
+;; reimplementation of invisible_prop.
+(define (invisible-level val)
+  "TEXT_PROP_MEANS_INVISIBLE, expressed on a raw property VALUE:
+0 = not invisible, 1 = t, else the fixnum ellipsis level.  invisible-p
+accepts a raw property value directly."
+  (let ((inv ((%c 'invisible-p) val)))
+    (cond ((%nilp inv) 0)
+          ((eq? inv #t) 1)
+          (else inv))))
+
+(define (adjust-point-for-property last-pt modified)
+  "Adjust point to a boundary of a region that has a `composition',
+`display' or `invisible' property that should be treated intangible.
+LAST-PT is the last position of point; MODIFIED is whether the buffer
+was just modified (which suppresses composition adjustment).  Mirrors
+src/keyboard.c adjust_point_for_property; eassert dropped (no behavior)."
+  (define (pt) ((%c 'point)))
+  (define (pt-byte) ((%c 'point-byte)))
+  (define (begv) ((%c 'point-min)))
+  (define (zv) ((%c 'point-max)))
+  (define (set-pt! p) ((%c 'goto-char) p))
+
+  ;; get_char_property_and_overlay + display_prop_intangible_p + range.
+  ;; Returns (values found? val beg end) for the display property at POS.
+  (define (display-range-at pos)
+    (let* ((po ((%c 'get-char-property-and-overlay) pos 'display
+                ((%c 'selected-window))))
+           (val ((%c 'car) po))
+           (ov ((%c 'cdr) po)))
+      (if (or (%nilp val)
+              (%nilp ((force %display-prop-intangible-p) val ov pos (pt-byte))))
+          (values #f #nil 0 0)
+          (if (not (%nilp ((%c 'overlayp) ov)))
+              (values #t val ((%c 'overlay-start) ov) ((%c 'overlay-end) ov))
+              ;; get_property_and_range (POS, display, ..., Qnil) — the C
+              ;; body tries the Scheme text-property path first.
+              (let ((v ((%c 'get-text-property) pos 'display
+                        ((%c 'current-buffer)))))
+                (if (%nilp v)
+                    (values #f #nil 0 0)
+                    (let* ((prev ((%c 'previous-single-property-change)
+                                  pos 'display ((%c 'current-buffer)) (begv)))
+                           (next ((%c 'next-single-property-change)
+                                  pos 'display ((%c 'current-buffer)) (zv)))
+                           (b (if (%nilp prev) (begv) prev))
+                           (e (if (%nilp next) (zv) next)))
+                      (values #t v b e))))))))
+
+  ;; The forward C while loop finding the invisible area's end.
+  (define (scan-invisible-forward pos ellipsis)
+    (let ((e pos)
+          (el ellipsis))
+      (let loop ()
+        (let* ((po ((%c 'get-char-property-and-overlay) e 'invisible #nil))
+               (val ((%c 'car) po))
+               (ov ((%c 'cdr) po))
+               (inv (invisible-level val)))
+          (if (and (< e (zv)) (> inv 0))
+              (begin
+                (set! el (or el (> inv 1)
+                             (and (not (%nilp ((%c 'overlayp) ov)))
+                                  (or (not (%nilp ((%c 'overlay-get) ov 'after-string)))
+                                      (not (%nilp ((%c 'overlay-get) ov 'before-string)))))))
+                (let ((tmp ((%c 'next-single-char-property-change)
+                            e 'invisible #nil #nil)))
+                  (set! e (if (and (not (%nilp tmp)) (integer? tmp)) tmp (zv)))
+                  (loop)))
+              (values e el))))))
+
+  ;; The backward C while loop finding the invisible area's start.
+  ;; FIX-20260901-guilemacs: the C body checks (beg > BEGV) BEFORE reading
+  ;; the property at (beg - 1); BEGV - 1 is an invalid buffer position and
+  ;; get-char-property-and-overlay signals args-out-of-range there.  Keep the
+  ;; same short-circuit order so the scan never reads past the accessible
+  ;; region's start.
+  (define (scan-invisible-backward pos ellipsis)
+    (let ((b pos)
+          (el ellipsis))
+      (let loop ()
+        (if (not (> b (begv)))
+            (values b el)
+            (let* ((po ((%c 'get-char-property-and-overlay) (- b 1) 'invisible #nil))
+                   (val ((%c 'car) po))
+                   (ov ((%c 'cdr) po))
+                   (inv (invisible-level val)))
+              (if (not (> inv 0))
+                  (values b el)
+                  (begin
+                    (set! el (or el (> inv 1)
+                                 (and (not (%nilp ((%c 'overlayp) ov)))
+                                      (or (not (%nilp ((%c 'overlay-get) ov 'after-string)))
+                                          (not (%nilp ((%c 'overlay-get) ov 'before-string)))))))
+                    (let ((tmp ((%c 'previous-single-char-property-change)
+                                b 'invisible #nil #nil)))
+                      (set! b (if (and (not (%nilp tmp)) (integer? tmp)) tmp (begv)))
+                      (loop)))))))))
+
+  (let ((check-composition (not modified))
+        (check-display #t)
+        (check-invisible #t)
+        (orig-pt (pt)))
+    (let comp-loop ()
+      (when (or check-composition check-display check-invisible)
+        ;; --- composition branch ---
+        (when (and check-composition
+                   (> (pt) (begv)) (< (pt) (zv))
+                   (let ((b ((force %composition-adjust-point) last-pt (pt))))
+                     (if (not (= b (pt)))
+                         (begin (set-pt! b) #t)
+                         #f)))
+          (set! check-display #t)
+          (set! check-invisible #t))
+        (set! check-composition #f)
+        ;; --- display branch ---
+        (when (and check-display
+                   (> (pt) (begv)) (< (pt) (zv)))
+          (let*-values (((found val beg end) (display-range-at (pt))))
+            (when (and found
+                       (or (< beg (pt))
+                           (and (<= beg (pt))
+                                (string? val)
+                                (= 0 (string-length val)))))
+              (set-pt! (if (< (pt) last-pt)
+                           (if (and (string? val) (= 0 (string-length val)))
+                               (max (- beg 1) (begv))
+                               beg)
+                           end))
+              (set! check-composition #t)
+              (set! check-invisible #t))))
+        (set! check-display #f)
+        ;; --- invisible branch ---
+        (when (and check-invisible (> (pt) (begv)) (< (pt) (zv)))
+          (let*-values (((e el) (scan-invisible-forward (pt) #f)))
+            (let*-values (((beg end ellipsis)
+                           (let*-values (((b el2) (scan-invisible-backward (pt) el)))
+                             (values b e el2))))
+              (when (and (< beg (pt)) (> end (pt)))
+                (set-pt! (if (and (= orig-pt (pt))
+                                  (or (< last-pt beg) (> last-pt end)))
+                             (begin (set! orig-pt -1)
+                                    (if (< (pt) last-pt) end beg))
+                             (if (< (pt) last-pt) beg end)))
+                (set! check-composition #t)
+                (set! check-display #t))
+              ;; Pretend the area doesn't exist if the buffer is not modified.
+              (when (and (not modified) (not ellipsis) (< beg end))
+                (cond
+                 ((and (= last-pt beg) (= (pt) end) (< end (zv)))
+                  (set! check-composition #t)
+                  (set! check-display #t)
+                  (set-pt! (+ end 1)))
+                 ((and (= last-pt end) (= (pt) beg) (> beg (begv)))
+                  (set! check-composition #t)
+                  (set! check-display #t)
+                  (set-pt! (- beg 1)))
+                 ((= (pt) (if (< (pt) last-pt) beg end))
+                  ;; We've already moved as far as we can; trying to go
+                  ;; to the other end would mean moving backwards.
+                  #f)
+                 (else
+                  (let ((val ((%c 'get-pos-property) (pt) 'invisible #nil)))
+                    (if (and (> (invisible-level val) 0)
+                             (let ((val2 ((%c 'get-pos-property)
+                                          (if (= (pt) beg) end beg)
+                                          'invisible #nil)))
+                               (= (invisible-level val2) 0)))
+                        (begin
+                          (set! check-composition #t)
+                          (set! check-display #t)
+                          (set-pt! (if (= (pt) beg) end beg))))))))))
+        (set! check-invisible #f)
+        (comp-loop))))))
 ;;;;
 ;;;; M7d — command_loop_1 entry point
 ;;;;

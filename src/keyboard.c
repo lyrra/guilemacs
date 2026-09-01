@@ -1069,8 +1069,6 @@ table.  */)
 /* M11 imp-1.1 — kbd_buffer queue accessors for Scheme ring-buffer walking.
    See docs/m11-plan.org §imp-1.1.  */
 
-static struct frame *some_mouse_moved (void);
-
 DEFUN ("--kbd-fetch-ptr-index", Fkbd_fetch_ptr_index, Skbd_fetch_ptr_index, 0, 0, 0,
        doc: /* Return the current kbd_fetch_ptr index (0..KBD_BUFFER_SIZE-1).
 
@@ -1105,12 +1103,16 @@ Handles wrap-around (kbd_store_ptr may have wrapped past KBD_BUFFER_SIZE).  */)
 DEFUN ("--some-mouse-moved", Fsome_mouse_moved, Ssome_mouse_moved, 0, 0, 0,
        doc: /* Return the frame that has pending mouse movement, or nil.
 
-Wraps some_mouse_moved().  Returns a frame Lisp_Object or nil.
-Scheme uses this in the wait loop to detect mouse-motion fallback.  */)
+M22 imp-3: dispatches to (emacs read-key-sequence) some-mouse-moved,
+which ports the old C some_mouse_moved().  Returns a frame Lisp_Object
+or nil.  Scheme uses this in the wait loop to detect mouse-motion
+fallback.  */)
   (void)
 {
-  struct frame *f = some_mouse_moved ();
-  return f ? make_lisp_ptr (f, Lisp_Vectorlike) : Qnil;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "some-mouse-moved");
+  return SCM_CALL_0 (proc);
 }
 
 DEFUN ("--frame-set-mouse-moved!", Fframe_set_mouse_moved,
@@ -1127,6 +1129,37 @@ site.  */)
   CHECK_FRAME (frame);
   XFRAME (frame)->mouse_moved = true;
   return Qnil;
+}
+
+/* M22 imp-3 — track-mouse trio.  Primitives for the (emacs
+   read-key-sequence) port of some_mouse_moved / tracking_off /
+   Finternal_track_mouse.  See docs/m22-plan.org §imp-3.  */
+
+DEFUN ("--track-mouse", Fc_track_mouse, Sc_track_mouse, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return the C track_mouse cell.
+Distinct from the elisp dynamic variable `track-mouse' read via
+symbol-value; this is the C Lisp_Object cell some_mouse_moved tests.  */)
+  (void)
+{
+  return track_mouse;
+}
+
+DEFUN ("--track-mouse-set!", Fc_track_mouse_set, Sc_track_mouse_set, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: set the C track_mouse cell.  */)
+  (Lisp_Object v)
+{
+  track_mouse = v;
+  return Qnil;
+}
+
+DEFUN ("--frame-mouse-moved-p", Fc_frame_mouse_moved_p, Sc_frame_mouse_moved_p, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: t if FRAME's mouse_moved
+bitfield is set.  Read-only — never clears the flag; the C redisplay
+code is what resets mouse_moved elsewhere.  */)
+  (Lisp_Object frame)
+{
+  CHECK_FRAME (frame);
+  return XFRAME (frame)->mouse_moved ? Qt : Qnil;
 }
 
 DEFUN ("--kbd-event-kind", Fkbd_event_kind, Skbd_event_kind, 1, 1, 0,
@@ -1954,41 +1987,21 @@ DEFUN ("--signaling-function-set!", Fc_signaling_function_set,
 
 /* Restore mouse tracking enablement.  See Finternal_track_mouse for
    the only use of this function.  */
-
-static void
-tracking_off (Lisp_Object old_track_mouse)
-{
-  track_mouse = old_track_mouse;
-  if (NILP (old_track_mouse))
-    {
-      /* Redisplay may have been preempted because there was input
-	 available, and it assumes it will be called again after the
-	 input has been processed.  If the only input available was
-	 the sort that we have just disabled, then we need to call
-	 redisplay.  */
-      if (!readable_events (READABLE_EVENTS_DO_TIMERS_NOW))
-	{
-	  redisplay_preserve_echo_area (6);
-	  get_input_pending (READABLE_EVENTS_DO_TIMERS_NOW);
-	}
-    }
-}
+/* M22 imp-3: tracking_off and some_mouse_moved moved to Scheme (emacs
+   read-key-sequence); their C bodies were deleted with the cutover.  */
 
 DEFUN ("internal--track-mouse", Finternal_track_mouse, Sinternal_track_mouse,
        1, 1, 0,
        doc: /* Call BODYFUN with mouse movement events enabled.  */)
   (Lisp_Object bodyfun)
 {
-  dynwind_begin ();
-  Lisp_Object val;
-
-  record_unwind_protect (tracking_off, track_mouse);
-
-  track_mouse = Qt;
-
-  val = call0 (bodyfun);
-  dynwind_end ();
-  return val;
+  /* M22 imp-3: dispatch to (emacs read-key-sequence)
+     internal-track-mouse, which ports the old dynwind/record_unwind
+     dance with Guile dynamic-wind.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "internal-track-mouse");
+  return SCM_CALL_1 (proc, bodyfun);
 }
 
 /* If mouse has moved on some frame and we are tracking the mouse,
@@ -1996,25 +2009,10 @@ DEFUN ("internal--track-mouse", Finternal_track_mouse, Sinternal_track_mouse,
 
    If ignore_mouse_drag_p is non-zero, ignore (implicit) mouse movement
    after resizing the tool-bar window.  */
+/* M22 imp-3: some_mouse_moved moved to (emacs read-key-sequence);
+   its C body was deleted with the cutover.  */
 
 bool ignore_mouse_drag_p;
-
-static struct frame *
-some_mouse_moved (void)
-{
-  Lisp_Object tail, frame;
-
-  if (NILP (track_mouse) || ignore_mouse_drag_p)
-    return NULL;
-
-  FOR_EACH_FRAME (tail, frame)
-    {
-      if (XFRAME (frame)->mouse_moved)
-	return XFRAME (frame);
-    }
-
-  return NULL;
-}
 
 
 /* This is the actual command reading loop,
@@ -2023,7 +2021,6 @@ some_mouse_moved (void)
 enum { READ_KEY_ELTS = 30 };
 static int read_key_sequence (Lisp_Object *, Lisp_Object,
                               bool, bool, bool, bool, bool);
-static void adjust_point_for_property (ptrdiff_t, bool);
 
 /* M7a — primitives exposed to (emacs command-loop) for the
    command_loop_1 prologue port.  See docs/keyboard.org §M7a.  */
@@ -2579,11 +2576,43 @@ DEFUN ("--adjust-point-for-property-cl1",
        doc: /* Internal: call adjust_point_for_property (last_point_position,
 MODIFF != cl1_prev_modiff).  Pulls the modified-flag from the
 file-static cl1_prev_modiff snapshot so Scheme doesn't have to
-plumb it.  */)
+plumb it.  M22 imp-3: dispatches to (emacs command-loop).  */)
   (void)
 {
-  adjust_point_for_property (last_point_position, MODIFF != cl1_prev_modiff);
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "adjust-point-for-property");
+  SCM_CALL_2 (proc, make_fixnum (last_point_position),
+	      MODIFF != cl1_prev_modiff ? Qt : Qnil);
   return Qnil;
+}
+
+DEFUN ("--composition-adjust-point", Fc_composition_adjust_point,
+       Sc_composition_adjust_point, 2, 2, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return
+composition_adjust_point (LAST-PT, PT) as a fixnum — the actual new
+position, unlike the *-changes-p variants which only report whether
+the position moved.  */)
+  (Lisp_Object last_pt, Lisp_Object pt)
+{
+  CHECK_FIXNUM (last_pt);
+  CHECK_FIXNUM (pt);
+  return make_fixnum (composition_adjust_point (XFIXNUM (last_pt),
+						XFIXNUM (pt)));
+}
+
+DEFUN ("--display-prop-intangible-p", Fc_display_prop_intangible_p,
+       Sc_display_prop_intangible_p, 4, 4, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: t if the display property
+VAL (on OVERLAY, at POS / POS-BYTE) is an intangible display
+property.  Wraps display_prop_intangible_p.  */)
+  (Lisp_Object val, Lisp_Object overlay, Lisp_Object pos, Lisp_Object pos_byte)
+{
+  CHECK_FIXNUM (pos);
+  CHECK_FIXNUM (pos_byte);
+  return (display_prop_intangible_p (val, overlay, XFIXNUM (pos),
+				     XFIXNUM (pos_byte))
+	  ? Qt : Qnil);
 }
 
 DEFUN ("--set-windows-or-buffers-changed",
@@ -2636,165 +2665,8 @@ read_menu_command (void)
   return SCM_CALL_0 (proc);
 }
 
-/* Adjust point to a boundary of a region that has such a property
-   that should be treated intangible.  For the moment, we check
-   `composition', `display' and `invisible' properties.
-   LAST_PT is the last position of point.  */
-
-static void
-adjust_point_for_property (ptrdiff_t last_pt, bool modified)
-{
-  ptrdiff_t beg, end;
-  Lisp_Object val, overlay, tmp;
-  /* When called after buffer modification, we should temporarily
-     suppress the point adjustment for automatic composition so that a
-     user can keep inserting another character at point or keep
-     deleting characters around point.  */
-  bool check_composition = ! modified;
-  bool check_display = true, check_invisible = true;
-  ptrdiff_t orig_pt = PT;
-
-  eassert (XBUFFER (XWINDOW (selected_window)->contents) == current_buffer);
-
-  /* FIXME: cycling is probably not necessary because these properties
-     can't be usefully combined anyway.  */
-  while (check_composition || check_display || check_invisible)
-    {
-      /* FIXME: check `intangible'.  */
-      if (check_composition
-	  && PT > BEGV && PT < ZV
-	  && (beg = composition_adjust_point (last_pt, PT)) != PT)
-	{
-	  SET_PT (beg);
-	  check_display = check_invisible = true;
-	}
-      check_composition = false;
-      if (check_display
-	  && PT > BEGV && PT < ZV
-	  && !NILP (val = get_char_property_and_overlay
-		              (make_fixnum (PT), Qdisplay, selected_window,
-			       &overlay))
-	  && display_prop_intangible_p (val, overlay, PT, PT_BYTE)
-	  && (!OVERLAYP (overlay)
-	      ? get_property_and_range (PT, Qdisplay, &val, &beg, &end, Qnil)
-	      : (beg = OVERLAY_START (overlay),
-		 end = OVERLAY_END (overlay)))
-	  && (beg < PT /* && end > PT   <- It's always the case.  */
-	      || (beg <= PT && STRINGP (val) && SCHARS (val) == 0)))
-	{
-	  eassert (end > PT);
-	  SET_PT (PT < last_pt
-		  ? (STRINGP (val) && SCHARS (val) == 0
-		     ? max (beg - 1, BEGV)
-		     : beg)
-		  : end);
-	  check_composition = check_invisible = true;
-	}
-      check_display = false;
-      if (check_invisible && PT > BEGV && PT < ZV)
-	{
-	  int inv;
-	  bool ellipsis = false;
-	  beg = end = PT;
-
-	  /* Find boundaries `beg' and `end' of the invisible area, if any.  */
-	  while (end < ZV
-#if 0
-		 /* FIXME: We should stop if we find a spot between
-		    two runs of `invisible' where inserted text would
-		    be visible.  This is important when we have two
-		    invisible boundaries that enclose an area: if the
-		    area is empty, we need this test in order to make
-		    it possible to place point in the middle rather
-		    than skip both boundaries.  However, this code
-		    also stops anywhere in a non-sticky text-property,
-		    which breaks (e.g.) Org mode.  */
-		 && (val = Fget_pos_property (make_fixnum (end),
-					      Qinvisible, Qnil),
-		     TEXT_PROP_MEANS_INVISIBLE (val))
-#endif
-		 && !NILP (val = get_char_property_and_overlay
-		           (make_fixnum (end), Qinvisible, Qnil, &overlay))
-		 && (inv = TEXT_PROP_MEANS_INVISIBLE (val)))
-	    {
-	      ellipsis = ellipsis || inv > 1
-		|| (OVERLAYP (overlay)
-		    && (!NILP (Foverlay_get (overlay, Qafter_string))
-			|| !NILP (Foverlay_get (overlay, Qbefore_string))));
-	      tmp = Fnext_single_char_property_change
-		(make_fixnum (end), Qinvisible, Qnil, Qnil);
-	      end = FIXNATP (tmp) ? XFIXNAT (tmp) : ZV;
-	    }
-	  while (beg > BEGV
-#if 0
-		 && (val = Fget_pos_property (make_fixnum (beg),
-					      Qinvisible, Qnil),
-		     TEXT_PROP_MEANS_INVISIBLE (val))
-#endif
-		 && !NILP (val = get_char_property_and_overlay
-		           (make_fixnum (beg - 1), Qinvisible, Qnil, &overlay))
-		 && (inv = TEXT_PROP_MEANS_INVISIBLE (val)))
-	    {
-	      ellipsis = ellipsis || inv > 1
-		|| (OVERLAYP (overlay)
-		    && (!NILP (Foverlay_get (overlay, Qafter_string))
-			|| !NILP (Foverlay_get (overlay, Qbefore_string))));
-	      tmp = Fprevious_single_char_property_change
-		(make_fixnum (beg), Qinvisible, Qnil, Qnil);
-	      beg = FIXNATP (tmp) ? XFIXNAT (tmp) : BEGV;
-	    }
-
-	  /* Move away from the inside area.  */
-	  if (beg < PT && end > PT)
-	    {
-	      SET_PT ((orig_pt == PT && (last_pt < beg || last_pt > end))
-		      /* We haven't moved yet (so we don't need to fear
-			 infinite-looping) and we were outside the range
-			 before (so either end of the range still corresponds
-			 to a move in the right direction): pretend we moved
-			 less than we actually did, so that we still have
-			 more freedom below in choosing which end of the range
-			 to go to.  */
-		      ? (orig_pt = -1, PT < last_pt ? end : beg)
-		      /* We either have moved already or the last point
-			 was already in the range: we don't get to choose
-			 which end of the range we have to go to.  */
-		      : (PT < last_pt ? beg : end));
-	      check_composition = check_display = true;
-	    }
-#if 0 /* This assertion isn't correct, because SET_PT may end up setting
-	 the point to something other than its argument, due to
-	 point-motion hooks, intangibility, etc.  */
-	  eassert (PT == beg || PT == end);
-#endif
-
-	  /* Pretend the area doesn't exist if the buffer is not
-	     modified.  */
-	  if (!modified && !ellipsis && beg < end)
-	    {
-	      if (last_pt == beg && PT == end && end < ZV)
-		(check_composition = check_display = true, SET_PT (end + 1));
-	      else if (last_pt == end && PT == beg && beg > BEGV)
-		(check_composition = check_display = true, SET_PT (beg - 1));
-	      else if (PT == ((PT < last_pt) ? beg : end))
-		/* We've already moved as far as we can.  Trying to go
-		   to the other end would mean moving backwards and thus
-		   could lead to an infinite loop.  */
-		;
-	      else if (val = Fget_pos_property (make_fixnum (PT),
-						Qinvisible, Qnil),
-		       TEXT_PROP_MEANS_INVISIBLE (val)
-		       && (val = (Fget_pos_property
-				  (make_fixnum (PT == beg ? end : beg),
-				   Qinvisible, Qnil)),
-			   !TEXT_PROP_MEANS_INVISIBLE (val)))
-		(check_composition = check_display = true,
-		 SET_PT (PT == beg ? end : beg));
-	    }
-	}
-      check_invisible = false;
-    }
-}
+/* M22 imp-3: adjust_point_for_property moved to (emacs command-loop);
+   its C body was deleted with the cutover.  */
 
 /* Subroutine for safe_run_hooks: run the hook's function.
    ARGS[0] holds the name of the hook, which we don't need here (we only use
@@ -11206,8 +11078,14 @@ either signal an error or silently fail to stuff the characters.  */)
 /* If STUFFSTRING is a string, stuff its contents as pending terminal input.
    Then in any case stuff anything Emacs has read ahead and not used.  */
 
-void
-stuff_buffered_input (Lisp_Object stuffstring)
+/* M22 imp-3 — the body moved to (emacs kbd-buffer) stuff-buffered-input.
+   This copy stays as the C fallback for the fatal-signal path only:
+   terminate_due_to_signal (src/emacs.c:421) sets fatal_error_in_progress
+   before calling shut_down_emacs, which calls stuff_buffered_input.  From
+   a signal handler the Guile VM may be interrupted mid-eval, so calling
+   into Scheme there is unsafe.  See docs/m22-plan.org §imp-3 (Finding D).  */
+static void
+stuff_buffered_input_c (Lisp_Object stuffstring)
 {
 #ifdef SIGTSTP  /* stuff_char is defined if SIGTSTP.  */
   register unsigned char *p;
@@ -11242,6 +11120,75 @@ stuff_buffered_input (Lisp_Object stuffstring)
   input_pending = false;
 #endif /* SIGTSTP */
 }
+
+void
+stuff_buffered_input (Lisp_Object stuffstring)
+{
+  /* Fatal-signal path: fall back to the C body (see above).  */
+  if (fatal_error_in_progress)
+    {
+      stuff_buffered_input_c (stuffstring);
+      return;
+    }
+#ifdef SIGTSTP
+  /* M22 imp-3: dispatch to (emacs kbd-buffer).  Keeps external linkage
+     and signature — src/emacs.c:2825 and Fsuspend_emacs call this.  The
+     #ifdef SIGTSTP guard absorbs the C body's own guard: on a build
+     without SIGTSTP the whole function is a no-op, exactly like the old
+     body (its entire contents sat inside #ifdef SIGTSTP).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kbd-buffer", "stuff-buffered-input");
+  SCM_CALL_1 (proc, stuffstring);
+#endif /* SIGTSTP */
+}
+
+DEFUN ("--stuff-char", Fc_stuff_char, Sc_stuff_char, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: stuff one char N into the
+tty input queue (wraps stuff_char).  No-op when SIGTSTP is not
+defined, so the Scheme body never needs to know about the guard.  */)
+  (Lisp_Object n)
+{
+#ifdef SIGTSTP
+  CHECK_FIXNAT (n);
+  stuff_char (XFIXNAT (n));
+#endif
+  return Qnil;
+}
+
+DEFUN ("--stuff-string", Fc_stuff_string, Sc_stuff_string, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: stuff S's bytes plus a
+trailing newline into the tty input queue.  No-op when SIGTSTP is not
+defined.  Mirrors the string block of the C stuff_buffered_input
+(SDATA/SBYTES loop) that Scheme cannot express over an elisp string.  */)
+  (Lisp_Object s)
+{
+#ifdef SIGTSTP
+  if (STRINGP (s))
+    {
+      unsigned char *p = SDATA (s);
+      ptrdiff_t count = SBYTES (s);
+      while (count-- > 0)
+	stuff_char (*p++);
+      stuff_char ('\n');
+    }
+#endif
+  return Qnil;
+}
+
+DEFUN ("--input-pending-set!", Fc_input_pending_set, Sc_input_pending_set,
+       1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: hard-set the C global
+`input_pending' to t/nil from V.  Unlike --update-input-pending (which
+recomputes via readable_events), this is a direct assignment — the
+stuff_buffered_input drain must force it false regardless of what else
+is pending.  */)
+  (Lisp_Object v)
+{
+  input_pending = !NILP (v);
+  return Qnil;
+}
+
 
 void
 set_waiting_for_input (struct timespec *time_to_clear)
@@ -11481,38 +11428,13 @@ otherwise Emacs uses CBREAK mode.
 See also `current-input-mode'.  */)
   (Lisp_Object interrupt)
 {
-  bool new_interrupt_input;
-#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
-#ifdef HAVE_X_WINDOWS
-  if (x_display_list != NULL)
-    {
-      /* When using X, don't give the user a real choice,
-	 because we haven't implemented the mechanisms to support it.  */
-      new_interrupt_input = true;
-    }
-  else
-#endif /* HAVE_X_WINDOWS */
-    new_interrupt_input = !NILP (interrupt);
-#else /* not USABLE_SIGIO || USABLE_SIGPOLL */
-  new_interrupt_input = false;
-#endif /* not USABLE_SIGIO || USABLE_SIGPOLL */
-
-  if (new_interrupt_input != interrupt_input)
-    {
-#ifndef DOS_NT
-      /* this causes startup screen to be restored and messes with the mouse */
-      reset_all_sys_modes ();
-      interrupt_input = new_interrupt_input;
-      init_all_sys_modes ();
-#else
-      interrupt_input = new_interrupt_input;
-#endif
-
-#ifdef POLL_FOR_INPUT
-      start_polling ();
-#endif
-    }
-  return Qnil;
+  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The X-override,
+     USABLE_SIGIO/SIGPOLL branch and the DOS_NT / POLL_FOR_INPUT guards
+     are reproduced by the Scheme body through the M22 imp-3 shims.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "set-input-interrupt-mode");
+  return SCM_CALL_1 (proc, interrupt);
 }
 
 DEFUN ("set-output-flow-control", Fset_output_flow_control, Sset_output_flow_control, 1, 2, 0,
@@ -11526,27 +11448,12 @@ Emacs reads input in CBREAK mode; see `set-input-interrupt-mode'.
 See also `current-input-mode'.  */)
   (Lisp_Object flow, Lisp_Object terminal)
 {
-  struct terminal *t = decode_tty_terminal (terminal);
-  struct tty_display_info *tty;
-
-  if (!t)
-    return Qnil;
-  tty = t->display_info.tty;
-
-  if (tty->flow_control != !NILP (flow))
-    {
-#ifndef DOS_NT
-      /* This causes startup screen to be restored and messes with the mouse.  */
-      reset_sys_modes (tty);
-#endif
-
-      tty->flow_control = !NILP (flow);
-
-#ifndef DOS_NT
-      init_sys_modes (tty);
-#endif
-    }
-  return Qnil;
+  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The terminal-arg
+     decode, DOS_NT guard and reset/init dance are in the Scheme body.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "set-output-flow-control");
+  return SCM_CALL_2 (proc, flow, terminal);
 }
 
 DEFUN ("set-input-meta-mode", Fset_input_meta_mode, Sset_input_meta_mode, 1, 2, 0,
@@ -11572,37 +11479,13 @@ the currently selected frame.
 See also `current-input-mode'.  */)
   (Lisp_Object meta, Lisp_Object terminal)
 {
-  struct terminal *t = decode_tty_terminal (terminal);
-  struct tty_display_info *tty;
-  int new_meta;
-
-  if (!t)
-    return Qnil;
-  tty = t->display_info.tty;
-
-  if (NILP (meta))
-    new_meta = 0;
-  else if (EQ (meta, Qt))
-    new_meta = 1;
-  else if (EQ (meta, Qencoded))
-    new_meta = 3;
-  else
-    new_meta = 2;
-
-  if (tty->meta_key != new_meta)
-    {
-#ifndef DOS_NT
-      /* this causes startup screen to be restored and messes with the mouse */
-      reset_sys_modes (tty);
-#endif
-
-      tty->meta_key = new_meta;
-
-#ifndef DOS_NT
-      init_sys_modes (tty);
-#endif
-    }
-  return Qnil;
+  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The META value
+     mapping (nil/t/encoded/else -> 0/1/3/2), terminal-arg decode,
+     DOS_NT guard and reset/init dance are in the Scheme body.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "set-input-meta-mode");
+  return SCM_CALL_2 (proc, meta, terminal);
 }
 
 DEFUN ("set-quit-char", Fset_quit_char, Sset_quit_char, 1, 1, 0,
@@ -11615,29 +11498,13 @@ process.
 See also `current-input-mode'.  */)
   (Lisp_Object quit)
 {
-  struct terminal *t = get_named_terminal (dev_tty);
-  struct tty_display_info *tty;
-
-  if (!t)
-    return Qnil;
-  tty = t->display_info.tty;
-
-  if (NILP (quit) || !FIXNUMP (quit) || XFIXNUM (quit) < 0 || XFIXNUM (quit) > 0400)
-    error ("QUIT must be an ASCII character");
-
-#ifndef DOS_NT
-  /* this causes startup screen to be restored and messes with the mouse */
-  reset_sys_modes (tty);
-#endif
-
-  /* Don't let this value be out of range.  */
-  quit_char = XFIXNUM (quit) & (tty->meta_key == 0 ? 0177 : 0377);
-
-#ifndef DOS_NT
-  init_sys_modes (tty);
-#endif
-
-  return Qnil;
+  /* M22 imp-3: dispatch to (emacs read-key-sequence).  The controlling-tty
+     resolution, ASCII-char error, mask and reset/init dance are in the
+     Scheme body.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs read-key-sequence", "set-quit-char");
+  return SCM_CALL_1 (proc, quit);
 }
 
 DEFUN ("set-input-mode", Fset_input_mode, Sset_input_mode, 3, 4, 0,
@@ -11713,6 +11580,249 @@ first; this subr dereferences FRAME_TTY unconditionally.  */)
   (void)
 {
   return make_fixnum (FRAME_TTY (XFRAME (selected_frame))->meta_key);
+}
+
+/* M22 imp-3 — the input-mode quartet (set-input-interrupt-mode,
+   set-output-flow-control, set-input-meta-mode, set-quit-char) moved to
+   (emacs read-key-sequence).  These shims give the Scheme bodies the
+   per-terminal and controlling-tty state they need.  See
+   docs/m22-plan.org §imp-3 (Findings A/B).  */
+
+/* Decode TERMINAL (a terminal object, a frame, or nil = selected frame)
+   to its tty_display_info, or NULL if it is not a tty terminal.  */
+static struct tty_display_info *
+m22_tty_of_terminal (Lisp_Object terminal)
+{
+  struct terminal *t = decode_tty_terminal (terminal);
+  return t ? t->display_info.tty : NULL;
+}
+
+/* The controlling tty's tty_display_info (get_named_terminal of the
+   dev_tty global), or NULL if there is no controlling tty.  */
+static struct tty_display_info *
+m22_controlling_tty (void)
+{
+  struct terminal *t = get_named_terminal (dev_tty);
+  return t ? t->display_info.tty : NULL;
+}
+
+DEFUN ("--decode-tty-terminal-p", Fc_decode_tty_terminal_p,
+       Sc_decode_tty_terminal_p, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: t if TERMINAL (a terminal
+object, a frame, or nil = selected frame) decodes to a tty terminal.  */)
+  (Lisp_Object terminal)
+{
+  return m22_tty_of_terminal (terminal) ? Qt : Qnil;
+}
+
+DEFUN ("--tty-flow-control", Fc_tty_flow_control, Sc_tty_flow_control, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return TERMINAL's
+flow_control flag (t/nil).  Caller must have confirmed
+--decode-tty-terminal-p first; nil is returned if TERMINAL does not
+decode to a tty.  */)
+  (Lisp_Object terminal)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  return tty ? (tty->flow_control ? Qt : Qnil) : Qnil;
+}
+
+DEFUN ("--tty-flow-control-set!", Fc_tty_flow_control_set,
+       Sc_tty_flow_control_set, 2, 2, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: set TERMINAL's
+flow_control flag to t/nil from FLOW.  Caller must have confirmed
+--decode-tty-terminal-p first; no-op if TERMINAL does not decode to a
+tty.  */)
+  (Lisp_Object terminal, Lisp_Object flow)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  if (tty)
+    tty->flow_control = !NILP (flow);
+  return Qnil;
+}
+
+DEFUN ("--tty-meta-key", Fc_tty_meta_key, Sc_tty_meta_key, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return TERMINAL's meta_key
+as a small integer (0..3).  Caller must have confirmed
+--decode-tty-terminal-p first; 0 is returned if TERMINAL does not
+decode to a tty.  */)
+  (Lisp_Object terminal)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  return make_fixnum (tty ? tty->meta_key : 0);
+}
+
+DEFUN ("--tty-meta-key-set!", Fc_tty_meta_key_set, Sc_tty_meta_key_set, 2, 2, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: set TERMINAL's meta_key to
+META (0..3).  Caller must have confirmed --decode-tty-terminal-p first;
+no-op if TERMINAL does not decode to a tty.  */)
+  (Lisp_Object terminal, Lisp_Object meta)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  if (tty)
+    tty->meta_key = XFIXNUM (meta);
+  return Qnil;
+}
+
+DEFUN ("--reset-sys-modes", Fc_reset_sys_modes, Sc_reset_sys_modes, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: reset the terminal modes of
+TERMINAL's tty (wraps reset_sys_modes (tty)).  Absorbs the #ifndef
+DOS_NT guard; no-op on DOS_NT or when TERMINAL does not decode to a
+tty.  */)
+  (Lisp_Object terminal)
+{
+#ifndef DOS_NT
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  if (tty)
+    reset_sys_modes (tty);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--init-sys-modes", Fc_init_sys_modes, Sc_init_sys_modes, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: initialize the terminal
+modes of TERMINAL's tty (wraps init_sys_modes (tty)).  Absorbs the
+#ifndef DOS_NT guard; no-op on DOS_NT or when TERMINAL does not decode
+to a tty.  */)
+  (Lisp_Object terminal)
+{
+#ifndef DOS_NT
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  if (tty)
+    init_sys_modes (tty);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--reset-all-sys-modes", Fc_reset_all_sys_modes, Sc_reset_all_sys_modes,
+       0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: reset all terminal modes
+(wraps reset_all_sys_modes).  Absorbs the #ifndef DOS_NT guard; no-op
+on DOS_NT.  */)
+  (void)
+{
+#ifndef DOS_NT
+  reset_all_sys_modes ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--init-all-sys-modes", Fc_init_all_sys_modes, Sc_init_all_sys_modes,
+       0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: initialize all terminal
+modes (wraps init_all_sys_modes).  Absorbs the #ifndef DOS_NT guard;
+no-op on DOS_NT.  */)
+  (void)
+{
+#ifndef DOS_NT
+  init_all_sys_modes ();
+#endif
+  return Qnil;
+}
+
+DEFUN ("--controlling-tty-meta-key", Fc_controlling_tty_meta_key,
+       Sc_controlling_tty_meta_key, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return the controlling
+tty's meta_key (0..3), or nil when there is no controlling tty.
+Sources from get_named_terminal (dev_tty), NOT from a Lisp TERMINAL
+argument.  */)
+  (void)
+{
+  struct tty_display_info *tty = m22_controlling_tty ();
+  return tty ? make_fixnum (tty->meta_key) : Qnil;
+}
+
+DEFUN ("--reset-controlling-tty-sys-modes", Fc_reset_controlling_tty_sys_modes,
+       Sc_reset_controlling_tty_sys_modes, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: reset the controlling
+tty's terminal modes (wraps reset_sys_modes).  Absorbs the #ifndef
+DOS_NT guard; no-op on DOS_NT or when there is no controlling tty.  */)
+  (void)
+{
+#ifndef DOS_NT
+  struct tty_display_info *tty = m22_controlling_tty ();
+  if (tty)
+    reset_sys_modes (tty);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--init-controlling-tty-sys-modes", Fc_init_controlling_tty_sys_modes,
+       Sc_init_controlling_tty_sys_modes, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: initialize the controlling
+tty's terminal modes (wraps init_sys_modes).  Absorbs the #ifndef
+DOS_NT guard; no-op on DOS_NT or when there is no controlling tty.  */)
+  (void)
+{
+#ifndef DOS_NT
+  struct tty_display_info *tty = m22_controlling_tty ();
+  if (tty)
+    init_sys_modes (tty);
+#endif
+  return Qnil;
+}
+
+DEFUN ("--quit-char-set!", Fc_quit_char_set, Sc_quit_char_set, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: set the C global quit_char
+to N.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNAT (n);
+  quit_char = XFIXNAT (n);
+  return Qnil;
+}
+
+DEFUN ("--sigio-or-poll-usable-p", Fc_sigio_or_poll_usable_p,
+       Sc_sigio_or_poll_usable_p, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: t when either USABLE_SIGIO
+or USABLE_SIGPOLL is defined (i.e. set-input-interrupt-mode's first
+branch is live).  */)
+  (void)
+{
+#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
+  return Qt;
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--x-display-forces-interrupt-p", Fc_x_display_forces_interrupt_p,
+       Sc_x_display_forces_interrupt_p, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: t when the "when using X,
+don't give the user a real choice" override applies: HAVE_X_WINDOWS
+with a live X display forces new_interrupt_input = true regardless of
+the INTERRUPT argument.  */)
+  (void)
+{
+#if defined (USABLE_SIGIO) || defined (USABLE_SIGPOLL)
+#ifdef HAVE_X_WINDOWS
+  return (x_display_list != NULL) ? Qt : Qnil;
+#else
+  return Qnil;
+#endif
+#else
+  return Qnil;
+#endif
+}
+
+DEFUN ("--interrupt-input-set!", Fc_interrupt_input_set,
+       Sc_interrupt_input_set, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: set the C global
+`interrupt_input' to t/nil from V.  */)
+  (Lisp_Object v)
+{
+  interrupt_input = !NILP (v);
+  return Qnil;
+}
+
+DEFUN ("--start-polling", Fc_start_polling, Sc_start_polling, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: call start_polling ().
+No-op when POLL_FOR_INPUT is not defined.  */)
+  (void)
+{
+#ifdef POLL_FOR_INPUT
+  start_polling ();
+#endif
+  return Qnil;
 }
 
 DEFUN ("current-input-mode", Fcurrent_input_mode, Scurrent_input_mode, 0, 0, 0,

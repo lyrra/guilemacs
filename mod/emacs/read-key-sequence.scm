@@ -14,6 +14,13 @@
             discard-input
             set-input-mode
             current-input-mode
+            set-input-interrupt-mode
+            set-output-flow-control
+            set-input-meta-mode
+            set-quit-char
+            some-mouse-moved
+            tracking-off
+            internal-track-mouse
             posn-at-point
             input-pending-p
             get-input-pending!
@@ -664,6 +671,159 @@ stores the return value into the C global `input_pending' itself."
    (else #nil)))
 
 ;;;;
+;;;; M22 imp-3 — the input-mode quartet (set-input-interrupt-mode,
+;;;; set-output-flow-control, set-input-meta-mode, set-quit-char) and
+;;;; the track-mouse trio (some-mouse-moved, tracking-off,
+;;;; internal-track-mouse).  Ported from src/keyboard.c.  See
+;;;; docs/m22-plan.org §imp-3 (Findings A/B/C).
+;;;;
+
+(define %decode-tty-terminal-p       (delay (%c '--decode-tty-terminal-p)))
+(define %tty-flow-control            (delay (%c '--tty-flow-control)))
+(define %tty-flow-control-set!       (delay (%c '--tty-flow-control-set!)))
+(define %tty-meta-key                (delay (%c '--tty-meta-key)))
+(define %tty-meta-key-set!           (delay (%c '--tty-meta-key-set!)))
+(define %reset-sys-modes             (delay (%c '--reset-sys-modes)))
+(define %init-sys-modes              (delay (%c '--init-sys-modes)))
+(define %reset-all-sys-modes         (delay (%c '--reset-all-sys-modes)))
+(define %init-all-sys-modes          (delay (%c '--init-all-sys-modes)))
+(define %controlling-tty-meta-key    (delay (%c '--controlling-tty-meta-key)))
+(define %reset-controlling-tty-sys-modes
+  (delay (%c '--reset-controlling-tty-sys-modes)))
+(define %init-controlling-tty-sys-modes
+  (delay (%c '--init-controlling-tty-sys-modes)))
+(define %quit-char-set!              (delay (%c '--quit-char-set!)))
+(define %sigio-or-poll-usable-p      (delay (%c '--sigio-or-poll-usable-p)))
+(define %x-display-forces-interrupt-p
+  (delay (%c '--x-display-forces-interrupt-p)))
+(define %interrupt-input-set!        (delay (%c '--interrupt-input-set!)))
+(define %start-polling               (delay (%c '--start-polling)))
+
+(define %track-mouse                 (delay (%c '--track-mouse)))
+(define %track-mouse-set!            (delay (%c '--track-mouse-set!)))
+(define %frame-mouse-moved-p         (delay (%c '--frame-mouse-moved-p)))
+(define %ignore-mouse-drag-p         (delay (%c '--ignore-mouse-drag-p)))
+(define %frame-list                  (delay (%c 'frame-list)))
+(define %redisplay-preserve-echo-area
+  (delay (%c '--redisplay-preserve-echo-area)))
+
+(define (set-input-interrupt-mode interrupt)
+  "Set interrupt mode of reading keyboard input.  If INTERRUPT is
+non-nil, Emacs will use input interrupts; otherwise CBREAK mode.
+Mirrors src/keyboard.c Fset_input_interrupt_mode."
+  (let ((new (cond
+              ((not (truthy? ((force %sigio-or-poll-usable-p)))) #nil)
+              ;; When using X, don't give the user a real choice,
+              ;; because we haven't implemented the mechanisms to
+              ;; support it.
+              ((truthy? ((force %x-display-forces-interrupt-p))) #t)
+              (else (if (%nilp interrupt) #nil #t)))))
+    (when (not (eq? new (if (%nilp ((force %interrupt-input-p)))
+                            #nil #t)))
+      ;; this causes startup screen to be restored and messes with the mouse
+      ((force %reset-all-sys-modes))
+      ((force %interrupt-input-set!) new)
+      ((force %init-all-sys-modes))
+      ((force %start-polling)))
+    #nil))
+
+(define (set-output-flow-control flow terminal)
+  "Enable or disable ^S/^Q flow control for output to TERMINAL.  If
+FLOW is non-nil, flow control is enabled.  Only has an effect on tty
+terminals.  Mirrors src/keyboard.c Fset_output_flow_control."
+  (if (not (truthy? ((force %decode-tty-terminal-p) terminal)))
+      #nil
+      (let ((new-flow (if (%nilp flow) #nil #t)))
+        (when (not (eq? new-flow
+                        (if (%nilp ((force %tty-flow-control) terminal))
+                            #nil #t)))
+          ;; this causes startup screen to be restored and messes with the mouse
+          ((force %reset-sys-modes) terminal)
+          ((force %tty-flow-control-set!) terminal new-flow)
+          ((force %init-sys-modes) terminal))
+        #nil)))
+
+(define (set-input-meta-mode meta terminal)
+  "Enable or disable 8-bit input on TERMINAL.  META t/encoded/nil/else
+maps to accept-8bit/encoded/ignore/pass-through.  Mirrors
+src/keyboard.c Fset_input_meta_mode."
+  (if (not (truthy? ((force %decode-tty-terminal-p) terminal)))
+      #nil
+      (let* ((new-meta (cond
+                        ((%nilp meta) 0)
+                        ((eq? meta #t) 1)
+                        ((eq? meta 'encoded) 3)
+                        (else 2)))
+             (cur ((force %tty-meta-key) terminal)))
+        (when (not (= cur new-meta))
+          ;; this causes startup screen to be restored and messes with the mouse
+          ((force %reset-sys-modes) terminal)
+          ((force %tty-meta-key-set!) terminal new-meta)
+          ((force %init-sys-modes) terminal))
+        #nil)))
+
+(define (set-quit-char quit)
+  "Specify character used for quitting.  QUIT must be an ASCII
+character.  Only affects the controlling tty of the Emacs process.
+Mirrors src/keyboard.c Fset_quit_char."
+  (let ((mk ((force %controlling-tty-meta-key))))
+    (if (%nilp mk)
+        ;; no controlling tty — the C body returns Qnil without
+        ;; validating QUIT (the !t check comes first).
+        #nil
+        (begin
+          (when (or (%nilp quit)
+                    (not (integer? quit))
+                    (< quit 0)
+                    (> quit #o400))
+            (error "QUIT must be an ASCII character"))
+          ;; this causes startup screen to be restored and messes with the mouse
+          ((force %reset-controlling-tty-sys-modes))
+          ;; Don't let this value be out of range.
+          ((force %quit-char-set!)
+           (logand quit (if (= mk 0) #o177 #o377)))
+          ((force %init-controlling-tty-sys-modes))
+          #nil))))
+
+(define (some-mouse-moved)
+  "Return the first frame with pending mouse movement, or nil.  Mirrors
+src/keyboard.c some_mouse_moved.  Pure reader — never clears a frame's
+mouse_moved flag."
+  (if (or (%nilp ((force %track-mouse)))
+          (truthy? ((force %ignore-mouse-drag-p))))
+      #nil
+      (let loop ((frames ((force %frame-list))))
+        (cond
+         ((%nilp frames) #nil)
+         ((truthy? ((force %frame-mouse-moved-p) ((%c 'car) frames)))
+          ((%c 'car) frames))
+         (else (loop ((%c 'cdr) frames)))))))
+
+(define (tracking-off old-track-mouse)
+  "Restore mouse tracking enablement.  Mirrors src/keyboard.c
+tracking_off: re-set track_mouse, and if the old value was nil,
+re-run redisplay if the only input available was mouse movement we
+have just disabled."
+  ((force %track-mouse-set!) old-track-mouse)
+  (when (%nilp old-track-mouse)
+    ;; Redisplay may have been preempted because there was input
+    ;; available.  If the only input available was the sort we have
+    ;; just disabled, call redisplay again.
+    (when (not (truthy? ((force %kbd-buffer-readable-events) 1)))
+      ((force %redisplay-preserve-echo-area) 6)
+      (get-input-pending! 1)))
+  #nil)
+
+(define (internal-track-mouse bodyfun)
+  "Call BODYFUN with mouse movement events enabled.  Mirrors
+src/keyboard.c Finternal_track_mouse: save track_mouse, enable it,
+call BODYFUN, and restore on both normal and non-local exit."
+  (let ((old ((force %track-mouse))))
+    (dynamic-wind
+      (lambda () ((force %track-mouse-set!) #t))
+      (lambda () ((%c 'funcall) bodyfun))
+      (lambda () (tracking-off old)))))
+
 ;;;; M6h — setup-phase procedures (called BEFORE the C state-machine
 ;;;; while-loop).  Not yet wired into runtime — the C function still
 ;;;; performs all of this work inline.  These procedures are tested
