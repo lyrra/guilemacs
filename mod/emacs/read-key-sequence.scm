@@ -703,7 +703,7 @@ stores the return value into the C global `input_pending' itself."
 (define %track-mouse-set!            (delay (%c '--track-mouse-set!)))
 (define %frame-mouse-moved-p         (delay (%c '--frame-mouse-moved-p)))
 (define %ignore-mouse-drag-p         (delay (%c '--ignore-mouse-drag-p)))
-(define %frame-list                  (delay (%c 'frame-list)))
+(define %frame-list-raw              (delay (%c '--frame-list-raw)))
 (define %redisplay-preserve-echo-area
   (delay (%c '--redisplay-preserve-echo-area)))
 
@@ -792,7 +792,7 @@ mouse_moved flag."
   (if (or (%nilp ((force %track-mouse)))
           (truthy? ((force %ignore-mouse-drag-p))))
       #nil
-      (let loop ((frames ((force %frame-list))))
+      (let loop ((frames ((force %frame-list-raw))))
         (cond
          ((%nilp frames) #nil)
          ((truthy? ((force %frame-mouse-moved-p) ((%c 'car) frames)))

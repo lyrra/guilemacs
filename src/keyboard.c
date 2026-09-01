@@ -1162,6 +1162,21 @@ code is what resets mouse_moved elsewhere.  */)
   return XFRAME (frame)->mouse_moved ? Qt : Qnil;
 }
 
+DEFUN ("--frame-list-raw", Fc_frame_list_raw, Sc_frame_list_raw, 0, 0, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return a copy of the raw
+Vframe_list in scan order.
+
+The elisp primitive `frame-list' — when compiled with a window system —
+filters out tooltip frames and reverses the order (Fframe_list,
+src/frame.c).  some_mouse_moved walks Vframe_list directly via
+FOR_EACH_FRAME — no filter, forward order — so Scheme needs this raw
+copy to behave identically.  Returns a fresh list; the caller may not
+mutate Vframe_list.  */)
+  (void)
+{
+  return Fcopy_sequence (Vframe_list);
+}
+
 DEFUN ("--kbd-event-kind", Fkbd_event_kind, Skbd_event_kind, 1, 1, 0,
        doc: /* Return the event_kind at kbd_buffer index N (0-based fixnum).
 

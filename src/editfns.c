@@ -160,6 +160,16 @@ Beginning of buffer is position (point-min).  */)
   return temp;
 }
 
+DEFUN ("point-byte", Fpoint_byte, Spoint_byte, 0, 0, 0,
+       doc: /* Return value of point, as a byte number.
+This is the position of point in the byte stream of the buffer,
+which differs from the character position when the buffer contains
+multibyte characters.  */)
+  (void)
+{
+  return make_fixnum (PT_BYTE);
+}
+
 DEFUN ("point-marker", Fpoint_marker, Spoint_marker, 0, 0, 0,
        doc: /* Return value of point, as a marker object.  */)
   (void)

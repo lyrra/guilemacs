@@ -30,6 +30,11 @@
       (report name (list 'FAIL 'expected expected 'got actual))))
 
 (define (%sym name) (symbol-function name))
+(define (try-check name expected thunk)
+  (catch #t
+    (lambda () (check name expected (thunk)))
+    (lambda (key . args)
+      (report name (list 'ERROR key args)))))
 (define ASCII-KEYSTROKE-EVENT (@@ (emacs kbd-buffer) ASCII-KEYSTROKE-EVENT))
 (define NON-ASCII-KEYSTROKE-EVENT (@@ (emacs kbd-buffer) NON-ASCII-KEYSTROKE-EVENT))
 
@@ -53,7 +58,8 @@
     --quit-char-set! --sigio-or-poll-usable-p --x-display-forces-interrupt-p
     --interrupt-input-set! --start-polling --track-mouse --track-mouse-set!
     --frame-mouse-moved-p --stuff-char --stuff-string --input-pending-set!
-    --composition-adjust-point --display-prop-intangible-p))
+    --composition-adjust-point --display-prop-intangible-p
+    --frame-list-raw point-byte))
 (for-each (lambda (n)
             (check (string-append "m22/imp3/shims/" (symbol->string n))
                    #t (procedure? (%sym n))))
@@ -218,6 +224,105 @@
   ((%c 'goto-char) 2)
   (adjust-point-for-property 2 #f)
   (check "m22/imp3/adjust-point/invisible-to-begv" 4 ((%c 'point))))
+
+;;; ---------------------------------------------------------------------
+;;; 5a. cr.org Finding 1: some-mouse-moved must scan the RAW Vframe_list,
+;;; not the `frame-list' primitive (which drops tooltip frames and
+;;; reverses order).  We cannot set the C mouse_moved bit from Scheme, so
+;;; this checks the raw-list shim resolves, is a proper list of frames,
+;;; and agrees with `frame-list' when no tooltip frame exists (batch).
+(define (list-of-frames? xs)
+  (cond ((null? xs) #t)
+        ((not (pair? xs)) #f)
+        ((eqv? #t ((%c 'frame-live-p) (car xs)))
+         (list-of-frames? (cdr xs)))
+        (else #f)))
+;; same-member check (order- and direction-independent): every live frame
+;; in RAW appears in `frame-list' and vice versa.  Robust whether or not
+;; Fframe_list reverses/tooltip-filters (that branch is HAVE_WINDOW_SYSTEM
+;; dependent).
+(define (same-frame-set? a b)
+  (or (and (null? a) (null? b))
+      (and (pair? a)
+           (let ((x (car a)))
+             (and (memq x b) (same-frame-set? (cdr a) (delq x b)))))))
+(let* ((raw ((%c '--frame-list-raw))))
+  (check "m22/imp3/frame-list-raw/is-proper-frame-list"
+         #t (list-of-frames? raw))
+  ;; batch has no tooltip frame, so RAW and `frame-list' hold the same
+  ;; frames; RAW is the forward-order Vframe_list copy (cr.org Finding 1).
+  (check "m22/imp3/frame-list-raw/same-frames-as-frame-list"
+         #t (same-frame-set? raw ((%c 'frame-list)))))
+
+;;; point-byte (restored standard primitive) — value-tested, not just
+;;; existence: in an all-ASCII buffer the byte position equals the
+;;; character position.
+(let* ((buf ((%c 'current-buffer))))
+  ((%c 'erase-buffer))
+  ((%c 'insert) "abcdefghi")
+  ((%c 'goto-char) 5)
+  (check "m22/imp3/point-byte/ascii-equals-charpos" 5 ((%c 'point-byte))))
+
+;;; ---------------------------------------------------------------------
+;;; 5b. adjust-point-for-property — display branch (cr.org Finding 2).
+;;;
+;;; A `display' string property is intangible: point inside the region
+;;; must move to the region end (when point moved forward) or the
+;;; region start (when point moved backward), matching the C
+;;; adjust_point_for_property display branch.
+(let* ((buf ((%c 'current-buffer))))
+  ((%c 'erase-buffer))
+  ((%c 'insert) "abcdefghi")
+  ;; display property on chars d,e,f (positions 4..6, region [4,7)).
+  ((%c 'put-text-property) 4 7 'display "XX")
+  ;; forward: point moved forward (pt=5 > last-pt=2) -> region end 7.
+  ((%c 'goto-char) 5)
+  (try-check "m22/imp3/adjust-point/display-fwd/pt0" 5 (lambda () ((%c 'point))))
+  (try-check "m22/imp3/adjust-point/display-fwd/adjust" 7
+             (lambda () (adjust-point-for-property 2 #f) ((%c 'point))))
+  (try-check "m22/imp3/adjust-point/display-fwd/after" 7 (lambda () ((%c 'point))))
+  ;; backward: point moved backward (pt=5 < last-pt=8) -> region start 4.
+  ((%c 'goto-char) 5)
+  (try-check "m22/imp3/adjust-point/display-back/adjust" 4
+             (lambda () (adjust-point-for-property 8 #f) ((%c 'point))))
+  (try-check "m22/imp3/adjust-point/display-back/after" 4 (lambda () ((%c 'point)))))
+
+;;; 5b2. display branch — zero-length display string (cr.org Finding 2).
+;;; A `display' property whose value is the empty string is still
+;;; intangible, and the (beg <= PT) + (string? val) + (= 0 length) clause
+;;; fires.  In this build get_property_and_range (C and Scheme alike)
+;;; derives the region start via previous-single-property-change, which
+;;; returns BEGV when point sits on the region's first char, so the
+;;; move clamps to (max (beg-1) BEGV) = 1.  Assert that exact parity
+;;; value so a divergence in the range-finding is caught.
+(let* ((buf ((%c 'current-buffer))))
+  ((%c 'erase-buffer))
+  ((%c 'insert) "abcdefghi")
+  ((%c 'put-text-property) 4 7 'display "")
+  (check "m22/imp3/adjust-point/display-empty-intangible"
+         #t ((%c '--display-prop-intangible-p) "" #nil 4 4))
+  ((%c 'goto-char) 4)
+  (try-check "m22/imp3/adjust-point/display-empty-string/beg-clamp"
+             1 (lambda () (adjust-point-for-property 8 #f) ((%c 'point))))
+  (try-check "m22/imp3/adjust-point/display-empty-string/after"
+             1 (lambda () ((%c 'point)))))
+
+;;; ---------------------------------------------------------------------
+;;; 5c. adjust-point-for-property — invisible "pretend area doesn't
+;;; exist" round-trip (cr.org Finding 2).  An invisible region whose
+;;; start equals last-pt and whose end equals PT triggers the
+;;; (last-pt == beg) && (PT == end) clause, which moves point one past
+;;; the region (end+1) so the area is skipped as if it were not there.
+(let* ((buf ((%c 'current-buffer))))
+  ((%c 'erase-buffer))
+  ((%c 'insert) "abcdefghi")
+  ;; invisible on positions 2..6 (chars b..f); region [2,7).
+  ((%c 'put-text-property) 2 7 'invisible #t)
+  ((%c 'goto-char) 4)
+  (try-check "m22/imp3/adjust-point/invisible-boundary-roundtrip"
+             8 (lambda () (adjust-point-for-property 2 #f) ((%c 'point))))
+  (try-check "m22/imp3/adjust-point/invisible-boundary-roundtrip/after"
+             8 (lambda () ((%c 'point)))))
 
 ;;; ---------------------------------------------------------------------
 ;;; 6. The corpus must not pollute the recent-keys ring: m3-recent-keys
