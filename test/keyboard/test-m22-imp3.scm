@@ -59,7 +59,7 @@
     --interrupt-input-set! --start-polling --track-mouse --track-mouse-set!
     --frame-mouse-moved-p --stuff-char --stuff-string --input-pending-set!
     --composition-adjust-point --display-prop-intangible-p
-    --frame-list-raw point-byte))
+    --frame-list-raw))
 (for-each (lambda (n)
             (check (string-append "m22/imp3/shims/" (symbol->string n))
                    #t (procedure? (%sym n))))
@@ -254,14 +254,15 @@
   (check "m22/imp3/frame-list-raw/same-frames-as-frame-list"
          #t (same-frame-set? raw ((%c 'frame-list)))))
 
-;;; point-byte (restored standard primitive) — value-tested, not just
+;;; position-bytes (cr.org Finding 1) — value-tested, not just
 ;;; existence: in an all-ASCII buffer the byte position equals the
 ;;; character position.
 (let* ((buf ((%c 'current-buffer))))
   ((%c 'erase-buffer))
   ((%c 'insert) "abcdefghi")
   ((%c 'goto-char) 5)
-  (check "m22/imp3/point-byte/ascii-equals-charpos" 5 ((%c 'point-byte))))
+  (check "m22/imp3/position-bytes/ascii-equals-charpos"
+         5 ((%c 'position-bytes) ((%c 'point)))))
 
 ;;; ---------------------------------------------------------------------
 ;;; 5b. adjust-point-for-property — display branch (cr.org Finding 2).

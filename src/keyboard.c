@@ -332,8 +332,6 @@ union buffered_input_event *kbd_store_ptr;
 static void echo_now (void);
 static ptrdiff_t echo_length (void);
 
-static void safe_run_hooks_maybe_narrowed (Lisp_Object, struct window *);
-
 /* Incremented whenever a timer is run.  */
 unsigned timers_run;
 
@@ -2049,25 +2047,44 @@ Wraps the C cancel_echoing helper used by command_loop_1's prologue.  */)
   return Qnil;
 }
 
-DEFUN ("--safe-run-hooks", Fc_safe_run_hooks, Sc_safe_run_hooks, 1, 1, 0,
-       doc: /* Internal: run HOOK under specbind inhibit-quit=t,
-without resizing or narrowing.  Wraps C safe_run_hooks.  */)
-  (Lisp_Object hook)
+DEFUN ("--get-large-narrowing-begv", Fc_get_large_narrowing_begv,
+       Sc_get_large_narrowing_begv, 1, 1, 0,
+       doc: /* Internal: return the large-narrowing begv for POS.
+Wraps xdisp.c get_large_narrowing_begv, which has no Lisp-visible
+primitive.  FIX-20260901-guilemacs.  */)
+  (Lisp_Object pos)
 {
-  safe_run_hooks (hook);
-  return Qnil;
+  CHECK_FIXNUM (pos);
+  return make_fixnum (get_large_narrowing_begv (XFIXNUM (pos)));
 }
 
-DEFUN ("--safe-run-hooks-maybe-narrowed-selected",
-       Fc_safe_run_hooks_maybe_narrowed_selected,
-       Sc_safe_run_hooks_maybe_narrowed_selected, 1, 1, 0,
-       doc: /* Internal: run HOOK under specbind inhibit-quit=t with
-maybe-narrowing applied against XWINDOW (selected_window).  Wraps C
-safe_run_hooks_maybe_narrowed.  */)
-  (Lisp_Object hook)
+DEFUN ("--get-large-narrowing-zv", Fc_get_large_narrowing_zv,
+       Sc_get_large_narrowing_zv, 1, 1, 0,
+       doc: /* Internal: return the large-narrowing zv for POS.
+Wraps xdisp.c get_large_narrowing_zv, which has no Lisp-visible
+primitive.  FIX-20260901-guilemacs.  */)
+  (Lisp_Object pos)
 {
-  safe_run_hooks_maybe_narrowed (hook, XWINDOW (selected_window));
-  return Qnil;
+  CHECK_FIXNUM (pos);
+  return make_fixnum (get_large_narrowing_zv (XFIXNUM (pos)));
+}
+
+DEFUN ("--buffer-beg", Fc_buffer_beg, Sc_buffer_beg, 0, 0, 0,
+       doc: /* Internal: return the absolute start position (BEG) of the
+current buffer.  Unlike `point-min', this does not move when the buffer
+is narrowed (BEG is always 1).  FIX-20260901-guilemacs.  */)
+  (void)
+{
+  return make_fixnum (BEG);
+}
+
+DEFUN ("--buffer-end", Fc_buffer_end, Sc_buffer_end, 0, 0, 0,
+       doc: /* Internal: return the absolute end position (Z) of the
+current buffer.  Unlike `point-max', this does not move when the buffer
+is narrowed.  FIX-20260901-guilemacs.  */)
+  (void)
+{
+  return make_fixnum (Z);
 }
 
 DEFUN ("--resize-echo-area-exactly", Fc_resize_echo_area_exactly,
@@ -2680,125 +2697,27 @@ read_menu_command (void)
   return SCM_CALL_0 (proc);
 }
 
-/* M22 imp-3: adjust_point_for_property moved to (emacs command-loop);
-   its C body was deleted with the cutover.  */
-
-/* Subroutine for safe_run_hooks: run the hook's function.
-   ARGS[0] holds the name of the hook, which we don't need here (we only use
-   it in the failure case of the internal_condition_case_n).  */
-
-static Lisp_Object
-safe_run_hooks_1 (ptrdiff_t nargs, Lisp_Object *args)
-{
-  eassert (nargs >= 2);
-  return Ffuncall (nargs - 1, args + 1);
-}
-
-/* Subroutine for safe_run_hooks: handle an error by clearing out the function
-   from the hook.  */
-
-static Lisp_Object
-safe_run_hooks_error (Lisp_Object error, ptrdiff_t nargs, Lisp_Object *args)
-{
-  eassert (nargs >= 2);
-  AUTO_STRING (format, "Error in %s (%S): %S");
-  Lisp_Object hook = args[0];
-  Lisp_Object fun = args[1];
-  CALLN (Fmessage, format, hook, fun, error);
-
-  if (SYMBOLP (hook))
-    {
-      bool found = false;
-      Lisp_Object newval = Qnil;
-      Lisp_Object val = find_symbol_value (hook);
-      FOR_EACH_TAIL (val)
-	if (EQ (fun, XCAR (val)))
-	  found = true;
-	else
-	  newval = Fcons (XCAR (val), newval);
-      if (found)
-	return Fset (hook, Fnreverse (newval));
-      /* Not found in the local part of the hook.  Let's look at the global
-	 part.  */
-      newval = Qnil;
-      val = NILP (Fdefault_boundp (hook)) ? Qnil : Fdefault_value (hook);
-      FOR_EACH_TAIL (val)
-	if (EQ (fun, XCAR (val)))
-	  found = true;
-	else
-	  newval = Fcons (XCAR (val), newval);
-      if (found)
-	return Fset_default (hook, Fnreverse (newval));
-    }
-  return Qnil;
-}
-
-static Lisp_Object
-safe_run_hook_funcall (ptrdiff_t nargs, Lisp_Object *args)
-{
-  /* We need to swap args[0] and args[1] here or in `safe_run_hooks_1`.
-     It's more convenient to do it here.  */
-  eassert (nargs >= 2);
-  Lisp_Object fun = args[0], hook = args[1];
-  /* The `nargs` array cannot be mutated safely here because it is
-     reused by our caller `run_hook_with_args`.
-     We could arguably change it temporarily if we set it back
-     to its original state before returning, but it's too ugly.  */
-  USE_SAFE_ALLOCA;
-  Lisp_Object *newargs;
-  SAFE_ALLOCA_LISP (newargs, nargs);
-  newargs[0] = hook, newargs[1] = fun;
-  memcpy (newargs + 2, args + 2, (nargs - 2) * word_size);
-  internal_condition_case_n (safe_run_hooks_1, nargs, newargs,
-                             Qt, safe_run_hooks_error);
-  SAFE_FREE ();
-  return Qnil;
-}
-
-/* If we get an error while running the hook, cause the hook variable
-   to be nil.  Also inhibit quits, so that C-g won't cause the hook
-   to mysteriously evaporate.  */
+/* M22 imp-4: safe_run_hooks family moved to (emacs command-loop);
+   safe_run_hooks and safe_run_hooks_2 remain thin dispatchers for
+   cross-file callers; the other four bodies were deleted with the
+   cutover.  */
 
 void
 safe_run_hooks (Lisp_Object hook)
 {
-  dynwind_begin ();
-  specbind_guile (Qinhibit_quit, Qt);
-  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}),
-                      safe_run_hook_funcall);
-  dynwind_end ();
-}
-
-static void
-safe_run_hooks_maybe_narrowed (Lisp_Object hook, struct window *w)
-{
-  dynwind_begin ();
-
-  specbind_guile (Qinhibit_quit, Qt);
-
-  if (current_buffer->long_line_optimizations_p
-      && long_line_optimizations_region_size > 0)
-    {
-      ptrdiff_t begv = get_large_narrowing_begv (PT);
-      ptrdiff_t zv = get_large_narrowing_zv (PT);
-      if (begv != BEG || zv != Z)
-	labeled_narrow_to_region (make_fixnum (begv), make_fixnum (zv),
-				  Qlong_line_optimizations_in_command_hooks);
-    }
-
-  run_hook_with_args (2, ((Lisp_Object []) {hook, hook}), safe_run_hook_funcall);
-  dynwind_end ();
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "safe-run-hooks!");
+  SCM_CALL_1 (proc, hook);
 }
 
 void
 safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1, Lisp_Object arg2)
 {
-  dynwind_begin ();
-
-  specbind_guile (Qinhibit_quit, Qt);
-  run_hook_with_args (4, ((Lisp_Object []) {hook, hook, arg1, arg2}),
-		      safe_run_hook_funcall);
-  dynwind_end ();
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs command-loop", "safe-run-hooks-2!");
+  SCM_CALL_3 (proc, hook, arg1, arg2);
 }
 
 

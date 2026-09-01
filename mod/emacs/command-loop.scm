@@ -17,6 +17,9 @@
             cmd-error
             cmd-error-internal!
             command-error-default-function
+            safe-run-hooks!
+            safe-run-hooks-2!
+            safe-run-hooks-maybe-narrowed!
             init-command-loop-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
@@ -42,8 +45,6 @@
 (define %clear-waiting-for-input              (delay (%c '--clear-waiting-for-input)))
 (define %set-this-command-key-count           (delay (%c '--set-this-command-key-count)))
 (define %set-this-single-command-key-start    (delay (%c '--set-this-single-command-key-start)))
-(define %safe-run-hooks-maybe-narrowed        (delay (%c '--safe-run-hooks-maybe-narrowed-selected)))
-(define %safe-run-hooks                       (delay (%c '--safe-run-hooks)))
 (define %echo-area-buffer-0-non-empty-p       (delay (%c '--echo-area-buffer-0-non-empty-p)))
 (define %resize-echo-area-exactly             (delay (%c '--resize-echo-area-exactly)))
 (define %current-kboard                       (delay (%c 'current-kboard)))
@@ -118,13 +119,13 @@ prologue (keyboard.c command_loop_1_prologue) verbatim:
       ;; `fboundp' is not a Scheme binding).
       (when (and (not (%nilp (symbol-value 'post-command-hook)))
                  ((%c 'fboundp) 'run-hooks))
-        ((force %safe-run-hooks-maybe-narrowed) 'post-command-hook))
+        (safe-run-hooks-maybe-narrowed! 'post-command-hook))
 
       (when (not (%nilp ((force %echo-area-buffer-0-non-empty-p))))
         ((force %resize-echo-area-exactly)))
 
       (when (not (%nilp (symbol-value 'delayed-warnings-list)))
-        ((force %safe-run-hooks) 'delayed-warnings-hook)))
+        (safe-run-hooks! 'delayed-warnings-hook)))
 
     ;; Save this-command / real-this-command into last-command slots.
     ((force %set-kboard-last-command)      kboard (symbol-value 'this-command))
@@ -189,7 +190,7 @@ docs/keyboard.org §M7b1."
         (lambda ()
           ((%c 'sit-for) (symbol-value 'minibuffer-message-timeout) 0 2)
           ((force %message1-clear))
-          ((%c '--safe-run-hooks) 'echo-area-clear-hook)
+          (safe-run-hooks! 'echo-area-clear-hook)
           ((force %resize-mini-window-minibuf-non-shrink)))
         (lambda () (set-symbol-value! 'inhibit-quit saved))))
 
@@ -245,7 +246,6 @@ docs/keyboard.org §M7b1."
 (define %save-point-before-last-command-or-undo         (delay (%c '--save-point-before-last-command-or-undo)))
 (define %reset-redisplay-tick-state                     (delay (%c '--reset-redisplay-tick-state)))
 (define %clear-display-working-on-window-p              (delay (%c '--clear-display-working-on-window-p)))
-(define %safe-run-hooks-maybe-narrowed-selected         (delay (%c '--safe-run-hooks-maybe-narrowed-selected)))
 
 (define (command-loop-1-iter-dispatch)
   "Dispatch portion of one iteration of command_loop_1's while-loop.
@@ -291,7 +291,7 @@ docs/keyboard.org §M7b2."
         (set-symbol-value! 'real-this-command cmd)
 
         ;; pre-command-hook.
-        ((force %safe-run-hooks-maybe-narrowed-selected) 'pre-command-hook)
+        (safe-run-hooks-maybe-narrowed! 'pre-command-hook)
 
         ;; Execute the command.
         (if (%nilp (symbol-value 'this-command))
@@ -339,7 +339,7 @@ docs/keyboard.org §M7b3."
   (let ((kboard ((force %current-kboard))))
     ((force %set-kboard-last-prefix-arg) kboard (symbol-value 'current-prefix-arg))
 
-    ((force %safe-run-hooks-maybe-narrowed) 'post-command-hook)
+    (safe-run-hooks-maybe-narrowed! 'post-command-hook)
 
     ;; Resize echo area if the displayed message is on the selected
     ;; frame's minibuffer (Bug#34317 guard).
@@ -348,7 +348,7 @@ docs/keyboard.org §M7b3."
       ((force %resize-echo-area-exactly)))
 
     (when (not (%nilp (symbol-value 'delayed-warnings-list)))
-      ((force %safe-run-hooks) 'delayed-warnings-hook))
+      (safe-run-hooks! 'delayed-warnings-hook))
 
     ;; Save final this-command / real-this-command / last-repeatable.
     ((force %set-kboard-last-command)      kboard (symbol-value 'this-command))
@@ -555,7 +555,9 @@ LAST-PT is the last position of point; MODIFIED is whether the buffer
 was just modified (which suppresses composition adjustment).  Mirrors
 src/keyboard.c adjust_point_for_property; eassert dropped (no behavior)."
   (define (pt) ((%c 'point)))
-  (define (pt-byte) ((%c 'point-byte)))
+  ;; cr.org Finding 1: point-byte was a new primitive with no precedent;
+  ;; the existing position-bytes (position arg) already does this.
+  (define (pt-byte) ((%c 'position-bytes) (pt)))
   (define (begv) ((%c 'point-min)))
   (define (zv) ((%c 'point-max)))
   (define (set-pt! p) ((%c 'goto-char) p))
@@ -958,6 +960,166 @@ Mirrors src/keyboard.c top_level_1 (lines 1306-1317)."
    (else
     ((%c 'message) "Bare Emacs (standard Lisp code not loaded)")))
   #nil)
+
+;;;;
+;;;; M22 imp-4 — safe_run_hooks family
+;;;;
+;;; Ported from src/keyboard.c (safe_run_hooks_1, safe_run_hooks_error,
+;;; safe_run_hook_funcall, safe_run_hooks, safe_run_hooks_2,
+;;; safe_run_hooks_maybe_narrowed).  run-hook-with-args-1 reimplements
+;;; the walk done by the src/eval.c run_hook_with_args helper (which
+;;; stays in C — it is not static, and six other call sites still use
+;;; it).  The three public entries are the thin-dispatcher
+;;; targets for the retained C safe_run_hooks / safe_run_hooks_2 and the
+;;; C callers of the narrowed variant; the two helpers stay private.
+
+;; Cache for the narrowing shims added with this port.  The C guard
+;; compares the computed region against the buffer's *absolute* bounds
+;; (BEG/Z), not the current narrowed bounds (BEGV/ZV), so mirror that
+;; with --buffer-beg/--buffer-end.
+(define %get-large-narrowing-begv (delay (%c '--get-large-narrowing-begv)))
+(define %get-large-narrowing-zv   (delay (%c '--get-large-narrowing-zv)))
+(define %buffer-beg               (delay (%c '--buffer-beg)))
+(define %buffer-end               (delay (%c '--buffer-end)))
+
+;; Specbind inhibit-quit = t for the duration of THUNK, restoring the
+;; saved value on the way out.  Mirrors the C dynwind_begin + specbind
+;; (Qinhibit_quit, Qt) + dynwind_end bracket.
+(define (specbind-inhibit-quit! thunk)
+  (let ((saved (symbol-value 'inhibit-quit)))
+    (dynamic-wind
+      (lambda () (set-symbol-value! 'inhibit-quit #t))
+      thunk
+      (lambda () (set-symbol-value! 'inhibit-quit saved)))))
+
+;; True when X is elisp t (C EQ (x, Qt)).  The runtime bridges Qt to
+;; Scheme #t; the defensive 't check mirrors buffer-locals.scm:358.
+(define (elisp-t? x)
+  (or (eq? x #t) (eq? x 't)))
+
+;; Copy of VAL with every element eq? to FUN removed.  Returns two
+;; values: (found? forward-order-new-list), mirroring the local- and
+;; default-part scans in safe_run_hooks_error (all occurrences are
+;; removed; the accumulator is reversed to restore forward order).
+(define (strip-hook-fun val fun)
+  (let loop ((tail val) (found #f) (acc '()))
+    (if (pair? tail)
+        (if (eq? fun (car tail))
+            (loop (cdr tail) #t acc)
+            (loop (cdr tail) found (cons (car tail) acc)))
+        (values found (reverse acc)))))
+
+;; safe-run-hook-funcall: run FUN with ARGS under an error trampoline
+;; (catch 'elisp-condition).  On error, report with `message' and remove
+;; FUN from the hook: from the local value first (set), else from the
+;; default value (set-default).  Replaces safe_run_hooks_1 +
+;; safe_run_hook_funcall + safe_run_hooks_error.
+(define (safe-run-hook-funcall hook fun . args)
+  (catch 'elisp-condition
+    (lambda () (apply (%c 'funcall) (cons fun args)))
+    (lambda (key err-sym err-data)
+      ((%c 'message) "Error in %s (%S): %S"
+       hook fun (cons err-sym err-data))
+      (call-with-values
+          (lambda ()
+            (strip-hook-fun (if ((%c 'boundp) hook)
+                                (symbol-value hook)
+                                #nil)
+                            fun))
+        (lambda (found newval)
+          (if found
+              (set-symbol-value! hook newval)
+              (call-with-values
+                  (lambda ()
+                    (strip-hook-fun (if (not (%nilp ((%c 'default-boundp) hook)))
+                                        ((%c 'default-value) hook)
+                                        #nil)
+                                    fun))
+                (lambda (found2 newval2)
+                  (when found2
+                    ((%c 'set-default) hook newval2))))))))))
+
+;; run-hook-with-args-1: call each function in HOOK's value with
+;; EXTRA-ARGS.  Reimplements the walk done by the src/eval.c
+;; run_hook_with_args helper (which stays in C — it is not static, and
+;; six other call sites still use it).  The Lisp run-hook-with-args
+;; primitive is a different, error-free shape and is not used here.
+(define (run-hook-with-args-1 hook . extra-args)
+  (if (not ((%c 'fboundp) 'run-hooks))
+      #nil
+      (let ((val (if ((%c 'boundp) hook) (symbol-value hook) #nil)))
+        (cond
+         ((%nilp val) #nil)
+         ((or (not (pair? val))
+              (not (%nilp ((%c 'functionp) val))))
+          (apply safe-run-hook-funcall hook val extra-args))
+         (else
+          (let ((global (if (not (%nilp ((%c 'default-boundp) hook)))
+                            ((%c 'default-value) hook)
+                            #nil)))
+            (let loop ((tail val))
+              (when (pair? tail)
+                (let ((elt (car tail)))
+                  (if (elisp-t? elt)
+                      ;; t means run the global (default) binding too.
+                      (unless (%nilp global)
+                        (if (or (not (pair? global))
+                                (not (%nilp ((%c 'functionp) global))))
+                            (apply safe-run-hook-funcall hook global extra-args)
+                            (let loop2 ((g global))
+                              (when (pair? g)
+                                ;; A nested t should not occur; ignore it
+                                ;; to avoid an endless loop (C comment).
+                                (unless (elisp-t? (car g))
+                                  (apply safe-run-hook-funcall hook (car g)
+                                         extra-args))
+                                (loop2 (cdr g))))))
+                      (apply safe-run-hook-funcall hook elt extra-args)))
+                (loop (cdr tail)))))
+          #nil)))))
+
+;; Replaces C safe_run_hooks.  Also used directly for the narrowed
+;; variant's own calls via safe-run-hooks-maybe-narrowed!.
+(define (safe-run-hooks! hook)
+  (specbind-inhibit-quit! (lambda () (run-hook-with-args-1 hook))))
+
+;; Replaces C safe_run_hooks_2.
+(define (safe-run-hooks-2! hook arg1 arg2)
+  (specbind-inhibit-quit!
+   (lambda () (run-hook-with-args-1 hook arg1 arg2))))
+
+;; Replaces C safe_run_hooks_maybe_narrowed.  When long-line
+;; optimizations are active and the computed region differs from the
+;; full accessible region, narrow before running and widen (plus restore
+;; point) afterward — mirroring the C labeled_narrow_to_region
+;; unwind-protect that dynwind_end triggers.
+(define (safe-run-hooks-maybe-narrowed! hook)
+  (specbind-inhibit-quit!
+   (lambda ()
+     (let ((did-narrow #f)
+           (ptm #nil))
+       (when (and (not (%nilp ((%c 'long-line-optimizations-p))))
+                  (> (symbol-value 'long-line-optimizations-region-size) 0))
+         (let ((begv ((force %get-large-narrowing-begv) ((%c 'point))))
+               (zv ((force %get-large-narrowing-zv) ((%c 'point)))))
+           ;; Compare against BEG/Z (absolute), not point-min/point-max
+           ;; (BEGV/ZV): when the buffer is already narrowed, begv/zv
+           ;; equal the current bounds exactly, yet C still narrows so
+           ;; point gets restored.  (command-loop.scm Finding 2, cr.org)
+           (unless (and (= begv ((force %buffer-beg)))
+                        (= zv ((force %buffer-end))))
+             (set! ptm ((%c 'point-marker)))
+             ((%c 'internal--labeled-narrow-to-region)
+              begv zv 'long-line-optimizations-in-command-hooks)
+             (set! did-narrow #t))))
+       (dynamic-wind
+         (lambda () #t)
+         (lambda () (run-hook-with-args-1 hook))
+         (lambda ()
+           (when did-narrow
+             ((%c 'internal--labeled-widen)
+              'long-line-optimizations-in-command-hooks)
+             ((%c 'goto-char) ptm))))))))
 
 ;;;;
 ;;;; Registration

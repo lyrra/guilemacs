@@ -9,9 +9,8 @@
 
 (test-assert "prologue/exists"             (fboundp '--command-loop-1-prologue))
 (test-assert "helpers/cancel-echoing"      (fboundp '--cancel-echoing))
-(test-assert "helpers/safe-run-hooks"      (fboundp '--safe-run-hooks))
-(test-assert "helpers/safe-run-hooks-maybe-narrowed"
-             (fboundp '--safe-run-hooks-maybe-narrowed-selected))
+(test-assert "helpers/get-large-narrowing-begv" (fboundp '--get-large-narrowing-begv))
+(test-assert "helpers/get-large-narrowing-zv"   (fboundp '--get-large-narrowing-zv))
 (test-assert "helpers/resize-echo-area"    (fboundp '--resize-echo-area-exactly))
 (test-assert "helpers/echo-area-non-empty" (fboundp '--echo-area-buffer-0-non-empty-p))
 (test-assert "helpers/clear-waiting"       (fboundp '--clear-waiting-for-input))

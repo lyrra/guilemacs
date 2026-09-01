@@ -20,8 +20,8 @@
 
 (ert-deftest m7a-helpers/exist ()
   (should (fboundp '--cancel-echoing))
-  (should (fboundp '--safe-run-hooks))
-  (should (fboundp '--safe-run-hooks-maybe-narrowed-selected))
+  (should (fboundp '--get-large-narrowing-begv))
+  (should (fboundp '--get-large-narrowing-zv))
   (should (fboundp '--resize-echo-area-exactly))
   (should (fboundp '--echo-area-buffer-0-non-empty-p))
   (should (fboundp '--clear-waiting-for-input)))

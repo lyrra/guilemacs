@@ -3632,9 +3632,11 @@ init_iterator (struct it *it, struct window *w,
    The restriction defined by these values is used around three
    low-level hooks: around 'fontification-functions', in
    'handle_fontified_prop', and around 'pre-command-hook' and
-   'post-command-hook', in 'safe_run_hooks_maybe_narrowed', which is
-   called in 'command_loop_1'.  These restrictions are set around
-   these hooks with 'labeled_narrow_to_region'; the restrictions are
+   'post-command-hook', in the Scheme 'safe-run-hooks-maybe-narrowed!'
+   (=emacs command-loop=), reached through the '--get-large-narrowing-begv'
+   / '--get-large-narrowing-zv' shims.  These restrictions are set around
+   these hooks with 'internal--labeled-narrow-to-region' + a
+   'internal--labeled-widen' restore; the restrictions are
    labeled, and cannot be removed with a call to 'widen', but can be
    removed with 'without-restriction' with a :label argument.
 */

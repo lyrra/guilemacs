@@ -173,6 +173,7 @@
 (load "test/keyboard/test-m22-input-pending.el")   ; M22 imp-1
 (load "test/keyboard/test-m22-recursive-edit.el")  ; M22 imp-2
 (load "test/keyboard/test-m22-imp3.el")             ; M22 imp-3
+(load "test/keyboard/test-m22-imp4.el")             ; M22 imp-4
 (message "")
 
 (message "========================================")
