@@ -267,3 +267,44 @@
 (check "m22/lossage/state-restored"
        (list %ring-saved %idx-saved %total-saved %limit-saved)
        (list ((force %ring)) ((force %idx)) ((force %total)) ((force %limit))))
+
+;;; ---------------------------------------------------------------------
+;;; 4. Real-ring safety (cr.org Finding 1).
+;;;
+;;; §3 installs a plain Guile vector via setup-ring, which hides the
+;;; original bug: lossage-size used Guile vector-length/vector-ref on the
+;;; ring, but the real C ring is an elisp vectorlike, not a Guile vector,
+;;; so a fresh session crashed on the first real resize.  The fix reads
+;;; the ring with the elisp-safe (%c 'length)/(%c 'aref), which dispatch
+;;; on both representations.  This section pins that fix against the real
+;;; ring left by §3's restore — no setup-ring involved.
+
+(let* ((ring  ((force %ring)))
+       (idx   ((force %idx)))
+       (total ((force %total)))
+       (limit ((force %limit))))
+  (dynamic-wind
+    (lambda () #f)
+    (lambda ()
+      ;; The real ring must NOT be a plain Guile vector: Guile's native
+      ;; vector-length must signal on it.  If this check ever fails, the
+      ;; ring representation changed and this section no longer tests the
+      ;; original crash.
+      (check "m22/real-ring/not-guile-vector" #t
+             (catch #t
+               (lambda () (vector-length ((force %ring))) #f)
+               (lambda (key . args) #t)))
+      ;; Resize the real ring (default limit 300 -> 200).  Pre-fix this
+      ;; crashed at line 70 (vector-length on an elisp vectorlike).
+      (let ((ret (lossage-size 200)))
+        (check "m22/real-ring/resize-returns" 200 ret)
+        (check "m22/real-ring/resize-limit" 200 ((force %limit)))
+        (check "m22/real-ring/resize-size" 200 ((%c 'length) ((force %ring)))))
+      ;; recent-keys on the real ring must not crash (line 122 aref path;
+      ;; reaches --make-event-array-from-vector for the short ring here).
+      (check "m22/real-ring/recent-keys-runs" #t
+             (begin (recent-keys) #t)))
+    (lambda () ((force %ring-set!) ring)
+               ((force %total-set!) total)
+               ((force %idx-set!) idx)
+               ((force %limit-set!) limit))))

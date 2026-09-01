@@ -67,7 +67,7 @@ Mirrors C Flossage_size; signals user-error on invalid input."
          (else
           (let* ((total ((%c '--total-keys)))
                  (ring  ((%c '--recent-keys-ring)))
-                 (rsize (vector-length ring))
+                 (rsize ((%c 'length) ring))
                  (kept  (if (> arg rsize) total (min arg total)))
                  (idx   ((%c '--recent-keys-index)))
                  (v     (make-vector arg #nil)))
@@ -80,7 +80,7 @@ Mirrors C Flossage_size; signals user-error on invalid input."
             ;; ever diverge.
             (let loop ((i 0))
               (when (< i kept)
-                (vector-set! v i (vector-ref ring (modulo (+ (- idx kept) i)
+                (vector-set! v i ((%c 'aref) ring (modulo (+ (- idx kept) i)
                                                           rsize)))
                 (loop (+ i 1))))
             ((%c '--recent-keys-ring-set!) v)
@@ -119,7 +119,7 @@ of the form (nil . COMMAND).  Mirrors C Frecent_keys."
                   (cond
                    ((and (not first?) (= i idx)) acc)
                    (else
-                    (let* ((e (vector-ref ring i))
+                    (let* ((e ((%c 'aref) ring i))
                            (keep? (or include-cmds
                                       (not (pair? e))
                                       (not (or (eq? (car e) #nil)
