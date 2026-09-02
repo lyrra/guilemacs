@@ -8,7 +8,8 @@
             echo-update
             echo-now
             echo-length
-            echo-truncate))
+            echo-truncate
+            init-echo-registrations))
 
 ;;; M18 imp-2 — Scheme echo bodies ported from src/keyboard.c.
 ;;;
@@ -232,3 +233,16 @@ actually shortened."
     (when (and (string? es) (> ((%c 'length) es) nchars))
       ((%c 'set-kboard-echo-string) kb ((%c 'substring) es 0 nchars)))
     ((%c '--truncate-echo-area) nchars)))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-echo-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((echo-keystrokes-help ,#t))))

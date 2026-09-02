@@ -18,7 +18,8 @@
             TOOL-BAR-ITEM-LABEL
             TOOL-BAR-ITEM-VERT-ONLY
             TOOL-BAR-ITEM-WRAP
-            TOOL-BAR-ITEM-NSLOTS))
+            TOOL-BAR-ITEM-NSLOTS
+            init-tool-bar-items-registrations))
 
 ;;; M10 imp-3 — Scheme port of tool_bar_items.
 ;;; C tool_bar_items in keyboard.c will become a SCM_CALL_1 shim into this
@@ -417,3 +418,16 @@
          (nitems (/ cnt TOOL-BAR-ITEM-NSLOTS))
          (vec ((force %--tool-bar-items-vector))))
     (cons vec nitems)))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-tool-bar-items-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((tool-bar-separator-image-expression ,#nil))))

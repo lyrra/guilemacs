@@ -16,7 +16,8 @@
             ;; tool-bar-items.
             menu-separator-names menu-separator-name?
             ;; Shared with (emacs help-echo) — M16 imp-2 (brief.org).
-            help-echo-substitute-command-keys))
+            help-echo-substitute-command-keys
+            init-menu-item-parse-registrations))
 
 ;;; M10 imp-1.3 — complete Scheme parse-menu-item port.
 ;;; Coexists with C parse_menu_item (keyboard.c:8836+), which is
@@ -374,3 +375,16 @@
                       (menu-item-eval-property tem)))
 
        1))))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-menu-item-parse-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((enable-disabled-menus-and-buttons ,#nil))))

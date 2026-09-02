@@ -12,7 +12,8 @@
             TAB-BAR-ITEM-CAPTION
             TAB-BAR-ITEM-BINDING
             TAB-BAR-ITEM-HELP
-            TAB-BAR-ITEM-NSLOTS))
+            TAB-BAR-ITEM-NSLOTS
+            init-tab-bar-items-registrations))
 
 ;;; M10 imp-2.2/2.3 — Scheme port of tab_bar_items.
 ;;; C tab_bar_items in keyboard.c is now a SCM_CALL_1 shim into this
@@ -331,3 +332,16 @@
          (nitems (/ cnt TAB-BAR-ITEM-NSLOTS))
          (vec ((force %--tab-bar-items-vector))))
     (cons vec nitems)))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-tab-bar-items-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((tab-bar-separator-image-expression ,#nil))))

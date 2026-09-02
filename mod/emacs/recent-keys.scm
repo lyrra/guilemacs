@@ -309,4 +309,12 @@ including that it does NOT bump num-nonmacro-input-events."
   (for-each (lambda (sym-fun)
               (set-symbol-function! (car sym-fun) (cadr sym-fun)))
             `((recent-keys  ,recent-keys)
-              (lossage-size ,lossage-size))))
+              (lossage-size ,lossage-size)))
+  ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((inhibit--record-char ,#nil)
+     (record-all-keys      ,#nil))))

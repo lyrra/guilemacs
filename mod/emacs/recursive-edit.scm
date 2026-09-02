@@ -227,4 +227,11 @@ and is irrelevant in batch and TTY)."
             `((exit-recursive-edit  ,exit-recursive-edit)
               (abort-recursive-edit ,abort-recursive-edit)
               (recursion-depth      ,recursion-depth)
-              (top-level            ,top-level))))
+              (top-level            ,top-level)))
+  ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((internal--top-level-message "Back to top level"))))

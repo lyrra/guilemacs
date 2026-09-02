@@ -1511,4 +1511,19 @@ See docs/keyboard.org §M8final."
               (--read-char-main        ,read-char-main)
               ;; Hoisted from C DEFUN: artificial switch-frame on focus-in.
               (internal-handle-focus-in
-                                       ,internal-handle-focus-in))))
+                                       ,internal-handle-focus-in)))
+  ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((auto-save-no-message          ,#nil)
+     (auto-save-timeout             30)
+     (input-method-previous-message ,#nil)
+     ;; C init_while_no_input_ignore_events (src/keyboard.c:12062-12081):
+     ;; Fcons prepends file-notify then dbus-event onto the 9-symbol base.
+     (while-no-input-ignore-events
+      ,(list 'file-notify 'dbus-event 'select-window 'help-echo 'move-frame
+             'iconify-frame 'make-frame-visible 'focus-in 'focus-out
+             'config-changed-event 'selection-request)))))

@@ -12059,27 +12059,6 @@ static const struct event_head head_table[] = {
   {SYMBOL_INDEX (Qtouchscreen_end),	SYMBOL_INDEX (Qtouchscreen)},
 };
 
-static Lisp_Object
-init_while_no_input_ignore_events (void)
-{
-  Lisp_Object events = listn (9, Qselect_window, Qhelp_echo, Qmove_frame,
-			      Qiconify_frame, Qmake_frame_visible,
-			      Qfocus_in, Qfocus_out, Qconfig_changed_event,
-			      Qselection_request);
-
-#ifdef HAVE_DBUS
-  events = Fcons (Qdbus_event, events);
-#endif
-#ifdef USE_FILE_NOTIFY
-  events = Fcons (Qfile_notify, events);
-#endif
-#ifdef THREADS_ENABLED
-  events = Fcons (Qthread_event, events);
-#endif
-
-  return events;
-}
-
 void
 syms_of_keyboard (void)
 {
@@ -12097,10 +12076,6 @@ syms_of_keyboard (void)
   rks_key                  = Qnil;
   staticpro (&rks_key);
   /* C-9b: rks_fkey/keytran/indec staticpro retired with the structs.  */
-
-  DEFVAR_LISP ("internal--top-level-message", Vinternal__top_level_message,
-	       doc: /* Message displayed by `normal-top-level'.  */);
-  Vinternal__top_level_message = build_pure_c_string ("Back to top level");
 
   /* M2 — predicate symbol for the kboard smob type.  */
   DEFSYM (Qkboardp, "kboardp");
@@ -12492,19 +12467,6 @@ will be in `last-command' during the following command.  */);
   Vreal_this_command = Qnil;
 
   DEFSYM (Qcurrent_minibuffer_command, "current-minibuffer-command");
-  DEFVAR_LISP ("current-minibuffer-command", Vcurrent_minibuffer_command,
-	       doc: /* This is like `this-command', but bound recursively.
-Code running from (for instance) a minibuffer hook can check this variable
-to see what command invoked the current minibuffer.  */);
-  Vcurrent_minibuffer_command = Qnil;
-
-  DEFVAR_LISP ("this-command-keys-shift-translated",
-	       Vthis_command_keys_shift_translated,
-	       doc: /* Non-nil if the key sequence activating this command was shift-translated.
-Shift-translation occurs when there is no binding for the key sequence
-as entered, but a binding was found by changing an upper-case letter
-to lower-case, or a shifted function key to an unshifted one.  */);
-  Vthis_command_keys_shift_translated = Qnil;
 
   DEFVAR_LISP ("this-original-command", Vthis_original_command,
 	       doc: /* The command bound to the current key sequence before remapping.
@@ -12518,28 +12480,11 @@ result of looking up the original command in the active keymaps.  */);
 Zero means disable autosaving due to number of characters typed.  */);
   auto_save_interval = 300;
 
-  DEFVAR_BOOL ("auto-save-no-message", auto_save_no_message,
-	       doc: /* Non-nil means do not print any message when auto-saving. */);
-  auto_save_no_message = false;
-
-  DEFVAR_LISP ("auto-save-timeout", Vauto_save_timeout,
-	       doc: /* Number of seconds idle time before auto-save.
-Zero or nil means disable auto-saving due to idleness.
-After auto-saving due to this many seconds of idle time,
-Emacs also does a garbage collection if that seems to be warranted.  */);
-  XSETFASTINT (Vauto_save_timeout, 30);
-
   DEFVAR_LISP ("echo-keystrokes", Vecho_keystrokes,
     doc: /* Nonzero means echo unfinished commands after this many seconds of pause.
 The value may be integer or floating point.
 If the value is zero, don't echo at all.  */);
   Vecho_keystrokes = make_fixnum (1);
-
-  DEFVAR_BOOL ("echo-keystrokes-help", echo_keystrokes_help,
-    doc: /* Whether to append help text to echoed commands.
-When non-nil, a reference to `C-h' is printed after echoed
-keystrokes.  */);
-  echo_keystrokes_help = true;
 
   DEFVAR_LISP ("polling-period", Vpolling_period,
 	      doc: /* Interval between polling for input during Lisp execution.
@@ -12557,17 +12502,6 @@ by position only.
 In Lisp, you might want to use `mouse-double-click-time' instead of
 reading the value of this variable directly.  */);
   Vdouble_click_time = make_fixnum (500);
-
-  DEFVAR_INT ("double-click-fuzz", double_click_fuzz,
-	      doc: /* Maximum mouse movement between clicks to make a double-click.
-On window-system frames, value is the number of pixels the mouse may have
-moved horizontally or vertically between two clicks to make a double-click.
-On non window-system frames, value is interpreted in units of 1/8 characters
-instead of pixels.
-
-This variable is also the threshold for motion of the mouse
-to count as a drag.  */);
-  double_click_fuzz = 3;
 
   DEFVAR_INT ("num-input-keys", num_input_keys,
 	      doc: /* Number of complete key sequences read as input so far.
@@ -12649,21 +12583,6 @@ See Info node `(elisp)Multiple Terminals'.  */);
 \(Even if the operating system has support for stopping a process.)  */);
   cannot_suspend = false;
 
-  DEFVAR_BOOL ("menu-prompting", menu_prompting,
-	       doc: /* Non-nil means prompt with menus when appropriate.
-This is done when reading from a keymap that has a prompt string,
-for elements that have prompt strings.
-The menu is displayed on the screen
-if X menus were enabled at configuration
-time and the previous event was a mouse click prefix key.
-Otherwise, menu prompting uses the echo area.  */);
-  menu_prompting = true;
-
-  DEFVAR_LISP ("menu-prompt-more-char", menu_prompt_more_char,
-	       doc: /* Character to see next line of menu prompt.
-Type this character while in a menu prompt to rotate around the lines of it.  */);
-  XSETINT (menu_prompt_more_char, ' ');
-
   DEFVAR_INT ("extra-keyboard-modifiers", extra_keyboard_modifiers,
 	      doc: /* A mask of additional modifier keys to use with every keyboard character.
 Emacs applies the modifiers of the character stored here to each keyboard
@@ -12693,42 +12612,6 @@ according to `select-active-regions', unless this is set to the symbol
   Vdeactivate_mark = Qnil;
   Fmake_variable_buffer_local (Qdeactivate_mark);
 
-  DEFVAR_LISP ("pre-command-hook", Vpre_command_hook,
-	       doc: /* Normal hook run before each command is executed.
-
-If an unhandled error happens in running this hook, the function in
-which the error occurred is unconditionally removed, since otherwise
-the error might happen repeatedly and make Emacs nonfunctional.
-
-Note that, when `long-line-optimizations-p' is non-nil in the buffer,
-these functions are called as if they were in a `with-restriction' form,
-with a `long-line-optimizations-in-command-hooks' label and with the
-buffer narrowed to a portion around point whose size is specified by
-`long-line-optimizations-region-size'.
-
-See also `post-command-hook'.  */);
-  Vpre_command_hook = Qnil;
-
-  DEFVAR_LISP ("post-command-hook", Vpost_command_hook,
-	       doc: /* Normal hook run after each command is executed.
-
-If an unhandled error happens in running this hook, the function in
-which the error occurred is unconditionally removed, since otherwise
-the error might happen repeatedly and make Emacs nonfunctional.
-
-It is a bad idea to use this hook for expensive processing.  If
-unavoidable, wrap your code in `(while-no-input (redisplay) CODE)' to
-avoid making Emacs unresponsive while the user types.
-
-Note that, when `long-line-optimizations-p' is non-nil in the buffer,
-these functions are called as if they were in a `with-restriction' form,
-with a `long-line-optimizations-in-command-hooks' label and with the
-buffer narrowed to a portion around point whose size is specified by
-`long-line-optimizations-region-size'.
-
-See also `pre-command-hook'.  */);
-  Vpost_command_hook = Qnil;
-
 #if 0
   DEFVAR_LISP ("echo-area-clear-hook", ...,
 	       doc: /* Normal hook run when clearing the echo area.  */);
@@ -12757,33 +12640,6 @@ See also `pre-command-hook'.  */);
 #endif
 
   Fset (Qecho_area_clear_hook, Qnil);
-
-#ifdef USE_LUCID
-  DEFVAR_BOOL ("lucid--menu-grab-keyboard",
-               lucid__menu_grab_keyboard,
-               doc: /* If non-nil, grab keyboard during menu operations.
-This is only relevant when using the Lucid X toolkit.  It can be
-convenient to disable this for debugging purposes.  */);
-  lucid__menu_grab_keyboard = true;
-#endif
-
-  DEFVAR_LISP ("menu-bar-final-items", Vmenu_bar_final_items,
-	       doc: /* List of menu bar items to move to the end of the menu bar.
-The elements of the list are event types that may have menu bar
-bindings.  The order of this list controls the order of the items.  */);
-  Vmenu_bar_final_items = Qnil;
-
-  DEFVAR_LISP ("tab-bar-separator-image-expression", Vtab_bar_separator_image_expression,
-    doc: /* Expression evaluating to the image spec for a tab-bar separator.
-This is used internally by graphical displays that do not render
-tab-bar separators natively.  Otherwise it is unused (e.g. on GTK).  */);
-  Vtab_bar_separator_image_expression = Qnil;
-
-  DEFVAR_LISP ("tool-bar-separator-image-expression", Vtool_bar_separator_image_expression,
-    doc: /* Expression evaluating to the image spec for a tool-bar separator.
-This is used internally by graphical displays that do not render
-tool-bar separators natively.  Otherwise it is unused (e.g. on GTK).  */);
-  Vtool_bar_separator_image_expression = Qnil;
 
   DEFVAR_KBOARD ("overriding-terminal-local-map",
 		 Voverriding_terminal_local_map,
@@ -12934,39 +12790,6 @@ The input method function should refer to the variables
 for guidance on what to do.  */);
   Vinput_method_function = Qlist;
 
-  DEFVAR_LISP ("input-method-previous-message",
-	       Vinput_method_previous_message,
-	       doc: /* When `input-method-function' is called, hold the previous echo area message.
-This variable exists because `read-event' clears the echo area
-before running the input method.  It is nil if there was no message.  */);
-  Vinput_method_previous_message = Qnil;
-
-  DEFVAR_LISP ("show-help-function", Vshow_help_function,
-	       doc: /* If non-nil, the function that implements the display of help.
-It's called with one argument, the help string to display.  */);
-  Vshow_help_function = Qnil;
-
-  DEFVAR_LISP ("disable-point-adjustment", Vdisable_point_adjustment,
-	       doc: /* If non-nil, suppress point adjustment after executing a command.
-
-After a command is executed, if point moved into a region that has
-special properties (e.g. composition, display), Emacs adjusts point to
-the boundary of the region.  But when a command leaves this variable at
-a non-nil value (e.g., with a setq), this point adjustment is suppressed.
-
-This variable is set to nil before reading a command, and is checked
-just after executing the command.  */);
-  Vdisable_point_adjustment = Qnil;
-
-  DEFVAR_LISP ("global-disable-point-adjustment",
-	       Vglobal_disable_point_adjustment,
-	       doc: /* If non-nil, always suppress point adjustments.
-
-The default value is nil, in which case point adjustments are
-suppressed only after special commands that leave
-`disable-point-adjustment' (which see) at a non-nil value.  */);
-  Vglobal_disable_point_adjustment = Qnil;
-
   DEFVAR_LISP ("minibuffer-message-timeout", Vminibuffer_message_timeout,
 	       doc: /* How long to display an echo-area message when the minibuffer is active.
 If the value is a number, it should be specified in seconds.
@@ -12978,34 +12801,6 @@ If the value is not a number, such messages never time out.  */);
 The value of that variable is passed to `quit-flag' and later causes a
 peculiar kind of quitting.  */);
   Vthrow_on_input = Qnil;
-
-  DEFVAR_LISP ("command-error-function", Vcommand_error_function,
-	       doc: /* Function to output error messages.
-Called with three arguments:
-- the error data, a list of the form (SIGNALED-CONDITION . SIGNAL-DATA)
-  such as what `condition-case' would bind its variable to,
-- the context (a string which normally goes at the start of the message),
-- the Lisp function within which the error was signaled.
-
-For instance, to make error messages stand out more in the echo area,
-you could say something like:
-
-    (setq command-error-function
-          (lambda (data _ _)
-            (message "%s" (propertize (error-message-string data)
-                                      \\='face \\='error))))
-
-Also see `set-message-function' (which controls how non-error messages
-are displayed).  */);
-  Vcommand_error_function = Qcommand_error_default_function;
-
-  DEFVAR_LISP ("enable-disabled-menus-and-buttons",
-	       Venable_disabled_menus_and_buttons,
-	       doc: /* If non-nil, don't ignore events produced by disabled menu items and tool-bar.
-
-Help functions bind this to allow help on disabled menu items
-and tool-bar buttons.  */);
-  Venable_disabled_menus_and_buttons = Qnil;
 
   DEFVAR_LISP ("select-active-regions",
 	       Vselect_active_regions,
@@ -13027,16 +12822,6 @@ If `select-active-regions' is non-nil, Emacs sets this to the
 text in the region before modifying the buffer.  The next call to
 the function `deactivate-mark' uses this to set the window selection.  */);
   Vsaved_region_selection = Qnil;
-
-  DEFVAR_LISP ("selection-inhibit-update-commands",
-	       Vselection_inhibit_update_commands,
-	       doc: /* List of commands which should not update the selection.
-Normally, if `select-active-regions' is non-nil and the mark remains
-active after a command (i.e. the mark was not deactivated), the Emacs
-command loop sets the selection to the text in the region.  However,
-if the command is in this list, the selection is not updated.  */);
-  Vselection_inhibit_update_commands
-    = list2 (Qhandle_switch_frame, Qhandle_select_window);
 
   DEFVAR_LISP ("debug-on-event",
                Vdebug_on_event,
@@ -13070,67 +12855,11 @@ preserve data in modified buffers that would otherwise be lost.
 If nil, Emacs crashes immediately in response to fatal signals.  */);
   attempt_orderly_shutdown_on_fatal_signal = true;
 
-  DEFVAR_LISP ("while-no-input-ignore-events",
-               Vwhile_no_input_ignore_events,
-               doc: /* Ignored events from `while-no-input'.
-Events in this list do not count as pending input while running
-`while-no-input' and do not cause any idle timers to get reset when they
-occur.  */);
-  Vwhile_no_input_ignore_events = init_while_no_input_ignore_events ();
-
-  DEFVAR_BOOL ("translate-upper-case-key-bindings",
-               translate_upper_case_key_bindings,
-               doc: /* If non-nil, interpret upper case keys as lower case (when applicable).
-Emacs allows binding both upper and lower case key sequences to
-commands.  However, if there is a lower case key sequence bound to a
-command, and the user enters an upper case key sequence that is not
-bound to a command, Emacs will use the lower case binding.  Setting
-this variable to nil inhibits this behavior.  */);
-  translate_upper_case_key_bindings = true;
-
-  DEFVAR_BOOL ("input-pending-p-filter-events",
-               input_pending_p_filter_events,
-               doc: /* If non-nil, `input-pending-p' ignores some input events.
-If this variable is non-nil (the default), `input-pending-p' and
-other similar functions ignore input events in `while-no-input-ignore-events'.
-This flag may eventually be removed once this behavior is deemed safe.  */);
-  input_pending_p_filter_events = true;
-
   DEFVAR_BOOL ("mwheel-coalesce-scroll-events", mwheel_coalesce_scroll_events,
 	       doc: /* Non-nil means send a wheel event only for scrolling at least one screen line.
 Otherwise, a wheel event will be sent every time the mouse wheel is
 moved.  */);
   mwheel_coalesce_scroll_events = true;
-
-  DEFVAR_LISP ("display-monitors-changed-functions", Vdisplay_monitors_changed_functions,
-    doc: /* Abnormal hook run when the monitor configuration changes.
-This can happen if a monitor is rotated, moved, plugged in or removed
-from a multi-monitor setup, if the primary monitor changes, or if the
-resolution of a monitor changes.  The hook should accept a single
-argument, which is the terminal on which the monitor configuration
-changed.  */);
-  Vdisplay_monitors_changed_functions = Qnil;
-
-  DEFVAR_BOOL ("inhibit--record-char",
-	       inhibit_record_char,
-	       doc: /* If non-nil, don't record input events.
-This inhibits recording input events for the purposes of keyboard
-macros, dribble file, and `recent-keys'.
-Internal use only.  */);
-  inhibit_record_char = false;
-
-  DEFVAR_BOOL ("record-all-keys", record_all_keys,
-	       doc: /* Non-nil means record all keys you type.
-When nil, the default, characters typed as part of passwords are
-not recorded.  The non-nil value countermands `inhibit--record-char',
-which see.  */);
-  record_all_keys = false;
-
-  DEFVAR_LISP ("post-select-region-hook", Vpost_select_region_hook,
-    doc: /* Abnormal hook run after the region is selected.
-This usually happens as a result of `select-active-regions'.  The hook
-is called with one argument, the string that was selected.  */);
-  Vpost_select_region_hook = Qnil;
 
   DEFVAR_BOOL ("disable-inhibit-text-conversion",
 	       disable_inhibit_text_conversion,
@@ -13139,13 +12868,6 @@ If non-nil, text conversion will continue to happen after a prefix
 key has been read inside `read-key-sequence'.  */);
   disable_inhibit_text_conversion = false;
 
-  DEFVAR_LISP ("current-key-remap-sequence",
-	       Vcurrent_key_remap_sequence,
-    doc: /* The key sequence currently being remap, or nil.
-Bound to a vector containing the sub-sequence matching a binding
-within `input-decode-map' or `local-function-key-map' when its bound
-function is called to remap that sequence.  */);
-  Vcurrent_key_remap_sequence = Qnil;
   DEFSYM (Qcurrent_key_remap_sequence, "current-key-remap-sequence");
 
   /* Create the initial keyboard.  Qt means 'unset'.  */

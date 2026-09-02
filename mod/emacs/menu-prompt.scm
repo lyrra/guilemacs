@@ -8,7 +8,8 @@
   #:export (record-menu-key
             read-menu-command
             read-char-x-menu-prompt
-            read-char-minibuf-menu-prompt))
+            read-char-minibuf-menu-prompt
+            init-menu-prompt-registrations))
 
 ;;; M20 imp-2 — Scheme menu-prompt bodies ported from src/keyboard.c.
 ;;;
@@ -273,3 +274,17 @@ event.  Port of C read_char_minibuf_menu_prompt
                               (if (not (%nilp ((%c 'kboard-defining-kbd-macro) kb2)))
                                   ((%c '--store-kbd-macro-char) obj)))
                             obj)))))))))))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-menu-prompt-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((menu-prompting         ,#t)
+     (menu-prompt-more-char  32))))

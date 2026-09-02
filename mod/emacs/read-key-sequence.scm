@@ -2191,4 +2191,14 @@ cached-dispatch into here."
                ,rks-iter-unbound-event-reduction!)
               ;; M6ae — text-conversion-disable check
               (--rks-iter-maybe-disable-text-conversion!
-               ,rks-iter-maybe-disable-text-conversion!))))
+               ,rks-iter-maybe-disable-text-conversion!)))
+  ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
+  ;; (special-event-map / function-key-map stay C: their C readers in
+  ;; keys_of_keyboard and init_kboard are not migrated yet.)
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((translate-upper-case-key-bindings ,#t)
+     (current-key-remap-sequence        ,#nil))))

@@ -10,7 +10,8 @@
             MENU-BAR-ITEM-STRING
             MENU-BAR-ITEM-DEF
             MENU-BAR-ITEM-HPOS
-            MENU-BAR-ITEM-NSLOTS))
+            MENU-BAR-ITEM-NSLOTS
+            init-menu-bar-items-registrations))
 
 ;;; M10 imp-4.3 — Scheme port of menu_bar_items driver + callback.
 ;;; C menu_bar_items at keyboard.c:8594 still runs; this module coexists
@@ -274,3 +275,18 @@
 
     ;; 8. Return the vector (no nitems — unlike tab/tool-bar).
     vec))
+
+;;;;
+;;;; Registration
+;;;;
+
+(define (init-menu-bar-items-registrations)
+  "Declare the local-only DEFVAR_* moved here from syms_of_keyboard."
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((menu-bar-final-items       ,#nil)
+     ;; C guards this with #ifdef USE_LUCID; declare unconditionally.
+     (lucid--menu-grab-keyboard  ,#t))))

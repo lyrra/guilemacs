@@ -1144,4 +1144,33 @@ command_loop_1_iter_pre_read."
               (--command-loop-main                 ,command-loop-main)
               (--cmd-error                         ,cmd-error)
               ;; Hoisted from C (was Fcommand_error_default_function).
-              (command-error-default-function      ,command-error-default-function))))
+              (command-error-default-function      ,command-error-default-function)))
+  ;; M23 imp-1 — local-only DEFVAR_* moved here from syms_of_keyboard.
+  ;; Declare special so elisp let/setq compiles as dynamic, and set the
+  ;; C default value (globals storage removed with the DEFVAR).
+  (for-each
+   (lambda (spec)
+     (proclaim-special! (car spec))
+     (unless (symbol-default-bound? (car spec))
+       (set-symbol-default-value! (car spec) (cadr spec))))
+   `((pre-command-hook              ,#nil)
+     (post-command-hook             ,#nil)
+     (disable-point-adjustment      ,#nil)
+     (global-disable-point-adjustment ,#nil)
+     (current-minibuffer-command    ,#nil)
+     (this-command-keys-shift-translated ,#nil)
+     (command-error-function        ,'command-error-default-function)
+     (selection-inhibit-update-commands
+      ,(list 'handle-switch-frame 'handle-select-window))
+     (post-select-region-hook       ,#nil)
+     ;; The four DEFVAR_* below live in modules that are lazily loaded
+     ;; only (lispy-event / kbd-buffer / help-echo) — their load-time
+     ;; top-level forms need C DEFUNs registered after prelude, so they
+     ;; cannot be use-modules'd at boot.  Declare them here (an
+     ;; eagerly-loaded module) so they are special + bound from the
+     ;; start.  FIX-20250902-guilemacs: rehome when those modules become
+     ;; boot-loadable.
+     (double-click-fuzz             3)
+     (input-pending-p-filter-events ,#t)
+     (display-monitors-changed-functions ,#nil)
+     (show-help-function            ,#nil))))

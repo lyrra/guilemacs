@@ -148,6 +148,12 @@
 (use-modules (emacs command-loop))
 (use-modules (emacs read-key-sequence))
 (use-modules (emacs read-char))
+(use-modules (emacs echo))
+(use-modules (emacs menu-prompt))
+(use-modules (emacs menu-bar-items))
+(use-modules (emacs tool-bar-items))
+(use-modules (emacs menu-item-parse))
+(use-modules (emacs tab-bar-items))
 
 (format (current-error-port) ";; initializing emacs modules~%")
 (init-boot-registrations)
@@ -176,6 +182,13 @@
 (init-command-loop-registrations)
 (init-read-key-sequence-registrations)
 (init-read-char-registrations)
+;; M23 imp-1 — local-only DEFVAR_* declarations (moved from syms_of_keyboard).
+(init-echo-registrations)
+(init-menu-prompt-registrations)
+(init-menu-bar-items-registrations)
+(init-tool-bar-items-registrations)
+(init-menu-item-parse-registrations)
+(init-tab-bar-items-registrations)
 
 (set-symbol-value! 'features '())
 (read-set! keywords 'prefix)
