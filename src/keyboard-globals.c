@@ -19,10 +19,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* This file holds cross-file DEFVAR_LISP/DEFVAR_INT/DEFVAR_BOOL and
-   DEFSYM call sites moved out of syms_of_keyboard in M23 (imp-2),
-   the 8 DEFVAR_KBOARD call sites relocated there in imp-3, and the
-   imp-4 cross-file DEFSYM sites appended at the end of
+/* This file holds the cross-file DEFVAR_LISP/DEFVAR_INT/DEFVAR_BOOL
+   call sites moved out of syms_of_keyboard in M23 imp-2, the 8
+   DEFVAR_KBOARD call sites relocated there in imp-3, and the imp-4
+   cross-file DEFSYM sites appended at the end of
    syms_of_keyboard_globals.  Each imp-2/imp-4 name here is read from
    at least one other .c/.h file, so its DEFVAR_* / DEFSYM call site
    must stay in a file scanned by make-docfile (base_obj), even though

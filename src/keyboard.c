@@ -12107,15 +12107,6 @@ syms_of_keyboard (void)
 
   DEFSYM (Qtimer_event_handler, "timer-event-handler");
 
-  /* Non-nil disable property on a command means do not execute it;
-     call disabled-command-function's value instead.  */
-
-
-  /* Hooks to run before and after each command.  */
-
-  /* Hook run after the region is selected.  */
-
-
   DEFSYM (Qfunction_key, "function-key");
 
   /* The values of Qevent_kind properties.  */
@@ -12148,8 +12139,6 @@ syms_of_keyboard (void)
   DEFSYM (Qconfig_changed_event, "config-changed-event");
   DEFSYM (Quser_signal_event, "user-signal-event");
 
-  /* Menu and tool bar item parts.  */
-
 #ifdef HAVE_NTGUI
   DEFSYM (Qlanguage_change, "language-change");
   DEFSYM (Qend_session, "end-session");
@@ -12174,14 +12163,6 @@ syms_of_keyboard (void)
 
   DEFSYM (Qtouch_end, "touch-end");
 
-  /* Menu and tool bar item parts.  */
-
-  /* Non-nil disable property on a command means
-     do not execute it; call disabled-command-function's value instead.  */
-
-  /* Symbols to use for parts of windows.  */
-
-
   DEFSYM (Qabove_handle, "above-handle");
   DEFSYM (Qhandle, "handle");
   DEFSYM (Qbelow_handle, "below-handle");
@@ -12193,14 +12174,6 @@ syms_of_keyboard (void)
   DEFSYM (Qleftmost, "leftmost");
   DEFSYM (Qrightmost, "rightmost");
 
-  /* Properties of event headers.  */
-
-  /* An event header symbol HEAD may have a property named
-     Qevent_symbol_element_mask, which is of the form (BASE MODIFIERS);
-     BASE is the base, unmodified version of HEAD, and MODIFIERS is the
-     mask of modifiers applied to it.  If present, this is used to help
-     speed up parse_modifiers.  */
-
   /* An unmodified event header BASE may have a property named
      Qmodifier_cache, which is an alist mapping modifier masks onto
      modified versions of BASE.  If present, this helps speed up
@@ -12209,9 +12182,6 @@ syms_of_keyboard (void)
 
 
   DEFSYM (Qpolling_period, "polling-period");
-
-
-  /* The primary selection.  */
 
 
   DEFSYM (Qinput_method_exit_on_first_char, "input-method-exit-on-first-char");
