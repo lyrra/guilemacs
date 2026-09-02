@@ -1168,7 +1168,7 @@ command_loop_1_iter_pre_read."
      ;; top-level forms need C DEFUNs registered after prelude, so they
      ;; cannot be use-modules'd at boot.  Declare them here (an
      ;; eagerly-loaded module) so they are special + bound from the
-     ;; start.  FIX-20250902-guilemacs: rehome when those modules become
+     ;; start.  FIX-20260902-guilemacs: rehome when those modules become
      ;; boot-loadable.
      (double-click-fuzz             3)
      (input-pending-p-filter-events ,#t)

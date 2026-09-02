@@ -12388,9 +12388,6 @@ syms_of_keyboard (void)
   staticpro (&menu_bar_touch_id);
 
 
-
-
-
   DEFVAR_LISP ("unread-post-input-method-events", Vunread_post_input_method_events,
 	       doc: /* List of events to be processed as input by input methods.
 These events are processed before `unread-command-events'
@@ -12404,35 +12401,6 @@ before actual keyboard input.
 If there's an active input method, the events are given to
 `input-method-function'.  */);
   Vunread_input_method_events = Qnil;
-
-
-  DEFVAR_KBOARD ("last-command", Vlast_command,
-		 doc: /* The last command executed.
-Normally a symbol with a function definition, but can be whatever was found
-in the keymap, or whatever the variable `this-command' was set to by that
-command.
-
-The value `mode-exit' is special; it means that the previous command
-read an event that told it to exit, and it did so and unread that event.
-In other words, the present command is the event that made the previous
-command exit.
-
-The value `kill-region' is special; it means that the previous command
-was a kill command.
-
-`last-command' has a separate binding for each terminal device.
-See Info node `(elisp)Multiple Terminals'.  */);
-
-  DEFVAR_KBOARD ("real-last-command", Vreal_last_command,
-		 doc: /* Same as `last-command', but never altered by Lisp code.
-Taken from the previous value of `real-this-command'.  */);
-
-  DEFVAR_KBOARD ("last-repeatable-command", Vlast_repeatable_command,
-		 doc: /* Last command that may be repeated.
-The last command executed that was not bound to an input event.
-This is the command `repeat' will try to repeat.
-Taken from a previous value of `real-this-command'.  */);
-
 
 
   DEFSYM (Qcurrent_minibuffer_command, "current-minibuffer-command");
@@ -12500,22 +12468,6 @@ for that character after that prefix key.  */);
   Vprefix_help_command = Qnil;
 
 
-  DEFVAR_KBOARD ("keyboard-translate-table", Vkeyboard_translate_table,
-                 doc: /* Translate table for local keyboard input, or nil.
-If non-nil, the value should be a char-table.  Each character read
-from the keyboard is looked up in this char-table.  If the value found
-there is non-nil, then it is used instead of the actual input character.
-
-The value can also be a string or vector, but this is considered obsolete.
-If it is a string or vector of length N, character codes N and up are left
-untranslated.  In a vector, an element which is nil means "no translation".
-
-This is applied to the characters supplied to input methods, not their
-output.  See also `translation-table-for-input'.
-
-This variable has a separate binding for each terminal.
-See Info node `(elisp)Multiple Terminals'.  */);
-
   DEFVAR_BOOL ("cannot-suspend", cannot_suspend,
 	       doc: /* Non-nil means to always spawn a subshell instead of suspending.
 \(Even if the operating system has support for stopping a process.)  */);
@@ -12553,75 +12505,11 @@ See Info node `(elisp)Multiple Terminals'.  */);
 
   Fset (Qecho_area_clear_hook, Qnil);
 
-  DEFVAR_KBOARD ("overriding-terminal-local-map",
-		 Voverriding_terminal_local_map,
-		 doc: /* Per-terminal keymap that takes precedence over all other keymaps.
-This variable is intended to let commands such as `universal-argument'
-set up a different keymap for reading the next command.
-
-`overriding-terminal-local-map' has a separate binding for each
-terminal device.  See Info node `(elisp)Multiple Terminals'.  */);
-
-
 
   DEFVAR_LISP ("special-event-map", Vspecial_event_map,
 	       doc: /* Keymap defining bindings for special events to execute at low level.  */);
   Vspecial_event_map = list1 (Qkeymap);
 
-  DEFVAR_KBOARD ("system-key-alist", Vsystem_key_alist,
-		 doc: /* Alist of system-specific X windows key symbols.
-Each element should have the form (N . SYMBOL) where N is the
-numeric keysym code (sans the \"system-specific\" bit 1<<28)
-and SYMBOL is its name.
-
-`system-key-alist' has a separate binding for each terminal device.
-See Info node `(elisp)Multiple Terminals'.  */);
-
-  DEFVAR_KBOARD ("local-function-key-map", Vlocal_function_key_map,
-                 doc: /* Keymap that translates key sequences to key sequences during input.
-This is used mainly for mapping key sequences into some preferred
-key events (symbols).
-
-The `read-key-sequence' function replaces any subsequence bound by
-`local-function-key-map' with its binding.  More precisely, when the
-active keymaps have no binding for the current key sequence but
-`local-function-key-map' binds a suffix of the sequence to a vector or
-string, `read-key-sequence' replaces the matching suffix with its
-binding, and continues with the new sequence.
-
-If the binding is a function, it is called with one argument (the prompt)
-and its return value (a key sequence) is used.
-
-The events that come from bindings in `local-function-key-map' are not
-themselves looked up in `local-function-key-map'.
-
-For example, suppose `local-function-key-map' binds `ESC O P' to [f1].
-Typing `ESC O P' to `read-key-sequence' would return [f1].  Typing
-`C-x ESC O P' would return [?\\C-x f1].  If [f1] were a prefix key,
-typing `ESC O P x' would return [f1 x].
-
-`local-function-key-map' has a separate binding for each terminal
-device.  See Info node `(elisp)Multiple Terminals'.  If you need to
-define a binding on all terminals, change `function-key-map'
-instead.  Initially, `local-function-key-map' is an empty keymap that
-has `function-key-map' as its parent on all terminal devices.  */);
-
-  DEFVAR_KBOARD ("input-decode-map", Vinput_decode_map,
-		 doc: /* Keymap that decodes input escape sequences.
-This is used mainly for mapping ASCII function key sequences into
-real Emacs function key events (symbols).
-
-The `read-key-sequence' function replaces any subsequence bound by
-`input-decode-map' with its binding.  Contrary to `function-key-map',
-this map applies its rebinding regardless of the presence of an ordinary
-binding.  So it is more like `key-translation-map' except that it applies
-before `function-key-map' rather than after.
-
-If the binding is a function, it is called with one argument (the prompt)
-and its return value (a key sequence) is used.
-
-The events that come from bindings in `input-decode-map' are not
-themselves looked up in `input-decode-map'.  */);
 
   DEFVAR_LISP ("function-key-map", Vfunction_key_map,
                doc: /* The parent keymap of all `local-function-key-map' instances.
@@ -12630,7 +12518,6 @@ here.  If a mapping is defined in both the current
 `local-function-key-map' binding and this variable, then the local
 definition will take precedence.  */);
   Vfunction_key_map = Fmake_sparse_keymap (Qnil);
-
 
 
   DEFVAR_LISP ("timer-list", Vtimer_list,

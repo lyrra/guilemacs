@@ -176,6 +176,7 @@
 (load "test/keyboard/test-m22-imp4.el")             ; M22 imp-4
 (load "test/keyboard/test-m23-imp1.el")             ; M23 imp-1
 (load "test/keyboard/test-m23-imp2.el")             ; M23 imp-2
+(load "test/keyboard/test-m23-imp3.el")             ; M23 imp-3
 (message "")
 
 (message "========================================")
