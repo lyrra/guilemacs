@@ -12372,78 +12372,10 @@ definition will take precedence.  */);
 void
 keys_of_keyboard (void)
 {
-  initial_define_lispy_key (Vspecial_event_map, "delete-frame",
-			    "handle-delete-frame");
-#ifdef HAVE_NTGUI
-  initial_define_lispy_key (Vspecial_event_map, "end-session",
-			    "kill-emacs");
-#endif
-  initial_define_lispy_key (Vspecial_event_map, "ns-put-working-text",
-			    "ns-put-working-text");
-  initial_define_lispy_key (Vspecial_event_map, "ns-unput-working-text",
-			    "ns-unput-working-text");
-  /* Here we used to use `ignore-event' which would simple set prefix-arg to
-     current-prefix-arg, as is done in `handle-switch-frame'.
-     But `handle-switch-frame is not run from the special-map.
-     Commands from that map are run in a special way that automatically
-     preserves the prefix-arg.  Restoring the prefix arg here is not just
-     redundant but harmful:
-     - C-u C-x v =
-     - current-prefix-arg is set to non-nil, prefix-arg is set to nil.
-     - after the first prompt, the exit-minibuffer-hook is run which may
-       iconify a frame and thus push a `iconify-frame' event.
-     - after running exit-minibuffer-hook, current-prefix-arg is
-       restored to the non-nil value it had before the prompt.
-     - we enter the second prompt.
-       current-prefix-arg is non-nil, prefix-arg is nil.
-     - before running the first real event, we run the special iconify-frame
-       event, but we pass the `special' arg to command-execute so
-       current-prefix-arg and prefix-arg are left untouched.
-     - here we foolishly copy the non-nil current-prefix-arg to prefix-arg.
-     - the next key event will have a spuriously non-nil current-prefix-arg.  */
-  initial_define_lispy_key (Vspecial_event_map, "iconify-frame",
-			    "ignore");
-  initial_define_lispy_key (Vspecial_event_map, "make-frame-visible",
-			    "ignore");
-  /* Handling it at such a low-level causes read_key_sequence to get
-   * confused because it doesn't realize that the current_buffer was
-   * changed by read_char.
-   *
-   * initial_define_lispy_key (Vspecial_event_map, "select-window",
-   * 			    "handle-select-window"); */
-  initial_define_lispy_key (Vspecial_event_map, "save-session",
-			    "handle-save-session");
-
-#ifdef HAVE_DBUS
-  /* Define a special event which is raised for dbus callback
-     functions.  */
-  initial_define_lispy_key (Vspecial_event_map, "dbus-event",
-			    "dbus-handle-event");
-#endif
-
-#ifdef THREADS_ENABLED
-  /* Define a special event which is raised for thread signals.  */
-  initial_define_lispy_key (Vspecial_event_map, "thread-event",
-			    "thread-handle-event");
-#endif
-
-#ifdef USE_FILE_NOTIFY
-  /* Define a special event which is raised for notification callback
-     functions.  */
-  initial_define_lispy_key (Vspecial_event_map, "file-notify",
-                            "file-notify-handle-event");
-#endif /* USE_FILE_NOTIFY */
-
-  initial_define_lispy_key (Vspecial_event_map, "config-changed-event",
-			    "ignore");
-#if defined (WINDOWSNT)
-  initial_define_lispy_key (Vspecial_event_map, "language-change",
-			    "ignore");
-#endif
-  initial_define_lispy_key (Vspecial_event_map, "focus-in",
-			    "handle-focus-in");
-  initial_define_lispy_key (Vspecial_event_map, "focus-out",
-			    "handle-focus-out");
-  initial_define_lispy_key (Vspecial_event_map, "move-frame",
-			    "handle-move-frame");
+  /* M23 imp-5: dispatch to (emacs command-loop) init-m23-imp5-
+     registrations, which runs here (not at prelude boot) because
+     special-event-map does not exist until syms_of_keyboard_globals
+     runs, earlier in this same src/emacs.c init sequence.  */
+  SCM_CALL_0 (scm_c_public_ref ("emacs command-loop",
+                                 "init-m23-imp5-registrations"));
 }

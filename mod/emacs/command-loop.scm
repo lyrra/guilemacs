@@ -21,7 +21,8 @@
             safe-run-hooks-2!
             safe-run-hooks-maybe-narrowed!
             init-command-loop-registrations
-            init-m23-imp4-registrations))
+            init-m23-imp4-registrations
+            init-m23-imp5-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
 ;;;
@@ -1218,3 +1219,64 @@ self-evaluating, matching the elisp reader idiom."
               "selection-request" "tty-select-active-regions" "undefined"
               "undo-auto--add-boundary" "undo-auto--undoably-changed-buffers"
               "window-edges" "xterm--set-selection")))
+
+;;; M23 imp-5 — special-event-map registration.
+;;;
+;;; Ports keys_of_keyboard's special-event-map table (previously a
+;;; ~76-line C table of initial_define_lispy_key calls in
+;;; src/keyboard.c) out of C into Scheme.  keys_of_keyboard now holds a
+;;; one-call dispatch to this function; it runs from src/emacs.c after
+;;; syms_of_keyboard_globals has created Vspecial_event_map, so the map
+;;; exists at this call site — unlike the prelude-boot call sites of
+;;; init-command-loop-registrations / init-m23-imp4-registrations, which
+;;; is why this registration must not be moved to prelude/load.scm.
+;;;
+;;; Each entry reproduces initial_define_lispy_key exactly: that C
+;;; helper is store_in_keymap (map, intern KEY, intern DEF, false), and
+;;; (define-key map (vector KEY) DEF) reduces to the same store_in_keymap
+;;; call for a one-element, non-character vector key.
+;;;
+;;; Dropped-platform entries (Windows-only, out of scope per docs/
+;;; milestone-overview.org "Platform scope") are deliberately not ported:
+;;;   end-session → kill-emacs   (#ifdef HAVE_NTGUI)
+;;;   language-change → ignore   (#if defined (WINDOWSNT))
+;;; thread-event → thread-handle-event (#ifdef THREADS_ENABLED) is also
+;;; not ported: this build has THREADS_ENABLED undefined and exposes no
+;;; Scheme featurep predicate for threads, so the binding is dead here.
+
+(define (init-m23-imp5-registrations)
+  "Install the special-event-map entries keys_of_keyboard used to
+register from C (initial_define_lispy_key).  Runs from keys_of_keyboard
+at C boot, after Vspecial_event_map exists."
+  (let ((sem (symbol-value 'special-event-map)))
+    (define (bind! key def)
+      ((%c 'define-key) sem (vector key) def))
+    (bind! 'delete-frame        'handle-delete-frame)
+    (bind! 'ns-put-working-text 'ns-put-working-text)
+    (bind! 'ns-unput-working-text 'ns-unput-working-text)
+    ;; Here we used to use `ignore-event' which would simple set prefix-arg
+    ;; to current-prefix-arg, as is done in `handle-switch-frame'.  But
+    ;; `handle-switch-frame is not run from the special-map.  Commands from
+    ;; that map are run in a special way that automatically preserves the
+    ;; prefix-arg.  Restoring the prefix arg here is not just redundant but
+    ;; harmful: see the historical C comment in keys_of_keyboard
+    ;; (iconify-frame entry) for the C-u C-x v = walk-through.
+    (bind! 'iconify-frame       'ignore)
+    (bind! 'make-frame-visible  'ignore)
+    (bind! 'save-session        'handle-save-session)
+    ;; select-window is intentionally NOT bound here.  Handling it at such
+    ;; a low level caused read_key_sequence to get confused because it does
+    ;; not realize that the current_buffer was changed by read_char (see
+    ;; the commented-out initial_define_lispy_key in the historical C).
+    (when (not (%nilp ((%c 'featurep) 'dbusbind)))
+      ;; Define a special event raised for dbus callback functions.
+      (bind! 'dbus-event 'dbus-handle-event))
+    (when (not (%nilp (or ((%c 'featurep) 'inotify)
+                          ((%c 'featurep) 'gfilenotify)
+                          ((%c 'featurep) 'kqueue))))
+      ;; Define a special event raised for notification callback functions.
+      (bind! 'file-notify 'file-notify-handle-event))
+    (bind! 'config-changed-event 'ignore)
+    (bind! 'focus-in            'handle-focus-in)
+    (bind! 'focus-out           'handle-focus-out)
+    (bind! 'move-frame          'handle-move-frame)))

@@ -20,9 +20,11 @@
 ;;;     set);
 ;;;   * source-level regression that the DEFVAR call sites moved out of
 ;;;     keyboard.c into keyboard-globals.c;
-;;;   * Vspecial_event_map's live bindings still resolve (16-entry C
-;;;     table, less the dropped-platform entries that this build does
-;;;     not define);
+;;;   * Vspecial_event_map's live bindings still resolve (now registered
+;;;     from Scheme by init-m23-imp5-registrations, which keys_of_keyboard
+;;;     dispatches to; the old 16-entry initial_define_lispy_key C table
+;;;     is gone, less the dropped-platform / dead-branch entries that
+;;;     this build does not bind);
 ;;;   * the head_table[]-driven event-kind / event-symbol-elements
 ;;;     properties survive (they are Fput at syms time, still in C);
 ;;;   * the three Fset-to-nil defaults survive.
@@ -142,17 +144,30 @@
               (not (gm5-has-defvar? gm5-keyboard-c name)) t nil))
 
 ;; -------------------------------------------------------------------
-;; Vspecial_event_map live bindings (still installed from C in
-;; keys_of_keyboard, which this commit does not port — see milestone).
-;; Assert the entries this platform defines resolve to the same command
-;; symbols.  Dropped-platform / feature-guarded entries (end-session,
-;; thread-event, language-change, dbus-event depending on build) are
-;; omitted where this build does not register them; the unconditional
-;; NS-named and core entries must resolve.
+;; Source-level regression: keys_of_keyboard no longer installs
+;; special-event-map bindings from C.  The whole initial_define_lispy_key
+;; table moved to Scheme (init-m23-imp5-registrations).  Scan for the
+;; literal call site so a stray future C reintroduction is caught.
 ;; -------------------------------------------------------------------
-;; entries.  config-changed-event is rebound by loadup.el (dynamic-setting
-;; installs dynamic-setting-handle-config-changed-event), so it is not in
-;; the exact-command table below.
+(gm5-report "m23/imp5/src/keys-of-keyboard/initial_define_lispy_key"
+            (not (string-match-p "initial_define_lispy_key"
+                                 gm5-keyboard-c))
+            t (string-match-p "initial_define_lispy_key"
+                              gm5-keyboard-c))
+
+;; -------------------------------------------------------------------
+;; Vspecial_event_map live bindings, registered from Scheme by
+;; init-m23-imp5-registrations (src/keyboard.c keys_of_keyboard now
+;; dispatches to it — see milestone).  Assert the entries this platform
+;; binds resolve to the same command symbols the old C table produced.
+;; Feature-guarded entries resolve per this build's live featurep result:
+;;   * dbus-event / file-notify are bound (HAVE_DBUS, USE_FILE_NOTIFY);
+;;   * thread-event is not (THREADS_ENABLED undefined);
+;;   * dropped-platform entries (end-session, language-change) are not
+;;     ported at all.
+;; config-changed-event is rebound by loadup.el (dynamic-setting
+;; installs dynamic-setting-handle-config-changed-event), so it is not
+;; in the exact-command table below.
 (defvar gm5-special
   '((delete-frame handle-delete-frame)
     (ns-put-working-text ns-put-working-text)
@@ -160,6 +175,8 @@
     (iconify-frame ignore)
     (make-frame-visible ignore)
     (save-session handle-save-session)
+    (dbus-event dbus-handle-event)
+    (file-notify file-notify-handle-event)
     (focus-in handle-focus-in)
     (focus-out handle-focus-out)
     (move-frame handle-move-frame)))
