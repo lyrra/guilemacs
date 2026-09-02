@@ -1,4 +1,5 @@
-/* Cross-file keyboard global variables (M23 imp-2, imp-3).
+/* Cross-file keyboard global variables and DEFSYM sites
+   (M23 imp-2, imp-3, imp-4).
 
 Copyright (C) 1985-1989, 1993-1997, 1999-2026 Free Software Foundation,
 Inc.
@@ -18,12 +19,14 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
 
-/* This file holds only the cross-file DEFVAR_LISP/DEFVAR_INT/DEFVAR_BOOL
-   and DEFSYM call sites moved out of syms_of_keyboard in M23 (imp-2),
-   plus the 8 DEFVAR_KBOARD call sites relocated there in imp-3.  Each
-   imp-2 variable here is read from at least one other .c file, so its
-   DEFVAR_* call site must stay in a file scanned by make-docfile
-   (base_obj), even though it no longer lives in keyboard.c.
+/* This file holds cross-file DEFVAR_LISP/DEFVAR_INT/DEFVAR_BOOL and
+   DEFSYM call sites moved out of syms_of_keyboard in M23 (imp-2),
+   the 8 DEFVAR_KBOARD call sites relocated there in imp-3, and the
+   imp-4 cross-file DEFSYM sites appended at the end of
+   syms_of_keyboard_globals.  Each imp-2/imp-4 name here is read from
+   at least one other .c/.h file, so its DEFVAR_* / DEFSYM call site
+   must stay in a file scanned by make-docfile (base_obj), even though
+   it no longer lives in keyboard.c.
 
    The imp-3 DEFVAR_KBOARD sites are a pure relocation: DEFVAR_KBOARD
    registers a Lisp_Kboard_Objfwd forwarding record (offsetof into
@@ -315,4 +318,44 @@ and its return value (a key sequence) is used.
 
 The events that come from bindings in `input-decode-map' are not
 themselves looked up in `input-decode-map'.  */);
+
+  /* M23 imp-4 — cross-file DEFSYM call sites relocated out of
+     syms_of_keyboard.  Each symbol below is read by name from at least
+     one other .c/.h file, so its DEFSYM must stay in a file scanned by
+     make-docfile (base_obj) to keep the generated Qsym #define and
+     defsym_name[] entry.  Pure relocation, unchanged text.  */
+
+  DEFSYM (QCfilter, ":filter");
+  DEFSYM (QCradio, ":radio");
+  DEFSYM (QCtoggle, ":toggle");
+  DEFSYM (QPRIMARY, "PRIMARY");
+  DEFSYM (Qactivate_menubar_hook, "activate-menubar-hook");
+  DEFSYM (Qbottom, "bottom");
+  DEFSYM (Qbottom_divider, "bottom-divider");
+  DEFSYM (Qcoding, "coding");
+  DEFSYM (Qconcat, "concat");
+  DEFSYM (Qcurrent_minibuffer_command, "current-minibuffer-command");
+  DEFSYM (Qdeactivate_mark, "deactivate-mark");
+  DEFSYM (Qdelete_frame, "delete-frame");
+  DEFSYM (Qdisabled, "disabled");
+  DEFSYM (Qdown, "down");
+  DEFSYM (Qdrag_internal_border, "drag-internal-border");
+  DEFSYM (Qevent_kind, "event-kind");
+  DEFSYM (Qevent_symbol_element_mask, "event-symbol-element-mask");
+  DEFSYM (Qevent_symbol_elements, "event-symbol-elements");
+  DEFSYM (Qfocus_in, "focus-in");
+  DEFSYM (Qhelp_echo, "help-echo");
+  DEFSYM (Qhelp_key_binding, "help-key-binding");
+  DEFSYM (Qiconify_frame, "iconify-frame");
+  DEFSYM (Qmouse_click, "mouse-click");
+  DEFSYM (Qright_divider, "right-divider");
+  DEFSYM (Qswitch_frame, "switch-frame");
+#ifdef HAVE_TEXT_CONVERSION
+  DEFSYM (Qtext_conversion, "text-conversion");
+#endif
+  DEFSYM (Qtop, "top");
+  DEFSYM (Qtouchscreen_begin, "touchscreen-begin");
+  DEFSYM (Qtouchscreen_end, "touchscreen-end");
+  DEFSYM (Qup, "up");
+  DEFSYM (Qvertical_line, "vertical-line");
 }

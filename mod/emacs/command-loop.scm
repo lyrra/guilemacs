@@ -20,7 +20,8 @@
             safe-run-hooks!
             safe-run-hooks-2!
             safe-run-hooks-maybe-narrowed!
-            init-command-loop-registrations))
+            init-command-loop-registrations
+            init-m23-imp4-registrations))
 
 ;;; M7a — Prologue of command_loop_1, ported from C to Scheme.
 ;;;
@@ -1174,3 +1175,46 @@ command_loop_1_iter_pre_read."
      (input-pending-p-filter-events ,#t)
      (display-monitors-changed-functions ,#nil)
      (show-help-function            ,#nil))))
+
+;;; M23 imp-4 — local-only DEFSYM symbols re-interned from Scheme.
+;;; These 39 symbol names had a DEFSYM call site in syms_of_keyboard
+;;; (src/keyboard.c) with no other C reader anywhere, so the call site
+;;; was deleted (see brief.org Group 2).  Deleting it removes the name
+;;; from make-docfile's defsym_name[]/lispsym[] bootstrap interning, so
+;;; the symbol now exists only if Scheme interns it here.
+;;;
+;;; Interning via `intern' (rebound to the pure-Scheme elisp-intern at
+;;; boot, utils.scm:566) returns the canonical Guile symbol for the
+;;; name.  A Guile symbol always exists once string->symbol runs, so
+;;; this re-interns the canonical object rather than creating a new
+;;; identity.  For the 11 keyword names (leading ":") we additionally
+;;; set the symbol's value to itself, the same self-evaluating-keyword
+;;; idiom the reader uses (reader.scm elisp-intern-and-make-keyword).
+;;; Keywords interned by `intern' alone would not self-evaluate.
+
+(define (init-m23-imp4-registrations)
+  "Intern the 39 local-only symbols deleted from syms_of_keyboard in
+M23 imp-4 (brief.org Group 2).  Makes the 11 keyword names among them
+self-evaluating, matching the elisp reader idiom."
+  (define (intern-one! name)
+    (let ((sym ((symbol-function 'intern) name #nil)))
+      (when (and (> (string-length name) 0)
+                 (char=? (string-ref name 0) #\:))
+        (set-symbol-value! sym sym))
+      sym))
+  (for-each intern-one!
+            '(":image" ":rtl" ":wrap" ":enable" ":visible" ":help"
+              ":button" ":keys" ":key-sequence" ":label" ":vert-only"
+              "activate-mark-hook" "command-error-default-function"
+              "command-execute" "current-key-remap-sequence"
+              "delayed-warnings-hook" "display-monitors-changed-functions"
+              "echo-keystrokes" "encoded" "gui-set-selection"
+              "handle-select-window" "handle-switch-frame"
+              "help--append-keystrokes-help" "help-echo-inhibit-substitution"
+              "internal-echo-keystrokes-prefix"
+              "long-line-optimizations-in-command-hooks" "menu-enable"
+              "mouse-fixup-help-message" "no-record" "post-command-hook"
+              "post-select-region-hook" "pre-command-hook"
+              "selection-request" "tty-select-active-regions" "undefined"
+              "undo-auto--add-boundary" "undo-auto--undoably-changed-buffers"
+              "window-edges" "xterm--set-selection")))

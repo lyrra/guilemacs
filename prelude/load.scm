@@ -180,6 +180,7 @@
 (init-recursive-edit-registrations)
 (init-this-command-keys-registrations)
 (init-command-loop-registrations)
+(init-m23-imp4-registrations)
 (init-read-key-sequence-registrations)
 (init-read-char-registrations)
 ;; M23 imp-1 — local-only DEFVAR_* declarations (moved from syms_of_keyboard).

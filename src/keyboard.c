@@ -1022,10 +1022,6 @@ table.  */)
   result = Fcons (Fcons (Qascii_keystroke, make_fixnum (ASCII_KEYSTROKE_EVENT)), result);
   result = Fcons (Fcons (Qmultibyte_char_keystroke, make_fixnum (MULTIBYTE_CHAR_KEYSTROKE_EVENT)), result);
   result = Fcons (Fcons (Qnon_ascii_keystroke, make_fixnum (NON_ASCII_KEYSTROKE_EVENT)), result);
-#ifdef HAVE_NS
-  result = Fcons (Fcons (Qns_nonkey, make_fixnum (NS_NONKEY_EVENT)), result);
-  result = Fcons (Fcons (Qns_text_event, make_fixnum (NS_TEXT_EVENT)), result);
-#endif
 #ifdef HAVE_NTGUI
   result = Fcons (Fcons (Qmultimedia_key, make_fixnum (MULTIMEDIA_KEY_EVENT)), result);
 #endif
@@ -12064,6 +12060,14 @@ syms_of_keyboard (void)
 {
 #include "keyboard.x"
 
+  /* M23 imp-4 — the cross-file DEFSYM sites for 31 symbols used by
+     other .c/.h files now live in syms_of_keyboard_globals
+     (keyboard-globals.c), which make-docfile still scans.  The
+     local-only DEFSYM sites for 39 symbols with no other C reader were
+     deleted; those symbols are now interned from Scheme boot code (see
+     prelude/load.scm).  Only symbols with a remaining C consumer stay
+     here.  */
+
   pending_funcalls = Qnil;
   staticpro (&pending_funcalls);
 
@@ -12087,11 +12091,6 @@ syms_of_keyboard (void)
   DEFSYM (Qiep, "iep");
 
   /* Tool-bars.  */
-  DEFSYM (QCimage, ":image");
-  DEFSYM (Qhelp_echo, "help-echo");
-  DEFSYM (Qhelp_echo_inhibit_substitution, "help-echo-inhibit-substitution");
-  DEFSYM (QCrtl, ":rtl");
-  DEFSYM (QCwrap, ":wrap");
 
   staticpro (&item_properties);
   item_properties = Qnil;
@@ -12110,28 +12109,16 @@ syms_of_keyboard (void)
 
   /* Non-nil disable property on a command means do not execute it;
      call disabled-command-function's value instead.  */
-  DEFSYM (Qdisabled, "disabled");
 
-  DEFSYM (Qundefined, "undefined");
 
   /* Hooks to run before and after each command.  */
-  DEFSYM (Qpre_command_hook, "pre-command-hook");
-  DEFSYM (Qpost_command_hook, "post-command-hook");
-  DEFSYM (Qlong_line_optimizations_in_command_hooks,
-	  "long-line-optimizations-in-command-hooks");
 
   /* Hook run after the region is selected.  */
-  DEFSYM (Qpost_select_region_hook, "post-select-region-hook");
 
-  DEFSYM (Qundo_auto__add_boundary, "undo-auto--add-boundary");
-  DEFSYM (Qundo_auto__undoably_changed_buffers,
-          "undo-auto--undoably-changed-buffers");
 
-  DEFSYM (Qdelayed_warnings_hook, "delayed-warnings-hook");
   DEFSYM (Qfunction_key, "function-key");
 
   /* The values of Qevent_kind properties.  */
-  DEFSYM (Qmouse_click, "mouse-click");
   DEFSYM (Qwheel_event, "wheel-event");
   DEFSYM (Qhorizontal_wheel_event, "horizontal-wheel-event");
 
@@ -12154,10 +12141,6 @@ syms_of_keyboard (void)
   DEFSYM (Qascii_keystroke, "ascii-keystroke");
   DEFSYM (Qmultibyte_char_keystroke, "multibyte-char-keystroke");
   DEFSYM (Qnon_ascii_keystroke, "non-ascii-keystroke");
-#ifdef HAVE_NS
-  DEFSYM (Qns_nonkey, "ns-nonkey");
-  DEFSYM (Qns_text_event, "ns-text-event");
-#endif
 #ifdef HAVE_NTGUI
   DEFSYM (Qmultimedia_key, "multimedia-key");
 #endif
@@ -12166,7 +12149,6 @@ syms_of_keyboard (void)
   DEFSYM (Quser_signal_event, "user-signal-event");
 
   /* Menu and tool bar item parts.  */
-  DEFSYM (Qmenu_enable, "menu-enable");
 
 #ifdef HAVE_NTGUI
   DEFSYM (Qlanguage_change, "language-change");
@@ -12193,35 +12175,16 @@ syms_of_keyboard (void)
   DEFSYM (Qtouch_end, "touch-end");
 
   /* Menu and tool bar item parts.  */
-  DEFSYM (QCenable, ":enable");
-  DEFSYM (QCvisible, ":visible");
-  DEFSYM (QChelp, ":help");
-  DEFSYM (QCfilter, ":filter");
-  DEFSYM (QCbutton, ":button");
-  DEFSYM (QCkeys, ":keys");
-  DEFSYM (QCkey_sequence, ":key-sequence");
 
   /* Non-nil disable property on a command means
      do not execute it; call disabled-command-function's value instead.  */
-  DEFSYM (QCtoggle, ":toggle");
-  DEFSYM (QCradio, ":radio");
-  DEFSYM (QClabel, ":label");
-  DEFSYM (QCvert_only, ":vert-only");
 
   /* Symbols to use for parts of windows.  */
-  DEFSYM (Qvertical_line, "vertical-line");
-  DEFSYM (Qright_divider, "right-divider");
-  DEFSYM (Qbottom_divider, "bottom-divider");
 
-  DEFSYM (Qmouse_fixup_help_message, "mouse-fixup-help-message");
 
   DEFSYM (Qabove_handle, "above-handle");
   DEFSYM (Qhandle, "handle");
   DEFSYM (Qbelow_handle, "below-handle");
-  DEFSYM (Qup, "up");
-  DEFSYM (Qdown, "down");
-  DEFSYM (Qtop, "top");
-  DEFSYM (Qbottom, "bottom");
   DEFSYM (Qend_scroll, "end-scroll");
   DEFSYM (Qratio, "ratio");
   DEFSYM (Qbefore_handle, "before-handle");
@@ -12231,15 +12194,12 @@ syms_of_keyboard (void)
   DEFSYM (Qrightmost, "rightmost");
 
   /* Properties of event headers.  */
-  DEFSYM (Qevent_kind, "event-kind");
-  DEFSYM (Qevent_symbol_elements, "event-symbol-elements");
 
   /* An event header symbol HEAD may have a property named
      Qevent_symbol_element_mask, which is of the form (BASE MODIFIERS);
      BASE is the base, unmodified version of HEAD, and MODIFIERS is the
      mask of modifiers applied to it.  If present, this is used to help
      speed up parse_modifiers.  */
-  DEFSYM (Qevent_symbol_element_mask, "event-symbol-element-mask");
 
   /* An unmodified event header BASE may have a property named
      Qmodifier_cache, which is an alist mapping modifier masks onto
@@ -12247,36 +12207,25 @@ syms_of_keyboard (void)
      apply_modifiers.  */
   DEFSYM (Qmodifier_cache, "modifier-cache");
 
-  DEFSYM (Qactivate_menubar_hook, "activate-menubar-hook");
 
   DEFSYM (Qpolling_period, "polling-period");
 
-  DEFSYM (Qgui_set_selection, "gui-set-selection");
-  DEFSYM (Qxterm__set_selection, "xterm--set-selection");
-  DEFSYM (Qtty_select_active_regions, "tty-select-active-regions");
 
   /* The primary selection.  */
-  DEFSYM (QPRIMARY, "PRIMARY");
 
-  DEFSYM (Qhandle_switch_frame, "handle-switch-frame");
-  DEFSYM (Qhandle_select_window, "handle-select-window");
 
   DEFSYM (Qinput_method_exit_on_first_char, "input-method-exit-on-first-char");
   DEFSYM (Qinput_method_use_echo_area, "input-method-use-echo-area");
 
   DEFSYM (Qhelp_form_show, "help-form-show");
 
-  DEFSYM (Qhelp_key_binding, "help-key-binding");
 
-  DEFSYM (Qhelp__append_keystrokes_help, "help--append-keystrokes-help");
 
-  DEFSYM (Qecho_keystrokes, "echo-keystrokes");
 
   Fset (Qinput_method_exit_on_first_char, Qnil);
   Fset (Qinput_method_use_echo_area, Qnil);
 
   /* Symbols for dragging internal borders.  */
-  DEFSYM (Qdrag_internal_border, "drag-internal-border");
   DEFSYM (Qleft_edge, "left-edge");
   DEFSYM (Qtop_left_corner, "top-left-corner");
   DEFSYM (Qtop_edge, "top-edge");
@@ -12289,17 +12238,11 @@ syms_of_keyboard (void)
   /* Symbols to head events.  */
   DEFSYM (Qmouse_movement, "mouse-movement");
   DEFSYM (Qscroll_bar_movement, "scroll-bar-movement");
-  DEFSYM (Qswitch_frame, "switch-frame");
-  DEFSYM (Qfocus_in, "focus-in");
   DEFSYM (Qfocus_out, "focus-out");
   DEFSYM (Qmove_frame, "move-frame");
-  DEFSYM (Qdelete_frame, "delete-frame");
-  DEFSYM (Qiconify_frame, "iconify-frame");
   DEFSYM (Qmake_frame_visible, "make-frame-visible");
   DEFSYM (Qno_event, "no-event");
   DEFSYM (Qselect_window, "select-window");
-  DEFSYM (Qselection_request, "selection-request");
-  DEFSYM (Qwindow_edges, "window-edges");
   {
     int i;
 
@@ -12312,8 +12255,6 @@ syms_of_keyboard (void)
 	Fput (var, Qevent_symbol_elements, list1 (var));
       }
   }
-  DEFSYM (Qno_record, "no-record");
-  DEFSYM (Qencoded, "encoded");
 
   DEFSYM (Qpreedit_text, "preedit-text");
 
@@ -12338,8 +12279,6 @@ syms_of_keyboard (void)
   raw_keybuf = make_nil_elisp_vector (30);
   staticpro (&raw_keybuf);
 
-  DEFSYM (Qcommand_execute, "command-execute");
-  DEFSYM (Qinternal_echo_keystrokes_prefix, "internal-echo-keystrokes-prefix");
 
   accent_key_syms = Qnil;
   staticpro (&accent_key_syms);
@@ -12403,7 +12342,6 @@ If there's an active input method, the events are given to
   Vunread_input_method_events = Qnil;
 
 
-  DEFSYM (Qcurrent_minibuffer_command, "current-minibuffer-command");
 
 
   DEFVAR_INT ("auto-save-interval", auto_save_interval,
@@ -12474,19 +12412,14 @@ for that character after that prefix key.  */);
   cannot_suspend = false;
 
 
-  DEFSYM (Qdeactivate_mark, "deactivate-mark");
 
 #if 0
   DEFVAR_LISP ("echo-area-clear-hook", ...,
 	       doc: /* Normal hook run when clearing the echo area.  */);
 #endif
   DEFSYM (Qecho_area_clear_hook, "echo-area-clear-hook");
-  DEFSYM (Qtouchscreen_begin, "touchscreen-begin");
-  DEFSYM (Qtouchscreen_end, "touchscreen-end");
   DEFSYM (Qtouchscreen_update, "touchscreen-update");
   DEFSYM (Qpinch, "pinch");
-  DEFSYM (Qdisplay_monitors_changed_functions,
-	  "display-monitors-changed-functions");
 
   /* Event-kind keys for the imp-3 dispatch switch (--ie-kind-from-name).  */
   DEFSYM (Qselection_request_event, "selection-request-event");
@@ -12497,11 +12430,7 @@ for that character after that prefix key.  */);
   DEFSYM (Qnotification_event, "notification-event");
 #endif
 
-  DEFSYM (Qcoding, "coding");
   DEFSYM (Qtouchscreen, "touchscreen");
-#ifdef HAVE_TEXT_CONVERSION
-  DEFSYM (Qtext_conversion, "text-conversion");
-#endif
 
   Fset (Qecho_area_clear_hook, Qnil);
 
@@ -12618,19 +12547,14 @@ If non-nil, text conversion will continue to happen after a prefix
 key has been read inside `read-key-sequence'.  */);
   disable_inhibit_text_conversion = false;
 
-  DEFSYM (Qcurrent_key_remap_sequence, "current-key-remap-sequence");
 
   /* Create the initial keyboard.  Qt means 'unset'.  */
   eassert (initial_kboard == NULL);
   initial_kboard = allocate_kboard (Qt);
 
-  DEFSYM (Qactivate_mark_hook, "activate-mark-hook");
-  DEFSYM (Qns_unput_working_text, "ns-unput-working-text");
   DEFSYM (Qinternal_timer_start_idle, "internal-timer-start-idle");
-  DEFSYM (Qconcat, "concat");
   DEFSYM (Qsuspend_hook, "suspend-hook");
   DEFSYM (Qsuspend_resume_hook, "suspend-resume-hook");
-  DEFSYM (Qcommand_error_default_function, "command-error-default-function");
   DEFSYM (Qsigusr2, "sigusr2");
 }
 
