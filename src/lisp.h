@@ -4631,6 +4631,7 @@ extern void record_auto_save (void);
 extern void force_auto_save_soon (void);
 extern void init_keyboard (void);
 extern void syms_of_keyboard (void);
+extern void syms_of_keyboard_globals (void);
 extern void keys_of_keyboard (void);
 
 /* Defined in indent.c.  */

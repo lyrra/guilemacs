@@ -1686,6 +1686,7 @@ main2 (void *ignore, int argc, char **argv)
 	 the X support will want to use.  This can happen when
 	 Emacs starts up from scratch (e.g., temacs).  */
       syms_of_keyboard ();
+      syms_of_keyboard_globals ();
 
       syms_of_fileio ();
       /* Before syms_of_coding to initialize Vgc_cons_threshold.  */
