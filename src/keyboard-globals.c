@@ -1,5 +1,5 @@
 /* Cross-file keyboard global variables and DEFSYM sites
-   (M23 imp-2, imp-3, imp-4).
+   (M23 imp-2, imp-3, imp-4, imp-5).
 
 Copyright (C) 1985-1989, 1993-1997, 1999-2026 Free Software Foundation,
 Inc.
@@ -27,6 +27,15 @@ along with GNU Emacs.  If not, see <https://www.gnu.org/licenses/>.  */
    at least one other .c/.h file, so its DEFVAR_* / DEFSYM call site
    must stay in a file scanned by make-docfile (base_obj), even though
    it no longer lives in keyboard.c.
+
+   M23 imp-5 relocates 23 of the 24 imp-1-deferred DEFVAR_* call sites
+   (18 with a keyboard-local C reader, group C; 5 cross-file names
+   imp-1's audit missed, group D).  Same pure-relocation rule as
+   imp-2/imp-3: each name keeps a live C reader, so its call site
+   stays in a make-docfile file; the reader and the globals.h storage
+   are untouched.  Exception: Vfunction_key_map (group C) stays in
+   syms_of_keyboard because allocate_kboard()->init_kboard() reads it
+   during syms_of_keyboard, before syms_of_keyboard_globals runs.
 
    The imp-3 DEFVAR_KBOARD sites are a pure relocation: DEFVAR_KBOARD
    registers a Lisp_Kboard_Objfwd forwarding record (offsetof into
@@ -318,6 +327,192 @@ and its return value (a key sequence) is used.
 
 The events that come from bindings in `input-decode-map' are not
 themselves looked up in `input-decode-map'.  */);
+
+  /* M23 imp-5 — relocated DEFVAR_LISP/INT/BOOL call sites whose
+     local-looking declarations were deferred from imp-1 because they
+     still have live C readers (group C) or were missed by imp-1's
+     audit because the reader lives in another .c file (group D).
+     Pure relocation, byte-for-byte text move; the reader and the
+     globals.h storage are unaffected (see docs/m23-plan.org Finding
+     6).  Each initializer line moves with its declaration so the
+     value is set only after defvar_* registers the forward.  */
+
+  DEFVAR_LISP ("unread-post-input-method-events", Vunread_post_input_method_events,
+               doc: /* List of events to be processed as input by input methods.
+These events are processed before `unread-command-events'
+and actual keyboard input, but are not given to `input-method-function'.  */);
+  Vunread_post_input_method_events = Qnil;
+
+  DEFVAR_LISP ("unread-input-method-events", Vunread_input_method_events,
+               doc: /* List of events to be processed as input by input methods.
+These events are processed after `unread-command-events', but
+before actual keyboard input.
+If there's an active input method, the events are given to
+`input-method-function'.  */);
+  Vunread_input_method_events = Qnil;
+
+  DEFVAR_INT ("auto-save-interval", auto_save_interval,
+              doc: /* Number of input events between auto-saves.
+Zero means disable autosaving due to number of characters typed.  */);
+  auto_save_interval = 300;
+
+  DEFVAR_LISP ("echo-keystrokes", Vecho_keystrokes,
+    doc: /* Nonzero means echo unfinished commands after this many seconds of pause.
+The value may be integer or floating point.
+If the value is zero, don't echo at all.  */);
+  Vecho_keystrokes = make_fixnum (1);
+
+  DEFVAR_LISP ("polling-period", Vpolling_period,
+              doc: /* Interval between polling for input during Lisp execution.
+The reason for polling is to make C-g work to stop a running program.
+Polling is needed only when using X windows and SIGIO does not work.
+Polling is automatically disabled in all other cases.  */);
+  Vpolling_period = make_float (2.0);
+
+  DEFVAR_INT ("num-input-keys", num_input_keys,
+              doc: /* Number of complete key sequences read as input so far.
+This includes key sequences read from keyboard macros.
+The number is effectively the number of interactive command invocations.  */);
+  num_input_keys = 0;
+
+  DEFVAR_LISP ("last-event-frame", Vlast_event_frame,
+               doc: /* The frame in which the most recently read event occurred.
+If the last event came from a keyboard macro, this is set to `macro'.  */);
+  Vlast_event_frame = Qnil;
+
+  DEFVAR_LISP ("last-event-device", Vlast_event_device,
+               doc: /* The name of the input device of the most recently read event.
+When the input extension is being used on X, this is the name of the X
+Input Extension device from which the last event was generated as a
+string.  Otherwise, this is "Virtual core keyboard" for keyboard input
+events, and "Virtual core pointer" for other events.
+
+It is nil if the last event did not come from an input device (i.e. it
+came from `unread-command-events' instead).  */);
+  Vlast_event_device = Qnil;
+
+  DEFVAR_LISP ("help-char", Vhelp_char,
+               doc: /* Character to recognize as meaning Help.
+When it is read, do `(eval help-form)', and display result if it's a string.
+If the value of `help-form' is nil, this char can be read normally.  */);
+  XSETINT (Vhelp_char, 8);
+
+  DEFVAR_LISP ("help-event-list", Vhelp_event_list,
+               doc: /* List of input events to recognize as meaning Help.
+These work just like the value of `help-char' (see that).  */);
+  Vhelp_event_list = Qnil;
+
+  DEFVAR_LISP ("prefix-help-command", Vprefix_help_command,
+               doc: /* Command to run when `help-char' character follows a prefix key.
+This command is used only when there is no actual binding
+for that character after that prefix key.  */);
+  Vprefix_help_command = Qnil;
+
+  DEFVAR_BOOL ("cannot-suspend", cannot_suspend,
+               doc: /* Non-nil means to always spawn a subshell instead of suspending.
+\(Even if the operating system has support for stopping a process.)  */);
+  cannot_suspend = false;
+
+  DEFVAR_LISP ("special-event-map", Vspecial_event_map,
+               doc: /* Keymap defining bindings for special events to execute at low level.  */);
+  Vspecial_event_map = list1 (Qkeymap);
+
+  DEFVAR_LISP ("timer-list", Vtimer_list,
+               doc: /* List of active absolute time timers in order of increasing time.  */);
+  Vtimer_list = Qnil;
+
+  DEFVAR_LISP ("timer-idle-list", Vtimer_idle_list,
+               doc: /* List of active idle-time timers in order of increasing time.  */);
+  Vtimer_idle_list = Qnil;
+
+  DEFVAR_LISP ("input-method-function", Vinput_method_function,
+               doc: /* If non-nil, the function that implements the current input method.
+It's called with one argument, which must be a single-byte
+character that was just read.  Any single-byte character is
+acceptable, except the DEL character, codepoint 127 decimal, 177 octal.
+Typically this function uses `read-event' to read additional events.
+When it does so, it should first bind `input-method-function' to nil
+so it will not be called recursively.
+
+The function should return a list of zero or more events
+to be used as input.  If it wants to put back some events
+to be reconsidered, separately, by the input method,
+it can add them to the beginning of `unread-command-events'.
+
+The input method function can find in `input-method-previous-message'
+the previous echo area message.
+
+The input method function should refer to the variables
+`input-method-use-echo-area' and `input-method-exit-on-first-char'
+for guidance on what to do.  */);
+  Vinput_method_function = Qlist;
+
+  DEFVAR_LISP ("minibuffer-message-timeout", Vminibuffer_message_timeout,
+               doc: /* How long to display an echo-area message when the minibuffer is active.
+If the value is a number, it should be specified in seconds.
+If the value is not a number, such messages never time out.  */);
+  Vminibuffer_message_timeout = make_fixnum (2);
+
+  DEFVAR_LISP ("select-active-regions",
+               Vselect_active_regions,
+               doc: /* If non-nil, any active region automatically sets the primary selection.
+This variable only has an effect when Transient Mark mode is enabled.
+
+If the value is `only', only temporarily active regions (usually made
+by mouse-dragging or shift-selection) set the window system's primary
+selection.
+
+If this variable causes the region to be set as the primary selection,
+`post-select-region-hook' is then run afterwards.  */);
+  Vselect_active_regions = Qt;
+
+  DEFVAR_LISP ("saved-region-selection",
+               Vsaved_region_selection,
+               doc: /* Contents of active region prior to buffer modification.
+If `select-active-regions' is non-nil, Emacs sets this to the
+text in the region before modifying the buffer.  The next call to
+the function `deactivate-mark' uses this to set the window selection.  */);
+  Vsaved_region_selection = Qnil;
+
+  DEFVAR_LISP ("debug-on-event",
+               Vdebug_on_event,
+               doc: /* Enter debugger on this event.
+When Emacs receives the special event specified by this variable,
+it will try to break into the debugger as soon as possible instead
+of processing the event normally through `special-event-map'.
+
+Currently, the only supported values for this
+variable are `sigusr1' and `sigusr2'.  */);
+  Vdebug_on_event = Qsigusr2;
+
+  DEFVAR_BOOL ("attempt-stack-overflow-recovery",
+               attempt_stack_overflow_recovery,
+               doc: /* If non-nil, attempt to recover from C stack overflows.
+This recovery is potentially unsafe and may lead to deadlocks or data
+corruption, but it usually works and may preserve modified buffers
+that would otherwise be lost.  If nil, treat stack overflow like any
+other kind of crash or fatal error.  */);
+  attempt_stack_overflow_recovery = true;
+
+  DEFVAR_BOOL ("attempt-orderly-shutdown-on-fatal-signal",
+               attempt_orderly_shutdown_on_fatal_signal,
+               doc: /* If non-nil, attempt orderly shutdown on fatal signals.
+By default this variable is non-nil, and Emacs attempts to perform
+an orderly shutdown when it catches a fatal signal (e.g., a crash).
+The orderly shutdown includes an attempt to auto-save your unsaved edits
+and other useful cleanups.  These cleanups are potentially unsafe and may
+lead to deadlocks or data corruption, but it usually works and may
+preserve data in modified buffers that would otherwise be lost.
+If nil, Emacs crashes immediately in response to fatal signals.  */);
+  attempt_orderly_shutdown_on_fatal_signal = true;
+
+  DEFVAR_BOOL ("disable-inhibit-text-conversion",
+               disable_inhibit_text_conversion,
+    doc: /* Don't disable text conversion inside `read-key-sequence'.
+If non-nil, text conversion will continue to happen after a prefix
+key has been read inside `read-key-sequence'.  */);
+  disable_inhibit_text_conversion = false;
+
 
   /* M23 imp-4 — cross-file DEFSYM call sites relocated out of
      syms_of_keyboard.  Each symbol below is read by name from at least
