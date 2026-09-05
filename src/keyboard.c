@@ -2723,20 +2723,6 @@ safe_run_hooks_2 (Lisp_Object hook, Lisp_Object arg1, Lisp_Object arg2)
 
 static struct atimer *poll_timer;
 
-/* The poll period that constructed this timer.  */
-static Lisp_Object poll_timer_time;
-
-#if defined CYGWIN || defined DOS_NT
-/* Poll for input, so that we catch a C-g if it comes in.  */
-void
-poll_for_input_1 (void)
-{
-  if (! input_blocked_p ()
-      && !waiting_for_input)
-    gobble_input ();
-}
-#endif
-
 /* Timer callback function for poll_timer.  TIMER is equal to
    poll_timer.  */
 
@@ -2745,59 +2731,51 @@ poll_for_input (struct atimer *timer)
 {
 }
 
+/* M24 shim — (re)start the poll atimer at the current polling period.
+   Mirrors the inner "start a new one" block of the old start_polling
+   body: turn alarm handling on, cancel any existing poll_timer, then
+   register a fresh continuous timer.  The compare-against-cached-period
+   decision (when to call this) moved to (emacs input-poll) as
+   start-polling!; that is the only piece of state that left C.  Returns
+   Qnil always.  */
+
+DEFUN ("--atimer-poll-restart!", F_atimer_poll_restart,
+       S_atimer_poll_restart, 0, 0, 0,
+       doc: /* Internal: (re)start the poll atimer at the current
+polling-period.  Mirrors the inner "start a new one" block of the old
+C start_polling; the when-to-restart decision lives in (emacs input-poll)
+as `start-polling!'.  */)
+  (void)
+{
+  turn_on_atimers (1);
+  struct timespec interval = dtotimespec (XFLOATINT (Vpolling_period));
+
+  if (poll_timer)
+    cancel_atimer (poll_timer);
+
+  poll_timer = start_atimer (ATIMER_CONTINUOUS, interval,
+			     poll_for_input, NULL);
+  return Qnil;
+}
+
 #endif /* POLL_FOR_INPUT */
 
 /* Begin signals to poll for input, if they are appropriate.
-   This function is called unconditionally from various places.  */
+   This function is called unconditionally from various places.  The
+   body lives in (emacs input-poll) as `start-polling!'; this C entry
+   point is a thin dispatcher for non-Scheme callers (init_keyboard,
+   bind_polling_period, the --start-polling DEFUN).  */
 
 void
 start_polling (void)
 {
 #ifdef POLL_FOR_INPUT
-  /* XXX This condition was (read_socket_hook && !interrupt_input),
-     but read_socket_hook is not global anymore.  Let's pretend that
-     it's always set.  */
-  if (!interrupt_input)
-    {
-      /* Turn alarm handling on unconditionally.  It might have
-	 been turned off in process.c.  */
-      turn_on_atimers (1);
-
-      /* If poll timer doesn't exist, or we need one with
-	 a different interval, start a new one.  */
-      if (NUMBERP (Vpolling_period)
-	  && (poll_timer == NULL
-	      || NILP (Fequal (Vpolling_period, poll_timer_time))))
-	{
-	  struct timespec interval = dtotimespec (XFLOATINT (Vpolling_period));
-
-	  if (poll_timer)
-	    cancel_atimer (poll_timer);
-
-	  poll_timer = start_atimer (ATIMER_CONTINUOUS, interval,
-				     poll_for_input, NULL);
-	  poll_timer_time = Vpolling_period;
-	}
-    }
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs input-poll", "start-polling!");
+  SCM_CALL_0 (proc);
 #endif
 }
-
-#if defined CYGWIN || defined DOS_NT
-/* True if we are using polling to handle input asynchronously.  */
-
-bool
-input_polling_used (void)
-{
-# ifdef POLL_FOR_INPUT
-  /* XXX This condition was (read_socket_hook && !interrupt_input),
-     but read_socket_hook is not global anymore.  Let's pretend that
-     it's always set.  */
-  return !interrupt_input;
-# else
-  return false;
-# endif
-}
-#endif
 
 /* Bind polling_period to a value at least N.
    But don't decrease it.  */
@@ -12303,8 +12281,8 @@ syms_of_keyboard (void)
   staticpro (&help_form_saved_window_configs);
 
 #ifdef POLL_FOR_INPUT
-  poll_timer_time = Qnil;
-  staticpro (&poll_timer_time);
+  /* M24: poll_timer_time moved to (emacs input-poll) as the Scheme
+     module cache *poll-timer-period*; nothing to staticpro here.  */
 #endif
 
   virtual_core_pointer_name = Qnil;

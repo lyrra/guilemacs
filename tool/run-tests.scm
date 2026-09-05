@@ -124,6 +124,7 @@
   "test/keyboard/test-m23-imp3.el"               ; M23 imp-3 (corpus prints PASS/FAIL)
   "test/keyboard/test-m23-imp4.el"               ; M23 imp-4 (corpus prints PASS/FAIL)
   "test/keyboard/test-m23-imp5.el"               ; M23 imp-5 (corpus prints PASS/FAIL)
+  "test/keyboard/test-m24-input-poll.el"         ; M24 polling policy (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

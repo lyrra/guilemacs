@@ -483,7 +483,6 @@ extern void temporarily_switch_to_single_kboard (struct frame *);
 extern void input_poll_signal (int);
 extern void start_polling (void);
 extern int gobble_input (void);
-extern bool input_polling_used (void);
 extern void clear_input_pending (void);
 extern bool requeued_command_events_pending_p (void);
 extern bool requeued_events_pending_p (void);
@@ -505,7 +504,6 @@ kbd_buffer_store_event_hold (struct input_event *event,
   kbd_buffer_store_buffered_event ((union buffered_input_event *) event,
 				   hold_quit);
 }
-extern void poll_for_input_1 (void);
 extern void show_help_echo (Lisp_Object, Lisp_Object, Lisp_Object,
                             Lisp_Object);
 extern void gen_help_event (Lisp_Object, Lisp_Object, Lisp_Object,
