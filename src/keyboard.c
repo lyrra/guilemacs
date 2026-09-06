@@ -389,7 +389,6 @@ static void timer_stop_idle (void);
 static void timer_resume_idle (void);
 static void deliver_user_signal (int);
 static char *find_user_signal_name (int);
-static void store_user_signal_events (void);
 
 /* Advance or retreat a buffered input event pointer.  */
 
@@ -7405,99 +7404,119 @@ get_input_pending (int flags)
   return input_pending;
 }
 
-/* Read any terminal input already buffered up by the system
-   into the kbd_buffer, but do not wait.
+/* M25 imp-3: the terminal_list walk that gobble_input used to do moved
+   into (emacs gobble) `gobble-input!'.  gobble_input is now a thin
+   dispatcher (below).  It returns the number of keyboard chars read,
+   or -1 meaning this is a bad time to try to read input.  Four
+   single-purpose shims stay C because each owns something Scheme
+   cannot reach safely:
 
-   Return the number of keyboard chars read, or -1 meaning
-   this is a bad time to try to read input.  */
+   - --terminal-read-socket-hook-p       predicate; read_socket_hook is
+     a raw C function pointer that a Scheme body only probes for here.
+   - --terminal-read-socket-hook!        drains read_socket_hook (a raw
+     C pointer, so the call itself must stay C) and owns the nr == -2
+     terminal-death arm (Fdelete_terminal, or terminate_due_to_signal
+     when the dying terminal was the last).  terminate_due_to_signal
+     never returns, so it must not unwind through a live Scheme call
+     frame; keeping it inside this shim's C body is the guard.
+   - --pending-signals-set!              pending_signals is also written
+     by deliver_input_available_signal from a signal handler.
+   - --frame-make-pointer-visible!       frame_make_pointer_visible is a
+     plain C subroutine; Scheme drives which frames via frame-list and
+     frame-terminal.  */
 
+/* Return t if TERMINAL has a read_socket_hook, else nil.  */
+DEFUN ("--terminal-read-socket-hook-p", Fterminal_read_socket_hook_p,
+       Sterminal_read_socket_hook_p, 1, 1, 0,
+       doc: /* Internal: return t if TERMINAL has a read_socket_hook.
+No side effects.  */)
+  (Lisp_Object terminal)
+{
+  struct terminal *t = decode_live_terminal (terminal);
+  return (t->read_socket_hook ? Qt : Qnil);
+}
+
+/* Static storage for the hold_quit input_event shared across calls to
+   --terminal-read-socket-hook!.  Reset once per call (M9 ie-smob
+   lifetime rule: the caller reads the returned smob's kind before the
+   next call reuses this storage).  */
+static struct input_event gobble_hold_quit_storage;
+
+DEFUN ("--terminal-read-socket-hook!", Fterminal_read_socket_hook,
+       Sterminal_read_socket_hook, 1, 1, 0,
+       doc: /* Internal: drain TERMINAL's read_socket_hook.  Reset a
+shared hold_quit input event to NO_EVENT, then call the hook repeatedly,
+adding each positive result to the count, until it returns 0 or less.
+If the last call returned -2 (the terminal died), delete the terminal —
+or terminate Emacs (SIGHUP) if it was the last one; that arm must stay
+in this C body because terminate_due_to_signal never returns.  Returns
+\(nread nr ie), where nr is the last hook return (0 clean end, -1 not
+ok to read now, -2 handled here) and ie wraps the shared hold_quit.
+Read ie's kind in the same step that receives it — the storage is
+reused on the next call.  */)
+  (Lisp_Object terminal)
+{
+  struct terminal *t = decode_live_terminal (terminal);
+  int nread = 0, nr;
+  Lisp_Object tmp;
+
+  memset (&gobble_hold_quit_storage, 0, sizeof gobble_hold_quit_storage);
+  gobble_hold_quit_storage.kind = NO_EVENT;
+  gobble_hold_quit_storage.frame_or_window = Qnil;
+  gobble_hold_quit_storage.arg = Qnil;
+  gobble_hold_quit_storage.device = Qt;
+
+  /* No need for FIONREAD or fcntl; just say don't wait.  */
+  while ((nr = (*t->read_socket_hook) (t, &gobble_hold_quit_storage)) > 0)
+    nread += nr;
+
+  if (nr == -2)
+    {
+      /* The terminal device terminated; it should be closed.  */
+      if (!terminal_list->next_terminal)
+	/* This was our last terminal.  SIGHUP seems appropriate if we
+	   can't reach the terminal.  Never returns.  */
+	terminate_due_to_signal (SIGHUP, 10);
+
+      /* XXX Is calling delete_terminal safe here?  It calls
+         delete_frame.  */
+      XSETTERMINAL (tmp, t);
+      Fdelete_terminal (tmp, Qnoelisp);
+    }
+
+  return list3 (make_fixnum (nread), make_fixnum (nr),
+		ie_wrap (&gobble_hold_quit_storage));
+}
+
+DEFUN ("--pending-signals-set!", Fpending_signals_set,
+       Spending_signals_set, 0, 0, 0,
+       doc: /* Internal: set the pending-signals flag.  pending_signals
+stays a C cell because deliver_input_available_signal also writes it
+from a signal handler.  Returns nil.  */)
+  (void)
+{
+  pending_signals = true;
+  return Qnil;
+}
+
+DEFUN ("--frame-make-pointer-visible!", Fframe_make_pointer_visible,
+       Sframe_make_pointer_visible, 1, 1, 0,
+       doc: /* Internal: make the mouse pointer visible on FRAME.
+frame_make_pointer_visible is a plain C subroutine.  Returns nil.  */)
+  (Lisp_Object frame)
+{
+  frame_make_pointer_visible (decode_live_frame (frame));
+  return Qnil;
+}
+
+/* Dispatch into (emacs gobble) `gobble-input!'.  */
 int
 gobble_input (void)
 {
-  int nread = 0;
-  bool err = false;
-  struct terminal *t;
-
-  /* Store pending user signal events, if any.  */
-  store_user_signal_events ();
-
-  /* Loop through the available terminals, and call their input hooks.  */
-  t = terminal_list;
-  while (t)
-    {
-      struct terminal *next = t->next_terminal;
-
-      if (t->read_socket_hook)
-        {
-          int nr;
-          struct input_event hold_quit;
-
-	  if (input_blocked_p ())
-	    {
-	      pending_signals = true;
-	      break;
-	    }
-
-          EVENT_INIT (hold_quit);
-          hold_quit.kind = NO_EVENT;
-
-          /* No need for FIONREAD or fcntl; just say don't wait.  */
-	  while ((nr = (*t->read_socket_hook) (t, &hold_quit)) > 0)
-	    nread += nr;
-
-          if (nr == -1)          /* Not OK to read input now.  */
-            {
-              err = true;
-            }
-          else if (nr == -2)          /* Non-transient error.  */
-            {
-              /* The terminal device terminated; it should be closed.  */
-
-              /* Kill Emacs if this was our last terminal.  */
-              if (!terminal_list->next_terminal)
-                /* Formerly simply reported no input, but that
-                   sometimes led to a failure of Emacs to terminate.
-                   SIGHUP seems appropriate if we can't reach the
-                   terminal.  */
-                /* ??? Is it really right to send the signal just to
-                   this process rather than to the whole process
-                   group?  Perhaps on systems with FIONREAD Emacs is
-                   alone in its group.  */
-		terminate_due_to_signal (SIGHUP, 10);
-
-              /* XXX Is calling delete_terminal safe here?  It calls delete_frame.  */
-	      {
-		Lisp_Object tmp;
-		XSETTERMINAL (tmp, t);
-		Fdelete_terminal (tmp, Qnoelisp);
-	      }
-            }
-
-	  /* If there was no error, make sure the pointer
-	     is visible for all frames on this terminal.  */
-	  if (nr >= 0)
-	    {
-	      Lisp_Object tail, frame;
-
-	      FOR_EACH_FRAME (tail, frame)
-		{
-		  struct frame *f = XFRAME (frame);
-		  if (FRAME_TERMINAL (f) == t)
-		    frame_make_pointer_visible (f);
-		}
-	    }
-
-          if (hold_quit.kind != NO_EVENT)
-            kbd_buffer_store_event (&hold_quit);
-        }
-
-      t = next;
-    }
-
-  if (err && !nread)
-    nread = -1;
-
-  return nread;
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs gobble", "gobble-input!");
+  return scm_to_int (SCM_CALL_0 (proc));
 }
 
 /* This is the tty way of reading available input.
@@ -7895,25 +7914,16 @@ find_user_signal_name (int sig)
   return NULL;
 }
 
-static void
-store_user_signal_events (void)
-{
-  /* The per-signal drain loop moved to (emacs gobble) as
-     `store-user-signal-events!'; this entry point (called by
-     gobble_input) is a thin dispatcher.  */
-  static SCM proc = SCM_UNDEFINED;
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs gobble", "store-user-signal-events!");
-  SCM_CALL_0 (proc);
-}
-
 /* --- M25 imp-1: user-signal primitives -------------------------------
    Scheme owns the drain decision ((emacs gobble)); C owns the raw
    user_signals list because handle_user_signal reads it from a signal
-   handler and store_user_signal_events needs node mutation.  (The
+   handler and store-user-signal-events! needs node mutation.  (The
    abandoned registration dispatcher add-user-signal! and its two
    primitives were deleted per cr.org Finding 1; add_user_signal stays
-   a plain C body.)  These DEFUNs expose query/mutation/event-fill only.
+   a plain C body.  The imp-1 thin dispatcher store_user_signal_events
+   was deleted by imp-3 — gobble-input! now calls the Scheme
+   store-user-signal-events! directly, so no C dispatcher is left.)
+   These DEFUNs expose query/mutation/event-fill only.
    The list walk shape is repeated here rather than in
    find_user_signal_name: that function stays C and normal-context-only,
    serving --user-signal-name.  (Do not repoint find_user_signal_name
