@@ -1,30 +1,32 @@
-;;; test-m25-imp1-user-signal.el --- M25 imp-1 (emacs gobble) test suite.
+;;; test-m25-imp2-async-input.el --- M25 imp-2 (emacs gobble) test suite.
 ;;;
-;;; Covers the M25 imp-1 cutover (brief.org M25): the user-signal drain
-;;; policy in (emacs gobble) as store-user-signal-events!.
+;;; Covers the M25 imp-2 cutover (brief.org M25): the async-input drain
+;;; and pending-signals dispatch moved out of src/keyboard.c into
+;;; (emacs gobble) as handle-async-input! and process-pending-signals!.
 ;;;
-;;; Wraps test/keyboard/test-m25-imp1-user-signal.scm -- the Scheme
-;;; test corpus.  Loads the Scheme file via eval-scheme, then reads back
+;;; Wraps test/keyboard/test-m25-imp2-async-input.scm -- the Scheme test
+;;; corpus.  Loads the Scheme file via eval-scheme, then reads back
 ;;; `test-results` (list of (NAME STATUS) pairs) and reports each via
-;;; princ.  Same harness as test-m24-input-poll.el.  See brief.org M25.
+;;; princ.  Same harness as test-m25-imp1-user-signal.el.  See
+;;; brief.org M25 imp-2.
 
-(princ "=== m25-imp1-user-signal test suite ===\n")
+(princ "=== m25-imp2-async-input test suite ===\n")
 
 ;; Run the Scheme test corpus.  Populates test-results in the
 ;; (guile-user) module.  Resolve the corpus path from load-file-name so
 ;; it works both from the repo root and from the harness, which loads
 ;; this file with CWD=test/.
 (let* ((dir (file-name-directory (or load-file-name default-directory)))
-       (corpus (expand-file-name "test-m25-imp1-user-signal.scm" dir)))
+       (corpus (expand-file-name "test-m25-imp2-async-input.scm" dir)))
   (condition-case err
       (eval-scheme
        (format "(primitive-load %S)" corpus))
-    (error (princ (format "M25US-CORPUS-LOAD-ERROR: %S\n" err)))))
+    (error (princ (format "M25AI-CORPUS-LOAD-ERROR: %S\n" err)))))
 
 ;; Read each result back and report PASS/FAIL.
 (let ((results (condition-case e
                    (eval-scheme "(reverse test-results)")
-                 (error (princ (format "M25US-READBACK-ERROR: %S\n" e)) '())))
+                 (error (princ (format "M25AI-READBACK-ERROR: %S\n" e)) '())))
       (pass 0)
       (fail 0))
   (dolist (result results)

@@ -7667,36 +7667,53 @@ tty_read_avail_input (struct terminal *terminal,
   return nread;
 }
 
+/* M25 imp-2: handle_async_input / process_pending_signals became thin
+   dispatchers into (emacs gobble).  Two C cells need Scheme-side
+   triggers and stay C: pending_signals (also written by
+   deliver_input_available_signal, a signal handler) and the atimer
+   callback machinery do_pending_atimers (the same kind of thing that
+   stayed C in M24, e.g. poll_timer).  keyboard.x auto-registers these
+   DEFUNs; neither is reached from an early-init path (see
+   early-init-c-body-before-defun-registration, docs/kb.org).  */
+
+DEFUN ("--pending-signals-clear!", Fpending_signals_clear,
+       Spending_signals_clear, 0, 0, 0,
+       doc: /* Internal: clear the pending-signals flag.  pending_signals
+stays a C cell because deliver_input_available_signal also writes it
+from a signal handler.  Returns nil.  */)
+  (void)
+{
+  pending_signals = false;
+  return Qnil;
+}
+
+DEFUN ("--do-pending-atimers!", Fdo_pending_atimers,
+       Sdo_pending_atimers, 0, 0, 0,
+       doc: /* Internal: call do_pending_atimers ().  Returns nil.  */)
+  (void)
+{
+  do_pending_atimers ();
+  return Qnil;
+}
+
+/* Dispatch into (emacs gobble) `handle-async-input!'.  */
 static void
 handle_async_input (void)
 {
-#if defined HAVE_ANDROID && !defined ANDROID_STUBIFY
-  /* Check and respond to an ``urgent'' query from the UI thread.
-     A query becomes urgent once the UI thread has been waiting
-     for more than two seconds.  */
-
-  android_check_query_urgent ();
-#endif /* HAVE_ANDROID && !ANDROID_STUBIFY */
-
-#ifndef DOS_NT
-  while (1)
-    {
-      int nread = gobble_input ();
-      /* -1 means it's not ok to read the input now.
-	 UNBLOCK_INPUT will read it later; now, avoid infinite loop.
-	 0 means there was no keyboard input available.  */
-      if (nread <= 0)
-	break;
-    }
-#endif
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs gobble", "handle-async-input!");
+  SCM_CALL_0 (proc);
 }
 
+/* Dispatch into (emacs gobble) `process-pending-signals!'.  */
 void
 process_pending_signals (void)
 {
-  pending_signals = false;
-  handle_async_input ();
-  do_pending_atimers ();
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs gobble", "process-pending-signals!");
+  SCM_CALL_0 (proc);
 }
 
 /* Undo any number of BLOCK_INPUT calls down to level LEVEL,
@@ -7792,10 +7809,11 @@ static struct user_signal_info *user_signals = NULL;
 /* Register a user signal.  Kept as a C body (not a dispatcher into
    (emacs gobble)) because init_signals calls this entry point before
    syms_of_keyboard registers the --user-signal-* DEFUNs, so a Scheme
-   dispatch would force --user-signal-registered? before it exists
-   (emacs.c: init_signals 1622 < syms_of_keyboard 1688; milestone M25
-   imp-1 close-out).  The duplicate-check decision here is trivial; the
-   drain *loop* policy lives in Scheme as store-user-signal-events!.  */
+   dispatch could not run before those primitives exist (emacs.c:
+   init_signals 1622 < syms_of_keyboard 1688; milestone M25 imp-1
+   close-out).  Registration needs no Scheme decision, so this stays a
+   plain C body; the drain *loop* policy lives in Scheme as
+   store-user-signal-events!.  */
 void
 add_user_signal (int sig, const char *name)
 {
@@ -7890,54 +7908,16 @@ store_user_signal_events (void)
 }
 
 /* --- M25 imp-1: user-signal primitives -------------------------------
-   Scheme owns the registration/drain decision ((emacs gobble)); C owns
-   the raw user_signals list because handle_user_signal reads it from a
-   signal handler and store_user_signal_events needs node mutation.
-   These DEFUNs expose query/mutation/event-fill only.  The list walk
-   shape is repeated here rather than in find_user_signal_name: that
-   function stays C and normal-context-only, serving --user-signal-name.
-   (Do not repoint find_user_signal_name at Scheme.)  */
-
-/* True if SIG is already registered.  Same walk as find_user_signal_name
-   (its sole caller is the --user-signal-name DEFUN; do not merge).  */
-DEFUN ("--user-signal-registered?", Fuser_signal_registered_p,
-       Suser_signal_registered_p, 1, 1, 0,
-       doc: /* Internal: return t if user-signal SIG is registered,
-nil otherwise.  */)
-  (Lisp_Object sig)
-{
-  struct user_signal_info *p;
-  int s = XFIXNUM (sig);
-
-  for (p = user_signals; p; p = p->next)
-    if (p->sig == s)
-      return Qt;
-  return Qnil;
-}
-
-/* Register a user signal unconditionally.  The Scheme caller
-   (add-user-signal! in (emacs gobble)) already ran the duplicate check,
-   so no early-return guard here — this is add_user_signal's body minus
-   that guard.  Returns nil always.  */
-DEFUN ("--user-signal-add!", Fuser_signal_add, Suser_signal_add, 2, 2, 0,
-       doc: /* Internal: register user-signal SIG named NAME.  Unconditional —
-the caller must have already checked --user-signal-registered?.  Returns
-nil.  */)
-  (Lisp_Object sig, Lisp_Object name)
-{
-  struct sigaction action;
-  struct user_signal_info *p = xmalloc (sizeof *p);
-
-  p->sig = XFIXNUM (sig);
-  p->name = xstrdup (SSDATA (name));
-  p->npending = 0;
-  p->next = user_signals;
-  user_signals = p;
-
-  emacs_sigaction_init (&action, deliver_user_signal);
-  sigaction (p->sig, &action, 0);
-  return Qnil;
-}
+   Scheme owns the drain decision ((emacs gobble)); C owns the raw
+   user_signals list because handle_user_signal reads it from a signal
+   handler and store_user_signal_events needs node mutation.  (The
+   abandoned registration dispatcher add-user-signal! and its two
+   primitives were deleted per cr.org Finding 1; add_user_signal stays
+   a plain C body.)  These DEFUNs expose query/mutation/event-fill only.
+   The list walk shape is repeated here rather than in
+   find_user_signal_name: that function stays C and normal-context-only,
+   serving --user-signal-name.  (Do not repoint find_user_signal_name
+   at Scheme.)  */
 
 /* Return an elisp list of the registered signal numbers.  The order is
    not semantically significant: store-user-signal-events! drains each

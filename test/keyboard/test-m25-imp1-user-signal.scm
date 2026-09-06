@@ -1,21 +1,19 @@
 ;;; test-m25-imp1-user-signal.scm --- M25 imp-1 (emacs gobble) test corpus.
 ;;;
-;;; Covers the M25 imp-1 cutover (brief.org M25): the registration +
-;;; drain *policy* moved out of src/keyboard.c into (emacs gobble) as
-;;; add-user-signal! and store-user-signal-events!.  The raw C list and
-;;; the primitives (--user-signal-registered?, --user-signal-add!,
-;;; --user-signal-list, --user-signal-pending,
+;;; Covers the M25 imp-1 cutover (brief.org M25): the user-signal drain
+;;; *policy* moved out of src/keyboard.c into (emacs gobble) as
+;;; store-user-signal-events!.  The raw C list and the primitives
+;;; (--user-signal-list, --user-signal-pending,
 ;;; --user-signal-pending-decrement!, --ie-user-signal-event) stay C
 ;;; (handle_user_signal touches the list from a signal handler).  This
 ;;; corpus exercises the moved policy logic:
 ;;;
-;;;   - add-user-signal! skips registration when the signal is already
-;;;     registered (does not call the --user-signal-add! primitive);
-;;;   - add-user-signal! registers a new signal exactly once, passing
-;;;     through (sig name);
 ;;;   - store-user-signal-events! drains each pending count into exactly
 ;;;     one USER_SIGNAL_EVENT per pending signal and stops at zero;
 ;;;   - store-user-signal-events! is a no-op when nothing is pending.
+;;;
+;;; (cr.org Finding 1 removed the abandoned add-user-signal! registration
+;;; dispatcher and its two primitives; the old add: checks were dropped.)
 ;;;
 ;;; gobble.scm references its C primitives through defelisp delays
 ;;; ((force %--...)), so these tests stub those delays by replacing them
@@ -62,37 +60,7 @@
 (define (with-store-stub! proc thunk)
   (with-gobble-delay! '%kbd-buffer-store-event! proc thunk))
 
-;;; --- 1. add-user-signal!: duplicate check -----------------------------
-
-;; 1a. A registered signal (registered? -> t) must NOT be re-added:
-;; the --user-signal-add! primitive is never called.
-(define add-calls 0)
-(with-gobble-delay! '%--user-signal-registered? (lambda (sig) #t)
-  (lambda ()
-    (with-gobble-delay! '%--user-signal-add!
-        (lambda (sig name) (set! add-calls (1+ add-calls)) #nil)
-      (lambda ()
-        (add-user-signal! 99 "test")
-        (check "add-user-signal!/skips-duplicate" 0 add-calls)))))
-
-;; 1b. A new signal (registered? -> nil) must be added exactly once,
-;; passing through the (sig name) pair.
-(define new-calls 0)
-(define new-args '())
-(with-gobble-delay! '%--user-signal-registered? (lambda (sig) #nil)
-  (lambda ()
-    (with-gobble-delay! '%--user-signal-add!
-        (lambda (sig name)
-          (set! new-calls (1+ new-calls))
-          (set! new-args (list sig name))
-          #nil)
-      (lambda ()
-        (add-user-signal! 99 "test")
-        (check "add-user-signal!/adds-when-new-count" 1 new-calls)
-        (check "add-user-signal!/adds-when-new-sig" 99 (car new-args))
-        (check "add-user-signal!/adds-when-new-name" "test" (cadr new-args))))))
-
-;;; --- 2. store-user-signal-events!: drain loop -------------------------
+;;; --- 1. store-user-signal-events!: drain loop -------------------------
 
 ;; Drain a signal with 2 pending events: exactly two USER_SIGNAL_EVENT
 ;; stores (and two --ie-user-signal-event fills), in order, then the
@@ -144,13 +112,10 @@
                 (check "store-user-signal-events!/no-pending-no-ie-fill"
                        0 noop-ie-calls)))))))))
 
-;;; --- 3. Cutover wiring ------------------------------------------------
-;;; add_user_signal / store_user_signal_events (C) must resolve the
-;;; (emacs gobble) public refs.  Verify both are exported procedures of
-;;; the module (their bodies are exercised in sections 1-2).
-(check "gobble/exported-add-user-signal!" #t
-       (procedure? (module-ref (resolve-interface '(emacs gobble))
-                               'add-user-signal!)))
+;;; --- 2. Cutover wiring ------------------------------------------------
+;;; store_user_signal_events (C) must resolve the (emacs gobble) public
+;;; ref.  Verify it is an exported procedure of the module (its body is
+;;; exercised in section 1).
 (check "gobble/exported-store-user-signal-events!" #t
        (procedure? (module-ref (resolve-interface '(emacs gobble))
                                'store-user-signal-events!)))
