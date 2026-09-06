@@ -128,6 +128,7 @@
   "test/keyboard/test-m25-imp1-user-signal.el"
   "test/keyboard/test-m25-imp2-async-input.el"
   "test/keyboard/test-m25-imp3-gobble-input.el"
+  "test/keyboard/test-m25-imp4-tty-read.el"
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

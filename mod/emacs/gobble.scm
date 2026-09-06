@@ -1,5 +1,6 @@
-;;; gobble.scm --- M25 imp-1 + imp-2 + imp-3: user-signal drain,
-;;;                  async input, gobble_input terminal walk
+;;; gobble.scm --- M25 imp-1 + imp-2 + imp-3 + imp-4: user-signal
+;;;                  drain, async input, gobble_input terminal walk,
+;;;                  tty_read_avail_input byte read/decode
 ;;;                  ((emacs gobble))
 ;;;
 ;;; Moves the normal-context *policy* for user-signal drain, the
@@ -66,11 +67,14 @@
 (define-module (emacs gobble)
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
+  #:use-module (rnrs bytevectors)     ; bytevector-u8-ref (tty byte decode)
+  #:use-module ((emacs event-modifiers) #:select (meta-modifier))
   #:declarative? #t
   #:export (store-user-signal-events!
             handle-async-input!
             process-pending-signals!
-            gobble-input!))
+            gobble-input!
+            tty-read-avail-input!))
 
 (defelisp %--user-signal-list               --user-signal-list)
 (defelisp %--user-signal-pending            --user-signal-pending)
@@ -104,8 +108,34 @@
 (defelisp %--frame-make-pointer-visible! --frame-make-pointer-visible!)
 (defelisp %--ie-kind                     --ie-kind)
 
+;; imp-4 shims and helpers.  tty-read-avail-input! reads the terminal's
+;; byte source and per-terminal meta/top-frame state through these
+;; single-purpose shims, whose C bodies own the USABLE_FIONREAD sizing,
+;; the nonblocking emacs_read (with its EIO close-terminal arm), and the
+;; raw meta_key / top_frame fields.  --quit-char, --kbd-on-hold-p and
+;; --kbd-buffer-nr-stored are reused (kbd-buffer.scm also defelisp's the
+;; same C primitives under its own local names — the established
+;; pattern).  kbd-buffer-store-event! is the shared M13 store.
+(defelisp %--kbd-buffer-nr-stored        --kbd-buffer-nr-stored)
+(defelisp %--kbd-on-hold-p               --kbd-on-hold-p)
+(defelisp %--quit-char                   --quit-char)
+(defelisp %--tty-meta-key                --tty-meta-key)
+(defelisp %--tty-top-frame               --tty-top-frame)
+(defelisp %--tty-bytes-readable          --tty-bytes-readable)
+(defelisp %--tty-read-nonblocking        --tty-read-nonblocking)
+(defelisp %--ie-ascii-keystroke-event    --ie-ascii-keystroke-event)
+
 ;; event_kind NO_EVENT is the first enum member (termhooks.h), value 0.
 (define +no-event-kind+ 0)
+
+;; KBD_BUFFER_SIZE is 4096 (src/keyboard.h) and the tty read caps a single
+;; emacs_read batch at KBD_BUFFER_SIZE - 1 = 4095 bytes ("avoids reading
+;; more than the kbd_buffer can really hold").  Hardcoded with a comment,
+;; mirroring kbd-buffer.scm's own private KBD-BUFFER-SIZE — there is no
+;; shared export for these, and they silently diverge only if C changes
+;; them.
+(define +kbd-buffer-size+ 4096)
+(define +cbuf-cap+       4095)   ; KBD_BUFFER_SIZE - 1
 
 ;; kbd-buffer-store-event! lives in (emacs kbd-buffer), which is not
 ;; imported eagerly (see module comment).  Resolve it lazily at call
@@ -200,3 +230,74 @@ signal-handler-written cell respectively)."
                     (if (and err (= total 0)) -1 total)))
               ;; Hookless terminal: skip without touching it.
               (loop rest total err))))))
+
+(define (tty-read-avail-input! terminal)
+  "Port of the post-guard body of tty_read_avail_input
+(src/keyboard.c, pre-imp-4 C body): size a nonblocking read of
+TERMINAL's tty, emacs_read the available bytes, then decode each raw
+byte's meta bit into an ASCII_KEYSTROKE_EVENT and store it via
+kbd-buffer-store-event!, stopping the decode early once a byte equal to
+the (meta-stripped) quit char is seen.
+
+The raw guards — dead terminal, terminal type, term_initted, suspended
+input — already ran in the C entry point tty_read_avail_input before it
+dispatched here, and the GPM drain also stayed in C.  This body runs the
+kbd_on_hold_p / buffer_free guard, FIONREAD sizing, the read, the
+decode and the store.  Returns the full number of bytes read from the
+tty (nread), even when the quit-char batch-break stopped the decode
+early — the return is the read count, not the number of bytes stored.
+
+Per-byte fidelity (must match the C original's order of operations): the
+meta modifier is computed from the ORIGINAL byte's high bit (when
+meta_key == 1), the byte is then stripped to 7 bits (only when
+meta_key < 2), and the STRIPPED code is compared against quit char.
+Getting the strip/compute order backwards silently zeroes the meta
+modifier.  See brief.org M25 imp-4."
+  (let* ((nr-stored ((force %--kbd-buffer-nr-stored)))
+         (buffer-free (- +kbd-buffer-size+ nr-stored 1)))
+    (if (or (not (eq? ((force %--kbd-on-hold-p)) #nil))
+            (<= buffer-free 0))
+        0
+        (let ((n-avail ((force %--tty-bytes-readable) terminal)))
+          (if (<= n-avail 0)
+              n-avail            ; 0 (nothing) or -2 (FIONREAD error)
+              ;; Don't read more than the kbd_buffer can hold, nor more
+              ;; than the remaining free slots.
+              (let* ((count (min n-avail +cbuf-cap+ buffer-free))
+                     (res ((force %--tty-read-nonblocking) terminal count)))
+                (if (not (pair? res))
+                    res          ; EIO close-terminal arm: bare -2
+                    (let ((nread (car res)))
+                      (if (<= nread 0)
+                          nread  ; 0 or a raw -1 read error
+                          (let ((bv (cdr res))
+                                (meta-key ((force %--tty-meta-key) terminal))
+                                (quit ((force %--quit-char)))
+                                (frame ((force %--tty-top-frame) terminal)))
+                            (let decode ((i 0))
+                              (when (< i nread)
+                                (let* ((b (bytevector-u8-ref bv i))
+                                       ;; Compute modifiers from the
+                                       ;; original byte, strip after.
+                                       (mods (if (and (= meta-key 1)
+                                                      (not (zero? (logand b #x80))))
+                                                 meta-modifier
+                                                 0))
+                                       (code (if (< meta-key 2)
+                                                 (logand b #x7f)
+                                                 b)))
+                                  ((force %kbd-buffer-store-event!)
+                                   ((force %--ie-ascii-keystroke-event)
+                                    code mods frame)
+                                   #f)
+                                  ;; Don't look at input that follows a
+                                  ;; C-g too closely (reduces lossage due
+                                  ;; to autorepeat on C-g).  The matching
+                                  ;; byte is already stored above; bytes
+                                  ;; after it in this batch are dropped.
+                                  (unless (= code quit)
+                                    (decode (+ i 1))))))
+                            ;; Return the read count, not the stored
+                            ;; count — the quit break may have stopped
+                            ;; the decode early.
+                            nread))))))))))

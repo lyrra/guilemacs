@@ -7523,61 +7523,34 @@ gobble_input (void)
 
    Note that each terminal device has its own `struct terminal' object,
    and so this function is called once for each individual termcap
-   terminal.  The first parameter indicates which terminal to read from.  */
+   terminal.  The first parameter indicates which terminal to read from.
 
-int
-tty_read_avail_input (struct terminal *terminal,
-                      struct input_event *hold_quit)
-{
-  /* Using KBD_BUFFER_SIZE - 1 here avoids reading more than
-     the kbd_buffer can really hold.  That may prevent loss
-     of characters on some systems when input is stuffed at us.  */
-  unsigned char cbuf[KBD_BUFFER_SIZE - 1];
-#ifndef WINDOWSNT
-  int n_to_read;
-#endif
-  int i;
-  struct tty_display_info *tty = terminal->display_info.tty;
-  int nread = 0;
-#ifdef subprocesses
-  int buffer_free = KBD_BUFFER_SIZE - kbd_buffer_nr_stored () - 1;
+   M25 imp-4: this is now a thin dispatcher into (emacs gobble)
+   `tty-read-avail-input!'.  Only the pieces that must stay C remain
+   here:
+   - the raw dead-terminal / terminal-type / term_initted /
+     suspended-terminal guards, read off the raw struct terminal *
+     before XSETTERMINAL.  A dead terminal must silently return 0, not
+     signal — routing through decode_live_terminal would change that;
+   - the GPM drain (an external C-library callout with no Scheme
+     representation).
+   Everything after the guards — buffer-free/hold sizing, FIONREAD
+   sizing, the nonblocking emacs_read, the per-byte meta decode and the
+   kbd_buffer_store_event calls — lives in the Scheme body.  */
 
-  if (kbd_on_hold_p () || buffer_free <= 0)
-    return 0;
-#endif	/* subprocesses */
-
-  if (!terminal->name)		/* Don't read from a dead terminal.  */
-    return 0;
-
-  if (terminal->type != output_termcap
-      && terminal->type != output_msdos_raw)
-    emacs_abort ();
-
-  /* XXX I think the following code should be moved to separate hook
-     functions in system-dependent files.  */
-#ifdef WINDOWSNT
-  /* FIXME: AFAIK, tty_read_avail_input is not used under w32 since the non-GUI
-     code sets read_socket_hook to w32_console_read_socket instead!  */
-  return 0;
-#else /* not WINDOWSNT */
-  if (! tty->term_initted)      /* In case we get called during bootstrap.  */
-    return 0;
-
-  if (! tty->input)
-    return 0;                   /* The terminal is suspended.  */
-
-#ifdef MSDOS
-  n_to_read = dos_keysns ();
-  if (n_to_read == 0)
-    return 0;
-
-  cbuf[0] = dos_keyread ();
-  nread = 1;
-
-#else /* not MSDOS */
+/* GPM: drain the GPM mouse event queue.  Returns the number of events
+   handled (each stored via handle_one_term_event), or 0 to fall
+   through to the byte read path.  Only reached once the raw guards
+   have passed (a live, tty-typed, initted, non-suspended terminal).
+   #ifdef'd out of this build: HAVE_GPM is undefined in src/config.h.  */
 #ifdef HAVE_GPM
+static int
+tty_gpm_read (struct tty_display_info *tty)
+{
+  int nread = 0;
+
   if (gpm_tty == tty)
-  {
+    {
       Gpm_Event event;
       int gpm, fd = gpm_fd;
 
@@ -7587,104 +7560,57 @@ tty_read_avail_input (struct terminal *terminal,
 		we save it in `fd' so close_gpm can remove it from the
 		select masks.
          gpm==-1 if a protocol error or EWOULDBLOCK; the latter is normal.  */
-      while (gpm = Gpm_GetEvent (&event), gpm == 1) {
-	  nread += handle_one_term_event (tty, &event);
-      }
+      while (gpm = Gpm_GetEvent (&event), gpm == 1)
+	nread += handle_one_term_event (tty, &event);
       if (gpm == 0)
 	/* Presumably the GPM daemon has closed the connection.  */
 	close_gpm (fd);
-      if (nread)
-	  return nread;
+    }
+  return nread;
+}
+#endif /* HAVE_GPM */
+
+int
+tty_read_avail_input (struct terminal *terminal,
+                      struct input_event *hold_quit)
+{
+  struct tty_display_info *tty = terminal->display_info.tty;
+  Lisp_Object term;
+  static SCM proc = SCM_UNDEFINED;
+
+  if (!terminal->name)		/* Don't read from a dead terminal.  */
+    return 0;
+
+  if (terminal->type != output_termcap
+      && terminal->type != output_msdos_raw)
+    emacs_abort ();
+
+  if (! tty->term_initted)      /* In case we get called during bootstrap.  */
+    return 0;
+
+  if (! tty->input)
+    return 0;                   /* The terminal is suspended.  */
+
+#ifdef HAVE_GPM
+  {
+    int gpm_read = tty_gpm_read (tty);
+    if (gpm_read)
+      return gpm_read;
   }
 #endif /* HAVE_GPM */
 
-/* Determine how many characters we should *try* to read.  */
-#ifdef USABLE_FIONREAD
-  /* Find out how much input is available.  */
-  if (ioctl (fileno (tty->input), FIONREAD, &n_to_read) < 0)
-    {
-      if (! noninteractive)
-        return -2;          /* Close this terminal.  */
-      else
-        n_to_read = 0;
-    }
-  if (n_to_read == 0)
-    return 0;
-  if (n_to_read > sizeof cbuf)
-    n_to_read = sizeof cbuf;
-#elif defined USG || defined CYGWIN
-  /* Read some input if available, but don't wait.  */
-  n_to_read = sizeof cbuf;
-  fcntl (fileno (tty->input), F_SETFL, O_NONBLOCK);
-#else
-# error "Cannot read without possibly delaying"
-#endif
-
-#ifdef subprocesses
-  /* Don't read more than we can store.  */
-  if (n_to_read > buffer_free)
-    n_to_read = buffer_free;
-#endif	/* subprocesses */
-
-  /* Now read; for one reason or another, this will not block.
-     NREAD is set to the number of chars read.  */
-  nread = emacs_read (fileno (tty->input), (char *) cbuf, n_to_read);
-  /* POSIX infers that processes which are not in the session leader's
-     process group won't get SIGHUPs at logout time.  BSDI adheres to
-     this part standard and returns -1 from read (0) with errno==EIO
-     when the control tty is taken away.
-     Jeffrey Honig <jch@bsdi.com> says this is generally safe.  */
-  if (nread == -1 && errno == EIO)
-    return -2;          /* Close this terminal.  */
-#if defined AIX && defined _BSD
-  /* The kernel sometimes fails to deliver SIGHUP for ptys.
-     This looks incorrect, but it isn't, because _BSD causes
-     O_NDELAY to be defined in fcntl.h as O_NONBLOCK,
-     and that causes a value other than 0 when there is no input.  */
-  if (nread == 0)
-    return -2;          /* Close this terminal.  */
-#endif
-
-#ifndef USABLE_FIONREAD
-#if defined (USG) || defined (CYGWIN)
-  fcntl (fileno (tty->input), F_SETFL, 0);
-#endif /* USG or CYGWIN */
-#endif /* no FIONREAD */
-
-  if (nread <= 0)
-    return nread;
-
-#endif /* not MSDOS */
-#endif /* not WINDOWSNT */
-
-  for (i = 0; i < nread; i++)
-    {
-      struct input_event buf;
-      EVENT_INIT (buf);
-      buf.kind = ASCII_KEYSTROKE_EVENT;
-      buf.modifiers = 0;
-      if (tty->meta_key == 1 && (cbuf[i] & 0x80))
-        buf.modifiers = meta_modifier;
-      if (tty->meta_key < 2)
-        cbuf[i] &= ~0x80;
-
-      buf.code = cbuf[i];
-      /* Set the frame corresponding to the active tty.  Note that the
-         value of selected_frame is not reliable here, redisplay tends
-         to temporarily change it.  */
-      buf.frame_or_window = tty->top_frame;
-      buf.arg = Qnil;
-
-      kbd_buffer_store_event (&buf);
-      /* Don't look at input that follows a C-g too closely.
-         This reduces lossage due to autorepeat on C-g.  */
-      if (buf.kind == ASCII_KEYSTROKE_EVENT
-          && buf.code == quit_char)
-        break;
-    }
-
-  return nread;
+  /* Dispatch the rest (buffer-free/hold sizing, FIONREAD sizing, the
+     nonblocking read, the per-byte meta decode and the store) into
+     (emacs gobble) `tty-read-avail-input!'.  The unused hold_quit
+     parameter is not forwarded: the pre-port C body never used it (it
+     called kbd_buffer_store_event, which takes no hold_quit), and
+     kbd-buffer-store-event! mirrors that with a #f hold-quit.  */
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs gobble", "tty-read-avail-input!");
+  XSETTERMINAL (term, terminal);
+  return scm_to_int (SCM_CALL_1 (proc, term));
 }
+
 
 /* M25 imp-2: handle_async_input / process_pending_signals became thin
    dispatchers into (emacs gobble).  Two C cells need Scheme-side
@@ -8003,6 +7929,39 @@ user-signal CODE and return an ie-smob wrapping it.  */)
   ie_user_signal_event_storage.device = Qt;
   ie_user_signal_event_storage.arg = Qnil;
   return ie_wrap (&ie_user_signal_event_storage);
+}
+
+/* M25 imp-4 — production event constructor for the TTY ASCII-keystroke
+   decode loop.  The meta-key decode and quit-char batch-break decisions
+   are made in Scheme (gobble.scm tty-read-avail-input!); this shim only
+   fills a fresh struct input_event with the already-resolved CODE,
+   MODIFIERS and FRAME-OR-WINDOW, kind fixed to ASCII_KEYSTROKE_EVENT,
+   arg nil and device t.  Do NOT reuse --ie-test-event for this — that
+   is a test-only helper.  The returned smob aliases the static storage,
+   which is reused on the next call — safe because the caller passes it
+   to kbd-buffer-store-event! synchronously (per the M9 ie-smob lifetime
+   rule) before building the next event.  */
+static struct input_event ie_ascii_keystroke_event_storage;
+
+DEFUN ("--ie-ascii-keystroke-event", Fie_ascii_keystroke_event,
+       Sie_ascii_keystroke_event, 3, 3, 0,
+       doc: /* Internal: build an ASCII_KEYSTROKE_EVENT input_event and
+return an ie-smob wrapping it.  CODE, MODIFIERS and FRAME-OR-WINDOW are
+stored as given; kind is always ASCII_KEYSTROKE_EVENT, arg nil, device
+Qt.  Caller must pass the returned smob to kbd-buffer-store-event! in
+the same step, per the M9 ie-smob lifetime rule.  */)
+  (Lisp_Object code, Lisp_Object modifiers, Lisp_Object frame_or_window)
+{
+  CHECK_FIXNUM (code);
+  CHECK_FIXNUM (modifiers);
+  memset (&ie_ascii_keystroke_event_storage, 0, sizeof ie_ascii_keystroke_event_storage);
+  ie_ascii_keystroke_event_storage.kind = ASCII_KEYSTROKE_EVENT;
+  ie_ascii_keystroke_event_storage.code = XFIXNUM (code);
+  ie_ascii_keystroke_event_storage.modifiers = XFIXNUM (modifiers);
+  ie_ascii_keystroke_event_storage.frame_or_window = frame_or_window;
+  ie_ascii_keystroke_event_storage.arg = Qnil;
+  ie_ascii_keystroke_event_storage.device = Qt;
+  return ie_wrap (&ie_ascii_keystroke_event_storage);
 }
 
 
@@ -11676,6 +11635,83 @@ no-op if TERMINAL does not decode to a tty.  */)
   if (tty)
     tty->meta_key = XFIXNUM (meta);
   return Qnil;
+}
+
+/* M25 imp-4 — TTY read-path shims for (emacs gobble) tty-read-avail-input!.
+   The dispatcher tty_read_avail_input already ran the raw guards (live,
+   tty-typed, initted, non-suspended terminal) before calling Scheme, so
+   these assume a live terminal; m22_tty_of_terminal returns NULL only for
+   a non-tty decode and the shims defensively return a neutral value then.  */
+
+DEFUN ("--tty-bytes-readable", Fc_tty_bytes_readable,
+       Sc_tty_bytes_readable, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: how many bytes are
+available on TERMINAL's tty, via the USABLE_FIONREAD ioctl only.  Caller
+must have confirmed --decode-tty-terminal-p first (the raw guards already
+ran in C).  Returns 0 for nothing available, the ioctl byte count for
+some available, or -2 when the ioctl fails and !noninteractive (matching
+the original C return -2 / close-terminal arm); when noninteractive and
+the ioctl fails, returns 0.  Returns 0 if TERMINAL does not decode to a
+tty.  */)
+  (Lisp_Object terminal)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  int n_to_read = 0;
+
+  if (!tty)
+    return make_fixnum (0);
+
+  if (ioctl (fileno (tty->input), FIONREAD, &n_to_read) < 0)
+    {
+      if (!noninteractive)
+        return make_fixnum (-2); /* Close this terminal.  */
+      else
+        n_to_read = 0;
+    }
+  return make_fixnum (n_to_read);
+}
+
+DEFUN ("--tty-read-nonblocking", Fc_tty_read_nonblocking,
+       Sc_tty_read_nonblocking, 2, 2, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: emacs_read up to N bytes
+from TERMINAL's tty into a fresh N-byte bytevector without blocking.
+Returns (nread . bytevector), where nread may be less than N.  Returns
+the bare fixnum -2 when the read failed with errno==EIO (matching the
+original C close-terminal arm).  Otherwise the raw emacs_read result is
+the pair's car (0, a short count, or a bare -1 — never swallowed here);
+the caller decides what to do with a negative count.  Returns (0 . empty)
+if TERMINAL does not decode to a tty.  */)
+  (Lisp_Object terminal, Lisp_Object n)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  int nbytes = XFIXNUM (n);
+  Lisp_Object bv = scm_c_make_bytevector (nbytes);
+  int nread;
+
+  if (!tty)
+    return scm_cons (make_fixnum (0), bv);
+
+  nread = emacs_read (fileno (tty->input), SCM_BYTEVECTOR_CONTENTS (bv),
+                      nbytes);
+  /* POSIX infers that processes which are not in the session leader's
+     process group won't get SIGHUPs at logout time.  BSDI adheres to
+     this part standard and returns -1 from read (0) with errno==EIO
+     when the control tty is taken away.
+     Jeffrey Honig <jch@bsdi.com> says this is generally safe.  */
+  if (nread == -1 && errno == EIO)
+    return make_fixnum (-2);  /* Close this terminal.  */
+  return scm_cons (make_fixnum (nread), bv);
+}
+
+DEFUN ("--tty-top-frame", Fc_tty_top_frame, Sc_tty_top_frame, 1, 1, 0,
+       doc: /* FIX-20260901-guilemacs: Internal: return the top_frame of
+TERMINAL's tty — the frame_or_window used for each keystroke event from
+that terminal.  Caller must have confirmed --decode-tty-terminal-p first;
+nil if TERMINAL does not decode to a tty.  */)
+  (Lisp_Object terminal)
+{
+  struct tty_display_info *tty = m22_tty_of_terminal (terminal);
+  return tty ? tty->top_frame : Qnil;
 }
 
 DEFUN ("--reset-sys-modes", Fc_reset_sys_modes, Sc_reset_sys_modes, 1, 1, 0,
