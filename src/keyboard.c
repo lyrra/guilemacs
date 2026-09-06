@@ -7789,6 +7789,13 @@ struct user_signal_info
 /* List of user signals.  */
 static struct user_signal_info *user_signals = NULL;
 
+/* Register a user signal.  Kept as a C body (not a dispatcher into
+   (emacs gobble)) because init_signals calls this entry point before
+   syms_of_keyboard registers the --user-signal-* DEFUNs, so a Scheme
+   dispatch would force --user-signal-registered? before it exists
+   (emacs.c: init_signals 1622 < syms_of_keyboard 1688; milestone M25
+   imp-1 close-out).  The duplicate-check decision here is trivial; the
+   drain *loop* policy lives in Scheme as store-user-signal-events!.  */
 void
 add_user_signal (int sig, const char *name)
 {
@@ -7873,29 +7880,139 @@ find_user_signal_name (int sig)
 static void
 store_user_signal_events (void)
 {
+  /* The per-signal drain loop moved to (emacs gobble) as
+     `store-user-signal-events!'; this entry point (called by
+     gobble_input) is a thin dispatcher.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs gobble", "store-user-signal-events!");
+  SCM_CALL_0 (proc);
+}
+
+/* --- M25 imp-1: user-signal primitives -------------------------------
+   Scheme owns the registration/drain decision ((emacs gobble)); C owns
+   the raw user_signals list because handle_user_signal reads it from a
+   signal handler and store_user_signal_events needs node mutation.
+   These DEFUNs expose query/mutation/event-fill only.  The list walk
+   shape is repeated here rather than in find_user_signal_name: that
+   function stays C and normal-context-only, serving --user-signal-name.
+   (Do not repoint find_user_signal_name at Scheme.)  */
+
+/* True if SIG is already registered.  Same walk as find_user_signal_name
+   (its sole caller is the --user-signal-name DEFUN; do not merge).  */
+DEFUN ("--user-signal-registered?", Fuser_signal_registered_p,
+       Suser_signal_registered_p, 1, 1, 0,
+       doc: /* Internal: return t if user-signal SIG is registered,
+nil otherwise.  */)
+  (Lisp_Object sig)
+{
   struct user_signal_info *p;
-  struct input_event buf;
-  bool buf_initialized = false;
+  int s = XFIXNUM (sig);
 
   for (p = user_signals; p; p = p->next)
-    if (p->npending > 0)
-      {
-	if (! buf_initialized)
-	  {
-	    memset (&buf, 0, sizeof buf);
-	    buf.kind = USER_SIGNAL_EVENT;
-	    buf.frame_or_window = selected_frame;
-	    buf_initialized = true;
-	  }
+    if (p->sig == s)
+      return Qt;
+  return Qnil;
+}
 
-	do
-	  {
-	    buf.code = p->sig;
-	    kbd_buffer_store_event (&buf);
-	    p->npending--;
-	  }
-	while (p->npending > 0);
-      }
+/* Register a user signal unconditionally.  The Scheme caller
+   (add-user-signal! in (emacs gobble)) already ran the duplicate check,
+   so no early-return guard here — this is add_user_signal's body minus
+   that guard.  Returns nil always.  */
+DEFUN ("--user-signal-add!", Fuser_signal_add, Suser_signal_add, 2, 2, 0,
+       doc: /* Internal: register user-signal SIG named NAME.  Unconditional —
+the caller must have already checked --user-signal-registered?.  Returns
+nil.  */)
+  (Lisp_Object sig, Lisp_Object name)
+{
+  struct sigaction action;
+  struct user_signal_info *p = xmalloc (sizeof *p);
+
+  p->sig = XFIXNUM (sig);
+  p->name = xstrdup (SSDATA (name));
+  p->npending = 0;
+  p->next = user_signals;
+  user_signals = p;
+
+  emacs_sigaction_init (&action, deliver_user_signal);
+  sigaction (p->sig, &action, 0);
+  return Qnil;
+}
+
+/* Return an elisp list of the registered signal numbers.  The order is
+   not semantically significant: store-user-signal-events! drains each
+   signal independently.  (Nodes are prepended, so this reflects the
+   linked-list traversal order, not registration order.)  */
+DEFUN ("--user-signal-list", Fuser_signal_list, Suser_signal_list, 0, 0, 0,
+       doc: /* Internal: return the list of registered user-signal
+numbers.  Order is not significant.  */)
+  (void)
+{
+  Lisp_Object result = Qnil;
+  struct user_signal_info *p;
+
+  for (p = user_signals; p; p = p->next)
+    result = Fcons (make_fixnum (p->sig), result);
+  return result;
+}
+
+/* Return SIG's current pending count (0 when not found — cannot happen
+   for a sig taken from --user-signal-list).  */
+DEFUN ("--user-signal-pending", Fuser_signal_pending, Suser_signal_pending,
+       1, 1, 0,
+       doc: /* Internal: return the number of pending signals for
+user-signal SIG.  */)
+  (Lisp_Object sig)
+{
+  struct user_signal_info *p;
+  int s = XFIXNUM (sig);
+
+  for (p = user_signals; p; p = p->next)
+    if (p->sig == s)
+      return make_fixnum (p->npending);
+  return make_fixnum (0);
+}
+
+/* Decrement SIG's pending count by one and return the new count.
+   Undefined (0) when SIG is not found.  */
+DEFUN ("--user-signal-pending-decrement!",
+       Fuser_signal_pending_decrement, Suser_signal_pending_decrement,
+       1, 1, 0,
+       doc: /* Internal: decrement user-signal SIG's pending count and
+return the new count.  */)
+  (Lisp_Object sig)
+{
+  struct user_signal_info *p;
+  int s = XFIXNUM (sig);
+
+  for (p = user_signals; p; p = p->next)
+    if (p->sig == s)
+      return make_fixnum (--p->npending);
+  return make_fixnum (0);
+}
+
+static struct input_event ie_user_signal_event_storage;
+
+/* Fill a USER_SIGNAL_EVENT input_event and return an ie-smob wrapping
+   it.  CODE is the user-signal number.  The ie-smob aliases the static
+   storage, which is reused on the next call — safe because
+   kbd-buffer-store-event! copies the event out of the smob synchronously
+   (via %--ie-copy) before the drain loop's next --ie-user-signal-event
+   call.  Caller must pass the returned smob to kbd-buffer-store-event!
+   in the same call, per the M9 ie-smob lifetime rule.  */
+DEFUN ("--ie-user-signal-event", Fie_user_signal_event,
+       Sie_user_signal_event, 1, 1, 0,
+       doc: /* Internal: build a USER_SIGNAL_EVENT input_event for
+user-signal CODE and return an ie-smob wrapping it.  */)
+  (Lisp_Object code)
+{
+  memset (&ie_user_signal_event_storage, 0, sizeof ie_user_signal_event_storage);
+  ie_user_signal_event_storage.kind = USER_SIGNAL_EVENT;
+  ie_user_signal_event_storage.frame_or_window = selected_frame;
+  ie_user_signal_event_storage.code = XFIXNUM (code);
+  ie_user_signal_event_storage.device = Qt;
+  ie_user_signal_event_storage.arg = Qnil;
+  return ie_wrap (&ie_user_signal_event_storage);
 }
 
 

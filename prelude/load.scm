@@ -151,6 +151,7 @@
 (use-modules (emacs echo))
 (use-modules (emacs menu-prompt))
 (use-modules (emacs input-poll))
+(use-modules (emacs gobble))
 (use-modules (emacs menu-bar-items))
 (use-modules (emacs tool-bar-items))
 (use-modules (emacs menu-item-parse))
