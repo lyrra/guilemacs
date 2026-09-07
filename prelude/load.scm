@@ -154,6 +154,7 @@
 (use-modules (emacs interrupt))
 (use-modules (emacs gobble))
 (use-modules (emacs single-kboard))
+(use-modules (emacs kboard-lifecycle))
 (use-modules (emacs menu-bar-items))
 (use-modules (emacs tool-bar-items))
 (use-modules (emacs menu-item-parse))

@@ -12132,30 +12132,17 @@ The `posn-' functions access elements of such lists.  */)
 static void
 init_kboard (KBOARD *kb, Lisp_Object type)
 {
-  kset_overriding_terminal_local_map (kb, Qnil);
-  kset_last_command (kb, Qnil);
-  kset_real_last_command (kb, Qnil);
-  kset_keyboard_translate_table (kb, Qnil);
-  kset_last_repeatable_command (kb, Qnil);
-  kset_prefix_arg (kb, Qnil);
-  kset_last_prefix_arg (kb, Qnil);
-  kset_kbd_queue (kb, Qnil);
-  kb->kbd_queue_has_data = false;
-  kb->immediate_echo = false;
-  kset_echo_string (kb, Qnil);
-  kset_echo_prompt (kb, Qnil);
-  kb->kbd_macro_buffer = 0;
-  kb->kbd_macro_bufsize = 0;
-  kset_defining_kbd_macro (kb, Qnil);
-  kset_last_kbd_macro (kb, Qnil);
-  kb->reference_count = 0;
-  kset_system_key_alist (kb, Qnil);
-  kset_system_key_syms (kb, Qnil);
-  kset_window_system (kb, type);
-  kset_input_decode_map (kb, Fmake_sparse_keymap (Qnil));
-  kset_local_function_key_map (kb, Fmake_sparse_keymap (Qnil));
-  Fset_keymap_parent (KVAR (kb, Vlocal_function_key_map), Vfunction_key_map);
-  kset_default_minibuffer_frame (kb, Qnil);
+  /* M27 imp-2 — raw C-only fields stay here; the Lisp_Object field
+     defaults and keymap wiring dispatch to (emacs kboard-lifecycle)
+     init-kboard!.  */
+  kb->immediate_echo = false;      /* no per-kb setter exists */
+  kb->kbd_macro_buffer = 0;        /* raw pointer; macros.c writes it */
+  kb->kbd_macro_bufsize = 0;       /* raw size; macros.c writes it */
+  kb->reference_count = 0;         /* raw int; terminal.c / term files manage it */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs kboard-lifecycle", "init-kboard!");
+  SCM_CALL_2 (proc, make_kboard_smob (kb), type);
 }
 
 /* Allocate and basically initialize keyboard
