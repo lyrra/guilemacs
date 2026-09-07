@@ -14,8 +14,8 @@
 ;;; shims.  `stuff-buffered-input' (M22 imp-3) is reused from
 ;;; (emacs kbd-buffer), not re-ported.
 ;;;
-;;; imp-2 (quit-throw-to-read-char) lands in this commit; imp-3
-;;; (handle-interrupt) lands in this same module in a later commit.
+;;; imp-2 (quit-throw-to-read-char) and imp-3 (handle-interrupt) both
+;;; land in this module.
 ;;;
 ;;; Conventions (identical to M9-M24, cf. mod/emacs/input-poll.scm):
 ;;; #nil is elisp nil; %nilp is the local elisp-nil predicate (defined
@@ -36,7 +36,7 @@
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
-  #:export (suspend-emacs quit-throw-to-read-char))
+  #:export (suspend-emacs quit-throw-to-read-char handle-interrupt))
 
 (define (%nilp x) (eq? x #nil))
 
@@ -136,3 +136,40 @@ quit_throw_to_read_char itself (see brief.org M26 imp-2)."
       ((%c '--switch-to-frame!) frame)))
   ;; C: abort_to_prompt (getctag, SCM_EOL);
   (abort-to-prompt ((%c '--get-ctag))))
+
+(define (handle-interrupt)
+  "Port of the in_signal_handler == false (arm 2 + tail) body of C
+handle_interrupt (src/keyboard.c): after a C-g that is not an emergency
+escape, bump force-quit-count, clear inhibit-quit when the count
+reaches 3, set quit-flag to t, restore the signal mask, and throw back
+to the waiting read-char loop when waiting-for-input is set and Emacs
+is not echoing.  The real-SIGINT path (in_signal_handler == true) stays
+a straight-line C copy in handle_interrupt itself
+(signal-handler-no-guile-vm-call); this Scheme body only runs on the
+normal path.  See brief.org M26 imp-3."
+  ;; arm 2: force-quit bump.
+  ;; C: int count = NILP (Vquit_flag) ? 1 : force_quit_count + 1;
+  (let ((count (if (%nilp (symbol-value 'quit-flag))
+                   1
+                   (1+ ((%c '--force-quit-count))))))
+    ;; C: force_quit_count = count;
+    ((%c '--set-force-quit-count!) count)
+    ;; C: if (count == 3) Vinhibit_quit = Qnil;
+    (when (= count 3)
+      (set-symbol-value! 'inhibit-quit #nil))
+    ;; C: Vquit_flag = Qt;
+    (set-symbol-value! 'quit-flag #t))
+  ;; tail.
+  ;; C: pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
+  ((%c '--restore-signal-mask))
+  ;; C: in_signal_handler == false: no maybe_reacquire_global_lock (that
+  ;;    branch is guarded by if (in_signal_handler)).
+  ;; C: if (waiting_for_input && !echoing) quit_throw_to_read_char (false);
+  ;;    NOTE (cr.org Finding 2, portability): in C this tail is wrapped in
+  ;;    #ifndef HAVE_NS; the brief's Scheme spec omits the guard, and NS is out
+  ;;    of scope, so this port follows the brief verbatim.  A future NS port
+  ;;    must decide whether the normal-path quit-throw stays here.
+  (when (and (not (%nilp ((%c '--waiting-for-input-p))))
+             (%nilp ((%c '--echoing-p))))
+    (quit-throw-to-read-char))   ; imp-2, same module, ends in abort-to-prompt.
+  #nil)

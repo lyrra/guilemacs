@@ -4513,10 +4513,12 @@ test suite (it would stop the runner).  */)
 
 DEFUN ("--handle-interrupt-normal", Fc_handle_interrupt_normal,
        Sc_handle_interrupt_normal, 0, 0, 0,
-       doc: /* TEMPORARY: call C's handle_interrupt (false).
-
-This shim is a thin call-through to C's handle_interrupt, which stays
-a C function until M26 ports it.  Returns nil.  */)
+       doc: /* Internal: run a C-g interrupt from a normal (non-signal)
+context, handle_interrupt (false).  The live dispatch from
+kbd-buffer.scm's quit-char branch (see brief.org M26).  Arm 1 (the
+emergency-escape prompt) stays in C on both the signal and this normal
+path; the arm-2 + tail force-quit body of this normal path is forwarded
+to (emacs interrupt) handle-interrupt.  Returns nil.  */)
   (void)
 {
   handle_interrupt (false);
@@ -11217,6 +11219,128 @@ read_stdin (void)
    enough times, then quit anyway.  See bug#6585.  */
 static int volatile force_quit_count;
 
+DEFUN ("--echoing-p", Fc_echoing_p, Sc_echoing_p, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: t if the C echoing flag is set.
+Getter for the echoing flag that --set-echoing! (src/keyboard.c) writes.  M26
+imp-3 (emacs interrupt) handle-interrupt needs it for the tail condition
+waiting_for_input && !echoing.  */)
+  (void)
+{
+  return echoing ? Qt : Qnil;
+}
+
+DEFUN ("--force-quit-count", Fc_force_quit_count, Sc_force_quit_count, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: return the C force_quit_count
+global as a fixnum.  M26 imp-3 (emacs interrupt) handle-interrupt needs it to
+reproduce handle_interrupt's arm-2 force-quit bump on the normal path.  */)
+  (void)
+{
+  return make_fixnum (force_quit_count);
+}
+
+DEFUN ("--set-force-quit-count!", Fc_set_force_quit_count, Sc_set_force_quit_count, 1, 1, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: set the C force_quit_count
+global to COUNT (a fixnum).  M26 imp-3 (emacs interrupt) handle-interrupt needs it
+to reproduce handle_interrupt's arm-2 force-quit bump on the normal path.  */)
+  (Lisp_Object count)
+{
+  CHECK_FIXNUM (count);
+  force_quit_count = XFIXNUM (count);
+  return count;
+}
+
+DEFUN ("--restore-signal-mask", Fc_restore_signal_mask, Sc_restore_signal_mask, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: reset the signal mask to the
+empty set, pthread_sigmask (SIG_SETMASK, &empty_mask, 0).  Reproduces the tail of
+C handle_interrupt (src/keyboard.c) for M26 imp-3 (emacs interrupt)
+handle-interrupt on the normal path.  */)
+  (void)
+{
+  pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
+  return Qnil;
+}
+
+/* M26 imp-3 — arm 1 of handle_interrupt: the emergency-escape prompt.  The body
+   below was extracted verbatim from C handle_interrupt (was lines 11241-11309),
+   preserving the #ifdef SIGTSTP / #ifdef MSDOS / #ifndef HAVE_NS arms byte for
+   byte.  It stays C on BOTH the signal and the normal path.  See brief.org M26
+   imp-3.  */
+static void
+handle_interrupt_emergency_escape (bool in_signal_handler)
+{
+  char c;
+
+  if (! in_signal_handler)
+    {
+      /* If SIGINT isn't blocked, don't let us be interrupted by
+         a SIGINT.  It might be harmful due to non-reentrancy
+         in I/O functions.  */
+      sigset_t blocked;
+      sigemptyset (&blocked);
+      sigaddset (&blocked, SIGINT);
+      pthread_sigmask (SIG_BLOCK, &blocked, 0);
+      fflush (stdout);
+    }
+
+  reset_all_sys_modes ();
+
+#ifdef SIGTSTP
+/*
+ * On systems which can suspend the current process and return to the original
+ * shell, this command causes the user to end up back at the shell.
+ * The "Auto-save" and "Abort" questions are not asked until
+ * the user elects to return to emacs, at which point he can save the current
+ * job and either dump core or continue.
+ */
+  sys_suspend ();
+#else
+  /* Perhaps should really fork an inferior shell?
+	 But that would not provide any way to get back
+	 to the original shell, ever.  */
+  write_stdout ("No support for stopping a process"
+		    " on this operating system;\n"
+		    "you can continue or abort.\n");
+#endif /* not SIGTSTP */
+#ifdef MSDOS
+  /* We must remain inside the screen area when the internal terminal
+	 is used.  Note that [Enter] is not echoed by dos.  */
+  cursor_to (SELECTED_FRAME (), 0, 0);
+#endif
+
+  write_stdout ("Emacs is resuming after an emergency escape.\n");
+
+  write_stdout ("Auto-save? (y or n) ");
+  c = read_stdin ();
+  if (c == 'y' || c == 'Y')
+    {
+      Fdo_auto_save (Qt, Qnil);
+#ifdef MSDOS
+      write_stdout ("\r\nAuto-save done");
+#else
+      write_stdout ("Auto-save done\n");
+#endif
+    }
+  while (c != '\n')
+    c = read_stdin ();
+
+#ifdef MSDOS
+  write_stdout ("\r\nAbort?  (y or n) ");
+#else
+  write_stdout ("Abort (and dump core)? (y or n) ");
+#endif
+  c = read_stdin ();
+  if (c == 'y' || c == 'Y')
+	emacs_abort ();
+  while (c != '\n')
+	c = read_stdin ();
+#ifdef MSDOS
+  write_stdout ("\r\nContinuing...\r\n");
+#else /* not MSDOS */
+  write_stdout ("Continuing...\n");
+#endif /* not MSDOS */
+  init_all_sys_modes ();
+}
+
 /* This routine is called at interrupt level in response to C-g.
 
    It is called from the SIGINT handler or kbd_buffer_store_event.
@@ -11231,93 +11355,33 @@ static int volatile force_quit_count;
 static void
 handle_interrupt (bool in_signal_handler)
 {
-  char c;
-
   cancel_echoing ();
 
   /* XXX This code needs to be revised for multi-tty support.  */
   if (!NILP (Vquit_flag) && get_named_terminal (dev_tty))
+    handle_interrupt_emergency_escape (in_signal_handler);  /* arm 1, C */
+  else if (in_signal_handler)
     {
-      if (! in_signal_handler)
-	{
-	  /* If SIGINT isn't blocked, don't let us be interrupted by
-	     a SIGINT.  It might be harmful due to non-reentrancy
-	     in I/O functions.  */
-	  sigset_t blocked;
-	  sigemptyset (&blocked);
-	  sigaddset (&blocked, SIGINT);
-	  pthread_sigmask (SIG_BLOCK, &blocked, 0);
-	  fflush (stdout);
-	}
-
-      reset_all_sys_modes ();
-
-#ifdef SIGTSTP
-/*
- * On systems which can suspend the current process and return to the original
- * shell, this command causes the user to end up back at the shell.
- * The "Auto-save" and "Abort" questions are not asked until
- * the user elects to return to emacs, at which point he can save the current
- * job and either dump core or continue.
- */
-      sys_suspend ();
-#else
-      /* Perhaps should really fork an inferior shell?
-	 But that would not provide any way to get back
-	 to the original shell, ever.  */
-      write_stdout ("No support for stopping a process"
-		    " on this operating system;\n"
-		    "you can continue or abort.\n");
-#endif /* not SIGTSTP */
-#ifdef MSDOS
-      /* We must remain inside the screen area when the internal terminal
-	 is used.  Note that [Enter] is not echoed by dos.  */
-      cursor_to (SELECTED_FRAME (), 0, 0);
-#endif
-
-      write_stdout ("Emacs is resuming after an emergency escape.\n");
-
-	  write_stdout ("Auto-save? (y or n) ");
-	  c = read_stdin ();
-	  if (c == 'y' || c == 'Y')
-	    {
-	      Fdo_auto_save (Qt, Qnil);
-#ifdef MSDOS
-	      write_stdout ("\r\nAuto-save done");
-#else
-	      write_stdout ("Auto-save done\n");
-#endif
-	    }
-	  while (c != '\n')
-	    c = read_stdin ();
-
-#ifdef MSDOS
-      write_stdout ("\r\nAbort?  (y or n) ");
-#else
-      write_stdout ("Abort (and dump core)? (y or n) ");
-#endif
-      c = read_stdin ();
-      if (c == 'y' || c == 'Y')
-	emacs_abort ();
-      while (c != '\n')
-	c = read_stdin ();
-#ifdef MSDOS
-      write_stdout ("\r\nContinuing...\r\n");
-#else /* not MSDOS */
-      write_stdout ("Continuing...\n");
-#endif /* not MSDOS */
-      init_all_sys_modes ();
-    }
-  else
-    {
-      /* Request quit when it's safe.  */
+      /* arm 2 + tail, SIGINT path.  Straight-line C copy.
+	 (signal-handler-no-guile-vm-call: never call into Guile from a
+	 signal handler.)  */
       int count = NILP (Vquit_flag) ? 1 : force_quit_count + 1;
       force_quit_count = count;
       if (count == 3)
 	Vinhibit_quit = Qnil;
       Vquit_flag = Qt;
     }
+  else
+    {
+      /* arm 2 + tail, normal path -> (emacs interrupt) handle-interrupt.  */
+      static SCM proc = SCM_UNDEFINED;
+      if (SCM_UNBNDP (proc))
+	proc = scm_c_public_ref ("emacs interrupt", "handle-interrupt");
+      SCM_CALL_0 (proc);
+      return;   /* Scheme body runs arm 2 + tail.  */
+    }
 
+  /* tail — arm 1 (both paths) and arm 2 signal path.  */
   pthread_sigmask (SIG_SETMASK, &empty_mask, 0);
 
 /* TODO: The longjmp in this call throws the NS event loop integration off,
