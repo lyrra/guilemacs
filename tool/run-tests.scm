@@ -132,6 +132,7 @@
   "test/keyboard/test-m26-imp1-suspend-emacs.el"
   "test/keyboard/test-m26-imp2-quit-throw.el"
   "test/keyboard/test-m26-imp3-handle-interrupt.el"
+  "test/keyboard/test-m27-single-kboard.el"   ; M27 imp-1 single-kboard (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

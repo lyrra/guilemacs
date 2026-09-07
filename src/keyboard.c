@@ -1529,57 +1529,44 @@ KBOARD_LISP_FIELD ("echo-prompt",                   echo_prompt)
 void
 not_single_kboard_state (KBOARD *kboard)
 {
-  if (kboard == current_kboard)
-    single_kboard = false;
+  /* M27 imp-1 — C body replaced by a SCM_CALL_1 into (emacs
+     single-kboard).  The single_kboard flag clear lives in Scheme
+     (not-single-kboard-state) over the M2 kboard smob.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs single-kboard", "not-single-kboard-state");
+  SCM_CALL_1 (proc, make_kboard_smob (kboard));
 }
 
 /* Maintain a stack of kboards, so other parts of Emacs
    can switch temporarily to the kboard of a given frame
-   and then revert to the previous status.  */
-
-struct kboard_stack
-{
-  KBOARD *kboard;
-  struct kboard_stack *next;
-};
-
-static struct kboard_stack *kboard_stack;
+   and then revert to the previous status.  The C struct
+   kboard_stack node is now a Scheme list owned by the
+   (emacs single-kboard) module.  */
 
 void
 push_kboard (struct kboard *k)
 {
-  struct kboard_stack *p = xmalloc (sizeof *p);
-
-  p->next = kboard_stack;
-  p->kboard = current_kboard;
-  kboard_stack = p;
-
-  current_kboard = k;
+  /* M27 imp-1 — C body replaced by a SCM_CALL_1 into (emacs
+     single-kboard).  push-kboard! saves current_kboard then sets it
+     to the pushed kboard, exactly like the deleted C node push.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs single-kboard", "push-kboard!");
+  SCM_CALL_1 (proc, make_kboard_smob (k));
 }
 
 void
 pop_kboard (void)
 {
-  struct terminal *t;
-  struct kboard_stack *p = kboard_stack;
-  bool found = false;
-  for (t = terminal_list; t; t = t->next_terminal)
-    {
-      if (t->kboard == p->kboard)
-        {
-          current_kboard = p->kboard;
-          found = true;
-          break;
-        }
-    }
-  if (!found)
-    {
-      /* The terminal we remembered has been deleted.  */
-      current_kboard = FRAME_KBOARD (SELECTED_FRAME ());
-      single_kboard = false;
-    }
-  kboard_stack = p->next;
-  xfree (p);
+  /* M27 imp-1 — C body replaced by a SCM_CALL_0 into (emacs
+     single-kboard).  pop-kboard! restores the saved kboard if it is
+     still live (any terminal still carries it), else falls back to the
+     selected frame's kboard and clears single_kboard.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs single-kboard", "pop-kboard!");
+  SCM_CALL_0 (proc);
 }
 
 /* Switch to single_kboard mode, making current_kboard the only KBOARD
@@ -1608,15 +1595,21 @@ temporarily_switch_to_single_kboard (struct frame *f)
            of presenting the user with a frozen screen.  */
         error ("Terminal %d is locked, cannot read from it",
                FRAME_TERMINAL (f)->id);
-      else
-        /* This call is unnecessary, but helps
-           `restore_kboard_configuration' discover if somebody changed
-           `current_kboard' behind our back.  */
-        push_kboard (current_kboard);
     }
-  else if (f != NULL)
-    current_kboard = FRAME_KBOARD (f);
-  single_kboard = true;
+  /* M27 imp-1 — the current-kboard / single_kboard switch policy
+     dispatches to (emacs single-kboard)
+     temporarily-switch-to-single-kboard!.  The locked-terminal error
+     above stays in the C entry (noreturn); so does the
+     record_unwind_protect_int unwind below, so a Scheme dispatch that
+     moves current_kboard cannot disturb the unwind frame (see
+     restore_kboard_configuration).  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs single-kboard",
+                             "temporarily-switch-to-single-kboard!");
+  SCM_CALL_2 (proc,
+              was_locked ? Qt : Qnil,
+              f ? make_kboard_smob (FRAME_KBOARD (f)) : Qnil);
   record_unwind_protect_int (restore_kboard_configuration, was_locked);
 }
 
@@ -4415,6 +4408,43 @@ DEFUN ("--kbd-single-kboard-p", Fc_kbd_single_kboard_p,
   (void)
 {
   return single_kboard ? Qt : Qnil;
+}
+
+DEFUN ("--kbd-single-kboard-set!", Fc_kbd_single_kboard_set,
+       Sc_kbd_single_kboard_set, 1, 1, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: hard-set the C static
+`single_kboard' flag to (not V nil) and return nil.  Scheme needs a
+setter for the flag (only the getter --kbd-single-kboard-p exists) to
+drive not_single_kboard_state and temporarily-switch-to-single-kboard!
+policy from (emacs single-kboard).  Mirrors --input-pending-set!.  */)
+  (Lisp_Object v)
+{
+  single_kboard = !NILP (v);
+  return Qnil;
+}
+
+DEFUN ("--kboard-live-p", Fc_kboard_live_p, Sc_kboard_live_p, 1, 1, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: return t when KB wraps
+a KBOARD still present on some terminal in `terminal_list', nil
+otherwise.  Keeps pop-kboard!'s raw `terminal_list' walk in C.  */)
+  (Lisp_Object kb)
+{
+  struct terminal *t;
+  CHECK_KBOARD (kb);
+  for (t = terminal_list; t; t = t->next_terminal)
+    if (t->kboard == XKBOARD (kb))
+      return Qt;
+  return Qnil;
+}
+
+DEFUN ("--selected-frame-kboard", Fc_selected_frame_kboard,
+       Sc_selected_frame_kboard, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: return the KBOARD of
+the selected frame as a kboard smob.  pop-kboard!'s fallback when the
+remembered kboard's terminal has been deleted.  */)
+  (void)
+{
+  return make_kboard_smob (FRAME_KBOARD (SELECTED_FRAME ()));
 }
 
 DEFUN ("--kbd-queue-has-data", Fc_kbd_queue_has_data,
