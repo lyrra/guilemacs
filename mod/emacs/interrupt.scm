@@ -14,9 +14,8 @@
 ;;; shims.  `stuff-buffered-input' (M22 imp-3) is reused from
 ;;; (emacs kbd-buffer), not re-ported.
 ;;;
-;;; imp-2 (quit-throw-to-read-char) and imp-3 (handle-interrupt) land
-;;; in this same module in later commits; this commit only adds
-;;; `suspend-emacs'.
+;;; imp-2 (quit-throw-to-read-char) lands in this commit; imp-3
+;;; (handle-interrupt) lands in this same module in a later commit.
 ;;;
 ;;; Conventions (identical to M9-M24, cf. mod/emacs/input-poll.scm):
 ;;; #nil is elisp nil; %nilp is the local elisp-nil predicate (defined
@@ -37,7 +36,7 @@
   #:use-module (emacs elisp-ref)      ; %c, defelisp
   #:use-module (emacs-elisp runtime)
   #:declarative? #t
-  #:export (suspend-emacs))
+  #:export (suspend-emacs quit-throw-to-read-char))
 
 (define (%nilp x) (eq? x #nil))
 
@@ -103,3 +102,37 @@ line; see brief.org M26 imp-1."
   ;; C: run_hook (Qsuspend_resume_hook);
   ((%c 'run-hooks) 'suspend-resume-hook)
   #nil)
+
+(define (quit-throw-to-read-char)
+  "Port of the from_signal == false body of C quit_throw_to_read_char
+(src/keyboard.c): throw back to the waiting read-char loop after a
+C-g.  Runs `kill-emacs' when quit-flag holds the kill-emacs sentinel
+set by batch EOF, clears both waiting-for-input fields plus
+input-pending, resets unread-command-events, switches to
+internal-last-event-frame when it differs from the selected frame,
+then aborts to the getctag prompt tag.  Never returns.  The
+from_signal == true path stays a plain C body in
+quit_throw_to_read_char itself (see brief.org M26 imp-2)."
+  ;; C: if (!from_signal && EQ (Vquit_flag, Qkill_emacs))
+  ;;       Fkill_emacs (Qnil, Qnil);  -- only on the false-signal path
+  ;;       this Scheme body runs, so test quit-flag directly.
+  (when (eq? (symbol-value 'quit-flag) 'kill-emacs)
+    ((%c 'kill-emacs) #nil #nil))
+  ;; C: clear_waiting_for_input ();  -- both halves: the waiting_for_input
+  ;;    field (existing --clear-waiting-for-input) plus the
+  ;;    input_available_clear_time field (imp-2 shim).
+  ((%c '--clear-waiting-for-input))
+  ((%c '--clear-input-available-clear-time!))
+  ;; C: input_pending = false;
+  ((%c '--input-pending-set!) #nil)
+  ;; C: Vunread_command_events = Qnil;  -- plain elisp variable.
+  (set-symbol-value! 'unread-command-events #nil)
+  ;; C: if (FRAMEP (internal_last_event_frame)
+  ;;        && !EQ (internal_last_event_frame, selected_frame))
+  ;;      do_switch_frame (make_lispy_switch_frame (...), 0, 0, Qnil);
+  (let ((frame ((%c '--get-internal-last-event-frame))))
+    (when (and (not (%nilp ((%c 'framep) frame)))
+               (not (eq? frame ((%c 'selected-frame)))))
+      ((%c '--switch-to-frame!) frame)))
+  ;; C: abort_to_prompt (getctag, SCM_EOL);
+  (abort-to-prompt ((%c '--get-ctag))))

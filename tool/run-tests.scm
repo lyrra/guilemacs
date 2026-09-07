@@ -130,6 +130,7 @@
   "test/keyboard/test-m25-imp3-gobble-input.el"
   "test/keyboard/test-m25-imp4-tty-read.el"
   "test/keyboard/test-m26-imp1-suspend-emacs.el"
+  "test/keyboard/test-m26-imp2-quit-throw.el"
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group

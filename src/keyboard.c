@@ -11340,28 +11340,72 @@ handle_interrupt (bool in_signal_handler)
 #endif
 }
 
+/* M26 imp-2 — quit_throw_to_read_char (from_signal == false) cutover
+   shims.  Thin wrappers over C-only helpers the Scheme body
+   (mod/emacs/interrupt.scm quit-throw-to-read-char) needs but that
+   have no Scheme port.  See brief.org M26 imp-2.  */
+DEFUN ("--clear-input-available-clear-time!",
+       Fc_clear_input_available_clear_time,
+       Sc_clear_input_available_clear_time, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: clear the C global
+input_available_clear_time.  This is the other half of the real
+clear_waiting_for_input (src/keyboard.c:11153); the existing
+--clear-waiting-for-input (src/keyboard.c:2103) only clears
+waiting_for_input, not input_available_clear_time.  The Scheme
+quit-throw-to-read-char calls this together with --clear-waiting-for-input
+to reproduce clear_waiting_for_input's full effect without touching
+either existing function.  */)
+  (void)
+{
+  input_available_clear_time = 0;
+  return Qnil;
+}
+
+DEFUN ("--switch-to-frame!", Fc_switch_to_frame, Sc_switch_to_frame, 1, 1, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: switch the selected
+frame to FRAME by calling do_switch_frame (make_lispy_switch_frame
+(frame), 0, 0, Qnil) — NO-QUIT/PREVIOUS/STEAL all false.  Wraps both
+C-only helpers in one call; no Scheme port exists for do_switch_frame
+or make_lispy_switch_frame (frame.c / keyboard.c internals).  The
+Scheme quit-throw-to-read-char does its own FRAMEP + EQ guard and calls
+this shim only when a switch is needed.  */)
+  (Lisp_Object frame)
+{
+  do_switch_frame (make_lispy_switch_frame (frame), 0, 0, Qnil);
+  return Qnil;
+}
+
 /* Handle a C-g by making read_char return C-g.  */
 
 static void
 quit_throw_to_read_char (bool from_signal)
 {
-  /* When not called from a signal handler it is safe to call
-     Lisp.  */
-  if (!from_signal && EQ (Vquit_flag, Qkill_emacs))
-    Fkill_emacs (Qnil, Qnil);
+  if (from_signal)
+    {
+      /* M26 imp-2: real-signal path stays C.  Never call into Guile
+         from the SIGINT handler (signal-handler-no-guile-vm-call,
+         docs/kb.org).  Straight-line copy of the pre-imp-2 body —
+         do not rewrite it, only relocate it under this guard.  */
+      clear_waiting_for_input ();
+      input_pending = false;
 
-  /* Prevent another signal from doing this before we finish.  */
-  clear_waiting_for_input ();
-  input_pending = false;
+      Vunread_command_events = Qnil;
 
-  Vunread_command_events = Qnil;
+      if (FRAMEP (internal_last_event_frame)
+          && !EQ (internal_last_event_frame, selected_frame))
+        do_switch_frame (make_lispy_switch_frame (internal_last_event_frame),
+                         0, 0, Qnil);
 
-  if (FRAMEP (internal_last_event_frame)
-      && !EQ (internal_last_event_frame, selected_frame))
-    do_switch_frame (make_lispy_switch_frame (internal_last_event_frame),
-		     0, 0, Qnil);
+      abort_to_prompt (getctag, SCM_EOL);
+    }
 
-  abort_to_prompt (getctag, SCM_EOL);
+  /* M26 imp-2: normal-context path -> (emacs interrupt)
+     quit-throw-to-read-char.  See brief.org M26 imp-2.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs interrupt", "quit-throw-to-read-char");
+  SCM_CALL_0 (proc);
+  emacs_abort ();  /* Not reached: the Scheme body ends in abort-to-prompt.  */
 }
 
 DEFUN ("set-input-interrupt-mode", Fset_input_interrupt_mode,
