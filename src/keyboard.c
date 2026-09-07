@@ -11013,40 +11013,11 @@ On such systems, calling this function with non-nil STUFFSTRING might
 either signal an error or silently fail to stuff the characters.  */)
   (Lisp_Object stuffstring)
 {
-  dynwind_begin ();
-  int old_height, old_width;
-  int width, height;
-
-  if (tty_list && tty_list->next)
-    error ("There are other tty frames open; close them before suspending Emacs");
-
-  if (!NILP (stuffstring))
-    CHECK_STRING (stuffstring);
-
-  run_hook (Qsuspend_hook);
-
-  get_tty_size (fileno (CURTTY ()->input), &old_width, &old_height);
-  reset_all_sys_modes ();
-  /* sys_suspend can get an error if it tries to fork a subshell
-     and the system resources aren't available for that.  */
-  record_unwind_protect_void (init_all_sys_modes);
-  stuff_buffered_input (stuffstring);
-  if (cannot_suspend)
-    sys_subshell ();
-  else
-    sys_suspend ();
-  dynwind_end ();
-
-  /* Check if terminal/window size has changed.
-     Note that this is not useful when we are running directly
-     with a window system; but suspend should be disabled in that case.  */
-  get_tty_size (fileno (CURTTY ()->input), &width, &height);
-  if (width != old_width || height != old_height)
-    change_frame_size (SELECTED_FRAME (), width, height, false, false, false);
-
-  run_hook (Qsuspend_resume_hook);
-
-  return Qnil;
+  /* M26 imp-1: dispatch to (emacs interrupt) -- see brief.org M26 imp-1.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs interrupt", "suspend-emacs");
+  return SCM_CALL_1 (proc, stuffstring);
 }
 
 /* If STUFFSTRING is a string, stuff its contents as pending terminal input.
@@ -11767,6 +11738,53 @@ no-op on DOS_NT.  */)
 #ifndef DOS_NT
   init_all_sys_modes ();
 #endif
+  return Qnil;
+}
+
+DEFUN ("--multiple-tty-frames?", Fc_multiple_tty_frames_p,
+       Sc_multiple_tty_frames_p, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: return t if more than one
+tty is open (tty_list has a next element), else nil.  Ports the
+`if (tty_list && tty_list->next) error (...)' guard in the old
+Fsuspend_emacs body; tty_list is a raw C global (src/term.c) not
+Lisp-visible any other way.  */)
+  (void)
+{
+  return (tty_list && tty_list->next) ? Qt : Qnil;
+}
+
+DEFUN ("--tty-size", Fc_tty_size, Sc_tty_size, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: return the controlling
+tty's current size as (WIDTH . HEIGHT) fixnums.  Wraps the
+get_tty_size (fileno (CURTTY ()->input), &width, &height) call the old
+Fsuspend_emacs made (both before and after the suspend).  */)
+  (void)
+{
+  int width, height;
+  get_tty_size (fileno (CURTTY ()->input), &width, &height);
+  return Fcons (make_fixnum (width), make_fixnum (height));
+}
+
+DEFUN ("--sys-subshell", Fc_sys_subshell, Sc_sys_subshell, 0, 0, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: run a subshell via
+sys_subshell (), return nil.  Mirrors the --sys-suspend shim for the
+cannot_suspend branch of the ported suspend-emacs.  Only smoke-tested,
+never exercised in the test suite (it would stop or fork the runner).  */)
+  (void)
+{
+  sys_subshell ();
+  return Qnil;
+}
+
+DEFUN ("--change-frame-size", Fc_change_frame_size, Sc_change_frame_size,
+       2, 2, 0,
+       doc: /* FIX-20260907-guilemacs: Internal: resize SELECTED_FRAME to
+WIDTH x HEIGHT.  Hardcodes PRETEND/DELAY/SAFE = false, which is always
+the case at the single (old Fsuspend_emacs) call site.  */)
+  (Lisp_Object width, Lisp_Object height)
+{
+  change_frame_size (SELECTED_FRAME (), XFIXNUM (width), XFIXNUM (height),
+                     false, false, false);
   return Qnil;
 }
 
