@@ -127,6 +127,12 @@ prompt tag minted by read-char-init-state."
               ;;    dynamic-wind, never save/restore at return (Risk 1):
               ;;    getctag is the inhibit-quit-style state here, and
               ;;    the after-thunk must run even on a quit throw.
+              ;;    (M28 imp-3: NOT collapsed to set-ctag-returns-old —
+              ;;    --set-ctag documents "return TAG" (mirrors
+              ;;    set-current-kboard) and test-m12-shims.scm pins that
+              ;;    contract (ctag/set-returns-tag); set-and-return-old
+              ;;    would break it.  Recorded in docs/m28-plan.org
+              ;;    §imp-3.  Kept as 3 crossings.)
               (dynamic-wind
                 (lambda ()
                   ;; C :3159-3161: getctag = local_tag; if (!end_time)

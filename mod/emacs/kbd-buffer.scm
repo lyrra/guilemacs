@@ -39,6 +39,13 @@
   #:use-module ((emacs event-modifiers)
                 #:select (make-ctrl-char ctrl-modifier meta-modifier
                           alt-modifier hyper-modifier super-modifier))
+  ;; M28 imp-3 — cut the wait-path forwarders over to the direct
+  ;; Scheme calls they already re-dispatch to (a C shim that only does
+  ;; scm_c_public_ref + call is a double hop).  Both modules import
+  ;; kbd-buffer state only lazily (delay module-ref), so this eager
+  ;; import is cycle-free.
+  #:use-module ((emacs read-key-sequence) #:select (some-mouse-moved))
+  #:use-module ((emacs gobble) #:select (gobble-input!))
   #:declarative? #t
   #:export (kbd-buffer-get-event
             noninteractive-fast-path?
@@ -81,6 +88,10 @@
 (defelisp %--detect-conversion-events   --detect-conversion-events)
 (defelisp %--kbd-fetch-ptr-index        --kbd-fetch-ptr-index)
 (defelisp %--kbd-store-ptr-index        --kbd-store-ptr-index)
+;; M28 imp-3 — batched ring-cursor empty test (see src/keyboard.c).
+;; An imp-3 attempt also added --kbd-peek-event; it was removed after
+;; it regressed the bench (cr.org F3).  See dispatch-event! below.
+(defelisp %--kbd-empty-p                --kbd-empty-p)
 (defelisp %--some-mouse-moved           --some-mouse-moved)
 (defelisp %--quit-throw-to-read-char    --quit-throw-to-read-char)
 (defelisp %--gobble-input               --gobble-input)
@@ -369,6 +380,16 @@ re-enter the wait loop for swallowed kinds; KBOARD is the F1 kboard
 prologue as a value, cr.org); USED-MOUSE-MENU is #t when a
 menu-bar / tab-bar / tool-bar / NS-nonkey event was dispatched.  The
 caller (kbd-buffer-get-event) guarantees a non-empty queue."
+  ;; M28 imp-3: the dispatch prologue stays as three scalar crossings
+  ;; (fetch-ptr-index + event-kind + event-ie).  An early attempt
+  ;; batched them into one --kbd-peek-event returning (values idx kind
+  ;; ie), but that added a scm_values list + call-with-values +
+  ;; re-list allocation on top of the single (unavoidable) ie_wrap smob
+  ;; and measured as a bench REGRESSION (median 5.0 -> 6.0 us,
+  ;; cr.org F3).  The smob allocation dominates; batching the two
+  ;; near-free make_fixnum reads with it loses.  Keep the scalar reads;
+  ;; only --kbd-empty-p (the queue-empty tests) stayed batched — one
+  ;; atomic C compare beats two index reads with no allocation.
   (let* ((idx ((force %--kbd-fetch-ptr-index)))
          (kind ((force %--kbd-event-kind) idx))
          (ie ((force %--kbd-event-ie) idx))
@@ -883,10 +904,9 @@ adapter is gone)."
          ((truthy? ((force %--detect-conversion-events)))
           (set! had-conv #t)
           'conv)
-         ((not (= ((force %--kbd-fetch-ptr-index))
-                  ((force %--kbd-store-ptr-index))))
+         ((not (truthy? ((force %--kbd-empty-p))))
           'queue)
-         ((truthy? ((force %--some-mouse-moved))) 'mouse)
+         ((truthy? (some-mouse-moved)) 'mouse)
          ((truthy? (symbol-value 'quit-flag))
           ((force %--quit-throw-to-read-char)))   ; never returns
          (else #f)))
@@ -894,10 +914,9 @@ adapter is gone)."
       ;; C 5095-5104 — post-gobble re-checks (selection requests join).
       (define (second-check)
         (cond
-         ((not (= ((force %--kbd-fetch-ptr-index))
-                  ((force %--kbd-store-ptr-index))))
+         ((not (truthy? ((force %--kbd-empty-p))))
           'queue)
-         ((truthy? ((force %--some-mouse-moved))) 'mouse)
+         ((truthy? (some-mouse-moved)) 'mouse)
          ((truthy? ((force %--x-detect-pending-selection-requests)))
           (set! had-sel #t)
           'sel)
@@ -937,9 +956,8 @@ adapter is gone)."
       ;; the queue is still empty (the wait may have stuffed events).
       (define (cbreak-gobble!)
         (when (and (eq? ((force %--interrupt-input-p)) #nil)
-                   (= ((force %--kbd-fetch-ptr-index))
-                      ((force %--kbd-store-ptr-index))))
-          ((force %--gobble-input))))
+                   (truthy? ((force %--kbd-empty-p))))
+          (gobble-input!)))
 
       ;; C 5142-5182 — post-wait prologue.  Order is exact: selection
       ;; handling, then the Vunread drain (outranks everything — a
@@ -980,8 +998,7 @@ adapter is gone)."
                               (eq? (symbol-value 'text-conversion-edits) #nil))
                           #nil
                           'text-conversion))
-                    (if (not (= ((force %--kbd-fetch-ptr-index))
-                                ((force %--kbd-store-ptr-index))))
+                    (if (not (truthy? ((force %--kbd-empty-p))))
                         (call-with-values (lambda () (dispatch-event!))
                           (lambda (ev kb umm)
                             ;; F1: adopt the dispatched event's kboard;
@@ -999,7 +1016,7 @@ adapter is gone)."
                         ;; else aborts.  mouse-motion-synthesize! itself
                         ;; re-checks some_mouse_moved and aborts when no
                         ;; frame has pending movement (C 5568-5571).
-                        (if (or (truthy? ((force %--some-mouse-moved)))
+                        (if (or (truthy? (some-mouse-moved))
                                 (not had-sel))
                             ;; F2 (cr.org): C 5524 sets *kbp = current_kboard
                             ;; inside the mouse-motion branch before the hook
@@ -1033,7 +1050,7 @@ adapter is gone)."
                   ;; compiled unconditionally in this tree; the C
                   ;; USABLE_SIGIO/SIGPOLL #ifdef is a
                   ;; micro-optimization).
-                  ((force %--gobble-input))
+                  (gobble-input!)
                   (let ((exit (second-check)))
                     (if exit
                         (let ((r (post-wait)))

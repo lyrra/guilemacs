@@ -1088,6 +1088,28 @@ Handles wrap-around (kbd_store_ptr may have wrapped past KBD_BUFFER_SIZE).  */)
   return make_fixnum (n + (n < 0 ? KBD_BUFFER_SIZE : 0));
 }
 
+/* M28 imp-3 — batched ring-cursor EMPTY test.  Replaces two separate
+   Scheme→C crossings (fetch-index + store-index) on the queue-empty
+   path with one atomic C comparison.  Pure C read (no advance, no
+   side effect).
+
+   An early imp-3 attempt also added --kbd-peek-event (fetch index +
+   kind copy + ie-smob in one call) to batch the dispatch prologue.
+   It was REMOVED after measurement (cr.org F3): it allocated a
+   scm_values list + call-with-values + re-list on top of the single
+   (unavoidable) ie_wrap smob and regressed the bench median 5.0 ->
+   6.0 us.  The dispatch prologue stays three scalar crossings.  */
+
+DEFUN ("--kbd-empty-p", Fkbd_empty_p, Skbd_empty_p, 0, 0, 0,
+       doc: /* Return t when the kbd_buffer queue is empty, else nil.
+
+One atomic C read of both ring cursors — more correct than comparing
+two separate --kbd-fetch-ptr-index / --kbd-store-ptr-index reads.  */)
+  (void)
+{
+  return (kbd_fetch_ptr == kbd_store_ptr) ? Qt : Qnil;
+}
+
 DEFUN ("--some-mouse-moved", Fsome_mouse_moved, Ssome_mouse_moved, 0, 0, 0,
        doc: /* Return the frame that has pending mouse movement, or nil.
 
