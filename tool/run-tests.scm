@@ -135,6 +135,7 @@
   "test/keyboard/test-m27-single-kboard.el"   ; M27 imp-1 single-kboard (corpus prints PASS/FAIL)
   "test/keyboard/test-m27-kboard-lifecycle.el" ; M27 imp-2 kboard lifecycle (corpus prints PASS/FAIL)
   "test/keyboard/test-m27-init-keyboard.el"    ; M27 imp-3 init_keyboard resets (corpus prints PASS/FAIL)
+  "test/keyboard/test-m27-ring-storage.el"     ; M27 imp-4 ring storage store->get->dispatch (corpus prints PASS/FAIL)
   "test/keyboard/test-m12-umm.el"             ; M12 imp-1+imp-2 (used-mouse-menu flag corpus)
   )
 (group
