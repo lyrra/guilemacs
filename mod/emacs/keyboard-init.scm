@@ -21,9 +21,9 @@
 ;;; and DEFUN registration are both complete before the first dispatch.
 ;;; No early-init hazard.
 ;;;
-;;; virtual_core_pointer_name / virtual_core_keyboard_name stay C
-;;; (dead-write, reclaimed at imp-5): they are never read in C and
-;;; Scheme uses its own string constants.
+;;; virtual_core_pointer_name / virtual_core_keyboard_name were C
+;;; static dead-writes, reclaimed at imp-5.  They are never read in C;
+;;; Scheme uses its own string constants (emacs kbd-buffer).
 
 (define-module (emacs keyboard-init)
   #:use-module (emacs elisp-ref)      ; %c, defelisp

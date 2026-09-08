@@ -60,9 +60,10 @@
 ;; (next_kbd_event, keyboard.c:409).
 (define KBD-BUFFER-SIZE 4096)
 
-;;; Virtual-core device names.  static Lisp_Object strings in C
-;;; (keyboard.c:13690-13691) with no DEFUN/DEFVAR — hardcoded here with
-;;; a comment; the values silently diverge only if C changes them.
+;;; Virtual-core device names.  Owned here in Scheme since M27 imp-5
+;;; (the former C static Lisp_Object mirrors and their staticpro /
+;;; dead-write were reclaimed).  These are plain strings, no DEFUN/
+;;; DEFVAR, used only by the device-tracking code below.
 (define VIRTUAL-CORE-KEYBOARD-NAME "Virtual core keyboard")
 (define VIRTUAL-CORE-POINTER-NAME  "Virtual core pointer")
 

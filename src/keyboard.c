@@ -355,11 +355,6 @@ static struct timespec timer_idleness_start_time;
 
 static struct timespec timer_last_idleness_start_time;
 
-/* Predefined strings for core device names.  */
-
-static Lisp_Object virtual_core_pointer_name;
-static Lisp_Object virtual_core_keyboard_name;
-
 /* If not nil, ID of the last TOUCHSCREEN_END_EVENT to land on the
    menu bar.  */
 static Lisp_Object menu_bar_touch_id;
@@ -4907,8 +4902,8 @@ DEFUN ("--frame-last-mouse-device", Fc_frame_last_mouse_device,
        doc: /* Internal: return FRAME's last_mouse_device — the string
    name of the last input device to move over FRAME, or nil/other when
    it is the virtual core pointer.  Returns nil when FRAME is not a
-   frame.  Used by imp-4 device tracking (the STRINGP test against
-   virtual_core_pointer_name).  */)
+   frame.  Used by imp-4 device tracking (compare against Scheme
+   (emacs kbd-buffer) VIRTUAL-CORE-POINTER-NAME).  */)
   (Lisp_Object frame)
 {
   if (!FRAMEP (frame))
@@ -12259,13 +12254,6 @@ init_keyboard (void)
     proc = scm_c_public_ref ("emacs keyboard-init", "init-keyboard!");
   SCM_CALL_0 (proc);
 
-  /* FIX-20260908-guilemacs: dead-write — virtual_core_pointer_name and
-     virtual_core_keyboard_name are staticpro'd and assigned here but
-     never read in C; Scheme keeps its own string constants
-     (mod/emacs/kbd-buffer.scm).  Reclaim at imp-5.  */
-  virtual_core_pointer_name = build_string ("Virtual core pointer");
-  virtual_core_keyboard_name = build_string ("Virtual core keyboard");
-
   current_kboard = initial_kboard;
   /* Re-initialize the keyboard again.  */
   wipe_kboard (current_kboard);
@@ -12604,12 +12592,6 @@ syms_of_keyboard (void)
   /* M24: poll_timer_time moved to (emacs input-poll) as the Scheme
      module cache *poll-timer-period*; nothing to staticpro here.  */
 #endif
-
-  virtual_core_pointer_name = Qnil;
-  staticpro (&virtual_core_pointer_name);
-
-  virtual_core_keyboard_name = Qnil;
-  staticpro (&virtual_core_keyboard_name);
 
   menu_bar_touch_id = Qnil;
   staticpro (&menu_bar_touch_id);
