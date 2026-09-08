@@ -678,9 +678,7 @@ unrecognized kind aborts."
 (defelisp %--menu-bar-touch-id --menu-bar-touch-id)
 (defelisp %--set-menu-bar-touch-id --set-menu-bar-touch-id)
 (defelisp %--coords-in-menu-bar-window --coords-in-menu-bar-window)
-(defelisp %--tab-bar-enrich-position --tab-bar-enrich-position)
 (defelisp %--menu-bar-touch-consume-p --menu-bar-touch-consume-p)
-(defelisp %--menu-bar-touch-activate --menu-bar-touch-activate)
 
 (define (mle-touchscreen-begin-event ie)
   ;; C body (keyboard.c:7260–7335): frame-live → menu-bar
@@ -701,7 +699,7 @@ unrecognized kind aborts."
               (let* ((pos (make-lispy-position
                            fow x y
                            ((force %--ie-timestamp) ie)))
-                     (pos ((force %--tab-bar-enrich-position)
+                     (pos (tab-bar-enrich-position
                            fow x y pos)))
                 (list 'touchscreen-begin (cons id pos))))))))
 
@@ -723,13 +721,13 @@ unrecognized kind aborts."
           ;; or finger slid off, return nil (C behavior).
           (if ((force %--menu-bar-touch-consume-p) id)
               ;; Consumed — activate or return nil.
-              ((force %--menu-bar-touch-activate)
+              (menu-bar-touch-activate
                fow x y fow ((force %--ie-timestamp) ie))
               ;; Not consumed — normal touch-end path.
               (let* ((pos (make-lispy-position
                            fow x y
                            ((force %--ie-timestamp) ie)))
-                     (pos ((force %--tab-bar-enrich-position)
+                     (pos (tab-bar-enrich-position
                            fow x y pos)))
                 (list 'touchscreen-end (cons id pos)
                       (if (not (zero? ((force %--ie-modifiers) ie)))
@@ -774,8 +772,6 @@ unrecognized kind aborts."
 
 (define %--ensure-button-down-location-size
   (delay (%c '--ensure-button-down-location-size)))
-(define %--mouse-click-menu-bar-intercept
-  (delay (%c '--mouse-click-menu-bar-intercept)))
 
 ;;; imp-7.5.2 — double-click detection (pure read, no mutations).
 ;;;
@@ -1022,7 +1018,7 @@ unrecognized kind aborts."
           ;; Step 1: menu-bar intercept (mouse-kind only).
           (if (eq? kind-tag 'mouse)
               (let ((mb-event
-                     ((force %--mouse-click-menu-bar-intercept)
+                     (mouse-click-menu-bar-intercept
                       fow x y mods ts fow)))
                 (if mb-event mb-event
                     ;; Not on menu bar — continue.

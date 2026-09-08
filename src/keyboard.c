@@ -6611,8 +6611,8 @@ DEFUN ("--menu-bar-hpos-vpos-raw", Fmenu_bar_hpos_vpos_raw_shim,
        Smenu_bar_hpos_vpos_raw_shim, 3, 3, 0,
        doc: /* FIX-20260829-guilemacs: internal: return (COLUMN . ROW)
 for the menu-bar WINDOW at frame-relative pixel (IX, IY), with NO
-FRAME_TO_WINDOW_PIXEL conversion.  Matches the raw call in the C
---menu-bar-touch-activate body: same compile guard and same
+FRAME_TO_WINDOW_PIXEL conversion.  Matches the raw call in the Scheme
+menu-bar-touch-activate port (emacs lispy-position): same compile guard and same
 NILP (menu_bar_window) short-circuit.  Used by the Scheme
 menu-bar-touch-activate port (M20, imp-4).  */)
   (Lisp_Object window, Lisp_Object ix, Lisp_Object iy)
@@ -6686,33 +6686,6 @@ Returns nil on platforms without a non-toolkit menu bar
 #endif
 }
 
-DEFUN ("--tab-bar-enrich-position", Ftab_bar_enrich_position,
-       Stab_bar_enrich_position, 4, 4, 0,
-       doc: /* If frame-relative (X, Y) falls inside FRAME's tab bar,
-enrich POSITION with the tab-bar item's propertized string.
-
-FRAME must be a live frame.  X and Y are fixnums (pixel coords).
-POSITION is the result of make-lispy-position.  Returns the enriched
-position (with propertized-string object appended) if a tab-bar
-item exists at (X, Y); returns POSITION unchanged otherwise.
-
-On builds without HAVE_WINDOW_SYSTEM, always returns POSITION
-unchanged.  */)
-  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
-   Lisp_Object position)
-{
-#ifdef HAVE_WINDOW_SYSTEM
-  static SCM proc = SCM_UNDEFINED;
-  CHECK_LIVE_FRAME (frame);
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position",
-			     "tab-bar-enrich-position");
-  return SCM_CALL_4 (proc, frame, x, y, position);
-#else
-  return position;
-#endif
-}
-
 DEFUN ("--menu-bar-touch-consume-p", Fmenu_bar_touch_consume_p,
        Smenu_bar_touch_consume_p, 1, 1, 0,
        doc: /* Return t if TOUCH-ID matches menu_bar_touch_id,
@@ -6736,37 +6709,6 @@ On platforms without a non-toolkit menu bar, always returns nil.  */)
     }
 #endif
   return Qnil;
-}
-
-DEFUN ("--menu-bar-touch-activate", Fmenu_bar_touch_activate,
-       Smenu_bar_touch_activate, 5, 5, 0,
-       doc: /* Activate the menu-bar item at frame-relative (X, Y)
-on FRAME and return the event (ITEM . POSITION).
-
-Call only after --menu-bar-touch-consume-p returned t.
-FRAME is a live frame.  X and Y are fixnum pixel coords.
-FOW is the original event->frame_or_window (for position building).
-TIMESTAMP is the event timestamp (already INT_TO_INTEGER'd).
-
-Returns nil if no menu-bar item is found at (X, Y)
-(e.g. finger slid off, menu-bar hidden between BEGIN and END).
-On non-menu-bar platforms, always returns nil.  */)
-  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
-   Lisp_Object fow, Lisp_Object timestamp)
-{
-#if defined HAVE_WINDOW_SYSTEM && !defined HAVE_EXT_MENU_BAR
-  static SCM proc = SCM_UNDEFINED;
-  CHECK_LIVE_FRAME (frame);
-  CHECK_FIXNUM (x);
-  CHECK_FIXNUM (y);
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position",
-                             "menu-bar-touch-activate");
-  SCM argv[5] = { frame, x, y, fow, timestamp };
-  return SCM_CALL_N (proc, argv, 5);
-#else
-  return Qnil;
-#endif
 }
 
 /* imp-7.1 — file-static getter/setter DEFUNs for double-click
@@ -6951,39 +6893,6 @@ lockstep (same C pattern at keyboard.c:6946-6948).  */)
       mouse_syms = larger_vector (mouse_syms, incr, -1);
     }
   return Qnil;
-}
-
-DEFUN ("--mouse-click-menu-bar-intercept",
-       Fmouse_click_menu_bar_intercept,
-       Smouse_click_menu_bar_intercept, 6, 6, 0,
-       doc: /* If the click at frame-relative (X, Y) on FRAME is on
-the menu bar (non-toolkit build), return the menu-bar item
-event (ITEM . POSITION).  Returns nil otherwise.
-
-FRAME is a live frame.  X and Y are fixnum pixel coords.
-MODIFIERS is the event modifier bitmask (must have down_modifier
-for menu-bar activation).  TIMESTAMP is the event timestamp
-(already INT_TO_INTEGER'd).  FOW is event->frame_or_window.
-
-Encapsulates the whole non-toolkit menu-bar intercept (toolkit check,
-down-modifier check, coordinate conversion, and menu-bar item
-iteration), which now lives in (emacs lispy-position)
-mouse-click-menu-bar-intercept.  On toolkit builds, returns nil.  */)
-  (Lisp_Object frame, Lisp_Object x, Lisp_Object y,
-   Lisp_Object modifiers, Lisp_Object timestamp, Lisp_Object fow)
-{
-  static SCM proc = SCM_UNDEFINED;
-  CHECK_LIVE_FRAME (frame);
-  CHECK_FIXNUM (x);
-  CHECK_FIXNUM (y);
-  CHECK_FIXNUM (modifiers);
-  if (SCM_UNBNDP (proc))
-    proc = scm_c_public_ref ("emacs lispy-position",
-			     "mouse-click-menu-bar-intercept");
-  {
-    SCM argv[6] = { frame, x, y, modifiers, timestamp, fow };
-    return SCM_CALL_N (proc, argv, 6);
-  }
 }
 
 DEFUN ("--ignore-mouse-drag-p", Fignore_mouse_drag_p,
