@@ -11166,6 +11166,50 @@ is pending.  */)
   return Qnil;
 }
 
+/* M27 imp-3 — three absolute reset shims for init_keyboard.  Each
+   existing reset accessor is only a getter or a delta step; the
+   init_keyboard port needs an absolute write, so these three cells get
+   dedicated shims (brief.org M27 imp-3).  */
+
+DEFUN ("--command-loop-level-set!", Fc_command_loop_level_set,
+       Sc_command_loop_level_set, 1, 1, 0,
+       doc: /* FIX-20260908-guilemacs: Internal: hard-set the C global
+`command_loop_level' to N (a fixnum).  init_keyboard needs the absolute
+-1; the existing increment!/decrement! pair only step the counter.
+Returns nil.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  command_loop_level = XFIXNUM (n);
+  return Qnil;
+}
+
+DEFUN ("--timer-idleness-reset!", Fc_timer_idleness_reset,
+       Sc_timer_idleness_reset, 0, 0, 0,
+       doc: /* FIX-20260908-guilemacs: Internal: reset
+timer_idleness_start_time to invalid_timespec ().  The only existing
+shim --timer-idleness-now is a getter (elapsed idle) and cannot reset;
+init_keyboard is where the absolute invalid write happens.  Returns
+nil.  */)
+  (void)
+{
+  timer_idleness_start_time = invalid_timespec ();
+  return Qnil;
+}
+
+DEFUN ("--interrupt-input-blocked-set!", Fc_interrupt_input_blocked_set,
+       Sc_interrupt_input_blocked_set, 1, 1, 0,
+       doc: /* FIX-20260908-guilemacs: Internal: hard-set the volatile
+int `interrupt_input_blocked' to N (a fixnum).  blockinput.h only
+increments/decrements it; init_keyboard is the one place that needs an
+absolute 0.  Returns nil.  */)
+  (Lisp_Object n)
+{
+  CHECK_FIXNUM (n);
+  interrupt_input_blocked = XFIXNUM (n);
+  return Qnil;
+}
+
 
 void
 set_waiting_for_input (struct timespec *time_to_clear)
@@ -12202,35 +12246,25 @@ void
 init_keyboard (void)
 {
   /* This is correct before outermost invocation of the editor loop.  */
-  command_loop_level = -1;
-  quit_char = Ctl ('g');
-  Vunread_command_events = Qnil;
-  /* getctag is a static Lisp_Object: zero-init leaves it the invalid
-     SCM 0, not Qnil (guilemacs Qnil is non-nil).  Initialize it so
-     --get-ctag and the deleted C main-queue read see the elisp nil
-     sentinel when no read is in flight.  */
-  getctag = Qnil;
-  last_command_event = Qnil;
-  last_nonmenu_event = Qnil;
-  last_input_event = Qnil;
-  timer_idleness_start_time = invalid_timespec ();
-  total_keys = 0;
-  recent_keys_index = 0;
-  kbd_fetch_ptr = kbd_buffer;
-  kbd_store_ptr = kbd_buffer;
-  track_mouse = Qnil;
-  input_pending = false;
-  interrupt_input_blocked = 0;
-  pending_signals = false;
+  /* Dispatch the 19 file-static resets to Scheme (brief.org M27 imp-3).
+     init_keyboard runs from src/emacs.c after load_guile_prelude and
+     syms_of_keyboard, so (emacs keyboard-init) is loaded and its C
+     DEFUNs are registered when this dispatcher fires (no
+     early-init-c-body-before-defun-registration hazard).  Each reset
+     cell is written by init-keyboard! in C order.  The C body keeps
+     only the current-kboard re-init, the sigaction installs, and the
+     signal / poll arms below.  */
+  static SCM proc = SCM_UNDEFINED;
+  if (SCM_UNBNDP (proc))
+    proc = scm_c_public_ref ("emacs keyboard-init", "init-keyboard!");
+  SCM_CALL_0 (proc);
 
+  /* FIX-20260908-guilemacs: dead-write — virtual_core_pointer_name and
+     virtual_core_keyboard_name are staticpro'd and assigned here but
+     never read in C; Scheme keeps its own string constants
+     (mod/emacs/kbd-buffer.scm).  Reclaim at imp-5.  */
   virtual_core_pointer_name = build_string ("Virtual core pointer");
   virtual_core_keyboard_name = build_string ("Virtual core keyboard");
-  Vlast_event_device = Qnil;
-
-  /* This means that command_loop_1 won't try to select anything the first
-     time through.  */
-  internal_last_event_frame = Qnil;
-  Vlast_event_frame = internal_last_event_frame;
 
   current_kboard = initial_kboard;
   /* Re-initialize the keyboard again.  */
